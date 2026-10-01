@@ -26,12 +26,12 @@ const APP_NAME = 'Awana Lobby Display';
 // runs on) and use a scratch profile (AWANA_LOBBY_USERDATA); a packaged
 // install ignores all three.
 const DEV = !app.isPackaged;
-const SITE = (DEV && process.env.AWANA_LOBBY_SITE) || 'https://patrick-simpson.github.io/Awana-Check-in-Display/';
+const SITE = (DEV && process.env.AWANA_LOBBY_SITE) || 'https://awana.kvbchurch.org/lobby/';
 const PAGE_URL = new URL('index.html', SITE).href;
 const SCHEDULE_URL = new URL('shared/schedule.json', SITE).href;
 const FEED_URL = new URL('calendar-feed.json', SITE).href;
 const SITE_ORIGIN = new URL(SITE).origin;
-// patrick-simpson.github.io also serves Journey Display and the printer's
+// awana.kvbchurch.org also serves Journey Display and the printer's
 // site: the lobby window stays on THIS site's pages, which own its storage.
 const SITE_PATH = new URL(SITE).pathname;
 const CLOCK_OFFSET = (() => {

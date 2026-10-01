@@ -42,7 +42,10 @@ const shortHash = (file) => createHash('sha256').update(readFileSync(file)).dige
 const localRefs = (page) =>
   [...page.matchAll(/\s(?:src|href)=["']([^"']*)["']/g)]
     .map((m) => m[1])
-    .filter((url) => url && !/^(?:[a-z][a-z\d+.-]*:|\/\/|#)/i.test(url));
+    .filter((url) => url && !/^(?:[a-z][a-z\d+.-]*:|\/\/|#)/i.test(url))
+    // ../lobby/ is the other app on the one site (the embedded display),
+    // not one of this page's assets, so the stamp leaves it alone.
+    .filter((url) => !url.startsWith('../'));
 
 /* The stamped page must carry ?v=<build> on every local reference the plain
    page has: the wordmark appears twice (the placeholder and the splash), so

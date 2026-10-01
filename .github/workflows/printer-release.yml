@@ -1,0 +1,557 @@
+name: Release Club Label Printer
+
+# One workflow cuts a printer release end to end. Run it from the Actions tab
+# (or `gh workflow run printer-release.yml -f version=6.22.0`), with the
+# version in printer/VERSION and printer/electron-app/package.json, no "v".
+#
+# It replaces the old repo's two workflows (create-release-tag.yml, which
+# pushed the tag and then dispatched build-electron.yml against it, because a
+# tag pushed by GITHUB_TOKEN fires no push trigger). Tag and build are jobs of
+# this one run now, chained with `needs`, so that dispatch -- and the
+# tag-only guards that existed because the build could also be started by
+# hand without a tag -- are gone. The tag is `printer-vX.Y.Z`: the monorepo
+# has several apps and only this one owns the `printer-` prefix.
+#
+# Update feed: installed printers read
+# https://awana.kvbchurch.org/updates/printer/latest.yml (electron-updater's
+# generic provider), NOT this repo's "Latest" release, which the printer and
+# the sound room app can no longer share. The installer and blockmap stay
+# release assets; the last job rewrites latest.yml to point at them by
+# absolute URL, commits it to site/updates/printer/ and dispatches ci.yml so
+# the site redeploys with it. Releases are therefore published with
+# make_latest: false. To undo a bad release, run printer-delete-release.yml
+# AND revert site/updates/printer/latest.yml.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release, e.g. 5.0.2 (no leading "v" and no "printer-v" prefix, both added automatically)'
+        required: true
+      ref:
+        description: 'Branch or commit to tag'
+        required: false
+        default: 'main'
+
+permissions:
+  contents: write   # create the tag and the release, commit the feed
+  actions: write    # dispatch ci.yml so the site redeploys with the new feed
+
+concurrency:
+  group: printer-release
+  cancel-in-progress: false
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    outputs:
+      sha: ${{ steps.tag.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+          fetch-depth: 0
+
+      - name: Validate version and create tag
+        id: tag
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Version must be X.Y.Z with no leading 'v' (got: '$VERSION')"
+            exit 1
+          fi
+          TAG="printer-v$VERSION"
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "::error::Tag $TAG already exists — bump to a new version instead of reusing one"
+            exit 1
+          fi
+          # Guard against releasing a build that doesn't match its own version
+          # bump (printer/VERSION is the single source of truth, kept in sync
+          # by printer/scripts/bump-version.cjs across the app).
+          REPO_VERSION="$(tr -d '[:space:]' < printer/VERSION)"
+          if [ "$REPO_VERSION" != "$VERSION" ]; then
+            echo "::error::printer/VERSION says $REPO_VERSION but you asked to release $VERSION — run printer/scripts/bump-version.cjs first"
+            exit 1
+          fi
+          PKG_VERSION="$(node -p "require('./printer/electron-app/package.json').version")"
+          if [ "$PKG_VERSION" != "$VERSION" ]; then
+            echo "::error::printer/electron-app/package.json says $PKG_VERSION but you asked to release $VERSION"
+            exit 1
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" -m "Release $TAG"
+          git push origin "$TAG"
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "### Created tag \`$TAG\`" >> "$GITHUB_STEP_SUMMARY"
+
+  # Gate the release on the test suites. Without this, `npm test` only ran on
+  # branch pushes and PRs (webpack.yml) — so a tag cut straight from a green
+  # main would still publish an .exe without re-verifying the trust model or
+  # the event contract. Cheap (~30s) next to the Windows build.
+  #
+  # Ubuntu on purpose: these suites are pure Node, and the security suite binds
+  # 0.0.0.0 and connects back over a non-loopback address, which is simpler
+  # without the Windows firewall involved.
+  test:
+    needs: tag
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.tag.outputs.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: |
+            printer/package-lock.json
+            printer/print-server/package-lock.json
+      - name: Install root dependencies
+        run: npm ci
+        working-directory: printer
+      - name: Install print-server dependencies
+        run: npm ci
+        working-directory: printer/print-server
+      - name: Run the test suites
+        run: npm test
+        working-directory: printer
+
+  build:
+    needs: [tag, test]
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.tag.outputs.sha }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: printer/electron-app/package-lock.json
+
+      # The full print server ships inside the installer via extraResources,
+      # INCLUDING its node_modules — without this install step the packaged
+      # app has no server dependencies at all. @napi-rs/canvas ships prebuilt
+      # N-API binaries, so this needs no build toolchain and the same modules
+      # load in both plain Node and Electron.
+      - name: Install print-server dependencies
+        run: npm ci --omit=dev
+        working-directory: printer/print-server
+
+      - name: Render smoke test (label pipeline works headless)
+        run: node scripts/render-smoke.cjs render-smoke-out
+        working-directory: printer
+
+      - name: Upload rendered label samples
+        uses: actions/upload-artifact@v4
+        with:
+          name: label-render-samples
+          path: printer/render-smoke-out/*.png
+          if-no-files-found: error
+
+      - name: Install electron-app dependencies
+        run: npm ci
+        working-directory: printer/electron-app
+
+      # Build only — publishing happens in the release job AFTER the installed
+      # exe passes the smoke test, so a broken build can never reach users.
+      - name: Build installer
+        run: npm run dist
+        working-directory: printer/electron-app
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Club-Label-Printer-Setup
+          path: |
+            printer/electron-app/dist/*.exe
+            printer/electron-app/dist/*.blockmap
+            printer/electron-app/dist/latest.yml
+          if-no-files-found: error
+
+  smoke-test:
+    needs: build
+    runs-on: windows-latest
+
+    steps:
+      - name: Download installer
+        uses: actions/download-artifact@v4
+        with:
+          name: Club-Label-Printer-Setup
+          path: installer
+
+      - name: Install silently
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem installer -Filter *.exe | Select-Object -First 1
+          $proc = Start-Process -FilePath $exe.FullName -ArgumentList '/S' -PassThru -Wait
+          Write-Host "Installer process exit code: $($proc.ExitCode)"
+
+          # electron-builder's one-click NSIS installer is a self-extracting
+          # stub that can hand off the real file copy to a detached child and
+          # return before that child finishes — a single Test-Path right after
+          # -Wait returns is a race (reproduced on two different runners).
+          # Poll for the app instead of assuming the exact path.
+          $deadline = (Get-Date).AddSeconds(60)
+          $installed = $null
+          while ((Get-Date) -lt $deadline) {
+            $found = Get-ChildItem "$env:LOCALAPPDATA\Programs" -Filter 'Club Label Printer.exe' -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+            if ($found) { $installed = $found.FullName; break }
+            Start-Sleep -Seconds 3
+          }
+
+          if (-not $installed) {
+            Write-Host "---- Diagnostics: $env:LOCALAPPDATA\Programs ----"
+            Get-ChildItem "$env:LOCALAPPDATA\Programs" -Recurse -ErrorAction SilentlyContinue |
+              Select-Object FullName | Format-Table -AutoSize | Out-String | Write-Host
+            Write-Host "---- Diagnostics: uninstall registry entries ----"
+            Get-ItemProperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*' -ErrorAction SilentlyContinue |
+              Where-Object { $_.DisplayName -like '*Label Printer*' } | Format-List | Out-String | Write-Host
+            throw "App exe never appeared under `$env:LOCALAPPDATA\Programs after 60s (installer exit code: $($proc.ExitCode))"
+          }
+
+          Write-Host "Installed app found at: $installed"
+          "INSTALLED_EXE=$installed" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      # Pre-seed config so the app starts the server instead of waiting in the
+      # first-run wizard. launchOnBoot off so the runner image stays clean.
+      #
+      # --user-data-dir pins Electron's userData folder explicitly instead of
+      # guessing where app.getPath('userData') lands: the install step above
+      # just proved the install directory uses package.json's "name" field
+      # (awana-label-printer — deliberately NOT renamed in the v5.9.0 "Club
+      # Label Printer" rebrand, see changes.md), not "productName" (now
+      # "Club Label Printer") as assumed — guessing the config/userData path
+      # the same way is the same class of bug. --user-data-dir is a native
+      # Electron/Chromium switch
+      # that app.getPath('userData') honors automatically, so this sidesteps
+      # the guess entirely. Stdout/stderr are captured so a future failure is
+      # diagnosable from logs instead of another blind guess.
+      - name: Seed config and launch
+        shell: pwsh
+        run: |
+          $ciDataDir = "$env:RUNNER_TEMP\awana-userdata"
+          New-Item -ItemType Directory -Force -Path $ciDataDir | Out-Null
+          @{ printerName = 'Microsoft Print to PDF'; checkinUrl = 'https://example.com/'; launchOnBoot = $false } |
+            ConvertTo-Json | Set-Content "$ciDataDir\config.json"
+          "CI_DATA_DIR=$ciDataDir" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          $launchTime = Get-Date
+          "APP_LAUNCH_TIME=$($launchTime.ToString('o'))" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          # Launch through cmd's OS-level file redirection, NOT PowerShell's
+          # -RedirectStandardOutput/-RedirectStandardError: those couple the
+          # app's stdout/stderr pipes to this step's pwsh process, so when the
+          # step exits moments later the pipes break and the app's next
+          # console write gets EPIPE — which kills a Node/Electron process
+          # (its uncaughtException handler writes to the equally-dead stderr).
+          # That matches the observed failure exactly: everything logged in
+          # the first seconds was captured, then the process silently
+          # vanished after this step ended. cmd hands the child real file
+          # handles that outlive everything.
+          $cmdProc = Start-Process cmd.exe `
+            -ArgumentList "/c", "`"`"$env:INSTALLED_EXE`" --auto-start --user-data-dir=`"$ciDataDir`" 1>`"$ciDataDir\stdout.log`" 2>`"$ciDataDir\stderr.log`"`"" `
+            -PassThru
+          # Resolve the actual app PID (cmd is just the launcher wrapper).
+          $appProc = $null
+          $findDeadline = (Get-Date).AddSeconds(30)
+          while ((Get-Date) -lt $findDeadline) {
+            $appProc = Get-Process 'Club Label Printer' -ErrorAction SilentlyContinue | Select-Object -First 1
+            if ($appProc) { break }
+            Start-Sleep -Milliseconds 500
+          }
+          if (-not $appProc) { throw "App process never appeared after launch (cmd wrapper PID $($cmdProc.Id), exited: $($cmdProc.HasExited))" }
+          "APP_PID=$($appProc.Id)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          Write-Host "Launched app PID $($appProc.Id) (via cmd wrapper $($cmdProc.Id))"
+
+      - name: Verify FULL server is up and serving
+        shell: pwsh
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: |
+          # Sample the process's liveness on every poll instead of only
+          # checking once at the end — a v5.0.2 run showed the server start
+          # and bind the port successfully, then the process was gone by the
+          # time of a single end-of-window check, with no way to tell when or
+          # why it died. This pinpoints the moment instead of guessing.
+          $deadline = (Get-Date).AddSeconds(90)
+          $health = $null
+          $diedAt = $null
+          while ((Get-Date) -lt $deadline) {
+            $alive = Get-Process -Id $env:APP_PID -ErrorAction SilentlyContinue
+            if (-not $alive -and -not $diedAt) {
+              $diedAt = Get-Date
+              $elapsed = [math]::Round(($diedAt - [datetime]$env:APP_LAUNCH_TIME).TotalSeconds, 1)
+              Write-Host "!! App process (PID $env:APP_PID) is no longer running — died ~${elapsed}s after launch"
+            }
+            try { $health = Invoke-RestMethod http://localhost:3456/health -TimeoutSec 3; break } catch { Start-Sleep 2 }
+          }
+          if (-not $health) {
+            Write-Host "---- Diagnostics: app stdout ----"
+            Get-Content "$env:CI_DATA_DIR\stdout.log" -ErrorAction SilentlyContinue | Write-Host
+            Write-Host "---- Diagnostics: app stderr ----"
+            Get-Content "$env:CI_DATA_DIR\stderr.log" -ErrorAction SilentlyContinue | Write-Host
+            Write-Host "---- Diagnostics: process liveness ----"
+            if ($diedAt) {
+              Write-Host "Process died at $diedAt (~$([math]::Round(($diedAt - [datetime]$env:APP_LAUNCH_TIME).TotalSeconds,1))s after launch); no /health response before or after."
+            } else {
+              Write-Host "Process (PID $env:APP_PID) was still running at timeout — server bound but never answered /health, or answered on a different interface."
+              Get-Process -Id $env:APP_PID -ErrorAction SilentlyContinue | Format-List | Out-String | Write-Host
+            }
+            Write-Host "---- Diagnostics: is anything listening on port 3456? ----"
+            Get-NetTCPConnection -LocalPort 3456 -ErrorAction SilentlyContinue | Format-Table -AutoSize | Out-String | Write-Host
+            Write-Host "---- Diagnostics: Windows Application event log (crash reports) ----"
+            Get-WinEvent -FilterHashtable @{ LogName = 'Application'; StartTime = [datetime]$env:APP_LAUNCH_TIME } -ErrorAction SilentlyContinue |
+              Where-Object { $_.Message -like '*Label Printer*' -or $_.ProviderName -like '*Application Error*' } |
+              Select-Object TimeCreated, Id, ProviderName, @{n='Message';e={$_.Message.Substring(0, [Math]::Min(500, $_.Message.Length))}} |
+              Format-List | Out-String | Write-Host
+            throw 'Server never answered /health'
+          }
+          Write-Host "Health: $($health | ConvertTo-Json -Compress)"
+          if ($health.status -ne 'ok') { throw "Unexpected health status: $($health.status)" }
+
+          # Version must match the version being released (guards a stale
+          # build). This workflow always releases, so there is no tag-less
+          # case to skip any more.
+          $expected = "$env:RELEASE_VERSION"
+          if ($health.version -ne $expected) { throw "Version mismatch: server=$($health.version) release=$expected" }
+
+          # The label brand kit (print-server/public/brand, shipped by
+          # extraResources' public/** filter) must have made it into the
+          # installed app. A label still prints without it (every piece falls
+          # back), which is exactly why a packaging slip would otherwise go
+          # unnoticed until someone looks at a label: fail the release here.
+          if (-not $health.fonts -or $health.fonts.failed.Count -ne 0 -or $health.fonts.loaded.Count -lt 4) {
+            throw "Label fonts did not load in the installed app: $($health.fonts | ConvertTo-Json -Compress)"
+          }
+          if (-not $health.clubMarks -or $health.clubMarks.failed.Count -ne 0 -or $health.clubMarks.loaded.Count -lt 6) {
+            throw "Club marks did not load in the installed app: $($health.clubMarks | ConvertTo-Json -Compress)"
+          }
+
+          # /preview only exists on the FULL server — this is the check that
+          # the packaged server (and its canvas renderer) actually loaded
+          # instead of anything degraded. It must return a real PNG.
+          $png = Invoke-WebRequest 'http://localhost:3456/preview?firstName=Smoke&lastName=Test' -TimeoutSec 15
+          if ($png.StatusCode -ne 200) { throw "/preview returned $($png.StatusCode)" }
+          $bytes = $png.Content
+          if ($bytes[0] -ne 0x89 -or $bytes[1] -ne 0x50) { throw '/preview did not return a PNG — full server render path broken' }
+          Write-Host "Preview PNG: $($bytes.Length) bytes"
+
+      - name: Stop app
+        if: always()
+        shell: pwsh
+        run: Get-Process 'Club Label Printer' -ErrorAction SilentlyContinue | Stop-Process -Force
+
+  release:
+    # Publish only after the INSTALLED app passed the smoke test.
+    needs: [tag, smoke-test]
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ inputs.version }}
+      GH_TOKEN: ${{ github.token }}
+
+    steps:
+      # main, not the tag: the feed is committed to main.
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Download installer
+        uses: actions/download-artifact@v4
+        with:
+          name: Club-Label-Printer-Setup
+          path: installer
+
+      # latest.yml + blockmap are the electron-updater feed inputs. Not
+      # "Latest": the printer reads site/updates/printer/latest.yml instead.
+      - name: Attach to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: printer-v${{ inputs.version }}
+          name: Club Label Printer ${{ inputs.version }}
+          make_latest: 'false'
+          files: |
+            installer/*.exe
+            installer/*.blockmap
+            installer/latest.yml
+
+      # Write the feed with ABSOLUTE asset URLs: the feed lives on the site,
+      # the installer on the release. electron-builder writes bare file
+      # names, which the generic provider would resolve against the site.
+      # The tag is read back from the release so a mismatch fails loudly.
+      - name: Write the update feed into the site
+        run: |
+          set -euo pipefail
+          TAG="printer-v$VERSION"
+          BASE="https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}"
+          mkdir -p site/updates/printer
+          BASE="$BASE" node -e '
+            const fs = require("fs");
+            const base = process.env.BASE;
+            const abs = (v) => {
+              v = v.trim().replace(/^["\x27]|["\x27]$/g, "");
+              return /^https?:\/\//.test(v) ? v : `${base}/${encodeURIComponent(v)}`;
+            };
+            const out = fs.readFileSync("installer/latest.yml", "utf8").split("\n").map((line) => {
+              const m = line.match(/^(\s*(?:-\s+)?(?:url|path):\s*)(.+?)\s*$/);
+              return m ? m[1] + abs(m[2]) : line;
+            }).join("\n");
+            fs.writeFileSync("site/updates/printer/latest.yml", out);
+          '
+          cat site/updates/printer/latest.yml
+          # The feed must name this version, and every url/path must be absolute.
+          grep -Eq "^version: ${VERSION}\s*$" site/updates/printer/latest.yml
+          if grep -E '^\s*(-\s+)?(url|path):' site/updates/printer/latest.yml | grep -vq "https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/"; then
+            echo "::error::a url/path in latest.yml is not an absolute release asset URL"; exit 1
+          fi
+          # ...and the assets it points at really are on the release.
+          grep -E '^\s*(-\s+)?(url|path):' site/updates/printer/latest.yml | sed -E 's/^[^:]*:\s*//' | sort -u | while read -r u; do
+            curl -fsSIL -o /dev/null "$u" || { echo "::error::feed points at a missing asset: $u"; exit 1; }
+          done
+
+      - name: Commit the feed and redeploy the site
+        run: |
+          set -euo pipefail
+          git config user.name 'sync-bot'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          git add site/updates/printer/latest.yml
+          git commit -m "chore: printer ${VERSION} update feed"
+          # main can move while the Windows build runs; rebase and retry.
+          for i in 1 2 3 4; do
+            if git push origin HEAD:main; then break
+            elif [ "$i" = 4 ]; then echo '::error::git push failed after retries'; exit 1
+            else git fetch origin main; git rebase origin/main; sleep $((i * 3)); fi
+          done
+          # A push made with GITHUB_TOKEN fires no push trigger, so ask for
+          # the CI run (and its deploy job) explicitly.
+          gh workflow run ci.yml --repo "${GITHUB_REPOSITORY}" --ref main
+          echo "### Released \`printer-v${VERSION}\`; feed committed and ci.yml dispatched" >> "$GITHUB_STEP_SUMMARY"
+
+      # The ping tells installed laptops to check the feed NOW, so wait for
+      # the redeployed site to serve the new version first. Non-fatal: if the
+      # site is not live yet (before switch day) or CI is slow, the laptops'
+      # 24h poll still finds the update.
+      - name: Wait for the live feed
+        run: |
+          for i in $(seq 1 60); do
+            if curl -fsSL "https://awana.kvbchurch.org/updates/printer/latest.yml?t=$(date +%s)" | grep -Eq "^version: ${VERSION}\s*$"; then
+              echo "Live feed has ${VERSION}"; exit 0
+            fi
+            sleep 30
+          done
+          echo "::warning::The live feed did not show ${VERSION} within 30 minutes; sending the ping anyway"
+
+      # Push notification of the release, over the SAME public Pusher channel
+      # the print server already publishes checkin/tally/etc. on — see
+      # CONTRACT.md's "`update` event (laptop-internal)" section. This is
+      # what lets installed laptops auto-update within a minute or two
+      # instead of waiting on their periodic poll (still 24h, kept as the
+      # safety net for a laptop that was offline when this fires).
+      #
+      # Runs only after the feed step above has waited for the NEW latest.yml
+      # to be live on the site, so the ping can never go out before the
+      # installer + feed are actually there for electron-updater to find (the
+      # feed now deploys with the site, a few minutes after the release). There is deliberately NO `if:` guard on the secrets: GitHub's
+      # workflow parser rejects `secrets.*` in step-level `if:` expressions
+      # (it invalidated the whole file — v5.8.0's first tag build died on
+      # exactly that), so the script below is the guard instead — it exits 0
+      # with a log line when the secrets are absent. An operator who never
+      # sets up push is never blocked from cutting a release; the 24h poll
+      # covers them completely, silently, forever.
+      #
+      # Deliberately a small inline Node script rather than a third-party
+      # action: the Pusher REST API's HMAC-SHA256 request signing
+      # (https://pusher.com/docs/channels/library_auth_reference/rest-api/)
+      # is a dozen lines and pulling in an action for it is a bigger trust
+      # surface than writing it here in the open.
+      - name: Notify laptops of the new release (Pusher push)
+        env:
+          PUSHER_APP_ID: ${{ secrets.PUSHER_APP_ID }}
+          PUSHER_KEY: ${{ secrets.PUSHER_KEY }}
+          PUSHER_SECRET: ${{ secrets.PUSHER_SECRET }}
+          PUSHER_CLUSTER: ${{ secrets.PUSHER_CLUSTER }}
+          # print-server/church-config.json's baked default ('awana-channel')
+          # is the fallback — the same constant server.js itself falls back
+          # to when church-config.json has no pusherChannel of its own.
+          PUSHER_CHANNEL: ${{ secrets.PUSHER_CHANNEL || vars.PUSHER_CHANNEL || 'awana-channel' }}
+          RELEASE_TAG: printer-v${{ inputs.version }}
+        run: |
+          cat > /tmp/pusher-notify.cjs <<'EOF'
+          'use strict';
+          const https = require('https');
+          const crypto = require('crypto');
+
+          const appId   = process.env.PUSHER_APP_ID;
+          const key     = process.env.PUSHER_KEY;
+          const secret  = process.env.PUSHER_SECRET;
+          const cluster = process.env.PUSHER_CLUSTER;
+          const channel = process.env.PUSHER_CHANNEL || 'awana-channel';
+          // The tag is "printer-v5.8.0" — strip the prefix so this matches
+          // package.json/app.getVersion()'s bare semver, same comparison the
+          // smoke-test job already does above.
+          const version = String(process.env.RELEASE_TAG || '').replace(/^printer-v/, '');
+
+          if (!appId || !key || !secret || !cluster || !version) {
+            console.log('[pusher-notify] Missing config or version — skipping (release is unaffected).');
+            process.exit(0);
+          }
+
+          const payload = JSON.stringify({ version, at: new Date().toISOString() });
+          const body = JSON.stringify({ name: 'update', channel, data: payload });
+
+          const requestPath = `/apps/${appId}/events`;
+          const authTimestamp = Math.floor(Date.now() / 1000);
+          const bodyMd5 = crypto.createHash('md5').update(body).digest('hex');
+
+          // Pusher's documented REST API auth scheme: sign
+          // "METHOD\npath\nsorted&query&params" with the app secret.
+          const params = {
+            auth_key: key,
+            auth_timestamp: String(authTimestamp),
+            auth_version: '1.0',
+            body_md5: bodyMd5,
+          };
+          const sortedQs = Object.keys(params).sort().map((k) => `${k}=${params[k]}`).join('&');
+          const stringToSign = `POST\n${requestPath}\n${sortedQs}`;
+          const signature = crypto.createHmac('sha256', secret).update(stringToSign).digest('hex');
+          // The signature/secret must never be logged — only status + non-sensitive metadata below.
+
+          const req = https.request({
+            hostname: `api-${cluster}.pusher.com`,
+            path: `${requestPath}?${sortedQs}&auth_signature=${signature}`,
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Content-Length': Buffer.byteLength(body),
+            },
+          }, (res) => {
+            // Log the status as soon as headers arrive rather than waiting on
+            // 'end' — some proxies close the socket after the body without a
+            // clean end-of-stream frame, which would otherwise swallow this
+            // log entirely on an already-successful request.
+            console.log(`[pusher-notify] status=${res.statusCode} channel=${channel} version=${version}`);
+            let data = '';
+            res.on('data', (d) => { data += d; });
+            const logErrorBody = () => {
+              if (res.statusCode >= 300 && data) console.log(`[pusher-notify] response: ${data.slice(0, 500)}`);
+            };
+            res.on('end', logErrorBody);
+            res.on('close', logErrorBody);
+            res.resume();
+          });
+          req.setTimeout(15000, () => {
+            console.log('[pusher-notify] request timed out (non-fatal)');
+            req.destroy();
+          });
+          req.on('error', (e) => {
+            // Never fail the release over this — the 24h poll is the safety net.
+            console.log(`[pusher-notify] request error (non-fatal): ${e.message}`);
+          });
+          req.write(body);
+          req.end();
+          EOF
+          node /tmp/pusher-notify.cjs

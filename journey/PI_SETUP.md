@@ -33,7 +33,7 @@ This guide is simple enough for anyone to follow. We'll get the Pi showing the J
 ## Step 3: Open the Journey Display (2 minutes)
 
 1. Open the web browser (Chromium or Firefox)
-2. In the address bar at the top, type: `https://patrick-simpson.github.io/Journey-Display/`
+2. In the address bar at the top, type: `https://awana.kvbchurch.org/journey/`
 3. Press Enter
 4. The Journey Display should now appear on your screen
 
@@ -70,7 +70,7 @@ We want the Pi to show the Journey Display every time it starts up.
    [Desktop Entry]
    Type=Application
    Name=Journey Display
-   Exec=chromium-browser --kiosk https://patrick-simpson.github.io/Journey-Display/
+   Exec=chromium-browser --kiosk https://awana.kvbchurch.org/journey/
    X-GNOME-Autostart-enabled=true
    ```
 
@@ -107,7 +107,7 @@ The Journey Display shows the Awana Check-in Display most of the day, then switc
 
 **Important:** these times live in the **website's own code on GitHub**,
 not in a file on the Pi. The Pi always loads the live site at
-`https://patrick-simpson.github.io/Journey-Display/` — it does not read
+`https://awana.kvbchurch.org/journey/` — it does not read
 a local copy, so editing a file on the Pi itself (even if one happens
 to exist there) won't change what the kiosk shows. To change the times
 for real:
@@ -192,7 +192,7 @@ The Pi is loading the wrong URL. The **only** correct address is the
 bare root:
 
 ```
-https://patrick-simpson.github.io/Journey-Display/
+https://awana.kvbchurch.org/journey/
 ```
 
 Do **not** append `/public/index.html` or `/pages/index.html`. Only the

@@ -37,10 +37,8 @@
       "package.json"
     ],
     "publish": {
-      "provider": "github",
-      "owner": "patrick-simpson",
-      "repo": "Awana-Check-in-Display",
-      "releaseType": "release",
+      "provider": "generic",
+      "url": "https://awana.kvbchurch.org/updates/lobby/",
       "channel": "lobby"
     },
     "win": {

@@ -79,7 +79,7 @@ function Test-SafeWebUrl {
 
 Write-Host ""
 Write-Host "  NOTE: There's now a simpler Windows app installer that replaces this script:" -ForegroundColor Yellow
-Write-Host "  https://github.com/patrick-simpson/Print-TwoTimTwo-Labels/releases/latest" -ForegroundColor Yellow
+Write-Host "  https://awana.kvbchurch.org/download/club-label-printer" -ForegroundColor Yellow
 Write-Host "  This script still works, but will be removed in a future release." -ForegroundColor Yellow
 Write-Host ""
 

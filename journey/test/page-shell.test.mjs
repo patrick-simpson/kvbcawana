@@ -60,7 +60,7 @@ function stubFullscreen(window) {
   return calls;
 }
 
-function postFromDisplay(kiosk, data, origin = 'https://patrick-simpson.github.io') {
+function postFromDisplay(kiosk, data, origin = 'https://example.test') {
   const { window } = kiosk;
   const frame = kiosk.document.getElementById('checkin-frame');
   window.dispatchEvent(
@@ -96,7 +96,7 @@ test('a message from anywhere else, or about anything else, is ignored', () => {
   window.dispatchEvent(
     new window.MessageEvent('message', {
       data: { type: 'awana-display:toggle-fullscreen' },
-      origin: 'https://patrick-simpson.github.io',
+      origin: 'https://example.test',
       source: window,
     })
   );

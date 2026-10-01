@@ -19,10 +19,22 @@ same rule as the rest.
   envelope vectors, the brand kit and `family.css`, which were byte-identical
   copies across the three repos, are compared here directly (canonical first:
   printer's vectors and `styles/family.css`, the lobby's `shared/brand/`).
-- **Nothing deploys from this repo yet.** The apps' own workflows sit dormant
-  under `lobby/.github/`, `journey/.github/` and `printer/.github/` (GitHub reads
-  only the root's), and the live sites, releases and auto-update feeds still
-  come from the three old repos until switch day.
+- `ci.yml`'s deploy job publishes the sync Worker and the one site
+  (`site/build.mjs`) to Cloudflare after every green push: **awana.kvbchurch.org**
+  (`SITE_ORIGIN` repository variable). The apps' own workflows under
+  `lobby/.github/`, `journey/.github/`, `printer/.github/` are dormant; their live
+  replacements are at the root: `printer-release.yml`, `desktop-release.yml`
+  (each tags `printer-v*` / `desktop-v*`, publishes with make_latest false, and
+  writes the app's update feed into `site/updates/`), the delete workflows,
+  `journey-update-lesson.yml`, `journey-transcode-all-lessons.yml`,
+  `lobby-update-calendar.yml`.
+- **Update feeds are ours, not GitHub's "Latest"**: both Electron apps use
+  electron-updater's generic provider on `awana.kvbchurch.org/updates/printer/`
+  and `/updates/lobby/` (channel lobby), with absolute URLs to this repo's
+  release assets (Pages cannot host the 170 MB installers). Two apps in one repo
+  cannot both be its single Latest release, which is what the old feeds needed.
+- Until switch day (`SWITCH.md`) the church's screens and installed apps still
+  run on the old repos' github.io sites and releases.
 
 ## The move in progress (owner's plan, 2026-10-01)
 
@@ -34,6 +46,6 @@ same rule as the rest.
    stay sealed end to end; same events and sanitizers).
 4. Every installed app repointed (printer and sound room update feeds, the Pi
    kiosk, Journey's embed, cross-links), one last release from each old repo.
-5. A full rehearsal on the temporary address, then ONE switch day the owner
+5. A full rehearsal, then ONE switch day (`SWITCH.md` is the runbook) the owner
    picks (never a Wednesday). OBS / ProPresenter feeds carry the passphrase in
    their link (owner's choice). No forwarding from the old github.io addresses.

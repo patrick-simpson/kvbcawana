@@ -21,7 +21,7 @@
 (function () {
   'use strict';
 
-  var SYNC_INDEX = 'https://patrick-simpson.github.io/Awana-Check-in-Display/shared/sync.json';
+  var SYNC_INDEX = new URL('../lobby/shared/sync.json', window.location.href).href;
   var SESSION_KEY = 'awanaSyncSession.v1';
   var DISPLAY_KEY = 'awanaDisplayKey.v1';
   var CONFIG_KEY = 'awanaConfig.v1';

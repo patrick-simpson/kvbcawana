@@ -1,0 +1,109 @@
+name: Update current lesson (Journey)
+
+# Ported into the monorepo root (GitHub reads only the root .github/workflows).
+# Scripts run from journey/; the commit lands on main and ci.yml is dispatched
+# to redeploy the one site, replacing the old repo's own Pages deploy.
+#
+# Nightly: resolve which Journey: Advocates lesson is "current" from the
+# church's TwoTimTwo calendar and write journey/public/current-lesson.json, so
+# the kiosk reads it same-origin instead of hitting a third-party site
+# at 6:30 PM. Only rewrites when the lesson changes (or weekly, as a
+# heartbeat for staleness), so most nights commit nothing.
+#
+# Also transcodes that lesson's video down to something the kiosk's weak
+# Raspberry Pi Zero can actually decode smoothly (journey/public/current-lesson-
+# video.mp4, ~5x smaller than Awana's original) — see the top of
+# journey/scripts/transcode-lesson-video.mjs for the full rationale, including the
+# deliberate, informed exception this makes to this project's normal
+# "never re-host the original video files" rule (journey/CLAUDE.md).
+
+on:
+  schedule:
+    - cron: '23 8 * * *' # ~4:23 AM Eastern, off-peak minute
+  workflow_dispatch:
+
+permissions:
+  contents: write # commit the refreshed feed
+  actions: write  # dispatch ci.yml (GITHUB_TOKEN pushes don't self-trigger it)
+
+concurrency:
+  group: journey-update-lesson
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: journey
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: journey/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install ffmpeg
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
+
+      - name: Resolve the current lesson
+        # Exits 1 (failing the run, which emails the repo owner) if the
+        # page stops parsing, or if public/lessons.json isn't populated
+        # yet — the last good committed lesson keeps serving either way.
+        run: npm run fetch-lesson
+
+      - name: Transcode the lesson video
+        # Never fails the job on its own (see the script's own comments) —
+        # a transcode failure just leaves current-lesson.json's downloadUrl
+        # pointing at the original, full-size, still-playable source.
+        run: npm run transcode-lesson
+
+      - name: Commit the refreshed lesson, if anything changed
+        # Pushes made with the default GITHUB_TOKEN deliberately do NOT
+        # trigger `on: push` workflows — see the dispatch step below.
+        # Rebases and retries on push rejection: this repo's own
+        # convention is "commit and push to main on every change", so a
+        # concurrent human push during the time this job spends on
+        # `npm ci`, the TwoTimTwo fetch, and the video download+transcode
+        # is routine, not exceptional, and should not cost a night's work.
+        run: |
+          if [ -n "$(git status --porcelain public/current-lesson.json public/current-lesson-video.mp4)" ]; then
+            git config user.name 'lesson-bot'
+            git config user.email 'github-actions[bot]@users.noreply.github.com'
+            git add public/current-lesson.json public/current-lesson-video.mp4
+            git commit -m 'chore: refresh current lesson'
+            for i in 1 2 3 4; do
+              if git push; then
+                break
+              elif [ "$i" = 4 ]; then
+                echo '::error::git push failed after retries' >&2
+                exit 1
+              else
+                git fetch origin main
+                git rebase origin/main
+                sleep $((i * 3))
+              fi
+            done
+          else
+            echo 'Lesson unchanged — nothing to commit.'
+          fi
+
+      - name: Redeploy
+        # Dispatched on every run, not only when the lesson changed: the
+        # old workflow only dispatched inside the "lesson changed"
+        # branch, with nothing verifying the dispatched deploy actually
+        # succeeded — if that one deploy run failed or was cancelled, the
+        # unchanged-lesson nights that followed took the other branch
+        # forever, and main's new lesson never reached the live site with
+        # no visible failure anywhere. A no-op site deploy is cheap, so
+        # reconciling unconditionally is worth it for that guarantee.
+        run: gh workflow run ci.yml --repo "$GITHUB_REPOSITORY" --ref main
+        env:
+          GH_TOKEN: ${{ github.token }}

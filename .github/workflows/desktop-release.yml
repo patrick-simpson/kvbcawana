@@ -1,0 +1,305 @@
+name: Release Awana Lobby Display (sound room app)
+
+# The Windows tray app in lobby/desktop/ that puts the live lobby signage full
+# screen on the sound room PC's lobby TV on club nights. One workflow cuts a
+# release end to end: run it from the Actions tab (or `gh workflow run
+# desktop-release.yml -f version=1.0.1`) with the version in
+# lobby/desktop/package.json, e.g. 1.0.1 (no "desktop-v").
+#
+# It replaces the old repo's create-desktop-release.yml (which pushed the tag
+# and dispatched build-desktop.yml against it, because a tag pushed with
+# GITHUB_TOKEN fires no push trigger -- the printer learned this at v5.0.2)
+# and build-desktop.yml. Tag and build are jobs of this one run now, chained
+# with `needs`, so that dispatch is gone. Ported from the label printer's
+# build-electron.yml: test, build the NSIS installer, install it silently on a
+# Windows runner and prove the installed app loads the live page, and only then
+# publish.
+#
+# Update feed: installed apps (electron-updater, generic provider, channel
+# `lobby`) read https://awana.kvbchurch.org/updates/lobby/lobby.yml. They used
+# to read this repo's ONE "Latest" GitHub release, which the monorepo's two
+# Electron apps cannot share, so releases are published with make_latest:
+# false, the .exe and .blockmap stay release assets, and the last job rewrites
+# lobby.yml to point at them by absolute URL, commits it to
+# site/updates/lobby/ and dispatches ci.yml so the site redeploys
+# with it. Never tag by hand; a stray release goes with
+# desktop-delete-release.yml (and a revert of the feed commit).
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release, e.g. 1.0.1 (must equal lobby/desktop/package.json; no "desktop-v")'
+        required: true
+      ref:
+        description: 'Branch or commit to tag'
+        required: false
+        default: 'main'
+
+permissions:
+  contents: write   # create the tag and the release, commit the feed
+  actions: write    # dispatch ci.yml so the site redeploys with the new feed
+
+concurrency:
+  group: desktop-release
+  cancel-in-progress: false
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    outputs:
+      sha: ${{ steps.tag.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+          fetch-depth: 0
+
+      - name: Check the version and tag
+        id: tag
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          if ! echo "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "Version must be X.Y.Z (no prefix, no pre-release): got '$VERSION'"; exit 1
+          fi
+          PKG=$(node -p "require('./lobby/desktop/package.json').version")
+          if [ "$PKG" != "$VERSION" ]; then
+            echo "lobby/desktop/package.json says $PKG; bump it (and its lockfile) first"; exit 1
+          fi
+          if git rev-parse -q --verify "refs/tags/desktop-v$VERSION" >/dev/null; then
+            echo "desktop-v$VERSION already exists"; exit 1
+          fi
+          TAG="desktop-v$VERSION"
+          git config user.name 'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          git tag -a "$TAG" -m "Awana Lobby Display $VERSION"
+          git push origin "$TAG"
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "Created $TAG"
+
+  test:
+    needs: tag
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: lobby
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.tag.outputs.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: lobby/package-lock.json
+      - name: Install the root toolchain (vitest, eslint)
+        run: npm ci
+      - name: Desktop unit tests
+        run: npx vitest run --config desktop/vitest.config.js
+      - name: Lint desktop/
+        run: npx eslint desktop
+
+  build:
+    needs: [tag, test]
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.tag.outputs.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: lobby/desktop/package-lock.json
+
+      - name: The version must match the release
+        shell: pwsh
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: |
+          $pkg = (Get-Content lobby/desktop/package.json -Raw | ConvertFrom-Json).version
+          if ($pkg -ne $env:RELEASE_VERSION) { throw "lobby/desktop/package.json is $pkg but the release is $env:RELEASE_VERSION" }
+
+      - name: Install
+        working-directory: lobby/desktop
+        run: npm ci
+
+      - name: Build the installer
+        working-directory: lobby/desktop
+        run: npx electron-builder --win --x64 --publish never
+
+      - name: Upload the installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: Awana-Lobby-Display-Setup
+          if-no-files-found: error
+          path: |
+            lobby/desktop/release/Awana-Lobby-Display-Setup.exe
+            lobby/desktop/release/Awana-Lobby-Display-Setup.exe.blockmap
+            lobby/desktop/release/lobby.yml
+
+  smoke-test:
+    needs: [tag, build]
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.tag.outputs.sha }}
+
+      - name: Download the installer
+        uses: actions/download-artifact@v4
+        with:
+          name: Awana-Lobby-Display-Setup
+          path: installer
+
+      - name: Install silently
+        shell: pwsh
+        run: |
+          $proc = Start-Process -FilePath installer\Awana-Lobby-Display-Setup.exe -ArgumentList '/S' -PassThru -Wait
+          Write-Host "Installer exit code: $($proc.ExitCode)"
+          # The one-click NSIS stub can return before its detached child has
+          # copied the files: poll for the app rather than test once.
+          $deadline = (Get-Date).AddSeconds(60)
+          $installed = $null
+          while ((Get-Date) -lt $deadline) {
+            $found = Get-ChildItem "$env:LOCALAPPDATA\Programs" -Filter 'Awana Lobby Display.exe' -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+            if ($found) { $installed = $found.FullName; break }
+            Start-Sleep -Seconds 3
+          }
+          if (-not $installed) {
+            Get-ChildItem "$env:LOCALAPPDATA\Programs" -Recurse -ErrorAction SilentlyContinue | Select-Object FullName | Format-Table -AutoSize | Out-String | Write-Host
+            throw "The app never appeared under LOCALAPPDATA\Programs (installer exit code $($proc.ExitCode))"
+          }
+          Write-Host "Installed: $installed"
+          "INSTALLED_EXE=$installed" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Launch in smoke-test mode
+        shell: pwsh
+        run: |
+          $dir = "$env:RUNNER_TEMP\lobby-userdata"
+          New-Item -ItemType Directory -Force -Path $dir | Out-Null
+          "CI_DATA_DIR=$dir" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          # cmd's own redirection, not PowerShell's: its pipes would close when
+          # this step ends and take the app down with EPIPE (the printer's
+          # finding).
+          Start-Process cmd.exe -ArgumentList "/c", "`"`"$env:INSTALLED_EXE`" --smoke-test --user-data-dir=`"$dir`" 1>`"$dir\stdout.log`" 2>`"$dir\stderr.log`"`""
+
+      - name: The installed app loads the live lobby page
+        shell: pwsh
+        run: |
+          $file = "$env:CI_DATA_DIR\smoke.json"
+          $deadline = (Get-Date).AddSeconds(120)
+          while ((Get-Date) -lt $deadline -and -not (Test-Path $file)) { Start-Sleep 2 }
+          if (-not (Test-Path $file)) {
+            Write-Host '---- lobby-display.log ----'; Get-Content "$env:CI_DATA_DIR\lobby-display.log" -ErrorAction SilentlyContinue | Write-Host
+            Write-Host '---- stderr ----'; Get-Content "$env:CI_DATA_DIR\stderr.log" -ErrorAction SilentlyContinue | Write-Host
+            throw 'The app never reported a loaded page'
+          }
+          $smoke = Get-Content $file -Raw | ConvertFrom-Json
+          Write-Host "Smoke: $($smoke | ConvertTo-Json -Compress)"
+          # The site the app is built to load is the SITE constant in
+          # lobby/desktop/main.js (a DEV-only env override comes first; the
+          # string literal after || is the packaged value), read here so the
+          # check follows the app when the site moves.
+          $mainJs = Get-Content lobby/desktop/main.js -Raw
+          $m = [regex]::Match($mainJs, "const SITE = [^\r\n]*?'(https://[^']+)'")
+          if (-not $m.Success) { throw 'Could not read the SITE constant from lobby/desktop/main.js' }
+          $site = $m.Groups[1].Value
+          Write-Host "Expected site: $site"
+          if (-not "$($smoke.url)".StartsWith($site)) { throw "Loaded the wrong page: $($smoke.url) (expected $site)" }
+          $expected = (Get-Content lobby/desktop/package.json -Raw | ConvertFrom-Json).version
+          if ($smoke.version -ne $expected) { throw "Installed version $($smoke.version), expected $expected" }
+
+      - name: Stop the app
+        if: always()
+        shell: pwsh
+        run: Get-Process 'Awana Lobby Display' -ErrorAction SilentlyContinue | Stop-Process -Force
+
+  release:
+    needs: [tag, smoke-test]
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ inputs.version }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      # main, not the tag: the feed is committed to main.
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Download the installer
+        uses: actions/download-artifact@v4
+        with:
+          name: Awana-Lobby-Display-Setup
+          path: installer
+
+      # make_latest is false on purpose: installed apps read the site's
+      # feed (below), and "Latest" now belongs to nothing.
+      - name: Publish the release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: desktop-v${{ inputs.version }}
+          name: Awana Lobby Display desktop-v${{ inputs.version }}
+          make_latest: 'false'
+          body: |
+            Windows installer for the sound room PC: `Awana-Lobby-Display-Setup.exe`.
+            Installed copies update themselves from the site's update feed, outside club-night hours.
+          files: |
+            installer/Awana-Lobby-Display-Setup.exe
+            installer/Awana-Lobby-Display-Setup.exe.blockmap
+            installer/lobby.yml
+
+      # electron-builder writes bare file names into lobby.yml; the generic
+      # provider would resolve them against the site, where the installer is
+      # not (Pages cannot host files over 25 MB). Rewrite every url/path to
+      # the release asset's absolute URL.
+      - name: Write the update feed into the site
+        run: |
+          set -euo pipefail
+          TAG="desktop-v$VERSION"
+          BASE="https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}"
+          mkdir -p site/updates/lobby
+          BASE="$BASE" node -e '
+            const fs = require("fs");
+            const base = process.env.BASE;
+            const abs = (v) => {
+              v = v.trim().replace(/^["\x27]|["\x27]$/g, "");
+              return /^https?:\/\//.test(v) ? v : `${base}/${encodeURIComponent(v)}`;
+            };
+            const out = fs.readFileSync("installer/lobby.yml", "utf8").split("\n").map((line) => {
+              const m = line.match(/^(\s*(?:-\s+)?(?:url|path):\s*)(.+?)\s*$/);
+              return m ? m[1] + abs(m[2]) : line;
+            }).join("\n");
+            fs.writeFileSync("site/updates/lobby/lobby.yml", out);
+          '
+          cat site/updates/lobby/lobby.yml
+          # Replaces the old "releases/latest is the new tag" check, which is
+          # false by design now: the feed written must name this version, and
+          # every url/path must be an absolute asset of this release.
+          grep -Eq "^version: ${VERSION}\s*$" site/updates/lobby/lobby.yml
+          if grep -E '^\s*(-\s+)?(url|path):' site/updates/lobby/lobby.yml | grep -vq "https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/"; then
+            echo "::error::a url/path in lobby.yml is not an absolute release asset URL"; exit 1
+          fi
+          grep -E '^\s*(-\s+)?(url|path):' site/updates/lobby/lobby.yml | sed -E 's/^[^:]*:\s*//' | sort -u | while read -r u; do
+            curl -fsSIL -o /dev/null "$u" || { echo "::error::feed points at a missing asset: $u"; exit 1; }
+          done
+
+      - name: Commit the feed and redeploy the site
+        run: |
+          set -euo pipefail
+          git config user.name 'sync-bot'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          git add site/updates/lobby/lobby.yml
+          git commit -m "chore: sound room app ${VERSION} update feed"
+          # main can move while the Windows build runs; rebase and retry.
+          for i in 1 2 3 4; do
+            if git push origin HEAD:main; then break
+            elif [ "$i" = 4 ]; then echo '::error::git push failed after retries'; exit 1
+            else git fetch origin main; git rebase origin/main; sleep $((i * 3)); fi
+          done
+          # A push made with GITHUB_TOKEN fires no push trigger, so ask for
+          # the CI run (and its deploy job) explicitly.
+          gh workflow run ci.yml --repo "${GITHUB_REPOSITORY}" --ref main
+          echo "Released desktop-v${VERSION}; feed committed and ci.yml dispatched"

@@ -14,7 +14,7 @@
 // the screens find the Worker at their own /api.
 //
 // Usage: node site/build.mjs   (after npm ci in lobby/ and printer/)
-import { cpSync, existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { execSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -48,10 +48,28 @@ const journeyOut = path.join(OUT, 'journey');
 cpSync(path.join(ROOT, 'journey', 'public'), journeyOut, { recursive: true });
 run(`node scripts/stamp-build.mjs ${BUILD_ID} ${JSON.stringify(journeyOut)}`, path.join(ROOT, 'journey'));
 
+// The Electron apps' auto-update feeds (site/updates/printer/latest.yml and
+// site/updates/lobby/lobby.yml), written by the release workflows. Always
+// present, so a missing feed is a 404 rather than a build failure.
+mkdirSync(path.join(ROOT, 'site', 'updates'), { recursive: true });
+cpSync(path.join(ROOT, 'site', 'updates'), path.join(OUT, 'updates'), { recursive: true });
+
 // Pretty addresses, and HTML / JSON never cached at the edge, so a deploy
 // and a calendar change reach the screens at once (Cloudflare Pages honours
 // _headers; the apps' service workers already go network-first for both).
+// Stable download links (the Install Guide, the extension popup, the sound
+// room card): the newest installer each update feed names, else the releases
+// page until the first release from this repo.
+const RELEASES = 'https://github.com/patrick-simpson/kvbcawana/releases';
+const newestInstaller = (feed) => {
+  const file = path.join(ROOT, 'site', 'updates', feed);
+  if (!existsSync(file)) return RELEASES;
+  const m = /^\s*(?:-\s+)?url:\s*(https:\/\/\S+\.exe)\s*$/m.exec(readFileSync(file, 'utf8'));
+  return m ? m[1] : RELEASES;
+};
 writeFileSync(path.join(OUT, '_redirects'), [
+  `/download/club-label-printer ${newestInstaller('printer/latest.yml')} 302`,
+  `/download/lobby-display ${newestInstaller('lobby/lobby.yml')} 302`,
   // Pages serves foo.html at /foo (and 308s the .html form there).
   '/projector /lobby/countdown 302',
   '/projector/ /lobby/countdown 302',
@@ -67,6 +85,8 @@ writeFileSync(path.join(OUT, '_headers'), [
   '/lobby/',
   '  Cache-Control: no-cache',
   '/journey/',
+  '  Cache-Control: no-cache',
+  '/updates/*',
   '  Cache-Control: no-cache',
   '',
 ].join('\n'));

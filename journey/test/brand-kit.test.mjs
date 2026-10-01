@@ -232,9 +232,11 @@ test('the page links the kit and loads nothing from the network', () => {
     assert.doesNotMatch(src, /^(https?:)?\/\//, `${src} is self-hosted`);
     assert.ok(existsSync(path.join(PUBLIC, src)), `${src} exists`);
   }
-  // The one cross-origin thing on the page is the Check-in Display itself.
+  // Nothing is cross-origin any more: the one site serves the Check-in
+  // Display beside this page, at ../lobby/.
   const external = [...html.matchAll(/(?:src|href)="(https?:[^"]+)"/g)].map((m) => m[1]);
-  assert.deepEqual(external, ['https://patrick-simpson.github.io/Awana-Check-in-Display/?lowPower=1']);
+  assert.deepEqual(external, []);
+  assert.match(html, /<iframe\b[^>]*src="\.\.\/lobby\/\?lowPower=1"/);
 
   for (const [name, css] of [
     ['style.css', styleCss],

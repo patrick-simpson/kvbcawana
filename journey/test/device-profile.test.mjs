@@ -53,8 +53,8 @@ const BUNDLE_ROUTES = {
 // every playback path here; a kiosk that has been used before has answered.
 const ANSWERED = { 'journey.captions': 'off' };
 
-const LOW_POWER_URL = 'https://patrick-simpson.github.io/Awana-Check-in-Display/?lowPower=1';
-const FULL_URL = 'https://patrick-simpson.github.io/Awana-Check-in-Display/';
+const LOW_POWER_URL = 'https://example.test/lobby/?lowPower=1';
+const FULL_URL = 'https://example.test/lobby/';
 
 test('detectDeviceProfile reads the machine, not the brand', () => {
   const kiosk = bootKiosk(ROUTES, ANSWERED);

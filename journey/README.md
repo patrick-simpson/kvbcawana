@@ -4,14 +4,14 @@ A simple kiosk website that displays the **Journey: Advocates** video lesson on 
 
 > This project is an independent, church-built tool. It is **not affiliated with, endorsed by, or approved by Awana Clubs International** — it simply plays curriculum video the church already licenses through its own Awana Ministry Membership, for internal, on-device use only.
 
-**About page (what it does, in plain words):** https://patrick-simpson.github.io/Journey-Display/about.html
+**About page (what it does, in plain words):** https://awana.kvbchurch.org/journey/about.html
 
 - **6:30 PM – 7:15 PM:** Shows the current week's Journey lesson video
 - **All other times:** Shows the Awana Check-in Display
 - **Runs on:** Raspberry Pi (any model, including Pi Zero)
 - **No setup complexity:** Plain HTML/CSS/JavaScript—no build step, no databases
 
-**Live site:** https://patrick-simpson.github.io/Journey-Display/
+**Live site:** https://awana.kvbchurch.org/journey/
 
 ---
 
@@ -80,7 +80,7 @@ This guide takes you from an unboxed Raspberry Pi to a working Journey Display. 
 2. Click it to open the browser
 3. In the address bar at the top, type:
    ```
-   https://patrick-simpson.github.io/Journey-Display/
+   https://awana.kvbchurch.org/journey/
    ```
 4. Press **Enter**
 5. The Journey Display should now appear
@@ -123,7 +123,7 @@ Copy this text **exactly** (it's important):
 [Desktop Entry]
 Type=Application
 Name=Journey Display
-Exec=chromium-browser --kiosk https://patrick-simpson.github.io/Journey-Display/
+Exec=chromium-browser --kiosk https://awana.kvbchurch.org/journey/
 X-GNOME-Autostart-enabled=true
 ```
 
@@ -170,7 +170,7 @@ it's just quietly showing the Check-in Display. Turn it off:
 
 By default, the Journey Display appears from **6:30 PM to 7:15 PM**.
 These times live in a file that's part of the **live website** — the
-same one your Pi loads from `https://patrick-simpson.github.io/Journey-Display/` —
+same one your Pi loads from `https://awana.kvbchurch.org/journey/` —
 not a file that lives on the Pi itself. **Editing a local copy on the
 Pi won't change anything the kiosk actually shows**, since the kiosk
 always loads the deployed site, not a local file. To change the

@@ -199,8 +199,10 @@ function effectiveProfile() {
    the low profile's, and a full-quality device gets the plain URL.
    index.html ships the low-power URL as the static src, so a browser with
    JavaScript disabled still shows something. */
-const CHECKIN_DISPLAY_ORIGIN = 'https://patrick-simpson.github.io';
-const CHECKIN_DISPLAY_URL = `${CHECKIN_DISPLAY_ORIGIN}/Awana-Check-in-Display/`;
+// The one site (awana.kvbchurch.org) serves both, so the display is this
+// page's own origin, at /lobby/.
+const CHECKIN_DISPLAY_ORIGIN = window.location.origin;
+const CHECKIN_DISPLAY_URL = new URL('../lobby/', window.location.href).href;
 
 function checkinDisplayUrl(profile) {
   return profile === 'low' ? `${CHECKIN_DISPLAY_URL}?lowPower=1` : CHECKIN_DISPLAY_URL;

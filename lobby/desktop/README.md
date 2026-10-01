@@ -8,7 +8,7 @@ booth on its own, and it updates itself from this repo's GitHub Releases.
 ## Install (once)
 
 1. Download **Awana-Lobby-Display-Setup.exe** from
-   <https://github.com/patrick-simpson/Awana-Check-in-Display/releases/latest>.
+   <https://awana.kvbchurch.org/download/lobby-display>.
 2. Run it. Windows may say "Windows protected your PC" (the app is not code
    signed): click **More info**, then **Run anyway**. It installs for the
    signed-in user, with no admin prompt, and starts.
