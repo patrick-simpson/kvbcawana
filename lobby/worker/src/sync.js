@@ -39,6 +39,7 @@ import {
 import { fromBase64, hmac, kidFor, newDisplayKey, randomBytes, safeEqual, seal, toBase64, toBase64Url } from './crypto.js';
 import { trigger as pusherTrigger } from './pusher.js';
 import { DEFAULT_CALENDAR_URL, scrapeCalendar } from './calendar.js';
+import { DOORBELL_EVENT, REPLAYED, checkPublish, frameText, replayKey } from './live.js';
 
 export const IP_MAX_FAILS = 5;
 export const IP_LOCK_MS = 15 * 60 * 1000;
@@ -127,15 +128,52 @@ export function buildSlidesChunks(deck, deckRev, publishedAt) {
 export class SyncCore {
   /**
    * @param {{ storage: Store, env: Record<string, any>, fetchFn?: typeof fetch, now?: () => number,
-   *   publish?: (channel: string, event: string, payload: unknown) => Promise<{ok: boolean, error?: string}> }} deps
+   *   publish?: (channel: string, event: string, payload: unknown) => Promise<{ok: boolean, error?: string}>,
+   *   broadcast?: (text: string) => number, closeAll?: (code: number, reason: string) => void }} deps
    */
-  constructor({ storage, env, fetchFn, now, publish }) {
+  constructor({ storage, env, fetchFn, now, publish, broadcast, closeAll }) {
     this.storage = storage;
     this.env = env || {};
     this.fetchFn = fetchFn || ((...args) => fetch(...args));
     this.now = now || (() => Date.now());
     this.publish = publish || ((channel, event, payload) =>
       pusherTrigger(this.env, channel, event, payload, { fetchFn: this.fetchFn }));
+    // The live channel: every screen's socket (index.js). Until switch day
+    // everything also goes to Pusher, so screens on either transport agree.
+    this.broadcast = broadcast || (() => 0);
+    this.closeAll = closeAll || (() => {});
+  }
+
+  /** Send a frame to every live screen, and keep it for late joiners. */
+  async relay(event, payload) {
+    const text = frameText(event, payload);
+    if (REPLAYED.includes(event)) await this.storage.put(replayKey(event), text);
+    if (event === 'slides') {
+      // The newest chunks (sealed, so their deck is unreadable here): enough
+      // for the largest deck. A joiner's assembler keeps only the newest
+      // complete deck, by its own strictly-newer rule, so stale chunks in
+      // the buffer are harmless.
+      const prev = (await this.storage.get('live:slides')) || { chunks: [] };
+      await this.storage.put('live:slides', { chunks: [...prev.chunks, text].slice(-SLIDES_TOTAL_MAX) });
+    }
+    return this.broadcast(text);
+  }
+
+  /** What a screen is handed the moment it connects. */
+  async replayFrames() {
+    const out = [];
+    for (const event of REPLAYED) {
+      const text = await this.storage.get(replayKey(event));
+      if (typeof text === 'string') out.push(text);
+    }
+    const slides = await this.storage.get('live:slides');
+    if (slides?.chunks) out.push(...slides.chunks);
+    return out;
+  }
+
+  /** Is this token a current session? (The socket upgrade cannot send headers.) @param {string} token */
+  async sessionValid(token) {
+    return this.authorized(new Request('https://sync.internal/', { headers: { Authorization: `Bearer ${token}` } }));
   }
 
   // ── storage helpers ────────────────────────────────────────────────────────
@@ -266,11 +304,13 @@ export class SyncCore {
   async publishSealed(event, payload) {
     const envelope = await seal(await this.displayKey(), event, payload);
     if (!envelope) return { ok: false, error: 'cannot-seal' };
+    await this.relay(event, envelope);
     return this.publish(DISPLAY_CHANNEL, event, envelope);
   }
 
   /** @param {'calendar'|'journey'|'template'} what @param {string} at */
   async ring(what, at) {
+    this.broadcast(frameText(DOORBELL_EVENT, { what, at }));
     return this.publish(SYNC_CHANNEL, SYNC_EVENT, { what, at });
   }
 
@@ -297,7 +337,7 @@ export class SyncCore {
       }
       const known = new Set([
         'GET /v1/state', 'PUT /v1/settings', 'PUT /v1/slides', 'PUT /v1/template',
-        'PUT /v1/journey', 'POST /v1/calendar/refresh', 'POST /v1/passphrase',
+        'PUT /v1/journey', 'POST /v1/calendar/refresh', 'POST /v1/passphrase', 'POST /v1/publish',
       ]);
       if (!known.has(route)) return fail('Not found.', 404);
       if (!(await this.authorized(request))) {
@@ -311,6 +351,7 @@ export class SyncCore {
         case 'PUT /v1/journey': return await this.putJourney(request);
         case 'POST /v1/calendar/refresh': return await this.refreshCalendar();
         case 'POST /v1/passphrase': return await this.changePassphrase(request, ip);
+        case 'POST /v1/publish': return await this.livePublish(request);
         default: return fail('Not found.', 404);
       }
     } catch (err) {
@@ -468,11 +509,28 @@ export class SyncCore {
     await this.storage.put('auth', auth);
     const rotateKey = body.rotateKey !== false;
     if (rotateKey) await this.storage.put('displayKey', newDisplayKey());
+    // Every open socket was opened with the old word: close them all, so each
+    // screen finds out now (its reconnect is refused and it asks again).
+    this.closeAll(4001, 'passphrase changed');
+    for (const event of REPLAYED) await this.storage.delete(replayKey(event));
+    await this.storage.delete('live:slides');
     return json({
       session: await this.mintSession(auth.epoch),
       displayKey: await this.displayKey(),
       rotatedKey: rotateKey,
     });
+  }
+
+  /**
+   * The check-in laptop's events (and anything else a signed-in device sends),
+   * relayed to every live screen exactly as given: sealed frames stay sealed.
+   * @param {Request} request
+   */
+  async livePublish(request) {
+    const res = checkPublish(await this.body(request));
+    if (!res.ok) return fail(res.error, res.status);
+    const screens = await this.relay(res.event, res.payload);
+    return json({ ok: true, screens });
   }
 
   /** The scheduled run: keep the calendar fresh without anyone pressing a button. */
