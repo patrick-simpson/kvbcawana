@@ -153,3 +153,12 @@ describe('publishing', () => {
     expect(await syncPublish(BASE, SESSION, 'slides', [], { fetchFn: answer(413, { error: 'too big' }) })).toMatchObject({ ok: false, reason: 'rejected', message: 'too big' });
   });
 });
+
+describe('a feed link that carries the passphrase (OBS, ProPresenter)', () => {
+  it('reads ?passphrase= or ?p=, normalized like a typed word', async () => {
+    const { passphraseFromUrl } = await import('../hooks/useSync.js');
+    expect(passphraseFromUrl('?passphrase=%20Kennebec%20&key=x')).toBe('kennebec');
+    expect(passphraseFromUrl('?p=KENNEBEC')).toBe('kennebec');
+    expect(passphraseFromUrl('?key=x')).toBe('');
+  });
+});

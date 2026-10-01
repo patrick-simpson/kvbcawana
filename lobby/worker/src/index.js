@@ -1,3 +1,4 @@
+/* global WebSocketPair, WebSocketRequestResponsePair -- Cloudflare Workers runtime globals */
 // The Cloudflare Worker: CORS at the edge, then every request goes to ONE
 // Durable Object, so all state lives in one place and every change is applied
 // in order. The behaviour is SyncCore (./sync.js); this file is only wiring.

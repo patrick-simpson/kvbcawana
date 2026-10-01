@@ -4,7 +4,7 @@
 // mounts useSyncDriver() once (it fetches and applies the state); Settings and
 // the slide editor read useSync() and call its actions.
 
-import { useEffect, useSyncExternalStore } from 'react';
+import { useEffect, useRef, useSyncExternalStore } from 'react';
 import {
   SYNC_CHANGE_EVENT,
   SYNC_POLL_MS,
@@ -123,9 +123,24 @@ export function onSyncDoorbell(fn) {
 /**
  * App's half: register how the state is applied (through the sanitizing
  * dispatch path and the config store), then keep it fresh.
- * @param {{ handlers: any, dispatch: (event: string, payload: unknown, handlers: any) => unknown }} deps
+ * @param {{ handlers: any, dispatch: (event: string, payload: unknown, handlers: any) => unknown,
+ *   store?: { config: Record<string, unknown>, overrides: Record<string, unknown>, updateConfig: (patch: Record<string, unknown>) => void } }} deps
  */
-export function useSyncDriver({ handlers, dispatch }) {
+export function useSyncDriver({ handlers, dispatch, store }) {
+  // A feed that cannot be typed into (OBS, ProPresenter) carries the word in
+  // its address: ?passphrase=… signs it in once (owner's choice, 2026-10-01).
+  // The word is then taken out of the address bar, so it is not left on
+  // screen or in this browser's history; the session is what stays.
+  const storeRef = useRef(store);
+  useEffect(() => { storeRef.current = store; }, [store]);
+  useEffect(() => {
+    const word = passphraseFromUrl();
+    if (!word) return;
+    stripPassphraseFromUrl();
+    if (loadSyncSession() || !storeRef.current) return;
+    signIn(word, storeRef.current).catch(() => {});
+  }, []);
+
   useEffect(() => {
     applier = (state) => {
       const { settings, slides } = wirePayloads(state);
@@ -233,6 +248,21 @@ export async function changePassphrase(current, next) {
   saveSyncSession(res.body.session);
   update({ signedIn: true });
   return { ok: true, rotatedKey: Boolean(res.body.rotatedKey) };
+}
+
+/** The ?passphrase= (or ?p=) a feed's link carries, or ''. */
+export function passphraseFromUrl(search = typeof window !== 'undefined' ? window.location.search : '') {
+  const q = new URLSearchParams(search);
+  return normalizeSyncPassphrase(q.get('passphrase') || q.get('p') || '');
+}
+
+function stripPassphraseFromUrl() {
+  try {
+    const url = new URL(window.location.href);
+    url.searchParams.delete('passphrase');
+    url.searchParams.delete('p');
+    window.history.replaceState(window.history.state, '', url);
+  } catch { /* an embed that cannot rewrite its URL keeps it; harmless */ }
 }
 
 /** @returns {SyncSnapshot} */

@@ -563,7 +563,8 @@ export default function App() {
   const { status, lastEventAt, lastCheckinAt, retry, nameStatus, slidesStatus, hasDisplayKey } = useSocket(socketHandlers);
   // The sync service's state (shared settings, the published deck) enters
   // through the same sanitizing dispatch path as a Pusher frame.
-  useSyncDriver({ handlers: socketHandlers, dispatch: dispatchEvent });
+  const syncStore = useMemo(() => ({ config: effectiveConfig, overrides, updateConfig }), [effectiveConfig, overrides, updateConfig]);
+  useSyncDriver({ handlers: socketHandlers, dispatch: dispatchEvent, store: syncStore });
 
   // Which typed deck actually renders: the published one wherever this device
   // follows it (the default), else this device's own. An EMPTY published deck
