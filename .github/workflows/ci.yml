@@ -1,0 +1,138 @@
+name: CI
+
+# One test run for the whole family. Each app keeps exactly the checks its
+# old repo ran; the copies the three used to compare over the network
+# (contract and envelope vectors, the brand kit, family.css) are compared
+# here directly. Nothing deploys from this repo yet: the apps' own workflows
+# sit dormant under their folders (GitHub reads only the root's) until the
+# one-site move at awana.kvbchurch.org replaces them.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  copies:
+    name: Family copies match
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node scripts/check-mirrors.mjs
+
+  lobby:
+    name: Lobby + projector
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: lobby
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: lobby/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run test:coverage
+      - name: Build
+        env:
+          VITE_PUSHER_APP_KEY: ${{ vars.PUSHER_APP_KEY }}
+          VITE_PUSHER_CLUSTER: ${{ vars.PUSHER_CLUSTER }}
+        run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - name: E2E smoke
+        run: npm run e2e
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lobby-playwright-report
+          path: lobby/playwright-report
+          retention-days: 7
+
+  worker:
+    name: Sync Worker
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: lobby
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: |
+            lobby/package-lock.json
+            lobby/worker/package-lock.json
+      - run: npm ci
+      - run: npm ci --prefix worker
+      - run: npx vitest run --config worker/vitest.config.js
+
+  desktop:
+    name: Sound room app (unit tests)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: lobby
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: lobby/package-lock.json
+      - run: npm ci
+      - run: npx vitest run --config desktop/vitest.config.js
+
+  journey:
+    name: Journey kiosk
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: journey
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: journey/package-lock.json
+      - run: npm ci
+      - run: node --check public/src/schedule.js && node --check public/src/sync.js
+      - run: npm test
+
+  printer:
+    name: Club Label Printer
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: printer
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: |
+            printer/package-lock.json
+            printer/print-server/package-lock.json
+      - run: npm ci
+      - run: npm ci
+        working-directory: printer/print-server
+      - run: npm test
+      - run: npm run build
