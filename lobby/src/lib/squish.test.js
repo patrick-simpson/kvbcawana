@@ -252,7 +252,7 @@ describe('the squish composed onto the entrance that grows the piece', () => {
         expect(y, `${entrance} at ${at}+${dur}, t=${t.toFixed(3)}`).toBeGreaterThanOrEqual(Math.min(scale, cap) - 1e-3);
       }
     }
-  });
+  }, 30000); // samples ~20,000 frames; under coverage on a CI runner it passed 5 s
 
   it('squashes at the very end of the entrance, and still rests on the design at the last keyframe', () => {
     for (const { beat, at, dur } of [...names, ...words]) {
