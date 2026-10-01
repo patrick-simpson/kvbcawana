@@ -128,7 +128,7 @@ jobs:
           }
           $smoke = Get-Content $file -Raw | ConvertFrom-Json
           Write-Host "Smoke: $($smoke | ConvertTo-Json -Compress)"
-          if (-not "$($smoke.url)".StartsWith('https://patrick-simpson.github.io/Awana-Check-in-Display/')) { throw "Loaded the wrong page: $($smoke.url)" }
+          if (-not "$($smoke.url)".StartsWith('https://awana.kvbchurch.org/lobby/')) { throw "Loaded the wrong page: $($smoke.url)" }
           $expected = (Get-Content desktop/package.json -Raw | ConvertFrom-Json).version
           if ($smoke.version -ne $expected) { throw "Installed version $($smoke.version), expected $expected" }
 
