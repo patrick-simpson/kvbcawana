@@ -1,0 +1,1310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Club Phone Check-in</title>
+<!-- The brand kit mirror (public/brand/), served to the Wi-Fi without a PIN
+     because this page is the PIN screen; see BRAND_PUBLIC_PATH in server.js.
+     The hex after each var() is the kit's own value, a fallback pinned to
+     tokens.css by scripts/test-dashboard-chrome.cjs. -->
+<link rel="stylesheet" href="/brand/fonts.css">
+<link rel="stylesheet" href="/brand/tokens.css">
+<style>
+  :root {
+    --c-blue: var(--brand-blue, #4C72B8);
+    --c-blue-deep: var(--brand-blue-deep, #34569A);
+    --c-ink: var(--brand-ink, #231F20);
+    --c-hot: var(--brand-hot, #F15A28);
+    --c-hot-deep: var(--brand-hot-deep, #9E3512);
+    --c-sun: var(--brand-sun, #FCB614);
+    --c-orange: var(--brand-orange, #FAA41D);
+    --c-orange-deep: var(--brand-orange-deep, #C97A08);
+    --c-cream: var(--brand-cream, #FFE8C2);
+    --c-cloud: var(--brand-cloud, #D6EFF8);
+    --c-puggles: var(--brand-puggles, #1DB6D9);
+    --c-puggles-deep: var(--brand-puggles-deep, #1A627C);
+    --c-cubbies: var(--brand-cubbies, #4C72B8);
+    --c-cubbies-deep: var(--brand-cubbies-deep, #2F4F8A);
+    --c-sparks: var(--brand-sparks, #F04A4B);
+    --c-sparks-deep: var(--brand-sparks-deep, #B82B32);
+    --c-sparks-tint: var(--brand-sparks-tint, #FDDACF);
+    --c-tnt: var(--brand-tnt, #58BD79);
+    --c-tnt-deep: var(--brand-tnt-deep, #2F8A4E);
+    --c-trek: var(--brand-trek, #047E71);
+    --c-trek-deep: var(--brand-trek-deep, #02554C);
+    --c-journey: var(--brand-journey, #8A649D);
+    --c-journey-deep: var(--brand-journey-deep, #56467F);
+    --bad: var(--c-sparks-deep);
+    --page: #F6F8FB;
+    --line: #E1E7EF;
+    --line-strong: #CFD8E3;
+    --ink-soft: #4A5160;
+    --ink-faint: #6B7280;
+    --f-shout: var(--brand-font-display, 'Paytone One', 'Arial Rounded MT Bold', 'Trebuchet MS', sans-serif);
+    --f-label: var(--brand-font-label, 'Londrina Solid', 'Arial Narrow', 'Helvetica Neue', sans-serif);
+    --f-read: var(--brand-font-body, 'Figtree', 'Segoe UI', system-ui, sans-serif);
+    --quick: var(--brand-dur-quick, 200ms);
+    --ease-pop: var(--brand-ease-pop, cubic-bezier(0.34, 1.56, 0.64, 1));
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body { font-family: var(--f-read); background: var(--page); color: var(--c-ink); padding-bottom: 40px; }
+  /* The header: the Awana Clubs mark and the page name on the Awana blue. The
+     two print buttons wrap to their own row on a narrow phone instead of
+     squeezing the title to nothing. */
+  .header { background: var(--c-blue); color: #fff; padding: 12px 16px; position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: 10px 12px; flex-wrap: wrap; }
+  .brand-mark { display: block; height: 34px; width: auto; flex: none; }
+  .titles { flex: 1 1 180px; min-width: 0; }
+  .header h1 { font-family: var(--f-shout); font-weight: 400; font-size: 21px; line-height: 1.1; }
+  .header .sub { font-size: 12px; line-height: 1.3; color: var(--c-cloud); margin-top: 2px; }
+  .hbtns { display: flex; gap: 8px; flex-wrap: wrap; }
+  .header .hbtn {
+    background: transparent; color: #fff; border: 2px solid rgba(255, 255, 255, 0.75); border-radius: 999px; padding: 6px 14px;
+    font-family: var(--f-label); font-size: 15px; line-height: 1.1; letter-spacing: 0.06em; text-transform: uppercase; white-space: nowrap; display: none;
+  }
+  .header .hbtn.on { background: #fff; color: var(--c-blue-deep); border-color: #fff; }
+  .wrap { padding: 14px; max-width: 520px; margin: 0 auto; }
+  input[type="search"], input[type="password"], input[type="text"], select {
+    width: 100%; padding: 12px 14px; font-family: var(--f-read); font-size: 16px; color: var(--c-ink);
+    border: 2px solid var(--line-strong); border-radius: 12px; background: #fff; outline: none;
+  }
+  input:focus, select:focus { border-color: var(--c-blue); box-shadow: 0 0 0 3px var(--c-cloud); }
+  input[type="checkbox"] { accent-color: var(--c-blue); width: 18px; height: 18px; }
+  /* Ink, not sunflower: a focus ring needs 3:1 against what it sits on, and
+     the sunflower managed under 1.8:1 on the white cards and the page. Ink is
+     3.4:1 or better on every light surface, the header blue included; the one
+     dark surface, the ink toast, gets the sunflower back (9:1 there). */
+  :focus-visible { outline: 3px solid var(--c-ink); outline-offset: 2px; }
+  .pin-box { display: flex; flex-direction: column; gap: 12px; margin-top: 18vh; text-align: center; background: #fff; border-radius: 18px; padding: 22px 18px; box-shadow: 0 2px 0 var(--line); }
+  .pin-box label { font-family: var(--f-label); font-size: 20px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--c-blue); }
+  .pin-box input { text-align: center; font-size: 22px; letter-spacing: 0.3em; }
+  .btn {
+    padding: 12px 18px; border: none; border-radius: 999px; cursor: pointer;
+    font-family: var(--f-label); font-size: 18px; line-height: 1.1; letter-spacing: 0.06em; text-transform: uppercase;
+    background: var(--c-blue); color: #fff; box-shadow: 0 3px 0 var(--c-blue-deep);
+    transition: transform var(--quick) var(--ease-pop);
+  }
+  .btn:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--c-blue-deep); }
+  .btn:disabled { opacity: 0.5; }
+  .btn.hot { background: var(--c-hot); font-weight: 900; box-shadow: 3px 3px 0 var(--c-hot-deep); }
+  .btn.danger { background: var(--c-sparks-deep); box-shadow: 0 3px 0 var(--c-ink); }
+  .btn.ghost { background: #fff; color: var(--c-ink); border: 2px solid var(--line-strong); box-shadow: 0 3px 0 var(--line-strong); }
+  .btn.link { background: none; box-shadow: none; color: var(--c-blue-deep); font-family: var(--f-read); font-size: 14px; font-weight: 600; letter-spacing: 0; text-transform: none; padding: 12px 4px; text-decoration: underline; }
+  /* The three views as one segmented control, the section tabs of this page. */
+  .tabs { display: flex; gap: 4px; background: #fff; border-radius: 999px; padding: 4px; margin-bottom: 12px; box-shadow: 0 2px 0 var(--line); }
+  .tab {
+    flex: 1; padding: 10px; border: none; border-radius: 999px; background: transparent; color: var(--ink-soft);
+    font-family: var(--f-label); font-size: 17px; line-height: 1.1; letter-spacing: 0.05em; text-transform: uppercase; white-space: nowrap;
+  }
+  .tab.on { background: var(--c-blue); color: #fff; box-shadow: 0 2px 0 var(--c-blue-deep); }
+  /* Three tabs do not fit one row on a 360px phone at full size — the
+     third label was clipped off the edge. Must stay AFTER the base .tab rule
+     or it loses the cascade. */
+  @media (max-width: 420px) { .tab { font-size: 15px; padding: 10px 4px; letter-spacing: 0.03em; } }
+  .group-btn {
+    display: flex; align-items: center; justify-content: space-between; width: 100%;
+    background: none; border: none; padding: 16px 2px 2px; color: var(--ink-soft);
+    font-family: var(--f-label); font-size: 16px; letter-spacing: 0.06em; text-transform: uppercase;
+  }
+  .group-btn .caret { font-family: var(--f-read); font-weight: 700; }
+  .kid {
+    --club: transparent;
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    background: #fff; border-radius: 14px; border-left: 6px solid var(--club);
+    padding: 12px 14px; margin-top: 8px; box-shadow: 0 2px 0 var(--line);
+  }
+  .kid .name { font-weight: 700; font-size: 16px; }
+  .kid .club { font-size: 13px; color: var(--ink-faint); }
+  .kid button {
+    flex: none; padding: 9px 16px; border: none; border-radius: 999px; background: var(--c-blue); color: #fff; box-shadow: 0 2px 0 var(--c-blue-deep);
+    font-family: var(--f-label); font-size: 16px; line-height: 1.1; letter-spacing: 0.05em; text-transform: uppercase;
+  }
+  .kid.done { opacity: 0.6; }
+  .kid.done button { background: var(--line); color: var(--ink-soft); box-shadow: none; }
+  .kid button.busy { background: var(--c-sun); color: var(--c-ink); box-shadow: 0 2px 0 var(--c-orange-deep); }
+  .kid button.restore { background: var(--c-ink); box-shadow: none; }
+  .kid button.remove { background: #fff; color: var(--c-sparks-deep); border: 2px solid var(--c-sparks-tint); box-shadow: none; }
+  .kid .tag { display: inline-block; font-family: var(--f-label); font-size: 13px; letter-spacing: 0.06em; text-transform: uppercase; padding: 1px 8px; border-radius: 999px; background: var(--c-cream); color: var(--c-hot-deep); margin-left: 6px; vertical-align: 1px; }
+  .kid[data-club="puggles"] { --club: var(--c-puggles); }
+  .kid[data-club="cubbies"] { --club: var(--c-cubbies); }
+  .kid[data-club="sparks"]  { --club: var(--c-sparks); }
+  .kid[data-club="tnt"]     { --club: var(--c-tnt); }
+  .kid[data-club="trek"]    { --club: var(--c-trek); }
+  .kid[data-club="journey"] { --club: var(--c-journey); }
+  .note { font-size: 13px; line-height: 1.45; color: var(--ink-soft); margin: 10px 2px; }
+  .total { font-family: var(--f-shout); font-weight: 400; font-size: 28px; line-height: 1.1; margin: 8px 2px 4px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 6px; }
+  .chip { font-family: var(--f-label); font-size: 15px; letter-spacing: 0.05em; text-transform: uppercase; background: #fff; border: 2px solid var(--line-strong); border-radius: 999px; padding: 4px 12px; color: var(--c-ink); }
+  .chip.club-chip {
+    font-weight: 900; border-color: var(--club, var(--ink-soft)); background: var(--club, var(--ink-soft)); color: #fff;
+    text-shadow: 0.07em 0.07em 0 var(--club-deep, transparent);
+  }
+  .club-puggles { --club: var(--c-puggles); --club-deep: var(--c-puggles-deep); }
+  .club-cubbies { --club: var(--c-cubbies); --club-deep: var(--c-cubbies-deep); }
+  .club-sparks  { --club: var(--c-sparks);  --club-deep: var(--c-sparks-deep); }
+  .club-tnt     { --club: var(--c-tnt);     --club-deep: var(--c-tnt-deep); }
+  .club-trek    { --club: var(--c-trek);    --club-deep: var(--c-trek-deep); }
+  .club-journey { --club: var(--c-journey); --club-deep: var(--c-journey-deep); }
+  .chip.leader-chip { display: inline-flex; align-items: center; gap: 6px; font-family: var(--f-read); font-size: 14px; letter-spacing: 0; text-transform: none; background: var(--c-cream); border-color: var(--c-orange); }
+  .chip.leader-chip button { border: none; background: transparent; color: var(--c-hot-deep); padding: 2px 4px; font-family: var(--f-label); font-size: 14px; letter-spacing: 0.05em; text-transform: uppercase; }
+  .chip.leader-chip button.x { font-family: var(--f-read); font-size: 18px; line-height: 1; }
+  .group-h { font-family: var(--f-label); font-size: 16px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-soft); margin: 16px 2px 2px; }
+  /* A print panel: a white card whose corner tab names it. */
+  .panel { background: #fff; border-radius: 16px; padding: 0 14px 14px; margin: 8px 0 12px; display: flex; flex-direction: column; gap: 10px; overflow: hidden; box-shadow: 0 2px 0 var(--line); }
+  .corner-tab {
+    --tab: var(--c-blue); --tab-deep: var(--c-blue-deep);
+    position: relative; align-self: flex-start; margin-left: -14px; padding: 10px 52px 20px 16px; isolation: isolate;
+    font-family: var(--f-label); font-weight: 900; font-size: 16px; line-height: 1.15; letter-spacing: 0.06em; text-transform: uppercase;
+    color: #fff; text-shadow: 0.07em 0.07em 0 var(--tab-deep);
+  }
+  .corner-tab::before {
+    content: ''; position: absolute; inset: 0; z-index: -1; background: var(--tab);
+    -webkit-mask: url('/brand/shapes/tab-b-sparks.svg#svgView(preserveAspectRatio(none))') no-repeat 0 0 / 100% 100%;
+    mask: url('/brand/shapes/tab-b-sparks.svg#svgView(preserveAspectRatio(none))') no-repeat 0 0 / 100% 100%;
+  }
+  /* Fail open: if the kit's shape cannot load (a missing mirror), a failed
+     mask would hide the field and leave white type on a white card, so the
+     tab falls back to a plain rounded field. Set by the probe in <head>. */
+  .no-kit-shape .corner-tab::before { -webkit-mask: none; mask: none; border-bottom-right-radius: 16px; }
+  .t-orange  { --tab: var(--c-orange);  --tab-deep: var(--c-orange-deep); }
+  .t-puggles { --tab: var(--c-puggles); --tab-deep: var(--c-puggles-deep); }
+  .t-tnt     { --tab: var(--c-tnt);     --tab-deep: var(--c-tnt-deep); }
+  .sheet { position: fixed; inset: 0; background: rgba(35, 31, 32, 0.55); display: none; align-items: flex-end; z-index: 20; }
+  .sheet .card { background: #fff; width: 100%; max-width: 520px; margin: 0 auto; border-radius: 22px 22px 0 0; padding: 20px 16px 26px; display: flex; flex-direction: column; gap: 12px; }
+  .sheet .title { font-family: var(--f-shout); font-weight: 400; font-size: 21px; line-height: 1.15; }
+  .sheet .body { font-size: 15px; color: var(--ink-soft); line-height: 1.45; }
+  .toast {
+    position: fixed; bottom: 14px; left: 50%; transform: translateX(-50%);
+    background: var(--c-ink); color: #fff; padding: 11px 18px; border-radius: 999px;
+    font-size: 14px; font-weight: 600; display: none; max-width: 92vw; text-align: center; z-index: 30;
+  }
+  .toast button { background: none; border: none; color: var(--c-sun); font-family: var(--f-label); font-size: 15px; letter-spacing: 0.06em; text-transform: uppercase; margin-left: 10px; text-decoration: underline; }
+  .toast :focus-visible { outline-color: var(--c-sun); }
+  .err { color: var(--bad); font-size: 14px; font-weight: 600; min-height: 18px; }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { transition: none !important; animation: none !important; }
+  }
+</style>
+<script>
+  // The corner tabs are masked by the kit's own shape; if it cannot load, say
+  // so on <html> so they fall back to a plain field (see .no-kit-shape).
+  (function () {
+    var probe = new Image();
+    probe.onerror = function () { document.documentElement.classList.add('no-kit-shape'); };
+    probe.src = '/brand/shapes/tab-b-sparks.svg';
+  })();
+</script>
+</head>
+<body>
+<div class="header">
+  <img class="brand-mark" src="/brand/logos/awana-clubs-white.svg" alt="Awana Clubs" width="81" height="34">
+  <div class="titles">
+    <h1>Club Phone Check-in</h1>
+    <div class="sub">Checks the kid in on the door laptop — the label prints there.</div>
+  </div>
+  <div class="hbtns">
+    <button class="hbtn" id="leader-toggle" type="button">Leader tag</button>
+    <button class="hbtn" id="custom-toggle" type="button">Custom label</button>
+  </div>
+</div>
+
+<div class="wrap" id="pin-screen">
+  <div class="pin-box">
+    <label for="pin">Enter the check-in PIN</label>
+    <input type="password" id="pin" inputmode="numeric" autocomplete="off" placeholder="PIN">
+    <div class="err" id="pin-err"></div>
+    <button class="btn" id="pin-btn">Unlock</button>
+  </div>
+</div>
+
+<div class="wrap" id="main-screen" style="display:none">
+  <div class="panel" id="leader-panel" style="display:none">
+    <h2 class="corner-tab t-orange">Leader name tag</h2>
+    <input type="text" id="leader-name" maxlength="80" placeholder="Leader's name" autocomplete="off">
+    <!-- Options are filled from the server's one club list (see loadClubs). -->
+    <select id="leader-club">
+      <option value="">No club</option>
+    </select>
+    <button class="btn hot" id="leader-print" type="button">Print leader tag</button>
+    <div id="leader-chips-wrap" style="display:none">
+      <div class="row" style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+        <span class="note" style="margin:0;font-weight:600">Remembered leaders</span>
+        <button class="btn ghost" id="leader-print-selected" type="button">Print selected</button>
+      </div>
+      <div id="leader-chips" class="chips"></div>
+      <div class="note" id="leader-chips-note" style="margin:0"></div>
+    </div>
+    <div class="err" id="leader-status"></div>
+    <div class="note" style="margin:0">Prints on the door printer. Does not count as a check-in. Whoever you print is remembered for one-tap reprints.</div>
+  </div>
+
+  <!-- Custom label: one line of free text, nothing else on the label. Same
+       panel shape as the leader section above, and the same rule — it prints
+       at the door and counts as nothing. -->
+  <div class="panel" id="custom-panel" style="display:none">
+    <h2 class="corner-tab t-puggles">Custom label</h2>
+    <input type="text" id="custom-text" maxlength="60" placeholder="VOLUNTEER, KITCHEN, Room 4 Helper…" autocomplete="off">
+    <button class="btn" id="custom-print" type="button">Print custom label</button>
+    <div class="err" id="custom-status"></div>
+    <div class="note" style="margin:0">One line of text, auto-sized, on an otherwise blank label. Not counted, not recorded — nothing reaches the lobby screens.</div>
+  </div>
+
+  <div class="tabs" role="tablist">
+    <button class="tab on" type="button" role="tab" aria-selected="true" data-tab="checkin">Check in</button>
+    <button class="tab" type="button" role="tab" aria-selected="false" data-tab="tonight">Tonight <span id="tonight-n"></span></button>
+    <!-- Short label so three tabs fit a 360px phone; the view's own note
+         carries the full "not checked in yet" wording. The count stays blank
+         until a roster has actually loaded — "(0)" would read as "nobody is
+         missing", which is the one thing this tab must never say wrongly. -->
+    <button class="tab" type="button" role="tab" aria-selected="false" data-tab="waiting">Not here <span id="waiting-n"></span></button>
+  </div>
+
+  <div id="checkin-view">
+    <input type="search" id="search" placeholder="Search kids by name…" autocomplete="off" aria-label="Search kids by name">
+    <div class="note">Tap Check in — the door laptop does the real check-in and prints the label. Greyed kids are already in.</div>
+    <div id="list"></div>
+  </div>
+
+  <div id="tonight-view" style="display:none">
+    <div class="total" id="tonight-total"></div>
+    <div class="chips" id="tonight-chips"></div>
+    <!-- Whether the number above agrees with TwoTimTwo's own. Hidden until
+         the check-in page has reported one: silence must never read as
+         agreement. -->
+    <div id="tonight-check" style="display:none;font-size:13px;line-height:1.45;margin:6px 0"></div>
+    <div class="note">This is exactly what the lobby screens are counting. <b>Remove</b> only fixes the count here — it does not undo the check-in on TwoTimTwo.</div>
+    <div id="tonight-list"></div>
+    <button class="btn link" id="visitor-toggle" type="button">Not on the list? Print a visitor label</button>
+    <div class="panel" id="visitor-form" style="display:none">
+      <h2 class="corner-tab t-tnt">Visitor label</h2>
+      <input type="text" id="visitor-name" maxlength="80" placeholder="Visitor's full name" autocomplete="off">
+      <select id="visitor-club"></select>
+      <div class="note" style="margin:0">Prints a first-timer label at the door and counts them tonight. This does <b>not</b> register them in TwoTimTwo — do that at the desk.</div>
+      <button class="btn" id="visitor-print" type="button">Print visitor label</button>
+      <div class="err" id="visitor-status"></div>
+    </div>
+  </div>
+
+  <div id="waiting-view" style="display:none">
+    <div class="total" id="waiting-total"></div>
+    <div class="note">On the roster and not checked in yet, as of the last roster sync. This is <b>not</b> a headcount — it only knows who has had a label printed tonight, so a nickname mismatch or a check-in done outside this server can read as missing.</div>
+    <div id="waiting-list"></div>
+  </div>
+</div>
+
+<div class="sheet" id="confirm-sheet">
+  <div class="card">
+    <div class="title" id="confirm-title"></div>
+    <div class="body" id="confirm-body"></div>
+    <button class="btn danger" id="confirm-ok" type="button">Remove from count</button>
+    <button class="btn ghost" id="confirm-cancel" type="button">Cancel</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+var PIN = sessionStorage.getItem('awanaPhonePin') || '';
+var KIDS = [];
+// The one club list, fetched from the server (GET /clubs) so the phone page,
+// the dashboard and the check-in widget can never disagree about which clubs
+// exist. The baked list is the pre-fetch fallback only.
+var CLUBS = ['Puggles', 'Cubbies', 'Sparks', 'T&T', 'Trek', 'Journey'];
+function loadClubs() {
+  postJson('/clubs', { pin: PIN }).then(function(d) {
+    if (d && Array.isArray(d.clubs) && d.clubs.length) {
+      CLUBS = d.clubs;
+      fillLeaderClubs();
+    }
+  }).catch(function() { fillLeaderClubs(); });
+}
+function fillLeaderClubs() {
+  var sel = document.getElementById('leader-club');
+  if (!sel) return;
+  var keep = sel.value;
+  sel.innerHTML = '<option value="">No club</option>';
+  CLUBS.forEach(function(c) {
+    var o = document.createElement('option');
+    o.value = c; o.textContent = c;
+    sel.appendChild(o);
+  });
+  if (keep) sel.value = keep;
+}
+
+// Per-kid transient UI state, keyed by kid.name.toLowerCase(). Presence of a
+// key here means "this phone has a check-in for this kid in flight (or just
+// failed/timed out) — don't let a background roster refresh clobber it".
+// Anything NOT in STATE just renders straight off KIDS[i].checkedIn (server
+// truth). Keeping this out of the DOM (rather than mutating buttons in place)
+// is what lets render() be called freely from the search box, the periodic
+// roster refresh, and visibilitychange without losing a "Working…" button.
+var STATE = {};
+
+// Tonight tab: the server's own "who is checked in" set (POST /phone/tonight)
+// — the same deduped list the lobby tally is built from. REMOVING mirrors
+// STATE for rows whose Remove is in flight.
+var TONIGHT = { checkedIn: 0, visitors: 0, byClub: {}, entries: [] };
+var REMOVING = {};
+var activeTab = 'checkin';
+
+// "Not here yet" tab. `rosterLoaded` exists so an unknown roster can never be
+// rendered as a confident empty list ("everyone is here") — the same rule the
+// lobby screens' checkout board follows. In-memory only: no config key, no
+// storage key.
+var NO_CLUB = 'No club';
+var rosterLoaded = false;
+var waitingCollapsed = {};   // club label -> true
+
+var unlockedState = false;   // true once we're past the PIN screen
+var unlockInFlight = false;  // guards unlock() against double-taps / Enter-mashing
+var pinCountdownTimer = null;
+
+var ROSTER_POLL_BASE_MS = 12000;   // ~12s — same family as the laptop dashboard's 10-15s poll
+var ROSTER_POLL_MAX_MS = 60000;
+var rosterPollMs = ROSTER_POLL_BASE_MS;
+var rosterPollTimer = null;
+var rosterPollResumeTimer = null;
+var rosterFetchInFlight = false;
+var pollActive = false;      // false while stopped by a 403/429 or before unlock
+
+function toast(msg, ms, actionLabel, onAction) {
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  if (actionLabel && onAction) {
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = actionLabel;
+    b.addEventListener('click', function() { t.style.display = 'none'; onAction(); });
+    t.appendChild(b);
+  }
+  t.style.display = 'block';
+  clearTimeout(t._timer);
+  t._timer = setTimeout(function() { t.style.display = 'none'; }, ms || 3000);
+}
+
+function esc(s) { return String(s == null ? '' : s); }
+
+// A club name to the brand kit's club key, for the row's colour edge and the
+// Tonight chips. The same rules as clubKey() in server.js; '' for anything else.
+function clubKit(name) {
+  var n = String(name || '').trim().toLowerCase();
+  if (!n) return '';
+  if (n.indexOf('puggle') !== -1) return 'puggles';
+  if (n.indexOf('cubbie') !== -1) return 'cubbies';
+  if (n.indexOf('spark') !== -1) return 'sparks';
+  if (n.indexOf('trek') !== -1) return 'trek';
+  if (n.indexOf('journey') !== -1) return 'journey';
+  if (n.indexOf('t&t') !== -1 || n.indexOf('t & t') !== -1 || n === 'tnt' || n === 't t') return 'tnt';
+  return '';
+}
+
+// One low-level POST, used by the initial unlock, the auto-unlock-on-load,
+// every background refresh and every Tonight-tab action — so all of them agree
+// on what 403/429/network mean. Throws an Error with a `.code` of
+// 'pin' | 'locked' | 'network' | 'http'; a 'locked' error also carries
+// `.retryAfter` (seconds) read off the server's Retry-After header; an 'http'
+// error carries `.status` and the server's `.message` when it sent one.
+function postJson(path, body) {
+  return fetch(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body || {})
+  }).then(function(r) {
+    if (r.status === 403) {
+      var pinErr = new Error('pin'); pinErr.code = 'pin'; throw pinErr;
+    }
+    // The server rate-limits wrong PINs, so distinguish "locked out" from
+    // "wrong" — otherwise a volunteer who fat-fingered it a few times sees
+    // "cannot reach the print server" and starts debugging the WiFi.
+    if (r.status === 429) {
+      var retryAfter = parseInt(r.headers.get('Retry-After'), 10);
+      var lockedErr = new Error('locked');
+      lockedErr.code = 'locked';
+      lockedErr.retryAfter = (isFinite(retryAfter) && retryAfter > 0) ? retryAfter : 60;
+      throw lockedErr;
+    }
+    if (!r.ok) {
+      return r.json().catch(function() { return null; }).then(function(data) {
+        var httpErr = new Error((data && data.error) || 'network');
+        httpErr.code = r.status >= 500 || !data ? 'network' : 'http';
+        httpErr.status = r.status;
+        throw httpErr;
+      });
+    }
+    return r.json();
+  });
+}
+
+function fetchRoster(pin) { return postJson('/phone/roster', { pin: pin }); }
+function fetchTonight(pin) { return postJson('/phone/tonight', { pin: pin }); }
+
+// ── PIN screen ────────────────────────────────────────────────────────────
+function clearPinCountdown() {
+  clearInterval(pinCountdownTimer);
+  pinCountdownTimer = null;
+}
+
+// Live countdown ("try again in 37s…") instead of a static message, ticking
+// once a second off the server's own Retry-After value. Keeps the unlock
+// button disabled for the duration so mashing Enter can't re-arm the limiter
+// the moment it opens back up.
+function startPinCountdown(seconds) {
+  clearPinCountdown();
+  var remaining = seconds;
+  var btn = document.getElementById('pin-btn');
+  var err = document.getElementById('pin-err');
+  btn.disabled = true;
+  function tick() {
+    if (remaining <= 0) {
+      clearPinCountdown();
+      err.textContent = '';
+      btn.disabled = false;
+      return;
+    }
+    err.textContent = 'Too many wrong PINs — try again in ' + remaining + 's';
+    remaining -= 1;
+  }
+  tick();
+  pinCountdownTimer = setInterval(tick, 1000);
+}
+
+function showMainScreen() {
+  document.getElementById('pin-screen').style.display = 'none';
+  document.getElementById('main-screen').style.display = 'block';
+  document.getElementById('leader-toggle').style.display = 'inline-block';
+  document.getElementById('custom-toggle').style.display = 'inline-block';
+}
+
+function showPinScreen(message) {
+  document.getElementById('main-screen').style.display = 'none';
+  document.getElementById('pin-screen').style.display = 'block';
+  document.getElementById('leader-toggle').style.display = 'none';
+  document.getElementById('custom-toggle').style.display = 'none';
+  document.getElementById('pin').value = '';
+  document.getElementById('pin-err').textContent = message || '';
+}
+
+// A 403 mid-poll means the desk changed the PIN out from under this phone.
+// A background timer must never be allowed to keep hammering the (now wrong)
+// saved PIN into the limiter, so this stops the loop outright rather than
+// backing off and retrying.
+function handlePinInvalidated() {
+  stopRosterPoll();
+  unlockedState = false;
+  sessionStorage.removeItem('awanaPhonePin');
+  PIN = '';
+  STATE = {};
+  REMOVING = {};
+  // The next volunteer must not see the previous PIN's missing list, and an
+  // unknown roster must read as unknown again rather than as "nobody missing".
+  rosterLoaded = false;
+  waitingCollapsed = {};
+  TONIGHT = { checkedIn: 0, visitors: 0, byClub: {}, entries: [] };
+  // Volunteers' names came from a PIN-gated call, so they leave with the PIN.
+  leaderSelection = {};
+  renderLeaderChips([], 0);
+  // The count check came from the same PIN-gated call; leave no stale verdict
+  // on screen for whoever picks the phone up next.
+  renderCountCheck(null);
+  clearPinCountdown();
+  showPinScreen('PIN changed — ask the check-in desk for the new PIN.');
+}
+
+// A 429 mid-poll means this address is rate-limited (could be this phone,
+// could be another device sharing the same NAT'd address) — not something a
+// re-typed PIN fixes. Stop polling immediately (same reason as the 403 case:
+// a timer must never grind the limiter) and resume on its own once the
+// lockout the server told us about should have cleared.
+function handleLockoutDuringPoll(retryAfterSeconds) {
+  var secs = (isFinite(retryAfterSeconds) && retryAfterSeconds > 0) ? retryAfterSeconds : 60;
+  pollActive = false;
+  clearTimeout(rosterPollTimer);
+  rosterPollTimer = null;
+  toast('Too many requests — pausing live updates for ' + secs + 's.', 6000);
+  clearTimeout(rosterPollResumeTimer);
+  rosterPollResumeTimer = setTimeout(function() { startRosterPoll(); }, (secs + 1) * 1000);
+}
+
+// Shared by an action's error path: the two "stop everything" codes get their
+// dedicated handlers; anything else is shown and the views are resynced.
+function handleActionError(e, prefix) {
+  if (e.code === 'pin') { handlePinInvalidated(); return; }
+  if (e.code === 'locked') { handleLockoutDuringPoll(e.retryAfter); return; }
+  toast(prefix + (e.code === 'network' ? 'cannot reach the print server. Same Wi-Fi?' : e.message), 5000);
+  refreshAll();
+}
+
+function unlock() {
+  if (unlockInFlight) return; // ignore double-taps / Enter-mashing while a request is outstanding
+  var pinVal = document.getElementById('pin').value.trim();
+  if (!pinVal) return;
+  unlockInFlight = true;
+  var btn = document.getElementById('pin-btn');
+  btn.disabled = true;
+  fetchRoster(pinVal).then(function(data) {
+    PIN = pinVal;
+    sessionStorage.setItem('awanaPhonePin', PIN);
+    KIDS = data.kids || [];
+    rosterLoaded = true;
+    STATE = {};
+    unlockedState = true;
+    showMainScreen();
+    render();
+    startRosterPoll();
+    refreshTonight();
+    loadClubs();
+    refreshLeaders();
+    unlockInFlight = false;
+    btn.disabled = false;
+  }).catch(function(e) {
+    unlockInFlight = false;
+    if (e.code === 'locked') {
+      startPinCountdown(e.retryAfter); // manages btn.disabled itself for the duration
+      return;
+    }
+    btn.disabled = false;
+    document.getElementById('pin-err').textContent =
+      e.code === 'pin' ? 'Wrong PIN — ask the check-in desk.'
+      : 'Cannot reach the print server. Same Wi-Fi?';
+  });
+}
+document.getElementById('pin-btn').addEventListener('click', unlock);
+document.getElementById('pin').addEventListener('keydown', function(e) { if (e.key === 'Enter') unlock(); });
+
+// ── Tabs ──────────────────────────────────────────────────────────────────
+function setTab(name) {
+  activeTab = name;
+  var tabs = document.querySelectorAll('.tab');
+  for (var i = 0; i < tabs.length; i++) {
+    tabs[i].className = 'tab' + (tabs[i].getAttribute('data-tab') === name ? ' on' : '');
+    tabs[i].setAttribute('aria-selected', tabs[i].getAttribute('data-tab') === name ? 'true' : 'false');
+  }
+  document.getElementById('checkin-view').style.display = name === 'checkin' ? 'block' : 'none';
+  document.getElementById('tonight-view').style.display = name === 'tonight' ? 'block' : 'none';
+  document.getElementById('waiting-view').style.display = name === 'waiting' ? 'block' : 'none';
+  if (name === 'tonight') refreshTonight(); // catch up right away, don't wait for the tick
+  if (name === 'waiting') renderWaiting();  // no fetch: it re-reads the roster the page already polls
+}
+(function() {
+  var tabs = document.querySelectorAll('.tab');
+  for (var i = 0; i < tabs.length; i++) {
+    tabs[i].addEventListener('click', function(e) { setTab(e.currentTarget.getAttribute('data-tab')); });
+  }
+})();
+
+// ── Roster + rendering ────────────────────────────────────────────────────
+function render() {
+  var q = document.getElementById('search').value.trim().toLowerCase();
+  var list = document.getElementById('list');
+  list.innerHTML = '';
+  var shown = KIDS.filter(function(k) { return !q || k.name.toLowerCase().indexOf(q) !== -1; }).slice(0, 40);
+  shown.forEach(function(k) {
+    var key = k.name.toLowerCase();
+    var st = STATE[key];
+    var row = document.createElement('div');
+    row.className = 'kid' + (!st && k.checkedIn ? ' done' : '');
+    row.setAttribute('data-club', clubKit(k.club));
+    var left = document.createElement('div');
+    var nm = document.createElement('div'); nm.className = 'name'; nm.textContent = k.name;
+    var cl = document.createElement('div'); cl.className = 'club';
+    cl.textContent = (k.club || '') + (!st && !k.checkedIn && k.removedHere ? ' · removed from tonight’s count on a phone' : '');
+    left.appendChild(nm); left.appendChild(cl);
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    if (st && st.status === 'sending') {
+      btn.textContent = 'Sending…'; btn.disabled = true; btn.classList.add('busy');
+    } else if (st && st.status === 'pending') {
+      btn.textContent = 'Working…'; btn.disabled = true; btn.classList.add('busy');
+    } else if (st && st.status === 'noanswer') {
+      btn.textContent = 'No answer'; btn.disabled = true;
+    } else if (st && st.status === 'restoring') {
+      btn.textContent = 'Adding…'; btn.disabled = true; btn.classList.add('busy');
+    } else if (k.checkedIn) {
+      btn.textContent = 'Checked in'; btn.disabled = true;
+    } else if (k.removedHere) {
+      // A driven check-in for a kid still on TwoTimTwo would be short-circuited
+      // by the door laptop ("already checked in"), so offer the reverse of the
+      // Remove instead.
+      btn.textContent = 'Add back'; btn.classList.add('restore');
+      btn.addEventListener('click', function() { restore({ name: k.name, key: key }); });
+    } else {
+      btn.textContent = 'Check in'; btn.disabled = false;
+      btn.addEventListener('click', function() { checkIn(k); });
+    }
+    row.appendChild(left); row.appendChild(btn);
+    list.appendChild(row);
+  });
+  if (!shown.length) {
+    list.innerHTML = '<div class="note">No kids match. The roster comes from the last CSV sync on the door laptop.</div>';
+  }
+  // Driven from inside render() (not only from the poll) because render() is
+  // also what a check-in, an undo and the search box call — otherwise the
+  // waiting list would go stale the moment someone checked a kid in.
+  renderWaiting();
+}
+document.getElementById('search').addEventListener('input', render);
+
+// Waiting = on the roster, not in tonight's active set, still an active
+// clubber. A kid a phone Removed (removedHere) IS waiting — the server has
+// taken them out of the count — but the row says so, so nobody calls a family
+// whose child is standing in the room.
+//
+// Known limitation, inherited from the route rather than introduced here:
+// /phone/roster's checked-in set is name-keyed while the history is keyed by
+// clubberId, so two children with the same name both read as checked in once
+// either one is — one twin can be missing from this list. Not fixable in the
+// browser; the roster payload carries no id.
+function waitingKids() {
+  return KIDS.filter(function(k) { return !k.checkedIn && !k.inactive; });
+}
+
+// Awana order first (CLUBS, from /clubs), then anything unfamiliar the CSV
+// carries, then "No club" — the same ordering rule fillVisitorClubs() uses.
+function waitingClubRank(label) {
+  if (label === NO_CLUB) return 900;
+  var low = label.toLowerCase();
+  for (var i = 0; i < CLUBS.length; i++) {
+    if (low.indexOf(CLUBS[i].toLowerCase()) !== -1) return i;
+  }
+  return 500;
+}
+
+function renderWaiting() {
+  var badge = document.getElementById('waiting-n');
+  var total = document.getElementById('waiting-total');
+  var list = document.getElementById('waiting-list');
+  if (!badge || !total || !list) return;
+  // Unknown is not zero: with no roster in hand an empty list would read as
+  // "everyone is here", so the badge stays blank and the view says so.
+  if (!rosterLoaded) {
+    badge.textContent = '';
+    if (activeTab !== 'waiting') return;
+    total.textContent = 'Roster not loaded';
+    list.innerHTML = '<div class="note">This phone has not managed to read the roster yet, so it cannot say who is missing. It keeps retrying on its own.</div>';
+    return;
+  }
+  var waiting = waitingKids();
+  badge.textContent = '(' + waiting.length + ')';
+  if (activeTab !== 'waiting') return;   // badge always current, DOM only when visible
+  if (!KIDS.length) {
+    total.textContent = 'No roster';
+    list.innerHTML = '<div class="note">The roster is empty — sync the CSV on the door laptop. Nobody can be counted missing until it loads.</div>';
+    return;
+  }
+  total.textContent = waiting.length + ' not here yet';
+  list.innerHTML = '';
+  if (!waiting.length) {
+    list.innerHTML = '<div class="note">Everyone on the roster is checked in.</div>';
+    return;
+  }
+  var groups = {};
+  waiting.forEach(function(k) {
+    var g = (k.club || '').trim() || NO_CLUB;
+    (groups[g] = groups[g] || []).push(k);
+  });
+  var labels = Object.keys(groups).sort(function(a, b) {
+    var d = waitingClubRank(a) - waitingClubRank(b);
+    return d || a.localeCompare(b);
+  });
+  // A CSV with no Club column groups everyone under "No club" — one flat list
+  // reads better there than a single pointless header.
+  var single = labels.length === 1;
+  labels.forEach(function(g) {
+    var rows = groups[g].slice().sort(function(a, b) { return a.name.localeCompare(b.name); });
+    var collapsed = !!waitingCollapsed[g];
+    if (!single) {
+      var h = document.createElement('button');
+      h.type = 'button';
+      h.className = 'group-btn';
+      h.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+      var lbl = document.createElement('span');
+      lbl.textContent = g + ' · ' + rows.length;
+      var caret = document.createElement('span');
+      caret.className = 'caret';
+      caret.textContent = collapsed ? '▸' : '▾';
+      h.appendChild(lbl); h.appendChild(caret);
+      h.addEventListener('click', function() {
+        if (waitingCollapsed[g]) delete waitingCollapsed[g]; else waitingCollapsed[g] = true;
+        renderWaiting();
+      });
+      list.appendChild(h);
+    }
+    if (collapsed && !single) return;
+    rows.forEach(function(k) {
+      var row = document.createElement('div'); row.className = 'kid';
+      row.setAttribute('data-club', clubKit(k.club));
+      var left = document.createElement('div');
+      var nm = document.createElement('div'); nm.className = 'name'; nm.textContent = k.name;
+      var sub = document.createElement('div'); sub.className = 'club';
+      sub.textContent = k.removedHere ? 'removed from tonight’s count on a phone' : (single ? (k.club || '') : '');
+      left.appendChild(nm); left.appendChild(sub);
+      row.appendChild(left);
+      list.appendChild(row);
+    });
+  });
+}
+
+function renderTonight() {
+  var n = document.getElementById('tonight-n');
+  n.textContent = '(' + (TONIGHT.checkedIn || 0) + ')';
+  var total = document.getElementById('tonight-total');
+  total.textContent = (TONIGHT.checkedIn || 0) + ' checked in tonight' +
+    (TONIGHT.visitors ? ' · ' + TONIGHT.visitors + ' visitor' + (TONIGHT.visitors === 1 ? '' : 's') : '');
+
+  var chips = document.getElementById('tonight-chips');
+  chips.innerHTML = '';
+  Object.keys(TONIGHT.byClub || {}).sort().forEach(function(club) {
+    var c = document.createElement('span'); c.className = 'chip club-chip' + (clubKit(club) ? ' club-' + clubKit(club) : '');
+    c.textContent = club + ' ' + TONIGHT.byClub[club];
+    chips.appendChild(c);
+  });
+
+  var list = document.getElementById('tonight-list');
+  list.innerHTML = '';
+  var entries = TONIGHT.entries || [];
+  if (!entries.length) {
+    list.innerHTML = '<div class="note">No one is counted yet tonight.</div>';
+    return;
+  }
+  var groups = {};
+  entries.forEach(function(e) {
+    var g = e.clubName || 'No club';
+    (groups[g] = groups[g] || []).push(e);
+  });
+  Object.keys(groups).sort().forEach(function(g) {
+    var h = document.createElement('div'); h.className = 'group-h'; h.textContent = g + ' · ' + groups[g].length;
+    list.appendChild(h);
+    groups[g].sort(function(a, b) { return String(b.at).localeCompare(String(a.at)); }).forEach(function(e) {
+      var row = document.createElement('div'); row.className = 'kid';
+      row.setAttribute('data-club', clubKit(e.clubName));
+      var left = document.createElement('div');
+      var nm = document.createElement('div'); nm.className = 'name';
+      nm.textContent = (e.firstName + ' ' + e.lastName).trim();
+      if (e.visitor) { var tag = document.createElement('span'); tag.className = 'tag'; tag.textContent = 'Visitor'; nm.appendChild(tag); }
+      var when = document.createElement('div'); when.className = 'club';
+      var d = new Date(e.at);
+      when.textContent = isNaN(d.getTime()) ? '' : d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+      left.appendChild(nm); left.appendChild(when);
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      if (REMOVING[e.key]) {
+        btn.textContent = 'Removing…'; btn.disabled = true; btn.classList.add('busy');
+      } else {
+        btn.textContent = 'Remove'; btn.classList.add('remove');
+        btn.addEventListener('click', function() { askRemove(e); });
+      }
+      row.appendChild(left); row.appendChild(btn);
+      list.appendChild(row);
+    });
+  });
+}
+
+// Folds a fresh server roster into KIDS. A kid this phone has a check-in
+// in flight for (anything with a STATE entry) keeps its EXISTING object —
+// same identity, same locally-known checkedIn value — so the "Working…"
+// button and the eventual `kid.checkedIn = true` from pollStatus still land
+// on the row actually on screen. Everyone else adopts the server's row
+// wholesale, which is how another phone's check-in (or an undo) shows up
+// here without a manual refresh.
+function mergeRoster(serverKids) {
+  rosterLoaded = true;   // a payload actually arrived: the waiting tab may speak
+  var oldByName = {};
+  KIDS.forEach(function(k) { oldByName[k.name.toLowerCase()] = k; });
+  KIDS = serverKids.map(function(sk) {
+    var key = sk.name.toLowerCase();
+    if (Object.prototype.hasOwnProperty.call(STATE, key) && oldByName[key]) {
+      return oldByName[key];
+    }
+    return sk;
+  });
+  fillVisitorClubs();
+}
+
+// The visitor form's club list: every club the roster mentions, in Awana
+// order, then anything unfamiliar the CSV carries, then "No club".
+function fillVisitorClubs() {
+  var sel = document.getElementById('visitor-club');
+  var current = sel.value;
+  var seen = {};
+  var clubs = [];
+  CLUBS.forEach(function(c) { seen[c] = true; clubs.push(c); });
+  KIDS.forEach(function(k) { var c = (k.club || '').trim(); if (c && !seen[c]) { seen[c] = true; clubs.push(c); } });
+  sel.innerHTML = '';
+  clubs.forEach(function(c) { var o = document.createElement('option'); o.textContent = c; o.value = c; sel.appendChild(o); });
+  var none = document.createElement('option'); none.value = ''; none.textContent = 'No club'; sel.appendChild(none);
+  if (current) sel.value = current;
+}
+
+function scheduleRosterPoll(delay) {
+  clearTimeout(rosterPollTimer);
+  if (!pollActive) return;
+  rosterPollTimer = setTimeout(refreshAll, delay == null ? rosterPollMs : delay);
+}
+
+function stopRosterPoll() {
+  pollActive = false;
+  clearTimeout(rosterPollTimer);
+  rosterPollTimer = null;
+  clearTimeout(rosterPollResumeTimer);
+  rosterPollResumeTimer = null;
+}
+
+function startRosterPoll() {
+  pollActive = true;
+  rosterPollMs = ROSTER_POLL_BASE_MS;
+  scheduleRosterPoll();
+}
+
+// One tick refreshes BOTH views from the server (roster + tonight), so the
+// Check-in tab's greyed kids and the Tonight tab's list can never drift apart.
+function refreshAll() {
+  if (!pollActive || rosterFetchInFlight) return;
+  if (document.hidden) { scheduleRosterPoll(); return; } // only poll while the tab is on screen
+  rosterFetchInFlight = true;
+  Promise.all([fetchRoster(PIN), fetchTonight(PIN)]).then(function(results) {
+    rosterFetchInFlight = false;
+    rosterPollMs = ROSTER_POLL_BASE_MS; // a success clears any backoff
+    mergeRoster(results[0].kids || []);
+    applyTonight(results[1]);
+    render();
+    renderTonight();
+    scheduleRosterPoll();
+  }).catch(function(e) {
+    rosterFetchInFlight = false;
+    if (e.code === 'pin') { handlePinInvalidated(); return; }
+    if (e.code === 'locked') { handleLockoutDuringPoll(e.retryAfter); return; }
+    // Network hiccup: skip this tick and back off, up to ~60s, until a
+    // fetch actually succeeds again.
+    rosterPollMs = Math.min(rosterPollMs * 2, ROSTER_POLL_MAX_MS);
+    scheduleRosterPoll();
+  });
+}
+var refreshRoster = refreshAll; // older name, kept for the pollStatus/checkIn paths below
+
+// A Remove this phone has in flight keeps the row hidden until the server
+// confirms (or the failure path puts it back) — same idea as STATE for kids.
+function applyTonight(data) {
+  if (!data || typeof data !== 'object') return;
+  TONIGHT = {
+    checkedIn: Number(data.checkedIn) || 0,
+    visitors: Number(data.visitors) || 0,
+    byClub: data.byClub || {},
+    entries: (data.entries || []).filter(function(e) { return !REMOVING[e.key]; })
+  };
+}
+
+// The print server's count against TwoTimTwo's own. A shortfall means a child
+// is checked in on TwoTimTwo wearing no label — the case worth walking over
+// for. An excess is usually a walk-in guest never registered there, and the
+// server has already subtracted those.
+function renderCountCheck(v) {
+  var el = document.getElementById('tonight-check');
+  if (!el) return;
+  if (!v || !v.known) { el.style.display = 'none'; return; }
+  el.style.display = '';
+  if (v.matches) {
+    el.style.color = '#15803d';
+    el.textContent = '\u2713 Matches TwoTimTwo (' + (v.theirs || 0) + ')';
+    return;
+  }
+  var short = v.unexplained < 0;
+  var clubs = (v.byClub || []).filter(function(c) { return c.unexplained !== 0; })
+    .map(function(c) { return c.club + ' ' + (c.unexplained < 0 ? '\u2212' : '+') + Math.abs(c.unexplained); })
+    .join(', ');
+  el.style.color = short ? '#b91c1c' : '#b45309';
+  el.textContent = '\u26A0 TwoTimTwo ' + v.theirs + ' \u00B7 printed ' + v.ours + ' \u2014 '
+    + Math.abs(v.unexplained) + (short ? ' with no label' : ' extra')
+    + (clubs ? ' (' + clubs + ')' : '');
+}
+
+function refreshCountCheck() {
+  if (!unlockedState) return;
+  postJson('/reconcile', { pin: PIN })
+    .then(renderCountCheck)
+    .catch(function() { /* the Tonight poll surfaces PIN/lockout trouble */ });
+}
+
+function refreshTonight() {
+  if (!unlockedState) return;
+  refreshCountCheck();
+  fetchTonight(PIN).then(function(data) {
+    applyTonight(data);
+    renderTonight();
+  }).catch(function(e) {
+    if (e.code === 'pin') { handlePinInvalidated(); return; }
+    if (e.code === 'locked') { handleLockoutDuringPoll(e.retryAfter); return; }
+    /* a transient miss here is picked up by the next refreshAll tick */
+  });
+}
+
+document.addEventListener('visibilitychange', function() {
+  if (document.hidden) return;
+  if (!unlockedState || !pollActive) return;
+  refreshAll(); // catch up immediately on returning to the tab, don't wait for the next tick
+});
+
+// ── Check-in ──────────────────────────────────────────────────────────────
+function checkIn(kid) {
+  var key = kid.name.toLowerCase();
+  STATE[key] = { status: 'sending', tries: 0 };
+  render();
+  fetch('/phone/checkin', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: kid.name, pin: PIN })
+  }).then(function(r) { return r.json(); }).then(function(data) {
+    if (!data.id) throw new Error(data.error || 'failed');
+    STATE[key] = { status: 'pending', id: data.id, tries: 0 };
+    render();
+    pollStatus(key, kid);
+  }).catch(function(e) {
+    delete STATE[key];
+    render();
+    toast('Could not queue: ' + e.message);
+  });
+}
+
+function pollStatus(key, kid) {
+  var st = STATE[key];
+  if (!st || st.status !== 'pending') return; // superseded (e.g. cleared elsewhere)
+  if (st.tries > 45) { // ~90 s — the laptop may be closed
+    STATE[key] = { status: 'noanswer' };
+    render();
+    toast('The door laptop is not responding — check in there instead.', 5000);
+    return;
+  }
+  setTimeout(function() {
+    var cur = STATE[key];
+    if (!cur || cur.status !== 'pending') return;
+    fetch('/phone/status/' + cur.id).then(function(r) { return r.json(); }).then(function(s) {
+      if (s.status === 'done') {
+        kid.checkedIn = true;
+        delete STATE[key];
+        toast(kid.name + ' is checked in — label printing at the door.');
+        render();
+        refreshRoster(); // pick up server truth (and any other pending updates) right away
+      } else if (s.status === 'failed') {
+        delete STATE[key];
+        render();
+        toast('Check-in failed: ' + (s.detail || 'see the door laptop'), 5000);
+        refreshRoster();
+      } else {
+        cur.tries += 1;
+        pollStatus(key, kid);
+      }
+    }).catch(function() {
+      cur.tries += 1;
+      pollStatus(key, kid);
+    });
+  }, 2000);
+}
+
+// ── Tonight: remove / add back ────────────────────────────────────────────
+function identityOf(entryOrKid) {
+  if (entryOrKid.firstName !== undefined) {
+    return { firstName: entryOrKid.firstName, lastName: entryOrKid.lastName, clubberId: entryOrKid.clubberId || null };
+  }
+  var parts = String(entryOrKid.name || '').trim().split(/\s+/);
+  return { firstName: parts[0] || '', lastName: parts.slice(1).join(' '), clubberId: null };
+}
+function displayName(ident) { return (ident.firstName + ' ' + ident.lastName).trim(); }
+
+var pendingConfirm = null;
+function askRemove(entry) {
+  var name = (entry.firstName + ' ' + entry.lastName).trim();
+  pendingConfirm = entry;
+  document.getElementById('confirm-title').textContent = 'Remove ' + name + ' from tonight’s count?';
+  document.getElementById('confirm-body').textContent =
+    'This only changes the count on the lobby screens and this list. It does NOT undo the check-in on TwoTimTwo — if ' +
+    entry.firstName + ' really left, also undo them on the door laptop.';
+  document.getElementById('confirm-sheet').style.display = 'flex';
+}
+function closeConfirm() {
+  pendingConfirm = null;
+  document.getElementById('confirm-sheet').style.display = 'none';
+}
+document.getElementById('confirm-cancel').addEventListener('click', closeConfirm);
+document.getElementById('confirm-sheet').addEventListener('click', function(e) { if (e.target === e.currentTarget) closeConfirm(); });
+document.getElementById('confirm-ok').addEventListener('click', function() {
+  var entry = pendingConfirm;
+  closeConfirm();
+  if (entry) removeEntry(entry);
+});
+
+function removeEntry(entry) {
+  var ident = identityOf(entry);
+  var name = displayName(ident);
+  // Optimistic: drop the row and decrement now; the server's answer (or the
+  // next refresh) is the truth either way.
+  REMOVING[entry.key] = true;
+  TONIGHT.entries = (TONIGHT.entries || []).filter(function(e) { return e.key !== entry.key; });
+  TONIGHT.checkedIn = Math.max(0, (TONIGHT.checkedIn || 0) - 1);
+  var g = entry.clubName || 'No club';
+  if (TONIGHT.byClub && TONIGHT.byClub[g]) { TONIGHT.byClub[g] -= 1; if (!TONIGHT.byClub[g]) delete TONIGHT.byClub[g]; }
+  if (entry.visitor && TONIGHT.visitors) TONIGHT.visitors -= 1;
+  renderTonight();
+  postJson('/phone/undo', { pin: PIN, firstName: ident.firstName, lastName: ident.lastName, clubberId: ident.clubberId }).then(function() {
+    delete REMOVING[entry.key];
+    toast(name + ' removed from tonight’s count.', 6000, 'Undo', function() { restore(entry); });
+    refreshAll();
+  }).catch(function(e) {
+    delete REMOVING[entry.key];
+    if (e.code === 'http' && e.status === 404) { toast('Already removed — refreshing.'); refreshAll(); return; }
+    handleActionError(e, 'Could not remove: ');
+  });
+}
+
+function restore(entryOrKid) {
+  var ident = identityOf(entryOrKid);
+  var name = displayName(ident);
+  var key = name.toLowerCase();
+  STATE[key] = { status: 'restoring' };
+  render();
+  postJson('/phone/restore', { pin: PIN, firstName: ident.firstName, lastName: ident.lastName, clubberId: ident.clubberId }).then(function() {
+    delete STATE[key];
+    toast(name + ' is back in tonight’s count.');
+    refreshAll();
+  }).catch(function(e) {
+    delete STATE[key];
+    render();
+    if (e.code === 'http' && e.status === 404) { toast('Nothing to add back for ' + name + ' — use Check in.', 5000); refreshAll(); return; }
+    handleActionError(e, 'Could not add back: ');
+  });
+}
+
+// ── Tonight: visitor label ────────────────────────────────────────────────
+document.getElementById('visitor-toggle').addEventListener('click', function() {
+  var f = document.getElementById('visitor-form');
+  var show = f.style.display === 'none';
+  f.style.display = show ? 'flex' : 'none';
+  if (show) { fillVisitorClubs(); document.getElementById('visitor-name').focus(); }
+});
+var visitorInFlight = false;
+function printVisitor() {
+  if (visitorInFlight) return;
+  var name = document.getElementById('visitor-name').value.trim();
+  var status = document.getElementById('visitor-status');
+  if (!name || name.split(/\s+/).length < 2) { status.textContent = 'Type the visitor’s first and last name.'; return; }
+  visitorInFlight = true;
+  status.textContent = '';
+  var btn = document.getElementById('visitor-print');
+  btn.disabled = true;
+  postJson('/phone/visitor', { pin: PIN, name: name, clubName: document.getElementById('visitor-club').value }).then(function(data) {
+    visitorInFlight = false; btn.disabled = false;
+    if (data && data.duplicate) { toast('Already printed a moment ago.'); return; }
+    toast('Visitor label for ' + name.split(/\s+/)[0] + ' printing at the door.', 4000);
+    document.getElementById('visitor-name').value = '';
+    refreshAll();
+  }).catch(function(e) {
+    visitorInFlight = false; btn.disabled = false;
+    if (e.code === 'http' && e.status === 409) {
+      toast(e.message, 6000);
+      setTab('checkin');
+      document.getElementById('search').value = name;
+      render();
+      return;
+    }
+    if (e.code === 'network' && e.status >= 500) { status.textContent = 'Printer problem — see the door laptop.'; return; }
+    handleActionError(e, 'Could not print: ');
+  });
+}
+document.getElementById('visitor-print').addEventListener('click', printVisitor);
+document.getElementById('visitor-name').addEventListener('keydown', function(e) { if (e.key === 'Enter') printVisitor(); });
+
+// ── Leader name tag ───────────────────────────────────────────────────────
+// Not a check-in: the server files it under isLeader, so nothing about
+// tonight's count moves. Direct print is fine — there is nothing to drive
+// on TwoTimTwo, and the server's own duplicate window absorbs a double-tap.
+// One panel at a time: two stacked panels would push the tabs off a phone
+// screen, and both of these are "print something that is not a check-in", so
+// only one of them is ever the thing you came here to do.
+function togglePhonePanel(which) {
+  var panels = { leader: 'leader-panel', custom: 'custom-panel' };
+  var open = document.getElementById(panels[which]).style.display === 'none';
+  Object.keys(panels).forEach(function(k) {
+    var on = open && k === which;
+    document.getElementById(panels[k]).style.display = on ? 'flex' : 'none';
+    document.getElementById(k + '-toggle').className = 'hbtn' + (on ? ' on' : '');
+  });
+  return open;
+}
+document.getElementById('leader-toggle').addEventListener('click', function() {
+  if (togglePhonePanel('leader')) document.getElementById('leader-name').focus();
+});
+document.getElementById('custom-toggle').addEventListener('click', function() {
+  if (togglePhonePanel('custom')) document.getElementById('custom-text').focus();
+});
+
+// ── Custom label ──────────────────────────────────────────────────────────
+// One line of free text at the door. Records nothing at all — not a history
+// row, not a ledger entry, nothing on the wire — so there is no list to
+// refresh afterwards, unlike the leader tag's chips.
+var customInFlight = false;
+function printCustomLabel() {
+  if (customInFlight) return;
+  var el = document.getElementById('custom-text');
+  var status = document.getElementById('custom-status');
+  var text = el.value.trim();
+  if (!text) { status.textContent = 'Type the label text.'; return; }
+  customInFlight = true;
+  status.textContent = '';
+  var btn = document.getElementById('custom-print');
+  btn.disabled = true;
+  postJson('/print-custom', { pin: PIN, text: text }).then(function(data) {
+    customInFlight = false; btn.disabled = false;
+    if (data && data.duplicate) { toast('Already printed a moment ago.'); return; }
+    toast('Custom label printing at the door.', 4000);
+    el.value = '';
+  }).catch(function(e) {
+    customInFlight = false; btn.disabled = false;
+    if (e.code === 'network' && e.status >= 500) { status.textContent = 'Printer problem — see the door laptop.'; return; }
+    if (e.code === 'http') { status.textContent = e.message; return; }
+    handleActionError(e, 'Could not print: ');
+  });
+}
+document.getElementById('custom-print').addEventListener('click', printCustomLabel);
+document.getElementById('custom-text').addEventListener('keydown', function(e) { if (e.key === 'Enter') printCustomLabel(); });
+var leaderInFlight = false;
+function printLeaderTag() {
+  if (leaderInFlight) return;
+  var name = document.getElementById('leader-name').value.trim();
+  var status = document.getElementById('leader-status');
+  if (!name) { status.textContent = 'Type the leader’s name.'; return; }
+  leaderInFlight = true;
+  status.textContent = '';
+  var btn = document.getElementById('leader-print');
+  btn.disabled = true;
+  postJson('/print-leader', { pin: PIN, name: name, clubName: document.getElementById('leader-club').value }).then(function(data) {
+    leaderInFlight = false; btn.disabled = false;
+    if (data && data.duplicate) { toast('Already printed a moment ago.'); return; }
+    toast('Leader tag for ' + name + ' printing at the door.', 4000);
+    document.getElementById('leader-name').value = '';
+    refreshLeaders();   // the name just printed is now a chip
+  }).catch(function(e) {
+    leaderInFlight = false; btn.disabled = false;
+    if (e.code === 'network' && e.status >= 500) { status.textContent = 'Printer problem — see the door laptop.'; return; }
+    if (e.code === 'http') { status.textContent = e.message; return; }
+    handleActionError(e, 'Could not print: ');
+  });
+}
+document.getElementById('leader-print').addEventListener('click', printLeaderTag);
+document.getElementById('leader-name').addEventListener('keydown', function(e) { if (e.key === 'Enter') printLeaderTag(); });
+
+// ── Remembered leaders ────────────────────────────────────────────────────
+// Whoever has had a tag printed comes back as a chip, so the second week
+// nobody types a name. Tick a few and Print selected tags a whole team.
+var leaderSelection = {};
+var leaderCache = [];
+
+function renderLeaderChips(leaders, hidden) {
+  leaderCache = (leaders || []).slice();
+  var wrap = document.getElementById('leader-chips-wrap');
+  var list = document.getElementById('leader-chips');
+  var note = document.getElementById('leader-chips-note');
+  list.textContent = '';
+  if (!leaderCache.length) { wrap.style.display = 'none'; return; }
+  wrap.style.display = 'block';
+  leaderCache.forEach(function(l) {
+    var name = ((l.firstName || '') + ' ' + (l.lastName || '')).trim();
+    var chip = document.createElement('span');
+    chip.className = 'chip leader-chip';
+    var pick = document.createElement('label');
+    pick.style.cssText = 'display:inline-flex;align-items:center;gap:6px';
+    var cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.checked = !!leaderSelection[l.key];
+    cb.addEventListener('change', function() {
+      if (cb.checked) leaderSelection[l.key] = true; else delete leaderSelection[l.key];
+    });
+    pick.appendChild(cb);
+    pick.appendChild(document.createTextNode(name + (l.clubName ? ' \u00B7 ' + l.clubName : '')));
+    var one = document.createElement('button');
+    one.type = 'button';
+    one.textContent = 'Print';
+    one.addEventListener('click', function() { printLeaders([l]); });
+    var x = document.createElement('button');
+    x.type = 'button';
+    x.textContent = '\u00D7';
+    x.setAttribute('aria-label', 'Forget ' + name);
+    x.className = 'x';
+    x.addEventListener('click', function() { forgetLeader(l.key, name); });
+    chip.appendChild(pick); chip.appendChild(one); chip.appendChild(x);
+    list.appendChild(chip);
+  });
+  note.textContent = hidden ? hidden + ' not printed this season (hidden)' : '';
+}
+
+function refreshLeaders() {
+  if (!unlockedState) return;
+  postJson('/leaders', { pin: PIN }).then(function(d) {
+    if (d) renderLeaderChips(d.leaders, d.hidden);
+  }).catch(function() { /* offline: leave the chips as they are */ });
+}
+
+function printLeaders(leaders) {
+  var status = document.getElementById('leader-status');
+  if (!leaders || !leaders.length) { status.textContent = 'Tick a leader first.'; return; }
+  if (leaderInFlight) return;
+  leaderInFlight = true;
+  status.textContent = '';
+  postJson('/print-leader', {
+    pin: PIN,
+    leaders: leaders.map(function(l) {
+      return { firstName: l.firstName, lastName: l.lastName, clubName: l.clubName || '' };
+    })
+  }).then(function(d) {
+    leaderInFlight = false;
+    d = d || {};
+    if (d.failed) {
+      var bad = (d.results || []).filter(function(x) { return !x.success; })
+        .map(function(x) { return x.name; }).join(', ');
+      status.textContent = 'Printed ' + d.printed + '; failed: ' + bad;
+    } else {
+      toast('Printing ' + d.printed + ' leader tag' + (d.printed === 1 ? '' : 's') + ' at the door.', 4000);
+      leaderSelection = {};
+    }
+    refreshLeaders();
+  }).catch(function(e) {
+    leaderInFlight = false;
+    if (e.code === 'network' && e.status >= 500) { status.textContent = 'Printer problem — see the door laptop.'; return; }
+    handleActionError(e, 'Could not print: ');
+  });
+}
+
+function forgetLeader(key, name) {
+  if (!confirm('Forget ' + name + '? Their tag can still be printed by typing the name.')) return;
+  delete leaderSelection[key];
+  postJson('/leaders/forget', { pin: PIN, key: key }).then(function(d) {
+    if (d) renderLeaderChips(d.leaders, d.hidden);
+  }).catch(function(e) { handleActionError(e, 'Could not update: '); });
+}
+
+document.getElementById('leader-print-selected').addEventListener('click', function() {
+  printLeaders(leaderCache.filter(function(l) { return leaderSelection[l.key]; }));
+});
+
+// Auto-unlock if a PIN is cached (or none is required).
+if (PIN) {
+  fetchRoster(PIN).then(function(data) {
+    KIDS = data.kids || [];
+    rosterLoaded = true;
+    STATE = {};
+    unlockedState = true;
+    showMainScreen();
+    render();
+    startRosterPoll();
+    refreshTonight();
+    loadClubs();
+    refreshLeaders();
+  }).catch(function(e) {
+    // Stale saved PIN: drop it and fall back to the PIN screen rather than
+    // silently retrying it (that would just feed the limiter).
+    sessionStorage.removeItem('awanaPhonePin');
+    PIN = '';
+    if (e.code === 'locked') startPinCountdown(e.retryAfter);
+    /* otherwise leave the PIN screen showing, no message needed */
+  });
+}
+</script>
+</body>
+</html>

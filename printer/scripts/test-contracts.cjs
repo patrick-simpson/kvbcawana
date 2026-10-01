@@ -1,0 +1,572 @@
+#!/usr/bin/env node
+// Contract tests for the Awana event bus — plain Node, zero dependencies.
+// Validates every payload builder in print-server/events.js against the
+// canonical contract-vectors.json, plus the isClubNightNow() scheduling gate.
+//
+// Run: npm run test:contracts   (or: node scripts/test-contracts.cjs)
+
+'use strict';
+
+// A crashed suite must FAIL, not pass: server.js's uncaughtException handler
+// (a production never-crash feature) can swallow a test-time crash, letting
+// the event loop drain and the process exit 0 without a summary ever printing.
+// If we reach 'exit' with code 0 and the suite never declared itself finished,
+// force red. (Found the hard way: a ReferenceError mid-suite passed CI.)
+let __suiteFinished = false;
+process.on('exit', (code) => {
+  if (code === 0 && !__suiteFinished) {
+    console.error('\u2717 Test suite terminated before completing (crash swallowed?) \u2014 failing.');
+    process.exitCode = 1;
+  }
+});
+
+
+const path = require('path');
+const fs = require('fs');
+
+const events = require(path.join(__dirname, '..', 'print-server', 'events.js'));
+const vectors = JSON.parse(
+  fs.readFileSync(path.join(__dirname, '..', 'contract-vectors.json'), 'utf8')
+);
+
+let passed = 0;
+let failed = 0;
+
+function check(name, cond, detail) {
+  if (cond) {
+    passed++;
+  } else {
+    failed++;
+    console.error(`  ✗ ${name}${detail ? ' — ' + detail : ''}`);
+  }
+}
+
+function keysOf(obj) {
+  return Object.keys(obj).sort();
+}
+
+function sameKeys(obj, fields, optional) {
+  const opt = new Set(optional || []);
+  const have = new Set(Object.keys(obj));
+  for (const f of fields) {
+    if (opt.has(f)) continue;
+    if (!have.has(f)) return false;
+  }
+  for (const k of have) {
+    if (!fields.includes(k) && !(vectorsOptional(k, optional))) return false;
+  }
+  return true;
+}
+
+function vectorsOptional(key, optional) {
+  return (optional || []).includes(key);
+}
+
+const ISO_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/;
+
+console.log('contract-vectors.json — self-consistency');
+{
+  // v4 added `checkout` (who is still in the building); v5 added `slides`
+  // (the operator's typed lobby deck, sealed and chunked); v6 added `settings`
+  // (the lobby screens' shared settings, one sealed frame).
+  check('contractVersion is 6', vectors.contractVersion === 6);
+  check('channel is awana-channel', vectors.channel === 'awana-channel');
+  for (const [name, spec] of Object.entries(vectors.events)) {
+    for (const [i, v] of (spec.valid || []).entries()) {
+      const allowed = [...spec.fields, ...(spec.optionalFields || [])];
+      const extras = Object.keys(v).filter(k => !allowed.includes(k));
+      check(`${name}.valid[${i}] has only declared fields`, extras.length === 0, `extras: ${extras.join(',')}`);
+    }
+    // The privacy rule, applied to the vectors themselves.
+    const banned = ['lastName', 'allergies', 'phone', 'address', 'photo'];
+    for (const [i, v] of (spec.valid || []).entries()) {
+      const raw = JSON.stringify(v);
+      check(`${name}.valid[${i}] carries no PII fields`, !banned.some(b => raw.includes(`"${b}"`)));
+    }
+  }
+}
+
+console.log('buildCheckin');
+{
+  const spec = vectors.events.checkin;
+  const c = events.buildCheckin({ firstName: '  Alice  ', club: 'Sparks', isBirthday: 1, isFirstTimer: 0 });
+  check('exact field set', keysOf(c).join(',') === [...spec.fields].sort().join(','), keysOf(c).join(','));
+  check('id is a uuid', /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(c.id));
+  check('at is ISO', ISO_RE.test(c.at));
+  check('firstName trimmed', c.firstName === 'Alice');
+  check('booleans coerced', c.isBirthday === true && c.isFirstTimer === false);
+  const c2 = events.buildCheckin({ firstName: 'Alice', lastName: 'Smith', club: 'Sparks', allergies: 'nuts' });
+  check('lastName structurally impossible', !('lastName' in c2) && !JSON.stringify(c2).includes('Smith'));
+  check('allergies structurally impossible', !('allergies' in c2) && !JSON.stringify(c2).includes('nuts'));
+  check('long names truncated to 40', events.buildCheckin({ firstName: 'x'.repeat(100) }).firstName.length === 40);
+  check('null input safe', typeof events.buildCheckin(null) === 'object');
+
+  // Celebration flags (#9/#10): optional means optional — the plain call above
+  // already proved the legacy shape; here the extended shape and the junk paths.
+  const cf = events.buildCheckin({ firstName: 'Noah', club: 'T&T', welcomeBack: true, milestone: 25 });
+  check('flags → exact extended field set',
+    keysOf(cf).join(',') === [...spec.fields, ...spec.optionalFields].sort().join(','), keysOf(cf).join(','));
+  check('welcomeBack only ever literal true',
+    !('welcomeBack' in events.buildCheckin({ firstName: 'N', welcomeBack: 'yes' })));
+  check('milestone must be a small positive integer',
+    !('milestone' in events.buildCheckin({ firstName: 'N', milestone: 'Alice Smith' }))
+    && !('milestone' in events.buildCheckin({ firstName: 'N', milestone: -5 }))
+    && !('milestone' in events.buildCheckin({ firstName: 'N', milestone: 2.5 }))
+    && events.buildCheckin({ firstName: 'N', milestone: 50 }).milestone === 50);
+  check('recap entries carry the flags through',
+    events.buildRecap([{ ...cf }]).entries[0].welcomeBack === true
+    && events.buildRecap([{ ...cf }]).entries[0].milestone === 25);
+  check('recap entries without flags keep the exact legacy entry shape',
+    Object.keys(events.buildRecap([events.buildCheckin({ firstName: 'A' })]).entries[0]).sort().join(',')
+      === [...vectors.events.recap.entryFields].sort().join(','));
+}
+
+console.log('buildRecap');
+{
+  const spec = vectors.events.recap;
+  const mk = n => events.buildCheckin({ firstName: 'Kid' + n, club: 'Sparks' });
+  const buffer = Array.from({ length: 25 }, (_, i) => mk(i));
+  const r = events.buildRecap(buffer);
+  check('exact field set', keysOf(r).join(',') === [...spec.fields].sort().join(','));
+  check(`caps at ${events.RECAP_MAX} entries`, r.entries.length === events.RECAP_MAX);
+  check('keeps the MOST RECENT entries', r.entries[r.entries.length - 1].firstName === 'Kid24');
+  check('at is ISO', ISO_RE.test(r.at));
+  for (const e of r.entries) {
+    check('entry has exact checkin shape', keysOf(e).join(',') === [...spec.entryFields].sort().join(','));
+  }
+  const dirty = events.buildRecap([{ firstName: 'NoId', club: 'Sparks' }, buffer[0]]);
+  check('entries without id/at dropped', dirty.entries.length === 1 && dirty.entries[0].firstName === 'Kid0');
+  check('non-array input safe', events.buildRecap('garbage').entries.length === 0);
+}
+
+console.log('buildTally');
+{
+  const spec = vectors.events.tally;
+  const t = events.buildTally({ Sparks: 12, 'T&T': 19.7, Cubbies: -3, Trek: 'Alice Smith' }, undefined);
+  check('exact field set', keysOf(t).join(',') === [...spec.fields].sort().join(','));
+  check('floats floored', t.counts['T&T'] === 19);
+  check('negative counts dropped', !('Cubbies' in t.counts));
+  check('non-numeric counts dropped (PII can never ride a tally)', !('Trek' in t.counts) && !JSON.stringify(t).includes('Alice'));
+  check('total derived when omitted', t.total === 31);
+  check('explicit total honored', events.buildTally({ Sparks: 1 }, 5).total === 5);
+  check('at is ISO', ISO_RE.test(t.at));
+  check('null input safe', events.buildTally(null).total === 0);
+
+  // Optional extras (#18/#19): season slug + rehearsal flag. Optional means
+  // optional — a plain call must keep the EXACT legacy shape so old
+  // consumers and deploy order never matter.
+  check('no extras → exact legacy field set', keysOf(t).join(',') === [...spec.fields].sort().join(','));
+  const ex = events.buildTally({ Sparks: 1 }, 1, { season: 'CHRISTMAS', rehearsal: true });
+  check('extras → exact extended field set',
+    keysOf(ex).join(',') === [...spec.fields, ...spec.optionalFields].sort().join(','));
+  check('season is normalized to a lowercase slug', ex.season === 'christmas');
+  check('rehearsal only ever true, never truthy junk',
+    events.buildTally({}, 0, { rehearsal: 'yes' }).rehearsal === undefined
+    && events.buildTally({}, 0, { rehearsal: true }).rehearsal === true);
+  check('a non-slug season is dropped, not rejected',
+    events.buildTally({}, 0, { season: '<script>alert(1)</script>' }).season === undefined);
+  check('empty season omitted (Screen season off broadcasts nothing)',
+    events.buildTally({}, 0, { season: '' }).season === undefined);
+}
+
+console.log('buildBirthdays');
+{
+  const spec = vectors.events.birthdays;
+  const b = events.buildBirthdays([
+    { firstName: 'Maya', club: 'Puggles', month: 9, day: 18 },
+    { firstName: 'Maya', lastName: 'Nguyen', club: 'Puggles', month: 9, day: 18, year: 2020 },
+    { firstName: 'Ghost', club: 'Sparks', month: 13, day: 40 },
+    { firstName: '', club: 'Sparks', month: 5, day: 5 },
+    null,
+  ]);
+  check('exact field set', keysOf(b).join(',') === [...spec.fields].sort().join(','));
+  check('valid entries pass', b.entries.length === 2);
+  for (const e of b.entries) {
+    check('entry has exact shape', keysOf(e).join(',') === [...spec.entryFields].sort().join(','));
+  }
+  check('lastName/year structurally impossible', !JSON.stringify(b).includes('Nguyen') && !JSON.stringify(b).includes('2020'));
+  check('out-of-range month/day dropped', !JSON.stringify(b).includes('Ghost'));
+  const big = events.buildBirthdays(Array.from({ length: 100 }, (_, i) => ({ firstName: 'K' + i, club: 'Sparks', month: 1, day: 1 })));
+  check('caps at 40 entries', big.entries.length === 40);
+}
+
+console.log('buildOps');
+{
+  const spec = vectors.events.ops;
+  const o = events.buildOps('print-failure', 'Sparks', { version: '5.27.0' });
+  check('exact field set (club + version)', keysOf(o).join(',') === [...spec.fields, ...spec.optionalFields].sort().join(','));
+  const o2 = events.buildOps('selector-fail');
+  check('optional fields omitted when absent', keysOf(o2).join(',') === [...spec.fields].sort().join(','));
+  check('unknown type returns null', events.buildOps('reboot-everything') === null);
+  check('type enum matches vectors', JSON.stringify([...events.OPS_TYPES].sort()) === JSON.stringify([...spec.types].sort()));
+  check('ops never carries a name field', !('name' in o) && !('firstName' in o));
+  // Update health beacon (#5): version + ok flag ONLY.
+  const beacon = events.buildOps('update-ok', null, { version: '5.27.0' });
+  check('update-ok carries the bare semver', beacon && beacon.version === '5.27.0' && beacon.type === 'update-ok');
+  const junk = events.buildOps('update-ok', null, { version: '<script>alert(1)</script>' });
+  check('non-semver version dropped, never published', junk && !('version' in junk) && !JSON.stringify(junk).includes('script'));
+  check('version with a v prefix dropped (bare semver only)', !('version' in events.buildOps('update-ok', null, { version: 'v5.27.0' })));
+}
+
+console.log('buildCanary');
+{
+  const c = events.buildCanary();
+  check('at is ISO', ISO_RE.test(c.at));
+  check('nonce is a short hex string', /^[0-9a-f]{16}$/.test(c.nonce));
+  check('no other fields', keysOf(c).join(',') === 'at,nonce');
+}
+
+console.log('buildTonight');
+{
+  const spec = vectors.events.tonight;
+  const t = events.buildTonight({ checkedIn: 63.9, booksCompleted: 4, awardsEarned: 11, friendsBrought: 2 });
+  check('exact field set', keysOf(t).join(',') === [...spec.fields].sort().join(','));
+  check('floats floored', t.checkedIn === 63);
+  check('at is ISO', ISO_RE.test(t.at));
+  const dirty = events.buildTonight({ checkedIn: 'Alice Smith', kids: ['Alice Smith'], booksCompleted: -5 });
+  check('non-numeric counter becomes 0 (PII can never ride)', dirty.checkedIn === 0 && !JSON.stringify(dirty).includes('Alice'));
+  check('per-child detail structurally impossible', !('kids' in dirty));
+  check('negative counter clamped to 0', dirty.booksCompleted === 0);
+  check('null input safe', events.buildTonight(null).checkedIn === 0);
+}
+
+console.log('buildPoints');
+{
+  const spec = vectors.events.points;
+  const p = events.buildPoints({ Red: 240, Blue: 215.8, Green: -1, Yellow: 'Alice Smith' }, 'Sparks');
+  check('exact field set (with club)', keysOf(p).join(',') === [...spec.fields, ...spec.optionalFields].sort().join(','));
+  check('floats floored', p.groups.Blue === 215);
+  check('negative dropped', !('Green' in p.groups));
+  check('non-numeric dropped (PII can never ride points)', !('Yellow' in p.groups) && !JSON.stringify(p).includes('Alice'));
+  check('club omitted when absent', keysOf(events.buildPoints({ Red: 1 })).join(',') === [...spec.fields].sort().join(','));
+  check('caps at maxGroups', Object.keys(events.buildPoints(
+    Object.fromEntries(Array.from({ length: 50 }, (_, i) => ['G' + i, i]))
+  ).groups).length <= spec.maxGroups);
+  check('at is ISO', ISO_RE.test(p.at));
+  check('null input safe', Object.keys(events.buildPoints(null).groups).length === 0);
+}
+
+console.log('buildSchedule');
+{
+  const spec = vectors.events.schedule;
+  const s = events.buildSchedule({ nextMeetingDate: '2026-09-23', title: 'Water Night', noClubThisWeek: false });
+  check('exact field set', keysOf(s).join(',') === [...spec.fields, ...spec.optionalFields].sort().join(','));
+  check('valid date kept', s.nextMeetingDate === '2026-09-23');
+  const bad = events.buildSchedule({ nextMeetingDate: 'next Wednesday-ish' });
+  check('malformed date dropped', !('nextMeetingDate' in bad) && !JSON.stringify(bad).includes('Wednesday-ish'));
+  const leaky = events.buildSchedule({ nextMeetingDate: '2026-09-23', attendees: ['parent@example.com'], organizer: 'Director Smith' });
+  check('iCal attendee/organizer structurally impossible', !JSON.stringify(leaky).includes('parent@example.com') && !JSON.stringify(leaky).includes('Director Smith'));
+  check('markup stripped from title', !events.buildSchedule({ title: 'Fun <b>Night</b>' }).title.includes('<'));
+  check('bare payload is just at', keysOf(events.buildSchedule({})).join(',') === 'at');
+  check('at is ISO', ISO_RE.test(s.at));
+  check('null input safe', ISO_RE.test(events.buildSchedule(null).at));
+}
+
+console.log('buildNotice');
+{
+  const spec = vectors.events.notice;
+  const n = events.buildNotice('critical', 'CLUB CANCELLED TONIGHT — snow');
+  check('exact field set', keysOf(n).join(',') === [...spec.fields].sort().join(','));
+  check('level enum matches vectors', JSON.stringify([...events.NOTICE_LEVELS].sort()) === JSON.stringify([...spec.levels].sort()));
+  check('unknown level falls back to info', events.buildNotice('emergency-broadcast', 'Doors open at 6').level === 'info');
+  const xss = events.buildNotice('warn', 'Pickup moved <script>alert(1)</script> to the gym');
+  check('markup stripped', !xss.message.includes('<script>') && !xss.message.includes('<'));
+  check('empty message returns null (cannot blank the screen)', events.buildNotice('info', '   ') === null);
+  check('missing message returns null', events.buildNotice('info') === null);
+  check(`message capped at ${spec.maxMessage}`, events.buildNotice('info', 'x'.repeat(500)).message.length === spec.maxMessage);
+  check('newlines collapsed', events.buildNotice('info', 'line one\n\nline two').message === 'line one line two');
+  check('at is ISO', ISO_RE.test(n.at));
+}
+
+console.log('buildSlidesDeck');
+{
+  const spec = vectors.events.slides;
+  const deck = events.buildSlidesDeck([
+    { id: 's_1', eyebrow: 'Awana Clubs', text: 'Welcome to\nAwana!', theme: 'sky', textSize: 'auto', durationSec: 0 },
+    { text: 'Grand Prix — Saturday 9 AM 🏎️', theme: 'auto', textSize: 'lg', durationSec: 12 },
+  ]);
+  check('two clean slides pass', deck.length === 2);
+  check('entry has exact shape (with id)',
+    keysOf(deck[0]).join(',') === [...spec.entryFields, 'id'].sort().join(','),
+    keysOf(deck[0]).join(','));
+  check('no entry ever carries a key outside the contract',
+    deck.every((s) => keysOf(s).every((k) => [...spec.entryFields, ...spec.entryOptionalFields].includes(k))));
+  check('entry has exact shape (no id)',
+    keysOf(deck[1]).join(',') === [...spec.entryFields].sort().join(','), keysOf(deck[1]).join(','));
+  check('multi-line text survives', deck[0].text === 'Welcome to\nAwana!');
+  check('theme/textSize whitelists match the vectors',
+    JSON.stringify(spec.themes) === JSON.stringify(['sky', 'sunset', 'night', 'meadow', 'lavender'])
+    && JSON.stringify(spec.textSizes) === JSON.stringify(['auto', 'xl', 'lg', 'md']));
+
+  // TEXT ONLY: a video slide references THIS device's storage — dropped.
+  const dirty = vectors.events.slides.dirty[0];
+  const scrubbed = events.buildSlidesDeck(dirty.payload.slides);
+  check('video slide dropped (dirty vector)', scrubbed.length === dirty.expectEntryCount);
+  check('nothing video-ish survives', !dirty.mustNotContain.some((s) => JSON.stringify(scrubbed).includes(s)));
+
+  const messy = vectors.events.slides.dirty[1];
+  const cleaned = events.buildSlidesDeck(messy.payload.slides);
+  check('oversized text sliced to the cap', cleaned[0].text.length === spec.maxText);
+  check('junk theme falls back to auto', cleaned[0].theme === 'auto');
+  check('junk textSize falls back to auto', cleaned[0].textSize === 'auto');
+  check('unknown per-slide fields stripped',
+    !messy.mustNotContain.some((s) => JSON.stringify(cleaned).includes(s)));
+  check('overlong duration clamped', cleaned[0].durationSec === 600);
+
+  check('blank text drops the slide', events.buildSlidesDeck([{ text: '   ' }]).length === 0);
+  check('eyebrow capped and single-line',
+    events.buildSlidesDeck([{ text: 'x', eyebrow: 'a\nb'.padEnd(100, 'y') }])[0].eyebrow.length <= spec.maxEyebrow
+    && !events.buildSlidesDeck([{ text: 'x', eyebrow: 'a\nb' }])[0].eyebrow.includes('\n'));
+  check('control characters never survive slide text',
+    events.buildSlidesDeck([{ text: 'abc' }])[0].text === 'a b c');
+  check('junk id omitted, clean id kept',
+    !('id' in events.buildSlidesDeck([{ text: 'x', id: 'a b' }])[0])
+    && events.buildSlidesDeck([{ text: 'x', id: 's_ok' }])[0].id === 's_ok');
+  check(`caps at ${spec.maxEntries} slides`,
+    events.buildSlidesDeck(Array.from({ length: 80 }, (_, i) => ({ text: 'slide ' + i }))).length === spec.maxEntries);
+  check('null input safe', events.buildSlidesDeck(null).length === 0);
+
+  // The optional show window (#345). Bare local dates, dropped when they are
+  // not a real calendar date — a slide with a junk window shows ALWAYS, which
+  // is the same as no window and strictly better than never appearing.
+  const dated = vectors.events.slides.valid[3];
+  const window = events.buildSlidesDeck(dated.slides);
+  check('a valid show window rides through verbatim',
+    window[0].showFrom === '2026-09-09' && window[0].showUntil === '2026-09-16'
+    && !('showFrom' in window[1]) && window[1].showUntil === '2026-10-04');
+  check('a dated entry still has an allowlisted key set',
+    window.every((s) => keysOf(s).every((k) => [...spec.entryFields, ...spec.entryOptionalFields].includes(k))),
+    keysOf(window[0]).join(','));
+  const badDates = vectors.events.slides.dirty[2];
+  const dropped = events.buildSlidesDeck(badDates.payload.slides);
+  check('an impossible date and free text are both dropped',
+    dropped.length === badDates.expectEntryCount
+    && !('showFrom' in dropped[0]) && !('showUntil' in dropped[0]));
+  check('nothing date-ish survives the dirty vector',
+    !badDates.mustNotContain.some((v) => JSON.stringify(dropped).includes(v)));
+  check('slideDate accepts a leap day and refuses a fake one',
+    events.slideDate('2024-02-29') === '2024-02-29' && events.slideDate('2026-02-29') === null
+    && events.slideDate('2026-13-01') === null && events.slideDate('2026-9-1') === null);
+  check('slideDate trims, and returns the typed string with NO timezone shift',
+    events.slideDate('  2026-12-25  ') === '2026-12-25');
+  check('a deck with no dates is byte-identical to before the field existed',
+    JSON.stringify(events.buildSlidesDeck([{ text: 'plain' }]))
+      === JSON.stringify([{ eyebrow: '', text: 'plain', theme: 'auto', textSize: 'auto', durationSec: 0 }]));
+
+  // The optional "Hold check-ins" mark. Literal true rides through; anything
+  // else is OMITTED (the key absent, never false), so an unmarked deck is
+  // byte-identical to before the field existed.
+  const held = vectors.events.slides.valid[4];
+  const heldDeck = events.buildSlidesDeck(held.slides);
+  check('holdCheckIns: true rides through verbatim (valid vector)',
+    heldDeck[0].holdCheckIns === true && !('holdCheckIns' in heldDeck[1]));
+  check('a held slide keeps its show window beside the mark',
+    heldDeck[0].showUntil === '2026-11-04' && !('showFrom' in heldDeck[0]));
+  check('a held entry still has an allowlisted key set',
+    heldDeck.every((s) => keysOf(s).every((k) => [...spec.entryFields, ...spec.entryOptionalFields].includes(k))),
+    keysOf(heldDeck[0]).join(','));
+  check('the vector round-trips byte-identically through the builder',
+    JSON.stringify(heldDeck) === JSON.stringify(held.slides), JSON.stringify(heldDeck));
+  check('the mark sits after the show window and before the id',
+    Object.keys(events.buildSlidesDeck([{ id: 's_h', text: 'x', showFrom: '2026-09-01', showUntil: '2026-09-30', holdCheckIns: true }])[0])
+      .slice(-4).join(',') === 'showFrom,showUntil,holdCheckIns,id');
+  const notHeld = vectors.events.slides.dirty[3];
+  const unheld = events.buildSlidesDeck(notHeld.payload.slides);
+  check('a non-true holdCheckIns drops the key, never the slide (dirty vector)',
+    unheld.length === notHeld.expectEntryCount && unheld.every((s) => !('holdCheckIns' in s)));
+  check('nothing hold-ish survives the dirty vector',
+    !notHeld.mustNotContain.some((v) => JSON.stringify(unheld).includes(v)));
+  for (const [label, value] of [['false', false], ["the string 'true'", 'true'], ['1', 1], ['null', null], ['an object', { on: true }]]) {
+    check(`holdCheckIns: ${label} is omitted, not coerced`,
+      !('holdCheckIns' in events.buildSlidesDeck([{ text: 'x', holdCheckIns: value }])[0]));
+  }
+  check('a missing holdCheckIns is omitted, not written as false',
+    !('holdCheckIns' in events.buildSlidesDeck([{ text: 'x' }])[0]));
+  check('a deck without the mark is byte-identical to before the field existed',
+    JSON.stringify(events.buildSlidesDeck([{ text: 'plain', holdCheckIns: false }]))
+      === JSON.stringify([{ eyebrow: '', text: 'plain', theme: 'auto', textSize: 'auto', durationSec: 0 }]));
+}
+
+console.log('buildSlidesChunks');
+{
+  const spec = vectors.events.slides;
+  const stamp = '2026-09-16T22:12:00.000Z';
+  const small = events.buildSlidesChunks(events.buildSlidesDeck([{ text: 'Welcome!' }]), 3, stamp);
+  check('a small deck is one chunk', small.length === 1 && small[0].seq === 0 && small[0].total === 1);
+  check('chunk has exact field set',
+    keysOf(small[0]).join(',') === [...spec.fields].sort().join(','), keysOf(small[0]).join(','));
+  check('chunk carries the rev and stamp verbatim',
+    small[0].deckRev === 3 && small[0].publishedAt === stamp);
+
+  const empty = events.buildSlidesChunks([], 4, stamp);
+  check('an EMPTY deck is one chunk with slides:[] — a cleared deck propagates',
+    empty.length === 1 && empty[0].total === 1 && Array.isArray(empty[0].slides) && empty[0].slides.length === 0);
+
+  // A big deck splits; every chunk stays inside the JSON budget, shares the
+  // stamp, and reassembles in seq order to the exact deck.
+  const bigDeck = events.buildSlidesDeck(Array.from({ length: 50 }, (_, i) => ({
+    text: (`Announcement ${i}: ` + 'Grand Prix — Saturday 9 AM 🏎️ '.repeat(12)),
+    eyebrow: 'Awana Clubs',
+    durationSec: 15,
+  })));
+  const chunks = events.buildSlidesChunks(bigDeck, 7, stamp);
+  check('a large deck splits into multiple chunks', chunks.length > 1, `got ${chunks.length}`);
+  check(`total stays within maxTotal (${spec.maxTotal})`, chunks.length <= spec.maxTotal, `got ${chunks.length}`);
+  check('every chunk fits the sealed 4096 rung',
+    chunks.every((c) => events.paddedSize('slides', Buffer.byteLength(JSON.stringify(c), 'utf8')) !== null));
+  check('seq/total are consistent',
+    chunks.every((c, i) => c.seq === i && c.total === chunks.length));
+  check('chunks reassemble to the exact deck',
+    JSON.stringify(chunks.flatMap((c) => c.slides)) === JSON.stringify(bigDeck));
+  check('identical inputs rebuild byte-identical chunks (rebroadcast contract)',
+    JSON.stringify(events.buildSlidesChunks(bigDeck, 7, stamp)) === JSON.stringify(chunks));
+
+  // The byte cap is NOT a chunk-count guarantee — greedy packing strands
+  // slack, so decks well under 40 KB can need more than maxTotal chunks.
+  // This pins that such decks EXIST, which is exactly why the publish
+  // endpoint dry-runs the chunker and refuses null before committing.
+  const cjkDeck = events.buildSlidesDeck(Array.from({ length: 25 }, () => ({
+    text: '你'.repeat(380) + 'x'.repeat(120),   // 500 chars, ~1.33 KB of JSON each
+  })));
+  check('a sub-40KB deck CAN be unchunkable (greedy worst case)',
+    events.slidesDeckJsonBytes(cjkDeck) <= events.SLIDES_DECK_JSON_MAX
+    && events.buildSlidesChunks(cjkDeck, 1, stamp) === null,
+    `${events.slidesDeckJsonBytes(cjkDeck)} bytes`);
+  // CHUNK BUDGET RE-CHECK (#345, then holdCheckIns): showFrom+showUntil cost
+  // 49 bytes a slide and holdCheckIns another 20, so the worst deck the entry
+  // caps admit — 50 slides, 500 characters of text, a full 60-character
+  // eyebrow, both dates AND holdCheckIns: true — must still fit maxTotal
+  // chunks. Measured: 35,251 bytes, 10 of the 12 chunks (5 slides a chunk).
+  // (This deck is the ceiling: MAX slides at MAX field lengths.)
+  const datedMaxDeck = events.buildSlidesDeck(Array.from({ length: spec.maxEntries }, (_, i) => ({
+    text: (`Slide ${i} `).padEnd(spec.maxText, 'x'),
+    eyebrow: 'y'.repeat(spec.maxEyebrow),
+    durationSec: 600,
+    showFrom: '2026-09-01',
+    showUntil: '2026-09-30',
+    holdCheckIns: true,
+  })));
+  const datedChunks = events.buildSlidesChunks(datedMaxDeck, 9, stamp);
+  check('every slide of the ceiling deck kept both dates and the hold mark',
+    datedMaxDeck.length === spec.maxEntries
+    && datedMaxDeck.every((s) => s.showFrom === '2026-09-01' && s.showUntil === '2026-09-30'
+      && s.holdCheckIns === true));
+  check('the ceiling deck passes the publish-time byte gate too',
+    events.slidesDeckJsonBytes(datedMaxDeck) <= events.SLIDES_DECK_JSON_MAX,
+    `${events.slidesDeckJsonBytes(datedMaxDeck)} bytes`);
+  check(`the dated ceiling deck still chunks within maxTotal (${spec.maxTotal})`,
+    datedChunks !== null && datedChunks.length <= spec.maxTotal,
+    datedChunks ? `${datedChunks.length} chunks, ${events.slidesDeckJsonBytes(datedMaxDeck)} bytes` : 'null');
+  check('and every one of its chunks still seals into the slides pad ladder',
+    datedChunks !== null
+    && datedChunks.every((c) => events.paddedSize('slides', Buffer.byteLength(JSON.stringify(c), 'utf8')) !== null));
+  check('the dated ceiling deck reassembles exactly',
+    JSON.stringify(datedChunks.flatMap((c) => c.slides)) === JSON.stringify(datedMaxDeck));
+
+  check('slidesDeckJsonBytes measures the sanitized deck',
+    events.slidesDeckJsonBytes(bigDeck) === Buffer.byteLength(JSON.stringify(bigDeck), 'utf8'));
+
+  // Every slides valid vector must seal (that is what the envelope fixture
+  // generator does with them) — belt and braces here, in the contract suite.
+  for (const [i, v] of spec.valid.entries()) {
+    check(`slides.valid[${i}] fits the slides pad ladder`,
+      events.paddedSize('slides', Buffer.byteLength(JSON.stringify(v), 'utf8')) !== null);
+  }
+}
+
+console.log('buildDisplaySettings (contract v6)');
+{
+  const spec = vectors.events.settings;
+  check('the builder\'s table is the contract\'s, key for key and rule for rule',
+    JSON.stringify(events.SETTINGS_SPEC) === JSON.stringify(spec.keys));
+  check('the size cap is the contract\'s', events.SETTINGS_JSON_MAX === spec.maxJsonBytes);
+  for (const [i, v] of spec.valid.entries()) {
+    const built = events.buildDisplaySettings(v.settings);
+    check(`settings.valid[${i}] passes through unchanged`, JSON.stringify(built) === JSON.stringify(v.settings), JSON.stringify(built));
+    check(`settings.valid[${i}] seals into the 4096 rung`,
+      events.paddedSize('settings', Buffer.byteLength(JSON.stringify(v), 'utf8')) !== null);
+  }
+  for (const [i, d] of spec.dirty.entries()) {
+    const raw = JSON.stringify(events.buildDisplaySettings(d.payload.settings));
+    for (const banned of d.mustNotContain) {
+      check(`settings.dirty[${i}] (${d.reason}) drops ${banned}`, !raw.includes(banned), raw);
+    }
+  }
+  const dirty0 = events.buildDisplaySettings(spec.dirty[0].payload.settings);
+  check('a club line keeps its words once the markup is gone', dirty0.clubPhrases.sparks === 'alert(1) Go!', JSON.stringify(dirty0));
+  check('a value inside its spec survives beside dropped ones', dirty0.milestoneEvery === 25);
+  check('only allowlisted keys ever come out',
+    Object.keys(events.buildDisplaySettings({ ...spec.valid[0].settings, manualSlides: [{ text: 'x' }], audioMuted: false }))
+      .every((k) => Object.prototype.hasOwnProperty.call(spec.keys, k)));
+  check('numbers clamp to their range', events.buildDisplaySettings({ standardDisplayMs: 999999, weatherLat: 200 }).standardDisplayMs === 20000
+    && events.buildDisplaySettings({ weatherLat: 200 }).weatherLat === 90);
+  check('a threshold list is repaired: whole, in range, unique, sorted, capped',
+    JSON.stringify(events.buildDisplaySettings({ bookMilestones: [25, 5, 5, 0, 1e9, 2.4, 'x', 10, 11, 12, 13, 14, 15, 16] }).bookMilestones)
+      === JSON.stringify([2, 5, 10, 11, 12, 13, 14, 15]));
+  check('an empty calendar URL is kept (it means "none")', events.buildDisplaySettings({ calendarUrl: '  ' }).calendarUrl === '');
+  check('junk in, nothing out', JSON.stringify(events.buildDisplaySettings(null)) === '{}'
+    && JSON.stringify(events.buildDisplaySettings(['showClock'])) === '{}');
+  // The worst case the caps admit: every string and club line at its cap.
+  const worst = {};
+  for (const [k, rule] of Object.entries(events.SETTINGS_SPEC)) {
+    if (rule.type === 'bool') worst[k] = true;
+    else if (rule.type === 'int' || rule.type === 'number') worst[k] = rule.max;
+    else if (rule.type === 'enum') worst[k] = rule.values.reduce((a, b) => (b.length > a.length ? b : a));
+    else if (rule.type === 'string') worst[k] = 'x'.repeat(rule.max);
+    else if (rule.type === 'url') worst[k] = 'https://' + 'x'.repeat(rule.max - 8);
+    else if (rule.type === 'time') worst[k] = '23:59';
+    else if (rule.type === 'slug') worst[k] = 'x'.repeat(rule.max);
+    else if (rule.type === 'intList') worst[k] = Array.from({ length: rule.maxItems }, (_, i) => rule.max - i);
+    else if (rule.type === 'phrases') {
+      worst[k] = {};
+      for (let i = 0; i < rule.maxKeys; i += 1) worst[k][`${String(i).padStart(2, '0')}${'k'.repeat(rule.maxKey - 2)}`] = 'p'.repeat(rule.maxValue);
+    }
+  }
+  const worstBuilt = events.buildDisplaySettings(worst);
+  const worstBytes = events.displaySettingsJsonBytes(worstBuilt);
+  check('the worst case the caps admit fits the size cap', worstBytes <= events.SETTINGS_JSON_MAX, `${worstBytes} bytes`);
+  check('and seals into one 4096 frame', events.buildSettingsPayload(worstBuilt, 999999, '2026-10-01T23:35:00.000Z') !== null);
+}
+
+console.log('isClubNightNow');
+{
+  const nights = [{ dow: 3, start: '17:30', end: '20:00' }];
+  // Wed Sep 16 2026 is a Wednesday.
+  check('inside window', events.isClubNightNow(nights, new Date(2026, 8, 16, 18, 0)) === true);
+  check('at start (inclusive)', events.isClubNightNow(nights, new Date(2026, 8, 16, 17, 30)) === true);
+  check('at end (exclusive)', events.isClubNightNow(nights, new Date(2026, 8, 16, 20, 0)) === false);
+  check('before window', events.isClubNightNow(nights, new Date(2026, 8, 16, 17, 29)) === false);
+  check('wrong day', events.isClubNightNow(nights, new Date(2026, 8, 17, 18, 0)) === false);
+  check('empty config', events.isClubNightNow([], new Date(2026, 8, 16, 18, 0)) === false);
+  check('garbage config safe', events.isClubNightNow('wednesday') === false);
+  check('malformed window safe', events.isClubNightNow([{ dow: 3, start: 'six', end: '20:00' }], new Date(2026, 8, 16, 18, 0)) === false);
+}
+
+console.log('publish() resilience');
+{
+  // A pusher whose trigger rejects must never reject the publish() promise.
+  const rejecting = { trigger: () => Promise.reject(new Error('network down')) };
+  const throwing = { trigger: () => { throw new Error('sync throw'); } };
+  Promise.all([
+    events.publish(rejecting, 'awana-channel', 'tally', events.buildTally({}, 0)),
+    events.publish(throwing, 'awana-channel', 'tally', events.buildTally({}, 0)),
+    events.publish(null, 'awana-channel', 'tally', events.buildTally({}, 0)),
+  ]).then(([a, b, c]) => {
+    check('rejecting trigger → false', a === false);
+    check('throwing trigger → false', b === false);
+    check('null pusher → false', c === false);
+    const st = events.getPublishState();
+    check('failure recorded for /health', st.lastPublishOk === false && !!st.lastError);
+    finish();
+  }).catch(e => {
+    failed++;
+    console.error('  ✗ publish() rejected — it must NEVER reject:', e.message);
+    finish();
+  });
+}
+
+function finish() {
+  console.log(`\n${passed} passed, ${failed} failed`);
+  __suiteFinished = true;
+  process.exit(failed ? 1 : 0);
+}

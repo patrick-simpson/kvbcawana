@@ -1,0 +1,2739 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Club Label Printer</title>
+<!-- The brand kit (the byte-identical mirror in public/brand/): the three
+     faces and the --brand-* tokens. Every colour below reads a token; the
+     hex after each var() is the kit's own value, a fallback so a missing
+     mirror leaves a legible page (scripts/test-dashboard-chrome.cjs pins
+     every fallback to tokens.css). -->
+<link rel="stylesheet" href="/brand/fonts.css">
+<link rel="stylesheet" href="/brand/tokens.css">
+<style>
+  :root {
+    --c-blue: var(--brand-blue, #4C72B8);
+    --c-blue-deep: var(--brand-blue-deep, #34569A);
+    /* The Awana blue is the Cubbies primary, so its deep shade is the plate
+       the stepped chip sits on over the blue header. */
+    --c-plate: var(--brand-cubbies-deep, #2F4F8A);
+    --c-ink: var(--brand-ink, #231F20);
+    --c-hot: var(--brand-hot, #F15A28);
+    --c-hot-deep: var(--brand-hot-deep, #9E3512);
+    --c-sun: var(--brand-sun, #FCB614);
+    --c-orange: var(--brand-orange, #FAA41D);
+    --c-orange-deep: var(--brand-orange-deep, #C97A08);
+    --c-cream: var(--brand-cream, #FFE8C2);
+    --c-sky: var(--brand-sky, #B3D0E7);
+    --c-cloud: var(--brand-cloud, #D6EFF8);
+    --c-puggles: var(--brand-puggles, #1DB6D9);
+    --c-puggles-deep: var(--brand-puggles-deep, #1A627C);
+    --c-cubbies: var(--brand-cubbies, #4C72B8);
+    --c-cubbies-deep: var(--brand-cubbies-deep, #2F4F8A);
+    --c-sparks: var(--brand-sparks, #F04A4B);
+    --c-sparks-deep: var(--brand-sparks-deep, #B82B32);
+    --c-sparks-tint: var(--brand-sparks-tint, #FDDACF);
+    --c-tnt: var(--brand-tnt, #58BD79);
+    --c-tnt-deep: var(--brand-tnt-deep, #2F8A4E);
+    --c-tnt-tint: var(--brand-tnt-tint, #D0E9D5);
+    --c-trek: var(--brand-trek, #047E71);
+    --c-trek-deep: var(--brand-trek-deep, #02554C);
+    --c-journey: var(--brand-journey, #8A649D);
+    --c-journey-deep: var(--brand-journey-deep, #56467F);
+    --c-journey-tint: var(--brand-journey-tint, #DED5EA);
+    --c-journey-ink: var(--brand-journey-ink, #403A77);
+
+    /* Status reads in the kit's own green, amber and red. */
+    --ok: var(--c-tnt-deep);
+    --ok-tint: var(--c-tnt-tint);
+    --warn: var(--c-orange-deep);
+    --warn-tint: var(--c-cream);
+    --bad: var(--c-sparks-deep);
+    --bad-tint: var(--c-sparks-tint);
+
+    /* Page neutrals (not brand colours): the mockup's field and card lines. */
+    --page: #F6F8FB;
+    --line: #E1E7EF;
+    --line-strong: #CFD8E3;
+    --ink-soft: #4A5160;
+    --ink-faint: #6B7280;
+
+    --f-shout: var(--brand-font-display, 'Paytone One', 'Arial Rounded MT Bold', 'Trebuchet MS', sans-serif);
+    --f-label: var(--brand-font-label, 'Londrina Solid', 'Arial Narrow', 'Helvetica Neue', sans-serif);
+    --f-read: var(--brand-font-body, 'Figtree', 'Segoe UI', system-ui, sans-serif);
+    --quick: var(--brand-dur-quick, 200ms);
+    --ease-pop: var(--brand-ease-pop, cubic-bezier(0.34, 1.56, 0.64, 1));
+    --ease-settle: var(--brand-ease-settle, cubic-bezier(0.16, 1, 0.3, 1));
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: var(--f-read); font-size: 14px; line-height: 1.45; background: var(--page); color: var(--c-ink); }
+  code { font-family: ui-monospace, Consolas, monospace; font-size: 0.92em; }
+
+  /* ── Header: the Awana Clubs mark, the product name, the stepped chip ── */
+  .header { background: var(--c-blue); color: #fff; padding: 14px 28px; display: flex; align-items: center; gap: 20px; }
+  .brand-mark { display: block; height: 50px; width: auto; flex: none; }
+  .brand-titles { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .header h1 { font-family: var(--f-shout); font-weight: 400; font-size: 30px; line-height: 1.05; letter-spacing: 0.01em; }
+  .header .ver { font-family: var(--f-label); font-size: 14px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--c-cloud); overflow-wrap: anywhere; }
+  .status-chip { margin-left: auto; flex: none; font-size: 24px; line-height: 0; color: #fff; }
+  .status-chip .chip-fallback { font-family: var(--f-label); font-size: 16px; line-height: 1.2; letter-spacing: 0.06em; text-transform: uppercase; }
+
+  .container { max-width: 1000px; margin: 0 auto; padding: 24px 20px 40px; display: flex; flex-direction: column; gap: 18px; }
+
+  /* ── Cards and their corner tabs ── */
+  .card { background: #fff; border-radius: 16px; overflow: hidden; box-shadow: 0 2px 0 var(--line); }
+  /* The header wraps: the card clips (overflow: hidden, for the tab's corner),
+     so on a narrow window (400% zoom, a phone) a button that cannot sit beside
+     the tab drops under it, still right-aligned, rather than being cut off. */
+  .card-header { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 0 12px; padding: 0 16px 0 0; min-height: 50px; }
+  .card-header > :not(.corner-tab) { padding-top: 12px; margin-left: auto; max-width: calc(100% - 16px); }
+  .card-header .btn { white-space: nowrap; }
+  .card-header .note-right { font-size: 13px; color: var(--ink-faint); text-align: right; }
+  .card-body { padding: 14px 20px 18px; }
+  .card-tools { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+
+  /* The catalog's wavy corner tab names each section (shapes/tab-b-sparks.svg,
+     painted in the section's colour through a mask and stretched to its label
+     with an svgView fragment; a browser without svgView draws it unstretched).
+     Light fields carry their deep shade as a hard offset under the white type
+     so it stays legible. */
+  .corner-tab {
+    --tab: var(--c-blue); --tab-deep: var(--c-blue-deep); --tab-ink: #fff;
+    position: relative; display: inline-block; flex: none; align-self: flex-start;
+    padding: 11px 58px 21px 20px;
+    font-family: var(--f-label); font-weight: 900; font-size: 15px; line-height: 1.15; letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--tab-ink); text-shadow: 0.07em 0.07em 0 var(--tab-deep);
+    isolation: isolate;
+  }
+  .corner-tab::before {
+    content: ''; position: absolute; inset: 0; z-index: -1; background: var(--tab);
+    -webkit-mask: url('/brand/shapes/tab-b-sparks.svg#svgView(preserveAspectRatio(none))') no-repeat 0 0 / 100% 100%;
+    mask: url('/brand/shapes/tab-b-sparks.svg#svgView(preserveAspectRatio(none))') no-repeat 0 0 / 100% 100%;
+  }
+  /* Fail open: if the kit's shape cannot load (a missing mirror), a failed
+     mask would hide the field and leave white type on a white card, so the
+     tab falls back to a plain rounded field. Set by the probe in <head>. */
+  .no-kit-shape .corner-tab::before { -webkit-mask: none; mask: none; border-bottom-right-radius: 16px; }
+  .t-blue    { --tab: var(--c-blue);    --tab-deep: var(--c-blue-deep); }
+  .t-orange  { --tab: var(--c-orange);  --tab-deep: var(--c-orange-deep); }
+  .t-tnt     { --tab: var(--c-tnt);     --tab-deep: var(--c-tnt-deep); }
+  .t-journey { --tab: var(--c-journey); --tab-deep: var(--c-journey-deep); }
+  .t-trek    { --tab: var(--c-trek);    --tab-deep: var(--c-trek-deep); }
+  .t-puggles { --tab: var(--c-puggles); --tab-deep: var(--c-puggles-deep); }
+  .t-sparks  { --tab: var(--c-sparks);  --tab-deep: var(--c-sparks-deep); }
+  .t-sun     { --tab: var(--c-sun);     --tab-deep: transparent; --tab-ink: var(--c-ink); }
+
+  /* ── Stat cards: tab, big Paytone One number, Londrina caption ── */
+  .stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+  .stat { display: flex; flex-direction: column; }
+  .stat .value { font-family: var(--f-shout); font-weight: 400; font-size: 46px; line-height: 1; color: var(--c-ink); padding: 10px 20px 0; }
+  .stat .value.words { font-size: 25px; line-height: 1.1; padding-top: 14px; overflow-wrap: anywhere; }
+  .stat .value.tone-bad { color: var(--bad); }
+  .stat .value.tone-muted { color: var(--ink-soft); }
+  .stat .label { font-family: var(--f-label); font-size: 14px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-soft); padding: 8px 20px 18px; }
+  .stat .consent { padding: 0 20px 16px; margin-top: -8px; font-size: 12px; line-height: 1.4; color: var(--ink-faint); }
+  @media (max-width: 900px) { .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (max-width: 480px) { .stats { grid-template-columns: 1fr; } }
+
+  /* ── Buttons: Londrina caps on flat fields with a hard offset ── */
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    padding: 8px 18px; border: 2px solid var(--line-strong); border-radius: 999px; cursor: pointer;
+    font-family: var(--f-label); font-weight: 400; font-size: 15px; line-height: 1.1; letter-spacing: 0.06em; text-transform: uppercase;
+    background: #fff; color: var(--c-ink); box-shadow: 0 3px 0 var(--line-strong);
+    transition: transform var(--quick) var(--ease-pop);
+  }
+  .btn:hover { transform: translateY(-1px); }
+  .btn:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--line-strong); }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+  .btn-primary { background: var(--c-blue); border-color: var(--c-blue); color: #fff; box-shadow: 0 3px 0 var(--c-blue-deep); }
+  .btn-primary:active { box-shadow: 0 1px 0 var(--c-blue-deep); }
+  .btn-hot { background: var(--c-hot); border-color: var(--c-hot); color: #fff; font-weight: 900; box-shadow: 3px 3px 0 var(--c-hot-deep); }
+  .btn-hot:active { box-shadow: 1px 1px 0 var(--c-hot-deep); }
+  .btn-secondary { background: #fff; color: var(--c-ink); }
+  .btn-sm { padding: 5px 12px; font-size: 13px; box-shadow: 0 2px 0 var(--line-strong); }
+  .btn-primary.btn-sm { box-shadow: 0 2px 0 var(--c-blue-deep); }
+  /* Ink, not sunflower: a focus ring needs 3:1 against what it sits on, and
+     the sunflower managed 1.4-1.8:1 on the white cards, the page and the cream
+     chips (1:1 on the update banner). Ink is 9:1 or better on all of them. */
+  :focus-visible { outline: 3px solid var(--c-ink); outline-offset: 2px; }
+
+  /* ── Form controls: Figtree, because they are read ── */
+  input[type="text"], input[type="number"], input[type="time"], input[type="password"], select, textarea {
+    font-family: var(--f-read); font-size: 14px; color: var(--c-ink);
+    padding: 8px 12px; border: 2px solid var(--line-strong); border-radius: 10px; background: #fff;
+  }
+  input[type="text"]:focus, input[type="number"]:focus, input[type="time"]:focus, select:focus, textarea:focus { border-color: var(--c-blue); outline: 3px solid var(--c-cloud); outline-offset: 0; }
+  input[readonly] { background: var(--page); }
+  input[type="checkbox"], input[type="range"] { accent-color: var(--c-blue); }
+  input[type="checkbox"] { width: 16px; height: 16px; flex: none; }
+  input[type="file"] { font-family: var(--f-read); }
+  .field-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  .card-note { font-size: 13px; color: var(--ink-soft); }
+
+  /* ── Status banners (traffic light, welcome-screen privacy) ── */
+  .traffic-light { --tl: var(--ok); --tl-tint: var(--ok-tint); display: flex; align-items: center; gap: 16px; padding: 16px 20px; border-radius: 16px; background: var(--tl-tint); margin-bottom: 4px; }
+  .traffic-light.green { --tl: var(--ok); --tl-tint: var(--ok-tint); }
+  .traffic-light.yellow { --tl: var(--warn); --tl-tint: var(--warn-tint); }
+  .traffic-light.red { --tl: var(--bad); --tl-tint: var(--bad-tint); }
+  .traffic-dot { width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0; background: var(--ok); box-shadow: 0 0 0 4px #fff, 3px 3px 0 4px rgba(35, 31, 32, 0.18); }
+  .traffic-dot.green { background: var(--ok); }
+  .traffic-dot.yellow { background: var(--c-orange); }
+  .traffic-dot.red { background: var(--c-sparks); }
+  .traffic-text { font-family: var(--f-shout); font-weight: 400; font-size: 21px; line-height: 1.15; color: var(--c-ink); }
+  .traffic-detail { font-size: 14px; color: var(--ink-soft); margin-top: 2px; }
+  .card > .traffic-light:only-child { margin: 0; border-radius: 16px; }
+
+  .warnings { display: flex; flex-direction: column; gap: 8px; }
+  .warning-item { font-size: 14px; padding: 10px 14px; background: var(--warn-tint); border-left: 5px solid var(--c-orange); border-radius: 10px; color: var(--c-ink); }
+  .warning-item.bad { background: var(--bad-tint); border-left-color: var(--c-sparks); }
+  .update-banner { background: var(--c-sun); color: var(--c-ink); padding: 10px 16px; font-size: 14px; font-weight: 700; text-align: center; }
+  .update-banner button {
+    margin-left: 12px; padding: 5px 14px; border: 2px solid var(--c-blue); border-radius: 999px; cursor: pointer;
+    background: var(--c-blue); color: #fff; box-shadow: 0 2px 0 var(--c-blue-deep);
+    font-family: var(--f-label); font-size: 14px; letter-spacing: 0.06em; text-transform: uppercase;
+  }
+
+  /* ── Tonight: club-colour chips and the safety flags ── */
+  .club-chips { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .club-chip {
+    --club: var(--ink-soft); --club-deep: transparent;
+    display: inline-flex; gap: 6px; align-items: baseline; border-radius: 999px; padding: 6px 15px;
+    background: var(--club); color: #fff; text-shadow: 0.07em 0.07em 0 var(--club-deep);
+    font-family: var(--f-label); font-weight: 900; font-size: 16px; line-height: 1.15; letter-spacing: 0.05em; text-transform: uppercase;
+  }
+  .club-chip .n { font-weight: 900; }
+  .club-puggles { --club: var(--c-puggles); --club-deep: var(--c-puggles-deep); }
+  .club-cubbies { --club: var(--c-cubbies); --club-deep: var(--c-cubbies-deep); }
+  .club-sparks  { --club: var(--c-sparks);  --club-deep: var(--c-sparks-deep); }
+  .club-tnt     { --club: var(--c-tnt);     --club-deep: var(--c-tnt-deep); }
+  .club-trek    { --club: var(--c-trek);    --club-deep: var(--c-trek-deep); }
+  .club-journey { --club: var(--c-journey); --club-deep: var(--c-journey-deep); }
+  .flag-list { display: flex; flex-direction: column; gap: 6px; }
+  .flag-item { font-size: 14px; padding: 7px 12px; border-radius: 10px; display: flex; justify-content: space-between; gap: 8px; color: var(--c-ink); border-left: 5px solid transparent; }
+  .flag-item.allergy { background: var(--bad-tint); border-left-color: var(--c-sparks); }
+  .flag-item.nophoto { background: var(--c-journey-tint); border-left-color: var(--c-journey); }
+  .flag-item.bday { background: var(--c-cream); border-left-color: var(--c-orange); }
+  .flag-tokens { font-family: var(--f-label); font-size: 15px; letter-spacing: 0.06em; text-transform: uppercase; }
+  .leader-chip { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; padding: 4px 6px 4px 10px; border-radius: 999px; background: var(--c-cream); border: 2px solid var(--c-orange); color: var(--c-ink); }
+  .leader-chip button { border: none; background: transparent; cursor: pointer; color: var(--c-hot-deep); padding: 0 3px; font-family: var(--f-label); font-size: 14px; letter-spacing: 0.05em; text-transform: uppercase; }
+  .leader-chip button.x { font-family: var(--f-read); font-size: 17px; line-height: 1; text-transform: none; }
+
+  /* ── Tables, diagnostics ── */
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th { text-align: left; padding: 9px 12px; background: var(--page); border-bottom: 2px solid var(--line); font-family: var(--f-label); font-weight: 400; font-size: 13px; text-transform: uppercase; color: var(--ink-faint); letter-spacing: 0.08em; }
+  td { padding: 8px 12px; border-bottom: 1px solid var(--line); }
+  tr:hover td { background: #FAFBFD; }
+  td.muted { font-size: 13px; color: var(--ink-faint); }
+  tr.row-failed td { background: var(--bad-tint); }
+  .row-tag { display: inline-block; margin-left: 4px; padding: 1px 8px; border-radius: 999px; vertical-align: 1px;
+    font-family: var(--f-label); font-size: 12px; letter-spacing: 0.06em; background: var(--line); color: var(--ink-soft); }
+  .row-tag.bad { background: var(--c-sparks); color: #fff; }
+  .row-tag.ok { background: var(--ok-tint); color: var(--ok); }
+  .row-tag.award { background: var(--c-cream); color: var(--c-hot-deep); }
+  .row-tag.leader { background: var(--c-cloud); color: var(--c-blue-deep); }
+  #schedule-table input[type="text"] { padding: 6px 8px; box-sizing: content-box; }
+  .diag-list { display: flex; flex-direction: column; gap: 2px; }
+  .diag-item { display: flex; align-items: center; gap: 10px; font-size: 14px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+  .diag-item:last-child { border-bottom: none; }
+  .diag-icon { font-size: 16px; width: 24px; text-align: center; }
+  .diag-detail { font-size: 13px; color: var(--ink-faint); margin-left: auto; text-align: right; }
+  .empty { text-align: center; padding: 24px; color: var(--ink-faint); font-size: 14px; }
+  .path-box { font-family: ui-monospace, Consolas, monospace; font-size: 12px; background: var(--page);
+    border: 2px solid var(--line); border-radius: 10px; padding: 8px 10px; word-break: break-all; }
+
+  /* ── Label preview and settings ── */
+  .preview-section { display: flex; gap: 14px; align-items: flex-start; flex-wrap: wrap; }
+  .preview-form { display: flex; flex-direction: column; gap: 8px; min-width: 220px; }
+  .preview-img { border: 2px solid var(--line); border-radius: 10px; max-width: 400px; width: 100%; background: #fff; }
+  .settings-form { display: flex; flex-direction: column; gap: 12px; }
+  .settings-form label, .field-label { font-size: 13px; font-weight: 700; color: var(--ink-soft); }
+  .settings-form select, .settings-form input[type="text"], .settings-form input[type="number"] { width: 100%; }
+  .settings-form > .btn-primary { align-self: flex-start; padding: 10px 30px; font-size: 16px; }
+  .section-label, .settings-form .section-label {
+    display: block; font-family: var(--f-label); font-weight: 400; font-size: 17px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--c-blue);
+  }
+  .settings-form p { line-height: 1.45; }
+  /* The settings hints are set inline at 10-11px in a pale grey. Lift them to a
+     legible size and the page's own grey here rather than rewriting every
+     line; the JS-driven notes carry an id and keep the colour they are given. */
+  .settings-form p { font-size: 13px !important; }
+  .settings-form p:not([id]) { color: var(--ink-faint) !important; }
+  .settings-form label[style*="font-size:11px"] { font-size: 13px !important; }
+
+  /* ── The section tabs (history, preview, settings, diagnostics, audit) ── */
+  .tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+  .tab {
+    padding: 8px 18px; cursor: pointer; border: 2px solid var(--line-strong); border-radius: 999px; background: #fff; color: var(--ink-soft);
+    font-family: var(--f-label); font-weight: 400; font-size: 16px; line-height: 1.1; letter-spacing: 0.06em; text-transform: uppercase;
+    box-shadow: 0 3px 0 var(--line-strong); transition: transform var(--quick) var(--ease-pop);
+  }
+  .tab:hover { transform: translateY(-1px); }
+  .tab.active { background: var(--c-blue); border-color: var(--c-blue); color: #fff; box-shadow: 0 3px 0 var(--c-blue-deep); }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  /* ── What's new ── */
+  #whatsnew-summary { font-family: var(--f-label); font-size: 16px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--c-blue); }
+
+  /* Deep-link target highlight (jumpToDisplayKey): a sunflower wash that
+     fades in and out. Opacity only, and it ends invisible. */
+  .flash { position: relative; }
+  .flash::after {
+    content: ''; position: absolute; inset: -8px; border-radius: 14px; background: var(--c-sun);
+    opacity: 0; pointer-events: none; animation: flash-highlight 1.6s var(--ease-settle) 1;
+  }
+  @keyframes flash-highlight {
+    0%, 100% { opacity: 0; }
+    20%, 60% { opacity: 0.3; }
+  }
+  /* The same wash held still: no in-between frames at all. */
+  @keyframes flash-hold {
+    from, to { opacity: 0.3; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+    /* The fade above is the wash's ONLY visible frame, so the blanket rule
+       would land a reduced-motion deep link on an unmarked block. Give it the
+       same 1.6 s as a still instead: on, held, off, with nothing moving. */
+    .flash::after { animation: flash-hold 1.6s 1 !important; }
+  }
+  @media (max-width: 640px) {
+    .header { padding: 12px 16px; gap: 12px; flex-wrap: wrap; }
+    .brand-mark { height: 38px; }
+    .header h1 { font-size: 24px; }
+    .container { padding: 16px 12px 32px; }
+  }
+</style>
+<script>
+  // The corner tabs are masked by the kit's own shape; if it cannot load, say
+  // so on <html> so they fall back to a plain field (see .no-kit-shape).
+  (function () {
+    var probe = new Image();
+    probe.onerror = function () { document.documentElement.classList.add('no-kit-shape'); };
+    probe.src = '/brand/shapes/tab-b-sparks.svg';
+  })();
+</script>
+</head>
+<body>
+
+<div class="header">
+  <img class="brand-mark" src="/brand/logos/awana-clubs-white.svg" alt="Awana Clubs" width="120" height="50">
+  <div class="brand-titles">
+    <h1>Club Label Printer</h1>
+    <span class="ver" id="version-text">Loading...</span>
+  </div>
+  <!-- The stepped chip "PRINTER / ONLINE", drawn by /step-chip.js. -->
+  <span id="status-badge" class="status-chip" role="status"></span>
+</div>
+
+<div id="update-banner" class="update-banner" style="display:none"></div>
+
+<div class="container">
+  <!-- Traffic light health indicator -->
+  <div id="traffic-light" class="traffic-light green">
+    <div id="traffic-dot" class="traffic-dot green"></div>
+    <div>
+      <div id="traffic-text" class="traffic-text">Checking status...</div>
+      <div id="traffic-detail" class="traffic-detail"></div>
+    </div>
+  </div>
+
+  <!-- Status cards row: a corner tab names each number. -->
+  <div class="stats">
+    <div class="card stat">
+      <span class="corner-tab t-orange">Prints today</span>
+      <div class="value" id="print-count">--</div>
+      <div class="label" id="print-since">Labels printed</div>
+    </div>
+    <div class="card stat">
+      <span class="corner-tab t-blue">In the roster</span>
+      <div class="value" id="roster-count">--</div>
+      <div class="label">Clubbers</div>
+      <div id="roster-consent" class="consent" style="display:none"></div>
+    </div>
+    <!-- The privacy card's verdict in two words, filled by renderPrivacy(). -->
+    <div class="card stat">
+      <span class="corner-tab t-tnt">Welcome screen</span>
+      <div class="value words" id="welcome-stat">&hellip;</div>
+      <div class="label" id="welcome-stat-note">Checking</div>
+    </div>
+    <div class="card stat">
+      <span class="corner-tab t-journey">Printer</span>
+      <div class="value words" id="printer-name">--</div>
+      <div class="label">Up <span id="uptime-value">--</span></div>
+    </div>
+  </div>
+
+  <!-- Tonight at a glance -->
+  <div class="card">
+    <div class="card-header">
+      <span class="corner-tab t-trek">Tonight at a glance</span>
+      <span id="tonight-summary" class="note-right"></span>
+    </div>
+    <div class="card-body" style="display:flex;flex-direction:column;gap:12px">
+      <div id="tonight-clubs" class="club-chips"><span class="empty" style="padding:0">No check-ins yet tonight</span></div>
+      <!-- Does our count agree with TwoTimTwo's own? Hidden entirely until
+           the check-in page has reported a number, because "I have not heard"
+           must never look like "we agree". -->
+      <div id="tonight-check" style="display:none;font-size:13px;line-height:1.45"></div>
+      <div id="tonight-flags" class="flag-list" style="display:none"></div>
+    </div>
+  </div>
+
+  <!-- Leader name tag. Its Print button is the page's one hot button. -->
+  <div class="card" id="leader-card">
+    <div class="card-header">
+      <span class="corner-tab t-orange">Leader name tag</span>
+      <span class="note-right">never counts toward tonight</span>
+    </div>
+    <div class="card-body" style="display:flex;flex-direction:column;gap:10px">
+      <div class="field-row">
+        <input type="text" id="leader-name" maxlength="80" placeholder="Leader's name" autocomplete="off" aria-label="Leader's name" style="flex:2;min-width:160px">
+        <!-- Options are filled from GET /clubs (the one place the club list
+             lives) so this dropdown can never drift from the others. -->
+        <select id="leader-club" aria-label="Leader's club" style="flex:1;min-width:120px">
+          <option value="">No club</option>
+        </select>
+        <button type="button" class="btn btn-hot" onclick="printLeaderTag()">Print leader tag</button>
+      </div>
+      <div id="leader-chips-wrap" style="display:none;flex-direction:column;gap:8px">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
+          <span class="field-label">Remembered leaders</span>
+          <button type="button" class="btn btn-sm" onclick="printSelectedLeaders()">Print selected</button>
+        </div>
+        <div id="leader-chips" style="display:flex;flex-wrap:wrap;gap:8px"></div>
+        <div id="leader-chips-note" class="card-note"></div>
+      </div>
+      <div id="leader-note" class="card-note">For adult volunteers: prints the name, a LEADER pill and "&lt;Club&gt; Leader". Whoever you print is remembered here for one-tap reprints; the phone page and the check-in widget show the same list.</div>
+    </div>
+  </div>
+
+  <!-- Custom label: one line of free text and nothing else. Sits right after
+       the leader card because it reuses that path end to end, and because the
+       two are the printer's only "this is not a child" labels. -->
+  <div class="card" id="custom-card">
+    <div class="card-header">
+      <span class="corner-tab t-puggles">Custom label</span>
+      <span class="note-right">not counted, not recorded</span>
+    </div>
+    <div class="card-body" style="display:flex;flex-direction:column;gap:10px">
+      <div class="field-row">
+        <input type="text" id="custom-text" maxlength="60" placeholder="VOLUNTEER, KITCHEN, Room 4 Helper…" autocomplete="off" aria-label="Custom label text" style="flex:2;min-width:200px">
+        <button type="button" class="btn btn-primary" onclick="printCustomLabel()">Print custom label</button>
+      </div>
+      <div id="custom-note" class="card-note">One line of text, auto-sized, on an otherwise blank label. It is not a check-in: nothing is counted, no history row is written and nothing reaches the lobby screens.</div>
+    </div>
+  </div>
+
+  <!-- Realtime privacy — top level on purpose. This used to live only inside
+       the Settings tab, below Pusher, where you had to already know it existed
+       to find it. Whether children's names go out encrypted is a front-page
+       fact, not a preference. -->
+  <div class="card" id="privacy-card">
+    <div class="card-header">
+      <span class="corner-tab t-tnt">Names on the welcome screen</span>
+      <button class="btn btn-primary btn-sm" onclick="jumpToDisplayKey()">Set up the display key</button>
+    </div>
+    <div class="card-body">
+      <div id="privacy-banner" class="traffic-light green" style="margin-bottom:0">
+        <div id="privacy-dot" class="traffic-dot green"></div>
+        <div>
+          <div id="privacy-text" class="traffic-text">Checking…</div>
+          <div id="privacy-detail" class="traffic-detail"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Night Status -->
+  <div class="card">
+    <div class="card-header">
+      <span class="corner-tab t-blue">Night status</span>
+      <span class="card-tools">
+        <button class="btn btn-secondary btn-sm" id="rehearsal-btn" onclick="toggleRehearsal()">Rehearsal mode</button>
+        <button class="btn btn-primary btn-sm" id="canary-btn" onclick="runCanary()">Test Night Systems</button>
+      </span>
+    </div>
+    <div class="card-body" style="padding:0">
+      <div id="night-status" class="diag-list" style="padding:6px 20px 10px">
+        <div class="empty">Loading...</div>
+      </div>
+      <div id="canary-result" style="display:none;padding:10px 20px;border-top:1px solid var(--line);font-size:13px"></div>
+    </div>
+  </div>
+
+  <!-- Lobby slides — the typed slide deck every display shows. Published from
+       here (paste/upload the display app's export) or from the display app's
+       own slide editor, which needs the publish token below. -->
+  <div class="card" id="lobby-slides-card">
+    <div class="card-header">
+      <span class="corner-tab t-journey">Lobby slides</span>
+      <span id="lobby-slides-summary" class="note-right">Loading…</span>
+    </div>
+    <div class="card-body" style="display:flex;flex-direction:column;gap:10px">
+      <div class="card-note">
+        Publish one typed slide deck to <strong>every</strong> display. On any display: Settings &rarr; Edit slides &rarr; <strong>Export</strong> gives you the <code>awana-slides.json</code> file — paste its contents here (or choose the file) and press Publish. Screens with the display key update within seconds; video slides always stay on the device they were added on.
+      </div>
+      <textarea id="lobby-slides-json" rows="3" aria-label="Slide deck JSON" placeholder='Paste the contents of awana-slides.json here…' style="width:100%;font-family:ui-monospace,monospace;font-size:12px"></textarea>
+      <div class="field-row">
+        <input type="file" id="lobby-slides-file" accept=".json,application/json" aria-label="Slide deck file" style="font-size:13px">
+        <span style="flex:1"></span>
+        <button class="btn btn-primary btn-sm" onclick="publishLobbyDeck()">Publish to all displays</button>
+      </div>
+      <div id="lobby-slides-note" class="card-note"></div>
+      <div style="border-top:1px solid var(--line);padding-top:12px">
+        <div class="card-note" style="margin-bottom:8px">
+          <strong>Publish token</strong> — lets the display app's slide editor publish straight from its Settings on this computer. Generate it once, paste it into that display's Settings, then Save. Clearing it revokes that path; this card keeps working without one.
+        </div>
+        <div class="field-row">
+          <input type="text" id="lobby-slides-token" readonly placeholder="No publish token set" aria-label="Publish token" style="flex:1;min-width:200px;font-family:ui-monospace,monospace;font-size:12px">
+          <button class="btn btn-secondary btn-sm" onclick="generateSlidesToken()">Generate</button>
+          <button class="btn btn-secondary btn-sm" onclick="copySlidesToken()">Copy</button>
+          <button class="btn btn-secondary btn-sm" onclick="clearSlidesToken()">Clear</button>
+        </div>
+        <div id="lobby-slides-token-note" class="card-note" style="margin-top:6px"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Print failures -->
+  <div id="failures-card" class="card" style="display:none">
+    <div class="card-header"><span class="corner-tab t-sparks">Print failures tonight</span></div>
+    <div class="card-body">
+      <div id="failures-list" class="warnings"></div>
+    </div>
+  </div>
+
+  <!-- Warnings -->
+  <div id="warnings-card" class="card" style="display:none">
+    <div class="card-header"><span class="corner-tab t-sun">Warnings</span></div>
+    <div class="card-body">
+      <div id="warnings-list" class="warnings"></div>
+    </div>
+  </div>
+
+  <!-- What's new (#6): the latest changes.md entry, straight from the shipped
+       file — the release notes are already written per version, so the panel
+       never needs its own copywriting. -->
+  <div id="whatsnew-card" class="card" style="display:none">
+    <div class="card-body" style="padding:12px 20px">
+      <details>
+        <summary id="whatsnew-summary" style="cursor:pointer">What's new</summary>
+        <div id="whatsnew-body" style="white-space:pre-wrap;font-size:13px;color:var(--ink-soft);margin-top:8px;max-height:260px;overflow-y:auto"></div>
+      </details>
+    </div>
+  </div>
+
+  <!-- Tabbed section: the section tabs are buttons, so they take focus and
+       Enter/Space like any other control. -->
+  <div>
+    <div class="tabs" role="tablist" aria-label="Dashboard sections">
+      <button type="button" class="tab active" role="tab" aria-selected="true" aria-controls="tab-history" data-tab="history">Print History</button>
+      <button type="button" class="tab" role="tab" aria-selected="false" aria-controls="tab-preview" data-tab="preview">Label Preview</button>
+      <button type="button" class="tab" role="tab" aria-selected="false" aria-controls="tab-settings" data-tab="settings">Settings</button>
+      <button type="button" class="tab" role="tab" aria-selected="false" aria-controls="tab-diagnostics" data-tab="diagnostics">Diagnostics</button>
+      <button type="button" class="tab" role="tab" aria-selected="false" aria-controls="tab-attendance" data-tab="attendance">Attendance Audit</button>
+    </div>
+    <div class="card">
+      <!-- History tab -->
+      <div id="tab-history" class="tab-content active">
+        <div class="card-header">
+          <span class="corner-tab t-blue">Recent prints</span>
+          <button class="btn btn-secondary btn-sm" onclick="loadHistory()">Refresh</button>
+        </div>
+        <div id="reprint-range" style="padding:6px 20px 14px;border-bottom:1px solid var(--line);display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
+          <label class="field-label">From<br><input type="time" id="rr-from"></label>
+          <label class="field-label">To<br><input type="time" id="rr-to"></label>
+          <label class="field-label">Club<br><select id="rr-club"><option value="">All clubs</option></select></label>
+          <button class="btn btn-secondary btn-sm" onclick="reprintRangePreview()">Reprint this stretch</button>
+          <div id="rr-note" class="card-note" style="flex:1 0 100%"></div>
+        </div>
+        <div class="card-body" style="padding:0">
+          <table>
+            <thead><tr><th>Name</th><th>Club</th><th>Printer</th><th>Time</th><th></th></tr></thead>
+            <tbody id="history-body"><tr><td colspan="5" class="empty">Loading...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Preview tab -->
+      <div id="tab-preview" class="tab-content">
+        <div class="card-header"><span class="corner-tab t-blue">Label preview</span></div>
+        <div class="card-body">
+          <div class="preview-section">
+            <div class="preview-form">
+              <input type="text" id="preview-first" placeholder="First name" value="Test">
+              <input type="text" id="preview-last" placeholder="Last name" value="Child">
+              <input type="text" id="preview-club" placeholder="Club name (optional)">
+              <button class="btn btn-primary" onclick="loadPreview()">Generate Preview</button>
+            </div>
+            <img id="preview-image" class="preview-img" alt="Label preview will appear here" style="display:none">
+          </div>
+
+          <div style="margin-top:18px; border-top:1px solid var(--line); padding-top:14px">
+            <label class="section-label">Per-club label template</label>
+            <p class="card-note" style="margin:4px 0 10px">
+              Switch parts of the label on or off per club. "Default" applies to every club without
+              its own template (and to unrecognized club names). The preview above updates live as
+              you tick; nothing prints differently until you press Save. Safety items &mdash; allergy
+              icons, the no-photo camera, birthday &mdash; are not templatable and always print.
+            </p>
+            <div class="preview-section">
+              <div class="preview-form">
+                <select id="tpl-club">
+                  <option value="default">Default (all clubs)</option>
+                </select>
+                <label style="font-weight:400; font-size:12px; color:#475569; display:flex; align-items:center; gap:6px">
+                  <input type="checkbox" id="tpl-showIconPanel" checked> Club logo / club mark panel
+                </label>
+                <label style="font-weight:400; font-size:12px; color:#475569; display:flex; align-items:center; gap:6px">
+                  <input type="checkbox" id="tpl-showLastName" checked> Last name
+                </label>
+                <label style="font-weight:400; font-size:12px; color:#475569; display:flex; align-items:center; gap:6px">
+                  <input type="checkbox" id="tpl-showClubLine" checked> Club name line
+                </label>
+                <label style="font-weight:400; font-size:12px; color:#475569; display:flex; align-items:center; gap:6px">
+                  <input type="checkbox" id="tpl-showGroupLine" checked> Handbook group line
+                </label>
+                <label style="font-weight:400; font-size:12px; color:#475569; display:flex; align-items:center; gap:6px">
+                  <input type="checkbox" id="tpl-showVisitorPill" checked> VISITOR pill
+                </label>
+                <label style="font-weight:400; font-size:12px; color:#475569; display:flex; align-items:center; gap:6px">
+                  <input type="checkbox" id="tpl-showFooter" checked> Label footer
+                </label>
+                <label style="font-weight:400; font-size:12px; color:#475569">
+                  Name size cap <span id="tpl-name-max-val">48</span>pt
+                  <input type="range" id="tpl-nameMaxPt" min="18" max="48" value="48" style="width:100%">
+                </label>
+                <label style="font-weight:400; font-size:12px; color:#475569; display:flex; align-items:center; gap:6px">
+                  <input type="checkbox" id="tpl-preview-visitor"> Preview as a visitor label
+                </label>
+                <button class="btn btn-primary btn-sm" onclick="saveTemplates()">Save templates</button>
+                <button class="btn btn-secondary btn-sm" onclick="resetTemplate()">Reset this club to default</button>
+                <div id="tpl-status" style="font-weight:700;color:var(--ok);display:none">Templates saved</div>
+              </div>
+              <img id="tpl-preview-image" class="preview-img" alt="Template preview" style="display:none">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Settings tab -->
+      <div id="tab-settings" class="tab-content">
+        <div class="card-header"><span class="corner-tab t-blue">Server configuration</span></div>
+        <div class="card-body">
+          <div class="settings-form">
+            <div>
+              <label>Printer</label>
+              <select id="settings-printer"><option value="">Loading...</option></select>
+            </div>
+            <div>
+              <label>Printer type</label>
+              <select id="settings-printer-type" onchange="toggleReceiptSettings()">
+                <option value="label">Label printer (4&Prime; &times; 2&Prime;)</option>
+                <option value="receipt">Receipt printer (80 mm roll, network) &mdash; trial</option>
+              </select>
+              <div id="receipt-settings" style="display:none; margin-top:8px; padding:10px; border:1px solid #e2e8f0; border-radius:8px">
+                <p style="font-size:11px;color:#64748b;margin:0 0 8px">
+                  Every label prints on the receipt printer instead: today's label turned sideways and scaled to fill the roll
+                  (about 2&#8542;&Prime; &times; 5&#8541;&Prime;), then cut. No tunes. If the receipt printer fails, the label goes to the
+                  printer chosen above instead (if it's connected).
+                </p>
+                <div style="display:grid; grid-template-columns: 2fr 1fr; gap:10px">
+                  <div>
+                    <label>Printer IP address</label>
+                    <input type="text" id="settings-receipt-host" placeholder="192.168.1.50" maxlength="253">
+                  </div>
+                  <div>
+                    <label>Port</label>
+                    <input type="number" id="settings-receipt-port" placeholder="9100" min="1" max="65535">
+                  </div>
+                  <div>
+                    <label>Cut</label>
+                    <select id="settings-receipt-cut">
+                      <option value="full">Full cut (tag drops free)</option>
+                      <option value="partial">Partial cut (tag hangs until torn off)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label>Printable width (dots)</label>
+                    <input type="number" id="settings-receipt-dots" placeholder="576" min="384" max="832" step="8">
+                  </div>
+                </div>
+                <div style="display:flex; gap:8px; margin-top:8px; flex-wrap:wrap">
+                  <button class="btn btn-secondary btn-sm" type="button" onclick="findReceiptPrinters()">Find printers</button>
+                  <button class="btn btn-secondary btn-sm" type="button" onclick="sendReceiptTest()">Send test tag</button>
+                </div>
+                <div id="receipt-found" style="margin-top:6px"></div>
+                <p id="receipt-status" style="font-size:11px;color:#64748b;margin:6px 0 0"></p>
+                <p style="font-size:10px;color:#94a3b8;margin:6px 0 0">
+                  Hold FEED while switching the printer on to print its self-test page with its IP address. 576 dots is 72 mm, the normal width for 80 mm paper.
+                  Find printers looks only on this computer's own network.
+                </p>
+              </div>
+            </div>
+            <div>
+              <label>Check-in URL</label>
+              <input type="text" id="settings-url" placeholder="https://yourchurch.twotimtwo.com/clubber/checkin">
+            </div>
+            <div style="margin-top:12px; border-top: 1px solid #e2e8f0; padding-top: 12px;">
+              <label class="section-label">Pusher Integration (Joyful Welcome Screen)</label>
+              <p style="font-size:11px; color:#64748b; margin-bottom:8px">Get these from your Pusher Channels dashboard</p>
+              <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                <div>
+                  <label>App ID</label>
+                  <input type="text" id="settings-pusher-id" placeholder="123456">
+                </div>
+                <div>
+                  <label>Cluster</label>
+                  <input type="text" id="settings-pusher-cluster" placeholder="us2">
+                </div>
+                <div>
+                  <label>Key</label>
+                  <input type="text" id="settings-pusher-key" placeholder="abc123def456">
+                </div>
+                <div>
+                  <label>Secret</label>
+                  <input type="text" id="settings-pusher-secret" placeholder="**********">
+                </div>
+              </div>
+            </div>
+            <div id="display-key-section" style="margin-top:12px; border-top: 1px solid #e2e8f0; padding-top: 12px;">
+              <label class="section-label">Realtime privacy &mdash; display key</label>
+              <p style="font-size:11px; color:#64748b; margin-bottom:8px">
+                The Pusher channel is <strong>public</strong>: anyone who views a screen's page source can
+                subscribe to it from anywhere. So children's first names are <strong>encrypted</strong> before
+                they leave this PC &mdash; and so is the published lobby slide deck, since it is
+                free-typed church copy. Generate the key once, then paste the same value into every
+                screen (Settings &rarr; Connection &rarr; Display key). Counts, clock and countdown never
+                need it &mdash; without it the welcome banners and slide sync stop.
+              </p>
+              <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap">
+                <input type="text" id="settings-display-key" placeholder="none &mdash; names are NOT encrypted" style="flex:1 1 240px" readonly>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="generateDisplayKey()">Generate display key</button>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="copyDisplayKey()">Copy</button>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="clearDisplayKey()">Clear</button>
+              </div>
+              <p id="display-key-note" style="font-size:10px;color:#94a3b8;margin-top:6px"></p>
+            </div>
+            <div id="sync-section" style="display:none; margin-top:12px; border-top: 1px solid #e2e8f0; padding-top: 12px;">
+              <label class="section-label">Sync service &mdash; one passphrase for every screen</label>
+              <p style="font-size:11px; color:#64748b; margin-bottom:8px">
+                The church&rsquo;s screens now sync through an always-on service, so they keep working with this
+                computer switched off. Sign this computer in with the church passphrase (the same word every screen
+                types). It then seals check-ins with the key the screens share, and the lobby slides and shared
+                settings live on the service instead of here. Sign this computer in <strong>before</strong> the
+                screens, so screens set up earlier keep reading names.
+              </p>
+              <div id="sync-signin-row" style="display:flex; gap:8px; align-items:center; flex-wrap:wrap">
+                <input type="password" id="sync-passphrase" placeholder="the church passphrase" autocomplete="off" style="flex:1 1 240px"
+                  onkeydown="if (event.key === 'Enter') syncSignIn()">
+                <button type="button" class="btn btn-secondary btn-sm" onclick="syncSignIn()">Sign in</button>
+              </div>
+              <div id="sync-signed-in-row" style="display:none; gap:8px; align-items:center; flex-wrap:wrap">
+                <code id="sync-signed-in-text" style="flex:1 1 240px">signed in</code>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="syncSignOut()">Sign out</button>
+              </div>
+              <p id="sync-note" style="font-size:10px;color:#94a3b8;margin-top:6px"></p>
+            </div>
+            <div id="display-login-section" style="margin-top:12px; border-top: 1px solid #e2e8f0; padding-top: 12px;">
+              <label class="section-label">Display login &mdash; one passphrase for every screen</label>
+              <p style="font-size:11px; color:#64748b; margin-bottom:8px">
+                Instead of pasting the display key into each screen, a volunteer types this passphrase once on
+                each screen &mdash; lobby TV: Settings &rarr; Connection &rarr; <em>Display login</em>; projector
+                page: Display Settings &rarr; <em>Log in</em>. The screen then receives the display key and the
+                slide-publish token automatically, and keeps working when you rotate either. Changing the
+                passphrase does <strong>not</strong> log screens out: each keeps working with the keys it already
+                holds, shows &ldquo;log in again&rdquo; in its settings, and needs the new passphrase before it can
+                follow the <em>next</em> key rotation. The screen needs the print server running to log in;
+                pasting keys by hand still works under the screen&rsquo;s <em>Advanced</em> section.
+              </p>
+              <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap">
+                <input type="text" id="settings-display-login" placeholder="none &mdash; screens paste keys by hand" autocomplete="off" style="flex:1 1 240px">
+                <button type="button" class="btn btn-secondary btn-sm" onclick="generateDisplayLogin()">Generate</button>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="saveDisplayLogin()">Save passphrase</button>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="copyDisplayLogin()">Copy</button>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="clearDisplayLogin()">Clear</button>
+              </div>
+              <p id="display-login-note" style="font-size:10px;color:#94a3b8;margin-top:6px"></p>
+              <div style="margin-top:10px">
+                <label style="font-size:11px">Screen settings URL (optional)</label>
+                <p style="font-size:11px; color:#64748b; margin-bottom:6px">
+                  Hand every screen its settings file too, so weather, calendar and corner widgets set
+                  themselves up instead of being typed in one at a time. This is the same address a screen
+                  accepts as <code>?config=</code> &mdash; a plain JSON file of display settings, <strong>not</strong>
+                  a secret and never children&rsquo;s data. It rides inside the same sealed login frame simply
+                  because that frame is already going there. <strong>https only</strong>, up to 200 characters;
+                  leave it blank and screens are set up by hand exactly as before. Clearing it here clears it on
+                  every logged-in screen at the next heartbeat.
+                </p>
+                <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap">
+                  <input type="text" id="settings-fleet-config-url" placeholder="https://example.org/awana-display.json" autocomplete="off" style="flex:1 1 240px">
+                </div>
+                <p style="font-size:10px;color:#94a3b8;margin-top:6px">Saved with <strong>Save Settings</strong> below.</p>
+              </div>
+            </div>
+            <div style="margin-top:12px; border-top: 1px solid #e2e8f0; padding-top: 12px;">
+              <label class="section-label">Check-in Features</label>
+              <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top:8px">
+                <div>
+                  <label>Phone check-in PIN</label>
+                  <input type="text" id="settings-phone-pin" placeholder="blank = Wi-Fi access off">
+                  <p style="font-size:10px;color:#94a3b8">At least 4 characters. Required for Wi-Fi access below — without it this PC stays private.</p>
+                </div>
+                <div>
+                  <label>Late grace (minutes)</label>
+                  <input type="number" id="settings-late-grace" min="0" max="120" placeholder="10">
+                  <p style="font-size:10px;color:#94a3b8">Past a club's start + grace, labels add a "Go to:" line</p>
+                </div>
+              </div>
+              <div style="margin-top:8px">
+                <label>Screen season</label>
+                <select id="settings-season-theme">
+                  <option value="auto">Auto (follow the calendar)</option>
+                  <option value="off">Off — each screen uses its own skin</option>
+                  <option value="back-to-school">Back to school</option>
+                  <option value="fall">Fall</option>
+                  <option value="thanksgiving">Thanksgiving</option>
+                  <option value="christmas">Christmas</option>
+                  <option value="winter">Winter</option>
+                  <option value="spring">Spring</option>
+                  <option value="easter">Easter</option>
+                  <option value="vbs-summer">VBS / Summer</option>
+                </select>
+                <p style="font-size:10px;color:#94a3b8">Tells the lobby welcome screens which seasonal skin to wear (labels no longer print seasonal art). Auto follows the calendar, Easter included; pick a season to pin it.</p>
+              </div>
+              <div style="margin-top:8px">
+                <label>Label footer</label>
+                <input type="text" id="settings-label-footer" maxlength="60" placeholder="e.g. KVBC Awana &middot; Wednesdays 6:15&ndash;8:00pm">
+                <p style="font-size:10px;color:#94a3b8">One short line printed along the bottom of every label &mdash; church name, a verse, or service times. Blank = no footer. Check the Label Preview tab after saving.</p>
+              </div>
+              <div style="display:flex; flex-direction:column; gap:8px; margin-top:10px; font-size:13px">
+                <label style="display:flex;align-items:center;gap:6px;color:#475569;font-weight:400">
+                  <input type="checkbox" id="settings-ft-inverted"> Visitor labels use the inverted (black) palette
+                </label>
+                <label style="display:flex;align-items:center;gap:6px;color:#475569;font-weight:400">
+                  <input type="checkbox" id="settings-trophy-band"> Band the next label of a child who finished a handbook
+                </label>
+                <label style="display:flex;align-items:center;gap:6px;color:#475569;font-weight:400">
+                  <input type="checkbox" id="settings-connect-card"> Print a second "connect card" label for visitors
+                </label>
+                <label style="display:flex;align-items:center;gap:6px;color:#475569;font-weight:400;margin-left:22px">
+                  <input type="checkbox" id="settings-connect-card-auto"> Also print it automatically on a first-ever check-in
+                </label>
+                <p style="font-size:10px;color:#94a3b8;margin:0 0 0 44px">
+                  Fires when this PC has never printed for the child before AND the club has met at least
+                  once already &mdash; so opening night (or a fresh install) never buries the printer in cards.
+                </p>
+                <div style="margin:2px 0 0 22px">
+                  <label style="font-size:11px">Connect card greeting</label>
+                  <input type="text" id="settings-connect-greeting" maxlength="60" placeholder="We're so glad you're here!">
+                </div>
+                <label style="display:flex;align-items:center;gap:6px;color:#475569;font-weight:400">
+                  <input type="checkbox" id="settings-musical"> Musical printer: a tune with every label — cycling three songs, Happy Birthday for birthday kids (TSPL printers, e.g. D450)
+                </label>
+                <label style="display:flex;align-items:center;gap:6px;color:#475569;font-weight:400">
+                  <input type="checkbox" id="settings-update-beacon"> Update health beacon: after an auto-update, announce "vX.Y.Z came back cleanly" on the event bus (version number only)
+                </label>
+                <p style="font-size:10px;color:#94a3b8;margin:0 0 0 22px">
+                  Raw-mode party trick: the label stock feeds and returns while the motor "sings".
+                  If your printer creeps forward instead of returning, turn this back off.
+                  Try it from Diagnostics &rarr; "Play test tune".
+                </p>
+                <label style="display:flex;align-items:center;gap:6px;color:#475569;font-weight:400">
+                  <input type="checkbox" id="settings-driven-checkin" checked> Allow driven check-ins (phone page)
+                </label>
+                <label style="display:flex;align-items:center;gap:6px;color:#475569;font-weight:400">
+                  <input type="checkbox" id="settings-lan-access"> Let phones on this Wi-Fi reach this PC (needs a PIN, restart to apply)
+                </label>
+                <p id="lan-access-note" style="font-size:10px;color:#94a3b8;margin:0 0 0 22px">
+                  Off by default: the roster, check-in history and allergy list stay on this computer.
+                  Turn this on only if you use the phone check-in page, and set a PIN above —
+                  phones then open http://&lt;this-pc-ip&gt;:3456/phone
+                </p>
+              </div>
+            </div>
+
+            <div style="margin-top:12px; border-top: 1px solid #e2e8f0; padding-top: 12px;">
+              <label class="section-label">Group Schedule (drives late "Go to:" routing)</label>
+              <table style="margin-top:8px" id="schedule-table">
+                <thead><tr><th>Club</th><th>Start</th><th>Location</th><th>Room</th><th></th></tr></thead>
+                <tbody id="schedule-body"></tbody>
+              </table>
+              <button class="btn btn-secondary btn-sm" style="margin-top:6px" onclick="addScheduleRow()">Add club row</button>
+            </div>
+
+            <button class="btn btn-primary" onclick="saveSettings()">Save Settings</button>
+            <div id="settings-status" style="font-weight:700;color:var(--ok);display:none">Settings saved</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Diagnostics tab -->
+      <div id="tab-diagnostics" class="tab-content">
+        <div class="card-header">
+          <span class="corner-tab t-blue">System diagnostics</span>
+          <span class="card-tools">
+            <button class="btn btn-secondary btn-sm" onclick="clearPrintQueue()">Clear print queue</button>
+            <button class="btn btn-secondary btn-sm" onclick="playTune()">Play test tune</button>
+            <button class="btn btn-primary btn-sm" onclick="runDiagnostics()">Run Diagnostics</button>
+          </span>
+        </div>
+        <div class="card-body">
+          <div id="diag-list" class="diag-list">
+            <div class="empty">Click "Run Diagnostics" to check system health</div>
+          </div>
+          <div id="extension-block" style="display:none;margin-top:16px;border-top:1px solid var(--line);padding-top:14px">
+            <label class="section-label">Chrome extension folder</label>
+            <p class="card-note" style="margin:6px 0 10px">
+              The app keeps this folder up to date on every launch. Load it once via
+              <strong>chrome://extensions &rarr; Developer mode &rarr; Load unpacked</strong>, and from then on
+              each app update refreshes the files in place &mdash; restart Chrome to pick them up.
+              Do <em>not</em> load a copy from Downloads; that copy never updates.
+            </p>
+            <div id="extension-path" class="path-box">&mdash;</div>
+            <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+              <button type="button" class="btn btn-secondary btn-sm" onclick="copyExtensionPath()">Copy folder path</button>
+              <span id="extension-copy-note" class="card-note" style="align-self:center"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Attendance Audit tab (#311) -->
+      <div id="tab-attendance" class="tab-content">
+        <div class="card-header">
+          <span class="corner-tab t-blue">Attendance audit</span>
+          <span class="card-tools" style="align-items:center">
+            <span id="audit-age" style="font-size:13px;color:#64748b">Loading&hellip;</span>
+            <button class="btn btn-secondary btn-sm" onclick="loadAttendanceAudit()">Refresh</button>
+          </span>
+        </div>
+        <div class="card-body">
+          <div id="audit-note" style="font-size:14px;color:#475569;line-height:1.5"></div>
+          <div id="audit-body" style="margin-top:10px"></div>
+          <div style="display:flex;gap:10px;align-items:center;margin-top:12px;flex-wrap:wrap">
+            <button class="btn btn-primary btn-sm" id="audit-apply-btn" onclick="applyAuditAdditions()" disabled>Apply missing dates</button>
+            <span id="audit-apply-note" class="card-note"></span>
+          </div>
+          <p class="card-note" style="margin-top:12px">
+            Nothing is ever deleted. The ledger legitimately holds walk-in guests TwoTimTwo never saw,
+            so a night only this machine knows about is information, not an error.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="/step-chip.js"></script>
+<script>
+const BASE = '';
+
+// ── Output escaping ───────────────────────────────────────────────────────────
+// Every value below that came from OUTSIDE this page — a child's name, a club
+// name, a printer name, an allergy token, a diagnostic detail — must go through
+// esc() before it is concatenated into an innerHTML string.
+//
+// This is not theoretical. POST /print writes firstName/lastName straight into
+// print-history.json, and this page rendered them raw, so a crafted name became
+// script running on http://localhost:3456 — the one origin the server trusts
+// with the Pusher secret and the phone PIN. Escaping here is the fix; the
+// server-side length/control-char capping is only belt and braces.
+//
+// Prefer textContent when setting a whole element's text. Use esc() when
+// building an HTML string.
+function esc(value) {
+  return String(value == null ? '' : value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+// Tab switching
+function showTab(name) {
+  var tab = document.querySelector('.tab[data-tab="' + name + '"]');
+  var content = document.getElementById('tab-' + name);
+  if (!tab || !content) return false;
+  document.querySelectorAll('.tab').forEach(function(t) {
+    t.classList.remove('active');
+    t.setAttribute('aria-selected', 'false');
+  });
+  document.querySelectorAll('.tab-content').forEach(function(c) { c.classList.remove('active'); });
+  tab.classList.add('active');
+  tab.setAttribute('aria-selected', 'true');
+  content.classList.add('active');
+  return true;
+}
+
+// ── Brand chrome ─────────────────────────────────────────────────────────────
+// The header's stepped chip: PRINTER / ONLINE while the server answers and the
+// printer is there, PROBLEM when a warning means nothing is coming out of the
+// printer, OFFLINE when the server does not answer. Drawn by /step-chip.js; if
+// that script is missing the same words are shown as plain text.
+var STATUS_CHIP = {
+  online:  { value: 'Online',  plate: 'var(--c-plate)', say: 'Printer online' },
+  problem: { value: 'Problem', plate: 'var(--c-hot-deep)', say: 'Printer problem, see the warnings' },
+  offline: { value: 'Offline', plate: 'var(--bad)', say: 'Print server offline' }
+};
+var statusChipState = null;
+function renderStatusChip(state) {
+  var el = document.getElementById('status-badge');
+  var chip = STATUS_CHIP[state];
+  if (!el || !chip) return;
+  statusChipState = state;
+  el.setAttribute('aria-label', chip.say);
+  el.title = chip.say;
+  if (window.StepChip) {
+    el.innerHTML = window.StepChip.svg('PRINTER', chip.value.toUpperCase(), { plate: chip.plate });
+  } else {
+    el.innerHTML = '<span class="chip-fallback">Printer \u00B7 ' + esc(chip.value) + '</span>';
+  }
+}
+// The chip is measured in Paytone One, so draw it again once the face has loaded.
+if (document.fonts && document.fonts.load) {
+  document.fonts.load('400 24px "Paytone One"').then(function() {
+    if (statusChipState) renderStatusChip(statusChipState);
+  }).catch(function() { /* keep the fallback measurement */ });
+}
+
+// The one club list's names, mapped to the kit's club colours. The same rules
+// as clubKey() in server.js, so a chip is coloured exactly when the label
+// renderer would recognise the club.
+function clubClass(name) {
+  var n = String(name || '').trim().toLowerCase();
+  if (!n) return '';
+  if (n.indexOf('puggle') !== -1) return 'club-puggles';
+  if (n.indexOf('cubbie') !== -1) return 'club-cubbies';
+  if (n.indexOf('spark') !== -1) return 'club-sparks';
+  if (n.indexOf('trek') !== -1) return 'club-trek';
+  if (n.indexOf('journey') !== -1) return 'club-journey';
+  if (n.indexOf('t&t') !== -1 || n.indexOf('t & t') !== -1 || n === 'tnt' || n === 't t') return 'club-tnt';
+  return '';
+}
+
+// The "Welcome screen" stat card: the privacy banner's verdict in two words.
+function setWelcomeStat(text, note, tone) {
+  var v = document.getElementById('welcome-stat');
+  var c = document.getElementById('welcome-stat-note');
+  if (!v || !c) return;
+  v.textContent = text;
+  v.className = 'value words' + (tone ? ' tone-' + tone : '');
+  c.textContent = note;
+}
+
+document.querySelectorAll('.tab').forEach(function(tab) {
+  tab.addEventListener('click', function() { showTab(tab.dataset.tab); });
+});
+
+// Open the Settings tab AND land on the display-key block, flashing it so the
+// eye has something to follow. A tab switch alone drops you at the top of a
+// long form, which is how this setting stayed invisible in the first place.
+function jumpToDisplayKey() {
+  showTab('settings');
+  var section = document.getElementById('display-key-section');
+  if (!section) return;
+  section.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  section.classList.remove('flash');
+  // Reading offsetWidth restarts the animation when the button is pressed
+  // twice; without it the second press does nothing visible.
+  void section.offsetWidth;
+  section.classList.add('flash');
+}
+
+// http://localhost:3456/#display-key — the deep link the extension points at,
+// so "where is this thing?" is answerable by clicking rather than by explaining.
+function jumpToDisplayLogin() {
+  showTab('settings');
+  var section = document.getElementById('display-login-section');
+  if (!section) return;
+  section.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  section.classList.remove('flash');
+  void section.offsetWidth;
+  section.classList.add('flash');
+}
+
+function applyHashRoute() {
+  var hash = (location.hash || '').replace('#', '');
+  if (hash === 'display-key' || hash === 'privacy') jumpToDisplayKey();
+  else if (hash === 'display-login') jumpToDisplayLogin();
+  else if (hash === 'extension') { showTab('diagnostics'); }
+  else if (hash) showTab(hash);
+}
+window.addEventListener('hashchange', applyHashRoute);
+
+function formatTime(iso) {
+  if (!iso) return '--';
+  var d = new Date(iso);
+  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+// "since 5:41 PM" under the Prints today number: when tonight's first label
+// came out. Before any print it says what the number counts.
+function renderPrintSince(entries) {
+  var el = document.getElementById('print-since');
+  if (!el) return;
+  var first = null;
+  (entries || []).forEach(function(e) {
+    var t = Date.parse(e && e.timestamp);
+    if (isFinite(t) && (first === null || t < first)) first = t;
+  });
+  el.textContent = first === null ? 'Labels printed'
+    : 'since ' + new Date(first).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+}
+
+function formatUptime(seconds) {
+  if (seconds < 60) return seconds + 's';
+  if (seconds < 3600) return Math.floor(seconds / 60) + 'm';
+  var h = Math.floor(seconds / 3600);
+  var m = Math.floor((seconds % 3600) / 60);
+  return h + 'h ' + m + 'm';
+}
+
+var WARNING_DESCRIPTIONS = {
+  csvMissing: 'The roster file (clubbers.csv) is missing. Labels will print without allergy or birthday info.',
+  csvEmpty: 'The roster file has no data. Labels will print without allergy or birthday info.',
+  csvStale: 'The roster data hasn\'t been updated recently. It may be missing new kids or allergy changes.',
+  printerNotFound: 'The configured printer was not found. Check that it\'s connected and turned on.',
+  printerCheckFailed: 'Could not check printer status. This may resolve on its own.',
+  // spoolerBacklog is deliberately NOT in this table: its message carries the
+  // live job count, the oldest job's age and the spooler status, and a static
+  // literal here would swallow all three.
+  spoolerCheckFailed: 'Could not read the Windows print queue, so a backlog would be invisible. The queue length is unknown, not zero.'
+};
+
+// Load health status
+// What's new (#6): one fetch at page load — the file can't change while the
+// server is running, so there is nothing to poll.
+function loadWhatsNew() {
+  fetch(BASE + '/whats-new')
+    .then(function(r) { return r.ok ? r.json() : null; })
+    .then(function(entry) {
+      if (!entry || !entry.version) return;
+      document.getElementById('whatsnew-summary').textContent =
+        "What's new in v" + entry.version + ' (' + entry.date + ')';
+      document.getElementById('whatsnew-body').textContent = entry.body || '';
+      document.getElementById('whatsnew-card').style.display = 'block';
+    })
+    .catch(function() { /* server offline or old build — card stays hidden */ });
+}
+
+function loadHealth() {
+  fetch(BASE + '/health').then(function(r) { return r.json(); }).then(function(data) {
+    document.getElementById('version-text').textContent = 'v' + data.version + (data.printer ? ' \u00B7 ' + data.printer : '');
+    document.getElementById('printer-name').textContent = data.printer || '(default)';
+    document.getElementById('uptime-value').textContent = formatUptime(data.uptime || 0);
+    setSyncState(data.sync);
+
+    // Update notice with one-click update: the server exits with a special
+    // code and the launcher (launch-awana.bat) re-runs the installer.
+    if (data.latestVersion && data.latestVersion !== data.version) {
+      var banner = document.getElementById('update-banner');
+      if (banner.dataset.updating !== '1') {
+        banner.style.display = 'block';
+        banner.textContent = 'Update available: v' + data.latestVersion + ' (current: v' + data.version + ')';
+        var btn = document.createElement('button');
+        btn.textContent = 'Update now';
+        btn.addEventListener('click', function() {
+          if (!confirm('Update the server to v' + data.latestVersion + ' now? Printing will pause for about a minute while it restarts.')) return;
+          banner.dataset.updating = '1';
+          banner.textContent = 'Updating \u2014 the server is restarting itself. This page will reconnect automatically.';
+          fetch(BASE + '/update-now', { method: 'POST' }).catch(function() {});
+        });
+        banner.appendChild(btn);
+      }
+    }
+
+    // Rehearsal mode (#19): the button always shows the CURRENT state and
+    // the click that gets you OUT is always available on it.
+    var rb = document.getElementById('rehearsal-btn');
+    if (rb) {
+      window.__rehearsalOn = data.rehearsal === true;
+      rb.textContent = data.rehearsal === true ? '⏹ End rehearsal (armed)' : 'Rehearsal mode';
+      rb.className = 'btn btn-secondary btn-sm';
+      rb.style.background = data.rehearsal === true ? '#dc2626' : '';
+      rb.style.color = data.rehearsal === true ? '#fff' : '';
+      rb.style.borderColor = data.rehearsal === true ? '#dc2626' : '';
+    }
+
+    // Warnings + traffic light
+    var warnings = data.warnings || [];
+    var warnCard = document.getElementById('warnings-card');
+    var warnList = document.getElementById('warnings-list');
+    var tl = document.getElementById('traffic-light');
+    var td = document.getElementById('traffic-dot');
+    var tt = document.getElementById('traffic-text');
+    var tdet = document.getElementById('traffic-detail');
+
+    // A jam is at least as bad as a missing printer: in both cases nothing is
+    // coming out of the printer, so it reads RED rather than a mild yellow.
+    var hasError = warnings.some(function(w) {
+      return w.type === 'printerNotFound' || w.type === 'spoolerBacklog';
+    });
+    var hasWarning = warnings.length > 0;
+    renderStatusChip(hasError ? 'problem' : 'online');
+
+    if (hasError) {
+      tl.className = 'traffic-light red';
+      td.className = 'traffic-dot red';
+      tt.textContent = 'Problem Detected';
+      tdet.textContent = 'Check the warnings below for details.';
+    } else if (hasWarning) {
+      tl.className = 'traffic-light yellow';
+      td.className = 'traffic-dot yellow';
+      tt.textContent = 'Attention Needed';
+      tdet.textContent = warnings.length + ' warning' + (warnings.length > 1 ? 's' : '') + ' \u2014 check below.';
+    } else {
+      tl.className = 'traffic-light green';
+      td.className = 'traffic-dot green';
+      tt.textContent = 'Everything Looks Good';
+      tdet.textContent = 'Server is running, printer connected, roster loaded.';
+    }
+
+    if (hasWarning) {
+      warnCard.style.display = 'block';
+      warnList.innerHTML = warnings.map(function(w) {
+        // Tolerate a bare string as well as {type, message}: /health is also
+        // read by the extension, and an older server paired with this page
+        // must not paint a blank yellow box — which is precisely the bug this
+        // replaced. WARNING_DESCRIPTIONS values are our own literals; the
+        // message from the wire is not.
+        if (typeof w === 'string') return '<div class="warning-item">' + esc(w) + '</div>';
+        var known = WARNING_DESCRIPTIONS[w && w.type];
+        return '<div class="warning-item">' + (known || esc(w && w.message)) + '</div>';
+      }).join('');
+    } else {
+      warnCard.style.display = 'none';
+    }
+
+    renderPrivacy(data);
+    renderExtensionBlock(data);
+    renderNightStatus(data);
+  }).catch(function() {
+    renderStatusChip('offline');
+    setWelcomeStat('Unknown', 'server offline', 'muted');
+    var tl = document.getElementById('traffic-light');
+    var td = document.getElementById('traffic-dot');
+    var tt = document.getElementById('traffic-text');
+    var tdet = document.getElementById('traffic-detail');
+    tl.className = 'traffic-light red';
+    td.className = 'traffic-dot red';
+    tt.textContent = 'Server Offline';
+    tdet.textContent = 'Cannot connect. Make sure Club Label Printer is running on this computer.';
+    // Say "unknown", never "encrypted". A stale green banner on an unreachable
+    // server is a claim about privacy we cannot currently stand behind.
+    var pb = document.getElementById('privacy-banner');
+    if (pb) {
+      pb.className = 'traffic-light yellow';
+      document.getElementById('privacy-dot').className = 'traffic-dot yellow';
+      document.getElementById('privacy-text').textContent = 'Unknown — server offline';
+      document.getElementById('privacy-detail').textContent = 'Cannot tell whether names are encrypted until the server answers.';
+    }
+  });
+}
+
+// Is our number right? — the print server counts labels it printed, TwoTimTwo
+// counts children its own check-in screen recorded. A shortfall is the one to
+// act on: a child checked in and got no label. An excess is usually a walk-in
+// guest printed without "Also register in TwoTimTwo", so the server subtracts
+// those before calling anything wrong and this shows only what is left.
+function loadCountCheck() {
+  fetch(BASE + '/reconcile').then(function(r) { return r.json(); }).then(function(v) {
+    var el = document.getElementById('tonight-check');
+    if (!el) return;
+    if (!v || !v.known) { el.style.display = 'none'; return; }
+    el.style.display = '';
+    if (v.matches) {
+      el.style.color = '#15803d';
+      el.textContent = '\u2713 Matches TwoTimTwo (' + esc(v.theirs) + ' checked in)'
+        + (v.explained ? ' \u00B7 ' + esc(v.explained) + ' walk-in guest(s) not registered there' : '');
+      return;
+    }
+    var short = v.unexplained < 0;
+    var clubs = (v.byClub || []).filter(function(c) { return c.unexplained !== 0; })
+      .map(function(c) { return esc(c.club) + ' ' + (c.unexplained < 0 ? '\u2212' : '+') + Math.abs(c.unexplained); })
+      .join(', ');
+    el.style.color = short ? '#b91c1c' : '#b45309';
+    el.innerHTML = '<strong>\u26A0 TwoTimTwo ' + esc(v.theirs) + ' \u00B7 printed ' + esc(v.ours) + '</strong> \u2014 '
+      + Math.abs(v.unexplained) + (short ? ' with no label printed' : ' more than TwoTimTwo has')
+      + (clubs ? '<br><span style="color:#64748b">' + clubs + '</span>' : '');
+  }).catch(function() { /* dashboard shows server trouble elsewhere */ });
+}
+
+// ── Attendance Audit (#311) ──────────────────────────────────────────────────
+// The season ledger against TwoTimTwo's own attendance grid. Two rules the
+// copy here must never break: an absent or unreadable grid says "Not checked",
+// never "agrees" and never a zero; and the Apply button only ever ADDS.
+function auditDays(ms) { return Math.max(0, Math.round(ms / 86400000)); }
+
+function loadAttendanceAudit() {
+  var age = document.getElementById('audit-age');
+  var note = document.getElementById('audit-note');
+  var body = document.getElementById('audit-body');
+  var btn = document.getElementById('audit-apply-btn');
+  if (!age || !note || !body || !btn) return;
+  fetch(BASE + '/attendance-audit').then(function(r) { return r.json(); }).then(function(v) {
+    btn.disabled = true;
+    btn.textContent = 'Apply missing dates';
+    body.innerHTML = '';
+    if (!v || !v.known) {
+      age.style.color = '#64748b';
+      age.textContent = 'Not checked';
+      var why = 'Not checked \u2014 no attendance grid has been read yet. Open TwoTimTwo in Chrome with the extension loaded (outside club hours) and this fills in on its own.';
+      if (v && v.reason === 'stale') {
+        why = 'Not checked \u2014 the last grid read is ' + auditDays(v.ageMs) + ' day(s) old, too stale to trust. It refreshes on its own from a TwoTimTwo tab.';
+      } else if (v && v.reason === 'no-meetings') {
+        why = 'Not checked \u2014 the grid held no past meeting dates, so there is nothing to compare.';
+      }
+      note.textContent = why;
+      return;
+    }
+    age.style.color = '#64748b';
+    age.textContent = 'Grid read ' + auditDays(v.ageMs) + ' day(s) ago'
+      + (v.season ? ' \u00B7 season ' + v.season : '');
+    var unread = (v.clubsUnread || []).length
+      ? ' Not included: ' + (v.clubsUnread || []).map(esc).join(', ') + ' (could not be read).'
+      : '';
+    if (v.matches) {
+      note.innerHTML = '<span style="color:#15803d;font-weight:600">\u2713 Agrees with TwoTimTwo across '
+        + esc(v.scopeDates) + ' meeting(s)</span>' + (unread ? '<span style="color:#64748b">' + unread + '</span>' : '');
+    } else {
+      note.innerHTML = '<span style="color:#b45309;font-weight:600">\u26A0 '
+        + esc(v.totals.missing) + ' night(s) TwoTimTwo has that this ledger does not, and '
+        + esc(v.totals.ledgerOnly) + ' this ledger has that TwoTimTwo does not</span>'
+        + '<br><span style="color:#64748b">A night only this machine knows about is usually a walk-in guest \u2014 those are never removed.'
+        + esc(unread) + '</span>';
+      var html = '<table style="width:100%;border-collapse:collapse;font-size:12px">'
+        + '<tr style="text-align:left;color:#64748b"><th style="padding:4px 6px">Child</th><th style="padding:4px 6px">Club</th>'
+        + '<th style="padding:4px 6px">Missing here</th><th style="padding:4px 6px">Only here</th></tr>';
+      (v.rows || []).forEach(function(r) {
+        html += '<tr style="border-top:1px solid #e2e8f0">'
+          + '<td style="padding:4px 6px">' + esc(r.name) + '</td>'
+          + '<td style="padding:4px 6px;color:#64748b">' + esc(r.club) + '</td>'
+          + '<td style="padding:4px 6px;color:#b91c1c">' + (r.missingHere.length ? esc(r.missingHere.join(', ')) : '\u2014') + '</td>'
+          + '<td style="padding:4px 6px;color:#64748b">' + (r.ledgerOnly.length ? esc(r.ledgerOnly.join(', ')) : '\u2014') + '</td>'
+          + '</tr>';
+      });
+      html += '</table>';
+      body.innerHTML = html;
+      if (v.totals.missing > 0) {
+        btn.disabled = false;
+        btn.textContent = 'Apply ' + v.totals.missing + ' missing date(s)';
+      }
+    }
+    // The four buckets that are never discrepancies and never applied.
+    var buckets = [
+      ['Same name twice \u2014 skipped on purpose', v.ambiguous],
+      ['Walk-in guests TwoTimTwo never saw', v.notOnRoster],
+      ['On TwoTimTwo but never printed here \u2014 not added', v.neverPrinted],
+      ['Clubs that could not be read', v.clubsUnread]
+    ].filter(function(b) { return (b[1] || []).length; });
+    if (buckets.length) {
+      body.innerHTML += '<div style="margin-top:10px;font-size:11px;color:#94a3b8">'
+        + buckets.map(function(b) {
+          return '<div title="' + esc(b[0]) + '">' + esc(b[0]) + ': ' + b[1].length
+            + ' \u2014 ' + b[1].slice(0, 8).map(esc).join(', ') + (b[1].length > 8 ? '\u2026' : '') + '</div>';
+        }).join('')
+        + '</div>';
+    }
+  }).catch(function() {
+    age.style.color = '#b91c1c';
+    age.textContent = 'Unknown \u2014 server offline';
+    note.textContent = 'The audit could not be read, so nothing is known about the ledger either way.';
+    body.innerHTML = '';
+    btn.disabled = true;
+  });
+}
+
+function applyAuditAdditions() {
+  var btn = document.getElementById('audit-apply-btn');
+  var out = document.getElementById('audit-apply-note');
+  if (!confirm('Add the missing night(s) to the season ledger?\n\nThis changes streaks and milestone counts for the rest of the season (a child jumping past 5 nights will not get their 5-night line). Nothing is ever deleted.')) return;
+  btn.disabled = true;
+  fetch(BASE + '/attendance-audit/apply', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ confirm: true })
+  }).then(function(r) { return r.json(); }).then(function(d) {
+    if (d && d.ok) {
+      out.style.color = '#15803d';
+      out.textContent = 'Added ' + d.added + ' date(s) across ' + (d.children || []).length + ' child(ren) \u00B7 0 deleted';
+    } else {
+      out.style.color = '#b91c1c';
+      out.textContent = (d && d.error) ? d.error : 'Could not apply';
+    }
+    loadAttendanceAudit();
+  }).catch(function() {
+    out.style.color = '#b91c1c';
+    out.textContent = 'Could not reach the print server';
+    loadAttendanceAudit();
+  });
+}
+
+// Tonight at a glance
+function loadTonightStats() {
+  fetch(BASE + '/stats/tonight').then(function(r) { return r.json(); }).then(function(st) {
+    var summary = document.getElementById('tonight-summary');
+    var parts = [st.checkedIn + ' checked in'];
+    if (st.visitors) parts.push(st.visitors + ' visitor' + (st.visitors > 1 ? 's' : ''));
+    parts.push(st.prints + ' label' + (st.prints === 1 ? '' : 's') + ' printed');
+    // Where the number came from. Said plainly on the card itself, not only in
+    // the yellow warning box, because "checked in" reads as one fact and it is
+    // actually two different measurements depending on whether TwoTimTwo's own
+    // report is arriving. The fallback also raises a /health warning.
+    if (st.countSource === 'report') parts.push('from TwoTimTwo\u2019s report');
+    else if (st.countSource === 'history') parts.push('from labels printed here');
+    summary.textContent = st.checkedIn ? parts.join(' \u00B7 ') : '';
+
+    var clubs = document.getElementById('tonight-clubs');
+    var clubNames = Object.keys(st.byClub || {}).sort();
+    if (!clubNames.length) {
+      clubs.innerHTML = '<span class="empty" style="padding:0">No check-ins yet tonight</span>';
+    } else {
+      clubs.innerHTML = clubNames.map(function(c) {
+        return '<span class="club-chip ' + clubClass(c) + '">' + esc(c) + ' <span class="n">' + esc(st.byClub[c]) + '</span></span>';
+      }).join('');
+    }
+
+    var flags = document.getElementById('tonight-flags');
+    var html = '';
+    (st.allergyKids || []).forEach(function(k) {
+      html += '<div class="flag-item allergy"><span>\u26A0\uFE0F ' + esc(k.name) + '</span><span class="flag-tokens">' + esc((k.allergies || []).join(', ')) + '</span></div>';
+    });
+    (st.noPhotoKids || []).forEach(function(n) {
+      html += '<div class="flag-item nophoto"><span>\uD83D\uDCF7\uD83D\uDEAB ' + esc(n) + '</span><span class="flag-tokens">NO PHOTOS</span></div>';
+    });
+    (st.birthdayKids || []).forEach(function(n) {
+      html += '<div class="flag-item bday"><span>\uD83C\uDF70 ' + esc(n) + '</span><span class="flag-tokens">birthday week</span></div>';
+    });
+    flags.style.display = html ? 'flex' : 'none';
+    flags.innerHTML = html;
+  }).catch(function() { /* server offline — health handler shows it */ });
+}
+
+// Load roster count
+function loadRoster() {
+  fetch(BASE + '/roster-status').then(function(r) { return r.json(); }).then(function(data) {
+    document.getElementById('roster-count').textContent = data.count || 0;
+    renderRosterConsent(data.consent);
+  });
+}
+
+// What the roster's two release columns actually say, as value counts (never
+// names), and how many children the no-photo camera will print for. This is
+// the readout for "no camera icons are showing up": if it says 0 flagged and
+// lists a spelling this app does not know, that spelling is the bug.
+function describeValues(bucket) {
+  var keys = Object.keys(bucket || {}).sort(function(a, b) { return bucket[b] - bucket[a]; });
+  if (!keys.length) return '(no values)';
+  return keys.slice(0, 8).map(function(v) {
+    return (v === '' ? 'blank' : '\u201C' + esc(v) + '\u201D') + ' \u00D7' + bucket[v];
+  }).join(', ') + (keys.length > 8 ? ', \u2026' : '');
+}
+function renderRosterConsent(c) {
+  var el = document.getElementById('roster-consent');
+  if (!el) return;
+  if (!c || !c.total) { el.style.display = 'none'; return; }
+  var color = c.flagged > 0 ? '#16a34a' : (c.unrecognized && c.unrecognized.length ? '#b45309' : '#64748b');
+  var html = '<div style="font-weight:700;color:' + color + '">\uD83D\uDCF7\uD83D\uDEAB ' + c.flagged + ' no-photo' +
+    (c.flagged === 0 && c.unrecognized && c.unrecognized.length ? ' \u2014 unrecognized values, see warning' : '') + '</div>';
+  html += '<div>Photo Release?: ' + (c.hasPhotoColumn ? describeValues(c.photoValues) : '<em>column missing</em>') + '</div>';
+  html += '<div>Med Release?: ' + (c.hasMedColumn ? describeValues(c.medValues) : '<em>column missing</em>') + '</div>';
+  el.innerHTML = html;
+  el.style.display = 'block';
+}
+
+// Load print history
+function loadHistory() {
+  fetch(BASE + '/history/today').then(function(r) { return r.json(); }).then(function(entries) {
+    document.getElementById('print-count').textContent = entries.filter(function(e) { return e.success !== false; }).length;
+    renderPrintSince(entries);
+    var tbody = document.getElementById('history-body');
+    if (!entries.length) {
+      tbody.innerHTML = '<tr><td colspan="5" class="empty">No prints today</td></tr>';
+      return;
+    }
+    tbody.innerHTML = entries.slice(0, 30).map(function(e, i) {
+      return '<tr' + (e.success === false ? ' class="row-failed"' : '') + '>' +
+        '<td><strong>' + esc(e.firstName || '') + ' ' + esc(e.lastName || '') + '</strong>' +
+          (e.success === false ? ' <span class="row-tag bad">FAILED</span>' : '') +
+          (e.isConnectCard ? ' <span class="row-tag ok">CONNECT CARD</span>' : '') +
+          (e.isAward ? ' <span class="row-tag award">AWARD</span>' : '') +
+          (e.isLeader ? ' <span class="row-tag leader">LEADER</span>' : '') +
+          (e.undone ? ' <span class="row-tag">UNDONE' + (e.undoneBy === 'phone' ? ' (PHONE)' : '') + '</span>' : '') + '</td>' +
+        '<td>' + esc(e.clubName || '--') + '</td>' +
+        '<td class="muted">' + esc(e.printer || 'default') + '</td>' +
+        '<td class="muted">' + esc(formatTime(e.timestamp)) + '</td>' +
+        '<td><button class="btn btn-secondary btn-sm" onclick="' + (e.isLeader ? 'reprintLeader' : 'reprint') + '(' + Number(i) + ')">Reprint</button></td>' +
+        '</tr>';
+    }).join('');
+  }).catch(function() {
+    document.getElementById('history-body').innerHTML = '<tr><td colspan="5" class="empty">Failed to load history</td></tr>';
+  });
+}
+
+function reprint(index) {
+  if (!confirm('Reprint this label?')) return;
+  fetch(BASE + '/history/today').then(function(r) { return r.json(); }).then(function(entries) {
+    var entry = entries[index];
+    if (!entry) return alert('Entry not found');
+    return fetch(BASE + '/reprint', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: entry.firstName + ' ' + entry.lastName })
+    });
+  }).then(function(r) {
+    if (r && r.ok) { alert('Reprint sent!'); loadHistory(); }
+    else alert('Reprint failed');
+  }).catch(function() { alert('Reprint failed'); });
+}
+
+// A leader row reprints as a leader tag (POST /print-leader), never through the
+// kid path — the server's index-based /reprint guards this too, but the
+// dashboard posts by name, and a name lookup excludes non-check-in rows.
+function reprintLeader(index) {
+  if (!confirm('Reprint this leader tag?')) return;
+  fetch(BASE + '/history/today').then(function(r) { return r.json(); }).then(function(entries) {
+    var entry = entries[index];
+    if (!entry) return alert('Entry not found');
+    return fetch(BASE + '/print-leader', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: (entry.firstName + ' ' + entry.lastName).trim(), clubName: entry.clubName || '' })
+    });
+  }).then(function(r) {
+    if (r && r.ok) { alert('Reprint sent!'); loadHistory(); }
+    else alert('Reprint failed');
+  }).catch(function() { alert('Reprint failed'); });
+}
+
+// Leader name tag card: an adult volunteer's tag. Never a check-in — see the
+// server's /print-leader comment for everything it deliberately does not touch.
+// ── The one club list ────────────────────────────────────────────────────────
+// Served by GET /clubs. Every club dropdown on every surface reads it, which
+// is how Journey ended up missing from the check-in widget's walk-in dropdown
+// back when each surface kept its own copy.
+function loadClubs() {
+  fetch(BASE + '/clubs').then(function(r) { return r.ok ? r.json() : null; }).then(function(d) {
+    if (!d || !Array.isArray(d.clubs)) return;
+    // Two dropdowns read the same one list: the leader card's club, and the
+    // range-reprint filter on the History tab.
+    [['leader-club', 'No club'], ['rr-club', 'All clubs']].forEach(function(pair) {
+      var sel = document.getElementById(pair[0]);
+      if (!sel) return;
+      var keep = sel.value;
+      sel.innerHTML = '<option value=""></option>';
+      sel.firstChild.textContent = pair[1];
+      d.clubs.forEach(function(c) {
+        var o = document.createElement('option');
+        o.value = c; o.textContent = c;
+        sel.appendChild(o);
+      });
+      if (keep) sel.value = keep;
+    });
+  }).catch(function() { /* leave the default-only lists */ });
+}
+
+// ── Reprint a whole stretch of tonight (#257) ────────────────────────────────
+// Two steps on purpose. The first press is a DRY RUN: the server returns the
+// count and the names and prints nothing, and that IS the confirm sheet — the
+// number the operator agrees to comes from the server, not from this page.
+var rrPending = null;
+
+// The time inputs are LOCAL wall clock; history timestamps are ISO/UTC. Build
+// the boundary from today's local date so a stretch means what the clock on
+// the wall said. From takes :00 seconds, To takes :59, so both ends are
+// inclusive of the whole minute the operator typed.
+function rrIso(id, endOfMinute) {
+  var v = (document.getElementById(id) || {}).value || '';
+  var m = /^(\d{1,2}):(\d{2})$/.exec(v);
+  if (!m) return null;
+  var now = new Date();
+  var d = new Date(now.getFullYear(), now.getMonth(), now.getDate(),
+    Number(m[1]), Number(m[2]), endOfMinute ? 59 : 0, endOfMinute ? 999 : 0);
+  return d.toISOString();
+}
+
+function rrNote(html) { document.getElementById('rr-note').innerHTML = html; }
+
+function reprintRangePreview() {
+  var from = rrIso('rr-from', false);
+  var to = rrIso('rr-to', true);
+  rrPending = null;
+  if (!from || !to) { rrNote('Enter both a start and an end time.'); return; }
+  var club = (document.getElementById('rr-club') || {}).value || '';
+  var body = { fromTs: from, toTs: to, club: club };
+  rrNote('Checking\u2026');
+  fetch(BASE + '/reprint-range', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+  })
+    .then(function(r) { return r.json().then(function(d) { return { ok: r.ok, d: d }; }); })
+    .then(function(res) {
+      if (!res.ok) { rrNote(esc((res.d && res.d.error) || 'Could not read the print history.')); return; }
+      var d = res.d;
+      if (!d.count) { rrNote('Nothing to reprint in that stretch.'); return; }
+      rrPending = body;
+      var names = (d.rows || []).map(function(r) {
+        return esc(r.name) + (r.clubName ? ' (' + esc(r.clubName) + ')' : '');
+      }).join(', ');
+      rrNote('<strong>' + d.count + ' label' + (d.count === 1 ? '' : 's') + '</strong> will reprint: ' + names
+        + (d.capped ? ' \u2014 capped at 20; run a narrower stretch for the rest' : '')
+        + '. Awards, leader tags and removed kids are skipped. '
+        + '<button class="btn btn-primary btn-sm" onclick="reprintRangeGo()">Print ' + d.count + ' label'
+        + (d.count === 1 ? '' : 's') + '</button>');
+    })
+    .catch(function() { rrNote('Could not reach the server.'); });
+}
+
+function reprintRangeGo() {
+  if (!rrPending) { rrNote('Press "Reprint this stretch" again \u2014 the list is stale.'); return; }
+  var body = { fromTs: rrPending.fromTs, toTs: rrPending.toTs, club: rrPending.club, confirm: true };
+  rrPending = null;
+  rrNote('Printing\u2026');
+  fetch(BASE + '/reprint-range', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+  })
+    .then(function(r) { return r.json().then(function(d) { return { ok: r.ok, d: d }; }); })
+    .then(function(res) {
+      if (!res.ok) { rrNote(esc((res.d && res.d.error) || 'Could not reprint that stretch.')); return; }
+      var d = res.d;
+      var n = (d.printed || []).length;
+      if (d.stoppedAt) {
+        rrNote('Printed ' + n + ' label' + (n === 1 ? '' : 's') + ', then failed on <strong>'
+          + esc(d.stoppedAt.name) + '</strong> \u2014 clear the jam and run the rest.');
+      } else {
+        rrNote('Reprinted ' + n + ' label' + (n === 1 ? '' : 's') + '.');
+      }
+      loadHistory();
+    })
+    .catch(function() { rrNote('Could not reach the server.'); });
+}
+
+// ── Remembered leaders ───────────────────────────────────────────────────────
+var leaderSelection = {};
+var leaderCache = [];
+
+function loadLeaderChips() {
+  fetch(BASE + '/leaders').then(function(r) { return r.ok ? r.json() : null; }).then(function(d) {
+    if (!d) return;
+    renderLeaderChips(d.leaders || [], d.hidden || 0);
+  }).catch(function() { /* offline — leave whatever is rendered */ });
+}
+
+function renderLeaderChips(leaders, hidden) {
+  leaderCache = leaders.slice();
+  var wrap = document.getElementById('leader-chips-wrap');
+  var list = document.getElementById('leader-chips');
+  var note = document.getElementById('leader-chips-note');
+  if (!wrap || !list) return;
+  list.innerHTML = '';
+  if (!leaders.length) { wrap.style.display = 'none'; return; }
+  wrap.style.display = 'flex';
+  leaders.forEach(function(l) {
+    var name = ((l.firstName || '') + ' ' + (l.lastName || '')).trim();
+    var chip = document.createElement('span');
+    chip.className = 'leader-chip';
+    var pick = document.createElement('label');
+    pick.style.cssText = 'display:inline-flex;align-items:center;gap:5px;cursor:pointer';
+    var cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.checked = !!leaderSelection[l.key];
+    cb.onchange = function() { if (cb.checked) leaderSelection[l.key] = true; else delete leaderSelection[l.key]; };
+    pick.appendChild(cb);
+    pick.appendChild(document.createTextNode(name + (l.clubName ? ' \u00B7 ' + l.clubName : '')));
+    var one = document.createElement('button');
+    one.type = 'button'; one.textContent = 'Print'; one.title = 'Print ' + name + "'s tag";
+    one.onclick = function() { printLeaders([l]); };
+    var x = document.createElement('button');
+    x.type = 'button'; x.textContent = '\u00D7'; x.title = 'Forget ' + name;
+    x.className = 'x';
+    x.setAttribute('aria-label', 'Forget ' + name);
+    x.onclick = function() { forgetLeader(l.key, name); };
+    chip.appendChild(pick); chip.appendChild(one); chip.appendChild(x);
+    list.appendChild(chip);
+  });
+  note.textContent = hidden ? hidden + ' leader' + (hidden === 1 ? '' : 's') + ' not printed this season (hidden)' : '';
+}
+
+function forgetLeader(key, name) {
+  if (!confirm('Forget ' + name + '? Their tag can still be printed by typing the name.')) return;
+  delete leaderSelection[key];
+  fetch(BASE + '/leaders/forget', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ key: key })
+  }).then(function(r) { return r.ok ? r.json() : null; })
+    .then(function(d) { if (d) renderLeaderChips(d.leaders || [], d.hidden || 0); })
+    .catch(function() { setLeaderNote('Could not reach the server.'); });
+}
+
+function setLeaderNote(text) {
+  var note = document.getElementById('leader-note');
+  if (note) note.textContent = text;
+}
+
+function printSelectedLeaders() {
+  var chosen = leaderCache.filter(function(l) { return leaderSelection[l.key]; });
+  if (!chosen.length) { setLeaderNote('Tick at least one remembered leader first.'); return; }
+  printLeaders(chosen);
+}
+
+// One path for a single chip, a batch of chips and the typed field. The server
+// prints sequentially and reports per name, so a jam names the missing tag.
+function printLeaders(leaders) {
+  setLeaderNote('Printing ' + leaders.length + ' tag' + (leaders.length === 1 ? '' : 's') + '\u2026');
+  fetch(BASE + '/print-leader', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ leaders: leaders.map(function(l) {
+      return { firstName: l.firstName, lastName: l.lastName, clubName: l.clubName || '' };
+    }) })
+  }).then(function(r) { return r.json().then(function(b) { return { ok: r.ok, body: b || {} }; }); })
+    .then(function(res) {
+      var b = res.body;
+      if (!res.ok) { setLeaderNote('Print failed: ' + (b.error || 'see the server log')); return; }
+      if (b.failed) {
+        var bad = (b.results || []).filter(function(x) { return !x.success; })
+          .map(function(x) { return x.name; }).join(', ');
+        setLeaderNote('Printed ' + b.printed + '; failed: ' + bad);
+      } else {
+        setLeaderNote('Printed ' + b.printed + ' tag' + (b.printed === 1 ? '' : 's') + '.');
+        leaderSelection = {};
+      }
+      loadLeaderChips();
+      loadHistory();
+    })
+    .catch(function() { setLeaderNote('Print failed — is the server running?'); });
+}
+
+function printLeaderTag() {
+  var nameEl = document.getElementById('leader-name');
+  var note = document.getElementById('leader-note');
+  var name = nameEl.value.trim();
+  if (!name) { note.textContent = 'Type the leader\'s name first.'; return; }
+  note.textContent = 'Printing…';
+  fetch(BASE + '/print-leader', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: name, clubName: document.getElementById('leader-club').value })
+  }).then(function(r) { return r.json().then(function(b) { return { ok: r.ok, body: b || {} }; }); })
+    .then(function(res) {
+      if (!res.ok) { note.textContent = 'Print failed: ' + (res.body.error || 'see the server log'); return; }
+      note.textContent = res.body.duplicate ? 'Already printed a moment ago.' : 'Printed ' + name + '.';
+      if (!res.body.duplicate) nameEl.value = '';
+      loadHistory();
+      loadLeaderChips();   // the name just printed is now a chip
+    })
+    .catch(function() { note.textContent = 'Print failed — is the server running?'; });
+}
+
+// ── Custom label ─────────────────────────────────────────────────────────────
+// One line of free text on a blank label. Deliberately does NOT call
+// loadHistory() afterwards the way the leader card does: there is no history
+// row to reload, and refreshing the list would suggest there might be. No
+// printer dropdown either — the leader card has none, so this follows it and
+// uses the server's configured printer.
+var CUSTOM_NOTE_DEFAULT = 'One line of text, auto-sized, on an otherwise blank label. It is not a check-in: nothing is counted, no history row is written and nothing reaches the lobby screens.';
+function printCustomLabel() {
+  var el = document.getElementById('custom-text');
+  var note = document.getElementById('custom-note');
+  var text = el.value.trim();
+  if (!text) { note.textContent = 'Type the label text first.'; return; }
+  note.textContent = 'Printing…';
+  fetch(BASE + '/print-custom', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text: text })
+  }).then(function(r) { return r.json().then(function(b) { return { ok: r.ok, body: b || {} }; }); })
+    .then(function(res) {
+      if (!res.ok) { note.textContent = 'Print failed: ' + (res.body.error || 'see the server log'); return; }
+      note.textContent = res.body.duplicate ? 'Already printed a moment ago.' : 'Printed. ' + CUSTOM_NOTE_DEFAULT;
+      if (!res.body.duplicate) el.value = '';
+    })
+    .catch(function() { note.textContent = 'Print failed — is the server running?'; });
+}
+document.getElementById('custom-text').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') printCustomLabel();
+});
+
+// Preview
+function loadPreview() {
+  var first = document.getElementById('preview-first').value.trim() || 'Preview';
+  var last = document.getElementById('preview-last').value.trim();
+  var club = document.getElementById('preview-club').value.trim();
+  var url = BASE + '/preview?firstName=' + encodeURIComponent(first) + '&lastName=' + encodeURIComponent(last);
+  if (club) url += '&clubName=' + encodeURIComponent(club);
+  var img = document.getElementById('preview-image');
+  img.src = url;
+  img.style.display = 'block';
+}
+
+// ── Per-club label templates ──────────────────────────────────────────────────
+// TPL_STATE mirrors config.labelTemplates: a map of clubKey (or 'default') →
+// overrides-only template object. The form edits one club at a time; Save
+// POSTs the whole map.
+var TPL_STATE = {};
+var TPL_FIELDS = ['showIconPanel', 'showLastName', 'showClubLine', 'showGroupLine', 'showVisitorPill', 'showFooter'];
+var TPL_CLUB_LABELS = { 'puggle': 'Puggles', 'cubbie': 'Cubbies', 'spark': 'Sparks', 't&t': 'T&T', 'trek': 'Trek', 'journey': 'Journey' };
+
+function loadTemplates() {
+  fetch(BASE + '/config/label-templates').then(function(r) { return r.json(); }).then(function(data) {
+    TPL_STATE = (data && data.templates) || {};
+    var sel = document.getElementById('tpl-club');
+    // Rebuild club options from the server's known-club list (keys are the
+    // server's canonical clubKey values — what TPL_STATE is keyed by).
+    sel.innerHTML = '<option value="default">Default (all clubs)</option>';
+    ((data && data.knownClubs) || []).forEach(function(k) {
+      var opt = document.createElement('option');
+      opt.value = k;
+      opt.textContent = TPL_CLUB_LABELS[k] || k;
+      sel.appendChild(opt);
+    });
+    renderTplForm();
+  }).catch(function() { /* templates UI stays at defaults; preview still works */ });
+}
+
+function tplSelectedKey() { return document.getElementById('tpl-club').value || 'default'; }
+
+function renderTplForm() {
+  var t = TPL_STATE[tplSelectedKey()] || {};
+  TPL_FIELDS.forEach(function(f) {
+    document.getElementById('tpl-' + f).checked = t[f] !== false;
+  });
+  var n = (typeof t.nameMaxPt === 'number' && t.nameMaxPt >= 18 && t.nameMaxPt <= 48) ? t.nameMaxPt : 48;
+  document.getElementById('tpl-nameMaxPt').value = n;
+  document.getElementById('tpl-name-max-val').textContent = n;
+  tplPreview();
+}
+
+// Harvest the form into TPL_STATE as overrides-only (a fully-default form
+// deletes the club's entry — same normalization the server applies).
+function readTplForm() {
+  var t = {};
+  TPL_FIELDS.forEach(function(f) {
+    if (!document.getElementById('tpl-' + f).checked) t[f] = false;
+  });
+  var n = Number(document.getElementById('tpl-nameMaxPt').value);
+  document.getElementById('tpl-name-max-val').textContent = String(n);
+  if (n >= 18 && n < 48) t.nameMaxPt = n;
+  if (Object.keys(t).length) TPL_STATE[tplSelectedKey()] = t;
+  else delete TPL_STATE[tplSelectedKey()];
+}
+
+function tplPreview() {
+  var key = tplSelectedKey();
+  var first = document.getElementById('preview-first').value.trim() || 'Preview';
+  var last = document.getElementById('preview-last').value.trim();
+  // For 'default', preview with whatever club the top form names (may be none);
+  // for a club entry, preview that club so its mark matches.
+  var club = key === 'default' ? document.getElementById('preview-club').value.trim() : key;
+  var t = TPL_STATE[key] || {};
+  var url = BASE + '/preview?firstName=' + encodeURIComponent(first)
+    + '&lastName=' + encodeURIComponent(last)
+    + '&template=' + encodeURIComponent(JSON.stringify(t));
+  if (club) url += '&clubName=' + encodeURIComponent(club);
+  if (document.getElementById('tpl-preview-visitor').checked) url += '&visitor=1';
+  var img = document.getElementById('tpl-preview-image');
+  img.src = url;
+  img.style.display = 'block';
+}
+
+document.getElementById('tpl-club').addEventListener('change', renderTplForm);
+document.getElementById('tpl-preview-visitor').addEventListener('change', tplPreview);
+TPL_FIELDS.forEach(function(f) {
+  document.getElementById('tpl-' + f).addEventListener('change', function() { readTplForm(); tplPreview(); });
+});
+document.getElementById('tpl-nameMaxPt').addEventListener('input', function() { readTplForm(); tplPreview(); });
+
+function resetTemplate() {
+  delete TPL_STATE[tplSelectedKey()];
+  renderTplForm();
+}
+
+function saveTemplates() {
+  fetch(BASE + '/config/label-templates', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ templates: TPL_STATE })
+  }).then(function(r) {
+    if (!r.ok) throw new Error('save failed');
+    return r.json();
+  }).then(function(d) {
+    TPL_STATE = (d && d.templates) || {};
+    renderTplForm();
+    var el = document.getElementById('tpl-status');
+    el.style.display = 'block';
+    setTimeout(function() { el.style.display = 'none'; }, 3000);
+  }).catch(function() {
+    alert('Saving templates failed — this only works from the dashboard on the server PC.');
+  });
+}
+
+// Rehearsal mode (#19): one button arms a fake club night — every print gets
+// the TEST band and records nothing, tallies tell the displays to watermark.
+function toggleRehearsal() {
+  var arming = window.__rehearsalOn !== true;
+  if (arming && !confirm('Arm rehearsal mode?\n\nEvery label will print with a TEST band and NOTHING will be recorded or broadcast as real (history, attendance, screens). It auto-disarms after 2 hours.')) return;
+  fetch(BASE + '/rehearsal', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ on: arming }) })
+    .then(function(r) { return r.json().then(function(d) { return { ok: r.ok, d: d }; }); })
+    .then(function(res) {
+      if (!res.ok) { alert(res.d && res.d.error ? res.d.error : 'Could not toggle rehearsal mode.'); return; }
+      window.__rehearsalOn = res.d.rehearsal === true;
+      loadHealth();
+    })
+    .catch(function() { alert('Could not reach the server.'); });
+}
+
+// Musical printer (#11/#12): the demo button. 409 means the toggle is off.
+// ── Receipt-printer trial ─────────────────────────────────────────────────────
+function toggleReceiptSettings() {
+  var on = document.getElementById('settings-printer-type').value === 'receipt';
+  document.getElementById('receipt-settings').style.display = on ? '' : 'none';
+}
+
+function receiptFormValues() {
+  return {
+    receiptHost: document.getElementById('settings-receipt-host').value.trim(),
+    receiptPort: document.getElementById('settings-receipt-port').value.trim(),
+    receiptDots: document.getElementById('settings-receipt-dots').value.trim(),
+    receiptCut: document.getElementById('settings-receipt-cut').value
+  };
+}
+
+function setReceiptStatus(text, bad) {
+  var el = document.getElementById('receipt-status');
+  el.textContent = text;
+  el.style.color = bad ? '#b91c1c' : '#64748b';
+}
+
+function sendReceiptTest() {
+  setReceiptStatus('Sending a test tag…');
+  fetch(BASE + '/receipt/test', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(receiptFormValues()) })
+    .then(function(r) { return r.json().then(function(d) { return { ok: r.ok, d: d }; }); })
+    .then(function(res) {
+      if (!res.ok) return setReceiptStatus('Test tag failed: ' + ((res.d && res.d.error) || 'unknown error'), true);
+      var st = res.d.status || {};
+      setReceiptStatus('Test tag sent to ' + res.d.host + '.' + (st.unknown ? ' (This printer doesn\'t report paper status.)' : st.paperLow ? ' Paper is nearly out.' : ' Paper OK.')
+        + ' Remember to Save if you changed anything.');
+    })
+    .catch(function() { setReceiptStatus('Could not reach the server.', true); });
+}
+
+function findReceiptPrinters() {
+  var box = document.getElementById('receipt-found');
+  box.textContent = '';
+  setReceiptStatus('Looking for printers on this network (a few seconds)…');
+  fetch(BASE + '/receipt/discover', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ receiptPort: receiptFormValues().receiptPort }) })
+    .then(function(r) { return r.json().then(function(d) { return { ok: r.ok, d: d }; }); })
+    .then(function(res) {
+      if (!res.ok) return setReceiptStatus((res.d && res.d.error) || 'Search failed.', true);
+      var list = res.d.printers || [];
+      if (!list.length) {
+        return setReceiptStatus('No printers answered on ' + ((res.d.subnets || []).join(', ') || 'this network')
+          + '. Check the cable and that the printer is on, or type its IP from the self-test page.', true);
+      }
+      setReceiptStatus('Found ' + list.length + '. Pick one, then Send test tag.');
+      list.forEach(function(p) {
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'btn btn-secondary btn-sm';
+        b.style.marginRight = '6px';
+        b.textContent = p.host;
+        b.onclick = function() { document.getElementById('settings-receipt-host').value = p.host; setReceiptStatus('Selected ' + p.host + '. Send a test tag, then Save.'); };
+        box.appendChild(b);
+      });
+    })
+    .catch(function() { setReceiptStatus('Could not reach the server.', true); });
+}
+
+function playTune() {
+  fetch(BASE + '/play-tune', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
+    .then(function(r) { return r.json().then(function(d) { return { ok: r.ok, d: d }; }); })
+    .then(function(res) {
+      if (res.ok) return;
+      alert(res.d && res.d.error ? res.d.error : 'Could not play the tune.');
+    })
+    .catch(function() { alert('Could not reach the server.'); });
+}
+
+// Clear a jammed printer's backlog (#256). Stays enabled unconditionally — a
+// queue the probe could not read is precisely when the operator needs it.
+function clearPrintQueue() {
+  if (!confirm('Clear every waiting print job on this printer?\n\nAny label still in the queue will NOT print. Use this after a jam or a paper-out, once the printer is fixed.')) return;
+  fetch(BASE + '/printer/clear-queue', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ confirm: true })
+  })
+    .then(function(r) { return r.json().then(function(d) { return { ok: r.ok, d: d }; }); })
+    .then(function(res) {
+      if (!res.ok) { alert(res.d && res.d.error ? res.d.error : 'Could not clear the print queue.'); return; }
+      var f = res.d.failed ? ' (' + res.d.failed + ' could not be removed)' : '';
+      alert('Removed ' + res.d.removed + ' waiting job' + (res.d.removed === 1 ? '' : 's') + f + '.');
+      loadHealth();
+    })
+    .catch(function() { alert('Could not reach the server.'); });
+}
+
+// Settings
+function scheduleRowHtml(row) {
+  row = row || {};
+  // esc() also closes the ATTRIBUTE injection here: these values land inside
+  // value="…", so an unescaped quote would break out of the attribute.
+  return '<tr>' +
+    '<td><input type="text" class="sched-club" value="' + esc(row.club || '') + '" placeholder="Sparks" style="width:90px"></td>' +
+    '<td><input type="text" class="sched-start" value="' + esc(row.startTime || '') + '" placeholder="18:30" style="width:60px"></td>' +
+    '<td><input type="text" class="sched-loc" value="' + esc(row.location || '') + '" placeholder="Music" style="width:110px"></td>' +
+    '<td><input type="text" class="sched-room" value="' + esc(row.room || '') + '" placeholder="Rm 4" style="width:60px"></td>' +
+    '<td><button class="btn btn-secondary btn-sm" onclick="this.closest(\'tr\').remove()">✕</button></td>' +
+    '</tr>';
+}
+
+function addScheduleRow(row) {
+  document.getElementById('schedule-body').insertAdjacentHTML('beforeend', scheduleRowHtml(row));
+}
+
+function readScheduleRows() {
+  return Array.from(document.querySelectorAll('#schedule-body tr')).map(function(tr) {
+    return {
+      club: tr.querySelector('.sched-club').value.trim(),
+      startTime: tr.querySelector('.sched-start').value.trim(),
+      location: tr.querySelector('.sched-loc').value.trim(),
+      room: tr.querySelector('.sched-room').value.trim()
+    };
+  }).filter(function(r) { return r.club; });
+}
+
+function loadSettings() {
+  // Load config
+  fetch(BASE + '/config').then(function(r) { return r.json(); }).then(function(config) {
+    document.getElementById('settings-url').value = config.checkinUrl || '';
+    document.getElementById('settings-pusher-id').value = config.pusherAppId || '';
+    document.getElementById('settings-pusher-cluster').value = config.pusherCluster || 'us2';
+    document.getElementById('settings-pusher-key').value = config.pusherKey || '';
+    document.getElementById('settings-pusher-secret').value = config.pusherSecret || '';
+    document.getElementById('settings-phone-pin').value = config.phonePin || '';
+    document.getElementById('settings-late-grace').value = config.lateGraceMin != null ? config.lateGraceMin : 10;
+    document.getElementById('settings-label-footer').value = config.labelFooter || '';
+    document.getElementById('settings-season-theme').value = config.seasonTheme || 'auto';
+    document.getElementById('settings-musical').checked = config.musicalPrinter === true;
+    document.getElementById('settings-printer-type').value = config.printerType === 'receipt' ? 'receipt' : 'label';
+    document.getElementById('settings-receipt-host').value = config.receiptHost || '';
+    document.getElementById('settings-receipt-port').value = config.receiptPort || '';
+    document.getElementById('settings-receipt-dots').value = config.receiptDots || '';
+    document.getElementById('settings-receipt-cut').value = config.receiptCut === 'partial' ? 'partial' : 'full';
+    toggleReceiptSettings();
+    document.getElementById('settings-update-beacon').checked = config.updateBeacon === true;
+    document.getElementById('settings-ft-inverted').checked = config.firstTimerInverted !== false;
+    document.getElementById('settings-trophy-band').checked = config.trophyBand !== false;
+    document.getElementById('settings-connect-card').checked = !!config.connectCard;
+    document.getElementById('settings-connect-card-auto').checked = !!config.connectCardAutoFirstTimer;
+    document.getElementById('settings-connect-greeting').value = config.connectCardGreeting || '';
+    document.getElementById('settings-driven-checkin').checked = config.enableDrivenCheckin !== false;
+    document.getElementById('settings-lan-access').checked = config.lanAccess === true;
+    // GET /config redacts displayKey like the Pusher secret, so we render its
+    // STATE rather than its value. Showing a fake masked string would invite
+    // someone to "copy" it into a screen.
+    setDisplayKeyState(config.displayKey || '');
+    setDisplayLoginState(config.displayLoginPassphrase || '');
+    initSyncSection();
+    document.getElementById('settings-fleet-config-url').value = config.fleetConfigUrl || '';
+    var body = document.getElementById('schedule-body');
+    body.innerHTML = '';
+    (config.schedule || []).forEach(addScheduleRow);
+
+    // Load printers for dropdown
+    return fetch(BASE + '/printers');
+  }).then(function(r) { return r.json(); }).then(function(data) {
+    var select = document.getElementById('settings-printer');
+    select.innerHTML = '';
+    var defOpt = document.createElement('option');
+    defOpt.value = '';
+    defOpt.textContent = data.serverDefault ? 'Current: ' + data.serverDefault : '(system default)';
+    select.appendChild(defOpt);
+    (data.printers || []).forEach(function(p) {
+      var opt = document.createElement('option');
+      opt.value = p.name;
+      opt.textContent = p.name + (p.isWindowsDefault ? ' (Windows default)' : '');
+      select.appendChild(opt);
+    });
+  }).catch(function() {
+    document.getElementById('settings-printer').innerHTML = '<option value="">Could not load printers</option>';
+  });
+}
+
+// ── Display key ───────────────────────────────────────────────────────────────
+// The AES key that lets the church's own screens read children's first names off
+// the PUBLIC Pusher channel. Shown in full on purpose: this page is served to
+// loopback only, and a volunteer has to be able to READ the key to type it into
+// a TV stick that has no clipboard. Never rendered anywhere else, never logged,
+// and GET /config redacts it for any non-loopback caller.
+function setDisplayKeyState(value) {
+  var input = document.getElementById('settings-display-key');
+  var note = document.getElementById('display-key-note');
+  input.value = value || '';
+  if (value) {
+    note.textContent = 'Names are encrypted. Paste this exact value into every screen, then press "Test Night Systems" to confirm each one can read it. Keep a copy where the church keeps the Wi-Fi password.';
+    note.style.color = '#16a34a';
+  } else {
+    note.textContent = "No key: children's first names are published in the clear on a channel anyone can subscribe to. Press Generate, then Save Settings.";
+    note.style.color = '#dc2626';
+  }
+}
+
+// ── Lobby slides card ────────────────────────────────────────────────────────
+// The deck itself is fetched (loopback-only endpoint) so the card can say what
+// is actually published; publishing goes through the same route the display
+// app's editor uses, so this card exercises the real pipe.
+function fmtDeckAge(iso) {
+  if (!iso) return '';
+  var mins = Math.round((Date.now() - Date.parse(iso)) / 60000);
+  if (!isFinite(mins) || mins < 0) return '';
+  if (mins < 1) return 'just now';
+  if (mins < 60) return mins + ' min ago';
+  var h = Math.floor(mins / 60);
+  return h + 'h ' + (mins % 60) + 'm ago';
+}
+
+function loadLobbyDeck() {
+  fetch(BASE + '/api/lobby-slides')
+    .then(function(r) { return r.ok ? r.json() : null; })
+    .then(function(d) {
+      if (!d) return;
+      var summary = document.getElementById('lobby-slides-summary');
+      if (d.deckRev >= 1) {
+        summary.textContent = 'Rev ' + d.deckRev + ' · ' + d.slides.length + ' slide' + (d.slides.length === 1 ? '' : 's')
+          + ' · published ' + formatTime(d.publishedAt) + (fmtDeckAge(d.publishedAt) ? ' (' + fmtDeckAge(d.publishedAt) + ')' : '');
+      } else {
+        summary.textContent = 'Nothing published yet';
+      }
+      var tokenInput = document.getElementById('lobby-slides-token');
+      // Never show the token itself here unless freshly generated — the saved
+      // one is a secret; the card only reports whether one exists.
+      if (!tokenInput.dataset.fresh) {
+        tokenInput.value = '';
+        tokenInput.placeholder = d.tokenConfigured ? 'A publish token is set (hidden) — Generate replaces it' : 'No publish token set';
+      }
+    })
+    .catch(function() { /* server offline — summary keeps its last text */ });
+}
+
+function publishLobbyDeck() {
+  var note = document.getElementById('lobby-slides-note');
+  var text = document.getElementById('lobby-slides-json').value.trim();
+  var doPublish = function(raw) {
+    var slides;
+    try {
+      slides = JSON.parse(raw);
+    } catch (e) {
+      note.textContent = "That isn't valid JSON — export the deck from a display's slide editor and paste the whole file.";
+      note.style.color = '#dc2626';
+      return;
+    }
+    if (!Array.isArray(slides)) slides = slides && Array.isArray(slides.slides) ? slides.slides : null;
+    if (!slides) {
+      note.textContent = 'Expected an array of slides (the awana-slides.json export).';
+      note.style.color = '#dc2626';
+      return;
+    }
+    fetch(BASE + '/api/lobby-slides', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ slides: slides }),
+    }).then(function(r) { return r.json().then(function(d) { return { ok: r.ok, d: d }; }); })
+      .then(function(res) {
+        if (!res.ok) throw new Error(res.d && res.d.error || 'publish failed');
+        note.textContent = 'Published rev ' + res.d.deckRev + ' (' + res.d.slideCount + ' slide' + (res.d.slideCount === 1 ? '' : 's')
+          + (res.d.droppedCount ? ', ' + res.d.droppedCount + ' device-local/blank dropped' : '')
+          + '). Keyed displays update within seconds; any that were off catch up within ~5 minutes of coming back.';
+        note.style.color = '#16a34a';
+        loadLobbyDeck();
+      })
+      .catch(function(e) {
+        note.textContent = 'Publish failed: ' + e.message;
+        note.style.color = '#dc2626';
+      });
+  };
+  var file = document.getElementById('lobby-slides-file').files[0];
+  if (!text && file) {
+    var reader = new FileReader();
+    reader.onload = function() { doPublish(String(reader.result)); };
+    reader.onerror = function() { note.textContent = 'Could not read that file.'; note.style.color = '#dc2626'; };
+    reader.readAsText(file);
+    return;
+  }
+  if (!text) {
+    note.textContent = 'Paste the exported slides JSON (or choose the file) first.';
+    note.style.color = '#dc2626';
+    return;
+  }
+  doPublish(text);
+}
+
+function generateSlidesToken() {
+  var input = document.getElementById('lobby-slides-token');
+  var note = document.getElementById('lobby-slides-token-note');
+  if (input.placeholder.indexOf('is set') !== -1
+      && !confirm('Replace the publish token?\n\nThe display that currently holds the old token will stop being able to publish until you paste the new one into its Settings.')) return;
+  fetch(BASE + '/config/slides-token/generate', { method: 'POST' })
+    .then(function(r) { if (!r.ok) throw new Error('generate failed'); return r.json(); })
+    .then(function(d) {
+      return fetch(BASE + '/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slidesPublishToken: d.token }),
+      }).then(function(r) {
+        if (!r.ok) throw new Error('save failed');
+        input.value = d.token;
+        input.dataset.fresh = '1';
+        note.textContent = 'Saved. Copy it into the publishing display: Settings → Slide sync → Publish token.';
+        note.style.color = '#16a34a';
+      });
+    })
+    .catch(function() { note.textContent = 'Could not generate a publish token — is the server running on this computer?'; note.style.color = '#dc2626'; });
+}
+
+function copySlidesToken() {
+  var input = document.getElementById('lobby-slides-token');
+  var note = document.getElementById('lobby-slides-token-note');
+  if (!input.value) { note.textContent = 'Nothing to copy — the saved token stays hidden. Press Generate to mint (and show) a fresh one.'; note.style.color = '#b45309'; return; }
+  var done = function() { note.textContent = 'Copied.'; note.style.color = '#16a34a'; };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(input.value).then(done, function() { input.select(); });
+  } else {
+    input.select();
+    try { document.execCommand('copy'); done(); } catch (e) { /* leave it selected */ }
+  }
+}
+
+function clearSlidesToken() {
+  if (!confirm('Clear the publish token?\n\nThe display app’s "Publish to all displays" button will stop working; this dashboard card keeps working.')) return;
+  fetch(BASE + '/config', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ slidesPublishToken: '' }),
+  }).then(function(r) {
+    if (!r.ok) throw new Error('save failed');
+    var input = document.getElementById('lobby-slides-token');
+    delete input.dataset.fresh;
+    input.value = '';
+    input.placeholder = 'No publish token set';
+    var note = document.getElementById('lobby-slides-token-note');
+    note.textContent = 'Cleared — the display-app publish path is revoked.';
+    note.style.color = '#64748b';
+  }).catch(function() { alert('Could not clear the token — is the server running?'); });
+}
+
+function generateDisplayKey() {
+  // Rotating invalidates every screen at once — there is no partial rotation, so
+  // this has to be a deliberate act rather than a stray click during club.
+  var current = document.getElementById('settings-display-key').value.trim();
+  if (current && !confirm('Replace the current display key?\n\nEvery screen will stop showing names until you paste the NEW key into each one. Do this between events, not during club.')) return;
+  fetch(BASE + '/config/display-key/generate', { method: 'POST' })
+    .then(function(r) { if (!r.ok) throw new Error('generate failed'); return r.json(); })
+    .then(function(d) {
+      setDisplayKeyState(d.key);
+      var note = document.getElementById('display-key-note');
+      note.textContent = 'New key generated but NOT saved yet. Copy it into every screen first, then press Save Settings — that order means a mistyped paste cannot leave the screens locked out.';
+      note.style.color = '#b45309';
+    })
+    .catch(function() { alert('Could not generate a display key — is the server running on this computer?'); });
+}
+
+function copyDisplayKey() {
+  var input = document.getElementById('settings-display-key');
+  if (!input.value) { alert('There is no display key to copy. Press Generate first.'); return; }
+  // navigator.clipboard needs a secure context, which http://localhost is — but
+  // fall back rather than failing silently on an older embedded browser.
+  var done = function() {
+    var note = document.getElementById('display-key-note');
+    var was = note.textContent;
+    note.textContent = 'Copied. Paste it into each screen under Settings → Connection → Display key.';
+    setTimeout(function() { note.textContent = was; }, 4000);
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(input.value).then(done, function() { input.select(); });
+  } else {
+    input.removeAttribute('readonly');
+    input.select();
+    try { document.execCommand('copy'); done(); } catch (e) { /* leave it selected */ }
+    input.setAttribute('readonly', 'readonly');
+  }
+}
+
+function clearDisplayKey() {
+  if (!confirm("Clear the display key?\n\nThe server drops back to ROLLOUT MODE: names and lobby slides go out unencrypted — and every screen that still holds a key will REFUSE those plaintext events, so keyed screens show no banners and keep their last slide deck. Clear the key on each screen too only if you truly mean to run unencrypted.")) return;
+  setDisplayKeyState('');
+}
+
+// ── Sync service ──────────────────────────────────────────────────────────────
+// Where it is comes from the display site's shared/sync.json (GitHub Pages
+// answers it to any origin). Until it names a service this section stays
+// hidden and the display login below is how screens are set up.
+var SYNC_INDEX = 'https://patrick-simpson.github.io/Awana-Check-in-Display/shared/sync.json';
+var syncUrl = '';
+
+function initSyncSection() {
+  return fetch(SYNC_INDEX, { cache: 'no-store' })
+    .then(function(r) { return r.ok ? r.json() : null; })
+    .then(function(d) {
+      var url = d && typeof d.url === 'string' ? d.url.trim().replace(/\/+$/, '') : '';
+      if (!/^https:\/\/[^\s?#]+$/.test(url)) return;
+      syncUrl = url;
+      document.getElementById('sync-section').style.display = 'block';
+      // Replaced: screens sign in through the service now.
+      document.getElementById('display-login-section').style.display = 'none';
+      loadHealth();
+    })
+    .catch(function() { /* offline: the old display login stays */ });
+}
+
+function setSyncState(sync) {
+  if (!sync) return;
+  var signedIn = !!sync.signedIn;
+  if (sync.url && !syncUrl) {
+    syncUrl = sync.url;
+    document.getElementById('sync-section').style.display = 'block';
+    document.getElementById('display-login-section').style.display = 'none';
+  }
+  document.getElementById('sync-signin-row').style.display = signedIn ? 'none' : 'flex';
+  document.getElementById('sync-signed-in-row').style.display = signedIn ? 'flex' : 'none';
+  var note = document.getElementById('sync-note');
+  if (sync.state === 'signed-out' && !signedIn) {
+    note.textContent = sync.error || 'Signed out: the passphrase was changed. Sign in again with the new one.';
+    note.style.color = '#dc2626';
+  } else if (signedIn) {
+    note.textContent = sync.state === 'unreachable'
+      ? 'Signed in, but the service could not be reached at the last check. Check-ins still print and reach the screens.'
+      : 'Signed in. Lobby slides and shared settings published on this computer go to the service.';
+    note.style.color = sync.state === 'unreachable' ? '#b45309' : '#16a34a';
+  }
+}
+
+function syncSignIn() {
+  var input = document.getElementById('sync-passphrase');
+  var note = document.getElementById('sync-note');
+  var passphrase = input.value.trim();
+  if (!passphrase) { note.textContent = 'Type the passphrase first.'; note.style.color = '#b45309'; return; }
+  note.textContent = 'Signing in…'; note.style.color = '#64748b';
+  fetch(BASE + '/config/sync-login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ passphrase: passphrase, url: syncUrl }),
+  }).then(function(r) { return r.json().then(function(b) { return { ok: r.ok, body: b || {} }; }); })
+    .then(function(res) {
+      if (!res.ok) {
+        var extra = res.body.triesLeft !== undefined ? ' ' + res.body.triesLeft + ' tries left before a 15-minute wait.' : '';
+        note.textContent = (res.body.error || 'Sign-in failed') + extra; note.style.color = '#dc2626';
+        return;
+      }
+      input.value = '';
+      note.textContent = 'Signed in (key ' + res.body.kid + ').' + (res.body.changedKey ? ' This computer now seals with the key the screens share.' : '');
+      note.style.color = '#16a34a';
+      loadHealth();
+    })
+    .catch(function() { note.textContent = 'Could not reach the print server.'; note.style.color = '#dc2626'; });
+}
+
+function syncSignOut() {
+  if (!confirm('Sign this computer out of the sync service?\n\nCheck-ins keep printing and keep their key. Slides and shared settings published here stay on this computer until it signs in again.')) return;
+  fetch(BASE + '/config/sync-logout', { method: 'POST' })
+    .then(function() { loadHealth(); })
+    .catch(function() {});
+}
+
+// ── Display login ─────────────────────────────────────────────────────────────
+// The one passphrase a volunteer types on each screen to receive the display key
+// and publish token. Shown in full for the same reason the display key is: this
+// page is loopback-only and someone has to read it aloud across a lobby.
+function setDisplayLoginState(value) {
+  var input = document.getElementById('settings-display-login');
+  var note = document.getElementById('display-login-note');
+  input.value = value || '';
+  if (value) {
+    note.textContent = 'Set. Screens log in with this passphrase — lobby TV: Settings → Connection → Display login; projector: Display Settings → Log in. Keep it with the Wi-Fi password; rotate it — and the display key — if it leaks.';
+    note.style.color = '#16a34a';
+  } else {
+    note.textContent = 'Not set: each screen needs the display key and publish token pasted by hand. Press Generate (or type a 12+ character sentence) and Save passphrase.';
+    note.style.color = '#b45309';
+  }
+}
+
+function postDisplayLogin(value, okNote) {
+  var note = document.getElementById('display-login-note');
+  return fetch(BASE + '/config', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ displayLoginPassphrase: value }),
+  }).then(function(r) { return r.json().then(function(b) { return { ok: r.ok, body: b || {} }; }); })
+    .then(function(res) {
+      if (!res.ok) { note.textContent = res.body.error || 'Save failed'; note.style.color = '#dc2626'; return false; }
+      setDisplayLoginState(value);
+      if (okNote) { note.textContent = okNote; note.style.color = '#16a34a'; }
+      loadHealth();
+      return true;
+    })
+    .catch(function() { note.textContent = 'Could not save — is the server running on this computer?'; note.style.color = '#dc2626'; return false; });
+}
+
+function generateDisplayLogin() {
+  var input = document.getElementById('settings-display-login');
+  if (input.value && !confirm('Replace the display passphrase?\n\nScreens already logged in keep working with the keys they hold. Each one shows "log in again" in its settings and needs the new passphrase before it can follow the next key rotation.')) return;
+  fetch(BASE + '/config/display-login/generate', { method: 'POST' })
+    .then(function(r) { if (!r.ok) throw new Error('generate failed'); return r.json(); })
+    .then(function(d) {
+      return postDisplayLogin(d.passphrase, 'Saved. Type it on each screen — lobby TV: Settings → Connection → Display login; projector: Display Settings → Log in. Screens then receive the display key and publish token by themselves.');
+    })
+    .catch(function() {
+      var note = document.getElementById('display-login-note');
+      note.textContent = 'Could not generate a passphrase — is the server running on this computer?'; note.style.color = '#dc2626';
+    });
+}
+
+function saveDisplayLogin() {
+  var value = document.getElementById('settings-display-login').value.trim();
+  if (!value) { clearDisplayLogin(); return; }
+  postDisplayLogin(value, 'Saved. Type it on each screen — lobby TV: Settings → Connection → Display login; projector: Display Settings → Log in.');
+}
+
+function copyDisplayLogin() {
+  var input = document.getElementById('settings-display-login');
+  var note = document.getElementById('display-login-note');
+  if (!input.value) { note.textContent = 'Nothing to copy yet — press Generate first.'; note.style.color = '#b45309'; return; }
+  var done = function() { note.textContent = 'Copied.'; note.style.color = '#16a34a'; };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(input.value).then(done, function() { input.select(); });
+  } else {
+    input.select();
+    try { document.execCommand('copy'); done(); } catch (e) { /* leave it selected */ }
+  }
+}
+
+function clearDisplayLogin() {
+  if (!confirm('Clear the display passphrase?\n\nScreens already logged in keep their keys; no new screen can log in until you set one again.')) return;
+  postDisplayLogin('', 'Cleared — screens paste keys by hand until a passphrase is set.');
+}
+
+function saveSettings() {
+  var printerName = document.getElementById('settings-printer').value;
+  var checkinUrl = document.getElementById('settings-url').value.trim();
+  var pusherAppId = document.getElementById('settings-pusher-id').value.trim();
+  var pusherCluster = document.getElementById('settings-pusher-cluster').value.trim();
+  var pusherKey = document.getElementById('settings-pusher-key').value.trim();
+  var pusherSecret = document.getElementById('settings-pusher-secret').value.trim();
+
+  fetch(BASE + '/config', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      printerName: printerName,
+      checkinUrl: checkinUrl,
+      pusherAppId: pusherAppId,
+      pusherCluster: pusherCluster,
+      pusherKey: pusherKey,
+      pusherSecret: pusherSecret,
+      phonePin: document.getElementById('settings-phone-pin').value.trim(),
+      lateGraceMin: Number(document.getElementById('settings-late-grace').value) || 10,
+      labelFooter: document.getElementById('settings-label-footer').value.trim(),
+      seasonTheme: document.getElementById('settings-season-theme').value,
+      musicalPrinter: document.getElementById('settings-musical').checked,
+      printerType: document.getElementById('settings-printer-type').value,
+      receiptHost: document.getElementById('settings-receipt-host').value.trim(),
+      receiptPort: document.getElementById('settings-receipt-port').value.trim(),
+      receiptDots: document.getElementById('settings-receipt-dots').value.trim(),
+      receiptCut: document.getElementById('settings-receipt-cut').value,
+      updateBeacon: document.getElementById('settings-update-beacon').checked,
+      firstTimerInverted: document.getElementById('settings-ft-inverted').checked,
+      trophyBand: document.getElementById('settings-trophy-band').checked,
+      connectCard: document.getElementById('settings-connect-card').checked,
+      connectCardAutoFirstTimer: document.getElementById('settings-connect-card-auto').checked,
+      connectCardGreeting: document.getElementById('settings-connect-greeting').value.trim(),
+      enableDrivenCheckin: document.getElementById('settings-driven-checkin').checked,
+      lanAccess: document.getElementById('settings-lan-access').checked,
+      displayKey: document.getElementById('settings-display-key').value.trim(),
+      displayLoginPassphrase: document.getElementById('settings-display-login').value.trim(),
+      fleetConfigUrl: document.getElementById('settings-fleet-config-url').value.trim()
+    })
+  }).then(function(r) {
+    if (!r.ok) {
+      // Surface WHY (e.g. a non-https settings URL) — a generic "saving
+      // failed" leaves the operator retyping a value the server will refuse
+      // again for a reason it already knows.
+      return r.json().catch(function() { return {}; }).then(function(b) {
+        throw new Error(b && b.error ? b.error : 'config save failed');
+      });
+    }
+    return fetch(BASE + '/config/schedule', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ schedule: readScheduleRows() })
+    });
+  }).then(function(r) {
+    if (r && r.ok) {
+      var el = document.getElementById('settings-status');
+      el.style.display = 'block';
+      setTimeout(function() { el.style.display = 'none'; }, 3000);
+    }
+  }).catch(function(e) {
+    alert((e && e.message && e.message !== 'config save failed')
+      ? ('Saving settings failed: ' + e.message)
+      : 'Saving settings failed — is the server running?');
+  });
+}
+
+// Night Status — event-bus + selector health from the extended /health payload
+// Every caller passes plain text (emoji included) — never HTML — so escaping
+// here covers the server-derived bits that ride along in `detail`, such as a
+// Pusher error string or a failing selector list.
+function statusRow(icon, label, detail) {
+  return '<div class="diag-item"><span class="diag-icon">' + esc(icon) + '</span><span>' + esc(label) + '</span><span class="diag-detail">' + esc(detail || '') + '</span></div>';
+}
+
+// ── Front-page privacy banner ────────────────────────────────────────────────
+// Answers one question without a click: are children's first names leaving this
+// PC encrypted? Three states, and "no Pusher at all" is deliberately NOT a
+// warning — a church with no welcome screen has nothing to encrypt.
+function renderPrivacy(h) {
+  var card = document.getElementById('privacy-card');
+  var banner = document.getElementById('privacy-banner');
+  var dot = document.getElementById('privacy-dot');
+  var text = document.getElementById('privacy-text');
+  var detail = document.getElementById('privacy-detail');
+  if (!card) return;
+
+  var pusherOn = h.pusher && h.pusher.configured;
+  if (!pusherOn) {
+    banner.className = 'traffic-light green';
+    dot.className = 'traffic-dot green';
+    text.textContent = 'No welcome screen connected';
+    setWelcomeStat('Not connected', 'no welcome screen', 'muted');
+    detail.textContent = 'Nothing is being broadcast, so there are no names to protect. Set up Pusher first if you want the lobby TV.';
+    return;
+  }
+
+  if (h.displayKeyConfigured) {
+    banner.className = 'traffic-light green';
+    dot.className = 'traffic-dot green';
+    text.textContent = '🔒 Names are encrypted';
+    setWelcomeStat('Names sealed', 'display key set', '');
+    detail.textContent = 'Key ' + (h.displayKeyId || '?') + ' — only screens holding this exact key can read names. '
+      + 'Press "Test Night Systems" to confirm each screen still can.';
+  } else {
+    banner.className = 'traffic-light red';
+    dot.className = 'traffic-dot red';
+    text.textContent = '⚠ Names are NOT encrypted';
+    setWelcomeStat('Not sealed', 'no display key', 'bad');
+    detail.textContent = "The Pusher channel is public: anyone who views a screen's page source can subscribe from anywhere "
+      + "and read every child's first name. Press “Set up the display key” above — it takes about a minute.";
+  }
+}
+
+// ── Managed extension folder ─────────────────────────────────────────────────
+// Only rendered when the Electron shell reported a folder. A standalone
+// `node server.js` has no managed copy, and inventing a path there would send
+// someone to a folder that does not exist.
+function renderExtensionBlock(h) {
+  var block = document.getElementById('extension-block');
+  var pathBox = document.getElementById('extension-path');
+  if (!block) return;
+  var ext = h.extension;
+  if (!ext || !ext.dir) { block.style.display = 'none'; return; }
+  block.style.display = 'block';
+  pathBox.textContent = ext.dir;
+  pathBox.title = ext.version ? 'Extension v' + ext.version : '';
+}
+
+function copyExtensionPath() {
+  var pathBox = document.getElementById('extension-path');
+  var note = document.getElementById('extension-copy-note');
+  var value = pathBox.textContent.trim();
+  if (!value || value === '—') return;
+  var done = function() {
+    note.textContent = 'Copied — paste it into the Load unpacked dialog.';
+    setTimeout(function() { note.textContent = ''; }, 4000);
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(value).then(done, function() { note.textContent = 'Copy failed — select the path above.'; });
+  } else {
+    note.textContent = 'Select the path above and copy it.';
+  }
+}
+
+function renderNightStatus(h) {
+  var el = document.getElementById('night-status');
+  var rows = '';
+
+  rows += statusRow(h.clubNight ? '🌙' : '💤',
+    h.clubNight ? 'Club night window — live broadcasts active' : 'Outside club-night window — broadcasts idle',
+    '');
+
+  var p = h.pusher || {};
+  if (!p.configured) {
+    rows += statusRow('⚪', 'Event bus (Pusher)', 'not configured');
+  } else if (p.lastPublishOk === null) {
+    rows += statusRow('🟡', 'Event bus (Pusher)', 'configured — nothing published yet');
+  } else if (p.lastPublishOk) {
+    rows += statusRow('✅', 'Event bus (Pusher)', 'last publish (' + (p.lastEvent || '?') + ') at ' + formatTime(p.lastPublishAt));
+  } else {
+    rows += statusRow('❌', 'Event bus (Pusher)', (p.lastError || 'publish failed') + ' at ' + formatTime(p.lastPublishAt));
+  }
+
+  var st = h.selectorSelfTest;
+  if (!st) {
+    rows += statusRow('🟡', 'Check-in page selectors', 'no report yet — is the check-in page open?');
+  } else if (st.ok) {
+    rows += statusRow('✅', 'Check-in page selectors', 'verified ' + formatTime(st.at));
+  } else {
+    var failedChecks = (st.results || []).filter(function(r) { return !r.passed; }).map(function(r) { return r.check; });
+    rows += statusRow('❌', 'Check-in page selectors', 'FAILING: ' + (failedChecks.join(', ') || 'unknown') + ' at ' + formatTime(st.at));
+  }
+
+  var mt = h.musicalTune;
+  if (mt && mt.enabled) {
+    if (!mt.last) {
+      rows += statusRow('🟡', 'Musical printer', 'on — no tune attempted yet this session');
+    } else if (mt.last.ok) {
+      rows += statusRow('🎵', 'Musical printer', "last tune '" + mt.last.tune + "' played " + formatTime(mt.last.at));
+    } else {
+      rows += statusRow('❌', 'Musical printer', "tune '" + mt.last.tune + "' FAILED: " + (mt.last.error || 'unknown') + ' at ' + formatTime(mt.last.at));
+    }
+  }
+
+  var rp = h.receiptPrinter;
+  if (rp && rp.enabled) {
+    var rpWhere = rp.host ? ' (' + rp.host + ')' : '';
+    if (!rp.last) {
+      rows += statusRow('🟡', 'Receipt printer', 'on' + rpWhere + ' — nothing printed yet this session');
+    } else if (rp.last.ok) {
+      rows += statusRow(rp.last.paperLow ? '🟡' : '✅', 'Receipt printer', 'last tag printed ' + formatTime(rp.last.at) + rpWhere + (rp.last.paperLow ? ' — paper nearly out' : ''));
+    } else {
+      rows += statusRow('❌', 'Receipt printer', 'FAILED: ' + (rp.last.error || 'unknown') + (rp.last.fellBackTo ? ' — printing on ' + rp.last.fellBackTo + ' instead' : '') + ' at ' + formatTime(rp.last.at));
+    }
+  }
+
+  var cc = h.contractCanary;
+  if (!cc) {
+    rows += statusRow('🟡', 'Site contract sweep', 'no run yet — runs daily from the check-in page, or use the widget\'s "Check site"');
+  } else if (cc.ok) {
+    var ccSoft = (cc.results || []).filter(function(r) { return !r.passed && r.soft; }).length;
+    rows += statusRow('✅', 'Site contract sweep',
+      (cc.results || []).length + ' checks passed ' + formatTime(cc.at) + (cc.manual ? ' (manual)' : '')
+      + (ccSoft ? ' · ' + ccSoft + ' off-day note' + (ccSoft > 1 ? 's' : '') : ''));
+  } else {
+    var ccFailed = (cc.results || []).filter(function(r) { return !r.passed && !r.soft; }).map(function(r) { return r.check; });
+    rows += statusRow('❌', 'Site contract sweep', 'DRIFT: ' + (ccFailed.join(', ') || 'unknown') + ' at ' + formatTime(cc.at));
+  }
+
+  var c = h.lastCanary;
+  if (!c) {
+    rows += statusRow('🟡', 'Last canary test', 'never run — use "Test Night Systems"');
+  } else {
+    var allPass = (c.stages || []).every(function(s) { return s.passed; });
+    rows += statusRow(allPass ? '✅' : '❌', 'Last canary test',
+      (c.stages || []).map(function(s) { return s.stage + (s.passed ? ' ✓' : ' ✗'); }).join(' · ') + ' at ' + formatTime(c.at));
+  }
+
+  if (h.csv && h.csv.updatedAt) {
+    var ageH = (Date.now() - new Date(h.csv.updatedAt).getTime()) / 3600000;
+    rows += statusRow(ageH > 24 ? '🟡' : '✅', 'Roster CSV', h.csv.count + ' kids, updated ' + (ageH < 1 ? 'under an hour ago' : Math.round(ageH) + 'h ago'));
+  } else {
+    rows += statusRow('❌', 'Roster CSV', 'missing');
+  }
+  if (h.sync && h.sync.signedIn) {
+    rows += statusRow(h.sync.state === 'unreachable' ? '🟡' : '🔑', 'Sync service',
+      h.sync.state === 'unreachable' ? 'signed in — the service could not be reached at the last check' : 'signed in — screens sync without this computer');
+  } else if (h.sync && h.sync.state === 'signed-out') {
+    rows += statusRow('❌', 'Sync service', 'signed out — the passphrase was changed; sign in again (Settings → Sync service)');
+  }
+  if (h.displayLogin && h.displayLogin.retired) {
+    // replaced by the sync service: nothing to show
+  } else if (h.displayLogin && h.displayLogin.configured) {
+    rows += statusRow(h.displayLogin.lastPublishedAt ? '🔑' : '🟡', 'Display login',
+      'passphrase set (key ' + (h.displayLogin.kid || '?') + ')'
+      + (h.displayLogin.lastPublishedAt ? ' — login frame published ' + formatTime(h.displayLogin.lastPublishedAt)
+        : ' — no login frame yet (needs the display key and Pusher)'));
+  } else {
+    rows += statusRow('⚪', 'Display login', 'not set — screens paste the display key by hand');
+  }
+
+  el.innerHTML = rows;
+
+  var failCard = document.getElementById('failures-card');
+  if (h.printFailures > 0) {
+    failCard.style.display = 'block';
+    fetch(BASE + '/failures').then(function(r) { return r.json(); }).then(function(list) {
+      document.getElementById('failures-list').innerHTML = list.map(function(f) {
+        return '<div class="warning-item bad">' +
+          '<strong>' + esc(f.name) + '</strong> (' + esc(f.club || 'no club') + ') at ' + esc(formatTime(f.at)) + ' — ' + esc(f.error) + '</div>';
+      }).join('');
+    }).catch(function() {});
+  } else {
+    failCard.style.display = 'none';
+  }
+}
+
+function runCanary() {
+  var btn = document.getElementById('canary-btn');
+  var out = document.getElementById('canary-result');
+  btn.disabled = true;
+  btn.textContent = 'Testing...';
+  out.style.display = 'block';
+  out.textContent = 'Printing a TEST label and pinging the event bus...';
+  fetch(BASE + '/canary', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
+    .then(function(r) { return r.json(); })
+    .then(function(res) {
+      out.innerHTML = (res.stages || []).map(function(s) {
+        return (s.passed ? '✅' : '❌') + ' <strong>' + esc(s.stage) + '</strong> — ' + esc(s.detail || '');
+      }).join('<br>');
+      loadHealth();
+    })
+    .catch(function() { out.textContent = 'Canary failed — could not reach the server.'; })
+    .finally(function() { btn.disabled = false; btn.textContent = 'Test Night Systems'; });
+}
+
+// Diagnostics
+function runDiagnostics() {
+  var list = document.getElementById('diag-list');
+  list.innerHTML = '<div class="empty">Running diagnostics...</div>';
+  fetch(BASE + '/diagnostics').then(function(r) { return r.json(); }).then(function(results) {
+    list.innerHTML = results.map(function(r) {
+      return '<div class="diag-item">' +
+        '<span class="diag-icon">' + (r.passed ? '\u2705' : '\u274C') + '</span>' +
+        '<span>' + esc(r.test) + '</span>' +
+        '<span class="diag-detail">' + esc(r.detail || '') + '</span>' +
+        '</div>';
+    }).join('');
+  }).catch(function() {
+    list.innerHTML = '<div class="empty">Failed to run diagnostics -- is the server running?</div>';
+  });
+}
+
+// Init
+loadWhatsNew();
+loadHealth();
+loadLobbyDeck();
+loadRoster();
+loadHistory();
+loadTonightStats();
+loadCountCheck();
+// No setInterval: the grid feed refreshes at most every 6 hours, so this
+// reads once at load and on the tab's own Refresh button.
+loadAttendanceAudit();
+loadClubs();
+loadLeaderChips();
+loadSettings();
+loadTemplates();
+// After loadSettings() so the key state is already painted when we scroll to it.
+applyHashRoute();
+
+// Refresh periodically
+setInterval(loadHealth, 10000);
+setInterval(loadHistory, 15000);
+setInterval(loadLobbyDeck, 30000);
+setInterval(loadTonightStats, 15000);
+setInterval(loadCountCheck, 30000);
+</script>
+</body>
+</html>

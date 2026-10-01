@@ -1,0 +1,83 @@
+{
+  "name": "awana-label-printer",
+  "version": "6.21.0",
+  "description": "Silent label printing for Awana check-in",
+  "main": "main.js",
+  "scripts": {
+    "dev": "electron .",
+    "build:renderer": "vite build --config renderer/vite.config.js",
+    "build": "npm run build:renderer && electron-builder --win --x64",
+    "dist": "npm run build:renderer && electron-builder --win --x64 --publish never"
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.9",
+    "pusher-js": "^8.6.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^5.0.0",
+    "electron": "^28.0.0",
+    "electron-builder": "^24.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "vite": "^6.2.0"
+  },
+  "build": {
+    "appId": "com.kvbc.awana-label-printer",
+    "productName": "Club Label Printer",
+    "publish": {
+      "provider": "github",
+      "owner": "patrick-simpson",
+      "repo": "Print-TwoTimTwo-Labels"
+    },
+    "win": {
+      "target": "nsis",
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "runAfterFinish": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "artifactName": "Club-Label-Printer-Setup.exe"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "src/**",
+      "dist/**",
+      "build/icon.png"
+    ],
+    "extraResources": [
+      {
+        "from": "../print-server",
+        "to": "print-server",
+        "filter": [
+          "*.js",
+          "church-config.json",
+          "package.json",
+          "public/**",
+          "node_modules/**"
+        ]
+      },
+      {
+        "from": "../",
+        "to": "./",
+        "filter": [
+          "changes.md"
+        ]
+      },
+      {
+        "from": "../chrome-extension",
+        "to": "chrome-extension",
+        "filter": [
+          "*.js",
+          "*.json",
+          "*.html",
+          "*.png",
+          "*.md"
+        ]
+      }
+    ]
+  }
+}
