@@ -136,3 +136,78 @@ jobs:
         working-directory: printer/print-server
       - run: npm test
       - run: npm run build
+
+  deploy:
+    # The sync Worker, then the one site, once every check above is green.
+    # Until CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID exist it stops,
+    # green. SITE_ORIGIN (a repository variable) is the site's address:
+    # unset means https://kvbcawana.pages.dev; set it to
+    # https://awana.kvbchurch.org on switch day.
+    name: Deploy to Cloudflare
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: [copies, lobby, worker, desktop, journey, printer]
+    runs-on: ubuntu-latest
+    concurrency:
+      group: deploy
+      cancel-in-progress: false
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check the Cloudflare secrets
+        id: ready
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "::notice::CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID are not set, so nothing was deployed."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Install
+        if: steps.ready.outputs.ready == 'true'
+        run: |
+          npm ci --prefix lobby
+          npm ci --prefix lobby/worker
+          npm ci --prefix printer
+      - name: Deploy the sync Worker
+        if: steps.ready.outputs.ready == 'true'
+        working-directory: lobby/worker
+        run: npx wrangler deploy
+      - name: Set the Worker's secrets
+        if: steps.ready.outputs.ready == 'true'
+        working-directory: lobby/worker
+        env:
+          PUSHER_APP_ID: ${{ secrets.PUSHER_APP_ID }}
+          PUSHER_KEY: ${{ secrets.PUSHER_KEY }}
+          PUSHER_SECRET: ${{ secrets.PUSHER_SECRET }}
+          PUSHER_CLUSTER: ${{ secrets.PUSHER_CLUSTER }}
+          INITIAL_PASSPHRASE: ${{ secrets.SYNC_PASSPHRASE }}
+        run: |
+          node -e '
+            const names = ["PUSHER_APP_ID", "PUSHER_KEY", "PUSHER_SECRET", "PUSHER_CLUSTER", "INITIAL_PASSPHRASE"];
+            const out = {};
+            for (const n of names) if (process.env[n]) out[n] = process.env[n];
+            const missing = names.filter((n) => !out[n]);
+            if (missing.length) console.log(`::warning::Not set yet: ${missing.join(", ")}.`);
+            require("fs").writeFileSync(process.env.RUNNER_TEMP + "/secrets.json", JSON.stringify(out));
+          '
+          npx wrangler secret bulk "$RUNNER_TEMP/secrets.json"
+          rm -f "$RUNNER_TEMP/secrets.json"
+      - name: Build the site
+        if: steps.ready.outputs.ready == 'true'
+        env:
+          SITE_ORIGIN: ${{ vars.SITE_ORIGIN || 'https://kvbcawana.pages.dev' }}
+          VITE_PUSHER_APP_KEY: ${{ vars.PUSHER_APP_KEY }}
+          VITE_PUSHER_CLUSTER: ${{ vars.PUSHER_CLUSTER }}
+        run: node site/build.mjs
+      - name: Publish the site
+        if: steps.ready.outputs.ready == 'true'
+        working-directory: site
+        run: |
+          WRANGLER=../lobby/worker/node_modules/.bin/wrangler
+          $WRANGLER pages project create kvbcawana --production-branch main 2>/dev/null || true
+          $WRANGLER pages deploy dist --project-name kvbcawana --branch main --commit-dirty=true

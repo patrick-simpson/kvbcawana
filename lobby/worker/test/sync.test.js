@@ -359,6 +359,8 @@ describe('requests', () => {
   it('allows only the family\'s own pages and localhost as browser origins', () => {
     expect(allowedOrigin('https://patrick-simpson.github.io')).toBe('https://patrick-simpson.github.io');
     expect(allowedOrigin('http://localhost:5173')).toBe('http://localhost:5173');
+    expect(allowedOrigin('https://awana.kvbchurch.org')).toBe('https://awana.kvbchurch.org');
+    expect(allowedOrigin('https://kvbcawana.pages.dev')).toBe('https://kvbcawana.pages.dev');
     expect(allowedOrigin('https://evil.example')).toBeNull();
     expect(allowedOrigin('https://patrick-simpson.github.io.evil.example')).toBeNull();
     expect(allowedOrigin(null)).toBeNull();

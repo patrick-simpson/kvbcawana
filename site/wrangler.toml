@@ -1,0 +1,12 @@
+# The one site: awana.kvbchurch.org (until switch day, kvbcawana.pages.dev).
+# Built by site/build.mjs into site/dist and published by the deploy job in
+# .github/workflows/ci.yml with `wrangler pages deploy`. /api/* is answered by
+# the sync Worker (lobby/worker/, Worker name awana-sync) through a service
+# binding, so the screens call their own origin: no CORS, one address.
+name = "kvbcawana"
+pages_build_output_dir = "dist"
+compatibility_date = "2026-09-01"
+
+[[services]]
+binding = "SYNC"
+service = "awana-sync"
