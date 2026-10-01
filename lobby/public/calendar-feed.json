@@ -1,0 +1,301 @@
+{
+  "version": 1,
+  "generatedAt": "2026-09-24T13:34:40.993Z",
+  "sourceUrl": "https://kvbchurch.twotimtwo.com/calendar/index",
+  "events": [
+    {
+      "date": "2026-09-30",
+      "kind": "club",
+      "title": "Awana meeting (Making Bracelets)",
+      "isCancelled": false,
+      "isSpecial": true
+    },
+    {
+      "date": "2026-10-07",
+      "kind": "club",
+      "title": "Awana meeting (Making Bracelets)",
+      "isCancelled": false,
+      "isSpecial": true
+    },
+    {
+      "date": "2026-10-14",
+      "kind": "club",
+      "title": "Bring a Friend Night - Posters due",
+      "isCancelled": false,
+      "isSpecial": true
+    },
+    {
+      "date": "2026-10-21",
+      "kind": "club",
+      "title": "Awana meeting",
+      "isCancelled": false,
+      "isSpecial": false
+    },
+    {
+      "date": "2026-10-28",
+      "kind": "club",
+      "title": "Awana meeting",
+      "isCancelled": false,
+      "isSpecial": false
+    },
+    {
+      "date": "2026-11-04",
+      "kind": "club",
+      "title": "Parent's Night - Poster Voting",
+      "isCancelled": false,
+      "isSpecial": true
+    },
+    {
+      "date": "2026-11-11",
+      "kind": "club",
+      "title": "Awana meeting",
+      "isCancelled": false,
+      "isSpecial": false
+    },
+    {
+      "date": "2026-11-18",
+      "kind": "club",
+      "title": "Prayer Meeting",
+      "isCancelled": false,
+      "isSpecial": true
+    },
+    {
+      "date": "2026-11-25",
+      "kind": "club",
+      "title": "No Awana this week",
+      "isCancelled": true,
+      "isSpecial": false
+    },
+    {
+      "date": "2026-12-02",
+      "kind": "club",
+      "title": "Awana meeting",
+      "isCancelled": false,
+      "isSpecial": false
+    },
+    {
+      "date": "2026-12-09",
+      "kind": "club",
+      "title": "Awana meeting",
+      "isCancelled": false,
+      "isSpecial": false
+    },
+    {
+      "date": "2026-12-16",
+      "kind": "club",
+      "title": "Christmas Night - last club before break",
+      "isCancelled": false,
+      "isSpecial": true
+    },
+    {
+      "date": "2026-12-23",
+      "kind": "club",
+      "title": "No Awana this week",
+      "isCancelled": true,
+      "isSpecial": false
+    },
+    {
+      "date": "2026-12-30",
+      "kind": "club",
+      "title": "No Awana this week",
+      "isCancelled": true,
+      "isSpecial": false
+    },
+    {
+      "date": "2027-01-06",
+      "kind": "club",
+      "title": "Awana meeting",
+      "isCancelled": false,
+      "isSpecial": false
+    },
+    {
+      "date": "2027-01-13",
+      "kind": "club",
+      "title": "Backwards Night",
+      "isCancelled": false,
+      "isSpecial": true
+    },
+    {
+      "date": "2027-01-20",
+      "kind": "club",
+      "title": "Awana meeting",
+      "isCancelled": false,
+      "isSpecial": false
+    },
+    {
+      "date": "2027-01-27",
+      "kind": "club",
+      "title": "Awana meeting",
+      "isCancelled": false,
+      "isSpecial": false
+    },
+    {
+      "date": "2027-02-03",
+      "kind": "club",
+      "title": "Awana meeting",
+      "isCancelled": false,
+      "isSpecial": false
+    },
+    {
+      "date": "2027-02-10",
+      "kind": "club",
+      "title": "Awana meeting",
+      "isCancelled": false,
+      "isSpecial": false
+    },
+    {
+      "date": "2027-02-17",
+      "kind": "club",
+      "title": "No Awana this week",
+      "isCancelled": true,
+      "isSpecial": false
+    },
+    {
+      "date": "2027-02-24",
+      "kind": "club",
+      "title": "Missions Night",
+      "isCancelled": false,
+      "isSpecial": true
+    },
+    {
+      "date": "2027-03-03",
+      "kind": "club",
+      "title": "Awana meeting",
+      "isCancelled": false,
+      "isSpecial": false
+    },
+    {
+      "date": "2027-03-06",
+      "kind": "note",
+      "title": "Build Day",
+      "isCancelled": false,
+      "isSpecial": false
+    },
+    {
+      "date": "2027-03-10",
+      "kind": "club",
+      "title": "Prayer Meeting",
+      "isCancelled": false,
+      "isSpecial": true
+    },
+    {
+      "date": "2027-03-17",
+      "kind": "club",
+      "title": "Awana meeting",
+      "isCancelled": false,
+      "isSpecial": false
+    },
+    {
+      "date": "2027-03-20",
+      "kind": "note",
+      "title": "Grand Prix",
+      "isCancelled": false,
+      "isSpecial": false
+    },
+    {
+      "date": "2027-03-24",
+      "kind": "club",
+      "title": "Awana meeting",
+      "isCancelled": false,
+      "isSpecial": false
+    },
+    {
+      "date": "2027-03-31",
+      "kind": "club",
+      "title": "Awana meeting",
+      "isCancelled": false,
+      "isSpecial": false
+    },
+    {
+      "date": "2027-04-07",
+      "kind": "club",
+      "title": "Awana meeting",
+      "isCancelled": false,
+      "isSpecial": false
+    },
+    {
+      "date": "2027-04-14",
+      "kind": "club",
+      "title": "Leader Appreciation Night",
+      "isCancelled": false,
+      "isSpecial": true
+    },
+    {
+      "date": "2027-04-21",
+      "kind": "club",
+      "title": "No Awana this week",
+      "isCancelled": true,
+      "isSpecial": false
+    },
+    {
+      "date": "2027-04-28",
+      "kind": "club",
+      "title": "Awana meeting",
+      "isCancelled": false,
+      "isSpecial": false
+    },
+    {
+      "date": "2027-05-05",
+      "kind": "club",
+      "title": "Step Up Night",
+      "isCancelled": false,
+      "isSpecial": true
+    },
+    {
+      "date": "2027-05-12",
+      "kind": "club",
+      "title": "Awana meeting",
+      "isCancelled": false,
+      "isSpecial": false
+    },
+    {
+      "date": "2027-05-19",
+      "kind": "club",
+      "title": "Awana meeting",
+      "isCancelled": false,
+      "isSpecial": false
+    },
+    {
+      "date": "2027-05-26",
+      "kind": "club",
+      "title": "No Awana this week",
+      "isCancelled": true,
+      "isSpecial": false
+    },
+    {
+      "date": "2027-06-02",
+      "kind": "club",
+      "title": "No Awana this week",
+      "isCancelled": true,
+      "isSpecial": false
+    },
+    {
+      "date": "2027-06-09",
+      "kind": "club",
+      "title": "No Awana this week",
+      "isCancelled": true,
+      "isSpecial": false
+    },
+    {
+      "date": "2027-06-16",
+      "kind": "club",
+      "title": "No Awana this week",
+      "isCancelled": true,
+      "isSpecial": false
+    },
+    {
+      "date": "2027-06-23",
+      "kind": "club",
+      "title": "No Awana this week",
+      "isCancelled": true,
+      "isSpecial": false
+    },
+    {
+      "date": "2027-06-30",
+      "kind": "club",
+      "title": "No Awana this week",
+      "isCancelled": true,
+      "isSpecial": false
+    }
+  ]
+}

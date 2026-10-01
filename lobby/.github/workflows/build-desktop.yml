@@ -1,0 +1,172 @@
+name: Build desktop app (Awana Lobby Display)
+
+# The Windows tray app in desktop/ that puts the live lobby signage full
+# screen on the sound room PC's lobby TV on club nights. Ported from the label
+# printer's build-electron.yml: test, build the NSIS installer, install it
+# silently on a Windows runner and prove the installed app loads the live
+# page, and only then publish the GitHub Release its auto-updater reads.
+#
+# Never tag by hand: run "Create desktop release" (create-desktop-release.yml),
+# which creates the desktop-vX.Y.Z tag and dispatches this workflow against it
+# (a tag pushed with GITHUB_TOKEN fires no push trigger by itself).
+
+on:
+  push:
+    tags: ['desktop-v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - name: Install the root toolchain (vitest, eslint)
+        run: npm ci
+      - name: Desktop unit tests
+        run: npx vitest run --config desktop/vitest.config.js
+      - name: Lint desktop/
+        run: npx eslint desktop
+
+  build:
+    needs: test
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: desktop/package-lock.json
+
+      - name: The version must match the tag
+        if: startsWith(github.ref, 'refs/tags/desktop-v')
+        shell: pwsh
+        run: |
+          $pkg = (Get-Content desktop/package.json -Raw | ConvertFrom-Json).version
+          $tag = "$env:GITHUB_REF_NAME".Substring('desktop-v'.Length)
+          if ($pkg -ne $tag) { throw "desktop/package.json is $pkg but the tag is $tag" }
+
+      - name: Install
+        working-directory: desktop
+        run: npm ci
+
+      - name: Build the installer
+        working-directory: desktop
+        run: npx electron-builder --win --x64 --publish never
+
+      - name: Upload the installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: Awana-Lobby-Display-Setup
+          if-no-files-found: error
+          path: |
+            desktop/release/Awana-Lobby-Display-Setup.exe
+            desktop/release/Awana-Lobby-Display-Setup.exe.blockmap
+            desktop/release/lobby.yml
+
+  smoke-test:
+    needs: build
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download the installer
+        uses: actions/download-artifact@v4
+        with:
+          name: Awana-Lobby-Display-Setup
+          path: installer
+
+      - name: Install silently
+        shell: pwsh
+        run: |
+          $proc = Start-Process -FilePath installer\Awana-Lobby-Display-Setup.exe -ArgumentList '/S' -PassThru -Wait
+          Write-Host "Installer exit code: $($proc.ExitCode)"
+          # The one-click NSIS stub can return before its detached child has
+          # copied the files: poll for the app rather than test once.
+          $deadline = (Get-Date).AddSeconds(60)
+          $installed = $null
+          while ((Get-Date) -lt $deadline) {
+            $found = Get-ChildItem "$env:LOCALAPPDATA\Programs" -Filter 'Awana Lobby Display.exe' -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+            if ($found) { $installed = $found.FullName; break }
+            Start-Sleep -Seconds 3
+          }
+          if (-not $installed) {
+            Get-ChildItem "$env:LOCALAPPDATA\Programs" -Recurse -ErrorAction SilentlyContinue | Select-Object FullName | Format-Table -AutoSize | Out-String | Write-Host
+            throw "The app never appeared under LOCALAPPDATA\Programs (installer exit code $($proc.ExitCode))"
+          }
+          Write-Host "Installed: $installed"
+          "INSTALLED_EXE=$installed" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Launch in smoke-test mode
+        shell: pwsh
+        run: |
+          $dir = "$env:RUNNER_TEMP\lobby-userdata"
+          New-Item -ItemType Directory -Force -Path $dir | Out-Null
+          "CI_DATA_DIR=$dir" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          # cmd's own redirection, not PowerShell's: its pipes would close when
+          # this step ends and take the app down with EPIPE (the printer's
+          # finding).
+          Start-Process cmd.exe -ArgumentList "/c", "`"`"$env:INSTALLED_EXE`" --smoke-test --user-data-dir=`"$dir`" 1>`"$dir\stdout.log`" 2>`"$dir\stderr.log`"`""
+
+      - name: The installed app loads the live lobby page
+        shell: pwsh
+        run: |
+          $file = "$env:CI_DATA_DIR\smoke.json"
+          $deadline = (Get-Date).AddSeconds(120)
+          while ((Get-Date) -lt $deadline -and -not (Test-Path $file)) { Start-Sleep 2 }
+          if (-not (Test-Path $file)) {
+            Write-Host '---- lobby-display.log ----'; Get-Content "$env:CI_DATA_DIR\lobby-display.log" -ErrorAction SilentlyContinue | Write-Host
+            Write-Host '---- stderr ----'; Get-Content "$env:CI_DATA_DIR\stderr.log" -ErrorAction SilentlyContinue | Write-Host
+            throw 'The app never reported a loaded page'
+          }
+          $smoke = Get-Content $file -Raw | ConvertFrom-Json
+          Write-Host "Smoke: $($smoke | ConvertTo-Json -Compress)"
+          if (-not "$($smoke.url)".StartsWith('https://patrick-simpson.github.io/Awana-Check-in-Display/')) { throw "Loaded the wrong page: $($smoke.url)" }
+          $expected = (Get-Content desktop/package.json -Raw | ConvertFrom-Json).version
+          if ($smoke.version -ne $expected) { throw "Installed version $($smoke.version), expected $expected" }
+
+      - name: Stop the app
+        if: always()
+        shell: pwsh
+        run: Get-Process 'Awana Lobby Display' -ErrorAction SilentlyContinue | Stop-Process -Force
+
+  release:
+    needs: smoke-test
+    if: startsWith(github.ref, 'refs/tags/desktop-v')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download the installer
+        uses: actions/download-artifact@v4
+        with:
+          name: Awana-Lobby-Display-Setup
+          path: installer
+
+      # make_latest: the installed apps read this repo's ONE "Latest" release
+      # (github.com/<repo>/releases/latest) as their update feed.
+      - name: Publish the release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Awana Lobby Display ${{ github.ref_name }}
+          make_latest: 'true'
+          body: |
+            Windows installer for the sound room PC: `Awana-Lobby-Display-Setup.exe`.
+            Installed copies update themselves from this release, outside club-night hours.
+          files: |
+            installer/Awana-Lobby-Display-Setup.exe
+            installer/Awana-Lobby-Display-Setup.exe.blockmap
+            installer/lobby.yml
+
+      - name: The update feed points at this release
+        run: |
+          sleep 10
+          latest=$(curl -fsSL -H 'Accept: application/json' "https://github.com/${GITHUB_REPOSITORY}/releases/latest" | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>console.log(JSON.parse(s).tag_name))")
+          echo "releases/latest -> $latest"
+          test "$latest" = "$GITHUB_REF_NAME"
+          curl -fsSIL "https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/lobby.yml" > /dev/null

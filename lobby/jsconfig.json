@@ -1,0 +1,18 @@
+{
+  "compilerOptions": {
+    "checkJs": false,
+    "allowJs": true,
+    "noEmit": true,
+    "strict": true,
+    "target": "es2022",
+    "lib": ["es2022", "dom", "dom.iterable"],
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "paths": { "react": ["./types/react.d.ts"], "react-dom": ["./types/react-dom.d.ts"] },
+    "types": []
+  },
+  "include": ["src", "types/env.d.ts", "types/react.d.ts", "types/react-dom.d.ts"]
+}

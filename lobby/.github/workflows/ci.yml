@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  push:
+    branches-ignore: [main]
+  pull_request:
+  schedule:
+    # Weekly sweep: contract drift is created by a printer-repo push,
+    # which this repo's push-triggered CI never sees.
+    - cron: '30 12 * * 4'
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check contract-vectors drift
+        run: node scripts/check-contract-drift.mjs
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test (with coverage gate)
+        run: npm run test:coverage
+
+      - name: Build
+        run: npm run build
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: E2E smoke tests
+        run: npm run e2e
+
+      - name: Event rendering (signage banners, ticker, milestones)
+        # ci.yml only, same reasoning as visual below: this drives the debug
+        # panel through several timed banner transitions, so it is exactly the
+        # kind of suite that must never block an urgent club-night redeploy.
+        run: npm run e2e:events
+
+      - name: Visual regression
+        # ci.yml only (never deploy.yml): pixel drift should flag a PR /
+        # weekly run, not block a live redeploy.
+        run: npm run e2e:visual
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/

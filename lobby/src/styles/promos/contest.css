@@ -1,0 +1,368 @@
+/* ── Promo: DEFEND poster contest (showreel) ────────────────
+   ContestPromo.jsx. Navy ground with a lighter pool, the gold band, the
+   taped DEFEND sign. Layering inside the slide, lowest first: texture (0),
+   vignette (1), the camera (2: gallery, spotlight, drift, sparkles, the
+   poster stack, the band, the cannon), the flash (5), wordmark and chip (6). */
+.promo-slide--contest {
+  background-color: #1f2a5c;
+  background-image: radial-gradient(ellipse 66% 58% at 50% 42%, #32427f 0%, rgba(50, 66, 127, 0) 62%);
+}
+.promo-slide--contest .promo-wordmark-slot,
+.promo-slide--contest .promo-chip-slot { z-index: 6; }
+.promo-slide--contest .promo-chip {
+  background: #f8a91c;
+  color: #1f2a5c;
+  box-shadow: 0 10px 28px rgba(6, 10, 28, 0.45), 0 0 0 3px rgba(255, 217, 138, 0.55);
+}
+
+.promo-contest-camera,
+.promo-contest-shake,
+.promo-contest-gallery,
+.promo-contest-depth,
+.promo-contest-cannon,
+.promo-contest-drift,
+.promo-contest-flash {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.promo-contest-camera { z-index: 2; }
+.promo-contest-shake { overflow: visible; }
+
+/* ── Act 1: the gallery wall ── */
+.promo-contest-gallery { z-index: 0; overflow: hidden; }
+/* Each depth is its own composited layer, so the push scales a raster
+   instead of repainting two dozen shadowed cards every frame. Depth is a
+   navy veil over each card rather than a filter on the moving layer. */
+.promo-contest-depth { transform-origin: 50% 46%; will-change: transform, opacity; }
+.promo-contest-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: #1f2a5c;
+  opacity: 0;
+}
+.promo-contest-depth--far .promo-contest-card::after { opacity: 0.42; }
+.promo-contest-depth--mid .promo-contest-card::after { opacity: 0.2; }
+.promo-contest-card-slot { position: absolute; }
+.promo-contest-card {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 0.6vmin;
+  box-shadow: 0 1.6vmin 3.4vmin rgba(6, 10, 28, 0.55);
+}
+.promo-contest-card-art {
+  position: absolute;
+  inset: 8% 8% 6%;
+  width: 84%;
+  height: 86%;
+}
+.promo-contest-card-tape {
+  position: absolute;
+  top: -4%;
+  left: 50%;
+  width: 40%;
+  height: 9%;
+  margin-left: -20%;
+  background: rgba(232, 220, 184, 0.9);
+  transform: rotate(-4deg);
+}
+
+.promo-contest-spot {
+  position: absolute;
+  z-index: 1;
+  left: 50%;
+  top: 44%;
+  width: 90vmax;
+  height: 70vmax;
+  margin-left: -45vmax;
+  margin-top: -35vmax;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(255, 236, 190, 0.3), rgba(255, 236, 190, 0.1) 55%, rgba(255, 236, 190, 0) 100%);
+  pointer-events: none;
+}
+
+/* ── Particles ── */
+.promo-contest-drift { z-index: 2; overflow: hidden; }
+.promo-contest-cannon { z-index: 5; overflow: hidden; }
+.promo-contest-bit {
+  position: absolute;
+  border-radius: 1px;
+}
+.promo-contest-cannon .promo-contest-bit { bottom: 0; }
+.promo-contest-bit--l { left: 2vw; }
+.promo-contest-bit--r { right: 2vw; }
+.promo-contest-bit--dot { border-radius: 50%; }
+.promo-contest-bit--gold { background: #f8a91c; }
+.promo-contest-bit--pale { background: #ffd98a; }
+.promo-contest-bit--white { background: rgba(255, 255, 255, 0.92); }
+
+.promo-contest-sparkle {
+  position: absolute;
+  z-index: 2;
+  color: #ffffff;
+  filter: drop-shadow(0 0 0.6vmin rgba(255, 255, 255, 0.4));
+}
+.promo-contest-sparkle--gold { color: #ffd98a; }
+.promo-contest-sparkle-art { display: block; width: 100%; height: 100%; }
+.promo-contest-sparkle--a { left: 7%; top: 20%; }
+.promo-contest-sparkle--b { left: 15%; top: 44%; }
+.promo-contest-sparkle--c { left: 9%; top: 57%; }
+.promo-contest-sparkle--d { right: 8%; top: 20%; }
+.promo-contest-sparkle--e { right: 15%; top: 42%; }
+.promo-contest-sparkle--f { right: 7%; top: 56%; }
+
+.promo-contest-burst {
+  position: absolute;
+  z-index: 4;
+  left: 50%;
+  top: 38%;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+.promo-contest-burst-star {
+  position: absolute;
+  left: -2.4vmin;
+  top: -2.4vmin;
+  width: 4.8vmin;
+  height: 4.8vmin;
+  color: #ffffff;
+}
+
+/* ── The poster stack: headline and sign ── */
+.promo-contest-stack {
+  position: absolute;
+  z-index: 3;
+  left: 4%;
+  right: 4%;
+  top: 10.5%;
+  bottom: 38%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: clamp(0.8rem, 3.2vh, 2.6rem);
+  text-align: center;
+}
+.promo-contest-headline {
+  color: #ffffff;
+  white-space: nowrap;
+  text-shadow: 0 0.06em 0 rgba(6, 10, 28, 0.55), 0 0 0.6em rgba(6, 10, 28, 0.5);
+}
+.promo-contest-hword { display: inline-block; }
+.promo-contest-hword--gold { color: #ffd98a; }
+
+.promo-contest-stage {
+  position: relative;
+  display: flex;
+  justify-content: center;
+}
+.promo-contest-ring {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 70vmin;
+  height: 42vmin;
+  margin-left: -35vmin;
+  margin-top: -21vmin;
+  border-radius: 50%;
+  border: 0.8vmin solid rgba(255, 217, 138, 0.8);
+  pointer-events: none;
+}
+.promo-contest-swing { transform-origin: 50% -6%; }
+.promo-contest-sign {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: clamp(0.4rem, 1.4vh, 1.2rem) clamp(1.4rem, 3.6vw, 4rem) clamp(0.5rem, 1.6vh, 1.4rem);
+  background-image: linear-gradient(178deg, #ffffff 0%, #f3efe4 100%);
+  border-radius: 5px;
+  box-shadow:
+    0 34px 70px rgba(6, 10, 28, 0.6),
+    0 2px 0 rgba(255, 255, 255, 0.7) inset;
+}
+.promo-contest-glintbox {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: inherit;
+  pointer-events: none;
+}
+.promo-contest-glint {
+  position: absolute;
+  top: -20%;
+  bottom: -20%;
+  left: 0;
+  width: 26%;
+  background: linear-gradient(100deg, rgba(255, 255, 255, 0) 0%, rgba(255, 246, 214, 0.85) 50%, rgba(255, 255, 255, 0) 100%);
+  transform: skewX(-18deg);
+}
+.promo-contest-glint--band { width: 12%; }
+.promo-contest-tape {
+  position: absolute;
+  z-index: 2;
+  width: clamp(34px, 4.6vw, 92px);
+  height: clamp(13px, 1.9vh, 28px);
+  background: rgba(232, 220, 184, 0.94);
+  box-shadow: 0 4px 10px rgba(8, 12, 32, 0.35);
+}
+.promo-contest-tape--tl { top: -0.8vh; left: -1.6vw; }
+.promo-contest-tape--tr { top: -0.8vh; right: -1.6vw; }
+.promo-contest-tape--bl { bottom: -0.8vh; left: -1.6vw; }
+.promo-contest-tape--br { bottom: -0.8vh; right: -1.6vw; }
+
+.promo-contest-word {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  line-height: 1;
+  font-family: var(--font-poster);
+  font-size: clamp(3.2rem, min(12.5vw, 20vh), 14rem);
+}
+.promo-contest-letter-slot {
+  position: relative;
+  display: inline-block;
+}
+.promo-contest-sketch {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.promo-contest-sketch path {
+  fill: none;
+  stroke: #1f2a5c;
+  stroke-width: 11;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.promo-contest-letter {
+  position: relative;
+  display: inline-block;
+  font-family: var(--font-poster);
+  font-weight: 400;
+  letter-spacing: 0.005em;
+  color: #f8a91c;
+  --po-w: 0.022em;
+  --po-c: #1f2a5c;
+  --po-s: rgba(194, 110, 8, 0.55);
+  --po-drop: 0.05em;
+}
+.promo-contest-marker-track {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+}
+.promo-contest-marker {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0.22em;
+  height: 0.77em;
+  /* The tip (bottom-centre of the art) sits on the track's centre. */
+  margin-left: -0.11em;
+  margin-top: -0.77em;
+  transform: rotate(28deg);
+  transform-origin: 50% 100%;
+  filter: drop-shadow(0 0.04em 0.05em rgba(6, 10, 28, 0.45));
+}
+.promo-contest-verse {
+  display: inline-block;
+  margin-top: clamp(0.1rem, 0.6vh, 0.6rem);
+  font-family: var(--promo-font-condensed);
+  font-weight: 600;
+  font-size: clamp(1rem, min(1.9vw, 3.3vh), 2rem);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #1f2a5c;
+}
+
+/* Tonight only: a rubber stamp thumped onto the sign's lower-right corner. */
+.promo-contest-stamp {
+  position: absolute;
+  z-index: 4;
+  right: -2.2vw;
+  bottom: -3.2vh;
+  padding: 0.18em 0.55em 0.22em;
+  border: 0.16em solid #1f2a5c;
+  border-radius: 0.3em;
+  background: rgba(248, 169, 28, 0.94);
+  font-family: var(--font-poster);
+  font-size: clamp(1.1rem, min(2.4vw, 4.2vh), 2.6rem);
+  line-height: 1;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: #1f2a5c;
+  box-shadow: 0 0.3em 0.8em rgba(6, 10, 28, 0.4);
+}
+
+/* ── Act 3: the band ── */
+.promo-contest-band {
+  position: absolute;
+  z-index: 4;
+  left: -8%;
+  right: -8%;
+  bottom: -4%;
+  height: 43%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* The band hangs off three edges so its rotated corners never expose
+     navy; the copy is padded up out of that overhang and out of the
+     bottom 12% (overscan and status stickers). */
+  padding-bottom: 16vh;
+  background-color: #f8a91c;
+  background-image: repeating-linear-gradient(
+    115deg,
+    rgba(255, 255, 255, 0.06) 0 14px,
+    rgba(255, 255, 255, 0) 14px 34px
+  );
+  transform-origin: 100% 50%;
+  box-shadow: 0 -22px 70px rgba(8, 12, 32, 0.45), 0 -0.6vh 0 #ffd98a inset;
+}
+.promo-contest-band-copy {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  width: 100%;
+  padding: 0 6%;
+}
+.promo-contest-kicker {
+  display: inline-block;
+  font-family: var(--promo-font-condensed);
+  font-weight: 600;
+  font-size: clamp(1rem, min(2.1vw, 3.7vh), 2rem);
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: #1f2a5c;
+}
+.promo-contest-due {
+  margin-top: 0.04em;
+  color: #ffffff;
+  --po-w: 0.026em;
+  --po-c: #1f2a5c;
+  --po-s: rgba(150, 84, 4, 0.45);
+  --po-drop: 0.06em;
+}
+.promo-contest-due-word { display: inline-block; }
+/* Scoped so it outranks the shared .promo-date size, which app.css
+   declares after this file. */
+.promo-slide--contest .promo-contest-due--long {
+  font-size: clamp(1.6rem, min(4.2vw, 7vh), 5rem);
+}
+.promo-slide--contest .promo-detail-slot { margin-top: 0.12em; }
+.promo-slide--contest .promo-detail { color: #1f2a5c; }
+
+.promo-contest-flash {
+  z-index: 5;
+  background: #fff8e4;
+}

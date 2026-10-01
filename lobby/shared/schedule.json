@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "timezone": "America/New_York",
+  "meeting": { "day": 3, "start": "18:00" },
+  "windows": [
+    { "kind": "slideshow", "deck": "opening", "title": "Opening Ceremony", "start": "18:00", "end": "18:05" },
+    { "kind": "game", "clubs": ["tnt"], "title": "T&T Game Time", "start": "18:05", "end": "18:30" },
+    { "kind": "game", "clubs": ["sparks"], "title": "Sparks Game Time", "start": "18:30", "end": "19:00" },
+    { "kind": "game", "clubs": ["cubbies", "puggles"], "title": "Puggles & Cubbies Game Time", "start": "19:00", "end": "19:30" },
+    { "kind": "slideshow", "deck": "closing", "title": "Closing", "start": "19:30", "end": "19:35" },
+    { "kind": "shutdown", "title": "Shutdown", "start": "19:35", "end": "24:00" }
+  ],
+  "specialDates": {}
+}

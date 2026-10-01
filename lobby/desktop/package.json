@@ -1,0 +1,67 @@
+{
+  "name": "awana-lobby-display",
+  "productName": "Awana Lobby Display",
+  "version": "1.0.0",
+  "private": true,
+  "description": "The lobby check-in signage for the sound room PC: full screen on the lobby TV on club nights, 5 to 8 pm.",
+  "author": "KVBC Awana",
+  "license": "UNLICENSED",
+  "type": "module",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win --x64 --publish never",
+    "test": "cd .. && npx vitest run --config desktop/vitest.config.js"
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.9"
+  },
+  "devDependencies": {
+    "electron": "^44.5.0",
+    "electron-builder": "^26.15.3"
+  },
+  "build": {
+    "appId": "org.kvbc.awana-lobby-display",
+    "productName": "Awana Lobby Display",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "src/**/*.js",
+      "!src/**/*.test.js",
+      "static/**",
+      "build/icon.png",
+      "build/icon.ico",
+      "package.json"
+    ],
+    "publish": {
+      "provider": "github",
+      "owner": "patrick-simpson",
+      "repo": "Awana-Check-in-Display",
+      "releaseType": "release",
+      "channel": "lobby"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "runAfterFinish": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Awana Lobby Display",
+      "artifactName": "Awana-Lobby-Display-Setup.exe"
+    }
+  }
+}

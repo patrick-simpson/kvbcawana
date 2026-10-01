@@ -1,0 +1,1495 @@
+{
+  "contractVersion": 6,
+  "channel": "awana-channel",
+  "note": "CANONICAL COPY (Print-TwoTimTwo-Labels). Mirrored byte-identical into the consumer repos (Awana-Check-in-Display, KVBC-Awana-Countdown). Privacy rule: only first names ever ride the channel — no lastName, no allergies, no contact info, no birth years. v3 adds four PII-free aggregate/context events sourced from TwoTimTwo's own reports: tonight (counters), points (color-team scores), schedule (next meeting), notice (church-authored public announcement — bounded and plain-text-forced). v5 adds `slides`: the operator's typed lobby slide deck, sealed and chunked — the second free-text surface on the channel, and the reason it rides encrypted. v6 adds `settings`: the lobby screens' shared settings, one sealed frame of allowlisted keys (no names; per-screen settings never ride the wire).",
+  "transport": {
+    "note": "The Pusher channel is PUBLIC and Pusher public channels have no server-side authorization primitive, so the four name-bearing events — and `slides` and `settings`, which carry arbitrary operator-authored copy — are sealed with AES-256-GCM before publish. This is a TRANSPORT layer: every payload vector below describes the OPENED payload, which both repos' sanitizers run on exactly as they would a plaintext one. The framing, padding sizes and a cross-implementation interop fixture live in envelope-vectors.json, which is mirrored byte-identically into the display repo alongside this file.",
+    "encryptedEvents": [
+      "checkin",
+      "recap",
+      "birthdays",
+      "checkout",
+      "slides",
+      "settings"
+    ],
+    "plaintextEvents": [
+      "tally",
+      "tonight",
+      "points",
+      "schedule",
+      "notice",
+      "ops",
+      "canary"
+    ],
+    "plaintextRationale": "Deliberate. Counts and church-authored copy carry no PII, and their readability is what lets a screen distinguish \"the pipe is down\" from \"I cannot read the names\" from \"quiet night\" — the last being the dangerous case, because nobody investigates a quiet night.",
+    "fixture": "envelope-vectors.json"
+  },
+  "events": {
+    "checkin": {
+      "fields": [
+        "id",
+        "at",
+        "firstName",
+        "club",
+        "isBirthday",
+        "isFirstTimer"
+      ],
+      "optionalForConsumers": [
+        "id",
+        "at"
+      ],
+      "valid": [
+        {
+          "id": "6f9619ff-8b86-4011-b42d-00c04fc964ff",
+          "at": "2026-09-16T22:05:11.000Z",
+          "firstName": "Alice",
+          "club": "Sparks",
+          "isBirthday": false,
+          "isFirstTimer": false
+        },
+        {
+          "id": "1c5b26fe-2c0a-4a1f-9d5e-8a51a1b7c001",
+          "at": "2026-09-16T22:06:00.000Z",
+          "firstName": "Marcos",
+          "club": "T&T",
+          "isBirthday": true,
+          "isFirstTimer": true
+        },
+        {
+          "id": "6f9619ff-8b86-4011-b42d-00c04fc964aa",
+          "at": "2026-09-16T22:06:00.000Z",
+          "firstName": "Noah",
+          "club": "T&T",
+          "isBirthday": false,
+          "isFirstTimer": false,
+          "welcomeBack": true,
+          "milestone": 25
+        }
+      ],
+      "dirty": [
+        {
+          "reason": "lastName must never leak to the screen",
+          "payload": {
+            "id": "6f9619ff-8b86-4011-b42d-00c04fc964ff",
+            "at": "2026-09-16T22:05:11.000Z",
+            "firstName": "Alice",
+            "lastName": "Smith",
+            "club": "Sparks",
+            "isBirthday": false,
+            "isFirstTimer": false
+          },
+          "mustNotContain": [
+            "lastName",
+            "Smith"
+          ]
+        },
+        {
+          "reason": "allergy / contact info must never leak",
+          "payload": {
+            "firstName": "Tommy",
+            "club": "Cubbies",
+            "isBirthday": false,
+            "isFirstTimer": false,
+            "allergies": "peanuts",
+            "phone": "555-0100"
+          },
+          "mustNotContain": [
+            "allergies",
+            "peanuts",
+            "phone",
+            "555-0100"
+          ]
+        },
+        {
+          "reason": "celebration flags must be literal true / a small int - junk is dropped, never rejected",
+          "payload": {
+            "id": "6f9619ff-8b86-4011-b42d-00c04fc964bb",
+            "at": "2026-09-16T22:06:00.000Z",
+            "firstName": "Noah",
+            "club": "T&T",
+            "isBirthday": false,
+            "isFirstTimer": false,
+            "welcomeBack": "yes",
+            "milestone": "Alice Smith"
+          },
+          "mustNotContain": [
+            "Alice Smith"
+          ]
+        }
+      ],
+      "reject": [
+        {
+          "reason": "missing firstName",
+          "payload": {
+            "club": "Sparks",
+            "isBirthday": false,
+            "isFirstTimer": false
+          }
+        },
+        {
+          "reason": "non-object",
+          "payload": "Alice checked in"
+        },
+        {
+          "reason": "null",
+          "payload": null
+        }
+      ],
+      "optionalFields": [
+        "welcomeBack",
+        "milestone"
+      ]
+    },
+    "recap": {
+      "fields": [
+        "entries",
+        "at"
+      ],
+      "entryFields": [
+        "id",
+        "at",
+        "firstName",
+        "club",
+        "isBirthday",
+        "isFirstTimer"
+      ],
+      "maxEntries": 30,
+      "valid": [
+        {
+          "entries": [
+            {
+              "id": "6f9619ff-8b86-4011-b42d-00c04fc964ff",
+              "at": "2026-09-16T22:05:11.000Z",
+              "firstName": "Alice",
+              "club": "Sparks",
+              "isBirthday": false,
+              "isFirstTimer": false
+            }
+          ],
+          "at": "2026-09-16T22:07:00.000Z"
+        },
+        {
+          "entries": [],
+          "at": "2026-09-16T22:07:00.000Z"
+        }
+      ],
+      "dirty": [
+        {
+          "reason": "entry smuggling a lastName must be stripped or dropped",
+          "payload": {
+            "entries": [
+              {
+                "id": "1c5b26fe-2c0a-4a1f-9d5e-8a51a1b7c001",
+                "at": "2026-09-16T22:06:00.000Z",
+                "firstName": "Nora",
+                "lastName": "Jones",
+                "club": "Trek",
+                "isBirthday": false,
+                "isFirstTimer": false
+              }
+            ],
+            "at": "2026-09-16T22:07:00.000Z"
+          },
+          "mustNotContain": [
+            "lastName",
+            "Jones"
+          ]
+        },
+        {
+          "reason": "entries without id/at cannot be deduped — dropped",
+          "payload": {
+            "entries": [
+              {
+                "firstName": "Chase",
+                "club": "T&T",
+                "isBirthday": false,
+                "isFirstTimer": false
+              }
+            ],
+            "at": "2026-09-16T22:07:00.000Z"
+          },
+          "expectEntryCount": 0
+        }
+      ],
+      "reject": [
+        {
+          "reason": "entries not an array",
+          "payload": {
+            "entries": "Alice",
+            "at": "2026-09-16T22:07:00.000Z"
+          }
+        },
+        {
+          "reason": "null",
+          "payload": null
+        }
+      ],
+      "entryOptionalFields": [
+        "welcomeBack",
+        "milestone"
+      ]
+    },
+    "checkout": {
+      "note": "Who is still in the building. TwoTimTwo's /clubber/checkout page IS the live list of children currently checked in, so this event carries that set rather than a departure signal. Same data class as `checkin` (first name + club, never a last name or an allergy), and sealed by the same transport. IMPORTANT for consumers: this is derived from whether volunteers PERFORMED checkout, not from whether children actually left, so it can be confidently wrong during a pickup rush. It also identifies unattended children once a count gets small, so a consumer MUST gate it behind an operator setting and must stop naming individuals below a threshold. See SECURITY.md in the display repo.",
+      "fields": [
+        "entries",
+        "printed",
+        "at"
+      ],
+      "optionalForConsumers": [
+        "printed"
+      ],
+      "entryFields": [
+        "firstName",
+        "club"
+      ],
+      "valid": [
+        {
+          "entries": [
+            {
+              "firstName": "Amy",
+              "club": "Sparks"
+            },
+            {
+              "firstName": "Marcos",
+              "club": "Truth & Training"
+            }
+          ],
+          "printed": 43,
+          "at": "2026-09-16T23:55:00.000Z"
+        },
+        {
+          "entries": [],
+          "printed": 43,
+          "at": "2026-09-16T23:59:00.000Z"
+        }
+      ],
+      "dirty": [
+        {
+          "reason": "a last name, allergy or clubber id smuggled into an entry must be dropped",
+          "payload": {
+            "entries": [
+              {
+                "firstName": "Amy",
+                "club": "Sparks",
+                "lastName": "Hendricks",
+                "allergies": "peanuts",
+                "clubberId": "8821",
+                "guardian": "R. Hendricks"
+              }
+            ],
+            "printed": 43,
+            "at": "2026-09-16T23:55:00.000Z"
+          },
+          "expect": {
+            "entries": [
+              {
+                "firstName": "Amy",
+                "club": "Sparks"
+              }
+            ],
+            "printed": 43
+          }
+        },
+        {
+          "reason": "an entry with no usable firstName is dropped, not rendered blank",
+          "payload": {
+            "entries": [
+              {
+                "firstName": "   ",
+                "club": "Sparks"
+              },
+              {
+                "firstName": "Amy",
+                "club": "Sparks"
+              }
+            ],
+            "at": "2026-09-16T23:55:00.000Z"
+          },
+          "expect": {
+            "entries": [
+              {
+                "firstName": "Amy",
+                "club": "Sparks"
+              }
+            ]
+          }
+        }
+      ],
+      "reject": [
+        {
+          "reason": "entries must be an array",
+          "payload": {
+            "entries": "Amy",
+            "at": "2026-09-16T23:55:00.000Z"
+          }
+        },
+        {
+          "reason": "a missing entries array is not an empty board",
+          "payload": {
+            "printed": 43,
+            "at": "2026-09-16T23:55:00.000Z"
+          }
+        },
+        {
+          "reason": "at is required so a consumer can age out a stale board",
+          "payload": {
+            "entries": []
+          }
+        },
+        {
+          "reason": "not an object",
+          "payload": "Amy"
+        }
+      ]
+    },
+    "tally": {
+      "fields": [
+        "counts",
+        "total",
+        "at"
+      ],
+      "maxClubs": 30,
+      "valid": [
+        {
+          "counts": {
+            "Sparks": 12,
+            "T&T": 19,
+            "Cubbies": 7,
+            "Puggles": 3
+          },
+          "total": 41,
+          "at": "2026-09-16T22:07:00.000Z"
+        },
+        {
+          "counts": {},
+          "total": 0,
+          "at": "2026-09-16T22:07:00.000Z"
+        },
+        {
+          "counts": {
+            "Sparks": 3
+          },
+          "total": 3,
+          "at": "2026-09-16T22:07:00.000Z",
+          "season": "christmas",
+          "rehearsal": true
+        }
+      ],
+      "dirty": [
+        {
+          "reason": "counts must be numbers only — a name smuggled as a value is dropped",
+          "payload": {
+            "counts": {
+              "Sparks": 12,
+              "T&T": "Alice Smith"
+            },
+            "total": 12,
+            "at": "2026-09-16T22:07:00.000Z"
+          },
+          "mustNotContain": [
+            "Alice Smith"
+          ]
+        },
+        {
+          "reason": "season must be a plain lowercase slug - anything else is dropped, never rejected",
+          "payload": {
+            "counts": {
+              "Sparks": 1
+            },
+            "total": 1,
+            "at": "2026-09-16T22:07:00.000Z",
+            "season": "<script>alert(1)</script>",
+            "rehearsal": "yes"
+          },
+          "mustNotContain": [
+            "script"
+          ]
+        }
+      ],
+      "reject": [
+        {
+          "reason": "counts missing",
+          "payload": {
+            "total": 5,
+            "at": "2026-09-16T22:07:00.000Z"
+          }
+        },
+        {
+          "reason": "no timestamp",
+          "payload": {
+            "counts": {
+              "Sparks": 1
+            },
+            "total": 1
+          }
+        }
+      ],
+      "optionalFields": [
+        "season",
+        "rehearsal"
+      ]
+    },
+    "birthdays": {
+      "fields": [
+        "entries",
+        "at"
+      ],
+      "entryFields": [
+        "firstName",
+        "club",
+        "month",
+        "day"
+      ],
+      "maxEntries": 40,
+      "valid": [
+        {
+          "entries": [
+            {
+              "firstName": "Maya",
+              "club": "Puggles",
+              "month": 9,
+              "day": 18
+            },
+            {
+              "firstName": "Sydney",
+              "club": "Sparks",
+              "month": 12,
+              "day": 30
+            }
+          ],
+          "at": "2026-09-16T22:00:00.000Z"
+        },
+        {
+          "entries": [],
+          "at": "2026-09-16T22:00:00.000Z"
+        }
+      ],
+      "dirty": [
+        {
+          "reason": "no lastName, no birth year — ever",
+          "payload": {
+            "entries": [
+              {
+                "firstName": "Maya",
+                "lastName": "Nguyen",
+                "club": "Puggles",
+                "month": 9,
+                "day": 18,
+                "year": 2020
+              }
+            ],
+            "at": "2026-09-16T22:00:00.000Z"
+          },
+          "mustNotContain": [
+            "lastName",
+            "Nguyen",
+            "year",
+            "2020"
+          ]
+        },
+        {
+          "reason": "out-of-range month/day entries are dropped",
+          "payload": {
+            "entries": [
+              {
+                "firstName": "Ghost",
+                "club": "Sparks",
+                "month": 13,
+                "day": 40
+              }
+            ],
+            "at": "2026-09-16T22:00:00.000Z"
+          },
+          "expectEntryCount": 0
+        }
+      ],
+      "reject": [
+        {
+          "reason": "entries not an array",
+          "payload": {
+            "entries": {},
+            "at": "2026-09-16T22:00:00.000Z"
+          }
+        },
+        {
+          "reason": "null",
+          "payload": null
+        }
+      ]
+    },
+    "ops": {
+      "fields": [
+        "type",
+        "at"
+      ],
+      "optionalFields": [
+        "club",
+        "version"
+      ],
+      "types": [
+        "print-failure",
+        "canary",
+        "selector-fail",
+        "update-ok"
+      ],
+      "valid": [
+        {
+          "type": "print-failure",
+          "club": "Sparks",
+          "at": "2026-09-16T22:10:00.000Z"
+        },
+        {
+          "type": "selector-fail",
+          "at": "2026-09-16T22:10:00.000Z"
+        },
+        {
+          "type": "update-ok",
+          "version": "5.27.0",
+          "at": "2026-09-16T22:10:00.000Z"
+        }
+      ],
+      "dirty": [
+        {
+          "reason": "ops events carry type/club/at ONLY — never a name",
+          "payload": {
+            "type": "print-failure",
+            "club": "Sparks",
+            "name": "Alice Smith",
+            "at": "2026-09-16T22:10:00.000Z"
+          },
+          "mustNotContain": [
+            "name",
+            "Alice Smith"
+          ]
+        },
+        {
+          "reason": "version must be a bare semver string — junk is dropped, never published",
+          "payload": {
+            "type": "update-ok",
+            "version": "<script>alert(1)</script>",
+            "at": "2026-09-16T22:10:00.000Z"
+          },
+          "mustNotContain": [
+            "version",
+            "script"
+          ]
+        }
+      ],
+      "reject": [
+        {
+          "reason": "unknown type",
+          "payload": {
+            "type": "reboot-everything",
+            "at": "2026-09-16T22:10:00.000Z"
+          }
+        },
+        {
+          "reason": "missing type",
+          "payload": {
+            "club": "Sparks",
+            "at": "2026-09-16T22:10:00.000Z"
+          }
+        }
+      ]
+    },
+    "canary": {
+      "fields": [
+        "at"
+      ],
+      "optionalFields": [
+        "nonce"
+      ],
+      "valid": [
+        {
+          "at": "2026-09-16T21:40:00.000Z",
+          "nonce": "a1b2c3d4e5f60718"
+        },
+        {
+          "at": "2026-09-16T21:40:00.000Z"
+        }
+      ],
+      "dirty": [],
+      "reject": [
+        {
+          "reason": "no timestamp",
+          "payload": {
+            "nonce": "a1b2c3d4e5f60718"
+          }
+        }
+      ]
+    },
+    "tonight": {
+      "fields": [
+        "checkedIn",
+        "booksCompleted",
+        "awardsEarned",
+        "friendsBrought",
+        "at"
+      ],
+      "valid": [
+        {
+          "checkedIn": 63,
+          "booksCompleted": 4,
+          "awardsEarned": 11,
+          "friendsBrought": 2,
+          "at": "2026-09-16T22:20:00.000Z"
+        },
+        {
+          "checkedIn": 0,
+          "booksCompleted": 0,
+          "awardsEarned": 0,
+          "friendsBrought": 0,
+          "at": "2026-09-16T22:20:00.000Z"
+        }
+      ],
+      "dirty": [
+        {
+          "reason": "counters are numbers only — a name smuggled into a counter must not survive",
+          "payload": {
+            "checkedIn": "Alice Smith",
+            "booksCompleted": 4,
+            "awardsEarned": 11,
+            "friendsBrought": 2,
+            "at": "2026-09-16T22:20:00.000Z"
+          },
+          "mustNotContain": [
+            "Alice Smith"
+          ]
+        },
+        {
+          "reason": "no per-child detail may ride along",
+          "payload": {
+            "checkedIn": 63,
+            "booksCompleted": 4,
+            "awardsEarned": 11,
+            "friendsBrought": 2,
+            "kids": [
+              "Alice Smith"
+            ],
+            "at": "2026-09-16T22:20:00.000Z"
+          },
+          "mustNotContain": [
+            "kids",
+            "Alice Smith"
+          ]
+        }
+      ],
+      "reject": [
+        {
+          "reason": "no timestamp",
+          "payload": {
+            "checkedIn": 63,
+            "booksCompleted": 0,
+            "awardsEarned": 0,
+            "friendsBrought": 0
+          }
+        },
+        {
+          "reason": "non-object",
+          "payload": "63 kids"
+        },
+        {
+          "reason": "null",
+          "payload": null
+        }
+      ]
+    },
+    "points": {
+      "fields": [
+        "groups",
+        "at"
+      ],
+      "optionalFields": [
+        "club"
+      ],
+      "maxGroups": 20,
+      "valid": [
+        {
+          "groups": {
+            "Red": 240,
+            "Blue": 215,
+            "Green": 198
+          },
+          "club": "Sparks",
+          "at": "2026-09-16T22:25:00.000Z"
+        },
+        {
+          "groups": {},
+          "at": "2026-09-16T22:25:00.000Z"
+        }
+      ],
+      "dirty": [
+        {
+          "reason": "point values are numbers only — a name smuggled as a value is dropped",
+          "payload": {
+            "groups": {
+              "Red": 240,
+              "Blue": "Alice Smith"
+            },
+            "at": "2026-09-16T22:25:00.000Z"
+          },
+          "mustNotContain": [
+            "Alice Smith"
+          ]
+        }
+      ],
+      "reject": [
+        {
+          "reason": "groups missing",
+          "payload": {
+            "at": "2026-09-16T22:25:00.000Z"
+          }
+        },
+        {
+          "reason": "no timestamp",
+          "payload": {
+            "groups": {
+              "Red": 1
+            }
+          }
+        },
+        {
+          "reason": "null",
+          "payload": null
+        }
+      ]
+    },
+    "schedule": {
+      "fields": [
+        "at"
+      ],
+      "optionalFields": [
+        "nextMeetingDate",
+        "title",
+        "noClubThisWeek"
+      ],
+      "valid": [
+        {
+          "nextMeetingDate": "2026-09-23",
+          "title": "Water Night",
+          "noClubThisWeek": false,
+          "at": "2026-09-16T22:30:00.000Z"
+        },
+        {
+          "noClubThisWeek": true,
+          "at": "2026-09-16T22:30:00.000Z"
+        },
+        {
+          "at": "2026-09-16T22:30:00.000Z"
+        }
+      ],
+      "dirty": [
+        {
+          "reason": "a malformed date must be dropped, never shown as-is",
+          "payload": {
+            "nextMeetingDate": "next Wednesday-ish",
+            "at": "2026-09-16T22:30:00.000Z"
+          },
+          "mustNotContain": [
+            "next Wednesday-ish"
+          ]
+        },
+        {
+          "reason": "iCal attendee/organizer detail must never ride along",
+          "payload": {
+            "nextMeetingDate": "2026-09-23",
+            "attendees": [
+              "parent@example.com"
+            ],
+            "organizer": "Director Smith",
+            "at": "2026-09-16T22:30:00.000Z"
+          },
+          "mustNotContain": [
+            "attendees",
+            "parent@example.com",
+            "organizer",
+            "Director Smith"
+          ]
+        }
+      ],
+      "reject": [
+        {
+          "reason": "no timestamp",
+          "payload": {
+            "nextMeetingDate": "2026-09-23"
+          }
+        },
+        {
+          "reason": "null",
+          "payload": null
+        }
+      ]
+    },
+    "slides": {
+      "note": "The lobby displays' typed slide deck (contract v5), published by the operator so every screen shows one deck. TEXT ONLY by contract: the display app's per-device video slides reference bytes in that device's own storage, so the publisher strips them and the consumer's sanitizer drops them. One publish is split into chunks so a large deck stays under Pusher's per-message ceiling; every chunk of a publish carries identical {deckRev, publishedAt}. publishedAt is the consumer's ONLY ordering and anti-replay authority — a deck commits iff its publishedAt is strictly newer than the committed one — because deckRev is an operator-facing counter that may restart at 1 if the publisher loses its state file. A slide may carry an optional show window — showFrom / showUntil, bare YYYY-MM-DD calendar dates with no timezone — so a dated announcement retires itself. Every consumer compares them against ITS OWN local date key, never a UTC-converted one; an unparseable date is dropped from the entry, which means the slide simply always shows. A slide may also carry holdCheckIns: true (omitted, never false, when unset): the display then holds its check-in banners while that slide is up and plays them afterwards at full length. An explicitly published EMPTY deck (slides:[] with total:1) propagates: 'the operator cleared the deck' and 'never received a deck' are different facts. The publisher refuses (at publish time, before committing) any deck that cannot be broadcast within maxTotal chunks, and additionally caps a whole deck's serialized JSON at 40000 bytes.",
+      "fields": [
+        "deckRev",
+        "publishedAt",
+        "seq",
+        "total",
+        "slides"
+      ],
+      "entryFields": [
+        "eyebrow",
+        "text",
+        "theme",
+        "textSize",
+        "durationSec"
+      ],
+      "entryOptionalFields": [
+        "id",
+        "showFrom",
+        "showUntil",
+        "holdCheckIns"
+      ],
+      "maxEntries": 50,
+      "maxTotal": 12,
+      "maxText": 500,
+      "maxEyebrow": 60,
+      "themes": [
+        "sky",
+        "sunset",
+        "night",
+        "meadow",
+        "lavender"
+      ],
+      "textSizes": [
+        "auto",
+        "xl",
+        "lg",
+        "md"
+      ],
+      "valid": [
+        {
+          "deckRev": 3,
+          "publishedAt": "2026-09-16T22:12:00.000Z",
+          "seq": 0,
+          "total": 1,
+          "slides": [
+            {
+              "id": "s_6f9619ff-8b86-4011-b42d-00c04fc964ff",
+              "eyebrow": "Awana Clubs",
+              "text": "Welcome to\nAwana!",
+              "theme": "sky",
+              "textSize": "auto",
+              "durationSec": 0
+            },
+            {
+              "eyebrow": "",
+              "text": "Grand Prix — Saturday 9 AM 🏎️",
+              "theme": "auto",
+              "textSize": "lg",
+              "durationSec": 12
+            }
+          ]
+        },
+        {
+          "deckRev": 4,
+          "publishedAt": "2026-09-16T22:15:00.000Z",
+          "seq": 0,
+          "total": 1,
+          "slides": []
+        },
+        {
+          "deckRev": 5,
+          "publishedAt": "2026-09-16T22:20:00.000Z",
+          "seq": 1,
+          "total": 3,
+          "slides": [
+            {
+              "eyebrow": "T&T",
+              "text": "Bring your handbook next week",
+              "theme": "meadow",
+              "textSize": "auto",
+              "durationSec": 0
+            }
+          ]
+        },
+        {
+          "deckRev": 6,
+          "publishedAt": "2026-09-16T22:25:00.000Z",
+          "seq": 0,
+          "total": 1,
+          "slides": [
+            {
+              "eyebrow": "Next week",
+              "text": "AWANA STORE NEXT WEEK",
+              "theme": "sunset",
+              "textSize": "auto",
+              "durationSec": 0,
+              "showFrom": "2026-09-09",
+              "showUntil": "2026-09-16"
+            },
+            {
+              "eyebrow": "",
+              "text": "Grand Prix sign-ups close Sunday",
+              "theme": "auto",
+              "textSize": "auto",
+              "durationSec": 0,
+              "showUntil": "2026-10-04"
+            }
+          ]
+        },
+        {
+          "deckRev": 8,
+          "publishedAt": "2026-09-16T22:35:00.000Z",
+          "seq": 0,
+          "total": 1,
+          "slides": [
+            {
+              "eyebrow": "Tonight",
+              "text": "Parents' Night\nStay for the closing ceremony",
+              "theme": "lavender",
+              "textSize": "auto",
+              "durationSec": 15,
+              "showUntil": "2026-11-04",
+              "holdCheckIns": true
+            },
+            {
+              "eyebrow": "",
+              "text": "Welcome to Awana!",
+              "theme": "auto",
+              "textSize": "auto",
+              "durationSec": 0
+            }
+          ]
+        }
+      ],
+      "dirty": [
+        {
+          "reason": "a video slide references THIS device's storage — dropped, never broadcast",
+          "payload": {
+            "deckRev": 3,
+            "publishedAt": "2026-09-16T22:12:00.000Z",
+            "seq": 0,
+            "total": 1,
+            "slides": [
+              {
+                "type": "video",
+                "videoId": "v_abc123",
+                "videoName": "opener.mp4",
+                "videoSize": 12345678,
+                "durationSec": 0
+              },
+              {
+                "eyebrow": "",
+                "text": "Store night is back!",
+                "theme": "auto",
+                "textSize": "auto",
+                "durationSec": 0
+              }
+            ]
+          },
+          "mustNotContain": [
+            "videoId",
+            "v_abc123",
+            "opener.mp4"
+          ],
+          "expectEntryCount": 1
+        },
+        {
+          "reason": "oversized text is sliced, a junk theme falls back to auto, and unknown per-slide fields are stripped",
+          "payload": {
+            "deckRev": 3,
+            "publishedAt": "2026-09-16T22:12:00.000Z",
+            "seq": 0,
+            "total": 1,
+            "slides": [
+              {
+                "eyebrow": "",
+                "text": "Great is Thy faithfulness! Great is Thy faithfulness! Great is Thy faithfulness! Great is Thy faithfulness! Great is Thy faithfulness! Great is Thy faithfulness! Great is Thy faithfulness! Great is Thy faithfulness! Great is Thy faithfulness! Great is Thy faithfulness! Great is Thy faithfulness! Great is Thy faithfulness! Great is Thy faithfulness! Great is Thy faithfulness! Great is Thy faithfulness! Great is Thy faithfulness! Great is Thy faithfulness! Great is Thy faithfulness! Great is Thy faithfulness! Great is Thy faithfulness! ",
+                "theme": "hotdog-stand",
+                "textSize": "banner",
+                "durationSec": 99999,
+                "presenterNotes": "call the Smiths about allergy forms"
+              }
+            ]
+          },
+          "mustNotContain": [
+            "hotdog-stand",
+            "banner",
+            "presenterNotes",
+            "Smiths"
+          ],
+          "expectEntryCount": 1
+        },
+        {
+          "reason": "a junk or impossible show window is dropped from the entry — the slide shows always rather than never",
+          "payload": {
+            "deckRev": 7,
+            "publishedAt": "2026-09-16T22:30:00.000Z",
+            "seq": 0,
+            "total": 1,
+            "slides": [
+              {
+                "eyebrow": "",
+                "text": "Bring a friend night",
+                "theme": "auto",
+                "textSize": "auto",
+                "durationSec": 0,
+                "showFrom": "2026-02-30",
+                "showUntil": "next Wednesday"
+              }
+            ]
+          },
+          "mustNotContain": [
+            "2026-02-30",
+            "next Wednesday"
+          ],
+          "expectEntryCount": 1
+        },
+        {
+          "reason": "holdCheckIns is honoured only as literal true — false, the string 'true', 1 and null are dropped from the entry, never coerced and never written as false",
+          "payload": {
+            "deckRev": 9,
+            "publishedAt": "2026-09-16T22:40:00.000Z",
+            "seq": 0,
+            "total": 1,
+            "slides": [
+              {
+                "eyebrow": "",
+                "text": "Bring a friend night",
+                "theme": "auto",
+                "textSize": "auto",
+                "durationSec": 0,
+                "holdCheckIns": false
+              },
+              {
+                "eyebrow": "",
+                "text": "Store night is back!",
+                "theme": "auto",
+                "textSize": "auto",
+                "durationSec": 0,
+                "holdCheckIns": "true"
+              },
+              {
+                "eyebrow": "",
+                "text": "Grand Prix sign-ups close Sunday",
+                "theme": "auto",
+                "textSize": "auto",
+                "durationSec": 0,
+                "holdCheckIns": 1
+              },
+              {
+                "eyebrow": "",
+                "text": "Welcome to Awana!",
+                "theme": "auto",
+                "textSize": "auto",
+                "durationSec": 0,
+                "holdCheckIns": null
+              }
+            ]
+          },
+          "mustNotContain": [
+            "holdCheckIns"
+          ],
+          "expectEntryCount": 4
+        }
+      ],
+      "reject": [
+        {
+          "reason": "publishedAt is the ordering authority — a chunk without it cannot be sequenced",
+          "payload": {
+            "deckRev": 3,
+            "seq": 0,
+            "total": 1,
+            "slides": []
+          }
+        },
+        {
+          "reason": "seq must be < total",
+          "payload": {
+            "deckRev": 3,
+            "publishedAt": "2026-09-16T22:12:00.000Z",
+            "seq": 1,
+            "total": 1,
+            "slides": []
+          }
+        },
+        {
+          "reason": "total above maxTotal",
+          "payload": {
+            "deckRev": 3,
+            "publishedAt": "2026-09-16T22:12:00.000Z",
+            "seq": 0,
+            "total": 13,
+            "slides": []
+          }
+        },
+        {
+          "reason": "slides must be an array",
+          "payload": {
+            "deckRev": 3,
+            "publishedAt": "2026-09-16T22:12:00.000Z",
+            "seq": 0,
+            "total": 1,
+            "slides": "Welcome to Awana"
+          }
+        },
+        {
+          "reason": "an empty slides array is only legal on a single-chunk publish — a multi-chunk deck has no empty pieces",
+          "payload": {
+            "deckRev": 3,
+            "publishedAt": "2026-09-16T22:12:00.000Z",
+            "seq": 0,
+            "total": 2,
+            "slides": []
+          }
+        },
+        {
+          "reason": "null",
+          "payload": null
+        }
+      ]
+    },
+    "notice": {
+      "fields": [
+        "level",
+        "message",
+        "at"
+      ],
+      "levels": [
+        "info",
+        "warn",
+        "critical"
+      ],
+      "maxMessage": 200,
+      "note": "`message` is the ONLY free-text field on the channel. It is church-authored copy written for public display (TwoTimTwo /msg/admin), shown verbatim by design — but bounded to 200 chars and forced to plain text so it cannot inject markup or break the layout. It is never derived from roster data.",
+      "valid": [
+        {
+          "level": "critical",
+          "message": "CLUB CANCELLED TONIGHT — snow",
+          "at": "2026-09-16T21:00:00.000Z"
+        },
+        {
+          "level": "info",
+          "message": "Bring your Bible next week!",
+          "at": "2026-09-16T21:00:00.000Z"
+        }
+      ],
+      "dirty": [
+        {
+          "reason": "markup must be stripped from display copy",
+          "payload": {
+            "level": "warn",
+            "message": "Pickup moved <script>alert(1)</script> to the gym",
+            "at": "2026-09-16T21:00:00.000Z"
+          },
+          "mustNotContain": [
+            "<script>",
+            "</script>"
+          ]
+        },
+        {
+          "reason": "unknown level falls back to info rather than being trusted",
+          "payload": {
+            "level": "emergency-broadcast",
+            "message": "Doors open at 6",
+            "at": "2026-09-16T21:00:00.000Z"
+          },
+          "mustNotContain": [
+            "emergency-broadcast"
+          ]
+        }
+      ],
+      "reject": [
+        {
+          "reason": "empty message must not blank the screen",
+          "payload": {
+            "level": "info",
+            "message": "   ",
+            "at": "2026-09-16T21:00:00.000Z"
+          }
+        },
+        {
+          "reason": "missing message",
+          "payload": {
+            "level": "info",
+            "at": "2026-09-16T21:00:00.000Z"
+          }
+        },
+        {
+          "reason": "null",
+          "payload": null
+        }
+      ]
+    },
+    "settings": {
+      "note": "The lobby screens' SHARED settings (contract v6), published from the display app's Settings on the check-in computer (POST /api/display-settings) and rebroadcast whole every ~5 minutes, so a change made once reaches every screen. One frame, sealed (operator-authored copy rides it: the welcome wording and one short line per club). `settings` carries ONLY keys from `keys`, every one optional: a consumer keeps its own value for any key the payload lacks, and drops (never coerces) a value that fails its spec. Per-screen settings (what plays behind the names, uploads, this TV's sound, motion, confetti, wake lock, simplified mode, the Pusher keys) are not in `keys` and can never ride the wire. publishedAt is the ONLY ordering and anti-replay authority (a consumer applies a payload iff its publishedAt is strictly newer than the one it holds); rev is an operator-facing counter that may restart at 1. No names, ever: thresholds, switches, times and church copy. The publisher caps the settings object's JSON at maxJsonBytes and refuses (413) anything bigger, so every accepted frame seals into the 4096 rung.",
+      "fields": [
+        "rev",
+        "publishedAt",
+        "settings"
+      ],
+      "keys": {
+        "standardDisplayMs": {
+          "type": "int",
+          "min": 2000,
+          "max": 20000
+        },
+        "specialDisplayMs": {
+          "type": "int",
+          "min": 3000,
+          "max": 25000
+        },
+        "clubPhrases": {
+          "type": "phrases",
+          "maxKeys": 15,
+          "maxKey": 40,
+          "maxValue": 80
+        },
+        "showBirthdayWeekRibbon": {
+          "type": "bool"
+        },
+        "clubTintBackground": {
+          "type": "bool"
+        },
+        "firstArrivalMoment": {
+          "type": "bool"
+        },
+        "milestoneEvery": {
+          "type": "int",
+          "min": 0,
+          "max": 10000
+        },
+        "clubMilestoneEvery": {
+          "type": "int",
+          "min": 0,
+          "max": 1000
+        },
+        "bookMilestones": {
+          "type": "intList",
+          "maxItems": 8,
+          "min": 1,
+          "max": 10000
+        },
+        "awardMilestones": {
+          "type": "intList",
+          "maxItems": 8,
+          "min": 1,
+          "max": 10000
+        },
+        "showClock": {
+          "type": "bool"
+        },
+        "showTally": {
+          "type": "bool"
+        },
+        "showTallySyncNote": {
+          "type": "bool"
+        },
+        "showWeatherChip": {
+          "type": "bool"
+        },
+        "weatherLocationName": {
+          "type": "string",
+          "max": 80
+        },
+        "weatherLat": {
+          "type": "number",
+          "min": -90,
+          "max": 90
+        },
+        "weatherLon": {
+          "type": "number",
+          "min": -180,
+          "max": 180
+        },
+        "weatherUnits": {
+          "type": "enum",
+          "values": [
+            "fahrenheit",
+            "celsius"
+          ]
+        },
+        "calendarEnabled": {
+          "type": "bool"
+        },
+        "calendarUrl": {
+          "type": "url",
+          "max": 300
+        },
+        "calendarWelcomeText": {
+          "type": "string",
+          "max": 80
+        },
+        "calendarShowWelcome": {
+          "type": "bool"
+        },
+        "calendarShowNextWeek": {
+          "type": "bool"
+        },
+        "calendarShowRemaining": {
+          "type": "bool"
+        },
+        "seasonPromos": {
+          "type": "bool"
+        },
+        "checkoutBoardMode": {
+          "type": "enum",
+          "values": [
+            "off",
+            "pickup",
+            "always"
+          ]
+        },
+        "checkoutBoardNamesAbove": {
+          "type": "int",
+          "min": 0,
+          "max": 200
+        },
+        "checkoutBoardStaleMin": {
+          "type": "int",
+          "min": 1,
+          "max": 120
+        },
+        "checkoutBoardFrom": {
+          "type": "time"
+        },
+        "checkoutBoardUntil": {
+          "type": "time"
+        },
+        "cornerStillHere": {
+          "type": "bool"
+        },
+        "nightTheme": {
+          "type": "slug",
+          "max": 32
+        },
+        "followPrinterTheme": {
+          "type": "bool"
+        },
+        "particleEffect": {
+          "type": "enum",
+          "values": [
+            "auto",
+            "off",
+            "snow",
+            "rain",
+            "sparkle"
+          ]
+        },
+        "weatherTheme": {
+          "type": "bool"
+        },
+        "aprilFools": {
+          "type": "bool"
+        }
+      },
+      "maxJsonBytes": 3800,
+      "valid": [
+        {
+          "rev": 4,
+          "publishedAt": "2026-10-01T23:35:00.000Z",
+          "settings": {
+            "standardDisplayMs": 7000,
+            "specialDisplayMs": 9000,
+            "clubPhrases": {
+              "sparks": "Shine bright tonight!",
+              "t&t": "Bring it!"
+            },
+            "milestoneEvery": 25,
+            "bookMilestones": [
+              5,
+              10,
+              25
+            ],
+            "showClock": true,
+            "weatherLocationName": "Waterville, Maine",
+            "weatherLat": 44.552,
+            "weatherLon": -69.6317,
+            "weatherUnits": "fahrenheit",
+            "calendarUrl": "https://kvbchurch.twotimtwo.com/calendar/index",
+            "checkoutBoardMode": "pickup",
+            "checkoutBoardNamesAbove": 3,
+            "checkoutBoardFrom": "19:35",
+            "checkoutBoardUntil": "20:30",
+            "cornerStillHere": true,
+            "nightTheme": "auto",
+            "particleEffect": "auto"
+          }
+        },
+        {
+          "rev": 1,
+          "publishedAt": "2026-10-01T18:00:00.000Z",
+          "settings": {}
+        }
+      ],
+      "dirty": [
+        {
+          "reason": "per-screen keys never ride the wire, and markup is stripped from club lines",
+          "payload": {
+            "rev": 5,
+            "publishedAt": "2026-10-01T23:40:00.000Z",
+            "settings": {
+              "backgroundSource": "video",
+              "pusherAppKey": "attacker-app",
+              "panicMode": true,
+              "displayKey": "QUJD",
+              "clubPhrases": {
+                "sparks": "<script>alert(1)</script>Go!"
+              },
+              "milestoneEvery": 25
+            }
+          },
+          "mustNotContain": [
+            "backgroundSource",
+            "attacker-app",
+            "panicMode",
+            "displayKey",
+            "<script>"
+          ]
+        },
+        {
+          "reason": "values outside their spec are dropped, not coerced",
+          "payload": {
+            "rev": 6,
+            "publishedAt": "2026-10-01T23:45:00.000Z",
+            "settings": {
+              "milestoneEvery": "25",
+              "checkoutBoardMode": "everyone",
+              "checkoutBoardFrom": "7:35pm",
+              "calendarUrl": "javascript:alert(1)",
+              "nightTheme": "<b>",
+              "showClock": "yes"
+            }
+          },
+          "mustNotContain": [
+            "\"25\"",
+            "everyone",
+            "7:35pm",
+            "javascript:",
+            "<b>",
+            "\"yes\""
+          ]
+        }
+      ],
+      "reject": [
+        {
+          "reason": "null",
+          "payload": null
+        },
+        {
+          "reason": "missing publishedAt, so it cannot be ordered",
+          "payload": {
+            "rev": 1,
+            "settings": {
+              "showClock": true
+            }
+          }
+        },
+        {
+          "reason": "settings is not an object",
+          "payload": {
+            "rev": 1,
+            "publishedAt": "2026-10-01T18:00:00.000Z",
+            "settings": [
+              "showClock"
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

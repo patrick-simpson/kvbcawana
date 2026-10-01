@@ -1,0 +1,269 @@
+/* ── Promo: Parents' Night (showreel cut) ────────────────────
+   The warm one: a cream ground in golden-hour light, a single rust line
+   that draws a parent and a child and pours itself into a gold heart,
+   the rust ribbon header and the title set
+   letter by letter. ParentsPromo.jsx owns the timing; this file owns
+   the look. Layers, lowest first: texture 0, vignette 1, far/mid
+   hearts 2, the camera scene 3, the copy 5, the header 6,
+   near hearts 7, the light leaks 8, wordmark and chip 9. */
+
+.promo-slide--parents {
+  background-color: #fbf1e1;
+  background-image:
+    radial-gradient(ellipse 70% 62% at 50% 50%, #fffaf0 0%, rgba(255, 250, 240, 0) 62%),
+    radial-gradient(ellipse 60% 50% at 12% 18%, rgba(242, 178, 94, 0.22) 0%, rgba(242, 178, 94, 0) 70%),
+    radial-gradient(ellipse 55% 45% at 90% 92%, rgba(200, 90, 46, 0.10) 0%, rgba(200, 90, 46, 0) 70%);
+  color: #3d1f33;
+}
+
+/* Cream needs a warm shade rather than black, or the corners go grey. */
+.promo-slide--parents .promo-texture { opacity: 0.045; mix-blend-mode: multiply; }
+.promo-slide--parents .promo-vignette {
+  background: radial-gradient(ellipse at 50% 50%, rgba(140, 70, 30, 0) 55%, rgba(140, 70, 30, 0.2) 100%);
+}
+
+/* ── Rising hearts, in depth ─────────────────────────────── */
+.promo-par-floats {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.promo-par-floats--back { z-index: 2; }
+.promo-par-floats--front { z-index: 7; }
+.promo-par-float {
+  position: absolute;
+  top: 104%;
+  height: auto;
+  overflow: visible;
+}
+.promo-par-float--gold { color: #e2a43c; }
+.promo-par-float--rust { color: #c85a2e; }
+
+/* ── The camera and the line drawing ─────────────────────── */
+.promo-par-camera {
+  position: absolute;
+  z-index: 3;
+  inset: 0;
+  transform-origin: 50% 52%;
+  pointer-events: none;
+}
+.promo-par-drawing {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.promo-par-line,
+.promo-par-trail {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.promo-par-line { stroke: #c85a2e; stroke-width: 7; }
+.promo-par-trail { stroke: #e2a43c; stroke-width: 20; }
+
+/* ── The heart ───────────────────────────────────────────── */
+.promo-par-heart-slot {
+  position: absolute;
+  top: 17.5%;
+  left: 0;
+  right: 0;
+  height: clamp(64px, min(12vw, 19vh), 240px);
+  display: flex;
+  justify-content: center;
+}
+.promo-par-heart {
+  position: relative;
+  height: 100%;
+  aspect-ratio: 200 / 190;
+}
+.promo-par-heart-svg {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.promo-par-halo,
+.promo-par-ring,
+.promo-par-flood {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  border-radius: 50%;
+  pointer-events: none;
+}
+.promo-par-rays {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 420%;
+  height: 420%;
+  margin: -210% 0 0 -210%;
+  pointer-events: none;
+}
+.promo-par-rays-disc {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: repeating-conic-gradient(from 0deg, rgba(242, 178, 94, 0.30) 0deg 7deg, rgba(242, 178, 94, 0) 7deg 20deg);
+  -webkit-mask-image: radial-gradient(circle closest-side, #000 18%, rgba(0, 0, 0, 0.5) 45%, transparent 100%);
+  mask-image: radial-gradient(circle closest-side, #000 18%, rgba(0, 0, 0, 0.5) 45%, transparent 100%);
+}
+.promo-par-halo {
+  width: 230%;
+  height: 230%;
+  margin: -115% 0 0 -115%;
+  background: radial-gradient(circle closest-side, rgba(242, 178, 94, 0.55) 0%, rgba(242, 178, 94, 0.22) 45%, rgba(242, 178, 94, 0) 100%);
+}
+.promo-par-ring {
+  width: 120%;
+  height: 120%;
+  margin: -60% 0 0 -60%;
+  border: clamp(2px, 0.35vmin, 5px) solid #e2a43c;
+}
+.promo-par-flood {
+  width: 200%;
+  height: 200%;
+  margin: -100% 0 0 -100%;
+  background: radial-gradient(circle closest-side, rgba(255, 252, 240, 1) 0%, rgba(255, 244, 214, 0.6) 50%, rgba(255, 244, 214, 0) 100%);
+}
+.promo-par-burst {
+  position: absolute;
+  left: 50%;
+  top: 45%;
+  width: 0;
+  height: 0;
+}
+.promo-par-burst-heart {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: auto;
+  margin: -1vmin 0 0 -1vmin;
+  overflow: visible;
+}
+
+/* ── The ribbon header ───────────────────────────────────── */
+.promo-par-header {
+  position: absolute;
+  z-index: 6;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 19%;
+  pointer-events: none;
+}
+.promo-par-header-svg {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.promo-par-header-svg:not(.promo-par-header-svg--back) {
+  filter: drop-shadow(0 10px 26px rgba(140, 70, 30, 0.25));
+}
+
+/* The wordmark and the chip ride the ribbon, above everything. */
+.promo-slide--parents .promo-wordmark-slot { z-index: 9; top: 2.8%; }
+.promo-slide--parents .promo-chip-slot { z-index: 9; top: 3.2%; }
+.promo-slide--parents .promo-chip {
+  background: #fbf1e1;
+  color: #c85a2e;
+  box-shadow: 0 8px 22px rgba(90, 40, 20, 0.3);
+}
+
+/* ── The copy ────────────────────────────────────────────── */
+.promo-par-stack {
+  position: absolute;
+  z-index: 5;
+  top: calc(17.5% + clamp(64px, min(12vw, 19vh), 240px));
+  bottom: 12%;
+  left: 5%;
+  right: 5%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(0.25rem, 1.2vh, 1rem);
+  text-align: center;
+  pointer-events: none;
+}
+.promo-par-title {
+  margin: 0;
+  font-family: var(--font-poster);
+  font-weight: 400;
+  font-size: clamp(2.6rem, min(8vw, 13vh), 9rem);
+  line-height: 1.05;
+  letter-spacing: 0.005em;
+  color: #3d1f33;
+  text-shadow: 0 0.05em 0 rgba(200, 90, 46, 0.22);
+}
+.promo-par--tonight .promo-par-title {
+  font-size: clamp(2.2rem, min(5.4vw, 10vh), 6.4rem);
+}
+.promo-par-title-text { display: inline-block; }
+.promo-par-word { display: inline-block; white-space: nowrap; }
+.promo-par-glyph {
+  display: inline-block;
+  transform-origin: 50% 80%;
+}
+.promo-par-rule {
+  margin-top: clamp(0.2rem, 1.2vh, 0.9rem);
+  width: clamp(110px, 18vw, 320px);
+  height: clamp(4px, 0.6vh, 8px);
+  transform-origin: center;
+}
+.promo-par-rule-bar {
+  width: 100%;
+  height: 100%;
+  border-radius: 999px;
+  background: #e2a43c;
+  transform-origin: center;
+}
+.promo-par-date-mask {
+  overflow: hidden;
+  padding: 0.05em 0.2em 0.1em;
+}
+.promo-par-date {
+  display: inline-block;
+  font-size: clamp(1.6rem, min(4.3vw, 8vh), 5rem);
+  color: #c85a2e;
+}
+.promo-par-date--welcome { text-transform: none; }
+.promo-par-tagline {
+  margin: 0;
+  font-family: var(--promo-font-display);
+  font-weight: 700;
+  font-size: clamp(1.2rem, min(2.6vw, 4.6vh), 2.8rem);
+  line-height: 1.15;
+  color: #3d1f33;
+}
+.promo-slide--parents .promo-detail-slot {
+  font-size: clamp(1.1rem, min(2.2vw, 3.9vh), 2.3rem);
+}
+.promo-slide--parents .promo-detail { color: #3d1f33; opacity: 0.85; }
+
+/* ── Light leaks ─────────────────────────────────────────── */
+.promo-par-leak {
+  position: absolute;
+  z-index: 8;
+  top: -40vh;
+  left: 0;
+  width: 64vw;
+  height: 180vh;
+  mix-blend-mode: multiply;
+  pointer-events: none;
+  background: linear-gradient(90deg,
+    rgba(240, 150, 70, 0) 0%,
+    rgba(240, 150, 70, 0.35) 25%,
+    rgba(250, 190, 110, 0.6) 45%,
+    rgba(255, 226, 170, 0.5) 52%,
+    rgba(245, 170, 95, 0.55) 60%,
+    rgba(226, 110, 55, 0.3) 80%,
+    rgba(226, 110, 55, 0) 100%);
+}
+.promo-par-leak--late { width: 36vw; }

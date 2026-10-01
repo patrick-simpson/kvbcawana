@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "generatedAt": "2026-09-01T00:00:00.000Z",
+  "sourceUrl": "https://example.invalid/calendar/index",
+  "events": [
+    { "date": "2026-09-16", "kind": "club", "title": "Awana", "isCancelled": false, "isSpecial": false },
+    { "date": "2026-09-23", "kind": "club", "title": "Crazy Hair Night", "isCancelled": false, "isSpecial": true },
+    { "date": "2026-09-30", "kind": "club", "title": "Awana", "isCancelled": false, "isSpecial": false },
+    { "date": "2026-10-07", "kind": "club", "title": "Awana", "isCancelled": false, "isSpecial": false }
+  ]
+}

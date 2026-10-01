@@ -1,0 +1,1205 @@
+/* ════════════════════════════════════════════════════════════════════
+   KVBC Awana Presentation Tool: the family brand kit on pure black.
+   The projector wears the Awana 2026-27 catalog like every other screen
+   in the family (shared/brand/README.md): Paytone One shouts (headlines,
+   the big figures), Londrina Solid labels (kickers, chips' small line,
+   buttons), Figtree is read (the pledges, notes). The catalog arrives
+   through the type, the club colours and marks, the stepped chip, and
+   the club waves, all over #000000: it is projected onto a blank wall.
+
+   Fonts are bundled (the same files the lobby bundles, so the service
+   worker precaches one copy for both pages and nothing is fetched from the
+   network at showtime): Paytone One and Londrina Solid from the kit's own
+   full font files (each license reserves the name, so never an @fontsource
+   subset; see the @font-faces below), the rest from @fontsource. The kit's
+   own tokens.css is pulled into this bundle at build time, exactly as the
+   lobby's app.css does, so the --brand-* values ARE the kit's file and
+   cannot drift.
+
+   This stylesheet is loaded ONLY by the presentation page
+   (countdown.html → src/presentation/main.jsx). Tailwind's source
+   scanning is pinned to this subtree so the signage app's class strings
+   never leak in, and the signage CSS graph never sees Tailwind at all.
+   ════════════════════════════════════════════════════════════════════ */
+@import "@fontsource-variable/figtree";
+/* Baloo 2 draws Devanagari, the one script a name may use that Paytone One
+   lacks and a chunky face still draws, so a birthday name stays in one
+   chunky voice, as it does in the lobby. */
+@import "@fontsource-variable/baloo-2";
+@import "../../shared/brand/tokens.css";
+
+@import "tailwindcss" source(none);
+@source "./";
+@source "../../countdown.html";
+
+/* The shout: Paytone One (owner's decision 2026-09-29; it replaced Galindo),
+   the kit's own full, unmodified files, byte for byte the lobby's (app.css
+   declares the same face; src/presentation/lib/kit.test.js pins the two
+   together). The overrides only seat the caps in a line box where the
+   approved mockup's caps sat, centred as before; see app.css. */
+@font-face {
+  font-family: "Paytone One";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  ascent-override: 96%;
+  descent-override: 43.6%;
+  line-gap-override: 0%;
+  src: url("../../shared/brand/fonts/paytone-one-full-400-normal.woff2") format("woff2"),
+       url("../../shared/brand/fonts/PaytoneOne-Regular.ttf") format("truetype");
+}
+
+/* The label voice: Londrina Solid, the kit's own full, unmodified files (its
+   license reserves the name, so never the @fontsource latin subset this page
+   used to import), byte for byte the lobby's declaration (app.css). The 400
+   cut only, which is already bold; declaring the 900 file would let a
+   `font-weight: 700+` rule reach for the much fatter Black. */
+@font-face {
+  font-family: "Londrina Solid";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400;
+  src: url("../../shared/brand/fonts/londrina-solid-full-400-normal.woff2") format("woff2"),
+       url("../../shared/brand/fonts/LondrinaSolid-Regular.ttf") format("truetype");
+}
+
+@theme {
+  /* ── The kit's three voices ─────────────────────────────────── */
+  /* shout: headlines, the big figures, chip values */
+  --font-display: "Paytone One", "Baloo 2 Variable", "Arial Rounded MT Bold", system-ui, sans-serif;
+  /* label: kickers, the chip's small line, buttons, the operator menu */
+  --font-condensed: "Londrina Solid", "Arial Narrow", system-ui, sans-serif;
+  /* read: the pledges, closing lines, notes */
+  --font-body: "Figtree Variable", "Figtree", "Segoe UI", system-ui, sans-serif;
+
+  /* Per-club colors: theme.json's values (shared-config.test.js pins
+     them), which are the kit's (src/lib/brandKit.test.js pins those). */
+  --color-club-puggles: #1DB6D9;
+  --color-club-cubbies: #4C72B8;
+  --color-club-sparks: #F04A4B;
+  --color-club-tnt: #58BD79;
+  --color-club-trek: #047E71;
+  --color-club-journey: #8A649D;
+
+  /* ── Ambient keyframes (infinite loops stay in CSS) ─────────── */
+  @keyframes waveDrift {
+    from { transform: translateX(0); }
+    to   { transform: translateX(-8%); }
+  }
+  @keyframes particleFloat {
+    0%   { transform: translateY(0);       opacity: 0; }
+    8%   { opacity: 1; }
+    88%  { opacity: 0.9; }
+    100% { transform: translateY(-110vh);  opacity: 0; }
+  }
+  @keyframes pulseRing {
+    0%   { transform: scale(0.75); opacity: 0.85; }
+    100% { transform: scale(2.6);  opacity: 0; }
+  }
+  @keyframes breathe {
+    0%, 100% { opacity: 0.7; transform: scale(1); }
+    50%       { opacity: 1;   transform: scale(1.04); }
+  }
+  @keyframes rainFall {
+    0%   { transform: translateY(-100vh) rotate(20deg); opacity: 0; }
+    10%  { opacity: 0.6; }
+    90%  { opacity: 0.3; }
+    100% { transform: translateY(100vh) rotate(20deg); opacity: 0; }
+  }
+  @keyframes snowFall {
+    0%   { transform: translateY(-100vh) translateX(0); opacity: 0; }
+    5%   { opacity: 0.8; }
+    95%  { opacity: 0.4; }
+    100% { transform: translateY(100vh) translateX(50px); opacity: 0; }
+  }
+  @keyframes thunderFlash {
+    0%, 10%, 100% { opacity: 0; }
+    5%, 8% { opacity: 0.15; }
+  }
+  @keyframes cloudDrift {
+    0%   { transform: translateX(-150px); }
+    50%  { transform: translateX(150px); }
+    100% { transform: translateX(-150px); }
+  }
+  @keyframes confettiExplode {
+    0%   { transform: translate(-50%, -50%) scale(0) rotate(0deg); opacity: 1; }
+    12%  { transform: translate(calc(-50% + var(--cx) * 0.5), calc(-50% + var(--cy) * 0.5)) scale(1) rotate(calc(var(--cr) * 0.3)); opacity: 1; }
+    100% { transform: translate(calc(-50% + var(--cx)), calc(-50% + var(--cy) + 50vh)) scale(0.3) rotate(var(--cr)); opacity: 0; }
+  }
+  @keyframes twinkle {
+    0%, 100% { opacity: var(--star-min, 0.15); }
+    50%      { opacity: var(--star-max, 0.7); }
+  }
+  @keyframes shootingStar {
+    0%   { transform: translateX(0) translateY(0) scaleX(0); opacity: 0; }
+    3%   { opacity: 1; transform: translateX(0) translateY(0) scaleX(1); }
+    100% { transform: translateX(var(--shoot-x, 250px)) translateY(var(--shoot-y, 150px)) scaleX(1); opacity: 0; }
+  }
+  @keyframes auroraWave {
+    0%   { transform: translateX(-30%) skewX(-5deg) scaleY(1); }
+    33%  { transform: translateX(10%) skewX(3deg) scaleY(1.3); }
+    66%  { transform: translateX(-10%) skewX(-3deg) scaleY(0.7); }
+    100% { transform: translateX(-30%) skewX(-5deg) scaleY(1); }
+  }
+  @keyframes leafFall {
+    0%   { transform: translateY(-10vh) rotate(0deg) translateX(0); opacity: 0; }
+    10%  { opacity: 0.6; }
+    90%  { opacity: 0.2; }
+    100% { transform: translateY(110vh) rotate(360deg) translateX(80px); opacity: 0; }
+  }
+  @keyframes fireflyGlow {
+    0%, 100% { opacity: 0; }
+    20%  { opacity: 0; }
+    35%  { opacity: 0.8; }
+    50%  { opacity: 0.5; }
+    65%  { opacity: 0.9; }
+    80%  { opacity: 0; }
+  }
+  @keyframes fireflyDrift {
+    0%   { transform: translate(0, 0); }
+    25%  { transform: translate(var(--fly-x1, 30px), var(--fly-y1, -20px)); }
+    50%  { transform: translate(var(--fly-x2, -15px), var(--fly-y2, 15px)); }
+    75%  { transform: translate(var(--fly-x3, 25px), var(--fly-y3, -25px)); }
+    100% { transform: translate(0, 0); }
+  }
+  @keyframes blossomFall {
+    0%   { transform: translateY(-10vh) rotate(0deg) translateX(0); opacity: 0; }
+    10%  { opacity: 0.5; }
+    50%  { transform: translateY(50vh) rotate(180deg) translateX(-40px); opacity: 0.35; }
+    100% { transform: translateY(110vh) rotate(360deg) translateX(20px); opacity: 0; }
+  }
+  @keyframes colonPulse {
+    0%, 100% { opacity: 1; }
+    50%      { opacity: 0.25; }
+  }
+  @keyframes screenShake {
+    0%, 100% { transform: translate(0, 0); }
+    10%  { transform: translate(-1px, 1px); }
+    20%  { transform: translate(1px, -1px); }
+    30%  { transform: translate(-1px, 0); }
+    40%  { transform: translate(1px, 1px); }
+    50%  { transform: translate(-1px, -1px); }
+    60%  { transform: translate(1px, 0); }
+    70%  { transform: translate(0, 1px); }
+    80%  { transform: translate(-1px, -1px); }
+    90%  { transform: translate(1px, 1px); }
+  }
+  @keyframes sparkleSpin {
+    0%, 100% { transform: rotate(0deg) scale(1); opacity: var(--star-min, 0.3); }
+    50%      { transform: rotate(20deg) scale(1.15); opacity: var(--star-max, 0.9); }
+  }
+}
+
+:root {
+  /* ── Timing: the kit's motion table (shared/brand/tokens.json) plus the
+        projector's own two; mirrored in src/presentation/lib/motion-tokens.js
+        (motion-tokens.test.js pins CSS to JS and both to the kit). ── */
+  --dur-beat: 100ms;
+  --dur-quick: 200ms;
+  --dur-exit: 280ms;
+  --dur-settle: 520ms;
+  --dur-pop: 460ms;
+  --dur-wipe: 640ms;
+  --dur-stinger: 560ms;
+  --dur-mode: 800ms;
+  --dur-sweep: 1100ms;
+  --ease-wipe: cubic-bezier(0.76, 0, 0.24, 1);
+  --ease-settle: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-pop: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-exit: cubic-bezier(0.7, 0, 0.84, 0);
+
+  /* ── The projector unit: 1% of the width of the largest 16:9 frame that
+        fits the window, so a 1280x720 and a 1920x1080 wall look the same,
+        and a 4:3 or ultrawide window letterboxes rather than overflowing.
+        Every size below is measured off the approved mockup in these units. */
+  --u: min(1vw, 1.7778vh);
+
+  /* ── Type scale (in projector units) ────────────────────────── */
+  /* The shout's sizes hold the approved mockup's cap heights, which were
+     Galindo's: Paytone One's caps stand 5.7% shorter at one size (its
+     figures 5%), so these are the mockup's 17.5 / 13 / 16 / 7.6 / 7 times
+     that, rounded. */
+  --text-timer: calc(18.4 * var(--u));      /* the countdown's figures */
+  --text-timer-days: calc(13.7 * var(--u)); /* "6d 23h 30m" */
+  --text-game-timer: calc(16.8 * var(--u)); /* the game clock */
+  --text-headline: calc(8 * var(--u));      /* slide headlines */
+  --text-game-headline: calc(7.4 * var(--u)); /* GAME TIME! */
+  --text-kicker: calc(2.6 * var(--u));
+  --text-body: calc(3 * var(--u));
+  --text-note: calc(2 * var(--u));
+
+  /* Paytone One and Londrina ship one weight each: never let the browser smear
+     a fake bold over them when an operator rule asks for 700 or 800. */
+  font-synthesis-weight: none;
+}
+
+@layer base {
+  html, body, #root {
+    height: 100%;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    background-color: #000000;
+  }
+  body {
+    font-family: var(--font-body);
+    color: #FFFFFF;
+  }
+}
+
+/* ── The kit's type ─────────────────────────────────────────────── */
+/* line-height: the mockup's .98 at Galindo's size, held in units at Paytone
+   One's (1 / 1.057); a title with a tall mark (É, Ș) gets more, inline, from
+   Headline.jsx's headlineBox. */
+.pj-headline {
+  font-family: var(--font-display);
+  font-weight: 400;
+  text-transform: uppercase;
+  line-height: 0.93;
+  text-align: center;
+  text-wrap: balance;
+}
+.pj-headline .w,
+.pj-body .w {
+  display: inline-block;
+  white-space: nowrap;
+}
+.pj-kicker {
+  font-family: var(--font-condensed);
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  line-height: 1;
+  /* letter-spacing leaves a trailing gap; pull it back to optical centre */
+  margin-right: -0.14em;
+}
+.pj-body {
+  font-family: var(--font-body);
+  font-weight: 600;
+  line-height: 1.32;
+  text-align: center;
+  text-wrap: balance;
+}
+
+/* ── The Awana Clubs mark (a broadcast logo, above every view) ── */
+.pj-mark {
+  position: absolute;
+  z-index: 30;
+  height: auto;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* ── The stepped chip (StepChip.jsx) ────────────────────────────── */
+.pj-chip {
+  display: inline-block;
+  position: relative;
+  line-height: 0;
+  vertical-align: middle;
+  flex: none;
+}
+.pj-chip svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+/* ── The club wave (ClubWave.jsx, ColorSweep.jsx) ───────────────── */
+.pj-wave {
+  position: absolute;
+  pointer-events: none;
+}
+.pj-wave__turn,
+.pj-wave__drift,
+.pj-wave__still {
+  position: absolute;
+  inset: 0;
+}
+.pj-wave__turn.is-top {
+  transform: scaleY(-1);
+}
+.pj-wave svg {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.pj-wave__drift {
+  animation: waveDrift 14s ease-in-out infinite alternate;
+}
+.pj-sweep {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 20;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* ── The big figures (BigTimer.jsx, DigitReel.jsx) ──────────────── */
+/* Paytone One's tabular figures (tnum): every digit on a 0.600em advance,
+   drawn for it by the type's designer, so a digit sits in its DigitReel cell
+   exactly as it would in tabular type and the clock never twitches. The
+   line box is the mockup's 1.12em at Galindo's size, held in units at
+   Paytone One's (1 / 1.05 for figures): 1.06em. */
+.pj-timer {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.06;
+}
+.pj-reel {
+  position: relative;
+  display: inline-flex;
+  justify-content: center;
+  height: 1.06em;
+  line-height: 1.06em;
+  vertical-align: bottom;
+  /* clip the roll top and bottom only, never a figure's sides */
+  clip-path: inset(0 -0.4em);
+}
+.pj-reel__digit {
+  display: inline-block;
+}
+.pj-timer__colon {
+  display: inline-block;
+  margin-inline: 0.03em;
+  animation: colonPulse 1s ease-in-out infinite;
+}
+.pj-timer__unit {
+  font-family: var(--font-condensed);
+  text-transform: uppercase;
+  font-size: 0.36em;
+  letter-spacing: 0.06em;
+  margin: 0 0.9em 0 0.2em;
+}
+.pj-timer__unit:last-child {
+  margin-right: 0;
+}
+
+/* ── Layout: every view is laid out on a 16:9 frame in projector units,
+      centred in the window; edge waves and the mark use the real edges. ── */
+.pj-frame {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: calc(100 * var(--u));
+  height: calc(56.25 * var(--u));
+}
+.pj-countdown,
+.pj-shutdown {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+.pj-countdown {
+  padding-bottom: calc(1.6 * var(--u));
+}
+/* A slide's text block: kicker at a fixed height, so it holds its place
+   from one slide to the next (the approved mockup). */
+.pj-slide {
+  position: absolute;
+  left: calc(8 * var(--u));
+  right: calc(8 * var(--u));
+  top: calc(15 * var(--u));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+.pj-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: calc(1.4 * var(--u)) calc(1.6 * var(--u));
+}
+.pj-slide-clock {
+  position: absolute;
+  z-index: 25;
+  top: calc(3.3 * var(--u));
+  right: calc(3.4 * var(--u));
+  font-size: calc(2.3 * var(--u));
+  color: rgb(255 255 255 / 0.85);
+  white-space: nowrap;
+  pointer-events: none;
+}
+/* One fixed cell per figure, for a ticking clock in a face with no
+   tabular figures (Londrina). */
+.pj-fig {
+  display: inline-block;
+  width: 0.52em;
+  text-align: center;
+}
+.pj-game {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(5.4 * var(--u));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.pj-game__marks {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: calc(3 * var(--u));
+  height: calc(6.9 * var(--u));
+}
+.pj-game__chips {
+  /* the figures' 1.06em line leaves room below them (0.27em); the chip
+     tucks up into it, where the mockup has it */
+  margin-top: calc(-1.4 * var(--u));
+}
+.pj-game__birthday {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(0.8 * var(--u));
+}
+.pj-game__cake {
+  display: block;
+  width: calc(6.4 * var(--u));
+}
+.pj-game__tally {
+  position: absolute;
+  z-index: 20;
+  top: calc(5.6 * var(--u));
+  right: calc(3.2 * var(--u));
+  display: flex;
+  gap: calc(1 * var(--u));
+}
+.pj-game__character {
+  position: absolute;
+  bottom: calc(2.4 * var(--u));
+  height: calc(16 * var(--u));
+  width: auto;
+}
+
+/* ── Operator chrome: the kit's buttons and panels on black ─────── */
+/* The one hot button: Londrina on the hot red-orange with a hard offset
+   shadow (flat, never a blur). */
+.pj-hot-button {
+  font-family: var(--font-condensed);
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  color: #FFFFFF;
+  background: var(--brand-hot);
+  border-radius: 999px;
+  box-shadow: 0.18em 0.18em 0 var(--brand-hot-deep);
+  transition: transform var(--dur-quick) var(--ease-pop), box-shadow var(--dur-quick) var(--ease-pop);
+}
+.pj-hot-button:hover {
+  transform: translate(-0.06em, -0.06em);
+  box-shadow: 0.24em 0.24em 0 var(--brand-hot-deep);
+}
+.pj-hot-button:active {
+  transform: translate(0.12em, 0.12em);
+  box-shadow: 0.06em 0.06em 0 var(--brand-hot-deep);
+}
+/* The quiet one: a white keyline pill for "Start over", "Prev / Next". */
+.pj-line-button {
+  font-family: var(--font-condensed);
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  line-height: 1;
+  color: rgb(255 255 255 / 0.55);
+  border: 2px solid rgb(255 255 255 / 0.3);
+  border-radius: 999px;
+  transition: color var(--dur-quick) ease, border-color var(--dur-quick) ease, background-color var(--dur-quick) ease;
+}
+.pj-line-button:hover {
+  color: #FFFFFF;
+  border-color: rgb(255 255 255 / 0.8);
+}
+/* Floating operator panels (the menu, the setup note, the slide nav):
+   the kit's ink, a white keyline, and a hard offset shadow in the chip's
+   charcoal. Legible over any view and never a blur. */
+.pj-panel {
+  background: var(--brand-ink);
+  border: 2px solid rgb(255 255 255 / 0.28);
+  border-radius: 14px;
+  box-shadow: 6px 6px 0 rgb(3 4 4 / 0.9);
+}
+.pj-panel-note {
+  font-family: var(--font-body);
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+/* The first-run setup note (SetupChecklist.jsx): a strip in the wall's bottom
+   margin band, where no view draws anything (see SETUP_NOTE there): the
+   Upcoming Awana Nights list stops at 51.75u and every other view ends
+   higher, so a note that stays below 51.75u can never cover a line of any of
+   them, at any window size. Anchored to the window's bottom, on the slides'
+   own left margin (8u), so on a 4:3 window it drops into the black band under
+   the frame and has more room. Two lines, sized in u with a 12px floor (it is
+   read at the keyboard, not off the wall); the button rides beside them.
+
+   It is as wide as its words, not the whole 84u: the bottom band is not
+   empty of the wall's OWN overlays. The slideshow's Prev / Next pill stands
+   at the window's bottom-right (SlideshowView.jsx: fixed, 2rem in, about
+   11.75rem wide, shown while the pointer is on the wall), so the note stops
+   14.5rem short of the window's right edge and wraps instead of running under
+   it. The two centred overlays (the ESC toast and the watchdog's "back to
+   schedule" pill) sit where any note wide enough to read would be, so the
+   note gives way to them entirely: see the :has() rule below. */
+.pj-setup-note {
+  position: absolute;
+  z-index: 40;
+  left: calc(50% - 42 * var(--u));
+  width: max-content;
+  max-width: min(calc(84 * var(--u)), calc(50% + 42 * var(--u) - 14.5rem));
+  bottom: max(calc(0.5 * var(--u)), 6px);
+  display: flex;
+  align-items: center;
+  gap: 1.4em;
+  padding: 0.32em 1em 0.36em;
+  border-width: 1.5px;
+  font-size: max(12px, calc(1.05 * var(--u)));
+  border-radius: 0.9em;
+  box-shadow: 0.25em 0.25em 0 rgb(3 4 4 / 0.9);
+}
+.pj-setup-note__text {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-areas:
+    'kicker steps'
+    'where where';
+  align-items: baseline;
+  column-gap: 1.6em;
+  row-gap: 0.1em;
+}
+.pj-setup-note__kicker {
+  grid-area: kicker;
+  margin: 0;
+  font-size: 1.1em;
+  letter-spacing: 0.1em;
+  margin-right: 0;
+  color: var(--brand-orange);
+  white-space: nowrap;
+}
+.pj-setup-note__steps {
+  grid-area: steps;
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: 1.6em;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.9em;
+  line-height: 1.3;
+  color: rgb(255 255 255 / 0.85);
+}
+.pj-setup-note__where {
+  grid-area: where;
+  margin: 0;
+  font-size: 0.85em;
+  line-height: 1.3;
+  color: rgb(255 255 255 / 0.6);
+}
+.pj-setup-note__dismiss {
+  flex: none;
+  padding: 0.35em 0.9em;
+  font-size: 0.85em;
+  white-space: nowrap;
+}
+/* The note gives way to the wall's own bottom-centre overlays (the slideshow's
+   "Exit slides / Press ESC again" toast, the watchdog's "Back to schedule in"
+   pill), which carry data-pj-bottom-overlay. They stand on the same band, over
+   the middle of it, and an operator prompt for one volunteer must never sit
+   over (or under) a live cue for the room. visibility, not display: nothing
+   moves. The overlays leave with an exit animation and stay in the DOM until
+   it ends, so the note comes back only once they are truly gone. */
+:root:has([data-pj-bottom-overlay]) .pj-setup-note {
+  visibility: hidden;
+}
+
+/* ── Particle float ── */
+.animate-particle-float {
+  animation: particleFloat linear infinite;
+}
+
+/* ── Urgency pulse ring ── */
+.animate-pulse-ring {
+  animation: pulseRing 1.4s ease-out infinite;
+}
+
+/* ── Breathing ── */
+.animate-breathe {
+  animation: breathe 3s ease-in-out infinite;
+}
+
+/* ── Sparkle doodle twinkle ── */
+.animate-sparkle {
+  animation: sparkleSpin ease-in-out infinite;
+}
+
+/* ── Screen shake ── */
+.animate-screen-shake {
+  animation: screenShake 0.3s ease-in-out infinite;
+}
+
+/* ── Test / kiosk determinism modes ─────────────────────────────
+   [data-vr]          — ?vr=1 visual-regression mode: every animation
+                        and transition frozen so two renders of one
+                        state are pixel-identical (screenshot tests).
+   [data-anim-paused] — set while the tab is hidden: ambient keyframe
+                        loops pause instead of burning GPU offscreen,
+                        and resume exactly where they left off. */
+[data-vr] *,
+[data-vr] *::before,
+[data-vr] *::after {
+  animation: none !important;
+  transition: none !important;
+}
+
+[data-anim-paused] *,
+[data-anim-paused] *::before,
+[data-anim-paused] *::after {
+  animation-play-state: paused !important;
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   Phones and tablets (lib/touch.js). Everything below is gated on the
+   PRIMARY pointer, never on the window's size: the projector PC (a mouse
+   and a keyboard) never matches these queries, so the wall it shows is the
+   one above, byte for byte. touch.test.js pins these two media queries to
+   lib/touch.js's TOUCH_QUERY and PORTRAIT_QUERY, so the components (which
+   ask the same questions from JS) and the CSS always agree. Keep every touch
+   rule in these blocks, and every size they redefine a custom property or an
+   override of a rule above, never an edit of it.
+   ════════════════════════════════════════════════════════════════════ */
+@media (hover: none) and (pointer: coarse) {
+  :root {
+    /* The corner the menu button takes (views/TouchMenu.jsx): its inset, its
+       44px and a gap. The wall's own top-right pieces stop short of it. */
+    --pj-menu-room: 62px;
+  }
+  /* A phone's browser draws its toolbars over the large viewport (vh), and
+     this page never scrolls them away: the frame fits the small one. */
+  @supports (height: 1svh) {
+    :root { --u: min(1vw, 1.7778svh); }
+  }
+
+  /* ── The menu button, top-right (a finger cannot hover) ── */
+  .pj-touch-bar {
+    position: fixed;
+    z-index: 50;
+    top: max(10px, env(safe-area-inset-top));
+    right: max(10px, env(safe-area-inset-right));
+    display: flex;
+    flex-direction: row-reverse;
+    align-items: flex-start;
+    gap: 8px;
+    pointer-events: none;
+  }
+  .pj-touch-bar > * { pointer-events: auto; }
+  .pj-touch-menu {
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    color: #fff;
+    background: rgb(35 31 32 / 0.72);
+    border: 1.5px solid rgb(255 255 255 / 0.32);
+    box-shadow: 3px 3px 0 rgb(3 4 4 / 0.9);
+    opacity: 0.8;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .pj-touch-menu:active { opacity: 1; transform: translate(1px, 1px); box-shadow: 2px 2px 0 rgb(3 4 4 / 0.9); }
+  .pj-touch-drift { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; max-width: min(320px, 70vw); }
+  .pj-touch-drift__pill {
+    min-height: 44px;
+    padding: 0 14px;
+    border-radius: 999px;
+    font-family: var(--font-condensed);
+    font-size: 14px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--brand-sun);
+    background: rgb(35 31 32 / 0.85);
+    border: 1.5px solid rgb(252 182 20 / 0.55);
+    touch-action: manipulation;
+  }
+  .pj-touch-drift__help {
+    margin: 0;
+    padding: 10px 12px;
+    border-radius: 12px;
+    font-family: var(--font-body);
+    font-size: 15px;
+    line-height: 1.4;
+    color: #fff;
+    background: var(--brand-ink);
+    border: 1.5px solid rgb(255 255 255 / 0.28);
+  }
+  /* The wall's own top-right corner pieces stop short of the button. */
+  .pj-slide-clock { right: max(calc(3.4 * var(--u)), var(--pj-menu-room)); }
+  .pj-game__tally { right: max(calc(3.2 * var(--u)), var(--pj-menu-room)); }
+
+  /* ── The menu sheet: the whole screen, its own scroll ── */
+  .pj-sheet {
+    position: fixed;
+    inset: 0;
+    z-index: 70;
+    display: flex;
+    flex-direction: column;
+    color: #fff;
+    background: var(--brand-ink);
+    color-scheme: dark;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left);
+    outline: none;
+  }
+  .pj-sheet__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    /* On a tablet the title and the ✕ line up with the centred column below. */
+    padding: 8px max(10px, calc((100% - 580px) / 2)) 8px max(20px, calc((100% - 548px) / 2));
+    border-bottom: 1.5px solid rgb(255 255 255 / 0.12);
+  }
+  .pj-sheet__title {
+    margin: 0;
+    font-family: var(--font-display);
+    font-weight: 400;
+    font-size: 22px;
+    line-height: 1;
+    text-transform: uppercase;
+  }
+  .pj-sheet__close {
+    flex: none;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    font-size: 22px;
+    color: #fff;
+    background: rgb(255 255 255 / 0.08);
+    border: 0;
+    touch-action: manipulation;
+  }
+  .pj-sheet__body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    padding: 6px 14px calc(28px + env(safe-area-inset-bottom));
+  }
+  .pj-sheet__column { max-width: 560px; margin: 0 auto; }
+  .pj-sheet__group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1.5px solid rgb(255 255 255 / 0.1);
+  }
+  .pj-sheet__group--first { margin-top: 4px; padding-top: 0; border-top: 0; }
+  .pj-sheet__label {
+    margin: 8px 6px 4px;
+    font-family: var(--font-condensed);
+    font-weight: 400;
+    font-size: 14px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--brand-orange);
+  }
+  .pj-sheet__grow { flex: 1; min-width: 0; }
+  .pj-sheet__row,
+  .pj-sheet__toggle {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    min-height: 48px;
+    padding: 10px 14px;
+    border: 0;
+    border-radius: 12px;
+    text-align: left;
+    font-family: var(--font-condensed);
+    font-weight: 400;
+    font-size: 18px;
+    line-height: 1.15;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: rgb(255 255 255 / 0.88);
+    background: transparent;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .pj-sheet__row:active,
+  .pj-sheet__toggle:active { background: rgb(255 255 255 / 0.1); }
+  .pj-sheet__row.is-on { color: var(--brand-ink); background: #fff; }
+  .pj-sheet__row--quiet { min-height: 44px; font-size: 16px; color: rgb(255 255 255 / 0.6); }
+  .pj-sheet__dot { flex: none; width: 12px; height: 12px; border-radius: 50%; }
+  .pj-sheet__toggle { min-height: 60px; }
+  .pj-sheet__toggle-label { display: block; }
+  .pj-sheet__toggle .pj-sheet__hint { display: block; margin: 3px 0 0; }
+  .pj-sheet__switch {
+    position: relative;
+    flex: none;
+    width: 48px;
+    height: 28px;
+    border-radius: 999px;
+    background: rgb(255 255 255 / 0.22);
+    transition: background-color var(--dur-quick) ease;
+  }
+  .pj-sheet__switch::after {
+    content: '';
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: #fff;
+    transition: transform var(--dur-quick) var(--ease-pop);
+  }
+  .pj-sheet__switch.is-on { background: var(--brand-tnt); }
+  .pj-sheet__switch.is-on::after { transform: translateX(20px); }
+  .pj-sheet__action {
+    min-height: 48px;
+    margin-top: 6px;
+    padding: 10px 18px;
+    border-radius: 999px;
+    border: 2px solid currentColor;
+    font-family: var(--font-condensed);
+    font-weight: 400;
+    font-size: 18px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    background: transparent;
+    touch-action: manipulation;
+  }
+  .pj-sheet__action:active { background: rgb(255 255 255 / 0.08); }
+  .pj-sheet__action--go { color: var(--brand-tnt); }
+  .pj-sheet__hint {
+    margin: 0 6px 4px;
+    font-family: var(--font-body);
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 1.4;
+    letter-spacing: 0;
+    text-transform: none;
+    color: rgb(255 255 255 / 0.6);
+  }
+  .pj-sheet__note {
+    margin: 2px 6px;
+    font-family: var(--font-body);
+    font-weight: 500;
+    font-size: 15px;
+    line-height: 1.4;
+    color: rgb(255 255 255 / 0.72);
+  }
+  .pj-sheet__note.is-ok { color: var(--brand-tnt); }
+  .pj-sheet__note.is-bad { color: var(--brand-hot); }
+  .pj-sheet__note.is-warn { color: var(--brand-sun); }
+  .pj-sheet__fold { display: flex; flex-direction: column; gap: 8px; padding: 2px 8px 8px; }
+  .pj-sheet__field { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  .pj-sheet__fields { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+  .pj-sheet__fields .pj-sheet__label { margin-left: 0; }
+  .pj-sheet__fields .pj-sheet__hint { margin-left: 0; }
+  .pj-sheet__input {
+    flex: 1 1 12rem;
+    min-width: 0;
+    min-height: 44px;
+    padding: 8px 12px;
+    border-radius: 10px;
+    border: 1.5px solid rgb(255 255 255 / 0.22);
+    background: rgb(255 255 255 / 0.1);
+    color: #fff;
+    font-family: var(--font-body);
+    /* 16px or more, or iOS zooms the whole page into the field on focus. */
+    font-size: 16px;
+    outline: none;
+  }
+  .pj-sheet__fields .pj-sheet__input { flex: none; width: 100%; }
+  .pj-sheet__input:focus { border-color: rgb(255 255 255 / 0.6); }
+  .pj-sheet__input::placeholder { color: rgb(255 255 255 / 0.45); }
+  .pj-sheet__input:disabled { opacity: 0.4; }
+  .pj-sheet__pill {
+    flex: none;
+    min-width: 44px;
+    min-height: 44px;
+    padding: 8px 16px;
+    border-radius: 999px;
+    border: 2px solid rgb(255 255 255 / 0.3);
+    font-family: var(--font-condensed);
+    font-weight: 400;
+    font-size: 16px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #fff;
+    background: transparent;
+    touch-action: manipulation;
+  }
+  .pj-sheet__pill:active { background: rgb(255 255 255 / 0.1); }
+  .pj-sheet__pill:disabled { opacity: 0.4; }
+  .pj-sheet__pill--go { color: var(--brand-tnt); border-color: rgb(88 189 121 / 0.6); }
+  .pj-sheet__pill--hot { color: var(--brand-hot); border-color: rgb(241 90 40 / 0.6); }
+  .pj-sheet__pill--sun { color: var(--brand-sun); border-color: rgb(252 182 20 / 0.6); }
+  .pj-sheet__list { display: flex; flex-direction: column; gap: 4px; margin: 0; padding: 0; list-style: none; }
+  .pj-sheet__item {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 10px;
+    min-height: 44px;
+    font-family: var(--font-condensed);
+    font-size: 16px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: rgb(255 255 255 / 0.78);
+  }
+  .pj-sheet__item .pj-sheet__hint { margin: 0; }
+  .pj-sheet__item--status { padding: 4px 14px; font-size: 17px; }
+  .pj-sheet__mono { font-family: monospace; font-size: 15px; color: rgb(255 255 255 / 0.85); }
+  .pj-sheet__fine { margin: 22px 6px 0; font-size: 12px; line-height: 1.5; color: rgb(255 255 255 / 0.45); }
+
+  /* ── The page as a thing held in the hand ── */
+  /* No pull-to-refresh reloading the wall, no double-tap zoom, and a long
+     press on the wall's art or words is not a save-image sheet or a text
+     selection. Pinch-zoom stays. */
+  html,
+  body {
+    overscroll-behavior: none;
+    touch-action: manipulation;
+  }
+  [data-mode] {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* ── A slide deck by finger (views/SlideshowView.jsx) ── */
+  /* The browser keeps vertical pans and pinches; a sideways swipe is ours. */
+  [data-slide] { touch-action: pan-y pinch-zoom; }
+  .pj-touch-slides {
+    position: fixed;
+    z-index: 50;
+    right: max(10px, env(safe-area-inset-right));
+    bottom: max(10px, env(safe-area-inset-bottom));
+    display: flex;
+    gap: 4px;
+    padding: 4px;
+    border-radius: 999px;
+    background: rgb(35 31 32 / 0.72);
+    border: 1.5px solid rgb(255 255 255 / 0.28);
+    box-shadow: 3px 3px 0 rgb(3 4 4 / 0.9);
+  }
+  .pj-touch-slides > button {
+    display: grid;
+    place-items: center;
+    min-width: 44px;
+    min-height: 44px;
+    border: 0;
+    border-radius: 999px;
+    color: #fff;
+    background: transparent;
+    opacity: 0.85;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .pj-touch-slides > button:active { background: rgb(255 255 255 / 0.14); }
+  .pj-touch-slides > button:disabled { opacity: 0.25; }
+  .pj-touch-slides__exit {
+    padding: 0 14px;
+    font-family: var(--font-condensed);
+    font-size: 16px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+  .pj-touch-slides > .pj-touch-slides__exit.is-armed { opacity: 1; background: var(--brand-hot); }
+  :root {
+    /* The Exit toast stands above the controls, at a size a phone can read. */
+    --pj-toast-bottom: calc(max(10px, env(safe-area-inset-bottom)) + 62px);
+    --pj-toast-size: max(15px, calc(2.2 * var(--u)));
+  }
+  /* A phone on its side: the wall fills the height and leaves a band at each
+     side, so the controls stand up in the right-hand band, clear of it. */
+  @media (min-aspect-ratio: 43/20) {
+    .pj-touch-slides { flex-direction: column; }
+    :root { --pj-toast-bottom: calc(3 * var(--u)); }
+  }
+
+  /* ── The wall's own buttons, a finger's size ── */
+  :root {
+    /* The watchdog's "Back to schedule in" pill (ResumePill.jsx) stands above
+       the slide controls, its chip readable and Stay a real target. */
+    --pj-resume-bottom: calc(max(10px, env(safe-area-inset-bottom)) + 62px);
+    --pj-resume-size: max(14px, calc(2 * var(--u)));
+    --pj-stay-size: max(17px, calc(1.5 * var(--u)));
+    /* The shutdown screen's Start Over, and the error screen's Reload. */
+    --pj-restart-size: max(16px, calc(1.5 * var(--u)));
+    --pj-reload-size: max(17px, calc(1.8 * var(--u)));
+  }
+  [data-resume-pill] .pj-hot-button,
+  .pj-shutdown .pj-line-button,
+  .pj-hot-button {
+    min-width: 64px;
+    min-height: 44px;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+  /* A tap leaves :hover stuck on the last button touched (iOS), so the PC's
+     hover lift is undone here; the press (:active) still shows. */
+  .pj-hot-button:hover:not(:active) {
+    transform: none;
+    box-shadow: 0.18em 0.18em 0 var(--brand-hot-deep);
+  }
+  .pj-line-button:hover:not(:active) {
+    color: rgb(255 255 255 / 0.55);
+    border-color: rgb(255 255 255 / 0.3);
+  }
+  .pj-line-button:active {
+    color: #fff;
+    border-color: rgb(255 255 255 / 0.8);
+  }
+
+  /* ── The first-run setup note (SetupChecklist.jsx), touch form ── */
+  /* A card at the bottom-left, as wide as its words up to 560px, its two
+     buttons a finger's size; above the slide controls while a deck is up.
+     A phone on its side has no free band at all (the wall fills its height),
+     so there the note is not on the wall: the menu button carries a mark and
+     the sheet opens on Display Settings with the note's steps at its top. */
+  .pj-setup-note--touch {
+    left: max(10px, env(safe-area-inset-left));
+    bottom: max(10px, env(safe-area-inset-bottom));
+    width: max-content;
+    max-width: min(560px, calc(100% - 20px));
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 8px 14px;
+    padding: 10px 12px 10px 14px;
+    font-size: 15px;
+    border-radius: 14px;
+  }
+  :root:has([data-slideshow-touch-nav]) .pj-setup-note--touch {
+    bottom: calc(max(10px, env(safe-area-inset-bottom)) + 62px);
+  }
+  .pj-setup-note--touch .pj-setup-note__text,
+  .pj-sheet__setup .pj-setup-note__text { display: block; flex: 1 1 14rem; min-width: 0; }
+  .pj-setup-note--touch .pj-setup-note__kicker,
+  .pj-sheet__setup .pj-setup-note__kicker { font-size: 15px; white-space: normal; }
+  .pj-setup-note--touch .pj-setup-note__steps,
+  .pj-sheet__setup .pj-setup-note__steps { display: flex; flex-wrap: wrap; column-gap: 1.2em; margin-top: 4px; font-size: 14px; }
+  .pj-setup-note__actions { display: flex; flex-wrap: wrap; gap: 8px; }
+  .pj-setup-note--touch .pj-setup-note__go,
+  .pj-setup-note--touch .pj-setup-note__dismiss,
+  .pj-sheet__setup .pj-setup-note__dismiss {
+    min-height: 44px;
+    padding: 0 16px;
+    font-size: 15px;
+    white-space: nowrap;
+  }
+  @media (min-aspect-ratio: 43/20) {
+    .pj-setup-note--touch { display: none; }
+  }
+  .pj-sheet__setup {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin: 10px 0 2px;
+    padding: 12px 14px;
+    border-radius: 14px;
+    border: 1.5px solid rgb(250 164 29 / 0.5);
+    background: rgb(250 164 29 / 0.08);
+  }
+  .pj-sheet__setup .pj-setup-note__where { margin: 6px 0 0; font-size: 14px; line-height: 1.4; color: rgb(255 255 255 / 0.65); }
+  .pj-touch-menu { position: relative; }
+  .pj-touch-menu[data-setup]::after {
+    content: '';
+    position: absolute;
+    top: -2px;
+    right: -2px;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--brand-orange);
+    border: 2px solid #000;
+  }
+}
+
+/* ── Upright on a phone or tablet (lib/touch.js PORTRAIT_QUERY) ──────────────
+   A 16:9 wall letterboxed into a thin band (a fifth of an iPhone's height,
+   8px type) is not the wall. Held upright the frame is 9:16 instead: u stays
+   1% of its WIDTH, so every width fit in the components (fittedU, fitChipU,
+   the chip lists) holds unchanged, and it is 177.78u tall. Only the vertical
+   places and the sizes change, through the type tokens, the custom
+   properties the components fall back from, and the portrait tables they
+   pick with usePortrait (COMING_UP_PORTRAIT, PLEDGE_FIT_PORTRAIT,
+   THEME_CHIP_PORTRAIT, the headline fits; Slide.test.jsx pins the tables to
+   this block). The mark and the menu share the top 16u; the bottom of the
+   screen is the controls' and the setup note's, so a slide's words end by
+   122u and every other view's by about 140u. */
+@media (hover: none) and (pointer: coarse) and (orientation: portrait) {
+  :root {
+    --u: min(1vw, 0.5625vh);
+    --text-timer: calc(21 * var(--u));
+    --text-timer-days: calc(18 * var(--u));
+    --text-game-timer: calc(30 * var(--u));
+    --text-headline: calc(12 * var(--u));
+    --text-game-headline: calc(12 * var(--u));
+    --text-kicker: calc(5 * var(--u));
+    --text-body: calc(5.6 * var(--u));
+    --text-note: calc(4 * var(--u));
+    /* The sizes the components set inline fall back from these. */
+    --pj-mark-left: 5;
+    --pj-mark-top: 4;
+    --pj-mark-width: 22;
+    --pj-countdown-kicker: calc(7 * var(--u));
+    --pj-countdown-gap: calc(2.2 * var(--u));
+    --pj-countdown-next: calc(4.4 * var(--u));
+    --pj-event-size: calc(5 * var(--u));
+    --pj-event-top: calc(14 * var(--u));
+    --pj-event-gap: calc(5.4 * var(--u));
+    --pj-game-chip-u: 5.5;
+    --pj-game-tally: calc(4.4 * var(--u));
+  }
+  @supports (height: 1svh) {
+    :root { --u: min(1vw, 0.5625svh); }
+  }
+  .pj-frame { height: calc(177.78 * var(--u)); }
+
+  /* ── The countdown: centred above the bottom's controls and note ── */
+  .pj-countdown { padding-bottom: calc(30 * var(--u)); }
+  /* A special night's name may take two lines; its "· in 2 days" never splits. */
+  [data-live] > p { max-width: calc(90 * var(--u)); white-space: normal; line-height: 1.12; }
+  [data-live] > p > span { white-space: nowrap; }
+
+  /* ── The slides (Slide.jsx COMING_UP_PORTRAIT restates these) ── */
+  .pj-slide { top: calc(50 * var(--u)); left: calc(6 * var(--u)); right: calc(6 * var(--u)); }
+  /* The Upcoming Awana Nights list takes the column from higher up (COMING_UP_PORTRAIT.top). */
+  .pj-slide:has(> .pj-chip-row) { top: calc(26 * var(--u)); }
+  .pj-chip-row { gap: calc(3.4 * var(--u)) calc(2.4 * var(--u)); }
+  /* The pledge clock stands centred at the top, between the mark and the menu. */
+  .pj-slide-clock { top: calc(5 * var(--u)); left: 0; right: 0; text-align: center; font-size: calc(4.2 * var(--u)); }
+
+  /* ── Game time ── */
+  .pj-game { top: calc(44 * var(--u)); }
+  .pj-game__marks { height: calc(14 * var(--u)); gap: calc(5 * var(--u)); }
+  .pj-game__chips { margin-top: calc(-2 * var(--u)); }
+  .pj-game__cake { width: calc(10 * var(--u)); }
+  .pj-game__tally { top: max(calc(17 * var(--u)), 66px); right: calc(5 * var(--u)); }
+  .pj-game__character { height: calc(30 * var(--u)); bottom: calc(4 * var(--u)); }
+
+  /* ── The shutdown screen ── */
+  .pj-shutdown { padding-bottom: calc(36 * var(--u)); }
+}

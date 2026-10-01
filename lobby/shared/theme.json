@@ -1,0 +1,110 @@
+{
+  "version": 1,
+  "church": {
+    "name": "KVBC",
+    "displayName": "Kennebec Valley Bible Church"
+  },
+  "brand": {
+    "yellow": "#FFC107",
+    "orange": "#F7941D"
+  },
+  "clubs": {
+    "puggles": {
+      "name": "Puggles",
+      "color": "#1DB6D9",
+      "deep": "#1A627C",
+      "tint": "#BCDCEE",
+      "aliases": [
+        "puggle"
+      ],
+      "art": {
+        "logo": "brand/logos/puggles-color.svg",
+        "logoWhite": "brand/logos/puggles-white.svg",
+        "characters": [
+          "art/puggles-char-alice.png",
+          "art/puggles-char-maya.png",
+          "art/puggles-char-sydney.png",
+          "art/puggles-char-duck.png"
+        ],
+        "group": "art/puggles-chars.png"
+      }
+    },
+    "cubbies": {
+      "name": "Cubbies",
+      "color": "#4C72B8",
+      "deep": "#2F4F8A",
+      "tint": "#C4DDF3",
+      "aliases": [
+        "cubbie",
+        "cubby"
+      ],
+      "art": {
+        "logo": "brand/logos/cubbies-color.svg",
+        "logoWhite": "brand/logos/cubbies-white.svg"
+      }
+    },
+    "sparks": {
+      "name": "Sparks",
+      "color": "#F04A4B",
+      "deep": "#B82B32",
+      "tint": "#FDDACF",
+      "aliases": [
+        "spark"
+      ],
+      "art": {
+        "logo": "brand/logos/sparks-color.svg",
+        "logoWhite": "brand/logos/sparks-white.svg"
+      }
+    },
+    "tnt": {
+      "name": "T&T",
+      "color": "#58BD79",
+      "deep": "#2F8A4E",
+      "tint": "#D0E9D5",
+      "aliases": [
+        "t&t",
+        "t & t",
+        "tt",
+        "truth & training",
+        "truth and training"
+      ],
+      "art": {
+        "logo": "brand/logos/tnt-color.svg",
+        "logoWhite": "brand/logos/tnt-white.svg",
+        "title": "art/tnt-title-agents-of-grace.png",
+        "characters": [
+          "art/tnt-char-chase.png",
+          "art/tnt-char-tommy.png",
+          "art/tnt-char-nora.png",
+          "art/tnt-char-marcos.png",
+          "art/tnt-char-rabbot.png"
+        ],
+        "group": "art/tnt-chars.png"
+      }
+    },
+    "trek": {
+      "name": "Trek",
+      "color": "#047E71",
+      "deep": "#02554C",
+      "tint": "#CCEAEC",
+      "aliases": [],
+      "art": {
+        "logo": "brand/logos/trek-color.svg",
+        "logoWhite": "brand/logos/trek-white.svg",
+        "monochrome": true
+      }
+    },
+    "journey": {
+      "name": "Journey",
+      "color": "#8A649D",
+      "deep": "#56467F",
+      "tint": "#DED5EA",
+      "aliases": [],
+      "art": {
+        "logo": "brand/logos/journey-color.svg",
+        "logoWhite": "brand/logos/journey-white.svg",
+        "monochrome": true
+      }
+    }
+  }
+}

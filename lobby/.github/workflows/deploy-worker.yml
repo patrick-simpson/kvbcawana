@@ -1,0 +1,130 @@
+name: Deploy the sync Worker
+
+# The always-on sync service (worker/): one passphrase sets up a screen, and
+# shared settings, slides, the screen template, Journey's room settings and
+# the church calendar sync through it, with the check-in laptop on or off.
+#
+# Needs these repository secrets (Settings → Secrets and variables → Actions):
+#   CLOUDFLARE_API_TOKEN   an API token with "Edit Cloudflare Workers"
+#   CLOUDFLARE_ACCOUNT_ID  the Cloudflare account's id
+#   PUSHER_APP_ID, PUSHER_KEY, PUSHER_SECRET, PUSHER_CLUSTER
+#                          the same Pusher app the print server uses
+#   SYNC_PASSPHRASE        the church passphrase the first time (e.g. kennebec);
+#                          after that, change it from Settings, not here
+# Until the Cloudflare secrets exist the job tests and stops, green, so a push
+# before setup is not a red build. worker/README.md is the step-by-step.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'worker/**'
+      - 'src/lib/syncSpecs.js'
+      - 'src/lib/sharedSettings.js'
+      - 'src/lib/slides.js'
+      - 'src/lib/envelope.js'
+      - 'src/lib/calendarParse.js'
+      - '.github/workflows/deploy-worker.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write # commit shared/sync.json the first time the URL is known
+  actions: write  # dispatch deploy.yml after that commit
+
+concurrency:
+  group: deploy-worker
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: |
+          npm ci
+          npm ci --prefix worker
+
+      - name: Test the Worker
+        run: npx vitest run --config worker/vitest.config.js
+
+      - name: Check the Cloudflare secrets
+        id: ready
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "::notice::CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID are not set yet, so the Worker was tested but not deployed. See worker/README.md."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Deploy
+        id: deploy
+        if: steps.ready.outputs.ready == 'true'
+        working-directory: worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          npx wrangler deploy 2>&1 | tee deploy.log
+          url=$(grep -oE 'https://[a-z0-9.-]+\.workers\.dev' deploy.log | head -n 1)
+          if [ -z "$url" ]; then
+            echo "::error::wrangler did not print the Worker's workers.dev address."
+            exit 1
+          fi
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+
+      - name: Set the Worker's secrets
+        if: steps.ready.outputs.ready == 'true'
+        working-directory: worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          PUSHER_APP_ID: ${{ secrets.PUSHER_APP_ID }}
+          PUSHER_KEY: ${{ secrets.PUSHER_KEY }}
+          PUSHER_SECRET: ${{ secrets.PUSHER_SECRET }}
+          PUSHER_CLUSTER: ${{ secrets.PUSHER_CLUSTER }}
+          INITIAL_PASSPHRASE: ${{ secrets.SYNC_PASSPHRASE }}
+        run: |
+          node -e '
+            const names = ["PUSHER_APP_ID", "PUSHER_KEY", "PUSHER_SECRET", "PUSHER_CLUSTER", "INITIAL_PASSPHRASE"];
+            const out = {};
+            for (const n of names) if (process.env[n]) out[n] = process.env[n];
+            const missing = names.filter((n) => !out[n]);
+            if (missing.length) console.log(`::warning::Not set yet: ${missing.join(", ")}. The Worker runs, but cannot publish or sign anyone in until they are.`);
+            require("fs").writeFileSync(process.env.RUNNER_TEMP + "/secrets.json", JSON.stringify(out));
+          '
+          npx wrangler secret bulk "$RUNNER_TEMP/secrets.json"
+          rm -f "$RUNNER_TEMP/secrets.json"
+
+      - name: Point the screens at the Worker
+        # shared/sync.json is how every screen (and Journey and the printer)
+        # finds the Worker. Written once, when the address first appears or
+        # changes, then the site is redeployed so the screens see it.
+        if: steps.ready.outputs.ready == 'true'
+        env:
+          URL: ${{ steps.deploy.outputs.url }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          printf '{\n  "url": "%s"\n}\n' "$URL" > shared/sync.json
+          if [ -n "$(git status --porcelain shared/sync.json)" ]; then
+            git config user.name 'sync-bot'
+            git config user.email 'github-actions[bot]@users.noreply.github.com'
+            git add shared/sync.json
+            git commit -m 'chore: point the screens at the sync Worker'
+            git push
+            gh workflow run deploy.yml --ref main
+          else
+            echo "shared/sync.json already points at $URL."
+          fi

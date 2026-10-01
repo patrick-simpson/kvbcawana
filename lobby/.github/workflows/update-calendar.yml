@@ -1,0 +1,59 @@
+name: Update calendar feed
+
+# Nightly: scrape the church calendar page into public/calendar-feed.json
+# so the display reads club nights same-origin (the calendar site sends
+# no CORS headers, so the browser can't fetch it directly). The script
+# only rewrites the file when the events change (or weekly, as a
+# heartbeat for the app's staleness check), so most nights commit nothing.
+
+on:
+  schedule:
+    - cron: '17 8 * * *' # ~4:17 AM Eastern, off-peak minute
+  workflow_dispatch:
+
+permissions:
+  contents: write # commit the refreshed feed
+  actions: write  # dispatch deploy.yml (GITHUB_TOKEN pushes don't self-trigger it)
+
+concurrency:
+  group: update-calendar
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Fetch and parse the calendar
+        # Exits 1 (failing the run, which emails the repo owner) if the
+        # page stops parsing — the last good committed feed keeps serving.
+        run: node scripts/fetch-calendar.mjs
+
+      - name: Commit and redeploy if the feed changed
+        # Pushes made with the default GITHUB_TOKEN deliberately do NOT
+        # trigger `on: push` workflows, so the deploy is dispatched
+        # explicitly. It still runs the lint+test gate before going live.
+        run: |
+          if [ -n "$(git status --porcelain public/calendar-feed.json)" ]; then
+            git config user.name 'calendar-bot'
+            git config user.email 'github-actions[bot]@users.noreply.github.com'
+            git add public/calendar-feed.json
+            git commit -m 'chore: refresh calendar feed'
+            git push
+            gh workflow run deploy.yml --ref main
+          else
+            echo 'Feed unchanged — nothing to deploy.'
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}

@@ -1,0 +1,126 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v4
+
+      - name: Force Pages source to "GitHub Actions"
+        # `actions/configure-pages@v5` + `enablement: true` only creates
+        # Pages if it doesn't exist — it won't flip an already-enabled
+        # site from "Deploy from a branch" to "GitHub Actions". This
+        # step calls the Pages REST API directly to switch build_type,
+        # so a novice who enabled Pages the wrong way never sees the
+        # source files served as-is.
+        uses: actions/github-script@v7
+        continue-on-error: true
+        with:
+          script: |
+            try {
+              await github.rest.repos.updateInformationAboutPagesSite({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                build_type: 'workflow',
+              });
+              core.info('Pages build_type set to "workflow".');
+            } catch (err) {
+              if (err.status === 404) {
+                core.info('Pages not enabled yet — configure-pages will create it.');
+              } else {
+                core.warning(`Could not update Pages build_type: ${err.message}`);
+              }
+            }
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check contract-vectors drift
+        # Warns (never fails) on network trouble so an outage can't block
+        # a club-night redeploy; fails only on a real byte mismatch.
+        run: node scripts/check-contract-drift.mjs
+
+      - name: Lint
+        # Gate the deploy: a push that fails lint, types, tests, or the
+        # e2e smoke suite never reaches the live signage site.
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test (with coverage gate)
+        run: npm run test:coverage
+
+      - name: Build
+        # Vite is configured with `base: './'` so assets use relative
+        # paths and the bundle works under any URL. The two repository
+        # VARIABLES below (Settings → Secrets and variables → Actions →
+        # Variables) bake the Pusher subscribe key + cluster into the site
+        # so a new screen connects with nothing typed; unset, the build is
+        # blank exactly as before. The key is public by design (it ships in
+        # every display's bundle), which is why it is a variable, not a
+        # secret. See README → "Option C — repository variables".
+        env:
+          VITE_PUSHER_APP_KEY: ${{ vars.PUSHER_APP_KEY }}
+          VITE_PUSHER_CLUSTER: ${{ vars.PUSHER_CLUSTER }}
+        run: npm run build
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: E2E smoke tests
+        # Functional only — the visual-regression project runs in ci.yml,
+        # where a 1-px drift can't block a club-night redeploy.
+        run: npm run e2e
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+        with:
+          # Auto-enable Pages with "GitHub Actions" as the source the
+          # first time this workflow runs, so a novice fork doesn't have
+          # to flip a setting in the UI.
+          enablement: true
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

@@ -1,0 +1,599 @@
+/* ── Promo: BARF Night, the slime cut (BarfEpicPromo.jsx) ─────────────
+   A blockbuster trailer that lands on the slime poster. The end card is
+   laid out as absolutely placed rows (each centred on a known % of the
+   height) so the choreography can move a row from mid-screen to its
+   place by a known distance. Sizes are all min(vw, vh), so 1920x1080,
+   1366x768 and 1024x600 keep the same proportions.
+
+   Stage layers, lowest first: night (1), edge drips + stains (2),
+   goo wall (3), falling drop (3), poster rows (6), flood (7), wave (8),
+   spray (8), cold-open card + macro drop (9), big splat (9), flash (10). */
+
+.promo-slide--barf-epic {
+  background-color: #3a0f63;
+  background-image: radial-gradient(ellipse 72% 64% at 50% 44%, #5b1f8f 0%, rgba(91, 31, 143, 0) 66%);
+  --promo-epic-kid-h: clamp(44px, min(6.6vw, 11.5vh), 170px);
+  --promo-epic-friend-fs: clamp(1.1rem, min(3.3vw, 5.5vh), 4.6rem);
+}
+
+.promo-epic-stage {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+}
+
+/* The cold open's darkness. */
+.promo-epic-night {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: radial-gradient(ellipse 70% 60% at 50% 40%, #1f0838 0%, #0c0216 100%);
+}
+
+/* ── Rows of the finished poster ── */
+.promo-epic-row {
+  position: absolute;
+  z-index: 6;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 0.32em;
+  text-align: center;
+  translate: 0 -50%;
+  pointer-events: none;
+}
+.promo-epic-row--top { top: 15.6%; z-index: 8; }
+.promo-epic-row--hero { top: 33.6%; align-items: flex-end; }
+.promo-epic-row--ever { top: 49.8%; }
+.promo-epic-row--date { top: 77.4%; }
+.promo-epic-row--shares { top: 83.7%; }
+.promo-epic-row--closer { top: 88.6%; }
+
+.promo-epic-slam {
+  position: relative;
+  display: inline-block;
+}
+
+/* The chromatic split: tinted copies laid exactly over the glyph. */
+.promo-epic-ghost {
+  position: absolute;
+  inset: 0;
+  display: block;
+  text-shadow: none;
+  mix-blend-mode: screen;
+  pointer-events: none;
+  white-space: nowrap;
+}
+.promo-epic-ghost--pink { color: #ff4fd8; }
+.promo-epic-ghost--cyan { color: #3ff2ff; }
+
+.promo-epic-small {
+  font-family: var(--font-poster);
+  font-weight: 400;
+  font-size: clamp(1.7rem, min(5.4vw, 8.8vh), 7rem);
+  line-height: 0.92;
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+  color: #ffffff;
+  --po-w: 0.03em;
+  --po-c: #3b1a63;
+  --po-s: rgba(26, 6, 46, 0.55);
+  --po-drop: 0.07em;
+}
+.promo-epic-biggest { color: #c7f26a; }
+
+/* BARF, the hero. */
+.promo-epic-hero-wobble {
+  display: block;
+  transform-origin: 50% 100%;
+}
+.promo-epic-hero {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  line-height: 0.78;
+}
+.promo-epic-hero-letter,
+.promo-epic-sweep {
+  font-family: var(--font-poster);
+  font-weight: 400;
+  font-size: clamp(3.8rem, min(18.5vw, 30vh), 24rem);
+  line-height: 0.78;
+  letter-spacing: 0;
+  font-kerning: none;
+  text-transform: uppercase;
+}
+.promo-epic-hero-letter {
+  color: #c7f26a;
+  --po-w: 0.026em;
+  --po-c: #3b1a63;
+  --po-s: rgba(26, 6, 46, 0.6);
+  --po-drop: 0.055em;
+}
+/* Centred under the letter with `translate`: framer-motion owns the
+   transform for the drip's growth. */
+.promo-epic-hero-letter .promo-epic-drip {
+  top: 96%;
+  translate: -50% 0;
+}
+/* The light sweep: the same four letters again, painted only with a
+   moving highlight band (clipped to the glyphs). */
+.promo-epic-sweep {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  color: transparent;
+  background-image: linear-gradient(105deg, rgba(255, 255, 255, 0) 38%, rgba(255, 255, 255, 0.85) 50%, rgba(255, 255, 255, 0) 62%);
+  background-size: 50% 100%;
+  background-repeat: no-repeat;
+  -webkit-background-clip: text;
+  background-clip: text;
+  pointer-events: none;
+}
+
+.promo-epic-ever { color: #ffffff; }
+.promo-epic-shock {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: clamp(60px, min(9vw, 16vh), 240px);
+  height: clamp(60px, min(9vw, 16vh), 240px);
+  margin: calc(clamp(60px, min(9vw, 16vh), 240px) / -2) 0 0 calc(clamp(60px, min(9vw, 16vh), 240px) / -2);
+  border: clamp(3px, 0.6vh, 8px) solid #c7f26a;
+  border-radius: 999px;
+}
+
+/* A drip: the slot owns position and growth, the body the sag. */
+.promo-epic-drip {
+  position: absolute;
+  top: 100%;
+  display: block;
+  transform-origin: 50% 0%;
+  pointer-events: none;
+}
+.promo-epic-drip-body {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 0 0 999px 999px;
+  transform-origin: 50% 0%;
+}
+
+/* ── The goo wall ── */
+.promo-epic-curtain {
+  position: absolute;
+  z-index: 3;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 8.6vh;
+  pointer-events: none;
+}
+.promo-epic-curtain-wall {
+  position: absolute;
+  inset: 0;
+  transform-origin: 50% 0%;
+}
+.promo-epic-curtain-wall > svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  filter: drop-shadow(0 0.8vh 1.6vh rgba(26, 6, 46, 0.45));
+}
+.promo-epic-curtain .promo-epic-drip { top: 76%; }
+
+/* Edge drips crawling down forever; they end off-frame. */
+.promo-epic-edges {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  overflow: hidden;
+  pointer-events: none;
+}
+.promo-epic-edge-drip {
+  position: absolute;
+  top: 0;
+  background: #7ed321;
+  border-radius: 999px 999px 60% 60%;
+  opacity: 0.75;
+}
+.promo-epic-edge-drip--left { left: 1.2%; }
+.promo-epic-edge-drip--right { right: 1.2%; }
+
+/* ── Splats on the glass (kept out of the type's column) ── */
+.promo-epic-splat {
+  position: absolute;
+  z-index: 2;
+  overflow: visible;
+  pointer-events: none;
+  filter: drop-shadow(0 1vh 2vh rgba(26, 6, 46, 0.4));
+}
+.promo-epic-splat--a { left: 3%; top: 19%; width: 20vmin; height: 20vmin; }
+.promo-epic-splat--b { right: 4%; top: 16%; width: 22vmin; height: 22vmin; }
+.promo-epic-splat--c { left: 5%; top: 55%; width: 17vmin; height: 17vmin; }
+.promo-epic-splat--d { right: 5%; top: 52%; width: 18vmin; height: 18vmin; }
+.promo-epic-splat--e { left: 14%; top: 38%; width: 11vmin; height: 11vmin; }
+.promo-epic-splat--glass {
+  z-index: 10;
+  left: 50%;
+  top: 46%;
+  width: 78vmin;
+  height: 78vmin;
+  margin: -39vmin 0 0 -39vmin;
+}
+
+/* ── The drop that falls into the puddle ── */
+.promo-epic-faller-slot {
+  position: absolute;
+  z-index: 3;
+  left: 50%;
+  top: 8%;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+.promo-epic-faller {
+  position: absolute;
+  left: -1.3vmin;
+  top: 0;
+  width: 2.6vmin;
+  height: 3.4vmin;
+  background: #7ed321;
+  border-radius: 50% 50% 50% 50% / 38% 38% 62% 62%;
+  transform-origin: 50% 0%;
+  box-shadow: inset -0.4vmin -0.5vmin 0 rgba(47, 102, 10, 0.5), inset 0.5vmin 0.4vmin 0 rgba(199, 242, 106, 0.8);
+}
+
+/* ── The puddle, the kids and the friend line ── */
+.promo-epic-lower {
+  position: absolute;
+  z-index: 6;
+  left: 0;
+  right: 0;
+  top: 64.6%;
+  height: 0;
+  pointer-events: none;
+}
+.promo-epic-puddle {
+  position: absolute;
+  left: 50%;
+  top: -0.9vh;
+  width: calc(var(--promo-epic-friend-fs) * 12.6);
+  height: calc(var(--promo-epic-friend-fs) * 1.9);
+  margin-left: calc(var(--promo-epic-friend-fs) * -6.3);
+  transform-origin: 50% 30%;
+}
+.promo-epic-puddle > svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  filter: drop-shadow(0 0.8vh 1.4vh rgba(26, 6, 46, 0.45));
+}
+/* BRING A REAL FRIEND, clipped to the puddle so it rises out of it. */
+.promo-epic-riser {
+  position: absolute;
+  left: 4%;
+  right: 4%;
+  top: 14%;
+  bottom: 10%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.promo-epic-friend {
+  display: block;
+  font-family: var(--font-poster);
+  font-weight: 400;
+  font-size: var(--promo-epic-friend-fs);
+  line-height: 1;
+  letter-spacing: 0.015em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: #3b1a63;
+  text-shadow: 0 0.05em 0 rgba(199, 242, 106, 0.9);
+}
+
+.promo-epic-crown {
+  position: absolute;
+  left: 50%;
+  bottom: 0.4vh;
+  width: calc(var(--promo-epic-kid-h) * 1.5);
+  height: calc(var(--promo-epic-kid-h) * 0.75);
+  margin-left: calc(var(--promo-epic-kid-h) * -0.75);
+  transform-origin: 50% 100%;
+  overflow: visible;
+}
+.promo-epic-ripple {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  width: calc(var(--promo-epic-kid-h) * 1.6);
+  height: calc(var(--promo-epic-kid-h) * 0.34);
+  margin: calc(var(--promo-epic-kid-h) * -0.17) 0 0 calc(var(--promo-epic-kid-h) * -0.8);
+  border: clamp(2px, 0.45vh, 6px) solid #c7f26a;
+  border-radius: 50%;
+}
+
+/* The kids stand on the puddle's surface; the clip is the surface, so
+   they rise out of the goo. */
+.promo-epic-kids {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1.3vh;
+  height: calc(var(--promo-epic-kid-h) * 1.45);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  overflow: hidden;
+  /* The two silhouettes overlap by the offset of their raised hands, so
+     the hands meet rather than pass. */
+  gap: calc(var(--promo-epic-kid-h) * -0.244);
+}
+.promo-epic-kid { position: relative; display: block; }
+.promo-epic-kid-bounce { display: block; transform-origin: 50% 100%; }
+.promo-epic-kid-art {
+  display: block;
+  height: var(--promo-epic-kid-h);
+  width: auto;
+  filter: drop-shadow(0 0 0.45vh rgba(199, 242, 106, 0.95));
+}
+.promo-epic-kid-art--flip { transform: scaleX(-1); }
+
+.promo-epic-pop-slot {
+  position: absolute;
+  left: 50%;
+  bottom: calc(var(--promo-epic-kid-h) * 0.865);
+  width: 0;
+  height: 0;
+}
+.promo-epic-pop {
+  position: absolute;
+  left: calc(var(--promo-epic-kid-h) * -0.25);
+  top: calc(var(--promo-epic-kid-h) * -0.25);
+  width: calc(var(--promo-epic-kid-h) * 0.5);
+  height: calc(var(--promo-epic-kid-h) * 0.5);
+  border: calc(var(--promo-epic-kid-h) * 0.06) solid #ffffff;
+  border-radius: 999px;
+}
+.promo-epic-ray-slot {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+}
+.promo-epic-ray {
+  position: absolute;
+  left: 0;
+  top: calc(var(--promo-epic-kid-h) * -0.025);
+  width: calc(var(--promo-epic-kid-h) * 0.26);
+  height: calc(var(--promo-epic-kid-h) * 0.05);
+  border-radius: 999px;
+  background: #ffffff;
+  transform-origin: 0% 50%;
+}
+.promo-epic-burst {
+  position: absolute;
+  left: 0;
+  top: 0;
+  border-radius: 999px;
+  background: #c7f26a;
+}
+
+/* ── Date, reward, closer ── */
+.promo-slide--barf-epic .promo-epic-date {
+  color: #ffffff;
+  white-space: nowrap;
+  font-size: clamp(1.4rem, min(3.8vw, 6.4vh), 5.6rem);
+  --po-w: 0.026em;
+  --po-c: #3b1a63;
+  --po-s: rgba(26, 6, 46, 0.5);
+  --po-drop: 0.06em;
+}
+.promo-slide--barf-epic .promo-epic-date--long {
+  font-size: clamp(1.2rem, min(3.4vw, 5.6vh), 4.6rem);
+}
+.promo-epic-driprow {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 88%;
+  height: 0;
+  pointer-events: none;
+}
+.promo-epic-flare {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 90vw;
+  height: clamp(2px, 0.35vh, 5px);
+  margin: 0 0 0 -45vw;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(199, 242, 106, 0) 0%, rgba(199, 242, 106, 0.9) 35%, #ffffff 50%, rgba(199, 242, 106, 0.9) 65%, rgba(199, 242, 106, 0) 100%);
+  box-shadow: 0 0 2vh rgba(199, 242, 106, 0.7);
+}
+.promo-epic-flare--date { top: 46%; }
+
+.promo-epic-shares-clip {
+  position: relative;
+  display: inline-block;
+  overflow: hidden;
+  padding: 0.05em 0.2em;
+}
+.promo-epic-shares {
+  display: inline-block;
+  font-family: var(--promo-font-condensed);
+  font-weight: 600;
+  font-size: clamp(0.95rem, min(2.1vw, 3.5vh), 2.5rem);
+  line-height: 1.2;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: #7ed321;
+  text-shadow: 0 0.06em 0 rgba(26, 6, 46, 0.55);
+}
+.promo-epic-shares-bar {
+  position: absolute;
+  inset: 0;
+  background: #c7f26a;
+  transform-origin: 0% 50%;
+}
+
+.promo-slide--barf-epic .promo-detail-slot {
+  min-height: 1.18em;
+  font-size: clamp(0.95rem, min(2.1vw, 3.5vh), 2.5rem);
+}
+.promo-slide--barf-epic .promo-detail { color: #ffffff; }
+
+/* ── Trailer layers ── */
+.promo-epic-flood {
+  position: absolute;
+  z-index: 7;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 104vh;
+  background:
+    radial-gradient(ellipse 60% 50% at 38% 40%, rgba(199, 242, 106, 0.55) 0%, rgba(199, 242, 106, 0) 70%),
+    #7ed321;
+  pointer-events: none;
+}
+.promo-epic-bubble {
+  position: absolute;
+  border-radius: 999px;
+  border: clamp(2px, 0.35vh, 5px) solid rgba(199, 242, 106, 0.95);
+  background: radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.7) 0 18%, rgba(199, 242, 106, 0.15) 20%);
+}
+.promo-epic-flood-edge {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -7.8vh;
+  width: 100%;
+  height: 8vh;
+  display: block;
+}
+
+.promo-epic-wave {
+  position: absolute;
+  z-index: 9;
+  top: -26vh;
+  left: -250vw;
+  width: 250vw;
+  height: 132vh;
+  pointer-events: none;
+}
+.promo-epic-wave > svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.promo-epic-spray {
+  position: absolute;
+  inset: 0;
+  z-index: 9;
+  pointer-events: none;
+}
+.promo-epic-spray-drop {
+  position: absolute;
+  border-radius: 999px;
+  background: #c7f26a;
+}
+
+.promo-epic-card {
+  position: absolute;
+  z-index: 10;
+  left: 0;
+  right: 0;
+  top: 58%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.4vh;
+  translate: 0 -50%;
+  pointer-events: none;
+}
+.promo-epic-card .promo-epic-flare { top: 0; margin-top: -1.2vh; }
+.promo-epic-card-title {
+  display: block;
+  padding-left: 0.34em;
+  font-family: var(--promo-font-condensed);
+  font-weight: 600;
+  font-size: clamp(1.4rem, min(3.4vw, 6vh), 4.4rem);
+  line-height: 1;
+  white-space: nowrap;
+  color: #ffffff;
+  text-shadow: 0 0 2.4vh rgba(199, 242, 106, 0.55);
+}
+.promo-epic-card-sub {
+  display: block;
+  font-family: var(--promo-font-condensed);
+  font-weight: 400;
+  font-size: clamp(0.9rem, min(1.7vw, 3vh), 2.2rem);
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: #c7f26a;
+}
+
+.promo-epic-macro-slot {
+  position: absolute;
+  z-index: 10;
+  left: 50%;
+  top: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+.promo-epic-strand {
+  position: absolute;
+  left: -0.5vmin;
+  top: 0;
+  width: 1vmin;
+  height: 16vh;
+  border-radius: 0 0 999px 999px;
+  background: linear-gradient(90deg, #4f9a12, #7ed321 40%, #c7f26a 60%, #7ed321);
+  transform-origin: 50% 0%;
+}
+.promo-epic-macro {
+  position: absolute;
+  left: -11vmin;
+  top: 13vh;
+  width: 22vmin;
+  height: 28.6vmin;
+  transform-origin: 50% 20%;
+}
+.promo-epic-macro > svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.promo-epic-flash {
+  position: absolute;
+  inset: 0;
+  z-index: 11;
+  background: #ffffff;
+  pointer-events: none;
+}
+
+/* The chip and the wordmark sit ON the goo wall, so both are inverted
+   against it: a lime chip on lime is no chip at all. */
+.promo-slide--barf-epic .promo-chip-slot { z-index: 5; top: 2.2%; }
+.promo-slide--barf-epic .promo-chip {
+  background: #3b1a63;
+  color: #c7f26a;
+  box-shadow: 0 0 0 0.14em #c7f26a, 0 10px 28px rgba(26, 6, 46, 0.45);
+}
+.promo-slide--barf-epic .promo-wordmark-slot { z-index: 5; top: 1.2%; }
+.promo-slide--barf-epic .promo-wordmark { filter: drop-shadow(0 0.25vh 0.5vh rgba(26, 6, 46, 0.55)); }

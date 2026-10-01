@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<!--
+  Art board for the custom Trek wordmark. Official Trek logo art isn't in
+  the 2026-27 catalog (its section falls outside the pages we have), so
+  this draws a white-knockout sibling of the real club wordmarks: chunky
+  Baloo 2 caps with a per-letter bounce, a rounded mountain-ridge motif
+  and a zigzag trail (the display's doodle language), and the small
+  "Awana Clubs" superscript the real marks carry.
+
+  Rendered to src/assets/clubs/trek.png by render-club-wordmarks.mjs.
+  Everything is pure white; the banner's club-color band provides the
+  contrast, exactly like the extracted catalog logos.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<style>
+  @font-face {
+    font-family: 'Baloo 2';
+    src: url('../../node_modules/@fontsource-variable/baloo-2/files/baloo-2-latin-wght-normal.woff2') format('woff2');
+    font-weight: 400 800;
+  }
+  html, body { margin: 0; width: 620px; height: 300px; background: transparent; overflow: hidden; }
+  .board { position: relative; width: 620px; height: 300px; color: #fff; }
+
+  .word {
+    position: absolute;
+    left: 50%;
+    bottom: 8px;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: baseline;
+    font-family: 'Baloo 2';
+    font-weight: 800;
+    font-size: 168px;
+    line-height: 1;
+    letter-spacing: 0.01em;
+  }
+  /* Hand-placed sticker bounce, like the catalog's playful logotypes. */
+  .word span { display: inline-block; }
+  .word span:nth-child(1) { transform: rotate(-3.5deg) translateY(-6px); }
+  .word span:nth-child(2) { transform: rotate(2deg) translateY(3px); }
+  .word span:nth-child(3) { transform: rotate(-2deg) translateY(-3px); }
+  .word span:nth-child(4) { transform: rotate(3deg) translateY(2px); }
+
+  .motif { position: absolute; top: 6px; left: 50%; transform: translateX(-50%); }
+  .awana {
+    position: absolute;
+    top: 22px;
+    right: 26px;
+    font-family: 'Baloo 2';
+    font-weight: 600;
+    font-size: 21px;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+  }
+</style>
+</head>
+<body>
+<div class="board">
+  <!-- Rounded mountain ridge with a snow notch + trail zigzag. -->
+  <svg class="motif" width="330" height="104" viewBox="0 0 330 104" fill="none"
+       stroke="#fff" stroke-width="13" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M12 92 L74 26 L118 66 L170 12 L232 78" />
+    <path d="M148 35 L170 12 L192 35" stroke-width="9" />
+    <path d="M252 92 L272 72 L292 88 L312 66" stroke-width="9" />
+    <circle cx="325" cy="52" r="5" fill="#fff" stroke="none" />
+  </svg>
+  <span class="awana">Awana Clubs</span>
+  <div class="word"><span>T</span><span>R</span><span>E</span><span>K</span></div>
+</div>
+</body>
+</html>

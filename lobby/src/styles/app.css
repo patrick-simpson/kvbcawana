@@ -1,0 +1,4075 @@
+/* ────────────────────────────────────────────────────────────
+   Awana Check-in Display — design system lifted from the
+   Awana Clubs 2026–27 catalog: chunky rounded display type,
+   sparkle doodles, wavy organic shapes, warm orange gradients,
+   and color-coded clubs.
+   ──────────────────────────────────────────────────────────── */
+
+/* The shared brand kit's tokens (--brand-*): club colors, house colors,
+   the three voices and the motion table. See shared/brand/README.md. */
+@import '../../shared/brand/tokens.css';
+
+/* The flagship welcome slide (src/components/FlagshipSlide.jsx). */
+@import './flagship.css';
+
+/* The fall promo showreels, one stylesheet per poster (the shared poster
+   rules, .promo-slide and friends, stay below in this file). Same font
+   border as everywhere else: src/lib/promoFonts.test.js reads these too. */
+@import './promos/contest.css';
+@import './promos/friend.css';
+@import './promos/barf-epic.css';
+@import './promos/parents.css';
+
+/* The shout: Paytone One, from the kit's own files (owner's decision
+   2026-09-29: it replaced Galindo, which "looks too much like SpongeBob").
+   Its license reserves the name "Paytone One", so this is the FULL,
+   unmodified font (shared/brand/README.md, "Reserved Font Names and the
+   OFL"): no @fontsource subset, which would be a Modified Version under that
+   name. The
+   WOFF2 is the TTF's own tables, losslessly compressed; the TTF is only the
+   fallback for a browser that refuses the WOFF2. One file covers every
+   letter a name here has needed (Latin-1, Latin Extended-A, Ș Ț, Vietnamese),
+   so there is no unicode-range split.
+
+   The ascent/descent overrides set where the caps sit in a line box, never
+   how they are drawn. Paytone's own metrics (ascent 1.113em, descent .283em)
+   seat its caps about 0.17em lower in any line box than the face every rule
+   and the approved mockup were drawn with, so a chip's value sagged in its
+   block and a name sank on its wave. These keep the caps' centre where it
+   was, relative to the box (and to SVG's central baseline, which the chips
+   use), and keep the content box's total height (1.396em) as the font has
+   it: 96% + 43.6%. The weight range claims every weight so an old
+   `font-weight: 800` picks this face as-is and can never trigger a
+   synthesized bold (it is a single, heavy weight). */
+@font-face {
+  font-family: 'Paytone One';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  ascent-override: 96%;
+  descent-override: 43.6%;
+  line-gap-override: 0%;
+  src: url('../../shared/brand/fonts/paytone-one-full-400-normal.woff2') format('woff2'),
+       url('../../shared/brand/fonts/PaytoneOne-Regular.ttf') format('truetype');
+}
+/* The label voice: Londrina Solid, from the kit's own files, for the same
+   reason as the shout above: its license reserves the name "Londrina Solid",
+   so this is the FULL, unmodified font in a WOFF2 of its untouched tables
+   (README, "Reserved Font Names and the OFL"), never the @fontsource latin
+   subset this page used to import (a Modified Version under that name).
+   The 400 cut only: it is already bold, and declaring the 900 file would
+   let any `font-weight: 700+` rule reach for the much fatter Black. The
+   `font-synthesis-weight: none` on :root keeps such a rule from smearing a
+   fake bold over it instead. The projector declares the same face in
+   src/presentation/index.css (its kit.test.js pins the two together). */
+@font-face {
+  font-family: 'Londrina Solid';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400;
+  src: url('../../shared/brand/fonts/londrina-solid-full-400-normal.woff2') format('woff2'),
+       url('../../shared/brand/fonts/LondrinaSolid-Regular.ttf') format('truetype');
+}
+/* The shout at the pre-rebrand footprint, for a rule still written against
+   --font-display: one sized for Baloo 2 ExtraBold, which Paytone One sets
+   about 9% wider than (the median over names, headlines and figures; 19% on
+   a short mixed-case name like Emma) with 11.5% taller caps. This alias
+   draws the same files at 88%, which lands at Baloo's median width less 4%,
+   its cap height less 2%, and about 5% over on the widest names: the
+   envelope the old 82% Galindo alias kept. It is transitional, and nearly
+   done: every stage that rebuilt a surface on the kit moved it onto
+   --font-shout (true-size Paytone One) and sized it for Paytone One (the
+   slide headlines, the check-in name, the sticker, the toasts and the
+   doors-open flourish, the ticker, the pickup board). The one rule left on
+   it is .countdown .time (CountdownTimer.jsx, which no screen renders). */
+@font-face {
+  font-family: 'Shout Fit';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  size-adjust: 88%;
+  ascent-override: 96%;
+  descent-override: 43.6%;
+  line-gap-override: 0%;
+  src: url('../../shared/brand/fonts/paytone-one-full-400-normal.woff2') format('woff2'),
+       url('../../shared/brand/fonts/PaytoneOne-Regular.ttf') format('truetype');
+}
+
+:root {
+  /* Catalog palette */
+  --awana-orange: #f7a41c;
+  --awana-orange-deep: #f26b21;
+  --awana-red: #e14b4b;
+  --awana-blue: #3054a8;
+  --awana-sky: #b9d5ec;
+  --awana-cream: #fff6e3;
+  --awana-gold: #ffb81c;       /* first-timer gold, CTA buttons */
+  --awana-gold-pale: #ffe6a3;  /* warm gradient tops, sparkle accents */
+  --awana-yellow: #ffd257;     /* tally count, star art */
+  --awana-coral: #ef5350;      /* birthday band top */
+  --awana-raspberry: #a04ba8;  /* birthday band bottom */
+  --ink: #33424f;             /* the charcoal of the catalog's AGES chips */
+  --ink-soft: #5b6b78;
+
+  /* Signage chrome (over arbitrary slides, dark glass stays legible) */
+  --glass-bg: rgba(24, 30, 44, 0.62);
+  --glass-border: rgba(255, 255, 255, 0.18);
+  --text-on-glass: #ffffff;
+  --text-on-glass-muted: rgba(255, 255, 255, 0.75);
+  --status-ok: #4caf50;
+  --status-idle: #9e9e9e;
+
+  /* Catalog "sticker" chrome — the AGES/GRADES tab treatment applied to
+     every fixed widget (see .sticker-chip). */
+  --sticker-bg: rgba(28, 34, 48, 0.72);
+  --sticker-edge: rgba(255, 246, 227, 0.92);
+  --sticker-edge-halo: rgba(255, 246, 227, 0.3);
+  --sticker-radius: 18px;
+
+  --radius-lg: 32px;
+  --radius-md: 16px;
+  --radius-sm: 10px;
+  --shadow-soft: 0 10px 40px rgba(20, 26, 40, 0.35);
+  --shadow-deep: 0 30px 90px rgba(20, 26, 40, 0.45);
+
+  /* The three brand voices (shared/brand/README.md). Paytone One shouts:
+     names, headlines, big numbers (the free match for the catalog's
+     RugFish; @font-face above, from the kit's own files). --font-shout is
+     Paytone One at true size, for everything built from the kit
+     (src/components/brand/ and every surface a stage has rebuilt: all of
+     the lobby's shouts); --font-display is the same face at the old Baloo
+     footprint for a rule not rebuilt yet (the 'Shout Fit' @font-face
+     above; only .countdown .time is left on it). Paytone draws
+     every Latin letter a name has needed, Ș, Ț and Vietnamese included;
+     Baloo 2 stays behind it for Devanagari, so a Hindi or Marathi name still
+     shouts in a chunky face (and the lobby fit's STACKED rule relies on it).
+     A script neither draws (Cyrillic, Greek, Hebrew, CJK) falls to the
+     system face. */
+  --font-shout: 'Paytone One', 'Baloo 2 Variable', 'Arial Rounded MT Bold', 'Segoe UI', system-ui, sans-serif;
+  --font-display: 'Shout Fit', 'Baloo 2 Variable', 'Arial Rounded MT Bold', 'Segoe UI', system-ui, sans-serif;
+  /* Figtree is read: body copy, settings, notices (for Gibson). */
+  --font-body: 'Figtree Variable', 'Figtree', 'Segoe UI', system-ui, sans-serif;
+  /* Londrina Solid labels: kickers, tabs, chips' small line, buttons
+     (for Motel California). The token keeps its old name so every label
+     rule picks the new voice up without a rename. */
+  --font-condensed: 'Londrina Solid', 'Arial Narrow', 'Segoe UI', system-ui, sans-serif;
+  /* The catalog has no hand-script voice of its own, so the old script
+     accents now speak in the label voice. */
+  --font-hand: var(--font-condensed);
+  /* The fall promo posters stay EXACTLY as printed, so they keep the
+     faces they were drawn in through their own tokens: no rule outside
+     .promo-* may use these, and no .promo-* rule may use the brand
+     tokens above (src/lib/promoFonts.test.js pins both). */
+  --promo-font-display: 'Baloo 2 Variable', 'Baloo 2', 'Segoe UI', system-ui, sans-serif;
+  --promo-font-condensed: 'Oswald Variable', 'Oswald', 'Arial Narrow', 'Segoe UI', system-ui, sans-serif;
+  --promo-font-body: 'Nunito Variable', 'Nunito', 'Segoe UI', system-ui, sans-serif;
+  /* The poster voice: the single-weight chunky face the fall event
+     promo slides set their hero words and dates in, so a poster reads
+     as a poster and not as another catalog page. Bundled via
+     @fontsource/lilita-one in src/main.jsx. */
+  --font-poster: 'Lilita One', 'Baloo 2 Variable', 'Baloo 2', 'Segoe UI', system-ui, sans-serif;
+
+  /* TV title-safe inset for all fixed chrome — older panels overscan. */
+  --safe-inset: max(24px, 2.5vmin);
+
+  color-scheme: light;
+  font-family: var(--font-body);
+  /* Paytone One and Londrina ship one weight each: never let the browser
+     smear a fake bold over them when an old rule asks for 800. */
+  font-synthesis-weight: none;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body, #root {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #0d1220;
+  color: var(--text-on-glass);
+}
+
+/* Full-bleed stage that fills the display. dvh tracks the real visible
+   height on phones, where the browser chrome eats into 100vh. */
+.stage {
+  /* The lobby's unit, 1% of a 16:9 stage's width, for every overlay on it
+     (the scene and the check-in moment set the same). */
+  --u: min(1vw, 1.7778vh);
+  /* The top band's top edge (src/lib/overlayFit.js OVERLAY): under the
+     demo / rehearsal tab while one hangs from the top edge. */
+  --band-top: calc(1.4 * var(--u));
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+}
+.stage.has-flags {
+  --band-top: calc(3.1 * var(--u));
+}
+
+/* Overlay mode (?overlay=1): the page becomes a transparent layer for
+   OBS / ProPresenter browser sources — banners and confetti only.
+   ?chroma=RRGGBB sets an inline solid key color on .stage instead. */
+.overlay-mode,
+.overlay-mode body,
+.overlay-mode #root,
+.stage.overlay {
+  background: transparent;
+}
+
+/* Background iframe sits behind everything. */
+.background-iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  z-index: 0;
+}
+
+/* Full-screen looping video background (#25). object-fit: cover — a
+   phone-shot vertical video or an off-ratio export fills the screen
+   instead of letterboxing black bars behind the banners. */
+.background-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: 0;
+  background: #000;
+}
+
+/* ── The lobby (CatalogScene.jsx, SlideCopy.jsx) ────────────
+   The approved mockup's studio behind every typed slide, calendar slide and
+   the idle placeholder: a flat field with tone-on-tone clouds and a sparse
+   scatter of white kit doodles; the copy on a 16:9 box centred on the
+   screen; the orange corner tab and the house waves over it all. Sized in u,
+   1% of a 16:9 stage's width, like the check-in moment; the slide editor's
+   1600x900 thumbnail frame pins --lobby-u to 16px so a thumbnail is the TV
+   at 0.15 scale. Flat colour and hard offsets only: no blur, no gradient. */
+.background-placeholder {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: var(--brand-sky);
+  z-index: 0;
+}
+.catalog-scene {
+  --u: var(--lobby-u, min(1vw, 1.7778vh));
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  isolation: isolate;
+  background: var(--brand-sky);
+}
+.lobby-fields {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+/* Two fields only ever coexist during a crossfade: the incoming one fades
+   up OVER the outgoing one, which holds until it is covered. */
+.lobby-field {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  z-index: 1;
+  background: var(--field);
+}
+.lobby-field.is-leaving {
+  z-index: 0;
+}
+.lobby-cloud {
+  position: absolute;
+  color: var(--cloud);
+}
+.lobby-cloud svg,
+.lobby-doodle svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.lobby-doodle {
+  position: absolute;
+  color: var(--doodle);
+}
+.lobby-doodle svg {
+  overflow: visible;
+}
+.lobby-content {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+}
+/* The copy's box: 100u x 56.25u, centred, so the layout is the mockup's on
+   any screen (a 4:3 projector gains a band above and below it). */
+.lobby-stage {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: calc(100 * var(--u));
+  height: calc(56.25 * var(--u));
+}
+/* A video or a poster: full-bleed over the field and the copy, under the
+   chrome (which has stepped aside for it, except under the flagship
+   welcome slide, which wears the scene's own tab and waves). */
+.lobby-media {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+.lobby-chrome {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+}
+/* The house waves: sunflower behind (19% of the screen, overhanging 4% each
+   side for its slow roll), Awana orange in front (15%). Both rise toward the
+   right, the sunflower a sliver above the orange all the way along, as the
+   approved renders show them. */
+.lobby-waves {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 19%;
+}
+.lobby-waves .lobby-wave--sun {
+  left: -4%;
+  right: -4%;
+  height: 100%;
+}
+.lobby-waves .lobby-wave--house {
+  height: 78.95%;
+}
+/* A skirt of the same orange under the house wave, riding with it: when the
+   wave swells up on a hand-off its foot never lifts off the bottom edge and
+   bares a strip of sunflower. */
+.lobby-waves .lobby-wave--house::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 99%;
+  height: 40%;
+  background: var(--brand-orange);
+}
+.lobby-tab {
+  width: calc(24 * var(--u));
+  height: calc(15.5 * var(--u));
+}
+.lobby-tab .brand-tab__content {
+  padding: calc(2.2 * var(--u)) 0 0 calc(2.6 * var(--u));
+}
+.lobby-tab__mark {
+  display: block;
+  width: calc(13 * var(--u));
+  height: auto;
+}
+
+/* The copy frame. Sizes, gaps and line breaks come from the fit in
+   src/lib/lobbyFrame.js (set inline, so the fit and the page cannot drift);
+   these rules only carry the voice. */
+.lobby-copy {
+  position: absolute;
+  left: 0;
+  right: 0;
+  text-align: center;
+  pointer-events: none;
+}
+.lobby-kicker {
+  margin: 0;
+  /* Its soft squish (SlideCopy.jsx) sits the line down onto its foot; the
+     text is centred in a full-width box, so scaleX stays about its middle. */
+  transform-origin: 50% 100%;
+  font-family: var(--font-condensed);
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--lobby-kicker);
+}
+.lobby-headline {
+  margin: 0;
+  white-space: nowrap;
+  color: var(--lobby-face);
+}
+/* The shout: true-size Paytone One (the fit measured it at true size),
+   caps, and the mockup's hard offset shadow (0.058em, SHOUT.shadow). The
+   padding (set inline from the fit, which counts it) is the shadow's own
+   room below, and a tall mark's room above and below its rows. */
+.lobby-headline--shout {
+  font-family: var(--font-shout);
+  font-weight: 400;
+  text-transform: uppercase;
+  text-shadow: 0.058em 0.058em 0 var(--lobby-shadow);
+}
+/* The read layout, for text too long to shout: the kit's reading face in
+   the case the operator typed, in the theme's reading ink (a paragraph of
+   white on the studio sky would lean on a shadow to be read at all). */
+.lobby-headline--read {
+  font-family: var(--font-body);
+  font-weight: 800;
+  color: var(--lobby-sub);
+}
+/* Every headline token is its own box, in both layouts, so a refit keeps
+   the same elements (SlideCopy.jsx); the rows are split by <br>. The bidi
+   algorithm sees each box as one neutral object, so a run of words against
+   the headline's direction sits in a <bdi dir> (.lobby-run) of its own, and
+   the punctuation at the run's edges in a box of its own outside it
+   (.lobby-punct), which lands with its word. */
+.lobby-word,
+.lobby-punct {
+  display: inline-block;
+  /* A shouted word squashes onto its baseline as it lands (the soft squish,
+     src/lib/squish.js), never about its middle, where it would look to
+     float: the headline sets --squish-baseline from its line height. */
+  transform-origin: 50% var(--squish-baseline, 50%);
+}
+/* A run keeps both edge boxes in every fit, so a refit never mounts one that
+   would land again; where this fit leaves nothing outside the run, the box is
+   empty and inline, which adds nothing to its row and no row of its own (an
+   empty inline-block after a word too wide for any line would). */
+.lobby-punct:empty {
+  display: inline;
+}
+/* Only a word wider than any line (a pasted URL) is ever cut: it takes rows
+   of its own, inside the read layout's width (set inline from the fit), and
+   each row is one of the pieces the fit cut it into, split by <br>. It never
+   wraps on its own: the browser would break it where it likes (after every
+   hyphen) and need rows the fit never counted. */
+.lobby-word--wide {
+  display: block;
+  margin-inline: auto;
+}
+.lobby-sub {
+  margin: 0;
+  font-family: var(--font-body);
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--lobby-sub);
+}
+.lobby-sub__line {
+  display: block;
+  white-space: nowrap;
+}
+.lobby-chip-row {
+  display: flex;
+  justify-content: center;
+  line-height: 0;
+}
+.lobby-chip {
+  display: inline-block;
+  line-height: 0;
+  transform-origin: 30% 60%;
+}
+
+/* Ambient motion, all transform and all CSS (compositor-driven, no per-frame
+   JS): the clouds drift, the doodles float and twinkle, the sunflower wave
+   rolls. Every loop starts and ends at rest, so the .zero-animation-mode
+   blanket rule (animation: none) freezes the finished design. Each field's
+   loops are offset to "started at page load" (--lobby-t, set by
+   CatalogScene), so two fields crossfading drift in step. */
+.lobby-ambient {
+  animation-duration: var(--dur, 8s);
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+  animation-delay: calc(var(--lobby-t, 0s) + var(--d, 0s));
+}
+.lobby-ambient--drift-a { --dur: 26s; animation-name: lobby-drift-a; }
+.lobby-ambient--drift-b { --dur: 32s; animation-name: lobby-drift-b; }
+.lobby-ambient--float { --dur: 7s; animation-name: lobby-float; }
+.lobby-ambient--twinkle { --dur: 3.6s; animation-name: lobby-twinkle; }
+.lobby-ambient--roll { --dur: 18s; animation-name: lobby-roll; }
+@keyframes lobby-drift-a {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  50% { transform: translate3d(calc(1.2 * var(--u)), calc(0.9 * var(--u)), 0) rotate(1.2deg); }
+}
+@keyframes lobby-drift-b {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  50% { transform: translate3d(calc(-1.4 * var(--u)), calc(-0.8 * var(--u)), 0) rotate(-1.4deg); }
+}
+@keyframes lobby-float {
+  0%, 100% { transform: translate3d(0, 0, 0) rotate(0deg); }
+  50% { transform: translate3d(0, calc(-0.6 * var(--u)), 0) rotate(6deg); }
+}
+@keyframes lobby-twinkle {
+  0%, 100% { transform: scale(1) rotate(0deg); }
+  50% { transform: scale(0.72) rotate(18deg); }
+}
+@keyframes lobby-roll {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  50% { transform: translate3d(calc(-2 * var(--u)), 0, 0); }
+}
+.lobby--still .lobby-ambient {
+  animation: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .lobby-ambient { animation: none; }
+}
+/* ── Typed slides: full-screen slideshow ──────────────────
+   Typed and calendar slides (ManualSlideshow.jsx) on the one persistent
+   lobby scene above, layered behind the check-in moment and confetti. */
+.manual-slideshow {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  z-index: 0;
+}
+/* The stinger (ManualSlideshow.jsx): a full-screen house wave that sweeps
+   up over the lobby whenever a transition involves a slide that holds
+   check-ins, so a poster arrives as its own moment. Two waves (sunflower
+   behind, Awana orange in front) with solid fills under their crests so
+   nothing shows through mid-sweep. */
+.slide-stinger {
+  position: absolute;
+  left: -3%;
+  right: -3%;
+  top: 0;
+  bottom: 0;
+  z-index: 6;
+  pointer-events: none;
+}
+.slide-stinger__wave--back {
+  height: 118%;
+}
+.slide-stinger__wave--front {
+  height: 108%;
+}
+/* The solid bodies under each wave. They start below each crest (so no flat
+   edge ever pokes above a wave) and run 22% past the box's bottom, which is
+   what keeps the bottom of the screen covered while the stinger holds 14%
+   high (STINGER_Y in ManualSlideshow.jsx). */
+.slide-stinger__fill {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -22%;
+}
+.slide-stinger__fill--back {
+  height: 112%;
+  background: var(--brand-sun);
+}
+.slide-stinger__fill--front {
+  height: 104%;
+  background: var(--brand-orange);
+}
+/* ── Typed slides: video slides ──────────────────────────── */
+.manual-slide-video-wrap {
+  position: absolute;
+  inset: 0;
+  background: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.manual-slide-video {
+  width: 100%;
+  height: 100%;
+  /* Letterbox rather than crop — announcement videos keep their titles. */
+  object-fit: contain;
+}
+.manual-slide-video-missing {
+  color: rgba(255, 255, 255, 0.35);
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+/* ── Typed slides: editor panel ──────────────────────────── */
+/* Same pinned header / scrolling body / pinned actions column as Settings
+   (.panel--tabbed), and the same kit card: each slide is a white card on
+   the pale field, named by a corner tab carrying its index line. */
+.panel--tabbed.panel--slides {
+  width: min(62rem, 94vw);
+}
+.slide-card {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  column-gap: 1.35rem;
+  align-items: start;
+  background: #ffffff;
+  border: 1.5px solid var(--panel-card-line);
+  border-radius: 16px;
+  padding: 0 1.35rem 1.1rem;
+  margin-bottom: 1.1rem;
+  overflow: hidden;
+}
+.slide-card > .slide-card-tab {
+  grid-column: 1 / -1;
+  justify-self: start;
+  position: relative;
+  max-width: calc(100% + 1.35rem);
+  margin: 0 0 1rem -1.35rem;
+}
+.slide-card-tab .brand-tab__content {
+  padding: 0.7rem 3.1rem 1.25rem 1.35rem;
+}
+.slide-card-preview { grid-column: 1; }
+.slide-card-fields { grid-column: 2; }
+.slide-card-index {
+  font-family: var(--font-condensed);
+  font-size: 1.1rem;
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #ffffff;
+  white-space: nowrap;
+}
+/* The focus target after a move: on the blue tab the ring is white. Scoped
+   under .panel so it outranks the panels' Awana-blue `.panel :focus-visible`
+   ring below, which a KEYBOARD move matches (a blue ring on the blue tab
+   cannot be seen); a mouse move only ever matched this rule. The 2px offset
+   keeps the ring on the blob, clear of the tab's tapering tail. */
+.panel .slide-card-index:focus { outline: 3px solid #ffffff; outline-offset: 2px; border-radius: 4px; }
+/* Show-window badges (#345) on the editor's index line. The row itself is
+   never hidden when a window closes — the operator has to be able to find
+   and fix the slide that stopped showing. Small stickers on the tab. */
+.slide-window-badge {
+  display: inline-block;
+  margin-left: 0.55rem;
+  padding: 0.22rem 0.55rem 0.18rem;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  letter-spacing: 0.07em;
+  vertical-align: 1px;
+}
+.slide-window-badge.is-expired {
+  background: #ffffff;
+  color: var(--brand-sparks-deep);
+}
+.slide-window-badge.is-scheduled {
+  background: var(--brand-sun);
+  color: var(--brand-ink);
+}
+.slide-card-fields .slide-counter { display: block; text-align: right; margin-top: 0.2rem; }
+.slide-empty {
+  position: relative;
+  isolation: isolate;
+  margin: 0.25rem 0 1.25rem;
+  padding: 1.6rem 1.5rem;
+  border: 2px solid var(--brand-blue);
+  border-radius: 16px;
+  text-align: center;
+  font-size: 1.02rem;
+  color: var(--panel-ink);
+}
+.slide-empty::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: var(--brand-cloud);
+  translate: 6px 5px;
+}
+.slide-card-preview {
+  position: relative;
+  width: 240px;
+  height: 135px;
+  flex-shrink: 0;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  pointer-events: none;
+  /* Flat, like the kit: a keyline and a hard offset, no blur. */
+  box-shadow: 0 0 0 1.5px var(--panel-card-line), 4px 4px 0 var(--brand-sky);
+}
+/* A fixed 1600×900 stage scaled down, so the thumbnail shows the same
+   composition the TV will. */
+.slide-card-frame {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 1600px;
+  height: 900px;
+  transform: scale(0.15);
+  transform-origin: top left;
+  /* The lobby's u for a 1600px-wide stage, so the thumbnail is the TV. */
+  --lobby-u: 16px;
+}
+/* Video slide thumbnail: fills the 1600×900 frame like a real slide. */
+.slide-card-video-thumb {
+  position: absolute;
+  inset: 0;
+  background: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.slide-card-video-thumb video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.slide-card-video-glyph {
+  font-size: 220px;
+  color: rgba(255, 255, 255, 0.35);
+}
+/* Rendered inside the 0.15-scaled frame, so sizes are ~6.7× the
+   intended on-screen size. */
+.slide-badge-missing {
+  position: absolute;
+  bottom: 70px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 24px 70px;
+  border-radius: 999px;
+  background: rgba(245, 158, 11, 0.92);
+  color: #442c05;
+  font-size: 88px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.slide-card-video-meta {
+  font-size: 0.98rem;
+  color: var(--panel-muted);
+  margin-bottom: 0.75rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.slide-card-video-meta strong {
+  color: var(--panel-ink);
+}
+.slide-card-fields {
+  min-width: 0;
+}
+.slide-card-fields .field {
+  margin-bottom: 0.85rem;
+}
+.slide-card-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 1.1rem;
+}
+.slide-card-row .field {
+  flex: 1 1 190px;
+}
+/* "Hold check-ins while this slide is up" (stage 4): its own keyline row,
+   warm while it is on, so a held slide reads as held at a glance. */
+.slide-card-hold {
+  display: flex;
+  gap: 0.8rem;
+  align-items: flex-start;
+  margin: 0.2rem 0 0.95rem;
+  padding: 0.8rem 0.95rem;
+  border: 2px solid var(--panel-card-line);
+  border-radius: 14px;
+  background: var(--panel-field);
+  cursor: pointer;
+}
+.slide-card-hold:has(input:checked) {
+  border-color: var(--brand-sun);
+  background: var(--brand-cream);
+}
+.slide-card-hold input {
+  flex: none;
+}
+.slide-card-hold .hint {
+  display: block;
+  margin-top: 0.15rem;
+  font-weight: 400;
+}
+.slide-card-controls {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.panel .slide-card-controls button {
+  min-height: 38px;
+  padding: 0.4rem 0.9rem 0.35rem;
+  font-size: 0.98rem;
+}
+.slide-editor-error {
+  padding: 0.7rem 0.95rem;
+  border-radius: 12px;
+  background: #ffffff;
+  border: 2px solid var(--brand-sparks-deep);
+  border-left-width: 6px;
+  color: var(--brand-sparks-deep);
+  font-size: 0.95rem;
+  font-weight: 700;
+  margin-bottom: 0.75rem;
+}
+/* Background source: the choices as kit chips; the chosen one is blue. */
+.radio-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+.panel .radio-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-height: 44px;
+  padding: 0.45rem 1.05rem 0.45rem 0.75rem;
+  border: 2px solid var(--panel-keyline);
+  border-radius: 999px;
+  background: #ffffff;
+  font-weight: 700;
+  cursor: pointer;
+}
+.panel .radio-option:has(input:checked) {
+  border-color: var(--brand-blue);
+  background: var(--brand-cloud);
+  color: var(--brand-blue-deep);
+  box-shadow: 0 3px 0 var(--brand-blue);
+}
+.panel .radio-option input[type='radio'] {
+  appearance: none;
+  display: inline-grid;
+  place-content: center;
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  border: 2px solid var(--panel-keyline);
+  border-radius: 50%;
+  background: #ffffff;
+  cursor: pointer;
+}
+.panel .radio-option input[type='radio']:checked {
+  border-color: var(--brand-blue);
+  background: radial-gradient(circle, var(--brand-blue) 0 42%, #ffffff 48%);
+}
+
+/* Transparent overlay layer: the check-in moment lives here. */
+.overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  pointer-events: none;
+  display: grid;
+  align-items: end;
+  justify-items: stretch;
+  overflow: hidden; /* the band slides in from below the viewport */
+}
+.overlay > * {
+  pointer-events: auto;
+}
+
+/* ── The check-in moment (src/components/CheckInMoment.jsx) ──────────
+   The catalog's club opener page, played live. Everything is sized in u,
+   1% of a 16:9 stage's width, so the moment keeps its proportions on any
+   screen: a 4:3 projector letterboxes the layout's height, an ultrawide its
+   width. Flat colour and hard offsets only, no blur or gradient: the one
+   depth cue is the name's offset shadow in the club's deep shade. */
+.checkin {
+  --u: min(1vw, 1.7778vh);
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  /* 52% of a 16:9 stage; on a squarer screen at least 46% of its height,
+     so the lobby's own bottom wave never peeks over the club's. */
+  height: max(calc(29.25 * var(--u)), 46vh);
+  pointer-events: none;
+  color: #fff;
+}
+.checkin__layer {
+  position: absolute;
+  inset: 0;
+  /* Its own stacking context, so the z-index that puts a newer club's wave
+     over the one it replaces never lifts a wave above the name. */
+  isolation: isolate;
+}
+.checkin__layer--back {
+  left: -3%;
+  right: -3%;
+}
+.checkin__wave {
+  position: absolute;
+  inset: 0;
+}
+.checkin__mark-slot {
+  position: absolute;
+  left: calc(3.6 * var(--u));
+  bottom: calc(3.2 * var(--u));
+  width: calc(17 * var(--u));
+  height: calc(6.4 * var(--u));
+  display: grid;
+  /* One cell exactly the slot's size: an auto row would take the art's own
+     height, and the near-square T&T mark then overflowed 17u x 6.4u to
+     ~16u tall and ran off the bottom of the screen. */
+  grid-template: minmax(0, 1fr) / minmax(0, 1fr);
+}
+.checkin__mark {
+  grid-area: 1 / 1;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: left bottom;
+}
+.checkin__copy {
+  position: absolute;
+  left: calc(24.6 * var(--u));
+  right: calc(3 * var(--u));
+  bottom: calc(3.1 * var(--u));
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+/* Each cell stacks the outgoing and incoming versions of its line in one
+   grid area, so a flip crosses over in place instead of reflowing. */
+.checkin__cell {
+  position: relative;
+  display: grid;
+  width: 100%;
+}
+.checkin__cell > * {
+  grid-area: 1 / 1;
+  align-self: end;
+}
+/* The outgoing copy on a flip leaves the flow the moment it starts to go,
+   so only the incoming child sizes the cell; the cells above then glide to
+   their new place (layout="position") instead of snapping twice. */
+.checkin__cell > .is-leaving {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+}
+.checkin__kicker {
+  /* The column is left-aligned: the kicker's squish sits on its foot at its
+     start, so its first letter never moves sideways. */
+  transform-origin: 0% 100%;
+  font-family: var(--font-condensed);
+  font-size: calc(2.5 * var(--u));
+  line-height: 1;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--club-tint);
+  margin-bottom: calc(0.9 * var(--u));
+}
+.checkin__name {
+  margin: 0;
+  font-family: var(--font-shout);
+  font-weight: 400;
+  /* The line height and any room for a tall mark are set inline from
+     nameBox() in src/lib/checkInMoment.js; this is the plain name's. */
+  line-height: 0.95;
+  white-space: nowrap;
+  color: #fff;
+  text-shadow: calc(0.45 * var(--u)) calc(0.45 * var(--u)) 0 var(--club-deep);
+}
+.checkin__name--wraps {
+  white-space: normal;
+}
+.checkin__word {
+  display: inline-block;
+  white-space: nowrap;
+}
+.checkin__letter {
+  display: inline-block;
+  /* The soft squish sits each letter down onto its baseline (the name sets
+     --squish-baseline from its own line height, see CheckInMoment.jsx). */
+  transform-origin: 50% var(--squish-baseline, 50%);
+}
+.checkin__line {
+  margin: calc(0.8 * var(--u)) 0 0;
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: calc(2.1 * var(--u));
+  line-height: 1.15;
+  color: #fff;
+  opacity: 0.95;
+}
+.checkin__sticker-slot {
+  position: absolute;
+  right: calc(6 * var(--u));
+  bottom: calc(21.5 * var(--u));
+  width: calc(13 * var(--u));
+  aspect-ratio: 1;
+  display: grid;
+}
+.checkin .checkin__sticker {
+  grid-area: 1 / 1;
+  position: relative;
+  width: 100%;
+}
+.checkin__sticker .brand-sticker__text {
+  /* The mockup's 2.05u and 3.4u in Galindo, times 1.057 to hold its caps. */
+  font-size: calc(2.17 * var(--u));
+  text-transform: uppercase;
+}
+/* Sized by the sticker's own moment, not the root's: an outgoing HAPPY
+   BIRTHDAY! keeps its size while a first-timer's NEW! flips in. */
+.checkin__sticker--first .brand-sticker__text {
+  font-size: calc(3.6 * var(--u));
+}
+.checkin__doodles {
+  /* The 16:9 box, pinned to the bottom like the name, so the doodles keep
+     their place beside it when the moment grows taller on a squarer screen. */
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: calc(29.25 * var(--u));
+}
+
+/* One hero at a time: while a child's name is up, the slide behind it
+   steps back instead of competing with it, and comes forward again when
+   the wave drops. Plain CSS transitions, so ?lowPower=1's blanket rule
+   turns them into an instant switch. The posters are left alone: they are
+   printed art, and stage 4 holds check-ins while one is up. */
+.background-placeholder .placeholder-copy,
+.manual-slideshow .manual-slide-copy {
+  transform-origin: 50% 40%;
+  transition:
+    opacity var(--brand-dur-settle) var(--brand-ease-settle),
+    transform var(--brand-dur-settle) var(--brand-ease-settle);
+}
+/* Scoped to the live background: the slide editor's thumbnails reuse
+   .manual-slide-copy and must keep showing what the TV will show. */
+.stage.checkin-active .background-placeholder .placeholder-copy,
+.stage.checkin-active .manual-slideshow .manual-slide-copy {
+  opacity: 0.28;
+  transform: scale(0.97);
+}
+/* The same step back, all the way, for the two things that take the middle
+   of the room over (rebrand stage 4b-2): a critical notice, and the pickup
+   board while it is the room's focus (src/lib/overlayFit.js lobbyRoom).
+   Their opaque plates sit on the copy's own box, so a faded headline would
+   only show as a ghost round their edges; it steps aside entirely and comes
+   back when they go. A poster or a video steps aside with it: a promo's
+   headline is as much the slide's copy as a typed one's. (Their wrapper's
+   own opacity is framer-motion's, inline, hence the !important; the field
+   and the chrome stay.) */
+.stage.notice-takeover .background-placeholder .placeholder-copy,
+.stage.notice-takeover .manual-slideshow .manual-slide-copy,
+.stage.board-up .background-placeholder .placeholder-copy,
+.stage.board-up .manual-slideshow .manual-slide-copy {
+  opacity: 0;
+  transform: scale(0.97);
+}
+.stage.notice-takeover .manual-slideshow .lobby-media,
+.stage.board-up .manual-slideshow .lobby-media {
+  opacity: 0 !important;
+  transition: opacity var(--brand-dur-settle) var(--brand-ease-settle);
+}
+/* The idle gear would sit on the club's mark; it still comes back the
+   moment an operator moves the mouse. */
+.stage.checkin-active .settings-gear.idle {
+  opacity: 0;
+}
+
+/* Ambient particle layer (#26): snow / rain / sparkles behind the widgets.
+   Pure CSS animation over a deterministic particle set — no JS per frame.
+   z-index 1: above the background scene, below everything that talks. Flat,
+   like everything in the kit: no glow, no gradient. Snow and rain keep their
+   own shapes; the sparkle field throws the kit's doodles (ParticleLayer.jsx),
+   a few of them in the season's pair on a skinned night. */
+.particle-layer {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 1;
+}
+.particle { position: absolute; display: block; }
+.particle-snow .particle {
+  top: -3vh;
+  border-radius: 50%;
+  background: #fff;
+  animation: particle-snow-fall linear infinite;
+}
+@keyframes particle-snow-fall {
+  0%   { transform: translate3d(0, -4vh, 0); }
+  25%  { transform: translate3d(2.2vw, 24vh, 0); }
+  50%  { transform: translate3d(-1.6vw, 52vh, 0); }
+  75%  { transform: translate3d(1.8vw, 78vh, 0); }
+  100% { transform: translate3d(-0.8vw, 106vh, 0); }
+}
+.particle-rain .particle {
+  top: -12vh;
+  width: max(2px, calc(0.12 * var(--u)));
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.8);
+  animation: particle-rain-fall linear infinite;
+}
+@keyframes particle-rain-fall {
+  0%   { transform: translate3d(0, -12vh, 0) rotate(8deg); }
+  100% { transform: translate3d(-6vw, 112vh, 0) rotate(8deg); }
+}
+.particle-sparkle .particle {
+  width: 1em;
+  height: 1em;
+  color: #fff;
+  opacity: 0;
+  animation: particle-sparkle-twinkle ease-in-out infinite;
+}
+.particle-sparkle .particle svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.particle-sparkle .particle--dot,
+.particle-sparkle .particle--ring {
+  width: 0.55em;
+  height: 0.55em;
+}
+.stage[data-skin] .particle-sparkle .particle:nth-child(3n + 1) { color: var(--skin-a); }
+.stage[data-skin] .particle-sparkle .particle:nth-child(5n + 2) { color: var(--skin-b); }
+@keyframes particle-sparkle-twinkle {
+  0%, 100% { opacity: 0; transform: scale(0.4) rotate(0deg); }
+  50%      { opacity: 0.9; transform: scale(1) rotate(45deg); }
+}
+
+/* ── Sticker chips (StickerChip.jsx) ───────────────────────
+   A kit chip for content longer than one value: the stepped plate
+   (StepPlate, see "Brand kit primitives" below) with a Londrina label on
+   its pill. Its tilt and pop ride framer-motion, never a CSS transform. */
+.sticker-chip {
+  position: relative;
+  transform-origin: 85% 30%;
+}
+.sticker-chip-spark {
+  position: absolute;
+  top: calc(-0.5 * var(--u));
+  right: calc(-0.4 * var(--u));
+  width: calc(1.3 * var(--u));
+  color: #fff;
+  pointer-events: none;
+}
+.sticker-chip-spark svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+/* ── Countdown timer ───────────────────────────────────── */
+/* Big sibling of the corner sticker chips: same die-cut treatment,
+   with its "Club starts in" line as the overlapping label tab. */
+.countdown {
+  position: absolute;
+  right: var(--safe-inset);
+  bottom: var(--safe-inset);
+  padding: 1.05rem 1.9rem 1rem;
+  min-width: 240px;
+  background: var(--sticker-bg);
+  border: 3px solid var(--sticker-edge);
+  border-radius: calc(var(--sticker-radius) + 6px);
+  outline: 2px solid var(--sticker-edge-halo);
+  outline-offset: 3px;
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+  text-align: center;
+  box-shadow: var(--shadow-soft), 0 1px 0 rgba(255, 255, 255, 0.1) inset;
+}
+.countdown .label {
+  position: absolute;
+  top: -0.85em;
+  left: 16px;
+  padding: 0.14em 0.65em 0.18em;
+  font-family: var(--font-condensed);
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.13em;
+  white-space: nowrap;
+  color: #fff;
+  background: linear-gradient(135deg, var(--awana-orange) 0%, var(--awana-orange-deep) 100%);
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(20, 26, 40, 0.35);
+  transform: rotate(-2deg);
+}
+.countdown .time {
+  font-family: var(--font-display);
+  font-size: 2.9rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+  line-height: 1.1;
+  background: linear-gradient(180deg, var(--awana-gold-pale) 10%, var(--awana-orange) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.countdown .tomorrow-label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--text-on-glass-muted);
+  margin-top: 0.2rem;
+}
+
+/* ── Settings gear button ──────────────────────────────────
+   A round kit chip: the chip charcoal printed a little out of register
+   behind a white keyline ring, the gear in white. */
+.settings-gear {
+  --gear-line: max(2px, calc(0.14 * var(--u)));
+  position: absolute;
+  left: var(--safe-inset);
+  bottom: var(--safe-inset);
+  width: max(46px, calc(2.9 * var(--u)));
+  height: max(46px, calc(2.9 * var(--u)));
+  border-radius: 50%;
+  background: transparent;
+  border: var(--gear-line) solid #fff;
+  color: #fff;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  /* The idle fade, the hover spin, and the soft squish's spring back from a
+     press (see "The soft squish: operator presses" below for why each
+     timing list is written out literally, fallback first). */
+  transition-property: opacity, transform, scale;
+  transition-duration: var(--brand-dur-exit), var(--brand-dur-quick), var(--squish-release);
+  transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1), cubic-bezier(0.34, 1.56, 0.64, 1), cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1), cubic-bezier(0.34, 1.56, 0.64, 1), linear(0, 0.213, 0.605, 0.93, 1.103, 1.142, 1.106, 1.05, 1.006, 0.984, 0.98, 0.986, 0.994, 1, 1.002, 1.003, 1);
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  padding: 0;
+  z-index: 50;
+}
+.settings-gear::before {
+  content: '';
+  position: absolute;
+  inset: calc(-1 * var(--gear-line));
+  border-radius: 50%;
+  background: var(--brand-chip);
+  transform: translate(calc(0.22 * var(--u)), calc(0.13 * var(--u)));
+  z-index: -1;
+}
+.settings-gear svg {
+  width: 48%;
+  height: 48%;
+}
+.settings-gear:hover { transform: rotate(45deg) scale(1.05); }
+/* Its press: a firmer squish than a pill's (a small round key), on the
+   individual `scale`, which composes with the hover spin and April Fools'
+   transform instead of fighting them; its origin stays where the rotation
+   turns. */
+.settings-gear:active {
+  scale: var(--squish-gear-x) var(--squish-gear-y);
+  transition-duration: var(--brand-dur-exit), var(--brand-dur-quick), var(--squish-press);
+  transition-timing-function: var(--brand-ease-settle), var(--brand-ease-pop), var(--brand-ease-settle);
+}
+/* Faint, not gone: a volunteer at an unconfigured TV must be able to find the way in. */
+.settings-gear.idle { opacity: 0.12; pointer-events: auto; }
+
+/* ── Panels: the operator's kit card ─────────────────────────────────────
+   Settings, the slide editor and the debug panel (and the first-run card,
+   which is a .panel too) speak the printer dashboard's language from the
+   approved mockup: an Awana-blue header band carrying the white Awana Clubs
+   mark and a Londrina title, white cards on a pale field named by the kit's
+   corner tabs, Figtree for everything read, Londrina for tabs and buttons,
+   the hot sticker for the ONE primary action, Awana-blue focus rings, and
+   status readouts on the chip's plate-and-keyline. Flat, like the kit:
+   depth is a hard offset, never a blur. An operator tool on the lobby TV,
+   so it stays calm, dark-on-light and legible at arm's length. */
+.panel-backdrop {
+  position: absolute;
+  inset: 0;
+  /* The chip charcoal (#030404 at 50%): a flat scrim, no blur to pay for. */
+  background: rgba(3, 4, 4, 0.5);
+  display: grid;
+  place-items: center;
+  z-index: 100;
+}
+.panel,
+.debug {
+  --panel-ink: var(--brand-ink);
+  /* 7.5:1 on white; every hint is read, so none of it may go faint. */
+  --panel-muted: #4F5561;
+  /* The dashboard's pale field, the card keyline, and the control keyline
+     (3.6:1 on white, the non-text contrast a field's edge needs). */
+  --panel-field: #F2F6FB;
+  --panel-card-line: #DCE4EF;
+  --panel-keyline: #7A879B;
+  --panel-placeholder: #6B7280;
+  --panel-radius: 22px;
+  --panel-pad: 2rem;
+  font-family: var(--font-body);
+  color: var(--panel-ink);
+}
+.panel {
+  width: min(36.25rem, 92vw);
+  max-height: 88vh;
+  overflow-y: auto;
+  background: #ffffff;
+  border: 0;
+  border-radius: var(--panel-radius);
+  padding: 2.25rem;
+  box-shadow: 0.6rem 0.6rem 0 rgba(3, 4, 4, 0.32);
+  scrollbar-width: thin;
+  scrollbar-color: var(--panel-keyline) transparent;
+}
+.panel::-webkit-scrollbar { width: 8px; }
+.panel::-webkit-scrollbar-thumb {
+  background: var(--panel-keyline);
+  border-radius: 999px;
+}
+.panel h2 {
+  margin: 0 0 1.25rem;
+  font-family: var(--font-condensed);
+  font-size: 2rem;
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--panel-ink);
+}
+/* Section headings: Londrina tracked caps. Inside a card they ride the
+   card's corner tab (.panel-card__tab below). */
+.panel h3.section {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  font-family: var(--font-condensed);
+  font-size: 1.1rem;
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--brand-blue-deep);
+}
+
+/* One short entrance, and a soft squish: the panel rises a little stretched
+   along its travel and springs home on the squish's own spring (the release
+   easing below), so it overshoots into the faintest squash and settles. The
+   zero-animation rule removes it, and the panel then simply is. It animates
+   the individual `translate` and `scale`, never `transform`, so April Fools'
+   rotation (which owns transform) is left alone, and it keeps the default
+   centre origin that rotation turns about. The last frame is the element's
+   own style: the resting design. The timing function is written out
+   literally, fallback first: a linear() behind var() could not fall back. */
+@keyframes panel-enter {
+  from { opacity: 0; translate: 0 0.75rem; scale: 0.97 1.03; }
+}
+.panel--tabbed,
+.debug {
+  animation: panel-enter var(--squish-release) both;
+  animation-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1);
+  animation-timing-function: linear(0, 0.213, 0.605, 0.93, 1.103, 1.142, 1.106, 1.05, 1.006, 0.984, 0.98, 0.986, 0.994, 1, 1.002, 1.003, 1);
+}
+/* The first-run card has no entrance: it must be there, whole, on the very
+   first frame (e2e/setup-card.spec.js), and it only ever leaves in the commit
+   that mounts a name. Its buttons still take the press. */
+
+/* ── Tabbed panels: Settings and the slide editor ────────────────────────
+   A fixed-height column: the header band and the tab rail pinned on top,
+   the cards scrolling on the pale field, the actions always visible at the
+   bottom (crucial when driving a TV from a couch). */
+.panel--tabbed {
+  width: min(60rem, 94vw);
+  height: min(56rem, 92vh);
+  max-height: 92vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 0 0 0.9rem;
+}
+/* The band: mark | title over the session line | the status readout. */
+.panel--tabbed .panel-header {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 1.35rem;
+  row-gap: 0.3rem;
+  padding: 1.05rem var(--panel-pad) 1.1rem;
+  background: var(--brand-blue);
+  color: #ffffff;
+  flex-shrink: 0;
+}
+.panel-mark {
+  display: block;
+  width: 7rem;
+  height: auto;
+  user-select: none;
+}
+.panel--tabbed .panel-header .panel-mark { grid-column: 1; grid-row: 1 / span 2; }
+.panel--tabbed .panel-header h2 {
+  grid-column: 2;
+  grid-row: 1;
+  align-self: end;
+  margin: 0;
+  font-size: 2.15rem;
+  color: #ffffff;
+}
+.panel--tabbed .panel-header .hint.panel-sub {
+  grid-column: 2;
+  grid-row: 2;
+  align-self: start;
+  color: #ffffff;
+  font-size: 0.92rem;
+}
+.panel--tabbed .panel-header .status-line {
+  grid-column: 3;
+  grid-row: 1 / span 2;
+  max-width: 24rem;
+  margin: 0;
+}
+/* Something is wrong (printer failures, a crashed layer, the central config,
+   the wake lock, demo mode): a white note across the band, keyed in the
+   Sparks red, or sunflower for the softer ones. */
+.panel .panel-header .hint.panel-alert {
+  grid-column: 1 / -1;
+  margin-top: 0.45rem;
+  padding: 0.6rem 0.95rem;
+  border-radius: 12px;
+  border-left: 6px solid var(--brand-sparks-deep);
+  background: #ffffff;
+  color: var(--panel-ink);
+  font-size: 0.92rem;
+}
+.panel .panel-header .hint.panel-alert--warn { border-left-color: var(--brand-sun); }
+.panel .panel-header .hint.panel-alert code { color: var(--panel-ink); }
+
+/* The tab rail: Londrina tracked caps; the open tab is the blue chip. */
+.panel-tabs {
+  display: flex;
+  gap: 0.35rem;
+  padding: 0.7rem var(--panel-pad) 0.75rem;
+  background: #ffffff;
+  border-bottom: 2px solid var(--panel-card-line);
+  overflow-x: auto;
+  scrollbar-width: none;
+  flex-shrink: 0;
+}
+.panel-tabs::-webkit-scrollbar { display: none; }
+.panel button.panel-tab {
+  /* Overrides the generic .panel button look: a tab is type, not a key. */
+  appearance: none;
+  min-height: 44px;
+  padding: 0.55rem 1.05rem 0.5rem;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  box-shadow: none;
+  font-size: 1.08rem;
+  letter-spacing: 0.07em;
+  color: var(--panel-muted);
+  white-space: nowrap;
+}
+.panel button.panel-tab:hover { color: var(--panel-ink); background: var(--brand-cloud); }
+/* A tab is type, not a key: a softer squish about its middle, and no sink. */
+.panel button.panel-tab {
+  --squish-x: var(--squish-tab-x);
+  --squish-y: var(--squish-tab-y);
+  --squish-sink: 0 0;
+  transform-origin: 50% 50%;
+}
+.panel button.panel-tab[aria-selected='true'] {
+  color: #ffffff;
+  background: var(--brand-blue);
+  box-shadow: 0 3px 0 var(--brand-blue-deep);
+}
+
+/* The body: cards on the pale field. */
+.panel-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1.35rem var(--panel-pad) 0.6rem;
+  background: var(--panel-field);
+  scrollbar-width: thin;
+  scrollbar-color: var(--panel-keyline) transparent;
+}
+.panel-body::-webkit-scrollbar { width: 8px; }
+.panel-body::-webkit-scrollbar-thumb {
+  background: var(--panel-keyline);
+  border-radius: 999px;
+}
+.panel-body:focus { outline: none; }
+
+/* A card: white on the field, like the dashboard's. A titled one wears the
+   kit's corner tab at its top-left, bleeding off the corner (the card clips
+   it), with the section heading in its fat end. */
+.panel-card {
+  background: #ffffff;
+  border: 1.5px solid var(--panel-card-line);
+  border-radius: 16px;
+  padding: 1.15rem 1.4rem 0.35rem;
+  margin-bottom: 1.1rem;
+  overflow: hidden;
+}
+/* The card's head: its corner tab, and (Settings) the scope tag on the right. */
+.panel-card__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin: -1.15rem 0 1rem -1.4rem;
+}
+.panel-card__head > .panel-card__tab {
+  position: relative;
+  width: max-content;
+  max-width: calc(100% + 1.4rem);
+  min-width: 0;
+}
+/* Every screen / This screen (Settings, contract v6 shared settings). */
+.panel .scope-tag {
+  flex: none;
+  margin-top: 0.9rem;
+  padding: 0.25rem 0.65rem 0.2rem;
+  border-radius: 999px;
+  font-family: var(--font-condensed);
+  font-size: 0.82rem;
+  letter-spacing: 0.06em;
+  line-height: 1.1;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.panel .scope-tag--shared { background: var(--brand-blue); color: #ffffff; }
+.panel .scope-tag--screen { background: var(--brand-cloud); color: var(--panel-ink); box-shadow: inset 0 0 0 1.5px var(--panel-keyline); }
+.panel-card__tab .brand-tab__content {
+  padding: 0.75rem 3.1rem 1.3rem 1.4rem;
+}
+.panel-card__tab h3.section { color: #ffffff; }
+
+/* A readout: the chip's plate and keyline on a light surface. The keyline
+   is the box; the plate is printed a little out of register behind it. */
+.panel .tab-intro,
+.panel .calendar-preview,
+.panel .notice-warn,
+.panel .panel-note {
+  position: relative;
+  isolation: isolate;
+  margin-bottom: 1.2rem;
+  padding: 0.75rem 1.05rem;
+  border: 2px solid var(--brand-blue);
+  border-radius: 14px;
+  background: transparent;
+  color: var(--panel-ink);
+  font-size: 0.95rem;
+}
+.panel .tab-intro::before,
+.panel .calendar-preview::before,
+.panel .notice-warn::before,
+.panel .panel-note::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: var(--brand-cloud);
+  translate: 5px 4px;
+}
+/* A published deck is being ignored: sunflower, not red; nothing is broken. */
+.panel .notice-warn { border-color: var(--brand-orange-deep); }
+.panel .notice-warn::before { background: var(--brand-cream); }
+.panel .calendar-preview {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin: 0.25rem 0 1.2rem;
+  font-weight: 700;
+}
+/* Connection tab summary: three short lines, one fact each. */
+.panel .conn-summary > div + div { margin-top: 0.3rem; }
+.panel .panel-intro { display: block; margin-bottom: 1.1rem; }
+
+/* The status readout in the band: the kit's chip, literally: a white
+   keyline over its plate, printed out of register. */
+.panel .status-line {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 1rem;
+  padding: 0.55rem 1rem;
+  border: 2px solid #ffffff;
+  border-radius: 14px;
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 0.92rem;
+  line-height: 1.3;
+}
+.panel .status-line::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  /* On the blue band the plate is the band's own deep shade, as the
+     mockup's dashboard draws its PRINTER / ONLINE chip. */
+  background: var(--brand-cubbies-deep);
+  translate: 5px 4px;
+}
+.panel .status-line .dot {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--panel-card-line);
+  box-shadow: 0 0 0 2px #ffffff;
+}
+.panel .status-line.connected .dot    { background: var(--brand-tnt); }
+.panel .status-line.connecting .dot   { background: var(--brand-sun); animation: pulse 1.2s ease-in-out infinite; }
+.panel .status-line.disconnected .dot { background: var(--brand-sparks); }
+
+/* ── Fields ─────────────────────────────────────────────────────────── */
+.panel .field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-bottom: 1.2rem;
+}
+.panel label,
+.panel .field-label {
+  font-size: 1.02rem;
+  font-weight: 700;
+  color: var(--panel-ink);
+  letter-spacing: 0;
+}
+.panel .hint {
+  font-size: 0.93rem;
+  color: var(--panel-muted);
+  line-height: 1.45;
+}
+.panel .hint strong { color: var(--panel-ink); }
+.panel .hint.lookup-done { color: var(--brand-tnt-deep); font-weight: 700; }
+.panel .hint.lookup-error,
+.panel .hint.hint--warn { color: var(--brand-sparks-deep); font-weight: 700; }
+.panel code {
+  padding: 1px 6px;
+  border-radius: 6px;
+  border: 1px solid var(--panel-card-line);
+  background: var(--panel-field);
+  color: var(--panel-ink);
+  font-family: ui-monospace, 'Cascadia Mono', 'Menlo', 'Consolas', monospace;
+  font-size: 0.88em;
+}
+.panel input[type='text'],
+.panel input[type='password'],
+.panel input[type='number'],
+.panel input[type='url'],
+.panel input[type='time'],
+.panel input[type='date'],
+.panel textarea,
+.panel select {
+  width: 100%;
+  min-height: 46px;
+  padding: 0.65rem 0.9rem;
+  border-radius: 12px;
+  border: 2px solid var(--panel-keyline);
+  background: #ffffff;
+  color: var(--panel-ink);
+  font: inherit;
+  font-size: 1.02rem;
+}
+.panel input::placeholder,
+.panel textarea::placeholder { color: var(--panel-placeholder); }
+.panel .field > input[type='number'] { max-width: 16rem; }
+.panel textarea {
+  resize: vertical;
+  min-height: 4.5rem;
+  line-height: 1.4;
+}
+.panel select {
+  appearance: none;
+  padding-right: 2.6rem;
+  background: #ffffff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 11'%3E%3Cpath d='M1.7 1.7 9 8.6l7.3-6.9' fill='none' stroke='%23231F20' stroke-width='2.4' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat right 0.95rem center / 0.95rem auto;
+  cursor: pointer;
+}
+.panel input[type='file'] {
+  font: inherit;
+  font-size: 0.95rem;
+  color: var(--panel-muted);
+}
+.panel input[type='file']::file-selector-button {
+  margin-right: 0.8rem;
+  padding: 0.5rem 1rem;
+  border: 2px solid var(--panel-keyline);
+  border-radius: 999px;
+  background: #ffffff;
+  color: var(--panel-ink);
+  font-family: var(--font-condensed);
+  font-size: 1rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+/* Focus: Awana blue, everywhere in the panels (the page-wide orange ring
+   is the lobby's). Fields also take the blue keyline. */
+.panel :focus-visible,
+.debug :focus-visible {
+  outline: 3px solid var(--brand-blue);
+  outline-offset: 2px;
+}
+/* A date field's calendar button is its own tab stop, and while it holds
+   focus the field itself is not :focus (Chrome), only :focus-within. */
+.panel input[type='date']:focus-within,
+.panel input:focus,
+.panel textarea:focus,
+.panel select:focus {
+  border-color: var(--brand-blue);
+  outline: 3px solid var(--brand-blue);
+  outline-offset: 2px;
+}
+
+/* The kit checkbox: a keyline box that fills Awana blue and pops the kit's
+   own check doodle. */
+.panel input[type='checkbox'] {
+  appearance: none;
+  display: inline-grid;
+  place-content: center;
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  margin: 0;
+  border: 2px solid var(--panel-keyline);
+  border-radius: 9px;
+  background: #ffffff;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transition-property: scale;
+  transition-duration: var(--squish-release);
+  transition-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition-timing-function: linear(0, 0.213, 0.605, 0.93, 1.103, 1.142, 1.106, 1.05, 1.006, 0.984, 0.98, 0.986, 0.994, 1, 1.002, 1.003, 1);
+}
+/* Pressed (the box itself, or anywhere on its toggle row, which makes the
+   box :active too) it squishes evenly, like Jelly UI's own checkbox. */
+.panel input[type='checkbox']:not(:disabled):active {
+  scale: var(--squish-box);
+  transition-duration: var(--squish-press);
+  transition-timing-function: var(--brand-ease-settle);
+}
+.panel input[type='checkbox']::before {
+  content: '';
+  width: 19px;
+  height: 19px;
+  background: #ffffff;
+  -webkit-mask: url('../../shared/brand/doodles/check.svg') center / contain no-repeat;
+  mask: url('../../shared/brand/doodles/check.svg') center / contain no-repeat;
+  scale: 0;
+  /* Going out on the exit curve, which never overshoots: any overshoot past
+     0 is a negative scale, a mirrored check. */
+  transition: scale var(--brand-dur-quick) var(--brand-ease-exit);
+}
+.panel input[type='checkbox']:checked {
+  border-color: var(--brand-blue);
+  background: var(--brand-blue);
+}
+/* Coming in on the squish's spring: past full size and back. */
+.panel input[type='checkbox']:checked::before {
+  scale: 1;
+  transition-property: scale;
+  transition-duration: var(--squish-release);
+  transition-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition-timing-function: linear(0, 0.213, 0.605, 0.93, 1.103, 1.142, 1.106, 1.05, 1.006, 0.984, 0.98, 0.986, 0.994, 1, 1.002, 1.003, 1);
+}
+
+/* The toggle row is a real <label>: whole row clickable, checkbox named. */
+.panel .toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.25rem;
+  padding: 0.85rem 0;
+  border-top: 1.5px solid var(--panel-card-line);
+}
+.panel .toggle:first-of-type { border-top: 0; }
+.panel h3.section + .toggle { border-top: 0; }
+/* A card that opens on a toggle (or on a field that does) needs no extra
+   air above it: the card's own padding is the gap. */
+.panel-card > .toggle:first-child,
+.panel-card > .field:first-child > .toggle:first-child { padding-top: 0.1rem; }
+.panel label.toggle {
+  font-size: inherit;
+  font-weight: inherit;
+  letter-spacing: normal;
+  cursor: pointer;
+}
+.panel .toggle-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+}
+.panel .toggle-title { font-size: 1.02rem; font-weight: 700; }
+.panel .toggle-copy .hint { display: block; }
+
+/* The club's own chip, where the panel lists the clubs (club phrases),
+   as the dashboard lists them: Londrina caps on the club colour. */
+.panel .club-chip {
+  display: inline-block;
+  margin-right: 0.15rem;
+  padding: 0.3rem 0.75rem 0.28rem;
+  border-radius: 999px;
+  background: var(--club);
+  color: #ffffff;
+  font-family: var(--font-condensed);
+  font-size: 0.98rem;
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  text-shadow: 1px 1px 0 var(--club-deep);
+  vertical-align: 1px;
+}
+.panel .panel-phrases {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr));
+  column-gap: 1.25rem;
+}
+
+/* Disabled controls must LOOK disabled — the login button a volunteer meets
+   first on a new screen used to render exactly like a live one. */
+.panel button:disabled,
+.panel input:disabled,
+.panel select:disabled,
+.panel textarea:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.panel button:disabled { box-shadow: none; }
+.panel button:disabled:hover { background: #ffffff; }
+.panel button.primary:disabled:hover { background: var(--brand-hot); }
+.panel .lookup-row {
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+}
+.panel .lookup-row input { flex: 1; }
+.panel .lookup-row button { flex-shrink: 0; }
+
+/* ── Buttons: Londrina caps on kit pills with a hard offset shadow ──────
+   The press moves the button, not its shadow: see the soft squish below. */
+.panel .actions {
+  display: flex;
+  gap: 0.65rem;
+  justify-content: flex-end;
+  margin-top: 1.75rem;
+  flex-wrap: wrap;
+}
+.panel button,
+.panel .actions label,
+.panel a.panel-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  min-height: 44px;
+  padding: 0.5rem 1.15rem 0.45rem;
+  border-radius: 999px;
+  border: 2px solid var(--panel-ink);
+  background: #ffffff;
+  color: var(--panel-ink);
+  font-family: var(--font-condensed);
+  font-size: 1.08rem;
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  box-shadow: 0 3px 0 var(--panel-ink);
+  cursor: pointer;
+}
+.panel button:hover,
+.panel .actions label:hover,
+.panel a.panel-button:hover { background: var(--brand-cloud); }
+
+/* ── The soft squish: operator presses ───────────────────────────────────
+   Jelly UI's feel on the kit's own controls (src/lib/squish.js has the one
+   physics; squishCss.test.js pins every number here to it). A press squashes
+   the control onto its ledge in --squish-press and sinks it 2px, as it
+   always sank; on release it springs back through a stretch and a smaller
+   squash to rest, over --squish-release, on the spring written as linear().
+   Transitions, never @keyframes: a transition never fires on mount, so a
+   panel that opens on a focused or checked control never wobbles it (and a
+   transition takes its timing from the state it moves INTO: the press is the
+   quick settle, the release the spring). The individual `scale` and
+   `translate` only, never `transform`, which April Fools owns.
+   The spring is written out literally, after a cubic-bezier fallback (the
+   kit's pop), and never inside var(): a linear() a browser cannot read,
+   behind var(), would leave the property unset instead of falling back.
+   Zero animation and the OS's reduced motion both kill the spring AND the
+   squash (the two blocks further down): there the press is the flat,
+   instant 2px sink it always was. */
+:root {
+  --squish-press: 100ms;
+  --squish-release: 750ms;
+  --squish-press-x: 1.04;
+  --squish-press-y: 0.92;
+  /* Per control: the gear is small and round (firmer), a tab is type and a
+     debug tile is wide (softer), a checkbox squishes evenly. */
+  --squish-gear-x: 1.1;
+  --squish-gear-y: 0.88;
+  --squish-tab-x: 1.03;
+  --squish-tab-y: 0.94;
+  --squish-tile-x: 1.02;
+  --squish-tile-y: 0.94;
+  --squish-box: 0.88;
+}
+.panel button,
+.panel .actions label,
+.panel a.panel-button,
+.panel .radio-option,
+.debug button {
+  --squish-x: var(--squish-press-x);
+  --squish-y: var(--squish-press-y);
+  --squish-sink: 0 2px;
+  /* Squash down onto its ledge. */
+  transform-origin: 50% 100%;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transition-property: scale, translate;
+  transition-duration: var(--squish-release);
+  transition-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition-timing-function: linear(0, 0.213, 0.605, 0.93, 1.103, 1.142, 1.106, 1.05, 1.006, 0.984, 0.98, 0.986, 0.994, 1, 1.002, 1.003, 1);
+}
+/* `:not(:disabled)` so a disabled key stays put; the two kill switches below
+   repeat it, or their `scale: none` would lose on specificity. */
+.panel button:not(:disabled):active,
+.panel .actions label:active,
+.panel a.panel-button:active,
+.panel .radio-option:active,
+.debug button:not(:disabled):active {
+  scale: var(--squish-x) var(--squish-y);
+  translate: var(--squish-sink);
+  transition-duration: var(--squish-press);
+  transition-timing-function: var(--brand-ease-settle);
+}
+/* The hit area never shrinks under a held pointer. Squashed onto its ledge
+   (origin at the foot) the box's top edge drops 4-6px, so a press that began
+   in that top band and was held past the 100 ms squash came up outside the
+   box, and the click went to the ancestor instead of the control. While
+   pressed, an invisible strip stands on the control's top edge and reaches
+   up past where it has gone (12px of its own, 11 drawn): it belongs to the
+   control, so up-in-place is a click on it. It only exists under :active,
+   where `scale` has made the control a containing block for it, so no
+   `position` is set on the control itself (the gear is absolute already).
+   The kill switches below hide it with the squash it compensates for. */
+.panel button:not(:disabled):active::after,
+.panel .actions label:active::after,
+.panel a.panel-button:active::after,
+.panel .radio-option:active::after,
+.debug button:not(:disabled):active::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 100%;
+  height: 12px;
+}
+/* A link that looks like one of the panel's buttons (the sound room app's
+   download and guide): same pill, never underlined. */
+.panel a.panel-button { text-decoration: none; }
+.panel a.panel-button:focus-visible { outline: 3px solid var(--brand-blue); outline-offset: 2px; }
+.panel .panel-links { display: flex; flex-wrap: wrap; gap: 0.65rem; margin: 0.75rem 0; }
+
+/* The quiet ones: tools and in-field actions. */
+.panel button.ghost,
+.panel a.panel-button.ghost {
+  border-color: var(--panel-keyline);
+  box-shadow: 0 3px 0 var(--panel-keyline);
+}
+/* Second rank: outlined in Awana blue (Save slides when Publish leads). */
+.panel button.secondary,
+.panel a.panel-button.secondary {
+  border-color: var(--brand-blue);
+  color: var(--brand-blue-deep);
+  box-shadow: 0 3px 0 var(--brand-blue);
+}
+/* The ONE primary action of a view: the hot sticker. */
+.panel button.primary {
+  border-color: var(--brand-hot);
+  background: var(--brand-hot);
+  color: #ffffff;
+  box-shadow: 0 4px 0 var(--brand-hot-deep);
+}
+.panel button.primary:hover { background: color-mix(in srgb, var(--brand-hot) 88%, var(--brand-hot-deep)); }
+.panel button.danger {
+  border-color: var(--brand-sparks-deep);
+  color: var(--brand-sparks-deep);
+  box-shadow: 0 3px 0 var(--brand-sparks-deep);
+}
+.panel button.danger:hover { background: var(--brand-sparks-tint); }
+.panel button.small {
+  min-height: 36px;
+  padding: 0.35rem 0.85rem 0.3rem;
+  font-size: 0.95rem;
+}
+
+/* The Save control is a <jelly-button> web component, restyled only through
+   its documented custom properties (outer-document rules on the host win
+   over its :host defaults): the hot sticker fill, the label voice, the
+   pill, and an Awana-blue focus ring. Its canvas body takes the kit's hard
+   offset as a zero-blur drop shadow. */
+.panel jelly-button {
+  --jelly-fill: var(--brand-hot);
+  --jelly-label: #ffffff;
+  --jelly-ring: var(--brand-blue);
+  --jelly-font-display: var(--font-condensed);
+  /* rem, like the rest of the panel, so a 1440p/4K root lifts it too. */
+  --jelly-button-height: 3.125rem;
+  --jelly-button-min-width: 8.75rem;
+  --jelly-button-padding-inline: 1.75rem;
+  --jelly-button-font-size: 1.25rem;
+  --jelly-button-radius: 999px;
+  filter: drop-shadow(0 4px 0 var(--brand-hot-deep));
+}
+/* The label's caps and tracking go on the documented inner part, because
+   the inner <button> resets both (the browser's own button style). */
+.panel jelly-button::part(button) {
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+/* The pinned foot of a tabbed panel. */
+.panel--tabbed .actions {
+  margin: 0;
+  padding: 0.95rem var(--panel-pad) 0.25rem;
+  gap: 0.55rem;
+  background: #ffffff;
+  border-top: 2px solid var(--panel-card-line);
+  flex-shrink: 0;
+}
+.panel--tabbed .actions button {
+  padding-inline: 0.95rem;
+  font-size: 1.02rem;
+}
+
+/* Shorter screens (a 720p TV): the chrome gives the cards the room. */
+@media (max-height: 820px) {
+  .panel--tabbed { height: 94vh; max-height: 94vh; padding-bottom: 0.6rem; }
+  .panel--tabbed .panel-header { padding-block: 0.7rem 0.75rem; row-gap: 0.15rem; }
+  .panel--tabbed .panel-header .panel-mark { width: 5.6rem; }
+  .panel--tabbed .panel-header h2 { font-size: 1.8rem; }
+  .panel--tabbed .panel-header .hint.panel-sub { font-size: 0.85rem; line-height: 1.35; }
+  .panel--tabbed .panel-header .status-line { padding: 0.4rem 0.8rem; font-size: 0.85rem; }
+  .panel-tabs { padding-block: 0.45rem 0.5rem; }
+  .panel button.panel-tab { min-height: 40px; padding-block: 0.45rem 0.4rem; }
+  .panel-body { padding-top: 1rem; }
+  .panel--tabbed .actions { padding-top: 0.6rem; gap: 0.45rem; }
+  .panel--tabbed .actions button { min-height: 40px; padding-block: 0.4rem 0.35rem; }
+  .panel--tabbed jelly-button { --jelly-button-height: 2.75rem; }
+  .panel .hint.panel-legal { margin-top: 0.4rem; font-size: 0.72rem; }
+  .panel .panel-header .hint.panel-alert { margin-top: 0.3rem; padding: 0.35rem 0.8rem; font-size: 0.85rem; line-height: 1.35; }
+  .panel .panel-header .panel-alert button.small { min-height: 30px; padding-block: 0.2rem 0.15rem; font-size: 0.88rem; }
+}
+.panel .hint.panel-legal {
+  margin: 0.55rem 0 0;
+  padding: 0 var(--panel-pad);
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+/* ── Debug panel ───────────────────────────────────────────────────────
+   The same kit card, parked top-left over the lobby: the header band with
+   its readouts as keyline chips, the simulators in two columns that scroll
+   under it, and Close pinned at the foot so a 720p screen can get out. */
+.debug {
+  position: absolute;
+  top: 1.5rem;
+  left: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  width: min(48rem, calc(100% - 3rem));
+  max-height: calc(100% - 3rem);
+  overflow: hidden;
+  background: var(--panel-field);
+  border-radius: var(--panel-radius);
+  z-index: 200;
+  box-shadow: 0.6rem 0.6rem 0 rgba(3, 4, 4, 0.32);
+}
+.debug-header {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  column-gap: 1.1rem;
+  padding: 0.95rem 1.35rem 1rem;
+  background: var(--brand-blue);
+  color: #ffffff;
+  flex-shrink: 0;
+}
+.debug-header .panel-mark { width: 5.6rem; grid-row: 1 / span 2; }
+.debug h3 {
+  margin: 0;
+  font-family: var(--font-condensed);
+  font-size: 1.55rem;
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #ffffff;
+}
+.debug-actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr));
+  grid-auto-rows: max-content;
+  align-content: start;
+  min-height: 0;
+  gap: 0.6rem;
+  padding: 1.05rem 1.35rem 1.15rem;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--panel-keyline) transparent;
+}
+.debug button {
+  min-height: 46px;
+  padding: 0.6rem 0.95rem;
+  border-radius: 12px;
+  border: 2px solid var(--panel-keyline);
+  background: #ffffff;
+  color: var(--panel-ink);
+  box-shadow: 0 3px 0 var(--panel-keyline);
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  font-weight: 650;
+  font-size: 0.97rem;
+  line-height: 1.25;
+}
+.debug button:hover { background: var(--brand-cloud); }
+/* The simulator tiles are wide: a softer squish keeps them in their grid gap. */
+.debug .debug-actions button {
+  --squish-x: var(--squish-tile-x);
+  --squish-y: var(--squish-tile-y);
+}
+.debug-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 1.35rem 0.85rem;
+  background: #ffffff;
+  border-top: 2px solid var(--panel-card-line);
+  flex-shrink: 0;
+}
+/* Close is a plain kit button (Londrina caps, ink keyline). */
+.debug .debug-footer button {
+  min-height: 44px;
+  padding: 0.5rem 1.4rem 0.45rem;
+  border-radius: 999px;
+  border-color: var(--panel-ink);
+  box-shadow: 0 3px 0 var(--panel-ink);
+  font-family: var(--font-condensed);
+  font-weight: 400;
+  font-size: 1.08rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-align: center;
+}
+.debug .close-hint {
+  font-size: 0.88rem;
+  color: var(--panel-muted);
+}
+.debug kbd {
+  padding: 1px 6px;
+  border-radius: 5px;
+  border: 1.5px solid var(--panel-keyline);
+  border-bottom-width: 3px;
+  background: #ffffff;
+  color: var(--panel-ink);
+  font-family: inherit;
+  font-size: 0.92em;
+  font-weight: 700;
+}
+
+/* ── Connection status sticker (the SIGNAL chip) ─────────────
+   The kit chip in the corner stack: SIGNAL on the pill, the pipe's state on
+   the block with a flat status dot, the printer's count as a hot pill, and
+   any fault in words on its own sunflower strip. Sized in u with a pixel
+   floor, and capped at 19u wide so its longest wording wraps inside the
+   stack instead of reaching into the top band. */
+.status-dot {
+  --plate-label: max(11px, calc(1.05 * var(--u)));
+  font-family: var(--font-body);
+  color: #fff;
+}
+.status-dot .sticker-chip-body {
+  max-width: calc(19 * var(--u));
+  padding: calc(0.5 * var(--u)) calc(0.9 * var(--u)) calc(0.6 * var(--u)) calc(0.75 * var(--u));
+}
+.status-dot .status-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.2em 0.5em;
+  font-size: max(12px, calc(1.2 * var(--u)));
+  font-weight: 700;
+  line-height: 1.2;
+}
+.status-dot .dot {
+  flex: none;
+  width: 0.62em;
+  height: 0.62em;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.55);
+  box-shadow: 0 0 0 0.12em rgba(255, 255, 255, 0.9);
+}
+.status-dot.connected .dot    { background: var(--brand-tnt); }
+.status-dot.connecting .dot   { background: var(--brand-sun); animation: pulse 1.2s ease-in-out infinite; }
+.status-dot.disconnected .dot { background: var(--brand-hot); }
+.status-dot.off .dot          { background: rgba(255, 255, 255, 0.45); }
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.35; }
+}
+
+/* ── Top-right corner stack: status, then weather / WAITING ───── */
+.corner-stack {
+  position: absolute;
+  top: var(--safe-inset);
+  right: var(--safe-inset);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: calc(0.9 * var(--u));
+  z-index: 36;
+}
+
+/* ── Corner info (CornerChip.jsx): one stepped chip at a time ─────── */
+.corner-bottom {
+  position: absolute;
+  right: calc(2.6 * min(1vw, 1.7778vh));
+  bottom: calc(1.8 * min(1vw, 1.7778vh));
+  z-index: 4;
+  pointer-events: none;
+  display: grid;
+  justify-items: end;
+}
+/* The outgoing and incoming chips cross over in the same spot. */
+.corner-bottom > .corner-chip,
+.corner-top > .corner-chip {
+  grid-area: 1 / 1;
+}
+.corner-top {
+  display: grid;
+  justify-items: end;
+}
+.corner-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  transform-origin: 85% 70%;
+}
+.corner-chip__note {
+  margin-top: 0.35rem;
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: calc(1.1 * min(1vw, 1.7778vh));
+  color: #fff;
+  text-shadow: 0 1px 0 rgba(3, 4, 4, 0.45);
+}
+
+/* ── Embedded: the bottom-right corner belongs to the host ─────────────
+   Inside the Journey kiosk's iframe, Journey floats its own buttons over
+   this page, and nothing in here can paint over a parent's element. The two
+   agree on where they go (src/lib/embed.js): while this display is up,
+   Journey keeps both of its 48px round buttons in ONE column in the
+   bottom-right corner (the view toggle, its settings gear stacked above
+   it), max(3vw, 24px) in from the right edge. Every other corner is ours:
+   the top-right stack is budgeted to the pixel against the band beside it
+   and the raised headline under it, and a tall problem sticker needs every
+   bit of it, so it stays exactly where it is. Embedded (App.jsx puts
+   `embedded` on <html> when window.self !== window.top), everything this
+   page draws in the bottom-right steps LEFT of the column, 8px clear (above
+   the corner chip is the copy, which may reach 45u, so it cannot go up):
+   - the corner chip (the time, tonight's tally, the WAITING chip);
+   - the tonight ticker, which moves left with it: a centred box moves by
+     half its right inset, so twice the chip's shift keeps the gap the two
+     have standalone. On a narrow screen that would run the widest night
+     (four stats, three-digit counts: ~58u) into the settings gear, because
+     the row is nearly full there (640x480: gear, ticker, chip and the
+     host's toggle leave ~15px between them), so it never moves further than
+     centring it between the gear (its left inset plus 52px, or 2.9u on a
+     big screen) and the widest corner chip (the clock, 15.3u).
+     That centring is only a place, not a size: on a narrow screen (a
+     portrait phone) the room between the gear and the widest chip is
+     narrower than the widest night (174px for 226px at 390x844), so the
+     ticker is capped to that room, less its own stat gap (0.8u) on each
+     side, and wraps its stats into rows instead of running under the chip.
+     Where the night fits (the Pi's 640x480, every 16:9 screen) the cap
+     never binds and it stays one row; at 592x432 (the Pi with overscan) it
+     is two rows, where it used to touch both neighbours;
+   - a check-in's name column (nameRoomU sizes the name to match);
+   - the operator's panels, which reach the bottom-right edge on a small
+     screen (the Pi's 640x480, 800x480, 1024x768): Settings and the slide editor
+     centre in the room left of the column (a click at the right end of
+     SAVE landed on the host's gear and opened ITS panel instead), and the
+     debug panel and the first-run card end short of it.
+   src/lib/embed.js HOST_CONTROL is the same geometry for the one fit done
+   in JS (the name), and embed.test.js fails if the two spellings drift.
+   Standalone none of these selectors match. */
+html.embedded {
+  --host-clear-x: calc(max(3vw, 24px) + 48px + 8px);
+}
+html.embedded .corner-bottom {
+  right: max(calc(2.6 * min(1vw, 1.7778vh)), var(--host-clear-x));
+}
+html.embedded .tonight-ticker {
+  right: max(0px, min(
+    2 * (var(--host-clear-x) - 2.6 * var(--u)),
+    var(--host-clear-x) + 15.3 * var(--u) - var(--safe-inset) - max(52px, 2.9 * var(--u))
+  ));
+  max-width: min(
+    60 * var(--u),
+    100% - var(--host-clear-x) - 15.3 * var(--u) - var(--safe-inset) - max(52px, 2.9 * var(--u)) - 1.6 * var(--u)
+  );
+  flex-wrap: wrap;
+}
+html.embedded .checkin__copy {
+  right: max(calc(3 * var(--u)), var(--host-clear-x));
+}
+html.embedded .panel-backdrop {
+  padding-left: 2vw;
+  padding-right: var(--host-clear-x);
+  /* One column exactly as wide as that room (an auto track would grow to
+     the panel's own 94-96vw and let it run on under the column). */
+  grid-template-columns: minmax(0, 1fr);
+}
+html.embedded .panel--tabbed {
+  max-width: 100%;
+}
+html.embedded .debug {
+  max-width: calc(100% - 1.5rem - var(--host-clear-x));
+}
+/* The first-run card is a strip between the gear and the corner chip, or a
+   stacked card above the gear on a phone, centred by margin-inline: a
+   max-width here would only re-centre it, so its right EDGE keeps clear of
+   the column (the phone card ran full width, under it). */
+html.embedded .panel.setup-card {
+  right: max(calc(19.2 * var(--u)), var(--host-clear-x));
+}
+@media (max-width: 639px) {
+  html.embedded .panel.setup-card {
+    right: var(--host-clear-x);
+  }
+}
+
+/* ── Milestone toast (MilestoneToast.jsx) ─────────────────
+   A kit chip in the top band: a Londrina kicker on the pill, one Paytone One
+   line on the block (sized by the fit, --toast-line), three sparkles on its
+   shoulder. The band sits between the corner tab and the top-right stack,
+   above the highest the slide copy can rise, and far above the check-in
+   wave (src/lib/overlayFit.js OVERLAY). Centred with inset + auto margins:
+   framer-motion owns `transform`. */
+.milestone-toast {
+  --plate-label: calc(1.45 * var(--u));
+  --toast-shadow: rgba(3, 4, 4, 0.28);
+  --toast-doodle: #fff;
+  position: absolute;
+  top: var(--band-top);
+  left: 0;
+  right: 0;
+  margin-inline: auto;
+  width: fit-content;
+  max-width: calc(50 * var(--u));
+  z-index: 40;
+  pointer-events: none;
+  transform-origin: 50% 0%;
+}
+.milestone-toast--hot { --toast-shadow: var(--brand-hot-deep); }
+.milestone-toast--handbook { --toast-shadow: var(--brand-blue-deep); }
+.milestone-toast--club { --toast-shadow: var(--club-deep); }
+.milestone-toast .milestone-label {
+  letter-spacing: 0.09em;
+}
+.milestone-toast .milestone-body {
+  display: flex;
+  align-items: center;
+  gap: calc(1 * var(--u));
+  padding: calc(0.6 * var(--u)) calc(1.2 * var(--u)) calc(0.6 * var(--u));
+}
+.milestone-toast .milestone-count {
+  display: block;
+  font-family: var(--font-shout);
+  font-size: var(--toast-line, calc(3.2 * var(--u)));
+  font-weight: 400;
+  /* MilestoneToast.jsx LINE.lineHeight: Galindo's 1.02, divided by 1.057. */
+  line-height: 0.97;
+  white-space: nowrap;
+  text-transform: uppercase;
+  color: #fff;
+  text-shadow: 0.05em 0.05em 0 var(--toast-shadow);
+}
+.milestone-toast .milestone-count__line {
+  display: block;
+}
+/* A line too long even for two lines at the smallest size (an unbroken
+   word of fifty letters): the fit says so (fitShout's `fits: false`) and the
+   line wraps inside the band rather than running out of it. */
+.milestone-toast .milestone-count--wrap {
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+/* Under the flag strip the band is shorter: the wordmark comes down to fit. */
+.milestone-toast--compact .club-logo-slot {
+  height: calc(2.9 * var(--u));
+}
+/* On an OBS feed a critical notice keeps the band and never yields, so the
+   toast drops below it (OVERLAY.band.bottom, plus a unit), not under it. */
+.milestone-toast--below {
+  top: calc(11.4 * var(--u));
+}
+/* The club's wordmark on its own colour (#332). Its art runs up to 800px
+   wide, so the slot pins its height and caps its width. */
+.milestone-toast .milestone-badge {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+}
+.milestone-toast .club-logo-slot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: calc(3.4 * var(--u));
+  flex-shrink: 0;
+}
+.milestone-toast .club-logo {
+  height: 100%;
+  width: auto;
+  max-width: calc(7.4 * var(--u));
+  object-fit: contain;
+}
+/* Wordmark only here: the mascot sticker is banner-scale art. */
+.milestone-toast .club-mascot { display: none; }
+.milestone-toast .club-title-fallback {
+  font-family: var(--font-condensed);
+  font-size: calc(1.6 * var(--u));
+  text-transform: uppercase;
+}
+.milestone-toast .milestone-doodles {
+  overflow: visible;
+}
+
+/* ── "+N more coming" (App.jsx .up-next) ───────────────────
+   A stepped chip ("UP NEXT / +3") on the club's own wave, above its mark
+   (the check-in moment's .checkin__mark-slot ends 9.6u up). */
+.up-next {
+  position: absolute;
+  left: calc(3.6 * var(--u));
+  bottom: calc(11 * var(--u));
+  z-index: 30;
+  line-height: 0;
+  pointer-events: none;
+  transform-origin: 20% 80%;
+}
+
+/* ── Debug stats row ───────────────────────────────────── */
+/* Live readouts in the debug panel's header band, each on the kit chip's
+   plate and keyline (a white keyline over the band's deep plate, offset). */
+.debug-stats {
+  grid-column: 2;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.55rem;
+  margin-top: 0.6rem;
+}
+.debug-stats > span {
+  position: relative;
+  isolation: isolate;
+  padding: 0.22rem 0.6rem 0.24rem;
+  border: 1.5px solid #ffffff;
+  border-radius: 999px;
+  color: #ffffff;
+  font-size: 0.84rem;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+.debug-stats > span::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: var(--brand-cubbies-deep);
+  translate: 3px 2px;
+}
+
+/* ── Shared interaction states ─────────────────────────── */
+button:focus-visible,
+input:focus-visible {
+  outline: 2px solid var(--awana-orange-deep);
+  outline-offset: 2px;
+}
+
+/* Respect users (and underpowered signage sticks) that prefer less motion. */
+@media (prefers-reduced-motion: reduce) {
+  .status-dot.connecting .dot,
+  .panel .status-line.connecting .dot,
+  .panel--tabbed,
+  .debug {
+    animation: none;
+  }
+  .settings-gear,
+  .panel button,
+  .panel .actions label,
+  .panel a.panel-button,
+  .panel .radio-option,
+  .panel input[type='checkbox'],
+  .panel input[type='checkbox']::before,
+  .panel input[type='checkbox']:checked::before,
+  .debug button {
+    transition: none;
+  }
+  /* No squash either: the press is the flat 2px sink, at once. Each selector
+     is the press rule's own, so it matches its specificity and wins by order. */
+  .settings-gear:active,
+  .panel button:not(:disabled):active,
+  .panel .actions label:active,
+  .panel a.panel-button:active,
+  .panel .radio-option:active,
+  .panel input[type='checkbox']:not(:disabled):active,
+  .debug button:not(:disabled):active {
+    scale: none;
+  }
+  /* Nothing squashes, so nothing needs the hit-area strip (and without a
+     scale there is no containing block for it to sit in). */
+  .panel button:not(:disabled):active::after,
+  .panel .actions label:active::after,
+  .panel a.panel-button:active::after,
+  .panel .radio-option:active::after,
+  .debug button:not(:disabled):active::after {
+    content: none;
+  }
+}
+
+/* Zero-animation mode (App.jsx toggles this on <html> from
+   config.reduceMotion — see ?lowPower=1 in urlFlags.js, for embedding on
+   hardware too weak to animate at all, like the Journey Display kiosk).
+   Deliberately a blanket rule rather than listing selectors one by one:
+   every CSS animation/transition on the page — the ones named above,
+   AND any future one added anywhere in this stylesheet — is covered
+   automatically, with no per-rule opt-in to remember. Framer-motion's
+   own JS-driven animations (opacity fades, etc.) are handled separately
+   by ZeroAnimationContext in src/lib/motion.jsx, since CSS can't reach
+   those. `*` never matches a pseudo-element and neither property is
+   inherited, so ::before / ::after are named too (the panels' checkbox
+   pops its check on a ::before; src/lib/zeroAnimationCss.test.js fails
+   any pseudo-element that animates without being named here). */
+.zero-animation-mode,
+.zero-animation-mode *,
+.zero-animation-mode *::before,
+.zero-animation-mode *::after {
+  animation: none !important;
+  transition: none !important;
+}
+/* The blanket rule stops the spring; this stops the squash, so a press on the
+   Pi is the flat, instant 2px sink it always was (the soft squish's presses,
+   above). Every press rule is named, one prefix deeper so it always wins;
+   squishCss.test.js fails a new press rule that is not. */
+.zero-animation-mode .settings-gear:active,
+.zero-animation-mode .panel button:not(:disabled):active,
+.zero-animation-mode .panel .actions label:active,
+.zero-animation-mode .panel a.panel-button:active,
+.zero-animation-mode .panel .radio-option:active,
+.zero-animation-mode .panel input[type='checkbox']:not(:disabled):active,
+.zero-animation-mode .debug button:not(:disabled):active {
+  scale: none;
+}
+.zero-animation-mode .panel button:not(:disabled):active::after,
+.zero-animation-mode .panel .actions label:active::after,
+.zero-animation-mode .panel a.panel-button:active::after,
+.zero-animation-mode .panel .radio-option:active::after,
+.zero-animation-mode .debug button:not(:disabled):active::after {
+  content: none;
+}
+
+/* ────────────────────────────────────────────────────────────
+   Responsive: phones & small screens.
+   The design targets a TV, but leaders open the display (and
+   especially Settings) on their phones. Two axes matter:
+   narrow screens (portrait phones) and SHORT screens (landscape
+   phones) — the slide type scales with vw, so short-and-wide is
+   the case that clips without help.
+   ──────────────────────────────────────────────────────────── */
+
+/* ── Narrow screens: compact chrome, wrappable banner ────── */
+@media (max-width: 700px) {
+  .corner-stack { gap: 0.85rem; }
+  .countdown {
+    min-width: 0;
+    padding: 0.6rem 1rem 0.65rem;
+    border-width: 2px;
+    border-radius: 16px;
+  }
+  .countdown .label { font-size: 0.62rem; letter-spacing: 0.1em; }
+  .countdown .time { font-size: 1.8rem; }
+
+  .first-time-burst { width: clamp(72px, 20vw, 110px); top: -22%; }
+  .welcome-back-seal { width: clamp(72px, 20vw, 110px); top: -22%; }
+  .first-time-burst span { font-size: clamp(0.7rem, 2.6vw, 0.95rem); }
+
+  /* The lobby's u makes the overlays tiny on a phone; give the ones a
+     leader reads there a floor, and let the band use the width. */
+  .milestone-toast,
+  .notice-banner--info,
+  .notice-banner--warn { max-width: 92vw; }
+  .tonight-ticker { max-width: 92vw; flex-wrap: wrap; }
+}
+
+/* ── Small screens in EITHER direction: compact panels ────
+   Covers portrait phones (narrow) and landscape phones (short).
+   The tabbed settings modal goes near-fullscreen so the pinned
+   action row stops crowding out the scrollable form. */
+@media (max-width: 640px), (max-height: 560px) {
+  .panel {
+    width: 96vw;
+    max-height: 94vh;
+    max-height: 94dvh;
+    padding: 1.4rem 1.15rem;
+    border-radius: 18px;
+  }
+  .panel,
+  .debug { --panel-pad: 1.15rem; }
+  .panel--tabbed {
+    width: 96vw;
+    height: 94vh;
+    height: 94dvh;
+    max-height: 94dvh;
+    padding: 0 0 0.6rem;
+  }
+  .panel--tabbed .panel-header { padding: 0.6rem var(--panel-pad) 0.65rem; column-gap: 0.75rem; }
+  .panel--tabbed .panel-header .panel-mark { width: 4.5rem; }
+  .panel--tabbed .panel-header h2 { font-size: 1.45rem; }
+  .panel--tabbed .panel-header .hint.panel-sub { font-size: 0.78rem; }
+  /* The status readout drops under the title instead of squeezing it. */
+  .panel--tabbed .panel-header .status-line {
+    grid-column: 1 / -1;
+    grid-row: auto;
+    max-width: none;
+    margin-top: 0.35rem;
+    padding: 0.3rem 0.7rem;
+    font-size: 0.78rem;
+  }
+  .panel-tabs { padding: 0.45rem var(--panel-pad); gap: 0.15rem; }
+  .panel button.panel-tab {
+    min-height: 40px;
+    padding: 0.45rem 0.65rem 0.4rem;
+    font-size: 0.9rem;
+    letter-spacing: 0.05em;
+  }
+  .panel-body { padding: 0.9rem var(--panel-pad) 0.4rem; }
+  .panel-card { padding: 0.9rem 1rem 0.2rem; }
+  .panel-card__head { margin: -0.9rem 0 0.8rem -1rem; }
+  .panel h2 { font-size: 1.5rem; margin-bottom: 0.9rem; }
+
+  /* The pinned actions compress into tidy rows of small buttons. */
+  .panel--tabbed .actions {
+    padding: 0.65rem var(--panel-pad) 0.15rem;
+    gap: 0.45rem;
+    justify-content: center;
+  }
+  .panel .actions button,
+  .panel .actions label {
+    flex: 1 1 auto;
+    min-height: 38px;
+    padding: 0.4rem 0.75rem 0.35rem;
+    font-size: 0.92rem;
+  }
+  .panel jelly-button {
+    --jelly-button-height: 2.6rem;
+    --jelly-button-min-width: 6rem;
+    --jelly-button-font-size: 1.05rem;
+  }
+  .slide-card { grid-template-columns: minmax(0, 1fr); padding: 0 1rem 1rem; }
+  .slide-card > .slide-card-tab { margin-left: -1rem; }
+  .slide-card-preview { margin-bottom: 0.9rem; }
+  .slide-card-fields { grid-column: 1; }
+  .debug { top: 0.75rem; left: 0.75rem; width: calc(100% - 1.5rem); max-height: calc(100% - 1.5rem); }
+
+  /* Bigger touch target for the gear on phones. */
+  .settings-gear { width: 52px; height: 52px; }
+  .settings-gear.idle { opacity: 0.35; pointer-events: auto; }
+}
+
+/* ── Short screens (landscape phones): compact corner chrome. The lobby's
+   slide type is sized in u (see .catalog-scene), which already follows the
+   height on a short screen, so it needs nothing here. ─────── */
+@media (max-height: 560px) {
+  .corner-stack { gap: 0.8rem; }
+  .countdown {
+    min-width: 0;
+    padding: 0.55rem 0.95rem 0.6rem;
+    border-width: 2px;
+    border-radius: 14px;
+  }
+  .countdown .label { font-size: 0.58rem; letter-spacing: 0.1em; }
+  .countdown .time { font-size: 1.6rem; }
+
+}
+
+/* ── Season promo slides (fall 2026) ───────────────────────
+   Four 15 second showreel pieces, one per fall poster, sharing one slot
+   in the background rotation (PromoSlide.jsx; which one shows is decided
+   in src/lib/promos.js). Each piece's own art lives in
+   src/styles/promos/<poster>.css, @imported at the top of this file;
+   only the rules every poster shares stay here. Unlike a typed slide
+   these are FULL-BLEED (the poster is the whole screen), so each keeps
+   its own safe area away from the corners instead of reusing
+   .manual-slide-copy's inset.
+
+   Sizes are clamp(min, min(vw, vh), max) so 1920x1080, 1366x768 and a
+   1024x600 stick all read the same, and the floors are deliberately
+   high: a line that will not fit should lose words, not points.
+
+   Layering inside a slide, lowest first: texture (0), vignette (1),
+   each poster's own art (2-3), the wordmark and the countdown chip (4). */
+.promo-slide {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  /* Pinned: anything a poster doesn't style itself inherits the face it
+     was drawn in, not the lobby's current body font, and the browser's
+     old synthesized-bold behaviour (the lobby turns that off at :root). */
+  font-family: var(--promo-font-body);
+  font-synthesis-weight: auto;
+  /* A promo is art, not text to select or a target to click. */
+  user-select: none;
+}
+
+/* Depth, two cheap static layers. The grain keeps a big flat field of
+   navy or purple from banding on a TV panel; the vignette pulls the
+   corners down so the hero sits in a pool of light. Neither animates. */
+.promo-texture,
+.promo-vignette {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.promo-texture {
+  z-index: 0;
+  opacity: 0.05;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+.promo-vignette {
+  z-index: 1;
+  background: radial-gradient(ellipse at 50% 44%, rgba(0, 0, 0, 0) 52%, rgba(0, 0, 0, 0.38) 100%);
+}
+
+/* The Awana Clubs wordmark, small and centred at the top of every
+   promo. Its own slot does the centring so framer-motion owns the
+   element's transform outright. */
+.promo-wordmark-slot {
+  position: absolute;
+  z-index: 4;
+  top: 3.2%;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+.promo-wordmark {
+  height: clamp(22px, min(2.6vw, 4.6vh), 52px);
+  width: auto;
+}
+
+/* The live counter: "3 club nights left" / "Tonight!". Top-LEFT on
+   purpose: the corner widget stack (clock, weather, tally) owns the
+   top right, and the settings gear owns the bottom left only as a
+   faded 44px target. The slot holds the position so the pill itself is
+   free to pulse on the mid-hold beat. */
+.promo-chip-slot {
+  position: absolute;
+  z-index: 4;
+  top: 3.4%;
+  left: 3.4%;
+}
+.promo-chip {
+  padding: 0.42em 1.1em 0.48em;
+  border-radius: 999px;
+  font-family: var(--promo-font-condensed);
+  font-weight: 600;
+  font-size: clamp(1rem, min(1.9vw, 3.4vh), 2rem);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.3);
+}
+
+/* The one headline per poster. */
+.promo-headline {
+  margin: 0;
+  font-family: var(--promo-font-display);
+  font-weight: 800;
+  font-size: clamp(2.2rem, min(4.6vw, 8vh), 5rem);
+  line-height: 1.02;
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+}
+
+/* Hero words and dates: the poster face, one weight, set big. */
+.promo-date {
+  font-family: var(--font-poster);
+  font-weight: 400;
+  font-size: clamp(2rem, min(5.2vw, 9vh), 6rem);
+  line-height: 1.04;
+  /* No extra tracking: the poster face already sets its own, and a
+     comma picked up a visible gap in front of it at these sizes. */
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+/* A two-tone outline: eight offsets of --po-c around the glyph, then
+   one solid drop of --po-s behind it. text-shadow rather than
+   -webkit-text-stroke because the stroke inks INWARD and thins a
+   display face at these sizes. Both properties inherit, so the class
+   goes on the element that owns the type and the inner beat span picks
+   it up. */
+.promo-outline {
+  text-shadow:
+    calc(var(--po-w) * -1) 0 0 var(--po-c),
+    var(--po-w) 0 0 var(--po-c),
+    0 calc(var(--po-w) * -1) 0 var(--po-c),
+    0 var(--po-w) 0 var(--po-c),
+    calc(var(--po-w) * -1) calc(var(--po-w) * -1) 0 var(--po-c),
+    var(--po-w) calc(var(--po-w) * -1) 0 var(--po-c),
+    calc(var(--po-w) * -1) var(--po-w) 0 var(--po-c),
+    var(--po-w) var(--po-w) 0 var(--po-c),
+    0 var(--po-drop, 0.07em) 0 var(--po-s, transparent);
+}
+
+/* The beat span: an inline-block so its one-shot bounce has something
+   to scale. */
+.promo-beat { display: inline-block; }
+
+/* The rotating detail line. One slot, one string at a time, at a size
+   that can actually be read from the check-in line. Everything the
+   printed poster says in small type takes its turn here. The slot owns
+   the font-size so its min-height can hold the row while
+   AnimatePresence swaps the string out. */
+.promo-detail-slot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 1.5em;
+  font-size: clamp(1.3rem, min(2.6vw, 4.6vh), 2.6rem);
+}
+.promo-detail {
+  display: inline-block;
+  font-family: var(--promo-font-condensed);
+  font-weight: 600;
+  font-size: 1em;
+  line-height: 1.2;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-align: center;
+}
+
+
+/* ── Wave 1: presentation variants + operator surfaces ─────────────── */
+
+/* Printer-problem count riding the Signal sticker: a hot pill. */
+.status-dot .ops-count {
+  flex: none;
+  padding: 0.08em 0.5em 0.1em;
+  border-radius: 999px;
+  background: var(--brand-hot);
+  color: #fff;
+  font-family: var(--font-condensed);
+  font-weight: 400;
+  letter-spacing: 0.05em;
+}
+
+/* Names arrive encrypted; when a screen can't read them it must SAY so, not
+   just quietly stop showing banners — that is indistinguishable from a quiet
+   night. Sunflower rather than hot: no child is missing a label, the wall is
+   just less welcoming until someone pastes the key. Its own strip under the
+   state, because the messages are sentences, not a status word; ink on
+   sunflower so it reads on any background the plate sits over. */
+.status-dot .name-fault {
+  display: block;
+  margin-top: 0.45em;
+  padding: 0.28em 0.55em 0.3em;
+  border-radius: 0.4em;
+  background: var(--brand-sun);
+  color: var(--brand-ink);
+  font-family: var(--font-condensed);
+  font-weight: 400;
+  font-size: max(11px, calc(1.1 * var(--u)));
+  letter-spacing: 0.05em;
+  line-height: 1.15;
+  text-transform: uppercase;
+}
+
+/* "simplified mode": quiet confirmation that panic mode is on, a charcoal
+   tab in the flag strip beside the demo and rehearsal tabs (below). */
+.panic-pill {
+  background: var(--brand-ink);
+  color: var(--brand-sun);
+}
+
+/* Demo-mode badge and rehearsal watermark: kit tabs hanging from the top
+   edge, side by side in one strip (.top-flags), above the top band, which
+   moves down under them (.stage.has-flags). The demo tab is the hot sticker
+   colour and never rotates: its whole job is to stop someone reading a
+   simulated banner as a real child arriving. Rehearsal (#19) is sunflower:
+   an armed mode on the PRINTER, cleared by its next tally. Above the
+   banner z-index so a burst of fake check-ins can't cover them. */
+.top-flags {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  margin-inline: auto;
+  width: fit-content;
+  /* Between the corner tab (24u) and the top-right stack (~78u): OVERLAY.flags. */
+  max-width: calc(54 * var(--u));
+  display: flex;
+  gap: calc(0.6 * var(--u));
+  z-index: 61;
+  pointer-events: none;
+}
+/* All three hanging at once (simplified mode, a latched demo and a
+   rehearsal) would run 63u wide, over the corner tab and the status
+   sticker's pill: the tabs set tighter so the strip keeps to its 54u. */
+.top-flags--tight .demo-pill,
+.top-flags--tight .rehearsal-pill,
+.top-flags--tight .panic-pill {
+  padding-inline: calc(0.75 * var(--u));
+  font-size: max(9px, calc(0.95 * var(--u)));
+  letter-spacing: 0.05em;
+}
+.demo-pill,
+.rehearsal-pill,
+.panic-pill {
+  --flag-deep: var(--brand-hot-deep);
+  display: flex;
+  align-items: center;
+  height: calc(2.5 * var(--u));
+  min-height: 24px;
+  padding: calc(0.2 * var(--u)) calc(1.1 * var(--u)) 0;
+  font-family: var(--font-condensed);
+  font-size: max(11px, calc(1.15 * var(--u)));
+  letter-spacing: 0.1em;
+  line-height: 1;
+  text-transform: uppercase;
+  white-space: nowrap;
+  border: max(2px, calc(0.13 * var(--u))) solid #fff;
+  border-top: 0;
+  border-radius: 0 0 calc(0.8 * var(--u)) calc(0.8 * var(--u));
+  box-shadow: calc(0.25 * var(--u)) calc(0.18 * var(--u)) 0 var(--flag-deep);
+}
+.demo-pill {
+  background: var(--brand-hot);
+  color: #fff;
+}
+.rehearsal-pill {
+  --flag-deep: var(--brand-orange-deep);
+  background: var(--brand-sun);
+  color: var(--brand-ink);
+}
+.panic-pill {
+  --flag-deep: rgba(3, 4, 4, 0.45);
+}
+
+/* ── Local .pptx renderer ──────────────────────────────────────────── */
+.pptx-stage {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.pptx-slide-wrap {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.pptx-slide {
+  position: relative;
+  /* Letterbox to the deck's own aspect ratio (inline style sets it);
+     container units size the type against the rendered width. */
+  width: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  aspect-ratio: 16 / 9;
+  margin: auto;
+  container-type: size;
+  overflow: hidden;
+}
+
+/* ── Themed night skins (#37) ──────────────────────────────────────── */
+/* Recolor the ambient stage decorations for special nights. Banners
+   keep club colors — the skin dresses the room, not the kids. */
+/* --skin-a / --skin-b are set INLINE by App.jsx from SKIN_TABLE
+   (src/lib/skins.js), not listed per-skin here. They used to be duplicated in
+   this file, which made adding a season a five-file edit and meant the CSS
+   could silently disagree with the JS. The table is now the only place the
+   colours live. */
+/* The idle headline wears the season's pair. It used to be a gradient FILL,
+   but a gradient clipped to text cannot sit on the lobby's hard offset
+   shadow (the shadow paints over it), and several pairs are pale enough to
+   vanish on their own scene without one. So the face keeps its theme's
+   colour and the season steps out behind it: a skin-a offset, then a skin-b
+   one, printed out of register like the catalog's own outlines. */
+.stage[data-skin] .background-placeholder .lobby-headline--shout {
+  text-shadow:
+    0.035em 0.035em 0 var(--skin-a),
+    0.07em 0.07em 0 var(--skin-b);
+}
+/* The room-wide chrome wears the season too: a room-wide toast's plate
+   gets an echo in the skin's first colour printed behind it and its
+   sparkles take the second, the "+N more coming" chip's keyline takes the
+   second, and a few sparkle particles take the pair. A club's own toast
+   keeps the club's colours at Christmas too, the same rule the confetti
+   follows (lib/confetti.js). */
+.stage[data-skin] .milestone-toast:not(.milestone-toast--club) {
+  --toast-doodle: var(--skin-b);
+}
+.stage[data-skin] .milestone-toast:not(.milestone-toast--club) .step-plate__echo {
+  display: block;
+  fill: var(--skin-a);
+}
+.stage[data-skin] .up-next .step-chip__keyline {
+  stroke: var(--skin-b);
+}
+
+/* ── Tonight ticker (onTonight): lobby stat strip ─────────────────── */
+/* The kit's count chips (the printer dashboard's club chips: a pill, white
+   Londrina caps, a Paytone One number) in the house blue, on the house waves
+   bottom-centre. Its widest night (four stats, three-digit counts: 263 /
+   48 / 112 / 19) runs ~59.5u, inside the 60u between the settings gear
+   (ends ~4.3u) and the corner chip (from ~82u). Below the check-in wave's z-index as a belt-and-braces
+   (it also unmounts via `active` while a banner is up, see
+   TonightTicker.jsx). Centred without translateX: framer-motion owns the
+   transform. */
+.tonight-ticker {
+  position: absolute;
+  bottom: calc(1.8 * var(--u));
+  left: 0;
+  right: 0;
+  margin-inline: auto;
+  width: fit-content;
+  max-width: calc(60 * var(--u));
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: calc(0.8 * var(--u));
+  pointer-events: none;
+}
+.tonight-ticker-stat {
+  /* Its soft squish sits the pill down onto the wave it rides. */
+  transform-origin: 50% 100%;
+  display: inline-flex;
+  align-items: baseline;
+  gap: calc(0.45 * var(--u));
+  padding: calc(0.5 * var(--u)) calc(1.1 * var(--u)) calc(0.45 * var(--u));
+  border-radius: 999px;
+  background: var(--brand-blue);
+  color: #fff;
+  white-space: nowrap;
+  box-shadow: calc(0.22 * var(--u)) calc(0.22 * var(--u)) 0 var(--brand-blue-deep);
+}
+.tonight-ticker-value {
+  display: inline-block;
+  font-family: var(--font-shout);
+  /* Stage 4b-2 drew 2.2u at line-height 1 in Galindo; Paytone One's figures
+     stand 5% shorter, so 1.05x the size at 1 / 1.05 the line height holds
+     the figures' height and the pill's. */
+  font-size: calc(2.3 * var(--u));
+  line-height: 0.95;
+  font-variant-numeric: tabular-nums;
+}
+.tonight-ticker-label {
+  font-family: var(--font-condensed);
+  font-size: calc(1.2 * var(--u));
+  letter-spacing: 0.08em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+/* ── Notice banner (onNotice): church-authored announcements ──────── */
+/* The kit's stepped chip (StepPlate): a Londrina label on the pill, the
+   message in Figtree on the block, sized by NoticeBanner's fit
+   (--notice-size). info and warn sit in the top band (between the corner
+   tab and the top-right stack, above the highest the copy rises); a toast
+   borrows the band while it is up. critical takes the middle of the room
+   over, the slide copy stepping back behind it. Centred with inset + auto
+   margins: framer-motion owns `transform`. */
+.notice-banner {
+  position: absolute;
+  pointer-events: none;
+}
+.notice-banner-eyebrow {
+  letter-spacing: 0.1em;
+}
+.notice-banner-message {
+  display: block;
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: var(--notice-size, calc(1.8 * var(--u)));
+  line-height: 1.2;
+  color: #fff;
+  overflow-wrap: break-word;
+  text-wrap: balance;
+}
+.notice-banner-message.is-set .notice-banner-line {
+  display: block;
+  white-space: nowrap;
+}
+.notice-banner--info,
+.notice-banner--warn {
+  --plate-label: calc(1.25 * var(--u));
+  top: var(--band-top);
+  left: 0;
+  right: 0;
+  margin-inline: auto;
+  width: fit-content;
+  max-width: calc(50 * var(--u));
+  z-index: 35;
+  transform-origin: 50% 0%;
+}
+.notice-banner--info .notice-banner-body,
+.notice-banner--warn .notice-banner-body {
+  padding: calc(0.55 * var(--u)) calc(1.1 * var(--u)) calc(0.6 * var(--u));
+}
+/* Warn: sunflower, so ink type. */
+.notice-banner--warn .notice-banner-eyebrow,
+.notice-banner--warn .notice-banner-message {
+  color: var(--brand-ink);
+}
+
+/* Critical: unmissable. The hot chip, big, centred on the copy's own box
+   (12u to 46u of the 16:9 frame, which is centred on any screen), at the
+   highest z-index on the stage (above the check-in moment's 10, the
+   toast's 40 and the gear's 50) so "CLUB CANCELLED TONIGHT" always wins.
+   Still below the Settings / slide editor / debug panels (100+). */
+.notice-banner--critical {
+  --plate-label: calc(2 * var(--u));
+  top: calc(50% - 16.125 * var(--u));
+  bottom: calc(50% - 17.875 * var(--u));
+  left: 0;
+  right: 0;
+  margin: auto;
+  width: fit-content;
+  height: fit-content;
+  max-width: calc(70 * var(--u));
+  z-index: 60;
+}
+.notice-banner--critical .notice-banner-eyebrow {
+  letter-spacing: 0.12em;
+}
+.notice-banner--critical .notice-banner-body {
+  padding: calc(1.1 * var(--u)) calc(2 * var(--u)) calc(1.3 * var(--u));
+}
+.notice-banner--critical .notice-banner-message {
+  font-weight: 800;
+  line-height: 1.15;
+  text-shadow: 0.05em 0.05em 0 var(--brand-hot-deep);
+}
+/* Where the middle is not the alert's to take (an OBS / ProPresenter feed,
+   which has no slide to step back, or the pickup board holding the middle:
+   lobbyRoom), it keeps to the top band instead (`is-band`): the band's
+   place and width, fitted to end where the band ends (noticeFit), still the
+   hot chip and still the highest thing on the stage. */
+.notice-banner--critical.is-band {
+  --plate-label: calc(1.4 * var(--u));
+  top: var(--band-top);
+  bottom: auto;
+  height: auto;
+  max-width: calc(50 * var(--u));
+  transform-origin: 50% 0%;
+}
+.notice-banner--critical.is-band .notice-banner-body {
+  padding: calc(0.55 * var(--u)) calc(1.1 * var(--u)) calc(0.6 * var(--u));
+}
+
+/* ── Weather mood over the season's scene ──────────────────────────────
+   The season picks the scene (background, waves, doodles); the weather only
+   cools and dims it. Implemented as a filter on the scene container rather
+   than a palette swap so a chosen skin (VBS, Easter) is never replaced by the
+   weather — and so club banners, which live outside the scene, keep their
+   catalog colours untouched.
+
+   --scene-dim is set inline by CatalogScene and clamped to >= 0.6, so this can
+   never black out the room. A cozy night reads as dusk indoors, not a fault. */
+.catalog-scene {
+  --scene-dim: 1;
+}
+.catalog-scene--cozy {
+  filter: brightness(var(--scene-dim)) saturate(0.86);
+  transition: filter 1.2s ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  .catalog-scene--cozy { transition: none; }
+}
+
+/* ── The arriving club's wash (#349) ───────────────────────────────────
+   While a child's banner holds the stage the scene behind it breathes that
+   child's own club accent, then fades back out when the banner leaves. Opt-in
+   (config.clubTintBackground), because a themed night skin is a look somebody
+   chose on purpose and this competes with it.
+
+   Deliberately opacity-only over a solid colour, with no blend mode: the layer
+   is always mounted so the fade has both directions to play, and a compositing
+   blend would cost real frames on the Raspberry Pi Zero kiosk that embeds this
+   page. It sits over the scene art and UNDER the scene's children, so slide
+   copy and the setup headline never go pastel.
+
+   No @keyframes and nothing framer-motion touches — just a transition, which
+   is exactly what the blanket .zero-animation-mode rule above already kills,
+   so under reduceMotion / ?lowPower=1 the tint snaps instead of fading. */
+.scene-club-tint {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: var(--club-tint, transparent);
+  opacity: 0;
+  transition: opacity 1.1s ease;
+  pointer-events: none;
+}
+.catalog-scene--club-tinted .scene-club-tint { opacity: 0.34; }
+@media (prefers-reduced-motion: reduce) {
+  .scene-club-tint { transition: none; }
+}
+
+/* Display key field — the key is masked and the buttons sit inline, because a
+   TV screenshot during setup must not hand over the one secret that matters. */
+.display-key-row {
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.display-key-row input { flex: 1 1 16ch; min-width: 0; }
+/* The masked value is a readout, so it sits on a plain keyline plate (full
+   ink: a faded secret-status line is the one a volunteer misreads). */
+.display-key-value {
+  flex: 1 1 16ch;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.panel code.display-key-value {
+  padding: 0.6rem 0.85rem;
+  border: 2px solid var(--panel-card-line);
+  border-radius: 12px;
+  font-size: 0.95rem;
+  line-height: 1.3;
+}
+
+/* ── Who's still here board (CheckoutBoard.jsx) ─────────────────────────────
+   The kit's card, the printer dashboard's: white, a hard offset shadow in
+   the house blue, and a wavy corner tab carrying the title. Each name is a
+   chip in its club's colour (Paytone One on the club, a hard shadow in its
+   deep shade), each club's run of chips led by its name in Londrina; the
+   count in the foot is Paytone One. While it is the room's focus (a live
+   list during pickup time: overlayFit.js boardPlacement) it takes the
+   middle of the room, centred on the copy's own box (12u to 46u of the
+   16:9 frame), and the slide copy steps back behind it (.stage.board-up).
+   The chip size comes from the component's fit (--name-size): every chip
+   metric below is in em of it, which is the model src/lib/overlayFit.js
+   boardRowsHeight uses (the name itself is drawn NAME_CHIP_TEXT x it). The rest of the time it is on, it is a one-line card at the foot
+   (.checkout-region--foot, below). */
+.checkout-region {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(50% - 16.125 * var(--u));
+  bottom: calc(50% - 17.875 * var(--u));
+  display: grid;
+  place-items: center;
+  z-index: 5;
+  pointer-events: none;
+}
+.checkout-board {
+  --name-size: calc(2 * var(--u));
+  position: relative;
+  max-width: calc(70 * var(--u));
+  min-width: calc(30 * var(--u));
+  padding: calc(4.7 * var(--u)) calc(2.2 * var(--u)) calc(1.6 * var(--u));
+  background: #fff;
+  color: var(--brand-ink);
+  border-radius: calc(1.3 * var(--u));
+  box-shadow: calc(0.5 * var(--u)) calc(0.5 * var(--u)) 0 var(--brand-blue);
+  overflow: hidden;
+  text-align: left;
+}
+.checkout-tab {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: calc(3.7 * var(--u));
+  padding: 0 calc(6 * var(--u)) calc(0.3 * var(--u)) calc(2.2 * var(--u));
+  display: flex;
+  align-items: center;
+  color: var(--brand-blue);
+}
+.checkout-tab svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.checkout-title {
+  position: relative;
+  margin: 0;
+  font-family: var(--font-condensed);
+  font-weight: 400;
+  font-size: calc(1.5 * var(--u));
+  letter-spacing: 0.1em;
+  line-height: 1;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: #fff;
+}
+.checkout-board.stale {
+  box-shadow: calc(0.5 * var(--u)) calc(0.5 * var(--u)) 0 var(--brand-hot);
+}
+.checkout-board.stale .checkout-tab { color: var(--brand-hot); }
+
+/* The foot (OVERLAY.foot): a stale or empty board, or an "always" board
+   while the program runs. One line on a small white card, bottom-centre
+   between the copy's lowest line (45u) and the ticker, clear of the gear and
+   the corner chip; the tab rides its left end instead of its corner. The
+   slides keep playing above it. */
+.checkout-region--foot {
+  top: auto;
+  bottom: calc(5.6 * var(--u));
+  display: flex;
+  justify-content: center;
+}
+.checkout-board--foot {
+  display: flex;
+  align-items: center;
+  gap: calc(1 * var(--u));
+  min-width: 0;
+  max-width: calc(56 * var(--u));
+  padding: calc(0.55 * var(--u)) calc(1.4 * var(--u)) calc(0.55 * var(--u)) 0;
+  border-radius: calc(0.9 * var(--u));
+  box-shadow: calc(0.35 * var(--u)) calc(0.35 * var(--u)) 0 var(--brand-blue);
+}
+.checkout-board--foot.stale {
+  box-shadow: calc(0.35 * var(--u)) calc(0.35 * var(--u)) 0 var(--brand-hot);
+}
+.checkout-board--foot .checkout-tab {
+  position: relative;
+  flex: none;
+  align-self: stretch;
+  height: auto;
+  margin: calc(-0.55 * var(--u)) 0;
+  /* The tab's wave eats into its right end: the title keeps clear of it. */
+  padding: 0 calc(4.6 * var(--u)) 0 calc(1.2 * var(--u));
+}
+.checkout-board--foot .checkout-title {
+  font-size: calc(1.05 * var(--u));
+}
+.checkout-board--foot .checkout-line,
+.checkout-board--foot .checkout-foot {
+  margin: 0;
+  max-width: none;
+  font-size: calc(1.2 * var(--u));
+  font-weight: 700;
+  line-height: 1.25;
+}
+.checkout-board--foot .checkout-count {
+  font-size: calc(1.89 * var(--u));
+}
+
+/* The list: one column per club (CheckoutBoard's fitColumns), youngest to
+   oldest. Each is headed by the club's plate, its white mark over "N
+   waiting" on the club's colour, then its names one chip per row,
+   alphabetical; a long club splits into --split sub-columns. The card takes
+   its full width when it lists, so the columns have the room. */
+.checkout-board:has(.checkout-columns) { width: calc(70 * var(--u)); }
+.checkout-columns {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(var(--columns, 1), minmax(0, 1fr));
+  gap: calc(1.2 * var(--u));
+  align-items: start;
+  font-size: var(--name-size);
+}
+.checkout-column {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4em;
+  min-width: 0;
+}
+.checkout-column__head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: calc(0.35 * var(--u));
+  height: calc(5.4 * var(--u));
+  margin-bottom: calc(0.6 * var(--u) - 0.4em);
+  padding: calc(0.45 * var(--u)) calc(0.6 * var(--u));
+  border-radius: calc(0.8 * var(--u));
+  background: var(--club);
+  box-shadow: calc(0.25 * var(--u)) calc(0.25 * var(--u)) 0 var(--club-deep);
+  color: #fff;
+}
+.checkout-column__mark {
+  display: block;
+  max-width: 100%;
+  height: calc(2.6 * var(--u));
+  object-fit: contain;
+  user-select: none;
+}
+.checkout-column__name {
+  font-family: var(--font-condensed);
+  font-size: calc(1.6 * var(--u));
+  letter-spacing: 0.06em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+.checkout-column__count {
+  font-family: var(--font-condensed);
+  font-size: calc(1.15 * var(--u));
+  letter-spacing: 0.08em;
+  line-height: 1;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.checkout-column .checkout-names {
+  display: grid;
+  grid-template-columns: repeat(var(--split, 1), minmax(0, 1fr));
+  gap: 0.4em 0.5em;
+  justify-items: start;
+}
+.checkout-column .checkout-name { min-width: 0; max-width: 100%; }
+.checkout-column .checkout-name__chip { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+.checkout-demo {
+  position: absolute;
+  top: calc(1 * var(--u));
+  right: calc(1.4 * var(--u));
+  padding: calc(0.3 * var(--u)) calc(0.8 * var(--u));
+  border-radius: 999px;
+  background: var(--brand-hot);
+  color: #fff;
+  font-family: var(--font-condensed);
+  font-size: calc(1.1 * var(--u));
+  letter-spacing: 0.08em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+.checkout-board--foot .checkout-demo { position: static; flex: none; }
+.checkout-names {
+  display: contents;
+}
+.checkout-name {
+  display: inline-flex;
+}
+/* The separator is real text (the list still reads as "Kid · Kid"), but
+   the chips' own gaps carry it on screen. */
+.checkout-sep {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.checkout-name__chip {
+  display: inline-block;
+  /* The chip was drawn around Galindo's caps at --name-size: the name is
+     Paytone One at 1.057x that (overlayFit.js NAME_CHIP_TEXT), whose caps
+     stand as tall, and the pill keeps its size in --name-size (1.75 tall,
+     0.65 of padding a side), which is what boardRowsHeight models. A name
+     whose capital carries a tall mark (É, Ấ) sits --seat lower
+     (overlayFit.js nameChipSeat, set inline): twice that of padding over a
+     line box twice that shorter, in the same pill. Unset, it is 0. */
+  font-size: 1.057em;
+  height: calc(1.75em / 1.057);
+  line-height: calc(1.75em / 1.057 - 2 * var(--seat, 0em));
+  padding: calc(2 * var(--seat, 0em)) calc(0.65em / 1.057) 0;
+  border-radius: 999px;
+  background: var(--club);
+  color: #fff;
+  font-family: var(--font-shout);
+  font-weight: 400;
+  white-space: nowrap;
+  text-shadow: 0.06em 0.06em 0 var(--club-deep);
+}
+
+/* The footer carries the honest wording — "not checked out yet", the label
+   count, and the data's age. It is small but must never be omitted: without it
+   the list reads as a verified headcount, which it is not. */
+.checkout-foot {
+  margin: calc(1.3 * var(--u)) 0 0;
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: calc(1.3 * var(--u));
+  color: #4b5058;
+}
+.checkout-count {
+  margin-right: 0.12em;
+  font-family: var(--font-shout);
+  /* Stage 4b-2's 2.5u at line-height 1 in Galindo, times 1.05 at 1 / 1.05:
+     Paytone One's figures stand 5% shorter. */
+  font-size: calc(2.63 * var(--u));
+  line-height: 0.95;
+  color: var(--brand-ink);
+  vertical-align: -0.08em;
+}
+.checkout-line {
+  margin: 0;
+  max-width: calc(52 * var(--u));
+  font-family: var(--font-body);
+  font-weight: 800;
+  font-size: calc(2.1 * var(--u));
+  line-height: 1.25;
+  color: var(--brand-ink);
+  text-wrap: balance;
+}
+.checkout-line.warn { color: var(--brand-hot-deep); }
+
+/* ─── April Fools (#21) ─────────────────────────────────────────────────────
+   config.aprilFools flips the whole stage upside down — but ONLY on April 1st
+   (App.jsx gates on the date, so the toggle is inert the other 364 days).
+   Escape hatches are non-negotiable: the settings gear and the settings panel
+   counter-rotate so an operator can always find the off switch right-side up.
+   The gear ends up in the opposite corner while flipped — that's part of the
+   joke — but its icon reads upright and it still opens a normal panel. */
+.stage.april-fools { transform: rotate(180deg); }
+.stage.april-fools .settings-gear,
+.stage.april-fools .panel-backdrop,
+.stage.april-fools .debug { transform: rotate(180deg); }
+.stage.april-fools .settings-gear:hover { transform: rotate(225deg) scale(1.05); }
+
+/* ── First-run card (signage): a kit card in the foot of the lobby ───
+   The printer dashboard's card: white, a hard offset in the house blue,
+   the heading as a hot Londrina kicker, Figtree to read, the kit's one hot
+   button for the way in and an outline button beside it. Still a .panel,
+   so it keeps the panel's hint and kbd styles.
+
+   It stands in the strip UNDER the copy's lowest line (OVERLAY.setup in
+   src/lib/overlayFit.js: 45u down the 16:9 box), between the gear and the
+   corner chip, because nothing the lobby draws on a slide comes below that
+   line. Parked above the gear it was 25u square and inside the copy's own
+   box at every size: it hid the start of a headline at 720p and the chip
+   row at 1080p. The strip is ~11u tall, so the words lie in columns: the
+   heading with the buttons beside it, the two steps side by side under
+   them. Sized in em off a root in the lobby's u (with a 12px floor, because
+   a volunteer reads it from arm's length), so on a 720p TV it holds its
+   space instead of running up into the headline. */
+.panel.setup-card {
+  position: absolute;
+  left: calc(var(--safe-inset) + max(46px, calc(2.9 * var(--u))) + calc(1.2 * var(--u)));
+  right: calc(19.2 * var(--u));
+  bottom: calc(1.8 * var(--u));
+  font-size: max(12px, calc(0.78 * var(--u)));
+  width: auto;
+  /* On an ultrawide window the strip would run far past the 16:9 box the
+     copy stands in: keep it to the box's width, centred between the gear
+     and the chip. */
+  max-width: calc(80 * var(--u));
+  margin-inline: auto;
+  max-height: none;
+  overflow: visible;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    'head actions'
+    'steps steps';
+  align-items: center;
+  gap: 0.5em 1.4em;
+  padding: 0.8em 1.15em 0.85em;
+  background: #fff;
+  color: var(--brand-ink);
+  border-radius: 1.1em;
+  box-shadow: 0.35em 0.35em 0 var(--brand-blue);
+  font-family: var(--font-body);
+  z-index: 45;
+}
+.setup-card__head { grid-area: head; min-width: 0; }
+.setup-card h3 {
+  margin: 0 0 0.2em;
+  font-family: var(--font-condensed);
+  font-size: 1.3em;
+  font-weight: 400;
+  letter-spacing: 0.06em;
+  line-height: 1.1;
+  text-transform: uppercase;
+  color: var(--brand-hot);
+}
+.setup-card ol {
+  grid-area: steps;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  column-gap: 2.6em;
+  margin: 0;
+  padding: 0 0 0 1.3em;
+  font-size: 0.95em;
+  line-height: 1.4;
+}
+.setup-card li::marker {
+  font-family: var(--font-condensed);
+  color: var(--brand-hot);
+}
+.setup-card .hint { display: block; font-size: 0.85em; line-height: 1.35; }
+.setup-card li.done { color: #6b7079; text-decoration: line-through; }
+.setup-card kbd {
+  font: inherit;
+  font-size: 0.8em;
+  padding: 0 0.35em;
+  border: 1px solid rgba(35, 31, 32, 0.25);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  background: #fff;
+}
+.setup-card .actions { grid-area: actions; margin: 0; justify-content: flex-end; flex-wrap: nowrap; gap: 0.6em; }
+.panel.setup-card .actions button {
+  padding: 0.5em 1.1em 0.45em;
+  border-radius: 999px;
+  font-family: var(--font-condensed);
+  font-size: 1.15em;
+  font-weight: 400;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+.panel.setup-card .actions button.primary {
+  background: var(--brand-hot);
+  color: #fff;
+  border: 2px solid var(--brand-hot);
+  box-shadow: 0.18em 0.18em 0 var(--brand-hot-deep);
+}
+.panel.setup-card .actions button.primary:hover { filter: none; background: #F36B3C; }
+.panel.setup-card .actions button.ghost {
+  background: transparent;
+  color: var(--brand-ink);
+  border: 2px solid var(--brand-ink);
+}
+.panel.setup-card .actions button.ghost:hover { background: rgba(35, 31, 32, 0.06); }
+/* A window too narrow for a strip (a phone) stacks the card above the gear,
+   the way it always stood. No lobby TV is this narrow: the strip holds down
+   to 800x600. */
+@media (max-width: 639px) {
+  .panel.setup-card {
+    left: var(--safe-inset);
+    right: var(--safe-inset);
+    max-width: none;
+    bottom: calc(var(--safe-inset) + max(46px, calc(2.9 * var(--u))) + 14px);
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      'head'
+      'steps'
+      'actions';
+  }
+  .setup-card ol { grid-template-columns: minmax(0, 1fr); row-gap: 0.35em; }
+  .setup-card .actions { justify-content: flex-start; }
+}
+.stage.april-fools .setup-card { transform: rotate(180deg); }
+
+/* Settings → Connection: the by-hand key fields fold away behind the login. */
+details.advanced-fields { margin: 0.25rem 0 0.9rem; border-top: 1.5px solid var(--panel-card-line, #DCE4EF); padding-top: 0.85rem; }
+/* The fold's handle: Londrina tracked caps in Awana blue, the kit chevron. */
+details.advanced-fields > summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-height: 40px;
+  padding: 0.2rem 0.1rem;
+  border-radius: 8px;
+  list-style: none;
+  cursor: pointer;
+  font-family: var(--font-condensed);
+  font-size: 1.05rem;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--brand-blue-deep);
+}
+details.advanced-fields > summary::-webkit-details-marker { display: none; }
+details.advanced-fields > summary::before {
+  content: '';
+  width: 0.62rem;
+  height: 1rem;
+  background: currentColor;
+  -webkit-mask: url('../../shared/brand/doodles/chevron.svg') center / contain no-repeat;
+  mask: url('../../shared/brand/doodles/chevron.svg') center / contain no-repeat;
+  rotate: 180deg;
+}
+details.advanced-fields[open] > summary::before { rotate: 270deg; }
+details.advanced-fields > summary:hover { color: var(--brand-blue); }
+details.advanced-fields[open] > summary { margin-bottom: 0.5rem; }
+details.advanced-fields > .hint { display: block; margin-bottom: 0.9rem; }
+
+/* ── Large canvases: 1440p / 4K at 100% OS scaling ──────────────────
+   Every headline ceiling in this file is a rem clamp, so lifting the root
+   size lifts them all together (same blanket strategy as
+   .zero-animation-mode). 1920-wide TVs — the design and Playwright
+   baseline viewport — are untouched: 2400px only reaches 1440p boxes, and
+   32px at 3840 reproduces the 1080p proportions exactly. The panels are
+   sized in rem above for the same reason; the gear (touch target) and the
+   slide-card thumbnail (locked to its 0.15 frame scale) stay in px. */
+@media (min-width: 2400px) {
+  html { font-size: 21px; }
+}
+@media (min-width: 3600px) {
+  html { font-size: 32px; }
+}
+
+/* ────────────────────────────────────────────────────────────
+   Brand kit primitives (src/components/brand/): the catalog's
+   stepped chip, club wave, corner tab, hot sticker and doodles.
+   Layout only; every color comes from a prop or a --brand-* token.
+   ──────────────────────────────────────────────────────────── */
+.step-chip {
+  display: inline-block;
+  position: relative;
+  line-height: 0;
+  vertical-align: middle;
+  flex: none;
+}
+.step-chip svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.brand-wave {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+}
+.brand-wave svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.brand-tab {
+  position: absolute;
+  left: 0;
+  top: 0;
+}
+.brand-tab svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.brand-tab__content {
+  position: relative;
+}
+.brand-sticker {
+  position: absolute;
+  aspect-ratio: 1;
+}
+.brand-sticker svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.brand-sticker__text {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-shout);
+  color: #fff;
+  text-align: center;
+  /* The mockup's .95 at Galindo's size, held in u at Paytone One's 1.057x. */
+  line-height: 0.9;
+}
+.brand-doodles {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.brand-doodle,
+.brand-doodle__twinkle {
+  position: absolute;
+  display: block;
+}
+.brand-doodle__twinkle {
+  inset: 0;
+}
+.brand-doodle svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  overflow: visible;
+}
+/* The stepped plate (StepPlate.jsx): the chip's silhouette around any
+   content. --plate-label is the label's font size; every other length is a
+   multiple of the pill's height (--plate-pill), the kit chip's proportions
+   (brand.js PLATE). The outline is drawn from the measured boxes behind the
+   label and the body. */
+.step-plate {
+  /* --plate-label is set by the overlay that owns the plate (the sticker, a
+     notice, a toast), on an ANCESTOR, so it is read here with a fallback and
+     never declared: a declaration on the plate itself would beat the
+     inherited size and pin every label to 1rem. */
+  --plate-pill: calc(2.05 * var(--plate-label, 1rem));
+  position: relative;
+  display: inline-grid;
+  /* Never wider than its owner: a toast line left to wrap wraps inside it. */
+  max-width: 100%;
+  grid-template-columns: auto;
+  justify-items: start;
+  color: #fff;
+  vertical-align: top;
+}
+.step-plate__shape {
+  position: absolute;
+  left: 0;
+  top: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+.step-plate__fill { fill: var(--brand-chip); }
+.step-plate__keyline { stroke: #fff; }
+.step-plate__echo { display: none; }
+.step-plate__label {
+  position: relative;
+  box-sizing: border-box;
+  height: var(--plate-pill);
+  min-width: calc(3.93 * var(--plate-label, 1rem));
+  padding: calc(0.1 * var(--plate-label, 1rem)) calc(0.75 * var(--plate-label, 1rem)) 0;
+  margin-right: calc(0.435 * var(--plate-pill));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-condensed);
+  font-size: var(--plate-label, 1rem);
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.step-plate__body {
+  position: relative;
+  justify-self: stretch;
+  margin-left: calc(0.73 * var(--plate-pill));
+  margin-top: calc(-0.087 * var(--plate-pill));
+}
+.step-plate--bare .step-plate__body {
+  margin: 0;
+}
+/* A stepped chip's glyph (the weather's sky doodle), on the chip's em grid. */
+.step-chip__icon {
+  position: absolute;
+  display: block;
+  color: #fff;
+  line-height: 0;
+  pointer-events: none;
+}
+.weather-glyph {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+/* ── Settings: two panes (SettingsPanel.jsx, .panel--settings) ───────────
+   A section list on the left and the chosen section on the right, the band
+   on top and Undo / Done pinned at the foot. On a phone (or a very short
+   screen) the list is the whole panel, a tap pushes the section full screen
+   and "All settings" comes back (data-view on the dialog says which). Only
+   .panel--settings is styled here: the slide editor also wears
+   .panel--tabbed and must not change. */
+.panel--settings {
+  width: min(68rem, 96vw);
+}
+.panel--settings .panel-header {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  padding-block: 0.75rem 0.8rem;
+}
+.panel--settings .panel-header .panel-mark { grid-row: 1; width: 5.4rem; }
+.panel--settings .panel-header h2 { grid-row: 1; align-self: center; font-size: 1.9rem; }
+.panel--settings .panel-header .status-line { grid-row: 1; margin: 0; }
+.settings-main {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(12.5rem, 17rem) minmax(0, 1fr);
+}
+.settings-nav {
+  overflow-y: auto;
+  padding: 0.8rem 0.7rem;
+  background: #ffffff;
+  border-right: 2px solid var(--panel-card-line);
+  scrollbar-width: thin;
+}
+.settings-nav [role='tablist'] { display: flex; flex-direction: column; gap: 0.2rem; }
+.panel button.settings-nav__item {
+  appearance: none;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: auto auto;
+  align-items: center;
+  justify-content: stretch;
+  column-gap: 0.5rem;
+  row-gap: 0.15rem;
+  width: 100%;
+  min-height: 52px;
+  padding: 0.55rem 0.85rem;
+  border: 0;
+  border-radius: 14px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--panel-ink);
+  text-align: left;
+  text-transform: none;
+  letter-spacing: 0;
+  /* A rail item is type, not a key: the tab's softer squish, no sink. */
+  --squish-x: var(--squish-tab-x);
+  --squish-y: var(--squish-tab-y);
+  --squish-sink: 0 0;
+  transform-origin: 50% 50%;
+}
+.settings-nav__label {
+  grid-column: 1;
+  font-family: var(--font-condensed);
+  font-size: 1.12rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.settings-nav__blurb {
+  grid-column: 1;
+  font-family: var(--font-body);
+  font-size: 0.82rem;
+  line-height: 1.25;
+  color: var(--panel-muted);
+}
+.settings-nav__badge {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  min-width: 1.6rem;
+  height: 1.6rem;
+  padding: 0 0.4rem;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--brand-sparks-deep);
+  color: #ffffff;
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  font-weight: 800;
+}
+.panel button.settings-nav__item:hover { background: var(--brand-cloud); }
+.panel button.settings-nav__item[aria-selected='true'] {
+  background: var(--brand-blue);
+  color: #ffffff;
+  box-shadow: 0 3px 0 var(--brand-blue-deep);
+}
+.panel button.settings-nav__item[aria-selected='true'] .settings-nav__blurb { color: #ffffff; }
+.panel button.settings-nav__item[aria-selected='true'] .settings-nav__badge { background: #ffffff; color: var(--brand-sparks-deep); }
+
+.settings-pane {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--panel-field);
+}
+.settings-pane:focus { outline: none; }
+.settings-pane__head {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem var(--panel-pad) 0;
+}
+.panel .settings-pane__title {
+  margin: 0;
+  font-family: var(--font-condensed);
+  font-size: 1.5rem;
+  font-weight: 400;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--panel-ink);
+}
+.panel button.settings-back { display: none; }
+.panel--settings .panel-body { padding-top: 0.9rem; }
+
+/* Status: what is wrong, worded by fix, at the top of the section. */
+.status-alerts { display: flex; flex-direction: column; gap: 0.6rem; margin-bottom: 1.1rem; }
+.panel .status-alert {
+  padding: 0.7rem 1rem;
+  border-radius: 12px;
+  border-left: 6px solid var(--brand-sparks-deep);
+  background: #ffffff;
+  color: var(--panel-ink);
+  font-size: 0.95rem;
+  line-height: 1.4;
+}
+.panel .status-alert--warn { border-left-color: var(--brand-sun); }
+.panel .status-sentence {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0 0 0.6rem;
+  font-weight: 700;
+}
+.panel .status-sentence .dot {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--panel-keyline);
+}
+.panel .status-sentence.connected .dot { background: var(--brand-tnt); }
+.panel .status-sentence.connecting .dot { background: var(--brand-sun); }
+.panel .status-sentence.disconnected .dot { background: var(--brand-sparks); }
+.panel .section-jump { align-self: flex-start; margin: 0.4rem 0 0.9rem; }
+.panel .conn-summary { margin-bottom: 0.4rem; }
+.panel .toggle-nested { padding-left: 1.4rem; border-left: 3px solid var(--panel-card-line); margin-left: 0.2rem; }
+.panel .toggle-nested .toggle { border-top: 0; padding-top: 0.2rem; }
+.panel .panel-fold { padding: 0.9rem 1.4rem 0.2rem; border: 1.5px solid var(--panel-card-line); border-radius: 16px; background: #ffffff; }
+
+/* Setup → Tools: one row per tool, the button and what it does. */
+.tool-grid { display: flex; flex-direction: column; gap: 0.2rem; margin-bottom: 0.9rem; }
+.tool {
+  display: grid;
+  grid-template-columns: 13.5rem minmax(0, 1fr);
+  align-items: center;
+  gap: 0.9rem;
+  padding: 0.55rem 0;
+  border-top: 1.5px solid var(--panel-card-line);
+}
+.tool:first-child { border-top: 0; }
+.tool > button { width: 100%; }
+
+/* The foot: a plain-words note on the left, Undo and Done on the right. */
+.panel--settings .actions { align-items: center; justify-content: flex-end; }
+.panel--settings .actions .settings-live { margin-right: auto; }
+
+/* ── Phones and very short screens: list, then one section ─────────────── */
+@media (max-width: 719px), (max-height: 480px) {
+  .panel--settings .panel-header .panel-mark { display: none; }
+  .panel--settings .panel-header h2 { font-size: 1.4rem; }
+  .panel--settings .panel-header .status-line { grid-column: 2 / -1; grid-row: 1; justify-self: end; margin: 0; }
+  .settings-main { grid-template-columns: minmax(0, 1fr); }
+  .settings-nav { border-right: 0; padding: 0.6rem var(--panel-pad); }
+  .panel--settings[data-view='list'] .settings-pane { display: none; }
+  .panel--settings[data-view='section'] .settings-nav { display: none; }
+  .panel--settings .settings-pane__head { padding: 0.55rem var(--panel-pad) 0; }
+  .panel button.settings-back { display: inline-flex; min-height: 44px; padding-inline: 0.8rem; }
+  .panel .settings-pane__title { font-size: 1.2rem; }
+  .tool { grid-template-columns: minmax(0, 1fr); gap: 0.3rem; }
+  .panel--settings .actions .settings-live { display: none; }
+  .panel--settings .actions > * { flex: 1 1 0; }
+}
+
+/* Settings → Pickup board: two times side by side, and the live preview, a
+   16:9 frame whose --u is 1% of its own width, so the board inside draws at
+   exactly its TV proportions. */
+.panel .field-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.9rem; }
+.board-preview {
+  position: relative;
+  container-type: inline-size;
+  --u: 1cqw;
+  aspect-ratio: 16 / 9;
+  margin: 0.2rem 0 0.7rem;
+  overflow: hidden;
+  border-radius: 12px;
+  background: var(--brand-cloud);
+  border: 1.5px solid var(--panel-card-line);
+}
+.board-preview .checkout-region { pointer-events: none; }

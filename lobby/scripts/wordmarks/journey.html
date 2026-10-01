@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<!--
+  Art board for the custom Journey wordmark — see trek.html for why these
+  exist. Journey gets a winding dotted path that swoops beneath the word
+  and lands on a four-point sparkle-compass (the same sparkle path the
+  display's Doodles use), plus the "Awana Clubs" superscript.
+
+  Rendered to src/assets/clubs/journey.png by render-club-wordmarks.mjs.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<style>
+  @font-face {
+    font-family: 'Baloo 2';
+    src: url('../../node_modules/@fontsource-variable/baloo-2/files/baloo-2-latin-wght-normal.woff2') format('woff2');
+    font-weight: 400 800;
+  }
+  html, body { margin: 0; width: 780px; height: 252px; background: transparent; overflow: hidden; }
+  .board { position: relative; width: 780px; height: 252px; color: #fff; }
+
+  .word {
+    position: absolute;
+    left: 48%;
+    top: 26px;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: baseline;
+    font-family: 'Baloo 2';
+    font-weight: 800;
+    font-size: 122px;
+    line-height: 1;
+    letter-spacing: 0.005em;
+  }
+  .word span { display: inline-block; }
+  .word span:nth-child(1) { transform: rotate(-3deg) translateY(-4px); }
+  .word span:nth-child(2) { transform: rotate(1.6deg) translateY(3px); }
+  .word span:nth-child(3) { transform: rotate(-1.6deg) translateY(-2px); }
+  .word span:nth-child(4) { transform: rotate(2.2deg) translateY(2px); }
+  .word span:nth-child(5) { transform: rotate(-2.2deg) translateY(-3px); }
+  .word span:nth-child(6) { transform: rotate(1.8deg) translateY(2px); }
+  .word span:nth-child(7) { transform: rotate(-2.8deg) translateY(-4px); }
+
+  .path { position: absolute; left: 50%; bottom: 2px; transform: translateX(-50%); }
+  .awana {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    font-family: 'Baloo 2';
+    font-weight: 600;
+    font-size: 21px;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+  }
+</style>
+</head>
+<body>
+<div class="board">
+  <span class="awana">Awana Clubs</span>
+  <div class="word">
+    <span>J</span><span>O</span><span>U</span><span>R</span><span>N</span><span>E</span><span>Y</span>
+  </div>
+  <!-- Winding dotted trail ending in a sparkle-compass. -->
+  <svg class="path" width="600" height="86" viewBox="0 0 560 86" fill="none">
+    <path d="M10 62 C 90 18, 170 84, 260 52 S 420 22, 488 46"
+          stroke="#fff" stroke-width="11" stroke-linecap="round"
+          stroke-dasharray="0.5 34" />
+    <path d="M527 18 C 529.6 34.2 539 43.6 555 46 C 539 48.6 529.6 58 527 74 C 524.4 58 515 48.6 499 46 C 515 43.6 524.4 34.2 527 18 Z"
+          fill="#fff" />
+  </svg>
+</div>
+</body>
+</html>

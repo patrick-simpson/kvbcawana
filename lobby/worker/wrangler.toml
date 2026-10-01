@@ -1,0 +1,21 @@
+# The Awana sync service. Deployed by .github/workflows/deploy-worker.yml;
+# its secrets (PUSHER_APP_ID, PUSHER_KEY, PUSHER_SECRET, PUSHER_CLUSTER,
+# INITIAL_PASSPHRASE) are set by that workflow from the repo's GitHub secrets.
+name = "awana-sync"
+main = "src/index.js"
+compatibility_date = "2026-09-01"
+compatibility_flags = ["nodejs_compat"]
+workers_dev = true
+
+[[durable_objects.bindings]]
+name = "SYNC"
+class_name = "SyncStore"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["SyncStore"]
+
+# Read the church calendar every six hours (UTC), so it is fresh without
+# anyone pressing Refresh.
+[triggers]
+crons = ["23 */6 * * *"]

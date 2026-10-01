@@ -1,0 +1,2819 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="robots" content="noindex">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" type="text/css" href="/assets/a0c308d3/mbmenu.css" media="screen" />
+<script type="text/javascript" src="/assets/a1a6c88a/jquery.min.js"></script>
+<script type="text/javascript" src="/bootstrap/js/bootstrap.min.js"></script>
+<script type="text/javascript" src="/js/offcanvas.js"></script>
+<script type="text/javascript" src="/js/moment.min.js"></script>
+<title>Kennebec Valley Baptist Church - Calendar</title>
+
+    <!-- Bootstrap -->
+    <link href="/bootstrap/css/bootstrap.min.css?v=1565761390" rel="stylesheet">
+    
+    <link href="/css/offcanvas.css" rel="stylesheet">
+    <link href="https://maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css" rel="stylesheet" integrity="sha384-wvfXpqpZZVQGK6TAh5PVlGOfQNHSoD2xbE+QkPxCAFlNEevoEH3Sl0sibVcOQVnN" crossorigin="anonymous">
+
+    <!-- Site -->
+    <link href="/css/shared.css?v=1503201826" rel="stylesheet">
+    <link href="/css/main-bootstrap.css?v=1727930836" rel="stylesheet">
+    <link href="/css/gen/tailwind.css?v=1756510807" rel="stylesheet">
+
+    <script type="text/javascript" src="/js/util.js?v=1660337781"></script>
+
+    <link rel="stylesheet" type="text/css" href="/css/production.css?v=1722487151" />
+            <style>
+            
+                .logo1 img {
+   border-radius: 5px;
+  box-shadow: 0 0 8px #8888;
+}
+                    </style>
+            <link rel="stylesheet" type="text/css" href="/css/print.css?v=1698933914" media="print" />
+
+
+
+    <!-- HTML5 Shim and Respond.js IE8 support of HTML5 elements and media queries -->
+    <!-- WARNING: Respond.js doesn't work if you view the page via file:// -->
+    <!--[if lt IE 9]>
+    <script src="https://oss.maxcdn.com/libs/html5shiv/3.7.0/html5shiv.js"></script>
+    <script src="https://oss.maxcdn.com/libs/respond.js/1.4.2/respond.min.js"></script>
+    <![endif]-->
+
+    
+    <script language="javascript" type="text/javascript" src="/js/modernizr.custom.92056.js"></script>
+    <script language="javascript" type="text/javascript" src="/js/jquery-ui-1.10.4.min.js"></script>
+    <link href="/css/jquery-ui-1.10.4.custom.css" rel="stylesheet" type="text/css">
+
+    <link href='//fonts.googleapis.com/css?family=Source+Sans+Pro:400,700,400italic,700italic' rel='stylesheet' type='text/css'>
+
+    <link href='//fonts.googleapis.com/css?family=PT+Sans:400,700,400italic,700italic|Raleway:700|Lato:400,700,400italic,700italic' rel='stylesheet' type='text/css'>
+
+    
+    <style>
+        body {
+            top: 0px !important;
+        }
+        body .goog-te-banner-frame {
+            display: none !important;
+            visibility: hidden !important;
+        }
+    </style>
+    <script type="text/javascript" src="/js/autosize.js"></script>
+    <script type="text/javascript" src="/js/cleave.min.js"></script>
+    <script type="text/javascript" src="/js/dcphone.js"></script>
+    <script>
+        $(function() {
+            autosize($('textarea'));
+        });
+    </script>
+
+    <link rel="shortcut icon" href="/favicon.ico" type="image/vnd.microsoft.icon"/>
+<link rel="icon" href="/favicon.ico" type="image/x-ico"/>
+<link REL="apple-touch-icon" HREF="/apple-touch-icon.png" />
+
+</head>
+<body>
+
+<div id="page-content-holder" class="loading">
+    <div id="app-content">
+                <nav id="site-navbar" class="ttt-small navbar navbar-default navbar-fixed-top" role="navigation">
+            <div class="container">
+                <!-- Brand and toggle get grouped for better mobile display -->
+                <div class="navbar-header">
+                    <script>
+                        $(function(){
+                            /* Clubber pic toggle size */
+                            $('body').on('click', '.pic-holder.toggle-size', function(){
+                                var img = $(this).find('img');
+                                if ($(this).hasClass('max-size')) {
+                                    img.attr("height", img.data('small'));
+                                    $(this).removeClass('max-size');
+                                } else {
+                                    img.data("small", img.attr('height'));
+                                    img.attr("height", '');
+                                    $(this).addClass('max-size');
+                                }
+                            });
+
+                            
+                            /* CLUBBER SEARCH *******************/
+                            $('.clubber-search-shortcut').click(function(){
+                                try {
+                                    if ($('body.has-push-left').length)
+                                        $('.site-nav-close').click();
+
+                                    $('#clubber-search-modal .modal-body').hide();
+                                    $('#clubber-search-text').val('');
+                                    $('#clubber-search-modal').modal('show');
+                                } finally {
+                                    return false;
+                                }
+                            });
+                            $('#clubber-search-modal').on('shown.bs.modal', function () {
+                                $('#clubber-search-text').focus();
+                            });
+                            $('#clubber-search-text').change(function(){
+                                $('#clubber-search-btn').click();
+                            });
+                            $('#clubber-search-btn').click(function(){
+                                try {
+                                    var modal_body = $('#clubber-search-modal .modal-body');
+                                    modal_body.html( '<i class="fa fa-refresh fa-spin fa-2x fa-fw" aria-hidden="true"></i> Searching')
+                                        .show();
+
+                                    $.ajax({
+                                        cache: false,
+                                        url: '/clubber/ajaxSearch?>',
+                                        data: 'text=' + $('#clubber-search-text').val(),
+                                        success: function(data){
+                                            modal_body.html(data);
+                                        },
+                                        error: function (response, b, error) {
+                                            if (data.responseText.trim()=='Login Required')
+                                                window.location.reload();
+                                            alert('Error receiving search results: ' + response.responseText);
+                                        }
+                                    });
+                                } finally {
+                                    return false;
+                                }
+                            });
+
+                            /* SHOW LEFT MENU *******************/
+                            $('.navbar-header .navbar-toggle').click(function(){
+                                $('body').addClass('has-push-left');
+                                $('.c-menu').addClass('is-active');
+                                $('.c-mask').addClass('is-active');
+                                $('#left-menu-container').show();
+                            });
+                            /* HIDE LEFT MENU *******************/
+                            $('#left-mask, .site-nav-close').click(function(){
+                                $('body').removeClass('has-push-left');
+                                $('.c-menu').removeClass('is-active');
+                                $('.c-mask').removeClass('is-active');
+                                $('#left-menu-container').hide();
+                            });
+
+                            $('.dropdown-toggle-2').click(function(){
+                                P = $(this).parent();
+                                P.toggleClass('open');
+                                return false;
+                                /*if (P.hasClass('open')) {
+                                    P.
+                                } else {
+
+                                }*/
+
+                            });
+                        });
+                    </script>
+
+                    
+                    <button type="button" class="navbar-toggle pull-left" xdata-toggle="collapse" xdata-target="#left-menu-container">
+                        <span class="sr-only">Toggle navigation</span>
+                        <span class="icon-bar"></span>
+                        <span class="icon-bar"></span>
+                        <span class="icon-bar"></span>
+                    </button>
+                    <div class="pull-right">
+                                                <a target="_blank" href="https://twotimtwo.com">
+                            <img src="/images/ttt_logo_right.png"
+                                 style="margin-top:5px;" />
+                        </a>
+                    </div>
+                    <span class="desktop" style="display:flex;justify-content: center; align-items: center; height: 49px">
+                        
+                        
+                        <a class="logo1" target="_blank" href="http://kvbchurch.org/"><img src="/images/logos/kvbchurch2.jpg" alt="" />                        </a>
+
+                                            </span>
+
+                                    </div>
+
+                <script>
+                    $(function(){
+                        $('#mobile-logo').click(function(){
+                            window.location = "/";
+                        });
+                    });
+                    function HeightPerc(o, std_height, ref_height, is_button) {
+                        perc = std_height * 100 / ref_height;
+                        perc = perc + '%';
+                        $(o).css('height', perc)
+                            .css('min-height',perc)
+                            .css('max-height',perc);
+
+
+                        if (is_button) {
+                            perc = 4 * 100 / window.innerHeight;
+                            perc = perc + '%';
+                            $(o).css('margin', perc);
+
+                            perc = std_height * 100 / window.innerWidth;
+                            perc = perc + '%';
+                            $(o).css('width', perc)
+                                .css('min-width',perc)
+                                .css('max-width',perc);
+                        } else {
+                            perc = 3 * 100 / window.innerHeight;
+                            perc = perc + '%';
+                            $(o).css('padding-top', perc);
+                        }
+                    }
+                    /*$(function(){
+                        /*if (Modernizr.touch) {
+                         //alert('mobile touch');
+
+                         HeightPerc($('#site-navbar'), 50, window.innerHeight);
+                         HeightPerc($('#mobile-left'), 26, 50, true);
+                         HeightPerc($('#mobile-right'), 40, 50, true);
+
+                         $('#site-navbar .container').css({'height':'100%'});
+                         $('#site-navbar .navbar-header').css({'height':'100%'});
+
+                         $('#site-navbar .desktop').hide();
+                         $('#site-navbar .mobile').show();
+                         }* /
+                    });*/
+                </script>
+                <style>
+                    span.navbar-hide {
+                        font-size: inherit;
+                    }
+                    #nav-bar .navbar-hide,
+                    #nav-container i.fa {
+                        display: none;
+                    }
+                    #nav-container i.fa.fa-mobile,
+                    #nav-container i.forum {
+                        display: inline-block;
+                    }
+                    #site-navigation i.fa-mobile {
+                        display: none;
+                    }
+                    #site-navigation i.fa.fa-close {
+                        font-size: 20px;
+                    }
+                    #site-navigation i.fa {
+                        margin-right: 4px;
+                        width: 20px;
+                        text-align: center;
+                        color: #678c89;
+                    }
+                    #site-navbar img#mobile-logo {
+                        cursor:pointer;
+                        height:90%;
+                        margin-left: 4px;
+                        padding-top: .3%;
+                    }
+                    #mobile-left {
+                        height: 26px;
+                        width: 26px;
+                        margin: 3px;
+                        border:none;
+                        background:none;
+                        padding: 0px;
+                    }
+                    #mobile-right {
+                        height: 40px;
+                        width:40px;
+                        border:none;
+                        margin:0px;
+                        padding: 0px;
+                    }
+                    #mobile-left img,
+                    #mobile-right img {
+                        height: 100%;
+                    }
+                    #mobile-right.navbar-toggle {
+                        padding: 0px;
+                    }
+                    div#main-navbar {
+                        background: #f8f8f8;
+                    }
+                </style>
+
+                <!-- Collect the nav links, forms, and other content for toggling -->
+                <div class="collapse navbar-collapse" id="main-navbar">
+                                    </div><!-- /.navbar-collapse -->
+            </div><!-- /.container-fluid -->
+        </nav>
+
+        
+        
+                <div id="header_and_menu" class="ttt-large " >
+            <div id="header">
+                                <div id="logo">
+                    <a class="logo1" target="_blank" href="http://kvbchurch.org/"><img src="/images/logos/kvbchurch2.jpg" alt="" /></a>
+
+
+                    <div id="awana-logo"></div>
+
+                    <div class="pull-right">
+                        <a id="ttt-logo" target="_blank" href="https://twotimtwo.com">
+                        </a>
+                    </div>
+                </div>
+            </div><!-- header -->
+
+            <style>
+                #nav ul ul {top:4px}
+                #nav ul #pay-hosting span {
+                    background: #e7beff;
+                }
+                #nav ul #covid19 span {
+                    background: rgba(255,255,205,.6);
+                }
+                #nav ul #pay-hosting span:hover {
+                    background: #ffe9b9;
+                }
+            </style>
+            <div id="mainmenu-x">
+                
+                 <div id="nav-container">
+<div id="nav-bar">
+<ul id="nav">
+<li><a href="/site/index"><span><i class="fa fa-home forum"></i><span class="navbar-hide">Home</span></span></a></li>
+<li><a href="/site/register"><span><i class="fa fa-pencil"></i>Registration</span></a></li>
+<li><a href="/clubber"><span><i class="fa fa-sign-in" ></i>Login</span></a></li>
+</ul></div></div>
+            </div><!-- mainmenu -->
+        </div>
+
+
+
+        <div class="container body-container">
+            <div class="row row-offcanvas row-offcanvas-left">
+
+                
+                
+                
+                <div class="main-container col-xs-12">
+                    
+
+                    <!-- breadcrumbs -->
+
+                    <div id="all-flashes" class="noprint"></div>
+                    <div class="container">
+    <div><!-- span-19 -->
+        <div id="content">
+                        
+<h1>Calendar</h1>
+
+
+<script>
+    function daynote_updated(link, data) {
+        //info = JSON.parse(data);
+
+        /*alert('daynote updated - not updating yet');
+        alert(data);
+        alert(link.closest('.day-note-container').html());*/
+        link.closest('.day-note-container').replaceWith(data);
+        /*for(var key in info) {
+            $('.info.' + key).html( info[key]);
+        }*/
+    }
+
+    $(function(){
+        $('.toggle-days').click(function(){
+            days = $(this).closest('.month').find('.days');
+            if (days.is(':visible')) {
+                days.hide();
+                $(this).addClass('show').removeClass('hide');
+            } else {
+                days.show();
+                $(this).addClass('hide').removeClass('show');
+            }
+        });
+    });
+</script>
+<style>
+    .month.past .dc-toggle.card .card-body {background: none}
+    .month.past h3 {display:inline-block; margin:0}
+
+    .checkinDisp.inactive {
+        opacity: .5;
+        font-weight: normal;
+    }
+    .month .days .dayline {
+
+        border-top: 1px dashed #ccc;
+    }
+    .month .days .dayline:first-child {
+        border-top: none;
+    }
+    .modal.is-loading .modal-body,
+    .modal.is-loading .modal-footer {
+        display: none;
+    }
+    .modal .loading {
+        background: #ddf;
+    }
+    .modal .loading:before {
+        content: "Loading";
+    }
+    td.cal_daynbr {
+        vertical-align: top;
+        font-weight: bold;
+        font-size: 110%;
+        min-width: 25px;
+        text-align: center;
+    }
+    a.toggle-days {
+        text-decoration: none;
+        cursor: pointer;
+        width: 15px;
+        height: 15px;
+        background-repeat: no-repeat;
+        background-position-x: center;
+        background-position-y: center;
+        display:inline-block}
+    a.toggle-days.hide {background-image: url('/images/minus.gif');}
+    a.toggle-days.show {background-image: url('/images/plus_1.gif');}
+    /*.month.past .days {display:none}*/
+    .month{background:#f1f4ff; border: 1px solid #b9c6d8; margin: 4px; padding: 2px 8px; /*width: 850px*/}
+    .month.past {background: #ddd; /*opacity: .7  caused problems with "change" overlay*/}
+    .month.past h3 {color: #999}
+    h3{margin-bottom: 5px; }
+    .days{padding: 0px 10px}
+    .day{display: inline-block;width:35px;text-align:right;font-weight: bold}
+    .msg{display: block;margin-left: 7px; font-weight: bold}
+    .skipped{color: #aaa; font-style: italic; font-weight: normal; background: none; border: none;}
+    a, a:visited{color: #55f}
+    .skipped a, .skipped a:visited,
+    .msg a, .msg a:visited{color: #99f; font-weight: normal}
+    a:hover{color: #95d}
+    /*#changeForm .main{background:yellow; border: 1px solid #ddd; padding: 0px 2px; position: relative}*/
+    /*.checkinInfo{ background:#FF9; padding: 3px 0px; border: 1px solid #dd6}*/
+    #clubs .checkbox input[type=checkbox] {
+        margin-left: 0px;
+        margin-right: 4px;
+    }
+    #clubs .checkbox label {
+        vertical-align: middle;
+    }
+    #checkinDetails{vertical-align: text-top; padding: 5px 2px; /*display: inline-block; */
+        /*position: absolute;*/ top: 50px; left:5px}
+    #checkinDetails div{display:inline-block; vertical-align: top; padding: 4px 4px}
+    #checkinDetails div div{display:block; vertical-align: top; padding: 4px 1px}
+    #checkinClubs{
+        background: #e7f6ff; border: 1px solid #e0eef7;
+        border-radius: 5px;
+        padding: 2px 4px;
+    }
+    .add{margin-left: 20px; margin-top: 4px}
+    a.datenoteEdit,
+    a.adddayevt {font-style: italic; padding-left: 15px; color: #99f}
+    a.datenoteEdit {
+        padding: 0px;
+    }
+    div.dayline tr:hover{background: #F5F4C5}
+    .dayline.past {background: #ddd}
+    .checkin-sample h4,
+    .checkin-sample table {margin: 0px;}
+    .checkin-title {color:white; font-weight:bold;}
+    .checkin-form {margin-top: 6px; background: yellow; min-height: 20px; padding: 2px}
+    .sample-column {width:350px}
+
+    .step-mtg {
+        padding: 5px 20px;
+        background: rgba(221, 181, 113, 0.4); /*rgba(0,0,0,.03);*/
+        border-radius: 5px;
+        margin-left: 10%;
+    }
+
+    .note {
+        color: #88a; font-style: italic;
+    }
+</style>
+
+
+<div style="clear:both">
+
+
+<div class="month "><h3><h3 class="alt">July</h3><div class="days"><div id='D2026-07-15' class='dayline '><table style="margin-bottom: 3px"><tr><td class='cal_daynbr skipped'>15</td><td class="cal-info-col"><div class='msg skipped'><div>No Awana this week </div><span class="fields" style="display:none" recid="0" checkin=""
+									calendar_id="" shekels="0" points="0" inactive="" automatic="" type=""
+									calendar_date="2026-07-15" clubkeys=""></span>
+							<span class="desc" style="display: none">Awana meeting</span> </div>        <style>
+            .link-popup {cursor: pointer}
+            #link-popup-modal .modal-content {
+                background: #f5f5f5;
+            }
+            #link-popup-modal .modal-header {
+                border-bottom: none;
+                padding: 5px 10px;
+                min-height: 30px;
+            }
+            #link-popup-modal .modal-body {
+                padding-top: 0px;
+            }
+        </style>
+        <div class="modal fade" id="link-popup-modal" tabindex="-1" role="dialog" aria-labelledby="myModalLabel">
+            <div class="modal-dialog modal-lg" role="document">
+                <div class="modal-content">
+                    <div class="modal-header">
+                       <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                    </div>
+                    <div class="modal-body">
+                       <div class="ajax-content">
+                       </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <script>
+            var link_popup_trigger_obj = null;
+            $(function(){
+                $('body').on('click', '.link-popup', function(){
+                    try {
+                        link_popup_trigger_obj = $(this);
+
+                        $('#link-popup-modal').modal('show')
+                            .find('.ajax-content')
+                            .html('Loading...')
+                            .load($(this).data('source'), function( response, status, xhr ) {
+                                      if ( status == "error" ) {
+                                        alert( 'Error: ' + xhr.responseText );
+                                      }
+                                    }
+                                );
+                    } finally {
+                        return false;
+                    }
+
+                }).on('click', '.add-hidden', function(){
+                    form = $(this).closest('form');
+                    form.append('<input type="hidden" name="'+$(this).attr('name')
+                        +'" value="'+$(this).attr('value')+'" />');
+
+                }).on('hidden.bs.modal', function (e) {
+                    hide = $(link_popup_trigger_obj).data('hide');
+                    if (hide) {
+                        var fn = window[hide];
+                        if (typeof fn === "function") {  //success is function name -> return result
+                            fn( link_popup_trigger_obj);
+                        } else {   //success is javascript - evaluate
+                            eval(hide);
+                        }
+                    }
+
+                }).on('submit', '#link-popup-modal form', function(){
+                    var F = $(this);
+                    $.ajax({
+                        cache: false,
+                        type: F.attr('method'),
+                        url: F.attr('action'),
+                        data: F.serialize(),
+                        success: function(data){
+                            var success = $(link_popup_trigger_obj).data('success');
+                            if (success) {
+                                var fn = window[success];
+                                if (typeof fn === "function")  //success is function name -> return result
+                                    fn( link_popup_trigger_obj, data);
+                                else    //success is javascript - evaluate
+                                    eval(success);
+                            }
+
+                            var success_replace = $(link_popup_trigger_obj).data('success-replace');
+                            if (success_replace) {
+                                F.closest('.ajax-content').html(data);
+
+                            } else {
+                                dont_hide = $(link_popup_trigger_obj).data('success-dont-hide');
+                                if (!dont_hide)
+                                    $('#link-popup-modal').modal('hide');
+                            }
+                        },
+                        error: function(data) {
+                            if (data.responseText.trim()=='Login Required')
+                                window.location.reload();
+                            alert('ERROR: '+data.responseText);
+                        }
+                    });
+                   return false;
+                });
+            });
+        </script>
+        </td></tr></table></div><div id='D2026-07-22' class='dayline '><table style="margin-bottom: 3px"><tr><td class='cal_daynbr skipped'>22</td><td class="cal-info-col"><div class='msg skipped'><div>No Awana this week </div><span class="fields" style="display:none" recid="0" checkin=""
+									calendar_id="" shekels="0" points="0" inactive="" automatic="" type=""
+									calendar_date="2026-07-22" clubkeys=""></span>
+							<span class="desc" style="display: none">Awana meeting</span> </div></td></tr></table></div><div id='D2026-07-29' class='dayline '><table style="margin-bottom: 3px"><tr><td class='cal_daynbr skipped'>29</td><td class="cal-info-col"><div class='msg skipped'><div>No Awana this week </div><span class="fields" style="display:none" recid="0" checkin=""
+									calendar_id="" shekels="0" points="0" inactive="" automatic="" type=""
+									calendar_date="2026-07-29" clubkeys=""></span>
+							<span class="desc" style="display: none">Awana meeting</span> </div></td></tr></table></div></div></div><div class="month "><h3><h3 class="alt">August</h3><div class="days"><div id='D2026-08-05' class='dayline '><table style="margin-bottom: 3px"><tr><td class='cal_daynbr skipped'>5</td><td class="cal-info-col"><div class='msg skipped'><div>No Awana this week </div><span class="fields" style="display:none" recid="0" checkin=""
+									calendar_id="" shekels="0" points="0" inactive="" automatic="" type=""
+									calendar_date="2026-08-05" clubkeys=""></span>
+							<span class="desc" style="display: none">Awana meeting</span> </div></td></tr></table></div><div id='D2026-08-12' class='dayline '><table style="margin-bottom: 3px"><tr><td class='cal_daynbr skipped'>12</td><td class="cal-info-col"><div class='msg skipped'><div>No Awana this week </div><span class="fields" style="display:none" recid="0" checkin=""
+									calendar_id="" shekels="0" points="0" inactive="" automatic="" type=""
+									calendar_date="2026-08-12" clubkeys=""></span>
+							<span class="desc" style="display: none">Awana meeting</span> </div></td></tr></table></div><div id='D2026-08-19' class='dayline '><table style="margin-bottom: 3px"><tr><td class='cal_daynbr skipped'>19</td><td class="cal-info-col"><div class='msg skipped'><div>No Awana this week </div><span class="fields" style="display:none" recid="0" checkin=""
+									calendar_id="" shekels="0" points="0" inactive="" automatic="" type=""
+									calendar_date="2026-08-19" clubkeys=""></span>
+							<span class="desc" style="display: none">Awana meeting</span> </div></td></tr></table></div><div id='D2026-08-26' class='dayline '><table style="margin-bottom: 3px"><tr><td class='cal_daynbr skipped'>26</td><td class="cal-info-col"><div class='msg skipped'><div>No Awana this week </div><span class="fields" style="display:none" recid="0" checkin=""
+									calendar_id="" shekels="0" points="0" inactive="" automatic="" type=""
+									calendar_date="2026-08-26" clubkeys=""></span>
+							<span class="desc" style="display: none">Awana meeting</span> </div></td></tr></table></div></div></div><div class="month "><h3><h3 class="alt">September</h3><div class="days"><div id='D2026-09-02' class='dayline '><table style="margin-bottom: 3px"><tr><td class='cal_daynbr'>2</td><td class="cal-info-col"><div class="mtg-container"><div class='msg'><span class='desc'>Awana meeting</span>  </div><div class='msg'><span class="fields" style="display:none" recid="0" checkin=""
+									calendar_id="368" shekels="0" points="0" inactive="" automatic="" type=""
+									calendar_date="2026-09-02" clubkeys=""></span>
+							<span class="desc" style="display: none">Awana meeting</span></div>        <script>
+            $(function(){
+                $('body').on('click', '.dcajax-edit', function(){
+                    try {
+                        var div = $(this).closest('.dcajax-view');
+
+                        $.ajax({
+                            url: div.attr('url'),
+                            data: div.attr('data'),
+                            cache: false,
+                            success: function (data) {
+                                div.html(data);
+                            },
+                            error: function (data) {
+                                if (data.responseText.trim()=='Login Required')
+                                    window.location.reload();
+                                alert('ERROR: ' + data.responseText);
+                            }
+
+                        });
+                    } finally {
+                        return false;
+                    }
+                });
+
+                $('body').on('click', '.dcajax-submit', function(){
+                    try {
+                        var div = $(this).closest('.dcajax-view');
+                        var form = $(this).closest('form');
+
+                        $.ajax({
+                            url: form.attr('action'),
+                            type: 'POST',
+                            data: form.serialize(),
+                            cache: false,
+                            success: function (data) {
+                                div.replaceWith(data);
+                            },
+                            error: function (data) {
+                                if (data.responseText.trim()=='Login Required')
+                                    window.location.reload();
+                                alert('ERROR: ' + data.responseText);
+                            }
+
+                        });
+                    } finally {
+                        return false;
+                    }
+                });
+
+            });
+        </script>
+        <style>
+            .dcajax-view form {
+                background: yellow;
+            }
+        </style>
+                        <div class="step-mtg">
+                    <div style="font-size: 90%; font-weight: bold; font-style: italic; text-decoration: underline">Section                        assigned to Meeting:
+                    </div>
+                    <table class="table-striped">
+                        <thead>
+                        <tr>
+                            <td>Club</td>
+                            <td>Book Track</td>
+                            <td>Section</td>
+                            <td>Special</td>
+                        </tr>
+                        </thead>
+
+                        <tbody>
+                                                    <tr class='book-track-mtg'>
+                                            <td>Cubbies </td>
+        <td>
+            HoneyComb        </td>
+        <td>
+                            <b>A</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                        <tr class='book-track-mtg'>
+                                            <td>T&T </td>
+        <td>
+            Mission: Agents of Grace (3)        </td>
+        <td>
+                            <b>Start Zone #1</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                        <tr class='book-track-mtg'>
+                                            <td>Trek</td>
+        <td>
+            Trek 1: His Story (+ Check)        </td>
+        <td>
+                            <b>1.1</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                        <tr class='book-track-mtg'>
+                                            <td>Trek</td>
+        <td>
+            Trek 3: His People (+ Check)        </td>
+        <td>
+                            <b>1.1</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                    </tbody>
+
+                        
+                    </table>
+                </div>
+                                <style>
+                    .step-mtg .table-striped>tbody>tr>td.ajax-form {
+                        background: yellow;
+                        padding: 5px;
+                        margin: 5px;
+                    }
+                </style>
+                </div></td></tr></table></div><div id='D2026-09-09' class='dayline '><table style="margin-bottom: 3px"><tr><td class='cal_daynbr'>9</td><td class="cal-info-col"><div class="mtg-container"><div class='msg'><span class='desc'>Water Night - Poster Contest kicks off</span>  </div><div class='msg'><span class="fields" style="display:none" recid="0" checkin=""
+									calendar_id="369" shekels="0" points="0" inactive="" automatic="" type=""
+									calendar_date="2026-09-09" clubkeys=""></span>
+							<span class="desc" style="display: none">Awana meeting</span></div>                <div class="step-mtg">
+                    <div style="font-size: 90%; font-weight: bold; font-style: italic; text-decoration: underline">Section                        assigned to Meeting:
+                    </div>
+                    <table class="table-striped">
+                        <thead>
+                        <tr>
+                            <td>Club</td>
+                            <td>Book Track</td>
+                            <td>Section</td>
+                            <td>Special</td>
+                        </tr>
+                        </thead>
+
+                        <tbody>
+                                                    <tr class='book-track-mtg'>
+                                            <td>Cubbies </td>
+        <td>
+            HoneyComb        </td>
+        <td>
+                            <b>B</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                        <tr class='book-track-mtg'>
+                                            <td>T&T </td>
+        <td>
+            Mission: Agents of Grace (3)        </td>
+        <td>
+                            <b>Start Zone #2</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                        <tr class='book-track-mtg'>
+                                            <td>Trek</td>
+        <td>
+            Trek 1: His Story (+ Check)        </td>
+        <td>
+                            <b>1.2</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                        <tr class='book-track-mtg'>
+                                            <td>Trek</td>
+        <td>
+            Trek 3: His People (+ Check)        </td>
+        <td>
+                            <b>1.2</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                    </tbody>
+
+                        
+                    </table>
+                </div>
+                </div></td></tr></table></div><div id='D2026-09-16' class='dayline '><table style="margin-bottom: 3px"><tr><td class='cal_daynbr'>16</td><td class="cal-info-col"><div class="mtg-container"><div class='msg'><span class='desc'>Awana meeting</span>  </div><div class='msg'><span class="fields" style="display:none" recid="0" checkin=""
+									calendar_id="370" shekels="0" points="0" inactive="" automatic="" type=""
+									calendar_date="2026-09-16" clubkeys=""></span>
+							<span class="desc" style="display: none">Awana meeting</span></div>                <div class="step-mtg">
+                    <div style="font-size: 90%; font-weight: bold; font-style: italic; text-decoration: underline">Section                        assigned to Meeting:
+                    </div>
+                    <table class="table-striped">
+                        <thead>
+                        <tr>
+                            <td>Club</td>
+                            <td>Book Track</td>
+                            <td>Section</td>
+                            <td>Special</td>
+                        </tr>
+                        </thead>
+
+                        <tbody>
+                                                    <tr class='book-track-mtg'>
+                                            <td>Cubbies </td>
+        <td>
+            HoneyComb        </td>
+        <td>
+                            <b>1</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                        <tr class='book-track-mtg'>
+                                            <td>T&T </td>
+        <td>
+            Mission: Agents of Grace (3)        </td>
+        <td>
+                            <b>1.1</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                        <tr class='book-track-mtg'>
+                                            <td>Trek</td>
+        <td>
+            Trek 1: His Story (+ Check)        </td>
+        <td>
+                            <b>1.3</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                        <tr class='book-track-mtg'>
+                                            <td>Trek</td>
+        <td>
+            Trek 3: His People (+ Check)        </td>
+        <td>
+                            <b>1.3</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                    </tbody>
+
+                        
+                    </table>
+                </div>
+                </div></td></tr></table></div><div id='D2026-09-23' class='dayline '><table style="margin-bottom: 3px"><tr><td class='cal_daynbr'>23</td><td class="cal-info-col"><div class="mtg-container"><div class='msg'><span class='desc'>Awana meeting</span>  </div><div class='msg'><span class="fields" style="display:none" recid="0" checkin=""
+									calendar_id="371" shekels="0" points="0" inactive="" automatic="" type=""
+									calendar_date="2026-09-23" clubkeys=""></span>
+							<span class="desc" style="display: none">Awana meeting</span></div>                <div class="step-mtg">
+                    <div style="font-size: 90%; font-weight: bold; font-style: italic; text-decoration: underline">Section                        assigned to Meeting:
+                    </div>
+                    <table class="table-striped">
+                        <thead>
+                        <tr>
+                            <td>Club</td>
+                            <td>Book Track</td>
+                            <td>Section</td>
+                            <td>Special</td>
+                        </tr>
+                        </thead>
+
+                        <tbody>
+                                                    <tr class='book-track-mtg'>
+                                            <td>Cubbies </td>
+        <td>
+            HoneyComb        </td>
+        <td>
+                            <b>2</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                        <tr class='book-track-mtg'>
+                                            <td>T&T </td>
+        <td>
+            Mission: Agents of Grace (3)        </td>
+        <td>
+                            <b>1.2</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                        <tr class='book-track-mtg'>
+                                            <td>Trek</td>
+        <td>
+            Trek 1: His Story (+ Check)        </td>
+        <td>
+                            <b>1.4</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                        <tr class='book-track-mtg'>
+                                            <td>Trek</td>
+        <td>
+            Trek 3: His People (+ Check)        </td>
+        <td>
+                            <b>1.4</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                    </tbody>
+
+                        
+                    </table>
+                </div>
+                </div></td></tr></table></div><div id='D2026-09-30' class='dayline '><table style="margin-bottom: 3px"><tr><td class='cal_daynbr'>30</td><td class="cal-info-col"><div class="mtg-container"><div class='msg'><span class='desc'>Awana meeting</span>  </div><div class='msg'><span class="fields" style="display:none" recid="0" checkin=""
+									calendar_id="372" shekels="0" points="0" inactive="" automatic="" type=""
+									calendar_date="2026-09-30" clubkeys=""></span>
+							<span class="desc" style="display: none">Awana meeting</span></div>                <div class="step-mtg">
+                    <div style="font-size: 90%; font-weight: bold; font-style: italic; text-decoration: underline">Section                        assigned to Meeting:
+                    </div>
+                    <table class="table-striped">
+                        <thead>
+                        <tr>
+                            <td>Club</td>
+                            <td>Book Track</td>
+                            <td>Section</td>
+                            <td>Special</td>
+                        </tr>
+                        </thead>
+
+                        <tbody>
+                                                    <tr class='book-track-mtg'>
+                                            <td>Cubbies </td>
+        <td>
+            HoneyComb        </td>
+        <td>
+                            <b>3</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                        <tr class='book-track-mtg'>
+                                            <td>T&T </td>
+        <td>
+            Mission: Agents of Grace (3)        </td>
+        <td>
+                            <b>1.3</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                        <tr class='book-track-mtg'>
+                                            <td>Trek</td>
+        <td>
+            Trek 1: His Story (+ Check)        </td>
+        <td>
+                            <b>1.5</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                        <tr class='book-track-mtg'>
+                                            <td>Trek</td>
+        <td>
+            Trek 3: His People (+ Check)        </td>
+        <td>
+                            <b>1.5</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                    </tbody>
+
+                        
+                    </table>
+                </div>
+                </div></td></tr></table></div></div></div><div class="month "><h3><h3 class="alt">October</h3><div class="days"><div id='D2026-10-07' class='dayline '><table style="margin-bottom: 3px"><tr><td class='cal_daynbr'>7</td><td class="cal-info-col"><div class="mtg-container"><div class='msg'><span class='desc'>Awana meeting</span>  </div><div class='msg'><span class="fields" style="display:none" recid="0" checkin=""
+									calendar_id="373" shekels="0" points="0" inactive="" automatic="" type=""
+									calendar_date="2026-10-07" clubkeys=""></span>
+							<span class="desc" style="display: none">Awana meeting</span></div>                <div class="step-mtg">
+                    <div style="font-size: 90%; font-weight: bold; font-style: italic; text-decoration: underline">Section                        assigned to Meeting:
+                    </div>
+                    <table class="table-striped">
+                        <thead>
+                        <tr>
+                            <td>Club</td>
+                            <td>Book Track</td>
+                            <td>Section</td>
+                            <td>Special</td>
+                        </tr>
+                        </thead>
+
+                        <tbody>
+                                                    <tr class='book-track-mtg'>
+                                            <td>Cubbies </td>
+        <td>
+            HoneyComb        </td>
+        <td>
+                            <b>4</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                        <tr class='book-track-mtg'>
+                                            <td>T&T </td>
+        <td>
+            Mission: Agents of Grace (3)        </td>
+        <td>
+                            <b>1.4</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                        <tr class='book-track-mtg'>
+                                            <td>Trek</td>
+        <td>
+            Trek 1: His Story (+ Check)        </td>
+        <td>
+                            <b>1.6</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                        <tr class='book-track-mtg'>
+                                            <td>Trek</td>
+        <td>
+            Trek 3: His People (+ Check)        </td>
+        <td>
+                            <b>1.6</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                    </tbody>
+
+                        
+                    </table>
+                </div>
+                </div></td></tr></table></div><div id='D2026-10-14' class='dayline '><table style="margin-bottom: 3px"><tr><td class='cal_daynbr'>14</td><td class="cal-info-col"><div class="mtg-container"><div class='msg'><span class='desc'>Bring a Friend Night - Posters due</span>  </div><div class='msg'><span class="fields" style="display:none" recid="0" checkin=""
+									calendar_id="374" shekels="0" points="0" inactive="" automatic="" type=""
+									calendar_date="2026-10-14" clubkeys=""></span>
+							<span class="desc" style="display: none">Awana meeting</span></div>                <div class="step-mtg">
+                    <div style="font-size: 90%; font-weight: bold; font-style: italic; text-decoration: underline">Section                        assigned to Meeting:
+                    </div>
+                    <table class="table-striped">
+                        <thead>
+                        <tr>
+                            <td>Club</td>
+                            <td>Book Track</td>
+                            <td>Section</td>
+                            <td>Special</td>
+                        </tr>
+                        </thead>
+
+                        <tbody>
+                                                    <tr class='book-track-mtg'>
+                                            <td>Cubbies </td>
+        <td>
+            HoneyComb        </td>
+        <td>
+                            <b>5</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                        <tr class='book-track-mtg'>
+                                            <td>T&T </td>
+        <td>
+            Mission: Agents of Grace (3)        </td>
+        <td>
+                            <b>1.5</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                        <tr class='book-track-mtg'>
+                                            <td>Trek</td>
+        <td>
+            Trek 1: His Story (+ Check)        </td>
+        <td>
+                            <b>1.7</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                        <tr class='book-track-mtg'>
+                                            <td>Trek</td>
+        <td>
+            Trek 3: His People (+ Check)        </td>
+        <td>
+                            <b>1.7</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                    </tbody>
+
+                        
+                    </table>
+                </div>
+                </div></td></tr></table></div><div id='D2026-10-21' class='dayline '><table style="margin-bottom: 3px"><tr><td class='cal_daynbr'>21</td><td class="cal-info-col"><div class="mtg-container"><div class='msg'><span class='desc'>Awana meeting</span>  </div><div class='msg'><span class="fields" style="display:none" recid="0" checkin=""
+									calendar_id="375" shekels="0" points="0" inactive="" automatic="" type=""
+									calendar_date="2026-10-21" clubkeys=""></span>
+							<span class="desc" style="display: none">Awana meeting</span></div>                <div class="step-mtg">
+                    <div style="font-size: 90%; font-weight: bold; font-style: italic; text-decoration: underline">Section                        assigned to Meeting:
+                    </div>
+                    <table class="table-striped">
+                        <thead>
+                        <tr>
+                            <td>Club</td>
+                            <td>Book Track</td>
+                            <td>Section</td>
+                            <td>Special</td>
+                        </tr>
+                        </thead>
+
+                        <tbody>
+                                                    <tr class='book-track-mtg'>
+                                            <td>Cubbies </td>
+        <td>
+            HoneyComb        </td>
+        <td>
+                            <b>6</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                        <tr class='book-track-mtg'>
+                                            <td>T&T </td>
+        <td>
+            Mission: Agents of Grace (3)        </td>
+        <td>
+                            <b>1.6</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                        <tr class='book-track-mtg'>
+                                            <td>Trek</td>
+        <td>
+            Trek 1: His Story (+ Check)        </td>
+        <td>
+                            <b>Review</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                        <tr class='book-track-mtg'>
+                                            <td>Trek</td>
+        <td>
+            Trek 3: His People (+ Check)        </td>
+        <td>
+                            <b>Review</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                    </tbody>
+
+                        
+                    </table>
+                </div>
+                </div></td></tr></table></div><div id='D2026-10-28' class='dayline '><table style="margin-bottom: 3px"><tr><td class='cal_daynbr'>28</td><td class="cal-info-col"><div class="mtg-container"><div class='msg'><span class='desc'>Awana meeting</span>  </div><div class='msg'><span class="fields" style="display:none" recid="0" checkin=""
+									calendar_id="376" shekels="0" points="0" inactive="" automatic="" type=""
+									calendar_date="2026-10-28" clubkeys=""></span>
+							<span class="desc" style="display: none">Awana meeting</span></div>                <div class="step-mtg">
+                    <div style="font-size: 90%; font-weight: bold; font-style: italic; text-decoration: underline">Section                        assigned to Meeting:
+                    </div>
+                    <table class="table-striped">
+                        <thead>
+                        <tr>
+                            <td>Club</td>
+                            <td>Book Track</td>
+                            <td>Section</td>
+                            <td>Special</td>
+                        </tr>
+                        </thead>
+
+                        <tbody>
+                                                    <tr class='book-track-mtg'>
+                                            <td>Cubbies </td>
+        <td>
+            HoneyComb        </td>
+        <td>
+                            <b>7</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                        <tr class='book-track-mtg'>
+                                            <td>T&T </td>
+        <td>
+            Mission: Agents of Grace (3)        </td>
+        <td>
+                            <b>2.1</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                        <tr class='book-track-mtg'>
+                                            <td>Trek</td>
+        <td>
+            Trek 1: His Story (+ Check)        </td>
+        <td>
+                            <b>2.1</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                        <tr class='book-track-mtg'>
+                                            <td>Trek</td>
+        <td>
+            Trek 3: His People (+ Check)        </td>
+        <td>
+                            <b>2.1</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                    </tbody>
+
+                        
+                    </table>
+                </div>
+                </div></td></tr></table></div></div></div><div class="month "><h3><h3 class="alt">November</h3><div class="days"><div id='D2026-11-04' class='dayline '><table style="margin-bottom: 3px"><tr><td class='cal_daynbr'>4</td><td class="cal-info-col"><div class="mtg-container"><div class='msg'><span class='desc'>Parent's Night - Poster Voting</span>  </div><div class='msg'><span class="fields" style="display:none" recid="0" checkin=""
+									calendar_id="377" shekels="0" points="0" inactive="" automatic="" type=""
+									calendar_date="2026-11-04" clubkeys=""></span>
+							<span class="desc" style="display: none">Awana meeting</span></div>                <div class="step-mtg">
+                    <div style="font-size: 90%; font-weight: bold; font-style: italic; text-decoration: underline">Section                        assigned to Meeting:
+                    </div>
+                    <table class="table-striped">
+                        <thead>
+                        <tr>
+                            <td>Club</td>
+                            <td>Book Track</td>
+                            <td>Section</td>
+                            <td>Special</td>
+                        </tr>
+                        </thead>
+
+                        <tbody>
+                                                    <tr class='book-track-mtg'>
+                                            <td>Cubbies </td>
+        <td>
+            HoneyComb        </td>
+        <td>
+                            <b>8</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                        <tr class='book-track-mtg'>
+                                            <td>T&T </td>
+        <td>
+            Mission: Agents of Grace (3)        </td>
+        <td>
+                            <b>2.2</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                        <tr class='book-track-mtg'>
+                                            <td>Trek</td>
+        <td>
+            Trek 1: His Story (+ Check)        </td>
+        <td>
+                            <b>2.2</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                        <tr class='book-track-mtg'>
+                                            <td>Trek</td>
+        <td>
+            Trek 3: His People (+ Check)        </td>
+        <td>
+                            <b>2.2</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                    </tbody>
+
+                        
+                    </table>
+                </div>
+                </div></td></tr></table></div><div id='D2026-11-11' class='dayline '><table style="margin-bottom: 3px"><tr><td class='cal_daynbr'>11</td><td class="cal-info-col"><div class="mtg-container"><div class='msg'><span class='desc'>Awana meeting</span>  </div><div class='msg'><span class="fields" style="display:none" recid="0" checkin=""
+									calendar_id="378" shekels="0" points="0" inactive="" automatic="" type=""
+									calendar_date="2026-11-11" clubkeys=""></span>
+							<span class="desc" style="display: none">Awana meeting</span></div>                <div class="step-mtg">
+                    <div style="font-size: 90%; font-weight: bold; font-style: italic; text-decoration: underline">Section                        assigned to Meeting:
+                    </div>
+                    <table class="table-striped">
+                        <thead>
+                        <tr>
+                            <td>Club</td>
+                            <td>Book Track</td>
+                            <td>Section</td>
+                            <td>Special</td>
+                        </tr>
+                        </thead>
+
+                        <tbody>
+                                                    <tr class='book-track-mtg'>
+                                            <td>Cubbies </td>
+        <td>
+            HoneyComb        </td>
+        <td>
+                            <b>9</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                        <tr class='book-track-mtg'>
+                                            <td>T&T </td>
+        <td>
+            Mission: Agents of Grace (3)        </td>
+        <td>
+                            <b>2.3</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                        <tr class='book-track-mtg'>
+                                            <td>Trek</td>
+        <td>
+            Trek 1: His Story (+ Check)        </td>
+        <td>
+                            <b>2.3</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                        <tr class='book-track-mtg'>
+                                            <td>Trek</td>
+        <td>
+            Trek 3: His People (+ Check)        </td>
+        <td>
+                            <b>2.3</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                    </tbody>
+
+                        
+                    </table>
+                </div>
+                </div></td></tr></table></div><div id='D2026-11-18' class='dayline '><table style="margin-bottom: 3px"><tr><td class='cal_daynbr'>18</td><td class="cal-info-col"><div class="mtg-container"><div class='msg'><span class='desc'>Prayer Meeting</span>  </div><div class='msg'><span class="fields" style="display:none" recid="0" checkin=""
+									calendar_id="379" shekels="0" points="0" inactive="" automatic="" type=""
+									calendar_date="2026-11-18" clubkeys=""></span>
+							<span class="desc" style="display: none">Awana meeting</span></div>                <div class="step-mtg">
+                    <div style="font-size: 90%; font-weight: bold; font-style: italic; text-decoration: underline">Section                        assigned to Meeting:
+                    </div>
+                    <table class="table-striped">
+                        <thead>
+                        <tr>
+                            <td>Club</td>
+                            <td>Book Track</td>
+                            <td>Section</td>
+                            <td>Special</td>
+                        </tr>
+                        </thead>
+
+                        <tbody>
+                                                    <tr class='book-track-mtg'>
+                                            <td>Cubbies </td>
+        <td>
+            HoneyComb        </td>
+        <td>
+                            <b>10</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                        <tr class='book-track-mtg'>
+                                            <td>T&T </td>
+        <td>
+            Mission: Agents of Grace (3)        </td>
+        <td>
+                            <b>2.4</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                        <tr class='book-track-mtg'>
+                                            <td>Trek</td>
+        <td>
+            Trek 1: His Story (+ Check)        </td>
+        <td>
+                            <b>2.4</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                        <tr class='book-track-mtg'>
+                                            <td>Trek</td>
+        <td>
+            Trek 3: His People (+ Check)        </td>
+        <td>
+                            <b>2.4</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                    </tbody>
+
+                        
+                    </table>
+                </div>
+                </div></td></tr></table></div><div id='D2026-11-25' class='dayline '><table style="margin-bottom: 3px"><tr><td class='cal_daynbr skipped'>25</td><td class="cal-info-col"><div class='msg skipped'><div>No Awana this week </div><span class="fields" style="display:none" recid="0" checkin=""
+									calendar_id="" shekels="0" points="0" inactive="" automatic="" type=""
+									calendar_date="2026-11-25" clubkeys=""></span>
+							<span class="desc" style="display: none">Awana meeting</span> </div></td></tr></table></div></div></div><div class="month "><h3><h3 class="alt">December</h3><div class="days"><div id='D2026-12-02' class='dayline '><table style="margin-bottom: 3px"><tr><td class='cal_daynbr'>2</td><td class="cal-info-col"><div class="mtg-container"><div class='msg'><span class='desc'>Awana meeting</span>  </div><div class='msg'><span class="fields" style="display:none" recid="0" checkin=""
+									calendar_id="381" shekels="0" points="0" inactive="" automatic="" type=""
+									calendar_date="2026-12-02" clubkeys=""></span>
+							<span class="desc" style="display: none">Awana meeting</span></div>                <div class="step-mtg">
+                    <div style="font-size: 90%; font-weight: bold; font-style: italic; text-decoration: underline">Section                        assigned to Meeting:
+                    </div>
+                    <table class="table-striped">
+                        <thead>
+                        <tr>
+                            <td>Club</td>
+                            <td>Book Track</td>
+                            <td>Section</td>
+                            <td>Special</td>
+                        </tr>
+                        </thead>
+
+                        <tbody>
+                                                    <tr class='book-track-mtg'>
+                                            <td>Cubbies </td>
+        <td>
+            HoneyComb        </td>
+        <td>
+                            <b>11</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                        <tr class='book-track-mtg'>
+                                            <td>T&T </td>
+        <td>
+            Mission: Agents of Grace (3)        </td>
+        <td>
+                            <b>2.5</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                        <tr class='book-track-mtg'>
+                                            <td>Trek</td>
+        <td>
+            Trek 1: His Story (+ Check)        </td>
+        <td>
+                            <b>2.5</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                        <tr class='book-track-mtg'>
+                                            <td>Trek</td>
+        <td>
+            Trek 3: His People (+ Check)        </td>
+        <td>
+                            <b>2.5</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                    </tbody>
+
+                        
+                    </table>
+                </div>
+                </div></td></tr></table></div><div id='D2026-12-09' class='dayline '><table style="margin-bottom: 3px"><tr><td class='cal_daynbr'>9</td><td class="cal-info-col"><div class="mtg-container"><div class='msg'><span class='desc'>Awana meeting</span>  </div><div class='msg'><span class="fields" style="display:none" recid="0" checkin=""
+									calendar_id="382" shekels="0" points="0" inactive="" automatic="" type=""
+									calendar_date="2026-12-09" clubkeys=""></span>
+							<span class="desc" style="display: none">Awana meeting</span></div>                <div class="step-mtg">
+                    <div style="font-size: 90%; font-weight: bold; font-style: italic; text-decoration: underline">Section                        assigned to Meeting:
+                    </div>
+                    <table class="table-striped">
+                        <thead>
+                        <tr>
+                            <td>Club</td>
+                            <td>Book Track</td>
+                            <td>Section</td>
+                            <td>Special</td>
+                        </tr>
+                        </thead>
+
+                        <tbody>
+                                                    <tr class='book-track-mtg'>
+                                            <td>Cubbies </td>
+        <td>
+            HoneyComb        </td>
+        <td>
+                            <b>12</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                        <tr class='book-track-mtg'>
+                                            <td>T&T </td>
+        <td>
+            Mission: Agents of Grace (3)        </td>
+        <td>
+                            <b>2.6</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                        <tr class='book-track-mtg'>
+                                            <td>Trek</td>
+        <td>
+            Trek 1: His Story (+ Check)        </td>
+        <td>
+                            <b>2.6</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                        <tr class='book-track-mtg'>
+                                            <td>Trek</td>
+        <td>
+            Trek 3: His People (+ Check)        </td>
+        <td>
+                            <b>2.6</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                    </tbody>
+
+                        
+                    </table>
+                </div>
+                </div></td></tr></table></div><div id='D2026-12-16' class='dayline '><table style="margin-bottom: 3px"><tr><td class='cal_daynbr'>16</td><td class="cal-info-col"><div class="mtg-container"><div class='msg'><span class='desc'>Christmas Night - last club before break</span>  </div><div class='msg'><span class="fields" style="display:none" recid="0" checkin=""
+									calendar_id="383" shekels="0" points="0" inactive="" automatic="" type=""
+									calendar_date="2026-12-16" clubkeys=""></span>
+							<span class="desc" style="display: none">Awana meeting</span></div></div></td></tr></table></div><div id='D2026-12-23' class='dayline '><table style="margin-bottom: 3px"><tr><td class='cal_daynbr skipped'>23</td><td class="cal-info-col"><div class='msg skipped'><div>No Awana this week </div><span class="fields" style="display:none" recid="0" checkin=""
+									calendar_id="" shekels="0" points="0" inactive="" automatic="" type=""
+									calendar_date="2026-12-23" clubkeys=""></span>
+							<span class="desc" style="display: none">Awana meeting</span> </div></td></tr></table></div><div id='D2026-12-30' class='dayline '><table style="margin-bottom: 3px"><tr><td class='cal_daynbr skipped'>30</td><td class="cal-info-col"><div class='msg skipped'><div>No Awana this week </div><span class="fields" style="display:none" recid="0" checkin=""
+									calendar_id="" shekels="0" points="0" inactive="" automatic="" type=""
+									calendar_date="2026-12-30" clubkeys=""></span>
+							<span class="desc" style="display: none">Awana meeting</span> </div></td></tr></table></div></div></div><div class="month "><h3><h3 class="alt">January</h3><div class="days"><div id='D2027-01-06' class='dayline '><table style="margin-bottom: 3px"><tr><td class='cal_daynbr'>6</td><td class="cal-info-col"><div class="mtg-container"><div class='msg'><span class='desc'>Awana meeting</span>  </div><div class='msg'><span class="fields" style="display:none" recid="0" checkin=""
+									calendar_id="386" shekels="0" points="0" inactive="" automatic="" type=""
+									calendar_date="2027-01-06" clubkeys=""></span>
+							<span class="desc" style="display: none">Awana meeting</span></div>                <div class="step-mtg">
+                    <div style="font-size: 90%; font-weight: bold; font-style: italic; text-decoration: underline">Section                        assigned to Meeting:
+                    </div>
+                    <table class="table-striped">
+                        <thead>
+                        <tr>
+                            <td>Club</td>
+                            <td>Book Track</td>
+                            <td>Section</td>
+                            <td>Special</td>
+                        </tr>
+                        </thead>
+
+                        <tbody>
+                                                    <tr class='book-track-mtg'>
+                                            <td>Cubbies </td>
+        <td>
+            HoneyComb        </td>
+        <td>
+                            <b>13</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                        <tr class='book-track-mtg'>
+                                            <td>T&T </td>
+        <td>
+            Mission: Agents of Grace (3)        </td>
+        <td>
+                            <b>2.7</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                        <tr class='book-track-mtg'>
+                                            <td>Trek</td>
+        <td>
+            Trek 1: His Story (+ Check)        </td>
+        <td>
+                            <b>2.7</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                        <tr class='book-track-mtg'>
+                                            <td>Trek</td>
+        <td>
+            Trek 3: His People (+ Check)        </td>
+        <td>
+                            <b>2.7</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                    </tbody>
+
+                        
+                    </table>
+                </div>
+                </div></td></tr></table></div><div id='D2027-01-13' class='dayline '><table style="margin-bottom: 3px"><tr><td class='cal_daynbr'>13</td><td class="cal-info-col"><div class="mtg-container"><div class='msg'><span class='desc'>Backwards Night</span>  </div><div class='msg'><span class="fields" style="display:none" recid="0" checkin=""
+									calendar_id="387" shekels="0" points="0" inactive="" automatic="" type=""
+									calendar_date="2027-01-13" clubkeys=""></span>
+							<span class="desc" style="display: none">Awana meeting</span></div>                <div class="step-mtg">
+                    <div style="font-size: 90%; font-weight: bold; font-style: italic; text-decoration: underline">Section                        assigned to Meeting:
+                    </div>
+                    <table class="table-striped">
+                        <thead>
+                        <tr>
+                            <td>Club</td>
+                            <td>Book Track</td>
+                            <td>Section</td>
+                            <td>Special</td>
+                        </tr>
+                        </thead>
+
+                        <tbody>
+                                                    <tr class='book-track-mtg'>
+                                            <td>Cubbies </td>
+        <td>
+            HoneyComb        </td>
+        <td>
+                            <b>14</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                        <tr class='book-track-mtg'>
+                                            <td>T&T </td>
+        <td>
+            Mission: Agents of Grace (3)        </td>
+        <td>
+                            <b>2.8</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                        <tr class='book-track-mtg'>
+                                            <td>Trek</td>
+        <td>
+            Trek 1: His Story (+ Check)        </td>
+        <td>
+                            <b>Review</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                        <tr class='book-track-mtg'>
+                                            <td>Trek</td>
+        <td>
+            Trek 3: His People (+ Check)        </td>
+        <td>
+                            <b>Review</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                    </tbody>
+
+                        
+                    </table>
+                </div>
+                </div></td></tr></table></div><div id='D2027-01-20' class='dayline '><table style="margin-bottom: 3px"><tr><td class='cal_daynbr'>20</td><td class="cal-info-col"><div class="mtg-container"><div class='msg'><span class='desc'>Awana meeting</span>  </div><div class='msg'><span class="fields" style="display:none" recid="0" checkin=""
+									calendar_id="388" shekels="0" points="0" inactive="" automatic="" type=""
+									calendar_date="2027-01-20" clubkeys=""></span>
+							<span class="desc" style="display: none">Awana meeting</span></div>                <div class="step-mtg">
+                    <div style="font-size: 90%; font-weight: bold; font-style: italic; text-decoration: underline">Section                        assigned to Meeting:
+                    </div>
+                    <table class="table-striped">
+                        <thead>
+                        <tr>
+                            <td>Club</td>
+                            <td>Book Track</td>
+                            <td>Section</td>
+                            <td>Special</td>
+                        </tr>
+                        </thead>
+
+                        <tbody>
+                                                    <tr class='book-track-mtg'>
+                                            <td>Cubbies </td>
+        <td>
+            HoneyComb        </td>
+        <td>
+                            <b>15</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                        <tr class='book-track-mtg'>
+                                            <td>T&T </td>
+        <td>
+            Mission: Agents of Grace (3)        </td>
+        <td>
+                            <b>3.1</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                        <tr class='book-track-mtg'>
+                                            <td>Trek</td>
+        <td>
+            Trek 1: His Story (+ Check)        </td>
+        <td>
+                            <b>3.1</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                        <tr class='book-track-mtg'>
+                                            <td>Trek</td>
+        <td>
+            Trek 3: His People (+ Check)        </td>
+        <td>
+                            <b>3.1</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                    </tbody>
+
+                        
+                    </table>
+                </div>
+                </div></td></tr></table></div><div id='D2027-01-27' class='dayline '><table style="margin-bottom: 3px"><tr><td class='cal_daynbr'>27</td><td class="cal-info-col"><div class="mtg-container"><div class='msg'><span class='desc'>Awana meeting</span>  </div><div class='msg'><span class="fields" style="display:none" recid="0" checkin=""
+									calendar_id="389" shekels="0" points="0" inactive="" automatic="" type=""
+									calendar_date="2027-01-27" clubkeys=""></span>
+							<span class="desc" style="display: none">Awana meeting</span></div>                <div class="step-mtg">
+                    <div style="font-size: 90%; font-weight: bold; font-style: italic; text-decoration: underline">Section                        assigned to Meeting:
+                    </div>
+                    <table class="table-striped">
+                        <thead>
+                        <tr>
+                            <td>Club</td>
+                            <td>Book Track</td>
+                            <td>Section</td>
+                            <td>Special</td>
+                        </tr>
+                        </thead>
+
+                        <tbody>
+                                                    <tr class='book-track-mtg'>
+                                            <td>Cubbies </td>
+        <td>
+            HoneyComb        </td>
+        <td>
+                            <b>16</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                        <tr class='book-track-mtg'>
+                                            <td>T&T </td>
+        <td>
+            Mission: Agents of Grace (3)        </td>
+        <td>
+                            <b>3.2</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                        <tr class='book-track-mtg'>
+                                            <td>Trek</td>
+        <td>
+            Trek 1: His Story (+ Check)        </td>
+        <td>
+                            <b>3.2</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                        <tr class='book-track-mtg'>
+                                            <td>Trek</td>
+        <td>
+            Trek 3: His People (+ Check)        </td>
+        <td>
+                            <b>3.2</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                    </tbody>
+
+                        
+                    </table>
+                </div>
+                </div></td></tr></table></div></div></div><div class="month "><h3><h3 class="alt">February</h3><div class="days"><div id='D2027-02-03' class='dayline '><table style="margin-bottom: 3px"><tr><td class='cal_daynbr'>3</td><td class="cal-info-col"><div class="mtg-container"><div class='msg'><span class='desc'>Awana meeting</span>  </div><div class='msg'><span class="fields" style="display:none" recid="0" checkin=""
+									calendar_id="390" shekels="0" points="0" inactive="" automatic="" type=""
+									calendar_date="2027-02-03" clubkeys=""></span>
+							<span class="desc" style="display: none">Awana meeting</span></div>                <div class="step-mtg">
+                    <div style="font-size: 90%; font-weight: bold; font-style: italic; text-decoration: underline">Section                        assigned to Meeting:
+                    </div>
+                    <table class="table-striped">
+                        <thead>
+                        <tr>
+                            <td>Club</td>
+                            <td>Book Track</td>
+                            <td>Section</td>
+                            <td>Special</td>
+                        </tr>
+                        </thead>
+
+                        <tbody>
+                                                    <tr class='book-track-mtg'>
+                                            <td>Cubbies </td>
+        <td>
+            HoneyComb        </td>
+        <td>
+                            <b>17</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                        <tr class='book-track-mtg'>
+                                            <td>T&T </td>
+        <td>
+            Mission: Agents of Grace (3)        </td>
+        <td>
+                            <b>3.3</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                        <tr class='book-track-mtg'>
+                                            <td>Trek</td>
+        <td>
+            Trek 1: His Story (+ Check)        </td>
+        <td>
+                            <b>3.3</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                        <tr class='book-track-mtg'>
+                                            <td>Trek</td>
+        <td>
+            Trek 3: His People (+ Check)        </td>
+        <td>
+                            <b>3.3</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                    </tbody>
+
+                        
+                    </table>
+                </div>
+                </div></td></tr></table></div><div id='D2027-02-10' class='dayline '><table style="margin-bottom: 3px"><tr><td class='cal_daynbr'>10</td><td class="cal-info-col"><div class="mtg-container"><div class='msg'><span class='desc'>Awana meeting</span>  </div><div class='msg'><span class="fields" style="display:none" recid="0" checkin=""
+									calendar_id="391" shekels="0" points="0" inactive="" automatic="" type=""
+									calendar_date="2027-02-10" clubkeys=""></span>
+							<span class="desc" style="display: none">Awana meeting</span></div>                <div class="step-mtg">
+                    <div style="font-size: 90%; font-weight: bold; font-style: italic; text-decoration: underline">Section                        assigned to Meeting:
+                    </div>
+                    <table class="table-striped">
+                        <thead>
+                        <tr>
+                            <td>Club</td>
+                            <td>Book Track</td>
+                            <td>Section</td>
+                            <td>Special</td>
+                        </tr>
+                        </thead>
+
+                        <tbody>
+                                                    <tr class='book-track-mtg'>
+                                            <td>Cubbies </td>
+        <td>
+            HoneyComb        </td>
+        <td>
+                            <b>18</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                        <tr class='book-track-mtg'>
+                                            <td>T&T </td>
+        <td>
+            Mission: Agents of Grace (3)        </td>
+        <td>
+                            <b>3.4</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                        <tr class='book-track-mtg'>
+                                            <td>Trek</td>
+        <td>
+            Trek 1: His Story (+ Check)        </td>
+        <td>
+                            <b>3.4</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                        <tr class='book-track-mtg'>
+                                            <td>Trek</td>
+        <td>
+            Trek 3: His People (+ Check)        </td>
+        <td>
+                            <b>3.4</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                    </tbody>
+
+                        
+                    </table>
+                </div>
+                </div></td></tr></table></div><div id='D2027-02-17' class='dayline '><table style="margin-bottom: 3px"><tr><td class='cal_daynbr skipped'>17</td><td class="cal-info-col"><div class='msg skipped'><div>No Awana this week </div><span class="fields" style="display:none" recid="0" checkin=""
+									calendar_id="" shekels="0" points="0" inactive="" automatic="" type=""
+									calendar_date="2027-02-17" clubkeys=""></span>
+							<span class="desc" style="display: none">Awana meeting</span> </div></td></tr></table></div><div id='D2027-02-24' class='dayline '><table style="margin-bottom: 3px"><tr><td class='cal_daynbr'>24</td><td class="cal-info-col"><div class="mtg-container"><div class='msg'><span class='desc'>Missions Night</span>  </div><div class='msg'><span class="fields" style="display:none" recid="0" checkin=""
+									calendar_id="393" shekels="0" points="0" inactive="" automatic="" type=""
+									calendar_date="2027-02-24" clubkeys=""></span>
+							<span class="desc" style="display: none">Awana meeting</span></div>                <div class="step-mtg">
+                    <div style="font-size: 90%; font-weight: bold; font-style: italic; text-decoration: underline">Section                        assigned to Meeting:
+                    </div>
+                    <table class="table-striped">
+                        <thead>
+                        <tr>
+                            <td>Club</td>
+                            <td>Book Track</td>
+                            <td>Section</td>
+                            <td>Special</td>
+                        </tr>
+                        </thead>
+
+                        <tbody>
+                                                    <tr class='book-track-mtg'>
+                                            <td>Cubbies </td>
+        <td>
+            HoneyComb        </td>
+        <td>
+                            <b>19</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                        <tr class='book-track-mtg'>
+                                            <td>T&T </td>
+        <td>
+            Mission: Agents of Grace (3)        </td>
+        <td>
+                            <b>3.5</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                        <tr class='book-track-mtg'>
+                                            <td>Trek</td>
+        <td>
+            Trek 1: His Story (+ Check)        </td>
+        <td>
+                            <b>3.5</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                        <tr class='book-track-mtg'>
+                                            <td>Trek</td>
+        <td>
+            Trek 3: His People (+ Check)        </td>
+        <td>
+                            <b>3.5</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                    </tbody>
+
+                        
+                    </table>
+                </div>
+                </div></td></tr></table></div></div></div><div class="month "><h3><h3 class="alt">March</h3><div class="days"><div id='D2027-03-03' class='dayline '><table style="margin-bottom: 3px"><tr><td class='cal_daynbr'>3</td><td class="cal-info-col"><div class="mtg-container"><div class='msg'><span class='desc'>Awana meeting</span>  </div><div class='msg'><span class="fields" style="display:none" recid="0" checkin=""
+									calendar_id="394" shekels="0" points="0" inactive="" automatic="" type=""
+									calendar_date="2027-03-03" clubkeys=""></span>
+							<span class="desc" style="display: none">Awana meeting</span></div>                <div class="step-mtg">
+                    <div style="font-size: 90%; font-weight: bold; font-style: italic; text-decoration: underline">Section                        assigned to Meeting:
+                    </div>
+                    <table class="table-striped">
+                        <thead>
+                        <tr>
+                            <td>Club</td>
+                            <td>Book Track</td>
+                            <td>Section</td>
+                            <td>Special</td>
+                        </tr>
+                        </thead>
+
+                        <tbody>
+                                                    <tr class='book-track-mtg'>
+                                            <td>Cubbies </td>
+        <td>
+            HoneyComb        </td>
+        <td>
+                            <b>20</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                        <tr class='book-track-mtg'>
+                                            <td>T&T </td>
+        <td>
+            Mission: Agents of Grace (3)        </td>
+        <td>
+                            <b>3.6</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                        <tr class='book-track-mtg'>
+                                            <td>Trek</td>
+        <td>
+            Trek 1: His Story (+ Check)        </td>
+        <td>
+                            <b>3.6</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                        <tr class='book-track-mtg'>
+                                            <td>Trek</td>
+        <td>
+            Trek 3: His People (+ Check)        </td>
+        <td>
+                            <b>3.6</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                    </tbody>
+
+                        
+                    </table>
+                </div>
+                </div></td></tr></table></div><div id='D2027-03-06' class='dayline '><table style="margin-bottom: 3px"><tr><td class='cal_daynbr skipped'>6 <div class="dow">Sat</div></td><td class="cal-info-col"><div class="day-note-container"><div class='day-note'>Build Day </div></div></td></tr></table></div><div id='D2027-03-10' class='dayline '><table style="margin-bottom: 3px"><tr><td class='cal_daynbr'>10</td><td class="cal-info-col"><div class="mtg-container"><div class='msg'><span class='desc'>Prayer Meeting</span>  </div><div class='msg'><span class="fields" style="display:none" recid="0" checkin=""
+									calendar_id="395" shekels="0" points="0" inactive="" automatic="" type=""
+									calendar_date="2027-03-10" clubkeys=""></span>
+							<span class="desc" style="display: none">Awana meeting</span></div>                <div class="step-mtg">
+                    <div style="font-size: 90%; font-weight: bold; font-style: italic; text-decoration: underline">Section                        assigned to Meeting:
+                    </div>
+                    <table class="table-striped">
+                        <thead>
+                        <tr>
+                            <td>Club</td>
+                            <td>Book Track</td>
+                            <td>Section</td>
+                            <td>Special</td>
+                        </tr>
+                        </thead>
+
+                        <tbody>
+                                                    <tr class='book-track-mtg'>
+                                            <td>Cubbies </td>
+        <td>
+            HoneyComb        </td>
+        <td>
+                            <b>21</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                        <tr class='book-track-mtg'>
+                                            <td>T&T </td>
+        <td>
+            Mission: Agents of Grace (3)        </td>
+        <td>
+                            <b>3.7</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                        <tr class='book-track-mtg'>
+                                            <td>Trek</td>
+        <td>
+            Trek 1: His Story (+ Check)        </td>
+        <td>
+                            <b>3.7</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                        <tr class='book-track-mtg'>
+                                            <td>Trek</td>
+        <td>
+            Trek 3: His People (+ Check)        </td>
+        <td>
+                            <b>3.7</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                    </tbody>
+
+                        
+                    </table>
+                </div>
+                </div></td></tr></table></div><div id='D2027-03-17' class='dayline '><table style="margin-bottom: 3px"><tr><td class='cal_daynbr'>17</td><td class="cal-info-col"><div class="mtg-container"><div class='msg'><span class='desc'>Awana meeting</span>  </div><div class='msg'><span class="fields" style="display:none" recid="0" checkin=""
+									calendar_id="396" shekels="0" points="0" inactive="" automatic="" type=""
+									calendar_date="2027-03-17" clubkeys=""></span>
+							<span class="desc" style="display: none">Awana meeting</span></div>                <div class="step-mtg">
+                    <div style="font-size: 90%; font-weight: bold; font-style: italic; text-decoration: underline">Section                        assigned to Meeting:
+                    </div>
+                    <table class="table-striped">
+                        <thead>
+                        <tr>
+                            <td>Club</td>
+                            <td>Book Track</td>
+                            <td>Section</td>
+                            <td>Special</td>
+                        </tr>
+                        </thead>
+
+                        <tbody>
+                                                    <tr class='book-track-mtg'>
+                                            <td>Cubbies </td>
+        <td>
+            HoneyComb        </td>
+        <td>
+                            <b>22</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                        <tr class='book-track-mtg'>
+                                            <td>T&T </td>
+        <td>
+            Mission: Agents of Grace (3)        </td>
+        <td>
+                            <b>3.8</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                        <tr class='book-track-mtg'>
+                                            <td>Trek</td>
+        <td>
+            Trek 1: His Story (+ Check)        </td>
+        <td>
+                            <b>Review</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                        <tr class='book-track-mtg'>
+                                            <td>Trek</td>
+        <td>
+            Trek 3: His People (+ Check)        </td>
+        <td>
+                            <b>Review</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                    </tbody>
+
+                        
+                    </table>
+                </div>
+                </div></td></tr></table></div><div id='D2027-03-20' class='dayline '><table style="margin-bottom: 3px"><tr><td class='cal_daynbr skipped'>20 <div class="dow">Sat</div></td><td class="cal-info-col"><div class="day-note-container"><div class='day-note'>Grand Prix </div></div></td></tr></table></div><div id='D2027-03-24' class='dayline '><table style="margin-bottom: 3px"><tr><td class='cal_daynbr'>24</td><td class="cal-info-col"><div class="mtg-container"><div class='msg'><span class='desc'>Awana meeting</span>  </div><div class='msg'><span class="fields" style="display:none" recid="0" checkin=""
+									calendar_id="397" shekels="0" points="0" inactive="" automatic="" type=""
+									calendar_date="2027-03-24" clubkeys=""></span>
+							<span class="desc" style="display: none">Awana meeting</span></div>                <div class="step-mtg">
+                    <div style="font-size: 90%; font-weight: bold; font-style: italic; text-decoration: underline">Section                        assigned to Meeting:
+                    </div>
+                    <table class="table-striped">
+                        <thead>
+                        <tr>
+                            <td>Club</td>
+                            <td>Book Track</td>
+                            <td>Section</td>
+                            <td>Special</td>
+                        </tr>
+                        </thead>
+
+                        <tbody>
+                                                    <tr class='book-track-mtg'>
+                                            <td>Cubbies </td>
+        <td>
+            HoneyComb        </td>
+        <td>
+                            <b>23</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                        <tr class='book-track-mtg'>
+                                            <td>T&T </td>
+        <td>
+            Mission: Agents of Grace (3)        </td>
+        <td>
+                            <b>4.1</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                        <tr class='book-track-mtg'>
+                                            <td>Trek</td>
+        <td>
+            Trek 1: His Story (+ Check)        </td>
+        <td>
+                            <b>4.1</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                        <tr class='book-track-mtg'>
+                                            <td>Trek</td>
+        <td>
+            Trek 3: His People (+ Check)        </td>
+        <td>
+                            <b>4.1</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                    </tbody>
+
+                        
+                    </table>
+                </div>
+                </div></td></tr></table></div><div id='D2027-03-31' class='dayline '><table style="margin-bottom: 3px"><tr><td class='cal_daynbr'>31</td><td class="cal-info-col"><div class="mtg-container"><div class='msg'><span class='desc'>Awana meeting</span>  </div><div class='msg'><span class="fields" style="display:none" recid="0" checkin=""
+									calendar_id="398" shekels="0" points="0" inactive="" automatic="" type=""
+									calendar_date="2027-03-31" clubkeys=""></span>
+							<span class="desc" style="display: none">Awana meeting</span></div>                <div class="step-mtg">
+                    <div style="font-size: 90%; font-weight: bold; font-style: italic; text-decoration: underline">Section                        assigned to Meeting:
+                    </div>
+                    <table class="table-striped">
+                        <thead>
+                        <tr>
+                            <td>Club</td>
+                            <td>Book Track</td>
+                            <td>Section</td>
+                            <td>Special</td>
+                        </tr>
+                        </thead>
+
+                        <tbody>
+                                                    <tr class='book-track-mtg'>
+                                            <td>Cubbies </td>
+        <td>
+            HoneyComb        </td>
+        <td>
+                            <b>24</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                        <tr class='book-track-mtg'>
+                                            <td>T&T </td>
+        <td>
+            Mission: Agents of Grace (3)        </td>
+        <td>
+                            <b>4.2</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                        <tr class='book-track-mtg'>
+                                            <td>Trek</td>
+        <td>
+            Trek 1: His Story (+ Check)        </td>
+        <td>
+                            <b>4.2</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                        <tr class='book-track-mtg'>
+                                            <td>Trek</td>
+        <td>
+            Trek 3: His People (+ Check)        </td>
+        <td>
+                            <b>4.2</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                    </tbody>
+
+                        
+                    </table>
+                </div>
+                </div></td></tr></table></div></div></div><div class="month "><h3><h3 class="alt">April</h3><div class="days"><div id='D2027-04-07' class='dayline '><table style="margin-bottom: 3px"><tr><td class='cal_daynbr'>7</td><td class="cal-info-col"><div class="mtg-container"><div class='msg'><span class='desc'>Awana meeting</span>  </div><div class='msg'><span class="fields" style="display:none" recid="0" checkin=""
+									calendar_id="399" shekels="0" points="0" inactive="" automatic="" type=""
+									calendar_date="2027-04-07" clubkeys=""></span>
+							<span class="desc" style="display: none">Awana meeting</span></div>                <div class="step-mtg">
+                    <div style="font-size: 90%; font-weight: bold; font-style: italic; text-decoration: underline">Section                        assigned to Meeting:
+                    </div>
+                    <table class="table-striped">
+                        <thead>
+                        <tr>
+                            <td>Club</td>
+                            <td>Book Track</td>
+                            <td>Section</td>
+                            <td>Special</td>
+                        </tr>
+                        </thead>
+
+                        <tbody>
+                                                    <tr class='book-track-mtg'>
+                                            <td>Cubbies </td>
+        <td>
+            HoneyComb        </td>
+        <td>
+                            <b>25</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                        <tr class='book-track-mtg'>
+                                            <td>T&T </td>
+        <td>
+            Mission: Agents of Grace (3)        </td>
+        <td>
+                            <b>4.3</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                        <tr class='book-track-mtg'>
+                                            <td>Trek</td>
+        <td>
+            Trek 1: His Story (+ Check)        </td>
+        <td>
+                            <b>4.3</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                        <tr class='book-track-mtg'>
+                                            <td>Trek</td>
+        <td>
+            Trek 3: His People (+ Check)        </td>
+        <td>
+                            <b>4.3</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                    </tbody>
+
+                        
+                    </table>
+                </div>
+                </div></td></tr></table></div><div id='D2027-04-14' class='dayline '><table style="margin-bottom: 3px"><tr><td class='cal_daynbr'>14</td><td class="cal-info-col"><div class="mtg-container"><div class='msg'><span class='desc'>Leader Appreciation Night</span>  </div><div class='msg'><span class="fields" style="display:none" recid="0" checkin=""
+									calendar_id="400" shekels="0" points="0" inactive="" automatic="" type=""
+									calendar_date="2027-04-14" clubkeys=""></span>
+							<span class="desc" style="display: none">Awana meeting</span></div>                <div class="step-mtg">
+                    <div style="font-size: 90%; font-weight: bold; font-style: italic; text-decoration: underline">Section                        assigned to Meeting:
+                    </div>
+                    <table class="table-striped">
+                        <thead>
+                        <tr>
+                            <td>Club</td>
+                            <td>Book Track</td>
+                            <td>Section</td>
+                            <td>Special</td>
+                        </tr>
+                        </thead>
+
+                        <tbody>
+                                                    <tr class='book-track-mtg'>
+                                            <td>Cubbies </td>
+        <td>
+            HoneyComb        </td>
+        <td>
+                            <b>26</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                        <tr class='book-track-mtg'>
+                                            <td>T&T </td>
+        <td>
+            Mission: Agents of Grace (3)        </td>
+        <td>
+                            <b>4.4</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                        <tr class='book-track-mtg'>
+                                            <td>Trek</td>
+        <td>
+            Trek 1: His Story (+ Check)        </td>
+        <td>
+                            <b>4.4</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                        <tr class='book-track-mtg'>
+                                            <td>Trek</td>
+        <td>
+            Trek 3: His People (+ Check)        </td>
+        <td>
+                            <b>4.4</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                    </tbody>
+
+                        
+                    </table>
+                </div>
+                </div></td></tr></table></div><div id='D2027-04-21' class='dayline '><table style="margin-bottom: 3px"><tr><td class='cal_daynbr skipped'>21</td><td class="cal-info-col"><div class='msg skipped'><div>No Awana this week </div><span class="fields" style="display:none" recid="0" checkin=""
+									calendar_id="" shekels="0" points="0" inactive="" automatic="" type=""
+									calendar_date="2027-04-21" clubkeys=""></span>
+							<span class="desc" style="display: none">Awana meeting</span> </div></td></tr></table></div><div id='D2027-04-28' class='dayline '><table style="margin-bottom: 3px"><tr><td class='cal_daynbr'>28</td><td class="cal-info-col"><div class="mtg-container"><div class='msg'><span class='desc'>Awana meeting</span>  </div><div class='msg'><span class="fields" style="display:none" recid="0" checkin=""
+									calendar_id="402" shekels="0" points="0" inactive="" automatic="" type=""
+									calendar_date="2027-04-28" clubkeys=""></span>
+							<span class="desc" style="display: none">Awana meeting</span></div>                <div class="step-mtg">
+                    <div style="font-size: 90%; font-weight: bold; font-style: italic; text-decoration: underline">Section                        assigned to Meeting:
+                    </div>
+                    <table class="table-striped">
+                        <thead>
+                        <tr>
+                            <td>Club</td>
+                            <td>Book Track</td>
+                            <td>Section</td>
+                            <td>Special</td>
+                        </tr>
+                        </thead>
+
+                        <tbody>
+                                                    <tr class='book-track-mtg'>
+                                            <td>T&T </td>
+        <td>
+            Mission: Agents of Grace (3)        </td>
+        <td>
+                            <b>4.5</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                        <tr class='book-track-mtg'>
+                                            <td>Trek</td>
+        <td>
+            Trek 1: His Story (+ Check)        </td>
+        <td>
+                            <b>4.5</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                        <tr class='book-track-mtg'>
+                                            <td>Trek</td>
+        <td>
+            Trek 3: His People (+ Check)        </td>
+        <td>
+                            <b>4.5</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                    </tbody>
+
+                        
+                    </table>
+                </div>
+                </div></td></tr></table></div></div></div><div class="month "><h3><h3 class="alt">May</h3><div class="days"><div id='D2027-05-05' class='dayline '><table style="margin-bottom: 3px"><tr><td class='cal_daynbr'>5</td><td class="cal-info-col"><div class="mtg-container"><div class='msg'><span class='desc'>Step Up Night</span>  </div><div class='msg'><span class="fields" style="display:none" recid="0" checkin=""
+									calendar_id="403" shekels="0" points="0" inactive="" automatic="" type=""
+									calendar_date="2027-05-05" clubkeys=""></span>
+							<span class="desc" style="display: none">Awana meeting</span></div>                <div class="step-mtg">
+                    <div style="font-size: 90%; font-weight: bold; font-style: italic; text-decoration: underline">Section                        assigned to Meeting:
+                    </div>
+                    <table class="table-striped">
+                        <thead>
+                        <tr>
+                            <td>Club</td>
+                            <td>Book Track</td>
+                            <td>Section</td>
+                            <td>Special</td>
+                        </tr>
+                        </thead>
+
+                        <tbody>
+                                                    <tr class='book-track-mtg'>
+                                            <td>T&T </td>
+        <td>
+            Mission: Agents of Grace (3)        </td>
+        <td>
+                            <b>4.6</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                        <tr class='book-track-mtg'>
+                                            <td>Trek</td>
+        <td>
+            Trek 1: His Story (+ Check)        </td>
+        <td>
+                            <b>4.6</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                        <tr class='book-track-mtg'>
+                                            <td>Trek</td>
+        <td>
+            Trek 3: His People (+ Check)        </td>
+        <td>
+                            <b>4.6</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                    </tbody>
+
+                        
+                    </table>
+                </div>
+                </div></td></tr></table></div><div id='D2027-05-12' class='dayline '><table style="margin-bottom: 3px"><tr><td class='cal_daynbr'>12</td><td class="cal-info-col"><div class="mtg-container"><div class='msg'><span class='desc'>Awana meeting</span>  </div><div class='msg'><span class="fields" style="display:none" recid="0" checkin=""
+									calendar_id="404" shekels="0" points="0" inactive="" automatic="" type=""
+									calendar_date="2027-05-12" clubkeys=""></span>
+							<span class="desc" style="display: none">Awana meeting</span></div>                <div class="step-mtg">
+                    <div style="font-size: 90%; font-weight: bold; font-style: italic; text-decoration: underline">Section                        assigned to Meeting:
+                    </div>
+                    <table class="table-striped">
+                        <thead>
+                        <tr>
+                            <td>Club</td>
+                            <td>Book Track</td>
+                            <td>Section</td>
+                            <td>Special</td>
+                        </tr>
+                        </thead>
+
+                        <tbody>
+                                                    <tr class='book-track-mtg'>
+                                            <td>T&T </td>
+        <td>
+            Mission: Agents of Grace (3)        </td>
+        <td>
+                            <b>4.7</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                        <tr class='book-track-mtg'>
+                                            <td>Trek</td>
+        <td>
+            Trek 1: His Story (+ Check)        </td>
+        <td>
+                            <b>4.7</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                        <tr class='book-track-mtg'>
+                                            <td>Trek</td>
+        <td>
+            Trek 3: His People (+ Check)        </td>
+        <td>
+                            <b>4.7</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                    </tbody>
+
+                        
+                    </table>
+                </div>
+                </div></td></tr></table></div><div id='D2027-05-19' class='dayline '><table style="margin-bottom: 3px"><tr><td class='cal_daynbr'>19</td><td class="cal-info-col"><div class="mtg-container"><div class='msg'><span class='desc'>Awana meeting</span>  </div><div class='msg'><span class="fields" style="display:none" recid="0" checkin=""
+									calendar_id="405" shekels="0" points="0" inactive="" automatic="" type=""
+									calendar_date="2027-05-19" clubkeys=""></span>
+							<span class="desc" style="display: none">Awana meeting</span></div>                <div class="step-mtg">
+                    <div style="font-size: 90%; font-weight: bold; font-style: italic; text-decoration: underline">Section                        assigned to Meeting:
+                    </div>
+                    <table class="table-striped">
+                        <thead>
+                        <tr>
+                            <td>Club</td>
+                            <td>Book Track</td>
+                            <td>Section</td>
+                            <td>Special</td>
+                        </tr>
+                        </thead>
+
+                        <tbody>
+                                                    <tr class='book-track-mtg'>
+                                            <td>T&T </td>
+        <td>
+            Mission: Agents of Grace (3)        </td>
+        <td>
+                            <b>4.8</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                        <tr class='book-track-mtg'>
+                                            <td>Trek</td>
+        <td>
+            Trek 1: His Story (+ Check)        </td>
+        <td>
+                            <b>Review</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                        <tr class='book-track-mtg'>
+                                            <td>Trek</td>
+        <td>
+            Trek 3: His People (+ Check)        </td>
+        <td>
+                            <b>Review</b>
+                        </td>
+        <td>
+                    </td>
+                                    </tr>
+                                                    </tbody>
+
+                        
+                    </table>
+                </div>
+                </div></td></tr></table></div><div id='D2027-05-26' class='dayline '><table style="margin-bottom: 3px"><tr><td class='cal_daynbr'>26</td><td class="cal-info-col"><div class="mtg-container"><div class='msg'><span class='desc'>Awards Night - final night of the year!</span>  </div><div class='msg'><span class="fields" style="display:none" recid="0" checkin=""
+									calendar_id="406" shekels="0" points="0" inactive="" automatic="" type=""
+									calendar_date="2027-05-26" clubkeys=""></span>
+							<span class="desc" style="display: none">Awana meeting</span></div></div></td></tr></table></div></div></div><div class="month "><h3><h3 class="alt">June</h3><div class="days"><div id='D2027-06-02' class='dayline '><table style="margin-bottom: 3px"><tr><td class='cal_daynbr skipped'>2</td><td class="cal-info-col"><div class='msg skipped'><div>No Awana this week </div><span class="fields" style="display:none" recid="0" checkin=""
+									calendar_id="" shekels="0" points="0" inactive="" automatic="" type=""
+									calendar_date="2027-06-02" clubkeys=""></span>
+							<span class="desc" style="display: none">Awana meeting</span> </div></td></tr></table></div><div id='D2027-06-09' class='dayline '><table style="margin-bottom: 3px"><tr><td class='cal_daynbr skipped'>9</td><td class="cal-info-col"><div class='msg skipped'><div>No Awana this week </div><span class="fields" style="display:none" recid="0" checkin=""
+									calendar_id="" shekels="0" points="0" inactive="" automatic="" type=""
+									calendar_date="2027-06-09" clubkeys=""></span>
+							<span class="desc" style="display: none">Awana meeting</span> </div></td></tr></table></div><div id='D2027-06-16' class='dayline '><table style="margin-bottom: 3px"><tr><td class='cal_daynbr skipped'>16</td><td class="cal-info-col"><div class='msg skipped'><div>No Awana this week </div><span class="fields" style="display:none" recid="0" checkin=""
+									calendar_id="" shekels="0" points="0" inactive="" automatic="" type=""
+									calendar_date="2027-06-16" clubkeys=""></span>
+							<span class="desc" style="display: none">Awana meeting</span> </div></td></tr></table></div><div id='D2027-06-23' class='dayline '><table style="margin-bottom: 3px"><tr><td class='cal_daynbr skipped'>23</td><td class="cal-info-col"><div class='msg skipped'><div>No Awana this week </div><span class="fields" style="display:none" recid="0" checkin=""
+									calendar_id="" shekels="0" points="0" inactive="" automatic="" type=""
+									calendar_date="2027-06-23" clubkeys=""></span>
+							<span class="desc" style="display: none">Awana meeting</span> </div></td></tr></table></div><div id='D2027-06-30' class='dayline '><table style="margin-bottom: 3px"><tr><td class='cal_daynbr skipped'>30</td><td class="cal-info-col"><div class='msg skipped'><div>No Awana this week </div><span class="fields" style="display:none" recid="0" checkin=""
+									calendar_id="" shekels="0" points="0" inactive="" automatic="" type=""
+									calendar_date="2027-06-30" clubkeys=""></span>
+							<span class="desc" style="display: none">Awana meeting</span> </div></td></tr></table></div></div></div>
+        </div><!-- content -->
+    </div>
+</div>
+
+
+                </div><!--/span-->
+            </div>
+
+            
+            <img class="center-block ttt-small no-print"
+                 src="/images/ttt_logo_mobile.png"
+                 style="margin-top: 10px;"/>
+
+            <div class="copyright row no-print text-muted text-center" style="margin: 8px 0px 0px">
+                Copyright &copy; 2026 by <a href="http://devonclark.net">Devon Clark</a>
+            </div>
+
+        </div>
+
+    </div>
+
+    <div id="left-menu-container">
+        <div id="left-mask">
+        </div>
+        <div id="site-navigation">
+            <div id="site-nav-bg">
+                <div style="text-align: right; padding: 5px 10px 0px;">
+                    <i class="fa fa-close site-nav-close"></i></span>
+                </div>
+                <div class="zcollapse znavbar-collapse" id="main-navbar">
+                            <ul class="nav navbar-nav">
+            <li class='' ><a href='/site/index' ><i class="fa fa-home forum"></i><span class="navbar-hide">Home</span> </a></li>
+<li class='' ><a href='/site/register' ><i class="fa fa-pencil"></i>Registration </a></li>
+<li class='' ><a href='/clubber' ><i class="fa fa-sign-in" ></i>Login </a></li>
+        </ul>
+                        </div><!-- /.navbar-collapse -->
+                <img class="center-block "
+                     src="/images/ttt_logo_mobile.png"
+                     style="margin-top: 10px;"/>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="loading-container"
+     style="">
+
+</div>
+<style>
+    #page-content-holder.loading {
+        opacity:.75;
+    }
+    #loading-container {
+        position:absolute;
+        color:white;
+        font-size:25px;
+        font-weight: bold;
+        top:0; left:0;right:0;bottom:0;
+        background: rgba(132, 232, 255, 0.3);
+        z-index: 5000;
+    }
+</style>
+<script>
+    $(function(){
+        $('#page-content-holder').removeClass('loading');
+        $('#loading-container').remove();
+    });
+    function loading_add() {
+        if ($('#loading-container').length===0) {
+            $('body').append('<div id="loading-container"></div>');
+        }
+    }
+    function loading_remove() {
+        $('#loading-container').remove();
+    }
+</script>
+
+<div class="modal fade" id="clubber-search-modal" tabindex="-1" role="dialog" aria-labelledby="myModalLabel">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header" style="background: #eed">
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                <div class="input-group" style="margin-right: 20px; width:90%">
+                    <input type="text"
+                           id="clubber-search-text"
+                           placeholder="Enter clubber name"
+                           class="form-control" placeholder="Search for...">
+                    <span class="input-group-btn">
+                        <button class="btn btn-primary" id="clubber-search-btn" type="button">Search for Clubber</button>
+                    </span>
+                </div>
+            </div>
+            <div class="modal-body" style="display:none">
+            </div>
+        </div>
+    </div>
+</div>
+
+        <div class="modal fade" id="dc-confirm-modal" tabindex="-1" role="dialog" aria-labelledby="myModalLabel">
+            <div class="modal-dialog x-modal-lg" role="document">
+                <div class="modal-content">
+                    <div class="modal-body" style="text-align:center">
+                       <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true" style="font-size:22px;">&times;</span></button>
+                        <p></p>
+                        <div >
+                            <a href="#" class="btn" data-dismiss="modal">
+                                 No
+                            </a>
+                            <a href="#" class="ok btn btn-primary">
+                                Yes
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <script>
+            var dc_confirm_callback = null;
+            function dc_confirm(question, callback) {
+                dc_confirm_callback = callback;
+
+                $('#dc-confirm-modal')
+                    .modal('show')
+                    .find('.modal-body p').html(question)
+                    ;
+            };
+            $(function(){
+                $('#dc-confirm-modal .ok').click(function(){
+                    dc_confirm_callback();
+                    $('#dc-confirm-modal').modal('hide');
+                    return false;
+                });
+            });
+        </script>
+        
+<script type="text/javascript">
+/*<![CDATA[*/
+jQuery(function($) {
+  $("#nav li").hover(
+    function () {
+      if ($(this).hasClass("parent")) {
+        $(this).addClass("over");
+      }
+    },
+    function () {
+      $(this).removeClass("over");
+    }
+  );
+
+$('table.table.items').addClass('table-striped table-hover');
+});
+/*]]>*/
+</script>
+</body>
+</html>

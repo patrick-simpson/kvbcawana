@@ -1,0 +1,37 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      # Keep the test-runner pair in lockstep — @vitest/coverage-v8 must
+      # match vitest's major or vitest refuses to start.
+      vitest:
+        patterns: ["vitest", "@vitest/*"]
+      playwright:
+        patterns: ["@playwright/*", "playwright*"]
+      dev-minor-patch:
+        dependency-type: development
+        update-types: ["minor", "patch"]
+      prod-minor-patch:
+        dependency-type: production
+        update-types: ["minor", "patch"]
+  # The sound room desktop app (desktop/): an always-on Electron window that
+  # loads a remote page, so its Electron must keep getting security updates.
+  - package-ecosystem: npm
+    directory: "/desktop"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3
+    groups:
+      electron:
+        patterns: ["electron", "electron-builder", "electron-updater"]
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday

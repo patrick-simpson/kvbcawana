@@ -1,0 +1,62 @@
+name: Create desktop release
+
+# The one way to cut an Awana Lobby Display release. Run it from the Actions
+# tab (or `actions_run_trigger`, workflow_id create-desktop-release.yml, ref
+# main) with the version in desktop/package.json, e.g. 1.0.1 (no "desktop-v").
+#
+# It creates the desktop-vX.Y.Z tag with its own token (a session's git access
+# cannot push tags) and then dispatches build-desktop.yml against that tag
+# explicitly: a tag pushed with GITHUB_TOKEN fires no other workflow's push
+# trigger (GitHub's anti-recursion rule; the printer learned this at v5.0.2).
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release, e.g. 1.0.1 (must equal desktop/package.json)'
+        required: true
+      ref:
+        description: 'Branch or commit to tag'
+        required: false
+        default: 'main'
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+          fetch-depth: 0
+
+      - name: Check the version
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          if ! echo "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "Version must be X.Y.Z (no prefix, no pre-release): got '$VERSION'"; exit 1
+          fi
+          PKG=$(node -p "require('./desktop/package.json').version")
+          if [ "$PKG" != "$VERSION" ]; then
+            echo "desktop/package.json says $PKG; bump it (and its lockfile) first"; exit 1
+          fi
+          if git rev-parse -q --verify "refs/tags/desktop-v$VERSION" >/dev/null; then
+            echo "desktop-v$VERSION already exists"; exit 1
+          fi
+
+      - name: Tag and build
+        env:
+          VERSION: ${{ inputs.version }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="desktop-v$VERSION"
+          git config user.name 'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          git tag -a "$TAG" -m "Awana Lobby Display $VERSION"
+          git push origin "$TAG"
+          gh workflow run build-desktop.yml --repo "${{ github.repository }}" --ref "$TAG"
+          echo "Dispatched build-desktop.yml for $TAG"

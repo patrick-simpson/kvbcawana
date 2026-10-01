@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'">
+<title>Choose the lobby TV</title>
+<style>
+  :root { --orange: #FAA41D; --deep: #C97A08; --ink: #231F20; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; font-family: "Segoe UI", system-ui, sans-serif; background: var(--orange); color: #fff; }
+  body { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 24px; text-align: center; -webkit-user-select: none; user-select: none; }
+  .n { font-size: 132px; line-height: 1; font-weight: 900; text-shadow: 6px 7px 0 var(--deep); }
+  .label { font-size: 22px; font-weight: 700; }
+  .size { font-size: 15px; opacity: .9; }
+  .current { font-size: 14px; background: rgba(0,0,0,.18); border-radius: 999px; padding: 3px 12px; }
+  .row { display: flex; gap: 12px; margin-top: 10px; }
+  button { font: inherit; font-size: 17px; font-weight: 700; border: 0; border-radius: 12px; padding: 12px 22px; cursor: pointer; }
+  .use { background: #fff; color: var(--ink); box-shadow: 4px 5px 0 var(--deep); }
+  .cancel { background: transparent; color: #fff; border: 2px solid rgba(255,255,255,.8); }
+</style>
+</head>
+<body>
+  <div class="n" id="n"></div>
+  <div class="label" id="label"></div>
+  <div class="size" id="size"></div>
+  <div class="current" id="current" hidden>The lobby TV right now</div>
+  <div class="row">
+    <button class="use" id="use" autofocus>Show the lobby on this screen</button>
+    <button class="cancel" id="cancel">Cancel</button>
+  </div>
+<script>
+  const q = new URLSearchParams(location.search);
+  document.getElementById('n').textContent = q.get('n') || '?';
+  document.getElementById('label').textContent = q.get('label') || '';
+  document.getElementById('size').textContent = q.get('size') || '';
+  document.getElementById('current').hidden = q.get('current') !== '1';
+  document.getElementById('use').addEventListener('click', () => window.chooser.choose());
+  document.getElementById('cancel').addEventListener('click', () => window.chooser.cancel());
+  addEventListener('keydown', (e) => { if (e.key === 'Escape') window.chooser.cancel(); });
+</script>
+</body>
+</html>

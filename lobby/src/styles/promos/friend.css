@@ -1,0 +1,473 @@
+/* ── Promo: BARF Night (FriendPromo.jsx) ───────────────────
+   The printed poster told as a comic book: purple ground and pool,
+   Ben-Day halftone, ink outlines, two panels, a high five, the acronym,
+   and the finished poster (headline over its turning 14-point burst,
+   the lime splat carrying BRING / A REAL / FRIEND, the date, the reward
+   starburst). Ink is #1e0836 everywhere.
+
+   Layering inside the shaker, lowest first: halftone (0), speed lines
+   (1), burst (2), splat (3), frame (4), panels / headline / date /
+   badge (5), acronym (6), kids (7), SPLAT! and spray (8), flash (9),
+   the wipe (10). Wordmark, chip and detail sit above the camera. */
+.promo-slide--friend {
+  background-color: #5b1f8f;
+  background-image: radial-gradient(ellipse 68% 60% at 50% 44%, #7b2fbd 0%, rgba(123, 47, 189, 0) 62%);
+}
+
+.promo-friend-camera,
+.promo-friend-shaker {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+}
+
+/* Ben-Day dots, heavier toward the corners, clear in the middle. */
+.promo-friend-halftone {
+  position: absolute;
+  inset: -4%;
+  z-index: 0;
+  background-image: radial-gradient(circle, rgba(30, 8, 54, 0.55) 30%, rgba(30, 8, 54, 0) 33%);
+  background-size: clamp(10px, 1.1vw, 22px) clamp(10px, 1.1vw, 22px);
+  -webkit-mask-image: radial-gradient(ellipse 60% 58% at 50% 46%, transparent 45%, #000 100%);
+  mask-image: radial-gradient(ellipse 60% 58% at 50% 46%, transparent 45%, #000 100%);
+  opacity: 0.8;
+  pointer-events: none;
+}
+
+.promo-friend-speed {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.promo-friend-speed path { fill: #1e0836; }
+
+/* ── Act one: the panels ───────────────────────────────────── */
+.promo-friend-panels {
+  position: absolute;
+  z-index: 5;
+  inset: 14% 5% 15%;
+  display: flex;
+  gap: 3vw;
+  pointer-events: none;
+}
+.promo-friend-panel {
+  position: relative;
+  flex: 1 1 0;
+  overflow: hidden;
+  border: clamp(4px, 0.55vh, 9px) solid #1e0836;
+  border-radius: 0.6vh;
+  box-shadow:
+    0 0 0 clamp(4px, 0.6vh, 10px) #ffffff,
+    1.2vh 1.6vh 0 clamp(4px, 0.6vh, 10px) #1e0836;
+}
+.promo-friend-panel--purple { background: radial-gradient(circle at 40% 60%, #9147d6 0%, #7b2fbd 45%, #5b1f8f 100%); }
+.promo-friend-panel--lime { background: radial-gradient(circle at 60% 60%, #c7f26a 0%, #7ed321 60%, #5fae12 100%); }
+.promo-friend-panel-dots {
+  position: absolute;
+  inset: 0;
+  background-size: clamp(9px, 1vw, 20px) clamp(9px, 1vw, 20px);
+  opacity: 0.5;
+}
+.promo-friend-panel--purple .promo-friend-panel-dots {
+  background-image: radial-gradient(circle, rgba(199, 242, 106, 0.55) 26%, rgba(199, 242, 106, 0) 30%);
+}
+.promo-friend-panel--lime .promo-friend-panel-dots {
+  background-image: radial-gradient(circle, rgba(91, 31, 143, 0.5) 26%, rgba(91, 31, 143, 0) 30%);
+}
+.promo-friend-panel-lines {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0.22;
+}
+.promo-friend-panel--purple .promo-friend-panel-lines path { fill: #1e0836; }
+.promo-friend-panel--lime .promo-friend-panel-lines path { fill: #ffffff; }
+.promo-friend-panel-caption {
+  position: absolute;
+  top: 0;
+  left: 0;
+  padding: 0.35em 0.8em 0.4em;
+  background: #c7f26a;
+  border-right: clamp(3px, 0.45vh, 7px) solid #1e0836;
+  border-bottom: clamp(3px, 0.45vh, 7px) solid #1e0836;
+  color: #1e0836;
+  font-family: var(--promo-font-condensed);
+  font-weight: 700;
+  font-size: clamp(1rem, min(1.9vw, 3.4vh), 2.2rem);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.promo-friend-panel-kid {
+  position: absolute;
+  bottom: -4%;
+  height: 72%;
+  aspect-ratio: 100 / 160;
+}
+.promo-friend-panel-kid--a { left: 16%; }
+.promo-friend-panel-kid--b { right: 16%; }
+.promo-friend-panel-kid .promo-friend-kid-art { width: 100%; height: 100%; }
+
+/* Speech bubbles: white, ink rim, a tail pointing down at the speaker. */
+.promo-friend-bubble {
+  position: absolute;
+  top: 17%;
+  max-width: 62%;
+  padding: 0.5em 0.9em 0.55em;
+  background: #ffffff;
+  border: clamp(3px, 0.45vh, 7px) solid #1e0836;
+  border-radius: 1.4em;
+  color: #1e0836;
+  font-family: var(--font-poster);
+  font-size: clamp(1.3rem, min(2.7vw, 4.8vh), 3.2rem);
+  line-height: 1.02;
+  text-align: center;
+  text-transform: uppercase;
+  box-shadow: 0.5vh 0.7vh 0 #1e0836;
+}
+.promo-friend-bubble::after {
+  content: '';
+  position: absolute;
+  bottom: -0.62em;
+  width: 0.9em;
+  height: 0.7em;
+  background: #ffffff;
+  border-right: clamp(3px, 0.45vh, 7px) solid #1e0836;
+  border-bottom: clamp(3px, 0.45vh, 7px) solid #1e0836;
+  clip-path: polygon(0 0, 100% 0, 100% 100%);
+}
+.promo-friend-bubble--a { right: 7%; transform-origin: 20% 110%; }
+.promo-friend-bubble--a::after { left: 22%; transform: skewX(-25deg); }
+.promo-friend-bubble--b {
+  left: 12%;
+  font-size: clamp(2.2rem, min(5.6vw, 10vh), 6.5rem);
+  transform-origin: 80% 110%;
+}
+.promo-friend-bubble--b::after { right: 22%; transform: scaleX(-1) skewX(-25deg); }
+
+/* ── The end card ──────────────────────────────────────────── */
+.promo-friend-frame {
+  position: absolute;
+  z-index: 4;
+  inset: clamp(8px, 1.6vh, 20px);
+  border: clamp(4px, 0.5vh, 8px) solid #1e0836;
+  border-radius: 1vh;
+  box-shadow: 0 0 0 clamp(8px, 1.6vh, 20px) #f3ecfb;
+  pointer-events: none;
+}
+
+.promo-friend-burst-slot {
+  --burst: clamp(300px, min(50vw, 84vh), 1000px);
+  position: absolute;
+  z-index: 2;
+  left: calc(50% - var(--burst) / 2);
+  top: calc(44% - var(--burst) / 2);
+  width: var(--burst);
+  height: var(--burst);
+  pointer-events: none;
+}
+.promo-friend-burst { width: 100%; height: 100%; overflow: visible; }
+
+.promo-friend-head {
+  position: absolute;
+  z-index: 5;
+  top: 8.5%;
+  left: 4%;
+  right: 4%;
+  display: flex;
+  justify-content: center;
+  text-align: center;
+}
+.promo-slide--friend .promo-friend-headline {
+  color: #7ed321;
+  font-size: clamp(2.6rem, min(7.6vw, 13vh), 9.5rem);
+  text-transform: none;
+  --po-w: 0.035em;
+  --po-c: #1e0836;
+  --po-s: #1e0836;
+  --po-drop: 0.1em;
+}
+.promo-slide--friend .promo-friend-headline--long { font-size: clamp(2rem, min(5.2vw, 9.4vh), 6.4rem); }
+
+.promo-friend-splat-area {
+  position: absolute;
+  z-index: 3;
+  top: 24%;
+  bottom: 31%;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.promo-friend-splat-slot,
+.promo-friend-jelly {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.promo-friend-splat {
+  height: 100%;
+  width: min(62vw, 60vh);
+  overflow: visible;
+  filter: drop-shadow(0.9vh 1.3vh 0 #1e0836);
+}
+.promo-friend-ink-stroke {
+  stroke: #1e0836;
+  stroke-width: 5;
+  stroke-linejoin: round;
+}
+.promo-friend-words {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 0.95;
+}
+.promo-friend-word {
+  display: inline-block;
+  font-family: var(--font-poster);
+  font-weight: 400;
+  font-size: clamp(2.2rem, min(6.4vw, 10.4vh), 7.5rem);
+  letter-spacing: 0.01em;
+  color: #3b1a63;
+  text-shadow: 0.04em 0.05em 0 #c7f26a;
+}
+
+.promo-friend-foot {
+  position: absolute;
+  z-index: 5;
+  top: 70%;
+  left: 4%;
+  right: 4%;
+  display: flex;
+  justify-content: center;
+  text-align: center;
+}
+.promo-slide--friend .promo-friend-date {
+  color: #ffffff;
+  font-size: clamp(1.8rem, min(4.6vw, 7.8vh), 5.6rem);
+  --po-w: 0.03em;
+  --po-c: #1e0836;
+  --po-s: #1e0836;
+  --po-drop: 0.08em;
+}
+.promo-slide--friend .promo-friend-date--long {
+  font-size: clamp(1.4rem, min(3.3vw, 5.8vh), 3.9rem);
+  text-transform: none;
+}
+
+/* The reward on a hand-cut starburst, right of the splat. */
+.promo-friend-badge {
+  --badge: clamp(160px, min(22vw, 38vh), 460px);
+  position: absolute;
+  z-index: 5;
+  right: 4%;
+  top: 29%;
+  width: var(--badge);
+  height: var(--badge);
+  filter: drop-shadow(0.6vh 0.9vh 0 #1e0836);
+}
+.promo-friend-badge-art { position: absolute; inset: 0; width: 100%; height: 100%; }
+.promo-friend-badge-copy {
+  position: absolute;
+  inset: 18% 19%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  color: #1e0836;
+  line-height: 0.95;
+  text-transform: uppercase;
+}
+.promo-friend-badge-big {
+  font-family: var(--font-poster);
+  font-size: calc(var(--badge) * 0.27);
+  color: #5b1f8f;
+}
+.promo-friend-badge-mid {
+  font-family: var(--font-poster);
+  font-size: calc(var(--badge) * 0.1);
+}
+.promo-friend-badge-small {
+  font-family: var(--promo-font-condensed);
+  font-weight: 700;
+  font-size: calc(var(--badge) * 0.086);
+  letter-spacing: 0.08em;
+  margin-top: 0.15em;
+}
+.promo-friend-badge-plus {
+  font-family: var(--promo-font-display);
+  font-weight: 800;
+  font-size: calc(var(--badge) * 0.074);
+  margin-top: 0.2em;
+  text-transform: none;
+}
+
+/* ── The acronym ───────────────────────────────────────────── */
+.promo-friend-acronym {
+  position: absolute;
+  z-index: 7;
+  font-size: clamp(3rem, min(8vw, 12.5vh), 10rem);
+  left: calc(50% - 2em);
+  top: calc(46% - 2.16em);
+  display: flex;
+  flex-direction: column;
+  pointer-events: none;
+}
+.promo-friend-row {
+  display: flex;
+  align-items: center;
+  height: 1em;
+  margin-bottom: 0.08em;
+}
+.promo-friend-tile {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 0.95em;
+  height: 1em;
+  border: 0.045em solid #1e0836;
+  border-radius: 0.14em;
+  box-shadow: 0.06em 0.07em 0 #1e0836;
+  color: #3b1a63;
+  font-family: var(--font-poster);
+  font-size: 1em;
+  line-height: 1;
+  padding-top: 0.06em;
+  box-sizing: border-box;
+}
+.promo-friend-tile--lime { background: #7ed321; }
+.promo-friend-tile--pale { background: #c7f26a; }
+.promo-friend-rest-mask {
+  display: inline-block;
+  overflow: hidden;
+  padding: 0.12em 0.12em 0.12em 0.1em;
+  margin: -0.12em 0 -0.12em;
+}
+.promo-friend-rest {
+  display: inline-block;
+  color: #ffffff;
+  font-family: var(--font-poster);
+  line-height: 1;
+  --po-w: 0.03em;
+  --po-c: #1e0836;
+  --po-s: #1e0836;
+  --po-drop: 0.07em;
+}
+
+/* ── The kids ──────────────────────────────────────────────── */
+.promo-friend-kid {
+  position: absolute;
+  z-index: 6;
+  bottom: -1%;
+  height: 30vh;
+  aspect-ratio: 100 / 160;
+  transform-origin: 50% 100%;
+  pointer-events: none;
+}
+.promo-friend-kid--a { left: 3vw; }
+.promo-friend-kid--b { right: 3vw; }
+.promo-friend-kid .promo-friend-kid-art { width: 100%; height: 100%; overflow: visible; }
+.promo-friend-kid--b .promo-friend-kid-art,
+.promo-friend-panel-kid--b .promo-friend-kid-art { transform: scaleX(-1); }
+
+/* ── The impact ────────────────────────────────────────────── */
+.promo-friend-flash {
+  position: absolute;
+  z-index: 9;
+  inset: -5%;
+  background: #ffffff;
+  pointer-events: none;
+}
+.promo-friend-boom {
+  --boom: clamp(220px, min(36vw, 54vh), 720px);
+  position: absolute;
+  z-index: 8;
+  left: calc(50% - var(--boom) / 2);
+  top: calc(30% - var(--boom) / 2);
+  width: var(--boom);
+  height: var(--boom);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+.promo-friend-boom-art { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.promo-friend-boom-word {
+  position: relative;
+  font-family: var(--font-poster);
+  font-size: calc(var(--boom) * 0.24);
+  color: #7ed321;
+  text-shadow:
+    -0.04em 0 0 #1e0836, 0.04em 0 0 #1e0836, 0 -0.04em 0 #1e0836, 0 0.04em 0 #1e0836,
+    -0.04em -0.04em 0 #1e0836, 0.04em -0.04em 0 #1e0836, -0.04em 0.04em 0 #1e0836, 0.04em 0.04em 0 #1e0836,
+    0.07em 0.1em 0 #1e0836;
+}
+.promo-friend-spray {
+  position: absolute;
+  z-index: 8;
+  left: 50%;
+  top: 44%;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+.promo-friend-drop {
+  position: absolute;
+  left: calc(var(--drop) * -0.5vw);
+  top: calc(var(--drop) * -0.5vw);
+  width: calc(var(--drop) * 1vw);
+  height: calc(var(--drop) * 1vw);
+  border-radius: 50%;
+  border: clamp(2px, 0.3vh, 4px) solid #1e0836;
+}
+.promo-friend-drop--lime { background: #7ed321; }
+.promo-friend-drop--pale { background: #c7f26a; }
+
+/* The match-cut wipe: a lime band of halftone with slanted edges. */
+.promo-friend-wipe {
+  position: absolute;
+  z-index: 10;
+  top: 0;
+  bottom: 0;
+  left: 10vw;
+  width: 80vw;
+  clip-path: polygon(18% 0, 100% 0, 82% 100%, 0 100%);
+  background-color: #7ed321;
+  background-image: radial-gradient(circle, rgba(91, 31, 143, 0.5) 28%, rgba(91, 31, 143, 0) 32%);
+  background-size: clamp(12px, 1.4vw, 28px) clamp(12px, 1.4vw, 28px);
+  pointer-events: none;
+}
+
+/* ── Wordmark, chip, detail ───────────────────────────────── */
+.promo-slide--friend .promo-wordmark-slot { top: 3%; }
+.promo-slide--friend .promo-chip-slot { top: 4%; left: 3.4%; }
+.promo-slide--friend .promo-chip {
+  background: #7ed321;
+  color: #1e0836;
+  border: clamp(2px, 0.35vh, 5px) solid #1e0836;
+  box-shadow: 0.4vh 0.6vh 0 #1e0836;
+}
+.promo-friend-detail {
+  position: absolute;
+  z-index: 5;
+  top: 80.5%;
+  left: 4%;
+  right: 4%;
+  pointer-events: none;
+}
+.promo-slide--friend .promo-detail {
+  padding: 0.22em 0.9em 0.28em;
+  background: #ffffff;
+  border: clamp(2px, 0.4vh, 6px) solid #1e0836;
+  box-shadow: 0.4vh 0.6vh 0 #1e0836;
+  color: #1e0836;
+}

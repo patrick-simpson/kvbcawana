@@ -1,0 +1,102 @@
+/* ── The flagship slide (FlagshipSlide.jsx) ───────────────────
+   The catalog's welcome page as a title sequence, first in every pass.
+   FlagshipSlide.jsx owns the timing; this file owns the look. It stands in
+   the same 100u x 56.25u frame as the lobby copy (u = 1% of a 16:9 stage),
+   full-bleed field behind it. Layers, lowest first: clouds 0,
+   headline 2, doodles 3. The corner tab and the house waves are the
+   scene's own chrome (CatalogScene), over this slide like every other. */
+
+.flagship {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: var(--brand-sky);
+  color: #fff;
+  transform-origin: 50% 40%;
+  transition:
+    opacity var(--brand-dur-settle) var(--brand-ease-settle),
+    transform var(--brand-dur-settle) var(--brand-ease-settle);
+}
+/* A name is on screen: the slide steps back the way typed copy does. */
+.stage.checkin-active .flagship {
+  opacity: 0.28;
+  transform: scale(0.97);
+}
+
+/* Everything below is laid out in the 16:9 frame, centred in the screen. */
+.flagship-clouds,
+.flagship-copy,
+.flagship-doodle-slot {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: calc(100 * var(--u));
+  height: calc(56.25 * var(--u));
+  pointer-events: none;
+}
+.flagship-clouds { z-index: 0; }
+
+.flagship-cloud {
+  position: absolute;
+  display: block;
+  background: var(--brand-cloud);
+  border-radius: 46% 54% 52% 48% / 58% 44% 56% 42%;
+}
+.flagship-cloud--a { left: -8%; top: 18%; width: 46%; height: 52%; }
+.flagship-cloud--b { right: -10%; top: 4%; width: 52%; height: 62%; }
+
+.flagship-copy {
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  /* Above the waves, clear of the tab and the top-right stack. */
+  padding-top: calc(19 * var(--u));
+  box-sizing: border-box;
+}
+.flagship-title { position: relative; }
+.flagship-row {
+  display: flex;
+  justify-content: center;
+  gap: 0.28em;
+  font-family: var(--font-shout);
+  font-size: calc(11.6 * var(--u));
+  line-height: 0.9;
+  text-transform: uppercase;
+  color: #fff;
+}
+.flagship-row--1 { font-size: calc(10.2 * var(--u)); }
+.flagship-word { display: flex; }
+/* The mask each letter rises from; padded so the hard shadow and the tall
+   accents are never cut by it. */
+.flagship-mask {
+  display: block;
+  overflow: hidden;
+  padding: 0.12em 0.14em 0.22em 0.02em;
+  margin: -0.12em -0.14em -0.22em -0.02em;
+}
+.flagship-letter {
+  display: block;
+  text-shadow: 0.05em 0.06em 0 var(--brand-blue);
+  will-change: transform;
+  /* Its soft squish sits it down onto its baseline: (SHOUT_BOX's ascent less
+     its descent, plus the row's 0.9 line height) / 2, pinned by
+     FlagshipSlide.test.jsx. Well inside the mask's pads either way. */
+  transform-origin: 50% 0.712em;
+}
+.flagship-sheen {
+  position: absolute;
+  inset: -4% -6%;
+  z-index: 1;
+  background: linear-gradient(100deg, rgba(255,255,255,0) 38%, rgba(255,255,255,0.55) 50%, rgba(255,255,255,0) 62%);
+  mix-blend-mode: soft-light;
+  pointer-events: none;
+}
+
+.flagship-doodle-slot { z-index: 3; }
+.flagship-doodles { position: absolute; }
+/* `inset: auto` comes FIRST in each rule below: it is a shorthand, and written
+   after left/right/top it wiped them, stacking both clusters at the frame's
+   top-left corner. */
+.flagship-doodle-slot--left .flagship-doodles { inset: auto; left: calc(5 * var(--u)); top: calc(15 * var(--u)); width: calc(20 * var(--u)); height: calc(18 * var(--u)); }
+.flagship-doodle-slot--right .flagship-doodles { inset: auto; right: calc(5 * var(--u)); top: calc(15 * var(--u)); width: calc(20 * var(--u)); height: calc(18 * var(--u)); }
