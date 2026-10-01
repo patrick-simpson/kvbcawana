@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Journey Display</title>
+  <!-- The deployed copy carries the commit SHA here (scripts/stamp-build.mjs,
+       run by deploy.yml); "dev" is what a checkout and the tests see. The
+       kiosk compares it with version.json to notice a new deploy and reload
+       itself when nothing is on screen. -->
+  <meta name="journey-build" content="dev" />
+  <!-- The Awana 2026-27 brand kit, mirrored byte for byte in brand/ (see
+       CLAUDE.md, "Brand kit"): its colour tokens and its three self-hosted
+       font families. Nothing on this page loads a font from the network. -->
+  <link rel="stylesheet" href="brand/tokens.css" />
+  <link rel="stylesheet" href="brand/fonts.css" />
+  <link rel="stylesheet" href="src/style.css" />
+</head>
+<body>
+  <div id="checkin-view" class="view">
+    <!-- The src here is the low-power one, so a browser with JavaScript off
+         still shows the display. schedule.js rewrites it at startup from the
+         device profile (see checkinDisplayUrl in src/schedule.js). -->
+    <iframe
+      id="checkin-frame"
+      src="https://patrick-simpson.github.io/Awana-Check-in-Display/?lowPower=1"
+      title="Awana Check-in Display"
+      allow="fullscreen"
+    ></iframe>
+  </div>
+
+  <div id="journey-view" class="view hidden">
+    <div id="journey-placeholder">
+      <span><img src="brand/logos/journey-white.svg" alt="Journey" draggable="false" /></span>
+    </div>
+    <div id="journey-splash" class="hidden">
+      <div id="journey-splash-wordmark">
+        <span id="journey-splash-journey"><img src="brand/logos/journey-white.svg" alt="Journey" draggable="false" /></span>
+        <span id="journey-splash-advocates">Advocates</span>
+      </div>
+      <div id="journey-splash-banner">Large Group Time</div>
+      <div id="journey-splash-lesson">
+        <span id="journey-splash-week"></span>
+        <span id="journey-splash-title"></span>
+      </div>
+      <div id="journey-splash-actions">
+        <button id="journey-splash-play-btn" type="button">
+          <span id="journey-splash-play-icon" aria-hidden="true">▶</span>
+          Begin Video
+        </button>
+        <button id="journey-splash-resume-btn" class="hidden" type="button">
+          <span class="journey-splash-play-icon" aria-hidden="true">▶</span>
+          <span id="journey-splash-resume-label">Resume</span>
+        </button>
+        <button id="journey-splash-startover-btn" class="hidden" type="button">Start over</button>
+        <button id="journey-splash-slides-btn" type="button">Skip to slides</button>
+      </div>
+      <p id="journey-splash-prompt">or press <kbd>Space</kbd> / <kbd>→</kbd> begin &middot; <kbd>Shift</kbd>+<kbd>→</kbd> slides &middot; <kbd>S</kbd> settings</p>
+      <p id="journey-splash-quality" class="hidden" role="status"></p>
+    </div>
+    <video id="journey-video" class="hidden" muted playsinline></video>
+    <div id="caption-prompt" class="hidden" role="dialog" aria-modal="true" aria-labelledby="caption-prompt-q">
+      <p id="caption-prompt-q">Show captions?</p>
+      <div id="caption-prompt-buttons">
+        <button id="caption-yes" type="button">Yes <span class="key-hint">(Y)</span></button>
+        <button id="caption-no" type="button">No <span class="key-hint">(N)</span></button>
+      </div>
+      <p id="caption-prompt-note">You can change this later with the <strong>CC</strong> button on the video.</p>
+    </div>
+    <div id="journey-loading" class="hidden" role="status">
+      <span id="journey-loading-text">Loading video&hellip;</span>
+      <span id="journey-loading-note">This can take a moment on the kiosk&rsquo;s connection</span>
+    </div>
+    <div id="caption-overlay" class="hidden" aria-live="polite"><span id="caption-text"></span></div>
+    <div id="video-controls" class="hidden">
+      <button id="back15-btn" type="button" aria-label="Back 15 seconds">Back 15s</button>
+      <button id="pause-btn" type="button">Pause</button>
+      <button id="fwd15-btn" type="button" aria-label="Forward 15 seconds">Skip 15s</button>
+      <button id="unmute-btn" type="button" aria-label="Unmute">🔇</button>
+      <button id="cc-btn" type="button" class="hidden" aria-pressed="false" aria-label="Toggle captions">CC</button>
+      <input id="video-scrubber" type="range" min="0" max="0" step="0.1" value="0" aria-label="Seek" />
+      <span id="video-time">0:00</span>
+    </div>
+    <div id="slides-view" class="hidden" aria-label="Teaching slides">
+      <div id="slide-stage">
+        <img id="slide-image" alt="" draggable="false" />
+        <div id="slide-template" class="hidden">
+          <h2 id="slide-template-heading"></h2>
+          <ul id="slide-template-bullets"></ul>
+        </div>
+      </div>
+      <div id="slide-controls">
+        <button id="slide-prev-btn" type="button">&larr; Back</button>
+        <span id="slide-counter" aria-live="polite"></span>
+        <button id="slide-next-btn" type="button">Next &rarr;</button>
+      </div>
+    </div>
+  </div>
+
+  <button id="toggle-btn" type="button" aria-label="Switch display">⇄</button>
+  <button id="settings-btn" type="button" aria-label="Video settings">⚙</button>
+
+  <div id="settings-panel" class="hidden" role="dialog" aria-label="Journey video settings" aria-modal="true">
+    <div id="settings-backdrop"></div>
+    <div id="settings-card">
+      <div id="settings-header">
+        <h2>Journey Videos</h2>
+        <button id="settings-close-btn" type="button" aria-label="Close">✕</button>
+      </div>
+      <p id="settings-preview-note">
+        Picking a video here plays it once, right now — it never changes what
+        automatically plays at 6:30&nbsp;PM.
+      </p>
+      <div id="settings-lesson-list" role="listbox" aria-label="Choose a lesson"></div>
+      <div id="settings-variant-picker" class="hidden">
+        <p id="settings-variant-prompt"></p>
+        <div id="settings-variant-buttons">
+          <button id="settings-variant-student" type="button">Student Video</button>
+          <button id="settings-variant-leader" type="button">Leader Video</button>
+          <button id="settings-variant-slides" type="button">Teaching slides</button>
+        </div>
+        <button id="settings-variant-back" type="button">← Back to list</button>
+      </div>
+      <div id="settings-student-picker" class="hidden">
+        <p id="settings-student-prompt"></p>
+        <div id="settings-student-buttons">
+          <button id="settings-student-video" type="button">Watch Video</button>
+          <button id="settings-student-prep" type="button">Read Prep</button>
+        </div>
+        <button id="settings-student-back" type="button">&larr; Back</button>
+      </div>
+      <div id="settings-leader-picker" class="hidden">
+        <p id="settings-leader-prompt"></p>
+        <div id="settings-leader-buttons">
+          <button id="settings-leader-video" type="button">Watch Video</button>
+          <button id="settings-leader-handout" type="button">View Handout</button>
+          <button id="settings-leader-prep" type="button">Read Prep</button>
+        </div>
+        <button id="settings-leader-back" type="button">← Back</button>
+      </div>
+      <div id="settings-captions">
+        <h3>Captions</h3>
+        <p class="settings-hint">
+          How captions look while they&rsquo;re on &mdash; the <kbd>CC</kbd> button
+          on the video is what turns them on and off.
+        </p>
+        <label class="settings-field" for="captions-size">
+          <span>Text size</span>
+          <select id="captions-size">
+            <option value="0.8">Small</option>
+            <option value="1">Normal</option>
+            <option value="1.3">Large</option>
+            <option value="1.6">Extra large</option>
+          </select>
+        </label>
+        <label class="settings-check"><input type="checkbox" id="captions-backdrop" /> <span><strong>Dark backdrop</strong> &mdash; a solid band behind the text, for bright video</span></label>
+      </div>
+      <div id="settings-sync" class="hidden">
+        <h3>Sync</h3>
+        <p class="settings-hint">
+          Sign this screen in with the church passphrase. Captions, the teaching
+          slides&rsquo; settings and tonight&rsquo;s edited bullets then follow every
+          Journey screen; video quality stays on this one. It sets up the lobby
+          check-in screen here too.
+        </p>
+        <div id="sync-signin" class="sync-row">
+          <input id="sync-passphrase" type="password" autocomplete="off" autocapitalize="none" spellcheck="false" enterkeyhint="go" placeholder="the church passphrase" aria-label="Passphrase" />
+          <button id="sync-signin-btn" type="button" class="quality-btn">Sign in</button>
+        </div>
+        <div id="sync-signed-in" class="sync-row hidden">
+          <span class="settings-hint">Signed in</span>
+          <button id="sync-signout-btn" type="button" class="quality-btn">Sign out</button>
+        </div>
+        <p id="sync-status" class="settings-hint" role="status"></p>
+      </div>
+      <div id="settings-quality">
+        <h3>Playback quality</h3>
+        <p class="settings-hint">
+          Auto reads the device. <strong>Low power</strong> is what the kiosk
+          Raspberry Pi needs: the small converted lesson videos, and the
+          check-in display with its animations turned down.
+          <strong>Full quality</strong> plays Awana&rsquo;s own full-size video
+          and lets the check-in display animate normally.
+        </p>
+        <div id="quality-buttons" role="group" aria-label="Playback quality">
+          <button id="quality-auto" type="button" class="quality-btn" aria-pressed="true">Auto</button>
+          <button id="quality-full" type="button" class="quality-btn" aria-pressed="false">Full quality</button>
+          <button id="quality-low" type="button" class="quality-btn" aria-pressed="false">Low power</button>
+        </div>
+        <p id="quality-status" class="settings-hint" role="status"></p>
+      </div>
+      <div id="settings-slides">
+        <h3>After the video: teaching slides</h3>
+        <p class="settings-slides-hint">
+          Awana&rsquo;s teaching slides for the lesson play once the video ends.
+          <kbd>Space</kbd> / <kbd>&rarr;</kbd> next, <kbd>&larr;</kbd> back, or tap the slide.
+        </p>
+        <label class="settings-slides-field" for="slides-auto-advance">
+          <span>Auto-advance</span>
+          <select id="slides-auto-advance">
+            <option value="0">Off &mdash; advance by hand</option>
+            <option value="15">Every 15 seconds</option>
+            <option value="30">Every 30 seconds</option>
+            <option value="45">Every 45 seconds</option>
+            <option value="60">Every minute</option>
+            <option value="120">Every 2 minutes</option>
+          </select>
+        </label>
+        <p class="settings-slides-label">Add to the end of the deck:</p>
+        <label class="settings-slides-check"><input type="checkbox" id="slides-extra-questions" /> <span><strong>Talk About It</strong> &mdash; discussion questions</span></label>
+        <label class="settings-slides-check"><input type="checkbox" id="slides-extra-takeaways" /> <span><strong>Remember This</strong> &mdash; key takeaways</span></label>
+        <label class="settings-slides-check"><input type="checkbox" id="slides-extra-challenges" /> <span><strong>This Week</strong> &mdash; challenges to try</span></label>
+        <div id="settings-notes-edit">
+          <button id="notes-edit-toggle" type="button" aria-expanded="false" aria-controls="notes-edit-body">
+            <span id="notes-edit-toggle-label">Edit tonight&rsquo;s bullets</span>
+            <span id="notes-edited-badge" class="hidden">Edited on this device</span>
+          </button>
+          <div id="notes-edit-body" class="hidden">
+            <p id="notes-edit-week" class="settings-hint"></p>
+            <div id="notes-edit-groups"></div>
+            <div id="notes-edit-actions">
+              <button id="notes-reset-btn" type="button" class="hidden">Reset to the written bullets</button>
+              <span id="notes-edit-status" role="status"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="handout-view" class="hidden" role="dialog" aria-modal="true" aria-label="Leader handout">
+    <div id="handout-header">
+      <span id="handout-title"></span>
+      <button id="handout-close-btn" type="button">✕ Close</button>
+    </div>
+    <iframe id="handout-frame" title="Leader handout PDF"></iframe>
+  </div>
+
+  <div id="prep-view" class="hidden" role="dialog" aria-modal="true" aria-label="Lesson prep">
+    <div id="prep-header">
+      <span id="prep-title"></span>
+      <button id="prep-close-btn" type="button">&#10005; Close</button>
+    </div>
+    <div id="prep-body" tabindex="0"></div>
+  </div>
+
+  <script src="src/schedule.js"></script>
+  <script src="src/sync.js"></script>
+</body>
+</html>

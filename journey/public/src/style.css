@@ -1,0 +1,2154 @@
+/* ── The kit, as this page uses it ─────────────────────────────────────
+   The Awana 2026-27 catalog's brand kit is mirrored byte for byte in
+   public/brand/ (see CLAUDE.md, "Brand kit"): brand/tokens.css defines the
+   --brand-* properties and brand/fonts.css the three self-hosted families,
+   both linked from index.html ahead of this sheet. Everything below reads
+   the kit through these aliases. Each one carries the kit's own value as its
+   fallback, so the kiosk still looks like itself if tokens.css ever failed to
+   load, and test/brand-kit.test.mjs fails if a fallback drifts from
+   tokens.css.
+
+   Journey's identity from the catalog: a deep ink field, the club purple, its
+   deep shade and a lavender tint. The one hot red-orange marks the one thing
+   to press. Paytone One shouts, Londrina Solid labels, Figtree is read.
+
+   Built for a 2017 Pi Zero: flat fills and hard offsets only (no blur, no
+   filters, no gradients), and no new animation. The splash's single opacity
+   pulse (journey-splash-pulse, below) is still the only keyframe on the page.
+
+   --u is one hundredth of the width of the largest 16:9 box that fits the
+   screen, which is the unit the approved mockup was drawn in, so a 1080p TV
+   gets the mockup exactly. On a squarer screen it may grow by up to a
+   quarter into the spare height: the kiosk's HDMI safe mode is 640x480 (see
+   PI_SETUP.md), where the 16:9 box alone would leave the splash small in a
+   field of empty purple. Every size built on it has a rem floor, because the
+   page is also opened on phones. */
+:root {
+  --jr-ink: var(--brand-journey-ink, #403A77);
+  --jr-purple: var(--brand-journey, #8A649D);
+  --jr-deep: var(--brand-journey-deep, #56467F);
+  --jr-tint: var(--brand-journey-tint, #DED5EA);
+  --jr-hot: var(--brand-hot, #F15A28);
+  --jr-hot-deep: var(--brand-hot-deep, #9E3512);
+  --jr-sun: var(--brand-sun, #FCB614);
+  --jr-chip: var(--brand-chip, rgba(3, 4, 4, 0.5));
+  --jr-night: var(--brand-ink, #231F20);
+  --jr-font-shout: var(--brand-font-display, 'Paytone One', 'Arial Rounded MT Bold', 'Trebuchet MS', sans-serif);
+  --jr-font-label: var(--brand-font-label, 'Londrina Solid', 'Arial Narrow', 'Helvetica Neue', sans-serif);
+  --jr-font-read: var(--brand-font-body, 'Figtree', 'Segoe UI', system-ui, sans-serif);
+  /* Every shout size below was tuned when Galindo was the shout. Paytone One
+     draws shorter capitals at one font-size (cap height .688 em against
+     Galindo's .725) and sits lower in its line box (its ascent, 1.113 em, is
+     far above its caps; Galindo's was .983 em), so each shout size is
+     multiplied by --jr-shout-fit to keep the caps as tall as they were, and
+     the headlines that stack over something are lifted by --jr-shout-lift to
+     keep the gap between their caps and the lines around them. Both are
+     measured, not guessed (see CLAUDE.md, "Brand kit"); a test fails if a
+     rule that sets the shout face forgets the fit. The lift is `top` on a
+     relatively positioned box, so it moves paint and nothing else: no
+     sibling shifts and nothing is clipped. */
+  --jr-shout-fit: 1.05;
+  --jr-shout-lift: -0.15em;
+  --u: min(1.25vw, 1.7778vh);
+
+  /* Wrapper art, baked from the kit's own shapes so each is ONE static image
+     (rasterised once, never repainted by anything that moves). The path data
+     is copied verbatim from public/brand/ and a test pins it there; only the
+     fills are baked in, because an SVG drawn as an image cannot inherit
+     currentColor.
+     - wave: brand/shapes/wave-journey.svg twice in one image, the deep shade
+       mirrored behind, the club purple in front (the mockup's bottom edge).
+     - tab: brand/shapes/tab-c-journey.svg, Journey's corner tab.
+     - doodles: the kit's sparkle, dot and squiggle (top right) and its
+       four-point sparkle and ring (left), in the mockup's two clusters. */
+  --jr-art-wave: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 576 325.62' preserveAspectRatio='none'><path fill='%2356467F' transform='matrix(-1.06 0 0 1 593.28 0)' d='M-44.64,327.18C-33.18,299.43 -32.31,269.45 -20.38,241.83C-8.45,214.21 19.95,187.39 56.86,186.99C69.04,186.86 80.92,189.63 92.90,191.35C110.53,193.89 128.68,194.16 146.42,192.16C163.36,190.24 180.46,186.03 193.34,177.12C207.02,167.66 214.55,153.99 222.53,141.08C237.45,116.91 256.98,92.66 287.56,80.90C315.33,70.23 347.96,71.53 378.43,75.43C408.91,79.32 439.36,85.59 470.17,84.07C526.12,81.31 575.00,41.71 594.00,0.00L594.00,343.62L-51.84,343.62L-44.64,327.18'/><path fill='%238A649D' transform='matrix(1 0 0 0.7143 0 93.03)' d='M-44.64,327.18C-33.18,299.43 -32.31,269.45 -20.38,241.83C-8.45,214.21 19.95,187.39 56.86,186.99C69.04,186.86 80.92,189.63 92.90,191.35C110.53,193.89 128.68,194.16 146.42,192.16C163.36,190.24 180.46,186.03 193.34,177.12C207.02,167.66 214.55,153.99 222.53,141.08C237.45,116.91 256.98,92.66 287.56,80.90C315.33,70.23 347.96,71.53 378.43,75.43C408.91,79.32 439.36,85.59 470.17,84.07C526.12,81.31 575.00,41.71 594.00,0.00L594.00,343.62L-51.84,343.62L-44.64,327.18'/></svg>");
+  --jr-art-tab: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 205.36 132.53' preserveAspectRatio='none'><path fill='%238A649D' d='M205.36,-35.10L-28.80,-35.10L-28.80,126.63C-17.85,129.47 -6.87,132.53 4.35,130.10C28.16,126.59 40.51,100.98 63.35,96.02C81.82,91.84 100.10,101.46 118.57,100.45C133.31,100.09 146.80,91.64 152.55,77.99C159.60,61.70 157.79,42.01 169.08,27.40C180.32,12.54 196.95,1.11 201.97,-17.74C203.57,-23.29 204.71,-29.13 205.36,-35.10'/></svg>");
+  --jr-art-doodles-right: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='80 6.6 9.6 8.58'><svg x='80' y='8' width='2.4' height='2.4' viewBox='0 0 12.61 12.61'><path fill='%23fff' d='M8.25,4.75L11.26,5.74C11.82,5.91 11.82,6.70 11.26,6.88L8.25,7.86C8.06,7.92 7.92,8.06 7.86,8.25L6.88,11.26C6.70,11.82 5.92,11.82 5.73,11.26L4.75,8.25C4.69,8.06 4.55,7.92 4.37,7.86L1.36,6.88C0.80,6.70 0.80,5.91 1.36,5.74L4.37,4.75C4.55,4.69 4.69,4.55 4.75,4.37L5.73,1.35C5.92,0.80 6.70,0.80 6.88,1.35L7.86,4.37C7.92,4.55 8.06,4.69 8.25,4.75'/></svg><svg x='84.5' y='6.6' width='1' height='1.0325' viewBox='0 0 8.62 8.90'><path fill='%23fff' d='M7.82,4.45C7.82,6.47 6.25,8.10 4.31,8.10C2.37,8.10 0.80,6.47 0.80,4.45C0.80,2.43 2.37,0.80 4.31,0.80C6.25,0.80 7.82,2.43 7.82,4.45'/></svg><svg x='87' y='9.6' width='2.6' height='5.578' viewBox='0 0 46.94 100.70' overflow='visible'><path fill='none' stroke='%23fff' stroke-width='1.6' stroke-linecap='round' d='M1.50,1.72C9.83,1.50 16.86,10.90 14.30,18.83C12.77,23.59 8.49,27.69 9.06,32.65C9.67,37.92 15.41,40.95 20.61,41.98C25.81,43.01 31.51,43.11 35.73,46.32C40.83,50.20 42.06,57.43 41.32,63.79C40.58,70.15 38.29,76.29 37.93,82.68C37.56,89.07 39.74,96.28 45.44,99.20'/></svg></svg>");
+  --jr-art-doodles-left: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='9 26 4.8 5.18'><svg x='12' y='26' width='1.8' height='1.8' viewBox='0 0 12.99 12.99'><path fill='%23fff' d='M6.12,9.87L2.27,11.83C1.56,12.19 0.80,11.43 1.16,10.72L3.12,6.87C3.24,6.63 3.24,6.36 3.12,6.12L1.16,2.27C0.80,1.56 1.56,0.80 2.27,1.16L6.12,3.12C6.36,3.24 6.63,3.24 6.87,3.12L10.72,1.16C11.43,0.80 12.19,1.56 11.83,2.27L9.86,6.12C9.75,6.36 9.75,6.63 9.86,6.87L11.83,10.72C12.19,11.43 11.43,12.19 10.72,11.83L6.87,9.87C6.62,9.95 6.36,9.75 6.12,9.87'/></svg><svg x='9' y='30' width='1.2' height='1.18' viewBox='0 0 6.52 6.41'><path fill='%23fff' d='M5.09,3.20C5.09,2.14 4.28,1.30 3.26,1.30C2.25,1.31 1.42,2.17 1.43,3.22C1.44,4.27 2.26,5.09 3.30,5.08C4.31,5.08 5.08,4.27 5.09,3.20M5.72,3.20C5.72,4.56 4.66,5.60 3.27,5.61C1.89,5.61 0.81,4.56 0.81,3.21C0.80,1.87 1.88,0.81 3.26,0.81C4.65,0.80 5.71,1.83 5.72,3.20'/></svg></svg>");
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #000000;
+}
+
+/* Kiosk cursor: hidden while idle (a stray arrow parked over the projected
+   video all evening looks broken), but visible the moment the mouse moves —
+   an operator has to be able to see the pointer to navigate at all. The
+   .cursor-hidden class is toggled by schedule.js on mouse movement/idle;
+   !important beats the controls' own `cursor: pointer` while idle. An
+   earlier version set `cursor: none` unconditionally, which made the
+   Journey view impossible to navigate with a mouse — don't regress that. */
+html.cursor-hidden,
+html.cursor-hidden * {
+  cursor: none !important;
+}
+
+.view {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+}
+
+.hidden {
+  display: none !important;
+}
+
+#checkin-view iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+
+#journey-view {
+  background: #000000;
+}
+
+/* No lesson resolved yet: the Journey wordmark on the deep ink field, with
+   the same bottom wave as the splash. Deliberately nothing else: this is the
+   "no data" state, and it must never look like a lesson waiting to start. */
+#journey-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4vh 4vw 16vh;
+  background: var(--jr-art-wave) left bottom / 100% 14% no-repeat, var(--jr-ink);
+  color: #ffffff;
+  font-family: var(--jr-font-shout);
+  font-size: calc(4rem * var(--jr-shout-fit));
+  letter-spacing: 0.05em;
+}
+
+#journey-placeholder img {
+  display: block;
+  width: clamp(12rem, 44 * var(--u), 50rem);
+  height: auto;
+}
+
+#journey-video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #000000;
+}
+
+/* ── "Large Group Time" splash — shown on entering the 6:30-7:15 window
+   instead of autoplaying; playback only starts once an operator presses
+   the button, Space, or → (see schedule.js's isAwaitingPlay()). Flat
+   colors, no blur/gradients/shadows beyond the button's, and the only
+   animation is a cheap opacity pulse — this still has to render smoothly
+   on a Raspberry Pi Zero. */
+#journey-splash {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  font-family: var(--jr-font-read);
+  text-align: center;
+  padding: 4vh 4vw 8.5vh;
+  overflow: hidden;
+  background: var(--jr-art-wave) left bottom / 100% 14% no-repeat, var(--jr-ink);
+}
+
+/* The two doodle clusters: static images on pseudo-elements, so the markup
+   carries none of them. The right one hangs from the top corner (clear of
+   the settings button), the left one sits beside the lesson name. */
+#journey-splash::before,
+#journey-splash::after {
+  content: '';
+  position: absolute;
+  pointer-events: none;
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
+}
+
+#journey-splash::before {
+  top: calc(6.6 * var(--u));
+  right: calc(10.4 * var(--u));
+  width: calc(9.6 * var(--u));
+  height: calc(8.58 * var(--u));
+  background-image: var(--jr-art-doodles-right);
+}
+
+#journey-splash::after {
+  top: calc(50% - 2.1 * var(--u));
+  left: calc(9 * var(--u));
+  width: calc(4.8 * var(--u));
+  height: calc(5.18 * var(--u));
+  background-image: var(--jr-art-doodles-left);
+}
+
+/* A phone held upright has no spare margin for them: the right cluster
+   would land on the settings button. */
+@media (max-width: 600px) {
+  #journey-splash::before,
+  #journey-splash::after {
+    display: none;
+  }
+}
+
+/* Splash type scales with the viewport (clamp between phone-readable and
+   the TV sizes these used to be fixed at) — the page is occasionally
+   opened on a phone, where the old fixed sizes overflowed the screen. */
+/* The catalog's Journey wordmark (brand/logos/journey-white.svg, the O a
+   disc with a mountain peak cut out) over ADVOCATES in tracked Londrina. */
+#journey-splash-wordmark {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(0.5rem, 2 * var(--u), 2.4rem);
+}
+
+#journey-splash-journey {
+  display: block;
+  line-height: 0;
+}
+
+#journey-splash-journey img {
+  display: block;
+  width: clamp(12rem, 36 * var(--u), 44rem);
+  height: auto;
+}
+
+/* Letter-spacing also trails the last letter, so the same amount on the left
+   keeps the word centred under the mark. */
+#journey-splash-advocates {
+  padding-left: 0.34em;
+  font-family: var(--jr-font-label);
+  font-size: clamp(0.95rem, 2.4 * var(--u), 3rem);
+  line-height: 1;
+  color: var(--jr-tint);
+  text-transform: uppercase;
+  letter-spacing: 0.34em;
+}
+
+/* "Large Group Time" is Journey's corner tab: the kit's wavy tab shape in the
+   club purple, bleeding off the top-left corner, with the label set into it.
+   Sized in em so the tab always grows with its own text (a phone's floor
+   size included). Out of the flow, so the column stays centred. */
+#journey-splash-banner {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 11.4em;
+  height: 7.4em;
+  padding: 1.14em 0 0 1.24em;
+  background: var(--jr-art-tab) left top / 100% 100% no-repeat;
+  color: #ffffff;
+  font-family: var(--jr-font-label);
+  font-size: clamp(0.85rem, 2.1 * var(--u), 2.6rem);
+  line-height: 1;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  text-align: left;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+#journey-splash-lesson {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(0.2rem, 0.4 * var(--u), 0.5rem);
+  margin-top: clamp(1rem, 3.2 * var(--u), 4rem);
+}
+
+/* WEEK 4 · UNIT 1 · LESSON 4 (see splashLessonText() in schedule.js). */
+#journey-splash-week {
+  font-family: var(--jr-font-label);
+  font-size: clamp(0.85rem, 2 * var(--u), 2.5rem);
+  line-height: 1;
+  color: var(--jr-tint);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+/* The lesson's name, shouted: Paytone One in caps with the deep shade as a hard
+   offset shadow (a flat second fill, painted once; never a blur). Capped at
+   7vw so the longest name in the course (RESURRECTION, week 18) stays clear
+   of the left doodle cluster on the Pi's 4:3 screen; a 16:9 TV never
+   reaches the cap. The fit and the lift (see the top of this sheet) keep the
+   caps as tall, and the gap under the kicker as tight, as the design was
+   drawn with Galindo. */
+#journey-splash-title {
+  position: relative;
+  top: var(--jr-shout-lift);
+  font-family: var(--jr-font-shout);
+  font-weight: 400;
+  font-size: calc(clamp(2rem, min(6.6 * var(--u), 7vw), 8rem) * var(--jr-shout-fit));
+  line-height: 0.98;
+  text-transform: uppercase;
+  text-shadow: 0.06em 0.06em 0 var(--jr-deep);
+  max-width: 90vw;
+  text-wrap: balance;
+}
+
+/* A title that did not split into a one-word name (splashLessonText() fell
+   back to the whole title) would be a wall of shouted lines; set it at the
+   size the old splash gave the title instead. */
+#journey-splash-title.is-long {
+  font-size: calc(clamp(1.4rem, 3.6 * var(--u), 4.4rem) * var(--jr-shout-fit));
+  line-height: 1.05;
+  /* Clear of both doodle clusters, which reach 13.8u in from each side. */
+  max-width: calc(100vw - 30 * var(--u));
+}
+
+/* Phones have no doodles (see above), so the title may use the width. After
+   the base rule on purpose: same specificity, so the later one wins. */
+@media (max-width: 600px) {
+  #journey-splash-title.is-long {
+    max-width: 90vw;
+  }
+}
+
+/* The splash's action row. Normally it holds one button ("Begin Video");
+   when an interrupted showing of this week's lesson was marked, schedule.js
+   swaps that for "Resume at M:SS" + "Start over" (see offerResume). Wraps on
+   a phone rather than pushing either button off the screen. */
+#journey-splash-actions {
+  margin-top: clamp(1.4rem, 5 * var(--u), 6.2rem);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(0.6rem, 1.4 * var(--u), 1.8rem);
+}
+
+/* Begin Video (and Resume, which takes its place) is the catalog's hot
+   sticker colour, so the one thing to press is the one thing that's orange.
+   Its depth is a hard offset in the hot's deep shade, like the kit's
+   stickers. Hover and keyboard focus add a lavender ring rather than a new
+   colour, so the hot stays the hot. */
+#journey-splash-play-btn,
+#journey-splash-resume-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.45em;
+  border: none;
+  border-radius: 999px;
+  padding: 0.435em 1.13em;
+  background: var(--jr-hot);
+  box-shadow: 0.13em 0.13em 0 var(--jr-hot-deep);
+  color: #ffffff;
+  font-family: var(--jr-font-label);
+  font-size: clamp(1.15rem, 2.3 * var(--u), 2.9rem);
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  touch-action: manipulation;
+}
+
+#journey-splash-play-btn:hover,
+#journey-splash-play-btn:focus-visible,
+#journey-splash-resume-btn:hover,
+#journey-splash-resume-btn:focus-visible {
+  outline: 0.12em solid var(--jr-tint);
+  outline-offset: 0.12em;
+}
+
+/* "Start over" is the secondary of the pair: same size to stay a fair
+   10-foot target, plainly not the primary colour. */
+#journey-splash-startover-btn {
+  border: none;
+  border-radius: 999px;
+  padding: 0.435em 1.13em;
+  background: var(--jr-purple);
+  color: #ffffff;
+  font-family: var(--jr-font-label);
+  font-size: clamp(1.15rem, 2.3 * var(--u), 2.9rem);
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  touch-action: manipulation;
+}
+
+#journey-splash-startover-btn:hover,
+#journey-splash-startover-btn:focus-visible {
+  background: var(--jr-deep);
+  outline: 0.12em solid var(--jr-tint);
+  outline-offset: 0.12em;
+}
+
+/* "Skip to slides" is quieter again than "Start over": it is always on the
+   splash, so it must not compete with Begin Video for the eye, while still
+   being a fair target from across a room. */
+#journey-splash-slides-btn {
+  border: max(2px, 0.11em) solid rgba(222, 213, 234, 0.6);
+  border-radius: 999px;
+  padding: 0.45em 1.1em;
+  background: transparent;
+  color: var(--jr-tint);
+  font-family: var(--jr-font-label);
+  font-size: clamp(1rem, 2 * var(--u), 2.5rem);
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  touch-action: manipulation;
+}
+
+#journey-splash-slides-btn:hover,
+#journey-splash-slides-btn:focus-visible {
+  background: rgba(222, 213, 234, 0.16);
+  border-color: var(--jr-tint);
+  color: #ffffff;
+}
+
+#journey-splash-play-icon,
+.journey-splash-play-icon {
+  font-size: 0.8em;
+}
+
+/* Figtree, the reading voice. The keys are plain words, as drawn in the
+   mockup, not boxed keycaps. */
+#journey-splash-prompt {
+  margin-top: clamp(0.8rem, 1.9 * var(--u), 2.4rem);
+  font-size: clamp(0.8rem, 1.25 * var(--u), 1.6rem);
+  color: rgba(255, 255, 255, 0.85);
+  opacity: 0.6;
+  animation: journey-splash-pulse 2.4s ease-in-out infinite;
+}
+
+#journey-splash-prompt kbd {
+  display: inline;
+  padding: 0;
+  background: none;
+  font-family: inherit;
+  font-size: 1em;
+}
+
+@keyframes journey-splash-pulse {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 0.9;
+  }
+}
+
+/* On touch-only devices the Space/→ hint is meaningless — the Begin Video
+   button is the touch path — so drop it rather than confuse. */
+@media (hover: none) and (pointer: coarse) {
+  #journey-splash-prompt {
+    display: none;
+  }
+}
+
+/* A note on the splash, where the operator is already looking at 6:30: the
+   lesson's video has not been converted for this kiosk yet, so it will be
+   streamed instead. Amber, because it is worth knowing and nothing is
+   broken. */
+#journey-splash-quality {
+  margin-top: 2vh;
+  max-width: min(52ch, 88vw);
+  padding: 0.6rem 0.9rem;
+  border-radius: 10px;
+  border-left: 4px solid var(--jr-sun);
+  background: var(--jr-deep);
+  color: #ffffff;
+  font-size: clamp(0.9rem, 1.5vw, 1.2rem);
+  line-height: 1.4;
+  text-align: left;
+}
+
+/* Loading indicator — shown while a lesson video is fetching/buffering, so a
+   slow start (especially a manual preview streaming a full-size original)
+   reads as "working on it" rather than a dead black screen. Same cheap
+   opacity-pulse-only animation budget as the splash — no spinners with
+   transforms, this renders on a Pi Zero. */
+/* Deep ink, still see-through: when a video stalls mid-lesson its frozen
+   frame stays faintly visible under the words, as it always did. */
+#journey-loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.2vh;
+  color: #ffffff;
+  font-family: var(--jr-font-read);
+  text-align: center;
+  padding: 4vh 4vw;
+  background: rgba(64, 58, 119, 0.82);
+  z-index: 5;
+  pointer-events: none;
+}
+
+#journey-loading-text {
+  position: relative;
+  top: var(--jr-shout-lift);
+  font-family: var(--jr-font-shout);
+  font-size: calc(clamp(1.4rem, 4.2 * var(--u), 5rem) * var(--jr-shout-fit));
+  font-weight: 400;
+  /* No shadow here: this is the element that pulses. */
+  animation: journey-splash-pulse 2.4s ease-in-out infinite;
+}
+
+#journey-loading-note {
+  font-size: clamp(0.95rem, 1.6 * var(--u), 2rem);
+  color: var(--jr-tint);
+  max-width: 80vw;
+}
+
+/* Both floating controls sit at least one safe-area inset in from the true
+   edge — consumer TVs fed over HDMI commonly crop several percent of each
+   edge ("overscan"), and PI_SETUP.md/README.md instruct enabling "HDMI Safe
+   Mode", which crops further still. A control flush against the literal
+   edge can be cropped off-screen entirely. */
+/* Playback control bar: pause/play, sound, scrubber, elapsed time. Fades
+   out together with the idle cursor (the same cursor-hidden class drives
+   both) so nothing sits over the video during the show, but reappears on
+   any mouse movement or touch — and stays visible while paused
+   (.force-visible, toggled from schedule.js). The right inset reserves
+   room for the view-toggle button parked in the corner. */
+#video-controls {
+  position: absolute;
+  left: max(3vw, 24px);
+  right: calc(max(3vw, 24px) + 88px);
+  bottom: max(3vh, 24px);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  border-radius: 999px;
+  background: rgba(64, 58, 119, 0.9);
+  z-index: 10;
+  transition: opacity 0.25s ease;
+  touch-action: manipulation;
+}
+
+html.cursor-hidden #video-controls:not(.force-visible) {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* The bar's pills are lavender with ink labels in Londrina, the kit's
+   button voice; hover and focus go white, a press goes club purple. */
+#pause-btn,
+#back15-btn,
+#fwd15-btn,
+#unmute-btn {
+  flex: none;
+  padding: 10px 18px;
+  border: none;
+  border-radius: 999px;
+  background: var(--jr-tint);
+  color: var(--jr-ink);
+  font-family: var(--jr-font-label);
+  font-size: 1.2rem;
+  font-weight: 400;
+  line-height: 1.1;
+  letter-spacing: 0.04em;
+  display: flex;
+  align-items: center;
+  gap: 0.4em;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+#pause-btn:hover,
+#pause-btn:focus-visible,
+#back15-btn:hover,
+#back15-btn:focus-visible,
+#fwd15-btn:hover,
+#fwd15-btn:focus-visible {
+  background: #ffffff;
+}
+
+/* Scrubber: sized for fingers (28px thumb), plain flat colors only. */
+#video-scrubber {
+  flex: 1;
+  min-width: 0;
+  height: 28px;
+  margin: 0;
+  background: transparent;
+  -webkit-appearance: none;
+  appearance: none;
+  cursor: pointer;
+}
+
+#video-scrubber::-webkit-slider-runnable-track {
+  height: 8px;
+  border-radius: 4px;
+  background: rgba(222, 213, 234, 0.4);
+}
+
+#video-scrubber::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 28px;
+  height: 28px;
+  margin-top: -10px;
+  border-radius: 50%;
+  border: none;
+  background: #ffffff;
+}
+
+#video-scrubber::-moz-range-track {
+  height: 8px;
+  border-radius: 4px;
+  background: rgba(222, 213, 234, 0.4);
+}
+
+#video-scrubber::-moz-range-thumb {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: none;
+  background: #ffffff;
+}
+
+/* CC toggle: same pill styling as pause/sound, with a clear on-state so an
+   operator can see at a glance whether captions are live. This button is the
+   only way back to the caption choice once it has been remembered (the
+   prompt asks once per device), so it must never be subtle. */
+#cc-btn {
+  flex: none;
+  padding: 10px 16px;
+  border: none;
+  border-radius: 999px;
+  background: var(--jr-tint);
+  color: var(--jr-ink);
+  font-family: var(--jr-font-label);
+  font-size: 1.2rem;
+  font-weight: 400;
+  line-height: 1.1;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+#cc-btn:hover,
+#cc-btn:focus-visible {
+  background: #ffffff;
+}
+
+/* On is the hot: the one state on this bar that must read from across the
+   room at a glance. */
+#cc-btn[aria-pressed='true'] {
+  background: var(--jr-hot);
+  color: #ffffff;
+}
+
+/* ── Caption rendering ────────────────────────────────────────────────
+   Captions are painted into this overlay rather than by the browser's own
+   ::cue renderer. Two reasons, both learned the hard way at real viewport
+   sizes: (1) ::cue sizing had to be in vh, which collapses to ~11px on a
+   phone held sideways (844x390) — illegible; (2) native cue placement is
+   relative to the letterboxed video box, so it drifts unpredictably between
+   a 16:9 TV and a portrait phone, and landed captions on top of the control
+   bar. A real element can use clamp()/vmin, is positioned by
+   positionCaptions() in schedule.js, and — unlike shadow-DOM cues — can be
+   measured by the test suite.
+
+   Size: vmin tracks whichever screen dimension constrains the video frame,
+   so one expression covers a TV read across a room and a phone in either
+   orientation; the clamp floor keeps it legible on the smallest screens and
+   the ceiling stops it swallowing the picture on very large ones. The
+   Settings size choice multiplies that expression through --caption-scale
+   rather than replacing it, so every option keeps the same responsive
+   behaviour (see applyCaptionDisplayPrefs() in schedule.js). */
+#caption-overlay {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 96px; /* replaced by positionCaptions() once metadata is known */
+  z-index: 8; /* under the control bar (10), over the video */
+  text-align: center;
+  pointer-events: none;
+  padding: 0 2vw;
+}
+
+#caption-text {
+  display: inline-block;
+  max-width: 92%;
+  padding: 0.2em 0.55em;
+  border-radius: 6px;
+  background-color: rgba(64, 58, 119, 0.8);
+  color: #ffffff;
+  font-family: var(--jr-font-read);
+  font-size: calc(clamp(18px, 4.5vmin, 56px) * var(--caption-scale, 1));
+  font-weight: 600;
+  line-height: 1.3;
+  text-align: center;
+  text-wrap: balance;
+  /* The band is deliberately semi-transparent, so over a bright or busy
+     frame the white text can lose contrast against it — the shadow keeps
+     the letterforms readable without making the band opaque. A hard offset
+     (the kit's only kind of shadow), not a blur: a cue changes every few
+     seconds, and a blurred shadow is the costliest text a Pi Zero paints. */
+  text-shadow: 0.05em 0.05em 0 rgba(35, 31, 32, 0.85);
+}
+
+/* Settings → Captions → "Dark backdrop": a solid band instead of the
+   translucent one, for a lesson whose frames are bright enough that even
+   the shadowed white text loses contrast. Flat colour only — no blur or
+   gradient — like everything else on the Pi's paint budget. The deep ink
+   holds white text at about 10:1. */
+#caption-overlay.caption-backdrop #caption-text {
+  background-color: var(--jr-ink);
+}
+
+/* ── Caption yes/no prompt ─────────────────────────────────────────────
+   Shown once per device (the answer is remembered) between the operator's
+   "start" gesture and playback. Same flat-color, opacity-only budget as the
+   splash it replaces on screen. */
+/* It takes the splash's place on screen, so it wears the splash's field and
+   bottom wave: the question in Paytone One, Yes (the focused default) in the hot,
+   No in the splash's outline style. */
+#caption-prompt {
+  position: absolute;
+  inset: 0;
+  z-index: 15;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3vh;
+  padding: 4vh 4vw 8.5vh;
+  background: var(--jr-art-wave) left bottom / 100% 14% no-repeat, var(--jr-ink);
+  color: #ffffff;
+  font-family: var(--jr-font-read);
+  text-align: center;
+}
+
+#caption-prompt-q {
+  position: relative;
+  top: var(--jr-shout-lift);
+  font-family: var(--jr-font-shout);
+  font-size: calc(clamp(1.8rem, 5.4 * var(--u), 6.5rem) * var(--jr-shout-fit));
+  font-weight: 400;
+  line-height: 1;
+  text-transform: uppercase;
+  text-shadow: 0.06em 0.06em 0 var(--jr-deep);
+}
+
+#caption-prompt-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: clamp(1rem, 3vw, 2rem);
+}
+
+#caption-prompt-buttons button {
+  min-width: clamp(9rem, 26vw, 15rem);
+  padding: clamp(0.5em, 2vh, 0.7em) clamp(1.2em, 3vw, 1.8em);
+  border: max(2px, 0.08em) solid rgba(222, 213, 234, 0.6);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--jr-tint);
+  font-family: var(--jr-font-label);
+  font-size: clamp(1.3rem, 3 * var(--u), 3.6rem);
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  touch-action: manipulation;
+}
+
+#caption-yes {
+  background: var(--jr-hot) !important;
+  border-color: var(--jr-hot) !important;
+  box-shadow: 0.13em 0.13em 0 var(--jr-hot-deep);
+  color: #ffffff !important;
+}
+
+#caption-prompt-buttons button:hover,
+#caption-prompt-buttons button:focus-visible {
+  background: rgba(222, 213, 234, 0.16);
+  border-color: var(--jr-tint);
+  color: #ffffff;
+}
+
+/* Yes arrives focused (Space/Enter take it), so its focus ring is the
+   lavender halo the splash's Begin Video wears, never a second colour. */
+#caption-yes:hover,
+#caption-yes:focus-visible {
+  outline: 0.12em solid var(--jr-tint);
+  outline-offset: 0.12em;
+}
+
+#caption-prompt-buttons .key-hint {
+  opacity: 0.75;
+}
+
+#caption-prompt-note {
+  font-size: clamp(0.95rem, 1.6 * var(--u), 2rem);
+  color: var(--jr-tint);
+  max-width: 40ch;
+}
+
+/* Touch devices have no Y/N keys to press - the buttons are the whole UI. */
+@media (hover: none) and (pointer: coarse) {
+  #caption-prompt-buttons .key-hint {
+    display: none;
+  }
+}
+
+#video-time {
+  flex: none;
+  color: #ffffff;
+  font-family: var(--jr-font-read);
+  font-size: 1.05rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Narrow screens: the bar's contents (five non-shrinking buttons, scrubber,
+   time readout) cannot fit one row — the CC button was once being clipped
+   off the screen edge entirely, which made captions impossible to toggle on
+   mobile. This wraps into two tidy rows: scrubber + elapsed time first (both
+   ordered ahead), then the buttons. It must come AFTER the base rules above:
+   an earlier copy of this block lost the cascade to
+   `#video-scrubber { flex: 1 }` and the scrubber never got its own row.
+   positionCaptions() reads the bar's real offsetHeight, so captions lift
+   automatically as it grows taller.
+
+   The breakpoint is 1100px, not the 760px it was when the bar held three
+   buttons: with the 15-second jumps added, one row of pills plus a usable
+   scrubber needs about that much. Below it the scrubber was being squeezed
+   to literally zero width (measured at 844x390, a phone held sideways) —
+   flex: 1 with min-width: 0 shrinks silently rather than overflowing. */
+@media (max-width: 1100px) {
+  #video-controls {
+    flex-wrap: wrap;
+    justify-content: center;
+    row-gap: 8px;
+    column-gap: 6px;
+    padding: 10px 10px;
+    /* Five pills, not three, since the 15-second jumps landed here: claw
+       back the inset that reserved room for the view-toggle button, leaving
+       just enough clearance beside it, so the buttons wrap into two tidy
+       rows instead of three. */
+    right: calc(max(3vw, 24px) + 60px);
+  }
+
+  /* The scrubber's basis is "the whole row bar the time readout", so those
+     two exactly fill the first row and every pill wraps below them together.
+     With a plain percentage basis, two or three pills tagged along on the
+     scrubber's row and the rest dropped below — a button bar split across a
+     line break is much harder to hit at a glance. 8rem comfortably clears
+     the widest readout the time can render. */
+  #video-scrubber {
+    flex: 1 1 calc(100% - 8rem);
+    order: -2;
+  }
+
+  /* The readout's box is the rest of that row (8rem less the 6px column
+     gap), whatever it says. Sized by its text, a short "0:00" (the whole
+     "Loading video…" wait, and any stream with no duration) left room for
+     the narrow Londrina "Back 15s" pill on the scrubber's row, and it
+     dropped back under the operator's finger when the duration arrived.
+     A fixed box also keeps the scrubber from resizing as the time ticks. */
+  #video-time {
+    flex: 0 0 calc(8rem - 6px);
+    order: -1;
+    font-size: 0.95rem;
+    text-align: right;
+  }
+
+  #pause-btn,
+  #back15-btn,
+  #fwd15-btn,
+  #unmute-btn,
+  #cc-btn {
+    padding: 8px 10px;
+    font-size: 0.85rem;
+  }
+}
+
+#unmute-btn::after {
+  /* A text label survives a missing emoji font (not guaranteed present on
+     every Raspberry Pi OS image) where the glyph alone would render as a
+     blank "tofu" box. */
+  content: 'Sound off';
+}
+
+#unmute-btn[aria-pressed='true']::after {
+  content: 'Sound on';
+}
+
+#unmute-btn:hover,
+#unmute-btn:focus-visible {
+  background: #ffffff;
+}
+
+/* The corner buttons are the kit's chip: charcoal at half strength with a
+   white glyph, which reads on every background they float over (the lobby's
+   sky blue, the Journey ink, a video frame) without shouting over any. */
+#toggle-btn {
+  position: fixed;
+  bottom: max(3vh, 24px);
+  right: max(3vw, 24px);
+  min-width: 48px;
+  min-height: 48px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: none;
+  background: var(--jr-chip);
+  color: #ffffff;
+  font-size: 1.4rem;
+  line-height: 1;
+  cursor: pointer;
+  z-index: 10;
+  transition: background-color 0.2s ease;
+}
+
+#toggle-btn:hover,
+#toggle-btn:focus-visible {
+  background: var(--jr-purple);
+}
+
+/* Third corner control — top-right, so it doesn't crowd the bottom row
+   (unmute bottom-left, view-toggle bottom-right). Same overscan-safe
+   inset and sizing as the other two. Over the Check-in Display it stacks
+   above the toggle instead (below). */
+#settings-btn {
+  position: fixed;
+  top: max(3vh, 24px);
+  right: max(3vw, 24px);
+  min-width: 48px;
+  min-height: 48px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: none;
+  background: var(--jr-chip);
+  color: #ffffff;
+  font-size: 1.4rem;
+  line-height: 1;
+  cursor: pointer;
+  z-index: 10;
+  transition: background-color 0.2s ease;
+}
+
+#settings-btn:hover,
+#settings-btn:focus-visible {
+  background: var(--jr-purple);
+}
+
+/* While the Check-in Display shows, the gear joins the toggle: stacked 8px
+   above it in the bottom-right corner, one column of two buttons. The
+   display is a frame, and a frame can never paint over its parent, so a
+   button in its top-right sat on the lobby's weather chip and status
+   sticker, whose room there is measured to the pixel against the headline
+   under them. The display keeps its bottom-right chips, ticker and a long
+   child's name out of exactly this column (its src/lib/embed.js and the
+   html.embedded rules in its app.css), and test/corner-buttons.test.mjs
+   pins the column. See CLAUDE.md, "The corner-button contract". Everywhere
+   else (the lesson, the splash, the slides) the gear keeps the top-right. */
+#checkin-view:not(.hidden) ~ #settings-btn {
+  top: auto;
+  bottom: calc(max(3vh, 24px) + 48px + 8px);
+}
+
+/* ── Video settings panel ──────────────────────────────────────────
+   Sized as a "10-foot UI": this renders on a TV read from across a room,
+   not a desktop monitor at arm's length, so everything here runs much
+   larger than typical web defaults. */
+
+#settings-panel {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* A flat scrim, then the card on the Journey ink with a hard offset in the
+   club purple for its depth (the kit's misregistered-print look; the old
+   60px blurred shadow was the most expensive thing on this page to paint). */
+#settings-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(35, 31, 32, 0.72);
+}
+
+#settings-card {
+  position: relative;
+  width: min(1100px, 94vw);
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  background: var(--jr-ink);
+  color: #ffffff;
+  border-radius: 20px;
+  padding: 2rem;
+  font-family: var(--jr-font-read);
+  box-shadow: 10px 10px 0 var(--jr-purple);
+}
+
+#settings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+}
+
+#settings-header h2 {
+  font-family: var(--jr-font-shout);
+  font-size: calc(2.4rem * var(--jr-shout-fit));
+  font-weight: 400;
+  line-height: 1.1;
+  text-shadow: 0.06em 0.06em 0 var(--jr-deep);
+}
+
+#settings-close-btn {
+  min-width: 60px;
+  min-height: 60px;
+  border: none;
+  border-radius: 999px;
+  background: rgba(222, 213, 234, 0.16);
+  color: #ffffff;
+  font-size: 1.6rem;
+  cursor: pointer;
+}
+
+#settings-close-btn:hover,
+#settings-close-btn:focus-visible {
+  background: rgba(222, 213, 234, 0.32);
+}
+
+#settings-preview-note {
+  font-size: 1.25rem;
+  color: var(--jr-tint);
+  margin-bottom: 1.25rem;
+}
+
+/* The lesson list is the card's flexible middle: it takes the space left over
+   after the header and the teaching-slide preferences below it, and scrolls
+   internally. The min-height floor matters — without it, on a short window
+   (or a phone, where the preferences block is tall) flexbox squeezed the list
+   to zero and the picker became unusable; the card's own overflow then catches
+   whatever still doesn't fit. */
+#settings-lesson-list {
+  flex: 1 1 auto;
+  min-height: 10rem;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.settings-lesson-row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6em;
+  width: 100%;
+  padding: 0.9rem 1.2rem;
+  border: none;
+  border-radius: 10px;
+  background: rgba(222, 213, 234, 0.08);
+  color: #ffffff;
+  font-family: inherit;
+  font-size: 1.5rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.settings-lesson-row:hover,
+.settings-lesson-row:focus-visible {
+  background: rgba(222, 213, 234, 0.2);
+}
+
+/* "WEEK 4" as a Londrina kicker beside the title. */
+.settings-lesson-row .settings-lesson-week {
+  flex: none;
+  min-width: 4.6em;
+  color: var(--jr-tint);
+  font-family: var(--jr-font-label);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-variant-numeric: tabular-nums;
+}
+
+.settings-lesson-row.settings-lesson-current {
+  outline: 2px solid var(--jr-tint);
+}
+
+#settings-variant-prompt,
+#settings-student-prompt,
+#settings-leader-prompt {
+  margin-bottom: 1.25rem;
+  font-size: 1.6rem;
+}
+
+#settings-variant-buttons,
+#settings-student-buttons,
+#settings-leader-buttons {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+#settings-variant-buttons button,
+#settings-student-buttons button,
+#settings-leader-buttons button {
+  flex: 1;
+  padding: 1.4rem;
+  border: none;
+  border-radius: 12px;
+  background: var(--jr-purple);
+  color: #ffffff;
+  font-family: var(--jr-font-label);
+  font-size: 1.7rem;
+  font-weight: 400;
+  line-height: 1.1;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+}
+
+#settings-variant-buttons button:hover,
+#settings-variant-buttons button:focus-visible,
+#settings-student-buttons button:hover,
+#settings-student-buttons button:focus-visible,
+#settings-leader-buttons button:hover,
+#settings-leader-buttons button:focus-visible {
+  background: var(--jr-deep);
+  outline: 2px solid var(--jr-tint);
+}
+
+#settings-variant-buttons button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+#settings-variant-back,
+#settings-student-back,
+#settings-leader-back {
+  border: none;
+  background: none;
+  color: var(--jr-tint);
+  font-family: var(--jr-font-label);
+  font-size: 1.4rem;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  align-self: flex-start;
+  padding: 0.5rem 0;
+}
+
+#settings-variant-back:hover,
+#settings-variant-back:focus-visible,
+#settings-student-back:hover,
+#settings-student-back:focus-visible,
+#settings-leader-back:hover,
+#settings-leader-back:focus-visible {
+  color: #ffffff;
+}
+
+/* ── Leader handout viewer: full-screen overlay with the PDF in an
+   iframe (Chromium's built-in viewer) and a big close button. ────── */
+/* Both reading overlays share one header: a deep-shade bar with the title
+   as a Londrina label and a lavender Close pill. The PDF itself is Chromium's
+   own viewer and is left alone. */
+#handout-view {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  background: var(--jr-ink);
+}
+
+#handout-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.9rem 1.5rem;
+  background: var(--jr-deep);
+  color: #ffffff;
+  font-family: var(--jr-font-read);
+}
+
+#handout-title {
+  font-family: var(--jr-font-label);
+  font-size: clamp(1.2rem, 2.6vw, 1.8rem);
+  font-weight: 400;
+  letter-spacing: 0.03em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#handout-close-btn {
+  flex: none;
+  min-height: 56px;
+  padding: 0 1.6rem;
+  border: none;
+  border-radius: 999px;
+  background: var(--jr-tint);
+  color: var(--jr-ink);
+  font-family: var(--jr-font-label);
+  font-size: 1.35rem;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+
+#handout-close-btn:hover,
+#handout-close-btn:focus-visible {
+  background: #ffffff;
+}
+
+#handout-frame {
+  flex: 1;
+  width: 100%;
+  border: none;
+  background: var(--jr-deep);
+}
+
+/* ── Leader prep: the handout's page-1 summary as text we lay out ─────
+   Same full-screen overlay shape as the handout viewer, but the content is
+   real DOM, so it reflows: a leader reads this on a phone as often as on
+   the TV. One measure (~62ch) keeps the lines readable at either size. */
+#prep-view {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  background: var(--jr-ink);
+  color: #ffffff;
+  font-family: var(--jr-font-read);
+}
+
+#prep-header {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.9rem 1.5rem;
+  background: var(--jr-deep);
+}
+
+#prep-title {
+  font-family: var(--jr-font-label);
+  font-size: clamp(1.15rem, 2.5vw, 1.8rem);
+  font-weight: 400;
+  letter-spacing: 0.03em;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#prep-close-btn {
+  flex: none;
+  min-height: 56px;
+  padding: 0 1.6rem;
+  border: none;
+  border-radius: 999px;
+  background: var(--jr-tint);
+  color: var(--jr-ink);
+  font-family: var(--jr-font-label);
+  font-size: 1.35rem;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+
+#prep-close-btn:hover,
+#prep-close-btn:focus-visible {
+  background: #ffffff;
+}
+
+#prep-close-btn:active {
+  background: var(--jr-purple);
+  color: #ffffff;
+  transition: none;
+}
+
+/* The body text size is set HERE, not on the paragraphs, so the `em`
+   measure below is relative to the text it is actually measuring. Sized like
+   the rest of this kiosk's UI: read on a phone up close AND on the TV from
+   across the room, so the ceiling is generous. */
+#prep-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: clamp(1rem, 3vw, 2.5rem);
+  font-size: clamp(1.05rem, 1.9vw, 2rem);
+}
+
+#prep-body > section,
+#prep-body > p {
+  max-width: 34em; /* ~65 characters at any of those sizes */
+  margin-left: auto;
+  margin-right: auto;
+}
+
+#prep-body > section {
+  margin-bottom: clamp(1.25rem, 3vh, 2rem);
+}
+
+/* Section heads are Londrina kickers in the lavender tint: BIG IDEA, KEY
+   POINTS, SCRIPTURE, DISCUSSION QUESTIONS. */
+#prep-body h3 {
+  font-family: var(--jr-font-label);
+  font-size: 1.2em;
+  font-weight: 400;
+  line-height: 1.1;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--jr-tint);
+  margin-bottom: 0.4em;
+}
+
+#prep-body p,
+#prep-body li {
+  font-size: 1em;
+  line-height: 1.5;
+}
+
+#prep-body ul,
+#prep-body ol {
+  padding-left: 1.4em;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6em;
+}
+
+#prep-body .prep-scripture {
+  font-weight: 600;
+}
+
+#prep-body .prep-note,
+#prep-body .prep-footer {
+  color: var(--jr-tint);
+  font-size: 0.8em;
+}
+
+#prep-body .prep-footer {
+  padding-top: 1rem;
+  border-top: 1px solid rgba(222, 213, 234, 0.25);
+}
+
+/* ── The transcript inside Read Prep ──────────────────────────────────
+   Collapsed behind one button under the summary, with an Edited / Exact
+   words toggle and a tappable timestamp beside every paragraph. Sized for
+   the same two screens as the rest of this overlay: read on the TV from
+   across the room, and read on a phone on the way to church. */
+#prep-body .prep-transcript {
+  max-width: 34em;
+  margin: clamp(1.25rem, 3vh, 2rem) auto 0;
+  padding-top: clamp(1rem, 2.5vh, 1.5rem);
+  border-top: 1px solid rgba(222, 213, 234, 0.25);
+}
+
+.prep-transcript-toggle {
+  width: 100%;
+  min-height: 56px; /* a finger, not a mouse */
+  padding: 0.85em 1.1em;
+  border: none;
+  border-radius: 12px;
+  background: var(--jr-purple);
+  color: #ffffff;
+  font-family: var(--jr-font-label);
+  font-size: 1.05em;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  text-align: left;
+  cursor: pointer;
+}
+
+.prep-transcript-toggle:hover,
+.prep-transcript-toggle:focus-visible {
+  background: var(--jr-deep);
+  outline: 2px solid var(--jr-tint);
+}
+
+.prep-transcript-toggle:active {
+  background: var(--jr-deep);
+  transition: none;
+}
+
+.prep-transcript-toggle[aria-expanded='true'] {
+  margin-bottom: 1em;
+}
+
+.prep-transcript-modes {
+  display: flex;
+  align-items: center;
+  gap: 0.6em;
+  flex-wrap: wrap;
+  margin-bottom: 1.2em;
+}
+
+.prep-modes-label {
+  font-family: var(--jr-font-label);
+  font-size: 0.85em;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--jr-tint);
+}
+
+.prep-mode-btn {
+  min-height: 48px;
+  padding: 0.5em 1.1em;
+  border: 2px solid rgba(222, 213, 234, 0.5);
+  border-radius: 999px;
+  background: none;
+  color: #ffffff;
+  font-family: var(--jr-font-label);
+  font-size: 0.9em;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+
+.prep-mode-btn[aria-pressed='true'] {
+  background: var(--jr-tint);
+  border-color: var(--jr-tint);
+  color: var(--jr-ink);
+}
+
+.prep-mode-btn:hover,
+.prep-mode-btn:focus-visible {
+  border-color: #ffffff;
+}
+
+.prep-mode-btn:active {
+  transition: none;
+  opacity: 0.8;
+}
+
+#prep-body .prep-para-heading {
+  font-family: var(--jr-font-label);
+  font-size: 1.1em;
+  font-weight: 400;
+  line-height: 1.15;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--jr-tint);
+  margin: 1.4em 0 0.4em;
+}
+
+/* The timestamp sits in a hanging margin beside the paragraph, like the
+   printed handout, so the text keeps one clean left edge to read down. */
+#prep-body .prep-para {
+  position: relative;
+  padding-left: 4.6em;
+  margin-bottom: 1em;
+  line-height: 1.55;
+}
+
+.prep-time {
+  position: absolute;
+  left: 0;
+  top: 0;
+  min-width: 3.6em;
+  min-height: 44px;
+  padding: 0.1em 0.35em;
+  border: none;
+  border-radius: 8px;
+  background: rgba(222, 213, 234, 0.16);
+  color: var(--jr-tint);
+  font-family: inherit;
+  font-size: 0.8em;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.prep-time:hover,
+.prep-time:focus-visible {
+  background: var(--jr-tint);
+  color: var(--jr-ink);
+}
+
+.prep-time:active {
+  background: var(--jr-purple);
+  color: #ffffff;
+  transition: none;
+}
+
+/* Below ~600px the hanging margin costs more than it gives: the timestamp
+   goes above its paragraph and the text runs the full width. */
+@media (max-width: 600px) {
+  #prep-body .prep-para {
+    padding-left: 0;
+  }
+
+  /* block, not inline-block: inline would leave the chip sitting in the
+     paragraph's first line with the text wrapping around it. */
+  .prep-time {
+    position: static;
+    display: block;
+    width: fit-content;
+    margin-bottom: 0.45em;
+  }
+}
+
+/* Status/error line inside the settings lesson list (loading, or the
+   list couldn't be fetched) — same 10-foot sizing as the rows it stands
+   in for. */
+.settings-list-note {
+  padding: 0.9rem 1.2rem;
+  font-size: 1.4rem;
+  color: var(--jr-tint);
+}
+
+/* ── Instant press feedback ───────────────────────────────────────────
+   Every control visibly changes the moment a finger/click lands on it —
+   before its handler has done any work at all. On the kiosk's flaky
+   connection some actions used to start with a (now-bounded) network wait,
+   and a press that changes nothing for even half a second reads as "the
+   button is broken". Flat background swaps only, no transforms — Pi Zero
+   animation budget. `transition: none` makes the pressed state land on the
+   very next paint instead of easing in; the release still eases out via
+   each control's own base transition. These sit at the end of the sheet so
+   they win the cascade over the hover/focus rules above. */
+/* A pressed hot button sinks onto its own offset: the deep shade fills it
+   and the shadow goes, a flat colour swap like every press here. */
+#journey-splash-play-btn:active,
+#journey-splash-resume-btn:active {
+  background: var(--jr-hot-deep);
+  box-shadow: none;
+  transition: none;
+}
+
+#journey-splash-startover-btn:active {
+  background: var(--jr-deep);
+  transition: none;
+}
+
+#journey-splash-slides-btn:active {
+  background: rgba(222, 213, 234, 0.32);
+  transition: none;
+}
+
+#pause-btn:active,
+#back15-btn:active,
+#fwd15-btn:active,
+#unmute-btn:active,
+#cc-btn:active {
+  background: var(--jr-purple);
+  color: #ffffff;
+  transition: none;
+}
+
+#cc-btn[aria-pressed='true']:active {
+  background: var(--jr-hot-deep);
+  transition: none;
+}
+
+#toggle-btn:active,
+#settings-btn:active {
+  background: var(--jr-deep);
+  transition: none;
+}
+
+.settings-lesson-row:active {
+  background: rgba(222, 213, 234, 0.34);
+}
+
+#settings-variant-buttons button:active:not(:disabled),
+#settings-student-buttons button:active,
+#settings-leader-buttons button:active {
+  background: var(--jr-deep);
+}
+
+#settings-close-btn:active {
+  background: rgba(222, 213, 234, 0.45);
+}
+
+#handout-close-btn:active {
+  background: var(--jr-purple);
+  color: #ffffff;
+}
+
+#settings-variant-back:active,
+#settings-student-back:active,
+#settings-leader-back:active {
+  color: #ffffff;
+}
+
+#caption-prompt-buttons button:active {
+  background: rgba(222, 213, 234, 0.34);
+  transition: none;
+}
+
+#caption-yes:active {
+  background: var(--jr-hot-deep) !important;
+  box-shadow: none;
+  transition: none;
+}
+
+/* ── Teaching slides (after the lesson video) ──────────────────────────
+   Awana's four 4:3 teaching slides for the lesson, then the generated
+   Talk About It / Remember This / This Week slides, shown once the video
+   ends. The stage is the largest 4:3 box that fits the screen (pillarboxed
+   on a 16:9 TV, letterboxed on a phone); everything inside is sized
+   relative to that box so the layout matches the deck at any screen size.
+   Static images + text only — no animation budget spent here at all. */
+#slides-view {
+  position: absolute;
+  inset: 0;
+  z-index: 6; /* over the (hidden) video, under the corner buttons (10) */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #000000;
+}
+
+#slide-stage {
+  position: relative;
+  width: min(100vw, calc(100vh * 4 / 3));
+  height: min(100vh, calc(100vw * 3 / 4));
+  background: #000000;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+#slide-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+/* The generated slides reproduce Awana's TEMPLATE slide: a centered
+   heading over three left-aligned bullets on the deck's own background
+   texture (extracted per week into slides/week-NN/template.jpg). Type is
+   measured against the stage height — the deck is 7.5in tall, its heading
+   60pt (~10.5%) and bullets 36pt when empty; filled bullets run smaller so
+   an 80-character line wraps to two lines, not three. */
+#slide-template {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  color: #ffffff;
+  font-family: Calibri, Carlito, system-ui, sans-serif;
+  display: flex;
+  flex-direction: column;
+  padding: calc(min(100vh, 75vw) * 0.055) calc(min(100vw, 133.33vh) * 0.07) calc(min(100vh, 75vw) * 0.05);
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+}
+
+#slide-template-heading {
+  flex: none;
+  text-align: center;
+  font-weight: 400;
+  font-size: calc(min(100vh, 75vw) * 0.105);
+  line-height: 1.15;
+  margin-bottom: calc(min(100vh, 75vw) * 0.07);
+}
+
+#slide-template-bullets {
+  flex: 1;
+  min-height: 0;
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0 calc(min(100vw, 133.33vh) * 0.02);
+  font-size: calc(min(100vh, 75vw) * 0.052);
+  line-height: 1.28;
+  display: flex;
+  flex-direction: column;
+  gap: calc(min(100vh, 75vw) * 0.045);
+}
+
+#slide-template-bullets li {
+  position: relative;
+  padding-left: 1.1em;
+}
+
+#slide-template-bullets li::before {
+  content: '\2022';
+  position: absolute;
+  left: 0;
+}
+
+/* Prev / counter / Next — same pill as the video bar, same idle fade, same
+   reserved corner for the ⇄ button. Space / → / ← and tapping the slide
+   (right two-thirds = next, left third = back) work without it. */
+#slide-controls {
+  position: absolute;
+  left: max(3vw, 24px);
+  right: calc(max(3vw, 24px) + 88px);
+  bottom: max(3vh, 24px);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 16px;
+  border-radius: 999px;
+  background: rgba(64, 58, 119, 0.9);
+  z-index: 10;
+  transition: opacity 0.25s ease;
+  touch-action: manipulation;
+}
+
+html.cursor-hidden #slide-controls {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Back is a lavender pill, Next the hot (the one to press, with the hot's
+   hard offset), in the video bar's Londrina voice. */
+#slide-prev-btn,
+#slide-next-btn {
+  flex: none;
+  min-width: 7.5em;
+  padding: 12px 22px;
+  border: none;
+  border-radius: 999px;
+  background: var(--jr-tint);
+  color: var(--jr-ink);
+  font-family: var(--jr-font-label);
+  font-size: 1.3rem;
+  font-weight: 400;
+  line-height: 1.1;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+#slide-next-btn {
+  background: var(--jr-hot);
+  box-shadow: 3px 3px 0 var(--jr-hot-deep);
+  color: #ffffff;
+}
+
+#slide-prev-btn:hover,
+#slide-prev-btn:focus-visible {
+  background: #ffffff;
+}
+
+#slide-next-btn:hover,
+#slide-next-btn:focus-visible {
+  outline: 2px solid var(--jr-tint);
+  outline-offset: 2px;
+}
+
+#slide-prev-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+#slide-prev-btn:active:not(:disabled) {
+  background: var(--jr-purple);
+  color: #ffffff;
+  transition: none;
+}
+
+#slide-next-btn:active {
+  background: var(--jr-hot-deep);
+  box-shadow: none;
+  transition: none;
+}
+
+#slide-counter {
+  color: var(--jr-tint);
+  font-family: var(--jr-font-label);
+  font-size: 1.3rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+@media (max-width: 760px) {
+  #slide-prev-btn,
+  #slide-next-btn {
+    min-width: 0;
+    padding: 10px 14px;
+    font-size: 0.95rem;
+  }
+
+  #slide-counter {
+    font-size: 0.95rem;
+  }
+}
+
+/* Settings → teaching-slide preferences (10-foot sized like the rest). */
+#settings-slides,
+#settings-captions,
+#settings-sync,
+#settings-quality {
+  margin-top: 1.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid rgba(222, 213, 234, 0.25);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+/* Section heads are Londrina kickers, as on the splash. */
+#settings-slides h3,
+#settings-captions h3,
+#settings-sync h3,
+#settings-quality h3 {
+  font-family: var(--jr-font-label);
+  font-size: 1.7rem;
+  font-weight: 400;
+  line-height: 1.1;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--jr-tint);
+}
+
+/* Settings -> Playback quality: Auto / Full quality / Low power, one pressed
+   at a time. Pill buttons like the Read Prep version switch, sized for the
+   same across-the-room read as the rest of this panel. */
+#quality-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.quality-btn {
+  min-height: 56px;
+  padding: 0.5em 1.4em;
+  border: 2px solid rgba(222, 213, 234, 0.5);
+  border-radius: 999px;
+  background: none;
+  color: #ffffff;
+  font-family: var(--jr-font-label);
+  font-size: 1.35rem;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+
+.quality-btn[aria-pressed='true'] {
+  background: var(--jr-tint);
+  border-color: var(--jr-tint);
+  color: var(--jr-ink);
+}
+
+.quality-btn:hover,
+.quality-btn:focus-visible {
+  border-color: #ffffff;
+}
+
+.quality-btn:active {
+  transition: none;
+  opacity: 0.8;
+}
+
+#quality-status:empty,
+#sync-status:empty {
+  display: none;
+}
+
+/* Settings -> Sync: the passphrase and its button on one row. 16px+ type in
+   the field (the panel's own scale), so a phone never zooms into it. */
+.sync-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+#sync-passphrase {
+  flex: 1 1 14rem;
+  min-height: 56px;
+  padding: 0 1rem;
+  border: 2px solid rgba(222, 213, 234, 0.5);
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.25);
+  color: #ffffff;
+  font: inherit;
+  font-size: 1.35rem;
+}
+
+#sync-status[data-tone='bad'] { color: #ffb4a8; }
+#sync-status[data-tone='ok'] { color: #c8f7c5; }
+
+.settings-slides-hint,
+.settings-hint {
+  font-size: 1.2rem;
+  color: var(--jr-tint);
+}
+
+.settings-slides-hint kbd,
+.settings-hint kbd {
+  display: inline-block;
+  padding: 0.05em 0.45em;
+  border-radius: 6px;
+  background: rgba(222, 213, 234, 0.18);
+  color: #ffffff;
+  font-family: inherit;
+  font-size: 0.95em;
+  font-weight: 700;
+}
+
+.settings-slides-field,
+.settings-field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  font-size: 1.4rem;
+}
+
+.settings-slides-field select,
+.settings-field select {
+  font: inherit;
+  font-size: 1.25rem;
+  padding: 0.5rem 0.8rem;
+  border-radius: 10px;
+  border: none;
+  background: rgba(222, 213, 234, 0.18);
+  color: #ffffff;
+  cursor: pointer;
+}
+
+.settings-slides-field select option,
+.settings-field select option {
+  color: #000000;
+}
+
+.settings-slides-label {
+  font-size: 1.3rem;
+  color: var(--jr-tint);
+  margin-top: 0.25rem;
+}
+
+.settings-slides-check,
+.settings-check {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  font-size: 1.35rem;
+  cursor: pointer;
+}
+
+.settings-slides-check input,
+.settings-check input {
+  width: 1.6rem;
+  height: 1.6rem;
+  accent-color: var(--jr-hot);
+  cursor: pointer;
+}
+
+/* Settings → "Edit tonight's bullets": a collapsed disclosure, because it is
+   a rarely-used detour and the panel's main job is picking a video. The
+   badge is what keeps a device-local override from being invisible. */
+#settings-notes-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+#notes-edit-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  align-self: flex-start;
+  padding: 0.6rem 1.1rem;
+  border: 2px solid rgba(222, 213, 234, 0.4);
+  border-radius: 10px;
+  background: rgba(222, 213, 234, 0.08);
+  color: #ffffff;
+  font-family: var(--jr-font-label);
+  font-size: 1.4rem;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+
+#notes-edit-toggle:hover,
+#notes-edit-toggle:focus-visible {
+  background: rgba(222, 213, 234, 0.2);
+}
+
+#notes-edit-toggle:active {
+  background: rgba(222, 213, 234, 0.32);
+  transition: none;
+}
+
+/* The one thing on this panel that is "different from what was written":
+   the kit's hot marks what is new. */
+#notes-edited-badge {
+  padding: 0.15em 0.7em;
+  border-radius: 999px;
+  background: var(--jr-hot);
+  color: #ffffff;
+  font-family: var(--jr-font-label);
+  font-size: 0.85em;
+  font-weight: 400;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+#notes-edit-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+#notes-edit-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.notes-edit-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.notes-edit-heading {
+  font-family: var(--jr-font-label);
+  font-size: 1.35rem;
+  font-weight: 400;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--jr-tint);
+}
+
+.notes-edit-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid rgba(222, 213, 234, 0.3);
+  border-radius: 10px;
+  background: rgba(222, 213, 234, 0.08);
+  color: #ffffff;
+  font-family: inherit;
+  font-size: 1.2rem;
+  line-height: 1.35;
+  resize: vertical;
+}
+
+.notes-edit-input:focus-visible {
+  outline: 2px solid var(--jr-tint);
+  background: rgba(222, 213, 234, 0.14);
+}
+
+#notes-edit-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+#notes-reset-btn {
+  padding: 0.6rem 1.1rem;
+  border: none;
+  border-radius: 10px;
+  background: rgba(222, 213, 234, 0.18);
+  color: #ffffff;
+  font-family: var(--jr-font-label);
+  font-size: 1.3rem;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+
+#notes-reset-btn:hover,
+#notes-reset-btn:focus-visible {
+  background: rgba(222, 213, 234, 0.32);
+}
+
+#notes-reset-btn:active {
+  background: rgba(222, 213, 234, 0.42);
+  transition: none;
+}
+
+#notes-edit-status {
+  font-size: 1.15rem;
+  color: var(--jr-tint);
+}
+
+/* Phone: one scroller, not two. The card itself scrolls and the lesson list
+   renders at its natural height, so a thumb-scroll runs through the weeks and
+   on into the preferences below — instead of a short list fighting the card
+   for room. The auto-advance row stacks so its menu can't overhang the card. */
+@media (max-width: 760px) {
+  #settings-lesson-list {
+    flex: none;
+    min-height: 0;
+    overflow-y: visible;
+  }
+
+  /* The week kicker's TV column would cost a phone row most of its width. */
+  .settings-lesson-row .settings-lesson-week {
+    min-width: 0;
+  }
+
+  .settings-slides-field,
+  .settings-field {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.4rem;
+  }
+
+  .settings-slides-field select,
+  .settings-field select {
+    width: 100%;
+  }
+
+  .settings-slides-check,
+  .settings-check {
+    align-items: flex-start;
+  }
+
+  .settings-slides-check input,
+  .settings-check input {
+    margin-top: 0.15em;
+    flex: none;
+  }
+
+  /* Watch Video / View Handout / Read Prep: three of these squeezed onto one
+     phone row leaves each too narrow to read. */
+  #settings-variant-buttons,
+  #settings-student-buttons,
+  #settings-leader-buttons {
+    flex-direction: column;
+  }
+
+  /* The Auto button carries what was detected, so it is the widest of the
+     three and cannot share a phone row with them. */
+  #quality-buttons {
+    flex-direction: column;
+  }
+
+  #notes-edit-toggle {
+    align-self: stretch;
+    justify-content: space-between;
+    font-size: 1.1rem;
+  }
+
+  .notes-edit-input {
+    font-size: 1.05rem;
+  }
+
+  #notes-reset-btn {
+    width: 100%;
+    font-size: 1.05rem;
+  }
+}

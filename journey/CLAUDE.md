@@ -1,0 +1,1457 @@
+# Journey Display — Project conventions for Claude
+
+## Git workflow: push directly to `main` on every update
+
+Every code change in this repo should be committed **and pushed to
+`main`** as part of the same turn. There are no feature branches and no
+pull request review step — the user has explicitly authorized direct
+pushes to `main`. The deploy workflow at
+`.github/workflows/deploy.yml` triggers on every push to `main`, so
+each push automatically redeploys the live kiosk site.
+
+Concretely, after editing any file:
+
+1. `git add` the changed files.
+2. `git commit` with a clear message.
+3. `git push -u origin main` (no PR, no other branch).
+
+**A deployed fix is NOT immediately live on the kiosk.** GitHub Pages
+serves every asset with `Cache-Control: max-age=600`, and Chromium's
+normal reload does not revalidate subresources that are still fresh —
+so for up to ~10 minutes after a deploy, an F5 on the Pi reloads
+`index.html` but keeps running the *previous* `schedule.js`/CSS from
+disk cache (this survives a reboot too). This has already caused one
+"the fix didn't work" false alarm during live testing. The kiosk now
+reloads itself onto a new build within a few minutes on its own (see
+"Self-updating kiosk" below), so this only bites when you are checking
+inside those minutes: to verify a fix right now, wait 10 minutes and then
+refresh, or hard-refresh (Ctrl+Shift+R) to bypass the cache immediately.
+When a live symptom contradicts code you know is deployed, suspect this
+cache before suspecting the code.
+
+## Self-updating kiosk
+
+Since 2026-09-16 the Pi picks up a deploy on its own, usually within a few
+minutes, with no SSH and no keyboard. The ten-minute note above is now
+only about *verifying a fix inside those minutes*: left alone, the kiosk
+gets there by itself.
+
+- **Build identity is stamped at deploy time**, because a site with no
+  build step has nothing that knows its own commit.
+  `scripts/stamp-build.mjs` runs in `deploy.yml` between the checkout and
+  the Pages upload and rewrites the copy being uploaded: it writes
+  `public/version.json` (`{ build, builtAt }`), puts the same SHA in
+  `index.html`'s `<meta name="journey-build">`, and appends `?v=<sha>` to
+  every `STAMPED_ASSETS` path: `src/schedule.js`, `src/style.css`,
+  `brand/tokens.css`, `brand/fonts.css` and the wordmark
+  `brand/logos/journey-white.svg`, every copy of each (the wordmark is on
+  the page twice). A test stamps the real page and fails if any local
+  `src`/`href` is left without `?v=`, so an asset added to the page has to
+  be added to `STAMPED_ASSETS` too. It also rewrites the deployed
+  `brand/fonts.css` so each font URL carries `?v=<first 12 hex of that
+  font's sha256>` (see "Brand kit" below). The committed page keeps
+  `content="dev"` and plain asset paths (a test pins that), the committed
+  `brand/` stays byte-identical to the kit, and `version.json` is
+  gitignored, so a checkout and the jsdom harness see the page exactly as
+  before. The script is idempotent and throws if the meta is missing, if
+  `brand/fonts.css` is missing or names no fonts, or if it names a font the
+  deploy does not carry, which fails the deploy loudly rather than shipping
+  a page that can never update itself or 404s its own type.
+- **The `?v=` is not decoration.** Pages serves every asset with
+  `max-age=600` and Chromium reuses a still-fresh subresource across a
+  reload, so without it a reload would come back running the *previous*
+  `schedule.js`. A changed query string is a different URL, so the new
+  page pulls new assets immediately.
+- **The poll**: every 3 minutes, and on the `online` event (rate limited
+  to once a minute), `version.json?b=<now>` with `cache: 'no-store'`
+  through `fetchWithTimeout` (5s), compared against the meta. A non-200
+  is "no news" and the poller stays inert, which is what a local checkout
+  and any unstamped copy see.
+- **Never reload onto the old page.** `max-age=600` applies to
+  `index.html` too, so `version.json` can report a new build minutes
+  before the edge serving this kiosk stops handing back the old page.
+  `index.html?b=<now>` is fetched no-store first and must actually carry
+  the new SHA; if it does not, the next tick tries again. Without this,
+  the reload looks exactly like "the deploy did not take", which is the
+  false alarm this repo has already had once.
+- **Never reload during something a room is watching.** `safeToReload()`
+  requires no video attached, no teaching slideshow, no `previewMode`, no
+  reader overlay, the Settings panel closed, no caption prompt, nothing
+  focused in a text field, and not the splash waiting for someone to press
+  Begin. In practice that means the Check-in Display is showing, or the
+  Journey window has ended. A busy kiosk re-checks every 15 seconds and
+  there is no forced deadline: an evening that never goes idle simply
+  updates tomorrow. Nothing is persisted, and the reload is a plain
+  `location.reload()` through a one-line `reloadPage()` indirection the
+  tests stub.
+- The embedded Check-in Display is a different origin and reloads itself
+  through its own version poll; nothing here reaches into that iframe.
+
+## GitHub Pages source must stay "GitHub Actions"
+
+The repo's Pages setting (Settings → Pages → Build and deployment →
+Source) must be **"GitHub Actions"**, never "Deploy from a branch".
+With the branch source set, every push to `main` triggers GitHub's
+built-in "pages build and deployment" workflow, which publishes the
+repo *root* (no `index.html` there — only `public/` has one) and races
+`deploy.yml`'s correct artifact; whichever finishes last wins, so the
+live site flip-flops between two entirely different layouts.
+
+That flip-flop is what made the 2026-08-22 kiosk outage so confusing to
+diagnose, and it's worth understanding the interaction, because the two
+layouts have **disjoint** valid URLs:
+
+| Pages source | `/` | `/public/index.html` |
+| --- | --- | --- |
+| GitHub Actions (correct) | 200 | 404 |
+| Deploy from a branch | 404 | 200 |
+
+The Pi had been misconfigured to load `…/Journey-Display/public/index.html`
+— a URL that is only valid under the *wrong* Pages source. So every time
+the built-in branch build won the race, the kiosk came back to life and
+the misconfiguration stayed hidden; every time `deploy.yml` won, the
+kiosk 404'd. Fixing the Pages source made the kiosk's 404 permanent
+rather than intermittent, which is why the Pi's URL had to be corrected
+to the canonical root (`https://patrick-simpson.github.io/Journey-Display/`)
+at the same time. **The lesson: a kiosk that recovers on its own is not
+evidence the kiosk is configured right** — check the URL the browser is
+actually on (`ps -eo args | grep -i '[c]hromi'`) before believing the
+server is at fault.
+
+`deploy.yml` has a best-effort step that tries to force the setting via
+the REST API, but
+the Actions `GITHUB_TOKEN` isn't allowed to change Pages settings
+("Resource not accessible by integration"), so only a repo admin can
+actually fix it in the UI. Symptom to recognize: a `dynamic/pages/
+pages-build-deployment` run appearing alongside a push means the
+setting has regressed.
+
+## Tech stack snapshot
+
+- Plain static HTML/CSS/JS — **deliberately no framework or build
+  step**. This runs on a Raspberry Pi Zero from 2017 (single-core
+  ARMv6, 512MB RAM), so keeping the page as light as possible for the
+  Chromium kiosk browser matters more than developer convenience.
+- Only `public/` is deployed to GitHub Pages (see
+  `.github/workflows/deploy.yml`) — repo docs, workflow files, etc.
+  never end up served on the live site. (The one README that is served is
+  `public/brand/README.md`, because the kit mirror is the whole kit, byte
+  for byte; see "Brand kit" below.)
+- `public/index.html` is the only page. It mounts two full-viewport
+  layers and toggles a `hidden` class between them rather than
+  destroying/recreating either — the Awana Check-in Display iframe
+  (`#checkin-view`) needs to stay connected in the background so its
+  live check-in data doesn't have to reconnect when Journey isn't
+  showing.
+- The repo root also has small **Node tool scripts** run only by
+  GitHub Actions, never on the Pi or in the browser: `fetch-current-
+  lesson.mjs` (uses `jsdom`; see "Current lesson lookup" below) and
+  `transcode-lesson-video.mjs` (shells out to `ffmpeg`, installed as a
+  workflow step; see "Video transcoding" below). Neither makes the
+  *site* a Node app: `public/` stays plain HTML/CSS/JS with no build
+  step, same as ever. `node_modules/` is gitignored.
+- `npm test` runs `node --test` over `test/`. `test/kiosk-dom.mjs` boots the
+  real `public/index.html` + `schedule.js` in jsdom (media, object URLs and
+  the Cache API stubbed; `caches` left undefined on purpose, which is the
+  path a fresh kiosk takes), so page behavior can be tested by pressing the
+  actual buttons rather than by calling internals. It boots as the real
+  kiosk (a Pi Zero UA, one core, so `detectDeviceProfile()` reads low);
+  pass its exported `DESKTOP` as the third argument for a page opened on a
+  Mac. schedule.js is a classic
+  script, so its top-level `function` declarations are reachable on `window`
+  while its `let`/`const` state deliberately is not. Run
+  `node --check public/src/schedule.js` alongside it. The one thing jsdom
+  cannot see is layout, so `test/control-bar-layout.test.mjs` (and
+  `test/corner-buttons.test.mjs`, see "Embedding note") opens the
+  page in real Chromium through `playwright-core` (answering every request
+  from `public/` itself: no server, no port, no network, schedule.js not
+  run). It uses the same binary as the handout renderer
+  (`PLAYWRIGHT_CHROMIUM`, else `/opt/pw-browsers/chromium`) and is skipped,
+  and says so, on a machine without it.
+
+## Brand kit (Awana 2026-27 catalog)
+
+Owner decision 2026-09-27: every screen in the Awana family (lobby signage,
+projector, this kiosk, the label printer) wears the 2026-27 catalog's design
+language and full official branding. For Journey that means the catalog's
+own identity: the wordmark whose O is a disc with a mountain peak cut out,
+the club purple `#8A649D`, its deep shade `#56467F`, the deep ink `#403A77`
+and the lavender tint `#DED5EA`, plus the house hot `#F15A28` for the one
+thing to press. Three voices: **Paytone One** shouts (the lesson name, the
+caption question, the settings title), **Londrina Solid** labels (kickers,
+the corner tab, every button), **Figtree** is read (hints, settings text,
+Read Prep, captions).
+
+- **Paytone One replaced Galindo as the shout on 2026-09-29** (owner: Galindo
+  "looks too much like SpongeBob"; picked from a side-by-side render). The
+  kit's `tokens.css` names it in `--brand-font-display`, `style.css` reads it
+  through `--jr-font-shout`, and `warmBrandFonts()` asks for
+  `400 1em "Paytone One"`. Nothing in `public/` outside the mirror may name
+  Galindo again (a test fails if it does); the posters' and the Check-in
+  Display's faces are not this repo's business.
+- **Paytone One ships WHOLE, never as a subset.** Its licence (SIL OFL 1.1)
+  reserves the name "Paytone One", and a latin subset or a re-encode is a
+  Modified Version that may not carry it. So `fonts/PaytoneOne-Regular.ttf`
+  is upstream's file byte for byte and `fonts/paytone-one-full-400-normal.woff2`
+  is the same font with every table untouched, compressed (README in the kit,
+  "Paytone One and the OFL"). `test/brand-kit.test.mjs` pins the TTF's hash
+  and that the WOFF2 expands to exactly the whole TTF. Do not swap in
+  `@fontsource` files or trim the font to save bytes: the WOFF2 is 42.7 KB
+  where Galindo's latin subset was 20 KB, a one-time fetch per font version
+  (`warmBrandFonts()` runs it while the Check-in Display is up, and
+  `stamp-build.mjs` versions the URL by the font's own hash). A browser that
+  cannot decode the WOFF2 falls through to the TTF (114 KB) with the same
+  metrics, which was checked by serving a garbage and a 404 WOFF2.
+- **The shout is fitted, not just swapped.** Every shout size in `style.css`
+  was drawn for Galindo. Paytone One's caps are shorter at one font-size
+  (cap height .688 em against .725) and sit lower in a tight line box (ascent
+  1.113 em against .983), so a bare swap made the lesson name 5% smaller,
+  dropped it about .15 em away from the kicker it belongs under, and crowded
+  the buttons below. Two tokens at the top of `style.css` undo that:
+  `--jr-shout-fit: 1.05` multiplies every shout size (a test fails if a rule
+  that sets the shout face leaves it out, and if the number stops matching
+  the shipped font's cap height), and `--jr-shout-lift: -0.15em` is `top` on
+  a relative box for the headlines stacked over other lines (the splash
+  title, the caption question, the loading text): paint moves, layout and
+  neighbours do not, and nothing is clipped. Measured against the Galindo
+  screens at 640x480 and 1080p, the caps land within 3 px of where they were
+  and the kicker-to-caps gap within 3 px; the widest name (RESURRECTION) is
+  4% narrower than it was, so the doodle clearance the 7vw cap protects only
+  grew. The settings title is fitted but not lifted: it is centred on its
+  close button, and Paytone One centres on it better than Galindo did.
+  `test/splash-fit.test.mjs` boots the page in Chromium (Pi user agent) and
+  checks all 32 lesson names at 592x432, 640x480, 720p and 1080p: the shout
+  face really loaded, one line, clear of the doodle cluster and the buttons,
+  the kicker-to-caps air in range, and an accented capital (Paytone One
+  reaches 1.16 em, past its own ascent) has no ancestor that clips it.
+  Changing the shout again means re-measuring both numbers, not just the name.
+- **Paytone One covers more than Galindo did** (Ș ș Ț ț, all Vietnamese, all
+  of Latin Extended-A), but still no Cyrillic, Greek, Hebrew, Arabic,
+  Devanagari, Thai or CJK: those fall through the stack to the system's
+  rounded face, as before. Its digits are proportional unless
+  `font-variant-numeric: tabular-nums` is set; nothing on this kiosk sets a
+  number in the shout face.
+
+- **`public/brand/` is a byte-identical mirror of the whole kit**, whose
+  canonical copy is `Awana-Check-in-Display/shared/brand/` (read its
+  README). Never edit it here. `node scripts/sync-brand-kit.mjs
+  <signage-checkout>` re-copies it and rewrites
+  `data/brand-kit-manifest.json` (a sha256 per file plus the signage commit
+  that last touched the kit); `--check` compares without writing and exits 1
+  on drift. `test/brand-kit.test.mjs` fails if the mirror and the manifest
+  disagree in any file, so a hand edit, a half copy or a dropped file is
+  caught here even though the canonical repo is not. Commit the mirror and
+  the manifest together.
+- **Self-hosted, never the network.** `index.html` links
+  `brand/tokens.css` and `brand/fonts.css` ahead of `src/style.css`; no
+  font, stylesheet or image comes from anywhere else (a test pins the only
+  cross-origin URL on the page to the Check-in Display iframe). A browser
+  fetches a web font only once text set in it is rendered, which here would
+  first happen at the 6:30 splash on the evening connection, so
+  `warmBrandFonts()` asks `document.fonts` for the three faces at startup,
+  fire and forget; nothing awaits it and a failure only means the fallbacks.
+  The TTFs and Londrina's 900 weight are in the mirror but never fetched.
+- **Versioned like the code.** `scripts/stamp-build.mjs` puts `?v=<sha>` on
+  both kit stylesheets and the wordmark, and `?v=<font's own hash>` on every
+  URL inside the deployed `brand/fonts.css`, so a self-updated kiosk never
+  pairs new `@font-face` rules with old font bytes, and a deploy that did
+  not touch the fonts does not make the Pi fetch them again (see
+  "Self-updating kiosk").
+- **`style.css` reads the kit through `--jr-*` aliases** at the top of the
+  sheet, each `var(--brand-…, <the kit's own value>)`, so the page still looks
+  like itself if `tokens.css` failed to load; the test fails if a fallback
+  drifts from `tokens.css`. `--u` is 1/100 of the largest 16:9 box's width
+  (allowed to grow a quarter into spare height on the 640x480 safe-mode
+  screen); every size built on it keeps a rem floor for phones.
+- **The wrapper art is baked, not markup.** The bottom wave (the kit's
+  Journey wave twice in one image, deep behind, purple in front), the corner
+  tab and the two doodle clusters are SVG data URIs in `style.css`, drawn as
+  backgrounds and pseudo-elements, so `index.html` gained only the wordmark
+  `<img>`s and every id and class stayed put. Their path data is copied
+  verbatim from `public/brand/shapes/` and `doodles/`, and a test pins each
+  one there; only the fills are baked, because an SVG drawn as an image
+  cannot inherit `currentColor`.
+- **The Pi Zero paint budget is a test, not a habit.** `journey-splash-pulse`
+  is the only `@keyframes`; no `filter` (prefixed or not), no
+  `backdrop-filter`, no gradients;
+  every `box-shadow`/`text-shadow` has zero blur (the kit's depth is a hard
+  offset), with one exception, `#slide-template`'s soft text shadow, which
+  copies Awana's deck. Measured in Chromium at 640x480 and 1080p: the idle
+  splash and the loading overlay repaint nothing while their pulse runs (it
+  runs on the compositor).
+- **Awana's deck is not ours.** The teaching-slide images and the TEMPLATE
+  slide's type (`#slide-template`, Calibri/Carlito over the deck's own
+  texture) stay exactly as they were; only the controls around them wear
+  the kit. The pillarbox stays black. `test/brand-kit.test.mjs` pins the
+  deck's rules (`#slides-view`, `#slide-stage`, `#slide-image` and every
+  `#slide-template*`) declaration for declaration, and fails if any other
+  rule names those elements.
+
+## About page (`public/about.html`)
+
+A static showcase page for church leadership, one of three sibling pages
+(Club Label Printer's home page, the Check-in Display's `about.html`, and
+this). It is one plain HTML file with no script at all: the shared
+`public/family.css` beside it (linked as `family.css?v=N`), and its own page
+styles inline in a `<style>` block. There is no `about.css`.
+
+- **The kiosk never loads it.** `index.html` does not link it, and it must
+  never load `schedule.js` or `style.css`; nothing here should ever add
+  weight to the Pi's page. `scripts/stamp-build.mjs` stamps `index.html`
+  only, so `about.html` needs no build meta and is left untouched by the
+  deploy (checked by running the stamp over a scratch copy of `public/`).
+- **`family.css` is byte-identical across the three repos.** The canonical
+  copy is `Print-TwoTimTwo-Labels/styles/family.css` and its spec is
+  `Print-TwoTimTwo-Labels/docs/FAMILY-DESIGN.md`; change it there and copy
+  the file byte-for-byte to all three, never edit this copy on its own.
+  Anything page-specific goes in `about.html`'s inline `<style>` with the
+  `jd-` prefix, built on the family tokens.
+- **Bump the `?v=` token on BOTH about pages whenever `family.css` changes**
+  (this one and the Check-in Display's `public/about.html`). Pages serves the
+  stylesheet with `max-age=600`, and the Check-in Display's service worker
+  serves same-origin stylesheets cache-first under its build's cache name,
+  so a deploy that changes only the CSS under an unchanged URL may never
+  reach a screen that already has the old copy. HTML is fetched fresh, so a
+  new query string on the link is what carries the change.
+- **The 6:30 start screen (Fig. 1 and the resume card) is drawn in the kit,
+  with the kit's own faces.** The page links `brand/fonts.css` (the same
+  self-hosted mirror the kiosk loads, full unmodified fonts) beside its
+  Google link, which asks for the editorial faces only (Fraunces, Source Sans
+  3, IBM Plex Mono): never Galindo (owner, 2026-09-29), never a Google or
+  subset copy of a brand face. The recreation follows `public/src/style.css`'s
+  splash: the deep ink field, the club purple corner tab and waves, Paytone
+  One for the shout (with `1.05` fit and the `-.15em` lift), Londrina Solid
+  for labels and buttons, Figtree for the hint. Its art is drawn fresh for the
+  page (no kit file, no `<img>`), and "Journey" is set as plain text, not the
+  wordmark: no Awana logo on this page. One deliberate departure, as on the
+  Check-in Display's page: the Begin Video orange is `#CF4518`, not the kit's
+  `#F15A28`, so its white label passes AA at mock size.
+  `test/about-page.test.mjs` pins the palette to `brand/tokens.css`, the
+  loaded faces, the departure and the no-image rule, and that nothing is
+  fetched from another host but the ONE Google stylesheet for the editorial
+  faces and its two preconnects (a v1 `css?family=Paytone+One` link, a mirror,
+  a preload, an `@import`, a page-local `@font-face` or a `url()` to another
+  host all fail it). The playback, slide-bar
+  and Read Prep recreations below it are still the pre-kit black / red /
+  system-ui drawings; redraw them the same way when they are next touched.
+- **Licensing wording is strict** (see "Licensing boundary" above): the page
+  says the kiosk plays curriculum the church already licenses through its
+  own Awana Ministry Membership, used only within the church's own program
+  (its kiosk and its leaders) and never shared or offered anywhere else, and
+  that each lesson is prepared so even the little Pi plays it smoothly. It
+  never says the kiosk plays "a copy", a "smaller copy", or anything
+  "re-encoded" or "transcoded", and never implies the Pi plays full
+  quality. It must never link to, name the URL or filename of, or advertise
+  any lesson video, transcoded copy, Release asset, transcript, handout or
+  slide image, and never say "re-host", "mirror", or "download" anywhere
+  near the videos (the phrase is "saved ahead on the kiosk itself"). Screen
+  mocks are CSS recreations with placeholder text: no video frames, no
+  slide artwork, no curriculum text or imagery, no Awana logos.
+- **The room is students.** Journey is the high-school ministry, so the page
+  says "students", never "children", about the people watching the lesson.
+- **Never link to the live kiosk.** Links out go to the two sibling pages
+  (the labels home page and the Check-in Display's `about.html`) and the
+  three GitHub repos only, never to this site's root or `index.html`, and
+  never to the Check-in Display's root or `countdown.html`.
+- Trademark: the "Not affiliated with or endorsed by Awana® Clubs
+  International" line sits at the top, in the meta description and in the
+  footer's full disclaimer.
+
+## Daily schedule
+
+`public/src/schedule.js` holds the switching logic:
+
+- `JOURNEY_START_MINUTES` (18:30) / `JOURNEY_END_MINUTES` (19:15) are
+  the schedule window in minutes-since-midnight, using the Pi's local
+  system clock. Change these two constants to retime the switch.
+- The Awana Check-in Display shows outside that window; the Journey
+  placeholder shows inside it. This repeats every day — there's no
+  date logic, only time-of-day.
+- On load, the current phase is computed immediately (so a reboot
+  mid-window comes up correct), then a ~15s poll only forces a view
+  change when the phase actually flips (i.e. exactly at the two
+  boundaries) — this is what lets the manual toggle button override
+  the view in between without being fought by the poller.
+
+## The Journey page itself
+
+`#journey-view` plays the current week's "Journey: Advocates" lesson
+video (a 32-week apologetics course, `https://clubs.awana.org/ym-course/advocates/`).
+Each lesson is a direct `.mp4` file hosted on Awana's own CDN (not
+Vimeo — confirmed by fetching the real page; each lesson ships both a
+"Leader Video" and a "Student Video", and this repo always uses the
+Student Video, since that's the one meant to play to the kids). If
+`public/current-lesson.json` hasn't resolved a lesson yet, it falls
+back to the plain placeholder (the Journey wordmark on the deep ink
+field, nothing else) —
+never a broken `<video>` — same "missing data renders nothing"
+principle as the sibling Awana-Check-in-Display repo.
+
+**Licensing boundary:** the church has an active Awana Ministry
+Membership covering this curriculum for its own program. Everything
+here is scoped to **internal, on-device playback only** — nothing here
+should ever redistribute, advertise, or link to these video files for
+anyone other than this kiosk. `public/lessons.json`'s `downloadUrl`s
+point at Awana's own CDN and are the canonical source; this repo never
+fetches them for any purpose beyond this kiosk's own playback/caching.
+
+**Deliberate, informed exception — re-encoded copies:**
+Awana doesn't offer a lower-resolution/lower-bitrate download for any
+lesson (checked directly against the real page — only "Leader Video"
+and "Student Video," both full quality), and the kiosk's Raspberry Pi
+Zero cannot decode the originals (1080p H.264, ~90-220MB each) at a
+usable frame rate. `scripts/transcode-lesson-video.mjs` (server-side,
+in the nightly Action) re-encodes the current lesson down to something
+the Pi Zero can actually play smoothly and writes it to
+`public/current-lesson-video.mp4`, which GitHub Pages then serves —
+technically a public URL, same as the rest of this site. The project
+owner chose this trade-off explicitly, aware that it's a narrower
+version of "never rehost" than the original wording: it's a re-encoded,
+lower-quality copy, used solely for this kiosk's own playback, never
+linked/advertised anywhere else — not a copy of the original files
+being redistributed.
+
+**Owner-approved extension (2026-08-22) — all lessons, on a Release:**
+the same exception now covers Pi-playable 480p re-encodes of *every*
+lesson video (32 Student + 31 Leader; week 27 has no Leader Video),
+uploaded as assets on the `transcoded-videos-v1` GitHub Release by
+`scripts/transcode-all-lessons.mjs` / the on-demand
+`transcode-all-lessons.yml` workflow. The manual video-picker plays
+these (originals were undecodable on the Pi Zero — reported broken from
+the live kiosk), falling back to the original URL if an asset is
+missing. A Release rather than `public/` keeps ~1.1GB out of the repo,
+its history, and every Pages deploy. Same character as the nightly
+exception: re-encoded, kiosk-playback-only, never linked elsewhere.
+The owner explicitly approved this extension when asked directly on
+2026-08-22. If you're touching this boundary in either direction,
+that's a call for the project owner, not an assumption to make either
+way.
+
+### `public/lessons.json` — the fixed lesson map
+
+Hand-maintained, not scraped nightly (the course itself doesn't change
+week to week): `{ version, sourceUrl, lessons: [{ week, unit, lesson,
+title, downloadUrl, leaderDownloadUrl, captions }, …] }`. `captions` is
+`{ student: bool, leader: bool }` — a shipped manifest of which
+transcripts exist in `public/transcripts/`, regenerated by
+`scripts/update-captions-manifest.mjs` (re-run it after adding or
+removing any VTT). It exists so `captionsAvailable()` in `schedule.js`
+answers "does this video have captions?" from data the page already
+has, instead of a network HEAD probe at the moment the operator presses
+play — the probe survives only as a bounded (2.5s-timeout) last resort
+for when lessons.json never loaded. `week` is a flat 1-32
+count in course order (`unit`/`lesson` are the Advocates page's own
+"Unit N, Lesson M" numbering — 8 units × 4 lessons). `downloadUrl` is
+always the Student Video (the one the auto-scheduled 6:30 show plays);
+`leaderDownloadUrl` is that lesson's Leader Video, used only by the
+manual video-picker in Settings (see "Manual video preview" below) —
+**`null` for week 27** ("Unit 7, Lesson 3: Suffering"), which really
+has no Leader Video on Awana's own page, not a scraping gap. Built by
+fetching and parsing the real Advocates page (all 32
+`.m-lesson-resources-block` tiles, each with a "Unit N, Lesson M"
+heading and a `.m-small-video-resource-tile` per video labeled "Student
+Video" / "Leader Video" with its own download link) — rebuild it the
+same way if Awana revises the course. Don't guess the Leader Video's
+filename from the Student one: it's usually `…-leader.mp4` but three
+lessons (weeks 17-19) use `…-leaders.mp4` (plural) instead — a real
+inconsistency in Awana's own naming, confirmed against the live page,
+not a typo to "fix" here.
+
+### Current lesson lookup
+
+`.github/workflows/update-lesson.yml` runs nightly (mirroring the
+sibling repo's `update-calendar.yml` pattern): it calls
+`scripts/fetch-current-lesson.mjs`, which resolves "what's the current
+lesson" from the church's own TwoTimTwo calendar
+(`https://kvbchurch.twotimtwo.com/calendar/index?current_only=Y`),
+matches it against `public/lessons.json`, and writes
+`public/current-lesson.json` — same-origin, so the kiosk never depends
+on a third-party fetch succeeding at 6:30 PM. Only commits when the
+resolved week actually changes (or weekly, as a staleness heartbeat).
+If it can't confidently resolve a lesson, it exits non-zero and leaves
+the last-good file alone — a bad parse must never overwrite a good
+lesson with a wrong one. `scripts/transcode-lesson-video.mjs` then runs
+as the next step in the same workflow — see "Video transcoding" below.
+
+**`current-lesson.json` schema** (`version: 2`): `{ week, title,
+sourceUrl, downloadUrl, transcodedAt, resolvedAt }`.
+- `sourceUrl` is the original (large) lesson file's CORS-friendly CDN
+  URL — see the CORS note further down. It's this script's own
+  "did the lesson actually change" identity (`sameLesson()` compares
+  `week`/`title`/`sourceUrl`, deliberately NOT `downloadUrl`).
+- `downloadUrl` is what the kiosk actually fetches/caches/plays. It
+  starts out equal to `sourceUrl` (so playback still works before
+  transcoding catches up) and gets overwritten to the small, same-origin
+  `current-lesson-video.mp4` once `transcode-lesson-video.mjs` succeeds.
+- `transcodedAt` is null until that transcode succeeds for the current
+  lesson. `fetch-current-lesson.mjs` resets both `downloadUrl` (back to
+  `sourceUrl`) and `transcodedAt` (back to null) whenever the lesson
+  genuinely changes, but **preserves** them across a heartbeat-only
+  rewrite (same lesson, just re-confirmed) — otherwise every weekly
+  heartbeat would discard a perfectly good transcoded video and make
+  the kiosk fall back to the full-size original until the next transcode
+  run, for no reason.
+
+**Verified DOM contract** (confirmed against a real saved response —
+see the comment at the top of `fetch-current-lesson.mjs`): this
+`?current_only=Y` endpoint is a *different* page/template than the
+general church calendar the sibling repo scrapes (`.dayline` divs) —
+it's a per-club "current book track" table (`tr.book-track-mtg`), one
+row per club, with a `Book Track` column ("Journey: Advocates") and a
+`Section` column carrying TwoTimTwo's own counter label (e.g. "Faith
+Foundations #7").
+
+**"Faith Foundations" is the entrance gate, not the book.** Every club
+runs through this generic onboarding sequence before starting whatever
+book they're actually assigned — "Faith Foundations #7" means "7 weeks
+into the entrance gate," **not** "week 7 of Advocates," even though it
+shows up under the "Journey: Advocates" Book Track. While a club is
+still there, the script defaults to **week 1** (the first Advocates
+video) rather than leaving the display blank — an explicit default, by
+request, not a match against the entrance-gate count.
+
+**Once in the book, the Section text is "Unit N #M"** — verified
+against this church's own full-year schedule (fetch
+`?current_only=N`, one book-track table per scheduled meeting date for
+the whole year, rather than just the current one). The Journey club's
+schedule shows the last entrance-gate meeting as "Faith Foundations #7"
+(2026-09-02), then the very next meeting (2026-09-09) as "Unit 1 #1",
+continuing in lockstep with the Advocates page's own numbering through
+"Unit 8 #4" (2027-05-19). So "Unit N #M" maps directly to
+`lessons.json`'s `unit`/`lesson` fields — an earlier version of this
+script guessed a flat 1-32 count instead, which happened to work for
+Unit 1 by coincidence but would have been wrong from Unit 2 onward;
+that guess has been replaced with this verified mapping.
+
+The entrance-gate label check is deliberately tolerant of whitespace
+(including a stray non-breaking space, which `String.trim()` alone
+does not strip from the middle of a string) and case, normalizing
+before comparison — the same tolerance `matchLesson()`'s `\s+` regex
+already had, so a template variance doesn't turn into a permanent
+nightly failure on one side but not the other.
+
+### Video transcoding (`scripts/transcode-lesson-video.mjs`)
+
+Runs as the step right after `fetch-current-lesson.mjs` in
+`update-lesson.yml`. Verified against a real lesson file: Awana's
+original is 1920x1080 H.264 Main profile, ~2.2Mbps video + 161kbps
+audio, ~94MB for a ~5.5 minute lesson. Re-encoded to 854x480 H.264
+**Baseline** profile (avoids CABAC entropy coding, which costs
+meaningfully more CPU to decode than baseline's CAVLC — the actual
+lever for a weak decoder, more than resolution alone), capped at
+~700kbps video + 96kbps audio, **same original frame rate** (shrinking
+resolution/bitrate/profile is what should let a weak decoder keep up;
+dropping frame rate further wasn't part of the ask and would look
+worse for no decode-cost benefit) — that lesson came out to ~17MB, a
+~5.5x reduction, visually clean at normal TV viewing distance (spot-
+checked by extracting and viewing real frames from both).
+
+- Downloads `current-lesson.json`'s `sourceUrl` — server-side, so
+  Node's `fetch()` doesn't care whether it's CORS-friendly (CORS is a
+  browser-only concept); this is simpler than the browser-side
+  constraint that made `sourceUrl` need to be CORS-friendly in the
+  first place (see the CORS note below).
+- Skips the work entirely if `current-lesson.json.transcodedAt` is
+  already set for the current lesson **and** `public/current-lesson-
+  video.mp4` still exists on disk — so a nightly run that finds nothing
+  changed doesn't re-download/re-encode ~100-200MB for no reason.
+- **Never fails the overall job.** Any failure (download, ffmpeg, disk)
+  is caught and logged; `current-lesson.json`'s `downloadUrl` is simply
+  left as whatever `fetch-current-lesson.mjs` wrote it as (`sourceUrl`,
+  the original) — the kiosk still plays and caches that directly, just
+  at full size/quality, rather than being left with no video at all.
+- **Single reusable filename** (`public/current-lesson-video.mp4`),
+  overwritten in place each time the lesson changes — not one file per
+  lesson. Keeps at most one lesson's video present in the working tree
+  at a time, matching the existing `current-lesson.json` pattern.
+  Git still keeps every past version in *history* though, so the
+  repo's `.git` size grows by roughly one lesson's transcoded size
+  (~15-20MB) every time the lesson changes — around 500-600MB across a
+  full 32-week run through the course. Not a problem at today's scale;
+  if it ever becomes one, moving this asset to a GitHub Release (which
+  doesn't bloat git history) is the natural next step. (The manual
+  picker's batch-transcoded copies DO live on a Release now — see the
+  owner-approved extension above — but this nightly file deliberately
+  stays in `public/`: the kiosk pre-caches it with a browser `fetch()`,
+  which needs a same-origin/CORS-friendly URL, and a Release download's
+  redirect hop has the same missing-CORS-header problem the "why
+  sourceUrl is a CDN URL" note below describes. Direct `<video>`
+  playback, which is all the picker does, doesn't care.)
+
+### Device profile: low power and full quality
+
+The kiosk is the 2017 Pi Zero, but this same URL gets opened on a Mac, a
+laptop and the odd phone, and the two want opposite things. So
+`detectDeviceProfile(userAgent, hardwareConcurrency)` in `schedule.js`
+(pure, wired to `navigator` in exactly one place) answers `'low'` or
+`'full'`, and everything quality-related reads `effectiveProfile()`:
+
+- **Low** when the UA says Linux on ARM (`armv6l`/`armv7l`/`aarch64`,
+  which covers every Raspberry Pi), when it says Android/Mobile/iPhone/iPad (a small
+  screen on cell data wants the small file), or when
+  `navigator.hardwareConcurrency <= 2`. Everything else is full.
+- **Per-device override** in Settings → "Playback quality": Auto / Full
+  quality / Low power, stored under `journey.playback.quality` and read
+  with the same try/catch shape as the caption prefs. Auto's label names
+  what was detected ("Auto (detected: full quality)"), because a promise
+  nobody can check is worth nothing on a wall-mounted screen. The answer
+  is cached per page load and recomputed when the setting changes; a
+  change applies at once (the iframe is swapped, the next pick reads the
+  new profile), and a write that failed says so rather than claiming it
+  saved, like the bullet editor.
+- **Low is the old behavior, byte for byte.** Every rule below that
+  predates this section is a low-profile rule, including the legacy
+  unversioned cache key, which only the low profile may read.
+
+What **full** changes, and nothing else does:
+
+- The embedded Check-in Display loses `?lowPower=1` (see "Embedding
+  note").
+- The scheduled show plays Awana's ORIGINAL: a cache hit for it, else
+  `current-lesson.json`'s `sourceUrl`, else `lessons.json`'s
+  `downloadUrl` for that week (`originalVideoUrl()`).
+  `scheduledVideoPlan()`'s "never play the undecodable original" guard and
+  the `#journey-splash-quality` note it drives are low-profile only:
+  nothing is degraded about playing the original, so there is no note.
+- The picker plays the originals with the 480p Release asset as its
+  one-shot error fallback, the exact inverse of the low profile
+  (`previewSources()`). The same-week cached-copy shortcut still applies,
+  pointing at the 1080p cache entry.
+- `cacheLessonBundle()` pre-downloads the ORIGINAL Student Video from
+  `sourceUrl` (CORS-friendly by design, see the CORS note below) instead
+  of the transcode. That entry is **optional**: a cross-origin file served
+  without CORS headers is not something this page can fix, so the failure
+  costs the video and nothing else in the bundle, and store-before-evict
+  still holds.
+- **The two qualities can never be confused for one another.**
+  `videoCacheKey(lesson, profile)` keys the original by its own URL plus
+  `?q=1080`. That marker is a query parameter and not a `#1080` fragment
+  on purpose: the Cache API ignores fragments when it matches, so a
+  fragment would silently be the same key as the 480p copy.
+
+Nothing about this rehosts anything: the originals are streamed (and
+cached for this kiosk's own playback) straight from Awana's own CDN, the
+same files `lessons.json` has always pointed at.
+
+### Video playback and offline resilience (`public/src/schedule.js`)
+
+No service worker — the browser's Cache API is used directly from
+`schedule.js`, which is simpler and is all this page's caching actually
+needs (a service worker was considered again for the 2026-09-01
+offline-resilience work and deliberately rejected: everything below is
+achievable with Cache API + blob URLs, and a mismanaged SW on a remote
+kiosk can pin stale code indefinitely — strictly worse than the
+10-minute Pages cache we already tiptoe around. Accepted residual risk:
+a reboot during a total outage has no app shell to load).
+
+- **No click or keypress may await the network before something visible
+  changes** — this is a hard rule, learned live ("you click buttons and
+  it doesn't respond" — reported 2026-09-01 from the kiosk on flaky
+  WiFi). The two offenders were `requestPlayback()` (awaited a caption
+  HEAD probe with no timeout before ANY DOM change, so Begin
+  Video/Space/the picker looked dead while the network dawdled) and
+  `openSettingsPanel()` (awaited lessons.json before unhiding the
+  panel, so a hung fetch made the gear button read as broken forever).
+  `requestPlayback()` now reveals the Journey layer + loading overlay
+  synchronously and probes after; the settings panel opens instantly
+  with a "Loading lesson list…" note that becomes a visible error state
+  on failure. Anything the UI indirectly waits on goes through
+  `fetchWithTimeout()`. Every control also got an instant `:active`
+  press state in style.css (`transition: none` so it lands next paint).
+  If you add a new interactive path, keep this property: acknowledge
+  first, network later.
+- **The whole current-week bundle is pre-downloaded, not just the
+  video**: `cacheLessonBundle()` (on load, hourly, and on the browser's
+  `online` event) stores the lesson video, BOTH caption transcripts, both
+  roles' Read Prep transcripts, and the leader handout in
+  `journey-videos-v1`. A 404 (week 27 has no leader
+  VTT/handout) is "legitimately missing — skip", not a failure; the old
+  bundle is evicted only after every piece of the new one stored
+  (store-before-evict, extended from the old single-video invariant —
+  on any real failure nothing is evicted and the next refresh retries).
+  Playback then consumes the cache: caption tracks and the handout
+  iframe get blob URLs when cached (revoked in `stopJourneyContent()` /
+  `closeHandout()`), so captions and the current week's handout work
+  offline. The *video* is the exception since 2026-09-16 (see "Playback
+  streams first" below): the bundle is what plays when the network cannot
+  serve it, not what plays by default. A same-week Student pick in the
+  manual picker goes through the same `resolveVideoSrc()`, so it streams
+  or plays the cached copy on the same rule. On the low profile that shortcut
+  is gated on `currentLesson.transcodedAt`, so a not-yet-transcoded 1080p
+  original never reaches the Pi's decoder that way; on the full profile
+  the original is what it wanted anyway. Which video the bundle stores at
+  all is the profile's choice (see "Device profile" above).
+- **The cached video is keyed by `transcodedAt`, not URL alone**
+  (`videoCacheKey()`, on the low profile; the full profile keys the
+  original by `?q=1080` instead, see "Device profile"): the nightly
+  transcode reuses one filename, so
+  when the lesson changes, this week's and last week's bytes share a
+  URL — and the kiosk essentially never witnesses the brief
+  pre-transcode CloudFront-URL state whose URL change used to be the
+  only thing that flushed the cache. Without the versioned key, a
+  cached lesson would survive its own replacement and the kiosk would
+  keep playing last week's video (latent from the day this cache
+  shipped; would first have bitten at the first real lesson change).
+  The transcripts/handout stay keyed by URL — they're per-week files,
+  so a week change alone flushes them; only a mid-week caption
+  correction can be ~a-week stale on an already-bundled kiosk, which is
+  accepted.
+- **lessons.json is cache-first**: fetched once at startup (5s timeout,
+  good copy stored in `journey-assets-v1`), served from that cache with
+  a quiet background revalidate afterward — the old
+  `{cache:'no-store'}`-on-every-open is gone. The `captions` manifest
+  (see above) is built from whichever copy loads; an old cached copy
+  without the field just falls back to probing.
+- **What still can't be pre-downloaded: the other 62 picker videos.**
+  GitHub Release URLs 302-redirect without CORS headers on the redirect
+  hop (verified live; documented below), so a browser fetch() can never
+  store their bytes — only same-origin copies would make a "download
+  all videos" feature possible, and rehosting is a project-owner call
+  (see the licensing boundary above). The picker still streams those.
+  **Asked and declined 2026-09-01**: the owner chose "current week is
+  enough" over a same-origin mirror + download-all — don't re-raise it
+  unless they bring it up.
+- If the loading overlay stays up ~12s, its note switches to say the
+  internet may be down and points at the ⇄ button (which never waits on
+  the network) — a stalled fetch fires no error event, and an endless
+  "Loading…" pulse is indistinguishable from progress.
+- **The video no longer autoplays at 6:30.** Crossing into the
+  scheduled window shows a branded "Large Group Time" splash
+  (`#journey-splash`) instead — the catalog's Journey wordmark over
+  ADVOCATES, the "Large Group Time" corner tab, and this week's lesson
+  prominently named: a kicker (`Week 4 · Unit 1 · Lesson 4`) over the
+  lesson's own name (`Logic`), both split out of `lessons.json`'s `title` by
+  the pure `splashLessonText()` and filled in from `currentLesson` by
+  `showJourneyContent()`. A title that is not "Unit N, Lesson M: Name" keeps
+  the whole title as the headline and `Week N` alone as the kicker, so a
+  change on Awana's side can cost the layout but never a word; a headline
+  over 14 characters gets `.is-long`, the smaller size the old title used
+  (every real name is one word of at most 12 letters, and a test walks all
+  32). The headline is capped at `7vw` so RESURRECTION (week 18, the
+  longest) clears the left doodle cluster on the Pi's 640x480 screen. The lesson video itself
+  is still queued up in the background exactly as before (see the
+  pre-fetch bullet right below) — only the on-screen *playback* waits.
+  An operator starts it with **Space**, **→**, or the on-screen "Begin
+  Video" button; all three are gated by `isAwaitingPlay()` (splash
+  visible, Journey view showing, not `previewMode`) and funnel into
+  `playCurrentLesson()`, which is the only thing that ever sets
+  `journeyVideo.src` for the scheduled show. This also conveniently
+  doubles as the audio-unlock gesture (see `audioUnlocked` below) —
+  pressing Space/→/the button to begin is itself a genuine user
+  action, so playback can start unmuted immediately rather than
+  needing a separate tap. **The manual preview flow (Settings panel)
+  is unchanged** — `startPreview()` still plays immediately, bypassing
+  the splash entirely; the splash-and-wait behavior only applies to
+  the scheduled 6:30 show.
+- **An interrupted lesson can be resumed.** The scheduled show marks its
+  position in `localStorage` (`journey.resume`, `{week, t, d, at}`) about
+  every 5 seconds, and the splash then offers **"Resume at M:SS" + "Start
+  over"** in place of "Begin Video" (never all three — Begin Video and Start
+  over are the same action). Space/→ take whichever primary button is
+  showing, so a reflexive tap resumes rather than restarting the room at
+  0:00. The offer is deliberately narrow, because resuming into the *wrong*
+  video is worse than restarting: the mark must carry the same `week` as the
+  queued lesson, be at least 30s in, at least 10s from the end, and less
+  than 4 hours old — anything else falls back to plain "Begin Video". The
+  mark is written against the week actually attached to the `<video>`
+  (`playingWeek`), not `currentLesson.week`, which the hourly refresh can
+  swap mid-playback; manual previews never write one (`previewMode`), and
+  the `ended` handler and `finishTeachingSlides()` clear it (both skipping
+  previews). The seek itself is armed as `pendingSeek` and applied by ONE
+  permanent `loadedmetadata` listener that re-checks `journeyRequestToken`,
+  so a stale resolve can never seek a newer video. Reading the mark touches
+  only `localStorage`, so the splash still renders with nothing awaited.
+- On load, and hourly afterward, it fetches `current-lesson.json` and
+  — regardless of what's currently on screen — pre-fetches that
+  lesson's bundle (video + transcripts + handout, see
+  `cacheLessonBundle()` above) into the `journey-videos-v1` cache
+  bucket, skipping pieces already there. This runs well ahead of
+  6:30 PM, so playback doesn't depend on the network being up at
+  showtime (the church's Pi connection is known to be flaky in the
+  evenings). A failed fetch of
+  `current-lesson.json` (the flaky-network case this exists for) is
+  treated as "no news" and never clears an already-loaded lesson —
+  only a genuinely resolved lesson can replace `currentLesson`.
+- **Why `sourceUrl` is a CDN URL, not the `clubs.awana.org` one
+  `lessons.json` lists:** `clubs.awana.org` 302-redirects lesson
+  downloads to a CloudFront-backed host, and that redirect response
+  itself carries no `Access-Control-Allow-Origin` header (confirmed
+  against the live site). A browser `fetch()` in CORS mode — which the
+  Cache API path needs, to read a response into a storable/playable
+  `Blob` — fails outright on that redirect hop, even though the
+  CloudFront target it points to *does* send
+  `access-control-allow-origin: *`. Switching to `no-cors` mode is
+  **not** a fix: an opaque response's body is null by spec (that's the
+  whole point of the opacity), so `.blob()` on it always yields 0
+  bytes, cached or not. The real fix has to happen server-side, where
+  CORS doesn't apply — `fetch-current-lesson.mjs` resolves the redirect
+  itself (a plain HEAD request) and records the already-CORS-enabled
+  final URL as `sourceUrl`, falling back to the original
+  `clubs.awana.org` URL if that resolution ever fails (still fine for
+  direct `<video>` playback either way, which is never subject to CORS
+  unless the `crossorigin` attribute is set — deliberately not set
+  here). In steady state `downloadUrl` is the transcoded same-origin
+  file, so this CORS distinction only actually matters for the (rare)
+  case where transcoding hasn't succeeded yet and the browser has to
+  fetch `sourceUrl` directly.
+- The previous week's cached video is evicted only once the new one is
+  safely stored, so a mid-download failure can't leave the cache empty.
+- **Playback streams first; the cached copy is the safety net** (changed
+  2026-09-16). The owner watched the live kiosk play a *picker* video,
+  streamed from the Release over plain HTTP, perfectly smoothly, while the
+  6:30 show — the same lesson, played from the Cache API as a blob URL —
+  stuttered badly. Both files are the identical encode (854x480 Baseline
+  3.1, 23.976 fps, same frame count), so the **blob-URL playback path on a
+  single-core, 512MB device is the only variable**: no range requests, and
+  the whole file materialised as one object before the decoder sees it. So
+  `resolveVideoSrc()` now prefers the network URL whenever the network can
+  answer — `navigator.onLine !== false` **and** one bounded `HEAD` through
+  `fetchWithTimeout` (2.5s) coming back ok — and falls back to the blob when
+  it can't. Both profiles, since a full-quality device streaming the
+  original from Awana's CDN is exactly what the picker has always done.
+  Acknowledge-first is untouched: the Journey layer and the loading overlay
+  are on screen before `playCurrentLesson()` awaits any of this.
+  `cacheLessonBundle()` is unchanged, store-before-evict included — the
+  cache is still what makes a dead evening a non-event, it is just no
+  longer the *first* choice on a working one.
+- **One stall swap, and only one.** A streamed video whose `waiting` state
+  persists for `STREAM_STALL_SWAP_MS` (8s) while the same bytes sit in the
+  cache hot-swaps to them: the position is remembered, armed as
+  `pendingSeek` and applied by the ONE permanent `loadedmetadata` listener
+  with its token check, and playback resumes. At most once per playback
+  (`streamSwapCandidate` is matched against the src the element actually
+  carries, and spent by the swap), never within `END_STALL_TOLERANCE_S` of
+  the end (the end-of-lesson handoff owns that stall), and never when
+  there is no cached copy — which is every picker video, and any evening
+  the bundle never landed. Captions, the handout and the slides still use
+  blob URLs; they are small, and none of them is decoded in real time.
+- The object URL, when one is made, is only ever revoked once its
+  replacement is already in hand, and only released for good (along with
+  detaching the `<video>` element) once the Journey window closes — a
+  ~100-200MB decoded blob has no reason to stay resident for the other 23
+  hours of the day on a 512MB Pi Zero.
+- Video starts muted (autoplay policy) with a visible unmute button
+  (a text label, not just an emoji glyph, since Raspberry Pi OS doesn't
+  always ship a color-emoji font); finishing the video falls back to
+  the Check-in Display immediately rather than waiting for 7:15.
+- **Captions** (owner-requested 2026-08-23): every lesson video can show
+  its transcript as WebVTT captions. Before playback the operator is
+  asked once — **"Show captions?" Yes/No, with Y/N keys** (Space/Enter
+  take the focused Yes default) — and the answer is persisted to
+  `localStorage` under `journey.captions`. Because the prompt asks
+  **once per device and then never again** (the owner's explicit
+  choice), the **CC button in the control bar is the only route back to
+  the setting** — keep it prominent, and keep it showing on/off state.
+  Note the contrast with `audioUnlocked`, which deliberately is *not*
+  persisted: a caption choice is a real operator preference with no
+  browser-side counterpart, so persisting it is honest rather than a
+  lie. Details worth not relearning:
+  - `requestPlayback()` is the single gate every playback path goes
+    through. It HEAD-probes the VTT first (memoized) and simply skips
+    the question when a transcript is missing — week 27 has no Leader
+    Video, and a future lesson revision could outpace the transcripts.
+  - That gate **must reveal `#journey-view` before showing the prompt**.
+    The prompt lives inside that layer, so asking while it's still
+    `hidden` renders the question into a `display:none` ancestor: the
+    operator picks a video, sees the Check-in Display, and playback
+    waits forever on a question nobody can see. Caught by screenshot;
+    don't regress it.
+  - **Captions are painted by us, not by the browser.** The track runs in
+    `mode = 'hidden'` (cues parsed, `cuechange` fires, nothing drawn
+    natively) and `renderActiveCues()` writes them into
+    `#caption-overlay`. Native `::cue` was tried first and abandoned for
+    two measured reasons: its font-size had to be in `vh`, which
+    collapses to ~11px on a phone held sideways (844x390), and native cue
+    placement follows the *letterboxed* video box, so it drifted between
+    form factors and landed captions on top of the control bar. A real
+    element takes `clamp()`/`vmin`, and — unlike shadow-DOM cues — can be
+    measured by the test suite.
+  - Size is `clamp(18px, 4.5vmin, 56px)`: `vmin` tracks whichever screen
+    dimension constrains the video frame, so one expression serves a TV
+    read across a room (~49px at 1080p) and a phone in either
+    orientation (18px floor). Verified at 1920x1080, 390x844, 844x390,
+    and 1024x768.
+  - `positionCaptions()` satisfies two different constraints at once: on
+    a filled 16:9 screen captions only need to clear the control bar; on
+    a letterboxed phone they instead sit just inside the video frame's
+    lower edge, so they don't float in the black band. It reads the
+    bar's live `offsetHeight`, so captions lift automatically when the
+    bar wraps to more rows on a narrow screen.
+  - **Cue length is a hard caption constraint.** Both caption sets are
+    now built from real word timestamps into cues of <=84 chars (see
+    "Leader transcripts" below for the 2026-09-06 leader redo). History
+    worth keeping: the first Leader transcripts were whisper's own
+    sentence segments, up to **202 characters** — fine to read, unusable
+    as a caption (a wall of text on a TV, six wrapped lines on a phone) —
+    and `scripts/resegment-vtt.py` split them at sentence/clause/word
+    boundaries, apportioning duration by character count. That script is
+    no longer part of the pipeline; it stays only as a record.
+  - **Size and backdrop are per-device settings** (Settings → Captions):
+    a size choice (Small 0.8 / Normal 1 / Large 1.3 / Extra large 1.6,
+    `journey.captions.size`) and a solid dark backdrop for bright frames
+    (`journey.captions.backdrop`), read with the same try/catch shape as
+    the slide preferences. The size **multiplies** the existing
+    `clamp(18px, 4.5vmin, 56px)` through a `--caption-scale` custom
+    property rather than replacing it, so every option keeps the same
+    responsive behaviour on every screen — note this scales the clamp's
+    floor too, so "Small" really is ~14px on a phone, which is the point of
+    choosing it. `applyCaptionDisplayPrefs()` re-runs `positionCaptions()`
+    after any change, because the band's height feeds the letterbox and
+    control-bar clearance maths. The **CC button remains the only on/off
+    control** — these settings only govern how captions look.
+  - The control bar itself needed a `max-width: 760px` media query: three
+    non-shrinking buttons plus scrubber and time cannot fit one row on a
+    phone, and the CC button was being **clipped off the screen edge** —
+    captions became impossible to toggle on mobile. Note that media
+    query must sit *after* the base control rules in the stylesheet; an
+    earlier copy placed before them lost the cascade to
+    `#video-scrubber { flex: 1 }` and the scrubber never got its own row.
+- **Playback control bar** (`#video-controls`): **Back 15s**, pause/play,
+  **Skip 15s**, the unmute button, a finger-sized scrubber, and an
+  elapsed/total time readout, along the bottom whenever a video is active.
+  The two 15-second jumps (also **`,`** / **`.`**, with **`[`** / **`]`** as
+  aliases) exist because dragging a finger-sized scrubber on a projected
+  screen to replay one sentence always overshoots; they seek an
+  already-attached source, so nothing is fetched and nothing is awaited.
+  They clamp to `duration - 0.25` so a skip can never trip the `ended`
+  handoff by accident — **→ stays the deliberate way on to the slides, and
+  ← is left alone** because it means "previous slide" once those are up.
+  Key repeats are ignored: a held key would queue seeks faster than the
+  Pi's decoder can serve them. Five pills no longer fit one row alongside a
+  usable scrubber below ~1100px, so **the bar's wrap media query is
+  `max-width: 1100px`**, not the 760px it was with three — below that the
+  scrubber was being squeezed to zero width (`flex: 1` with `min-width: 0`
+  shrinks silently rather than overflowing; measured at 844x390). In that
+  block the scrubber's basis is `calc(100% - 8rem)` so it and the time
+  readout fill the first row exactly and the pills wrap together beneath
+  them, rather than two or three tagging along on the scrubber's row. The
+  readout's box is the rest of that row, `calc(8rem - 6px)` (the column gap)
+  and right-aligned, not the width of its text: with the kit's narrower
+  Londrina pills a short `0:00`, which is what it says through the whole
+  loading wait, left room for Back 15s on the scrubber's row, and the pill
+  dropped back under the operator's finger when the duration arrived.
+  `test/control-bar-layout.test.mjs` measures it at the Pi's sizes. It fades out with the
+  same `cursor-hidden` idle mechanism as the mouse cursor (touches
+  count as activity too — phones have no mousemove) and is pinned
+  visible while paused (`.force-visible`), since a frozen frame with no
+  visible controls reads as a crash. Tapping/clicking the video itself
+  toggles pause, and Space does too during playback (guarded so it
+  never fires while the settings panel is open or a button has focus —
+  and Space's original job, starting the splash's queued lesson, takes
+  precedence). The bar's right inset reserves room for the view-toggle
+  button in the corner.
+- **The splash and loading overlays are viewport-responsive**
+  (`clamp()` type sizes and a clamp()-sized wordmark image, each with a
+  rem floor) — the page is occasionally
+  opened on a phone, where the original fixed TV sizes overflowed; the
+  Space/→ keyboard hint is hidden on touch-only devices. A
+  failed/stalled video load falls back to the placeholder too, rather
+  than a silent black frame indistinguishable from a dead display.
+  `video.loop` is explicitly set `false` (it was never looping by
+  accident, but this makes the intent explicit rather than relying on
+  the element's default).
+- **Autoplay-with-sound after the first click:** browsers only allow
+  *unmuted* autoplay once a genuine user gesture has occurred on the
+  page. This page's only clickable elements are its two corner buttons,
+  the splash's "Begin Video" button, and the Space/→ keys that start
+  the scheduled lesson (a click inside the Check-in Display iframe is a
+  different origin and never bubbles up to this document); any of them
+  sets an in-memory `audioUnlocked` flag before `playCurrentLesson()`
+  reads it, so the scheduled lesson now starts unmuted from its very
+  first play — the splash's whole reason for existing is that playback
+  never begins without one of these gestures having just happened.
+  Deliberately **not** persisted to `localStorage` — the browser's own
+  gesture-based permission is itself scoped to the page's lifetime (it
+  doesn't survive a reload/reboot either), so persisting "still
+  unlocked" past that point would just be wrong. The one path that can
+  still start muted is a manual preview (Settings panel) opened before
+  any gesture on the page at all — rare, since opening Settings is
+  itself a click.
+- **`lastPhase` invariant — do not break this again:** `lastPhase`
+  tracks only the *scheduled* phase (for detecting a genuine 18:30/
+  19:15 boundary crossing); the manual toggle button and the video's
+  `ended` handler both call `setView()` directly to change what's on
+  screen *without* touching `lastPhase`. That's what lets either of
+  them hold a view that disagrees with `scheduledPhase()` (checkin
+  shown early, or shown again after the lesson finished early) without
+  the next 15s poll tick fighting them. An earlier version of the
+  `ended` handler set `lastPhase = 'checkin'` directly, which made the
+  *very next* poll tick see a manufactured "flip" back to `'journey'`
+  and restart the lesson from frame zero — confirmed live before the
+  fix. If you touch the poller or either handler, re-verify this
+  property doesn't regress.
+- A **loading overlay** (`#journey-loading`) covers the gap between
+  asking a video to play and frames actually rendering — shown by
+  `playCurrentLesson()`/`startPreview()`, re-shown by the video's
+  `waiting` event on mid-play buffering stalls, hidden by `playing` and
+  on every teardown/error path. It exists mostly for manual previews,
+  which stream Awana's full-size originals and can take long enough to
+  start that the screen otherwise reads as dead. Cheap opacity pulse
+  only, same animation budget as the splash.
+- The **mouse cursor auto-hides after 5s idle** and reappears on any
+  mouse movement (`cursor-hidden` class on `<html>`, toggled in
+  `schedule.js`). An earlier version set `cursor: none`
+  unconditionally, which made the Journey view impossible to navigate
+  with a mouse — reported broken from the live kiosk, don't regress it.
+  Note the parent page never sees mousemove while the pointer is over
+  the Check-in Display iframe (cross-origin) — the embedded app governs
+  its own cursor there, and that's fine.
+- The **Settings panel is sized as a 10-foot UI** (rows ~1.5rem in a
+  ~1100px card) — it renders on a TV read from across a room, not a
+  desktop monitor; "too small to read" was likewise reported from the
+  live kiosk.
+- A screen [Wake Lock](https://developer.mozilla.org/en-US/docs/Web/API/Screen_Wake_Lock_API)
+  is requested on load and re-acquired on `visibilitychange`, since
+  Raspberry Pi OS's default screen-blanking would otherwise leave the
+  kiosk asleep long before 6:30 PM with no local activity to prevent
+  it. Not fatal if unsupported — disabling blanking at the OS level
+  (see `PI_SETUP.md`) is the belt-and-braces fallback either way.
+
+### Leader transcripts and handouts (owner-requested 2026-08-22)
+
+Derived text content from the Leader Videos, same licensing character
+as the re-encoded videos (internal ministry use for this church's own
+leaders, never linked/advertised elsewhere; owner requested this
+directly):
+
+- **`public/transcripts/week-NN-leader.vtt`** — WebVTT transcript of
+  each Leader Video (31 files; week 27 has none to transcribe). First
+  generated with faster-whisper "small" (sentence segments); **redone
+  2026-09-06 at large-v3** through the same pipeline as the Student
+  captions — `transcribe-student-captions.py leader` (word timestamps,
+  domain-vocabulary prompt, hallucination-hardened flags), a per-week
+  review pass writing `leader-corrections/week-NN.json` (mostly the
+  boundary-repeat words that `condition_on_previous_text=False`
+  produces, plus capitalisation and a handful of real mishearings), the
+  physics validator, an audio re-decode of every flagged cue, then
+  `build-student-captions.py leader`. Same-origin, so they work as
+  `<track>` captions without CORS issues. Regenerate only if Awana
+  revises a video. Measured against the old pass: ~2.5% of words sat in
+  a changed hunk; most hunks were filler, but the redo fixed real
+  meaning errors ("except Christ" → "accept Christ", "relative to this
+  day" → "relativistic", "the fairy" → "the Tooth Fairy", dropped
+  clauses like "The doctor told me") and cut cue counts by roughly a
+  third because cues now follow speech instead of split sentences.
+  **Re-transcribing renumbers every cue**, and `data/leader-transcript-
+  prose.json` addresses cues by number — run
+  `scripts/remap-transcript-prose-cues.py <dir-of-old-vtts>` before the
+  prose validator, which maps each paragraph boundary by time onto the
+  new numbering (keep a copy of the old VTTs for exactly this).
+  Two names both whisper passes garbled and the review pass now knows:
+  the Awana Youth Ministries site is **AwanaYM.org**, and the author of
+  *Questioning the Bible* is **Jonathan Morrow**.
+- **Captions must be verified against AUDIO, not by reading.** Whisper
+  hallucinates, and this bit us: run with
+  `condition_on_previous_text=True` (the library default) it repeats and
+  invents fluent text that no amount of proofreading can distinguish
+  from a real sentence. Week 1 cue 53 read "Apology is not just about
+  being an apologist." — a perfectly sensible line that **does not exist
+  in the audio at all**; re-decoding that 0.64s window returns only the
+  tail of the previous sentence. Two defences, both now permanent:
+  - `scripts/validate-captions.py` gates publishing. It BLOCKS any cue
+    of >=25 characters faster than **40 chars/sec** (`BLOCK_RATE`;
+    brisk human speech peaks near 20, and the worst offender was 106), a
+    near-duplicate of its neighbour, or a sub-0.6s echo cue, and marks
+    26-40 chars/sec as REVIEW (`REVIEW_RATE`: a careful read, not a
+    gate). `build-student-captions.py` repeats the rate and
+    near-duplicate detectors and refuses to write a week whose flagged
+    cues are neither corrected nor listed under `"verified"` in that
+    week's corrections file. Flags are not proof of a hallucination —
+    they are a demand to check that cue against audio.
+  - `scripts/verify-caption-cue.py` re-decodes the window
+    around a cue independently (beam 10, no conditioning, so it cannot
+    inherit the original's invention) and prints it beside the current
+    text and neighbours. Note the only ffmpeg on the box is Playwright's
+    stripped build, which cannot demux mp4 — decode via
+    `faster_whisper.audio.decode_audio` and slice the array instead.
+  - Transcription now runs `condition_on_previous_text=False` plus
+    `hallucination_silence_threshold=2.0` and `repetition_penalty=1.1`.
+    Measured effect: the conditioned pass flagged **1.98%** of cues
+    across 13 weeks; the first hardened week flagged **zero**. The cost
+    is slightly less cross-window consistency, which is a good trade
+    against inventing scripture.
+- **`public/handouts/week-NN-leader-handout.pdf`** — an **accessible**
+  (tagged) PDF for leaders: page 1 is the summary, and after it come the
+  **transcript pages** (owner-requested 2026-09-06) — that week's Leader
+  Video edited into readable prose, a timestamp beside each paragraph and
+  section headings to skim by. Roughly 2-5 pages of transcript per handout;
+  week 27 has no Leader Video, so it has no handout at all.
+  - The whole pipeline lives in the repo now, so a handout can actually be
+    corrected and regenerated: `data/leader-handout-summaries.json` (page 1)
+    and `data/leader-transcript-prose.json` (the edited transcript) are
+    hand-editable data; `scripts/render-leader-handouts.mjs` renders, and
+    `scripts/finalize-handout-pdf.py` stamps /Lang, the XMP+docinfo title
+    and DisplayDocTitle **and verifies** every file is tagged, titled and
+    language-marked. Both data files stay hand-edited build inputs and the
+    handout pipeline is unchanged, but the **edited prose is now served**,
+    per week, under `public/prep-transcripts/` — the owner asked for the
+    transcript on screen (2026-09-16), so Read Prep reads it out of the same
+    JSON rather than a leader having to open the PDF. The `.vtt` is still the
+    only copy of the *spoken* words that is published on its own.
+  - The prose is *edited for reading* (the owner's choice over verbatim):
+    spoken grammar repaired, filler and false starts removed, every point,
+    example and Scripture reference kept. Two rules exist because an error
+    that flickers past in a caption is permanent in print: an editor may
+    repair a misheard word only when context makes the intended one
+    unambiguous, and must **never** guess at a proper noun or a Scripture
+    reference (leave the oddity instead). Every week was then re-checked
+    against its own VTT by a second pass. When the leader captions were
+    redone at large-v3 (2026-09-06) the prose, the page-1 summaries and the
+    teaching-slide notes were re-checked against a word-level diff of old
+    vs new transcript, week by week: 48 prose edits and one summary key
+    point changed, no slide bullet needed to. Two lessons from that pass:
+    the newer decode is not automatically right (where its wording was
+    itself odd — "green until my shirt is black" — the old reading was
+    kept), and drafting agents drift toward restyling; only edits traceable
+    to a specific diff hunk were accepted.
+  - `scripts/validate-transcript-prose.py` gates it mechanically, because
+    proofreading cannot catch these: paragraphs must **tile the cue numbers**
+    1..lastCue with no gap (a dropped passage shows up as a gap), the edited
+    text must stay above half the spoken word count (below that it was
+    summarized, not edited), and **every book of the Bible named in the prose
+    must also appear in the transcript** — which is what catches an invented
+    or "tidied-up" citation. Run it before rendering.
+  - **`@page` carries the margins, not `body` padding.** Body padding only
+    insets the first page's top and the last page's bottom, so with the old
+    single-page CSS the new transcript pages ran to the paper's edge.
+- **The old one-page description, for context** — page 1 is still exactly
+  this: a summary of each Leader Video for leaders:
+  Big Idea, Key Points, Scripture, Discussion Questions, plus the
+  trademark/internal-use footer. Generated from semantic HTML via
+  Chromium `page.pdf({ tagged: true })` (real structure tags), then a
+  pikepdf pass sets `/Lang`, XMP+docinfo title, and
+  `DisplayDocTitle` — verify any regenerated file is still 1 page,
+  tagged, titled, and language-marked before committing. Content is
+  written from the transcript, not invented — scripture references only
+  where the video actually cites them.
+- **`public/leader-prep.json` — the same page-1 summary as *text*** (the
+  "Read Prep" overlay, `#prep-view`). A PDF in an iframe is right on the TV
+  and wrong on a phone, which is where a leader actually preps; this renders
+  Big Idea / Key Points / Scripture / Discussion Questions as real DOM, so it
+  reflows on any screen and — being one ~58KB same-origin file, loaded
+  cache-first out of `journey-assets-v1` and warmed at startup like
+  `lessons.json` and `teaching-slides.json` — it opens with the network dead,
+  which the streamed PDF cannot do for a non-current week.
+  `scripts/build-leader-prep.mjs` GENERATES it (`npm run build-leader-prep`);
+  `render-leader-handouts.mjs` calls the same writer, so the served copy
+  can't drift from the handouts. `data/leader-handout-summaries.json` remains
+  the single hand-edited source and stays a build input — only the summaries
+  travel, because those are this church's own writing about each video. Week
+  27 has no Leader Video, so it has no entry, and the overlay says exactly
+  that rather than showing a blank panel. Nothing is ever added to this file:
+  it is warmed at startup for all 31 weeks, so it has to stay small.
+- **The transcript inside Read Prep** (owner-requested 2026-09-16). Under the
+  summary, collapsed behind one "Read the full transcript" button, every prep
+  carries that video's whole transcript in two versions: **Edited** (the same
+  prose the handout prints) and **Exact words** (the verbatim cue text).
+  Per-device preference `journey.prep.transcriptMode`, read with the same
+  try/catch shape as the caption prefs. Both versions live in the one file, so
+  switching repaints from memory and fetches nothing.
+  - `scripts/build-prep-transcripts.mjs` (`npm run build-prep-transcripts`)
+    writes `public/prep-transcripts/week-NN-<role>.json` for BOTH roles from
+    `data/<role>-transcript-prose.json` and that week's VTT.
+    `build-leader-prep.mjs` chains it, so `render-leader-handouts.mjs` keeps
+    all the served copies in step for free. It is gated by
+    `validate-transcript-prose.py`, which grew `--role`/`--prose` for the
+    student side: a role whose prose fails is NOT written, because a gap in
+    the paragraph tiling means a dropped passage and half a transcript in
+    front of a leader is worse than none. A role whose prose file does not
+    exist is skipped quietly.
+  - **Per-week files**, not one big one, for the same reason leader-prep.json
+    carries only summaries: a transcript is tens of KB and is fetched only
+    when a leader actually expands one. The current week's two files ride
+    `cacheLessonBundle()`, so tonight's lesson reads with the network dead;
+    any other week is fetched cache-first through `fetchWithTimeout` (5s) and
+    stored in `journey-assets-v1` only after it parses. A failure is never
+    memoized, or one bad evening would cost a 24/7 kiosk that transcript
+    until a reload.
+  - **`data/student-transcript-prose.json`** is the Student Video's half, the
+    same schema and 32 weeks (owner-requested 2026-09-16, same licensing
+    character as the leader prose: this church's own editing of a video it is
+    licensed to show, for its own leaders, never linked elsewhere).
+  - Each paragraph keeps the printed handout's **timestamp as a real button**
+    in a hanging margin (above the paragraph below 600px). Pressing one
+    closes the overlay and starts that role's video there, through the same
+    `playLeaderPreview()` / `playStudentPreview()` the picker uses. The seek
+    is armed as `pendingSeek` only AFTER `startPreview()` has bumped
+    `journeyRequestToken`, so the one permanent `loadedmetadata` listener
+    applies it and a superseded request can never seek a newer video.
+    Acknowledge-first holds: the overlay closes and the loading overlay
+    appears before anything is fetched.
+- **Picker flow:** lesson → Student/Leader → Student: Watch Video / Read Prep,
+  Leader: Watch Video / View Handout / Read Prep. Both roles ask the second
+  question now; only the Leader side has a handout. A **Student Read Prep has
+  no summary at all** (the summaries are written from the Leader Video, so
+  showing them there would credit the wrong video): one line saying so, and
+  the transcript expanded already. The handout opens in a full-screen
+  iframe overlay (`#handout-view`, Chromium's built-in PDF viewer) so
+  the kiosk never leaves the page; closing it detaches the iframe
+  `src` (512MB-Pi memory hygiene). `#prep-view` is the same shape with our
+  own DOM (emptied on close for the same reason, and Escape closes it).
+  Both count as "a reading overlay is up" via `readerOverlayOpen()`, which
+  is what keeps the playback and Settings keyboard shortcuts inert while
+  either is covering the screen.
+
+### Teaching slides after the video (owner-requested 2026-09-06)
+
+Every Advocates lesson also ships a 5-slide **Teaching Slides** `.pptx`
+on the course page (title, core verse, misconception, illumination, and
+a blank **TEMPLATE** — a heading over three empty bullets — for the
+leader to fill in). The kiosk shows them after any lesson video ends,
+scheduled show or picker preview, before falling back to whatever the
+video's ending used to do.
+
+- **Owner-approved licensing extension (2026-09-06):** slides 1-4 of
+  every deck are rendered to 1280x960 JPEGs in `public/slides/week-NN/`
+  (~15MB for the whole course), plus each deck's template background as
+  `template.jpg`. Same character as the re-encoded videos: kiosk-only
+  copies, never linked or advertised elsewhere. The owner chose
+  "all 32 weeks in the site itself" over nightly-current-week or a
+  Release, so the current week's slides pre-download with the bundle and
+  the picker can show any week offline-capable.
+- `scripts/render-teaching-slides.py` is the reproducible pipeline
+  (LibreOffice Impress → PDF → pypdfium2 → JPEG; extracts the template's
+  largest referenced image as the background). It refuses a deck that
+  isn't exactly 5 slides — all 32 were on 2026-09-06. Weeks 3 and 4
+  really do have a doubled `.pptx.pptx` extension on Awana's side.
+  **It refuses to run without Carlito and Liberation Sans** (the
+  metric-compatible stand-ins for the decks' Calibri and Arial): the first
+  render was done without them, LibreOffice fell back to DejaVu Sans, and
+  on two dozen slides the wider face pushed the last line of body text off
+  the bottom of the picture (owner-reported 2026-09-16 from week 2's
+  misconception slide). All 32 decks were re-rendered with the right fonts
+  that day; the template backgrounds were unaffected. If a slide ever looks
+  cut off again, check `fc-match Calibri` before suspecting the deck.
+- `public/teaching-slides.json` — `{ version, sourceUrl, headings,
+  weeks: { "N": { title, deckUrl, slides, notes } } }`. `notes` is the
+  generated fill for the TEMPLATE slide, three kinds × three bullets:
+  `questions` ("Talk About It" — discussion questions addressed to the
+  students), `takeaways` ("Remember This"), `challenges` ("This Week").
+  Written from each week's **Leader Video transcript** (week 27, which
+  has no Leader Video, from the Student transcript), every bullet grounded
+  in what the video says, ≤80 characters, then adversarially re-checked
+  against the transcript by a second pass. Hand-edit the JSON to correct
+  wording; the kiosk renders these as HTML text over `template.jpg`
+  (`#slide-template` in style.css mirrors the deck: centered heading,
+  three left-aligned bullets, white on the texture) so they stay crisp
+  and editable — the only slide we *fill in*, never an image we copy.
+- **A leader can rewrite tonight's three bullets on the kiosk itself**
+  (Settings → "Edit tonight's bullets"): nine textareas, prefilled from
+  `teaching-slides.json`, stored per device under
+  `journey.slides.notesOverride` as `{ "<week>": { questions|takeaways|
+  challenges: […] } }` and preferred by `slideNotesFor()`, which
+  `buildSlideItems()` now reads instead of `notes` directly. Rules that
+  matter: `public/teaching-slides.json` is never written — it stays the
+  canonical hand-edited source, and only the kinds that actually **differ**
+  from it are stored, so a later JSON correction still reaches every kind the
+  leader left alone. Clearing all three lines of a kind falls back to the
+  written bullets (the tick boxes are how you drop a slide). Bullets are
+  capped at 80 characters and 3 per kind, on the way in *and* on the way out
+  of storage. Only the currently-resolved week is editable, and the editor
+  names it, because "tonight's" has to be unambiguous about what Reset
+  undoes. Nothing marks an override **on the slide** (the wall must look the
+  same either way), so Settings carries an "Edited on this device" badge
+  — visible without opening the disclosure — plus a Reset; and a write
+  that *fails* (kiosk storage blocked) says so rather than claiming "Saved",
+  because the slideshow reads the override back out of storage, so an edit
+  that could not be stored did not take. The Space/→ "begin the lesson"
+  shortcut now also requires the Settings panel closed and no text field
+  focused: with real textareas on the page, a space between two words must
+  stay a space.
+- **The deck can also be reached WITHOUT the video** (owner request
+  2026-09-16), because some weeks the room has already watched the lesson or
+  there is no time for it, and the slides are the part the leader needs.
+  Two entry points, both landing on the same `startTeachingSlides()`:
+  - **On the 6:30 splash**: a quieter secondary button, "Skip to slides",
+    beside Begin Video / Resume / Start over (it never replaces them), and
+    **Shift+→** (`skipToTeachingSlides()`). Plain → still begins the video,
+    deliberately: a reflexive tap must never skip a lesson, which is the
+    same reason Space stays "pause" during playback. Gated exactly like
+    Begin Video (`isAwaitingPlay()` plus the Settings panel closed and no
+    text field focused), repeats ignored, nothing awaited before the stage
+    appears, and `journeyVideo.src` is never set at all. It runs in the
+    SCHEDULED (non-preview) mode, so Finish hands back to the Check-in
+    Display exactly as it does after a video, and it clears
+    `journey.resume` because the lesson is being called done, which is what
+    `finishTeachingSlides()` does at the other end of the same show.
+  - **In the picker**: a third first-level choice, "Teaching slides",
+    beside Student / Leader, enabled for every week including 27 (the deck
+    exists whether or not a Leader Video does). `startSlidesPreview()` runs
+    it in `previewMode` with `previewWeek` set, so the right deck shows,
+    Finish runs `endPreview()`, the poll and the hourly refresh stay out of
+    the way, and ⇄ tears it down through `stopJourneyContent()`.
+  The splash hint line now reads "Space / → begin · Shift+→ slides ·
+  S settings" and is still hidden on touch-only devices.
+- **Four ways in from a video, never just `ended`** (`endOfLessonHandoff()`):
+  the video's own `ended` event, the near-end stall watchdog, a manual → ,
+  and a fatal video error all funnel through one handoff. Hanging the slides off
+  `ended` alone stranded a leader mid-club on 2026-09-06: the lesson wedged
+  on its last chunk over church WiFi, `ended` never fired, and the room sat
+  on a frozen final frame under "Loading video…" with no way to reach the
+  slides. So: a stall that is still stuck after `LOADING_STALL_MS` **and**
+  within `END_STALL_TOLERANCE_S` of the end is treated as finished; **→**
+  hands over from a video that is playing, paused or wedged (Space stays
+  "pause", so a reflexive tap can't skip a lesson); and a video that errors
+  outright shows the slides rather than the dead placeholder. Test the
+  triggers, not just `startTeachingSlides()` — the original suite called
+  that function directly, which is exactly why this shipped broken.
+- **Playback** (`startTeachingSlides()` in schedule.js): the video is
+  released (same memory hygiene as `stopJourneyContent()`), the deck's
+  slides show in a 4:3 stage (pillarboxed on the TV), then whichever
+  generated slides Settings has ticked. Leader-driven: Space / → / Enter
+  next, ← back, tap the slide (left third = back), or the Prev/Next bar
+  (fades with the idle cursor like the video bar). "Finish" on the last
+  slide runs the old end-of-video behavior (Check-in Display for the
+  scheduled show, `endPreview()` for a preview). `stopJourneyContent()`
+  tears it down, so the ⇄ button and the 7:15 boundary work unchanged;
+  `showJourneyContent()` treats a running slideshow like a playing video
+  (no splash over it). A preview remembers its week (`previewWeek`) so a
+  Leader/Student preview shows *that* lesson's slides.
+- **Settings → "After the video: teaching slides"**: auto-advance
+  interval (off = manual, 15s–2min; any manual step resets the timer) and
+  three checkboxes for which generated slides to append. Persisted per
+  device in localStorage (`journey.slides.autoAdvanceSec`,
+  `journey.slides.extras`), like the caption choice. The splash hint now
+  reads "Space / → · S for settings" — **S** opens Settings from anywhere
+  (not while typing in a field), Escape closes it.
+- The current week's slide images + template are part of the prefetched
+  bundle (`cacheLessonBundle()`), and `teaching-slides.json` is
+  cache-first in `journey-assets-v1` like `lessons.json`, so the whole
+  post-video show works with the network dead. A slide image that fails
+  to load skips ahead (bounded) rather than sitting on black.
+
+### Manual video preview (Settings panel)
+
+A third corner button (`#settings-btn`, top-right, same subtle style as
+the other two; stacked above the toggle while the Check-in Display shows,
+see "The corner-button contract" under "Embedding note") opens a panel
+listing every lesson in `lessons.json`, so an operator can play any week on
+demand — for testing, previewing an
+upcoming lesson, or catching up after a missed night.
+
+- **Always a one-off.** Picking a lesson plays it immediately and never
+  writes to `current-lesson.json` or touches `currentLesson` — the
+  6:30 auto-schedule is completely unaffected by what was manually
+  previewed, by design (confirmed: crossing the 6:30/7:15 boundary
+  mid-preview doesn't interrupt it, and ending a preview afterward
+  correctly resumes the real auto-resolved lesson, not the previewed
+  one).
+- **Plays the pre-transcoded 480p Release asset** on the low profile
+  (`transcodedPreviewUrl()` in `schedule.js` →
+  `releases/download/transcoded-videos-v1/week-NN-{student,leader}.mp4`),
+  falling back to the original URL once if that asset errors. On the full
+  profile it is the other way round: the original, with the Release copy
+  as the one-shot fallback (`previewSources()`). An
+  earlier version played the originals directly as an "accepted
+  trade-off" — but the Pi Zero can't decode 1080p at a watchable frame
+  rate at all, so every non-current week was effectively unplayable
+  (reported broken from the live kiosk; the owner then approved the
+  batch-transcode extension above). Still bypasses the Cache API — an
+  occasional manual action doesn't need the nightly lesson's
+  pre-caching machinery, it just needs a decodable file.
+- **Picking a lesson always asks Leader or Student Video first.** An
+  earlier version skipped the question inside the 6:30-7:15 window
+  (playing the Student Video directly, like the scheduled show) as a
+  deliberate distinction — but in practice the two behaviors read as
+  the picker being flaky, not as a rule ("it's not asking me
+  consistently" — reported from the live kiosk 2026-08-22), so the
+  choice is now unconditional. Lessons with no Leader Video
+  (`leaderDownloadUrl: null` — currently only week 27) disable that
+  choice rather than offering a dead link.
+- **`previewMode`** (in `schedule.js`) is the flag that makes this
+  safe: the 15s scheduler poll and the hourly lesson refresh both
+  no-op while it's set, so neither can interrupt an active preview or
+  silently swap its video out from under it. It's cleared, and control
+  handed back to `setView(scheduledPhase())`, when the preview's video
+  ends/errors or the operator taps the view-toggle button (deliberately
+  reused rather than adding a fourth button) — never anything else.
+
+### Room settings sync (`public/src/sync.js`, owner-requested 2026-10-01)
+
+The Awana screens share one always-on sync service (the Awana Check-in
+Display repo's `worker/`; its `CLAUDE.md` "The sync service" and
+`worker/README.md`). Settings → **Sync** signs this kiosk in with the church
+passphrase, and then the ROOM settings follow every Journey screen: captions
+on/off (`journey.captions`, applied at the next video), caption size and
+backdrop, the teaching slides' auto-advance and extras, and tonight's edited
+bullets (`journey.slides.notesOverride`). **Video quality and the prep
+transcript choice never travel** (they belong to the device and the leader);
+the service's allowlist (`sanitizeJourney` in that repo's
+`src/lib/syncSpecs.js`) drops anything else.
+
+- Its own classic script, loaded after `schedule.js`, which it only touches
+  through `applyCaptionDisplayPrefs()` / `syncSlidesPrefInputs()` on `window`.
+  Stamped like the rest (`STAMPED_ASSETS`).
+- The sign-in uses the lobby signage's own slots (`awanaSyncSession.v1`,
+  `awanaDisplayKey.v1`, and `awanaConfig.v1`'s Pusher key if it has none):
+  this page and the embedded Check-in Display share an origin, so one sign-in
+  sets both up, and the iframe is reloaded once to pick it up.
+- Pi-light: one fetch at start, one every ten minutes and on `online`, and one
+  PUT a second after a change in the Settings card or a CC press (only when
+  the room's values actually differ). A 401 means the passphrase was changed:
+  the session is dropped and the panel says so.
+- Hidden, and silent, until the display site's `shared/sync.json` names a
+  service. `test/sync.test.mjs` boots the real page with a stand-in service.
+
+## Embedding note
+
+The Awana Check-in Display (`https://patrick-simpson.github.io/Awana-Check-in-Display/`)
+has no `X-Frame-Options`/CSP restriction, so it embeds fine in
+`#checkin-view`'s iframe. If that ever changes, this page would need a
+different integration approach (e.g. redirecting instead of embedding).
+
+`?lowPower=1` scopes reduced animations to *this* embed (that sibling
+app's own signage runs on far more powerful devices too, so its
+confetti/motion defaults stay full-strength). It is no longer a fixed
+part of the URL: `index.html` ships the low-power URL as the static
+`src`, so a browser with JavaScript off still shows something, and
+`applyCheckinDisplayUrl()` rewrites it at startup from
+`effectiveProfile()` (see "Device profile") to the same URL with or
+without the flag. The Pi still gets it; a Mac does not. The rewrite only
+happens when the URL actually differs, because re-assigning `src` reloads
+the iframe and drops the display's live check-in socket for nothing. See
+that repo's `src/lib/urlFlags.js` and `CLAUDE.md` before changing this.
+
+**The fullscreen message contract.** A double-click inside the iframe is
+cross-origin and never reaches this document, so the display posts
+`{ type: 'awana-display:toggle-fullscreen' }` to `window.parent` when it
+is embedded, instead of fullscreening its own stage. This page toggles
+fullscreen on `document.documentElement` (never on the iframe or the
+`<video>`: fullscreening either would take the ⇄ and ⚙ buttons off the
+screen with it), and accepts the message only when `event.source` is its
+own iframe's `contentWindow` **and** `event.origin` is the display's
+origin or this page's own. A double-click on `#journey-view` does the
+same thing locally, inert over a control, a text field, the settings
+panel or a reading overlay.
+
+**The corner-button contract.** The ⇄ toggle and the ⚙ gear float over the
+Check-in Display's iframe all through the check-in phase, and a frame can
+never paint over its parent: live on 2026-09-29 the toggle covered the last
+digit of the lobby's RIGHT NOW clock at 720p and the gear the end of its
+OVERCAST chip at 1080p. The two sides now agree on one place for the
+buttons. While the display shows, the gear stacks 8px above the toggle
+(`#checkin-view:not(.hidden) ~ #settings-btn` in `style.css`, no script),
+so both sit in ONE 48px column in the bottom-right corner, `max(3vw, 24px)`
+in from the right edge, the toggle `max(3vh, 24px)` up from the bottom. The
+display, finding itself framed (`window.self !== window.top`), keeps its
+corner chip, its tonight ticker, a long child's name and its own operator
+panels (Settings, the slide editor, the debug panel, the first-run card) out
+of that column (its `src/lib/embed.js` and the `html.embedded` rules in its
+`app.css`): a click in the column always lands on these buttons, so before
+the display's panels kept out, a click on the right end of its Settings SAVE
+at 640x480 opened this page's settings panel instead. README.md's "Previewing
+Any Lesson" tells the operator where the gear is in each view.
+The display's top-right is its own: its status sticker and weather chip are
+measured to the pixel there against the headline under them and the notice
+band beside them, so they have nowhere to go (moved down under a button, a
+tall sticker ran into the headline on the Pi; moved left, the widest weather
+chip ran into the band). So the gear leaves it, and only while the display
+shows: over the lesson, the splash and the slides it keeps the top-right. Both buttons stay in the page's tab order (toggle, then gear)
+and keep their size and chip style.
+`test/corner-buttons.test.mjs` pins the column and the top-right, and that
+the frame fills the viewport from 0,0 (so the display's 1vw is ours), in
+Chromium at 592x432, 640x480, 720p and 1080p. Nothing crosses the wire and
+the iframe URL is unchanged. If the buttons ever move, grow or get a sibling
+over the frame, change the display's `HOST_CONTROL` (`src/lib/embed.js`), its
+`html.embedded` rules and its `e2e/embedHost.js` in step, and land the
+display first: until it knows, a button in a new place sits on its chips.
