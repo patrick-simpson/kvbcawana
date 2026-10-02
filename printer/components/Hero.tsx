@@ -45,11 +45,13 @@ export const Hero: React.FC = () => (
       <figure className="fam-frame fam-frame--label">
         <div className="fam-frame__stage">
           <LabelOnLiner spec={HERO_LABEL}
-            label="Recreation of a 4 by 2 inch check-in label: a round S monogram for Sparks in a grey panel on the left; a small leaf at the top; the first name Micah in large bold type with Sparks beneath it; and along the bottom right, a star (this week’s collectible icon), a birthday cake with the words Turning 7, a peanut for a nut allergy, and a crossed-out camera meaning no photos." />
+            label="Recreation of a 4 by 2 inch check-in label: a round S monogram for Sparks in a grey panel on the left; a small leaf at the top; the first name Micah in large bold type with Sparks beneath it; and along the bottom right, a star (this week’s collectible icon), a birthday cake with the words Turning 7, a peanut for a nut allergy, and a crossed-out camera meaning no photos, with a solid black bar down the label's right edge, also meaning no photos." />
         </div>
         <Caption fig="Fig. 1" names>
           The 4×2 label, as the printer draws it: a first name you can read across a room, and the
-          allergy, birthday and photo wishes in the corner where every leader knows to look. The
+          allergy, birthday and photo wishes in the corner where every leader knows to look. A child
+          who may not be photographed also gets a black bar down the right edge, for whoever holds the
+          camera. The
           printed label also carries the last name, left off here. The club appears here as the
           printer’s monogram badge; on the printed label it may carry the club’s own artwork.
         </Caption>

@@ -1,4 +1,13 @@
-﻿## [6.22.0] - 2026-10-01
+﻿## [6.23.0] - 2026-10-02
+A child who may not be photographed now gets a solid bar down the label's right edge, as well as the crossed-out camera.
+
+**Why.** The camera is one small icon in a row of them; whoever is taking pictures should be able to tell from across the room, or through a viewfinder, without reading the row.
+
+**What prints.** A bar 1/4 inch wide, top to bottom, flush with the paper's right edge, on exactly the labels that carry the crossed-out camera (the same `noPhoto` flag: reprints and the director's list agree with it). It is black on a white label and white on a black one (stepping up, or an inverted first-timer label), where black would vanish. Everything else on the label (the name, the visitor pill, the icon row) keeps 4 pt clear of it, so it all moves 16 pt in. On a no-photo birthday label with two or more allergies, that leaves no room for the "Turning 7!" words; the cake, the allergy icons and the camera all stay, as they always do when the row is full.
+
+**For maintainers.** `NO_PHOTO_BAR_W` / `NO_PHOTO_CUT` in `server.js`, and a local badge width `bw` inside `generateLabel()` for everything drawn on the badge. `test-label-golden.cjs` checks the bar on white, crowded, step-up and inverted labels (solid, edge to edge, 4 pt clear before it) and that a label without the flag has none; the three baselines with a no-photo child are regenerated. The site's label recreation draws the bar too.
+
+## [6.22.0] - 2026-10-01
 The move to awana.kvbchurch.org: updates now come from the church's own site, and every live frame also goes to the sync service's own channel while this computer is signed in.
 
 **Updates.** electron-updater reads https://awana.kvbchurch.org/updates/printer/latest.yml (the generic provider) instead of this repo's GitHub releases, because the printer now lives in the kvbc-awana repo beside the lobby's own Windows app, and two apps cannot share one repo's "Latest" release. The installer itself is still a GitHub release asset. This release is the bridge: the last one from Print-TwoTimTwo-Labels.

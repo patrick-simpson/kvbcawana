@@ -1026,13 +1026,17 @@ async function main() {
     const BADGE_TOP_PX = Math.round(6 * S);                       // INSET
     const X0 = Math.round((6 + 84 + 8) * S);                       // TEXT_X
     const X1 = Math.round((6 + 276) * S);                          // right edge of the badge
-    const inkBands = async (buf) => {
+    // A no-photo label's content stops 16 pt short of the badge's edge, where
+    // its edge bar begins 4 pt further on (NO_PHOTO_CUT); the bar is not ink
+    // of the name, so a scan of such a label stops where its content does.
+    const X1_NO_PHOTO = Math.round((6 + 276 - 16) * S);
+    const inkBands = async (buf, x1 = X1) => {
       const px = await pixels(buf);
       const bands = [];
       let open = -1;
       for (let y = 0; y < px.h; y++) {
         let ink = false;
-        for (let x = X0; x < X1 && !ink; x++) {
+        for (let x = X0; x < x1 && !ink; x++) {
           const i = (y * px.w + x) * 4;
           if (0.2126 * px.data[i] + 0.7152 * px.data[i + 1] + 0.0722 * px.data[i + 2] < 128) ink = true;
         }
@@ -1066,10 +1070,58 @@ async function main() {
     const PAPER_EDGE_PX = Math.round((4 - 0.5) * S);
     for (const name of ['Ấn', 'Ẳ', 'Émile', 'Ângelo', 'Ömer', 'Ñandú']) {
       const crowded = CASES.find((c) => c.name === 'name-tall-accent-crowded').model;
-      const bands = await inkBands(await render({ ...crowded, firstName: name }));
+      const bands = await inkBands(await render({ ...crowded, firstName: name }), crowded.noPhoto ? X1_NO_PHOTO : X1);
       check(`"${name}" on a crowded label: the first name's ink stays 3.5 pt or more off the paper's top edge`,
         bands.length > 0 && bands[0][0] >= PAPER_EDGE_PX, `${JSON.stringify(bands[0])} vs ${PAPER_EDGE_PX}`);
     }
+  }
+
+  // ── The no-photo edge bar ─────────────────────────────────────────────────
+  // A child who may not be photographed carries a solid 1/4 inch bar down the
+  // label's right edge as well as the crossed-out camera (owner, 2026-10-02):
+  // black on a white label, white on an inverted one, top to bottom and flush
+  // with the paper's edge, and nothing else printed within 4 pt of it. Measured
+  // on the image, so it holds whatever the fonts.
+  {
+    const S = 300 / 72;
+    const BAR_X = Math.round((288 - 18) * S);       // 1125 px: the bar's inner edge
+    const CLEAR_X = Math.round((288 - 18 - 4) * S); // 1108 px: content stops here
+    const lum = (px, x, y) => {
+      const i = (y * px.w + x) * 4;
+      return 0.2126 * px.data[i] + 0.7152 * px.data[i + 1] + 0.0722 * px.data[i + 2];
+    };
+    // Every pixel of the bar is `dark`; none of the 4 pt gap before it is.
+    const barHolds = (px, dark) => {
+      for (let y = 0; y < px.h; y++) {
+        for (let x = BAR_X; x < px.w; x++) if ((lum(px, x, y) < 128) !== dark) return `bar pixel ${x},${y}`;
+        for (let x = CLEAR_X; x < BAR_X; x++) if ((lum(px, x, y) < 128) === dark) return `gap pixel ${x},${y}`;
+      }
+      return '';
+    };
+    const busy = { firstName: 'Maximiliana', lastName: 'Wolfeschlegel', clubName: 'T&T', handbookGroup: 'Group 4',
+      isBirthday: true, birthdayAge: 9, allergyTokens: ['peanut', 'dairy'], isVisitor: true, awanaShares: 12,
+      footerText: 'Kennebec Valley Baptist Church' };
+    for (const [label, model, dark] of [
+      ['a white label', { firstName: 'Testkid', lastName: 'Sample', clubName: 'Sparks' }, true],
+      ['a crowded label (visitor pill, icon row, footer)', busy, true],
+      ['a step-up label (white on black)', { firstName: 'Testkid', lastName: 'Sample', clubName: 'Sparks', stepUp: true, stepUpNextClub: 'T&T' }, false],
+      ['an inverted first-timer label', { firstName: 'Newkid', lastName: 'Sample', clubName: 'Cubbies', extras: { inverted: true } }, false],
+    ]) {
+      const px = await pixels(await render({ ...model, noPhoto: true }));
+      const bad = barHolds(px, dark);
+      check(`no-photo edge bar on ${label}: solid ${dark ? 'black' : 'white'}, edge to edge, with 4 pt clear before it`, !bad, bad);
+    }
+    // ...and a child who MAY be photographed has no bar: past the badge's own
+    // right edge (282 pt), where nothing else ever prints, the paper is the
+    // label's background. (Inside it, a long name may use the room the bar
+    // would take.)
+    const BADGE_EDGE_X = Math.round((6 + 276) * S);
+    const plain = await pixels(await render({ firstName: 'Testkid', lastName: 'Sample', clubName: 'Sparks' }));
+    let inked = '';
+    for (let y = 0; y < plain.h && !inked; y++) {
+      for (let x = BADGE_EDGE_X; x < plain.w; x++) if (lum(plain, x, y) < 128) { inked = `${x},${y}`; break; }
+    }
+    check('a label without the no-photo flag has no edge bar', !inked, inked);
   }
 
   // ── Capitals sit on the centre: the custom label and the monogram badge ───
@@ -1443,9 +1495,11 @@ async function main() {
       withAge >= Math.min(without, Math.round(90 * (300 / 72))),
       `leftmost ink ${withAge} with the age vs ${without} without it`);
 
-    // Two allergies + a camera leaves room for the short form but not the
-    // long one, so the ladder's middle rung is exercised rather than assumed.
-    const mid = { ...base, allergyTokens: ['NUTS', 'DAIRY'], noPhoto: true };
+    // One allergy + a camera leaves room for the short form but not the long
+    // one, so the ladder's middle rung is exercised rather than assumed. (Two
+    // allergies did until the no-photo edge bar took 16 pt of the row; on a
+    // no-photo label they now drop the words, and the icons all stay.)
+    const mid = { ...base, allergyTokens: ['NUTS'], noPhoto: true };
     const midPlain = await render(mid);
     const midAge = await render({ ...mid, birthdayAge: 7 });
     check('a moderately crowded row still says something about the age',

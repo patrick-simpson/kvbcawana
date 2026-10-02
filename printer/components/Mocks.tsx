@@ -11,7 +11,9 @@ import { Icon, IconName } from './family/Icons';
    zone above a reserved bottom band, a ~12pt seasonal motif top-centre, the
    icon row right-anchored on the bottom padding line (collectible, coin,
    flame, sparkle, cake + age words, allergies, no-photo camera — in that
-   order), the bottom-left stack (trophy band, "Go to", milestone, footer) at
+   order), a no-photo child's 18pt edge bar down the right edge (whenever the
+   camera is on the row; the content stops 16pt short of the badge's edge),
+   the bottom-left stack (trophy band, "Go to", milestone, footer) at
    10pt on 13pt steps, and the -10° TEST band. Page CSS converts points to cqi
    (1pt = 100/288 cqi) so every mock keeps the real proportions at any width.
    ─────────────────────────────────────────────────────────────────────────── */
@@ -49,9 +51,12 @@ export const LabelArt: React.FC<{ spec: LabelSpec }> = ({ spec }) => {
   // 7pt + 13pt per bottom-left line, whichever is taller.
   const bandPt = Math.max(glyphs.length ? 20 : 0, lines.length ? 7 + lines.length * 13 : 0);
   const hasPanel = !!spec.mono;
+  // generateLabel draws the edge bar for exactly the children it draws the
+  // crossed-out camera for, so the mock follows the glyph.
+  const noPhoto = glyphs.some(g => g.k === 'icon' && g.icon === 'nocam');
   const style = { ['--lbl-band' as string]: `${(bandPt * 100) / 288}cqi` } as React.CSSProperties;
   return (
-    <div className={`lbl-label${spec.inverted ? ' lbl-label--inverted' : ''}${hasPanel ? '' : ' lbl-label--nopanel'}`} style={style}>
+    <div className={`lbl-label${spec.inverted ? ' lbl-label--inverted' : ''}${hasPanel ? '' : ' lbl-label--nopanel'}${noPhoto ? ' lbl-label--nophoto' : ''}`} style={style}>
       {hasPanel && (
         <div className="lbl-label__panel"><span className="lbl-label__mono" data-long={spec.mono && spec.mono.length > 1 ? '' : undefined}>{spec.mono}</span></div>
       )}
@@ -78,6 +83,7 @@ export const LabelArt: React.FC<{ spec: LabelSpec }> = ({ spec }) => {
           ))}
         </div>
       )}
+      {noPhoto && <div className="lbl-label__nophoto" />}
       {spec.test && <div className="lbl-label__test"><span>TEST — NOT A CHECK-IN</span></div>}
     </div>
   );

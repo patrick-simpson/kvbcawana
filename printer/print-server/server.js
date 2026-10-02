@@ -250,6 +250,18 @@ const DIVIDER_X   = BX + ICON_COL_W;
 const TEXT_X      = DIVIDER_X + 8;    // right text zone start
 const TEXT_W      = BX + BW - TEXT_X; // right text zone width
 
+// No-photo edge bar (owner, 2026-10-02): a child who may not be photographed
+// gets a solid bar down the label's right edge as well as the crossed-out
+// camera, so a photographer spots it at a glance, from across a room or in a
+// viewfinder, without reading the icon row. 1/4 inch, top to bottom, flush
+// with the paper's edge, in the label's ink (black, or white on an inverted
+// label, where black would vanish). Everything else on the label keeps
+// NO_PHOTO_BAR_GAP clear of it: the badge's content edge moves in by
+// NO_PHOTO_CUT.
+const NO_PHOTO_BAR_W   = 18;  // 1/4 inch
+const NO_PHOTO_BAR_GAP = 4;
+const NO_PHOTO_CUT     = (BX + BW) - (PAGE_W - NO_PHOTO_BAR_W - NO_PHOTO_BAR_GAP);  // 16 pt
+
 // The first name in the kit's shout face (Paytone One), as multiples of its
 // size. Where the ink lands is measured off the canvas at a 'top' baseline (the
 // line's origin is the top of the em box the canvas picks for it):
@@ -1921,8 +1933,13 @@ async function generateLabel(input) {
   const hasLogo     = !stepUp && !!clubImageBuffer && tplOn('showIconPanel');
   const hasEmblem   = !stepUp && !hasLogo && !!CLUB_MONOGRAM[clubKey(clubName)] && tplOn('showIconPanel');
   const hasIcon     = hasLogo || hasEmblem;
+  // A no-photo label's content stops short of its edge bar: `bw` is the
+  // badge's width for everything drawn on it (the outline and the icon
+  // panel's clip keep the full BW; the bar covers that end of them).
+  const barCut  = noPhoto ? NO_PHOTO_CUT : 0;
+  const bw      = BW - barCut;
   const textX   = hasIcon ? TEXT_X : BX + 10;
-  const textW   = hasIcon ? TEXT_W : BW - 20;
+  const textW   = hasIcon ? TEXT_W - barCut : bw - 20;
 
   // ── Badge border (no outline) ─────────────────────────────────────────────
   roundedRect(ctx, BX, BY, BW, BH, CORNER);
@@ -2097,7 +2114,7 @@ async function generateLabel(input) {
   // How much of the bottom band the right-anchored icon row may occupy before
   // it would run into the icon panel (or the badge's left padding when there
   // is none). 178pt with a panel present.
-  const ICON_ROW_MAX_W = (BX + BW - 6) - (hasIcon ? TEXT_X : BX + 8);
+  const ICON_ROW_MAX_W = (BX + bw - 6) - (hasIcon ? TEXT_X : BX + 8);
 
   // Twin-safe (#13): the middle initial rides the first-name line so the
   // width fit below accounts for it; the birth-month hint is its own small
@@ -2294,7 +2311,7 @@ async function generateLabel(input) {
     const vText = pillText;
     const vWidth = type.measure(ctx, 'pill', fs5, vText);
     const vPad = 4;
-    const vX = BX + BW - vPad - vWidth - 8;
+    const vX = BX + bw - vPad - vWidth - 8;
     const vY = BY + vPad;
     // Rounded pill background — invert on step-up so it stays readable
     ctx.fillStyle = COLOR.visitorBg;
@@ -2315,7 +2332,7 @@ async function generateLabel(input) {
   // below truncate against THIS, not a guessed fraction of the badge, so a wide
   // allergy row and a footer can share the band without colliding. Defaults to
   // the badge's right padding edge when there is no icon row at all.
-  let iconRowLeftX = BX + BW - 8;
+  let iconRowLeftX = BX + bw - 8;
   if (hasIconRowGlyphs) {
     const EMOJI_SIZE         = 16;
     const ALLERGY_EMOJI_SIZE = 22;
@@ -2401,7 +2418,7 @@ async function generateLabel(input) {
       }
     }
 
-    let ex = BX + BW - PAD - totalW;
+    let ex = BX + bw - PAD - totalW;
     iconRowLeftX = ex;
     const ey = BY + BH - PAD;  // shared baseline along the bottom padding line
     glyphs.forEach(function(g) {
@@ -2477,6 +2494,14 @@ async function generateLabel(input) {
     }
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
+  }
+
+  // ── No-photo edge bar ─────────────────────────────────────────────────────
+  // Drawn after the content (nothing reaches it; this is belt and braces) and
+  // before the TEST band, which must stay readable across the whole label.
+  if (noPhoto) {
+    ctx.fillStyle = COLOR.name;
+    ctx.fillRect(PAGE_W - NO_PHOTO_BAR_W, 0, NO_PHOTO_BAR_W, PAGE_H);
   }
 
   // ── TEST overlay (canary labels) ──────────────────────────────────────────

@@ -127,7 +127,8 @@ const Accuracy: React.FC = () => (
           safeguard="The dashboard’s consent summary shows the answers it found, never children’s names."
           hood={<><code>parseNoPhoto()</code> reads both the photo-release and the medical-release columns and flags any answer that starts with a negative word (“No”, “Declined”) or carries a negative phrase (“Not signed”, “No photos”). Blank, “N/A” and “pending” mean not answered, and never print the camera.</>}>
           If a family has said no to photos, in either consent column and in any of the ways a church
-          might write it, the crossed-out camera prints. If the column can’t be read, the dashboard says so.
+          might write it, the crossed-out camera prints, and a solid bar runs down the label’s right edge
+          so whoever holds the camera sees it at a glance. If the column can’t be read, the dashboard says so.
         </CapabilityCard>
         <CapabilityCard icon="id" title="Twin-safe labels"
           hood={<>Identity is anchored to TwoTimTwo’s own clubber id first, with the name as a fallback, through printing, duplicate checks and reprints. An ambiguous name is refused rather than guessed.</>}>
