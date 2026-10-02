@@ -164,13 +164,13 @@
   translate: -50% -50%; rotate: -10.31deg; background: var(--li); color: var(--lp);
   display: grid; place-items: center; font: 800 6.944cqi/1 var(--font-body); letter-spacing: .01em; white-space: nowrap;
 }
-/* the no-photo edge bar: 18pt, top to bottom, flush with the paper's right
-   edge, in the label's ink; everything else stops 16pt further in */
-.lbl-label__nophoto { position: absolute; top: 0; bottom: 0; right: 0; width: 6.25cqi; background: var(--li); }
-.lbl-label--nophoto .lbl-label__text { right: 7.639cqi; }
-.lbl-label--nophoto.lbl-label--nopanel .lbl-label__text { right: 11.111cqi; }
-.lbl-label--nophoto .lbl-label__pill { right: 10.417cqi; }
-.lbl-label--nophoto .lbl-label__row { right: 9.722cqi; }
+/* the no-photo edge bar: 9pt, top to bottom, flush with the paper's right
+   edge, in the label's ink; everything else stops 7pt further in */
+.lbl-label__nophoto { position: absolute; top: 0; bottom: 0; right: 0; width: 3.125cqi; background: var(--li); }
+.lbl-label--nophoto .lbl-label__text { right: 4.514cqi; }
+.lbl-label--nophoto.lbl-label--nopanel .lbl-label__text { right: 7.986cqi; }
+.lbl-label--nophoto .lbl-label__pill { right: 7.292cqi; }
+.lbl-label--nophoto .lbl-label__row { right: 6.597cqi; }
 .lbl-label--custom { display: grid; place-items: center; padding: 5.556cqi 6.25cqi; }
 .lbl-label__custom { font: 800 13.5cqi/1.15 var(--font-body); letter-spacing: -.01em; text-align: center; }
 

@@ -11,8 +11,8 @@ import { Icon, IconName } from './family/Icons';
    zone above a reserved bottom band, a ~12pt seasonal motif top-centre, the
    icon row right-anchored on the bottom padding line (collectible, coin,
    flame, sparkle, cake + age words, allergies, no-photo camera — in that
-   order), a no-photo child's 18pt edge bar down the right edge (whenever the
-   camera is on the row; the content stops 16pt short of the badge's edge),
+   order), a no-photo child's 9pt edge bar down the right edge (whenever the
+   camera is on the row; the content stops 7pt short of the badge's edge),
    the bottom-left stack (trophy band, "Go to", milestone, footer) at
    10pt on 13pt steps, and the -10° TEST band. Page CSS converts points to cqi
    (1pt = 100/288 cqi) so every mock keeps the real proportions at any width.

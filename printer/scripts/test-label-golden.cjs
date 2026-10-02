@@ -1026,10 +1026,10 @@ async function main() {
     const BADGE_TOP_PX = Math.round(6 * S);                       // INSET
     const X0 = Math.round((6 + 84 + 8) * S);                       // TEXT_X
     const X1 = Math.round((6 + 276) * S);                          // right edge of the badge
-    // A no-photo label's content stops 16 pt short of the badge's edge, where
+    // A no-photo label's content stops 7 pt short of the badge's edge, where
     // its edge bar begins 4 pt further on (NO_PHOTO_CUT); the bar is not ink
     // of the name, so a scan of such a label stops where its content does.
-    const X1_NO_PHOTO = Math.round((6 + 276 - 16) * S);
+    const X1_NO_PHOTO = Math.round((6 + 276 - 7) * S);
     const inkBands = async (buf, x1 = X1) => {
       const px = await pixels(buf);
       const bands = [];
@@ -1077,15 +1077,18 @@ async function main() {
   }
 
   // ── The no-photo edge bar ─────────────────────────────────────────────────
-  // A child who may not be photographed carries a solid 1/4 inch bar down the
+  // A child who may not be photographed carries a solid 1/8 inch bar down the
   // label's right edge as well as the crossed-out camera (owner, 2026-10-02):
   // black on a white label, white on an inverted one, top to bottom and flush
   // with the paper's edge, and nothing else printed within 4 pt of it. Measured
   // on the image, so it holds whatever the fonts.
   {
     const S = 300 / 72;
-    const BAR_X = Math.round((288 - 18) * S);       // 1125 px: the bar's inner edge
-    const CLEAR_X = Math.round((288 - 18 - 4) * S); // 1108 px: content stops here
+    // 279 pt is 1162.5 px, so the pixel the edge falls in is part-covered and
+    // belongs to neither side.
+    const BAR_X = Math.ceil((288 - 9) * S);         // 1163 px: the bar's first whole pixel
+    const GAP_END = Math.floor((288 - 9) * S);      // 1162 px: the part-covered one
+    const CLEAR_X = Math.round((288 - 9 - 4) * S);  // 1146 px: content stops here
     const lum = (px, x, y) => {
       const i = (y * px.w + x) * 4;
       return 0.2126 * px.data[i] + 0.7152 * px.data[i + 1] + 0.0722 * px.data[i + 2];
@@ -1094,7 +1097,7 @@ async function main() {
     const barHolds = (px, dark) => {
       for (let y = 0; y < px.h; y++) {
         for (let x = BAR_X; x < px.w; x++) if ((lum(px, x, y) < 128) !== dark) return `bar pixel ${x},${y}`;
-        for (let x = CLEAR_X; x < BAR_X; x++) if ((lum(px, x, y) < 128) === dark) return `gap pixel ${x},${y}`;
+        for (let x = CLEAR_X; x < GAP_END; x++) if ((lum(px, x, y) < 128) === dark) return `gap pixel ${x},${y}`;
       }
       return '';
     };
@@ -1497,7 +1500,7 @@ async function main() {
 
     // One allergy + a camera leaves room for the short form but not the long
     // one, so the ladder's middle rung is exercised rather than assumed. (Two
-    // allergies did until the no-photo edge bar took 16 pt of the row; on a
+    // allergies did until the no-photo edge bar took 7 pt of the row; on a
     // no-photo label they now drop the words, and the icons all stay.)
     const mid = { ...base, allergyTokens: ['NUTS'], noPhoto: true };
     const midPlain = await render(mid);

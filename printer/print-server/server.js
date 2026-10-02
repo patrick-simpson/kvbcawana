@@ -253,14 +253,14 @@ const TEXT_W      = BX + BW - TEXT_X; // right text zone width
 // No-photo edge bar (owner, 2026-10-02): a child who may not be photographed
 // gets a solid bar down the label's right edge as well as the crossed-out
 // camera, so a photographer spots it at a glance, from across a room or in a
-// viewfinder, without reading the icon row. 1/4 inch, top to bottom, flush
+// viewfinder, without reading the icon row. 1/8 inch, top to bottom, flush
 // with the paper's edge, in the label's ink (black, or white on an inverted
 // label, where black would vanish). Everything else on the label keeps
 // NO_PHOTO_BAR_GAP clear of it: the badge's content edge moves in by
 // NO_PHOTO_CUT.
-const NO_PHOTO_BAR_W   = 18;  // 1/4 inch
+const NO_PHOTO_BAR_W   = 9;   // 1/8 inch
 const NO_PHOTO_BAR_GAP = 4;
-const NO_PHOTO_CUT     = (BX + BW) - (PAGE_W - NO_PHOTO_BAR_W - NO_PHOTO_BAR_GAP);  // 16 pt
+const NO_PHOTO_CUT     = (BX + BW) - (PAGE_W - NO_PHOTO_BAR_W - NO_PHOTO_BAR_GAP);  // 7 pt
 
 // The first name in the kit's shout face (Paytone One), as multiples of its
 // size. Where the ink lands is measured off the canvas at a 'top' baseline (the
