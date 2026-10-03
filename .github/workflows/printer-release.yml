@@ -189,6 +189,11 @@ jobs:
         shell: pwsh
         run: |
           $exe = Get-ChildItem installer -Filter *.exe | Select-Object -First 1
+          # Which machine this is: the start-up crash below has been seen on
+          # some runners and not others with the same image, so the processor
+          # is the next suspect. Logged, not acted on.
+          Get-CimInstance Win32_Processor | Select-Object Name, NumberOfLogicalProcessors | Format-List | Out-String | Write-Host
+          Write-Host "Installer: $($exe.Name) $($exe.Length) bytes, SHA256 $((Get-FileHash $exe.FullName).Hash)"
           $proc = Start-Process -FilePath $exe.FullName -ArgumentList '/S' -PassThru -Wait
           Write-Host "Installer process exit code: $($proc.ExitCode)"
           # 0xC0000005 (access violation) within seconds of starting, before a
