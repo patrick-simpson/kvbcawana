@@ -40,8 +40,11 @@ import { join } from 'node:path';
 import { spawn } from 'node:child_process';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
+import { encodeForPi } from './pi-encode.mjs';
 
-const RELEASE_TAG = 'transcoded-videos-v1';
+// v2 (2026-10-03): every file under 25 MiB, for awana.kvbchurch.org/journey/videos/
+// (site/build.mjs copies this release there on every deploy).
+const RELEASE_TAG = 'journey-videos-v2';
 const LESSONS_PATH = 'public/lessons.json';
 
 function run(cmd, args, { capture = false } = {}) {
@@ -84,6 +87,7 @@ try {
   await run('gh', [
     'release', 'create', RELEASE_TAG,
     '--title', 'Transcoded lesson videos (kiosk playback)',
+    '--latest=false',
     '--notes', 'Pi-Zero-playable 480p re-encodes of the Journey: Advocates lesson videos, used only by this kiosk’s manual video-picker. See CLAUDE.md for the licensing boundary.',
   ]);
 }
@@ -118,25 +122,10 @@ for (const job of jobs) {
     console.log(`↓ ${name} — downloading ${job.url}`);
     await downloadTo(job.url, rawPath);
     console.log(`⚙ ${name} — transcoding (${Math.round(statSync(rawPath).size / 1e6)}MB original)…`);
-    // Settings identical to transcode-lesson-video.mjs — verified against a
-    // real lesson file (94MB 1080p -> ~17MB 480p, clean at TV distance).
-    await run('ffmpeg', [
-      '-y', '-hide_banner', '-loglevel', 'error',
-      '-i', rawPath,
-      '-vf', 'scale=854:480',
-      '-c:v', 'libx264',
-      '-profile:v', 'baseline',
-      '-level', '3.1',
-      '-preset', 'veryfast',
-      '-crf', '26',
-      '-maxrate', '700k',
-      '-bufsize', '1400k',
-      '-c:a', 'aac',
-      '-b:a', '96k',
-      '-ac', '2',
-      '-movflags', '+faststart',
-      outPath,
-    ]);
+    // The same encode as this week's lesson (pi-encode.mjs), under the
+    // site's 25 MiB file limit.
+    const { refit } = await encodeForPi(rawPath, outPath);
+    if (refit) console.log(`  ${name} refit to fit the size cap`);
     console.log(`↑ ${name} — uploading (${Math.round(statSync(outPath).size / 1e6)}MB)…`);
     await run('gh', ['release', 'upload', RELEASE_TAG, outPath, '--clobber']);
     done += 1;

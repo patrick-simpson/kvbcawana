@@ -53,7 +53,8 @@
 import { readFileSync, writeFileSync, existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { spawn } from 'node:child_process';
+import { statSync } from 'node:fs';
+import { encodeForPi, PI_VIDEO_MAX_BYTES } from './pi-encode.mjs';
 
 const DEFAULT_LESSON = 'public/current-lesson.json';
 const DEFAULT_OUT = 'public/current-lesson-video.mp4';
@@ -62,21 +63,6 @@ const OUT_FILENAME = 'current-lesson-video.mp4'; // relative path written into d
 function arg(flag) {
   const i = process.argv.indexOf(flag);
   return i !== -1 ? process.argv[i + 1] : undefined;
-}
-
-function run(cmd, args) {
-  return new Promise((resolve, reject) => {
-    const proc = spawn(cmd, args, { stdio: ['ignore', 'pipe', 'pipe'] });
-    let stderr = '';
-    proc.stderr.on('data', (d) => {
-      stderr += d;
-    });
-    proc.on('error', reject); // e.g. ffmpeg not installed
-    proc.on('close', (code) => {
-      if (code === 0) resolve();
-      else reject(new Error(`${cmd} exited ${code}: ${stderr.slice(-2000)}`));
-    });
-  });
 }
 
 async function downloadTo(url, destPath) {
@@ -111,7 +97,8 @@ if (!lesson.sourceUrl || typeof lesson.sourceUrl !== 'string') {
 // present? Nothing to do. (transcodedAt is cleared by fetch-current-
 // lesson.mjs whenever the lesson genuinely changes, so this only skips
 // when it's truly still the same lesson as last time.)
-if (lesson.transcodedAt && existsSync(outPath)) {
+// A file from before the size cap (pi-encode.mjs) is done again.
+if (lesson.transcodedAt && existsSync(outPath) && statSync(outPath).size < PI_VIDEO_MAX_BYTES) {
   console.log(`Week ${lesson.week} already transcoded at ${lesson.transcodedAt} — nothing to do.`);
   process.exit(0);
 }
@@ -124,23 +111,8 @@ try {
   await downloadTo(lesson.sourceUrl, rawPath);
 
   console.log('Transcoding to 854x480 baseline H.264…');
-  await run('ffmpeg', [
-    '-y',
-    '-i', rawPath,
-    '-vf', 'scale=854:480',
-    '-c:v', 'libx264',
-    '-profile:v', 'baseline',
-    '-level', '3.1',
-    '-preset', 'veryfast',
-    '-crf', '26',
-    '-maxrate', '700k',
-    '-bufsize', '1400k',
-    '-c:a', 'aac',
-    '-b:a', '96k',
-    '-ac', '2',
-    '-movflags', '+faststart',
-    outPath,
-  ]);
+  const { refit } = await encodeForPi(rawPath, outPath);
+  if (refit) console.log('Refit to stay under the site\'s 25 MiB file limit.');
 
   lesson.downloadUrl = OUT_FILENAME;
   lesson.transcodedAt = new Date().toISOString();
