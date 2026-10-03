@@ -2,7 +2,7 @@
   if (window.__awanaPrinterLoaded) return;
   window.__awanaPrinterLoaded = true;
 
-  const EXTENSION_VERSION = '6.27.0';
+  const EXTENSION_VERSION = '6.28.0';
   const PRINT_COOLDOWN = 2000;
   // POST /print is synchronous on the server: PowerShell + a cold printer can
   // take 15-30 s (the server retries the spooler internally). This must sit
@@ -1056,7 +1056,10 @@
         });
     });
 
-    controls.append(modeSelect, statusEl, testBtn, nightTestBtn);
+    controls.append(modeSelect, statusEl);
+    var testsRow = document.createElement('div');
+    Object.assign(testsRow.style, { display: 'flex', gap: '6px', flexWrap: 'wrap' });
+    testsRow.append(testBtn, nightTestBtn);
 
     // Printer row
     var printerRow = document.createElement('div');
@@ -1080,7 +1083,18 @@
     printingToChange.rel = 'noopener';
     printingToChange.textContent = 'Change';
     Object.assign(printingToChange.style, { fontSize: '11px', color: '#2563eb', whiteSpace: 'nowrap' });
-    printingTo.append(printingToName, printingToChange);
+    // Green when the print server answers, red when it doesn't.
+    var printingToDot = document.createElement('span');
+    printingToDot.id = 'awana-printing-to-dot';
+    Object.assign(printingToDot.style, {
+      width: '8px', height: '8px', borderRadius: '50%', background: '#cbd5e1',
+      flex: '0 0 auto', alignSelf: 'center'
+    });
+    printingToName.style.flex = '1';
+    printingToName.style.overflow = 'hidden';
+    printingToName.style.textOverflow = 'ellipsis';
+    printingToName.style.whiteSpace = 'nowrap';
+    printingTo.append(printingToDot, printingToName, printingToChange);
     printerRow.append(printerLabel, printingTo);
 
     // Status rows
@@ -2654,6 +2668,9 @@
       // (or any link) must not have Enter rerouted into the search box.
       if (ae && ae !== searchInput && ae !== document.body && ae !== document.documentElement) return;
       if (ae === searchInput && searchInput.value) return;
+      // The search box lives on the Check in tab: on another tab the operator
+      // is doing something else there, so nothing moves.
+      if (searchInput.offsetParent === null) return;
       searchInput.value = '';
       searchResults.style.display = 'none';
       try { searchInput.focus({ preventScroll: true }); } catch (e) { searchInput.focus(); }
@@ -2744,19 +2761,88 @@
     feedList.textContent = 'No prints yet tonight';
     feedWrap.append(feedLabel, feedList);
 
-    // Panel layout, most-used first: last-prints feed + search + Quick Mode
-    // on top, then the per-night toggles, printing controls, walk-in
-    // printing, tonight's reprint list, and finally status lines and help.
+    // ── Layout (6.28.0): a top strip that is always there, then four tabs ──
+    // The top strip says where labels print and shows a problem only when
+    // there is one (each of those rows hides itself when all is well). Below
+    // it, tabs in the order the night goes: Check in (the rush: search, Quick
+    // Mode, the print mode, last prints), Walk-ins (guests, families,
+    // registering, leaders), Tonight (the count, its checks, the reprint list)
+    // and Settings (night modes, sound, tests, every status detail, help).
+    // Every element and its behaviour is unchanged; only where it sits.
+    var topStrip = document.createElement('div');
+    topStrip.id = 'awana-panel-top';
+    Object.assign(topStrip.style, {
+      display: 'flex', flexDirection: 'column', gap: '6px',
+      padding: '8px 12px', flex: '0 0 auto', borderBottom: '1px solid #e8f5e9'
+    });
+    topStrip.append(printerRow, queueBadge, csvWarningBanner, updateRow);
+
+    var TABS = [
+      ['checkin', 'Check in'], ['walkins', 'Walk-ins'], ['tonight', 'Tonight'], ['settings', 'Settings']
+    ];
+    var tabBar = document.createElement('div');
+    tabBar.setAttribute('role', 'tablist');
+    Object.assign(tabBar.style, {
+      display: 'flex', flex: '0 0 auto', padding: '0 8px',
+      borderBottom: '1px solid #e2e8f0', background: '#ffffff'
+    });
+    var tabButtons = {};
+    var tabPanes = {};
+    function pane(key, children) {
+      var el = document.createElement('div');
+      el.id = 'awana-tab-' + key;
+      el.setAttribute('role', 'tabpanel');
+      Object.assign(el.style, { display: 'none', flexDirection: 'column', gap: '8px' });
+      el.append.apply(el, children);
+      tabPanes[key] = el;
+      return el;
+    }
+    function showPanelTab(key) {
+      TABS.forEach(function(t) {
+        var on = t[0] === key;
+        tabPanes[t[0]].style.display = on ? 'flex' : 'none';
+        var b = tabButtons[t[0]];
+        b.setAttribute('aria-selected', on ? 'true' : 'false');
+        b.style.color = on ? '#2e7d32' : '#64748b';
+        b.style.borderBottomColor = on ? '#4caf50' : 'transparent';
+      });
+      panelBody.scrollTop = 0;
+      if (scrollFade) updateScrollFade();   // not yet built on the first call
+      if (key === 'checkin') refocusSearch();
+      if (key === 'tonight') loadTonight();
+    }
+    TABS.forEach(function(t) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.setAttribute('role', 'tab');
+      b.textContent = t[1];
+      Object.assign(b.style, {
+        flex: '1 1 0', background: 'none', border: 'none', borderBottom: '2px solid transparent',
+        padding: '8px 4px 6px', margin: '0', cursor: 'pointer',
+        fontFamily: "'Londrina Solid', 'Arial Narrow', system-ui, sans-serif",
+        fontSize: '14px', letterSpacing: '0.05em', textTransform: 'uppercase', color: '#64748b'
+      });
+      b.addEventListener('click', function() { showPanelTab(t[0]); });
+      tabButtons[t[0]] = b;
+      tabBar.appendChild(b);
+    });
+
+    var sectionGap = function() { var d = divider(); d.style.margin = '4px 0'; return d; };
     panelBody.append(
-      feedWrap, divider(),
-      searchContainer, quickModeRow,
-      divider(), sectionLabel('Night Modes'), stepUpRow, storeRow,
-      divider(), sectionLabel('Printing'), controls, printerRow,
-      divider(), walkInLabel, walkInRow, walkInClubRow, customStatus, walkInChoice, familyWrap, registerCheck, registerFields, leaderChipsWrap,
-      divider(), tonightHeader, countCheck, tonightList,
-      queueBadge, reconcileRow, verifyRow, contractRow, csvStatus, csvWarningBanner, privacyStatus, updateRow,
-      divider(), soundRow, helpBtn
+      pane('checkin', [searchContainer, quickModeRow, controls, feedWrap]),
+      pane('walkins', [walkInLabel, walkInRow, walkInClubRow, customStatus, walkInChoice, familyWrap,
+        registerCheck, registerFields, leaderChipsWrap]),
+      pane('tonight', [tonightHeader, countCheck, tonightList, reconcileRow, verifyRow]),
+      pane('settings', [
+        sectionLabel('Night modes'), stepUpRow, storeRow,
+        sectionGap(), sectionLabel('Sound'), soundRow,
+        sectionGap(), sectionLabel('Tests'), testsRow,
+        sectionGap(), sectionLabel('Status'), csvStatus, contractRow, privacyStatus,
+        sectionGap(), helpBtn
+      ])
     );
+    showPanelTab('checkin');
+
     // A scrollbar the operator can actually SEE. A body that scrolls but shows
     // no affordance looks identical to content that is cut off — which is the
     // impression this panel gave before, and the reason nobody tried scrolling.
@@ -2797,7 +2883,7 @@
     window.addEventListener('resize', updateScrollFade);
     setTimeout(updateScrollFade, 0);
 
-    panel.append(panelHeader, panelBody, scrollFade);
+    panel.append(panelHeader, topStrip, tabBar, panelBody, scrollFade);
     widget.append(pill, panel);
 
     // ── Mount: fixed overlay on the right, below the site nav bars ──
@@ -2958,8 +3044,13 @@
         if (use.backup) text += ', backup ' + use.backup;
         nameEl.textContent = text;
         nameEl.title = text;
+        setPrintingDot(true);
       })
-      .catch(function() { nameEl.textContent = 'Print server not reachable'; });
+      .catch(function() { nameEl.textContent = 'Print server not reachable'; setPrintingDot(false); });
+  }
+  function setPrintingDot(ok) {
+    var dot = document.getElementById('awana-printing-to-dot');
+    if (dot) dot.style.background = ok ? '#4caf50' : '#e53935';
   }
 
   // Auto-focus (#1): the widget's search box is the fastest path from "kid at
@@ -4417,6 +4508,7 @@
   }
   loadBrandFonts();
   fetchPrinters();
+  setInterval(fetchPrinters, 120000);   // keeps the ready dot honest
   watchCheckins();
   loadTonight();
   loadCountCheck();

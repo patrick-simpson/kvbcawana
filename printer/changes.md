@@ -1,4 +1,18 @@
-﻿## [6.27.0] - 2026-10-03
+﻿## [6.28.0] - 2026-10-03
+The extension's panel on the TwoTimTwo check-in page is reorganized: a short strip that is always there, then four tabs in the order the night goes.
+
+**Why.** Options had been added one at a time for years, so the panel was one long column of about fifty controls and seven status lines, and the owner found it hard to follow.
+
+**The layout.**
+- **Always at the top**: a dot (green when the print server answers, red when it doesn't) and "Printing to" with a Change link to the dashboard. A problem shows here only while there is one: the print queue backing up, an outdated roster, a server update.
+- **Check in** (opens first): search, Quick Mode, Auto-Print / Print Dialog / Off, last prints. The rush never needs to scroll.
+- **Walk-ins**: the walk-in guest, a family, registering in TwoTimTwo, remembered leaders.
+- **Tonight**: the count, Sync now and Verify, tonight's list with Reprint (refreshed when the tab opens).
+- **Settings**: Step Up Night and Awana Store Night, Mute sounds, Test and Night Test, the roster, site-contract and privacy status lines, Help.
+
+Same TwoTimTwo green header and white body; tab names in Londrina Solid like the panel's section labels. Every control keeps its behaviour; only where it sits changed. The search box takes the cursor back after a check-in only while the Check in tab is showing.
+
+## [6.27.0] - 2026-10-03
 On a receipt roll the name tag is now the same label the right way up, scaled to the roll's width: about 2⅞″ × 1⅜″, a quarter of the paper. The Label Preview shows the tag the chosen printer will print, at its size.
 
 **Why.** Turned a quarter turn to fill the roll the long way, a tag came out about 2⅞″ × 5⅝″, which the owner found far larger than wanted.
