@@ -12,7 +12,7 @@ Student video on first use and keeps it for subsequent cues.
 import json, os, subprocess, sys
 
 SCRATCH = os.path.dirname(os.path.abspath(__file__))
-RELEASE = "https://github.com/patrick-simpson/Journey-Display/releases/download/transcoded-videos-v1"
+RELEASE = "https://github.com/patrick-simpson/kvbcawana/releases/download/journey-videos-v2"
 PAD = 2.5  # seconds of context on each side
 
 args = sys.argv[1:]

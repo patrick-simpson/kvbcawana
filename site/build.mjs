@@ -91,6 +91,19 @@ writeFileSync(path.join(OUT, '_headers'), [
   '',
 ].join('\n'));
 
+// Journey's lesson videos for the picker: the `journey-videos-v2` release
+// (journey/scripts/pi-encode.mjs keeps every one under 25 MiB), copied to
+// /journey/videos/ on every deploy. Pages uploads only files it has not seen,
+// so an unchanged set costs the download and nothing more. A deploy (CI) must
+// have them; a local build without the gh CLI carries on without.
+const REPO = process.env.GITHUB_REPOSITORY || 'patrick-simpson/kvbcawana';
+try {
+  run(`gh release download journey-videos-v2 --repo ${REPO} --pattern "*.mp4" --dir ${JSON.stringify(path.join(journeyOut, 'videos'))} --clobber`, ROOT);
+} catch (e) {
+  if (process.env.CI) throw e;
+  console.warn('  (no lesson videos: gh could not download journey-videos-v2)');
+}
+
 // Files over Pages' 25 MiB limit (the Journey kiosk's weekly lesson
 // transcode, ~30 MiB) are taken out of the upload and served by
 // site/functions/journey/[[path]].js from GitHub's copy of THIS commit, so
@@ -98,7 +111,6 @@ writeFileSync(path.join(OUT, '_headers'), [
 // journey/public can be served that way; anything else that big is a build
 // output, and fails the build rather than the deploy.
 const PAGES_FILE_MAX = 25 * 1024 * 1024;
-const REPO = process.env.GITHUB_REPOSITORY || 'patrick-simpson/kvbcawana';
 const largeFiles = {};
 const walk = (dir) => readdirSync(dir, { withFileTypes: true }).flatMap((d) =>
   d.isDirectory() ? walk(path.join(dir, d.name)) : [path.join(dir, d.name)]);
@@ -107,6 +119,7 @@ for (const file of walk(OUT)) {
   const sitePath = '/' + path.relative(OUT, file).split(path.sep).join('/');
   if (!sitePath.startsWith('/journey/')) throw new Error(`${sitePath} is over 25 MiB, and only journey/public files can be served from the repo`);
   const repoPath = `journey/public/${sitePath.slice('/journey/'.length)}`;
+  if (!existsSync(path.join(ROOT, repoPath))) throw new Error(`${sitePath} is over 25 MiB and is not a file in the repo`);
   largeFiles[sitePath] = `https://raw.githubusercontent.com/${REPO}/${BUILD_ID}/${repoPath}`;
   rmSync(file);
   console.log(`  ${sitePath} is ${(statSync(path.join(ROOT, repoPath)).size / 1048576).toFixed(1)} MiB: served from the repo, not uploaded`);

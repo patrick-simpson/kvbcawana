@@ -1967,7 +1967,7 @@ window.addEventListener('online', () => refreshLesson());
    any one of them right now — always a one-off: it never changes what
    the schedule above will automatically show at the next 6:30 PM, and
    never touches current-lesson.json. Plays the lesson's pre-transcoded
-   480p copy from the GitHub Release (see transcodedPreviewUrl above),
+   480p copy from videos/ on this site (see transcodedPreviewUrl above),
    falling back to the original URL only if that asset is missing — an
    earlier version played the originals directly, which the Pi Zero
    cannot decode at a watchable frame rate, so "only the current week
@@ -1992,8 +1992,11 @@ let previewWeek = null;
 // rate, so previews play these first and only fall back to the original if
 // the asset is missing. (Release asset URLs 302-redirect, which <video>
 // follows fine; no crossorigin attribute means CORS never applies.)
-const TRANSCODED_VIDEO_BASE =
-  'https://github.com/patrick-simpson/Journey-Display/releases/download/transcoded-videos-v1/';
+// Since 2026-10-03 they are served from this site itself, under videos/ (the
+// kvbcawana `journey-videos-v2` release, every file under 25 MiB, copied there
+// by site/build.mjs on each deploy), so they are same-origin like everything
+// else here.
+const TRANSCODED_VIDEO_BASE = 'videos/';
 
 function transcodedPreviewUrl(week, variant) {
   return `${TRANSCODED_VIDEO_BASE}week-${String(week).padStart(2, '0')}-${variant}.mp4`;

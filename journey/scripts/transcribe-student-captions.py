@@ -30,7 +30,7 @@ REPO = "/home/user/Journey-Display"
 CUE_DIR = os.path.join(SCRATCH, f"{KIND}-cues")
 TXT_DIR = os.path.join(SCRATCH, f"{KIND}-txt")
 MP4_DIR = os.path.join(SCRATCH, f"{KIND}-mp4")  # pre-downloaded copies are reused
-RELEASE = "https://github.com/patrick-simpson/Journey-Display/releases/download/transcoded-videos-v1"
+RELEASE = "https://github.com/patrick-simpson/kvbcawana/releases/download/journey-videos-v2"
 os.makedirs(CUE_DIR, exist_ok=True)
 os.makedirs(TXT_DIR, exist_ok=True)
 

@@ -414,7 +414,10 @@ being redistributed.
 **Owner-approved extension (2026-08-22) — all lessons, on a Release:**
 the same exception now covers Pi-playable 480p re-encodes of *every*
 lesson video (32 Student + 31 Leader; week 27 has no Leader Video),
-uploaded as assets on the `transcoded-videos-v1` GitHub Release by
+uploaded as assets on the `journey-videos-v2` GitHub Release in
+kvbcawana (each under 25 MiB, by `scripts/pi-encode.mjs`; served from
+awana.kvbchurch.org/journey/videos/, where `site/build.mjs` copies them on
+every deploy, since 2026-10-03) by
 `scripts/transcode-all-lessons.mjs` / the on-demand
 `transcode-all-lessons.yml` workflow. The manual video-picker plays
 these (originals were undecodable on the Pi Zero — reported broken from
@@ -1338,7 +1341,7 @@ upcoming lesson, or catching up after a missed night.
   one).
 - **Plays the pre-transcoded 480p Release asset** on the low profile
   (`transcodedPreviewUrl()` in `schedule.js` →
-  `releases/download/transcoded-videos-v1/week-NN-{student,leader}.mp4`),
+  `videos/week-NN-{student,leader}.mp4` on this site),
   falling back to the original URL once if that asset errors. On the full
   profile it is the other way round: the original, with the Release copy
   as the one-shot fallback (`previewSources()`). An
