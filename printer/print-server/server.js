@@ -5722,7 +5722,12 @@ function isSafePrinterName(name) {
   if (s.length > PRINTER_NAME_MAX) return false;
   // eslint-disable-next-line no-control-regex
   if (/[\x00-\x1f\x7f]/.test(s)) return false;
-  return !/["'`$;|&<>(){}\[\]\\\r\n%]/.test(s);
+  // Parentheses are allowed: Windows names printers "Star TSP100 Cutter
+  // (TSP143)", "... (Copy 1)", "... (redirected 2)", and every place a name
+  // reaches PowerShell it is inside a single-quoted string or an environment
+  // variable, where they are plain characters. A subexpression still needs
+  // the "$" refused here.
+  return !/["'`$;|&<>{}\[\]\\\r\n%]/.test(s);
 }
 
 // Prints a PDF on Windows.

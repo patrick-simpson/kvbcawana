@@ -714,6 +714,9 @@ console.log('isSafePrinterName — a printer name reaches PowerShell, so it is v
   check('rejects a single quote as well', isSafePrinterName("Bob's printer") === false);
   check('rejects an absurdly long value', isSafePrinterName('x'.repeat(500)) === false);
   check('ACCEPTS a real printer name', isSafePrinterName('Brother QL-820NWB') === true);
+  check('ACCEPTS the Star driver\'s own name, parentheses and all',
+    isSafePrinterName('Star TSP100 Cutter (TSP143)') === true);
+  check('ACCEPTS a copied printer', isSafePrinterName('Brother QL-820NWB (Copy 1)') === true);
   check('ACCEPTS a name with spaces and a dash', isSafePrinterName('HP LaserJet 400 - Office') === true);
   check('ACCEPTS empty, meaning use the default printer', isSafePrinterName('') === true);
   check('ACCEPTS null/undefined as empty', isSafePrinterName(null) === true && isSafePrinterName(undefined) === true);

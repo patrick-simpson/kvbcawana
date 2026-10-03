@@ -1,4 +1,11 @@
-﻿## [6.25.0] - 2026-10-03
+﻿## [6.25.1] - 2026-10-03
+The USB receipt printer can be chosen when Windows names it with parentheses, as the Star driver does ("Star TSP100 Cutter (TSP143)").
+
+**Why.** Send test tag answered "Pick the receipt printer from the list first" with the Star picked, and Save would not keep it: the printer-name check refused `(` and `)`, which Windows uses in driver names and in copies ("(Copy 1)", "(redirected 2)").
+
+**What changes.** `isSafePrinterName()` allows parentheses. Every place a printer name reaches PowerShell it sits in a single-quoted string or an environment variable, where they are plain characters; `$`, quotes, backticks, `;`, `|`, `&`, braces and brackets are still refused, so a subexpression still cannot get through. New checks in `test-server-helpers.cjs`.
+
+## [6.25.0] - 2026-10-03
 The receipt-printer trial can now use a USB receipt printer through its Windows driver, such as a Star TSP100 futurePRNT, as well as the network one from 6.19.0.
 
 **Why.** The owner is running the trial on a USB Star TSP100 futurePRNT instead of a network printer. That printer takes only images from Star's Windows driver, not raw ESC/POS commands, so the 6.19.0 network path can't drive it.
