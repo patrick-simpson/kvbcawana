@@ -350,8 +350,9 @@ async function main() {
     check('leader mode prints through the leader path', /printLeaders\(/.test(leaderBranch));
     check('ticking Leader visibly retargets the row rather than leaving it identical',
       /Print Leader Tag/.test(ext) && /visitorCb\.disabled/.test(ext) && /registerCb\.disabled/.test(ext));
-    check('the remembered-leader chips are in the panel layout', /leaderChipsWrap/.test(ext)
-      && ext.indexOf('leaderChipsWrap,') > 0);
+    // 6.28.0: the panel is tabs; the chips belong to the Walk-ins tab.
+    check('the remembered-leader chips are in the panel layout (Walk-ins tab)',
+      /pane\('walkins', \[[^\]]*leaderChipsWrap/.test(ext));
   }
 
   listener.close();
