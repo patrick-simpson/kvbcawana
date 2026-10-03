@@ -244,7 +244,8 @@
   // the ones already in, greyed.
   function pageChildren() {
     var out = [];
-    var els = document.querySelectorAll('.clubber');
+    // .checked-in rows stay in TwoTimTwo's page, hidden: those children are in.
+    var els = document.querySelectorAll('.clubber:not(.checked-in)');
     for (var i = 0; i < els.length; i++) {
       var el = els[i];
       var nameEl = el.querySelector('.name');

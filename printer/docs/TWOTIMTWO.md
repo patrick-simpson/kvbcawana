@@ -98,6 +98,12 @@ Clicking a `.clubber` opens `#checkin-modal` and populates the hidden
 | POST | `/clubber/checkinclubberundo` | `calendar_id`, `clubber_id` | HTML snippet, `"(checkin undone)"` |
 | GET | `/clubber/ajaxSearch?text=<frag>` | — | HTML `<table>` of `<a href="/clubber/update/{id}">First Last</a>` + club |
 
+- **No CSRF token** (checked on the live page, 2026-10-03): `#checkinForm` is
+  exactly `clubber_id` (`#checkinClubberId`), `calendar_id` (`#calendar_id`)
+  and the `events[]` checkboxes, and the page has no `YII_CSRF_TOKEN` field.
+  A successful check-in is answered 200 with the child's name; TwoTimTwo's own
+  handler then gives the row `.checked-in` and hides it (the row stays in the
+  page, which its name filter and Undo rely on).
 - `#lastCheckin` (`<div id="lastCheckin">Last checked in: <div></div></div>`) is
   what the extension's MutationObserver watches for **local** check-ins.
 - The extension does **not** call `checkinclubber` directly — it clicks the

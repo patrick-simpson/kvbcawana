@@ -1,4 +1,11 @@
-﻿## [7.4.1] - 2026-10-03
+﻿## [7.4.2] - 2026-10-03
+Touch check-in: check-ins go through on the real TwoTimTwo page.
+
+**The real cause.** TwoTimTwo's check-in page carries no security (CSRF) token, and the extension's quick check-in refused to post without one. So every touch check-in went to the fallback of clicking the child's row, which opened TwoTimTwo's pop-up out of sight behind the touch screen: nothing was recorded, and the hidden pop-ups left the page frozen. 7.4.1 stopped the freezing but still wanted the token, so it would have refused every touch check-in. The quick check-in now posts exactly what TwoTimTwo's own Checkin button posts (the child, the meeting and the check-in items), tested on the live page: a family of four checked in, each confirmed by TwoTimTwo, and TwoTimTwo's own pop-up still opened normally afterwards.
+
+**Children checked in on TwoTimTwo itself drop off the touch screen.** TwoTimTwo hides a checked-in child's row rather than removing it; the touch screen now skips those rows too (it was still listing them as to come), and a touch check-in marks the row the same way TwoTimTwo does.
+
+## [7.4.1] - 2026-10-03
 Touch check-in: no more stuck TwoTimTwo page after a few check-ins; the app window checks for updates every 30 seconds; and a new version restarts Chrome on the check-in page by itself.
 
 **What went wrong.** When a quick check-in could not confirm itself (it matched the child's row by its exact name text, which a doubled space or a nickname defeats), it fell back to clicking the row on TwoTimTwo's page. That opened TwoTimTwo's check-in pop-up behind the full-screen touch check-in, where nobody could see it; a few of those stacked up, and after Close their grey backdrop covered the page until it was refreshed.

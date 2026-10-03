@@ -110,6 +110,10 @@ console.log('touch check-in: families still to come');
   const c = fs.readFileSync(path.join(__dirname, '..', 'chrome-extension', 'content.js'), 'utf8');
   const api = c.slice(c.indexOf('window.__awanaTouchApi = {'), c.indexOf('injectWidget();', c.indexOf('window.__awanaTouchApi = {')));
   check('the touch API never clicks a TwoTimTwo row or polls for its modal', api.length > 200 && !/\.click\(\)|pollForCheckinButton|tryDirectCheckin/.test(api));
+  check('no CSRF token needed: TwoTimTwo\'s check-in page has none (live, 7.4.2)',
+    /if \(!calendarId\) return Promise\.resolve\('no-form'\);/.test(c) && /if \(csrfToken\) body \+= '&YII_CSRF_TOKEN=/.test(c));
+  check('rows TwoTimTwo already checked in (.checked-in, hidden) are not offered or posted',
+    /:not\(\.checked-in\)'\) : null;/.test(c) && /querySelectorAll\('\.clubber:not\(\.checked-in\)'\)/.test(fs.readFileSync(path.join(__dirname, '..', 'chrome-extension', 'touch.js'), 'utf8')));
   check('touch check-ins run one at a time', /touchQueue = run\.catch/.test(api));
   check('the row is dropped by its recid, not its name text', /var row = rowByRecid\(recid\);/.test(c));
   check('a failed post refreshes the token in the background and retries once', /return refreshCheckinTokens\(\)\.then\(function\(\) \{ return postTouchCheckin\(/.test(c));

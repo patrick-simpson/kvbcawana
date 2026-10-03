@@ -2,7 +2,7 @@
   if (window.__awanaPrinterLoaded) return;
   window.__awanaPrinterLoaded = true;
 
-  const EXTENSION_VERSION = '7.4.1';
+  const EXTENSION_VERSION = '7.4.2';
   const PRINT_COOLDOWN = 2000;
   // POST /print is synchronous on the server: PowerShell + a cold printer can
   // take 15-30 s (the server retries the spooler internally). This must sit
@@ -4568,8 +4568,10 @@
   // and calendar id, and tries once more; then it says so.
   var touchQueue = Promise.resolve();
 
+  // A row TwoTimTwo has checked in stays in the page, hidden, with
+  // .checked-in; that child is not there to check in any more.
   function rowByRecid(recid) {
-    return recid ? document.querySelector('.clubber[recid="' + String(recid).replace(/[^0-9A-Za-z_-]/g, '') + '"]') : null;
+    return recid ? document.querySelector('.clubber[recid="' + String(recid).replace(/[^0-9A-Za-z_-]/g, '') + '"]:not(.checked-in)') : null;
   }
 
   function refreshCheckinTokens() {
@@ -4580,11 +4582,10 @@
         var doc = new DOMParser().parseFromString(html, 'text/html');
         var tok = doc.querySelector('input[name="YII_CSRF_TOKEN"]');
         var cal = doc.getElementById('calendar_id');
-        if (!tok || !tok.value) return false;
-        document.querySelectorAll('input[name="YII_CSRF_TOKEN"]').forEach(function(i) { i.value = tok.value; });
+        if (tok && tok.value) document.querySelectorAll('input[name="YII_CSRF_TOKEN"]').forEach(function(i) { i.value = tok.value; });
         var mine = document.getElementById('calendar_id');
         if (cal && cal.value && mine) mine.value = cal.value;
-        return true;
+        return !!(cal && cal.value);
       })
       .catch(function() { return false; });
   }
@@ -4592,11 +4593,15 @@
   function postTouchCheckin(recid, name, clubId, options) {
     var calInput = document.getElementById('calendar_id');
     var calendarId = calInput && calInput.value;
+    // TwoTimTwo's own check-in posts #checkinForm as it is: clubber_id,
+    // calendar_id and events[], and NO CSRF token (live page, 2026-10-03: the
+    // check-in page carries none). Requiring one sent every touch check-in to
+    // the hidden modal. A token is still sent if a page ever has one.
     var csrfToken = findCsrfToken();
-    if (!calendarId || !csrfToken) return Promise.resolve('no-form');
+    if (!calendarId) return Promise.resolve('no-form');
     var body = 'clubber_id=' + encodeURIComponent(recid) + '&calendar_id=' + encodeURIComponent(calendarId);
     collectApplicableEvents(clubId, options).forEach(function(v) { body += '&events%5B%5D=' + encodeURIComponent(v); });
-    body += '&YII_CSRF_TOKEN=' + encodeURIComponent(csrfToken);
+    if (csrfToken) body += '&YII_CSRF_TOKEN=' + encodeURIComponent(csrfToken);
     return fetch('/clubber/checkinclubber', {
       method: 'POST', credentials: 'same-origin',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -4606,8 +4611,10 @@
       return r.text().then(function(text) {
         var first = (name || '').trim().split(/\s+/)[0] || '';
         if (first && String(text || '').toLowerCase().indexOf(first.toLowerCase()) === -1) return 'no-confirm';
+        // What TwoTimTwo's own success handler does: mark the row checked in
+        // and hide it (its name filter and undo both expect the row to stay).
         var row = rowByRecid(recid);
-        if (row && row.parentNode) row.parentNode.removeChild(row);
+        if (row) { row.classList.add('checked-in'); row.style.display = 'none'; }
         var last = document.querySelector('#lastCheckin div');
         if (last) last.innerHTML = text;   // what TwoTimTwo's own success handler does
         return 'ok';
