@@ -2,7 +2,7 @@
   if (window.__awanaPrinterLoaded) return;
   window.__awanaPrinterLoaded = true;
 
-  const EXTENSION_VERSION = '6.28.0';
+  const EXTENSION_VERSION = '7.0.0';
   const PRINT_COOLDOWN = 2000;
   // POST /print is synchronous on the server: PowerShell + a cold printer can
   // take 15-30 s (the server retries the spooler internally). This must sit
@@ -2761,7 +2761,7 @@
     feedList.textContent = 'No prints yet tonight';
     feedWrap.append(feedLabel, feedList);
 
-    // ── Layout (6.28.0): a top strip that is always there, then four tabs ──
+    // ── Layout (7.0.0): a top strip that is always there, then four tabs ──
     // The top strip says where labels print and shows a problem only when
     // there is one (each of those rows hides itself when all is well). Below
     // it, tabs in the order the night goes: Check in (the rush: search, Quick

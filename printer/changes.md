@@ -1,5 +1,7 @@
-﻿## [6.28.0] - 2026-10-03
-The extension's panel on the TwoTimTwo check-in page is reorganized: a short strip that is always there, then four tabs in the order the night goes.
+﻿## [7.0.0] - 2026-10-03
+Version 7: a new icon, and the extension's panel on the TwoTimTwo check-in page reorganized into a short strip that is always there and four tabs in the order the night goes. (Released as 7.0.0 rather than 6.28.0, at the owner's word.)
+
+**The icon.** A name tag with a green check, on the brand kit's orange (`electron-app/build/icon.svg` is the source; `icon.ico` carries 16 to 256 px, `icon.png` the window and tray). It replaces the plain purple square on the desktop shortcut, the Start menu, the taskbar, the tray and the installer.
 
 **Why.** Options had been added one at a time for years, so the panel was one long column of about fifty controls and seven status lines, and the owner found it hard to follow.
 
