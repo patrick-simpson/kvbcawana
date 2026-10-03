@@ -1,4 +1,17 @@
-﻿## [7.5.0] - 2026-10-03
+﻿## [7.6.0] - 2026-10-03
+Touch check-in: search shows families first, Bible starts ticked, and the motion is quicker and more joyful. Also fixes check-ins made from the panel and from phones being repeated.
+
+**Families first when you type.** Typing a name now shows the matching households first, as large family cards (the family's name and every child still to come, with the children the search matched picked out); tapping one opens the family's page. The matching children follow on their own "Children" panel, a misspelling offers "Did you mean" families, and families not here the last two club nights appear only at the very bottom, as small buttons, so a returning family can still be found.
+
+**Bible starts ticked** on a child's card and on a family's page, wherever the club has Bible (Sparks, T&T and Trek on KVBC's page). Untick it for a child who didn't bring one.
+
+**Quicker, more joyful, smoother.** Tiles and cards land in about half a second with a stretch, a squash and one wobble; presses squash harder and spring back faster; the card, the family page and the messages bounce in, and a ticked box pops. Nothing that stays on screen replays its entrance any more: as you type, results that remain glide to their new places and only new ones land; a family you just checked in pops out of the list as it leaves, and the tiles left behind glide to fill the gap.
+
+**Fixed: check-ins from the panel and from phones repeated.** TwoTimTwo keeps a checked-in child's row in the page, hidden. The panel's quick check-in and phone check-ins looked for that row to disappear, so a check-in that had worked looked as if it had not, and the extension opened TwoTimTwo's pop-up and checked the child in again (the source of "may not have stuck" warnings). Hidden rows no longer count, those paths post directly the way the touch screen does (no security token needed), and a phone check-in never opens the pop-up while the touch screen covers the page.
+
+Tested on KVBC's live check-in page: 140 children grouped into 63 families, a family of four checked in with Bible pre-ticked on the three whose clubs have it, back to the list in 0.16 s, then undone.
+
+## [7.5.0] - 2026-10-03
 Touch check-in: back to the families the moment you tap, and up to about 70 families on one screen.
 
 **Back at once.** Check in on a child's card, or "All of them" on a family's page, and the screen goes straight back: to the family list, or to the brothers and sisters' page when there is one. The check-ins finish in the background, one at a time, and a green line says when they are through ("Johnson: 3 checked in"). The family leaves the list as soon as you tap; if a check-in fails, a red line names the child and they come back to the list. Checking in each child separately on a family's page now goes back the moment the last one is in, with no pause.

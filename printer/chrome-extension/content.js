@@ -2,7 +2,7 @@
   if (window.__awanaPrinterLoaded) return;
   window.__awanaPrinterLoaded = true;
 
-  const EXTENSION_VERSION = '7.5.0';
+  const EXTENSION_VERSION = '7.6.0';
   const PRINT_COOLDOWN = 2000;
   // POST /print is synchronous on the server: PowerShell + a cold printer can
   // take 15-30 s (the server retries the spooler internally). This must sit
@@ -596,15 +596,17 @@
     if (!clubberId) return Promise.resolve(false);
     var calInput = document.getElementById('calendar_id');
     var calendarId = calInput && calInput.value;
+    // No CSRF token on TwoTimTwo's check-in page (see postTouchCheckin): one is
+    // sent only if a page has it. Requiring it sent every check-in to the modal.
     var csrfToken = findCsrfToken();
-    if (!calendarId || !csrfToken) return Promise.resolve(false);
+    if (!calendarId) return Promise.resolve(false);
 
     var body = 'clubber_id=' + encodeURIComponent(clubberId) +
       '&calendar_id=' + encodeURIComponent(calendarId);
     collectApplicableEvents(clubId, options).forEach(function(v) {
       body += '&events%5B%5D=' + encodeURIComponent(v);
     });
-    body += '&YII_CSRF_TOKEN=' + encodeURIComponent(csrfToken);
+    if (csrfToken) body += '&YII_CSRF_TOKEN=' + encodeURIComponent(csrfToken);
 
     return fetch('/clubber/checkinclubber', {
       method: 'POST',
@@ -626,8 +628,10 @@
       // put forever, the caller's "did the row disappear?" verification always
       // times out, and it falls back to the click-and-poll dance — checking the
       // child in a SECOND time and double-crediting their events.
-      var row = findClubberElByName(childName);
-      if (row && row.parentNode) row.parentNode.removeChild(row);
+      // Marked the way TwoTimTwo's own handler marks it (hidden, .checked-in),
+      // found by its id so a name with a stray space cannot miss it.
+      var row = rowByRecid(clubberId) || findClubberElByName(childName);
+      if (row) { row.classList.add('checked-in'); row.style.display = 'none'; }
       return true;
     }).catch(function() {
       return false;
@@ -3616,10 +3620,15 @@
   // so callers must re-resolve before each .click() — otherwise the click
   // hits a detached node and the modal never opens (label prints, page
   // check-in silently fails).
+  // TwoTimTwo keeps a checked-in child's row in the page, hidden, with
+  // .checked-in (live page, 2026-10-03). Every "is the row gone yet?" check
+  // here means "not checked in yet", so those rows never count: before 7.6.0
+  // they did, a check-in that had worked looked like one that had not, and
+  // the modal fallback clicked the hidden row and checked the child in again.
   function findClubberElByName(name) {
     var target = (name || '').trim();
     if (!target) return null;
-    var els = document.querySelectorAll('.clubber');
+    var els = document.querySelectorAll('.clubber:not(.checked-in)');
     for (var i = 0; i < els.length; i++) {
       var nameEl = els[i].querySelector('.name');
       if (nameEl && nameEl.innerText.trim() === target) return els[i];
@@ -4105,6 +4114,13 @@
       if (ok) {
         reportPhoneAction(action.id, true, '');
         setTimeout(function() { phoneNamesInFlight.delete(nameKey); }, 15000);
+        return;
+      }
+      if (window.__awanaTouchOpen) {
+        // The touch screen covers the page: a modal opened now would sit
+        // behind it, unseen (the 7.4 freeze). Say so instead.
+        phoneNamesInFlight.delete(nameKey);
+        reportPhoneAction(action.id, false, 'Could not check in from the phone; check in at the desk');
         return;
       }
       el.click();

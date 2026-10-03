@@ -345,6 +345,20 @@
     '.card.in .nm{color:#94a3b8}',
     '.card.in .cl{color:#94a3b8}',
     '.card.in:active{transform:none}',
+    '.rfams{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:12px}',
+    '.fcard{all:unset;box-sizing:border-box;cursor:pointer;display:flex;flex-direction:column;justify-content:center;gap:8px;min-height:104px;',
+    '  padding:14px 18px 14px 26px;background:#fff;border-radius:20px;position:relative;overflow:hidden;box-shadow:0 3px 14px rgba(15,23,42,.1)}',
+    '.fcard::before{content:"";position:absolute;left:0;top:0;bottom:0;width:12px;background:linear-gradient(var(--stripe))}',
+    '.fcard .fn{font:400 32px/1.05 "Paytone One","Figtree",sans-serif;color:#2F4F8A;overflow-wrap:anywhere}',
+    '.fcard .kids{display:flex;flex-wrap:wrap;gap:6px 8px}',
+    '.fcard .kid{display:inline-flex;align-items:center;gap:6px;padding:4px 12px 4px 8px;border-radius:999px;background:#F1F5F9;',
+    '  font:700 19px "Figtree",system-ui,sans-serif;color:#334155}',
+    '.fcard .kid.hit{background:color-mix(in srgb,var(--c) 18%,#fff);color:#231F20}',
+    '.fcard .dot{width:12px;height:12px;border-radius:50%;background:var(--c)}',
+    '.panel{margin-top:18px;padding:12px 14px 14px;background:rgba(255,255,255,.55);border-radius:22px}',
+    '.panel .sec{margin-top:2px}',
+    '.awayrow{display:flex;flex-wrap:wrap;gap:8px}',
+    '.awayrow .famsm{height:48px;flex:0 1 220px}',
     '.tag{font-family:"Londrina Solid","Arial Narrow",sans-serif;font-size:17px;letter-spacing:.05em;text-transform:uppercase;',
     '  padding:4px 10px;border-radius:999px;background:#E2E8F0;color:#475569;white-space:nowrap}',
     '@keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}',
@@ -442,20 +456,33 @@
     // the family page and the toast spring in. Exits stay quick and plain,
     // the lobby's rule. The linear() strings are written out literally, never
     // behind var(), so a browser that cannot read one keeps the plain motion.
-    '.card,.fam,.famsm,.btn,.go1,.opt,.close,.jam,.clear{transform-origin:50% 100%;',
-    '  transition-property:scale,translate,border-color,background,filter;transition-duration:750ms;',
+    '.card,.fam,.fcard,.famsm,.btn,.go1,.opt,.close,.jam,.clear{transform-origin:50% 100%;',
+    '  transition-property:scale,translate,border-color,background,filter;transition-duration:520ms;',
     '  transition-timing-function:cubic-bezier(.34,1.56,.64,1);transition-timing-function:linear(0, 0.213, 0.605, 0.93, 1.103, 1.142, 1.106, 1.05, 1.006, 0.984, 0.98, 0.986, 0.994, 1, 1.002, 1.003, 1)}',
-    '.card:active,.fam:active,.famsm:active,.tile .go1:active{transform:none;scale:1.02 .94;translate:0 2px;transition-duration:100ms;transition-timing-function:ease-out}',
-    '.btn:active,.opt:active,.close:active,.jam:active,.search .clear:active{transform:none;scale:1.04 .92;translate:0 2px;transition-duration:100ms;transition-timing-function:ease-out}',
+    '.card:active,.fam:active,.fcard:active,.famsm:active,.tile .go1:active{transform:none;scale:1.03 .92;translate:0 3px;transition-duration:80ms;transition-timing-function:ease-out}',
+    '.btn:active,.opt:active,.close:active,.jam:active,.search .clear:active{transform:none;scale:1.06 .9;translate:0 3px;transition-duration:80ms;transition-timing-function:ease-out}',
     '.search .clear:active{translate:0 calc(-50% + 2px)}',
     '.card.in:active{scale:none;translate:none}',
-    '@keyframes land{from{opacity:0;translate:0 14px;scale:.92 1.08}to{opacity:1;translate:0 0;scale:1 1}}',
-    '.card,.fam,.famsm,.tile{animation:land 750ms both;animation-timing-function:linear(0, 0.213, 0.605, 0.93, 1.103, 1.142, 1.106, 1.05, 1.006, 0.984, 0.98, 0.986, 0.994, 1, 1.002, 1.003, 1)}',
-    '.sheet.on{transition:transform 650ms linear(0, 0.213, 0.605, 0.93, 1.103, 1.142, 1.106, 1.05, 1.006, 0.984, 0.98, 0.986, 0.994, 1, 1.002, 1.003, 1)}',
-    '.sib.on{transition:transform 750ms linear(0, 0.213, 0.605, 0.93, 1.103, 1.142, 1.106, 1.05, 1.006, 0.984, 0.98, 0.986, 0.994, 1, 1.002, 1.003, 1)}',
-    '.toast.on{transition:transform 650ms linear(0, 0.213, 0.605, 0.93, 1.103, 1.142, 1.106, 1.05, 1.006, 0.984, 0.98, 0.986, 0.994, 1, 1.002, 1.003, 1)}',
-    '@keyframes boxpop{from{scale:.4}to{scale:1}}',
-    '.opt.on .box{animation:boxpop 750ms both;animation-timing-function:linear(0, 0.213, 0.605, 0.93, 1.103, 1.142, 1.106, 1.05, 1.006, 0.984, 0.98, 0.986, 0.994, 1, 1.002, 1.003, 1)}',
+    // 7.6.0: joyful and quick. A piece lands in ~half a second: up from below,
+    // stretched tall, overshoots into a squash, wobbles once and rests. Pieces
+    // that stay on screen across a redraw never replay it (.stay); they glide
+    // to their new place instead (flip() in render), and a family that has just
+    // been checked in pops out of the list as it leaves.
+    '@keyframes land{0%{opacity:0;translate:0 18px;scale:.84 1.16}45%{opacity:1;translate:0 -3px;scale:1.07 .93}70%{translate:0 0;scale:.98 1.02}100%{opacity:1;translate:0 0;scale:1 1}}',
+    '.card,.fam,.fcard,.famsm,.tile{animation:land 480ms cubic-bezier(.3,.7,.4,1) both}',
+    '.stay{animation:none!important}',
+    '@keyframes sheetin{0%{transform:translate(-50%,105%)}60%{transform:translate(-50%,-3%) scale(1.02,.98)}80%{transform:translate(-50%,1%) scale(.99,1.01)}100%{transform:translate(-50%,0)}}',
+    '.sheet.on{animation:sheetin 460ms cubic-bezier(.3,.7,.4,1) both}',
+    '.sib.on{transition:transform 520ms linear(0, 0.213, 0.605, 0.93, 1.103, 1.142, 1.106, 1.05, 1.006, 0.984, 0.98, 0.986, 0.994, 1, 1.002, 1.003, 1)}',
+    '@keyframes toastin{0%{transform:translate(-50%,-160%) scale(.8)}55%{transform:translate(-50%,8%) scale(1.06,.94)}78%{transform:translate(-50%,-2%) scale(.98,1.02)}100%{transform:translate(-50%,0) scale(1)}}',
+    '.toast.on{animation:toastin 440ms cubic-bezier(.3,.7,.4,1) both}',
+    '@keyframes tickpop{0%{transform:scale(0) rotate(-40deg)}60%{transform:scale(1.3) rotate(10deg)}100%{transform:none}}',
+    '.toast.on .tick{animation:tickpop 420ms cubic-bezier(.3,.7,.4,1) 120ms both}',
+    '.ghosts{position:fixed;inset:0;pointer-events:none;z-index:1;overflow:hidden}',
+    '.ghosts>*{position:fixed;display:block!important;margin:0!important}',
+    '.ghosts>*>*{width:100%;height:100%;animation:none!important}',
+    '@keyframes boxpop{0%{scale:.3;rotate:-20deg}55%{scale:1.25;rotate:6deg}100%{scale:1;rotate:0deg}}',
+    '.opt.on .box{animation:boxpop 360ms cubic-bezier(.3,.7,.4,1) both}',
     '.wrap.grow{transition:clip-path 900ms linear(0, 0.145, 0.446, 0.75, 0.977, 1.103, 1.142, 1.126, 1.084, 1.04, 1.006, 0.987, 0.98, 0.982, 0.987, 0.994, 0.999, 1.002, 1.003, 1.003, 1.002, 1.001, 1, 1, 1)}',
     '.wrap.shrink{transition:clip-path 260ms cubic-bezier(.4,0,1,1),opacity 260ms ease}',
     '@media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}',
@@ -524,7 +551,8 @@
     els.sib.setAttribute('role', 'dialog');
     els.toast = el('div', 'toast');
 
-    wrap.append(top, search, els.list);
+    els.ghosts = el('div', 'ghosts');
+    wrap.append(top, search, els.list, els.ghosts);
     root.append(style, wrap, els.scrim, els.sheet, els.sib, els.toast);
     document.addEventListener('keydown', onKey, true);
   }
@@ -551,12 +579,77 @@
     return isNaN(d) ? '' : d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
   }
 
+  // ── Smooth redraws (7.6.0) ──────────────────────────────────────────────
+  // Every tile is keyed. A redraw reuses the element a key already had (so
+  // nothing that stays replays its landing), and afterwards every survivor
+  // glides from where it was to where it is now (FLIP, on the same jelly
+  // curve); new keys land, staggered; keys that left fade and shrink away, or
+  // pop when the family has just been checked in.
+  var SPRING = 'linear(0, 0.213, 0.605, 0.93, 1.103, 1.142, 1.106, 1.05, 1.006, 0.984, 0.98, 0.986, 0.994, 1, 1.002, 1.003, 1)';
+  var kd = { prev: {}, next: {}, fresh: 0 };
+  var joyRecids = {};
+  function calm() { return window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches; }
+  function beginKeyed(list) {
+    var prev = {};
+    list.querySelectorAll('[data-k]').forEach(function (e) {
+      prev[e.dataset.k] = { el: e, r: e.getBoundingClientRect(), pc: e.parentNode ? e.parentNode.className : '' };
+    });
+    kd = { prev: prev, next: {}, fresh: 0 };
+  }
+  function keyed(tag, cls, k) {
+    var o = kd.prev[k], e;
+    if (o && o.el.tagName === tag.toUpperCase() && !kd.next[k]) {
+      e = o.el;
+      e.className = cls + ' stay';
+      e.removeAttribute('style');
+      while (e.firstChild) e.removeChild(e.firstChild);
+      e.onclick = null;
+      e.removeAttribute('aria-disabled');
+    } else {
+      e = el(tag, cls);
+      e.style.animationDelay = Math.min(kd.fresh++, 14) * 16 + 'ms';
+    }
+    e.dataset.k = k;
+    kd.next[k] = e;
+    return e;
+  }
+  function endKeyed() {
+    if (calm()) return;
+    Object.keys(kd.next).forEach(function (k) {
+      var o = kd.prev[k], e = kd.next[k];
+      if (!o || o.el !== e || !e.animate || !e.isConnected) return;
+      var r = e.getBoundingClientRect();
+      if (!r.width || !o.r.width) return;
+      var dx = o.r.left - r.left, dy = o.r.top - r.top, sx = o.r.width / r.width, sy = o.r.height / r.height;
+      if (Math.abs(dx) < 1 && Math.abs(dy) < 1 && Math.abs(sx - 1) < 0.01 && Math.abs(sy - 1) < 0.01) return;
+      e.animate([{ transformOrigin: '0 0', transform: 'translate(' + dx + 'px,' + dy + 'px) scale(' + sx + ',' + sy + ')' },
+        { transformOrigin: '0 0', transform: 'none' }], { duration: 520, easing: SPRING });
+    });
+    Object.keys(kd.prev).forEach(function (k) {
+      if (kd.next[k]) return;
+      var o = kd.prev[k];
+      if (!o.r.width || !els.ghosts || o.r.bottom < 0 || o.r.top > window.innerHeight) return;
+      var holder = el('div', o.pc);
+      holder.style.cssText = 'left:' + o.r.left + 'px;top:' + o.r.top + 'px;width:' + o.r.width + 'px;height:' + o.r.height + 'px';
+      o.el.classList.add('stay');
+      holder.append(o.el);
+      els.ghosts.append(holder);
+      var joy = (o.el.dataset.recids || '').split(',').some(function (id) { return id && joyRecids[id]; });
+      var a = holder.animate(joy
+        ? [{ transform: 'none', opacity: 1 }, { transform: 'translateY(-10px) scale(1.12,.9)', opacity: 1, offset: 0.35 },
+           { transform: 'translateY(-26px) scale(.4)', opacity: 0 }]
+        : [{ transform: 'none', opacity: 1 }, { transform: 'scale(.85)', opacity: 0 }],
+        { duration: joy ? 460 : 160, easing: joy ? 'cubic-bezier(.3,.7,.4,1)' : 'ease-in', fill: 'forwards' });
+      a.onfinish = function () { holder.remove(); };
+    });
+  }
+
   function card(p, i) {
     var club = clubFor(p.clubId, p.clubName);
-    var b = el('button', 'card' + (p.checkedIn ? ' in' : ''));
+    var b = keyed('button', 'card' + (p.checkedIn ? ' in' : ''), 'c:' + (p.recid || norm(p.name)));
     b.style.setProperty('--club', p.checkedIn ? '#CBD5E1' : club.color);
     b.style.setProperty('--deep', club.deep);
-    b.style.animationDelay = Math.min(i, 10) * 18 + 'ms';
+    if (p.recid) b.dataset.recids = p.recid;
     var txt = el('div');
     txt.style.cssText = 'flex:1;min-width:0';
     txt.append(el('div', 'nm', p.name), el('div', 'cl', club.name));
@@ -565,8 +658,47 @@
       b.append(el('span', 'tag', 'Checked in' + (p.at ? ' ' + timeOf(p.at) : '')));
       b.setAttribute('aria-disabled', 'true');
     } else {
-      b.addEventListener('click', function () { openConfirm(p); });
+      b.onclick = function () { openConfirm(p); };
     }
+    return b;
+  }
+
+  // A family in the search results: its name, and every child still to come
+  // as a chip, the ones the search matched picked out.
+  function famCard(f, hits) {
+    var b = keyed('button', 'fcard', 'r:' + f.key);
+    var stops = f.kids.map(function (c) { return clubFor(c.clubId, c.clubName).color; });
+    b.style.setProperty('--stripe', stops.length > 1 ? stops.join(',') : stops[0] + ',' + stops[0]);
+    b.dataset.recids = f.kids.map(function (c) { return c.recid; }).join(',');
+    var single = f.kids.length === 1;
+    b.append(el('div', 'fn', single ? f.kids[0].name : f.name));
+    var line = el('div', 'kids');
+    f.kids.forEach(function (c) {
+      var club = clubFor(c.clubId, c.clubName);
+      var k = el('span', 'kid' + (hits[c.recid] ? ' hit' : ''));
+      k.style.setProperty('--c', club.color);
+      k.append(el('span', 'dot'), document.createTextNode(single ? club.name : c.name.split(' ')[0]));
+      line.append(k);
+    });
+    b.append(line);
+    b.setAttribute('aria-label', famLabel(f));
+    b.onclick = function () { famClick(f); };
+    return b;
+  }
+
+  function awayButton(f, prefix) {
+    var b = keyed('button', 'famsm', prefix + f.key);
+    b.dataset.recids = f.kids.map(function (c) { return c.recid; }).join(',');
+    var dots = el('span', 'dots');
+    f.kids.forEach(function (c) {
+      var d = el('span', 'dot');
+      d.style.setProperty('--c', clubFor(c.clubId, c.clubName).color);
+      dots.append(d);
+    });
+    b.append(dots, el('span', 'nm', f.kids.length === 1 ? f.kids[0].name : f.name));
+    if (f.kids.length > 1) b.append(el('span', 'n', String(f.kids.length)));
+    b.setAttribute('aria-label', famLabel(f));
+    b.onclick = function () { famClick(f); };
     return b;
   }
 
@@ -578,26 +710,76 @@
     var q = els.input.value;
     els.search.classList.toggle('has', !!q);
     var list = els.list;
+    beginKeyed(list);
     while (list.firstChild) list.removeChild(list.firstChild);
     if (!q.trim()) {
       renderFamilies(list);
+      endKeyed();
       return;
     }
     lastFamSig = '';
+    renderSearch(list, all, q);
+    endKeyed();
+  }
+
+  // Typing (7.6.0): households first, as family cards (every child still to
+  // come, the matched ones picked out); then the matching children on their
+  // own panel; "Did you mean" families for a misspelling; and only at the very
+  // bottom, as small buttons, families not here the last two club nights.
+  function renderSearch(list, all, q) {
     var r = searchPeople(all, q);
-    var n = 0;
-    if (r.matches.length) {
-      var g = el('div', 'grid');
-      r.matches.forEach(function (p) { g.append(card(p, n++)); });
+    var fams = groupFamilies(pageChildren(), households);
+    var famOf = {};
+    fams.forEach(function (f) { f.kids.forEach(function (k) { famOf[k.recid] = f; }); });
+    var hits = {}, seen = {};
+    function famsFor(people) {
+      var out = [];
+      people.forEach(function (p) {
+        if (p.checkedIn || !p.recid) return;
+        hits[p.recid] = true;
+        var f = famOf[p.recid];
+        if (f && !seen[f.key]) { seen[f.key] = true; out.push(f); }
+      });
+      return out;
+    }
+    var exact = famsFor(r.matches);
+    var near = norm(q).length >= 3 ? famsFor(r.close) : [];
+    var away = exact.concat(near).filter(isAway);
+    exact = exact.filter(function (f) { return !isAway(f); });
+    near = near.filter(function (f) { return !isAway(f); });
+    var awayKid = {};
+    away.forEach(function (f) { f.kids.forEach(function (k) { awayKid[k.recid] = true; }); });
+    var kids = r.matches.filter(function (p) { return !p.recid || !awayKid[p.recid]; });
+
+    if (exact.length) {
+      list.append(el('div', 'sec', exact.length === 1 ? 'Family' : 'Families'));
+      var g = el('div', 'rfams');
+      exact.forEach(function (f) { g.append(famCard(f, hits)); });
       list.append(g);
     }
-    if (r.close.length && norm(q).length >= 3) {
-      list.append(el('div', 'sec', r.matches.length ? 'Or did you mean' : 'Did you mean'));
-      var g2 = el('div', 'grid');
-      r.close.forEach(function (p) { g2.append(card(p, n++)); });
+    if (near.length) {
+      list.append(el('div', 'sec', exact.length ? 'Or did you mean' : 'Did you mean'));
+      var g2 = el('div', 'rfams');
+      near.forEach(function (f) { g2.append(famCard(f, hits)); });
       list.append(g2);
     }
-    if (!r.matches.length && !r.close.length) {
+    if (kids.length) {
+      var panel = el('div', 'panel');
+      panel.append(el('div', 'sec', 'Children'));
+      var g3 = el('div', 'grid');
+      kids.forEach(function (p, i) { g3.append(card(p, i)); });
+      panel.append(g3);
+      list.append(panel);
+    }
+    if (away.length) {
+      var box = el('div', 'away');
+      box.append(el('div', 'lead', 'Not here the last two club nights'));
+      var row = el('div', 'awayrow');
+      away.forEach(function (f) { row.append(awayButton(f, 's:')); });
+      box.append(row);
+      list.append(box);
+    }
+    if (!exact.length && !near.length && !kids.length && !away.length) {
       list.append(el('div', 'hint', 'No child matches “' + q.trim() + '”. A new child? Use Walk-ins in the panel.'));
     }
   }
@@ -636,7 +818,7 @@
 
   function famClick(f) {
     if (f.kids.length === 1) openConfirm(f.kids[0]);
-    else openSiblings(null, f.kids, { bible: false, friend: false }, f.name);
+    else openSiblings(null, f.kids, { bible: true, friend: false }, f.name);
   }
   function famLabel(f) {
     return f.kids.length === 1 ? f.kids[0].name : f.name + ': ' + f.kids.map(function (c) { return c.name.split(' ')[0]; }).join(', ');
@@ -670,20 +852,7 @@
       awayBox.style.height = awayH + 'px';
       awayBox.append(el('div', 'lead', 'Not here the last two club nights \u00b7 ' + away.length));
       var ag = el('div', 'awaygrid');
-      away.forEach(function (f) {
-        var b = el('button', 'famsm');
-        var dots = el('span', 'dots');
-        f.kids.forEach(function (c) {
-          var d = el('span', 'dot');
-          d.style.setProperty('--c', clubFor(c.clubId, c.clubName).color);
-          dots.append(d);
-        });
-        b.append(dots, el('span', 'nm', f.kids.length === 1 ? f.kids[0].name : f.name));
-        if (f.kids.length > 1) b.append(el('span', 'n', String(f.kids.length)));
-        b.setAttribute('aria-label', famLabel(f));
-        b.addEventListener('click', function () { famClick(f); });
-        ag.append(b);
-      });
+      away.forEach(function (f) { ag.append(awayButton(f, 'a:')); });
       awayBox.append(ag);
       H -= awayH + 16;
     }
@@ -702,7 +871,8 @@
     if (awayBox) { grid.style.maxHeight = Math.max(40, H) + 'px'; grid.style.overflowY = 'auto'; }
     var fs = compact ? Math.max(13, Math.min(30, fit.h * 0.4)) : Math.max(18, Math.min(64, fit.h * 0.32, fit.w / 8));
     main.forEach(function (f, i) {
-      var b = el('button', 'fam');
+      var b = keyed('button', 'fam', 'f:' + f.key);
+      b.dataset.recids = f.kids.map(function (c) { return c.recid; }).join(',');
       // Each tile's name fits its width on one line: Paytone One averages a
       // little over half an em a letter, and the tile pads about 1.9em. On a
       // one-line tile the name keeps about 55% of the width, the children the rest.
@@ -710,7 +880,6 @@
       var title = single ? f.kids[0].name : f.name;
       var own = Math.min(fs, (fit.w - 8) / (title.length * 0.6 + (compact ? 1.3 : 1.9)));
       b.style.fontSize = Math.max(compact ? 12 : 14, Math.round(own)) + 'px';
-      b.style.animationDelay = Math.min(i, 24) * 12 + 'ms';
       var stops = f.kids.map(function (c) { return clubFor(c.clubId, c.clubName).color; });
       b.style.setProperty('--stripe', stops.length > 1 ? stops.join(',') : stops[0] + ',' + stops[0]);
       b.append(el('div', 'fn', title));
@@ -726,7 +895,7 @@
       });
       b.append(line);
       b.setAttribute('aria-label', famLabel(f));
-      b.addEventListener('click', function () { famClick(f); });
+      b.onclick = function () { famClick(f); };
       grid.append(b);
     });
     list.append(grid);
@@ -764,7 +933,8 @@
     var club = clubFor(p.clubId, p.clubName);
     state.child = p;
     state.items = itemsFor(p.clubId);
-    state.choice = { bible: false, friend: false };
+    // Bible is ticked to start with wherever the club has it (owner, 7.6.0).
+    state.choice = { bible: !!state.items.bible, friend: false };
     var s = els.sheet;
     while (s.firstChild) s.removeChild(s.firstChild);
     s.style.setProperty('--club', club.color);
@@ -772,7 +942,7 @@
     s.append(el('div', 'bar'), el('div', 'nm', p.name), el('div', 'cl', club.name));
     if (state.items.bible || state.items.friend) {
       var opts = el('div', 'opts');
-      if (state.items.bible) opts.append(optButton('Bible', false, function (v) { state.choice.bible = v; }));
+      if (state.items.bible) opts.append(optButton('Bible', state.choice.bible, function (v) { state.choice.bible = v; }));
       if (state.items.friend) opts.append(optButton('Brought a friend', false, function (v) { state.choice.friend = v; }));
       s.append(opts);
     }
@@ -834,6 +1004,7 @@
     var done = 0;
     // Every child of the tap leaves the list now, not as their turn comes.
     entries.forEach(function (e) {
+      joyRecids[e.c.recid] = true;
       recentlyIn[e.c.recid] = { name: e.c.name, clubName: e.c.clubName, clubId: e.c.clubId, at: new Date().toISOString() };
     });
     return entries.reduce(function (chain, e) {

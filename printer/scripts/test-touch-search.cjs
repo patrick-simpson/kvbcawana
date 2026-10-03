@@ -114,6 +114,19 @@ console.log('touch check-in: families still to come');
     /if \(!calendarId\) return Promise\.resolve\('no-form'\);/.test(c) && /if \(csrfToken\) body \+= '&YII_CSRF_TOKEN=/.test(c));
   check('rows TwoTimTwo already checked in (.checked-in, hidden) are not offered or posted',
     /:not\(\.checked-in\)'\) : null;/.test(c) && /querySelectorAll\('\.clubber:not\(\.checked-in\)'\)/.test(fs.readFileSync(path.join(__dirname, '..', 'chrome-extension', 'touch.js'), 'utf8')));
+  const tj = fs.readFileSync(path.join(__dirname, '..', 'chrome-extension', 'touch.js'), 'utf8');
+  check('Bible starts ticked wherever the club has it (7.6.0)', /state\.choice = \{ bible: !!state\.items\.bible, friend: false \};/.test(tj)
+    && /openSiblings\(null, f\.kids, \{ bible: true, friend: false \}, f\.name\)/.test(tj));
+  check('a typed search shows households first, then the children, away families last', (function () {
+    const r = tj.slice(tj.indexOf('function renderSearch'), tj.indexOf('// ── Families still to come'));
+    const a = r.indexOf("'Families'"), b = r.indexOf("'Children'"), c = r.indexOf("'Not here the last two club nights'");
+    return a > 0 && a < b && b < c;
+  })());
+  check('redraws are keyed (no tile replays its landing) and survivors glide', /function keyed\(tag, cls, k\)/.test(tj) && /beginKeyed\(list\);[\s\S]{0,400}endKeyed\(\);/.test(tj));
+  check('rows TwoTimTwo has checked in never count as "still there" for the panel and phone paths',
+    /function findClubberElByName\(name\) \{[\s\S]{0,120}querySelectorAll\('\.clubber:not\(\.checked-in\)'\)/.test(c));
+  check('the panel and phone direct path needs no CSRF token either', /var csrfToken = findCsrfToken\(\);\s*if \(!calendarId\) return Promise\.resolve\(false\);/.test(c));
+  check('a phone check-in never opens the modal under the touch screen', /if \(window\.__awanaTouchOpen\) \{[\s\S]{0,300}reportPhoneAction\(action\.id, false/.test(c));
   check('touch check-ins run one at a time', /touchQueue = run\.catch/.test(api));
   check('the row is dropped by its recid, not its name text', /var row = rowByRecid\(recid\);/.test(c));
   check('a failed post refreshes the token in the background and retries once', /return refreshCheckinTokens\(\)\.then\(function\(\) \{ return postTouchCheckin\(/.test(c));
