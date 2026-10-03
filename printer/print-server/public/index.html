@@ -642,8 +642,8 @@
               </div>
               <div id="receipt-settings" style="display:none; margin-top:8px; padding:10px; border:1px solid #e2e8f0; border-radius:8px">
                 <p style="font-size:11px;color:#64748b;margin:0 0 8px">
-                  On a receipt roll each name tag is today's label turned sideways and scaled to fill the roll
-                  (about 2&#8542;&Prime; &times; 5&#8541;&Prime;), then cut. No tunes.
+                  On a receipt roll each name tag is the same label, scaled down to the roll's width
+                  (about 2&#8542;&Prime; &times; 1&#8540;&Prime;), then cut. No tunes.
                   <span class="receipt-usb-only">Set the cut (full or partial) and the paper (72mm x Receipt) in the printer's own Windows printing preferences.</span>
                 </p>
                 <div style="display:grid; grid-template-columns: 2fr 1fr; gap:10px">
@@ -1783,9 +1783,39 @@ function loadPreview() {
   var club = document.getElementById('preview-club').value.trim();
   var url = BASE + '/preview?firstName=' + encodeURIComponent(first) + '&lastName=' + encodeURIComponent(last);
   if (club) url += '&clubName=' + encodeURIComponent(club);
-  var img = document.getElementById('preview-image');
-  img.src = url;
-  img.style.display = 'block';
+  showTagPreview(document.getElementById('preview-image'), url);
+}
+
+// A preview is drawn at the size the name tag printer prints it (6.27.0):
+// 4 x 2 in on a label printer, about 2 7/8 x 1 3/8 in on an 80 mm roll, at
+// 96 CSS pixels to the inch (close to true size on most screens), with the
+// size written under it. X-Tag-Size comes from GET /preview.
+function showTagPreview(img, url) {
+  fetch(url).then(function(r) {
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    var size = (r.headers.get('X-Tag-Size') || '4.00x2.00').split('x').map(Number);
+    var roll = r.headers.get('X-Tag-Printer') === 'receipt';
+    return r.blob().then(function(b) { return { b: b, size: size, roll: roll }; });
+  }).then(function(p) {
+    if (img.dataset.objectUrl) URL.revokeObjectURL(img.dataset.objectUrl);
+    img.dataset.objectUrl = URL.createObjectURL(p.b);
+    img.src = img.dataset.objectUrl;
+    img.style.width = Math.round(p.size[0] * 96) + 'px';
+    img.style.maxWidth = '100%';
+    img.style.display = 'block';
+    var cap = img.nextElementSibling && img.nextElementSibling.classList.contains('preview-size')
+      ? img.nextElementSibling : null;
+    if (!cap) {
+      cap = document.createElement('p');
+      cap.className = 'preview-size';
+      cap.style.cssText = 'font-size:11px;color:#64748b;margin:6px 0 0';
+      img.parentNode.insertBefore(cap, img.nextSibling);
+    }
+    cap.textContent = (p.roll ? 'As it prints on the 80 mm receipt roll: ' : 'As it prints on the 4\u2033 \u00d7 2\u2033 label printer: ')
+      + p.size[0].toFixed(2) + '\u2033 \u00d7 ' + p.size[1].toFixed(2) + '\u2033, shown about actual size.';
+  }).catch(function() {
+    img.style.display = 'none';
+  });
 }
 
 // ── Per-club label templates ──────────────────────────────────────────────────
@@ -1853,9 +1883,7 @@ function tplPreview() {
     + '&template=' + encodeURIComponent(JSON.stringify(t));
   if (club) url += '&clubName=' + encodeURIComponent(club);
   if (document.getElementById('tpl-preview-visitor').checked) url += '&visitor=1';
-  var img = document.getElementById('tpl-preview-image');
-  img.src = url;
-  img.style.display = 'block';
+  showTagPreview(document.getElementById('tpl-preview-image'), url);
 }
 
 document.getElementById('tpl-club').addEventListener('change', renderTplForm);

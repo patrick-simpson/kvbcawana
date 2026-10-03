@@ -3,9 +3,9 @@
 //
 // WHAT THIS GUARDS
 //
-// * The tag is the 4×2 label, turned and scaled, never a second layout: the
-//   raster is `dots` wide and twice that long, and the label's top-left corner
-//   lands at the roll's top-right (a quarter turn clockwise).
+// * The tag is the 4×2 label, scaled and the right way up, never a second
+//   layout: the raster is `dots` wide and half that long (its 4in side across
+//   the roll), and the label's top-left corner is the tag's top-left.
 // * The ESC/POS stream: reset, GS v 0 bands that add up to the whole picture,
 //   and the cut the setting asked for (65 full, 66 partial).
 // * DLE EOT status: paper out or cover open refuses the job BEFORE a byte of it
@@ -153,17 +153,17 @@ exit 0
   }
 
   // ── 2. The picture ─────────────────────────────────────────────────────────
-  console.log('\nreceipt: rotate and scale');
+  console.log('\nreceipt: scale, the right way up');
   {
     const c = createCanvas(1200, 600);
     const g = c.getContext('2d');
     g.fillStyle = '#fff'; g.fillRect(0, 0, 1200, 600);
     g.fillStyle = '#000'; g.fillRect(0, 0, 100, 100);   // the label's top-left corner
     const r = await receipt.rasterizeLabel(c.toBuffer('image/png'), 576);
-    check('raster is dots wide and twice that long', r.width === 576 && r.height === 1152, `${r.width}×${r.height}`);
+    check('raster is dots wide and half that long', r.width === 576 && r.height === 288, `${r.width}×${r.height}`);
     const on = (x, y) => !!(r.bits[y * (r.width / 8) + (x >> 3)] & (0x80 >> (x & 7)));
-    check("the label's top-left lands at the roll's top-right", on(570, 5) && !on(5, 5) && !on(570, 1140) && !on(5, 1140));
-    check('everything else is white', !on(288, 576));
+    check("the label's top-left is the tag's top-left (not turned)", on(5, 5) && !on(570, 5) && !on(5, 282) && !on(570, 282));
+    check('everything else is white', !on(288, 144));
 
     // The yellow allergy warning icon is a mid-tone (luma ~196). A plain threshold
     // printed it as bare paper; it must come out as dots, while solid black stays solid.
@@ -175,21 +175,22 @@ exit 0
     const yr = await receipt.rasterizeLabel(y.toBuffer('image/png'), 576);
     const yon = (x, yy) => !!(yr.bits[yy * 72 + (x >> 3)] & (0x80 >> (x & 7)));
     let yInk = 0, bInk = 0, n = 0;
-    // label (600..800, 300..500) → raster x = 576 - label y*0.96, y = label x*0.96
-    for (let ry = 600; ry < 760; ry++) for (let rx = 100; rx < 270; rx++) { n++; if (yon(rx, ry)) yInk++; }
+    // label (x, y) → raster (x*0.48, y*0.48): yellow 600..800 × 300..500 is
+    // 288..384 × 144..240; black 100..300 × 300..500 is 48..144 × 144..240.
+    for (let ry = 150; ry < 234; ry++) for (let rx = 294; rx < 378; rx++) { n++; if (yon(rx, ry)) yInk++; }
     let bn = 0;
-    for (let ry = 110; ry < 280; ry++) for (let rx = 100; rx < 270; rx++) { bn++; if (yon(rx, ry)) bInk++; }
+    for (let ry = 150; ry < 234; ry++) for (let rx = 54; rx < 138; rx++) { bn++; if (yon(rx, ry)) bInk++; }
     check('a yellow icon prints as dots, not bare paper', yInk / n > 0.1 && yInk / n < 0.4, `ink ${(yInk / n * 100).toFixed(1)}%`);
     check('solid black stays solid', bInk === bn, `${bInk}/${bn}`);
     let paper = 0;
-    for (let ry = 900; ry < 1100; ry++) for (let rx = 0; rx < 576; rx++) if (yon(rx, ry)) paper++;
+    for (let ry = 0; ry < 130; ry++) for (let rx = 0; rx < 576; rx++) if (yon(rx, ry)) paper++;
     check('bare paper stays bare (no speckle)', paper === 0, `${paper} stray dots`);
 
     const real = await server.generateLabel({ firstName: 'Avery', lastName: 'Sample', clubName: 'Sparks' });
     const rr = await receipt.rasterizeLabel(real.pngPath, 576);
     fs.unlink(real.pngPath, () => {});
     let ink = 0; for (const b of rr.bits) ink += b ? 1 : 0;
-    check('a real label rasterizes with ink on it', rr.height === 1152 && ink > 1000, `ink bytes ${ink}`);
+    check('a real label rasterizes with ink on it', rr.height === 288 && ink > 500, `ink bytes ${ink}`);
   }
 
   // ── 3. The byte stream ─────────────────────────────────────────────────────
@@ -313,6 +314,9 @@ exit 0
     const saved = JSON.parse(fs.readFileSync(cfgPath, 'utf8'));
     check('label, full cut and port 9100 are defaults that delete their keys',
       r.status === 200 && !('printerType' in saved) && !('receiptCut' in saved) && !('receiptPort' in saved), JSON.stringify(saved));
+    const lp = await fetch(BASE + '/preview?firstName=Avery&lastName=Sample');
+    check('on a 4×2 printer the preview is the 4×2 label', lp.headers.get('x-tag-size') === '4.00x2.00'
+      && lp.headers.get('x-tag-printer') === 'label', lp.headers.get('x-tag-size'));
 
     server.setPrinterName('Fake');
     printer.jobs.length = 0;
@@ -355,14 +359,21 @@ exit 0
     check('not on the 4×2 spooler, not on the network printer', spoolJobs() === spool0 && printer.jobs.length === 0);
     const ps1 = fs.readFileSync(path.join(binDir, 'last-receipt.ps1'), 'utf8');
     check('to the chosen printer', /\$name = 'Star TSP100 Cutter'/.test(ps1));
-    check('on a page exactly the tag: 576×1152 dots at 203 dpi', /PaperSize\("Club tag", 284, 567\)/.test(ps1), (ps1.match(/PaperSize\([^)]*\)/) || [])[0]);
+    check('on a page exactly the tag: 576×288 dots at 203 dpi', /PaperSize\("Club tag", 284, 142\)/.test(ps1), (ps1.match(/PaperSize\([^)]*\)/) || [])[0]);
     check('drawn dot for dot, never smoothed', /NearestNeighbor/.test(ps1));
     check('asking Windows about the printer before printing', ps1.indexOf('Win32_Printer') >= 0 && ps1.indexOf('Win32_Printer') < ps1.indexOf('.Print()'));
     const { loadImage } = require(path.join(__dirname, '..', 'print-server', 'node_modules', '@napi-rs/canvas'));
     const tag = await loadImage(fs.readFileSync(path.join(binDir, 'last-tag.png')));
-    check('the driver gets the 1-bit tag, 576 wide and twice as long', tag.width === 576 && tag.height === 1152, `${tag.width}×${tag.height}`);
+    check('the driver gets the 1-bit tag, 576 wide and half as long', tag.width === 576 && tag.height === 288, `${tag.width}×${tag.height}`);
     let h = await health();
     check('/health names the connection and the printer', h.receiptPrinter.connection === 'usb' && h.receiptPrinter.host === 'Star TSP100 Cutter', JSON.stringify(h.receiptPrinter));
+
+    // The preview is what the chosen printer prints (6.27.0).
+    let pv = await fetch(BASE + '/preview?firstName=Avery&lastName=Sample');
+    const pvImg = await loadImage(Buffer.from(await pv.arrayBuffer()));
+    check('on a receipt roll the preview is the tag, at its size', pv.headers.get('x-tag-size') === '2.84x1.42'
+      && pv.headers.get('x-tag-printer') === 'receipt' && pvImg.width === 576 && pvImg.height === 288,
+      `${pv.headers.get('x-tag-size')} ${pvImg.width}×${pvImg.height}`);
 
     fs.writeFileSync(low, '');
     await post('/print-custom', { text: 'USB low' });

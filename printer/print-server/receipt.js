@@ -1,14 +1,16 @@
 'use strict';
 // ── Receipt-printer trial (80mm ESC/POS over the network) ────────────────────
 // An opt-in alternative to the 4×2 label printer: the SAME label the ONE
-// renderer (generateLabel) draws is rotated a quarter turn and scaled to fill
-// the roll's printable width, then sent as raw ESC/POS to the printer's TCP
+// renderer (generateLabel) draws is scaled down to the roll's printable width,
+// the right way up (its 4in side across the roll), then sent as raw ESC/POS to the printer's TCP
 // port 9100 (the industry's "raw" / JetDirect port) and cut. No Windows
 // driver, no PowerShell, no spooler.
 //
 // What this module is NOT: a second label layout. It never draws a label of
 // its own; the picture is the 4×2 label at 2:1, so the tag is printable-width
-// wide and twice that long (576 dots → 2.83in × 5.67in at 203 dpi).
+// wide and half that long (576 × 288 dots → 2.84in × 1.42in at 203 dpi).
+// Until 6.27.0 the label was turned a quarter turn to fill the roll the long
+// way (2.84in × 5.67in); the owner found those far too big (2026-10-03).
 //
 // Everything here is either pure (rasterize, buildEscPos, parse) or a single
 // TCP conversation, so the whole path is testable on a Linux runner against a
@@ -94,14 +96,14 @@ function optionsFrom(cfg) {
 async function rasterizeLabel(png, dots) {
   const img = await loadImage(png);
   const width = dots;                                         // across the head
-  const height = Math.round(width * (img.width / img.height)); // along the feed
+  const height = Math.round(width * (img.height / img.width)); // along the feed
   const canvas = createCanvas(width, height);
   const ctx = canvas.getContext('2d');
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, width, height);
-  ctx.translate(width, 0);
-  ctx.rotate(Math.PI / 2);
-  ctx.drawImage(img, 0, 0, height, width);
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(img, 0, 0, width, height);
   const px = ctx.getImageData(0, 0, width, height).data;
   const lum = new Float32Array(width * height);
   const solid = new Uint8Array(width * height);   // 1 = ink, 2 = paper, 0 = tone

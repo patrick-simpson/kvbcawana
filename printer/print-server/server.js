@@ -5050,8 +5050,20 @@ app.get('/preview', async (req, res) => {
       footerText: labelFooterText(),
       template,
     });
+    // The preview is what the name tag printer will print (6.27.0): on a
+    // receipt roll that is the 1-bit tag at the roll's width, not the 4×2.
+    // X-Tag-Size (inches, "w x h") lets the dashboard draw it at true size.
     res.set('Content-Type', 'image/png');
-    res.send(result.buffer);
+    if (receipt.isEnabled(config)) {
+      const tag = await receipt.renderTagPng(result.pngPath, receipt.optionsFrom(config).dots);
+      res.set('X-Tag-Size', `${(tag.width / RECEIPT_DPI).toFixed(2)}x${(tag.height / RECEIPT_DPI).toFixed(2)}`);
+      res.set('X-Tag-Printer', 'receipt');
+      res.send(tag.buffer);
+    } else {
+      res.set('X-Tag-Size', '4.00x2.00');
+      res.set('X-Tag-Printer', 'label');
+      res.send(result.buffer);
+    }
     // Clean up temp file
     fs.unlink(result.pngPath, () => {});
   } catch (err) {

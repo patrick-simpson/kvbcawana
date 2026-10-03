@@ -1,4 +1,15 @@
-﻿## [6.26.0] - 2026-10-03
+﻿## [6.27.0] - 2026-10-03
+On a receipt roll the name tag is now the same label the right way up, scaled to the roll's width: about 2⅞″ × 1⅜″, a quarter of the paper. The Label Preview shows the tag the chosen printer will print, at its size.
+
+**Why.** Turned a quarter turn to fill the roll the long way, a tag came out about 2⅞″ × 5⅝″, which the owner found far larger than wanted.
+
+**What prints.** Both receipt connections (USB and network) send the 4×2 label scaled to the printable width (576 × 288 dots at 203 dpi), not turned. The design is unchanged, the no-photo bar included. A 4×2 label printer, and a backup printer, print 4″ × 2″ as before.
+
+**The preview.** `GET /preview` returns what the name tag printer prints: on a receipt roll the 1-bit tag, with `X-Tag-Size` (inches) and `X-Tag-Printer`. The dashboard's Label Preview and the template editor draw it at about actual size, with the size written under it.
+
+**For maintainers.** `rasterizeLabel()` in `receipt.js` scales without turning; `test-receipt.cjs` pins the 576 × 288 raster, the page size (284 × 142 hundredths of an inch) and both previews.
+
+## [6.26.0] - 2026-10-03
 One place to choose the printer: the dashboard. The extension's panel on the check-in page shows where labels print, and its Settings page now only points to the dashboard.
 
 **Why.** There were three printer choices (the extension panel's Printer list, the dashboard's Printer box, and the receipt printer box under Printer type), plus an extension Settings page that edited the same Pusher keys as the dashboard. Picking the Star TSP100 in the extension's list printed a 4×2 page on an 80 mm roll, or made the Star its own fallback.
