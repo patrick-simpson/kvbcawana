@@ -119,11 +119,17 @@
   }
 
   // Bail quietly on a dead session or an unexpected (HTML login page) shape.
+  // Signed out is TwoTimTwo's login form (its password box), or the bare
+  // "Login Required" its AJAX endpoints answer with. Never those words or
+  // "login" + "password" anywhere in a page: checked on the live site
+  // (2026-10-03), EVERY signed-in TwoTimTwo page carries "Login Required" in
+  // its own script and mentions both words, so the old test read the check-in
+  // report, the colour-group points and the checkout list as signed out and
+  // none of those feeds ever reached the print app (7.10.0).
   function isLoginPage(text) {
     if (typeof text !== 'string' || !text) return true;
-    if (text.indexOf('Login Required') !== -1) return true;
-    if (/<html/i.test(text) && /login/i.test(text) && /password/i.test(text)) return true;
-    return false;
+    if (text.trim() === 'Login Required') return true;
+    return /name=["']LoginForm\[password\]["']/.test(text);
   }
 
   function looksLikeCsv(text) {

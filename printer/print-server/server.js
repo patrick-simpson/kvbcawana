@@ -3499,7 +3499,7 @@ app.use((req, res, next) => {
 // LAN_PUBLIC_PATHS is the one exception: the phone page itself is the PIN entry
 // form, so it must load before a PIN exists to send. It contains no roster
 // data — every byte of that arrives via POST /phone/roster, which is gated.
-const LAN_PUBLIC_PATHS = new Set(['/phone']);
+const LAN_PUBLIC_PATHS = new Set(['/phone', '/phone/ym']);
 
 // The brand kit (public/brand/, the byte-identical mirror of the signage repo's
 // shared/brand/) is public too, for the same reason: the phone page's fonts,
@@ -8191,6 +8191,17 @@ app.post('/config/label-templates', (req, res) => {
 
 app.get('/phone', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'phone.html'));
+});
+
+// The youth leaders' page (7.10.0): the same phone page, Trek and Journey only,
+// check-in only. Same PIN, same calls; the filter is the page's own.
+const YM_PAGE_FLAGS = "<script>window.AWANA_ONLY_CLUBS = ['trek', 'journey']; window.AWANA_SIMPLE = true;</script>\n";
+function ymPhonePage(page, extra = '') {
+  return page.replace('<script>\n// ── The touch check-in', `${extra}${YM_PAGE_FLAGS}<script>\n// ── The touch check-in`);
+}
+app.get('/phone/ym', (req, res) => {
+  const page = fs.readFileSync(path.join(__dirname, 'public', 'phone.html'), 'utf8');
+  res.type('html').send(ymPhonePage(page));
 });
 
 // Roster + tonight's checked-in set for the phone page.

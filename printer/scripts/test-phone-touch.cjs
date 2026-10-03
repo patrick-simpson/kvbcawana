@@ -89,6 +89,40 @@ const BASE = `http://127.0.0.1:${PORT}`;
       /setTimeout\(loadHouseholds, 5000\);/.test(touch) && /shareContext\(\); \} \}\)/.test(touch));
   }
 
+  console.log('\nthe youth leaders’ page and the 7:15 check-out (7.10.0)');
+  {
+    const res = await fetch(BASE + '/phone/ym');
+    const html = await res.text();
+    check('/phone/ym serves the phone page marked Trek and Journey only, check-in only',
+      res.status === 200 && html.indexOf("window.AWANA_ONLY_CLUBS = ['trek', 'journey']; window.AWANA_SIMPLE = true;") !== -1
+      && html.indexOf('AWANA_SIMPLE') < html.indexOf("var RELAY = window.AWANA_RELAY"));
+    const phone = fs.readFileSync(path.join(root, 'print-server', 'public', 'phone.html'), 'utf8');
+    check('the page keeps only those clubs’ children', /return !ONLY \|\| ONLY\.indexOf\(clubKit\(sk\.club\)\) !== -1;/.test(phone));
+    check('the simple page hides Tonight and the + menu, and never asks for leaders or jams',
+      /\$\('count-pill'\)\.hidden = SIMPLE;/.test(phone) && /\$\('menu-btn'\)\.hidden = SIMPLE;/.test(phone) && /if \(SIMPLE\) return;[^\n]*\n  refreshLeaders\(\);/.test(phone));
+    const build = fs.readFileSync(path.join(root, '..', 'site', 'build.mjs'), 'utf8');
+    check('the website builds /checkin/ym too', /path\.join\(checkinOut, 'ym', 'index\.html'\)/.test(build) && /AWANA_ONLY_CLUBS = \['trek', 'journey'\]/.test(build));
+
+    const ext = fs.readFileSync(path.join(root, 'chrome-extension', 'content.js'), 'utf8');
+    const grab = (name) => { const i = ext.indexOf('function ' + name + '('); let d = 0, j = ext.indexOf('{', i); for (; j < ext.length; j++) { if (ext[j] === '{') d++; else if (ext[j] === '}' && --d === 0) break; } return ext.slice(i, j + 1); };
+    const vm = require('vm');
+    const sb = { YM_CHECKOUT: { enabled: true, at: '19:15', clubs: ['trek', 'journey'] }, CHURCH_CFG: { clubNights: [{ dow: 3 }] },
+      parseHM: (s) => { const m = /^(\d{1,2}):(\d{2})$/.exec(s); return m ? +m[1] * 60 + +m[2] : null; } };
+    vm.createContext(sb);
+    vm.runInContext(grab('ymCheckoutDue') + '\n' + grab('ymClubOf'), sb);
+    const wed = (h, m) => new Date(2026, 9, 7, h, m), thu = new Date(2026, 9, 8, 19, 30);
+    check('the check-out starts at 7:15 on a club night, and runs on from there (late arrivals too)',
+      !sb.ymCheckoutDue(wed(19, 14)) && sb.ymCheckoutDue(wed(19, 15)) && sb.ymCheckoutDue(wed(20, 45)));
+    check('never on another night', !sb.ymCheckoutDue(thu));
+    sb.YM_CHECKOUT.enabled = false;
+    check('the church can switch it off', !sb.ymCheckoutDue(wed(19, 30)));
+    check('only Trek and Journey are checked out',
+      sb.ymClubOf('Trek') === 'trek' && sb.ymClubOf('Journey') === 'journey' && !sb.ymClubOf('T&T') && !sb.ymClubOf('Sparks') && !sb.ymClubOf(''));
+    check('the sweep runs every 30 seconds, checks out with TwoTimTwo’s own call, and never twice',
+      /setInterval\(function\(\) \{ ymSweep\(false\); \}, YM_SWEEP_MS\);/.test(ext) && /var YM_SWEEP_MS = 30 \* 1000;/.test(ext)
+      && /'calendar_id=' \+ encodeURIComponent\(cal\[1\]\) \+ '&clubber_id='/.test(ext) && /done\.indexOf\(id\) === -1/.test(ext));
+  }
+
   console.log(`\n${passed} passed, ${failed} failed`);
   process.exit(failed ? 1 : 0);
 })().catch((e) => { console.error(e); process.exit(1); });

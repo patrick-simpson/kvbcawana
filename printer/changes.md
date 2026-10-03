@@ -1,4 +1,13 @@
-﻿## [7.9.0] - 2026-10-03
+﻿## [7.10.0] - 2026-10-03
+A Trek & Journey phone page for the youth leaders, and Trek and Journey are checked out at 7:15.
+
+**Trek & Journey page.** awana.kvbchurch.org/checkin/ym (any network, the sync passphrase) and /phone/ym on the church Wi-Fi (the phone PIN) are the phone check-in for Trek and Journey only: their families and children, the child's card and the family page, and nothing else (no Tonight, no labels, no Printer jammed).
+
+**Automatic check-out at 7:15.** On a club night, from 7:15 PM the check-in page checks every Trek and Journey child out in TwoTimTwo, every 30 seconds until the night ends, so a child who arrives after 7:15 is checked out within half a minute. Each child is checked out once a night. The time and clubs can be changed (or the check-out turned off) in the church config's `ymCheckout`.
+
+**Signed-in pages no longer read as signed out.** Every TwoTimTwo page carries the words "Login Required" in its script, and the print app took that to mean it was signed out, so it never read the check-in report. It now looks for the sign-in form itself. That brings back what reads the report: tonight's count from TwoTimTwo, the missed-label check (which prints a label for a check-in that never printed one, at most five at a time), club points and the pick-up board's list.
+
+## [7.9.0] - 2026-10-03
 Phone check-in from anywhere: awana.kvbchurch.org/checkin. And the laptop's touch screen stays live while you search.
 
 **awana.kvbchurch.org/checkin.** The phone page now works from any phone on any network, not only the church Wi-Fi. Open awana.kvbchurch.org/checkin and type the sync passphrase (the one the lobby screens sign in with); everything the Wi-Fi page does works there: families, search, the child's card with Bible ticked, brothers and sisters, Tonight with Remove and Add back, Printer jammed, and the leader, custom and visitor labels. Each request travels through the sync service to the check-in laptop, which carries it out exactly as for a phone on the Wi-Fi and sends the answer back, usually within two or three seconds. So the laptop must be on, signed in to the sync service (the dashboard's Sync setting), with the TwoTimTwo check-in page open; if it isn't, the page says the check-in laptop is not answering. The church-Wi-Fi page (the Phones address, PIN as before) keeps working as a fallback when the internet is down.

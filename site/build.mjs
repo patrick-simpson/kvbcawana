@@ -66,6 +66,12 @@ run(`node scripts/stamp-build.mjs ${BUILD_ID} ${JSON.stringify(journeyOut)}`, pa
     throw new Error('site/build.mjs: phone.html no longer has the shape /checkin expects');
   }
   writeFileSync(path.join(checkinOut, 'index.html'), online);
+  // The youth leaders' page (7.10.0): Trek and Journey only, check-in only.
+  const ym = online.replace("<script>window.AWANA_RELAY = '/api';</script>\n",
+    "<script>window.AWANA_RELAY = '/api';</script>\n<script>window.AWANA_ONLY_CLUBS = ['trek', 'journey']; window.AWANA_SIMPLE = true;</script>\n");
+  if (ym === online) throw new Error('site/build.mjs: could not mark /checkin/ym');
+  mkdirSync(path.join(checkinOut, 'ym'), { recursive: true });
+  writeFileSync(path.join(checkinOut, 'ym', 'index.html'), ym);
 }
 
 // The Electron apps' auto-update feeds (site/updates/printer/latest.yml and

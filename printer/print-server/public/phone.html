@@ -518,6 +518,11 @@
 // sync passphrase and every call travels through the sync service's relay:
 // the laptop collects it, runs it exactly as below, and the answer comes back.
 var RELAY = window.AWANA_RELAY || '';
+// The youth page (7.10.0: /checkin/ym online, /phone/ym on the Wi-Fi): only
+// the clubs in AWANA_ONLY_CLUBS (brand-kit keys, e.g. trek and journey), and
+// check-in only (AWANA_SIMPLE): no Tonight pill, no + menu.
+var ONLY = Array.isArray(window.AWANA_ONLY_CLUBS) ? window.AWANA_ONLY_CLUBS : null;
+var SIMPLE = !!window.AWANA_SIMPLE;
 var PIN_KEY = RELAY ? 'awanaCheckinSession' : 'awanaPhonePin';
 
 // ── State ──────────────────────────────────────────────────────────────────
@@ -708,8 +713,8 @@ function startPinCountdown(seconds) {
 function showMainScreen() {
   $('pin-screen').hidden = true;
   $('main-screen').hidden = false;
-  $('count-pill').hidden = false;
-  $('menu-btn').hidden = false;
+  $('count-pill').hidden = SIMPLE;
+  $('menu-btn').hidden = SIMPLE;
 }
 function showPinScreen(message) {
   closeAll();
@@ -764,6 +769,7 @@ function startSession(data) {
   startRosterPoll();
   refreshTonight();
   loadClubs();
+  if (SIMPLE) return;   // the youth page: check-in only
   refreshLeaders();
   refreshJam();
 }
@@ -813,6 +819,11 @@ if (RELAY) {
   $('pin').style.letterSpacing = 'normal';
   document.querySelector('#pin-screen p').textContent = 'Type the check-in passphrase (the one the lobby screens use).';
 }
+if (ONLY) {
+  var ymTitle = window.AWANA_TITLE || 'Trek & Journey';
+  document.querySelector('.top h1').textContent = ymTitle;
+  document.title = ymTitle + ' check-in';
+}
 $('pin-btn').addEventListener('click', unlock);
 $('pin').addEventListener('keydown', function(e) { if (e.key === 'Enter') unlock(); });
 
@@ -823,7 +834,9 @@ function applyRoster(data) {
   rosterLoaded = true;
   var oldByName = {};
   KIDS.forEach(function(k) { oldByName[k.name.toLowerCase()] = k; });
-  KIDS = (data.kids || []).map(function(sk) {
+  KIDS = (data.kids || []).filter(function(sk) {
+    return !ONLY || ONLY.indexOf(clubKit(sk.club)) !== -1;
+  }).map(function(sk) {
     var key = sk.name.toLowerCase();
     if (Object.prototype.hasOwnProperty.call(STATE, key) && oldByName[key]) return oldByName[key];
     return sk;

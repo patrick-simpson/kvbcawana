@@ -133,8 +133,8 @@ function loadParser() {
     new JSDOM('').window.DOMParser,
     (text) => {
       if (typeof text !== 'string' || !text) return true;
-      if (text.indexOf('Login Required') !== -1) return true;
-      return /<html/i.test(text) && /login/i.test(text) && /password/i.test(text);
+      if (text.trim() === 'Login Required') return true;
+      return /name=["']LoginForm\[password\]["']/.test(text);
     },
   );
 }
@@ -185,8 +185,16 @@ async function main() {
     check('the fallback keeps per-club counts',
       fell && fell.byClub.Cubbies === 14 && fell.byClub.Sparks === 29);
 
-    check('a login bounce reads as unknown, not an empty club night', parse('<html><body>login password</body></html>') === null);
+    check('a login bounce reads as unknown, not an empty club night', parse('<html><body><form><input name="LoginForm[username]"><input type="password" name="LoginForm[password]"></form></body></html>') === null);
+    // Live (2026-10-03): every signed-in page's own script says "Login Required"
+    // and mentions login and password; that alone is NOT a login page.
+    check('a real report whose script mentions "Login Required" still parses',
+      parse(REAL_REPORT.replace('</body>', "<script>if (data.responseText.trim()=='Login Required') location.reload(); // login password</script></body>")) !== null);
     check('"Login Required" reads as unknown', parse('Login Required') === null);
+    const feedsSrc = fs.readFileSync(path.join(__dirname, '..', 'chrome-extension', 'feeds.js'), 'utf8');
+    check('feeds.js itself judges a login page by its form, not by the words every page carries',
+      /if \(text\.trim\(\) === 'Login Required'\) return true;\s*return \/name=\["'\]LoginForm\\\[password\\\]\["'\]\/\.test\(text\);/.test(feedsSrc)
+      && !/text\.indexOf\('Login Required'\) !== -1/.test(feedsSrc));
     check('a page with no club tables reads as unknown', parse('<html><body><table><tr><td>x</td></tr></table></body></html>') === null);
     check('empty input reads as unknown', parse('') === null);
     // A real, genuine zero must still be reportable.

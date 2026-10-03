@@ -2,7 +2,7 @@
   if (window.__awanaPrinterLoaded) return;
   window.__awanaPrinterLoaded = true;
 
-  const EXTENSION_VERSION = '7.9.0';
+  const EXTENSION_VERSION = '7.10.0';
   const PRINT_COOLDOWN = 2000;
   // POST /print is synchronous on the server: PowerShell + a cold printer can
   // take 15-30 s (the server retries the spooler internally). This must sit
@@ -3984,6 +3984,12 @@
       .then(function(cfg) {
         if (Array.isArray(cfg.sharesClubIds) && cfg.sharesClubIds.length) CHURCH_CFG.sharesClubIds = cfg.sharesClubIds;
         if (Array.isArray(cfg.clubNights) && cfg.clubNights.length) CHURCH_CFG.clubNights = cfg.clubNights;
+        if (cfg.ymCheckout && typeof cfg.ymCheckout === 'object') {
+          var yc = cfg.ymCheckout;
+          if (yc.enabled === false) YM_CHECKOUT.enabled = false;
+          if (typeof yc.at === 'string' && parseHM(yc.at) !== null) YM_CHECKOUT.at = yc.at;
+          if (Array.isArray(yc.clubs) && yc.clubs.length) YM_CHECKOUT.clubs = yc.clubs.map(function(c) { return String(c).toLowerCase(); });
+        }
         console.log('[Awana] Church config loaded');
       })
       .catch(function() { /* baked defaults */ });
@@ -4010,6 +4016,107 @@
       return st !== null && en !== null && mins >= st && mins < en;
     });
   }
+
+  // ── Youth check-out (7.10.0) ───────────────────────────────────────────────
+  // Trek and Journey leave the building partway through the night, so from
+  // 7:15 PM on a club night every Trek and Journey child still checked in is
+  // checked OUT on TwoTimTwo, the way a volunteer tapping Check out on its
+  // Checkout page would, and anyone who checks in after that is checked out
+  // within the half minute (owner, 2026-10-03). It reads TwoTimTwo's own
+  // Checkout page (docs/TWOTIMTWO.md §2.1: a row per child still checked in,
+  // a.checkout[clubber_id], the club in the icon's alt) and posts exactly what
+  // that page's own button posts: calendar_id (from the page's script) and
+  // clubber_id, answered "OK". Until midnight; church-config.json's ymCheckout
+  // {enabled, at, clubs} can move or turn it off.
+  var YM_CHECKOUT = { enabled: true, at: '19:15', clubs: ['trek', 'journey'] };
+  var YM_SWEEP_MS = 30 * 1000;
+  var ymSweeping = false;
+
+  function ymCheckoutDue(now) {
+    if (!YM_CHECKOUT.enabled) return false;
+    var mins = now.getHours() * 60 + now.getMinutes();
+    var at = parseHM(YM_CHECKOUT.at);
+    if (at === null || mins < at) return false;
+    return CHURCH_CFG.clubNights.some(function(w) { return w && Number(w.dow) === now.getDay(); });
+  }
+
+  function ymClubOf(alt) {
+    var a = String(alt || '').trim().toLowerCase();
+    for (var i = 0; i < YM_CHECKOUT.clubs.length; i++) if (a.indexOf(YM_CHECKOUT.clubs[i]) !== -1) return YM_CHECKOUT.clubs[i];
+    return '';
+  }
+
+  // Who this station has already checked out tonight, by meeting date: the
+  // check-in report keeps listing a child after a check-out, so without this
+  // every sweep would post them again.
+  function ymDone(date) {
+    try { return JSON.parse(localStorage.getItem('awanaYmOut.' + date) || '[]'); } catch (e) { return []; }
+  }
+  function ymMarkDone(date, ids) {
+    try { localStorage.setItem('awanaYmOut.' + date, JSON.stringify(ids.slice(-500))); } catch (e) { /* storage off */ }
+  }
+
+  // One sweep. Resolves { ok, checkedOut: [names], failed: [names] }. `force`
+  // skips the clock (the test hook below), never the page checks.
+  //
+  // Who is in comes from TwoTimTwo's check-in report for the meeting the
+  // Checkout page is on (live, 2026-10-03: KVBC's Checkout page lists nobody,
+  // the check-out tracking it shows being off for its clubs, while the report
+  // lists every check-in), plus anyone the Checkout page itself lists, should
+  // that ever be turned on. The check-out is that page's own call either way;
+  // TwoTimTwo answers it "OK".
+  function ymSweep(force) {
+    if (ymSweeping) return Promise.resolve({ ok: false, busy: true });
+    if (!force && !ymCheckoutDue(new Date())) return Promise.resolve({ ok: true, idle: true, checkedOut: [], failed: [] });
+    ymSweeping = true;
+    return fetch('/clubber/checkout', { credentials: 'same-origin', signal: AbortSignal.timeout(15000) })
+      .then(function(r) { return r.ok ? r.text() : ''; })
+      .then(function(html) {
+        var doc = new DOMParser().parseFromString(html || '', 'text/html');
+        if (!/Checkout Clubber/.test(doc.title || '')) return { ok: false, error: 'not the checkout page (signed out?)', checkedOut: [], failed: [] };
+        var cal = /calendar_id:\s*(\d+)/.exec(html);
+        var dateOpt = doc.querySelector('select#date option[selected]');
+        var date = dateOpt ? dateOpt.getAttribute('value') : '';
+        if (!cal || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return { ok: false, error: 'no meeting on the checkout page', checkedOut: [], failed: [] };
+        var want = {};
+        doc.querySelectorAll('a.checkout[clubber_id]').forEach(function(a) {
+          var tr = a.closest('tr');
+          var img = tr && tr.querySelector('img.club-icon-20');
+          if (!img || !ymClubOf(img.getAttribute('alt'))) return;
+          var nameEl = tr.querySelector('td.name, td.clubber');
+          want[a.getAttribute('clubber_id')] = nameEl ? nameEl.textContent.trim().replace(/\s+/g, ' ') : '';
+        });
+        return fetchCheckinReport(date).then(function(report) {
+          (report || []).forEach(function(e) { if (ymClubOf(e.club) && !(e.clubberId in want)) want[e.clubberId] = e.name; });
+          var done = ymDone(date);
+          var ids = Object.keys(want).filter(function(id) { return done.indexOf(id) === -1; });
+          var out = { ok: true, checkedOut: [], failed: [] };
+          return ids.reduce(function(chain, id) {
+            return chain.then(function() {
+              return fetch('/clubber/checkout', {
+                method: 'POST', credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: 'calendar_id=' + encodeURIComponent(cal[1]) + '&clubber_id=' + encodeURIComponent(id),
+                signal: AbortSignal.timeout(10000)
+              }).then(function(r) { return r.ok ? r.text() : ''; })
+                .then(function(t) {
+                  if (String(t).trim() === 'OK') { out.checkedOut.push(want[id] || id); done.push(id); }
+                  else out.failed.push(want[id] || id);
+                })
+                .catch(function() { out.failed.push(want[id] || id); });
+            });
+          }, Promise.resolve()).then(function() {
+            ymMarkDone(date, done);
+            if (out.checkedOut.length) console.log('[Awana] Youth check-out: ' + out.checkedOut.length + ' Trek/Journey checked out');
+            if (out.failed.length) console.warn('[Awana] Youth check-out failed for ' + out.failed.length);
+            return out;
+          });
+        });
+      })
+      .catch(function(e) { return { ok: false, error: String(e && e.message || e), checkedOut: [], failed: [] }; })
+      .then(function(r) { ymSweeping = false; return r; });
+  }
+  window.__awanaYmSweep = ymSweep;
 
   // ── Confirmation feed (#17a) + pinned last-5 (#29 polish) ──────────────────
   // Every print this station sends, newest first, with how it was detected:
@@ -4169,12 +4276,17 @@
   var RECONCILE_INTERVAL_CLUB_MS    = 5 * 60 * 1000;
   var RECONCILE_INTERVAL_OFF_MS     = 10 * 60 * 1000;
 
-  function fetchCheckinReport() {
-    return fetch('/clubber/checkin_report?date=' + todayIsoDate(), { credentials: 'same-origin', signal: AbortSignal.timeout(10000) })
-      .then(function(r) { return r.ok ? r.text() : null; })
+  function fetchCheckinReport(date) {
+    return fetch('/clubber/checkin_report?date=' + (date || todayIsoDate()), { credentials: 'same-origin', signal: AbortSignal.timeout(10000) })
+      .then(function(r) { return r.ok && !/\/site\/login/.test(r.url || '') ? r.text() : null; })
       .then(function(html) {
-        if (!html || html.indexOf('Login Required') !== -1) return null;
+        if (!html) return null;
         var doc = new DOMParser().parseFromString(html, 'text/html');
+        // Signed out is the login form (or a redirect to it, above). Never the
+        // words "Login Required": every TwoTimTwo page carries them in its own
+        // script (its AJAX error handlers), so that test read every report as
+        // signed out and this parse never ran on the live site (7.10.0).
+        if (doc.querySelector('input[name="LoginForm[password]"]')) return null;
         var tables = doc.querySelectorAll('table');
         if (!tables.length) return null;
         var out = [];
@@ -4196,10 +4308,11 @@
               // Defensive fallback if the name is folded into the same cell as
               // the edit link, rather than its own <td> — strip the link's own
               // text so what remains is (hopefully) just the child's name.
+              // Live (2026-10-03): the cell is [edit link] Name [undo link],
+              // so EVERY link goes, or the name reads "Name undo".
               var clone = tds[0].cloneNode(true);
-              var innerLink = clone.querySelector('a');
-              if (innerLink) innerLink.remove();
-              name = (clone.textContent || '').trim();
+              clone.querySelectorAll('a').forEach(function(a) { a.remove(); });
+              name = (clone.textContent || '').trim().replace(/\s+/g, ' ');
             }
             if (!name) return;
             out.push({ clubberId: clubberId, name: name, club: clubName });
@@ -4457,7 +4570,9 @@
     }).then(function(r) { return r.ok ? r.text() : null; }).then(function(html) {
       if (!html) {
         push('/clubber/checkin_report parses', false, 'fetch failed (HTTP error)');
-      } else if (html.indexOf('Login Required') !== -1) {
+      } else if (/name="LoginForm\[password\]"/.test(html)) {
+        // The login form, never the words "Login Required" (every page's own
+        // script carries them; see fetchCheckinReport).
         push('/clubber/checkin_report parses', false, 'login bounce — session expired?');
       } else {
         var tables = new DOMParser().parseFromString(html, 'text/html').querySelectorAll('table').length;
@@ -4821,6 +4936,8 @@
   })();
   // Peak-window auto-refresh
   setInterval(autoRefresh, AUTO_REFRESH_INTERVAL_MS);
+  // Youth check-out: every half minute; it does nothing before 7:15 on a club night.
+  setInterval(function() { ymSweep(false); }, YM_SWEEP_MS);
   loadChurchConfig();
   setTimeout(pollPendingActions, 4000);
   syncCsv();

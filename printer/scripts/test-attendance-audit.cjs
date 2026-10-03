@@ -93,8 +93,8 @@ function loadGridParser() {
     function pad2(n) { return (n < 10 ? '0' : '') + n; }
     function isLoginPage(text) {
       if (typeof text !== 'string' || !text) return true;
-      if (text.indexOf('Login Required') !== -1) return true;
-      return /<html/i.test(text) && /login/i.test(text) && /password/i.test(text);
+      if (text.trim() === 'Login Required') return true;
+      return /name=["']LoginForm\[password\]["']/.test(text);
     }
     function looksLikeCsv(text) {
       if (!text) return false;
