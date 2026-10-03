@@ -2,7 +2,7 @@
   if (window.__awanaPrinterLoaded) return;
   window.__awanaPrinterLoaded = true;
 
-  const EXTENSION_VERSION = '7.4.0';
+  const EXTENSION_VERSION = '7.4.1';
   const PRINT_COOLDOWN = 2000;
   // POST /print is synchronous on the server: PowerShell + a cold printer can
   // take 15-30 s (the server retries the spooler internally). This must sit
@@ -3918,7 +3918,9 @@
       var WINDOW_END   = 18 * 60;      // 6:00 PM
       if (mins < WINDOW_START || mins >= WINDOW_END) return;
 
-      // Suppress reload if any modal is open or user is typing
+      // Suppress reload if any modal is open or user is typing, or the touch
+      // check-in is up (a reload would drop it and its full screen mid-family).
+      if (window.__awanaTouchOpen) return;
       if (document.getElementById('checkin-modal')) return;
       var active = document.activeElement;
       if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.tagName === 'SELECT')) return;
@@ -4526,11 +4528,95 @@
   // only if that cannot be verified TwoTimTwo's own modal, driven with the
   // same Bible / Friend options. Content scripts share one isolated world, so
   // this object is visible to touch.js and never to the TwoTimTwo page.
+  // ── Touch check-in's own path (7.4.1) ──────────────────────────────────────
+  // The touch screen covers the whole page, so it must never fall back to
+  // clicking a row: TwoTimTwo's modal then opened BEHIND the screen, stacked
+  // up a few check-ins later, and left its grey backdrop over the page after
+  // Close (the owner's "page becomes unresponsive"). It posts directly, judges
+  // success by TwoTimTwo's own answer, and drops the row by its recid (a
+  // name-text match missed rows whose name differed by a space or a nickname,
+  // which was what sent check-ins to the modal in the first place). A failed
+  // post re-reads the check-in page in the background for a fresh CSRF token
+  // and calendar id, and tries once more; then it says so.
+  var touchQueue = Promise.resolve();
+
+  function rowByRecid(recid) {
+    return recid ? document.querySelector('.clubber[recid="' + String(recid).replace(/[^0-9A-Za-z_-]/g, '') + '"]') : null;
+  }
+
+  function refreshCheckinTokens() {
+    return fetch(location.pathname + location.search, { credentials: 'same-origin', signal: AbortSignal.timeout(8000) })
+      .then(function(r) { return r.ok ? r.text() : ''; })
+      .then(function(html) {
+        if (!html) return false;
+        var doc = new DOMParser().parseFromString(html, 'text/html');
+        var tok = doc.querySelector('input[name="YII_CSRF_TOKEN"]');
+        var cal = doc.getElementById('calendar_id');
+        if (!tok || !tok.value) return false;
+        document.querySelectorAll('input[name="YII_CSRF_TOKEN"]').forEach(function(i) { i.value = tok.value; });
+        var mine = document.getElementById('calendar_id');
+        if (cal && cal.value && mine) mine.value = cal.value;
+        return true;
+      })
+      .catch(function() { return false; });
+  }
+
+  function postTouchCheckin(recid, name, clubId, options) {
+    var calInput = document.getElementById('calendar_id');
+    var calendarId = calInput && calInput.value;
+    var csrfToken = findCsrfToken();
+    if (!calendarId || !csrfToken) return Promise.resolve('no-form');
+    var body = 'clubber_id=' + encodeURIComponent(recid) + '&calendar_id=' + encodeURIComponent(calendarId);
+    collectApplicableEvents(clubId, options).forEach(function(v) { body += '&events%5B%5D=' + encodeURIComponent(v); });
+    body += '&YII_CSRF_TOKEN=' + encodeURIComponent(csrfToken);
+    return fetch('/clubber/checkinclubber', {
+      method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: body, signal: AbortSignal.timeout(8000)
+    }).then(function(r) {
+      if (!r.ok) return 'http-' + r.status;
+      return r.text().then(function(text) {
+        var first = (name || '').trim().split(/\s+/)[0] || '';
+        if (first && String(text || '').toLowerCase().indexOf(first.toLowerCase()) === -1) return 'no-confirm';
+        var row = rowByRecid(recid);
+        if (row && row.parentNode) row.parentNode.removeChild(row);
+        var last = document.querySelector('#lastCheckin div');
+        if (last) last.innerHTML = text;   // what TwoTimTwo's own success handler does
+        return 'ok';
+      });
+    }).catch(function() { return 'network'; });
+  }
+
+  function touchCheckin(recid, name, clubId, options) {
+    return postTouchCheckin(recid, name, clubId, options).then(function(r) {
+      if (r === 'ok') return r;
+      console.log('[Awana] Touch check-in for ' + name + ' failed (' + r + '); refreshing the page tokens and trying once more');
+      return refreshCheckinTokens().then(function() { return postTouchCheckin(recid, name, clubId, options); });
+    });
+  }
+
+  // TwoTimTwo's modal or its backdrop, left behind by anything: closed, so
+  // the page answers clicks again when the touch screen goes away.
+  function clearStuckModal() {
+    var m = document.getElementById('checkin-modal');
+    if (m && window.getComputedStyle(m).display !== 'none') {
+      var x = m.querySelector('[data-dismiss="modal"], [data-bs-dismiss="modal"], .close, .btn-close');
+      if (x) x.click();
+      m.style.display = 'none';
+      m.classList.remove('in', 'show');
+    }
+    document.querySelectorAll('.modal-backdrop').forEach(function(b) { b.remove(); });
+    document.body.classList.remove('modal-open');
+    document.body.style.removeProperty('padding-right');
+    document.body.style.removeProperty('overflow');
+  }
+
   window.__awanaTouchApi = {
-    // Resolves 'direct' (posted and verified), 'modal' (handed to the modal
-    // fallback, which retries on its own) or 'gone' (no such row: already in).
+    // Resolves 'direct' (posted and confirmed by TwoTimTwo) or 'gone' (no such
+    // row: already in). Rejects with Error(reason) when it could not check in.
+    // Never opens TwoTimTwo's modal (see touchCheckin). One at a time.
     checkIn: function(recid, options) {
-      var el = recid ? document.querySelector('.clubber[recid="' + String(recid).replace(/[^0-9A-Za-z_-]/g, '') + '"]') : null;
+      var el = rowByRecid(recid);
       if (!el) return Promise.resolve('gone');
       var nameEl = el.querySelector('.name');
       var name = nameEl ? nameEl.innerText.trim() : '';
@@ -4546,16 +4632,29 @@
           doPrint(name, club.clubName, club.clubImageData, undefined, recid);
         }
       }
-      return tryDirectCheckin(recid, name, clubId, opts).then(function(ok) {
-        if (ok) return 'direct';
-        _quickModeProcessing = true;
-        el.click();
-        setTimeout(function() {
-          pollForCheckinButton({ name: name, element: el }, opts, 30);
-          setTimeout(function() { _quickModeProcessing = false; }, 500);
-        }, 150);
-        return 'modal';
+      var run = touchQueue.then(function() {
+        if (!rowByRecid(recid)) return 'gone';
+        return touchCheckin(recid, name, clubId, opts).then(function(r) {
+          if (r === 'ok') return 'direct';
+          if (!rowByRecid(recid)) return 'gone';
+          throw new Error(r);
+        });
       });
+      touchQueue = run.catch(function() {});
+      return run;
+    },
+    // Closing the touch screen: clear anything TwoTimTwo left over the page,
+    // and reload it when children were checked in, so its own lists, counts
+    // and token are fresh. Waits for the print queue to empty first.
+    closed: function(checkedIn) {
+      clearStuckModal();
+      if (!checkedIn) return;
+      var tries = 0;
+      (function reloadWhenIdle() {
+        if (window.__awanaTouchOpen) return;           // reopened meanwhile
+        if ((getQueue().length > 0 || _quickModeProcessing) && ++tries < 20) { setTimeout(reloadWhenIdle, 500); return; }
+        touchQueue.then(function() { if (!window.__awanaTouchOpen) location.reload(); });
+      })();
     },
     // Tonight's live check-ins from the print server (the panel's own Tonight
     // list), as "first last" keys; empty when the server can't be reached.

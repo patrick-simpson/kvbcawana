@@ -1,4 +1,11 @@
-﻿## [7.4.0] - 2026-10-03
+﻿## [7.4.1] - 2026-10-03
+Touch check-in: no more stuck TwoTimTwo page after a few check-ins.
+
+**What went wrong.** When a quick check-in could not confirm itself (it matched the child's row by its exact name text, which a doubled space or a nickname defeats), it fell back to clicking the row on TwoTimTwo's page. That opened TwoTimTwo's check-in pop-up behind the full-screen touch check-in, where nobody could see it; a few of those stacked up, and after Close their grey backdrop covered the page until it was refreshed.
+
+**Now.** The touch check-in never opens TwoTimTwo's pop-up. It posts the check-in directly, one child at a time, takes TwoTimTwo's own reply as the confirmation, and removes the child's row by its id. If a post is refused, it quietly re-reads the check-in page for a fresh security token and tries once more; if that fails too, it says so in red and the child can be tapped again. Closing the touch check-in clears any pop-up or grey backdrop left on the page and, if anyone was checked in, reloads TwoTimTwo once the tags have gone to the printer, so its own lists start fresh. (It does not reload after every check-in: that would drop out of full screen each time, and only a tap can bring full screen back.) The 5:40 pm peak-window auto-reload waits while the touch check-in is open.
+
+## [7.4.0] - 2026-10-03
 Touch check-in: a "Printer jammed" button for the Star.
 
 **Printer jammed.** While the Star receipt printer is the selected printer, the touch check-in's top bar has a "Printer jammed" button beside Close. One tap (no confirm) reprints every check-in from the last 60 seconds twice: once on the Star and once on the backup label printer ("If it fails, print on" on the dashboard). If the Star is still jammed, the label printer's copies still come out, and the message says which printer printed. Failed, removed, award and leader rows never reprint, and each child prints once per printer. It is refused while rehearsal mode is armed.

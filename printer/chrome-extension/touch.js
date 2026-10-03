@@ -795,11 +795,12 @@
         toast(p.name + ' is already checked in', false);
         return false;
       }
+      checkedInThisVisit = true;
       recentlyIn[p.recid] = { name: p.name, clubName: p.clubName, clubId: p.clubId, at: new Date().toISOString() };
       setTimeout(refreshTonight, 2500);
       return true;
     }).catch(function () {
-      toast('Couldn’t check in ' + p.name + '. Try it on the TwoTimTwo page.', true);
+      toast('Couldn’t check in ' + p.name + '. Check the internet, then try again.', true);
       return false;
     });
   }
@@ -1015,9 +1016,15 @@
     setTimeout(function () { try { els.input.focus({ preventScroll: true }); } catch (e) { els.input.focus(); } }, 60);
   }
 
+  var checkedInThisVisit = false;
   function closeScreen() {
     state.open = false;
     window.__awanaTouchOpen = false;
+    // The page behind: any leftover TwoTimTwo modal cleared, and a reload once
+    // the shrink has played if anyone was checked in (content.js, closed()).
+    var reload = checkedInThisVisit;
+    checkedInThisVisit = false;
+    if (typeof API.closed === 'function') setTimeout(function () { API.closed(reload); }, 320);
     closeConfirm();
     els.sib.classList.remove('on');
     if (enteredFullscreen && document.fullscreenElement && document.exitFullscreen) {

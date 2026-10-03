@@ -104,5 +104,18 @@ console.log('touch check-in: families still to come');
   check('a tile never gets smaller as families leave (one fewer is never smaller)', shrinking);
 }
 
+// The touch path never opens TwoTimTwo's modal (7.4.1): behind the full-screen
+// overlay it stacked up and left its grey backdrop over the page after Close.
+{
+  const c = fs.readFileSync(path.join(__dirname, '..', 'chrome-extension', 'content.js'), 'utf8');
+  const api = c.slice(c.indexOf('window.__awanaTouchApi = {'), c.indexOf('injectWidget();', c.indexOf('window.__awanaTouchApi = {')));
+  check('the touch API never clicks a TwoTimTwo row or polls for its modal', api.length > 200 && !/\.click\(\)|pollForCheckinButton|tryDirectCheckin/.test(api));
+  check('touch check-ins run one at a time', /touchQueue = run\.catch/.test(api));
+  check('the row is dropped by its recid, not its name text', /var row = rowByRecid\(recid\);/.test(c));
+  check('a failed post refreshes the token in the background and retries once', /return refreshCheckinTokens\(\)\.then\(function\(\) \{ return postTouchCheckin\(/.test(c));
+  check('Close clears a stuck modal and reloads only after check-ins', /closed: function\(checkedIn\) \{\s*clearStuckModal\(\);\s*if \(!checkedIn\) return;/.test(api));
+  check('the peak-window auto-reload waits while the touch screen is up', /if \(window\.__awanaTouchOpen\) return;\s*if \(document\.getElementById\('checkin-modal'\)\) return;/.test(c));
+}
+
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);
