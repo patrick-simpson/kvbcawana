@@ -1,3 +1,4 @@
 node_modules
 site/dist
 site/.wrangler
+site/lib/large-files.generated.js

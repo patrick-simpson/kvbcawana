@@ -14,7 +14,7 @@
 // the screens find the Worker at their own /api.
 //
 // Usage: node site/build.mjs   (after npm ci in lobby/ and printer/)
-import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { execSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -90,6 +90,29 @@ writeFileSync(path.join(OUT, '_headers'), [
   '  Cache-Control: no-cache',
   '',
 ].join('\n'));
+
+// Files over Pages' 25 MiB limit (the Journey kiosk's weekly lesson
+// transcode, ~30 MiB) are taken out of the upload and served by
+// site/functions/journey/[[path]].js from GitHub's copy of THIS commit, so
+// they always match the files deployed beside them. Only files committed under
+// journey/public can be served that way; anything else that big is a build
+// output, and fails the build rather than the deploy.
+const PAGES_FILE_MAX = 25 * 1024 * 1024;
+const REPO = process.env.GITHUB_REPOSITORY || 'patrick-simpson/kvbcawana';
+const largeFiles = {};
+const walk = (dir) => readdirSync(dir, { withFileTypes: true }).flatMap((d) =>
+  d.isDirectory() ? walk(path.join(dir, d.name)) : [path.join(dir, d.name)]);
+for (const file of walk(OUT)) {
+  if (statSync(file).size < PAGES_FILE_MAX) continue;
+  const sitePath = '/' + path.relative(OUT, file).split(path.sep).join('/');
+  if (!sitePath.startsWith('/journey/')) throw new Error(`${sitePath} is over 25 MiB, and only journey/public files can be served from the repo`);
+  const repoPath = `journey/public/${sitePath.slice('/journey/'.length)}`;
+  largeFiles[sitePath] = `https://raw.githubusercontent.com/${REPO}/${BUILD_ID}/${repoPath}`;
+  rmSync(file);
+  console.log(`  ${sitePath} is ${(statSync(path.join(ROOT, repoPath)).size / 1048576).toFixed(1)} MiB: served from the repo, not uploaded`);
+}
+writeFileSync(path.join(ROOT, 'site', 'lib', 'large-files.generated.js'),
+  `// Written by site/build.mjs for build ${BUILD_ID}; not committed.\nexport const LARGE_FILES = ${JSON.stringify(largeFiles, null, 2)};\n`);
 
 for (const must of ['index.html', 'lobby/index.html', 'lobby/countdown.html', 'journey/index.html', 'lobby/shared/sync.json']) {
   if (!existsSync(path.join(OUT, must))) throw new Error(`site build is missing ${must}`);
