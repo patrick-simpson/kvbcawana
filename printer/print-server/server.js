@@ -2780,6 +2780,32 @@ async function printLabel(pngPath, printerName) {
   }
 }
 
+// "Printer jammed" (touch check-in, 7.4.0): one copy on the Star AND one on
+// the backup label printer, never printLabel's either-or fallback, so a Star
+// that is still jammed costs nothing and a Star that came back gives a second
+// tag. Throws only when neither printer took it. { star, label }: 'ok' or why.
+async function printJamCopies(pngPath) {
+  const out = { star: 'ok', label: 'ok' };
+  const opts = receipt.optionsFrom(config);
+  const at = new Date().toISOString();
+  try {
+    const r = await printReceipt(pngPath, opts);
+    lastReceipt = { ok: true, at, paperLow: r.paperLow };
+  } catch (e) {
+    out.star = String(e.message || e).split('\n')[0].slice(0, 160);
+    lastReceipt = { ok: false, at, error: out.star };
+  }
+  const backup = backupPrinter();
+  if (!backup) out.label = 'No backup label printer is set.';
+  else if (opts.usb && backup.toLowerCase() === String(opts.printerName || '').toLowerCase()) out.label = 'The backup printer is the Star too.';
+  else if (!isSafePrinterName(backup) || !fallbackPrinterReady(backup)) out.label = `"${backup}" is not available.`;
+  else {
+    try { printImage(pngPath, backup); } catch (e) { out.label = String(e.message || e).split('\n')[0].slice(0, 160); }
+  }
+  if (out.star !== 'ok' && out.label !== 'ok') throw new Error(`Star: ${out.star} Label printer: ${out.label}`);
+  return out;
+}
+
 // The /health half: one {type, message} warning while the trial is on and the
 // last receipt print didn't go cleanly. Clears on the next good print.
 function receiptWarnings() {
@@ -5189,7 +5215,9 @@ async function reprintRow(entry, printerName, opts = {}) {
     pngPath = result.pngPath;
 
     if (!silent) playTuneIfEnabled(effectivePrinter, birthday ? 'birthday' : undefined);
-    await printLabel(pngPath, effectivePrinter);
+    let copies = null;
+    if (opts.jam) copies = await printJamCopies(pngPath);
+    else await printLabel(pngPath, effectivePrinter);
 
     addHistoryEntry({
       firstName: entry.firstName, lastName: entry.lastName,
@@ -5198,7 +5226,7 @@ async function reprintRow(entry, printerName, opts = {}) {
     });
 
     console.log(`[reprint] ${fullName}`);
-    return { ok: true, name: fullName };
+    return copies ? { ok: true, name: fullName, copies } : { ok: true, name: fullName };
   } catch (err) {
     console.error('[reprint] Error:', err.message);
     addHistoryEntry({
@@ -5321,6 +5349,46 @@ app.post('/reprint-range', async (req, res) => {
   return res.json({
     success: !stopped, printed, count: sel.rows.length, capped: sel.capped, stoppedAt: stopped,
   });
+});
+
+// "Printer jammed" on the touch check-in (7.4.0). One tap, no confirm (the
+// owner's call): every check-in label from the last JAM_WINDOW_MS prints again,
+// once on the Star and once on the backup label printer. Receipt mode only:
+// with a 4×2 label printer there is no Star to be jammed. Rows come from
+// selectReprintRange, so failed, undone, award and leader rows never print and
+// a child appears once.
+const JAM_WINDOW_MS = 60 * 1000;
+
+app.get('/touch/jam', (req, res) => {
+  const t = printingTarget();
+  res.json({ available: t.kind === 'receipt', backup: t.backup || null, windowSec: JAM_WINDOW_MS / 1000 });
+});
+
+app.post('/jam-reprint', async (req, res) => {
+  if (!receipt.isEnabled(config)) {
+    return res.status(409).json({ error: 'Printer jammed is for the Star receipt printer, and it is not the selected printer.' });
+  }
+  if (isRehearsalActive()) {
+    return res.status(409).json({ error: 'Rehearsal mode is armed — disarm it before reprinting.' });
+  }
+  const now = Date.now();
+  const sel = selectReprintRange({
+    history: loadHistory(), fromISO: new Date(now - JAM_WINDOW_MS).toISOString(), toISO: new Date(now).toISOString(),
+  });
+  if (sel.error || !sel.count) return res.json({ success: true, count: 0, printed: [], star: 0, label: 0 });
+
+  const printed = [];
+  let star = 0, label = 0, starError = null, labelError = null, stopped = null;
+  for (let i = 0; i < sel.rows.length; i++) {
+    const r = await reprintRow(sel.rows[i], '', { silent: true, jam: true });
+    if (!r.ok) { stopped = { name: r.name, error: r.error }; break; }
+    printed.push(r.name);
+    if (r.copies.star === 'ok') star++; else starError = r.copies.star;
+    if (r.copies.label === 'ok') label++; else labelError = r.copies.label;
+    if (i < sel.rows.length - 1) await new Promise(done => setTimeout(done, REPRINT_RANGE_GAP_MS));
+  }
+  console.log(`[jam-reprint] ${printed.length}/${sel.rows.length} (star ${star}, label ${label})${stopped ? ` — stopped at ${stopped.name}` : ''}`);
+  return res.json({ success: !stopped, count: sel.rows.length, printed, star, label, starError, labelError, stoppedAt: stopped });
 });
 
 // ── Award slip labels ─────────────────────────────────────────────────────────
@@ -8464,7 +8532,7 @@ module.exports = {
   // Range reprint (#257) — the selector is pure, so every exclusion rule
   // (awards, leader tags, failed rows, undone rows, the club filter, the
   // newest-row-per-child dedupe and the cap) is testable without printing.
-  selectReprintRange, REPRINT_RANGE_MAX, REPRINT_RANGE_GAP_MS,
+  selectReprintRange, REPRINT_RANGE_MAX, REPRINT_RANGE_GAP_MS, printJamCopies, JAM_WINDOW_MS,
   localDayISO, historyIdentityKey, clubKey,
   // Remembered leaders + the one club list every dropdown reads. Pure but for
   // their file, so the upsert/cap/season rules and the club-table agreement

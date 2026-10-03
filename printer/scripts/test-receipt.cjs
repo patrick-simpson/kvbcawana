@@ -429,6 +429,29 @@ exit 0
     h = await health();
     check('and a good tag clears the failure warnings', !(h.warnings || []).some(w => w && /^receipt(Fallback|PrinterFailed|PaperLow)$/.test(w.type)), JSON.stringify(h.warnings));
 
+    // "Printer jammed" (7.4.0): the last minute again, on the Star AND the label printer.
+    useConfig({ backupPrinterName: 'Fake', receiptPrinterName: 'Star TSP100 Cutter' });
+    let jam = await (await fetch(BASE + '/touch/jam')).json();
+    check('the jam button is offered while the Star is the printer', jam.available === true && jam.backup === 'Fake' && jam.windowSec === 60, JSON.stringify(jam));
+    r = await post('/print', { firstName: 'Jamie', lastName: 'Jamtest', clubName: 'Sparks' });
+    check('(a check-in to reprint)', r.status === 200, JSON.stringify(r.body));
+    let rj = receiptJobs(), sj = spoolJobs();
+    r = await post('/jam-reprint', {});
+    check('Printer jammed reprints the last minute once on each printer', r.status === 200 && r.body.success && r.body.printed.includes('Jamie Jamtest')
+      && r.body.star === r.body.printed.length && r.body.label === r.body.printed.length
+      && receiptJobs() === rj + r.body.printed.length && spoolJobs() === sj + r.body.printed.length, `${JSON.stringify(r.body)} ${receiptJobs() - rj}/${spoolJobs() - sj}`);
+    fs.writeFileSync(problem, 'paper jam');
+    rj = receiptJobs(); sj = spoolJobs();
+    r = await post('/jam-reprint', {});
+    check('a Star that is still jammed: the label printer copies print anyway', r.status === 200 && r.body.success && r.body.star === 0
+      && r.body.label === r.body.printed.length && r.body.printed.length > 0 && receiptJobs() === rj && spoolJobs() === sj + r.body.printed.length
+      && /paper jam/.test(r.body.starError || ''), JSON.stringify(r.body));
+    useConfig({ backupPrinterName: '' });
+    r = await post('/jam-reprint', {});
+    check('neither printer: it stops and says who', r.status === 200 && r.body.success === false && r.body.stoppedAt && /No backup label printer/.test(r.body.stoppedAt.error), JSON.stringify(r.body));
+    fs.unlinkSync(problem);
+    useConfig({ backupPrinterName: 'Fake' });
+
   }
 
   await printer.close();

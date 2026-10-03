@@ -1,4 +1,9 @@
-﻿## [7.3.0] - 2026-10-03
+﻿## [7.4.0] - 2026-10-03
+Touch check-in: a "Printer jammed" button for the Star.
+
+**Printer jammed.** While the Star receipt printer is the selected printer, the touch check-in's top bar has a "Printer jammed" button beside Close. One tap (no confirm) reprints every check-in from the last 60 seconds twice: once on the Star and once on the backup label printer ("If it fails, print on" on the dashboard). If the Star is still jammed, the label printer's copies still come out, and the message says which printer printed. Failed, removed, award and leader rows never reprint, and each child prints once per printer. It is refused while rehearsal mode is armed.
+
+## [7.3.0] - 2026-10-03
 Touch check-in: its own Check in button left of Club Print, opening into true full screen with the lobby's jelly motion throughout; families named by their last name alone; and families who haven't come lately in a row of smaller buttons at the bottom.
 
 **The Check in button.** A blue "Check in" pill always sits just left of the panel's corner (the Club Print pill, or the open panel). One tap grows the touch check-in out of the pill into true full screen: no tabs, no address bar. Close, or Escape, gives the screen back. It replaces the "Open touch check-in" button in the panel.
