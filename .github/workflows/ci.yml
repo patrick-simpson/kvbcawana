@@ -49,9 +49,6 @@ jobs:
       - run: npm run typecheck
       - run: npm run test:coverage
       - name: Build
-        env:
-          VITE_PUSHER_APP_KEY: ${{ vars.PUSHER_APP_KEY }}
-          VITE_PUSHER_CLUSTER: ${{ vars.PUSHER_CLUSTER }}
         run: npm run build
       - run: npx playwright install --with-deps chromium
       - name: E2E smoke
@@ -192,17 +189,22 @@ jobs:
             const out = {};
             for (const n of names) if (process.env[n]) out[n] = process.env[n];
             const missing = names.filter((n) => !out[n]);
-            if (missing.length) console.log(`::warning::Not set yet: ${missing.join(", ")}.`);
+            if (missing.length) console.log(`Not set here: ${missing.join(", ")}.`);
             require("fs").writeFileSync(process.env.RUNNER_TEMP + "/secrets.json", JSON.stringify(out));
+            require("fs").writeFileSync(process.env.RUNNER_TEMP + "/unset.txt", missing.join("\n"));
           '
           npx wrangler secret bulk "$RUNNER_TEMP/secrets.json"
-          rm -f "$RUNNER_TEMP/secrets.json"
+          # Pusher is retired (2026-10-03): a PUSHER_* secret deleted here is
+          # deleted from the Worker too, so it stops sending to Pusher. Only
+          # those: INITIAL_PASSPHRASE counts once and is never removed.
+          grep '^PUSHER_' "$RUNNER_TEMP/unset.txt" | while read -r name; do
+            npx wrangler secret delete "$name" </dev/null >/dev/null 2>&1 && echo "Removed $name from the Worker." || true
+          done
+          rm -f "$RUNNER_TEMP/secrets.json" "$RUNNER_TEMP/unset.txt"
       - name: Build the site
         if: steps.ready.outputs.ready == 'true'
         env:
           SITE_ORIGIN: ${{ vars.SITE_ORIGIN || 'https://kvbcawana.pages.dev' }}
-          VITE_PUSHER_APP_KEY: ${{ vars.PUSHER_APP_KEY }}
-          VITE_PUSHER_CLUSTER: ${{ vars.PUSHER_CLUSTER }}
         run: node site/build.mjs
       - name: Publish the site
         if: steps.ready.outputs.ready == 'true'

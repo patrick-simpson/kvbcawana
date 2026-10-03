@@ -25,7 +25,7 @@ function memoryStore() {
   };
 }
 
-function setup({ env = {}, html = CALENDAR_HTML, start = Date.parse('2026-10-01T18:00:00Z') } = {}) {
+function setup({ env = {}, html = CALENDAR_HTML, start = Date.parse('2026-10-01T18:00:00Z'), publish } = {}) {
   let t = start;
   const sent = [];
   const fetched = [];
@@ -34,7 +34,7 @@ function setup({ env = {}, html = CALENDAR_HTML, start = Date.parse('2026-10-01T
     storage,
     env: { INITIAL_PASSPHRASE: 'kennebec', PUSHER_KEY: 'pk', PUSHER_CLUSTER: 'us2', ...env },
     now: () => t,
-    publish: async (channel, event, payload) => { sent.push({ channel, event, payload }); return { ok: true }; },
+    publish: publish || (async (channel, event, payload) => { sent.push({ channel, event, payload }); return { ok: true }; }),
     fetchFn: async (url) => {
       fetched.push(String(url));
       return new Response(html, { status: 200 });
@@ -161,6 +161,17 @@ describe('sessions', () => {
 });
 
 describe('shared settings', () => {
+  it('with Pusher retired (no secrets), a save still reports its broadcast: the live channel carried it', async () => {
+    const s = setup({ publish: async () => ({ ok: false, error: 'pusher-not-configured' }) });
+    const { body: login } = await s.login();
+    const out = await (await s.call('PUT', '/v1/settings', { settings: { checkoutBoardMode: 'pickup' } }, login.session)).json();
+    expect(out.broadcast).toBe(true);
+    const failing = setup({ publish: async () => ({ ok: false, status: 500, error: 'pusher-500' }) });
+    const { body: login2 } = await failing.login();
+    const out2 = await (await failing.call('PUT', '/v1/settings', { settings: { checkoutBoardMode: 'pickup' } }, login2.session)).json();
+    expect(out2.broadcast).toBe(false);
+  });
+
   it('stores the allowlisted keys, seals a settings frame every screen can open, and orders it', async () => {
     const s = setup();
     const { body: login } = await s.login();

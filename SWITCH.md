@@ -52,9 +52,11 @@ it.
 
 ## After the day
 
-- After a good club night: clear the Pusher keys on the printer dashboard,
-  delete the `PUSHER_*` secrets here (the Worker stops sending to Pusher by
-  itself), and delete the Pusher app.
+- Pusher off (done 2026-10-03, at the owner's word that every screen was
+  moved): clear the Pusher keys on the printer dashboard, delete the
+  `PUSHER_*` secrets and the `PUSHER_APP_KEY` / `PUSHER_CLUSTER` variables
+  here (the next deploy deletes the Worker's own copies, and the site has
+  built without a Pusher key since that day), then delete the Pusher app.
 - Archive the three old repos (read-only; their Journey video release keeps
   serving the lesson videos, which `journey/public/src/schedule.js` still reads).
 - A screen nobody remembered keeps showing the old site, which stops getting

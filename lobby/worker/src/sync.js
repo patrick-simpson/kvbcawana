@@ -138,8 +138,10 @@ export class SyncCore {
     this.now = now || (() => Date.now());
     this.publish = publish || ((channel, event, payload) =>
       pusherTrigger(this.env, channel, event, payload, { fetchFn: this.fetchFn }));
-    // The live channel: every screen's socket (index.js). Until switch day
-    // everything also goes to Pusher, so screens on either transport agree.
+    // The live channel: every screen's socket (index.js). While the Pusher
+    // secrets are set, everything also goes to Pusher, so screens on either
+    // transport agree; with them removed (Pusher retired, 2026-10-03) the
+    // live channel alone carries it.
     this.broadcast = broadcast || (() => 0);
     this.closeAll = closeAll || (() => {});
   }
@@ -305,7 +307,9 @@ export class SyncCore {
     const envelope = await seal(await this.displayKey(), event, payload);
     if (!envelope) return { ok: false, error: 'cannot-seal' };
     await this.relay(event, envelope);
-    return this.publish(DISPLAY_CHANNEL, event, envelope);
+    const sent = await this.publish(DISPLAY_CHANNEL, event, envelope);
+    // No Pusher at all is not a failed broadcast: the live channel carried it.
+    return sent.error === 'pusher-not-configured' ? { ok: true } : sent;
   }
 
   /** @param {'calendar'|'journey'|'template'} what @param {string} at */
