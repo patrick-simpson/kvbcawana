@@ -2,7 +2,7 @@
   if (window.__awanaPrinterLoaded) return;
   window.__awanaPrinterLoaded = true;
 
-  const EXTENSION_VERSION = '7.0.0';
+  const EXTENSION_VERSION = '7.1.0';
   const PRINT_COOLDOWN = 2000;
   // POST /print is synchronous on the server: PowerShell + a cold printer can
   // take 15-30 s (the server retries the spooler internally). This must sit
@@ -2662,6 +2662,7 @@
     //     mid-search here, nothing moves.
     REFOCUS_SEARCH = function() {
       if (isMinimized) return;
+      if (window.__awanaTouchOpen) return;   // the touch check-in is in front
       var ae = document.activeElement;
       // Never steal from ANYTHING the operator focused — not just text
       // fields: a keyboard operator tabbed onto the modal's Checkin button
@@ -2777,6 +2778,29 @@
     });
     topStrip.append(printerRow, queueBadge, csvWarningBanner, updateRow);
 
+    // Touch check-in (7.1.0, touch.js): the full-screen, touch-first check-in.
+    var touchOpenBtn = document.createElement('button');
+    touchOpenBtn.type = 'button';
+    touchOpenBtn.textContent = 'Open touch check-in';
+    Object.assign(touchOpenBtn.style, {
+      width: '100%', minHeight: '40px', border: 'none', borderRadius: '8px', cursor: 'pointer',
+      background: '#4c72b8', color: '#ffffff', fontSize: '14px', fontWeight: '700',
+      fontFamily: "'Figtree', system-ui, sans-serif"
+    });
+    touchOpenBtn.addEventListener('click', function() {
+      if (typeof window.__awanaTouchOpenScreen === 'function') window.__awanaTouchOpenScreen();
+    });
+    // Its sibling page, on unless switched off (localStorage, this browser).
+    var touchSibRow = document.createElement('label');
+    Object.assign(touchSibRow.style, { display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', cursor: 'pointer', color: '#1e293b' });
+    var touchSibCb = document.createElement('input');
+    touchSibCb.type = 'checkbox';
+    try { touchSibCb.checked = localStorage.getItem('awana_touchSiblings') !== 'off'; } catch (e) { touchSibCb.checked = true; }
+    touchSibCb.addEventListener('change', function() {
+      try { localStorage.setItem('awana_touchSiblings', touchSibCb.checked ? 'on' : 'off'); } catch (e) { /* private mode */ }
+    });
+    touchSibRow.append(touchSibCb, document.createTextNode('Offer brothers and sisters after a check-in'));
+
     var TABS = [
       ['checkin', 'Check in'], ['walkins', 'Walk-ins'], ['tonight', 'Tonight'], ['settings', 'Settings']
     ];
@@ -2829,12 +2853,13 @@
 
     var sectionGap = function() { var d = divider(); d.style.margin = '4px 0'; return d; };
     panelBody.append(
-      pane('checkin', [searchContainer, quickModeRow, controls, feedWrap]),
+      pane('checkin', [touchOpenBtn, searchContainer, quickModeRow, controls, feedWrap]),
       pane('walkins', [walkInLabel, walkInRow, walkInClubRow, customStatus, walkInChoice, familyWrap,
         registerCheck, registerFields, leaderChipsWrap]),
       pane('tonight', [tonightHeader, countCheck, tonightList, reconcileRow, verifyRow]),
       pane('settings', [
         sectionLabel('Night modes'), stepUpRow, storeRow,
+        sectionGap(), sectionLabel('Touch check-in'), touchSibRow,
         sectionGap(), sectionLabel('Sound'), soundRow,
         sectionGap(), sectionLabel('Tests'), testsRow,
         sectionGap(), sectionLabel('Status'), csvStatus, contractRow, privacyStatus,
@@ -3017,7 +3042,8 @@
   function loadBrandFonts() {
     if (typeof FontFace === 'undefined' || !document.fonts) return;
     [['Figtree', 'figtree-latin-wght-normal.woff2', '100 900'],
-     ['Londrina Solid', 'londrina-solid-full-400-normal.woff2', '400']].forEach(function(f) {
+     ['Londrina Solid', 'londrina-solid-full-400-normal.woff2', '400'],
+     ['Paytone One', 'paytone-one-full-400-normal.woff2', '400']].forEach(function(f) {
       fetch(PRINT_SERVER + '/brand/fonts/' + f[1], { signal: AbortSignal.timeout(5000) })
         .then(function(r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.arrayBuffer(); })
         .then(function(buf) {
@@ -4467,6 +4493,59 @@
       setTimeout(function() { _quickModeProcessing = false; }, 500);
     }, 150);
   }, true); // capture phase
+
+  // ── Touch check-in's way in (7.1.0) ───────────────────────────────────────
+  // touch.js (the full-screen touch check-in, a second content script) checks
+  // children in through THIS, so it is the exact path Quick Mode uses: the
+  // label prints first (same dedupe), then the direct POST to TwoTimTwo, and
+  // only if that cannot be verified TwoTimTwo's own modal, driven with the
+  // same Bible / Friend options. Content scripts share one isolated world, so
+  // this object is visible to touch.js and never to the TwoTimTwo page.
+  window.__awanaTouchApi = {
+    // Resolves 'direct' (posted and verified), 'modal' (handed to the modal
+    // fallback, which retries on its own) or 'gone' (no such row: already in).
+    checkIn: function(recid, options) {
+      var el = recid ? document.querySelector('.clubber[recid="' + String(recid).replace(/[^0-9A-Za-z_-]/g, '') + '"]') : null;
+      if (!el) return Promise.resolve('gone');
+      var nameEl = el.querySelector('.name');
+      var name = nameEl ? nameEl.innerText.trim() : '';
+      var clubId = el.getAttribute('club_id') || null;
+      var opts = options || {};
+      if (name && selectedMode !== 'off' && !isPrinted(name, recid)) {
+        var batchKey = resolveIdentityKey(name, recid);
+        if (!batchPrintedNames.has(batchKey)) {
+          markPrinted(name, recid);
+          batchPrintedNames.add(batchKey);
+          setTimeout(function() { batchPrintedNames.delete(batchKey); }, 8000);
+          var club = lookupClub(name);
+          doPrint(name, club.clubName, club.clubImageData, undefined, recid);
+        }
+      }
+      return tryDirectCheckin(recid, name, clubId, opts).then(function(ok) {
+        if (ok) return 'direct';
+        _quickModeProcessing = true;
+        el.click();
+        setTimeout(function() {
+          pollForCheckinButton({ name: name, element: el }, opts, 30);
+          setTimeout(function() { _quickModeProcessing = false; }, 500);
+        }, 150);
+        return 'modal';
+      });
+    },
+    // Tonight's live check-ins from the print server (the panel's own Tonight
+    // list), as "first last" keys; empty when the server can't be reached.
+    tonight: function() {
+      return fetch(PRINT_SERVER + '/history/today', { signal: AbortSignal.timeout(3000) })
+        .then(function(r) { return r.ok ? r.json() : []; })
+        .then(function(all) {
+          return (all || []).filter(function(e) {
+            return e && e.success !== false && !e.undone && !e.isAward && !e.isConnectCard && !e.isLeader;
+          }).map(function(e) { return { name: ((e.firstName || '') + ' ' + (e.lastName || '')).trim(), at: e.timestamp || e.at || null, clubName: e.clubName || '' }; });
+        })
+        .catch(function() { return []; });
+    },
+    printServer: PRINT_SERVER,
+  };
 
   injectWidget();
   loadPrintedState();

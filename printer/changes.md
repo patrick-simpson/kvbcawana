@@ -1,4 +1,19 @@
-﻿## [7.0.0] - 2026-10-03
+﻿## [7.1.0] - 2026-10-03
+Touch check-in: a full-screen, touch-first check-in over the TwoTimTwo check-in page, for the check-in laptop's touchscreen, with a sibling page.
+
+**Opening it.** "Open touch check-in" at the top of the panel's Check in tab. ✕ or Escape closes it; TwoTimTwo is underneath, untouched.
+
+**Search.** Type a first name, a last name, or both in either order; the list follows every letter. A misspelling still finds the child: close names are listed under "Did you mean", best first (letters swapped or one or two off, and the sound-alike spellings parents choose between: Jaxon / Jackson, Caitlin / Kaitlyn). One or two letters only ever match the start of a name. Children already in tonight are shown greyed with their time and cannot be tapped.
+
+**Checking in.** A tap opens the child's card: Bible and Brought a friend (only for clubs whose TwoTimTwo check-in has them), then Check in. Nothing is checked in without that second tap. The check-in goes through the panel's own path, exactly as Quick Mode: the label prints, then the direct check-in to TwoTimTwo, and TwoTimTwo's own check-in window only if that cannot be confirmed.
+
+**Brothers and sisters.** If TwoTimTwo files other children under the same household and they are not in yet, their page slides in: one tap each, or All of them (one at a time, in order). Bible and Friend start as the first child's answers, where their club has them, and each can be unchecked. Done, Escape, or typing the next name closes it. Panel → Settings → "Offer brothers and sisters after a check-in" turns the page off. The household list is read from TwoTimTwo's own Household export (re-read every 30 minutes); only household ids and children's names are kept, in memory on that page, never stored or sent.
+
+**Look.** The brand kit: Paytone One names, Londrina Solid labels, Figtree, a club-colour stripe on every child. Motion is transform and opacity only, and stops under the OS's reduced-motion setting. It draws in its own shadow root, so TwoTimTwo's page and this screen never restyle each other.
+
+**For maintainers.** New `chrome-extension/touch.js` (a second content script after `content.js`): the pure search and household parsing at the top, which `scripts/test-touch-search.cjs` (in `npm test`) loads in Node; the screen below. `content.js` exposes `window.__awanaTouchApi` (`checkIn(recid, {Bible, Friend})`, `tonight()`) in the extensions' isolated world, invisible to TwoTimTwo's page, and its panel search never takes focus while the touch screen is open.
+
+## [7.0.0] - 2026-10-03
 Version 7: a new icon, and the extension's panel on the TwoTimTwo check-in page reorganized into a short strip that is always there and four tabs in the order the night goes. (Released as 7.0.0 rather than 6.28.0, at the owner's word.)
 
 **The icon.** A name tag with a green check, on the brand kit's orange (`electron-app/build/icon.svg` is the source; `icon.ico` carries 16 to 256 px, `icon.png` the window and tray). It replaces the plain purple square on the desktop shortcut, the Start menu, the taskbar, the tray and the installer.
