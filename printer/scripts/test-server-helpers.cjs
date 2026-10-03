@@ -32,7 +32,7 @@ const {
   effectiveHandbookGroup, reconcileHistoryWithReport, reportEntryIdentityKey,
   tonightCheckins, markManualUndo, clearManualUndo, computeTonightStats, isNonCheckinRow, splitFullName,
   trophyBandFor, TROPHY_BAND_MAX,
-  lateGoToLine, scheduleRowFor, DEFAULT_SCHEDULE, applySavedConfig,
+  lateGoToLine, scheduleRowFor, DEFAULT_SCHEDULE, applySavedConfig, recentAttendance,
 } = require(path.join(__dirname, '..', 'print-server', 'server.js'));
 
 const feeds = require(path.join(__dirname, '..', 'print-server', 'feeds.js'));
@@ -1768,6 +1768,24 @@ console.log('\ntrophy band (#293): band text + completed-books window');
   check('own rows: grace counts from the earliest slot', lateGoToLine('Sparks', at('18:10')) === '');
   check('own rows: a club they do not list gets no line', lateGoToLine('Cubbies', at('19:10')) === '');
   applySavedConfig({ schedule: [] });
+}
+
+// ── Who came lately (the touch check-in's bottom row) ───────────────────────
+{
+  const ledger = {
+    'id:1': { name: 'Micah Johnson', dates: ['2026-09-16', '2026-09-23', '2026-09-30'] },
+    'id:2': { name: 'Ava Smith', dates: ['2026-09-16'] },                   // missed both of the last two
+    'id:3': { name: 'Eli Ross', dates: ['2026-09-23'] },                    // came to one of them
+    'nora bennett': { name: 'Nora Bennett', dates: ['2026-09-30'] },        // name-keyed, came
+    'id:4': { name: 'Zoe Kim', dates: ['2026-10-07'] },                     // only tonight: not a past night
+  };
+  const r = recentAttendance(ledger, '2026-10-07');
+  check('the last two club nights before today', r.ready && r.nights.join() === '2026-09-23,2026-09-30', JSON.stringify(r.nights));
+  check('children at either night are recent (by id)', r.ids.includes('1') && r.ids.includes('3') && !r.ids.includes('2'), JSON.stringify(r.ids));
+  check('a name-keyed child counts too', r.names.includes('nora bennett'));
+  check('tonight is never one of the two nights', !r.ids.includes('4'));
+  check('fewer than two nights: nothing is split', recentAttendance({ 'id:1': { name: 'A', dates: ['2026-09-30'] } }, '2026-10-07').ready === false);
+  check('an empty ledger: nothing is split', recentAttendance({}, '2026-10-07').ready === false);
 }
 
 console.log('');

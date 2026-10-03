@@ -2,7 +2,7 @@
   if (window.__awanaPrinterLoaded) return;
   window.__awanaPrinterLoaded = true;
 
-  const EXTENSION_VERSION = '7.2.0';
+  const EXTENSION_VERSION = '7.3.0';
   const PRINT_COOLDOWN = 2000;
   // POST /print is synchronous on the server: PowerShell + a cold printer can
   // take 15-30 s (the server retries the spooler internally). This must sit
@@ -4543,6 +4543,13 @@
           }).map(function(e) { return { name: ((e.firstName || '') + ' ' + (e.lastName || '')).trim(), at: e.timestamp || e.at || null, clubName: e.clubName || '' }; });
         })
         .catch(function() { return []; });
+    },
+    // Who was at either of the last two club nights (the print server's
+    // attendance ledger), for the touch check-in's bottom row; null on error.
+    recent: function() {
+      return fetch(PRINT_SERVER + '/touch/recent', { signal: AbortSignal.timeout(3000) })
+        .then(function(r) { return r.ok ? r.json() : null; })
+        .catch(function() { return null; });
     },
     printServer: PRINT_SERVER,
   };

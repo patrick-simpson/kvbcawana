@@ -4951,6 +4951,35 @@ app.get('/attendance-audit', (req, res) => {
   res.json(auditAttendance(loadAttendance(), attendanceGrid));
 });
 
+// ── Who came lately (7.3.0, the touch check-in's bottom row) ─────────────────
+// The last two club nights before today, and every child who was at either:
+// the touch check-in moves a family whose children were at neither down to
+// a row of smaller buttons. A club night is any date some child attended (the
+// streak's rule), so a cancelled week never counts against anyone. Fewer than
+// two club nights so far means nothing is split (ready: false).
+function recentAttendance(ledger, today = localDayISO()) {
+  const nights = new Set();
+  for (const k of Object.keys(ledger || {})) {
+    const ds = ledger[k] && Array.isArray(ledger[k].dates) ? ledger[k].dates : [];
+    for (const d of ds) if (typeof d === 'string' && d < today) nights.add(d);
+  }
+  const lastTwo = [...nights].sort().slice(-2);
+  if (lastTwo.length < 2) return { ready: false, nights: lastTwo, ids: [], names: [] };
+  const ids = [], names = [];
+  for (const k of Object.keys(ledger)) {
+    const e = ledger[k];
+    const ds = e && Array.isArray(e.dates) ? e.dates : [];
+    if (!ds.some(d => lastTwo.includes(d))) continue;
+    if (k.startsWith('id:')) ids.push(k.slice(3));
+    if (e.name) names.push(String(e.name).toLowerCase().trim());
+  }
+  return { ready: true, nights: lastTwo, ids, names };
+}
+
+app.get('/touch/recent', (req, res) => {
+  res.json(recentAttendance(loadAttendance()));
+});
+
 // ADDITIVE ONLY, and confirm-gated like /reset-tonight. It recomputes the audit
 // server-side rather than trusting a client-supplied date list, adds only dates
 // for children who already have a ledger entry and matched exactly one grid
@@ -8397,7 +8426,7 @@ module.exports = {
   // Pure helpers exported for scripts/test-server-helpers.cjs — they carry
   // the assumptions about TwoTimTwo's real /clubber/csv export format.
   parseCSV, normalizeHeader, findClubberIn, parseNoPhoto, noPhotoFor,
-  lateGoToLine, scheduleRowFor, DEFAULT_SCHEDULE,
+  lateGoToLine, scheduleRowFor, DEFAULT_SCHEDULE, recentAttendance,
   parseYesRelease, rosterConsentSummary, consentWarningFor,
   isSafePrinterName,
   parseAllergies,

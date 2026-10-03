@@ -1,4 +1,13 @@
-﻿## [7.2.0] - 2026-10-03
+﻿## [7.3.0] - 2026-10-03
+Touch check-in: families are named by their last name alone, and families who haven't come lately move to a row of smaller buttons at the bottom.
+
+**Last names.** "Brooks", not "The Brooks family", on the family page; after a check-in the sibling page asks "Johnson: also here tonight?".
+
+**Not here the last two club nights.** A family none of whose children came to either of the last two club nights moves from the tiles to a row of small buttons at the bottom (the name, a dot per child in their club's colour, how many). The row takes at most about a third of the screen and scrolls inside itself; the families above size themselves to the rest. A tap works the same as on a tile. If everyone still to come is in that row, they become the main tiles instead. A club night is any date some child attended (a cancelled week counts against no one), from the print server's attendance ledger, which the Attendance Audit keeps in step with TwoTimTwo. Before there have been two club nights this season, nothing is split.
+
+**For maintainers.** New `GET /touch/recent` (`recentAttendance()` in `server.js`: the last two club nights before today and the ids and names of every child at either), `__awanaTouchApi.recent()` in `content.js`, the split in `touch.js`'s `renderFamilies()`. New checks in `test-server-helpers.cjs`.
+
+## [7.2.0] - 2026-10-03
 Touch check-in: whenever the search box is empty, the families still to come fill the screen.
 
 **What shows.** One tile per family with a child not yet checked in: the family's name and, beneath it, only the children still to come, each with a dot in their club's colour (the tile's stripe carries every club). A child TwoTimTwo files with no household, or every child before the household list has loaded, gets a tile of their own with their full name. Families are in alphabetical order; families are never guessed from names.
