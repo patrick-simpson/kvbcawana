@@ -71,6 +71,7 @@
   .pin h2 { font-family: var(--f-shout); font-weight: 400; font-size: 26px; color: var(--c-blue-deep); }
   .pin input { height: 60px; border-radius: 16px; border: 3px solid var(--line); padding: 0 16px; font: 700 26px var(--f-read); letter-spacing: .3em; text-align: center; }
   .pin input:focus { border-color: var(--c-blue); outline: none; }
+  .pin .btn { flex: none; width: 100%; }
   .err { color: var(--bad); font-weight: 700; font-size: 15px; min-height: 1.2em; }
 
   /* ── Search + list ── */
@@ -510,8 +511,17 @@
 
   // touch-core:end
 
+// ── Online or on the Wi-Fi ─────────────────────────────────────────────────
+// On the church Wi-Fi this page is served by the laptop's print app and talks
+// to it directly, unlocked with the PIN. At awana.kvbchurch.org/checkin
+// (7.9.0; the site build sets AWANA_RELAY to its /api) it signs in with the
+// sync passphrase and every call travels through the sync service's relay:
+// the laptop collects it, runs it exactly as below, and the answer comes back.
+var RELAY = window.AWANA_RELAY || '';
+var PIN_KEY = RELAY ? 'awanaCheckinSession' : 'awanaPhonePin';
+
 // ── State ──────────────────────────────────────────────────────────────────
-var PIN = sessionStorage.getItem('awanaPhonePin') || '';
+var PIN = sessionStorage.getItem(PIN_KEY) || '';
 var KIDS = [];                 // the roster: { name, club, checkedIn, removedHere, inactive }
 var HOUSEHOLDS = null;         // householdIndex()-shaped, from the laptop via /phone/roster
 var ITEMS = { bible: [], friend: [] };
@@ -579,7 +589,59 @@ function toast(msg, ms, actionLabel, onAction, kind) {
 
 // ── Talking to the print server ────────────────────────────────────────────
 // Throws an Error with a `.code` of 'pin' | 'locked' | 'network' | 'http'.
+function call(method, path, body) {
+  if (RELAY) return relayCall(method, path, body);
+  if (method === 'GET') {
+    return fetch(path, { headers: { 'X-Awana-Pin': PIN } }).then(function(r) {
+      if (r.status === 403) { var e = new Error('pin'); e.code = 'pin'; throw e; }
+      return r.json();
+    });
+  }
+  return postJson(path, body);
+}
+var LAPTOP_DOWN = 'The check-in laptop is not answering. Is it on, with the TwoTimTwo check-in page open?';
+function relayErr(code, message, status) { var e = new Error(message || code); e.code = code; if (status) e.status = status; return e; }
+// One relayed call: hand it over, then collect the answer (the laptop asks
+// every second while phones are busy, so this is usually a second or two).
+function relayCall(method, path, body) {
+  var auth = { 'Content-Type': 'application/json', Authorization: 'Bearer ' + PIN };
+  return fetch(RELAY + '/v1/relay', { method: 'POST', headers: auth, body: JSON.stringify({ method: method, path: path, body: body || {} }) })
+    .catch(function() { throw relayErr('network', 'No internet connection.'); })
+    .then(function(r) {
+      if (r.status === 401) throw relayErr('pin');
+      return r.json().catch(function() { return {}; }).then(function(d) {
+        if (!r.ok || !d.id) throw relayErr('http', d.error || 'The sync service refused that.', r.status);
+        return d.id;
+      });
+    })
+    .then(function(id) {
+      var started = Date.now();
+      return new Promise(function(resolve, reject) {
+        (function poll() {
+          fetch(RELAY + '/v1/relay/result?id=' + id, { headers: auth }).then(function(r) {
+            if (r.status === 401) throw relayErr('pin');
+            return r.json();
+          }).then(function(d) {
+            if (!d.done) {
+              if (Date.now() - started > 60000) { reject(relayErr('network', LAPTOP_DOWN)); return; }
+              setTimeout(poll, 500);
+              return;
+            }
+            if (d.status >= 200 && d.status < 300) { resolve(d.body); return; }
+            if (d.status === 504) { reject(relayErr('network', LAPTOP_DOWN, 504)); return; }
+            var b = d.body || {};
+            reject(relayErr(d.status >= 500 || !b.error ? 'network' : 'http', b.error || LAPTOP_DOWN, d.status));
+          }).catch(function(e) {
+            if (e && e.code) { reject(e); return; }
+            if (Date.now() - started > 60000) { reject(relayErr('network', 'No internet connection.')); return; }
+            setTimeout(poll, 1000);
+          });
+        })();
+      });
+    });
+}
 function postJson(path, body) {
+  if (RELAY) return relayCall('POST', path, body);
   return fetch(path, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -662,7 +724,7 @@ function showPinScreen(message) {
 function handlePinInvalidated() {
   stopRosterPoll();
   unlockedState = false;
-  sessionStorage.removeItem('awanaPhonePin');
+  sessionStorage.removeItem(PIN_KEY);
   PIN = '';
   STATE = {};
   REMOVING = {};
@@ -675,7 +737,7 @@ function handlePinInvalidated() {
   renderLeaderChips([], 0);
   renderCountCheck(null);
   clearPinCountdown();
-  showPinScreen('PIN changed — ask the check-in desk for the new PIN.');
+  showPinScreen(RELAY ? 'Signed out (the passphrase changed?). Type it again.' : 'PIN changed — ask the check-in desk for the new PIN.');
 }
 // A 429 mid-poll: rate-limited. Stop polling and resume when the lockout clears.
 function handleLockoutDuringPoll(retryAfterSeconds) {
@@ -690,7 +752,7 @@ function handleLockoutDuringPoll(retryAfterSeconds) {
 function handleActionError(e, prefix) {
   if (e.code === 'pin') { handlePinInvalidated(); return; }
   if (e.code === 'locked') { handleLockoutDuringPoll(e.retryAfter); return; }
-  toast(prefix + (e.code === 'network' ? 'cannot reach the print server. Same Wi-Fi?' : e.message), 5000, null, null, 'bad');
+  toast(prefix + (e.code === 'network' ? (RELAY ? e.message : 'cannot reach the print server. Same Wi-Fi?') : e.message), 5000, null, null, 'bad');
   refreshAll();
 }
 function startSession(data) {
@@ -712,9 +774,13 @@ function unlock() {
   unlockInFlight = true;
   var btn = $('pin-btn');
   btn.disabled = true;
-  fetchRoster(pinVal).then(function(data) {
-    PIN = pinVal;
-    sessionStorage.setItem('awanaPhonePin', PIN);
+  (RELAY ? relayLogin(pinVal) : Promise.resolve(pinVal)).then(function(key) {
+    if (RELAY) PIN = key;
+    return fetchRoster(key).then(function(data) { return { key: key, data: data }; });
+  }).then(function(got) {
+    var data = got.data;
+    PIN = got.key;
+    sessionStorage.setItem(PIN_KEY, PIN);
     unlockInFlight = false;
     btn.disabled = false;
     startSession(data);
@@ -722,8 +788,30 @@ function unlock() {
     unlockInFlight = false;
     if (e.code === 'locked') { startPinCountdown(e.retryAfter); return; }
     btn.disabled = false;
+    if (RELAY) { PIN = ''; $('pin-err').textContent = e.code === 'wrong' || e.code === 'pin' ? 'That is not the passphrase.' : (e.message || LAPTOP_DOWN); return; }
     $('pin-err').textContent = e.code === 'pin' ? 'Wrong PIN — ask the check-in desk.' : 'Cannot reach the print server. Same Wi-Fi?';
   });
+}
+// Online: the sync passphrase gets a session, which every relayed call carries.
+function relayLogin(passphrase) {
+  return fetch(RELAY + '/v1/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ passphrase: passphrase }) })
+    .catch(function() { throw relayErr('network', 'No internet connection.'); })
+    .then(function(r) {
+      return r.json().catch(function() { return {}; }).then(function(d) {
+        if (r.status === 429) { var e = relayErr('locked'); e.retryAfter = d.retryAfterSec || 60; throw e; }
+        if (r.status === 401) throw relayErr('wrong');
+        if (!r.ok || !d.session) throw relayErr('network', d.error || 'The sync service did not answer.');
+        return d.session;
+      });
+    });
+}
+if (RELAY) {
+  $('pin').type = 'password';
+  $('pin').setAttribute('inputmode', 'text');
+  $('pin').setAttribute('placeholder', 'Passphrase');
+  $('pin').setAttribute('aria-label', 'Passphrase');
+  $('pin').style.letterSpacing = 'normal';
+  document.querySelector('#pin-screen p').textContent = 'Type the check-in passphrase (the one the lobby screens use).';
 }
 $('pin-btn').addEventListener('click', unlock);
 $('pin').addEventListener('keydown', function(e) { if (e.key === 'Enter') unlock(); });
@@ -1236,7 +1324,7 @@ function pollStatus(key, kid, settle) {
   setTimeout(function() {
     var cur = STATE[key];
     if (!cur || cur.status !== 'pending') return;
-    fetch('/phone/status/' + cur.id, { headers: { 'X-Awana-Pin': PIN } }).then(function(r) { return r.json(); }).then(function(s) {
+    call('GET', '/phone/status/' + cur.id).then(function(s) {
       if (s.status === 'done') {
         kid.checkedIn = true;
         delete STATE[key];
@@ -1428,8 +1516,7 @@ $('menu-close').addEventListener('click', hideSheet);
 // label printer. Offered only while the Star is the selected printer.
 function refreshJam() {
   if (!unlockedState) return;
-  fetch('/touch/jam', { headers: { 'X-Awana-Pin': PIN } }).then(function(r) { return r.ok ? r.json() : null; })
-    .then(function(j) { $('jam-sec').hidden = !(j && j.available); }).catch(function() {});
+  call('GET', '/touch/jam').then(function(j) { $('jam-sec').hidden = !(j && j.available); }).catch(function() {});
 }
 var jamInFlight = false;
 $('jam-btn').addEventListener('click', function() {
@@ -1608,7 +1695,7 @@ $('visitor-name').addEventListener('keydown', function(e) { if (e.key === 'Enter
 // Auto-unlock with the PIN this tab already used.
 if (PIN) {
   fetchRoster(PIN).then(startSession).catch(function(e) {
-    sessionStorage.removeItem('awanaPhonePin');
+    sessionStorage.removeItem(PIN_KEY);
     PIN = '';
     if (e.code === 'locked') startPinCountdown(e.retryAfter);
   });

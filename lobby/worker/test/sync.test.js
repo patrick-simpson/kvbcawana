@@ -377,3 +377,80 @@ describe('requests', () => {
     expect(allowedOrigin(null)).toBeNull();
   });
 });
+
+describe('the phone check-in relay (printer 7.9.0)', () => {
+  it('a page asks, the laptop takes it, answers, and the page collects the answer once', async () => {
+    const s = setup();
+    const { body: { session } } = await s.login();
+    let r = await s.call('POST', '/v1/relay', { method: 'POST', path: '/phone/checkin', body: { name: 'Ava Stone', options: { Bible: true } } }, session);
+    expect(r.status).toBe(200);
+    const { id, laptopOnline } = await r.json();
+    expect(id).toMatch(/^[0-9a-f]{24}$/);
+    expect(laptopOnline).toBe(false);
+    expect(await (await s.call('GET', `/v1/relay/result?id=${id}`, undefined, session)).json()).toEqual({ done: false, laptopOnline: false });
+    r = await s.call('GET', '/v1/relay/next', undefined, session);
+    const next = await r.json();
+    expect(next.busy).toBe(true);
+    expect(next.requests).toEqual([{ id, method: 'POST', path: '/phone/checkin', body: { name: 'Ava Stone', options: { Bible: true } } }]);
+    expect((await (await s.call('GET', '/v1/relay/next', undefined, session)).json()).requests).toEqual([]);
+    r = await s.call('POST', '/v1/relay/answer', { id, status: 200, body: { id: 'x', queued: true } }, session);
+    expect(r.status).toBe(200);
+    expect(await (await s.call('GET', `/v1/relay/result?id=${id}`, undefined, session)).json()).toEqual({ done: true, status: 200, body: { id: 'x', queued: true } });
+    // deleted as it was read: names never sit here
+    expect([...s.storage.map.keys()].filter((k) => k.startsWith('relay:ans:'))).toEqual([]);
+  });
+
+  it('only the phone page’s own calls can be relayed', async () => {
+    const s = setup();
+    const { body: { session } } = await s.login();
+    for (const [method, path] of [['POST', '/config'], ['GET', '/history/today'], ['POST', '/phone/../config'], ['DELETE', '/phone/checkin'], ['POST', '/touch/context']]) {
+      const r = await s.call('POST', '/v1/relay', { method, path, body: {} }, session);
+      expect(r.status, `${method} ${path}`).toBe(400);
+    }
+    for (const [method, path] of [['POST', '/phone/roster'], ['GET', '/phone/status/0f8c1a2b-3c4d'], ['POST', '/jam-reprint'], ['GET', '/touch/jam']]) {
+      const r = await s.call('POST', '/v1/relay', { method, path, body: {} }, session);
+      expect(r.status, `${method} ${path}`).toBe(200);
+    }
+  });
+
+  it('signed out: nothing can be asked, taken or read', async () => {
+    const s = setup();
+    for (const [m, p] of [['POST', '/v1/relay'], ['GET', '/v1/relay/next'], ['POST', '/v1/relay/answer'], ['GET', '/v1/relay/result?id=abc']]) {
+      expect((await s.call(m, p, { method: 'POST', path: '/phone/roster' })).status, `${m} ${p}`).toBe(401);
+    }
+  });
+
+  it('a laptop that never answers: the page hears so, and the request (a child’s name) is gone', async () => {
+    const s = setup();
+    const { body: { session } } = await s.login();
+    const { id } = await (await s.call('POST', '/v1/relay', { method: 'POST', path: '/phone/checkin', body: { name: 'Eli Stone' } }, session)).json();
+    s.tick(46 * 1000);
+    const res = await (await s.call('GET', `/v1/relay/result?id=${id}`, undefined, session)).json();
+    expect(res.done).toBe(true);
+    expect(res.status).toBe(504);
+    expect(res.body.error).toMatch(/not answering/);
+    expect(JSON.stringify(await s.storage.get('relay:queue'))).not.toContain('Eli Stone');
+  });
+
+  it('an answer nobody collects is deleted after two minutes', async () => {
+    const s = setup();
+    const { body: { session } } = await s.login();
+    const { id } = await (await s.call('POST', '/v1/relay', { method: 'POST', path: '/phone/roster', body: {} }, session)).json();
+    await s.call('GET', '/v1/relay/next', undefined, session);
+    await s.call('POST', '/v1/relay/answer', { id, status: 200, body: { kids: [{ name: 'Mia Reed' }] } }, session);
+    s.tick(2 * 60 * 1000 + 1);
+    await s.call('GET', '/v1/relay/next', undefined, session);
+    expect(await s.storage.get(`relay:ans:${id}`)).toBeUndefined();
+  });
+
+  it('the laptop asks every second only while phones are busy, and says it is on', async () => {
+    const s = setup();
+    const { body: { session } } = await s.login();
+    expect((await (await s.call('GET', '/v1/relay/next', undefined, session)).json()).busy).toBe(false);
+    await s.call('POST', '/v1/relay', { method: 'POST', path: '/phone/tonight', body: {} }, session);
+    const { laptopOnline } = await (await s.call('POST', '/v1/relay', { method: 'POST', path: '/phone/tonight', body: {} }, session)).json();
+    expect(laptopOnline).toBe(true);
+    s.tick(5 * 60 * 1000 + 1);
+    expect((await (await s.call('GET', '/v1/relay/next', undefined, session)).json()).busy).toBe(false);
+  });
+});

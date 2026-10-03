@@ -946,10 +946,37 @@
   // While the families are showing, follow the page: a child checked in at
   // another station (or by the panel) leaves, and the tiles grow. Re-drawn
   // only when the set of families actually changes, so nothing replays.
+  // 7.9.0: a search that is open follows too (a child checked in from a
+  // phone or the panel drops out of the results within 3 s); the keyed redraw
+  // glides what stays, so it never jumps under a finger. Only an open card or
+  // family page holds the screen still.
+  var lastSearchSig = '';
   setInterval(function () {
-    if (!state.open || !els.input || els.input.value.trim() || els.sheet.classList.contains('on') || siblingsOpen()) return;
+    if (!state.open || !els.input || els.sheet.classList.contains('on') || siblingsOpen()) return;
+    if (els.input.value.trim()) {
+      var sig = famSig() + '#' + Object.keys(recentlyIn).length;
+      if (sig !== lastSearchSig) { lastSearchSig = sig; render(); }
+      return;
+    }
     if (famSig() !== lastFamSig) render();
   }, 3000);
+  // ...and tonight's count (and who shows as checked in) every 15 s, from
+  // the print app, which counts the phones' check-ins too.
+  var lastTonightSig = '';
+  setInterval(function () {
+    if (!state.open || typeof API.tonight !== 'function') return;
+    API.tonight().then(function (list) {
+      list = list || [];
+      var sig = list.length + ':' + list.map(function (t) { return t.name; }).join('|');
+      if (sig === lastTonightSig) return;
+      lastTonightSig = sig;
+      tonight = list;
+      if (els.sheet.classList.contains('on') || siblingsOpen()) {
+        var n = people().filter(function (p) { return p.checkedIn; }).length;
+        els.count.textContent = n ? n + ' checked in tonight' : '';
+      } else render();
+    });
+  }, 15000);
   window.addEventListener('resize', function () {
     if (state.open && els.input && !els.input.value.trim()) render();
   });

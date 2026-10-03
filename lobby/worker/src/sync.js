@@ -40,6 +40,7 @@ import { fromBase64, hmac, kidFor, newDisplayKey, randomBytes, safeEqual, seal, 
 import { trigger as pusherTrigger } from './pusher.js';
 import { DEFAULT_CALENDAR_URL, scrapeCalendar } from './calendar.js';
 import { DOORBELL_EVENT, REPLAYED, checkPublish, frameText, replayKey } from './live.js';
+import { Relay } from './relay.js';
 
 export const IP_MAX_FAILS = 5;
 export const IP_LOCK_MS = 15 * 60 * 1000;
@@ -144,6 +145,7 @@ export class SyncCore {
     // live channel alone carries it.
     this.broadcast = broadcast || (() => 0);
     this.closeAll = closeAll || (() => {});
+    this.relayQueue = new Relay(this.storage, this.now);
   }
 
   /** Send a frame to every live screen, and keep it for late joiners. */
@@ -342,6 +344,7 @@ export class SyncCore {
       const known = new Set([
         'GET /v1/state', 'PUT /v1/settings', 'PUT /v1/slides', 'PUT /v1/template',
         'PUT /v1/journey', 'POST /v1/calendar/refresh', 'POST /v1/passphrase', 'POST /v1/publish',
+        'POST /v1/relay', 'GET /v1/relay/next', 'POST /v1/relay/answer', 'GET /v1/relay/result',
       ]);
       if (!known.has(route)) return fail('Not found.', 404);
       if (!(await this.authorized(request))) {
@@ -356,6 +359,17 @@ export class SyncCore {
         case 'POST /v1/calendar/refresh': return await this.refreshCalendar();
         case 'POST /v1/passphrase': return await this.changePassphrase(request, ip);
         case 'POST /v1/publish': return await this.livePublish(request);
+        // The phone check-in relay (relay.js): the page asks, the laptop answers.
+        case 'POST /v1/relay': {
+          const r = await this.relayQueue.enqueue(await this.body(request));
+          return r.ok ? json({ id: r.id, laptopOnline: r.laptopOnline }) : fail(r.error, r.status);
+        }
+        case 'GET /v1/relay/next': return json(await this.relayQueue.take());
+        case 'POST /v1/relay/answer': {
+          const r = await this.relayQueue.answer(await this.body(request));
+          return r.ok ? json({ ok: true }) : fail(r.error, r.status);
+        }
+        case 'GET /v1/relay/result': return json(await this.relayQueue.result(url.searchParams.get('id')));
         default: return fail('Not found.', 404);
       }
     } catch (err) {
@@ -539,6 +553,7 @@ export class SyncCore {
 
   /** The scheduled run: keep the calendar fresh without anyone pressing a button. */
   async cron() {
+    await this.relayQueue.purge();
     const res = await this.refreshCalendar();
     return res.status;
   }

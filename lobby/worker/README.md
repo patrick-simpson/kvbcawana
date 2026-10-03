@@ -134,3 +134,23 @@ All JSON. Every route but the first three needs `Authorization: Bearer
 Changes to the template, Journey's settings and the calendar ring a plaintext
 doorbell, `changed` `{what, at}` on the `awana-sync` Pusher channel; it carries
 no content, and a screen that hears it fetches from here.
+
+## The phone check-in relay (printer 7.9.0)
+
+`awana.kvbchurch.org/checkin` is the print app's phone page, online. It signs in
+with the passphrase like any screen, and every call it would make to the
+check-in laptop on the church Wi-Fi goes through four routes instead
+(`src/relay.js`):
+
+| Route | Who | What |
+|---|---|---|
+| `POST /v1/relay` `{method, path, body}` | the page | queue one of the phone page's own calls (`RELAY_ROUTES` only) |
+| `GET /v1/relay/next` | the laptop's print app | take every waiting call; `busy` says whether to ask again in a second or in 20 s |
+| `POST /v1/relay/answer` `{id, status, body}` | the laptop | the call's answer |
+| `GET /v1/relay/result?id=` | the page | the answer, once (`{done: false}` until then) |
+
+Nothing about the roster is stored: a call waits at most 45 s for the laptop, an
+answer at most 2 minutes for its page, and is deleted as it is read. The laptop
+runs only the same `RELAY_ROUTES` (`printer/print-server/phone-relay.js`,
+pinned equal by `printer/scripts/test-phone-relay.cjs`), and only while it is
+signed in to this service.

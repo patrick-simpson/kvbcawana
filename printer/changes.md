@@ -1,4 +1,13 @@
-﻿## [7.8.0] - 2026-10-03
+﻿## [7.9.0] - 2026-10-03
+Phone check-in from anywhere: awana.kvbchurch.org/checkin. And the laptop's touch screen stays live while you search.
+
+**awana.kvbchurch.org/checkin.** The phone page now works from any phone on any network, not only the church Wi-Fi. Open awana.kvbchurch.org/checkin and type the sync passphrase (the one the lobby screens sign in with); everything the Wi-Fi page does works there: families, search, the child's card with Bible ticked, brothers and sisters, Tonight with Remove and Add back, Printer jammed, and the leader, custom and visitor labels. Each request travels through the sync service to the check-in laptop, which carries it out exactly as for a phone on the Wi-Fi and sends the answer back, usually within two or three seconds. So the laptop must be on, signed in to the sync service (the dashboard's Sync setting), with the TwoTimTwo check-in page open; if it isn't, the page says the check-in laptop is not answering. The church-Wi-Fi page (the Phones address, PIN as before) keeps working as a fallback when the internet is down.
+
+**Nothing stored online.** The sync service keeps no roster: a request waits at most 45 seconds for the laptop, and an answer (which can hold children's names) at most two minutes for its phone, and is deleted the moment the phone reads it. Only the phone page's own requests can travel this way; the laptop checks the same list again before running anything, and asks for requests every 20 seconds, or every second while a phone has been busy in the last five minutes.
+
+**The laptop's touch screen follows phones live.** A child checked in from a phone (or the panel) now drops out of an open search within three seconds, the same as from the families list, and the "checked in tonight" count refreshes every 15 seconds, phones' check-ins included. Only an open child's card or family page holds the screen still.
+
+## [7.8.0] - 2026-10-03
 The phone check-in, rebuilt as the touch check-in.
 
 **It looks and works like the laptop's touch screen.** The phone page (the Phones address on the Club Label Printer window, PIN as before) opens on the families still to come, two to a row, each with their children and club colours, and the families not here the last two club nights as small buttons at the bottom. Typing shows matching families first, then the matching children on their own panel, "Did you mean" families for a misspelling, and away families last. A child's card has Bible ticked where the club has it (and Brought a friend); Check in goes straight back to the list while the check-in finishes on the check-in laptop, and a green line says when it is through (a failure says so in red, and the child comes back). Brothers and sisters get their own page, one tap each or "All of them". The same joyful jelly motion as the touch screen: tiles land and settle, survivors glide while you type, a checked-in family pops out of the list.

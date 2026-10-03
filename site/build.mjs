@@ -5,6 +5,7 @@
 //   /lobby/      the lobby signage (lobby/ build; countdown.html is the projector)
 //   /projector   a redirect to /lobby/countdown.html
 //   /journey/    the Journey kiosk (journey/public, build-stamped)
+//   /checkin     the phone check-in, online (the print app's phone page, relayed)
 //   /api/*       the sync Worker, through site/functions (not built here)
 //
 // Each app is built exactly as its own deploy built it, so nothing inside an
@@ -47,6 +48,25 @@ writeFileSync(path.join(OUT, 'lobby', 'shared', 'sync.json'), `${JSON.stringify(
 const journeyOut = path.join(OUT, 'journey');
 cpSync(path.join(ROOT, 'journey', 'public'), journeyOut, { recursive: true });
 run(`node scripts/stamp-build.mjs ${BUILD_ID} ${JSON.stringify(journeyOut)}`, path.join(ROOT, 'journey'));
+
+// The phone check-in, online (printer 7.9.0): the print app's own phone page,
+// with its brand kit beside it, signed in with the sync passphrase and every
+// call relayed to the check-in laptop through /api (lobby/worker/src/relay.js).
+// It carries no roster: names arrive only through the relay, from the laptop.
+{
+  const checkinOut = path.join(OUT, 'checkin');
+  const PHONE_PUBLIC = path.join(ROOT, 'printer', 'print-server', 'public');
+  mkdirSync(checkinOut, { recursive: true });
+  cpSync(path.join(PHONE_PUBLIC, 'brand'), path.join(checkinOut, 'brand'), { recursive: true });
+  const page = readFileSync(path.join(PHONE_PUBLIC, 'phone.html'), 'utf8');
+  const online = page
+    .replaceAll('"/brand/', '"/checkin/brand/')
+    .replace('<script>\n// ── The touch check-in', `<script>window.AWANA_RELAY = '/api';</script>\n<script>\n// ── The touch check-in`);
+  if (online === page || !online.includes("window.AWANA_RELAY = '/api'") || online.includes('"/brand/')) {
+    throw new Error('site/build.mjs: phone.html no longer has the shape /checkin expects');
+  }
+  writeFileSync(path.join(checkinOut, 'index.html'), online);
+}
 
 // The Electron apps' auto-update feeds (site/updates/printer/latest.yml and
 // site/updates/lobby/lobby.yml), written by the release workflows. Always
