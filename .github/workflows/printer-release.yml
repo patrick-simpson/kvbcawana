@@ -191,6 +191,18 @@ jobs:
           $exe = Get-ChildItem installer -Filter *.exe | Select-Object -First 1
           $proc = Start-Process -FilePath $exe.FullName -ArgumentList '/S' -PassThru -Wait
           Write-Host "Installer process exit code: $($proc.ExitCode)"
+          # 0xC0000005 (access violation) within seconds of starting, before a
+          # single file is copied: seen on the hosted runner for 7.3.0 and 7.6.0
+          # while the same installer built from near-identical code installed
+          # cleanly for 7.4.0-7.5.0, so it is the runner, not the installer
+          # (an installer bug crashes every time). Retry that one exit code ONCE,
+          # out loud; a second crash, or any other failure, still fails here.
+          if ($proc.ExitCode -eq -1073741819) {
+            Write-Host "::warning::Installer crashed at start (0xC0000005); retrying once"
+            Start-Sleep -Seconds 5
+            $proc = Start-Process -FilePath $exe.FullName -ArgumentList '/S' -PassThru -Wait
+            Write-Host "Installer process exit code (retry): $($proc.ExitCode)"
+          }
 
           # electron-builder's one-click NSIS installer is a self-extracting
           # stub that can hand off the real file copy to a detached child and
