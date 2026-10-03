@@ -2778,18 +2778,6 @@
     });
     topStrip.append(printerRow, queueBadge, csvWarningBanner, updateRow);
 
-    // Touch check-in (7.1.0, touch.js): the full-screen, touch-first check-in.
-    var touchOpenBtn = document.createElement('button');
-    touchOpenBtn.type = 'button';
-    touchOpenBtn.textContent = 'Open touch check-in';
-    Object.assign(touchOpenBtn.style, {
-      width: '100%', minHeight: '40px', border: 'none', borderRadius: '8px', cursor: 'pointer',
-      background: '#4c72b8', color: '#ffffff', fontSize: '14px', fontWeight: '700',
-      fontFamily: "'Figtree', system-ui, sans-serif"
-    });
-    touchOpenBtn.addEventListener('click', function() {
-      if (typeof window.__awanaTouchOpenScreen === 'function') window.__awanaTouchOpenScreen();
-    });
     // Its sibling page, on unless switched off (localStorage, this browser).
     var touchSibRow = document.createElement('label');
     Object.assign(touchSibRow.style, { display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', cursor: 'pointer', color: '#1e293b' });
@@ -2853,7 +2841,7 @@
 
     var sectionGap = function() { var d = divider(); d.style.margin = '4px 0'; return d; };
     panelBody.append(
-      pane('checkin', [touchOpenBtn, searchContainer, quickModeRow, controls, feedWrap]),
+      pane('checkin', [searchContainer, quickModeRow, controls, feedWrap]),
       pane('walkins', [walkInLabel, walkInRow, walkInClubRow, customStatus, walkInChoice, familyWrap,
         registerCheck, registerFields, leaderChipsWrap]),
       pane('tonight', [tonightHeader, countCheck, tonightList, reconcileRow, verifyRow]),
@@ -2926,6 +2914,42 @@
     });
     document.body.appendChild(widget);
 
+    // ── The Check in pill (7.4.0): the touch check-in's door ──
+    // Its own pill, always just left of whatever the widget is showing (the
+    // Club Print pill, or the open panel), in the brand kit's blue. One tap
+    // grows the touch check-in out of it into true full screen (touch.js).
+    var touchPill = document.createElement('button');
+    touchPill.id = 'awana-touch-pill';
+    touchPill.type = 'button';
+    touchPill.title = 'Touch check-in (full screen)';
+    touchPill.innerHTML = '<span style="font-size:14px">&#x2714;&#xFE0E;</span> Check in';
+    Object.assign(touchPill.style, {
+      position: 'fixed', top: PANEL_TOP + 'px', zIndex: '99999',
+      display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 14px',
+      background: '#4c72b8', color: '#ffffff', border: 'none', borderRadius: '20px', cursor: 'pointer',
+      boxShadow: '0 2px 8px rgba(76,114,184,0.35)', fontSize: '12px', fontWeight: '700',
+      fontFamily: "'Figtree', system-ui, sans-serif", whiteSpace: 'nowrap', userSelect: 'none',
+      transformOrigin: '50% 100%',
+      transition: 'scale 750ms linear(0, 0.213, 0.605, 0.93, 1.103, 1.142, 1.106, 1.05, 1.006, 0.984, 0.98, 0.986, 0.994, 1, 1.002, 1.003, 1)'
+    });
+    // The lobby's press: squash onto the ledge, spring back on release.
+    touchPill.addEventListener('pointerdown', function() { touchPill.style.transitionDuration = '100ms'; touchPill.style.scale = '1.06 0.9'; });
+    var releasePill = function() { touchPill.style.transitionDuration = '750ms'; touchPill.style.scale = '1 1'; };
+    touchPill.addEventListener('pointerup', releasePill);
+    touchPill.addEventListener('pointerleave', releasePill);
+    touchPill.addEventListener('click', function() {
+      if (typeof window.__awanaTouchOpenScreen === 'function') window.__awanaTouchOpenScreen(touchPill.getBoundingClientRect());
+    });
+    document.body.appendChild(touchPill);
+    function placeTouchPill() {
+      var r = widget.getBoundingClientRect();
+      touchPill.style.right = Math.max(8, Math.round(window.innerWidth - r.left + 8)) + 'px';
+    }
+    window.addEventListener('resize', placeTouchPill);
+    if (typeof ResizeObserver === 'function') {
+      try { new ResizeObserver(placeTouchPill).observe(widget); } catch (e) { /* ignore */ }
+    }
+
     // ── Toggle logic ──
     function applyMinimized(min) {
       isMinimized = min;
@@ -2934,6 +2958,7 @@
       // scrolling body), and restoring it as a block would drop that layout.
       panel.style.display = min ? 'none' : 'flex';
       localStorage.setItem(MINIMIZE_KEY, min ? 'true' : 'false');
+      placeTouchPill();
     }
 
     pill.addEventListener('click', function() { applyMinimized(false); loadTonight(); refocusSearch(); });

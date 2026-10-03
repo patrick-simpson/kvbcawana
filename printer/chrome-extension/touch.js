@@ -420,6 +420,31 @@
     '  animation:pop .3s cubic-bezier(.3,1.6,.5,1) both}',
     '.toast.bad .tick{color:#B82B32}',
     '@keyframes pop{from{transform:scale(.3)}to{transform:none}}',
+    // ── Jelly (7.4.0): the lobby's soft squish, its spring exactly ─────────
+    // Jelly UI's scale spring (stiffness 260, damping 17, mass 1), as the
+    // lobby's squish.js writes it: releaseEasing() over 750 ms, and the same
+    // spring over 900 ms for the screen growing out of its pill. A press
+    // squashes onto its ledge in 100 ms and springs back; tiles, cards and
+    // buttons land stretched and settle through a squash; the confirm card,
+    // the family page and the toast spring in. Exits stay quick and plain,
+    // the lobby's rule. The linear() strings are written out literally, never
+    // behind var(), so a browser that cannot read one keeps the plain motion.
+    '.card,.fam,.famsm,.btn,.go1,.opt,.close,.clear{transform-origin:50% 100%;',
+    '  transition-property:scale,translate,border-color,background,filter;transition-duration:750ms;',
+    '  transition-timing-function:cubic-bezier(.34,1.56,.64,1);transition-timing-function:linear(0, 0.213, 0.605, 0.93, 1.103, 1.142, 1.106, 1.05, 1.006, 0.984, 0.98, 0.986, 0.994, 1, 1.002, 1.003, 1)}',
+    '.card:active,.fam:active,.famsm:active,.tile .go1:active{transform:none;scale:1.02 .94;translate:0 2px;transition-duration:100ms;transition-timing-function:ease-out}',
+    '.btn:active,.opt:active,.close:active,.search .clear:active{transform:none;scale:1.04 .92;translate:0 2px;transition-duration:100ms;transition-timing-function:ease-out}',
+    '.search .clear:active{translate:0 calc(-50% + 2px)}',
+    '.card.in:active{scale:none;translate:none}',
+    '@keyframes land{from{opacity:0;translate:0 14px;scale:.92 1.08}to{opacity:1;translate:0 0;scale:1 1}}',
+    '.card,.fam,.famsm,.tile{animation:land 750ms both;animation-timing-function:linear(0, 0.213, 0.605, 0.93, 1.103, 1.142, 1.106, 1.05, 1.006, 0.984, 0.98, 0.986, 0.994, 1, 1.002, 1.003, 1)}',
+    '.sheet.on{transition:transform 650ms linear(0, 0.213, 0.605, 0.93, 1.103, 1.142, 1.106, 1.05, 1.006, 0.984, 0.98, 0.986, 0.994, 1, 1.002, 1.003, 1)}',
+    '.sib.on{transition:transform 750ms linear(0, 0.213, 0.605, 0.93, 1.103, 1.142, 1.106, 1.05, 1.006, 0.984, 0.98, 0.986, 0.994, 1, 1.002, 1.003, 1)}',
+    '.toast.on{transition:transform 650ms linear(0, 0.213, 0.605, 0.93, 1.103, 1.142, 1.106, 1.05, 1.006, 0.984, 0.98, 0.986, 0.994, 1, 1.002, 1.003, 1)}',
+    '@keyframes boxpop{from{scale:.4}to{scale:1}}',
+    '.opt.on .box{animation:boxpop 750ms both;animation-timing-function:linear(0, 0.213, 0.605, 0.93, 1.103, 1.142, 1.106, 1.05, 1.006, 0.984, 0.98, 0.986, 0.994, 1, 1.002, 1.003, 1)}',
+    '.wrap.grow{transition:clip-path 900ms linear(0, 0.145, 0.446, 0.75, 0.977, 1.103, 1.142, 1.126, 1.084, 1.04, 1.006, 0.987, 0.98, 0.982, 0.987, 0.994, 0.999, 1.002, 1.003, 1.003, 1.002, 1.001, 1, 1, 1)}',
+    '.wrap.shrink{transition:clip-path 260ms cubic-bezier(.4,0,1,1),opacity 260ms ease}',
     '@media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}',
   ].join('\n');
 
@@ -911,16 +936,46 @@
   }
 
   // ── Open / close ──────────────────────────────────────────────────────────
-  function openScreen() {
+  // The screen grows out of the Check in pill (fromRect) on the long spring,
+  // and asks the browser for true full screen: no tabs, no address bar. That
+  // needs the tap that opened it, so it is asked for here, inside that tap.
+  // Escape (or Close) gives it back.
+  var enteredFullscreen = false;
+  function insetFor(r) {
+    return 'inset(' + Math.round(r.top) + 'px ' + Math.round(window.innerWidth - r.right) + 'px '
+      + Math.round(window.innerHeight - r.bottom) + 'px ' + Math.round(r.left) + 'px round 20px)';
+  }
+  function pillRect() {
+    var pill = document.getElementById('awana-touch-pill');
+    return pill ? pill.getBoundingClientRect() : null;
+  }
+
+  function openScreen(fromRect) {
     if (!host) build();
     if (!host.isConnected) document.body.appendChild(host);
     state.open = true;
     window.__awanaTouchOpen = true;
+    var de = document.documentElement;
+    if (!document.fullscreenElement && de.requestFullscreen) {
+      de.requestFullscreen({ navigationUI: 'hide' }).then(function () { enteredFullscreen = true; }).catch(function () { /* stays windowed */ });
+    }
     loadHouseholds();
     refreshTonight();
     loadRecent();
+    var w = els.wrap;
+    w.classList.remove('shrink', 'grow');
+    var r = fromRect || pillRect();
+    if (r) {
+      w.style.clipPath = insetFor(r);
+      w.classList.add('on');
+      void w.offsetWidth;
+      w.classList.add('grow');
+      requestAnimationFrame(function () { w.style.clipPath = 'inset(0px 0px 0px 0px round 0px)'; });
+    } else {
+      w.style.clipPath = '';
+      requestAnimationFrame(function () { w.classList.add('on'); });
+    }
     render();
-    requestAnimationFrame(function () { els.wrap.classList.add('on'); });
     setTimeout(function () { try { els.input.focus({ preventScroll: true }); } catch (e) { els.input.focus(); } }, 60);
   }
 
@@ -929,8 +984,19 @@
     window.__awanaTouchOpen = false;
     closeConfirm();
     els.sib.classList.remove('on');
-    els.wrap.classList.remove('on');
-    setTimeout(function () { if (!state.open && host) host.remove(); }, 230);
+    if (enteredFullscreen && document.fullscreenElement && document.exitFullscreen) {
+      document.exitFullscreen().catch(function () { /* already out */ });
+    }
+    enteredFullscreen = false;
+    var w = els.wrap;
+    var r = pillRect();
+    w.classList.remove('grow');
+    w.classList.add('shrink');
+    if (r) w.style.clipPath = insetFor(r);
+    w.classList.remove('on');
+    setTimeout(function () {
+      if (!state.open && host) { host.remove(); w.classList.remove('shrink'); w.style.clipPath = ''; }
+    }, 300);
   }
 
   window.__awanaTouchOpenScreen = openScreen;

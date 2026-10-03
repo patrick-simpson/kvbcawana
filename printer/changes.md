@@ -1,5 +1,9 @@
 ﻿## [7.3.0] - 2026-10-03
-Touch check-in: families are named by their last name alone, and families who haven't come lately move to a row of smaller buttons at the bottom.
+Touch check-in: its own Check in button left of Club Print, opening into true full screen with the lobby's jelly motion throughout; families named by their last name alone; and families who haven't come lately in a row of smaller buttons at the bottom.
+
+**The Check in button.** A blue "Check in" pill always sits just left of the panel's corner (the Club Print pill, or the open panel). One tap grows the touch check-in out of the pill into true full screen: no tabs, no address bar. Close, or Escape, gives the screen back. It replaces the "Open touch check-in" button in the panel.
+
+**Jelly, everywhere.** The lobby's soft squish, with its spring exactly (Jelly UI's stiffness 260, damping 17, mass 1, as the lobby's `squish.js` writes it): every press squashes onto its ledge and springs back, tiles, cards and buttons land stretched and settle through a squash, the confirm card, the family page and the "checked in" message spring in, a ticked box pops, and the screen itself grows out of the pill on the same spring. Exits stay quick and plain, as in the lobby; the OS's reduced-motion setting stills all of it.
 
 **Last names.** "Brooks", not "The Brooks family", on the family page; after a check-in the sibling page asks "Johnson: also here tonight?".
 
