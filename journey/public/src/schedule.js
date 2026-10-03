@@ -1993,9 +1993,9 @@ let previewWeek = null;
 // the asset is missing. (Release asset URLs 302-redirect, which <video>
 // follows fine; no crossorigin attribute means CORS never applies.)
 // Since 2026-10-03 they are served from this site itself, under videos/ (the
-// kvbcawana `journey-videos-v2` release, every file under 25 MiB, copied there
-// by site/build.mjs on each deploy), so they are same-origin like everything
-// else here.
+// kvbcawana `journey-videos-v2` release, every file under 25 MiB, streamed by
+// site/functions/journey with Range, so a video can seek), so they are
+// same-origin like everything else here.
 const TRANSCODED_VIDEO_BASE = 'videos/';
 
 function transcodedPreviewUrl(week, variant) {

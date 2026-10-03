@@ -91,41 +91,36 @@ writeFileSync(path.join(OUT, '_headers'), [
   '',
 ].join('\n'));
 
-// Journey's lesson videos for the picker: the `journey-videos-v2` release
-// (journey/scripts/pi-encode.mjs keeps every one under 25 MiB), copied to
-// /journey/videos/ on every deploy. Pages uploads only files it has not seen,
-// so an unchanged set costs the download and nothing more. A deploy (CI) must
-// have them; a local build without the gh CLI carries on without.
+// Videos are never uploaded to Pages, whose static files ignore Range requests
+// (measured 2026-10-03: every request answered 200 with the whole file), so a
+// <video> could not seek or resume mid-lesson. site/functions/journey/[[path]].js
+// streams them instead, on this origin, with Range passed through:
+//   /journey/videos/<file>.mp4  the picker's lesson videos, from the
+//                               journey-videos-v2 release (pi-encode.mjs keeps
+//                               every one under 25 MiB);
+//   any other journey/public .mp4, and any file over Pages' 25 MiB limit,
+//                               from GitHub's copy of THIS commit, so it always
+//                               matches the files deployed beside it.
+// Only files committed under journey/public can be served that way; anything
+// else that big is a build output, and fails the build rather than the deploy.
 const REPO = process.env.GITHUB_REPOSITORY || 'patrick-simpson/kvbcawana';
-try {
-  run(`gh release download journey-videos-v2 --repo ${REPO} --pattern "*.mp4" --dir ${JSON.stringify(path.join(journeyOut, 'videos'))} --clobber`, ROOT);
-} catch (e) {
-  if (process.env.CI) throw e;
-  console.warn('  (no lesson videos: gh could not download journey-videos-v2)');
-}
-
-// Files over Pages' 25 MiB limit (the Journey kiosk's weekly lesson
-// transcode, ~30 MiB) are taken out of the upload and served by
-// site/functions/journey/[[path]].js from GitHub's copy of THIS commit, so
-// they always match the files deployed beside them. Only files committed under
-// journey/public can be served that way; anything else that big is a build
-// output, and fails the build rather than the deploy.
+const VIDEO_PREFIXES = { '/journey/videos/': `https://github.com/${REPO}/releases/download/journey-videos-v2/` };
 const PAGES_FILE_MAX = 25 * 1024 * 1024;
 const largeFiles = {};
 const walk = (dir) => readdirSync(dir, { withFileTypes: true }).flatMap((d) =>
   d.isDirectory() ? walk(path.join(dir, d.name)) : [path.join(dir, d.name)]);
 for (const file of walk(OUT)) {
-  if (statSync(file).size < PAGES_FILE_MAX) continue;
+  if (statSync(file).size < PAGES_FILE_MAX && !file.endsWith('.mp4')) continue;
   const sitePath = '/' + path.relative(OUT, file).split(path.sep).join('/');
   if (!sitePath.startsWith('/journey/')) throw new Error(`${sitePath} is over 25 MiB, and only journey/public files can be served from the repo`);
   const repoPath = `journey/public/${sitePath.slice('/journey/'.length)}`;
   if (!existsSync(path.join(ROOT, repoPath))) throw new Error(`${sitePath} is over 25 MiB and is not a file in the repo`);
   largeFiles[sitePath] = `https://raw.githubusercontent.com/${REPO}/${BUILD_ID}/${repoPath}`;
   rmSync(file);
-  console.log(`  ${sitePath} is ${(statSync(path.join(ROOT, repoPath)).size / 1048576).toFixed(1)} MiB: served from the repo, not uploaded`);
+  console.log(`  ${sitePath} (${(statSync(path.join(ROOT, repoPath)).size / 1048576).toFixed(1)} MiB): streamed from the repo, not uploaded`);
 }
 writeFileSync(path.join(ROOT, 'site', 'lib', 'large-files.generated.js'),
-  `// Written by site/build.mjs for build ${BUILD_ID}; not committed.\nexport const LARGE_FILES = ${JSON.stringify(largeFiles, null, 2)};\n`);
+  `// Written by site/build.mjs for build ${BUILD_ID}; not committed.\nexport const LARGE_FILES = ${JSON.stringify(largeFiles, null, 2)};\nexport const LARGE_PREFIXES = ${JSON.stringify(VIDEO_PREFIXES, null, 2)};\n`);
 
 for (const must of ['index.html', 'lobby/index.html', 'lobby/countdown.html', 'journey/index.html', 'lobby/shared/sync.json']) {
   if (!existsSync(path.join(OUT, must))) throw new Error(`site build is missing ${must}`);

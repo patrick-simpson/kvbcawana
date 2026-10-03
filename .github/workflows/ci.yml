@@ -205,7 +205,6 @@ jobs:
         if: steps.ready.outputs.ready == 'true'
         env:
           SITE_ORIGIN: ${{ vars.SITE_ORIGIN || 'https://kvbcawana.pages.dev' }}
-          GH_TOKEN: ${{ github.token }}   # gh release download (Journey's lesson videos)
         run: node site/build.mjs
       - name: Publish the site
         if: steps.ready.outputs.ready == 'true'

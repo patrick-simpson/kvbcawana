@@ -416,8 +416,9 @@ the same exception now covers Pi-playable 480p re-encodes of *every*
 lesson video (32 Student + 31 Leader; week 27 has no Leader Video),
 uploaded as assets on the `journey-videos-v2` GitHub Release in
 kvbcawana (each under 25 MiB, by `scripts/pi-encode.mjs`; served from
-awana.kvbchurch.org/journey/videos/, where `site/build.mjs` copies them on
-every deploy, since 2026-10-03) by
+awana.kvbchurch.org/journey/videos/ since 2026-10-03, streamed from that
+release by the site's function with Range passed through, because Pages'
+static files ignore Range and a video must seek) by
 `scripts/transcode-all-lessons.mjs` / the on-demand
 `transcode-all-lessons.yml` workflow. The manual video-picker plays
 these (originals were undecodable on the Pi Zero — reported broken from

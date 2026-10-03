@@ -1,23 +1,41 @@
-// Files too big for Cloudflare Pages (25 MiB a file) are left out of the
-// upload by site/build.mjs and served from here instead: streamed from
-// GitHub's copy of the SAME commit the site was built from (so the file always
-// matches the JSON deployed beside it), on the site's own origin, so a page's
-// Cache API fetch and <video> work exactly as they did when the file was a
-// static asset. The one today is the Journey kiosk's weekly lesson transcode.
+// Videos, and any file too big for Cloudflare Pages (25 MiB a file), are left
+// out of the upload by site/build.mjs and served from here instead, because
+// Pages' static files ignore Range and a <video> must be able to seek. Each is
+// streamed from GitHub (the Journey lesson videos from their release; this
+// week's lesson from the repo at the SAME commit the site was built from, so
+// it always matches the JSON deployed beside it), with Range passed through,
+// on the site's own origin, so a page's Cache API fetch and its <video> work
+// exactly as they did when the file was a static asset.
 
 const TYPES = { mp4: 'video/mp4', webm: 'video/webm', mp3: 'audio/mpeg', zip: 'application/zip', pdf: 'application/pdf' };
 // What a video player and a cache need from the upstream answer, and no more.
 const PASS_BACK = ['Content-Length', 'Content-Range', 'Accept-Ranges', 'ETag', 'Last-Modified'];
 
+// A file under a prefix is one plain name: letters, digits, dot, dash,
+// underscore, ending .mp4. Nothing else can reach the upstream folder.
+const PREFIX_FILE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,80}\.mp4$/;
+
+/** The upstream URL for `pathname`, from the exact map or a prefix, or null. */
+export function upstreamFor(pathname, files, prefixes = {}) {
+  if (Object.prototype.hasOwnProperty.call(files, pathname)) return files[pathname];
+  for (const [prefix, base] of Object.entries(prefixes)) {
+    if (!pathname.startsWith(prefix)) continue;
+    const name = pathname.slice(prefix.length);
+    if (PREFIX_FILE.test(name) && !name.includes('..')) return base + name;
+  }
+  return null;
+}
+
 /**
  * @param {Request} request
  * @param {Record<string, string>} files  site path -> upstream URL
  * @param {typeof fetch} [fetchFn]
- * @returns {Promise<Response | null>} null when the path is not one of `files`
+ * @param {Record<string, string>} [prefixes]  site folder -> upstream folder
+ * @returns {Promise<Response | null>} null when the path is none of these
  */
-export async function proxyLarge(request, files, fetchFn = fetch) {
+export async function proxyLarge(request, files, fetchFn = fetch, prefixes = {}) {
   const url = new URL(request.url);
-  const target = Object.prototype.hasOwnProperty.call(files, url.pathname) ? files[url.pathname] : null;
+  const target = upstreamFor(url.pathname, files, prefixes);
   if (!target) return null;
   if (request.method !== 'GET' && request.method !== 'HEAD') {
     return new Response('Method not allowed', { status: 405, headers: { Allow: 'GET, HEAD' } });
