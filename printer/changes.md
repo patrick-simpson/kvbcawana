@@ -1,4 +1,17 @@
-﻿## [7.1.0] - 2026-10-03
+﻿## [7.2.0] - 2026-10-03
+Touch check-in: whenever the search box is empty, the families still to come fill the screen.
+
+**What shows.** One tile per family with a child not yet checked in: the family's name and, beneath it, only the children still to come, each with a dot in their club's colour (the tile's stripe carries every club). A child TwoTimTwo files with no household, or every child before the household list has loaded, gets a tile of their own with their full name. Families are in alphabetical order; families are never guessed from names.
+
+**Sized to what's left.** The tiles are the largest equal size that fits every family on the screen without scrolling (never narrower than twice their height), so they grow as families arrive; only past about 80 families at 1280 x 800 does the grid scroll at the smallest size. Each name sizes itself to fit its tile on one line. The screen follows the page every 3 seconds, so a child checked in elsewhere leaves without a tap, and it only redraws when the families change.
+
+**Tapping.** A family opens its page (the brothers-and-sisters page: one tap per child, or All of them, Bible and Friend off to start); a child on their own opens their check-in card. Typing a letter swaps to search; clearing it, or finishing a check-in, brings the families back. When nobody is left: "Everyone's checked in!"
+
+**Also.** A hidden message or card no longer leaves a sliver of itself or its shadow at the screen's edge.
+
+**For maintainers.** `groupFamilies()` and `fitTiles()` in `touch.js`'s pure half; new checks in `test-touch-search.cjs` (grouping, naming, the tile fit, and that a tile never shrinks as families leave).
+
+## [7.1.0] - 2026-10-03
 Touch check-in: a full-screen, touch-first check-in over the TwoTimTwo check-in page, for the check-in laptop's touchscreen, with a sibling page.
 
 **Opening it.** "Open touch check-in" at the top of the panel's Check in tab. ✕ or Escape closes it; TwoTimTwo is underneath, untouched.

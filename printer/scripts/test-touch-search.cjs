@@ -74,5 +74,35 @@ console.log('touch check-in: households');
   check('an export without the columns yields nothing', !Object.keys(t.householdIndex('a,b\n1,2\n').byName).length);
 }
 
+console.log('touch check-in: families still to come');
+{
+  const csv = 'Household ID,Active Clubbers\n1,"Micah Johnson, Ava Johnson, Eli Ross"\n2,"Jackson Smith, Lily Smith"\n';
+  const h = t.householdIndex(csv);
+  const left = [
+    { name: 'Micah Johnson', recid: '1' }, { name: 'Ava Johnson', recid: '2' }, { name: 'Eli Ross', recid: '3' },
+    { name: 'Jackson Smith', recid: '4' }, { name: 'Nora Bennett', recid: '5' },
+  ];
+  const f = t.groupFamilies(left, h);
+  check('children group by household; a child it doesn\'t place stands alone', f.length === 3, JSON.stringify(f.map((x) => x.name)));
+  const j = f.find((x) => x.kids.length === 3);
+  check('a blended family is named by its most common last name', j && j.name === 'Johnson & Ross', j && j.name);
+  check('families sort by name', f.map((x) => x.name).join() === 'Bennett,Johnson & Ross,Smith', f.map((x) => x.name).join());
+  check('only the children still to come are in a family (Lily is in already)', f.find((x) => x.name === 'Smith').kids.length === 1);
+  check('before the household list loads, everyone stands alone', t.groupFamilies(left, null).length === 5);
+
+  const W = 1232, H = 600;
+  const few = t.fitTiles(3, W, H, 12, 1.6, 92);
+  const many = t.fitTiles(30, W, H, 12, 1.6, 92);
+  check('few families: big tiles, no scrolling', !few.scroll && few.h > 180, JSON.stringify(few));
+  check('more families: smaller tiles, still no scrolling', !many.scroll && many.h < few.h && many.h >= 92, JSON.stringify(many));
+  const lots = t.fitTiles(200, W, H, 12, 1.6, 92);
+  check('too many to fit: the minimum size, scrolling', lots.scroll && lots.h === 92 && lots.cols >= 4, JSON.stringify(lots));
+  const rowsNeeded = (r) => Math.ceil(30 / r.cols) * r.h + (Math.ceil(30 / r.cols) - 1) * 12;
+  check('the tiles that fit do fit the height', rowsNeeded(many) <= H + 0.5, String(rowsNeeded(many)));
+  let prev = Infinity, shrinking = true;
+  for (let n = 1; n <= 60; n++) { const r = t.fitTiles(n, W, H, 12, 1.6, 92); if (r.h > prev + 0.5) shrinking = false; prev = r.h; }
+  check('a tile never gets smaller as families leave (one fewer is never smaller)', shrinking);
+}
+
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

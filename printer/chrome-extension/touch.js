@@ -165,8 +165,57 @@
     return { byName: byName, members: members };
   }
 
+  // The children still to come, as families: grouped by TwoTimTwo household
+  // (never guessed; a child the household list doesn't place, or every child
+  // before it has loaded, is a family of one), named by the children's last
+  // name, in alphabetical order.
+  function groupFamilies(children, households) {
+    var groups = {}, order = [];
+    children.forEach(function (c) {
+      var hh = households && households.byName[norm(c.name)];
+      var key = hh ? 'hh:' + hh : 'kid:' + (c.recid || c.name);
+      if (!groups[key]) { groups[key] = { key: key, kids: [] }; order.push(key); }
+      groups[key].kids.push(c);
+    });
+    return order.map(function (k) {
+      var g = groups[k];
+      var counts = {}, lasts = [];
+      g.kids.forEach(function (c) {
+        var last = c.name.split(' ').slice(1).join(' ') || c.name;
+        if (!counts[last]) { counts[last] = 0; lasts.push(last); }
+        counts[last]++;
+      });
+      lasts.sort(function (a, b) { return counts[b] - counts[a] || a.localeCompare(b); });
+      g.name = lasts.slice(0, 2).join(' & ');
+      g.kids.sort(function (a, b) { return a.name.localeCompare(b.name); });
+      return g;
+    }).sort(function (a, b) { return a.name.localeCompare(b.name) || a.kids[0].name.localeCompare(b.kids[0].name); });
+  }
+
+  // The biggest equal tiles that fit `n` into a W x H box without scrolling:
+  // try every column count and keep the one whose tiles stand tallest, a tile
+  // never narrower than `minAspect` times its height (names need the width).
+  // Below `minH` tall they no longer fit, so the grid scrolls at minH instead.
+  // As children arrive n falls, and a tile only ever grows.
+  function fitTiles(n, W, H, gap, minAspect, minH) {
+    if (n <= 0 || W <= 0 || H <= 0) return { cols: 1, w: W, h: minH, scroll: false };
+    var best = null;
+    for (var cols = 1; cols <= n; cols++) {
+      var rows = Math.ceil(n / cols);
+      var w = (W - gap * (cols - 1)) / cols;
+      var h = Math.min((H - gap * (rows - 1)) / rows, w / minAspect);
+      if (w > 0 && h > 0 && (!best || h > best.h)) best = { cols: cols, w: w, h: h };
+    }
+    if (!best || best.h < minH) {
+      var cols2 = Math.max(1, Math.floor((W + gap) / (minH * minAspect + gap)));
+      return { cols: cols2, w: (W - gap * (cols2 - 1)) / cols2, h: minH, scroll: true };
+    }
+    return { cols: best.cols, w: best.w, h: best.h, scroll: false };
+  }
+
   if (typeof module === 'object' && module.exports) {
-    module.exports = { norm: norm, sound: sound, editDistance: editDistance, searchPeople: searchPeople, householdIndex: householdIndex, parseCsv: parseCsv };
+    module.exports = { norm: norm, sound: sound, editDistance: editDistance, searchPeople: searchPeople, householdIndex: householdIndex, parseCsv: parseCsv,
+      groupFamilies: groupFamilies, fitTiles: fitTiles };
     return;
   }
 
@@ -293,11 +342,25 @@
     '.tag{font-family:"Londrina Solid","Arial Narrow",sans-serif;font-size:17px;letter-spacing:.05em;text-transform:uppercase;',
     '  padding:4px 10px;border-radius:999px;background:#E2E8F0;color:#475569;white-space:nowrap}',
     '@keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}',
+    '.fams{display:grid;gap:12px}',
+    '.fam{all:unset;box-sizing:border-box;cursor:pointer;display:flex;flex-direction:column;justify-content:center;gap:.25em;',
+    '  padding:.5em .8em .5em 1.1em;background:#fff;border-radius:18px;position:relative;overflow:hidden;min-width:0;',
+    '  box-shadow:0 2px 10px rgba(15,23,42,.08);animation:rise .24s cubic-bezier(.2,.8,.2,1) both;transition:transform .12s ease}',
+    '.fam:active{transform:scale(.97)}',
+    '.fam .fn{font-family:"Paytone One","Figtree",sans-serif;line-height:1.05;color:#2F4F8A;overflow-wrap:anywhere;',
+    '  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}',
+    '.fam .kids{display:flex;flex-wrap:wrap;gap:.2em .7em;font-weight:700;color:#334155;line-height:1.2}',
+    '.fam .kid{display:inline-flex;align-items:center;gap:.35em;white-space:nowrap}',
+    '.fam .dot{width:.7em;height:.7em;border-radius:50%;background:var(--c);flex:0 0 auto}',
+    '.fam::before{content:"";position:absolute;left:0;top:0;bottom:0;width:8px;background:linear-gradient(var(--stripe))}',
+    '.cheer{display:grid;place-items:center;height:100%;text-align:center;font:400 44px "Paytone One","Figtree",sans-serif;color:#2F8A4E}',
+    '.lead{font-family:"Londrina Solid","Arial Narrow",sans-serif;font-size:20px;letter-spacing:.06em;text-transform:uppercase;color:#4C72B8;margin:0 4px 10px}',
     '.scrim{position:fixed;inset:0;background:rgba(15,23,42,.36);opacity:0;pointer-events:none;transition:opacity .2s ease;z-index:2}',
     '.scrim.on{opacity:1;pointer-events:auto}',
     '.sheet{position:fixed;left:50%;bottom:0;width:min(640px,100%);transform:translate(-50%,105%);z-index:3;',
     '  background:#fff;border-radius:28px 28px 0 0;padding:28px 28px 32px;box-shadow:0 -8px 32px rgba(15,23,42,.18);',
     '  transition:transform .26s cubic-bezier(.2,.8,.2,1)}',
+    '.sheet:not(.on){visibility:hidden;box-shadow:none;transition:transform .26s ease,visibility 0s .26s}',
     '.sheet.on{transform:translate(-50%,0)}',
     '.sheet .bar{height:10px;border-radius:999px;background:var(--club);margin:-8px 0 20px}',
     '.sheet .nm{font-family:"Paytone One","Figtree",sans-serif;font-size:44px;line-height:1.05;overflow-wrap:anywhere}',
@@ -317,6 +380,7 @@
     '.btn[disabled]{filter:grayscale(.6) opacity(.6);cursor:default}',
     '.sib{position:fixed;inset:0;z-index:4;background:#EAF4FB;display:flex;flex-direction:column;',
     '  transform:translateX(100%);transition:transform .28s cubic-bezier(.2,.8,.2,1)}',
+    '.sib:not(.on){visibility:hidden;transition:transform .28s ease,visibility 0s .28s}',
     '.sib.on{transform:none}',
     '.sib .head{padding:24px 24px 6px}',
     '.sib .done-l{font-family:"Londrina Solid","Arial Narrow",sans-serif;font-size:22px;letter-spacing:.05em;text-transform:uppercase;color:#2F8A4E}',
@@ -339,6 +403,7 @@
     '.toast{position:fixed;left:50%;top:20px;transform:translate(-50%,-160%);z-index:5;display:flex;align-items:center;gap:14px;',
     '  padding:16px 24px;border-radius:999px;background:#2F8A4E;color:#fff;font:700 22px "Figtree",system-ui,sans-serif;',
     '  box-shadow:0 8px 24px rgba(15,23,42,.2);transition:transform .24s cubic-bezier(.2,.8,.2,1)}',
+    '.toast:not(.on){opacity:0;visibility:hidden;transition:transform .24s ease,opacity .2s ease,visibility 0s .24s}',
     '.toast.on{transform:translate(-50%,0)}',
     '.toast.bad{background:#B82B32}',
     '.tick{width:34px;height:34px;border-radius:50%;background:#fff;color:#2F8A4E;display:grid;place-items:center;font-size:22px;',
@@ -460,9 +525,10 @@
     var list = els.list;
     while (list.firstChild) list.removeChild(list.firstChild);
     if (!q.trim()) {
-      list.append(el('div', 'hint', all.length ? 'Start typing a child’s first or last name.' : 'No children on this page yet. Is the TwoTimTwo check-in page loaded?'));
+      renderFamilies(list);
       return;
     }
+    lastFamSig = '';
     var r = searchPeople(all, q);
     var n = 0;
     if (r.matches.length) {
@@ -480,6 +546,69 @@
       list.append(el('div', 'hint', 'No child matches “' + q.trim() + '”. A new child? Use Walk-ins in the panel.'));
     }
   }
+
+  // ── Families still to come (whenever the search is empty) ────────────────
+  var lastFamSig = '';
+  function renderFamilies(list) {
+    var kids = pageChildren();
+    var fams = groupFamilies(kids, households);
+    lastFamSig = fams.map(function (f) { return f.key + ':' + f.kids.length; }).join('|');
+    if (!fams.length) {
+      list.append(el('div', 'cheer', document.querySelectorAll('.clubber').length || tonight.length
+        ? 'Everyone\u2019s checked in!' : 'No children on this page yet.'));
+      return;
+    }
+    list.append(el('div', 'lead', fams.length + (fams.length === 1 ? ' family' : ' families') + ' still to come \u00b7 tap one, or type a name'));
+    var W = list.clientWidth - 48;                      // the list's side padding
+    var H = list.clientHeight - 24 - 40;                // bottom padding and the line above
+    var fit = fitTiles(fams.length, W, H, 12, 2, 92);
+    var grid = el('div', 'fams');
+    grid.style.gridTemplateColumns = 'repeat(' + fit.cols + ', minmax(0, 1fr))';
+    grid.style.gridAutoRows = Math.floor(fit.h) + 'px';
+    var fs = Math.max(18, Math.min(64, fit.h * 0.32, fit.w / 8));
+    fams.forEach(function (f, i) {
+      var b = el('button', 'fam');
+      // Each tile's name fits its width on one line: Paytone One averages a
+      // little over half an em a letter, and the tile pads about 1.9em.
+      var title = f.kids.length === 1 ? f.kids[0].name : f.name;
+      var own = Math.min(fs, (fit.w - 8) / (title.length * 0.6 + 1.9));
+      b.style.fontSize = Math.max(14, Math.round(own)) + 'px';
+      b.style.animationDelay = Math.min(i, 24) * 12 + 'ms';
+      var stops = f.kids.map(function (c) { return clubFor(c.clubId, c.clubName).color; });
+      b.style.setProperty('--stripe', stops.length > 1 ? stops.join(',') : stops[0] + ',' + stops[0]);
+      var single = f.kids.length === 1;
+      b.append(el('div', 'fn', title));
+      var line = el('div', 'kids');
+      line.style.fontSize = Math.max(13, Math.round(fs * 0.46)) + 'px';
+      f.kids.forEach(function (c) {
+        var k = el('span', 'kid');
+        var dot = el('span', 'dot');
+        dot.style.setProperty('--c', clubFor(c.clubId, c.clubName).color);
+        k.append(dot, document.createTextNode(single ? clubFor(c.clubId, c.clubName).name : c.name.split(' ')[0]));
+        line.append(k);
+      });
+      b.append(line);
+      b.setAttribute('aria-label', single ? f.kids[0].name : 'The ' + f.name + ' family: ' + f.kids.map(function (c) { return c.name.split(' ')[0]; }).join(', '));
+      b.addEventListener('click', function () {
+        if (single) openConfirm(f.kids[0]);
+        else openSiblings(null, f.kids, { bible: false, friend: false }, 'The ' + f.name + ' family');
+      });
+      grid.append(b);
+    });
+    list.append(grid);
+  }
+
+  // While the families are showing, follow the page: a child checked in at
+  // another station (or by the panel) leaves, and the tiles grow. Re-drawn
+  // only when the set of families actually changes, so nothing replays.
+  setInterval(function () {
+    if (!state.open || !els.input || els.input.value.trim() || els.sheet.classList.contains('on') || siblingsOpen()) return;
+    var sig = groupFamilies(pageChildren(), households).map(function (f) { return f.key + ':' + f.kids.length; }).join('|');
+    if (sig !== lastFamSig) render();
+  }, 3000);
+  window.addEventListener('resize', function () {
+    if (state.open && els.input && !els.input.value.trim()) render();
+  });
 
   // ── Confirm ───────────────────────────────────────────────────────────────
   function optButton(label, on, onChange) {
@@ -582,13 +711,19 @@
     openSiblings(p, sibs, choice);
   }
 
-  function openSiblings(first, sibs, choice) {
+  // The family page: after a check-in (first = that child) it offers the
+  // brothers and sisters; from a family tile (first = null) it is the family.
+  function openSiblings(first, sibs, choice, title) {
     var s = els.sib;
     while (s.firstChild) s.removeChild(s.firstChild);
     var head = el('div', 'head');
-    var last = first.name.split(' ').slice(1).join(' ');
-    head.append(el('div', 'done-l', '✓ ' + first.name + ' is checked in'),
-      el('h2', null, 'Also here tonight' + (last ? ' from the ' + last + ' family' : '') + '?'));
+    if (first) {
+      var last = first.name.split(' ').slice(1).join(' ');
+      head.append(el('div', 'done-l', '\u2713 ' + first.name + ' is checked in'),
+        el('h2', null, 'Also here tonight' + (last ? ' from the ' + last + ' family' : '') + '?'));
+    } else {
+      head.append(el('h2', null, title || 'This family'));
+    }
     var tiles = el('div', 'tiles');
     var pending = [];
     sibs.forEach(function (c, i) {
