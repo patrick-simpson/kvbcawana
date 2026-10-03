@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import BrandHeader from './BrandHeader.jsx';
 import CornerTab from './CornerTab.jsx';
 import StepChip from './StepChip.jsx';
 
 const SERVER = 'http://localhost:3456';
+const UPDATE_CHECK_MS = 30 * 1000;
 
 export default function StatusPanel({ config, onReset }) {
   const [health, setHealth]         = useState(null);   // /health JSON or null
@@ -15,6 +16,8 @@ export default function StatusPanel({ config, onReset }) {
   const [starting, setStarting]     = useState(false);  // Start Server button
   const [checking, setChecking]     = useState(false);  // Check for Updates button
   const [checkNote, setCheckNote]   = useState('');     // result of an explicit check
+  const serverStateRef = useRef(null); serverStateRef.current = serverState;
+  const checkingRef = useRef(false);   checkingRef.current = checking;
 
   useEffect(() => {
     let alive = true;
@@ -34,6 +37,28 @@ export default function StatusPanel({ config, onReset }) {
     poll();
     const t = setInterval(poll, 5000);
     window.awana.getLanAddress?.().then(a => { if (alive) setLanAddress(a); });
+    return () => { alive = false; clearInterval(t); };
+  }, []);
+
+  // While this window is open and on screen, look for an update every 30 s
+  // (owner, 7.4.1): the release ping that used to make updates near-instant
+  // went with Pusher, so the app's own poll is once a day. Quiet: no spinner,
+  // the version line just says when it last looked. Stops once an update is
+  // found (it downloads on its own) and while the window is minimized.
+  useEffect(() => {
+    let alive = true;
+    const t = setInterval(async () => {
+      if (document.visibilityState !== 'visible') return;
+      const u = (serverStateRef.current && serverStateRef.current.update) || {};
+      if (u.available || u.downloaded || checkingRef.current) return;
+      try {
+        const r = await window.awana.checkForUpdates?.();
+        if (!alive || !r || r.supported === false) return;
+        setServerState(st => ({ ...(st || {}), update: r }));
+        const at = new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+        if (r.upToDate) setCheckNote(`You have the newest version (checked ${at}).`);
+      } catch { /* offline: try again in 30 s */ }
+    }, UPDATE_CHECK_MS);
     return () => { alive = false; clearInterval(t); };
   }, []);
 

@@ -20,4 +20,12 @@
     });
     return true; // Required to keep the message channel open for async fetch
   }
+  // A new version is on disk (the app rewrote this folder when it updated):
+  // re-read it now instead of waiting for someone to restart Chrome (7.4.1).
+  // The page that asked reloads itself a moment later to get the new scripts.
+  if (message.type === 'AWANA_RELOAD_SELF') {
+    sendResponse({ ok: true });
+    setTimeout(() => chrome.runtime.reload(), 100);
+    return false;
+  }
 });

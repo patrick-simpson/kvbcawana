@@ -41,18 +41,20 @@ The KVBC widget will now automatically appear on the check-in page!
 
 Chrome does **not** auto-update extensions loaded in Developer Mode, and Chrome
 only honours a self-hosted `update_url` for Web Store or enterprise-policy
-installs. So there is no fully silent update available here — but the manual
-work is down to one step:
+installs. Since 7.4.1 it loads itself anyway, at any hour:
 
-1. The app updates itself (electron-updater), as before.
-2. On its next launch it rewrites the managed folder with the extension files
-   from the new build. This happens whether or not Chrome is open.
-3. Chrome re-reads an unpacked extension when it restarts. The widget shows
-   *"Extension vX.Y.Z is installed — restart Chrome to load it"* until you do.
+1. The app updates itself (electron-updater) within a minute of the release,
+   and its restart restarts the print server.
+2. On that launch it rewrites the managed folder with the extension files from
+   the new build. This happens whether or not Chrome is open.
+3. The check-in page sees the new version on disk, asks the extension to
+   re-read its folder (`chrome.runtime.reload()`, the same as **Reload** on
+   `chrome://extensions`), and refreshes the check-in tab. It waits only for a
+   tag still queued to print, a touch check-in being posted, or a volunteer
+   tapping the touch screen (at most two minutes). Other tabs are untouched.
 
-So: **restart Chrome.** No download, no unzip, no re-adding the extension. If you
-would rather not close your tabs, `chrome://extensions` → **Reload** on the
-KVBC entry does the same thing immediately.
+If that cannot happen (an extension loaded from some other folder), the widget
+still shows *"Extension vX.Y.Z is installed — restart Chrome to load it"*.
 
 The version banner compares the extension's version against the print server's,
 so a mismatch is always visible on the check-in page rather than something you

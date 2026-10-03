@@ -114,6 +114,10 @@ console.log('touch check-in: families still to come');
   check('the row is dropped by its recid, not its name text', /var row = rowByRecid\(recid\);/.test(c));
   check('a failed post refreshes the token in the background and retries once', /return refreshCheckinTokens\(\)\.then\(function\(\) \{ return postTouchCheckin\(/.test(c));
   check('Close clears a stuck modal and reloads only after check-ins', /closed: function\(checkedIn\) \{\s*clearStuckModal\(\);\s*if \(!checkedIn\) return;/.test(api));
+  check('a new version on disk loads itself: the extension re-reads its folder, then the tab reloads',
+    /if \(managed\) selfUpdateTo\(data\.version\);/.test(c) && /type: 'AWANA_RELOAD_SELF'/.test(c)
+    && /AWANA_RELOAD_SELF[\s\S]{0,120}chrome\.runtime\.reload\(\)/.test(fs.readFileSync(path.join(__dirname, '..', 'chrome-extension', 'background.js'), 'utf8')));
+  check('once per version per tab, so a copy that cannot reload never loops', /sessionStorage\.getItem\(key\)\) return;/.test(c));
   check('the peak-window auto-reload waits while the touch screen is up', /if \(window\.__awanaTouchOpen\) return;\s*if \(document\.getElementById\('checkin-modal'\)\) return;/.test(c));
 }
 

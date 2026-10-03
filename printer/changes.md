@@ -1,9 +1,13 @@
 ﻿## [7.4.1] - 2026-10-03
-Touch check-in: no more stuck TwoTimTwo page after a few check-ins.
+Touch check-in: no more stuck TwoTimTwo page after a few check-ins; the app window checks for updates every 30 seconds; and a new version loads in Chrome by itself.
 
 **What went wrong.** When a quick check-in could not confirm itself (it matched the child's row by its exact name text, which a doubled space or a nickname defeats), it fell back to clicking the row on TwoTimTwo's page. That opened TwoTimTwo's check-in pop-up behind the full-screen touch check-in, where nobody could see it; a few of those stacked up, and after Close their grey backdrop covered the page until it was refreshed.
 
 **Now.** The touch check-in never opens TwoTimTwo's pop-up. It posts the check-in directly, one child at a time, takes TwoTimTwo's own reply as the confirmation, and removes the child's row by its id. If a post is refused, it quietly re-reads the check-in page for a fresh security token and tries once more; if that fails too, it says so in red and the child can be tapped again. Closing the touch check-in clears any pop-up or grey backdrop left on the page and, if anyone was checked in, reloads TwoTimTwo once the tags have gone to the printer, so its own lists start fresh. (It does not reload after every check-in: that would drop out of full screen each time, and only a tap can bring full screen back.) The 5:40 pm peak-window auto-reload waits while the touch check-in is open.
+
+**Updates every 30 seconds while the app's window is open.** The Club Label Printer window now looks for a new version every 30 seconds while it is open and not minimized, and the version line says when it last looked. (The release ping that made updates near-instant went away with Pusher; with the window closed the app still checks at start and once a day.)
+
+**A new version loads everywhere by itself, at any hour.** The app already installed its own update within a minute (restarting the print server with it); now Chrome follows without anyone restarting it. When the check-in page sees that the app has put a newer extension on disk, the extension re-reads its folder and the check-in tab refreshes, after any tag still printing, any touch check-in being posted, and any volunteer mid-tap on the touch screen (two minutes at most). Other Chrome tabs are left alone.
 
 ## [7.4.0] - 2026-10-03
 Touch check-in: a "Printer jammed" button for the Star.

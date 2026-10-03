@@ -3004,6 +3004,33 @@
   }
 
   // Check server health: extension version mismatch, server updates, CSV warnings
+  // Every new version loads by itself, at any hour (owner, 7.4.1): the app
+  // installs its own update within a minute and restarts the print server;
+  // this is Chrome's half. The extension re-reads its folder (the app has
+  // already written the new files there) and the check-in tab reloads, which
+  // is all "restart Chrome" ever achieved, without closing anyone's tabs. It
+  // waits only for what is in flight: a tag still queued to print, a touch
+  // check-in being posted, or the touch screen in use (up to two minutes of
+  // quiet). Tried once per version per tab, so a copy that cannot reload
+  // itself (installed from somewhere else) falls back to the notice.
+  var selfUpdating = false;
+  function selfUpdateTo(version) {
+    if (selfUpdating) return;
+    var key = 'awanaSelfUpdate.' + version;
+    try { if (sessionStorage.getItem(key)) return; } catch (e) { /* storage off */ }
+    selfUpdating = true;
+    var started = Date.now();
+    (function whenIdle() {
+      var busy = getQueue().length > 0 || _quickModeProcessing ||
+        (window.__awanaTouchOpen && Date.now() - (window.__awanaTouchLastTap || 0) < 20000);
+      if (busy && Date.now() - started < 120000) { setTimeout(whenIdle, 2000); return; }
+      try { sessionStorage.setItem(key, '1'); } catch (e) { /* storage off */ }
+      console.log('[Awana] Loading extension v' + version + ' (was v' + EXTENSION_VERSION + ')');
+      try { chrome.runtime.sendMessage({ type: 'AWANA_RELOAD_SELF' }); } catch (e) { /* already reloading */ }
+      setTimeout(function() { location.reload(); }, 1500);
+    })();
+  }
+
   function checkForExtensionUpdate() {
     fetch(PRINT_SERVER + '/health', { signal: AbortSignal.timeout(3000) })
       .then(function(r) { return r.json(); })
@@ -3019,6 +3046,7 @@
             // hasn't re-read them. Say the action that actually works instead
             // of "reload extension", which reads as "go download it again".
             var managed = data.extension && data.extension.version === data.version;
+            if (managed) selfUpdateTo(data.version);
             notice.textContent = managed
               ? 'Extension v' + data.version + ' is installed — restart Chrome to load it'
               : 'Update available: v' + data.version + ' (reload extension at chrome://extensions)';

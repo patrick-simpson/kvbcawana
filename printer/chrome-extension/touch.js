@@ -466,6 +466,8 @@
     // The host is the one layer over TwoTimTwo; inside it the screen, the
     // scrim, the confirm card, the sibling page and the toast stack 1 to 5.
     host.style.cssText = 'position:fixed;inset:0;z-index:2147483000;display:block';
+    // A volunteer in the middle of a family holds off the self-update reload.
+    host.addEventListener('pointerdown', function () { window.__awanaTouchLastTap = Date.now(); }, true);
     root = host.attachShadow({ mode: 'open' });
     var style = el('style');
     style.textContent = CSS;
@@ -955,6 +957,7 @@
 
   function onKey(e) {
     if (!state.open) return;
+    window.__awanaTouchLastTap = Date.now();
     if (e.key === 'Escape') {
       e.preventDefault();
       if (els.sheet.classList.contains('on')) closeConfirm();
