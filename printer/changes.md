@@ -1,4 +1,22 @@
-﻿## [6.24.0] - 2026-10-03
+﻿## [6.25.0] - 2026-10-03
+The receipt-printer trial can now use a USB receipt printer through its Windows driver, such as a Star TSP100 futurePRNT, as well as the network one from 6.19.0.
+
+**Why.** The owner is running the trial on a USB Star TSP100 futurePRNT instead of a network printer. That printer takes only images from Star's Windows driver, not raw ESC/POS commands, so the 6.19.0 network path can't drive it.
+
+**What changes.** Settings → Printer type has a third choice, "Receipt printer (80 mm roll, USB / Windows driver, e.g. Star TSP100) — trial", with its own list for picking the receipt printer from the Windows printers. The tag is the same: today's label turned sideways and scaled to fill the roll, about 2⅞″ × 5⅝″. The driver gets the exact black-and-white dots the network path would send (576 × 1152 at the head's 203 dpi), on a page exactly that size, drawn without smoothing, so the driver has nothing to dither or resample. The cut (full or partial) is set in the printer's own Windows printing preferences.
+
+**Before each tag, Windows is asked about the printer.** If Windows says it isn't installed, is offline, out of paper, has its cover open, is jammed or needs attention, nothing is sent to it. That child's label goes to the 4×2 printer chosen in the Printer box (the same fallback and `receiptFallback` warning as 6.19.0), or the print fails with the reason if there is no 4×2 printer. Low paper raises `receiptPaperLow`. This is only as good as what the driver tells Windows: a printer whose driver reports nothing is treated as fine and gets the tag. The receipt printer is never used as its own fallback, so picking the Star in both boxes fails loudly instead of printing a 4×2 picture on the roll.
+
+**Send test tag** prints on whichever receipt printer the form shows (network or USB) and nowhere else. The network option, Find printers and the cut setting stay exactly as they were for a network printer.
+
+**Setup on the check-in laptop.** In the Star's Windows printing preferences, set the paper to 72 mm × Receipt (so the page ends where the tag does) and choose the cut. Keep the 4×2 printer selected in the main Printer box as the fallback.
+
+**For maintainers.**
+- `receipt.js`: `printerType` 'receipt-usb' (`RECEIPT_TYPES`, `isUsb()`, and `usb` / `printerName` in `optionsFrom()`), and `renderTagPng()`, the same 1-bit raster as a PNG.
+- `server.js`: `printReceiptWindows()` is one PowerShell run that checks Win32_Printer (`WorkOffline`, `PrinterStatus`, `DetectedErrorState`), exits 3 with `RECEIPT_PROBLEM: <reason>` instead of printing, or prints the tag 1:1 on a custom `PaperSize`. A reported problem is not retried; other errors get the one retry `printImage()` has. `printReceipt()` picks the connection for `printLabel()` and `/receipt/test`. New config key `receiptPrinterName`, validated like `worksheetPrinter`. `/health`'s `receiptPrinter` gains `connection` ('network' / 'usb').
+- `test-receipt.cjs` covers it with a fake Windows (a PowerShell stub that reports problems or low paper and keeps the tag it was given): the page size, the 1-bit tag, problems falling back, no fallback to itself, and the test button.
+
+## [6.24.0] - 2026-10-03
 A late child's label now says where their club is right now, using the church's printed 2026-27 club schedule out of the box.
 
 **Why.** The schedule table held one place per club, but every club moves during the night (Cubbies are in the Large Classroom at 6:05 and in the Fellowship Hall for games at 7:00), so a label printed at 7:10 sent a child to the wrong room.

@@ -2620,6 +2620,100 @@ function fallbackPrinterReady(name) {
   }
 }
 
+// The Windows-driver half of the receipt trial (printerType 'receipt-usb'),
+// for a USB receipt printer such as a Star TSP100 futurePRNT that takes only
+// driver graphics. One PowerShell run asks Windows about the printer FIRST
+// (Win32_Printer: missing, offline, out of paper, cover open, jammed) and
+// prints only when nothing is wrong, so a problem becomes a fallback to the
+// 4×2 printer instead of a job that sits in the queue while the child walks
+// away. Drivers that report nothing read as fine (fail open: print). The tag
+// is the 1-bit picture the network path would send, drawn 1:1 at the head's
+// 203 dpi on a page exactly its size; the cut is the driver's own setting.
+const RECEIPT_DPI = 203;
+const RECEIPT_PROBLEM_EXIT = 3;
+function printReceiptWindows(tagPngPath, printerName, size) {
+  const safePath = tagPngPath.replace(/'/g, "''");
+  const safePrinter = String(printerName).replace(/'/g, "''");
+  // PaperSize and DrawImage both take hundredths of an inch.
+  const w = Math.round(size.width / RECEIPT_DPI * 100);
+  const h = Math.round(size.height / RECEIPT_DPI * 100);
+  const ps = `
+$ErrorActionPreference = 'Stop'
+Add-Type -AssemblyName System.Drawing
+$name = '${safePrinter}'
+$p = Get-CimInstance Win32_Printer | Where-Object { $_.Name -eq $name } | Select-Object -First 1
+if (-not $p) { Write-Output 'RECEIPT_PROBLEM: it is not installed in Windows'; exit ${RECEIPT_PROBLEM_EXIT} }
+if ($p.WorkOffline -or $p.PrinterStatus -eq 7) { Write-Output 'RECEIPT_PROBLEM: Windows says it is offline (check its USB cable and power)'; exit ${RECEIPT_PROBLEM_EXIT} }
+switch ([int]$p.DetectedErrorState) {
+  4  { Write-Output 'RECEIPT_PROBLEM: out of paper'; exit ${RECEIPT_PROBLEM_EXIT} }
+  7  { Write-Output 'RECEIPT_PROBLEM: the cover is open'; exit ${RECEIPT_PROBLEM_EXIT} }
+  8  { Write-Output 'RECEIPT_PROBLEM: paper jam'; exit ${RECEIPT_PROBLEM_EXIT} }
+  9  { Write-Output 'RECEIPT_PROBLEM: Windows says it is offline (check its USB cable and power)'; exit ${RECEIPT_PROBLEM_EXIT} }
+  10 { Write-Output 'RECEIPT_PROBLEM: the printer needs attention'; exit ${RECEIPT_PROBLEM_EXIT} }
+}
+$low = ([int]$p.DetectedErrorState -eq 3)
+$pd = New-Object System.Drawing.Printing.PrintDocument
+$pd.PrinterSettings.PrinterName = $name
+$pd.DocumentName = 'Club Label Printer tag'
+$pd.DefaultPageSettings.PaperSize = New-Object System.Drawing.Printing.PaperSize("Club tag", ${w}, ${h})
+$pd.DefaultPageSettings.Margins = New-Object System.Drawing.Printing.Margins(0,0,0,0)
+$pd | Add-Member -NotePropertyName TagImagePath -NotePropertyValue '${safePath}'
+$pd.add_PrintPage({
+  param($sender, $e)
+  $img = [System.Drawing.Image]::FromFile($sender.TagImagePath)
+  try {
+    $e.Graphics.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::NearestNeighbor
+    $e.Graphics.PixelOffsetMode = [System.Drawing.Drawing2D.PixelOffsetMode]::Half
+    $e.Graphics.DrawImage($img, 0, 0, ${w}, ${h})
+  } finally { $img.Dispose() }
+})
+$pd.Print()
+$pd.Dispose()
+if ($low) { Write-Output 'RECEIPT_PAPER_LOW' }
+`.trim();
+
+  const psPath = tmpFilePath('awana-receipt', 'ps1');
+  try {
+    fs.writeFileSync(psPath, ps, 'utf8');
+    let lastErr = null;
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        const out = execSync(`powershell -NoProfile -ExecutionPolicy Bypass -File "${psPath}"`, {
+          timeout: 20000, windowsHide: true, encoding: 'utf8',
+        });
+        return { paperLow: /RECEIPT_PAPER_LOW/.test(out || '') };
+      } catch (e) {
+        const m = /RECEIPT_PROBLEM: ([^\r\n]+)/.exec(String(e.stdout || ''));
+        // A problem the printer reported is an answer, not a hiccup: no retry.
+        if (m) throw new Error(m[1].trim());
+        lastErr = e;
+        if (attempt < 2) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 750);
+      }
+    }
+    throw new Error(`printing failed (${String(lastErr && lastErr.message || lastErr).split('\n')[0].slice(0, 120)})`);
+  } finally {
+    fs.unlink(psPath, () => {});
+  }
+}
+
+// Both receipt connections, one call: the network printer (ESC/POS) or the
+// Windows driver. Resolves with { status? , paperLow }.
+async function printReceipt(pngPath, opts) {
+  if (!opts.usb) {
+    const r = await receipt.printPng(pngPath, opts);
+    return { status: r.status, paperLow: !!(r.status && r.status.paperLow) };
+  }
+  if (!opts.printerName || !isSafePrinterName(opts.printerName)) throw new Error('no receipt printer is chosen');
+  const tag = await receipt.renderTagPng(pngPath, opts.dots);
+  const tagPath = tmpFilePath('awana-tag', 'png');
+  try {
+    fs.writeFileSync(tagPath, tag.buffer);
+    return printReceiptWindows(tagPath, opts.printerName, tag);
+  } finally {
+    fs.unlink(tagPath, () => {});
+  }
+}
+
 async function printLabel(pngPath, printerName) {
   if (!receipt.isEnabled(config)) {
     printImage(pngPath, printerName);
@@ -2628,21 +2722,26 @@ async function printLabel(pngPath, printerName) {
   const opts = receipt.optionsFrom(config);
   const at = new Date().toISOString();
   try {
-    const r = await receipt.printPng(pngPath, opts);
-    lastReceipt = { ok: true, at, paperLow: !!(r.status && r.status.paperLow) };
+    const r = await printReceipt(pngPath, opts);
+    lastReceipt = { ok: true, at, paperLow: r.paperLow };
     return { via: 'receipt' };
   } catch (e) {
     const why = String(e.message || e).slice(0, 160);
     lastReceipt = { ok: false, at, error: why };
     console.warn(`[receipt] Print failed: ${why}`);
     const fallback = String(printerName || PRINTER_NAME || '').trim();
-    if (fallback && isSafePrinterName(fallback) && fallbackPrinterReady(fallback)) {
+    // Never "fall back" to the receipt printer itself (the Star picked in the
+    // main Printer box too): that's a second failure, not a 4×2 label.
+    const sameAsReceipt = opts.usb && fallback.toLowerCase() === opts.printerName.toLowerCase();
+    if (fallback && !sameAsReceipt && isSafePrinterName(fallback) && fallbackPrinterReady(fallback)) {
       printImage(pngPath, fallback);
       lastReceipt.fellBackTo = fallback;
       console.warn(`[receipt] Printed on the 4×2 printer "${fallback}" instead`);
       return { via: 'fallback', printer: fallback };
     }
-    throw new Error(`Receipt printer: ${why}. ${fallback
+    throw new Error(`Receipt printer: ${why}. ${sameAsReceipt
+      ? 'The main Printer setting is the receipt printer too, so there is no 4×2 fallback.'
+      : fallback
       ? `The 4×2 printer "${fallback}" is not available either.`
       : 'No 4×2 printer is set as a fallback.'}`);
   }
@@ -2652,7 +2751,11 @@ async function printLabel(pngPath, printerName) {
 // last receipt print didn't go cleanly. Clears on the next good print.
 function receiptWarnings() {
   if (!receipt.isEnabled(config)) return [];
-  if (!receipt.isSafeHost(config.receiptHost)) {
+  if (receipt.isUsb(config)) {
+    if (!String(config.receiptPrinterName || '').trim()) {
+      return [{ type: 'receiptPrinterUnset', message: 'Receipt printer (USB) mode is on but no receipt printer is chosen. Open Settings → Printer type and pick it from the list.' }];
+    }
+  } else if (!receipt.isSafeHost(config.receiptHost)) {
     return [{ type: 'receiptPrinterUnset', message: 'Receipt printer mode is on but no printer address is set. Open Settings → Printer and enter its IP (or press Find printers).' }];
   }
   if (!lastReceipt) return [];
@@ -7110,7 +7213,10 @@ app.get('/health', async (req, res) => {
     // site has no business reading.
     receiptPrinter: {
       enabled: receipt.isEnabled(config),
-      ...(isTrustedConfigOrigin(req) ? { host: config.receiptHost || null } : {}),
+      connection: receipt.isEnabled(config) ? (receipt.isUsb(config) ? 'usb' : 'network') : null,
+      ...(isTrustedConfigOrigin(req) ? {
+        host: receipt.isUsb(config) ? (config.receiptPrinterName || null) : (config.receiptHost || null),
+      } : {}),
       last: lastReceipt,
     },
     // Windows spooler backlog (#256), as NUMBERS rather than prose, so the
@@ -7341,7 +7447,7 @@ app.post('/config', (req, res) => {
     labelFooter, connectCardAutoFirstTimer, connectCardGreeting, seasonTheme,
     musicalPrinter, updateBeacon, slidesPublishToken, displayLoginPassphrase,
     trophyBand, fleetConfigUrl,
-    printerType, receiptHost, receiptPort, receiptDots, receiptCut,
+    printerType, receiptHost, receiptPort, receiptDots, receiptCut, receiptPrinterName,
   } = req.body || {};
   if (!isTrustedConfigOrigin(req) && SECRET_CONFIG_KEYS.some(k => (req.body || {})[k] !== undefined)) {
     return res.status(403).json({ error: 'Pusher/PIN/display-login settings can only be changed from the dashboard or the extension options page' });
@@ -7504,8 +7610,17 @@ app.post('/config', (req, res) => {
     if (printerType !== undefined) {
       const pt = String(printerType || 'label');
       if (pt === 'label') delete next.printerType;
-      else if (pt === 'receipt') next.printerType = 'receipt';
-      else return res.status(400).json({ error: 'printerType must be label or receipt' });
+      else if (receipt.RECEIPT_TYPES.includes(pt)) next.printerType = pt;
+      else return res.status(400).json({ error: 'printerType must be label, receipt or receipt-usb' });
+    }
+    // The USB receipt printer's Windows name. It reaches a PowerShell script,
+    // so it gets the same refusal as worksheetPrinter: never persist anything
+    // that isn't a plain printer label.
+    if (receiptPrinterName !== undefined) {
+      const rp = String(receiptPrinterName || '').trim();
+      if (rp === '') delete next.receiptPrinterName;
+      else if (!isSafePrinterName(rp)) return res.status(400).json({ error: 'receiptPrinterName contains unsupported characters' });
+      else next.receiptPrinterName = rp;
     }
     if (receiptHost !== undefined) {
       const rh = String(receiptHost || '').trim();
@@ -7648,7 +7763,7 @@ app.post('/play-tune', (req, res) => {
 function receiptOverrides(body) {
   const b = body || {};
   const out = receipt.optionsFrom({ ...config, ...Object.fromEntries(
-    ['receiptHost', 'receiptPort', 'receiptDots', 'receiptCut']
+    ['printerType', 'receiptHost', 'receiptPort', 'receiptDots', 'receiptCut', 'receiptPrinterName']
       .filter(k => b[k] !== undefined && b[k] !== '').map(k => [k, b[k]])) });
   return out;
 }
@@ -7658,16 +7773,24 @@ app.post('/receipt/test', async (req, res) => {
     return res.status(403).json({ error: 'The test tag only works from the dashboard on this computer' });
   }
   const opts = receiptOverrides(req.body);
-  if (!receipt.isSafeHost(opts.host)) {
+  // The form's printer type decides which connection the test uses; the
+  // 'label' choice (testing before switching) means the network one.
+  if (String((req.body || {}).printerType || '') === 'receipt-usb') opts.usb = true;
+  else if ((req.body || {}).printerType !== undefined) opts.usb = false;
+  if (opts.usb) {
+    if (!opts.printerName || !isSafePrinterName(opts.printerName)) {
+      return res.status(400).json({ error: 'Pick the receipt printer from the list first' });
+    }
+  } else if (!receipt.isSafeHost(opts.host)) {
     return res.status(400).json({ error: 'Enter the receipt printer\'s IP address first (or press Find printers)' });
   }
   let pngPath = null;
   try {
     const result = await generateLabel({ firstName: 'Test tag', lastName: '', clubName: 'Test', testBanner: true });
     pngPath = result.pngPath;
-    const r = await receipt.printPng(pngPath, opts);
-    lastReceipt = { ok: true, at: new Date().toISOString(), paperLow: !!(r.status && r.status.paperLow) };
-    res.json({ ok: true, host: opts.host, status: r.status });
+    const r = await printReceipt(pngPath, opts);
+    lastReceipt = { ok: true, at: new Date().toISOString(), paperLow: r.paperLow };
+    res.json({ ok: true, host: opts.usb ? opts.printerName : opts.host, usb: opts.usb, status: r.status || null, paperLow: r.paperLow });
   } catch (e) {
     res.status(502).json({ ok: false, error: String(e.message || e) });
   } finally {

@@ -38,8 +38,18 @@ const PAPER_WHITE = 224;
 const SOLID_INK = 64;
 
 // ── Settings ─────────────────────────────────────────────────────────────────
+// printerType 'receipt' is the network (ESC/POS) receipt printer; 'receipt-usb'
+// is a receipt printer reached through its Windows driver (e.g. a USB Star
+// TSP100 futurePRNT, which takes only driver graphics, never raw ESC/POS).
+// Both print the same tag; only the last hop differs.
+const RECEIPT_TYPES = ['receipt', 'receipt-usb'];
+
 function isEnabled(cfg) {
-  return !!cfg && cfg.printerType === 'receipt';
+  return !!cfg && RECEIPT_TYPES.includes(cfg.printerType);
+}
+
+function isUsb(cfg) {
+  return !!cfg && cfg.printerType === 'receipt-usb';
 }
 
 // A host goes only to net.connect (never a shell), but it is still persisted
@@ -71,6 +81,8 @@ function optionsFrom(cfg) {
     port: normalizePort(c.receiptPort) || RECEIPT_DEFAULT_PORT,
     dots: normalizeDots(c.receiptDots) || RECEIPT_DEFAULT_DOTS,
     cut:  c.receiptCut === 'partial' ? 'partial' : 'full',
+    usb:  isUsb(c),
+    printerName: String(c.receiptPrinterName || '').trim(),
   };
 }
 
@@ -130,6 +142,27 @@ async function rasterizeLabel(png, dots) {
     }
   }
   return { width, height, bits };
+}
+
+// The same 1-bit raster as a PNG, for the Windows-driver path: the driver
+// gets exactly the dots the network path would send, at the head's own
+// resolution, so it has nothing left to dither or resample.
+async function renderTagPng(png, dots) {
+  const { width, height, bits } = await rasterizeLabel(png, dots);
+  const canvas = createCanvas(width, height);
+  const ctx = canvas.getContext('2d');
+  const img = ctx.createImageData(width, height);
+  const rowBytes = width / 8;
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const v = bits[y * rowBytes + (x >> 3)] & (0x80 >> (x & 7)) ? 0 : 255;
+      const i = (y * width + x) * 4;
+      img.data[i] = img.data[i + 1] = img.data[i + 2] = v;
+      img.data[i + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  return { buffer: canvas.toBuffer('image/png'), width, height };
 }
 
 // ── ESC/POS job ──────────────────────────────────────────────────────────────
@@ -305,7 +338,7 @@ async function discover({ port = RECEIPT_DEFAULT_PORT, timeoutMs = 400, concurre
 
 module.exports = {
   RECEIPT_DEFAULT_PORT, RECEIPT_DEFAULT_DOTS, RECEIPT_MIN_DOTS, RECEIPT_MAX_DOTS, RECEIPT_CUTS,
-  isEnabled, isSafeHost, normalizePort, normalizeDots, optionsFrom,
+  RECEIPT_TYPES, isEnabled, isUsb, renderTagPng, isSafeHost, normalizePort, normalizeDots, optionsFrom,
   rasterizeLabel, buildEscPos, parseStatus, statusProblem,
   printPng, checkStatus, discover, localSubnets,
 };

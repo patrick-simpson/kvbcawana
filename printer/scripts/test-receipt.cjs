@@ -91,7 +91,27 @@ async function main() {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'awana-receipt-'));
   const binDir = fs.mkdtempSync(path.join(os.tmpdir(), 'awana-receipt-bin-'));
   const spoolLog = path.join(binDir, 'spool.log');
-  fs.writeFileSync(path.join(binDir, 'powershell'), `#!/bin/sh\necho job >> ${spoolLog}\nexit 0\n`, { mode: 0o755 });
+  // A fake Windows. The USB receipt script (it names its document "Club Label
+  // Printer tag") is answered like Win32_Printer would: a file named `problem`
+  // makes it report that problem and print nothing; `low` adds the paper-low
+  // note. Its tag picture and script are kept for inspection. Every other
+  // PowerShell run is a 4×2 label job on the spooler.
+  const receiptLog = path.join(binDir, 'receipt.log');
+  fs.writeFileSync(path.join(binDir, 'powershell'), `#!/bin/sh
+f="$5"
+if [ -n "$f" ] && grep -q 'Club Label Printer tag' "$f" 2>/dev/null; then
+  cp "$f" "${binDir}/last-receipt.ps1"
+  if [ -f "${binDir}/problem" ]; then echo "RECEIPT_PROBLEM: $(cat "${binDir}/problem")"; exit 3; fi
+  png=$(sed -n "s/.*TagImagePath -NotePropertyValue '\\([^']*\\)'.*/\\1/p" "$f")
+  cp "$png" "${binDir}/last-tag.png"
+  echo tag >> ${receiptLog}
+  if [ -f "${binDir}/low" ]; then echo RECEIPT_PAPER_LOW; fi
+  exit 0
+fi
+echo job >> ${spoolLog}
+exit 0
+`, { mode: 0o755 });
+  const receiptJobs = () => { try { return fs.readFileSync(receiptLog, 'utf8').split('\n').filter(Boolean).length; } catch { return 0; } };
   process.env.PATH = `${binDir}${path.delimiter}${process.env.PATH}`;
   const spoolJobs = () => { try { return fs.readFileSync(spoolLog, 'utf8').split('\n').filter(Boolean).length; } catch { return 0; } };
 
@@ -302,6 +322,85 @@ async function main() {
     check('with the trial off, labels go to the spooler as before', r.status === 200 && printer.jobs.length === 0 && spoolJobs() > b2);
     h = await health();
     check('and /health carries no receipt warnings', !(h.warnings || []).some(w => w && /^receipt/.test(w.type)) && h.receiptPrinter.enabled === false);
+  }
+
+  // ── 7. The USB receipt printer (Windows driver, e.g. a Star TSP100) ─────────
+  console.log('\nreceipt: USB through the Windows driver');
+  {
+    const cfgPath = path.join(dataDir, 'config.json');
+    const useConfig = (extra) => {
+      const c = { ...JSON.parse(fs.readFileSync(cfgPath, 'utf8')), ...extra };
+      fs.writeFileSync(cfgPath, JSON.stringify(c, null, 2));
+      server.applySavedConfig(c);
+    };
+    const problem = path.join(binDir, 'problem');
+    const low = path.join(binDir, 'low');
+    check('receipt-usb counts as receipt mode', receipt.isEnabled({ printerType: 'receipt-usb' }) && receipt.isUsb({ printerType: 'receipt-usb' })
+      && !receipt.isUsb({ printerType: 'receipt' }));
+
+    let r = await post('/config', { printerType: 'receipt-usb', receiptPrinterName: 'Star TSP100 Cutter' });
+    let saved = JSON.parse(fs.readFileSync(cfgPath, 'utf8'));
+    check('the USB type and the printer name save', r.status === 200 && saved.printerType === 'receipt-usb'
+      && saved.receiptPrinterName === 'Star TSP100 Cutter', JSON.stringify(r.body));
+    r = await post('/config', { receiptPrinterName: 'Star"; Remove-Item C:\\' });
+    check('a printer name with shell characters is refused', r.status === 400);
+
+    server.setPrinterName('Fake');
+    useConfig({ printerName: 'Fake' });
+    printer.jobs.length = 0;
+    const spool0 = spoolJobs();
+    const rec0 = receiptJobs();
+    r = await post('/print-custom', { text: 'USB one' });
+    check('a label prints through the receipt driver', r.status === 200 && receiptJobs() === rec0 + 1, JSON.stringify(r.body));
+    check('not on the 4×2 spooler, not on the network printer', spoolJobs() === spool0 && printer.jobs.length === 0);
+    const ps1 = fs.readFileSync(path.join(binDir, 'last-receipt.ps1'), 'utf8');
+    check('to the chosen printer', /\$name = 'Star TSP100 Cutter'/.test(ps1));
+    check('on a page exactly the tag: 576×1152 dots at 203 dpi', /PaperSize\("Club tag", 284, 567\)/.test(ps1), (ps1.match(/PaperSize\([^)]*\)/) || [])[0]);
+    check('drawn dot for dot, never smoothed', /NearestNeighbor/.test(ps1));
+    check('asking Windows about the printer before printing', ps1.indexOf('Win32_Printer') >= 0 && ps1.indexOf('Win32_Printer') < ps1.indexOf('.Print()'));
+    const { loadImage } = require(path.join(__dirname, '..', 'print-server', 'node_modules', '@napi-rs/canvas'));
+    const tag = await loadImage(fs.readFileSync(path.join(binDir, 'last-tag.png')));
+    check('the driver gets the 1-bit tag, 576 wide and twice as long', tag.width === 576 && tag.height === 1152, `${tag.width}×${tag.height}`);
+    let h = await health();
+    check('/health names the connection and the printer', h.receiptPrinter.connection === 'usb' && h.receiptPrinter.host === 'Star TSP100 Cutter', JSON.stringify(h.receiptPrinter));
+
+    fs.writeFileSync(low, '');
+    await post('/print-custom', { text: 'USB low' });
+    fs.unlinkSync(low);
+    h = await health();
+    check('Windows reporting low paper raises receiptPaperLow', (h.warnings || []).some(w => w && w.type === 'receiptPaperLow'));
+
+    fs.writeFileSync(problem, 'out of paper');
+    const spool1 = spoolJobs();
+    const rec1 = receiptJobs();
+    r = await post('/print-custom', { text: 'USB two' });
+    check('a reported problem prints nothing on the receipt printer', receiptJobs() === rec1);
+    check('and the label falls back to the 4×2 printer', r.status === 200 && spoolJobs() === spool1 + 1, `${r.status} ${JSON.stringify(r.body)}`);
+    h = await health();
+    const fb = (h.warnings || []).find(w => w && w.type === 'receiptFallback');
+    check('with the reason on /health', fb && /out of paper/.test(fb.message) && /Fake/.test(fb.message), JSON.stringify(h.warnings));
+
+    // The receipt printer chosen as the main printer too: no fallback to itself.
+    server.setPrinterName('Star TSP100 Cutter');
+    useConfig({ printerName: 'Star TSP100 Cutter' });
+    const spool2 = spoolJobs();
+    r = await post('/print-custom', { text: 'USB three' });
+    check('it never falls back to the receipt printer itself', r.status === 500 && spoolJobs() === spool2
+      && /main Printer setting is the receipt printer too/.test(r.body && r.body.error), JSON.stringify(r.body));
+    fs.unlinkSync(problem);
+
+    const noName = JSON.parse(fs.readFileSync(cfgPath, 'utf8')); delete noName.receiptPrinterName;
+    fs.writeFileSync(cfgPath, JSON.stringify(noName, null, 2)); server.applySavedConfig(noName);
+    let h0 = await health();
+    check('USB mode with no printer chosen says so', (h0.warnings || []).some(w => w && w.type === 'receiptPrinterUnset' && /pick it from the list/.test(w.message)));
+    r = await post('/receipt/test', { printerType: 'receipt-usb', receiptPrinterName: '' });
+    check('the USB test tag needs a printer picked (blank form, none saved)', r.status === 400 && /Pick the receipt printer/.test(r.body && r.body.error));
+    const rec3 = receiptJobs();
+    r = await post('/receipt/test', { printerType: 'receipt-usb', receiptPrinterName: 'Star TSP100 Cutter' });
+    check('Send test tag prints on the USB receipt printer only', r.status === 200 && r.body.usb === true && receiptJobs() === rec3 + 1, JSON.stringify(r.body));
+    h = await health();
+    check('and a good tag clears the failure warnings', !(h.warnings || []).some(w => w && /^receipt(Fallback|PrinterFailed|PaperLow)$/.test(w.type)), JSON.stringify(h.warnings));
+
   }
 
   await printer.close();

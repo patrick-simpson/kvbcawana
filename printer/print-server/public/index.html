@@ -634,6 +634,7 @@
               <select id="settings-printer-type" onchange="toggleReceiptSettings()">
                 <option value="label">Label printer (4&Prime; &times; 2&Prime;)</option>
                 <option value="receipt">Receipt printer (80 mm roll, network) &mdash; trial</option>
+                <option value="receipt-usb">Receipt printer (80 mm roll, USB / Windows driver, e.g. Star TSP100) &mdash; trial</option>
               </select>
               <div id="receipt-settings" style="display:none; margin-top:8px; padding:10px; border:1px solid #e2e8f0; border-radius:8px">
                 <p style="font-size:11px;color:#64748b;margin:0 0 8px">
@@ -641,16 +642,24 @@
                   (about 2&#8542;&Prime; &times; 5&#8541;&Prime;), then cut. No tunes. If the receipt printer fails, the label goes to the
                   printer chosen above instead (if it's connected).
                 </p>
+                <div id="receipt-usb-fields" style="display:none; margin-bottom:8px">
+                  <label>Receipt printer</label>
+                  <select id="settings-receipt-printer"><option value="">Loading...</option></select>
+                  <p style="font-size:10px;color:#94a3b8;margin:4px 0 0">
+                    Pick the receipt printer as Windows lists it. Set the cut (full or partial) in its own Windows printing preferences.
+                    Keep the 4&times;2 printer chosen in the Printer box above: it's the fallback.
+                  </p>
+                </div>
                 <div style="display:grid; grid-template-columns: 2fr 1fr; gap:10px">
-                  <div>
+                  <div class="receipt-net-only">
                     <label>Printer IP address</label>
                     <input type="text" id="settings-receipt-host" placeholder="192.168.1.50" maxlength="253">
                   </div>
-                  <div>
+                  <div class="receipt-net-only">
                     <label>Port</label>
                     <input type="number" id="settings-receipt-port" placeholder="9100" min="1" max="65535">
                   </div>
-                  <div>
+                  <div class="receipt-net-only">
                     <label>Cut</label>
                     <select id="settings-receipt-cut">
                       <option value="full">Full cut (tag drops free)</option>
@@ -663,12 +672,12 @@
                   </div>
                 </div>
                 <div style="display:flex; gap:8px; margin-top:8px; flex-wrap:wrap">
-                  <button class="btn btn-secondary btn-sm" type="button" onclick="findReceiptPrinters()">Find printers</button>
+                  <button class="btn btn-secondary btn-sm receipt-net-only" type="button" onclick="findReceiptPrinters()">Find printers</button>
                   <button class="btn btn-secondary btn-sm" type="button" onclick="sendReceiptTest()">Send test tag</button>
                 </div>
                 <div id="receipt-found" style="margin-top:6px"></div>
                 <p id="receipt-status" style="font-size:11px;color:#64748b;margin:6px 0 0"></p>
-                <p style="font-size:10px;color:#94a3b8;margin:6px 0 0">
+                <p class="receipt-net-only" style="font-size:10px;color:#94a3b8;margin:6px 0 0">
                   Hold FEED while switching the printer on to print its self-test page with its IP address. 576 dots is 72 mm, the normal width for 80 mm paper.
                   Find printers looks only on this computer's own network.
                 </p>
@@ -1892,10 +1901,15 @@ function toggleRehearsal() {
 }
 
 // Musical printer (#11/#12): the demo button. 409 means the toggle is off.
+var savedReceiptPrinterName = '';
+
 // ── Receipt-printer trial ─────────────────────────────────────────────────────
 function toggleReceiptSettings() {
-  var on = document.getElementById('settings-printer-type').value === 'receipt';
-  document.getElementById('receipt-settings').style.display = on ? '' : 'none';
+  var type = document.getElementById('settings-printer-type').value;
+  var usb = type === 'receipt-usb';
+  document.getElementById('receipt-settings').style.display = (type === 'receipt' || usb) ? '' : 'none';
+  document.getElementById('receipt-usb-fields').style.display = usb ? '' : 'none';
+  Array.prototype.forEach.call(document.querySelectorAll('.receipt-net-only'), function(el) { el.style.display = usb ? 'none' : ''; });
 }
 
 function receiptFormValues() {
@@ -1903,7 +1917,9 @@ function receiptFormValues() {
     receiptHost: document.getElementById('settings-receipt-host').value.trim(),
     receiptPort: document.getElementById('settings-receipt-port').value.trim(),
     receiptDots: document.getElementById('settings-receipt-dots').value.trim(),
-    receiptCut: document.getElementById('settings-receipt-cut').value
+    receiptCut: document.getElementById('settings-receipt-cut').value,
+    printerType: document.getElementById('settings-printer-type').value,
+    receiptPrinterName: document.getElementById('settings-receipt-printer').value
   };
 }
 
@@ -1920,7 +1936,9 @@ function sendReceiptTest() {
     .then(function(res) {
       if (!res.ok) return setReceiptStatus('Test tag failed: ' + ((res.d && res.d.error) || 'unknown error'), true);
       var st = res.d.status || {};
-      setReceiptStatus('Test tag sent to ' + res.d.host + '.' + (st.unknown ? ' (This printer doesn\'t report paper status.)' : st.paperLow ? ' Paper is nearly out.' : ' Paper OK.')
+      var paperNote = res.d.usb ? (res.d.paperLow ? ' Paper is nearly out.' : '')
+        : (st.unknown ? ' (This printer doesn\'t report paper status.)' : st.paperLow ? ' Paper is nearly out.' : ' Paper OK.');
+      setReceiptStatus('Test tag sent to ' + res.d.host + '.' + paperNote
         + ' Remember to Save if you changed anything.');
     })
     .catch(function() { setReceiptStatus('Could not reach the server.', true); });
@@ -2024,7 +2042,9 @@ function loadSettings() {
     document.getElementById('settings-label-footer').value = config.labelFooter || '';
     document.getElementById('settings-season-theme').value = config.seasonTheme || 'auto';
     document.getElementById('settings-musical').checked = config.musicalPrinter === true;
-    document.getElementById('settings-printer-type').value = config.printerType === 'receipt' ? 'receipt' : 'label';
+    document.getElementById('settings-printer-type').value =
+      (config.printerType === 'receipt' || config.printerType === 'receipt-usb') ? config.printerType : 'label';
+    savedReceiptPrinterName = config.receiptPrinterName || '';
     document.getElementById('settings-receipt-host').value = config.receiptHost || '';
     document.getElementById('settings-receipt-port').value = config.receiptPort || '';
     document.getElementById('settings-receipt-dots').value = config.receiptDots || '';
@@ -2064,8 +2084,32 @@ function loadSettings() {
       opt.textContent = p.name + (p.isWindowsDefault ? ' (Windows default)' : '');
       select.appendChild(opt);
     });
+    // The USB receipt printer's list: the same Windows printers, plus the saved
+    // one even if Windows isn't listing it right now (so Save can't drop it).
+    var rsel = document.getElementById('settings-receipt-printer');
+    rsel.innerHTML = '';
+    var none = document.createElement('option');
+    none.value = '';
+    none.textContent = '(choose the receipt printer)';
+    rsel.appendChild(none);
+    var names = (data.printers || []).map(function(p) { return p.name; });
+    if (savedReceiptPrinterName && names.indexOf(savedReceiptPrinterName) < 0) names.unshift(savedReceiptPrinterName);
+    names.forEach(function(n) {
+      var o = document.createElement('option');
+      o.value = n;
+      o.textContent = n;
+      rsel.appendChild(o);
+    });
+    rsel.value = savedReceiptPrinterName;
   }).catch(function() {
     document.getElementById('settings-printer').innerHTML = '<option value="">Could not load printers</option>';
+    // Keep the saved choice selectable so a Save made now doesn't clear it.
+    var keep = document.getElementById('settings-receipt-printer');
+    keep.innerHTML = '';
+    var o = document.createElement('option');
+    o.value = savedReceiptPrinterName;
+    o.textContent = savedReceiptPrinterName || 'Could not load printers';
+    keep.appendChild(o);
   });
 }
 
@@ -2449,6 +2493,7 @@ function saveSettings() {
       receiptPort: document.getElementById('settings-receipt-port').value.trim(),
       receiptDots: document.getElementById('settings-receipt-dots').value.trim(),
       receiptCut: document.getElementById('settings-receipt-cut').value,
+      receiptPrinterName: document.getElementById('settings-receipt-printer').value,
       updateBeacon: document.getElementById('settings-update-beacon').checked,
       firstTimerInverted: document.getElementById('settings-ft-inverted').checked,
       trophyBand: document.getElementById('settings-trophy-band').checked,
