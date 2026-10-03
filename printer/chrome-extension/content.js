@@ -2,7 +2,7 @@
   if (window.__awanaPrinterLoaded) return;
   window.__awanaPrinterLoaded = true;
 
-  const EXTENSION_VERSION = '7.6.0';
+  const EXTENSION_VERSION = '7.7.0';
   const PRINT_COOLDOWN = 2000;
   // POST /print is synchronous on the server: PowerShell + a cold printer can
   // take 15-30 s (the server retries the spooler internally). This must sit
@@ -4110,7 +4110,11 @@
     }
 
     // F-2: try the direct check-in POST first; fall back to click + poll.
-    tryDirectCheckin(recid, action.name, clubId, {}).then(function(ok) {
+    // Bible / Brought a friend as the phone's card had them (7.7.0).
+    var phoneOpts = {};
+    if (action.options && typeof action.options.Bible === 'boolean') phoneOpts.Bible = action.options.Bible;
+    if (action.options && typeof action.options.Friend === 'boolean') phoneOpts.Friend = action.options.Friend;
+    tryDirectCheckin(recid, action.name, clubId, phoneOpts).then(function(ok) {
       if (ok) {
         reportPhoneAction(action.id, true, '');
         setTimeout(function() { phoneNamesInFlight.delete(nameKey); }, 15000);
@@ -4124,7 +4128,7 @@
         return;
       }
       el.click();
-      pollForCheckinButton({ name: action.name, element: el }, {}, 30);
+      pollForCheckinButton({ name: action.name, element: el }, phoneOpts, 30);
       verifyAndReport();
     });
   }
@@ -4743,6 +4747,14 @@
           return b;
         });
       }).catch(function() { return { error: 'The print app is not answering.' }; });
+    },
+    // The phone page's families and Bible/Friend clubs (7.7.0), to the print
+    // server: names and club names only.
+    shareContext: function(payload) {
+      return fetch(PRINT_SERVER + '/touch/context', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload), signal: AbortSignal.timeout(5000),
+      }).catch(function() { /* print app not running: phones keep the last copy */ });
     },
     printServer: PRINT_SERVER,
   };

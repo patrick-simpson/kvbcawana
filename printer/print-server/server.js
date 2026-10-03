@@ -3212,6 +3212,88 @@ function lateGoToLine(clubName, now = new Date()) {
   return where ? `Go to: ${where}` : '';
 }
 
+// ── The drop-off tag (7.7.0) ──────────────────────────────────────────────────
+// On the receipt printer, a child who arrives late gets a plain name tag and
+// the family gets ONE extra tag: "Drop-off locations at 6:42 PM", then a line
+// per child of the household (TwoTimTwo's, from the check-in laptop's
+// /touch/context; a child it doesn't place is a household of one), each with
+// where their club is right now. Owner's choices: the whole household, printed
+// with the first late child, once per family per night.
+const dropOffPrinted = new Map();   // household key -> local day it printed
+function dropOffName(s) { return String(s || '').toLowerCase().replace(/\s+/g, ' ').trim(); }
+function titleCaseName(s) {
+  return String(s || '').split(' ').map(w => w ? w[0].toUpperCase() + w.slice(1) : w).join(' ');
+}
+function dropOffTagFor(firstName, lastName, clubName, now = new Date(), opts = {}) {
+  const self = dropOffName(`${firstName} ${lastName}`);
+  if (!self) return null;
+  const ctx = loadTouchContext();
+  const house = (ctx.households || []).find(h => h.includes(self)) || [self];
+  const key = house.slice().sort().join('|');
+  const today = localDayISO(now);
+  if (!opts.demo && dropOffPrinted.get(key) === today) return null;
+  const roster = loadClubbers();
+  const byName = new Map(roster.map(r => [dropOffName(`${r.FirstName || ''} ${r.LastName || ''}`), r]));
+  const lines = [];
+  for (const member of house) {
+    const r = byName.get(member);
+    if (member !== self && (!r || String(r.Inactive || '').trim())) continue;
+    const club = member === self ? (clubName || (r && r.Club) || '') : String((r && r.Club) || '').trim();
+    const row = scheduleRowFor(club, now);
+    if (!row) continue;
+    const first = member === self ? String(firstName).trim() : String((r && r.FirstName) || member.split(' ')[0]).trim();
+    lines.push({ first: first || titleCaseName(member.split(' ')[0]), club, activity: row.location || '', place: row.room || '' });
+  }
+  if (!lines.length) return null;
+  lines.sort((a, b) => a.first.localeCompare(b.first));
+  if (!opts.demo) dropOffPrinted.set(key, today);
+  const time = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  return { title: `Drop-off locations at ${time}`, family: titleCaseName(String(lastName || '').trim()) || 'this', lines };
+}
+// One 4x2 page (the receipt printer scales it to the roll like every tag): a
+// black band with the title, then a row per child, the name in the shout and
+// where to go beside it, all sized to fit.
+async function generateDropOffTag(tag) {
+  const cvs = createCanvas(PX_W, PX_H);
+  const ctx = cvs.getContext('2d');
+  ctx.scale(SCALE, SCALE);
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, PAGE_W, PAGE_H);
+  const type = labelType('');
+  const M = 10;
+  const BAND = 30;
+  ctx.fillStyle = '#000000';
+  ctx.fillRect(0, 0, PAGE_W, BAND);
+  ctx.fillStyle = '#ffffff';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  let ts = 20;
+  while (ts > 10 && type.measure(ctx, 'band', ts, tag.title.toUpperCase()) > PAGE_W - 2 * M) ts -= 0.5;
+  type.fill(ctx, 'band', ts, tag.title.toUpperCase(), PAGE_W / 2, BAND / 2 + 1);
+  const n = tag.lines.length;
+  const avail = PAGE_H - BAND - 12;
+  const rowH = Math.min(36, avail / n);
+  const top = BAND + 6 + (avail - rowH * n) / 2;   // the rows sit centred under the band
+  ctx.fillStyle = '#000000';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  // One size for every row (the widest row decides), so the tag reads as a list.
+  const rows = tag.lines.map(l => ({ name: l.first, where: [l.place, l.activity].filter(Boolean).join(' · ') }));
+  let size = Math.min(24, rowH * 0.72);
+  const width = (r) => type.measure(ctx, 'name', size, r.name) + size * 0.45 + type.measure(ctx, 'goTo', size * 0.8, r.where);
+  while (size > 7 && rows.some(r => width(r) > PAGE_W - 2 * M)) size -= 0.5;
+  rows.forEach((r, i) => {
+    const y = top + rowH * i + rowH / 2;
+    type.fill(ctx, 'name', size, r.name, M, y);
+    type.fill(ctx, 'goTo', size * 0.8, r.where, M + type.measure(ctx, 'name', size, r.name) + size * 0.45, y);
+    if (i < n - 1) { ctx.fillRect(M, top + rowH * (i + 1) - 0.4, PAGE_W - 2 * M, 0.8); }
+  });
+  const pngPath = tmpFilePath('awana-dropoff', 'png');
+  const buffer = cvs.toBuffer('image/png');
+  fs.writeFileSync(pngPath, buffer);
+  return { pngPath, buffer };
+}
+
 // Operator-configured footer (#8) — one short line (church name, a verse,
 // service times) along the bottom of every label. Read from config here, at
 // the call sites, and passed INTO generateLabel as input.footerText: the
@@ -3764,7 +3846,10 @@ async function performCheckinPrint(input) {
   // attendance milestones (#30), and the inverted first-timer palette (#27).
   const extras = {};
   const goTo = lateGoToLine(effectiveClubName);
-  if (goTo) extras.goToLine = goTo;
+  // On the receipt printer a late child's tag carries no "Go to:" line: the
+  // family gets one drop-off tag instead, after the name tag (7.7.0).
+  const dropOffInstead = !!goTo && receipt.isEnabled(config);
+  if (goTo && !dropOffInstead) extras.goToLine = goTo;
   if (visitor && config.firstTimerInverted !== false) extras.inverted = true;
 
   let pngPath = null;
@@ -3911,6 +3996,25 @@ async function performCheckinPrint(input) {
         }
       } catch (e) {
         console.warn('[print] Connect card failed (non-critical):', e.message);
+      }
+    }
+
+    // The drop-off tag (7.7.0): a late child on the receipt printer, and the
+    // first of their household tonight. Never fails the check-in.
+    if (dropOffInstead) {
+      let dropPath = null;
+      try {
+        const tag = dropOffTagFor(firstName, lastName, effectiveClubName, new Date(), { demo: isDemo });
+        if (tag) {
+          const out = await generateDropOffTag(tag);
+          dropPath = out.pngPath;
+          await printLabel(dropPath, effectivePrinter);
+          console.log(`[print] Drop-off tag for the ${tag.family} family: ${tag.lines.map(l => l.first).join(', ')}`);
+        }
+      } catch (e) {
+        console.warn('[print] Drop-off tag failed (non-critical):', e.message);
+      } finally {
+        if (dropPath) fs.unlink(dropPath, () => {});
       }
     }
 
@@ -5004,6 +5108,39 @@ function recentAttendance(ledger, today = localDayISO()) {
 
 app.get('/touch/recent', (req, res) => {
   res.json(recentAttendance(loadAttendance()));
+});
+
+// What the phone page needs to look like the touch check-in (7.7.0), sent by
+// the check-in laptop's extension, which can read TwoTimTwo: the household
+// groupings (children's names only, lowercased, two or more to a household)
+// and which clubs' check-in has Bible / Brought a friend (club names). Nothing
+// else is accepted. Loopback only (the extension), kept on disk so phones keep
+// their families across a restart.
+const TOUCH_CONTEXT_FILE = path.join(DATA_DIR, 'touch-context.json');
+function sanitizeTouchContext(body) {
+  const b = body || {};
+  const name = (x) => security.sanitizeStoredText(String(x || ''), 120).toLowerCase().replace(/\s+/g, ' ').trim();
+  const households = (Array.isArray(b.households) ? b.households : []).slice(0, 2000)
+    .map(h => (Array.isArray(h) ? h : []).slice(0, 20).map(name).filter(Boolean))
+    .filter(h => h.length >= 2);
+  const clubs = (x) => (Array.isArray(x) ? x : []).slice(0, 20)
+    .map(c => security.sanitizeStoredText(String(c || ''), 40).trim()).filter(Boolean);
+  const items = { bible: clubs(b.items && b.items.bible), friend: clubs(b.items && b.items.friend) };
+  return { households, items, at: new Date().toISOString() };
+}
+let touchContext = null;
+function loadTouchContext() {
+  if (touchContext) return touchContext;
+  try {
+    if (fs.existsSync(TOUCH_CONTEXT_FILE)) touchContext = sanitizeTouchContext(JSON.parse(fs.readFileSync(TOUCH_CONTEXT_FILE, 'utf8')));
+  } catch (e) { console.warn('[touch] Could not read the saved families:', e.message); }
+  return touchContext || { households: [], items: { bible: [], friend: [] }, at: null };
+}
+app.post('/touch/context', (req, res) => {
+  if (!security.isLoopbackRequest(req)) return res.status(403).json({ error: 'The check-in laptop only' });
+  touchContext = sanitizeTouchContext(req.body);
+  try { fs.writeFileSync(TOUCH_CONTEXT_FILE, JSON.stringify(touchContext)); } catch (e) { console.warn('[touch] Could not save the families:', e.message); }
+  res.json({ ok: true, households: touchContext.households.length });
 });
 
 // ADDITIVE ONLY, and confirm-gated like /reset-tonight. It recomputes the audit
@@ -8087,7 +8224,10 @@ app.post('/phone/roster', (req, res) => {
       inactive: !!String(r.Inactive || '').trim(),
     };
   }).filter(k => k.name);
-  res.json({ kids });
+  // 7.7.0: the touch check-in's families and Bible/Friend clubs (from the
+  // laptop's extension) and who came the last two club nights.
+  const ctx = loadTouchContext();
+  res.json({ kids, households: ctx.households, items: ctx.items, recent: recentAttendance(loadAttendance()) });
 });
 
 // The identity a phone request names: `clubberId` when the phone knows it (it
@@ -8200,6 +8340,12 @@ app.post('/phone/checkin', (req, res) => {
   // PIN already verified by the auth gate for every non-loopback caller.
   const name = String((req.body && req.body.name) || '').trim().slice(0, 80);
   if (!name) return res.status(400).json({ error: 'name is required' });
+  // Bible / Brought a friend from the phone's card (7.7.0): booleans only, and
+  // only the two the laptop knows how to tick.
+  const o = (req.body && req.body.options) || {};
+  const options = {};
+  if (typeof o.Bible === 'boolean') options.Bible = o.Bible;
+  if (typeof o.Friend === 'boolean') options.Friend = o.Friend;
   prunePendingActions();
   // One pending action per kid — a double-tap must not double-drive.
   const existing = pendingActions.find(a => a.name.toLowerCase() === name.toLowerCase() && a.status === 'pending');
@@ -8207,6 +8353,7 @@ app.post('/phone/checkin', (req, res) => {
   const action = {
     id: crypto.randomUUID(),
     name,
+    options,
     at: new Date().toISOString(),
     status: 'pending',
     detail: '',
@@ -8532,7 +8679,8 @@ module.exports = {
   // Range reprint (#257) — the selector is pure, so every exclusion rule
   // (awards, leader tags, failed rows, undone rows, the club filter, the
   // newest-row-per-child dedupe and the cap) is testable without printing.
-  selectReprintRange, REPRINT_RANGE_MAX, REPRINT_RANGE_GAP_MS, printJamCopies, JAM_WINDOW_MS,
+  selectReprintRange, REPRINT_RANGE_MAX, REPRINT_RANGE_GAP_MS, printJamCopies, JAM_WINDOW_MS, sanitizeTouchContext,
+  dropOffTagFor, generateDropOffTag,
   localDayISO, historyIdentityKey, clubKey,
   // Remembered leaders + the one club list every dropdown reads. Pure but for
   // their file, so the upsert/cap/season rules and the club-table agreement

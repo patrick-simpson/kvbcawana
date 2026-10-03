@@ -28,6 +28,7 @@
 (function () {
   'use strict';
 
+  // touch-core:begin (this block is copied verbatim into print-server/public/phone.html by scripts/sync-touch-core.cjs; test-touch-search.cjs pins the two equal)
   // ── Search (pure; the tests load this half in Node) ──────────────────────
   function norm(s) {
     return String(s == null ? '' : s)
@@ -213,6 +214,8 @@
     return { cols: best.cols, w: best.w, h: best.h, scroll: false };
   }
 
+  // touch-core:end
+
   if (typeof module === 'object' && module.exports) {
     module.exports = { norm: norm, sound: sound, editDistance: editDistance, searchPeople: searchPeople, householdIndex: householdIndex, parseCsv: parseCsv,
       groupFamilies: groupFamilies, fitTiles: fitTiles };
@@ -290,8 +293,41 @@
     householdsAt = Date.now();
     fetch('/household/csv', { credentials: 'same-origin', signal: AbortSignal.timeout(15000) })
       .then(function (r) { return r.ok ? r.text() : ''; })
-      .then(function (t) { if (t) households = householdIndex(t); })
+      .then(function (t) { if (t) { households = householdIndex(t); shareContext(); } })
       .catch(function () { /* no sibling page tonight, nothing else changes */ });
+  }
+
+  // The phone page shows the same families and ticks the same boxes (7.7.0):
+  // this laptop is the one that can read TwoTimTwo, so it hands the print
+  // server the household groupings (children's names only) and the clubs
+  // whose check-in has Bible / Brought a friend.
+  function itemClubs() {
+    var names = {};
+    document.querySelectorAll('.clubber[club_id]').forEach(function (r) {
+      var img = r.querySelector('.club img');
+      var n = img ? (img.getAttribute('alt') || '').trim() : '';
+      if (n) names[r.getAttribute('club_id')] = n;
+    });
+    var out = { bible: [], friend: [] };
+    var form = document.getElementById('checkinForm');
+    if (!form) return out;
+    form.querySelectorAll('input.event[name="events[]"]').forEach(function (input) {
+      if (input.getAttribute('automatic') === '1') return;
+      var lbl = input.nextElementSibling ? input.nextElementSibling.textContent : '';
+      var kind = /bible/i.test(lbl) ? 'bible' : /friend|brought/i.test(lbl) ? 'friend' : '';
+      if (!kind) return;
+      (input.getAttribute('clubs') || '').split(',').forEach(function (id) {
+        id = id.trim();
+        var n = names[id] || (CLUBS[id] && CLUBS[id].name);
+        if (n && out[kind].indexOf(n) < 0) out[kind].push(n);
+      });
+    });
+    return out;
+  }
+  function shareContext() {
+    if (!households || typeof API.shareContext !== 'function') return;
+    var list = Object.keys(households.members).map(function (id) { return households.members[id]; });
+    API.shareContext({ households: list, items: itemClubs() });
   }
 
   function refreshTonight() {
@@ -749,7 +785,12 @@
     near = near.filter(function (f) { return !isAway(f); });
     var awayKid = {};
     away.forEach(function (f) { f.kids.forEach(function (k) { awayKid[k.recid] = true; }); });
-    var kids = r.matches.filter(function (p) { return !p.recid || !awayKid[p.recid]; });
+    // A child who is a family of one is already their family card; the panel
+    // lists the brothers and sisters the cards hold, and anyone already in.
+    var kids = r.matches.filter(function (p) {
+      if (p.recid && awayKid[p.recid]) return false;
+      return p.checkedIn || !p.recid || !famOf[p.recid] || famOf[p.recid].kids.length > 1;
+    });
 
     if (exact.length) {
       list.append(el('div', 'sec', exact.length === 1 ? 'Family' : 'Families'));
@@ -1252,4 +1293,7 @@
   }
 
   window.__awanaTouchOpenScreen = openScreen;
+  // The phones' families stay current even when nobody opens the touch screen.
+  setTimeout(loadHouseholds, 5000);
+  setInterval(loadHouseholds, 31 * 60 * 1000);
 })();

@@ -452,6 +452,45 @@ exit 0
     fs.unlinkSync(problem);
     useConfig({ backupPrinterName: 'Fake' });
 
+    // The drop-off tag (7.7.0): a late child on the receipt printer gets a
+    // plain name tag, and the family one drop-off tag, once a night.
+    {
+      const at = new Date(); at.setHours(18, 42, 0, 0);
+      fs.writeFileSync(path.join(dataDir, 'clubbers.csv'), 'First Name,Last Name,Club\nBobby,Kwik,Sparks\nElla,Kwik,T&T\nHal,Kwik,Cubbies\nSolo,Kid,Trek\n');
+      let r = await post('/touch/context', { households: [['Bobby Kwik', 'Ella Kwik', 'Hal Kwik']], items: { bible: [], friend: [] } });
+      check('(the laptop shares the households)', r.status === 200 && r.body.households === 1, JSON.stringify(r.body));
+      const tag = server.dropOffTagFor('Bobby', 'Kwik', 'Sparks', at);
+      check('the drop-off tag lists the whole household, each with where their club is now',
+        tag && tag.title === 'Drop-off locations at 6:42 PM' && JSON.stringify(tag.lines.map(l => [l.first, l.place, l.activity])) ===
+        JSON.stringify([['Bobby', 'Fellowship Hall', 'Games'], ['Ella', 'Child Discipleship Wing', 'Large Group'], ['Hal', 'Large Classroom', 'Large Group']]), JSON.stringify(tag));
+      check('one per family per night: a brother or sister after that gets none', server.dropOffTagFor('Ella', 'Kwik', 'T&T', at) === null);
+      const solo = server.dropOffTagFor('Solo', 'Kid', 'Trek', at);
+      check('a child the household list does not place is a family of one', solo && solo.lines.length === 1 && solo.lines[0].place === 'Youth Building', JSON.stringify(solo));
+      const png = await server.generateDropOffTag(tag);
+      const { loadImage } = require(path.join(__dirname, '..', 'print-server', 'node_modules', '@napi-rs/canvas'));
+      const img = await loadImage(fs.readFileSync(png.pngPath));
+      check('it is drawn on the label page the receipt printer scales to the roll', img.width === 1200 && img.height === 600, `${img.width}x${img.height}`);
+      fs.unlinkSync(png.pngPath);
+
+      // End to end: a late check-in (every club "started" at midnight).
+      useConfig({ schedule: [{ club: 'Trek', startTime: '00:00', location: 'Games', room: 'Gym' }], lateGraceMin: 0 });
+      if (new Date().getHours() || new Date().getMinutes()) {
+        fs.writeFileSync(path.join(dataDir, 'clubbers.csv'), 'First Name,Last Name,Club\nTess,Late,Trek\nTom,Late,Trek\n');
+        await post('/touch/context', { households: [['Tess Late', 'Tom Late']], items: { bible: [], friend: [] } });
+        let rj = receiptJobs();
+        r = await post('/print', { firstName: 'Tess', lastName: 'Late', clubName: 'Trek' });
+        check('a late child on the Star: the name tag, then the family’s drop-off tag', r.status === 200 && receiptJobs() === rj + 2, `${r.status} ${receiptJobs() - rj}`);
+        const src = fs.readFileSync(path.join(__dirname, '..', 'print-server', 'server.js'), 'utf8');
+        check('and the name tag carries no "Go to:" line on the Star', /const dropOffInstead = !!goTo && receipt\.isEnabled\(config\);\s*if \(goTo && !dropOffInstead\) extras\.goToLine = goTo;/.test(src));
+        rj = receiptJobs();
+        r = await post('/print', { firstName: 'Tom', lastName: 'Late', clubName: 'Trek' });
+        check('the brother after her: his name tag only', r.status === 200 && receiptJobs() === rj + 1, `${r.status} ${receiptJobs() - rj}`);
+      }
+      const noSched = JSON.parse(fs.readFileSync(cfgPath, 'utf8')); delete noSched.schedule; delete noSched.lateGraceMin;
+      fs.writeFileSync(cfgPath, JSON.stringify(noSched, null, 2)); server.applySavedConfig(noSched);
+      fs.unlinkSync(path.join(dataDir, 'clubbers.csv'));
+    }
+
   }
 
   await printer.close();

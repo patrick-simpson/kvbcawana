@@ -1,4 +1,13 @@
-﻿## [7.6.0] - 2026-10-03
+﻿## [7.7.0] - 2026-10-03
+On the Star receipt printer, a late family gets one drop-off tag.
+
+**The drop-off tag.** When a child checks in late (more than the lateness grace, 10 minutes by default, after their club's first time slot) and the Star receipt printer is the name tag printer, their name tag no longer carries a "Go to:" line. Instead, right after it, the family gets one more tag: "DROP-OFF LOCATIONS AT 6:42 PM" across the top, then a line for every child in the household, each with where their club is at that moment, from the club schedule ("Bobby · Fellowship Hall · Games"). It prints once per family per night, with the first late child; brothers and sisters checking in after that get their name tags only. The household is TwoTimTwo's (see below); a child it doesn't place gets a tag of their own. With the 4×2 label printer nothing changes: the late child's label keeps its "Go to:" line.
+
+**How the print app knows the families.** The check-in laptop's extension, which can read TwoTimTwo, now hands the print app the household groupings (children's names only) and which clubs' check-in has Bible and Brought a friend, when the check-in page loads and every half hour. The print app keeps the last copy on disk, and only the laptop itself can set it. A check-in sent from a phone now also carries Bible and Brought a friend through to TwoTimTwo.
+
+Also on the touch screen: a child who is a family of one shows once in search results (their family card), not again on the Children panel.
+
+## [7.6.0] - 2026-10-03
 Touch check-in: search shows families first, Bible starts ticked, and the motion is quicker and more joyful. Also fixes check-ins made from the panel and from phones being repeated.
 
 **Families first when you type.** Typing a name now shows the matching households first, as large family cards (the family's name and every child still to come, with the children the search matched picked out); tapping one opens the family's page. The matching children follow on their own "Children" panel, a misspelling offers "Did you mean" families, and families not here the last two club nights appear only at the very bottom, as small buttons, so a returning family can still be found.
