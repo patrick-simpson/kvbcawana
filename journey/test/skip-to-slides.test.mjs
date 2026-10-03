@@ -4,7 +4,7 @@
 // runs in and what it must never touch on the way.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { bootKiosk, tick, PI_ZERO } from './kiosk-dom.mjs';
+import { bootKiosk, tick, PI_ZERO, DEFAULT_NOW } from './kiosk-dom.mjs';
 
 const LESSONS = {
   version: 1,
@@ -110,7 +110,8 @@ test('Shift+ArrowRight skips, plain ArrowRight still begins the video', async ()
 });
 
 test('skipping clears the resume mark: the lesson is being called done', async () => {
-  const mark = JSON.stringify({ week: 1, t: 200, d: 600, at: Date.now() });
+  // Stamped on the page's pinned clock (kiosk-dom.mjs), not the real one.
+  const mark = JSON.stringify({ week: 1, t: 200, d: 600, at: DEFAULT_NOW });
   const kiosk = await bootAtTheSplash({ ...ANSWERED, 'journey.resume': mark });
   // The splash is offering to resume, which is exactly the state where a skip
   // must not leave last time's position lying around.

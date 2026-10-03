@@ -18,6 +18,29 @@ import { JSDOM } from 'jsdom';
 const REPO = path.dirname(new URL(import.meta.url).pathname).replace(/\/test$/, '');
 const PUBLIC = path.join(REPO, 'public');
 
+// The page's schedule is the Pi's LOCAL time of day (Journey 18:30-19:15), so a
+// test that reads the real clock behaves differently inside that window than
+// outside it (the suite hung every evening in it). Every boot therefore pins
+// the page's Date to a fixed local time OUTSIDE the window; the clock still
+// advances in real time from there, so timers and Date.now() deltas work.
+// AWANA_TEST_NOW (any Date-parsable string) overrides it for an ad-hoc run.
+export const DEFAULT_NOW = new Date(2026, 9, 7, 12, 0, 0).getTime(); // Wed noon, local
+
+export function pinClock(window, nowMs = DEFAULT_NOW) {
+  const RealDate = window.Date;
+  const offset = nowMs - RealDate.now();
+  class PinnedDate extends RealDate {
+    constructor(...args) {
+      if (args.length === 0) super(RealDate.now() + offset);
+      else super(...args);
+    }
+    static now() {
+      return RealDate.now() + offset;
+    }
+  }
+  window.Date = PinnedDate;
+}
+
 export const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 // The kiosk this harness boots is the real one: a Raspberry Pi Zero, which
@@ -98,6 +121,8 @@ export function bootKiosk(routes = {}, prefs = {}, device = PI_ZERO, setup = nul
     configurable: true,
   });
   Object.defineProperty(video, 'duration', { get: () => 600, configurable: true });
+
+  pinClock(window, process.env.AWANA_TEST_NOW ? new Date(process.env.AWANA_TEST_NOW).getTime() : DEFAULT_NOW);
 
   for (const [key, value] of Object.entries(prefs)) window.localStorage.setItem(key, value);
   if (setup) setup(window);
