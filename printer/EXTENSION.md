@@ -47,7 +47,9 @@ installs. Since 7.4.1 it loads itself anyway, at any hour:
    and its restart restarts the print server.
 2. On that launch it rewrites the managed folder with the extension files from
    the new build. This happens whether or not Chrome is open.
-3. The check-in page sees the new version on disk, asks the extension to
+3. The app then closes Chrome (every window) and reopens it on the check-in
+   page only, which loads the new extension (`electron-app/src/chrome-restart.js`).
+4. As a backup, a check-in page that sees the new version on disk asks the extension to
    re-read its folder (`chrome.runtime.reload()`, the same as **Reload** on
    `chrome://extensions`), and refreshes the check-in tab. It waits only for a
    tag still queued to print, a touch check-in being posted, or a volunteer

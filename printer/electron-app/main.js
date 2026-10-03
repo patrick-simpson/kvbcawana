@@ -4,11 +4,12 @@ const fs = require('fs');
 const net = require('net');
 const http = require('http');
 const os = require('os');
-const { execFileSync } = require('child_process');
+const { execFileSync, spawn } = require('child_process');
 const { runMigration, removeShortcuts, findOldBrandShortcuts } = require('./src/migrate');
 const configStore = require('./src/config-store');
 const extensionSync = require('./src/extension-sync');
 const updatePush = require('./src/update-push');
+const chromeRestart = require('./src/chrome-restart');
 
 // ── Safe external opens ───────────────────────────────────────────────────────
 // shell.openExternal() hands its argument to the OS handler, so on Windows a
@@ -866,9 +867,23 @@ app.whenReady().then(async () => {
   // directly and does not depend on the server module at all).
   setupUpdatePush();
 
+  // A new version landed this launch (the app wrote a newer extension to its
+  // folder): restart Chrome so it loads it, on the check-in page only, at any
+  // hour (owner, 7.4.1). Packaged builds only; it replaces the startup open.
+  const restartChromeNow = app.isPackaged && extensionState.action === 'updated'
+    && !!config.printerName && isSafeExternalUrl(config.checkinUrl);
+
   if (!config.printerName) {
     // First run — show setup wizard (prefilled from legacy config if migrated)
     createSetupWindow();
+  } else if (restartChromeNow) {
+    chromeRestart.restartChrome({
+      url: String(config.checkinUrl).trim(),
+      execFileSync, spawn, existsSync: fs.existsSync,
+      openExternal: (u) => shell.openExternal(u),
+      sleep: (ms) => new Promise(r => setTimeout(r, ms)),
+      log: (m) => console.log(m),
+    }).catch((e) => console.warn('[chrome] restart failed:', e && e.message));
   } else if (!isAutoStart) {
     // On login-item auto-start stay silent; only open the browser when a
     // person launched the app.
