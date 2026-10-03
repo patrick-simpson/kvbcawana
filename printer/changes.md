@@ -1,4 +1,11 @@
-﻿## [7.4.2] - 2026-10-03
+﻿## [7.5.0] - 2026-10-03
+Touch check-in: back to the families the moment you tap, and up to about 70 families on one screen.
+
+**Back at once.** Check in on a child's card, or "All of them" on a family's page, and the screen goes straight back: to the family list, or to the brothers and sisters' page when there is one. The check-ins finish in the background, one at a time, and a green line says when they are through ("Johnson: 3 checked in"). The family leaves the list as soon as you tap; if a check-in fails, a red line names the child and they come back to the list. Checking in each child separately on a family's page now goes back the moment the last one is in, with no pause.
+
+**Up to about 70 families without scrolling.** As the list grows the gaps close up, and once the tiles get small the children's first names give way to a row of club-coloured dots (one per child), so the family's last name keeps the whole tile and stays readable; a tile can go down to 40 px tall. With a long list, the "Not here the last two club nights" row is shorter, with smaller buttons. On a 1366×768 laptop screen, 67 families plus that row fit with nothing to scroll.
+
+## [7.4.2] - 2026-10-03
 Touch check-in: check-ins go through on the real TwoTimTwo page.
 
 **The real cause.** TwoTimTwo's check-in page carries no security (CSRF) token, and the extension's quick check-in refused to post without one. So every touch check-in went to the fallback of clicking the child's row, which opened TwoTimTwo's pop-up out of sight behind the touch screen: nothing was recorded, and the hidden pop-ups left the page frozen. 7.4.1 stopped the freezing but still wanted the token, so it would have refused every touch check-in. The quick check-in now posts exactly what TwoTimTwo's own Checkin button posts (the child, the meeting and the check-in items), tested on the live page: a family of four checked in, each confirmed by TwoTimTwo, and TwoTimTwo's own pop-up still opened normally afterwards.

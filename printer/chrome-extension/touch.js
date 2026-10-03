@@ -353,6 +353,13 @@
     '  padding:.5em .8em .5em 1.1em;background:#fff;border-radius:18px;position:relative;overflow:hidden;min-width:0;',
     '  box-shadow:0 2px 10px rgba(15,23,42,.08);animation:rise .24s cubic-bezier(.2,.8,.2,1) both;transition:transform .12s ease}',
     '.fam:active{transform:scale(.97)}',
+    '.fams.compact .fam{gap:.3em;padding:0 .5em 0 .8em;border-radius:12px}',
+    '.fams.compact .fam::before{width:6px}',
+    '.fams.compact .fam .fn{display:block;white-space:nowrap;text-overflow:ellipsis;min-width:0}',
+    '.fams.compact .fam .kids{flex-wrap:nowrap;overflow:hidden;gap:0 .3em}',
+    '.away.tight .awaygrid{grid-auto-rows:40px;gap:6px}',
+    '.away.tight .famsm .nm{font-size:15px}',
+    '.away.tight{margin-top:10px}',
     '.fam .fn{font-family:"Paytone One","Figtree",sans-serif;line-height:1.05;color:#2F4F8A;overflow-wrap:anywhere;',
     '  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}',
     '.fam .kids{display:flex;flex-wrap:wrap;gap:.2em .7em;font-weight:700;color:#334155;line-height:1.2}',
@@ -657,8 +664,9 @@
     if (away.length) {
       var colsAway = Math.max(1, Math.floor((W + 8) / (170 + 8)));
       var rowsAway = Math.ceil(away.length / colsAway);
-      awayH = Math.min(36 + rowsAway * 56 + (rowsAway - 1) * 8, Math.round(H * 0.34));
-      awayBox = el('div', 'away');
+      var awayRow = main.length > 30 ? 40 : 56;
+      awayH = Math.min(36 + rowsAway * awayRow + (rowsAway - 1) * 8, Math.round(H * (main.length > 30 ? 0.22 : 0.34)));
+      awayBox = el('div', 'away' + (awayRow < 56 ? ' tight' : ''));
       awayBox.style.height = awayH + 'px';
       awayBox.append(el('div', 'lead', 'Not here the last two club nights \u00b7 ' + away.length));
       var ag = el('div', 'awaygrid');
@@ -680,20 +688,28 @@
       H -= awayH + 16;
     }
 
-    var fit = fitTiles(main.length, W, H, 12, 2, 92);
-    var grid = el('div', 'fams');
+    // Up to ~70 families without scrolling (owner, 7.5.0): the gaps close up as
+    // the list grows, and once tiles get small the children's names give way
+    // to their club dots, so the family's name keeps the whole tile, down to a
+    // 40px row.
+    var gap = main.length > 40 ? 6 : main.length > 16 ? 8 : 12;
+    var fit = fitTiles(main.length, W, H, gap, 2, 40);
+    var compact = fit.h < 74;
+    var grid = el('div', 'fams' + (compact ? ' compact' : ''));
+    grid.style.gap = gap + 'px';
     grid.style.gridTemplateColumns = 'repeat(' + fit.cols + ', minmax(0, 1fr))';
     grid.style.gridAutoRows = Math.floor(fit.h) + 'px';
-    if (awayBox) { grid.style.maxHeight = Math.max(92, H) + 'px'; grid.style.overflowY = 'auto'; }
-    var fs = Math.max(18, Math.min(64, fit.h * 0.32, fit.w / 8));
+    if (awayBox) { grid.style.maxHeight = Math.max(40, H) + 'px'; grid.style.overflowY = 'auto'; }
+    var fs = compact ? Math.max(13, Math.min(30, fit.h * 0.4)) : Math.max(18, Math.min(64, fit.h * 0.32, fit.w / 8));
     main.forEach(function (f, i) {
       var b = el('button', 'fam');
       // Each tile's name fits its width on one line: Paytone One averages a
-      // little over half an em a letter, and the tile pads about 1.9em.
+      // little over half an em a letter, and the tile pads about 1.9em. On a
+      // one-line tile the name keeps about 55% of the width, the children the rest.
       var single = f.kids.length === 1;
       var title = single ? f.kids[0].name : f.name;
-      var own = Math.min(fs, (fit.w - 8) / (title.length * 0.6 + 1.9));
-      b.style.fontSize = Math.max(14, Math.round(own)) + 'px';
+      var own = Math.min(fs, (fit.w - 8) / (title.length * 0.6 + (compact ? 1.3 : 1.9)));
+      b.style.fontSize = Math.max(compact ? 12 : 14, Math.round(own)) + 'px';
       b.style.animationDelay = Math.min(i, 24) * 12 + 'ms';
       var stops = f.kids.map(function (c) { return clubFor(c.clubId, c.clubName).color; });
       b.style.setProperty('--stripe', stops.length > 1 ? stops.join(',') : stops[0] + ',' + stops[0]);
@@ -704,7 +720,8 @@
         var k = el('span', 'kid');
         var dot = el('span', 'dot');
         dot.style.setProperty('--c', clubFor(c.clubId, c.clubName).color);
-        k.append(dot, document.createTextNode(single ? clubFor(c.clubId, c.clubName).name : c.name.split(' ')[0]));
+        k.append(dot);
+        if (!compact) k.append(document.createTextNode(single ? clubFor(c.clubId, c.clubName).name : c.name.split(' ')[0]));
         line.append(k);
       });
       b.append(line);
@@ -766,12 +783,14 @@
     go.addEventListener('click', function () {
       if (go.disabled) return;
       go.disabled = true;
-      go.textContent = 'Checking in…';
-      checkInOne(p, state.choice).then(function (ok) {
-        closeConfirm();
-        if (!ok) return;
-        afterCheckIn(p, state.choice);
-      });
+      var choice = { bible: state.choice.bible, friend: state.choice.friend };
+      closeConfirm();
+      // Back at once (owner, 7.5.0): the check-in finishes in the background,
+      // and the brothers and sisters' page, if any, comes up straight away.
+      var sibs = siblingsOf(p);
+      checkInBackground([{ c: p, mine: choice }], null);
+      if (sibs.length) openSiblings(p, sibs, choice);
+      else resetSearch();
     });
     acts.append(no, go);
     s.append(acts);
@@ -793,18 +812,39 @@
     var items = itemsFor(p.clubId);
     if (items.bible) options.Bible = !!choice.bible;
     if (items.friend) options.Friend = !!choice.friend;
+    // Counted as in from the tap (7.5.0: the screen goes back at once), so the
+    // family leaves the list now; a failure puts the child back.
+    recentlyIn[p.recid] = { name: p.name, clubName: p.clubName, clubId: p.clubId, at: new Date().toISOString() };
     return API.checkIn(p.recid, options).then(function (how) {
-      if (how === 'gone') {
-        toast(p.name + ' is already checked in', false);
-        return false;
-      }
+      if (how === 'gone') return 'gone';
       checkedInThisVisit = true;
-      recentlyIn[p.recid] = { name: p.name, clubName: p.clubName, clubId: p.clubId, at: new Date().toISOString() };
       setTimeout(refreshTonight, 2500);
       return true;
     }).catch(function () {
+      delete recentlyIn[p.recid];
       toast('Couldn’t check in ' + p.name + '. Check the internet, then try again.', true);
+      if (state.open && els.input && !els.input.value.trim() && !siblingsOpen()) render();
       return false;
+    });
+  }
+
+  // The check-ins of one tap, in the background, one green line when they are
+  // all through (a failure has already said so in red).
+  function checkInBackground(entries, title) {
+    var done = 0;
+    // Every child of the tap leaves the list now, not as their turn comes.
+    entries.forEach(function (e) {
+      recentlyIn[e.c.recid] = { name: e.c.name, clubName: e.c.clubName, clubId: e.c.clubId, at: new Date().toISOString() };
+    });
+    return entries.reduce(function (chain, e) {
+      return chain.then(function () { return checkInOne(e.c, e.mine).then(function (ok) { if (ok) done++; }); });
+    }, Promise.resolve()).then(function () {
+      if (!done) return;
+      var bad = entries.length - done;
+      if (!bad || !els.toast.classList.contains('bad') || !els.toast.classList.contains('on')) {
+        toast(entries.length === 1 ? entries[0].c.name + ' is checked in'
+          : (title ? title + ': ' : '') + done + ' checked in', false);
+      }
     });
   }
 
@@ -819,15 +859,6 @@
     return pageChildren().filter(function (c) { return wanted[norm(c.name)] && c.recid !== p.recid; });
   }
 
-  function afterCheckIn(p, choice) {
-    var sibs = siblingsOf(p);
-    if (!sibs.length) {
-      toast(p.name + ' is checked in', false);
-      resetSearch();
-      return;
-    }
-    openSiblings(p, sibs, choice);
-  }
 
   // The family page: after a check-in (first = that child) it offers the
   // brothers and sisters; from a family tile (first = null) it is the family.
@@ -874,10 +905,13 @@
     allBtn.addEventListener('click', function () {
       if (allBtn.disabled) return;
       allBtn.disabled = true;
-      // One at a time, in order: the panel's path drives one TwoTimTwo page.
-      pending.reduce(function (chain, entry) {
-        return chain.then(function () { return checkInTile(entry); });
-      }, Promise.resolve()).then(function () { setTimeout(closeSiblings, 600); });
+      // Back to the families at once (owner, 7.5.0); the check-ins go one at a
+      // time in the background (the API queues them in order anyway).
+      var left = pending.filter(function (e) { return e.state === 'ready'; });
+      left.forEach(function (e) { e.state = 'busy'; });
+      var famName = first ? first.name.split(' ').slice(1).join(' ') : (title || '');
+      checkInBackground(left, famName);
+      closeSiblings();
     });
     foot.append(done, allBtn);
     s.append(head, tiles, foot);
@@ -900,7 +934,7 @@
         entry.state = 'ready';
         entry.go.textContent = 'Check in';
       }
-      if (state.siblings.length && state.siblings.every(function (x) { return x.state === 'done'; })) setTimeout(closeSiblings, 700);
+      if (state.siblings.length && state.siblings.every(function (x) { return x.state === 'done'; })) closeSiblings();
     });
   }
 
