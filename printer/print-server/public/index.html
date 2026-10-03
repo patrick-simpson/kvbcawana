@@ -625,31 +625,27 @@
         <div class="card-header"><span class="corner-tab t-blue">Server configuration</span></div>
         <div class="card-body">
           <div class="settings-form">
+            <!-- The ONE place a printer is chosen (6.26.0): the extension's panel on
+                 the check-in page only shows it. -->
             <div>
-              <label>Printer</label>
-              <select id="settings-printer"><option value="">Loading...</option></select>
-            </div>
-            <div>
-              <label>Printer type</label>
-              <select id="settings-printer-type" onchange="toggleReceiptSettings()">
-                <option value="label">Label printer (4&Prime; &times; 2&Prime;)</option>
-                <option value="receipt">Receipt printer (80 mm roll, network) &mdash; trial</option>
-                <option value="receipt-usb">Receipt printer (80 mm roll, USB / Windows driver, e.g. Star TSP100) &mdash; trial</option>
-              </select>
+              <label>Name tag printer</label>
+              <select id="settings-printer" onchange="onTagPrinterChange()"><option value="">Loading...</option></select>
+              <div id="settings-paper-row" style="display:flex; gap:16px; flex-wrap:wrap; margin-top:6px; font-size:13px">
+                <label style="display:flex; align-items:center; gap:6px; font-weight:400; margin:0">
+                  <input type="radio" name="settings-paper" id="settings-paper-label" value="label" onchange="toggleReceiptSettings()" checked>
+                  4&Prime; &times; 2&Prime; labels
+                </label>
+                <label style="display:flex; align-items:center; gap:6px; font-weight:400; margin:0">
+                  <input type="radio" name="settings-paper" id="settings-paper-roll" value="roll" onchange="toggleReceiptSettings()">
+                  80 mm receipt roll (e.g. Star TSP100)
+                </label>
+              </div>
               <div id="receipt-settings" style="display:none; margin-top:8px; padding:10px; border:1px solid #e2e8f0; border-radius:8px">
                 <p style="font-size:11px;color:#64748b;margin:0 0 8px">
-                  Every label prints on the receipt printer instead: today's label turned sideways and scaled to fill the roll
-                  (about 2&#8542;&Prime; &times; 5&#8541;&Prime;), then cut. No tunes. If the receipt printer fails, the label goes to the
-                  printer chosen above instead (if it's connected).
+                  On a receipt roll each name tag is today's label turned sideways and scaled to fill the roll
+                  (about 2&#8542;&Prime; &times; 5&#8541;&Prime;), then cut. No tunes.
+                  <span class="receipt-usb-only">Set the cut (full or partial) and the paper (72mm x Receipt) in the printer's own Windows printing preferences.</span>
                 </p>
-                <div id="receipt-usb-fields" style="display:none; margin-bottom:8px">
-                  <label>Receipt printer</label>
-                  <select id="settings-receipt-printer"><option value="">Loading...</option></select>
-                  <p style="font-size:10px;color:#94a3b8;margin:4px 0 0">
-                    Pick the receipt printer as Windows lists it. Set the cut (full or partial) in its own Windows printing preferences.
-                    Keep the 4&times;2 printer chosen in the Printer box above: it's the fallback.
-                  </p>
-                </div>
                 <div style="display:grid; grid-template-columns: 2fr 1fr; gap:10px">
                   <div class="receipt-net-only">
                     <label>Printer IP address</label>
@@ -682,6 +678,14 @@
                   Find printers looks only on this computer's own network.
                 </p>
               </div>
+            </div>
+            <div>
+              <label>If it fails, print on</label>
+              <select id="settings-backup-printer"><option value="">(no backup)</option></select>
+              <p style="font-size:10px;color:#94a3b8;margin:4px 0 0">
+                Optional. When the name tag printer reports a problem (out of paper, offline, unplugged), that child's
+                label prints here instead, and the dashboard says so.
+              </p>
             </div>
             <div>
               <label>Check-in URL</label>
@@ -1901,25 +1905,47 @@ function toggleRehearsal() {
 }
 
 // Musical printer (#11/#12): the demo button. 409 means the toggle is off.
-var savedReceiptPrinterName = '';
+// ── Name tag printer (the one place a printer is chosen) ─────────────────────
+// One box lists the Windows printers and the network receipt printer; the
+// paper choice says whether a Windows printer is a 4×2 label printer or an
+// 80 mm receipt roll, guessed from its name when it is picked.
+var NETWORK_RECEIPT = '__network__';
+var ROLL_PRINTER_NAME = /\bstar\b|\btsp\s?\d|receipt|\bpos[- ]?\d|80\s?mm/i;
+
+function tagPrinterKind() {
+  if (document.getElementById('settings-printer').value === NETWORK_RECEIPT) return 'receipt';
+  return document.getElementById('settings-paper-roll').checked ? 'receipt-usb' : 'label';
+}
+
+function onTagPrinterChange() {
+  var v = document.getElementById('settings-printer').value;
+  if (v && v !== NETWORK_RECEIPT) {
+    var roll = ROLL_PRINTER_NAME.test(v);
+    document.getElementById('settings-paper-roll').checked = roll;
+    document.getElementById('settings-paper-label').checked = !roll;
+  }
+  toggleReceiptSettings();
+}
 
 // ── Receipt-printer trial ─────────────────────────────────────────────────────
 function toggleReceiptSettings() {
-  var type = document.getElementById('settings-printer-type').value;
-  var usb = type === 'receipt-usb';
-  document.getElementById('receipt-settings').style.display = (type === 'receipt' || usb) ? '' : 'none';
-  document.getElementById('receipt-usb-fields').style.display = usb ? '' : 'none';
-  Array.prototype.forEach.call(document.querySelectorAll('.receipt-net-only'), function(el) { el.style.display = usb ? 'none' : ''; });
+  var kind = tagPrinterKind();
+  document.getElementById('settings-paper-row').style.display =
+    document.getElementById('settings-printer').value === NETWORK_RECEIPT ? 'none' : '';
+  document.getElementById('receipt-settings').style.display = kind === 'label' ? 'none' : '';
+  Array.prototype.forEach.call(document.querySelectorAll('.receipt-net-only'), function(el) { el.style.display = kind === 'receipt' ? '' : 'none'; });
+  Array.prototype.forEach.call(document.querySelectorAll('.receipt-usb-only'), function(el) { el.style.display = kind === 'receipt-usb' ? '' : 'none'; });
 }
 
 function receiptFormValues() {
+  var kind = tagPrinterKind();
   return {
     receiptHost: document.getElementById('settings-receipt-host').value.trim(),
     receiptPort: document.getElementById('settings-receipt-port').value.trim(),
     receiptDots: document.getElementById('settings-receipt-dots').value.trim(),
     receiptCut: document.getElementById('settings-receipt-cut').value,
-    printerType: document.getElementById('settings-printer-type').value,
-    receiptPrinterName: document.getElementById('settings-receipt-printer').value
+    printerType: kind,
+    receiptPrinterName: kind === 'receipt-usb' ? document.getElementById('settings-printer').value : ''
   };
 }
 
@@ -2042,9 +2068,16 @@ function loadSettings() {
     document.getElementById('settings-label-footer').value = config.labelFooter || '';
     document.getElementById('settings-season-theme').value = config.seasonTheme || 'auto';
     document.getElementById('settings-musical').checked = config.musicalPrinter === true;
-    document.getElementById('settings-printer-type').value =
-      (config.printerType === 'receipt' || config.printerType === 'receipt-usb') ? config.printerType : 'label';
-    savedReceiptPrinterName = config.receiptPrinterName || '';
+    var receiptMode = config.printerType === 'receipt' || config.printerType === 'receipt-usb';
+    savedTagPrinter = config.printerType === 'receipt' ? NETWORK_RECEIPT
+      : config.printerType === 'receipt-usb' ? (config.receiptPrinterName || '')
+      : (config.printerName || '');
+    document.getElementById('settings-paper-roll').checked = config.printerType === 'receipt-usb';
+    document.getElementById('settings-paper-label').checked = config.printerType !== 'receipt-usb';
+    // A config from before the backup box: in receipt mode the old Printer box
+    // was the fallback.
+    savedBackupPrinter = Object.prototype.hasOwnProperty.call(config, 'backupPrinterName')
+      ? (config.backupPrinterName || '') : (receiptMode ? (config.printerName || '') : '');
     document.getElementById('settings-receipt-host').value = config.receiptHost || '';
     document.getElementById('settings-receipt-port').value = config.receiptPort || '';
     document.getElementById('settings-receipt-dots').value = config.receiptDots || '';
@@ -2072,45 +2105,39 @@ function loadSettings() {
     // Load printers for dropdown
     return fetch(BASE + '/printers');
   }).then(function(r) { return r.json(); }).then(function(data) {
-    var select = document.getElementById('settings-printer');
-    select.innerHTML = '';
-    var defOpt = document.createElement('option');
-    defOpt.value = '';
-    defOpt.textContent = data.serverDefault ? 'Current: ' + data.serverDefault : '(system default)';
-    select.appendChild(defOpt);
-    (data.printers || []).forEach(function(p) {
-      var opt = document.createElement('option');
-      opt.value = p.name;
-      opt.textContent = p.name + (p.isWindowsDefault ? ' (Windows default)' : '');
-      select.appendChild(opt);
-    });
-    // The USB receipt printer's list: the same Windows printers, plus the saved
-    // one even if Windows isn't listing it right now (so Save can't drop it).
-    var rsel = document.getElementById('settings-receipt-printer');
-    rsel.innerHTML = '';
-    var none = document.createElement('option');
-    none.value = '';
-    none.textContent = '(choose the receipt printer)';
-    rsel.appendChild(none);
-    var names = (data.printers || []).map(function(p) { return p.name; });
-    if (savedReceiptPrinterName && names.indexOf(savedReceiptPrinterName) < 0) names.unshift(savedReceiptPrinterName);
-    names.forEach(function(n) {
-      var o = document.createElement('option');
-      o.value = n;
-      o.textContent = n;
-      rsel.appendChild(o);
-    });
-    rsel.value = savedReceiptPrinterName;
+    fillPrinterSelects(data.printers || []);
   }).catch(function() {
-    document.getElementById('settings-printer').innerHTML = '<option value="">Could not load printers</option>';
-    // Keep the saved choice selectable so a Save made now doesn't clear it.
-    var keep = document.getElementById('settings-receipt-printer');
-    keep.innerHTML = '';
-    var o = document.createElement('option');
-    o.value = savedReceiptPrinterName;
-    o.textContent = savedReceiptPrinterName || 'Could not load printers';
-    keep.appendChild(o);
+    fillPrinterSelects(null);
   });
+}
+
+var savedTagPrinter = '';
+var savedBackupPrinter = '';
+
+// Both boxes list the Windows printers, plus the saved choice even when
+// Windows isn't listing it right now, so a Save can never drop it.
+function fillPrinterSelects(printers) {
+  var names = (printers || []).map(function(p) { return p.name; });
+  var isDefault = {};
+  (printers || []).forEach(function(p) { if (p.isWindowsDefault) isDefault[p.name] = true; });
+  function fill(id, first, saved, extra) {
+    var sel = document.getElementById(id);
+    sel.innerHTML = '';
+    var list = names.slice();
+    if (saved && saved !== NETWORK_RECEIPT && list.indexOf(saved) < 0) list.unshift(saved);
+    [[first[0], first[1]]].concat(list.map(function(n) { return [n, n + (isDefault[n] ? ' (Windows default)' : '')]; }))
+      .concat(extra || []).forEach(function(o) {
+        var opt = document.createElement('option');
+        opt.value = o[0];
+        opt.textContent = o[1];
+        sel.appendChild(opt);
+      });
+    sel.value = saved;
+  }
+  fill('settings-printer', ['', printers ? 'Windows default printer' : 'Could not load printers'], savedTagPrinter,
+    [[NETWORK_RECEIPT, 'Receipt printer on the network (by IP address)']]);
+  fill('settings-backup-printer', ['', '(no backup)'], savedBackupPrinter);
+  toggleReceiptSettings();
 }
 
 // ── Display key ───────────────────────────────────────────────────────────────
@@ -2466,7 +2493,11 @@ function clearDisplayLogin() {
 }
 
 function saveSettings() {
-  var printerName = document.getElementById('settings-printer').value;
+  // printerName is the Windows printer every 4×2 print path uses: the name tag
+  // printer itself, or on a receipt roll the backup (which is what it was).
+  var printerName = tagPrinterKind() === 'label'
+    ? document.getElementById('settings-printer').value
+    : document.getElementById('settings-backup-printer').value;
   var checkinUrl = document.getElementById('settings-url').value.trim();
   var pusherAppId = document.getElementById('settings-pusher-id').value.trim();
   var pusherCluster = document.getElementById('settings-pusher-cluster').value.trim();
@@ -2488,12 +2519,13 @@ function saveSettings() {
       labelFooter: document.getElementById('settings-label-footer').value.trim(),
       seasonTheme: document.getElementById('settings-season-theme').value,
       musicalPrinter: document.getElementById('settings-musical').checked,
-      printerType: document.getElementById('settings-printer-type').value,
+      printerType: tagPrinterKind(),
       receiptHost: document.getElementById('settings-receipt-host').value.trim(),
       receiptPort: document.getElementById('settings-receipt-port').value.trim(),
       receiptDots: document.getElementById('settings-receipt-dots').value.trim(),
       receiptCut: document.getElementById('settings-receipt-cut').value,
-      receiptPrinterName: document.getElementById('settings-receipt-printer').value,
+      receiptPrinterName: tagPrinterKind() === 'receipt-usb' ? document.getElementById('settings-printer').value : '',
+      backupPrinterName: document.getElementById('settings-backup-printer').value,
       updateBeacon: document.getElementById('settings-update-beacon').checked,
       firstTimerInverted: document.getElementById('settings-ft-inverted').checked,
       trophyBand: document.getElementById('settings-trophy-band').checked,

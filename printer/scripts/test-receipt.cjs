@@ -386,13 +386,30 @@ exit 0
     const spool2 = spoolJobs();
     r = await post('/print-custom', { text: 'USB three' });
     check('it never falls back to the receipt printer itself', r.status === 500 && spoolJobs() === spool2
-      && /main Printer setting is the receipt printer too/.test(r.body && r.body.error), JSON.stringify(r.body));
+      && /backup printer is the receipt printer too/.test(r.body && r.body.error), JSON.stringify(r.body));
+
+    // The backup box (6.26.0): its own setting, used instead of the legacy
+    // Printer box once it is saved, and '' meaning no backup at all.
+    r = await post('/config', { backupPrinterName: 'Fake' });
+    check('the backup printer saves', r.status === 200 && JSON.parse(fs.readFileSync(cfgPath, 'utf8')).backupPrinterName === 'Fake', JSON.stringify(r.body));
+    const spool3 = spoolJobs();
+    r = await post('/print-custom', { text: 'USB backup' });
+    check('a receipt failure goes to the backup printer, not the Printer box', r.status === 200 && spoolJobs() === spool3 + 1, `${r.status} ${JSON.stringify(r.body)}`);
+    useConfig({ backupPrinterName: '' });
+    const spool4 = spoolJobs();
+    r = await post('/print-custom', { text: 'USB no backup' });
+    check('no backup chosen: nothing prints, and the error says so', r.status === 500 && spoolJobs() === spool4
+      && /No backup printer is set/.test(r.body && r.body.error), JSON.stringify(r.body));
+    r = await post('/config', { backupPrinterName: 'x" ; calc' });
+    check('a backup printer name with shell characters is refused', r.status === 400);
+    const noBackup = JSON.parse(fs.readFileSync(cfgPath, 'utf8')); delete noBackup.backupPrinterName;
+    fs.writeFileSync(cfgPath, JSON.stringify(noBackup, null, 2)); server.applySavedConfig(noBackup);
     fs.unlinkSync(problem);
 
     const noName = JSON.parse(fs.readFileSync(cfgPath, 'utf8')); delete noName.receiptPrinterName;
     fs.writeFileSync(cfgPath, JSON.stringify(noName, null, 2)); server.applySavedConfig(noName);
     let h0 = await health();
-    check('USB mode with no printer chosen says so', (h0.warnings || []).some(w => w && w.type === 'receiptPrinterUnset' && /pick it from the list/.test(w.message)));
+    check('USB mode with no printer chosen says so', (h0.warnings || []).some(w => w && w.type === 'receiptPrinterUnset' && /pick it as the name tag printer/.test(w.message)));
     r = await post('/receipt/test', { printerType: 'receipt-usb', receiptPrinterName: '' });
     check('the USB test tag needs a printer picked (blank form, none saved)', r.status === 400 && /Pick the receipt printer/.test(r.body && r.body.error));
     const rec3 = receiptJobs();

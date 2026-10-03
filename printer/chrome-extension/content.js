@@ -2,7 +2,7 @@
   if (window.__awanaPrinterLoaded) return;
   window.__awanaPrinterLoaded = true;
 
-  const EXTENSION_VERSION = '6.25.1';
+  const EXTENSION_VERSION = '6.26.0';
   const PRINT_COOLDOWN = 2000;
   // POST /print is synchronous on the server: PowerShell + a cold printer can
   // take 15-30 s (the server retries the spooler internally). This must sit
@@ -29,7 +29,11 @@
   const STORE_KEY      = 'awana_storeMode';  // 'auto' | 'on' | 'off'
 
   let selectedMode        = localStorage.getItem(STORAGE_KEY) || 'auto';
-  let selectedPrinterName = localStorage.getItem(PRINTER_KEY) || '';
+  // The printer is chosen in ONE place, the print dashboard (6.26.0): every
+  // print goes to the printer the server is set to, so this is always empty
+  // and a choice this browser saved before is forgotten (just below).
+  const selectedPrinterName = '';
+  try { localStorage.removeItem(PRINTER_KEY); } catch (e) { /* private mode */ }
   let soundMuted          = localStorage.getItem(MUTE_KEY) === 'true';
   let quickModeEnabled    = localStorage.getItem(QUICK_MODE_KEY) === 'true';
   let stepUpMode          = localStorage.getItem(STEP_UP_KEY) || 'auto';
@@ -804,8 +808,9 @@
     function sectionLabel(text) {
       var el = document.createElement('div');
       Object.assign(el.style, {
-        fontSize: '10px', color: '#94a3b8', fontWeight: '600',
-        textTransform: 'uppercase', letterSpacing: '0.05em'
+        fontFamily: "'Londrina Solid', 'Arial Narrow', system-ui, sans-serif",
+        fontSize: '12px', color: '#94a3b8', fontWeight: '400',
+        textTransform: 'uppercase', letterSpacing: '0.06em'
       });
       el.textContent = text;
       return el;
@@ -820,7 +825,7 @@
     const widget = document.createElement('div');
     widget.id = 'awana-widget';
     Object.assign(widget.style, {
-      fontFamily: 'system-ui, -apple-system, sans-serif',
+      fontFamily: "'Figtree', system-ui, -apple-system, sans-serif",
       fontSize: '13px',
       transition: 'all 0.2s ease'
     });
@@ -1057,29 +1062,26 @@
     var printerRow = document.createElement('div');
     Object.assign(printerRow.style, { display: 'flex', flexDirection: 'column', gap: '2px' });
 
-    var printerLabel = sectionLabel('Printer');
+    var printerLabel = sectionLabel('Printing to');
 
-    var printerSelect = document.createElement('select');
-    printerSelect.id = 'awana-printer-select';
-    Object.assign(printerSelect.style, {
-      width: '100%', padding: '5px 8px', borderRadius: '6px',
-      border: '1px solid #e2e8f0', cursor: 'pointer',
-      fontSize: '11px', background: '#f8fafc', color: '#475569'
+    // Read-only: the printer is set on the print dashboard, and only there.
+    var printingTo = document.createElement('div');
+    printingTo.id = 'awana-printing-to';
+    Object.assign(printingTo.style, {
+      display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '8px',
+      fontSize: '12px', color: '#334155'
     });
-    var loadingOpt = document.createElement('option');
-    loadingOpt.value = ''; loadingOpt.textContent = 'Loading printers...'; loadingOpt.disabled = true;
-    printerSelect.appendChild(loadingOpt);
-
-    printerSelect.addEventListener('change', function() {
-      selectedPrinterName = printerSelect.value;
-      localStorage.setItem(PRINTER_KEY, selectedPrinterName);
-      if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
-        chrome.storage.local.set({ awana_selectedPrinterName: selectedPrinterName });
-      }
-      console.log('[Awana] Printer changed to:', selectedPrinterName || '(server default)');
-    });
-
-    printerRow.append(printerLabel, printerSelect);
+    var printingToName = document.createElement('span');
+    printingToName.id = 'awana-printing-to-name';
+    printingToName.textContent = 'Checking...';
+    var printingToChange = document.createElement('a');
+    printingToChange.href = PRINT_SERVER + '/#settings';
+    printingToChange.target = '_blank';
+    printingToChange.rel = 'noopener';
+    printingToChange.textContent = 'Change';
+    Object.assign(printingToChange.style, { fontSize: '11px', color: '#2563eb', whiteSpace: 'nowrap' });
+    printingTo.append(printingToName, printingToChange);
+    printerRow.append(printerLabel, printingTo);
 
     // Status rows
     var csvStatus = document.createElement('div');
@@ -2921,51 +2923,43 @@
       .catch(function() { /* server offline, ignore */ });
   }
 
+  // The family's faces (6.26.0): Figtree to read, Londrina Solid for the panel's
+  // labels, the same files the dashboard and the lobby use, from the print
+  // server's copy of the brand kit. Fetched as bytes and handed to FontFace, so
+  // the check-in page's own font rules cannot block them; with the server down
+  // the panel simply keeps the system face.
+  function loadBrandFonts() {
+    if (typeof FontFace === 'undefined' || !document.fonts) return;
+    [['Figtree', 'figtree-latin-wght-normal.woff2', '100 900'],
+     ['Londrina Solid', 'londrina-solid-full-400-normal.woff2', '400']].forEach(function(f) {
+      fetch(PRINT_SERVER + '/brand/fonts/' + f[1], { signal: AbortSignal.timeout(5000) })
+        .then(function(r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.arrayBuffer(); })
+        .then(function(buf) {
+          var face = new FontFace(f[0], buf, { weight: f[2] });
+          document.fonts.add(face);
+          return face.load();
+        })
+        .catch(function() { /* system face it is */ });
+    });
+  }
+
+  // Shows where labels print, as the print dashboard has it set ("Star TSP100
+  // Cutter (TSP143), backup Brother QL-820NWB"). A server older than 6.26.0
+  // has no inUse: its default printer is shown instead.
   function fetchPrinters() {
-    var select = document.getElementById('awana-printer-select');
-    if (!select) return;
+    var nameEl = document.getElementById('awana-printing-to-name');
+    if (!nameEl) return;
     fetch(PRINT_SERVER + '/printers', { signal: AbortSignal.timeout(5000) })
-      .then(function(r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(function(r) { return r.json(); })
       .then(function(data) {
-        var printers = data.printers || [];
-        var serverDefault = data.serverDefault || '';
-        while (select.firstChild) select.removeChild(select.firstChild);
-        var defOpt = document.createElement('option');
-        defOpt.value = '';
-        defOpt.textContent = serverDefault
-          ? 'Server Default (' + serverDefault + ')'
-          : 'Server Default (system)';
-        select.appendChild(defOpt);
-        printers.forEach(function(p) {
-          var opt = document.createElement('option');
-          opt.value = p.name;
-          opt.textContent = p.name + (p.isWindowsDefault ? ' \u2605' : '');
-          select.appendChild(opt);
-        });
-        var saved = localStorage.getItem(PRINTER_KEY) || '';
-        var exists = Array.from(select.options).some(function(o) { return o.value === saved; });
-        if (exists && saved) {
-          select.value = saved;
-        } else if (!saved && data.autoDetected) {
-          // Auto-select when only one printer is connected and nothing was saved
-          select.value = data.autoDetected;
-          localStorage.setItem(PRINTER_KEY, data.autoDetected);
-        } else {
-          select.value = exists ? saved : '';
-          if (!exists && saved) localStorage.removeItem(PRINTER_KEY);
-        }
-        selectedPrinterName = select.value;
-        console.log('[Awana] Loaded ' + printers.length + ' printer(s)' +
-          (data.autoDetected ? ' (auto-detected: ' + data.autoDetected + ')' : ''));
+        var use = data.inUse || { name: data.serverDefault || '' };
+        var text = use.name || 'the Windows default printer';
+        if (use.kind === 'receipt') text += ' (80 mm roll)';
+        if (use.backup) text += ', backup ' + use.backup;
+        nameEl.textContent = text;
+        nameEl.title = text;
       })
-      .catch(function(err) {
-        console.log('[Awana] Could not load printers:', err.message);
-        while (select.firstChild) select.removeChild(select.firstChild);
-        var fallback = document.createElement('option');
-        fallback.value = ''; fallback.textContent = 'Default (server)';
-        select.appendChild(fallback);
-        select.value = ''; selectedPrinterName = '';
-      });
+      .catch(function() { nameEl.textContent = 'Print server not reachable'; });
   }
 
   // Auto-focus (#1): the widget's search box is the fastest path from "kid at
@@ -4385,16 +4379,11 @@
 
   injectWidget();
   loadPrintedState();
-  // Restore printer selection from chrome.storage.local (survives extension updates)
-  // Also restore Step Up Night and Awana Store mode if set on the options page.
+  // Restore Step Up Night and Awana Store mode (chrome.storage.local survives
+  // extension updates).
   if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
-    chrome.storage.local.get(['awana_selectedPrinterName', 'awana_stepUpMode', 'awana_storeMode'], function(result) {
-      if (result.awana_selectedPrinterName && !localStorage.getItem(PRINTER_KEY)) {
-        selectedPrinterName = result.awana_selectedPrinterName;
-        localStorage.setItem(PRINTER_KEY, selectedPrinterName);
-        var sel = document.getElementById('awana-printer-select');
-        if (sel) sel.value = selectedPrinterName;
-      }
+    chrome.storage.local.remove('awana_selectedPrinterName');
+    chrome.storage.local.get(['awana_stepUpMode', 'awana_storeMode'], function(result) {
       if (result.awana_stepUpMode && result.awana_stepUpMode !== stepUpMode) {
         stepUpMode = result.awana_stepUpMode;
         localStorage.setItem(STEP_UP_KEY, stepUpMode);
@@ -4426,6 +4415,7 @@
       }
     });
   }
+  loadBrandFonts();
   fetchPrinters();
   watchCheckins();
   loadTonight();

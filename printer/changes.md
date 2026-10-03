@@ -1,4 +1,20 @@
-﻿## [6.25.1] - 2026-10-03
+﻿## [6.26.0] - 2026-10-03
+One place to choose the printer: the dashboard. The extension's panel on the check-in page shows where labels print, and its Settings page now only points to the dashboard.
+
+**Why.** There were three printer choices (the extension panel's Printer list, the dashboard's Printer box, and the receipt printer box under Printer type), plus an extension Settings page that edited the same Pusher keys as the dashboard. Picking the Star TSP100 in the extension's list printed a 4×2 page on an 80 mm roll, or made the Star its own fallback.
+
+**The dashboard (Settings).**
+- **Name tag printer**: the Windows printers and "Receipt printer on the network (by IP address)". For a Windows printer, **4″ × 2″ labels** or **80 mm receipt roll**, guessed from the name as it is picked (Star, TSP, receipt, POS, 80 mm mean a roll). This replaces Printer, Printer type and Receipt printer.
+- **If it fails, print on**: optional, empty by default. A receipt printer that reports a problem, or a label printer whose print fails, sends that child's label here, and the dashboard says so (`receiptFallback`, or the new `printerFallback`). A config saved before this keeps its old fallback (the Printer box) until Settings is saved.
+
+**The extension.**
+- The panel's Printer list is gone: "Printing to: Star TSP100 Cutter (TSP143) (80 mm roll), backup ..." with a Change link to the dashboard. Prints no longer carry a printer of their own, and a choice this browser saved before is forgotten, so nothing can override the dashboard.
+- The Settings page (and the popup's button) opens the dashboard. Its Pusher keys are gone (Pusher is retired); Step Up Night and Awana Store Night stay on the panel, where they already were.
+- The panel wears the family's faces, Figtree and Londrina Solid, loaded from the print server's brand kit.
+
+**For maintainers.** `backupPrinter()` and `printingTarget()` in `server.js`; `GET /printers` adds `inUse` `{kind, name, backup}`; `POST /config` takes `backupPrinterName` ('' is no backup; a missing key is a config from before it). New checks in `test-receipt.cjs`.
+
+## [6.25.1] - 2026-10-03
 The USB receipt printer can be chosen when Windows names it with parentheses, as the Star driver does ("Star TSP100 Cutter (TSP143)").
 
 **Why.** Send test tag answered "Pick the receipt printer from the list first" with the Star picked, and Save would not keep it: the printer-name check refused `(` and `)`, which Windows uses in driver names and in copies ("(Copy 1)", "(redirected 2)").

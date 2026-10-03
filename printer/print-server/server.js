@@ -2714,10 +2714,43 @@ async function printReceipt(pngPath, opts) {
   }
 }
 
+// The backup printer ("If it fails, print on", 6.26.0): set on the dashboard
+// beside the name tag printer, '' for none. A config from before it existed
+// keeps its old meaning: in receipt mode the 4×2 printer in the Printer box
+// was the fallback; a 4×2 label printer had none.
+function backupPrinter() {
+  if (Object.prototype.hasOwnProperty.call(config, 'backupPrinterName')) {
+    return String(config.backupPrinterName || '').trim();
+  }
+  return receipt.isEnabled(config) ? String(PRINTER_NAME || '').trim() : '';
+}
+
+// Where labels print, in words, for the extension's panel and the dashboard.
+function printingTarget() {
+  const backup = backupPrinter() || null;
+  if (receipt.isUsb(config)) return { kind: 'receipt', name: String(config.receiptPrinterName || '').trim() || null, backup };
+  if (receipt.isEnabled(config)) return { kind: 'receipt', name: config.receiptHost ? `receipt printer at ${config.receiptHost}` : null, backup };
+  return { kind: 'label', name: PRINTER_NAME || null, backup };
+}
+
+let lastLabelBackup = null;   // { at, error, to } when a 4×2 print fell back; cleared by the next good print
+
 async function printLabel(pngPath, printerName) {
   if (!receipt.isEnabled(config)) {
-    printImage(pngPath, printerName);
-    return { via: 'label' };
+    try {
+      printImage(pngPath, printerName);
+      lastLabelBackup = null;
+      return { via: 'label' };
+    } catch (e) {
+      const backup = backupPrinter();
+      const main = String(printerName || PRINTER_NAME || '').trim();
+      if (!backup || backup.toLowerCase() === main.toLowerCase()
+        || !isSafePrinterName(backup) || !fallbackPrinterReady(backup)) throw e;
+      printImage(pngPath, backup);
+      lastLabelBackup = { at: new Date().toISOString(), error: String(e.message || e).split('\n')[0].slice(0, 160), to: backup };
+      console.warn(`[print] "${main}" failed; printed on the backup "${backup}" instead`);
+      return { via: 'fallback', printer: backup };
+    }
   }
   const opts = receipt.optionsFrom(config);
   const at = new Date().toISOString();
@@ -2729,9 +2762,9 @@ async function printLabel(pngPath, printerName) {
     const why = String(e.message || e).slice(0, 160);
     lastReceipt = { ok: false, at, error: why };
     console.warn(`[receipt] Print failed: ${why}`);
-    const fallback = String(printerName || PRINTER_NAME || '').trim();
-    // Never "fall back" to the receipt printer itself (the Star picked in the
-    // main Printer box too): that's a second failure, not a 4×2 label.
+    const fallback = backupPrinter();
+    // Never "fall back" to the receipt printer itself (the Star picked as its
+    // own backup): that's a second failure, not a label.
     const sameAsReceipt = opts.usb && fallback.toLowerCase() === opts.printerName.toLowerCase();
     if (fallback && !sameAsReceipt && isSafePrinterName(fallback) && fallbackPrinterReady(fallback)) {
       printImage(pngPath, fallback);
@@ -2740,20 +2773,24 @@ async function printLabel(pngPath, printerName) {
       return { via: 'fallback', printer: fallback };
     }
     throw new Error(`Receipt printer: ${why}. ${sameAsReceipt
-      ? 'The main Printer setting is the receipt printer too, so there is no 4×2 fallback.'
+      ? 'The backup printer is the receipt printer too, so there is no backup.'
       : fallback
-      ? `The 4×2 printer "${fallback}" is not available either.`
-      : 'No 4×2 printer is set as a fallback.'}`);
+      ? `The backup printer "${fallback}" is not available either.`
+      : 'No backup printer is set.'}`);
   }
 }
 
 // The /health half: one {type, message} warning while the trial is on and the
 // last receipt print didn't go cleanly. Clears on the next good print.
 function receiptWarnings() {
-  if (!receipt.isEnabled(config)) return [];
+  if (!receipt.isEnabled(config)) {
+    if (!lastLabelBackup) return [];
+    const at = new Date(lastLabelBackup.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    return [{ type: 'printerFallback', message: `The name tag printer failed at ${at} (${lastLabelBackup.error}), so labels went to the backup "${lastLabelBackup.to}". Check it, then print a test label.` }];
+  }
   if (receipt.isUsb(config)) {
     if (!String(config.receiptPrinterName || '').trim()) {
-      return [{ type: 'receiptPrinterUnset', message: 'Receipt printer (USB) mode is on but no receipt printer is chosen. Open Settings → Printer type and pick it from the list.' }];
+      return [{ type: 'receiptPrinterUnset', message: 'Receipt printer (USB) mode is on but no receipt printer is chosen. Open Settings → Printer and pick it as the name tag printer.' }];
     }
   } else if (!receipt.isSafeHost(config.receiptHost)) {
     return [{ type: 'receiptPrinterUnset', message: 'Receipt printer mode is on but no printer address is set. Open Settings → Printer and enter its IP (or press Find printers).' }];
@@ -2764,7 +2801,7 @@ function receiptWarnings() {
     return [{ type: 'receiptFallback', message: `The receipt printer failed at ${when} (${lastReceipt.error}), so labels are printing on "${lastReceipt.fellBackTo}" instead. Fix it, then press Send test tag in Settings.` }];
   }
   if (!lastReceipt.ok) {
-    return [{ type: 'receiptPrinterFailed', message: `The receipt printer failed at ${when} (${lastReceipt.error}) and no 4×2 printer could take the label. Fix it, then reprint from the failures list.` }];
+    return [{ type: 'receiptPrinterFailed', message: `The receipt printer failed at ${when} (${lastReceipt.error}) and no backup printer could take the label. Fix it, then reprint from the failures list.` }];
   }
   if (lastReceipt.paperLow) {
     return [{ type: 'receiptPaperLow', message: 'The receipt printer reports its paper roll is nearly out. Have a spare roll ready.' }];
@@ -3430,10 +3467,10 @@ app.get('/printers', (req, res) => {
     if (!Array.isArray(parsed)) parsed = [parsed];  // PowerShell returns bare object for single printer
     const printers = parsed.map(p => ({ name: p.Name, isWindowsDefault: !!p.Default }));
     const autoDetected = printers.length === 1 ? printers[0].name : null;
-    res.json({ printers, serverDefault: PRINTER_NAME || null, autoDetected });
+    res.json({ printers, serverDefault: PRINTER_NAME || null, autoDetected, inUse: printingTarget() });
   } catch (err) {
     console.error('[printers] Failed to list printers:', err.message);
-    res.status(500).json({ error: 'Failed to list printers', printers: [] });
+    res.status(500).json({ error: 'Failed to list printers', printers: [], inUse: printingTarget() });
   }
 });
 
@@ -7452,10 +7489,10 @@ app.post('/config', (req, res) => {
     labelFooter, connectCardAutoFirstTimer, connectCardGreeting, seasonTheme,
     musicalPrinter, updateBeacon, slidesPublishToken, displayLoginPassphrase,
     trophyBand, fleetConfigUrl,
-    printerType, receiptHost, receiptPort, receiptDots, receiptCut, receiptPrinterName,
+    printerType, receiptHost, receiptPort, receiptDots, receiptCut, receiptPrinterName, backupPrinterName,
   } = req.body || {};
   if (!isTrustedConfigOrigin(req) && SECRET_CONFIG_KEYS.some(k => (req.body || {})[k] !== undefined)) {
-    return res.status(403).json({ error: 'Pusher/PIN/display-login settings can only be changed from the dashboard or the extension options page' });
+    return res.status(403).json({ error: 'Pusher/PIN/display-login settings can only be changed from the dashboard on this computer' });
   }
   try {
     const next = {};
@@ -7621,6 +7658,13 @@ app.post('/config', (req, res) => {
     // The USB receipt printer's Windows name. It reaches a PowerShell script,
     // so it gets the same refusal as worksheetPrinter: never persist anything
     // that isn't a plain printer label.
+    // "If it fails, print on" (6.26.0). Kept even when empty: '' is a choice
+    // (no backup), unlike a missing key, which means a config from before it.
+    if (backupPrinterName !== undefined) {
+      const bp = String(backupPrinterName || '').trim();
+      if (!isSafePrinterName(bp)) return res.status(400).json({ error: 'backupPrinterName contains unsupported characters' });
+      next.backupPrinterName = bp;
+    }
     if (receiptPrinterName !== undefined) {
       const rp = String(receiptPrinterName || '').trim();
       if (rp === '') delete next.receiptPrinterName;

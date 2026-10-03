@@ -21,6 +21,6 @@
 }
 
 document.getElementById('check-btn').addEventListener('click', checkServer);
-document.getElementById('settings-btn').addEventListener('click', () => chrome.runtime.openOptionsPage());
+document.getElementById('settings-btn').addEventListener('click', () => chrome.tabs.create({ url: 'http://localhost:3456/#settings' }));
 // Check status immediately when popup opens
 checkServer();
