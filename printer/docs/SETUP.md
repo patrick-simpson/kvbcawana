@@ -71,8 +71,9 @@ Details in `EXTENSION.md`.
   works under the screen's *Advanced* section.
 - **Check-in Features** — phone PIN, late-arrival grace, visitor label
   style, connect cards, and the driven-check-in kill switch.
-- **Group Schedule** — one row per club (start time, location, room);
-  late check-ins get a "Go to:" line on the label.
+- **Club Schedule** — one row per slot of the night (club, from, activity,
+  place), filled in with the church's 2026-27 schedule until you change it;
+  a late check-in's label gets a "Go to:" line naming where the club is now.
 
 ## 4. Phone check-in (optional, OFF by default)
 

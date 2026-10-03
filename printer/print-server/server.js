@@ -2967,27 +2967,81 @@ function trophyBandFor(book) {
 }
 
 // ── Group schedule (#28) ──────────────────────────────────────────────────────
-// Where each club goes first, and when — drives the "Go to:" routing line on
+// Where each club is, and from when — drives the "Go to:" routing line on
 // late check-ins. Rows live in config.json: { club, startTime "HH:MM",
-// location, room }. Grace defaults to 10 minutes past the club's start.
+// location, room }, any number per club: each is one slot of the night, and a
+// late child is sent to the club's slot that started last before they arrived
+// ("Go to: Games, Fellowship Hall" at 7:10). `location` is the activity and
+// `room` the place, so the line reads like the printed schedule. No line until
+// the club's FIRST slot plus the grace (10 minutes by default) has passed.
+//
+// DEFAULT_SCHEDULE is KVBC's printed 2026-27 club schedule (owner,
+// 2026-10-03), used whenever this computer has no rows of its own: an empty
+// table on the dashboard means "the club schedule", so clearing it brings
+// these back. Trek and Journey share a column on the poster and part only at
+// 7:00, so each has its own rows.
+const DEFAULT_SCHEDULE = Object.freeze([
+  ['Puggles', '17:45', 'Free Time', 'Toddler Nursery'],
+  ['Puggles', '18:00', 'Opening', 'Fellowship Hall'],
+  ['Puggles', '18:05', 'Group Time', 'Toddler Nursery'],
+  ['Puggles', '19:00', 'Games', 'Fellowship Hall'],
+  ['Cubbies', '17:45', 'Free Time', 'Fellowship Hall'],
+  ['Cubbies', '18:00', 'Opening', 'Fellowship Hall'],
+  ['Cubbies', '18:05', 'Small Group', 'Large Classroom'],
+  ['Cubbies', '18:30', 'Large Group', 'Large Classroom'],
+  ['Cubbies', '19:00', 'Games', 'Fellowship Hall'],
+  ['Sparks', '17:45', 'Small Group', 'Child Discipleship Wing'],
+  ['Sparks', '18:30', 'Games', 'Fellowship Hall'],
+  ['Sparks', '19:00', 'Large Group', 'Large Classroom'],
+  ['T&T', '17:45', 'Handbook Time', 'Fellowship Hall'],
+  ['T&T', '18:00', 'Opening', 'Fellowship Hall'],
+  ['T&T', '18:05', 'Games', 'Fellowship Hall'],
+  ['T&T', '18:30', 'Large Group', 'Child Discipleship Wing'],
+  ['T&T', '19:00', 'Small Group', 'Child Discipleship Wing'],
+  ['Trek', '17:45', 'Handbook Time', 'Youth Building'],
+  ['Trek', '18:05', 'Games', 'Youth Building'],
+  ['Trek', '18:30', 'Large Group', 'Youth Building'],
+  ['Trek', '19:00', 'Small Group', 'Child Discipleship Wing'],
+  ['Journey', '17:45', 'Handbook Time', 'Youth Building'],
+  ['Journey', '18:05', 'Games', 'Youth Building'],
+  ['Journey', '18:30', 'Large Group', 'Youth Building'],
+  ['Journey', '19:00', 'Small Group', 'Youth Building'],
+].map(([club, startTime, location, room]) => Object.freeze({ club, startTime, location, room })));
+const SCHEDULE_MAX_ROWS = 60;
+
 function scheduleRows() {
-  return Array.isArray(config.schedule) ? config.schedule : [];
+  return Array.isArray(config.schedule) && config.schedule.length ? config.schedule : DEFAULT_SCHEDULE;
 }
 
-function scheduleRowFor(clubName) {
+// A club's slots that have a readable start, earliest first.
+function clubSlots(clubName) {
   const key = clubKey(clubName);
-  if (!key) return null;
-  return scheduleRows().find(r => r && clubKey(r.club) === key) || null;
+  if (!key) return [];
+  return scheduleRows()
+    .filter(r => r && clubKey(r.club) === key)
+    .map(r => ({ row: r, start: r.startTime ? events.parseHM(r.startTime) : null }))
+    .filter(s => s.start !== null)
+    .sort((a, b) => a.start - b.start);
+}
+
+// The club's slot under way at `now` (the last to have started), or its
+// first slot before the night begins. Null for a club with no rows.
+function scheduleRowFor(clubName, now = new Date()) {
+  const slots = clubSlots(clubName);
+  if (!slots.length) return null;
+  const mins = now.getHours() * 60 + now.getMinutes();
+  let current = slots[0];
+  for (const s of slots) if (s.start <= mins) current = s;
+  return current.row;
 }
 
 function lateGoToLine(clubName, now = new Date()) {
-  const row = scheduleRowFor(clubName);
-  if (!row || !row.startTime) return '';
-  const start = events.parseHM(row.startTime);
-  if (start === null) return '';
+  const slots = clubSlots(clubName);
+  if (!slots.length) return '';
   const graceMin = Number.isFinite(Number(config.lateGraceMin)) ? Number(config.lateGraceMin) : 10;
   const mins = now.getHours() * 60 + now.getMinutes();
-  if (mins <= start + graceMin) return '';
+  if (mins <= slots[0].start + graceMin) return '';
+  const row = scheduleRowFor(clubName, now);
   const where = [row.location, row.room].filter(Boolean).join(', ');
   return where ? `Go to: ${where}` : '';
 }
@@ -7228,6 +7282,9 @@ app.get('/config', (req, res) => {
     saved = { ...saved };
     SECRET_CONFIG_KEYS.forEach(k => { delete saved[k]; });
   }
+  // The dashboard's schedule table shows the club schedule this computer
+  // actually routes by, the default included when it has none of its own.
+  if (!Array.isArray(saved.schedule) || !saved.schedule.length) saved = { ...saved, schedule: scheduleRows() };
   res.json(saved);
 });
 
@@ -7506,11 +7563,11 @@ app.get('/config/schedule', (req, res) => {
 app.post('/config/schedule', (req, res) => {
   const { schedule, lateGraceMin } = req.body || {};
   if (!Array.isArray(schedule)) return res.status(400).json({ error: 'schedule must be an array' });
-  const rows = schedule.slice(0, 12).map(r => ({
+  const rows = schedule.slice(0, SCHEDULE_MAX_ROWS).map(r => ({
     club: String(r && r.club || '').slice(0, 30),
     startTime: /^\d{1,2}:\d{2}$/.test(String(r && r.startTime || '')) ? String(r.startTime) : '',
     location: String(r && r.location || '').slice(0, 40),
-    room: String(r && r.room || '').slice(0, 20),
+    room: String(r && r.room || '').slice(0, 40),
   })).filter(r => r.club);
   try {
     const next = fs.existsSync(CONFIG_FILE) ? JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8')) : {};
@@ -8156,6 +8213,7 @@ module.exports = {
   // Pure helpers exported for scripts/test-server-helpers.cjs — they carry
   // the assumptions about TwoTimTwo's real /clubber/csv export format.
   parseCSV, normalizeHeader, findClubberIn, parseNoPhoto, noPhotoFor,
+  lateGoToLine, scheduleRowFor, DEFAULT_SCHEDULE,
   parseYesRelease, rosterConsentSummary, consentWarningFor,
   isSafePrinterName,
   parseAllergies,

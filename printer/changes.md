@@ -1,4 +1,17 @@
-﻿## [6.23.0] - 2026-10-02
+﻿## [6.24.0] - 2026-10-03
+A late child's label now says where their club is right now, using the church's printed 2026-27 club schedule out of the box.
+
+**Why.** The schedule table held one place per club, but every club moves during the night (Cubbies are in the Large Classroom at 6:05 and in the Fellowship Hall for games at 7:00), so a label printed at 7:10 sent a child to the wrong room.
+
+**What changes.**
+- The schedule is a list of time slots, any number per club: a child checked in after the club's first slot plus the late grace (10 minutes) gets "Go to: <activity>, <place>" for the club's slot that started last, e.g. "Go to: Games, Fellowship Hall" at 7:10.
+- With no rows of its own, this computer routes by the church's 2026-27 schedule (Puggles, Cubbies, Sparks, T&T, Trek and Journey, 5:45 to 7:00 slots), and the dashboard shows it filled in. Edit it there; delete every row and save to go back to it. Trek and Journey have their own rows: they part at 7:00 (Trek to the Child Discipleship Wing, Journey in the Youth Building).
+- A connect card names the club's slot under way when it prints.
+- The table takes up to 60 rows and 40-character place names ("Child Discipleship Wing" was cut off at 20).
+
+**For maintainers.** `DEFAULT_SCHEDULE`, `clubSlots()` and a time-aware `scheduleRowFor(club, now)` in `server.js`; `lateGoToLine` counts the grace from the club's earliest slot. `GET /config` fills in `schedule` with the rows in effect. New checks in `test-server-helpers.cjs`.
+
+## [6.23.0] - 2026-10-02
 A child who may not be photographed now gets a solid bar down the label's right edge, as well as the crossed-out camera.
 
 **Why.** The camera is one small icon in a row of them; whoever is taking pictures should be able to tell from across the room, or through a viewfinder, without reading the row.

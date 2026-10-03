@@ -786,7 +786,7 @@
                 <div>
                   <label>Late grace (minutes)</label>
                   <input type="number" id="settings-late-grace" min="0" max="120" placeholder="10">
-                  <p style="font-size:10px;color:#94a3b8">Past a club's start + grace, labels add a "Go to:" line</p>
+                  <p style="font-size:10px;color:#94a3b8">Past a club's first slot + grace, a late label says where the club is now ("Go to:")</p>
                 </div>
               </div>
               <div style="margin-top:8px">
@@ -857,12 +857,17 @@
             </div>
 
             <div style="margin-top:12px; border-top: 1px solid #e2e8f0; padding-top: 12px;">
-              <label class="section-label">Group Schedule (drives late "Go to:" routing)</label>
+              <label class="section-label">Club Schedule (drives late "Go to:" routing)</label>
+              <p style="font-size:10px;color:#94a3b8;margin:4px 0 0">
+                One row per slot of the night, as on the printed schedule: a child checked in late is sent to
+                their club's slot that started last ("Go to: Games, Fellowship Hall"). Delete every row and save
+                to go back to the church's 2026-27 schedule.
+              </p>
               <table style="margin-top:8px" id="schedule-table">
-                <thead><tr><th>Club</th><th>Start</th><th>Location</th><th>Room</th><th></th></tr></thead>
+                <thead><tr><th>Club</th><th>From</th><th>Activity</th><th>Place</th><th></th></tr></thead>
                 <tbody id="schedule-body"></tbody>
               </table>
-              <button class="btn btn-secondary btn-sm" style="margin-top:6px" onclick="addScheduleRow()">Add club row</button>
+              <button class="btn btn-secondary btn-sm" style="margin-top:6px" onclick="addScheduleRow()">Add a slot</button>
             </div>
 
             <button class="btn btn-primary" onclick="saveSettings()">Save Settings</button>
@@ -1985,8 +1990,8 @@ function scheduleRowHtml(row) {
   return '<tr>' +
     '<td><input type="text" class="sched-club" value="' + esc(row.club || '') + '" placeholder="Sparks" style="width:90px"></td>' +
     '<td><input type="text" class="sched-start" value="' + esc(row.startTime || '') + '" placeholder="18:30" style="width:60px"></td>' +
-    '<td><input type="text" class="sched-loc" value="' + esc(row.location || '') + '" placeholder="Music" style="width:110px"></td>' +
-    '<td><input type="text" class="sched-room" value="' + esc(row.room || '') + '" placeholder="Rm 4" style="width:60px"></td>' +
+    '<td><input type="text" class="sched-loc" value="' + esc(row.location || '') + '" placeholder="Games" style="width:110px"></td>' +
+    '<td><input type="text" class="sched-room" value="' + esc(row.room || '') + '" placeholder="Fellowship Hall" style="width:160px"></td>' +
     '<td><button class="btn btn-secondary btn-sm" onclick="this.closest(\'tr\').remove()">✕</button></td>' +
     '</tr>';
 }

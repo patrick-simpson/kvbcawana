@@ -32,6 +32,7 @@ const {
   effectiveHandbookGroup, reconcileHistoryWithReport, reportEntryIdentityKey,
   tonightCheckins, markManualUndo, clearManualUndo, computeTonightStats, isNonCheckinRow, splitFullName,
   trophyBandFor, TROPHY_BAND_MAX,
+  lateGoToLine, scheduleRowFor, DEFAULT_SCHEDULE, applySavedConfig,
 } = require(path.join(__dirname, '..', 'print-server', 'server.js'));
 
 const feeds = require(path.join(__dirname, '..', 'print-server', 'feeds.js'));
@@ -1729,6 +1730,41 @@ console.log('\ntrophy band (#293): band text + completed-books window');
     /case 'completedBooks':[\s\S]{0,300}isInClubWindow\(\) \? 10 \* 60 \* 1000 : Infinity/.test(extSrc));
   check('the scheduler knows the task in all three tables',
     /completedBooks: 0/.test(extSrc) && /completedBooks: runCompletedBooks/.test(extSrc));
+}
+
+// ── Late "Go to:" routing: the club schedule's time slots ──────────────────
+// A late child is sent where their club is NOW: the club's slot that started
+// last. With no rows of its own, this computer routes by the church's printed
+// 2026-27 schedule.
+{
+  const at = (hm) => { const [h, m] = hm.split(':').map(Number); return new Date(2026, 9, 7, h, m); };
+  applySavedConfig({ schedule: [] });
+  check('the default schedule has every club', ['Puggles', 'Cubbies', 'Sparks', 'T&T', 'Trek', 'Journey']
+    .every(c => DEFAULT_SCHEDULE.some(r => r.club === c)));
+  check('no Go to line within the grace after the club starts', lateGoToLine('Cubbies', at('17:55')) === '');
+  check('just past the grace: the first slot', lateGoToLine('Cubbies', at('17:56')) === 'Go to: Free Time, Fellowship Hall');
+  check('Cubbies at 6:10: small group', lateGoToLine('Cubbies', at('18:10')) === 'Go to: Small Group, Large Classroom');
+  check('Cubbies at 7:10: games', lateGoToLine('Cubbies', at('19:10')) === 'Go to: Games, Fellowship Hall');
+  check('Sparks at 6:40: games', lateGoToLine('Sparks', at('18:40')) === 'Go to: Games, Fellowship Hall');
+  check('T&T at 6:45: large group', lateGoToLine('T&T', at('18:45')) === 'Go to: Large Group, Child Discipleship Wing');
+  check('Trek and Journey part at 7:00',
+    lateGoToLine('Trek', at('19:05')) === 'Go to: Small Group, Child Discipleship Wing'
+    && lateGoToLine('Journey', at('19:05')) === 'Go to: Small Group, Youth Building');
+  check('a slot starts exactly on its minute', lateGoToLine('Puggles', at('19:00')) === 'Go to: Games, Fellowship Hall');
+  check('an unknown club gets no line', lateGoToLine('Choir', at('19:00')) === '');
+  check('before the night, a club\'s row is its first slot', scheduleRowFor('Sparks', at('16:00')).location === 'Small Group');
+  check('every default line fits the label\'s 48 characters', DEFAULT_SCHEDULE.every(r => `Go to: ${r.location}, ${r.room}`.length <= 48));
+
+  // This computer's own rows replace the default entirely, in any order.
+  applySavedConfig({ schedule: [
+    { club: 'Sparks', startTime: '19:00', location: 'Music', room: 'Rm 4' },
+    { club: 'Sparks', startTime: '18:00', location: 'Crafts', room: 'Rm 2' },
+  ] });
+  check('own rows: the slot under way, whatever order they are saved in', lateGoToLine('Sparks', at('18:20')) === 'Go to: Crafts, Rm 2'
+    && lateGoToLine('Sparks', at('19:30')) === 'Go to: Music, Rm 4');
+  check('own rows: grace counts from the earliest slot', lateGoToLine('Sparks', at('18:10')) === '');
+  check('own rows: a club they do not list gets no line', lateGoToLine('Cubbies', at('19:10')) === '');
+  applySavedConfig({ schedule: [] });
 }
 
 console.log('');
