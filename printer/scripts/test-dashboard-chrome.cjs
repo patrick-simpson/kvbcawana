@@ -222,7 +222,8 @@ console.log('\ndashboard chrome: nothing the scripts use went missing');
 for (const name of ['dashboard', 'phone', 'bookmarklet']) {
   const src = SURFACES[name];
   const ids = new Set([...src.matchAll(/\bid="([^"]+)"/g)].map((m) => m[1]));
-  const used = [...new Set([...src.matchAll(/getElementById\('([^']+)'\)/g)].map((m) => m[1]))];
+  // getElementById('x'), or the phone page's $('x') shorthand for it.
+  const used = [...new Set([...src.matchAll(/(?:getElementById|[^\w.]\$)\('([^']+)'\)/g)].map((m) => m[1]))];
   const missing = used.filter((id) => !ids.has(id));
   check(`every element the ${name} looks up exists (${used.length} ids)`, used.length > 0 && missing.length === 0,
     `missing: ${missing.join(', ')}`);
@@ -314,27 +315,28 @@ console.log('\ndashboard chrome: the section tabs keep aria-selected in step');
     }
   }
   {
+    // 7.7.0: the phone page has no tabs; Tonight, the + menu, the child's card
+    // and the Remove confirmation are bottom sheets, and exactly one is ever
+    // up, over the scrim. The shipped showSheet() / hideSheet(), run against
+    // the page's own markup.
     const win = domOf(SURFACES.phone);
     const doc = win.document;
-    const src = functionSource(SURFACES.phone, 'setTab');
-    check('the phone page ships setTab()', !!src);
-    // setTab() catches the Tonight and Not-here views up; those are the
-    // page's network half, not the tabs', so they are stubbed here.
-    win.eval('var activeTab; function refreshTonight() {} function renderWaiting() {}');
-    win.eval(src || '');
-    check('the phone tabs sit in a tablist', !!doc.querySelector('[role="tablist"] [role="tab"]'));
-    const names = [...doc.querySelectorAll('.tab[data-tab]')].map((t) => t.getAttribute('data-tab'));
-    const first = selected(doc);
-    check('the phone page starts with one selected tab, the lit one',
-      first.length === 1 && first[0].classList.contains('on'), first.map((t) => t.getAttribute('data-tab')).join(', '));
-    for (const n of [...names.slice().reverse(), ...names]) {
-      if (typeof win.setTab === 'function') win.setTab(n);
-      const sel = selected(doc);
-      const view = doc.getElementById(`${n}-view`);
-      check(`phone setTab('${n}') leaves exactly that tab selected`,
-        sel.length === 1 && sel[0].getAttribute('data-tab') === n && sel[0].classList.contains('on')
-        && !!view && view.style.display === 'block', sel.map((t) => t.getAttribute('data-tab')).join(', ') || 'none');
+    const show = functionSource(SURFACES.phone, 'showSheet');
+    const hide = functionSource(SURFACES.phone, 'hideSheet');
+    check('the phone page ships showSheet() and hideSheet()', !!show && !!hide);
+    win.eval('var openSheet = null; function $(id) { return document.getElementById(id); }');
+    win.eval((show || '') + (hide || ''));
+    const sheets = [...doc.querySelectorAll('.sheet')].map((x) => x.id);
+    check('every sheet is a labelled-up dialog', sheets.length >= 4
+      && sheets.every((id) => doc.getElementById(id).getAttribute('role') === 'dialog'), sheets.join(', '));
+    for (const id of [...sheets, ...sheets.slice().reverse()]) {
+      if (typeof win.showSheet === 'function') win.showSheet(id);
+      const on = [...doc.querySelectorAll('.sheet.on')].map((x) => x.id);
+      check(`phone showSheet('${id}') leaves exactly that sheet up, over the scrim`,
+        on.length === 1 && on[0] === id && doc.getElementById('scrim').classList.contains('on'), on.join(', ') || 'none');
     }
+    if (typeof win.hideSheet === 'function') win.hideSheet();
+    check('hideSheet() leaves no sheet and no scrim', !doc.querySelector('.sheet.on') && !doc.getElementById('scrim').classList.contains('on'));
   }
 }
 
@@ -415,11 +417,8 @@ console.log('\ndashboard chrome: the phone page loads only what the Wi-Fi can re
   // script-set path outside /brand/ 403s on the Wi-Fi exactly like a tag's.
   const refs = pageAssetRefs(SURFACES.phone).filter((r) => !/^(https?:|data:|javascript:)/.test(r.url));
   const local = refs.map((r) => r.url);
-  check('the phone page’s script-set assets are collected too (the tab-shape probe)',
-    refs.some((r) => r.script && r.url === '/brand/shapes/tab-b-sparks.svg'), JSON.stringify(refs.filter((r) => r.script)));
-  check('the phone page’s stylesheet url()s are collected (the tab mask)',
-    refs.some((r) => !r.script && r.url.startsWith('/brand/shapes/tab-b-sparks.svg#svgView(')), JSON.stringify(local));
-  check('the phone page loads the kit', local.length >= 4, JSON.stringify(local));
+  check('the phone page draws the Awana Clubs mark from the kit', local.includes('/brand/logos/awana-clubs-white.svg'), JSON.stringify(local));
+  check('the phone page loads the kit', local.length >= 3, JSON.stringify(local));
   check('every same-origin asset the phone page loads is under /brand/', local.every((r) => r.startsWith('/brand/')),
     JSON.stringify(local.filter((r) => !r.startsWith('/brand/'))));
   const exists = local.map((r) => r.split('#')[0]).filter((r) => !fs.existsSync(path.join(root, 'print-server', 'public', r)));

@@ -188,9 +188,8 @@ async function main() {
         url: (g.attr || g.q1 || g.q2 || g.bare || g.prop || g.set).split('#')[0], script: !!(g.prop || g.set),
       }));
       const assets = refs.map((r) => r.url);
-      check('the phone page’s script-set asset (the tab-shape probe) is collected too',
-        refs.some((r) => r.script && r.url === '/brand/shapes/tab-b-sparks.svg'), JSON.stringify(refs));
-      check('the phone page loads brand assets at all', assets.length >= 4, JSON.stringify(assets));
+      check('the phone page’s Awana Clubs mark is collected too', assets.includes('/brand/logos/awana-clubs-white.svg'), JSON.stringify(refs));
+      check('the phone page loads brand assets at all', assets.length >= 3, JSON.stringify(assets));
       check('every asset the phone page loads is under /brand/ (anything else would 403 on the Wi-Fi)',
         assets.every((a) => a.startsWith('/brand/')), JSON.stringify(assets));
       for (const a of new Set(assets)) {

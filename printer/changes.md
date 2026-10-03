@@ -1,4 +1,13 @@
-﻿## [7.7.0] - 2026-10-03
+﻿## [7.8.0] - 2026-10-03
+The phone check-in, rebuilt as the touch check-in.
+
+**It looks and works like the laptop's touch screen.** The phone page (the Phones address on the Club Label Printer window, PIN as before) opens on the families still to come, two to a row, each with their children and club colours, and the families not here the last two club nights as small buttons at the bottom. Typing shows matching families first, then the matching children on their own panel, "Did you mean" families for a misspelling, and away families last. A child's card has Bible ticked where the club has it (and Brought a friend); Check in goes straight back to the list while the check-in finishes on the check-in laptop, and a green line says when it is through (a failure says so in red, and the child comes back). Brothers and sisters get their own page, one tap each or "All of them". The same joyful jelly motion as the touch screen: tiles land and settle, survivors glide while you type, a checked-in family pops out of the list.
+
+**Everything else is one tap away.** The "N in" pill at the top opens Tonight: the count by club, the check against TwoTimTwo, and the list with Remove (and Add back on the child's card). The + button holds Printer jammed (while the Star is the printer), Leader tag (with the remembered leaders), Custom label and Visitor label. The old "Not here" tab is the families list itself.
+
+**The same families as the laptop.** The phone uses the household groupings and Bible / Brought a friend clubs the check-in laptop shares with the print app (7.7.0), and its search and family grouping are the touch screen's own code, copied verbatim (scripts/sync-touch-core.cjs) and pinned equal by a test.
+
+## [7.7.0] - 2026-10-03
 On the Star receipt printer, a late family gets one drop-off tag.
 
 **The drop-off tag.** When a child checks in late (more than the lateness grace, 10 minutes by default, after their club's first time slot) and the Star receipt printer is the name tag printer, their name tag no longer carries a "Go to:" line. Instead, right after it, the family gets one more tag: "DROP-OFF LOCATIONS AT 6:42 PM" across the top, then a line for every child in the household, each with where their club is at that moment, from the club schedule ("Bobby · Fellowship Hall · Games"). It prints once per family per night, with the first late child; brothers and sisters checking in after that get their name tags only. The household is TwoTimTwo's (see below); a child it doesn't place gets a tag of their own. With the 4×2 label printer nothing changes: the late child's label keeps its "Go to:" line.
