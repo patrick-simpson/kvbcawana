@@ -6104,7 +6104,12 @@ const PDF_MAGIC = '%PDF-';
 // printImage(). If a specific printer was requested, best-effort switch the
 // Windows default printer to it first (Start-Process -Verb Print has no
 // direct "-Printer" argument) — failure to do that is non-fatal, the job
-// still goes to whatever the current default is.
+// still goes to whatever the current default is. The default is PUT BACK
+// afterwards, from this side, whatever happened to the print (a reader that
+// stays open past the 30 s and gets the script killed included): until
+// 7.11.1 it stayed switched, so on an install whose label printer is "the
+// system default" every label after a mid-club worksheet went to the letter
+// printer.
 // A printer name is operator data that reaches a shell. Windows printer names
 // are plain labels ("Brother QL-820NWB", "HP LaserJet (Office)"), so anything
 // carrying quotes, shell metacharacters, or control characters is not a printer
@@ -6142,8 +6147,40 @@ function printPdf(pdfPath, printerName) {
   return withPrinter(() => printPdfNow(pdfPath, printerName));
 }
 
-async function printPdfNow(pdfPath, printerName) {
+// The name of the current Windows default printer, or '' when unknown.
+async function currentDefaultPrinter() {
+  try {
+    const raw = await runPowerShell(['-Command', 'Get-CimInstance -ClassName Win32_Printer | Where-Object { $_.Default -eq $true } | Select-Object -First 1 -ExpandProperty Name'], { timeout: 8000 });
+    const name = String(raw || '').trim();
+    return isSafePrinterName(name) ? name : '';
+  } catch {
+    return '';
+  }
+}
 
+// Make the named printer the Windows default again (the name rides in the
+// environment, never in the script).
+async function restoreDefaultPrinter(name) {
+  if (!name || !isSafePrinterName(name)) return;
+  try {
+    await runPowerShell(['-Command', '$p = Get-CimInstance -ClassName Win32_Printer | Where-Object { $_.Name -eq $env:AWANA_PRINTER }; if ($p) { Invoke-CimMethod -InputObject $p -MethodName SetDefaultPrinter | Out-Null }'], {
+      timeout: 8000, env: Object.assign({}, process.env, { AWANA_PRINTER: name }),
+    });
+  } catch (e) {
+    console.warn(`[print-pdf] Could not put the default printer back to "${name}":`, e.message.split('\n')[0]);
+  }
+}
+
+async function printPdfNow(pdfPath, printerName) {
+  const previous = printerName && process.platform === 'win32' ? await currentDefaultPrinter() : '';
+  try {
+    await runPdfPrintScript(pdfPath, printerName);
+  } finally {
+    if (previous && previous !== printerName) await restoreDefaultPrinter(previous);
+  }
+}
+
+async function runPdfPrintScript(pdfPath, printerName) {
   const ps = `
 $ErrorActionPreference = 'Stop'
 $target = $env:AWANA_PDF_PATH

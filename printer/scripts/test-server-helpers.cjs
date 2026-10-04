@@ -722,6 +722,21 @@ console.log('isSafePrinterName — a printer name reaches PowerShell, so it is v
   check('ACCEPTS null/undefined as empty', isSafePrinterName(null) === true && isSafePrinterName(undefined) === true);
 }
 
+console.log('printPdf — a worksheet never leaves the Windows default printer switched');
+{
+  // REGRESSION GUARD: the worksheet print made its printer the Windows default
+  // and never put it back, so on an install whose label printer is "the system
+  // default" every label after a mid-club worksheet went to the letter printer.
+  const src = require('fs').readFileSync(path.join(__dirname, '..', 'print-server', 'server.js'), 'utf8');
+  const printPdf = src.slice(src.indexOf('async function printPdfNow('), src.indexOf('async function runPdfPrintScript('));
+  check('the previous default is read before the print', /const previous = printerName && process\.platform === 'win32' \? await currentDefaultPrinter\(\) : '';/.test(printPdf));
+  check('and put back in a finally, whatever happened to the print', /finally \{\s*if \(previous && previous !== printerName\) await restoreDefaultPrinter\(previous\);/.test(printPdf));
+  const restore = src.slice(src.indexOf('async function restoreDefaultPrinter('), src.indexOf('async function printPdfNow('));
+  const restoreCommand = restore.slice(0, restore.indexOf('console.warn'));   // the PowerShell call, before the warning that names the printer
+  check('the name rides in the environment, never in the script', /\$env:AWANA_PRINTER/.test(restoreCommand) && /AWANA_PRINTER: name/.test(restoreCommand) && !/\$\{name\}/.test(restoreCommand));
+  check('and is validated first', /if \(!name \|\| !isSafePrinterName\(name\)\) return;/.test(restore));
+}
+
 console.log('packaging — every print-server module must ship inside the Windows app');
 {
   // REGRESSION GUARD: electron-builder copies print-server via an
