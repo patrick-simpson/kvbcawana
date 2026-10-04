@@ -16,9 +16,16 @@ on:
 permissions:
   contents: read
 
+# A newer push to the same PR replaces its run. On main a run is never
+# cancelled: every push to main is followed within minutes by another (the
+# release workflows and the nightly bots commit a feed or a lesson and
+# dispatch this workflow), and cancelling the run in flight killed its deploy
+# job between the Worker and the site, or starved the deploy altogether while
+# commits kept landing. The deploy job's own group below keeps main's deploys
+# in order, newest pending only.
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   copies:
