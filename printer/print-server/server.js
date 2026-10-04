@@ -220,12 +220,19 @@ const EVENT_CHANNEL = churchConfig.pusherChannel || 'awana-channel';
 // been switched on receives the last frame at once (see publishProvision()).
 const PROVISION_CHANNEL = events.provisionChannelFor(EVENT_CHANNEL);
 
+const PUSHER_TIMEOUT_MS = 10000;
 const pusher = (config.pusherAppId && config.pusherKey && config.pusherSecret)
   ? new Pusher({
       appId:   config.pusherAppId,
       key:     config.pusherKey,
       secret:  config.pusherSecret,
       cluster: config.pusherCluster || 'us2',
+      // The REST publish has no timeout of its own: with the internet down
+      // but DNS up, each trigger() hung for the socket's two minutes and the
+      // publisher's await chain hung with it. Ten seconds is generous for one
+      // small frame; a frame that misses it is lost the way a dropped one is
+      // (the recap carries the check-in two minutes later).
+      timeout: PUSHER_TIMEOUT_MS,
     })
   : null;
 

@@ -68,6 +68,7 @@ const realLoad = Module._load;
 Module._load = function patched(request) {
   if (request === 'pusher') {
     return class FakePusher {
+      constructor(opts) { globalThis.__pusherOpts = opts; }
       trigger(channel, event, payload) {
         wire.push({ channel, event, payload });
         return Promise.resolve();
@@ -189,6 +190,13 @@ async function main() {
   }
 
   // ── 2. Generating and saving a key ─────────────────────────────────────────
+  console.log('realtime: the Pusher client never waits forever');
+  {
+    const opts = globalThis.__pusherOpts || {};
+    check('the REST client is built with a 10 s request timeout (it had none: a dead internet hung every publish for the socket\'s two minutes)',
+      opts.timeout === 10000 && opts.cluster === 'us2', JSON.stringify(opts));
+  }
+
   console.log('realtime: generating and saving a key');
   let KEY;
   {
