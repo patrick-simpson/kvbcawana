@@ -145,6 +145,19 @@ for (const file of walk(OUT)) {
   rmSync(file);
   console.log(`  ${sitePath} (${(statSync(path.join(ROOT, repoPath)).size / 1048576).toFixed(1)} MiB): streamed from the repo, not uploaded`);
 }
+// Pages invokes a Function for every request under a folder that has one
+// (functions/journey, functions/api) unless _routes.json says otherwise, so
+// without it every static Journey request (the page, its scripts, the brand
+// kit, schedule.json) went through the Function and fell through to the file:
+// an invocation counted against the daily quota and a hop added to a kiosk on
+// a Pi, for nothing. Only the paths a Function actually answers are routed to
+// one: the sync Worker under /api, the lesson videos, and the large files
+// streamed from the repo. Everything else is a plain static file.
+writeFileSync(path.join(OUT, '_routes.json'), `${JSON.stringify({
+  version: 1,
+  include: ['/api', '/api/*', ...Object.keys(VIDEO_PREFIXES).map((p) => `${p}*`), ...Object.keys(largeFiles).sort()],
+  exclude: [],
+}, null, 2)}\n`);
 writeFileSync(path.join(ROOT, 'site', 'lib', 'large-files.generated.js'),
   `// Written by site/build.mjs for build ${BUILD_ID}; not committed.\nexport const LARGE_FILES = ${JSON.stringify(largeFiles, null, 2)};\nexport const LARGE_PREFIXES = ${JSON.stringify(VIDEO_PREFIXES, null, 2)};\n`);
 
