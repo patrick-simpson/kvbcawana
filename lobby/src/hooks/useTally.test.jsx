@@ -135,6 +135,35 @@ describe('useTally', () => {
     expect(api.current.count).toBe(0);
   });
 
+  it('rollover() re-reads today\'s number: zero on a new day, and the first check-in ticks', () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      vi.setSystemTime(new Date(2026, 9, 7, 23, 58));   // a Wednesday, late
+      const { api } = setup();
+      act(() => { api.current.sync(87, Date.now()); });
+      expect(api.current.count).toBe(87);
+      vi.setSystemTime(new Date(2026, 9, 8, 0, 1));      // Thursday
+      act(() => { api.current.rollover(); });
+      expect(api.current.count).toBe(0);
+      // Last night's tally no longer orders anything: a check-in counts at once.
+      let ticked;
+      act(() => { ticked = api.current.bump(Date.now()); });
+      expect(ticked).toBe(true);
+      expect(api.current.count).toBe(1);
+      expect(JSON.parse(localStorage.getItem('awanaTally.v1')).date).toBe('2026-10-08');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('rollover() on the same day keeps the number', () => {
+    const { api } = setup();
+    act(() => { api.current.bump(); });
+    act(() => { api.current.bump(); });
+    act(() => { api.current.rollover(); });
+    expect(api.current.count).toBe(2);
+  });
+
   it('reset() zeroes the counter, and a later fresh tally re-adopts', () => {
     const { api } = setup();
     act(() => { for (let i = 0; i < 6; i++) api.current.bump(); });

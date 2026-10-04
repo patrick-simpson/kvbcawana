@@ -78,6 +78,17 @@ export function useTally() {
     return true;
   }, []);
 
+  // Midnight on a screen that stays up all week. The stored number is keyed
+  // by the local date (load()), but the state was read once at mount, so the
+  // corner showed last Wednesday's count until the first new tally landed.
+  // Re-read today's (zero on a new day) and forget the broadcasts that
+  // ordered last night, so the first check-in ticks straight away.
+  const rollover = useCallback(() => {
+    setCount(load());
+    lastAtRef.current = null;
+    adoptedAtRef.current = null;
+  }, []);
+
   const reset = useCallback(() => {
     save(0);
     setCount(0);
@@ -128,5 +139,5 @@ export function useTally() {
     return total - current;
   }, []);
 
-  return { count, bump, reset, sync };
+  return { rollover, count, bump, reset, sync };
 }

@@ -146,7 +146,7 @@ export default function App() {
   const {
     currentEvent, run: checkInRun, step: checkInStep, enqueue, skipCurrent, pending, gap: checkInGap,
   } = useCheckInQueue(config, { held: checkInsHeld });
-  const { count, bump, reset: resetTally, sync: syncTally } = useTally();
+  const { count, bump, reset: resetTally, sync: syncTally, rollover: rolloverTally } = useTally();
   // Set (synchronously, before the reconciled `count` even commits) whenever
   // a tally broadcast jumps the counter, so the milestone effect below can
   // tell a reconciliation apart from a real one-at-a-time bump() and skip
@@ -621,6 +621,28 @@ export default function App() {
     }, 60000);
     return () => clearInterval(timer);
   }, []);
+  // A new night starts tonight's count and every once-per-night ledger over.
+  // These refs lived as long as the page, so a TV left up all week read last
+  // Wednesday's count in the corner until the first tally landed, and the
+  // 25/50/100 crossings, the club milestones, the handbook thresholds and
+  // "Doors are open" fired on the first club night after a load and never
+  // again until someone reloaded it. The first broadcast of the new night is
+  // a baseline again (prev refs null), never a replay.
+  const nightRef = useRef(todayStr);
+  useEffect(() => {
+    if (nightRef.current === todayStr) return;
+    nightRef.current = todayStr;
+    rolloverTally();
+    clubCountsRef.current = {};
+    firedClubMilestonesRef.current = new Set();
+    firstOfNightFiredRef.current = false;
+    prevCheckedInRef.current = null;
+    firedNightMilestonesRef.current = new Set();
+    prevBooksRef.current = null;
+    firedBookMilestonesRef.current = new Set();
+    prevAwardsRef.current = null;
+    firedAwardMilestonesRef.current = new Set();
+  }, [todayStr, rolloverTally]);
 
   // "Birthday this Friday!" for an arriving child the roster says has a
   // birthday later this week. Pure matcher — see src/lib/birthdayWeek.js for
