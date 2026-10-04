@@ -571,11 +571,25 @@ function loadClubbers() {
 // longest wait any client will do before it gives up, plus a little.
 const DUPLICATE_WINDOW_MS = 45000;
 const recentPrints = new Map();  // nameKey → timestamp of last successful print
+// Prints under way, claimed at the duplicate check and released when the print
+// settles. recordPrint() runs only after the label is out, so until 7.11.1 two
+// requests that overlapped (the extension's retry at 38 s behind a slow
+// driver, two detection paths, a double tap) both passed the window test
+// before either had recorded, and both printed. A claim is never older than
+// IN_FLIGHT_MAX_MS: a throw that skipped a release cannot block a child's next
+// label for the rest of the night.
+const printsInFlight = new Map();  // nameKey → claimed at
+const IN_FLIGHT_MAX_MS = 2 * 60 * 1000;
 
 function isDuplicatePrint(nameKey) {
+  const claimed = printsInFlight.get(nameKey);
+  if (claimed !== undefined && Date.now() - claimed < IN_FLIGHT_MAX_MS) return true;
   const last = recentPrints.get(nameKey);
   return last !== undefined && Date.now() - last < DUPLICATE_WINDOW_MS;
 }
+
+function claimPrint(nameKey) { printsInFlight.set(nameKey, Date.now()); }
+function releasePrint(nameKey) { printsInFlight.delete(nameKey); }
 
 function recordPrint(nameKey) {
   const now = Date.now();
@@ -3787,6 +3801,7 @@ async function performCheckinPrint(input) {
     console.log(`[print] '${firstName} ${lastName}' already printed within ${DUPLICATE_WINDOW_MS / 1000}s — duplicate suppressed`);
     return { status: 200, body: { success: true, duplicate: true } };
   }
+  if (!isDemo) claimPrint(dupKey);
 
   // Reload CSV on every request so mid-event additions are always picked up.
   // If the file is locked or missing, loadClubbers() returns [] and logs a
@@ -4064,6 +4079,7 @@ async function performCheckinPrint(input) {
     }
     return { status: 500, body: { error: err.message, ...(isDemo ? { demo: true } : {}) } };
   } finally {
+    if (!isDemo) releasePrint(dupKey);
     if (pngPath) fs.unlink(pngPath, () => {});
     if (connectPngPath) fs.unlink(connectPngPath, () => {});
   }
@@ -5577,6 +5593,7 @@ app.post('/print-award', async (req, res) => {
     console.log(`[print-award] '${firstName} ${lastName}' — '${awardText}' already printed within ${DUPLICATE_WINDOW_MS / 1000}s — duplicate suppressed`);
     return res.json({ success: true, duplicate: true });
   }
+  claimPrint(dupKey);
 
   // Enrich from the roster the same way /print does, including clubberId
   // awareness — an award slip must show the same allergy/no-photo safety
@@ -5632,6 +5649,7 @@ app.post('/print-award', async (req, res) => {
     recordPrintFailure(`${firstName} ${lastName}`.trim(), effectiveClubName, err.message);
     res.status(500).json({ error: err.message });
   } finally {
+    releasePrint(dupKey);
     if (pngPath) fs.unlink(pngPath, () => {});
   }
 });
@@ -5840,6 +5858,7 @@ async function performLeaderPrint(input) {
     console.log(`[print-leader] '${firstName} ${lastName}' already printed within ${DUPLICATE_WINDOW_MS / 1000}s — duplicate suppressed`);
     return { status: 200, body: { success: true, duplicate: true } };
   }
+  if (!isDemo) claimPrint(dupKey);
 
   let pngPath = null;
   try {
@@ -5866,6 +5885,7 @@ async function performLeaderPrint(input) {
     }
     return { status: 500, body: { error: err.message } };
   } finally {
+    if (!isDemo) releasePrint(dupKey);
     if (pngPath) fs.unlink(pngPath, () => {});
   }
 }
@@ -5962,6 +5982,7 @@ app.post('/print-custom', async (req, res) => {
     console.log(`[print-custom] '${norm.text}' already printed within ${DUPLICATE_WINDOW_MS / 1000}s — duplicate suppressed`);
     return res.json({ success: true, duplicate: true });
   }
+  claimPrint(dupKey);
 
   let pngPath = null;
   try {
@@ -5976,6 +5997,7 @@ app.post('/print-custom', async (req, res) => {
     console.error('[print-custom] Error:', err.message);
     return res.status(500).json({ success: false, error: err.message });
   } finally {
+    releasePrint(dupKey);
     if (pngPath) fs.unlink(pngPath, () => {});
   }
 });
