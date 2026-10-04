@@ -40,6 +40,8 @@ const RELAY_BUSY_MS = 1000;
 const RELAY_IDLE_MS = 20 * 1000;
 const RELAY_SIGNED_OUT_MS = 60 * 1000;
 const LOCAL_TIMEOUT_MS = 60 * 1000;   // a Printer jammed reprint of a full minute can take this long
+// How many phone requests the laptop runs at once per round.
+const RELAY_PARALLEL = 3;
 
 /**
  * One round: collect, run, answer. Never throws.
@@ -51,12 +53,11 @@ async function relayOnce(o) {
   const fetchFn = o.fetchFn || fetch;
   const next = await o.syncRequest(o.base, '/v1/relay/next', { session: o.session, fetchFn: o.fetchFn });
   if (!next.ok || !next.body) return { ok: false, status: next.status, busy: false, handled: 0 };
-  const requests = Array.isArray(next.body.requests) ? next.body.requests : [];
+  const requests = (Array.isArray(next.body.requests) ? next.body.requests : []).filter((req) => req && typeof req.id === 'string');
   let handled = 0;
-  for (const req of requests) {
+  const runOne = async (req) => {
     let status = 502;
     let body = { error: 'The check-in laptop could not run that.' };
-    if (!req || typeof req.id !== 'string') continue;
     if (!relayAllowed(req.method, req.path)) {
       status = 403;
       body = { error: 'Not something the phone page may ask.' };
@@ -76,7 +77,13 @@ async function relayOnce(o) {
     }
     await o.syncRequest(o.base, '/v1/relay/answer', { method: 'POST', session: o.session, body: { id: req.id, status, body }, fetchFn: o.fetchFn });
     handled++;
-  }
+  };
+  // A few at a time, not one after another: each phone's request is its own,
+  // and one slow one (a reprint, a print that waits on the spooler) used to
+  // hold every other phone behind it for up to LOCAL_TIMEOUT_MS.
+  let cursor = 0;
+  const worker = async () => { while (cursor < requests.length) await runOne(requests[cursor++]); };
+  await Promise.all(Array.from({ length: Math.min(RELAY_PARALLEL, requests.length) }, worker));
   if (handled) log(`[relay] answered ${handled} phone request(s)`);
   return { ok: true, status: next.status, busy: !!next.body.busy || handled > 0, handled };
 }
@@ -107,4 +114,4 @@ function startPhoneRelay({ signedIn, localBase, syncRequest, fetchFn, log, setTi
   return () => { stopped = true; if (timer) clearTimeout(timer); };
 }
 
-module.exports = { RELAY_ROUTES, relayAllowed, relayOnce, startPhoneRelay, RELAY_BUSY_MS, RELAY_IDLE_MS };
+module.exports = { RELAY_ROUTES, relayAllowed, relayOnce, startPhoneRelay, RELAY_BUSY_MS, RELAY_IDLE_MS, RELAY_PARALLEL };

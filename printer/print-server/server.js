@@ -5605,18 +5605,23 @@ app.post('/reprint-range', async (req, res) => {
     });
   }
 
+  if (reprintRun) return res.status(409).json({ error: reprintBusyMessage(), busy: reprintRun });
+  reprintRun = { kind: 'range', count: sel.rows.length, printed: 0, startedAt: Date.now() };
   const printed = [];
   let stopped = null;
+  try {
   for (let i = 0; i < sel.rows.length; i++) {
     const r = await reprintRow(sel.rows[i], printerName, { silent: true });
     // Stop on the FIRST failure: a jam would otherwise fire 19 more ops
     // print-failure events and write 19 more failed history rows.
     if (!r.ok) { stopped = { name: r.name, error: r.error }; break; }
     printed.push(r.name);
+    reprintRun.printed = printed.length;
     // Awaited, never Atomics.wait — the point is that a queued POST /print for
     // a child at the door gets served between reprints.
     if (i < sel.rows.length - 1) await new Promise(done => setTimeout(done, REPRINT_RANGE_GAP_MS));
   }
+  } finally { reprintRun = null; }
 
   console.log(`[reprint-range] ${printed.length}/${sel.rows.length} label(s)${stopped ? ` — stopped at ${stopped.name}` : ''}`);
   // Always 200 so the client can render a partial run rather than a bare
@@ -5634,9 +5639,21 @@ app.post('/reprint-range', async (req, res) => {
 // a child appears once.
 const JAM_WINDOW_MS = 60 * 1000;
 
+// One reprint run at a time, across both routes. A second tap on "Printer
+// jammed" (or a range reprint while a jam reprint runs) used to start a second
+// loop interleaved with the first: every label twice, the gap between them
+// gone, and the jam fed faster. Now it is refused with 409 and told how far
+// the first run has got; the page retries when it is done.
+let reprintRun = null;
+function reprintBusyMessage() {
+  const r = reprintRun;
+  const what = r.kind === 'jam' ? 'The jam reprint' : 'A reprint';
+  return `${what} is already running (${r.printed} of ${r.count} printed). Wait for it to finish.`;
+}
+
 app.get('/touch/jam', (req, res) => {
   const t = printingTarget();
-  res.json({ available: t.kind === 'receipt', backup: t.backup || null, windowSec: JAM_WINDOW_MS / 1000 });
+  res.json({ available: t.kind === 'receipt', backup: t.backup || null, windowSec: JAM_WINDOW_MS / 1000, busy: reprintRun ? { ...reprintRun } : null });
 });
 
 app.post('/jam-reprint', async (req, res) => {
@@ -5651,17 +5668,22 @@ app.post('/jam-reprint', async (req, res) => {
     history: loadHistory(), fromISO: new Date(now - JAM_WINDOW_MS).toISOString(), toISO: new Date(now).toISOString(),
   });
   if (sel.error || !sel.count) return res.json({ success: true, count: 0, printed: [], star: 0, label: 0 });
+  if (reprintRun) return res.status(409).json({ error: reprintBusyMessage(), busy: reprintRun });
+  reprintRun = { kind: 'jam', count: sel.rows.length, printed: 0, startedAt: Date.now() };
 
   const printed = [];
   let star = 0, label = 0, starError = null, labelError = null, stopped = null;
+  try {
   for (let i = 0; i < sel.rows.length; i++) {
     const r = await reprintRow(sel.rows[i], '', { silent: true, jam: true });
     if (!r.ok) { stopped = { name: r.name, error: r.error }; break; }
     printed.push(r.name);
+    reprintRun.printed = printed.length;
     if (r.copies.star === 'ok') star++; else starError = r.copies.star;
     if (r.copies.label === 'ok') label++; else labelError = r.copies.label;
     if (i < sel.rows.length - 1) await new Promise(done => setTimeout(done, REPRINT_RANGE_GAP_MS));
   }
+  } finally { reprintRun = null; }
   console.log(`[jam-reprint] ${printed.length}/${sel.rows.length} (star ${star}, label ${label})${stopped ? ` — stopped at ${stopped.name}` : ''}`);
   return res.json({ success: !stopped, count: sel.rows.length, printed, star, label, starError, labelError, stoppedAt: stopped });
 });

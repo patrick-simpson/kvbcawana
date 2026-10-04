@@ -94,6 +94,25 @@ const PORT = 34575;
     check('the switch goes back on', (await cfg({ enableDrivenCheckin: true })).ok);
   }
 
+  console.log('\nphone relay: a few at a time');
+  {
+    // Five phones ask at once, and one slow answer (a reprint, say) must not
+    // hold the other four: the laptop runs RELAY_PARALLEL at a time.
+    let inFlight = 0, most = 0;
+    const slowFetch = async (...args) => {
+      inFlight++; most = Math.max(most, inFlight);
+      await new Promise((r) => setTimeout(r, 120));
+      try { return await fetch(...args); } finally { inFlight--; }
+    };
+    for (let i = 0; i < 5; i++) await svc('POST', '/v1/relay', { method: 'GET', path: '/touch/jam' }, session);
+    const t0 = Date.now();
+    const once = await relay.relayOnce({ base: 'x', session, localBase, syncRequest, fetchFn: slowFetch });
+    const took = Date.now() - t0;
+    check('all five are answered', once.ok && once.handled === 5, JSON.stringify(once));
+    check('three at a time, no more', most === relay.RELAY_PARALLEL && relay.RELAY_PARALLEL === 3, `most in flight ${most}`);
+    check('so five slow answers take two rounds, not five', took < 5 * 120, `${took} ms`);
+  }
+
   console.log('\nphone relay: the loop');
   {
     const r = await relay.relayOnce({ base: 'x', session: 'v1.1.1.nope', localBase, syncRequest });

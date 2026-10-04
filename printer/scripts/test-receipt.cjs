@@ -98,6 +98,7 @@ async function main() {
   // PowerShell run is a 4×2 label job on the spooler.
   const receiptLog = path.join(binDir, 'receipt.log');
   fs.writeFileSync(path.join(binDir, 'powershell'), `#!/bin/sh
+if [ -f "${binDir}/slow" ]; then sleep 1; fi
 f="$5"
 if [ -n "$f" ] && grep -q 'Club Label Printer tag' "$f" 2>/dev/null; then
   cp "$f" "${binDir}/last-receipt.ps1"
@@ -451,6 +452,32 @@ exit 0
     check('neither printer: it stops and says who', r.status === 200 && r.body.success === false && r.body.stoppedAt && /No backup label printer/.test(r.body.stoppedAt.error), JSON.stringify(r.body));
     fs.unlinkSync(problem);
     useConfig({ backupPrinterName: 'Fake' });
+
+    // One reprint run at a time (7.11.1): a second tap on Printer jammed while
+    // the first run is still printing is refused, not interleaved.
+    {
+      r = await post('/print', { firstName: 'Second', lastName: 'Jamtest', clubName: 'Sparks' });
+      check('(another check-in in the jam window)', r.status === 200, JSON.stringify(r.body));
+      const slow = path.join(binDir, 'slow');
+      fs.writeFileSync(slow, '');
+      const first = post('/jam-reprint', {});
+      await new Promise(done => setTimeout(done, 300));
+      const second = await post('/jam-reprint', {});
+      check('a second tap while the first run prints is refused with 409 and told how far it got',
+        second.status === 409 && /already running \(\d+ of 2 printed\)/.test(second.body && second.body.error) && second.body.busy && second.body.busy.kind === 'jam',
+        JSON.stringify(second));
+      const range = await post('/reprint-range', { fromTs: new Date(Date.now() - 60000).toISOString(), toTs: new Date().toISOString(), confirm: true });
+      check('and so is a range reprint meanwhile', range.status === 409 && /already running/.test(range.body && range.body.error), JSON.stringify(range));
+      jam = await (await fetch(BASE + '/touch/jam')).json();
+      check('/touch/jam says a run is busy', jam.busy && jam.busy.kind === 'jam' && jam.busy.count === 2, JSON.stringify(jam));
+      r = await first;
+      check('the first run finishes as before', r.status === 200 && r.body.success && r.body.printed.length === 2, JSON.stringify(r.body));
+      fs.unlinkSync(slow);
+      jam = await (await fetch(BASE + '/touch/jam')).json();
+      check('and the latch is released', jam.busy === null, JSON.stringify(jam));
+      r = await post('/jam-reprint', {});
+      check('so the next tap runs', r.status === 200 && r.body.success, JSON.stringify(r.body));
+    }
 
     // The drop-off tag (7.7.0): a late child on the receipt printer gets a
     // plain name tag, and the family one drop-off tag, once a night.
