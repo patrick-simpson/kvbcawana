@@ -60,14 +60,65 @@ const CSV_FILE = path.join(DATA_DIR, 'clubbers.csv');
 
 // ── Load configuration ────────────────────────────────────────────────────────
 const CONFIG_FILE = path.join(DATA_DIR, 'config.json');
-let config = {};
-try {
-  if (fs.existsSync(CONFIG_FILE)) {
-    config = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'));
-  }
-} catch (e) {
-  console.warn('[config] Failed to load config.json:', e.message);
+const CONFIG_BAK = CONFIG_FILE + '.bak';
+// Why config.json could not be read, for /health; null while it is fine.
+let configFileDamaged = null;
+
+// config.json holds the PIN, the display key, the sync sign-in and the
+// schedule, and has several writers (this server and the Electron app). Until
+// 7.11.1 this server wrote it in place, so a crash or a power cut mid-write
+// left a truncated file that read as "no config"; the Electron wizard then
+// merged its three keys over {} and every secret was gone, and every settings
+// save here threw until someone fixed the file by hand. Now: every write is
+// tmp + fsync + rename and keeps the previous good file as config.json.bak;
+// a read that fails restores that backup; a file that cannot be read and has
+// no usable backup is moved aside, never written over, so what it held can
+// still be copied back.
+function isConfigShape(v) { return !!v && typeof v === 'object' && !Array.isArray(v); }
+function loadConfigFile() {
+  let raw = null;
+  try { raw = fs.existsSync(CONFIG_FILE) ? fs.readFileSync(CONFIG_FILE, 'utf8') : null; } catch (e) { raw = ''; }
+  if (raw === null) return {};
+  try {
+    const parsed = JSON.parse(raw);
+    if (isConfigShape(parsed)) return parsed;
+  } catch (e) { /* damaged: recover below */ }
+  try {
+    const bak = JSON.parse(fs.readFileSync(CONFIG_BAK, 'utf8'));
+    if (isConfigShape(bak)) {
+      fs.copyFileSync(CONFIG_BAK, CONFIG_FILE);
+      configFileDamaged = 'config.json could not be read and was restored from config.json.bak (the settings as of the save before last). Check Settings.';
+      console.warn('[config] ' + configFileDamaged);
+      return bak;
+    }
+  } catch (e) { /* no usable backup */ }
+  const aside = `${CONFIG_FILE}.damaged-${new Date().toISOString().replace(/[:.]/g, '-')}`;
+  try { fs.renameSync(CONFIG_FILE, aside); } catch (e) { /* leave it; the next write replaces it */ }
+  configFileDamaged = `config.json could not be read and no backup was usable; it was moved to ${path.basename(aside)}. The PIN, display key and sync sign-in must be set again, or copied back from that file.`;
+  console.error('[config] ' + configFileDamaged);
+  return {};
 }
+
+// Windows: Defender or the indexer can hold the target for a moment.
+function renameWithRetrySync(from, to) {
+  for (let attempt = 1; ; attempt++) {
+    try { fs.renameSync(from, to); return; } catch (e) {
+      if (attempt >= 6 || !['EPERM', 'EBUSY', 'EACCES'].includes(e.code)) throw e;
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 50 * attempt);
+    }
+  }
+}
+
+function writeConfigFile(next) {
+  const tmp = CONFIG_FILE + '.tmp';
+  const fd = fs.openSync(tmp, 'w');
+  try { fs.writeSync(fd, JSON.stringify(next, null, 2), null, 'utf8'); fs.fsyncSync(fd); } finally { fs.closeSync(fd); }
+  // The file being replaced is the last good one: it becomes the backup.
+  try { if (fs.existsSync(CONFIG_FILE)) fs.copyFileSync(CONFIG_FILE, CONFIG_BAK); } catch (e) { /* best effort */ }
+  renameWithRetrySync(tmp, CONFIG_FILE);
+}
+
+let config = loadConfigFile();
 
 // Install the display key into the publisher. The three name-bearing events
 // (checkin, recap, birthdays) are sealed with it so the PUBLIC Pusher channel
@@ -6798,9 +6849,9 @@ function signedInToSync() {
 }
 
 function writeConfigPatch(mutate) {
-  const next = fs.existsSync(CONFIG_FILE) ? JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8')) : {};
+  const next = loadConfigFile();
   mutate(next);
-  fs.writeFileSync(CONFIG_FILE, JSON.stringify(next, null, 2), 'utf8');
+  writeConfigFile(next);
   applySavedConfig(next);
 }
 
@@ -7375,6 +7426,9 @@ app.get('/health', async (req, res) => {
   // Copy: checkPrinterWarnings() hands back its CACHED array, so appending in
   // place would re-append on every poll until the cache expired.
   const warnings = [...await checkPrinterWarnings()];
+  // config.json could not be read at some point since this server started
+  // (loadConfigFile): what was done about it, until a restart, so it is seen.
+  if (configFileDamaged) warnings.push({ type: 'configDamaged', message: configFileDamaged });
   // Surface security misconfiguration where the operator already looks. A
   // silently loopback-only server looks identical to a broken phone page, and
   // "I turned on phone check-in and nothing happens" must not be a mystery.
@@ -7690,7 +7744,7 @@ app.get('/config', (req, res) => {
   let saved;
   try {
     saved = fs.existsSync(CONFIG_FILE)
-      ? JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'))
+      ? loadConfigFile()
       : { printerName: PRINTER_NAME, checkinUrl: '' };
   } catch (e) {
     saved = { printerName: PRINTER_NAME, checkinUrl: '' };
@@ -7764,10 +7818,7 @@ app.post('/config', (req, res) => {
     return res.status(403).json({ error: 'Pusher/PIN/display-login settings can only be changed from the dashboard on this computer' });
   }
   try {
-    const next = {};
-    if (fs.existsSync(CONFIG_FILE)) {
-      Object.assign(next, JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8')));
-    }
+    const next = loadConfigFile();
     if (printerName !== undefined) next.printerName = printerName;
     // checkinUrl is handed to shell.openExternal() (Electron) and Start-Process
     // (legacy installer), so an unvalidated value was an arbitrary URI aimed at
@@ -7977,7 +8028,7 @@ app.post('/config', (req, res) => {
       next.worksheetPrinter = wp;
     }
 
-    fs.writeFileSync(CONFIG_FILE, JSON.stringify(next, null, 2), 'utf8');
+    writeConfigFile(next);
     // Keep the live process in sync so schedule/PIN/toggle/key changes apply
     // without a restart (Pusher creds still need one — noted in the UI).
     applySavedConfig(next);
@@ -8003,10 +8054,10 @@ app.post('/config/schedule', (req, res) => {
     room: String(r && r.room || '').slice(0, 40),
   })).filter(r => r.club);
   try {
-    const next = fs.existsSync(CONFIG_FILE) ? JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8')) : {};
+    const next = loadConfigFile();
     next.schedule = rows;
     if (lateGraceMin !== undefined) next.lateGraceMin = Math.max(0, Math.min(120, Number(lateGraceMin) || 0));
-    fs.writeFileSync(CONFIG_FILE, JSON.stringify(next, null, 2), 'utf8');
+    writeConfigFile(next);
     applySavedConfig(next);
     res.json({ ok: true, schedule: rows });
   } catch (e) {
@@ -8189,10 +8240,10 @@ app.post('/config/label-templates', (req, res) => {
   const cleaned = sanitizeLabelTemplates((req.body || {}).templates);
   if (!cleaned.ok) return res.status(400).json({ error: cleaned.error });
   try {
-    const next = fs.existsSync(CONFIG_FILE) ? JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8')) : {};
+    const next = loadConfigFile();
     if (Object.keys(cleaned.value).length === 0) delete next.labelTemplates;
     else next.labelTemplates = cleaned.value;
-    fs.writeFileSync(CONFIG_FILE, JSON.stringify(next, null, 2), 'utf8');
+    writeConfigFile(next);
     applySavedConfig(next);
     console.log('[config] Label templates saved:', Object.keys(cleaned.value).join(', ') || '(none)');
     res.json({ ok: true, templates: cleaned.value });
@@ -8508,9 +8559,7 @@ app.use((err, req, res, next) => {
 // Off by default — enable via config.json { "prewarmPrinter": true }
 function prewarmPrinterIfConfigured() {
   try {
-    const prewarmConfig = fs.existsSync(CONFIG_FILE)
-      ? JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'))
-      : {};
+    const prewarmConfig = loadConfigFile();
     // Not in receipt mode: a blank 5.7in tag would just waste sticker stock.
     if (prewarmConfig.prewarmPrinter && !receipt.isEnabled(prewarmConfig)) {
       setTimeout(async () => {

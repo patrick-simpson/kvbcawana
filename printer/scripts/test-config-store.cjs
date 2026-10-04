@@ -161,8 +161,10 @@ console.log('config-store: first run and malformed files');
   check('a corrupt config reads as null rather than throwing',
     store.loadConfig(p) === null);
   const recovered = store.saveConfig(p, { printerName: 'Recovered' });
-  check('a corrupt config is replaced rather than crashing the app',
+  check('a corrupt config with no backup is replaced rather than crashing the app',
     recovered.printerName === 'Recovered');
+  check('and the damaged file is kept beside it, moved aside, for what it still holds',
+    fs.readdirSync(path.dirname(p)).some((n) => /^config\.json\.damaged-/.test(n)));
 
   // A JSON scalar/array is valid JSON but not a config — must not be merged
   // into, or Object.assign would produce index keys from an array.
@@ -174,6 +176,29 @@ console.log('config-store: first run and malformed files');
   fs.writeFileSync(p, '"a string"');
   check('a JSON string is not treated as a config', store.loadConfig(p) === null);
 
+  fs.rmSync(dir, { recursive: true, force: true });
+}
+
+console.log('config-store: a damaged file is recovered from the backup the last save kept');
+{
+  const dir = tmpdir();
+  const p = path.join(dir, 'config.json');
+  store.saveConfig(p, { phonePin: '4321', displayKey: 'k1', printerName: 'A' });
+  store.saveConfig(p, { printerName: 'B' });
+  check('every save keeps the file it replaced as config.json.bak',
+    fs.existsSync(`${p}.bak`) && JSON.parse(fs.readFileSync(`${p}.bak`, 'utf8')).printerName === 'A');
+  // A power cut mid-write (by this app or the print server): a truncated file.
+  fs.writeFileSync(p, '{"phonePin": "4321", "disp');
+  const back = store.loadConfig(p);
+  check('a damaged config reads as the backup, not as null',
+    back && back.phonePin === '4321' && back.displayKey === 'k1' && back.printerName === 'A', JSON.stringify(back));
+  check('and the backup is copied back into place', JSON.parse(fs.readFileSync(p, 'utf8')).printerName === 'A');
+  fs.writeFileSync(p, '{"phonePin": "4321", "disp');
+  const saved = store.saveConfig(p, { printerName: 'C' });
+  check('a save over a damaged config merges over the backup: the PIN and the display key survive',
+    saved.phonePin === '4321' && saved.displayKey === 'k1' && saved.printerName === 'C', JSON.stringify(saved));
+  check('nothing was moved aside, since the backup stood in',
+    !fs.readdirSync(dir).some((n) => /damaged-/.test(n)));
   fs.rmSync(dir, { recursive: true, force: true });
 }
 
