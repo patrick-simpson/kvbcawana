@@ -6986,6 +6986,7 @@ app.post('/config/sync-logout', (req, res) => {
 });
 
 function startClubNightTimers() {
+  startPrinterCheckTimer();
   setInterval(onClubNight(publishRecap), 2 * 60 * 1000);
   setInterval(onTallyWindow(publishTally), 60 * 1000);
   setInterval(onClubNight(publishBirthdays), 10 * 60 * 1000);
@@ -7150,6 +7151,18 @@ app.get('/config/church', (req, res) => {
 // ── Enhanced health check ────────────────────────────────────────────────────
 let cachedPrinterCheck = { warnings: [], checkedAt: 0, spooler: null };
 const PRINTER_CHECK_INTERVAL = 60000; // 60 seconds
+// The probe in flight, if any: /health never waits on one that another
+// caller (or the timer) already started, and never starts a second.
+let printerCheckInFlight = null;
+
+// Keep the probes warm from a timer, so a /health request is answered from
+// the cache and only ever triggers a refresh in the background. Until 7.11.1
+// the dashboard's own 15 s poll paid for the printer and spooler probes (a
+// few seconds, in series) once a minute, on the request.
+function startPrinterCheckTimer() {
+  const t = setInterval(() => { checkPrinterWarnings().catch(() => {}); }, PRINTER_CHECK_INTERVAL);
+  if (t.unref) t.unref();
+}
 
 // ── Windows spooler backlog (#256) ───────────────────────────────────────────
 // checkPrinterWarnings only ever asked Get-Printer whether the configured name
@@ -7331,6 +7344,16 @@ async function checkPrinterWarnings() {
   if (now - cachedPrinterCheck.checkedAt < PRINTER_CHECK_INTERVAL) {
     return cachedPrinterCheck.warnings;
   }
+  // Stale: start one refresh and hand back what is known meanwhile. Only a
+  // server that has never probed (its first /health) waits for the answer.
+  if (!printerCheckInFlight) {
+    printerCheckInFlight = probePrinterWarnings(now).finally(() => { printerCheckInFlight = null; });
+  }
+  if (cachedPrinterCheck.checkedAt === 0) return printerCheckInFlight;
+  return cachedPrinterCheck.warnings;
+}
+
+async function probePrinterWarnings(now) {
   const warnings = [];
   const csvPath = CSV_FILE;
 

@@ -26,6 +26,11 @@ const PORT = 34584;
   check('the only Atomics.wait left is the config rename retry (a rare error path)', (SRC.match(/Atomics\.wait\(/g) || []).length === 1 && /renameWithRetrySync[\s\S]{0,400}Atomics\.wait/.test(SRC));
   check('every PowerShell goes through runPowerShell, with no shell', /execFile\('powershell', \['-NoProfile', '-ExecutionPolicy', 'Bypass', \.\.\.args\]/.test(SRC) && !/powershell -NoProfile/.test(SRC.replace(/\/\/[^\n]*/g, '')));
 
+  console.log('\nhealth: the printer probes run from a timer, and /health never waits on a stale cache');
+  check('a timer keeps the probe cache warm', /function startPrinterCheckTimer\(\)[\s\S]*setInterval\(\(\) => \{ checkPrinterWarnings\(\)\.catch/.test(SRC) && /startPrinterCheckTimer\(\);/.test(SRC.slice(SRC.indexOf('function startClubNightTimers'))));
+  check('a stale cache is handed back while one refresh runs in the background', /if \(cachedPrinterCheck\.checkedAt === 0\) return printerCheckInFlight;\s*return cachedPrinterCheck\.warnings;/.test(SRC));
+  check('never two probes at once', /if \(!printerCheckInFlight\) \{\s*printerCheckInFlight = probePrinterWarnings\(now\)\.finally/.test(SRC));
+
   // A stub powershell that takes half a second per job and logs each one.
   const binDir = fs.mkdtempSync(path.join(os.tmpdir(), 'awana-psbin-'));
   const jobLog = path.join(binDir, 'jobs.log');
