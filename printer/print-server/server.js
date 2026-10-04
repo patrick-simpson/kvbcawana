@@ -3535,6 +3535,20 @@ function wakePendingWaiters() {
 // ── Express server ────────────────────────────────────────────────────────────
 const app = express();
 
+// Express 4 does not catch a rejected async handler: the request hung until
+// the client's own timeout, and the client's retry hit the same throw. Every
+// async route registered on `app` is wrapped here, once, so a rejection reaches
+// the JSON error handler at the bottom of this file and the client hears
+// "500" at once instead of nothing.
+for (const method of ['get', 'post', 'put', 'delete', 'patch']) {
+  const register = app[method].bind(app);
+  app[method] = (route, ...handlers) => register(route, ...handlers.map((h) => (
+    typeof h === 'function' && h.constructor && h.constructor.name === 'AsyncFunction'
+      ? (req, res, next) => h(req, res, next).catch(next)
+      : h
+  )));
+}
+
 // ── CORS: an allowlist, not `*` ───────────────────────────────────────────────
 // This used to be `app.use(cors())`, i.e. `Access-Control-Allow-Origin: *` on
 // every response. Because the browser lets a page READ a response bearing that
@@ -3917,11 +3931,16 @@ async function performCheckinPrint(input) {
   // warning — this request continues with a basic label.
   clubbers = loadClubbers();
 
-  // Attempt to enrich the label with data from the CSV
-  const record = findClubber(firstName, lastName, clubberId);
-
-  let allergyTokens, handbookGroup, birthday, cakeWeek, birthdayAge, noPhoto;
+  // Attempt to enrich the label with data from the CSV. Enrichment fails
+  // OPEN: a roster row this code did not expect (a date in a new format, a
+  // notes field that is not text) used to throw here, before the try below,
+  // and the child at the door got no label and the extension no answer. Now
+  // the basic label prints and the console says what was skipped.
+  let record = null;
+  let allergyTokens = [], handbookGroup = '', birthday = false, cakeWeek = false, birthdayAge = null, noPhoto = false;
   let effectiveClubName = clubName;
+  try {
+  record = findClubber(firstName, lastName, clubberId);
   if (record) {
     // TwoTimTwo CSV has "Notes" instead of a dedicated "Allergies" column.
     // Check Allergies first (manual CSV), fall back to Notes (TwoTimTwo).
@@ -3953,12 +3972,23 @@ async function performCheckinPrint(input) {
       console.log(`[csv] '${firstName} ${lastName}' not found in CSV — printing basic label`);
     }
   }
+  } catch (e) {
+    console.warn(`[csv] Enrichment failed for '${firstName} ${lastName}' (${e && e.message}) — printing basic label`);
+    allergyTokens = []; handbookGroup = ''; birthday = false; cakeWeek = false; birthdayAge = null; noPhoto = false;
+    effectiveClubName = clubName;
+  }
 
   // Step Up Night: only honour the client's flag if the kid is actually in
   // a graduating cohort (puggle = always, cubbie = 5 by Oct 15, others =
   // graduating grade). All other kids print a normal label tonight.
-  const stepUp = !!stepUpNight && isSteppingUp(record, effectiveClubName);
-  const stepUpNextClub = stepUp ? (nextClubFor(effectiveClubName) || '') : '';
+  let stepUp = false, stepUpNextClub = '';
+  try {
+    stepUp = !!stepUpNight && isSteppingUp(record, effectiveClubName);
+    stepUpNextClub = stepUp ? (nextClubFor(effectiveClubName) || '') : '';
+  } catch (e) {
+    console.warn(`[print] Step-up check failed for '${firstName} ${lastName}' (${e && e.message}) — printing a normal label`);
+    stepUp = false; stepUpNextClub = '';
+  }
   if (stepUp) {
     console.log(`[print] ${firstName} ${lastName} stepping up: ${effectiveClubName} → ${stepUpNextClub}`);
   }
@@ -3970,7 +4000,8 @@ async function performCheckinPrint(input) {
   // Wave 2 extras: late-arrival routing from the group schedule (#28),
   // attendance milestones (#30), and the inverted first-timer palette (#27).
   const extras = {};
-  const goTo = lateGoToLine(effectiveClubName);
+  let goTo = null;
+  try { goTo = lateGoToLine(effectiveClubName); } catch (e) { console.warn(`[print] Late routing failed (${e && e.message}) — no "Go to" line`); }
   // On the receipt printer a late child's tag carries no "Go to:" line: the
   // family gets one drop-off tag instead, after the name tag (7.7.0).
   const dropOffInstead = !!goTo && receipt.isEnabled(config);

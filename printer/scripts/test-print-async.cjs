@@ -80,6 +80,24 @@ const PORT = 34584;
     check('and no job started before the one before it had finished', !overlapping);
   }
 
+  console.log('\nroutes: a rejected async handler is a 500 at once, never a hang');
+  {
+    // A route that rejects, placed where the real ones are (before the JSON
+    // error handler, which Express 4 only reaches for errors passed to next).
+    server.app.get('/__test-reject', async () => { throw new Error('boom'); });
+    const stack = server.app._router.stack;
+    const layer = stack.pop();
+    const errAt = stack.findIndex((l) => l.handle && l.handle.length === 4);
+    stack.splice(errAt, 0, layer);
+    const t0 = Date.now();
+    const r = await fetch(`${base}/__test-reject`, { signal: AbortSignal.timeout(5000) }).then(async (x) => ({ status: x.status, body: await x.json().catch(() => null) })).catch((e) => ({ status: 0, body: String(e) }));
+    check('the client hears 500 as JSON', r.status === 500 && r.body && r.body.error === 'Internal server error', JSON.stringify(r));
+    check('within the moment, not after a timeout', Date.now() - t0 < 2000, `${Date.now() - t0} ms`);
+    const src = fs.readFileSync(path.join(__dirname, '..', 'print-server', 'server.js'), 'utf8');
+    check('every async route is wrapped at registration', /h\.constructor\.name === 'AsyncFunction'\s*\?\s*\(req, res, next\) => h\(req, res, next\)\.catch\(next\)/.test(src));
+    check('label enrichment fails open to a basic label', /Enrichment failed for '\$\{firstName\} \$\{lastName\}'/.test(src) && /Step-up check failed/.test(src) && /Late routing failed/.test(src));
+  }
+
   await server.stopListening();
   console.log(`\n${passed} passed, ${failed} failed`);
   process.exit(failed ? 1 : 0);
