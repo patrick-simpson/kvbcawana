@@ -45,6 +45,7 @@ import { birthdayRibbon } from './lib/birthdayWeek.js';
 import { autoParticleEffect, weatherMood } from './lib/weather.js';
 import { useCelebrationQueue } from './hooks/useCelebrationQueue.js';
 import { timedFetch } from './lib/timedFetch.js';
+import { CLOCK_SKEW_TOLERANCE_MS, stampReceived } from './lib/freshness.js';
 import {
   AWARD_MILESTONES, BOOK_MILESTONES, awardMilestoneCopy, bookMilestoneCopy,
   crossedMilestones, isBigMilestone, nightMilestoneCopy,
@@ -201,7 +202,7 @@ export default function App() {
   // Stamped where the payload lands (handleCheckout), not from an effect.
   const [emptySince, setEmptySince] = useState(/** @type {number | null} */ (null));
   const handleCheckout = useCallback((payload) => {
-    setCheckout(payload);
+    setCheckout(stampReceived(payload));
     const empty = Array.isArray(payload?.entries) && payload.entries.length === 0;
     setEmptySince((was) => (empty ? (was ?? Date.now()) : null));
   }, []);
@@ -396,7 +397,7 @@ export default function App() {
   const prevAwardsRef = useRef(null);
   const firedAwardMilestonesRef = useRef(new Set());
   const handleTonight = useCallback((payload) => {
-    setTonight(payload);
+    setTonight(stampReceived(payload));
     // One helper for all three counters: baseline the first payload, then
     // celebrate each threshold at most once tonight.
     const crossings = (value, prevRef, firedRef, thresholds, copy, kind) => {
@@ -421,7 +422,7 @@ export default function App() {
 
   // Church-authored announcements (#onNotice): the state lives above, beside
   // the room rules it feeds.
-  const handleNotice = useCallback((payload) => setNotice(payload), []);
+  const handleNotice = useCallback((payload) => setNotice(stampReceived(payload)), []);
   const clearNotice = useCallback(() => setNotice(null), []);
 
   // Every live check-in — real or simulated — plays a banner and bumps
@@ -489,9 +490,18 @@ export default function App() {
   // older than the replay window.
   const handleRecap = useCallback((recap) => {
     const maxAgeMs = (config.recapMaxAgeMin ?? 20) * 60 * 1000;
+    // The window is measured from the recap's own newest entry, never from
+    // this screen's clock: a TV twenty minutes fast used to discard every
+    // child a recap carried. The printer stamps every entry on one clock.
+    // This clock still bounds it (CLOCK_SKEW_TOLERANCE_MS): the Worker
+    // replays the last recap to a screen that connects, and last Wednesday's
+    // must not greet last Wednesday's children on Thursday.
+    const newest = recap.entries.reduce((m, e) => (Number.isFinite(e.at) && e.at > m ? e.at : m), -Infinity);
+    const now = Date.now();
     for (const entry of recap.entries) {
       if (hasSeen(entry.id)) continue;
-      if (Date.now() - entry.at > maxAgeMs) continue;
+      if (newest - entry.at > maxAgeMs) continue;
+      if (now - entry.at > maxAgeMs + CLOCK_SKEW_TOLERANCE_MS) continue;
       markSeen(entry.id, entry.at);
       enqueue({ ...entry, presentation: 'replay' });
       bump(entry.at);

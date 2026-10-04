@@ -136,6 +136,46 @@ describe("tonight's counter never runs above the printer's total", () => {
     expect(storedCount()).toBe(3);
   });
 
+  // A recap is aged against its own newest entry, never this screen's clock:
+  // a TV twenty minutes fast used to discard every child a recap carried, and
+  // one twenty minutes slow replayed a window it should not have.
+  it('a recap from a printer whose clock is far off this screen\'s is still replayed', async () => {
+    await mount();
+    const fast = Date.now() + 25 * 60 * 1000;    // the printer's clock, 25 minutes ahead
+    await act(async () => {
+      bound.recap({
+        entries: ['f1', 'f2', 'f3'].map((id, i) => ({ firstName: `Fast${i}`, club: 'Sparks', id, at: fast - i * 1000 })),
+        at: fast,
+      });
+    });
+    expect(storedCount()).toBe(3);
+    const slow = Date.now() - 25 * 60 * 1000;    // or 25 minutes behind
+    await act(async () => {
+      bound.recap({
+        entries: ['s1', 's2'].map((id, i) => ({ firstName: `Slow${i}`, club: 'Sparks', id, at: slow - i * 1000 })),
+        at: slow,
+      });
+    });
+    expect(storedCount()).toBe(5);
+    // But an entry older than the window, measured against the recap's own newest, is left out.
+    await act(async () => {
+      bound.recap({
+        entries: [
+          { firstName: 'New', club: 'Sparks', id: 'n1', at: slow },
+          { firstName: 'Old', club: 'Sparks', id: 'o1', at: slow - 40 * 60 * 1000 },
+        ],
+        at: slow,
+      });
+    });
+    expect(storedCount()).toBe(6);
+    // And a recap replayed from another night entirely greets nobody.
+    const lastWeek = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    await act(async () => {
+      bound.recap({ entries: [{ firstName: 'Ghost', club: 'Sparks', id: 'g1', at: lastWeek }], at: lastWeek });
+    });
+    expect(storedCount()).toBe(6);
+  });
+
   // C-4. Settings → "Preview a check-in" is a rehearsal for the operator. It
   // must show the banner and mark the screen demo mode without touching the
   // number on the lobby wall.

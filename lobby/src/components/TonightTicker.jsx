@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import { M } from '../lib/motion.jsx';
 import { DUR, EASE, beats } from '../lib/brand.js';
-import { isFresh } from '../lib/freshness.js';
+import { isFresh, stampOf } from '../lib/freshness.js';
 import { TONIGHT_STALE_MS } from '../lib/constants.js';
 import { holdThenLand } from '../lib/lobbyMotion.js';
 import { squishBump, squishLand, withSquish } from '../lib/squish.js';
@@ -83,7 +83,7 @@ export function tonightRows(tonight) {
  * strip does: is anything of tonight's on the lobby right now?
  */
 export function tickerRows(tonight, now) {
-  return isFresh(tonight?.at, TONIGHT_STALE_MS, now) ? tonightRows(tonight) : [];
+  return isFresh(stampOf(tonight), TONIGHT_STALE_MS, now) ? tonightRows(tonight) : [];
 }
 
 /**

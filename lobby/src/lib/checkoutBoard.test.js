@@ -257,3 +257,30 @@ describe('grouping is deterministic', () => {
     expect(groupByClub(undefined)).toEqual([]);
   });
 });
+
+describe('decideBoard ages the data by this screen\'s clock when App stamped it', () => {
+  it('a payload stamped fresh here is live, however far off the printer\'s own at is', () => {
+    const now = 1_700_000_000_000;
+    const d = decideBoard({
+      checkout: { entries: [{ firstName: 'Ava', club: 'Sparks' }], printed: 10, at: now - 90 * 60 * 1000, receivedAt: now - 1000 },
+      mode: 'always', namesAbove: 0, staleMin: 15, now,
+    });
+    expect(d.state).not.toBe(BOARD_STALE);
+  });
+  it('a payload the printer stamped hours ago is old whatever its arrival says (a replayed frame)', () => {
+    const now = 1_700_000_000_000;
+    const d = decideBoard({
+      checkout: { entries: [{ firstName: 'Ava', club: 'Sparks' }], printed: 10, at: now - 26 * 60 * 60 * 1000, receivedAt: now - 1000 },
+      mode: 'always', namesAbove: 0, staleMin: 15, now,
+    });
+    expect(d.state).toBe(BOARD_STALE);
+  });
+  it('an unstamped payload is aged by its own at, as before', () => {
+    const now = 1_700_000_000_000;
+    const d = decideBoard({
+      checkout: { entries: [{ firstName: 'Ava', club: 'Sparks' }], printed: 10, at: now - 2 * 60 * 60 * 1000 },
+      mode: 'always', namesAbove: 0, staleMin: 15, now,
+    });
+    expect(d.state).toBe(BOARD_STALE);
+  });
+});

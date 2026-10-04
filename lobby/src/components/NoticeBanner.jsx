@@ -4,7 +4,7 @@ import { M } from '../lib/motion.jsx';
 import { DUR, EASE } from '../lib/brand.js';
 import { holdThenLand } from '../lib/lobbyMotion.js';
 import { squishLand, withSquish } from '../lib/squish.js';
-import { isFresh } from '../lib/freshness.js';
+import { isFresh, stampOf } from '../lib/freshness.js';
 import { NOTICE_MAX_AGE_MS } from '../lib/constants.js';
 import { OVERLAY, bandRoom, fitParagraph, plateChrome } from '../lib/overlayFit.js';
 import { useFontsReady } from '../hooks/useFontsReady.js';
@@ -37,7 +37,7 @@ const PLATE_SPILL = 0.3;
  * @param {number} now
  */
 export function noticeShowing(notice, now) {
-  return Boolean(notice?.message) && isFresh(notice?.at, NOTICE_MAX_AGE_MS, now);
+  return Boolean(notice?.message) && isFresh(stampOf(notice), NOTICE_MAX_AGE_MS, now);
 }
 
 /**

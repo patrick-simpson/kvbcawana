@@ -1,3 +1,5 @@
+import { stampOf } from './freshness.js';
+
 // @ts-check
 // Should the who's-still-here board be on screen right now, and if so, may it
 // name individuals?
@@ -92,7 +94,7 @@ export function inPickupWindow(now, from = PICKUP_FROM, until = PICKUP_UNTIL) {
 
 /**
  * @param {object} input
- * @param {{entries: {firstName: string, club: string}[], at: number, printed?: number}|null} input.checkout
+ * @param {{entries: {firstName: string, club: string}[], at: number, printed?: number, receivedAt?: number}|null} input.checkout
  *   Latest sanitized `checkout` payload, or null if none has arrived.
  * @param {string} input.mode 'off' | 'pickup' | 'always'
  * @param {number} input.namesAbove Suppress names at or below this count. 0 disables.
@@ -124,7 +126,9 @@ export function decideBoard({ checkout, mode, namesAbove, staleMin, now, from, u
     return { state: BOARD_HIDDEN, reason: `outside the pickup window (${from || PICKUP_FROM} to ${until || PICKUP_UNTIL})` };
   }
 
-  const ageMin = (now - checkout.at) / 60000;
+  // Aged from its arrival here, not the printer's clock, unless it really is
+  // old (lib/freshness.js, stampOf).
+  const ageMin = (now - stampOf(checkout)) / 60000;
   // A future timestamp means the two clocks disagree. Treat it as age zero
   // rather than as "fresh forever" — a skewed producer clock must not be able to
   // pin the board open indefinitely.
