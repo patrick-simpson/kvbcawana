@@ -6936,21 +6936,96 @@ function writeConfigPatch(mutate) {
 // sync service's channel while signed in, one at a time and in order, so a
 // check-in never lands after the tally that counts it any more than Pusher
 // would. Only the display channel's events: never the provision frame.
-let relayChain = Promise.resolve();
+//
+// A QUEUE WITH LIMITS, not an endless chain (7.11.1). With the church Wi-Fi
+// up and the internet down, every frame waited its 15 s timeout behind every
+// earlier one: a sixty-child rush built a backlog of a hundred frames, half
+// an hour of timeouts, and when the network came back the screens got stale
+// frames minutes late. So: of the kinds that describe a state (the tally, the
+// recap, who is still here) only the newest waits, a check-in older than two
+// minutes is not sent (the recap carries it), the queue holds at most
+// RELAY_QUEUE_MAX frames, and after RELAY_BREAK_AFTER failures in a row the
+// relay fails fast for RELAY_BREAK_MS instead of timing out frame by frame.
+const RELAY_QUEUE_MAX = 50;
+const RELAY_CHECKIN_MAX_AGE_MS = 2 * 60 * 1000;
+const RELAY_BREAK_AFTER = 3;
+const RELAY_BREAK_MS = 30 * 1000;
+// Kinds of which only the newest frame matters to a screen.
+const RELAY_LATEST_ONLY = new Set(['tally', 'recap', 'birthdays', 'tonight', 'checkout', 'points', 'schedule', 'notice', 'settings']);
+let relayQueue = [];
+let relayDraining = false;
+let relayFailures = 0;
+let relayBrokenUntil = 0;
+
+function resetRelayForTest() {
+  for (const q of relayQueue) for (const r of q.resolves) r(false);
+  relayQueue = [];
+  relayFailures = 0;
+  relayBrokenUntil = 0;
+}
+
+async function drainRelay() {
+  if (relayDraining) return;
+  relayDraining = true;
+  try {
+    while (relayQueue.length) {
+      const item = relayQueue.shift();
+      let ok = false;
+      if (item.event === 'checkin' && Date.now() - item.at > RELAY_CHECKIN_MAX_AGE_MS) {
+        // Too old to greet a child with; the recap will carry it.
+      } else if (Date.now() < relayBrokenUntil) {
+        // The breaker is open: fail fast.
+      } else {
+        const r = await syncClient.syncRequest(config.syncUrl, '/v1/publish', {
+          method: 'POST', body: { event: item.event, payload: item.body }, session: config.syncSession,
+        });
+        if (r.status === 401) checkSyncSignIn().catch(() => {});
+        ok = r.ok;
+        if (ok || (r.status >= 400 && r.status < 500)) relayFailures = 0;   // a refusal is an answer, not an outage
+        else if (++relayFailures >= RELAY_BREAK_AFTER) {
+          relayBrokenUntil = Date.now() + RELAY_BREAK_MS;
+          relayFailures = 0;
+          console.warn(`[sync] The sync service is not reachable; not trying again for ${RELAY_BREAK_MS / 1000} s.`);
+        }
+      }
+      for (const resolve of item.resolves) resolve(ok);
+    }
+  } finally {
+    relayDraining = false;
+  }
+}
+
 events.setRelay((channel, event, body) => {
   if (channel !== EVENT_CHANNEL || !signedInToSync()) return false;
-  const send = () => syncClient.syncRequest(config.syncUrl, '/v1/publish', {
-    method: 'POST', body: { event, payload: body }, session: config.syncSession,
-  }).then((r) => {
-    if (r.status === 401) checkSyncSignIn().catch(() => {});
-    return r.ok;
+  if (Date.now() < relayBrokenUntil) return false;
+  return new Promise((resolve) => {
+    if (RELAY_LATEST_ONLY.has(event)) {
+      // The newest frame of this kind replaces any still waiting; whoever
+      // waited on the old one hears how the new one fared.
+      const resolves = [];
+      relayQueue = relayQueue.filter((q) => { if (q.event !== event) return true; resolves.push(...q.resolves); return false; });
+      relayQueue.push({ event, body, at: Date.now(), resolves: [...resolves, resolve] });
+    } else {
+      relayQueue.push({ event, body, at: Date.now(), resolves: [resolve] });
+    }
+    while (relayQueue.length > RELAY_QUEUE_MAX) {
+      const dropped = relayQueue.shift();
+      for (const r of dropped.resolves) r(false);
+    }
+    drainRelay();
   });
-  const next = relayChain.then(send, send);
-  relayChain = next.catch(() => false);
-  return next;
 });
 
-async function checkSyncSignIn() {
+// One check at a time: a burst of 401s used to start one per frame, and each
+// that found the session gone rewrote config.json.
+let signInCheck = null;
+function checkSyncSignIn() {
+  if (signInCheck) return signInCheck;
+  signInCheck = checkSyncSignInNow().finally(() => { signInCheck = null; });
+  return signInCheck;
+}
+
+async function checkSyncSignInNow() {
   if (!signedInToSync()) return;
   const verdict = await syncClient.syncCheck(config.syncUrl, config.syncSession);
   syncStatus = { state: verdict, checkedAt: new Date().toISOString(), error: null };
@@ -8850,7 +8925,7 @@ function startListening(attempt = 1) {
 }
 
 module.exports = {
-  app, startListening, stopListening, setUpdateHandler, setLatestVersion, setExtensionInfo, setOpsAlertHandler,
+  app, startListening, stopListening, resetRelayForTest, setUpdateHandler, setLatestVersion, setExtensionInfo, setOpsAlertHandler,
   // For the Electron shell: this module is require-cached across settings
   // saves, so the shell pushes the freshly merged config.json and printer
   // name into the LIVE module instead of relying on load-time state.

@@ -66,7 +66,7 @@ globalThis.fetch = async (url, init = {}) => {
     return reply(200, { session: SESSION, displayKey: service.key, pusher: { key: 'k', cluster: 'us2' }, state: {} });
   }
   if (route === '/v1/state') return reply(service.stateStatus, {});
-  if (route === '/v1/publish') return reply(200, { ok: true, screens: 2 });
+  if (route === '/v1/publish') { if (service.publishDelayMs) await new Promise((r) => setTimeout(r, service.publishDelayMs)); return reply(service.livePublishStatus || 200, { ok: true, screens: 2 }); }
   if (route === '/v1/slides') return reply(service.publishStatus, { deckRev: 5, publishedAt: '2026-10-01T18:00:00.000Z', slideCount: 1, droppedCount: 0 });
   if (route === '/v1/settings') return reply(service.publishStatus, { rev: 3, publishedAt: '2026-10-01T18:00:00.000Z', keyCount: 1 });
   return reply(404, {});
@@ -153,6 +153,40 @@ async function main() {
     check('the check-in is sealed on the way (no name in the clear)', sent[0] && sent[0].body.payload.v === 1 && !JSON.stringify(sent[0].body).includes('Noah'));
     const alone = await events.publish(null, 'awana-channel', 'tally', { counts: {}, total: 0, at: new Date().toISOString() });
     check('with no Pusher at all, the service is the path', alone === true);
+  }
+
+  console.log('sync: the relay queue has limits');
+  {
+    const events = require(path.join(__dirname, '..', 'print-server', 'events.js'));
+    const server = require(path.join(__dirname, '..', 'print-server', 'server.js'));
+    const now = () => new Date().toISOString();
+    // A slow service and a burst of tallies: only the newest is sent, and
+    // everyone who published hears how it fared.
+    service.publishDelayMs = 120;
+    let before = service.calls.length;
+    const results = await Promise.all([1, 2, 3, 4, 5].map((n) => events.publish(null, 'awana-channel', 'tally', { counts: { Sparks: n }, total: n, at: now() })));
+    service.publishDelayMs = 0;
+    const tallies = service.calls.slice(before).filter((c) => c.route === '/v1/publish' && c.body.event === 'tally');
+    check('a burst of five tallies behind a slow service sends two at most: the one in flight and the newest', tallies.length <= 2 && tallies[tallies.length - 1].body.payload.total === 5, JSON.stringify(tallies.map((c) => c.body.payload.total)));
+    check('every publisher was answered, and with success', results.every((r) => r === true), JSON.stringify(results));
+    // Check-ins are never coalesced: each child is greeted.
+    before = service.calls.length;
+    await Promise.all(['a', 'b', 'c'].map((id) => events.publish(null, 'awana-channel', 'checkin', { id, firstName: 'Kid', club: 'Sparks', at: now() })));
+    check('three check-ins are three frames', service.calls.slice(before).filter((c) => c.body && c.body.event === 'checkin').length === 3);
+    // The breaker: three outages in a row and the relay fails fast.
+    service.livePublishStatus = 503;
+    before = service.calls.length;
+    for (let i = 0; i < 3; i++) await events.publish(null, 'awana-channel', 'checkin', { id: 'x' + i, firstName: 'Kid', club: 'Sparks', at: now() });
+    const tried = service.calls.slice(before).filter((c) => c.route === '/v1/publish').length;
+    const fast = await events.publish(null, 'awana-channel', 'checkin', { id: 'y', firstName: 'Kid', club: 'Sparks', at: now() });
+    check('three failures try the service, the fourth frame fails fast without a call', tried === 3 && fast === false && service.calls.length === before + 3, `tried ${tried}, calls after ${service.calls.length - before}`);
+    service.livePublishStatus = 200;
+    server.resetRelayForTest();
+    const back = await events.publish(null, 'awana-channel', 'tally', { counts: {}, total: 1, at: now() });
+    check('closed again, frames flow', back === true);
+    const src = fs.readFileSync(path.join(__dirname, '..', 'print-server', 'server.js'), 'utf8');
+    check('the queue is bounded and old check-ins are left to the recap', /RELAY_QUEUE_MAX = 50/.test(src) && /RELAY_CHECKIN_MAX_AGE_MS = 2 \* 60 \* 1000/.test(src) && /RELAY_BREAK_MS = 30 \* 1000/.test(src));
+    check('one sign-in check at a time', /if \(signInCheck\) return signInCheck;/.test(src));
   }
 
   console.log('sync: the old paths go quiet');
