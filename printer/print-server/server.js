@@ -27,7 +27,7 @@ const brand = require('./brand');
 const receipt = require('./receipt');
 const syncClient = require('./sync-client');
 const phoneRelay = require('./phone-relay');
-const { execSync } = require('child_process');
+const { execFile } = require('child_process');
 const http  = require('http');
 const https = require('https');
 const crypto = require('crypto');
@@ -2602,7 +2602,46 @@ async function generateLabel(input) {
 // PrintDocument object itself so the PrintPage handler can load it fresh —
 // this sidesteps the .NET event handler scope issue where outer-scope
 // variables are not reliably accessible inside add_PrintPage scriptblocks.
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// Every PowerShell this server runs goes through here, OFF the event loop.
+// Until 7.11.1 each was execSync, with Atomics.wait between retries: while a
+// label printed (up to about a minute with a hung driver and a backup
+// printer), nothing else was served (no other /print, no phone request, no
+// /health), the extension's long poll stalled, and inside Electron the tray
+// and Settings froze. The arguments go straight to the process (no shell), so
+// nothing in a printer name or a path is ever interpreted.
+// @returns {Promise<string>} stdout; rejects with the error carrying .stdout
+function runPowerShell(args, { timeout = 15000, env } = {}) {
+  return new Promise((resolve, reject) => {
+    execFile('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', ...args], {
+      timeout, windowsHide: true, encoding: 'utf8', env, maxBuffer: 4 * 1024 * 1024,
+    }, (err, stdout, stderr) => {
+      if (err) {
+        err.stdout = stdout;
+        err.stderr = stderr;
+        return reject(err);
+      }
+      resolve(stdout == null ? '' : String(stdout));
+    });
+  });
+}
+
+// The printer is one device: its jobs (labels, tags, the tune, a worksheet)
+// run one at a time, in the order they were asked for, while everything else
+// the server does carries on around them. A failed job never blocks the next.
+let printerChain = Promise.resolve();
+function withPrinter(fn) {
+  const run = printerChain.then(fn, fn);
+  printerChain = run.catch(() => {});
+  return run;
+}
+
 function printImage(imagePath, printerName) {
+  return withPrinter(() => printImageNow(imagePath, printerName));
+}
+
+async function printImageNow(imagePath, printerName) {
   // Escape single quotes in paths/names for PowerShell single-quoted strings
   const safePath    = imagePath.replace(/'/g, "''");
   const safePrinter = (printerName || '').replace(/'/g, "''");
@@ -2634,19 +2673,14 @@ $pd.Dispose()
     let lastErr = null;
     for (let attempt = 1; attempt <= 2; attempt++) {
       try {
-        const result = execSync(`powershell -NoProfile -ExecutionPolicy Bypass -File "${psPath}"`, {
-          timeout: 15000,
-          windowsHide: true,
-          encoding: 'utf8'
-        });
-        if (result) console.log('[print] PowerShell:', result.trim());
+        const result = await runPowerShell(['-File', psPath], { timeout: 15000 });
+        if (result && result.trim()) console.log('[print] PowerShell:', result.trim());
         return;
       } catch (e) {
         lastErr = e;
         if (attempt < 2) {
           console.warn(`[print] Attempt ${attempt} failed (${e.message.split('\n')[0]}) — retrying in 750ms`);
-          // Synchronous wait keeps the existing blocking print contract
-          Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 750);
+          await sleep(750);
         }
       }
     }
@@ -2670,14 +2704,14 @@ let lastReceipt = null;   // { ok, at, error?, fellBackTo?, paperLow? }
 // to a disconnected USB printer just waits in the queue, which would look like
 // success while the child walks away with nothing. Off Windows (tests) or if
 // the query itself fails, assume yes and let printImage() be the judge.
-function fallbackPrinterReady(name) {
+async function fallbackPrinterReady(name) {
   if (process.platform !== 'win32') return true;
   try {
     const safe = name.replace(/'/g, "''");
-    const raw = execSync(
-      `powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-CimInstance Win32_Printer | Where-Object { $_.Name -eq '${safe}' } | Select-Object WorkOffline,PrinterStatus | ConvertTo-Json -Compress"`,
-      { timeout: 8000, windowsHide: true }
-    ).toString().trim();
+    const raw = (await runPowerShell(
+      ['-Command', `Get-CimInstance Win32_Printer | Where-Object { $_.Name -eq '${safe}' } | Select-Object WorkOffline,PrinterStatus | ConvertTo-Json -Compress`],
+      { timeout: 8000 },
+    )).trim();
     if (!raw) return false;
     const p = JSON.parse(raw);
     return !(p.WorkOffline === true || p.PrinterStatus === 7);
@@ -2698,6 +2732,10 @@ function fallbackPrinterReady(name) {
 const RECEIPT_DPI = 203;
 const RECEIPT_PROBLEM_EXIT = 3;
 function printReceiptWindows(tagPngPath, printerName, size) {
+  return withPrinter(() => printReceiptWindowsNow(tagPngPath, printerName, size));
+}
+
+async function printReceiptWindowsNow(tagPngPath, printerName, size) {
   const safePath = tagPngPath.replace(/'/g, "''");
   const safePrinter = String(printerName).replace(/'/g, "''");
   // PaperSize and DrawImage both take hundredths of an inch.
@@ -2744,16 +2782,14 @@ if ($low) { Write-Output 'RECEIPT_PAPER_LOW' }
     let lastErr = null;
     for (let attempt = 1; attempt <= 2; attempt++) {
       try {
-        const out = execSync(`powershell -NoProfile -ExecutionPolicy Bypass -File "${psPath}"`, {
-          timeout: 20000, windowsHide: true, encoding: 'utf8',
-        });
+        const out = await runPowerShell(['-File', psPath], { timeout: 20000 });
         return { paperLow: /RECEIPT_PAPER_LOW/.test(out || '') };
       } catch (e) {
         const m = /RECEIPT_PROBLEM: ([^\r\n]+)/.exec(String(e.stdout || ''));
         // A problem the printer reported is an answer, not a hiccup: no retry.
         if (m) throw new Error(m[1].trim());
         lastErr = e;
-        if (attempt < 2) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 750);
+        if (attempt < 2) await sleep(750);
       }
     }
     throw new Error(`printing failed (${String(lastErr && lastErr.message || lastErr).split('\n')[0].slice(0, 120)})`);
@@ -2774,7 +2810,10 @@ async function printReceipt(pngPath, opts) {
   const tagPath = tmpFilePath('awana-tag', 'png');
   try {
     fs.writeFileSync(tagPath, tag.buffer);
-    return printReceiptWindows(tagPath, opts.printerName, tag);
+    // Awaited inside the try: the finally deletes the tag file, and the
+    // driver has to have read it first (a bare return would let the finally
+    // run before the print did).
+    return await printReceiptWindows(tagPath, opts.printerName, tag);
   } finally {
     fs.unlink(tagPath, () => {});
   }
@@ -2804,15 +2843,15 @@ let lastLabelBackup = null;   // { at, error, to } when a 4×2 print fell back; 
 async function printLabel(pngPath, printerName) {
   if (!receipt.isEnabled(config)) {
     try {
-      printImage(pngPath, printerName);
+      await printImage(pngPath, printerName);
       lastLabelBackup = null;
       return { via: 'label' };
     } catch (e) {
       const backup = backupPrinter();
       const main = String(printerName || PRINTER_NAME || '').trim();
       if (!backup || backup.toLowerCase() === main.toLowerCase()
-        || !isSafePrinterName(backup) || !fallbackPrinterReady(backup)) throw e;
-      printImage(pngPath, backup);
+        || !isSafePrinterName(backup) || !(await fallbackPrinterReady(backup))) throw e;
+      await printImage(pngPath, backup);
       lastLabelBackup = { at: new Date().toISOString(), error: String(e.message || e).split('\n')[0].slice(0, 160), to: backup };
       console.warn(`[print] "${main}" failed; printed on the backup "${backup}" instead`);
       return { via: 'fallback', printer: backup };
@@ -2832,8 +2871,8 @@ async function printLabel(pngPath, printerName) {
     // Never "fall back" to the receipt printer itself (the Star picked as its
     // own backup): that's a second failure, not a label.
     const sameAsReceipt = opts.usb && fallback.toLowerCase() === opts.printerName.toLowerCase();
-    if (fallback && !sameAsReceipt && isSafePrinterName(fallback) && fallbackPrinterReady(fallback)) {
-      printImage(pngPath, fallback);
+    if (fallback && !sameAsReceipt && isSafePrinterName(fallback) && (await fallbackPrinterReady(fallback))) {
+      await printImage(pngPath, fallback);
       lastReceipt.fellBackTo = fallback;
       console.warn(`[receipt] Printed on the 4×2 printer "${fallback}" instead`);
       return { via: 'fallback', printer: fallback };
@@ -2864,9 +2903,9 @@ async function printJamCopies(pngPath) {
   const backup = backupPrinter();
   if (!backup) out.label = 'No backup label printer is set.';
   else if (opts.usb && backup.toLowerCase() === String(opts.printerName || '').toLowerCase()) out.label = 'The backup printer is the Star too.';
-  else if (!isSafePrinterName(backup) || !fallbackPrinterReady(backup)) out.label = `"${backup}" is not available.`;
+  else if (!isSafePrinterName(backup) || !(await fallbackPrinterReady(backup))) out.label = `"${backup}" is not available.`;
   else {
-    try { printImage(pngPath, backup); } catch (e) { out.label = String(e.message || e).split('\n')[0].slice(0, 160); }
+    try { await printImage(pngPath, backup); } catch (e) { out.label = String(e.message || e).split('\n')[0].slice(0, 160); }
   }
   if (out.star !== 'ok' && out.label !== 'ok') throw new Error(`Star: ${out.star} Label printer: ${out.label}`);
   return out;
@@ -2964,10 +3003,14 @@ function buildTuneTspl(tuneName) {
 }
 
 // Send raw bytes to a named printer via winspool's RAW datatype — the escape
-// hatch past the GDI driver. Same execSync/temp-file discipline as
+// hatch past the GDI driver. Same PowerShell/temp-file discipline as
 // printImage(); the printer name is validated (isSafePrinterName) at the
 // endpoint, single quotes escaped here.
 function sendRawToPrinter(bytes, printerName) {
+  return withPrinter(() => sendRawToPrinterNow(bytes, printerName));
+}
+
+async function sendRawToPrinterNow(bytes, printerName) {
   const binPath = tmpFilePath('awana-tune', 'bin');
   fs.writeFileSync(binPath, bytes);
   const safeBin = binPath.replace(/'/g, "''");
@@ -3014,7 +3057,7 @@ try {
   const psPath = tmpFilePath('awana-tune', 'ps1');
   try {
     fs.writeFileSync(psPath, ps, 'utf8');
-    execSync(`powershell -NoProfile -ExecutionPolicy Bypass -File "${psPath}"`, { timeout: 15000, windowsHide: true });
+    await runPowerShell(['-File', psPath], { timeout: 15000 });
   } finally {
     fs.unlink(psPath, () => {});
     fs.unlink(binPath, () => {});
@@ -3027,7 +3070,7 @@ try {
 // Win32 error — is kept for /health so "it just prints normal" is
 // diagnosable from the dashboard instead of invisible.
 let lastTune = null; // { ok, tune, printer, error?, at }
-function playTuneIfEnabled(printerName, tuneName) {
+async function playTuneIfEnabled(printerName, tuneName) {
   if (config.musicalPrinter !== true) return false;
   // The receipt-printer trial is silent on purpose (owner's decision): an
   // ESC/POS head can't sing, and the 4×2 fallback stays quiet too.
@@ -3035,15 +3078,13 @@ function playTuneIfEnabled(printerName, tuneName) {
   const name = TUNE_NAMES.includes(tuneName) ? tuneName : nextTuneName();
   for (let attempt = 1; attempt <= 2; attempt++) {
     try {
-      sendRawToPrinter(Buffer.from(buildTuneTspl(name), 'ascii'), printerName);
+      await sendRawToPrinter(Buffer.from(buildTuneTspl(name), 'ascii'), printerName);
       lastTune = { ok: true, tune: name, printer: String(printerName || ''), at: new Date().toISOString() };
       console.log(`[tune] Played '${name}' on ${printerName || 'default printer'}`);
       return true;
     } catch (e) {
       if (attempt === 1) {
-        // Synchronous breather before the one retry — this path runs just
-        // before printImage's own execSync, so async waiting buys nothing.
-        try { Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 400); } catch { /* ok */ }
+        await sleep(400);   // a breather before the one retry
         continue;
       }
       lastTune = {
@@ -3631,12 +3672,9 @@ app.get('/roster-status', (req, res) => {
   res.json({ count: clubbers.length, consent: rosterConsentSummary(clubbers) });
 });
 
-app.get('/printers', (req, res) => {
+app.get('/printers', async (req, res) => {
   try {
-    const raw = execSync(
-      'powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-Printer | Select-Object Name, Default | ConvertTo-Json -Compress"',
-      { timeout: 8000, windowsHide: true }
-    ).toString().trim();
+    const raw = (await runPowerShell(['-Command', 'Get-Printer | Select-Object Name, Default | ConvertTo-Json -Compress'], { timeout: 8000 })).trim();
     let parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) parsed = [parsed];  // PowerShell returns bare object for single printer
     const printers = parsed.map(p => ({ name: p.Name, isWindowsDefault: !!p.Default }));
@@ -4005,7 +4043,7 @@ async function performCheckinPrint(input) {
     // test prints only, which is why real check-ins printed silently). Tunes
     // cycle per label; a birthday kid's label plays Happy Birthday. Played
     // BEFORE the label so the backfeed returns the media to its start.
-    playTuneIfEnabled(effectivePrinter, cakeWeek ? 'birthday' : undefined);
+    await playTuneIfEnabled(effectivePrinter, cakeWeek ? 'birthday' : undefined);
     await printLabel(pngPath, effectivePrinter);
     if (!isDemo) recordPrint(dupKey);
 
@@ -4415,7 +4453,7 @@ function isNonCheckinRow(e) {
 // A jam or a torn roll eats eight labels in a rush, and the operator had to
 // reprint one Print History row at a time while a line formed at the door.
 //
-// Cap of 20, not 40: printImage is execSync with a 15s timeout plus one retry
+// Cap of 20, not 40: printImage runs PowerShell with a 15s timeout plus one retry
 // preceded by a SYNCHRONOUS 750ms wait, i.e. up to ~31s of blocked event loop
 // per label. Forty labels could stall POST /print for a child at the door for
 // minutes. The inter-label gap below is an awaited setTimeout for the same
@@ -5366,7 +5404,7 @@ async function reprintRow(entry, printerName, opts = {}) {
     try {
       const result = await renderLeaderLabel({ firstName: entry.firstName, lastName: entry.lastName, clubName: entry.clubName });
       leaderPng = result.pngPath;
-      if (!silent) playTuneIfEnabled(effectivePrinter);
+      if (!silent) await playTuneIfEnabled(effectivePrinter);
       await printLabel(leaderPng, effectivePrinter);
       addHistoryEntry({
         firstName: entry.firstName, lastName: entry.lastName, clubName: entry.clubName,
@@ -5419,7 +5457,7 @@ async function reprintRow(entry, printerName, opts = {}) {
     });
     pngPath = result.pngPath;
 
-    if (!silent) playTuneIfEnabled(effectivePrinter, birthday ? 'birthday' : undefined);
+    if (!silent) await playTuneIfEnabled(effectivePrinter, birthday ? 'birthday' : undefined);
     let copies = null;
     if (opts.jam) copies = await printJamCopies(pngPath);
     else await printLabel(pngPath, effectivePrinter);
@@ -5678,7 +5716,7 @@ app.post('/print-award', async (req, res) => {
     });
     pngPath = result.pngPath;
 
-    playTuneIfEnabled(effectivePrinter, birthday ? 'birthday' : undefined);
+    await playTuneIfEnabled(effectivePrinter, birthday ? 'birthday' : undefined);
     await printLabel(pngPath, effectivePrinter);
     recordPrint(dupKey);
 
@@ -5915,7 +5953,7 @@ async function performLeaderPrint(input) {
   try {
     const result = await renderLeaderLabel({ firstName, lastName, clubName, testBanner: isDemo });
     pngPath = result.pngPath;
-    playTuneIfEnabled(effectivePrinter);
+    await playTuneIfEnabled(effectivePrinter);
     await printLabel(pngPath, effectivePrinter);
     if (isDemo) {
       console.log(`[print-leader] Printed a TEST leader tag for '${firstName} ${lastName}' — nothing recorded`);
@@ -6039,7 +6077,7 @@ app.post('/print-custom', async (req, res) => {
   try {
     const result = await generateLabel({ customText: norm.text });
     pngPath = result.pngPath;
-    playTuneIfEnabled(effectivePrinter);
+    await playTuneIfEnabled(effectivePrinter);
     await printLabel(pngPath, effectivePrinter);
     recordPrint(dupKey);
     console.log(`[print-custom] ${norm.text}`);
@@ -6062,7 +6100,7 @@ const PDF_MAX_BYTES = 12 * 1024 * 1024; // ~12MB cap on the DECODED payload
 const PDF_MAGIC = '%PDF-';
 
 // Prints a PDF on Windows via the shell's registered PDF handler (Start-Process
-// -Verb Print), the same temp-file + execSync + finally-unlink shape as
+// -Verb Print), the same temp-file + PowerShell + finally-unlink shape as
 // printImage(). If a specific printer was requested, best-effort switch the
 // Windows default printer to it first (Start-Process -Verb Print has no
 // direct "-Printer" argument) — failure to do that is non-fatal, the job
@@ -6099,8 +6137,12 @@ function isSafePrinterName(name) {
 // that was reachable from any website the volunteer had open.
 function printPdf(pdfPath, printerName) {
   if (!isSafePrinterName(printerName)) {
-    throw new Error('Refusing to print: printer name contains unsupported characters');
+    return Promise.reject(new Error('Refusing to print: printer name contains unsupported characters'));
   }
+  return withPrinter(() => printPdfNow(pdfPath, printerName));
+}
+
+async function printPdfNow(pdfPath, printerName) {
 
   const ps = `
 $ErrorActionPreference = 'Stop'
@@ -6118,16 +6160,14 @@ Start-Process -FilePath $target -Verb Print -WindowStyle Hidden -Wait
   const psPath = tmpFilePath('awana-print-pdf', 'ps1');
   try {
     fs.writeFileSync(psPath, ps, 'utf8');
-    const result = execSync(`powershell -NoProfile -ExecutionPolicy Bypass -File "${psPath}"`, {
+    const result = await runPowerShell(['-File', psPath], {
       timeout: 30000,
-      windowsHide: true,
-      encoding: 'utf8',
       env: Object.assign({}, process.env, {
         AWANA_PDF_PATH: pdfPath,
         AWANA_PRINTER: printerName || '',
       }),
     });
-    if (result) console.log('[print-pdf] PowerShell:', result.trim());
+    if (result && result.trim()) console.log('[print-pdf] PowerShell:', result.trim());
   } finally {
     fs.unlink(psPath, () => {});
   }
@@ -6187,7 +6227,7 @@ app.post(PDF_UPLOAD_PATH, express.json({ limit: '18mb' }), async (req, res) => {
   const pdfPath = tmpFilePath('awana-doc', 'pdf');
   try {
     fs.writeFileSync(pdfPath, buffer);
-    printPdf(pdfPath, effectivePrinter);
+    await printPdf(pdfPath, effectivePrinter);
     console.log(`[print-pdf] Printed ${label ? `'${String(label).slice(0, 60)}' ` : ''}(${buffer.length} bytes) to ${effectivePrinter || 'default'}`);
     res.json({ success: true });
   } catch (err) {
@@ -7054,7 +7094,7 @@ app.post('/canary', async (req, res) => {
     // Startup chirp (#12): the morning test print announces itself with a
     // two-second motor melody. Failure is swallowed inside — the canary's
     // job is the label and the pipe, never the music.
-    playTuneIfEnabled(printerName);
+    await playTuneIfEnabled(printerName);
     await printLabel(pngPath, printerName);
     stages.push({ stage: 'print', passed: true, detail: `TEST label sent to ${printerName || 'default printer'}` });
   } catch (err) {
@@ -7124,7 +7164,7 @@ const SPOOLER_BACKLOG_JOBS = 3;             // three or more jobs waiting
 const SPOOLER_STUCK_MS = 90000;             // or one job older than 90s
 // Half the Get-Printer probe's 8000ms on purpose. checkPrinterWarnings is
 // awaited by GET /health on a single-threaded server where printImage's
-// execSync can already block ~31s, so /health's worst case must not double.
+// a print can already take ~31s, so /health's worst case must not double.
 const SPOOLER_PROBE_TIMEOUT_MS = 4000;
 const SPOOLER_CLEAR_TIMEOUT_MS = 15000;
 // JobStatus is a comma-separated flags string. A paper-out can sit on a SINGLE
@@ -7132,7 +7172,7 @@ const SPOOLER_CLEAR_TIMEOUT_MS = 15000;
 // this item exists for, so an error status is a third stuck trigger.
 const SPOOLER_ERROR_TOKENS = ['error', 'offline', 'paperout', 'paused', 'blocked', 'userintervention'];
 
-// Reads the queue. Its own script, its own temp file, its own execSync — the
+// Reads the queue. Its own script, its own temp file, its own PowerShell — the
 // raw queue commands never touch printImage/sendRawToPrinter or POST /print.
 //
 // SECURITY: the printer name is validated by isSafePrinterName AND handed to
@@ -7171,7 +7211,7 @@ ConvertTo-Json -Compress -InputObject @{ ok = $true; removed = $removed; failed 
 // Returns an array of { id, status, submitted } jobs, or null meaning UNKNOWN.
 // NEVER [] on failure: an empty queue and an unreadable queue are opposite
 // facts, and collapsing "I could not read it" into a zero is the whole bug.
-function readSpoolerQueue(printerName) {
+async function readSpoolerQueue(printerName) {
   if (process.platform !== 'win32') return null;
   // isSafePrinterName returns true for '' ("use the default"), so the
   // truthiness check comes first — -PrinterName is mandatory and cannot take ''.
@@ -7181,10 +7221,8 @@ function readSpoolerQueue(printerName) {
   const psPath = tmpFilePath('awana-print', 'ps1');
   try {
     fs.writeFileSync(psPath, PS_READ_QUEUE, 'utf8');
-    const raw = execSync(`powershell -NoProfile -ExecutionPolicy Bypass -File "${psPath}"`, {
+    const raw = await runPowerShell(['-File', psPath], {
       timeout: SPOOLER_PROBE_TIMEOUT_MS,
-      windowsHide: true,
-      encoding: 'utf8',
       env: Object.assign({}, process.env, { AWANA_QUEUE_PRINTER: printerName }),
     });
     const text = String(raw == null ? '' : raw).trim();
@@ -7267,16 +7305,14 @@ function parseClearQueueResult(raw) {
 
 // Manual only: never called by anything automatic, so nothing ever clears the
 // queue on its own. Returns { removed, failed } or null.
-function clearPrintQueue(printerName) {
+async function clearPrintQueue(printerName) {
   if (process.platform !== 'win32') return null;
   if (!printerName || !isSafePrinterName(printerName)) return null;
   const psPath = tmpFilePath('awana-print', 'ps1');
   try {
     fs.writeFileSync(psPath, PS_CLEAR_QUEUE, 'utf8');
-    const raw = execSync(`powershell -NoProfile -ExecutionPolicy Bypass -File "${psPath}"`, {
+    const raw = await runPowerShell(['-File', psPath], {
       timeout: SPOOLER_CLEAR_TIMEOUT_MS,
-      windowsHide: true,
-      encoding: 'utf8',
       env: Object.assign({}, process.env, { AWANA_QUEUE_PRINTER: printerName }),
     });
     return parseClearQueueResult(raw);
@@ -7324,10 +7360,7 @@ async function checkPrinterWarnings() {
   if (PRINTER_NAME && process.platform === 'win32') {
     let printerFound = false;
     try {
-      const raw = execSync(
-        'powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-Printer | Select-Object Name | ConvertTo-Json -Compress"',
-        { timeout: 8000, windowsHide: true }
-      ).toString().trim();
+      const raw = (await runPowerShell(['-Command', 'Get-Printer | Select-Object Name | ConvertTo-Json -Compress'], { timeout: 8000 })).trim();
       let parsed = JSON.parse(raw);
       if (!Array.isArray(parsed)) parsed = [parsed];
       const names = parsed.map(p => p.Name);
@@ -7345,7 +7378,7 @@ async function checkPrinterWarnings() {
     // warning, not two confusing ones, and /health's worst-case synchronous
     // block must not double.
     if (printerFound) {
-      spooler = summarizeSpoolerJobs(readSpoolerQueue(PRINTER_NAME), now);
+      spooler = summarizeSpoolerJobs(await readSpoolerQueue(PRINTER_NAME), now);
       if (spooler.unknown) {
         warnings.push({
           type: 'spoolerCheckFailed',
@@ -8108,7 +8141,7 @@ app.post('/rehearsal', (req, res) => {
   res.json({ ok: true, rehearsal: rehearsalState.on });
 });
 
-app.post('/play-tune', (req, res) => {
+app.post('/play-tune', async (req, res) => {
   if (!isTrustedConfigOrigin(req)) {
     return res.status(403).json({ error: 'The tune button only works from the dashboard on this computer' });
   }
@@ -8120,7 +8153,7 @@ app.post('/play-tune', (req, res) => {
     return res.status(400).json({ error: 'printerName contains unsupported characters' });
   }
   const tune = String((req.body || {}).tune || '') || undefined;
-  const ok = playTuneIfEnabled(wanted || PRINTER_NAME, tune);
+  const ok = await playTuneIfEnabled(wanted || PRINTER_NAME, tune);
   res.json({ ok, tune: lastTune ? lastTune.tune : null, error: !ok && lastTune ? lastTune.error : undefined });
 });
 
@@ -8187,7 +8220,7 @@ app.post('/receipt/discover', async (req, res) => {
 //
 // The body is validated BEFORE the platform short-circuit, exactly as
 // POST /print-pdf does, so the 400s stay observable from Linux CI.
-app.post('/printer/clear-queue', (req, res) => {
+app.post('/printer/clear-queue', async (req, res) => {
   if (!isTrustedConfigOrigin(req)) {
     return res.status(403).json({ error: 'The print queue can only be cleared from the dashboard on this computer' });
   }
@@ -8206,7 +8239,7 @@ app.post('/printer/clear-queue', (req, res) => {
     return res.status(501).json({ error: 'Clearing the print queue requires Windows' });
   }
   try {
-    const result = clearPrintQueue(target);
+    const result = await clearPrintQueue(target);
     if (!result) return res.status(500).json({ error: 'Could not clear the print queue' });
     // So the next /health tells the truth instead of a 60s-stale backlog.
     cachedPrinterCheck.checkedAt = 0;
@@ -8500,10 +8533,7 @@ app.get('/diagnostics', async (req, res) => {
   // 2. Printer detected
   if (process.platform === 'win32') {
     try {
-      const raw = execSync(
-        'powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-Printer | Select-Object Name, Default | ConvertTo-Json -Compress"',
-        { timeout: 8000, windowsHide: true }
-      ).toString().trim();
+      const raw = (await runPowerShell(['-Command', 'Get-Printer | Select-Object Name, Default | ConvertTo-Json -Compress'], { timeout: 8000 })).trim();
       let parsed = JSON.parse(raw);
       if (!Array.isArray(parsed)) parsed = [parsed];
       const target = PRINTER_NAME || parsed.find(p => p.Default)?.Name || '(none)';
@@ -8566,7 +8596,7 @@ function prewarmPrinterIfConfigured() {
         try {
           console.log('[prewarm] Sending blank label to printer...');
           const result = await generateLabel({ firstName: ' ', lastName: ' ', clubName: '' });
-          printImage(result.pngPath, PRINTER_NAME);
+          await printImage(result.pngPath, PRINTER_NAME);
           fs.unlink(result.pngPath, () => {});
           console.log('[prewarm] Done');
         } catch (e) {
