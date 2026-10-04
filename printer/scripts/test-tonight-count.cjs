@@ -447,6 +447,46 @@ async function main() {
     setReport(null);
   }
 
+  // ── 11. The cap never evicts today's rows ─────────────────────────────────
+  console.log('\ntonight: the history cap never evicts today');
+  {
+    setReport(null);
+    const historyFile = path.join(dataDir, 'print-history.json');
+    const row = (i, when) => ({
+      firstName: 'Old' + i, lastName: 'Row', clubName: 'Sparks', printer: 'Fake', success: true,
+      clubberId: String(100000 + i), timestamp: when.toISOString(),
+    });
+    const yesterday = new Date(Date.now() - 24 * 3600 * 1000);
+    // 200 rows from yesterday, then one child tonight: the cap holds at 200
+    // and it is yesterday's oldest row that goes, never tonight's.
+    fs.writeFileSync(historyFile, JSON.stringify(Array.from({ length: 200 }, (_, i) => row(i, yesterday))));
+    let r = await post('/print', { firstName: 'Vega', lastName: 'Capper', clubName: 'Sparks', clubberId: '9101' });
+    let history = (await j('/history')).body || [];
+    check('200 old rows and one tonight: still 200 rows', history.length === 200, `${history.length} rows; print said ${r.status} ${JSON.stringify(r.body)}`);
+    check('tonight’s row is the newest and was kept', history[0] && history[0].firstName === 'Vega', JSON.stringify(history[0]));
+    check('it was yesterday’s oldest row that went', !history.some((r) => r.firstName === 'Old199'));
+    // 200 rows from TONIGHT, then one more child: every one of them stays.
+    const tonight = new Date(Date.now() - 60 * 1000);
+    fs.writeFileSync(historyFile, JSON.stringify(Array.from({ length: 200 }, (_, i) => row(i, tonight))));
+    r = await post('/print', { firstName: 'Rigel', lastName: 'Capper', clubName: 'Sparks', clubberId: '9102' });
+    history = (await j('/history')).body || [];
+    check('a 201-child night keeps all 201 rows', history.length === 201, `${history.length} rows; print said ${r.status} ${JSON.stringify(r.body)}`);
+    check('the first arrival of the night is still there', history.some((r) => r.firstName === 'Old199'));
+    check('and the tally fallback counts every one of them', computeTonightStats().checkedIn === 201, String(computeTonightStats().checkedIn));
+    // Mixed: 150 tonight behind 100 from yesterday keeps all of tonight and the
+    // 50 newest of yesterday (200 in all plus the extra from tonight).
+    fs.writeFileSync(historyFile, JSON.stringify([
+      ...Array.from({ length: 150 }, (_, i) => row(i, tonight)),
+      ...Array.from({ length: 100 }, (_, i) => row(500 + i, yesterday)),
+    ]));
+    r = await post('/print', { firstName: 'Deneb', lastName: 'Capper', clubName: 'Sparks', clubberId: '9103' });
+    history = (await j('/history')).body || [];
+    check('tonight’s rows beyond the cap stay while old rows go', history.length === 200
+      && history.filter((x) => Number(x.clubberId) >= 100500).length === 49,
+      `${history.length} rows, ${history.filter((x) => Number(x.clubberId) >= 100500).length} old; print said ${r.status}`);
+    fs.writeFileSync(historyFile, '[]');
+  }
+
   listener.close();
   console.log('');
   console.log(`${passed} passed, ${failed} failed`);

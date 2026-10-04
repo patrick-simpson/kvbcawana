@@ -3099,7 +3099,7 @@ async function playTuneIfEnabled(printerName, tuneName) {
 }
 
 // ── Attendance ledger (#30) ───────────────────────────────────────────────────
-// Print history rolls over every ~2 nights (MAX_HISTORY=200), so milestones
+// Print history keeps only MAX_HISTORY old rows and ages out, so milestones
 // need their own compact ledger: one dates[] per kid, one entry per day,
 // season-scoped (Awana years start Aug 1). Written atomically like history.
 const ATTENDANCE_FILE = path.join(DATA_DIR, 'attendance.json');
@@ -4196,7 +4196,14 @@ app.post('/print', async (req, res) => {
 
 // ── Print history ────────────────────────────────────────────────────────────
 const HISTORY_FILE = path.join(DATA_DIR, 'print-history.json');
+// The cap on OLD rows. Today's rows are never evicted (see addHistoryEntry):
+// the duplicate guard, "already printed tonight", the trophy marker and the
+// tally fallback all read today's rows, and a 200-child night used to push its
+// first arrivals out before the evening ended, so a reprint printed a second
+// trophy band and the fallback count came up short. HISTORY_HARD_MAX is the
+// one bound that still holds on a day gone wrong (a loop of prints).
 const MAX_HISTORY = 200;
+const HISTORY_HARD_MAX = 5000;
 
 function loadHistory() {
   try {
@@ -4540,9 +4547,8 @@ function addHistoryEntry(entry) {
     award: security.sanitizeStoredText(entry.award || ''),
     // #293: which handbook this label's trophy band celebrated. A marker, not
     // display data — it is what stops a second band for the same child tonight.
-    // (MAX_HISTORY caps the log at 200 rows, so on a huge night this marker can
-    // be evicted and a much-later reprint could band once more. Acceptable for
-    // a decoration; not worth an unbounded store.)
+    // (Today's rows are never evicted, so it holds all evening; a reprint
+    // weeks later may band once more, which is acceptable for a decoration.)
     trophyBook: security.sanitizeStoredText(entry.trophyBook || '', 60),
     // Connect cards (#10) are flagged for the same reason award slips are:
     // they show in /history so the operator can see the card went out, but
@@ -4563,8 +4569,20 @@ function addHistoryEntry(entry) {
       : null,
     timestamp: new Date().toISOString()
   });
-  if (history.length > MAX_HISTORY) history.length = MAX_HISTORY;
-  saveHistory(history);
+  saveHistory(trimHistory(history));
+}
+
+// Newest first: the first MAX_HISTORY rows stay, and so does every row from
+// today beyond them, up to HISTORY_HARD_MAX in all.
+function trimHistory(history) {
+  if (history.length <= MAX_HISTORY) return history;
+  const today = localDayISO();
+  const kept = [];
+  for (const row of history) {
+    if (kept.length >= HISTORY_HARD_MAX) break;
+    if (kept.length < MAX_HISTORY || isOnLocalDay(row && row.timestamp, today)) kept.push(row);
+  }
+  return kept;
 }
 
 app.get('/history', (req, res) => {
