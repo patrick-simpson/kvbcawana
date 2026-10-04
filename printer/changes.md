@@ -1,4 +1,13 @@
-﻿## [7.10.0] - 2026-10-03
+﻿## [7.11.0] - 2026-10-04
+A phone check-in is "checked in" only when TwoTimTwo says so.
+
+**Fixed: the phone said checked in, TwoTimTwo had nothing.** A check-in made from a phone (awana.kvbchurch.org/checkin or the Wi-Fi page) could show a green "is checked in" line, and print the label, while TwoTimTwo had not recorded the child. Two causes, both on the check-in laptop's extension. It judged TwoTimTwo's reply by whether the child's first name appeared anywhere in it, which a whole page passes too (a refused post or a signed-out session answered with the check-in page lists every name on the roster). And it posted the meeting id the check-in page was loaded with; that tab stays open for days, so by club night the post carried last week's meeting and TwoTimTwo filed the check-in there, or refused it.
+
+**What it does now.** A reply counts only when it is TwoTimTwo's own short answer naming the child, never a page or a login form. Every direct check-in (phone, the touch screen, Quick Mode) starts from a copy of the page no older than five minutes, and a refusal re-reads the page and posts once more. Then, before the phone is told anything, the extension reads TwoTimTwo's own check-in report: the green line comes only when the report lists the child. If it does not, the child goes back on the laptop's list and the phone says "TwoTimTwo did not record the check-in. Check in at the desk." A child whose label printed but who is still on the list is checked in rather than reported "already in".
+
+**The dashboard's "Allow driven check-ins" switch.** With it off, a phone check-in used to wait 90 seconds and then say the laptop was not answering; it now says at once that phone check-ins are turned off on the laptop, and where the switch is.
+
+## [7.10.0] - 2026-10-03
 A Trek & Journey phone page for the youth leaders, and Trek and Journey are checked out at 7:15.
 
 **Trek & Journey page.** awana.kvbchurch.org/checkin/ym (any network, the sync passphrase) and /phone/ym on the church Wi-Fi (the phone PIN) are the phone check-in for Trek and Journey only: their families and children, the child's card and the family page, and nothing else (no Tonight, no labels, no Printer jammed).
