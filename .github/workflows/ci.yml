@@ -177,12 +177,46 @@ jobs:
           npm ci --prefix lobby
           npm ci --prefix lobby/worker
           npm ci --prefix printer
-      - name: Deploy the sync Worker
+      - name: Did the Worker change?
+        # Every deploy of the Worker is a new version, and a new version
+        # restarts its Durable Object: every lobby TV, the projector and the
+        # Journey kiosk lose their live socket and reconnect. Deploying it on
+        # every push (the nightly bots' feed and lesson commits included) did
+        # that several times a day for nothing. It deploys only when something
+        # it is built from changed: its own folder, the lobby lib files it
+        # imports, or this workflow. A push compares against the commit before
+        # it; a dispatch (the bots and the release workflows dispatch this
+        # right after their own one commit) against the parent; anything
+        # unknowable deploys, the safe direction.
+        id: worker
         if: steps.ready.outputs.ready == 'true'
+        env:
+          BEFORE: ${{ github.event.before }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          set -u
+          BASE=""
+          if [ "$EVENT" = "push" ] && [ -n "$BEFORE" ] && ! echo "$BEFORE" | grep -Eq '^0+$'; then
+            git fetch -q --depth=1 origin "$BEFORE" && BASE="$BEFORE"
+          else
+            git fetch -q --deepen=1 origin && BASE="$(git rev-parse --verify -q HEAD~1 || true)"
+          fi
+          if [ -z "$BASE" ]; then
+            echo "No base commit to compare against; deploying the Worker."
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          elif git diff --quiet "$BASE" HEAD -- lobby/worker lobby/src/lib .github/workflows/ci.yml; then
+            echo "Nothing the Worker is built from changed since $BASE; its deploy is skipped."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "The Worker's sources changed since $BASE; deploying it."
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Deploy the sync Worker
+        if: steps.ready.outputs.ready == 'true' && steps.worker.outputs.changed == 'true'
         working-directory: lobby/worker
         run: npx wrangler deploy
       - name: Set the Worker's secrets
-        if: steps.ready.outputs.ready == 'true'
+        if: steps.ready.outputs.ready == 'true' && steps.worker.outputs.changed == 'true'
         working-directory: lobby/worker
         env:
           PUSHER_APP_ID: ${{ secrets.PUSHER_APP_ID }}
