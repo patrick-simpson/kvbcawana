@@ -24,6 +24,13 @@
 //     query below) are passed straight through to the network: a cached
 //     answer would pin the screen to the build it already has, forever.
 //     See src/lib/buildReload.js, whose BUILD_PROBE_PARAM this mirrors.
+//   · The sync service (/api/…) is network-only too. On the one site it is
+//     same-origin, and its GETs (/api/v1/state, /api/v1/calendar) end in no
+//     .json, so the asset rule would have answered every 10-minute poll and
+//     every doorbell refetch from the first cached body until the next
+//     deploy: settings and slide sync frozen, a bearer-authenticated body in
+//     Cache Storage. Nothing sent with an Authorization header is cached by
+//     any rule either.
 
 const VERSION = '__BUILD_HASH__';
 const PRECACHE = __PRECACHE_MANIFEST__;
@@ -52,6 +59,7 @@ self.addEventListener('activate', (event) => {
 // offline shell on every later boot until someone cleared site data.
 function cacheable(request, response) {
   if (!response.ok || response.redirected) return false;
+  if (request.headers && typeof request.headers.get === 'function' && request.headers.get('authorization')) return false;
   if (response.url && new URL(response.url).origin !== self.location.origin) return false;
   if (request.mode === 'navigate') return (response.headers.get('content-type') || '').includes('text/html');
   return true;
@@ -88,6 +96,7 @@ self.addEventListener('fetch', (event) => {
   // Network-only, not even network-first: the deploy heartbeat and the HTML
   // freshness probe are the two questions a cache must never answer.
   if (url.searchParams.has('awanaBuild') || url.pathname.endsWith('/version.json')) return;
+  if (url.pathname === '/api' || url.pathname.startsWith('/api/')) return;
 
   if (request.mode === 'navigate' || url.pathname.endsWith('.json')) {
     event.respondWith(networkFirst(request));

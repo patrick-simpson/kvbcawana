@@ -80,6 +80,33 @@ describe('service worker: what may become the offline shell', () => {
     expect(plain.put).toHaveLength(0);
   });
 
+  it('leaves the sync service (/api/…) to the network: never answered from a cache, never stored', async () => {
+    let fetched = 0;
+    const sw = boot({ fetchImpl: async () => { fetched += 1; return response({ url: 'https://church.github.io/api/v1/state', contentType: 'application/json' }); } });
+    for (const url of ['https://church.github.io/api/v1/state', 'https://church.github.io/api/v1/calendar', 'https://church.github.io/api']) {
+      let result;
+      sw.listeners.fetch({
+        request: { method: 'GET', url, mode: 'cors', headers: { get: () => null } },
+        respondWith: (p) => { result = p; },
+      });
+      expect(result).toBeUndefined();   // not intercepted at all: the browser fetches it itself
+    }
+    expect(fetched).toBe(0);
+    expect(sw.put).toHaveLength(0);
+  });
+
+  it('never caches anything sent with an Authorization header, whatever its path', async () => {
+    const sw = boot({ fetchImpl: async () => response({ url: 'https://church.github.io/lobby/shared/private', contentType: 'application/json' }) });
+    let result;
+    sw.listeners.fetch({
+      request: { method: 'GET', url: 'https://church.github.io/lobby/shared/private', mode: 'cors', headers: { get: (h) => (h === 'authorization' ? 'Bearer x' : null) } },
+      respondWith: (p) => { result = p; },
+    });
+    const res = await result;
+    expect(res.ok).toBe(true);
+    expect(sw.put).toHaveLength(0);
+  });
+
   it('still caches JSON feeds (not navigations) when they are clean', async () => {
     const sw = boot({ fetchImpl: async () => response({ url: 'https://church.github.io/shared/schedule.json', contentType: 'application/json' }) });
     let result;
