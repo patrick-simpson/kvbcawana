@@ -8665,6 +8665,25 @@ function recordBootVersionAndMaybeBeacon() {
   }
 }
 
+// The server that is actually bound, whichever listen attempt it came from.
+// startListening() returns the FIRST attempt's server, as it always did (the
+// tests wait on its 'listening' event), but a retry after EADDRINUSE makes a
+// new one, which the Electron shell never saw: it held the dead first object,
+// said "running", and closing it left the live one bound (so a restart hit
+// EADDRINUSE itself, five times, and gave up). The shell now waits on
+// `.ready` (resolves with the live server once any attempt binds, rejects
+// after the last fails) and stops the server with stopListening().
+let liveServer = null;
+/** @type {{ resolve: Function, reject: Function } | null} */
+let listenWaiter = null;
+
+function stopListening() {
+  const s = liveServer;
+  liveServer = null;
+  if (listenWaiter) { listenWaiter.reject(new Error('stopped before it was listening')); listenWaiter = null; }
+  return new Promise((resolve) => { if (!s) return resolve(); s.close(() => resolve()); });
+}
+
 function startListening(attempt = 1) {
   if (attempt === 1 && !startupTasksDone) {
     startupTasksDone = true;
@@ -8701,7 +8720,14 @@ function startListening(attempt = 1) {
     hasPin: security.isAcceptablePin(config.phonePin),
     envHost: process.env.AWANA_BIND_HOST,
   });
+  let ready = null;
+  if (attempt === 1) {
+    ready = new Promise((resolve, reject) => { listenWaiter = { resolve, reject }; });
+    ready.catch(() => {});   // a shell that does not await it must not see an unhandled rejection
+  }
   const server = app.listen(PORT, bind.host, () => {
+    liveServer = server;
+    if (listenWaiter) { listenWaiter.resolve(server); listenWaiter = null; }
     console.log(`\n  Club Print Server v${SERVER_VERSION}  •  http://localhost:${PORT}`);
     console.log(`  Dashboard : http://localhost:${PORT}/`);
     console.log(`  Printer   : ${PRINTER_NAME || '(system default)'}`);
@@ -8723,15 +8749,18 @@ function startListening(attempt = 1) {
     } else if (err.code === 'EADDRINUSE') {
       console.error(`[startup] Port ${PORT} is still in use after ${LISTEN_MAX_ATTEMPTS} attempts.`);
       console.error('[startup] Another print server is likely running — close it and restart, or reboot the machine.');
+      if (listenWaiter) { listenWaiter.reject(new Error(`Port ${PORT} is still in use after ${LISTEN_MAX_ATTEMPTS} attempts. Another print server is likely running: close it and restart, or reboot the machine.`)); listenWaiter = null; }
     } else {
       console.error('[startup] Server error:', err.message);
+      if (listenWaiter) { listenWaiter.reject(err); listenWaiter = null; }
     }
   });
+  if (ready) server.ready = ready;
   return server;
 }
 
 module.exports = {
-  app, startListening, setUpdateHandler, setLatestVersion, setExtensionInfo, setOpsAlertHandler,
+  app, startListening, stopListening, setUpdateHandler, setLatestVersion, setExtensionInfo, setOpsAlertHandler,
   // For the Electron shell: this module is require-cached across settings
   // saves, so the shell pushes the freshly merged config.json and printer
   // name into the LIVE module instead of relying on load-time state.

@@ -584,7 +584,10 @@ async function resolvePortConflict() {
 
 function startServer(config) {
   if (serverInstance) {
-    serverInstance.close();
+    // The server that is really bound, whichever listen attempt got there
+    // (the object startListening() returns is only the first attempt's).
+    if (serverModule && serverModule.stopListening) serverModule.stopListening();
+    else serverInstance.close();
     serverInstance = null;
   }
   // The FULL print server (roster enrichment, dedup, history, Pusher event
@@ -619,8 +622,30 @@ function startServer(config) {
     if (updateState.available) serverModule.setLatestVersion(updateState.available);
     if (serverModule.setExtensionInfo) serverModule.setExtensionInfo(extensionState);
     serverInstance = serverModule.startListening();
-    serverState = { status: 'running', error: null };
-    console.log('[server] Print server started from', fullServerDir);
+    // The bind is asynchronous and retries a busy port for about 20 s, so
+    // "running" is said only once it is true. Until 7.11.1 the tray said
+    // Running the moment the module loaded, and a port still held by a
+    // previous instance left labels unprintable behind a green tray icon,
+    // with the failure on a console no packaged app shows.
+    serverState = { status: 'starting', error: null };
+    console.log('[server] Print server starting from', fullServerDir);
+    const started = serverInstance;
+    (started.ready || Promise.resolve(started)).then(() => {
+      if (serverInstance !== started) return;   // restarted meanwhile
+      serverState = { status: 'running', error: null };
+      console.log('[server] Print server is listening on port', PORT);
+      if (currentConfig) buildTray(currentConfig);
+    }, (err) => {
+      if (serverInstance !== started) return;
+      serverState = { status: 'failed', error: err && err.message ? err.message : String(err) };
+      console.error('[server] Print server could not listen:', serverState.error);
+      if (currentConfig) buildTray(currentConfig);
+      try {
+        if (Notification.isSupported()) {
+          new Notification({ title: 'Club Label Printer: labels cannot print', body: serverState.error }).show();
+        }
+      } catch (e) { console.warn('[alert] Notification failed:', e.message); }
+    });
   } catch (e) {
     serverState = { status: 'failed', error: `${e.message}\n${e.stack || ''}` };
     console.error('[server] Print server failed to start:', e);
@@ -706,6 +731,28 @@ function probeServer(timeoutMs = 2500) {
     req.on('timeout', () => { req.destroy(); resolve(false); });
   });
 }
+
+// The tray's word is checked against the port once a minute. Two misses in
+// a row (the server died, or hung) restart it and say so; a server still
+// starting, or one the shell already knows has failed, is left to its own
+// retries. Until 7.11.1 nothing probed after launch, so a dead server kept
+// its green tray icon all evening.
+let healthMisses = 0;
+async function watchServer() {
+  if (serverState.status !== 'running') { healthMisses = 0; return; }
+  if (await probeServer(5000)) { healthMisses = 0; return; }
+  healthMisses += 1;
+  console.warn(`[server] /health did not answer (${healthMisses} in a row)`);
+  if (healthMisses < 2) return;
+  healthMisses = 0;
+  serverState = { status: 'failed', error: 'The print server stopped answering and is being restarted.' };
+  if (currentConfig) buildTray(currentConfig);
+  try {
+    if (Notification.isSupported()) new Notification({ title: 'Club Label Printer', body: 'The print server stopped answering; restarting it.' }).show();
+  } catch (e) { console.warn('[alert] Notification failed:', e.message); }
+  startServer(currentConfig || loadConfig() || {});
+}
+setInterval(() => { watchServer().catch((e) => console.warn('[server] health probe failed:', e.message)); }, 60_000).unref?.();
 
 // Launching the app is the operator's "make it work" gesture — every entry
 // point (fresh launch, second launch via the desktop shortcut, the Start
@@ -940,7 +987,8 @@ app.on('window-all-closed', () => {
 
 app.on('before-quit', () => {
   app.isQuitting = true;
-  if (serverInstance) serverInstance.close();
+  if (serverModule && serverModule.stopListening) serverModule.stopListening();
+  else if (serverInstance) serverInstance.close();
   if (pdfWindow && !pdfWindow.isDestroyed()) pdfWindow.destroy();
   if (pusherClient) { try { pusherClient.disconnect(); } catch { /* quitting anyway */ } }
 });
