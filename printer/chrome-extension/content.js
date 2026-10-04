@@ -660,7 +660,15 @@
   // never a rejection, so callers can always .then() it.
   function tryDirectCheckin(clubberId, childName, clubId, options) {
     if (CHURCH_CFG.enableDrivenCheckin === false) return Promise.resolve(false);
-    return driveCheckinDirect(clubberId, childName, clubId, options).then(function(posted) {
+    // A fresh meeting id first (see ensureFreshCheckinTokens), then the post;
+    // a refusal re-reads the page and posts once more, as the touch screen does.
+    return ensureFreshCheckinTokens().then(function() {
+      return driveCheckinDirect(clubberId, childName, clubId, options);
+    }).then(function(posted) {
+      if (posted) return true;
+      console.log('[Awana] Direct check-in for ' + childName + ' was not confirmed; refreshing the page tokens and trying once more');
+      return refreshCheckinTokens().then(function() { return driveCheckinDirect(clubberId, childName, clubId, options); });
+    }).then(function(posted) {
       if (!posted) return false;
       return new Promise(function(resolve) {
         var attempts = 0;
@@ -4725,6 +4733,20 @@
     return recid ? document.querySelector('.clubber[recid="' + String(recid).replace(/[^0-9A-Za-z_-]/g, '') + '"]:not(.checked-in)') : null;
   }
 
+  // The meeting id (#calendar_id) and any CSRF token are read from the page as
+  // it was LOADED. The check-in tab stays open for days, so by club night a
+  // direct post carried last week's meeting: TwoTimTwo answered as if it had
+  // worked (its snippet) and filed the check-in under the old meeting, or
+  // refused it. Before 7.11.0 only the touch screen refreshed, and only after a
+  // refusal, which the stale-but-accepted case never produces. Now every
+  // direct post (phone, Quick Mode, touch) starts from a page copy no older
+  // than CHECKIN_TOKENS.freshMs, one fetch of the page every few minutes.
+  var CHECKIN_TOKENS = { at: Date.now(), freshMs: 5 * 60 * 1000 };
+  function ensureFreshCheckinTokens() {
+    if (Date.now() - CHECKIN_TOKENS.at < CHECKIN_TOKENS.freshMs) return Promise.resolve(true);
+    return refreshCheckinTokens();
+  }
+
   function refreshCheckinTokens() {
     return fetch(location.pathname + location.search, { credentials: 'same-origin', signal: AbortSignal.timeout(8000) })
       .then(function(r) { return r.ok ? r.text() : ''; })
@@ -4736,6 +4758,7 @@
         if (tok && tok.value) document.querySelectorAll('input[name="YII_CSRF_TOKEN"]').forEach(function(i) { i.value = tok.value; });
         var mine = document.getElementById('calendar_id');
         if (cal && cal.value && mine) mine.value = cal.value;
+        if (cal && cal.value) CHECKIN_TOKENS.at = Date.now();
         return !!(cal && cal.value);
       })
       .catch(function() { return false; });
@@ -4773,7 +4796,9 @@
   }
 
   function touchCheckin(recid, name, clubId, options) {
-    return postTouchCheckin(recid, name, clubId, options).then(function(r) {
+    return ensureFreshCheckinTokens().then(function() {
+      return postTouchCheckin(recid, name, clubId, options);
+    }).then(function(r) {
       if (r === 'ok') return r;
       console.log('[Awana] Touch check-in for ' + name + ' failed (' + r + '); refreshing the page tokens and trying once more');
       return refreshCheckinTokens().then(function() { return postTouchCheckin(recid, name, clubId, options); });

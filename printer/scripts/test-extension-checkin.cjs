@@ -93,6 +93,33 @@ check('postTouchCheckin (the touch screen) judges its reply with checkinReplyOk'
 check('no direct-post path still trusts "the first name appears in the reply"',
   !/text\.indexOf\(firstName\)/.test(SRC) && !/indexOf\(first\.toLowerCase\(\)\) === -1\) return 'no-confirm'/.test(SRC));
 
-__suiteFinished = true;
-console.log(`\n${passed} passed, ${failed} failed`);
-process.exit(failed ? 1 : 0);
+console.log('\nextension check-in tokens: a fresh meeting id before every direct post');
+{
+  // ensureFreshCheckinTokens() reads CHECKIN_TOKENS and calls refreshCheckinTokens();
+  // both are supplied here so the lifted function runs as shipped.
+  const calls = [];
+  const mk = (ageMs) => new Function('CHECKIN_TOKENS', 'refreshCheckinTokens', 'Date',
+    extractFunction('ensureFreshCheckinTokens') + '; return ensureFreshCheckinTokens;')(
+    { at: 1000000 - ageMs, freshMs: 5 * 60 * 1000 },
+    () => { calls.push('refresh'); return Promise.resolve(true); },
+    { now: () => 1000000 });
+  (async () => {
+    const fresh = await mk(60 * 1000)();
+    check('a page copy a minute old is used as is', fresh === true && calls.length === 0, JSON.stringify(calls));
+    const stale = await mk(6 * 60 * 1000)();
+    check('a page copy older than five minutes is re-read first', stale === true && calls.length === 1, JSON.stringify(calls));
+    check('the freshness window is five minutes', /freshMs: 5 \* 60 \* 1000/.test(SRC));
+    check('a successful re-read stamps the copy fresh', /if \(cal && cal\.value\) CHECKIN_TOKENS\.at = Date\.now\(\);/.test(extractFunction('refreshCheckinTokens')));
+
+    const direct = extractFunction('tryDirectCheckin');
+    check('tryDirectCheckin (phone, Quick Mode) starts from a fresh meeting id', /ensureFreshCheckinTokens\(\)\.then/.test(direct));
+    check('tryDirectCheckin re-reads the page and posts once more after a refusal',
+      /refreshCheckinTokens\(\)\.then\(function\(\) \{ return driveCheckinDirect\(/.test(direct)
+      && direct.split('driveCheckinDirect(').length === 3);
+    check('touchCheckin (the touch screen) starts from a fresh meeting id too', /ensureFreshCheckinTokens\(\)\.then/.test(extractFunction('touchCheckin')));
+
+    __suiteFinished = true;
+    console.log(`\n${passed} passed, ${failed} failed`);
+    process.exit(failed ? 1 : 0);
+  })();
+}
