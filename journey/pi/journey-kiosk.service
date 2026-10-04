@@ -1,0 +1,25 @@
+# The Journey kiosk as a user service (PI_SETUP.md, step 4b):
+#   mkdir -p ~/.config/systemd/user
+#   cp journey-kiosk.sh ~/journey-kiosk.sh && chmod +x ~/journey-kiosk.sh
+#   cp journey-kiosk.service ~/.config/systemd/user/
+#   systemctl --user daemon-reload && systemctl --user enable --now journey-kiosk
+#   sudo loginctl enable-linger "$USER"    # start it at boot, before anyone logs in
+# systemd restarts it if the script itself ever dies; the script restarts the
+# browser whenever the browser dies.
+[Unit]
+Description=Journey Display kiosk (Chromium)
+After=graphical-session.target network-online.target
+Wants=network-online.target
+PartOf=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=%h/journey-kiosk.sh
+Restart=always
+RestartSec=5
+# Journey's own page keeps the screen awake (a wake lock) once it is up; this
+# is for the minutes before it loads.
+Environment=JOURNEY_URL=https://awana.kvbchurch.org/journey/
+
+[Install]
+WantedBy=graphical-session.target

@@ -49,42 +49,55 @@ We want the Pi to show the Journey Display every time it starts up.
 4. Find "HDMI Safe Mode" and turn it **ON**
 5. Click **OK** and **Reboot** when asked
 
-### 4b. Start the Browser on Boot
+### 4b. Start the Browser on Boot, and Keep It Running
 
-1. Open a terminal (black window with text)
+The browser is started by a small service that also **restarts it whenever it
+crashes or closes**. Before this, a crashed browser (an "Aw, Snap" page, or the
+Pi running out of memory) meant a dark screen until someone brought a
+keyboard; now it comes back on its own within a few seconds.
+
+1. Open a terminal:
    - Click Raspberry Pi menu → Accessories → Terminal
-2. Type this command (paste it exactly):
+2. Download the two files from the website's repository and install them
+   (paste these lines exactly, one block at a time, pressing Enter after each):
    ```
-   mkdir -p ~/.config/autostart
+   curl -fsSL https://raw.githubusercontent.com/patrick-simpson/kvbcawana/main/journey/pi/journey-kiosk.sh -o ~/journey-kiosk.sh
+   chmod +x ~/journey-kiosk.sh
+   mkdir -p ~/.config/systemd/user
+   curl -fsSL https://raw.githubusercontent.com/patrick-simpson/kvbcawana/main/journey/pi/journey-kiosk.service -o ~/.config/systemd/user/journey-kiosk.service
+   systemctl --user daemon-reload
+   systemctl --user enable --now journey-kiosk
+   sudo loginctl enable-linger "$USER"
    ```
-3. Press Enter
-
-4. Type this second command:
+   The Journey Display should open full screen within a few seconds.
+3. If you had set up the older autostart entry from an earlier version of this
+   guide, remove it so two browsers do not start:
    ```
-   nano ~/.config/autostart/journey.desktop
-   ```
-5. Press Enter
-
-6. You'll see a text editor. Copy and paste this exactly:
-   ```
-   [Desktop Entry]
-   Type=Application
-   Name=Journey Display
-   Exec=chromium-browser --kiosk https://awana.kvbchurch.org/journey/
-   X-GNOME-Autostart-enabled=true
+   rm -f ~/.config/autostart/journey.desktop
    ```
 
-7. Press **Ctrl + X** to save
-8. Press **Y** for yes
-9. Press **Enter** to confirm the filename
+> If step 2 says it cannot find `chromium-browser` or `chromium`, your Pi's
+> browser has another name: open a terminal and run
+> `which chromium-browser || which chromium`. The script looks for both.
 
-10. Close the terminal
+### 4c. Reboot Once a Night, and Let the Pi Watch Itself
 
-> If the display doesn't auto-start and you see an error mentioning
-> `chromium-browser`, open a terminal and run
-> `which chromium-browser || which chromium` to check which name your
-> Pi's version actually uses, then use that name in the `Exec=` line
-> above instead.
+Two safety nets for a screen that runs for weeks:
+
+1. **A nightly reboot** at 3:30 AM, when nothing is on screen, so a slow leak
+   can never build up for a month. In the terminal:
+   ```
+   (crontab -l 2>/dev/null; echo '30 3 * * * /sbin/shutdown -r now') | sudo crontab -
+   ```
+2. **The hardware watchdog**, which reboots the Pi if it ever locks up
+   completely (the browser service cannot help with that):
+   ```
+   sudo apt-get install -y watchdog
+   echo 'dtparam=watchdog=on' | sudo tee -a /boot/firmware/config.txt
+   sudo sed -i 's/^#\?watchdog-device.*/watchdog-device = \/dev\/watchdog/; s/^#\?max-load-1 .*/max-load-1 = 24/' /etc/watchdog.conf
+   sudo systemctl enable --now watchdog
+   ```
+   (On an older Pi OS the file is `/boot/config.txt`.)
 
 ### 4d. Disable Screen Blanking (don't skip this)
 
@@ -113,7 +126,7 @@ to exist there) won't change what the kiosk shows. To change the times
 for real:
 
 1. On any computer, go to
-   https://github.com/patrick-simpson/Journey-Display/blob/main/public/src/schedule.js
+   https://github.com/patrick-simpson/kvbcawana/blob/main/journey/public/src/schedule.js
 2. Click the pencil (✏️) icon to edit it directly in the browser
 3. Find these two lines near the top:
    ```javascript
@@ -198,10 +211,9 @@ https://awana.kvbchurch.org/journey/
 Do **not** append `/public/index.html` or `/pages/index.html`. Only the
 contents of `public/` are deployed, and they're served *at the root* —
 so `public/` is not part of the live URL even though it is part of the
-repo. Capitalization matters too: `Journey-Display`, not
-`journey-display`.
+repo.
 
-To find and fix it over SSH, check **both** places the URL can hide —
+To find and fix it over SSH, check **every** place the URL can hide —
 having two autostart entries with two different wrong URLs is exactly
 how this last went wrong:
 
@@ -209,14 +221,22 @@ how this last went wrong:
 # What is the browser actually on right now?
 ps -eo args | grep -i '[c]hromi' | tr ' ' '\n' | grep -i '^http'
 
-# Every autostart file that could launch it
+# The kiosk service (step 4b) takes its URL from here...
+grep -n JOURNEY_URL ~/.config/systemd/user/journey-kiosk.service
+# ...and any leftover autostart file from an older setup could launch a second browser
 grep -rniI 'chromi' ~/.config/autostart/ ~/.config/labwc/ \
   ~/.config/lxsession/ ~/.config/wayfire.ini /etc/xdg/lxsession/ 2>/dev/null
 ```
 
-Recent Pi OS (Bookworm) uses `~/.config/labwc/autostart`; older LXDE
-setups use `~/.config/autostart/*.desktop`. Correct the URL in each one
+Correct the URL in the service file (then `systemctl --user daemon-reload
+&& systemctl --user restart journey-kiosk`), delete any autostart entry
 you find, then `sudo reboot`.
+
+**The browser crashed or closed and the screen is dark:**
+- The kiosk service restarts it within about five seconds. If the screen
+  stays dark, over SSH run `systemctl --user status journey-kiosk` and
+  `journalctl --user -u journey-kiosk -n 50`; `systemctl --user restart
+  journey-kiosk` brings it back by hand.
 
 Note that a kiosk which fixes *itself* after a while is still broken —
 see the Pages-source section in `CLAUDE.md` for why a wrong Pi URL can
@@ -226,4 +246,4 @@ appear to work intermittently.
 
 Your Journey Display is now set up. The Pi will automatically start and show the display whenever you power it on.
 
-**Need help?** Ask someone with the Journey-Display repository access to check the GitHub issues or contact the setup team.
+**Need help?** Ask someone with access to the kvbcawana repository on GitHub to check its issues, or contact the setup team.
