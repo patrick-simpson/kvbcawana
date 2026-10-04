@@ -109,6 +109,40 @@ function renameWithRetrySync(from, to) {
   }
 }
 
+// Every data file (the history, the attendance ledger, the leaders, the
+// event buffer, the deck, the shared settings, the roster) is written the
+// same way: tmp, fsync, rename with retries. A save that still fails is
+// remembered by file name and shown on the dashboard through /health until
+// the next save of that file succeeds; before this a full disk, a locked
+// folder or a permissions change was one console line nobody saw while the
+// history, and with it tonight's count and the reprint list, silently went
+// nowhere. Returns true when the file is on disk.
+const dataSaveFailures = new Map();
+function saveFileAtomic(file, text, label = path.basename(file)) {
+  const tmp = file + '.tmp';
+  try {
+    const fd = fs.openSync(tmp, 'w');
+    try { fs.writeSync(fd, text, null, 'utf8'); fs.fsyncSync(fd); } finally { fs.closeSync(fd); }
+    renameWithRetrySync(tmp, file);
+    dataSaveFailures.delete(label);
+    return true;
+  } catch (e) {
+    try { fs.unlinkSync(tmp); } catch (_) { /* nothing to remove */ }
+    dataSaveFailures.set(label, { message: e.message, at: Date.now() });
+    console.warn(`[data] Could not save ${label}: ${e.message}`);
+    return false;
+  }
+}
+function dataSaveWarning() {
+  if (!dataSaveFailures.size) return null;
+  const names = [...dataSaveFailures.keys()].sort();
+  const first = dataSaveFailures.get(names[0]);
+  return {
+    type: 'dataSave',
+    message: `${names.join(', ')} could not be saved (${first.message}). Labels still print, but what ${names.length === 1 ? 'it records' : 'they record'} is being lost: check the data folder's disk space and permissions.`,
+  };
+}
+
 function writeConfigFile(next) {
   const tmp = CONFIG_FILE + '.tmp';
   const fd = fs.openSync(tmp, 'w');
@@ -243,11 +277,7 @@ try {
 function pushEventToBuffer(checkinEvent) {
   eventBuffer.push(checkinEvent);
   if (eventBuffer.length > EVENT_BUFFER_MAX) eventBuffer.splice(0, eventBuffer.length - EVENT_BUFFER_MAX);
-  try {
-    const tmp = EVENT_BUFFER_FILE + '.tmp';
-    fs.writeFileSync(tmp, JSON.stringify(eventBuffer), 'utf8');
-    fs.renameSync(tmp, EVENT_BUFFER_FILE);
-  } catch (e) { /* persistence is best-effort */ }
+  saveFileAtomic(EVENT_BUFFER_FILE, JSON.stringify(eventBuffer));
 }
 
 // ── Print-failure tracking ────────────────────────────────────────────────────
@@ -3121,11 +3151,7 @@ function loadAttendance() {
 }
 
 function saveAttendance(ledger) {
-  try {
-    const tmp = ATTENDANCE_FILE + '.tmp';
-    fs.writeFileSync(tmp, JSON.stringify(ledger), 'utf8');
-    fs.renameSync(tmp, ATTENDANCE_FILE);
-  } catch (e) { console.warn('[attendance] Failed to save ledger:', e.message); }
+  saveFileAtomic(ATTENDANCE_FILE, JSON.stringify(ledger));
 }
 
 // Upsert tonight for this kid. Returns:
@@ -3714,7 +3740,6 @@ app.post('/update-csv', (req, res) => {
     return res.status(400).json({ error: 'csv field is required (string)' });
   }
   const csvPath = CSV_FILE;
-  const tmpPath = csvPath + '.tmp';
 
   // Parse BEFORE writing. A sync that yields zero rows (login redirect, an
   // export format change, a truncated download) must not overwrite a roster
@@ -3726,19 +3751,14 @@ app.post('/update-csv', (req, res) => {
     return res.status(422).json({ error: 'CSV parsed to 0 rows — roster not replaced', count: clubbers.length });
   }
 
-  try {
-    // Atomic write: write to a temp file then rename over the target, so a
-    // crash or concurrent reader mid-write can never observe a truncated CSV.
-    fs.writeFileSync(tmpPath, csv, 'utf8');
-    fs.renameSync(tmpPath, csvPath);
-    clubbers = rows;
-    console.log(`[csv] Updated clubbers.csv from browser (${rows.length} clubber(s))`);
-    res.json({ ok: true, count: rows.length });
-  } catch (e) {
-    console.error('[csv] Failed to write clubbers.csv:', e.message);
-    fs.unlink(tmpPath, () => {});
-    res.status(500).json({ error: 'Failed to write CSV' });
+  // Atomic write: write to a temp file then rename over the target, so a
+  // crash or concurrent reader mid-write can never observe a truncated CSV.
+  if (!saveFileAtomic(csvPath, csv)) {
+    return res.status(500).json({ error: 'Failed to write CSV' });
   }
+  clubbers = rows;
+  console.log(`[csv] Updated clubbers.csv from browser (${rows.length} clubber(s))`);
+  res.json({ ok: true, count: rows.length });
 });
 
 // ── Label generation (returns PNG, no printing) ──────────────────────────────
@@ -4222,15 +4242,9 @@ function loadHistory() {
 }
 
 function saveHistory(entries) {
-  try {
-    // Atomic write — a crash mid-save must not corrupt the history JSON,
-    // which would break /history and reprints until manually deleted.
-    const tmpPath = HISTORY_FILE + '.tmp';
-    fs.writeFileSync(tmpPath, JSON.stringify(entries, null, 2), 'utf8');
-    fs.renameSync(tmpPath, HISTORY_FILE);
-  } catch (e) {
-    console.warn('[history] Failed to save print history:', e.message);
-  }
+  // Atomic write: a crash mid-save must not corrupt the history JSON, which
+  // would break /history and reprints until manually deleted.
+  saveFileAtomic(HISTORY_FILE, JSON.stringify(entries, null, 2));
 }
 
 // Does a history row refer to this child?
@@ -5850,13 +5864,7 @@ function loadLeaders() {
 }
 
 function saveLeaders(list) {
-  try {
-    const tmpPath = LEADERS_FILE + '.tmp';
-    fs.writeFileSync(tmpPath, JSON.stringify(list, null, 2), 'utf8');
-    fs.renameSync(tmpPath, LEADERS_FILE);
-  } catch (e) {
-    console.warn('[leaders] Failed to save remembered leaders:', e.message);
-  }
+  saveFileAtomic(LEADERS_FILE, JSON.stringify(list, null, 2));
 }
 
 /**
@@ -6609,11 +6617,7 @@ app.post('/reset-tonight', (req, res) => {
   if (ledgerTouched) saveAttendance(ledger);
 
   eventBuffer = [];
-  try {
-    const tmp = EVENT_BUFFER_FILE + '.tmp';
-    fs.writeFileSync(tmp, JSON.stringify(eventBuffer), 'utf8');
-    fs.renameSync(tmp, EVENT_BUFFER_FILE);
-  } catch (e) { console.warn('[reset] Could not persist emptied event buffer:', e.message); }
+  saveFileAtomic(EVENT_BUFFER_FILE, JSON.stringify(eventBuffer));
 
   // Drop the report too. "Tonight never happened" has to mean it on every
   // surface, and TwoTimTwo's report will go on listing those children for the
@@ -6703,11 +6707,7 @@ try {
 }
 
 function persistLobbySlides() {
-  try {
-    const tmp = LOBBY_SLIDES_FILE + '.tmp';
-    fs.writeFileSync(tmp, JSON.stringify(lobbySlides), 'utf8');
-    fs.renameSync(tmp, LOBBY_SLIDES_FILE);
-  } catch (e) { console.warn('[slides] Could not persist lobby deck:', e.message); }
+  saveFileAtomic(LOBBY_SLIDES_FILE, JSON.stringify(lobbySlides));
 }
 
 // Broadcast the CURRENT deck: every chunk of one publish shares its
@@ -6808,11 +6808,7 @@ try {
 }
 
 function persistDisplaySettings() {
-  try {
-    const tmp = DISPLAY_SETTINGS_FILE + '.tmp';
-    fs.writeFileSync(tmp, JSON.stringify(displaySettings), 'utf8');
-    fs.renameSync(tmp, DISPLAY_SETTINGS_FILE);
-  } catch (e) { console.warn('[settings] Could not persist display settings:', e.message); }
+  saveFileAtomic(DISPLAY_SETTINGS_FILE, JSON.stringify(displaySettings));
 }
 
 // Rebroadcasts reuse publishedAt byte-identically, like the deck's.
@@ -7615,6 +7611,9 @@ app.get('/health', async (req, res) => {
   // config.json could not be read at some point since this server started
   // (loadConfigFile): what was done about it, until a restart, so it is seen.
   if (configFileDamaged) warnings.push({ type: 'configDamaged', message: configFileDamaged });
+  // A data file whose last save failed (saveFileAtomic), until one succeeds.
+  const saveWarning = dataSaveWarning();
+  if (saveWarning) warnings.push(saveWarning);
   // Surface security misconfiguration where the operator already looks. A
   // silently loopback-only server looks identical to a broken phone page, and
   // "I turned on phone check-in and nothing happens" must not be a mystery.

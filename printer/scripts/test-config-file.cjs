@@ -79,6 +79,28 @@ const PORT = 34582;
     check('/health names the file to copy the PIN and keys back from', !!w && /must be set again/.test(w.message) && w.message.includes(aside[0]), JSON.stringify(w));
   }
 
+  console.log('\ndata files: a save that fails is a dashboard warning until one succeeds');
+  {
+    // A folder where the file should be: the rename over it fails, as a full
+    // disk or a locked folder would make it fail.
+    const bufferFile = path.join(dataDir, 'events-buffer.json');
+    try { fs.unlinkSync(bufferFile); } catch (_) { /* may not exist yet */ }
+    fs.mkdirSync(bufferFile);
+    const r = await post('/reset-tonight', { confirm: true });
+    check('the route still answers', r.status === 200, JSON.stringify(r));
+    let health = await get('/health');
+    let w = (health.warnings || []).find((x) => x && x.type === 'dataSave');
+    check('/health warns, as a {type, message} object, naming the file', !!w && typeof w.message === 'string' && w.message.includes('events-buffer.json'), JSON.stringify(health.warnings));
+    check('and says labels still print', !!w && /Labels still print/.test(w.message));
+    check('no .tmp is left behind', !fs.existsSync(`${bufferFile}.tmp`));
+    fs.rmdirSync(bufferFile);
+    await post('/reset-tonight', { confirm: true });
+    health = await get('/health');
+    w = (health.warnings || []).find((x) => x && x.type === 'dataSave');
+    check('the next good save clears it', !w, JSON.stringify(health.warnings));
+    check('and the file is there', fs.existsSync(bufferFile) && fs.statSync(bufferFile).isFile());
+  }
+
   console.log(`\n${passed} passed, ${failed} failed`);
   process.exit(failed ? 1 : 0);
 })().catch((e) => { console.error(e); process.exit(1); });
