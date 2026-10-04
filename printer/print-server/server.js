@@ -274,7 +274,21 @@ try {
   }
 } catch (e) { /* corrupt buffer — start fresh */ }
 
+// The recap is TONIGHT's check-ins. The buffer was filtered to today only
+// when it was restored at startup, so in a process that ran from one club
+// night into the next (the laptop is rarely restarted) last week's children
+// were replayed onto the screens all through the following evening until
+// the 50-entry cap pushed them out. Pure, so a test can hand it yesterday.
+function recapEntriesForTonight(buffer, today = localDayISO()) {
+  return (Array.isArray(buffer) ? buffer : []).filter((e) => e && typeof e.at === 'string' && isOnLocalDay(e.at, today));
+}
+function pruneEventBuffer() {
+  const kept = recapEntriesForTonight(eventBuffer);
+  if (kept.length !== eventBuffer.length) eventBuffer = kept;
+}
+
 function pushEventToBuffer(checkinEvent) {
+  pruneEventBuffer();
   eventBuffer.push(checkinEvent);
   if (eventBuffer.length > EVENT_BUFFER_MAX) eventBuffer.splice(0, eventBuffer.length - EVENT_BUFFER_MAX);
   saveFileAtomic(EVENT_BUFFER_FILE, JSON.stringify(eventBuffer));
@@ -6711,6 +6725,7 @@ function publishRecap() {
     // children of the night are silently missed before anything appears on the
     // wall. With it, a wrong key is on screen before the doors even open.
     // The consumer's handleRecap iterates `entries`, so [] is a clean no-op.
+    pruneEventBuffer();
     if (!eventBuffer.length && !events.getDisplayKeyState().configured) return;
     events.publish(pusher, EVENT_CHANNEL, 'recap', events.buildRecap(eventBuffer));
   } catch (e) { console.warn('[events] recap publish skipped:', e.message); }
@@ -9006,7 +9021,7 @@ module.exports = {
   lateGoToLine, scheduleRowFor, DEFAULT_SCHEDULE, recentAttendance,
   parseYesRelease, rosterConsentSummary, consentWarningFor,
   isSafePrinterName,
-  parseAllergies,
+  parseAllergies, recapEntriesForTonight,
   historyRowMatches, historyIdentityKey, distinctChildrenPrintedToday,
   reconcileHistoryWithReport, reportEntryIdentityKey, computeTonightStats,
   // "Is our count right?" — the pure comparison against TwoTimTwo's own

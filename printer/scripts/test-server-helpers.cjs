@@ -23,6 +23,7 @@ process.on('exit', (code) => {
 });
 
 
+const fs = require('fs');
 const path = require('path');
 
 const {
@@ -33,6 +34,7 @@ const {
   tonightCheckins, markManualUndo, clearManualUndo, computeTonightStats, isNonCheckinRow, splitFullName,
   trophyBandFor, TROPHY_BAND_MAX,
   lateGoToLine, scheduleRowFor, DEFAULT_SCHEDULE, applySavedConfig, recentAttendance,
+  recapEntriesForTonight,
 } = require(path.join(__dirname, '..', 'print-server', 'server.js'));
 
 const feeds = require(path.join(__dirname, '..', 'print-server', 'feeds.js'));
@@ -613,6 +615,25 @@ console.log('reconcileHistoryWithReport — R-1 undo detection: mark, decrement,
     const out = reconcileHistoryWithReport([], [], Date.parse(iso('19')));
     check('empty history + empty report changes nothing', out.changed === 0 && out.skipped === false);
   }
+}
+
+console.log('recapEntriesForTonight — the recap is tonight, never last week');
+{
+  const at = (iso) => new Date(iso + 'T19:00:00').toISOString();   // 7 pm local on that day
+  const buffer = [
+    { id: 'a', at: at('2026-10-07'), firstName: 'Ava' },
+    { id: 'b', at: at('2026-09-30'), firstName: 'Ben' },     // last club night
+    { id: 'c', at: at('2026-10-07'), firstName: 'Cal' },
+    { id: 'd', at: 'not a date', firstName: 'Dee' },
+    null,
+  ];
+  const tonight = recapEntriesForTonight(buffer, '2026-10-07');
+  check('only tonight\'s entries are replayed', tonight.map((e) => e.id).join(',') === 'a,c', JSON.stringify(tonight.map((e) => e.id)));
+  check('an entry with no readable time is dropped, not replayed forever', !tonight.some((e) => e.id === 'd'));
+  check('a buffer that is all tonight is untouched', recapEntriesForTonight(buffer.slice(0, 1), '2026-10-07').length === 1);
+  check('the day defaults to today', Array.isArray(recapEntriesForTonight([])));
+  const src = fs.readFileSync(path.join(__dirname, '..', 'print-server', 'server.js'), 'utf8');
+  check('publishRecap prunes before it publishes, and so does every push', /function publishRecap\(\) \{\s*try \{[\s\S]*?pruneEventBuffer\(\);[\s\S]*?buildRecap\(eventBuffer\)/.test(src) && /function pushEventToBuffer\(checkinEvent\) \{\s*pruneEventBuffer\(\);/.test(src));
 }
 
 console.log('isNonCheckinRow — one predicate for every non-check-in print');
