@@ -17,6 +17,7 @@ const ALLOWED = new Set([
   'src/hooks/useWakeLock.js',
   'src/hooks/useBuildReload.js',
   'src/lib/buildReload.js',
+  'src/lib/reloadLedger.js',
   'src/lib/weather.js',
   'src/lib/skins.js',
   'src/components/BirthdayArt.jsx',

@@ -1,25 +1,8 @@
 import { useEffect, useRef } from 'react';
-import { WATCHDOG_DISCONNECT_MIN, WATCHDOG_MAX_RELOADS_PER_HOUR } from '../lib/constants.js';
+import { WATCHDOG_DISCONNECT_MIN } from '../lib/constants.js';
+import { selfReload } from '../lib/reloadLedger.js';
 
-const RELOADS_KEY = 'awanaWatchdogReloads.v1';
 const CHECK_MS = 60 * 1000;
-
-function recentReloads() {
-  try {
-    const list = JSON.parse(sessionStorage.getItem(RELOADS_KEY)) || [];
-    return list.filter((t) => Number.isFinite(t) && Date.now() - t < 60 * 60 * 1000);
-  } catch {
-    return [];
-  }
-}
-
-function recordReload(list) {
-  try {
-    sessionStorage.setItem(RELOADS_KEY, JSON.stringify([...list, Date.now()]));
-  } catch {
-    /* storage blocked — the reload still happens, just uncounted */
-  }
-}
 
 /**
  * Kiosk self-heal: a display that runs unattended for days can wedge in
@@ -54,14 +37,11 @@ export function useWatchdogReload(status, watchdogReloadMin = WATCHDOG_DISCONNEC
       const downSince = downSinceRef.current;
       if (!downSince) return;
       if (Date.now() - downSince < watchdogReloadMin * 60 * 1000) return;
-      const list = recentReloads();
-      if (list.length >= WATCHDOG_MAX_RELOADS_PER_HOUR) return;
-      recordReload(list);
       // The clock starts over: a reload the browser did not carry out is
       // asked for again only after another full stretch, and the hourly cap
-      // still bounds it.
+      // (shared with the crash boundary, reloadLedger) still bounds it.
       downSinceRef.current = Date.now();
-      window.location.reload();
+      selfReload();
     }, CHECK_MS);
     return () => clearInterval(timer);
   }, [watchdogReloadMin]);

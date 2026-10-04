@@ -11,6 +11,7 @@ import { useSchedule } from './hooks/useSchedule.js';
 import { useRealtime } from './hooks/useRealtime.js';
 import { useWakeLock } from '../hooks/useWakeLock.js';
 import { useBuildReload } from '../hooks/useBuildReload.js';
+import { selfReload } from '../lib/reloadLedger.js';
 import { projectorIdle } from '../lib/buildReload.js';
 import { ViewErrorBoundary, ErrorScreen } from './components/ViewErrorBoundary.jsx';
 import { AwanaMark } from './components/AwanaMark.jsx';
@@ -234,17 +235,29 @@ const ActiveView = ({ state, now, tally, meetingTheme, onSelect, firstGameIndex,
   }
 };
 
-/** Last-resort boundary (per-view boundaries catch view crashes first). */
+/**
+ * Last-resort boundary (per-view boundaries catch view crashes first). A
+ * wall nobody is standing at cannot press Reload, so after ten seconds it
+ * reloads itself, under the hourly cap every self-reload on either page
+ * shares (src/lib/reloadLedger.js), so a crash that comes straight back
+ * cannot spin the projector.
+ */
 export class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
     this.state = { hasError: false, error: null };
+    this.timer = null;
   }
   static getDerivedStateFromError(error) {
     return { hasError: true, error };
   }
   componentDidCatch(error, errorInfo) {
     console.error('Uncaught error:', error, errorInfo);
+    if (this.timer) clearTimeout(this.timer);
+    this.timer = setTimeout(() => { this.timer = null; selfReload(); }, 10_000);
+  }
+  componentWillUnmount() {
+    if (this.timer) clearTimeout(this.timer);
   }
   render() {
     if (this.state.hasError) {

@@ -22,6 +22,7 @@ import '@fontsource-variable/nunito';
 import '@fontsource-variable/oswald';
 import '@fontsource/lilita-one';
 import App from './App.jsx';
+import { RootErrorBoundary } from './components/RootErrorBoundary.jsx';
 import './styles/app.css';
 
 // Jelly UI web components (<jelly-theme>, <jelly-button>, …), vendored
@@ -45,8 +46,10 @@ if (import.meta.env.PROD && 'serviceWorker' in navigator) {
 // layout-neutral, paints nothing — so the signage stage is unaffected.
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <jelly-theme mode="auto">
-      <App />
-    </jelly-theme>
+    <RootErrorBoundary>
+      <jelly-theme mode="auto">
+        <App />
+      </jelly-theme>
+    </RootErrorBoundary>
   </React.StrictMode>,
 );
