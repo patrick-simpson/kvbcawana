@@ -589,6 +589,25 @@
     return out;
   }
 
+  // Did TwoTimTwo record the check-in? Its answer to POST /clubber/checkinclubber
+  // is the short #lastCheckin snippet naming the child (docs/TWOTIMTWO.md §2.3).
+  // Until 7.11.0 the test was "the child's first name appears in the reply",
+  // which a whole page passes too: a refused post, a signed-out session or a
+  // redirect answered with the check-in page (every name on the roster) or
+  // the login form, and the extension hid the row, printed the label and told
+  // the phone the child was in (green) while TwoTimTwo had nothing. So: a
+  // snippet, never a page, never the login form or the bare "Login Required"
+  // the AJAX endpoints answer with when signed out, and it names the child.
+  function checkinReplyOk(text, childName) {
+    var CHECKIN_REPLY_MAX = 4000;   // a snippet; the check-in page itself is far larger
+    var t = typeof text === 'string' ? text.trim() : '';
+    if (!t || t.length > CHECKIN_REPLY_MAX) return false;
+    if (/<!doctype|<html[\s>]|<head[\s>]|<body[\s>]/i.test(t)) return false;
+    if (t === 'Login Required' || /name=["']LoginForm\[/.test(t) || /type=["']password["']/i.test(t)) return false;
+    var first = (childName || '').trim().split(/\s+/)[0] || '';
+    return !!first && t.toLowerCase().indexOf(first.toLowerCase()) !== -1;
+  }
+
   // POSTs the real check-in directly. Resolves true only once the row has
   // actually vanished from the roster (the same success signal the
   // click-and-poll path uses) — a truthy HTTP response alone isn't trusted.
@@ -618,10 +637,7 @@
       if (!r.ok) return false;
       return r.text();
     }).then(function(text) {
-      if (!text) return false;
-      var firstName = (childName || '').trim().split(/\s+/)[0] || '';
-      var ok = firstName ? text.indexOf(firstName) !== -1 : true;
-      if (!ok) return false;
+      if (!checkinReplyOk(text, childName)) return false;
       // Drop the row ourselves. TwoTimTwo removes a checked-in child's row from
       // its own AJAX success handler — which never runs here, because posting
       // directly is the whole point of this path. Without this the row stays
@@ -4744,8 +4760,7 @@
     }).then(function(r) {
       if (!r.ok) return 'http-' + r.status;
       return r.text().then(function(text) {
-        var first = (name || '').trim().split(/\s+/)[0] || '';
-        if (first && String(text || '').toLowerCase().indexOf(first.toLowerCase()) === -1) return 'no-confirm';
+        if (!checkinReplyOk(text, name)) return 'no-confirm';
         // What TwoTimTwo's own success handler does: mark the row checked in
         // and hide it (its name filter and undo both expect the row to stay).
         var row = rowByRecid(recid);
