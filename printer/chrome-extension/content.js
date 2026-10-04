@@ -312,6 +312,15 @@
     } catch (e) { /* ignore quota errors */ }
   }
 
+  function unmarkPrinted(name, recid) {
+    if (!name || !name.trim()) return;
+    printedNames.delete(resolveIdentityKey(name, recid));
+    printedNames.delete('nm:' + nameKeyOf(name));
+    try {
+      sessionStorage.setItem(REMOTE_PRINTED_KEY, JSON.stringify(Array.from(printedNames)));
+    } catch (e) { /* ignore quota errors */ }
+  }
+
   function isUndo(text) {
     return text && text.toLowerCase().includes('undo');
   }
@@ -464,6 +473,14 @@
     var q = getQueue();
     q.push(payload);
     saveQueue(q);
+    // The label did NOT print, so "printed" is withdrawn. Every detection path
+    // marks a child printed before doPrint, and flushQueue rightly drops a
+    // queued item whose child is marked printed; with the mark left standing,
+    // every label queued while the print server was down was dropped the
+    // moment it came back, silently (7.11.1). Whichever print really goes
+    // through marks the child again, and the queued copy is then the one
+    // dropped.
+    if (payload && payload.name) unmarkPrinted(payload.name, payload.clubberId);
     console.log('[Awana] Queued print for later (' + q.length + ' in queue)');
   }
   function flushQueue() {
