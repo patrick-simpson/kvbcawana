@@ -23,16 +23,28 @@ the first release of each must go out from the old repo once more, built from
 this repo's folder. That one release is the bridge: it points every later
 update at awana.kvbchurch.org/updates/.
 
-1. **Printer 6.22.0.** Bump `printer/` (`node scripts/bump-version.cjs 6.22.0`
-   in `printer/`, lockfiles, changes.md), push here, run
-   **Release Club Label Printer** (`printer-release.yml`, version 6.22.0): the
-   feed on the site now names 6.22.0. Then push the same code to the old repo
-   (`git subtree split --prefix=printer` → Print-TwoTimTwo-Labels `main`) and
-   dispatch its `create-release-tag.yml` with 6.22.0, so installed 6.21.0
-   laptops update to it.
-2. **Sound room app 1.1.0.** The same with `lobby/desktop/` (its site is now
-   awana.kvbchurch.org/lobby/): `desktop-release.yml` here, then the old
-   repo's `create-desktop-release.yml` from `git subtree split --prefix=lobby`.
+**Pick the bridge versions first.** electron-updater never downgrades, and
+this repo's release workflows now refuse a feed that does not move forward.
+So each bridge version must be above ALL of: what the machines have installed
+(the printer dashboard's version; the sound room app's tray), the old repo's
+latest release, and what this site's feed already names
+(`site/updates/printer/latest.yml`, `site/updates/lobby/lobby.yml`; on
+2026-10-04 those were 7.11.0 and 1.1.0, and the tag `desktop-v1.1.0` already
+exists here, so the sound room bridge is at least 1.1.1). An earlier draft of
+this page named 6.22.0 and 1.1.0: following it would have moved the printer
+feed backwards and stopped every updated laptop from updating. Below, P and S
+are the versions you picked.
+
+1. **Printer P.** Bump `printer/` (`node scripts/bump-version.cjs P` in
+   `printer/`, lockfiles, changes.md), push here, run **Release Club Label
+   Printer** (`printer-release.yml`, version P): the feed on the site now
+   names P. Then push the same code to the old repo (`git subtree split
+   --prefix=printer` → Print-TwoTimTwo-Labels `main`) and dispatch its
+   `create-release-tag.yml` with P, so the installed laptops update to it.
+2. **Sound room app S.** The same with `lobby/desktop/` (its site is now
+   awana.kvbchurch.org/lobby/): bump `lobby/desktop/package.json` to S (and
+   its lockfile), `desktop-release.yml` here, then the old repo's
+   `create-desktop-release.yml` from `git subtree split --prefix=lobby`.
 
 Both install themselves when nothing is on screen.
 
@@ -40,9 +52,9 @@ Both install themselves when nothing is on screen.
 
 | Where | What |
 | --- | --- |
-| **Check-in laptop, first** | Printer app updates to 6.22.0 (or download it from awana.kvbchurch.org/download/club-label-printer). Dashboard → Settings → **Sync service** → type the passphrase → Sign in. |
+| **Check-in laptop, first** | Printer app updates to P (or download it from awana.kvbchurch.org/download/club-label-printer). Dashboard → Settings → **Sync service** → type the passphrase → Sign in. |
 | **Each lobby TV** (browser) | Open **awana.kvbchurch.org/lobby/**, gear → Settings → Setup → type the passphrase. Set it as the browser's start page / kiosk URL. |
-| **Sound room PC** | The app updates to 1.1.0 and opens awana.kvbchurch.org/lobby/ by itself. Tray → *Set up on this screen* → type the passphrase once. |
+| **Sound room PC** | The app updates to S and opens awana.kvbchurch.org/lobby/ by itself. Tray → *Set up on this screen* → type the passphrase once. |
 | **Projector PC** | Open **awana.kvbchurch.org/projector**, menu → Display Settings → type the passphrase. |
 | **Journey Pi** | Change the kiosk URL to **awana.kvbchurch.org/journey/** (`journey/PI_SETUP.md`, the autostart line), reboot, Settings → Sync → passphrase. |
 | **OBS / ProPresenter** | Browser source URL: `https://awana.kvbchurch.org/lobby/?passphrase=kennebec` (add `&key=…` flags as before). |
