@@ -67,6 +67,18 @@ const SEALED = new Set(ENCRYPTED_EVENTS);
 /** The live channel's keep-alive, and its reconnect backoff in seconds. */
 const LIVE_PING_MS = 25 * 1000;
 const LIVE_BACKOFF_SEC = [1, 2, 5, 10, 30];
+/**
+ * Liveness. A socket that has heard nothing (no frame, no pong) for this long
+ * is dead whatever its readyState says: after a Wi-Fi roam, a router reboot or
+ * a NAT drop the TCP side can stay half-open for many minutes, with every ping
+ * sent into a buffer and the screen reading "connected" while check-ins go
+ * missing. Pusher-js carried its own activity timeout; this is the live
+ * channel's. Two ping periods plus a margin, so one lost pong is forgiven.
+ * And a socket that has not opened within LIVE_CONNECT_MS is dropped the same
+ * way, rather than sitting in CONNECTING for the browser's own long timeout.
+ */
+const LIVE_DEAD_MS = 2 * LIVE_PING_MS + 10 * 1000;
+const LIVE_CONNECT_MS = 10 * 1000;
 
 /** Consecutive decrypt failures before a screen admits it cannot read names. */
 const UNREADABLE_AFTER = 2;
@@ -375,16 +387,35 @@ export function useSocket(handlers) {
       if (!session) { setSocketStatus('disconnected'); return; }
       setSocketStatus('connecting');
       let opened = false;
+      let lastRx = Date.now();
       const sock = new WebSocket(`${base}/v1/live?session=${encodeURIComponent(session)}`);
       ws = sock;
+      // Our own verdict on a socket the browser still calls open (or still
+      // connecting): detach it, close it, and take the close path ourselves,
+      // because a half-open socket's close() may not report back for minutes.
+      const drop = (why) => {
+        if (ws !== sock) return;
+        console.warn(`[live] ${why}; reconnecting`);
+        sock.onopen = null; sock.onmessage = null; sock.onerror = null;
+        const onclose = sock.onclose;
+        sock.onclose = null;
+        try { sock.close(4000, why); } catch { /* already gone */ }
+        onclose?.({ code: 4000 });
+      };
+      const connectTimer = setTimeout(() => { if (!opened) drop('the live channel did not open in time'); }, LIVE_CONNECT_MS);
       sock.onopen = () => {
         opened = true;
         attempts = 0;
+        lastRx = Date.now();
         setSocketStatus('connected');
         setRetry(null);
-        ping = setInterval(() => { try { sock.send('ping'); } catch { /* closing */ } }, LIVE_PING_MS);
+        ping = setInterval(() => {
+          if (Date.now() - lastRx > LIVE_DEAD_MS) { drop('the live channel fell silent'); return; }
+          try { sock.send('ping'); } catch { /* closing */ }
+        }, LIVE_PING_MS);
       };
       sock.onmessage = (m) => {
+        lastRx = Date.now();
         if (typeof m.data !== 'string' || m.data === 'pong') return;
         let frame;
         try { frame = JSON.parse(m.data); } catch { return; }
@@ -394,6 +425,7 @@ export function useSocket(handlers) {
         fn?.(frame.d);
       };
       sock.onclose = (ev) => {
+        clearTimeout(connectTimer);
         if (ping) { clearInterval(ping); ping = null; }
         if (ws === sock) ws = null;
         if (closed) return;

@@ -29,7 +29,7 @@ class FakeSocket {
     sockets.push(this);
   }
   send(data) { this.sent.push(data); }
-  close(code = 1000) { this.onclose?.({ code }); }
+  close(code = 1000) { this.closed = code; this.onclose?.({ code }); }
   /** test helpers */
   openNow() { this.onopen?.(); }
   frame(e, d) { this.onmessage?.({ data: JSON.stringify({ e, d }) }); }
@@ -155,6 +155,49 @@ describe('the live channel replaces Pusher once a screen is signed in', () => {
       act(() => sockets[0].close(1006));
       expect(result.current.status).toBe('disconnected');
       expect(result.current.retry).toEqual({ attempts: 1, delaySec: 1 });
+      act(() => { vi.advanceTimersByTime(1000); });
+      expect(sockets).toHaveLength(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('drops a socket that falls silent, even one the browser still calls open', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'setInterval', 'clearTimeout', 'clearInterval', 'Date'] });
+    try {
+      signedIn();
+      const { result } = renderHook(() => useSocket({}));
+      await vi.waitFor(() => expect(sockets).toHaveLength(1));
+      act(() => sockets[0].openNow());
+      // Pongs keep it alive for as long as they come.
+      act(() => { vi.advanceTimersByTime(25000); sockets[0].onmessage({ data: 'pong' }); });
+      act(() => { vi.advanceTimersByTime(25000); sockets[0].onmessage({ data: 'pong' }); });
+      act(() => { vi.advanceTimersByTime(25000); });
+      expect(sockets[0].sent.filter((s) => s === 'pong' || s === 'ping')).toHaveLength(3);
+      expect(sockets).toHaveLength(1);
+      expect(result.current.status).toBe('connected');
+      // Then the Wi-Fi roams: nothing comes back. Two ping periods and a margin later it is dropped.
+      act(() => { vi.advanceTimersByTime(25000); });
+      act(() => { vi.advanceTimersByTime(25000); });
+      expect(sockets[0].closed).toBe(4000);
+      expect(result.current.status).toBe('disconnected');
+      act(() => { vi.advanceTimersByTime(1000); });
+      expect(sockets).toHaveLength(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('drops a socket that never opens, instead of waiting on the browser', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'setInterval', 'clearTimeout', 'clearInterval', 'Date'] });
+    try {
+      signedIn();
+      const { result } = renderHook(() => useSocket({}));
+      await vi.waitFor(() => expect(sockets).toHaveLength(1));
+      expect(result.current.status).toBe('connecting');
+      act(() => { vi.advanceTimersByTime(10000); });
+      expect(sockets[0].closed).toBe(4000);
+      expect(result.current.status).toBe('disconnected');
       act(() => { vi.advanceTimersByTime(1000); });
       expect(sockets).toHaveLength(2);
     } finally {
