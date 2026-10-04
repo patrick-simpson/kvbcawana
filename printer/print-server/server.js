@@ -8352,6 +8352,12 @@ app.post('/phone/checkin', (req, res) => {
   // PIN already verified by the auth gate for every non-loopback caller.
   const name = String((req.body && req.body.name) || '').trim().slice(0, 80);
   if (!name) return res.status(400).json({ error: 'name is required' });
+  // The dashboard's "Allow driven check-ins" switch. Off, the check-in page
+  // never collects these, so a phone used to wait 90 s and hear "the laptop
+  // is not answering"; it now hears what is really wrong, at once.
+  if (config.enableDrivenCheckin === false) {
+    return res.status(409).json({ error: 'Phone check-ins are turned off on the check-in laptop (printer dashboard → Settings → "Allow driven check-ins").' });
+  }
   // Bible / Brought a friend from the phone's card (7.7.0): booleans only, and
   // only the two the laptop knows how to tick.
   const o = (req.body && req.body.options) || {};

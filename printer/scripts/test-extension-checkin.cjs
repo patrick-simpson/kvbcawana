@@ -118,6 +118,29 @@ console.log('\nextension check-in tokens: a fresh meeting id before every direct
       && direct.split('driveCheckinDirect(').length === 3);
     check('touchCheckin (the touch screen) starts from a fresh meeting id too', /ensureFreshCheckinTokens\(\)\.then/.test(extractFunction('touchCheckin')));
 
+
+    console.log('\nextension phone check-in: the green line comes from TwoTimTwo\'s report');
+    {
+      const reportHasCheckin = new Function('nameKeyOf',
+        extractFunction('reportHasCheckin') + '; return reportHasCheckin;')(
+        new Function(extractFunction('nameKeyOf') + '; return nameKeyOf;')());
+      const report = [{ clubberId: '4821', name: 'Ava Stone', club: 'Sparks' }, { clubberId: '77', name: 'Mia  Lee', club: 'T&T' }];
+      check('the child is on the report by TwoTimTwo id', reportHasCheckin(report, '4821', 'Someone Else') === true);
+      check('the child is on the report by name when the row had no id', reportHasCheckin(report, null, 'ava stone') === true);
+      check('spacing in the report name does not matter', reportHasCheckin(report, null, 'Mia Lee') === true);
+      check('a child not on the report is not checked in', reportHasCheckin(report, '9', 'Eli Stone') === false);
+      check('an empty report is "not checked in", not "unknown"', reportHasCheckin([], '4821', 'Ava Stone') === false);
+      check('an unreadable report is unknown (null), never a yes', reportHasCheckin(null, '4821', 'Ava Stone') === null && reportHasCheckin(undefined, '4821', 'Ava Stone') === null);
+
+      const exec = extractFunction('executePhoneAction');
+      check('the phone executor reports success only through the report check', !/reportPhoneAction\(action\.id, true, ''\)/.test(exec.replace(extractFunction('reportDone'), '')) && /confirmCheckinOnReport\(recid, action\.name\)/.test(extractFunction('reportDone')));
+      check('a printed child whose row is still on the page is driven, not reported "already in"',
+        exec.indexOf('var el = findClubberElByName(action.name);') < exec.indexOf("'Already checked in at this station'")
+        && /if \(isPrinted\(action\.name\)\) reportPhoneAction\(action\.id, true, 'Already checked in at this station'\)/.test(exec));
+      check('when the report has no record the row comes back and the phone hears why',
+        /row\.classList\.remove\('checked-in'\); row\.style\.display = ''/.test(extractFunction('reportDone'))
+        && /TwoTimTwo did not record the check-in/.test(extractFunction('reportDone')));
+    }
     __suiteFinished = true;
     console.log(`\n${passed} passed, ${failed} failed`);
     process.exit(failed ? 1 : 0);

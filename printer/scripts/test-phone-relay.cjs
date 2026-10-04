@@ -81,6 +81,19 @@ const PORT = 34575;
     check('a GET (Printer jammed available?) works too', r.body.status === 200 && typeof r.body.body.available === 'boolean', JSON.stringify(r.body));
   }
 
+  console.log('\nphone relay: the driven check-in switch');
+  {
+    const cfg = (body) => fetch(`${localBase}/config`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    check('the switch can be turned off from this computer', (await cfg({ enableDrivenCheckin: false })).ok);
+    const id = (await svc('POST', '/v1/relay', { method: 'POST', path: '/phone/checkin', body: { name: 'Eli Stone' } }, session)).body.id;
+    await relay.relayOnce({ base: 'x', session, localBase, syncRequest });
+    const r = await svc('GET', `/v1/relay/result?id=${id}`, undefined, session);
+    check('with it off a phone check-in is refused at once, saying why', r.body.done && r.body.status === 409 && /turned off on the check-in laptop/.test(r.body.body && r.body.body.error), JSON.stringify(r.body));
+    const pending = await (await fetch(`${localBase}/pending-actions`)).json();
+    check('and nothing is queued for the check-in page', !(pending.actions || []).some((x) => x.name === 'Eli Stone'), JSON.stringify(pending));
+    check('the switch goes back on', (await cfg({ enableDrivenCheckin: true })).ok);
+  }
+
   console.log('\nphone relay: the loop');
   {
     const r = await relay.relayOnce({ base: 'x', session: 'v1.1.1.nope', localBase, syncRequest });

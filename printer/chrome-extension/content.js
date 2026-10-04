@@ -4203,32 +4203,83 @@
     }).catch(function() {});
   }
 
+  // Does TwoTimTwo's own check-in report list this child tonight? The only
+  // answer a phone is given a green line for (7.11.0). The direct post's reply
+  // and the row vanishing are this station's READING of a reply; the report is
+  // TwoTimTwo's record, and once the two disagreed: the phone said checked in,
+  // the label printed, and TwoTimTwo had nothing. Matched by the child's
+  // TwoTimTwo id when the row carried one, else by name. null: the report
+  // could not be read (signed out, network), so nothing is known either way.
+  function reportHasCheckin(entries, recid, name) {
+    if (!Array.isArray(entries)) return null;
+    var id = recid ? String(recid) : '';
+    var key = nameKeyOf(name);
+    for (var i = 0; i < entries.length; i++) {
+      var e = entries[i] || {};
+      if (id && String(e.clubberId || '') === id) return true;
+      if (key && nameKeyOf(e.name) === key) return true;
+    }
+    return false;
+  }
+
+  // Read the report; on an unreadable report read it once more a moment
+  // later, and only then trust the reply already judged (checkinReplyOk, a
+  // fresh meeting id) rather than fail a check-in TwoTimTwo may well have.
+  function confirmCheckinOnReport(recid, name) {
+    return fetchCheckinReport().then(function(entries) {
+      var has = reportHasCheckin(entries, recid, name);
+      if (has !== null) return has;
+      return new Promise(function(r) { setTimeout(r, 2000); })
+        .then(function() { return fetchCheckinReport(); })
+        .then(function(again) { var h = reportHasCheckin(again, recid, name); return h === null ? true : h; });
+    });
+  }
+
   function executePhoneAction(action) {
     if (phoneActionsInFlight.has(action.id)) return;
     phoneActionsInFlight.add(action.id);
     var nameKey = action.name.toLowerCase().trim();
 
-    if (isPrinted(action.name)) {
-      reportPhoneAction(action.id, true, 'Already checked in at this station');
-      return;
-    }
     var el = findClubberElByName(action.name);
     if (!el) {
-      reportPhoneAction(action.id, false, 'Kid not on the check-in page (already in, or filtered)');
+      // No row to check in. TwoTimTwo hides a row it has checked in, so a
+      // child this station already printed is in; otherwise the page is
+      // filtered or the name differs, and the desk has to look.
+      if (isPrinted(action.name)) reportPhoneAction(action.id, true, 'Already checked in at this station');
+      else reportPhoneAction(action.id, false, 'Kid not on the check-in page (already in, or filtered)');
       return;
     }
+    // A row still on the page is NOT checked in, printed label or not (a
+    // label printed for a check-in TwoTimTwo never recorded is exactly the
+    // case this path must repair), so the check-in is driven either way; the
+    // label's own dedup stops a second print.
     console.log('[Awana] Phone check-in: driving ' + action.name);
     phoneNamesInFlight.add(nameKey);
     var recid = el.getAttribute('recid');
     var clubId = el.getAttribute('club_id');
+
+    // The green line: TwoTimTwo's report lists the child. If it does not, the
+    // row this station hid comes back for the desk, and the phone hears why.
+    function reportDone() {
+      confirmCheckinOnReport(recid, action.name).then(function(has) {
+        if (has) {
+          reportPhoneAction(action.id, true, '');
+          setTimeout(function() { phoneNamesInFlight.delete(nameKey); }, 15000);
+          return;
+        }
+        var row = recid ? document.querySelector('.clubber[recid="' + String(recid).replace(/[^0-9A-Za-z_-]/g, '') + '"]') : null;
+        if (row) { row.classList.remove('checked-in'); row.style.display = ''; }
+        phoneNamesInFlight.delete(nameKey);
+        reportPhoneAction(action.id, false, 'TwoTimTwo did not record the check-in. Check in at the desk.');
+      });
+    }
 
     // Success = the row vanishes (TwoTimTwo removes checked-in kids).
     function verifyAndReport() {
       var deadline = Date.now() + 25000;
       (function verify() {
         if (!findClubberElByName(action.name)) {
-          reportPhoneAction(action.id, true, '');
-          setTimeout(function() { phoneNamesInFlight.delete(nameKey); }, 15000);
+          reportDone();
           return;
         }
         if (Date.now() > deadline) {
@@ -4246,11 +4297,7 @@
     if (action.options && typeof action.options.Bible === 'boolean') phoneOpts.Bible = action.options.Bible;
     if (action.options && typeof action.options.Friend === 'boolean') phoneOpts.Friend = action.options.Friend;
     tryDirectCheckin(recid, action.name, clubId, phoneOpts).then(function(ok) {
-      if (ok) {
-        reportPhoneAction(action.id, true, '');
-        setTimeout(function() { phoneNamesInFlight.delete(nameKey); }, 15000);
-        return;
-      }
+      if (ok) { reportDone(); return; }
       if (window.__awanaTouchOpen) {
         // The touch screen covers the page: a modal opened now would sit
         // behind it, unseen (the 7.4 freeze). Say so instead.
