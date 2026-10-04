@@ -272,10 +272,38 @@ function openLobby() {
       retryTimer = setTimeout(() => { if (lobby && !lobby.isDestroyed()) lobby.loadURL(PAGE_URL); }, RETRY_LOAD_MS);
     }
   });
-  wc.on('render-process-gone', (_e, details) => {
-    log('page crashed', details);
-    setTimeout(() => { if (lobby && !lobby.isDestroyed()) lobby.loadURL(PAGE_URL); }, 3000);
+  // A crashed page is reloaded after a short wait, then longer waits: a page
+  // that dies the moment it loads (a bad deploy, a GPU fault) used to be
+  // reloaded every 3 s for ever. After three crashes in a row the offline
+  // card takes the screen and its 30 s retry carries on. A page that HANGS
+  // (not a crash: the renderer is up and answering nothing) is given 20 s
+  // and then reloaded the same way; a frozen page used to sit there all
+  // evening, since nothing watched for it.
+  const crashes = [];
+  const reloadAfterCrash = (why, details) => {
+    const t = Date.now();
+    while (crashes.length && t - crashes[0] > 10 * 60 * 1000) crashes.shift();
+    crashes.push(t);
+    log(why, details, `(${crashes.length} in the last 10 minutes)`);
+    if (crashes.length >= 3) {
+      wc.loadFile(path.join(HERE, 'static', 'offline.html')).catch(() => {});
+      clearTimeout(retryTimer);
+      retryTimer = setTimeout(() => { if (lobby && !lobby.isDestroyed()) lobby.loadURL(PAGE_URL); }, RETRY_LOAD_MS);
+      return;
+    }
+    const wait = 3000 * crashes.length;
+    setTimeout(() => { if (lobby && !lobby.isDestroyed()) lobby.loadURL(PAGE_URL); }, wait);
+  };
+  wc.on('render-process-gone', (_e, details) => reloadAfterCrash('page crashed', details));
+  let hungTimer = null;
+  wc.on('unresponsive', () => {
+    clearTimeout(hungTimer);
+    hungTimer = setTimeout(() => {
+      hungTimer = null;
+      if (lobby && !lobby.isDestroyed()) reloadAfterCrash('page hung for 20 s', {});
+    }, 20_000);
   });
+  wc.on('responsive', () => { clearTimeout(hungTimer); hungTimer = null; });
   // The page's own double-click fullscreen can leave the window part of it
   // behind when it ends; put the lobby back where it belongs.
   lobby.on('leave-html-full-screen', () => setTimeout(place, 50));
@@ -295,7 +323,11 @@ function openLobby() {
     saveState();
     log('closed by hand: hidden until the next club night');
   });
+  const thisWindow = lobby;
   lobby.on('closed', () => {
+    // A stale 'closed' from a window already replaced (Hide, then Show at
+    // once) must not drop the reference to the live one.
+    if (lobby !== thisWindow) return;
     lobby = null;
     placedAs = null;
     updateTray();
@@ -388,10 +420,22 @@ function evaluate() {
 let tickTimer = null;
 function scheduleTick() {
   clearTimeout(tickTimer);
-  // On the minute (plus a hair), so 5:00 and 8:00 land on time.
+  // On the minute (plus a hair), so 5:00 and 8:00 land on time. The next tick
+  // is armed BEFORE the rule runs: a throw inside evaluate() (a window that
+  // vanished mid-call, a display that unplugged) used to end the schedule for
+  // good, so the lobby never opened or closed again until the app restarted.
   const ms = 60_000 - (now().getTime() % 60_000) + 150;
-  tickTimer = setTimeout(() => { evaluate(); scheduleTick(); }, ms);
+  tickTimer = setTimeout(() => {
+    scheduleTick();
+    try { evaluate(); } catch (err) { log('evaluate failed', err); }
+  }, ms);
 }
+
+// An uncaught error in the main process would otherwise put Electron's modal
+// error dialog on the lobby TV. Log it and carry on; the schedule above and
+// the window's own reload path do the recovering.
+process.on('uncaughtException', (err) => { log('uncaught exception', err); });
+process.on('unhandledRejection', (reason) => { log('unhandled rejection', reason instanceof Error ? reason : new Error(String(reason))); });
 
 /* ── Choosing the monitor ──────────────────────────────────────────── */
 
