@@ -115,6 +115,31 @@ describe('useBuildReload', () => {
     expect(reloadPage).toHaveBeenCalledTimes(1);
   });
 
+  it('a deploy that lands while the screen waits is taken, not waited out forever', async () => {
+    const THIRD = 'cccccccccccc';
+    let version = versionBody(NEXT);
+    let html = htmlFor(OWN);
+    const fetchImpl = vi.fn((url) => Promise.resolve({
+      ok: true,
+      text: () => Promise.resolve(String(url).startsWith('version.json') ? version : html),
+    }));
+    vi.stubGlobal('fetch', fetchImpl);
+    let busy = true;
+
+    render(<Harness isBusy={() => busy} />);
+    // NEXT is noticed; the screen is busy, so it waits.
+    await vi.advanceTimersByTimeAsync(BUILD_CHECK_MS + BUILD_BUSY_RECHECK_MS * 3);
+    expect(reloadPage).not.toHaveBeenCalled();
+    // Meanwhile a third build deploys and the CDN serves it.
+    version = versionBody(THIRD);
+    html = htmlFor(THIRD);
+    await vi.advanceTimersByTimeAsync(BUILD_BUSY_RECHECK_MS * 3);
+    expect(reloadPage).not.toHaveBeenCalled();   // still busy
+    busy = false;
+    await vi.advanceTimersByTimeAsync(BUILD_BUSY_RECHECK_MS + 100);
+    expect(reloadPage).toHaveBeenCalledTimes(1);
+  });
+
   it('holds the reload while the screen is busy and takes it when the room is free', async () => {
     const fetchImpl = serve({ version: versionBody(NEXT), html: htmlFor(NEXT) });
     vi.stubGlobal('fetch', fetchImpl);

@@ -74,7 +74,16 @@ export function useBuildReload(isBusy) {
       if (busy()) return;
 
       const deployed = buildFromHtml(await probe(window.location.pathname));
-      if (cancelled || deployed !== pending) return;
+      if (cancelled || !deployed || deployed === own) return;   // the CDN still serves ours (or nothing readable): wait
+      if (deployed !== pending) {
+        // A later deploy landed while this screen waited (every push to main
+        // deploys, and two in one evening is routine). The HTML already
+        // carries that newer build, so it is the one to reload into; waiting
+        // for the HTML to match the build first noticed meant waiting
+        // forever.
+        console.warn(`[build] build ${deployed} overtook ${pending} while this screen waited`);
+        pending = deployed;
+      }
 
       // Fetching the HTML takes long enough for a check-in to land, so ask once
       // more rather than reloading over a banner that started while we waited.
