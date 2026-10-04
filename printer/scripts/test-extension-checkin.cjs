@@ -93,6 +93,18 @@ check('postTouchCheckin (the touch screen) judges its reply with checkinReplyOk'
 check('no direct-post path still trusts "the first name appears in the reply"',
   !/text\.indexOf\(firstName\)/.test(SRC) && !/indexOf\(first\.toLowerCase\(\)\) === -1\) return 'no-confirm'/.test(SRC));
 
+console.log('\nextension undo detection: the word, never a substring of a name');
+{
+  const isUndo = new Function(extractFunction('isUndo') + '; return isUndo;')();
+  check('"(checkin undone)" after a name is an undo', isUndo('Ava Stone (checkin undone)') === true);
+  check('the undo link\'s own word is an undo', isUndo('undo') === true && isUndo('Ava Stone undo') === true);
+  check('case does not matter', isUndo('Ava Stone (Checkin UNDONE)') === true);
+  check('Mundo is a name, not an undo', isUndo('Mundo') === false && isUndo('Carlos Mundo') === false);
+  check('Dundon, Fundora and Mundorf are names', isUndo('Dundon') === false && isUndo('Fundora') === false && isUndo('Mundorf') === false);
+  check('empty and non-string are not', isUndo('') === false && isUndo(null) === false && isUndo(undefined) === false);
+  check('doPrint no longer tests the child\'s name or club for "undo"', !/isUndo\(firstName\)/.test(extractFunction('doPrint')));
+}
+
 console.log('\nextension check-in tokens: a fresh meeting id before every direct post');
 {
   // ensureFreshCheckinTokens() reads CHECKIN_TOKENS and calls refreshCheckinTokens();

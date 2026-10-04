@@ -321,8 +321,14 @@
     } catch (e) { /* ignore quota errors */ }
   }
 
+  // TwoTimTwo's #lastCheckin line after an undo: the child's name and
+  // "(checkin undone)" (docs/TWOTIMTWO.md §2.3), or the undo link's own word.
+  // The word, never a substring: "undo" inside a NAME (Mundo, Dundon,
+  // Fundora, Mundorf) read as an undo until 7.11.1, so those children never
+  // got a label and, on the reconcile and phone paths, were marked printed
+  // without one.
   function isUndo(text) {
-    return text && text.toLowerCase().includes('undo');
+    return !!text && /\bundo(ne)?\b/i.test(String(text));
   }
 
   // Step Up Night — the one Wednesday a year when kids whose age/grade puts
@@ -3718,12 +3724,6 @@
     var parts = fullName.split(' ');
     var firstName = parts[0] || '';
     var lastName = parts.slice(1).join(' ') || '';
-
-    if (isUndo(firstName) || isUndo(lastName) || isUndo(clubName)) {
-      setStatus('\uD83D\uDEAB');
-      clearStatus();
-      return;
-    }
 
     var payload = {
       name: fullName, clubName: clubName, clubImageData: imageData,
