@@ -1,4 +1,5 @@
 import JSZip from 'jszip';
+import { timedFetch } from './timedFetch.js';
 
 // ─────────────────────────────────────────────────────────────
 // Local .pptx parsing — hand-rolled on JSZip + the browser's native
@@ -57,7 +58,8 @@ export async function downloadPptx(url) {
   const downloadUrl = convertToDownloadUrl(url);
   if (!downloadUrl) throw new Error('Invalid OneDrive URL');
 
-  const response = await fetch(downloadUrl);
+  // A PowerPoint can be large; a minute, not the usual deadline.
+  const response = await timedFetch(downloadUrl, {}, 60_000);
   if (!response.ok) throw new Error(`Failed to download presentation: HTTP ${response.status}`);
   return await response.blob();
 }

@@ -44,6 +44,7 @@ import { squishLand, withSquish } from './lib/squish.js';
 import { birthdayRibbon } from './lib/birthdayWeek.js';
 import { autoParticleEffect, weatherMood } from './lib/weather.js';
 import { useCelebrationQueue } from './hooks/useCelebrationQueue.js';
+import { timedFetch } from './lib/timedFetch.js';
 import {
   AWARD_MILESTONES, BOOK_MILESTONES, awardMilestoneCopy, bookMilestoneCopy,
   crossedMilestones, isBigMilestone, nightMilestoneCopy,
@@ -108,7 +109,7 @@ export default function App() {
   useEffect(() => {
     if (!remoteConfigUrl) return undefined;
     let cancelled = false;
-    fetch(remoteConfigUrl, { cache: 'no-cache' })
+    timedFetch(remoteConfigUrl, { cache: 'no-cache' })
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
       .then((raw) => {
         if (cancelled) return;

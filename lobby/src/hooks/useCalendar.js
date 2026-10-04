@@ -3,6 +3,7 @@ import { parseCalendarHtml, sanitizeEvents, sanitizeFeed } from '../lib/calendar
 import { MIN_CLUB_EVENTS } from '../lib/constants.js';
 import { resolveSyncUrl } from '../lib/syncService.js';
 import { onSyncDoorbell, refreshCalendarViaSync, useSync } from './useSync.js';
+import { timedFetch } from '../lib/timedFetch.js';
 
 // Layers of "the screen must never go calendar-blind":
 //   0. the sync service's copy (worker/), read from the church page on demand
@@ -41,7 +42,7 @@ function saveCache(events) {
 
 async function fetchFeed() {
   try {
-    const res = await fetch(`${import.meta.env.BASE_URL}calendar-feed.json`, { cache: 'no-cache' });
+    const res = await timedFetch(`${import.meta.env.BASE_URL}calendar-feed.json`, { cache: 'no-cache' });
     if (!res.ok) return null;
     const feed = sanitizeFeed(await res.json());
     return feed.events.length ? feed : null;
@@ -53,7 +54,7 @@ async function fetchFeed() {
 async function fetchSynced(base) {
   if (!base) return null;
   try {
-    const res = await fetch(`${base}/v1/calendar`, { cache: 'no-store' });
+    const res = await timedFetch(`${base}/v1/calendar`, { cache: 'no-store' });
     if (!res.ok) return null;
     const raw = await res.json();
     const feed = sanitizeFeed(raw);
@@ -68,7 +69,7 @@ async function fetchSynced(base) {
 async function fetchDirect(calendarUrl) {
   if (!calendarUrl) return null;
   try {
-    const res = await fetch(calendarUrl);
+    const res = await timedFetch(calendarUrl);
     if (!res.ok) return null;
     const events = sanitizeEvents(parseCalendarHtml(await res.text()));
     return events.filter((e) => e.kind === 'club').length >= MIN_CLUB_EVENTS ? events : null;

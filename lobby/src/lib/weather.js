@@ -1,3 +1,5 @@
+import { timedFetch } from './timedFetch.js';
+
 // ─────────────────────────────────────────────────────────────
 // Weather for the "nothing special next week" slide — Open-Meteo,
 // which is free, keyless, and CORS-enabled, so it works straight
@@ -136,7 +138,7 @@ export function buildForecastUrl({ lat, lon, units = 'fahrenheit' }) {
 export async function fetchCurrentWeather({ lat, lon, units = 'fahrenheit' }) {
   if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
   try {
-    const res = await fetch(buildForecastUrl({ lat, lon, units }));
+    const res = await timedFetch(buildForecastUrl({ lat, lon, units }));
     if (!res.ok) return null;
     const data = await res.json();
     const cur = data?.current;
@@ -162,7 +164,7 @@ export async function geocodeLocation(name) {
   if (!query) return null;
   try {
     const params = new URLSearchParams({ name: query, count: '1', language: 'en', format: 'json' });
-    const res = await fetch(`https://geocoding-api.open-meteo.com/v1/search?${params}`);
+    const res = await timedFetch(`https://geocoding-api.open-meteo.com/v1/search?${params}`);
     if (!res.ok) return null;
     const hit = (await res.json())?.results?.[0];
     if (!hit || typeof hit.latitude !== 'number') return null;

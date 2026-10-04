@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { sanitizeTheme } from '../lib/theme.js';
 import { applyClubOverrides } from '../lib/clubs.js';
+import { timedFetch } from '../lib/timedFetch.js';
 
 // Fetch the shared theme.json (published by the countdown repo's Pages
 // site), preload any club art it references, then apply the overrides
@@ -34,7 +35,7 @@ export function useTheme(config) {
     let cancelled = false;
     const load = async () => {
       try {
-        const res = await fetch(url, { cache: 'no-cache' });
+        const res = await timedFetch(url, { cache: 'no-cache' });
         if (!res.ok) return;
         const raw = await res.json();
         const clean = sanitizeTheme(raw, url);

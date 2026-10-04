@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { DEFAULT_SCHEDULE, resolvePhase, sanitizeSchedule } from '../lib/schedule.js';
+import { timedFetch } from '../lib/timedFetch.js';
 
 // Fetch → cache → baked default, in that order. The shared schedule is
 // published by the countdown repo's Pages site so all three Awana apps
@@ -61,7 +62,7 @@ export function useSchedule(config) {
     let cancelled = false;
     const load = async () => {
       try {
-        const res = await fetch(url, { cache: 'no-cache' });
+        const res = await timedFetch(url, { cache: 'no-cache' });
         if (!res.ok) return;
         const raw = await res.json();
         const clean = sanitizeSchedule(raw);

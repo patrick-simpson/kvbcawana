@@ -115,6 +115,10 @@ export const BUILD_CHECK_MS = 3 * 60 * 1000;
 export const BUILD_BUSY_RECHECK_MS = 15 * 1000;
 export const BUILD_ONLINE_MIN_MS = 60 * 1000;
 export const BUILD_PROBE_TIMEOUT_MS = 5000;
+// Every other network request (src/lib/timedFetch.js): long enough for a slow
+// church connection to answer a calendar page, short enough that a request
+// black-holed by the network fails before the next poll is due.
+export const FETCH_TIMEOUT_MS = 15_000;
 
 // How long after the last realtime event the signage page still counts as
 // busy. A banner has just come down; give the room a beat before the screen

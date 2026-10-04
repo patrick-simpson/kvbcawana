@@ -20,6 +20,7 @@
 import { saveDisplayKey } from './displayKey.js';
 import { isPlausibleKey } from './envelope.js';
 import { normalizeSyncPassphrase, sanitizeTemplate } from './syncSpecs.js';
+import { timedFetch } from './timedFetch.js';
 
 export const SYNC_SESSION_STORAGE = 'awanaSyncSession.v1';
 /** The last address shared/sync.json gave (not a secret), for offline boots. */
@@ -116,7 +117,7 @@ export async function resolveSyncUrl(opts = {}) {
  * @returns {Promise<{ok: boolean, status: number, body: any}>} status 0 = unreachable
  */
 export async function syncRequest(base, path, opts = {}) {
-  const fetchFn = opts.fetchFn || fetch;
+  const fetchFn = opts.fetchFn || timedFetch;
   /** @type {Record<string, string>} */
   const headers = {};
   if (opts.body !== undefined) headers['Content-Type'] = 'application/json';
