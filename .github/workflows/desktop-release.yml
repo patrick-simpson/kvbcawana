@@ -255,6 +255,25 @@ jobs:
       # provider would resolve them against the site, where the installer is
       # not (Pages cannot host files over 25 MB). Rewrite every url/path to
       # the release asset's absolute URL.
+      - name: The feed only ever moves forward
+        # electron-updater never downgrades: a feed that names a version at or
+        # below what it already serves stops every updated sound room PC from
+        # updating, silently. (SWITCH.md once asked for exactly that.)
+        run: |
+          set -euo pipefail
+          FEED=site/updates/lobby/lobby.yml
+          if [ -f "$FEED" ]; then
+            CURRENT="$(sed -nE 's/^version:[[:space:]]*([0-9][0-9.]*).*/\1/p' "$FEED" | head -1)"
+            if [ -n "$CURRENT" ]; then
+              NEWEST="$(printf '%s\n%s\n' "$CURRENT" "$VERSION" | sort -V | tail -1)"
+              if [ "$CURRENT" = "$VERSION" ] || [ "$NEWEST" != "$VERSION" ]; then
+                echo "::error::$FEED already serves $CURRENT; releasing $VERSION would stop every updated sound room PC from updating (electron-updater never downgrades). Pick a version above $CURRENT."
+                exit 1
+              fi
+              echo "The feed moves from $CURRENT to $VERSION."
+            fi
+          fi
+
       - name: Write the update feed into the site
         run: |
           set -euo pipefail

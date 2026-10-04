@@ -400,6 +400,25 @@ jobs:
       # the installer on the release. electron-builder writes bare file
       # names, which the generic provider would resolve against the site.
       # The tag is read back from the release so a mismatch fails loudly.
+      - name: The feed only ever moves forward
+        # electron-updater never downgrades: a feed that names a version at or
+        # below what it already serves stops every updated laptop from
+        # updating, silently. (SWITCH.md once asked for exactly that.)
+        run: |
+          set -euo pipefail
+          FEED=site/updates/printer/latest.yml
+          if [ -f "$FEED" ]; then
+            CURRENT="$(sed -nE 's/^version:[[:space:]]*([0-9][0-9.]*).*/\1/p' "$FEED" | head -1)"
+            if [ -n "$CURRENT" ]; then
+              NEWEST="$(printf '%s\n%s\n' "$CURRENT" "$VERSION" | sort -V | tail -1)"
+              if [ "$CURRENT" = "$VERSION" ] || [ "$NEWEST" != "$VERSION" ]; then
+                echo "::error::$FEED already serves $CURRENT; releasing $VERSION would stop every updated laptop from updating (electron-updater never downgrades). Pick a version above $CURRENT."
+                exit 1
+              fi
+              echo "The feed moves from $CURRENT to $VERSION."
+            fi
+          fi
+
       - name: Write the update feed into the site
         run: |
           set -euo pipefail
