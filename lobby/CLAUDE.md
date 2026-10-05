@@ -5,23 +5,25 @@
 Every code change in this repo should be committed **and pushed to
 `main`** as part of the same turn. There are no feature branches and no
 pull request review step — the user has explicitly authorized direct
-pushes to `main`. The deploy workflow at
-`.github/workflows/deploy.yml` triggers on every push to `main`, so
-each push automatically redeploys the live signage site.
+pushes to `main`. The root `.github/workflows/ci.yml` runs this app's
+checks (lint, typecheck, vitest, build, the Playwright smoke suite) on every
+push and then publishes the one site, so each green push redeploys
+https://awana.kvbchurch.org/lobby/ (the signage) and `/lobby/countdown` (the
+projector). This folder's own `.github/` workflows are dormant.
 
-Concretely, after editing any file:
+Concretely, after editing any file: run the checks a contributor runs
+(`npm run lint`, `npm run typecheck`, `npx vitest run`, `npm run build`, and
+`npm run e2e` for anything the smoke suite covers), `git add`, `git commit`
+with a clear message, and `git push origin HEAD:main` (no PR, no other branch).
 
-1. `git add` the changed files.
-2. `git commit` with a clear message.
-3. `git push -u origin main` (no PR, no other branch).
-
-If the working branch is not already `main` (e.g. you started on a
-`claude/...` branch), `git push origin HEAD:main` is acceptable.
-
-> Note: this convention lives in memory only. To make the harness
-> *enforce* an auto-push (i.e. block stopping until a push has
-> happened), configure a Stop hook in `.claude/settings.json`. Ask the
-> user before adding hooks.
+**Where the screens are (since 2026-10-03).** Every screen listens to the
+sync Worker's live channel (`/api/v1/live`, `lobby/worker/`), signed in with
+the church passphrase; the Pusher keys are cleared and Pusher is off
+(SWITCH.md). The wire design below was written for a public Pusher channel
+and applies unchanged to the live channel: the same events, the same
+allowlist sanitizers, the same sealed envelopes and anti-downgrade rule.
+Where this file says "the Pusher channel", read "the live channel" too. The
+print server still carries the Pusher publisher until switch day's cleanup.
 
 ## Embedding on weaker hardware — `?lowPower=1`
 
@@ -275,7 +277,7 @@ and `doodles/`. Read its README before changing it.
   `art.logo` (full color, for light fields) on banners, which sit on the
   club's own color. `clubs.js` carries the same catalog values as the
   pre-load fallback.
-- **Mirrors.** Journey-Display (`public/brand/`) and the printer
+- **Mirrors.** Journey (`journey/public/brand/`) and the printer
   (`print-server/public/brand/`) carry byte-identical copies with drift
   checks, so neither depends on the network at showtime. Change the kit
   here first, then re-copy it into both.
@@ -330,8 +332,9 @@ and `doodles/`. Read its README before changing it.
 - A hand-written service worker (`src/sw.js`, emitted with a per-build
   cache version by the `serviceWorker()` plugin in vite.config.js)
   gives both pages an offline shell — JSON and HTML stay network-first
-  so deploys and schedule edits are never masked by a cache, and the
-  self-update probes are network-ONLY (see "Self-updating pages")
+  (falling back to the cached copy after 8 s of no answer, so lie-fi never
+  hangs a reload), `/api` is never touched, and the self-update probes are
+  network-ONLY (see "Self-updating pages")
 - Quality gates on every push to `main`: lint, `tsc` typecheck of the
   `@ts-check` seams, vitest with coverage thresholds, build, and the
   Playwright smoke suite; visual regression runs in ci.yml only
@@ -354,7 +357,7 @@ and `doodles/`. Read its README before changing it.
 ## About page (`public/about.html`)
 
 A plain static showcase page for church leadership, published at
-`https://patrick-simpson.github.io/Awana-Check-in-Display/about.html`. It is
+`https://awana.kvbchurch.org/lobby/about.html`. It is
 one of three "family" pages (with the Club Label Printer home and Journey
 Display's `about.html`) that share one design system. Rules:
 
@@ -368,18 +371,18 @@ Display's `about.html`) that share one design system. Rules:
   precache manifest and carry no `awana-build` stamp, so the self-update
   poller ignores them.
 - **Bump `family.css?v=` whenever `family.css` changes, on BOTH about pages**
-  (this one and Journey-Display's `public/about.html`, which links it the
+  (this one and Journey's `journey/public/about.html`, which links it the
   same way). A browser that already has the signage's service worker still
   serves this page through it: the HTML network-first, but the stylesheet
   cache-first under the current build's cache name, which a CSS-only deploy
   never changes. A new query string is a new cache key, so the bump is what
   gets a restyled `family.css` to a signage device. Page-only styling needs
   no bump: it is inline, so it travels with the network-first HTML.
-- **`family.css` is byte-identical across the three repos** (this one,
-  Journey-Display, Print-TwoTimTwo-Labels). The canonical copy is
-  `Print-TwoTimTwo-Labels/styles/family.css` and its spec is
-  `Print-TwoTimTwo-Labels/docs/FAMILY-DESIGN.md`; never edit this copy,
-  only replace it with the canonical file. Page-only styling goes in
+- **`family.css` is byte-identical across the three apps** (`lobby/`,
+  `journey/`, `printer/`; `scripts/check-mirrors.mjs` fails CI on drift). The
+  canonical copy is `printer/styles/family.css` and its spec is
+  `printer/docs/FAMILY-DESIGN.md`; never edit this copy, only replace it
+  with the canonical file. Page-only styling goes in
   `about.html`'s `<style>` block, every class prefixed `cid-`.
 - **No Awana art on this page.** The owner uses the official Awana branding
   (club marks, the Awana Clubs mark, the catalog's design language) on the
@@ -649,7 +652,7 @@ Setup → **Sound room app** card links the installer and that guide
 the installer's asset name is fixed, so the link never changes). The owner's calls:
 
 - **The live site, not a bundled copy.** It loads
-  `https://patrick-simpson.github.io/Awana-Check-in-Display/index.html` in a
+  `https://awana.kvbchurch.org/lobby/` in a
   `persist:lobby` partition, so every deploy reaches the booth by itself and
   the page's own settings, display login and service-worker cache survive
   restarts. Nothing in the page knows it is in the app: `window.self ===
@@ -686,8 +689,8 @@ the installer's asset name is fixed, so the link never changes). The owner's cal
   without a gesture, but the page's `<video muted>` is left alone. The cursor
   hides after 3 s still; display sleep is blocked while visible; the 5 pm open
   uses `showInactive()` so it never takes focus from the booth; the window only
-  navigates within this site's path (the github.io origin also serves Journey
-  and the printer); external links open in the default browser; downloads save
+  navigates within this site's path (awana.kvbchurch.org also serves Journey
+  and the printer's pages); external links open in the default browser; downloads save
   straight to Downloads (`will-download`), never a Save dialog on the TV;
   localStorage is flushed before the window closes and on quit; a failed first
   load, or a 4xx/5xx answer from Pages, shows `static/offline.html` and retries
@@ -1312,8 +1315,10 @@ setup guide and the API. The owner's calls:
   editor publish to it (`publishViaSync`), it seals the same `settings` /
   `slides` frames (contract v5 / v6) and publishes them with the Pusher REST
   API. Check-ins never pass through it.
-- **Found by `shared/sync.json`** (`{url}`), which `deploy-worker.yml` writes the
-  first time it deploys. `url: ""` means no service yet: every screen keeps the
+- **Found by `shared/sync.json`** (`{url}`), written when the Worker was first
+  deployed (today the root `ci.yml` deploys it, only when its sources changed,
+  because every deploy restarts the Durable Object and drops every screen's
+  socket). `url: ""` means no service yet: every screen keeps the
   print server's display login exactly as before (the Setup card and the
   projector's menu switch on `useSync().url`).
 - **The session is a secret** in its own slot (`awanaSyncSession.v1`), like the
@@ -1344,11 +1349,12 @@ setup guide and the API. The owner's calls:
   the Worker when one exists (`template: false`) and reports it in the old
   words, so `QuickNav` and the setup note barely changed and the isolation
   allowlist did not grow.
-- **Gates:** the Worker's tests run in `deploy-worker.yml`
-  (`npx vitest run --config worker/vitest.config.js`), not the site's deploy
-  gate (the root vitest excludes `worker/**`; the root lint covers it). Until
-  `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` exist that workflow tests and
-  stops, green.
+- **Gates:** the Worker's tests run in `ci.yml`'s `worker` job
+  (`npx vitest run --config worker/vitest.config.js`), not this app's vitest
+  (the root vitest excludes `worker/**`; the root lint covers it). Its relay
+  writes the laptop's "I asked" stamp at most every 15 s, keeps a taken
+  request 75 s (the laptop allows itself 60 s), and refuses a body over
+  128 KB by Content-Length before reading it.
 
 ## Tonight counter: the printer's tally is the source of truth
 
@@ -1414,9 +1420,11 @@ watching.
   all. A missing, non-200 or unparsable `version.json` is likewise "no news",
   never a change: a captive portal answering every URL with a login page must
   not be able to reload the wall.
-- **The HTML is checked before reloading.** GitHub Pages serves everything
-  with `max-age=600`, so its CDN can still be handing out the previous
-  `index.html` minutes after `version.json` has moved on. A reload that
+- **The HTML is checked before reloading.** The site's HTML and JSON are
+  served `no-cache` now (`site/build.mjs` writes the `_headers`), but a CDN
+  edge or a proxy can still hand out the previous `index.html` for a moment
+  after `version.json` has moved on, which was the rule under GitHub Pages'
+  ten-minute cache. A reload that
   landed on the old HTML would come straight back and loop, so the page
   fetches its own `location.pathname` first and only reloads when that HTML
   already carries the new hash. Both probes carry
