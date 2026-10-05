@@ -373,7 +373,8 @@ jobs:
     # Publish only after the INSTALLED app passed the smoke test.
     needs: [tag, smoke-test]
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # The "wait for the live feed" step alone allows 30 minutes.
+    timeout-minutes: 45
     env:
       VERSION: ${{ inputs.version }}
       GH_TOKEN: ${{ github.token }}
