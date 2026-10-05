@@ -189,7 +189,24 @@ function performQuitAndInstall(reason) {
   // automatically after a NON-silent install unless this is set — and the
   // entire point of this change is that the print server comes back up on
   // its own with no one there to double-click the shortcut.
-  autoUpdater.quitAndInstall(true, true);
+  //
+  // A way back (7.11.1): quitAndInstall normally never returns, but when it
+  // throws, or returns and the app is still here two minutes later, the
+  // in-flight flag used to stay set for the life of the process and every
+  // later update was ignored until someone killed the app. Now the flag is
+  // dropped and the app goes on serving; the next update gets a fresh try.
+  const giveUp = (why) => {
+    console.warn(`[update] The install did not happen (${why}); the app goes on serving and will try the next update.`);
+    installInFlight = false;
+    app.isQuitting = false;
+  };
+  try {
+    autoUpdater.quitAndInstall(true, true);
+    const t = setTimeout(() => { if (installInFlight) giveUp('still running two minutes after quitAndInstall'); }, 2 * 60 * 1000);
+    if (t && typeof t.unref === 'function') t.unref();
+  } catch (e) {
+    giveUp(e && e.message ? e.message : String(e));
+  }
 }
 
 function scheduleAutoInstall(info) {
@@ -564,6 +581,18 @@ async function resolvePortConflict() {
   if (await isPortFree(PORT)) return;
   const owner = findPortOwner(PORT);
   const desc = owner ? `${owner.name} (PID ${owner.pid})` : 'another program';
+  if (isAutoStart) {
+    // Nobody is at the keyboard on a login-item auto-start: a modal here held
+    // the whole boot, server included, until someone clicked. Say so in a
+    // notification and go on; the server's own start fails on the busy port,
+    // the tray shows it, and the watchdog retries every minute until the
+    // port is free or a person opens the app and resolves it.
+    console.warn(`[port] Port ${PORT} is in use by ${desc}; auto-start continues without the dialog.`);
+    try {
+      if (Notification.isSupported()) new Notification({ title: 'Club Label Printer: port in use', body: `Port ${PORT} is being used by ${desc}. Open the app from the tray to stop it; labels cannot print until then.` }).show();
+    } catch { /* no notifications here */ }
+    return;
+  }
   const { response } = await dialog.showMessageBox({
     type: 'warning',
     title: 'Port 3456 is in use',
