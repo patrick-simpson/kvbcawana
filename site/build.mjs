@@ -102,6 +102,15 @@ writeFileSync(path.join(OUT, '_redirects'), [
   '',
 ].join('\n'));
 writeFileSync(path.join(OUT, '_headers'), [
+  // Vite names every built asset by its content hash (main-DVTDSuLn.js), so a
+  // changed file is a new URL and the old one can be kept for good. Pages'
+  // default for them was max-age=0: every TV revalidated every script and
+  // font on every load. Journey's files are not hashed (they carry ?v=) and
+  // keep the default.
+  '/assets/*',
+  '  Cache-Control: public, max-age=31536000, immutable',
+  '/lobby/assets/*',
+  '  Cache-Control: public, max-age=31536000, immutable',
   '/*.html',
   '  Cache-Control: no-cache',
   '/*.json',
