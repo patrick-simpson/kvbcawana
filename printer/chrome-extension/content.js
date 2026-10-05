@@ -5036,7 +5036,16 @@
     return function isWaiting() { return waiting && !led; };
   }
 
-  injectWidget();
+  // Every boot step on its own: one exception in the 2,200-line injectWidget()
+  // (a TwoTimTwo markup change, a missing element) used to end the script
+  // right there, before detection, the queue flush or the phone poll had
+  // started, so the desk printed nothing and the console said why to nobody.
+  // A step that fails is logged and the rest still boot.
+  function bootStep(label, fn) {
+    try { fn(); } catch (e) { console.error('[Awana] ' + label + ' failed at boot: ' + (e && e.message ? e.message : e)); }
+  }
+
+  bootStep('widget', injectWidget);
   loadPrintedState();
   // Restore Step Up Night and Awana Store mode (chrome.storage.local survives
   // extension updates).
@@ -5075,17 +5084,17 @@
     });
   }
   // What every tab runs: the widget's own data, read-only probes, update checks.
-  loadBrandFonts();
-  fetchPrinters();
+  bootStep('brand fonts', loadBrandFonts);
+  bootStep('printer list', fetchPrinters);
   setInterval(fetchPrinters, 120000);   // keeps the ready dot honest
-  loadTonight();
-  loadCountCheck();
+  bootStep('tonight', loadTonight);
+  bootStep('count check', loadCountCheck);
   // If the page produced no roster (site down, offline reload, or this tab is
   // not the printing one), fall back to the copy cached in chrome.storage.local
   // so search still works.
   setTimeout(restoreRosterFromLocal, 2000);
-  loadChurchConfig();
-  checkForExtensionUpdate();
+  bootStep('church config', loadChurchConfig);
+  bootStep('update check', checkForExtensionUpdate);
   // Periodically check server health for CSV warnings + update notices
   setInterval(checkForExtensionUpdate, 60000);
   // Selector self-test: first probe after the page settles, then every 10 min
@@ -5102,8 +5111,8 @@
   // What only the printing tab runs: everything that detects a check-in,
   // prints, reconciles, drives phone actions or writes to the print server.
   function startPrintMachinery() {
-    loadPrintedState();   // the shared store as it stands now, not at this tab's load
-    watchCheckins();
+    bootStep('printed state', loadPrintedState);   // the shared store as it stands now, not at this tab's load
+    bootStep('check-in watcher', watchCheckins);
     // Establish the roster baseline on load (or re-populate ROSTER_CACHE after a
     // reload that preserved baselineScanned in the shared dedup store).
     setTimeout(scanClubberList, 500);
@@ -5122,7 +5131,7 @@
     // Youth check-out: every half minute; it does nothing before 7:15 on a club night.
     setInterval(function() { ymSweep(false); }, YM_SWEEP_MS);
     setTimeout(pollPendingActions, 4000);
-    syncCsv();
+    bootStep('roster sync', syncCsv);
     // Contract canary (#3): once per day, shortly after the page settles.
     setTimeout(maybeRunDailyContractCanary, 45000);
     // R-1: first reconcile pass ~60s after load, then self-reschedules based on

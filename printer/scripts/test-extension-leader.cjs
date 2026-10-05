@@ -123,15 +123,31 @@ const pruneSharedDedup = new Function('SHARED_DEDUP_PREFIX', extractFunction('pr
   {
     const boot = SRC.slice(SRC.indexOf('function startPrintMachinery()'));
     const inside = boot.slice(0, boot.indexOf('electPrintLeader(typeof navigator'));
-    for (const fn of ['watchCheckins()', 'scanClubberList', 'autoRefresh', 'ymSweep(false)', 'pollPendingActions', 'syncCsv()', 'runReconcile()', 'flushQueue', 'maybeRunDailyContractCanary']) {
+    for (const fn of ['watchCheckins', 'scanClubberList', 'autoRefresh', 'ymSweep(false)', 'pollPendingActions', 'syncCsv', 'runReconcile()', 'flushQueue', 'maybeRunDailyContractCanary']) {
       check(`${fn} runs only in the printing tab`, inside.includes(fn), fn);
     }
     const outside = SRC.slice(SRC.indexOf('// What every tab runs'), SRC.indexOf('function startPrintMachinery()'));
-    for (const fn of ['loadTonight()', 'fetchPrinters()', 'restoreRosterFromLocal', 'checkForExtensionUpdate()', 'runSelectorSelfTest']) {
+    for (const fn of ['loadTonight', 'fetchPrinters', 'restoreRosterFromLocal', 'checkForExtensionUpdate', 'runSelectorSelfTest']) {
       check(`${fn} runs in every tab (the widget still works)`, outside.includes(fn), fn);
     }
     check('the election is wired to navigator.locks with the machinery as the leader\'s work', /electPrintLeader\(typeof navigator !== 'undefined' \? navigator\.locks : null, startPrintMachinery,/.test(SRC));
-    check('the leader re-reads the shared store when it takes over', /function startPrintMachinery\(\) \{\s*loadPrintedState\(\);/.test(SRC));
+    check('the leader re-reads the shared store when it takes over', /function startPrintMachinery\(\) \{\s*bootStep\('printed state', loadPrintedState\);/.test(SRC));
+  }
+
+  console.log('\nboot: one failing step does not stop the rest');
+  {
+    const bootStep = new Function(extractFunction('bootStep') + '; return bootStep;')();
+    const errors = [];
+    const realError = console.error; console.error = (m) => errors.push(m);
+    let ran = 0;
+    bootStep('widget', () => { throw new Error('no #content on this page'); });
+    bootStep('tonight', () => { ran++; });
+    console.error = realError;
+    check('the step that threw is logged by name, and the next step runs', ran === 1 && errors.length === 1 && /widget failed at boot: no #content/.test(errors[0]), JSON.stringify(errors));
+    for (const step of ["bootStep('widget', injectWidget)", "bootStep('check-in watcher', watchCheckins)", "bootStep('printed state', loadPrintedState)", "bootStep('roster sync', syncCsv)", "bootStep('church config', loadChurchConfig)"]) {
+      check(`${step} is guarded`, SRC.includes(step));
+    }
+    check('nothing boots unguarded ahead of the widget', !/^\s{2}injectWidget\(\);/m.test(SRC));
   }
 
   console.log(`\n${passed} passed, ${failed} failed`);
