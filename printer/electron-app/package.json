@@ -55,8 +55,14 @@
           "*.js",
           "church-config.json",
           "package.json",
-          "public/**",
-          "node_modules/**"
+          "public/**"
+        ]
+      },
+      {
+        "from": "../print-server/node_modules",
+        "to": "print-server/node_modules",
+        "filter": [
+          "**/*"
         ]
       },
       {
