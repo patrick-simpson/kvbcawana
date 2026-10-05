@@ -45,14 +45,45 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  tag:
+  # The tests run FIRST, and the tag is created only once they pass. The tag
+  # used to be pushed before anything ran, so a failing test or build left a
+  # tag behind and the retry died on "already exists".
+  test:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    outputs:
+      sha: ${{ steps.sha.outputs.sha }}
+    defaults:
+      run:
+        working-directory: lobby
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+      - id: sha
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: lobby/package-lock.json
+      - name: Install the root toolchain (vitest, eslint)
+        run: npm ci
+      - name: Desktop unit tests
+        run: npx vitest run --config desktop/vitest.config.js
+      - name: Lint desktop/
+        run: npx eslint desktop
+
+  tag:
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
     outputs:
       sha: ${{ steps.tag.outputs.sha }}
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.ref }}
+          ref: ${{ needs.test.outputs.sha }}
           fetch-depth: 0
 
       - name: Check the version and tag
@@ -78,31 +109,11 @@ jobs:
           echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
           echo "Created $TAG"
 
-  test:
-    needs: tag
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: lobby
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.tag.outputs.sha }}
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: 'npm'
-          cache-dependency-path: lobby/package-lock.json
-      - name: Install the root toolchain (vitest, eslint)
-        run: npm ci
-      - name: Desktop unit tests
-        run: npx vitest run --config desktop/vitest.config.js
-      - name: Lint desktop/
-        run: npx eslint desktop
 
   build:
     needs: [tag, test]
     runs-on: windows-latest
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
         with:
@@ -142,6 +153,7 @@ jobs:
   smoke-test:
     needs: [tag, build]
     runs-on: windows-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
         with:
@@ -219,6 +231,7 @@ jobs:
   release:
     needs: [tag, smoke-test]
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     env:
       VERSION: ${{ inputs.version }}
       GH_TOKEN: ${{ github.token }}

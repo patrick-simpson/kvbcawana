@@ -42,14 +42,47 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  tag:
+  # The tests run FIRST, and the tag is created only once they pass. The tag
+  # used to be pushed before anything ran, so a failing test or build left a
+  # tag behind and the retry died on "already exists".
+  test:
     runs-on: ubuntu-latest
+    timeout-minutes: 25
+    outputs:
+      sha: ${{ steps.sha.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+      - id: sha
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: |
+            printer/package-lock.json
+            printer/print-server/package-lock.json
+      - name: Install root dependencies
+        run: npm ci
+        working-directory: printer
+      - name: Install print-server dependencies
+        run: npm ci
+        working-directory: printer/print-server
+      - name: Run the test suites
+        run: npm test
+        working-directory: printer
+
+  tag:
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
     outputs:
       sha: ${{ steps.tag.outputs.sha }}
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.ref }}
+          ref: ${{ needs.test.outputs.sha }}
           fetch-depth: 0
 
       - name: Validate version and create tag
@@ -87,41 +120,14 @@ jobs:
           echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
           echo "### Created tag \`$TAG\`" >> "$GITHUB_STEP_SUMMARY"
 
-  # Gate the release on the test suites. Without this, `npm test` only ran on
-  # branch pushes and PRs (webpack.yml) — so a tag cut straight from a green
-  # main would still publish an .exe without re-verifying the trust model or
-  # the event contract. Cheap (~30s) next to the Windows build.
-  #
-  # Ubuntu on purpose: these suites are pure Node, and the security suite binds
-  # 0.0.0.0 and connects back over a non-loopback address, which is simpler
-  # without the Windows firewall involved.
-  test:
-    needs: tag
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.tag.outputs.sha }}
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-          cache-dependency-path: |
-            printer/package-lock.json
-            printer/print-server/package-lock.json
-      - name: Install root dependencies
-        run: npm ci
-        working-directory: printer
-      - name: Install print-server dependencies
-        run: npm ci
-        working-directory: printer/print-server
-      - name: Run the test suites
-        run: npm test
-        working-directory: printer
+  # (The test suites are the first job above: pure Node, on Ubuntu on
+  # purpose, since the security suite binds 0.0.0.0 and connects back over a
+  # non-loopback address, which is simpler without the Windows firewall.)
 
   build:
     needs: [tag, test]
     runs-on: windows-latest
+    timeout-minutes: 45
 
     steps:
       - uses: actions/checkout@v4
@@ -177,6 +183,7 @@ jobs:
   smoke-test:
     needs: build
     runs-on: windows-latest
+    timeout-minutes: 30
 
     steps:
       - name: Download installer
@@ -366,6 +373,7 @@ jobs:
     # Publish only after the INSTALLED app passed the smoke test.
     needs: [tag, smoke-test]
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     env:
       VERSION: ${{ inputs.version }}
       GH_TOKEN: ${{ github.token }}
