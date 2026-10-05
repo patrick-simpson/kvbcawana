@@ -62,6 +62,47 @@ const PORT = 34581;
   }
   slow.close();
 
+  console.log('\nclub image download: whatever the URL answers, the label is not held hostage');
+  {
+    let open = 0;
+    const odd = http.createServer((req, res) => {
+      open++;
+      res.on('close', () => { open--; });
+      if (req.url === '/missing.png') { res.writeHead(404); res.end('gone'); return; }
+      if (req.url === '/page.png') { res.writeHead(200, { 'Content-Type': 'text/html' }); res.end('<html>login</html>'); return; }
+      if (req.url === '/declared-huge.png') { res.writeHead(200, { 'Content-Type': 'image/png', 'Content-Length': String(50 * 1024 * 1024) }); res.write(PNG); return; }
+      if (req.url === '/endless.png') {
+        res.writeHead(200, { 'Content-Type': 'image/png' });
+        const chunk = Buffer.alloc(256 * 1024);
+        const pump = () => { if (res.destroyed) return; if (res.write(chunk)) setImmediate(pump); else res.once('drain', pump); };
+        pump();
+        return;
+      }
+      res.writeHead(200, { 'Content-Type': 'image/png' }); res.end(PNG);
+    });
+    await new Promise((r) => odd.listen(0, '127.0.0.1', r));
+    const at = (p) => `http://127.0.0.1:${odd.address().port}${p}`;
+    const t0 = Date.now();
+    const rs = await Promise.all([
+      post('/print', { name: 'Ivy Stone', clubberId: '5001', clubName: 'Sparks', clubImageData: at('/missing.png') }),
+      post('/print', { name: 'Jon Stone', clubberId: '5002', clubName: 'Sparks', clubImageData: at('/page.png') }),
+      post('/print', { name: 'Kai Stone', clubberId: '5003', clubName: 'Sparks', clubImageData: at('/declared-huge.png') }),
+      post('/print', { name: 'Lia Stone', clubberId: '5004', clubName: 'Sparks', clubImageData: at('/endless.png') }),
+    ]);
+    const took = Date.now() - t0;
+    check('a 404, an HTML page, a declared-huge file and an endless stream each let the print go on (here: to the missing printer)',
+      rs.every((r) => r.status === 500 && r.body && !/image|icon/i.test(r.body.error || '')), JSON.stringify(rs.map((r) => [r.status, r.body && r.body.error])));
+    check('none of them waited on the download past its 4 s timeout plus the retry', took < 12000, `${took} ms`);
+    const mem = process.memoryUsage().heapUsed;
+    check('the endless stream was cut off at the 2 MB cap, not buffered', mem < 400 * 1024 * 1024, `${Math.round(mem / 1048576)} MB heap`);
+    await new Promise((r) => setTimeout(r, 200));
+    check('every upstream connection was drained or destroyed', open === 0, `${open} still open`);
+    const src = fs.readFileSync(path.join(root, 'print-server', 'server.js'), 'utf8');
+    check('non-200 answers close the socket, not leave it to the agent', /res\.statusCode !== 200\) \{[\s\S]{0,200}?req\.destroy\(\);/.test(src));
+    check('a label prints without its icon rather than fail (the icon is decoration)', /console\.log\(`\[icon\] Could not load club image: \$\{e\.message\}`\);\s*\}\s*return null;/.test(src));
+    odd.close();
+  }
+
   console.log('\nduplicate guard: every guarded print claims and releases its key');
   {
     const src = fs.readFileSync(path.join(root, 'print-server', 'server.js'), 'utf8');

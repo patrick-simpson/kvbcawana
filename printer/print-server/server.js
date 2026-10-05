@@ -1302,17 +1302,45 @@ function sweepOrphanedTempFiles() {
 }
 
 // ── Download a remote image into a Buffer ─────────────────────────────────────
+// A club logo is a small PNG. Anything else the URL answers with is refused
+// before it is buffered: the icon is decoration, and a label must never wait
+// on, or hold in memory, whatever a misconfigured or hostile URL sends.
+const IMAGE_MAX_BYTES = 2 * 1024 * 1024;
 function downloadImage(url) {
   return new Promise((resolve, reject) => {
     const proto = url.startsWith('https') ? https : http;
     const req = proto.get(url, { timeout: 4000 }, (res) => {
-      if (res.statusCode !== 200) { reject(new Error(`HTTP ${res.statusCode}`)); return; }
+      if (res.statusCode !== 200) {
+        // Close the socket: a stalled upstream must not be held open until
+        // the agent gives up on it.
+        req.destroy();
+        reject(new Error(`HTTP ${res.statusCode}`));
+        return;
+      }
+      const type = String(res.headers['content-type'] || '').toLowerCase();
+      if (type && !type.startsWith('image/')) {
+        req.destroy();
+        reject(new Error(`not an image (${type.split(';')[0]})`));
+        return;
+      }
+      const declared = Number(res.headers['content-length']);
+      if (Number.isFinite(declared) && declared > IMAGE_MAX_BYTES) {
+        req.destroy();
+        reject(new Error(`too large (${declared} bytes)`));
+        return;
+      }
       const chunks = [];
-      res.on('data', c => chunks.push(c));
+      let size = 0;
+      res.on('data', (c) => {
+        size += c.length;
+        if (size > IMAGE_MAX_BYTES) { req.destroy(new Error(`too large (over ${IMAGE_MAX_BYTES} bytes)`)); return; }
+        chunks.push(c);
+      });
+      res.on('error', reject);
       res.on('end', () => resolve(Buffer.concat(chunks)));
     });
     req.on('error', reject);
-    req.on('timeout', () => { req.destroy(); reject(new Error('timeout')); });
+    req.on('timeout', () => { req.destroy(new Error('timeout')); });
   });
 }
 
