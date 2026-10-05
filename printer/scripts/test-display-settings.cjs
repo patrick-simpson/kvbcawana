@@ -172,6 +172,12 @@ async function main() {
     check('opts in to Private Network Access', res.headers.get('access-control-allow-private-network') === 'true');
     const other = await fetch(`${BASE}/config`, { method: 'OPTIONS', headers: { Origin: DISPLAY_ORIGIN, 'Access-Control-Request-Method': 'POST' } });
     check('the carve-out stops at the two display paths', other.status === 403);
+    // The display's new home (awana.kvbchurch.org) is allowed by default too,
+    // so a screen there can publish before and after switch day.
+    const newHome = await fetch(`${BASE}/api/display-settings`, { method: 'OPTIONS', headers: { Origin: 'https://awana.kvbchurch.org', 'Access-Control-Request-Method': 'POST', 'Access-Control-Request-Headers': 'content-type,authorization' } });
+    check('the one site at awana.kvbchurch.org is a display origin by default', newHome.status === 204 && newHome.headers.get('access-control-allow-origin') === 'https://awana.kvbchurch.org', String(newHome.status));
+    const stranger = await fetch(`${BASE}/api/display-settings`, { method: 'OPTIONS', headers: { Origin: 'https://awana.kvbchurch.org.evil.example', 'Access-Control-Request-Method': 'POST' } });
+    check('a look-alike origin is not', stranger.status === 403 || !stranger.headers.get('access-control-allow-origin'), String(stranger.status));
   }
 
   console.log('display-settings: bad bodies');

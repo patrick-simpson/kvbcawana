@@ -203,8 +203,10 @@ const CHURCH_DEFAULTS = {
   // Origins allowed to POST /api/lobby-slides (with the publish token) — the
   // deployed display app, so its slide editor's "Publish to all displays"
   // button can reach this server from the check-in machine's own browser.
-  // Exact origins only; a fork edits this like every other church knob.
-  displayOrigins: ['https://patrick-simpson.github.io'],
+  // Exact origins only; a fork edits this like every other church knob. Both
+  // homes of the display are listed until switch day (SWITCH.md): the old
+  // github.io site and awana.kvbchurch.org, so a screen on either can publish.
+  displayOrigins: ['https://patrick-simpson.github.io', 'https://awana.kvbchurch.org'],
 };
 let churchConfig = { ...CHURCH_DEFAULTS };
 try {
