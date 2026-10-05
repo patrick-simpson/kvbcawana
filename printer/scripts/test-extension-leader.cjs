@@ -235,6 +235,20 @@ const pruneSharedDedup = new Function('SHARED_DEDUP_PREFIX', extractFunction('pr
     check('the print server unreachable: driven anyway, as before', down.driven.join() === 'd4');
   }
 
+  console.log('\nyouth check-out: a refused child is tried three times a night, not every 30 s');
+  {
+    const ymStillToTry = new Function('YM_MAX_FAILS', extractFunction('ymStillToTry') + '; return ymStillToTry;')(3);
+    const ymPruneNights = new Function(extractFunction('ymPruneNights') + '; return ymPruneNights;')();
+    check('done children and children refused three times are left alone; the rest are tried', ymStillToTry(['1', '2', '3', '4'], ['1'], { 2: 3, 3: 2 }).join() === '3,4');
+    const storage = memStorage();
+    storage.setItem('awanaYmOut.2026-09-30', '["5"]');
+    storage.setItem('awanaYmFail.2026-09-30', '{"6":3}');
+    storage.setItem('awanaYmOut.2026-10-07', '["7"]');
+    storage.setItem('awana_other', 'x');
+    check('other nights\' done lists and counts are pruned, tonight\'s and everything else kept', ymPruneNights(storage, '2026-10-07') === 2 && storage.length === 2 && storage.getItem('awanaYmOut.2026-10-07') === '["7"]');
+    check('the sweep counts each failure and asks only the children still to try', /var ids = ymStillToTry\(Object\.keys\(want\), done, fails\);/.test(SRC) && (SRC.match(/fails\[id\] = \(fails\[id\] \|\| 0\) \+ 1;/g) || []).length === 2 && /ymMarkFails\(date, fails\);/.test(SRC));
+  }
+
   console.log(`\n${passed} passed, ${failed} failed`);
   process.exit(failed ? 1 : 0);
 })().catch((e) => { console.error(e); process.exit(1); });

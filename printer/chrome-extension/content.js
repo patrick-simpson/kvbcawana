@@ -4133,6 +4133,31 @@
   // Who this station has already checked out tonight, by meeting date: the
   // check-in report keeps listing a child after a check-out, so without this
   // every sweep would post them again.
+  // A child whose check-out TwoTimTwo refuses (or that errors) is tried
+  // YM_MAX_FAILS times on a night, not every 30 s all evening: the page
+  // answered, and asking again is load on the church's site for the same
+  // answer. Tonight's counts live beside the done list, keyed by the date,
+  // and both are pruned of other nights as they are written.
+  var YM_MAX_FAILS = 3;
+  function ymStillToTry(ids, done, fails) {
+    return ids.filter(function(id) { return done.indexOf(id) === -1 && (fails[id] || 0) < YM_MAX_FAILS; });
+  }
+  function ymFails(date) {
+    try { var o = JSON.parse(localStorage.getItem('awanaYmFail.' + date) || '{}'); return o && typeof o === 'object' ? o : {}; } catch (e) { return {}; }
+  }
+  function ymMarkFails(date, fails) {
+    try { localStorage.setItem('awanaYmFail.' + date, JSON.stringify(fails)); } catch (e) { /* storage off */ }
+    ymPruneNights(localStorage, date);
+  }
+  function ymPruneNights(storage, date) {
+    var gone = [];
+    for (var i = 0; i < storage.length; i++) {
+      var k = storage.key(i);
+      if (k && (k.indexOf('awanaYmOut.') === 0 || k.indexOf('awanaYmFail.') === 0) && k.slice(k.indexOf('.') + 1) !== date) gone.push(k);
+    }
+    gone.forEach(function(k) { storage.removeItem(k); });
+    return gone.length;
+  }
   function ymDone(date) {
     try { return JSON.parse(localStorage.getItem('awanaYmOut.' + date) || '[]'); } catch (e) { return []; }
   }
@@ -4173,7 +4198,8 @@
         return fetchCheckinReport(date).then(function(report) {
           (report || []).forEach(function(e) { if (ymClubOf(e.club) && !(e.clubberId in want)) want[e.clubberId] = e.name; });
           var done = ymDone(date);
-          var ids = Object.keys(want).filter(function(id) { return done.indexOf(id) === -1; });
+          var fails = ymFails(date);
+          var ids = ymStillToTry(Object.keys(want), done, fails);
           var out = { ok: true, checkedOut: [], failed: [] };
           return ids.reduce(function(chain, id) {
             return chain.then(function() {
@@ -4185,12 +4211,13 @@
               }).then(function(r) { return r.ok ? r.text() : ''; })
                 .then(function(t) {
                   if (String(t).trim() === 'OK') { out.checkedOut.push(want[id] || id); done.push(id); }
-                  else out.failed.push(want[id] || id);
+                  else { out.failed.push(want[id] || id); fails[id] = (fails[id] || 0) + 1; }
                 })
-                .catch(function() { out.failed.push(want[id] || id); });
+                .catch(function() { out.failed.push(want[id] || id); fails[id] = (fails[id] || 0) + 1; });
             });
           }, Promise.resolve()).then(function() {
             ymMarkDone(date, done);
+            ymMarkFails(date, fails);
             if (out.checkedOut.length) console.log('[Awana] Youth check-out: ' + out.checkedOut.length + ' Trek/Journey checked out');
             if (out.failed.length) console.warn('[Awana] Youth check-out failed for ' + out.failed.length);
             return out;
