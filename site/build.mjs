@@ -15,13 +15,32 @@
 // the screens find the Worker at their own /api.
 //
 // Usage: node site/build.mjs   (after npm ci in lobby/ and printer/)
-import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { execSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const OUT = path.join(ROOT, 'site', 'dist');
+
+// A 40-hex id for a folder: every file's path and bytes, in sorted order (the
+// shape of a commit SHA, which is what stamp-build.mjs and the kiosk's poll
+// expect). Generated files that are never committed are left out so a build
+// of the same sources is the same id.
+function hashTree(dir) {
+  const h = createHash('sha1');
+  const walk = (d) => {
+    for (const name of readdirSync(d).sort()) {
+      const p = path.join(d, name);
+      if (statSync(p).isDirectory()) { walk(p); continue; }
+      if (name === 'version.json') continue;
+      h.update(path.relative(dir, p)).update('\0').update(readFileSync(p)).update('\0');
+    }
+  };
+  walk(dir);
+  return h.digest('hex');
+}
 const ORIGIN = (process.env.SITE_ORIGIN || 'https://kvbcawana.pages.dev').replace(/\/+$/, '');
 const BUILD_ID = process.env.GITHUB_SHA || execSync('git rev-parse HEAD', { cwd: ROOT }).toString().trim();
 
@@ -47,7 +66,12 @@ writeFileSync(path.join(OUT, 'lobby', 'shared', 'sync.json'), `${JSON.stringify(
 // Journey: its static public/, stamped like its own deploy stamps it.
 const journeyOut = path.join(OUT, 'journey');
 cpSync(path.join(ROOT, 'journey', 'public'), journeyOut, { recursive: true });
-run(`node scripts/stamp-build.mjs ${BUILD_ID} ${JSON.stringify(journeyOut)}`, path.join(ROOT, 'journey'));
+// Journey's build id is a hash of ITS OWN files, not the monorepo commit: the
+// kiosk reloads itself when its build id changes, and stamped with the commit
+// every push to any app (the nightly bots' feed commits included) reloaded
+// every idle kiosk and dropped the embedded lobby's socket for nothing.
+const journeyBuild = hashTree(path.join(ROOT, 'journey', 'public'));
+run(`node scripts/stamp-build.mjs ${journeyBuild} ${JSON.stringify(journeyOut)}`, path.join(ROOT, 'journey'));
 
 // The phone check-in, online (printer 7.9.0): the print app's own phone page,
 // with its brand kit beside it, signed in with the sync passphrase and every
