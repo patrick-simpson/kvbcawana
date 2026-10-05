@@ -5,43 +5,39 @@
 Every code change in this repo should be committed **and pushed to
 `main`** as part of the same turn. There are no feature branches and no
 pull request review step — the user has explicitly authorized direct
-pushes to `main`. The deploy workflow at
-`.github/workflows/deploy.yml` triggers on every push to `main`, so
-each push automatically redeploys the live kiosk site.
+pushes to `main`. The root `.github/workflows/ci.yml` runs this app's
+checks (`npm test`: `node --test` over `test/`, the jsdom kiosk harness and
+the Chromium layout tests) on every push and then publishes the one site, so
+each green push redeploys https://awana.kvbchurch.org/journey/ (the only
+correct kiosk address). This folder's own `.github/` workflows are dormant.
 
-Concretely, after editing any file:
+Concretely, after editing any file: run `npm test` and `node --check
+public/src/schedule.js`, `git add`, `git commit` with a clear message, and
+`git push origin HEAD:main` (no PR, no other branch).
 
-1. `git add` the changed files.
-2. `git commit` with a clear message.
-3. `git push -u origin main` (no PR, no other branch).
-
-**A deployed fix is NOT immediately live on the kiosk.** GitHub Pages
-serves every asset with `Cache-Control: max-age=600`, and Chromium's
-normal reload does not revalidate subresources that are still fresh —
-so for up to ~10 minutes after a deploy, an F5 on the Pi reloads
-`index.html` but keeps running the *previous* `schedule.js`/CSS from
-disk cache (this survives a reboot too). This has already caused one
-"the fix didn't work" false alarm during live testing. The kiosk now
-reloads itself onto a new build within a few minutes on its own (see
-"Self-updating kiosk" below), so this only bites when you are checking
-inside those minutes: to verify a fix right now, wait 10 minutes and then
-refresh, or hard-refresh (Ctrl+Shift+R) to bypass the cache immediately.
-When a live symptom contradicts code you know is deployed, suspect this
-cache before suspecting the code.
+**Seeing a fix on the Pi.** The kiosk reloads itself onto a new build within
+a few minutes on its own (see "Self-updating kiosk" below), and the site
+serves `index.html` and every JSON `no-cache` with the stamped `?v=` on each
+asset, so a reload gets the new code. To look right now, hard-refresh
+(Ctrl+Shift+R). When a live symptom contradicts code you know is deployed,
+check the build id the page carries (`<meta name="journey-build">`) before
+suspecting the code. (Under GitHub Pages, until 2026-10, a ten-minute
+asset cache made "the fix didn't work" a false alarm more than once.)
 
 ## Self-updating kiosk
 
 Since 2026-09-16 the Pi picks up a deploy on its own, usually within a few
-minutes, with no SSH and no keyboard. The ten-minute note above is now
-only about *verifying a fix inside those minutes*: left alone, the kiosk
-gets there by itself.
+minutes, with no SSH and no keyboard.
 
-- **Build identity is stamped at deploy time**, because a site with no
-  build step has nothing that knows its own commit.
-  `scripts/stamp-build.mjs` runs in `deploy.yml` between the checkout and
-  the Pages upload and rewrites the copy being uploaded: it writes
-  `public/version.json` (`{ build, builtAt }`), puts the same SHA in
-  `index.html`'s `<meta name="journey-build">`, and appends `?v=<sha>` to
+- **Build identity is stamped at site build time**, because a site with no
+  build step has nothing that knows its own version.
+  `scripts/stamp-build.mjs` is run by `site/build.mjs` on the copy being
+  published, with a build id that is a hash of `journey/public`'s own files
+  (not the monorepo commit: stamped with the commit, every push to any app
+  reloaded every idle kiosk and dropped the embedded lobby's socket for
+  nothing). It writes
+  `public/version.json` (`{ build, builtAt }`), puts the same id in
+  `index.html`'s `<meta name="journey-build">`, and appends `?v=<id>` to
   every `STAMPED_ASSETS` path: `src/schedule.js`, `src/style.css`,
   `brand/tokens.css`, `brand/fonts.css` and the wordmark
   `brand/logos/journey-white.svg`, every copy of each (the wordmark is on
@@ -57,19 +53,18 @@ gets there by itself.
   `brand/fonts.css` is missing or names no fonts, or if it names a font the
   deploy does not carry, which fails the deploy loudly rather than shipping
   a page that can never update itself or 404s its own type.
-- **The `?v=` is not decoration.** Pages serves every asset with
-  `max-age=600` and Chromium reuses a still-fresh subresource across a
-  reload, so without it a reload would come back running the *previous*
-  `schedule.js`. A changed query string is a different URL, so the new
-  page pulls new assets immediately.
+- **The `?v=` is not decoration.** Chromium reuses a still-fresh
+  subresource across a reload, so without it a reload could come back
+  running the *previous* `schedule.js`. A changed query string is a different
+  URL, so the new page pulls new assets immediately.
 - **The poll**: every 3 minutes, and on the `online` event (rate limited
   to once a minute), `version.json?b=<now>` with `cache: 'no-store'`
   through `fetchWithTimeout` (5s), compared against the meta. A non-200
   is "no news" and the poller stays inert, which is what a local checkout
   and any unstamped copy see.
-- **Never reload onto the old page.** `max-age=600` applies to
-  `index.html` too, so `version.json` can report a new build minutes
-  before the edge serving this kiosk stops handing back the old page.
+- **Never reload onto the old page.** A CDN edge or a proxy can hand back
+  the old `index.html` for a moment after `version.json` has moved on (under
+  GitHub Pages it was minutes).
   `index.html?b=<now>` is fetched no-store first and must actually carry
   the new SHA; if it does not, the next tick tries again. Without this,
   the reload looks exactly like "the deploy did not take", which is the
@@ -87,44 +82,19 @@ gets there by itself.
 - The embedded Check-in Display is a different origin and reloads itself
   through its own version poll; nothing here reaches into that iframe.
 
-## GitHub Pages source must stay "GitHub Actions"
+## The kiosk's address, and a lesson from the GitHub Pages days
 
-The repo's Pages setting (Settings → Pages → Build and deployment →
-Source) must be **"GitHub Actions"**, never "Deploy from a branch".
-With the branch source set, every push to `main` triggers GitHub's
-built-in "pages build and deployment" workflow, which publishes the
-repo *root* (no `index.html` there — only `public/` has one) and races
-`deploy.yml`'s correct artifact; whichever finishes last wins, so the
-live site flip-flops between two entirely different layouts.
-
-That flip-flop is what made the 2026-08-22 kiosk outage so confusing to
-diagnose, and it's worth understanding the interaction, because the two
-layouts have **disjoint** valid URLs:
-
-| Pages source | `/` | `/public/index.html` |
-| --- | --- | --- |
-| GitHub Actions (correct) | 200 | 404 |
-| Deploy from a branch | 404 | 200 |
-
-The Pi had been misconfigured to load `…/Journey-Display/public/index.html`
-— a URL that is only valid under the *wrong* Pages source. So every time
-the built-in branch build won the race, the kiosk came back to life and
-the misconfiguration stayed hidden; every time `deploy.yml` won, the
-kiosk 404'd. Fixing the Pages source made the kiosk's 404 permanent
-rather than intermittent, which is why the Pi's URL had to be corrected
-to the canonical root (`https://patrick-simpson.github.io/Journey-Display/`)
-at the same time. **The lesson: a kiosk that recovers on its own is not
-evidence the kiosk is configured right** — check the URL the browser is
-actually on (`ps -eo args | grep -i '[c]hromi'`) before believing the
+The only correct kiosk address is `https://awana.kvbchurch.org/journey/`
+(never `/public/index.html`, never a github.io address: the old sites are not
+forwarded, see SWITCH.md). The site is Cloudflare Pages now, published by the
+root `ci.yml`, so the old GitHub Pages "source must be GitHub Actions" setting
+no longer exists. What survives from the 2026-08-22 outage it caused: **a
+kiosk that recovers on its own is not evidence it is configured right.** The
+Pi had been loading a URL that was only valid under the wrong Pages source,
+so it worked whenever the wrong build won a race and 404'd whenever the right
+one did. Check the URL the browser is actually on (`ps -eo args | grep -i
+'[c]hromi'`, and the kiosk service's `JOURNEY_URL`) before believing the
 server is at fault.
-
-`deploy.yml` has a best-effort step that tries to force the setting via
-the REST API, but
-the Actions `GITHUB_TOKEN` isn't allowed to change Pages settings
-("Resource not accessible by integration"), so only a repo admin can
-actually fix it in the UI. Symptom to recognize: a `dynamic/pages/
-pages-build-deployment` run appearing alongside a push means the
-setting has regressed.
 
 ## Tech stack snapshot
 
@@ -132,8 +102,8 @@ setting has regressed.
   step**. This runs on a Raspberry Pi Zero from 2017 (single-core
   ARMv6, 512MB RAM), so keeping the page as light as possible for the
   Chromium kiosk browser matters more than developer convenience.
-- Only `public/` is deployed to GitHub Pages (see
-  `.github/workflows/deploy.yml`) — repo docs, workflow files, etc.
+- Only `public/` is deployed, under `/journey/` of the one site (by
+  `site/build.mjs`) — repo docs, workflow files, etc.
   never end up served on the live site. (The one README that is served is
   `public/brand/README.md`, because the kit mirror is the whole kit, byte
   for byte; see "Brand kit" below.)
@@ -233,7 +203,7 @@ Read Prep, captions).
   number in the shout face.
 
 - **`public/brand/` is a byte-identical mirror of the whole kit**, whose
-  canonical copy is `Awana-Check-in-Display/shared/brand/` (read its
+  canonical copy is `lobby/shared/brand/` (read its
   README). Never edit it here. `node scripts/sync-brand-kit.mjs
   <signage-checkout>` re-copies it and rewrites
   `data/brand-kit-manifest.json` (a sha256 per file plus the signage commit
@@ -301,8 +271,8 @@ styles inline in a `<style>` block. There is no `about.css`.
   only, so `about.html` needs no build meta and is left untouched by the
   deploy (checked by running the stamp over a scratch copy of `public/`).
 - **`family.css` is byte-identical across the three repos.** The canonical
-  copy is `Print-TwoTimTwo-Labels/styles/family.css` and its spec is
-  `Print-TwoTimTwo-Labels/docs/FAMILY-DESIGN.md`; change it there and copy
+  copy is `printer/styles/family.css` and its spec is
+  `printer/docs/FAMILY-DESIGN.md`; change it there and copy
   the file byte-for-byte to all three, never edit this copy on its own.
   Anything page-specific goes in `about.html`'s inline `<style>` with the
   `jd-` prefix, built on the family tokens.
@@ -403,8 +373,9 @@ Zero cannot decode the originals (1080p H.264, ~90-220MB each) at a
 usable frame rate. `scripts/transcode-lesson-video.mjs` (server-side,
 in the nightly Action) re-encodes the current lesson down to something
 the Pi Zero can actually play smoothly and writes it to
-`public/current-lesson-video.mp4`, which GitHub Pages then serves —
-technically a public URL, same as the rest of this site. The project
+`public/current-lesson-video.mp4`, which the site then serves (streamed from
+the repo by the Pages Function, `site/lib/proxyLarge.js`, since it is over
+Pages' 25 MiB) — technically a public URL, same as the rest of this site. The project
 owner chose this trade-off explicitly, aware that it's a narrower
 version of "never rehost" than the original wording: it's a re-encoded,
 lower-quality copy, used solely for this kiosk's own playback, never
@@ -463,8 +434,8 @@ not a typo to "fix" here.
 
 ### Current lesson lookup
 
-`.github/workflows/update-lesson.yml` runs nightly (mirroring the
-sibling repo's `update-calendar.yml` pattern): it calls
+The root `.github/workflows/journey-update-lesson.yml` runs nightly (mirroring
+the lobby's `lobby-update-calendar.yml` pattern): it calls
 `scripts/fetch-current-lesson.mjs`, which resolves "what's the current
 lesson" from the church's own TwoTimTwo calendar
 (`https://kvbchurch.twotimtwo.com/calendar/index?current_only=Y`),
@@ -537,7 +508,7 @@ nightly failure on one side but not the other.
 ### Video transcoding (`scripts/transcode-lesson-video.mjs`)
 
 Runs as the step right after `fetch-current-lesson.mjs` in
-`update-lesson.yml`. Verified against a real lesson file: Awana's
+`journey-update-lesson.yml`. Verified against a real lesson file: Awana's
 original is 1920x1080 H.264 Main profile, ~2.2Mbps video + 161kbps
 audio, ~94MB for a ~5.5 minute lesson. Re-encoded to 854x480 H.264
 **Baseline** profile (avoids CABAC entropy coding, which costs
@@ -1324,6 +1295,17 @@ video's ending used to do.
   post-video show works with the network dead. A slide image that fails
   to load skips ahead (bounded) rather than sitting on black.
 
+### Left alone: the idle watch
+
+A forgotten preview or an open Settings panel used to pin the kiosk (7.11.1
+era, 2026-10-05): previewMode holds off the 6:30 scheduler and an open panel
+counts as busy for the self-updater. `idleWatch()` runs once a minute and,
+with nobody touching the kiosk (any key, tap or click is activity), ends a
+PAUSED preview after `PREVIEW_IDLE_MS` (20 min; a playing one is never cut)
+and closes the panel after `SETTINGS_IDLE_MS` (15 min). The wake lock asks
+again when the OS releases it and every five minutes while there is none.
+`test/idle.test.mjs` drives both.
+
 ### Manual video preview (Settings panel)
 
 A third corner button (`#settings-btn`, top-right, same subtle style as
@@ -1399,7 +1381,8 @@ the service's allowlist (`sanitizeJourney` in that repo's
 
 ## Embedding note
 
-The Awana Check-in Display (`https://patrick-simpson.github.io/Awana-Check-in-Display/`)
+The Awana Check-in Display (`https://awana.kvbchurch.org/lobby/`, the same
+origin as this page since the move)
 has no `X-Frame-Options`/CSP restriction, so it embeds fine in
 `#checkin-view`'s iframe. If that ever changes, this page would need a
 different integration approach (e.g. redirecting instead of embedding).

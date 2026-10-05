@@ -239,8 +239,8 @@ you find, then `sudo reboot`.
   journey-kiosk` brings it back by hand.
 
 Note that a kiosk which fixes *itself* after a while is still broken —
-see the Pages-source section in `CLAUDE.md` for why a wrong Pi URL can
-appear to work intermittently.
+see "The kiosk's address" in `CLAUDE.md` for why a wrong Pi URL once
+appeared to work intermittently.
 
 ## That's It!
 
