@@ -3,7 +3,7 @@
 // Durable Object, so all state lives in one place and every change is applied
 // in order. The behaviour is SyncCore (./sync.js); this file is only wiring.
 
-import { SyncCore, json } from './sync.js';
+import { BODY_MAX, SyncCore, json } from './sync.js';
 
 /** The pages that may call this service from a browser. */
 const ALLOWED_ORIGINS = [
@@ -125,6 +125,10 @@ export default {
     // A socket upgrade goes straight through: its 101 cannot be re-wrapped,
     // and it carries no CORS (the session in its query string is the lock).
     if (url.pathname === '/v1/live') return store(env).fetch(request);
+    // Refuse a body too big to save BEFORE buffering it (the login route is
+    // public, and a body was read whole before any size check).
+    const declared = Number(request.headers.get('Content-Length'));
+    if (Number.isFinite(declared) && declared > BODY_MAX) return withCors(json({ error: 'That is too big to save.' }, 413), origin);
     const headers = new Headers(request.headers);
     headers.set('x-client-ip', request.headers.get('CF-Connecting-IP') || 'unknown');
     const forwarded = new Request(request.url, {

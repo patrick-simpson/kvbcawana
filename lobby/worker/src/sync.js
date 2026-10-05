@@ -52,7 +52,7 @@ export const SETTINGS_JSON_MAX = 3800;
 /** The slide chunker's budget and count (print-server/events.js). */
 export const SLIDES_CHUNK_JSON_BUDGET = 3900;
 export const SLIDES_TOTAL_MAX = 12;
-const BODY_MAX = 128 * 1024;
+export const BODY_MAX = 128 * 1024;   // bytes; the entry point refuses a longer Content-Length before reading
 
 /** The channel the screens already listen on for check-ins. */
 export const DISPLAY_CHANNEL = 'awana-channel';
@@ -381,8 +381,13 @@ export class SyncCore {
 
   /** @param {Request} request */
   async body(request) {
+    // Bytes, not UTF-16 units: a body of CJK or emoji was measured at half
+    // its size. The Content-Length check in index.js stops a long body from
+    // being buffered at all; this is the backstop for one that lied.
+    const declared = Number(request.headers.get('content-length'));
+    if (Number.isFinite(declared) && declared > BODY_MAX) throw new BadRequest('That is too big to save.');
     const text = await request.text();
-    if (text.length > BODY_MAX) throw new BadRequest('That is too big to save.');
+    if (new TextEncoder().encode(text).length > BODY_MAX) throw new BadRequest('That is too big to save.');
     try {
       const parsed = JSON.parse(text || '{}');
       if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('shape');

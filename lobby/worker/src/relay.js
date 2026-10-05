@@ -42,6 +42,8 @@ export function relayAllowed(method, path) {
 export const REQUEST_TTL_MS = 45 * 1000;   // the laptop takes it within this, or the page hears "not answering"
 export const ANSWER_TTL_MS = 2 * 60 * 1000;
 export const LAPTOP_ONLINE_MS = 60 * 1000;  // the laptop asked within this: it is on
+export const LAPTOP_STAMP_MS = 15 * 1000;   // how stale the "laptop asked" stamp may get before a poll rewrites it
+export const TAKEN_TTL_MS = 75 * 1000;      // a request the laptop took lives this long past the taking: its own timeout is 60 s
 export const BUSY_MS = 5 * 60 * 1000;       // a phone asked within this: the laptop asks every second
 export const QUEUE_MAX = 50;
 export const REQUEST_BODY_MAX = 8 * 1024;
@@ -59,6 +61,14 @@ export class Relay {
   }
 
   async queue() { return (await this.storage.get('relay:queue')) || []; }
+
+  // A request waits REQUEST_TTL_MS to be taken; once taken it lives
+  // TAKEN_TTL_MS more. It used to be dropped at 45 s whether taken or not,
+  // while the laptop allows itself 60 s to answer (a jam reprint): the answer
+  // landed on a 404 and the phone had already been told to try again.
+  alive(r, t) {
+    return r.taken ? t - r.taken < TAKEN_TTL_MS : t - r.at < REQUEST_TTL_MS;
+  }
 
   async laptopOnline() {
     const seen = await this.storage.get('relay:laptop');
@@ -98,7 +108,7 @@ export class Relay {
     if (keep.length !== held.length) await this.storage.put('relay:held', keep);
     // ...and every request the laptop never took (it holds a child's name).
     const q = await this.queue();
-    const live = q.filter((r) => t - r.at < REQUEST_TTL_MS);
+    const live = q.filter((r) => this.alive(r, t));
     if (live.length !== q.length) await this.storage.put('relay:queue', live);
     return held.length - keep.length + q.length - live.length;
   }
@@ -107,9 +117,14 @@ export class Relay {
   async take() {
     const t = this.now();
     await this.purge();
-    await this.storage.put('relay:laptop', t);
+    // The stamp is for laptopOnline()'s minute-wide question, so a poll that
+    // comes every second (busy) or every 20 s (idle) does not need to write
+    // it every time: about 4,300 writes a day from one idle laptop, against
+    // the free tier's daily cap, said the same thing 15 s apart.
+    const seen = await this.storage.get('relay:laptop');
+    if (typeof seen !== 'number' || t - seen >= LAPTOP_STAMP_MS) await this.storage.put('relay:laptop', t);
     const all = await this.queue();
-    const live = all.filter((r) => t - r.at < REQUEST_TTL_MS);
+    const live = all.filter((r) => this.alive(r, t));
     const fresh = live.filter((r) => !r.taken);
     for (const r of fresh) r.taken = t;
     if (fresh.length || live.length !== all.length) await this.storage.put('relay:queue', live);

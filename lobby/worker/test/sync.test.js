@@ -379,6 +379,48 @@ describe('requests', () => {
 });
 
 describe('the phone check-in relay (printer 7.9.0)', () => {
+  it('the laptop\'s "I asked" stamp is written once per 15 s, not on every poll', async () => {
+    const s = setup();
+    const { body: { session } } = await s.login();
+    const puts = [];
+    const realPut = s.storage.put.bind(s.storage);
+    s.storage.put = async (k, v) => { puts.push(k); return realPut(k, v); };
+    for (let i = 0; i < 10; i++) { await s.call('GET', '/v1/relay/next', undefined, session); s.tick(1000); }
+    expect(puts.filter((k) => k === 'relay:laptop')).toHaveLength(1);
+    s.tick(15_000);
+    await s.call('GET', '/v1/relay/next', undefined, session);
+    expect(puts.filter((k) => k === 'relay:laptop')).toHaveLength(2);
+    // and the page still sees the laptop as online throughout
+    const r = await (await s.call('POST', '/v1/relay', { method: 'GET', path: '/touch/jam' }, session)).json();
+    expect(r.laptopOnline).toBe(true);
+  });
+
+  it('a request the laptop TOOK lives past 45 s: its own timeout is 60 s (a jam reprint)', async () => {
+    const s = setup();
+    const { body: { session } } = await s.login();
+    const { id } = await (await s.call('POST', '/v1/relay', { method: 'POST', path: '/jam-reprint', body: {} }, session)).json();
+    await s.call('GET', '/v1/relay/next', undefined, session);   // taken at t
+    s.tick(55_000);
+    const r = await s.call('POST', '/v1/relay/answer', { id, status: 200, body: { success: true } }, session);
+    expect(r.status).toBe(200);
+    expect(await (await s.call('GET', `/v1/relay/result?id=${id}`, undefined, session)).json()).toMatchObject({ done: true, status: 200 });
+    // an UNTAKEN request still goes at 45 s: the laptop was not there, and the
+    // next poll (which purges) no longer offers it
+    const { id: id2 } = await (await s.call('POST', '/v1/relay', { method: 'GET', path: '/touch/jam' }, session)).json();
+    s.tick(46_000);
+    expect((await (await s.call('GET', '/v1/relay/next', undefined, session)).json()).requests).toEqual([]);
+    expect((await s.call('POST', '/v1/relay/answer', { id: id2, status: 200, body: {} }, session)).status).toBe(404);
+  });
+
+  it('a body too big to save is refused by its byte length', async () => {
+    const s = setup();
+    const login = await s.login();
+    const big = 'ü'.repeat(70 * 1024);   // 70 K characters, 140 KB of UTF-8: over the cap in bytes, under it in UTF-16 units
+    const r = await s.call('PUT', '/v1/settings', { settings: { note: big } }, login.body.session);
+    expect(r.status).toBe(400);
+    expect((await r.json()).error).toMatch(/too big/);
+  });
+
   it('a page asks, the laptop takes it, answers, and the page collects the answer once', async () => {
     const s = setup();
     const { body: { session } } = await s.login();
