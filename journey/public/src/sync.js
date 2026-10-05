@@ -27,6 +27,7 @@
   var CONFIG_KEY = 'awanaConfig.v1';
   var APPLIED_KEY = 'journey.sync.savedAt';
   var POLL_MS = 10 * 60 * 1000;
+  var REQUEST_TIMEOUT_MS = 8000;   // one answer or none: a hung request must not hold a pull or a push forever
   var PUSH_DELAY_MS = 1000;
   var SESSION_RE = /^v1\.\d+\.\d+\.[A-Za-z0-9_-]{20,}$/;
 
@@ -116,6 +117,7 @@
       headers: headers,
       body: opts.body === undefined ? undefined : JSON.stringify(opts.body),
       cache: 'no-store',
+      signal: typeof AbortSignal !== 'undefined' && AbortSignal.timeout ? AbortSignal.timeout(REQUEST_TIMEOUT_MS) : undefined,
     }).then(function (res) {
       return res.json().then(function (b) { return { ok: res.ok, status: res.status, body: b }; },
         function () { return { ok: res.ok, status: res.status, body: null }; });
@@ -254,21 +256,34 @@
       if (e.target && e.target.closest && e.target.closest('#cc-btn, .cc-btn, [data-captions-toggle]')) schedulePush();
     });
 
-    fetch(SYNC_INDEX, { cache: 'no-store' }).then(function (r) { return r.ok ? r.json() : null; }, function () { return null; })
-      .then(function (d) {
-        var url = d && typeof d.url === 'string' ? d.url.trim().replace(/\/+$/, '') : '';
-        if (!/^https:\/\/[^\s?#]+$/.test(url)) return;
-        base = url;
-        lastPushed = JSON.stringify(readRoom());
-        render();
-        pull();
-        setInterval(pull, POLL_MS);
-        window.addEventListener('online', pull);
-      });
+    // The index names the service. One failed read used to leave sync dead
+    // until the next reload (days, on a kiosk): it is retried with backoff
+    // until it is read, and the index may also honestly say there is no
+    // service yet (url ""), which is not a failure.
+    var attempt = 0;
+    function readIndex() {
+      fetch(SYNC_INDEX, { cache: 'no-store', signal: typeof AbortSignal !== 'undefined' && AbortSignal.timeout ? AbortSignal.timeout(REQUEST_TIMEOUT_MS) : undefined })
+        .then(function (r) { return r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)); })
+        .then(function (d) {
+          var url = d && typeof d.url === 'string' ? d.url.trim().replace(/\/+$/, '') : '';
+          if (!/^https:\/\/[^\s?#]+$/.test(url)) return;
+          base = url;
+          lastPushed = JSON.stringify(readRoom());
+          render();
+          pull();
+          setInterval(pull, POLL_MS);
+          window.addEventListener('online', pull);
+        }, function () {
+          setTimeout(readIndex, indexRetryWait(attempt++));
+        });
+    }
+    readIndex();
   }
+  // 15 s, 30 s, 60 s, then every five minutes.
+  function indexRetryWait(n) { return Math.min(15000 * Math.pow(2, n), 5 * 60 * 1000); }
 
   // Test seam: the jsdom harness drives the same functions the page uses.
-  window.journeySync = { readRoom: readRoom, applyRoom: applyRoom, pull: pull, push: push, signIn: signIn, signOut: signOut };
+  window.journeySync = { readRoom: readRoom, applyRoom: applyRoom, pull: pull, push: push, signIn: signIn, signOut: signOut, indexRetryWait: indexRetryWait };
 
   start();
 })();
