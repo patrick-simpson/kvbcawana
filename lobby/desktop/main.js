@@ -578,14 +578,38 @@ function checkForUpdates(byHand = false) {
   autoUpdater.checkForUpdates().catch((err) => { log('update check failed', err); updateStatus = 'update check failed'; updateTray(); });
 }
 
+// One install at a time, with a way back. quitAndInstall() hands the app to
+// the installer and normally never returns; when it throws, or returns and
+// the app is still here two minutes later, the update is treated as not
+// installable from this run: the "ready" flag is dropped so the minute tick
+// stops re-trying it, the quiet-relaunch mark is undone (the next launch is
+// a person's), and the next downloaded update gets a fresh try.
+let installing = false;
 function installUpdate() {
+  if (installing) return;
+  installing = true;
   log('installing update');
   // The installer relaunches the app with no arguments, which would read as
   // a person opening it (and show the lobby for three hours at 2 am).
   state.quietRelaunch = true;
   saveState();
   closingByApp = true;
-  autoUpdater.quitAndInstall(true, true);
+  const giveUp = (why) => {
+    log('update did not install:', why);
+    installing = false;
+    updateReady = false;
+    updateStatus = 'update did not install; will try the next one';
+    state.quietRelaunch = false;
+    saveState();
+    closingByApp = false;
+    updateTray();
+  };
+  try {
+    autoUpdater.quitAndInstall(true, true);
+    setTimeout(() => { if (!app.isQuitting) giveUp('the app is still running two minutes after quitAndInstall'); }, 2 * 60 * 1000).unref?.();
+  } catch (e) {
+    giveUp(e && e.message ? e.message : String(e));
+  }
 }
 
 function maybeInstallUpdate() {
