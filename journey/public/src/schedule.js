@@ -263,6 +263,37 @@ let audioUnlocked = false;
    document; the Check-in Display iframe is a different origin and
    manages its own cursor. */
 const CURSOR_IDLE_MS = 5000;
+
+/* A forgotten preview or an open Settings panel used to pin the kiosk for
+   good: a leader previews a lesson, pauses it, walks away, and the 6:30
+   scheduler (which previewMode holds off) never gets the room back; or the
+   Settings panel is left up and the self-updater (which counts it as busy)
+   never reloads. idleWatch() runs once a minute and, with nobody touching
+   the kiosk for the stated time, ends a PAUSED preview (never a playing
+   one) and closes the panel. Any key, tap or click is activity. */
+const PREVIEW_IDLE_MS = 20 * 60 * 1000;
+const SETTINGS_IDLE_MS = 15 * 60 * 1000;
+let lastActivityAt = Date.now();
+function noteActivity() { lastActivityAt = Date.now(); }
+['pointerdown', 'keydown', 'touchstart', 'wheel'].forEach((type) => document.addEventListener(type, noteActivity, { passive: true, capture: true }));
+function idleWatch(now = Date.now()) {
+  const idleFor = now - lastActivityAt;
+  const acted = [];
+  if (previewMode && idleFor > PREVIEW_IDLE_MS && !slideshow && (journeyVideo.paused || journeyVideo.ended || !journeyVideo.src)) {
+    console.log('Journey: a paused preview was left for ' + Math.round(idleFor / 60000) + ' minutes; handing the room back');
+    endPreview();
+    acted.push('preview');
+  }
+  if (!settingsPanel.classList.contains('hidden') && idleFor > SETTINGS_IDLE_MS) {
+    console.log('Journey: the Settings panel was left open; closing it');
+    closeSettingsPanel();
+    acted.push('settings');
+  }
+  return acted;
+}
+setInterval(idleWatch, 60 * 1000);
+window.idleWatch = idleWatch;
+window.noteActivity = noteActivity;
 let cursorIdleTimer = null;
 document.documentElement.classList.add('cursor-hidden');
 function markActivity() {
@@ -1872,11 +1903,20 @@ async function requestWakeLock() {
   if (!('wakeLock' in navigator)) return;
   try {
     wakeLock = await navigator.wakeLock.request('screen');
+    // The OS can release the lock on its own (a power event, a modal, a
+    // monitor sleeping), and a kiosk never fires visibilitychange, so the
+    // release itself is the cue to ask again, a moment later.
+    if (wakeLock && typeof wakeLock.addEventListener === 'function') {
+      wakeLock.addEventListener('release', () => { setTimeout(requestWakeLock, 2000); }, { once: true });
+    }
   } catch {
     // e.g. the tab isn't visible yet — visibilitychange below retries.
   }
 }
 requestWakeLock();
+// And a slow heartbeat for a lock that was never granted or whose release
+// event was missed: ask again every five minutes while there is none.
+setInterval(() => { if (!wakeLock || wakeLock.released) requestWakeLock(); }, 5 * 60 * 1000);
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible' && (!wakeLock || wakeLock.released)) {
     requestWakeLock();
