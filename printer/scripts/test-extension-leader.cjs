@@ -150,6 +150,53 @@ const pruneSharedDedup = new Function('SHARED_DEDUP_PREFIX', extractFunction('pr
     check('nothing boots unguarded ahead of the widget', !/^\s{2}injectWidget\(\);/m.test(SRC));
   }
 
+  console.log('\npeak-window refresh: it asks whether the modal is SHOWING, and reloads nothing mid-flight');
+  {
+    // #checkin-modal is static markup on TwoTimTwo's page: always present, so
+    // the old presence check meant the 5:40-6:00 reload never happened.
+    const code = extractFunction('isShowing') + '\n' + extractFunction('autoRefresh');
+    const build = new Function('env', `
+      const document = env.document, window = env.window, location = env.location;
+      const isInClubWindow = () => true;
+      const getQueue = () => env.queue;
+      const _quickModeProcessing = env.quick;
+      const phoneActionsInFlight = env.phones;
+      const Date = env.Date;
+      ${code}
+      return { autoRefresh, isShowing };
+    `);
+    const at550 = class extends Date { constructor(...a) { super(...(a.length ? a : [2026, 9, 7, 17, 50, 0])); } };
+    const page = (over = {}) => {
+      const modal = { isConnected: true, offsetParent: null, style: { display: over.modalShown ? 'block' : 'none' } };
+      const env = {
+        reloads: 0, queue: over.queue || [], quick: !!over.quick, phones: new Set(over.phones || []), Date: at550,
+        document: { hidden: false, activeElement: over.typing ? { tagName: 'INPUT' } : null, getElementById: (id) => (id === 'checkin-modal' ? modal : null) },
+        window: { __awanaTouchOpen: false, getComputedStyle: (el) => ({ display: el.style.display, visibility: 'visible' }) },
+      };
+      env.location = { reload: () => { env.reloads++; } };
+      return Object.assign(build(env), { env });
+    };
+    let p = page();
+    p.autoRefresh();
+    check('with the modal present but hidden, the peak-window reload happens', p.env.reloads === 1, String(p.env.reloads));
+    p = page({ modalShown: true });
+    p.autoRefresh();
+    check('with the modal showing, it does not', p.env.reloads === 0);
+    p = page({ queue: [{ name: 'x' }] });
+    p.autoRefresh();
+    check('a label still queued holds the reload', p.env.reloads === 0);
+    p = page({ phones: ['abc'] });
+    p.autoRefresh();
+    check('a phone check-in being driven holds the reload', p.env.reloads === 0);
+    p = page({ quick: true });
+    p.autoRefresh();
+    check('a quick-mode batch holds the reload', p.env.reloads === 0);
+    p = page({ typing: true });
+    p.autoRefresh();
+    check('typing holds it, as before', p.env.reloads === 0);
+    check('isShowing: detached and display:none are not showing; offsetParent is', !p.isShowing(null) && !p.isShowing({ isConnected: false }) && p.isShowing({ isConnected: true, offsetParent: {} }));
+  }
+
   console.log(`\n${passed} passed, ${failed} failed`);
   process.exit(failed ? 1 : 0);
 })().catch((e) => { console.error(e); process.exit(1); });

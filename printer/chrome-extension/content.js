@@ -4010,6 +4010,16 @@
   // busiest window (5:40 PM - 6:00 PM) we reload the page every 30 seconds
   // so the .clubber-list diff sees the latest state.  Suppressed while the
   // user is mid-action (modal open, typing).
+  // Is this element actually on screen (not display:none, not hidden, not
+  // detached)? offsetParent is null for all three, and for position:fixed,
+  // which a modal often is, so check the computed style too.
+  function isShowing(el) {
+    if (!el || !el.isConnected) return false;
+    if (el.offsetParent !== null) return true;
+    var cs = window.getComputedStyle ? window.getComputedStyle(el) : null;
+    return !!cs && cs.display !== 'none' && cs.visibility !== 'hidden';
+  }
+
   function autoRefresh() {
     try {
       if (document.hidden) return;
@@ -4026,9 +4036,15 @@
       // Suppress reload if any modal is open or user is typing, or the touch
       // check-in is up (a reload would drop it and its full screen mid-family).
       if (window.__awanaTouchOpen) return;
-      if (document.getElementById('checkin-modal')) return;
+      // #checkin-modal is static markup on TwoTimTwo's page: it is always
+      // THERE, so a presence check meant this reload never happened. Ask
+      // whether it is showing.
+      if (isShowing(document.getElementById('checkin-modal'))) return;
       var active = document.activeElement;
       if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.tagName === 'SELECT')) return;
+      // Nothing in flight: a label still printing or queued, a phone check-in
+      // being driven, or a quick-mode batch would be cut off by the reload.
+      if (getQueue().length > 0 || _quickModeProcessing || phoneActionsInFlight.size > 0) return;
 
       console.log('[Awana] Peak-window auto-refresh');
       location.reload();

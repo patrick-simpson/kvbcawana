@@ -108,7 +108,7 @@ console.log('touch check-in: families still to come');
 // overlay it stacked up and left its grey backdrop over the page after Close.
 {
   const c = fs.readFileSync(path.join(__dirname, '..', 'chrome-extension', 'content.js'), 'utf8');
-  const api = c.slice(c.indexOf('window.__awanaTouchApi = {'), c.indexOf('injectWidget();', c.indexOf('window.__awanaTouchApi = {')));
+  const api = c.slice(c.indexOf('window.__awanaTouchApi = {'), c.indexOf("bootStep('widget', injectWidget);", c.indexOf('window.__awanaTouchApi = {')));
   check('the touch API never clicks a TwoTimTwo row or polls for its modal', api.length > 200 && !/\.click\(\)|pollForCheckinButton|tryDirectCheckin/.test(api));
   check('no CSRF token needed: TwoTimTwo\'s check-in page has none (live, 7.4.2)',
     /if \(!calendarId\) return Promise\.resolve\('no-form'\);/.test(c) && /if \(csrfToken\) body \+= '&YII_CSRF_TOKEN=/.test(c));
@@ -135,7 +135,7 @@ console.log('touch check-in: families still to come');
     /if \(managed\) selfUpdateTo\(data\.version\);/.test(c) && /type: 'AWANA_RELOAD_SELF'/.test(c)
     && /AWANA_RELOAD_SELF[\s\S]{0,120}chrome\.runtime\.reload\(\)/.test(fs.readFileSync(path.join(__dirname, '..', 'chrome-extension', 'background.js'), 'utf8')));
   check('once per version per tab, so a copy that cannot reload never loops', /sessionStorage\.getItem\(key\)\) return;/.test(c));
-  check('the peak-window auto-reload waits while the touch screen is up', /if \(window\.__awanaTouchOpen\) return;\s*if \(document\.getElementById\('checkin-modal'\)\) return;/.test(c));
+  check('the peak-window auto-reload waits while the touch screen is up', /if \(window\.__awanaTouchOpen\) return;[\s\S]{0,400}if \(isShowing\(document\.getElementById\('checkin-modal'\)\)\) return;/.test(c));
 }
 
 console.log(`\n${passed} passed, ${failed} failed`);
