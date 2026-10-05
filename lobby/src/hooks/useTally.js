@@ -68,13 +68,14 @@ export function useTally() {
         return false;
       }
     }
-    setCount(() => {
-      // Re-read storage so a tally that rolled past midnight (or another
-      // tab that counted) stays consistent, then add ours.
-      const next = load() + 1;
-      save(next);
-      return next;
-    });
+    // Re-read storage so a tally that rolled past midnight (or another tab
+    // that counted) stays consistent, then add ours. Outside the updater on
+    // purpose: React may run an updater more than once (StrictMode does, and
+    // a render it throws away), and one that saves as it goes counted the
+    // same child twice.
+    const next = load() + 1;
+    save(next);
+    setCount(next);
     return true;
   }, []);
 
