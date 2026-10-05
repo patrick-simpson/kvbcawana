@@ -2,19 +2,19 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import vm from 'node:vm';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 // The service worker never runs under jsdom or Playwright, so its one
 // judgement call — what may become the offline shell — is exercised here in a
 // bare VM with fake caches/fetch. The build plugin's two placeholders are
 // substituted the same way vite.config.js does.
 
-function boot({ fetchImpl }) {
+function boot({ fetchImpl, cached }) {
   const listeners = {};
   const put = [];
   const cache = {
     put: async (req, res) => { put.push({ req, res }); },
-    match: async () => undefined,
+    match: async () => cached,
     addAll: async () => {},
   };
   const context = {
@@ -29,6 +29,8 @@ function boot({ fetchImpl }) {
     URL,
     Promise,
     console,
+    setTimeout,
+    clearTimeout,
   };
   const source = readFileSync(resolve(__dirname, 'sw.js'), 'utf8')
     .replace('__BUILD_HASH__', 'test')
@@ -105,6 +107,41 @@ describe('service worker: what may become the offline shell', () => {
     const res = await result;
     expect(res.ok).toBe(true);
     expect(sw.put).toHaveLength(0);
+  });
+
+  it('lie-fi: a navigation the network does not answer in 8 s is served from the cached shell', async () => {
+    vi.useFakeTimers();
+    try {
+      const shell = response({ url: 'https://church.github.io/index.html' });
+      const sw = boot({ fetchImpl: () => new Promise(() => {}), cached: shell });   // the network never answers
+      const pending = navigate(sw);
+      await vi.advanceTimersByTimeAsync(8000);
+      const res = await pending;
+      expect(res).toBe(shell);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('lie-fi with nothing cached: it keeps waiting for the network rather than fail at 8 s', async () => {
+    vi.useFakeTimers();
+    try {
+      let answer;
+      const sw = boot({ fetchImpl: () => new Promise((r) => { answer = r; }), cached: undefined });
+      const pending = navigate(sw);
+      await vi.advanceTimersByTimeAsync(8000);
+      const late = response();
+      answer(late);
+      expect(await pending).toBe(late);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('a fast network answer is used, and the timer does not keep the worker alive', async () => {
+    const sw = boot({ fetchImpl: async () => response(), cached: response({ url: 'https://church.github.io/old.html' }) });
+    const res = await navigate(sw);
+    expect(res.url).toBe('https://church.github.io/index.html');
   });
 
   it('still caches JSON feeds (not navigations) when they are clean', async () => {

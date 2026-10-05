@@ -65,16 +65,36 @@ function cacheable(request, response) {
   return true;
 }
 
+// How long network-first waits for the network before the cached copy
+// answers. Lie-fi (a connection that is up but answers nothing) used to hang a
+// navigation at the browser's own timeout, a minute or more of blank TV,
+// instead of falling back to the shell it had. A fetch that is merely slow
+// still lands in the cache for next time.
+const NETWORK_FIRST_MS = 8000;
+
 async function networkFirst(request) {
   const cache = await caches.open(CACHE_NAME);
-  try {
-    const fresh = await fetch(request);
+  const cachedFor = () => cache.match(request, { ignoreSearch: request.mode === 'navigate' });
+  const attempt = fetch(request).then((fresh) => {
     if (cacheable(request, fresh)) cache.put(request, fresh.clone());
     return fresh;
+  });
+  let timer;
+  const tooSlow = new Promise((resolve) => { timer = setTimeout(() => resolve(null), NETWORK_FIRST_MS); });
+  try {
+    const fresh = await Promise.race([attempt, tooSlow]);
+    if (fresh) return fresh;
+    // Too slow: the cached copy if there is one, else keep waiting for the
+    // network (a blank screen is not better than a late one).
+    const cached = await cachedFor();
+    if (cached) { attempt.catch(() => {}); return cached; }
+    return await attempt;
   } catch (err) {
-    const cached = await cache.match(request, { ignoreSearch: request.mode === 'navigate' });
+    const cached = await cachedFor();
     if (cached) return cached;
     throw err;
+  } finally {
+    clearTimeout(timer);
   }
 }
 
