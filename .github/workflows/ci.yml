@@ -31,6 +31,7 @@ jobs:
   copies:
     name: Family copies match
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -41,6 +42,7 @@ jobs:
   lobby:
     name: Lobby + projector
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     defaults:
       run:
         working-directory: lobby
@@ -71,6 +73,7 @@ jobs:
   worker:
     name: Sync Worker
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: lobby
@@ -90,6 +93,7 @@ jobs:
   desktop:
     name: Sound room app (unit tests)
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: lobby
@@ -106,6 +110,7 @@ jobs:
   journey:
     name: Journey kiosk
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     defaults:
       run:
         working-directory: journey
@@ -123,6 +128,7 @@ jobs:
   printer:
     name: Club Label Printer
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     defaults:
       run:
         working-directory: printer
@@ -141,16 +147,44 @@ jobs:
       - run: npm test
       - run: npm run build
 
+  site:
+    # site/build.mjs has hard failures (a page that lost the shape /checkin
+    # expects, a file over Pages' 25 MiB that is not in the repo, a missing
+    # must-have) and the Pages Function has tests. Both used to run only
+    # inside the main-only deploy job, after the Worker had already shipped,
+    # so a PR never saw them. Here they run on every push and PR, with a
+    # placeholder origin; the deploy job builds again with the real one.
+    name: The one site
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install
+        run: |
+          npm ci --prefix lobby
+          npm ci --prefix printer
+      - name: Build the site
+        env:
+          SITE_ORIGIN: https://awana.kvbchurch.org
+        run: node site/build.mjs
+      - name: Test the Pages Function
+        run: node --test site/test/*.test.mjs
+
   deploy:
-    # The sync Worker, then the one site, once every check above is green.
-    # Until CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID exist it stops,
-    # green. SITE_ORIGIN (a repository variable) is the site's address:
-    # unset means https://kvbcawana.pages.dev; set it to
-    # https://awana.kvbchurch.org on switch day.
+    # The site is built first (its failures are the cheap ones), then the
+    # sync Worker, then the site is published, once every check above is
+    # green. Until CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID exist it
+    # stops, green. SITE_ORIGIN (a repository variable) is the site's
+    # address, https://awana.kvbchurch.org; a deploy without it fails rather
+    # than quietly publishing a site that points at the wrong host.
     name: Deploy to Cloudflare
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
-    needs: [copies, lobby, worker, desktop, journey, printer]
+    needs: [copies, lobby, worker, desktop, journey, printer, site]
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     concurrency:
       group: deploy
       cancel-in-progress: false
@@ -177,6 +211,16 @@ jobs:
           npm ci --prefix lobby
           npm ci --prefix lobby/worker
           npm ci --prefix printer
+      - name: Build the site
+        if: steps.ready.outputs.ready == 'true'
+        env:
+          SITE_ORIGIN: ${{ vars.SITE_ORIGIN }}
+        run: |
+          if [ -z "$SITE_ORIGIN" ]; then
+            echo "::error::The SITE_ORIGIN repository variable is not set (https://awana.kvbchurch.org). Nothing was deployed."
+            exit 1
+          fi
+          node site/build.mjs
       - name: Did the Worker change?
         # Every deploy of the Worker is a new version, and a new version
         # restarts its Durable Object: every lobby TV, the projector and the
@@ -242,11 +286,6 @@ jobs:
             npx wrangler secret delete "$name" </dev/null >/dev/null 2>&1 && echo "Removed $name from the Worker." || true
           done
           rm -f "$RUNNER_TEMP/secrets.json" "$RUNNER_TEMP/unset.txt"
-      - name: Build the site
-        if: steps.ready.outputs.ready == 'true'
-        env:
-          SITE_ORIGIN: ${{ vars.SITE_ORIGIN || 'https://kvbcawana.pages.dev' }}
-        run: node site/build.mjs
       - name: Publish the site
         if: steps.ready.outputs.ready == 'true'
         working-directory: site
