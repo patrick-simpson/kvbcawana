@@ -25,6 +25,7 @@ concurrency:
 jobs:
   update:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     defaults:
       run:
         working-directory: lobby
@@ -57,7 +58,21 @@ jobs:
             git config user.email 'github-actions[bot]@users.noreply.github.com'
             git add public/calendar-feed.json
             git commit -m 'chore: refresh calendar feed'
-            git push
+            # A human push to main during the fetch is routine, not
+            # exceptional (the repo's rule is push straight to main), so a
+            # rejected push is rebased and retried, as the lesson bot does.
+            for i in 1 2 3 4; do
+              if git push; then
+                break
+              elif [ "$i" = 4 ]; then
+                echo '::error::git push failed after retries' >&2
+                exit 1
+              else
+                git fetch origin main
+                git rebase origin/main
+                sleep $((i * 3))
+              fi
+            done
             gh workflow run ci.yml --repo "$GITHUB_REPOSITORY" --ref main
           else
             echo 'Feed unchanged — nothing to deploy.'
