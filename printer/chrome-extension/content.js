@@ -114,6 +114,33 @@
   // reload can't re-trigger the "first pass never prints" seeding twice.
   var REMOTE_RECONCILE_BASELINE_KEY = 'awana_reconcileBaselineDone';
 
+  // ── The dedup state is shared by every TwoTimTwo tab, and keyed by the day ──
+  // It lived in sessionStorage, which is per TAB: a second TwoTimTwo tab (a
+  // volunteer opening the roster in a new tab, a browser restore) started with
+  // an empty printed set, seeded its own baseline a minute after load, and then
+  // printed every check-in made elsewhere as "missed" (7.11.1). Now one copy
+  // in localStorage, under today's date so a new club night starts clean and
+  // nothing from last week is ever "already printed"; other days' copies are
+  // removed as they are found. The 4-hour idle reset still applies on top.
+  var SHARED_DEDUP_PREFIX = 'awana_shared_';
+  var dedupStore = {
+    key: function(k) { return SHARED_DEDUP_PREFIX + todayIsoDate() + '_' + k; },
+    getItem: function(k) { return localStorage.getItem(this.key(k)); },
+    setItem: function(k, v) { localStorage.setItem(this.key(k), v); },
+    removeItem: function(k) { localStorage.removeItem(this.key(k)); },
+  };
+  function pruneSharedDedup(storage, today) {
+    var keep = SHARED_DEDUP_PREFIX + today + '_';
+    var gone = [];
+    for (var i = 0; i < storage.length; i++) {
+      var k = storage.key(i);
+      if (k && k.indexOf(SHARED_DEDUP_PREFIX) === 0 && k.indexOf(keep) !== 0) gone.push(k);
+    }
+    gone.forEach(function(k) { storage.removeItem(k); });
+    return gone.length;
+  }
+  try { pruneSharedDedup(localStorage, todayIsoDate()); } catch (e) { /* storage off */ }
+
   // ── R-4: stable identity keys ───────────────────────────────────────────
   // Internal whitespace is collapsed, not just trimmed: the check-in report's
   // name sits between two links in the markup, so its text can come back with
@@ -215,16 +242,16 @@
 
   function loadPrintedState() {
     try {
-      var ts = parseInt(sessionStorage.getItem(REMOTE_PRINTED_TS) || '0', 10);
+      var ts = parseInt(dedupStore.getItem(REMOTE_PRINTED_TS) || '0', 10);
       if (ts && Date.now() - ts < REMOTE_STALE_MS) {
-        var arr = JSON.parse(sessionStorage.getItem(REMOTE_PRINTED_KEY) || '[]');
+        var arr = JSON.parse(dedupStore.getItem(REMOTE_PRINTED_KEY) || '[]');
         if (Array.isArray(arr)) printedNames = new Set(arr.map(migrateLegacyKey));
-        baselineScanned = sessionStorage.getItem(REMOTE_BASELINE_KEY) === '1';
-        reconcileBaselineDone = sessionStorage.getItem(REMOTE_RECONCILE_BASELINE_KEY) === '1';
+        baselineScanned = dedupStore.getItem(REMOTE_BASELINE_KEY) === '1';
+        reconcileBaselineDone = dedupStore.getItem(REMOTE_RECONCILE_BASELINE_KEY) === '1';
         // Restore knownClubbers + ROSTER_CACHE so diff survives a reload.
-        var knownArr = JSON.parse(sessionStorage.getItem(REMOTE_KNOWN_KEY) || '[]');
+        var knownArr = JSON.parse(dedupStore.getItem(REMOTE_KNOWN_KEY) || '[]');
         if (Array.isArray(knownArr)) knownClubbers = new Set(knownArr.map(migrateLegacyKey));
-        var rosterObj = JSON.parse(sessionStorage.getItem(REMOTE_ROSTER_KEY) || '{}');
+        var rosterObj = JSON.parse(dedupStore.getItem(REMOTE_ROSTER_KEY) || '{}');
         if (rosterObj && typeof rosterObj === 'object') {
           ROSTER_CACHE = {};
           ROSTER_NAME_INDEX = {};
@@ -237,12 +264,12 @@
           });
         }
       } else {
-        sessionStorage.removeItem(REMOTE_PRINTED_KEY);
-        sessionStorage.removeItem(REMOTE_PRINTED_TS);
-        sessionStorage.removeItem(REMOTE_BASELINE_KEY);
-        sessionStorage.removeItem(REMOTE_KNOWN_KEY);
-        sessionStorage.removeItem(REMOTE_ROSTER_KEY);
-        sessionStorage.removeItem(REMOTE_RECONCILE_BASELINE_KEY);
+        dedupStore.removeItem(REMOTE_PRINTED_KEY);
+        dedupStore.removeItem(REMOTE_PRINTED_TS);
+        dedupStore.removeItem(REMOTE_BASELINE_KEY);
+        dedupStore.removeItem(REMOTE_KNOWN_KEY);
+        dedupStore.removeItem(REMOTE_ROSTER_KEY);
+        dedupStore.removeItem(REMOTE_RECONCILE_BASELINE_KEY);
       }
     } catch (e) { /* ignore sessionStorage errors */ }
   }
@@ -250,9 +277,9 @@
   var rosterDirty = false;
   function saveScanState() {
     try {
-      sessionStorage.setItem(REMOTE_KNOWN_KEY, JSON.stringify(Array.from(knownClubbers)));
+      dedupStore.setItem(REMOTE_KNOWN_KEY, JSON.stringify(Array.from(knownClubbers)));
       if (rosterDirty) {
-        sessionStorage.setItem(REMOTE_ROSTER_KEY, JSON.stringify(ROSTER_CACHE));
+        dedupStore.setItem(REMOTE_ROSTER_KEY, JSON.stringify(ROSTER_CACHE));
         persistRosterLocal();
         rosterDirty = false;
       }
@@ -307,8 +334,8 @@
     var key = resolveIdentityKey(name, recid);
     printedNames.add(key);
     try {
-      sessionStorage.setItem(REMOTE_PRINTED_KEY, JSON.stringify(Array.from(printedNames)));
-      sessionStorage.setItem(REMOTE_PRINTED_TS, String(Date.now()));
+      dedupStore.setItem(REMOTE_PRINTED_KEY, JSON.stringify(Array.from(printedNames)));
+      dedupStore.setItem(REMOTE_PRINTED_TS, String(Date.now()));
     } catch (e) { /* ignore quota errors */ }
   }
 
@@ -317,7 +344,7 @@
     printedNames.delete(resolveIdentityKey(name, recid));
     printedNames.delete('nm:' + nameKeyOf(name));
     try {
-      sessionStorage.setItem(REMOTE_PRINTED_KEY, JSON.stringify(Array.from(printedNames)));
+      dedupStore.setItem(REMOTE_PRINTED_KEY, JSON.stringify(Array.from(printedNames)));
     } catch (e) { /* ignore quota errors */ }
   }
 
@@ -2232,9 +2259,9 @@
           if (!res.ok) { alert(res.d && res.d.error ? res.d.error : 'Reset failed.'); return; }
           printedNames.clear();
           try {
-            sessionStorage.removeItem(REMOTE_PRINTED_KEY);
-            sessionStorage.removeItem(REMOTE_PRINTED_TS);
-            sessionStorage.removeItem(REMOTE_RECONCILE_BASELINE_KEY);
+            dedupStore.removeItem(REMOTE_PRINTED_KEY);
+            dedupStore.removeItem(REMOTE_PRINTED_TS);
+            dedupStore.removeItem(REMOTE_RECONCILE_BASELINE_KEY);
           } catch (e) { /* ignore */ }
           reconcileBaselineDone = false;
           runReconcile();   // re-seed dedup from the live report, print nothing
@@ -3585,7 +3612,7 @@
     if (!baselineScanned) {
       knownClubbers = current;
       baselineScanned = true;
-      try { sessionStorage.setItem(REMOTE_BASELINE_KEY, '1'); } catch (e) {}
+      try { dedupStore.setItem(REMOTE_BASELINE_KEY, '1'); } catch (e) {}
       console.log('[Awana] Baseline established: ' + current.size + ' kids');
       saveScanState();
       return;
@@ -4471,10 +4498,10 @@
         // First successful reconcile this session: seed dedup with everyone
         // already checked in so we never print the whole existing roster —
         // a station opened mid-event must not trigger a paper explosion.
-        // Persisted to sessionStorage so a page reload can't re-baseline.
+        // Persisted to the shared dedup store so a reload, or another tab, can't re-baseline.
         entries.forEach(function(e) { markPrinted(e.name, e.clubberId); });
         reconcileBaselineDone = true;
-        try { sessionStorage.setItem(REMOTE_RECONCILE_BASELINE_KEY, '1'); } catch (err) { /* ignore */ }
+        try { dedupStore.setItem(REMOTE_RECONCILE_BASELINE_KEY, '1'); } catch (err) { /* ignore */ }
         console.log('[Awana] Reconcile: baseline seeded with ' + entries.length + ' existing check-in(s) — will not print for these');
         updateReconcileWidget(0);
         return;
@@ -4978,6 +5005,37 @@
     printServer: PRINT_SERVER,
   };
 
+  // ── One printing tab ─────────────────────────────────────────────────────
+  // Every TwoTimTwo tab in this browser runs this script, and until 7.11.1
+  // every one of them detected, scanned, reconciled, polled the phones and
+  // flushed the queue: a second tab printed its own copy of every label. One
+  // tab now holds the "awana-print-leader" Web Lock and runs the print
+  // machinery; the others keep the widget (search, settings, reprints,
+  // tonight) and say so. The lock passes to the next tab the moment the
+  // leader closes, and the shared dedup store means the new leader does not
+  // print the night again. No Web Locks (an old Chrome): the tab leads alone.
+  var PRINT_LEADER_LOCK = 'awana-print-leader';
+  function electPrintLeader(locks, onLead, onWait) {
+    if (!locks || typeof locks.request !== 'function') { onLead(); return; }
+    var led = false;
+    var lead = function() { if (!led) { led = true; onLead(); } };
+    var waiting = false;
+    try {
+      var p = locks.request(PRINT_LEADER_LOCK, { mode: 'exclusive' }, function() {
+        lead();
+        return new Promise(function() { /* held for the life of this tab */ });
+      });
+      if (p && typeof p.catch === 'function') p.catch(function() { lead(); });
+      if (typeof locks.query === 'function') {
+        locks.query().then(function(q) {
+          var held = (q && q.held || []).some(function(l) { return l.name === PRINT_LEADER_LOCK; });
+          if (held && !led && onWait) { waiting = true; onWait(); }
+        }).catch(function() { /* no answer: nothing to say */ });
+      }
+    } catch (e) { lead(); }
+    return function isWaiting() { return waiting && !led; };
+  }
+
   injectWidget();
   loadPrintedState();
   // Restore Step Up Night and Awana Store mode (chrome.storage.local survives
@@ -5016,48 +5074,23 @@
       }
     });
   }
+  // What every tab runs: the widget's own data, read-only probes, update checks.
   loadBrandFonts();
   fetchPrinters();
   setInterval(fetchPrinters, 120000);   // keeps the ready dot honest
-  watchCheckins();
   loadTonight();
   loadCountCheck();
-  // Establish the roster baseline on load (or re-populate ROSTER_CACHE after a
-  // reload that preserved baselineScanned via sessionStorage).
-  setTimeout(scanClubberList, 500);
-  // If the page produced no roster (site down, offline reload), fall back to
-  // the copy cached in chrome.storage.local so search still works.
+  // If the page produced no roster (site down, offline reload, or this tab is
+  // not the printing one), fall back to the copy cached in chrome.storage.local
+  // so search still works.
   setTimeout(restoreRosterFromLocal, 2000);
-  // Safety-net scan in case the MutationObserver misses a DOM change —
-  // adaptive (#17a): 2 s inside the club-night window so remote check-ins
-  // print fast at the door, 5 s the rest of the week. Self-rescheduling
-  // setTimeout instead of setInterval so a slow scan can never stack.
-  (function scheduleScan() {
-    setTimeout(function() {
-      try { scanClubberList(); } catch (e) { /* keep scanning */ }
-      scheduleScan();
-    }, isInClubWindow() ? 2000 : SCAN_INTERVAL_MS);
-  })();
-  // Peak-window auto-refresh
-  setInterval(autoRefresh, AUTO_REFRESH_INTERVAL_MS);
-  // Youth check-out: every half minute; it does nothing before 7:15 on a club night.
-  setInterval(function() { ymSweep(false); }, YM_SWEEP_MS);
   loadChurchConfig();
-  setTimeout(pollPendingActions, 4000);
-  syncCsv();
   checkForExtensionUpdate();
   // Periodically check server health for CSV warnings + update notices
   setInterval(checkForExtensionUpdate, 60000);
   // Selector self-test: first probe after the page settles, then every 10 min
   setTimeout(runSelectorSelfTest, 15000);
   setInterval(runSelectorSelfTest, SELFTEST_INTERVAL_MS);
-  // Contract canary (#3): once per day, shortly after the page settles.
-  setTimeout(maybeRunDailyContractCanary, 45000);
-  // R-1: first reconcile pass ~60s after load, then self-reschedules based on
-  // isInClubWindow() (every 60s in-window, every 10 min otherwise).
-  setTimeout(function() {
-    runReconcile().then(scheduleNextReconcile).catch(scheduleNextReconcile);
-  }, RECONCILE_FIRST_DELAY_MS);
   // Keep the Tonight list fresh while the panel is expanded (other stations
   // print too — their check-ins should show up here for reprints).
   setInterval(function() {
@@ -5066,12 +5099,50 @@
   }, 60000);
   updateQueueBadge();
 
-  // Flush any queued prints on startup
-  setTimeout(flushQueue, 3000);
-  // Periodically try to flush queue
-  setInterval(function() {
-    if (getQueue().length > 0) flushQueue();
-  }, 30000);
+  // What only the printing tab runs: everything that detects a check-in,
+  // prints, reconciles, drives phone actions or writes to the print server.
+  function startPrintMachinery() {
+    loadPrintedState();   // the shared store as it stands now, not at this tab's load
+    watchCheckins();
+    // Establish the roster baseline on load (or re-populate ROSTER_CACHE after a
+    // reload that preserved baselineScanned in the shared dedup store).
+    setTimeout(scanClubberList, 500);
+    // Safety-net scan in case the MutationObserver misses a DOM change —
+    // adaptive (#17a): 2 s inside the club-night window so remote check-ins
+    // print fast at the door, 5 s the rest of the week. Self-rescheduling
+    // setTimeout instead of setInterval so a slow scan can never stack.
+    (function scheduleScan() {
+      setTimeout(function() {
+        try { scanClubberList(); } catch (e) { /* keep scanning */ }
+        scheduleScan();
+      }, isInClubWindow() ? 2000 : SCAN_INTERVAL_MS);
+    })();
+    // Peak-window auto-refresh
+    setInterval(autoRefresh, AUTO_REFRESH_INTERVAL_MS);
+    // Youth check-out: every half minute; it does nothing before 7:15 on a club night.
+    setInterval(function() { ymSweep(false); }, YM_SWEEP_MS);
+    setTimeout(pollPendingActions, 4000);
+    syncCsv();
+    // Contract canary (#3): once per day, shortly after the page settles.
+    setTimeout(maybeRunDailyContractCanary, 45000);
+    // R-1: first reconcile pass ~60s after load, then self-reschedules based on
+    // isInClubWindow() (every 60s in-window, every 10 min otherwise).
+    setTimeout(function() {
+      runReconcile().then(scheduleNextReconcile).catch(scheduleNextReconcile);
+    }, RECONCILE_FIRST_DELAY_MS);
+    // Flush any queued prints on startup
+    setTimeout(flushQueue, 3000);
+    // Periodically try to flush queue
+    setInterval(function() {
+      if (getQueue().length > 0) flushQueue();
+    }, 30000);
+    setStatus('');
+    console.log('[Awana] This tab prints');
+  }
+  electPrintLeader(typeof navigator !== 'undefined' ? navigator.locks : null, startPrintMachinery, function() {
+    setStatus('Another TwoTimTwo tab is printing; this one only looks things up.');
+    console.log('[Awana] Another tab holds the print lock; waiting');
+  });
 
   console.log('[Awana] Extension loaded (v' + EXTENSION_VERSION + ')');
 })();

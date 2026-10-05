@@ -72,6 +72,7 @@ function page() {
     const AMBIGUOUS_NAME = '*';
     const ROSTER_NAME_INDEX = {};
     const localStorage = env.localStorage, sessionStorage = env.sessionStorage;
+    const dedupStore = env.sessionStorage;   // the shared dedup store, one tab's view of it
     const printedNames = new Set();
     function updateQueueBadge() {}
     function playSuccess() {}
