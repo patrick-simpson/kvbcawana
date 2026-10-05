@@ -197,6 +197,44 @@ const pruneSharedDedup = new Function('SHARED_DEDUP_PREFIX', extractFunction('pr
     check('isShowing: detached and display:none are not showing; offsetParent is', !p.isShowing(null) && !p.isShowing({ isConnected: false }) && p.isShowing({ isConnected: true, offsetParent: {} }));
   }
 
+  console.log('\nphone actions: claimed before they are driven');
+  {
+    const build = new Function('env', `
+      const PRINT_SERVER = 'http://print.test';
+      const phoneActionsInFlight = env.inFlight;
+      const fetch = (url, opts) => { env.calls.push(url); return Promise.resolve({ status: env.claimStatus }); };
+      const drivePhoneAction = (a) => env.driven.push(a.id);
+      ${extractFunction('executePhoneAction')}
+      return executePhoneAction;
+    `);
+    const env = (claimStatus) => ({ calls: [], driven: [], inFlight: new Set(), claimStatus });
+    let e = env(200);
+    build(e)({ id: 'a1', name: 'Ava Stone' });
+    await tick();
+    check('a granted claim drives the check-in', e.calls[0] === 'http://print.test/pending-actions/a1/claim' && e.driven.join() === 'a1', JSON.stringify(e));
+    build(e)({ id: 'a1', name: 'Ava Stone' });
+    await tick();
+    check('the same action again (the next poll) is not claimed or driven twice', e.calls.length === 1 && e.driven.length === 1);
+    e = env(409);
+    build(e)({ id: 'b2', name: 'Eli Stone' });
+    await tick();
+    check('claimed by another tab: not driven, and not left marked in flight', e.driven.length === 0 && !e.inFlight.has('b2'));
+    e = env(404);
+    build(e)({ id: 'c3', name: 'Mia Stone' });
+    await tick();
+    check('gone: not driven', e.driven.length === 0);
+    const down = { calls: [], driven: [], inFlight: new Set() };
+    new Function('env', `
+      const PRINT_SERVER = 'x'; const phoneActionsInFlight = env.inFlight;
+      const fetch = () => Promise.reject(new Error('down'));
+      const drivePhoneAction = (a) => env.driven.push(a.id);
+      ${extractFunction('executePhoneAction')}
+      return executePhoneAction;
+    `)(down)({ id: 'd4', name: 'Kai Stone' });
+    await tick();
+    check('the print server unreachable: driven anyway, as before', down.driven.join() === 'd4');
+  }
+
   console.log(`\n${passed} passed, ${failed} failed`);
   process.exit(failed ? 1 : 0);
 })().catch((e) => { console.error(e); process.exit(1); });

@@ -3630,9 +3630,22 @@ const PENDING_MAX = 100;
 const PENDING_WAITERS_MAX = 4;
 const PENDING_TTL_MS = 10 * 60 * 1000;
 
+// A claim is a lease. The extension claims an action before driving it, so a
+// second tab (or the same tab's next poll) never drives the same child twice,
+// and a claimed action is not handed out again; one that is never answered
+// within PENDING_CLAIM_MS goes back to pending for the next poll to take.
+const PENDING_CLAIM_MS = 90 * 1000;
 function prunePendingActions() {
-  const cutoff = Date.now() - PENDING_TTL_MS;
+  const now = Date.now();
+  const cutoff = now - PENDING_TTL_MS;
   pendingActions = pendingActions.filter(a => new Date(a.at).getTime() >= cutoff).slice(-PENDING_MAX);
+  for (const a of pendingActions) {
+    if (a.status === 'claimed' && now - a.claimedAt > PENDING_CLAIM_MS) {
+      a.status = 'pending';
+      delete a.claimedAt;
+      console.warn(`[phone] ${a.name}: claim expired without a result, offered again`);
+    }
+  }
 }
 
 function wakePendingWaiters() {
@@ -8904,6 +8917,16 @@ app.get('/pending-actions', (req, res) => {
     pendingWaiters = pendingWaiters.filter(w => w !== waiter);
   });
   pendingWaiters.push(waiter);
+});
+
+app.post('/pending-actions/:id/claim', (req, res) => {
+  prunePendingActions();
+  const action = pendingActions.find(a => a.id === req.params.id);
+  if (!action) return res.status(404).json({ error: 'unknown action' });
+  if (action.status !== 'pending') return res.status(409).json({ error: `already ${action.status}`, status: action.status });
+  action.status = 'claimed';
+  action.claimedAt = Date.now();
+  res.json({ ok: true, leaseMs: PENDING_CLAIM_MS });
 });
 
 app.post('/pending-actions/:id/result', (req, res) => {

@@ -144,7 +144,7 @@ console.log('\nextension check-in tokens: a fresh meeting id before every direct
       check('an empty report is "not checked in", not "unknown"', reportHasCheckin([], '4821', 'Ava Stone') === false);
       check('an unreadable report is unknown (null), never a yes', reportHasCheckin(null, '4821', 'Ava Stone') === null && reportHasCheckin(undefined, '4821', 'Ava Stone') === null);
 
-      const exec = extractFunction('executePhoneAction');
+      const exec = extractFunction('drivePhoneAction');   // the driving half; executePhoneAction claims first (test-extension-leader)
       check('the phone executor reports success only through the report check', !/reportPhoneAction\(action\.id, true, ''\)/.test(exec.replace(extractFunction('reportDone'), '')) && /confirmCheckinOnReport\(recid, action\.name\)/.test(extractFunction('reportDone')));
       check('a printed child whose row is still on the page is driven, not reported "already in"',
         exec.indexOf('var el = findClubberElByName(action.name);') < exec.indexOf("'Already checked in at this station'")

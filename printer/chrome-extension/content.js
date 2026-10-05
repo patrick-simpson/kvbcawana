@@ -4295,9 +4295,24 @@
     });
   }
 
+  // Claim before driving (7.11.1). The print server leases the action to
+  // whoever claims it first and stops offering it, so a second tab, or this
+  // tab's next poll half a second later, never drives the same child twice;
+  // a claim nobody answers in 90 s is offered again. Claimed by someone else
+  // (409) or gone (404): nothing to do here. The server unreachable: drive
+  // anyway, as before; the lock already makes this the only printing tab.
   function executePhoneAction(action) {
-    if (phoneActionsInFlight.has(action.id)) return;
+    if (!action || typeof action.id !== 'string' || phoneActionsInFlight.has(action.id)) return;
     phoneActionsInFlight.add(action.id);
+    fetch(PRINT_SERVER + '/pending-actions/' + action.id + '/claim', { method: 'POST', signal: AbortSignal.timeout(4000) })
+      .then(function(r) {
+        if (r.status === 409 || r.status === 404) { phoneActionsInFlight.delete(action.id); return; }
+        drivePhoneAction(action);
+      })
+      .catch(function() { drivePhoneAction(action); });
+  }
+
+  function drivePhoneAction(action) {
     var nameKey = action.name.toLowerCase().trim();
 
     var el = findClubberElByName(action.name);

@@ -81,6 +81,26 @@ const PORT = 34575;
     check('a GET (Printer jammed available?) works too', r.body.status === 200 && typeof r.body.body.available === 'boolean', JSON.stringify(r.body));
   }
 
+  console.log('\nphone relay: a phone action is claimed before it is driven');
+  {
+    const pending = await (await fetch(`${localBase}/pending-actions`)).json();
+    const ava = (pending.actions || []).find((x) => x.name === 'Ava Stone');
+    check('(her check-in is pending for the check-in page)', !!ava, JSON.stringify(pending));
+    let r = await fetch(`${localBase}/pending-actions/${ava.id}/claim`, { method: 'POST' });
+    check('the first claim is granted, with its lease', r.status === 200 && (await r.json()).leaseMs === 90000);
+    const again = await fetch(`${localBase}/pending-actions/${ava.id}/claim`, { method: 'POST' });
+    check('a second claim (another tab, the next poll) is refused', again.status === 409 && (await again.json()).status === 'claimed');
+    const hidden = await fetch(`${localBase}/pending-actions`, { signal: AbortSignal.timeout(700) }).then((x) => x.json()).catch(() => 'waiting');
+    check('a claimed action is not handed out again: the poll waits for new ones instead of spinning', hidden === 'waiting' || !(hidden.actions || []).some((x) => x.id === ava.id), JSON.stringify(hidden));
+    let st = await (await fetch(`${localBase}/phone/status/${ava.id}`)).json();
+    check('the phone sees it as still in progress', st.status === 'claimed');
+    r = await fetch(`${localBase}/pending-actions/${ava.id}/result`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ok: true }) });
+    st = await (await fetch(`${localBase}/phone/status/${ava.id}`)).json();
+    check('and the result lands as before', r.status === 200 && st.status === 'done');
+    const src = fs.readFileSync(path.join(root, 'print-server', 'server.js'), 'utf8');
+    check('a claim never answered goes back to pending after 90 s', /PENDING_CLAIM_MS = 90 \* 1000/.test(src) && /a\.status === 'claimed' && now - a\.claimedAt > PENDING_CLAIM_MS[\s\S]{0,80}a\.status = 'pending'/.test(src));
+  }
+
   console.log('\nphone relay: the driven check-in switch');
   {
     const cfg = (body) => fetch(`${localBase}/config`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
