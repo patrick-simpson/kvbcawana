@@ -20,8 +20,8 @@ benefit. `%APPDATA%\awana-label-printer\chrome-extension` is therefore the
 real, current path — don't "fix" it back to a title-cased `Club Label
 Printer` folder; it was never that, even under the old branding (that was a
 pre-existing doc bug, corrected in the 5.9.0 pass). Same reasoning protects
-the Pusher channel `awana-channel` (shared wire protocol with the
-`Awana-Check-in-Display` repo) and the `AWANA_*` env vars / `X-Awana-Pin`
+the channel name `awana-channel` (the wire protocol shared with the lobby
+app in `lobby/`) and the `AWANA_*` env vars / `X-Awana-Pin`
 header / `window.awana` bridge (internal-only, never shown to a user) — none
 of these are part of the product's public branding, so none of them move if
 "Club Label Printer" ever changes again.
@@ -33,26 +33,25 @@ Every functional change requires:
 3. **Website/UI** — Update React components if affecting user install/usage.
 4. **Build** — `npm run build` to sync bookmarklet and dist.
 5. **Commit & push** — Never leave uncommitted. Changes only done when deployed.
-6. **Open a PR to `main`** — ALWAYS, for every pushed branch, including
-   website-only changes: nothing is live until it lands on `main` (GitHub
-   Pages deploys from `main`, and releases are cut from `main`), so a pushed
-   branch with no PR is work stranded where the operator can't see it. This
-   rule exists because it happened: the round-2 ideas page sat pushed-but-dark
-   until someone asked where it was. If the operator hasn't said otherwise,
-   also merge it once CI is green.
+6. **Push to `main`** — the owner's rule for this repo (the old printer repo
+   used PRs). Nothing is live until it is on `main`: the root `ci.yml` runs
+   every app's checks on each push and then publishes the site (the home page,
+   `/checkin`, the update feeds) to awana.kvbchurch.org. A pushed branch
+   nobody merges is work stranded where the operator can't see it (it
+   happened once, with the ideas page).
 7. **Cut the release** (if `electron-app/` or `print-server/` changed) — see "Releasing the Windows app" below. Don't stop at pushing to `main`; the `.exe` isn't live until the tagged build publishes.
 
 ## Releasing the Windows app
 
-**Never create the release tag manually** (`git tag` + `git push`, or the GitHub web UI "Draft a new release" flow). This has repeatedly failed in practice: a Claude Code session's git access is commonly scoped to branches only (tag pushes rejected), and manual web-UI tagging has hit silent footguns — tag name case-sensitivity (`build-electron.yml` matches lowercase `v*` only; `V5.0.2` or `5.0.2` without the `v` silently never triggers it), and republishing a release without first deleting its underlying tag reuses the old tag ref instead of moving it.
+**Never create the release tag manually** (`git tag` + `git push`, or the GitHub web UI "Draft a new release" flow). It has failed repeatedly in practice: a Claude Code session's git access is commonly scoped to branches only (tag pushes rejected), and manual tagging has hit silent footguns (tag name case, a republished release reusing its old tag ref).
 
-Instead, after steps 1–5 land on `main`, cut the release by dispatching **`.github/workflows/create-release-tag.yml`** with a `version` input (e.g. `5.0.2`, no leading `v`):
-- **Human:** GitHub → Actions tab → "Create Release Tag" → Run workflow → enter the version.
-- **Claude:** `mcp__github__actions_run_trigger` with `method: "run_workflow"`, `workflow_id: "create-release-tag.yml"`, `ref: "main"`, `inputs: {"version": "5.0.2"}`.
+Instead, once steps 1–5 are on `main`, dispatch **`.github/workflows/printer-release.yml`** (at the repo root) with the `version` input (e.g. `7.11.1`, no prefix; the tag it makes is `printer-v7.11.1`) and `ref` `main`:
+- **Human:** GitHub → Actions → "Release Club Label Printer" → Run workflow → enter the version.
+- **Claude:** `mcp__github__actions_run_trigger` with `method: "run_workflow"`, `workflow_id: "printer-release.yml"`, `ref: "main"`, `inputs: {"version": "7.11.1", "ref": "main"}`.
 
-That workflow creates and pushes the `vX.Y.Z` tag using its own `GITHUB_TOKEN` (not subject to session git restrictions), then explicitly dispatches `build-electron.yml` against that tag — a plain tag push alone isn't enough, because GitHub's anti-recursion rule means a push made *by* `GITHUB_TOKEN` doesn't fire other workflows' `push` triggers (confirmed the hard way: v5.0.2's tag was created but never auto-built). The dispatched run behaves identically to a native tag-push trigger: build → headless render smoke test → silent-install + `/health` + `/preview` smoke test on a Windows runner → publish the `.exe` + `latest.yml` + blockmap to the GitHub Release. Watch it through via `mcp__github__actions_get`/`get_job_logs` — don't consider a release done until that pipeline is green and the release has assets attached.
+The workflow runs the test suites FIRST, then creates the tag (so a failing test never leaves a tag behind), builds the `.exe` on Windows, smoke-tests it (silent install, `/health`, `/preview`), publishes the GitHub Release with `make_latest: false`, and commits the update feed to `site/updates/printer/` (which `ci.yml` then publishes). **The feed is ours, not GitHub's "Latest"**: the app updates from awana.kvbchurch.org/updates/printer/, and the workflow refuses a version that would move the feed backwards. Watch it through with `mcp__github__actions_get`; a release is done when the run is green, the release has its assets, and the feed names the new version.
 
-**Made a mistake (wrong-case tag, stray manual release)?** Don't try to delete it via git/web UI either — same restriction. Dispatch **`.github/workflows/delete-release.yml`** with `tag` set to the exact stray tag name; it removes both the release and its underlying git tag via its own token. Do this promptly if the mistaken tag/release is newer than the real one — GitHub's "latest release" (which electron-updater's auto-update check queries) is whichever release was published most recently, not the highest version number, so a stray release left in place can break real users' auto-update.
+**Made a mistake?** Dispatch **`.github/workflows/printer-delete-release.yml`** with the exact stray tag; it removes the release and its tag with its own token (and revert the feed commit if one was made).
 
 ## Commands
 
@@ -61,10 +60,13 @@ That workflow creates and pushes the `vX.Y.Z` tag using its own `GITHUB_TOKEN` (
 | React (root) | `npm run dev` (port 3000) \| `npm run build` |
 | Electron | `npm run dev` \| `npm run dist` (NSIS .exe) |
 | Print Server | `PRINTER_NAME="Printer" node server.js` (port 3456) |
+| Checks (root) | `npm test` runs every suite in `scripts/` (what `ci.yml` and the release run); extension logic is tested by lifting functions out of `content.js` (see `scripts/test-extension-*.cjs`) |
 
-## Public website (root React app → GitHub Pages)
+## Public website (root React app → the home page of awana.kvbchurch.org)
 
-The home page is a capability showcase written for church leadership first
+Built by `site/build.mjs` (`npm run build` here with `SITE_BASE=/`) and served
+at the one site's root; the lobby lives under `/lobby`, Journey under
+`/journey`, the phone page under `/checkin`. The home page is a capability showcase written for church leadership first
 (then other churches and volunteers: the Simulator, Install Guide and FAQ
 sit lower down, and the `#install`, `#simulator`, `#faq`, `#features` and
 `#how-it-works` anchors must keep resolving). It is one of three "family"
@@ -73,9 +75,10 @@ pages with the Check-in Display's and Journey Display's `about.html`.
 - **This repo holds the family design system.** `styles/family.css` is the
   canonical stylesheet and `docs/FAMILY-DESIGN.md` its spec
   (`docs/family-reference.html` renders every component). Byte-identical
-  copies live at `Awana-Check-in-Display/public/family.css` and
-  `Journey-Display/public/family.css`: change the canonical file, copy it
-  over both, and bump the `family.css?v=N` token on both about pages.
+  copies live at `lobby/public/family.css` and `journey/public/family.css`
+  (`scripts/check-mirrors.mjs` fails CI if they drift): change the canonical
+  file, copy it over both, and bump the `family.css?v=N` token on both about
+  pages.
   Page-only styling goes in `styles/page.css` (`lbl-` prefix).
 - **Tailwind v4 is compiled** (`@tailwindcss/vite`, `styles/site.css` with
   `source(none)` + explicit `@source` lines limited to the site's own files).
@@ -127,7 +130,7 @@ The `tally` payload shape is unchanged and must stay so.
 
 **The brand kit (6.17.0, shout face Paytone One since 6.18.0).**
 `print-server/public/brand/` is a byte-identical
-mirror of the canonical kit in Awana-Check-in-Display (`shared/brand/`), pinned
+mirror of the canonical kit in `lobby/shared/brand/`, pinned
 by `scripts/brand-kit.sha256` and checked by `scripts/test-brand-kit.cjs` (in
 `npm test`); take a new kit with `node scripts/gen-brand-manifest.cjs --from
 <canonical>`, never by hand (the text files are LF only; `.gitattributes`
@@ -201,11 +204,16 @@ free text on a blank label and records nothing at all: no `addHistoryEntry`, no
 `recordAttendance`, no `publishTally`, no `events.publish*`. It is not a
 check-in in any mode, so it carries no TEST band either.
 
-**Realtime privacy:** the Pusher channel is PUBLIC and Pusher public channels
-have no server-side authorization primitive, so `checkin`, `recap` and
+**Realtime privacy:** the screens' channel was a PUBLIC Pusher channel, which
+has no server-side authorization primitive, so `checkin`, `recap` and
 `birthdays` are sealed with AES-256-GCM before publish (`print-server/events.js`;
-consumer half is `src/lib/envelope.js` in the display repo). Rules that must
-survive any change:
+consumer half is `lobby/src/lib/envelope.js`). Since 2026-10-03 the screens
+listen to the sync Worker's live channel instead and the Pusher keys are
+cleared on the dashboard (SWITCH.md); the printer relays every frame to the
+Worker (`events.setRelay`, a bounded queue with a breaker, `/health` warns
+while it is open) under exactly the same sealing rules, and the Pusher
+publisher stays until switch day's cleanup. Rules that must survive any
+change, for whichever pipe is on:
 - **Fail closed, never plaintext.** If a key is configured but a payload cannot
   be sealed, publish NOTHING. A silent downgrade is the worst outcome available.
 - With **no** key configured the publisher stays plaintext on purpose (an
@@ -245,7 +253,20 @@ phone-PIN warnings were invisible for exactly this reason. `warningTexts()` in
 Use `applySavedConfig()` for the live sync — plain `Object.assign` cannot DELETE,
 which is why clearing the phone PIN used to leave the old one accepted until a
 restart. The Electron app must merge via `electron-app/src/config-store.js`,
-never write the file whole.
+never write the file whole. Every write of config.json (both sides) is
+tmp + fsync + rename with a `.bak` of the file it replaces; a damaged file is
+restored from the backup or moved aside, never written over, and `/health`
+says so. Every other data file goes through `saveFileAtomic()` in server.js
+(retrying rename, a `/health` warning while a save keeps failing), the
+history and the attendance ledger are held in memory and re-read only when
+their file changes, and club logos are stored once by hash
+(`club-icons.json`), never in each history row.
+
+**One printing tab.** Every TwoTimTwo tab runs `content.js`, but only the
+tab holding the `awana-print-leader` Web Lock runs the print machinery
+(`startPrintMachinery`); the dedup state is one localStorage copy keyed by the
+day (`dedupStore`), never sessionStorage. A phone action is claimed on the
+server (`POST /pending-actions/:id/claim`, a 90 s lease) before it is driven.
 
 **Data Flow:**
 - Bookmarklet fetches CSV → POST /update-csv
