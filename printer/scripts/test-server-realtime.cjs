@@ -621,7 +621,11 @@ async function main() {
     // 45s in 6.14.0 (it has to outlast the extension's own 35s client timeout,
     // or the retry after an abort prints a second label), and a hardcoded copy
     // would have gone on "proving" the old number.
-    const remaining = server.DUPLICATE_WINDOW_MS + 200 - elapsed;
+    // The server stamps the window from the moment the label FINISHED printing
+    // (releasePrint), and amyPrintedAt was taken when the request went out,
+    // so the margin has to cover a print's own duration: 200 ms was a few
+    // hundred milliseconds short on a slow CI runner (7.11.1 release run).
+    const remaining = server.DUPLICATE_WINDOW_MS + 2000 - elapsed;
     if (remaining > 0) await new Promise((resolve) => setTimeout(resolve, remaining));
 
     const reprint = await post('/print', { firstName: 'Amy', lastName: 'Tester', clubName: 'Sparks' });
