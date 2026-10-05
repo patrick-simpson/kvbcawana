@@ -7719,6 +7719,16 @@ app.get('/health', async (req, res) => {
   // A data file whose last save failed (saveFileAtomic), until one succeeds.
   const saveWarning = dataSaveWarning();
   if (saveWarning) warnings.push(saveWarning);
+  // The live-channel relay's breaker is open: frames to the sync service are
+  // being dropped. With Pusher also configured the screens still get them that
+  // way, which is why this used to be a console line nobody saw; without
+  // Pusher it was the only pipe. Either way the operator should know.
+  if (signedInToSync() && Date.now() < relayBrokenUntil) {
+    warnings.push({
+      type: 'syncRelay',
+      message: `The sync service is not answering, so live frames are not reaching screens through it (next try in ${Math.max(1, Math.ceil((relayBrokenUntil - Date.now()) / 1000))} s). Labels still print. Check the internet connection.`,
+    });
+  }
   // Surface security misconfiguration where the operator already looks. A
   // silently loopback-only server looks identical to a broken phone page, and
   // "I turned on phone check-in and nothing happens" must not be a mystery.

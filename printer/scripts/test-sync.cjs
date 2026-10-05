@@ -180,8 +180,13 @@ async function main() {
     const tried = service.calls.slice(before).filter((c) => c.route === '/v1/publish').length;
     const fast = await events.publish(null, 'awana-channel', 'checkin', { id: 'y', firstName: 'Kid', club: 'Sparks', at: now() });
     check('three failures try the service, the fourth frame fails fast without a call', tried === 3 && fast === false && service.calls.length === before + 3, `tried ${tried}, calls after ${service.calls.length - before}`);
+    const health = await j('/health');
+    const w = (health.body.warnings || []).find((x) => x && x.type === 'syncRelay');
+    check('while the breaker is open /health says the sync service is not answering, as a {type, message} object', !!w && typeof w.message === 'string' && /sync service is not answering/.test(w.message) && /Labels still print/.test(w.message), JSON.stringify(health.body.warnings));
     service.livePublishStatus = 200;
     server.resetRelayForTest();
+    const healthAfter = await j('/health');
+    check('and the warning goes with the breaker', !(healthAfter.body.warnings || []).some((x) => x && x.type === 'syncRelay'));
     const back = await events.publish(null, 'awana-channel', 'tally', { counts: {}, total: 1, at: now() });
     check('closed again, frames flow', back === true);
     const src = fs.readFileSync(path.join(__dirname, '..', 'print-server', 'server.js'), 'utf8');
