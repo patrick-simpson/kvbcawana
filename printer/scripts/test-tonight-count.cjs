@@ -105,7 +105,14 @@ async function main() {
   });
 
   const TODAY = localDayISO();
-  const NOW = Date.now();
+  // The synthetic rows below are stamped up to 40 minutes before NOW and must
+  // all fall on TODAY. Run within the first hour after local midnight (20:00
+  // Eastern on a UTC runner) the real clock put them on yesterday, and every
+  // "tonight" count came up empty. The pure sections take NOW as a parameter,
+  // so an hour into today is as good a "now" as the real one for them; the
+  // route sections further down use the server's own clock and no at().
+  const DAY_START = new Date(TODAY + 'T00:00:00').getTime();
+  const NOW = Date.now() - DAY_START < 60 * 60000 ? DAY_START + 60 * 60000 : Date.now();
   const at = (minutesAgo) => new Date(NOW - minutesAgo * 60000).toISOString();
 
   // History is newest-first, the way loadHistory() serves it.
@@ -456,7 +463,7 @@ async function main() {
       firstName: 'Old' + i, lastName: 'Row', clubName: 'Sparks', printer: 'Fake', success: true,
       clubberId: String(100000 + i), timestamp: when.toISOString(),
     });
-    const yesterday = new Date(Date.now() - 24 * 3600 * 1000);
+    const yesterday = new Date(DAY_START - 60000);   // a minute before midnight
     // 200 rows from yesterday, then one child tonight: the cap holds at 200
     // and it is yesterday's oldest row that goes, never tonight's.
     fs.writeFileSync(historyFile, JSON.stringify(Array.from({ length: 200 }, (_, i) => row(i, yesterday))));
@@ -466,7 +473,7 @@ async function main() {
     check('tonight’s row is the newest and was kept', history[0] && history[0].firstName === 'Vega', JSON.stringify(history[0]));
     check('it was yesterday’s oldest row that went', !history.some((r) => r.firstName === 'Old199'));
     // 200 rows from TONIGHT, then one more child: every one of them stays.
-    const tonight = new Date(Date.now() - 60 * 1000);
+    const tonight = new Date(Math.max(Date.now() - 60 * 1000, DAY_START + 1000));   // a minute ago, but never yesterday
     fs.writeFileSync(historyFile, JSON.stringify(Array.from({ length: 200 }, (_, i) => row(i, tonight))));
     r = await post('/print', { firstName: 'Rigel', lastName: 'Capper', clubName: 'Sparks', clubberId: '9102' });
     history = (await j('/history')).body || [];
