@@ -263,6 +263,16 @@ if (pusher) {
 function localDayISO(d = new Date()) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
+// Whole calendar days from one local day (YYYY-MM-DD) to another, zone-free:
+// the two days' civil dates, never two Dates subtracted, because across
+// spring-forward fourteen calendar days are 13.96 twenty-four-hour spans.
+function calendarDaysBetween(fromDay, toDay) {
+  const parse = (d) => {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(d || ''));
+    return m ? Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : NaN;
+  };
+  return Math.round((parse(toDay) - parse(fromDay)) / 86400000);
+}
 function isOnLocalDay(isoTimestamp, localDay) {
   if (typeof isoTimestamp !== 'string') return false;
   const t = new Date(isoTimestamp);
@@ -3278,12 +3288,12 @@ function recordAttendance(firstName, lastName, clubberId = null) {
   // New-kid window (#15): tonight is within 14 days of the kid's first-ever
   // night on this ledger — their first two typical club weeks. Day-based, not
   // night-based, so a make-up event in the same fortnight doesn't extend it.
+  // Calendar days: the old 24-hour arithmetic came up short across
+  // spring-forward and kept the sparkle a night too long.
   let isNewKid = false;
   const firstNight = entry.dates.reduce((a, b) => (a && a < b ? a : b), null);
   if (firstNight) {
-    const first = new Date(firstNight + 'T00:00:00');
-    const now = new Date(today + 'T00:00:00');
-    isNewKid = (now - first) / 86400000 < 14;
+    isNewKid = calendarDaysBetween(firstNight, today) < 14;
   }
 
   const start = seasonStartISO();
@@ -9068,7 +9078,7 @@ module.exports = {
   lateGoToLine, scheduleRowFor, DEFAULT_SCHEDULE, recentAttendance,
   parseYesRelease, rosterConsentSummary, consentWarningFor,
   isSafePrinterName,
-  parseAllergies, recapEntriesForTonight,
+  parseAllergies, recapEntriesForTonight, calendarDaysBetween,
   historyRowMatches, historyIdentityKey, distinctChildrenPrintedToday,
   reconcileHistoryWithReport, reportEntryIdentityKey, computeTonightStats,
   // "Is our count right?" — the pure comparison against TwoTimTwo's own

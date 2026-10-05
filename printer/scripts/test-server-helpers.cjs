@@ -34,7 +34,7 @@ const {
   tonightCheckins, markManualUndo, clearManualUndo, computeTonightStats, isNonCheckinRow, splitFullName,
   trophyBandFor, TROPHY_BAND_MAX,
   lateGoToLine, scheduleRowFor, DEFAULT_SCHEDULE, applySavedConfig, recentAttendance,
-  recapEntriesForTonight,
+  recapEntriesForTonight, calendarDaysBetween,
 } = require(path.join(__dirname, '..', 'print-server', 'server.js'));
 
 const feeds = require(path.join(__dirname, '..', 'print-server', 'feeds.js'));
@@ -634,6 +634,27 @@ console.log('recapEntriesForTonight — the recap is tonight, never last week');
   check('the day defaults to today', Array.isArray(recapEntriesForTonight([])));
   const src = fs.readFileSync(path.join(__dirname, '..', 'print-server', 'server.js'), 'utf8');
   check('publishRecap prunes before it publishes, and so does every push', /function publishRecap\(\) \{\s*try \{[\s\S]*?pruneEventBuffer\(\);[\s\S]*?buildRecap\(eventBuffer\)/.test(src) && /function pushEventToBuffer\(checkinEvent\) \{\s*pruneEventBuffer\(\);/.test(src));
+}
+
+console.log('calendarDaysBetween — the new-kid window counts calendar days, not 24-hour spans');
+{
+  check('fourteen days apart is 14', calendarDaysBetween('2026-03-01', '2026-03-15') === 14);
+  check('the same day is 0', calendarDaysBetween('2026-10-07', '2026-10-07') === 0);
+  check('across a month end', calendarDaysBetween('2026-09-30', '2026-10-01') === 1);
+  check('across a year end', calendarDaysBetween('2025-12-31', '2026-01-01') === 1);
+  check('garbage is NaN, not a number that looks right', Number.isNaN(calendarDaysBetween('nope', '2026-01-01')));
+  // The old arithmetic in an Eastern Time zone: fourteen calendar days across
+  // spring-forward are 13.96 twenty-four-hour spans, so a child whose first
+  // night was two weeks before was still "new" on the night the sparkle should
+  // have ended. The helper does not care what zone the laptop is in.
+  const { execFileSync } = require('child_process');
+  const out = execFileSync(process.argv[0], ['-e', `
+    const first = new Date('2026-03-01T00:00:00'), now = new Date('2026-03-15T00:00:00');
+    process.stdout.write(String((now - first) / 86400000));
+  `], { env: { ...process.env, TZ: 'America/New_York' }, encoding: 'utf8' });
+  check('(the old formula really did come up short across spring-forward)', Number(out) < 14, out);
+  const src = fs.readFileSync(path.join(__dirname, '..', 'print-server', 'server.js'), 'utf8');
+  check('recordAttendance judges the window with it', /isNewKid = calendarDaysBetween\(firstNight, today\) < 14;/.test(src));
 }
 
 console.log('isNonCheckinRow — one predicate for every non-check-in print');
