@@ -1831,7 +1831,23 @@ function pngDimensions(buf) {
 }
 const LOGO_MAX_SOURCE_SIDE = 8192;  // refuse to DECODE anything bigger
 
+// Prepared once per logo and ink. A club's logo is the same bytes on every
+// label of the night (and the kit's marks never change), yet each print
+// decoded it, scanned it and cropped it again. Keyed by the bytes' hash, not
+// the buffer, because every request arrives with its own Buffer; the result
+// is only ever read (drawImage), so one shared canvas is safe.
+const LOGO_PREP_MAX = 24;
+const logoPrepCache = new Map();   // sha256(bytes) + ink → prepared logo (or null)
 async function prepareLogoForThermal(clubImageBuffer, { ink = [0, 0, 0] } = {}) {
+  if (!clubImageBuffer) return null;
+  const key = `${crypto.createHash('sha256').update(clubImageBuffer).digest('hex')}:${ink.join(',')}`;
+  if (logoPrepCache.has(key)) return logoPrepCache.get(key);
+  const prepared = await prepareLogoForThermalNow(clubImageBuffer, { ink });
+  if (logoPrepCache.size >= LOGO_PREP_MAX) logoPrepCache.delete(logoPrepCache.keys().next().value);
+  logoPrepCache.set(key, prepared);
+  return prepared;
+}
+async function prepareLogoForThermalNow(clubImageBuffer, { ink = [0, 0, 0] } = {}) {
   if (!clubImageBuffer) return null;
   const sniffed = Buffer.isBuffer(clubImageBuffer) ? pngDimensions(clubImageBuffer) : null;
   if (sniffed && Math.max(sniffed.width, sniffed.height) > LOGO_MAX_SOURCE_SIDE) {

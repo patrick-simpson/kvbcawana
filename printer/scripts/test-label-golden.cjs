@@ -1377,6 +1377,15 @@ async function main() {
       && padded.height <= 94 && padded.height >= 88,
       padded ? `${padded.width}x${padded.height}` : 'null');
 
+    // Prepared once per logo and ink: every label of the night arrives with
+    // its own Buffer of the same bytes, and used to decode, scan and crop it
+    // again each time.
+    const again = await prepareLogoForThermal(paddedLogo());
+    check('the same logo bytes are prepared once and the result reused', again === padded);
+    const paddedWhite = await prepareLogoForThermal(paddedLogo(), { ink: [255, 255, 255] });
+    check('a different ink is its own preparation', paddedWhite !== null && paddedWhite !== padded);
+    check('the cache is bounded', /LOGO_PREP_MAX = 24/.test(require('fs').readFileSync(require('path').join(__dirname, '..', 'print-server', 'server.js'), 'utf8')));
+
     // A pale-gray card must read as PAPER: at the old threshold of 40 the
     // whole card became a featureless black slab and the artwork inside it
     // was indistinguishable from its background.
