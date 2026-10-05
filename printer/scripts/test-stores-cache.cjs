@@ -88,6 +88,21 @@ const PORT = 34586;
     check('a hand-edited ledger is what the server counts', att && att.seasonCount === 2, JSON.stringify(att));
   }
 
+  console.log('\nstores: the roster is parsed when it changes, not on every print');
+  {
+    const loadedLines = () => logs.filter((l) => l.startsWith('[csv] Loaded ')).length;
+    const before = loadedLines();
+    const csvReads = reads.csv;
+    await post('/print', { name: 'Ava Stone', clubberId: '1', clubName: 'Sparks', demo: true });
+    await post('/print', { name: 'Eli Stone', clubberId: '2', clubName: 'Sparks', demo: true });
+    await post('/print', { name: 'Ava Stone', clubberId: '1', clubName: 'Sparks', demo: true });
+    check('three prints against an unchanged roster parse and log it zero times', loadedLines() === before && reads.csv === csvReads, `${loadedLines() - before} loads, ${reads.csv - csvReads} reads`);
+    await new Promise((r) => setTimeout(r, 20));
+    fs.writeFileSync(csvFile, 'First Name,Last Name,Club,Notes\nAva,Stone,Sparks,Peanut allergy\nEli,Stone,Sparks,\n');
+    const r = await post('/print', { name: 'Ava Stone', clubberId: '1', clubName: 'Sparks', demo: true });
+    check('a changed roster is re-read before the next label', r.status === 200 && loadedLines() === before + 1 && logs.some((l) => /Enriched: Ava Stone.*allergies: NUTS/i.test(l)), `${loadedLines() - before} loads`);
+  }
+
   await server.stopListening();
   console.log(`\n${passed} passed, ${failed} failed`);
   process.exit(failed ? 1 : 0);

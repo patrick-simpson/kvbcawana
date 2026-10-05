@@ -649,11 +649,20 @@ function parseCSV(raw) {
 //   ENOENT  — file doesn't exist yet (first run, or file was deleted)
 //   EBUSY   — PowerShell is currently overwriting the file mid-event
 //   other   — malformed data, permissions, etc.
+// The roster is re-read before every label so a mid-event addition is picked
+// up, but it was also re-PARSED and its sample names logged every time, on a
+// file that changes a few times a night. One stat() now answers "same file as
+// last time?" and the parsed rows are reused; a changed file is parsed and
+// logged as before.
+let clubbersStamp = null;
 function loadClubbers() {
   const csvPath = CSV_FILE;
+  const stamp = fileStamp(csvPath);
+  if (stamp !== 'missing' && stamp === clubbersStamp && clubbers.length > 0) return clubbers;
   try {
     const raw = fs.readFileSync(csvPath, 'utf8');
     const rows = parseCSV(raw);
+    clubbersStamp = stamp;
     if (rows.length > 0) {
       // Log every parsed column (not just the known ones) so a renamed
       // TwoTimTwo header that misses HEADER_MAP is visible in the console
