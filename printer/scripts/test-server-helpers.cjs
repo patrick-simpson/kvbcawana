@@ -34,7 +34,7 @@ const {
   tonightCheckins, markManualUndo, clearManualUndo, computeTonightStats, isNonCheckinRow, splitFullName,
   trophyBandFor, TROPHY_BAND_MAX,
   lateGoToLine, scheduleRowFor, DEFAULT_SCHEDULE, applySavedConfig, recentAttendance,
-  recapEntriesForTonight, calendarDaysBetween,
+  recapEntriesForTonight, calendarDaysBetween, isNewerVersion,
 } = require(path.join(__dirname, '..', 'print-server', 'server.js'));
 
 const feeds = require(path.join(__dirname, '..', 'print-server', 'feeds.js'));
@@ -655,6 +655,22 @@ console.log('calendarDaysBetween — the new-kid window counts calendar days, no
   check('(the old formula really did come up short across spring-forward)', Number(out) < 14, out);
   const src = fs.readFileSync(path.join(__dirname, '..', 'print-server', 'server.js'), 'utf8');
   check('recordAttendance judges the window with it', /isNewKid = calendarDaysBetween\(firstNight, today\) < 14;/.test(src));
+}
+
+console.log('isNewerVersion — an update is newer, never merely different');
+{
+  check('a higher patch is newer', isNewerVersion('7.11.1', '7.11.0'));
+  check('a higher minor is newer', isNewerVersion('7.12.0', '7.11.9'));
+  check('a higher major is newer', isNewerVersion('8.0.0', '7.99.99'));
+  check('numeric, not string: 7.10.0 is newer than 7.9.0', isNewerVersion('7.10.0', '7.9.0') && !isNewerVersion('7.9.0', '7.10.0'));
+  check('the same version is not', !isNewerVersion('7.11.0', '7.11.0'));
+  check('an older version in the feed is not an update (a pulled release, a stale mirror)', !isNewerVersion('7.10.9', '7.11.0'));
+  check('garbage is never newer', !isNewerVersion('latest', '7.11.0') && !isNewerVersion(null, '7.11.0') && !isNewerVersion('7.11.0', ''));
+  const src = fs.readFileSync(path.join(__dirname, '..', 'print-server', 'server.js'), 'utf8');
+  check('the VERSION poll, the shell\'s report and /update-now all judge by it',
+    /if \(isNewerVersion\(ver, SERVER_VERSION\)\) \{\s*latestVersion = ver;/.test(src)
+    && /function setLatestVersion\(ver\) \{\s*if \(isNewerVersion\(ver, SERVER_VERSION\)\)/.test(src)
+    && /if \(!isNewerVersion\(latestVersion, SERVER_VERSION\)\) \{\s*return res\.status\(409\)/.test(src));
 }
 
 console.log('isNonCheckinRow — one predicate for every non-check-in print');

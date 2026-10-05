@@ -7667,8 +7667,22 @@ const UPDATE_CHECK_INTERVAL = 6 * 3600000; // 6 hours
 // they feed electron-updater's state into /health via setLatestVersion().
 let updateHandler = null;
 function setUpdateHandler(fn) { updateHandler = fn; }
+// "Newer" is a numeric compare of the three parts, never a string compare
+// (7.10.0 sorts before 7.9.0 as strings) and never "different": an older
+// version in the feed (a release pulled back, a stale mirror) used to read as
+// an update and /update-now would have installed it over this one.
+function isNewerVersion(candidate, current) {
+  const parts = (v) => {
+    const m = /^(\d+)\.(\d+)\.(\d+)$/.exec(String(v || '').trim());
+    return m ? [Number(m[1]), Number(m[2]), Number(m[3])] : null;
+  };
+  const a = parts(candidate), b = parts(current);
+  if (!a || !b) return false;
+  for (let i = 0; i < 3; i++) if (a[i] !== b[i]) return a[i] > b[i];
+  return false;
+}
 function setLatestVersion(ver) {
-  if (ver && /^\d+\.\d+\.\d+$/.test(String(ver).trim())) latestVersion = String(ver).trim();
+  if (isNewerVersion(ver, SERVER_VERSION)) latestVersion = String(ver).trim();
 }
 
 // Where the Electron shell keeps the managed copy of the Chrome extension, and
@@ -7708,11 +7722,9 @@ function checkForUpdates() {
     res.on('data', c => data += c);
     res.on('end', () => {
       const ver = data.trim();
-      if (ver && /^\d+\.\d+\.\d+$/.test(ver)) {
+      if (isNewerVersion(ver, SERVER_VERSION)) {
         latestVersion = ver;
-        if (ver !== SERVER_VERSION) {
-          console.log(`[update] New version available: ${ver} (current: ${SERVER_VERSION})`);
-        }
+        console.log(`[update] New version available: ${ver} (current: ${SERVER_VERSION})`);
       }
     });
   }).on('error', () => { /* ignore */ });
@@ -7961,7 +7973,7 @@ app.get('/failures', (req, res) => {
 // starts the new server. Guarded so a stray call when no update exists can't
 // bounce the server mid-event for nothing.
 app.post('/update-now', (req, res) => {
-  if (!latestVersion || latestVersion === SERVER_VERSION) {
+  if (!isNewerVersion(latestVersion, SERVER_VERSION)) {
     return res.status(409).json({ error: 'Already on the latest version', version: SERVER_VERSION });
   }
   res.json({ ok: true, updatingTo: latestVersion });
@@ -9078,7 +9090,7 @@ module.exports = {
   lateGoToLine, scheduleRowFor, DEFAULT_SCHEDULE, recentAttendance,
   parseYesRelease, rosterConsentSummary, consentWarningFor,
   isSafePrinterName,
-  parseAllergies, recapEntriesForTonight, calendarDaysBetween,
+  parseAllergies, recapEntriesForTonight, calendarDaysBetween, isNewerVersion,
   historyRowMatches, historyIdentityKey, distinctChildrenPrintedToday,
   reconcileHistoryWithReport, reportEntryIdentityKey, computeTonightStats,
   // "Is our count right?" — the pure comparison against TwoTimTwo's own
