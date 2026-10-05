@@ -133,6 +133,30 @@ function saveFileAtomic(file, text, label = path.basename(file)) {
     return false;
   }
 }
+// The stores stay in memory. print-history.json and attendance.json were read
+// from disk and parsed on nearly every request (the print path several times,
+// the dashboard every 15 s, every phone every 12 s). A store is re-read only
+// when the file on disk is not the one last read or written here (its size or
+// modification time moved: a hand edit, another process), which costs one
+// stat() instead of a read and a parse.
+const storeCache = new Map();   // file → { stamp, value }
+function fileStamp(file) {
+  try { const st = fs.statSync(file); return `${st.mtimeMs}:${st.size}`; } catch (e) { return 'missing'; }
+}
+function cachedStore(file, read) {
+  const stamp = fileStamp(file);
+  const hit = storeCache.get(file);
+  if (hit && hit.stamp === stamp) return hit.value;
+  const value = read();
+  storeCache.set(file, { stamp, value });
+  return value;
+}
+// A save through saveFileAtomic is what the cache holds next, so the write is
+// never followed by a read of what was just written.
+function cacheStore(file, value) {
+  storeCache.set(file, { stamp: fileStamp(file), value });
+}
+
 function dataSaveWarning() {
   if (!dataSaveFailures.size) return null;
   const names = [...dataSaveFailures.keys()].sort();
@@ -3202,17 +3226,19 @@ function seasonStartISO(now = new Date()) {
 }
 
 function loadAttendance() {
-  try {
-    if (fs.existsSync(ATTENDANCE_FILE)) {
-      const raw = JSON.parse(fs.readFileSync(ATTENDANCE_FILE, 'utf8'));
-      if (raw && typeof raw === 'object') return raw;
-    }
-  } catch (e) { console.warn('[attendance] Failed to load ledger:', e.message); }
-  return {};
+  return cachedStore(ATTENDANCE_FILE, () => {
+    try {
+      if (fs.existsSync(ATTENDANCE_FILE)) {
+        const raw = JSON.parse(fs.readFileSync(ATTENDANCE_FILE, 'utf8'));
+        if (raw && typeof raw === 'object') return raw;
+      }
+    } catch (e) { console.warn('[attendance] Failed to load ledger:', e.message); }
+    return {};
+  });
 }
 
 function saveAttendance(ledger) {
-  saveFileAtomic(ATTENDANCE_FILE, JSON.stringify(ledger));
+  if (saveFileAtomic(ATTENDANCE_FILE, JSON.stringify(ledger))) cacheStore(ATTENDANCE_FILE, ledger);
 }
 
 // Upsert tonight for this kid. Returns:
@@ -4369,25 +4395,30 @@ const MAX_HISTORY = 200;
 const HISTORY_HARD_MAX = 5000;
 
 function loadHistory() {
-  try {
-    if (fs.existsSync(HISTORY_FILE)) {
-      const raw = JSON.parse(fs.readFileSync(HISTORY_FILE, 'utf8'));
-      // MAX_HISTORY caps the row COUNT; this caps the AGE. Without it a church
-      // that prints a handful of labels a week accumulated children's names and
-      // check-in times indefinitely. Applied on read as well as write so an
-      // existing over-long file shrinks on the next run.
-      return security.pruneHistoryByAge(raw, config.historyRetentionDays, Date.now());
+  const rows = cachedStore(HISTORY_FILE, () => {
+    try {
+      if (fs.existsSync(HISTORY_FILE)) {
+        const raw = JSON.parse(fs.readFileSync(HISTORY_FILE, 'utf8'));
+        return Array.isArray(raw) ? raw : [];
+      }
+    } catch (e) {
+      console.warn('[history] Failed to load print history:', e.message);
     }
-  } catch (e) {
-    console.warn('[history] Failed to load print history:', e.message);
-  }
-  return [];
+    return [];
+  });
+  // MAX_HISTORY caps the row COUNT; this caps the AGE. Without it a church
+  // that prints a handful of labels a week accumulated children's names and
+  // check-in times indefinitely. Applied on read as well as write so an
+  // existing over-long file shrinks on the next run. A fresh array each call,
+  // so a caller that unshifts into its copy never edits the cache behind the
+  // next caller's back.
+  return security.pruneHistoryByAge(rows, config.historyRetentionDays, Date.now());
 }
 
 function saveHistory(entries) {
   // Atomic write: a crash mid-save must not corrupt the history JSON, which
   // would break /history and reprints until manually deleted.
-  saveFileAtomic(HISTORY_FILE, JSON.stringify(entries, null, 2));
+  if (saveFileAtomic(HISTORY_FILE, JSON.stringify(entries, null, 2))) cacheStore(HISTORY_FILE, entries);
 }
 
 // Does a history row refer to this child?
