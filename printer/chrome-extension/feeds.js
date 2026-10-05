@@ -422,19 +422,29 @@
     if (!Array.isArray(slips) || !slips.length) return;
     var slipped = loadSlipped();
     var posted = 0;
-    var changed = false;
+    // Marked "slipped" only once the print server has ACCEPTED the slip
+    // (7.11.1): marked at the post, a server that was down or refused the
+    // slip left the award marked and the slip never printed. The in-flight set
+    // keeps an overlapping tick from posting the same slip twice meanwhile.
     for (var i = 0; i < slips.length && posted < AWARD_SLIP_CAP; i++) {
       var s = slips[i];
       if (!s || !s.name || !s.award) continue;
       var key = (s.name + '|' + s.award).toLowerCase();
-      if (slipped.has(key)) continue;
-      slipped.add(key);
-      changed = true;
+      if (slipped.has(key) || slipsInFlight.has(key)) continue;
+      slipsInFlight.add(key);
       posted++;
-      postFeed('/print-award', { name: s.name, clubName: s.clubName || '', award: s.award });
+      (function(k, slip) {
+        postFeed('/print-award', { name: slip.name, clubName: slip.clubName || '', award: slip.award }).then(function(r) {
+          slipsInFlight.delete(k);
+          if (!r || !r.ok) return;
+          var now = loadSlipped();
+          now.add(k);
+          saveSlipped(now);
+        });
+      })(key, s);
     }
-    if (changed) saveSlipped(slipped);
   }
+  var slipsInFlight = new Set();
 
   function runTonight() {
     var today = formatDateYMD(new Date());
@@ -694,19 +704,28 @@
     if (!isNearClubWindowStart(WORKSHEETS_WINDOW_GRACE_MIN)) return;
     var todayStr = formatDateYMD(new Date());
     if (alreadyPrintedWorksheetsToday(todayStr)) return;
-    // Mark before the async fetches so an overlapping tick can't double-fire.
-    markWorksheetsPrinted(todayStr);
+    // One run at a time, and the day is marked done only once the print
+    // server has ACCEPTED a worksheet (7.11.1): marked up front, a server
+    // that was down at 5:30 left the night marked and no agendas printed.
+    if (worksheetsRunning) return;
+    worksheetsRunning = true;
     var calId = getCalendarIdFromPage();
-    CHURCH_CFG.sharesClubIds.forEach(function(clubId) {
+    var jobs = CHURCH_CFG.sharesClubIds.map(function(clubId) {
       var url = '/meeting/handbook?club_id=' + encodeURIComponent(clubId) +
         (calId ? '&cal_id=' + encodeURIComponent(calId) : '');
-      fetchPdfBase64(url).then(function(b64) {
-        if (!b64) return;
+      return fetchPdfBase64(url).then(function(b64) {
+        if (!b64) return false;
         var clubName = CLUB_ID_NAMES[String(clubId)] || String(clubId);
-        postFeed('/print-pdf', { pdfBase64: b64, label: clubName + ' handbook agenda' });
-      });
+        return postFeed('/print-pdf', { pdfBase64: b64, label: clubName + ' handbook agenda' }).then(function(r) { return !!(r && r.ok); });
+      }).catch(function() { return false; });
+    });
+    return Promise.all(jobs).then(function(results) {
+      worksheetsRunning = false;
+      if (results.some(Boolean)) markWorksheetsPrinted(todayStr);
+      return results;
     });
   }
+  var worksheetsRunning = false;
 
   // ── Attendance grid → the local ledger audit (#311) ────────────────────────
   // The print server's attendance.json drives milestones, the streak flame and
