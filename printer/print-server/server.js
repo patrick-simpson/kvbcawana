@@ -4308,6 +4308,57 @@ app.post('/print', async (req, res) => {
 
 // ── Print history ────────────────────────────────────────────────────────────
 const HISTORY_FILE = path.join(DATA_DIR, 'print-history.json');
+
+// ── Club icons, once each ─────────────────────────────────────────────────────
+// Every history row used to carry its club's logo as a base64 PNG (10-30 KB),
+// so a 200-row file was a few megabytes, re-read and re-parsed on nearly every
+// request and rewritten on every check-in. The logo is one of a handful of
+// images a night: it is kept ONCE here, by content hash, and a row carries the
+// hash (`clubIcon`). Rows written before this still carry `clubImageData` and
+// are read either way (historyClubImage); the dashboard never used the blob,
+// so /history and /history/today no longer send it.
+const ICONS_FILE = path.join(DATA_DIR, 'club-icons.json');
+const ICONS_MAX = 60;
+let clubIcons = null;   // hash → data URL, loaded on first use
+function loadClubIcons() {
+  if (clubIcons) return clubIcons;
+  clubIcons = new Map();
+  try {
+    if (fs.existsSync(ICONS_FILE)) {
+      const raw = JSON.parse(fs.readFileSync(ICONS_FILE, 'utf8'));
+      if (raw && typeof raw === 'object') for (const [k, v] of Object.entries(raw)) if (typeof v === 'string') clubIcons.set(k, v);
+    }
+  } catch (e) { console.warn('[icons] Could not load club-icons.json:', e.message); }
+  return clubIcons;
+}
+function iconHash(dataUrl) { return crypto.createHash('sha256').update(dataUrl).digest('hex').slice(0, 20); }
+// Store a data: URL once; returns its hash. Anything else (a URL, nothing) is
+// not stored and returns null.
+function rememberClubIcon(image) {
+  if (typeof image !== 'string' || !image.startsWith('data:') || image.length > 512 * 1024) return null;
+  const icons = loadClubIcons();
+  const hash = iconHash(image);
+  if (!icons.has(hash)) {
+    icons.set(hash, image);
+    while (icons.size > ICONS_MAX) icons.delete(icons.keys().next().value);
+    saveFileAtomic(ICONS_FILE, JSON.stringify(Object.fromEntries(icons)));
+  }
+  return hash;
+}
+// The image a history row printed with: its own blob (older rows, URLs) or the
+// stored icon its hash names.
+function historyClubImage(row) {
+  if (!row) return null;
+  if (row.clubImageData) return row.clubImageData;
+  if (row.clubIcon) return loadClubIcons().get(row.clubIcon) || null;
+  return null;
+}
+// What /history and /history/today send: everything but the blob.
+function historyRowForDashboard(row) {
+  if (!row || typeof row !== 'object' || !('clubImageData' in row)) return row;
+  const { clubImageData, ...rest } = row;
+  return rest;
+}
 // The cap on OLD rows. Today's rows are never evicted (see addHistoryEntry):
 // the duplicate guard, "already printed tonight", the trophy marker and the
 // tally fallback all read today's rows, and a 200-child night used to push its
@@ -4641,7 +4692,10 @@ function addHistoryEntry(entry) {
     firstName: security.sanitizeStoredText(entry.firstName),
     lastName: security.sanitizeStoredText(entry.lastName),
     clubName: security.sanitizeStoredText(entry.clubName || ''),
-    clubImageData: entry.clubImageData || null,
+    // A data: URL is kept once in club-icons.json and named here by hash; a
+    // URL (small) rides along as it always did.
+    clubIcon: rememberClubIcon(entry.clubImageData),
+    clubImageData: typeof entry.clubImageData === 'string' && !entry.clubImageData.startsWith('data:') ? entry.clubImageData : null,
     printer: security.sanitizeStoredText(entry.printer || ''),
     success: entry.success,
     visitor: !!entry.visitor,
@@ -4692,15 +4746,14 @@ function trimHistory(history) {
 }
 
 app.get('/history', (req, res) => {
-  const history = loadHistory();
-  res.json(history);
+  res.json(loadHistory().map(historyRowForDashboard));
 });
 
 app.get('/history/today', (req, res) => {
   const history = loadHistory();
   const today = localDayISO();
   const todayEntries = history.filter(e => isOnLocalDay(e.timestamp, today));
-  res.json(todayEntries);
+  res.json(todayEntries.map(historyRowForDashboard));
 });
 
 // ── Who is checked in tonight ─────────────────────────────────────────────────
@@ -5566,7 +5619,7 @@ async function reprintRow(entry, printerName, opts = {}) {
       noPhoto = noPhotoFor(record);
     }
 
-    const clubImageBuffer = await resolveImageBuffer(entry.clubImageData);
+    const clubImageBuffer = await resolveImageBuffer(historyClubImage(entry));
     // NOTE: visitor, stepUp, awanaShares, goToLine and milestoneLine are all
     // absent here because print history never stored them, so a reprint has
     // quietly differed from the original label. Naming the fields makes that
@@ -5588,7 +5641,7 @@ async function reprintRow(entry, printerName, opts = {}) {
 
     addHistoryEntry({
       firstName: entry.firstName, lastName: entry.lastName,
-      clubName: entry.clubName, clubImageData: entry.clubImageData,
+      clubName: entry.clubName, clubImageData: historyClubImage(entry),
       printer: effectivePrinter, success: true, clubberId: entry.clubberId
     });
 
@@ -5598,7 +5651,7 @@ async function reprintRow(entry, printerName, opts = {}) {
     console.error('[reprint] Error:', err.message);
     addHistoryEntry({
       firstName: entry.firstName, lastName: entry.lastName,
-      clubName: entry.clubName, clubImageData: entry.clubImageData,
+      clubName: entry.clubName, clubImageData: historyClubImage(entry),
       printer: effectivePrinter, success: false, clubberId: entry.clubberId
     });
     recordPrintFailure(fullName.trim(), entry.clubName, err.message);
@@ -9090,7 +9143,7 @@ module.exports = {
   lateGoToLine, scheduleRowFor, DEFAULT_SCHEDULE, recentAttendance,
   parseYesRelease, rosterConsentSummary, consentWarningFor,
   isSafePrinterName,
-  parseAllergies, recapEntriesForTonight, calendarDaysBetween, isNewerVersion,
+  parseAllergies, recapEntriesForTonight, calendarDaysBetween, isNewerVersion, historyClubImage,
   historyRowMatches, historyIdentityKey, distinctChildrenPrintedToday,
   reconcileHistoryWithReport, reportEntryIdentityKey, computeTonightStats,
   // "Is our count right?" — the pure comparison against TwoTimTwo's own
