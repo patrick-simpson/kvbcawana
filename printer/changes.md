@@ -1,4 +1,11 @@
-﻿## [7.11.1] - 2026-10-05
+﻿## [7.12.0] - 2026-10-05
+The app now runs on Electron 44 (it was Electron 28).
+
+**Why.** Electron bundles its own copy of Chromium, and Electron 28 stopped receiving Chromium security fixes in 2024. The app ships to the check-in laptop and opens web content (the settings window, the update check), so it should run on a supported Chromium. Electron 44 is the same version the sound room's Awana Lobby Display already uses. The installer builder moves from electron-builder 24 to 26 to match.
+
+**What you should notice.** Nothing. Printing, the settings window, the tray, phone check-in and updates work as before; the print server, the label renderer and its fonts are unchanged. The app still needs Windows 10 or later, as it has since 2023.
+
+## [7.11.1] - 2026-10-05
 A stability pass on the check-in laptop: one printing tab, nothing lost when the internet is down, and a dashboard that says what is wrong.
 
 **One TwoTimTwo tab prints.** Every TwoTimTwo tab in the browser used to run the whole extension, each with its own memory of who had printed, so a second tab (the roster opened in a new tab, a browser restore) printed its own copy of every label. Now exactly one tab prints and the others say so in their status line; if that tab is closed the next one takes over, and the "already printed" memory is shared across tabs and starts fresh each club night. A phone check-in is likewise claimed by one tab before it is driven, so two tabs never drive the same child.
