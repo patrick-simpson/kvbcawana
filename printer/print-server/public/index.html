@@ -1482,7 +1482,7 @@ function loadHistory() {
           (e.isConnectCard ? ' <span class="row-tag ok">CONNECT CARD</span>' : '') +
           (e.isAward ? ' <span class="row-tag award">AWARD</span>' : '') +
           (e.isLeader ? ' <span class="row-tag leader">LEADER</span>' : '') +
-          (e.undone ? ' <span class="row-tag">UNDONE' + (e.undoneBy === 'phone' ? ' (PHONE)' : '') + '</span>' : '') + '</td>' +
+          (e.undone ? ' <span class="row-tag">UNDONE' + (e.undoneBy === 'phone' ? ' (PHONE)' : e.undoneBy === 'twotimtwo' ? ' (ON TWOTIMTWO, FROM A PHONE)' : '') + '</span>' : '') + '</td>' +
         '<td>' + esc(e.clubName || '--') + '</td>' +
         '<td class="muted">' + esc(e.printer || 'default') + '</td>' +
         '<td class="muted">' + esc(formatTime(e.timestamp)) + '</td>' +

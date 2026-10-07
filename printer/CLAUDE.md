@@ -122,7 +122,7 @@ printer's own history is the fallback, and `/health` raises a
 dashboard), `/phone/tonight` and `/health` all read it, and none of them
 computes a count of its own. Rules: only a report the reconcile pass actually
 APPLIED is kept (one the mass-undo guard refused would zero a night); a row
-marked `undoneBy` — the phone's Remove, or `/reset-tonight` — beats the report,
+marked `undoneBy` — the phone's Remove or Undo check-in, or `/reset-tonight` — beats the report,
 because TwoTimTwo goes on listing that child all evening; unregistered visitors
 do not count while a report is fresh (owner's decision — they are not on it);
 identities match on BOTH the clubber id and the name, so one child is never two,
@@ -278,6 +278,24 @@ tab holding the `awana-print-leader` Web Lock runs the print machinery
 (`startPrintMachinery`); the dedup state is one localStorage copy keyed by the
 day (`dedupStore`), never sessionStorage. A phone action is claimed on the
 server (`POST /pending-actions/:id/claim`, a 90 s lease) before it is driven.
+
+**The phone's Tonight list: Remove vs Undo check-in (7.14.0).** Remove
+(`POST /phone/undo`) is LOCAL: `markManualUndo(..., 'phone')`, the ledger strip,
+`publishTally()`, nothing sent to TwoTimTwo. Undo check-in is the same route
+with `inTwoTimTwo: true` (the website's relay allowlist already carries
+`/phone/undo` and `/phone/status/:id`, and the Worker's list lives outside this
+folder, so do not add a route for it): it needs a `clubberId` (400 otherwise:
+visitors and id-less rows get Remove only), obeys `enableDrivenCheckin` (409),
+and queues a `{type:'undo'}` pending action that NOTHING applies until the
+extension reports `ok === true` (`applyTwoTimTwoUndo`: `undoneBy: 'twotimtwo'`,
+so the roster offers Check in again, never Add back). Undo actions go only to a
+poller with `?accept=undo` (an older extension would answer "Already checked
+in", ok:true), fail with the reason if unclaimed in `UNDO_PICKUP_MS` or if a
+claim's lease runs out (never re-driven), and take one result only. The
+extension (`undoCheckinOnTwoTimTwo`) posts `checkinclubberundo` with the fresh
+`#calendar_id` and the clubber id, counts only `undoReplyVerdict`'s short
+"(checkin undone)" (never a page, the login form or "Login Required"), and
+then requires the report not to list the child. `scripts/test-phone-undo.cjs`.
 
 **Data Flow:**
 - Bookmarklet fetches CSV → POST /update-csv

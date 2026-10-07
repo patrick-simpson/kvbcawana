@@ -1,4 +1,13 @@
-﻿## [7.13.0] - 2026-10-07
+﻿## [7.14.0] - 2026-10-07
+Undo a check-in on TwoTimTwo from the phone.
+
+**New: "Undo check-in" on the phone's Tonight list.** Each child on the list now has an Undo check-in button beside Remove. It asks first, naming the child, and then the check-in laptop undoes the check-in on TwoTimTwo itself, the same undo as the link on TwoTimTwo's check-in report. Only when TwoTimTwo answers "(checkin undone)", and its report no longer lists the child, does the child come off tonight's count and the lobby screens, and the phone says "undone in TwoTimTwo". The child shows up on the laptop's check-in list again, so they can be checked in again later. It works the same on the church Wi-Fi page and on awana.kvbchurch.org/checkin.
+
+**When it cannot.** Nothing changes unless TwoTimTwo confirms it, and the phone says exactly why: phone check-ins are switched off on the laptop ("Allow driven check-ins", which covers undo too), no TwoTimTwo tab is open there (or its extension is older than this one), the laptop is signed out of TwoTimTwo, its TwoTimTwo tab is not the check-in page, or TwoTimTwo refused. The message offers Remove, if you only want the child off tonight's count.
+
+**Remove is unchanged.** It still only takes a child off this laptop's count and the screens, and is the only choice for a child with no TwoTimTwo record (an unregistered visitor), which the row now says. A laptop still on an older print app only removes the child from the count when asked to undo, and the phone says so.
+
+## [7.13.0] - 2026-10-07
 Tonight's count is right again, and the screens get it.
 
 **Fixed: 11 children checked in, the count said 2.** The extension reads TwoTimTwo's check-in report to build tonight's count. Since TwoTimTwo moved the child's name into the cell with the edit and undo links (3 October), the extension still read the NEXT cell as the name, and on clubs with a friend / shares / points column that cell says something like "YES 1 Share 1 Point". Every child with the same summary then counted as one child, so the phone page, the dashboard and every lobby screen showed far too few. It now reads the name from the cell with the links, falls back to the roster by TwoTimTwo id, and never takes a "Yes", "No", "Shares" or "Points" cell for a name. Two different TwoTimTwo ids are always two children, whatever the names say.

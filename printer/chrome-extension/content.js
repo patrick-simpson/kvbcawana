@@ -2,7 +2,7 @@
   if (window.__awanaPrinterLoaded) return;
   window.__awanaPrinterLoaded = true;
 
-  const EXTENSION_VERSION = '7.13.0';
+  const EXTENSION_VERSION = '7.14.0';
   const PRINT_COOLDOWN = 2000;
   // POST /print is synchronous on the server: PowerShell + a cold printer can
   // take 15-30 s (the server retries the spooler internally). This must sit
@@ -4340,6 +4340,7 @@
   }
 
   function drivePhoneAction(action) {
+    if (action.type === 'undo') { driveUndoAction(action); return; }
     var nameKey = action.name.toLowerCase().trim();
 
     var el = findClubberElByName(action.name);
@@ -4413,12 +4414,103 @@
     });
   }
 
+  // ── Phone undo (7.14.0) ────────────────────────────────────────────────
+  // The phone's "Undo check-in": TwoTimTwo's own undo, the call its report's
+  // undoCheckin(id) link makes (docs/TWOTIMTWO.md §2.3: POST
+  // /clubber/checkinclubberundo with calendar_id and clubber_id, answered with
+  // a short snippet ending "(checkin undone)"). Judged as strictly as a
+  // check-in's reply: TwoTimTwo's own short answer saying so, never a page,
+  // the login form or the bare "Login Required". Each reason a phone can be
+  // told is one sentence here (the server keeps 200 characters of it).
+  var UNDO_SAY = {
+    off: 'Phone check-ins and undos are switched off on the check-in laptop (printer dashboard, Settings, "Allow driven check-ins").',
+    'no-id': 'The check-in laptop has no TwoTimTwo id for this child. Use Remove, and undo at the desk.',
+    'no-form': 'The printing TwoTimTwo tab on the laptop is not the check-in page. Open the check-in page there and try again.',
+    'signed-out': 'The check-in laptop is signed out of TwoTimTwo. Sign in there and try again.',
+    refused: 'TwoTimTwo refused the undo (it may have no check-in for this child at tonight\'s meeting). Check at the desk.',
+    network: 'The check-in laptop could not reach TwoTimTwo. Check its internet and try again.'
+  };
+
+  // One reply, one verdict: 'ok' | 'signed-out' | 'refused'.
+  function undoReplyVerdict(text) {
+    var t = typeof text === 'string' ? text.trim() : '';
+    if (t === 'Login Required' || /name=["']LoginForm\[/.test(t) || /type=["']password["']/i.test(t)) return 'signed-out';
+    if (!t || t.length > 4000) return 'refused';   // a snippet; any page is far larger
+    if (/<!doctype|<html[\s>]|<head[\s>]|<body[\s>]/i.test(t)) return 'refused';
+    return /\(\s*checkin\s+undone\s*\)/i.test(t) ? 'ok' : 'refused';
+  }
+
+  // The post itself, with this page's meeting id (#calendar_id, kept fresh by
+  // ensureFreshCheckinTokens). No meeting id means this tab is not the
+  // check-in page, and nothing is sent: an undo filed under no meeting, or
+  // last week's, is not one. Resolves 'ok' | 'no-form' | 'signed-out' |
+  // 'refused' | 'http-N' | 'network'; never rejects.
+  function postUndoCheckin(clubberId) {
+    var calInput = document.getElementById('calendar_id');
+    var calendarId = calInput && calInput.value;
+    if (!calendarId) return Promise.resolve('no-form');
+    var body = 'calendar_id=' + encodeURIComponent(calendarId) + '&clubber_id=' + encodeURIComponent(clubberId);
+    var csrfToken = findCsrfToken();   // none on the live page; sent only if one appears
+    if (csrfToken) body += '&YII_CSRF_TOKEN=' + encodeURIComponent(csrfToken);
+    return fetch('/clubber/checkinclubberundo', {
+      method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: body, signal: AbortSignal.timeout(8000)
+    }).then(function(r) {
+      if (/\/site\/login/.test(r.url || '')) return 'signed-out';
+      if (!r.ok) return 'http-' + r.status;
+      return r.text().then(undoReplyVerdict);
+    }).catch(function() { return 'network'; });
+  }
+
+  // The whole undo. A fresh meeting id first; a refusal re-reads the page and
+  // posts once more (a refusal is harmless to repeat: the child is either
+  // still in, or TwoTimTwo refuses again). Then TwoTimTwo's report must not
+  // list the child any more, the same record a phone check-in is held to; an
+  // unreadable report leaves the reply's word standing. Resolves
+  // { ok, detail }.
+  function undoCheckinOnTwoTimTwo(clubberId, name) {
+    if (CHURCH_CFG.enableDrivenCheckin === false) return Promise.resolve({ ok: false, detail: UNDO_SAY.off });
+    if (!clubberId) return Promise.resolve({ ok: false, detail: UNDO_SAY['no-id'] });
+    var id = String(clubberId);
+    return ensureFreshCheckinTokens().then(function() {
+      return postUndoCheckin(id);
+    }).then(function(r) {
+      if (r === 'ok' || r === 'signed-out' || r === 'no-form') return r;
+      console.log('[Awana] Phone undo for ' + name + ' not confirmed (' + r + '); refreshing the page tokens and trying once more');
+      return refreshCheckinTokens().then(function() { return postUndoCheckin(id); });
+    }).then(function(r) {
+      if (r !== 'ok') {
+        var why = UNDO_SAY[r] || (/^http-/.test(r) ? 'TwoTimTwo answered with an error (' + r.replace('http-', 'HTTP ') + '). Check at the desk.' : UNDO_SAY.refused);
+        return { ok: false, detail: why };
+      }
+      return fetchCheckinReport().then(function(entries) {
+        if (reportHasCheckin(entries, id, '') === true) {
+          return { ok: false, detail: 'TwoTimTwo answered "(checkin undone)" but its report still lists ' + (name || 'the child') + '. Check the report at the desk.' };
+        }
+        // What TwoTimTwo's own undo leaves on its page: the child's row back
+        // in the list, so they can be checked in again here or from a phone.
+        var row = document.querySelector('.clubber[recid="' + id.replace(/[^0-9A-Za-z_-]/g, '') + '"]');
+        if (row) { row.classList.remove('checked-in'); row.style.display = ''; }
+        return { ok: true, detail: '' };
+      });
+    });
+  }
+
+  function driveUndoAction(action) {
+    console.log('[Awana] Phone undo: ' + action.name);
+    undoCheckinOnTwoTimTwo(action.clubberId, action.name).then(function(r) {
+      reportPhoneAction(action.id, r.ok === true, r.detail);
+    });
+  }
+
   function pollPendingActions() {
     if (CHURCH_CFG.enableDrivenCheckin === false) {
       setTimeout(pollPendingActions, 60000);
       return;
     }
-    fetch(PRINT_SERVER + '/pending-actions', { signal: AbortSignal.timeout(30000) })
+    // accept=undo: this extension can drive the phone's undo too (7.14.0).
+    fetch(PRINT_SERVER + '/pending-actions?accept=undo', { signal: AbortSignal.timeout(30000) })
       .then(function(r) { return r.json(); })
       .then(function(data) {
         (data.actions || []).forEach(executePhoneAction);

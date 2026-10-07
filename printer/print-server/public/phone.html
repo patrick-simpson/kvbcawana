@@ -188,6 +188,9 @@
   .row .who b { display: block; font-size: 17px; }
   .row .who span { font-size: 13px; color: var(--ink-faint); }
   .row button { border: 2px solid var(--line); background: #fff; color: var(--bad); font-weight: 700; font-size: 14px; padding: 8px 12px; border-radius: 12px; cursor: pointer; }
+  .row .who small { display: block; font-size: 12px; color: var(--ink-faint); }
+  .row .rowacts { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+  .row button.tt { color: var(--c-blue-deep); }
   .row .vtag { font-family: var(--f-label); font-size: 13px; letter-spacing: .05em; text-transform: uppercase; color: var(--c-hot-deep); margin-left: 6px; }
   .leader-chip { display: inline-flex; align-items: center; gap: 6px; padding: 6px 8px 6px 12px; border-radius: 999px; background: var(--c-cream); font-weight: 700; font-size: 15px; }
   .leader-chip button { border: none; background: #fff; border-radius: 999px; padding: 4px 10px; font-weight: 700; font-size: 13px; cursor: pointer; color: var(--c-blue-deep); }
@@ -535,6 +538,7 @@ var CLUBS = ['Puggles', 'Cubbies', 'Sparks', 'T&T', 'Trek', 'Journey'];
 var STATE = {};                // name key -> { status: 'sending'|'pending'|'restoring', id, tries }
 var TONIGHT = { checkedIn: 0, visitors: 0, byClub: {}, entries: [] };
 var REMOVING = {};
+var UNDOING = {};              // entry key -> true while TwoTimTwo's undo is under way
 var rosterLoaded = false;
 var unlockedState = false;
 var unlockInFlight = false;
@@ -1435,9 +1439,22 @@ function renderTonight() {
       var d = new Date(e.at);
       who.appendChild(b);
       who.appendChild(el('span', null, isNaN(d.getTime()) ? '' : d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })));
+      // Undo check-in (7.14.0) needs the child's TwoTimTwo id; without one
+      // (a visitor, a label printed before the roster knew them) only the
+      // local Remove is possible, and the row says so.
+      var acts = el('div', 'rowacts');
+      var busy = REMOVING[e.key] || UNDOING[e.key];
+      if (e.clubberId && !e.visitor) {
+        var ub = el('button', 'tt', UNDOING[e.key] ? 'Undoing…' : 'Undo check-in'); ub.type = 'button';
+        if (busy) ub.disabled = true; else ub.addEventListener('click', function() { askUndo(e); });
+        acts.appendChild(ub);
+      } else {
+        who.appendChild(el('small', null, e.visitor ? 'Not on TwoTimTwo: Remove only' : 'No TwoTimTwo id here: Remove only'));
+      }
       var btn = el('button', null, REMOVING[e.key] ? 'Removing…' : 'Remove'); btn.type = 'button';
-      if (REMOVING[e.key]) btn.disabled = true; else btn.addEventListener('click', function() { askRemove(e); });
-      row.appendChild(who); row.appendChild(btn);
+      if (busy) btn.disabled = true; else btn.addEventListener('click', function() { askRemove(e); });
+      acts.appendChild(btn);
+      row.appendChild(who); row.appendChild(acts);
       list.appendChild(row);
     });
   });
@@ -1469,23 +1486,96 @@ function identityOf(x) {
   return { firstName: parts[0] || '', lastName: parts.slice(1).join(' '), clubberId: null };
 }
 function displayName(ident) { return (ident.firstName + ' ' + ident.lastName).trim(); }
-var pendingConfirm = null;
+var pendingConfirm = null;     // { entry, mode: 'remove' | 'undo' }
 function askRemove(entry) {
   var name = (entry.firstName + ' ' + entry.lastName).trim();
-  pendingConfirm = entry;
+  pendingConfirm = { entry: entry, mode: 'remove' };
   $('confirm-title').textContent = 'Remove ' + name + ' from tonight’s count?';
   $('confirm-body').textContent = 'This only changes the count on the lobby screens and this list. It does NOT undo the check-in on TwoTimTwo. If ' +
     entry.firstName + ' really left, also undo them on the check-in laptop.';
+  $('confirm-ok').textContent = 'Remove from count';
+  showSheet('confirm-sheet');
+}
+function askUndo(entry) {
+  var name = (entry.firstName + ' ' + entry.lastName).trim();
+  pendingConfirm = { entry: entry, mode: 'undo' };
+  $('confirm-title').textContent = 'Undo ' + name + '’s check-in on TwoTimTwo?';
+  $('confirm-body').textContent = 'The check-in laptop undoes it on TwoTimTwo, and then ' + entry.firstName +
+    ' comes off tonight’s count and the lobby screens. If TwoTimTwo does not confirm it, nothing changes and this page says why.';
+  $('confirm-ok').textContent = 'Undo check-in';
   showSheet('confirm-sheet');
 }
 $('confirm-cancel').addEventListener('click', function() { pendingConfirm = null; renderTonight(); showSheet('tonight-sheet'); });
 $('confirm-ok').addEventListener('click', function() {
-  var entry = pendingConfirm;
+  var c = pendingConfirm;
   pendingConfirm = null;
   renderTonight();
   showSheet('tonight-sheet');
-  if (entry) removeEntry(entry);
+  if (c && c.mode === 'undo') undoEntry(c.entry);
+  else if (c) removeEntry(c.entry);
 });
+
+// ── Tonight: undo on TwoTimTwo (7.14.0) ────────────────────────────────────
+// Queued for the check-in laptop like a phone check-in (/phone/undo with
+// inTwoTimTwo, the same route Remove uses, so the website's relay carries it),
+// then followed on /phone/status. The count changes only when the laptop's
+// extension reports TwoTimTwo's own "(checkin undone)"; any failure says
+// exactly why and offers Remove, which stays the volunteer's choice.
+var UNDO_GIVE_UP_MS = 3 * 60 * 1000;   // the server answers by then (a minute to pick up, 90 s to report)
+function undoEntry(entry) {
+  var ident = identityOf(entry), name = displayName(ident);
+  UNDOING[entry.key] = true;
+  renderTonight();
+  postJson('/phone/undo', { pin: PIN, firstName: ident.firstName, lastName: ident.lastName, clubberId: ident.clubberId, inTwoTimTwo: true }).then(function(data) {
+    if (data && data.id) { pollUndo(entry, data.id, Date.now()); return; }
+    // An older print app on the laptop does not know the undo and Removed
+    // the child from the count instead. Say exactly that.
+    delete UNDOING[entry.key];
+    toast(name + ' was only removed from tonight’s count: the check-in laptop’s app is older and cannot undo on TwoTimTwo. Undo there too.', 9000, null, null, 'bad');
+    refreshAll();
+  }).catch(function(e) {
+    delete UNDOING[entry.key];
+    renderTonight();
+    if (e.code === 'pin' || e.code === 'locked') { handleActionError(e, ''); return; }
+    undoFailed(entry, e.message);
+  });
+}
+function pollUndo(entry, id, started) {
+  setTimeout(function() {
+    if (!UNDOING[entry.key]) return;
+    call('GET', '/phone/status/' + id).then(function(s) {
+      if (s && s.status === 'done') {
+        delete UNDOING[entry.key];
+        toast(displayName(identityOf(entry)) + ': undone in TwoTimTwo.', 4000, null, null, 'good');
+        refreshAll();
+        return;
+      }
+      if (s && s.status === 'failed') { delete UNDOING[entry.key]; renderTonight(); undoFailed(entry, s.detail); return; }
+      if (s && s.error && !s.status) { lost(); return; }   // on the Wi-Fi a 404 arrives as a body
+      next();
+    }).catch(function(e) {
+      if (e && e.code === 'http' && e.status === 404) { lost(); return; }
+      next();
+    });
+  }, 1500);
+  function lost() {
+    delete UNDOING[entry.key];
+    renderTonight();
+    undoFailed(entry, 'The check-in laptop lost track of it (restarted?). Check TwoTimTwo before trying again.');
+  }
+  function next() {
+    if (Date.now() - started > UNDO_GIVE_UP_MS) {
+      delete UNDOING[entry.key];
+      renderTonight();
+      undoFailed(entry, 'The check-in laptop has not answered. Check TwoTimTwo before trying again.');
+      return;
+    }
+    pollUndo(entry, id, started);
+  }
+}
+function undoFailed(entry, why) {
+  toast('Not undone in TwoTimTwo: ' + (why || 'see the check-in laptop.'), 10000, 'Remove', function() { askRemove(entry); }, 'bad');
+}
 function removeEntry(entry) {
   var ident = identityOf(entry), name = displayName(ident);
   REMOVING[entry.key] = true;

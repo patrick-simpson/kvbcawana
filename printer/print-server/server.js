@@ -3624,7 +3624,7 @@ function labelTemplateFor(clubName) {
 // is for a child with no TwoTimTwo row, whom roster-diff, reconcile and the
 // last-check-in observer can therefore never see; a leader tag (POST
 // /print-leader) is not a check-in at all. PIN-over-HTTP is LAN-trust only.
-let pendingActions = [];      // { id, name, at, status, detail }
+let pendingActions = [];      // { id, type, name, at, status, detail } (type 'checkin' | 'undo')
 let pendingWaiters = [];      // long-poll responders
 const PENDING_MAX = 100;
 const PENDING_WAITERS_MAX = 4;
@@ -3635,11 +3635,34 @@ const PENDING_TTL_MS = 10 * 60 * 1000;
 // and a claimed action is not handed out again; one that is never answered
 // within PENDING_CLAIM_MS goes back to pending for the next poll to take.
 const PENDING_CLAIM_MS = 90 * 1000;
+
+// An undo (7.14.0) is never left waiting and never driven twice. One nobody
+// picks up within UNDO_PICKUP_MS fails with the reason, so a phone that gave up
+// is never contradicted by a laptop that undoes the child ten minutes later;
+// a claimed one whose lease runs out fails too, because the post may already
+// have reached TwoTimTwo and a second one would only read as a refusal.
+const UNDO_PICKUP_MS = 60 * 1000;
+const UNDO_NOT_PICKED_UP = 'The check-in laptop did not pick it up: no TwoTimTwo tab open there, or its extension is older than 7.14. Nothing was changed.';
+const UNDO_NO_ANSWER = 'The check-in laptop started the undo but never reported back. Check TwoTimTwo\'s report before trying again.';
+const actionType = (a) => (a && a.type === 'undo' ? 'undo' : 'checkin');
+
 function prunePendingActions() {
   const now = Date.now();
   const cutoff = now - PENDING_TTL_MS;
   pendingActions = pendingActions.filter(a => new Date(a.at).getTime() >= cutoff).slice(-PENDING_MAX);
   for (const a of pendingActions) {
+    if (actionType(a) === 'undo') {
+      if (a.status === 'pending' && now - new Date(a.at).getTime() > UNDO_PICKUP_MS) {
+        a.status = 'failed';
+        a.detail = UNDO_NOT_PICKED_UP;
+        console.warn(`[phone] Undo for ${a.name}: nobody picked it up`);
+      } else if (a.status === 'claimed' && now - a.claimedAt > PENDING_CLAIM_MS) {
+        a.status = 'failed';
+        a.detail = UNDO_NO_ANSWER;
+        console.warn(`[phone] Undo for ${a.name}: claimed, never answered`);
+      }
+      continue;
+    }
     if (a.status === 'claimed' && now - a.claimedAt > PENDING_CLAIM_MS) {
       a.status = 'pending';
       delete a.claimedAt;
@@ -3648,12 +3671,20 @@ function prunePendingActions() {
   }
 }
 
+// What one poller is handed. An undo goes only to an extension that says it
+// can do one (`?accept=undo`, 7.14.0): an older one would take it for a
+// check-in, find no row for a child already in, and answer "Already checked
+// in at this station" with ok:true, which here would read as a done undo.
+function pendingFor(accept) {
+  const kinds = new Set(String(accept || '').split(',').map(s => s.trim()));
+  return pendingActions.filter(a => a.status === 'pending' && (actionType(a) === 'checkin' || kinds.has(actionType(a))));
+}
+
 function wakePendingWaiters() {
   const waiters = pendingWaiters.splice(0);
-  const pending = pendingActions.filter(a => a.status === 'pending');
   waiters.forEach(w => {
     clearTimeout(w.timer);
-    try { w.res.json({ actions: pending }); } catch { /* client gone */ }
+    try { w.res.json({ actions: pendingFor(w.accept) }); } catch { /* client gone */ }
   });
 }
 
@@ -4906,7 +4937,8 @@ function tonightCheckins(history = loadHistory(), today = localDayISO()) {
 //     phone's Remove, or /reset-tonight) suppresses that child even though
 //     TwoTimTwo still lists them - which it will, because Remove is local by
 //     design. Without this, Remove and Reset would both stop working the
-//     moment a report went fresh.
+//     moment a report went fresh. The phone's Undo check-in (7.14.0,
+//     'twotimtwo') rides the same rule until the next report drops the child.
 //   * UNREGISTERED VISITORS DO NOT COUNT while a report is fresh (owner's
 //     decision, 2026-09-16). They are not in the report and they never will
 //     be, so the tick-up skips them too; a visitor who IS on the report (they
@@ -8892,8 +8924,18 @@ app.post('/phone/tonight', (req, res) => {
 // TwoTimTwo; the phone page says so, and the volunteer undoes there too if
 // the child really left. reconcileHistoryWithReport() respects the `undoneBy`
 // marker, so the kid staying on TwoTimTwo's report cannot re-count them.
+//
+// With `inTwoTimTwo: true` (7.14.0, the phone's "Undo check-in") it is the
+// REAL undo instead: queued for the check-in page's extension like a phone
+// check-in, and nothing here changes until that extension reports TwoTimTwo's
+// own "(checkin undone)" (applyTwoTimTwoUndo, from the result route). It rides
+// this route, not a new one, because the website's /checkin page reaches the
+// laptop only through the sync service's relay, whose allowlist already
+// carries /phone/undo and /phone/status/:id. An older print server ignores
+// the flag and Removes; its answer has no `id`, and the phone says so.
 app.post('/phone/undo', (req, res) => {
   const ident = phoneIdentity(req.body);
+  if (req.body && req.body.inTwoTimTwo === true) return queueTwoTimTwoUndo(ident, res);
   if (!ident.firstName && !ident.lastName && !ident.clubberId) {
     return res.status(400).json({ error: 'firstName/lastName or clubberId is required' });
   }
@@ -8906,6 +8948,56 @@ app.post('/phone/undo', (req, res) => {
   const st = computeTonightStats();
   res.json({ ok: true, undone: out.changed, checkedIn: st.checkedIn, byClub: st.byClub });
 });
+
+// The phone's "Undo check-in" (7.14.0). TwoTimTwo's undo takes the meeting
+// and the clubber id, so a child with no id here (an unregistered visitor, a
+// row printed before the roster knew them) can only be Removed. The "Allow
+// driven check-ins" switch covers it exactly as it covers a phone check-in.
+function queueTwoTimTwoUndo(ident, res) {
+  if (!ident.clubberId) {
+    return res.status(400).json({ error: 'This child has no TwoTimTwo id on the check-in laptop, so it cannot undo them there. Use Remove, and undo at the desk.' });
+  }
+  if (config.enableDrivenCheckin === false) {
+    return res.status(409).json({ error: 'Undo on TwoTimTwo is turned off with phone check-ins on the check-in laptop (printer dashboard → Settings → "Allow driven check-ins").' });
+  }
+  prunePendingActions();
+  // One undo in flight per child: a double-tap must not post twice.
+  const existing = pendingActions.find(a => actionType(a) === 'undo' && a.clubberId === ident.clubberId
+    && (a.status === 'pending' || a.status === 'claimed'));
+  if (existing) return res.json({ id: existing.id, queued: true });
+  const name = `${ident.firstName} ${ident.lastName}`.trim() || `clubber ${ident.clubberId}`;
+  const action = {
+    id: crypto.randomUUID(),
+    type: 'undo',
+    name,
+    firstName: ident.firstName,
+    lastName: ident.lastName,
+    clubberId: ident.clubberId,
+    at: new Date().toISOString(),
+    status: 'pending',
+    detail: '',
+  };
+  pendingActions.push(action);
+  console.log(`[phone] Undo queued: ${name}`);
+  wakePendingWaiters();
+  return res.json({ id: action.id, queued: true });
+}
+
+// TwoTimTwo has undone the check-in, so this laptop does what Remove does: the
+// child's rows tonight are marked undone (by 'twotimtwo', so the phone offers
+// Check in again, never "Add back", which would count a child TwoTimTwo no
+// longer has), tonight leaves their ledger and the screens drop them at once.
+// The marker also holds the count down until the next report, which still
+// lists the child, is replaced by one that does not.
+function applyTwoTimTwoUndo(action) {
+  const ident = { firstName: action.firstName || '', lastName: action.lastName || '', clubberId: action.clubberId || null };
+  const out = markManualUndo(loadHistory(), ident, Date.now(), 'twotimtwo');
+  if (out.changed) saveHistory(out.history);
+  try { stripDayFromLedger(ledgerKeysFor(ident.firstName, ident.lastName, ident.clubberId), localDayISO()); } catch { /* ledger trouble never blocks the undo */ }
+  publishTally();
+  console.log(`[phone] Undone on TwoTimTwo: ${action.name} (${out.changed} row(s) here)`);
+  return out.changed;
+}
 
 // Reverse a phone Remove ("Add back"). Only rows the phone itself undid are
 // eligible — an undo detected from TwoTimTwo's report is TwoTimTwo's truth and
@@ -8967,10 +9059,11 @@ app.post('/phone/checkin', (req, res) => {
   if (typeof o.Friend === 'boolean') options.Friend = o.Friend;
   prunePendingActions();
   // One pending action per kid — a double-tap must not double-drive.
-  const existing = pendingActions.find(a => a.name.toLowerCase() === name.toLowerCase() && a.status === 'pending');
+  const existing = pendingActions.find(a => actionType(a) === 'checkin' && a.name.toLowerCase() === name.toLowerCase() && a.status === 'pending');
   if (existing) return res.json({ id: existing.id, queued: true });
   const action = {
     id: crypto.randomUUID(),
+    type: 'checkin',
     name,
     options,
     at: new Date().toISOString(),
@@ -8984,14 +9077,16 @@ app.post('/phone/checkin', (req, res) => {
 });
 
 // Extension long-poll: returns pending actions immediately if any exist,
-// otherwise holds the request up to 25 s waiting for one.
+// otherwise holds the request up to 25 s waiting for one. `?accept=undo` is
+// how a 7.14.0+ extension says it can also undo (see pendingFor).
 app.get('/pending-actions', (req, res) => {
   prunePendingActions();
-  const pending = pendingActions.filter(a => a.status === 'pending');
+  const accept = typeof req.query.accept === 'string' ? req.query.accept.slice(0, 40) : '';
+  const pending = pendingFor(accept);
   if (pending.length || pendingWaiters.length >= PENDING_WAITERS_MAX) {
     return res.json({ actions: pending });
   }
-  const waiter = { res, timer: null };
+  const waiter = { res, timer: null, accept };
   waiter.timer = setTimeout(() => {
     pendingWaiters = pendingWaiters.filter(w => w !== waiter);
     try { res.json({ actions: [] }); } catch { /* client gone */ }
@@ -9016,6 +9111,19 @@ app.post('/pending-actions/:id/claim', (req, res) => {
 app.post('/pending-actions/:id/result', (req, res) => {
   const action = pendingActions.find(a => a.id === req.params.id);
   if (!action) return res.status(404).json({ error: 'unknown action' });
+  if (actionType(action) === 'undo') {
+    // Answered once. A late or repeated result (a second tab, a retry after a
+    // timeout) never re-marks the night or flips a reported failure to done.
+    if (action.status === 'done' || action.status === 'failed') return res.json({ ok: true, already: action.status });
+    // Only a literal true, the extension's verdict on TwoTimTwo's own
+    // "(checkin undone)" reply, changes anything here.
+    const ok = !!req.body && req.body.ok === true;
+    action.status = ok ? 'done' : 'failed';
+    action.detail = String((req.body && req.body.detail) || '').slice(0, 200);
+    if (ok) applyTwoTimTwoUndo(action);
+    else console.log(`[phone] Undo for ${action.name} failed${action.detail ? ' — ' + action.detail : ''}`);
+    return res.json({ ok: true });
+  }
   action.status = (req.body && req.body.ok) ? 'done' : 'failed';
   action.detail = String((req.body && req.body.detail) || '').slice(0, 200);
   console.log(`[phone] ${action.name}: ${action.status}${action.detail ? ' — ' + action.detail : ''}`);
@@ -9023,6 +9131,7 @@ app.post('/pending-actions/:id/result', (req, res) => {
 });
 
 app.get('/phone/status/:id', (req, res) => {
+  prunePendingActions();   // so an undo nobody picked up reads as failed, with why
   const action = pendingActions.find(a => a.id === req.params.id);
   if (!action) return res.status(404).json({ error: 'unknown action' });
   res.json({ status: action.status, detail: action.detail });
