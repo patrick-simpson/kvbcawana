@@ -1,4 +1,15 @@
-﻿## [7.12.1] - 2026-10-07
+﻿## [7.13.0] - 2026-10-07
+Tonight's count is right again, and the screens get it.
+
+**Fixed: 11 children checked in, the count said 2.** The extension reads TwoTimTwo's check-in report to build tonight's count. Since TwoTimTwo moved the child's name into the cell with the edit and undo links (3 October), the extension still read the NEXT cell as the name, and on clubs with a friend / shares / points column that cell says something like "YES 1 Share 1 Point". Every child with the same summary then counted as one child, so the phone page, the dashboard and every lobby screen showed far too few. It now reads the name from the cell with the links, falls back to the roster by TwoTimTwo id, and never takes a "Yes", "No", "Shares" or "Points" cell for a name. Two different TwoTimTwo ids are always two children, whatever the names say.
+
+**Fixed: labels printed as "YES 1 Share 1 Point".** The same misread made the missed-check-in catch-up print labels with that "name". A child whose name cannot be read is now never printed; the catch-up waits until the roster knows them.
+
+**A half-read report is not trusted.** The report's own "Count:" lines say how many children it lists. A read that found fewer is not used for the count (or to mark anyone undone); the count falls back to this laptop's own history and the dashboard says why. An older extension still loaded in Chrome is handled on the laptop side too, but reload the extension (or restart Chrome) to pick this one up.
+
+**The screens catch up.** The count is now sent to the screens every minute from an hour before club starts (it used to start at the club's start time, while children are checked in from 5:20), and a count that failed to reach the sync service is sent again as soon as it answers instead of being dropped. A lobby screen no longer shows last week's final number when it first connects on a club night.
+
+## [7.12.1] - 2026-10-07
 The lobby TV no longer shows "FYI: No results found." when TwoTimTwo has no announcement.
 
 **Why.** The extension reads TwoTimTwo's admin messages page. With no message, that page is a table holding one placeholder row, "No results found.", and the one-row fallback took it for an announcement and sent it to the lobby as an FYI. Empty-table placeholders are now ignored, so a screen shows a notice only when the church wrote one.
