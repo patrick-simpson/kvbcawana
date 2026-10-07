@@ -707,7 +707,12 @@ the installer's asset name is fixed, so the link never changes). The owner's cal
   login, uploads) until "Back to the lobby TV" or the showing ends.
 - **Updates** (electron-updater, GitHub provider, channel `lobby`, so the app
   reads `lobby.yml` and can never install another app's `latest.yml`):
-  downloaded in the background, installed only while nothing is on screen.
+  checked every 10 minutes, downloaded in the background and installed the
+  moment the download finishes, WHATEVER is on screen (owner, 2026-10-07,
+  reversing the old "only while nothing is on screen" rule: every release
+  reaches the booth at once, a club night included). The screen is gone for the
+  installer's few seconds and the quiet relaunch puts it back from the schedule
+  and state.json; do not reintroduce an idle gate.
   The feed is this repo's ONE "Latest" release, so **no other release may
   ever be published in this repo as Latest** (create anything else as a
   prerelease or with `make_latest: false`), and the version stays plain
@@ -725,6 +730,36 @@ the installer's asset name is fixed, so the link never changes). The owner's cal
   the live page with the right version, then the release with the `.exe`,
   its blockmap and `lobby.yml`, and a check that `releases/latest` is the new
   tag. Never tag by hand; a stray release goes with `delete-desktop-release.yml`.
+- **One of three screens** (owner, 2026-10-07; `src/screens.js`, pure): the
+  lobby (`/lobby/index.html`), the projector (`/lobby/countdown.html`) or
+  Journey (`/journey/`), one at a time, in the same `persist:lobby` profile (one
+  origin, so one passphrase signs in all three). `state.settings.screen` in
+  state.json; an old state.json reads as the lobby. Its window stays inside that
+  screen's folder; switching replaces a screen that is up at once, on the same
+  monitor. The hours stay 5:00 to 8:00 pm for all three (owner's call). The
+  tray has a Screen submenu and the chooser and titles name the screen.
+- **The Settings window** (the tray's Settings..., or a double-click on the
+  icon): a normal window on the primary monitor. Its left column is
+  `static/configure.html` (the app's own settings: screen, monitor, shutdown,
+  Start with Windows; `static/configure-preload.cjs` is its whole bridge),
+  360px wide under a 64px header (`CONFIG_SIDE` / `CONFIG_HEADER` in main.js,
+  change both together); the rest is a `WebContentsView` in the same profile
+  loading the screen's `?configure=1` page (see "Configure mode" below), so the
+  screen itself is never reloaded or covered. A screen (re)opened while it is
+  up never buries it (`place()` moves it back on top). Offline, the pane shows
+  `static/settings-offline.html` and retries every 30 s.
+- **The club-night shutdown** (`src/shutdown.js`, `src/settings.js`, pure; owner,
+  2026-10-07): OFF until turned on in the Settings window, then only on a club
+  night (`clubNightToday`, which still answers after the 8:00 pm close), at a
+  set evening time (17:00-23:59, default 20:15). Two minutes before, a small
+  dark card (`static/shutdown.html`, `card-preload.cjs`) sits in the corner of
+  the PRIMARY monitor, above a full-screen screen on a one-monitor PC and on the
+  booth monitor otherwise, never a dialog, with "Not tonight", which holds for
+  that night (the tray and the Settings window offer the same). It is armed
+  only by a minute seen before the warning, in memory, so a PC switched on,
+  woken or restarted after that is left alone; an armed shutdown keeps the PC
+  awake past the close. It runs `shutdown.exe /s /t 0` (no `/f`: an app with
+  unsaved work may ask), only packaged on Windows; a development run logs it.
 - **Gates.** The desktop tests run in `build-desktop.yml`
   (`npx vitest run --config desktop/vitest.config.js`), NOT in the website's
   deploy gate: the root vitest excludes `desktop/**`, so a desktop test can
@@ -732,6 +767,38 @@ the installer's asset name is fixed, so the link never changes). The owner's cal
   `desktop/` (its `node_modules/` and `release/` are ignored). Dev-only
   environment overrides (`AWANA_LOBBY_SITE`, `AWANA_LOBBY_NOW`,
   `AWANA_LOBBY_USERDATA`) are ignored in a packaged build.
+
+## Configure mode (`?configure=1`, the sound room app's Settings window)
+
+`src/lib/configureRelay.js` (owner, 2026-10-07). The desktop app's Settings
+window shows a screen's own settings beside the live screen, in the same
+browser profile, so everything SAVED already reaches the live screen through
+the shared localStorage (useConfig, useDisplayKey, useSyncedDeck and the
+projector's three device stores all take another window's change live). What
+storage cannot carry, the buttons that act on the screen itself, is relayed
+over one same-origin `BroadcastChannel('awana-configure')` as
+`{ screen, action, data }`; the live screen obeys only its own screen's
+allowlisted actions, as its own button would (a preview check-in still goes
+through `simulateEvent`'s sanitizers).
+
+- **The lobby** (`App.jsx`, `CONFIGURE`): Settings open from load on the
+  configurator's paper, no Done, no gear, no Debug, no first-run card. Relayed:
+  Preview a check-in, Reset tonight's counter, the pickup board demo, and
+  "background video changed" (its bytes are in this profile's IndexedDB). The
+  socket still feeds Settings' status, but its check-in, recap, pickup and
+  notice handlers are no-ops there, and there is no sound, confetti, wake lock
+  or watchdog reload. Journey's embedded copy (`isEmbedded()`) ignores relays.
+  `e2e/configure.spec.js` drives both pages in one context.
+- **The projector** (`presentation/App.jsx`, `views/ConfigureView.jsx`): the
+  menu's items in the touch sheet's layout (the `.pj-sheet` rules sit just
+  before the touch block for that reason), no wall, chimes, wake lock, Full
+  screen switch or self-reload. A wall pick and Resume Schedule are relayed
+  (checked by `isTarget` before the projector obeys) and mirrored on the page.
+  `e2e/configure-projector.spec.js`.
+- **Journey** speaks the same channel as `screen: 'journey'` (journey/CLAUDE.md).
+- A new Settings button that acts on the screen itself must be relayed here too,
+  or hidden in configure mode: in the configurator it would otherwise act on
+  the hidden configure page.
 
 ## The check-in moment (rebrand stage 3)
 

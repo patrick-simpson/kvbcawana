@@ -128,3 +128,17 @@ export function nextClubNight(now, { schedule = null, feed = null } = {}, days =
   }
   return null;
 }
+
+/**
+ * Whether today (in the church's zone) is a club night, at any hour: the
+ * optional shutdown asks after the 8:00 pm close, which nextClubNight() has
+ * already moved past.
+ *
+ * @param {Date} now
+ * @param {{ schedule?: Schedule | null, feed?: Feed | null }} sources
+ */
+export function clubNightToday(now, { schedule = null, feed = null } = {}) {
+  const timeZone = typeof schedule?.timezone === 'string' && schedule.timezone ? schedule.timezone : DEFAULT_TIMEZONE;
+  const { dateKey, weekday } = zonedParts(now, timeZone);
+  return isClubNight(dateKey, weekday, { schedule, feed, timeZone });
+}

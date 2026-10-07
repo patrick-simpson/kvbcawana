@@ -11,6 +11,11 @@
 //                  weather layers so two renders of the same state are
 //                  pixel-identical. Doubles as a low-power switch for
 //                  weak projector hardware (see useLowPower.js).
+//   ?view=game   — open on game time, as if picked from the menu (App.jsx;
+//                  the lobby's Settings → Status → Other screens links it).
+//   ?configure=1 — the operator menu alone, for the sound room app's
+//                  Settings window (views/ConfigureView.jsx); its wall picks
+//                  are relayed to the live projector (src/lib/configureRelay.js).
 
 function readFlags() {
   try {
@@ -18,9 +23,11 @@ function readFlags() {
     return {
       freeze: params.get('freeze') === '1',
       vr: params.get('vr') === '1',
+      view: params.get('view'),
+      configure: params.get('configure') === '1',
     };
   } catch {
-    return { freeze: false, vr: false };
+    return { freeze: false, vr: false, view: null, configure: false };
   }
 }
 

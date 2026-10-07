@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { AnimatePresence, MotionConfig, motion } from 'framer-motion';
 import { AppMode } from './types.js';
 import { FLAGS } from './lib/flags.js';
@@ -23,10 +23,17 @@ import { SlideshowView } from './views/SlideshowView.jsx';
 import { ShutdownView } from './views/ShutdownView.jsx';
 import { QuickNav } from './views/QuickNav.jsx';
 import { TouchMenu } from './views/TouchMenu.jsx';
+import { ConfigureView } from './views/ConfigureView.jsx';
+import { listenForRelay, relayToScreen } from '../lib/configureRelay.js';
 import { unlockStingers } from './lib/stingers.js';
 import { isTouch, usePortrait, useTouch } from './lib/touch.js';
 
 const OPENING_WINDOW_INDEX = 0;
+const CONFIGURE = FLAGS.configure;
+
+/** A relayed wall pick, checked before the live projector obeys it. */
+const isTarget = (t) => Boolean(t) && typeof t === 'object'
+  && (t.type === 'countdown' || (t.type === 'window' && Number.isInteger(t.index) && t.index >= 0 && t.index < 50));
 
 export const App = () => {
   const now = useClock();
@@ -49,6 +56,23 @@ export const App = () => {
   const scheduleCfg = useEffectiveSchedule();
   const effectiveWindows = windowsForDate(now, scheduleCfg) ?? scheduleCfg.windows;
   const firstGameIndex = effectiveWindows.findIndex((w) => w.kind === 'game');
+
+  // ?view=game (the lobby's Settings → Other screens): open on game time
+  // exactly as the menu would, so the watchdog and the resume pill still
+  // hand it back to the schedule. A game window already on is left alone.
+  // Once only: the flag leaves the URL, so a self-update reload lands on the
+  // schedule instead of jumping back into games.
+  const deepLinked = useRef(false);
+  useEffect(() => {
+    if (deepLinked.current || FLAGS.view !== 'game') return;
+    deepLinked.current = true;
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('view');
+      window.history.replaceState(window.history.state, '', url);
+    } catch { /* the jump still happens */ }
+    if (state.mode !== AppMode.GAME_TIME && firstGameIndex >= 0) select({ type: 'window', index: firstGameIndex });
+  }, [state.mode, firstGameIndex, select]);
 
   // ?vr=1 (visual-regression / screenshot mode): stamp the root so CSS
   // can kill every keyframe animation, and tell framer-motion to skip
@@ -93,7 +117,7 @@ export const App = () => {
 
   // The projector must never doze off mid-countdown (same shared hook
   // as the signage page — on the presentation import allowlist).
-  useWakeLock(true);
+  useWakeLock(!CONFIGURE);
 
   // Self-updating (see CLAUDE.md, "Self-updating pages"): the projector picks
   // up a new deploy on its own, and only while nobody is watching it count.
@@ -101,7 +125,8 @@ export const App = () => {
   // hour out, before 5:30 on a club night, and any other day of the week.
   // The rule itself lives in the shared pure helper; here it is just "not
   // idle means busy".
-  const buildReloadBusy = useCallback(() => !projectorIdle(state), [state]);
+  // The configure page never reloads itself under the operator's typing.
+  const buildReloadBusy = useCallback(() => CONFIGURE || !projectorIdle(state), [state]);
   useBuildReload(buildReloadBusy);
 
   // A deliberately bare wall (the opening's closing blackout, the shutdown
@@ -127,6 +152,29 @@ export const App = () => {
       window.removeEventListener('keydown', arm, { capture: true });
     };
   }, []);
+
+  // The live projector: obey a wall pick relayed from a configure page beside
+  // it (the sound room app's Settings window), as its own menu would.
+  useEffect(() => {
+    if (CONFIGURE) return undefined;
+    return listenForRelay('projector', ['select', 'resume'], (action, target) => {
+      if (action === 'resume') resume();
+      else if (isTarget(target)) select(target);
+    });
+  }, [select, resume]);
+
+  if (CONFIGURE) {
+    return (
+      <ConfigureView
+        now={now}
+        state={state}
+        isOverride={isOverride}
+        socketStatus={socketStatus}
+        onSelect={(target) => { relayToScreen('projector', 'select', target); select(target); }}
+        onResume={() => { relayToScreen('projector', 'resume'); resume(); }}
+      />
+    );
+  }
 
   return (
     <MotionConfig reducedMotion={FLAGS.vr ? 'always' : 'user'}>

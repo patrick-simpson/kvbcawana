@@ -14,6 +14,7 @@ import { useDisplayKey } from '../../hooks/useDisplayKey.js';
 import { maskDisplayKey } from '../../lib/displayKey.js';
 import { isPlausibleKey } from '../../lib/envelope.js';
 import { GlassPanel } from '../components/GlassPanel.jsx';
+import { FLAGS } from '../lib/flags.js';
 
 /**
  * Hidden operator menu. Its hover zone is only the top-right corner —
@@ -373,6 +374,8 @@ const fullscreenSubscribe = (fn) => {
 const isFullscreen = () => Boolean(document.fullscreenElement);
 const FullscreenToggle = () => {
   const on = useSyncExternalStore(fullscreenSubscribe, isFullscreen, () => false);
+  // The configure page would only fill its own pane of the Settings window.
+  if (FLAGS.configure) return null;
   if (!document.fullscreenEnabled || typeof document.documentElement.requestFullscreen !== 'function') return null;
   return (
     <ToggleButton

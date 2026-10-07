@@ -27,6 +27,19 @@
       title="Awana Check-in Display"
       allow="fullscreen"
     ></iframe>
+    <!-- Configure mode (?configure=1, the sound room app's Settings window):
+         the page is only the Settings panel, and the frame above must never
+         load there (a second live socket, and children's names or a chime in
+         the booth). Removed here, the moment it is parsed, because by the
+         time schedule.js runs the lobby page could already be starting. -->
+    <script>
+      try {
+        if (new URLSearchParams(location.search).get('configure') === '1') {
+          document.documentElement.classList.add('configure-mode');
+          document.getElementById('checkin-frame').remove();
+        }
+      } catch (e) { /* schedule.js checks again */ }
+    </script>
   </div>
 
   <div id="journey-view" class="view hidden">

@@ -1,6 +1,7 @@
 # Awana Lobby Display (sound room PC)
 
-A small Windows app that puts the **lobby check-in signage** full screen on
+A small Windows app that puts the **lobby check-in signage** (or, if you
+choose, the projector or the Journey kiosk) full screen on
 the lobby TV on club nights, from **5:00 pm to 8:00 pm**, and takes it down
 again. It loads the live signage site, so every website update reaches the
 booth on its own, and it updates itself from this repo's GitHub Releases.
@@ -23,6 +24,35 @@ booth on its own, and it updates itself from this repo's GitHub Releases.
 It starts with Windows from then on, and waits in the system tray (the orange
 Awana icon by the clock).
 
+## Which screen
+
+The app shows one of three screens, chosen under **Settings** (or the tray's
+**Screen** menu): the **lobby check-in signage** (the default), the
+**projector** (countdown, pledges, game time and goodnight) or the **Journey
+kiosk**. All three use the same club-night hours, and switching swaps the
+screen straight away on the same monitor.
+
+## Settings
+
+Choose **Settings...** in the tray menu (or double-click the tray icon). A
+window opens on the main monitor, never on the TV. On the left are the app's
+own settings: which screen, which monitor, the club-night shutdown and Start
+with Windows. On the right are the chosen screen's own settings, the same ones
+its gear (or the projector's corner menu) shows. Changes there go live on the
+screen as you make them, without reloading or covering it; **Preview a
+check-in**, **Reset tonight's counter** and the projector's picks (for example
+**T&T Game Time**) play on the screen itself.
+
+## Shutting the PC down after club
+
+Off until you turn it on in **Settings → Shut down**. Then, on club nights only,
+the PC shuts itself down at the time you set (8:15 pm unless you change it).
+Two minutes before, a small dark card appears in the bottom-right corner of the
+main screen with a countdown and **Not tonight**, which cancels it for that
+night (so does the tray's **Cancel tonight's shutdown**). A PC switched on
+after the time is never shut down. A program with unsaved work may still ask
+before Windows lets it close.
+
 ## Every club night
 
 Nothing to do. Switch the PC on and sign in; at 5:00 pm the signage appears
@@ -43,14 +73,17 @@ sees it again.
 
 | Item | What it does |
 | --- | --- |
+| Settings... | Opens the Settings window on the main monitor (also a double-click on the icon). |
+| Screen | Lobby, projector or Journey. |
+| Cancel tonight's shutdown | Only while the shutdown card is counting down. |
 | Show now (for 3 hours) | Shows it on the TV now, on any day. It hides itself three hours later. |
 | Hide until the next club night | Takes it down; the schedule brings it back next club night. (Closing the window does the same.) |
 | Resume schedule | Drops a Show now or a Hide and goes back to the clock. |
 | Set up on this screen (in a window) | Shows the signage in a normal window on this monitor, for the display login, uploads and exports. "Back to the lobby TV" returns it. |
-| Choose the lobby TV... | Shows the numbered cards again to pick a different monitor. |
+| Choose the lobby TV... | Shows the numbered cards again to pick a different monitor (it names whichever screen is chosen). |
 | Reload the page | Reloads the signage. |
 | Start with Windows | On by default. |
-| Check for updates / Restart to update now | Updates install by themselves while nothing is on screen; this does it now. |
+| Check for updates / Restart to update now | Updates are checked every 10 minutes and install the moment they download, even during club night (the screen is gone for a few seconds and comes back by itself); this checks now. |
 | Open log file | For troubleshooting. |
 
 Opening the app from the Start menu or desktop icon while it is running is
@@ -70,8 +103,8 @@ the same as **Show now**.
 
 ## For developers
 
-`main.js` wires Electron to three pure modules in `src/` (`clubNight.js`,
-`visibility.js`, `displays.js`), which hold every rule and have unit tests
+`main.js` wires Electron to the pure modules in `src/` (`clubNight.js`,
+`visibility.js`, `displays.js`, `screens.js`, `settings.js`, `shutdown.js`), which hold every rule and have unit tests
 (`npm test`, run from this folder). `npm start` runs it unpackaged; these
 environment variables work only unpackaged:
 

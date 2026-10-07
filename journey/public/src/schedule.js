@@ -26,6 +26,26 @@ function fetchWithTimeout(url, options, timeoutMs) {
   );
 }
 
+/* Configure mode (`?configure=1`, exactly '1'): the sound room app's Settings
+   window loads this page beside the live kiosk, in the same browser profile,
+   and here the page is ONLY the Settings panel. Nothing of the kiosk runs:
+   no schedule, no video, no splash, no bundle download, no wake lock, no
+   self-update, and the Check-in Display frame is removed by index.html before
+   it can load. What the panel saves goes to localStorage, which the live
+   kiosk picks up through its storage listener; what the panel would DO to
+   the screen (play a lesson, open a handout or a prep) is relayed to the
+   live kiosk instead (relayToKiosk / handleConfigureRelay below). The same
+   protocol as the lobby's (lobby/src/lib/configureRelay.js). */
+const CONFIGURE_MODE = (() => {
+  try {
+    return new URLSearchParams(window.location.search).get('configure') === '1';
+  } catch {
+    return false;
+  }
+})();
+const CONFIGURE_CHANNEL = 'awana-configure';
+if (CONFIGURE_MODE) document.documentElement.classList.add('configure-mode');
+
 const checkinView = document.getElementById('checkin-view');
 const checkinFrame = document.getElementById('checkin-frame');
 const journeyView = document.getElementById('journey-view');
@@ -54,6 +74,7 @@ const settingsBtn = document.getElementById('settings-btn');
 const settingsPanel = document.getElementById('settings-panel');
 const settingsBackdrop = document.getElementById('settings-backdrop');
 const settingsCloseBtn = document.getElementById('settings-close-btn');
+const settingsPreviewNote = document.getElementById('settings-preview-note');
 const settingsLessonList = document.getElementById('settings-lesson-list');
 const settingsVariantPicker = document.getElementById('settings-variant-picker');
 const settingsVariantPrompt = document.getElementById('settings-variant-prompt');
@@ -212,7 +233,7 @@ function checkinDisplayUrl(profile) {
 // iframe in Chromium, which would drop the display's live check-in socket
 // for no reason at all.
 function applyCheckinDisplayUrl() {
-  if (!checkinFrame) return;
+  if (!checkinFrame || CONFIGURE_MODE) return;
   const wanted = checkinDisplayUrl(effectiveProfile());
   if (checkinFrame.getAttribute('src') !== wanted) checkinFrame.src = wanted;
 }
@@ -284,7 +305,8 @@ function idleWatch(now = Date.now()) {
     endPreview();
     acted.push('preview');
   }
-  if (!settingsPanel.classList.contains('hidden') && idleFor > SETTINGS_IDLE_MS) {
+  // The configure page IS the panel: it never closes.
+  if (!CONFIGURE_MODE && !settingsPanel.classList.contains('hidden') && idleFor > SETTINGS_IDLE_MS) {
     console.log('Journey: the Settings panel was left open; closing it');
     closeSettingsPanel();
     acted.push('settings');
@@ -295,7 +317,6 @@ setInterval(idleWatch, 60 * 1000);
 window.idleWatch = idleWatch;
 window.noteActivity = noteActivity;
 let cursorIdleTimer = null;
-document.documentElement.classList.add('cursor-hidden');
 function markActivity() {
   document.documentElement.classList.remove('cursor-hidden');
   clearTimeout(cursorIdleTimer);
@@ -303,8 +324,12 @@ function markActivity() {
     document.documentElement.classList.add('cursor-hidden');
   }, CURSOR_IDLE_MS);
 }
-document.addEventListener('mousemove', markActivity);
-document.addEventListener('touchstart', markActivity, { passive: true });
+// A configure page is a desktop form under an operator's mouse: the pointer stays.
+if (!CONFIGURE_MODE) {
+  document.documentElement.classList.add('cursor-hidden');
+  document.addEventListener('mousemove', markActivity);
+  document.addEventListener('touchstart', markActivity, { passive: true });
+}
 
 function scheduledPhase() {
   const now = new Date();
@@ -1593,7 +1618,9 @@ function setView(phase) {
 // the lesson finished early) without the next 15s poll tick fighting them —
 // the poll only acts when scheduledPhase() itself has actually changed.
 let lastPhase = scheduledPhase();
-setView(lastPhase);
+// A configure page shows neither layer (style.css hides both), and nothing
+// here may start the splash or a video behind the panel.
+if (!CONFIGURE_MODE) setView(lastPhase);
 
 // True while a manually-picked video (from the Settings panel) is playing.
 // The poller and the hourly lesson refresh both skip their normal
@@ -1604,7 +1631,7 @@ setView(lastPhase);
 let previewMode = false;
 
 setInterval(() => {
-  if (previewMode) return;
+  if (previewMode || CONFIGURE_MODE) return;
   const phase = scheduledPhase();
   if (phase !== lastPhase) {
     lastPhase = phase;
@@ -1755,6 +1782,9 @@ function beginScheduledPlay(resumeAt = 0) {
 }
 
 document.addEventListener('keydown', (e) => {
+  // A configure page is only the panel, which never closes: no shortcut
+  // below (S, Escape, Space, the arrows) means anything there.
+  if (CONFIGURE_MODE) return;
   // The caption prompt owns the keyboard while it's up: Y/N answer it, and
   // Space/Enter take the focused default (Yes) so an operator who reflexively
   // taps Space to start the video isn't stopped by an unfamiliar screen.
@@ -1913,15 +1943,19 @@ async function requestWakeLock() {
     // e.g. the tab isn't visible yet — visibilitychange below retries.
   }
 }
-requestWakeLock();
-// And a slow heartbeat for a lock that was never granted or whose release
-// event was missed: ask again every five minutes while there is none.
-setInterval(() => { if (!wakeLock || wakeLock.released) requestWakeLock(); }, 5 * 60 * 1000);
-document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible' && (!wakeLock || wakeLock.released)) {
-    requestWakeLock();
-  }
-});
+// The configure page is on the operator's own monitor: it has no business
+// holding that screen awake.
+if (!CONFIGURE_MODE) {
+  requestWakeLock();
+  // And a slow heartbeat for a lock that was never granted or whose release
+  // event was missed: ask again every five minutes while there is none.
+  setInterval(() => { if (!wakeLock || wakeLock.released) requestWakeLock(); }, 5 * 60 * 1000);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && (!wakeLock || wakeLock.released)) {
+      requestWakeLock();
+    }
+  });
+}
 
 // Once the lesson finishes, there's nothing left to show for the rest of
 // the window — fall back to the Check-in Display right away rather than
@@ -2054,14 +2088,26 @@ async function refreshLesson() {
   if (changed && lastPhase === 'journey' && !previewMode) showJourneyContent();
 }
 
-refreshLesson();
-setInterval(refreshLesson, LESSON_REFRESH_MS);
-// The browser noticing the connection coming back is a better moment to
-// retry than waiting out the hourly timer — flaky church WiFi is the normal
-// operating condition here. ('online' can fire in bursts on a flapping
-// connection; the bundleInFlight guard in cacheLessonBundle() is what keeps
-// that from stacking duplicate multi-MB downloads on the single-core Pi.)
-window.addEventListener('online', () => refreshLesson());
+if (CONFIGURE_MODE) {
+  // The panel only needs to know which week is tonight's (the bullet editor
+  // and the list's highlight). One read, no bundle: the videos are the live
+  // kiosk's business, not this window's.
+  loadCurrentLesson().then((lesson) => {
+    currentLesson = lesson || lastKnownLesson();
+    if (!currentLesson) return;
+    updateNotesEditedBadge();
+    if (allLessons) renderLessonList(allLessons);
+  });
+} else {
+  refreshLesson();
+  setInterval(refreshLesson, LESSON_REFRESH_MS);
+  // The browser noticing the connection coming back is a better moment to
+  // retry than waiting out the hourly timer — flaky church WiFi is the normal
+  // operating condition here. ('online' can fire in bursts on a flapping
+  // connection; the bundleInFlight guard in cacheLessonBundle() is what keeps
+  // that from stacking duplicate multi-MB downloads on the single-core Pi.)
+  window.addEventListener('online', () => refreshLesson());
+}
 
 /* ── Manual video preview (Settings panel) ────────────────────────────
    Lets an operator browse every lesson in public/lessons.json and play
@@ -2768,13 +2814,18 @@ function openSettingsPanel() {
       // rendered by a faster concurrent open.
       if (note.isConnected) renderLessonList(lessons);
     } else {
-      note.textContent =
-        'The lesson list couldn’t load — check the kiosk’s internet connection, then close and reopen this panel.';
+      note.textContent = CONFIGURE_MODE
+        ? 'The lesson list couldn’t load. Check this computer’s internet connection, then reopen this window.'
+        : 'The lesson list couldn’t load — check the kiosk’s internet connection, then close and reopen this panel.';
     }
   });
 }
 
 function closeSettingsPanel() {
+  // The configure page is the panel and nothing else: there is nothing
+  // behind it to close onto. (The bullet editor's own debounce and its
+  // collapse still save what was typed.)
+  if (CONFIGURE_MODE) return;
   // Commit anything typed into the bullet editor first: the panel closes on
   // Escape or a backdrop click without the textarea ever blurring, so the
   // debounced save may still be pending.
@@ -2861,9 +2912,7 @@ function startSlidesPreview(week) {
 
 settingsVariantSlidesBtn.addEventListener('click', () => {
   if (!pendingPreviewLesson) return;
-  const week = pendingPreviewLesson.week;
-  closeSettingsPanel();
-  startSlidesPreview(week);
+  runPickerChoice('slides', pendingPreviewLesson);
 });
 
 /* Both roles' previews live in one function each, because the Read Prep
@@ -2935,15 +2984,12 @@ settingsVariantStudentBtn.addEventListener('click', () => {
 
 settingsStudentVideoBtn.addEventListener('click', () => {
   if (!pendingPreviewLesson) return;
-  const lesson = pendingPreviewLesson;
-  closeSettingsPanel();
-  requestPlayback(captionUrlFor(lesson.week, 'student'), () => playStudentPreview(lesson));
+  runPickerChoice('student', pendingPreviewLesson);
 });
 
 settingsStudentPrepBtn.addEventListener('click', () => {
   if (!pendingPreviewLesson) return;
-  openPrep(pendingPreviewLesson, 'student');
-  closeSettingsPanel();
+  runPickerChoice('student-prep', pendingPreviewLesson);
 });
 
 settingsStudentBackBtn.addEventListener('click', () => {
@@ -2963,27 +3009,142 @@ settingsVariantLeaderBtn.addEventListener('click', () => {
 
 settingsLeaderVideoBtn.addEventListener('click', () => {
   if (!pendingPreviewLesson || !pendingPreviewLesson.leaderDownloadUrl) return;
-  const lesson = pendingPreviewLesson;
-  closeSettingsPanel();
-  requestPlayback(captionUrlFor(lesson.week, 'leader'), () => playLeaderPreview(lesson));
+  runPickerChoice('leader', pendingPreviewLesson);
 });
 
 settingsLeaderHandoutBtn.addEventListener('click', () => {
   if (!pendingPreviewLesson) return;
-  openHandout(pendingPreviewLesson);
-  closeSettingsPanel();
+  runPickerChoice('handout', pendingPreviewLesson);
 });
 
 settingsLeaderPrepBtn.addEventListener('click', () => {
   if (!pendingPreviewLesson) return;
-  openPrep(pendingPreviewLesson, 'leader');
-  closeSettingsPanel();
+  runPickerChoice('leader-prep', pendingPreviewLesson);
 });
 
 settingsLeaderBackBtn.addEventListener('click', () => {
   settingsLeaderPicker.classList.add('hidden');
   settingsVariantPicker.classList.remove('hidden');
 });
+
+/* ── The picker's last step, here or relayed from a configure page ────
+   Every final choice in the picker acts on the SCREEN (plays a lesson, puts
+   the slides, a handout or a prep over the wall), so on a configure page it
+   is not run at all: it is posted on the 'awana-configure' BroadcastChannel
+   as { screen: 'journey', action: 'pick', data: { week, choice } }, the same
+   shape as the lobby's relayToScreen(), and the live kiosk in the same
+   browser profile runs it through the very same PICKER_CHOICES entry its own
+   button would. A BroadcastChannel never leaves this origin in this browser
+   profile, and nothing answers it: if no kiosk is open, nothing happens. */
+const PICKER_CHOICES = {
+  student: (lesson) => {
+    closeSettingsPanel();
+    requestPlayback(captionUrlFor(lesson.week, 'student'), () => playStudentPreview(lesson));
+  },
+  leader: (lesson) => {
+    closeSettingsPanel();
+    requestPlayback(captionUrlFor(lesson.week, 'leader'), () => playLeaderPreview(lesson));
+  },
+  slides: (lesson) => {
+    closeSettingsPanel();
+    startSlidesPreview(lesson.week);
+  },
+  handout: (lesson) => {
+    openHandout(lesson);
+    closeSettingsPanel();
+  },
+  'student-prep': (lesson) => {
+    openPrep(lesson, 'student');
+    closeSettingsPanel();
+  },
+  'leader-prep': (lesson) => {
+    openPrep(lesson, 'leader');
+    closeSettingsPanel();
+  },
+};
+// The Leader side of the picker is disabled for a week with no Leader Video
+// (27), so a relay may not reach these for one either.
+const PICKER_NEEDS_LEADER = ['leader', 'handout', 'leader-prep'];
+const PICKER_LABELS = {
+  student: 'Student Video',
+  leader: 'Leader Video',
+  slides: 'teaching slides',
+  handout: 'Leader Handout',
+  'student-prep': 'Student Prep',
+  'leader-prep': 'Leader Prep',
+};
+
+function runPickerChoice(choice, lesson) {
+  if (!CONFIGURE_MODE) {
+    PICKER_CHOICES[choice](lesson);
+    return;
+  }
+  relayToKiosk('pick', { week: lesson.week, choice });
+  // The panel stays (it is the page); it goes back to the list and says
+  // where the choice went, because nothing changes on this screen.
+  resetSettingsPanelToList();
+  settingsPreviewNote.textContent =
+    `Sent to the Journey screen: Week ${lesson.week}, ${PICKER_LABELS[choice]}.`;
+}
+
+function relayToKiosk(action, data) {
+  try {
+    const channel = new BroadcastChannel(CONFIGURE_CHANNEL);
+    channel.postMessage({ screen: 'journey', action, data });
+    channel.close();
+  } catch {
+    // No BroadcastChannel: the button simply does nothing.
+  }
+}
+
+/* The live kiosk's side. Only 'pick' is allowed, and its data is checked as
+   strictly as a click would be: a choice from PICKER_CHOICES, a week this
+   kiosk's own lessons.json knows, and a Leader Video for the Leader side.
+   Returns whether it acted (the tests read that). */
+const RELAY_ACTIONS = ['pick'];
+
+function handleConfigureRelay(message) {
+  if (CONFIGURE_MODE) return false;
+  if (!message || typeof message !== 'object' || message.screen !== 'journey') return false;
+  if (!RELAY_ACTIONS.includes(message.action)) return false;
+  const data = message.data;
+  if (!data || typeof data !== 'object' || !Number.isInteger(data.week)) return false;
+  const choice = data.choice;
+  if (typeof choice !== 'string' || !Object.prototype.hasOwnProperty.call(PICKER_CHOICES, choice)) return false;
+  if (!allLessons) {
+    // Warmed at startup, so this is only a relay in the first seconds after a
+    // boot: take it once the list is in.
+    loadAllLessons().then((lessons) => { if (lessons) handleConfigureRelay(message); });
+    return false;
+  }
+  const lesson = allLessons.find((l) => l && l.week === data.week);
+  if (!lesson) return false;
+  if (PICKER_NEEDS_LEADER.includes(choice) && !lesson.leaderDownloadUrl) return false;
+  // On the kiosk the picker cannot be reached under a reading overlay, so one
+  // left open is closed first rather than covering what was asked for.
+  if (readerOverlayOpen()) {
+    closeHandout();
+    closePrep();
+  }
+  // The operator's click in the configure page stands in for one on the
+  // kiosk. A browser that disagrees refuses the unmuted play, and every play
+  // path already falls back to muted.
+  audioUnlocked = true;
+  PICKER_CHOICES[choice](lesson);
+  return true;
+}
+
+// Kept in a binding so it is never collected while the kiosk runs.
+const configureChannel = (() => {
+  if (CONFIGURE_MODE || typeof BroadcastChannel === 'undefined') return null;
+  try {
+    const channel = new BroadcastChannel(CONFIGURE_CHANNEL);
+    channel.onmessage = (event) => handleConfigureRelay(event.data);
+    return channel;
+  } catch {
+    return null;
+  }
+})();
 
 /* ── Teaching slides (after the lesson video) ─────────────────────────
    Each Advocates lesson ships a 5-slide "Teaching Slides" deck on the
@@ -3612,8 +3773,80 @@ slideStage.addEventListener('click', (e) => {
 loadAllLessons();
 loadTeachingSlides();
 // Small (~58KB) and only read when a leader presses "Read Prep" — but warmed
-// here, because the whole point is that it opens on a dead connection.
-loadLeaderPrep();
+// here, because the whole point is that it opens on a dead connection. (A
+// configure page never opens a prep itself: it relays the choice.)
+if (!CONFIGURE_MODE) loadLeaderPrep();
+
+/* ── Settings saved by another window, taken live ─────────────────────
+   The configure page beside the kiosk (and the kiosk's own sync, run from
+   either window) writes the same localStorage, and a 'storage' event fires
+   in every OTHER window of the origin. Each key below is re-applied through
+   the function its own control uses, so the kiosk ends up exactly where it
+   would be had the change been made on it. The embedded Check-in Display
+   writes this storage too (its own awana* keys), so anything not listed
+   costs one lookup and nothing else: this is a Pi Zero. The sync session
+   (awanaSyncSession.v1) is sync.js's to watch. */
+const LIVE_STORAGE_KEYS = {
+  [CAPTION_PREF_KEY]: () => {
+    // Applied to a video already on screen too, which is what pressing CC
+    // here would have done.
+    const on = storedCaptionPref();
+    if (on === null || on === captionsEnabled) return;
+    captionsEnabled = on;
+    if (journeyVideo.hasAttribute('src')) applyCaptions();
+  },
+  [CAPTION_SIZE_KEY]: () => {
+    syncCaptionPrefInputs();
+    applyCaptionDisplayPrefs();
+  },
+  [PLAYBACK_QUALITY_KEY]: () => {
+    profileCache = null; // the cached answer is the old choice's
+    applyCheckinDisplayUrl();
+    syncQualityButtons();
+  },
+  [SLIDES_AUTO_KEY]: () => syncSlidesPrefInputs(),
+  [SLIDE_NOTES_OVERRIDE_KEY]: () => {
+    updateNotesEditedBadge();
+    refreshOpenNotesEditor();
+  },
+};
+LIVE_STORAGE_KEYS[CAPTION_BACKDROP_KEY] = LIVE_STORAGE_KEYS[CAPTION_SIZE_KEY];
+LIVE_STORAGE_KEYS[SLIDES_EXTRAS_KEY] = () => {
+  syncSlidesPrefInputs();
+  refreshOpenNotesEditor(); // its headings say which kinds are ticked
+};
+
+// Never under someone's fingers: an editor being typed in keeps its words.
+function refreshOpenNotesEditor() {
+  if (notesEditBody.classList.contains('hidden') || notesEditBody.contains(document.activeElement)) return;
+  renderNotesEditor();
+}
+
+function applyStoredSetting(key) {
+  if (key === null) {
+    // localStorage.clear() somewhere: everything is back to its default.
+    for (const apply of new Set(Object.values(LIVE_STORAGE_KEYS))) apply();
+    return;
+  }
+  const apply = Object.prototype.hasOwnProperty.call(LIVE_STORAGE_KEYS, key) ? LIVE_STORAGE_KEYS[key] : null;
+  if (apply) apply();
+}
+
+window.addEventListener('storage', (event) => applyStoredSetting(event.key));
+
+/* A configure page opens on the panel, for good: no close button, and the
+   note above the list says where a pick goes. */
+if (CONFIGURE_MODE) {
+  settingsCloseBtn.hidden = true;
+  settingsPreviewNote.textContent =
+    'Picking a video here plays it once on the Journey screen. It never changes what plays automatically at 6:30 PM.';
+  openSettingsPanel();
+  // The bullet editor saves on a short debounce; a window closed inside it
+  // must not lose the last words typed.
+  window.addEventListener('pagehide', () => {
+    if (!notesEditBody.classList.contains('hidden')) saveNotesEditor();
+  });
+}
 
 /* The brand kit's fonts are self-hosted (brand/fonts.css), but a browser only
    fetches a web font once text set in it is actually rendered, and on this
@@ -3771,10 +4004,15 @@ async function checkForNewBuild() {
   takeNewBuild();
 }
 
-setInterval(checkForNewBuild, VERSION_POLL_MS);
-// A kiosk that was offline through a deploy should not wait out the timer.
-// 'online' fires in bursts on flapping WiFi, so it is rate limited.
-window.addEventListener('online', () => {
-  if (Date.now() - lastVersionCheckMs < VERSION_ONLINE_MIN_GAP_MS) return;
-  checkForNewBuild();
-});
+// A configure page never reloads itself under the operator's typing (its
+// open panel would hold safeToReload() off anyway); it takes a new build the
+// next time it is opened.
+if (!CONFIGURE_MODE) {
+  setInterval(checkForNewBuild, VERSION_POLL_MS);
+  // A kiosk that was offline through a deploy should not wait out the timer.
+  // 'online' fires in bursts on flapping WiFi, so it is rate limited.
+  window.addEventListener('online', () => {
+    if (Date.now() - lastVersionCheckMs < VERSION_ONLINE_MIN_GAP_MS) return;
+    checkForNewBuild();
+  });
+}

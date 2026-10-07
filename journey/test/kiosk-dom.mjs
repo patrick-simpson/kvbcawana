@@ -66,15 +66,17 @@ export const DESKTOP = {
  *                running on, defaulting to the kiosk's own Pi Zero
  * @param setup   optional (window) => void, run just before schedule.js, for a
  *                browser capability jsdom lacks that the page reads at startup
+ * @param pageUrl the address the page is opened at (a query string such as
+ *                ?configure=1 is read by the page itself)
  * @returns { dom, window, document, fetchLog, seeks, video, close }
  */
-export function bootKiosk(routes = {}, prefs = {}, device = PI_ZERO, setup = null) {
+export function bootKiosk(routes = {}, prefs = {}, device = PI_ZERO, setup = null, pageUrl = 'https://example.test/') {
   const html = readFileSync(path.join(PUBLIC, 'index.html'), 'utf8').replace(
     '<script src="src/schedule.js"></script>',
     ''
   );
   const dom = new JSDOM(html, {
-    url: 'https://example.test/',
+    url: pageUrl,
     runScripts: 'dangerously',
     pretendToBeVisual: true,
     userAgent: device.userAgent,

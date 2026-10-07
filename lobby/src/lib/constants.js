@@ -131,6 +131,11 @@ export const BUILD_QUIET_MS = 5000;
 export const DESKTOP_APP_DOWNLOAD_URL = 'https://awana.kvbchurch.org/download/lobby-display';
 export const DESKTOP_APP_GUIDE_URL = 'https://github.com/patrick-simpson/kvbcawana/blob/main/lobby/desktop/README.md';
 
+// The family's other screens, linked from Settings → Status → Other screens.
+// `?view=game` opens the projector straight into game time (its App.jsx).
+export const PROJECTOR_GAME_TIME_URL = 'https://awana.kvbchurch.org/lobby/countdown?view=game';
+export const JOURNEY_URL = 'https://awana.kvbchurch.org/journey/';
+
 // How long Settings → Pickup board → "Show a demo on this TV" holds a sample
 // board on this screen (owner, 2026-10-01: about 20 seconds).
 export const BOARD_DEMO_MS = 20_000;

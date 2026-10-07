@@ -32,6 +32,16 @@ const media = typeof window !== 'undefined' && window.matchMedia
 
 media?.addEventListener?.('change', () => notify());
 
+// Another window of this profile (the configure page, ?configure=1) may flip
+// the switch: take it live.
+if (typeof window !== 'undefined') {
+  window.addEventListener('storage', (e) => {
+    if (e.key !== STORAGE_KEY && e.key !== null) return;
+    stored = readStored();
+    notify();
+  });
+}
+
 function notify() {
   for (const fn of listeners) fn();
 }

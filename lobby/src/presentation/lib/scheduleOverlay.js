@@ -43,6 +43,17 @@ function load() {
 let overlay = load();
 let merged = mergeConfig();
 
+// Another window of this profile (the configure page, ?configure=1) edits
+// the same overlay: take its change live, as this window's own would be.
+if (typeof window !== 'undefined') {
+  window.addEventListener('storage', (e) => {
+    if (e.key !== STORAGE_KEY && e.key !== null) return;
+    overlay = load();
+    merged = mergeConfig();
+    for (const fn of listeners) fn();
+  });
+}
+
 function mergeConfig() {
   return Object.keys(overlay).length === 0
     ? SCHEDULE_CONFIG

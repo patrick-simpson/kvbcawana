@@ -68,10 +68,20 @@ import { useWatchdogReload } from './hooks/useWatchdogReload.js';
 import { useBuildReload } from './hooks/useBuildReload.js';
 import { useTallerThan } from './hooks/useTallerThan.js';
 import { isEmbedded } from './lib/embed.js';
+import { isConfigureMode, listenForRelay, relayToScreen } from './lib/configureRelay.js';
+import { BACKGROUND_VIDEO_CHANGED_EVENT } from './components/VideoBackground.jsx';
 import { BOARD_DEMO_MS, BUILD_QUIET_MS, SHARE_DEBOUNCE_MS, COUNTS_WITHOUT_NAMES_MS, DROPPED_GRACE_MS, EMBED_FULLSCREEN_MESSAGE, GEAR_IDLE_MS, LAYER_FAULT_SHOW_MS, MILESTONE_TOAST_MS, OPS_FAILURES_MAX, SETUP_CARD_QUIET_MS } from './lib/constants.js';
 
 // Read once — the URL can't change without a full page load.
 const FLAGS = parseUrlFlags();
+// ?configure=1: this screen's Settings only, beside the live screen (the sound
+// room app's Settings window; src/lib/configureRelay.js). Saved settings reach
+// the live screen through storage; its own buttons are relayed to it. Names,
+// sound and confetti never play here, and it holds no wake lock.
+const CONFIGURE = isConfigureMode();
+// The live screen's side of the relay: what a configure page may ask of it.
+const RELAYED = ['preview-checkin', 'reset-tally', 'board-demo', 'media-changed'];
+const noop = () => {};
 
 // The WAITING chip pops in on the kit's curve and squashes at the pop's peak
 // (the soft squish, src/lib/squish.js). A constant: the chip stays mounted
@@ -571,11 +581,16 @@ export default function App() {
     onSettings,
   }), [handleCheckIn, handleRecap, recordOps, handleTally, handleTonight, handleNotice, handleCheckout, onSlides, onSettings]);
 
-  const { status, lastEventAt, lastCheckinAt, retry, nameStatus, slidesStatus, hasDisplayKey } = useSocket(socketHandlers);
+  // In configure mode the socket only feeds Settings' status: no child's
+  // name, recap, pickup or notice is ever shown in the booth's Settings window.
+  const liveHandlers = useMemo(() => (CONFIGURE
+    ? { ...socketHandlers, onCheckin: noop, onRecap: noop, onCheckout: noop, onNotice: noop }
+    : socketHandlers), [socketHandlers]);
+  const { status, lastEventAt, lastCheckinAt, retry, nameStatus, slidesStatus, hasDisplayKey } = useSocket(liveHandlers);
   // The sync service's state (shared settings, the published deck) enters
   // through the same sanitizing dispatch path as a Pusher frame.
   const syncStore = useMemo(() => ({ config: effectiveConfig, overrides, updateConfig }), [effectiveConfig, overrides, updateConfig]);
-  useSyncDriver({ handlers: socketHandlers, dispatch: dispatchEvent, store: syncStore });
+  useSyncDriver({ handlers: liveHandlers, dispatch: dispatchEvent, store: syncStore });
 
   // Which typed deck actually renders: the published one wherever this device
   // follows it (the default), else this device's own. An EMPTY published deck
@@ -615,11 +630,11 @@ export default function App() {
     return simulateEvent(event, payload, socketHandlers, meta);
   }, [socketHandlers]);
 
-  const wakeLockStatus = useWakeLock(config.keepScreenAwake);
+  const wakeLockStatus = useWakeLock(config.keepScreenAwake && !CONFIGURE);
 
   // Kiosk self-heal: reload once if the pipe stays dead far longer than
   // any normal blip (rate-limited; 'off' — never configured — is exempt).
-  useWatchdogReload(status, config.watchdogReloadMin);
+  useWatchdogReload(status, CONFIGURE ? 0 : config.watchdogReloadMin);
 
   // ── Calendar-aware slides ─────────────────────────────────
   // The local date key ticks over at midnight so "tonight" flips
@@ -736,7 +751,7 @@ export default function App() {
 
   // Room-wide confetti intensity (Settings → Screen & corner).
   useEffect(() => {
-    setConfettiLevel(config.confettiLevel);
+    setConfettiLevel(CONFIGURE ? 'off' : config.confettiLevel);
   }, [config.confettiLevel]);
 
   // Tally milestones: every Nth check-in gets a room-wide celebration.
@@ -756,7 +771,7 @@ export default function App() {
     enqueueCelebration({ kind: 'tally', count });
   }, [count, config.milestoneEvery, enqueueCelebration]);
 
-  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(CONFIGURE);
   const [slideEditorOpen, setSlideEditorOpen] = useState(false);
   // Settings remembers its tab for the session, and the slide editor knows
   // whether it was opened from Settings → Slides (so closing it goes back
@@ -1088,6 +1103,42 @@ export default function App() {
     }
   }, []);
 
+  const previewCheckIn = useCallback((p) => simulate('checkin', p, { countsTowardTally: false }), [simulate]);
+  const resetTonight = useCallback(() => {
+    // Resetting the counter is also the documented way to give back a
+    // "Doors are open" flourish an afternoon rehearsal consumed (#335).
+    clearFirstOfNight();
+    firstOfNightFiredRef.current = false;
+    resetTally();
+  }, [resetTally]);
+
+  // Configure mode: the page shows only Settings, on a plain ground.
+  useEffect(() => {
+    if (!CONFIGURE) return undefined;
+    document.documentElement.classList.add('configure-mode');
+    // A background video saved here lives in this profile's IndexedDB; tell
+    // the live screen to read it again.
+    const relayVideo = () => relayToScreen('lobby', 'media-changed');
+    window.addEventListener(BACKGROUND_VIDEO_CHANGED_EVENT, relayVideo);
+    return () => {
+      document.documentElement.classList.remove('configure-mode');
+      window.removeEventListener(BACKGROUND_VIDEO_CHANGED_EVENT, relayVideo);
+    };
+  }, []);
+
+  // The live screen: do what a configure page beside it asks, exactly as its
+  // own Settings buttons would. Never in configure mode itself, and never in
+  // Journey's embedded copy (a lobby relay is for the lobby screen).
+  useEffect(() => {
+    if (CONFIGURE || isEmbedded()) return undefined;
+    return listenForRelay('lobby', RELAYED, (action, data) => {
+      if (action === 'preview-checkin') previewCheckIn(data);
+      else if (action === 'reset-tally') resetTonight();
+      else if (action === 'board-demo') startBoardDemo();
+      else if (action === 'media-changed') window.dispatchEvent(new Event(BACKGROUND_VIDEO_CHANGED_EVENT));
+    });
+  }, [previewCheckIn, resetTonight, startBoardDemo]);
+
   // Overlay mode (?overlay=1): transparent stage with banners + confetti
   // only, for use as an OBS browser source / ProPresenter web overlay.
   // The html element also needs the class so nothing paints behind the
@@ -1257,7 +1308,7 @@ export default function App() {
           currentEvent={currentEvent}
           run={checkInRun}
           step={checkInStep}
-          audioEnabled={!config.audioMuted}
+          audioEnabled={!config.audioMuted && !CONFIGURE}
           clubPhrases={config.clubPhrases}
           birthdayRibbon={birthdayWeekRibbon}
         />
@@ -1453,14 +1504,14 @@ export default function App() {
           when the room has space for it (never on an OBS/ProPresenter feed,
           over a panel, a name, a poster or a pickup list), and it hides
           itself once the screen is connected and keyed. */}
-      {setupSeated && (
+      {setupSeated && !CONFIGURE && (
         <SetupCard
           card={setupCard}
           onOpenSettings={() => { setSettingsTab('setup'); setSettingsOpen(true); }}
         />
       )}
 
-      {!overlay && (
+      {!overlay && !CONFIGURE && (
         <button
           className={`settings-gear ${gearIdle ? 'idle' : ''}`}
           onClick={() => { setSettingsTab(null); setSettingsOpen(true); }}
@@ -1498,25 +1549,22 @@ export default function App() {
             shareStatus={shareStatus}
             onShare={shareSettings}
             onReset={resetConfig}
-            onClose={() => setSettingsOpen(false)}
+            configure={CONFIGURE}
+            onClose={CONFIGURE ? noop : () => setSettingsOpen(false)}
             // A rehearsal for the operator, not a child in the lobby: it plays
             // the banner and lights the demo badge, but the public "Tonight"
             // count belongs to the printer and must not move for a preview.
-            onTest={(p) => simulate('checkin', p, { countsTowardTally: false })}
-            onResetTally={() => {
-              // Resetting the counter is also the documented way to give back a
-              // "Doors are open" flourish an afternoon rehearsal consumed (#335).
-              clearFirstOfNight();
-              firstOfNightFiredRef.current = false;
-              resetTally();
-            }}
+            // In configure mode these three play on the live screen instead.
+            onTest={CONFIGURE ? (p) => relayToScreen('lobby', 'preview-checkin', p) : previewCheckIn}
+            onResetTally={CONFIGURE ? () => relayToScreen('lobby', 'reset-tally') : resetTonight}
             onOpenSlideEditor={() => {
               setSettingsOpen(false);
               setEditorFromSettings(true);
               setSlideEditorOpen(true);
             }}
-            onOpenDebug={() => { setSettingsOpen(false); setDebugOpen(true); }}
+            onOpenDebug={CONFIGURE ? undefined : () => { setSettingsOpen(false); setDebugOpen(true); }}
             onBoardDemo={() => {
+              if (CONFIGURE) { relayToScreen('lobby', 'board-demo'); return; }
               // A rehearsal on this screen: the demo badge stays up until reload,
               // like every other simulated thing.
               startBoardDemo();
