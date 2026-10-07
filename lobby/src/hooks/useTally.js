@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from 'react';
-import { TALLY_BUMP_GRACE_MS, TALLY_REORDER_MS } from '../lib/constants.js';
+import { TALLY_EARLIER_NIGHT_MS, TALLY_BUMP_GRACE_MS, TALLY_REORDER_MS } from '../lib/constants.js';
 
 const STORAGE_KEY = 'awanaTally.v1';
 
@@ -127,6 +127,13 @@ export function useTally() {
     // sanitizeTally() drops any payload without a real `at`, so a missing
     // one here means something upstream is wrong — stay defensive.
     if (typeof at !== 'number' || !Number.isFinite(at)) return 0;
+    // A tally from an EARLIER NIGHT is never tonight's count. The sync service
+    // replays the last tally it stored to every screen that connects, so the
+    // first connection of a club night used to adopt last week's final number
+    // (and hold "Doors are open" back, which wants 0) until the printer's first
+    // tally of the night. Judged against this device's clock, so only by a
+    // margin no real clock skew reaches (a skewed screen still adopts, above).
+    if (Date.now() - at > TALLY_EARLIER_NIGHT_MS) return 0;
     const last = lastAtRef.current;
     if (last !== null && at < last && last - at <= TALLY_REORDER_MS) return 0;
     lastAtRef.current = at;

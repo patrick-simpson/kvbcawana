@@ -72,6 +72,17 @@ describe('useTally', () => {
     expect(api.current.count).toBe(3);
   });
 
+  it("ignores last week's tally, which the sync service replays on connect", () => {
+    const { api } = setup();
+    let delta;
+    act(() => { delta = api.current.sync(87, Date.now() - 7 * 24 * 60 * 60 * 1000); });
+    expect(delta).toBe(0);
+    expect(api.current.count).toBe(0);
+    // Tonight's first tally is adopted as usual.
+    act(() => { delta = api.current.sync(2, Date.now()); });
+    expect(api.current.count).toBe(2);
+  });
+
   it('ignores a broadcast delivered out of order', () => {
     const { api } = setup();
     const t = Date.now();
