@@ -25,6 +25,7 @@ const ALLOWED = new Set([
   'src/hooks/useDisplayKey.js',
   'src/lib/displayKey.js',
   'src/lib/envelope.js',
+  'src/lib/configureRelay.js',
 ]);
 
 const walk = (dir) => readdirSync(dir).flatMap((f) => {

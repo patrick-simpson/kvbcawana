@@ -9,6 +9,16 @@ const STORAGE_KEY = 'awanaCountdownStingers.v1';
 let enabled = readStored();
 const listeners = new Set();
 
+// Another window of this profile (the configure page, ?configure=1) may flip
+// the switch: take it live.
+if (typeof window !== 'undefined') {
+  window.addEventListener('storage', (e) => {
+    if (e.key !== STORAGE_KEY && e.key !== null) return;
+    enabled = readStored();
+    for (const fn of listeners) fn();
+  });
+}
+
 function readStored() {
   try {
     return localStorage.getItem(STORAGE_KEY) === '1';
