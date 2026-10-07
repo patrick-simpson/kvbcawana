@@ -129,7 +129,7 @@ export default function SettingsPanel({
   config, savedConfig, overrides, status, nameStatus, demoActive, lastEventAt, calendar, phase, scheduleSource,
   opsFailures, remoteConfigError, wakeLockStatus, layerFaults,
   initialTab = null, onTabChange,
-  onChange, onReplace, onReset, onClose, onTest, onResetTally, onOpenSlideEditor, onOpenDebug, onBoardDemo,
+  onChange, onReplace, onReset, onClose, onTest, onResetTally, onOpenSlideEditor, onOpenDebug, onBoardDemo, configure = false,
   syncedDeck, slidesStatus, onForgetSyncedDeck,
   shared = null, shareStatus = null, onShare,
 }) {
@@ -504,13 +504,16 @@ export default function SettingsPanel({
             {shareStatus?.state === 'sending' ? 'Sending to every screen…'
               : shareStatus?.state === 'sent' ? 'Sent to every screen.'
                 : shareStatus?.state === 'failed' ? 'This screen only (see Setup → Shared settings).'
-                  : changed ? 'Changes are live on this screen.' : 'Changes apply as you make them.'}
+                  : configure ? 'Changes go live on the screen as you make them.'
+                    : changed ? 'Changes are live on this screen.' : 'Changes apply as you make them.'}
           </span>
           <button type="button" className="ghost" onClick={undo} disabled={!changed}
             title="Put every setting back the way it was when you opened Settings (not the login, keys or uploaded files)">
             Undo changes
           </button>
-          {zeroAnimation
+          {/* Configure mode (the sound room app's Settings window) has no
+              Done: the window itself is closed instead. */}
+          {configure ? null : zeroAnimation
             ? <button type="button" className="primary" onClick={done}>Done</button>
             : <jelly-button variant="mint" onClick={done}>Done</jelly-button>}
         </div>

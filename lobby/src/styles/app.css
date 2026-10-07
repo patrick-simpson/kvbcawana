@@ -4073,3 +4073,7 @@ details.advanced-fields > .hint { display: block; margin-bottom: 0.9rem; }
   border: 1.5px solid var(--panel-card-line);
 }
 .board-preview .checkout-region { pointer-events: none; }
+
+/* Configure mode (?configure=1, the sound room app's Settings window): Settings
+   alone, on the configurator's own paper, never the signage behind it. */
+html.configure-mode .panel-backdrop { background: #F6F4EF; }
