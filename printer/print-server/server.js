@@ -4950,6 +4950,13 @@ function tonightCheckins(history = loadHistory(), today = localDayISO()) {
 //     over-count this is meant to remove, not one to reintroduce.
 let lastCheckinReport = null;   // { at, entries } — the last report we trusted
 let lastPartialReport = null;   // { at, parsed, declared } — the last one we refused as partial
+// Who has been checked OUT tonight, by TwoTimTwo clubber id (7.15.0, owner
+// 2026-10-07: "the number should go down when kids check out", on every
+// surface). The extension's youth check-out (Trek and Journey from 7:15) posts
+// its whole list for the meeting date after every pass, so a restart of this
+// server catches up within one 30 s pass. Nothing else checks children out on
+// TwoTimTwo at KVBC: its Checkout page lists nobody, tracking being off.
+let checkedOutTonight = { date: null, ids: new Set() };
 
 // One child per clubber id, plus one per id-less name.
 function distinctReportChildren(entries) {
@@ -5011,13 +5018,20 @@ const displayClub = (raw) => String(raw == null ? '' : raw).replace(/&amp;/gi, '
  *            checkedIn:number, byClub:Object}}
  */
 function authoritativeTonight(tonight = tonightCheckins(), now = Date.now()) {
+  // Checked out tonight: off every count, report or history (7.15.0).
+  const outIds = checkedOutTonight.date === tonight.date ? checkedOutTonight.ids : new Set();
+  const isOut = (keys) => keys.some((k) => k.startsWith('id:') && outIds.has(k.slice(3)));
   const fromHistory = () => {
     const byClub = {};
+    let here = 0;
+    let out = 0;
     tonight.active.forEach((e) => {
+      if (isOut(identityKeysOfRow(e))) { out += 1; return; }
       const club = displayClub(e.clubName) || 'No club';
       byClub[club] = (byClub[club] || 0) + 1;
+      here += 1;
     });
-    return { source: 'history', at: null, ageMs: null, checkedIn: tonight.active.length, byClub };
+    return { source: 'history', at: null, ageMs: null, checkedIn: here, checkedOut: out, byClub };
   };
 
   const rep = lastCheckinReport;
@@ -5048,9 +5062,11 @@ function authoritativeTonight(tonight = tonightCheckins(), now = Date.now()) {
 
   const byKey = new Map();
   const slots = [];
+  const left = new Set();
   const add = (keys, club) => {
     if (!keys.length) return;
     if (keys.some((k) => suppressed.has(k))) return;
+    if (isOut(keys)) { keys.filter((k) => k.startsWith('id:')).forEach((k) => left.add(k)); return; }
     // Two different TwoTimTwo ids are two different children, whatever their
     // names say: a name match only joins an entry to a slot that has no id, or
     // the same one. (A shared bogus "name" merged every child with the same
@@ -5096,7 +5112,7 @@ function authoritativeTonight(tonight = tonightCheckins(), now = Date.now()) {
     byClub[name] = (byClub[name] || 0) + 1;
   });
 
-  return { source: 'report', at: rep.at, ageMs, checkedIn: slots.length, byClub };
+  return { source: 'report', at: rep.at, ageMs, checkedIn: slots.length, checkedOut: left.size, byClub };
 }
 
 // ── Tonight at a glance ───────────────────────────────────────────────────────
@@ -5134,6 +5150,8 @@ function computeTonightStats(tonight = tonightCheckins(), now = Date.now()) {
     date: tonight.date,
     prints: tonight.entries.length,
     checkedIn: auth.checkedIn,
+    // Checked out tonight, already taken off `checkedIn` (7.15.0).
+    checkedOut: auth.checkedOut || 0,
     visitors,
     byClub: auth.byClub,
     // Which measurement the two numbers above came from, and how old it is.
@@ -6768,6 +6786,25 @@ app.post('/feed/checkin-report', (req, res) => {
   res.json({ ok: true, applied: true, changed: outcome.changed });
 });
 
+// Who the extension's youth check-out has checked out tonight (7.15.0): the
+// WHOLE list for the meeting date, every pass, replace semantics. Loopback /
+// PIN-gated like every /feed route and never published: clubber ids only.
+// A change takes those children off tonight's count at once.
+app.post('/feed/checked-out', (req, res) => {
+  const result = feeds.validateCheckedOutBody(req.body);
+  if (!result.ok) return res.status(400).json({ ok: false, error: result.reason });
+  const { date, clubberIds } = result.payload;
+  if (date !== localDayISO()) return res.json({ ok: true, applied: false, reason: 'not tonight' });
+  const before = checkedOutTonight.date === date ? checkedOutTonight.ids : new Set();
+  // The extension's list only grows through a night; a shorter one (its
+  // storage cleared) never puts children back.
+  const ids = new Set([...before, ...clubberIds]);
+  const changed = ids.size !== before.size || checkedOutTonight.date !== date;
+  checkedOutTonight = { date, ids };
+  if (changed) publishTally();
+  res.json({ ok: true, applied: true, checkedOut: ids.size });
+});
+
 // #2: the extension's "didn't stick" list — kids whose driven site check-in
 // never verified (label printed, TwoTimTwo never confirmed). Stored in
 // memory only and surfaced as a /health warning so the dashboard shows the
@@ -6932,6 +6969,7 @@ app.post('/reset-tonight', (req, res) => {
   // this printer knows about, and this covers anyone it does not.
   lastCheckinReport = null;
   lastPartialReport = null;
+  checkedOutTonight = { date: null, ids: new Set() };
 
   publishTally();
   console.log(`[reset] Tonight reset by operator: ${undone} check-in(s) marked undone, ledger ${ledgerTouched ? 'cleared for today' : 'untouched'}`);
@@ -8899,6 +8937,7 @@ app.post('/phone/tonight', (req, res) => {
   res.json({
     date: t.date,
     checkedIn: st.checkedIn,
+    checkedOut: st.checkedOut,
     visitors: st.visitors,
     byClub: st.byClub,
     // 'report' or 'history' — the phone shows the same number the lobby screen
@@ -8912,6 +8951,8 @@ app.post('/phone/tonight', (req, res) => {
       lastName: e.lastName || '',
       clubName: (e.clubName || '').trim(),
       clubberId: e.clubberId != null ? String(e.clubberId) : null,
+      // Checked out tonight (7.15.0): still listed, off the count.
+      checkedOut: e.clubberId != null && checkedOutTonight.date === t.date && checkedOutTonight.ids.has(String(e.clubberId).trim()),
       visitor: !!e.visitor,
       at: e.timestamp,
     })),
@@ -9428,6 +9469,7 @@ module.exports = {
   // in stale-report mode) without a scrape, a socket or a wall-clock wait.
   authoritativeTonight, REPORT_FRESH_MS, TALLY_GRACE_MIN, TALLY_LEAD_MIN,
   _setLastCheckinReportForTests(report) { lastCheckinReport = report; },
+  _setCheckedOutForTests(date, ids) { checkedOutTonight = { date, ids: new Set(ids) }; },
   _getLastCheckinReportForTests() { return lastCheckinReport; },
   // Attendance audit (#311) — the diff is PURE so "unknown is not zero" and
   // "additive only" are exhaustively testable without a browser or a scrape.

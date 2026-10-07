@@ -225,6 +225,24 @@ function validateCheckinReportBody(body) {
   return { ok: true, payload: { entries, declared } };
 }
 
+// ── POST /feed/checked-out (7.15.0) ───────────────────────────────────────
+// The extension's youth check-out list for one meeting date: TwoTimTwo clubber
+// ids only, never names.
+const CHECKED_OUT_MAX = 500;
+function validateCheckedOutBody(body) {
+  if (!isPlainObject(body)) return { ok: false, reason: 'body must be an object' };
+  const date = typeof body.date === 'string' ? body.date : '';
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return { ok: false, reason: 'date must be YYYY-MM-DD' };
+  if (!Array.isArray(body.clubberIds)) return { ok: false, reason: 'clubberIds must be an array' };
+  if (body.clubberIds.length > CHECKED_OUT_MAX) return { ok: false, reason: `clubberIds must not exceed ${CHECKED_OUT_MAX}` };
+  const clubberIds = [];
+  for (const raw of body.clubberIds) {
+    const id = raw != null ? String(raw).trim() : '';
+    if (/^\d{1,20}$/.test(id) && !clubberIds.includes(id)) clubberIds.push(id);
+  }
+  return { ok: true, payload: { date, clubberIds } };
+}
+
 // The text of a report column that is not a name: nothing but a "Yes" / "No"
 // and counts of shares or points ("YES 1 Share 1 Point", "2 Points"). The
 // WHOLE text has to be that: a child may well be called "No..." or "Yes...".
@@ -499,6 +517,7 @@ module.exports = {
   // rules without going through the throttle/state machinery.
   validateTonightBody,
   isSummaryCellText,
+  validateCheckedOutBody,
   validatePointsBody,
   validateScheduleBody,
   validateNoticeBody,

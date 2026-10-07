@@ -1396,7 +1396,8 @@ function applyAuditAdditions() {
 function loadTonightStats() {
   fetch(BASE + '/stats/tonight').then(function(r) { return r.json(); }).then(function(st) {
     var summary = document.getElementById('tonight-summary');
-    var parts = [st.checkedIn + ' checked in'];
+    var parts = [st.checkedIn + ' here now'];
+    if (st.checkedOut) parts.push(st.checkedOut + ' checked out');
     if (st.visitors) parts.push(st.visitors + ' visitor' + (st.visitors > 1 ? 's' : ''));
     parts.push(st.prints + ' label' + (st.prints === 1 ? '' : 's') + ' printed');
     // Where the number came from. Said plainly on the card itself, not only in
@@ -1405,7 +1406,7 @@ function loadTonightStats() {
     // report is arriving. The fallback also raises a /health warning.
     if (st.countSource === 'report') parts.push('from TwoTimTwo\u2019s report');
     else if (st.countSource === 'history') parts.push('from labels printed here');
-    summary.textContent = st.checkedIn ? parts.join(' \u00B7 ') : '';
+    summary.textContent = (st.checkedIn || st.checkedOut) ? parts.join(' \u00B7 ') : '';
 
     var clubs = document.getElementById('tonight-clubs');
     var clubNames = Object.keys(st.byClub || {}).sort();

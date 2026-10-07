@@ -1130,7 +1130,7 @@ function renderSearch(list, q) {
 
 function renderCount() {
   $('count-pill').textContent = (TONIGHT.checkedIn || 0) + ' in';
-  $('count-pill').setAttribute('aria-label', (TONIGHT.checkedIn || 0) + ' checked in tonight. Show who.');
+  $('count-pill').setAttribute('aria-label', (TONIGHT.checkedIn || 0) + ' here now. Show who.');
 }
 
 $('search').addEventListener('input', render);
@@ -1398,6 +1398,7 @@ function applyTonight(data) {
   if (!data || typeof data !== 'object') return;
   TONIGHT = {
     checkedIn: Number(data.checkedIn) || 0,
+    checkedOut: Number(data.checkedOut) || 0,
     visitors: Number(data.visitors) || 0,
     byClub: data.byClub || {},
     entries: (data.entries || []).filter(function(e) { return !REMOVING[e.key]; })
@@ -1413,7 +1414,9 @@ function refreshTonight() {
     });
 }
 function renderTonight() {
-  $('tonight-total').textContent = (TONIGHT.checkedIn || 0) + ' checked in tonight' +
+  // "Here now" (7.15.0): children checked out tonight are off the count.
+  $('tonight-total').textContent = (TONIGHT.checkedIn || 0) + ' here now' +
+    (TONIGHT.checkedOut ? ' · ' + TONIGHT.checkedOut + ' checked out' : '') +
     (TONIGHT.visitors ? ' · ' + TONIGHT.visitors + ' visitor' + (TONIGHT.visitors === 1 ? '' : 's') : '');
   var chips = $('tonight-chips');
   chips.textContent = '';
@@ -1436,6 +1439,7 @@ function renderTonight() {
       var row = el('div', 'row'), who = el('div', 'who');
       var b = el('b', null, (e.firstName + ' ' + e.lastName).trim());
       if (e.visitor) b.appendChild(el('span', 'vtag', 'Visitor'));
+      if (e.checkedOut) b.appendChild(el('span', 'vtag', 'Checked out'));
       var d = new Date(e.at);
       who.appendChild(b);
       who.appendChild(el('span', null, isNaN(d.getTime()) ? '' : d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })));

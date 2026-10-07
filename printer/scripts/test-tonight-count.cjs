@@ -560,6 +560,42 @@ async function main() {
       JSON.stringify((h.body.warnings || []).map((w) => w.type)));
   }
 
+  // ── 7.15.0: checked out tonight comes off the count, everywhere ──────────
+  console.log('\ntonight: children checked out tonight are off the count');
+  {
+    const setOut = server._setCheckedOutForTests;
+    const t = tonightCheckins(hist([
+      { firstName: 'Tess', lastName: 'Trek', clubberId: '8801', clubName: 'Trek', timestamp: at(40) },
+      { firstName: 'Jay', lastName: 'Journey', clubberId: '8802', clubName: 'Journey', timestamp: at(40) },
+      { firstName: 'Sam', lastName: 'Sparks', clubberId: '8803', clubName: 'Sparks', timestamp: at(40) },
+    ]), TODAY);
+    setReport(null);
+    setOut(TODAY, ['8801', '8802']);
+    let a = authoritativeTonight(t, NOW);
+    check('history mode: two checked out, one here', a.checkedIn === 1 && a.checkedOut === 2 && a.byClub.Sparks === 1 && !a.byClub.Trek, JSON.stringify(a));
+    setReport({ at: NOW - 60000, entries: [
+      { clubberId: '8801', name: 'Tess Trek', club: 'Trek' },
+      { clubberId: '8802', name: 'Jay Journey', club: 'Journey' },
+      { clubberId: '8803', name: 'Sam Sparks', club: 'Sparks' },
+      { clubberId: '8804', name: 'Max Cubbies', club: 'Cubbies' },
+    ] });
+    a = authoritativeTonight(t, NOW);
+    check('report mode: the report keeps listing them, the count does not', a.checkedIn === 2 && a.checkedOut === 2, JSON.stringify(a));
+    setOut('2000-01-01', ['8801', '8802']);
+    check("another night's list changes nothing", authoritativeTonight(t, NOW).checkedIn === 4);
+
+    setOut(null, []);
+    const feeds = require(path.join(__dirname, '..', 'print-server', 'feeds.js'));
+    check('the intake keeps digit ids only, deduped', JSON.stringify(feeds.validateCheckedOutBody({ date: TODAY, clubberIds: ['1', 1, 'x', ' 2 ', '1'] }).payload.clubberIds) === '["1","2"]');
+    check('and refuses a bad date', feeds.validateCheckedOutBody({ date: 'tonight', clubberIds: [] }).ok === false);
+    const r = await post('/feed/checked-out', { date: localDayISO(), clubberIds: ['8801'] });
+    check('POST /feed/checked-out applies tonight\'s list', r.status === 200 && r.body.applied === true && r.body.checkedOut === 1, JSON.stringify(r.body));
+    const r2 = await post('/feed/checked-out', { date: localDayISO(), clubberIds: [] });
+    check('a shorter list never puts a child back', r2.body.checkedOut === 1, JSON.stringify(r2.body));
+    setOut(null, []);
+    setReport(null);
+  }
+
   listener.close();
   console.log('');
   console.log(`${passed} passed, ${failed} failed`);

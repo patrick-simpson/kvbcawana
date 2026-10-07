@@ -1,4 +1,11 @@
-﻿## [7.14.0] - 2026-10-07
+﻿## [7.15.0] - 2026-10-07
+Tonight's count goes down as children check out.
+
+**"Here now", everywhere.** The count on the phone page, the dashboard, the lobby screens and the projector used to be everyone checked in tonight, so it never moved when Trek and Journey left at 7:15. The extension's youth check-out now tells the print app who it has checked out tonight, after every pass, and every one of those numbers leaves them out. The phone page says "18 here now · 12 checked out" and marks those children "Checked out" in its list. The attendance record keeps everyone who came.
+
+**Also.** The lobby's "tonight" strip at the bottom of the screen is now off unless a screen turns it on (Settings → Screen & corner → This TV → Tonight's numbers strip), and the corner's "synced with the check-in desk" note is shown only when the count jumps up, never for children leaving.
+
+## [7.14.0] - 2026-10-07
 Undo a check-in on TwoTimTwo from the phone.
 
 **New: "Undo check-in" on the phone's Tonight list.** Each child on the list now has an Undo check-in button beside Remove. It asks first, naming the child, and then the check-in laptop undoes the check-in on TwoTimTwo itself, the same undo as the link on TwoTimTwo's check-in report. Only when TwoTimTwo answers "(checkin undone)", and its report no longer lists the child, does the child come off tonight's count and the lobby screens, and the phone says "undone in TwoTimTwo". The child shows up on the laptop's check-in list again, so they can be checked in again later. It works the same on the church Wi-Fi page and on awana.kvbchurch.org/checkin.

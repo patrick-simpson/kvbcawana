@@ -776,7 +776,7 @@ async function main() {
   console.log('\nrealtime: phone Tonight list + manual undo/restore + visitor label');
   {
     const shape = (e) => JSON.stringify(Object.keys(e).sort());
-    const WANT_SHAPE = JSON.stringify(['at', 'clubName', 'clubberId', 'firstName', 'key', 'lastName', 'visitor']);
+    const WANT_SHAPE = JSON.stringify(['at', 'checkedOut', 'clubName', 'clubberId', 'firstName', 'key', 'lastName', 'visitor']);
 
     const stats0 = (await j('/stats/tonight')).body;
 

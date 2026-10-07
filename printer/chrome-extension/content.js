@@ -2,7 +2,7 @@
   if (window.__awanaPrinterLoaded) return;
   window.__awanaPrinterLoaded = true;
 
-  const EXTENSION_VERSION = '7.14.0';
+  const EXTENSION_VERSION = '7.15.0';
   const PRINT_COOLDOWN = 2000;
   // POST /print is synchronous on the server: PowerShell + a cold printer can
   // take 15-30 s (the server retries the spooler internally). This must sit
@@ -4165,6 +4165,19 @@
     try { localStorage.setItem('awanaYmOut.' + date, JSON.stringify(ids.slice(-500))); } catch (e) { /* storage off */ }
   }
 
+  // Tell the print server who is checked out tonight (7.15.0): the WHOLE list
+  // for the meeting date, every pass, so tonight's count drops on every screen
+  // as Trek and Journey leave, and a restarted server catches up within a
+  // pass. Clubber ids only. Best-effort, like every other feed post.
+  function postCheckedOut(date, ids) {
+    fetch(PRINT_SERVER + '/feed/checked-out', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ date: date, clubberIds: ids }),
+      signal: AbortSignal.timeout(8000)
+    }).catch(function() { /* the next pass sends it again */ });
+  }
+
   // One sweep. Resolves { ok, checkedOut: [names], failed: [names] }. `force`
   // skips the clock (the test hook below), never the page checks.
   //
@@ -4218,6 +4231,7 @@
           }, Promise.resolve()).then(function() {
             ymMarkDone(date, done);
             ymMarkFails(date, fails);
+            postCheckedOut(date, done);
             if (out.checkedOut.length) console.log('[Awana] Youth check-out: ' + out.checkedOut.length + ' Trek/Journey checked out');
             if (out.failed.length) console.warn('[Awana] Youth check-out failed for ' + out.failed.length);
             return out;

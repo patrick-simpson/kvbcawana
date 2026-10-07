@@ -137,6 +137,12 @@ never printed. A report that parsed fewer children than its own `Count:` footers
 club window to `TALLY_GRACE_MIN` after, and a state frame (tally, recap, …) the
 sync relay could not deliver is OWED and resent once the service answers.
 `scripts/test-report-parse.cjs` runs the extension's parser on the live layout.
+**Checked out tonight comes off every count (7.15.0, owner).** The extension's
+youth check-out (`ymSweep`) posts its whole list of clubber ids for the meeting
+date to `POST /feed/checked-out` after every pass (replace semantics, merged so
+a shorter list never puts a child back); `authoritativeTonight()` leaves those
+ids out in both modes and reports `checkedOut`, so `checkedIn` everywhere means
+"here now". The attendance ledger is untouched.
 The `tally` payload shape is unchanged and must stay so.
 
 **The brand kit (6.17.0, shout face Paytone One since 6.18.0).**
