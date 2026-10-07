@@ -111,6 +111,18 @@ function slipsPage(env) {
     check('no PDF to print: nothing posted, nothing marked', env.posts.length === 0 && env.marked.length === 0);
   }
 
+  console.log('\nannouncement scrape: an empty table is not an announcement');
+  {
+    const isEmpty = new Function(`${extractFunction('isEmptyTableText')} return isEmptyTableText;`)();
+    for (const t of ['No results found.', 'No results found', 'No data available in table', 'No records found', 'No messages.', 'Nothing found']) {
+      check(`"${t}" is the empty placeholder`, isEmpty(t) === true);
+    }
+    for (const t of ['No Awana tonight, weather', 'No club this week. Enjoy the break!', 'Bring a friend night is next week']) {
+      check(`"${t}" is a real announcement`, isEmpty(t) === false);
+    }
+    check('the scrape checks it before posting', /isEmptyTableText\(text\)\) return null/.test(SRC));
+  }
+
   console.log(`\n${passed} passed, ${failed} failed`);
   process.exit(failed ? 1 : 0);
 })().catch((e) => { console.error(e); process.exit(1); });

@@ -600,6 +600,15 @@
 
   var NOTICE_MAX_LEN = 300;
 
+  // The placeholder row a table shows when it has nothing in it ("No results
+  // found.", "No data available in table", "No records"). With no admin
+  // message TwoTimTwo's page is a table of exactly that one row, which the
+  // single-row guess below took for an announcement and put on the lobby TV
+  // as an FYI.
+  function isEmptyTableText(text) {
+    return /^(no\s+(results?|records?|data|messages?|entries|items|matching)\b[^.]{0,40}\.?|nothing\s+(found|to\s+show)\.?)$/i.test(String(text || '').trim());
+  }
+
   function parseAdminMessages(html) {
     if (!html || isLoginPage(html)) return null;
     var doc;
@@ -634,7 +643,7 @@
     }
     if (!text) return null;
     text = text.replace(/\s+/g, ' ').trim();
-    if (!text) return null;
+    if (!text || isEmptyTableText(text)) return null;
     if (text.length > NOTICE_MAX_LEN) text = text.slice(0, NOTICE_MAX_LEN - 1) + '…';
     var level = 'info';
     if (/cancel|closed|no club/i.test(text)) level = 'critical';

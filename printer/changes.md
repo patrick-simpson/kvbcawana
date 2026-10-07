@@ -1,4 +1,11 @@
-﻿## [7.12.0] - 2026-10-05
+﻿## [7.12.1] - 2026-10-07
+The lobby TV no longer shows "FYI: No results found." when TwoTimTwo has no announcement.
+
+**Why.** The extension reads TwoTimTwo's admin messages page. With no message, that page is a table holding one placeholder row, "No results found.", and the one-row fallback took it for an announcement and sent it to the lobby as an FYI. Empty-table placeholders are now ignored, so a screen shows a notice only when the church wrote one.
+
+**What you should notice.** The stray FYI banner stops. Real announcements, including cancellations, show as before.
+
+## [7.12.0] - 2026-10-05
 The app now runs on Electron 44 (it was Electron 28).
 
 **Why.** Electron bundles its own copy of Chromium, and Electron 28 stopped receiving Chromium security fixes in 2024. The app ships to the check-in laptop and opens web content (the settings window, the update check), so it should run on a supported Chromium. Electron 44 is the same version the sound room's Awana Lobby Display already uses. The installer builder moves from electron-builder 24 to 26 to match.
