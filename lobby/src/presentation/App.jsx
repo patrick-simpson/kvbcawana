@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { AnimatePresence, MotionConfig, motion } from 'framer-motion';
 import { AppMode } from './types.js';
 import { FLAGS } from './lib/flags.js';
@@ -49,6 +49,23 @@ export const App = () => {
   const scheduleCfg = useEffectiveSchedule();
   const effectiveWindows = windowsForDate(now, scheduleCfg) ?? scheduleCfg.windows;
   const firstGameIndex = effectiveWindows.findIndex((w) => w.kind === 'game');
+
+  // ?view=game (the lobby's Settings → Other screens): open on game time
+  // exactly as the menu would, so the watchdog and the resume pill still
+  // hand it back to the schedule. A game window already on is left alone.
+  // Once only: the flag leaves the URL, so a self-update reload lands on the
+  // schedule instead of jumping back into games.
+  const deepLinked = useRef(false);
+  useEffect(() => {
+    if (deepLinked.current || FLAGS.view !== 'game') return;
+    deepLinked.current = true;
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('view');
+      window.history.replaceState(window.history.state, '', url);
+    } catch { /* the jump still happens */ }
+    if (state.mode !== AppMode.GAME_TIME && firstGameIndex >= 0) select({ type: 'window', index: firstGameIndex });
+  }, [state.mode, firstGameIndex, select]);
 
   // ?vr=1 (visual-regression / screenshot mode): stamp the root so CSS
   // can kill every keyframe animation, and tell framer-motion to skip

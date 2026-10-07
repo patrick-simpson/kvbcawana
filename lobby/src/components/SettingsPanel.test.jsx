@@ -667,6 +667,20 @@ describe('Setup: tools', () => {
   });
 });
 
+describe('Status: other screens', () => {
+  it('links the projector on game time and Journey, each in a new tab', () => {
+    render(<SettingsPanel {...{ ...happyProps(), initialTab: 'status' }} />);
+    const projector = screen.getByRole('link', { name: 'Projector: game time' });
+    expect(projector.getAttribute('href')).toBe('https://awana.kvbchurch.org/lobby/countdown?view=game');
+    const journey = screen.getByRole('link', { name: 'Journey' });
+    expect(journey.getAttribute('href')).toBe('https://awana.kvbchurch.org/journey/');
+    for (const a of [projector, journey]) {
+      expect(a.getAttribute('target')).toBe('_blank');
+      expect(a.getAttribute('rel')).toContain('noopener');
+    }
+  });
+});
+
 describe('Pickup board', () => {
   const open = (extra = {}) => {
     const props = { ...happyProps(), initialTab: 'pickup', onBoardDemo: vi.fn(), ...extra };

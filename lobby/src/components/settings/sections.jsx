@@ -9,7 +9,7 @@ import { SEASON_PROMOS } from '../../lib/promos.js';
 import { SAMPLE_BOARD_NAMES } from '../../lib/demoNames.js';
 import { decideBoard, demoCheckout } from '../../lib/checkoutBoard.js';
 import CheckoutBoard from '../CheckoutBoard.jsx';
-import { DESKTOP_APP_DOWNLOAD_URL, DESKTOP_APP_GUIDE_URL } from '../../lib/constants.js';
+import { DESKTOP_APP_DOWNLOAD_URL, DESKTOP_APP_GUIDE_URL, JOURNEY_URL, PROJECTOR_GAME_TIME_URL } from '../../lib/constants.js';
 import { phaseWords } from '../../lib/settingsSections.js';
 import {
   ChangePassphraseField, DisplayKeyField, DisplayLoginField, MilestoneListField, PanelCard, PptxUploadField,
@@ -292,6 +292,21 @@ export function StatusSection({
         {calendarEnabled && calendar?.refresh ? (
           <CalendarRefresh calendar={calendar} />
         ) : null}
+      </PanelCard>
+
+      <PanelCard title="Other screens" tab="var(--brand-blue)">
+        <div className="panel-links">
+          <a className="panel-button secondary" href={PROJECTOR_GAME_TIME_URL} target="_blank" rel="noopener noreferrer">
+            Projector: game time
+          </a>
+          <a className="panel-button secondary" href={JOURNEY_URL} target="_blank" rel="noopener noreferrer">
+            Journey
+          </a>
+        </div>
+        <p className="hint">
+          Each opens in a new tab. The projector starts on game time and goes back to its own schedule after
+          15 minutes or at the evening&rsquo;s next change.
+        </p>
       </PanelCard>
 
       <PanelCard title="About" tab="var(--brand-trek)">

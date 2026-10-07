@@ -25,6 +25,16 @@ for (const { now, mode, deck, label } of CASES) {
   });
 }
 
+// ?view=game, the lobby Settings' "Projector: game time" button: an afternoon
+// that would show the countdown opens on the first game window instead, and
+// the flag leaves the URL so a self-update reload lands on the schedule.
+test('?view=game opens on game time and drops the flag', async ({ page }) => {
+  await page.goto('/countdown.html?now=2026-09-16T15:00:00&view=game');
+  await expect(page.locator('[data-mode="game-time"]')).toBeVisible();
+  await expect.poll(() => new URL(page.url()).searchParams.has('view')).toBe(false);
+  expect(new URL(page.url()).searchParams.get('now')).toBe('2026-09-16T15:00:00');
+});
+
 // The shutdown screen's idle blackout (src/presentation/lib/idleBlackout.js)
 // only arms after 20 minutes of no key or mouse activity, and the idle
 // clock starts at mount — so a freshly loaded shutdown screen is always
