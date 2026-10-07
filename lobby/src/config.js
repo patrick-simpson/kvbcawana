@@ -125,6 +125,12 @@ const config = {
   // produces those constantly.
   showTallySyncNote: true,
 
+  // The "tonight" strip at the bottom centre ("N checked in", books, awards,
+  // friends). Off unless a screen turns it on (owner, 2026-10-07: "I don't want
+  // it to show the number in the center"); per screen, Settings → Screen &
+  // corner → This TV.
+  showTonightTicker: false,
+
   // Handbook milestones (#358): the `tonight` broadcast already carries how
   // many books were finished and awards earned this evening, and nothing
   // rendered them — so the only thing the screen ever cheered was heads

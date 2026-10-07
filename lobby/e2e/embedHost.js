@@ -46,7 +46,9 @@ export async function embed(page, { config = {}, weather = null, tally = 0, quer
   await page.addInitScript(({ cfg, count, card }) => {
     if (!location.pathname.endsWith('/index.html')) return;
     if (!card) localStorage.setItem('awanaSetupCardDismissed.v1', '1');
-    localStorage.setItem('awanaConfig.v1', JSON.stringify(cfg));
+    // The tonight strip is off by default (7.15.0); the embedded layout is
+    // measured with it, the widest night's strip being the tightest case.
+    localStorage.setItem('awanaConfig.v1', JSON.stringify({ showTonightTicker: true, ...cfg }));
     const d = new Date();
     const pad = (n) => String(n).padStart(2, '0');
     if (count) localStorage.setItem('awanaTally.v1', JSON.stringify({ date: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`, count }));

@@ -661,6 +661,12 @@ export function ScreenSection({ form, set, update, panicMode, onPanic, wakeLockS
               : 'The browser refused (battery saver?) — the TV may sleep mid-club.'}</strong>
             : 'Asks the browser to stop the TV or monitor from sleeping while the display is open.'}
         />
+        <Toggle
+          checked={form.showTonightTicker === true}
+          onChange={set('showTonightTicker')}
+          title="Tonight's numbers strip"
+          hint="A strip at the bottom of the screen with tonight's check-ins, books finished, awards and friends brought."
+        />
         <div className="field">
           <label htmlFor="confettiLevel">Confetti</label>
           <select id="confettiLevel" value={form.confettiLevel} onChange={set('confettiLevel')}>

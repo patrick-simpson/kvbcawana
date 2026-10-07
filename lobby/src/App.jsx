@@ -366,7 +366,10 @@ export default function App() {
       // One-step deltas are ordinary broadcast ordering (our bump() and the
       // printer's total crossing paths) and happen constantly — narrating
       // those would be noise, and would teach the room to ignore the note.
-      if (Math.abs(delta) > 1 && showTallyRef.current) {
+      // Only a jump UP is explained (7.15.0): since the count is "here now",
+      // a drop is children checking out (Trek and Journey leave at 7:15), not
+      // a correction, and saying "synced" every week at 7:15 would be wrong.
+      if (delta > 1 && showTallyRef.current) {
         setTallySync({ from: tally.total - delta, to: tally.total });
       }
     }
@@ -821,7 +824,7 @@ export default function App() {
     panelOpen: settingsOpen || slideEditorOpen,
     checkInUp: setupNameUp,
     held: setupHeld,
-    ticker: !FLAGS.overlay && tickerActive && tickerRows(tonight, tonightNow).length > 0,
+    ticker: !FLAGS.overlay && config.showTonightTicker === true && tickerActive && tickerRows(tonight, tonightNow).length > 0,
     room,
   });
 
@@ -1352,7 +1355,7 @@ export default function App() {
           corner item) — only overlay mode (transparent OBS/ProPresenter
           source, banners + confetti only) hides it. Yields to an active
           check-in banner via `active`; see TonightTicker.jsx. */}
-      {!overlay && (
+      {!overlay && config.showTonightTicker === true && (
         <ErrorBoundary label="tonight-ticker" eventKey={boardNow} onError={() => recordLayerFault('tonight strip')}>
           <TonightTicker tonight={tonight} active={tickerActive} now={tonightNow} />
         </ErrorBoundary>

@@ -173,7 +173,7 @@ describe('the first-run card\'s seat', () => {
   const night = () => ({ checkedIn: 12, booksCompleted: 0, awardsEarned: 0, friendsBrought: 0, at: Date.now() });
 
   it('an unconfigured screen shows it, and the card gives the foot to the tonight strip while the strip has counts', async () => {
-    setup();
+    setup({ showTonightTicker: true });
     const { container } = await mount();
     expect(card(container)).not.toBeNull();
     // Counts to show: the strip is what the lobby is showing, so the card waits.
@@ -189,7 +189,7 @@ describe('the first-run card\'s seat', () => {
   it('the card comes back when the tonight feed goes stale, on the strip\'s own clock', async () => {
     // Only the intervals and the wall clock are faked: framer-motion keeps its own frame clock.
     vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'Date'] });
-    setup();
+    setup({ showTonightTicker: true });
     const { container } = await mount();
     await act(async () => { bound.tonight(night()); });
     expect(ticker(container)).not.toBeNull();
@@ -202,7 +202,7 @@ describe('the first-run card\'s seat', () => {
 
   it('a configured screen never shows it, and the strip is never held back', async () => {
     localStorage.setItem('awanaSetupCardDismissed.v1', '1');
-    setup();
+    setup({ showTonightTicker: true });
     const { container } = await mount();
     await act(async () => { bound.tonight(night()); });
     expect(card(container)).toBeNull();
@@ -210,7 +210,7 @@ describe('the first-run card\'s seat', () => {
   });
 
   it('waits behind a critical notice that takes the middle, and comes back when it goes', async () => {
-    setup();
+    setup({ showTonightTicker: true });
     const { container } = await mount();
     expect(card(container)).not.toBeNull();
     await act(async () => { bound.notice({ level: 'critical', message: 'CLUB CANCELLED TONIGHT', at: Date.now() }); });

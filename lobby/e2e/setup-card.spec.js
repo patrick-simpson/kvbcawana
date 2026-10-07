@@ -138,7 +138,8 @@ test.describe('the lobby\'s first-run card, 1280x720', () => {
     // Content over instructions: the strip is what the room is looking at,
     // and the debug panel's simulator must show it on a fresh screen too.
     await page.route(/open-meteo|pusher|twotimtwo|sockjs/, (route) => route.abort());
-    await page.addInitScript(NO_KEY);
+    // The strip is off by default (7.15.0): this screen has turned it on.
+    await page.addInitScript(() => localStorage.setItem('awanaConfig.v1', JSON.stringify({ pusherAppKey: '', showTonightTicker: true })));
     await page.goto('/index.html?lowPower=1');
     await expect(page.locator('.setup-card')).toBeVisible();
     await page.keyboard.press('Control+Shift+D');

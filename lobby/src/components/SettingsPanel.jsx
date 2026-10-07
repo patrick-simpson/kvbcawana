@@ -39,6 +39,7 @@ export function seedForm(c) {
     showConnectionStatus: !!c.showConnectionStatus,
     showTally: c.showTally !== false,
     showTallySyncNote: c.showTallySyncNote !== false,
+    showTonightTicker: c.showTonightTicker === true,
     keepScreenAwake: c.keepScreenAwake !== false,
     showClock: !!c.showClock,
     // Reads the one skin table. When this repeated the ids by hand, a saved

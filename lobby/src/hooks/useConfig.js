@@ -39,6 +39,7 @@ const VALIDATORS = {
   keepScreenAwake: isBool,
   milestoneEvery: numberBetween(0, 10000),
   showTallySyncNote: isBool,
+  showTonightTicker: isBool,
   // Threshold LISTS, repaired rather than rejected — see sanitizeMilestoneList
   // in lib/milestones.js. Array-shaped here, whole-number-repaired below.
   bookMilestones: Array.isArray,

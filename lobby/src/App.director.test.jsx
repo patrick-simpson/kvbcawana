@@ -306,21 +306,36 @@ describe('the lobby director, end to end', { timeout: 20_000 }, () => {
     const note = () => tallyChip()?.querySelector('.corner-chip__note')?.textContent ?? null;
     expect(value()).toBe('TONIGHT 80');
 
-    // An 80 → 78 correction lands while the tally is up. The chip is frozen
+    // An 80 → 83 catch-up lands while the tally is up. The chip is frozen
     // until the next load, so it must not explain a number it is not showing.
-    await act(async () => { bound.tally({ counts: { Sparks: 78 }, total: 78, at: Date.now() }); });
+    await act(async () => { bound.tally({ counts: { Sparks: 83 }, total: 83, at: Date.now() }); });
     expect(value()).toBe('TONIGHT 80');
     expect(note()).toBeNull();
 
     // The next time the tally comes round (past any few-second timer), it
     // shows the corrected number, explained...
     await tick(10000);
-    expect(value()).toBe('TONIGHT 78');
+    expect(value()).toBe('TONIGHT 83');
     expect(note()).toBe('synced with the check-in desk');
 
     // ...and the time after that it is an ordinary one.
     await tick(15000);
-    expect(value()).toBe('TONIGHT 78');
+    expect(value()).toBe('TONIGHT 83');
+    expect(note()).toBeNull();
+  });
+
+  it('a drop (children checking out) lowers the corner without a "synced" note', async () => {
+    localStorage.setItem('awanaTally.v1', JSON.stringify({ date: todayKey(), count: 40 }));
+    configure({ manualSlides: [A, B] });
+    await mountPastFlagship();
+    const tallyChip = () => document.querySelector('.corner-chip--tally');
+    const value = () => tallyChip()?.querySelector('[role="img"]').getAttribute('aria-label');
+    const note = () => tallyChip()?.querySelector('.corner-chip__note')?.textContent ?? null;
+    expect(value()).toBe('TONIGHT 40');
+    // Trek and Journey checked out at 7:15: 40 → 28.
+    await act(async () => { bound.tally({ counts: { Sparks: 28 }, total: 28, at: Date.now() }); });
+    await tick(10000);
+    expect(value()).toBe('TONIGHT 28');
     expect(note()).toBeNull();
   });
 
