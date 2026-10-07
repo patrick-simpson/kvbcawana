@@ -526,6 +526,9 @@ function cancelShutdown() {
 
 function shutDownNow() {
   if (!warning) return;
+  // A timer that fires long after its time (the PC slept through the
+  // countdown after all) is not a warning anyone saw: stand down.
+  if (now().getTime() - warning.deadline > 60_000) { stopWarning('missed its time (asleep?)'); return; }
   log('shutting down the PC');
   try { session.fromPartition('persist:lobby').flushStorageData(); } catch { /* best effort */ }
   warning.card?.webContents.send('card:shutting-down');
