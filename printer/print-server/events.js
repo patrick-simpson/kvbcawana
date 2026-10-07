@@ -655,19 +655,20 @@ function parseHM(s) {
 // rather than rolled into the next day - a window that ends at 23:30 gets its
 // grace up to 24:00 and no further, which is honest about what this function
 // can express (one day, one window).
-function isClubNightNow(clubNights, date, graceMinutes = 0) {
+function isClubNightNow(clubNights, date, graceMinutes = 0, leadMinutes = 0) {
   if (!Array.isArray(clubNights)) return false;
   const d = date instanceof Date && !isNaN(date.getTime()) ? date : new Date();
   const mins = d.getHours() * 60 + d.getMinutes();
-  const graceRaw = Number(graceMinutes);
-  const grace = Number.isFinite(graceRaw) ? Math.max(0, Math.round(graceRaw)) : 0;
+  const minutes = (raw) => { const n = Number(raw); return Number.isFinite(n) ? Math.max(0, Math.round(n)) : 0; };
+  const grace = minutes(graceMinutes);
+  const lead = minutes(leadMinutes);
   return clubNights.some(w => {
     if (!w || typeof w !== 'object') return false;
     if (Number(w.dow) !== d.getDay()) return false;
     const start = parseHM(w.start);
     const end = parseHM(w.end);
     if (start === null || end === null) return false;
-    return mins >= start && mins < Math.min(end + grace, 24 * 60);
+    return mins >= Math.max(start - lead, 0) && mins < Math.min(end + grace, 24 * 60);
   });
 }
 

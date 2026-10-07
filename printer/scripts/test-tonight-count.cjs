@@ -94,7 +94,7 @@ async function main() {
 
   const server = require(path.join(__dirname, '..', 'print-server', 'server.js'));
   const {
-    authoritativeTonight, tonightCheckins, computeTonightStats, REPORT_FRESH_MS, TALLY_GRACE_MIN,
+    authoritativeTonight, tonightCheckins, computeTonightStats, REPORT_FRESH_MS, TALLY_GRACE_MIN, TALLY_LEAD_MIN,
     localDayISO, historyIdentityKey,
   } = server;
   const setReport = server._setLastCheckinReportForTests;
@@ -342,6 +342,13 @@ async function main() {
       && events.isClubNightNow([{ dow: 3, start: '22:00', end: '23:30' }], new Date(2026, 8, 17, 0, 10), TALLY_GRACE_MIN) === false);
     check('omitting the grace is byte-identical to the old two-argument call',
       events.isClubNightNow(nights, wed(20, 5)) === events.isClubNightNow(nights, wed(20, 5), 0));
+    // 7.13.0: and it opens an hour early, because children are checked in from
+    // the moment the doors open (5:22 on 2026-10-07, against a 5:30 start).
+    check(`the lead is ${TALLY_LEAD_MIN} minutes`, TALLY_LEAD_MIN === 60);
+    check('at 17:00 the tally window is open with the lead',
+      events.isClubNightNow(nights, wed(17, 0), TALLY_GRACE_MIN, TALLY_LEAD_MIN) === true);
+    check('at 16:29 it is still shut', events.isClubNightNow(nights, wed(16, 29), TALLY_GRACE_MIN, TALLY_LEAD_MIN) === false);
+    check('the club window itself does not move', events.isClubNightNow(nights, wed(17, 0)) === false);
   }
 
   // ── 8. The routes ────────────────────────────────────────────────────────
@@ -492,6 +499,65 @@ async function main() {
       && history.filter((x) => Number(x.clubberId) >= 100500).length === 49,
       `${history.length} rows, ${history.filter((x) => Number(x.clubberId) >= 100500).length} old; print said ${r.status}`);
     fs.writeFileSync(historyFile, '[]');
+  }
+
+  // ── 2026-10-07: 11 checked in read as 2 ───────────────────────────────────
+  // An extension older than 7.13.0 read the cell AFTER the edit link as the
+  // name, which on the live report is a summary ("YES 1 Share 1 Point") on clubs
+  // with those columns, so every child with the same summary merged into one.
+  console.log('\ntonight: different clubber ids are different children, whatever the names say');
+  {
+    const t = tonightCheckins(hist([]), TODAY);
+    setReport({
+      at: NOW - 2 * 60000,
+      entries: [
+        { clubberId: '7001', name: 'YES 1 Share 1 Point', club: 'T&T' },
+        { clubberId: '7002', name: 'YES 1 Share 1 Point', club: 'T&T' },
+        { clubberId: '7003', name: 'No 0 Shares 0 Points', club: 'Sparks' },
+        { clubberId: '7004', name: 'No 0 Shares 0 Points', club: 'Sparks' },
+        { clubberId: '7005', name: 'No 0 Shares 0 Points', club: 'Sparks' },
+      ],
+    });
+    const a = authoritativeTonight(t, NOW);
+    check('five ids are five children', a.checkedIn === 5, JSON.stringify(a));
+    check('in their own clubs', a.byClub['T&T'] === 2 && a.byClub.Sparks === 3, JSON.stringify(a.byClub));
+    // A name-only history row still joins the id-bearing report entry it names.
+    const t2 = tonightCheckins(hist([{ firstName: 'Nova', lastName: 'Tester', timestamp: at(40) }]), TODAY);
+    setReport({ at: NOW - 60000, entries: [{ clubberId: '7010', name: 'Nova Tester', club: 'Sparks' }] });
+    check('a name-only row still matches its report entry', authoritativeTonight(t2, NOW).checkedIn === 1,
+      JSON.stringify(authoritativeTonight(t2, NOW)));
+    setReport(null);
+  }
+
+  console.log('\ntonight: report intake drops summary-cell names and refuses a partial report');
+  {
+    const feeds = require(path.join(__dirname, '..', 'print-server', 'feeds.js'));
+    const v = feeds.validateCheckinReportBody({
+      ok: true, declared: 3,
+      entries: [
+        { clubberId: '7101', name: 'YES 1 Share 1 Point', club: 'T&T' },
+        { clubberId: null, name: '2 Points', club: 'T&T' },
+        { clubberId: '7102', name: 'Ada Tester', club: 'Sparks' },
+      ],
+    });
+    check('a summary-cell name keeps its id and loses the name',
+      v.ok && v.payload.entries.length === 2 && v.payload.entries[0].clubberId === '7101' && v.payload.entries[0].name === '',
+      JSON.stringify(v));
+    check('the declared count comes through', v.ok && v.payload.declared === 3);
+    check('real names are not summaries', !feeds.isSummaryCellText('Noah Tester') && !feeds.isSummaryCellText('Yesenia Tester') && !feeds.isSummaryCellText('No Id Kid')
+      && feeds.isSummaryCellText('YES') && feeds.isSummaryCellText('1 Share 1 Point'));
+
+    setReport(null);
+    await new Promise((resolve) => setTimeout(resolve, 5200));   // past the intake's 5 s throttle
+    const r = await post('/feed/checkin-report', {
+      ok: true, declared: 11,
+      entries: [{ clubberId: '7201', name: 'Ada Tester', club: 'Sparks' }, { clubberId: '7202', name: 'Bo Tester', club: 'Cubbies' }],
+    });
+    check('a report that parsed 2 of the 11 it lists is not applied as the count',
+      r.status === 200 && r.body.applied === false && authoritativeTonight().source === 'history', `${r.status} ${JSON.stringify(r.body)} ${JSON.stringify(authoritativeTonight())}`);
+    const h = await j('/health');
+    check('and /health says why', (h.body.warnings || []).some((w) => w.type === 'report-partial'),
+      JSON.stringify((h.body.warnings || []).map((w) => w.type)));
   }
 
   listener.close();

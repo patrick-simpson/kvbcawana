@@ -204,16 +204,34 @@ function validateCheckinReportBody(body) {
   const entries = [];
   for (const raw of body.entries) {
     if (!isPlainObject(raw)) continue;
-    const name = String(raw.name || '').trim().slice(0, 80);
-    if (!name) continue; // an entry with no readable name can't be matched to anyone
+    let name = String(raw.name || '').trim().slice(0, 80);
     const clubberIdRaw = raw.clubberId != null ? String(raw.clubberId).trim() : '';
-    entries.push({
-      name,
-      clubberId: clubberIdRaw ? clubberIdRaw.slice(0, 40) : null,
-      club: String(raw.club || '').trim().slice(0, 60),
-    });
+    const clubberId = clubberIdRaw ? clubberIdRaw.slice(0, 40) : null;
+    // A summary cell read as the name (7.13.0, 2026-10-07): an extension older
+    // than 7.13.0 took the cell AFTER the edit link, which on the live report
+    // is "YES 1 Share 1 Point" on clubs with those columns. Every child with
+    // the same summary then merged into one (11 checked in read as 2), and the
+    // missed-check-in pass printed labels with it. Such an entry keeps its
+    // clubber id, which still identifies the child, and loses the name.
+    if (isSummaryCellText(name)) name = '';
+    if (!name && !clubberId) continue; // nothing left to match anyone by
+    entries.push({ name, clubberId, club: String(raw.club || '').trim().slice(0, 60) });
   }
-  return { ok: true, payload: { entries } };
+  // The report's own "Count:" footers, summed (7.13.0 extension). A parse that
+  // came back with fewer children than TwoTimTwo says it lists is partial, and
+  // server.js will not build tonight's count on it.
+  const declared = Number.isInteger(body.declared) && body.declared >= 0 && body.declared <= CHECKIN_REPORT_MAX
+    ? body.declared : null;
+  return { ok: true, payload: { entries, declared } };
+}
+
+// The text of a report column that is not a name: nothing but a "Yes" / "No"
+// and counts of shares or points ("YES 1 Share 1 Point", "2 Points"). The
+// WHOLE text has to be that: a child may well be called "No..." or "Yes...".
+function isSummaryCellText(text) {
+  const t = String(text || '').trim();
+  if (!t) return false;
+  return /^(?:(?:yes|no)\b\s*)?(?:\d+\s*(?:shares?|points?)\b\s*)*$/i.test(t);
 }
 
 // ── POST /feed/unverified-checkins (#2: batch self-verify report) ─────────
@@ -480,6 +498,7 @@ module.exports = {
   // Exported individually so focused unit tests can exercise validation
   // rules without going through the throttle/state machinery.
   validateTonightBody,
+  isSummaryCellText,
   validatePointsBody,
   validateScheduleBody,
   validateNoticeBody,

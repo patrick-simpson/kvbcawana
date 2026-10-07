@@ -125,7 +125,18 @@ APPLIED is kept (one the mass-undo guard refused would zero a night); a row
 marked `undoneBy` — the phone's Remove, or `/reset-tonight` — beats the report,
 because TwoTimTwo goes on listing that child all evening; unregistered visitors
 do not count while a report is fresh (owner's decision — they are not on it);
-identities match on BOTH the clubber id and the name, so one child is never two.
+identities match on BOTH the clubber id and the name, so one child is never two,
+but two DIFFERENT clubber ids are always two children (7.13.0: a shared bogus
+name, the report's "YES 1 Share 1 Point" cell, merged 11 children into 2). The
+report's name is the text of the cell holding the edit link (live since
+2026-10-03: [edit] Name [undo]); a summary cell is never a name (both the
+extension and `validateCheckinReportBody` refuse one), and a name-less entry is
+never printed. A report that parsed fewer children than its own `Count:` footers
+(`declared`) is PARTIAL: neither the count nor an undo list, and `/health` says
+`report-partial`. The tally's tick runs from `TALLY_LEAD_MIN` (60) before the
+club window to `TALLY_GRACE_MIN` after, and a state frame (tally, recap, …) the
+sync relay could not deliver is OWED and resent once the service answers.
+`scripts/test-report-parse.cjs` runs the extension's parser on the live layout.
 The `tally` payload shape is unchanged and must stay so.
 
 **The brand kit (6.17.0, shout face Paytone One since 6.18.0).**

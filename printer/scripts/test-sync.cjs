@@ -189,6 +189,24 @@ async function main() {
     check('and the warning goes with the breaker', !(healthAfter.body.warnings || []).some((x) => x && x.type === 'syncRelay'));
     const back = await events.publish(null, 'awana-channel', 'tally', { counts: {}, total: 1, at: now() });
     check('closed again, frames flow', back === true);
+    // 7.13.0: a tally that did not get through is sent again once the service
+    // answers, instead of leaving the screens on the last number they had.
+    service.livePublishStatus = 503;
+    await events.publish(null, 'awana-channel', 'tally', { counts: { Sparks: 7 }, total: 7, at: now() });
+    service.livePublishStatus = 200;
+    before = service.calls.length;
+    await settle(5600);
+    const retried = service.calls.slice(before).filter((c) => c.route === '/v1/publish' && c.body.event === 'tally');
+    check('a failed tally is sent again when the service is back', retried.length === 1 && retried[0].body.payload.total === 7, JSON.stringify(retried.map((c) => c.body.payload.total)));
+    // ...but not once a newer one has got through.
+    service.livePublishStatus = 503;
+    await events.publish(null, 'awana-channel', 'tally', { counts: { Sparks: 8 }, total: 8, at: now() });
+    service.livePublishStatus = 200;
+    await events.publish(null, 'awana-channel', 'tally', { counts: { Sparks: 9 }, total: 9, at: now() });
+    before = service.calls.length;
+    await settle(5600);
+    check('an owed tally a newer one overtook is not resent', !service.calls.slice(before).some((c) => c.route === '/v1/publish' && c.body.event === 'tally'));
+    server.resetRelayForTest();
     const src = fs.readFileSync(path.join(__dirname, '..', 'print-server', 'server.js'), 'utf8');
     check('the queue is bounded and old check-ins are left to the recap', /RELAY_QUEUE_MAX = 50/.test(src) && /RELAY_CHECKIN_MAX_AGE_MS = 2 \* 60 \* 1000/.test(src) && /RELAY_BREAK_MS = 30 \* 1000/.test(src));
     check('one sign-in check at a time', /if \(signInCheck\) return signInCheck;/.test(src));

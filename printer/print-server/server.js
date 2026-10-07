@@ -4917,6 +4917,24 @@ function tonightCheckins(history = loadHistory(), today = localDayISO()) {
 //     collapsed. Counting the same child under `id:` and `name:` is the exact
 //     over-count this is meant to remove, not one to reintroduce.
 let lastCheckinReport = null;   // { at, entries } — the last report we trusted
+let lastPartialReport = null;   // { at, parsed, declared } — the last one we refused as partial
+
+// One child per clubber id, plus one per id-less name.
+function distinctReportChildren(entries) {
+  const keys = new Set();
+  (Array.isArray(entries) ? entries : []).forEach((e) => {
+    const id = e && e.clubberId != null ? String(e.clubberId).trim() : '';
+    const name = normalizedName(e && e.name);
+    if (id) keys.add(`id:${id}`); else if (name) keys.add(`name:${name}`);
+  });
+  return keys.size;
+}
+
+/** A report whose own footers list more children than the parse found. */
+function reportIsPartial(payload) {
+  return Boolean(payload) && Number.isInteger(payload.declared)
+    && distinctReportChildren(payload.entries) < payload.declared;
+}
 
 // Two 5-minute extension polls plus slack. Longer than one missed poll (so a
 // single hiccup does not flip the whole count back to history mode), shorter
@@ -5001,9 +5019,19 @@ function authoritativeTonight(tonight = tonightCheckins(), now = Date.now()) {
   const add = (keys, club) => {
     if (!keys.length) return;
     if (keys.some((k) => suppressed.has(k))) return;
+    // Two different TwoTimTwo ids are two different children, whatever their
+    // names say: a name match only joins an entry to a slot that has no id, or
+    // the same one. (A shared bogus "name" merged every child with the same
+    // report summary into one: 11 checked in read as 2, 2026-10-07.)
+    const id = keys.find((k) => k.startsWith('id:'));
     let slot = null;
     for (const k of keys) {
-      if (byKey.has(k)) { slot = byKey.get(k); break; }
+      const hit = byKey.get(k);
+      if (!hit) continue;
+      const hitId = [...hit.keys].find((x) => x.startsWith('id:'));
+      if (id && hitId && hitId !== id) continue;
+      slot = hit;
+      break;
     }
     if (!slot) { slot = { keys: new Set(), club: '' }; slots.push(slot); }
     if (!slot.club && club) slot.club = club;
@@ -6675,6 +6703,16 @@ app.post('/feed/checkin-report', (req, res) => {
   if (result.throttled) return res.json({ ok: true, throttled: true });
 
   const now = Date.now();
+  // A PARTIAL report is neither the count nor an undo list: a parse that found
+  // fewer children than TwoTimTwo's own "Count:" footers say it lists (7.13.0;
+  // 2026-10-07 an 11-child report read as 2). The count falls back to this
+  // printer's history, /health says why, and nobody is marked undone for
+  // being missing from it.
+  if (reportIsPartial(result.payload)) {
+    lastPartialReport = { at: now, parsed: distinctReportChildren(result.payload.entries), declared: result.payload.declared };
+    console.warn(`[reconcile] the report parsed ${lastPartialReport.parsed} of the ${lastPartialReport.declared} children TwoTimTwo lists; not counting from it`);
+    return res.json({ ok: true, applied: false, changed: 0, reason: 'partial report' });
+  }
   const outcome = reconcileHistoryWithReport(loadHistory(), result.payload.entries, now);
   if (outcome.skipped) {
     console.warn('[reconcile]', outcome.reason);
@@ -6687,6 +6725,7 @@ app.post('/feed/checkin-report', (req, res) => {
   // Applied (even with nothing to change): this is now what the count is built
   // from, until it goes stale or a newer one lands.
   lastCheckinReport = { at: now, entries: result.payload.entries };
+  lastPartialReport = null;
   if (outcome.changed > 0) {
     saveHistory(outcome.history);
   }
@@ -6860,6 +6899,7 @@ app.post('/reset-tonight', (req, res) => {
   // rest of the evening - the `undoneBy: 'reset'` markers above cover the kids
   // this printer knows about, and this covers anyone it does not.
   lastCheckinReport = null;
+  lastPartialReport = null;
 
   publishTally();
   console.log(`[reset] Tonight reset by operator: ${undone} check-in(s) marked undone, ledger ${ledgerTouched ? 'cleared for today' : 'untouched'}`);
@@ -7109,11 +7149,17 @@ function onClubNight(fn) {
 // tally simply stops arriving shows the 8 o'clock number all evening. So the
 // TALLY, and only the tally, keeps going for an extra hour.
 const TALLY_GRACE_MIN = 60;
+// And an hour BEFORE the published start (7.13.0). Children are checked in
+// from the moment the doors open, well ahead of 6:30, and the lobby screens are
+// up from 5:00: on 2026-10-07 the first kids arrived at 5:22, and with the
+// tally's own tick not starting until 5:30 a screen that missed one check-in
+// sat on the wrong count until the next one got through.
+const TALLY_LEAD_MIN = 60;
 
 function onTallyWindow(fn) {
   return () => {
     try {
-      if (!events.isClubNightNow(churchConfig.clubNights, undefined, TALLY_GRACE_MIN)) return;
+      if (!events.isClubNightNow(churchConfig.clubNights, undefined, TALLY_GRACE_MIN, TALLY_LEAD_MIN)) return;
       fn();
     } catch (e) { /* scheduler must never die */ }
   };
@@ -7207,12 +7253,37 @@ let relayQueue = [];
 let relayDraining = false;
 let relayFailures = 0;
 let relayBrokenUntil = 0;
+// OWED (7.13.0): the newest frame of a state kind that did not get through (a
+// failed send, or one refused while the breaker was open) is sent again once
+// the service answers, unless a newer one of that kind has got through first.
+// Before, a tally that failed was simply gone, and a lobby screen kept the
+// number it had until the next check-in or the next scheduled tally.
+const RELAY_RETRY_MS = 5 * 1000;
+const relayOwed = new Map();
+let relayRetryTimer = null;
+
+function oweRelay(event, body) {
+  if (!RELAY_LATEST_ONLY.has(event)) return;
+  relayOwed.set(event, body);
+  if (relayRetryTimer) return;
+  const wait = Math.max(relayBrokenUntil - Date.now(), 0) + RELAY_RETRY_MS;
+  relayRetryTimer = setTimeout(() => {
+    relayRetryTimer = null;
+    const owed = [...relayOwed];
+    relayOwed.clear();
+    if (!signedInToSync()) return;
+    for (const [event, body] of owed) enqueueRelay(event, body);
+  }, wait);
+  if (relayRetryTimer.unref) relayRetryTimer.unref();
+}
 
 function resetRelayForTest() {
   for (const q of relayQueue) for (const r of q.resolves) r(false);
   relayQueue = [];
   relayFailures = 0;
   relayBrokenUntil = 0;
+  relayOwed.clear();
+  if (relayRetryTimer) { clearTimeout(relayRetryTimer); relayRetryTimer = null; }
 }
 
 async function drainRelay() {
@@ -7225,13 +7296,16 @@ async function drainRelay() {
       if (item.event === 'checkin' && Date.now() - item.at > RELAY_CHECKIN_MAX_AGE_MS) {
         // Too old to greet a child with; the recap will carry it.
       } else if (Date.now() < relayBrokenUntil) {
-        // The breaker is open: fail fast.
+        // The breaker is open: fail fast, and owe a state frame.
+        oweRelay(item.event, item.body);
       } else {
         const r = await syncClient.syncRequest(config.syncUrl, '/v1/publish', {
           method: 'POST', body: { event: item.event, payload: item.body }, session: config.syncSession,
         });
         if (r.status === 401) checkSyncSignIn().catch(() => {});
         ok = r.ok;
+        if (ok) relayOwed.delete(item.event);   // a newer one got through
+        else if (!(r.status >= 400 && r.status < 500)) oweRelay(item.event, item.body);
         if (ok || (r.status >= 400 && r.status < 500)) relayFailures = 0;   // a refusal is an answer, not an outage
         else if (++relayFailures >= RELAY_BREAK_AFTER) {
           relayBrokenUntil = Date.now() + RELAY_BREAK_MS;
@@ -7248,7 +7322,11 @@ async function drainRelay() {
 
 events.setRelay((channel, event, body) => {
   if (channel !== EVENT_CHANNEL || !signedInToSync()) return false;
-  if (Date.now() < relayBrokenUntil) return false;
+  if (Date.now() < relayBrokenUntil) { oweRelay(event, body); return false; }
+  return enqueueRelay(event, body);
+});
+
+function enqueueRelay(event, body) {
   return new Promise((resolve) => {
     if (RELAY_LATEST_ONLY.has(event)) {
       // The newest frame of this kind replaces any still waiting; whoever
@@ -7265,7 +7343,7 @@ events.setRelay((channel, event, body) => {
     }
     drainRelay();
   });
-});
+}
 
 // One check at a time: a burst of 401s used to start one per frame, and each
 // that found the session gone rewrote config.json.
@@ -7949,6 +8027,12 @@ app.get('/health', async (req, res) => {
   // window (or on a report having landed today and then gone stale), because
   // "no report at 3pm on a Tuesday" is not news.
   const tallyNow = authoritativeTonight();
+  if (lastPartialReport && Date.now() - lastPartialReport.at < REPORT_FRESH_MS) {
+    warnings.push({
+      type: 'report-partial',
+      message: `TwoTimTwo's check-in report lists ${lastPartialReport.declared} children but only ${lastPartialReport.parsed} could be read, so tonight's count is not taken from it. Reload the Chrome extension (chrome://extensions) or restart Chrome to pick up the newest version.`,
+    });
+  }
   if (tallyNow.source === 'history'
       && (events.isClubNightNow(churchConfig.clubNights) || lastCheckinReport)) {
     const mins = lastCheckinReport ? Math.round((Date.now() - lastCheckinReport.at) / 60000) : null;
@@ -9233,7 +9317,7 @@ module.exports = {
   // Tonight's count. authoritativeTonight() is THE definition every surface
   // reads; the setter exists so a test can put the server in report mode (and
   // in stale-report mode) without a scrape, a socket or a wall-clock wait.
-  authoritativeTonight, REPORT_FRESH_MS, TALLY_GRACE_MIN,
+  authoritativeTonight, REPORT_FRESH_MS, TALLY_GRACE_MIN, TALLY_LEAD_MIN,
   _setLastCheckinReportForTests(report) { lastCheckinReport = report; },
   _getLastCheckinReportForTests() { return lastCheckinReport; },
   // Attendance audit (#311) — the diff is PURE so "unknown is not zero" and

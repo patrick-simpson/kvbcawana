@@ -2,7 +2,7 @@
   if (window.__awanaPrinterLoaded) return;
   window.__awanaPrinterLoaded = true;
 
-  const EXTENSION_VERSION = '7.12.1';
+  const EXTENSION_VERSION = '7.13.0';
   const PRINT_COOLDOWN = 2000;
   // POST /print is synchronous on the server: PowerShell + a cold printer can
   // take 15-30 s (the server retries the spooler internally). This must sit
@@ -4463,34 +4463,57 @@
         var tables = doc.querySelectorAll('table');
         if (!tables.length) return null;
         var out = [];
+        // The report's own "Count: N" footers, summed: what TwoTimTwo says it
+        // lists. Sent with the entries, so a parse that found fewer children
+        // than that is known to be partial (7.13.0) instead of being trusted.
+        var declared = 0;
+        var declaredAll = true;
         tables.forEach(function(table) {
           var titleTh = table.querySelector('th.title');
           var clubImg = titleTh ? titleTh.querySelector('img[alt]') : null;
           var clubName = clubImg ? (clubImg.getAttribute('alt') || '').trim().replace(/&amp;/g, '&') : '';
+          if (!clubName) return; // the page's decorative title table
+          var totals = table.querySelector('tfoot tr.totals');
+          var cm = totals ? /Count:\s*(\d+)/i.exec(totals.textContent || '') : null;
+          if (cm) declared += parseInt(cm[1], 10); else declaredAll = false;
           var rows = table.querySelectorAll('tbody tr');
           rows.forEach(function(row) {
             var tds = row.querySelectorAll('td');
             if (!tds.length) return;
-            var link = tds[0].querySelector('a[href*="/meeting/clubberCheckin/"]');
+            var link = row.querySelector('a[href*="/meeting/clubberCheckin/"]');
             if (!link) return;
             var m = /\/meeting\/clubberCheckin\/(\d+)/.exec(link.getAttribute('href') || '');
             if (!m) return;
             var clubberId = m[1];
-            var name = tds.length > 1 ? (tds[1].textContent || '').trim() : '';
+            // The name is the text of the cell that holds the edit link, with
+            // every link taken out. Live (2026-10-03) that cell is
+            // [edit link] Name [undo link]. Only when it holds nothing else is
+            // the name in the next cell (the older markup). Reading the next
+            // cell FIRST took "YES 1 Share 1 Point" for a name on clubs with
+            // those columns: those children merged into one in tonight's count
+            // and the missed-check-in pass printed labels with it (2026-10-07).
+            var cell = link.closest('td') || tds[0];
+            var clone = cell.cloneNode(true);
+            clone.querySelectorAll('a').forEach(function(a) { a.remove(); });
+            var name = (clone.textContent || '').trim().replace(/\s+/g, ' ');
             if (!name) {
-              // Defensive fallback if the name is folded into the same cell as
-              // the edit link, rather than its own <td> — strip the link's own
-              // text so what remains is (hopefully) just the child's name.
-              // Live (2026-10-03): the cell is [edit link] Name [undo link],
-              // so EVERY link goes, or the name reads "Name undo".
-              var clone = tds[0].cloneNode(true);
-              clone.querySelectorAll('a').forEach(function(a) { a.remove(); });
-              name = (clone.textContent || '').trim().replace(/\s+/g, ' ');
+              var next = cell.nextElementSibling;
+              name = next ? (next.textContent || '').trim().replace(/\s+/g, ' ') : '';
             }
-            if (!name) return;
+            // Never a summary cell: no child is called "YES" or "2 Points".
+            // (the whole text: a child may be called "No..." or "Yes...").
+            if (name && /^(?:(?:yes|no)\b\s*)?(?:\d+\s*(?:shares?|points?)\b\s*)*$/i.test(name)) name = '';
+            // No name read: the roster knows this clubber id (the report's id
+            // is the roster's recid). Still none: the entry keeps its id for
+            // the count, and is never printed (runReconcile skips it).
+            if (!name) {
+              var known = ROSTER_CACHE['id:' + clubberId];
+              if (known && known.displayName) name = known.displayName;
+            }
             out.push({ clubberId: clubberId, name: name, club: clubName });
           });
         });
+        if (declaredAll) out.declared = declared;
         return out;
       })
       .catch(function(e) {
@@ -4517,6 +4540,7 @@
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         ok: true,
+        declared: typeof entries.declared === 'number' ? entries.declared : undefined,
         entries: entries.map(function(e) {
           return { clubberId: e.clubberId, name: e.name, club: e.club };
         })
@@ -4594,6 +4618,9 @@
           RECONCILE_MAX_PRINTS + ' this pass (a gap this large means something is wrong; check the roster)');
       }
       missed.slice(0, RECONCILE_MAX_PRINTS).forEach(function(e) {
+        // Never a label without a name (an entry whose name could not be read
+        // and whose id the roster does not know yet).
+        if (!e.name) { console.warn('[Awana] Reconcile: clubber ' + e.clubberId + ' has no readable name; not printing'); return; }
         // Mode check FIRST. Marking before it meant a reconcile tick that fired
         // while a volunteer had printing off (reloading paper) permanently ate
         // those check-ins — flipping the mode back never recovered them, unlike
