@@ -278,6 +278,18 @@
         });
     }
     readIndex();
+
+    // A sign-in or sign-out made in another window of this origin (the sound
+    // room app's configure page beside this kiosk, or the embedded lobby
+    // screen, which shares the slot) reaches this one here: the session is
+    // read from storage on every use, so the card is redrawn and, signed in,
+    // the room's settings are pulled now rather than at the next ten-minute
+    // tick. Every other key is ignored at the cost of one comparison.
+    window.addEventListener('storage', function (e) {
+      if (e.key !== SESSION_KEY && e.key !== null) return;
+      render();
+      if (session()) pull();
+    });
   }
   // 15 s, 30 s, 60 s, then every five minutes.
   function indexRetryWait(n) { return Math.min(15000 * Math.pow(2, n), 5 * 60 * 1000); }

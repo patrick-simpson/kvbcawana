@@ -1378,6 +1378,54 @@ the service's allowlist (`sanitizeJourney` in that repo's
   the session is dropped and the panel says so.
 - Hidden, and silent, until the display site's `shared/sync.json` names a
   service. `test/sync.test.mjs` boots the real page with a stand-in service.
+- A sign-in or sign-out made in another window of the origin (the configure
+  page below, or the embedded lobby, which shares the slot) arrives as a
+  `storage` event on `awanaSyncSession.v1`: sync.js reads the session from
+  storage on every use, so it only redraws the card and, signed in, pulls at
+  once.
+
+### Configure mode (`?configure=1`, 2026-10-07)
+
+The sound room app (`lobby/desktop/`) can show this kiosk full screen on a
+monitor, and its Settings window loads `…/journey/?configure=1` in a pane on
+the operator's own monitor, in the SAME browser profile (same localStorage,
+same BroadcastChannel scope). The lobby and the projector have the same mode;
+the protocol is `lobby/src/lib/configureRelay.js` and Journey speaks it with
+`screen: 'journey'`.
+
+- **The page is only the Settings panel.** `CONFIGURE_MODE` (exactly `'1'`)
+  near the top of `schedule.js`; `html.configure-mode` in `style.css` hides
+  both layers, the corner buttons, the scrim and the close button and sets the
+  card on the configurator's warm paper (`#f6f4ef`). The panel opens at load
+  and never closes: `closeSettingsPanel()` returns early, the keydown handler
+  returns first thing (no S, no Escape), `idleWatch()` skips the panel.
+- **Nothing of the kiosk runs**, each gated where it starts: no `setView()` at
+  load and no 15s poll, no `refreshLesson()` (one `loadCurrentLesson()` for
+  tonight's week, never `cacheLessonBundle()`), no wake lock, no
+  `loadLeaderPrep()`, no version poller, no idle cursor. **The Check-in
+  Display frame never loads**: an inline script right after the iframe in
+  `index.html` removes it the moment it is parsed (a second live socket, and
+  children's names or a chime in the booth), because by the time schedule.js
+  runs the lobby page could already be starting; `applyCheckinDisplayUrl()`
+  is gated too. Everything the panel saves still writes localStorage.
+- **Every final picker choice is relayed, never run there**:
+  `runPickerChoice()` posts `{ screen: 'journey', action: 'pick', data: {
+  week, choice } }` on `awana-configure`, with `choice` one of
+  `PICKER_CHOICES` (`student`, `leader`, `slides`, `handout`, `student-prep`,
+  `leader-prep`: the handout and the preps open over the wall too), puts the
+  panel back on its list and says "Sent to the Journey screen". The live
+  kiosk's `handleConfigureRelay()` allows only `pick`, a week its own
+  lessons.json knows, a Leader Video for the Leader side, closes a reading
+  overlay left open, and runs the very `PICKER_CHOICES` entry its own button
+  runs. Nothing answers a relay: with no kiosk open, nothing happens.
+- **Settings saved in another window are taken live** by one `storage`
+  listener (`LIVE_STORAGE_KEYS`): caption on/off, size and backdrop, playback
+  quality (drops `profileCache`, re-applies the iframe URL), the slides'
+  auto-advance and extras, and the notes override (badge, and the editor if
+  open and not being typed in), each through its control's own function. The
+  embedded lobby writes this storage too, so any other key costs one lookup.
+- `test/configure-mode.test.mjs` (the harness's fifth argument is the page
+  URL) boots both sides.
 
 ## Embedding note
 

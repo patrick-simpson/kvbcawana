@@ -131,3 +131,25 @@ test('a passphrase change elsewhere signs this screen out and says so', async ()
   assert.ok(!k.document.getElementById('sync-signin').classList.contains('hidden'));
   k.close();
 });
+
+test('a sign-in made in another window (the configure page) signs this screen in, without a reload', async () => {
+  const k = boot({ journey: ROOM });
+  await settle();
+  const doc = k.document;
+  assert.ok(!doc.getElementById('sync-signin').classList.contains('hidden'), 'signed out to begin with');
+  assert.equal(k.calls.filter((c) => c.route === '/v1/state').length, 0);
+  // The other window writes the shared slot; this one only hears the event.
+  k.window.localStorage.setItem('awanaSyncSession.v1', SESSION);
+  k.window.dispatchEvent(new k.window.StorageEvent('storage', { key: 'awanaSyncSession.v1' }));
+  await settle();
+  assert.ok(doc.getElementById('sync-signin').classList.contains('hidden'));
+  assert.ok(!doc.getElementById('sync-signed-in').classList.contains('hidden'));
+  const pull = k.calls.find((c) => c.route === '/v1/state');
+  assert.equal(pull.auth, `Bearer ${SESSION}`, 'the room is pulled now, not at the next ten-minute tick');
+  assert.equal(doc.getElementById('captions-size').value, '1.3');
+  // And a sign-out there signs this one out.
+  k.window.localStorage.removeItem('awanaSyncSession.v1');
+  k.window.dispatchEvent(new k.window.StorageEvent('storage', { key: 'awanaSyncSession.v1' }));
+  assert.ok(!doc.getElementById('sync-signin').classList.contains('hidden'));
+  k.close();
+});

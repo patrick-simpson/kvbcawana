@@ -1041,6 +1041,35 @@ html.cursor-hidden #video-controls:not(.force-visible) {
   margin-bottom: 1.25rem;
 }
 
+/* Configure mode (?configure=1): the page is only this panel, shown in the
+   sound room app's Settings window beside the live kiosk. No kiosk under it,
+   so no scrim and no corner buttons; the plain ground is the warm paper of
+   the configurator around it. The card itself keeps its own look, filling
+   the pane up to its usual width, and still scrolls inside. */
+html.configure-mode,
+html.configure-mode body {
+  background: #f6f4ef;
+}
+
+html.configure-mode #checkin-view,
+html.configure-mode #journey-view,
+html.configure-mode #toggle-btn,
+html.configure-mode #settings-btn,
+html.configure-mode #settings-backdrop,
+html.configure-mode #settings-close-btn {
+  display: none;
+}
+
+html.configure-mode #settings-panel {
+  padding: 16px;
+  align-items: stretch;
+}
+
+html.configure-mode #settings-card {
+  width: min(1100px, 100%);
+  max-height: 100%;
+}
+
 /* The lesson list is the card's flexible middle: it takes the space left over
    after the header and the teaching-slide preferences below it, and scrolls
    internally. The min-height floor matters — without it, on a short window
