@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'">
-<title>Choose the lobby TV</title>
+<title>Choose the monitor</title>
 <style>
   :root { --orange: #FAA41D; --deep: #C97A08; --ink: #231F20; }
   * { box-sizing: border-box; }
@@ -23,7 +23,7 @@
   <div class="n" id="n"></div>
   <div class="label" id="label"></div>
   <div class="size" id="size"></div>
-  <div class="current" id="current" hidden>The lobby TV right now</div>
+  <div class="current" id="current" hidden>In use right now</div>
   <div class="row">
     <button class="use" id="use" autofocus>Show the lobby on this screen</button>
     <button class="cancel" id="cancel">Cancel</button>
@@ -34,6 +34,7 @@
   document.getElementById('label').textContent = q.get('label') || '';
   document.getElementById('size').textContent = q.get('size') || '';
   document.getElementById('current').hidden = q.get('current') !== '1';
+  document.getElementById('use').textContent = `Show ${q.get('what') || 'the lobby'} on this screen`;
   document.getElementById('use').addEventListener('click', () => window.chooser.choose());
   document.getElementById('cancel').addEventListener('click', () => window.chooser.cancel());
   addEventListener('keydown', (e) => { if (e.key === 'Escape') window.chooser.cancel(); });

@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'">
+<title>Shutting down</title>
+<style>
+  /* Quiet on purpose: on a one-monitor PC this sits in the corner of the
+     screen everyone is looking at. Dark, small, no alarm colours. */
+  :root { --bg: #1E2230; --ink: #F3F1EC; --muted: #9EA5B6; --line: rgba(255,255,255,.22); --accent: #F2A33A; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); color: var(--ink);
+    font-family: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif; -webkit-user-select: none; user-select: none; }
+  body { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 16px; padding: 0 18px 4px 20px; }
+  .label { font-size: 13px; color: var(--muted); margin: 0 0 2px; }
+  .time { font-size: 26px; font-weight: 600; line-height: 1.1; font-variant-numeric: tabular-nums; letter-spacing: .01em; margin: 0; }
+  .time small { font-size: 13px; font-weight: 400; color: var(--muted); margin-left: 6px; letter-spacing: 0; }
+  button { font: inherit; font-size: 14px; font-weight: 600; color: var(--ink); background: transparent;
+    border: 1px solid var(--line); border-radius: 8px; padding: 8px 16px; cursor: pointer; }
+  button:hover { background: rgba(255,255,255,.08); border-color: rgba(255,255,255,.4); }
+  button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .bar { position: fixed; left: 0; right: 0; bottom: 0; height: 3px; background: rgba(255,255,255,.08); }
+  .bar i { display: block; height: 100%; width: 100%; background: var(--accent); transform-origin: left; }
+</style>
+</head>
+<body>
+  <div>
+    <p class="label" id="label"></p>
+    <p class="time" id="time"></p>
+  </div>
+  <button id="cancel" type="button">Not tonight</button>
+  <div class="bar"><i id="fill"></i></div>
+<script>
+  const q = new URLSearchParams(location.search);
+  const deadline = Number(q.get('deadline')) || Date.now() + 120000;
+  const total = Math.max(1000, deadline - Date.now());
+  const label = document.getElementById('label');
+  const time = document.getElementById('time');
+  const fill = document.getElementById('fill');
+  const cancel = document.getElementById('cancel');
+  label.textContent = `This PC shuts down at ${q.get('at') || 'the set time'}`;
+  let done = false;
+  function tick() {
+    if (done) return;
+    const left = Math.max(0, deadline - Date.now());
+    const s = Math.ceil(left / 1000);
+    time.innerHTML = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}<small>left</small>`;
+    fill.style.transform = `scaleX(${left / total})`;
+    if (left > 0) setTimeout(tick, 250);
+  }
+  tick();
+  cancel.addEventListener('click', () => window.card.cancel());
+  addEventListener('keydown', (e) => { if (e.key === 'Escape') window.card.cancel(); });
+  window.card.onShuttingDown(() => {
+    done = true;
+    label.textContent = 'Club night is over';
+    time.textContent = 'Shutting down…';
+    cancel.hidden = true;
+    fill.style.transform = 'scaleX(0)';
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'">
+<title>Awana Lobby Display: Settings</title>
+<style>
+  /* The app's own settings. The column is 360px and the header 64px: main.js
+     (CONFIG_SIDE / CONFIG_HEADER) lays the screen's settings page beside and
+     below them, so change both together. */
+  :root {
+    --paper: #F6F4EF; --card: #FFFFFF; --ink: #23262F; --muted: #5B606D; --faint: #8A8F9B;
+    --line: #E3DED3; --accent: #E58A12; --accent-ink: #8A4E00; --accent-wash: #FCF1E1;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { margin: 0; height: 100%; background: var(--paper); color: var(--ink);
+    font: 14px/1.45 "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif; }
+  body { display: grid; grid-template-rows: 64px 1fr; grid-template-columns: 360px 1fr; overflow: hidden; }
+
+  header { grid-column: 1 / -1; display: grid; grid-template-columns: 360px 1fr; align-items: center; border-bottom: 1px solid var(--line); background: var(--card); }
+  .brand { padding: 0 24px; display: flex; align-items: baseline; gap: 10px; border-right: 1px solid var(--line); height: 100%; align-content: center; flex-wrap: wrap; }
+  .brand b { font-size: 16px; font-weight: 600; letter-spacing: -.005em; }
+  .brand span { font-size: 13px; color: var(--faint); }
+  .screen-title { padding: 0 24px; display: flex; flex-direction: column; justify-content: center; min-width: 0; }
+  .screen-title b { font-weight: 600; font-size: 15px; }
+  .screen-title span { font-size: 13px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  aside { overflow-y: auto; padding: 20px 24px 24px; border-right: 1px solid var(--line); display: flex; flex-direction: column; gap: 26px; }
+  section h2 { font-size: 13px; font-weight: 600; color: var(--muted); margin: 0 0 10px; }
+  .status { font-size: 13px; color: var(--muted); background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+  .status strong { color: var(--ink); font-weight: 600; }
+
+  .options { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 10px; background: var(--card); overflow: hidden; }
+  .option { display: grid; grid-template-columns: 18px 1fr; gap: 10px; padding: 11px 12px; cursor: pointer; border-top: 1px solid var(--line); position: relative; }
+  .option:first-child { border-top: 0; }
+  .option:hover { background: #FBFAF7; }
+  .option input { margin: 3px 0 0; accent-color: var(--accent); width: 16px; height: 16px; }
+  .option b { font-weight: 600; display: block; }
+  .option span { font-size: 13px; color: var(--muted); }
+  .option:has(input:checked) { background: var(--accent-wash); }
+  .option:has(input:checked)::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--accent); }
+
+  .row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .monitor { font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .monitor.none { color: var(--accent-ink); font-weight: 400; }
+  .hint { font-size: 13px; color: var(--muted); margin: 8px 0 0; }
+
+  button { font: inherit; font-weight: 600; font-size: 13px; color: var(--ink); background: var(--card); border: 1px solid #CFC8BA; border-radius: 8px; padding: 6px 12px; cursor: pointer; white-space: nowrap; }
+  button:hover { border-color: #A9A196; }
+  button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .link { background: none; border: 0; padding: 0; color: var(--muted); font-weight: 400; text-decoration: underline; text-underline-offset: 2px; }
+  .link:hover { color: var(--ink); }
+
+  .switch { display: flex; align-items: center; justify-content: space-between; gap: 12px; cursor: pointer; }
+  .switch input { appearance: none; -webkit-appearance: none; width: 38px; height: 22px; border-radius: 11px; background: #CFC8BA; position: relative; margin: 0; flex: none; cursor: pointer; transition: background .15s; }
+  .switch input::after { content: ''; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.2); transition: transform .15s; }
+  .switch input:checked { background: var(--accent); }
+  .switch input:checked::after { transform: translateX(16px); }
+  .time { display: flex; align-items: center; gap: 10px; margin-top: 12px; }
+  .time input { font: inherit; font-size: 14px; padding: 5px 8px; border: 1px solid #CFC8BA; border-radius: 8px; background: var(--card); color: var(--ink); }
+  .time input:disabled { opacity: .5; }
+  .warn { margin-top: 12px; padding: 10px 12px; border-radius: 10px; background: #1E2230; color: #F3F1EC; display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 13px; }
+  .warn button { background: transparent; color: inherit; border-color: rgba(255,255,255,.3); }
+  .bad { color: #A33A1B; }
+
+  footer { margin-top: auto; font-size: 12px; color: var(--faint); display: flex; flex-wrap: wrap; gap: 6px 14px; }
+  footer .link { font-size: 12px; color: var(--faint); }
+</style>
+</head>
+<body>
+  <header>
+    <div class="brand"><b>Awana Lobby Display</b><span>Settings</span></div>
+    <div class="screen-title"><b id="screen-name">&nbsp;</b><span id="screen-hint">&nbsp;</span></div>
+  </header>
+
+  <aside>
+    <div class="status" id="status" aria-live="polite">&nbsp;</div>
+
+    <section>
+      <h2 id="screen-h">Screen on this PC</h2>
+      <div class="options" role="radiogroup" aria-labelledby="screen-h" id="screens"></div>
+      <p class="hint">Shown on club nights from 5:00 to 8:00 pm. Switching swaps it straight away on the same monitor.</p>
+    </section>
+
+    <section>
+      <h2>Monitor</h2>
+      <div class="row">
+        <span class="monitor" id="monitor">&nbsp;</span>
+        <button type="button" id="choose">Choose&hellip;</button>
+      </div>
+    </section>
+
+    <section>
+      <h2>Shut down</h2>
+      <label class="switch">
+        <span>Shut this PC down on club nights</span>
+        <input type="checkbox" id="sd-on" role="switch">
+      </label>
+      <div class="time">
+        <label for="sd-at">At</label>
+        <input type="time" id="sd-at" min="17:00" max="23:59" step="60">
+        <span class="hint" id="sd-bad" hidden style="margin:0"></span>
+      </div>
+      <p class="hint">A small card in the corner of the main screen counts down for two minutes first, with a button to cancel for that night. A PC switched on after the time is left alone.</p>
+      <div class="warn" id="sd-warn" hidden>
+        <span id="sd-warn-text"></span>
+        <button type="button" id="sd-cancel">Not tonight</button>
+      </div>
+    </section>
+
+    <section>
+      <h2>Windows</h2>
+      <label class="switch">
+        <span>Start with Windows</span>
+        <input type="checkbox" id="autostart" role="switch">
+      </label>
+    </section>
+
+    <footer>
+      <span id="version"></span>
+      <button type="button" class="link" id="reload">Reload the screen</button>
+      <button type="button" class="link" id="log">Open log</button>
+    </footer>
+  </aside>
+
+<script>
+  const app = window.lobbyApp;
+  const $ = (id) => document.getElementById(id);
+  const BLURB = {
+    lobby: ['Lobby check-in signage', 'Names, slides and the pickup board.'],
+    projector: ['Projector', 'Countdown, pledges, game time and goodnight.'],
+    journey: ['Journey kiosk', 'Lessons and teaching slides for the Journey room.'],
+  };
+
+  function renderScreens(state) {
+    const box = $('screens');
+    if (box.childElementCount !== state.screens.length) {
+      box.textContent = '';
+      for (const { id } of state.screens) {
+        const [name, line] = BLURB[id] || [id, ''];
+        const label = document.createElement('label');
+        label.className = 'option';
+        label.innerHTML = '<input type="radio" name="screen"><div><b></b><span></span></div>';
+        label.querySelector('input').value = id;
+        label.querySelector('b').textContent = name;
+        label.querySelector('span').textContent = line;
+        label.querySelector('input').addEventListener('change', (e) => { if (e.target.checked) app.set({ screen: id }).then(render); });
+        box.append(label);
+      }
+    }
+    for (const input of box.querySelectorAll('input')) input.checked = input.value === state.settings.screen;
+  }
+
+  function render(state) {
+    const [name] = BLURB[state.settings.screen] || [state.settings.screen];
+    $('screen-name').textContent = `${name} settings`;
+    $('screen-hint').textContent = `Changes go live on ${state.where} as you make them, without interrupting it.`;
+    $('status').innerHTML = '';
+    const strong = document.createElement('strong');
+    strong.textContent = state.status;
+    $('status').append(strong);
+    renderScreens(state);
+
+    const m = $('monitor');
+    m.classList.toggle('none', !state.monitor);
+    m.textContent = state.monitor || (state.monitors > 1 ? 'None chosen yet' : 'This PC\u2019s only screen');
+
+    $('sd-on').checked = state.settings.shutdown.enabled;
+    if (document.activeElement !== $('sd-at')) $('sd-at').value = state.settings.shutdown.at;
+    $('sd-at').disabled = !state.settings.shutdown.enabled;
+    $('sd-warn').hidden = !state.warning;
+    if (state.warning) $('sd-warn-text').textContent = `Shutting down at ${state.warning.at}`;
+
+    $('autostart').checked = state.autostart;
+    $('autostart').disabled = state.dev;
+    $('version').textContent = `Version ${state.version}`;
+  }
+
+  $('choose').addEventListener('click', () => app.chooseMonitor());
+  $('reload').addEventListener('click', () => app.reloadScreen());
+  $('log').addEventListener('click', () => app.openLog());
+  $('sd-cancel').addEventListener('click', () => app.cancelShutdown());
+  $('sd-on').addEventListener('change', (e) => app.set({ shutdown: { enabled: e.target.checked } }).then(render));
+  $('autostart').addEventListener('change', (e) => app.set({ autostart: e.target.checked }).then(render));
+  $('sd-at').addEventListener('change', (e) => {
+    const v = e.target.value;
+    const ok = /^\d\d:\d\d$/.test(v) && v >= '17:00';
+    $('sd-bad').hidden = ok;
+    $('sd-bad').className = 'hint bad';
+    $('sd-bad').textContent = ok ? '' : 'Pick an evening time, 5:00 pm or later.';
+    if (ok) app.set({ shutdown: { at: v } }).then(render);
+  });
+
+  app.onState(render);
+  app.get().then(render);
+</script>
+</body>
+</html>

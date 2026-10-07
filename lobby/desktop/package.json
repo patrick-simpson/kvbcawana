@@ -1,7 +1,7 @@
 {
   "name": "awana-lobby-display",
   "productName": "Awana Lobby Display",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "private": true,
   "description": "The lobby check-in signage for the sound room PC: full screen on the lobby TV on club nights, 5 to 8 pm.",
   "author": "KVBC Awana",

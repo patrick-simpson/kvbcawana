@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { CLOSE_AT_MIN, OPEN_AT_MIN, displayWindow, isClubNight, nextClubNight, zonedParts } from './clubNight.js';
+import { CLOSE_AT_MIN, OPEN_AT_MIN, clubNightToday, displayWindow, isClubNight, nextClubNight, zonedParts } from './clubNight.js';
 
 // Eastern wall-clock time -> the real instant (EDT in fall 2026 is UTC-4).
 const et = (iso) => new Date(`${iso}-04:00`);
@@ -106,5 +106,18 @@ describe('nextClubNight', () => {
 
   it('skips a cancelled night', () => {
     expect(nextClubNight(et('2026-10-08T10:00'), sources)).toBe('2026-10-21');
+  });
+});
+
+describe('clubNightToday', () => {
+  it('still says yes after the 8:00 pm close, when nextClubNight has moved on', () => {
+    const late = et('2026-10-07T20:15:00');
+    expect(clubNightToday(late, { schedule: SCHEDULE, feed: FEED })).toBe(true);
+    expect(nextClubNight(late, { schedule: SCHEDULE, feed: FEED })).not.toBe('2026-10-07');
+  });
+
+  it('says no on a cancelled night and on an ordinary Thursday', () => {
+    expect(clubNightToday(et('2026-10-14T20:15:00'), { schedule: SCHEDULE, feed: FEED })).toBe(false);
+    expect(clubNightToday(et('2026-10-08T20:15:00'), { schedule: SCHEDULE, feed: FEED })).toBe(false);
   });
 });
