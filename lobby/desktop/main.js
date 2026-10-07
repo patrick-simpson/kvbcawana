@@ -58,7 +58,9 @@ const SMOKE = process.argv.includes('--smoke-test');
 if (DEV && process.env.AWANA_LOBBY_USERDATA) app.setPath('userData', process.env.AWANA_LOBBY_USERDATA);
 
 const SOURCES_EVERY_MS = 60 * 60 * 1000; // re-read the schedule and feed hourly
-const UPDATE_EVERY_MS = 4 * 60 * 60 * 1000;
+// Updates install the moment they are downloaded (owner, 2026-10-07), so the
+// feed is asked often: a release reaches the booth within about ten minutes.
+const UPDATE_EVERY_MS = 10 * 60 * 1000;
 const RETRY_LOAD_MS = 30 * 1000;
 const CURSOR_IDLE_MS = 3000;
 
@@ -429,7 +431,6 @@ function evaluate() {
   const shutdownAhead = checkShutdown(t, win);
   holdAwake(visible || clubNightAhead || shutdownAhead);
   updateTray();
-  if (!visible) maybeInstallUpdate();
 }
 
 let tickTimer = null;
@@ -836,8 +837,12 @@ function updateTray() {
 
 /* ── Updates ───────────────────────────────────────────────────────── */
 
-// Downloaded in the background, installed only while nothing is on screen:
-// a club night is never interrupted to install a fix.
+// Checked every ten minutes, downloaded in the background and installed the
+// moment the download finishes, whatever is on screen (owner, 2026-10-07:
+// every release reaches the booth at once, a club night included). The screen
+// is gone for the few seconds the installer takes and comes back by itself:
+// the relaunch is quiet, and the schedule and any Show now or Hide in
+// state.json put it back exactly as it was.
 function checkForUpdates(byHand = false) {
   if (DEV) return;
   updateStatus = byHand ? 'checking' : updateStatus;
@@ -848,9 +853,10 @@ function checkForUpdates(byHand = false) {
 // One install at a time, with a way back. quitAndInstall() hands the app to
 // the installer and normally never returns; when it throws, or returns and
 // the app is still here two minutes later, the update is treated as not
-// installable from this run: the "ready" flag is dropped so the minute tick
-// stops re-trying it, the quiet-relaunch mark is undone (the next launch is
-// a person's), and the next downloaded update gets a fresh try.
+// installable from this run: the "ready" flag is dropped, the quiet-relaunch
+// mark is undone (the next launch is a person's), and the next downloaded
+// update gets a fresh try (this one installs on the next quit, which
+// autoInstallOnAppQuit does).
 let installing = false;
 function installUpdate() {
   if (installing) return;
@@ -879,11 +885,6 @@ function installUpdate() {
   }
 }
 
-function maybeInstallUpdate() {
-  if (!updateReady || lobby || choosers.size) return;
-  installUpdate();
-}
-
 function wireUpdater() {
   if (DEV) return;
   autoUpdater.autoDownload = true;
@@ -897,7 +898,7 @@ function wireUpdater() {
     updateStatus = `${info.version} ready`;
     log('update downloaded', info.version);
     updateTray();
-    evaluate();
+    installUpdate();
   });
   autoUpdater.on('error', (err) => { log('updater error', err); updateStatus = 'update failed'; updateTray(); });
   setTimeout(() => checkForUpdates(), 30_000);

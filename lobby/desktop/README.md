@@ -83,7 +83,7 @@ sees it again.
 | Choose the lobby TV... | Shows the numbered cards again to pick a different monitor (it names whichever screen is chosen). |
 | Reload the page | Reloads the signage. |
 | Start with Windows | On by default. |
-| Check for updates / Restart to update now | Updates install by themselves while nothing is on screen; this does it now. |
+| Check for updates / Restart to update now | Updates are checked every 10 minutes and install the moment they download, even during club night (the screen is gone for a few seconds and comes back by itself); this checks now. |
 | Open log file | For troubleshooting. |
 
 Opening the app from the Start menu or desktop icon while it is running is

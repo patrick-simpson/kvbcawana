@@ -707,7 +707,12 @@ the installer's asset name is fixed, so the link never changes). The owner's cal
   login, uploads) until "Back to the lobby TV" or the showing ends.
 - **Updates** (electron-updater, GitHub provider, channel `lobby`, so the app
   reads `lobby.yml` and can never install another app's `latest.yml`):
-  downloaded in the background, installed only while nothing is on screen.
+  checked every 10 minutes, downloaded in the background and installed the
+  moment the download finishes, WHATEVER is on screen (owner, 2026-10-07,
+  reversing the old "only while nothing is on screen" rule: every release
+  reaches the booth at once, a club night included). The screen is gone for the
+  installer's few seconds and the quiet relaunch puts it back from the schedule
+  and state.json; do not reintroduce an idle gate.
   The feed is this repo's ONE "Latest" release, so **no other release may
   ever be published in this repo as Latest** (create anything else as a
   prerelease or with `make_latest: false`), and the version stays plain
