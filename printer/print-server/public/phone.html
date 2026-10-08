@@ -550,6 +550,7 @@ var rosterPollMs = ROSTER_POLL_BASE_MS;
 var rosterPollTimer = null;
 var rosterPollResumeTimer = null;
 var rosterFetchInFlight = false;
+var rosterEpoch = 0;           // bumped by every confirmed check-in: an older roster answer is stale
 var pollActive = false;
 
 var KIT = {
@@ -1349,6 +1350,7 @@ function pollStatus(key, kid, settle) {
     call('GET', '/phone/status/' + cur.id).then(function(s) {
       if (s.status === 'done') {
         kid.checkedIn = true;
+        rosterEpoch += 1;
         delete STATE[key];
         settle(true, kid);
       } else if (s.status === 'failed') {
@@ -1377,9 +1379,13 @@ function refreshAll() {
   if (!pollActive || rosterFetchInFlight) return;
   if (document.hidden) { scheduleRosterPoll(); return; }
   rosterFetchInFlight = true;
+  var epoch = rosterEpoch;
   Promise.all([fetchRoster(PIN), fetchTonight(PIN)]).then(function(results) {
     rosterFetchInFlight = false;
     rosterPollMs = ROSTER_POLL_BASE_MS;
+    // Asked before a check-in was confirmed: it would put that child back on
+    // the list. Ask again instead.
+    if (epoch !== rosterEpoch) { scheduleRosterPoll(0); return; }
     applyRoster(results[0]);
     applyTonight(results[1]);
     if (!$('fampage').classList.contains('on') && openSheet !== 'kid-sheet') render(); else renderCount();
