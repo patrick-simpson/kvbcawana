@@ -77,6 +77,9 @@ function buildCheckin(input) {
   // matters, and the fixed 512-byte checkin pad has ~100 bytes of headroom
   // these short fields fit inside (test:envelope proves length uniformity).
   if (src.welcomeBack === true) out.welcomeBack = true;
+  // oneOff (7.18.0): a one-off name tag (a lost tag, a child not checking in
+  // tonight). The screens play the welcome but never count it.
+  if (src.oneOff === true) out.oneOff = true;
   const ms = Number(src.milestone);
   if (Number.isInteger(ms) && ms > 0 && ms <= 999) out.milestone = ms;
   return out;

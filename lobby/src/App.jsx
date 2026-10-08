@@ -475,6 +475,7 @@ export default function App() {
     // judgement — including the phase gate that stops a screen booting at
     // 6:40pm from crowning whoever it sees first — is in lib/firstOfNight.js.
     if (config.firstArrivalMoment !== false
+        && !payload.oneOff
         && isFirstOfNight({
           count,
           phase: phaseRef.current,
@@ -510,7 +511,10 @@ export default function App() {
     // "Preview a check-in" rehearse a banner without moving the lobby's number.
     // The check-in's own `at` lets useTally tell "the printer's total already
     // counts this child" from "this child is new".
-    if (meta?.countsTowardTally !== false) bump(payload.at);
+    // A one-off name tag (printer 7.18.0) is welcomed and never counted:
+    // the printer's tally does not count it either, so a tick here would
+    // only be taken back by the next tally.
+    if (meta?.countsTowardTally !== false && !payload.oneOff) bump(payload.at);
     // `count` and the config flag are read above, so they belong in the deps.
     // Re-identifying this handler is free: useSocket keeps handlers in a ref
     // it re-points every render, so the Pusher subscription never churns.

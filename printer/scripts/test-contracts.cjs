@@ -103,9 +103,11 @@ console.log('buildCheckin');
 
   // Celebration flags (#9/#10): optional means optional — the plain call above
   // already proved the legacy shape; here the extended shape and the junk paths.
-  const cf = events.buildCheckin({ firstName: 'Noah', club: 'T&T', welcomeBack: true, milestone: 25 });
+  const cf = events.buildCheckin({ firstName: 'Noah', club: 'T&T', welcomeBack: true, milestone: 25, oneOff: true });
   check('flags → exact extended field set',
     keysOf(cf).join(',') === [...spec.fields, ...spec.optionalFields].sort().join(','), keysOf(cf).join(','));
+  check('oneOff only ever literal true',
+    !('oneOff' in events.buildCheckin({ firstName: 'N', oneOff: 'yes' })) && events.buildCheckin({ firstName: 'N', oneOff: true }).oneOff === true);
   check('welcomeBack only ever literal true',
     !('welcomeBack' in events.buildCheckin({ firstName: 'N', welcomeBack: 'yes' })));
   check('milestone must be a small positive integer',

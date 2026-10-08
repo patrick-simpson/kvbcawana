@@ -38,7 +38,7 @@ const SANITIZERS = {
 // The exact key set each sanitizer may emit (checkin `at` becomes epoch
 // ms locally, so values differ from the wire shape but keys must not).
 const ALLOWED_KEYS = {
-  checkin: ['id', 'at', 'firstName', 'club', 'isBirthday', 'isFirstTimer', 'welcomeBack', 'milestone'],
+  checkin: ['id', 'at', 'firstName', 'club', 'isBirthday', 'isFirstTimer', 'welcomeBack', 'milestone', 'oneOff'],
   recap: ['entries', 'at'],
   checkout: ['entries', 'at', 'printed'],
   tally: ['counts', 'total', 'at', 'season', 'rehearsal'],
@@ -280,6 +280,13 @@ describe('checkin celebration flags (#9/#10)', () => {
     const out = sc({ ...base, welcomeBack: true, milestone: 25 });
     expect(out.welcomeBack).toBe(true);
     expect(out.milestone).toBe(25);
+  });
+
+  it('keeps a one-off tag\'s oneOff only as literal true', () => {
+    expect(sc({ ...base, oneOff: true }).oneOff).toBe(true);
+    const junk = sc({ ...base, oneOff: 'yes' });
+    expect(junk).not.toBeNull();
+    expect(junk.oneOff).toBeUndefined();
   });
 
   it('drops junk without rejecting the checkin', () => {

@@ -1510,8 +1510,16 @@ so a child sees the number move within a second of their own check-in.
   and the sanitizer would have to allowlist something the contract has no
   word for. The debug panel's simulators still count, on purpose: that panel
   exists to rehearse the real thing end to end.
-- Nothing about the wire changed; the `checkin`/`tally` sanitizers and
-  `contract-vectors.json` are untouched. The existing "synced with the
+- **A one-off name tag is welcomed, never counted** (printer 7.18.0, owner
+  2026-10-08). Its `checkin` carries contract v6's optional `oneOff` (literal
+  `true` or absent, kept by `sanitizeCheckin`): the moment plays in full, but
+  `handleCheckIn` neither bumps the count nor crowns it the night's first
+  arrival, and the printer never puts it in a recap or a tally. Unlike the
+  Settings preview this one IS on the wire, because the printer is the one
+  that knows; an older screen drops the field, ticks once, and the next tally
+  takes it back. `App.tally.test.jsx` pins it.
+- Apart from `oneOff`, nothing about the wire changed for the counter; the
+  `checkin`/`tally` sanitizers are otherwise as they were. The existing "synced with the
   check-in desk" note still explains a correction bigger than one either way.
 
 ## Self-updating pages

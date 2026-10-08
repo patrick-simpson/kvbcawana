@@ -20,6 +20,7 @@
  * @property {boolean} isBirthday
  * @property {boolean} isFirstTimer
  * @property {true} [welcomeBack] Returning kid's first night of the season (#9).
+ * @property {true} [oneOff] A one-off name tag (printer 7.18.0): welcomed, never counted.
  * @property {number} [milestone] Season night-count on a label-milestone night (#10).
  * @property {string} [id] Producer uuid for live-vs-replay dedupe.
  * @property {number} [at] Epoch ms.
@@ -217,6 +218,9 @@ export function sanitizeCheckin(payload) {
   // first night of the season (#9) and the label-milestone night count for
   // the milestone wall (#10). Same literal/int discipline as the producer.
   if (raw.welcomeBack === true) safe.welcomeBack = true;
+  // A one-off name tag (a lost tag, a child not checking in tonight): the
+  // welcome plays, the count never moves (printer 7.18.0). Literal true only.
+  if (raw.oneOff === true) safe.oneOff = true;
   if (typeof raw.milestone === 'number' && Number.isInteger(raw.milestone)
       && raw.milestone > 0 && raw.milestone <= 999) {
     safe.milestone = raw.milestone;

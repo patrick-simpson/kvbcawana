@@ -99,6 +99,17 @@ describe("tonight's counter never runs above the printer's total", () => {
     expect(storedCount()).toBe(9);
   });
 
+  // A one-off name tag (printer 7.18.0): the child is welcomed, the count
+  // never moves, because the printer's tally does not count them either.
+  it('a one-off name tag is welcomed but never counted', async () => {
+    await mount();
+    const t = Date.now();
+    await act(async () => { bound.checkin(kid({ at: t, oneOff: true })); });
+    expect(storedCount()).toBe(0);
+    await act(async () => { bound.checkin(kid({ id: 'next-kid', at: t + 10, firstName: 'Ben' })); });
+    expect(storedCount()).toBe(1);
+  });
+
   // O-4. Two stations, or a recap racing the live event on a separate decrypt
   // chain, can deliver the same check-in twice. markSeen was called but never
   // consulted, so the second delivery counted a second child.
