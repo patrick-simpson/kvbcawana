@@ -77,6 +77,8 @@
   /* ── Search + list ── */
   .search { position: sticky; top: calc(60px + env(safe-area-inset-top)); z-index: 5; padding: 10px 12px 8px; background: var(--page); }
   .search .box { position: relative; }
+  .down-note { margin: 8px 2px 0; padding: 8px 12px; border-radius: 12px; background: var(--c-cream); color: var(--c-hot-deep); font-size: 14px; font-weight: 600; line-height: 1.35; }
+  .down-note[hidden] { display: none; }
   .search input { width: 100%; height: 56px; border-radius: 18px; border: 3px solid #fff; background: #fff; padding: 0 48px 0 46px;
     font: 600 20px var(--f-read); color: var(--c-ink); box-shadow: 0 3px 12px rgba(47,79,138,.12); -webkit-appearance: none; appearance: none; }
   .search input:focus { border-color: var(--c-blue); outline: none; }
@@ -251,6 +253,7 @@
       <input type="search" id="search" placeholder="Type a first or last name" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="search" aria-label="Search by first or last name">
       <button class="clear" id="search-clear" type="button" aria-label="Clear" hidden>✕</button>
     </div>
+    <p class="down-note" id="down-note" role="status" hidden>Not hearing from the check-in laptop. This list may be out of date; trying again.</p>
   </div>
   <div class="list" id="list" aria-live="polite"></div>
 </main>
@@ -551,6 +554,7 @@ var rosterPollTimer = null;
 var rosterPollResumeTimer = null;
 var rosterFetchInFlight = false;
 var rosterEpoch = 0;           // bumped by every confirmed check-in: an older roster answer is stale
+var rosterMisses = 0;          // roster polls in a row that got no answer
 var pollActive = false;
 
 var KIT = {
@@ -1383,6 +1387,7 @@ function refreshAll() {
   Promise.all([fetchRoster(PIN), fetchTonight(PIN)]).then(function(results) {
     rosterFetchInFlight = false;
     rosterPollMs = ROSTER_POLL_BASE_MS;
+    showLaptopDown(false);
     // Asked before a check-in was confirmed: it would put that child back on
     // the list. Ask again instead.
     if (epoch !== rosterEpoch) { scheduleRosterPoll(0); return; }
@@ -1395,9 +1400,17 @@ function refreshAll() {
     rosterFetchInFlight = false;
     if (e.code === 'pin') { handlePinInvalidated(); return; }
     if (e.code === 'locked') { handleLockoutDuringPoll(e.retryAfter); return; }
+    showLaptopDown(true);
     rosterPollMs = Math.min(rosterPollMs * 2, ROSTER_POLL_MAX_MS);
     scheduleRosterPoll();
   });
+}
+// Two polls in a row with no answer: say so, because the list is now only as
+// fresh as the last answer, and a child checked in at the desk since then
+// still shows here.
+function showLaptopDown(down) {
+  rosterMisses = down ? rosterMisses + 1 : 0;
+  $('down-note').hidden = rosterMisses < 2;
 }
 document.addEventListener('visibilitychange', function() {
   if (document.hidden || !unlockedState || !pollActive) return;
