@@ -551,6 +551,31 @@ console.log('reconcileHistoryWithReport — R-1 undo detection: mark, decrement,
     check('a visitor reappearing in the report still clears an existing undone flag', out.changed === 1 && out.history[0].undone === undefined);
   }
 
+  // ── A row printed without an id is still the child the report lists ───────
+  // Report entries always carry an id; a walk-in's or a pre-roster print's row
+  // has only a name. Keyed on the id alone, the report never "listed" that row,
+  // so a child TwoTimTwo had checked in was marked undone all night (2026-10-08).
+  {
+    const history = [row({ clubberId: null, firstName: 'Lyra', lastName: 'Tester' }), ...others()];
+    const out = reconcileHistoryWithReport(history,
+      [{ clubberId: '7', name: 'Lyra  Tester ', club: 'Trek' }, ...othersInReport()], Date.parse(iso('19')));
+    check('a name-only row of a child on the report is NOT marked undone', out.changed === 0 && out.history[0].undone === undefined);
+  }
+  {
+    const history = [row({ clubberId: null, firstName: 'Lyra', lastName: 'Tester', undone: true, undoneAt: iso('18') }), ...others()];
+    const out = reconcileHistoryWithReport(history,
+      [{ clubberId: '7', name: 'Lyra Tester', club: 'Trek' }, ...othersInReport()], Date.parse(iso('19')));
+    check('...and a name-only row wrongly undone earlier is cleared', out.changed === 1 && out.history[0].undone === undefined);
+  }
+  {
+    // A row WITH an id is matched on that id only: a namesake on the report
+    // (a different child) never keeps it checked in.
+    const history = [row({ clubberId: '1' }), ...others()];
+    const out = reconcileHistoryWithReport(history,
+      [{ clubberId: '2', name: 'Amy Zephyr', club: 'Sparks' }, ...othersInReport()], Date.parse(iso('19')));
+    check('an id-bearing row is not kept by a namesake with another id', out.changed === 1 && out.history[0].undone === true);
+  }
+
   // ── A phone Remove survives the kid reappearing on TwoTimTwo's report ─────
   // Remove is local-only by design, so the child is EXPECTED to still be on the
   // report; without this rule the very next pass would re-count them.

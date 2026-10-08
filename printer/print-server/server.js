@@ -4591,11 +4591,21 @@ function reportEntryIdentityKey(entry) {
 //     Rows this function itself marks never carry `undoneBy`.
 function reconcileHistoryWithReport(history, reportEntries, now = Date.now()) {
   const today = localDayISO(new Date(now));
-  const reportKeys = new Set(
-    (Array.isArray(reportEntries) ? reportEntries : [])
-      .map(reportEntryIdentityKey)
-      .filter(k => k !== 'name:')
-  );
+  // Every key each report entry could be filed under (id AND name): a row
+  // printed without an id (a walk-in, a print before the roster cache knew the
+  // child) is still that child, and comparing it to the entry's id alone
+  // marked a child TwoTimTwo lists as undone, all night (2026-10-08).
+  const reportKeys = new Set();
+  (Array.isArray(reportEntries) ? reportEntries : []).forEach((entry) => {
+    identityKeysOfReportEntry(entry).forEach((k) => reportKeys.add(k));
+  });
+  // A row with an id is matched on its id only, so a namesake on the report
+  // never keeps a different child's undone row alive.
+  const onReport = (row) => {
+    const keys = identityKeysOfRow(row);
+    const id = keys.find((k) => k.startsWith('id:'));
+    return id ? reportKeys.has(id) : keys.some((k) => reportKeys.has(k));
+  };
 
   // The newest (index-first, since history is unshift()ed newest-first) row
   // per identity — the one row this pass is allowed to touch.
@@ -4613,7 +4623,7 @@ function reconcileHistoryWithReport(history, reportEntries, now = Date.now()) {
   activeIdx.forEach((i) => {
     const row = history[i];
     if (!row.undone) checkedInBefore++;
-    const inReport = reportKeys.has(historyIdentityKey(row));
+    const inReport = onReport(row);
     if (!inReport && !row.undone && !row.visitor) toUndo.push(i);
     else if (inReport && row.undone && !row.undoneBy) toClear.push(i);
   });
