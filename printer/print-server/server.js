@@ -9028,6 +9028,23 @@ app.get('/phone/ym', (req, res) => {
   res.type('html').send(ymPhonePage(page));
 });
 
+// Every identity key (id: and name:) of a child who came tonight, for the
+// phone's roster: the same children the count reads (TwoTimTwo's report when it
+// is fresh, so a child checked in at the desk or on TwoTimTwo itself is never
+// offered again; 2026-10-08, the youth page listed them), plus this printer's
+// own active rows, plus anyone checked out tonight (they came; the 7:15 youth
+// check-out must not put Trek and Journey back on the list).
+function rosterCheckedInKeys(tonight = tonightCheckins(), now = Date.now()) {
+  const keys = new Set();
+  tonight.active.forEach((row) => identityKeysOfRow(row).forEach((k) => keys.add(k)));
+  tonightHereNow(tonight, now).children.forEach((c) => c.keys.forEach((k) => keys.add(k)));
+  if (checkedOutTonight.date === tonight.date) {
+    checkedOutTonight.ids.forEach((id) => keys.add(`id:${id}`));
+    (checkedOutTonight.names || new Set()).forEach((n) => keys.add(`name:${n}`));
+  }
+  return keys;
+}
+
 // Roster + tonight's checked-in set for the phone page.
 app.post('/phone/roster', (req, res) => {
   // PIN already verified by the auth gate for every non-loopback caller.
@@ -9036,14 +9053,15 @@ app.post('/phone/roster', (req, res) => {
   // TwoTimTwo (R-1) or on a phone (Remove) frees the kid for re-check-in here
   // instead of leaving them "checkedIn: true" all night.
   const t = tonightCheckins();
-  const nameOf = (e) => `${e.firstName || ''} ${e.lastName || ''}`.toLowerCase().trim();
-  const checkedIn = new Set(t.active.map(nameOf));
+  const nameOf = (e) => normalizedName(`${e.firstName || ''} ${e.lastName || ''}`);
+  const checkedIn = rosterCheckedInKeys(t);
+  const isIn = (keys) => keys.some((k) => checkedIn.has(k));
   // Kids a phone removed tonight (and who have not been checked in again
   // since) get an "Add back" affordance instead of "Check in": a driven
   // check-in for a kid still on TwoTimTwo would be short-circuited by the
   // station as already-checked-in, printing and counting nothing.
   const removedHere = new Set(
-    t.entries.filter(e => e.undone && e.undoneBy === 'phone').map(nameOf).filter(n => !checkedIn.has(n))
+    t.entries.filter(e => e.undone && e.undoneBy === 'phone' && !isIn(identityKeysOfRow(e))).map(nameOf)
   );
   // `inactive` so the phone's Not-here-yet tab can leave former clubbers out
   // of a call list — loadClubbers() returns every row the CSV ever carried, so
@@ -9051,11 +9069,12 @@ app.post('/phone/roster', (req, res) => {
   // idiom as twinDisambiguation(): any non-blank Inactive cell means inactive.
   const kids = clubbers.map(r => {
     const name = `${r.FirstName || ''} ${r.LastName || ''}`.trim();
-    const key = name.toLowerCase();
+    const key = normalizedName(name);
+    const id = String(r.ClubberID || '').trim();
     return {
       name,
       club: r.Club || '',
-      checkedIn: checkedIn.has(key),
+      checkedIn: isIn(id ? [`id:${id}`, `name:${key}`] : [`name:${key}`]),
       removedHere: removedHere.has(key),
       inactive: !!String(r.Inactive || '').trim(),
     };
