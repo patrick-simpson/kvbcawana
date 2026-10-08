@@ -66,6 +66,12 @@ const layout = (page) => page.evaluate(() => {
     pieces,
     escaped: run ? pieces.filter((p) => p.left < run.left - 0.5 || p.right > run.right + 0.5
       || p.top < run.top - 0.5 || p.bottom > run.bottom + 0.5).length : null,
+    // Which pieces, and where, for the failure message.
+    escapees: run ? [...document.querySelectorAll('.stage .checkout-plate, .stage .checkout-name__chip, .stage .checkout-more')]
+      .map((el) => ({ el, r: el.getBoundingClientRect() }))
+      .filter(({ r }) => r.left < run.left - 0.5 || r.right > run.right + 0.5 || r.top < run.top - 0.5 || r.bottom > run.bottom + 0.5)
+      .map(({ el, r }) => `${el.className}:"${el.textContent.trim()}" ${Math.round(r.left)},${Math.round(r.top)}-${Math.round(r.right)},${Math.round(r.bottom)}`)
+      .concat(`run ${Math.round(run.left)},${Math.round(run.top)}-${Math.round(run.right)},${Math.round(run.bottom)}`) : [],
     size: document.querySelector('.stage .checkout-board')
       ? parseFloat(getComputedStyle(document.querySelector('.stage .checkout-board')).getPropertyValue('--name-size'))
       : null,
@@ -96,6 +102,10 @@ for (const [width, height] of [[1920, 1080], [1280, 720], [640, 480]]) {
       await expect(board.locator('.checkout-demo')).toHaveText('Demo · sample names');
       await expect(board.locator('.checkout-plate')).toHaveCount(6);
       await page.evaluate(() => document.fonts.ready);
+      // Settled: the marks' images and the strip's own correction (it moves a
+      // name behind "+N more" for as long as the browser's wrap overflows).
+      await expect.poll(async () => (await layout(page)).escaped, { timeout: 5000 }).toBe(0)
+        .catch(async (e) => { throw new Error(`${e.message}\n${(await layout(page)).escapees.join('\n')}`); });
       const l = await layout(page);
       expectInTheFoot(l);
       expect(l.escaped).toBe(0);

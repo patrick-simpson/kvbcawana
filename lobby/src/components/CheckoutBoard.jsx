@@ -76,14 +76,19 @@ function useRunBox(ref, active) {
   useLayoutEffect(() => {
     const el = ref.current;
     if (!active || !el || typeof ResizeObserver === 'undefined') return undefined;
-    const ro = new ResizeObserver(() => {
+    const read = () => {
       const width = el.clientWidth;
       const height = el.clientHeight;
-      flushSync(() => setBox((old) => {
+      setBox((old) => {
         if (!(width > 0 && height > 0)) return null;
         return old && old.width === width && old.height === height ? old : { width, height };
-      }));
-    });
+      });
+    };
+    // Read once now, before the first paint: waiting for the observer's first
+    // answer left a slow machine (CI) a frame or more on the 1080p fallback,
+    // whose chips overflow a 640x480 strip (2026-10-08).
+    read();
+    const ro = new ResizeObserver(() => flushSync(read));
     ro.observe(el);
     return () => ro.disconnect();
   }, [ref, active]);
@@ -128,8 +133,9 @@ export default function CheckoutBoard({ decision, checkout, calm, demo = false, 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useLayoutEffect(() => {
     const el = runRef.current;
-    if (!listed || !box || !el) return;
-    if (el.scrollHeight > el.clientHeight + 1 && extraN < (checkout?.entries?.length || 0)) {
+    if (!listed || !el) return;
+    const over = el.scrollHeight > el.clientHeight + 1 || el.scrollWidth > el.clientWidth + 1;
+    if (over && extraN < (checkout?.entries?.length || 0)) {
       setExtra({ key: fitKey, n: extraN + 1 });
     }
   });
