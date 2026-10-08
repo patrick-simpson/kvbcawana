@@ -150,6 +150,7 @@ const Accuracy: React.FC = () => (
         { b: 'A daily read-only check', rest: "that TwoTimTwo’s pages still work the way the extension expects, caught before club night." },
         { b: '“Tonight” means tonight:', rest: 'streaks, exports and counts agree on the local evening, even late at night.' },
         { b: 'Reset tonight', rest: 'zeroes a practice night on every screen at once, without deleting a single history row.' },
+        { b: 'Who is still here at pickup:', rest: 'the laptop keeps the lobby screens’ still-here list itself, sealed like every name, for the clubs a leader ticks on the dashboard (Trek and Journey start unticked: they leave on their own).' },
       ]} />
     </div>
   </section>
@@ -179,7 +180,7 @@ const NightOf: React.FC = () => (
       <ul className="fam-cards">
         <CapabilityCard icon="phone" title="A phone becomes a check-in station" tag="Off by default"
           safeguard="The laptop only answers phones after a church sets a PIN and turns on phone access."
-          hood={<>The Tonight tab mirrors the same list the lobby tally is built from, with Remove and Add back for local corrections. Remove fixes the count here; it never undoes the check-in on TwoTimTwo. Undo check-in does: the laptop undoes it on TwoTimTwo, and the count changes only once TwoTimTwo confirms.</>}>
+          hood={<>The Tonight tab mirrors the same list the lobby tally is built from, with Remove and Add back for local corrections. Remove fixes the count here; it never undoes the check-in on TwoTimTwo. Undo check-in does: the laptop undoes it on TwoTimTwo, and the count changes only once TwoTimTwo confirms. Check out works the same way: the laptop checks the child out on TwoTimTwo, and only once TwoTimTwo answers OK does the child come off the count and the lobby’s still-here list.</>}>
           A volunteer’s phone on the church Wi-Fi can check a child in, print a leader’s name tag, and see
           exactly who is being counted tonight.
         </CapabilityCard>

@@ -246,7 +246,7 @@ const pruneSharedDedup = new Function('SHARED_DEDUP_PREFIX', extractFunction('pr
     storage.setItem('awanaYmOut.2026-10-07', '["7"]');
     storage.setItem('awana_other', 'x');
     check('other nights\' done lists and counts are pruned, tonight\'s and everything else kept', ymPruneNights(storage, '2026-10-07') === 2 && storage.length === 2 && storage.getItem('awanaYmOut.2026-10-07') === '["7"]');
-    check('the sweep counts each failure and asks only the children still to try', /var ids = ymStillToTry\(Object\.keys\(want\), done, fails\);/.test(SRC) && (SRC.match(/fails\[id\] = \(fails\[id\] \|\| 0\) \+ 1;/g) || []).length === 2 && /ymMarkFails\(date, fails\);/.test(SRC));
+    check('the sweep counts each failure and asks only the children still to try', /var ids = ymStillToTry\(Object\.keys\(want\), done, fails\);/.test(SRC) && (SRC.match(/fails\[id\] = \(fails\[id\] \|\| 0\) \+ 1;/g) || []).length === 1 && /return postClubberCheckout\(page\.cal, id\)\.then/.test(SRC) && /ymMarkFails\(date, fails\);/.test(SRC));
   }
 
   console.log(`\n${passed} passed, ${failed} failed`);

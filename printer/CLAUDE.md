@@ -303,6 +303,32 @@ extension (`undoCheckinOnTwoTimTwo`) posts `checkinclubberundo` with the fresh
 "(checkin undone)" (never a page, the login form or "Login Required"), and
 then requires the report not to list the child. `scripts/test-phone-undo.cjs`.
 
+**The still-here list and the phone's Check out (7.16.0, owner 2026-10-08).**
+The lobby's pickup list (shown from 7:30) is built HERE, not scraped:
+TwoTimTwo's Checkout page lists nobody at KVBC. `tonightHereNow()` is the
+"who" behind `authoritativeTonight()` (one child per identity, same rules,
+visitors only when history-built), and `publishStillHere()` filters it by
+config `pickupClubs` (`print-server/pickup.js`; default every club but Trek
+and Journey; the dashboard's "Clubs on the pickup list") and publishes the
+existing sealed `checkout` event through `events.buildCheckout` (shape
+unchanged and mirrored with the lobby: entries {firstName, club} plus
+`printed`). Every minute in the tally window and, debounced, on any change
+(`publishTally()` calls `stillHereChanged()`), never outside the window.
+`POST /feed/checkout` still validates and answers ok but NEVER publishes (an
+empty scrape would clear the lobby). Phone Check out = `/phone/undo` with
+`checkout: true` (same relay reasoning as Undo): with a clubber id it queues
+a `{type:'checkout'}` one-shot action (only for `?accept=...checkout`, same
+pickup/lease failures as undo) applied only on a literal `ok === true`
+(`applyTwoTimTwoCheckout` → `markCheckedOut` → `publishTally`); the extension
+(`checkoutOnTwoTimTwo`) uses the youth sweep's `readCheckoutPage` +
+`postClubberCheckout` and accepts only an exact "OK". Without an id it is a
+local by-name mark (`checkedOutTonight.names`). `/phone/tonight` lists
+`features: ['checkout']` so a newer website phone page never offers it to an
+older laptop. Check-outs made on the Checkout page: feeds.js compares two
+genuine reads (`checkoutDisappearances`) and posts ids with
+`source: 'checkout-page'`; the server skips ids whose newest row is undone.
+`scripts/test-pickup-board.cjs`.
+
 **Data Flow:**
 - Bookmarklet fetches CSV → POST /update-csv
 - Server reloads clubbers.csv on every print request

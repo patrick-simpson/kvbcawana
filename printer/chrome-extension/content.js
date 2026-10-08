@@ -2,7 +2,7 @@
   if (window.__awanaPrinterLoaded) return;
   window.__awanaPrinterLoaded = true;
 
-  const EXTENSION_VERSION = '7.15.0';
+  const EXTENSION_VERSION = '7.16.0';
   const PRINT_COOLDOWN = 2000;
   // POST /print is synchronous on the server: PowerShell + a cold printer can
   // take 15-30 s (the server retries the spooler internally). This must sit
@@ -4187,19 +4187,52 @@
   // lists every check-in), plus anyone the Checkout page itself lists, should
   // that ever be turned on. The check-out is that page's own call either way;
   // TwoTimTwo answers it "OK".
+  // TwoTimTwo's Checkout page, read for its meeting: resolves { ok, html, doc,
+  // cal, date } or { ok: false, error }. The page's own script carries the
+  // meeting id its Check out button posts (calendar_id), and the selected
+  // date is the meeting's. Shared by the youth sweep and the phone's Check
+  // out (7.16.0).
+  function readCheckoutPage() {
+    return fetch('/clubber/checkout', { credentials: 'same-origin', signal: AbortSignal.timeout(15000) })
+      .then(function(r) {
+        if (/\/site\/login/.test(r.url || '')) return '';
+        return r.ok ? r.text() : '';
+      })
+      .then(function(html) {
+        var doc = new DOMParser().parseFromString(html || '', 'text/html');
+        if (!/Checkout Clubber/.test(doc.title || '')) return { ok: false, error: 'not the checkout page (signed out?)' };
+        var cal = /calendar_id:\s*(\d+)/.exec(html);
+        var dateOpt = doc.querySelector('select#date option[selected]');
+        var date = dateOpt ? dateOpt.getAttribute('value') : '';
+        if (!cal || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return { ok: false, error: 'no meeting on the checkout page' };
+        return { ok: true, html: html, doc: doc, cal: cal[1], date: date };
+      });
+  }
+
+  // The Checkout page's own call: calendar_id + clubber_id, answered with
+  // exactly "OK" (docs/TWOTIMTWO.md §2.1). Resolves true only for that exact
+  // answer; anything else (a page, the login form, "Login Required", an
+  // error, no network) is false. Never rejects.
+  function postClubberCheckout(cal, id) {
+    return fetch('/clubber/checkout', {
+      method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: 'calendar_id=' + encodeURIComponent(cal) + '&clubber_id=' + encodeURIComponent(id),
+      signal: AbortSignal.timeout(10000)
+    }).then(function(r) { return r.ok ? r.text() : ''; })
+      .then(function(t) { return String(t).trim() === 'OK'; })
+      .catch(function() { return false; });
+  }
+
   function ymSweep(force) {
     if (ymSweeping) return Promise.resolve({ ok: false, busy: true });
     if (!force && !ymCheckoutDue(new Date())) return Promise.resolve({ ok: true, idle: true, checkedOut: [], failed: [] });
     ymSweeping = true;
-    return fetch('/clubber/checkout', { credentials: 'same-origin', signal: AbortSignal.timeout(15000) })
-      .then(function(r) { return r.ok ? r.text() : ''; })
-      .then(function(html) {
-        var doc = new DOMParser().parseFromString(html || '', 'text/html');
-        if (!/Checkout Clubber/.test(doc.title || '')) return { ok: false, error: 'not the checkout page (signed out?)', checkedOut: [], failed: [] };
-        var cal = /calendar_id:\s*(\d+)/.exec(html);
-        var dateOpt = doc.querySelector('select#date option[selected]');
-        var date = dateOpt ? dateOpt.getAttribute('value') : '';
-        if (!cal || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return { ok: false, error: 'no meeting on the checkout page', checkedOut: [], failed: [] };
+    return readCheckoutPage()
+      .then(function(page) {
+        if (!page.ok) return { ok: false, error: page.error, checkedOut: [], failed: [] };
+        var doc = page.doc;
+        var date = page.date;
         var want = {};
         doc.querySelectorAll('a.checkout[clubber_id]').forEach(function(a) {
           var tr = a.closest('tr');
@@ -4216,17 +4249,10 @@
           var out = { ok: true, checkedOut: [], failed: [] };
           return ids.reduce(function(chain, id) {
             return chain.then(function() {
-              return fetch('/clubber/checkout', {
-                method: 'POST', credentials: 'same-origin',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: 'calendar_id=' + encodeURIComponent(cal[1]) + '&clubber_id=' + encodeURIComponent(id),
-                signal: AbortSignal.timeout(10000)
-              }).then(function(r) { return r.ok ? r.text() : ''; })
-                .then(function(t) {
-                  if (String(t).trim() === 'OK') { out.checkedOut.push(want[id] || id); done.push(id); }
-                  else { out.failed.push(want[id] || id); fails[id] = (fails[id] || 0) + 1; }
-                })
-                .catch(function() { out.failed.push(want[id] || id); fails[id] = (fails[id] || 0) + 1; });
+              return postClubberCheckout(page.cal, id).then(function(ok) {
+                if (ok) { out.checkedOut.push(want[id] || id); done.push(id); }
+                else { out.failed.push(want[id] || id); fails[id] = (fails[id] || 0) + 1; }
+              });
             });
           }, Promise.resolve()).then(function() {
             ymMarkDone(date, done);
@@ -4355,6 +4381,7 @@
 
   function drivePhoneAction(action) {
     if (action.type === 'undo') { driveUndoAction(action); return; }
+    if (action.type === 'checkout') { driveCheckoutAction(action); return; }
     var nameKey = action.name.toLowerCase().trim();
 
     var el = findClubberElByName(action.name);
@@ -4518,13 +4545,57 @@
     });
   }
 
+  // ── Phone check-out (7.16.0) ───────────────────────────────────────────
+  // The phone's "Check out": TwoTimTwo's own check-out, the call its Checkout
+  // page's button makes (the youth sweep's postClubberCheckout: calendar_id
+  // from that page and the clubber id, answered exactly "OK"). Nothing else
+  // counts. There is no report to confirm it against (the check-in report
+  // goes on listing a child after a check-out), so the exact answer is the
+  // record. On OK the id joins tonight's checked-out list, posted to the print
+  // server with the youth sweep's (so a restarted print server catches up).
+  var CHECKOUT_SAY = {
+    off: 'Phone check-ins and check-outs are switched off on the check-in laptop (printer dashboard, Settings, "Allow driven check-ins").',
+    'no-id': 'The check-in laptop has no TwoTimTwo id for this child, so it cannot check them out there.',
+    'signed-out': 'The check-in laptop could not open TwoTimTwo\'s Checkout page (signed out?). Sign in there and try again.',
+    'no-meeting': 'TwoTimTwo\'s Checkout page shows no meeting tonight. Check at the desk.',
+    refused: 'TwoTimTwo did not answer OK to the check-out (the child may not be checked in at tonight\'s meeting). Check at the desk.',
+    network: 'The check-in laptop could not reach TwoTimTwo. Check its internet and try again.'
+  };
+
+  // Resolves { ok, detail }; never rejects.
+  function checkoutOnTwoTimTwo(clubberId, name) {
+    if (CHURCH_CFG.enableDrivenCheckin === false) return Promise.resolve({ ok: false, detail: CHECKOUT_SAY.off });
+    if (!clubberId) return Promise.resolve({ ok: false, detail: CHECKOUT_SAY['no-id'] });
+    var id = String(clubberId);
+    return readCheckoutPage().then(function(page) {
+      if (!page.ok) return { ok: false, detail: /meeting/.test(page.error || '') ? CHECKOUT_SAY['no-meeting'] : CHECKOUT_SAY['signed-out'] };
+      return postClubberCheckout(page.cal, id).then(function(ok) {
+        if (!ok) return { ok: false, detail: CHECKOUT_SAY.refused };
+        var done = ymDone(page.date);
+        if (done.indexOf(id) === -1) done.push(id);
+        ymMarkDone(page.date, done);
+        postCheckedOut(page.date, done);
+        console.log('[Awana] Phone check-out: ' + (name || id) + ' checked out on TwoTimTwo');
+        return { ok: true, detail: '' };
+      });
+    }).catch(function() { return { ok: false, detail: CHECKOUT_SAY.network }; });
+  }
+
+  function driveCheckoutAction(action) {
+    console.log('[Awana] Phone check-out: ' + action.name);
+    checkoutOnTwoTimTwo(action.clubberId, action.name).then(function(r) {
+      reportPhoneAction(action.id, r.ok === true, r.detail);
+    });
+  }
+
   function pollPendingActions() {
     if (CHURCH_CFG.enableDrivenCheckin === false) {
       setTimeout(pollPendingActions, 60000);
       return;
     }
-    // accept=undo: this extension can drive the phone's undo too (7.14.0).
-    fetch(PRINT_SERVER + '/pending-actions?accept=undo', { signal: AbortSignal.timeout(30000) })
+    // accept=undo,checkout: this extension can drive the phone's undo
+    // (7.14.0) and check-out (7.16.0) too.
+    fetch(PRINT_SERVER + '/pending-actions?accept=undo,checkout', { signal: AbortSignal.timeout(30000) })
       .then(function(r) { return r.json(); })
       .then(function(data) {
         (data.actions || []).forEach(executePhoneAction);

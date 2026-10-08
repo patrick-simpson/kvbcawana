@@ -1,4 +1,17 @@
-﻿## [7.15.0] - 2026-10-07
+﻿## [7.16.0] - 2026-10-08
+Who is still here at pickup, and a Check out button on the phone.
+
+**New: the print app keeps the lobby's still-here list.** From 7:30 the lobby screens list the children not yet picked up and say "… has checked out" as each one leaves. TwoTimTwo's own Checkout page lists nobody at KVBC (its check-out tracking is off), so the list the extension used to read from it was always empty. The print app now builds the list itself from tonight's count: the children here now, by first name and club, sealed like every other name. It is sent every minute on a club night and within seconds of any change (a label, a check-out, an undo, a fresh TwoTimTwo report, a change of clubs).
+
+**New: "Clubs on the pickup list" on the dashboard (Settings).** One set of check boxes for every screen. Trek and Journey start unticked, because they leave on their own at 7:15.
+
+**New: "Check out" on the phone's Tonight list.** It asks first, naming the child, and then the check-in laptop checks the child out on TwoTimTwo with the Checkout page's own button call. Only when TwoTimTwo answers "OK" does the child come off tonight's count and the still-here list, and the row then says "Checked out". Like Undo check-in, nothing changes otherwise, the phone says exactly why, and it is covered by "Allow driven check-ins". It works the same on the church Wi-Fi page and on awana.kvbchurch.org/checkin. A child with no TwoTimTwo record on the laptop (an unregistered visitor) gets "Mark checked out" instead, which only takes them off the count and the list here. The button shows only when the laptop's print app is this version or newer.
+
+**Check-outs made on TwoTimTwo count too.** If the church turns check-out tracking on, the extension notices a child who was on the Checkout page and is gone at its next good read, and takes them off the count. A child whose check-in was undone also leaves that page; the print app skips a child it knows was undone, but an undo made on TwoTimTwo itself and not yet seen in its report can still be read as a check-out for a few minutes.
+
+**Also.** An older extension still posting the Checkout page's (empty) list is answered as before but no longer reaches the screens, so it can never tell the lobby the building is clear.
+
+## [7.15.0] - 2026-10-07
 Tonight's count goes down as children check out.
 
 **"Here now", everywhere.** The count on the phone page, the dashboard, the lobby screens and the projector used to be everyone checked in tonight, so it never moved when Trek and Journey left at 7:15. The extension's youth check-out now tells the print app who it has checked out tonight, after every pass, and every one of those numbers leaves them out. The phone page says "18 here now · 12 checked out" and marks those children "Checked out" in its list. The attendance record keeps everyone who came.

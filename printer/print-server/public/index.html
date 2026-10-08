@@ -870,6 +870,16 @@
             </div>
 
             <div style="margin-top:12px; border-top: 1px solid #e2e8f0; padding-top: 12px;">
+              <label class="section-label">Clubs on the pickup list</label>
+              <p style="font-size:10px;color:#94a3b8;margin:4px 0 0">
+                From 7:30 the lobby screens list the children in these clubs who are still here, and say
+                "&hellip; has checked out" as each one is checked out from the phone page (or on TwoTimTwo).
+                One setting for every screen. Trek and Journey leave on their own at 7:15, so they start unticked.
+              </p>
+              <div id="settings-pickup-clubs" style="display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:6px"></div>
+            </div>
+
+            <div style="margin-top:12px; border-top: 1px solid #e2e8f0; padding-top: 12px;">
               <label class="section-label">Club Schedule (drives late "Go to:" routing)</label>
               <p style="font-size:10px;color:#94a3b8;margin:4px 0 0">
                 One row per slot of the night, as on the printed schedule: a child checked in late is sent to
@@ -2119,6 +2129,7 @@ function loadSettings() {
     document.getElementById('settings-connect-card-auto').checked = !!config.connectCardAutoFirstTimer;
     document.getElementById('settings-connect-greeting').value = config.connectCardGreeting || '';
     document.getElementById('settings-driven-checkin').checked = config.enableDrivenCheckin !== false;
+    renderPickupClubs(config.pickupClubs);
     document.getElementById('settings-lan-access').checked = config.lanAccess === true;
     // GET /config redacts displayKey like the Pusher secret, so we render its
     // STATE rather than its value. Showing a fake masked string would invite
@@ -2521,6 +2532,36 @@ function clearDisplayLogin() {
   postDisplayLogin('', 'Cleared — screens paste keys by hand until a passphrase is set.');
 }
 
+// "Clubs on the pickup list" (7.16.0): config.json `pickupClubs`, the one
+// setting every lobby screen's still-here list follows. Not saved yet means
+// the default: every club but Trek and Journey (print-server/pickup.js).
+var PICKUP_CLUBS = ['Puggles', 'Cubbies', 'Sparks', 'T&T', 'Trek', 'Journey'];
+var PICKUP_DEFAULT = ['Puggles', 'Cubbies', 'Sparks', 'T&T'];
+function renderPickupClubs(saved) {
+  var ticked = Array.isArray(saved) ? saved : PICKUP_DEFAULT;
+  var box = document.getElementById('settings-pickup-clubs');
+  box.textContent = '';
+  PICKUP_CLUBS.forEach(function(club, i) {
+    var label = document.createElement('label');
+    label.style.cssText = 'display:flex;align-items:center;gap:6px;color:#475569;font-weight:400';
+    var cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.id = 'settings-pickup-' + i;
+    cb.value = club;
+    cb.checked = ticked.indexOf(club) !== -1;
+    label.appendChild(cb);
+    label.appendChild(document.createTextNode(' ' + club));
+    box.appendChild(label);
+  });
+}
+function readPickupClubs() {
+  var boxes = document.querySelectorAll('#settings-pickup-clubs input[type=checkbox]');
+  if (!boxes.length) return undefined;   // never rendered: leave the saved value alone
+  var out = [];
+  for (var i = 0; i < boxes.length; i++) if (boxes[i].checked) out.push(boxes[i].value);
+  return out;
+}
+
 function saveSettings() {
   // printerName is the Windows printer every 4×2 print path uses: the name tag
   // printer itself, or on a receipt roll the backup (which is what it was).
@@ -2562,6 +2603,7 @@ function saveSettings() {
       connectCardAutoFirstTimer: document.getElementById('settings-connect-card-auto').checked,
       connectCardGreeting: document.getElementById('settings-connect-greeting').value.trim(),
       enableDrivenCheckin: document.getElementById('settings-driven-checkin').checked,
+      pickupClubs: readPickupClubs(),
       lanAccess: document.getElementById('settings-lan-access').checked,
       displayKey: document.getElementById('settings-display-key').value.trim(),
       displayLoginPassphrase: document.getElementById('settings-display-login').value.trim(),

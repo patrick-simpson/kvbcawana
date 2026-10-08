@@ -15,8 +15,10 @@
 //   - Must never throw into the page. Every fetch/parse step is guarded;
 //     network/parse failures are logged and swallowed, never surfaced.
 //   - Privacy invariant: only aggregate numbers, team/club names, dates,
-//     church-authored announcement text and (for the sealed checkout board)
-//     children's FIRST names ever reach the Pusher channel. Never last names,
+//     church-authored announcement text and (for the sealed checkout board,
+//     children's FIRST names; since 7.16.0 the print server builds that list
+//     itself and this file posts the Checkout page's clubber ids only) ever
+//     reach the Pusher channel. Never last names,
 //     allergy/contact info, birth years, or calendar attendee/organizer/
 //     location data.
 //   - Three posts DO carry a child's full name, and all go to LOCALHOST ONLY
@@ -961,7 +963,10 @@
   // the row disappears once they are. So "who is still here" is simply the set
   // of rows, and needs no departure event to miss.
   //
-  // THIS IS THE ONE FEED THAT CARRIES NAMES ONTO THE WIRE. Everything else
+  // (7.16.0: the parse below is now only the guard for parseCheckoutIds(); its
+  // names are no longer posted. The print server builds the still-here list.)
+  //
+  // THIS WAS THE ONE FEED THAT CARRIED NAMES ONTO THE WIRE. Everything else
   // published from this file is aggregate counters and church copy; the three
   // full-name posts (/print-award, /feed/completed-books,
   // /feed/attendance-grid) stay on localhost and are never published. First name + club only here, and the print
@@ -1043,16 +1048,67 @@
     return entries;
   }
 
+  // Who is on the page, by TwoTimTwo clubber id (a.checkout[clubber_id]), and
+  // the meeting it shows: { date, ids } or null whenever parseCheckoutHtml()
+  // could not genuinely read the page (wrong page, signed out, filtered,
+  // drifted). Ids only; names are not read here.
+  function parseCheckoutIds(html, today) {
+    if (parseCheckoutHtml(html) === null) return null;
+    var doc;
+    try { doc = new DOMParser().parseFromString(html, 'text/html'); } catch (e) { return null; }
+    var ids = [];
+    var links = doc.querySelectorAll('a.checkout[clubber_id]');
+    for (var i = 0; i < links.length; i++) {
+      var id = String(links[i].getAttribute('clubber_id') || '').trim();
+      if (/^\d{1,20}$/.test(id) && ids.indexOf(id) === -1) ids.push(id);
+    }
+    var opt = doc.querySelector('select#date option[selected]');
+    var date = opt && /^\d{4}-\d{2}-\d{2}$/.test(opt.getAttribute('value') || '') ? opt.getAttribute('value') : today;
+    return { date: date, ids: ids };
+  }
+
+  // Children checked out ON TwoTimTwo's Checkout page (7.16.0), for when its
+  // check-out tracking is turned on: a child listed at the last good read and
+  // gone at this one has been checked out. Only two genuine reads of the same
+  // meeting are ever compared (a failed read keeps the last good one and
+  // compares nothing). A row also leaves the page when its check-in is UNDONE;
+  // the print server skips a child it knows was undone, and the rest of that
+  // ambiguity is accepted (owner, 2026-10-08). Returns
+  // { last, goneTonight, gone } for the next call: pure, so it is tested.
+  function checkoutDisappearances(state, read) {
+    var st = state || { last: null, goneTonight: null };
+    if (!read) return { last: st.last, goneTonight: st.goneTonight, gone: [] };
+    var gone = [];
+    var tonight = st.goneTonight && st.goneTonight.date === read.date ? st.goneTonight.ids.slice() : [];
+    if (st.last && st.last.date === read.date) {
+      st.last.ids.forEach(function(id) {
+        if (read.ids.indexOf(id) === -1) {
+          gone.push(id);
+          if (tonight.indexOf(id) === -1) tonight.push(id);
+        }
+      });
+    }
+    return { last: { date: read.date, ids: read.ids.slice() }, goneTonight: { date: read.date, ids: tonight }, gone: gone };
+  }
+
+  var checkoutState = { last: null, goneTonight: null };
+
+  // Since 7.16.0 the print server builds the lobby's still-here list itself
+  // (KVBC's Checkout page lists nobody, check-out tracking being off), so this
+  // no longer posts the page's names to /feed/checkout: it reads the page
+  // only to notice check-outs made there, and posts their clubber ids (the
+  // whole list for the night, which the server merges, after every good read)
+  // to /feed/checked-out.
   function runCheckout() {
     fetchText('/clubber/checkout').then(function(html) {
-      var entries = parseCheckoutHtml(html);
-      // null means "could not read it". Post nothing: a silent gap ages the
-      // board on screen, which is honest, whereas an empty array would claim
-      // the room is clear.
-      if (!entries) return;
-      // `printed` is filled in by the print server from its own history — this
-      // script has no idea how many labels were printed.
-      postFeed('/feed/checkout', { entries: entries });
+      var read = parseCheckoutIds(html, formatDateYMD(new Date()));
+      var next = checkoutDisappearances(checkoutState, read);
+      checkoutState = { last: next.last, goneTonight: next.goneTonight };
+      if (next.gone.length) console.log(LOG_PREFIX, next.gone.length + ' child(ren) checked out on the Checkout page');
+      // The whole night's list after every good read, so a print server
+      // restarted mid-evening catches up within a minute.
+      if (!read || !next.goneTonight.ids.length) return;
+      postFeed('/feed/checked-out', { date: next.goneTonight.date, clubberIds: next.goneTonight.ids, source: 'checkout-page' });
     });
   }
 

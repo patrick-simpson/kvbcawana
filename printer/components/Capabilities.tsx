@@ -44,7 +44,7 @@ const CATALOG: Group[] = [
       { name: 'CSV check-in import (official write-path)', use: 'used', where: '/clubber/checkin_csv',
         body: 'Upload a check-in CSV and TwoTimTwo records attendance, with fuzzy name-matching. The printer can now export tonight\u2019s check-ins in exactly this format (R-2), so a station that lost its connection reconciles instead of hand-entering a whole night.' },
       { name: 'Checkout with pickup security', use: 'partial', where: '/clubber/checkout',
-        body: 'Lists checked-in kids with guardians, authorized-pickup names, a security code entered at check-in, and photo. Could drive a matching parent-pickup tag. The extension reads the live list, first names and clubs only, to feed the lobby checkout board, which is off by default.' },
+        body: 'Lists checked-in kids with guardians, authorized-pickup names, a security code entered at check-in, and photo. Could drive a matching parent-pickup tag. KVBC has its check-out tracking off, so the page lists nobody there; the printer builds the lobby’s still-here list from tonight’s count instead. The extension checks a child out with this page’s own call (Trek and Journey at 7:15, or a phone’s Check out), and notices children checked out on the page itself, by clubber id only.' },
       { name: 'Walk-in visitor registration', use: 'used', where: '/clubber/register',
         body: 'Register a brand-new child right from the check-in page. The widget now prints the guest label AND (optionally) creates the TwoTimTwo record in one step (F-3) \u2014 the label always prints even if the form errors, because the child is already at the door.' },
     ],

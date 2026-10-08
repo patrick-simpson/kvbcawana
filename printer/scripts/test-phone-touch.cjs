@@ -120,7 +120,7 @@ const BASE = `http://127.0.0.1:${PORT}`;
       sb.ymClubOf('Trek') === 'trek' && sb.ymClubOf('Journey') === 'journey' && !sb.ymClubOf('T&T') && !sb.ymClubOf('Sparks') && !sb.ymClubOf(''));
     check('the sweep runs every 30 seconds, checks out with TwoTimTwo’s own call, and never twice',
       /setInterval\(function\(\) \{ ymSweep\(false\); \}, YM_SWEEP_MS\);/.test(ext) && /var YM_SWEEP_MS = 30 \* 1000;/.test(ext)
-      && /'calendar_id=' \+ encodeURIComponent\(cal\[1\]\) \+ '&clubber_id='/.test(ext) && /done\.indexOf\(id\) === -1/.test(ext));
+      && /'calendar_id=' \+ encodeURIComponent\(cal\) \+ '&clubber_id='/.test(ext) && /done\.indexOf\(id\) === -1/.test(ext));
   }
 
   console.log(`\n${passed} passed, ${failed} failed`);

@@ -539,6 +539,7 @@ var STATE = {};                // name key -> { status: 'sending'|'pending'|'res
 var TONIGHT = { checkedIn: 0, visitors: 0, byClub: {}, entries: [] };
 var REMOVING = {};
 var UNDOING = {};              // entry key -> true while TwoTimTwo's undo is under way
+var CHECKING_OUT = {};         // entry key -> true while a check-out is under way (7.16.0)
 var rosterLoaded = false;
 var unlockedState = false;
 var unlockInFlight = false;
@@ -1401,6 +1402,9 @@ function applyTonight(data) {
     checkedOut: Number(data.checkedOut) || 0,
     visitors: Number(data.visitors) || 0,
     byClub: data.byClub || {},
+    // Check out (7.16.0) only when the laptop's print server says it can:
+    // the website's copy of this page may be newer than the laptop's app.
+    canCheckout: Array.isArray(data.features) && data.features.indexOf('checkout') !== -1,
     entries: (data.entries || []).filter(function(e) { return !REMOVING[e.key]; })
   };
 }
@@ -1447,7 +1451,16 @@ function renderTonight() {
       // (a visitor, a label printed before the roster knew them) only the
       // local Remove is possible, and the row says so.
       var acts = el('div', 'rowacts');
-      var busy = REMOVING[e.key] || UNDOING[e.key];
+      var busy = REMOVING[e.key] || UNDOING[e.key] || CHECKING_OUT[e.key];
+      // Check out (7.16.0): on TwoTimTwo through the laptop for a row with a
+      // TwoTimTwo id; "Mark checked out" (here only) for one without. Never
+      // on a child already checked out.
+      if (TONIGHT.canCheckout && !e.checkedOut) {
+        var hasId = e.clubberId && !e.visitor;
+        var cb = el('button', 'tt', CHECKING_OUT[e.key] ? 'Checking out…' : (hasId ? 'Check out' : 'Mark checked out')); cb.type = 'button';
+        if (busy) cb.disabled = true; else cb.addEventListener('click', function() { askCheckout(e); });
+        acts.appendChild(cb);
+      }
       if (e.clubberId && !e.visitor) {
         var ub = el('button', 'tt', UNDOING[e.key] ? 'Undoing…' : 'Undo check-in'); ub.type = 'button';
         if (busy) ub.disabled = true; else ub.addEventListener('click', function() { askUndo(e); });
@@ -1509,13 +1522,25 @@ function askUndo(entry) {
   $('confirm-ok').textContent = 'Undo check-in';
   showSheet('confirm-sheet');
 }
+function askCheckout(entry) {
+  var name = (entry.firstName + ' ' + entry.lastName).trim();
+  var hasId = entry.clubberId && !entry.visitor;
+  pendingConfirm = { entry: entry, mode: 'checkout' };
+  $('confirm-title').textContent = (hasId ? 'Check out ' : 'Mark ') + name + (hasId ? '?' : ' checked out?');
+  $('confirm-body').textContent = hasId
+    ? 'The check-in laptop checks ' + entry.firstName + ' out on TwoTimTwo, and then they come off tonight’s count and the lobby’s still-here list. If TwoTimTwo does not answer OK, nothing changes and this page says why.'
+    : entry.firstName + ' has no TwoTimTwo record on the check-in laptop, so this only takes them off tonight’s count and the lobby’s still-here list. Nothing is sent to TwoTimTwo.';
+  $('confirm-ok').textContent = hasId ? 'Check out' : 'Mark checked out';
+  showSheet('confirm-sheet');
+}
 $('confirm-cancel').addEventListener('click', function() { pendingConfirm = null; renderTonight(); showSheet('tonight-sheet'); });
 $('confirm-ok').addEventListener('click', function() {
   var c = pendingConfirm;
   pendingConfirm = null;
   renderTonight();
   showSheet('tonight-sheet');
-  if (c && c.mode === 'undo') undoEntry(c.entry);
+  if (c && c.mode === 'checkout') checkoutEntry(c.entry);
+  else if (c && c.mode === 'undo') undoEntry(c.entry);
   else if (c) removeEntry(c.entry);
 });
 
@@ -1544,17 +1569,22 @@ function undoEntry(entry) {
     undoFailed(entry, e.message);
   });
 }
-function pollUndo(entry, id, started) {
+// Follows a queued undo or check-out on /phone/status until the laptop says
+// done or failed (`kind` 'undo' | 'checkout').
+function pollUndo(entry, id, started, kind) {
+  var co = kind === 'checkout';
+  var busy = co ? CHECKING_OUT : UNDOING;
+  var failed = co ? checkoutFailed : undoFailed;
   setTimeout(function() {
-    if (!UNDOING[entry.key]) return;
+    if (!busy[entry.key]) return;
     call('GET', '/phone/status/' + id).then(function(s) {
       if (s && s.status === 'done') {
-        delete UNDOING[entry.key];
-        toast(displayName(identityOf(entry)) + ': undone in TwoTimTwo.', 4000, null, null, 'good');
+        delete busy[entry.key];
+        toast(displayName(identityOf(entry)) + (co ? ': checked out in TwoTimTwo.' : ': undone in TwoTimTwo.'), 4000, null, null, 'good');
         refreshAll();
         return;
       }
-      if (s && s.status === 'failed') { delete UNDOING[entry.key]; renderTonight(); undoFailed(entry, s.detail); return; }
+      if (s && s.status === 'failed') { delete busy[entry.key]; renderTonight(); failed(entry, s.detail); return; }
       if (s && s.error && !s.status) { lost(); return; }   // on the Wi-Fi a 404 arrives as a body
       next();
     }).catch(function(e) {
@@ -1563,22 +1593,49 @@ function pollUndo(entry, id, started) {
     });
   }, 1500);
   function lost() {
-    delete UNDOING[entry.key];
+    delete busy[entry.key];
     renderTonight();
-    undoFailed(entry, 'The check-in laptop lost track of it (restarted?). Check TwoTimTwo before trying again.');
+    failed(entry, 'The check-in laptop lost track of it (restarted?). Check TwoTimTwo before trying again.');
   }
   function next() {
     if (Date.now() - started > UNDO_GIVE_UP_MS) {
-      delete UNDOING[entry.key];
+      delete busy[entry.key];
       renderTonight();
-      undoFailed(entry, 'The check-in laptop has not answered. Check TwoTimTwo before trying again.');
+      failed(entry, 'The check-in laptop has not answered. Check TwoTimTwo before trying again.');
       return;
     }
-    pollUndo(entry, id, started);
+    pollUndo(entry, id, started, kind);
   }
 }
 function undoFailed(entry, why) {
   toast('Not undone in TwoTimTwo: ' + (why || 'see the check-in laptop.'), 10000, 'Remove', function() { askRemove(entry); }, 'bad');
+}
+
+// ── Tonight: check out (7.16.0) ────────────────────────────────────────────
+// Rides /phone/undo with `checkout: true` (the relay already carries it), the
+// same queue-and-follow as Undo check-in: the child comes off the count and
+// the lobby's still-here list only when TwoTimTwo answers OK. A row with no
+// TwoTimTwo id is marked here at once (local: true in the answer).
+function checkoutEntry(entry) {
+  var ident = identityOf(entry), name = displayName(ident);
+  CHECKING_OUT[entry.key] = true;
+  renderTonight();
+  postJson('/phone/undo', { pin: PIN, firstName: ident.firstName, lastName: ident.lastName, clubberId: entry.visitor ? null : ident.clubberId, checkout: true }).then(function(data) {
+    if (data && data.id) { pollUndo(entry, data.id, Date.now(), 'checkout'); return; }
+    delete CHECKING_OUT[entry.key];
+    if (data && data.local) toast(name + ' marked checked out (on this laptop only).', 5000, null, null, 'good');
+    // An older print app that ignored the flag Removed the child instead.
+    else toast(name + ' was only removed from tonight’s count: the check-in laptop’s app is older and cannot check out. Check out at the desk.', 9000, null, null, 'bad');
+    refreshAll();
+  }).catch(function(e) {
+    delete CHECKING_OUT[entry.key];
+    renderTonight();
+    if (e.code === 'pin' || e.code === 'locked') { handleActionError(e, ''); return; }
+    checkoutFailed(entry, e.message);
+  });
+}
+function checkoutFailed(entry, why) {
+  toast('Not checked out: ' + (why || 'see the check-in laptop.'), 10000, null, null, 'bad');
 }
 function removeEntry(entry) {
   var ident = identityOf(entry), name = displayName(ident);

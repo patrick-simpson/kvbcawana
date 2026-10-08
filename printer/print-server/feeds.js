@@ -518,6 +518,7 @@ module.exports = {
   validateTonightBody,
   isSummaryCellText,
   validateCheckedOutBody,
+  validateCheckoutBody,
   validatePointsBody,
   validateScheduleBody,
   validateNoticeBody,

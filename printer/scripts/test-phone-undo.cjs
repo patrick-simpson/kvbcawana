@@ -172,7 +172,7 @@ async function extensionSuite() {
     check('a claimed undo action is driven as an undo, not a check-in',
       /function drivePhoneAction\(action\) \{\n    if \(action\.type === 'undo'\) \{ driveUndoAction\(action\); return; \}/.test(SRC));
     check('its result goes back as a strict ok', /reportPhoneAction\(action\.id, r\.ok === true, r\.detail\)/.test(extractFunction('driveUndoAction')));
-    check('the poll tells the print server it can undo', /PRINT_SERVER \+ '\/pending-actions\?accept=undo'/.test(extractFunction('pollPendingActions')));
+    check('the poll tells the print server it can undo', /PRINT_SERVER \+ '\/pending-actions\?accept=undo,checkout'/.test(extractFunction('pollPendingActions')));
     check('the undo starts from a fresh meeting id', /ensureFreshCheckinTokens\(\)\.then/.test(extractFunction('undoCheckinOnTwoTimTwo')));
   }
 }
@@ -288,9 +288,9 @@ async function serverSuite() {
       const src = fs.readFileSync(path.join(root, 'print-server', 'server.js'), 'utf8');
       check('an undo nobody picks up in a minute fails, with the reason',
         /const UNDO_PICKUP_MS = 60 \* 1000;/.test(src)
-        && /a\.status === 'pending' && now - new Date\(a\.at\)\.getTime\(\) > UNDO_PICKUP_MS\) \{\n\s+a\.status = 'failed';\n\s+a\.detail = UNDO_NOT_PICKED_UP;/.test(src));
+        && /a\.status === 'pending' && now - new Date\(a\.at\)\.getTime\(\) > UNDO_PICKUP_MS\) \{\n\s+a\.status = 'failed';\n\s+a\.detail = co \? CHECKOUT_NOT_PICKED_UP : UNDO_NOT_PICKED_UP;/.test(src));
       check('a claimed undo whose lease runs out fails, never re-driven',
-        /a\.status === 'claimed' && now - a\.claimedAt > PENDING_CLAIM_MS\) \{\n\s+a\.status = 'failed';\n\s+a\.detail = UNDO_NO_ANSWER;/.test(src));
+        /a\.status === 'claimed' && now - a\.claimedAt > PENDING_CLAIM_MS\) \{\n\s+a\.status = 'failed';\n\s+a\.detail = co \? CHECKOUT_NO_ANSWER : UNDO_NO_ANSWER;/.test(src));
       check('the phone\'s status read is where that is noticed', /app\.get\('\/phone\/status\/:id', \(req, res\) => \{\n  prunePendingActions\(\);/.test(src));
       const phone = fs.readFileSync(path.join(root, 'print-server', 'public', 'phone.html'), 'utf8');
       check('the phone asks the laptop through /phone/undo (the relay\'s allowlisted route) with inTwoTimTwo',

@@ -27,6 +27,7 @@ const brand = require('./brand');
 const receipt = require('./receipt');
 const syncClient = require('./sync-client');
 const phoneRelay = require('./phone-relay');
+const pickup = require('./pickup');
 const { execFile } = require('child_process');
 const http  = require('http');
 const https = require('https');
@@ -3644,22 +3645,28 @@ const PENDING_CLAIM_MS = 90 * 1000;
 const UNDO_PICKUP_MS = 60 * 1000;
 const UNDO_NOT_PICKED_UP = 'The check-in laptop did not pick it up: no TwoTimTwo tab open there, or its extension is older than 7.14. Nothing was changed.';
 const UNDO_NO_ANSWER = 'The check-in laptop started the undo but never reported back. Check TwoTimTwo\'s report before trying again.';
-const actionType = (a) => (a && a.type === 'undo' ? 'undo' : 'checkin');
+// A phone "Check out" (7.16.0) is driven exactly like an undo: one shot, never
+// left waiting, never driven twice, and only a 7.16 extension takes one.
+const CHECKOUT_NOT_PICKED_UP = 'The check-in laptop did not pick it up: no TwoTimTwo tab open there, or its extension is older than 7.16. Nothing was changed.';
+const CHECKOUT_NO_ANSWER = 'The check-in laptop started the check-out but never reported back. Check TwoTimTwo before trying again.';
+const actionType = (a) => (a && (a.type === 'undo' || a.type === 'checkout') ? a.type : 'checkin');
+const isOneShot = (a) => actionType(a) !== 'checkin';
 
 function prunePendingActions() {
   const now = Date.now();
   const cutoff = now - PENDING_TTL_MS;
   pendingActions = pendingActions.filter(a => new Date(a.at).getTime() >= cutoff).slice(-PENDING_MAX);
   for (const a of pendingActions) {
-    if (actionType(a) === 'undo') {
+    if (isOneShot(a)) {
+      const co = actionType(a) === 'checkout';
       if (a.status === 'pending' && now - new Date(a.at).getTime() > UNDO_PICKUP_MS) {
         a.status = 'failed';
-        a.detail = UNDO_NOT_PICKED_UP;
-        console.warn(`[phone] Undo for ${a.name}: nobody picked it up`);
+        a.detail = co ? CHECKOUT_NOT_PICKED_UP : UNDO_NOT_PICKED_UP;
+        console.warn(`[phone] ${co ? 'Check-out' : 'Undo'} for ${a.name}: nobody picked it up`);
       } else if (a.status === 'claimed' && now - a.claimedAt > PENDING_CLAIM_MS) {
         a.status = 'failed';
-        a.detail = UNDO_NO_ANSWER;
-        console.warn(`[phone] Undo for ${a.name}: claimed, never answered`);
+        a.detail = co ? CHECKOUT_NO_ANSWER : UNDO_NO_ANSWER;
+        console.warn(`[phone] ${co ? 'Check-out' : 'Undo'} for ${a.name}: claimed, never answered`);
       }
       continue;
     }
@@ -3675,6 +3682,7 @@ function prunePendingActions() {
 // can do one (`?accept=undo`, 7.14.0): an older one would take it for a
 // check-in, find no row for a child already in, and answer "Already checked
 // in at this station" with ok:true, which here would read as a done undo.
+// A check-out likewise only with `checkout` in the list (7.16.0).
 function pendingFor(accept) {
   const kinds = new Set(String(accept || '').split(',').map(s => s.trim()));
   return pendingActions.filter(a => a.status === 'pending' && (actionType(a) === 'checkin' || kinds.has(actionType(a))));
@@ -4954,9 +4962,12 @@ let lastPartialReport = null;   // { at, parsed, declared } — the last one we 
 // 2026-10-07: "the number should go down when kids check out", on every
 // surface). The extension's youth check-out (Trek and Journey from 7:15) posts
 // its whole list for the meeting date after every pass, so a restart of this
-// server catches up within one 30 s pass. Nothing else checks children out on
-// TwoTimTwo at KVBC: its Checkout page lists nobody, tracking being off.
-let checkedOutTonight = { date: null, ids: new Set() };
+// server catches up within one 30 s pass. Since 7.16.0 the phone's Check out
+// adds to it too (and, with check-out tracking turned on, a child seen leaving
+// TwoTimTwo's Checkout page); at KVBC that page lists nobody, tracking off.
+// `names` (7.16.0): children with no clubber id here, checked out on the
+// phone by name only (normalizedName keys); never sent to TwoTimTwo.
+let checkedOutTonight = { date: null, ids: new Set(), names: new Set() };
 
 // One child per clubber id, plus one per id-less name.
 function distinctReportChildren(entries) {
@@ -5010,28 +5021,33 @@ function identityKeysOfReportEntry(entry) {
 const displayClub = (raw) => String(raw == null ? '' : raw).replace(/&amp;/gi, '&').trim();
 
 /**
- * THE one function every surface asks "how many children are here tonight".
- * Pure but for its read of lastCheckinReport, so both modes are unit-tested
- * without a socket, a scrape or a clock.
+ * WHO is here now tonight: one entry per child, by the rules of the count
+ * (below). authoritativeTonight() counts these; the lobby's still-here list
+ * (7.16.0, publishStillHere) names them. Pure but for its reads of
+ * lastCheckinReport and checkedOutTonight.
  *
  * @returns {{source:'report'|'history', at:number|null, ageMs:number|null,
- *            checkedIn:number, byClub:Object}}
+ *            children:Array<{keys:string[], club:string, firstName:string}>,
+ *            checkedOut:number}}
  */
-function authoritativeTonight(tonight = tonightCheckins(), now = Date.now()) {
-  // Checked out tonight: off every count, report or history (7.15.0).
-  const outIds = checkedOutTonight.date === tonight.date ? checkedOutTonight.ids : new Set();
-  const isOut = (keys) => keys.some((k) => k.startsWith('id:') && outIds.has(k.slice(3)));
+function tonightHereNow(tonight = tonightCheckins(), now = Date.now()) {
+  // Checked out tonight: off every count, report or history (7.15.0). By
+  // clubber id; a child with no id here can be marked by name (7.16.0, the
+  // phone's local "Mark checked out").
+  const sameNight = checkedOutTonight.date === tonight.date;
+  const outIds = sameNight ? checkedOutTonight.ids : new Set();
+  const outNames = sameNight && checkedOutTonight.names ? checkedOutTonight.names : new Set();
+  const isOut = (keys) => keys.some((k) => (k.startsWith('id:') && outIds.has(k.slice(3)))
+    || (k.startsWith('name:') && outNames.has(k.slice(5))));
   const fromHistory = () => {
-    const byClub = {};
-    let here = 0;
+    const children = [];
     let out = 0;
     tonight.active.forEach((e) => {
-      if (isOut(identityKeysOfRow(e))) { out += 1; return; }
-      const club = displayClub(e.clubName) || 'No club';
-      byClub[club] = (byClub[club] || 0) + 1;
-      here += 1;
+      const keys = identityKeysOfRow(e);
+      if (isOut(keys)) { out += 1; return; }
+      children.push({ keys, club: displayClub(e.clubName), firstName: String(e.firstName || '').trim() });
     });
-    return { source: 'history', at: null, ageMs: null, checkedIn: here, checkedOut: out, byClub };
+    return { source: 'history', at: null, ageMs: null, children, checkedOut: out };
   };
 
   const rep = lastCheckinReport;
@@ -5041,11 +5057,12 @@ function authoritativeTonight(tonight = tonightCheckins(), now = Date.now()) {
   if (ageMs < 0 || ageMs > REPORT_FRESH_MS) return fromHistory();
   if (localDayISO(new Date(rep.at)) !== tonight.date) return fromHistory();
 
-  // Identities a PERSON took off tonight, and the club each identity's rows
-  // were printed under. Both read the newest row per identity, the same row
-  // every other consumer treats as current.
+  // Identities a PERSON took off tonight, and the club (and first name) each
+  // identity's rows were printed under. Both read the newest row per
+  // identity, the same row every other consumer treats as current.
   const suppressed = new Set();
   const clubByKey = new Map();
+  const firstByKey = new Map();
   const seen = new Set();
   for (const e of tonight.entries) {
     if (!`${e.firstName || ''} ${e.lastName || ''}`.trim()) continue;
@@ -5054,8 +5071,10 @@ function authoritativeTonight(tonight = tonightCheckins(), now = Date.now()) {
     seen.add(canonical);
     const keys = identityKeysOfRow(e);
     const club = displayClub(e.clubName);
+    const first = String(e.firstName || '').trim();
     keys.forEach((k) => {
       if (club && !clubByKey.has(k)) clubByKey.set(k, club);
+      if (first && !firstByKey.has(k)) firstByKey.set(k, first);
       if (e.undone && e.undoneBy) suppressed.add(k);
     });
   }
@@ -5063,10 +5082,10 @@ function authoritativeTonight(tonight = tonightCheckins(), now = Date.now()) {
   const byKey = new Map();
   const slots = [];
   const left = new Set();
-  const add = (keys, club) => {
+  const add = (keys, club, firstName) => {
     if (!keys.length) return;
     if (keys.some((k) => suppressed.has(k))) return;
-    if (isOut(keys)) { keys.filter((k) => k.startsWith('id:')).forEach((k) => left.add(k)); return; }
+    if (isOut(keys)) { left.add(keys.find((k) => k.startsWith('id:')) || keys[0]); return; }
     // Two different TwoTimTwo ids are two different children, whatever their
     // names say: a name match only joins an entry to a slot that has no id, or
     // the same one. (A shared bogus "name" merged every child with the same
@@ -5081,14 +5100,15 @@ function authoritativeTonight(tonight = tonightCheckins(), now = Date.now()) {
       slot = hit;
       break;
     }
-    if (!slot) { slot = { keys: new Set(), club: '' }; slots.push(slot); }
+    if (!slot) { slot = { keys: new Set(), club: '', firstName: '' }; slots.push(slot); }
     if (!slot.club && club) slot.club = club;
+    if (!slot.firstName && firstName) slot.firstName = firstName;
     keys.forEach((k) => { slot.keys.add(k); byKey.set(k, slot); });
   };
 
   // The report is the floor.
   (Array.isArray(rep.entries) ? rep.entries : []).forEach((entry) => {
-    add(identityKeysOfReportEntry(entry), displayClub(entry && entry.club));
+    add(identityKeysOfReportEntry(entry), displayClub(entry && entry.club), splitFullName(entry && entry.name).firstName);
   });
   // Plus everyone who checked in since it was taken. Visitors excluded: they
   // have no TwoTimTwo record, so the next report would silently drop them and
@@ -5097,22 +5117,40 @@ function authoritativeTonight(tonight = tonightCheckins(), now = Date.now()) {
     if (row.visitor) return;
     const at = Date.parse(row.timestamp);
     if (!Number.isFinite(at) || at <= rep.at) return;
-    add(identityKeysOfRow(row), displayClub(row.clubName));
+    add(identityKeysOfRow(row), displayClub(row.clubName), String(row.firstName || '').trim());
   });
 
-  const byClub = {};
-  slots.forEach((slot) => {
+  const children = slots.map((slot) => {
     let club = slot.club;
-    if (!club) {
-      for (const k of slot.keys) {
-        if (clubByKey.has(k)) { club = clubByKey.get(k); break; }
-      }
+    let firstName = '';
+    for (const k of slot.keys) {
+      if (!club && clubByKey.has(k)) club = clubByKey.get(k);
+      // The name this printer printed beats the report's first word ("Mary
+      // Kate" prints as Mary Kate; the report's split would say Mary).
+      if (!firstName && firstByKey.has(k)) firstName = firstByKey.get(k);
     }
-    const name = club || 'No club';
+    return { keys: [...slot.keys], club: club || '', firstName: firstName || slot.firstName };
+  });
+
+  return { source: 'report', at: rep.at, ageMs, children, checkedOut: left.size };
+}
+
+/**
+ * THE one function every surface asks "how many children are here tonight".
+ * Pure but for its read of lastCheckinReport, so both modes are unit-tested
+ * without a socket, a scrape or a clock.
+ *
+ * @returns {{source:'report'|'history', at:number|null, ageMs:number|null,
+ *            checkedIn:number, byClub:Object}}
+ */
+function authoritativeTonight(tonight = tonightCheckins(), now = Date.now()) {
+  const here = tonightHereNow(tonight, now);
+  const byClub = {};
+  here.children.forEach((c) => {
+    const name = c.club || 'No club';
     byClub[name] = (byClub[name] || 0) + 1;
   });
-
-  return { source: 'report', at: rep.at, ageMs, checkedIn: slots.length, checkedOut: left.size, byClub };
+  return { source: here.source, at: here.at, ageMs: here.ageMs, checkedIn: here.children.length, checkedOut: here.checkedOut, byClub };
 }
 
 // ── Tonight at a glance ───────────────────────────────────────────────────────
@@ -6711,25 +6749,21 @@ app.post('/feed/tonight',  makeFeedRoute('tonight'));
 app.post('/feed/points',   makeFeedRoute('points'));
 app.post('/feed/schedule', makeFeedRoute('schedule'));
 app.post('/feed/notice',   makeFeedRoute('notice'));
-// Who is still in the building (contract v4). The extension scrapes
-// TwoTimTwo's /clubber/checkout page — which IS the live list of children
-// currently checked in — and posts the rows here. The print server cannot fetch
-// that page itself: only the volunteer's browser holds the TwoTimTwo session.
-//
-// Consequence to accept honestly: this only works while someone has that tab
-// open, so the board must degrade by showing its age rather than by silently
-// claiming everyone is still present.
-//
-// `printed` is filled in HERE rather than trusted from the extension, because the
-// server is the only thing that knows how many labels it printed. It means
-// exactly "labels this server printed tonight" — NOT "children in the building".
-// Those are different populations (another station, a manual check-in, a printer
-// jam) and the display is required to word it as the former.
-app.post('/feed/checkout', (req, res, next) => {
-  if (req.body && typeof req.body === 'object' && !Array.isArray(req.body)) {
-    req.body.printed = distinctChildrenPrintedToday();
-  }
-  return makeFeedRoute('checkout')(req, res, next);
+// Who is still in the building (contract v4). An extension older than 7.16
+// scrapes TwoTimTwo's /clubber/checkout page and posts its rows here. Since
+// 7.16.0 (owner 2026-10-08) the print server builds the still-here list
+// ITSELF (publishStillHere): that page lists nobody at KVBC, check-out
+// tracking being off, and an empty scrape published here would tell every
+// lobby screen the building was clear. So a post is still validated and
+// answered `ok` (an older extension must not log errors all evening), but it
+// is never published: the server's own list always wins. A 7.16 extension
+// reads the page only to notice children checked out there
+// (/feed/checked-out with source 'checkout-page').
+app.post('/feed/checkout', (req, res) => {
+  const body = req.body && typeof req.body === 'object' && !Array.isArray(req.body) ? req.body : null;
+  const result = feeds.validateCheckoutBody(body);
+  if (!result.ok) return res.status(400).json({ ok: false, error: result.reason });
+  res.json({ ok: true, published: false, superseded: 'the print server publishes its own still-here list' });
 });
 
 // Undo detection (roadmap follow-up to R-1). content.js's runReconcile()
@@ -6790,20 +6824,60 @@ app.post('/feed/checkin-report', (req, res) => {
 // WHOLE list for the meeting date, every pass, replace semantics. Loopback /
 // PIN-gated like every /feed route and never published: clubber ids only.
 // A change takes those children off tonight's count at once.
+//
+// `source: 'checkout-page'` (7.16.0) is the extension noticing children who
+// were on TwoTimTwo's Checkout page at its last good read and are gone now,
+// for when check-out tracking is turned on there. A row also leaves that page
+// when its check-in is UNDONE, so a child whose newest row here is undone is
+// not taken for a check-out (an undo made on TwoTimTwo and not yet seen by
+// the report pass can still be: an accepted ambiguity, owner 2026-10-08).
 app.post('/feed/checked-out', (req, res) => {
   const result = feeds.validateCheckedOutBody(req.body);
   if (!result.ok) return res.status(400).json({ ok: false, error: result.reason });
-  const { date, clubberIds } = result.payload;
+  const { date } = result.payload;
+  let { clubberIds } = result.payload;
   if (date !== localDayISO()) return res.json({ ok: true, applied: false, reason: 'not tonight' });
-  const before = checkedOutTonight.date === date ? checkedOutTonight.ids : new Set();
+  let skipped = 0;
+  if (req.body.source === 'checkout-page') {
+    const undone = undoneClubberIdsTonight();
+    const kept = clubberIds.filter((id) => !undone.has(id));
+    skipped = clubberIds.length - kept.length;
+    clubberIds = kept;
+  }
   // The extension's list only grows through a night; a shorter one (its
   // storage cleared) never puts children back.
-  const ids = new Set([...before, ...clubberIds]);
-  const changed = ids.size !== before.size || checkedOutTonight.date !== date;
-  checkedOutTonight = { date, ids };
+  const changed = markCheckedOut(date, clubberIds, []);
   if (changed) publishTally();
-  res.json({ ok: true, applied: true, checkedOut: ids.size });
+  res.json({ ok: true, applied: true, checkedOut: checkedOutTonight.ids.size, skipped });
 });
+
+// Tonight's checked-out set grows by these ids / names; true when it changed.
+// A new night starts it afresh.
+function markCheckedOut(date, ids, names) {
+  const same = checkedOutTonight.date === date;
+  const nextIds = new Set(same ? checkedOutTonight.ids : []);
+  const nextNames = new Set(same && checkedOutTonight.names ? checkedOutTonight.names : []);
+  const before = nextIds.size + nextNames.size;
+  (ids || []).forEach((id) => { const v = String(id == null ? '' : id).trim(); if (v) nextIds.add(v); });
+  (names || []).forEach((n) => { const v = normalizedName(n); if (v) nextNames.add(v); });
+  checkedOutTonight = { date, ids: nextIds, names: nextNames };
+  return !same || nextIds.size + nextNames.size !== before;
+}
+
+// Clubber ids whose newest row tonight is undone (any reason: the phone's
+// Remove or Undo check-in, the report pass, a reset).
+function undoneClubberIdsTonight() {
+  const out = new Set();
+  const seen = new Set();
+  for (const e of tonightCheckins().entries) {
+    if (e.clubberId == null || !String(e.clubberId).trim()) continue;
+    const id = String(e.clubberId).trim();
+    if (seen.has(id)) continue;
+    seen.add(id);
+    if (e.undone) out.add(id);
+  }
+  return out;
+}
 
 // #2: the extension's "didn't stick" list — kids whose driven site check-in
 // never verified (label printed, TwoTimTwo never confirmed). Stored in
@@ -6969,7 +7043,7 @@ app.post('/reset-tonight', (req, res) => {
   // this printer knows about, and this covers anyone it does not.
   lastCheckinReport = null;
   lastPartialReport = null;
-  checkedOutTonight = { date: null, ids: new Set() };
+  checkedOutTonight = { date: null, ids: new Set(), names: new Set() };
 
   publishTally();
   console.log(`[reset] Tonight reset by operator: ${undone} check-in(s) marked undone, ledger ${ledgerTouched ? 'cleared for today' : 'untouched'}`);
@@ -6993,6 +7067,61 @@ function publishTally() {
       rehearsal: isRehearsalActive(),
     }));
   } catch (e) { console.warn('[events] tally publish skipped:', e.message); }
+  // Everything that moves the count (a print, an undo, a check-out, a report
+  // applied, a reset) calls this, so the still-here list follows it.
+  stillHereChanged();
+}
+
+// ── The lobby's still-here list (7.16.0, owner 2026-10-08) ──────────────────
+// At 7:30 the lobby screens show the children not yet picked up, then "<name>
+// has checked out" as each leaves (the lobby diffs successive lists).
+// TwoTimTwo's Checkout page lists nobody at KVBC, so THIS is the list: the
+// children here now by the count's own rules (tonightHereNow: report plus
+// newer history, minus undone, minus checked out; visitors only while the
+// count is history-built, exactly as the count treats them), in the clubs
+// ticked under "Clubs on the pickup list" (config `pickupClubs`, default every
+// club but Trek and Journey), first name + club, sorted, capped at
+// CHECKOUT_MAX. It rides the existing sealed `checkout` event with `printed`
+// beside it, its payload shape unchanged (events.buildCheckout). Published
+// every minute in the tally window and, coalesced, within seconds of any
+// change; never outside that window (names have no business on the wire at
+// 2 pm Tuesday). The lobby decides when to SHOW it.
+const STILL_HERE_DEBOUNCE_MS = 2000;
+let lastStillHereSig = null;
+let stillHereTimer = null;
+
+function stillHereEntries() {
+  return pickup.buildStillHere(tonightHereNow().children, pickup.pickupClubsOf(config), events.CHECKOUT_MAX);
+}
+
+let stillHereWindowForTests = null;
+function stillHereInWindow() {
+  if (typeof stillHereWindowForTests === 'function') return stillHereWindowForTests();
+  return events.isClubNightNow(churchConfig.clubNights, undefined, TALLY_GRACE_MIN, TALLY_LEAD_MIN);
+}
+
+/** Publish the list now (the minute timer's job, and a change's). */
+function publishStillHere() {
+  try {
+    const entries = stillHereEntries();
+    const payload = events.buildCheckout(entries, distinctChildrenPrintedToday());
+    lastStillHereSig = JSON.stringify(payload.entries);
+    events.publish(pusher, EVENT_CHANNEL, 'checkout', payload);
+  } catch (e) { console.warn('[events] still-here publish skipped:', e.message); }
+}
+
+/** Something that may change the list happened: publish soon if it did. */
+function stillHereChanged() {
+  if (stillHereTimer) return;
+  stillHereTimer = setTimeout(() => {
+    stillHereTimer = null;
+    try {
+      if (!stillHereInWindow()) return;
+      const sig = JSON.stringify(events.buildCheckout(stillHereEntries()).entries);
+      if (sig !== lastStillHereSig) publishStillHere();
+    } catch (e) { /* the minute timer tries again */ }
+  }, STILL_HERE_DEBOUNCE_MS);
+  if (stillHereTimer.unref) stillHereTimer.unref();
 }
 
 function publishRecap() {
@@ -7500,6 +7629,7 @@ function startClubNightTimers() {
   startPrinterCheckTimer();
   setInterval(onClubNight(publishRecap), 2 * 60 * 1000);
   setInterval(onTallyWindow(publishTally), 60 * 1000);
+  setInterval(onTallyWindow(publishStillHere), 60 * 1000);
   setInterval(onClubNight(publishBirthdays), 10 * 60 * 1000);
   // Provision heartbeat: NOT club-night-gated and load-bearing — Pusher's cache
   // holds the last frame for ~30 minutes, so this is what a screen switched on
@@ -8409,7 +8539,7 @@ app.post('/config', (req, res) => {
     worksheetPrinter, lanAccess, allowedOrigins, historyRetentionDays, displayKey,
     labelFooter, connectCardAutoFirstTimer, connectCardGreeting, seasonTheme,
     musicalPrinter, updateBeacon, slidesPublishToken, displayLoginPassphrase,
-    trophyBand, fleetConfigUrl,
+    trophyBand, fleetConfigUrl, pickupClubs,
     printerType, receiptHost, receiptPort, receiptDots, receiptCut, receiptPrinterName, backupPrinterName,
   } = req.body || {};
   if (!isTrustedConfigOrigin(req) && SECRET_CONFIG_KEYS.some(k => (req.body || {})[k] !== undefined)) {
@@ -8612,6 +8742,18 @@ app.post('/config', (req, res) => {
       else return res.status(400).json({ error: 'receiptCut must be full or partial' });
     }
     if (enableDrivenCheckin !== undefined) next.enableDrivenCheckin = !!enableDrivenCheckin;
+    // "Clubs on the pickup list" (7.16.0): the one setting every lobby
+    // screen's still-here list follows. null puts it back to the default
+    // (every club but Trek and Journey); a club name we do not know is a 400.
+    let pickupChanged = false;
+    if (pickupClubs !== undefined) {
+      const pc = pickup.normalizePickupClubs(pickupClubs);
+      if (!pc.ok) return res.status(400).json({ error: pc.reason });
+      const before = JSON.stringify(pickup.pickupClubsOf(next));
+      if (pc.value === null) delete next.pickupClubs;
+      else next.pickupClubs = pc.value;
+      pickupChanged = JSON.stringify(pickup.pickupClubsOf(next)) !== before;
+    }
     if (lateGraceMin !== undefined) next.lateGraceMin = Math.max(0, Math.min(120, Number(lateGraceMin) || 0));
     // Worksheets (POST /print-pdf) are letter-size, not 4x2 labels, so a
     // church running two printers can route them separately.
@@ -8630,6 +8772,7 @@ app.post('/config', (req, res) => {
     // Keep the live process in sync so schedule/PIN/toggle/key changes apply
     // without a restart (Pusher creds still need one — noted in the UI).
     applySavedConfig(next);
+    if (pickupChanged) stillHereChanged();
     console.log('[config] Saved');
     res.json({ ok: true });
   } catch (e) {
@@ -8945,14 +9088,20 @@ app.post('/phone/tonight', (req, res) => {
     // list below is always this printer's own rows: in report mode it can hold
     // an unregistered visitor who is deliberately not in `checkedIn`.
     countSource: st.countSource,
+    // What this print server can do from the Tonight list, so the website's
+    // phone page (which may be newer than the laptop) offers only that.
+    features: ['checkout'],
     entries: t.active.map(e => ({
       key: historyIdentityKey(e),
       firstName: e.firstName || '',
       lastName: e.lastName || '',
       clubName: (e.clubName || '').trim(),
       clubberId: e.clubberId != null ? String(e.clubberId) : null,
-      // Checked out tonight (7.15.0): still listed, off the count.
-      checkedOut: e.clubberId != null && checkedOutTonight.date === t.date && checkedOutTonight.ids.has(String(e.clubberId).trim()),
+      // Checked out tonight (7.15.0; by name for an id-less row, 7.16.0):
+      // still listed, off the count, and never offered Check out again.
+      checkedOut: checkedOutTonight.date === t.date && (
+        (e.clubberId != null && checkedOutTonight.ids.has(String(e.clubberId).trim()))
+        || Boolean(checkedOutTonight.names && checkedOutTonight.names.has(normalizedName(`${e.firstName || ''} ${e.lastName || ''}`)))),
       visitor: !!e.visitor,
       at: e.timestamp,
     })),
@@ -8976,6 +9125,7 @@ app.post('/phone/tonight', (req, res) => {
 // the flag and Removes; its answer has no `id`, and the phone says so.
 app.post('/phone/undo', (req, res) => {
   const ident = phoneIdentity(req.body);
+  if (req.body && req.body.checkout === true) return phoneCheckout(ident, res);
   if (req.body && req.body.inTwoTimTwo === true) return queueTwoTimTwoUndo(ident, res);
   if (!ident.firstName && !ident.lastName && !ident.clubberId) {
     return res.status(400).json({ error: 'firstName/lastName or clubberId is required' });
@@ -9022,6 +9172,74 @@ function queueTwoTimTwoUndo(ident, res) {
   console.log(`[phone] Undo queued: ${name}`);
   wakePendingWaiters();
   return res.json({ id: action.id, queued: true });
+}
+
+// The phone's "Check out" (7.16.0, owner 2026-10-08). Rides /phone/undo with
+// `checkout: true` for the same reason Undo check-in does: the website's
+// relay allowlist (lobby/worker/src/relay.js) already carries /phone/undo and
+// /phone/status/:id. (An older print server ignores the flag and Removes; the
+// phone shows Check out only when /phone/tonight lists 'checkout' in
+// `features`, so that cannot happen from a page that knows to look.)
+//
+// With a clubber id it is TwoTimTwo's own check-out, queued for the check-in
+// page's extension as a `{type:'checkout'}` pending action that nothing here
+// applies until the extension reports TwoTimTwo's exact "OK"
+// (applyTwoTimTwoCheckout). Without one (a visitor, a row printed before the
+// roster knew the child) TwoTimTwo has nothing to check out, so it is a LOCAL
+// mark, applied at once and said so: off the count and the still-here list,
+// nothing sent anywhere.
+function phoneCheckout(ident, res) {
+  if (!ident.clubberId) {
+    if (!ident.firstName && !ident.lastName) {
+      return res.status(400).json({ error: 'firstName/lastName or clubberId is required' });
+    }
+    const t = tonightCheckins();
+    const name = normalizedName(`${ident.firstName} ${ident.lastName}`);
+    const row = t.active.find((e) => normalizedName(`${e.firstName || ''} ${e.lastName || ''}`) === name);
+    if (!row) return res.status(404).json({ error: 'Nobody by that name is checked in tonight' });
+    // A row that does carry an id goes through TwoTimTwo like any other.
+    if (row.clubberId != null && String(row.clubberId).trim()) {
+      return phoneCheckout({ ...ident, clubberId: String(row.clubberId).trim() }, res);
+    }
+    if (markCheckedOut(t.date, [], [name])) publishTally();
+    console.log(`[phone] Marked checked out (here only): ${ident.firstName} ${ident.lastName}`.trim());
+    const st = computeTonightStats();
+    return res.json({ ok: true, checkedOut: true, local: true, checkedIn: st.checkedIn, byClub: st.byClub });
+  }
+  if (config.enableDrivenCheckin === false) {
+    return res.status(409).json({ error: 'Check-out on TwoTimTwo is turned off with phone check-ins on the check-in laptop (printer dashboard → Settings → "Allow driven check-ins").' });
+  }
+  prunePendingActions();
+  const existing = pendingActions.find(a => actionType(a) === 'checkout' && a.clubberId === ident.clubberId
+    && (a.status === 'pending' || a.status === 'claimed'));
+  if (existing) return res.json({ id: existing.id, queued: true });
+  const name = `${ident.firstName} ${ident.lastName}`.trim() || `clubber ${ident.clubberId}`;
+  const action = {
+    id: crypto.randomUUID(),
+    type: 'checkout',
+    name,
+    firstName: ident.firstName,
+    lastName: ident.lastName,
+    clubberId: ident.clubberId,
+    at: new Date().toISOString(),
+    status: 'pending',
+    detail: '',
+  };
+  pendingActions.push(action);
+  console.log(`[phone] Check-out queued: ${name}`);
+  wakePendingWaiters();
+  return res.json({ id: action.id, queued: true });
+}
+
+// TwoTimTwo answered "OK": the child is checked out. Off tonight's count (the
+// 7.15.0 checked-out set, which the extension also re-posts after every pass,
+// so a restart of this server catches up), and off the still-here list, which
+// publishTally() republishes. The attendance ledger keeps them: they came.
+function applyTwoTimTwoCheckout(action) {
+  const changed = markCheckedOut(localDayISO(), [action.clubberId], []);
+  publishTally();
+  console.log(`[phone] Checked out on TwoTimTwo: ${action.name}`);
+  return changed;
 }
 
 // TwoTimTwo has undone the check-in, so this laptop does what Remove does: the
@@ -9152,17 +9370,19 @@ app.post('/pending-actions/:id/claim', (req, res) => {
 app.post('/pending-actions/:id/result', (req, res) => {
   const action = pendingActions.find(a => a.id === req.params.id);
   if (!action) return res.status(404).json({ error: 'unknown action' });
-  if (actionType(action) === 'undo') {
+  if (isOneShot(action)) {
     // Answered once. A late or repeated result (a second tab, a retry after a
     // timeout) never re-marks the night or flips a reported failure to done.
     if (action.status === 'done' || action.status === 'failed') return res.json({ ok: true, already: action.status });
     // Only a literal true, the extension's verdict on TwoTimTwo's own
-    // "(checkin undone)" reply, changes anything here.
+    // "(checkin undone)" reply (or, for a check-out, its exact "OK"),
+    // changes anything here.
     const ok = !!req.body && req.body.ok === true;
     action.status = ok ? 'done' : 'failed';
     action.detail = String((req.body && req.body.detail) || '').slice(0, 200);
-    if (ok) applyTwoTimTwoUndo(action);
-    else console.log(`[phone] Undo for ${action.name} failed${action.detail ? ' — ' + action.detail : ''}`);
+    const co = actionType(action) === 'checkout';
+    if (ok) { if (co) applyTwoTimTwoCheckout(action); else applyTwoTimTwoUndo(action); }
+    else console.log(`[phone] ${co ? 'Check-out' : 'Undo'} for ${action.name} failed${action.detail ? ' — ' + action.detail : ''}`);
     return res.json({ ok: true });
   }
   action.status = (req.body && req.body.ok) ? 'done' : 'failed';
@@ -9467,9 +9687,10 @@ module.exports = {
   // Tonight's count. authoritativeTonight() is THE definition every surface
   // reads; the setter exists so a test can put the server in report mode (and
   // in stale-report mode) without a scrape, a socket or a wall-clock wait.
-  authoritativeTonight, REPORT_FRESH_MS, TALLY_GRACE_MIN, TALLY_LEAD_MIN,
+  authoritativeTonight, tonightHereNow, stillHereEntries, publishStillHere, REPORT_FRESH_MS, TALLY_GRACE_MIN, TALLY_LEAD_MIN,
   _setLastCheckinReportForTests(report) { lastCheckinReport = report; },
-  _setCheckedOutForTests(date, ids) { checkedOutTonight = { date, ids: new Set(ids) }; },
+  _setStillHereWindowForTests(fn) { stillHereWindowForTests = fn; },
+  _setCheckedOutForTests(date, ids, names) { checkedOutTonight = { date, ids: new Set(ids), names: new Set((names || []).map(normalizedName)) }; },
   _getLastCheckinReportForTests() { return lastCheckinReport; },
   // Attendance audit (#311) — the diff is PURE so "unknown is not zero" and
   // "additive only" are exhaustively testable without a browser or a scrape.
