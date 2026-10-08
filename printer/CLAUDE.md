@@ -248,6 +248,10 @@ the screens welcome the child and never count them. Never into the recap
 buffer, no `publishTally()`. A reprint of a one-off (`reprintRow`) stays a
 one-off and greets nobody. The touch check-in, the phone's + menu (relayed:
 both allowlists carry it) and the dashboard all call the same route.
+The touch check-in's **Undo check-in** (7.18.0, it replaced Printer jammed)
+lists `/phone/tonight` and undoes through `/phone/undo` exactly like the
+phone; a successful TwoTimTwo undo also `unmarkPrinted()`s the child, or a
+check-in after it was answered "Already checked in at this station".
 
 **Custom labels never write history.** `POST /print-custom` prints one line of
 free text on a blank label and records nothing at all: no `addHistoryEntry`, no

@@ -1,4 +1,15 @@
-﻿## [7.17.0] - 2026-10-08
+﻿## [7.18.0] - 2026-10-08
+One-off name tags, Undo check-in on the touch screen, and a better late drop-off label.
+
+**New: one-off name tags.** For a lost or torn tag, or a child who is not checking in tonight (a sibling along for the night, a guest). Type a first name, pick the club, Print tag. The child gets the club's name tag and the full welcome on the lobby screens, but nothing counts: not tonight's numbers, not attendance, not the pickup list. The print log keeps the tag, marked One-off, so it can be reprinted. It is on the touch check-in (the new One-off tag button), the phone's + menu (also on awana.kvbchurch.org/checkin) and the dashboard.
+
+**New: Undo check-in on the touch check-in.** It replaces the old Printer jammed button. It lists everyone checked in tonight, newest first, with a search box when the list is long. Undo asks first, then undoes the check-in on TwoTimTwo exactly like the phone's Undo check-in, and the child's tile comes back so they can be checked in again. A visitor with no TwoTimTwo record gets Remove instead.
+
+**Fixed: checking a child in again after an undo prints a label.** The check-in laptop remembered the child as printed tonight, so a check-in after an Undo check-in (from the touch screen or a phone) was answered "Already checked in at this station" and printed nothing.
+
+**The late drop-off label is redesigned.** LATE DROP-OFF and the time across the top; for one child, their club mark, their name, GO TO and the room in large type; for brothers and sisters, a row each with the club mark, the name, a dotted line and the room, with what is happening there underneath. Sized to fit up to five children on one 4x2 label.
+
+## [7.17.0] - 2026-10-08
 One printer: the 4x2 label printer. The receipt printer is gone.
 
 **The receipt printer trial is removed (owner).** The Star TSP100 and Rongta receipt printers, the "80 mm receipt roll" setting, the network printer address, Find printers, Send test tag and the "Printer jammed" button (on the phone, the touch check-in and the extension) are gone, with all their code. Every label prints on the name tag printer (the D450), and on the backup printer if that fails, as before. A computer still set to the receipt printer prints on its name tag printer straight away: the old settings are ignored, a backup that named the receipt printer is not used, and the next save in Settings clears them.
