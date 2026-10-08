@@ -1701,11 +1701,10 @@ console.log('range reprint (#257) — which of tonight’s rows come back out');
   // Wiring: the range must reuse the single-row path, not grow a second one.
   const rangeSrc = require('fs').readFileSync(
     path.join(__dirname, '..', 'print-server', 'server.js'), 'utf8');
-  check('/reprint, /reprint-range and /jam-reprint all go through reprintRow()',
-    (rangeSrc.match(/await reprintRow\(/g) || []).length === 3, 'a second render path would drift');
-  check('Printer jammed reprints silently, through the both-printers path',
-    /reprintRow\(sel\.rows\[i\], '', \{ silent: true, jam: true \}\)/.test(rangeSrc)
-    && /if \(opts\.jam\) copies = await printJamCopies\(pngPath\)/.test(rangeSrc));
+  check('/reprint and /reprint-range both go through reprintRow()',
+    (rangeSrc.match(/await reprintRow\(/g) || []).length === 2, 'a second render path would drift');
+  check('the receipt-printer trial is gone (no receipt module, no jam reprint)',
+    !/require\('\.\/receipt'\)|printJamCopies|\/jam-reprint|\/touch\/jam|\/receipt\//.test(rangeSrc));
   check('the range never records attendance', !/reprint-range[\s\S]{0,2600}recordAttendance\(/.test(rangeSrc));
   check('the range never publishes a tally or a checkin',
     !/reprint-range[\s\S]{0,2600}(publishTally\(|events\.publish\()/.test(rangeSrc));

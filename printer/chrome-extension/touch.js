@@ -352,11 +352,6 @@
     '.close{all:unset;cursor:pointer;width:52px;height:52px;border-radius:50%;background:#fff;color:#231F20;',
     '  display:grid;place-items:center;font-size:26px;box-shadow:0 2px 8px rgba(15,23,42,.12)}',
     '.close:active{transform:scale(.94)}',
-    '.jam{all:unset;cursor:pointer;height:52px;padding:0 22px;border-radius:26px;background:#fff;color:#C2410C;',
-    '  border:3px solid #F15A28;font:800 19px "Figtree",system-ui,sans-serif;display:flex;align-items:center;',
-    '  box-shadow:0 2px 8px rgba(15,23,42,.12)}',
-    '.jam[hidden]{display:none}',
-    '.jam.busy{opacity:.55;pointer-events:none}',
     '.search{margin:6px 24px 14px;position:relative}',
     '.search input{width:100%;height:76px;border-radius:20px;border:3px solid #fff;background:#fff;',
     '  padding:0 24px 0 64px;font:600 30px "Figtree",system-ui,sans-serif;color:#231F20;outline:none;',
@@ -492,11 +487,11 @@
     // the family page and the toast spring in. Exits stay quick and plain,
     // the lobby's rule. The linear() strings are written out literally, never
     // behind var(), so a browser that cannot read one keeps the plain motion.
-    '.card,.fam,.fcard,.famsm,.btn,.go1,.opt,.close,.jam,.clear{transform-origin:50% 100%;',
+    '.card,.fam,.fcard,.famsm,.btn,.go1,.opt,.close,.clear{transform-origin:50% 100%;',
     '  transition-property:scale,translate,border-color,background,filter;transition-duration:520ms;',
     '  transition-timing-function:cubic-bezier(.34,1.56,.64,1);transition-timing-function:linear(0, 0.213, 0.605, 0.93, 1.103, 1.142, 1.106, 1.05, 1.006, 0.984, 0.98, 0.986, 0.994, 1, 1.002, 1.003, 1)}',
     '.card:active,.fam:active,.fcard:active,.famsm:active,.tile .go1:active{transform:none;scale:1.03 .92;translate:0 3px;transition-duration:80ms;transition-timing-function:ease-out}',
-    '.btn:active,.opt:active,.close:active,.jam:active,.search .clear:active{transform:none;scale:1.06 .9;translate:0 3px;transition-duration:80ms;transition-timing-function:ease-out}',
+    '.btn:active,.opt:active,.close:active,.search .clear:active{transform:none;scale:1.06 .9;translate:0 3px;transition-duration:80ms;transition-timing-function:ease-out}',
     '.search .clear:active{translate:0 calc(-50% + 2px)}',
     '.card.in:active{scale:none;translate:none}',
     // 7.6.0: joyful and quick. A piece lands in ~half a second: up from below,
@@ -548,12 +543,7 @@
     var close = el('button', 'close', '✕');
     close.setAttribute('aria-label', 'Close touch check-in');
     close.addEventListener('click', closeScreen);
-    // "Printer jammed": only while the Star is the selected printer (jamInfo).
-    // One tap reprints the last minute on the Star and the label printer.
-    var jam = els.jam = el('button', 'jam', 'Printer jammed');
-    jam.hidden = true;
-    jam.addEventListener('click', reprintJam);
-    top.append(el('div', 'title', 'Check in'), els.count, el('div', 'sp'), jam, close);
+    top.append(el('div', 'title', 'Check in'), els.count, el('div', 'sp'), close);
 
     var search = els.search = el('div', 'search');
     var input = els.input = el('input');
@@ -1191,31 +1181,6 @@
     setTimeout(function () { try { els.input.focus({ preventScroll: true }); } catch (e) { /* ignore */ } }, 30);
   }
 
-  function loadJam() {
-    if (typeof API.jamInfo !== 'function') return;
-    API.jamInfo().then(function (j) { if (els.jam) els.jam.hidden = !(j && j.available); });
-  }
-
-  function reprintJam() {
-    var b = els.jam;
-    if (!b || b.classList.contains('busy') || typeof API.jam !== 'function') return;
-    b.classList.add('busy');
-    toast('Reprinting the last minute…');
-    API.jam().then(function (r) {
-      b.classList.remove('busy');
-      r = r || {};
-      if (r.error) { toast(r.error, true); return; }
-      if (!r.count) { toast('No check-ins in the last minute to reprint.'); return; }
-      var n = r.printed ? r.printed.length : 0;
-      var tags = n === 1 ? '1 tag' : n + ' tags';
-      if (r.stoppedAt) { toast('Reprinted ' + tags + ', then both printers failed at ' + r.stoppedAt.name + '.', true); return; }
-      if (r.star === n && r.label === n) { toast('Reprinted ' + tags + ' on the Star and the label printer.'); return; }
-      if (r.label === n) { toast('Reprinted ' + tags + ' on the label printer. The Star is still not printing.', true); return; }
-      if (r.star === n) { toast('Reprinted ' + tags + ' on the Star. Label printer: ' + (r.labelError || 'not printing') , true); return; }
-      toast('Reprinted ' + tags + '. Star ' + r.star + ', label printer ' + r.label + '.', true);
-    });
-  }
-
   var toastTimer = null;
   function toast(text, bad) {
     var t = els.toast;
@@ -1275,7 +1240,6 @@
     loadHouseholds();
     refreshTonight();
     loadRecent();
-    loadJam();
     var w = els.wrap;
     w.classList.remove('shrink', 'grow');
     var r = fromRect || pillRect();

@@ -233,7 +233,7 @@
   <img class="brand-mark" src="/brand/logos/awana-clubs-white.svg" alt="Awana Clubs">
   <h1>Check in</h1>
   <button class="pill" id="count-pill" type="button" hidden>0 in</button>
-  <button class="round" id="menu-btn" type="button" aria-label="More: visitor, leader tag, custom label, printer jammed" hidden>+</button>
+  <button class="round" id="menu-btn" type="button" aria-label="More: visitor, leader tag, custom label" hidden>+</button>
 </header>
 
 <div class="pin" id="pin-screen">
@@ -277,11 +277,6 @@
 
 <div class="sheet" id="menu-sheet" role="dialog" aria-modal="true">
   <div class="grab"></div>
-  <div class="menu-sec" id="jam-sec" hidden>
-    <h3>The Star is jammed?</h3>
-    <button class="btn danger" id="jam-btn" type="button">Printer jammed</button>
-    <p class="err" id="jam-status"></p>
-  </div>
   <div class="menu-sec" id="leader-panel">
     <h3>Leader tag</h3>
     <div class="field">
@@ -781,7 +776,6 @@ function startSession(data) {
   loadClubs();
   if (SIMPLE) return;   // the youth page: check-in only
   refreshLeaders();
-  refreshJam();
 }
 function unlock() {
   if (unlockInFlight) return;
@@ -1695,36 +1689,9 @@ function restore(x) {
   });
 }
 
-// ── The + menu: printer jammed, leader tag, custom label, visitor ──────────
-$('menu-btn').addEventListener('click', function() { refreshJam(); refreshLeaders(); fillClubSelects(); showSheet('menu-sheet'); });
+// ── The + menu: leader tag, custom label, visitor ──────────
+$('menu-btn').addEventListener('click', function() { refreshLeaders(); fillClubSelects(); showSheet('menu-sheet'); });
 $('menu-close').addEventListener('click', hideSheet);
-
-// Printer jammed (the Star only): the last minute again, on the Star and the
-// label printer. Offered only while the Star is the selected printer.
-function refreshJam() {
-  if (!unlockedState) return;
-  call('GET', '/touch/jam').then(function(j) { $('jam-sec').hidden = !(j && j.available); }).catch(function() {});
-}
-var jamInFlight = false;
-$('jam-btn').addEventListener('click', function() {
-  if (jamInFlight) return;
-  jamInFlight = true;
-  var btn = $('jam-btn'), status = $('jam-status');
-  btn.disabled = true; status.textContent = '';
-  postJson('/jam-reprint', { pin: PIN }).then(function(r) {
-    jamInFlight = false; btn.disabled = false;
-    if (!r.count) { toast('No check-ins in the last minute to reprint.'); return; }
-    var n = (r.printed || []).length, tags = n === 1 ? '1 tag' : n + ' tags';
-    if (r.stoppedAt) { status.textContent = 'Reprinted ' + tags + ', then both printers failed at ' + r.stoppedAt.name + '.'; return; }
-    if (r.star === n && r.label === n) { toast('Reprinted ' + tags + ' on the Star and the label printer.', 4000, null, null, 'good'); hideSheet(); return; }
-    if (r.label === n) { status.textContent = 'Reprinted ' + tags + ' on the label printer. The Star is still not printing.'; return; }
-    status.textContent = 'Reprinted ' + tags + '. Star ' + r.star + ', label printer ' + r.label + '.';
-  }).catch(function(e) {
-    jamInFlight = false; btn.disabled = false;
-    if (e.code === 'http') { status.textContent = e.message; return; }
-    handleActionError(e, 'Could not reprint: ');
-  });
-});
 
 // A leader tag is not a check-in: the server files it under isLeader.
 var leaderInFlight = false;

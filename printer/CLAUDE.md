@@ -223,6 +223,21 @@ web copies were Latin subsets until the 6.18.0 kit). What that means here:
   smoke check still needs 4 loaded fonts (Paytone One, Londrina Solid, Londrina
   Solid Black, Figtree): the number is unchanged.
 
+**One printer: the 4x2 label printer (7.17.0, owner 2026-10-08).** The
+receipt-printer trial (Star TSP100 / Rongta, `receipt.js`, printerType
+`receipt`/`receipt-usb`, `/receipt/*`, "Printer jammed" and `/jam-reprint`,
+`/touch/jam`) was removed for good: do not bring any of it back. `printLabel()`
+is `printImage()` on the name tag printer with the backup printer
+(`backupPrinter()`) as its only fallback. `RETIRED_PRINTER_KEYS` are ignored,
+a backup naming the old `receiptPrinterName` is not used, and POST /config
+drops them all. A late child (`lateGoToLine` answers) gets a plain name tag and
+the household ONE drop-off label (`dropOffTagFor` / `generateDropOffTag`, once
+per family per night) on the label printer. `printerSetupWarnings()` (pure)
+judges the setup: `printerUnset`, `printerNotFound`, `printerOffline`
+(Get-Printer PrinterStatus), `printerLooksLikeReceipt`; the dashboard and the
+status window read offline and receipt-like as PROBLEM.
+`scripts/test-label-printer.cjs`.
+
 **Custom labels never write history.** `POST /print-custom` prints one line of
 free text on a blank label and records nothing at all: no `addHistoryEntry`, no
 `recordAttendance`, no `publishTally`, no `events.publish*`. It is not a

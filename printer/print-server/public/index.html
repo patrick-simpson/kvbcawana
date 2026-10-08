@@ -629,55 +629,7 @@
                  the check-in page only shows it. -->
             <div>
               <label>Name tag printer</label>
-              <select id="settings-printer" onchange="onTagPrinterChange()"><option value="">Loading...</option></select>
-              <div id="settings-paper-row" style="display:flex; gap:16px; flex-wrap:wrap; margin-top:6px; font-size:13px">
-                <label style="display:flex; align-items:center; gap:6px; font-weight:400; margin:0">
-                  <input type="radio" name="settings-paper" id="settings-paper-label" value="label" onchange="toggleReceiptSettings()" checked>
-                  4&Prime; &times; 2&Prime; labels
-                </label>
-                <label style="display:flex; align-items:center; gap:6px; font-weight:400; margin:0">
-                  <input type="radio" name="settings-paper" id="settings-paper-roll" value="roll" onchange="toggleReceiptSettings()">
-                  80 mm receipt roll (e.g. Star TSP100)
-                </label>
-              </div>
-              <div id="receipt-settings" style="display:none; margin-top:8px; padding:10px; border:1px solid #e2e8f0; border-radius:8px">
-                <p style="font-size:11px;color:#64748b;margin:0 0 8px">
-                  On a receipt roll each name tag is the same label, scaled down to the roll's width
-                  (about 2&#8542;&Prime; &times; 1&#8540;&Prime;), then cut. No tunes.
-                  <span class="receipt-usb-only">Set the cut (full or partial) and the paper (72mm x Receipt) in the printer's own Windows printing preferences.</span>
-                </p>
-                <div style="display:grid; grid-template-columns: 2fr 1fr; gap:10px">
-                  <div class="receipt-net-only">
-                    <label>Printer IP address</label>
-                    <input type="text" id="settings-receipt-host" placeholder="192.168.1.50" maxlength="253">
-                  </div>
-                  <div class="receipt-net-only">
-                    <label>Port</label>
-                    <input type="number" id="settings-receipt-port" placeholder="9100" min="1" max="65535">
-                  </div>
-                  <div class="receipt-net-only">
-                    <label>Cut</label>
-                    <select id="settings-receipt-cut">
-                      <option value="full">Full cut (tag drops free)</option>
-                      <option value="partial">Partial cut (tag hangs until torn off)</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label>Printable width (dots)</label>
-                    <input type="number" id="settings-receipt-dots" placeholder="576" min="384" max="832" step="8">
-                  </div>
-                </div>
-                <div style="display:flex; gap:8px; margin-top:8px; flex-wrap:wrap">
-                  <button class="btn btn-secondary btn-sm receipt-net-only" type="button" onclick="findReceiptPrinters()">Find printers</button>
-                  <button class="btn btn-secondary btn-sm" type="button" onclick="sendReceiptTest()">Send test tag</button>
-                </div>
-                <div id="receipt-found" style="margin-top:6px"></div>
-                <p id="receipt-status" style="font-size:11px;color:#64748b;margin:6px 0 0"></p>
-                <p class="receipt-net-only" style="font-size:10px;color:#94a3b8;margin:6px 0 0">
-                  Hold FEED while switching the printer on to print its self-test page with its IP address. 576 dots is 72 mm, the normal width for 80 mm paper.
-                  Find printers looks only on this computer's own network.
-                </p>
-              </div>
+              <select id="settings-printer"><option value="">Loading...</option></select>
             </div>
             <div>
               <label>If it fails, print on</label>
@@ -1198,9 +1150,12 @@ function loadHealth() {
     var tdet = document.getElementById('traffic-detail');
 
     // A jam is at least as bad as a missing printer: in both cases nothing is
-    // coming out of the printer, so it reads RED rather than a mild yellow.
+    // coming out of the printer, so it reads RED rather than a mild yellow. So
+    // does a printer Windows calls offline, and a name tag printer that looks
+    // like the retired receipt printer (labels would not reach the D450).
     var hasError = warnings.some(function(w) {
-      return w.type === 'printerNotFound' || w.type === 'spoolerBacklog';
+      return w.type === 'printerNotFound' || w.type === 'spoolerBacklog'
+        || w.type === 'printerOffline' || w.type === 'printerLooksLikeReceipt';
     });
     var hasWarning = warnings.length > 0;
     renderStatusChip(hasError ? 'problem' : 'online');
@@ -1798,15 +1753,13 @@ function loadPreview() {
 }
 
 // A preview is drawn at the size the name tag printer prints it (6.27.0):
-// 4 x 2 in on a label printer, about 2 7/8 x 1 3/8 in on an 80 mm roll, at
-// 96 CSS pixels to the inch (close to true size on most screens), with the
+// 4 x 2 in on the label printer, at 96 CSS pixels to the inch (close to true size on most screens), with the
 // size written under it. X-Tag-Size comes from GET /preview.
 function showTagPreview(img, url) {
   fetch(url).then(function(r) {
     if (!r.ok) throw new Error('HTTP ' + r.status);
     var size = (r.headers.get('X-Tag-Size') || '4.00x2.00').split('x').map(Number);
-    var roll = r.headers.get('X-Tag-Printer') === 'receipt';
-    return r.blob().then(function(b) { return { b: b, size: size, roll: roll }; });
+    return r.blob().then(function(b) { return { b: b, size: size }; });
   }).then(function(p) {
     if (img.dataset.objectUrl) URL.revokeObjectURL(img.dataset.objectUrl);
     img.dataset.objectUrl = URL.createObjectURL(p.b);
@@ -1822,7 +1775,7 @@ function showTagPreview(img, url) {
       cap.style.cssText = 'font-size:11px;color:#64748b;margin:6px 0 0';
       img.parentNode.insertBefore(cap, img.nextSibling);
     }
-    cap.textContent = (p.roll ? 'As it prints on the 80 mm receipt roll: ' : 'As it prints on the 4\u2033 \u00d7 2\u2033 label printer: ')
+    cap.textContent = 'As it prints on the 4\u2033 \u00d7 2\u2033 label printer: '
       + p.size[0].toFixed(2) + '\u2033 \u00d7 ' + p.size[1].toFixed(2) + '\u2033, shown about actual size.';
   }).catch(function() {
     img.style.display = 'none';
@@ -1944,98 +1897,6 @@ function toggleRehearsal() {
 }
 
 // Musical printer (#11/#12): the demo button. 409 means the toggle is off.
-// ── Name tag printer (the one place a printer is chosen) ─────────────────────
-// One box lists the Windows printers and the network receipt printer; the
-// paper choice says whether a Windows printer is a 4×2 label printer or an
-// 80 mm receipt roll, guessed from its name when it is picked.
-var NETWORK_RECEIPT = '__network__';
-var ROLL_PRINTER_NAME = /\bstar\b|\btsp\s?\d|receipt|\bpos[- ]?\d|80\s?mm/i;
-
-function tagPrinterKind() {
-  if (document.getElementById('settings-printer').value === NETWORK_RECEIPT) return 'receipt';
-  return document.getElementById('settings-paper-roll').checked ? 'receipt-usb' : 'label';
-}
-
-function onTagPrinterChange() {
-  var v = document.getElementById('settings-printer').value;
-  if (v && v !== NETWORK_RECEIPT) {
-    var roll = ROLL_PRINTER_NAME.test(v);
-    document.getElementById('settings-paper-roll').checked = roll;
-    document.getElementById('settings-paper-label').checked = !roll;
-  }
-  toggleReceiptSettings();
-}
-
-// ── Receipt-printer trial ─────────────────────────────────────────────────────
-function toggleReceiptSettings() {
-  var kind = tagPrinterKind();
-  document.getElementById('settings-paper-row').style.display =
-    document.getElementById('settings-printer').value === NETWORK_RECEIPT ? 'none' : '';
-  document.getElementById('receipt-settings').style.display = kind === 'label' ? 'none' : '';
-  Array.prototype.forEach.call(document.querySelectorAll('.receipt-net-only'), function(el) { el.style.display = kind === 'receipt' ? '' : 'none'; });
-  Array.prototype.forEach.call(document.querySelectorAll('.receipt-usb-only'), function(el) { el.style.display = kind === 'receipt-usb' ? '' : 'none'; });
-}
-
-function receiptFormValues() {
-  var kind = tagPrinterKind();
-  return {
-    receiptHost: document.getElementById('settings-receipt-host').value.trim(),
-    receiptPort: document.getElementById('settings-receipt-port').value.trim(),
-    receiptDots: document.getElementById('settings-receipt-dots').value.trim(),
-    receiptCut: document.getElementById('settings-receipt-cut').value,
-    printerType: kind,
-    receiptPrinterName: kind === 'receipt-usb' ? document.getElementById('settings-printer').value : ''
-  };
-}
-
-function setReceiptStatus(text, bad) {
-  var el = document.getElementById('receipt-status');
-  el.textContent = text;
-  el.style.color = bad ? '#b91c1c' : '#64748b';
-}
-
-function sendReceiptTest() {
-  setReceiptStatus('Sending a test tag…');
-  fetch(BASE + '/receipt/test', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(receiptFormValues()) })
-    .then(function(r) { return r.json().then(function(d) { return { ok: r.ok, d: d }; }); })
-    .then(function(res) {
-      if (!res.ok) return setReceiptStatus('Test tag failed: ' + ((res.d && res.d.error) || 'unknown error'), true);
-      var st = res.d.status || {};
-      var paperNote = res.d.usb ? (res.d.paperLow ? ' Paper is nearly out.' : '')
-        : (st.unknown ? ' (This printer doesn\'t report paper status.)' : st.paperLow ? ' Paper is nearly out.' : ' Paper OK.');
-      setReceiptStatus('Test tag sent to ' + res.d.host + '.' + paperNote
-        + ' Remember to Save if you changed anything.');
-    })
-    .catch(function() { setReceiptStatus('Could not reach the server.', true); });
-}
-
-function findReceiptPrinters() {
-  var box = document.getElementById('receipt-found');
-  box.textContent = '';
-  setReceiptStatus('Looking for printers on this network (a few seconds)…');
-  fetch(BASE + '/receipt/discover', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ receiptPort: receiptFormValues().receiptPort }) })
-    .then(function(r) { return r.json().then(function(d) { return { ok: r.ok, d: d }; }); })
-    .then(function(res) {
-      if (!res.ok) return setReceiptStatus((res.d && res.d.error) || 'Search failed.', true);
-      var list = res.d.printers || [];
-      if (!list.length) {
-        return setReceiptStatus('No printers answered on ' + ((res.d.subnets || []).join(', ') || 'this network')
-          + '. Check the cable and that the printer is on, or type its IP from the self-test page.', true);
-      }
-      setReceiptStatus('Found ' + list.length + '. Pick one, then Send test tag.');
-      list.forEach(function(p) {
-        var b = document.createElement('button');
-        b.type = 'button';
-        b.className = 'btn btn-secondary btn-sm';
-        b.style.marginRight = '6px';
-        b.textContent = p.host;
-        b.onclick = function() { document.getElementById('settings-receipt-host').value = p.host; setReceiptStatus('Selected ' + p.host + '. Send a test tag, then Save.'); };
-        box.appendChild(b);
-      });
-    })
-    .catch(function() { setReceiptStatus('Could not reach the server.', true); });
-}
-
 function playTune() {
   fetch(BASE + '/play-tune', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
     .then(function(r) { return r.json().then(function(d) { return { ok: r.ok, d: d }; }); })
@@ -2107,21 +1968,8 @@ function loadSettings() {
     document.getElementById('settings-label-footer').value = config.labelFooter || '';
     document.getElementById('settings-season-theme').value = config.seasonTheme || 'auto';
     document.getElementById('settings-musical').checked = config.musicalPrinter === true;
-    var receiptMode = config.printerType === 'receipt' || config.printerType === 'receipt-usb';
-    savedTagPrinter = config.printerType === 'receipt' ? NETWORK_RECEIPT
-      : config.printerType === 'receipt-usb' ? (config.receiptPrinterName || '')
-      : (config.printerName || '');
-    document.getElementById('settings-paper-roll').checked = config.printerType === 'receipt-usb';
-    document.getElementById('settings-paper-label').checked = config.printerType !== 'receipt-usb';
-    // A config from before the backup box: in receipt mode the old Printer box
-    // was the fallback.
-    savedBackupPrinter = Object.prototype.hasOwnProperty.call(config, 'backupPrinterName')
-      ? (config.backupPrinterName || '') : (receiptMode ? (config.printerName || '') : '');
-    document.getElementById('settings-receipt-host').value = config.receiptHost || '';
-    document.getElementById('settings-receipt-port').value = config.receiptPort || '';
-    document.getElementById('settings-receipt-dots').value = config.receiptDots || '';
-    document.getElementById('settings-receipt-cut').value = config.receiptCut === 'partial' ? 'partial' : 'full';
-    toggleReceiptSettings();
+    savedTagPrinter = config.printerName || '';
+    savedBackupPrinter = config.backupPrinterName || '';
     document.getElementById('settings-update-beacon').checked = config.updateBeacon === true;
     document.getElementById('settings-ft-inverted').checked = config.firstTimerInverted !== false;
     document.getElementById('settings-trophy-band').checked = config.trophyBand !== false;
@@ -2160,13 +2008,13 @@ function fillPrinterSelects(printers) {
   var names = (printers || []).map(function(p) { return p.name; });
   var isDefault = {};
   (printers || []).forEach(function(p) { if (p.isWindowsDefault) isDefault[p.name] = true; });
-  function fill(id, first, saved, extra) {
+  function fill(id, first, saved) {
     var sel = document.getElementById(id);
     sel.innerHTML = '';
     var list = names.slice();
-    if (saved && saved !== NETWORK_RECEIPT && list.indexOf(saved) < 0) list.unshift(saved);
+    if (saved && list.indexOf(saved) < 0) list.unshift(saved);
     [[first[0], first[1]]].concat(list.map(function(n) { return [n, n + (isDefault[n] ? ' (Windows default)' : '')]; }))
-      .concat(extra || []).forEach(function(o) {
+      .forEach(function(o) {
         var opt = document.createElement('option');
         opt.value = o[0];
         opt.textContent = o[1];
@@ -2174,10 +2022,8 @@ function fillPrinterSelects(printers) {
       });
     sel.value = saved;
   }
-  fill('settings-printer', ['', printers ? 'Windows default printer' : 'Could not load printers'], savedTagPrinter,
-    [[NETWORK_RECEIPT, 'Receipt printer on the network (by IP address)']]);
+  fill('settings-printer', ['', printers ? 'Windows default printer' : 'Could not load printers'], savedTagPrinter);
   fill('settings-backup-printer', ['', '(no backup)'], savedBackupPrinter);
-  toggleReceiptSettings();
 }
 
 // ── Display key ───────────────────────────────────────────────────────────────
@@ -2563,11 +2409,8 @@ function readPickupClubs() {
 }
 
 function saveSettings() {
-  // printerName is the Windows printer every 4×2 print path uses: the name tag
-  // printer itself, or on a receipt roll the backup (which is what it was).
-  var printerName = tagPrinterKind() === 'label'
-    ? document.getElementById('settings-printer').value
-    : document.getElementById('settings-backup-printer').value;
+  // printerName is the Windows printer every 4×2 print path uses.
+  var printerName = document.getElementById('settings-printer').value;
   var checkinUrl = document.getElementById('settings-url').value.trim();
   var pusherAppId = document.getElementById('settings-pusher-id').value.trim();
   var pusherCluster = document.getElementById('settings-pusher-cluster').value.trim();
@@ -2589,12 +2432,6 @@ function saveSettings() {
       labelFooter: document.getElementById('settings-label-footer').value.trim(),
       seasonTheme: document.getElementById('settings-season-theme').value,
       musicalPrinter: document.getElementById('settings-musical').checked,
-      printerType: tagPrinterKind(),
-      receiptHost: document.getElementById('settings-receipt-host').value.trim(),
-      receiptPort: document.getElementById('settings-receipt-port').value.trim(),
-      receiptDots: document.getElementById('settings-receipt-dots').value.trim(),
-      receiptCut: document.getElementById('settings-receipt-cut').value,
-      receiptPrinterName: tagPrinterKind() === 'receipt-usb' ? document.getElementById('settings-printer').value : '',
       backupPrinterName: document.getElementById('settings-backup-printer').value,
       updateBeacon: document.getElementById('settings-update-beacon').checked,
       firstTimerInverted: document.getElementById('settings-ft-inverted').checked,
@@ -2751,18 +2588,6 @@ function renderNightStatus(h) {
       rows += statusRow('🎵', 'Musical printer', "last tune '" + mt.last.tune + "' played " + formatTime(mt.last.at));
     } else {
       rows += statusRow('❌', 'Musical printer', "tune '" + mt.last.tune + "' FAILED: " + (mt.last.error || 'unknown') + ' at ' + formatTime(mt.last.at));
-    }
-  }
-
-  var rp = h.receiptPrinter;
-  if (rp && rp.enabled) {
-    var rpWhere = rp.host ? ' (' + rp.host + ')' : '';
-    if (!rp.last) {
-      rows += statusRow('🟡', 'Receipt printer', 'on' + rpWhere + ' — nothing printed yet this session');
-    } else if (rp.last.ok) {
-      rows += statusRow(rp.last.paperLow ? '🟡' : '✅', 'Receipt printer', 'last tag printed ' + formatTime(rp.last.at) + rpWhere + (rp.last.paperLow ? ' — paper nearly out' : ''));
-    } else {
-      rows += statusRow('❌', 'Receipt printer', 'FAILED: ' + (rp.last.error || 'unknown') + (rp.last.fellBackTo ? ' — printing on ' + rp.last.fellBackTo + ' instead' : '') + ' at ' + formatTime(rp.last.at));
     }
   }
 

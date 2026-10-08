@@ -130,7 +130,8 @@ export default function StatusPanel({ config, onReset }) {
 
   // Same rule as the dashboard's header chip: PROBLEM when a warning means
   // nothing is coming out of the printer.
-  const printerProblem = warnings.some(w => w && (w.type === 'printerNotFound' || w.type === 'spoolerBacklog'));
+  const printerProblem = warnings.some(w => w && (w.type === 'printerNotFound' || w.type === 'spoolerBacklog'
+    || w.type === 'printerOffline' || w.type === 'printerLooksLikeReceipt'));
   const chip = failed ? { value: 'OFFLINE', plate: 'var(--bad)' }
     : printerProblem ? { value: 'PROBLEM', plate: 'var(--c-hot-deep)' }
     : { value: 'ONLINE', plate: 'var(--c-plate)' };

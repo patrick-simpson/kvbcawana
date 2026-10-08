@@ -1,4 +1,13 @@
-﻿## [7.16.1] - 2026-10-08
+﻿## [7.17.0] - 2026-10-08
+One printer: the 4x2 label printer. The receipt printer is gone.
+
+**The receipt printer trial is removed (owner).** The Star TSP100 and Rongta receipt printers, the "80 mm receipt roll" setting, the network printer address, Find printers, Send test tag and the "Printer jammed" button (on the phone, the touch check-in and the extension) are gone, with all their code. Every label prints on the name tag printer (the D450), and on the backup printer if that fails, as before. A computer still set to the receipt printer prints on its name tag printer straight away: the old settings are ignored, a backup that named the receipt printer is not used, and the next save in Settings clears them.
+
+**The late arrival's drop-off card prints on the label printer.** A child who arrives after their club has started gets a plain name tag, and the family gets one extra label: "Drop-off locations at 6:42 PM", with every child of the household and where their club is right now. It prints once per family per night, with the first late child. (It used to print only on the receipt printer; on the label printer a late child got a "Go to:" line instead.)
+
+**The dashboard says more about the name tag printer.** It turns red when Windows says the printer is offline, paused, out of labels or jammed (labels would wait in the queue), and when the chosen printer looks like the retired receipt printer. It also says so when no name tag printer is chosen at all, since labels would then go to whatever Windows' default printer is. The Windows status window follows the same rule.
+
+## [7.16.1] - 2026-10-08
 The Trek & Journey check-in page no longer offers children who are already in.
 
 **The phone's list agrees with the count.** The phone pages (the youth page at /phone/ym and awana.kvbchurch.org/checkin/ym, and the full phone page) decided who was already checked in from the labels this laptop printed, by exact name. The count every screen shows reads TwoTimTwo's own check-in report. So a child checked in at the desk or on TwoTimTwo itself, a label that failed to print, or a name with a double space in it was still offered, and tapping them did nothing (the laptop sees them already in). The list now reads the same children the count does, matched on their TwoTimTwo id as well as their name, and a child checked out tonight is not offered again.

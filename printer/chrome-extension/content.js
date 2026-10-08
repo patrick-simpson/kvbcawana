@@ -2,7 +2,7 @@
   if (window.__awanaPrinterLoaded) return;
   window.__awanaPrinterLoaded = true;
 
-  const EXTENSION_VERSION = '7.16.1';
+  const EXTENSION_VERSION = '7.17.0';
   const PRINT_COOLDOWN = 2000;
   // POST /print is synchronous on the server: PowerShell + a cold printer can
   // take 15-30 s (the server retries the spooler internally). This must sit
@@ -3186,8 +3186,8 @@
     });
   }
 
-  // Shows where labels print, as the print dashboard has it set ("Star TSP100
-  // Cutter (TSP143), backup Brother QL-820NWB"). A server older than 6.26.0
+  // Shows where labels print, as the print dashboard has it set ("Phomemo
+  // D450, backup Brother QL-820NWB"). A server older than 6.26.0
   // has no inUse: its default printer is shown instead.
   function fetchPrinters() {
     var nameEl = document.getElementById('awana-printing-to-name');
@@ -3197,7 +3197,6 @@
       .then(function(data) {
         var use = data.inUse || { name: data.serverDefault || '' };
         var text = use.name || 'the Windows default printer';
-        if (use.kind === 'receipt') text += ' (80 mm roll)';
         if (use.backup) text += ', backup ' + use.backup;
         nameEl.textContent = text;
         nameEl.title = text;
@@ -5237,24 +5236,6 @@
       return fetch(PRINT_SERVER + '/touch/recent', { signal: AbortSignal.timeout(3000) })
         .then(function(r) { return r.ok ? r.json() : null; })
         .catch(function() { return null; });
-    },
-    // "Printer jammed" (7.4.0): whether the Star is the selected printer, and
-    // the one-tap reprint of the last minute on the Star and the label printer.
-    jamInfo: function() {
-      return fetch(PRINT_SERVER + '/touch/jam', { signal: AbortSignal.timeout(3000) })
-        .then(function(r) { return r.ok ? r.json() : null; })
-        .catch(function() { return null; });
-    },
-    jam: function() {
-      return fetch(PRINT_SERVER + '/jam-reprint', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}',
-        signal: AbortSignal.timeout(90000),
-      }).then(function(r) {
-        return r.json().catch(function() { return {}; }).then(function(b) {
-          if (!r.ok) return { error: b.error || ('HTTP ' + r.status) };
-          return b;
-        });
-      }).catch(function() { return { error: 'The print app is not answering.' }; });
     },
     // The phone page's families and Bible/Friend clubs (7.7.0), to the print
     // server: names and club names only.

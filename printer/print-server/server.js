@@ -24,7 +24,6 @@ const { createCanvas, loadImage } = require('@napi-rs/canvas');
 // The catalog brand kit (fonts + official one-colour club marks) the label is
 // set in. Loaded on require; every piece of it fails open — see brand.js.
 const brand = require('./brand');
-const receipt = require('./receipt');
 const syncClient = require('./sync-client');
 const phoneRelay = require('./phone-relay');
 const pickup = require('./pickup');
@@ -2831,18 +2830,18 @@ $pd.Dispose()
   }
 }
 
-// ── Where a label goes: the 4×2 printer, or the receipt-printer trial ─────────
-// Every label print in this file goes through here. With printerType unset
-// (the default) it is exactly printImage(). With printerType 'receipt' the
-// same PNG goes to the network receipt printer (print-server/receipt.js); if
-// that fails, the label goes to the named 4×2 printer when one is set and
-// Windows says it is there, so no child misses a tag. Only when both fail
-// does the caller see an error, and it records the failure as it always has
-// (the dashboard's failures list and its Reprint button).
-let lastReceipt = null;   // { ok, at, error?, fellBackTo?, paperLow? }
+// ── Where a label goes: the 4×2 label printer (and its backup) ────────────────
+// Every label print in this file goes through printLabel(). It is printImage()
+// on the name tag printer; if that fails and a backup printer is set (and
+// Windows says it is there), the same label prints on the backup, so no child
+// misses a tag. Only when both fail does the caller see an error, and it
+// records the failure as it always has (the dashboard's failures list and its
+// Reprint button). The receipt-printer trial (Star / Rongta, 6.22-7.16) is
+// gone (owner, 2026-10-08): its config keys are ignored and dropped on the
+// next save (RETIRED_PRINTER_KEYS).
 
-// Is the named 4×2 printer installed and not offline? On Windows a job sent
-// to a disconnected USB printer just waits in the queue, which would look like
+// Is the named printer installed and not offline? On Windows a job sent to a
+// disconnected USB printer just waits in the queue, which would look like
 // success while the child walks away with nothing. Off Windows (tests) or if
 // the query itself fails, assume yes and let printImage() be the judge.
 async function fallbackPrinterReady(name) {
@@ -2861,224 +2860,50 @@ async function fallbackPrinterReady(name) {
   }
 }
 
-// The Windows-driver half of the receipt trial (printerType 'receipt-usb'),
-// for a USB receipt printer such as a Star TSP100 futurePRNT that takes only
-// driver graphics. One PowerShell run asks Windows about the printer FIRST
-// (Win32_Printer: missing, offline, out of paper, cover open, jammed) and
-// prints only when nothing is wrong, so a problem becomes a fallback to the
-// 4×2 printer instead of a job that sits in the queue while the child walks
-// away. Drivers that report nothing read as fine (fail open: print). The tag
-// is the 1-bit picture the network path would send, drawn 1:1 at the head's
-// 203 dpi on a page exactly its size; the cut is the driver's own setting.
-const RECEIPT_DPI = 203;
-const RECEIPT_PROBLEM_EXIT = 3;
-function printReceiptWindows(tagPngPath, printerName, size) {
-  return withPrinter(() => printReceiptWindowsNow(tagPngPath, printerName, size));
-}
-
-async function printReceiptWindowsNow(tagPngPath, printerName, size) {
-  const safePath = tagPngPath.replace(/'/g, "''");
-  const safePrinter = String(printerName).replace(/'/g, "''");
-  // PaperSize and DrawImage both take hundredths of an inch.
-  const w = Math.round(size.width / RECEIPT_DPI * 100);
-  const h = Math.round(size.height / RECEIPT_DPI * 100);
-  const ps = `
-$ErrorActionPreference = 'Stop'
-Add-Type -AssemblyName System.Drawing
-$name = '${safePrinter}'
-$p = Get-CimInstance Win32_Printer | Where-Object { $_.Name -eq $name } | Select-Object -First 1
-if (-not $p) { Write-Output 'RECEIPT_PROBLEM: it is not installed in Windows'; exit ${RECEIPT_PROBLEM_EXIT} }
-if ($p.WorkOffline -or $p.PrinterStatus -eq 7) { Write-Output 'RECEIPT_PROBLEM: Windows says it is offline (check its USB cable and power)'; exit ${RECEIPT_PROBLEM_EXIT} }
-switch ([int]$p.DetectedErrorState) {
-  4  { Write-Output 'RECEIPT_PROBLEM: out of paper'; exit ${RECEIPT_PROBLEM_EXIT} }
-  7  { Write-Output 'RECEIPT_PROBLEM: the cover is open'; exit ${RECEIPT_PROBLEM_EXIT} }
-  8  { Write-Output 'RECEIPT_PROBLEM: paper jam'; exit ${RECEIPT_PROBLEM_EXIT} }
-  9  { Write-Output 'RECEIPT_PROBLEM: Windows says it is offline (check its USB cable and power)'; exit ${RECEIPT_PROBLEM_EXIT} }
-  10 { Write-Output 'RECEIPT_PROBLEM: the printer needs attention'; exit ${RECEIPT_PROBLEM_EXIT} }
-}
-$low = ([int]$p.DetectedErrorState -eq 3)
-$pd = New-Object System.Drawing.Printing.PrintDocument
-$pd.PrinterSettings.PrinterName = $name
-$pd.DocumentName = 'Club Label Printer tag'
-$pd.DefaultPageSettings.PaperSize = New-Object System.Drawing.Printing.PaperSize("Club tag", ${w}, ${h})
-$pd.DefaultPageSettings.Margins = New-Object System.Drawing.Printing.Margins(0,0,0,0)
-$pd | Add-Member -NotePropertyName TagImagePath -NotePropertyValue '${safePath}'
-$pd.add_PrintPage({
-  param($sender, $e)
-  $img = [System.Drawing.Image]::FromFile($sender.TagImagePath)
-  try {
-    $e.Graphics.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::NearestNeighbor
-    $e.Graphics.PixelOffsetMode = [System.Drawing.Drawing2D.PixelOffsetMode]::Half
-    $e.Graphics.DrawImage($img, 0, 0, ${w}, ${h})
-  } finally { $img.Dispose() }
-})
-$pd.Print()
-$pd.Dispose()
-if ($low) { Write-Output 'RECEIPT_PAPER_LOW' }
-`.trim();
-
-  const psPath = tmpFilePath('awana-receipt', 'ps1');
-  try {
-    fs.writeFileSync(psPath, ps, 'utf8');
-    let lastErr = null;
-    for (let attempt = 1; attempt <= 2; attempt++) {
-      try {
-        const out = await runPowerShell(['-File', psPath], { timeout: 20000 });
-        return { paperLow: /RECEIPT_PAPER_LOW/.test(out || '') };
-      } catch (e) {
-        const m = /RECEIPT_PROBLEM: ([^\r\n]+)/.exec(String(e.stdout || ''));
-        // A problem the printer reported is an answer, not a hiccup: no retry.
-        if (m) throw new Error(m[1].trim());
-        lastErr = e;
-        if (attempt < 2) await sleep(750);
-      }
-    }
-    throw new Error(`printing failed (${String(lastErr && lastErr.message || lastErr).split('\n')[0].slice(0, 120)})`);
-  } finally {
-    fs.unlink(psPath, () => {});
-  }
-}
-
-// Both receipt connections, one call: the network printer (ESC/POS) or the
-// Windows driver. Resolves with { status? , paperLow }.
-async function printReceipt(pngPath, opts) {
-  if (!opts.usb) {
-    const r = await receipt.printPng(pngPath, opts);
-    return { status: r.status, paperLow: !!(r.status && r.status.paperLow) };
-  }
-  if (!opts.printerName || !isSafePrinterName(opts.printerName)) throw new Error('no receipt printer is chosen');
-  const tag = await receipt.renderTagPng(pngPath, opts.dots);
-  const tagPath = tmpFilePath('awana-tag', 'png');
-  try {
-    fs.writeFileSync(tagPath, tag.buffer);
-    // Awaited inside the try: the finally deletes the tag file, and the
-    // driver has to have read it first (a bare return would let the finally
-    // run before the print did).
-    return await printReceiptWindows(tagPath, opts.printerName, tag);
-  } finally {
-    fs.unlink(tagPath, () => {});
-  }
-}
+// Settings the receipt trial wrote. Nothing reads them; POST /config drops
+// them, so the next save leaves a clean file.
+const RETIRED_PRINTER_KEYS = ['printerType', 'receiptHost', 'receiptPort', 'receiptDots', 'receiptCut', 'receiptPrinterName'];
 
 // The backup printer ("If it fails, print on", 6.26.0): set on the dashboard
-// beside the name tag printer, '' for none. A config from before it existed
-// keeps its old meaning: in receipt mode the 4×2 printer in the Printer box
-// was the fallback; a 4×2 label printer had none.
+// beside the name tag printer, '' for none. Never the retired receipt printer
+// (a receipt-mode config could name the Star as its own backup).
 function backupPrinter() {
-  if (Object.prototype.hasOwnProperty.call(config, 'backupPrinterName')) {
-    return String(config.backupPrinterName || '').trim();
-  }
-  return receipt.isEnabled(config) ? String(PRINTER_NAME || '').trim() : '';
+  const backup = String(config.backupPrinterName || '').trim();
+  const retired = String(config.receiptPrinterName || '').trim();
+  if (backup && retired && backup.toLowerCase() === retired.toLowerCase()) return '';
+  return backup;
 }
 
 // Where labels print, in words, for the extension's panel and the dashboard.
 function printingTarget() {
-  const backup = backupPrinter() || null;
-  if (receipt.isUsb(config)) return { kind: 'receipt', name: String(config.receiptPrinterName || '').trim() || null, backup };
-  if (receipt.isEnabled(config)) return { kind: 'receipt', name: config.receiptHost ? `receipt printer at ${config.receiptHost}` : null, backup };
-  return { kind: 'label', name: PRINTER_NAME || null, backup };
+  return { kind: 'label', name: PRINTER_NAME || null, backup: backupPrinter() || null };
 }
 
-let lastLabelBackup = null;   // { at, error, to } when a 4×2 print fell back; cleared by the next good print
+let lastLabelBackup = null;   // { at, error, to } when a print fell back; cleared by the next good print
 
 async function printLabel(pngPath, printerName) {
-  if (!receipt.isEnabled(config)) {
-    try {
-      await printImage(pngPath, printerName);
-      lastLabelBackup = null;
-      return { via: 'label' };
-    } catch (e) {
-      const backup = backupPrinter();
-      const main = String(printerName || PRINTER_NAME || '').trim();
-      if (!backup || backup.toLowerCase() === main.toLowerCase()
-        || !isSafePrinterName(backup) || !(await fallbackPrinterReady(backup))) throw e;
-      await printImage(pngPath, backup);
-      lastLabelBackup = { at: new Date().toISOString(), error: String(e.message || e).split('\n')[0].slice(0, 160), to: backup };
-      console.warn(`[print] "${main}" failed; printed on the backup "${backup}" instead`);
-      return { via: 'fallback', printer: backup };
-    }
-  }
-  const opts = receipt.optionsFrom(config);
-  const at = new Date().toISOString();
   try {
-    const r = await printReceipt(pngPath, opts);
-    lastReceipt = { ok: true, at, paperLow: r.paperLow };
-    return { via: 'receipt' };
+    await printImage(pngPath, printerName);
+    lastLabelBackup = null;
+    return { via: 'label' };
   } catch (e) {
-    const why = String(e.message || e).slice(0, 160);
-    lastReceipt = { ok: false, at, error: why };
-    console.warn(`[receipt] Print failed: ${why}`);
-    const fallback = backupPrinter();
-    // Never "fall back" to the receipt printer itself (the Star picked as its
-    // own backup): that's a second failure, not a label.
-    const sameAsReceipt = opts.usb && fallback.toLowerCase() === opts.printerName.toLowerCase();
-    if (fallback && !sameAsReceipt && isSafePrinterName(fallback) && (await fallbackPrinterReady(fallback))) {
-      await printImage(pngPath, fallback);
-      lastReceipt.fellBackTo = fallback;
-      console.warn(`[receipt] Printed on the 4×2 printer "${fallback}" instead`);
-      return { via: 'fallback', printer: fallback };
-    }
-    throw new Error(`Receipt printer: ${why}. ${sameAsReceipt
-      ? 'The backup printer is the receipt printer too, so there is no backup.'
-      : fallback
-      ? `The backup printer "${fallback}" is not available either.`
-      : 'No backup printer is set.'}`);
+    const backup = backupPrinter();
+    const main = String(printerName || PRINTER_NAME || '').trim();
+    if (!backup || backup.toLowerCase() === main.toLowerCase()
+      || !isSafePrinterName(backup) || !(await fallbackPrinterReady(backup))) throw e;
+    await printImage(pngPath, backup);
+    lastLabelBackup = { at: new Date().toISOString(), error: String(e.message || e).split('\n')[0].slice(0, 160), to: backup };
+    console.warn(`[print] "${main}" failed; printed on the backup "${backup}" instead`);
+    return { via: 'fallback', printer: backup };
   }
 }
 
-// "Printer jammed" (touch check-in, 7.4.0): one copy on the Star AND one on
-// the backup label printer, never printLabel's either-or fallback, so a Star
-// that is still jammed costs nothing and a Star that came back gives a second
-// tag. Throws only when neither printer took it. { star, label }: 'ok' or why.
-async function printJamCopies(pngPath) {
-  const out = { star: 'ok', label: 'ok' };
-  const opts = receipt.optionsFrom(config);
-  const at = new Date().toISOString();
-  try {
-    const r = await printReceipt(pngPath, opts);
-    lastReceipt = { ok: true, at, paperLow: r.paperLow };
-  } catch (e) {
-    out.star = String(e.message || e).split('\n')[0].slice(0, 160);
-    lastReceipt = { ok: false, at, error: out.star };
-  }
-  const backup = backupPrinter();
-  if (!backup) out.label = 'No backup label printer is set.';
-  else if (opts.usb && backup.toLowerCase() === String(opts.printerName || '').toLowerCase()) out.label = 'The backup printer is the Star too.';
-  else if (!isSafePrinterName(backup) || !(await fallbackPrinterReady(backup))) out.label = `"${backup}" is not available.`;
-  else {
-    try { await printImage(pngPath, backup); } catch (e) { out.label = String(e.message || e).split('\n')[0].slice(0, 160); }
-  }
-  if (out.star !== 'ok' && out.label !== 'ok') throw new Error(`Star: ${out.star} Label printer: ${out.label}`);
-  return out;
-}
-
-// The /health half: one {type, message} warning while the trial is on and the
-// last receipt print didn't go cleanly. Clears on the next good print.
-function receiptWarnings() {
-  if (!receipt.isEnabled(config)) {
-    if (!lastLabelBackup) return [];
-    const at = new Date(lastLabelBackup.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-    return [{ type: 'printerFallback', message: `The name tag printer failed at ${at} (${lastLabelBackup.error}), so labels went to the backup "${lastLabelBackup.to}". Check it, then print a test label.` }];
-  }
-  if (receipt.isUsb(config)) {
-    if (!String(config.receiptPrinterName || '').trim()) {
-      return [{ type: 'receiptPrinterUnset', message: 'Receipt printer (USB) mode is on but no receipt printer is chosen. Open Settings → Printer and pick it as the name tag printer.' }];
-    }
-  } else if (!receipt.isSafeHost(config.receiptHost)) {
-    return [{ type: 'receiptPrinterUnset', message: 'Receipt printer mode is on but no printer address is set. Open Settings → Printer and enter its IP (or press Find printers).' }];
-  }
-  if (!lastReceipt) return [];
-  const when = new Date(lastReceipt.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-  if (!lastReceipt.ok && lastReceipt.fellBackTo) {
-    return [{ type: 'receiptFallback', message: `The receipt printer failed at ${when} (${lastReceipt.error}), so labels are printing on "${lastReceipt.fellBackTo}" instead. Fix it, then press Send test tag in Settings.` }];
-  }
-  if (!lastReceipt.ok) {
-    return [{ type: 'receiptPrinterFailed', message: `The receipt printer failed at ${when} (${lastReceipt.error}) and no backup printer could take the label. Fix it, then reprint from the failures list.` }];
-  }
-  if (lastReceipt.paperLow) {
-    return [{ type: 'receiptPaperLow', message: 'The receipt printer reports its paper roll is nearly out. Have a spare roll ready.' }];
-  }
-  return [];
+// The /health half: one {type, message} warning while the last label went to
+// the backup printer. Clears on the next good print.
+function printerFallbackWarnings() {
+  if (!lastLabelBackup) return [];
+  const at = new Date(lastLabelBackup.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  return [{ type: 'printerFallback', message: `The name tag printer failed at ${at} (${lastLabelBackup.error}), so labels went to the backup "${lastLabelBackup.to}". Check it, then print a test label.` }];
 }
 
 // ── Musical printer (#11/#12) ─────────────────────────────────────────────────
@@ -3213,9 +3038,6 @@ try {
 let lastTune = null; // { ok, tune, printer, error?, at }
 async function playTuneIfEnabled(printerName, tuneName) {
   if (config.musicalPrinter !== true) return false;
-  // The receipt-printer trial is silent on purpose (owner's decision): an
-  // ESC/POS head can't sing, and the 4×2 fallback stays quiet too.
-  if (receipt.isEnabled(config)) return false;
   const name = TUNE_NAMES.includes(tuneName) ? tuneName : nextTuneName();
   for (let attempt = 1; attempt <= 2; attempt++) {
     try {
@@ -3458,9 +3280,9 @@ function lateGoToLine(clubName, now = new Date()) {
   return where ? `Go to: ${where}` : '';
 }
 
-// ── The drop-off tag (7.7.0) ──────────────────────────────────────────────────
-// On the receipt printer, a child who arrives late gets a plain name tag and
-// the family gets ONE extra tag: "Drop-off locations at 6:42 PM", then a line
+// ── The drop-off tag (7.7.0; on the label printer since 7.17.0) ──────────────
+// A child who arrives late gets a plain name tag and the family gets ONE
+// extra label: "Drop-off locations at 6:42 PM", then a line
 // per child of the household (TwoTimTwo's, from the check-in laptop's
 // /touch/context; a child it doesn't place is a household of one), each with
 // where their club is right now. Owner's choices: the whole household, printed
@@ -3496,8 +3318,7 @@ function dropOffTagFor(firstName, lastName, clubName, now = new Date(), opts = {
   const time = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
   return { title: `Drop-off locations at ${time}`, family: titleCaseName(String(lastName || '').trim()) || 'this', lines };
 }
-// One 4x2 page (the receipt printer scales it to the roll like every tag): a
-// black band with the title, then a row per child, the name in the shout and
+// One 4x2 label: a black band with the title, then a row per child, the name in the shout and
 // where to go beside it, all sized to fit.
 async function generateDropOffTag(tag) {
   const cvs = createCanvas(PX_W, PX_H);
@@ -4166,10 +3987,10 @@ async function performCheckinPrint(input) {
   const extras = {};
   let goTo = null;
   try { goTo = lateGoToLine(effectiveClubName); } catch (e) { console.warn(`[print] Late routing failed (${e && e.message}) — no "Go to" line`); }
-  // On the receipt printer a late child's tag carries no "Go to:" line: the
-  // family gets one drop-off tag instead, after the name tag (7.7.0).
-  const dropOffInstead = !!goTo && receipt.isEnabled(config);
-  if (goTo && !dropOffInstead) extras.goToLine = goTo;
+  // A late child's name tag carries no "Go to:" line: the family gets one
+  // drop-off label instead, after the name tag (owner, 2026-10-08: the card
+  // the receipt printer had, on the label printer).
+  const dropOffInstead = !!goTo;
   if (visitor && config.firstTimerInverted !== false) extras.inverted = true;
 
   let pngPath = null;
@@ -4319,7 +4140,7 @@ async function performCheckinPrint(input) {
       }
     }
 
-    // The drop-off tag (7.7.0): a late child on the receipt printer, and the
+    // The drop-off tag: a late child, and the
     // first of their household tonight. Never fails the check-in.
     if (dropOffInstead) {
       let dropPath = null;
@@ -5720,20 +5541,11 @@ app.get('/preview', async (req, res) => {
       footerText: labelFooterText(),
       template,
     });
-    // The preview is what the name tag printer will print (6.27.0): on a
-    // receipt roll that is the 1-bit tag at the roll's width, not the 4×2.
     // X-Tag-Size (inches, "w x h") lets the dashboard draw it at true size.
     res.set('Content-Type', 'image/png');
-    if (receipt.isEnabled(config)) {
-      const tag = await receipt.renderTagPng(result.pngPath, receipt.optionsFrom(config).dots);
-      res.set('X-Tag-Size', `${(tag.width / RECEIPT_DPI).toFixed(2)}x${(tag.height / RECEIPT_DPI).toFixed(2)}`);
-      res.set('X-Tag-Printer', 'receipt');
-      res.send(tag.buffer);
-    } else {
-      res.set('X-Tag-Size', '4.00x2.00');
-      res.set('X-Tag-Printer', 'label');
-      res.send(result.buffer);
-    }
+    res.set('X-Tag-Size', '4.00x2.00');
+    res.set('X-Tag-Printer', 'label');
+    res.send(result.buffer);
     // Clean up temp file
     fs.unlink(result.pngPath, () => {});
   } catch (err) {
@@ -5830,9 +5642,7 @@ async function reprintRow(entry, printerName, opts = {}) {
     pngPath = result.pngPath;
 
     if (!silent) await playTuneIfEnabled(effectivePrinter, birthday ? 'birthday' : undefined);
-    let copies = null;
-    if (opts.jam) copies = await printJamCopies(pngPath);
-    else await printLabel(pngPath, effectivePrinter);
+    await printLabel(pngPath, effectivePrinter);
 
     addHistoryEntry({
       firstName: entry.firstName, lastName: entry.lastName,
@@ -5841,7 +5651,7 @@ async function reprintRow(entry, printerName, opts = {}) {
     });
 
     console.log(`[reprint] ${fullName}`);
-    return copies ? { ok: true, name: fullName, copies } : { ok: true, name: fullName };
+    return { ok: true, name: fullName };
   } catch (err) {
     console.error('[reprint] Error:', err.message);
     addHistoryEntry({
@@ -5971,62 +5781,15 @@ app.post('/reprint-range', async (req, res) => {
   });
 });
 
-// "Printer jammed" on the touch check-in (7.4.0). One tap, no confirm (the
-// owner's call): every check-in label from the last JAM_WINDOW_MS prints again,
-// once on the Star and once on the backup label printer. Receipt mode only:
-// with a 4×2 label printer there is no Star to be jammed. Rows come from
-// selectReprintRange, so failed, undone, award and leader rows never print and
-// a child appears once.
-const JAM_WINDOW_MS = 60 * 1000;
-
-// One reprint run at a time, across both routes. A second tap on "Printer
-// jammed" (or a range reprint while a jam reprint runs) used to start a second
-// loop interleaved with the first: every label twice, the gap between them
-// gone, and the jam fed faster. Now it is refused with 409 and told how far
-// the first run has got; the page retries when it is done.
+// One reprint run at a time. A second range reprint while one runs used to
+// start a second loop interleaved with the first: every label twice, the gap
+// between them gone. Now it is refused with 409 and told how far the first run
+// has got; the page retries when it is done.
 let reprintRun = null;
 function reprintBusyMessage() {
   const r = reprintRun;
-  const what = r.kind === 'jam' ? 'The jam reprint' : 'A reprint';
-  return `${what} is already running (${r.printed} of ${r.count} printed). Wait for it to finish.`;
+  return `A reprint is already running (${r.printed} of ${r.count} printed). Wait for it to finish.`;
 }
-
-app.get('/touch/jam', (req, res) => {
-  const t = printingTarget();
-  res.json({ available: t.kind === 'receipt', backup: t.backup || null, windowSec: JAM_WINDOW_MS / 1000, busy: reprintRun ? { ...reprintRun } : null });
-});
-
-app.post('/jam-reprint', async (req, res) => {
-  if (!receipt.isEnabled(config)) {
-    return res.status(409).json({ error: 'Printer jammed is for the Star receipt printer, and it is not the selected printer.' });
-  }
-  if (isRehearsalActive()) {
-    return res.status(409).json({ error: 'Rehearsal mode is armed — disarm it before reprinting.' });
-  }
-  const now = Date.now();
-  const sel = selectReprintRange({
-    history: loadHistory(), fromISO: new Date(now - JAM_WINDOW_MS).toISOString(), toISO: new Date(now).toISOString(),
-  });
-  if (sel.error || !sel.count) return res.json({ success: true, count: 0, printed: [], star: 0, label: 0 });
-  if (reprintRun) return res.status(409).json({ error: reprintBusyMessage(), busy: reprintRun });
-  reprintRun = { kind: 'jam', count: sel.rows.length, printed: 0, startedAt: Date.now() };
-
-  const printed = [];
-  let star = 0, label = 0, starError = null, labelError = null, stopped = null;
-  try {
-  for (let i = 0; i < sel.rows.length; i++) {
-    const r = await reprintRow(sel.rows[i], '', { silent: true, jam: true });
-    if (!r.ok) { stopped = { name: r.name, error: r.error }; break; }
-    printed.push(r.name);
-    reprintRun.printed = printed.length;
-    if (r.copies.star === 'ok') star++; else starError = r.copies.star;
-    if (r.copies.label === 'ok') label++; else labelError = r.copies.label;
-    if (i < sel.rows.length - 1) await new Promise(done => setTimeout(done, REPRINT_RANGE_GAP_MS));
-  }
-  } finally { reprintRun = null; }
-  console.log(`[jam-reprint] ${printed.length}/${sel.rows.length} (star ${star}, label ${label})${stopped ? ` — stopped at ${stopped.name}` : ''}`);
-  return res.json({ success: !stopped, count: sel.rows.length, printed, star, label, starError, labelError, stoppedAt: stopped });
-});
 
 // ── Award slip labels ─────────────────────────────────────────────────────────
 // A small recognition slip ("🏅 Awarded: <award>") for a completed book or
@@ -7990,6 +7753,42 @@ async function clearPrintQueue(printerName) {
 const SPOOLER_UNKNOWN = Object.freeze(
   { unknown: true, count: null, oldestAgeMs: null, stuck: false, errorStatuses: [] });
 
+// The name tag printer's setup, judged from Get-Printer's Name + PrinterStatus
+// rows (null when the query failed). Pure, so every case is tested off
+// Windows. A missing printer and an offline one both mean labels are not
+// coming out; no printer chosen means they go to whatever Windows' default
+// printer is (a PDF writer, or the retired receipt printer); and a chosen
+// printer that looks like the retired receipt printer is said out loud.
+const PRINTER_STATUS_PROBLEMS = {
+  1: 'paused', 2: 'in an error state', 4: 'reporting a paper jam', 5: 'out of labels',
+  7: 'reporting a paper problem', 8: 'offline (check its USB cable and power)',
+};
+const RECEIPT_LIKE_NAME = /\bstar\b|\btsp\s?\d|rongta|receipt|\b80\s?mm\b|\bpos[- ]?\d/i;
+function printerSetupWarnings(name, printers) {
+  const chosen = String(name || '').trim();
+  if (!chosen) {
+    return [{ type: 'printerUnset', message: 'No name tag printer is chosen, so labels go to Windows\' default printer. Pick the label printer (the D450) in Settings \u2192 Printer.' }];
+  }
+  const out = [];
+  if (RECEIPT_LIKE_NAME.test(chosen)) {
+    out.push({ type: 'printerLooksLikeReceipt', message: `The name tag printer is "${chosen}", which looks like the retired receipt printer. Pick the label printer (the D450) in Settings \u2192 Printer.` });
+  }
+  if (printers === null) {
+    out.push({ type: 'printerCheckFailed', message: 'Could not query printers' });
+    return out;
+  }
+  const row = (printers || []).find((p) => p && p.Name === chosen);
+  if (!row) {
+    out.push({ type: 'printerNotFound', message: `Printer "${chosen}" not found` });
+    return out;
+  }
+  const problem = PRINTER_STATUS_PROBLEMS[Number(row.PrinterStatus)];
+  if (problem) {
+    out.push({ type: 'printerOffline', message: `Windows says the name tag printer "${chosen}" is ${problem}. Labels will wait in the queue until it is fixed.` });
+  }
+  return out;
+}
+
 async function checkPrinterWarnings() {
   const now = Date.now();
   if (now - cachedPrinterCheck.checkedAt < PRINTER_CHECK_INTERVAL) {
@@ -8031,20 +7830,18 @@ async function probePrinterWarnings(now) {
 
   // Check printer (Windows only)
   let spooler = SPOOLER_UNKNOWN;
-  if (PRINTER_NAME && process.platform === 'win32') {
-    let printerFound = false;
-    try {
-      const raw = (await runPowerShell(['-Command', 'Get-Printer | Select-Object Name | ConvertTo-Json -Compress'], { timeout: 8000 })).trim();
-      let parsed = JSON.parse(raw);
-      if (!Array.isArray(parsed)) parsed = [parsed];
-      const names = parsed.map(p => p.Name);
-      printerFound = names.includes(PRINTER_NAME);
-      if (!printerFound) {
-        warnings.push({ type: 'printerNotFound', message: `Printer "${PRINTER_NAME}" not found` });
-      }
-    } catch (e) {
-      warnings.push({ type: 'printerCheckFailed', message: 'Could not query printers' });
+  if (process.platform === 'win32') {
+    let printers = null;
+    if (PRINTER_NAME) {
+      try {
+        const raw = (await runPowerShell(['-Command', 'Get-Printer | Select-Object Name,PrinterStatus | ConvertTo-Json -Compress'], { timeout: 8000 })).trim();
+        const parsed = JSON.parse(raw);
+        printers = Array.isArray(parsed) ? parsed : [parsed];
+      } catch (e) { printers = null; }
     }
+    const setup = printerSetupWarnings(PRINTER_NAME, printers);
+    warnings.push(...setup);
+    const printerFound = !!PRINTER_NAME && !setup.some((w) => w.type === 'printerNotFound' || w.type === 'printerCheckFailed');
 
     // The spooler probe (#256) sits OUTSIDE that try/catch so a queue failure
     // can never be mislabelled printerCheckFailed, and is skipped entirely
@@ -8268,7 +8065,7 @@ app.get('/health', async (req, res) => {
   // otherwise just print plainer labels and nobody would know why.
   const brandKit = brand.status();
   warnings.push(...brand.warnings());
-  warnings.push(...receiptWarnings());
+  warnings.push(...printerFallbackWarnings());
   let csvUpdatedAt = null;
   try {
     csvUpdatedAt = fs.statSync(CSV_FILE).mtime.toISOString();
@@ -8311,17 +8108,6 @@ app.get('/health', async (req, res) => {
     // the exact Win32 error when the RAW path fails — "it just prints
     // normal" must be diagnosable from the dashboard.
     musicalTune: { enabled: config.musicalPrinter === true, last: lastTune },
-    // Receipt-printer trial. The address is a LAN IP (no username in it), but
-    // it's kept to this computer anyway, like every other setting the check-in
-    // site has no business reading.
-    receiptPrinter: {
-      enabled: receipt.isEnabled(config),
-      connection: receipt.isEnabled(config) ? (receipt.isUsb(config) ? 'usb' : 'network') : null,
-      ...(isTrustedConfigOrigin(req) ? {
-        host: receipt.isUsb(config) ? (config.receiptPrinterName || null) : (config.receiptHost || null),
-      } : {}),
-      last: lastReceipt,
-    },
     // Windows spooler backlog (#256), as NUMBERS rather than prose, so the
     // Night Status card and any future UI don't have to parse a sentence.
     // Counts, ages and spooler status tokens only — deliberately never a
@@ -8550,7 +8336,7 @@ app.post('/config', (req, res) => {
     labelFooter, connectCardAutoFirstTimer, connectCardGreeting, seasonTheme,
     musicalPrinter, updateBeacon, slidesPublishToken, displayLoginPassphrase,
     trophyBand, fleetConfigUrl, pickupClubs,
-    printerType, receiptHost, receiptPort, receiptDots, receiptCut, receiptPrinterName, backupPrinterName,
+    backupPrinterName,
   } = req.body || {};
   if (!isTrustedConfigOrigin(req) && SECRET_CONFIG_KEYS.some(k => (req.body || {})[k] !== undefined)) {
     return res.status(403).json({ error: 'Pusher/PIN/display-login settings can only be changed from the dashboard on this computer' });
@@ -8705,17 +8491,6 @@ app.post('/config', (req, res) => {
     // printer model are a party trick, not a guarantee.
     if (musicalPrinter !== undefined) next.musicalPrinter = !!musicalPrinter;
     if (updateBeacon !== undefined) next.updateBeacon = !!updateBeacon;
-    // Receipt-printer trial (print-server/receipt.js). 'label' is the default
-    // and deletes the key, so a church that never opts in keeps a clean file.
-    if (printerType !== undefined) {
-      const pt = String(printerType || 'label');
-      if (pt === 'label') delete next.printerType;
-      else if (receipt.RECEIPT_TYPES.includes(pt)) next.printerType = pt;
-      else return res.status(400).json({ error: 'printerType must be label, receipt or receipt-usb' });
-    }
-    // The USB receipt printer's Windows name. It reaches a PowerShell script,
-    // so it gets the same refusal as worksheetPrinter: never persist anything
-    // that isn't a plain printer label.
     // "If it fails, print on" (6.26.0). Kept even when empty: '' is a choice
     // (no backup), unlike a missing key, which means a config from before it.
     if (backupPrinterName !== undefined) {
@@ -8723,34 +8498,11 @@ app.post('/config', (req, res) => {
       if (!isSafePrinterName(bp)) return res.status(400).json({ error: 'backupPrinterName contains unsupported characters' });
       next.backupPrinterName = bp;
     }
-    if (receiptPrinterName !== undefined) {
-      const rp = String(receiptPrinterName || '').trim();
-      if (rp === '') delete next.receiptPrinterName;
-      else if (!isSafePrinterName(rp)) return res.status(400).json({ error: 'receiptPrinterName contains unsupported characters' });
-      else next.receiptPrinterName = rp;
-    }
-    if (receiptHost !== undefined) {
-      const rh = String(receiptHost || '').trim();
-      if (rh === '') delete next.receiptHost;
-      else if (!receipt.isSafeHost(rh)) return res.status(400).json({ error: 'The receipt printer address must be an IP address like 192.168.1.50' });
-      else next.receiptHost = rh;
-    }
-    if (receiptPort !== undefined) {
-      if (receiptPort === '' || receiptPort === null || Number(receiptPort) === receipt.RECEIPT_DEFAULT_PORT) delete next.receiptPort;
-      else if (!receipt.normalizePort(receiptPort)) return res.status(400).json({ error: 'The receipt printer port must be 1-65535' });
-      else next.receiptPort = receipt.normalizePort(receiptPort);
-    }
-    if (receiptDots !== undefined) {
-      if (receiptDots === '' || receiptDots === null || Number(receiptDots) === receipt.RECEIPT_DEFAULT_DOTS) delete next.receiptDots;
-      else if (!receipt.normalizeDots(receiptDots)) return res.status(400).json({ error: `The printable width must be ${receipt.RECEIPT_MIN_DOTS}-${receipt.RECEIPT_MAX_DOTS} dots` });
-      else next.receiptDots = receipt.normalizeDots(receiptDots);
-    }
-    if (receiptCut !== undefined) {
-      const rc = String(receiptCut || 'full');
-      if (rc === 'full') delete next.receiptCut;
-      else if (rc === 'partial') next.receiptCut = 'partial';
-      else return res.status(400).json({ error: 'receiptCut must be full or partial' });
-    }
+    // The receipt-printer trial's settings leave the file on this save, and a
+    // backup that named the receipt printer goes with them.
+    const retiredReceipt = String(next.receiptPrinterName || '').trim().toLowerCase();
+    RETIRED_PRINTER_KEYS.forEach((k) => { delete next[k]; });
+    if (retiredReceipt && String(next.backupPrinterName || '').trim().toLowerCase() === retiredReceipt) next.backupPrinterName = '';
     if (enableDrivenCheckin !== undefined) next.enableDrivenCheckin = !!enableDrivenCheckin;
     // "Clubs on the pickup list" (7.16.0): the one setting every lobby
     // screen's still-here list follows. null puts it back to the default
@@ -8873,62 +8625,6 @@ app.post('/play-tune', async (req, res) => {
   const tune = String((req.body || {}).tune || '') || undefined;
   const ok = await playTuneIfEnabled(wanted || PRINTER_NAME, tune);
   res.json({ ok, tune: lastTune ? lastTune.tune : null, error: !ok && lastTune ? lastTune.error : undefined });
-});
-
-// Receipt-printer trial: "Send test tag" and "Find printers". Dashboard-only
-// (trusted origin), like /play-tune. The test tag deliberately goes ONLY to the
-// receipt printer, never the 4×2 fallback, because its whole job is to prove
-// that printer works; and it accepts the form's unsaved values so an operator
-// can try an address before saving it. A TEST label records nothing.
-function receiptOverrides(body) {
-  const b = body || {};
-  const out = receipt.optionsFrom({ ...config, ...Object.fromEntries(
-    ['printerType', 'receiptHost', 'receiptPort', 'receiptDots', 'receiptCut', 'receiptPrinterName']
-      .filter(k => b[k] !== undefined && b[k] !== '').map(k => [k, b[k]])) });
-  return out;
-}
-
-app.post('/receipt/test', async (req, res) => {
-  if (!isTrustedConfigOrigin(req)) {
-    return res.status(403).json({ error: 'The test tag only works from the dashboard on this computer' });
-  }
-  const opts = receiptOverrides(req.body);
-  // The form's printer type decides which connection the test uses; the
-  // 'label' choice (testing before switching) means the network one.
-  if (String((req.body || {}).printerType || '') === 'receipt-usb') opts.usb = true;
-  else if ((req.body || {}).printerType !== undefined) opts.usb = false;
-  if (opts.usb) {
-    if (!opts.printerName || !isSafePrinterName(opts.printerName)) {
-      return res.status(400).json({ error: 'Pick the receipt printer from the list first' });
-    }
-  } else if (!receipt.isSafeHost(opts.host)) {
-    return res.status(400).json({ error: 'Enter the receipt printer\'s IP address first (or press Find printers)' });
-  }
-  let pngPath = null;
-  try {
-    const result = await generateLabel({ firstName: 'Test tag', lastName: '', clubName: 'Test', testBanner: true });
-    pngPath = result.pngPath;
-    const r = await printReceipt(pngPath, opts);
-    lastReceipt = { ok: true, at: new Date().toISOString(), paperLow: r.paperLow };
-    res.json({ ok: true, host: opts.usb ? opts.printerName : opts.host, usb: opts.usb, status: r.status || null, paperLow: r.paperLow });
-  } catch (e) {
-    res.status(502).json({ ok: false, error: String(e.message || e) });
-  } finally {
-    if (pngPath) fs.unlink(pngPath, () => {});
-  }
-});
-
-app.post('/receipt/discover', async (req, res) => {
-  if (!isTrustedConfigOrigin(req)) {
-    return res.status(403).json({ error: 'Finding printers only works from the dashboard on this computer' });
-  }
-  const port = receipt.normalizePort((req.body || {}).receiptPort) || receipt.RECEIPT_DEFAULT_PORT;
-  try {
-    const printers = await receipt.discover({ port });
-    res.json({ printers, subnets: receipt.localSubnets().map(s => s.base + '.0/24') });
-  } catch (e) {
-    res.status(500).json({ error: String(e.message || e) });
-  }
 });
 
 // Clear a jammed printer's backlog (#256). Gated the way /play-tune and
@@ -9494,8 +9190,7 @@ app.use((err, req, res, next) => {
 function prewarmPrinterIfConfigured() {
   try {
     const prewarmConfig = loadConfigFile();
-    // Not in receipt mode: a blank 5.7in tag would just waste sticker stock.
-    if (prewarmConfig.prewarmPrinter && !receipt.isEnabled(prewarmConfig)) {
+    if (prewarmConfig.prewarmPrinter) {
       setTimeout(async () => {
         try {
           console.log('[prewarm] Sending blank label to printer...');
@@ -9742,7 +9437,7 @@ module.exports = {
   // Range reprint (#257) — the selector is pure, so every exclusion rule
   // (awards, leader tags, failed rows, undone rows, the club filter, the
   // newest-row-per-child dedupe and the cap) is testable without printing.
-  selectReprintRange, REPRINT_RANGE_MAX, REPRINT_RANGE_GAP_MS, printJamCopies, JAM_WINDOW_MS, sanitizeTouchContext,
+  selectReprintRange, REPRINT_RANGE_MAX, REPRINT_RANGE_GAP_MS, sanitizeTouchContext,
   dropOffTagFor, generateDropOffTag,
   localDayISO, historyIdentityKey, clubKey,
   // Remembered leaders + the one club list every dropdown reads. Pure but for
@@ -9765,8 +9460,8 @@ module.exports = {
   easterSunday, seasonForDate, SEASON_KEYS, currentScreenSeason,
   // Musical printer (#11/#12) — the TSPL compiler is the testable artifact.
   buildTuneTspl, nextTuneName, TUNE_NAMES, TUNE_ROTATION,
-  // Receipt-printer trial: the dispatcher every label print goes through.
-  printLabel, receiptWarnings,
+  // The dispatcher every label print goes through (with its backup printer).
+  printLabel, printerFallbackWarnings, backupPrinter, RETIRED_PRINTER_KEYS, printerSetupWarnings,
   // Spooler backlog (#256). The verdict and both parsers are PURE so the one
   // piece of judgement here is exhaustively testable on a machine with no
   // Windows spooler at all — which is every CI runner this repo has.
