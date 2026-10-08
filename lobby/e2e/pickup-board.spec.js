@@ -200,7 +200,9 @@ for (const [width, height] of [[1920, 1080], [1280, 720], [640, 480]]) {
       expect(shown + more.reduce((a, b) => a + b, 0)).toBe(60);
       // A 1080p TV names every one of them; 720p and the Pi say "+N more".
       if (width === 1920) expect(more).toEqual([]);
-      await expect(board.locator('.checkout-foot')).toContainText('60 not checked out yet');
+      // No count line under the title any more (owner, 2026-10-08).
+      await expect(board.locator('.checkout-foot')).toHaveCount(0);
+      await expect(board).not.toContainText('not checked out yet');
       // The slides above carry on as normal.
       expect(await copyOpacity()).toBe(1);
       await expect(page.locator('.stage.board-up')).toHaveCount(0);

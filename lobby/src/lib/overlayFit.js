@@ -542,8 +542,7 @@ export function footHeight(pieces, s, width) {
  * `height`; where even `min` cannot hold it, names come off the longest club
  * first, one at a time (the last alphabetically), into a "+N more" chip at
  * that club's end, until it fits. Every club keeps its plate, which still
- * counts all of its children, and the count line under the run says the
- * whole number, so nobody is ever silently left off. `fits` is false only
+ * counts all of its children, so nobody is ever silently left off. `fits` is false only
  * when even the plates and their "+N more" chips cannot fit (a box far too
  * small for any list), and the run is then cut by the box. Units are the
  * caller's (u, or px), the same for every number.

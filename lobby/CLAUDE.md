@@ -1072,7 +1072,7 @@ house waves, and who holds which part of the room is one pure function,
   notice keeps the middle, celebrations are never held for it, the tonight
   strip steps away while it is up, and the first-run card yields its seat to
   it. A names list fills the strip: a house-blue tab at the left end with the
-  title over the whole count line, then every club's plate (white mark or
+  title, then every club's plate (white mark or
   name, "N waiting") followed by its name chips, one run wrapping across the
   strip. `fitFoot` (overlayFit.js) sizes the chips to the run's MEASURED box
   (CheckoutBoard's ResizeObserver; jsdom falls back to the 1080p box in u):
@@ -1081,7 +1081,7 @@ house waves, and who holds which part of the room is one pure function,
   Settings preview, a TV in miniature, has no px floor). Where even that
   cannot hold everyone, the longest club's last names go behind a "+N more"
   chip, one at a time, until it fits; every plate still counts all its
-  children and the count line says the total. Measured with real fonts: the
+  children. Measured with real fonts: the
   60-entry cap of ordinary names all shows at 1920x1080 (~15.5px chips) and
   1280x720 (~10.3px); the Pi's 640x480 run is ~310x110px, so a long list
   there is mostly "+N more" (about 13 of 40 names show). A stale or empty

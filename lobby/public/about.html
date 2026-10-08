@@ -255,8 +255,7 @@
      -------------------------------------------------------------------------- */
   /* The real board is the kit's white card in a strip along the bottom of
      the screen, under the slides (2026-10-07): a blue tab at its left end
-     with the title and the honest count line, then each club's plate ("N
-     waiting") followed by its names as chips in the club's colour, wrapping
+     with the title, then each club's plate ("N waiting") followed by its names as chips in the club's colour, wrapping
      across the strip. Plates and chips use each club's deep shade here so the
      mock's small print stays AA at mock size. */
   .cid-board {
@@ -267,7 +266,6 @@
   .cid-board--line { top: auto; bottom: 2.5%; left: 5%; right: 26%; translate: none; width: fit-content; max-width: 69%; margin-inline: auto; padding: 4.8cqi 3cqi 2cqi; }
   .cid-board--strip { top: auto; left: 5%; right: 21%; bottom: 2.5%; translate: none; width: auto; height: 31%; padding: 0 1.4cqi 0 0; display: flex; align-items: stretch; gap: 1.2cqi; }
   .cid-board--strip .cid-board__tab { position: static; align-self: stretch; display: flex; flex-direction: column; justify-content: center; gap: .6cqi; padding: 0 1.4cqi 0 1.4cqi; border-radius: 0 2cqi 2cqi 0; white-space: normal; flex: none; width: max(13cqi, 7em); }
-  .cid-board--strip .cid-board__foot { margin: 0; flex-basis: 100%; font-size: max(1.4cqi, var(--cid-min)); line-height: 1.15; }
   .cid-board__run { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; align-items: center; align-content: center; gap: .5cqi .6cqi; min-width: 0; }
   .cid-board__run li { display: contents; }
   .cid-board--strip .cid-board__plate { display: inline-flex; align-items: center; gap: .5cqi; padding: .3cqi .8cqi; }
@@ -281,7 +279,6 @@
   .cid-board__club { font: 400 max(2.2cqi, var(--cid-min))/1 var(--cid-label); letter-spacing: .08em; text-transform: uppercase; }
   .cid-board__count { font: 400 max(1.5cqi, var(--cid-min))/1 var(--cid-label); letter-spacing: .08em; text-transform: uppercase; }
   .cid-board__name { padding: .35em .7em .3em; border-radius: 999px; background: var(--club); color: #fff; font: 400 max(2.4cqi * var(--cid-fit), var(--cid-min))/1 var(--cid-shout); white-space: nowrap; }
-  .cid-board__foot { margin: 1.6cqi 0 0; font: 600 max(1.8cqi, var(--cid-min) + 1px)/1.3 var(--cid-read); color: #4b5058; }
   .cid-board__line { margin: 0; font: 800 max(2.4cqi, var(--cid-min))/1.3 var(--cid-read); max-width: 46ch; color: #1d2433; }
 
   /* --------------------------------------------------------------------------
@@ -934,7 +931,7 @@
         <div class="cid-pair">
           <figure class="fam-frame fam-frame--tv">
             <div class="fam-frame__stage">
-              <div class="fam-frame__screen cid-scr" role="img" aria-label="Recreation of the lobby TV at pickup time: the slide above still reads This week, Bring a friend next week! Along the bottom, a white strip titled Still to be picked up lists each club's names after its plate: Cubbies, 2 waiting: Ava and Leo. Sparks, 3 waiting: Eli, Micah and Nora. T and T, 2 waiting: Grace and Noah. Its last line reads 7 not checked out yet. A stepped sticker in the corner shows the time, Right now, 8:05.">
+              <div class="fam-frame__screen cid-scr" role="img" aria-label="Recreation of the lobby TV at pickup time: the slide above still reads This week, Bring a friend next week! Along the bottom, a white strip titled Still to be picked up lists each club's names after its plate: Cubbies, 2 waiting: Ava and Leo. Sparks, 3 waiting: Eli, Micah and Nora. T and T, 2 waiting: Grace and Noah. A stepped sticker in the corner shows the time, Right now, 8:05.">
                 <div aria-hidden="true">
                   <span class="cid-blob cid-blob--a"></span><span class="cid-blob cid-blob--b"></span>
                   <svg class="cid-dz" style="left:6%;top:14%;width:7cqi;height:3.5cqi" viewBox="0 0 40 20"><use href="#i-dz-arc"/></svg>
@@ -949,12 +946,11 @@
                     <li style="--club:#2F4F8A"><span class="cid-board__plate"><span class="cid-board__club">Cubbies</span><span class="cid-board__count">2 waiting</span></span><span class="cid-board__name">Ava</span><span class="cid-board__name">Leo</span></li>
                     <li style="--club:#B82B32"><span class="cid-board__plate"><span class="cid-board__club">Sparks</span><span class="cid-board__count">3 waiting</span></span><span class="cid-board__name">Eli</span><span class="cid-board__name">Micah</span><span class="cid-board__name">Nora</span></li>
                     <li style="--club:#2F7A47"><span class="cid-board__plate"><span class="cid-board__club">T&amp;T</span><span class="cid-board__count">2 waiting</span></span><span class="cid-board__name">Grace</span><span class="cid-board__name">Noah</span></li>
-                    <li><span class="cid-board__foot">7 not checked out yet</span></li>
                   </ul>
                 </div>
               </div>
             </div>
-            <figcaption class="fam-frame__caption"><b>Fig. 7</b> With plenty of children still waiting, first names stand after their club’s plate along the bottom of the screen, the slide carries on above, and the strip says “not checked out yet.”<span class="fam-frame__recreated">Recreated for illustration. Names are examples.</span></figcaption>
+            <figcaption class="fam-frame__caption"><b>Fig. 7</b> With plenty of children still waiting, first names stand after their club’s plate along the bottom of the screen, and the slide carries on above.<span class="fam-frame__recreated">Recreated for illustration. Names are examples.</span></figcaption>
           </figure>
           <figure class="fam-frame fam-frame--tv">
             <div class="fam-frame__stage">

@@ -3361,7 +3361,7 @@ input:focus-visible {
 }
 
 /* The list: the card fills the strip, the tab its left end
-   (the title on two lines, the count line under it, white on house blue),
+   (the title on two lines, white on house blue),
    then the run of every club's plate and chips wrapping across the room
    left, the strip's whole height. The run's box comes from this grid, never
    from the chips, so the fit can measure it. */
@@ -3374,8 +3374,8 @@ input:focus-visible {
   padding: 0.45em 0.9em 0.45em 0;
 }
 /* The wavy tab is a corner shape (its wave runs corner to corner), so on a
-   column this tall it would leave the count line's lower rows on the white
-   card: the list's tab is a solid house-blue panel with a round right edge. */
+   column this tall it would leave the tab's lower rows on the white card:
+   the list's tab is a solid house-blue panel with a round right edge. */
 .checkout-board--list .checkout-tab {
   flex-direction: column;
   align-items: flex-start;
@@ -3444,17 +3444,6 @@ input:focus-visible {
   flex-direction: column;
   align-items: flex-start;
   gap: 0.4em;
-}
-.checkout-board--list .checkout-foot {
-  margin: 0;
-  font-size: 0.8em;
-  line-height: 1.25;
-  color: #fff;
-}
-.checkout-board--list .checkout-count {
-  display: block;
-  font-size: 1.9em;
-  color: #fff;
 }
 .checkout-demo {
   flex: none;
@@ -3575,23 +3564,6 @@ input:focus-visible {
   text-shadow: 0.06em 0.06em 0 var(--club-deep, var(--brand-blue-deep));
 }
 
-/* The count line carries the honest wording — "not checked out yet", the label
-   count, and the data's age. It is small but must never be omitted: without it
-   the list reads as a verified headcount, which it is not. */
-.checkout-foot {
-  font-family: var(--font-body);
-  font-weight: 600;
-  color: #4b5058;
-}
-.checkout-count {
-  margin-right: 0.12em;
-  font-family: var(--font-shout);
-  /* Paytone One's figures at 1 / 1.05 of their size: they stand 5% shorter
-     than the caps the line around them was drawn for. */
-  line-height: 0.95;
-  color: var(--brand-ink);
-  vertical-align: -0.08em;
-}
 .checkout-line {
   margin: 0;
   font-family: var(--font-body);

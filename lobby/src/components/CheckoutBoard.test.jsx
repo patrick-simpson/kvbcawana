@@ -26,7 +26,7 @@ describe('CheckoutBoard', () => {
     expect(container.innerHTML).toBe('');
   });
 
-  it('at pickup time names each child as a chip in their club\'s colour, after the club\'s plate, with the honest count line', () => {
+  it('at pickup time names each child as a chip in their club\'s colour, after the club\'s plate, with no count line under the title', () => {
     const { container } = still(<CheckoutBoard decision={{ state: 'names', ageMin: 3 }} checkout={checkout} />);
     // Always in the foot: the strip under the slides (owner, 2026-10-07).
     expect(container.querySelector('.checkout-region')).not.toBeNull();
@@ -43,9 +43,11 @@ describe('CheckoutBoard', () => {
     expect(sparks.querySelector('.checkout-names').textContent).toBe('Demo Kid · Sample Star');
     // Sized by the fit (unmeasured in jsdom: its 1080p box, in u).
     expect(board.style.getPropertyValue('--name-size')).toMatch(/^calc\([\d.]+ \* var\(--u\)\)$/);
-    const foot = board.querySelector('.checkout-meta .checkout-foot');
-    expect(foot.querySelector('.checkout-count').textContent).toBe('3');
-    expect(foot.textContent).toBe('3 not checked out yet · 43 labels printed tonight · updated 3 min ago');
+    // The tab is its title alone: no count line (owner, 2026-10-08). Each
+    // plate's "N waiting" says the count.
+    expect(board.querySelector('.checkout-foot')).toBeNull();
+    expect(board.querySelector('.checkout-meta')).toBeNull();
+    expect(board.textContent).not.toMatch(/not checked out yet|labels printed|updated \d+ min ago/);
     expect(board.textContent).not.toMatch(/still in the building/i);
     expect(board.querySelector('.checkout-demo')).toBeNull();
     expect(board.querySelector('.checkout-more')).toBeNull();
@@ -59,7 +61,7 @@ describe('CheckoutBoard', () => {
     expect(last.querySelector('.checkout-plate__count').textContent).toBe('1 waiting');
   });
 
-  it('the 60-entry cap never lists more than fits: the rest stand behind "+N more", every plate and the count line whole', () => {
+  it('the 60-entry cap never lists more than fits: the rest stand behind "+N more", every plate whole', () => {
     // Ten long names in each of six clubs, in jsdom's 1080p box at its rough
     // (wide) letter widths.
     const clubs = ['Puggles', 'Cubbies', 'Sparks', 'T&T', 'Trek', 'Journey'];
@@ -72,14 +74,15 @@ describe('CheckoutBoard', () => {
     const more = [...container.querySelectorAll('.checkout-more')].map((m) => Number(/^\+(\d+) more$/.exec(m.textContent)[1]));
     expect(more.length).toBeGreaterThan(0);
     expect(shown + more.reduce((a, b) => a + b, 0)).toBe(60);
-    expect(container.querySelector('.checkout-foot').textContent).toMatch(/^60 not checked out yet/);
+    expect(container.querySelector('.checkout-foot')).toBeNull();
+    expect(container.querySelector('.checkout-board').textContent).not.toMatch(/not checked out yet/);
   });
 
-  it('a demo says so on the card and in the count line', () => {
+  it('a demo says so on the card', () => {
     const { container } = still(<CheckoutBoard decision={{ state: 'names', ageMin: 30 }} checkout={checkout} demo />);
     expect(container.querySelector('.checkout-meta .checkout-demo').textContent).toBe('Demo · sample names');
-    expect(container.querySelector('.checkout-foot').textContent).toMatch(/a demo, not real children$/);
-    expect(container.querySelector('.checkout-foot').textContent).not.toMatch(/updated/);
+    expect(container.querySelector('.checkout-foot')).toBeNull();
+    expect(container.textContent).not.toMatch(/not checked out yet|a demo, not real children/);
   });
 
   it('names nobody when the decision is anonymous', () => {

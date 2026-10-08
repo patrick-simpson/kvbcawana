@@ -39,13 +39,14 @@ import {
 // announcements."; until then a live list at pickup time took the middle and
 // the copy stepped aside behind it).
 //
-//  - A names board fills the strip: the tab at the left end, its title over
-//    the honest count line, then every club's plate (its white mark, "N
-//    waiting") followed by its names as chips in its colour, alphabetical, in
-//    one run that wraps across the strip (fitFoot sizes the chips to the
-//    strip's measured box). Where even the smallest chips cannot hold
-//    everyone, a club's last names stand behind a "+N more" chip; its plate and
-//    the count line still say the whole number.
+//  - A names board fills the strip: the tab at the left end with its title,
+//    then every club's plate (its white mark, "N waiting") followed by its
+//    names as chips in its colour, alphabetical, in one run that wraps across
+//    the strip (fitFoot sizes the chips to the strip's measured box). Where
+//    even the smallest chips cannot hold everyone, a club's last names stand
+//    behind a "+N more" chip; its plate still says the whole number.
+//    (Owner, 2026-10-08: the "not checked out yet · N labels printed tonight"
+//    line under the title is gone; each plate's "N waiting" says the count.)
 //  - A stale or empty board, or the anonymous line, is a one-line card on the
 //    strip's floor, in the same words.
 //
@@ -104,7 +105,7 @@ function useRunBox(ref, active) {
  *   <MotionConfig reducedMotion="user">, so this only covers the operator's own
  *   "simplified mode" switch.
  * @param {boolean} [props.demo] a sample board (Settings' preview and demo):
- *   it says so on its card and its count line, so it can never pass for a real list
+ *   it says so on its card, so it can never pass for a real list
  * @param {boolean} [props.preview] drawn in Settings' miniature TV: no floor
  *   in px on the chips' size
  */
@@ -142,7 +143,6 @@ export default function CheckoutBoard({ decision, checkout, calm, demo = false, 
   if (!shown) return null;
 
   const entries = checkout?.entries || [];
-  const count = entries.length;
   const clubs = listed
     ? groupByClub(entries, getAllClubs()).map((g) => {
       const club = getClubPalette(g.club);
@@ -195,18 +195,6 @@ export default function CheckoutBoard({ decision, checkout, calm, demo = false, 
     </div>
   );
   const demoTag = demo && <span className="checkout-demo">Demo · sample names</span>;
-  const countLine = state === BOARD_NAMES && (
-    <p className="checkout-foot">
-      {/* "not checked out yet", never "still in the building" — the data
-          cannot support the stronger claim, and the weaker one is what a
-          volunteer needs to act on anyway. */}
-      <span className="checkout-count">{count}</span> not checked out yet
-      {typeof checkout?.printed === 'number' && ` · ${checkout.printed} labels printed tonight`}
-      {!demo && decision.ageMin > 1 && ` · updated ${decision.ageMin} min ago`}
-      {demo && ' · a demo, not real children'}
-    </p>
-  );
-
   return (
     // Keyed on what it shows, so moving between the one line and the list
     // lands the card afresh rather than stretching it across the strip.
@@ -219,9 +207,9 @@ export default function CheckoutBoard({ decision, checkout, calm, demo = false, 
       >
         {listed ? (
           <>
-            {/* The tab carries the count line under its title, so the run
+            {/* The tab is its title alone (and the demo's tag), so the run
                 has the strip's whole height. */}
-            {tab(<div className="checkout-meta">{countLine}{demoTag}</div>)}
+            {tab(demo ? <div className="checkout-meta">{demoTag}</div> : null)}
             <ul className="checkout-run" ref={runRef}>
               {/* Every club in one run, youngest to oldest, each led by its
                   own plate (its white mark and how many are waiting) so a

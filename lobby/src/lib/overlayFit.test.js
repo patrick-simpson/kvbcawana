@@ -375,9 +375,8 @@ describe('the overlays\' shouts hold stage 4b-2\'s cap heights in Paytone One', 
     expect(Math.abs(lh(rule) - 1 / 1.05)).toBeLessThanOrEqual(0.005);
   });
 
-  it('the pickup board\'s count: Paytone One\'s figures at 1 / 1.05', () => {
-    // Sized afresh for the foot (2026-10-07), in em of the strip's words.
-    expect(Math.abs(lh(body('.checkout-count')) - 1 / 1.05)).toBeLessThanOrEqual(0.005);
+  it('the pickup board has no count line any more (owner, 2026-10-08): its styles are gone', () => {
+    expect(css).not.toMatch(/checkout-count|checkout-foot/);
   });
 
   it('the pickup board\'s names: drawn NAME_CHIP_TEXT x the chip\'s size, the pill as it was', () => {
@@ -507,8 +506,9 @@ describe('the pickup board in the foot (fitFoot)', () => {
 
   // The strip and the card in px, from app.css (.checkout-region and
   // .checkout-board--list): the run is what is left of the strip after the
-  // card's padding, the tab (its padding and a title at most 7em of 0.9em),
-  // the column gap, and the count line under it. Measured with jsdom's rough
+  // card's padding, the tab (its padding and a title at most 7em of 0.9em)
+  // and the column gap; the tab is a column of its own, so nothing sits
+  // under the run. Measured with jsdom's rough
   // widths (0.7em a Paytone letter, wider than the real face), so a run that
   // fits here has room to spare on a TV.
   const run = (w, h) => {
@@ -519,7 +519,7 @@ describe('the pickup board in the foot (fitFoot)', () => {
     const height = h / 2 - 18.675 * u;
     const em = Math.max(11, 0.95 * u);
     const tab = (1 + 2.6 + 7 * 0.9) * em;
-    return { strip: { width, height }, width: width - 0.9 * em - 0.9 * em - tab, height: height - 0.85 * em - 0.3 * em - 1.4 * em };
+    return { strip: { width, height }, width: width - 0.9 * em - 0.9 * em - tab, height: height - 0.85 * em - 0.3 * em };
   };
   // The printer sends at most 60 entries (sanitizeCheckout): here ten in each
   // club, of ordinary first-name lengths, and then of long ones.
