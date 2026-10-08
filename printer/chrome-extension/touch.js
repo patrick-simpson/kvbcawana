@@ -478,6 +478,63 @@
     '  animation:pop .3s cubic-bezier(.3,1.6,.5,1) both}',
     '.toast.bad .tick{color:#B82B32}',
     '@keyframes pop{from{transform:scale(.3)}to{transform:none}}',
+    // ── One-off name tag (7.18.0): the top bar's button and its sheet ──────
+    '.obtn{all:unset;cursor:pointer;height:52px;padding:0 22px 0 18px;border-radius:999px;background:#fff;color:#2F4F8A;',
+    '  display:inline-flex;align-items:center;gap:10px;box-shadow:0 2px 8px rgba(15,23,42,.12);',
+    '  font-family:"Londrina Solid","Arial Narrow",sans-serif;font-size:21px;letter-spacing:.05em;text-transform:uppercase;white-space:nowrap}',
+    '.obtn svg{width:24px;height:24px;flex:none;color:#4C72B8}',
+    '.obtn:focus-visible,.ctile:focus-visible,.close:focus-visible{outline:3px solid #231F20;outline-offset:2px}',
+    '.sheet.one{width:min(720px,100%);--club:#4C72B8}',
+    '.one .bar{background:#E2E8F0;transition:background .2s ease}',
+    '.one.picked .bar{background:var(--club)}',
+    '.one .hd{display:flex;align-items:baseline;justify-content:space-between;gap:16px}',
+    '.one .nm{font-size:38px;color:#2F4F8A}',
+    '.one .x{all:unset;cursor:pointer;flex:none;width:48px;height:48px;margin:-6px -6px 0 0;border-radius:50%;background:#F1F5F9;color:#334155;',
+    '  display:grid;place-items:center;font-size:22px}',
+    '.one .quiet{margin:6px 0 0;color:#64748b;font:500 17px/1.35 "Figtree",system-ui,sans-serif}',
+    '.one input{display:block;width:100%;height:76px;margin-top:20px;border-radius:20px;border:3px solid #E2E8F0;background:#fff;',
+    '  padding:0 24px;font:600 30px "Figtree",system-ui,sans-serif;color:#231F20;outline:none;transition:border-color .15s ease}',
+    '.one input:focus{border-color:#4C72B8}',
+    '.one input::placeholder{color:#94a3b8;font-weight:500}',
+    '.one .lbl{font-family:"Londrina Solid","Arial Narrow",sans-serif;font-size:20px;letter-spacing:.06em;text-transform:uppercase;color:#4C72B8;margin:20px 4px 10px}',
+    '.ctiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}',
+    '.ctile{all:unset;box-sizing:border-box;cursor:pointer;position:relative;display:flex;align-items:center;justify-content:center;min-height:72px;padding:0 14px;',
+    '  border-radius:18px;border:3px solid transparent;background:color-mix(in srgb,var(--c) 14%,#fff);color:var(--d);',
+    '  font-family:"Londrina Solid","Arial Narrow",sans-serif;font-size:26px;letter-spacing:.05em;text-transform:uppercase}',
+    '.ctile .ck{position:absolute;right:10px;top:50%;margin-top:-13px;width:26px;height:26px;border-radius:50%;background:#fff;color:var(--d);',
+    '  display:none;place-items:center;font:700 16px "Figtree",system-ui,sans-serif}',
+    '.ctile.on{background:var(--c);color:#fff;border-color:var(--d);text-shadow:.07em .07em 0 var(--d)}',
+    '.ctile.on .ck{display:grid;text-shadow:none;animation:boxpop 360ms cubic-bezier(.3,.7,.4,1) both}',
+    '.one .oerr{min-height:24px;margin:12px 4px 0;color:#B82B32;font:700 18px/1.3 "Figtree",system-ui,sans-serif}',
+    '.one .acts{margin-top:10px}',
+    '.one .btn.go{background:var(--club)}',
+    // ── Undo check-in (7.18.0): tonight's list, each row with its undo ─────
+    '.sheet.undo{display:flex;flex-direction:column;max-height:calc(100vh - 32px)}',
+    '.undo .uf{height:60px;margin-top:16px;font-size:24px}',
+    '.undo .uf[hidden]{display:none}',
+    '.undo>*{flex:none}',
+    '.undo>.urows{flex:1 1 auto}',
+    '.urows{flex:1;min-height:120px;overflow-y:auto;margin:12px -12px 0;padding:0 12px;overscroll-behavior:contain}',
+    '.urow{display:flex;align-items:center;gap:14px;min-height:76px;padding:10px 4px;border-bottom:1px solid #E2E8F0;transition:opacity .15s ease}',
+    '.urow:last-child{border-bottom:none}',
+    '.urow .dot{width:14px;height:14px;border-radius:50%;background:var(--c);flex:none}',
+    '.urow .who{flex:1;min-width:0}',
+    '.urow .un{font:400 24px/1.1 "Paytone One","Figtree",sans-serif;color:#231F20;overflow-wrap:anywhere}',
+    '.urow .meta{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px;margin-top:4px;font:600 16px "Figtree",system-ui,sans-serif;color:#64748b}',
+    '.urow .meta .cl{font-family:"Londrina Solid","Arial Narrow",sans-serif;font-size:17px;letter-spacing:.05em;text-transform:uppercase;color:var(--d)}',
+    '.urow .meta .tag{font-size:15px;padding:2px 9px}',
+    '.urow .ask{margin-top:4px;font:700 17px/1.3 "Figtree",system-ui,sans-serif;color:#231F20}',
+    '.urow .uerr{margin-top:4px;font:700 16px/1.3 "Figtree",system-ui,sans-serif;color:#B82B32}',
+    '.urow .acts2{display:flex;gap:8px;flex:none}',
+    '.ub{all:unset;box-sizing:border-box;cursor:pointer;display:grid;place-items:center;min-height:52px;min-width:104px;padding:0 18px;border-radius:16px;',
+    '  border:3px solid #E2E8F0;background:#fff;color:#B82B32;font:700 19px "Figtree",system-ui,sans-serif;white-space:nowrap}',
+    '.ub.calm{color:#334155}',
+    '.ub.do{background:#B82B32;border-color:#B82B32;color:#fff}',
+    '.ub[disabled]{cursor:default;color:#94a3b8;border-color:#E2E8F0;background:#F8FAFC}',
+    '.urow.busy .un{color:#64748b}',
+    '.urow.asking{background:#FFF7F2;border-radius:16px;border-bottom-color:transparent;padding:10px 12px;margin:2px -8px}',
+    '.uhint{padding:28px 8px;text-align:center;color:#64748b;font:500 19px "Figtree",system-ui,sans-serif}',
+    '.ub:focus-visible{outline:3px solid #231F20;outline-offset:2px}',
     // ── Jelly (7.4.0): the lobby's soft squish, its spring exactly ─────────
     // Jelly UI's scale spring (stiffness 260, damping 17, mass 1), as the
     // lobby's squish.js writes it: releaseEasing() over 750 ms, and the same
@@ -487,11 +544,11 @@
     // the family page and the toast spring in. Exits stay quick and plain,
     // the lobby's rule. The linear() strings are written out literally, never
     // behind var(), so a browser that cannot read one keeps the plain motion.
-    '.card,.fam,.fcard,.famsm,.btn,.go1,.opt,.close,.clear{transform-origin:50% 100%;',
+    '.card,.fam,.fcard,.famsm,.btn,.go1,.opt,.close,.clear,.obtn,.ctile,.one .x,.ub{transform-origin:50% 100%;',
     '  transition-property:scale,translate,border-color,background,filter;transition-duration:520ms;',
     '  transition-timing-function:cubic-bezier(.34,1.56,.64,1);transition-timing-function:linear(0, 0.213, 0.605, 0.93, 1.103, 1.142, 1.106, 1.05, 1.006, 0.984, 0.98, 0.986, 0.994, 1, 1.002, 1.003, 1)}',
     '.card:active,.fam:active,.fcard:active,.famsm:active,.tile .go1:active{transform:none;scale:1.03 .92;translate:0 3px;transition-duration:80ms;transition-timing-function:ease-out}',
-    '.btn:active,.opt:active,.close:active,.search .clear:active{transform:none;scale:1.06 .9;translate:0 3px;transition-duration:80ms;transition-timing-function:ease-out}',
+    '.btn:active,.opt:active,.close:active,.search .clear:active,.obtn:active,.ctile:active,.one .x:active,.ub:not([disabled]):active{transform:none;scale:1.06 .9;translate:0 3px;transition-duration:80ms;transition-timing-function:ease-out}',
     '.search .clear:active{translate:0 calc(-50% + 2px)}',
     '.card.in:active{scale:none;translate:none}',
     // 7.6.0: joyful and quick. A piece lands in ~half a second: up from below,
@@ -543,7 +600,15 @@
     var close = el('button', 'close', '✕');
     close.setAttribute('aria-label', 'Close touch check-in');
     close.addEventListener('click', closeScreen);
-    top.append(el('div', 'title', 'Check in'), els.count, el('div', 'sp'), close);
+    var oneBtn = el('button', 'obtn');
+    oneBtn.append(tagIcon(), document.createTextNode('One-off tag'));
+    oneBtn.setAttribute('aria-label', 'Print a one-off name tag');
+    oneBtn.addEventListener('click', openOneOff);
+    var undoBtn = el('button', 'obtn');
+    undoBtn.append(undoIcon(), document.createTextNode('Undo check-in'));
+    undoBtn.setAttribute('aria-label', 'Undo a check-in');
+    undoBtn.addEventListener('click', openUndo);
+    top.append(el('div', 'title', 'Check in'), els.count, el('div', 'sp'), undoBtn, oneBtn, close);
 
     var search = els.search = el('div', 'search');
     var input = els.input = el('input');
@@ -570,16 +635,24 @@
     els.list.setAttribute('aria-live', 'polite');
 
     els.scrim = el('div', 'scrim');
-    els.scrim.addEventListener('click', closeConfirm);
+    els.scrim.addEventListener('click', function () { if (oneOffOpen()) closeOneOff(); else if (undoOpen()) closeUndo(); else closeConfirm(); });
     els.sheet = el('div', 'sheet');
     els.sheet.setAttribute('role', 'dialog');
+    els.one = el('div', 'sheet one');
+    els.one.setAttribute('role', 'dialog');
+    els.one.setAttribute('aria-modal', 'true');
+    els.one.setAttribute('aria-label', 'One-off name tag');
+    els.undo = el('div', 'sheet one undo');
+    els.undo.setAttribute('role', 'dialog');
+    els.undo.setAttribute('aria-modal', 'true');
+    els.undo.setAttribute('aria-label', 'Undo a check-in');
     els.sib = el('div', 'sib');
     els.sib.setAttribute('role', 'dialog');
     els.toast = el('div', 'toast');
 
     els.ghosts = el('div', 'ghosts');
     wrap.append(top, search, els.list, els.ghosts);
-    root.append(style, wrap, els.scrim, els.sheet, els.sib, els.toast);
+    root.append(style, wrap, els.scrim, els.sheet, els.one, els.undo, els.sib, els.toast);
     document.addEventListener('keydown', onKey, true);
   }
 
@@ -942,7 +1015,7 @@
   // family page holds the screen still.
   var lastSearchSig = '';
   setInterval(function () {
-    if (!state.open || !els.input || els.sheet.classList.contains('on') || siblingsOpen()) return;
+    if (!state.open || !els.input || els.sheet.classList.contains('on') || oneOffOpen() || undoOpen() || siblingsOpen()) return;
     if (els.input.value.trim()) {
       var sig = famSig() + '#' + Object.keys(recentlyIn).length;
       if (sig !== lastSearchSig) { lastSearchSig = sig; render(); }
@@ -961,7 +1034,7 @@
       if (sig === lastTonightSig) return;
       lastTonightSig = sig;
       tonight = list;
-      if (els.sheet.classList.contains('on') || siblingsOpen()) {
+      if (els.sheet.classList.contains('on') || oneOffOpen() || undoOpen() || siblingsOpen()) {
         var n = people().filter(function (p) { return p.checkedIn; }).length;
         els.count.textContent = n ? n + ' checked in tonight' : '';
       } else render();
@@ -1199,7 +1272,9 @@
     window.__awanaTouchLastTap = Date.now();
     if (e.key === 'Escape') {
       e.preventDefault();
-      if (els.sheet.classList.contains('on')) closeConfirm();
+      if (oneOffOpen()) closeOneOff();
+      else if (undoOpen()) { if (undo.ask) { undo.ask = null; renderUndo(); } else closeUndo(); }
+      else if (els.sheet.classList.contains('on')) closeConfirm();
       else if (siblingsOpen()) closeSiblings();
       else closeScreen();
       return;
@@ -1211,6 +1286,369 @@
       els.input.value = '';
       try { els.input.focus({ preventScroll: true }); } catch (err) { els.input.focus(); }
     }
+  }
+
+  // ── One-off name tag (7.18.0) ─────────────────────────────────────────────
+  // A tag for a child who is not checking in here and now: a lost or torn tag,
+  // or a child along for the night. A typed first name and a club (no roster
+  // lookup), printed through POST /print-oneoff: the screens welcome them, the
+  // count never moves, and the print log keeps a row marked one-off. After a
+  // print the name clears and the club stays, so a volunteer can do several in
+  // a row; Done, Escape or the scrim closes it.
+  var ONE_ORDER = ['4', '1', '2', '3', '6', '7'];   // youngest first, as GET /clubs
+  var one = { club: '', busy: false, built: false };
+
+  function tagIcon() {
+    var NS = 'http://www.w3.org/2000/svg';
+    var svg = document.createElementNS(NS, 'svg');
+    svg.setAttribute('viewBox', '0 0 24 24');
+    svg.setAttribute('fill', 'none');
+    svg.setAttribute('stroke', 'currentColor');
+    svg.setAttribute('stroke-width', '2.4');
+    svg.setAttribute('stroke-linejoin', 'round');
+    svg.setAttribute('aria-hidden', 'true');
+    var p = document.createElementNS(NS, 'path');
+    p.setAttribute('d', 'M3 12V5a2 2 0 0 1 2-2h7l9 9-9 9z');
+    var c = document.createElementNS(NS, 'circle');
+    c.setAttribute('cx', '8'); c.setAttribute('cy', '8'); c.setAttribute('r', '1.7');
+    svg.append(p, c);
+    return svg;
+  }
+
+  function oneOffOpen() { return !!(els.one && els.one.classList.contains('on')); }
+
+  function buildOneOff() {
+    var s = els.one;
+    var hd = el('div', 'hd');
+    var x = el('button', 'x', '✕');
+    x.setAttribute('aria-label', 'Close');
+    x.addEventListener('click', function () { closeOneOff(); });
+    hd.append(el('div', 'nm', 'One-off name tag'), x);
+    var quiet = el('p', 'quiet', 'Prints a name tag and welcomes them on the screens. It doesn’t count toward tonight.');
+    var input = els.oneName = el('input');
+    input.type = 'text';
+    input.maxLength = 40;
+    input.placeholder = 'Child’s first name';
+    input.autocomplete = 'off';
+    input.spellcheck = false;
+    input.setAttribute('autocapitalize', 'words');
+    input.setAttribute('enterkeyhint', 'go');
+    input.setAttribute('aria-label', 'Child’s first name');
+    input.addEventListener('input', function () { els.oneErr.textContent = ''; syncOneOff(); });
+    // The keys are this field's: nothing on the page behind hears them.
+    input.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') return;                 // the screen's own Escape closes the sheet
+      e.stopPropagation();
+      if (e.key === 'Enter') { e.preventDefault(); printOneOff(); }
+    });
+    var lbl = el('div', 'lbl', 'Club');
+    lbl.id = 'awana-oneoff-club-l';
+    var tiles = el('div', 'ctiles');
+    tiles.setAttribute('role', 'radiogroup');
+    tiles.setAttribute('aria-labelledby', lbl.id);
+    els.oneTiles = [];
+    ONE_ORDER.forEach(function (id) {
+      var c = CLUBS[id];
+      var t = el('button', 'ctile');
+      t.setAttribute('role', 'radio');
+      t.setAttribute('aria-checked', 'false');
+      t.style.setProperty('--c', c.color);
+      t.style.setProperty('--d', c.deep);
+      t.dataset.club = c.name;
+      t.append(document.createTextNode(c.name), el('span', 'ck', '✓'));
+      t.addEventListener('click', function () {
+        one.club = c.name;
+        els.oneErr.textContent = '';
+        syncOneOff();
+        if (!els.oneName.value.trim()) focusOneName();
+      });
+      tiles.append(t);
+      els.oneTiles.push(t);
+    });
+    els.oneErr = el('div', 'oerr');
+    els.oneErr.setAttribute('role', 'alert');
+    var acts = el('div', 'acts');
+    var done = el('button', 'btn no', 'Done');
+    done.addEventListener('click', function () { closeOneOff(); });
+    var go = els.oneGo = el('button', 'btn go', 'Print tag');
+    go.addEventListener('click', printOneOff);
+    acts.append(done, go);
+    s.append(el('div', 'bar'), hd, quiet, input, lbl, tiles, els.oneErr, acts);
+    one.built = true;
+  }
+
+  // The button wakes only with a name and a club; the sheet takes the club's colour.
+  function syncOneOff() {
+    var club = one.club ? clubFor('', one.club) : null;
+    els.one.classList.toggle('picked', !!club);
+    els.one.style.setProperty('--club', club ? club.color : '#4C72B8');
+    els.oneTiles.forEach(function (t) {
+      var on = t.dataset.club === one.club;
+      t.classList.toggle('on', on);
+      t.setAttribute('aria-checked', on ? 'true' : 'false');
+    });
+    els.oneGo.disabled = one.busy || !club || !els.oneName.value.trim();
+    els.oneGo.textContent = one.busy ? 'Printing…' : 'Print tag';
+  }
+
+  function focusOneName() {
+    setTimeout(function () { try { els.oneName.focus({ preventScroll: true }); } catch (e) { els.oneName.focus(); } }, 30);
+  }
+
+  function openOneOff() {
+    if (!one.built) buildOneOff();
+    closeConfirm();
+    closeUndo(true);
+    els.oneErr.textContent = '';
+    syncOneOff();
+    els.scrim.classList.add('on');
+    els.one.classList.add('on');
+    focusOneName();
+  }
+
+  // quiet: the whole screen is closing, so the search keeps its own focus.
+  function closeOneOff(quiet) {
+    if (!els.one || !oneOffOpen()) return;
+    els.one.classList.remove('on');
+    els.scrim.classList.remove('on');
+    if (quiet) return;
+    setTimeout(function () { try { els.input.focus({ preventScroll: true }); } catch (e) { /* ignore */ } }, 30);
+  }
+
+  function printOneOff() {
+    if (one.busy || !els.oneName) return;
+    var name = els.oneName.value.replace(/\s+/g, ' ').trim();
+    if (!name) { els.oneErr.textContent = 'Type the child’s first name.'; focusOneName(); return; }
+    if (!one.club) { els.oneErr.textContent = 'Pick the child’s club.'; return; }
+    if (typeof API.printOneOff !== 'function') { els.oneErr.textContent = 'Reload this page to print one-off tags.'; return; }
+    one.busy = true;
+    els.oneErr.textContent = '';
+    syncOneOff();
+    API.printOneOff(name, one.club).then(function (d) {
+      one.busy = false;
+      var first = (d && d.firstName) || name;
+      toast(d && d.demo ? 'Test tag printed' : d && d.duplicate ? 'Already printing' : 'Printing ' + first + '’s tag', false);
+      els.oneName.value = '';
+      syncOneOff();
+      if (oneOffOpen()) focusOneName();
+    }).catch(function (err) {
+      one.busy = false;
+      syncOneOff();
+      els.oneErr.textContent = (err && err.message) || 'The tag did not print. Try again.';
+      if (oneOffOpen()) focusOneName();
+    });
+  }
+
+  // ── Undo check-in (7.18.0) ────────────────────────────────────────────────
+  // Everyone counted tonight (POST /phone/tonight), newest first, each with
+  // the phone's own Undo check-in: confirmed on the row, queued for this tab's
+  // extension (POST /phone/undo with inTwoTimTwo) and followed on
+  // /phone/status until TwoTimTwo confirms or the reason comes back. Nothing
+  // changes until it does. A row with no TwoTimTwo id (a visitor, a label
+  // printed before the roster knew them) can only be Removed from tonight's
+  // count, here only, and says so.
+  var UNDO_GIVE_UP_MS = 3 * 60 * 1000;   // as the phone: a minute to pick up, 90 s to report
+  var undo = { built: false, entries: null, loadErr: '', ask: null, busy: {}, err: {} };
+
+  function undoIcon() {
+    var NS = 'http://www.w3.org/2000/svg';
+    var svg = document.createElementNS(NS, 'svg');
+    svg.setAttribute('viewBox', '0 0 24 24');
+    svg.setAttribute('fill', 'none');
+    svg.setAttribute('stroke', 'currentColor');
+    svg.setAttribute('stroke-width', '2.4');
+    svg.setAttribute('stroke-linecap', 'round');
+    svg.setAttribute('stroke-linejoin', 'round');
+    svg.setAttribute('aria-hidden', 'true');
+    var a = document.createElementNS(NS, 'path');
+    a.setAttribute('d', 'M9 14 4 9l5-5');
+    var b = document.createElementNS(NS, 'path');
+    b.setAttribute('d', 'M4 9h10.5a5.5 5.5 0 0 1 0 11H11');
+    svg.append(a, b);
+    return svg;
+  }
+
+  function undoOpen() { return !!(els.undo && els.undo.classList.contains('on')); }
+  function undoKey(e) { return e.key || (e.clubberId ? 'id:' + e.clubberId : 'n:' + norm(e.firstName + ' ' + e.lastName)); }
+  function undoName(e) { return ((e.firstName || '') + ' ' + (e.lastName || '')).trim(); }
+  function canUndoThere(e) { return !!e.clubberId && !e.visitor; }
+
+  function buildUndo() {
+    var s = els.undo;
+    var hd = el('div', 'hd');
+    var x = el('button', 'x', '✕');
+    x.setAttribute('aria-label', 'Close');
+    x.addEventListener('click', function () { closeUndo(); });
+    hd.append(el('div', 'nm', 'Undo a check-in'), x);
+    var quiet = el('p', 'quiet', 'Everyone checked in tonight, newest first. An undo happens in TwoTimTwo too.');
+    var f = els.undoFilter = el('input', 'uf');
+    f.type = 'text';
+    f.placeholder = 'Find a name';
+    f.autocomplete = 'off';
+    f.spellcheck = false;
+    f.setAttribute('autocapitalize', 'words');
+    f.setAttribute('aria-label', 'Find a child in tonight’s list');
+    f.addEventListener('input', function () { undo.ask = null; renderUndo(); });
+    f.addEventListener('keydown', function (e) { if (e.key !== 'Escape') e.stopPropagation(); });
+    els.undoRows = el('div', 'urows');
+    els.undoRows.setAttribute('aria-live', 'polite');
+    var acts = el('div', 'acts');
+    var done = el('button', 'btn no', 'Done');
+    done.addEventListener('click', function () { closeUndo(); });
+    acts.append(done);
+    s.append(el('div', 'bar'), hd, quiet, f, els.undoRows, acts);
+    undo.built = true;
+  }
+
+  function loadUndo() {
+    if (typeof API.tonightEntries !== 'function') { undo.entries = []; undo.loadErr = 'Reload this page to undo check-ins here.'; renderUndo(); return Promise.resolve(); }
+    return API.tonightEntries().then(function (list) {
+      undo.entries = list.slice().sort(function (a, b) { return String(b.at || '').localeCompare(String(a.at || '')); });
+      undo.loadErr = '';
+      renderUndo();
+    }).catch(function (err) {
+      if (!undo.entries) undo.entries = [];
+      undo.loadErr = (err && err.message) || 'Can’t reach the print app.';
+      renderUndo();
+    });
+  }
+
+  function renderUndo() {
+    if (!undo.built) return;
+    var box = els.undoRows;
+    var all = undo.entries;
+    els.undoFilter.hidden = !all || all.length <= 8;
+    while (box.firstChild) box.removeChild(box.firstChild);
+    if (!all) { box.append(el('div', 'uhint', 'Loading tonight’s list…')); return; }
+    if (undo.loadErr && !all.length) { box.append(el('div', 'uhint', undo.loadErr)); return; }
+    var q = els.undoFilter.hidden ? '' : els.undoFilter.value;
+    var shown = q.trim() ? searchPeople(all.map(function (e) { return { name: undoName(e), e: e }; }), q).matches.map(function (p) { return p.e; }) : all;
+    if (!all.length) { box.append(el('div', 'uhint', 'No one is checked in tonight.')); return; }
+    if (!shown.length) { box.append(el('div', 'uhint', 'No one tonight matches “' + q.trim() + '”.')); return; }
+    shown.forEach(function (e) { box.append(undoRow(e)); });
+  }
+
+  function undoRow(e) {
+    var k = undoKey(e), club = clubFor('', e.clubName), name = undoName(e);
+    var there = canUndoThere(e), busy = !!undo.busy[k], asking = undo.ask === k && !busy;
+    var row = el('div', 'urow' + (busy ? ' busy' : '') + (asking ? ' asking' : ''));
+    row.style.setProperty('--c', e.clubName ? club.color : '#CBD5E1');
+    row.style.setProperty('--d', club.deep);
+    var who = el('div', 'who');
+    who.append(el('div', 'un', name || 'No name'));
+    var acts = el('div', 'acts2');
+    if (asking) {
+      who.append(el('div', 'ask', there
+        ? 'Undo ' + (e.firstName || name) + '’s check-in? It is undone in TwoTimTwo too.'
+        : 'Remove ' + (e.firstName || name) + ' from tonight’s count? Nothing changes in TwoTimTwo.'));
+      var no = el('button', 'ub calm', 'Cancel');
+      no.addEventListener('click', function () { undo.ask = null; renderUndo(); });
+      var yes = el('button', 'ub do', there ? 'Undo' : 'Remove');
+      yes.addEventListener('click', function () { runUndo(e); });
+      acts.append(no, yes);
+      setTimeout(function () { try { yes.focus({ preventScroll: true }); } catch (err) { /* ignore */ } }, 30);
+    } else {
+      var meta = el('div', 'meta');
+      if (e.clubName) meta.append(el('span', 'cl', club.name || e.clubName));
+      var t = timeOf(e.at);
+      if (t) meta.append(el('span', null, t));
+      if (e.visitor) meta.append(el('span', 'tag', 'Visitor'));
+      if (e.checkedOut) meta.append(el('span', 'tag', 'Checked out'));
+      if (!there) meta.append(el('span', null, e.visitor ? 'Not on TwoTimTwo: Remove only' : 'No TwoTimTwo id here: Remove only'));
+      who.append(meta);
+      if (undo.err[k]) who.append(el('div', 'uerr', undo.err[k]));
+      var b = el('button', 'ub', busy ? (there ? 'Undoing…' : 'Removing…') : there ? 'Undo' : 'Remove');
+      b.setAttribute('aria-label', (there ? 'Undo check-in for ' : 'Remove from tonight’s count: ') + name);
+      if (busy) b.disabled = true;
+      else b.addEventListener('click', function () { delete undo.err[k]; undo.ask = k; renderUndo(); });
+      acts.append(b);
+    }
+    row.append(el('span', 'dot'), who, acts);
+    return row;
+  }
+
+  function openUndo() {
+    if (!undo.built) buildUndo();
+    closeConfirm();
+    closeOneOff(true);
+    undo.ask = null;
+    els.undoFilter.value = '';
+    renderUndo();
+    els.scrim.classList.add('on');
+    els.undo.classList.add('on');
+    loadUndo().then(function () {
+      if (undoOpen() && !els.undoFilter.hidden) { try { els.undoFilter.focus({ preventScroll: true }); } catch (e) { /* ignore */ } }
+    });
+  }
+
+  function closeUndo(quiet) {
+    if (!els.undo || !undoOpen()) return;
+    undo.ask = null;
+    els.undo.classList.remove('on');
+    els.scrim.classList.remove('on');
+    if (quiet) return;
+    setTimeout(function () { try { els.input.focus({ preventScroll: true }); } catch (e) { /* ignore */ } }, 30);
+  }
+
+  function runUndo(e) {
+    var k = undoKey(e), there = canUndoThere(e);
+    var first = e.firstName || undoName(e);
+    undo.ask = null;
+    undo.busy[k] = true;
+    delete undo.err[k];
+    renderUndo();
+    API.undoCheckin(e, there).then(function (d) {
+      if (there && d && d.id) { pollUndo(e, d.id, Date.now()); return; }
+      delete undo.busy[k];
+      if (there) {
+        // An older print app Removed the child from the count instead.
+        undo.err[k] = 'Only removed from tonight’s count: the print app is older and cannot undo in TwoTimTwo. Undo there too.';
+        loadUndo();
+        return;
+      }
+      undoDone(e, first + ' is off tonight’s count');
+    }).catch(function (err) {
+      delete undo.busy[k];
+      undo.err[k] = (err && err.message) || 'That did not go through.';
+      renderUndo();
+    });
+  }
+
+  function pollUndo(e, id, started) {
+    var k = undoKey(e);
+    setTimeout(function () {
+      if (!undo.busy[k]) return;
+      API.undoStatus(id).then(function (s) {
+        if (s && s.status === 'done') { delete undo.busy[k]; undoDone(e, (e.firstName || undoName(e)) + '’s check-in is undone'); return; }
+        if (s && s.status === 'failed') { fail(s.detail || 'TwoTimTwo did not undo it. Check at the desk.'); return; }
+        next();
+      }).catch(function (err) {
+        if (err && err.status === 404) { fail('The print app lost track of it (restarted?). Check TwoTimTwo before trying again.'); return; }
+        next();
+      });
+    }, 1500);
+    function fail(why) { delete undo.busy[k]; undo.err[k] = 'Not undone: ' + why; renderUndo(); }
+    function next() {
+      if (Date.now() - started > UNDO_GIVE_UP_MS) { fail('the check-in page has not answered. Check TwoTimTwo before trying again.'); return; }
+      pollUndo(e, id, started);
+    }
+  }
+
+  // Off the list; the child's tile comes back (content.js puts TwoTimTwo's
+  // row back on the page after a confirmed undo), and the page reloads when
+  // the screen closes, so TwoTimTwo's own lists are fresh.
+  function undoDone(e, msg) {
+    var k = undoKey(e);
+    if (undo.entries) undo.entries = undo.entries.filter(function (x) { return undoKey(x) !== k; });
+    var n = norm(undoName(e));
+    Object.keys(recentlyIn).forEach(function (id) {
+      if (id === String(e.clubberId) || norm(recentlyIn[id].name) === n) delete recentlyIn[id];
+    });
+    checkedInThisVisit = true;
+    renderUndo();
+    toast(msg, false);
+    refreshTonight();
+    if (undoOpen()) loadUndo();
   }
 
   // ── Open / close ──────────────────────────────────────────────────────────
@@ -1266,6 +1704,8 @@
     var reload = checkedInThisVisit;
     checkedInThisVisit = false;
     if (typeof API.closed === 'function') setTimeout(function () { API.closed(reload); }, 320);
+    closeOneOff(true);
+    closeUndo(true);
     closeConfirm();
     els.sib.classList.remove('on');
     if (enteredFullscreen && document.fullscreenElement && document.exitFullscreen) {

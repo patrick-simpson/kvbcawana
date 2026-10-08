@@ -2,7 +2,7 @@
   if (window.__awanaPrinterLoaded) return;
   window.__awanaPrinterLoaded = true;
 
-  const EXTENSION_VERSION = '7.17.0';
+  const EXTENSION_VERSION = '7.18.0';
   const PRINT_COOLDOWN = 2000;
   // POST /print is synchronous on the server: PowerShell + a cold printer can
   // take 15-30 s (the server retries the spooler internally). This must sit
@@ -3423,10 +3423,10 @@
         // Count only LIVE check-ins: history is a log, so an undone kid's row
         // stays in it forever — counting raw rows was why the number never
         // went back down after an undo. Failed prints, award slips, connect
-        // cards and leader name tags never counted as check-ins either
-        // (mirrors the server's isNonCheckinRow()).
+        // cards, leader name tags and one-off name tags never counted as
+        // check-ins either (mirrors the server's isNonCheckinRow()).
         var entries = (allEntries || []).filter(function(e) {
-          return e && e.success !== false && !e.undone && !e.isAward && !e.isConnectCard && !e.isLeader;
+          return e && e.success !== false && !e.undone && !e.isAward && !e.isConnectCard && !e.isLeader && !e.oneOff;
         });
         if (count) count.textContent = entries.length ? entries.length + ' printed' : '';
         while (list.firstChild) list.removeChild(list.firstChild);
@@ -5225,7 +5225,7 @@
         .then(function(r) { return r.ok ? r.json() : []; })
         .then(function(all) {
           return (all || []).filter(function(e) {
-            return e && e.success !== false && !e.undone && !e.isAward && !e.isConnectCard && !e.isLeader;
+            return e && e.success !== false && !e.undone && !e.isAward && !e.isConnectCard && !e.isLeader && !e.oneOff;
           }).map(function(e) { return { name: ((e.firstName || '') + ' ' + (e.lastName || '')).trim(), at: e.timestamp || e.at || null, clubName: e.clubName || '' }; });
         })
         .catch(function() { return []; });
@@ -5244,6 +5244,61 @@
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload), signal: AbortSignal.timeout(5000),
       }).catch(function() { /* print app not running: phones keep the last copy */ });
+    },
+    // A one-off name tag (7.18.0): a typed first name and a club, printed and
+    // welcomed on the screens, never a check-in and never counted. Resolves
+    // the server's answer ({success, duplicate?, demo?}); rejects with
+    // Error(the server's own message) on a refusal or a printer failure.
+    printOneOff: function(firstName, clubName) {
+      return fetch(PRINT_SERVER + '/print-oneoff', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ firstName: firstName, clubName: clubName, printerName: selectedPrinterName || '' }),
+        signal: AbortSignal.timeout(20000),
+      }).then(function(r) {
+        return r.json().catch(function() { return {}; }).then(function(d) {
+          if (!r.ok || !d || d.success !== true) throw new Error((d && d.error) || 'The tag did not print.');
+          return d;
+        });
+      }, function() { throw new Error('Can\u2019t reach the print app. Is it running?'); });
+    },
+    // Undo check-in from the touch screen (7.18.0): tonight's counted children
+    // with what an undo needs (POST /phone/tonight; loopback, so no PIN), the
+    // undo itself (POST /phone/undo: inTwoTimTwo for a child with a TwoTimTwo
+    // id, queued for this tab's own poller exactly like the phone's Undo
+    // check-in; without one it is the local Remove), and its progress
+    // (GET /phone/status/:id). Each rejects with Error(the server's message);
+    // a status the server has lost rejects with err.status 404.
+    tonightEntries: function() {
+      return fetch(PRINT_SERVER + '/phone/tonight', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}',
+        signal: AbortSignal.timeout(5000),
+      }).then(function(r) {
+        if (!r.ok) throw new Error('The print app did not answer (HTTP ' + r.status + ').');
+        return r.json();
+      }, function() { throw new Error('Can\u2019t reach the print app. Is it running?'); })
+        .then(function(d) { return (d && Array.isArray(d.entries)) ? d.entries : []; });
+    },
+    undoCheckin: function(entry, inTwoTimTwo) {
+      var body = { firstName: entry.firstName || '', lastName: entry.lastName || '', clubberId: entry.clubberId || null };
+      if (inTwoTimTwo) body.inTwoTimTwo = true;
+      return fetch(PRINT_SERVER + '/phone/undo', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body), signal: AbortSignal.timeout(10000),
+      }).then(function(r) {
+        return r.json().catch(function() { return {}; }).then(function(d) {
+          if (!r.ok) { var e = new Error((d && d.error) || 'The print app refused that (HTTP ' + r.status + ').'); e.status = r.status; throw e; }
+          return d || {};
+        });
+      }, function() { throw new Error('Can\u2019t reach the print app. Is it running?'); });
+    },
+    undoStatus: function(id) {
+      return fetch(PRINT_SERVER + '/phone/status/' + encodeURIComponent(id), { signal: AbortSignal.timeout(5000) })
+        .then(function(r) {
+          return r.json().catch(function() { return {}; }).then(function(d) {
+            if (!r.ok) { var e = new Error((d && d.error) || 'HTTP ' + r.status); e.status = r.status; throw e; }
+            return d || {};
+          });
+        });
     },
     printServer: PRINT_SERVER,
   };

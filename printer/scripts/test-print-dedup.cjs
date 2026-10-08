@@ -108,8 +108,8 @@ const PORT = 34581;
     const src = fs.readFileSync(path.join(root, 'print-server', 'server.js'), 'utf8');
     const claims = (src.match(/claimPrint\(dupKey\)/g) || []).length;
     const releases = (src.match(/releasePrint\(dupKey\)/g) || []).length;
-    check('four guarded prints (check-in, award, leader, custom), each claiming', claims === 4, String(claims));
-    check('and each releasing in its finally', releases === 4, String(releases));
+    check('five guarded prints (check-in, award, leader, custom, one-off), each claiming', claims === 5, String(claims));
+    check('and each releasing in its finally', releases === 5, String(releases));
     check('the in-flight claim is tested before the 45 s window', /printsInFlight\.get\(nameKey\)[\s\S]*recentPrints\.get\(nameKey\)/.test(src.slice(src.indexOf('function isDuplicatePrint'), src.indexOf('function claimPrint'))));
   }
 

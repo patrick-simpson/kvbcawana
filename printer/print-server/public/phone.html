@@ -159,6 +159,15 @@
   .field input:focus, .field select:focus { border-color: var(--c-blue); outline: none; }
   .menu-sec { padding: 4px 0 6px; border-top: 1px solid var(--line); }
   .grab + .menu-sec, .grab + [hidden] + .menu-sec { border-top: none; }
+  /* One-off name tag (7.18.0): the clubs as club-coloured chips, youngest first. */
+  .cpick { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+  .cpick button { position: relative; border: 3px solid transparent; cursor: pointer; min-height: 46px; padding: 0 6px; border-radius: 14px;
+    background: color-mix(in srgb, var(--c) 14%, #fff); color: var(--d);
+    font-family: var(--f-label); font-size: 17px; letter-spacing: .05em; text-transform: uppercase; }
+  .cpick button[aria-checked="true"] { background: var(--c); border-color: var(--d); color: #fff; text-shadow: .07em .07em 0 var(--d); }
+  #oneoff-panel .btn.go { flex: none; }
+  .quiet { color: var(--ink-faint); font-size: 14px; line-height: 1.4; margin: 8px 2px 0; }
+  .quiet + .err { margin-top: 6px; }
 
   /* ── The family page ── */
   .fampage { position: fixed; inset: 0; z-index: 15; background: var(--page); display: flex; flex-direction: column;
@@ -210,12 +219,12 @@
   .toast :focus-visible { outline-color: var(--c-sun); }
 
   /* ── Jelly: the touch check-in's, the lobby's spring ── */
-  .fam, .fcard, .card, .famsm, .btn, .go1, .opt, .pill, .round, .row button { transform-origin: 50% 100%;
+  .fam, .fcard, .card, .famsm, .btn, .go1, .opt, .pill, .round, .row button, .cpick button { transform-origin: 50% 100%;
     transition-property: scale, translate, border-color, background; transition-duration: 520ms;
     transition-timing-function: cubic-bezier(.34,1.56,.64,1);
     transition-timing-function: linear(0, 0.213, 0.605, 0.93, 1.103, 1.142, 1.106, 1.05, 1.006, 0.984, 0.98, 0.986, 0.994, 1, 1.002, 1.003, 1); }
   .fam:active, .fcard:active, .card:active, .famsm:active, .go1:active { scale: 1.03 .92; translate: 0 3px; transition-duration: 80ms; transition-timing-function: ease-out; }
-  .btn:active, .opt:active, .pill:active, .round:active, .row button:active { scale: 1.06 .9; translate: 0 3px; transition-duration: 80ms; transition-timing-function: ease-out; }
+  .btn:active, .opt:active, .pill:active, .round:active, .row button:active, .cpick button:active { scale: 1.06 .9; translate: 0 3px; transition-duration: 80ms; transition-timing-function: ease-out; }
   .card.in:active { scale: none; translate: none; }
   @keyframes land { 0% { opacity: 0; translate: 0 16px; scale: .84 1.16; } 45% { opacity: 1; translate: 0 -3px; scale: 1.07 .93; } 70% { translate: 0 0; scale: .98 1.02; } 100% { opacity: 1; translate: 0 0; scale: 1 1; } }
   .fam, .fcard, .card, .famsm, .tile { animation: land 480ms cubic-bezier(.3,.7,.4,1) both; }
@@ -233,7 +242,7 @@
   <img class="brand-mark" src="/brand/logos/awana-clubs-white.svg" alt="Awana Clubs">
   <h1>Check in</h1>
   <button class="pill" id="count-pill" type="button" hidden>0 in</button>
-  <button class="round" id="menu-btn" type="button" aria-label="More: visitor, leader tag, custom label" hidden>+</button>
+  <button class="round" id="menu-btn" type="button" aria-label="More: one-off name tag, leader tag, custom label, visitor" hidden>+</button>
 </header>
 
 <div class="pin" id="pin-screen">
@@ -277,6 +286,16 @@
 
 <div class="sheet" id="menu-sheet" role="dialog" aria-modal="true">
   <div class="grab"></div>
+  <div class="menu-sec" id="oneoff-panel">
+    <h3 id="oneoff-h">One-off name tag</h3>
+    <div class="field">
+      <input type="text" id="oneoff-name" maxlength="40" placeholder="Child’s first name" autocomplete="off" autocorrect="off" autocapitalize="words" spellcheck="false" enterkeyhint="go" aria-label="Child’s first name">
+      <div class="cpick" id="oneoff-clubs" role="radiogroup" aria-label="Child’s club"></div>
+      <button class="btn go" id="oneoff-print" type="button" disabled>Print tag</button>
+    </div>
+    <p class="quiet">Prints a name tag and welcomes them on the screens. It doesn’t count toward tonight.</p>
+    <p class="err" id="oneoff-status" role="alert"></p>
+  </div>
   <div class="menu-sec" id="leader-panel">
     <h3>Leader tag</h3>
     <div class="field">
@@ -699,6 +718,7 @@ function fillClubSelects() {
   var none2 = el('option', null, 'No club'); none2.value = ''; vis.appendChild(none2);
   if (keepL) lead.value = keepL;
   if (keepV) vis.value = keepV;
+  renderOneOffClubs();
 }
 
 // ── PIN ────────────────────────────────────────────────────────────────────
@@ -1689,7 +1709,7 @@ function restore(x) {
   });
 }
 
-// ── The + menu: leader tag, custom label, visitor ──────────
+// ── The + menu: one-off name tag, leader tag, custom label, visitor ──────────
 $('menu-btn').addEventListener('click', function() { refreshLeaders(); fillClubSelects(); showSheet('menu-sheet'); });
 $('menu-close').addEventListener('click', hideSheet);
 
@@ -1812,6 +1832,80 @@ function printCustomLabel() {
 }
 $('custom-print').addEventListener('click', printCustomLabel);
 $('custom-text').addEventListener('keydown', function(e) { if (e.key === 'Enter') printCustomLabel(); });
+
+// One-off name tag (7.18.0): a typed first name and a club, no roster lookup.
+// The screens welcome the child; the count never moves. After a print the
+// name clears and the club stays, so a run of tags is name, Print, name, Print.
+var oneOffClub = '';
+var oneOffInFlight = false;
+var oneOffClubsFor = '';
+// Rebuilt only when the club list changes (the roster poll calls this every
+// few seconds, and a chip swapped out under a finger would lose the tap).
+function renderOneOffClubs() {
+  var box = $('oneoff-clubs');
+  if (oneOffClub && CLUBS.indexOf(oneOffClub) === -1) oneOffClub = '';
+  if (oneOffClubsFor === CLUBS.join('|')) {
+    Array.prototype.forEach.call(box.children, function(b) { b.setAttribute('aria-checked', b.textContent === oneOffClub ? 'true' : 'false'); });
+    syncOneOff();
+    return;
+  }
+  oneOffClubsFor = CLUBS.join('|');
+  box.textContent = '';
+  CLUBS.forEach(function(c) {
+    var kit = clubOf(c);
+    var b = el('button', null, c);
+    b.type = 'button';
+    b.setAttribute('role', 'radio');
+    b.setAttribute('aria-checked', c === oneOffClub ? 'true' : 'false');
+    b.style.setProperty('--c', kit.color);
+    b.style.setProperty('--d', kit.deep);
+    b.addEventListener('click', function() {
+      oneOffClub = c;
+      $('oneoff-status').textContent = '';
+      renderOneOffClubs();
+      if (!$('oneoff-name').value.trim()) $('oneoff-name').focus();
+    });
+    box.appendChild(b);
+  });
+  syncOneOff();
+}
+// The button wakes only with a name and a club, and wears the club's colour.
+function syncOneOff() {
+  var btn = $('oneoff-print');
+  $('oneoff-panel').style.setProperty('--club', oneOffClub ? clubOf(oneOffClub).color : '');
+  btn.disabled = oneOffInFlight || !oneOffClub || !$('oneoff-name').value.trim();
+  btn.textContent = oneOffInFlight ? 'Printing…' : 'Print tag';
+}
+function printOneOff() {
+  if (oneOffInFlight) return;
+  var input = $('oneoff-name'), status = $('oneoff-status');
+  var firstName = input.value.replace(/\s+/g, ' ').trim();
+  if (!firstName) { status.textContent = 'Type the child’s first name.'; return; }
+  if (!oneOffClub) { status.textContent = 'Pick the child’s club.'; return; }
+  oneOffInFlight = true;
+  status.textContent = '';
+  syncOneOff();
+  postJson('/print-oneoff', { pin: PIN, firstName: firstName, clubName: oneOffClub }).then(function(data) {
+    oneOffInFlight = false;
+    data = data || {};
+    var who = data.firstName || firstName;
+    if (data.duplicate) toast('Already printing ' + who + '’s tag.');
+    else if (data.demo) toast('Test tag printed (rehearsal mode).', 4000, null, null, 'good');
+    else toast('Printing ' + who + '’s tag.', 4000, null, null, 'good');
+    input.value = '';
+    syncOneOff();
+    input.focus();
+  }).catch(function(e) {
+    oneOffInFlight = false;
+    syncOneOff();
+    if (e.code === 'network' && e.status >= 500) { status.textContent = 'Printer problem — see the check-in laptop.'; return; }
+    if (e.code === 'http') { status.textContent = e.message; return; }
+    handleActionError(e, 'Could not print: ');
+  });
+}
+$('oneoff-print').addEventListener('click', printOneOff);
+$('oneoff-name').addEventListener('input', function() { $('oneoff-status').textContent = ''; syncOneOff(); });
+$('oneoff-name').addEventListener('keydown', function(e) { if (e.key === 'Enter') printOneOff(); });
 
 // A visitor not on the roster: a visitor label, counted tonight.
 var visitorInFlight = false;

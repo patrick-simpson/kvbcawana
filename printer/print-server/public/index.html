@@ -216,6 +216,14 @@
   .flag-item.nophoto { background: var(--c-journey-tint); border-left-color: var(--c-journey); }
   .flag-item.bday { background: var(--c-cream); border-left-color: var(--c-orange); }
   .flag-tokens { font-family: var(--f-label); font-size: 15px; letter-spacing: 0.06em; text-transform: uppercase; }
+  /* One-off name tag: the Tonight chips as a picker. Tinted until picked. */
+  .club-pick { display: flex; flex-wrap: wrap; gap: 6px; }
+  .club-pick .club-chip { border: 2px solid transparent; cursor: pointer; padding: 5px 13px; font-size: 15px;
+    background: color-mix(in srgb, var(--club) 14%, #fff); color: var(--club-deep); text-shadow: none;
+    transition: transform var(--quick) var(--ease-pop); }
+  .club-pick .club-chip:hover { transform: translateY(-1px); }
+  .club-pick .club-chip:active { transform: translateY(1px); }
+  .club-pick .club-chip[aria-checked="true"] { background: var(--club); border-color: var(--club-deep); color: #fff; text-shadow: 0.07em 0.07em 0 var(--club-deep); }
   .leader-chip { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; padding: 4px 6px 4px 10px; border-radius: 999px; background: var(--c-cream); border: 2px solid var(--c-orange); color: var(--c-ink); }
   .leader-chip button { border: none; background: transparent; cursor: pointer; color: var(--c-hot-deep); padding: 0 3px; font-family: var(--f-label); font-size: 14px; letter-spacing: 0.05em; text-transform: uppercase; }
   .leader-chip button.x { font-family: var(--f-read); font-size: 17px; line-height: 1; text-transform: none; }
@@ -233,6 +241,7 @@
   .row-tag.ok { background: var(--ok-tint); color: var(--ok); }
   .row-tag.award { background: var(--c-cream); color: var(--c-hot-deep); }
   .row-tag.leader { background: var(--c-cloud); color: var(--c-blue-deep); }
+  .row-tag.oneoff { background: var(--c-tnt-tint); color: var(--c-tnt-deep); }
   #schedule-table input[type="text"] { padding: 6px 8px; box-sizing: content-box; }
   .diag-list { display: flex; flex-direction: column; gap: 2px; }
   .diag-item { display: flex; align-items: center; gap: 10px; font-size: 14px; padding: 8px 0; border-bottom: 1px solid var(--line); }
@@ -424,6 +433,26 @@
         <button type="button" class="btn btn-primary" onclick="printCustomLabel()">Print custom label</button>
       </div>
       <div id="custom-note" class="card-note">One line of text, auto-sized, on an otherwise blank label. It is not a check-in: nothing is counted, no history row is written and nothing reaches the lobby screens.</div>
+    </div>
+  </div>
+
+  <!-- One-off name tag (7.18.0): a child's name tag that is not a check-in (a
+       lost tag, a child not checking in tonight). Typed first name + club, no
+       roster lookup; the screens welcome them, the count never moves, and the
+       print log keeps a row marked One-off. Beside the custom label because
+       both are "a label, not a check-in". -->
+  <div class="card" id="oneoff-card">
+    <div class="card-header">
+      <span class="corner-tab t-tnt">One-off name tag</span>
+      <span class="note-right">welcomed on the screens, never counted</span>
+    </div>
+    <div class="card-body" style="display:flex;flex-direction:column;gap:10px">
+      <div class="field-row">
+        <input type="text" id="oneoff-name" maxlength="40" placeholder="Child's first name" autocomplete="off" autocapitalize="words" spellcheck="false" enterkeyhint="go" aria-label="Child's first name" style="flex:1 1 180px;min-width:160px">
+        <div id="oneoff-clubs" class="club-pick" role="radiogroup" aria-label="Child's club"></div>
+        <button type="button" id="oneoff-print" class="btn btn-primary" onclick="printOneOff()" disabled>Print tag</button>
+      </div>
+      <div id="oneoff-note" class="card-note">Prints a name tag and welcomes them on the screens. It doesn't count toward tonight. For a lost tag, or a child who isn't checking in tonight.</div>
     </div>
   </div>
 
@@ -1448,11 +1477,12 @@ function loadHistory() {
           (e.isConnectCard ? ' <span class="row-tag ok">CONNECT CARD</span>' : '') +
           (e.isAward ? ' <span class="row-tag award">AWARD</span>' : '') +
           (e.isLeader ? ' <span class="row-tag leader">LEADER</span>' : '') +
+          (e.oneOff ? ' <span class="row-tag oneoff">ONE-OFF</span>' : '') +
           (e.undone ? ' <span class="row-tag">UNDONE' + (e.undoneBy === 'phone' ? ' (PHONE)' : e.undoneBy === 'twotimtwo' ? ' (ON TWOTIMTWO, FROM A PHONE)' : '') + '</span>' : '') + '</td>' +
         '<td>' + esc(e.clubName || '--') + '</td>' +
         '<td class="muted">' + esc(e.printer || 'default') + '</td>' +
         '<td class="muted">' + esc(formatTime(e.timestamp)) + '</td>' +
-        '<td><button class="btn btn-secondary btn-sm" onclick="' + (e.isLeader ? 'reprintLeader' : 'reprint') + '(' + Number(i) + ')">Reprint</button></td>' +
+        '<td><button class="btn btn-secondary btn-sm" onclick="' + (e.isLeader ? 'reprintLeader' : e.oneOff ? 'reprintOneOff' : 'reprint') + '(' + Number(i) + ')">Reprint</button></td>' +
         '</tr>';
     }).join('');
   }).catch(function() {
@@ -1495,6 +1525,27 @@ function reprintLeader(index) {
   }).catch(function() { alert('Reprint failed'); });
 }
 
+// A one-off row reprints by its index (POST /reprint {index}): the server keeps
+// it a one-off (same plain tag, still never counted, no welcome). By name would
+// miss it, since the name lookup skips every non-check-in row. The index is
+// into today's rows, which lead the newest-first log.
+function reprintOneOff(index) {
+  if (!confirm('Reprint this one-off name tag?')) return;
+  fetch(BASE + '/history/today').then(function(r) { return r.json(); }).then(function(entries) {
+    var entry = entries[index];
+    if (!entry || !entry.oneOff) { alert('That row has moved. Refresh the list and try again.'); return null; }
+    return fetch(BASE + '/reprint', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ index: index })
+    });
+  }).then(function(r) {
+    if (r === null) return;
+    if (r && r.ok) { alert('Reprint sent!'); loadHistory(); }
+    else alert('Reprint failed');
+  }).catch(function() { alert('Reprint failed'); });
+}
+
 // Leader name tag card: an adult volunteer's tag. Never a check-in — see the
 // server's /print-leader comment for everything it deliberately does not touch.
 // ── The one club list ────────────────────────────────────────────────────────
@@ -1504,6 +1555,7 @@ function reprintLeader(index) {
 function loadClubs() {
   fetch(BASE + '/clubs').then(function(r) { return r.ok ? r.json() : null; }).then(function(d) {
     if (!d || !Array.isArray(d.clubs)) return;
+    renderOneOffClubs(d.clubs);
     // Two dropdowns read the same one list: the leader card's club, and the
     // range-reprint filter on the History tab.
     [['leader-club', 'No club'], ['rr-club', 'All clubs']].forEach(function(pair) {
@@ -1741,6 +1793,76 @@ function printCustomLabel() {
 document.getElementById('custom-text').addEventListener('keydown', function(e) {
   if (e.key === 'Enter') printCustomLabel();
 });
+
+// ── One-off name tag (7.18.0) ────────────────────────────────────────────────
+// A typed first name and a club, printed through POST /print-oneoff: the
+// screens welcome the child, the count never moves, and the print log keeps a
+// row marked One-off (so this card reloads the history, like the leader card).
+// The name clears after a print and the club stays, for a run of tags.
+var oneOffClub = '';
+var oneOffBusy = false;
+function renderOneOffClubs(clubs) {
+  var box = document.getElementById('oneoff-clubs');
+  box.innerHTML = '';
+  if (oneOffClub && clubs.indexOf(oneOffClub) === -1) oneOffClub = '';
+  clubs.forEach(function(c) {
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'club-chip ' + clubClass(c);
+    b.textContent = c;
+    b.setAttribute('role', 'radio');
+    b.setAttribute('aria-checked', c === oneOffClub ? 'true' : 'false');
+    b.addEventListener('click', function() {
+      oneOffClub = c;
+      box.querySelectorAll('.club-chip').forEach(function(x) { x.setAttribute('aria-checked', x === b ? 'true' : 'false'); });
+      syncOneOff();
+      var nameEl = document.getElementById('oneoff-name');
+      if (!nameEl.value.trim()) nameEl.focus();
+    });
+    box.appendChild(b);
+  });
+  syncOneOff();
+}
+// Print wakes only with a name and a club.
+function syncOneOff() {
+  var btn = document.getElementById('oneoff-print');
+  btn.disabled = oneOffBusy || !oneOffClub || !document.getElementById('oneoff-name').value.trim();
+  btn.textContent = oneOffBusy ? 'Printing…' : 'Print tag';
+}
+function printOneOff() {
+  if (oneOffBusy) return;
+  var nameEl = document.getElementById('oneoff-name');
+  var note = document.getElementById('oneoff-note');
+  var firstName = nameEl.value.replace(/\s+/g, ' ').trim();
+  if (!firstName) { note.textContent = 'Type the child\'s first name first.'; return; }
+  if (!oneOffClub) { note.textContent = 'Pick the child\'s club.'; return; }
+  oneOffBusy = true;
+  syncOneOff();
+  note.textContent = 'Printing…';
+  fetch(BASE + '/print-oneoff', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ firstName: firstName, clubName: oneOffClub })
+  }).then(function(r) { return r.json().catch(function() { return {}; }).then(function(b) { return { ok: r.ok, body: b || {} }; }); })
+    .then(function(res) {
+      oneOffBusy = false;
+      if (!res.ok || res.body.success !== true) { note.textContent = 'Print failed: ' + (res.body.error || 'see the server log'); syncOneOff(); return; }
+      var who = res.body.firstName || firstName;
+      note.textContent = res.body.duplicate ? 'Already printing ' + who + '\'s tag.'
+        : res.body.demo ? 'Test tag printed (rehearsal mode): nothing recorded, nothing on the screens.'
+        : 'Printed ' + who + '\'s tag: welcomed on the screens, not counted.';
+      nameEl.value = '';
+      syncOneOff();
+      nameEl.focus();
+      loadHistory();
+    })
+    .catch(function() { oneOffBusy = false; syncOneOff(); note.textContent = 'Print failed — is the server running?'; });
+}
+document.getElementById('oneoff-name').addEventListener('input', syncOneOff);
+document.getElementById('oneoff-name').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') printOneOff();
+});
+renderOneOffClubs(['Puggles', 'Cubbies', 'Sparks', 'T&T', 'Trek', 'Journey']);
 
 // Preview
 function loadPreview() {
