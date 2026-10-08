@@ -1316,6 +1316,10 @@ function checkInMany(entries, family) {
       STATE[key] = { status: 'pending', id: data.id, tries: 0 };
       pollStatus(key, k, settle);
     }).catch(function(err) {
+      // The child goes back on the list: left 'sending', they were hidden for
+      // the rest of the session.
+      delete STATE[key];
+      render();
       if (err.code === 'pin' || err.code === 'locked') { handleActionError(err, ''); return; }
       settle(false, k, err.message);
     });
