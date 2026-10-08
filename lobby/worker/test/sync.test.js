@@ -391,14 +391,14 @@ describe('the phone check-in relay (printer 7.9.0)', () => {
     await s.call('GET', '/v1/relay/next', undefined, session);
     expect(puts.filter((k) => k === 'relay:laptop')).toHaveLength(2);
     // and the page still sees the laptop as online throughout
-    const r = await (await s.call('POST', '/v1/relay', { method: 'GET', path: '/touch/jam' }, session)).json();
+    const r = await (await s.call('POST', '/v1/relay', { method: 'GET', path: '/phone/status/0f8c1a2b-3c4d' }, session)).json();
     expect(r.laptopOnline).toBe(true);
   });
 
-  it('a request the laptop TOOK lives past 45 s: its own timeout is 60 s (a jam reprint)', async () => {
+  it('a request the laptop TOOK lives past 45 s: its own timeout is 60 s (a label on a slow print queue)', async () => {
     const s = setup();
     const { body: { session } } = await s.login();
-    const { id } = await (await s.call('POST', '/v1/relay', { method: 'POST', path: '/jam-reprint', body: {} }, session)).json();
+    const { id } = await (await s.call('POST', '/v1/relay', { method: 'POST', path: '/print-custom', body: {} }, session)).json();
     await s.call('GET', '/v1/relay/next', undefined, session);   // taken at t
     s.tick(55_000);
     const r = await s.call('POST', '/v1/relay/answer', { id, status: 200, body: { success: true } }, session);
@@ -406,7 +406,7 @@ describe('the phone check-in relay (printer 7.9.0)', () => {
     expect(await (await s.call('GET', `/v1/relay/result?id=${id}`, undefined, session)).json()).toMatchObject({ done: true, status: 200 });
     // an UNTAKEN request still goes at 45 s: the laptop was not there, and the
     // next poll (which purges) no longer offers it
-    const { id: id2 } = await (await s.call('POST', '/v1/relay', { method: 'GET', path: '/touch/jam' }, session)).json();
+    const { id: id2 } = await (await s.call('POST', '/v1/relay', { method: 'GET', path: '/phone/status/0f8c1a2b-3c4d' }, session)).json();
     s.tick(46_000);
     expect((await (await s.call('GET', '/v1/relay/next', undefined, session)).json()).requests).toEqual([]);
     expect((await s.call('POST', '/v1/relay/answer', { id: id2, status: 200, body: {} }, session)).status).toBe(404);
@@ -449,7 +449,7 @@ describe('the phone check-in relay (printer 7.9.0)', () => {
       const r = await s.call('POST', '/v1/relay', { method, path, body: {} }, session);
       expect(r.status, `${method} ${path}`).toBe(400);
     }
-    for (const [method, path] of [['POST', '/phone/roster'], ['GET', '/phone/status/0f8c1a2b-3c4d'], ['POST', '/jam-reprint'], ['GET', '/touch/jam']]) {
+    for (const [method, path] of [['POST', '/phone/roster'], ['GET', '/phone/status/0f8c1a2b-3c4d'], ['POST', '/print-custom']]) {
       const r = await s.call('POST', '/v1/relay', { method, path, body: {} }, session);
       expect(r.status, `${method} ${path}`).toBe(200);
     }

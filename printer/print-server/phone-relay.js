@@ -27,8 +27,6 @@ const RELAY_ROUTES = Object.freeze([
   ['POST', /^\/leaders\/forget$/],
   ['POST', /^\/clubs$/],
   ['POST', /^\/reconcile$/],
-  ['POST', /^\/jam-reprint$/],
-  ['GET', /^\/touch\/jam$/],
 ]);
 
 function relayAllowed(method, path) {
@@ -39,7 +37,7 @@ function relayAllowed(method, path) {
 const RELAY_BUSY_MS = 1000;
 const RELAY_IDLE_MS = 20 * 1000;
 const RELAY_SIGNED_OUT_MS = 60 * 1000;
-const LOCAL_TIMEOUT_MS = 60 * 1000;   // a Printer jammed reprint of a full minute can take this long
+const LOCAL_TIMEOUT_MS = 60 * 1000;   // a label that waits on the print queue can take this long
 // How many phone requests the laptop runs at once per round.
 const RELAY_PARALLEL = 3;
 

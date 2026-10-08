@@ -29,8 +29,6 @@ export const RELAY_ROUTES = Object.freeze([
   ['POST', /^\/leaders\/forget$/],
   ['POST', /^\/clubs$/],
   ['POST', /^\/reconcile$/],
-  ['POST', /^\/jam-reprint$/],
-  ['GET', /^\/touch\/jam$/],
 ]);
 
 /** @param {unknown} method @param {unknown} path */
@@ -64,7 +62,7 @@ export class Relay {
 
   // A request waits REQUEST_TTL_MS to be taken; once taken it lives
   // TAKEN_TTL_MS more. It used to be dropped at 45 s whether taken or not,
-  // while the laptop allows itself 60 s to answer (a jam reprint): the answer
+  // while the laptop allows itself 60 s to answer (a label waiting on the print queue): the answer
   // landed on a 404 and the phone had already been told to try again.
   alive(r, t) {
     return r.taken ? t - r.taken < TAKEN_TTL_MS : t - r.at < REQUEST_TTL_MS;

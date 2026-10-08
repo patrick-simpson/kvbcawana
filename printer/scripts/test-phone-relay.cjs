@@ -63,7 +63,7 @@ const PORT = 34575;
     // the page asks for the roster and to check Ava in with her Bible
     const a = (await svc('POST', '/v1/relay', { method: 'POST', path: '/phone/roster', body: {} }, session)).body.id;
     const b = (await svc('POST', '/v1/relay', { method: 'POST', path: '/phone/checkin', body: { name: 'Ava Stone', options: { Bible: true } } }, session)).body.id;
-    const c = (await svc('POST', '/v1/relay', { method: 'GET', path: '/touch/jam' }, session)).body.id;
+    const c = (await svc('POST', '/v1/relay', { method: 'GET', path: '/phone/status/0f8c1a2b-3c4d' }, session)).body.id;
     let r = await svc('GET', `/v1/relay/result?id=${a}`, undefined, session);
     check('before the laptop asks, the page is told to wait', r.body.done === false, JSON.stringify(r.body));
     const once = await relay.relayOnce({ base: 'x', session, localBase, syncRequest });
@@ -78,7 +78,7 @@ const PORT = 34575;
     const ava = (pending.actions || []).find((x) => x.name === 'Ava Stone');
     check('with her Bible ticked, as on the Wi-Fi', ava && ava.options && ava.options.Bible === true, JSON.stringify(pending));
     r = await svc('GET', `/v1/relay/result?id=${c}`, undefined, session);
-    check('a GET (Printer jammed available?) works too', r.body.status === 200 && typeof r.body.body.available === 'boolean', JSON.stringify(r.body));
+    check('a GET (a check-in\'s status) is relayed and answered too', r.body.done === true && r.body.status === 404 && r.body.body.error === 'unknown action', JSON.stringify(r.body));
   }
 
   console.log('\nphone relay: a phone action is claimed before it is driven');
@@ -124,7 +124,7 @@ const PORT = 34575;
       await new Promise((r) => setTimeout(r, 120));
       try { return await fetch(...args); } finally { inFlight--; }
     };
-    for (let i = 0; i < 5; i++) await svc('POST', '/v1/relay', { method: 'GET', path: '/touch/jam' }, session);
+    for (let i = 0; i < 5; i++) await svc('POST', '/v1/relay', { method: 'GET', path: '/phone/status/0f8c1a2b-3c4d' }, session);
     const t0 = Date.now();
     const once = await relay.relayOnce({ base: 'x', session, localBase, syncRequest, fetchFn: slowFetch });
     const took = Date.now() - t0;
