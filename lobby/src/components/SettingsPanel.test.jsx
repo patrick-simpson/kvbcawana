@@ -575,11 +575,14 @@ describe('Check-ins, Screen & corner, Celebrations, Pickup board, Look & season'
     expect(box.checked).toBe(true);
   });
 
-  it('the pickup board is its own section and keeps its guard copy', () => {
+  it('the pickup board is its own section, with no switch or times, and keeps its guard copy', () => {
     render(<SettingsPanel {...{ ...happyProps(), initialTab: 'pickup' }} />);
-    expect(screen.getByLabelText("Who's still here board").value).toBe('off');
-    expect(screen.queryByLabelText('Stop showing names at or below')).toBeNull();
-    fireEvent.change(screen.getByLabelText("Who's still here board"), { target: { value: 'pickup' } });
+    // It comes on by itself at 7:30 pm (owner, 2026-10-08).
+    expect(screen.queryByLabelText("Who's still here board")).toBeNull();
+    expect(screen.queryByLabelText('Show from')).toBeNull();
+    expect(screen.queryByLabelText('Hide after')).toBeNull();
+    expect(screen.getByText("Shows by itself from 7:30 pm on club nights. Which clubs are on the list is set on the check-in laptop's dashboard.")).toBeTruthy();
+    expect(screen.getByLabelText('Stop showing names at or below')).toBeTruthy();
     expect(screen.getByText(/This is the setting that matters/)).toBeTruthy();
   });
 
@@ -681,24 +684,35 @@ describe('Status: other screens', () => {
   });
 });
 
+describe('Screen & corner: the club count', () => {
+  it('This TV offers None or one club, and a pick is this screen\'s own', () => {
+    const props = { ...happyProps(), initialTab: 'display', onChange: vi.fn() };
+    render(<SettingsPanel {...props} />);
+    const select = screen.getByLabelText('Club count (upper right)');
+    expect(select.value).toBe('');
+    expect([...select.options].map((o) => o.value)).toEqual(['', 'puggles', 'cubbies', 'sparks', 'tnt', 'trek', 'journey']);
+    expect([...select.options].map((o) => o.textContent)).toContain('T&T');
+    fireEvent.change(select, { target: { value: 'tnt' } });
+    expect(props.onChange).toHaveBeenLastCalledWith({ cornerClub: 'tnt' });
+  });
+});
+
 describe('Pickup board', () => {
   const open = (extra = {}) => {
     const props = { ...happyProps(), initialTab: 'pickup', onBoardDemo: vi.fn(), ...extra };
-    props.config = { ...defaults, audioMuted: true, checkoutBoardMode: 'pickup' };
+    // An old screen's saved mode and window ride along, and are ignored.
+    props.config = { ...defaults, audioMuted: true, checkoutBoardMode: 'pickup', checkoutBoardFrom: '19:35' };
     render(<SettingsPanel {...props} />);
     return props;
   };
 
-  it('shows the pickup window, 7:35 to 8:30 pm unless changed, and applies a new time when the field is left', () => {
+  it('an old saved mode or window is never written back', () => {
     const props = open();
-    const from = screen.getByLabelText('Show from');
-    expect(from.value).toBe('19:35');
-    expect(screen.getByLabelText('Hide after').value).toBe('20:30');
-    typeAndLeave(from, '19:45');
-    expect(props.onChange).toHaveBeenLastCalledWith({ checkoutBoardFrom: '19:45' });
-    // A cleared time falls back to the default rather than writing junk.
-    typeAndLeave(from, '');
-    expect(props.onChange).toHaveBeenLastCalledWith({ checkoutBoardFrom: '19:35' });
+    typeAndLeave(screen.getByLabelText('Stop showing names at or below'), '5');
+    expect(props.onChange).toHaveBeenLastCalledWith({ checkoutBoardNamesAbove: 5 });
+    for (const call of props.onChange.mock.calls) {
+      for (const key of ['checkoutBoardMode', 'checkoutBoardFrom', 'checkoutBoardUntil']) expect(call[0]).not.toHaveProperty(key);
+    }
   });
 
   it('the corner countdown is on by default and a switch away', () => {
@@ -709,14 +723,14 @@ describe('Pickup board', () => {
     expect(props.onChange).toHaveBeenCalledWith({ cornerStillHere: false });
   });
 
-  it('previews the columns on sample names, and follows the naming guard as it changes', () => {
+  it('previews the board in the foot on sample names, and follows the naming guard as it changes', () => {
     open();
     const preview = screen.getByRole('img', { name: /preview of the pickup board/ });
-    expect(preview.querySelectorAll('.checkout-column').length).toBe(6);
+    expect(preview.querySelectorAll('.checkout-board--list .checkout-club').length).toBe(6);
     expect(preview.querySelector('.checkout-demo')).toBeTruthy();
     expect(preview.textContent).toMatch(/Sample Sam/);
     fireEvent.change(screen.getByLabelText('Stop showing names at or below'), { target: { value: '50' } });
-    expect(preview.querySelector('.checkout-column')).toBeNull();
+    expect(preview.querySelector('.checkout-club')).toBeNull();
     expect(preview.textContent).toMatch(/Almost everyone has been picked up/);
   });
 
@@ -726,10 +740,9 @@ describe('Pickup board', () => {
     expect(props.onBoardDemo).toHaveBeenCalled();
   });
 
-  it('with the board off only the mode is asked, but the preview still shows what it would look like', () => {
+  it('the preview is always there, on sample names', () => {
     const props = { ...happyProps(), initialTab: 'pickup' };
     render(<SettingsPanel {...props} />);
-    expect(screen.queryByLabelText('Show from')).toBeNull();
     expect(screen.getByRole('img', { name: /preview of the pickup board/ })).toBeTruthy();
   });
 });

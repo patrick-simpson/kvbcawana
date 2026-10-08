@@ -2,8 +2,9 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import {
-  NAME_CHIP_CLEAR, NAME_CHIP_TEXT, OVERLAY, balanceLines, fitColumns, bandRoom, bandTop, boardPlacement, boardRowsHeight,
-  fitBoard, fitParagraph, fitShout, lobbyRoom, nameChipSeat, plateChrome, setupUp, wrapLines,
+  FOOT_CHIP, FOOT_FLOOR_PX, NAME_CHIP_CLEAR, NAME_CHIP_TEXT, OVERLAY, balanceLines, bandRoom, bandTop, boardPlacement,
+  fitFoot, fitParagraph, fitShout, footHeight, footRange, lobbyRoom, moreLabel, nameChipSeat, plateChrome, setupUp,
+  waitingLabel, wrapLines,
 } from './overlayFit.js';
 import { LAYOUT } from './lobbyFrame.js';
 import { PLATE, SHOUT_BOX } from './brand.js';
@@ -33,7 +34,7 @@ describe('the overlay bands', () => {
     expect(right).toBeLessThanOrEqual(78);
   });
 
-  it('keep the takeover region inside the copy box, above the house waves', () => {
+  it('keep the critical notice\'s takeover region inside the copy box, above the house waves', () => {
     expect(OVERLAY.centre.top).toBeGreaterThan(OVERLAY.band.bottom);
     expect(OVERLAY.centre.bottom).toBeLessThanOrEqual(46.5);
   });
@@ -52,10 +53,40 @@ describe('the overlay bands', () => {
     expect(css).toMatch(new RegExp(`\\.top-flags \\{[^}]*max-width: calc\\(${OVERLAY.flags.width} \\* var\\(--u\\)\\)`));
   });
 
-  it('keep the foot between the copy\'s lowest line and the ticker', () => {
-    // 16:9: the stage is 56.25u tall; the card is at most ~5u tall.
-    expect(56.25 - OVERLAY.foot.bottom - 5).toBeGreaterThanOrEqual(LAYOUT.safeBottom);
-    expect(OVERLAY.foot.width).toBeLessThanOrEqual(80 - 20);
+  it('seat the pickup board in the first-run card\'s strip: under the copy\'s lowest line, between the gear and the corner chip', () => {
+    // One seat, two tenants (owner, 2026-10-07: the list takes the bottom of
+    // the screen, never the announcements above it).
+    expect(OVERLAY.foot).toBe(OVERLAY.setup);
+    expect(OVERLAY.foot.top).toBeGreaterThanOrEqual(LAYOUT.safeBottom);
+    // The "has checked out" banners (.checkout-leaves) share the rule.
+    const rule = /^\.checkout-region,\n\.checkout-leaves \{([^}]*)\}/m.exec(css)?.[1] ?? '';
+    expect(rule).not.toBe('');
+    // The strip's top is 45u down the 16:9 box, which is centred on the
+    // stage: 45 - 28.125 under its middle, so a 4:3 screen's extra height
+    // below the box is the strip's too.
+    expect(rule).toMatch(new RegExp(`top: calc\\(50% \\+ ${OVERLAY.foot.top - 56.25 / 2} \\* var\\(--u\\)\\)`));
+    // Its floor is the corner chip's own line, 1.8u off the bottom ...
+    expect(rule).toMatch(new RegExp(`bottom: calc\\(${OVERLAY.foot.bottom} \\* var\\(--u\\)\\)`));
+    expect(css).toMatch(new RegExp(`\\.corner-bottom \\{[^}]*bottom: calc\\(${OVERLAY.foot.bottom} \\* min\\(1vw, 1\\.7778vh\\)\\)`));
+    // ... and it runs from a gap past the gear to a gap short of the chip,
+    // exactly as the first-run card does.
+    expect(rule).toMatch(new RegExp(`right: calc\\(${100 - OVERLAY.foot.chipLeft + OVERLAY.foot.gap} \\* var\\(--u\\)\\)`));
+    expect(rule).toMatch(new RegExp(`left: calc\\(var\\(--safe-inset\\) \\+ max\\(46px, calc\\(2\\.9 \\* var\\(--u\\)\\)\\) \\+ calc\\(${OVERLAY.foot.gap} \\* var\\(--u\\)\\)\\)`));
+    const card = /^\.panel\.setup-card \{([^}]*)\}/m.exec(css)?.[1] ?? '';
+    for (const prop of ['left', 'right', 'max-width']) {
+      const decl = (body) => new RegExp(`\\n\\s*${prop}: ([^;]+);`).exec(body)?.[1];
+      expect(decl(rule), prop).toBe(decl(card));
+    }
+    // Nothing the board draws reaches above the strip: the card is held to it.
+    expect(/\n\.checkout-board \{([^}]*)\}/.exec(css)?.[1]).toMatch(/max-height: 100%;/);
+  });
+
+  it('never let a critical notice in the middle and the board in the foot meet', () => {
+    expect(OVERLAY.centre.bottom).toBeGreaterThan(OVERLAY.foot.top);
+    // The takeover card is centred in the middle and three shouted lines at
+    // most (~22u with its plate), so it ends ~6u above the strip.
+    const mid = (OVERLAY.centre.top + OVERLAY.centre.bottom) / 2;
+    expect(mid + 22 / 2).toBeLessThan(OVERLAY.foot.top);
   });
 
   it('keep the first-run card\'s seat under the copy\'s lowest line, between the gear and the corner chip', () => {
@@ -109,64 +140,64 @@ describe('the step-plate label size', () => {
 });
 
 describe('who holds which part of the room', () => {
-  const live = [BOARD_NAMES, BOARD_ANONYMOUS];
-  it('the board takes the middle only for a live list at pickup time', () => {
-    for (const pickup of [true, false]) {
-      for (const state of live) {
-        expect(boardPlacement(state, pickup)).toBe(pickup ? 'centre' : 'foot');
-      }
-      // A stale or empty board is never the room's focus: it has nothing live to list.
-      expect(boardPlacement(BOARD_STALE, pickup)).toBe('foot');
-      expect(boardPlacement(BOARD_EMPTY, pickup)).toBe('foot');
-      expect(boardPlacement(BOARD_HIDDEN, pickup)).toBeNull();
+  it('the board, whenever it shows anything, has the foot and never the middle', () => {
+    // Owner, 2026-10-07: "The still remaining kids list should just take the
+    // bottom of the screen. It shouldn't take over all of the announcements."
+    for (const state of [BOARD_NAMES, BOARD_ANONYMOUS, BOARD_STALE, BOARD_EMPTY]) {
+      expect(boardPlacement(state)).toBe('foot');
+      const room = lobbyRoom({ boardState: state });
+      expect(room).toEqual({ board: 'foot', banner: null, critical: null, copyAside: false, toastBelow: false });
+    }
+    expect(boardPlacement(BOARD_HIDDEN)).toBeNull();
+    expect(boardPlacement(undefined)).toBeNull();
+  });
+
+  it('a critical notice takes the middle, the pickup list or not, and the copy steps aside for it alone', () => {
+    expect(lobbyRoom({ criticalLive: true, boardState: BOARD_HIDDEN }))
+      .toEqual({ board: null, banner: null, critical: 'centre', copyAside: true, toastBelow: false });
+    // Over a live list it stays in its own place; the board keeps the foot.
+    for (const state of [BOARD_NAMES, BOARD_ANONYMOUS, BOARD_STALE]) {
+      expect(lobbyRoom({ criticalLive: true, boardState: state }))
+        .toEqual({ board: 'foot', banner: null, critical: 'centre', copyAside: true, toastBelow: false });
     }
   });
 
-  it('a stale board on a non-club day sits at the foot and leaves the slides alone', () => {
-    const room = lobbyRoom({ boardState: BOARD_STALE, pickup: false });
-    expect(room).toMatchObject({ board: 'foot', copyAside: false, critical: null });
-  });
-
-  it('a critical notice takes the middle, unless the pickup board holds it', () => {
-    expect(lobbyRoom({ criticalLive: true, boardState: BOARD_HIDDEN, pickup: false }))
-      .toEqual({ board: null, critical: 'centre', copyAside: true, holdCelebrations: false, toastBelow: false });
-    // Beside a board at the foot, the middle is still the notice's.
-    expect(lobbyRoom({ criticalLive: true, boardState: BOARD_STALE, pickup: false }))
-      .toMatchObject({ board: 'foot', critical: 'centre', copyAside: true, holdCelebrations: false });
-    // Over the pickup list it keeps to the band, both stay whole, and the
-    // celebrations wait: the band is taken and the board is right below it.
-    expect(lobbyRoom({ criticalLive: true, boardState: BOARD_NAMES, pickup: true }))
-      .toEqual({ board: 'centre', critical: 'band', copyAside: true, holdCelebrations: true, toastBelow: false });
+  it('nothing about the board holds the celebrations back any more', () => {
+    for (const criticalLive of [false, true]) {
+      const room = lobbyRoom({ criticalLive, boardState: BOARD_NAMES });
+      expect(room).not.toHaveProperty('holdCelebrations');
+      expect(room.toastBelow).toBe(false);
+    }
   });
 
   it('on an OBS feed there is no board and the alert keeps to the band, with a toast below it', () => {
-    expect(lobbyRoom({ overlay: true, criticalLive: true, boardState: BOARD_NAMES, pickup: true }))
-      .toEqual({ board: null, critical: 'band', copyAside: false, holdCelebrations: false, toastBelow: true });
-    expect(lobbyRoom({ overlay: true, boardState: BOARD_NAMES, pickup: true }).critical).toBeNull();
+    expect(lobbyRoom({ overlay: true, criticalLive: true, boardState: BOARD_NAMES }))
+      .toEqual({ board: null, banner: null, critical: 'band', copyAside: false, toastBelow: true });
+    expect(lobbyRoom({ overlay: true, boardState: BOARD_NAMES }).critical).toBeNull();
   });
 
-  it('a name at the door outranks the pickup list', () => {
-    expect(lobbyRoom({ checkInUp: true, boardState: BOARD_NAMES, pickup: true }))
-      .toMatchObject({ board: null, copyAside: false });
+  it('a "has checked out" banner borrows the foot from the board, and gives it back', () => {
+    expect(lobbyRoom({ boardState: BOARD_NAMES, leaveUp: true }))
+      .toEqual({ board: null, banner: 'foot', critical: null, copyAside: false, toastBelow: false });
+    expect(lobbyRoom({ boardState: BOARD_NAMES, leaveUp: false }).board).toBe('foot');
+    // A name at the door outranks it too, and an OBS feed never shows one.
+    expect(lobbyRoom({ boardState: BOARD_NAMES, leaveUp: true, checkInUp: true })).toMatchObject({ board: null, banner: null });
+    expect(lobbyRoom({ overlay: true, leaveUp: true }).banner).toBeNull();
+    // It moves nothing else: a critical notice keeps the middle.
+    expect(lobbyRoom({ criticalLive: true, leaveUp: true }).critical).toBe('centre');
+    // The first-run card gives it the seat.
+    expect(setupUp({ due: true, room: lobbyRoom({ leaveUp: true }) })).toBe(false);
   });
 
-  // A late arrival at pickup time hides the board for its run, but the board
-  // still owns the middle: a critical notice stays in the band (it used to
-  // jump over the WELCOME kicker for the run and back), and the celebrations
-  // keep waiting, so no toast comes up only to be hidden when the run ends.
-  it('a check-in run at pickup time leaves a critical notice in the band', () => {
-    const before = lobbyRoom({ criticalLive: true, boardState: BOARD_NAMES, pickup: true });
-    const during = lobbyRoom({ criticalLive: true, checkInUp: true, boardState: BOARD_NAMES, pickup: true });
-    expect(before).toMatchObject({ board: 'centre', critical: 'band', holdCelebrations: true });
-    expect(during).toEqual({ board: null, critical: 'band', copyAside: false, holdCelebrations: true, toastBelow: false });
-    // With no board seated, a run changes nothing about the notice either.
-    expect(lobbyRoom({ criticalLive: true, checkInUp: true, boardState: BOARD_HIDDEN, pickup: false }).critical)
-      .toBe(lobbyRoom({ criticalLive: true, boardState: BOARD_HIDDEN, pickup: false }).critical);
+  it('a name at the door outranks the pickup list, and moves nothing else', () => {
+    expect(lobbyRoom({ checkInUp: true, boardState: BOARD_NAMES }))
+      .toEqual({ board: null, banner: null, critical: null, copyAside: false, toastBelow: false });
+    expect(lobbyRoom({ checkInUp: true, criticalLive: true, boardState: BOARD_NAMES }).critical).toBe('centre');
   });
 });
 
 describe('the first-run card\'s seat (setupUp)', () => {
-  const room = (over = {}) => lobbyRoom({ boardState: BOARD_HIDDEN, pickup: false, ...over });
+  const room = (over = {}) => lobbyRoom({ boardState: BOARD_HIDDEN, ...over });
 
   it('is up on an ordinary lobby, and only while the screen is still due for setup', () => {
     expect(setupUp({ due: true, room: room() })).toBe(true);
@@ -184,25 +215,18 @@ describe('the first-run card\'s seat (setupUp)', () => {
     expect(setupUp({ due: true, held: true, room: room() })).toBe(false);
   });
 
-  it('gives way to whatever holds the middle or the foot of the room', () => {
-    // A critical notice in the middle, the pickup list in the middle at pickup time ...
+  it('gives way to a critical notice in the middle and to whatever holds the foot', () => {
     expect(setupUp({ due: true, room: room({ criticalLive: true }) })).toBe(false);
-    expect(setupUp({ due: true, room: room({ boardState: BOARD_NAMES, pickup: true }) })).toBe(false);
-    // ... the board's one-line card at the foot, in the strip the card would take ...
-    expect(setupUp({ due: true, room: room({ boardState: BOARD_STALE, pickup: false }) })).toBe(false);
+    // The pickup board shares its seat, whatever it shows ...
+    for (const state of [BOARD_NAMES, BOARD_ANONYMOUS, BOARD_STALE, BOARD_EMPTY]) {
+      expect(setupUp({ due: true, room: room({ boardState: state }) }), state).toBe(false);
+    }
     // ... and the tonight strip on the waves there, while it has counts to show.
     expect(setupUp({ due: true, ticker: true, room: room() })).toBe(false);
     expect(setupUp({ due: true, ticker: false, room: room() })).toBe(true);
   });
 
-  it('a critical notice that keeps to the top band leaves the card its seat, unless a list holds the middle', () => {
-    // On an OBS feed the notice always keeps to the band (the card is never
-    // there anyway); over a live pickup list it does too, and the list still
-    // holds the room, so the card waits for the list, not for the notice.
-    const overList = room({ criticalLive: true, boardState: BOARD_NAMES, pickup: true });
-    expect(overList.critical).toBe('band');
-    expect(overList.board).toBe('centre');
-    expect(setupUp({ due: true, room: overList })).toBe(false);
+  it('a critical notice that keeps to the top band leaves the card its seat', () => {
     expect(setupUp({ due: true, room: { board: null, critical: 'band' } })).toBe(true);
   });
 });
@@ -335,41 +359,6 @@ describe('fitParagraph', () => {
   });
 });
 
-describe('the pickup board fit', () => {
-  const groups = [
-    { club: 'Sparks', names: ['Ava', 'Liam', 'Maximilian', 'Sophia'] },
-    { club: 'T&T', names: ['Noah', 'Mia'] },
-  ];
-
-  it('grows with the name size and with more names', () => {
-    expect(boardRowsHeight(groups, 2, 60, measure)).toBeGreaterThan(boardRowsHeight(groups, 1, 60, measure));
-    const more = [{ club: 'Sparks', names: Array(40).fill('Charlotte') }];
-    expect(boardRowsHeight(more, 1.5, 60, measure)).toBeGreaterThan(boardRowsHeight(groups, 1.5, 60, measure));
-  });
-
-  it('picks the largest size that fits, and the floor when nothing does', () => {
-    const f = fitBoard(groups, { width: 60, height: 20, max: 2.1, min: 1 }, measure);
-    expect(f).toEqual({ size: 2.1, fits: true });
-    const sixty = [{ club: 'Sparks', names: Array(60).fill('Isabella-Rose') }];
-    const g = fitBoard(sixty, { width: 60, height: 20, max: 2.1, min: 1 }, measure);
-    expect(g.size).toBeLessThan(2.1);
-    expect(boardRowsHeight(sixty, g.size, 60, measure) <= 20 || g.fits === false).toBe(true);
-    const h = fitBoard(sixty, { width: 20, height: 5, max: 2.1, min: 1 }, measure);
-    expect(h).toEqual({ size: 1, fits: false });
-  });
-
-  it('counts each name at the size its chip draws it, in a pill that keeps its size', () => {
-    // One name: its club's label and its chip, on one row.
-    const one = [{ club: '', names: ['Maximilian'] }];
-    const x = 0.34; // the empty label's trailing room, per unit of size
-    const row = (s) => x * s + 0.45 * s + measure('Maximilian') * NAME_CHIP_TEXT * s + 1.3 * s;
-    const s = 2;
-    // Just wide enough for the chip at its drawn size: one row; a hair less: two.
-    expect(boardRowsHeight(one, s, row(s), measure)).toBeCloseTo(1.75 * s, 9);
-    expect(boardRowsHeight(one, s, row(s) - 0.05, measure)).toBeGreaterThan(1.75 * s);
-  });
-});
-
 // Stage 4b-2 sized the overlays' shouts for Galindo; Paytone One's caps
 // stand 5.7% shorter at one size (its figures 5%), so each shout is that
 // much larger and each line height that much tighter (CLAUDE.md, the brand
@@ -386,11 +375,9 @@ describe('the overlays\' shouts hold stage 4b-2\'s cap heights in Paytone One', 
     expect(Math.abs(lh(rule) - 1 / 1.05)).toBeLessThanOrEqual(0.005);
   });
 
-  it('the pickup board\'s count: 2.5u (1.8u at the foot) at 1 in Galindo', () => {
-    const rule = body('.checkout-count');
-    expect(Math.abs(u(rule) - 2.5 * 1.05)).toBeLessThanOrEqual(0.01);
-    expect(Math.abs(lh(rule) - 1 / 1.05)).toBeLessThanOrEqual(0.005);
-    expect(Math.abs(u(body('.checkout-board--foot .checkout-count')) - 1.8 * 1.05)).toBeLessThanOrEqual(0.01);
+  it('the pickup board\'s count: Paytone One\'s figures at 1 / 1.05', () => {
+    // Sized afresh for the foot (2026-10-07), in em of the strip's words.
+    expect(Math.abs(lh(body('.checkout-count')) - 1 / 1.05)).toBeLessThanOrEqual(0.005);
   });
 
   it('the pickup board\'s names: drawn NAME_CHIP_TEXT x the chip\'s size, the pill as it was', () => {
@@ -439,41 +426,128 @@ describe('a name chip\'s seat (nameChipSeat)', () => {
   });
 });
 
-describe('the pickup board columns (fitColumns)', () => {
-  // A fixed-width face: every character 0.6em, so the arithmetic is plain.
-  const mono = (text) => text.length * 0.6;
-  const box = { width: 65.4, height: 23.6, head: 6, gap: 1.2, max: 2.6, min: 1 };
-  const club = (name, n) => ({ club: name, names: Array.from({ length: n }, (_, i) => `Kid${String(i).padStart(2, '0')}`) });
 
-  it('a few names per club take the largest size, one column each', () => {
-    const fit = fitColumns([club('Sparks', 3), club('T&T', 2)], box, mono);
-    expect(fit).toEqual({ size: 2.6, split: [1, 1], fits: true });
+// The pickup board in the foot (owner, 2026-10-07): every club's plate and
+// chips in one run that wraps across the strip, sized to the run's box, with
+// "+N more" where even the smallest readable chips cannot hold everyone.
+describe('the pickup board in the foot (fitFoot)', () => {
+  const mono = (text) => [...text].reduce((w, ch) => w + (ch === ' ' ? 0.3 : 0.6), 0);
+  const kids = (n, name = 'Kid') => Array.from({ length: n }, (_, i) => `${name}${String(i).padStart(2, '0')}`);
+  const CLUBS = ['Puggles', 'Cubbies', 'Sparks', 'T&T', 'Trek', 'Journey'];
+
+  it('models a wrapping row the way flex lays it out', () => {
+    // Three 10-wide pieces in 25: two rows; in 32 (two gaps of 0.45 at s 1): one.
+    expect(footHeight([10, 10, 10], 1, 25)).toBeCloseTo(2 * FOOT_CHIP.row + FOOT_CHIP.gap, 9);
+    expect(footHeight([10, 10, 10], 1, 31)).toBeCloseTo(FOOT_CHIP.row, 9);
+    expect(footHeight([10, 10, 10], 1, 30.85)).toBeGreaterThan(FOOT_CHIP.row);
+    expect(footHeight([], 1, 10)).toBe(0);
   });
 
-  it('more clubs or longer names step the size down until the widest fits its column', () => {
-    const six = ['Puggles', 'Cubbies', 'Sparks', 'T&T', 'Trek', 'Journey'].map((n) => club(n, 3));
-    const fit = fitColumns(six, box, mono);
+  it('counts a plate as its mark (or name) and "N waiting", and a chip at the size it draws its name', () => {
+    // One club with one name: the plate and the chip side by side exactly when
+    // the run is as wide as both and a gap.
+    const s = 2;
+    const label = (t) => (mono(t.toUpperCase()) + FOOT_CHIP.plate.track * t.length) * FOOT_CHIP.plate.label * s;
+    const plate = FOOT_CHIP.plate.pad * s + FOOT_CHIP.plate.mark * s + FOOT_CHIP.plate.gap * s + label(waitingLabel(1));
+    const chip = mono('Maximilian') * NAME_CHIP_TEXT * s + FOOT_CHIP.pad * s;
+    const width = plate + FOOT_CHIP.gap * s + chip;
+    const one = [{ club: 'Sparks', names: ['Maximilian'], mark: true }];
+    expect(fitFoot(one, { width, height: FOOT_CHIP.row * s, max: s, min: 1 }, mono)).toEqual({ size: s, hidden: [0], fits: true });
+    expect(fitFoot(one, { width: width - 0.05, height: FOOT_CHIP.row * s, max: s, min: 1 }, mono).size).toBeLessThan(s);
+    // Without a mark, the plate carries the club's name instead.
+    const named = [{ club: 'Guests', names: ['Ava'] }];
+    const wide = fitFoot(named, { width: 1000, height: FOOT_CHIP.row * s, max: s, min: 1 }, mono);
+    expect(wide).toEqual({ size: s, hidden: [0], fits: true });
+  });
+
+  it('takes the largest size that fits, stepping down as the list grows', () => {
+    // Two clubs of three: two rows at 1.8 (2 x 1.75 + 0.45, x 1.8 = 7.11).
+    const box = { width: 60, height: 7.2, max: 1.8, min: 0.5, step: 0.05 };
+    const few = fitFoot(CLUBS.slice(0, 2).map((club) => ({ club, names: kids(3), mark: true })), box, mono);
+    expect(few).toEqual({ size: 1.8, hidden: [0, 0], fits: true });
+    const many = fitFoot(CLUBS.map((club) => ({ club, names: kids(8), mark: true })), box, mono);
+    expect(many.fits).toBe(true);
+    expect(many.hidden).toEqual([0, 0, 0, 0, 0, 0]);
+    expect(many.size).toBeLessThan(few.size);
+  });
+
+  it('where the smallest size cannot hold them, puts the longest club\'s last names behind "+N more", plates kept', () => {
+    const groups = [
+      { club: 'Sparks', names: kids(30), mark: true },
+      { club: 'T&T', names: kids(4), mark: true },
+    ];
+    const box = { width: 40, height: 4, max: 1, min: 0.8, step: 0.05 };
+    const fit = fitFoot(groups, box, mono);
     expect(fit.fits).toBe(true);
-    const colW = (box.width - box.gap * 5) / 6;
-    expect(mono('Kid00') * NAME_CHIP_TEXT * fit.size + 1.3 * fit.size).toBeLessThanOrEqual(colW + 1e-9);
-    expect(fit.size).toBeLessThan(2.6);
+    expect(fit.size).toBe(0.8);
+    expect(fit.hidden[0]).toBeGreaterThan(0);
+    // The short club keeps its names while the long one has more to give.
+    expect(fit.hidden[1]).toBeLessThanOrEqual(fit.hidden[0]);
+    expect(moreLabel(fit.hidden[0])).toBe(`+${fit.hidden[0]} more`);
   });
 
-  it('a long club splits into side-by-side sub-columns before it shrinks to nothing', () => {
-    const fit = fitColumns([club('Sparks', 24), club('T&T', 2)], box, mono);
-    expect(fit.fits).toBe(true);
-    expect(fit.split[0]).toBeGreaterThan(1);
-    expect(fit.split[1]).toBe(1);
-    // Every sub-column's rows fit under the head.
-    const rowsFit = Math.floor((box.height - box.head + 0.4 * fit.size) / (2.15 * fit.size));
-    expect(Math.ceil(24 / fit.split[0])).toBeLessThanOrEqual(rowsFit);
-  });
-
-  it('says when even the smallest size cannot hold a huge board', () => {
-    const huge = ['Puggles', 'Cubbies', 'Sparks', 'T&T', 'Trek', 'Journey'].map((n) => club(n, 60));
-    const fit = fitColumns(huge, box, mono);
+  it('says so when even the plates cannot fit a box far too small for any list', () => {
+    const groups = CLUBS.map((club) => ({ club, names: kids(10), mark: true }));
+    const fit = fitFoot(groups, { width: 5, height: 1, max: 1, min: 0.5 }, mono);
     expect(fit.fits).toBe(false);
-    expect(fit.size).toBe(1);
-    expect(fit.split.every((n) => n <= 3)).toBe(true);
+    expect(fit.hidden).toEqual(groups.map((g) => g.names.length));
   });
+
+  it('sizes the chips from the run\'s height: two rows at most, a twelfth at least, and a floor in px', () => {
+    const r = footRange(140, FOOT_FLOOR_PX);
+    expect(r.max).toBeCloseTo(140 / (2 * FOOT_CHIP.row + FOOT_CHIP.gap), 9);
+    expect(r.min).toBeCloseTo(140 / 12, 9);
+    expect(footRange(90, FOOT_FLOOR_PX).min).toBe(FOOT_FLOOR_PX);
+    // A miniature TV keeps its proportions.
+    expect(footRange(36).min).toBeCloseTo(3, 9);
+    // A run too short for two rows of the floor still gets one size.
+    const tiny = footRange(20, FOOT_FLOOR_PX);
+    expect(tiny.min).toBe(tiny.max);
+  });
+
+  // The strip and the card in px, from app.css (.checkout-region and
+  // .checkout-board--list): the run is what is left of the strip after the
+  // card's padding, the tab (its padding and a title at most 7em of 0.9em),
+  // the column gap, and the count line under it. Measured with jsdom's rough
+  // widths (0.7em a Paytone letter, wider than the real face), so a run that
+  // fits here has room to spare on a TV.
+  const run = (w, h) => {
+    const u = Math.min(w / 100, (h * 1.7778) / 100);
+    const safe = Math.max(24, (2.5 * Math.min(w, h)) / 100);
+    const left = safe + Math.max(46, 2.9 * u) + 1.2 * u;
+    const width = Math.min(w - left - 19.2 * u, 80 * u);
+    const height = h / 2 - 18.675 * u;
+    const em = Math.max(11, 0.95 * u);
+    const tab = (1 + 2.6 + 7 * 0.9) * em;
+    return { strip: { width, height }, width: width - 0.9 * em - 0.9 * em - tab, height: height - 0.85 * em - 0.3 * em - 1.4 * em };
+  };
+  // The printer sends at most 60 entries (sanitizeCheckout): here ten in each
+  // club, of ordinary first-name lengths, and then of long ones.
+  const ORDINARY = ['Sophia', 'Oliver', 'Amelia', 'Lucas', 'Harper', 'Mason', 'Evelyn', 'Logan', 'Abigail', 'Elijah'];
+  const LONG = ['Alexander', 'Charlotte', 'Benjamin', 'Isabella', 'Theodore', 'Penelope', 'Sebastian', 'Josephine', 'Nathaniel', 'Gabriella'];
+  const sixty = (names) => CLUBS.map((club) => ({ club, names: [...names].sort(), mark: club !== 'Journey' }));
+
+  for (const [w, h] of [[1920, 1080], [3840, 2160], [1280, 720], [640, 480]]) {
+    for (const [kind, names] of [['ordinary', ORDINARY], ['long', LONG]]) {
+      it(`holds the 60-entry cap (${kind} names) at ${w}x${h}: never past the run's box, never under the floor, nobody uncounted`, () => {
+        const box = run(w, h);
+        // The strip is the same ~9.45u everywhere 16:9, ~120px on the Pi.
+        expect(box.strip.height).toBeGreaterThan(100);
+        const groups = sixty(names);
+        const range = footRange(box.height, FOOT_FLOOR_PX);
+        const fit = fitFoot(groups, { width: box.width, height: box.height, ...range, step: 0.25 });
+        expect(fit.fits).toBe(true);
+        expect(fit.size).toBeGreaterThanOrEqual(FOOT_FLOOR_PX);
+        // Every club keeps its plate (counting all ten), and what it shows and
+        // what stands behind its "+N more" add up to its ten.
+        for (const n of fit.hidden) {
+          expect(n).toBeGreaterThanOrEqual(0);
+          expect(n).toBeLessThanOrEqual(10);
+        }
+        // A 1080p or 4K TV names all sixty ordinary names, even measured this
+        // wide; a long-named night or a smaller screen says "+N more".
+        if (w >= 1920 && kind === 'ordinary') expect(fit.hidden).toEqual([0, 0, 0, 0, 0, 0]);
+      });
+    }
+  }
 });

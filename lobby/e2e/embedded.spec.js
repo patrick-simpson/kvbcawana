@@ -109,6 +109,32 @@ for (const [width, height] of [[640, 480], [1280, 720], [1920, 1080]]) {
   });
 }
 
+// The pickup board's strip (owner, 2026-10-07: the bottom of the screen) and
+// its "has checked out" banner stand where the first-run card does, so
+// embedded they end short of the corner chip, which has stepped left of the
+// host's column, and never reach the column.
+for (const [width, height] of [[640, 480], [1280, 720]]) {
+  test.describe(`embedded at ${width}x${height}, the pickup board`, () => {
+    test.use({ viewport: { width, height } });
+
+    test('stands in the foot, short of the corner chip and the host\'s column', async ({ page }) => {
+      await page.clock.setSystemTime(new Date('2026-10-06T19:45:00-04:00'));
+      const frame = await embed(page, { config: { seasonPromos: false, showTonightTicker: false } });
+      await frame.locator('.stage').click({ position: { x: 5, y: 5 } });
+      await page.keyboard.press('Control+Shift+D');
+      await frame.getByRole('button', { name: /Still-here board: 9 children/ }).click();
+      await page.keyboard.press('Control+Shift+D');
+      await expect(frame.locator('.debug')).toHaveCount(0);
+      await expect(frame.locator('.checkout-board--list')).toBeVisible();
+      await page.waitForTimeout(300);
+      const strip = await boxes(frame, '.stage .checkout-region, .stage .checkout-leaves');
+      expectClear([...strip, ...await boxes(frame, '.checkout-plate, .checkout-name__chip')], { width, height });
+      const chips = await boxes(frame, '.corner-bottom .corner-chip');
+      for (const s of strip) for (const c of chips) expect(s.right, 'strip past the corner chip').toBeLessThanOrEqual(c.left);
+    });
+  });
+}
+
 // The operator's panels, opened inside the frame. Settings and the slide
 // editor are 94-96vw wide and the debug panel is parked top-left at nearly the
 // full width, so on a small screen they reached under the host's column: at

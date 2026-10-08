@@ -4,10 +4,11 @@ import { NOTICE_MAX_AGE_MS } from './lib/constants.js';
 
 // WHO HOLDS WHICH PART OF THE ROOM (rebrand stage 4b-2): whole-App tests of
 // the rules src/lib/overlayFit.js lobbyRoom decides and App wires up: the
-// slide copy steps aside for whatever holds the middle, the pickup board is
-// the room's focus only at pickup time, a critical notice keeps to the band
-// over the board, a band notice gives the band to a toast, and the takeover
-// and the banner judge a notice on one clock. Events go in through the real
+// slide copy steps aside for a critical notice in the middle, the pickup
+// board always has the foot and leaves the copy, a notice and the
+// celebrations where they are (owner, 2026-10-07), a band notice gives the
+// band to a toast, and the takeover and the banner judge a notice on one
+// clock. Events go in through the real
 // socket seam (sanitizers and all), as in App.tally.test.jsx.
 
 let bound = {};
@@ -26,16 +27,10 @@ vi.mock('pusher-js', () => ({
 const App = (await import('./App.jsx')).default;
 const cfg = await import('./hooks/useConfig.js');
 
-const pad = (n) => String(n).padStart(2, '0');
-// The pickup window (Settings → Pickup board) around the real clock: open
-// (half an hour either side of now) or shut (starting an hour from now).
-function pickupWindow(open) {
-  const d = new Date();
-  const mins = d.getHours() * 60 + d.getMinutes();
-  const hm = (m) => { const w = ((m % 1440) + 1440) % 1440; return `${pad(Math.floor(w / 60))}:${pad(w % 60)}`; };
-  return open
-    ? { checkoutBoardFrom: hm(mins - 30), checkoutBoardUntil: hm(mins + 30) }
-    : { checkoutBoardFrom: hm(mins + 60), checkoutBoardUntil: hm(mins + 120) };
+// The pickup features come on by themselves from 7:30 pm (2026-10-08): the
+// clock at 7:45 pm (or 6:00 pm, before), on a Tuesday, still running.
+function clockAt(h, m, extra = []) {
+  vi.useFakeTimers({ toFake: ['Date', ...extra], now: new Date(2026, 9, 6, h, m), shouldAdvanceTime: true });
 }
 
 function setup(config = {}) {
@@ -90,55 +85,122 @@ describe('the room rules, wired up', () => {
     expect(has(container, 'notice-takeover')).toBe(false);
   });
 
-  it('at pickup time a live list takes the middle; during the program it waits at the foot beside the slides', async () => {
-    setup({ checkoutBoardMode: 'always', ...pickupWindow(true) });
+  it('from 7:30 pm the list takes the foot by itself and the slides carry on above it; before, nothing shows', async () => {
+    clockAt(19, 45);
+    setup();
     const pickup = await mount();
     await act(async () => { bound.checkout({ entries: kids(9), printed: 40, at: Date.now() }); });
-    expect(has(pickup.container, 'board-up')).toBe(true);
-    expect(pickup.container.querySelector('.checkout-region--foot')).toBeNull();
+    expect(pickup.container.querySelector('.checkout-region .checkout-board--list')).not.toBeNull();
     expect(pickup.container.querySelectorAll('.checkout-name__chip')).toHaveLength(9);
+    // Nothing on the stage steps aside for it.
+    expect(has(pickup.container, 'board-up')).toBe(false);
+    expect(has(pickup.container, 'notice-takeover')).toBe(false);
+    expect(pickup.container.querySelector('.manual-slideshow .manual-slide-copy')).not.toBeNull();
     cleanup();
 
     bound = {};
-    setup({ checkoutBoardMode: 'always', ...pickupWindow(false) });
-    const program = await mount();
+    clockAt(18, 0);
+    setup();
+    const early = await mount();
     await act(async () => { bound.checkout({ entries: kids(9), printed: 40, at: Date.now() }); });
-    expect(has(program.container, 'board-up')).toBe(false);
-    expect(program.container.querySelector('.checkout-region--foot .checkout-board--foot')).not.toBeNull();
-    expect(program.container.querySelector('.checkout-name__chip')).toBeNull();
+    // Before 7:30 pm there is no board at all, whatever the list says.
+    expect(early.container.querySelector('.checkout-board')).toBeNull();
   });
 
-  it('a stale board never blanks the slides, even in the pickup window', async () => {
-    setup({ checkoutBoardMode: 'always', ...pickupWindow(true) });
+  it('a stale board is a one-line card in the foot, even in the pickup window', async () => {
+    clockAt(19, 45);
+    setup();
     const { container } = await mount();
     await act(async () => { bound.checkout({ entries: kids(9), printed: 40, at: Date.now() - 26 * 3600 * 1000 }); });
-    expect(container.querySelector('.checkout-board.stale.checkout-board--foot')).not.toBeNull();
+    expect(container.querySelector('.checkout-board.stale.checkout-board--line')).not.toBeNull();
     expect(has(container, 'board-up')).toBe(false);
   });
 
-  it('over the pickup list a critical notice keeps to the band, and both stay whole', async () => {
-    setup({ checkoutBoardMode: 'always', ...pickupWindow(true) });
+  it('over the pickup list a critical notice still takes the middle, and both stay whole', async () => {
+    clockAt(19, 45);
+    setup();
     const { container } = await mount();
     await act(async () => { bound.checkout({ entries: kids(12), printed: 40, at: Date.now() }); });
     await act(async () => { bound.notice({ level: 'critical', message: 'SEVERE WEATHER: everyone stays inside', at: Date.now() }); });
-    expect(has(container, 'board-up')).toBe(true);
-    expect(has(container, 'notice-takeover')).toBe(false);
-    expect(container.querySelector('.notice-banner--critical').classList.contains('is-band')).toBe(true);
+    expect(has(container, 'notice-takeover')).toBe(true);
+    expect(container.querySelector('.notice-banner--critical').classList.contains('is-band')).toBe(false);
     expect(container.querySelectorAll('.checkout-name__chip')).toHaveLength(12);
   });
 
-  it('with a critical notice over the pickup list, celebrations wait for the band', async () => {
-    setup({ checkoutBoardMode: 'always', ...pickupWindow(true) });
+  it('the pickup list holds no celebration back: a milestone toast comes up over the slides', async () => {
+    clockAt(19, 45);
+    setup();
     const { container } = await mount();
     await act(async () => { bound.checkout({ entries: kids(12), printed: 40, at: Date.now() }); });
-    await act(async () => { bound.notice({ level: 'critical', message: 'SEVERE WEATHER: everyone stays inside', at: Date.now() }); });
     await act(async () => { bound.tonight({ checkedIn: 48, booksCompleted: 0, awardsEarned: 0, friendsBrought: 0, at: Date.now() }); });
     await act(async () => { bound.tonight({ checkedIn: 51, booksCompleted: 0, awardsEarned: 0, friendsBrought: 0, at: Date.now() }); });
-    await new Promise((r) => setTimeout(r, 200));
-    expect(container.querySelector('.milestone-toast')).toBeNull();
-    // The alert goes: the band is free, and the toast that waited comes up.
-    await act(async () => { bound.notice({ level: 'info', message: 'All clear', at: Date.now() + 1 }); });
     await waitFor(() => expect(container.querySelector('.milestone-toast')).not.toBeNull());
+    expect(container.querySelector('.checkout-board--list')).not.toBeNull();
+  });
+
+  it('the tonight strip steps out of the foot while the board stands there, and comes back after', async () => {
+    localStorage.setItem('awanaSetupCardDismissed.v1', '1');
+    clockAt(19, 45);
+    setup({ showTonightTicker: true });
+    const { container } = await mount();
+    await act(async () => { bound.tonight({ checkedIn: 12, booksCompleted: 0, awardsEarned: 0, friendsBrought: 0, at: Date.now() }); });
+    expect(container.querySelector('.tonight-ticker')).not.toBeNull();
+    await act(async () => { bound.checkout({ entries: kids(9), printed: 40, at: Date.now() }); });
+    await waitFor(() => expect(container.querySelector('.tonight-ticker')).toBeNull());
+    expect(container.querySelector('.checkout-board--list')).not.toBeNull();
+    // Everyone checked out: the foot says so ("A child has checked out" for
+    // the last ones, then the minute's "Everyone has been checked out"), and
+    // the strip waits for both.
+    await act(async () => { bound.checkout({ entries: [], printed: 40, at: Date.now() }); });
+    expect(container.querySelector('.checkout-leave--child')).not.toBeNull();
+    expect(container.querySelector('.tonight-ticker')).toBeNull();
+  });
+
+  it('a child leaving the list is "<name> has checked out" in the foot, in the list\'s place, then the list comes back', async () => {
+    clockAt(19, 45);
+    setup();
+    const { container } = await mount();
+    await act(async () => { bound.checkout({ entries: kids(9), printed: 40, at: Date.now() }); });
+    // The first list after a load is a baseline: nobody "checks out".
+    expect(container.querySelector('.checkout-leave')).toBeNull();
+    await act(async () => { bound.checkout({ entries: kids(9).slice(1), printed: 40, at: Date.now() }); });
+    const banner = container.querySelector('.checkout-leaves .checkout-leave--name');
+    expect(banner.textContent).toBe('Kid0 has checked out');
+    expect(container.querySelector('.checkout-board')).toBeNull();
+    // A few seconds, then the list is back.
+    await waitFor(() => expect(container.querySelector('.checkout-leave')).toBeNull(), { timeout: 4500 });
+    expect(container.querySelectorAll('.checkout-name__chip')).toHaveLength(8);
+  }, 10_000);
+
+  it('at or below the naming guard a leaving child is "A child", and before 7:30 nothing is said', async () => {
+    clockAt(19, 45);
+    setup();
+    const pickup = await mount();
+    await act(async () => { bound.checkout({ entries: kids(4), printed: 40, at: Date.now() }); });
+    await act(async () => { bound.checkout({ entries: kids(3), printed: 40, at: Date.now() }); });
+    expect(pickup.container.querySelector('.checkout-leave').textContent).toBe('A child has checked out');
+    expect(pickup.container.textContent).not.toMatch(/Kid3/);
+    cleanup();
+    vi.useRealTimers();
+
+    bound = {};
+    clockAt(18, 0);
+    setup();
+    const early = await mount();
+    await act(async () => { bound.checkout({ entries: kids(9), printed: 40, at: Date.now() }); });
+    await act(async () => { bound.checkout({ entries: kids(8), printed: 40, at: Date.now() }); });
+    expect(early.container.querySelector('.checkout-leave')).toBeNull();
+  });
+
+  it('a check-in moment outranks a "has checked out" banner', async () => {
+    clockAt(19, 45);
+    setup();
+    const { container } = await mount();
+    await act(async () => { bound.checkout({ entries: kids(9), printed: 40, at: Date.now() }); });
+    await act(async () => { bound.checkin({ firstName: 'Ann', club: 'Sparks', id: 'a1', at: Date.now() }); });
+    await act(async () => { bound.checkout({ entries: kids(9).slice(1), printed: 40, at: Date.now() }); });
+    expect(has(container, 'checkin-active')).toBe(true);
+    expect(container.querySelector('.checkout-leave')).toBeNull();
   });
 
   it('a flag tab hanging from the top edge pushes the band down', async () => {
@@ -220,22 +282,25 @@ describe('the first-run card\'s seat', () => {
     expect(card(container)).not.toBeNull();
   });
 
-  it('waits behind a pickup list, and behind the board\'s one-line card at the foot', async () => {
-    setup({ checkoutBoardMode: 'always', ...pickupWindow(true) });
+  it('yields its seat to the pickup board, the list or its one-line card', async () => {
+    clockAt(19, 45);
+    setup();
     const list = await mount();
     expect(card(list.container)).not.toBeNull();
     await act(async () => { bound.checkout({ entries: kids(9), printed: 40, at: Date.now() }); });
-    expect(has(list.container, 'board-up')).toBe(true);
+    expect(list.container.querySelector('.checkout-board--list')).not.toBeNull();
     expect(card(list.container)).toBeNull();
     cleanup();
 
     bound = {};
-    setup({ checkoutBoardMode: 'always', ...pickupWindow(false) });
-    const foot = await mount();
-    expect(card(foot.container)).not.toBeNull();
-    await act(async () => { bound.checkout({ entries: kids(9), printed: 40, at: Date.now() }); });
-    expect(foot.container.querySelector('.checkout-board--foot')).not.toBeNull();
-    expect(card(foot.container)).toBeNull();
+    clockAt(19, 45);
+    setup();
+    const line = await mount();
+    expect(card(line.container)).not.toBeNull();
+    // Two left: the anonymous line, a one-line card.
+    await act(async () => { bound.checkout({ entries: kids(2), printed: 40, at: Date.now() }); });
+    expect(line.container.querySelector('.checkout-board--line')).not.toBeNull();
+    expect(card(line.container)).toBeNull();
   });
 
   it('gives way to a name: the check-in wave rises through the foot', async () => {
@@ -260,12 +325,38 @@ describe('the first-run card\'s seat', () => {
   });
 });
 
+describe('the per-screen club count (owner, 2026-10-08)', () => {
+  const chip = (c) => c.querySelector('.corner-stack .corner-chip--club');
+
+  it('shows its club\'s count from the latest tally, all night, top right; hidden until a tally has the club', async () => {
+    setup({ cornerClub: 'tnt' });
+    const { container } = await mount();
+    expect(chip(container)).toBeNull();
+    await act(async () => { bound.tally({ counts: { Sparks: 4 }, total: 4, at: Date.now() }); });
+    expect(chip(container)).toBeNull();
+    await act(async () => { bound.tally({ counts: { Sparks: 4, 'T&T': 9 }, total: 13, at: Date.now() + 1 }); });
+    expect(chip(container).getAttribute('aria-label')).toBe('T&T: 9 here now');
+    expect(chip(container).textContent).toContain('T&T');
+    expect(chip(container).textContent).toContain('9');
+    // "Here now": a child checked out comes off the printer's count.
+    await act(async () => { bound.tally({ counts: { Sparks: 4, 'T&T': 8 }, total: 12, at: Date.now() + 2 }); });
+    expect(chip(container).textContent).toContain('8');
+  });
+
+  it('none by default, and never on another screen\'s say-so', async () => {
+    setup();
+    const { container } = await mount();
+    await act(async () => { bound.tally({ counts: { Sparks: 4, 'T&T': 9 }, total: 13, at: Date.now() }); });
+    expect(chip(container)).toBeNull();
+  });
+});
+
 describe('one clock for a notice', () => {
   it('the takeover and the banner go together when a critical notice expires, whatever the board is doing', async () => {
     // Only the intervals and the wall clock are faked: framer-motion keeps
     // its own frame clock, and the socket's timers stay real.
     vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'Date'] });
-    setup({ checkoutBoardMode: 'off' });
+    setup();
     const { container } = await mount();
     const agree = () => {
       const banner = container.querySelector('.notice-banner--critical') != null;

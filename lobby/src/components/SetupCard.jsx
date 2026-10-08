@@ -12,8 +12,8 @@ import { useDisplayLogin } from '../hooks/useDisplayLogin.js';
 // Where it stands is the lobby's business, not the card's: it sits in the
 // strip under the copy's lowest line, beside the gear (OVERLAY.setup in
 // src/lib/overlayFit.js), and App asks `setupUp()` there whether the room
-// has space for it right now (not over a name, a poster, a pickup list, the
-// tonight strip...). Its own judgement is only "is this screen still
+// has space for it right now (not over a name, a poster, the pickup board,
+// which shares its seat, the tonight strip...). Its own judgement is only "is this screen still
 // unconfigured, and has nobody said stop": `useSetupCard`. The two are split
 // so App can ask both, and so the card can give way to content.
 //

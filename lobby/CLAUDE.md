@@ -147,7 +147,10 @@ copy, which may reach 45u, so it cannot go up):
   1024x768 SAVE, the slide editor's CANCEL and the debug panel's Close sat
   under the host's buttons: a click on SAVE's right end opened JOURNEY's
   settings panel and left ours open, unsaved (a click in the column always
-  reaches the host, never this page).
+  reaches the host, never this page);
+- the pickup board's strip and its "has checked out" banners (the first-run
+  card's seat), whose right edge moves with the corner chip: `max(2.6u,
+  --host-clear-x) + 16.6u` (`html.embedded .checkout-region`).
 
 The column's inner edge is written twice on purpose: `HOST_CONTROL` /
 `hostClearancePx` in `embed.js` (the name fit sizes type in JS) and the
@@ -607,8 +610,8 @@ over it. `src/lib/flagship.js` is the pure half (`FLAGSHIP_SLIDE`,
 - **Never holds check-ins.** `holdsCheckIns` is false for it: names play over
   it at once, the slideshow pauses for them like for any slide, and it steps
   back (`.stage.checkin-active .flagship`, the copy's own 0.28 / 0.97) and
-  forward again, and steps aside entirely for the pickup board and a critical
-  notice (it is a `.lobby-media`). `e2e/flagship.events.spec.js` drives all of
+  forward again, and steps aside entirely for a critical notice (it is a
+  `.lobby-media`). The pickup board in the foot leaves it where it is. `e2e/flagship.events.spec.js` drives all of
   that in a real browser.
 - **A 10 second title sequence** (`FLAGSHIP_DURATION_SEC`, the slide's own
   hold): two clouds drift in, WELCOME and TO AWANA! assemble letter by letter
@@ -896,6 +899,23 @@ The typed slideshow and the check-in queue take turns instead of competing
 - **Problem indicators are not corner info.** The status sticker (connection,
   printer failures, name faults, layer faults) shows whenever there is a
   problem, on any slide.
+- **The club count** (owner, 2026-10-08): per screen, never shared
+  (`config.cornerClub`, '' or a club id from `CORNER_CLUB_IDS` in
+  `src/lib/clubs.js`; Settings → Screen & corner → This TV → "Club count
+  (upper right)"), for a TV at one club's door. A stepped chip in the club's
+  plate colour, the club's name over the count, in the top-right stack under
+  the sticker, all night, from the latest `tally`'s per-club `counts`
+  (`countForClub`, matched by `clubKey`, so "T&T", 'tnt' and "Truth &
+  Training" are one club; since printer 7.15.0 the counts are "here now").
+  Hidden until a tally has the club. It takes the top slot the weather and the
+  WAITING chip share (`topTaken` in App), so they move out exactly as for a
+  tall sticker: the weather leaves the rotation and the WAITING chip comes
+  down to the bottom corner, and the stack keeps its 14u budget. A tall
+  sticker (a fault strip) outranks it. `useConfig.js` writes the ids out
+  rather than importing clubs.js (the projector imports useConfig, and
+  clubs.js brings every club's art); `useConfig.test.js` pins the two.
+  `clubs.test.js` (`clubKey`, `countForClub`), `App.overlays.test.jsx` and
+  `e2e/pickup-board.spec.js` ("the club count, top right") pin the rest.
 
 ## The lobby scene and the slide frame (rebrand stage 4b)
 
@@ -1013,7 +1033,8 @@ catalog page. Two shapes carry it all:
   milestone toasts are StepPlates. `.step-plate__echo` is a hidden copy of the
   plate that a skinned night paints in `--skin-a`.
 - **The white kit card** (the printer dashboard's): the pickup board with its
-  wavy corner tab and club-colour name chips, and the first-run setup card.
+  house-blue tab (the kit's wavy tab on its one-line card) and club-colour
+  name chips, and the first-run setup card.
 
 Where things go is one table, `OVERLAY` in `src/lib/overlayFit.js`, measured
 against the corner tab, the top-right stack, the copy's `LAYOUT` and the
@@ -1035,19 +1056,41 @@ house waves, and who holds which part of the room is one pure function,
   (all three at once set tighter, `.top-flags--tight`); while one hangs the
   band starts under it (`.stage.has-flags`, `bandTop`).
 - **The centre** (12u to 46u of the 16:9 box) is taken over by a critical
-  notice, and by the pickup board only while it is the room's focus: a live
-  list (names or the anonymous line) during pickup time (`boardPlacement`,
-  `PICKUP_TIME`: decideBoard's window plus the schedule's own `shutdown`).
-  The slide copy steps fully aside behind whichever holds it
-  (`.stage.notice-takeover`, `.stage.board-up`), and so does a poster or a
-  video (`.lobby-media`), as it steps back for a name.
-- **The foot** is the pickup board the rest of the time it is on (a stale or
-  empty board, or an "always" board while the program runs): a one-line card
-  bottom-centre above the ticker, beside the slides, which keep playing. Its
-  words are the board's own; a live list there is its count line, never a
-  partial list, and the names come up when pickup starts. A stale board is
-  never allowed to blank the lobby (it stays up until data or a reload
-  clears it, and a visible board still counts as busy for the self-updater).
+  notice, and only by it. The slide copy steps fully aside behind it
+  (`.stage.notice-takeover`), and so does a poster or a video (`.lobby-media`),
+  as it steps back for a name. Until 2026-10-07 the pickup list took it too.
+- **The foot is the pickup board's** (owner, 2026-10-07: "The still remaining
+  kids list should just take the bottom of the screen. It shouldn't take over
+  all of the announcements."). `boardPlacement(state)` is `'foot'` for every
+  state the board shows, never the centre (the name is `'foot'`, not `'band'`,
+  because `'band'` is the top band's). `OVERLAY.foot` is the same object as
+  `OVERLAY.setup`: the strip under the copy's lowest line (45u down the 16:9
+  frame, `calc(50% + 16.875u)`, so a 4:3 screen's extra height is the
+  strip's) to the corner chip's line 1.8u off the bottom, from a 1.2u gap past
+  the gear to 19.2u from the right (a gap short of the corner chip), at most
+  80u wide. The slides above it carry on as normal: no step-back, a critical
+  notice keeps the middle, celebrations are never held for it, the tonight
+  strip steps away while it is up, and the first-run card yields its seat to
+  it. A names list fills the strip: a house-blue tab at the left end with the
+  title over the whole count line, then every club's plate (white mark or
+  name, "N waiting") followed by its name chips, one run wrapping across the
+  strip. `fitFoot` (overlayFit.js) sizes the chips to the run's MEASURED box
+  (CheckoutBoard's ResizeObserver; jsdom falls back to the 1080p box in u):
+  at most two rows of the largest chips, never smaller than a twelfth of the
+  run's height nor `FOOT_FLOOR_PX` (10px) on a real screen (`footRange`; the
+  Settings preview, a TV in miniature, has no px floor). Where even that
+  cannot hold everyone, the longest club's last names go behind a "+N more"
+  chip, one at a time, until it fits; every plate still counts all its
+  children and the count line says the total. Measured with real fonts: the
+  60-entry cap of ordinary names all shows at 1920x1080 (~15.5px chips) and
+  1280x720 (~10.3px); the Pi's 640x480 run is ~310x110px, so a long list
+  there is mostly "+N more" (about 13 of 40 names show). A stale or empty
+  board, or the anonymous line, is a one-line card on the strip's floor. A
+  stale board is never allowed to blank the lobby, and a visible board still
+  counts as busy for the self-updater. `e2e/pickup-board.spec.js` measures the
+  strip against the copy's drawn rows, the gear and the corner chip, every
+  plate and chip against the run, and the 60-entry cap at 1080p, 720p and
+  640x480; `overlayFit.test.js` proves the cap on the model at four sizes.
 - **The first-run card has the foot too** (`OVERLAY.setup`, `setupUp()`,
   `.panel.setup-card`; live smoke check 2026-09-29: it hid the start
   of a long calendar title at 720p and the chip row at 1080p). A corner is
@@ -1062,7 +1105,7 @@ house waves, and who holds which part of the room is one pure function,
   the pure `setupUp(...)` (given lobbyRoom's answer), to whatever legitimately
   holds that part of the room: a name (the check-in wave rises through it), a
   held poster or slide (the chrome steps aside for those), an open panel,
-  the pickup list, the board's foot card, the tonight strip while it has
+  the pickup board or a "has checked out" banner (its own seat), the tonight strip while it has
   counts to show (content over instructions: the strip is what the room is
   looking at, and the debug panel's "Show tonight ticker" must work on a
   fresh screen) and a critical notice in the middle. App keeps the strip's
@@ -1094,11 +1137,12 @@ house waves, and who holds which part of the room is one pure function,
   - `useLinger(flag, ms)` starts its linger in the render the flag falls in
     (React's adjust-state-during-render), never from an effect, or one
     committed frame would have the flag off and the linger not yet on.
-- **When two meet.** A critical notice over the pickup list keeps to the top
-  band (`is-band`) so both stay whole, and the celebrations wait (the queue
-  holds and a toast already up steps aside) until one of them goes. On an OBS
-  overlay feed a critical notice always keeps to the band, and a toast drops
-  below it (`milestone-toast--below`). The takeover class and the banner
+- **When two meet.** A critical notice and the pickup board never meet (the
+  centre ends ~6u above the strip), so a notice keeps the middle over the list
+  and nothing holds the celebrations for the board (the old `holdCelebrations`
+  and the toast's `yielding` are gone). On an OBS overlay feed a critical
+  notice always keeps to the band, and a toast drops below it
+  (`milestone-toast--below`). The takeover class and the banner
   judge a notice on ONE clock: App's `noticeNow`, handed to NoticeBanner as
   `now` (`noticeShowing`), never the board's ticker, which a checkout
   payload re-stamps.
@@ -1116,7 +1160,7 @@ house waves, and who holds which part of the room is one pure function,
   wave has risen (`WAVE_UP_SEC`, from `FRONT_WAVE_DELAY`).
 
 Every size is fitted by measurement (`fitShout`, `fitParagraph` with
-`balanceLines`, `fitBoard`), so a 40-character name, a 200-character notice or
+`balanceLines`, `fitFoot`), so a 40-character name, a 200-character notice or
 a 60-name board steps down inside its band rather than spilling onto the
 headline, and plates hug their text. `fitShout` takes the most balanced
 two-line split and says `fits: false` when even `twoLineMin` is too wide; the
@@ -1358,8 +1402,15 @@ confetti, wake lock and connection sticker, simplified mode, the Pusher keys,
   a screen that does not follow reads "This screen"). A new setting goes in
   `SHARED_SPEC` (and the printer's table, the contract vectors and the
   printer first) or it stays per-screen; there is no third place.
-- `App.sharedSettings.test.jsx` drives it end to end: a frame turns the pickup
-  board on and cannot smuggle a per-screen key, a non-following screen ignores
+- **Retired keys** (`RETIRED_SHARED`): `checkoutBoardMode`, `checkoutBoardFrom`
+  and `checkoutBoardUntil` left the app on 2026-10-08 (the board comes on by
+  itself) but are still in the printer's contract vectors, so `SHARED_SPEC`
+  keeps them and a frame carrying them is accepted; they are not config keys,
+  so `VALIDATORS` drops them when the shared layer resolves, and `pickShared`
+  never publishes them. Retire them from the contract (printer first) and
+  they leave here too.
+- `App.sharedSettings.test.jsx` drives it end to end: a frame sets the pickup
+  board's naming guard and cannot smuggle a per-screen key, a non-following screen ignores
   it, and a shared change in Settings reaches the print server's URL with the
   token.
 
@@ -1500,7 +1551,7 @@ watching.
   cached answer would pin the screen to the build it already has.
 - **Busy means busy, and there is no deadline.** Signage is busy while a
   check-in banner (and so any birthday ribbon riding on it), a celebration or
-  doors-open flourish, a visible checkout board, an open Settings / slide
+  doors-open flourish, a visible checkout board or "has checked out" banner, an open Settings / slide
   editor / debug panel, or an event from the last `BUILD_QUIET_MS` is on
   screen. The projector is busy unless `projectorIdle()` says otherwise:
   shutdown is always safe, a countdown still more than `COUNTDOWN_IDLE_MS`
@@ -1866,8 +1917,12 @@ change:
 one payload that names children who are *not yet with a parent*, so the
 rendering rules are part of the privacy design, not styling:
 
-- It is **off by default** (`checkoutBoardMode: 'off'`). No default is
-  right for every church, so it takes a deliberate choice.
+- **It comes on by itself at pickup time** (owner, 2026-10-08), from 7:30 pm
+  (`PICKUP_START`, `inPickupHours`, `pickupNow`) until midnight, every night.
+  There is no on/off mode and no window any more: the printer only publishes
+  a checkout list on club nights, and which clubs are on it is set on the
+  check-in laptop's dashboard. (Until then it was off by default, then a mode
+  and a window in Settings.) Before 7:30 a list on the wire shows nothing.
 - Below `checkoutBoardNamesAbove` children it **stops naming anyone**. A
   long list is anonymising; two names late in the evening point at two
   specific unattended children, and `checkin` already published those
@@ -1879,32 +1934,47 @@ rendering rules are part of the privacy design, not styling:
   out yet", never "still in the building".
 - All of that judgement lives in the pure `decideBoard()` in
   `src/lib/checkoutBoard.js` so it can be tested exhaustively.
-- **'pickup' mode is a time window the church sets** (owner, 2026-10-01:
-  `checkoutBoardFrom` / `checkoutBoardUntil`, local "HH:MM", default 7:35 to
-  8:30 pm; `inPickupWindow`, which also handles a window past midnight). It
-  used to follow the schedule's phases, and the set it allowed left out
-  `shutdown`, so the board went DOWN at 7:35 as families arrived. Inside the
-  window it stays until the list empties, says "Everyone has been checked
-  out" for `EMPTY_HOLD_MS` (one minute, from `emptySince`, which App stamps
-  where the payload lands), then steps away; by `checkoutBoardUntil` it is
-  gone whatever the list says. `pickupNow()` is the same window for either
-  mode that is on: it is when a live list takes the middle (`boardPlacement`,
-  `lobbyRoom({ pickup })`) and when the corner counts down.
+- **Once the list empties** it says "Everyone has been checked out" for
+  `EMPTY_HOLD_MS` (one minute, from `emptySince`, which App stamps where the
+  payload lands), then steps away for the night. `pickupNow()` is when the
+  board shows, when the "has checked out" banners may speak and when the
+  corner counts down.
+- **"<First name> has checked out"** (owner, 2026-10-08;
+  `src/lib/checkoutLeaves.js`, `useCheckoutBanners`, `CheckoutBanner.jsx`):
+  the payload has no ids, so a departure is the multiset difference (first
+  name + club) between two successive lists. Only between two FRESH lists
+  this screen saw in a row, in pickup time: never on the first list after a
+  load or a reconnect (any change of the socket's status forgets the
+  baseline; the Worker replays the last list to a screen that connects), never
+  from or to a stale list, so never because the feed went quiet. A name only
+  while the NEW list is still in its names state (more than
+  `checkoutBoardNamesAbove` left, or the guard at 0); otherwise "A child has
+  checked out", with no name, no club and no club colour. One at a time,
+  `LEAVE_BANNER_MS` (3 s) each, in the foot in the list's place
+  (`lobbyRoom`'s `banner`), the list back after; past `LEAVE_QUEUE_CAP` (6)
+  waiting the rest collapse into one "and N more have checked out". A
+  check-in moment outranks it (the head waits unseen and gets its full time
+  after), the queue empties outside pickup time, and it is never on an OBS
+  feed. Every piece is `M.*`. `checkoutLeaves.test.js` (the rules),
+  `useCheckoutBanners.test.jsx` (the turns), `CheckoutBanner.test.jsx`,
+  `App.overlays.test.jsx` and `e2e/pickup-board.spec.js` ("a child leaving the
+  list", 1080p and 640x480) pin it.
 - **The corner counts down only what the board itself says**
-  (`stillHereCount`, `cornerStillHere`, on by default): in the window, while
+  (`stillHereCount`, `cornerStillHere`, on by default): from 7:30 pm, while
   the board is NAMING children, the tally's slot reads PICKUP over the number
   with "not checked out yet" under it (`STILL_HERE_NOTE`, shown even when the
   correction note is switched off). Never while the board is anonymous (an
   exact small number on a public wall singles children out), never from a
   stale, empty or switched-off board; tonight's count comes back.
-- **One column per club** (`fitColumns` in `overlayFit.js`, youngest club
-  first by `getAllClubs()`): the club's plate (white mark, "N waiting"), then
-  its names as chips, alphabetical; a long club splits into up to three
-  sub-columns before the size steps down. `e2e/pickup-board.spec.js` checks
-  every chip stays inside its column and the card at three sizes.
+- **In the foot, one run, club by club** (`fitFoot` in `overlayFit.js`,
+  youngest club first by `getAllClubs()`; see "The foot is the pickup board's"
+  above): the club's plate (white mark, "N waiting"), then its names as chips,
+  alphabetical, "+N more" where the smallest readable chips cannot hold them.
+  `e2e/pickup-board.spec.js` checks every plate and chip stays inside the run
+  and the strip at three sizes.
 - **The demo** (Settings → Pickup board): a live preview on sample names
   (`demoCheckout`, `SAMPLE_BOARD_NAMES`, obviously made-up), and "Show a demo
   on this TV", `BOARD_DEMO_MS` (20 s) on this screen only, with the demo
   badge and a "Demo · sample names" tag on the card. `decideBoard`'s `demo`
-  bypasses the mode and the clock, never the naming rule, and never touches
-  the real checkout data.
+  bypasses the clock, never the naming rule, and never touches the real
+  checkout data. The demo never says "has checked out".

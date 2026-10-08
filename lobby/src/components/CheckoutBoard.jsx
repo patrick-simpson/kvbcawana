@@ -1,7 +1,9 @@
+import { useLayoutEffect, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import { M } from '../lib/motion.jsx';
-import { DUR, EASE, SHAPES, beats } from '../lib/brand.js';
+import { DUR, EASE, SHAPES } from '../lib/brand.js';
 import { getAllClubs, getClubPalette } from '../lib/clubs.js';
-import { OVERLAY, fitColumns, nameChipSeat } from '../lib/overlayFit.js';
+import { FOOT_FLOOR_PX, fitFoot, footRange, moreLabel, nameChipSeat, waitingLabel } from '../lib/overlayFit.js';
 import { measureInk } from '../lib/lobbyFrame.js';
 import { useFontsReady } from '../hooks/useFontsReady.js';
 import {
@@ -27,37 +29,66 @@ import {
 // out yet" and never as "the building is clear" — because acting on the second
 // meaning when the first is what we know is how a child gets left behind.
 //
-// The look (rebrand stage 4b-2) is the kit's card, the printer dashboard's:
-// a white card with a hard offset shadow and a wavy corner tab carrying its
-// title, the count in Paytone One. Since 2026-10-01 the list is one column per
-// club (its plate, "N waiting", then its names as chips in its colour). WHERE it
-// goes is src/lib/overlayFit.js boardPlacement, handed in as `placement`:
+// The look (rebrand stage 4b-2) is the kit's card, the printer dashboard's: a
+// white card with a hard offset shadow and a house-blue tab carrying its title
+// (the kit's wavy tab on the one-line card), the count in Paytone One. WHERE it goes is always the foot (src/lib/overlayFit.js
+// OVERLAY.foot, boardPlacement): the strip under the copy's lowest line, from
+// the gear to the corner chip, the first-run card's seat. The slides above it
+// carry on as normal (owner, 2026-10-07: "The still remaining kids list should
+// just take the bottom of the screen. It shouldn't take over all of the
+// announcements."; until then a live list at pickup time took the middle and
+// the copy stepped aside behind it).
 //
-//  - 'centre' while it is the room's focus (a live list during pickup time):
-//    it takes the middle of the room and the slide copy steps back behind it
-//    (App's `board-up` stage class), as it does for a name. Reserving room for
-//    up to sixty names would shrink every slide all evening.
-//  - 'foot' the rest of the time it is on (a stale or empty board, or an
-//    "always" board while the program is running): a one-line card at the
-//    foot, beside the slides, which keep playing. It says the same things,
-//    in the same words; a live list there is its count line, because a
-//    partial list must never pass for the whole one, and the names are for
-//    pickup, when the board comes back to the middle.
+//  - A names board fills the strip: the tab at the left end, its title over
+//    the honest count line, then every club's plate (its white mark, "N
+//    waiting") followed by its names as chips in its colour, alphabetical, in
+//    one run that wraps across the strip (fitFoot sizes the chips to the
+//    strip's measured box). Where even the smallest chips cannot hold
+//    everyone, a club's last names stand behind a "+N more" chip; its plate and
+//    the count line still say the whole number.
+//  - A stale or empty board, or the anonymous line, is a one-line card on the
+//    strip's floor, in the same words.
+//
+// It only ever shows at pickup time (from 7:30 pm by itself, since 2026-10-08:
+// checkoutBoard.js decideBoard), so there is no longer a count-line-only
+// version of a names board for the program hours.
 
-// The columns' fit, in u: the card's inner width (70u less 2 x 2.2u of
-// padding), and the height left in the centre region after the tab (4.7u),
-// the foot (~3.9u) and the bottom padding (1.6u) (app.css); each column's
-// head (the club's plate: its mark and "N waiting") is 6u of it, and the
-// columns stand 1.2u apart (owner, 2026-10-01: columns by club, so a parent
-// looks under their child's club).
-const COLUMNS = {
-  width: OVERLAY.centre.width - 4.6,
-  height: OVERLAY.centre.bottom - OVERLAY.centre.top - 10.4,
-  head: 6,
-  gap: 1.2,
-  max: 2.6,
-  min: 1,
-};
+/**
+ * The fit's box when the strip has not been measured (no layout: jsdom, or a
+ * frame before the ResizeObserver's first answer), in u: the run's room on a
+ * 1920x1080 screen (the strip, 75u x 9.45u there, less the tab and the
+ * card's padding).
+ */
+const FALLBACK = { width: 65, height: 8.7 };
+
+/**
+ * The run's own box, measured (px), while `active`: a ResizeObserver re-reads
+ * it when the screen or the card changes and applies it before the frame is
+ * painted (flushSync), as useTallerThan does. The box comes from the card's
+ * grid, never from the chips in it, so a new fit never resizes it. Null
+ * without layout.
+ * @param {{ current: HTMLElement | null }} ref
+ * @param {boolean} active
+ * @returns {{ width: number, height: number } | null}
+ */
+function useRunBox(ref, active) {
+  const [box, setBox] = useState(/** @type {{ width: number, height: number } | null} */ (null));
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!active || !el || typeof ResizeObserver === 'undefined') return undefined;
+    const ro = new ResizeObserver(() => {
+      const width = el.clientWidth;
+      const height = el.clientHeight;
+      flushSync(() => setBox((old) => {
+        if (!(width > 0 && height > 0)) return null;
+        return old && old.width === width && old.height === height ? old : { width, height };
+      }));
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [ref, active]);
+  return active ? box : null;
+}
 
 /**
  * @param {object} props
@@ -67,24 +98,41 @@ const COLUMNS = {
  *   OS-level reduced-motion is already handled globally by App's
  *   <MotionConfig reducedMotion="user">, so this only covers the operator's own
  *   "simplified mode" switch.
- * @param {'centre' | 'foot'} [props.placement] where it goes (boardPlacement)
  * @param {boolean} [props.demo] a sample board (Settings' preview and demo):
- *   it says so on its tab and its foot, so it can never pass for a real list
+ *   it says so on its card and its count line, so it can never pass for a real list
+ * @param {boolean} [props.preview] drawn in Settings' miniature TV: no floor
+ *   in px on the chips' size
  */
-export default function CheckoutBoard({ decision, checkout, calm, placement = 'centre', demo = false }) {
+export default function CheckoutBoard({ decision, checkout, calm, demo = false, preview = false }) {
   useFontsReady();
   const state = decision?.state;
-  if (state !== BOARD_NAMES && state !== BOARD_ANONYMOUS
-      && state !== BOARD_EMPTY && state !== BOARD_STALE) {
-    return null;
-  }
+  const shown = state === BOARD_NAMES || state === BOARD_ANONYMOUS
+    || state === BOARD_EMPTY || state === BOARD_STALE;
+  const listed = state === BOARD_NAMES;
+  const runRef = useRef(/** @type {HTMLUListElement | null} */ (null));
+  const box = useRunBox(runRef, listed);
+  if (!shown) return null;
 
-  const foot = placement === 'foot';
   const entries = checkout?.entries || [];
-  const listed = state === BOARD_NAMES && !foot;
-  const groups = listed ? groupByClub(entries, getAllClubs()) : [];
   const count = entries.length;
-  const fit = listed ? fitColumns(groups, COLUMNS) : null;
+  const clubs = listed
+    ? groupByClub(entries, getAllClubs()).map((g) => {
+      const club = getClubPalette(g.club);
+      return { ...g, palette: club, mark: Boolean(club.logo) };
+    })
+    : [];
+  let fit = null;
+  let nameSize;
+  if (listed && box) {
+    // Measured, in px: the chips' range from the run's height (footRange),
+    // with a floor a lobby can read, except in Settings' miniature TV.
+    const range = footRange(box.height, preview ? 0 : FOOT_FLOOR_PX);
+    fit = fitFoot(clubs, { ...box, ...range, step: 0.25 });
+    nameSize = `${fit.size}px`;
+  } else if (listed) {
+    fit = fitFoot(clubs, { ...FALLBACK, ...footRange(FALLBACK.height), step: 0.01 });
+    nameSize = `calc(${fit.size} * var(--u))`;
+  }
 
   const anim = calm
     ? {}
@@ -94,98 +142,113 @@ export default function CheckoutBoard({ decision, checkout, calm, placement = 'c
         transition: { duration: DUR.settle, ease: EASE.settle },
       };
 
+  const tab = (/** @type {import('react').ReactNode} */ more = null) => (
+    <div className="checkout-tab">
+      <svg viewBox={SHAPES.tab.viewBox} preserveAspectRatio="none" aria-hidden="true" focusable="false">
+        <path d={SHAPES.tab.d} fill="currentColor" />
+      </svg>
+      <h2 className="checkout-title">Still to be picked up</h2>
+      {more}
+    </div>
+  );
+  const demoTag = demo && <span className="checkout-demo">Demo · sample names</span>;
+  const countLine = state === BOARD_NAMES && (
+    <p className="checkout-foot">
+      {/* "not checked out yet", never "still in the building" — the data
+          cannot support the stronger claim, and the weaker one is what a
+          volunteer needs to act on anyway. */}
+      <span className="checkout-count">{count}</span> not checked out yet
+      {typeof checkout?.printed === 'number' && ` · ${checkout.printed} labels printed tonight`}
+      {!demo && decision.ageMin > 1 && ` · updated ${decision.ageMin} min ago`}
+      {demo && ' · a demo, not real children'}
+    </p>
+  );
+
   return (
-    // Keyed on the placement, so moving between the foot and the middle
-    // lands the card afresh rather than sliding it across the slide.
-    <div key={placement} className={`checkout-region${foot ? ' checkout-region--foot' : ''}`}>
+    // Keyed on what it shows, so moving between the one line and the list
+    // lands the card afresh rather than stretching it across the strip.
+    <div key={listed ? 'list' : 'line'} className="checkout-region">
       <M.section
-        className={`checkout-board ${state}${foot ? ' checkout-board--foot' : ''}${demo ? ' checkout-board--demo' : ''}`}
+        className={`checkout-board ${state} checkout-board--${listed ? 'list' : 'line'}${demo ? ' checkout-board--demo' : ''}`}
         aria-live="polite"
-        style={fit ? { '--name-size': `calc(${fit.size} * var(--u))`, '--columns': groups.length } : undefined}
+        style={listed ? { '--name-size': nameSize } : undefined}
         {...anim}
       >
-        <div className="checkout-tab">
-          <svg viewBox={SHAPES.tab.viewBox} preserveAspectRatio="none" aria-hidden="true" focusable="false">
-            <path d={SHAPES.tab.d} fill="currentColor" />
-          </svg>
-          <h2 className="checkout-title">Still to be picked up</h2>
-        </div>
-        {demo && <span className="checkout-demo">Demo · sample names</span>}
+        {listed ? (
+          <>
+            {/* The tab carries the count line under its title, so the run
+                has the strip's whole height. */}
+            {tab(<div className="checkout-meta">{countLine}{demoTag}</div>)}
+            <ul className="checkout-run" ref={runRef}>
+              {/* Every club in one run, youngest to oldest, each led by its
+                  own plate (its white mark and how many are waiting) so a
+                  parent finds their child's club at a glance, then each name
+                  a chip in the club's colour, alphabetical. Quiet, no
+                  springs: this is a reference list a volunteer scans. */}
+              {clubs.map((g, i) => {
+                const hidden = fit.hidden[i] || 0;
+                const names = hidden ? g.names.slice(0, g.names.length - hidden) : g.names;
+                return (
+                  <li
+                    key={g.club}
+                    className="checkout-club"
+                    style={{ '--club': g.palette.primary, '--club-deep': g.palette.deep || g.palette.primary }}
+                  >
+                    <span className="checkout-plate">
+                      {g.mark
+                        ? <img className="checkout-plate__mark" src={g.palette.logo} alt={g.palette.name || g.club} draggable="false" />
+                        : <span className="checkout-plate__name">{g.club}</span>}
+                      <span className="checkout-plate__count">{waitingLabel(g.names.length)}</span>
+                    </span>
+                    <span className="checkout-names">
+                      {names.map((name, j) => (
+                        // A real separator between chips, so the list still
+                        // reads (and copies) as "Demo Kid · Sample Star".
+                        <span key={`${name}-${j}`} className="checkout-name">
+                          {j ? <span className="checkout-sep"> · </span> : null}
+                          <NameChip name={name} />
+                        </span>
+                      ))}
+                      {hidden > 0 && (
+                        <span className="checkout-name">
+                          {names.length ? <span className="checkout-sep"> · </span> : null}
+                          <span className="checkout-more">{moreLabel(hidden)}</span>
+                        </span>
+                      )}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          </>
+        ) : (
+          <>
+            {tab()}
+            {demoTag}
 
-        {state === BOARD_EMPTY && (
-          <p className="checkout-line good">
-            Everyone has been checked out. Thanks for a great night!
-          </p>
-        )}
+            {state === BOARD_EMPTY && (
+              <p className="checkout-line good">
+                Everyone has been checked out. Thanks for a great night!
+              </p>
+            )}
 
-        {state === BOARD_ANONYMOUS && (
-          // Deliberately no names and no exact number. At this point in the
-          // evening a count of one or two, on a public wall, is a statement about
-          // specific unattended children — and their first names were already on
-          // this same screen earlier tonight.
-          <p className="checkout-line">
-            Almost everyone has been picked up. Please see the check-in desk.
-          </p>
-        )}
+            {state === BOARD_ANONYMOUS && (
+              // Deliberately no names and no exact number. At this point in the
+              // evening a count of one or two, on a public wall, is a statement about
+              // specific unattended children — and their first names were already on
+              // this same screen earlier tonight.
+              <p className="checkout-line">
+                Almost everyone has been picked up. Please see the check-in desk.
+              </p>
+            )}
 
-        {state === BOARD_STALE && (
-          <p className="checkout-line warn">
-            This list stopped updating about {decision.ageMin} min ago
-            {' '}— please check with the check-in desk rather than relying on it.
-          </p>
-        )}
-
-        {listed && (
-          <ul className="checkout-columns">
-            {/* One column per club, youngest to oldest, each headed by the
-                club's own plate (its white mark and how many are waiting) so
-                a parent finds their child's club at a glance, and each name
-                a chip in the club's colour, alphabetical. A long club splits
-                into side-by-side sub-columns (fit.split). Quiet, no springs:
-                this is a reference list a volunteer scans. */}
-            {groups.map((g, i) => {
-              const club = getClubPalette(g.club);
-              return (
-                <M.li
-                  key={g.club}
-                  className="checkout-column"
-                  style={{ '--club': club.primary, '--club-deep': club.deep || club.primary, '--split': fit.split[i] }}
-                  initial={calm ? false : { opacity: 0, y: '0.5em' }}
-                  animate={{ opacity: 1, y: '0em' }}
-                  transition={{ duration: DUR.settle, delay: beats(1 + i * 0.7), ease: EASE.settle }}
-                >
-                  <div className="checkout-column__head">
-                    {club.logo
-                      ? <img className="checkout-column__mark" src={club.logo} alt={club.name || g.club} draggable="false" />
-                      : <span className="checkout-column__name">{g.club}</span>}
-                    <span className="checkout-column__count">{g.names.length} waiting</span>
-                  </div>
-                  <span className="checkout-names">
-                    {g.names.map((name, j) => (
-                      // A real separator between chips, so the list still
-                      // reads (and copies) as "Demo Kid · Sample Star".
-                      <span key={`${name}-${j}`} className="checkout-name">
-                        {j ? <span className="checkout-sep"> · </span> : null}
-                        <NameChip name={name} />
-                      </span>
-                    ))}
-                  </span>
-                </M.li>
-              );
-            })}
-          </ul>
-        )}
-
-        {state === BOARD_NAMES && (
-          <p className="checkout-foot">
-            {/* "not checked out yet", never "still in the building" — the data
-                cannot support the stronger claim, and the weaker one is what a
-                volunteer needs to act on anyway. */}
-            <span className="checkout-count">{count}</span> not checked out yet
-            {typeof checkout?.printed === 'number' && ` · ${checkout.printed} labels printed tonight`}
-            {!demo && decision.ageMin > 1 && ` · updated ${decision.ageMin} min ago`}
-            {demo && ' · a demo, not real children'}
-          </p>
+            {state === BOARD_STALE && (
+              <p className="checkout-line warn">
+                This list stopped updating about {decision.ageMin} min ago
+                {' '}— please check with the check-in desk rather than relying on it.
+              </p>
+            )}
+          </>
         )}
       </M.section>
     </div>

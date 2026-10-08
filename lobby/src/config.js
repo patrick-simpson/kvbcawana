@@ -156,6 +156,12 @@ const config = {
   // display is open (Screen Wake Lock API; ignored where unsupported).
   keepScreenAwake: true,
 
+  // One club's count in the top-right corner, all night, for a screen that
+  // stands at that club's door (owner, 2026-10-08): '' (none) or a club id
+  // (lib/clubs.js CORNER_CLUB_IDS). Per screen, never shared: each TV picks
+  // its own club. The count is the printer's tally, "here now".
+  cornerClub: '',
+
   // ── Calendar-aware slides ─────────────────────────────────
   // The display can read the church's Awana calendar and auto-generate
   // slides in the typed-slides rotation: "Welcome to Water Night!",
@@ -229,16 +235,17 @@ const config = {
 
   // ── Who's still here board ────────────────────────────────────────────
   // Shows which children have not been checked out yet, from the printer's
-  // `checkout` broadcast.
+  // `checkout` broadcast, along the bottom of the screen, with a "has checked
+  // out" banner as each one leaves the list.
   //
-  // 'off' (default) | 'pickup' (only in the last stretch of club and just
-  // after) | 'always' (whenever fresh data is arriving).
-  //
-  // OFF BY DEFAULT ON PURPOSE. This is the only widget whose data is a list
-  // of children who are NOT yet with a parent, and no default is right for
-  // every church — so it takes a deliberate choice rather than appearing
-  // because someone updated the app.
-  checkoutBoardMode: 'off',
+  // There is no on/off mode and no window any more (owner, 2026-10-08): the
+  // pickup features come on by themselves from 7:30 pm until midnight
+  // (checkoutBoard.js PICKUP_START). The printer only sends a list on club
+  // nights, and which clubs are on it is set on the check-in laptop's
+  // dashboard. The old checkoutBoardMode / checkoutBoardFrom /
+  // checkoutBoardUntil are not config keys: a saved value is dropped as
+  // unknown, and a shared-settings frame still carrying them (the contract
+  // allows them) is accepted and ignored (sharedSettings.js RETIRED_SHARED).
 
   // Stop naming individuals at or below this many children still here, and
   // show a neutral "almost everyone has been picked up" line instead.
@@ -255,15 +262,7 @@ const config = {
   // and must show as an AGE rather than as a silently frozen list.
   checkoutBoardStaleMin: 8,
 
-  // 'pickup' mode's window, local 24-hour "HH:MM" (owner, 2026-10-01): the
-  // board comes up at checkoutBoardFrom, stays until the list empties (then
-  // says "Everyone has been checked out" for a minute and steps away), and is
-  // gone by checkoutBoardUntil whatever the list says. Also when the corner
-  // counter counts down and an "always" board takes the middle of the room.
-  checkoutBoardFrom: '19:35',
-  checkoutBoardUntil: '20:30',
-
-  // During that window, while the board is naming children, the corner's
+  // From 7:30 pm, while the board is naming children, the corner's
   // "Tonight" counter switches to how many are not checked out yet and counts
   // down as they are. Never while the board withholds names (a small number on
   // a public wall singles children out), and never from a stale list.

@@ -98,6 +98,9 @@ test('a notice event renders the announcement banner verbatim', async ({ page })
 });
 
 test('a tonight event renders the ticker counters', async ({ page }) => {
+  // The strip is off unless this screen turns it on (Settings → Screen &
+  // corner → This TV → "Tonight's numbers strip", 2026-10-07).
+  await page.addInitScript(() => localStorage.setItem('awanaConfig.v1', JSON.stringify({ showTonightTicker: true })));
   await goSignage(page);
   await openDebug(page);
 
@@ -119,7 +122,7 @@ test('a 20-kid rush queues rather than dropping banners', async ({ page }) => {
   await expect(page.locator('.debug-stats')).toContainText(/queued: [1-9]/);
 });
 
-test('a tally broadcast reconciles the corner counter, including counting DOWN', async ({ page }) => {
+test('a tally broadcast reconciles the corner counter, including counting DOWN, without a "synced" note', async ({ page }) => {
   // The corner shows one item at a time, moving on with each slide load. The
   // placeholder background has no slides, so a timer on the slideshow delay
   // stands in for the loads; with the clock off (and no weather in this
@@ -146,17 +149,17 @@ test('a tally broadcast reconciles the corner counter, including counting DOWN',
   await expect(tally(80)).toBeAttached({ timeout: 12000 });
 
   await page.getByRole('button', { name: 'Simulate club tally (counts)' }).click();
-  // #351 — an 80 → 78 correction is a two-step move, so the counter says
-  // where it came from. Without this the room reads a counter that drops as
-  // a broken screen. The note rides the corner's next load, under the
-  // corrected number it explains.
+  // The printer's total wins, down as well as up. Since printer 7.15.0 the
+  // count is "here now", so a drop is children checking out, not a
+  // correction: it carries no "synced with the check-in desk" note (#351's
+  // note is for a jump UP only, 2026-10-07).
   await expect(tally(78)).toBeAttached({ timeout: 12000 });
+  await page.waitForTimeout(500);
   await expect(
     page.locator('.corner-chip--tally')
       .filter({ has: page.getByRole('img', { name: 'TONIGHT 78' }) })
-      .locator('.corner-chip__note')
-      .first(),
-  ).toHaveText(/synced with the check-in desk/i);
+      .locator('.corner-chip__note'),
+  ).toHaveCount(0);
 });
 
 test('simulated events do not raise page errors', async ({ page }) => {
@@ -387,36 +390,38 @@ test('a critical notice stays on top of a check-in, and the slide copy steps asi
   expect(onTop).toBe('notice');
 });
 
-test('at pickup time the pickup list takes the middle and the slide copy steps aside', async ({ page }) => {
-  // A pickup window open all day (Settings → Pickup board).
-  const config = { backgroundSource: 'manual', calendarEnabled: false, seasonPromos: false, manualSlides: TYPED_DECK, checkoutBoardMode: 'always', checkoutBoardFrom: '00:00', checkoutBoardUntil: '23:59', sharedScheduleUrl: '' };
-  await page.addInitScript((c) => localStorage.setItem('awanaConfig.v1', JSON.stringify(c)), config);
-  await goSignage(page);
-  await openDebug(page);
-  await page.getByRole('button', { name: /Still-here board: 9 children/ }).click();
-  await expect(page.locator('.checkout-board.names')).toBeVisible();
-  await expect(page.locator('.checkout-name__chip')).toHaveCount(9);
-  // The copy steps fully aside behind the list.
-  await expect.poll(() => copyOpacity(page)).toBe(0);
-});
+// The pickup features come on by themselves from 7:30 pm (2026-10-08): the
+// page's clock is set to a Tuesday evening, running.
+const PICKUP_TIME = new Date('2026-10-06T19:45:00-04:00');
 
-test('during the program an "always" board sits at the foot and the slides keep showing', async ({ page }) => {
-  // A pickup window that never opens (it starts and ends at the same minute).
-  const config = { backgroundSource: 'manual', calendarEnabled: false, seasonPromos: false, manualSlides: TYPED_DECK, checkoutBoardMode: 'always', checkoutBoardFrom: '00:00', checkoutBoardUntil: '00:00', sharedScheduleUrl: '' };
+test('at pickup time the list takes the foot by itself and the slides carry on above it', async ({ page }) => {
+  await page.clock.install({ time: PICKUP_TIME });
+  const config = { backgroundSource: 'manual', calendarEnabled: false, seasonPromos: false, manualSlides: TYPED_DECK, sharedScheduleUrl: '' };
   await page.addInitScript((c) => localStorage.setItem('awanaConfig.v1', JSON.stringify(c)), config);
   await goSignage(page);
   await openDebug(page);
   await page.getByRole('button', { name: /Still-here board: 9 children/ }).click();
-  const foot = page.locator('.checkout-board--foot');
-  await expect(foot).toBeVisible();
-  await expect(foot).toContainText('9 not checked out yet');
-  await expect(page.locator('.checkout-name__chip')).toHaveCount(0);
+  await expect(page.locator('.checkout-board.names.checkout-board--list')).toBeVisible();
+  await expect(page.locator('.checkout-name__chip')).toHaveCount(9);
   await page.waitForTimeout(800);
+  // Nothing steps aside for it, and it stays below the copy's box.
   expect(await copyOpacity(page)).toBe(1);
-  // …and the foot card stays below the copy's box.
-  const card = await foot.boundingBox();
+  await expect(page.locator('.stage.board-up')).toHaveCount(0);
+  const card = await page.locator('.checkout-board').boundingBox();
   const copy = await page.locator('.manual-slideshow .manual-slide-copy .lobby-headline').first().boundingBox();
   expect(card.y).toBeGreaterThan(copy.y + copy.height);
+});
+
+test('before 7:30 pm a list on the wire shows nothing', async ({ page }) => {
+  await page.clock.install({ time: new Date('2026-10-06T18:10:00-04:00') });
+  const config = { backgroundSource: 'manual', calendarEnabled: false, seasonPromos: false, manualSlides: TYPED_DECK, sharedScheduleUrl: '' };
+  await page.addInitScript((c) => localStorage.setItem('awanaConfig.v1', JSON.stringify(c)), config);
+  await goSignage(page);
+  await openDebug(page);
+  await page.getByRole('button', { name: /Still-here board: 9 children/ }).click();
+  await page.waitForTimeout(800);
+  await expect(page.locator('.checkout-board')).toHaveCount(0);
+  expect(await copyOpacity(page)).toBe(1);
 });
 
 test('a T&T check-in keeps its square mark inside its slot, on screen', async ({ page }) => {
@@ -571,7 +576,7 @@ for (const [width, height] of [[1920, 1080], [1280, 720], [3840, 2160]]) {
     test('a pickup-board chip keeps a capital\'s mark on its pill', async ({ page }) => {
       const at = '2026-09-16T19:40:00-04:00';
       await page.clock.install({ time: new Date(at) });
-      const send = await goLobby(page, { checkoutBoardMode: 'always', checkoutBoardNamesAbove: 0, firstArrivalMoment: false });
+      const send = await goLobby(page, { checkoutBoardNamesAbove: 0, firstArrivalMoment: false });
       const names = ['Élodie', 'Ấn', 'NGUYỄN', 'Ștefan', 'Ava'];
       await send('checkout', { entries: names.map((firstName) => ({ firstName, club: 'Sparks' })), printed: 12, at });
       await expect(page.locator('.checkout-name__chip')).toHaveCount(names.length);

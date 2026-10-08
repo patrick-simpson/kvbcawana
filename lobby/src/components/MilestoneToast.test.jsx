@@ -326,11 +326,9 @@ describe('the toast in the band', () => {
     await waitFor(() => expect(opacity(toasts()[0])).toBe(1), { timeout: 2000 });
   });
 
-  it('drops below a critical notice that keeps the band, and steps aside when it must wait', async () => {
+  it('drops below a critical notice that keeps the band', () => {
     const c = { kind: 'tally', count: 25 };
-    const { container, rerender } = still(<MilestoneToast celebration={c} club={null} below />);
+    const { container } = still(<MilestoneToast celebration={c} club={null} below />);
     expect(container.querySelector('.milestone-toast').classList.contains('milestone-toast--below')).toBe(true);
-    rerender(<ZeroAnimationContext.Provider value><MilestoneToast celebration={c} club={null} yielding /></ZeroAnimationContext.Provider>);
-    await waitFor(() => expect(opacity(container.querySelector('.milestone-toast'))).toBe(0));
   });
 });

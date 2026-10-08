@@ -38,35 +38,40 @@ import { BOARD_ANONYMOUS, BOARD_EMPTY, BOARD_NAMES, BOARD_STALE } from './checko
  * strip that hangs from the top edge above it; while it hangs, the band
  * starts under it (bandTop) and has that much less height.
  *
- * `centre`: the copy's own region, for the two things that take the room
- * over while they are up (a critical notice, and the pickup board while it
- * is the room's focus: see boardPlacement); the copy steps back behind them
- * the way it does for a name.
+ * `centre`: the copy's own region, for the one thing that takes the room over
+ * while it is up, a critical notice; the copy steps back behind it the way it
+ * does for a name. Nothing else takes the middle: the pickup board stopped
+ * doing so on 2026-10-07 (it has the foot, below).
  *
  * `stack.stickerMax`: how tall the status sticker may stand before the chip
  * stacked under it would reach a raised headline.
  *
- * `foot`: the pickup board's small spot when it is NOT the room's focus (a
- * stale or empty board, or one outside pickup time): bottom-centre, between
- * the copy's lowest line and the ticker, beside the slides rather than
- * over them.
+ * `foot`: the strip under the copy's lowest line (`top`: LAYOUT.safeBottom, 45u
+ * down the 16:9 box, down to the corner chip's own line, `bottom` 1.8u off the
+ * bottom edge), from a `gap` past the gear's right edge to a `gap` short of
+ * the corner chip's left edge (`chipLeft`, ~82u, the number the ticker's room
+ * is measured to). Nothing the lobby draws on a slide comes below `top`, so
+ * whatever stays in the strip can never cover copy. Two things take turns in
+ * it (app.css `.checkout-region`, `.setup-card`):
  *
- * `setup`: the first-run card's seat (SetupCard.jsx, app.css `.setup-card`):
- * the strip under the copy's lowest line (`top`: LAYOUT.safeBottom, 45u
- * down the 16:9 box), from the gear's right edge to the corner chip's left
- * edge (`chipLeft`, ~82u, the number the ticker's room is measured to), a
- * `gap` clear of each. It used to stand above the gear, 25u wide and 25u
- * tall, which is inside the copy's own box at every size: it hid the start
- * of a headline at 720p and the chip row at 1080p. Nothing the lobby draws
- * on a slide comes below `top`, so a card that stays under it can never
- * cover copy; it lays its words out in columns to fit the 11u that leaves.
+ *  - the pickup board, whenever it is on (owner, 2026-10-07: "The still
+ *    remaining kids list should just take the bottom of the screen. It
+ *    shouldn't take over all of the announcements."): at pickup time the whole
+ *    strip, its names wrapping across it (fitFoot), and otherwise a one-line
+ *    card on the strip's floor; the slides above carry on as normal;
+ *  - the first-run card (`setup`, the same seat), which yields to the board.
+ *    It used to stand above the gear, 25u wide and 25u tall, which is inside
+ *    the copy's own box at every size: it hid the start of a headline at 720p
+ *    and the chip row at 1080p. It lays its words out in columns to fit the
+ *    ~11u the strip leaves.
  */
+const FOOT = { top: 45, bottom: 1.8, gap: 1.2, chipLeft: 82 };
 export const OVERLAY = {
   band: { top: 1.4, width: 50, bottom: 10.4 },
   flags: { height: 2.5, gap: 0.6, width: 54 },
   centre: { top: 12, bottom: 46, width: 70 },
-  foot: { bottom: 5.6, width: 56 },
-  setup: { top: 45, gap: 1.2, chipLeft: 82 },
+  foot: FOOT,
+  setup: FOOT,
   // The top-right stack: the status sticker, then the weather chip (~6.4u
   // tall, 0.9u under it) from ~1.4u down. The chip must end by 14u, where a
   // raised row wider than 45u starts (lobbyFrame), so a sticker taller than
@@ -106,28 +111,26 @@ export function plateChrome(label) {
 /**
  * Where the pickup board goes, given the decision decideBoard made (that
  * decision, what it may show and whether it may name anyone, is not this
- * function's business; this only decides WHERE and how much room it takes).
+ * function's business; this only decides WHERE).
  *
- *  - 'centre': it is the room's focus: a live list (names, or the
- *    anonymous "almost everyone") while the room is being picked up (the
- *    pickup window, checkoutBoard.js pickupNow). It takes the middle and the
- *    slide copy steps aside.
- *  - 'foot': it is on, but the room is not being picked up (an "always"
- *    board during the program), or it has nothing live to list (stale,
- *    empty). A one-line card in the foot beside the slides, which keep
- *    playing: a stale card on a Tuesday must never blank the lobby.
+ *  - 'foot': whenever it shows anything (names, the anonymous line, a stale or
+ *    empty board). It has the strip under the copy (OVERLAY.foot) and never
+ *    the middle: at pickup time its names wrap across the whole strip, the
+ *    rest of the time it is a one-line card on the strip's floor (what it
+ *    lists is CheckoutBoard's `pickup`). The slides above carry on as normal
+ *    either way: a stale card on a Tuesday must never blank the lobby, and
+ *    since 2026-10-07 neither may the list at pickup time (owner: it
+ *    "shouldn't take over all of the announcements"). Until then a live list
+ *    at pickup time took the centre and the copy stepped aside behind it.
  *  - null: hidden.
  *
  * @param {string | undefined} state  the BoardDecision's state
- * @param {boolean} pickup  whether the room is being picked up right now
- * @returns {'centre' | 'foot' | null}
+ * @returns {'foot' | null}
  */
-export function boardPlacement(state, pickup) {
-  if (state === BOARD_NAMES || state === BOARD_ANONYMOUS) {
-    return pickup ? 'centre' : 'foot';
-  }
-  if (state === BOARD_STALE || state === BOARD_EMPTY) return 'foot';
-  return null;
+export function boardPlacement(state) {
+  return state === BOARD_NAMES || state === BOARD_ANONYMOUS || state === BOARD_STALE || state === BOARD_EMPTY
+    ? 'foot'
+    : null;
 }
 
 /**
@@ -136,40 +139,40 @@ export function boardPlacement(state, pickup) {
  *
  *  - The board: boardPlacement, never on an OBS feed and never while a name
  *    is up (a child at the door outranks the pickup list).
- *  - A critical notice takes the centre, except where the centre is not its
- *    to take: on an OBS feed (no slide behind it) and while the pickup board
- *    holds the centre (both must stay whole). There it takes the top band.
- *  - The copy steps aside for whichever holds the centre.
+ *  - A "has checked out" banner (`leaveUp`: one is waiting its turn) takes
+ *    the foot in the board's place while it is up, under the same two rules;
+ *    the board comes back when it goes.
+ *  - A critical notice takes the centre, except on an OBS feed (no slide
+ *    behind it), where it takes the top band. The board in the foot changes
+ *    nothing about it: the two never meet (the centre ends above the strip).
+ *  - The copy steps aside only for a critical notice in the centre.
  *  - A toast never shares the band with a critical notice: on a feed it drops
- *    below the notice; over the pickup board there is no room below, so the
- *    celebrations wait (and one already up steps aside) until one of the two
- *    goes.
+ *    below the notice. Nothing else holds the celebrations back here (a held
+ *    slide does, in App).
  *
  * @param {{
  *   overlay?: boolean,
  *   criticalLive?: boolean,
  *   boardState?: string,
- *   pickup?: boolean,
  *   checkInUp?: boolean,
+ *   leaveUp?: boolean,
  * }} s
  */
-export function lobbyRoom({ overlay = false, criticalLive = false, boardState, pickup = false, checkInUp = false }) {
-  // Where the board sits, whether or not a check-in run is hiding it right
-  // now. The notice's seat and the celebration hold follow the SEAT, so a late
-  // arrival at pickup time does not throw a band notice into the middle for
-  // the length of the run (and over the WELCOME kicker), nor let a queued
-  // toast up only to hide it again when the run ends.
-  const seat = overlay ? null : boardPlacement(boardState, pickup);
-  const board = checkInUp ? null : seat;
+export function lobbyRoom({ overlay = false, criticalLive = false, boardState, checkInUp = false, leaveUp = false }) {
+  // A "has checked out" banner borrows the foot from the board while it is up
+  // (owner, 2026-10-08), and the board comes back after it.
+  /** @type {'foot' | null} */
+  const banner = overlay || checkInUp || !leaveUp ? null : 'foot';
+  /** @type {'foot' | null} */
+  const board = overlay || checkInUp || banner ? null : boardPlacement(boardState);
   /** @type {'centre' | 'band' | null} */
-  const critical = !criticalLive ? null : overlay || seat === 'centre' ? 'band' : 'centre';
-  const holdCelebrations = critical === 'band' && seat === 'centre';
+  const critical = !criticalLive ? null : overlay ? 'band' : 'centre';
   return {
     board,
+    banner,
     critical,
-    copyAside: board === 'centre' || critical === 'centre',
-    holdCelebrations,
-    toastBelow: critical === 'band' && !holdCelebrations,
+    copyAside: critical === 'centre',
+    toastBelow: critical === 'band',
   };
 }
 
@@ -193,11 +196,12 @@ export function lobbyRoom({ overlay = false, criticalLive = false, boardState, p
  *    the chrome steps aside for it, so does the card. `held` is judged by
  *    what the room sees: from the moment the slide is chosen until the
  *    stinger has cleared after it (App lingers the flag by STINGER_SEC).
- *  - Whatever holds the middle of the room (the pickup list, a critical
- *    notice) or the foot (the pickup board's one-line card, the tonight
- *    strip while it has counts to show) has the room: the card waits, as
- *    the celebrations do. Content over instructions, every time: the card is
- *    a prompt for one volunteer, and these are what the lobby is showing.
+ *  - Whatever holds the middle of the room (a critical notice) or the foot
+ *    (the pickup board, whatever it shows, or a "has checked out" banner,
+ *    in the card's own seat; the
+ *    tonight strip while it has counts to show) has the room: the card
+ *    waits. Content over instructions, every time: the card is a prompt for
+ *    one volunteer, and these are what the lobby is showing.
  *
  * `room` is lobbyRoom's answer for the same moment; `ticker` says the
  * tonight strip is up (TonightTicker.jsx tickerRows).
@@ -209,13 +213,13 @@ export function lobbyRoom({ overlay = false, criticalLive = false, boardState, p
  *   checkInUp?: boolean,
  *   held?: boolean,
  *   ticker?: boolean,
- *   room?: { board?: 'centre' | 'foot' | null, critical?: 'centre' | 'band' | null },
+ *   room?: { board?: 'foot' | null, banner?: 'foot' | null, critical?: 'centre' | 'band' | null },
  * }} s
  * @returns {boolean}
  */
 export function setupUp({ due = false, overlay = false, panelOpen = false, checkInUp = false, held = false, ticker = false, room = {} }) {
   if (!due || overlay || panelOpen || checkInUp || held || ticker) return false;
-  return room.board == null && room.critical !== 'centre';
+  return room.board == null && room.banner == null && room.critical !== 'centre';
 }
 
 /* ── One shouted line (a toast) ──────────────────────────────────── */
@@ -432,100 +436,141 @@ export function nameChipSeat(ink) {
 }
 
 /**
- * The board's chips at chip size `s` (the name's font size, u): each club is
- * a run of chips (the club's own label chip, then one chip per name) that
- * wraps inside `width`. Returns how tall the run of rows is, so the fit can
- * pick the largest size that keeps the whole board inside its region.
+ * The foot board's pieces, per unit of the chip size `s` (the name's font
+ * size before NAME_CHIP_TEXT; app.css `--name-size`, every rule below in em of
+ * it): a name chip is its name drawn NAME_CHIP_TEXT x s plus `pad` of padding
+ * and `row` tall; chips and rows stand `gap` apart. A club's plate is as tall
+ * as a chip: `plate.pad` of padding in all, then the club's white mark (a box
+ * at most `plate.mark` wide) or its name, `plate.gap`, and "N WAITING", both
+ * in Londrina caps at `plate.label` with `plate.track` of tracking per letter.
+ * A "+N more" chip is a name chip whose name is "+N more".
+ */
+export const FOOT_CHIP = {
+  row: 1.75,
+  gap: 0.45,
+  pad: 1.3,
+  plate: { pad: 1.1, mark: 2.6, gap: 0.35, label: 0.72, track: 0.06 },
+};
+
+/**
+ * The least a name chip may be on a real screen, px (the name is drawn
+ * NAME_CHIP_TEXT x it): smaller than this a lobby cannot read it, and
+ * fitFoot puts names behind "+N more" instead.
+ */
+export const FOOT_FLOOR_PX = 10;
+
+/**
+ * The chip sizes a run `height` tall may use: at most two rows of the
+ * largest chips (a short list is big), never smaller than a twelfth of its
+ * height, nor than `floor` (FOOT_FLOOR_PX on a real screen, in px; 0 for a TV
+ * drawn in miniature, which keeps its proportions instead).
+ * @param {number} height
+ * @param {number} [floor]
+ * @returns {{ max: number, min: number }}
+ */
+export function footRange(height, floor = 0) {
+  const max = height / (2 * FOOT_CHIP.row + FOOT_CHIP.gap);
+  return { max, min: Math.min(max, Math.max(floor, height / 12)) };
+}
+
+/** The words a club's plate counts with, and a trimmed club's last chip. */
+export const waitingLabel = (/** @type {number} */ n) => `${n} waiting`;
+export const moreLabel = (/** @type {number} */ n) => `+${n} more`;
+
+/**
+ * The widths of the pieces of the foot board's one wrapping run, in the
+ * order they stand: per club its plate, its shown names (the first, by the
+ * order given, which is alphabetical), and a "+N more" chip when `hidden` of
+ * them do not fit. Each is capped at the run's `width` (a chip that long is
+ * cut short with an ellipsis, app.css).
  *
- * Chip metrics are the CSS's (app.css `.checkout-*`): a name chip is its
- * text (drawn at NAME_CHIP_TEXT x s) plus 1.3 x s of padding, a club's
- * label its Londrina caps at 0.62 x s plus 0.34 x s after it, chips
- * 0.45 x s apart, rows 1.75 x s tall and 0.45 x s apart, and 0.7 x s
- * between clubs.
- *
- * @param {{ club: string, names: string[] }[]} groups
+ * @param {{ club: string, names: string[], mark?: boolean }[]} groups
+ * @param {number[]} hidden  per club, how many of its names stand behind "+N more"
  * @param {number} s
  * @param {number} width
- * @param {Measure} [measure]
+ * @param {Measure} measure
+ * @returns {number[]}
  */
-export function boardRowsHeight(groups, s, width, measure = measureText) {
-  const gap = 0.45 * s;
-  const rowH = 1.75 * s;
-  let rows = 0;
-  for (const g of groups) {
-    let x = measure(String(g.club || '').toUpperCase(), 'label') * 0.62 * s + 0.34 * s;
-    rows += 1;
-    for (const name of g.names) {
-      const w = Math.min(width, measure(name, 'shout') * NAME_CHIP_TEXT * s + 1.3 * s);
-      if (x + gap + w > width) {
-        rows += 1;
-        x = w;
-      } else {
-        x += gap + w;
-      }
-    }
-  }
-  const clubGaps = Math.max(0, groups.length - 1) * 0.7 * s;
-  return rows * rowH + Math.max(0, rows - groups.length) * gap + clubGaps;
+function footPieces(groups, hidden, s, width, measure) {
+  const { pad, plate } = FOOT_CHIP;
+  const label = (/** @type {string} */ text) => {
+    const caps = text.toUpperCase();
+    return (measure(caps, 'label') + plate.track * [...caps].length) * plate.label * s;
+  };
+  const chip = (/** @type {string} */ text) => Math.min(width, measure(text, 'shout') * NAME_CHIP_TEXT * s + pad * s);
+  /** @type {number[]} */
+  const out = [];
+  groups.forEach((g, i) => {
+    const head = g.mark ? plate.mark * s : label(String(g.club || ''));
+    out.push(Math.min(width, plate.pad * s + head + plate.gap * s + label(waitingLabel(g.names.length))));
+    const shown = g.names.length - (hidden[i] || 0);
+    for (let j = 0; j < shown; j += 1) out.push(chip(g.names[j]));
+    if (hidden[i]) out.push(chip(moreLabel(hidden[i])));
+  });
+  return out;
 }
 
 /**
- * The largest name size (on `step`) at which every club's chips fit inside
- * `height` x `width`; `min` if even that overflows (the board then scrolls
- * nothing and simply runs long, which only a 60-name board could make it).
+ * How tall a run of pieces stands at chip size `s` when it wraps inside
+ * `width` (rows `FOOT_CHIP.row` tall, `FOOT_CHIP.gap` apart either way), the
+ * way a wrapping flex row lays them out.
+ * @param {number[]} pieces
+ * @param {number} s
+ * @param {number} width
+ */
+export function footHeight(pieces, s, width) {
+  if (!pieces.length) return 0;
+  const gap = FOOT_CHIP.gap * s;
+  let rows = 1;
+  let x = 0;
+  for (const w of pieces) {
+    if (x > 0 && x + gap + w > width + 1e-9) {
+      rows += 1;
+      x = w;
+    } else {
+      x += (x > 0 ? gap : 0) + w;
+    }
+  }
+  return rows * FOOT_CHIP.row * s + (rows - 1) * gap;
+}
+
+/**
+ * The pickup board's names in the foot (owner, 2026-10-07: the list takes the
+ * bottom of the screen, never the announcements above it): every club's plate
+ * and name chips in one run that wraps across the strip. The largest chip size
+ * (on `step`, from `max` down to `min`) at which the whole run fits `width` x
+ * `height`; where even `min` cannot hold it, names come off the longest club
+ * first, one at a time (the last alphabetically), into a "+N more" chip at
+ * that club's end, until it fits. Every club keeps its plate, which still
+ * counts all of its children, and the count line under the run says the
+ * whole number, so nobody is ever silently left off. `fits` is false only
+ * when even the plates and their "+N more" chips cannot fit (a box far too
+ * small for any list), and the run is then cut by the box. Units are the
+ * caller's (u, or px), the same for every number.
  *
- * @param {{ club: string, names: string[] }[]} groups
+ * @param {{ club: string, names: string[], mark?: boolean }[]} groups  clubs in order, names sorted; `mark`: the plate shows the club's mark
  * @param {{ width: number, height: number, max: number, min: number, step?: number }} box
  * @param {Measure} [measure]
- * @returns {{ size: number, fits: boolean }}
+ * @returns {{ size: number, hidden: number[], fits: boolean }}
  */
-export function fitBoard(groups, { width, height, max, min, step = 0.05 }, measure = measureText) {
-  for (let s = max; s >= min - 1e-9; s = Number((s - step).toFixed(3))) {
-    if (boardRowsHeight(groups, s, width, measure) <= height) return { size: Number(s.toFixed(3)), fits: true };
+export function fitFoot(groups, { width, height, max, min, step = 0.05 }, measure = measureText) {
+  const none = groups.map(() => 0);
+  const fitsAt = (/** @type {number} */ s, /** @type {number[]} */ hidden) =>
+    footHeight(footPieces(groups, hidden, s, width, measure), s, width) <= height + 1e-9;
+  const top = Math.max(min, max);
+  const stepAt = step > 0 ? step : 0.05;
+  for (let s = top; s >= min - 1e-9; s = Number((s - stepAt).toFixed(4))) {
+    if (fitsAt(s, none)) return { size: Number(s.toFixed(3)), hidden: none, fits: true };
   }
-  return { size: min, fits: false };
-}
-
-/**
- * The pickup board's columns, one per club with children waiting: the largest
- * name size (on `step`) at which every column fits `height` under its `head`,
- * each name one chip on a row of its own, alphabetical. A club with more names
- * than one column holds at that size splits into two (then three) side by side
- * inside its column, which needs the room for its widest name in each; the
- * size steps down until every column fits, or stops at `min` with
- * `fits: false`. Returns the size and how many sub-columns each club takes.
- * Chip widths are the name in Paytone One at NAME_CHIP_TEXT x the size plus
- * 1.3 of padding, as boardRowsHeight models them; rows are 1.75 tall with a
- * 0.4 gap.
- *
- * @param {{ club: string, names: string[] }[]} groups
- * @param {{ width: number, height: number, head: number, gap: number, max: number, min: number, step?: number }} box
- * @param {Measure} [measure]
- * @returns {{ size: number, split: number[], fits: boolean }}
- */
-export function fitColumns(groups, { width, height, head, gap, max, min, step = 0.05 }, measure = measureText) {
-  const n = Math.max(1, groups.length);
-  const colW = (width - gap * (n - 1)) / n;
-  const widest = groups.map((g) => Math.max(0, ...g.names.map((name) => measure(name, 'shout') * NAME_CHIP_TEXT)));
-  /** @param {number} s */
-  const tryAt = (s) => {
-    const rowH = 1.75 * s;
-    const rowGap = 0.4 * s;
-    const rowsFit = Math.max(1, Math.floor((height - head + rowGap) / (rowH + rowGap)));
-    const split = [];
-    for (let i = 0; i < groups.length; i += 1) {
-      const sub = Math.ceil(groups[i].names.length / rowsFit);
-      const subW = (colW - 0.5 * s * (sub - 1)) / sub;
-      if (sub > 3 || widest[i] * s + 1.3 * s > subW) return null;
-      split.push(sub);
-    }
-    return split;
-  };
-  for (let s = max; s >= min - 1e-9; s = Number((s - step).toFixed(3))) {
-    const split = tryAt(s);
-    if (split) return { size: Number(s.toFixed(3)), split, fits: true };
+  const hidden = [...none];
+  while (!fitsAt(min, hidden)) {
+    let pick = -1;
+    groups.forEach((g, i) => {
+      const shown = g.names.length - hidden[i];
+      if (shown > 0 && (pick === -1 || shown >= groups[pick].names.length - hidden[pick])) pick = i;
+    });
+    if (pick === -1) return { size: Number(min.toFixed(3)), hidden, fits: false };
+    hidden[pick] += 1;
   }
-  const rowH = 1.75 * min;
-  const rowsFit = Math.max(1, Math.floor((height - head + 0.4 * min) / (rowH + 0.4 * min)));
-  return { size: min, split: groups.map((g) => Math.min(3, Math.ceil(g.names.length / rowsFit))), fits: false };
+  return { size: Number(min.toFixed(3)), hidden, fits: true };
 }

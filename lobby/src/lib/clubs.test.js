@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getClubPalette, getAllClubs } from './clubs.js';
+import { CORNER_CLUB_IDS, clubKey, countForClub, getClubPalette, getAllClubs } from './clubs.js';
 
 describe('getClubPalette', () => {
   it('is case-insensitive and trims whitespace', () => {
@@ -65,5 +65,32 @@ describe('getClubPalette', () => {
       expect(getClubPalette(club).tagline).toBeUndefined();
       expect(getClubPalette(club).ages).toBeUndefined();
     }
+  });
+});
+
+describe('one club\'s count from a tally (the per-screen club count)', () => {
+  it('knows a club by any spelling', () => {
+    expect(clubKey('T&T')).toBe('t&t');
+    expect(clubKey('tnt')).toBe('t&t');
+    expect(clubKey(' Truth & Training ')).toBe('t&t');
+    expect(clubKey('Sparks')).toBe('sparks');
+    expect(clubKey('Guests')).toBeNull();
+    expect(clubKey(null)).toBeNull();
+  });
+
+  it('every id the Settings menu offers is a club', () => {
+    expect(CORNER_CLUB_IDS.map(clubKey)).toEqual(['puggles', 'cubbies', 'sparks', 't&t', 'trek', 'journey']);
+  });
+
+  it('reads the tally\'s display-name keys, and says null when the club is not in it', () => {
+    const counts = { Sparks: 12, 'T&T': 9, Trek: 0 };
+    expect(countForClub(counts, 'tnt')).toBe(9);
+    expect(countForClub(counts, 'sparks')).toBe(12);
+    expect(countForClub(counts, 'trek')).toBe(0);
+    expect(countForClub(counts, 'journey')).toBeNull();
+    expect(countForClub(null, 'sparks')).toBeNull();
+    expect(countForClub(counts, '')).toBeNull();
+    // Two spellings of one club in one tally add up.
+    expect(countForClub({ 'T&T': 3, 'Truth & Training': 2 }, 'tnt')).toBe(5);
   });
 });

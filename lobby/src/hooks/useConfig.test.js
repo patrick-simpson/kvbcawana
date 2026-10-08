@@ -312,3 +312,17 @@ describe('the shared settings layer (contract v6)', () => {
     expect(result.current.config.nightTheme).toBe(defaults.nightTheme);
   });
 });
+
+describe('cornerClub (per screen, owner 2026-10-08)', () => {
+  it('takes none or one of the club ids the Settings menu offers, and nothing else', async () => {
+    const { CORNER_CLUB_IDS } = await import('../lib/clubs.js');
+    for (const id of ['', ...CORNER_CLUB_IDS]) expect(sanitizeOverrides({ cornerClub: id })).toEqual({ cornerClub: id });
+    for (const bad of ['T&T', 'Sparks', 'awana', 1, null]) expect(sanitizeOverrides({ cornerClub: bad })).toEqual({});
+  });
+
+  it('is never a shared key: each TV picks its own club', async () => {
+    const { isSharedKey } = await import('../lib/sharedSettings.js');
+    expect(isSharedKey('cornerClub')).toBe(false);
+    expect(defaults.cornerClub).toBe('');
+  });
+});

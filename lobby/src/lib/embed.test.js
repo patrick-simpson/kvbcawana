@@ -167,6 +167,22 @@ describe('app.css: the operator\'s panels and a wrapped ticker keep out of the c
     for (const r of embedded) expect(decl(r.body, 'max-width')).toBeFalsy();
   });
 
+  // The pickup board's strip ends a gap short of the corner chip; embedded,
+  // the chip steps left of the host's column, so the strip's edge moves with
+  // it by exactly the chip's shift (owner, 2026-10-07: the board in the foot).
+  it('the pickup board\'s strip ends short of the corner chip wherever the chip has gone', () => {
+    const own = decl(rule('.checkout-region, .checkout-leaves', 'right').body, 'right');
+    expect(own).toBe('calc(19.2 * var(--u))');
+    const chip = decl(rule('html.embedded .corner-bottom').body, 'right');
+    expect(chip).toBe('max(calc(2.6 * min(1vw, 1.7778vh)), var(--host-clear-x))');
+    // 19.2u standalone is the chip's 2.6u plus 16.6u; embedded, the chip's own
+    // right edge plus the same 16.6u.
+    expect(decl(rule('html.embedded .checkout-region, html.embedded .checkout-leaves').body, 'right'))
+      .toBe('calc(max(2.6 * var(--u), var(--host-clear-x)) + 16.6 * var(--u))');
+    // The Settings preview draws a TV, not this screen: it keeps the TV's edge.
+    expect(decl(rule('html.embedded .board-preview .checkout-region').body, 'right')).toBe(own);
+  });
+
   // Centred between the gear and the widest chip, the widest night is still
   // wider than that room on a portrait phone (390x844: 226px in 174px), and it
   // ran 26px under the shifted clock chip. It is capped to exactly the room

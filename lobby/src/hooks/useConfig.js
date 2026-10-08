@@ -18,7 +18,6 @@ const SHARED_STORAGE_KEY = 'awanaSharedSettings.v1';
 // produce NaN timers or a broken screen on club night.
 const isBool = (v) => typeof v === 'boolean';
 const isString = (v) => typeof v === 'string';
-const isHHMM = (v) => typeof v === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(v);
 const numberBetween = (min, max) => (v) => typeof v === 'number' && Number.isFinite(v) && v >= min && v <= max;
 
 const VALIDATORS = {
@@ -37,6 +36,10 @@ const VALIDATORS = {
   showConnectionStatus: isBool,
   showTally: isBool,
   keepScreenAwake: isBool,
+  // lib/clubs.js CORNER_CLUB_IDS, written out: the projector imports this
+  // file, and clubs.js brings every club's art with it (useConfig.test.js
+  // pins the two lists equal).
+  cornerClub: (v) => ['', 'puggles', 'cubbies', 'sparks', 'tnt', 'trek', 'journey'].includes(v),
   milestoneEvery: numberBetween(0, 10000),
   showTallySyncNote: isBool,
   showTonightTicker: isBool,
@@ -56,14 +59,11 @@ const VALIDATORS = {
   clubMilestoneEvery: numberBetween(0, 1000),
   firstArrivalMoment: isBool,
   clubTintBackground: isBool,
-  // Who's-still-here board. OFF by default and deliberately so — see
-  // CheckoutBoard.jsx for why this one needs an operator decision rather than a
-  // sensible default.
-  checkoutBoardMode: (v) => ['off', 'pickup', 'always'].includes(v),
+  // Who's-still-here board. No mode or window since 2026-10-08: it comes on
+  // by itself at 7:30 pm (checkoutBoard.js), so checkoutBoardMode / From /
+  // Until are unknown keys here and a saved value is dropped.
   checkoutBoardNamesAbove: numberBetween(0, 200),
   checkoutBoardStaleMin: numberBetween(1, 120),
-  checkoutBoardFrom: isHHMM,
-  checkoutBoardUntil: isHHMM,
   cornerStillHere: isBool,
   // Reads the one skin table rather than repeating its ids — adding a season
   // used to mean editing this list, skins.js, the Settings dropdown and the CSS.

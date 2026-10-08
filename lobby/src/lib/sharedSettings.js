@@ -64,6 +64,16 @@ export const SHARED_SPEC = {
   aprilFools: { type: 'bool' },
 };
 
+/**
+ * Keys the contract still allows (printer/'s contract-vectors.json, which this
+ * table mirrors) but this build no longer has: the pickup board's mode and
+ * window, gone since 2026-10-08 (it comes on by itself at 7:30 pm). A frame
+ * carrying them is accepted, and the values go nowhere: they are not config
+ * keys, so useConfig's VALIDATORS drop them when the shared layer resolves.
+ * Retire them from the contract (printer first) and they leave here too.
+ */
+export const RETIRED_SHARED = Object.freeze(['checkoutBoardMode', 'checkoutBoardFrom', 'checkoutBoardUntil']);
+
 export const SHARED_KEYS = Object.freeze(Object.keys(SHARED_SPEC));
 const SHARED = new Set(SHARED_KEYS);
 

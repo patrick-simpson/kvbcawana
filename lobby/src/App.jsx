@@ -6,6 +6,7 @@ import Overlay from './components/Overlay.jsx';
 import ParticleLayer from './components/ParticleLayer.jsx';
 import TonightTicker, { tickerRows } from './components/TonightTicker.jsx';
 import CheckoutBoard from './components/CheckoutBoard.jsx';
+import CheckoutBanner from './components/CheckoutBanner.jsx';
 import NoticeBanner, { NOTICE_CHECK_MS, noticeShowing } from './components/NoticeBanner.jsx';
 import CornerChip from './components/CornerChip.jsx';
 import StepChip from './components/brand/StepChip.jsx';
@@ -37,7 +38,7 @@ import { fireMilestone, setConfettiLevel, setConfettiLoad, setConfettiSkin } fro
 import { resolveSkin, sceneForSkin, SKIN_TABLE } from './lib/skins.js';
 import { BOARD_HIDDEN, decideBoard, demoCheckout, pickupNow, stillHereCount } from './lib/checkoutBoard.js';
 import { SAMPLE_BOARD_NAMES } from './lib/demoNames.js';
-import { getAllClubs } from './lib/clubs.js';
+import { countForClub, getAllClubs } from './lib/clubs.js';
 import { OVERLAY, lobbyRoom, setupUp } from './lib/overlayFit.js';
 import { STINGER_SEC, holdThenLand } from './lib/lobbyMotion.js';
 import { squishLand, withSquish } from './lib/squish.js';
@@ -45,7 +46,9 @@ import { birthdayRibbon } from './lib/birthdayWeek.js';
 import { autoParticleEffect, weatherMood } from './lib/weather.js';
 import { useCelebrationQueue } from './hooks/useCelebrationQueue.js';
 import { timedFetch } from './lib/timedFetch.js';
-import { CLOCK_SKEW_TOLERANCE_MS, stampReceived } from './lib/freshness.js';
+import { CLOCK_SKEW_TOLERANCE_MS, stampOf, stampReceived } from './lib/freshness.js';
+import { leavesFor, listFresh } from './lib/checkoutLeaves.js';
+import { useCheckoutBanners } from './hooks/useCheckoutBanners.js';
 import {
   AWARD_MILESTONES, BOOK_MILESTONES, awardMilestoneCopy, bookMilestoneCopy,
   crossedMilestones, isBigMilestone, nightMilestoneCopy,
@@ -211,11 +214,31 @@ export default function App() {
   // "Everyone has been checked out" for a minute from then, and steps away.
   // Stamped where the payload lands (handleCheckout), not from an effect.
   const [emptySince, setEmptySince] = useState(/** @type {number | null} */ (null));
+  // "<First name> has checked out" (owner, 2026-10-08; src/lib/checkoutLeaves.js
+  // says when a departure may be said, useCheckoutBanners takes the turns):
+  // each fresh list is compared with the last one this screen saw in a row
+  // (the baseline), which a reconnect or a status change forgets, so the
+  // Worker's replay of the last list to a screen that connects is a baseline,
+  // never a room full of departures. A check-in moment outranks the banners.
+  const { current: leaveNow, add: addLeaves, clear: clearLeaves } = useCheckoutBanners({ held: currentEvent != null });
+  const leaveBaselineRef = useRef(/** @type {{ entries: any[], stamp: number } | null} */ (null));
+  const leaveRulesRef = useRef({ staleMin: config.checkoutBoardStaleMin, namesAbove: config.checkoutBoardNamesAbove });
+  useEffect(() => {
+    leaveRulesRef.current = { staleMin: config.checkoutBoardStaleMin, namesAbove: config.checkoutBoardNamesAbove };
+  }, [config.checkoutBoardStaleMin, config.checkoutBoardNamesAbove]);
   const handleCheckout = useCallback((payload) => {
-    setCheckout(stampReceived(payload));
+    const stamped = stampReceived(payload);
+    setCheckout(stamped);
     const empty = Array.isArray(payload?.entries) && payload.entries.length === 0;
     setEmptySince((was) => (empty ? (was ?? Date.now()) : null));
-  }, []);
+    const now = Date.now();
+    const after = { entries: Array.isArray(payload?.entries) ? payload.entries : [], stamp: stampOf(stamped) };
+    const { staleMin, namesAbove } = leaveRulesRef.current;
+    if (!FLAGS.overlay) {
+      addLeaves(leavesFor({ before: leaveBaselineRef.current, after, now, staleMin, namesAbove, pickup: pickupNow({ now }) }));
+    }
+    leaveBaselineRef.current = listFresh(after.stamp, staleMin, now) ? after : null;
+  }, [addLeaves]);
 
   // Settings → Pickup board → "Show a demo on this TV": a sample board for
   // BOARD_DEMO_MS on this screen only, whatever the mode and the clock. It
@@ -234,26 +257,18 @@ export default function App() {
 
   const boardDecision = useMemo(() => decideBoard({
     checkout: boardData,
-    mode: config.checkoutBoardMode,
     namesAbove: config.checkoutBoardNamesAbove,
     staleMin: config.checkoutBoardStaleMin,
-    from: config.checkoutBoardFrom,
-    until: config.checkoutBoardUntil,
     emptySince,
     demo: boardDemo,
     now: boardNow,
-  }), [boardData, config.checkoutBoardMode, config.checkoutBoardNamesAbove,
-    config.checkoutBoardStaleMin, config.checkoutBoardFrom, config.checkoutBoardUntil,
-    emptySince, boardDemo, boardNow]);
-  // Is the room being picked up: the board then takes the middle, and the
-  // corner counter counts down (checkoutBoard.js pickupNow).
-  const pickup = pickupNow({
-    mode: config.checkoutBoardMode,
-    now: boardNow,
-    from: config.checkoutBoardFrom,
-    until: config.checkoutBoardUntil,
-    demo: boardDemo,
-  });
+  }), [boardData, config.checkoutBoardNamesAbove, config.checkoutBoardStaleMin, emptySince, boardDemo, boardNow]);
+  // Is the room being picked up: from 7:30 pm by itself, every night
+  // (checkoutBoard.js pickupNow). The board, the "has checked out" banners and
+  // the corner counter all follow it; outside it, no banner waits.
+  const pickup = pickupNow({ now: boardNow, demo: boardDemo });
+  const pickupHours = pickupNow({ now: boardNow });
+  useEffect(() => { if (!pickupHours) clearLeaves(); }, [pickupHours, clearLeaves]);
 
   // Church-authored announcements (#onNotice): latest one wins, same as
   // the tally/ops widgets. NoticeBanner picks its presentation from `level`;
@@ -269,15 +284,14 @@ export default function App() {
   const noticeUp = noticeShowing(notice, noticeNow);
 
   // Who holds which part of the room (src/lib/overlayFit.js lobbyRoom): the
-  // pickup board in the middle or at the foot, a critical notice in the
-  // middle or the top band, and whether the celebrations must wait for a
-  // band that a critical notice holds over the board.
+  // pickup board in the foot (never the middle, owner 2026-10-07), and a
+  // critical notice in the middle or, on an OBS feed, the top band.
   const room = lobbyRoom({
     overlay: FLAGS.overlay,
     criticalLive: noticeUp && notice?.level === 'critical',
     boardState: boardDecision.state,
-    pickup,
     checkInUp: currentEvent != null,
+    leaveUp: leaveNow != null,
   });
 
   // One celebration at a time. Three milestone paths (night thresholds,
@@ -288,7 +302,7 @@ export default function App() {
     current: celebration,
     enqueue: enqueueCelebration,
     depth: celebrationDepth,
-  } = useCelebrationQueue(MILESTONE_TOAST_MS, { held: checkInsHeld || room.holdCelebrations });
+  } = useCelebrationQueue(MILESTONE_TOAST_MS, { held: checkInsHeld });
 
   // Confetti fires when a celebration reaches the SCREEN, not when it is
   // queued — otherwise a burst would go off for a toast nobody can see yet.
@@ -317,6 +331,7 @@ export default function App() {
   // per-club counts; when one club crosses a multiple of
   // clubMilestoneEvery, the milestone toast celebrates that club.
   const clubCountsRef = useRef({});
+  const [tallyCounts, setTallyCounts] = useState(/** @type {Record<string, number> | null} */ (null));
   // Same once-per-night rule the night milestones have: a tally that bounces
   // down (an operator undo) and back up must not re-fire the same threshold.
   const firedClubMilestonesRef = useRef(new Set());
@@ -355,6 +370,9 @@ export default function App() {
       }
     }
     clubCountsRef.current = { ...prevCounts, ...tally.counts };
+    // The latest per-club counts, as they are, for the per-screen club count
+    // in the top-right corner (config.cornerClub).
+    setTallyCounts(tally.counts);
 
     // Reconcile the corner "Tonight" counter to this broadcast's total —
     // the fix for both an operator UNDO on the print server (total drops)
@@ -590,6 +608,9 @@ export default function App() {
     ? { ...socketHandlers, onCheckin: noop, onRecap: noop, onCheckout: noop, onNotice: noop }
     : socketHandlers), [socketHandlers]);
   const { status, lastEventAt, lastCheckinAt, retry, nameStatus, slidesStatus, hasDisplayKey } = useSocket(liveHandlers);
+  // A reconnect (any change of the socket's state) forgets the last list: the
+  // next one is a baseline, never a room full of "has checked out".
+  useEffect(() => { leaveBaselineRef.current = null; }, [status]);
   // The sync service's state (shared settings, the published deck) enters
   // through the same sanitizing dispatch path as a Pusher frame.
   const syncStore = useMemo(() => ({ config: effectiveConfig, overrides, updateConfig }), [effectiveConfig, overrides, updateConfig]);
@@ -663,6 +684,7 @@ export default function App() {
     nightRef.current = todayStr;
     rolloverTally();
     clubCountsRef.current = {};
+    setTallyCounts(null);
     firedClubMilestonesRef.current = new Set();
     firstOfNightFiredRef.current = false;
     prevCheckedInRef.current = null;
@@ -786,8 +808,9 @@ export default function App() {
 
   // The first-run card: still wanted on this screen (useSetupCard), and does
   // the room have space for it right now (setupUp: not over a name, a poster,
-  // an open panel, a pickup list, a critical notice or the tonight strip, all
-  // of which are what the lobby is showing). It stands in the foot of the lobby.
+  // an open panel, the pickup board, a critical notice or the tonight strip,
+  // all of which are what the lobby is showing). It stands in the foot of the
+  // lobby, the pickup board's seat.
   // The strip's clock is kept here and handed to it, so the card and the strip
   // agree at the moment the feed goes stale.
   const [tonightNow, setTonightNow] = useState(() => Date.now());
@@ -797,7 +820,9 @@ export default function App() {
     const t = setInterval(advance, 30000);
     return () => clearInterval(t);
   }, [tonight]);   // re-stamp on new data so a fresh payload is never judged aged
-  const tickerActive = !currentEvent && !checkInsHeld;
+  // The strip rides the waves in the foot, where the pickup board stands: it
+  // steps away while the board is up, as it does for a name.
+  const tickerActive = !currentEvent && !checkInsHeld && room.board == null && room.banner == null;
   const setupCard = useSetupCard({ status, hasDisplayKey });
   // Two of the facts setupUp judges flip before the room can see it, and the
   // card is judged by what the room sees:
@@ -904,9 +929,10 @@ export default function App() {
     || slideEditorOpen
     || debugOpen
     || boardDecision.state !== BOARD_HIDDEN
+    || leaveNow != null
     || (lastEventAt != null && Date.now() - lastEventAt < BUILD_QUIET_MS)
   ), [currentEvent, pending, celebration, celebrationDepth, settingsOpen, slideEditorOpen, debugOpen,
-    boardDecision.state, lastEventAt]);
+    boardDecision.state, leaveNow, lastEventAt]);
   useBuildReload(buildReloadBusy);
 
   // Printer trouble also forces the sticker visible — a kid at the door
@@ -941,6 +967,17 @@ export default function App() {
   // sky.
   const stickerRef = useRef(/** @type {HTMLDivElement | null} */ (null));
   const stickerTall = useTallerThan(stickerRef, OVERLAY.stack.stickerMax, showStatus);
+  // The per-screen club count (owner, 2026-10-08; Settings → Screen & corner
+  // → This TV → "Club count (upper right)"): one club's "here now" count from
+  // the latest tally, all night, in the top slot under the status sticker.
+  // It takes the slot the weather and the WAITING chip share, so they move
+  // out exactly as they do for a tall sticker (the weather leaves the
+  // rotation, the WAITING chip comes down to the bottom corner), and the
+  // stack keeps its 14u budget. A tall sticker (a fault strip) outranks it,
+  // as it outranks the sky. Hidden until a tally has the club in it.
+  const cornerClubCount = config.cornerClub ? countForClub(tallyCounts, config.cornerClub) : null;
+  const clubChipUp = !FLAGS.overlay && cornerClubCount != null && !stickerTall;
+  const topTaken = stickerTall || clubChipUp;
   const slideDriven = !FLAGS.overlay && config.backgroundSource === 'manual'
     && (autoSlides.length + visibleManualSlides.length) > 1;
   const corner = useCornerItem(
@@ -952,7 +989,7 @@ export default function App() {
       stillHere: config.showTally && config.cornerStillHere !== false
         ? stillHereCount(boardDecision, boardData, pickup)
         : null,
-      weather: showWeatherChip && !stickerTall ? weather : null,
+      weather: showWeatherChip && !topTaken ? weather : null,
       correction: config.showTally ? tallySync : null,
     },
     {
@@ -978,7 +1015,7 @@ export default function App() {
   // While the sticker stands tall (stickerTall, above) the top slot has no
   // room under it: the weather sits out, and one already up leaves now
   // rather than at the next load.
-  const cornerItem = stickerTall && corner.item?.corner === 'top' ? null : corner.item;
+  const cornerItem = topTaken && corner.item?.corner === 'top' ? null : corner.item;
 
   // The sync note is opt-out (#351). Gated at RENDER, not at capture, so
   // turning it off in Settings hides one that is already up rather than
@@ -1199,9 +1236,9 @@ export default function App() {
   }, []);
 
   // Who holds which part of the room (rebrand stage 4b-2; `room` above, the
-  // bands in src/lib/overlayFit.js). The slide copy steps back behind
-  // whichever holds the middle, the way it does for a name: a critical
-  // notice, or the pickup board while it is the room's focus. The demo,
+  // bands in src/lib/overlayFit.js). The slide copy steps back behind a
+  // critical notice in the middle, the way it does for a name; the pickup
+  // board in the foot leaves it where it is. The demo,
   // rehearsal and simplified-mode tabs hanging from the top edge push the
   // top band down under them.
   // The simplified-mode confirmation hangs there too: at the bottom it sat
@@ -1220,7 +1257,6 @@ export default function App() {
     aprilFools && 'april-fools',
     currentEvent && !overlay && 'checkin-active',
     room.critical === 'centre' && 'notice-takeover',
-    room.board === 'centre' && 'board-up',
     flagsUp && 'has-flags',
   ].filter(Boolean).join(' ');
 
@@ -1345,7 +1381,7 @@ export default function App() {
               showNote={syncNote}
               size="calc(3.1 * min(1vw, 1.7778vh))"
             />
-            {stickerTall && waitingChip}
+            {topTaken && waitingChip}
           </div>
         </ErrorBoundary>
       )}
@@ -1354,20 +1390,31 @@ export default function App() {
           (it's realtime print-server data, not an operator-configured
           corner item) — only overlay mode (transparent OBS/ProPresenter
           source, banners + confetti only) hides it. Yields to an active
-          check-in banner via `active`; see TonightTicker.jsx. */}
+          check-in banner, and to the pickup board in the foot it rides in,
+          via `active`; see TonightTicker.jsx. */}
       {!overlay && config.showTonightTicker === true && (
         <ErrorBoundary label="tonight-ticker" eventKey={boardNow} onError={() => recordLayerFault('tonight strip')}>
           <TonightTicker tonight={tonight} active={tickerActive} now={tonightNow} />
         </ErrorBoundary>
       )}
 
-      {/* Who is still waiting to be picked up. Off unless the operator turned it
-          on, and it yields to an active check-in banner — a child arriving at the
-          door outranks the pickup list. All the visibility judgement is in the
-          pure decideBoard(); see src/lib/checkoutBoard.js for why it is gated. */}
+      {/* Who is still waiting to be picked up, in the foot under the slides.
+          Off unless the operator turned it on, and it yields to an active
+          check-in banner — a child arriving at the door outranks the pickup
+          list. All the visibility judgement is in the pure decideBoard(); see
+          src/lib/checkoutBoard.js for why it is gated. */}
       {room.board && (
         <ErrorBoundary label="checkout-board" eventKey={boardNow} onError={() => recordLayerFault('pickup board')}>
-          <CheckoutBoard decision={boardDecision} checkout={boardData} calm={config.panicMode === true} placement={room.board} demo={boardDemo} />
+          <CheckoutBoard decision={boardDecision} checkout={boardData} calm={config.panicMode === true} demo={boardDemo} />
+        </ErrorBoundary>
+      )}
+
+      {/* "<First name> has checked out", one child at a time, in the foot in
+          place of the list (owner, 2026-10-08): see src/lib/checkoutLeaves.js
+          for when a name may be said. */}
+      {!overlay && (
+        <ErrorBoundary label="checkout-banner" eventKey={leaveNow?.id ?? 0} onError={() => recordLayerFault('pickup board')}>
+          <CheckoutBanner item={room.banner ? leaveNow : null} calm={config.panicMode === true} />
         </ErrorBoundary>
       )}
 
@@ -1429,6 +1476,27 @@ export default function App() {
               info coming and going never moves it; the weather and the
               WAITING chip never show together (the corner is hidden while
               a slide holds check-ins) and cross over in one cell. */}
+          <AnimatePresence>
+            {clubChipUp && (
+              <M.div
+                key={`club-${config.cornerClub}`}
+                className="corner-chip corner-chip--club"
+                role="status"
+                aria-label={`${getClubPalette(config.cornerClub).name}: ${cornerClubCount} here now`}
+                initial={WAITING_ENTER.initial}
+                animate={WAITING_ENTER.animate}
+                exit={{ opacity: 0, scale: 0.9, transition: { duration: DUR.exit, ease: EASE.exit } }}
+                transition={WAITING_ENTER.transition}
+              >
+                <StepChip
+                  label={getClubPalette(config.cornerClub).name.toUpperCase()}
+                  value={cornerClubCount}
+                  size="calc(2.5 * min(1vw, 1.7778vh))"
+                  plate={getClubPalette(config.cornerClub).primary}
+                />
+              </M.div>
+            )}
+          </AnimatePresence>
           <div className="corner-top">
             <CornerChip
               item={cornerItem}
@@ -1437,7 +1505,7 @@ export default function App() {
               hidden={cornerHidden}
               size="calc(2.5 * min(1vw, 1.7778vh))"
             />
-            {!stickerTall && waitingChip}
+            {!topTaken && waitingChip}
           </div>
         </div>
       )}
@@ -1452,7 +1520,6 @@ export default function App() {
         club={celebrationClub}
         compact={flagsUp}
         below={room.toastBelow}
-        yielding={room.holdCelebrations}
         afterNotice={bandNoticeUp}
       />
 
@@ -1505,7 +1572,7 @@ export default function App() {
           It stands in the strip under the copy's lowest line, beside the
           gear (OVERLAY.setup), so it never covers a headline; setupUp() says
           when the room has space for it (never on an OBS/ProPresenter feed,
-          over a panel, a name, a poster or a pickup list), and it hides
+          over a panel, a name, a poster or the pickup board), and it hides
           itself once the screen is connected and keyed. */}
       {setupSeated && !CONFIGURE && (
         <SetupCard

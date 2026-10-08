@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import vectors from './__fixtures__/contract-vectors.json';
-import { SHARED_KEYS, SHARED_SPEC, isSharedKey, pickShared, sanitizeSettingsPayload, sanitizeSharedValues } from './sharedSettings.js';
+import { RETIRED_SHARED, SHARED_KEYS, SHARED_SPEC, isSharedKey, pickShared, sanitizeSettingsPayload, sanitizeSharedValues } from './sharedSettings.js';
 import defaults from '../config.js';
 
 describe('the shared settings table', () => {
@@ -8,8 +8,24 @@ describe('the shared settings table', () => {
     expect(SHARED_SPEC).toEqual(vectors.events.settings.keys);
   });
 
-  it('every shared key is a real config key with a default', () => {
-    for (const key of SHARED_KEYS) expect(Object.prototype.hasOwnProperty.call(defaults, key), key).toBe(true);
+  it('every shared key is a real config key with a default, but the retired ones, which are not keys at all', () => {
+    for (const key of SHARED_KEYS) {
+      expect(Object.prototype.hasOwnProperty.call(defaults, key), key).toBe(!RETIRED_SHARED.includes(key));
+    }
+    // Retired keys are still the contract's (printer first), so still accepted.
+    for (const key of RETIRED_SHARED) expect(SHARED_KEYS, key).toContain(key);
+  });
+
+  it('a frame carrying a retired key is accepted, and the value reaches no setting', async () => {
+    const { resolveStoredConfig, sanitizeOverrides } = await import('../hooks/useConfig.js');
+    const out = sanitizeSettingsPayload({ rev: 3, publishedAt: '2026-10-08T18:00:00.000Z', settings: { checkoutBoardMode: 'off', checkoutBoardFrom: '19:00', checkoutBoardNamesAbove: 5 } });
+    expect(out.settings).toEqual({ checkoutBoardMode: 'off', checkoutBoardFrom: '19:00', checkoutBoardNamesAbove: 5 });
+    const resolved = resolveStoredConfig({}, {}, out);
+    expect(resolved.checkoutBoardNamesAbove).toBe(5);
+    for (const key of RETIRED_SHARED) expect(resolved, key).not.toHaveProperty(key);
+    // An old screen's saved values are dropped the same way.
+    expect(sanitizeOverrides({ checkoutBoardMode: 'off', checkoutBoardFrom: '19:35', checkoutBoardUntil: '20:30', cornerStillHere: false }))
+      .toEqual({ cornerStillHere: false });
   });
 
   it('keeps every per-screen and secret thing off the wire (owner, 2026-10-01: hardware and location stay put)', () => {
@@ -54,7 +70,7 @@ describe('pickShared', () => {
     expect(picked.milestoneEvery).toBe(30);
     expect(Object.keys(picked).every(isSharedKey)).toBe(true);
     expect('backgroundSource' in picked).toBe(false);
-    // The defaults themselves are all publishable.
-    expect(Object.keys(pickShared(defaults)).sort()).toEqual([...SHARED_KEYS].sort());
+    // The defaults themselves are all publishable; a retired key is never published.
+    expect(Object.keys(pickShared(defaults)).sort()).toEqual(SHARED_KEYS.filter((k) => !RETIRED_SHARED.includes(k)).sort());
   });
 });

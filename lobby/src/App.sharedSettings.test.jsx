@@ -27,17 +27,9 @@ vi.mock('pusher-js', () => ({
 const App = (await import('./App.jsx')).default;
 const cfg = await import('./hooks/useConfig.js');
 
-const pad = (n) => String(n).padStart(2, '0');
-// The pickup window (Settings → Pickup board) around the real clock: open
-// (half an hour either side of now) or shut (starting an hour from now).
-function pickupWindow(open) {
-  const d = new Date();
-  const mins = d.getHours() * 60 + d.getMinutes();
-  const hm = (m) => { const w = ((m % 1440) + 1440) % 1440; return `${pad(Math.floor(w / 60))}:${pad(w % 60)}`; };
-  return open
-    ? { checkoutBoardFrom: hm(mins - 30), checkoutBoardUntil: hm(mins + 30) }
-    : { checkoutBoardFrom: hm(mins + 60), checkoutBoardUntil: hm(mins + 120) };
-}
+// Pickup time (from 7:30 pm by itself since 2026-10-08), on a Tuesday, with
+// the wall clock still running.
+const pickupTime = () => vi.useFakeTimers({ toFake: ['Date'], now: new Date(2026, 9, 6, 19, 45), shouldAdvanceTime: true });
 
 function setup(config = {}) {
   localStorage.setItem('awanaConfig.v1', JSON.stringify({
@@ -77,35 +69,41 @@ beforeEach(() => {
   sessionStorage.clear();
   vi.spyOn(console, 'warn').mockImplementation(() => {});
 });
-afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); cfg._resetForTest(); });
+afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.useRealTimers(); cfg._resetForTest(); });
 
 describe('shared settings, wired up', () => {
-  it('a settings frame turns on the pickup board here, and cannot touch a per-screen key', async () => {
+  it('a settings frame sets the pickup board\'s naming guard here, and cannot touch a per-screen key', async () => {
+    pickupTime();
     vi.stubGlobal('fetch', vi.fn(() => Promise.reject(new Error('offline'))));
     setup();
     const { container } = await mount();
     await act(async () => {
       bound.settings({
         rev: 2, publishedAt: new Date().toISOString(),
-        settings: { checkoutBoardMode: 'always', ...pickupWindow(true), backgroundSource: 'video', reduceMotion: false },
+        // checkoutBoardMode is retired (2026-10-08) but still the contract's:
+        // accepted, and it switches nothing off.
+        settings: { checkoutBoardNamesAbove: 20, checkoutBoardMode: 'off', backgroundSource: 'video', reduceMotion: false },
       });
     });
     await act(async () => { bound.checkout({ entries: kids(9), printed: 40, at: Date.now() }); });
-    expect(container.querySelectorAll('.checkout-name__chip')).toHaveLength(9);
+    // Nine children at or below the shared guard of 20: no names.
+    expect(container.querySelector('.checkout-board.anonymous')).not.toBeNull();
+    expect(container.querySelectorAll('.checkout-name__chip')).toHaveLength(0);
     // The per-screen keys it smuggled in are gone: still zero animation, still typed slides.
     expect(document.documentElement.classList.contains('zero-animation-mode')).toBe(true);
     expect(JSON.parse(localStorage.getItem('awanaSharedSettings.v1')).settings).not.toHaveProperty('backgroundSource');
   });
 
   it('a screen that does not follow ignores it', async () => {
+    pickupTime();
     vi.stubGlobal('fetch', vi.fn(() => Promise.reject(new Error('offline'))));
     setup({ followSharedSettings: false });
     const { container } = await mount();
     await act(async () => {
-      bound.settings({ rev: 2, publishedAt: new Date().toISOString(), settings: { checkoutBoardMode: 'always', ...pickupWindow(true) } });
+      bound.settings({ rev: 2, publishedAt: new Date().toISOString(), settings: { checkoutBoardNamesAbove: 20 } });
     });
     await act(async () => { bound.checkout({ entries: kids(9), printed: 40, at: Date.now() }); });
-    expect(container.querySelector('.checkout-board')).toBeNull();
+    expect(container.querySelectorAll('.checkout-name__chip')).toHaveLength(9);
   });
 
   it('a shared change in Settings is sent to the print server on this computer, with the token', async () => {

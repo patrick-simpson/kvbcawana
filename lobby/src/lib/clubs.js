@@ -138,6 +138,46 @@ export function getClubPalette(clubName) {
   return override ? { ...base, ...override } : base;
 }
 
+/**
+ * A club's canonical key ('sparks', 't&t', ...) from any spelling the system
+ * uses: a display name ("T&T", "Sparks"), an id ('tnt'), an alias ("Truth &
+ * Training") or a theme alias. Null for a name no club answers to.
+ * @param {unknown} name
+ * @returns {string | null}
+ */
+export function clubKey(name) {
+  if (!name || typeof name !== 'string') return null;
+  const key = name.trim().toLowerCase();
+  const canonical = ALIASES[key] || aliasOverrides[key] || key;
+  return CLUBS[canonical] ? canonical : null;
+}
+
+/**
+ * The ids the per-screen club count (Settings → Screen & corner → This TV →
+ * "Club count (upper right)") offers, youngest club first, as theme.json keys
+ * them.
+ */
+export const CORNER_CLUB_IDS = ['puggles', 'cubbies', 'sparks', 'tnt', 'trek', 'journey'];
+
+/**
+ * One club's count from a tally's per-club `counts` (keyed by display name,
+ * "Sparks", "T&T"; since printer 7.15.0 a "here now" count, children checked
+ * out already taken off), matched by clubKey so any spelling of the club
+ * counts. Null when the tally has no entry for it (or no tally yet).
+ * @param {Record<string, number> | null | undefined} counts
+ * @param {string} club  an id or any name the club answers to
+ * @returns {number | null}
+ */
+export function countForClub(counts, club) {
+  const want = clubKey(club);
+  if (!want || !counts || typeof counts !== 'object') return null;
+  let found = null;
+  for (const [name, n] of Object.entries(counts)) {
+    if (clubKey(name) === want && Number.isFinite(n)) found = (found ?? 0) + n;
+  }
+  return found;
+}
+
 export function getAllClubs() {
   // Used by the debug panel's "Trigger Every Club" button.
   return Object.values(CLUBS).map((c) => c.name);

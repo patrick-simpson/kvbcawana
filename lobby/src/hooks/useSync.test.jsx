@@ -11,7 +11,7 @@ const BASE = 'https://awana-sync.example.workers.dev';
 const SESSION = 'v1.1.1790839331729.oWr6n92IJW5ldPGmtiyjPHAZpca-QGToNlKGXlKI6vc';
 const KEY = 'AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA=';
 const STATE = {
-  settings: { rev: 7, publishedAt: '2026-10-01T18:00:00.000Z', settings: { checkoutBoardMode: 'pickup' } },
+  settings: { rev: 7, publishedAt: '2026-10-01T18:00:00.000Z', settings: { checkoutBoardNamesAbove: 7 } },
   slides: { deckRev: 3, publishedAt: '2026-10-01T18:00:00.000Z', slides: [{ text: 'Store next week', eyebrow: '', theme: 'auto', textSize: 'auto', durationSec: 0 }] },
   template: { savedAt: '2026-10-01T17:00:00.000Z', config: { audioMuted: true } },
   journey: null,
@@ -69,8 +69,8 @@ describe('signing in with the passphrase', () => {
     expect(result.current.config.pusherAppKey).toBe('pk');
     expect(result.current.config.audioMuted).toBe(true);
     // Through the same sanitizers a Pusher frame takes.
-    expect(result.current.shared).toMatchObject({ rev: 7, settings: { checkoutBoardMode: 'pickup' } });
-    expect(result.current.config.checkoutBoardMode).toBe('pickup');
+    expect(result.current.shared).toMatchObject({ rev: 7, settings: { checkoutBoardNamesAbove: 7 } });
+    expect(result.current.config.checkoutBoardNamesAbove).toBe(7);
     expect(onSlides).toHaveBeenCalledWith(expect.objectContaining({ deckRev: 3, slides: [expect.objectContaining({ text: 'Store next week' })] }), undefined);
   });
 

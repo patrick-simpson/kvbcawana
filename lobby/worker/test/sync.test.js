@@ -164,11 +164,11 @@ describe('shared settings', () => {
   it('with Pusher retired (no secrets), a save still reports its broadcast: the live channel carried it', async () => {
     const s = setup({ publish: async () => ({ ok: false, error: 'pusher-not-configured' }) });
     const { body: login } = await s.login();
-    const out = await (await s.call('PUT', '/v1/settings', { settings: { checkoutBoardMode: 'pickup' } }, login.session)).json();
+    const out = await (await s.call('PUT', '/v1/settings', { settings: { checkoutBoardNamesAbove: 7 } }, login.session)).json();
     expect(out.broadcast).toBe(true);
     const failing = setup({ publish: async () => ({ ok: false, status: 500, error: 'pusher-500' }) });
     const { body: login2 } = await failing.login();
-    const out2 = await (await failing.call('PUT', '/v1/settings', { settings: { checkoutBoardMode: 'pickup' } }, login2.session)).json();
+    const out2 = await (await failing.call('PUT', '/v1/settings', { settings: { checkoutBoardNamesAbove: 7 } }, login2.session)).json();
     expect(out2.broadcast).toBe(false);
   });
 
@@ -176,7 +176,7 @@ describe('shared settings', () => {
     const s = setup();
     const { body: login } = await s.login();
     const res = await s.call('PUT', '/v1/settings', {
-      settings: { checkoutBoardMode: 'pickup', audioMuted: true, pusherAppKey: 'x', bogus: 1 },
+      settings: { checkoutBoardNamesAbove: 7, audioMuted: true, pusherAppKey: 'x', bogus: 1 },
     }, login.session);
     const out = await res.json();
     expect(out).toMatchObject({ rev: 1, keyCount: 1, broadcast: true });
@@ -185,7 +185,7 @@ describe('shared settings', () => {
     expect(frame.channel).toBe('awana-channel');
     const opened = await openEnvelope(await importDisplayKey(login.displayKey), 'settings', frame.payload);
     expect(opened.ok).toBe(true);
-    expect(sanitizeSettings(opened.payload)).toMatchObject({ rev: 1, settings: { checkoutBoardMode: 'pickup' } });
+    expect(sanitizeSettings(opened.payload)).toMatchObject({ rev: 1, settings: { checkoutBoardNamesAbove: 7 } });
 
     // A second change in the same millisecond still stamps strictly later.
     const again = await (await s.call('PUT', '/v1/settings', { settings: { showClock: false } }, login.session)).json();

@@ -31,12 +31,16 @@ import { stampOf } from './freshness.js';
 //     TwoTimTwo tab open, so silence is the expected end-of-night state, not a
 //     fault. A frozen list that still looks live is the worst rendering.
 //
-// So: off by default, time-windowed, name-suppressed below a threshold, and
-// aged rather than frozen.
+// So: time-windowed, name-suppressed below a threshold, and aged rather than
+// frozen.
 //
-// Until 2026-10-01 'pickup' mode followed the schedule's phases, and the set it
-// allowed left out 'shutdown', so the board went DOWN at 7:35, as families
-// arrived. It now follows a window the church sets (Settings → Pickup board).
+// Until 2026-10-01 'pickup' mode followed the schedule's phases (and went DOWN
+// at 7:35, as families arrived); until 2026-10-08 a mode and a window set in
+// Settings. Since then there is no switch at all (owner, 2026-10-08): the
+// pickup features come on by themselves from PICKUP_START local time every
+// night until midnight. The printer only publishes a checkout list on club
+// nights, and which clubs are on it is set on the check-in laptop's
+// dashboard, so "on" is the printer's business and "when" is this clock's.
 
 /** Board states the component knows how to render. */
 export const BOARD_HIDDEN = 'hidden';
@@ -52,13 +56,11 @@ export const BOARD_EMPTY = 'empty';
  * @property {number} [ageMin] How old the data is, when that matters.
  */
 
-/** The default pickup window, local time (owner, 2026-10-01). */
-export const PICKUP_FROM = '19:35';
-export const PICKUP_UNTIL = '20:30';
+/** When the pickup features come on, local time, every night until midnight (owner, 2026-10-08). */
+export const PICKUP_START = '19:30';
 
 /**
- * How long "Everyone has been checked out" stays up in pickup mode once the
- * list empties, before the board steps away for the night.
+ * How long "Everyone has been checked out" stays up once the list empties, before the board steps away for the night.
  */
 export const EMPTY_HOLD_MS = 60_000;
 
@@ -74,56 +76,41 @@ export function parseHHMM(hhmm) {
 }
 
 /**
- * Whether `now` (epoch ms, read in the screen's local time) is inside the
- * pickup window [from, until). A window whose end comes before its start runs
- * past midnight; one that starts and ends at the same minute is never open. A
- * malformed time falls back to the default.
+ * Whether `now` (epoch ms, read in the screen's local time) is pickup time:
+ * PICKUP_START or later, until midnight.
  * @param {number} now
- * @param {string} [from]
- * @param {string} [until]
  * @returns {boolean}
  */
-export function inPickupWindow(now, from = PICKUP_FROM, until = PICKUP_UNTIL) {
-  const start = parseHHMM(from) ?? /** @type {number} */ (parseHHMM(PICKUP_FROM));
-  const end = parseHHMM(until) ?? /** @type {number} */ (parseHHMM(PICKUP_UNTIL));
-  if (start === end) return false;
+export function inPickupHours(now) {
+  const start = /** @type {number} */ (parseHHMM(PICKUP_START));
   const d = new Date(now);
-  const mins = d.getHours() * 60 + d.getMinutes();
-  return start < end ? mins >= start && mins < end : mins >= start || mins < end;
+  return d.getHours() * 60 + d.getMinutes() >= start;
 }
 
 /**
  * @param {object} input
  * @param {{entries: {firstName: string, club: string}[], at: number, printed?: number, receivedAt?: number}|null} input.checkout
  *   Latest sanitized `checkout` payload, or null if none has arrived.
- * @param {string} input.mode 'off' | 'pickup' | 'always'
  * @param {number} input.namesAbove Suppress names at or below this count. 0 disables.
  * @param {number} input.staleMin Minutes before the data is stale.
  * @param {number} input.now Epoch ms.
- * @param {string} [input.from] Pickup window start, "HH:MM" local ('pickup' mode).
- * @param {string} [input.until] Pickup window end, "HH:MM" local ('pickup' mode).
  * @param {number | null} [input.emptySince] When this screen first saw the list
  *   empty (epoch ms), or null while it has names on it.
  * @param {boolean} [input.demo] A sample board shown on purpose (Settings' demo):
- *   on whatever the mode and the clock, but the naming rule still applies.
+ *   on whatever the clock says, but the naming rule still applies.
  * @returns {BoardDecision}
  */
-export function decideBoard({ checkout, mode, namesAbove, staleMin, now, from, until, emptySince = null, demo = false }) {
-  if (!demo && mode !== 'pickup' && mode !== 'always') {
-    return { state: BOARD_HIDDEN, reason: 'the board is switched off in Settings' };
-  }
+export function decideBoard({ checkout, namesAbove, staleMin, now, emptySince = null, demo = false }) {
   // Nothing has ever arrived. Show NOTHING rather than an empty board: an empty
   // board reads as "everyone has been picked up", and we do not know that.
   if (!checkout || !Number.isFinite(checkout.at)) {
     return { state: BOARD_HIDDEN, reason: 'no checkout data has arrived yet' };
   }
 
-  // 'pickup' restricts it to the part of the evening it is for: the pickup
-  // window the church sets (7:35 to 8:30 pm unless changed). The board has
-  // no business on the wall at 6:10pm when every child has just arrived.
-  const pickup = !demo && mode === 'pickup';
-  if (pickup && !inPickupWindow(now, from, until)) {
-    return { state: BOARD_HIDDEN, reason: `outside the pickup window (${from || PICKUP_FROM} to ${until || PICKUP_UNTIL})` };
+  // Pickup time only: from 7:30 pm until midnight. The board has no business
+  // on the wall at 6:10pm when every child has just arrived.
+  if (!demo && !inPickupHours(now)) {
+    return { state: BOARD_HIDDEN, reason: `not pickup time yet (it comes on by itself at ${PICKUP_START})` };
   }
 
   // Aged from its arrival here, not the printer's clock, unless it really is
@@ -140,9 +127,9 @@ export function decideBoard({ checkout, mode, namesAbove, staleMin, now, from, u
   const count = checkout.entries.length;
   // An empty board is real information and is safe to show: nobody is named, and
   // "everyone has been checked out" is exactly what a volunteer wants at 8:15.
-  // In pickup mode, once it has said so for a minute, it steps away for the night.
+  // Once it has said so for a minute, it steps away for the night.
   if (count === 0) {
-    if (pickup && typeof emptySince === 'number' && Number.isFinite(emptySince) && now - emptySince >= EMPTY_HOLD_MS) {
+    if (!demo && typeof emptySince === 'number' && Number.isFinite(emptySince) && now - emptySince >= EMPTY_HOLD_MS) {
       return { state: BOARD_HIDDEN, reason: 'everyone has been checked out' };
     }
     return { state: BOARD_EMPTY, ageMin: Math.round(age) };
@@ -159,17 +146,15 @@ export function decideBoard({ checkout, mode, namesAbove, staleMin, now, from, u
 }
 
 /**
- * Is the room being picked up right now, as far as the board's placement and
- * the corner counter are concerned? A 'pickup' board's own window; an
- * 'always' board's too (outside it, an always-on list sits at the foot); a
+ * Is the room being picked up right now, as far as the board, the "has checked
+ * out" banners and the corner counter are concerned? From PICKUP_START until
+ * midnight, every night (the printer only sends a list on club nights); a
  * demo always is.
- * @param {{ mode: string, now: number, from?: string, until?: string, demo?: boolean }} input
+ * @param {{ now: number, demo?: boolean }} input
  * @returns {boolean}
  */
-export function pickupNow({ mode, now, from, until, demo = false }) {
-  if (demo) return true;
-  if (mode !== 'pickup' && mode !== 'always') return false;
-  return inPickupWindow(now, from, until);
+export function pickupNow({ now, demo = false }) {
+  return demo || inPickupHours(now);
 }
 
 /**

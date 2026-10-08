@@ -82,8 +82,8 @@ export function noticeFit(level, message, { compact = false, place = 'centre' } 
  *     the stage class) the way it does for a name. At the app's highest
  *     z-index, above even an active check-in: "CLUB CANCELLED TONIGHT" must
  *     never lose the fight with a birthday banner for a parent's attention.
- *     Where the centre is not its to take (an OBS overlay feed, or the
- *     pickup board holding the middle: src/lib/overlayFit.js lobbyRoom) it
+ *     Where the centre is not its to take (an OBS overlay feed, which has
+ *     no slide behind it: src/lib/overlayFit.js lobbyRoom) it
  *     sits in the top band instead (`place` 'band'), fitted to end where the
  *     band ends. It never yields.
  *

@@ -1031,24 +1031,21 @@ html, body, #root {
   opacity: 0.28;
   transform: scale(0.97);
 }
-/* The same step back, all the way, for the two things that take the middle
-   of the room over (rebrand stage 4b-2): a critical notice, and the pickup
-   board while it is the room's focus (src/lib/overlayFit.js lobbyRoom).
-   Their opaque plates sit on the copy's own box, so a faded headline would
-   only show as a ghost round their edges; it steps aside entirely and comes
-   back when they go. A poster or a video steps aside with it: a promo's
-   headline is as much the slide's copy as a typed one's. (Their wrapper's
-   own opacity is framer-motion's, inline, hence the !important; the field
-   and the chrome stay.) */
+/* The same step back, all the way, for the one thing that takes the middle
+   of the room over (rebrand stage 4b-2): a critical notice
+   (src/lib/overlayFit.js lobbyRoom). Its opaque plate sits on the copy's own
+   box, so a faded headline would only show as a ghost round its edges; it
+   steps aside entirely and comes back when the notice goes. A poster or a
+   video steps aside with it: a promo's headline is as much the slide's copy
+   as a typed one's. (Their wrapper's own opacity is framer-motion's, inline,
+   hence the !important; the field and the chrome stay.) The pickup board
+   never does this: it has the foot, under the copy (owner, 2026-10-07). */
 .stage.notice-takeover .background-placeholder .placeholder-copy,
-.stage.notice-takeover .manual-slideshow .manual-slide-copy,
-.stage.board-up .background-placeholder .placeholder-copy,
-.stage.board-up .manual-slideshow .manual-slide-copy {
+.stage.notice-takeover .manual-slideshow .manual-slide-copy {
   opacity: 0;
   transform: scale(0.97);
 }
-.stage.notice-takeover .manual-slideshow .lobby-media,
-.stage.board-up .manual-slideshow .lobby-media {
+.stage.notice-takeover .manual-slideshow .lobby-media {
   opacity: 0 !important;
   transition: opacity var(--brand-dur-settle) var(--brand-ease-settle);
 }
@@ -2292,7 +2289,9 @@ html, body, #root {
      screen (the Pi's 640x480, 800x480, 1024x768): Settings and the slide editor
      centre in the room left of the column (a click at the right end of
      SAVE landed on the host's gear and opened ITS panel instead), and the
-     debug panel and the first-run card end short of it.
+     debug panel and the first-run card end short of it;
+   - the pickup board's strip, which ends short of the corner chip wherever
+     the chip has gone.
    src/lib/embed.js HOST_CONTROL is the same geometry for the one fit done
    in JS (the name), and embed.test.js fails if the two spellings drift.
    Standalone none of these selectors match. */
@@ -2335,6 +2334,17 @@ html.embedded .debug {
    the column (the phone card ran full width, under it). */
 html.embedded .panel.setup-card {
   right: max(calc(19.2 * var(--u)), var(--host-clear-x));
+}
+/* The pickup board's strip ends a gap short of the corner chip, wherever the
+   chip stands: left of the host's column, the chip's shift plus the same
+   16.6u (its widest, the clock's 15.3u, and the 1.2u gap) as standalone. The
+   Settings preview draws a TV, not this one, so it keeps the TV's edge. */
+html.embedded .checkout-region,
+html.embedded .checkout-leaves {
+  right: calc(max(2.6 * var(--u), var(--host-clear-x)) + 16.6 * var(--u));
+}
+html.embedded .board-preview .checkout-region {
+  right: calc(19.2 * var(--u));
 }
 @media (max-width: 639px) {
   html.embedded .panel.setup-card {
@@ -3251,51 +3261,65 @@ input:focus-visible {
 
 /* ── Who's still here board (CheckoutBoard.jsx) ─────────────────────────────
    The kit's card, the printer dashboard's: white, a hard offset shadow in
-   the house blue, and a wavy corner tab carrying the title. Each name is a
-   chip in its club's colour (Paytone One on the club, a hard shadow in its
-   deep shade), each club's run of chips led by its name in Londrina; the
-   count in the foot is Paytone One. While it is the room's focus (a live
-   list during pickup time: overlayFit.js boardPlacement) it takes the
-   middle of the room, centred on the copy's own box (12u to 46u of the
-   16:9 frame), and the slide copy steps back behind it (.stage.board-up).
-   The chip size comes from the component's fit (--name-size): every chip
-   metric below is in em of it, which is the model src/lib/overlayFit.js
-   boardRowsHeight uses (the name itself is drawn NAME_CHIP_TEXT x it). The rest of the time it is on, it is a one-line card at the foot
-   (.checkout-region--foot, below). */
-.checkout-region {
+   the house blue, and a wavy tab carrying the title. Each name is a chip in
+   its club's colour (Paytone One on the club, a hard shadow in its deep
+   shade), each club's run of chips led by its plate; the count is Paytone
+   One. It always stands in the foot (src/lib/overlayFit.js OVERLAY.foot,
+   the first-run card's seat): the strip under the copy's lowest line (45u
+   down the 16:9 box, 16.875u under its middle) down to the corner chip's own
+   line 1.8u off the bottom, from a gap past the gear to a gap short of the
+   corner chip (82u), so it never covers slide copy, the gear or the chip, and
+   the slides above it carry on as normal (owner, 2026-10-07: the list "should
+   just take the bottom of the screen"). The strip's words are sized in em off
+   one root here, in the lobby's u with an 11px floor, so the Pi's 640x480
+   still reads them; the chips have their own size (--name-size), the fit's
+   (CheckoutBoard's fitFoot over the run's measured box), and every chip
+   metric below is in em of it, the model src/lib/overlayFit.js FOOT_CHIP
+   uses (the name itself is drawn NAME_CHIP_TEXT x it). The "has checked out"
+   banners (.checkout-leaves) stand in the same strip. */
+.checkout-region,
+.checkout-leaves {
   position: absolute;
-  left: 0;
-  right: 0;
-  top: calc(50% - 16.125 * var(--u));
-  bottom: calc(50% - 17.875 * var(--u));
-  display: grid;
-  place-items: center;
+  top: calc(50% + 16.875 * var(--u));
+  bottom: calc(1.8 * var(--u));
+  left: calc(var(--safe-inset) + max(46px, calc(2.9 * var(--u))) + calc(1.2 * var(--u)));
+  right: calc(19.2 * var(--u));
+  /* On an ultrawide window the strip would run far past the 16:9 box: keep
+     it to the box's width, centred between the gear and the chip, as the
+     first-run card does. */
+  max-width: calc(80 * var(--u));
+  margin-inline: auto;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  font-size: max(11px, calc(0.95 * var(--u)));
   z-index: 5;
   pointer-events: none;
 }
 .checkout-board {
-  --name-size: calc(2 * var(--u));
+  --name-size: 1em;
   position: relative;
-  max-width: calc(70 * var(--u));
-  min-width: calc(30 * var(--u));
-  padding: calc(4.7 * var(--u)) calc(2.2 * var(--u)) calc(1.6 * var(--u));
+  min-width: 0;
+  max-width: 100%;
+  max-height: 100%;
   background: #fff;
   color: var(--brand-ink);
-  border-radius: calc(1.3 * var(--u));
-  box-shadow: calc(0.5 * var(--u)) calc(0.5 * var(--u)) 0 var(--brand-blue);
+  border-radius: 0.7em;
+  box-shadow: 0.3em 0.3em 0 var(--brand-blue);
   overflow: hidden;
   text-align: left;
 }
+.checkout-board.stale {
+  box-shadow: 0.3em 0.3em 0 var(--brand-hot);
+}
 .checkout-tab {
-  position: absolute;
-  left: 0;
-  top: 0;
-  height: calc(3.7 * var(--u));
-  padding: 0 calc(6 * var(--u)) calc(0.3 * var(--u)) calc(2.2 * var(--u));
+  position: relative;
+  flex: none;
   display: flex;
   align-items: center;
   color: var(--brand-blue);
 }
+.checkout-board.stale .checkout-tab { color: var(--brand-hot); }
 .checkout-tab svg {
   position: absolute;
   inset: 0;
@@ -3308,152 +3332,150 @@ input:focus-visible {
   margin: 0;
   font-family: var(--font-condensed);
   font-weight: 400;
-  font-size: calc(1.5 * var(--u));
+  font-size: 0.9em;
   letter-spacing: 0.1em;
-  line-height: 1;
+  line-height: 1.05;
   text-transform: uppercase;
   white-space: nowrap;
   color: #fff;
 }
-.checkout-board.stale {
-  box-shadow: calc(0.5 * var(--u)) calc(0.5 * var(--u)) 0 var(--brand-hot);
-}
-.checkout-board.stale .checkout-tab { color: var(--brand-hot); }
 
-/* The foot (OVERLAY.foot): a stale or empty board, or an "always" board
-   while the program runs. One line on a small white card, bottom-centre
-   between the copy's lowest line (45u) and the ticker, clear of the gear and
-   the corner chip; the tab rides its left end instead of its corner. The
-   slides keep playing above it. */
-.checkout-region--foot {
-  top: auto;
-  bottom: calc(5.6 * var(--u));
-  display: flex;
-  justify-content: center;
-}
-.checkout-board--foot {
+/* One line (a stale or empty board, or the anonymous line) on a small card
+   on the strip's floor; the tab rides its left end, its wave eating into its right end. */
+.checkout-board--line {
   display: flex;
   align-items: center;
-  gap: calc(1 * var(--u));
-  min-width: 0;
-  max-width: calc(56 * var(--u));
-  padding: calc(0.55 * var(--u)) calc(1.4 * var(--u)) calc(0.55 * var(--u)) 0;
-  border-radius: calc(0.9 * var(--u));
-  box-shadow: calc(0.35 * var(--u)) calc(0.35 * var(--u)) 0 var(--brand-blue);
+  gap: 0.8em;
+  padding: 0.45em 1.1em 0.45em 0;
 }
-.checkout-board--foot.stale {
-  box-shadow: calc(0.35 * var(--u)) calc(0.35 * var(--u)) 0 var(--brand-hot);
-}
-.checkout-board--foot .checkout-tab {
-  position: relative;
-  flex: none;
+.checkout-board--line .checkout-tab {
   align-self: stretch;
-  height: auto;
-  margin: calc(-0.55 * var(--u)) 0;
-  /* The tab's wave eats into its right end: the title keeps clear of it. */
-  padding: 0 calc(4.6 * var(--u)) 0 calc(1.2 * var(--u));
+  margin: -0.45em 0;
+  padding: 0 3.6em 0 1em;
 }
-.checkout-board--foot .checkout-title {
-  font-size: calc(1.05 * var(--u));
-}
-.checkout-board--foot .checkout-line,
-.checkout-board--foot .checkout-foot {
+.checkout-board--line .checkout-line {
   margin: 0;
-  max-width: none;
-  font-size: calc(1.2 * var(--u));
+  font-size: 1em;
   font-weight: 700;
   line-height: 1.25;
 }
-.checkout-board--foot .checkout-count {
-  font-size: calc(1.89 * var(--u));
-}
 
-/* The list: one column per club (CheckoutBoard's fitColumns), youngest to
-   oldest. Each is headed by the club's plate, its white mark over "N
-   waiting" on the club's colour, then its names one chip per row,
-   alphabetical; a long club splits into --split sub-columns. The card takes
-   its full width when it lists, so the columns have the room. */
-.checkout-board:has(.checkout-columns) { width: calc(70 * var(--u)); }
-.checkout-columns {
-  list-style: none;
+/* The list: the card fills the strip, the tab its left end
+   (the title on two lines, the count line under it, white on house blue),
+   then the run of every club's plate and chips wrapping across the room
+   left, the strip's whole height. The run's box comes from this grid, never
+   from the chips, so the fit can measure it. */
+.checkout-board--list {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: 0.8em;
+  padding: 0.45em 0.9em 0.45em 0;
+}
+/* The wavy tab is a corner shape (its wave runs corner to corner), so on a
+   column this tall it would leave the count line's lower rows on the white
+   card: the list's tab is a solid house-blue panel with a round right edge. */
+.checkout-board--list .checkout-tab {
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 0.45em;
+  width: 8.6em;
+  margin: -0.45em 0;
+  padding: 0.5em 1em 0.6em 0.9em;
+  background: var(--brand-blue);
+  border-radius: 0 1.2em 1.2em 0;
+}
+.checkout-board--list .checkout-tab svg { display: none; }
+.checkout-board--list .checkout-title {
+  white-space: normal;
+  text-wrap: balance;
+}
+.checkout-run {
+  min-width: 0;
+  min-height: 0;
   margin: 0;
   padding: 0;
-  display: grid;
-  grid-template-columns: repeat(var(--columns, 1), minmax(0, 1fr));
-  gap: calc(1.2 * var(--u));
-  align-items: start;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-content: center;
+  align-items: center;
+  gap: 0.45em;
+  overflow: hidden;
   font-size: var(--name-size);
 }
-.checkout-column {
-  display: flex;
-  flex-direction: column;
-  gap: 0.4em;
-  min-width: 0;
-}
-.checkout-column__head {
-  display: flex;
-  flex-direction: column;
+/* A club is its plate and its chips, standing in the run itself. */
+.checkout-club { display: contents; }
+.checkout-plate {
+  flex: none;
+  display: inline-flex;
   align-items: center;
-  justify-content: center;
-  gap: calc(0.35 * var(--u));
-  height: calc(5.4 * var(--u));
-  margin-bottom: calc(0.6 * var(--u) - 0.4em);
-  padding: calc(0.45 * var(--u)) calc(0.6 * var(--u));
-  border-radius: calc(0.8 * var(--u));
-  background: var(--club);
-  box-shadow: calc(0.25 * var(--u)) calc(0.25 * var(--u)) 0 var(--club-deep);
-  color: #fff;
-}
-.checkout-column__mark {
-  display: block;
+  gap: 0.35em;
   max-width: 100%;
-  height: calc(2.6 * var(--u));
+  height: 1.75em;
+  padding: 0 0.55em;
+  border-radius: 0.5em;
+  background: var(--club);
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.checkout-plate__mark {
+  display: block;
+  width: auto;
+  height: 1.15em;
+  max-width: 2.6em;
   object-fit: contain;
   user-select: none;
 }
-.checkout-column__name {
+.checkout-plate__name,
+.checkout-plate__count {
   font-family: var(--font-condensed);
-  font-size: calc(1.6 * var(--u));
+  font-size: 0.72em;
   letter-spacing: 0.06em;
   line-height: 1;
   text-transform: uppercase;
 }
-.checkout-column__count {
+.checkout-meta {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.4em;
+}
+.checkout-board--list .checkout-foot {
+  margin: 0;
+  font-size: 0.8em;
+  line-height: 1.25;
+  color: #fff;
+}
+.checkout-board--list .checkout-count {
+  display: block;
+  font-size: 1.9em;
+  color: #fff;
+}
+.checkout-demo {
+  flex: none;
+  padding: 0.3em 0.75em;
+  border-radius: 999px;
+  background: var(--brand-hot);
+  color: #fff;
   font-family: var(--font-condensed);
-  font-size: calc(1.15 * var(--u));
+  font-size: 0.8em;
   letter-spacing: 0.08em;
   line-height: 1;
   text-transform: uppercase;
   white-space: nowrap;
 }
-.checkout-column .checkout-names {
-  display: grid;
-  grid-template-columns: repeat(var(--split, 1), minmax(0, 1fr));
-  gap: 0.4em 0.5em;
-  justify-items: start;
-}
-.checkout-column .checkout-name { min-width: 0; max-width: 100%; }
-.checkout-column .checkout-name__chip { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
-.checkout-demo {
-  position: absolute;
-  top: calc(1 * var(--u));
-  right: calc(1.4 * var(--u));
-  padding: calc(0.3 * var(--u)) calc(0.8 * var(--u));
-  border-radius: 999px;
-  background: var(--brand-hot);
-  color: #fff;
-  font-family: var(--font-condensed);
-  font-size: calc(1.1 * var(--u));
-  letter-spacing: 0.08em;
-  line-height: 1;
-  text-transform: uppercase;
-}
-.checkout-board--foot .checkout-demo { position: static; flex: none; }
 .checkout-names {
   display: contents;
 }
 .checkout-name {
   display: inline-flex;
+  min-width: 0;
+  max-width: 100%;
 }
 /* The separator is real text (the list still reads as "Kid · Kid"), but
    the chips' own gaps carry it on screen. */
@@ -3470,7 +3492,7 @@ input:focus-visible {
   /* The chip was drawn around Galindo's caps at --name-size: the name is
      Paytone One at 1.057x that (overlayFit.js NAME_CHIP_TEXT), whose caps
      stand as tall, and the pill keeps its size in --name-size (1.75 tall,
-     0.65 of padding a side), which is what boardRowsHeight models. A name
+     0.65 of padding a side), which is what FOOT_CHIP models. A name
      whose capital carries a tall mark (É, Ấ) sits --seat lower
      (overlayFit.js nameChipSeat, set inline): twice that of padding over a
      line box twice that shorter, in the same pill. Unset, it is 0. */
@@ -3485,35 +3507,95 @@ input:focus-visible {
   font-weight: 400;
   white-space: nowrap;
   text-shadow: 0.06em 0.06em 0 var(--club-deep);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* "+N more": the chip's own metrics (a name chip whose name is "+N more",
+   as fitFoot counts it), printed the other way round so it never reads as
+   a child's name. */
+.checkout-more {
+  display: inline-block;
+  font-size: 1.057em;
+  height: calc(1.75em / 1.057);
+  line-height: calc(1.75em / 1.057);
+  padding: 0 calc(0.65em / 1.057);
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: inset 0 0 0 0.12em var(--club);
+  color: var(--club-deep);
+  font-family: var(--font-shout);
+  font-weight: 400;
+  white-space: nowrap;
 }
 
-/* The footer carries the honest wording — "not checked out yet", the label
+/* "<First name> has checked out" (CheckoutBanner.jsx, owner 2026-10-08): one
+   child at a time on the strip's floor, in the board's place while it is up.
+   A named child's banner is the club's colour with its white mark, Paytone
+   One in white with the club's deep shade as its hard shadow, as the
+   check-in moment's name is; "A child" and "and N more" are house blue with
+   no club. One line, cut short with an ellipsis rather than ever wrapping
+   above the strip. Sized in em of the strip's root (11px floor). */
+.checkout-leave {
+  display: flex;
+  align-items: center;
+  gap: 0.7em;
+  min-width: 0;
+  max-width: 100%;
+  padding: 0.55em 1.3em 0.6em;
+  border-radius: 0.8em;
+  background: var(--club, var(--brand-blue));
+  box-shadow: 0.3em 0.3em 0 var(--club-deep, var(--brand-blue-deep));
+  color: #fff;
+}
+.checkout-leave__mark {
+  flex: none;
+  display: block;
+  height: 2.2em;
+  width: auto;
+  max-width: 5em;
+  object-fit: contain;
+  user-select: none;
+}
+.checkout-leave__club {
+  flex: none;
+  font-family: var(--font-condensed);
+  font-size: 1.2em;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.checkout-leave__text {
+  min-width: 0;
+  font-family: var(--font-shout);
+  font-size: 2.1em;
+  line-height: 1.15;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-shadow: 0.06em 0.06em 0 var(--club-deep, var(--brand-blue-deep));
+}
+
+/* The count line carries the honest wording — "not checked out yet", the label
    count, and the data's age. It is small but must never be omitted: without it
    the list reads as a verified headcount, which it is not. */
 .checkout-foot {
-  margin: calc(1.3 * var(--u)) 0 0;
   font-family: var(--font-body);
   font-weight: 600;
-  font-size: calc(1.3 * var(--u));
   color: #4b5058;
 }
 .checkout-count {
   margin-right: 0.12em;
   font-family: var(--font-shout);
-  /* Stage 4b-2's 2.5u at line-height 1 in Galindo, times 1.05 at 1 / 1.05:
-     Paytone One's figures stand 5% shorter. */
-  font-size: calc(2.63 * var(--u));
+  /* Paytone One's figures at 1 / 1.05 of their size: they stand 5% shorter
+     than the caps the line around them was drawn for. */
   line-height: 0.95;
   color: var(--brand-ink);
   vertical-align: -0.08em;
 }
 .checkout-line {
   margin: 0;
-  max-width: calc(52 * var(--u));
   font-family: var(--font-body);
   font-weight: 800;
-  font-size: calc(2.1 * var(--u));
-  line-height: 1.25;
   color: var(--brand-ink);
   text-wrap: balance;
 }
@@ -4072,7 +4154,13 @@ details.advanced-fields > .hint { display: block; margin-bottom: 0.9rem; }
   background: var(--brand-cloud);
   border: 1.5px solid var(--panel-card-line);
 }
-.board-preview .checkout-region { pointer-events: none; }
+/* The board in it stands where it does on a 1920x1080 TV: the gear's edge
+   there (5.5u), and the strip's words in the lobby's u alone, since the 11px
+   floor is for a real screen, not a TV drawn this small. */
+.board-preview .checkout-region {
+  left: calc(5.5 * var(--u));
+  font-size: calc(0.95 * var(--u));
+}
 
 /* Configure mode (?configure=1, the sound room app's Settings window): Settings
    alone, on the configurator's own paper, never the signage behind it. */

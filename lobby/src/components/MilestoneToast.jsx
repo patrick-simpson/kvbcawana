@@ -44,8 +44,9 @@ import ClubBadge from './ClubBadge.jsx';
  * holds out of sight until the notice has lifted away, then pops; the notice
  * waits for the toast's exit in turn (NoticeBanner). A critical notice never
  * moves, so on an OBS feed, where it keeps to the band, the toast drops below
- * it (`below`); over the pickup board there is no room below, so App holds
- * the queue and a toast already up steps aside (`yielding`).
+ * it (`below`). (Until 2026-10-07 a critical notice also kept to the band over
+ * a pickup list in the middle, and the toasts waited; the board has the foot
+ * now, and a critical notice keeps the middle.)
  */
 
 // Band geometry for the fit, in u (app.css .milestone-toast carries the same).
@@ -192,11 +193,10 @@ const SPARKLES = [
  *   club: any,
  *   compact?: boolean,
  *   below?: boolean,
- *   yielding?: boolean,
  *   afterNotice?: boolean,
  * }} props
  */
-export default function MilestoneToast({ celebration, club, compact = false, below = false, yielding = false, afterNotice = false }) {
+export default function MilestoneToast({ celebration, club, compact = false, below = false, afterNotice = false }) {
   useFontsReady();
   return (
     <AnimatePresence>
@@ -207,7 +207,6 @@ export default function MilestoneToast({ celebration, club, compact = false, bel
           club={club}
           compact={compact}
           below={below}
-          yielding={yielding}
           afterNotice={afterNotice}
         />
       )}
@@ -218,11 +217,8 @@ export default function MilestoneToast({ celebration, club, compact = false, bel
 const FROM = { opacity: 0, y: '-35%', scale: 0.85 };
 const TO = { opacity: 1, y: '0%', scale: 1 };
 const AWAY = { opacity: 0, y: '-30%', scale: 0.96, transition: { duration: DUR.exit, ease: EASE.exit } };
-// Stepping aside for a band notice: AWAY, with the squish's two axes sent
-// home on AWAY's own timing, in case the notice takes the band mid-squish.
-const YIELD = { ...AWAY, scaleX: 1, scaleY: 1 };
 
-function Toast({ celebration, club, compact, below, yielding, afterNotice }) {
+function Toast({ celebration, club, compact, below, afterNotice }) {
   const t = toastFor(celebration);
   const logo = t.tone === 'club' && club?.logo;
   const fit = toastFit(t.line, { compact: compact && !below, logo: Boolean(logo) });
@@ -257,7 +253,7 @@ function Toast({ celebration, club, compact, below, yielding, afterNotice }) {
       className={`${t.className} milestone-toast--${t.tone}${t.big ? ' milestone-toast--big' : ''}${below ? ' milestone-toast--below' : ''}${compact && !below ? ' milestone-toast--compact' : ''}`}
       style={style}
       initial={beat.plate.initial}
-      animate={yielding ? YIELD : { ...beat.plate.animate, transition: beat.plate.transition }}
+      animate={{ ...beat.plate.animate, transition: beat.plate.transition }}
       exit={AWAY}
     >
       <StepPlate

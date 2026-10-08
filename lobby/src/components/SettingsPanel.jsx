@@ -5,7 +5,6 @@ import { sanitizeMilestoneList } from '../lib/milestones.js';
 import { NIGHT_THEME_VALUES } from '../lib/skins.js';
 import { SAMPLE_NAMES, pick } from '../lib/demoNames.js';
 import { localDateStr } from '../lib/calendarLogic.js';
-import { PICKUP_FROM, PICKUP_UNTIL, parseHHMM } from '../lib/checkoutBoard.js';
 import { useDisplayKey } from '../hooks/useDisplayKey.js';
 import { useDisplayLogin } from '../hooks/useDisplayLogin.js';
 import { pageBuild } from '../lib/buildReload.js';
@@ -17,6 +16,7 @@ import {
   SlidesSection, StatusSection, statusProblems,
 } from './settings/sections.jsx';
 import { FollowingContext } from './settings/fields.jsx';
+import { CORNER_CLUB_IDS } from '../lib/clubs.js';
 import awanaClubsMark from '../../shared/brand/logos/awana-clubs-white.svg';
 
 const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
@@ -41,6 +41,7 @@ export function seedForm(c) {
     showTallySyncNote: c.showTallySyncNote !== false,
     showTonightTicker: c.showTonightTicker === true,
     keepScreenAwake: c.keepScreenAwake !== false,
+    cornerClub: CORNER_CLUB_IDS.includes(c.cornerClub) ? c.cornerClub : '',
     showClock: !!c.showClock,
     // Reads the one skin table. When this repeated the ids by hand, a saved
     // skin the list had never heard of (thanksgiving, easter, vbs) was silently
@@ -61,11 +62,8 @@ export function seedForm(c) {
     firstArrivalMoment: c.firstArrivalMoment !== false,
     showBirthdayWeekRibbon: c.showBirthdayWeekRibbon !== false,
     clubPhrases: { ...(c.clubPhrases || {}) },
-    checkoutBoardMode: ['pickup', 'always'].includes(c.checkoutBoardMode) ? c.checkoutBoardMode : 'off',
     checkoutBoardNamesAbove: c.checkoutBoardNamesAbove ?? 3,
     checkoutBoardStaleMin: c.checkoutBoardStaleMin ?? 8,
-    checkoutBoardFrom: parseHHMM(c.checkoutBoardFrom) == null ? PICKUP_FROM : c.checkoutBoardFrom,
-    checkoutBoardUntil: parseHHMM(c.checkoutBoardUntil) == null ? PICKUP_UNTIL : c.checkoutBoardUntil,
     cornerStillHere: c.cornerStillHere !== false,
     milestoneEvery: c.milestoneEvery ?? 25,
     // Threshold LISTS (#358) — seeded through the same sanitizer the config
@@ -101,8 +99,6 @@ export function normalize(f) {
     clubMilestoneEvery: clamp(Math.round(f.clubMilestoneEvery) || 0, 0, 1000),
     checkoutBoardNamesAbove: clamp(Math.round(f.checkoutBoardNamesAbove) || 0, 0, 200),
     checkoutBoardStaleMin: clamp(Math.round(f.checkoutBoardStaleMin) || 8, 1, 120),
-    checkoutBoardFrom: parseHHMM(f.checkoutBoardFrom) == null ? PICKUP_FROM : f.checkoutBoardFrom,
-    checkoutBoardUntil: parseHHMM(f.checkoutBoardUntil) == null ? PICKUP_UNTIL : f.checkoutBoardUntil,
     calendarUrl: f.calendarUrl.trim(),
     calendarWelcomeText: f.calendarWelcomeText.trim().slice(0, 80) || 'Welcome to Awana!',
     weatherLocationName: f.weatherLocationName.trim().slice(0, 80),

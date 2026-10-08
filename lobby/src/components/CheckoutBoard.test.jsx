@@ -26,37 +26,58 @@ describe('CheckoutBoard', () => {
     expect(container.innerHTML).toBe('');
   });
 
-  it('names each child as a chip in their club\'s colour, one column per club, with the honest foot', () => {
+  it('at pickup time names each child as a chip in their club\'s colour, after the club\'s plate, with the honest count line', () => {
     const { container } = still(<CheckoutBoard decision={{ state: 'names', ageMin: 3 }} checkout={checkout} />);
-    const board = container.querySelector('.checkout-board.names');
+    // Always in the foot: the strip under the slides (owner, 2026-10-07).
+    expect(container.querySelector('.checkout-region')).not.toBeNull();
+    const board = container.querySelector('.checkout-board.names.checkout-board--list');
     expect(board.querySelector('.checkout-title').textContent).toBe('Still to be picked up');
-    const columns = [...board.querySelectorAll('.checkout-column')];
+    const clubs = [...board.querySelectorAll('.checkout-run > .checkout-club')];
     // Youngest club first, as the clubs stand: Sparks before T&T.
-    expect(columns.map((c) => c.querySelector('.checkout-column__mark').getAttribute('alt'))).toEqual(['Sparks', 'T&T']);
-    expect(board.style.getPropertyValue('--columns')).toBe('2');
-    const [sparks] = columns;
+    expect(clubs.map((c) => c.querySelector('.checkout-plate__mark').getAttribute('alt'))).toEqual(['Sparks', 'T&T']);
+    const [sparks] = clubs;
     expect(sparks.style.getPropertyValue('--club')).toBe(getClubPalette('Sparks').primary);
-    expect(sparks.querySelector('.checkout-column__count').textContent).toBe('2 waiting');
+    expect(sparks.querySelector('.checkout-plate__count').textContent).toBe('2 waiting');
     expect([...sparks.querySelectorAll('.checkout-name__chip')].map((c) => c.textContent)).toEqual(['Demo Kid', 'Sample Star']);
     // Still reads as a list, separators and all.
     expect(sparks.querySelector('.checkout-names').textContent).toBe('Demo Kid · Sample Star');
-    const foot = board.querySelector('.checkout-foot');
+    // Sized by the fit (unmeasured in jsdom: its 1080p box, in u).
+    expect(board.style.getPropertyValue('--name-size')).toMatch(/^calc\([\d.]+ \* var\(--u\)\)$/);
+    const foot = board.querySelector('.checkout-meta .checkout-foot');
     expect(foot.querySelector('.checkout-count').textContent).toBe('3');
     expect(foot.textContent).toBe('3 not checked out yet · 43 labels printed tonight · updated 3 min ago');
     expect(board.textContent).not.toMatch(/still in the building/i);
     expect(board.querySelector('.checkout-demo')).toBeNull();
+    expect(board.querySelector('.checkout-more')).toBeNull();
   });
 
-  it('a club the clubs table does not know still gets a column, by name', () => {
+  it('a club the clubs table does not know still gets a plate, by name', () => {
     const odd = { ...checkout, entries: [...checkout.entries, { firstName: 'Visitor', club: 'Guests' }] };
     const { container } = still(<CheckoutBoard decision={{ state: 'names', ageMin: 0 }} checkout={odd} />);
-    const last = [...container.querySelectorAll('.checkout-column')].at(-1);
-    expect(last.querySelector('.checkout-column__name').textContent).toBe('Guests');
+    const last = [...container.querySelectorAll('.checkout-club')].at(-1);
+    expect(last.querySelector('.checkout-plate__name').textContent).toBe('Guests');
+    expect(last.querySelector('.checkout-plate__count').textContent).toBe('1 waiting');
   });
 
-  it('a demo says so on the card and in the foot', () => {
+  it('the 60-entry cap never lists more than fits: the rest stand behind "+N more", every plate and the count line whole', () => {
+    // Ten long names in each of six clubs, in jsdom's 1080p box at its rough
+    // (wide) letter widths.
+    const clubs = ['Puggles', 'Cubbies', 'Sparks', 'T&T', 'Trek', 'Journey'];
+    const names = ['Alexander', 'Charlotte', 'Benjamin', 'Isabella', 'Theodore', 'Penelope', 'Sebastian', 'Josephine', 'Nathaniel', 'Gabriella'];
+    const big = { entries: clubs.flatMap((club) => names.map((firstName) => ({ firstName: `${firstName}-Rose`, club }))), printed: 60, at: Date.now() };
+    const { container } = still(<CheckoutBoard decision={{ state: 'names', ageMin: 0 }} checkout={big} />);
+    const plates = [...container.querySelectorAll('.checkout-plate__count')].map((p) => p.textContent);
+    expect(plates).toEqual(Array(6).fill('10 waiting'));
+    const shown = container.querySelectorAll('.checkout-name__chip').length;
+    const more = [...container.querySelectorAll('.checkout-more')].map((m) => Number(/^\+(\d+) more$/.exec(m.textContent)[1]));
+    expect(more.length).toBeGreaterThan(0);
+    expect(shown + more.reduce((a, b) => a + b, 0)).toBe(60);
+    expect(container.querySelector('.checkout-foot').textContent).toMatch(/^60 not checked out yet/);
+  });
+
+  it('a demo says so on the card and in the count line', () => {
     const { container } = still(<CheckoutBoard decision={{ state: 'names', ageMin: 30 }} checkout={checkout} demo />);
-    expect(container.querySelector('.checkout-demo').textContent).toBe('Demo · sample names');
+    expect(container.querySelector('.checkout-meta .checkout-demo').textContent).toBe('Demo · sample names');
     expect(container.querySelector('.checkout-foot').textContent).toMatch(/a demo, not real children$/);
     expect(container.querySelector('.checkout-foot').textContent).not.toMatch(/updated/);
   });
@@ -93,37 +114,21 @@ describe('a name chip with a tall mark', () => {
   });
 });
 
-describe('CheckoutBoard at the foot', () => {
-  // Where it goes is overlayFit.js boardPlacement; at the foot it is one line
-  // beside the slides, in the same words.
-  it('lists nobody at the foot: a live list there is its honest count line', () => {
-    const { container } = still(<CheckoutBoard decision={{ state: 'names', ageMin: 3 }} checkout={checkout} placement="foot" />);
-    expect(container.querySelector('.checkout-region--foot')).not.toBeNull();
-    const board = container.querySelector('.checkout-board.names.checkout-board--foot');
-    expect(board.querySelector('.checkout-title').textContent).toBe('Still to be picked up');
-    // A partial list must never pass for the whole one: no names at all.
-    expect(board.querySelector('.checkout-name__chip')).toBeNull();
-    expect(board.textContent).not.toMatch(/Demo Kid|Sample Star|Test Kid/);
-    expect(board.querySelector('.checkout-foot').textContent)
-      .toBe('3 not checked out yet · 43 labels printed tonight · updated 3 min ago');
-  });
-
-  it('keeps the stale, empty and anonymous wording at the foot', () => {
-    const stale = still(<CheckoutBoard decision={{ state: 'stale', ageMin: 1560 }} checkout={checkout} placement="foot" />).container;
-    expect(stale.querySelector('.checkout-board--foot').textContent)
+describe('the one-line card', () => {
+  // A stale or empty board, or the anonymous line, is one line on a small
+  // card on the strip's floor, in the same words.
+  it('the stale, empty and anonymous lines are one-line cards', () => {
+    const stale = still(<CheckoutBoard decision={{ state: 'stale', ageMin: 1560 }} checkout={checkout} />).container;
+    expect(stale.querySelector('.checkout-region .checkout-board--line').textContent)
       .toContain('This list stopped updating about 1560 min ago — please check with the check-in desk rather than relying on it.');
+    expect(stale.querySelector('.checkout-run')).toBeNull();
     cleanup();
-    const empty = still(<CheckoutBoard decision={{ state: 'empty', ageMin: 0 }} checkout={{ ...checkout, entries: [] }} placement="foot" />).container;
-    expect(empty.textContent).toContain('Everyone has been checked out. Thanks for a great night!');
+    const empty = still(<CheckoutBoard decision={{ state: 'empty', ageMin: 0 }} checkout={{ ...checkout, entries: [] }} />).container;
+    expect(empty.querySelector('.checkout-board--line').textContent).toContain('Everyone has been checked out. Thanks for a great night!');
     cleanup();
-    const anon = still(<CheckoutBoard decision={{ state: 'anonymous', ageMin: 0 }} checkout={checkout} placement="foot" />).container;
-    expect(anon.textContent).toContain('Almost everyone has been picked up. Please see the check-in desk.');
+    const anon = still(<CheckoutBoard decision={{ state: 'anonymous', ageMin: 0 }} checkout={checkout} />).container;
+    expect(anon.querySelector('.checkout-board--line').textContent).toContain('Almost everyone has been picked up. Please see the check-in desk.');
     expect(anon.textContent).not.toMatch(/\d+ not checked out/);
-  });
-
-  it('the middle is the default, and lists the names', () => {
-    const { container } = still(<CheckoutBoard decision={{ state: 'names', ageMin: 0 }} checkout={checkout} />);
-    expect(container.querySelector('.checkout-region--foot')).toBeNull();
-    expect(container.querySelectorAll('.checkout-name__chip')).toHaveLength(3);
+    expect(anon.querySelector('.checkout-name__chip')).toBeNull();
   });
 });

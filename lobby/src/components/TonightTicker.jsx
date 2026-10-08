@@ -105,14 +105,17 @@ export function tickerRows(tonight, now) {
  * four rotation slots would crowd out the clock and weather the operator
  * asked for. A quiet strip of its own keeps both simple.
  *
- * `active` (false while a check-in banner holds the stage) unmounts it
+ * `active` (false while a check-in banner holds the stage, or while the
+ * pickup board stands in the foot it rides in) unmounts it
  * via AnimatePresence instead of leaning on z-index alone — a clean dip
  * out and back, and no strip sitting inertly behind a birthday banner.
  * Hidden entirely until the first broadcast arrives, and again once the
  * feed goes stale (TONIGHT_STALE_MS) — a frozen "63 checked in" from an
- * hour ago is worse than showing nothing. It holds the foot of the lobby:
- * the first-run card waits for it (src/lib/overlayFit.js setupUp), never the
- * other way round, since these counts are what the room is looking at.
+ * hour ago is worse than showing nothing. It holds the foot of the lobby
+ * over the first-run card, which waits for it (src/lib/overlayFit.js
+ * setupUp), never the other way round, since these counts are what the room
+ * is looking at; the pickup board outranks both (owner, 2026-10-07: the list
+ * takes the bottom of the screen).
  */
 export default function TonightTicker({ tonight, active, now: clock }) {
   const [own, setOwn] = useState(() => Date.now());
