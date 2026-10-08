@@ -232,7 +232,7 @@ is `printImage()` on the name tag printer with the backup printer
 a backup naming the old `receiptPrinterName` is not used, and POST /config
 drops them all. A late child (`lateGoToLine` answers) gets a plain name tag and
 the household ONE drop-off label (`dropOffTagFor` / `generateDropOffTag`, once
-per family per night) on the label printer. `printerSetupWarnings()` (pure)
+per family per night) on the label printer. The card's band says GO TO and the time, never "late", and the child's own tag is identical to everyone's (owner: nothing singles a child out). `printerSetupWarnings()` (pure)
 judges the setup: `printerUnset`, `printerNotFound`, `printerOffline`
 (Get-Printer PrinterStatus), `printerLooksLikeReceipt`; the dashboard and the
 status window read offline and receipt-like as PROBLEM.

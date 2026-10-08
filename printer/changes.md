@@ -1,4 +1,9 @@
-﻿## [7.18.0] - 2026-10-08
+﻿## [7.18.1] - 2026-10-08
+The drop-off card says GO TO.
+
+**Nothing on a late arrival's labels says "late" (owner).** The family's drop-off card now reads GO TO and the time across the top, instead of LATE DROP-OFF, and a single child's card no longer repeats GO TO above the room. The child's own name tag was already identical to every other child's (no "Go to" line on it since 7.17.0), so nothing they wear singles them out.
+
+## [7.18.0] - 2026-10-08
 One-off name tags, Undo check-in on the touch screen, and a better late drop-off label.
 
 **New: one-off name tags.** For a lost or torn tag, or a child who is not checking in tonight (a sibling along for the night, a guest). Type a first name, pick the club, Print tag. The child gets the club's name tag and the full welcome on the lobby screens, but nothing counts: not tonight's numbers, not attendance, not the pickup list. The print log keeps the tag, marked One-off, so it can be reprinted. It is on the touch check-in (the new One-off tag button), the phone's + menu (also on awana.kvbchurch.org/checkin) and the dashboard.
