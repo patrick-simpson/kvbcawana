@@ -111,6 +111,28 @@ export default function CheckoutBoard({ decision, checkout, calm, demo = false, 
   const listed = state === BOARD_NAMES;
   const runRef = useRef(/** @type {HTMLUListElement | null} */ (null));
   const box = useRunBox(runRef, listed);
+  // The browser's word, after the fit's: fitFoot predicts the wrap from
+  // measured text, and a real screen can still wrap one chip more (CI's
+  // 640x480 put five chips under the strip, 2026-10-08). While the run's
+  // content stands taller than the run, one more name goes behind "+N more",
+  // before the frame is painted. Starts again whenever the list or the box
+  // changes.
+  const [extra, setExtra] = useState({ key: '', n: 0 });
+  const fitKey = listed
+    ? `${box ? `${box.width}x${box.height}` : '-'}|${(checkout?.entries || []).map((e) => `${e.club}/${e.firstName}`).join(',')}`
+    : '';
+  const extraN = extra.key === fitKey ? extra.n : 0;
+  // No dependency list on purpose: the check has to run after EVERY render,
+  // including the one useFontsReady makes when the faces arrive, and it stops
+  // by itself (it only acts while the run overflows).
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useLayoutEffect(() => {
+    const el = runRef.current;
+    if (!listed || !box || !el) return;
+    if (el.scrollHeight > el.clientHeight + 1 && extraN < (checkout?.entries?.length || 0)) {
+      setExtra({ key: fitKey, n: extraN + 1 });
+    }
+  });
   if (!shown) return null;
 
   const entries = checkout?.entries || [];
@@ -128,6 +150,21 @@ export default function CheckoutBoard({ decision, checkout, calm, demo = false, 
     // with a floor a lobby can read, except in Settings' miniature TV.
     const range = footRange(box.height, preview ? 0 : FOOT_FLOOR_PX);
     fit = fitFoot(clubs, { ...box, ...range, step: 0.25 });
+    // The browser's correction (above): each extra name comes off the club
+    // with the most still showing, as fitFoot's own overflow does.
+    if (extraN) {
+      const hidden = [...fit.hidden];
+      for (let k = 0; k < extraN; k++) {
+        let pick = -1;
+        clubs.forEach((g, i) => {
+          const left = g.names.length - (hidden[i] || 0);
+          if (left > 0 && (pick === -1 || left >= clubs[pick].names.length - (hidden[pick] || 0))) pick = i;
+        });
+        if (pick === -1) break;
+        hidden[pick] = (hidden[pick] || 0) + 1;
+      }
+      fit = { ...fit, hidden };
+    }
     nameSize = `${fit.size}px`;
   } else if (listed) {
     fit = fitFoot(clubs, { ...FALLBACK, ...footRange(FALLBACK.height), step: 0.01 });
