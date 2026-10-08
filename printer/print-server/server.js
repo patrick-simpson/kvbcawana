@@ -3318,8 +3318,23 @@ function dropOffTagFor(firstName, lastName, clubName, now = new Date(), opts = {
   const time = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
   return { title: `Drop-off locations at ${time}`, family: titleCaseName(String(lastName || '').trim()) || 'this', lines };
 }
-// One 4x2 label: a black band with the title, then a row per child, the name in the shout and
-// where to go beside it, all sized to fit.
+// The drop-off label (redesigned 7.18.0). Read at arm's length by a parent in
+// a hurry, so the hierarchy is: who, then WHERE, then what is happening there.
+//   - A black band: LATE DROP-OFF on the left, the time on the right.
+//   - One child: the club mark large on the left, the name in the shout, then
+//     GO TO and the room large, the activity under it.
+//   - Siblings: one row each, the club mark, the name, a dotted leader and the
+//     room set flush right (the activity under it while the rows are tall
+//     enough, beside it after a dot when they are not). One name size and one
+//     room size for every row, so the card reads as a list.
+// Monochrome and nothing thinner than 0.8 pt: it prints on the D450's 203 dpi
+// head. Every size steps down until the widest row fits; a mark that will not
+// draw falls back to the club's monogram.
+const DROP_M = 10;          // side margin
+const DROP_BAND = 24;       // header band height
+async function dropOffMark(club) {
+  try { return await thermalClubMark(clubKey(club), false); } catch (e) { return null; }
+}
 async function generateDropOffTag(tag) {
   const cvs = createCanvas(PX_W, PX_H);
   const ctx = cvs.getContext('2d');
@@ -3327,34 +3342,152 @@ async function generateDropOffTag(tag) {
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, PAGE_W, PAGE_H);
   const type = labelType('');
-  const M = 10;
-  const BAND = 30;
-  ctx.fillStyle = '#000000';
-  ctx.fillRect(0, 0, PAGE_W, BAND);
+  const ink = '#000000';
+  const M = DROP_M;
+
+  // The band.
+  const timeText = String(tag.title || '').replace(/^.*\bat\s+/i, '').trim();
+  ctx.fillStyle = ink;
+  ctx.fillRect(0, 0, PAGE_W, DROP_BAND);
   ctx.fillStyle = '#ffffff';
-  ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  let ts = 20;
-  while (ts > 10 && type.measure(ctx, 'band', ts, tag.title.toUpperCase()) > PAGE_W - 2 * M) ts -= 0.5;
-  type.fill(ctx, 'band', ts, tag.title.toUpperCase(), PAGE_W / 2, BAND / 2 + 1);
-  const n = tag.lines.length;
-  const avail = PAGE_H - BAND - 12;
-  const rowH = Math.min(36, avail / n);
-  const top = BAND + 6 + (avail - rowH * n) / 2;   // the rows sit centred under the band
-  ctx.fillStyle = '#000000';
   ctx.textAlign = 'left';
-  ctx.textBaseline = 'middle';
-  // One size for every row (the widest row decides), so the tag reads as a list.
-  const rows = tag.lines.map(l => ({ name: l.first, where: [l.place, l.activity].filter(Boolean).join(' · ') }));
-  let size = Math.min(24, rowH * 0.72);
-  const width = (r) => type.measure(ctx, 'name', size, r.name) + size * 0.45 + type.measure(ctx, 'goTo', size * 0.8, r.where);
-  while (size > 7 && rows.some(r => width(r) > PAGE_W - 2 * M)) size -= 0.5;
-  rows.forEach((r, i) => {
-    const y = top + rowH * i + rowH / 2;
-    type.fill(ctx, 'name', size, r.name, M, y);
-    type.fill(ctx, 'goTo', size * 0.8, r.where, M + type.measure(ctx, 'name', size, r.name) + size * 0.45, y);
-    if (i < n - 1) { ctx.fillRect(M, top + rowH * (i + 1) - 0.4, PAGE_W - 2 * M, 0.8); }
-  });
+  type.fill(ctx, 'band', 15, 'LATE DROP-OFF', M, DROP_BAND / 2 + 0.5);
+  if (timeText) {
+    ctx.textAlign = 'right';
+    const ts = 15;
+    type.fill(ctx, 'name', ts, timeText, PAGE_W - M, DROP_BAND / 2 + type.capCentre(ctx, 'name', timeText) * ts);
+  }
+
+  const marks = await Promise.all(tag.lines.map((l) => dropOffMark(l.club)));
+  // A mark fills a box `bw` wide and `bh` tall, centred: the wordmarks
+  // (Sparks, Cubbies, Trek) are wide and the badges (T&T) square, so a square
+  // box printed the wordmarks tiny.
+  const drawMark = (i, x, y, bw, bh) => {
+    const art = marks[i];
+    if (art) {
+      const scale = Math.min(bw / art.width, bh / art.height);
+      const w = art.width * scale;
+      const h = art.height * scale;
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(art.canvas, x + (bw - w) / 2, y + (bh - h) / 2, w, h);
+      return;
+    }
+    const mono = CLUB_MONOGRAM[clubKey(tag.lines[i].club)] || '?';
+    const r = Math.min(bw, bh) * 0.46;
+    ctx.fillStyle = ink;
+    ctx.beginPath(); ctx.arc(x + bw / 2, y + bh / 2, r, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#ffffff';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    const ms = type.fit(ctx, 'monogram', mono, r * 1.5, r, 6);
+    type.fill(ctx, 'monogram', ms, mono, x + bw / 2, y + bh / 2 + type.capCentre(ctx, 'monogram', mono) * ms);
+  };
+  // Cap height of the shout at a size, so a read line can share its baseline.
+  const capH = (size) => {
+    const r = type.inkReach(ctx, 'name', 'H', 'alphabetic');
+    return (r ? r.above : 0.7) * size;
+  };
+  const shout = (text, size, x, y, align = 'left') => {
+    ctx.fillStyle = ink; ctx.textAlign = align; ctx.textBaseline = 'middle';
+    type.fill(ctx, 'name', size, text, x, y + type.capCentre(ctx, 'name', text) * size);
+  };
+  const read = (role, text, size, x, y, align = 'left') => {
+    ctx.fillStyle = ink; ctx.textAlign = align; ctx.textBaseline = 'middle';
+    type.fill(ctx, role, size, text, x, y);
+  };
+
+  const top = DROP_BAND;
+  const bottom = PAGE_H - 6;
+  const n = tag.lines.length;
+
+  if (n === 1) {
+    // One child: the hero layout.
+    const l = tag.lines[0];
+    const bw = 92, bh = 72;
+    const markX = M;
+    const midY = top + (bottom - top) / 2;
+    drawMark(0, markX, midY - bh / 2, bw, bh);
+    const x = markX + bw + 14;
+    const w = PAGE_W - M - x;
+    const nameSize = type.fit(ctx, 'name', l.first, w, 30, 12);
+    const roomText = l.place || l.activity || '';
+    const actText = l.place && l.activity ? l.activity : '';
+    const roomSize = type.fit(ctx, 'goTo', roomText, w, 19, 9);
+    const actSize = Math.min(12, roomSize * 0.7);
+    const kick = 8.5;
+    const gap = 6;
+    const blockH = nameSize * 0.8 + gap + kick + 3 + roomSize + (actText ? 2 + actSize : 0);
+    let y = midY - blockH / 2;
+    shout(l.first, nameSize, x, y + nameSize * 0.4);
+    y += nameSize * 0.8 + gap;
+    read('band', 'GO TO', kick, x, y + kick / 2);
+    y += kick + 3;
+    read('goTo', roomText, roomSize, x, y + roomSize / 2);
+    y += roomSize + 2;
+    if (actText) read('milestone', actText, actSize, x, y + actSize / 2);
+  } else {
+    // Siblings: an even list.
+    const rowH = (bottom - top - 4) / n;
+    const bh = Math.min(rowH * 0.74, 30);
+    const bw = Math.min(bh * 1.75, 46);
+    const twoLine = rowH >= 30;
+    const rows = tag.lines.map((l) => ({
+      name: l.first,
+      room: l.place || l.activity || '',
+      act: l.place && l.activity ? l.activity : '',
+    }));
+    const left = M + bw + 8;
+    const right = PAGE_W - M;
+    const LEADER_MIN = 26;
+    let nameSize = Math.min(22, rowH * 0.56);
+    let roomSize = Math.min(14, rowH * (twoLine ? 0.36 : 0.44));
+    const actSizeOf = (rs) => rs * 0.74;
+    const rightW = (r) => twoLine
+      ? Math.max(type.measure(ctx, 'goTo', roomSize, r.room), r.act ? type.measure(ctx, 'milestone', actSizeOf(roomSize), r.act) : 0)
+      : type.measure(ctx, 'goTo', roomSize, r.room) + (r.act ? type.measure(ctx, 'milestone', actSizeOf(roomSize), ` \u00b7 ${r.act}`) : 0);
+    const fits = () => rows.every((r) => type.measure(ctx, 'name', nameSize, r.name) + LEADER_MIN + rightW(r) <= right - left);
+    while (!fits() && (nameSize > 8 || roomSize > 6)) {
+      nameSize = Math.max(8, nameSize - 0.5);
+      roomSize = Math.max(6, roomSize - 0.4);
+    }
+    rows.forEach((r, i) => {
+      const y0 = top + 2 + rowH * i;
+      const cy = y0 + rowH / 2;
+      drawMark(i, M, cy - bh / 2, bw, bh);
+      shout(r.name, nameSize, left, cy);
+      const nameEnd = left + type.measure(ctx, 'name', nameSize, r.name);
+      let roomStart;
+      const as = actSizeOf(roomSize);
+      if (twoLine && r.act) {
+        const lineGap = 1.5;
+        const blockH = roomSize + lineGap + as;
+        const yRoom = cy - blockH / 2 + roomSize / 2;
+        read('goTo', r.room, roomSize, right, yRoom, 'right');
+        read('milestone', r.act, as, right, yRoom + roomSize / 2 + lineGap + as / 2, 'right');
+        roomStart = right - Math.max(type.measure(ctx, 'goTo', roomSize, r.room), type.measure(ctx, 'milestone', as, r.act));
+      } else {
+        // One line: the room and the activity on the NAME's baseline.
+        const base = cy + capH(nameSize) / 2;
+        const tail = r.act ? ` \u00b7 ${r.act}` : '';
+        const tailW = tail ? type.measure(ctx, 'milestone', as, tail) : 0;
+        ctx.fillStyle = ink; ctx.textAlign = 'right'; ctx.textBaseline = 'alphabetic';
+        if (tail) type.fill(ctx, 'milestone', as, tail, right, base);
+        type.fill(ctx, 'goTo', roomSize, r.room, right - tailW, base);
+        roomStart = right - tailW - type.measure(ctx, 'goTo', roomSize, r.room);
+      }
+      // The dotted leader, from the name to the room, just above the name's
+      // baseline, the way a printed menu runs its dots.
+      const from = nameEnd + 5;
+      const to = roomStart - 5;
+      const dotY = cy + capH(nameSize) / 2 - 1.2;
+      ctx.fillStyle = ink;
+      for (let x = from; x <= to; x += 3.2) {
+        ctx.beginPath(); ctx.arc(x, dotY, 0.8, 0, Math.PI * 2); ctx.fill();
+      }
+    });
+  }
+
   const pngPath = tmpFilePath('awana-dropoff', 'png');
   const buffer = cvs.toBuffer('image/png');
   fs.writeFileSync(pngPath, buffer);
