@@ -184,6 +184,9 @@ exit 0
     fs.unlinkSync(png.pngPath);
 
     const src = fs.readFileSync(path.join(__dirname, '..', 'print-server', 'server.js'), 'utf8');
+    const dropSrc = src.slice(src.indexOf('async function generateDropOffTag'), src.indexOf('// Operator-configured footer', src.indexOf('async function generateDropOffTag')));
+    check('the drop-off card says GO TO and never "late" (nothing singles a child out)',
+      /'GO TO'/.test(dropSrc) && !/['"`][^'"`]*\blate\b[^'"`]*['"`]/i.test(dropSrc));
     check('a late child\'s name tag carries no "Go to:" line (the drop-off label replaces it)',
       /const dropOffInstead = !!goTo;/.test(src) && !/extras\.goToLine = goTo/.test(src));
 

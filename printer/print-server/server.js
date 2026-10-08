@@ -3320,9 +3320,10 @@ function dropOffTagFor(firstName, lastName, clubName, now = new Date(), opts = {
 }
 // The drop-off label (redesigned 7.18.0). Read at arm's length by a parent in
 // a hurry, so the hierarchy is: who, then WHERE, then what is happening there.
-//   - A black band: LATE DROP-OFF on the left, the time on the right.
+//   - A black band: GO TO on the left, the time on the right. Never the
+//     word "late" (owner, 2026-10-08: nothing on it singles a child out).
 //   - One child: the club mark large on the left, the name in the shout, then
-//     GO TO and the room large, the activity under it.
+//     the room large, the activity under it.
 //   - Siblings: one row each, the club mark, the name, a dotted leader and the
 //     room set flush right (the activity under it while the rows are tall
 //     enough, beside it after a dot when they are not). One name size and one
@@ -3352,7 +3353,7 @@ async function generateDropOffTag(tag) {
   ctx.fillStyle = '#ffffff';
   ctx.textBaseline = 'middle';
   ctx.textAlign = 'left';
-  type.fill(ctx, 'band', 15, 'LATE DROP-OFF', M, DROP_BAND / 2 + 0.5);
+  type.fill(ctx, 'band', 15, 'GO TO', M, DROP_BAND / 2 + 0.5);
   if (timeText) {
     ctx.textAlign = 'right';
     const ts = 15;
@@ -3415,14 +3416,11 @@ async function generateDropOffTag(tag) {
     const actText = l.place && l.activity ? l.activity : '';
     const roomSize = type.fit(ctx, 'goTo', roomText, w, 19, 9);
     const actSize = Math.min(12, roomSize * 0.7);
-    const kick = 8.5;
-    const gap = 6;
-    const blockH = nameSize * 0.8 + gap + kick + 3 + roomSize + (actText ? 2 + actSize : 0);
+    const gap = 9;
+    const blockH = nameSize * 0.8 + gap + roomSize + (actText ? 2 + actSize : 0);
     let y = midY - blockH / 2;
     shout(l.first, nameSize, x, y + nameSize * 0.4);
     y += nameSize * 0.8 + gap;
-    read('band', 'GO TO', kick, x, y + kick / 2);
-    y += kick + 3;
     read('goTo', roomText, roomSize, x, y + roomSize / 2);
     y += roomSize + 2;
     if (actText) read('milestone', actText, actSize, x, y + actSize / 2);
