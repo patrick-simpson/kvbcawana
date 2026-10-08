@@ -4532,6 +4532,10 @@
         // in the list, so they can be checked in again here or from a phone.
         var row = document.querySelector('.clubber[recid="' + id.replace(/[^0-9A-Za-z_-]/g, '') + '"]');
         if (row) { row.classList.remove('checked-in'); row.style.display = ''; }
+        // And this station forgets it printed them tonight: left marked, a
+        // check-in after the undo (here, from a phone or the touch screen) was
+        // answered "Already checked in at this station" and printed nothing.
+        unmarkPrinted(name || '', id);
         return { ok: true, detail: '' };
       });
     });

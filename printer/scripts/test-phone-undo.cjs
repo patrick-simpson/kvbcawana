@@ -130,8 +130,8 @@ async function extensionSuite() {
   console.log('\nextension undo: the whole undo');
   {
     const run = async ({ posts, report, driven = true, rowSel }) => {
-      const env = { posted: 0, refreshed: 0, row: { classList: { removed: [], remove(c) { this.removed.push(c); } }, style: { display: 'none' } }, rowSel: null };
-      const fn = new Function('CHURCH_CFG', 'ensureFreshCheckinTokens', 'refreshCheckinTokens', 'postUndoCheckin', 'fetchCheckinReport', 'reportHasCheckin', 'document', 'console',
+      const env = { posted: 0, refreshed: 0, unmarked: [], row: { classList: { removed: [], remove(c) { this.removed.push(c); } }, style: { display: 'none' } }, rowSel: null };
+      const fn = new Function('CHURCH_CFG', 'ensureFreshCheckinTokens', 'refreshCheckinTokens', 'postUndoCheckin', 'fetchCheckinReport', 'reportHasCheckin', 'document', 'console', 'unmarkPrinted',
         UNDO_SAY_SRC + '\n' + extractFunction('undoCheckinOnTwoTimTwo') + '; return undoCheckinOnTwoTimTwo;')(
         { enableDrivenCheckin: driven },
         () => Promise.resolve(true),
@@ -140,12 +140,14 @@ async function extensionSuite() {
         () => Promise.resolve(report),
         new Function('nameKeyOf', extractFunction('reportHasCheckin') + '; return reportHasCheckin;')((n) => String(n || '').toLowerCase().trim()),
         { querySelector: (sel) => { env.rowSel = sel; return rowSel === false ? null : env.row; } },
-        { log() {} });
+        { log() {} },
+        (name, id) => env.unmarked.push(`${name}|${id}`));
       env.out = await fn('4821', 'Ava Stone');
       return env;
     };
     let e = await run({ posts: ['ok'], report: [{ clubberId: '77', name: 'Mia Reed' }] });
     check('TwoTimTwo says undone and its report agrees: ok', e.out.ok === true && e.posted === 1, JSON.stringify(e.out));
+    check('and this station forgets it printed them, so a check-in after the undo prints again', e.unmarked.join() === 'Ava Stone|4821', e.unmarked.join());
     check('and the child\'s row comes back on the check-in page', e.rowSel === '.clubber[recid="4821"]' && e.row.classList.removed.join() === 'checked-in' && e.row.style.display === '');
     e = await run({ posts: ['ok'], report: null });
     check('an unreadable report leaves TwoTimTwo\'s word standing', e.out.ok === true);
