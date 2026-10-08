@@ -4549,7 +4549,7 @@ function stripDayFromLedger(keys, day) {
 // lookup, the phone roster) — a missed exclusion at any of those sites means a
 // recognition print counts as a child, so they must all share this test.
 function isNonCheckinRow(e) {
-  return !!(e && (e.isAward || e.isConnectCard || e.isLeader));
+  return !!(e && (e.isAward || e.isConnectCard || e.isLeader || e.oneOff));
 }
 
 // ── Reprint a whole stretch of tonight (#257) ────────────────────────────────
@@ -4656,6 +4656,8 @@ function addHistoryEntry(entry) {
     // Leader name tags (POST /print-leader): an adult volunteer's tag, never a
     // child's check-in. Same exclusion everywhere via isNonCheckinRow().
     isLeader: !!entry.isLeader,
+    // A one-off name tag (7.18.0): printed and logged, never a check-in.
+    ...(entry.oneOff ? { oneOff: true } : {}),
     // TwoTimTwo's own clubber id, when the caller knew it. Everything here was
     // keyed on a lowercased "first last" string, so two children who share a
     // name merged into one row — the same defect the extension already fixed on
@@ -5579,6 +5581,28 @@ async function reprintRow(entry, printerName, opts = {}) {
   const effectivePrinter = (printerName && printerName.trim()) || entry.printer || PRINTER_NAME;
   const silent = opts.silent === true;
 
+  // A one-off name tag reprinted from the print log stays a one-off: the
+  // same plain tag again, a row that is still `oneOff` (never a check-in),
+  // and no welcome on the screens (a reprint never greets anyone).
+  if (entry.oneOff) {
+    let png = null;
+    try {
+      const result = await renderOneOffLabel(entry.firstName, entry.clubName);
+      png = result.pngPath;
+      await printLabel(png, effectivePrinter);
+      addHistoryEntry({ firstName: entry.firstName, lastName: '', clubName: entry.clubName, printer: effectivePrinter, success: true, oneOff: true });
+      console.log(`[reprint] one-off tag ${entry.firstName}`);
+      return { ok: true, name: entry.firstName, oneOff: true };
+    } catch (err) {
+      console.error('[reprint] Error:', err.message);
+      addHistoryEntry({ firstName: entry.firstName, lastName: '', clubName: entry.clubName, printer: effectivePrinter, success: false, oneOff: true });
+      recordPrintFailure(entry.firstName, entry.clubName, err.message);
+      return { ok: false, name: entry.firstName, error: err.message };
+    } finally {
+      if (png) fs.unlink(png, () => {});
+    }
+  }
+
   // A leader tag reprinted by index must come back out as a leader tag: the
   // kid path below would render allergy/birthday enrichment for a same-named
   // child and record an UNFLAGGED row — turning an adult's name tag into a
@@ -6067,6 +6091,84 @@ app.post('/leaders/forget', (req, res) => {
   const active = activeLeaders(leaders);
   console.log(`[leaders] ${removed ? 'Forgot' : 'No such remembered leader:'} '${key}'`);
   res.json({ ok: true, removed, leaders: active, hidden: leaders.length - active.length });
+});
+
+// ── One-off name tags (7.18.0, owner 2026-10-08) ──────────────────────────────
+// A name tag for a child that is NOT a check-in: a lost or torn tag, or a
+// child who is not checking in tonight (a sibling along for the night, a
+// guest). Typed first name + club (owner's choice: no roster lookup, so no
+// allergy or birthday line). The label is the club's stock label for that
+// name; the screens play the full welcome (a sealed `checkin` with
+// `oneOff: true`, which the lobby never counts and which never enters the
+// recap); the print log keeps a row marked `oneOff`, which isNonCheckinRow()
+// keeps out of every count, the attendance ledger, the still-here list and
+// the reconcile pass. Same route from the dashboard, the touch check-in and
+// the phone (relayed).
+function oneOffClub(raw) {
+  const want = clubKey(String(raw || ''));
+  if (!want) return '';
+  return CLUB_LIST.find((c) => clubKey(c) === want) || '';
+}
+async function renderOneOffLabel(firstName, clubName, testBanner = false) {
+  return generateLabel({
+    firstName, lastName: '', clubName,
+    footerText: labelFooterText(),
+    template: labelTemplateFor(clubName),
+    testBanner,
+  });
+}
+async function performOneOffPrint(input) {
+  const b = input || {};
+  const firstName = security.sanitizeStoredText(b.firstName || '', 40).replace(/\s+/g, ' ').trim();
+  if (!firstName) return { status: 400, body: { error: 'Type the child\'s first name.' } };
+  const clubName = oneOffClub(b.clubName);
+  if (!clubName) return { status: 400, body: { error: 'Pick the child\'s club.' } };
+  if (!isSafePrinterName(b.printerName)) return { status: 400, body: { error: 'invalid printer name' } };
+  const effectivePrinter = (b.printerName && String(b.printerName).trim()) || PRINTER_NAME;
+  // Rehearsal/demo: the TEST band, nothing recorded, nothing on the screens.
+  const isDemo = b.demo === true || b.demo === 'true' || isRehearsalActive();
+
+  // Namespaced, never a check-in's key; absorbs a double tap.
+  const dupKey = `oneoff:${firstName}:${clubName}`.toLowerCase();
+  if (!isDemo && isDuplicatePrint(dupKey)) {
+    console.log(`[print-oneoff] '${firstName}' (${clubName}) already printed within ${DUPLICATE_WINDOW_MS / 1000}s — duplicate suppressed`);
+    return { status: 200, body: { success: true, duplicate: true, firstName, clubName } };
+  }
+  if (!isDemo) claimPrint(dupKey);
+
+  let pngPath = null;
+  try {
+    const result = await renderOneOffLabel(firstName, clubName, isDemo);
+    pngPath = result.pngPath;
+    await playTuneIfEnabled(effectivePrinter);
+    await printLabel(pngPath, effectivePrinter);
+    if (isDemo) {
+      console.log(`[print-oneoff] Printed a TEST one-off tag for '${firstName}' — nothing recorded`);
+      return { status: 200, body: { success: true, demo: true, firstName, clubName } };
+    }
+    recordPrint(dupKey);
+    addHistoryEntry({ firstName, lastName: '', clubName, printer: effectivePrinter, success: true, oneOff: true });
+    // The welcome, never the count: no recap buffer, no tally change.
+    events.publish(pusher, EVENT_CHANNEL, 'checkin', events.buildCheckin({
+      firstName, club: clubName, isBirthday: false, isFirstTimer: false, oneOff: true,
+    }));
+    console.log(`[print-oneoff] ${firstName} — ${clubName}`);
+    return { status: 200, body: { success: true, firstName, clubName } };
+  } catch (err) {
+    console.error('[print-oneoff] Error:', err.message);
+    if (!isDemo) {
+      addHistoryEntry({ firstName, lastName: '', clubName, printer: effectivePrinter, success: false, oneOff: true });
+      recordPrintFailure(firstName, clubName, err.message);
+    }
+    return { status: 500, body: { error: err.message } };
+  } finally {
+    if (!isDemo) releasePrint(dupKey);
+    if (pngPath) fs.unlink(pngPath, () => {});
+  }
+}
+app.post('/print-oneoff', async (req, res) => {
+  const out = await performOneOffPrint(req.body);
+  res.status(out.status).json(out.body);
 });
 
 // One leader tag. Extracted from the route so "Print selected" can print a
@@ -9438,7 +9540,7 @@ module.exports = {
   // (awards, leader tags, failed rows, undone rows, the club filter, the
   // newest-row-per-child dedupe and the cap) is testable without printing.
   selectReprintRange, REPRINT_RANGE_MAX, REPRINT_RANGE_GAP_MS, sanitizeTouchContext,
-  dropOffTagFor, generateDropOffTag,
+  dropOffTagFor, generateDropOffTag, performOneOffPrint, oneOffClub,
   localDayISO, historyIdentityKey, clubKey,
   // Remembered leaders + the one club list every dropdown reads. Pure but for
   // their file, so the upsert/cap/season rules and the club-table agreement

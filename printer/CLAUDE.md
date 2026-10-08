@@ -238,6 +238,17 @@ judges the setup: `printerUnset`, `printerNotFound`, `printerOffline`
 status window read offline and receipt-like as PROBLEM.
 `scripts/test-label-printer.cjs`.
 
+**One-off name tags (7.18.0, owner 2026-10-08).** `POST /print-oneoff`
+{firstName, clubName} (typed name + a club from `CLUB_LIST`, no roster lookup)
+prints the club's stock label for that first name, logs a history row with
+`oneOff: true` (kept by `addHistoryEntry`; `isNonCheckinRow()` keeps it out of
+every count, attendance, the still-here list and the reconcile pass), and
+publishes a sealed `checkin` with `oneOff: true` (contract optional field):
+the screens welcome the child and never count them. Never into the recap
+buffer, no `publishTally()`. A reprint of a one-off (`reprintRow`) stays a
+one-off and greets nobody. The touch check-in, the phone's + menu (relayed:
+both allowlists carry it) and the dashboard all call the same route.
+
 **Custom labels never write history.** `POST /print-custom` prints one line of
 free text on a blank label and records nothing at all: no `addHistoryEntry`, no
 `recordAttendance`, no `publishTally`, no `events.publish*`. It is not a

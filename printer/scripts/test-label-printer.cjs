@@ -205,6 +205,44 @@ exit 0
     check('(a check-in with no schedule prints one label)', r.status === 200);
   }
 
+  origLog('label printer: one-off name tags');
+  {
+    const events = require(path.join(__dirname, '..', 'print-server', 'events.js'));
+    const sent = [];
+    const realPublish = events.publish;
+    events.publish = (pusher, channel, name, payload) => { sent.push({ name, payload }); return realPublish(pusher, channel, name, payload); };
+    const before = (await post('/phone/tonight', {})).body.checkedIn;
+    const histBefore = (await (await fetch(BASE + '/history/today')).json());
+    let n = jobs().length;
+    let r = await post('/print-oneoff', { firstName: '  Maddie ', clubName: 'sparks' });
+    check('a one-off tag prints on the label printer', r.status === 200 && r.body.success && jobs().length === n + 1 && r.body.firstName === 'Maddie' && r.body.clubName === 'Sparks', `${r.status} ${JSON.stringify(r.body)}`);
+    const ci = sent.filter((x) => x.name === 'checkin').pop();
+    check('the screens get the welcome, marked oneOff', ci && ci.payload.firstName === 'Maddie' && ci.payload.club === 'Sparks' && ci.payload.oneOff === true, JSON.stringify(ci));
+    check('and nothing else: no tally, no recap', !sent.some((x) => x.name === 'tally' || x.name === 'recap'), sent.map((x) => x.name).join(','));
+    const after = (await post('/phone/tonight', {})).body.checkedIn;
+    check('tonight\'s count does not move', after === before, `${before} -> ${after}`);
+    const hist = JSON.parse(fs.readFileSync(path.join(dataDir, 'print-history.json'), 'utf8'));
+    check('the print log keeps it, marked oneOff', hist[0] && hist[0].firstName === 'Maddie' && hist[0].oneOff === true && hist[0].success === true, JSON.stringify(hist[0]));
+    check('and it is not a check-in anywhere', server.isNonCheckinRow(hist[0]));
+    r = await post('/print-oneoff', { firstName: 'Maddie', clubName: 'Sparks' });
+    check('a double tap is absorbed', r.status === 200 && r.body.duplicate === true && jobs().length === n + 1, JSON.stringify(r.body));
+    r = await post('/print-oneoff', { firstName: '', clubName: 'Sparks' });
+    check('no name: 400 with the words', r.status === 400 && /first name/.test(r.body.error));
+    r = await post('/print-oneoff', { firstName: 'Ava', clubName: 'Narnia' });
+    check('no real club: 400 with the words', r.status === 400 && /club/.test(r.body.error));
+    r = await post('/print-oneoff', { firstName: 'Tess', clubName: 'T&T' });
+    check('T&T is a club', r.status === 200 && r.body.clubName === 'T&T', JSON.stringify(r.body));
+    // Reprinted from the print log, it stays a one-off and greets nobody.
+    sent.length = 0;
+    n = jobs().length;
+    r = await post('/reprint', { index: 0 });
+    const hist2 = JSON.parse(fs.readFileSync(path.join(dataDir, 'print-history.json'), 'utf8'));
+    check('a reprint of a one-off is a one-off again, with no welcome', r.status === 200 && jobs().length === n + 1 && hist2[0].oneOff === true && !sent.some((x) => x.name === 'checkin'), `${r.status} ${JSON.stringify(r.body)} ${JSON.stringify(hist2[0])}`);
+    check('(the count still has not moved)', (await post('/phone/tonight', {})).body.checkedIn === before);
+    events.publish = realPublish;
+    void histBefore;
+  }
+
   origLog('label printer: one reprint run at a time');
   {
     fs.writeFileSync(path.join(binDir, 'slow'), '');
