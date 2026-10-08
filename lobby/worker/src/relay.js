@@ -25,6 +25,7 @@ export const RELAY_ROUTES = Object.freeze([
   ['POST', /^\/phone\/visitor$/],
   ['POST', /^\/print-leader$/],
   ['POST', /^\/print-custom$/],
+  ['POST', /^\/print-oneoff$/],
   ['POST', /^\/leaders$/],
   ['POST', /^\/leaders\/forget$/],
   ['POST', /^\/clubs$/],
