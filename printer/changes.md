@@ -1,4 +1,13 @@
-﻿## [7.16.0] - 2026-10-08
+﻿## [7.16.1] - 2026-10-08
+The Trek & Journey check-in page no longer offers children who are already in.
+
+**The phone's list agrees with the count.** The phone pages (the youth page at /phone/ym and awana.kvbchurch.org/checkin/ym, and the full phone page) decided who was already checked in from the labels this laptop printed, by exact name. The count every screen shows reads TwoTimTwo's own check-in report. So a child checked in at the desk or on TwoTimTwo itself, a label that failed to print, or a name with a double space in it was still offered, and tapping them did nothing (the laptop sees them already in). The list now reads the same children the count does, matched on their TwoTimTwo id as well as their name, and a child checked out tonight is not offered again.
+
+**A label printed without a TwoTimTwo id no longer reads as undone.** When the report arrived, a child whose label had been printed with only a name (a walk-in, or a print before the roster knew them) was marked as not checked in, all evening, although TwoTimTwo listed them.
+
+**The phone page itself.** A check-in the laptop refuses puts the child back on the list (it used to hide them until the page was reloaded). A list refresh asked just before a check-in was confirmed no longer puts that child back for a few seconds. And when the laptop stops answering, a note under the search box says the list may be out of date, instead of nothing.
+
+## [7.16.0] - 2026-10-08
 Who is still here at pickup, and a Check out button on the phone.
 
 **New: the print app keeps the lobby's still-here list.** From 7:30 the lobby screens list the children not yet picked up and say "… has checked out" as each one leaves. TwoTimTwo's own Checkout page lists nobody at KVBC (its check-out tracking is off), so the list the extension used to read from it was always empty. The print app now builds the list itself from tonight's count: the children here now, by first name and club, sealed like every other name. It is sent every minute on a club night and within seconds of any change (a label, a check-out, an undo, a fresh TwoTimTwo report, a change of clubs).

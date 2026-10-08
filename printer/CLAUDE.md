@@ -144,6 +144,13 @@ a shorter list never puts a child back); `authoritativeTonight()` leaves those
 ids out in both modes and reports `checkedOut`, so `checkedIn` everywhere means
 "here now". The attendance ledger is untouched.
 The `tally` payload shape is unchanged and must stay so.
+**The phone's roster reads the same children (7.16.1).** `/phone/roster`'s
+`checkedIn` comes from `rosterCheckedInKeys()`: every identity key the count
+reads (`tonightHereNow()`), this printer's active rows, and anyone checked out
+tonight, matched on the CSV's `ClubberID` and the normalised name. It used to
+read only this printer's rows by exact name, so the youth page offered children
+checked in at the desk or on TwoTimTwo. The report pass matches a row WITH an
+id on its id only, and a name-only row on the report entry's name too.
 
 **The brand kit (6.17.0, shout face Paytone One since 6.18.0).**
 `print-server/public/brand/` is a byte-identical
