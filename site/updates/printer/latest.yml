@@ -1,8 +1,8 @@
-version: 7.15.0
+version: 7.16.0
 files:
-  - url: https://github.com/patrick-simpson/kvbcawana/releases/download/printer-v7.15.0/Club-Label-Printer-Setup.exe
-    sha512: bpEtM5LovXI+0u3J+Pj4mgZBUWV/Mos/pBpj/gAvKE5wasbzJhF7WZWGYd8gFdQbdKxGJcSRFlQDGaAbFhOHzg==
-    size: 245747060
-path: https://github.com/patrick-simpson/kvbcawana/releases/download/printer-v7.15.0/Club-Label-Printer-Setup.exe
-sha512: bpEtM5LovXI+0u3J+Pj4mgZBUWV/Mos/pBpj/gAvKE5wasbzJhF7WZWGYd8gFdQbdKxGJcSRFlQDGaAbFhOHzg==
-releaseDate: '2026-10-07T23:46:55.192Z'
+  - url: https://github.com/patrick-simpson/kvbcawana/releases/download/printer-v7.16.0/Club-Label-Printer-Setup.exe
+    sha512: nkTtTlBs6z0atJQZnHIgiZAHYOKso5zSSlXUnzQT3r+Ms248cyJL1C3+eU1XQ0UwH8BtpVnM/DQLxvym9/d3Fg==
+    size: 245755104
+path: https://github.com/patrick-simpson/kvbcawana/releases/download/printer-v7.16.0/Club-Label-Printer-Setup.exe
+sha512: nkTtTlBs6z0atJQZnHIgiZAHYOKso5zSSlXUnzQT3r+Ms248cyJL1C3+eU1XQ0UwH8BtpVnM/DQLxvym9/d3Fg==
+releaseDate: '2026-10-08T01:32:13.607Z'
