@@ -248,6 +248,16 @@ Read this first if you are picking the work up in a new session.
   report has no edit link per row, only the undo control (`undoCheckin(id)`),
   which now identifies the child. Still to do: the shadow night itself,
   holding the Worker's count against the laptop's on a Wednesday.
+- **Phase 4, the phone page, built early (owner, 2026-10-11).** A test
+  check-in of one child through the Worker worked on the live site (and was
+  undone). awana.kvbchurch.org/checkin now checks in through the Worker, laptop
+  on or off, with Bible and Brought a friend as ticked (item labels read off
+  TwoTimTwo's check-in page, each sent only for the clubs it applies to). With
+  the laptop on, the Worker tells it to print the tag at once (printer 7.20.0's
+  job route; one tag a night, see printer/CLAUDE.md); with it off the child is
+  checked in with no tag, and the roster and Tonight come from TwoTimTwo.
+  Undo, check-out, visitors and custom labels still go to the laptop.
+  `CLOUD_CHECKIN = "off"` puts the check-in back on the laptop.
 - **To start the shadow night:** add the three GitHub secrets, then **Actions
   → CI → Run workflow** with "Redeploy the sync Worker" ticked (a Worker only
   gets new secrets when it deploys). Before Wednesday, on any lobby screen signed

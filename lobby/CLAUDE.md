@@ -1565,7 +1565,13 @@ setup guide and the API. The owner's calls:
   would, and keeps counts at `GET /v1/cloud/status`. TwoTimTwo's terms: never
   faster than 15 s, everything encrypted (no password or cookie at rest, no
   names stored, ids sealed), no vendor support. `CLOUD_CHECKIN` in
-  `wrangler.toml` switches it (`shadow` / `off`).
+  `wrangler.toml` switches it (`shadow` / `off`). Since 2026-10-11 the online
+  phone page checks in through it too (`worker/src/phone.js`): the Worker
+  answers the relayed POST /phone/checkin and its status itself, queues a
+  print JOB for the laptop when it is online (`Relay.enqueueJob`, never a page
+  route), and answers /phone/roster and /phone/tonight from TwoTimTwo while
+  the laptop is off. `CLOUD_CHECKIN = "off"` sends everything to the laptop
+  again.
 - **Gates:** the Worker's tests run in `ci.yml`'s `worker` job
   (`npx vitest run --config worker/vitest.config.js`), not this app's vitest
   (the root vitest excludes `worker/**`; the root lint covers it). Its relay
