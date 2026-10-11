@@ -50,7 +50,8 @@ import { birthdayRibbon } from './lib/birthdayWeek.js';
 import { autoParticleEffect, weatherMood } from './lib/weather.js';
 import { useCelebrationQueue } from './hooks/useCelebrationQueue.js';
 import { timedFetch } from './lib/timedFetch.js';
-import { CLOCK_SKEW_TOLERANCE_MS, stampOf, stampReceived } from './lib/freshness.js';
+import { CLOCK_SKEW_TOLERANCE_MS, isFresh, stampOf, stampReceived } from './lib/freshness.js';
+import { COUNT_WATCH_START, countsWithoutNamesNow, nameArrived, watchCounts } from './lib/countsWithoutNames.js';
 import { leavesFor, listFresh } from './lib/checkoutLeaves.js';
 import { useCheckoutBanners } from './hooks/useCheckoutBanners.js';
 import {
@@ -77,7 +78,7 @@ import { useTallerThan } from './hooks/useTallerThan.js';
 import { isEmbedded } from './lib/embed.js';
 import { isConfigureMode, listenForRelay, relayToScreen } from './lib/configureRelay.js';
 import { BACKGROUND_VIDEO_CHANGED_EVENT } from './components/VideoBackground.jsx';
-import { BOARD_DEMO_MS, BUILD_QUIET_MS, SHARE_DEBOUNCE_MS, COUNTS_WITHOUT_NAMES_MS, DROPPED_GRACE_MS, EMBED_FULLSCREEN_MESSAGE, GEAR_IDLE_MS, LAYER_FAULT_SHOW_MS, MILESTONE_TOAST_MS, OPS_FAILURES_MAX, SETUP_CARD_QUIET_MS } from './lib/constants.js';
+import { BOARD_DEMO_MS, BUILD_QUIET_MS, SHARE_DEBOUNCE_MS, COUNTS_WITHOUT_NAMES_MS, TONIGHT_STALE_MS, DROPPED_GRACE_MS, EMBED_FULLSCREEN_MESSAGE, GEAR_IDLE_MS, LAYER_FAULT_SHOW_MS, MILESTONE_TOAST_MS, OPS_FAILURES_MAX, SETUP_CARD_QUIET_MS } from './lib/constants.js';
 
 // Read once — the URL can't change without a full page load.
 const FLAGS = parseUrlFlags();
@@ -924,19 +925,33 @@ export default function App() {
   // missing its key, it publishes nothing on the name events, so this screen
   // sees a climbing tally and no banners. Without this, that is indistinguishable
   // from a quiet night, and the one-pager would send nobody anywhere.
-  const [countsWithoutNames, setCountsWithoutNames] = useState(false);
-  useEffect(() => {
-    // `lastCheckinAt` only advances when a checkin actually OPENED and passed
-    // its sanitizer, so it is the honest "names are reaching this screen" signal.
-    const climbing = (tonight?.checkedIn || 0) > 0;
-    // Always resolve through a timer, never synchronously: the clear case is
-    // just a zero-delay check, which keeps this out of the render path.
-    const check = () => setCountsWithoutNames(
-      climbing && !nameFault
-      && (!lastCheckinAt || Date.now() - lastCheckinAt > COUNTS_WITHOUT_NAMES_MS));
-    const timer = setTimeout(check, climbing && !nameFault ? COUNTS_WITHOUT_NAMES_MS : 0);
-    return () => clearTimeout(timer);
-  }, [tonight?.checkedIn, lastCheckinAt, nameFault]);
+  // Only a rise this screen SEES, unnamed (src/lib/countsWithoutNames.js): a
+  // replayed frame from last club night, or a screen opened after the names
+  // went by, is not the fault.
+  const [countWatch, setCountWatch] = useState(COUNT_WATCH_START);
+  const [watchedTonight, setWatchedTonight] = useState(null);
+  if (tonight !== watchedTonight) {
+    setWatchedTonight(tonight);
+    if (tonight) {
+      setCountWatch(watchCounts(countWatch, {
+        count: tonight.checkedIn || 0,
+        fresh: isFresh(stampOf(tonight), TONIGHT_STALE_MS, tonight.receivedAt ?? tonightNow),
+        now: tonight.receivedAt ?? tonightNow,
+        lastNameAt: lastCheckinAt,
+      }));
+    }
+  }
+  const [watchedNameAt, setWatchedNameAt] = useState(lastCheckinAt);
+  if (lastCheckinAt !== watchedNameAt) {
+    setWatchedNameAt(lastCheckinAt);
+    if (lastCheckinAt) setCountWatch(nameArrived(countWatch));
+  }
+  const countsWithoutNames = countsWithoutNamesNow(countWatch, {
+    now: tonightNow,
+    afterMs: COUNTS_WITHOUT_NAMES_MS,
+    fresh: isFresh(stampOf(tonight), TONIGHT_STALE_MS, tonightNow),
+    nameFault: Boolean(nameFault),
+  });
 
   // Layer-fault ledger. Every stage layer sits behind an ErrorBoundary keyed on
   // boardNow, so a crashed layer is retried every 30 s instead of being fenced

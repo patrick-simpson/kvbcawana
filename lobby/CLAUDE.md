@@ -1608,6 +1608,16 @@ so a child sees the number move within a second of their own check-in.
   Settings preview this one IS on the wire, because the printer is the one
   that knows; an older screen drops the field, ticks once, and the next tally
   takes it back. `App.tally.test.jsx` pins it.
+- **"COUNTS RISING, NO NAMES — CHECK THE PRINTER"** (the sticker's alarm for a
+  print server that publishes counts but not the sealed names) fires only on a
+  rise THIS screen sees in fresh `tonight` frames with no name following for
+  `COUNTS_WITHOUT_NAMES_MS` (`src/lib/countsWithoutNames.js`: the first fresh
+  frame is a baseline, a stale one is ignored, a name within `NAME_SLACK_MS`
+  before the rise covers it, any name clears it). It used to read any count
+  above zero with no name for six minutes as the fault, so the Worker's replay
+  of last Wednesday's `tonight` frame put it up on every screen on a Sunday
+  (owner, 2026-10-11), and a screen opened mid-evening showed it too.
+  `App.countsWithoutNames.test.jsx` pins both and the real fault.
 - Apart from `oneOff`, nothing about the wire changed for the counter; the
   `checkin`/`tally` sanitizers are otherwise as they were. The existing "synced with the
   check-in desk" note still explains a correction bigger than one either way.
