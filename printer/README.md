@@ -8,7 +8,7 @@ When a child checks in during club, automatically print a 4" × 2" label to your
 
 ## Quick Start — Download the Installer (Recommended)
 
-**[👉 Download Club-Label-Printer-Setup.exe](https://github.com/patrick-simpson/Print-TwoTimTwo-Labels/releases/latest/download/Club-Label-Printer-Setup.exe)**
+**[👉 Download Club-Label-Printer-Setup.exe](https://awana.kvbchurch.org/download/club-label-printer)**
 
 1. Download the `.exe` file (if SmartScreen shows "Windows protected your PC", click **More info → Run anyway**)
 2. Double-click to install (one-click, per-user, no admin needed)
@@ -40,7 +40,7 @@ The app imports your printer, check-in URL, and roster automatically on first ru
 If you prefer the terminal-based setup or need a portable version:
 
 ### Step 1: Download
-Download `install-and-run.ps1` from the [GitHub releases](https://github.com/patrick-simpson/Print-TwoTimTwo-Labels/releases) or [directly from the repo](https://raw.githubusercontent.com/patrick-simpson/Print-TwoTimTwo-Labels/main/install-and-run.ps1).
+Copy `install-and-run.ps1` from this folder (`printer/`). Retired: the one-line `irm https://awana.kvbchurch.org/install.ps1 | iex` now installs the Windows app above instead, since the old Print-TwoTimTwo-Labels repo it used to fetch from is archived.
 
 ### Step 2: Run
 Right-click `install-and-run.ps1` → **Run with PowerShell**
@@ -184,7 +184,7 @@ GitHub Actions automatically:
 - Creates a GitHub Release
 - Attaches `Club-Label-Printer-Setup.exe` to it
 
-Users download from: **https://github.com/patrick-simpson/Print-TwoTimTwo-Labels/releases/latest**
+Users download from: **https://awana.kvbchurch.org/download/club-label-printer** (the newest release in `site/updates/printer/latest.yml`)
 
 To test the build without releasing, go to **Actions** → **Build Electron App** → **Run workflow** and select your branch.
 

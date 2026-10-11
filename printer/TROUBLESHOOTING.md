@@ -279,7 +279,7 @@ If none of these solutions work:
    - Browser console errors (F12 → Console tab)
    - Windows printer name (Settings → Printers & scanners)
 
-2. **Check the GitHub issues:** https://github.com/patrick-simpson/Print-TwoTimTwo-Labels/issues
+2. **Check the GitHub issues:** https://github.com/patrick-simpson/kvbcawana/issues
    - Your issue might already be documented
 
 3. **Create a new issue** with the information above

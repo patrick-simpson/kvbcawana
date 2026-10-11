@@ -5,7 +5,6 @@ import { Icon } from './family/Icons';
 type ConnectionStatus = 'idle' | 'checking' | 'connected' | 'error';
 
 const INSTALLER_URL = 'https://awana.kvbchurch.org/download/club-label-printer';
-const LEGACY_INSTALL_CMD = "powershell -ExecutionPolicy Bypass -Command 'irm https://awana.kvbchurch.org/install.ps1 | iex'";
 
 const Step: React.FC<{ n: number; title: string; children: React.ReactNode }> = ({ n, title, children }) => (
   <li className="lbl-install__step">
@@ -20,17 +19,8 @@ const Code: React.FC<{ children: React.ReactNode }> = ({ children }) => (
 );
 
 export const InstallGuide: React.FC = () => {
-  const [copied, setCopied] = useState(false);
   const [connStatus, setConnStatus] = useState<ConnectionStatus>('idle');
   const [connDetail, setConnDetail] = useState('');
-
-  const copyCmd = async () => {
-    try {
-      await navigator.clipboard.writeText(LEGACY_INSTALL_CMD);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch { /* clipboard unavailable */ }
-  };
 
   const testConnection = async () => {
     setConnStatus('checking');
@@ -92,22 +82,10 @@ export const InstallGuide: React.FC = () => {
               If Windows asks about network access after setup, click <strong>Allow</strong>. That’s what lets
               phones on your Wi-Fi use phone check-in, once you turn it on and set a PIN.
             </p>
-            <details className="fam-hood lbl-legacy">
-              <summary><svg className="fam-hood__chev" aria-hidden="true" focusable="false"><use href="#i-chev" /></svg>Previous install method (PowerShell script, deprecated)</summary>
-              <div className="fam-hood__body">
-                <p>
-                  Existing script installs at <Code>C:\output</Code> keep working and are imported
-                  automatically the first time you run the new app. To install the old way anyway, paste this
-                  into PowerShell:
-                </p>
-                <div className="lbl-cmd">
-                  <code className="lbl-cmd__text">{LEGACY_INSTALL_CMD}</code>
-                  <button type="button" onClick={copyCmd} className="lbl-cmd__copy" aria-label={copied ? 'Copied' : 'Copy command'}>
-                    <Icon name={copied ? 'check' : 'copy'} />
-                  </button>
-                </div>
-              </div>
-            </details>
+            <p className="lbl-small">
+              Set up with the old PowerShell script at <Code>C:\output</Code>? Install the app above: it
+              imports that install automatically the first time it runs.
+            </p>
           </Step>
 
           <Step n={2} title="Load the browser extension">

@@ -3,7 +3,7 @@
 This document pins the payload schemas for every event on the shared Pusher
 channel **`awana-channel`**. The **print server in this repo is the ONLY
 publisher** (it holds the Pusher secret); the consumer is
-[Awana-Check-in-Display](https://github.com/patrick-simpson/Awana-Check-in-Display) —
+the lobby app ([`lobby/`](../lobby/) in this repo, was Awana-Check-in-Display) —
 both its signage page and its presentation page (`/countdown.html`, which
 absorbed the retired KVBC-Awana-Countdown app) — subscribing with the
 public key only.
@@ -227,7 +227,7 @@ exact key sets, correct types, PII structurally impossible, plus the
 
 1. Update `contract-vectors.json` **here first** (canonical copy).
 2. Update the builders + `test-contracts.cjs`, keep them green.
-3. Mirror the vectors file byte-identical into Awana-Check-in-Display
+3. Mirror the vectors file byte-identical into `lobby/` (was Awana-Check-in-Display; `scripts/check-mirrors.mjs` fails until you do)
    (`src/lib/__fixtures__/contract-vectors.json`) and update its
    sanitizers/tests in the same change.
 4. New fields must be optional for consumers for at least one release cycle so

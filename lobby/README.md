@@ -7,7 +7,7 @@
 > [TRADEMARKS.md](TRADEMARKS.md) before reusing anything here, especially
 > the bundled club artwork.
 
-**About page:** a plain-language tour of what this display does, for church leadership — <https://patrick-simpson.github.io/Awana-Check-in-Display/about.html>
+**About page:** a plain-language tour of what this display does, for church leadership — <https://awana.kvbchurch.org/>
 
 A joyful welcome screen for your Awana club, styled after the official Awana Clubs catalog — chunky rounded type, sparkle doodles, wavy shapes and the catalog's warm orange. Runs full-screen on a TV or projector, loops your PowerPoint in the background, and reacts to each child's check-in with a celebratory banner, confetti, and an optional chime.
 
@@ -37,7 +37,7 @@ pledges), per-club game-time screens with live check-in counts and
 birthday shout-outs, a closing slide, and a shutdown view — all driven
 by a pure, tested schedule engine over `shared/schedule.json`.
 
-- **URL:** `https://<owner>.github.io/Awana-Check-in-Display/countdown.html`
+- **URL:** `https://awana.kvbchurch.org/lobby/countdown` (also `/projector`)
 - **Source:** `src/presentation/` (fully isolated from the signage app;
   it shares only the sanitized Pusher socket and the device config store)
 - **Time-travel QA:** append `?now=2026-09-16T18:04:00` (any ISO
@@ -262,7 +262,7 @@ device's own clock and timezone — keep the TV's clock right.
 
 ## 5. Point your check-in system at Pusher
 
-**Using the [Awana Label Printer](https://github.com/patrick-simpson/Print-TwoTimTwo-Labels)?**
+**Using the [Awana Label Printer](../printer/)?**
 It broadcasts automatically: on its dashboard (`http://localhost:3456`) →
 Settings → Pusher Integration, enter the same Pusher app's App ID, Key,
 Secret, and Cluster, then click **Test Welcome Screen** — a "Test" banner

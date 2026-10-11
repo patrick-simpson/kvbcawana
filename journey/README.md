@@ -177,7 +177,7 @@ always loads the deployed site, not a local file. To change the
 schedule for real:
 
 1. On any computer (doesn't need to be the Pi), go to
-   https://github.com/patrick-simpson/Journey-Display/blob/main/public/src/schedule.js
+   https://github.com/patrick-simpson/kvbcawana/blob/main/journey/public/src/schedule.js
 2. Click the pencil (✏️) icon in the top right to edit the file
    directly in your browser — no need to clone the repository
 3. Find these lines near the top:

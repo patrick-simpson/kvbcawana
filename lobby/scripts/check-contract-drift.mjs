@@ -1,5 +1,5 @@
 // Guards the mirrored fixtures. Their canonical copies live in the printer repo
-// (Print-TwoTimTwo-Labels — the sole publisher); this repo carries byte-identical
+// (printer/ in kvbcawana, was Print-TwoTimTwo-Labels — the sole publisher); this repo carries byte-identical
 // mirrors that its tests run against. Drift is created by a *printer-repo* push,
 // which this repo's push-triggered CI never sees — hence the weekly cron in
 // ci.yml.
@@ -29,7 +29,7 @@ import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 
 const RAW_BASE =
-  'https://raw.githubusercontent.com/patrick-simpson/Print-TwoTimTwo-Labels/main';
+  'https://raw.githubusercontent.com/patrick-simpson/kvbcawana/main/printer';
 
 const MIRRORS = [
   {

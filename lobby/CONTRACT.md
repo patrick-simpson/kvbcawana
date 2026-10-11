@@ -1,7 +1,7 @@
 # Awana Event Bus Contract v2 (mirror)
 
 **The canonical copy of this contract lives in the printer repo:**
-[Print-TwoTimTwo-Labels → CONTRACT.md](https://github.com/patrick-simpson/Print-TwoTimTwo-Labels/blob/main/CONTRACT.md),
+[`printer/CONTRACT.md`](../printer/CONTRACT.md) (was Print-TwoTimTwo-Labels),
 alongside the machine-readable `contract-vectors.json`, which is mirrored
 byte-identical here as `src/lib/__fixtures__/contract-vectors.json`.
 If you change anything, update the canonical copy first, then the mirrors

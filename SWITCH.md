@@ -69,7 +69,9 @@ it.
   `PUSHER_*` secrets and the `PUSHER_APP_KEY` / `PUSHER_CLUSTER` variables
   here (the next deploy deletes the Worker's own copies, and the site has
   built without a Pusher key since that day), then delete the Pusher app.
-- Archive the three old repos (read-only; their Journey video release keeps
-  serving the lesson videos, which `journey/public/src/schedule.js` still reads).
+- Archive the three old repos (done 2026-10-11; read-only, their releases and
+  github.io sites stay up as they were, and nothing reads from them: the
+  lesson videos come from this repo's `journey-videos-v2` release). Nothing is
+  ever published from them again; every change lands here.
 - A screen nobody remembered keeps showing the old site, which stops getting
   check-ins once Pusher is off: open awana.kvbchurch.org on it.

@@ -50,8 +50,14 @@ commits or files.
   events and sanitizers as the Pusher design). The Pusher keys are cleared and
   the printer relays every frame to the Worker; the Pusher publisher code
   stays until switch day's cleanup.
-- Until switch day (`SWITCH.md`) the church's screens and installed apps may
-  still run on the old repos' github.io sites and releases.
+- **The three old repos are archived** (2026-10-11, after switch day): every
+  screen runs on awana.kvbchurch.org and both installed apps update from its
+  feeds (their bridge releases, printer 6.22.0 and sound room 1.1.0, went out
+  on 2026-10-01). Never work in Print-TwoTimTwo-Labels, Awana-Check-in-Display
+  or Journey-Display: all work lands in this repo's folders (a session that
+  started in the old lobby repo on 2026-10-11 had to be ported here). Their
+  github.io sites still serve the last build, and nothing reads from them (the
+  lesson videos come from this repo's own `journey-videos-v2` release).
 - `AUDIT-2026-10-04.md` is the stability and performance audit; its status
   section says what was fixed on 2026-10-04/05 and what is deferred.
 
@@ -63,7 +69,8 @@ commits or files.
    `/journey`, `/api`).
 3. Pusher replaced by the Worker's own live channel (done 2026-10-03).
 4. Every installed app repointed (printer and sound room update feeds, the Pi
-   kiosk, Journey's embed, cross-links), one last release from each old repo.
+   kiosk, Journey's embed, cross-links), one last release from each old repo
+   (done by 2026-10-03).
 5. A full rehearsal, then ONE switch day (`SWITCH.md` is the runbook) the owner
    picks (never a Wednesday). OBS / ProPresenter feeds carry the passphrase in
    their link (owner's choice). No forwarding from the old github.io addresses.

@@ -1,4 +1,9 @@
-﻿## [7.18.1] - 2026-10-08
+﻿## Website - 2026-10-11
+The old one-line PowerShell install now installs the Windows app.
+
+**The old repos are archived (owner).** `irm https://awana.kvbchurch.org/install.ps1 | iex` used to download the PowerShell script install from Print-TwoTimTwo-Labels, which is now read-only: it would have installed code that can never update and predates the sync service. The command now downloads and starts the Club Label Printer app from the site's download link instead, and the install guide no longer offers the script install (it says the app imports an old `C:\output` install by itself). No app release: nothing in `print-server/` or `electron-app/` changed. The download, issues and contract links in the docs, and the prompt the ideas page builds, now name this repo (kvbcawana) instead of the archived ones.
+
+## [7.18.1] - 2026-10-08
 The drop-off card says GO TO.
 
 **Nothing on a late arrival's labels says "late" (owner).** The family's drop-off card now reads GO TO and the time across the top, instead of LATE DROP-OFF, and a single child's card no longer repeats GO TO above the room. The child's own name tag was already identical to every other child's (no "Go to" line on it since 7.17.0), so nothing they wear singles them out.

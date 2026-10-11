@@ -632,10 +632,10 @@
 
       var APP_NAME = { P: 'Printer', D: 'Display', J: 'Journey', B: 'Both' };
       var REPO_FOR = {
-        P: 'github.com/patrick-simpson/Print-TwoTimTwo-Labels',
-        D: 'github.com/patrick-simpson/Awana-Check-in-Display',
-        J: 'github.com/patrick-simpson/Journey-Display',
-        B: 'more than one repo (see build notes)'
+        P: 'printer/',
+        D: 'lobby/',
+        J: 'journey/',
+        B: 'more than one folder (see build notes)'
       };
       var FEAS_NAME = { V: 'Verified', L: 'Likely', N: 'Needs check' };
 
@@ -815,9 +815,9 @@
 
       // ── Build the prompt from the checked ideas ─────────────────────────────
       var REPO_RULES = {
-        P: 'Print-TwoTimTwo-Labels (Club Label Printer): follow CLAUDE.md\'s mandatory checklist. Bump the version with node scripts/bump-version.cjs when server.js or install-and-run.ps1 change (and regenerate the print-server/ and electron-app/ lockfiles), add a changes.md entry at the top, run the relevant npm test:* suites, npm run build, commit, push, open a PR to main, merge when CI is green, and cut the release via the create-release-tag.yml workflow when electron-app/ or print-server/ changed. Never break the privacy rules: sealed events fail closed, printing is never gated on the pipe, /health warnings are {type, message} objects, config writes go through applySavedConfig / config-store.js.',
-        D: 'Awana-Check-in-Display: every change is committed and pushed to main (the deploy workflow redeploys on push). Every Pusher payload passes its allowlist sanitizer in src/lib/eventSanitizers.js (first names only), the display key and tokens never enter VALIDATORS in useConfig.js, every animated signage component uses M from src/lib/motion.jsx, and src/presentation/ obeys the import isolation rule. Extend the vitest suites and the Playwright specs the idea names; keep coverage thresholds green. Presentation schedule-engine changes need matching schedule.test.js cases and the ?now= boundary checks.',
-        J: 'Journey-Display: plain HTML/CSS/JS only, no framework or build step (Raspberry Pi Zero). Commit and push to main (Pages redeploys; remember the 10-minute Pages cache when verifying on the kiosk). Honor CLAUDE.md: acknowledge first and hit the network later, store-before-evict for cached bundles, the lastPhase invariant, memory hygiene for video/blob/iframe teardown, the licensing boundary on lesson media, and never re-raise the declined bulk video mirror.'
+        P: 'printer/ (Club Label Printer): follow printer/CLAUDE.md\'s mandatory checklist. Bump the version with node scripts/bump-version.cjs when server.js or install-and-run.ps1 change (and regenerate the print-server/ and electron-app/ lockfiles), add a changes.md entry at the top, run the relevant npm test:* suites, npm run build, commit and push to main, and cut the release via the root printer-release.yml workflow when electron-app/ or print-server/ changed. Never break the privacy rules: sealed events fail closed, printing is never gated on the pipe, /health warnings are {type, message} objects, config writes go through applySavedConfig / config-store.js.',
+        D: 'lobby/ (lobby signage and projector): every change is committed and pushed to main (the root ci.yml checks it and redeploys the site). Every Pusher payload passes its allowlist sanitizer in src/lib/eventSanitizers.js (first names only), the display key and tokens never enter VALIDATORS in useConfig.js, every animated signage component uses M from src/lib/motion.jsx, and src/presentation/ obeys the import isolation rule. Extend the vitest suites and the Playwright specs the idea names; keep coverage thresholds green. Presentation schedule-engine changes need matching schedule.test.js cases and the ?now= boundary checks.',
+        J: 'journey/ (Journey kiosk): plain HTML/CSS/JS only, no framework or build step (Raspberry Pi Zero). Commit and push to main (the root ci.yml redeploys the site). Honor CLAUDE.md: acknowledge first and hit the network later, store-before-evict for cached bundles, the lastPhase invariant, memory hygiene for video/blob/iframe teardown, the licensing boundary on lesson media, and never re-raise the declined bulk video mirror.'
       };
 
       function buildPrompt() {
@@ -829,12 +829,12 @@
         });
         var lines = [];
         lines.push('I want to build the following ' + picked.length + ' feature' + (picked.length === 1 ? '' : 's') + ' across my Awana apps.');
-        lines.push('Repos: label printer ' + REPO_FOR.P + ', check-in display ' + REPO_FOR.D + ', Journey kiosk ' + REPO_FOR.J + '.');
+        lines.push('Repo: github.com/patrick-simpson/kvbcawana, one repo with a folder per app: label printer ' + REPO_FOR.P + ', check-in display ' + REPO_FOR.D + ', Journey kiosk ' + REPO_FOR.J + '. The old Print-TwoTimTwo-Labels, Awana-Check-in-Display and Journey-Display repos are archived: never work in them.');
         lines.push('');
         lines.push('How to work:');
-        lines.push('- Read each repo\'s CLAUDE.md first and follow it; the build notes below were written against the code as of 2026-09-08, so re-verify file paths and function names before editing.');
-        lines.push('- For each feature, confirm the approach against the current code, then implement it fully: code, tests, docs, and the repo\'s commit/push/PR conventions. If a "Needs check" item turns out infeasible, say so and stop on that item rather than improvising around a privacy or licensing rule.');
-        lines.push('- Work the features in the order listed, one commit per feature (or per repo per feature for cross-repo items), and finish with a short summary of what landed and what was verified.');
+        lines.push('- Read the root CLAUDE.md and each app folder\'s CLAUDE.md first and follow them; the build notes below were written against the code as of 2026-09-08, so re-verify file paths and function names before editing.');
+        lines.push('- For each feature, confirm the approach against the current code, then implement it fully: code, tests, docs, and the repo\'s commit/push conventions. If a "Needs check" item turns out infeasible, say so and stop on that item rather than improvising around a privacy or licensing rule.');
+        lines.push('- Work the features in the order listed, one commit per feature (or per app per feature for cross-app items), and finish with a short summary of what landed and what was verified.');
         lines.push('- Never relax a privacy invariant: only first names, counts and dates ever reach a screen; encrypted events stay encrypted; secrets stay out of exported config.');
         lines.push('');
         ['P', 'D', 'J'].forEach(function (k) { if (apps[k]) { lines.push('Repo rules, ' + APP_NAME[k] + ': ' + REPO_RULES[k]); lines.push(''); } });

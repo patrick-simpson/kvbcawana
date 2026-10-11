@@ -3,7 +3,7 @@
 ## 1. Print server (the main laptop)
 
 Install the Windows app: download **Club-Label-Printer-Setup.exe**
-from the [latest release](https://github.com/patrick-simpson/Print-TwoTimTwo-Labels/releases/latest),
+from the [download link](https://awana.kvbchurch.org/download/club-label-printer),
 run it (SmartScreen: *More info → Run anyway*), pick your printer and
 check-in URL. The app lives in the system tray, hosts the full server
 on port **3456**, starts with Windows, auto-updates, and can print a

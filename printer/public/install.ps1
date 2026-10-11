@@ -1,39 +1,34 @@
-# Club Label Print Server -- Bootstrap Installer
+# Club Label Printer -- one-line installer
 # Usage: irm https://awana.kvbchurch.org/install.ps1 | iex
 #
-# Downloads and runs the full installer, targeting c:\output as the install directory.
+# This used to download the old PowerShell install from the Print-TwoTimTwo-Labels
+# repo. That repo is archived (2026-10-11): the script install it fetched can no
+# longer update, and it predates the sync service every screen now uses. So this
+# command now installs the current Windows app instead, from the same link as the
+# Download button on awana.kvbchurch.org. The app finds an old C:\output install
+# and imports it the first time it runs.
 
 $ErrorActionPreference = "Stop"
-$InstallDir = "c:\output"
+$InstallerUrl = "https://awana.kvbchurch.org/download/club-label-printer"
+$InstallerPath = Join-Path $env:TEMP "Club-Label-Printer-Setup.exe"
 
 Write-Host ""
 Write-Host "=========================================================" -ForegroundColor Cyan
-Write-Host "  Club Label Print Server -- Bootstrap Installer" -ForegroundColor Cyan
+Write-Host "  Club Label Printer -- Installer" -ForegroundColor Cyan
 Write-Host "=========================================================" -ForegroundColor Cyan
 Write-Host ""
-
-# Create install directory if it doesn't exist
-if (-not (Test-Path $InstallDir)) {
-    Write-Host "Creating install directory: $InstallDir" -ForegroundColor Gray
-    New-Item -ItemType Directory -Path $InstallDir -Force | Out-Null
-}
-
-# Download the full installer script
-$installerUrl = "https://raw.githubusercontent.com/patrick-simpson/Print-TwoTimTwo-Labels/main/install-and-run.ps1"
-$installerPath = Join-Path $InstallDir "install-and-run.ps1"
-
-Write-Host "Downloading installer..." -ForegroundColor Gray
+Write-Host "Downloading the Club Label Printer app..." -ForegroundColor Gray
 try {
-    Invoke-WebRequest -Uri $installerUrl -OutFile $installerPath -UseBasicParsing
-    Write-Host "[OK] Installer downloaded." -ForegroundColor Green
+    Invoke-WebRequest -Uri $InstallerUrl -OutFile $InstallerPath -UseBasicParsing
+    Write-Host "[OK] Downloaded." -ForegroundColor Green
 } catch {
-    Write-Host "[FAIL] Could not download installer: $_" -ForegroundColor Red
-    Write-Host "  Check your internet connection and try again." -ForegroundColor Yellow
+    Write-Host "[FAIL] Could not download the app: $_" -ForegroundColor Red
+    Write-Host "  Check your internet connection, or download it from" -ForegroundColor Yellow
+    Write-Host "  https://awana.kvbchurch.org and run it." -ForegroundColor Yellow
     exit 1
 }
 
-# Run the full installer with c:\output as the install path
-# Use -ExecutionPolicy Bypass to avoid "scripts disabled" errors on restricted systems
-Write-Host "Launching installer..." -ForegroundColor Gray
+Write-Host "Starting the installer. If Windows SmartScreen appears, click" -ForegroundColor Gray
+Write-Host "'More info', then 'Run anyway'." -ForegroundColor Gray
 Write-Host ""
-powershell -ExecutionPolicy Bypass -File $installerPath -InstallPath $InstallDir
+Start-Process -FilePath $InstallerPath
