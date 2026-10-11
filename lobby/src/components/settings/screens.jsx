@@ -123,7 +123,8 @@ export function ScreensSection({ onOpen, goTo }) {
                   <span className="screen-row__glyph"><ScreenGlyph kind={s.kind} /></span>
                   <span className="screen-row__text">
                     <span className="screen-row__name">{s.name}</span>
-                    <span className="screen-row__meta"><ScreenState online={s.online} /> · {s.online ? 'seen' : 'last seen'} {seenWords(s.lastSeen)}</span>
+                    <span className="screen-row__meta"><ScreenState online={s.online} /> · {s.online ? 'seen' : 'last seen'} {seenWords(s.lastSeen)}
+                      {s.pendingRoleChange?.printRole === false && <> · <span className="hint--warn">print server off once the last label prints</span></>}</span>
                   </span>
                   {s.kind === 'lobby' ? (
                     <button type="button" className="secondary small" onClick={() => onOpen(s)} aria-label={`Open settings for ${s.name}`}>
@@ -152,7 +153,7 @@ const FIELD_WORDS = {
   lowPower: { title: 'Low power', hint: 'No motion on the wall: for a weak projector PC.' },
   stingers: { title: 'Countdown chimes', hint: 'The chimes as the countdown runs out.' },
   playbackQuality: { title: 'Playback quality', hint: 'Auto picks by the device; Low power plays the small files.', options: { auto: 'Auto', full: 'Full quality', low: 'Low power' } },
-  printRole: { title: 'Print server', hint: 'Prints the check-in labels. The computer refuses to stop while a label is printing.', confirm: true },
+  printRole: { title: 'Print server', hint: 'Prints the check-in labels. Turned off mid-print, it waits for the last label, then restarts.', confirm: true },
   displayRole: { title: 'Display', hint: 'Shows a screen on its monitor on club nights.', confirm: true },
   displayFrom: { title: 'Display from', hint: 'Club nights only.' },
   displayUntil: { title: 'Display until', hint: '' },
@@ -175,7 +176,10 @@ function KindSettings({ screen, onChanged, onGone }) {
   /** @param {string} key @param {unknown} value */
   const change = async (key, value) => {
     const words = /** @type {any} */ (FIELD_WORDS)[key];
-    if (words?.confirm && !window.confirm(`${value ? 'Turn on' : 'Turn off'} ${words.title.toLowerCase()} on ${screen.name}?`)) return;
+    const ask = key === 'printRole' && value === false
+      ? `Turn off the print server on ${screen.name}? If a label is printing or waiting, it finishes first; then ${screen.name} restarts without it.`
+      : `${value ? 'Turn on' : 'Turn off'} ${words?.title.toLowerCase()} on ${screen.name}?`;
+    if (words?.confirm && !window.confirm(ask)) return;
     const next = sanitizeScreenSettings(screen.kind, { ...(settings || {}), [key]: value });
     setSettings(next);
     const res = await saveScreenSettings(screen.id, screen.kind, next);

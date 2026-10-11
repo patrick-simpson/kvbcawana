@@ -109,3 +109,23 @@ test('a projector is edited in its row', async ({ page }) => {
   await expect.poll(() => page.w.settings[PJ].settings).toEqual({ lowPower: true });
   await expect(row.getByText(/Saved\. Gym projector takes it/)).toBeVisible();
 });
+
+test('a KVBC Awana computer: turning its print server off says it waits for the last label, and a held change shows', async ({ page }) => {
+  const PC = 'pc_cccccccccccccccccccc';
+  const now = new Date().toISOString();
+  page.w.screens[PC] = { id: PC, kind: 'computer', name: 'Check-in laptop', createdAt: now, lastSeen: now, online: true, live: false };
+  page.w.settings[PC] = { savedAt: now, settings: { printRole: true, displayRole: false, displayFrom: '17:00', displayUntil: '20:00' } };
+  const dialog = page.getByRole('dialog', { name: 'Settings' });
+  await dialog.getByRole('tab', { name: 'Screens' }).click();
+  await dialog.getByRole('button', { name: 'Open settings for Check-in laptop' }).click();
+  const row = dialog.locator(`[data-screen="${PC}"]`);
+  let asked = '';
+  page.once('dialog', (d) => { asked = d.message(); d.accept(); });
+  await row.getByRole('checkbox', { name: 'Print server' }).uncheck();
+  await expect.poll(() => page.w.settings[PC].settings.printRole).toBe(false);
+  expect(asked).toMatch(/If a label is printing or waiting, it finishes first/);
+  // The computer's next hello says it is holding the change.
+  page.w.screens[PC].pendingRoleChange = { printRole: false, displayRole: false };
+  await dialog.getByRole('button', { name: 'Check again' }).click();
+  await expect(row).toContainText('print server off once the last label prints');
+});
