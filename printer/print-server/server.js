@@ -2862,6 +2862,52 @@ $pd.Dispose()
   }
 }
 
+// Several labels as ONE print job (8.2.0, the BARF Bag labels: the owner asked
+// for one job). Windows: one PrintDocument, a page per label, in order. CUPS:
+// one lp with every file. No retry: half a batch printed twice is worse than
+// a clear failure the operator can press again.
+async function printImagesNow(paths, printerName) {
+  if (CUPS_BACKEND) {
+    const id = await cups.cupsPrint(paths, printerName || '', { media: config.cupsMedia });
+    console.log('[print] CUPS job', id, `(${paths.length} labels)`);
+    return;
+  }
+  const list = paths.map((p) => `'${p.replace(/'/g, "''")}'`).join(',');
+  const safePrinter = (printerName || '').replace(/'/g, "''");
+  const ps = `
+$ErrorActionPreference = 'Stop'
+Add-Type -AssemblyName System.Drawing
+$pd = New-Object System.Drawing.Printing.PrintDocument
+${safePrinter ? `$pd.PrinterSettings.PrinterName = '${safePrinter}'` : ''}
+$pd.DefaultPageSettings.PaperSize = New-Object System.Drawing.Printing.PaperSize("Label", 400, 200)
+$pd.DefaultPageSettings.Margins = New-Object System.Drawing.Printing.Margins(0,0,0,0)
+$pd | Add-Member -NotePropertyName LabelImagePaths -NotePropertyValue @(${list})
+$pd | Add-Member -NotePropertyName LabelIndex -NotePropertyValue 0
+$pd.add_PrintPage({
+  param($sender, $e)
+  $img = [System.Drawing.Image]::FromFile($sender.LabelImagePaths[$sender.LabelIndex])
+  try { $e.Graphics.DrawImage($img, 0, 0, $e.PageBounds.Width, $e.PageBounds.Height) }
+  finally { $img.Dispose() }
+  $sender.LabelIndex = $sender.LabelIndex + 1
+  $e.HasMorePages = $sender.LabelIndex -lt $sender.LabelImagePaths.Count
+})
+$pd.Print()
+$pd.Dispose()
+`.trim();
+  const psPath = tmpFilePath('awana-print', 'ps1');
+  try {
+    fs.writeFileSync(psPath, ps, 'utf8');
+    const result = await runPowerShell(['-File', psPath], { timeout: 15000 + 2000 * paths.length });
+    if (result && result.trim()) console.log('[print] PowerShell:', result.trim());
+  } finally {
+    fs.unlink(psPath, () => {});
+  }
+}
+
+function printImages(paths, printerName) {
+  return withPrinter(() => printImagesNow(paths, printerName));
+}
+
 // ── Where a label goes: the 4×2 label printer (and its backup) ────────────────
 // Every label print in this file goes through printLabel(). It is printImage()
 // on the name tag printer; if that fails and a backup printer is set (and
@@ -3377,9 +3423,9 @@ async function dropOffMark(club) {
 // ── The BARFED tag (8.1.0, owner 2026-10-11) ─────────────────────────────────
 // BARF Night is "Bring A Real Friend". A child who brought one that night gets
 // a second name tag to choose from: a slime band with drips across the top
-// with BARFED! knocked out of it, their first name, and who they brought
-// ("brought Maya!", or "Brought A Real Friend" with no name typed), with two
-// ink splats. One colour like every label here: the fun is in the shapes.
+// with BARFED! knocked out of it, their first name below, and two ink splats
+// (8.2.0: no line under the name, the owner's pick of the drafts). One colour
+// like every label here: the fun is in the shapes.
 // Which nights are BARF Nights: church-config.json `barfNights` (dates).
 // (config.json's own `barfNights`, when set, wins: a test, or a moved night.)
 function isBarfNight(now = new Date()) {
@@ -3416,12 +3462,7 @@ const BARF_DRIPS = Object.freeze([
 ]);
 const BARF_BAND = 40;
 
-function barfFriendLine(friendName) {
-  const f = String(friendName || '').trim().replace(/\s+/g, ' ').slice(0, 24);
-  return f ? `brought ${f}!` : 'Brought A Real Friend';
-}
-
-async function generateBarfTag({ firstName, friendName }) {
+async function generateBarfTag({ firstName }) {
   const cvs = createCanvas(PX_W, PX_H);
   const ctx = cvs.getContext('2d');
   ctx.scale(SCALE, SCALE);
@@ -3472,19 +3513,72 @@ async function generateBarfTag({ firstName, friendName }) {
   splat(20, 124, 6);
   splat(PAGE_W - 22, 120, 5);
 
-  // The name, then who they brought.
+  // The name, alone below the slime (owner, 2026-10-11: no line under it).
   const first = String(firstName || '').trim() || 'Friend';
   ctx.fillStyle = ink;
-  const ns = type.fit(ctx, 'name', first, PAGE_W - 70, 40, 16);
-  type.fill(ctx, 'name', ns, first, PAGE_W / 2, 86 + type.capCentre(ctx, 'name', first) * ns);
-  const line = barfFriendLine(friendName);
-  const ls = type.fit(ctx, 'goTo', line, PAGE_W - 80, 15, 9);
-  type.fill(ctx, 'goTo', ls, line, PAGE_W / 2, 124);
+  const ns = type.fit(ctx, 'name', first, PAGE_W - 70, 46, 16);
+  type.fill(ctx, 'name', ns, first, PAGE_W / 2, 98 + type.capCentre(ctx, 'name', first) * ns);
 
   const pngPath = tmpFilePath('awana-barf', 'png');
   const buffer = cvs.toBuffer('image/png');
   fs.writeFileSync(pngPath, buffer);
   return { pngPath, buffer };
+}
+
+// ── BARF Bag labels (8.2.0, owner 2026-10-11) ──────────────────────────────────
+// One for each child who brought a friend tonight and one for each friend, to
+// stick on their bag: "SOPHIA'S" big, then a slime band rising from the bottom
+// with BARF BAG in it. All of them print as ONE job (printImages).
+function barfBagOwner(name) {
+  const first = String(name || '').trim().split(/\s+/)[0].toLocaleUpperCase('en-US').slice(0, 24);
+  if (!first) return '';
+  return /S$/.test(first) ? `${first}’` : `${first}’S`;
+}
+
+async function generateBarfBag(name) {
+  const cvs = createCanvas(PX_W, PX_H);
+  const ctx = cvs.getContext('2d');
+  ctx.scale(SCALE, SCALE);
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, PAGE_W, PAGE_H);
+  const type = labelType('');
+  const ink = '#000000';
+  const top = PAGE_H - BARF_BAND;
+
+  // The slime rises from the bottom: a band, a wavy top edge, drips pointing up.
+  ctx.fillStyle = ink;
+  ctx.beginPath();
+  ctx.moveTo(0, PAGE_H);
+  ctx.lineTo(PAGE_W, PAGE_H);
+  ctx.lineTo(PAGE_W, top);
+  for (let x = PAGE_W; x >= 0; x -= 12) ctx.quadraticCurveTo(x - 6, top - ((x / 12) % 2 ? 4 : -2), x - 12, top);
+  ctx.closePath();
+  ctx.fill();
+  for (const [x, len, w] of BARF_DRIPS) {
+    const l = Math.min(len, 22);
+    ctx.beginPath();
+    ctx.moveTo(x - w / 2 - 3, top + 2);
+    ctx.quadraticCurveTo(x - w / 2, top - 2, x - w / 2, top - l + w / 2);
+    ctx.arc(x, top - l + w / 2, w / 2, Math.PI, 0, false);
+    ctx.quadraticCurveTo(x + w / 2, top - 2, x + w / 2 + 3, top + 2);
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#ffffff';
+  const bag = 'BARF BAG';
+  const bs = type.fit(ctx, 'name', bag, PAGE_W - 40, 28, 14);
+  type.fill(ctx, 'name', bs, bag, PAGE_W / 2, top + BARF_BAND / 2 + 1 + type.capCentre(ctx, 'name', bag) * bs);
+
+  const owner = barfBagOwner(name) || 'MY';
+  ctx.fillStyle = ink;
+  const os2 = type.fit(ctx, 'name', owner, PAGE_W - 36, 44, 14);
+  type.fill(ctx, 'name', os2, owner, PAGE_W / 2, 42 + type.capCentre(ctx, 'name', owner) * os2);
+
+  const pngPath = tmpFilePath('awana-barfbag', 'png');
+  fs.writeFileSync(pngPath, cvs.toBuffer('image/png'));
+  return { pngPath };
 }
 
 async function generateDropOffTag(tag) {
@@ -4470,7 +4564,7 @@ async function performCheckinPrint(input) {
     if (broughtFriend === true && isBarfNight()) {
       let barfPath = null;
       try {
-        const out = await generateBarfTag({ firstName, friendName: cleanFriendName(friendName) });
+        const out = await generateBarfTag({ firstName });
         barfPath = out.pngPath;
         await printLabel(barfPath, effectivePrinter);
         console.log(`[print] BARFED tag for '${firstName}'`);
@@ -4536,6 +4630,30 @@ async function performCheckinPrint(input) {
     if (connectPngPath) fs.unlink(connectPngPath, () => {});
   }
 }
+
+// BARF Bag labels (8.2.0, owner 2026-10-11): one label per name, "SOPHIA'S"
+// over BARF BAG, all in ONE print job. Sent by the sync Worker (a job from
+// lobby Settings: every child who brought a friend tonight, and each friend
+// who was named), or from this laptop. Names in, labels out; nothing kept.
+const BARF_BAGS_MAX = 120;
+app.post('/print-barf-bags', async (req, res) => {
+  const raw = req.body && Array.isArray(req.body.names) ? req.body.names : null;
+  if (!raw) return res.status(400).json({ error: 'names must be a list' });
+  const names = raw.map((n) => cleanFriendName(n)).filter((n) => barfBagOwner(n)).slice(0, BARF_BAGS_MAX);
+  if (!names.length) return res.status(400).json({ error: 'No names to print.' });
+  const paths = [];
+  try {
+    for (const n of names) paths.push((await generateBarfBag(n)).pngPath);
+    await printImages(paths, PRINTER_NAME);
+    console.log(`[print] ${names.length} BARF Bag label(s), one job`);
+    res.json({ ok: true, printed: names.length });
+  } catch (e) {
+    console.error('[print] BARF Bag labels failed:', e.message);
+    res.status(500).json({ error: 'The BARF Bag labels did not print. Check the label printer, then try again.' });
+  } finally {
+    for (const p of paths) fs.unlink(p, () => {});
+  }
+});
 
 app.post('/print', async (req, res) => {
   const body = req.body || {};
@@ -9901,7 +10019,7 @@ module.exports = {
   // (awards, leader tags, failed rows, undone rows, the club filter, the
   // newest-row-per-child dedupe and the cap) is testable without printing.
   selectReprintRange, REPRINT_RANGE_MAX, REPRINT_RANGE_GAP_MS, sanitizeTouchContext,
-  dropOffTagFor, generateDropOffTag, generateBarfTag, isBarfNight, barfFriendLine, cleanFriendName, performOneOffPrint, oneOffClub,
+  dropOffTagFor, generateDropOffTag, generateBarfTag, generateBarfBag, barfBagOwner, isBarfNight, cleanFriendName, performOneOffPrint, oneOffClub,
   localDayISO, historyIdentityKey, clubKey,
   // Remembered leaders + the one club list every dropdown reads. Pure but for
   // their file, so the upsert/cap/season rules and the club-table agreement

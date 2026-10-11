@@ -36,6 +36,7 @@ const RELAY_ROUTES = Object.freeze([
 // these routes: a page's calls still go through RELAY_ROUTES alone.
 const JOB_ROUTES = Object.freeze([
   ['POST', /^\/print$/],
+  ['POST', /^\/print-barf-bags$/],   // 8.2.0: lobby Settings' BARF Bag labels
 ]);
 
 function jobAllowed(method, path) {

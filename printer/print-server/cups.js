@@ -42,7 +42,8 @@ function lpArgs(imagePath, printerName, opts = {}) {
     if (!isCupsQueueName(printerName)) throw new Error(`Not a printer name CUPS accepts: "${printerName}"`);
     args.push('-d', printerName);
   }
-  args.push('-n', '1', '-o', `media=${media}`, '-o', 'fit-to-page', '--', imagePath);
+  // Several files (8.2.0, the BARF Bag labels) are ONE job, a page each.
+  args.push('-n', '1', '-o', `media=${media}`, '-o', 'fit-to-page', '--', ...[].concat(imagePath));
   return args;
 }
 

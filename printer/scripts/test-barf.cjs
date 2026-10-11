@@ -54,8 +54,8 @@ const today = (() => { const d = new Date(); return `${d.getFullYear()}-${String
   {
     check('tonight is a BARF Night here', server.isBarfNight() === true);
     check('another night is not', server.isBarfNight(new Date('2000-01-05T12:00:00')) === false);
-    check('the friend line names the friend, or says what BARF means',
-      server.barfFriendLine('Maya') === 'brought Maya!' && server.barfFriendLine('') === 'Brought A Real Friend');
+    check('a BARF Bag is the first name in capitals, made possessive',
+      server.barfBagOwner('Sophia Simpson') === 'SOPHIA\u2019S' && server.barfBagOwner('james') === 'JAMES\u2019' && server.barfBagOwner('  ') === '');
     check('a typed name is one clean line of at most 24',
       server.cleanFriendName('  <Ma\nya>  ') === 'Maya' && server.cleanFriendName('x'.repeat(40)).length === 24 && server.cleanFriendName(7) === '');
     const tag = await server.generateBarfTag({ firstName: 'Ava', friendName: 'Maya' });
@@ -77,6 +77,23 @@ const today = (() => { const d = new Date(); return `${d.getFullYear()}-${String
     r = await post('/print', { name: 'Mia Lee', clubName: 'T&T', clubberId: '3', cloud: true, friend: true, friendName: 'Jo' });
     await settle();
     check('a cloud check-in prints both, and is not reported again (the service recorded it)', jobs() === 7 && reports.length === 2, `${jobs()} ${reports.length}`);
+  }
+
+  console.log('\nBARF Night: the BARF Bag labels, one job');
+  {
+    const bag = await server.generateBarfBag('Maya');
+    const png = fs.readFileSync(bag.pngPath);
+    check('a BARF Bag label is a 4x2 label too', png.readUInt32BE(16) === 1200 && png.readUInt32BE(20) === 600);
+    fs.unlinkSync(bag.pngPath);
+    const before = jobs();
+    let r = await post('/print-barf-bags', { names: ['Sophia Simpson', 'Maya', 'James'] });
+    check('three labels go to the printer as ONE job', r.status === 200 && r.body.printed === 3 && jobs() === before + 1, `${JSON.stringify(r)} ${jobs() - before}`);
+    r = await post('/print-barf-bags', { names: [' ', 7] });
+    check('nothing to print is a clear refusal', r.status === 400 && jobs() === before + 1, JSON.stringify(r));
+    r = await post('/print-barf-bags', {});
+    check('and so is no list', r.status === 400);
+    const relay = require(path.join(root, 'print-server', 'phone-relay.js'));
+    check('the sync service may send it as a job; a phone page may not', relay.jobAllowed('POST', '/print-barf-bags') && !relay.relayAllowed('POST', '/print-barf-bags'));
   }
 
   console.log('\nBARF Night: the phone\'s card');

@@ -381,7 +381,12 @@ club and friend's name to the Worker (`POST /v1/cloud/friend`) for the
 night's email, except for a cloud check-in, which the Worker recorded
 itself. The touch screen and phone.html ask "Friend's first name" under
 Brought a friend (`friendInput`); a sibling's card never copies the name.
-`scripts/test-barf.cjs`.
+8.2.0: the BARFED tag is the name alone (no friend line), and
+`POST /print-barf-bags {names}` prints one BARF Bag label per name
+(`generateBarfBag`, `barfBagOwner`: "SOPHIA’S", "JAMES’") as ONE job:
+`printImages()` is one PrintDocument with a page per label on Windows and one
+`lp` with every file under CUPS, never retried. It is a Worker JOB route
+(`JOB_ROUTES`), sent from the lobby's Settings. `scripts/test-barf.cjs`.
 
 **The still-here list and the phone's Check out (7.16.0, owner 2026-10-08).**
 The lobby's pickup list (shown from 7:30) is built HERE, not scraped:

@@ -1,4 +1,13 @@
-﻿## [8.1.0] - 2026-10-11
+﻿## [8.2.0] - 2026-10-11
+BARF Bag labels, and a simpler BARFED tag.
+
+**New: BARF Bag labels (owner).** In the lobby screen's Settings → Setup → Cloud check-in → BARF Night, Print BARF Bag labels prints one label for every child checked in with Brought a friend tonight and one for each friend whose name was typed: the first name in capitals, "SOPHIA’S", over a slime band reading BARF BAG. They print together as one job, each child followed by their friend. A friend ticked at TwoTimTwo's own desk box has no name, so no label (Settings says how many). The laptop must be on.
+
+**The BARFED tag is just the name now.** The line under it ("brought Maya!") is gone, the owner's pick of the drafts.
+
+**The release notes are in the lobby's Settings.** Settings → Setup → Release notes shows this whole list.
+
+## [8.1.0] - 2026-10-11
 BARF Night: the BARFED tag, and the friend's name.
 
 **New: the BARFED tag (owner).** On BARF Night (Wednesday, October 14), a child checked in with Brought a friend gets a second name tag to choose from: a slime band dripping across the top with BARFED! in it, their first name, and who they brought ("brought Maya!", or "Brought A Real Friend" when no name was typed). It prints right after their own tag, from every way of checking in: the touch screen, a phone (on the Wi-Fi or at awana.kvbchurch.org/checkin) and TwoTimTwo's own check-in box at the desk. Other nights, Brought a friend prints the usual one tag. The date is `barfNights` in church-config.json, so next year's BARF Night is one date to change.
