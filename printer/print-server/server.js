@@ -3995,6 +3995,21 @@ function corsPolicy(req, res, next) {
     if (!security.isLoopbackRequest(req)) {
       return res.status(403).json({ error: 'The settings page can only reach the print server on the computer it runs on' });
     }
+    // Signed in to /settings with the church passphrase is enough (owner,
+    // 2026-10-11): the page sends its sync session, which the sync service
+    // confirms (settingsPageSessionOk). The publish token still works.
+    if (/^Sync\s/i.test(String(req.headers.authorization || ''))) {
+      return settingsPageSessionOk(req).then((ok) => {
+        if (!ok) {
+          console.warn(`[security] Refused settings-page ${req.method} ${req.path}: the sync service did not confirm the sign-in`);
+          return res.status(403).json({ error: signedInToSync()
+            ? 'Sign in to the settings page again: the sync service did not accept its sign-in.'
+            : 'This print server is not signed in to the sync service. Sign it in on its dashboard, or paste the publish token.' });
+        }
+        req.settingsPage = true;
+        return next();
+      }, () => res.status(403).json({ error: 'Could not check the sign-in with the sync service. Try again.' }));
+    }
     if (!config.slidesPublishToken) {
       return res.status(403).json({ error: 'No publish token is set on the print server. Open its dashboard → Lobby slides → Generate publish token, then paste it into the settings page.' });
     }
@@ -7283,6 +7298,27 @@ app.post('/feed/completed-books', (req, res) => {
 //     origin check is browser hygiene (curl can forge an Origin, a tab cannot).
 // Either way the payload goes through buildSlidesDeck, so nothing but capped
 // text slides can reach the wire, whoever asks.
+// The settings page's sync sessions the sync service has confirmed, by their
+// SHA-256 (never the session itself), each good for SETTINGS_SESSION_OK_MS so
+// a page's dozen calls cost one check. Only for this computer's own browser
+// (corsPolicy checks the socket first), and only while this print server is
+// signed in to the same service: the page's session is checked against
+// config.syncUrl, never an address the request names.
+const SETTINGS_SESSION_OK_MS = 10 * 60 * 1000;
+const settingsPageSessions = new Map();
+async function settingsPageSessionOk(req) {
+  const m = /^Sync\s+(\S+)$/i.exec(String(req.headers.authorization || ''));
+  if (!m || !syncClient.isValidSession(m[1]) || !signedInToSync()) return false;
+  const key = crypto.createHash('sha256').update(m[1]).digest('hex');
+  const until = settingsPageSessions.get(key);
+  if (until && until > Date.now()) return true;
+  settingsPageSessions.delete(key);
+  if ((await syncClient.syncCheck(config.syncUrl, m[1])) !== 'ok') return false;
+  if (settingsPageSessions.size >= 32) settingsPageSessions.clear();
+  settingsPageSessions.set(key, Date.now() + SETTINGS_SESSION_OK_MS);
+  return true;
+}
+
 function slidesTokenOk(req) {
   const m = /^Bearer\s+(.+)$/i.exec(String(req.headers.authorization || ''));
   const token = String(config.slidesPublishToken || '');

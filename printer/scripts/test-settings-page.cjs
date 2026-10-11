@@ -30,6 +30,9 @@ const PORT = Number(process.env.AWANA_TEST_PORT || 34583);
 const BASE = `http://127.0.0.1:${PORT}`;
 const PAGE = 'https://awana.kvbchurch.org';
 const OLD_SITE = 'https://patrick-simpson.github.io';
+const SYNC = 'https://sync.example.org';
+const GOOD_SESSION = 'v1.2.1700000000000.settingspagesettingspagesettings';
+const syncChecks = [];
 
 let passed = 0;
 let failed = 0;
@@ -95,7 +98,20 @@ async function main() {
     checkinUrl: 'https://example.com/checkin',
     phonePin: '4321',
     displayKey: 'AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA=',
+    // Signed in to the sync service, as the check-in laptop is.
+    syncUrl: SYNC, syncSession: 'v1.1.1700000000000.printserverprintserverprintserver',
   }, null, 2));
+  // The sync service, faked: /v1/state answers 200 for GOOD_SESSION only.
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async (url, opts) => {
+    if (!String(url).startsWith(SYNC)) return realFetch(url, opts);
+    const auth = (opts && opts.headers && (opts.headers.Authorization || opts.headers.authorization)) || '';
+    if (String(url) === `${SYNC}/v1/state`) {
+      syncChecks.push(auth);
+      return new Response(JSON.stringify({}), { status: auth === `Bearer ${GOOD_SESSION}` || /printserver/.test(auth) ? 200 : 401 });
+    }
+    return new Response(JSON.stringify({ error: 'not here' }), { status: 404 });
+  };
 
   process.env.AWANA_DATA_DIR = dataDir;
   process.env.AWANA_PORT = String(PORT);
@@ -245,6 +261,26 @@ async function main() {
     check('the slides publish preflight is as it was', slides.status === 204 && slides.headers.get('access-control-allow-private-network') === 'true');
     const twotimtwo = await preflight('/print', 'POST', 'https://kvbchurch.twotimtwo.com');
     check('TwoTimTwo\'s own calls are as they were (no private-network opt-in)', twotimtwo.status === 204 && !twotimtwo.headers.get('access-control-allow-private-network'));
+  }
+
+  console.log('settings page: signed in with the passphrase instead of the token');
+  {
+    const sync = (s) => ({ Origin: PAGE, Authorization: `Sync ${s}` });
+    const before = syncChecks.length;
+    const ok = await j('/history/today', { headers: sync(GOOD_SESSION) });
+    check('a session the sync service confirms is let in', ok.status === 200, String(ok.status));
+    await j('/config', { headers: sync(GOOD_SESSION) });
+    check('...and is asked about once, then remembered', syncChecks.length === before + 1, String(syncChecks.length - before));
+    const cfg = await j('/config', { headers: sync(GOOD_SESSION) });
+    check('...and still sees no secret', cfg.status === 200 && cfg.body.phonePin === undefined && cfg.body.syncSession === undefined);
+    const pin = await post('/config', { phonePin: '1111' }, sync(GOOD_SESSION));
+    check('...and still cannot change one', pin.status === 403);
+    const bad = await j('/printers', { headers: sync('v1.3.1700000000000.notasessionnotasessionnotases') });
+    check('a session the service refuses is refused', bad.status === 403 && /sign/i.test(bad.body.error), String(bad.status));
+    const junk = await j('/printers', { headers: sync('../../etc') });
+    check('a malformed one is refused without asking the service', junk.status === 403);
+    const health = await j('/health', { headers: { Origin: PAGE } });
+    check('/health still needs nothing', health.status === 200);
   }
 
   console.log('settings page: every settings entry point goes to it');

@@ -7,16 +7,21 @@ const res = (body, status = 200) => ({ ok: status < 400, status, json: async () 
 const HEALTH = { status: 'ok', printer: 'Dock', version: '8.3.0', warnings: [{ type: 'x', message: 'The printer is out of labels' }], lobbySlides: { tokenConfigured: true } };
 const CONFIG = { printerName: 'Dock', backupPrinterName: '', labelFooter: 'KVBC', pickupClubs: ['Sparks'], lateGraceMin: 10, seasonTheme: 'auto' };
 
+const SESSION = 'v1.1.1700000000000.settingspagesettingspagesettings';
+
 /** A stand-in print server: routes by method and path, remembers what it was sent. */
 function server({ token = 'tok', online = true } = {}) {
   const calls = [];
   const fn = vi.fn(async (url, init = {}) => {
+    if (!String(url).startsWith('http://localhost:3456')) return res({}, 404);   // the page's own sync.json
     const path = String(url).replace('http://localhost:3456', '');
     const method = init.method || 'GET';
     calls.push({ path, method, headers: init.headers || {}, body: init.body ? JSON.parse(init.body) : undefined });
     if (!online) throw new TypeError('Failed to fetch');
     if (path === '/health') return res(HEALTH);
-    if ((init.headers || {}).Authorization !== `Bearer ${token}`) return res({ error: 'Wrong publish token.' }, 403);
+    const auth = (init.headers || {}).Authorization;
+    if (auth === 'Sync v1.1.1700000000000.notthesessionnotthesessionnot') return res({ error: 'Sign in to the settings page again: the sync service did not accept its sign-in.' }, 403);
+    if (auth !== `Bearer ${token}` && auth !== `Sync ${SESSION}`) return res({ error: 'Wrong publish token.' }, 403);
     if (path === '/config' && method === 'GET') return res(CONFIG);
     if (path === '/config' && method === 'POST') return res({ ok: true });
     if (path === '/printers') return res({ printers: [{ name: 'Dock' }, { name: 'Spare' }] });
@@ -69,6 +74,25 @@ describe('Laptop section', () => {
     expect(s.calls.map((c) => c.path)).toEqual(['/health']);
   });
 
+  it('signed in with the passphrase: no token needed, the session is what is sent', async () => {
+    localStorage.setItem('awanaSyncSession.v1', SESSION);
+    const s = server();
+    vi.stubGlobal('fetch', s.fn);
+    render(<LaptopSection />);
+    expect((await screen.findByLabelText('Name tag printer')).value).toBe('Dock');
+    expect(s.calls.find((c) => c.path === '/config').headers.Authorization).toBe(`Sync ${SESSION}`);
+  });
+
+  it('a session the printer refuses says to sign in again, and offers the token', async () => {
+    localStorage.setItem('awanaSyncSession.v1', 'v1.1.1700000000000.notthesessionnotthesessionnot');
+    const s = server();
+    vi.stubGlobal('fetch', s.fn);
+    render(<LaptopSection />);
+    expect(await screen.findByText(/Sign in to the settings page again/)).toBeTruthy();
+    expect(screen.getByText(/Or paste the printer/)).toBeTruthy();
+    expect(screen.queryByLabelText('Name tag printer')).toBeNull();
+  });
+
   it('found with a token: the printer, labels, pickup list, schedule and tonight', async () => {
     savePublishToken('tok');
     const s = server();
@@ -76,7 +100,7 @@ describe('Laptop section', () => {
     render(<LaptopSection />);
     const tag = await screen.findByLabelText('Name tag printer');
     expect(tag.value).toBe('Dock');
-    expect(screen.getByLabelText('Label footer').value).toBe('KVBC');
+    expect(screen.getByRole('textbox', { name: 'Label footer' }).value).toBe('KVBC');
     expect(screen.getByRole('checkbox', { name: 'Sparks' }).checked).toBe(true);
     expect(screen.getByRole('checkbox', { name: 'Cubbies' }).checked).toBe(false);
     expect(await screen.findByLabelText('Row 1 club')).toBeTruthy();

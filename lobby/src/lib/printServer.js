@@ -68,22 +68,25 @@ export async function probePrintServer(opts) {
 
 /**
  * @typedef {{ ok: true, data: any }
- *   | { ok: false, reason: 'no-token' | 'no-token-on-server' | 'wrong-token' | 'refused' | 'unreachable' | 'rejected', status: number, error: string }} Reply
+ *   | { ok: false, reason: 'no-token' | 'no-token-on-server' | 'wrong-token' | 'sign-in-refused' | 'refused' | 'unreachable' | 'rejected', status: number, error: string }} Reply
  */
 
 /**
- * One call to the print server with the publish token.
+ * One call to the print server, proven by the page's sync sign-in (owner,
+ * 2026-10-11: the passphrase is enough; the print server asks the sync
+ * service) or, pasted once, the publish token, which wins when both are held.
  * @param {string} path
- * @param {{ token: string, method?: 'GET' | 'POST', body?: unknown, raw?: boolean, fetchFn?: typeof fetch, timeoutMs?: number }} opts
+ * @param {{ token?: string, session?: string, method?: 'GET' | 'POST', body?: unknown, raw?: boolean, fetchFn?: typeof fetch, timeoutMs?: number }} opts
  * @returns {Promise<Reply>}
  */
 export async function callPrintServer(path, opts) {
   const token = String(opts.token || '').trim();
-  if (!token) return { ok: false, reason: 'no-token', status: 0, error: 'Paste the publish token first.' };
+  const session = String(opts.session || '').trim();
+  if (!token && !session) return { ok: false, reason: 'no-token', status: 0, error: 'Sign in under Setup first.' };
   const fetchFn = opts.fetchFn || fetch;
   const post = opts.method === 'POST';
   /** @type {Record<string, string>} */
-  const headers = { Authorization: `Bearer ${token}` };
+  const headers = { Authorization: token ? `Bearer ${token}` : `Sync ${session}` };
   if (post) headers['Content-Type'] = 'application/json';
   let res;
   try {
@@ -105,6 +108,7 @@ export async function callPrintServer(path, opts) {
   const error = body && typeof body.error === 'string' ? body.error : `HTTP ${res.status}`;
   if (res.status === 403 && /No publish token/i.test(error)) return { ok: false, reason: 'no-token-on-server', status: 403, error };
   if (res.status === 403 && /Wrong publish token/i.test(error)) return { ok: false, reason: 'wrong-token', status: 403, error };
+  if (res.status === 403 && !token && /sync service|sign in/i.test(error)) return { ok: false, reason: 'sign-in-refused', status: 403, error };
   if (res.status === 403) return { ok: false, reason: 'refused', status: 403, error };
   return { ok: false, reason: 'rejected', status: res.status, error };
 }

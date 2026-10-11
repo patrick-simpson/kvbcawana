@@ -117,8 +117,10 @@ the Step Up Night / Awana Store Night switches, which stay there.
 (`SETTINGS_PAGE_CONFIG_KEYS`: the printer's own, never a secret, the network
 switch or the CORS list). `corsPolicy` answers the preflight for those routes
 only, with `Access-Control-Allow-Private-Network: true` when Chrome asks.
-Every route but `/health` needs the publish token (the credential the page
-already holds for slides) and a loopback socket; what passes is marked
+Every route but `/health` needs a loopback socket and either the page's sync
+sign-in (`Authorization: Sync <session>`, which the print server confirms with
+the sync service at `/v1/state` and remembers by its hash for 10 minutes;
+owner, 2026-10-11: "passphrase sign-in is enough") or the publish token; what passes is marked
 `req.settingsPage`, which the four printer routes that were "dashboard on this
 computer only" (templates, clear queue, test tune, POST /config) accept next to
 `isTrustedConfigOrigin`. The secret-holding routes never look at the mark.
@@ -131,11 +133,8 @@ on the check-in laptop to set the printer" and lists what it would show.
 
 ### Left for the owner
 
-- **The token.** The page needs the publish token to change anything (it is
-  stored per browser; a signed-in settings page has none until pasted, once,
-  from the dashboard's Lobby slides card). A one-click pairing from the
-  dashboard is possible but puts a secret in a URL or needs a new route; not
-  built.
+- **The token** (decided 2026-10-11): signed in to /settings with the
+  passphrase is enough; the publish token stays as a fallback, folded away.
 - **Phone PIN and the keys stay on the dashboard.** The PIN protects the
   roster on the Wi-Fi and the token's blast radius was chosen small (slides
   and settings); letting a page set the PIN or the display key would widen it.

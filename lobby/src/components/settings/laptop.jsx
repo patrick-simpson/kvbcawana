@@ -1,5 +1,7 @@
 import { Fragment, useCallback, useEffect, useId, useState } from 'react';
 import { PUBLISH_TOKEN_CHANGE_EVENT, loadPublishToken } from '../../lib/publishToken.js';
+import { loadSyncSession } from '../../lib/syncService.js';
+import { useSync } from '../../hooks/useSync.js';
 import {
   PICKUP_CLUBS, PRINT_DASHBOARD_URL, callPrintServer, canReprint, cleanScheduleRows, formToTemplate, healthSummary,
   historyTags, NAME_SIZE_MAX, NAME_SIZE_MIN, pickupTicked, printerOptions, probePrintServer, TEMPLATE_FIELDS,
@@ -66,20 +68,27 @@ function NotFound({ onLookAgain, checking }) {
   );
 }
 
-/** The publish token, which is how the page proves itself to the printer. */
-function ConnectCard({ health, problem }) {
+/**
+ * How the page proves itself to the printer: signing in under Setup (the
+ * print server asks the sync service), or, as a fallback, its publish token.
+ */
+function ConnectCard({ health, problem, signedIn }) {
   const serverHasNone = health.lobbySlides?.tokenConfigured === false || problem?.reason === 'no-token-on-server';
+  const lead = problem?.reason === 'wrong-token' ? 'The printer did not accept that token.'
+    : problem?.reason === 'sign-in-refused' ? problem.error
+      : signedIn ? 'The printer is here.' : 'The printer is here. Sign in under Setup with the church passphrase to change its settings.';
   return (
     <PanelCard title="Connect to the printer" tab="var(--brand-sun)">
-      <p className="laptop-away__lead">
-        {problem?.reason === 'wrong-token' ? 'The printer did not accept that token.' : 'The printer found. Paste its token once to change its settings.'}
-      </p>
+      <p className="laptop-away__lead">{lead}</p>
+      <details className="advanced-fields">
+        <summary>Or paste the printer&rsquo;s publish token</summary>
       <p className="hint">
         {serverHasNone
           ? 'The printer has no token yet. On the laptop open the print dashboard → Lobby slides → Generate publish token, then paste it here.'
           : 'On the laptop, the print dashboard → Lobby slides shows the token (Copy). It stays in this browser, never in a settings export or a link.'}
       </p>
       <PublishTokenField />
+      </details>
       <div className="field">
         <a className="hint" href={PRINT_DASHBOARD_URL} target="_blank" rel="noopener noreferrer">Open the print dashboard on this computer</a>
       </div>
@@ -472,6 +481,13 @@ function DashboardOnlyCard() {
 
 function Found({ health, onRefresh }) {
   const [token, setToken] = useState(loadPublishToken);
+  // Signed in with the passphrase is enough: the print server confirms the
+  // session with the sync service. A pasted token still wins.
+  // (useSync re-renders this on signing in or out; the stored session is what
+  // is sent, and one the service no longer knows is refused, with a word.)
+  const { signedIn } = useSync();
+  const session = loadSyncSession();
+  const proof = token || session;
   const [problem, setProblem] = useState(null);
   const [cfg, setCfg] = useState(null);
   const [printers, setPrinters] = useState(undefined);
@@ -483,13 +499,13 @@ function Found({ health, onRefresh }) {
   }, []);
 
   const api = useCallback(async (path, opts) => {
-    const r = await callPrintServer(path, { token, ...opts });
-    if (!r.ok && (r.reason === 'wrong-token' || r.reason === 'no-token-on-server')) setProblem(r);
+    const r = await callPrintServer(path, { token, session, ...opts });
+    if (!r.ok && (r.reason === 'wrong-token' || r.reason === 'no-token-on-server' || r.reason === 'sign-in-refused')) setProblem(r);
     return r;
-  }, [token]);
+  }, [token, session]);
 
   useEffect(() => {
-    if (!token) return undefined;
+    if (!proof) return undefined;
     let alive = true;
     (async () => {
       const [c, p] = await Promise.all([api('/config'), api('/printers')]);
@@ -498,7 +514,7 @@ function Found({ health, onRefresh }) {
       setPrinters(p.ok ? p.data.printers || [] : null);
     })();
     return () => { alive = false; };
-  }, [token, api]);
+  }, [proof, api]);
 
   const save = useCallback(async (patch) => {
     const r = await api('/config', { method: 'POST', body: patch });
@@ -506,13 +522,13 @@ function Found({ health, onRefresh }) {
     return r;
   }, [api]);
 
-  const connected = token && !problem;
+  const connected = Boolean(proof) && !problem;
   return (
     <>
       <StatusCard health={health} api={api} onRefresh={onRefresh} />
-      {!connected && <ConnectCard health={health} problem={problem} />}
+      {!connected && <ConnectCard health={health} problem={problem} signedIn={signedIn} />}
       {connected && cfg && (
-        <Fragment key={token}>
+        <Fragment key={proof}>
           <PrintersCard cfg={cfg} printers={printers} save={save} />
           <LabelsCard cfg={cfg} save={save} api={api} />
           <NightCard cfg={cfg} save={save} api={api} />

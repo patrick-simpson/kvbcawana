@@ -889,7 +889,8 @@ through `simulateEvent`'s sanitizers).
 - **The Laptop section** (phase 3, `settings/laptop.jsx`, `lib/printServer.js`,
   `sectionsFor(page)`: listed on the settings page only) probes
   `http://localhost:3456/health` when it is opened, never on load, and then
-  talks to the print server's own routes with the publish token. What the page
+  talks to the print server's own routes with its sync sign-in (the print
+  server confirms it with the sync service), or a pasted publish token. What the page
   may do is the server's rule (`printer/print-server/security.js`,
   `SETTINGS_PAGE_ROUTES`); a new call needs a row there and a test in
   `printer/scripts/test-settings-page.cjs` first. The phone PIN and the keys

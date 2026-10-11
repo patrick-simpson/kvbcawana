@@ -393,7 +393,10 @@ awana.kvbchurch.org/settings (its Laptop section) calls this server on
 localhost. `security.SETTINGS_PAGE_ORIGIN` is the one exact origin (never
 `displayOrigins`), `SETTINGS_PAGE_ROUTES` the whole list of paths and methods,
 `SETTINGS_PAGE_CONFIG_KEYS` the only keys POST /config takes from it; every
-route but /health needs the publish token and a loopback socket (`corsPolicy`
+route but /health needs a loopback socket and either the page's sync session
+(`Authorization: Sync`, confirmed with the sync service by
+`settingsPageSessionOk`, only while this server is signed in to it) or the
+publish token (`corsPolicy`
 sets `req.settingsPage`), and the preflight answers Private Network Access
 for those routes only. A route that should accept the page next to the
 dashboard uses `isTrustedOrSettingsPage`; anything holding a secret or opening
