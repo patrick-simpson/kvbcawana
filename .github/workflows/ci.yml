@@ -78,6 +78,7 @@ jobs:
               # suite. (In a case pattern * also matches "/", so this is a test.)
               if [[ "$f" != */* && "$f" == *.md ]]; then continue; fi
               case "$f" in
+                journey/public/src/schedule.js) lobby=true ;;  # screenSpecs.test.js reads it
                 lobby/worker/*|lobby/desktop/*|printer/*|journey/*|site/*|.github/workflows/*) ;;
                 *) lobby=true ;;
               esac
