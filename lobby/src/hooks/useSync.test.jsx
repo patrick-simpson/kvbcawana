@@ -186,20 +186,22 @@ describe('Setup: Test TwoTimTwo sign-in', () => {
 
   it('asks the service for one read and says what it found', async () => {
     const calls = fakeService({
-      '/v1/cloud/read-now': () => [200, { ok: true, verdict: 'baseline', status: { checkedIn: 3, checkinPage: { ok: true, calendarId: '368', events: 2 } } }],
+      '/v1/cloud/read-now': (init) => [200, JSON.parse(init.body).test === true
+        ? { ok: true, test: { ok: true, date: '2026-10-07', checkedIn: 3, partial: false, checkinPage: { ok: true, calendarId: '368', events: 2 } }, status: {} }
+        : { ok: false, error: 'wrong-route', status: {} }],
     });
     saveSyncSession(SESSION);
     _resetSyncForTest();
     const view = within(render(<CloudCheckinTestField />).container);
     fireEvent.click(view.getByRole('button', { name: 'Test TwoTimTwo sign-in' }));
-    await waitFor(() => expect(view.getByRole('status').textContent).toContain('3 children checked in today'));
+    await waitFor(() => expect(view.getByRole('status').textContent).toContain('read the report for Wednesday, Oct 7: 3 children checked in'));
     const call = calls.find((c) => c.url.endsWith('/v1/cloud/read-now'));
     expect(call.init.method).toBe('POST');
     expect(call.init.headers.Authorization).toBe(`Bearer ${SESSION}`);
   });
 
   it('a refused password is shown as a warning', async () => {
-    fakeService({ '/v1/cloud/read-now': () => [200, { ok: false, error: 'login-refused', status: {} }] });
+    fakeService({ '/v1/cloud/read-now': () => [200, { ok: false, test: { ok: false, date: '2026-10-07', error: 'login-refused' }, status: {} }] });
     saveSyncSession(SESSION);
     _resetSyncForTest();
     const view = within(render(<CloudCheckinTestField />).container);

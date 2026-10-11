@@ -8,6 +8,7 @@ import {
   READ_INTERVAL_MS,
   Watcher,
   compareReport,
+  lastClubNight,
   localTime,
   openState,
   sealState,
@@ -271,5 +272,46 @@ describe('the status routes', () => {
     const status = await (await call('GET', '/v1/cloud/status', session)).json();
     expect(status.checkedIn).toBe(1);
     expect(JSON.stringify(status)).not.toMatch(/Tester|checkin@example|right-pass/);
+  });
+});
+
+describe('the Settings test read', () => {
+  const SUNDAY = Date.parse('2026-10-11T18:45:00Z');
+
+  it('reads the most recent club night: today on a Wednesday, else the last one', () => {
+    expect(lastClubNight(SUNDAY)).toBe('2026-10-07');
+    expect(lastClubNight(WED_6PM)).toBe('2026-10-14');
+    expect(lastClubNight(Date.parse('2026-10-15T03:30:00Z'))).toBe('2026-10-14'); // 11:30 pm Wednesday EDT
+    expect(lastClubNight(Date.parse('2026-11-03T15:00:00Z'))).toBe('2026-10-28'); // across the clock change
+  });
+
+  it('on a Sunday it reads last Wednesday\'s report and gives its counts', async () => {
+    const s = setup({ start: SUNDAY, kids: [kid(1), kid(2, 'Cubbies'), kid(3)] });
+    const r = await s.w.testRead();
+    expect(r.ok).toBe(true);
+    expect(r.test).toMatchObject({ ok: true, date: '2026-10-07', checkedIn: 3, byClub: { Sparks: 2, Cubbies: 1 }, partial: false });
+    expect(r.test.checkinPage).toMatchObject({ ok: true, calendarId: '368' });
+    expect(s.tt.calls.find((c) => c.path.startsWith('/clubber/checkin_report')).path).toBe('/clubber/checkin_report?date=2026-10-07');
+    // The watcher's own night is untouched: no snapshot, no count.
+    expect(s.storage.map.has('cloud:snap')).toBe(false);
+    expect((await s.w.status()).checkedIn).toBeNull();
+  });
+
+  it('shares the 15 second clock with the watcher', async () => {
+    const s = setup({ start: SUNDAY, kids: [kid(1)] });
+    await s.w.testRead();
+    s.tick(3000);
+    const again = await s.w.testRead();
+    expect(again).toMatchObject({ ok: true, throttled: true, test: { date: '2026-10-07', checkedIn: 1 } });
+    expect(reportReads(s)).toBe(1);
+  });
+
+  it('an unreadable page is described by its shape, never its text', async () => {
+    const tt = fakeTwoTimTwo({ report: () => '<html><head><title>KVBC - Checkin Report</title></head><body><table><tr><td>Zed Uniquename</td></tr></table></body></html>' });
+    const alarm = { at: null };
+    const w = new Watcher({ storage: memoryStore(), env: ENV, fetchFn: tt.fetchFn, now: () => SUNDAY, alarms: { set: (a) => { alarm.at = a; }, get: () => alarm.at }, log: () => {} });
+    const r = await w.testRead();
+    expect(r.test).toMatchObject({ ok: false, error: 'report-unreadable', shape: { title: 'KVBC - Checkin Report', tables: 1, clubTables: 0, loginForm: false } });
+    expect(JSON.stringify(r)).not.toContain('Uniquename');
   });
 });

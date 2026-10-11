@@ -258,6 +258,76 @@ export async function syncPublish(base, session, kind, payload, opts = {}) {
     : { ok: true, deckRev: Number(b.deckRev) || 0, publishedAt: String(b.publishedAt || ''), slideCount: Number(b.slideCount) || 0, droppedCount: Number(b.droppedCount) || 0 };
 }
 
+/** The words for the Worker's fixed error codes (cloud check-in). */
+const CLOUD_ERRORS = {
+  'login-refused': 'TwoTimTwo refused the user name or password. Check the two secrets in GitHub (and that the user can sign in on TwoTimTwo), then redeploy the Worker.',
+  'twotimtwo-down': 'TwoTimTwo is not answering properly right now. Try again in a few minutes.',
+  timeout: 'TwoTimTwo took too long to answer. Try again in a few minutes.',
+  network: 'The sync service could not reach TwoTimTwo. Try again in a few minutes.',
+  'signed-out': 'TwoTimTwo signed the user in but then would not show the report. Check the user has the Record Checkin role.',
+  'report-unreadable': 'Signed in, but the check-in report did not look like the report. TwoTimTwo may have changed the page.',
+  'off-site-redirect': 'TwoTimTwo sent the service to another website, so it stopped. Check TWOTIMTWO_HOST is kvbchurch.twotimtwo.com.',
+};
+
+/** @param {unknown} error @param {any} st */
+function cloudErrorWords(error, st) {
+  if (error === 'login-backoff') {
+    const wait = Math.max(1, Math.ceil((Number(st?.loginBlockedForSec) || 0) / 60));
+    return `TwoTimTwo refused the last sign-in, so the service is waiting ${wait} minute${wait === 1 ? '' : 's'} before trying again (it never hammers their login).`;
+  }
+  return CLOUD_ERRORS[/** @type {keyof typeof CLOUD_ERRORS} */ (String(error))] || `It did not work (${String(error).slice(0, 40)}).`;
+}
+
+/** "Wednesday, Oct 7" for a YYYY-MM-DD. @param {unknown} date */
+function clubNightWords(date) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(date || ''));
+  if (!m) return 'the last club night';
+  return new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]))).toLocaleDateString('en-US', { timeZone: 'UTC', weekday: 'long', month: 'short', day: 'numeric' });
+}
+
+/** @param {any} page */
+function checkinPageWords(page) {
+  if (!page || typeof page !== 'object') return '';
+  return page.ok
+    ? ` The check-in page read too (meeting ${String(page.calendarId || '?').slice(0, 12)}, ${Number(page.events) || 0} check-in items).`
+    : ' But the check-in page could not be read; check the user has the Record Checkin role.';
+}
+
+/** @param {unknown} n */
+const childrenWords = (n) => `${n} child${n === 1 ? '' : 'ren'} checked in`;
+
+/**
+ * The club-night test (the Worker's {test: true} read): the most recent club
+ * night's report, so the count can be held against the laptop's for that night.
+ * @param {any} test @param {boolean} throttled @param {any} st
+ * @returns {{ok: boolean, text: string}}
+ */
+function describeClubNightTest(test, throttled, st) {
+  const lead = throttled ? 'Read a moment ago (TwoTimTwo allows one read every 15 s): ' : '';
+  const day = clubNightWords(test.date);
+  if (!test.ok) {
+    const shape = test.shape && typeof test.shape === 'object' ? test.shape : null;
+    if (test.error === 'report-unreadable' && shape) {
+      const title = String(shape.title || '').slice(0, 80) || 'no title';
+      return {
+        ok: false,
+        text: `${lead}Signed in to TwoTimTwo, but the report for ${day} did not look like the report (page “${title}”, ` +
+          `${Number(shape.tables) || 0} tables, ${Number(shape.clubTables) || 0} with a club). If club met that night, ` +
+          'TwoTimTwo has changed the page: send this line to whoever looks after the screens.',
+      };
+    }
+    return { ok: false, text: lead + cloudErrorWords(test.error, st) };
+  }
+  const n = Number.isInteger(test.checkedIn) ? test.checkedIn : 0;
+  const partial = test.partial ? ' (TwoTimTwo listed more than could be read, so this is short)' : '';
+  const page = checkinPageWords(test.checkinPage);
+  return {
+    ok: !test.partial && (!test.checkinPage || test.checkinPage.ok === true),
+    text: `${lead}Signed in to TwoTimTwo and read the report for ${day}: ${childrenWords(n)}${partial}.${page} ` +
+      'It should match the laptop’s count for that night.',
+  };
+}
+
 /**
  * What the Setup card's "Test TwoTimTwo sign-in" says about the Worker's
  * answer to POST /v1/cloud/read-now (CLOUD-CHECKIN.md, phase 1). Pure. The
@@ -276,28 +346,13 @@ export function describeCloudTest(res) {
   if (body.error === 'not-configured') {
     return { ok: false, text: 'The sync service has no TwoTimTwo user yet. Add the TWOTIMTWO_USERNAME and TWOTIMTWO_PASSWORD secrets in GitHub, then run CI with "Redeploy the sync Worker" ticked.' };
   }
+  if (body.test && typeof body.test === 'object') return describeClubNightTest(body.test, Boolean(body.throttled), st);
   // A read in the last 15 s (TwoTimTwo's limit) is not repeated: report that one.
   const error = body.throttled ? st.lastError : body.error;
   const lead = body.throttled ? 'Read 15 seconds ago (TwoTimTwo allows one read every 15 s): ' : '';
-  if (error) {
-    const wait = Math.max(1, Math.ceil((Number(st.loginBlockedForSec) || 0) / 60));
-    const words = {
-      'login-refused': 'TwoTimTwo refused the user name or password. Check the two secrets in GitHub (and that the user can sign in on TwoTimTwo), then redeploy the Worker.',
-      'login-backoff': `TwoTimTwo refused the last sign-in, so the service is waiting ${wait} minute${wait === 1 ? '' : 's'} before trying again (it never hammers their login).`,
-      'twotimtwo-down': 'TwoTimTwo is not answering properly right now. Try again in a few minutes.',
-      timeout: 'TwoTimTwo took too long to answer. Try again in a few minutes.',
-      network: 'The sync service could not reach TwoTimTwo. Try again in a few minutes.',
-      'signed-out': 'TwoTimTwo signed the user in but then would not show the report. Check the user has the Record Checkin role.',
-      'report-unreadable': 'Signed in, but the check-in report did not look like the report. TwoTimTwo may have changed the page.',
-      'off-site-redirect': 'TwoTimTwo sent the service to another website, so it stopped. Check TWOTIMTWO_HOST is kvbchurch.twotimtwo.com.',
-    };
-    return { ok: false, text: lead + (words[/** @type {keyof typeof words} */ (error)] || `It did not work (${String(error).slice(0, 40)}).`) };
-  }
+  if (error) return { ok: false, text: lead + cloudErrorWords(error, st) };
   const n = Number.isInteger(st.checkedIn) ? st.checkedIn : null;
-  const count = n === null ? 'the report was only partly readable, so no count yet' : `${n} child${n === 1 ? '' : 'ren'} checked in today`;
+  const count = n === null ? 'the report was only partly readable, so no count yet' : `${childrenWords(n)} today`;
   const page = st.checkinPage;
-  const pageWords = !page ? '' : page.ok
-    ? ` The check-in page read too (meeting ${String(page.calendarId || '?').slice(0, 12)}, ${Number(page.events) || 0} check-in items).`
-    : ' But the check-in page could not be read; check the user has the Record Checkin role.';
-  return { ok: !page || page.ok, text: `${lead}Signed in to TwoTimTwo and read today’s report: ${count}.${pageWords}` };
+  return { ok: !page || page.ok, text: `${lead}Signed in to TwoTimTwo and read today’s report: ${count}.${checkinPageWords(page)}` };
 }

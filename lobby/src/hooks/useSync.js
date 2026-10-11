@@ -218,13 +218,14 @@ export async function saveTemplate(config) {
 
 /**
  * "Test TwoTimTwo sign-in": the Worker signs in as the church's check-in user
- * and reads today's report once (cloud check-in, phase 1). Read-only.
+ * and reads the most recent club night's report once (cloud check-in, phase
+ * 1), so the test means something on any day. Read-only.
  * @returns {Promise<{ok: boolean, text: string}>}
  */
 export async function testCloudCheckin() {
   const url = await ensureUrl();
   if (!url || !loadSyncSession()) return { ok: false, text: 'Sign this screen in with the passphrase first.' };
-  return describeCloudTest(await syncRequest(url, '/v1/cloud/read-now', { method: 'POST', body: {}, session: loadSyncSession() }));
+  return describeCloudTest(await syncRequest(url, '/v1/cloud/read-now', { method: 'POST', body: { test: true }, session: loadSyncSession() }));
 }
 
 /**

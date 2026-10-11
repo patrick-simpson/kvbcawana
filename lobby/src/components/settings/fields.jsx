@@ -448,7 +448,8 @@ export function TemplateField() {
 
 /**
  * Cloud check-in (CLOUD-CHECKIN.md): one button that has the sync service sign
- * in to TwoTimTwo as the church's check-in user and read today's report once,
+ * in to TwoTimTwo as the church's check-in user and read the most recent club
+ * night's report once (today's has no club tables on any other day),
  * so the owner can prove the secrets work before a club night. Read-only, and
  * the answer is counts only; TwoTimTwo allows one read every 15 seconds, so a
  * second press inside that reports the last read instead.
@@ -472,8 +473,8 @@ export function CloudCheckinTestField() {
       </button>
       <span className="hint" role="status">
         {note ? <strong className={note.ok ? undefined : 'hint--warn'}>{note.text}</strong> : null}{' '}
-        The sync service signs in as the church&rsquo;s check-in user and reads today&rsquo;s check-in report once.
-        It changes nothing on TwoTimTwo and shows only a count.
+        The sync service signs in as the church&rsquo;s check-in user and reads the last club night&rsquo;s
+        check-in report once. It changes nothing on TwoTimTwo and shows only a count.
       </span>
     </div>
   );

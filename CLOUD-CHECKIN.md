@@ -244,8 +244,11 @@ Read this first if you are picking the work up in a new session.
   → CI → Run workflow** with "Redeploy the sync Worker" ticked (a Worker only
   gets new secrets when it deploys). Before Wednesday, on any lobby screen signed
   in with the passphrase, open Settings → Setup → Cloud check-in → **Test
-  TwoTimTwo sign-in** (it calls `POST /api/v1/cloud/read-now` and says what
-  happened in words; a pass names today's count and the meeting id). On the
+  TwoTimTwo sign-in** (it calls `POST /api/v1/cloud/read-now` with
+  `{test: true}`, which reads the most recent club night's report, because
+  on any other day the report has no club tables; a pass names that night's
+  count, to hold against the laptop's, and an unreadable page is described
+  by its title and table counts, never its text). On the
   night, compare its `checkedIn` and `byClub` with the laptop's dashboard
   (the laptop takes checked-out children off; this does not yet). Watch for
   `lastError`, `partial` and `massUndoRefused`. One risk to watch: the

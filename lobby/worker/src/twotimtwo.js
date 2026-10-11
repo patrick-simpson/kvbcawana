@@ -126,6 +126,25 @@ export function parseCheckinReport(html) {
 }
 
 /**
+ * What a page looks like, for a "did not look like the report" message: its
+ * title and how many tables and club tables it has. Never any cell text, so
+ * never a name.
+ * @param {string} html
+ */
+export function pageShape(html) {
+  const doc = documentOf(html);
+  const tables = [...doc.querySelectorAll('table')];
+  const title = doc.querySelector('title');
+  return {
+    title: squash(title ? title.textContent : '').slice(0, 80),
+    bytes: String(html || '').length,
+    tables: tables.length,
+    clubTables: tables.filter((t) => t.querySelector('th.title img[alt]')).length,
+    loginForm: isLoginPage(html),
+  };
+}
+
+/**
  * The check-in page (/clubber/checkin): tonight's meeting id, its check-in
  * items with their club scopes, and the roster rows. Phase 1 keeps NO names
  * from it: ids, clubs and the checked-in mark only. null when it is not the
@@ -319,7 +338,9 @@ export class TwoTimTwoClient {
     const page = await this.page(`/clubber/checkin_report?date=${encodeURIComponent(date)}`);
     if (!page.ok) return page;
     const report = parseCheckinReport(page.html);
-    return report ? { ok: /** @type {const} */ (true), report } : { ok: /** @type {const} */ (false), error: 'report-unreadable' };
+    return report
+      ? { ok: /** @type {const} */ (true), report }
+      : { ok: /** @type {const} */ (false), error: 'report-unreadable', shape: pageShape(page.html) };
   }
 
   async checkinPage() {

@@ -88,6 +88,19 @@ export function watchWindow(ms) {
   return { open: false, date: t.date, untilMs: Math.max(60 * 1000, untilMin * 60 * 1000) };
 }
 
+/**
+ * The date of the most recent club night, today included: what the Settings
+ * test reads, because on any other day the report has no club tables at all.
+ * Calendar arithmetic on the local date, so a clock change cannot move it.
+ * @param {number} ms
+ */
+export function lastClubNight(ms) {
+  const t = localTime(ms);
+  const back = Math.min(...CLUB_NIGHTS.map((n) => (t.dow - n.dow + 7) % 7));
+  const [y, m, d] = t.date.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, d - back)).toISOString().slice(0, 10);
+}
+
 /** @param {string} secret */
 async function stateKey(secret) {
   const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), 'HKDF', false, ['deriveKey']);
@@ -291,6 +304,48 @@ export class Watcher {
   }
 
   /**
+   * The Settings button's test: sign in and read the most recent club night's
+   * report (today on a Wednesday), so it means something on any day. It
+   * changes nothing the watcher keeps but the shared 15 s clock; the answer is
+   * counts only, and on an unreadable page its shape (title, table counts).
+   */
+  async testRead() {
+    if (this.mode === 'off') return { ok: false, error: 'off', status: await this.status() };
+    const client = this.clientFor();
+    if (!client) return { ok: false, error: 'not-configured', status: await this.status() };
+    if (this.inFlight) await this.inFlight.catch(() => {});
+    const status = await this.loadStatus();
+    const now = this.now();
+    if (status.lastReadAt && now - Date.parse(status.lastReadAt) < READ_INTERVAL_MS) {
+      return { ok: !!status.lastTest?.ok, throttled: true, test: status.lastTest || null, status: await this.status() };
+    }
+    status.reads += 1;
+    status.lastReadAt = new Date(now).toISOString();
+    const date = lastClubNight(now);
+    const res = await client.report(date);
+    /** @type {Record<string, any>} */
+    let test;
+    if (res.ok) {
+      const kids = childrenOf(res.report.entries);
+      test = {
+        ok: true, date, checkedIn: Object.keys(kids).length, byClub: countByClub(kids), declared: res.report.declared,
+        partial: res.report.declared !== null && res.report.entries.length < res.report.declared,
+      };
+      const page = await client.checkinPage();
+      test.checkinPage = page.ok
+        ? { ok: true, calendarId: page.page.calendarId, events: page.page.events.length }
+        : { ok: false, error: page.error };
+    } else {
+      test = { ok: false, date, error: res.error, shape: 'shape' in res ? res.shape : null };
+    }
+    test.at = status.lastReadAt;
+    status.lastTest = test;
+    this.note(status, 'settings-test', { ok: test.ok, date });
+    await this.storage.put('cloud:status', status);
+    return { ok: test.ok, test, status: await this.status() };
+  }
+
+  /**
    * One read of tonight's report, applied by the rules above. Concurrent calls
    * share one read, and no read starts within READ_INTERVAL_MS of the last.
    * @returns {Promise<{ok: boolean, throttled?: boolean, error?: string, verdict?: string}>}
@@ -330,6 +385,7 @@ export class Watcher {
     if (client.logins > loginsBefore) this.note(status, 'sign-in', { ok: res.ok || res.error !== 'login-refused' });
     if (!res.ok) {
       status.lastError = res.error;
+      status.lastShape = 'shape' in res ? res.shape : null;
       this.note(status, 'error', { error: res.error });
       this.log(`[cloud] shadow: report read failed (${res.error})`);
       await this.storage.put('cloud:status', status);
@@ -340,6 +396,7 @@ export class Watcher {
     status.okReads += 1;
     status.lastOkAt = status.lastReadAt;
     status.lastError = null;
+    status.lastShape = null;
     status.verdict = verdict;
     status.declared = res.report.declared;
     if (verdict === 'partial') {

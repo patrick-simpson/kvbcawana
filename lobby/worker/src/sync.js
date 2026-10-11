@@ -384,7 +384,11 @@ export class SyncCore {
         case 'GET /v1/cloud/status':
           await this.watcher.arm();
           return json(await this.watcher.status());
-        case 'POST /v1/cloud/read-now': return json(await this.watcher.readNow());
+        case 'POST /v1/cloud/read-now': {
+          // {test: true} is the Settings button: the most recent club night.
+          const body = await this.body(request);
+          return json(body.test === true ? await this.watcher.testRead() : await this.watcher.readNow());
+        }
         default: return fail('Not found.', 404);
       }
     } catch (err) {

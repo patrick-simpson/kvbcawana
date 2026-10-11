@@ -204,3 +204,33 @@ describe('the cloud check-in test button\'s words', () => {
     expect(ok({ ok: true, throttled: true, status: { lastError: 'login-refused' } })).toMatchObject({ ok: false });
   });
 });
+
+describe('the club-night test\'s words (the button\'s own read)', () => {
+  const ok = (test, extra = {}) => describeCloudTest({ ok: true, status: 200, body: { ok: test.ok, test, status: {}, ...extra } });
+  const page = { ok: true, calendarId: '368', events: 3 };
+
+  it('a pass names the night and its count, to hold against the laptop', () => {
+    const r = ok({ ok: true, date: '2026-10-07', checkedIn: 11, partial: false, checkinPage: page });
+    expect(r.ok).toBe(true);
+    expect(r.text).toBe('Signed in to TwoTimTwo and read the report for Wednesday, Oct 7: 11 children checked in. ' +
+      'The check-in page read too (meeting 368, 3 check-in items). It should match the laptop’s count for that night.');
+  });
+
+  it('a short read is not a pass', () => {
+    const r = ok({ ok: true, date: '2026-10-07', checkedIn: 9, partial: true, checkinPage: page });
+    expect(r.ok).toBe(false);
+    expect(r.text).toContain('so this is short');
+  });
+
+  it('an unreadable report says what the page looked like', () => {
+    const r = ok({ ok: false, date: '2026-10-07', error: 'report-unreadable', shape: { title: 'KVBC - Checkin Report', tables: 1, clubTables: 0 } });
+    expect(r.ok).toBe(false);
+    expect(r.text).toContain('the report for Wednesday, Oct 7 did not look like the report (page “KVBC - Checkin Report”, 1 tables, 0 with a club)');
+  });
+
+  it('other failures keep their words, and a quick second press reports the last test', () => {
+    expect(ok({ ok: false, date: '2026-10-07', error: 'login-refused' }).text).toContain('refused the user name or password');
+    const again = ok({ ok: true, date: '2026-10-07', checkedIn: 2, checkinPage: page }, { throttled: true });
+    expect(again.text).toMatch(/^Read a moment ago .*2 children checked in/);
+  });
+});
