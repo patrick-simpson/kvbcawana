@@ -13,6 +13,7 @@ import {
   checkinReplyOk,
   parseCheckinReport,
   parseHouseholdCsv,
+  reportColumns,
   rowShape,
   twoTimTwoHost,
 } from '../src/twotimtwo.js';
@@ -136,6 +137,16 @@ describe('the row shape (for a report that reads short)', () => {
   it('a handler that carries text gives only its function name', () => {
     const html = page(table('Sparks ', []).replace('</thead>', "</thead><tr><td onclick=\"confirm('Undo Zed Uniquename?')\">x</td></tr>"));
     expect(JSON.stringify(rowShape(html))).not.toContain('Uniquename');
+  });
+});
+
+describe('the report\'s columns (no names)', () => {
+  it('gives each club\'s headings and counts its summary values only', () => {
+    const cols = reportColumns(SAMPLES.live);
+    expect(cols.map((c) => c.club)).toEqual(['Cubbies', 'Sparks', 'T&T']);
+    expect(cols[2].values).toEqual({ 'YES 1 Share 1 Point': 2 });
+    expect(cols[2].headers).toEqual(['2026-10-07', 'Clubber']);
+    expect(JSON.stringify(cols)).not.toMatch(/Tester/);
   });
 });
 

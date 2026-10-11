@@ -191,6 +191,34 @@ export function rowShape(html) {
 }
 
 /**
+ * Each club table's column headings and the summary values in its rows
+ * ("YES", "No 0 Shares 0 Points"), counted: what the report says beside each
+ * child, for Brought a friend (BARF Night, 2026-10-14). Headings are the
+ * church's item names, and a value is kept only when it is a summary cell
+ * (SUMMARY_CELL_RE), so never a name.
+ * @param {string} html
+ */
+export function reportColumns(html) {
+  const doc = documentOf(html);
+  /** @type {{club: string, headers: string[], values: Record<string, number>}[]} */
+  const out = [];
+  for (const table of doc.querySelectorAll('table')) {
+    const crest = table.querySelector('th.title img[alt]');
+    if (!crest) continue;
+    const headers = [...table.querySelectorAll('thead th')].filter((th) => !th.classList.contains('title'))
+      .map((th) => squash(th.textContent).slice(0, 40));
+    /** @type {Record<string, number>} */
+    const values = {};
+    for (const td of table.querySelectorAll('tbody td')) {
+      const t = squash(td.textContent);
+      if (t && SUMMARY_CELL_RE.test(t)) values[t.slice(0, 40)] = (values[t.slice(0, 40)] || 0) + 1;
+    }
+    out.push({ club: String(crest.getAttribute('alt') || '').trim(), headers, values });
+  }
+  return out;
+}
+
+/**
  * A check-in item's words ("Bible", "Brought a friend"): the label wrapping
  * it, the one for its id, or the label right after it, as the extension
  * reads them (collectApplicableEvents). Church-typed text, never a name.
