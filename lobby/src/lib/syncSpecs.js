@@ -122,9 +122,9 @@ export function sanitizeTemplate(raw) {
 
 // `computer` is the KVBC Awana Windows app (UNIFIED-APP.md, v9): a computer
 // registers with its roles (print server, display, or both) and its display
-// hours, under the name its first-run wizard gave it. The kind is here so the
-// registry, the allowlist and /settings' list already take it; the app's side
-// and its /settings card come with v9.
+// hours, under the name its first-run wizard gave it. The app's side is
+// printer/electron-app/src/device-sync.js, whose copy of this kind's rules
+// its test pins to the one below.
 
 /** @typedef {'lobby' | 'projector' | 'journey' | 'computer'} ScreenKind */
 
@@ -152,7 +152,8 @@ export const SCREEN_SPECS = {
   },
   // The two role switches and the club-night display hours (default 5:00 to
   // 8:00 pm). Whether a role may change now (never a print server turned off
-  // mid-print) is the app's to refuse; this only says what may be stored.
+  // mid-print) is the app's to hold until it is idle (its hello then carries
+  // `pendingRoleChange`); this only says what may be stored.
   computer: {
     printRole: { type: 'bool' },
     displayRole: { type: 'bool' },

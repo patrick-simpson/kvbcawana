@@ -212,6 +212,25 @@ describe('a screen\'s own settings', () => {
     expect((await s.call('GET', '/v1/screens')).body.screens.map((x) => x.kind)).toEqual(['computer']);
   });
 
+  it('a computer holding a print-off says so in its hello, and the list shows it until a hello without one', async () => {
+    const s = setup();
+    await s.signIn();
+    const PC = 'pc_eeeeeeeeeeeeeeeeeeee';
+    await s.call('POST', '/v1/screens/hello', { id: PC, kind: 'computer', name: 'Check-in laptop' });
+    const held = await s.call('POST', '/v1/screens/hello', {
+      id: PC, kind: 'computer', pendingRoleChange: { printRole: false, displayRole: true, audioMuted: true, displayFrom: 'soon' },
+    });
+    expect(held.body.screen.pendingRoleChange).toEqual({ printRole: false, displayRole: true });
+    expect((await s.call('GET', '/v1/screens')).body.screens[0].pendingRoleChange).toEqual({ printRole: false, displayRole: true });
+    await s.call('POST', '/v1/screens/hello', { id: PC, kind: 'computer' });
+    expect((await s.call('GET', '/v1/screens')).body.screens[0]).not.toHaveProperty('pendingRoleChange');
+    // Never for another kind, and junk is no hold.
+    await s.call('POST', '/v1/screens/hello', { id: TV, kind: 'lobby', pendingRoleChange: { printRole: false } });
+    await s.call('POST', '/v1/screens/hello', { id: PC, kind: 'computer', pendingRoleChange: 'yes' });
+    const list = (await s.call('GET', '/v1/screens')).body.screens;
+    expect(list.some((x) => 'pendingRoleChange' in x)).toBe(false);
+  });
+
   it('a save rings that screen\'s doorbell on the live channel, stamped strictly after the last', async () => {
     const s = setup();
     await s.signIn();

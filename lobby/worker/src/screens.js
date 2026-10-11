@@ -6,7 +6,8 @@
 // can list the screens and change any one of them from any device.
 //
 // WHAT IT HOLDS
-//   screens        one index, {[id]: {id, kind, name, createdAt, lastSeen}},
+//   screens        one index, {[id]: {id, kind, name, createdAt, lastSeen,
+//                  pending?}}, `pending` only for a computer (below),
 //                  at most SCREENS_MAX entries (one key, so no storage listing)
 //   screen:<id>    that screen's settings, {savedAt, settings}, through the
 //                  kind's allowlist (SCREEN_SPECS in src/lib/syncSpecs.js, the
@@ -18,6 +19,11 @@
 // replayed to a screen that connects later (a preview check-in an hour late
 // is worse than none), and neither goes to Pusher. No child's name is ever in
 // any of it: a screen's settings are its chime, motion and the like.
+//
+// A KVBC Awana computer (kind 'computer', UNIFIED-APP.md) never turns its
+// print server off while a label is printing or waiting: it holds that change
+// and says so in each hello as `pendingRoleChange` (the settings it is
+// waiting to apply), which the list shows until a hello without one.
 
 import {
   SCREEN_DEFAULT_NAMES,
@@ -44,7 +50,8 @@ const INDEX = 'screens';
 export const screenSettingsKey = (id) => `screen:${id}`;
 
 /**
- * @typedef {{id: string, kind: import('../../src/lib/syncSpecs.js').ScreenKind, name: string, createdAt: string, lastSeen: number}} ScreenRecord
+ * @typedef {{id: string, kind: import('../../src/lib/syncSpecs.js').ScreenKind, name: string, createdAt: string, lastSeen: number,
+ *   pending?: Record<string, unknown>}} ScreenRecord
  * @typedef {{savedAt: string, settings: Record<string, unknown>}} ScreenSettings
  * @typedef {{ok: true, body: unknown} | {ok: false, status: number, error: string}} Result
  */
@@ -99,6 +106,7 @@ export class Screens {
       lastSeen: new Date(r.lastSeen).toISOString(),
       live: onLive,
       online: onLive || this.now() - r.lastSeen <= ONLINE_MS,
+      ...(r.pending ? { pendingRoleChange: r.pending } : {}),
     };
   }
 
@@ -119,7 +127,7 @@ export class Screens {
   }
 
   /**
-   * POST /v1/screens/hello {id, kind, name?}: a screen says it is here. A new
+   * POST /v1/screens/hello {id, kind, name?, pendingRoleChange?}: a screen says it is here. A new
    * screen is added (named `name`, else its kind's default); a known one only
    * moves its lastSeen (its name is changed by rename, never by a hello, so a
    * TV restarting cannot undo a name given on /settings). The answer carries
@@ -135,15 +143,21 @@ export class Screens {
     const t = this.now();
     let r = Screens.pick(index, id);
     if (r && r.kind !== kind) return refuse(409, 'That id belongs to another kind of screen.');
+    // A computer's held change, through its allowlist; nothing for any other kind.
+    const held = kind === 'computer' ? sanitizeScreenSettings(kind, body.pendingRoleChange) : {};
+    const pending = Object.keys(held).length ? held : undefined;
     if (!r) {
       if (Object.keys(index).length >= SCREENS_MAX && !(await this.makeRoom(index))) {
         return refuse(409, 'The service already knows as many screens as it keeps. Forget an old one on the settings page.');
       }
       r = { id, kind, name: cleanScreenName(body.name) || SCREEN_DEFAULT_NAMES[kind], createdAt: new Date(t).toISOString(), lastSeen: t };
+      if (pending) r.pending = pending;
       index[id] = r;
       await this.saveIndex(index);
-    } else if (t - r.lastSeen >= SEEN_WRITE_MS) {
+    } else if (t - r.lastSeen >= SEEN_WRITE_MS || JSON.stringify(r.pending) !== JSON.stringify(pending)) {
       r.lastSeen = t;
+      if (pending) r.pending = pending;
+      else delete r.pending;
       await this.saveIndex(index);
     }
     return { ok: true, body: { screen: this.view({ ...r, lastSeen: t }, this.liveScreens()), settings: await this.settingsOf(id) } };
