@@ -3,8 +3,9 @@
 Owner request, 2026-10-11: "make this application so that the check-ins just
 happen in a cloud computer, and everything can be done without the check-in
 laptop existing", through Cloudflare, with labels still printing at church.
-This is the plan. Nothing here is built yet; each phase below lands on its own
-and the laptop keeps working until the last one.
+This is the plan; the status of each part is under "Status and hand-off" at
+the end. Each phase lands on its own and the laptop keeps working until the
+last one.
 
 ## The owner's decisions (2026-10-11)
 
@@ -211,3 +212,33 @@ The parsers and every request are built and tested against captured shapes
 (selectors and column names only, never real data, per `TWOTIMTWO.md`).
 Sessions do not sign in to the live TwoTimTwo site; every live check is the
 owner's shadow night, with a test child and an undo.
+
+## Status and hand-off
+
+Read this first if you are picking the work up in a new session.
+
+- **Plan and decisions:** this file (owner, 2026-10-11).
+- **TwoTimTwo's agreement:** the owner reports (2026-10-11) that TwoTimTwo
+  gave permission for an automated check-in user on the church's site.
+  Record who granted it and how (email, ticket) here when available.
+- **Built so far (printer 7.19.0):** the Linux print path the Pi needs.
+  `printer/print-server/cups.js` prints through CUPS and reads printer state
+  from `lpstat`; it is switched on with `AWANA_PRINT_BACKEND=cups` (plus
+  `PRINTER_NAME` set to the CUPS queue). Tested with stand-in `lp` / `lpstat`
+  (`scripts/test-cups.cjs`, `scripts/test-cups-server.cjs`); not yet on a real
+  Pi or printer.
+- **Not built yet:**
+  - the Pi image and its service (Node, the print server headless under
+    systemd with the two variables above, CUPS with `printer-driver-dymo`),
+    the station's pairing with the Worker, the print-job queue and the sealed
+    roster (pieces 3 and 4);
+  - the Worker's TwoTimTwo client and the report watcher (pieces 1 and 2).
+    A Claude Code session on 2026-10-11 was stopped by its environment's
+    safety check before building the unattended TwoTimTwo sign-in, even after
+    the owner reported permission; that part may need to be built outside
+    such a session, or with the permission documented above;
+  - the phone page and touch screen answered by the Worker (piece 5), and the
+    Worker publishing the screens' frames (piece 6).
+- **Owner's to-do (phase 0):** the dedicated TwoTimTwo user and its GitHub
+  secrets, the Pi hardware, the printer's exact model, and changing the
+  password that was posted in a chat on 2026-10-11.

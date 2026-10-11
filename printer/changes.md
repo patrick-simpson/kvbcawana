@@ -1,4 +1,9 @@
-﻿## Website - 2026-10-11
+﻿## [7.19.0] - 2026-10-11
+The print server can run on a Raspberry Pi, printing through CUPS.
+
+**New: a Linux print path (the print station in CLOUD-CHECKIN.md).** With `AWANA_PRINT_BACKEND=cups` set, the print server sends each label to CUPS (`lp`) instead of Windows, and reads the printer list and its state (paused, out of labels, jammed, offline) from `lpstat`, so the dashboard's printer warnings work the same. The label itself is unchanged: the same renderer and the same PNG. The roll defaults to the DYMO 30256 (`w167h288`); `cupsMedia` in Settings names another. Nothing changes on Windows: the switch is never inferred from the operating system, so the Windows app prints exactly as before.
+
+## Website - 2026-10-11
 The old one-line PowerShell install now installs the Windows app.
 
 **The old repos are archived (owner).** `irm https://awana.kvbchurch.org/install.ps1 | iex` used to download the PowerShell script install from Print-TwoTimTwo-Labels, which is now read-only: it would have installed code that can never update and predates the sync service. The command now downloads and starts the Club Label Printer app from the site's download link instead, and the install guide no longer offers the script install (it says the app imports an old `C:\output` install by itself). No app release: nothing in `print-server/` or `electron-app/` changed. The download, issues and contract links in the docs, and the prompt the ideas page builds, now name this repo (kvbcawana) instead of the archived ones.

@@ -113,6 +113,17 @@ pages with the Check-in Display's and Journey Display's `about.html`.
   purity). Fail open: any broken template renders the stock label. Safety
   content (allergy icons, no-photo camera, birthday) is not templatable.
 
+**Printing on Linux (7.19.0, CLOUD-CHECKIN.md's Raspberry Pi print station).**
+`print-server/cups.js` prints the same label PNG through CUPS (`lp`, argument
+arrays only, a queue name with spaces is refused) and reads `lpstat -l -p -d`
+into the Get-Printer shape `printerSetupWarnings()` already judges. It is ON
+only when `AWANA_PRINT_BACKEND=cups` (the station's service sets it, with
+`PRINTER_NAME`): never inferred from the OS, because the test suites run on
+Linux with a stand-in `powershell`. `config.cupsMedia` names the roll (default
+DYMO 30256, `w167h288`). The Windows path is untouched.
+`scripts/test-cups.cjs` (parsers, and the runners against stand-in `lp` /
+`lpstat`) and `scripts/test-cups-server.cjs` (the real server in station mode).
+
 **Tonight's count:** TwoTimTwo's own `/clubber/checkin_report` is the source of
 truth when it is fresh (received within `REPORT_FRESH_MS`, 12 minutes); the
 printer's own history is the fallback, and `/health` raises a

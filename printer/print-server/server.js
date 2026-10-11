@@ -28,6 +28,12 @@ const syncClient = require('./sync-client');
 const phoneRelay = require('./phone-relay');
 const pickup = require('./pickup');
 const { execFile } = require('child_process');
+const cups = require('./cups');
+// The Raspberry Pi print station (CLOUD-CHECKIN.md) prints through CUPS. It is
+// an explicit opt-in its service sets, never inferred from the OS: the test
+// suites run on Linux with a stand-in `powershell`, and the Windows app is
+// untouched either way.
+const CUPS_BACKEND = process.env.AWANA_PRINT_BACKEND === 'cups';
 const http  = require('http');
 const https = require('https');
 const crypto = require('crypto');
@@ -2781,7 +2787,33 @@ function printImage(imagePath, printerName) {
   return withPrinter(() => printImageNow(imagePath, printerName));
 }
 
+// The Raspberry Pi print station (CUPS_BACKEND): the same label through CUPS, with the same one retry. config.cupsMedia names the label roll.
+async function printImageCups(imagePath, printerName) {
+  let lastErr = null;
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      const id = await cups.cupsPrint(imagePath, printerName || '', { media: config.cupsMedia });
+      console.log('[print] CUPS job', id);
+      return;
+    } catch (e) {
+      lastErr = e;
+      if (attempt < 2) {
+        console.warn(`[print] Attempt ${attempt} failed (${String(e.message).split('\n')[0]}) — retrying in 750ms`);
+        await sleep(750);
+      }
+    }
+  }
+  throw lastErr;
+}
+
+// What CUPS knows, in the shape the Windows checks read from Get-Printer.
+async function cupsPrinterRows() {
+  const got = await cups.cupsPrinters();
+  return got ? got.printers.map((p) => ({ Name: p.name, PrinterStatus: p.status, Default: p.isDefault })) : null;
+}
+
 async function printImageNow(imagePath, printerName) {
+  if (CUPS_BACKEND) return printImageCups(imagePath, printerName);
   // Escape single quotes in paths/names for PowerShell single-quoted strings
   const safePath    = imagePath.replace(/'/g, "''");
   const safePrinter = (printerName || '').replace(/'/g, "''");
@@ -2845,6 +2877,12 @@ $pd.Dispose()
 // success while the child walks away with nothing. Off Windows (tests) or if
 // the query itself fails, assume yes and let printImage() be the judge.
 async function fallbackPrinterReady(name) {
+  if (CUPS_BACKEND) {
+    const rows = await cupsPrinterRows();
+    if (!rows) return true;
+    const row = rows.find((p) => p.Name === name);
+    return !!row && !PRINTER_STATUS_PROBLEMS[row.PrinterStatus];
+  }
   if (process.platform !== 'win32') return true;
   try {
     const safe = name.replace(/'/g, "''");
@@ -3829,6 +3867,16 @@ app.get('/roster-status', (req, res) => {
 });
 
 app.get('/printers', async (req, res) => {
+  if (CUPS_BACKEND) {
+    const rows = await cupsPrinterRows();
+    if (!rows) {
+      res.status(500).json({ error: 'Failed to list printers', printers: [], inUse: printingTarget() });
+      return;
+    }
+    const printers = rows.map((p) => ({ name: p.Name, isWindowsDefault: !!p.Default }));
+    res.json({ printers, serverDefault: PRINTER_NAME || null, autoDetected: printers.length === 1 ? printers[0].name : null, inUse: printingTarget() });
+    return;
+  }
   try {
     const raw = (await runPowerShell(['-Command', 'Get-Printer | Select-Object Name, Default | ConvertTo-Json -Compress'], { timeout: 8000 })).trim();
     let parsed = JSON.parse(raw);
@@ -8061,9 +8109,12 @@ async function probePrinterWarnings(now) {
     }
   } catch (e) { /* ignore */ }
 
-  // Check printer (Windows only)
+  // Check printer (Windows, and CUPS on the Linux print station; the spooler
+  // backlog probe is Windows-only)
   let spooler = SPOOLER_UNKNOWN;
-  if (process.platform === 'win32') {
+  if (CUPS_BACKEND) {
+    warnings.push(...printerSetupWarnings(PRINTER_NAME, PRINTER_NAME ? await cupsPrinterRows() : []));
+  } else if (process.platform === 'win32') {
     let printers = null;
     if (PRINTER_NAME) {
       try {
@@ -8569,7 +8620,7 @@ app.post('/config', (req, res) => {
     labelFooter, connectCardAutoFirstTimer, connectCardGreeting, seasonTheme,
     musicalPrinter, updateBeacon, slidesPublishToken, displayLoginPassphrase,
     trophyBand, fleetConfigUrl, pickupClubs,
-    backupPrinterName,
+    backupPrinterName, cupsMedia,
   } = req.body || {};
   if (!isTrustedConfigOrigin(req) && SECRET_CONFIG_KEYS.some(k => (req.body || {})[k] !== undefined)) {
     return res.status(403).json({ error: 'Pusher/PIN/display-login settings can only be changed from the dashboard on this computer' });
@@ -8736,6 +8787,13 @@ app.post('/config', (req, res) => {
     const retiredReceipt = String(next.receiptPrinterName || '').trim().toLowerCase();
     RETIRED_PRINTER_KEYS.forEach((k) => { delete next[k]; });
     if (retiredReceipt && String(next.backupPrinterName || '').trim().toLowerCase() === retiredReceipt) next.backupPrinterName = '';
+    // The label roll on a Linux print station (cups.js): a CUPS media keyword,
+    // '' for the DYMO 30256 default.
+    if (cupsMedia !== undefined) {
+      const m = String(cupsMedia || '').trim();
+      if (m && !cups.isMediaKeyword(m)) return res.status(400).json({ error: 'cupsMedia is not a CUPS media name' });
+      if (m) next.cupsMedia = m; else delete next.cupsMedia;
+    }
     if (enableDrivenCheckin !== undefined) next.enableDrivenCheckin = !!enableDrivenCheckin;
     // "Clubs on the pickup list" (7.16.0): the one setting every lobby
     // screen's still-here list follows. null puts it back to the default
@@ -9364,7 +9422,12 @@ app.get('/diagnostics', async (req, res) => {
   results.push({ test: 'Server running', passed: true, detail: `v${SERVER_VERSION}, uptime ${Math.round(process.uptime())}s` });
 
   // 2. Printer detected
-  if (process.platform === 'win32') {
+  if (CUPS_BACKEND) {
+    const rows = await cupsPrinterRows();
+    const target = PRINTER_NAME || (rows || []).find((p) => p.Default)?.Name || '(none)';
+    const found = !!rows && rows.some((p) => p.Name === (PRINTER_NAME || '') || (!PRINTER_NAME && p.Default));
+    results.push({ test: 'Printer detected', passed: found, detail: rows ? target : 'CUPS did not answer (lpstat)' });
+  } else if (process.platform === 'win32') {
     try {
       const raw = (await runPowerShell(['-Command', 'Get-Printer | Select-Object Name, Default | ConvertTo-Json -Compress'], { timeout: 8000 })).trim();
       let parsed = JSON.parse(raw);
