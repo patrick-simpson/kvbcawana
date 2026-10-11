@@ -25,6 +25,7 @@ import { QuickNav } from './views/QuickNav.jsx';
 import { TouchMenu } from './views/TouchMenu.jsx';
 import { ConfigureView } from './views/ConfigureView.jsx';
 import { listenForRelay, relayToScreen } from '../lib/configureRelay.js';
+import { useProjectorScreen } from './hooks/useProjectorScreen.js';
 import { unlockStingers } from './lib/stingers.js';
 import { isTouch, usePortrait, useTouch } from './lib/touch.js';
 
@@ -162,6 +163,17 @@ export const App = () => {
       else if (isTarget(target)) select(target);
     });
   }, [select, resume]);
+
+  // Managed from /settings (SETTINGS.md, phase 2): registered with the sync
+  // Worker, its two switches followed, a wall pick or Resume obeyed. Never
+  // from the configure page itself.
+  useProjectorScreen({
+    enabled: !CONFIGURE,
+    onAction: (action, target) => {
+      if (action === 'resume') resume();
+      else if (action === 'select' && isTarget(target)) select(target);
+    },
+  });
 
   if (CONFIGURE) {
     return (

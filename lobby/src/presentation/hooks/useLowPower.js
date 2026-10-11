@@ -71,6 +71,9 @@ function subscribe(fn) {
   return () => listeners.delete(fn);
 }
 
+/** Follow the saved preference (the screen registry sends a change up). */
+export const subscribeLowPower = subscribe;
+
 export function useLowPower() {
   return useSyncExternalStore(subscribe, isLowPower, isLowPower);
 }
