@@ -66,7 +66,9 @@ export class CloudPhone {
       const p = await client.checkinPage();
       events = p.ok ? p.page.events : [];
     }
-    const out = { households: hh.ok ? hh.households : [], items: itemClubs(events), at: t };
+    // Why there are no families, as a fixed code (never page text), so a roster
+    // without them can be told apart from a household export that failed.
+    const out = { households: hh.ok ? hh.households : [], items: itemClubs(events), at: t, ...(hh.ok ? {} : { familiesError: hh.error }) };
     // Only a good read is kept: a failure is asked again next time.
     if (hh.ok) this.familiesCache = out;
     return out;
@@ -86,7 +88,7 @@ export class CloudPhone {
     const f = await this.families();
     return {
       ...body,
-      ...(noFamilies ? { households: f.households } : {}),
+      ...(noFamilies ? { households: f.households, ...(f.familiesError ? { familiesError: f.familiesError } : {}) } : {}),
       ...(noItems ? { items: f.items } : {}),
     };
   }
@@ -187,7 +189,7 @@ export class CloudPhone {
       }
     }
     const f = await this.families(page.page);
-    return { status: 200, body: { kids, households: f.households, items: itemClubs(page.page.events), recent: { ready: false, names: [] }, source: 'cloud' } };
+    return { status: 200, body: { kids, households: f.households, ...(f.familiesError ? { familiesError: f.familiesError } : {}), items: itemClubs(page.page.events), recent: { ready: false, names: [] }, source: 'cloud' } };
   }
 
   /** Tonight with the laptop off: today's report, as the laptop's /phone/tonight shapes it. */

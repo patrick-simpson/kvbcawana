@@ -209,6 +209,7 @@ describe('families on the roster (owner, 2026-10-11)', () => {
     const ans = await s.relay('POST', '/phone/roster', {});
     expect(ans.status).toBe(200);
     expect(ans.body.households).toEqual([]);
+    expect(ans.body.familiesError).toBe('households-unreadable');
     expect(ans.body.kids.length).toBe(3);
   });
 
