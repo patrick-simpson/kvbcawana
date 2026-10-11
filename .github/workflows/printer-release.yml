@@ -159,6 +159,11 @@ jobs:
           name: label-render-samples
           path: printer/render-smoke-out/*.png
           if-no-files-found: error
+          # Only passed between this run's jobs (build, smoke test, release); the
+          # installers people download live on the Release. Kept a day, not
+          # GitHub's default 90, which filled the account's 0.5 GB of Actions
+          # storage with old installers (owner, 2026-10-11).
+          retention-days: 1
 
       - name: Install electron-app dependencies
         run: npm ci
@@ -179,6 +184,11 @@ jobs:
             printer/electron-app/dist/*.blockmap
             printer/electron-app/dist/latest.yml
           if-no-files-found: error
+          # Only passed between this run's jobs (build, smoke test, release); the
+          # installers people download live on the Release. Kept a day, not
+          # GitHub's default 90, which filled the account's 0.5 GB of Actions
+          # storage with old installers (owner, 2026-10-11).
+          retention-days: 1
 
   smoke-test:
     needs: build

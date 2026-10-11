@@ -145,6 +145,11 @@ jobs:
         with:
           name: Awana-Lobby-Display-Setup
           if-no-files-found: error
+          # Only passed between this run's jobs (build, smoke test, release); the
+          # installers people download live on the Release. Kept a day, not
+          # GitHub's default 90, which filled the account's 0.5 GB of Actions
+          # storage with old installers (owner, 2026-10-11).
+          retention-days: 1
           path: |
             lobby/desktop/release/Awana-Lobby-Display-Setup.exe
             lobby/desktop/release/Awana-Lobby-Display-Setup.exe.blockmap
