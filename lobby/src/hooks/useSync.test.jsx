@@ -4,7 +4,7 @@ import { useSync, useSyncDriver, ringSyncDoorbell, signIn, syncNow, _resetSyncFo
 import { dispatchEvent } from './useSocket.js';
 import { _resetForTest as resetConfig, receiveSharedSettings, useConfig } from './useConfig.js';
 import { loadSyncSession, saveSyncSession } from '../lib/syncService.js';
-import { CloudCheckinTestField, SyncSignInField } from '../components/settings/fields.jsx';
+import { BarfBagsField, CloudCheckinTestField, FriendsListField, SyncSignInField } from '../components/settings/fields.jsx';
 import { useCalendar } from './useCalendar.js';
 
 const BASE = 'https://awana-sync.example.workers.dev';
@@ -207,5 +207,37 @@ describe('Setup: Test TwoTimTwo sign-in', () => {
     const view = within(render(<CloudCheckinTestField />).container);
     fireEvent.click(view.getByRole('button', { name: 'Test TwoTimTwo sign-in' }));
     await waitFor(() => expect(view.getByRole('status').querySelector('.hint--warn')?.textContent).toContain('refused the user name or password'));
+  });
+});
+
+describe('Setup: BARF Night', () => {
+  it('shows tonight\'s list grouped by club', async () => {
+    fakeService({ '/v1/cloud/friends': () => [200, { date: '2026-10-14', total: 2, clubs: [
+      { club: 'Sparks', kids: [{ name: 'Kit Tester', friend: 'Maya' }] },
+      { club: 'Trek', kids: [{ name: 'Al Tester', friend: '' }] },
+    ] }] });
+    saveSyncSession(SESSION);
+    _resetSyncForTest();
+    const view = within(render(<FriendsListField />).container);
+    fireEvent.click(view.getByRole('button', { name: 'Show tonight’s list' }));
+    await waitFor(() => expect(view.getByRole('status').textContent).toContain('2 children brought a friend tonight.'));
+    expect(view.getByRole('status').textContent).toContain('Kit Tester: brought Maya');
+    expect(view.getByRole('status').textContent).toContain('Al Tester: friend’s name not given');
+  });
+
+  it('asks before printing the BARF Bag labels, then says what went', async () => {
+    const calls = fakeService({ '/v1/cloud/barf-bags': () => [200, { ok: true, labels: 3, kids: 2, friends: 1, unnamed: 1, date: '2026-10-14' }] });
+    saveSyncSession(SESSION);
+    _resetSyncForTest();
+    const confirm = vi.spyOn(window, 'confirm');
+    confirm.mockReturnValueOnce(false);
+    const view = within(render(<BarfBagsField />).container);
+    fireEvent.click(view.getByRole('button', { name: 'Print BARF Bag labels' }));
+    expect(calls.some((c) => c.url.endsWith('/v1/cloud/barf-bags'))).toBe(false);
+    confirm.mockReturnValueOnce(true);
+    fireEvent.click(view.getByRole('button', { name: 'Print BARF Bag labels' }));
+    await waitFor(() => expect(view.getByRole('status').textContent).toContain('Sent 3 BARF Bag labels to the label printer as one job: 2 children and 1 friend.'));
+    expect(view.getByRole('status').textContent).toContain('1 friend was checked in at TwoTimTwo’s desk box with no name');
+    confirm.mockRestore();
   });
 });

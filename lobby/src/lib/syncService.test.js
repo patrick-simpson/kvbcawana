@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   SYNC_SESSION_STORAGE,
+  describeBarfBags,
   describeCloudTest,
   SYNC_URL_STORAGE,
   isValidSyncUrl,
@@ -232,5 +233,15 @@ describe('the club-night test\'s words (the button\'s own read)', () => {
     expect(ok({ ok: false, date: '2026-10-07', error: 'login-refused' }).text).toContain('refused the user name or password');
     const again = ok({ ok: true, date: '2026-10-07', checkedIn: 2, checkinPage: page }, { throttled: true });
     expect(again.text).toMatch(/^Read a moment ago .*2 children checked in/);
+  });
+});
+
+describe('the BARF Bag button\'s words', () => {
+  const ans = (body) => describeBarfBags({ ok: true, status: 200, body });
+  it('names what went, and what could not', () => {
+    expect(ans({ ok: true, labels: 1, kids: 1, friends: 0, unnamed: 1 }).text).toBe('Sent 1 BARF Bag label to the label printer as one job: 1 child and 0 friends. 1 friend was checked in at TwoTimTwo’s desk box with no name, so no label for them.');
+    expect(ans({ ok: false, reason: 'none' }).text).toContain('Nobody has been checked in with Brought a friend');
+    expect(ans({ ok: false, reason: 'laptop-off' })).toMatchObject({ ok: false, text: expect.stringContaining('laptop is not on') });
+    expect(describeBarfBags({ ok: false, status: 404, body: {} }).text).toContain('next deploy');
   });
 });

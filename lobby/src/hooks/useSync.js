@@ -8,6 +8,7 @@ import { useEffect, useRef, useSyncExternalStore } from 'react';
 import {
   SYNC_CHANGE_EVENT,
   SYNC_POLL_MS,
+  describeBarfBags,
   describeCloudTest,
   loadSyncSession,
   resolveSyncUrl,
@@ -226,6 +227,29 @@ export async function testCloudCheckin() {
   const url = await ensureUrl();
   if (!url || !loadSyncSession()) return { ok: false, text: 'Sign this screen in with the passphrase first.' };
   return describeCloudTest(await syncRequest(url, '/v1/cloud/read-now', { method: 'POST', body: { test: true }, session: loadSyncSession() }));
+}
+
+/**
+ * "Print BARF Bag labels": the Worker sends tonight's names (each child who
+ * brought a friend, and each named friend) to the laptop, printed as one job.
+ * @returns {Promise<{ok: boolean, text: string}>}
+ */
+export async function printBarfBags() {
+  const url = await ensureUrl();
+  if (!url || !loadSyncSession()) return { ok: false, text: 'Sign this screen in with the passphrase first.' };
+  return describeBarfBags(await syncRequest(url, '/v1/cloud/barf-bags', { method: 'POST', body: {}, session: loadSyncSession() }));
+}
+
+/**
+ * Tonight's list of who brought a friend (BARF Night), grouped by club.
+ * @returns {Promise<{ok: true, report: {date: string, total: number, clubs: {club: string, kids: {name: string, friend: string}[]}[]}} | {ok: false, text: string}>}
+ */
+export async function loadFriendsReport() {
+  const url = await ensureUrl();
+  if (!url || !loadSyncSession()) return { ok: false, text: 'Sign this screen in with the passphrase first.' };
+  const res = await syncRequest(url, '/v1/cloud/friends', { session: loadSyncSession() });
+  if (res.ok && res.body && Array.isArray(res.body.clubs)) return { ok: true, report: res.body };
+  return { ok: false, text: res.status === 0 ? 'Could not reach the sync service.' : (res.body?.error || `The sync service answered HTTP ${res.status}.`) };
 }
 
 /**

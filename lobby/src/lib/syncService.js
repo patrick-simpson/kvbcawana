@@ -356,3 +356,25 @@ export function describeCloudTest(res) {
   const page = st.checkinPage;
   return { ok: !page || page.ok, text: `${lead}Signed in to TwoTimTwo and read today’s report: ${count}.${checkinPageWords(page)}` };
 }
+
+/**
+ * What "Print BARF Bag labels" says about the Worker's answer to POST
+ * /v1/cloud/barf-bags (BARF Night, owner 2026-10-11). Pure.
+ * @param {{ok: boolean, status: number, body: any}} res
+ * @returns {{ok: boolean, text: string}}
+ */
+export function describeBarfBags(res) {
+  if (res.status === 0) return { ok: false, text: 'Could not reach the sync service. Check this screen’s internet connection.' };
+  if (res.status === 401) return { ok: false, text: 'This screen is signed out. Type the passphrase again above, then try.' };
+  if (res.status === 404) return { ok: false, text: 'The sync service does not have BARF Bag labels yet. They arrive with its next deploy.' };
+  const b = res.body && typeof res.body === 'object' ? res.body : {};
+  if (!res.ok) return { ok: false, text: typeof b.error === 'string' ? b.error : `The sync service answered HTTP ${res.status}.` };
+  const n = (/** @type {unknown} */ x) => (Number.isInteger(x) ? /** @type {number} */ (x) : 0);
+  const unnamed = n(b.unnamed) ? ` ${n(b.unnamed)} friend${n(b.unnamed) === 1 ? ' was' : 's were'} checked in at TwoTimTwo’s desk box with no name, so no label for ${n(b.unnamed) === 1 ? 'them' : 'those'}.` : '';
+  if (b.ok) {
+    return { ok: true, text: `Sent ${n(b.labels)} BARF Bag label${n(b.labels) === 1 ? '' : 's'} to the label printer as one job: ${n(b.kids)} child${n(b.kids) === 1 ? '' : 'ren'} and ${n(b.friends)} friend${n(b.friends) === 1 ? '' : 's'}.${unnamed}` };
+  }
+  if (b.reason === 'none') return { ok: false, text: 'Nobody has been checked in with Brought a friend tonight yet.' };
+  if (b.reason === 'laptop-off') return { ok: false, text: 'The check-in laptop is not on, so nothing could print. Turn it on (with the label printer), then press again.' };
+  return { ok: false, text: 'Too many requests are waiting for the laptop. Try again in a moment.' };
+}

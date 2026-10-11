@@ -9,7 +9,8 @@ import { maskDisplayKey } from '../../lib/displayKey.js';
 import { isPlausibleKey } from '../../lib/envelope.js';
 import { loadPublishToken, maskPublishToken, savePublishToken } from '../../lib/publishToken.js';
 import CornerTab from '../brand/CornerTab.jsx';
-import { changePassphrase, saveTemplate, signIn, signOut, testCloudCheckin, useSync } from '../../hooks/useSync.js';
+import { changePassphrase, loadFriendsReport, printBarfBags, saveTemplate, signIn, signOut, testCloudCheckin, useSync } from '../../hooks/useSync.js';
+import { RELEASE_NOTES_URL, parseReleaseNotes } from '../../lib/releaseNotes.js';
 import { useConfig } from '../../hooks/useConfig.js';
 import { PASSPHRASE_MIN, TEMPLATE_KEYS } from '../../lib/syncSpecs.js';
 
@@ -477,6 +478,99 @@ export function CloudCheckinTestField() {
         check-in report once. It changes nothing on TwoTimTwo and shows only a count.
       </span>
     </div>
+  );
+}
+
+/**
+ * BARF Night (owner, 2026-10-11): one press prints a BARF Bag label for each
+ * child who brought a friend tonight and for each friend, as one job on the
+ * label printer (through the sync service to the check-in laptop). It asks
+ * first: a stray tap would spend a strip of labels.
+ */
+export function BarfBagsField() {
+  const sync = useSync();
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState(/** @type {{text: string, ok: boolean} | null} */ (null));
+  if (!sync.signedIn) return null;
+  const run = async () => {
+    if (!window.confirm('Print a BARF Bag label for every child who brought a friend tonight, and for each friend?')) return;
+    setBusy(true);
+    setNote(null);
+    setNote(await printBarfBags());
+    setBusy(false);
+  };
+  return (
+    <div className="field">
+      <button type="button" className="ghost section-jump" disabled={busy} onClick={run}>
+        {busy ? 'Sending to the label printer…' : 'Print BARF Bag labels'}
+      </button>
+      <span className="hint" role="status">
+        {note ? <strong className={note.ok ? undefined : 'hint--warn'}>{note.text}</strong> : null}{' '}
+        One label each, &ldquo;SOPHIA&rsquo;S BARF BAG&rdquo;, for every child checked in with Brought a friend
+        tonight and every friend whose name was typed, printed together on the check-in laptop&rsquo;s label printer.
+      </span>
+    </div>
+  );
+}
+
+/** Tonight's "who brought a friend", grouped by club, on request (BARF Night). */
+export function FriendsListField() {
+  const sync = useSync();
+  const [busy, setBusy] = useState(false);
+  const [got, setGot] = useState(/** @type {any} */ (null));
+  if (!sync.signedIn) return null;
+  const run = async () => { setBusy(true); setGot(await loadFriendsReport()); setBusy(false); };
+  const r = got && got.ok ? got.report : null;
+  return (
+    <div className="field">
+      <button type="button" className="ghost section-jump" disabled={busy} onClick={run}>
+        {busy ? 'Loading…' : r ? 'Refresh tonight’s list' : 'Show tonight’s list'}
+      </button>
+      {got && !got.ok && <span className="hint hint--warn" role="status">{got.text}</span>}
+      {r && (
+        <div className="release-notes" role="status">
+          <p className="hint"><strong>{r.total} {r.total === 1 ? 'child' : 'children'} brought a friend tonight.</strong></p>
+          {r.clubs.map((/** @type {any} */ c) => (
+            <section key={c.club} className="release-notes__version">
+              <h4>{c.club}</h4>
+              {c.kids.map((/** @type {any} */ k) => (
+                <p key={k.name} className="hint">{k.name}: {k.friend ? `brought ${k.friend}` : 'friend’s name not given'}</p>
+              ))}
+            </section>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * The label printer's full release notes (owner, 2026-10-11), read from the
+ * site (printer/changes.md, published by site/build.mjs). Loaded when opened.
+ */
+export function ReleaseNotesField() {
+  const [notes, setNotes] = useState(/** @type {import('../../lib/releaseNotes.js').Section[] | null | 'error'} */ (null));
+  const load = () => {
+    if (notes) return;
+    fetch(RELEASE_NOTES_URL, { cache: 'no-store' })
+      .then((r) => (r.ok ? r.text() : Promise.reject(new Error(String(r.status)))))
+      .then((t) => { const parsed = parseReleaseNotes(t); setNotes(parsed.length ? parsed : 'error'); })
+      .catch(() => setNotes('error'));
+  };
+  return (
+    <details className="advanced-fields release-notes" onToggle={(e) => { if (e.currentTarget.open) load(); }}>
+      <summary>Club Label Printer release notes</summary>
+      {notes === null && <p className="hint">Loading…</p>}
+      {notes === 'error' && <p className="hint hint--warn">The release notes could not be loaded. Check this screen&rsquo;s internet connection.</p>}
+      {Array.isArray(notes) && notes.map((sec) => (
+        <section key={sec.title} className="release-notes__version">
+          <h4>{sec.title}</h4>
+          {sec.paragraphs.map((runs, i) => (
+            <p key={i} className="hint">{runs.map((r, j) => (r.bold ? <strong key={j}>{r.text}</strong> : <span key={j}>{r.text}</span>))}</p>
+          ))}
+        </section>
+      ))}
+    </details>
   );
 }
 

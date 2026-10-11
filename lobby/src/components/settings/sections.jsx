@@ -14,7 +14,7 @@ import { DESKTOP_APP_DOWNLOAD_URL, DESKTOP_APP_GUIDE_URL, JOURNEY_URL, PROJECTOR
 import { phaseWords } from '../../lib/settingsSections.js';
 import {
   ChangePassphraseField, DisplayKeyField, DisplayLoginField, MilestoneListField, PanelCard, PptxUploadField,
-  CloudCheckinTestField, PublishTokenField, SyncSignInField, TemplateField,
+  BarfBagsField, CloudCheckinTestField, FriendsListField, PublishTokenField, ReleaseNotesField, SyncSignInField, TemplateField,
   Toggle, VideoUploadField,
 } from './fields.jsx';
 
@@ -1051,8 +1051,16 @@ export function SetupSection({
             now it only watches and counts, beside the laptop.
           </p>
           <CloudCheckinTestField />
+          <h4 className="settings-subhead">BARF Night</h4>
+          <FriendsListField />
+          <BarfBagsField />
         </PanelCard>
       )}
+
+      <PanelCard title="Release notes" tab="var(--brand-trek)">
+        <p className="hint">Everything that has changed in the check-in laptop&rsquo;s Club Label Printer, newest first.</p>
+        <ReleaseNotesField />
+      </PanelCard>
 
       <PanelCard title="Tools" tab="var(--brand-trek)">
         <div className="tool-grid">

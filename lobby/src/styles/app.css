@@ -3722,6 +3722,12 @@ input:focus-visible {
 .stage.april-fools .setup-card { transform: rotate(180deg); }
 
 /* Settings → Connection: the by-hand key fields fold away behind the login. */
+/* Settings → Setup: the Cloud check-in card's BARF Night heading and the
+   release notes (owner, 2026-10-11). */
+.panel .settings-subhead { margin: 1.1rem 0 0.35rem; font-family: var(--brand-font-label, inherit); font-size: 1.05rem; letter-spacing: 0.02em; }
+.release-notes__version { margin: 0.9rem 0 0; }
+.release-notes__version h4 { margin: 0 0 0.3rem; font-size: 1rem; }
+.release-notes__version .hint { display: block; margin: 0 0 0.45rem; }
 details.advanced-fields { margin: 0.25rem 0 0.9rem; border-top: 1.5px solid var(--panel-card-line, #DCE4EF); padding-top: 0.85rem; }
 /* The fold's handle: Londrina tracked caps in Awana blue, the kit chevron. */
 details.advanced-fields > summary {

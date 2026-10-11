@@ -104,6 +104,11 @@ run(`node scripts/stamp-build.mjs ${journeyBuild} ${JSON.stringify(journeyOut)}`
 mkdirSync(path.join(ROOT, 'site', 'updates'), { recursive: true });
 cpSync(path.join(ROOT, 'site', 'updates'), path.join(OUT, 'updates'), { recursive: true });
 
+// The Club Label Printer's release notes, for the lobby's Settings → Setup →
+// Release notes (owner, 2026-10-11): printer/changes.md as it is.
+mkdirSync(path.join(OUT, 'release-notes'), { recursive: true });
+cpSync(path.join(ROOT, 'printer', 'changes.md'), path.join(OUT, 'release-notes', 'printer.md'));
+
 // Pretty addresses, and HTML / JSON never cached at the edge, so a deploy
 // and a calendar change reach the screens at once (Cloudflare Pages honours
 // _headers; the apps' service workers already go network-first for both).
@@ -146,6 +151,9 @@ writeFileSync(path.join(OUT, '_headers'), [
   '/journey/',
   '  Cache-Control: no-cache',
   '/updates/*',
+  '  Cache-Control: no-cache',
+  '/release-notes/*',
+  '  Content-Type: text/markdown; charset=utf-8',
   '  Cache-Control: no-cache',
   '',
 ].join('\n'));
