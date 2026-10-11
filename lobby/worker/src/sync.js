@@ -43,6 +43,7 @@ import { DOORBELL_EVENT, REPLAYED, checkPublish, frameText, replayKey } from './
 import { Relay } from './relay.js';
 import { Watcher } from './watcher.js';
 import { CloudPhone } from './phone.js';
+import { Friends } from './friends.js';
 
 export const IP_MAX_FAILS = 5;
 export const IP_LOCK_MS = 15 * 60 * 1000;
@@ -152,7 +153,9 @@ export class SyncCore {
     // Cloud check-in (CLOUD-CHECKIN.md), phase 1: the read-only report watcher.
     this.watcher = new Watcher({ storage: this.storage, env: this.env, fetchFn: this.fetchFn, now: this.now, alarms });
     // ...and the phone page's check-ins, answered here instead of by the laptop.
-    this.phone = new CloudPhone({ watcher: this.watcher, relay: this.relayQueue, storage: this.storage, now: this.now });
+    // ...and who brought a friend tonight (BARF Night's email; friends.js).
+    this.friends = new Friends({ storage: this.storage, watcher: this.watcher, now: this.now });
+    this.phone = new CloudPhone({ watcher: this.watcher, relay: this.relayQueue, storage: this.storage, now: this.now, friends: this.friends });
   }
 
   /** The Durable Object's alarm: the watcher's 15 s read (it sets the next one). */
@@ -350,6 +353,11 @@ export class SyncCore {
           return await this.login(request, ip);
         case 'GET /v1/calendar':
           return await this.getCalendar();
+        // The scheduled email's read-only link: one night's report, no session.
+        case 'GET /v1/cloud/friends-report': {
+          const report = await this.friends.reportByLink(url.searchParams.get('token'));
+          return report ? json(report) : fail('That link has expired or is not right.', 404);
+        }
         default:
           break;
       }
@@ -358,6 +366,7 @@ export class SyncCore {
         'PUT /v1/journey', 'POST /v1/calendar/refresh', 'POST /v1/passphrase', 'POST /v1/publish',
         'POST /v1/relay', 'GET /v1/relay/next', 'POST /v1/relay/answer', 'GET /v1/relay/result',
         'GET /v1/cloud/status', 'POST /v1/cloud/read-now', 'POST /v1/cloud/checkin',
+        'POST /v1/cloud/friend', 'GET /v1/cloud/friends', 'POST /v1/cloud/friends-link',
       ]);
       if (!known.has(route)) return fail('Not found.', 404);
       if (!(await this.authorized(request))) {
@@ -398,6 +407,14 @@ export class SyncCore {
         case 'GET /v1/cloud/status':
           await this.watcher.arm();
           return json(await this.watcher.status());
+        // Who brought a friend (friends.js): recorded by the laptop, read by a
+        // signed-in screen, and one read-only link for the scheduled email.
+        case 'POST /v1/cloud/friend': {
+          const r = await this.friends.record(await this.body(request));
+          return r.ok ? json({ ok: true }) : fail(r.error, r.status);
+        }
+        case 'GET /v1/cloud/friends': return json(await this.friends.report(url.searchParams.get('date')));
+        case 'POST /v1/cloud/friends-link': return json(await this.friends.makeLink((await this.body(request)).date));
         // Check one child in on TwoTimTwo; a preview unless {confirm: true}.
         case 'POST /v1/cloud/checkin': return json(await this.watcher.checkIn(await this.body(request)));
         case 'POST /v1/cloud/read-now': {
@@ -597,6 +614,8 @@ export class SyncCore {
     // Keeps the watcher's alarm set (it sets its own after each run; this is
     // the safety net if one was ever lost).
     await this.watcher.arm();
+    // Who brought a friend is kept a few nights, then deleted (friends.js).
+    await this.friends.purge();
     const res = await this.refreshCalendar();
     return res.status;
   }

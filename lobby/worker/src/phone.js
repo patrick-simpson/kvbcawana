@@ -37,13 +37,14 @@ export class CloudPhone {
   /**
    * @param {{ watcher: import('./watcher.js').Watcher, relay: import('./relay.js').Relay,
    *   storage: { get(k: string): Promise<any>, put(k: string, v: any): Promise<void>, delete(k: string): Promise<any> },
-   *   now: () => number }} deps
+   *   now: () => number, friends?: import('./friends.js').Friends }} deps
    */
-  constructor({ watcher, relay, storage, now }) {
+  constructor({ watcher, relay, storage, now, friends }) {
     this.watcher = watcher;
     this.relay = relay;
     this.storage = storage;
     this.now = now;
+    this.friends = friends || null;
   }
 
   /**
@@ -119,13 +120,22 @@ export class CloudPhone {
     if (!name) return { status: 400, body: { error: 'name is required' } };
     const o = body.options && typeof body.options === 'object' ? body.options : {};
     const options = { Bible: o.Bible === true, Friend: o.Friend === true };
+    const friendName = options.Friend && typeof o.FriendName === 'string' ? o.FriendName.replace(/\s+/g, ' ').trim().slice(0, 24) : '';
     const r = await this.watcher.checkIn({ name, options, confirm: true });
     const id = await this.saveAction(r.ok ? 'done' : 'failed', r.ok ? '' : this.why(r));
+    // Who brought a friend, for BARF Night's email (friends.js).
+    if (r.ok && options.Friend && this.friends) {
+      await this.friends.record({ name: r.child.name, club: r.child.club, clubberId: r.child.clubberId, friendName });
+    }
     if (r.ok && laptopOnline) {
       // The tag, at once: the laptop prints it and greets the child on the TVs
       // (printer 8.0.0's job route; an older laptop refuses the job, and its
       // report check still prints the tag within five minutes).
-      await this.relay.enqueueJob('/print', { name: r.child.name, clubName: r.child.club, clubberId: r.child.clubberId, cloud: true });
+      // With Brought a friend, the laptop also prints the BARFED tag on BARF Night (8.1.0).
+      await this.relay.enqueueJob('/print', {
+        name: r.child.name, clubName: r.child.club, clubberId: r.child.clubberId, cloud: true,
+        ...(options.Friend ? { friend: true, friendName } : {}),
+      });
     }
     return { status: 200, body: { id, queued: true } };
   }
