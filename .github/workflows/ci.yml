@@ -36,6 +36,61 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  # Which slow suites this push can affect. The lobby's (7.5 min, mostly the
+  # browser tests) and the printer's (3 min) are skipped only when EVERY
+  # changed file is one that suite was checked never to read (owner,
+  # 2026-10-11: a Worker fix waited 8 minutes on lobby tests it cannot touch).
+  # Anything unknown runs everything: a manual run or a bot's dispatch, no
+  # base to compare with, or a change to this file. The fast jobs always run.
+  #   lobby   reads only lobby/ (its vitest excludes worker/ and desktop/,
+  #           whose lint moved into their own jobs below)
+  #   printer reads printer/, plus lobby/worker/src/relay.js
+  #           (test-phone-relay) and site/build.mjs (test-phone-touch)
+  changes:
+    name: What changed
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      lobby: ${{ steps.pick.outputs.lobby }}
+      printer: ${{ steps.pick.outputs.printer }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: pick
+        env:
+          EVENT: ${{ github.event_name }}
+          BEFORE: ${{ github.event.before }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -u
+          base=""
+          if [ "$EVENT" = "push" ] && [ -n "$BEFORE" ] && ! echo "$BEFORE" | grep -Eq '^0+$'; then base="$BEFORE"
+          elif [ "$EVENT" = "pull_request" ] && [ -n "$PR_BASE" ]; then base="$PR_BASE"; fi
+          files=""
+          if [ -n "$base" ] && git cat-file -e "$base^{commit}" 2>/dev/null; then files="$(git diff --name-only "$base" HEAD)"; fi
+          lobby=true; printer=true
+          if [ -n "$base" ] && [ -n "$files" ] && ! printf '%s\n' "$files" | grep -qx '.github/workflows/ci.yml'; then
+            lobby=false; printer=false
+            while IFS= read -r f; do
+              # A note at the top level (CLOUD-CHECKIN.md, CLAUDE.md) is read by no
+              # suite. (In a case pattern * also matches "/", so this is a test.)
+              if [[ "$f" != */* && "$f" == *.md ]]; then continue; fi
+              case "$f" in
+                lobby/worker/*|lobby/desktop/*|printer/*|journey/*|site/*|.github/workflows/*) ;;
+                *) lobby=true ;;
+              esac
+              case "$f" in
+                lobby/worker/src/relay.js|site/build.mjs) printer=true ;;
+                lobby/*|journey/*|site/updates/*|.github/workflows/*) ;;
+                *) printer=true ;;
+              esac
+            done <<< "$files"
+          fi
+          echo "Changed since ${base:-unknown}: $(printf '%s\n' "$files" | grep -c . || true) file(s). Lobby tests: $lobby. Printer tests: $printer."
+          echo "lobby=$lobby" >> "$GITHUB_OUTPUT"
+          echo "printer=$printer" >> "$GITHUB_OUTPUT"
+
   copies:
     name: Family copies match
     runs-on: ubuntu-latest
@@ -49,6 +104,8 @@ jobs:
 
   lobby:
     name: Lobby + projector
+    needs: changes
+    if: needs.changes.outputs.lobby == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     defaults:
@@ -96,6 +153,8 @@ jobs:
             lobby/worker/package-lock.json
       - run: npm ci
       - run: npm ci --prefix worker
+      # The lobby job's \`eslint .\` covers worker/ too, but it may be skipped.
+      - run: npx eslint worker
       - run: npx vitest run --config worker/vitest.config.js
 
   desktop:
@@ -113,6 +172,8 @@ jobs:
           cache: npm
           cache-dependency-path: lobby/package-lock.json
       - run: npm ci
+      # The lobby job's \`eslint .\` covers desktop/ too, but it may be skipped.
+      - run: npx eslint desktop
       - run: npx vitest run --config desktop/vitest.config.js
 
   journey:
@@ -135,6 +196,8 @@ jobs:
 
   printer:
     name: Club Label Printer
+    needs: changes
+    if: needs.changes.outputs.printer == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 25
     defaults:
@@ -189,8 +252,10 @@ jobs:
     # address, https://awana.kvbchurch.org; a deploy without it fails rather
     # than quietly publishing a site that points at the wrong host.
     name: Deploy to Cloudflare
-    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
-    needs: [copies, lobby, worker, desktop, journey, printer, site]
+    # A suite "What changed" skipped is not a failure: !failure() and
+    # !cancelled() let the deploy run past it, and still stop on any red job.
+    if: ${{ !failure() && !cancelled() && github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}
+    needs: [changes, copies, lobby, worker, desktop, journey, printer, site]
     runs-on: ubuntu-latest
     timeout-minutes: 30
     concurrency:

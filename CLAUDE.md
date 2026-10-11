@@ -17,7 +17,11 @@ commits or files.
 ## What runs today
 
 - `.github/workflows/ci.yml` runs on every push and PR: each app's checks as
-  its old repo ran them (all on Node 22), `scripts/check-mirrors.mjs` (the
+  its old repo ran them (all on Node 22; its "What changed" job skips the
+  lobby's 7.5-minute suite and the printer's 3-minute one only when every
+  changed file is one that suite never reads, so a Worker-only change
+  deploys in about 2 minutes; keep that job's lists in step when a suite
+  starts reading another folder), `scripts/check-mirrors.mjs` (the
   contract and envelope vectors, the brand kit and `family.css`, which must be
   byte-identical across the apps; canonical first: the printer's vectors and
   `printer/styles/family.css`, the lobby's `shared/brand/`), and a `site` job
