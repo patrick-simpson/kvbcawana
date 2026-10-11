@@ -1,6 +1,6 @@
 # Awana Lobby Display (sound room PC)
 
-> **Replaced by KVBC Awana (2026).** Version 2.1.0 is this app's last
+> **Replaced by KVBC Awana (2026).** Version 2.1.x is this app's last
 > release. Once KVBC Awana 9 is out, it installs KVBC Awana by itself (as a
 > display, with this PC's screen, monitor, shutdown and Start with Windows
 > carried over, and the screens still signed in), and KVBC Awana then removes

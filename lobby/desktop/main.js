@@ -872,22 +872,34 @@ function checkForUpdates(byHand = false) {
 let handingOff = false;
 
 async function downloadVerified(url, sha512, dest) {
-  const res = await net.fetch(url, { cache: 'no-store' });
-  if (!res.ok || !res.body) throw new Error(`installer download: HTTP ${res.status}`);
-  const hash = createHash('sha512');
+  // A download that stalls for a minute gives up (and the hand-off with it),
+  // so a dead connection never holds `handingOff` and the lobby feed forever.
+  const ctrl = new AbortController();
+  let stall = setTimeout(() => ctrl.abort(), 60_000);
   const tmp = `${dest}.part`;
-  await new Promise((resolve, reject) => {
-    const out = fs.createWriteStream(tmp);
-    const src = Readable.fromWeb(/** @type {any} */ (res.body));
-    src.on('data', (chunk) => hash.update(chunk));
-    src.on('error', reject);
-    out.on('error', reject);
-    out.on('finish', resolve);
-    src.pipe(out);
-  });
-  if (hash.digest('base64') !== sha512) {
+  try {
+    const res = await net.fetch(url, { cache: 'no-store', signal: ctrl.signal });
+    if (!res.ok || !res.body) throw new Error(`installer download: HTTP ${res.status}`);
+    const hash = createHash('sha512');
+    await new Promise((resolve, reject) => {
+      const out = fs.createWriteStream(tmp);
+      const src = Readable.fromWeb(/** @type {any} */ (res.body));
+      src.on('data', (chunk) => {
+        hash.update(chunk);
+        clearTimeout(stall);
+        stall = setTimeout(() => { ctrl.abort(); src.destroy(new Error('installer download stalled')); }, 60_000);
+      });
+      src.on('error', reject);
+      out.on('error', reject);
+      out.on('finish', resolve);
+      src.pipe(out);
+    });
+    if (hash.digest('base64') !== sha512) throw new Error('installer download: sha512 does not match the feed');
+  } catch (err) {
     try { fs.unlinkSync(tmp); } catch { /* gone */ }
-    throw new Error('installer download: sha512 does not match the feed');
+    throw err;
+  } finally {
+    clearTimeout(stall);
   }
   fs.renameSync(tmp, dest);
 }
@@ -908,27 +920,37 @@ async function tryHandOff() {
   updateStatus = `moving to KVBC Awana ${feed.version}`;
   updateTray();
   log('handing over to KVBC Awana', feed.version, feed.url);
+  const handoffPath = path.join(app.getPath('appData'), HANDOFF_DIR, HANDOFF_FILE);
   try {
     const installer = path.join(app.getPath('temp'), INSTALLER_NAME);
     await downloadVerified(feed.url, feed.sha512, installer);
-    const handoffDir = path.join(app.getPath('appData'), HANDOFF_DIR);
-    fs.mkdirSync(handoffDir, { recursive: true });
-    writeJson(path.join(handoffDir, HANDOFF_FILE), buildHandoff(state, {
+    fs.mkdirSync(path.dirname(handoffPath), { recursive: true });
+    writeJson(handoffPath, buildHandoff(state, {
       version: app.getVersion(),
       userData: userDir(),
       exe: process.execPath,
       startWithWindows: autostartOn(),
       at: new Date().toISOString(),
     }));
-    if (!fs.existsSync(path.join(handoffDir, HANDOFF_FILE))) throw new Error('the hand-off could not be written');
+    if (!fs.existsSync(handoffPath)) throw new Error('the hand-off could not be written');
     // Commit tonight's login and settings to disk: KVBC Awana copies this
     // profile on its first start.
     try { await session.fromPartition('persist:lobby').flushStorageData(); } catch { /* best effort */ }
     // /S installs silently; --force-run starts KVBC Awana when it is done
     // (an NSIS one-click installer runs nothing after a silent install
     // otherwise). Detached, so it outlives this app, which it replaces.
+    // Quit only once the installer has started and not failed straight away
+    // (blocked, or the file gone): otherwise stay on, and the screen with it.
     const child = spawn(installer, ['/S', '--force-run'], { detached: true, stdio: 'ignore', windowsHide: true });
-    child.on('error', (err) => log('KVBC Awana installer did not start', err));
+    await new Promise((resolve, reject) => {
+      const early = setTimeout(resolve, 3000);
+      child.once('error', (err) => { clearTimeout(early); reject(new Error(`KVBC Awana installer did not start: ${err.message}`)); });
+      child.once('exit', (code) => {
+        clearTimeout(early);
+        if (code === 0) resolve(undefined);
+        else reject(new Error(`KVBC Awana installer stopped at once (exit ${code})`));
+      });
+    });
     child.unref();
     log('KVBC Awana installer started; quitting');
     closingByApp = true;
@@ -936,6 +958,8 @@ async function tryHandOff() {
     return true;
   } catch (err) {
     log('hand-off failed; staying', err);
+    // No stale hand-off for a KVBC Awana installed here later by hand.
+    try { fs.unlinkSync(handoffPath); } catch { /* never written */ }
     handingOff = false;
     updateStatus = 'could not move to KVBC Awana; will try again tomorrow';
     updateTray();

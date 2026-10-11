@@ -17,8 +17,9 @@
 // The NSIS uninstaller copies itself to a temp folder and returns at once,
 // so success is judged afterwards: the entry gone and the .exe gone.
 // Its login item (Electron writes HKCU\...\Run under the app's
-// AppUserModelId, org.kvbc.awana-lobby-display) is removed either way; the
-// bridge release also turned it off itself before it quit. Its userData
+// AppUserModelId, org.kvbc.awana-lobby-display) is removed either way (the
+// bridge release leaves it in place, so a failed install still comes back at
+// the next sign-in). Its userData
 // (%APPDATA%\Awana Lobby Display) is left alone: the uninstaller keeps it too,
 // and it is the only copy of what the hand-off carried over.
 'use strict';
