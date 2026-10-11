@@ -4,6 +4,10 @@
 // in order. The behaviour is SyncCore (./sync.js); this file is only wiring.
 
 import { BODY_MAX, SyncCore, json } from './sync.js';
+import { isScreenId } from '../../src/lib/syncSpecs.js';
+
+/** A live socket opened by a registered screen carries this tag (screens.js). */
+const SCREEN_TAG = 'screen:';
 
 /** The pages that may call this service from a browser. */
 const ALLOWED_ORIGINS = [
@@ -54,6 +58,15 @@ export class SyncStore {
         set: (at) => state.storage.setAlarm(at),
         get: () => state.storage.getAlarm(),
       },
+      // Which registered screens are on the live channel right now: their
+      // sockets carry the screen's id as a tag (live() below).
+      liveScreens: () => {
+        const ids = new Set();
+        for (const ws of state.getWebSockets()) {
+          for (const tag of state.getTags(ws)) if (tag.startsWith(SCREEN_TAG)) ids.add(tag.slice(SCREEN_TAG.length));
+        }
+        return ids;
+      },
     });
     // A screen's keep-alive "ping" is answered without waking this object, so
     // a room of idle TVs costs nothing between frames.
@@ -83,7 +96,10 @@ export class SyncStore {
     }
     const pair = new WebSocketPair();
     const [client, server] = Object.values(pair);
-    this.state.acceptWebSocket(server);
+    // A registered screen names itself (?screen=<id>), so /settings can say it
+    // is online. Only a well-formed id is kept; anything else is a plain socket.
+    const screen = url.searchParams.get('screen');
+    this.state.acceptWebSocket(server, isScreenId(screen) ? [`${SCREEN_TAG}${screen}`] : []);
     // Catch it up: the last tally, recap, birthdays and the rest, and the
     // newest deck's chunks, as the printer's rebroadcasts would within minutes.
     for (const text of await this.core.replayFrames()) {
@@ -128,7 +144,7 @@ export default {
         status: 204,
         headers: origin ? {
           'Access-Control-Allow-Origin': origin,
-          'Access-Control-Allow-Methods': 'GET, POST, PUT, OPTIONS',
+          'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
           'Access-Control-Allow-Headers': 'Authorization, Content-Type',
           'Access-Control-Max-Age': '86400',
           Vary: 'Origin',

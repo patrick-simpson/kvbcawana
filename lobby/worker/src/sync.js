@@ -15,6 +15,7 @@
 //   template   the "new screen" template, {savedAt, config}
 //   journey    the Journey kiosk's room settings, {savedAt, settings}
 //   calendar   the church calendar, {version, generatedAt, checkedAt, sourceUrl, events}
+//   screens    the screen registry and each screen's own settings (screens.js)
 //
 // WHO MAY DO WHAT (owner's choice B): anyone holding the passphrase can read
 // and change everything. So the passphrase is the one lock, and guessing it
@@ -44,6 +45,7 @@ import { Relay } from './relay.js';
 import { Watcher } from './watcher.js';
 import { CloudPhone } from './phone.js';
 import { Friends } from './friends.js';
+import { Screens } from './screens.js';
 
 export const IP_MAX_FAILS = 5;
 export const IP_LOCK_MS = 15 * 60 * 1000;
@@ -134,9 +136,10 @@ export class SyncCore {
    * @param {{ storage: Store, env: Record<string, any>, fetchFn?: typeof fetch, now?: () => number,
    *   publish?: (channel: string, event: string, payload: unknown) => Promise<{ok: boolean, error?: string}>,
    *   broadcast?: (text: string) => number, closeAll?: (code: number, reason: string) => void,
-   *   alarms?: { set(atMs: number): Promise<void>|void, get(): Promise<number|null>|number|null } }} deps
+   *   alarms?: { set(atMs: number): Promise<void>|void, get(): Promise<number|null>|number|null },
+   *   liveScreens?: () => Set<string> }} deps
    */
-  constructor({ storage, env, fetchFn, now, publish, broadcast, closeAll, alarms }) {
+  constructor({ storage, env, fetchFn, now, publish, broadcast, closeAll, alarms, liveScreens }) {
     this.storage = storage;
     this.env = env || {};
     this.fetchFn = fetchFn || ((...args) => fetch(...args));
@@ -156,6 +159,14 @@ export class SyncCore {
     // ...and who brought a friend tonight (BARF Night's email; friends.js).
     this.friends = new Friends({ storage: this.storage, watcher: this.watcher, now: this.now });
     this.phone = new CloudPhone({ watcher: this.watcher, relay: this.relayQueue, storage: this.storage, now: this.now, friends: this.friends });
+    // The screen registry (SETTINGS.md, phase 2): its doorbells ride the live
+    // channel only, for the one screen they name.
+    this.screens = new Screens({
+      storage: this.storage,
+      now: this.now,
+      liveScreens,
+      ring: (payload) => { this.broadcast(frameText(DOORBELL_EVENT, payload)); },
+    });
   }
 
   /** The Durable Object's alarm: the watcher's 15 s read (it sets the next one). */
@@ -361,6 +372,7 @@ export class SyncCore {
         default:
           break;
       }
+      if (url.pathname === '/v1/screens' || url.pathname.startsWith('/v1/screens/')) return await this.screenRoute(request, url);
       const known = new Set([
         'GET /v1/state', 'PUT /v1/settings', 'PUT /v1/slides', 'PUT /v1/template',
         'PUT /v1/journey', 'POST /v1/calendar/refresh', 'POST /v1/passphrase', 'POST /v1/publish',
@@ -438,6 +450,41 @@ export class SyncCore {
       console.error('[sync] unexpected error', err);
       return fail('Something went wrong on the sync service.', 500);
     }
+  }
+
+  /**
+   * The screen registry's routes (screens.js), all behind a session:
+   *   GET    /v1/screens                  every screen
+   *   POST   /v1/screens/hello            {id, kind, name?}
+   *   GET    /v1/screens/<id>/settings    {screen, settings}
+   *   PUT    /v1/screens/<id>/settings    {settings}
+   *   PUT    /v1/screens/<id>/name        {name}
+   *   POST   /v1/screens/<id>/action      {action, data?}
+   *   DELETE /v1/screens/<id>
+   * @param {Request} request @param {URL} url
+   */
+  async screenRoute(request, url) {
+    const m = /^\/v1\/screens(?:\/([^/]+)(?:\/(settings|name|action))?)?$/.exec(url.pathname);
+    if (!m) return fail('Not found.', 404);
+    const [, id = '', part = ''] = m;
+    // 'hello' is never an id (an id is 16 to 64 characters).
+    const route = !id ? `${request.method} list` : id === 'hello' && !part ? `${request.method} hello` : `${request.method} ${part}`;
+    const known = ['GET list', 'POST hello', 'GET settings', 'PUT settings', 'PUT name', 'POST action', 'DELETE '];
+    if (!known.includes(route)) return fail('Not found.', 404);
+    if (!(await this.authorized(request))) {
+      return fail('This screen is signed out. Type the passphrase again.', 401, { reason: 'signed-out' });
+    }
+    let res;
+    switch (route) {
+      case 'GET list': res = await this.screens.list(); break;
+      case 'POST hello': res = await this.screens.hello(await this.body(request)); break;
+      case 'GET settings': res = await this.screens.get(id); break;
+      case 'PUT settings': res = await this.screens.putSettings(id, await this.body(request)); break;
+      case 'PUT name': res = await this.screens.rename(id, await this.body(request)); break;
+      case 'POST action': res = await this.screens.act(id, await this.body(request)); break;
+      default: res = await this.screens.forget(id);
+    }
+    return res.ok ? json(res.body) : fail(res.error, res.status);
   }
 
   /** @param {Request} request */

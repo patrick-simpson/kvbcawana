@@ -12,6 +12,9 @@
 // JOURNEY_SPEC is the Journey kiosk's room settings: the ones every Journey
 // screen should share. Video quality and the leader prep transcript choice
 // stay on each device (they depend on that device and that leader).
+//
+// SCREEN_SPECS (below) is each registered screen's OWN settings, per kind,
+// which /settings edits through the Worker.
 
 /**
  * @typedef {{ type: 'bool' }
@@ -100,6 +103,122 @@ export function sanitizeTemplate(raw) {
     if (value !== undefined) out[key] = value;
   }
   return out;
+}
+
+// ── Screens (SETTINGS.md, phase 2) ─────────────────────────────────────────
+// Every lobby TV, projector and Journey kiosk registers with the Worker under
+// a name, and /settings edits any one's OWN settings there; the screen applies
+// them as its device layer. SCREEN_SPECS is the one allowlist both sides
+// apply, per kind. Never a shared key (those travel as the `settings` frame),
+// never the Pusher keys, never panic mode (simplified mode is a hand on the
+// TV, not a remote switch), never the typed deck or an upload, never a URL a
+// screen would fetch on its own (the fleet's schedule and theme files), and
+// never a secret. screenSpecs.test.js pins the lobby's against useConfig's
+// VALIDATORS and SHARED_SPEC.
+
+/** @typedef {'lobby' | 'projector' | 'journey'} ScreenKind */
+
+/** @type {readonly ScreenKind[]} */
+export const SCREEN_KINDS = Object.freeze(['lobby', 'projector', 'journey']);
+
+/** @type {Record<ScreenKind, Record<string, SimpleRule>>} */
+export const SCREEN_SPECS = {
+  lobby: {
+    ...TEMPLATE_SPEC,
+    // lib/clubs.js CORNER_CLUB_IDS, written out like useConfig's (pinned).
+    cornerClub: { type: 'enum', values: ['', 'puggles', 'cubbies', 'sparks', 'tnt', 'trek', 'journey'] },
+    showTonightTicker: { type: 'bool' },
+  },
+  // The projector's two device switches (presentation/hooks/useLowPower.js,
+  // presentation/lib/stingers.js).
+  projector: {
+    lowPower: { type: 'bool' },
+    stingers: { type: 'bool' },
+  },
+  // Journey's one device setting the room does not share (schedule.js
+  // PLAYBACK_QUALITY_CHOICES).
+  journey: {
+    playbackQuality: { type: 'enum', values: ['auto', 'full', 'low'] },
+  },
+};
+
+/**
+ * What /settings may ask a screen to do (the configure relay's own actions,
+ * configureRelay.js), delivered on the live channel. Each one is a request the
+ * screen treats like a press of its own button.
+ * @type {Record<ScreenKind, readonly string[]>}
+ */
+export const SCREEN_ACTIONS = {
+  lobby: Object.freeze(['preview-checkin', 'reset-tally', 'board-demo']),
+  projector: Object.freeze(['select', 'resume']),
+  journey: Object.freeze([]),
+};
+
+/** What a screen is called until someone names it. @type {Record<ScreenKind, string>} */
+export const SCREEN_DEFAULT_NAMES = { lobby: 'Lobby TV', projector: 'Projector', journey: 'Journey kiosk' };
+
+export const SCREEN_NAME_MAX = 40;
+const SCREEN_ID_RE = /^[A-Za-z0-9_-]{16,64}$/;
+
+/** @param {unknown} kind @returns {kind is ScreenKind} */
+export function isScreenKind(kind) {
+  return typeof kind === 'string' && /** @type {readonly string[]} */ (SCREEN_KINDS).includes(kind);
+}
+
+/** A screen's id: random, made once on the screen. @param {unknown} id @returns {id is string} */
+export function isScreenId(id) {
+  return typeof id === 'string' && SCREEN_ID_RE.test(id);
+}
+
+/**
+ * A screen's name as people type it: one line, no control characters, at most
+ * SCREEN_NAME_MAX characters. '' when nothing is left.
+ * @param {unknown} raw
+ */
+export function cleanScreenName(raw) {
+  if (typeof raw !== 'string') return '';
+  // eslint-disable-next-line no-control-regex
+  return raw.replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, SCREEN_NAME_MAX).trim();
+}
+
+/**
+ * Exactly the kind's allowlist; anything else is dropped. {} for junk or an
+ * unknown kind. Key order is the spec's, so two sanitized copies of the same
+ * settings stringify the same.
+ * @param {unknown} kind
+ * @param {unknown} raw
+ * @returns {Record<string, unknown>}
+ */
+export function sanitizeScreenSettings(kind, raw) {
+  /** @type {Record<string, unknown>} */
+  const out = {};
+  if (!isScreenKind(kind) || !raw || typeof raw !== 'object' || Array.isArray(raw)) return out;
+  const src = /** @type {Record<string, unknown>} */ (raw);
+  for (const [key, rule] of Object.entries(SCREEN_SPECS[kind])) {
+    if (!Object.prototype.hasOwnProperty.call(src, key)) continue;
+    const value = cleanSimple(rule, src[key]);
+    if (value !== undefined) out[key] = value;
+  }
+  return out;
+}
+
+/**
+ * One action for a screen of this kind, or null. Only the projector's wall
+ * pick carries data, checked exactly as the projector checks a relayed one.
+ * @param {unknown} kind
+ * @param {unknown} action
+ * @param {unknown} [data]
+ * @returns {{action: string, data?: {type: 'countdown'} | {type: 'window', index: number}} | null}
+ */
+export function sanitizeScreenAction(kind, action, data) {
+  if (!isScreenKind(kind) || typeof action !== 'string' || !SCREEN_ACTIONS[kind].includes(action)) return null;
+  if (kind !== 'projector' || action !== 'select') return { action };
+  const t = /** @type {any} */ (data);
+  if (t && t.type === 'countdown') return { action, data: { type: 'countdown' } };
+  if (t && t.type === 'window' && Number.isInteger(t.index) && t.index >= 0 && t.index < 50) {
+    return { action, data: { type: 'window', index: t.index } };
+  }
+  return null;
 }
 
 /** @param {unknown} value */

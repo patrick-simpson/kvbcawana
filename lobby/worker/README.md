@@ -152,6 +152,32 @@ Changes to the template, Journey's settings and the calendar ring a plaintext
 doorbell, `changed` `{what, at}` on the `awana-sync` Pusher channel; it carries
 no content, and a screen that hears it fetches from here.
 
+### Screens (`src/screens.js`, SETTINGS.md phase 2)
+
+Every lobby TV, projector and Journey kiosk registers here under an id it made
+once and keeps in its own storage, so awana.kvbchurch.org/settings can list
+them and change each one's OWN settings (its chime, motion, what plays behind
+the names; never a shared setting, a Pusher key, panic mode or a secret: the
+allowlist is `SCREEN_SPECS` in `src/lib/syncSpecs.js`, which the screens
+apply too). At most 40 screens; a full registry makes room only by forgetting
+one silent for a month.
+
+| Route | |
+| --- | --- |
+| `POST /v1/screens/hello` `{id, kind, name?}` | `{screen, settings}`; adds a new screen (a known one keeps its name), moves `lastSeen` |
+| `GET /v1/screens` | `{screens: [{id, kind, name, createdAt, lastSeen, online, live}], max}`; online = seen in the last 3 minutes or on the live channel |
+| `GET /v1/screens/<id>/settings` | `{screen, settings: {savedAt, settings} \| null}` |
+| `PUT /v1/screens/<id>/settings` `{settings}` | `{savedAt, settings, dropped}`; the whole layer, through the kind's allowlist |
+| `PUT /v1/screens/<id>/name` `{name}` | `{screen}` |
+| `POST /v1/screens/<id>/action` `{action, data?}` | `{ok, delivered}`; lobby: `preview-checkin`, `reset-tally`, `board-demo`; projector: `select`, `resume` |
+| `DELETE /v1/screens/<id>` | `{forgotten}`; a screen still running comes back at its next hello |
+
+A settings change, a rename and an action ring the live channel only (never
+Pusher, never replayed to a screen that connects later): `changed` `{what:
+'screen', id, at}` or `{what: 'screen-action', id, action, data?, at}`. A
+screen's live socket carries its id (`/v1/live?session=…&screen=<id>`), which
+is how the list knows it is on the channel.
+
 ## The phone check-in relay (printer 7.9.0)
 
 `awana.kvbchurch.org/checkin` is the print app's phone page, online. It signs in
