@@ -5,7 +5,9 @@
 // SERVER (everything that was the printer app; it runs only while print is
 // on) and the DISPLAY (the sound room app's main process,
 // src/display/display.js; it runs only while display is on). The first-run
-// wizard (src/setup-wizard.js) sets them; the tray reopens it.
+// wizard (src/setup-wizard.js) sets them; the tray reopens it. Signed in,
+// the computer is a row on awana.kvbchurch.org/settings (src/device-sync.js),
+// which can change its roles and display hours from any device.
 const { app, BrowserWindow, Tray, Menu, ipcMain, shell, nativeImage, dialog, Notification, safeStorage, net: electronNet } = require('electron');
 const path = require('path');
 const fs = require('fs');
@@ -24,6 +26,7 @@ const oldApp = require('./src/old-app');
 const { createDisplay } = require('./src/display/display');
 const { createSetupWizard } = require('./src/setup-wizard');
 const { createSyncSession } = require('./src/sync-session');
+const { createDeviceSync } = require('./src/device-sync');
 const { findDisplay } = require('./src/display/displays');
 const { SCREENS } = require('./src/display/screens');
 
@@ -105,6 +108,8 @@ let roles = rolesStore.normalizeRoles(null);
 let display = null;       // src/display/display.js, created once; runs only while roles.display
 let wizard = null;        // src/setup-wizard.js
 let syncSession = null;   // src/sync-session.js
+let syncClient = null;    // print-server/sync-client.js (loaded in app.whenReady)
+let deviceSync = null;    // src/device-sync.js: this computer's row on /settings
 let setupWindow = null;   // the print server's status window (renderer/), print role only
 let pdfWindow = null;  // hidden window used for printer enumeration
 let serverInstance = null;
@@ -183,13 +188,11 @@ function refreshTray() {
 // The operator's reversed policy: a mid-club release only ever happens
 // because they shipped an urgent fix, so the app quits and re-installs the
 // MOMENT a download finishes — no more "Restart to update" waiting for a
-// human. A label mid-print should still get to finish, though:
-// print-server/server.js exposes no "printing/queue busy" signal today (see
-// its module.exports — no isBusy()/queue getter of any kind), and this
-// deliberately does not add one (see the goal doc — no new plumbing for
-// this). If that ever changes, prefer polling it below, capped at
-// AUTO_INSTALL_BUSY_CAP_MS. Until then, a short fixed grace gives an
-// in-flight /print HTTP response time to flush before the process exits.
+// human. A label mid-print should still get to finish, though: since 9.0.0
+// print-server/server.js exports isBusy() (a label printing, waiting its
+// turn, or a phone check-in still to be driven), so a print server polls it
+// below, capped at AUTO_INSTALL_BUSY_CAP_MS. Without one (a display-only
+// computer) a short fixed grace is the whole wait.
 const AUTO_INSTALL_GRACE_MS = 5000;
 const UPDATE_EVERY_MS = 10 * 60 * 1000;
 const AUTO_INSTALL_BUSY_CAP_MS = 60000;
@@ -506,6 +509,10 @@ function buildTray(config) {
   else if (roles.print) tip.push(`Printing to ${config.printerName || 'the system default printer'}`);
   if (roles.display && display && display.isRunning()) tip.push(display.statusLine());
   if (!roles.setupDone) tip.push('Not set up yet: click to set it up');
+  // This computer's row on /settings (src/device-sync.js).
+  const dev = deviceSync ? deviceSync.status() : null;
+  if (dev && dev.state === 'signed-out') tip.push('Signed out: /settings cannot reach it');
+  if (dev && dev.pending) tip.push('Print server off once the last label prints');
   // Windows cuts a tray tooltip at 127 characters.
   tray.setToolTip(tip.join('\n').slice(0, 127));
 
@@ -514,6 +521,12 @@ function buildTray(config) {
   ];
   if (!roles.setupDone) {
     template.push({ label: 'Set up this computer...', click: () => openWizard() });
+  }
+  if (dev && dev.state === 'signed-out') {
+    template.push({ label: '⚠ Signed out of the settings page: sign in again...', click: () => openWizard() });
+  }
+  if (dev && dev.pending) {
+    template.push({ label: 'Print server turns off once the last label prints', enabled: false });
   }
 
   if (roles.print) {
@@ -1156,6 +1169,7 @@ async function applyRoles(next, { fromWizard = false } = {}) {
   }
   if (!roles.display && display.isRunning()) display.stop();
   refreshTray();
+  if (deviceSync) deviceSync.nudge();
   if (relaunch) {
     setTimeout(() => {
       app.relaunch({ args: process.argv.slice(1).filter((a) => a !== '--auto-start') });
@@ -1166,9 +1180,11 @@ async function applyRoles(next, { fromWizard = false } = {}) {
   return { relaunch };
 }
 
-const serverBusy = () => {
-  try { return Boolean(serverModule && typeof serverModule.isBusy === 'function' && serverModule.isBusy()); } catch { return false; }
-};
+// A label printing, waiting its turn, or a phone check-in still to come
+// (print-server/server.js isBusy()). No print server, never busy.
+function serverBusy() {
+  try { return Boolean(roles.print && serverModule && typeof serverModule.isBusy === 'function' && serverModule.isBusy()); } catch { return false; }
+}
 
 /** The wizard's Finish. Returns { ok, error? }; the wizard shows the error. */
 async function finishSetup(choices) {
@@ -1209,6 +1225,8 @@ async function finishSetup(choices) {
   if (roles.print && printerChanged) startServer(currentConfig);
   if (roles.print && pendingPassphrase) signPrintServerIn(pendingPassphrase);
   pendingPassphrase = null;
+  // A new sign-in, or a first setup: on /settings now, not in two minutes.
+  if (deviceSync) deviceSync.start();
   return { ok: true, roles };
 }
 
@@ -1221,10 +1239,55 @@ function openWizard() {
   });
 }
 
-// The hook for /settings' computer device (UNIFIED-APP.md; not wired to any
-// page yet): what this computer is, and a change to it, through the same
-// check and the same applyRoles() the wizard uses. Answered only to this
-// app's own file:// windows, never to the remote screens in persist:lobby.
+// ─── This computer on /settings (src/device-sync.js) ─────────────────────────
+
+/** The four keys /settings keeps for a computer (SCREEN_SPECS.computer). */
+function deviceSettings() {
+  const { hours } = display.info().settings;
+  return { printRole: roles.print, displayRole: roles.display, displayFrom: hours.start, displayUntil: hours.end };
+}
+
+/**
+ * The bearer for the screen registry: the app's own sign-in (the wizard's,
+ * safeStorage), else, on a print server, the print server's own (an 8.x
+ * laptop that never ran the wizard is still listed). None until setup is
+ * done, so a computer half way through the wizard is never changed from
+ * outside.
+ */
+function deviceSession() {
+  if (!roles.setupDone || !syncSession) return null;
+  const own = syncSession.session();
+  if (own) return { url: own.url, session: own.session };
+  if (roles.print && syncClient) {
+    const c = loadConfig() || {};
+    if (syncClient.isValidSyncUrl(c.syncUrl) && syncClient.isValidSession(c.syncSession)) return { url: c.syncUrl, session: c.syncSession };
+  }
+  return null;
+}
+
+/**
+ * A change from /settings, through the paths the wizard and its Settings
+ * window take: the hours through display.configure, the roles through the
+ * same check and applyRoles() as the wizard and 'roles:set' (print off
+ * restarts the app). device-sync.js never asks for print off while the print
+ * server is busy; the check here refuses it anyway if a label started since.
+ */
+async function applyDeviceSettings(s) {
+  const { hours } = display.info().settings;
+  if (s.displayFrom !== hours.start || s.displayUntil !== hours.end) {
+    display.configure({ hours: { start: s.displayFrom, end: s.displayUntil } });
+  }
+  if (s.printRole === roles.print && s.displayRole === roles.display) return { ok: true };
+  const check = rolesStore.checkRolesChange(roles, { print: s.printRole, display: s.displayRole }, { printing: serverBusy() });
+  if (!check.ok) return check;
+  await applyRoles(check.roles);
+  return { ok: true };
+}
+
+// The local half of the same hook: what this computer is, and a change to
+// it, through the same check and the same applyRoles() the wizard uses.
+// Answered only to this app's own file:// windows, never to the remote
+// screens in persist:lobby.
 function deviceSnapshot() {
   const d = display.info();
   return {
@@ -1235,6 +1298,7 @@ function deviceSnapshot() {
     display: { screen: d.settings.screen, hours: d.settings.hours },
     version: app.getVersion(),
     sync: syncSession ? syncSession.status() : { signedIn: false },
+    settings: deviceSync ? deviceSync.status() : null,
   };
 }
 const fromOwnPage = (event) => String(event.senderFrame && event.senderFrame.url || event.sender.getURL()).startsWith('file:');
@@ -1309,12 +1373,35 @@ app.whenReady().then(async () => {
     smoke: process.argv.includes('--display-smoke-test'),
     getAutostart: autostartOn,
     setAutostart,
-    onChange: refreshTray,
+    // A change in the display's Settings window goes up to /settings too.
+    onChange: () => { refreshTray(); if (deviceSync) deviceSync.nudge(); },
   });
-  syncSession = createSyncSession({
+  syncClient = require(path.join(printServerDir(), 'sync-client.js'));
+  syncSession = createSyncSession({ userData, safeStorage, syncClient });
+  deviceSync = createDeviceSync({
     userData,
-    safeStorage,
-    syncClient: require(path.join(printServerDir(), 'sync-client.js')),
+    deviceId: () => {
+      roles = rolesStore.ensureDeviceId(userData, roles);
+      return roles.deviceId;
+    },
+    session: deviceSession,
+    request: (base, p, opts) => syncClient.syncRequest(base, p, opts),
+    name: () => roles.name || os.hostname(),
+    setName: async (name) => {
+      const check = rolesStore.checkRolesChange(roles, { name });
+      if (check.ok) await applyRoles(check.roles);
+    },
+    local: deviceSettings,
+    apply: applyDeviceSettings,
+    busy: serverBusy,
+    onStatus: (st) => { console.log('[device]', st.state, st.pending ? `(held: ${JSON.stringify(st.pending)})` : ''); refreshTray(); },
+    onSignedOut: (s) => {
+      // The app's own sign-in is dropped, as a screen drops its session on a
+      // 401; the print server's own (config.json) is the print server's.
+      const own = syncSession.session();
+      if (own && own.session === s.session) syncSession.signOut();
+    },
+    log: (...a) => console.log(...a),
   });
   wizard = createSetupWizard({
     staticDir: path.join(__dirname, 'static'),
@@ -1360,6 +1447,9 @@ app.whenReady().then(async () => {
 
   if (!roles.setupDone) openWizard();
   removeOldAppIfHandedOff();
+  // 4. This computer's row on /settings (does nothing until it is signed in
+  // and set up, then says hello every two minutes).
+  deviceSync.start();
 });
 
 app.on('second-instance', () => {

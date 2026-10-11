@@ -984,7 +984,12 @@ function createDisplay(opts) {
       if (d) state.display = rememberDisplay(d);
     }
     saveState();
-    if (running) { closeLobby(); evaluate(); loadConfigScreen(); }
+    if (running) {
+      // A new screen or monitor reopens it; new hours alone (from /settings)
+      // only open or close it on the next evaluate, like setHours.
+      if (typeof screenId === 'string' || monitorId != null) { closeLobby(); evaluate(); loadConfigScreen(); }
+      else { evaluate(); pushConfigState(); }
+    }
     return state.settings;
   }
 

@@ -3,7 +3,11 @@
 // Electron-free, like config-store.js, so it is tested without booting
 // Electron (test/roles.test.cjs).
 //
-// roles.json in userData: { print, display, name, setupDone }.
+// roles.json in userData: { print, display, name, setupDone, deviceId? }.
+// `deviceId` is this computer's id in the sync Worker's screen registry
+// (device-sync.js, kind 'computer'): made once, the first time it registers,
+// and kept here so a reinstall over the same userData stays the same row on
+// /settings.
 //
 // WHERE A COMPUTER'S ROLES COME FROM, the first time v9 starts on it:
 //   1. a roles.json already there: that, whatever else is on disk;
@@ -20,16 +24,20 @@
 //
 // THE HOOK FOR /settings (UNIFIED-APP.md: "each computer registers as a
 // device, kind `computer`"): this file is the one record of a computer's
-// roles and name. main.js applies a change live through applyRoles() (IPC
-// 'roles:set', today used by the wizard); the device registration will read
-// it and call the same path. Nothing here talks to the network.
+// roles and name. main.js applies a change live through applyRoles(): the
+// wizard, IPC 'roles:set' and the /settings registration (device-sync.js) all
+// take that one path. Nothing here talks to the network.
 'use strict';
 
+const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 
 const ROLES_FILE = 'roles.json';
 const NAME_MAX = 60;
+// The Worker's screen id (lobby/src/lib/syncSpecs.js isScreenId).
+const DEVICE_ID_RE = /^[A-Za-z0-9_-]{16,64}$/;
+const isDeviceId = (v) => typeof v === 'string' && DEVICE_ID_RE.test(v);
 
 // Files only the print server (or the printer app's own extension sync)
 // writes into userData. Chromium's own folders (Local State, Partitions,
@@ -55,15 +63,32 @@ function cleanName(value) {
     .trim();
 }
 
-/** A roles object from anything; never throws. */
+/** A roles object from anything; never throws. `deviceId` only when there is a good one. */
 function normalizeRoles(raw) {
   const r = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
-  return {
+  const out = {
     print: r.print === true,
     display: r.display === true,
     name: cleanName(r.name),
     setupDone: r.setupDone === true,
   };
+  if (isDeviceId(r.deviceId)) out.deviceId = r.deviceId;
+  return out;
+}
+
+/** 16 random bytes, url-safe (22 characters): the lobby's newScreenId(). */
+function newDeviceId() {
+  return crypto.randomBytes(16).toString('base64url');
+}
+
+/**
+ * The roles with a deviceId, made and written once when there is none.
+ * @returns {ReturnType<typeof normalizeRoles>}
+ */
+function ensureDeviceId(dir, roles) {
+  const r = normalizeRoles(roles);
+  if (r.deviceId) return r;
+  return writeRoles(dir, { ...r, deviceId: newDeviceId() });
 }
 
 const rolesPath = (dir) => path.join(dir, ROLES_FILE);
@@ -149,6 +174,8 @@ function checkRolesChange(current, patch, { printing = false } = {}) {
     display: typeof p.display === 'boolean' ? p.display : current.display,
     name: typeof p.name === 'string' ? p.name : current.name,
     setupDone: typeof p.setupDone === 'boolean' ? p.setupDone : current.setupDone,
+    // Never changed by a patch: the computer's row on /settings.
+    deviceId: current.deviceId,
   });
   if (next.setupDone && !next.print && !next.display) {
     return { ok: false, error: 'Choose at least one: print server or display.' };
@@ -163,6 +190,9 @@ module.exports = {
   ROLES_FILE,
   NAME_MAX,
   PRINTER_DATA,
+  isDeviceId,
+  newDeviceId,
+  ensureDeviceId,
   cleanName,
   normalizeRoles,
   readRoles,
