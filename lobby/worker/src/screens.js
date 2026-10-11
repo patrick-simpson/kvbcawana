@@ -111,7 +111,7 @@ export class Screens {
   /** GET /v1/screens: every screen, by kind, then name. @returns {Promise<Result>} */
   async list() {
     const live = this.liveScreens();
-    const order = { lobby: 0, projector: 1, journey: 2 };
+    const order = { lobby: 0, projector: 1, journey: 2, computer: 3 };
     const screens = Object.values(await this.index())
       .map((r) => this.view(r, live))
       .sort((a, b) => (order[a.kind] - order[b.kind]) || a.name.localeCompare(b.name) || a.id.localeCompare(b.id));

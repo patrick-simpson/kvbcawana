@@ -198,6 +198,20 @@ describe('a screen\'s own settings', () => {
       .toEqual({ playbackQuality: 'low' });
   });
 
+  it('a KVBC Awana computer (v9) registers with its roles and display hours, and takes no actions', async () => {
+    const s = setup();
+    await s.signIn();
+    const PC = 'pc_dddddddddddddddddddd';
+    const hi = await s.call('POST', '/v1/screens/hello', { id: PC, kind: 'computer', name: 'Check-in laptop' });
+    expect(hi.body.screen).toMatchObject({ kind: 'computer', name: 'Check-in laptop' });
+    const res = await s.call('PUT', `/v1/screens/${PC}/settings`, {
+      settings: { printRole: true, displayRole: false, displayFrom: '17:00', displayUntil: '25:00', audioMuted: true },
+    });
+    expect(res.body.settings).toEqual({ printRole: true, displayRole: false, displayFrom: '17:00' });
+    expect((await s.call('POST', `/v1/screens/${PC}/action`, { action: 'reset-tally' })).status).toBe(400);
+    expect((await s.call('GET', '/v1/screens')).body.screens.map((x) => x.kind)).toEqual(['computer']);
+  });
+
   it('a save rings that screen\'s doorbell on the live channel, stamped strictly after the last', async () => {
     const s = setup();
     await s.signIn();

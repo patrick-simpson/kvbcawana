@@ -20,7 +20,8 @@
  * @typedef {{ type: 'bool' }
  *   | { type: 'int', min: number, max: number }
  *   | { type: 'enum', values: string[] }
- *   | { type: 'url', max: number }} SimpleRule
+ *   | { type: 'url', max: number }
+ *   | { type: 'time' }} SimpleRule
  */
 
 /** @type {Record<string, SimpleRule>} */
@@ -82,6 +83,9 @@ function cleanSimple(rule, v) {
       if (!s) return '';
       return s.length <= rule.max && /^https:\/\/[^\s<>"']+$/i.test(s) ? s : undefined;
     }
+    case 'time':
+      // "HH:MM", 24-hour, as an <input type="time"> gives it.
+      return typeof v === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(v) ? v : undefined;
     default:
       return undefined;
   }
@@ -116,10 +120,16 @@ export function sanitizeTemplate(raw) {
 // never a secret. screenSpecs.test.js pins the lobby's against useConfig's
 // VALIDATORS and SHARED_SPEC.
 
-/** @typedef {'lobby' | 'projector' | 'journey'} ScreenKind */
+// `computer` is the KVBC Awana Windows app (UNIFIED-APP.md, v9): a computer
+// registers with its roles (print server, display, or both) and its display
+// hours, under the name its first-run wizard gave it. The kind is here so the
+// registry, the allowlist and /settings' list already take it; the app's side
+// and its /settings card come with v9.
+
+/** @typedef {'lobby' | 'projector' | 'journey' | 'computer'} ScreenKind */
 
 /** @type {readonly ScreenKind[]} */
-export const SCREEN_KINDS = Object.freeze(['lobby', 'projector', 'journey']);
+export const SCREEN_KINDS = Object.freeze(['lobby', 'projector', 'journey', 'computer']);
 
 /** @type {Record<ScreenKind, Record<string, SimpleRule>>} */
 export const SCREEN_SPECS = {
@@ -140,6 +150,15 @@ export const SCREEN_SPECS = {
   journey: {
     playbackQuality: { type: 'enum', values: ['auto', 'full', 'low'] },
   },
+  // The two role switches and the club-night display hours (default 5:00 to
+  // 8:00 pm). Whether a role may change now (never a print server turned off
+  // mid-print) is the app's to refuse; this only says what may be stored.
+  computer: {
+    printRole: { type: 'bool' },
+    displayRole: { type: 'bool' },
+    displayFrom: { type: 'time' },
+    displayUntil: { type: 'time' },
+  },
 };
 
 /**
@@ -152,10 +171,11 @@ export const SCREEN_ACTIONS = {
   lobby: Object.freeze(['preview-checkin', 'reset-tally', 'board-demo']),
   projector: Object.freeze(['select', 'resume']),
   journey: Object.freeze([]),
+  computer: Object.freeze([]),
 };
 
 /** What a screen is called until someone names it. @type {Record<ScreenKind, string>} */
-export const SCREEN_DEFAULT_NAMES = { lobby: 'Lobby TV', projector: 'Projector', journey: 'Journey kiosk' };
+export const SCREEN_DEFAULT_NAMES = { lobby: 'Lobby TV', projector: 'Projector', journey: 'Journey kiosk', computer: 'Computer' };
 
 export const SCREEN_NAME_MAX = 40;
 const SCREEN_ID_RE = /^[A-Za-z0-9_-]{16,64}$/;
