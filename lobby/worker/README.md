@@ -54,6 +54,17 @@ In this repository on GitHub: **Settings** → **Secrets and variables** →
 
 The Pusher values are the ones the printer app already uses.
 
+For cloud check-in (`CLOUD-CHECKIN.md` at the repo root), three more:
+
+| Name | Value |
+| --- | --- |
+| `TWOTIMTWO_USERNAME` | the church's dedicated TwoTimTwo check-in user (its email) |
+| `TWOTIMTWO_PASSWORD` | that user's password |
+| `TWOTIMTWO_HOST` | `kvbchurch.twotimtwo.com` (the default when unset; only a `*.twotimtwo.com` name is accepted) |
+
+A secret added later reaches the Worker only when it is redeployed: **Actions**
+→ **CI** → **Run workflow** with **Redeploy the sync Worker** ticked.
+
 ### 4. Deploy
 
 **Actions** → **Deploy the sync Worker** → **Run workflow**. It tests the
@@ -99,8 +110,11 @@ new one.
 The passphrase as a salted hash (never the word), the session-signing secret,
 the encryption key, the shared settings, the published slide deck, the screen
 template, Journey's room settings, and the church calendar. No names of
-children, ever: check-ins still go from the laptop straight to the screens
-over Pusher, sealed, and never pass through here.
+children, ever: the laptop's check-in frames pass through sealed, and the
+cloud check-in watcher (below) reads TwoTimTwo's report in memory and keeps
+only counts, plus last read's clubber ids sealed under a key derived from the
+TwoTimTwo password secret. The TwoTimTwo password and its session cookie are
+never stored.
 
 ## Developing
 
@@ -131,6 +145,9 @@ All JSON. Every route but the first three needs `Authorization: Bearer
 | `POST /v1/calendar/refresh` | `{changed, generatedAt, checkedAt, clubCount, eventCount}`; 502 `{error}` keeps the last good copy |
 | `POST /v1/passphrase` `{current, next, rotateKey?}` | `{session, displayKey, rotatedKey}` |
 
+| `GET /v1/cloud/status` | the cloud check-in watcher: `{mode, configured, windowOpen, checkedIn, byClub, tonight, lastError, checkinPage, log, ...}`, counts and fixed codes only |
+| `POST /v1/cloud/read-now` | one report read now, on any day (a rehearsal), never within 15 s of the last: `{ok, verdict?, error?, throttled?, status}` |
+
 Changes to the template, Journey's settings and the calendar ring a plaintext
 doorbell, `changed` `{what, at}` on the `awana-sync` Pusher channel; it carries
 no content, and a screen that hears it fetches from here.
@@ -154,3 +171,21 @@ answer at most 2 minutes for its page, and is deleted as it is read. The laptop
 runs only the same `RELAY_ROUTES` (`printer/print-server/phone-relay.js`,
 pinned equal by `printer/scripts/test-phone-relay.cjs`), and only while it is
 signed in to this service.
+
+## Cloud check-in: the report watcher (phase 1, shadow)
+
+`src/twotimtwo.js` (the client and parsers) and `src/watcher.js` (the
+watcher), CLOUD-CHECKIN.md pieces 1 and 2. With `CLOUD_CHECKIN = "shadow"`
+(`wrangler.toml`) and the three `TWOTIMTWO_*` secrets set, a Durable Object
+alarm reads `/clubber/checkin_report?date=<today>` every 15 seconds on club
+nights from 4:30 to 9:00 pm Eastern (the printer's `clubNights`, an hour
+either side) and sleeps the rest of the week. It **publishes nothing**: it
+logs the tally it would publish and what it would print
+(`npx wrangler tail`, lines starting `[cloud] shadow:`) and keeps the status
+above. TwoTimTwo agreed to an automated user reading every 15 seconds
+(2026-10-11), so nothing here reads faster, "read now" included.
+
+Safety: a report with fewer children than its own `Count:` footers is partial
+and changes nothing; a read that would drop more than half the room is
+refused; a refused sign-in waits 5, then 15, then 60 minutes; every request is
+https to the one TwoTimTwo host and a redirect anywhere else is refused.

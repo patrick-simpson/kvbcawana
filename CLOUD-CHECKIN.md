@@ -166,8 +166,9 @@ first names only, sealed, through each event's own allowlist sanitizer.
   drift checks fail loudly, the phone page says check-in is unavailable, and
   volunteers check in on TwoTimTwo directly: the report watcher still prints
   their labels as long as the report parses.
-- Ask TwoTimTwo before switching over whether an automated user on their site
-  is acceptable, and whether they rate-limit or block cloud addresses.
+- TwoTimTwo has agreed (below): an automated user, reading every 15 seconds,
+  everything encrypted. Whether they block cloud addresses shows on the first
+  shadow night (`lastError` on the status).
 
 ## When something breaks on a club night
 
@@ -218,9 +219,37 @@ owner's shadow night, with a test child and an undo.
 Read this first if you are picking the work up in a new session.
 
 - **Plan and decisions:** this file (owner, 2026-10-11).
-- **TwoTimTwo's agreement:** the owner reports (2026-10-11) that TwoTimTwo
-  gave permission for an automated check-in user on the church's site.
-  Record who granted it and how (email, ticket) here when available.
+- **TwoTimTwo's agreement:** granted by **Devin at TwoTimTwo**, reported by
+  the owner on 2026-10-11. Its terms: automated check-ins through Cloudflare
+  are allowed **as long as everything is encrypted**; reads **every 15
+  seconds** are fine; and **TwoTimTwo will not give technical support** if
+  anything goes wrong with the process. So the Worker never reads faster than
+  every 15 s (`READ_INTERVAL_MS`, a manual read included), every request is
+  https, the password and session cookie are never stored, and what is stored
+  holds no names and seals its ids. Because there is no vendor support, the
+  laptop stays as the spare, and the paper sheet stays the fallback. If the
+  permission ever needs showing, file the email (or note how it was given)
+  here.
+- **Built (2026-10-11): phase 1, the read-only watcher.** In the sync Worker:
+  `lobby/worker/src/twotimtwo.js` (sign-in, the report and check-in page
+  parsers, which a test runs against the extension's own parser on the same
+  pages) and `lobby/worker/src/watcher.js` (the 15 s alarm in the club
+  window, the partial and mass-undo guards, the sealed state). It publishes
+  nothing; `GET /api/v1/cloud/status` (signed in with the passphrase) shows
+  its counts, and `POST /api/v1/cloud/read-now` reads once on any day for a
+  rehearsal. `CLOUD_CHECKIN = "shadow"` in `wrangler.toml`; `"off"` stops it.
+  Idle until the three secrets exist. Tests: `lobby/worker/test/twotimtwo.test.js`,
+  `watcher.test.js`. Not yet run against the live site.
+- **To start the shadow night:** add the three GitHub secrets, then **Actions
+  → CI → Run workflow** with "Redeploy the sync Worker" ticked (a Worker only
+  gets new secrets when it deploys). Before Wednesday, sign in on any screen
+  and `POST /api/v1/cloud/read-now` (or ask a session to add a button) to
+  check the sign-in works: expect `ok: true`, `checkinPage.ok: true`. On the
+  night, compare its `checkedIn` and `byClub` with the laptop's dashboard
+  (the laptop takes checked-out children off; this does not yet). Watch for
+  `lastError`, `partial` and `massUndoRefused`. One risk to watch: the
+  Workers free plan allows 10 ms of CPU per run, and each read parses the
+  report; if runs are cut off, `lastReadAt` stops moving.
 - **Built so far (printer 7.19.0):** the Linux print path the Pi needs.
   `printer/print-server/cups.js` prints through CUPS and reads printer state
   from `lpstat`; it is switched on with `AWANA_PRINT_BACKEND=cups` (plus
@@ -232,13 +261,12 @@ Read this first if you are picking the work up in a new session.
     systemd with the two variables above, CUPS with `printer-driver-dymo`),
     the station's pairing with the Worker, the print-job queue and the sealed
     roster (pieces 3 and 4);
-  - the Worker's TwoTimTwo client and the report watcher (pieces 1 and 2).
-    A Claude Code session on 2026-10-11 was stopped by its environment's
-    safety check before building the unattended TwoTimTwo sign-in, even after
-    the owner reported permission; that part may need to be built outside
-    such a session, or with the permission documented above;
+  - the watcher's later phases: check-outs off the count, printing a label
+    for each check-in it finds (needs the station), and publishing;
   - the phone page and touch screen answered by the Worker (piece 5), and the
     Worker publishing the screens' frames (piece 6).
 - **Owner's to-do (phase 0):** the dedicated TwoTimTwo user and its GitHub
-  secrets, the Pi hardware, the printer's exact model, and changing the
-  password that was posted in a chat on 2026-10-11.
+  secrets (`TWOTIMTWO_USERNAME`, `TWOTIMTWO_PASSWORD`, `TWOTIMTWO_HOST`), then
+  the Worker redeploy above; the Pi hardware; the printer's exact model; and
+  changing the password that was posted in a chat on 2026-10-11 (the
+  dedicated user should have its own, never that one).

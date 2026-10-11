@@ -1557,6 +1557,15 @@ setup guide and the API. The owner's calls:
   the Worker when one exists (`template: false`) and reports it in the old
   words, so `QuickNav` and the setup note barely changed and the isolation
   allowlist did not grow.
+- **Cloud check-in, phase 1** (`CLOUD-CHECKIN.md`, 2026-10-11): the Worker
+  signs in to TwoTimTwo as the church's dedicated user (`TWOTIMTWO_*` Worker
+  secrets) and, on club nights 4:30 to 9:00 pm Eastern, reads the check-in
+  report every 15 s from a Durable Object alarm (`worker/src/twotimtwo.js`,
+  `worker/src/watcher.js`). Read-only: it publishes nothing, logs what it
+  would, and keeps counts at `GET /v1/cloud/status`. TwoTimTwo's terms: never
+  faster than 15 s, everything encrypted (no password or cookie at rest, no
+  names stored, ids sealed), no vendor support. `CLOUD_CHECKIN` in
+  `wrangler.toml` switches it (`shadow` / `off`).
 - **Gates:** the Worker's tests run in `ci.yml`'s `worker` job
   (`npx vitest run --config worker/vitest.config.js`), not this app's vitest
   (the root vitest excludes `worker/**`; the root lint covers it). Its relay

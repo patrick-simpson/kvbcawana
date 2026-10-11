@@ -61,7 +61,11 @@ commits or files.
 - `CLOUD-CHECKIN.md` is the plan (owner, 2026-10-11) to retire the check-in
   laptop: the sync Worker talks to TwoTimTwo itself, a Raspberry Pi at church
   prints the labels. Phased, shadow-tested beside the laptop; read it before
-  touching check-in, the relay or the print path.
+  touching check-in, the relay or the print path. TwoTimTwo (Devin) allowed
+  it on 2026-10-11: everything encrypted, reads no faster than every 15 s, no
+  vendor support. Phase 1 (the Worker's read-only report watcher,
+  `lobby/worker/src/twotimtwo.js` / `watcher.js`) is built and idle until the
+  `TWOTIMTWO_*` secrets are set.
 - `AUDIT-2026-10-04.md` is the stability and performance audit; its status
   section says what was fixed on 2026-10-04/05 and what is deferred.
 
