@@ -895,6 +895,16 @@ through `simulateEvent`'s sanitizers).
   `SETTINGS_PAGE_ROUTES`); a new call needs a row there and a test in
   `printer/scripts/test-settings-page.cjs` first. The phone PIN and the keys
   are not here on purpose. `e2e/settings-laptop.spec.js` stubs localhost.
+- **Screens, managed from /settings** (SETTINGS.md phase 2): a lobby TV and
+  the projector register with the sync Worker (`useScreenSync`,
+  `lib/screenSync.js`, `worker/src/screens.js`) and follow their own settings
+  there as their device layer; the one allowlist is `SCREEN_SPECS` in
+  `syncSpecs.js`. On the settings page, Screens opens a TV in the same panel
+  (`RemoteScreenPanel`, `RemoteScreenContext`): a `scope="screen"` card comes
+  back and writes to the Worker, a card about this browser takes `local` and
+  stays out. A new per-screen setting goes in `SCREEN_SPECS` too, or /settings
+  cannot change it; a new action goes in `SCREEN_ACTIONS` and the screen's
+  `onAction`.
 - A new Settings button that acts on the screen itself must be relayed here too,
   or hidden in configure mode: in the configurator it would otherwise act on
   the hidden configure page.
@@ -1730,8 +1740,9 @@ The full Awana Presentation Tool, migrated from KVBC-Awana-Countdown
   `src/lib/buildReload.js`, `src/lib/weather.js`, `src/lib/skins.js`,
   `src/components/BirthdayArt.jsx`, and the secret-storage helpers
   `src/hooks/useDisplayLogin.js`, `src/hooks/useDisplayKey.js`,
-  `src/lib/displayKey.js` (`maskDisplayKey`) and `src/lib/envelope.js`
-  (`isPlausibleKey`). Its realtime data must flow through the sanitized
+  `src/lib/displayKey.js` (`maskDisplayKey`), `src/lib/envelope.js`
+  (`isPlausibleKey`), `src/lib/configureRelay.js` and `src/hooks/useScreenSync.js`
+  (the screen registry, SETTINGS.md phase 2). Its realtime data must flow through the sanitized
   socket — never a second Pusher stack; the wake-lock, Open-Meteo
   fetcher, skin table, birthday art, self-update poller and the display
   key / login slots are shared so the two pages can't drift apart (the

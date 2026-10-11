@@ -79,6 +79,52 @@ welcome. This is the plan; its status is at the end.
   (Preview a check-in, Reset tonight's counter, the board demo) are gone, the
   pill and footer speak of the sign-in, and it opens on Setup until signed in.
   `e2e/settings-page.spec.js` pins it. The lobby TV's own Settings is unchanged.
+- 2026-10-11: **Phase 2 built** (lobby TVs and projectors; Journey left, below).
+  - **Worker** (`lobby/worker/src/screens.js`, routes in `sync.js`, API in
+    `worker/README.md`): `POST /v1/screens/hello`, `GET /v1/screens`,
+    `GET/PUT /v1/screens/<id>/settings`, `PUT .../name`, `POST .../action`,
+    `DELETE /v1/screens/<id>`, all behind the session. At most 40 screens,
+    2 KB of settings each; online = a hello in the last 3 minutes or a live
+    socket tagged with the screen's id (`/v1/live?...&screen=<id>`). The one
+    allowlist is `SCREEN_SPECS` in `lobby/src/lib/syncSpecs.js` (lobby: the
+    template keys plus `cornerClub` and `showTonightTicker`; projector:
+    `lowPower`, `stingers`; journey: `playbackQuality`; computer, for v9
+    (UNIFIED-APP.md): `printRole`, `displayRole`, `displayFrom`,
+    `displayUntil`), never a shared key, a Pusher key, panic mode, the deck or
+    a fleet URL (`screenSpecs.test.js`). A change, rename or action rings
+    `changed` `{what: 'screen' | 'screen-action', id}` on the live channel
+    only, never replayed.
+  - **Lobby TV** (`useScreenSync`, `lib/screenSync.js`): registers when signed
+    in and not in configure mode or embedded in Journey; id and last agreed
+    copy in `awanaScreens.v1`; the Worker's newer copy replaces the
+    allowlisted part of the device layer through `replaceConfig`, a change on
+    the TV goes up 1.5 s later. Named in Settings → Setup ("Lobby TV", or "OBS
+    overlay" for an overlay feed).
+  - **/settings**: a Screens section after Status (`SCREENS_SECTION`,
+    `sectionsFor(page, {remote})`). A lobby TV opens in the same panel
+    (`RemoteScreenPanel`, `RemoteScreenContext`): its "This screen" cards come
+    back tagged "<name> only" and write to the Worker; cards about this
+    browser (`PanelCard local`) stay out; shared cards only while it follows
+    the shared settings; its Status is the TV (on or off, rename, forget,
+    Preview a check-in, pickup demo, Reset tonight's counter). A projector's,
+    kiosk's or computer's switches are edited in its row.
+    `e2e/settings-screens.spec.js`.
+  - **Projector** (`presentation/hooks/useProjectorScreen.js`): the same hook,
+    Low power and the chimes as its layer, a wall pick or Resume obeyed;
+    `useScreenSync.js` joined the isolation allowlist on purpose.
+  - **TODO, Journey** (not built): Journey has no live socket, so it would
+    follow by its hello alone. In `journey/public/src/sync.js`: keep the id in
+    the same `awanaScreens.v1` slot under `journey` (one origin, the lobby's
+    format), POST `/v1/screens/hello {id, kind: 'journey'}` every 2 minutes
+    while signed in and not in configure mode, reconcile `playbackQuality`
+    with `journey.playback.quality` against `synced` exactly as
+    `reconcileScreen` does, and apply through the same function
+    `LIVE_STORAGE_KEYS[PLAYBACK_QUALITY_KEY]` runs (a same-window write fires
+    no `storage` event); add a case to `test/sync.test.mjs`. /settings
+    already lists and edits a Journey kiosk in its row.
+  - **For the owner**: a forgotten screen that is still running comes back at
+    its next hello (by design); and a change made on /settings while the TV
+    has an unsent change of its own wins over it.
 - 2026-10-11: **Phase 3 built** (printer 8.3.0; not released, no dispatch).
   Inventory below; what was built and what is still the owner's call after it.
 
