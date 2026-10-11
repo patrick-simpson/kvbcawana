@@ -58,6 +58,10 @@ commits or files.
   started in the old lobby repo on 2026-10-11 had to be ported here). Their
   github.io sites still serve the last build, and nothing reads from them (the
   lesson videos come from this repo's own `journey-videos-v2` release).
+- `CLOUD-CHECKIN.md` is the plan (owner, 2026-10-11) to retire the check-in
+  laptop: the sync Worker talks to TwoTimTwo itself, a Raspberry Pi at church
+  prints the labels. Phased, shadow-tested beside the laptop; read it before
+  touching check-in, the relay or the print path.
 - `AUDIT-2026-10-04.md` is the stability and performance audit; its status
   section says what was fixed on 2026-10-04/05 and what is deferred.
 
