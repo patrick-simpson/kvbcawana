@@ -114,6 +114,26 @@ export class Friends {
   }
 
   /**
+   * The names for the BARF Bag labels (owner, 2026-10-11): each child who
+   * brought a friend, then their friend right after (so a pair's labels come
+   * out together), club by club. A friend with no name typed (TwoTimTwo's desk
+   * box) has no label, and is counted so the screen can say so.
+   * @param {unknown} date
+   */
+  async bagNames(date) {
+    const report = await this.report(date);
+    const names = [];
+    let unnamed = 0;
+    for (const club of report.clubs) {
+      for (const kid of club.kids) {
+        names.push(kid.name);
+        if (kid.friend) names.push(kid.friend); else unnamed += 1;
+      }
+    }
+    return { date: report.date, names, kids: report.total, friends: report.total - unnamed, unnamed };
+  }
+
+  /**
    * A read-only link to one night's report, for the scheduled email. It opens
    * that night only and stops working at noon the next day (Eastern, near
    * enough: 16:00 UTC). Only its hash is stored.

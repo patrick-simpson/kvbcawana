@@ -366,7 +366,7 @@ export class SyncCore {
         'PUT /v1/journey', 'POST /v1/calendar/refresh', 'POST /v1/passphrase', 'POST /v1/publish',
         'POST /v1/relay', 'GET /v1/relay/next', 'POST /v1/relay/answer', 'GET /v1/relay/result',
         'GET /v1/cloud/status', 'POST /v1/cloud/read-now', 'POST /v1/cloud/checkin',
-        'POST /v1/cloud/friend', 'GET /v1/cloud/friends', 'POST /v1/cloud/friends-link',
+        'POST /v1/cloud/friend', 'GET /v1/cloud/friends', 'POST /v1/cloud/friends-link', 'POST /v1/cloud/barf-bags',
       ]);
       if (!known.has(route)) return fail('Not found.', 404);
       if (!(await this.authorized(request))) {
@@ -415,6 +415,15 @@ export class SyncCore {
         }
         case 'GET /v1/cloud/friends': return json(await this.friends.report(url.searchParams.get('date')));
         case 'POST /v1/cloud/friends-link': return json(await this.friends.makeLink((await this.body(request)).date));
+        // BARF Bag labels: tonight's names to the laptop, printed as one job
+        // (printer 8.2.0's /print-barf-bags, a job no page can send itself).
+        case 'POST /v1/cloud/barf-bags': {
+          const bags = await this.friends.bagNames((await this.body(request)).date);
+          if (!bags.names.length) return json({ ok: false, reason: 'none', ...bags, names: undefined });
+          if (!(await this.relayQueue.laptopOnline())) return json({ ok: false, reason: 'laptop-off', ...bags, names: undefined });
+          const job = await this.relayQueue.enqueueJob('/print-barf-bags', { names: bags.names });
+          return json({ ok: job.ok, reason: job.ok ? undefined : 'busy', labels: bags.names.length, kids: bags.kids, friends: bags.friends, unnamed: bags.unnamed, date: bags.date });
+        }
         // Check one child in on TwoTimTwo; a preview unless {confirm: true}.
         case 'POST /v1/cloud/checkin': return json(await this.watcher.checkIn(await this.body(request)));
         case 'POST /v1/cloud/read-now': {

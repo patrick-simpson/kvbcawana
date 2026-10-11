@@ -137,3 +137,26 @@ describe('tidying up', () => {
     expect((await s.call('GET', '/v1/cloud/friends?date=2026-10-14')).body.total).toBe(0);
   });
 });
+
+describe('BARF Bag labels', () => {
+  it('each child, then their named friend, club by club, as one job for the laptop', async () => {
+    const s = await setup({ laptopOn: true });
+    await s.call('POST', '/v1/cloud/friend', { name: 'Zoe Tester', club: 'Sparks', friendName: 'Ana' });
+    await s.call('POST', '/v1/cloud/friend', { name: 'Dot Tester', club: 'Cubbies', friendName: 'Ed' });
+    await s.call('POST', '/v1/cloud/friend', { name: 'Al Tester', club: 'Trek', friendName: '' });
+    expect((await s.call('POST', '/v1/cloud/barf-bags', {}, false)).status).toBe(401);
+    const r = await s.call('POST', '/v1/cloud/barf-bags', {});
+    expect(r.body).toEqual({ ok: true, labels: 5, kids: 3, friends: 2, unnamed: 1, date: '2026-10-14' });
+    const job = (await s.call('GET', '/v1/relay/next')).body.requests[0];
+    expect(job).toMatchObject({ path: '/print-barf-bags', job: true, body: { names: ['Dot Tester', 'Ed', 'Zoe Tester', 'Ana', 'Al Tester'] } });
+  });
+
+  it('says why when it cannot: nobody tonight, or the laptop is off', async () => {
+    const s = await setup({ laptopOn: true });
+    expect((await s.call('POST', '/v1/cloud/barf-bags', {})).body).toMatchObject({ ok: false, reason: 'none' });
+    const off = await setup();
+    await off.call('POST', '/v1/cloud/friend', { name: 'Zoe Tester', club: 'Sparks', friendName: 'Ana' });
+    expect((await off.call('POST', '/v1/cloud/barf-bags', {})).body).toMatchObject({ ok: false, reason: 'laptop-off', kids: 1 });
+    expect(off.storage.map.get('relay:queue') || []).toEqual([]);
+  });
+});
