@@ -1,4 +1,6 @@
-﻿## [8.3.0] - 2026-10-11
+﻿
+
+## [8.3.0] - 2026-10-11
 The printer's settings open on awana.kvbchurch.org/settings, and the extension points there.
 
 **New: the laptop's settings on the one settings page (owner).** Open awana.kvbchurch.org/settings in Chrome on this laptop and its new Laptop section finds this print server by itself: the name tag printer and the backup printer, the label footer and the label options, each club's label layout (with a preview), the pickup clubs, the club schedule, tonight's prints with a Reprint on each, the system diagnostics, a test label and Clear print queue. On any other computer or phone it says to open the page on the check-in laptop. Signed in to the page with the church passphrase is all it takes: the print server confirms the sign-in with the sync service (and remembers it for ten minutes), and only from this laptop's own browser. The publish token still works as a fallback. Without either, the page can read only whether the server is running. The dashboard on this computer is unchanged and stays the fallback for a night with no internet.

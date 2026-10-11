@@ -32,7 +32,7 @@ export const InstallGuide: React.FC = () => {
       setConnDetail(`v${data.version} — printer: ${data.printer}`);
     } catch {
       setConnStatus('error');
-      setConnDetail('Server not reachable — make sure the Club Label Printer window is open on this computer.');
+      setConnDetail('Server not reachable — make sure KVBC Awana is running on this computer as a print server.');
     }
   };
 
@@ -56,7 +56,7 @@ export const InstallGuide: React.FC = () => {
         <ol className="lbl-install">
           <Step n={1} title="Install the app">
             <p className="flex flex-wrap items-center gap-x-4 gap-y-2">
-              <a href={INSTALLER_URL} className="fam-btn"><Icon name="download" />Download Club Label Printer for Windows</a>
+              <a href={INSTALLER_URL} className="fam-btn"><Icon name="download" />Download KVBC Awana for Windows</a>
               <span className="text-step--1 text-ink-3">then run the downloaded file</span>
             </p>
             <div className="lbl-note lbl-note--block">
@@ -67,16 +67,20 @@ export const InstallGuide: React.FC = () => {
               </p>
             </div>
             <p>
-              The print server starts the moment the app opens, even before setup is finished. The
-              one-page setup asks you to pick your label printer, confirm your church’s check-in address,
-              and click <strong>Save &amp; Start</strong>. The app then lives in the system tray (near
-              the clock), starts automatically when the PC boots, prints a test label on demand, and{' '}
-              <strong>updates itself</strong>, so there are no installers to re-run.
+              The app is <strong>KVBC Awana</strong>, one app for every computer at club (it was called
+              Club Label Printer until version 9). Its setup asks what this computer is for: choose{' '}
+              <strong>Print server</strong> (add <strong>Display</strong> too if this PC also puts a screen
+              on a TV), type the church passphrase, give the computer a name, pick your label printer and
+              confirm your church’s check-in address. The app then lives in the system tray (near the
+              clock), starts automatically when the PC boots, prints a test label on demand, and{' '}
+              <strong>updates itself</strong>, so there are no installers to re-run. A computer that already
+              ran Club Label Printer updates to KVBC Awana by itself and stays a print server, with no
+              setup to redo.
             </p>
             <p className="lbl-small">
-              Server not running for any reason? Launch <strong>Club Label Printer</strong> from the desktop
+              Server not running for any reason? Launch <strong>KVBC Awana</strong> from the desktop
               or Start menu again: every launch checks the server and starts it if it’s down. There’s also a{' '}
-              <strong>Start print server</strong> button in the tray menu and in Settings.
+              <strong>Start print server</strong> button in the tray menu and in the print server window.
             </p>
             <p className="lbl-small">
               If Windows asks about network access after setup, click <strong>Allow</strong>. That’s what lets
