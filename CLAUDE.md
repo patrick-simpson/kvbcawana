@@ -82,6 +82,12 @@ commits or files.
   vendor support. Phase 1 (the Worker's read-only report watcher,
   `lobby/worker/src/twotimtwo.js` / `watcher.js`) is built and idle until the
   `TWOTIMTWO_*` secrets are set.
+- `UNIFIED-APP.md` (owner, 2026-10-11): ONE Windows app, **KVBC Awana**
+  (printer 9.0.0, `printer/electron-app/`), a print server, a display or
+  both per computer, set by a first-run wizard. The sound room app
+  (`lobby/desktop/`) ends at 2.1.0, which hands the sound room PC over to it.
+  Built on branch `kvbc-awana-v9`, not yet released; its "Still to do" lists
+  what the release workflows must change for the rename.
 - `AUDIT-2026-10-04.md` is the stability and performance audit; its status
   section says what was fixed on 2026-10-04/05 and what is deferred.
 

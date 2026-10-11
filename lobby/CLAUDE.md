@@ -726,6 +726,18 @@ over it. `src/lib/flagship.js` is the pure half (`FLAGSHIP_SLIDE`,
 
 ## The sound room desktop app (`desktop/`, Awana Lobby Display)
 
+**Being replaced by KVBC Awana (UNIFIED-APP.md, owner 2026-10-11).** Its main
+process and pure modules now live in `printer/electron-app/src/display/` as
+the display role of the one app (with per-computer hours); change the display
+THERE. This folder's 2.1.0 is the last release, the bridge
+(`src/handoff.js`): on each update check it reads the printer feed first and,
+once that is KVBC Awana 9.0.0 or later, downloads it (sha512 checked), writes
+`%APPDATA%\awana-label-printer\handoff.json`, runs it with `/S --force-run`
+and quits; KVBC Awana applies the hand-off and uninstalls this app. Keep the
+hand-off format in step with `printer/electron-app/src/handoff.js`. After the
+bridge is out the lobby feed stays at 2.1.0: never point `lobby.yml` at a
+KVBC Awana installer. What follows describes this app as it is.
+
 Owner request 2026-09-29: a Windows app for the sound room PC that shows the
 lobby signage full screen on the lobby TV on club nights, 5:00 to 8:00 pm.
 Electron, in `desktop/` with its own `package.json` (the root `npm ci` never

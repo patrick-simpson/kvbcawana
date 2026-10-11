@@ -3,14 +3,17 @@
 Senior Software Engineer focused on **Technical Integrity, Quality, and Operational Excellence**. Surgical fixes addressing root causes, not workarounds.
 
 ## Project
-Windows app for printing child check-in labels at Awana events from TwoTimTwo.com. Branded **"Club Label Printer"** since v5.9.0 (was "Awana Label Printer" — renamed for Awana Clubs International trademark compliance; see changes.md's 5.9.0 entry for the full rationale).
+Windows app for printing child check-in labels at Awana events from TwoTimTwo.com. Since **9.0.0 the Windows app is "KVBC Awana"**, one app for every KVBC Awana computer: a print server, a display (the sound room app moved in), or both (see "KVBC Awana (9.0.0)" below and the root `UNIFIED-APP.md`). It was "Club Label Printer" from v5.9.0 (and "Awana Label Printer" before that — renamed for Awana Clubs International trademark compliance; see changes.md's 5.9.0 entry), and the public site still calls the print server that.
 
 **Components:** React Simulator (root) | Chrome Extension (chrome-extension/, zipped for download by bump-version.cjs) | Electron App (electron-app/) | Print Server (print-server/) | Legacy Installer (install-and-run.ps1, deprecated)
 
 **Branding vs. internal identifiers — don't conflate these when touching either:**
-`productName` (`electron-app/package.json`) is "Club Label Printer" — every
-user-visible string (window titles, tray, shortcuts, installer filename)
-should match it. `"name"`/`"appId"` (`awana-label-printer` /
+`build.productName` (`electron-app/package.json`) is "KVBC Awana" since
+9.0.0 (`APP_NAME` in main.js) — every user-visible string in the app (window
+titles, tray, notifications, shortcuts, installer filename) should match it.
+It must stay under `build` only: a TOP-LEVEL `productName` would become
+Electron's app name and move userData (`electron-app/test/roles.test.cjs`
+fails if one appears). `"name"`/`"appId"` (`awana-label-printer` /
 `com.kvbc.awana-label-printer`) are **deliberately still the old name** —
 electron-builder derives the install directory and `app.getPath('userData')`
 from `"name"`, not `productName` (confirmed in `build-electron.yml`'s CI
@@ -41,12 +44,58 @@ Every functional change requires:
    happened once, with the ideas page).
 7. **Cut the release** (if `electron-app/` or `print-server/` changed) — see "Releasing the Windows app" below. Don't stop at pushing to `main`; the `.exe` isn't live until the tagged build publishes.
 
+## KVBC Awana (9.0.0): roles, the display, the wizard
+
+Owner, 2026-10-11 (the root `UNIFIED-APP.md` has the decisions and the full
+build notes). The electron-app is one app with two roles:
+
+- **`roles.json`** in userData (`src/roles.js`): `{print, display, name,
+  setupDone}`, decided ONCE on the first v9 start, before anything writes to
+  userData: a saved file wins; then the sound room's hand-off (a display);
+  then printer data already in userData (`PRINTER_DATA`: the check-in laptop
+  upgrading from 8.x is a print server with the display OFF and setup done,
+  so it never sees the wizard or the display); else a new install (the
+  wizard). Every write keeps `roles.json.bak`, read when the file is damaged.
+- **The print server runs only with the print role**: `startServer()` and
+  `ensureServerRunning()` return at once without it, and everything the app
+  did at launch is `startPrintRole()`. Turning print off relaunches the app
+  (the server module keeps timers of its own once loaded).
+- **The display** is `src/display/` (the sound room app's main process,
+  `createDisplay()`, started and stopped by the display role; the rules are
+  lobby/CLAUDE.md's "The sound room desktop app", except that the hours are
+  per computer, `settings.hours`, default 17:00-20:00, and the tray, updater,
+  login item and single-instance lock are main.js's). Its pure modules'
+  tests are `electron-app/test/*.test.cjs` on `node:test` (`npm run
+  test:app`, part of `npm test`).
+- **Updates**: every 10 minutes for every role, installed the moment they
+  download (the sound room's rule). The print role adds no idle gate: the
+  5 s grace, or a capped busy poll if the server ever exports `isBusy()`.
+- **Start with Windows** is one login item for both roles: config.json's
+  `launchOnBoot` (the tray's checkbox, the display's Settings, the wizard).
+- **The wizard** (`src/setup-wizard.js`, `static/setup.html`, a six-call
+  preload): role, the church passphrase (signs in through
+  `print-server/sync-client.js`; the session goes to `sync-session.bin`
+  encrypted with safeStorage, memory only where it cannot encrypt, never a
+  plain file; the passphrase is held in memory until the wizard closes, to
+  sign the print server in too via its loopback `/config/sync-login`), a
+  name, the printer, the screen + monitor + hours. Tray: "Set up this
+  computer...". It styles itself from the print server's brand-kit mirror,
+  two folders up from `static/` both unpackaged and packaged.
+- **The sound room hand-off**: `src/handoff.js` reads
+  `%APPDATA%\awana-label-printer\handoff.json` (written by
+  `lobby/desktop` 2.1.0), and `src/old-app.js` uninstalls Awana Lobby
+  Display afterwards. The format is shared with
+  `lobby/desktop/src/handoff.js`: change both together.
+- **The /settings hook**: `roles:get` / `roles:set` in main.js (own file://
+  windows only), `deviceSnapshot()`, the session. Phase 2's `computer` device
+  builds on these.
+
 ## Releasing the Windows app
 
 **Never create the release tag manually** (`git tag` + `git push`, or the GitHub web UI "Draft a new release" flow). It has failed repeatedly in practice: a Claude Code session's git access is commonly scoped to branches only (tag pushes rejected), and manual tagging has hit silent footguns (tag name case, a republished release reusing its old tag ref).
 
 Instead, once steps 1–5 are on `main`, dispatch **`.github/workflows/printer-release.yml`** (at the repo root) with the `version` input (e.g. `7.11.1`, no prefix; the tag it makes is `printer-v7.11.1`) and `ref` `main`:
-- **Human:** GitHub → Actions → "Release Club Label Printer" → Run workflow → enter the version.
+- **Human:** GitHub → Actions → "Release Club Label Printer" → Run workflow → enter the version. (9.0.0 renamed the app: the workflow's smoke test must look for `KVBC Awana.exe` and the process `KVBC Awana` first; see `UNIFIED-APP.md`, "Still to do".)
 - **Claude:** `mcp__github__actions_run_trigger` with `method: "run_workflow"`, `workflow_id: "printer-release.yml"`, `ref: "main"`, `inputs: {"version": "7.11.1", "ref": "main"}`.
 
 The workflow runs the test suites FIRST, then creates the tag (so a failing test never leaves a tag behind), builds the `.exe` on Windows, smoke-tests it (silent install, `/health`, `/preview`), publishes the GitHub Release with `make_latest: false`, and commits the update feed to `site/updates/printer/` (which `ci.yml` then publishes). **The feed is ours, not GitHub's "Latest"**: the app updates from awana.kvbchurch.org/updates/printer/, and the workflow refuses a version that would move the feed backwards. Watch it through with `mcp__github__actions_get`; a release is done when the run is green, the release has its assets, and the feed names the new version.
