@@ -16,7 +16,9 @@
 // src/shutdown.js).
 
 import { app, BrowserWindow, Menu, Tray, WebContentsView, ipcMain, nativeImage, net, powerMonitor, powerSaveBlocker, screen, session, shell } from 'electron';
-import { execFile } from 'node:child_process';
+import { execFile, spawn } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import { Readable } from 'node:stream';
 import updaterPkg from 'electron-updater';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -27,6 +29,7 @@ import { findDisplay, rememberDisplay } from './src/displays.js';
 import { SCREENS, isScreenPage, screenUrls } from './src/screens.js';
 import { normalizeSettings, parseTime } from './src/settings.js';
 import { shutdownDeadline, shutdownStep } from './src/shutdown.js';
+import { HANDOFF_DIR, HANDOFF_FILE, INSTALLER_NAME, KVBC_FEED_URL, buildHandoff, parseFeed, shouldHandOff } from './src/handoff.js';
 
 const { autoUpdater } = updaterPkg;
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -847,7 +850,97 @@ function checkForUpdates(byHand = false) {
   if (DEV) return;
   updateStatus = byHand ? 'checking' : updateStatus;
   updateTray();
-  autoUpdater.checkForUpdates().catch((err) => { log('update check failed', err); updateStatus = 'update check failed'; updateTray(); });
+  // 2.1.0, the bridge: KVBC Awana first; this app's own feed only until
+  // KVBC Awana 9 is out (src/handoff.js).
+  tryHandOff().then((handing) => {
+    if (handing) return;
+    autoUpdater.checkForUpdates().catch((err) => { log('update check failed', err); updateStatus = 'update check failed'; updateTray(); });
+  });
+}
+
+/* ── The hand-off to KVBC Awana (2.1.0, this app's last release) ───── */
+
+// KVBC Awana (the printer app, v9) replaces this app: one Windows app for
+// the print server and the screens (UNIFIED-APP.md). Once its feed names
+// 9.0.0 or later, this downloads its installer, checks the sha512 the feed
+// gives, writes the hand-off (this PC is a display; its screen, monitor,
+// shutdown, Start with Windows and where this app's browser profile is) to
+// KVBC Awana's own userData folder, runs the installer silently and quits.
+// KVBC Awana then applies the hand-off and uninstalls this app and its login
+// item. A failure leaves this app running as before, tried again the next
+// day (state.handoffTry); the lobby feed's updates go on meanwhile.
+let handingOff = false;
+
+async function downloadVerified(url, sha512, dest) {
+  const res = await net.fetch(url, { cache: 'no-store' });
+  if (!res.ok || !res.body) throw new Error(`installer download: HTTP ${res.status}`);
+  const hash = createHash('sha512');
+  const tmp = `${dest}.part`;
+  await new Promise((resolve, reject) => {
+    const out = fs.createWriteStream(tmp);
+    const src = Readable.fromWeb(/** @type {any} */ (res.body));
+    src.on('data', (chunk) => hash.update(chunk));
+    src.on('error', reject);
+    out.on('error', reject);
+    out.on('finish', resolve);
+    src.pipe(out);
+  });
+  if (hash.digest('base64') !== sha512) {
+    try { fs.unlinkSync(tmp); } catch { /* gone */ }
+    throw new Error('installer download: sha512 does not match the feed');
+  }
+  fs.renameSync(tmp, dest);
+}
+
+/** @returns {Promise<boolean>} true while a hand-off is under way (skip the lobby feed) */
+async function tryHandOff() {
+  if (DEV || SMOKE || process.platform !== 'win32') return false;
+  if (handingOff) return true;
+  let feed = null;
+  try {
+    const res = await net.fetch(`${KVBC_FEED_URL}?t=${Date.now()}`, { cache: 'no-store' });
+    if (res.ok) feed = parseFeed(await res.text());
+  } catch (err) { log('KVBC Awana feed unreachable', String(err)); }
+  if (!shouldHandOff(feed, state.handoffTry, Date.now()) || !feed) return false;
+  handingOff = true;
+  state.handoffTry = { version: feed.version, at: Date.now() };
+  saveState();
+  updateStatus = `moving to KVBC Awana ${feed.version}`;
+  updateTray();
+  log('handing over to KVBC Awana', feed.version, feed.url);
+  try {
+    const installer = path.join(app.getPath('temp'), INSTALLER_NAME);
+    await downloadVerified(feed.url, feed.sha512, installer);
+    const handoffDir = path.join(app.getPath('appData'), HANDOFF_DIR);
+    fs.mkdirSync(handoffDir, { recursive: true });
+    writeJson(path.join(handoffDir, HANDOFF_FILE), buildHandoff(state, {
+      version: app.getVersion(),
+      userData: userDir(),
+      exe: process.execPath,
+      startWithWindows: autostartOn(),
+      at: new Date().toISOString(),
+    }));
+    if (!fs.existsSync(path.join(handoffDir, HANDOFF_FILE))) throw new Error('the hand-off could not be written');
+    // Commit tonight's login and settings to disk: KVBC Awana copies this
+    // profile on its first start.
+    try { await session.fromPartition('persist:lobby').flushStorageData(); } catch { /* best effort */ }
+    // /S installs silently; --force-run starts KVBC Awana when it is done
+    // (an NSIS one-click installer runs nothing after a silent install
+    // otherwise). Detached, so it outlives this app, which it replaces.
+    const child = spawn(installer, ['/S', '--force-run'], { detached: true, stdio: 'ignore', windowsHide: true });
+    child.on('error', (err) => log('KVBC Awana installer did not start', err));
+    child.unref();
+    log('KVBC Awana installer started; quitting');
+    closingByApp = true;
+    app.quit();
+    return true;
+  } catch (err) {
+    log('hand-off failed; staying', err);
+    handingOff = false;
+    updateStatus = 'could not move to KVBC Awana; will try again tomorrow';
+    updateTray();
+    return false;
+  }
 }
 
 // One install at a time, with a way back. quitAndInstall() hands the app to

@@ -1,5 +1,16 @@
 # Awana Lobby Display (sound room PC)
 
+> **Replaced by KVBC Awana (2026).** Version 2.1.0 is this app's last
+> release. Once KVBC Awana 9 is out, it installs KVBC Awana by itself (as a
+> display, with this PC's screen, monitor, shutdown and Start with Windows
+> carried over, and the screens still signed in), and KVBC Awana then removes
+> this app. Nothing to do at the PC. KVBC Awana is one app for every KVBC
+> Awana computer: the check-in laptop's print server, a display, or both;
+> its guide is the printer's (`printer/README.md`) and the plan is
+> `UNIFIED-APP.md` at the repo root. For a NEW display, install KVBC Awana
+> (awana.kvbchurch.org/download/club-label-printer) and choose Display in its
+> setup, not this app.
+
 A small Windows app that puts the **lobby check-in signage** (or, if you
 choose, the projector or the Journey kiosk) full screen on
 the lobby TV on club nights, from **5:00 pm to 8:00 pm**, and takes it down
