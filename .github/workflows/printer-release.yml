@@ -1,6 +1,12 @@
-name: Release Club Label Printer
+name: Release KVBC Awana
 
-# One workflow cuts a printer release end to end. Run it from the Actions tab
+# One workflow cuts a printer release end to end. Since 9.0.0 the app is
+# "KVBC Awana" (UNIFIED-APP.md): build.productName names the installer
+# (KVBC-Awana-Setup.exe), the exe and the process ("KVBC Awana"); the
+# package "name" (awana-label-printer), the appId and so the install folder
+# (%LOCALAPPDATA%\Programs\awana-label-printer) and userData are unchanged,
+# which is how the check-in laptop upgrades in place from this feed.
+# Run it from the Actions tab
 # (or `gh workflow run printer-release.yml -f version=6.22.0`), with the
 # version in printer/VERSION and printer/electron-app/package.json, no "v".
 #
@@ -178,7 +184,7 @@ jobs:
       - name: Upload installer artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Club-Label-Printer-Setup
+          name: KVBC-Awana-Setup
           path: |
             printer/electron-app/dist/*.exe
             printer/electron-app/dist/*.blockmap
@@ -199,7 +205,7 @@ jobs:
       - name: Download installer
         uses: actions/download-artifact@v4
         with:
-          name: Club-Label-Printer-Setup
+          name: KVBC-Awana-Setup
           path: installer
 
       - name: Install silently
@@ -234,7 +240,7 @@ jobs:
           $deadline = (Get-Date).AddSeconds(60)
           $installed = $null
           while ((Get-Date) -lt $deadline) {
-            $found = Get-ChildItem "$env:LOCALAPPDATA\Programs" -Filter 'Club Label Printer.exe' -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+            $found = Get-ChildItem "$env:LOCALAPPDATA\Programs" -Filter 'KVBC Awana.exe' -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
             if ($found) { $installed = $found.FullName; break }
             Start-Sleep -Seconds 3
           }
@@ -245,11 +251,18 @@ jobs:
               Select-Object FullName | Format-Table -AutoSize | Out-String | Write-Host
             Write-Host "---- Diagnostics: uninstall registry entries ----"
             Get-ItemProperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*' -ErrorAction SilentlyContinue |
-              Where-Object { $_.DisplayName -like '*Label Printer*' } | Format-List | Out-String | Write-Host
+              Where-Object { $_.DisplayName -like '*KVBC Awana*' -or $_.DisplayName -like '*Label Printer*' } | Format-List | Out-String | Write-Host
             throw "App exe never appeared under `$env:LOCALAPPDATA\Programs after 60s (installer exit code: $($proc.ExitCode))"
           }
 
           Write-Host "Installed app found at: $installed"
+          # The renamed app (9.0.0) must land in the SAME folder as every 8.x
+          # install: the folder comes from package.json's "name", and a new
+          # one would leave the check-in laptop with two copies.
+          if ($installed -notlike "*\Programs\awana-label-printer\KVBC Awana.exe") {
+            throw "Installed to an unexpected folder: $installed (expected %LOCALAPPDATA%\Programs\awana-label-printer)"
+          }
+          if ($exe.Name -ne 'KVBC-Awana-Setup.exe') { throw "Unexpected installer name: $($exe.Name)" }
           "INSTALLED_EXE=$installed" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
       # Pre-seed config so the app starts the server instead of waiting in the
@@ -259,8 +272,8 @@ jobs:
       # guessing where app.getPath('userData') lands: the install step above
       # just proved the install directory uses package.json's "name" field
       # (awana-label-printer — deliberately NOT renamed in the v5.9.0 "Club
-      # Label Printer" rebrand, see changes.md), not "productName" (now
-      # "Club Label Printer") as assumed — guessing the config/userData path
+      # Label Printer" rebrand or the 9.0.0 "KVBC Awana" one, see changes.md),
+      # not "productName" (now "KVBC Awana") as assumed — guessing the config/userData path
       # the same way is the same class of bug. --user-data-dir is a native
       # Electron/Chromium switch
       # that app.getPath('userData') honors automatically, so this sidesteps
@@ -293,7 +306,7 @@ jobs:
           $appProc = $null
           $findDeadline = (Get-Date).AddSeconds(30)
           while ((Get-Date) -lt $findDeadline) {
-            $appProc = Get-Process 'Club Label Printer' -ErrorAction SilentlyContinue | Select-Object -First 1
+            $appProc = Get-Process 'KVBC Awana' -ErrorAction SilentlyContinue | Select-Object -First 1
             if ($appProc) { break }
             Start-Sleep -Milliseconds 500
           }
@@ -339,7 +352,7 @@ jobs:
             Get-NetTCPConnection -LocalPort 3456 -ErrorAction SilentlyContinue | Format-Table -AutoSize | Out-String | Write-Host
             Write-Host "---- Diagnostics: Windows Application event log (crash reports) ----"
             Get-WinEvent -FilterHashtable @{ LogName = 'Application'; StartTime = [datetime]$env:APP_LAUNCH_TIME } -ErrorAction SilentlyContinue |
-              Where-Object { $_.Message -like '*Label Printer*' -or $_.ProviderName -like '*Application Error*' } |
+              Where-Object { $_.Message -like '*KVBC Awana*' -or $_.ProviderName -like '*Application Error*' } |
               Select-Object TimeCreated, Id, ProviderName, @{n='Message';e={$_.Message.Substring(0, [Math]::Min(500, $_.Message.Length))}} |
               Format-List | Out-String | Write-Host
             throw 'Server never answered /health'
@@ -374,10 +387,19 @@ jobs:
           if ($bytes[0] -ne 0x89 -or $bytes[1] -ne 0x50) { throw '/preview did not return a PNG — full server render path broken' }
           Write-Host "Preview PNG: $($bytes.Length) bytes"
 
+          # KVBC Awana's roles (9.0.0): the seeded config.json is printer data,
+          # so this start must have decided "print server, display off, setup
+          # done" (the check-in laptop's upgrade path) and written roles.json.
+          $roles = Get-Content "$env:CI_DATA_DIR\roles.json" -Raw -ErrorAction SilentlyContinue | ConvertFrom-Json
+          if (-not $roles -or $roles.print -ne $true -or $roles.display -ne $false -or $roles.setupDone -ne $true) {
+            throw "roles.json is not the upgraded laptop's (print server, display off, setup done): $($roles | ConvertTo-Json -Compress)"
+          }
+          Write-Host "Roles: $($roles | ConvertTo-Json -Compress)"
+
       - name: Stop app
         if: always()
         shell: pwsh
-        run: Get-Process 'Club Label Printer' -ErrorAction SilentlyContinue | Stop-Process -Force
+        run: Get-Process 'KVBC Awana' -ErrorAction SilentlyContinue | Stop-Process -Force
 
   release:
     # Publish only after the INSTALLED app passed the smoke test.
@@ -399,7 +421,7 @@ jobs:
       - name: Download installer
         uses: actions/download-artifact@v4
         with:
-          name: Club-Label-Printer-Setup
+          name: KVBC-Awana-Setup
           path: installer
 
       # latest.yml + blockmap are the electron-updater feed inputs. Not
@@ -408,7 +430,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: printer-v${{ inputs.version }}
-          name: Club Label Printer ${{ inputs.version }}
+          name: KVBC Awana ${{ inputs.version }}
           make_latest: 'false'
           files: |
             installer/*.exe

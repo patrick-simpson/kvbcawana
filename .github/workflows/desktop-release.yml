@@ -264,7 +264,8 @@ jobs:
           make_latest: 'false'
           body: |
             Windows installer for the sound room PC: `Awana-Lobby-Display-Setup.exe`.
-            Installed copies update themselves from the site's update feed, outside club-night hours.
+            Installed copies update themselves from the site's update feed as soon as a release is out.
+            From 2.1.0 this app is being replaced by KVBC Awana: once the printer feed has KVBC Awana 9.0.0 or later, it installs KVBC Awana as this PC's display and removes itself. New PCs: install KVBC Awana (awana.kvbchurch.org/download/kvbc-awana).
           files: |
             installer/Awana-Lobby-Display-Setup.exe
             installer/Awana-Lobby-Display-Setup.exe.blockmap
