@@ -191,6 +191,21 @@ export function rowShape(html) {
 }
 
 /**
+ * A check-in item's words ("Bible", "Brought a friend"): the label wrapping
+ * it, the one for its id, or the label right after it, as the extension
+ * reads them (collectApplicableEvents). Church-typed text, never a name.
+ * @param {any} doc @param {any} input
+ */
+function itemLabel(doc, input) {
+  let label = input.closest('label');
+  const id = input.getAttribute('id');
+  if (!label && id) label = [...doc.querySelectorAll('label[for]')].find((l) => l.getAttribute('for') === id) || null;
+  if (!label && input.nextElementSibling && input.nextElementSibling.tagName === 'LABEL') label = input.nextElementSibling;
+  const text = label ? label.textContent : (input.nextSibling ? input.nextSibling.textContent : '');
+  return squash(text).slice(0, 60);
+}
+
+/**
  * The check-in page (/clubber/checkin): tonight's meeting id, its check-in
  * items with their club scopes, and the roster rows. Phase 1 keeps NO names
  * from it: ids, clubs and the checked-in mark only. null when it is not the
@@ -210,6 +225,7 @@ export function parseCheckinPage(html) {
       id: String(el.getAttribute('value') || '').trim(),
       clubs: String(el.getAttribute('clubs') || '').split(',').map((c) => c.trim()).filter((c) => /^\d+$/.test(c)),
       automatic: el.getAttribute('automatic') === '1',
+      label: itemLabel(doc, el),
     }))
     .filter((e) => /^\d{1,12}$/.test(e.id));
   // Names are read for finding one child to check in (cloud check-in's
@@ -248,6 +264,28 @@ export function checkinReplyOk(text, childName) {
   if (t === 'Login Required' || /name=["']LoginForm\[/.test(t) || /type=["']password["']/i.test(t)) return false;
   const first = String(childName || '').trim().split(/\s+/)[0] || '';
   return !!first && t.toLowerCase().includes(first.toLowerCase());
+}
+
+// Which of tonight's check-in items a check-in sends (cloud check-in).
+export const BIBLE_RE = /bible/i;
+export const FRIEND_RE = /friend|brought/i;
+
+/**
+ * The items a check-in sends: every automatic one (Attendance), Bible and
+ * Brought a friend when the phone ticked them, and only items whose clubs
+ * include the child's (none listed: every club). The extension's
+ * collectApplicableEvents, without a checkbox's own state to read.
+ * @param {{id: string, clubs: string[], automatic: boolean, label?: string}[]} events
+ * @param {string} clubId @param {{Bible?: unknown, Friend?: unknown}} [options]
+ */
+export function itemsToSend(events, clubId, options = {}) {
+  return events.filter((e) => {
+    if (e.clubs.length && !e.clubs.includes(String(clubId))) return false;
+    if (e.automatic) return true;
+    if (BIBLE_RE.test(e.label || '')) return options.Bible === true;
+    if (FRIEND_RE.test(e.label || '')) return options.Friend === true;
+    return false;
+  }).map((e) => e.id);
 }
 
 /** @param {string} html */

@@ -95,6 +95,39 @@ export class Relay {
     return { ok: true, id, laptopOnline: await this.laptopOnline() };
   }
 
+  /**
+   * A job for the laptop that only this service creates (cloud check-in: print
+   * the tag of a child the Worker just checked in). Marked `job`, and the
+   * laptop runs a job only from its own short JOB_ROUTES list, so the phone
+   * page's RELAY_ROUTES stay as narrow as they were: no page can ask for one.
+   * Nobody collects its answer; purge() drops it with the rest.
+   * @param {string} path @param {Record<string, unknown>} body
+   */
+  async enqueueJob(path, body) {
+    const t = this.now();
+    const q = (await this.queue()).filter((r) => this.alive(r, t));
+    if (q.length >= QUEUE_MAX) return { ok: false };
+    const id = randomId();
+    q.push({ id, method: 'POST', path, body, at: t, taken: 0, job: true });
+    await this.storage.put('relay:queue', q);
+    await this.storage.put('relay:busy', t + BUSY_MS);
+    return { ok: true, id };
+  }
+
+  /**
+   * An answer this service makes itself, collected by the page exactly like
+   * the laptop's (cloud check-in answers the phone page's own calls).
+   * @param {number} status @param {unknown} body
+   */
+  async store(status, body) {
+    const id = randomId();
+    await this.storage.put(`relay:ans:${id}`, { status, body, at: this.now() });
+    const held = (await this.storage.get('relay:held')) || [];
+    held.push({ id, at: this.now() });
+    await this.storage.put('relay:held', held);
+    return id;
+  }
+
   /** Delete every answer nobody collected in time (names never sit here). */
   async purge() {
     const t = this.now();
@@ -129,7 +162,7 @@ export class Relay {
     if (fresh.length || live.length !== all.length) await this.storage.put('relay:queue', live);
     const busyUntil = (await this.storage.get('relay:busy')) || 0;
     return {
-      requests: fresh.map(({ id, method, path, body }) => ({ id, method, path, body })),
+      requests: fresh.map(({ id, method, path, body, job }) => (job ? { id, method, path, body, job: true } : { id, method, path, body })),
       busy: busyUntil > t,
     };
   }

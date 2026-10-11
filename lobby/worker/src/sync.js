@@ -42,6 +42,7 @@ import { DEFAULT_CALENDAR_URL, scrapeCalendar } from './calendar.js';
 import { DOORBELL_EVENT, REPLAYED, checkPublish, frameText, replayKey } from './live.js';
 import { Relay } from './relay.js';
 import { Watcher } from './watcher.js';
+import { CloudPhone } from './phone.js';
 
 export const IP_MAX_FAILS = 5;
 export const IP_LOCK_MS = 15 * 60 * 1000;
@@ -150,6 +151,8 @@ export class SyncCore {
     this.relayQueue = new Relay(this.storage, this.now);
     // Cloud check-in (CLOUD-CHECKIN.md), phase 1: the read-only report watcher.
     this.watcher = new Watcher({ storage: this.storage, env: this.env, fetchFn: this.fetchFn, now: this.now, alarms });
+    // ...and the phone page's check-ins, answered here instead of by the laptop.
+    this.phone = new CloudPhone({ watcher: this.watcher, relay: this.relayQueue, storage: this.storage, now: this.now });
   }
 
   /** The Durable Object's alarm: the watcher's 15 s read (it sets the next one). */
@@ -371,7 +374,13 @@ export class SyncCore {
         case 'POST /v1/publish': return await this.livePublish(request);
         // The phone check-in relay (relay.js): the page asks, the laptop answers.
         case 'POST /v1/relay': {
-          const r = await this.relayQueue.enqueue(await this.body(request));
+          const req = await this.body(request);
+          // Cloud check-in: the calls the Worker answers itself (phone.js);
+          // the page collects the answer from /v1/relay/result as ever.
+          const laptopOnline = await this.relayQueue.laptopOnline();
+          const own = await this.phone.answer(req, laptopOnline);
+          if (own) return json({ id: await this.relayQueue.store(own.status, own.body), laptopOnline });
+          const r = await this.relayQueue.enqueue(req);
           return r.ok ? json({ id: r.id, laptopOnline: r.laptopOnline }) : fail(r.error, r.status);
         }
         case 'GET /v1/relay/next': return json(await this.relayQueue.take());

@@ -144,8 +144,8 @@ describe('the check-in page parser', () => {
     expect(p.calendarId).toBe('368');
     expect(p.meetingDate).toBe('2026-10-14');
     expect(p.events).toEqual([
-      { id: '707', clubs: ['2', '3', '6'], automatic: false },
-      { id: '40', clubs: ['4', '1', '2', '3', '6'], automatic: true },
+      { id: '707', clubs: ['2', '3', '6'], automatic: false, label: 'Bible' },
+      { id: '40', clubs: ['4', '1', '2', '3', '6'], automatic: true, label: 'Attendance' },
     ]);
     expect(p.roster).toEqual([
       { clubberId: '662', clubId: '2', name: 'Kit Tester', club: 'Sparks', checkedIn: false },

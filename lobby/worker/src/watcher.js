@@ -22,7 +22,7 @@
 //                 the storage alone opens nothing). No names, ever.
 // The session cookie and the password never touch storage (twotimtwo.js).
 
-import { TwoTimTwoClient, credentialsFrom, rowShape } from './twotimtwo.js';
+import { TwoTimTwoClient, credentialsFrom, itemsToSend, rowShape } from './twotimtwo.js';
 import { fromBase64, toBase64 } from './crypto.js';
 
 /** TwoTimTwo's agreed limit (2026-10-11): one report read per 15 seconds. */
@@ -307,11 +307,12 @@ export class Watcher {
    * Check one child in on TwoTimTwo (CLOUD-CHECKIN.md phase 4's first piece,
    * owner-only: a signed-in screen asks, never the watcher). Without
    * `confirm: true` it only previews: who it found, their club, and the
-   * meeting the check-in would record on. Attendance and the other automatic
-   * items that apply to the child's club are sent, as the check-in page does.
+   * meeting the check-in would record on. It sends what the check-in page
+   * would: Attendance (every automatic item), plus Bible and Brought a friend
+   * when `options` ticks them, each only where it applies to the child's club.
    * The answer names the child (the caller asked for them by name); nothing
    * stored or logged does.
-   * @param {{name?: unknown, clubberId?: unknown, confirm?: unknown}} body
+   * @param {{name?: unknown, clubberId?: unknown, confirm?: unknown, options?: unknown}} body
    */
   async checkIn(body) {
     if (this.mode === 'off') return { ok: false, error: 'off' };
@@ -326,16 +327,18 @@ export class Watcher {
     if (!found.length) return { ok: false, error: 'not-found' };
     if (found.length > 1) return { ok: false, error: 'ambiguous', matches: found.length };
     const child = found[0];
-    const events = page.page.events.filter((e) => e.automatic && (!e.clubs.length || e.clubs.includes(child.clubId)));
+    const o = body.options && typeof body.options === 'object' ? /** @type {any} */ (body.options) : {};
+    const events = itemsToSend(page.page.events, child.clubId, { Bible: o.Bible === true, Friend: o.Friend === true });
+    const hasAttendance = page.page.events.some((e) => e.automatic && (!e.clubs.length || e.clubs.includes(child.clubId)));
     const preview = {
       child: { name: child.name, club: child.club, clubberId: child.clubberId },
       meeting: { calendarId: page.page.calendarId, date: page.page.meetingDate },
       events: events.length,
     };
     if (child.checkedIn) return { ok: false, error: 'already-checked-in', ...preview };
-    if (!events.length) return { ok: false, error: 'no-attendance-item', ...preview };
+    if (!hasAttendance) return { ok: false, error: 'no-attendance-item', ...preview };
     if (body.confirm !== true) return { ok: true, preview: true, ...preview };
-    const res = await client.checkIn({ clubberId: child.clubberId, calendarId: page.page.calendarId, events: events.map((e) => e.id), name: child.name });
+    const res = await client.checkIn({ clubberId: child.clubberId, calendarId: page.page.calendarId, events, name: child.name });
     const status = await this.loadStatus();
     this.note(status, 'cloud-check-in', { ok: res.ok, club: child.club });
     await this.storage.put('cloud:status', status);
