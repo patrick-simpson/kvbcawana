@@ -879,6 +879,13 @@ through `simulateEvent`'s sanitizers).
   (checked by `isTarget` before the projector obeys) and mirrored on the page.
   `e2e/configure-projector.spec.js`.
 - **Journey** speaks the same channel as `screen: 'journey'` (journey/CLAUDE.md).
+- **The settings page** (`settings.html`, served at awana.kvbchurch.org/settings;
+  owner, 2026-10-11, the plan in the root `SETTINGS.md`) is this same bundle in
+  configure mode on a device that is NOT a screen: `isSettingsPage()` reads its
+  `awana-page` meta, App passes `page` and no screen actions, and
+  `SettingsPageContext` leaves out every `scope="screen"` card not marked
+  `keep`. A new "This screen" card is hidden there by itself; mark it `keep`
+  only if it means something on a phone. `e2e/settings-page.spec.js`.
 - A new Settings button that acts on the screen itself must be relayed here too,
   or hidden in configure mode: in the configurator it would otherwise act on
   the hidden configure page.

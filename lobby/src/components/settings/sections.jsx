@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useContext, useState } from 'react';
 import { useSync } from '../../hooks/useSync.js';
 import { geocodeLocation } from '../../lib/weather.js';
 import { deriveClubInfo, formatShortDate, isStoreNight, localDateStr, splitTitle } from '../../lib/calendarLogic.js';
@@ -14,7 +14,7 @@ import { DESKTOP_APP_DOWNLOAD_URL, DESKTOP_APP_GUIDE_URL, JOURNEY_URL, PROJECTOR
 import { phaseWords } from '../../lib/settingsSections.js';
 import {
   ChangePassphraseField, DisplayKeyField, DisplayLoginField, MilestoneListField, PanelCard, PptxUploadField,
-  BarfBagsField, CloudCheckinTestField, FriendsListField, PublishTokenField, ReleaseNotesField, SyncSignInField, TemplateField,
+  BarfBagsField, CloudCheckinTestField, FriendsListField, PublishTokenField, ReleaseNotesField, SettingsPageContext, SyncSignInField, TemplateField,
   Toggle, VideoUploadField,
 } from './fields.jsx';
 
@@ -344,10 +344,12 @@ export function CheckinsSection({ form, set, update, onPreview }) {
           onChange={(ms) => update({ specialDisplayMs: ms }, { apply: false })}
           hint="The extra-celebratory banners hold a little longer."
         />
-        <button type="button" className="secondary section-jump" onClick={onPreview}
-          title="Shows a sample welcome on this screen. It marks the screen ‘demo mode’ (red badge at the top) until it is reloaded.">
-          Preview a check-in
-        </button>
+        {onPreview && (
+          <button type="button" className="secondary section-jump" onClick={onPreview}
+            title="Shows a sample welcome on this screen. It marks the screen ‘demo mode’ (red badge at the top) until it is reloaded.">
+            Preview a check-in
+          </button>
+        )}
       </PanelCard>
 
       <PanelCard title="Extras" tab="var(--brand-journey)" scope="shared">
@@ -414,6 +416,7 @@ export function CheckinsSection({ form, set, update, onPreview }) {
 // ── Slides ────────────────────────────────────────────────────────────────
 
 export function SlidesSection({ form, set, update, slideCount, onEditSlides, syncedDeck, today, onPreviewPromo }) {
+  const page = useContext(SettingsPageContext);
   const n = slideCount;
   const typedLine = form.backgroundSource === 'manual'
     ? (n === 0
@@ -526,19 +529,19 @@ export function SlidesSection({ form, set, update, slideCount, onEditSlides, syn
         )}
       </PanelCard>
 
-      <PanelCard title="Typed & published slides" tab="var(--brand-journey)" scope="screen">
+      <PanelCard title="Typed & published slides" tab="var(--brand-journey)" scope="screen" keep>
         <div className="field">
           <span className="hint">{typedLine}</span>
           <button type="button" className="secondary section-jump" onClick={onEditSlides}>
             Edit slides… (Ctrl+Shift+E)
           </button>
         </div>
-        <Toggle
+        {!page && <Toggle
           checked={form.followPublishedSlides !== false}
           onChange={set('followPublishedSlides')}
           title="Follow published slides"
           hint="Show the deck published from the check-in computer instead of this device’s own typed slides. Video slides saved on this device still play alongside it."
-        />
+        />}
       </PanelCard>
 
       <PanelCard title="Calendar slides" tab="var(--brand-trek)" scope="shared">
@@ -978,19 +981,21 @@ export function SetupSection({
   // until then the print server's display login, exactly as before.
   const syncState = useSync();
   const viaSync = Boolean(syncState.url);
+  const page = useContext(SettingsPageContext);
 
   return (
     <>
-      <PanelCard title="Connect this screen" scope="screen">
+      <PanelCard title={page ? 'Sign in' : 'Connect this screen'} scope="screen" keep>
         {viaSync ? (
           <>
             <SyncSignInField secure={secure} />
-            <TemplateField />
+            {!page && <TemplateField />}
             <ChangePassphraseField />
           </>
         ) : <DisplayLoginField status={status} secure={secure} login={login} />}
         <details
           className="advanced-fields"
+          hidden={page}
           open={advancedOpen}
           onToggle={(e) => setAdvancedOpen(e.currentTarget.open)}
         >
@@ -1062,34 +1067,37 @@ export function SetupSection({
         <ReleaseNotesField />
       </PanelCard>
 
-      <PanelCard title="Tools" tab="var(--brand-trek)">
-        <div className="tool-grid">
-          {onOpenDebug && (
+      {/* This browser's own settings file and counter: not on the settings page. */}
+      {!page && (
+        <PanelCard title="Tools" tab="var(--brand-trek)">
+          <div className="tool-grid">
+            {onOpenDebug && (
+              <div className="tool">
+                <button type="button" className="ghost" onClick={onOpenDebug}>Debug panel</button>
+                <span className="hint">Simulate check-ins and see connection stats (Ctrl+Shift+D).</span>
+              </div>
+            )}
             <div className="tool">
-              <button type="button" className="ghost" onClick={onOpenDebug}>Debug panel</button>
-              <span className="hint">Simulate check-ins and see connection stats (Ctrl+Shift+D).</span>
+              <button type="button" className="ghost" onClick={onExport}>Export settings</button>
+              <span className="hint">Download this screen’s settings as a file. Never includes the login or keys.</span>
             </div>
-          )}
-          <div className="tool">
-            <button type="button" className="ghost" onClick={onExport}>Export settings</button>
-            <span className="hint">Download this screen’s settings as a file. Never includes the login or keys.</span>
-          </div>
-          <div className="tool">
-            <button type="button" className="ghost" onClick={onImport}>Import settings</button>
-            <span className="hint">Load a settings file exported from another screen. Applies at once.</span>
-          </div>
-          {onResetTally && (
             <div className="tool">
-              <button type="button" className="ghost" onClick={onResetTally}>Reset tonight&rsquo;s counter</button>
-              <span className="hint">Back to zero until the printer’s next count. Also re-arms the “Doors are open” moment.</span>
+              <button type="button" className="ghost" onClick={onImport}>Import settings</button>
+              <span className="hint">Load a settings file exported from another screen. Applies at once.</span>
             </div>
-          )}
-          <div className="tool">
-            <button type="button" className="danger" onClick={onReset}>Reset this screen</button>
-            <span className="hint">Every setting back to its default, typed slides included. The login, keys and uploaded files stay.</span>
+            {onResetTally && (
+              <div className="tool">
+                <button type="button" className="ghost" onClick={onResetTally}>Reset tonight&rsquo;s counter</button>
+                <span className="hint">Back to zero until the printer’s next count. Also re-arms the “Doors are open” moment.</span>
+              </div>
+            )}
+            <div className="tool">
+              <button type="button" className="danger" onClick={onReset}>Reset this screen</button>
+              <span className="hint">Every setting back to its default, typed slides included. The login, keys and uploaded files stay.</span>
+            </div>
           </div>
-        </div>
-      </PanelCard>
+        </PanelCard>
+      )}
 
       <PanelCard title="Sound room app" tab="var(--brand-blue)">
         <p className="hint">

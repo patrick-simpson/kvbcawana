@@ -85,6 +85,10 @@ export function Toggle({ checked, onChange, title, hint, disabled }) {
 // Whether this screen follows the shared settings (contract v6): the card tags
 // say "Every screen" only while it does.
 export const FollowingContext = createContext(true);
+// True on awana.kvbchurch.org/settings (SETTINGS.md): the device is not a
+// screen, so a "This screen" card has nothing to set and is left out unless
+// it is marked `keep` (signing in, the slide editor).
+export const SettingsPageContext = createContext(false);
 
 /**
  * Where a card's settings apply: `shared` ones reach every screen through the
@@ -93,7 +97,8 @@ export const FollowingContext = createContext(true);
  */
 function ScopeTag({ scope }) {
   const following = useContext(FollowingContext);
-  if (!scope) return null;
+  const page = useContext(SettingsPageContext);
+  if (!scope || (page && scope === 'screen')) return null;
   const shared = scope === 'shared' && following;
   return (
     <span className={`scope-tag scope-tag--${shared ? 'shared' : 'screen'}`}
@@ -109,7 +114,9 @@ function ScopeTag({ scope }) {
 // cards. A titled card names its section with the kit's corner tab (the
 // colour only tells the sections apart); the heading inside it is the same
 // <h3 className="section"> the tab always had.
-export function PanelCard({ title, tab = 'var(--brand-blue)', scope, children }) {
+export function PanelCard({ title, tab = 'var(--brand-blue)', scope, keep = false, children }) {
+  const page = useContext(SettingsPageContext);
+  if (page && scope === 'screen' && !keep) return null;
   return (
     <div className="panel-card">
       {title ? (

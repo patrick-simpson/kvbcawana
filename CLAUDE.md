@@ -32,7 +32,7 @@ commits or files.
   Durable Object and drops every screen's socket), then publishes the site to
   Cloudflare Pages at **awana.kvbchurch.org**: `/` the printer's public site,
   `/lobby`, `/lobby/countdown` (the projector), `/journey`, `/checkin` (the
-  phone page), `/api` (the Worker), `/updates` (the apps' update feeds).
+  phone page), `/settings` (one settings page for every screen, `SETTINGS.md`), `/api` (the Worker), `/updates` (the apps' update feeds).
   Journey is stamped with a hash of its own files, so only a Journey change
   reloads the kiosks.
 - Releases: `printer-release.yml` and `desktop-release.yml` (dispatch with

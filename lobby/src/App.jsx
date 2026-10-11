@@ -76,7 +76,7 @@ import { useWatchdogReload } from './hooks/useWatchdogReload.js';
 import { useBuildReload } from './hooks/useBuildReload.js';
 import { useTallerThan } from './hooks/useTallerThan.js';
 import { isEmbedded } from './lib/embed.js';
-import { isConfigureMode, listenForRelay, relayToScreen } from './lib/configureRelay.js';
+import { isConfigureMode, isSettingsPage, listenForRelay, relayToScreen } from './lib/configureRelay.js';
 import { BACKGROUND_VIDEO_CHANGED_EVENT } from './components/VideoBackground.jsx';
 import { BOARD_DEMO_MS, BUILD_QUIET_MS, SHARE_DEBOUNCE_MS, COUNTS_WITHOUT_NAMES_MS, TONIGHT_STALE_MS, DROPPED_GRACE_MS, EMBED_FULLSCREEN_MESSAGE, GEAR_IDLE_MS, LAYER_FAULT_SHOW_MS, MILESTONE_TOAST_MS, OPS_FAILURES_MAX, SETUP_CARD_QUIET_MS } from './lib/constants.js';
 
@@ -87,6 +87,9 @@ const FLAGS = parseUrlFlags();
 // the live screen through storage; its own buttons are relayed to it. Names,
 // sound and confetti never play here, and it holds no wake lock.
 const CONFIGURE = isConfigureMode();
+// awana.kvbchurch.org/settings (SETTINGS.md): configure mode on a device that
+// is not a screen, so nothing is relayed and this browser's own cards hide.
+const SETTINGS_PAGE = isSettingsPage();
 // The live screen's side of the relay: what a configure page may ask of it.
 const RELAYED = ['preview-checkin', 'reset-tally', 'board-demo', 'media-changed'];
 const noop = () => {};
@@ -1695,13 +1698,14 @@ export default function App() {
             onShare={shareSettings}
             onReset={resetConfig}
             configure={CONFIGURE}
+            page={SETTINGS_PAGE}
             onClose={CONFIGURE ? noop : () => setSettingsOpen(false)}
             // A rehearsal for the operator, not a child in the lobby: it plays
             // the banner and lights the demo badge, but the public "Tonight"
             // count belongs to the printer and must not move for a preview.
             // In configure mode these three play on the live screen instead.
-            onTest={CONFIGURE ? (p) => relayToScreen('lobby', 'preview-checkin', p) : previewCheckIn}
-            onResetTally={CONFIGURE ? () => relayToScreen('lobby', 'reset-tally') : resetTonight}
+            onTest={SETTINGS_PAGE ? undefined : CONFIGURE ? (p) => relayToScreen('lobby', 'preview-checkin', p) : previewCheckIn}
+            onResetTally={SETTINGS_PAGE ? undefined : CONFIGURE ? () => relayToScreen('lobby', 'reset-tally') : resetTonight}
             onOpenSlideEditor={() => {
               setSettingsOpen(false);
               setEditorFromSettings(true);
@@ -1713,7 +1717,7 @@ export default function App() {
               startPromoPreview(key);
               setSettingsOpen(false);
             }}
-            onBoardDemo={() => {
+            onBoardDemo={SETTINGS_PAGE ? undefined : () => {
               if (CONFIGURE) { relayToScreen('lobby', 'board-demo'); return; }
               // A rehearsal on this screen: the demo badge stays up until reload,
               // like every other simulated thing.

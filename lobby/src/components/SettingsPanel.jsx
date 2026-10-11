@@ -7,6 +7,7 @@ import { SAMPLE_NAMES, pick } from '../lib/demoNames.js';
 import { localDateStr } from '../lib/calendarLogic.js';
 import { useDisplayKey } from '../hooks/useDisplayKey.js';
 import { useDisplayLogin } from '../hooks/useDisplayLogin.js';
+import { useSync } from '../hooks/useSync.js';
 import { pageBuild } from '../lib/buildReload.js';
 import { SECTIONS, openingSection } from '../lib/settingsSections.js';
 import { isSharedKey, pickShared } from '../lib/sharedSettings.js';
@@ -15,7 +16,7 @@ import {
   CelebrationsSection, CheckinsSection, LookSection, PickupSection, ScreenSection, SetupSection,
   SlidesSection, StatusSection, statusProblems,
 } from './settings/sections.jsx';
-import { FollowingContext } from './settings/fields.jsx';
+import { FollowingContext, SettingsPageContext } from './settings/fields.jsx';
 import { CORNER_CLUB_IDS } from '../lib/clubs.js';
 import { celebrateChange } from '../lib/settingsJoy.js';
 import awanaClubsMark from '../../shared/brand/logos/awana-clubs-white.svg';
@@ -127,7 +128,7 @@ export default function SettingsPanel({
   config, savedConfig, overrides, status, nameStatus, demoActive, lastEventAt, calendar, phase, scheduleSource,
   opsFailures, remoteConfigError, wakeLockStatus, layerFaults,
   initialTab = null, onTabChange,
-  onChange, onReplace, onReset, onClose, onTest, onResetTally, onOpenSlideEditor, onOpenDebug, onBoardDemo, onPreviewPromo, configure = false,
+  onChange, onReplace, onReset, onClose, onTest, onResetTally, onOpenSlideEditor, onOpenDebug, onBoardDemo, onPreviewPromo, configure = false, page = false,
   syncedDeck, slidesStatus, onForgetSyncedDeck,
   shared = null, shareStatus = null, onShare,
 }) {
@@ -154,9 +155,12 @@ export default function SettingsPanel({
   const [build] = useState(() => pageBuild());
   const problems = statusProblems({ opsFailures, layerFaults, remoteConfigError, wakeLockStatus, demoActive, status });
 
-  const [section, setSectionState] = useState(() => openingSection(initialTab, {
+  const { signedIn } = useSync();
+  // The settings page opens on signing in until it is signed in: nothing
+  // there reaches a screen without it.
+  const [section, setSectionState] = useState(() => (page && !signedIn && !initialTab ? 'setup' : openingSection(initialTab, {
     status, keyed, problems: problems.length,
-  }));
+  })));
   // Phones show the list, then one section full screen; an explicit request
   // (the first-run card) goes straight to its section.
   const [view, setView] = useState(() => (initialTab ? 'section' : 'list'));
@@ -391,7 +395,7 @@ export default function SettingsPanel({
       />
     );
   } else if (section === 'checkins') {
-    body = <CheckinsSection {...props} onPreview={preview} />;
+    body = <CheckinsSection {...props} onPreview={onTest ? preview : null} />;
   } else if (section === 'slides') {
     body = (
       <SlidesSection
@@ -429,7 +433,8 @@ export default function SettingsPanel({
     );
   }
 
-  const pill = {
+  // The settings page is not a screen: what matters there is the sign-in.
+  const pill = page ? (signedIn ? 'Signed in' : 'Not signed in') : {
     connected: keyed ? 'Connected' : 'Connected · not logged in',
     connecting: 'Connecting…',
     disconnected: 'Disconnected',
@@ -449,13 +454,14 @@ export default function SettingsPanel({
       >
         <div className="panel-header">
           <img className="panel-mark" src={awanaClubsMark} alt="" draggable="false" />
-          <h2>Settings</h2>
-          <div className={`status-line ${status}`} role="status">
+          <h2>{page ? 'KVBC Awana Settings' : 'Settings'}</h2>
+          <div className={`status-line ${page ? (signedIn ? 'connected' : 'off') : status}`} role="status">
             <span className="dot" />
             <span>{pill}{problems.length ? ` · ${problems.length} to check` : ''}</span>
           </div>
         </div>
 
+        <SettingsPageContext.Provider value={page}>
         <FollowingContext.Provider value={form.followSharedSettings !== false}>
         <div className="settings-main">
           <nav className="settings-nav" aria-label="Settings sections">
@@ -507,13 +513,15 @@ export default function SettingsPanel({
         </div>
 
         </FollowingContext.Provider>
+        </SettingsPageContext.Provider>
 
         <div className="actions">
           <span className={`hint settings-live${shareStatus?.state === 'failed' ? ' hint--warn' : ''}`} aria-live="polite">
             {shareStatus?.state === 'sending' ? 'Sending to every screen…'
               : shareStatus?.state === 'sent' ? 'Sent to every screen.'
                 : shareStatus?.state === 'failed' ? 'This screen only (see Setup → Shared settings).'
-                  : configure ? 'Changes go live on the screen as you make them.'
+                  : page ? (signedIn ? 'Changes reach every screen as you make them.' : 'Sign in under Setup to change every screen.')
+                    : configure ? 'Changes go live on the screen as you make them.'
                     : changed ? 'Changes are live on this screen.' : 'Changes apply as you make them.'}
           </span>
           <button type="button" className="ghost" onClick={undo} disabled={!changed}

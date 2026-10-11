@@ -133,6 +133,9 @@ export default defineConfig({
       input: {
         index: resolve(__dirname, 'index.html'),
         countdown: resolve(__dirname, 'countdown.html'),
+        // One settings page for every screen (SETTINGS.md): the signage's
+        // own bundle in configure mode, flagged by its awana-page meta.
+        settings: resolve(__dirname, 'settings.html'),
       },
     },
   },

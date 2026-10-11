@@ -18,8 +18,20 @@
 
 export const CONFIGURE_CHANNEL = 'awana-configure';
 
+/**
+ * The one settings page (awana.kvbchurch.org/settings, SETTINGS.md): the
+ * signage's own bundle served as settings.html, which says so in a meta tag.
+ * It is configure mode with every screen's shared settings and none of this
+ * browser's own (a phone is not a screen).
+ * @param {Document | null} [doc]
+ */
+export function isSettingsPage(doc = typeof document === 'undefined' ? null : document) {
+  return doc?.querySelector?.('meta[name="awana-page"]')?.getAttribute('content') === 'settings';
+}
+
 /** @param {string} [search] */
 export function isConfigureMode(search = typeof window === 'undefined' ? '' : window.location.search) {
+  if (isSettingsPage()) return true;
   try {
     return new URLSearchParams(search).get('configure') === '1';
   } catch {

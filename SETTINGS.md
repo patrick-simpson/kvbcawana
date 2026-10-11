@@ -68,4 +68,14 @@ welcome. This is the plan; its status is at the end.
 
 ## Status and hand-off
 
-- 2026-10-11: plan written (this file). Nothing built yet.
+- 2026-10-11: plan written (this file).
+- 2026-10-11: **Phase 1 built.** `lobby/settings.html` is a third Vite entry
+  (the signage bundle, flagged by `<meta name="awana-page" content="settings">`;
+  `isSettingsPage()` in `configureRelay.js`), served at `/lobby/settings` with
+  `/settings` 302ing there (`site/build.mjs`). It is configure mode plus
+  `SettingsPageContext`: a `scope="screen"` card is left out unless marked
+  `keep` (Sign in, Typed & published slides), the Tools card, the template
+  button, the advanced key fields and every button that acts on a screen
+  (Preview a check-in, Reset tonight's counter, the board demo) are gone, the
+  pill and footer speak of the sign-in, and it opens on Setup until signed in.
+  `e2e/settings-page.spec.js` pins it. The lobby TV's own Settings is unchanged.

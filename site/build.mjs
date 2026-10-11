@@ -4,6 +4,7 @@
 //   /            the Club Label Printer's public site (printer/, built at base /)
 //   /lobby/      the lobby signage (lobby/ build; countdown.html is the projector)
 //   /projector   a redirect to /lobby/countdown.html
+//   /settings    a redirect to /lobby/settings.html, one settings page (SETTINGS.md)
 //   /journey/    the Journey kiosk (journey/public, build-stamped)
 //   /checkin     the phone check-in, online (the print app's phone page, relayed)
 //   /api/*       the sync Worker, through site/functions (not built here)
@@ -128,6 +129,9 @@ writeFileSync(path.join(OUT, '_redirects'), [
   // Pages serves foo.html at /foo (and 308s the .html form there).
   '/projector /lobby/countdown 302',
   '/projector/ /lobby/countdown 302',
+  // The one settings page for every screen (SETTINGS.md).
+  '/settings /lobby/settings 302',
+  '/settings/ /lobby/settings 302',
   '',
 ].join('\n'));
 writeFileSync(path.join(OUT, '_headers'), [
@@ -202,7 +206,7 @@ writeFileSync(path.join(OUT, '_routes.json'), `${JSON.stringify({
 writeFileSync(path.join(ROOT, 'site', 'lib', 'large-files.generated.js'),
   `// Written by site/build.mjs for build ${BUILD_ID}; not committed.\nexport const LARGE_FILES = ${JSON.stringify(largeFiles, null, 2)};\nexport const LARGE_PREFIXES = ${JSON.stringify(VIDEO_PREFIXES, null, 2)};\n`);
 
-for (const must of ['index.html', 'lobby/index.html', 'lobby/countdown.html', 'journey/index.html', 'lobby/shared/sync.json']) {
+for (const must of ['index.html', 'lobby/index.html', 'lobby/countdown.html', 'lobby/settings.html', 'journey/index.html', 'lobby/shared/sync.json']) {
   if (!existsSync(path.join(OUT, must))) throw new Error(`site build is missing ${must}`);
 }
 console.log(`\n✓ site/dist built for ${ORIGIN} (build ${BUILD_ID.slice(0, 7)})`);
