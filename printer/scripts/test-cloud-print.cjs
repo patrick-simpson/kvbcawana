@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Cloud check-in (7.20.0): the sync service checks a child in on TwoTimTwo and
+// Cloud check-in (8.0.0): the sync service checks a child in on TwoTimTwo and
 // asks this laptop for the tag (POST /print with cloud: true). The extension,
 // which did not drive that check-in, finds the child later and asks again;
 // the child must get ONE tag tonight, not two. A stub powershell counts the

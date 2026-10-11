@@ -133,7 +133,7 @@ const PORT = 34575;
     check('so five slow answers take two rounds, not five', took < 5 * 120, `${took} ms`);
   }
 
-  console.log('\nphone relay: the service\'s own jobs (7.20.0, cloud check-in)');
+  console.log('\nphone relay: the service\'s own jobs (8.0.0, cloud check-in)');
   {
     check('a job may only print; a page\'s calls are still the phone routes alone',
       relay.jobAllowed('POST', '/print') && !relay.jobAllowed('POST', '/config') && !relay.jobAllowed('POST', '/phone/undo')

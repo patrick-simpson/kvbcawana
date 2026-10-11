@@ -4083,7 +4083,7 @@ async function performCheckinPrint(input) {
   // the name for walk-ins and older extensions that send no id.
   const dupKey = (clubberId ? `id:${String(clubberId).trim()}` : `${firstName} ${lastName}`)
     .toLowerCase().trim();
-  // Cloud check-in (7.20.0): the sync service checked this child in on
+  // Cloud check-in (8.0.0): the sync service checked this child in on
   // TwoTimTwo and asked for the tag (cloudCheckin). The extension, which did
   // not drive that check-in, finds the child later (its report check, or a
   // roster diff after a reload) and asks again, past the 45 s window above,
@@ -4862,7 +4862,7 @@ function addHistoryEntry(entry) {
     isLeader: !!entry.isLeader,
     // A one-off name tag (7.18.0): printed and logged, never a check-in.
     ...(entry.oneOff ? { oneOff: true } : {}),
-    // A tag for a cloud check-in (7.20.0): the sync service checked the child
+    // A tag for a cloud check-in (8.0.0): the sync service checked the child
     // in on TwoTimTwo. Marks the night's tag as printed (printedTonightFor).
     ...(entry.cloudCheckin ? { cloudCheckin: true } : {}),
     // TwoTimTwo's own clubber id, when the caller knew it. Everything here was

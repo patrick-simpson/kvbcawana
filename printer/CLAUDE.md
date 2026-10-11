@@ -351,7 +351,7 @@ extension (`undoCheckinOnTwoTimTwo`) posts `checkinclubberundo` with the fresh
 "(checkin undone)" (never a page, the login form or "Login Required"), and
 then requires the report not to list the child. `scripts/test-phone-undo.cjs`.
 
-**Cloud check-in from the online phone page (7.20.0, owner 2026-10-11).** On
+**Cloud check-in from the online phone page (8.0.0, owner 2026-10-11).** On
 awana.kvbchurch.org/checkin the sync Worker answers POST /phone/checkin itself
 (`lobby/worker/src/phone.js`): TwoTimTwo's own check-in post, with Bible and
 Brought a friend as ticked, laptop on or off. With the laptop online it then

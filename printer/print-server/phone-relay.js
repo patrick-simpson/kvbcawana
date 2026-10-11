@@ -30,7 +30,7 @@ const RELAY_ROUTES = Object.freeze([
   ['POST', /^\/reconcile$/],
 ]);
 
-// Jobs the sync service itself sends (7.20.0, cloud check-in): it checked a
+// Jobs the sync service itself sends (8.0.0, cloud check-in): it checked a
 // child in on TwoTimTwo and asks for the tag. Marked `job` by the service,
 // which no phone page can make it do (the service's own enqueueJob), and only
 // these routes: a page's calls still go through RELAY_ROUTES alone.

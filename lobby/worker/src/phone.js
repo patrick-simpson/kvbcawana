@@ -78,7 +78,7 @@ export class CloudPhone {
     const id = await this.saveAction(r.ok ? 'done' : 'failed', r.ok ? '' : this.why(r));
     if (r.ok && laptopOnline) {
       // The tag, at once: the laptop prints it and greets the child on the TVs
-      // (printer 7.20.0's job route; an older laptop refuses the job, and its
+      // (printer 8.0.0's job route; an older laptop refuses the job, and its
       // report check still prints the tag within five minutes).
       await this.relay.enqueueJob('/print', { name: r.child.name, clubName: r.child.club, clubberId: r.child.clubberId, cloud: true });
     }

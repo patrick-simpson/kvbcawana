@@ -1,4 +1,4 @@
-﻿## [7.20.0] - 2026-10-11
+﻿## [8.0.0] - 2026-10-11
 The phone page checks children in through the cloud, and the laptop prints their tags at once.
 
 **New: cloud check-in from awana.kvbchurch.org/checkin (owner).** Check in on the phone page and the sync service (Cloudflare) checks the child in on TwoTimTwo itself, with the laptop on or off, and with Bible and Brought a friend as ticked on the child's card. When this laptop is on, the service then tells it to print the child's tag, and the tag prints within a second or two, with the welcome on the lobby screens, as before. With the laptop off the child is still checked in on TwoTimTwo; there is no tag until the Raspberry Pi print station exists (CLOUD-CHECKIN.md).

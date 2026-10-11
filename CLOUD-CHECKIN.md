@@ -253,7 +253,7 @@ Read this first if you are picking the work up in a new session.
   undone). awana.kvbchurch.org/checkin now checks in through the Worker, laptop
   on or off, with Bible and Brought a friend as ticked (item labels read off
   TwoTimTwo's check-in page, each sent only for the clubs it applies to). With
-  the laptop on, the Worker tells it to print the tag at once (printer 7.20.0's
+  the laptop on, the Worker tells it to print the tag at once (printer 8.0.0's
   job route; one tag a night, see printer/CLAUDE.md); with it off the child is
   checked in with no tag, and the roster and Tonight come from TwoTimTwo.
   Undo, check-out, visitors and custom labels still go to the laptop.
