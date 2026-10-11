@@ -8,6 +8,7 @@ import { useEffect, useRef, useSyncExternalStore } from 'react';
 import {
   SYNC_CHANGE_EVENT,
   SYNC_POLL_MS,
+  describeCloudTest,
   loadSyncSession,
   resolveSyncUrl,
   saveSyncSession,
@@ -213,6 +214,17 @@ export async function saveTemplate(config) {
   return res.ok
     ? { ok: true }
     : { ok: false, message: res.status === 0 ? 'Could not reach the sync service.' : (res.body?.error || `HTTP ${res.status}`) };
+}
+
+/**
+ * "Test TwoTimTwo sign-in": the Worker signs in as the church's check-in user
+ * and reads today's report once (cloud check-in, phase 1). Read-only.
+ * @returns {Promise<{ok: boolean, text: string}>}
+ */
+export async function testCloudCheckin() {
+  const url = await ensureUrl();
+  if (!url || !loadSyncSession()) return { ok: false, text: 'Sign this screen in with the passphrase first.' };
+  return describeCloudTest(await syncRequest(url, '/v1/cloud/read-now', { method: 'POST', body: {}, session: loadSyncSession() }));
 }
 
 /**

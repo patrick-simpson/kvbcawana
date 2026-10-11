@@ -242,9 +242,10 @@ Read this first if you are picking the work up in a new session.
   `watcher.test.js`. Not yet run against the live site.
 - **To start the shadow night:** add the three GitHub secrets, then **Actions
   → CI → Run workflow** with "Redeploy the sync Worker" ticked (a Worker only
-  gets new secrets when it deploys). Before Wednesday, sign in on any screen
-  and `POST /api/v1/cloud/read-now` (or ask a session to add a button) to
-  check the sign-in works: expect `ok: true`, `checkinPage.ok: true`. On the
+  gets new secrets when it deploys). Before Wednesday, on any lobby screen signed
+  in with the passphrase, open Settings → Setup → Cloud check-in → **Test
+  TwoTimTwo sign-in** (it calls `POST /api/v1/cloud/read-now` and says what
+  happened in words; a pass names today's count and the meeting id). On the
   night, compare its `checkedIn` and `byClub` with the laptop's dashboard
   (the laptop takes checked-out children off; this does not yet). Watch for
   `lastError`, `partial` and `massUndoRefused`. One risk to watch: the

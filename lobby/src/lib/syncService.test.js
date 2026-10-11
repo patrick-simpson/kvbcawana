@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   SYNC_SESSION_STORAGE,
+  describeCloudTest,
   SYNC_URL_STORAGE,
   isValidSyncUrl,
   loadSyncSession,
@@ -160,5 +161,46 @@ describe('a feed link that carries the passphrase (OBS, ProPresenter)', () => {
     expect(passphraseFromUrl('?passphrase=%20Kennebec%20&key=x')).toBe('kennebec');
     expect(passphraseFromUrl('?p=KENNEBEC')).toBe('kennebec');
     expect(passphraseFromUrl('?key=x')).toBe('');
+  });
+});
+
+describe('the cloud check-in test button\'s words', () => {
+  const ok = (body) => describeCloudTest({ ok: true, status: 200, body });
+  const page = { ok: true, calendarId: '368', events: 3 };
+
+  it('a working sign-in says so, with today\'s count and the check-in page', () => {
+    const r = ok({ ok: true, verdict: 'baseline', status: { checkedIn: 0, checkinPage: page } });
+    expect(r.ok).toBe(true);
+    expect(r.text).toBe('Signed in to TwoTimTwo and read today’s report: 0 children checked in today. The check-in page read too (meeting 368, 3 check-in items).');
+    expect(ok({ ok: true, status: { checkedIn: 1, checkinPage: page } }).text).toContain('1 child checked in');
+  });
+
+  it('a report that only partly parsed, or an unreadable check-in page, is not a pass', () => {
+    expect(ok({ ok: true, status: { checkedIn: null, checkinPage: page } }).text).toContain('only partly readable');
+    const r = ok({ ok: true, status: { checkedIn: 4, checkinPage: { ok: false, error: 'checkin-page-unreadable' } } });
+    expect(r).toMatchObject({ ok: false });
+    expect(r.text).toContain('Record Checkin');
+  });
+
+  it('names each failure in words, never a bare code', () => {
+    expect(describeCloudTest({ ok: false, status: 0, body: null }).text).toContain('Could not reach the sync service');
+    expect(describeCloudTest({ ok: false, status: 401, body: {} }).text).toContain('signed out');
+    expect(describeCloudTest({ ok: false, status: 404, body: {} }).text).toContain('next deploy');
+    expect(ok({ ok: false, error: 'not-configured', status: {} }).text).toContain('TWOTIMTWO_USERNAME');
+    expect(ok({ ok: false, error: 'off', status: {} }).text).toContain('switched off');
+    expect(ok({ ok: false, error: 'login-refused', status: {} }).text).toContain('refused the user name or password');
+    expect(ok({ ok: false, error: 'login-backoff', status: { loginBlockedForSec: 290 } }).text).toContain('waiting 5 minutes');
+    expect(ok({ ok: false, error: 'login-backoff', status: { loginBlockedForSec: 20 } }).text).toContain('waiting 1 minute ');
+    for (const code of ['twotimtwo-down', 'timeout', 'network', 'signed-out', 'report-unreadable', 'off-site-redirect']) {
+      const r = ok({ ok: false, error: code, status: {} });
+      expect(r.ok).toBe(false);
+      expect(r.text).not.toContain(code);
+    }
+    expect(ok({ ok: false, error: 'something-new', status: {} }).text).toContain('(something-new)');
+  });
+
+  it('a press inside TwoTimTwo\'s 15 seconds reports the read just made', () => {
+    expect(ok({ ok: true, throttled: true, status: { checkedIn: 2, checkinPage: page } }).text).toMatch(/^Read 15 seconds ago .*2 children checked in/);
+    expect(ok({ ok: true, throttled: true, status: { lastError: 'login-refused' } })).toMatchObject({ ok: false });
   });
 });

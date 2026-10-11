@@ -1,10 +1,10 @@
-import { act, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, renderHook, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useSync, useSyncDriver, ringSyncDoorbell, signIn, syncNow, _resetSyncForTest } from './useSync.js';
 import { dispatchEvent } from './useSocket.js';
 import { _resetForTest as resetConfig, receiveSharedSettings, useConfig } from './useConfig.js';
 import { loadSyncSession, saveSyncSession } from '../lib/syncService.js';
-import { SyncSignInField } from '../components/settings/fields.jsx';
+import { CloudCheckinTestField, SyncSignInField } from '../components/settings/fields.jsx';
 import { useCalendar } from './useCalendar.js';
 
 const BASE = 'https://awana-sync.example.workers.dev';
@@ -174,5 +174,36 @@ describe('the calendar from the sync service', () => {
     let out;
     await act(async () => { out = await result.current.refresh(); });
     expect(out).toMatchObject({ ok: false, message: 'Only 2 club nights were found.' });
+  });
+});
+
+describe('Setup: Test TwoTimTwo sign-in', () => {
+  it('is only offered on a signed-in screen', () => {
+    fakeService();
+    const { container } = render(<CloudCheckinTestField />);
+    expect(container.innerHTML).toBe('');
+  });
+
+  it('asks the service for one read and says what it found', async () => {
+    const calls = fakeService({
+      '/v1/cloud/read-now': () => [200, { ok: true, verdict: 'baseline', status: { checkedIn: 3, checkinPage: { ok: true, calendarId: '368', events: 2 } } }],
+    });
+    saveSyncSession(SESSION);
+    _resetSyncForTest();
+    const view = within(render(<CloudCheckinTestField />).container);
+    fireEvent.click(view.getByRole('button', { name: 'Test TwoTimTwo sign-in' }));
+    await waitFor(() => expect(view.getByRole('status').textContent).toContain('3 children checked in today'));
+    const call = calls.find((c) => c.url.endsWith('/v1/cloud/read-now'));
+    expect(call.init.method).toBe('POST');
+    expect(call.init.headers.Authorization).toBe(`Bearer ${SESSION}`);
+  });
+
+  it('a refused password is shown as a warning', async () => {
+    fakeService({ '/v1/cloud/read-now': () => [200, { ok: false, error: 'login-refused', status: {} }] });
+    saveSyncSession(SESSION);
+    _resetSyncForTest();
+    const view = within(render(<CloudCheckinTestField />).container);
+    fireEvent.click(view.getByRole('button', { name: 'Test TwoTimTwo sign-in' }));
+    await waitFor(() => expect(view.getByRole('status').querySelector('.hint--warn')?.textContent).toContain('refused the user name or password'));
   });
 });

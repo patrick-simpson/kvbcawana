@@ -14,7 +14,7 @@ import { DESKTOP_APP_DOWNLOAD_URL, DESKTOP_APP_GUIDE_URL, JOURNEY_URL, PROJECTOR
 import { phaseWords } from '../../lib/settingsSections.js';
 import {
   ChangePassphraseField, DisplayKeyField, DisplayLoginField, MilestoneListField, PanelCard, PptxUploadField,
-  PublishTokenField, SyncSignInField, TemplateField,
+  CloudCheckinTestField, PublishTokenField, SyncSignInField, TemplateField,
   Toggle, VideoUploadField,
 } from './fields.jsx';
 
@@ -1043,6 +1043,16 @@ export function SetupSection({
           </div>
         )}
       </PanelCard>
+
+      {viaSync && syncState.signedIn && (
+        <PanelCard title="Cloud check-in" tab="var(--brand-sparks)">
+          <p className="hint">
+            Being built to replace the check-in laptop: the sync service reads TwoTimTwo itself on club nights. For
+            now it only watches and counts, beside the laptop.
+          </p>
+          <CloudCheckinTestField />
+        </PanelCard>
+      )}
 
       <PanelCard title="Tools" tab="var(--brand-trek)">
         <div className="tool-grid">

@@ -9,7 +9,7 @@ import { maskDisplayKey } from '../../lib/displayKey.js';
 import { isPlausibleKey } from '../../lib/envelope.js';
 import { loadPublishToken, maskPublishToken, savePublishToken } from '../../lib/publishToken.js';
 import CornerTab from '../brand/CornerTab.jsx';
-import { changePassphrase, saveTemplate, signIn, signOut, useSync } from '../../hooks/useSync.js';
+import { changePassphrase, saveTemplate, signIn, signOut, testCloudCheckin, useSync } from '../../hooks/useSync.js';
 import { useConfig } from '../../hooks/useConfig.js';
 import { PASSPHRASE_MIN, TEMPLATE_KEYS } from '../../lib/syncSpecs.js';
 
@@ -441,6 +441,39 @@ export function TemplateField() {
         A screen signed in for the first time takes this screen&rsquo;s own settings (what plays behind the names,
         the chime, motion, confetti and the like) wherever it has none of its own.
         {sync.template?.savedAt ? ` Last saved ${whenWords(sync.template.savedAt)}.` : ' None saved yet.'}
+      </span>
+    </div>
+  );
+}
+
+/**
+ * Cloud check-in (CLOUD-CHECKIN.md): one button that has the sync service sign
+ * in to TwoTimTwo as the church's check-in user and read today's report once,
+ * so the owner can prove the secrets work before a club night. Read-only, and
+ * the answer is counts only; TwoTimTwo allows one read every 15 seconds, so a
+ * second press inside that reports the last read instead.
+ */
+export function CloudCheckinTestField() {
+  const sync = useSync();
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState(/** @type {{text: string, ok: boolean} | null} */ (null));
+  if (!sync.signedIn) return null;
+  const run = async () => {
+    setBusy(true);
+    setNote(null);
+    const res = await testCloudCheckin();
+    setBusy(false);
+    setNote(res);
+  };
+  return (
+    <div className="field">
+      <button type="button" className="ghost section-jump" disabled={busy} onClick={run}>
+        {busy ? 'Signing in to TwoTimTwo…' : 'Test TwoTimTwo sign-in'}
+      </button>
+      <span className="hint" role="status">
+        {note ? <strong className={note.ok ? undefined : 'hint--warn'}>{note.text}</strong> : null}{' '}
+        The sync service signs in as the church&rsquo;s check-in user and reads today&rsquo;s check-in report once.
+        It changes nothing on TwoTimTwo and shows only a count.
       </span>
     </div>
   );

@@ -257,3 +257,47 @@ export async function syncPublish(base, session, kind, payload, opts = {}) {
     ? { ok: true, rev: Number(b.rev) || 0, publishedAt: String(b.publishedAt || ''), keyCount: Number(b.keyCount) || 0 }
     : { ok: true, deckRev: Number(b.deckRev) || 0, publishedAt: String(b.publishedAt || ''), slideCount: Number(b.slideCount) || 0, droppedCount: Number(b.droppedCount) || 0 };
 }
+
+/**
+ * What the Setup card's "Test TwoTimTwo sign-in" says about the Worker's
+ * answer to POST /v1/cloud/read-now (CLOUD-CHECKIN.md, phase 1). Pure. The
+ * answer carries counts and fixed codes only, never a name.
+ * @param {{ok: boolean, status: number, body: any}} res
+ * @returns {{ok: boolean, text: string}}
+ */
+export function describeCloudTest(res) {
+  if (res.status === 0) return { ok: false, text: 'Could not reach the sync service. Check this screen’s internet connection.' };
+  if (res.status === 401) return { ok: false, text: 'This screen is signed out. Type the passphrase again above, then test.' };
+  if (res.status === 404) return { ok: false, text: 'The sync service does not have cloud check-in yet. It arrives with its next deploy.' };
+  const body = res.body && typeof res.body === 'object' ? res.body : {};
+  const st = body.status && typeof body.status === 'object' ? body.status : {};
+  if (!res.ok) return { ok: false, text: typeof body.error === 'string' ? body.error : `The sync service answered HTTP ${res.status}.` };
+  if (body.error === 'off') return { ok: false, text: 'Cloud check-in is switched off on the sync service (CLOUD_CHECKIN in wrangler.toml).' };
+  if (body.error === 'not-configured') {
+    return { ok: false, text: 'The sync service has no TwoTimTwo user yet. Add the TWOTIMTWO_USERNAME and TWOTIMTWO_PASSWORD secrets in GitHub, then run CI with "Redeploy the sync Worker" ticked.' };
+  }
+  // A read in the last 15 s (TwoTimTwo's limit) is not repeated: report that one.
+  const error = body.throttled ? st.lastError : body.error;
+  const lead = body.throttled ? 'Read 15 seconds ago (TwoTimTwo allows one read every 15 s): ' : '';
+  if (error) {
+    const wait = Math.max(1, Math.ceil((Number(st.loginBlockedForSec) || 0) / 60));
+    const words = {
+      'login-refused': 'TwoTimTwo refused the user name or password. Check the two secrets in GitHub (and that the user can sign in on TwoTimTwo), then redeploy the Worker.',
+      'login-backoff': `TwoTimTwo refused the last sign-in, so the service is waiting ${wait} minute${wait === 1 ? '' : 's'} before trying again (it never hammers their login).`,
+      'twotimtwo-down': 'TwoTimTwo is not answering properly right now. Try again in a few minutes.',
+      timeout: 'TwoTimTwo took too long to answer. Try again in a few minutes.',
+      network: 'The sync service could not reach TwoTimTwo. Try again in a few minutes.',
+      'signed-out': 'TwoTimTwo signed the user in but then would not show the report. Check the user has the Record Checkin role.',
+      'report-unreadable': 'Signed in, but the check-in report did not look like the report. TwoTimTwo may have changed the page.',
+      'off-site-redirect': 'TwoTimTwo sent the service to another website, so it stopped. Check TWOTIMTWO_HOST is kvbchurch.twotimtwo.com.',
+    };
+    return { ok: false, text: lead + (words[/** @type {keyof typeof words} */ (error)] || `It did not work (${String(error).slice(0, 40)}).`) };
+  }
+  const n = Number.isInteger(st.checkedIn) ? st.checkedIn : null;
+  const count = n === null ? 'the report was only partly readable, so no count yet' : `${n} child${n === 1 ? '' : 'ren'} checked in today`;
+  const page = st.checkinPage;
+  const pageWords = !page ? '' : page.ok
+    ? ` The check-in page read too (meeting ${String(page.calendarId || '?').slice(0, 12)}, ${Number(page.events) || 0} check-in items).`
+    : ' But the check-in page could not be read; check the user has the Record Checkin role.';
+  return { ok: !page || page.ok, text: `${lead}Signed in to TwoTimTwo and read today’s report: ${count}.${pageWords}` };
+}
