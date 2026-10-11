@@ -102,8 +102,11 @@ jobs:
           node-version: '22'
       - run: node scripts/check-mirrors.mjs
 
-  lobby:
-    name: Lobby + projector
+  lobby-checks:
+    # Lint, typecheck and the vitest suite. Runs beside lobby-e2e (which
+    # builds and drives the browser), so the two halves of the old 7.5-minute
+    # serial lobby job overlap.
+    name: Lobby + projector (lint, types, unit tests)
     needs: changes
     if: needs.changes.outputs.lobby == 'true'
     runs-on: ubuntu-latest
@@ -122,9 +125,44 @@ jobs:
       - run: npm run lint
       - run: npm run typecheck
       - run: npm run test:coverage
+
+  lobby-e2e:
+    name: Lobby + projector (build, browser smoke)
+    needs: changes
+    if: needs.changes.outputs.lobby == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: lobby
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: lobby/package-lock.json
+      - run: npm ci
       - name: Build
         run: npm run build
-      - run: npx playwright install --with-deps chromium
+      # Chromium is cached by the version of @playwright/test the lockfile
+      # installs (the browser build is tied to it). A hit still needs the OS
+      # libraries, which live outside the cache.
+      - name: Playwright version
+        id: pw
+        run: echo "version=$(node -p "require('./package-lock.json').packages['node_modules/@playwright/test'].version")" >> "$GITHUB_OUTPUT"
+      - name: Cache Chromium
+        id: pwcache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.pw.outputs.version }}
+      - name: Install Chromium and its system libraries
+        if: steps.pwcache.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium
+      - name: Install Chromium's system libraries (browser cached)
+        if: steps.pwcache.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium
       - name: E2E smoke
         run: npm run e2e
       - name: Upload Playwright report
@@ -153,7 +191,7 @@ jobs:
             lobby/worker/package-lock.json
       - run: npm ci
       - run: npm ci --prefix worker
-      # The lobby job's \`eslint .\` covers worker/ too, but it may be skipped.
+      # The lobby-checks job's \`eslint .\` covers worker/ too, but it may be skipped.
       - run: npx eslint worker
       - run: npx vitest run --config worker/vitest.config.js
 
@@ -172,7 +210,7 @@ jobs:
           cache: npm
           cache-dependency-path: lobby/package-lock.json
       - run: npm ci
-      # The lobby job's \`eslint .\` covers desktop/ too, but it may be skipped.
+      # The lobby-checks job's \`eslint .\` covers desktop/ too, but it may be skipped.
       - run: npx eslint desktop
       - run: npx vitest run --config desktop/vitest.config.js
 
@@ -223,8 +261,10 @@ jobs:
     # expects, a file over Pages' 25 MiB that is not in the repo, a missing
     # must-have) and the Pages Function has tests. Both used to run only
     # inside the main-only deploy job, after the Worker had already shipped,
-    # so a PR never saw them. Here they run on every push and PR, with a
-    # placeholder origin; the deploy job builds again with the real one.
+    # so a PR never saw them. Here they run on every push and PR, and this is
+    # the ONE build: the deploy job publishes the dist this job uploads (with
+    # the same SITE_ORIGIN: the repository variable, which the deploy used,
+    # else the production address) instead of rebuilding it.
     name: The one site
     runs-on: ubuntu-latest
     timeout-minutes: 25
@@ -233,16 +273,34 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+          cache: npm
+          cache-dependency-path: |
+            lobby/package-lock.json
+            printer/package-lock.json
       - name: Install
         run: |
           npm ci --prefix lobby
           npm ci --prefix printer
       - name: Build the site
         env:
-          SITE_ORIGIN: https://awana.kvbchurch.org
+          SITE_ORIGIN: ${{ vars.SITE_ORIGIN || 'https://awana.kvbchurch.org' }}
         run: node site/build.mjs
       - name: Test the Pages Function
         run: node --test site/test/*.test.mjs
+      # What the deploy job publishes: dist, and the generated list of files
+      # too big for Pages (site/functions/journey imports it; it is not
+      # committed). Hidden files are included so nothing in dist is dropped.
+      - name: Keep the built site for the deploy job
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v4
+        with:
+          name: site-dist
+          path: |
+            site/dist
+            site/lib/large-files.generated.js
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 1
 
   deploy:
     # The site is built first (its failures are the cheap ones), then the
@@ -255,7 +313,7 @@ jobs:
     # A suite "What changed" skipped is not a failure: !failure() and
     # !cancelled() let the deploy run past it, and still stop on any red job.
     if: ${{ !failure() && !cancelled() && github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}
-    needs: [changes, copies, lobby, worker, desktop, journey, printer, site]
+    needs: [changes, copies, lobby-checks, lobby-e2e, worker, desktop, journey, printer, site]
     runs-on: ubuntu-latest
     timeout-minutes: 30
     concurrency:
@@ -269,6 +327,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+          cache: npm
+          cache-dependency-path: lobby/worker/package-lock.json
       - name: Check the Cloudflare secrets
         id: ready
         run: |
@@ -278,13 +338,19 @@ jobs:
           else
             echo "ready=true" >> "$GITHUB_OUTPUT"
           fi
-      - name: Install
+      - name: Install the Worker's packages (wrangler)
         if: steps.ready.outputs.ready == 'true'
-        run: |
-          npm ci --prefix lobby
-          npm ci --prefix lobby/worker
-          npm ci --prefix printer
-      - name: Build the site
+        run: npm ci --prefix lobby/worker
+      - name: Fetch the site the site job built
+        # Built once, by the site job of this same run, with the same
+        # SITE_ORIGIN and commit. dist, plus site/lib/large-files.generated.js
+        # (the Pages Function imports it), land back where they were built.
+        if: steps.ready.outputs.ready == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: site-dist
+          path: site
+      - name: Check the site's origin
         if: steps.ready.outputs.ready == 'true'
         env:
           SITE_ORIGIN: ${{ vars.SITE_ORIGIN }}
@@ -293,7 +359,8 @@ jobs:
             echo "::error::The SITE_ORIGIN repository variable is not set (https://awana.kvbchurch.org). Nothing was deployed."
             exit 1
           fi
-          node site/build.mjs
+          test -f site/dist/index.html && test -f site/dist/lobby/shared/sync.json && test -f site/lib/large-files.generated.js
+          grep -q "\"url\": \"${SITE_ORIGIN%/}/api\"" site/dist/lobby/shared/sync.json || { echo "::error::The built site does not point at $SITE_ORIGIN/api."; exit 1; }
       - name: Did the Worker change?
         # Every deploy of the Worker is a new version, and a new version
         # restarts its Durable Object: every lobby TV, the projector and the

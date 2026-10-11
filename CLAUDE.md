@@ -25,10 +25,19 @@ commits or files.
   contract and envelope vectors, the brand kit and `family.css`, which must be
   byte-identical across the apps; canonical first: the printer's vectors and
   `printer/styles/family.css`, the lobby's `shared/brand/`), and a `site` job
-  that builds the one site and tests its Pages Function.
-- `ci.yml`'s deploy job, on `main` only and once everything is green: builds
-  the site (`site/build.mjs`, `SITE_ORIGIN` required), deploys the sync
-  Worker only when its sources changed (every Worker deploy restarts its
+  that builds the one site (once per run: it uploads `site/dist` and
+  `site/lib/large-files.generated.js` as a one-day `site-dist` artifact) and
+  tests its Pages Function. The lobby runs as two parallel jobs,
+  `lobby-checks` (lint, typecheck, vitest) and `lobby-e2e` (build, browser
+  smoke; Chromium cached by the `@playwright/test` version in
+  `lobby/package-lock.json`). Every `setup-node` caches npm. The printer's
+  48 test scripts stay serial on purpose: many bind fixed ports that
+  collide across scripts (34573, 34575, 34581, 34583, 34586, 34597).
+- `ci.yml`'s deploy job, on `main` only and once everything is green: takes
+  the site the `site` job built (it does not rebuild; the `SITE_ORIGIN`
+  repository variable is required, and the site job builds with that same
+  variable, so they agree), installs only the Worker's packages (wrangler),
+  deploys the sync Worker only when its sources changed (every Worker deploy restarts its
   Durable Object and drops every screen's socket), then publishes the site to
   Cloudflare Pages at **awana.kvbchurch.org**: `/` the printer's public site,
   `/lobby`, `/lobby/countdown` (the projector), `/journey`, `/checkin` (the
