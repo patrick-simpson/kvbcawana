@@ -388,6 +388,19 @@ Brought a friend (`friendInput`); a sibling's card never copies the name.
 `lp` with every file under CUPS, never retried. It is a Worker JOB route
 (`JOB_ROUTES`), sent from the lobby's Settings. `scripts/test-barf.cjs`.
 
+**The settings page reaches this server (8.3.0, owner 2026-10-11).**
+awana.kvbchurch.org/settings (its Laptop section) calls this server on
+localhost. `security.SETTINGS_PAGE_ORIGIN` is the one exact origin (never
+`displayOrigins`), `SETTINGS_PAGE_ROUTES` the whole list of paths and methods,
+`SETTINGS_PAGE_CONFIG_KEYS` the only keys POST /config takes from it; every
+route but /health needs the publish token and a loopback socket (`corsPolicy`
+sets `req.settingsPage`), and the preflight answers Private Network Access
+for those routes only. A route that should accept the page next to the
+dashboard uses `isTrustedOrSettingsPage`; anything holding a secret or opening
+the network keeps `isTrustedConfigOrigin` alone. The extension's options,
+popup and "Printing to Change" link open the settings page; the dashboard is
+the offline fallback. `scripts/test-settings-page.cjs`.
+
 **The still-here list and the phone's Check out (7.16.0, owner 2026-10-08).**
 The lobby's pickup list (shown from 7:30) is built HERE, not scraped:
 TwoTimTwo's Checkout page lists nobody at KVBC. `tonightHereNow()` is the

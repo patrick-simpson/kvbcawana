@@ -886,6 +886,14 @@ through `simulateEvent`'s sanitizers).
   `SettingsPageContext` leaves out every `scope="screen"` card not marked
   `keep`. A new "This screen" card is hidden there by itself; mark it `keep`
   only if it means something on a phone. `e2e/settings-page.spec.js`.
+- **The Laptop section** (phase 3, `settings/laptop.jsx`, `lib/printServer.js`,
+  `sectionsFor(page)`: listed on the settings page only) probes
+  `http://localhost:3456/health` when it is opened, never on load, and then
+  talks to the print server's own routes with the publish token. What the page
+  may do is the server's rule (`printer/print-server/security.js`,
+  `SETTINGS_PAGE_ROUTES`); a new call needs a row there and a test in
+  `printer/scripts/test-settings-page.cjs` first. The phone PIN and the keys
+  are not here on purpose. `e2e/settings-laptop.spec.js` stubs localhost.
 - A new Settings button that acts on the screen itself must be relayed here too,
   or hidden in configure mode: in the configurator it would otherwise act on
   the hidden configure page.
