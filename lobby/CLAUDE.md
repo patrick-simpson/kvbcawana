@@ -566,9 +566,10 @@ wins over readability, but every fact lands on the end card. Signage only
   length on the next slide, and the stinger wave carries the lobby into and
   out of each poster. At 15 s a poster now holds the line a little longer
   than the old 8 s ones did.
-- Settings → Slides → **"Fall event promos"**
-  (`config.seasonPromos`) turns them off without touching the other
-  auto-slides.
+- Settings → Slides → **"Season promos"**
+  (`config.seasonPromos`) turns them off, and the snow-alerts slide with them
+  (next section), without touching the other auto-slides. It shows while
+  either season is live and its hint names what it switches.
 - Testing: vitest fake timers cannot drive framer-motion (it captured the
   real `requestAnimationFrame` at import), and Playwright's paused clock
   does not drive its opacity, so a moving frame has to be sampled in real
@@ -579,6 +580,85 @@ wins over readability, but every fact lands on the end card. Signage only
   together**. Deliberately hardcoded (owner's choice 2026-09-13), because
   the art is built on specific printed posters, not something an operator
   types a date into.
+
+## The snow-alerts slide (November to March)
+
+Owner request 2026-10-11: a slide that gets parents signed up for the text the
+church sends when snow cancels club, with a QR code and the URL
+(kvbchurch.org/alerts, which redirects to the Church Center "Notification
+Preferences" form). Concept 1 of three: a night blizzard,
+a phone that drops in and lights up with the cancellation text, then the QR on a
+snowdrift. `src/lib/snowAlerts.js` is the pure half, `SnowAlertsPromo.jsx` +
+`src/styles/promos/snow-alerts.css` the art, `src/lib/alertsQr.js` the code.
+
+- **It rides the promo slot on its own cadence** (owner's calls): only from
+  Nov 1 to Mar 31 (`inSnowSeason`), one lap in six (`SNOW_CADENCE.calm`) on an
+  ordinary week, every other lap (`storm`) when an inch or more
+  (`SNOW_INCHES`) is forecast on the next club night or the day before it.
+  `buildPromoSlot(..., { snowAlerts: true, snowForecast })` weaves
+  `[S, x, x, x, x, x]` / `[S, x]`, the fall posters filling the x laps and
+  `null` where none is live; `promoForLap` reads a lap and ManualSlideshow's
+  `nextStep` steps past a null lap (a layout effect moves on before paint if
+  the deck lands on one), so a lone snow slide is still rare. A deck that is
+  only the slot never sits out. It holds check-ins like any promo, so a parent
+  mid-scan never loses the code under a name, and it still needs the feed.
+- **"Snow is coming" is the next club night** from `clubNights()` (so a
+  cancelled night or a `noClub` week is never threatened), within
+  `SNOW_LOOKAHEAD_DAYS`, from `useSnowForecast` (`fetchSnowForecast` in
+  `weather.js`: Open-Meteo daily `snowfall_sum` in inches, 8 days, every 3 h,
+  only in season, last good copy kept). No forecast means the calm cadence and
+  wording, never a guess. The kicker then names the night (`snowAlertCopy`:
+  "Tonight / Tomorrow / Wednesday looks snowy") in the hot colour. The
+  headline is the owner's own words, SIGN UP FOR / CANCELLATION / TEXTS, every
+  week, stacked on three lines straight above the code: there is no line of
+  copy between them (owner, 2026-10-11), so do not add one back.
+- **The phone is a Pixel 11 Pro XL on the Android 17 lock screen** (owner,
+  2026-10-11): the body at its real 162.7 x 76.5 mm ratio, the glass at the
+  panel's 20:9, a centred punch hole, the lock key above the volume rocker, and
+  everything on the screen laid out in Android dp (`--dp`, the panel is 412dp
+  wide) at the "large" font scale (`--sp` = 1.3dp): status icons, the small
+  clock with date and weather, one expanded Messages conversation notification
+  (letter tile, badge, actions), the fingerprint mark and the two corner
+  shortcuts. It shows the church's real cancellation text (`sampleAlertText`,
+  word for word but for the apostrophe in "weeks’"), dated the day the slide
+  airs. There is no EXAMPLE TEXT tag any more (the owner removed it, over the
+  risk of a real-looking date). **The lock screen is live**: its clock is the
+  current time (`lockTime`, re-read each minute), its weather the lobby's own
+  (`useWeather`, which also fetches while the snow slide can air; no reading,
+  no weather shown), and its battery tonight's check-ins (`batteryLevel`,
+  capped at 100). App provides the weather and the count through
+  `LobbyLiveContext` (`src/lib/lobbyLive.jsx`).
+- **The QR is art, not code at runtime.** `alertsQr.js` holds the module matrix
+  (version 3, error correction Q); `alertsQr.test.js` regenerates it with the
+  `qrcode` dev dependency and fails on any difference, so change the URL there
+  and run `node scripts/promo/alerts-qr.mjs`. It is 19u square on white with a
+  quiet zone and holds still from 6.6 s to the end of the 20 s hold
+  (`SNOW_ALERT_SEC`); never put motion on it.
+- **It wears the lobby's kit**, not a poster's faces: every class is
+  `.snow-alerts*` (the root also carries `.promo-slide--snow`, which sets no
+  font), so `promoFonts.test.js` holds. Its stages are sized in `--u` like the
+  lobby. The blizzard is three tiled layers the GPU only moves (each loop one
+  whole tile, so the frozen frame matches), the near one clipped to the phone's
+  side so it never crosses the words or the code; no clip-path, no filter
+  animation. Every beat is `landsAt` / `keyframes`, and the last keyframe is
+  the finished card (`?lowPower=1`).
+- Settings → Slides → "Season promos" turns it off with the fall posters.
+
+## Previewing a promo (Settings → Slides → "Preview the promos")
+
+Owner request 2026-10-11: a way to watch each promo on demand. The FIRST card
+in Slides (it sat last and was missed), grouped Fall posters / Snow alerts; one button per
+entry in `PREVIEW_PROMOS` (`src/lib/promos.js`): the four fall posters, the snow
+slide, and the snow slide's snow-week version. `previewPromo(key, ...)` builds
+the same descriptor `buildPromoSlot` would, whatever the date (a past poster
+names its date instead of a count; the snow week names the next club night, or
+the coming Wednesday with no feed). App plays it as a full-screen
+`.lobby-preview` layer over the background (never `.promo-*`, which
+`promoFonts.test.js` reserves for poster faces) for the promo's own
+`durationSec`, then removes it; a click or Esc stops it early. While it is up it
+holds check-ins exactly like a real poster (`checkInsHeld`, `posterHeld`) and
+counts as busy for the self-updater. It is local to this screen: nothing is
+stored or published. `App.director.test.jsx` drives it end to end.
 
 ## The flagship welcome slide (first in every pass, except Wednesday club)
 
@@ -1361,6 +1441,16 @@ tab ids, which section it opens on, the phase in plain words).
   the `html.embedded .panel--tabbed` cap still applies. `e2e/settings.spec.js`
   checks the panes at three sizes and the phone flow; `e2e/panels.spec.js`
   presses Undo (a plain panel button) for the squish tests.
+- **Joy** (owner, 2026-10-11: "joyful animations as I select each option and
+  enter each tab"). Entering a section, its title swings in and its cards
+  cascade up on the squish's spring (the pane body is keyed per section); the
+  rail's picked item hops. Ticking a box, picking a radio option or a menu
+  value boings that control and bursts kit sparkles from it
+  (`src/lib/settingsJoy.js`, from one `change` listener on the dialog, as DOM
+  classes, never a keyframe keyed on `:checked`, which would also play on
+  mount); unticking only boops. Individual `scale` / `rotate` / `translate`
+  only. Zero animation and reduced motion stop all of it, and the script makes
+  no burst under either.
 - Copy elsewhere names sections as `Settings → Setup`, `Settings → Slides`,
   `Settings → Screen & corner`: rename a section and grep for its name.
 

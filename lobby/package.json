@@ -43,6 +43,7 @@
     "eslint-plugin-react-hooks": "^7.1.1",
     "globals": "^17.6.0",
     "jsdom": "^29.1.1",
+    "qrcode": "^1.5.4",
     "tailwindcss": "^4.2.2",
     "typescript": "^7.0.2",
     "vite": "^5.4.8",

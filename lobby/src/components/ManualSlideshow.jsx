@@ -12,7 +12,7 @@ import Wave from './brand/Wave.jsx';
 import PromoSlide from './PromoSlide.jsx';
 import FlagshipSlide from './FlagshipSlide.jsx';
 import { isFlagshipSlide } from '../lib/flagship.js';
-import { isPromoSlide } from '../lib/promos.js';
+import { isPromoSlide, promoForLap } from '../lib/promos.js';
 import {
   holdsCheckIns,
   isVideoSlide,
@@ -144,16 +144,25 @@ export default function ManualSlideshow({ slides, slideshowDelaySec, clubTint = 
   const safe = slides.length ? step % slides.length : 0;
   const lap = slides.length ? Math.floor(step / slides.length) : 0;
 
+  // A promo slot can have nothing to show on a lap (the snow-alerts slide's
+  // cadence leaves empty laps, src/lib/promos.js): the step past it is skipped,
+  // so the deck moves straight on to its next slide. Read through a ref so
+  // `advance` stays one stable function for every timer that holds it.
+  const deck = useRef(slides);
+  useLayoutEffect(() => {
+    deck.current = slides;
+  }, [slides]);
   const advance = useCallback(() => {
-    setStep((prev) => prev + 1);
+    setStep((prev) => nextStep(prev, deck.current));
   }, []);
 
   const slide = slides[safe];
   // Which promo this lap is showing, resolved ONCE so the hold and the art
   // can never disagree about it.
-  const promo = isPromoSlide(slide) && slide.promos?.length
-    ? slide.promos[lap % slide.promos.length]
-    : null;
+  const promo = isPromoSlide(slide) ? promoForLap(slide, lap, slides.length) : null;
+  // Landed on an empty lap of the slot without advancing into it (the first
+  // step, or a deck that grew under the step): move on before it paints.
+  const skipped = slides.length > 1 && isPromoSlide(slide) && promo == null;
   // A NUMBER, not the array: App re-renders on every event and can hand
   // down an equal-but-new deck; keying the timer on the array restarted the
   // hold each time, and the show stalled on one slide through a whole
@@ -222,13 +231,17 @@ export default function ManualSlideshow({ slides, slideshowDelaySec, clubTint = 
   // at once, and a weak Pi is slow to run the effect) the card was drawn over
   // the new poster's date chip for that long.
   useLayoutEffect(() => {
+    if (skipped) {
+      advance();
+      return;
+    }
     onSlide?.({ key: slideKey, special, poster: kind === 'promo' });
-  }, [onSlide, slideKey, special, kind]);
+  }, [onSlide, slideKey, special, kind, skipped, advance]);
   // Leaving the slideshow (the background switched away) must never leave
   // the lobby holding check-ins.
   useEffect(() => () => onSlide?.({ key: 'none', special: false, poster: false }), [onSlide]);
 
-  if (!slides.length || !slide) return null;
+  if (!slides.length || !slide || skipped) return null;
 
   return (
     <div className="manual-slideshow">
@@ -354,4 +367,23 @@ function VideoSlide({ slide, loop, onFinished }) {
       )}
     </div>
   );
+}
+
+/**
+ * The step after `prev`, past any lap on which a promo slot has nothing to
+ * show. Gives up after one full turn of every slot's cycle, so a deck that is
+ * nothing but empty laps (which buildPromoSlot never makes) still advances.
+ *
+ * @param {number} prev
+ * @param {Array<any>} slides
+ */
+export function nextStep(prev, slides) {
+  const n = slides.length;
+  if (n <= 1) return prev + 1;
+  const longest = Math.max(1, ...slides.map((s) => (isPromoSlide(s) ? s.promos?.length || 1 : 1)));
+  for (let step = prev + 1; step <= prev + n * longest; step += 1) {
+    const s = slides[step % n];
+    if (!isPromoSlide(s) || promoForLap(s, Math.floor(step / n), n) != null) return step;
+  }
+  return prev + 1;
 }

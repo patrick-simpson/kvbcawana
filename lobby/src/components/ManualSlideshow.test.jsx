@@ -1,7 +1,7 @@
 import { useLayoutEffect } from 'react';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
-import ManualSlideshow, { MISSING_VIDEO_SKIP_MS } from './ManualSlideshow.jsx';
+import ManualSlideshow, { MISSING_VIDEO_SKIP_MS, nextStep } from './ManualSlideshow.jsx';
 import { ZeroAnimationContext } from '../lib/motion.jsx';
 import { getVideo } from '../lib/videoStore.js';
 
@@ -476,5 +476,65 @@ describe('ManualSlideshow: the slide report reaches App before the frame is pain
     const held = { id: 's_h', eyebrow: '', text: 'Held', theme: 'sky', durationSec: 0, holdCheckIns: true };
     render(<Parent slides={[held, deck[0]]} />);
     expect(toldAtParentLayout).toEqual([expect.objectContaining({ special: true })]);
+  });
+});
+
+// The snow-alerts slide airs one lap in six (src/lib/snowAlerts.js), so its
+// slot carries null entries for the laps it sits out, and the slideshow must
+// step straight past the slot on those laps rather than show a blank frame.
+describe('ManualSlideshow: a promo slot that sits out a lap', () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+  });
+
+  const snow = { id: 'promo_snow_alerts', kind: 'snowAlerts', eventDate: '', tonight: false, countdown: null, afterContest: true, durationSec: 20, snow: null };
+  const slot = { id: 'season_promo', type: 'promo', durationSec: 15, promos: [snow, null, null] };
+  const two = [deck[0], deck[1], slot];
+  // Zero animation: exits are instant, so the DOM holds only what is on
+  // screen (fake timers cannot run framer-motion's exit animations).
+  const still = (ui) => render(<ZeroAnimationContext.Provider value>{ui}</ZeroAnimationContext.Provider>);
+
+  it('shows the snow slide on its lap and skips the slot on the laps it sits out', () => {
+    const { container } = still(<ManualSlideshow slides={two} slideshowDelaySec={5} />);
+    expect(shows('First slide')).toBe(true);
+    act(() => vi.advanceTimersByTime(5000)); // → Second slide (4 s)
+    act(() => vi.advanceTimersByTime(4000)); // → the slot, lap 0: snow
+    expect(container.querySelector('.promo-slide--snow')).not.toBeNull();
+    act(() => vi.advanceTimersByTime(19999));
+    expect(container.querySelector('.promo-slide--snow')).not.toBeNull();
+    act(() => vi.advanceTimersByTime(1)); // its own 20 s → lap 1
+    expect(shows('First slide')).toBe(true);
+    act(() => vi.advanceTimersByTime(5000));
+    expect(shows('Second slide')).toBe(true);
+    // Lap 1's slot entry is null: straight on to lap 2's first slide, at
+    // once, not after the slot's 15 s hold.
+    act(() => vi.advanceTimersByTime(4000));
+    expect(shows('First slide')).toBe(true);
+    expect(shows('Second slide')).toBe(false);
+  });
+
+  it('never strands a lone slot on an empty lap', () => {
+    const { container } = still(<ManualSlideshow slides={[slot]} slideshowDelaySec={5} />);
+    expect(container.querySelector('.promo-slide--snow')).not.toBeNull();
+  });
+
+  it('moves on before painting when it lands on an empty lap without advancing into it', () => {
+    // A deck whose first position is a slot sitting out lap 0.
+    const sitsOut = { ...slot, promos: [null, snow] };
+    const { container } = still(<ManualSlideshow slides={[sitsOut, deck[0]]} slideshowDelaySec={5} />);
+    expect(container.querySelector('.promo-slide')).toBeNull();
+    expect(shows('First slide')).toBe(true);
+  });
+
+  it('counts the next step past every empty lap, and always moves', () => {
+    expect(nextStep(1, two)).toBe(2); // the slot, lap 0: snow
+    expect(nextStep(4, two)).toBe(6); // the slot, lap 1: null, skipped
+    expect(nextStep(7, two)).toBe(9); // lap 2: null too, skipped
+    expect(nextStep(10, two)).toBe(11); // lap 3: snow again (3 % 3 === 0)
+    expect(nextStep(0, [deck[0]])).toBe(1);
+    // Past the empty slot to the next lap's first slide.
+    expect(nextStep(0, [deck[0], { ...slot, promos: [null] }])).toBe(2);
   });
 });

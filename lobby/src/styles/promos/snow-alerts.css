@@ -1,0 +1,490 @@
+/* ── Snow alerts (SnowAlertsPromo.jsx) ───────────────────────────────────
+   "Sign up for cancellation texts": a night blizzard, a phone that lights up with the
+   cancellation text, and the sign-up QR on a snowdrift. The lobby's own kit
+   (Paytone One, Londrina Solid, Figtree), not a poster's faces, so every rule
+   is .snow-alerts* (src/lib/promoFonts.test.js keeps the brand tokens off
+   .promo-* rules). The component owns the timing; this file owns the look.
+
+   Two stages, each the widest 16:9 frame that fits, sized in --u (1% of its
+   width) so 720p, 1080p and 4K all hold the same layout: the back one (the
+   phone, its glow and rings) sits under the drifts, the front one (the words
+   and the code) over them. The snow and the sky are full-bleed.
+
+   Layers, lowest first: sky 0, far / mid snow 1, back stage 2, drifts 3,
+   front stage 4, near snow 5 (the phone's side only, never over the words or
+   the code). */
+
+.promo-slide--snow {
+  background: #0f1f4a;
+}
+
+.snow-alerts {
+  --u: min(1vw, 1.7778vh);
+  --snow-ink: #0b1633;
+  --snow-sun: #fcb614;
+  color: #ffffff;
+}
+
+.snow-alerts__sky {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background:
+    linear-gradient(90deg, rgba(10, 20, 52, 0.55) 0%, rgba(10, 20, 52, 0) 55%),
+    radial-gradient(ellipse 80% 70% at 68% 40%, #3a5fa8 0%, #1f3a7a 48%, #0f1f4a 100%);
+}
+.snow-alerts--storm .snow-alerts__sky {
+  background:
+    linear-gradient(90deg, rgba(8, 14, 40, 0.6) 0%, rgba(8, 14, 40, 0) 55%),
+    radial-gradient(ellipse 80% 70% at 68% 40%, #33508f 0%, #1a2f66 48%, #0b1838 100%);
+}
+
+/* ── Snow: tiled layers that only ever move ─────────────────────────────── */
+.snow-alerts__snow {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  overflow: hidden;
+  pointer-events: none;
+}
+.snow-alerts__tile {
+  position: absolute;
+  top: -40vmin;
+  left: -60vmin;
+  right: 0;
+  bottom: 0;
+  background-repeat: repeat;
+  will-change: transform;
+}
+.snow-alerts__near {
+  position: absolute;
+  z-index: 5;
+  top: 0;
+  bottom: 0;
+  left: 58%;
+  right: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.snow-alerts__near .snow-alerts__snow { z-index: auto; }
+.snow-alerts--storm .snow-alerts__snow--mid,
+.snow-alerts--storm .snow-alerts__snow--near { filter: brightness(1.15); }
+
+/* ── The two stages ─────────────────────────────────────────────────────── */
+.snow-alerts__stage {
+  position: absolute;
+  z-index: 4;
+  left: 50%;
+  top: 50%;
+  width: calc(var(--u) * 100);
+  height: calc(var(--u) * 56.25);
+  translate: -50% -50%;
+  pointer-events: none;
+}
+.snow-alerts__stage[aria-hidden] { z-index: 2; }
+
+/* ── The phone ──────────────────────────────────────────────────────────── */
+.snow-alerts__glow {
+  position: absolute;
+  left: calc(var(--u) * 56);
+  top: calc(var(--u) * 2);
+  width: calc(var(--u) * 38);
+  height: calc(var(--u) * 46);
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(150, 190, 255, 0.45), rgba(150, 190, 255, 0));
+}
+.snow-alerts__rings {
+  position: absolute;
+  left: calc(var(--u) * 74.5);
+  top: calc(var(--u) * 26);
+  width: 0;
+  height: 0;
+}
+.snow-alerts__ring {
+  position: absolute;
+  left: calc(var(--u) * -9);
+  top: calc(var(--u) * -9);
+  width: calc(var(--u) * 18);
+  height: calc(var(--u) * 18);
+  border-radius: 50%;
+  border: calc(var(--u) * 0.22) solid rgba(255, 255, 255, 0.85);
+}
+/* A Pixel 11 Pro XL (162.7 x 76.5 mm, a 6.8" 20:9 panel at 1344 x 2992)
+   showing the Android 17 lock screen. The body is 19.6u wide, so its height
+   keeps the real 2.127 ratio, and the frame is padded so the glass inside is
+   the panel's own 20:9. Everything on the screen is laid out in Android's dp
+   (the panel is 412dp wide), at the system's "large" font scale (1.3) so the
+   message reads across a lobby: --dp and --sp below. */
+.snow-alerts__phone-slot {
+  position: absolute;
+  left: calc(var(--u) * 64.4);
+  top: calc(var(--u) * 5.3);
+  width: calc(var(--u) * 19.6);
+  height: calc(var(--u) * 41.7);
+}
+.snow-alerts__phone {
+  position: absolute;
+  inset: 0;
+  box-sizing: border-box;
+  padding: calc(var(--u) * 0.79);
+  border-radius: calc(var(--u) * 2.9);
+  /* Obsidian: matte black aluminium, the glass edge catching the glow. */
+  background: #101113;
+  box-shadow:
+    0 calc(var(--u) * 2.4) calc(var(--u) * 5) rgba(0, 0, 20, 0.55),
+    0 0 0 calc(var(--u) * 0.16) #2b2d31 inset,
+    0 0 0 calc(var(--u) * 0.22) #050506 inset,
+    calc(var(--u) * 0.1) 0 0 calc(var(--u) * 0.1) #34363b;
+}
+.snow-alerts__key {
+  position: absolute;
+  right: calc(var(--u) * -0.26);
+  width: calc(var(--u) * 0.3);
+  border-radius: 0 calc(var(--u) * 0.14) calc(var(--u) * 0.14) 0;
+  background: linear-gradient(90deg, #1a1b1e 0%, #45484f 55%, #6b6f78 100%);
+}
+.snow-alerts__key--power { top: calc(var(--u) * 8.6); height: calc(var(--u) * 2.4); }
+.snow-alerts__key--volume { top: calc(var(--u) * 12.4); height: calc(var(--u) * 5.2); }
+.snow-alerts__screen {
+  --dp: calc(var(--u) * 0.04374);
+  --sp: calc(var(--dp) * 1.3);
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border-radius: calc(var(--dp) * 46);
+  background: #000000;
+  font-family: var(--font-body);
+}
+.snow-alerts__lock {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(120% 60% at 80% 95%, #2c4f93 0%, rgba(44, 79, 147, 0) 70%),
+    linear-gradient(175deg, #182a55 0%, #11204a 45%, #0b1533 100%);
+}
+.snow-alerts__screen-snow {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+/* The selfie camera's small round perforation, centred. */
+.snow-alerts__punch {
+  position: absolute;
+  left: 50%;
+  top: calc(var(--dp) * 13);
+  width: calc(var(--dp) * 22);
+  height: calc(var(--dp) * 22);
+  translate: -50% 0;
+  border-radius: 50%;
+  background: radial-gradient(circle at 40% 38%, #1d2333 0 18%, #000 30%);
+}
+/* Status bar: on the lock screen the time moves down into the clock, so the
+   right-hand icons are all that is up here. */
+.snow-alerts__status {
+  position: absolute;
+  top: calc(var(--dp) * 16);
+  right: calc(var(--dp) * 22);
+  height: calc(var(--dp) * 20);
+  display: flex;
+  align-items: center;
+  gap: calc(var(--dp) * 6);
+  color: #e3e2e9;
+}
+.snow-alerts__status svg {
+  width: calc(var(--dp) * 18);
+  height: calc(var(--dp) * 18);
+  fill: currentColor;
+}
+.snow-alerts__battery {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: calc(var(--dp) * 26);
+  height: calc(var(--dp) * 14);
+  margin-right: calc(var(--dp) * 2);
+  border-radius: calc(var(--dp) * 4.5);
+  /* Tonight's check-ins: the fill is the charge, the number inside it. */
+  background: linear-gradient(90deg, #e3e2e9 var(--level, 100%), rgba(227, 226, 233, 0.42) var(--level, 100%));
+  color: #11204a;
+  font-size: calc(var(--dp) * 10.5);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+.snow-alerts__battery > span {
+  /* Dark over the charge, light over the empty part, split at the level. */
+  width: 100%;
+  text-align: center;
+  background: linear-gradient(90deg, #11204a var(--level, 100%), #f2f1f7 var(--level, 100%));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.snow-alerts__battery::after {
+  content: '';
+  position: absolute;
+  right: calc(var(--dp) * -3);
+  width: calc(var(--dp) * 2);
+  height: calc(var(--dp) * 6);
+  border-radius: 0 calc(var(--dp) * 1.5) calc(var(--dp) * 1.5) 0;
+  background: #e3e2e9;
+}
+/* The small clock (there is a notification), with date and weather under it,
+   in the wallpaper's Material You primary. */
+.snow-alerts__clock {
+  position: absolute;
+  left: calc(var(--dp) * 28);
+  top: calc(var(--dp) * 66);
+  display: flex;
+  flex-direction: column;
+  color: #d8e2ff;
+}
+.snow-alerts__time {
+  font-weight: 600;
+  font-size: calc(var(--dp) * 86);
+  line-height: 1;
+  letter-spacing: -0.03em;
+}
+.snow-alerts__date {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--dp) * 10);
+  margin-top: calc(var(--dp) * 8);
+  font-weight: 600;
+  font-size: calc(var(--sp) * 15);
+  color: #e3e2e9;
+}
+.snow-alerts__weather {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(var(--dp) * 5);
+}
+.snow-alerts__weather svg path { stroke: #d8e2ff; }
+.snow-alerts__weather .snow-alerts__wx { width: 1.1em; height: 1.1em; fill: #d8e2ff; }
+.snow-alerts__weather .snow-alerts__wx path { stroke: none; }
+/* One expanded conversation notification (Google Messages), the shape
+   Android draws it: the contact's letter tile with the app's badge, name and
+   time, the whole message, then the actions as tonal pills. */
+.snow-alerts__note {
+  position: absolute;
+  left: calc(var(--dp) * 12);
+  right: calc(var(--dp) * 12);
+  top: calc(var(--dp) * 236);
+  box-sizing: border-box;
+  display: flex;
+  gap: calc(var(--dp) * 12);
+  padding: calc(var(--dp) * 16) calc(var(--dp) * 14) calc(var(--dp) * 14) calc(var(--dp) * 16);
+  border-radius: calc(var(--dp) * 28);
+  background: #22252c;
+  color: #e3e2e9;
+}
+.snow-alerts__avatar {
+  position: relative;
+  flex: none;
+  width: calc(var(--dp) * 48);
+  height: calc(var(--dp) * 48);
+  border-radius: 50%;
+  background: #2d4678;
+  color: #d8e2ff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: calc(var(--dp) * 22);
+}
+.snow-alerts__badge {
+  position: absolute;
+  right: calc(var(--dp) * -4);
+  bottom: calc(var(--dp) * -4);
+  width: calc(var(--dp) * 22);
+  height: calc(var(--dp) * 22);
+  border-radius: 50%;
+  background: #adc6ff;
+  box-shadow: 0 0 0 calc(var(--dp) * 2.5) #22252c;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.snow-alerts__badge svg {
+  width: calc(var(--dp) * 12);
+  height: calc(var(--dp) * 12);
+  fill: #102f60;
+}
+.snow-alerts__note-main {
+  flex: 1;
+  min-width: 0;
+}
+.snow-alerts__note-head {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--dp) * 5);
+  min-height: calc(var(--dp) * 26);
+}
+.snow-alerts__sender {
+  font-weight: 700;
+  font-size: calc(var(--sp) * 16);
+  line-height: 1.25;
+}
+.snow-alerts__now {
+  flex: 1;
+  font-weight: 500;
+  font-size: calc(var(--sp) * 13);
+  color: #c4c6d0;
+}
+.snow-alerts__expand {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: calc(var(--dp) * 34);
+  height: calc(var(--dp) * 24);
+  border-radius: calc(var(--dp) * 12);
+  background: #33363e;
+}
+.snow-alerts__expand svg {
+  width: calc(var(--dp) * 18);
+  height: calc(var(--dp) * 18);
+  fill: #e3e2e9;
+}
+.snow-alerts__note-body {
+  margin-top: calc(var(--dp) * 4);
+  font-weight: 500;
+  font-size: calc(var(--sp) * 14);
+  line-height: 1.43;
+  color: #e3e2e9;
+}
+.snow-alerts__actions {
+  display: flex;
+  gap: calc(var(--dp) * 8);
+  margin-top: calc(var(--dp) * 14);
+}
+.snow-alerts__actions span {
+  padding: calc(var(--dp) * 8) calc(var(--dp) * 16);
+  border-radius: calc(var(--dp) * 20);
+  background: #3e4759;
+  color: #dae2f9;
+  font-weight: 600;
+  font-size: calc(var(--sp) * 13);
+  line-height: 1.2;
+  white-space: nowrap;
+}
+/* The under-display fingerprint sensor, and the two shortcuts in the bottom
+   corners (flashlight, camera). */
+.snow-alerts__fingerprint {
+  position: absolute;
+  left: 50%;
+  bottom: calc(var(--dp) * 118);
+  width: calc(var(--dp) * 52);
+  height: calc(var(--dp) * 52);
+  translate: -50% 0;
+  fill: none;
+  stroke: #e3e2e9;
+  stroke-width: 2.6;
+  stroke-linecap: round;
+}
+.snow-alerts__shortcut {
+  position: absolute;
+  bottom: calc(var(--dp) * 32);
+  width: calc(var(--dp) * 64);
+  height: calc(var(--dp) * 64);
+  border-radius: 50%;
+  background: rgba(62, 71, 89, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.snow-alerts__shortcut svg {
+  width: calc(var(--dp) * 26);
+  height: calc(var(--dp) * 26);
+  fill: #dae2f9;
+}
+.snow-alerts__shortcut--left { left: calc(var(--dp) * 28); }
+.snow-alerts__shortcut--right { right: calc(var(--dp) * 28); }
+
+/* ── The drifts ─────────────────────────────────────────────────────────── */
+.snow-alerts__drifts {
+  position: absolute;
+  z-index: 3;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+/* ── The words ──────────────────────────────────────────────────────────── */
+.snow-alerts__copy {
+  position: absolute;
+  left: calc(var(--u) * 6);
+  top: calc(var(--u) * 5.5);
+  width: calc(var(--u) * 56);
+}
+.snow-alerts__kicker {
+  display: inline-block;
+  padding: calc(var(--u) * 0.38) calc(var(--u) * 1.25) calc(var(--u) * 0.25);
+  border-radius: calc(var(--u) * 0.75);
+  background: var(--snow-sun);
+  color: #231f20;
+  font-family: var(--font-condensed);
+  font-size: calc(var(--u) * 1.9);
+  line-height: 1.1;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  box-shadow: calc(var(--u) * 0.25) calc(var(--u) * 0.25) 0 var(--snow-ink);
+}
+.snow-alerts--storm .snow-alerts__kicker {
+  background: #f15a28;
+  color: #ffffff;
+}
+.snow-alerts__headline {
+  margin: calc(var(--u) * 1.4) 0 0;
+  font-family: var(--font-shout);
+  font-weight: 400;
+  /* Three stacked lines, the poster's one statement. CANCELLATION is
+     7.41em of Paytone One: 6.8u is 50.4u, clear of the phone, and the block
+     ends ~28.6u, 3u above the code. */
+  font-size: calc(var(--u) * 6.8);
+  line-height: 0.93;
+  text-transform: uppercase;
+  color: #ffffff;
+  text-shadow: 0.06em 0.06em 0 var(--snow-ink);
+}
+.snow-alerts__line { display: block; white-space: nowrap; }
+.snow-alerts__word { display: inline-block; margin-right: 0.24em; }
+.snow-alerts__word:last-child { margin-right: 0; }
+
+/* ── The code ───────────────────────────────────────────────────────────── */
+.snow-alerts__scan {
+  position: absolute;
+  left: calc(var(--u) * 6);
+  top: calc(var(--u) * 31.6);
+  display: flex;
+  align-items: center;
+  gap: calc(var(--u) * 2);
+}
+.snow-alerts__plate {
+  flex: none;
+  box-sizing: border-box;
+  width: calc(var(--u) * 19);
+  height: calc(var(--u) * 19);
+  padding: calc(var(--u) * 1);
+  border-radius: calc(var(--u) * 1.4);
+  background: #ffffff;
+  box-shadow: 0 calc(var(--u) * 1.1) calc(var(--u) * 2.5) rgba(0, 10, 40, 0.35);
+}
+.snow-alerts__qr {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.snow-alerts__url {
+  font-family: var(--font-shout);
+  /* The address stands alone beside the code (owner, 2026-10-11). */
+  font-size: calc(var(--u) * 3);
+  line-height: 1;
+  color: #ffffff;
+  text-shadow: 0.08em 0.08em 0 var(--snow-ink);
+  white-space: nowrap;
+}

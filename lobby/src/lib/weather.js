@@ -156,6 +156,47 @@ export async function fetchCurrentWeather({ lat, lon, units = 'fahrenheit' }) {
 }
 
 /**
+ * The daily snowfall forecast the snow-alerts slide asks about: eight days
+ * from today, in inches (`precipitation_unit: inch` converts Open-Meteo's
+ * snowfall too), keyed by the location's own local dates.
+ */
+export function buildSnowForecastUrl({ lat, lon }) {
+  const params = new URLSearchParams({
+    latitude: String(lat),
+    longitude: String(lon),
+    daily: 'snowfall_sum',
+    precipitation_unit: 'inch',
+    forecast_days: '8',
+    timezone: 'auto',
+  });
+  return `https://api.open-meteo.com/v1/forecast?${params}`;
+}
+
+/**
+ * `{ time: ['YYYY-MM-DD', ...], inches: [n, ...] }`, or null on ANY failure.
+ * A missing forecast only means the slide keeps its ordinary-week wording and
+ * cadence; it can never put an error on the screen or claim snow it was not
+ * told about. A day the API left blank counts as no snow.
+ *
+ * @returns {Promise<{ time: string[], inches: number[] }|null>}
+ */
+export async function fetchSnowForecast({ lat, lon }) {
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+  try {
+    const res = await fetch(buildSnowForecastUrl({ lat, lon }));
+    if (!res.ok) return null;
+    const daily = (await res.json())?.daily;
+    const time = Array.isArray(daily?.time) ? daily.time : null;
+    const sums = Array.isArray(daily?.snowfall_sum) ? daily.snowfall_sum : null;
+    if (!time || !sums || time.length !== sums.length) return null;
+    if (!time.every((t) => typeof t === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(t))) return null;
+    return { time, inches: sums.map((v) => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : 0)) };
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Town name → best coordinate match (for the Settings "Look up"
  * button). Null when nothing matches or the network is down.
  */

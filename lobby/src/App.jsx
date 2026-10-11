@@ -32,8 +32,12 @@ import { useTally } from './hooks/useTally.js';
 import { useTheme } from './hooks/useTheme.js';
 import { useCalendar } from './hooks/useCalendar.js';
 import { useWeather } from './hooks/useWeather.js';
+import { useSnowForecast } from './hooks/useSnowForecast.js';
+import { inSnowSeason } from './lib/snowAlerts.js';
+import { LobbyLiveContext } from './lib/lobbyLive.jsx';
 import { buildCalendarSlides, deriveClubInfo, localDateStr } from './lib/calendarLogic.js';
-import { buildPromoSlot } from './lib/promos.js';
+import { buildPromoSlot, previewPromo } from './lib/promos.js';
+import PromoSlide from './components/PromoSlide.jsx';
 import { fireMilestone, setConfettiLevel, setConfettiLoad, setConfettiSkin } from './lib/confetti.js';
 import { resolveSkin, sceneForSkin, SKIN_TABLE } from './lib/skins.js';
 import { BOARD_HIDDEN, decideBoard, demoCheckout, pickupNow, stillHereCount } from './lib/checkoutBoard.js';
@@ -157,7 +161,13 @@ export default function App() {
   // comes from a deck that can move on to an ordinary slide (see
   // ManualSlideshow), so a child can never wait forever.
   const [slideInfo, setSlideInfo] = useState({ key: 'none', special: false, poster: false });
-  const checkInsHeld = !FLAGS.overlay && slideInfo.special;
+  // Settings → Slides → "Preview the promos": one promo played full screen on
+  // this TV for its own hold, over whatever the slideshow is doing. It holds
+  // check-ins exactly as the real poster would (names wait behind the
+  // WAITING chip, then play in full), so a rehearsal never hides a child.
+  const [promoPreview, setPromoPreview] = useState(/** @type {{ promo: any, at: number } | null} */ (null));
+  const previewUp = !FLAGS.overlay && promoPreview != null;
+  const checkInsHeld = !FLAGS.overlay && (slideInfo.special || previewUp);
   const {
     currentEvent, run: checkInRun, step: checkInStep, enqueue, skipCurrent, pending, gap: checkInGap,
   } = useCheckInQueue(config, { held: checkInsHeld });
@@ -719,7 +729,11 @@ export default function App() {
   // weather — a coupling nobody would guess.
   const weatherTheme = config.weatherTheme === true;
   const particleAuto = config.particleEffect === 'auto';
-  const weather = useWeather(config, (showWeatherChip || weatherTheme || particleAuto) && !FLAGS.overlay);
+  // The snow slide's phone shows the weather too, so it asks while that
+  // slide can air.
+  const snowPhone = config.calendarEnabled && config.seasonPromos !== false && inSnowSeason(todayStr);
+  const weather = useWeather(config, (showWeatherChip || weatherTheme || particleAuto || snowPhone) && !FLAGS.overlay);
+  const lobbyLive = useMemo(() => ({ weather, checkedIn: count }), [weather, count]);
   // 'auto' matches the particles to the sky outside: snowfall when it's
   // snowing, rainfall when it's raining or storming, nothing otherwise
   // (and nothing when the weather is unknown — no location, dead API).
@@ -741,13 +755,40 @@ export default function App() {
   // published, and memoized on exactly the inputs it reads so the background's
   // hold timer isn't restarted by every check-in.
   const seasonPromos = config.seasonPromos;
+  // The snow-alerts slide's forecast (src/lib/snowAlerts.js): asked for only in
+  // the snow season and only when the slide could show, so a September screen
+  // or an OBS overlay never calls the weather API for it.
+  const promosOn = calendarEnabled && seasonPromos !== false;
+  const snowForecast = useSnowForecast(config, promosOn && inSnowSeason(todayStr) && !FLAGS.overlay);
   const promoSlot = useMemo(
     () => buildPromoSlot(calendar.events, todayStr, {
       specialDates,
-      enabled: calendarEnabled && seasonPromos !== false,
+      enabled: promosOn,
+      snowAlerts: true,
+      snowForecast,
     }),
-    [calendar.events, todayStr, specialDates, calendarEnabled, seasonPromos]
+    [calendar.events, todayStr, specialDates, promosOn, snowForecast]
   );
+
+  // A preview runs for its promo's own hold, and Escape ends it early (a click
+  // on it does too). Each start is a new `at`, so the poster replays from the
+  // top even when the same one is picked twice.
+  const startPromoPreview = useCallback((key) => {
+    const promo = previewPromo(key, calendar.events, todayStr, specialDates);
+    if (promo) setPromoPreview({ promo, at: Date.now() });
+  }, [calendar.events, todayStr, specialDates]);
+  const stopPromoPreview = useCallback(() => setPromoPreview(null), []);
+  useEffect(() => {
+    if (!promoPreview) return undefined;
+    const ms = Math.max(1, Number(promoPreview.promo.durationSec) || 15) * 1000;
+    const timer = setTimeout(() => setPromoPreview(null), ms);
+    const onKey = (e) => { if (e.key === 'Escape') setPromoPreview(null); };
+    window.addEventListener('keydown', onKey);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [promoPreview]);
 
   // One array identity per (calendarSlides, promoSlot) pair, for the same
   // reason the memo above exists — see BackgroundIframe's `deck`.
@@ -930,12 +971,13 @@ export default function App() {
     || celebration != null
     || celebrationDepth() > 0
     || settingsOpen
+    || previewUp
     || slideEditorOpen
     || debugOpen
     || boardDecision.state !== BOARD_HIDDEN
     || leaveNow != null
     || (lastEventAt != null && Date.now() - lastEventAt < BUILD_QUIET_MS)
-  ), [currentEvent, pending, celebration, celebrationDepth, settingsOpen, slideEditorOpen, debugOpen,
+  ), [currentEvent, pending, celebration, celebrationDepth, settingsOpen, previewUp, slideEditorOpen, debugOpen,
     boardDecision.state, leaveNow, lastEventAt]);
   useBuildReload(buildReloadBusy);
 
@@ -1254,7 +1296,7 @@ export default function App() {
   // A promo poster is full-bleed art with its own header where the band
   // sits: a band notice steps aside for it as it does for a toast (a poster
   // always moves on, since it holds check-ins), and comes back after.
-  const posterHeld = checkInsHeld && slideInfo.poster === true;
+  const posterHeld = checkInsHeld && (slideInfo.poster === true || previewUp);
   const stageClass = [
     'stage',
     overlay && 'overlay',
@@ -1301,6 +1343,7 @@ export default function App() {
     // so config.reduceMotion === true means truly zero animation, not
     // just reduced transforms.
     <ZeroAnimationContext.Provider value={config.reduceMotion}>
+    <LobbyLiveContext.Provider value={lobbyLive}>
     <MotionConfig reducedMotion={config.reduceMotion ? 'always' : 'user'}>
     <div
       className={stageClass}
@@ -1333,6 +1376,19 @@ export default function App() {
             paused={currentEvent != null}
             onSlide={handleSlide}
           />
+        </ErrorBoundary>
+      )}
+
+      {/* Settings → Slides → "Preview the promos": the poster over the slideshow,
+          on this TV only, for its own hold. A click anywhere ends it. */}
+      {previewUp && (
+        <ErrorBoundary label="promo-preview" onError={stopPromoPreview}>
+          <div className="lobby-preview" onClick={stopPromoPreview} data-testid="promo-preview">
+            <PromoSlide key={promoPreview.at} promo={promoPreview.promo} />
+            <button type="button" className="lobby-preview__stop" onClick={stopPromoPreview}>
+              Preview · click or press Esc to stop
+            </button>
+          </div>
         </ErrorBoundary>
       )}
 
@@ -1637,6 +1693,11 @@ export default function App() {
               setSlideEditorOpen(true);
             }}
             onOpenDebug={CONFIGURE ? undefined : () => { setSettingsOpen(false); setDebugOpen(true); }}
+            onPreviewPromo={CONFIGURE ? undefined : (key) => {
+              // Like the board demo: close Settings so the TV shows it.
+              startPromoPreview(key);
+              setSettingsOpen(false);
+            }}
             onBoardDemo={() => {
               if (CONFIGURE) { relayToScreen('lobby', 'board-demo'); return; }
               // A rehearsal on this screen: the demo badge stays up until reload,
@@ -1691,6 +1752,7 @@ export default function App() {
       )}
     </div>
     </MotionConfig>
+    </LobbyLiveContext.Provider>
     </ZeroAnimationContext.Provider>
   );
 }

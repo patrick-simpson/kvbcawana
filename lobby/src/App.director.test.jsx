@@ -235,6 +235,48 @@ describe('the lobby director, end to end', { timeout: 20_000 }, () => {
     expect(onScreen('Slide A')).toBe(false);
   });
 
+  it('a promo preview from Settings plays full screen, holds names like the real thing, and stops on Esc', async () => {
+    configure();
+    await mountPastFlagship();
+    const preview = () => document.querySelector('[data-testid="promo-preview"]');
+    await act(async () => { document.querySelector('[aria-label="Open settings"]').click(); });
+    await act(async () => {
+      [...document.querySelectorAll('[role="tab"]')].find((t) => t.textContent.includes('Slides')).click();
+    });
+    await act(async () => {
+      [...document.querySelectorAll('button')].find((b) => b.textContent === 'Snow alerts: snow week').click();
+    });
+    expect(document.querySelector('.panel--settings')).toBeNull();
+    expect(preview()?.querySelector('.snow-alerts--storm')).not.toBeNull();
+
+    await act(async () => { bound.checkin({ firstName: 'Ann', club: 'Sparks', id: 'p1', at: Date.now() }); });
+    expect(banner()).toBeNull();
+    expect(waiting()?.getAttribute('aria-label')).toBe('1 child waiting to be welcomed');
+    expect(reloadBusy()).toBe(true);
+
+    await act(async () => { window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })); });
+    await tick(250);
+    expect(preview()).toBeNull();
+    expect(banner()).not.toBeNull();
+  });
+
+  it('a promo preview ends by itself when the promo does', async () => {
+    configure();
+    await mountPastFlagship();
+    await act(async () => { document.querySelector('[aria-label="Open settings"]').click(); });
+    await act(async () => {
+      [...document.querySelectorAll('[role="tab"]')].find((t) => t.textContent.includes('Slides')).click();
+    });
+    await act(async () => {
+      [...document.querySelectorAll('button')].find((b) => b.textContent === 'Poster contest').click();
+    });
+    expect(document.querySelector('[data-testid="promo-preview"]')).not.toBeNull();
+    await tick(14_500);
+    expect(document.querySelector('[data-testid="promo-preview"]')).not.toBeNull();
+    await tick(750);
+    expect(document.querySelector('[data-testid="promo-preview"]')).toBeNull();
+  });
+
   it('the corner steps aside on a held slide without spending an item there', async () => {
     localStorage.setItem('awanaTally.v1', JSON.stringify({ date: todayKey(), count: 7 }));
     configure();

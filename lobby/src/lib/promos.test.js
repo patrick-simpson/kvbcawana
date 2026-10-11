@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
+  promoForLap,
   CONTEST_DATE,
   PROMO_DURATION_SEC,
   SEASON_PROMOS,
@@ -7,6 +8,8 @@ import {
   countdownLabel,
   isPromoSlide,
   nightsUntil,
+  PREVIEW_PROMOS,
+  previewPromo,
 } from './promos.js';
 
 // The real fall-2026 Wednesdays, same shape the calendar feed delivers.
@@ -215,5 +218,99 @@ describe('buildPromoSlot', () => {
     expect(live('2026-10-14')).toBe(true);
     expect(live('2026-10-15')).toBe(false);
     expect(live('2026-11-04')).toBe(false);
+  });
+});
+
+// The snow-alerts slide rides the promo slot on its own cadence
+// (src/lib/snowAlerts.js): one lap in six on a calm week, every other lap
+// when snow is forecast near club night. Null entries are laps the slot sits
+// out, which ManualSlideshow steps past.
+describe('buildPromoSlot with the snow-alerts slide', () => {
+  const winter = [...season, club('2026-11-18'), club('2026-11-25'), club('2026-12-02'), club('2026-12-09')];
+  const kinds = (s) => (s ? s.promos.map((p) => (p ? p.kind : null)) : null);
+  const dry = { time: ['2026-11-29', '2026-11-30', '2026-12-01', '2026-12-02'], inches: [0, 0, 0, 0] };
+  const stormy = { time: dry.time, inches: [0, 0, 0, 3.5] };
+  const snowSlot = (today, forecast = null, extra = {}) => buildPromoSlot(winter, today, { snowAlerts: true, snowForecast: forecast, ...extra });
+
+  it('takes one lap in six on a calm week, and sits the other five out when nothing else is live', () => {
+    expect(kinds(snowSlot('2026-11-29', dry))).toEqual(['snowAlerts', null, null, null, null, null]);
+    expect(kinds(snowSlot('2026-12-10'))).toEqual(['snowAlerts', null, null, null, null, null]);
+  });
+
+  it('takes every other lap when snow is forecast for club night', () => {
+    const s = snowSlot('2026-11-29', stormy);
+    expect(kinds(s)).toEqual(['snowAlerts', null]);
+    expect(s.promos[0].snow).toEqual({ date: '2026-12-02', when: 'later', weekday: 'Wednesday', inches: 3.5 });
+    expect(s.promos[0].durationSec).toBe(20);
+  });
+
+  it('shares its off laps with a fall poster that is still live', () => {
+    // Nov 1 to 4: Parents' Night is still up, so it fills the other laps.
+    expect(kinds(snowSlot('2026-11-02'))).toEqual(['snowAlerts', 'parents', 'parents', 'parents', 'parents', 'parents']);
+  });
+
+  it('alternates with a live poster in a snow week', () => {
+    // Snow forecast for Wed Nov 4, Parents' Night itself: every other lap each.
+    const nov = { time: ['2026-11-02', '2026-11-03', '2026-11-04'], inches: [0, 0, 2] };
+    const s = buildPromoSlot(winter, '2026-11-02', { snowAlerts: true, snowForecast: nov });
+    expect(kinds(s)).toEqual(['snowAlerts', 'parents']);
+    expect(s.promos[0].snow?.when).toBe('later');
+  });
+
+  it('never shows outside November to March', () => {
+    expect(kinds(snowSlot('2026-10-31'))).not.toContain('snowAlerts');
+    expect(buildPromoSlot(winter, '2027-04-01', { snowAlerts: true })).toBeNull();
+  });
+
+  it('is off unless asked for, and goes with the rest when promos are switched off', () => {
+    expect(kinds(buildPromoSlot(winter, '2026-11-02'))).toEqual(['parents']);
+    expect(snowSlot('2026-12-10', null, { enabled: false })).toBeNull();
+  });
+
+  it('still needs the calendar feed, like every promo', () => {
+    expect(buildPromoSlot([], '2026-12-10', { snowAlerts: true })).toBeNull();
+  });
+
+  it('promoForLap: picks the lap’s entry, and never leaves a lone slot blank', () => {
+    const slot = snowSlot('2026-12-10');
+    expect(promoForLap(slot, 0, 3)?.kind).toBe('snowAlerts');
+    expect(promoForLap(slot, 1, 3)).toBeNull();
+    expect(promoForLap(slot, 6, 3)?.kind).toBe('snowAlerts');
+    expect(promoForLap(slot, 1, 1)?.kind).toBe('snowAlerts');
+    expect(promoForLap(null, 0, 3)).toBeNull();
+  });
+});
+
+describe('previewPromo: Settings → Slides → Preview the promos', () => {
+  it('offers every poster and both snow versions', () => {
+    expect(PREVIEW_PROMOS.map((p) => p.key)).toEqual(['contest', 'friend', 'barfEpic', 'parents', 'snowAlerts', 'snowAlertsStorm']);
+    for (const p of PREVIEW_PROMOS) expect(previewPromo(p.key, season, '2026-10-01')).not.toBeNull();
+    expect(previewPromo('nope', season, '2026-10-01')).toBeNull();
+  });
+
+  it('counts a fall poster down from the real calendar while its night is ahead', () => {
+    const d = previewPromo('contest', season, '2026-10-01');
+    expect(d).toMatchObject({ id: 'promo_contest', kind: 'contest', eventDate: '2026-10-14', tonight: false, durationSec: 15 });
+    expect(d.countdown).toBe(countdownLabel(nightsUntil(season, '2026-10-01', '2026-10-14'), '2026-10-01', '2026-10-14'));
+    expect(previewPromo('friend', season, '2026-10-14')).toMatchObject({ tonight: true, countdown: 'Tonight!' });
+  });
+
+  it('plays a poster whose night has passed, naming its date instead of a count', () => {
+    const d = previewPromo('barfEpic', season, '2026-12-01');
+    expect(d.tonight).toBe(false);
+    expect(d.countdown).toMatch(/October/);
+    expect(d.countdown).not.toMatch(/left|Next|Tonight/);
+  });
+
+  it('the ordinary snow slide has no storm; the snow week names the next club night', () => {
+    expect(previewPromo('snowAlerts', season, '2026-10-01')).toMatchObject({ kind: 'snowAlerts', snow: null, durationSec: 20 });
+    expect(previewPromo('snowAlertsStorm', season, '2026-10-01').snow)
+      .toEqual({ date: '2026-10-07', when: 'later', weekday: 'Wednesday', inches: 3 });
+    expect(previewPromo('snowAlertsStorm', season, '2026-10-07').snow.when).toBe('tonight');
+  });
+
+  it('without a feed the snow week names the coming Wednesday', () => {
+    expect(previewPromo('snowAlertsStorm', null, '2026-12-04').snow).toMatchObject({ date: '2026-12-09', weekday: 'Wednesday' });
+    expect(previewPromo('snowAlertsStorm', [], '2026-12-09').snow).toMatchObject({ date: '2026-12-09', when: 'tonight' });
   });
 });

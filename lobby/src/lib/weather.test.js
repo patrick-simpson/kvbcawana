@@ -3,6 +3,8 @@ import {
   autoParticleEffect,
   buildForecastUrl,
   fetchCurrentWeather,
+  buildSnowForecastUrl,
+  fetchSnowForecast,
   geocodeLocation,
   weatherMood,
   weatherPresentation,
@@ -90,6 +92,40 @@ describe('fetchCurrentWeather', () => {
     expect(await fetchCurrentWeather({ lat: 1, lon: 2 })).toBeNull();
 
     expect(await fetchCurrentWeather({ lat: NaN, lon: 2 })).toBeNull();
+  });
+});
+
+describe('the snow-alerts forecast (fetchSnowForecast)', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('asks for eight days of snowfall in inches, in the location’s own dates', () => {
+    const url = new URL(buildSnowForecastUrl({ lat: 44.55, lon: -69.63 }));
+    expect(url.searchParams.get('daily')).toBe('snowfall_sum');
+    expect(url.searchParams.get('precipitation_unit')).toBe('inch');
+    expect(url.searchParams.get('forecast_days')).toBe('8');
+    expect(url.searchParams.get('timezone')).toBe('auto');
+  });
+
+  it('returns each day’s snowfall, a blank day as none', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ daily: { time: ['2026-12-01', '2026-12-02', '2026-12-03'], snowfall_sum: [0.4, 3.1, null] } }),
+    }));
+    expect(await fetchSnowForecast({ lat: 44.5, lon: -69.6 })).toEqual({
+      time: ['2026-12-01', '2026-12-02', '2026-12-03'], inches: [0.4, 3.1, 0],
+    });
+  });
+
+  it('is null on any failure, never a guess', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, json: async () => ({}) }));
+    expect(await fetchSnowForecast({ lat: 1, lon: 2 })).toBeNull();
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ daily: { time: ['2026-12-01'], snowfall_sum: [] } }) }));
+    expect(await fetchSnowForecast({ lat: 1, lon: 2 })).toBeNull();
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ daily: { time: ['tomorrow'], snowfall_sum: [2] } }) }));
+    expect(await fetchSnowForecast({ lat: 1, lon: 2 })).toBeNull();
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')));
+    expect(await fetchSnowForecast({ lat: 1, lon: 2 })).toBeNull();
+    expect(await fetchSnowForecast({ lat: NaN, lon: 2 })).toBeNull();
   });
 });
 

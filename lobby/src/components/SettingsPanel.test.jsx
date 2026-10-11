@@ -498,7 +498,7 @@ describe('Slides', () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date('2026-10-01T12:00:00'));
     const props = open();
-    const promos = screen.getByLabelText('Fall event promos');
+    const promos = screen.getByLabelText('Season promos');
     expect(promos.checked).toBe(true);
     fireEvent.click(promos);
     expect(props.onChange).toHaveBeenCalledWith({ seasonPromos: false });
@@ -507,11 +507,21 @@ describe('Slides', () => {
     vi.useRealTimers();
   });
 
-  it('after the season the promos toggle leaves the page', () => {
+  it('the promos toggle stays through the snow season and names what it switches', () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date('2026-12-01T12:00:00'));
     open();
-    expect(screen.queryByLabelText('Fall event promos')).toBeNull();
+    expect(screen.getByLabelText('Season promos')).toBeTruthy();
+    expect(screen.getByText(/snow-alerts sign-up/)).toBeTruthy();
+    expect(screen.queryByText(/Poster Contest/)).toBeNull();
+    vi.useRealTimers();
+  });
+
+  it('after both seasons the promos toggle leaves the page', () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2027-06-01T12:00:00'));
+    open();
+    expect(screen.queryByLabelText('Season promos')).toBeNull();
     vi.useRealTimers();
   });
 
@@ -744,6 +754,23 @@ describe('Pickup board', () => {
     const props = { ...happyProps(), initialTab: 'pickup' };
     render(<SettingsPanel {...props} />);
     expect(screen.getByRole('img', { name: /preview of the pickup board/ })).toBeTruthy();
+  });
+});
+
+describe('Preview the promos', () => {
+  it('lists every promo, and a click hands that one to the screen', () => {
+    const props = { ...happyProps(), initialTab: 'slides', onPreviewPromo: vi.fn() };
+    render(<SettingsPanel {...props} />);
+    const names = ['Poster contest', 'BARF Night', 'BARF Night: slime cut', 'Parents’ Night', 'Snow alerts', 'Snow alerts: snow week'];
+    for (const n of names) expect(screen.getByRole('button', { name: n })).toBeTruthy();
+    // It is the first card in Slides, the fall posters grouped apart from the snow slide.
+    expect(document.querySelector('.panel-body .panel-card .section').textContent).toBe('Preview the promos');
+    const fall = screen.getByRole('group', { name: 'Fall posters' });
+    expect([...fall.querySelectorAll('button')].map((b) => b.textContent)).toEqual(names.slice(0, 4));
+    fireEvent.click(screen.getByRole('button', { name: 'Snow alerts: snow week' }));
+    expect(props.onPreviewPromo).toHaveBeenCalledWith('snowAlertsStorm');
+    fireEvent.click(screen.getByRole('button', { name: 'Poster contest' }));
+    expect(props.onPreviewPromo).toHaveBeenLastCalledWith('contest');
   });
 });
 

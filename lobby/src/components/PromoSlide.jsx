@@ -2,6 +2,7 @@ import ContestPromo, { DETAILS as CONTEST_DETAILS } from './promos/ContestPromo.
 import FriendPromo, { DETAILS as FRIEND_DETAILS } from './promos/FriendPromo.jsx';
 import BarfEpicPromo, { DETAILS as BARF_EPIC_DETAILS } from './promos/BarfEpicPromo.jsx';
 import ParentsPromo, { DETAILS as PARENTS_DETAILS } from './promos/ParentsPromo.jsx';
+import SnowAlertsPromo, { DETAILS as SNOW_ALERTS_DETAILS } from './promos/SnowAlertsPromo.jsx';
 
 export { RotatingDetail, splatPath, landsAt, keyframes } from './promos/kit.jsx';
 
@@ -12,7 +13,9 @@ export { RotatingDetail, splatPath, landsAt, keyframes } from './promos/kit.jsx'
 // on its own finished printed poster. Which one shows, when, and what its
 // countdown says is decided in the pure src/lib/promos.js; each poster's
 // art lives in its own file under ./promos/, built from ./promos/kit.jsx.
-// This file is only the index.
+// This file is only the index. The snow-alerts slide (Nov to Mar, the
+// text-message sign-up) rides the same slot on its own cadence and wears the
+// lobby's kit rather than a poster's faces; see src/lib/snowAlerts.js.
 // ─────────────────────────────────────────────────────────────
 
 // Every line each poster says in its one rotating detail slot, in order.
@@ -23,6 +26,7 @@ export const PROMO_DETAILS = Object.freeze({
   friend: FRIEND_DETAILS,
   barfEpic: BARF_EPIC_DETAILS,
   parents: PARENTS_DETAILS,
+  snowAlerts: SNOW_ALERTS_DETAILS,
 });
 
 const NO_DETAILS = Object.freeze([]);
@@ -48,6 +52,7 @@ const SCENES = {
   friend: FriendPromo,
   barfEpic: BarfEpicPromo,
   parents: ParentsPromo,
+  snowAlerts: SnowAlertsPromo,
 };
 
 /**

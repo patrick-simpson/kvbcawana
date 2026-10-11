@@ -5,7 +5,8 @@ import { deriveClubInfo, formatShortDate, isStoreNight, localDateStr, splitTitle
 import { skinOptions } from '../../lib/skins.js';
 import { CORNER_CLUB_IDS, getAllClubs, getClubPalette } from '../../lib/clubs.js';
 import { maskDisplayKey } from '../../lib/displayKey.js';
-import { SEASON_PROMOS } from '../../lib/promos.js';
+import { PREVIEW_PROMOS, SEASON_PROMOS } from '../../lib/promos.js';
+import { inSnowSeason } from '../../lib/snowAlerts.js';
 import { SAMPLE_BOARD_NAMES } from '../../lib/demoNames.js';
 import { decideBoard, demoCheckout } from '../../lib/checkoutBoard.js';
 import CheckoutBoard from '../CheckoutBoard.jsx';
@@ -26,8 +27,9 @@ export const SOURCE_LABELS = {
   video: 'Looping video',
 };
 
-// The last day any fall promo can show; past it the toggle has nothing to
-// turn off, so it leaves the page instead of sitting there all year.
+// The last day any fall promo can show. Past it, and outside the snow season
+// (when the snow-alerts slide rides the same switch), the toggle has nothing
+// to turn off, so it leaves the page instead of sitting there all year.
 const PROMOS_END = SEASON_PROMOS.reduce((max, p) => (p.eventDate > max ? p.eventDate : max), '');
 
 /** A duration kept in milliseconds, typed in seconds. */
@@ -411,7 +413,7 @@ export function CheckinsSection({ form, set, update, onPreview }) {
 
 // ── Slides ────────────────────────────────────────────────────────────────
 
-export function SlidesSection({ form, set, update, slideCount, onEditSlides, syncedDeck, today }) {
+export function SlidesSection({ form, set, update, slideCount, onEditSlides, syncedDeck, today, onPreviewPromo }) {
   const n = slideCount;
   const typedLine = form.backgroundSource === 'manual'
     ? (n === 0
@@ -419,7 +421,12 @@ export function SlidesSection({ form, set, update, slideCount, onEditSlides, syn
       : `${n} slide${n === 1 ? '' : 's'} saved on this device.`)
     : 'Typed and published slides only show while “Typed & published slides” is picked above.';
   const ignored = syncedDeck && form.backgroundSource !== 'manual';
-  const promosLive = !PROMOS_END || today <= PROMOS_END;
+  const fallLive = !PROMOS_END || today <= PROMOS_END;
+  const snowLive = inSnowSeason(today);
+  const promoHint = [
+    fallLive && 'Poster Contest, BARF Night, Parents’ Night: animated, dated, retire themselves.',
+    snowLive && 'The snow-alerts sign-up (QR for kvbchurch.org/alerts), Nov to Mar: about one pass in six, every other pass when snow is forecast for club night.',
+  ].filter(Boolean).join(' ');
 
   return (
     <>
@@ -432,6 +439,30 @@ export function SlidesSection({ form, set, update, slideCount, onEditSlides, syn
             Show the published slides
           </button>
         </div>
+      )}
+
+      {onPreviewPromo && (
+        <PanelCard title="Preview the promos" tab="var(--brand-hot)" scope="screen">
+          <p className="hint preview-promos__hint">
+            Plays one promo full screen on this TV, start to finish, whatever the date. Names that arrive meanwhile
+            wait and then play in full, as they do for the real thing. Click the screen or press Esc to stop early.
+          </p>
+          {[
+            { id: 'fall', label: 'Fall posters', keys: PREVIEW_PROMOS.filter((p) => !p.key.startsWith('snow')) },
+            { id: 'snow', label: 'Snow alerts (November to March)', keys: PREVIEW_PROMOS.filter((p) => p.key.startsWith('snow')) },
+          ].map((g) => (
+            <div className="field" key={g.id}>
+              <span className="field-label" id={`preview-${g.id}`}>{g.label}</span>
+              <div className="preview-promos" role="group" aria-labelledby={`preview-${g.id}`}>
+                {g.keys.map((p) => (
+                  <button key={p.key} type="button" className="secondary preview-promos__button" onClick={() => onPreviewPromo(p.key)}>
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+        </PanelCard>
       )}
 
       <PanelCard title="What plays behind the names" scope="screen">
@@ -536,9 +567,9 @@ export function SlidesSection({ form, set, update, slideCount, onEditSlides, syn
               title="Nights-remaining slide" hint="A countdown nudge once fewer than 10 club nights remain." />
           </>
         )}
-        {promosLive && (
+        {(fallLive || snowLive) && (
           <Toggle checked={form.seasonPromos} onChange={set('seasonPromos')}
-            title="Fall event promos" hint="Poster Contest, BARF Night, Parents' Night. Animated, dated, retire themselves." />
+            title="Season promos" hint={promoHint} />
         )}
         <details className="advanced-fields">
           <summary>Calendar source</summary>
@@ -556,6 +587,7 @@ export function SlidesSection({ form, set, update, slideCount, onEditSlides, syn
           </div>
         </details>
       </PanelCard>
+
     </>
   );
 }
