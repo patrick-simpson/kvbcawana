@@ -11,6 +11,7 @@ import {
   credentialsFrom,
   parseCheckinPage,
   parseCheckinReport,
+  rowShape,
   twoTimTwoHost,
 } from '../src/twotimtwo.js';
 
@@ -101,6 +102,22 @@ describe('the check-in report parser', () => {
     const theirs = await extensionParser()(SAMPLES[name]);
     expect(ours.entries).toEqual([...theirs].map((e) => ({ clubberId: e.clubberId, name: e.name, club: e.club })));
     expect(ours.declared).toBe(typeof theirs.declared === 'number' ? theirs.declared : null);
+  });
+});
+
+describe('the row shape (for a report that reads short)', () => {
+  it('describes how rows are built without a word of their text', () => {
+    const html = page(table('Sparks ', [{ id: 4121, name: 'Zed Uniquename', summary: 'YES 1 Share 1 Point' }]));
+    const shape = rowShape(html);
+    expect(shape.rows).toBe(1);
+    expect(shape.sample[0]).toMatchObject({ cells: 2, links: ['/meeting/clubberCheckin/N', ''], handlers: ['onclick:undoCheckin'] });
+    expect(shape.sample[0].attrs).toContain('a[href]');
+    expect(JSON.stringify(shape)).not.toMatch(/Uniquename|Zed|4121|YES|Share/);
+  });
+
+  it('a handler that carries text gives only its function name', () => {
+    const html = page(table('Sparks ', []).replace('</thead>', "</thead><tr><td onclick=\"confirm('Undo Zed Uniquename?')\">x</td></tr>"));
+    expect(JSON.stringify(rowShape(html))).not.toContain('Uniquename');
   });
 });
 

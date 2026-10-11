@@ -154,6 +154,35 @@ export function pageShape(html) {
 }
 
 /**
+ * How a club table's rows are built, for a report that read short: per row,
+ * its cell count, the tags inside, the NAMES of the attributes it carries,
+ * its links' paths (digits as N, no query) and its handlers' function names.
+ * Never text, never an attribute value but those two, so never a name. This
+ * is what found the fix when the live report read 0 of 94 (2026-10-11).
+ * @param {string} html
+ */
+export function rowShape(html) {
+  const doc = documentOf(html);
+  const table = [...doc.querySelectorAll('table')].find((t) => t.querySelector('th.title img[alt]'));
+  if (!table) return null;
+  const rows = [...table.querySelectorAll('tr')].filter((r) => r.closest('table') === table && !r.closest('thead') && !r.closest('tfoot'));
+  const uniq = (xs) => [...new Set(xs)].slice(0, 20);
+  const sample = rows.slice(0, 3).map((row) => {
+    const els = [row, ...row.querySelectorAll('*')];
+    return {
+      cells: row.querySelectorAll('td').length,
+      tags: uniq(els.slice(1).map((e) => e.tagName.toLowerCase())),
+      attrs: uniq(els.flatMap((e) => [...e.attributes].map((a) => `${e.tagName.toLowerCase()}[${a.name}]`))),
+      links: uniq([...row.querySelectorAll('a[href]')].map((a) => String(a.getAttribute('href') || '').split(/[?#]/)[0].replace(/\d+/g, 'N'))
+        .filter((h) => /^[\w/.:-]{0,80}$/.test(h))),
+      handlers: uniq(els.flatMap((e) => [...e.attributes].filter((a) => /^on/i.test(a.name))
+        .map((a) => `${a.name}:${(/^\s*([A-Za-z_$][\w$.]{0,40})\s*\(/.exec(a.value) || [])[1] || '?'}`))),
+    };
+  });
+  return { rows: rows.length, sample };
+}
+
+/**
  * The check-in page (/clubber/checkin): tonight's meeting id, its check-in
  * items with their club scopes, and the roster rows. Phase 1 keeps NO names
  * from it: ids, clubs and the checked-in mark only. null when it is not the
@@ -348,7 +377,7 @@ export class TwoTimTwoClient {
     if (!page.ok) return page;
     const report = parseCheckinReport(page.html);
     return report
-      ? { ok: /** @type {const} */ (true), report }
+      ? { ok: /** @type {const} */ (true), report, html: page.html }
       : { ok: /** @type {const} */ (false), error: 'report-unreadable', shape: pageShape(page.html) };
   }
 

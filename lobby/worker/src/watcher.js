@@ -22,7 +22,7 @@
 //                 the storage alone opens nothing). No names, ever.
 // The session cookie and the password never touch storage (twotimtwo.js).
 
-import { TwoTimTwoClient, credentialsFrom } from './twotimtwo.js';
+import { TwoTimTwoClient, credentialsFrom, rowShape } from './twotimtwo.js';
 import { fromBase64, toBase64 } from './crypto.js';
 
 /** TwoTimTwo's agreed limit (2026-10-11): one report read per 15 seconds. */
@@ -331,6 +331,7 @@ export class Watcher {
         ok: true, date, checkedIn: Object.keys(kids).length, byClub: countByClub(kids), declared: res.report.declared,
         partial: res.report.declared !== null && res.report.entries.length < res.report.declared,
       };
+      if (test.partial) test.rowShape = rowShape(res.html);
       const page = await client.checkinPage();
       test.checkinPage = page.ok
         ? { ok: true, calendarId: page.page.calendarId, events: page.page.events.length }
