@@ -1,8 +1,8 @@
-version: 8.2.0
+version: 9.0.0
 files:
-  - url: https://github.com/patrick-simpson/kvbcawana/releases/download/printer-v8.2.0/Club-Label-Printer-Setup.exe
-    sha512: mpwK8cNUcL6ZyyvXWkUxwK2nSoXI4VqLj01eJ8Orkgs/Jic0c0FL2uV6+i1T5F6p2OsRkuR7HFFgNaRnQpLtPQ==
-    size: 245760585
-path: https://github.com/patrick-simpson/kvbcawana/releases/download/printer-v8.2.0/Club-Label-Printer-Setup.exe
-sha512: mpwK8cNUcL6ZyyvXWkUxwK2nSoXI4VqLj01eJ8Orkgs/Jic0c0FL2uV6+i1T5F6p2OsRkuR7HFFgNaRnQpLtPQ==
-releaseDate: '2026-10-11T21:02:15.881Z'
+  - url: https://github.com/patrick-simpson/kvbcawana/releases/download/printer-v9.0.0/KVBC-Awana-Setup.exe
+    sha512: qdzR2xb41dhGEB26VGFXNzm6kbZOq9FBNbyp2z3JmTG3l7MiAEp9KLjZUAVEkYixu1VG5jLVKwFIXSWEw8bViA==
+    size: 245823693
+path: https://github.com/patrick-simpson/kvbcawana/releases/download/printer-v9.0.0/KVBC-Awana-Setup.exe
+sha512: qdzR2xb41dhGEB26VGFXNzm6kbZOq9FBNbyp2z3JmTG3l7MiAEp9KLjZUAVEkYixu1VG5jLVKwFIXSWEw8bViA==
+releaseDate: '2026-10-11T23:07:10.530Z'
