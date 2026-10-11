@@ -38,7 +38,11 @@ const PORT = 34584;
   process.env.PATH = `${binDir}:${process.env.PATH}`;
 
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'awana-async-'));
-  fs.writeFileSync(path.join(dataDir, 'config.json'), JSON.stringify({ printerName: 'Fake' }));
+  // lateGraceMin a whole day: nobody here is ever late, whatever the clock says.
+  // A late child also gets a drop-off tag, so from 18:15 on a UTC runner (each
+  // club's start plus the 10-minute grace) every child printed two jobs and the
+  // job count below failed every afternoon.
+  fs.writeFileSync(path.join(dataDir, 'config.json'), JSON.stringify({ printerName: 'Fake', lateGraceMin: 24 * 60 }));
   fs.writeFileSync(path.join(dataDir, 'clubbers.csv'), 'First Name,Last Name,Club\nAva,Stone,Sparks\nEli,Stone,Cubbies\nMia,Lee,T&T\n');
   Object.assign(process.env, { AWANA_DATA_DIR: dataDir, AWANA_PORT: String(PORT), AWANA_BIND_HOST: '127.0.0.1', PRINTER_NAME: 'Fake' });
   const server = require(path.join(root, 'print-server', 'server.js'));
