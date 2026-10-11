@@ -79,3 +79,69 @@ welcome. This is the plan; its status is at the end.
   (Preview a check-in, Reset tonight's counter, the board demo) are gone, the
   pill and footer speak of the sign-in, and it opens on Setup until signed in.
   `e2e/settings-page.spec.js` pins it. The lobby TV's own Settings is unchanged.
+- 2026-10-11: **Phase 3 built** (printer 8.3.0; not released, no dispatch).
+  Inventory below; what was built and what is still the owner's call after it.
+
+### Inventory: every setting and tool, and where it lives now
+
+The print dashboard (`printer/print-server/public/index.html`, localhost:3456)
+and the Chrome extension (`chrome-extension/`). The extension's options page
+and popup held no settings of their own (6.26.0 moved the printer pick to the
+dashboard); the check-in page's panel shows the printer read-only and holds
+the Step Up Night / Awana Store Night switches, which stay there.
+
+| Setting or tool | Routes | On /settings (Laptop) |
+| --- | --- | --- |
+| Name tag printer, backup printer | GET /printers, GET and POST /config | yes |
+| Label footer, visitor palette, trophy band, connect card (+ auto, greeting) | POST /config | yes |
+| Per-club label layout, with preview | GET and POST /config/label-templates, GET /preview | yes |
+| Pickup clubs | POST /config `pickupClubs` | yes |
+| Club schedule, late grace | GET and POST /config/schedule | yes |
+| Screen season | POST /config `seasonTheme` | yes |
+| Print history and reprint | GET /history/today, POST /reprint | yes |
+| Diagnostics, system status | GET /diagnostics, GET /health, GET /failures | yes (diagnostics, status and warnings) |
+| Test label (Test Night Systems) | POST /canary | yes |
+| Clear print queue, test tune | POST /printer/clear-queue, POST /play-tune | yes |
+| Phone PIN, Wi-Fi access for phones, driven check-ins | POST /config | **dashboard only** (see below) |
+| Display key, display login, Pusher keys, publish token, sync sign-in | POST /config, /config/*/generate, /config/sync-* | **dashboard only** |
+| Check-in URL, fleet config URL, allowed origins, history retention | POST /config | **dashboard only** |
+| Rehearsal mode | POST /rehearsal | dashboard only (it changes every print and every screen) |
+| Reprint a stretch, leader tags, custom label, one-off tag, attendance audit, lobby slide publish, extension folder path | various | dashboard only (not settings; left where they work) |
+| Extension: popup status, Settings button, options page, "Printing to Change" link | GET /health (popup) | now open /settings |
+
+### How the page reaches the server
+
+`security.js` holds one exact origin (`https://awana.kvbchurch.org`, not
+`displayOrigins`, which still lists the archived github.io), a route table
+(`SETTINGS_PAGE_ROUTES`) and the keys POST /config takes from the page
+(`SETTINGS_PAGE_CONFIG_KEYS`: the printer's own, never a secret, the network
+switch or the CORS list). `corsPolicy` answers the preflight for those routes
+only, with `Access-Control-Allow-Private-Network: true` when Chrome asks.
+Every route but `/health` needs the publish token (the credential the page
+already holds for slides) and a loopback socket; what passes is marked
+`req.settingsPage`, which the four printer routes that were "dashboard on this
+computer only" (templates, clear queue, test tune, POST /config) accept next to
+`isTrustedConfigOrigin`. The secret-holding routes never look at the mark.
+`scripts/test-settings-page.cjs` pins all of it (91 checks).
+
+The lobby's Laptop section (`laptop.jsx`, `lib/printServer.js`) probes
+`/health` only when opened, so Chrome's local-network prompt, if it shows one,
+comes from a click and not from page load. Not found, it says "Open this page
+on the check-in laptop to set the printer" and lists what it would show.
+
+### Left for the owner
+
+- **The token.** The page needs the publish token to change anything (it is
+  stored per browser; a signed-in settings page has none until pasted, once,
+  from the dashboard's Lobby slides card). A one-click pairing from the
+  dashboard is possible but puts a secret in a URL or needs a new route; not
+  built.
+- **Phone PIN and the keys stay on the dashboard.** The PIN protects the
+  roster on the Wi-Fi and the token's blast radius was chosen small (slides
+  and settings); letting a page set the PIN or the display key would widen it.
+  Say so if you want them on /settings anyway (it would need a separate
+  confirmation credential).
+- **Real Chrome.** Preflight and Private Network Access are pinned with
+  headers in tests; not seen in a real browser here. Chrome 142+ replaces PNA
+  with a Local Network Access permission prompt for a public page calling the
+  laptop: allow it once; test on the laptop before relying on it.
