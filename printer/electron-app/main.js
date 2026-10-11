@@ -799,8 +799,10 @@ function startServer(config) {
 }
 
 // ─── Self-repair for a broken install ────────────────────────────────────────
+// The site's stable link to the newest installer (/download/club-label-printer
+// is the same target, for links made before 9.0.0).
 const REPAIR_INSTALLER_URL =
-  'https://awana.kvbchurch.org/download/club-label-printer';
+  'https://awana.kvbchurch.org/download/kvbc-awana';
 
 function offerRepairInstall(errMessage) {
   dialog.showMessageBox({

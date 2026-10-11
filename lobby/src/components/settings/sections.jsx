@@ -10,7 +10,7 @@ import { inSnowSeason } from '../../lib/snowAlerts.js';
 import { SAMPLE_BOARD_NAMES } from '../../lib/demoNames.js';
 import { decideBoard, demoCheckout } from '../../lib/checkoutBoard.js';
 import CheckoutBoard from '../CheckoutBoard.jsx';
-import { DESKTOP_APP_DOWNLOAD_URL, DESKTOP_APP_GUIDE_URL, JOURNEY_URL, PROJECTOR_GAME_TIME_URL } from '../../lib/constants.js';
+import { DESKTOP_APP_DOWNLOAD_URL, JOURNEY_URL, PROJECTOR_GAME_TIME_URL } from '../../lib/constants.js';
 import { phaseWords } from '../../lib/settingsSections.js';
 import {
   ChangePassphraseField, DisplayKeyField, DisplayLoginField, MilestoneListField, PanelCard, PptxUploadField,
@@ -1112,17 +1112,15 @@ export function SetupSection({
         </PanelCard>
       )}
 
-      <PanelCard title="Sound room app" tab="var(--brand-blue)" local>
+      <PanelCard title="KVBC Awana for Windows" tab="var(--brand-blue)" local>
         <p className="hint">
-          <strong>Awana Lobby Display</strong> is a Windows app for the sound room PC. It puts this lobby screen full
-          screen on the lobby TV on club nights, from 5:00 to 8:00 pm, starts with Windows and keeps itself up to date.
+          <strong>KVBC Awana</strong> is the one app for every church computer: a display that puts this screen full
+          screen on a TV on club nights (5:00 to 8:00 pm unless you change it), the check-in print server, or both. Its
+          first run asks which; change it later under Screens on the settings page. It keeps itself up to date.
         </p>
         <div className="panel-links">
           <a className="panel-button secondary" href={DESKTOP_APP_DOWNLOAD_URL} target="_blank" rel="noopener noreferrer">
             Download for Windows
-          </a>
-          <a className="panel-button ghost" href={DESKTOP_APP_GUIDE_URL} target="_blank" rel="noopener noreferrer">
-            Setup guide
           </a>
         </div>
         <p className="hint">

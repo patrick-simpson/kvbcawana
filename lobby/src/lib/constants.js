@@ -133,11 +133,11 @@ export const FETCH_TIMEOUT_MS = 15_000;
 // blinks.
 export const BUILD_QUIET_MS = 5000;
 
-// The sound room desktop app (desktop/, "Awana Lobby Display"): the installer
-// on this repo's Latest release, and its volunteer guide. Settings → Setup
-// links both. The fixed asset name keeps the download link permanent.
-export const DESKTOP_APP_DOWNLOAD_URL = 'https://awana.kvbchurch.org/download/lobby-display';
-export const DESKTOP_APP_GUIDE_URL = 'https://github.com/patrick-simpson/kvbcawana/blob/main/lobby/desktop/README.md';
+// KVBC Awana, the one Windows app for every church computer (UNIFIED-APP.md:
+// a display, the print server, or both; it replaced the sound room app,
+// desktop/). Settings → Setup links its installer: the site's stable link to
+// the newest one the printer feed names (site/lib/downloads.js).
+export const DESKTOP_APP_DOWNLOAD_URL = 'https://awana.kvbchurch.org/download/kvbc-awana';
 
 // The family's other screens, linked from Settings → Status → Other screens.
 // `?view=game` opens the projector straight into game time (its App.jsx).

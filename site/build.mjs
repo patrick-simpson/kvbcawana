@@ -21,6 +21,7 @@ import { execSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { downloadRedirects } from './lib/downloads.js';
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const OUT = path.join(ROOT, 'site', 'dist');
@@ -113,19 +114,18 @@ cpSync(path.join(ROOT, 'printer', 'changes.md'), path.join(OUT, 'release-notes',
 // Pretty addresses, and HTML / JSON never cached at the edge, so a deploy
 // and a calendar change reach the screens at once (Cloudflare Pages honours
 // _headers; the apps' service workers already go network-first for both).
-// Stable download links (the Install Guide, the extension popup, the sound
-// room card): the newest installer each update feed names, else the releases
-// page until the first release from this repo.
+// Stable download links (the Install Guide, the extension popup, the
+// signage's KVBC Awana card): the newest installer each update feed names,
+// else the releases page until the first release from this repo
+// (site/lib/downloads.js; /download/kvbc-awana and /download/club-label-printer
+// are the same app since 9.0.0).
 const RELEASES = 'https://github.com/patrick-simpson/kvbcawana/releases';
-const newestInstaller = (feed) => {
+const readFeed = (feed) => {
   const file = path.join(ROOT, 'site', 'updates', feed);
-  if (!existsSync(file)) return RELEASES;
-  const m = /^\s*(?:-\s+)?url:\s*(https:\/\/\S+\.exe)\s*$/m.exec(readFileSync(file, 'utf8'));
-  return m ? m[1] : RELEASES;
+  return existsSync(file) ? readFileSync(file, 'utf8') : null;
 };
 writeFileSync(path.join(OUT, '_redirects'), [
-  `/download/club-label-printer ${newestInstaller('printer/latest.yml')} 302`,
-  `/download/lobby-display ${newestInstaller('lobby/lobby.yml')} 302`,
+  ...downloadRedirects(readFeed, RELEASES),
   // Pages serves foo.html at /foo (and 308s the .html form there).
   '/projector /lobby/countdown 302',
   '/projector/ /lobby/countdown 302',

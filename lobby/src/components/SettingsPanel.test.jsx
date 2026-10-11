@@ -666,17 +666,15 @@ describe('Setup: tools', () => {
     expect(props.onClose).toHaveBeenCalled();
   });
 
-  it('links the Windows installer and its guide', () => {
+  it('links the KVBC Awana installer (the one app, v9), never the sound room app\'s', () => {
     render(<SettingsPanel {...{ ...happyProps(), initialTab: 'setup' }} />);
+    expect(screen.getByRole('heading', { name: 'KVBC Awana for Windows' })).toBeTruthy();
     const download = screen.getByRole('link', { name: 'Download for Windows' });
-    expect(download.getAttribute('href')).toBe('https://awana.kvbchurch.org/download/lobby-display');
-    const guide = screen.getByRole('link', { name: 'Setup guide' });
-    expect(guide.getAttribute('href')).toBe('https://github.com/patrick-simpson/kvbcawana/blob/main/lobby/desktop/README.md');
+    expect(download.getAttribute('href')).toBe('https://awana.kvbchurch.org/download/kvbc-awana');
+    expect(screen.queryByRole('link', { name: 'Setup guide' })).toBeNull();
     // Out to a new tab: the lobby page itself never navigates away.
-    for (const a of [download, guide]) {
-      expect(a.getAttribute('target')).toBe('_blank');
-      expect(a.getAttribute('rel')).toContain('noopener');
-    }
+    expect(download.getAttribute('target')).toBe('_blank');
+    expect(download.getAttribute('rel')).toContain('noopener');
   });
 });
 

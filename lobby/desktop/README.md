@@ -8,7 +8,7 @@
 > Awana computer: the check-in laptop's print server, a display, or both;
 > its guide is the printer's (`printer/README.md`) and the plan is
 > `UNIFIED-APP.md` at the repo root. For a NEW display, install KVBC Awana
-> (awana.kvbchurch.org/download/club-label-printer) and choose Display in its
+> (awana.kvbchurch.org/download/kvbc-awana) and choose Display in its
 > setup, not this app.
 
 A small Windows app that puts the **lobby check-in signage** (or, if you
