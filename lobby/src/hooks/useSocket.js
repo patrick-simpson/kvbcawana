@@ -16,6 +16,7 @@ import {
 } from '../lib/displayLogin.js';
 import { SYNC_CHANNEL, SYNC_EVENT, loadSyncSession } from '../lib/syncService.js';
 import { ringSyncDoorbell, syncNow, useSync } from './useSync.js';
+import { liveScreenId } from '../lib/screenSync.js';
 import {
   sanitizeBirthdays,
   sanitizeCanary,
@@ -388,7 +389,10 @@ export function useSocket(handlers) {
       setSocketStatus('connecting');
       let opened = false;
       let lastRx = Date.now();
-      const sock = new WebSocket(`${base}/v1/live?session=${encodeURIComponent(session)}`);
+      // A registered screen names itself (useScreenSync), so /settings can
+      // tell it is on the channel. The id authorizes nothing; the session does.
+      const screen = liveScreenId();
+      const sock = new WebSocket(`${base}/v1/live?session=${encodeURIComponent(session)}${screen ? `&screen=${encodeURIComponent(screen)}` : ''}`);
       ws = sock;
       // Our own verdict on a socket the browser still calls open (or still
       // connecting): detach it, close it, and take the close path ourselves,

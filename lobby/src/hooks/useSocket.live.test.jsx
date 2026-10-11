@@ -139,7 +139,7 @@ describe('the live channel replaces Pusher once a screen is signed in', () => {
       sockets[0].frame('__proto__', {});
       sockets[0].frame('changed', { what: 'calendar' });
     });
-    expect(rang).toHaveBeenCalledWith('calendar');
+    expect(rang).toHaveBeenCalledWith('calendar', { what: 'calendar' });
     off();
   });
 

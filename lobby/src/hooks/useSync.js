@@ -45,7 +45,7 @@ let snapshot = {
 };
 /** @type {Set<() => void>} */
 const listeners = new Set();
-/** @type {Set<(what: string) => void>} */
+/** @type {Set<(what: string, payload?: any) => void>} */
 const doorbellListeners = new Set();
 /** @type {((state: any) => void) | null} */
 let applier = null;
@@ -111,12 +111,14 @@ export function syncNow() {
  */
 export function ringSyncDoorbell(payload) {
   const what = payload && typeof payload === 'object' ? /** @type {any} */ (payload).what : null;
-  if (!['calendar', 'journey', 'template'].includes(what)) return;
-  doorbellListeners.forEach((fn) => fn(what));
+  // 'screen' and 'screen-action' name one registered screen (useScreenSync
+  // checks the id); they ride the live channel only.
+  if (!['calendar', 'journey', 'template', 'screen', 'screen-action'].includes(what)) return;
+  doorbellListeners.forEach((fn) => fn(what, payload));
   if (what === 'template') syncNow();
 }
 
-/** @param {(what: string) => void} fn */
+/** @param {(what: string, payload?: any) => void} fn */
 export function onSyncDoorbell(fn) {
   doorbellListeners.add(fn);
   return () => { doorbellListeners.delete(fn); };
@@ -205,6 +207,20 @@ export function signOut() {
 export async function publishViaSync(kind, payload) {
   const url = await ensureUrl();
   return syncPublish(url, loadSyncSession(), kind, payload);
+}
+
+/**
+ * One signed-in request to the Worker (the screen registry's routes use it).
+ * Never throws; status 0 is unreachable, -1 is not signed in here.
+ * @param {string} path
+ * @param {{method?: string, body?: unknown}} [opts]
+ * @returns {Promise<{ok: boolean, status: number, body: any}>}
+ */
+export async function syncAuthed(path, opts = {}) {
+  const url = await ensureUrl();
+  const session = loadSyncSession();
+  if (!url || !session) return { ok: false, status: -1, body: null };
+  return syncRequest(url, path, { ...opts, session });
 }
 
 /** Save these per-screen settings as the template new screens start from. @param {Record<string, unknown>} config */

@@ -13,6 +13,7 @@ import { changePassphrase, loadFriendsReport, printBarfBags, saveTemplate, signI
 import { RELEASE_NOTES_URL, parseReleaseNotes } from '../../lib/releaseNotes.js';
 import { useConfig } from '../../hooks/useConfig.js';
 import { PASSPHRASE_MIN, TEMPLATE_KEYS } from '../../lib/syncSpecs.js';
+import { renameThisScreen, useThisScreen } from '../../hooks/useScreenSync.js';
 
 // The Settings panel's building blocks: rows, cards, and the fields that keep
 // their own storage (the three secrets, the uploaded files) and so are never
@@ -420,6 +421,40 @@ export function ChangePassphraseField() {
           : 'Do this if the word got out. It signs every screen out and replaces the encryption key.'}
       </span>
     </details>
+  );
+}
+
+/**
+ * This screen's name on /settings (SETTINGS.md, phase 2). Shown once the
+ * screen has registered with the sync service; saved on Enter or on leaving
+ * the field.
+ */
+export function ScreenNameField() {
+  const me = useThisScreen();
+  const [draft, setDraft] = useState(/** @type {string | null} */ (null));
+  const [note, setNote] = useState(/** @type {{text: string, warn?: boolean} | null} */ (null));
+  if (!me.registered) return null;
+  const value = draft ?? me.name;
+  const save = async () => {
+    if (draft == null || draft.trim() === me.name) { setDraft(null); return; }
+    const res = await renameThisScreen(draft);
+    setNote(res.ok ? { text: 'Saved.' } : { warn: true, text: res.message || 'Not saved.' });
+    if (res.ok) setDraft(null);
+  };
+  return (
+    <div className="field">
+      <label htmlFor="screen-name">This screen&rsquo;s name</label>
+      <input
+        id="screen-name" type="text" maxLength={40} value={value} autoComplete="off"
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={save}
+        onKeyDown={(e) => { if (e.key === 'Enter') save(); }}
+      />
+      <span className="hint" role="status">
+        {note && <><strong className={note.warn ? 'hint--warn' : undefined}>{note.text}</strong> </>}
+        How the settings page lists this screen. Its own settings can be changed there from any phone or computer.
+      </span>
+    </div>
   );
 }
 

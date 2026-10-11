@@ -41,7 +41,8 @@ import PromoSlide from './components/PromoSlide.jsx';
 import { fireMilestone, setConfettiLevel, setConfettiLoad, setConfettiSkin } from './lib/confetti.js';
 import { resolveSkin, sceneForSkin, SKIN_TABLE } from './lib/skins.js';
 import { BOARD_HIDDEN, decideBoard, demoCheckout, pickupNow, stillHereCount } from './lib/checkoutBoard.js';
-import { SAMPLE_BOARD_NAMES } from './lib/demoNames.js';
+import { SAMPLE_BOARD_NAMES, SAMPLE_NAMES, pick } from './lib/demoNames.js';
+import { useScreenSync } from './hooks/useScreenSync.js';
 import { countForClub, getAllClubs } from './lib/clubs.js';
 import { OVERLAY, lobbyRoom, setupUp } from './lib/overlayFit.js';
 import { STINGER_SEC, holdThenLand } from './lib/lobbyMotion.js';
@@ -1242,6 +1243,23 @@ export default function App() {
       else if (action === 'media-changed') window.dispatchEvent(new Event(BACKGROUND_VIDEO_CHANGED_EVENT));
     });
   }, [previewCheckIn, resetTonight, startBoardDemo]);
+
+  // Managed from /settings (SETTINGS.md, phase 2): a real screen registers
+  // with the sync Worker, follows its own settings there as its device layer,
+  // and does what /settings asks of it, as its own buttons would. The preview
+  // picks its own sample name: nothing name-shaped crosses the wire for it.
+  useScreenSync({
+    kind: 'lobby',
+    enabled: !CONFIGURE && !isEmbedded(),
+    overrides,
+    replaceConfig,
+    defaultName: FLAGS.overlay ? 'OBS overlay' : 'Lobby TV',
+    onAction: (action) => {
+      if (action === 'preview-checkin') previewCheckIn({ firstName: pick(SAMPLE_NAMES), club: 'Sparks' });
+      else if (action === 'reset-tally') resetTonight();
+      else if (action === 'board-demo') startBoardDemo();
+    },
+  });
 
   // Overlay mode (?overlay=1): transparent stage with banners + confetti
   // only, for use as an OBS browser source / ProPresenter web overlay.

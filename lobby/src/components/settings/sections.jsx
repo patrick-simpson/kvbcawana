@@ -15,7 +15,7 @@ import { phaseWords } from '../../lib/settingsSections.js';
 import {
   ChangePassphraseField, DisplayKeyField, DisplayLoginField, MilestoneListField, PanelCard, PptxUploadField,
   BarfBagsField, CloudCheckinTestField, FriendsListField, PublishTokenField, ReleaseNotesField, SettingsPageContext, SyncSignInField, TemplateField,
-  Toggle, VideoUploadField,
+  Toggle, VideoUploadField, ScreenNameField,
 } from './fields.jsx';
 
 // Radio order = the setup journey: the typed/published deck is the default
@@ -989,6 +989,7 @@ export function SetupSection({
         {viaSync ? (
           <>
             <SyncSignInField secure={secure} />
+            {!page && <ScreenNameField />}
             {!page && <TemplateField />}
             <ChangePassphraseField />
           </>
