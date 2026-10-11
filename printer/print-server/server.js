@@ -3374,6 +3374,119 @@ const DROP_BAND = 24;       // header band height
 async function dropOffMark(club) {
   try { return await thermalClubMark(clubKey(club), false); } catch (e) { return null; }
 }
+// ── The BARFED tag (8.1.0, owner 2026-10-11) ─────────────────────────────────
+// BARF Night is "Bring A Real Friend". A child who brought one that night gets
+// a second name tag to choose from: a slime band with drips across the top
+// with BARFED! knocked out of it, their first name, and who they brought
+// ("brought Maya!", or "Brought A Real Friend" with no name typed), with two
+// ink splats. One colour like every label here: the fun is in the shapes.
+// Which nights are BARF Nights: church-config.json `barfNights` (dates).
+// (config.json's own `barfNights`, when set, wins: a test, or a moved night.)
+function isBarfNight(now = new Date()) {
+  const nights = Array.isArray(config.barfNights) ? config.barfNights
+    : Array.isArray(churchConfig.barfNights) ? churchConfig.barfNights : [];
+  return nights.includes(localDayISO(now));
+}
+
+// The friend's first name as a volunteer typed it: one line, no control
+// characters, at most 24 characters. '' for anything else.
+function cleanFriendName(raw) {
+  if (typeof raw !== 'string') return '';
+  return raw.replace(/[\u0000-\u001f\u007f<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, 24);
+}
+
+// Tell the sync service who brought a friend tonight (BARF Night's 6:30 email,
+// owner 2026-10-11): the child, their club and the friend's first name (or
+// none, from TwoTimTwo's own desk box). Only while signed in to the service;
+// best effort, never in the way of a label.
+function reportFriend(f) {
+  if (!signedInToSync()) return;
+  syncClient.syncRequest(config.syncUrl, '/v1/cloud/friend', {
+    method: 'POST', session: config.syncSession,
+    body: { name: `${f.firstName} ${f.lastName}`.trim(), club: f.clubName || '', clubberId: f.clubberId || null, friendName: f.friendName || '' },
+  }).then((r) => { if (!r || !r.ok) console.warn(`[barf] friend not recorded on the sync service (${r ? r.status : 'no answer'})`); })
+    .catch(() => console.warn('[barf] friend not recorded on the sync service'));
+}
+
+// Drips hang off the band: x, length (pt), width. Short over the middle so they
+// never reach the name; long at the sides.
+const BARF_DRIPS = Object.freeze([
+  [14, 30, 11], [38, 15, 8], [64, 22, 10], [104, 8, 7], [140, 12, 8],
+  [178, 7, 7], [212, 18, 9], [246, 13, 8], [274, 32, 11],
+]);
+const BARF_BAND = 40;
+
+function barfFriendLine(friendName) {
+  const f = String(friendName || '').trim().replace(/\s+/g, ' ').slice(0, 24);
+  return f ? `brought ${f}!` : 'Brought A Real Friend';
+}
+
+async function generateBarfTag({ firstName, friendName }) {
+  const cvs = createCanvas(PX_W, PX_H);
+  const ctx = cvs.getContext('2d');
+  ctx.scale(SCALE, SCALE);
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, PAGE_W, PAGE_H);
+  const type = labelType('');
+  const ink = '#000000';
+
+  // The slime: a band with a wavy lower edge and drips with round ends.
+  ctx.fillStyle = ink;
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.lineTo(PAGE_W, 0);
+  ctx.lineTo(PAGE_W, BARF_BAND);
+  for (let x = PAGE_W; x >= 0; x -= 12) {
+    ctx.quadraticCurveTo(x - 6, BARF_BAND + ((x / 12) % 2 ? 4 : -2), x - 12, BARF_BAND);
+  }
+  ctx.closePath();
+  ctx.fill();
+  for (const [x, len, w] of BARF_DRIPS) {
+    ctx.beginPath();
+    ctx.moveTo(x - w / 2 - 3, BARF_BAND - 2);
+    ctx.quadraticCurveTo(x - w / 2, BARF_BAND + 2, x - w / 2, BARF_BAND + len - w / 2);
+    ctx.arc(x, BARF_BAND + len - w / 2, w / 2, Math.PI, 0, true);
+    ctx.quadraticCurveTo(x + w / 2, BARF_BAND + 2, x + w / 2 + 3, BARF_BAND - 2);
+    ctx.closePath();
+    ctx.fill();
+    // A drop about to fall from the longest drips.
+    if (len >= 22) { ctx.beginPath(); ctx.arc(x, BARF_BAND + len + 6, w * 0.28, 0, Math.PI * 2); ctx.fill(); }
+  }
+
+  // BARFED!, knocked out of the band.
+  ctx.fillStyle = '#ffffff';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  const word = 'BARFED!';
+  const ws = type.fit(ctx, 'name', word, PAGE_W - 40, 30, 16);
+  type.fill(ctx, 'name', ws, word, PAGE_W / 2, BARF_BAND / 2 + 1 + type.capCentre(ctx, 'name', word) * ws);
+
+  // Two splats, low in the corners.
+  const splat = (cx, cy, r) => {
+    ctx.fillStyle = ink;
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
+    [[1.5, -0.6, 0.32], [-1.4, -0.9, 0.24], [1.1, 1.2, 0.2], [-1.6, 0.8, 0.28], [0.2, -1.7, 0.18]].forEach(([dx, dy, k]) => {
+      ctx.beginPath(); ctx.arc(cx + dx * r, cy + dy * r, r * k, 0, Math.PI * 2); ctx.fill();
+    });
+  };
+  splat(20, 124, 6);
+  splat(PAGE_W - 22, 120, 5);
+
+  // The name, then who they brought.
+  const first = String(firstName || '').trim() || 'Friend';
+  ctx.fillStyle = ink;
+  const ns = type.fit(ctx, 'name', first, PAGE_W - 70, 40, 16);
+  type.fill(ctx, 'name', ns, first, PAGE_W / 2, 86 + type.capCentre(ctx, 'name', first) * ns);
+  const line = barfFriendLine(friendName);
+  const ls = type.fit(ctx, 'goTo', line, PAGE_W - 80, 15, 9);
+  type.fill(ctx, 'goTo', ls, line, PAGE_W / 2, 124);
+
+  const pngPath = tmpFilePath('awana-barf', 'png');
+  const buffer = cvs.toBuffer('image/png');
+  fs.writeFileSync(pngPath, buffer);
+  return { pngPath, buffer };
+}
+
 async function generateDropOffTag(tag) {
   const cvs = createCanvas(PX_W, PX_H);
   const ctx = cvs.getContext('2d');
@@ -4053,7 +4166,9 @@ async function performCheckinPrint(input) {
     clubberId     = null,
     suppressConnectCard = false,
     demo          = false,
-    cloudCheckin  = false
+    cloudCheckin  = false,
+    broughtFriend = false,
+    friendName    = ''
   } = input || {};
 
   // ── Demo / training mode ────────────────────────────────────────────────────
@@ -4350,6 +4465,27 @@ async function performCheckinPrint(input) {
       }
     }
 
+    // BARF Night (8.1.0, owner): a child who brought a friend gets a second
+    // tag, BARFED, to choose from. After their own tag, and never in its way.
+    if (broughtFriend === true && isBarfNight()) {
+      let barfPath = null;
+      try {
+        const out = await generateBarfTag({ firstName, friendName: cleanFriendName(friendName) });
+        barfPath = out.pngPath;
+        await printLabel(barfPath, effectivePrinter);
+        console.log(`[print] BARFED tag for '${firstName}'`);
+      } catch (e) {
+        console.warn('[print] BARFED tag failed (non-critical):', e.message);
+      } finally {
+        if (barfPath) fs.unlink(barfPath, () => {});
+      }
+    }
+    // Who brought a friend, for BARF Night's email (a cloud check-in was
+    // recorded by the service itself). Any night: the list is by date.
+    if (broughtFriend === true && !isDemo && !cloudCheckin) {
+      reportFriend({ firstName, lastName, clubName: effectiveClubName, clubberId, friendName: cleanFriendName(friendName) });
+    }
+
     if (isDemo) {
       // The label printed and nothing else happened: no broadcast, no history,
       // no tally, no ledger. Deliberately logged so a demo run is obvious when
@@ -4418,6 +4554,7 @@ app.post('/print', async (req, res) => {
     visitor: body.visitor, stepUpNight: body.stepUpNight, awanaShares: body.awanaShares,
     clubberId: body.clubberId, suppressConnectCard: body.suppressConnectCard, demo: body.demo,
     cloudCheckin: body.cloud === true,
+    broughtFriend: body.friend === true, friendName: cleanFriendName(body.friendName),
   });
   res.status(out.status).json(out.body);
 });
@@ -9360,6 +9497,8 @@ app.post('/phone/checkin', (req, res) => {
   const options = {};
   if (typeof o.Bible === 'boolean') options.Bible = o.Bible;
   if (typeof o.Friend === 'boolean') options.Friend = o.Friend;
+  // BARF Night (8.1.0): the friend's first name, when Brought a friend is on.
+  if (options.Friend === true && cleanFriendName(o.FriendName)) options.FriendName = cleanFriendName(o.FriendName);
   prunePendingActions();
   // One pending action per kid — a double-tap must not double-drive.
   const existing = pendingActions.find(a => actionType(a) === 'checkin' && a.name.toLowerCase() === name.toLowerCase() && a.status === 'pending');
@@ -9762,7 +9901,7 @@ module.exports = {
   // (awards, leader tags, failed rows, undone rows, the club filter, the
   // newest-row-per-child dedupe and the cap) is testable without printing.
   selectReprintRange, REPRINT_RANGE_MAX, REPRINT_RANGE_GAP_MS, sanitizeTouchContext,
-  dropOffTagFor, generateDropOffTag, performOneOffPrint, oneOffClub,
+  dropOffTagFor, generateDropOffTag, generateBarfTag, isBarfNight, barfFriendLine, cleanFriendName, performOneOffPrint, oneOffClub,
   localDayISO, historyIdentityKey, clubKey,
   // Remembered leaders + the one club list every dropdown reads. Pure but for
   // their file, so the upsert/cap/season rules and the club-table agreement

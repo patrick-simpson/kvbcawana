@@ -7,5 +7,6 @@
   "clubNights": [
     { "dow": 3, "start": "17:30", "end": "20:00" }
   ],
-  "canaryLeadMinutes": 20
+  "canaryLeadMinutes": 20,
+  "barfNights": ["2026-10-14"]
 }

@@ -2,7 +2,7 @@
   if (window.__awanaPrinterLoaded) return;
   window.__awanaPrinterLoaded = true;
 
-  const EXTENSION_VERSION = '8.0.0';
+  const EXTENSION_VERSION = '8.1.0';
   const PRINT_COOLDOWN = 2000;
   // POST /print is synchronous on the server: PowerShell + a cold printer can
   // take 15-30 s (the server retries the spooler internally). This must sit
@@ -3744,6 +3744,65 @@
     doPrint(name, club.clubName, club.clubImageData, 'local', cachedMeta && cachedMeta.recid);
   }
 
+  // ── BARF Night (8.1.0, owner 2026-10-11): who brought a friend ─────────
+  // Wherever a check-in is known to come with Brought a friend (the touch
+  // screen, a phone's card, TwoTimTwo's own box at the desk), a note is left
+  // here, by clubber id and by name, with the friend's first name when one was
+  // typed. doPrint takes it, whichever path prints the tag (even the report
+  // check, later), and tells the print server, which prints the BARFED tag on
+  // BARF Night and passes the friend on for the night's email.
+  var FRIEND_NOTE_MS = 15 * 60 * 1000;
+  var friendNotes = {};
+  function noteFriend(recid, name, friendName, keepNamed) {
+    var rec = { friendName: String(friendName || '').replace(/\s+/g, ' ').trim().slice(0, 24), at: Date.now() };
+    var keys = [];
+    if (recid) keys.push('id:' + recid);
+    if (name) keys.push('nm:' + nameKeyOf(name));
+    keys.forEach(function(k) {
+      // A desk click never overwrites a note that already has a name in it
+      // (a driven check-in that fell back to clicking TwoTimTwo's button).
+      if (keepNamed && friendNotes[k] && friendNotes[k].friendName) return;
+      friendNotes[k] = rec;
+    });
+  }
+  function takeFriendNote(recid, name) {
+    var now = Date.now();
+    Object.keys(friendNotes).forEach(function(k) { if (now - friendNotes[k].at > FRIEND_NOTE_MS) delete friendNotes[k]; });
+    var keys = [];
+    if (recid) keys.push('id:' + recid);
+    if (name) keys.push('nm:' + nameKeyOf(name));
+    var found = null;
+    keys.forEach(function(k) { if (!found && friendNotes[k]) found = friendNotes[k]; });
+    keys.forEach(function(k) { delete friendNotes[k]; });
+    return found;
+  }
+  // TwoTimTwo's own check-in box: at the moment its Check in button is
+  // pressed, is Brought a friend ticked? (No name: that box has no field.)
+  function friendBoxTicked() {
+    var form = document.getElementById('checkinForm');
+    if (!form) return false;
+    var ticked = false;
+    form.querySelectorAll('input.event[name="events[]"]').forEach(function(input) {
+      if (!input.checked) return;
+      var lbl = input.closest('label');
+      if (!lbl && input.id) lbl = document.querySelector('label[for="' + input.id + '"]');
+      var text = lbl ? (lbl.textContent || '') : (input.nextElementSibling ? (input.nextElementSibling.textContent || '') : (input.nextSibling ? (input.nextSibling.textContent || '') : ''));
+      if (/friend|brought/i.test(text)) ticked = true;
+    });
+    return ticked;
+  }
+  document.addEventListener('click', function(ev) {
+    try {
+      var btn = ev.target && ev.target.closest ? ev.target.closest('#checkin') : null;
+      if (!btn || !friendBoxTicked()) return;
+      var idEl = document.getElementById('checkinClubberId');
+      var recid = idEl && idEl.value ? String(idEl.value) : '';
+      var row = recid ? rowByRecid(recid) : null;
+      var nameEl = row ? row.querySelector('.name') : null;
+      noteFriend(recid, nameEl ? nameEl.innerText.trim() : '', '', true);
+    } catch (e) { /* never in the way of TwoTimTwo's own button */ }
+  }, true);
+
   function doPrint(fullName, clubName, imageData, source, explicitClubberId) {
     setStatus('\u23F3');
 
@@ -3764,6 +3823,11 @@
     var cached = rosterLookupByName(fullName);
     var resolvedClubberId = explicitClubberId || (cached && cached.recid) || null;
     if (resolvedClubberId) payload.clubberId = resolvedClubberId;
+    var friendNote = takeFriendNote(resolvedClubberId, fullName);
+    if (friendNote) {
+      payload.friend = true;
+      if (friendNote.friendName) payload.friendName = friendNote.friendName;
+    }
     if (isAwanaStoreNight()) {
       var bal = getShareBalance(firstName, lastName);
       if (bal !== null) payload.awanaShares = bal + 1;
@@ -4439,6 +4503,7 @@
     var phoneOpts = {};
     if (action.options && typeof action.options.Bible === 'boolean') phoneOpts.Bible = action.options.Bible;
     if (action.options && typeof action.options.Friend === 'boolean') phoneOpts.Friend = action.options.Friend;
+    if (phoneOpts.Friend === true) noteFriend(recid, action.name, action.options.FriendName || '');
     tryDirectCheckin(recid, action.name, clubId, phoneOpts).then(function(ok) {
       if (ok) { reportDone(); return; }
       if (window.__awanaTouchOpen) {
@@ -5188,6 +5253,7 @@
       var name = nameEl ? nameEl.innerText.trim() : '';
       var clubId = el.getAttribute('club_id') || null;
       var opts = options || {};
+      if (opts.Friend === true) noteFriend(recid, name, opts.FriendName || '');
       if (name && selectedMode !== 'off' && !isPrinted(name, recid)) {
         var batchKey = resolveIdentityKey(name, recid);
         if (!batchPrintedNames.has(batchKey)) {

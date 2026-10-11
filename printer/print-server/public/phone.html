@@ -183,6 +183,11 @@
   .tile .cl { font-family: var(--f-label); font-size: 15px; letter-spacing: .05em; text-transform: uppercase; color: var(--deep); }
   .tile .opts { margin: 10px 0 0; }
   .tile .opt { min-height: 46px; font-size: 16px; padding: 0 12px; }
+  /* BARF Night (8.1.0): the friend's first name, under Brought a friend. 16px: iOS zooms smaller inputs. */
+  .fname { display: block; box-sizing: border-box; width: 100%; min-height: 50px; margin: 10px 0 0; padding: 0 14px;
+    border: 3px solid var(--club, #4C72B8); border-radius: 12px; background: #fff; color: #16243F; font-weight: 600; font-size: 18px; line-height: 1.2; font-family: inherit; }
+  .fname[hidden] { display: none; }
+  .tile .fname { min-height: 44px; font-size: 16px; }
   .tile .go1 { border: none; cursor: pointer; width: 100%; display: grid; place-items: center; margin-top: 10px; min-height: 52px; border-radius: 14px;
     background: var(--club); color: #fff; font-family: var(--f-shout); font-size: 20px; }
   .tile.done .go1 { background: #E8F5E9; color: var(--good); cursor: default; }
@@ -1177,6 +1182,22 @@ document.addEventListener('keydown', function(e) {
   if (openSheet) hideSheet(); else if ($('fampage').classList.contains('on')) closeFamily();
 });
 
+// BARF Night (8.1.0, owner): "Friend's first name", shown while Brought a
+// friend is on. The name belongs to this child only (never copied to a sibling).
+function friendInput(holder) {
+  var inp = el('input', 'fname');
+  inp.type = 'text';
+  inp.maxLength = 24;
+  inp.placeholder = 'Friend’s first name';
+  inp.setAttribute('aria-label', 'Friend’s first name');
+  inp.autocomplete = 'off';
+  inp.setAttribute('autocapitalize', 'words');
+  inp.setAttribute('enterkeyhint', 'done');
+  inp.hidden = !holder.friend;
+  inp.addEventListener('input', function() { holder.friendName = inp.value; });
+  return inp;
+}
+
 function optButton(label, on, onChange) {
   var b = el('button', 'opt' + (on ? ' on' : ''));
   b.type = 'button';
@@ -1211,8 +1232,14 @@ function openKid(p) {
   else if (items.bible || items.friend) {
     var opts = el('div', 'opts');
     if (items.bible) opts.appendChild(optButton('Bible', choice.bible, function(v) { choice.bible = v; }));
-    if (items.friend) opts.appendChild(optButton('Brought a friend', false, function(v) { choice.friend = v; }));
+    var fname = items.friend ? friendInput(choice) : null;
+    if (items.friend) opts.appendChild(optButton('Brought a friend', false, function(v) {
+      choice.friend = v;
+      fname.hidden = !v;
+      if (v) setTimeout(function() { try { fname.focus(); } catch (e) { /* ignore */ } }, 30);
+    }));
     s.appendChild(opts);
+    if (fname) s.appendChild(fname);
   }
   var acts = el('div', 'acts');
   var no = el('button', 'btn no', 'Cancel'); no.type = 'button';
@@ -1223,7 +1250,8 @@ function openKid(p) {
     if (k.removedHere) { restore({ name: k.name }); return; }
     var sibs = siblingsOf(p);
     checkInMany([{ p: p, choice: choice }], null);
-    if (sibs.length) openFamily(p, sibs, choice); else { $('search').value = ''; render(); }
+    // Brothers and sisters start from this child's Bible / friend ticks, never their friend's name.
+    if (sibs.length) openFamily(p, sibs, { bible: choice.bible, friend: choice.friend }); else { $('search').value = ''; render(); }
   });
   acts.appendChild(no); acts.appendChild(go);
   s.appendChild(acts);
@@ -1270,8 +1298,10 @@ function openFamily(first, kids, choice, title) {
     if (items.bible || items.friend) {
       var o = el('div', 'opts');
       if (items.bible) o.appendChild(optButton('Bible', mine.bible, function(v) { mine.bible = v; }));
-      if (items.friend) o.appendChild(optButton('Brought a friend', mine.friend, function(v) { mine.friend = v; }));
+      var fn = items.friend ? friendInput(mine) : null;
+      if (items.friend) o.appendChild(optButton('Brought a friend', mine.friend, function(v) { mine.friend = v; fn.hidden = !v; }));
       t.appendChild(o);
+      if (fn) t.appendChild(fn);
     }
     var go = el('button', 'go1', 'Check in'); go.type = 'button';
     var entry = { p: c, choice: mine, t: t, go: go, state: 'ready' };
@@ -1330,6 +1360,8 @@ function checkInMany(entries, family) {
     var items = itemsFor(k.club);
     if (items.bible) options.Bible = !!e.choice.bible;
     if (items.friend) options.Friend = !!e.choice.friend;
+    var friendName = String(e.choice.friendName || '').replace(/\s+/g, ' ').trim().slice(0, 24);
+    if (options.Friend && friendName) options.FriendName = friendName;
     postJson('/phone/checkin', { pin: PIN, name: k.name, options: options }).then(function(data) {
       if (!data || !data.id) throw new Error((data && data.error) || 'failed');
       STATE[key] = { status: 'pending', id: data.id, tries: 0 };

@@ -258,6 +258,14 @@ Read this first if you are picking the work up in a new session.
   checked in with no tag, and the roster and Tonight come from TwoTimTwo.
   Undo, check-out, visitors and custom labels still go to the laptop.
   `CLOUD_CHECKIN = "off"` puts the check-in back on the laptop.
+- **BARF Night, 2026-10-14 (owner).** Who brought a friend is recorded in the
+  Worker (`lobby/worker/src/friends.js`: child, club, the friend's first name,
+  sealed per night, deleted after three days) from the cloud check-in and from
+  the laptop (printer 8.1.0, every check-in path). `GET /v1/cloud/friends` is
+  the report grouped by club; `POST /v1/cloud/friends-link` makes the one
+  read-only link (`GET /v1/cloud/friends-report?token=`, that night only,
+  until noon the next day) that a scheduled Claude run reads at 6:30 pm to
+  email the owner. The BARFED tag is the printer's (printer/CLAUDE.md).
 - **To start the shadow night:** add the three GitHub secrets, then **Actions
   → CI → Run workflow** with "Redeploy the sync Worker" ticked (a Worker only
   gets new secrets when it deploys). Before Wednesday, on any lobby screen signed

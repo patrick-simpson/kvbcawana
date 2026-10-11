@@ -365,6 +365,24 @@ Worker's. `cloud: true` writes `cloudCheckin: true` on the history row, and
 refuses a cloud job for a child already printed tonight; an undone row counts
 for neither. `scripts/test-cloud-print.cjs`, `test-phone-relay.cjs`.
 
+**BARF Night (8.1.0, owner 2026-10-11).** On a date in `barfNights`
+(church-config.json; config.json's own wins, which the tests use),
+`performCheckinPrint` with `broughtFriend` prints a second tag after the
+child's own, `generateBarfTag()` (slime band, BARFED!, the first name,
+`barfFriendLine()`), never in the way of the first. `/print` reads
+`friend: true` and `friendName` (`cleanFriendName`: one line, 24 chars);
+`/phone/checkin` keeps `options.FriendName` only with `Friend`. The extension
+leaves a friend note (`noteFriend`, by clubber id and name, 15 minutes) from
+the touch bridge, a phone action, and a capture-phase click on TwoTimTwo's
+own `#checkin` button when its Brought a friend box is ticked
+(`friendBoxTicked`, no name); `doPrint` takes it (`takeFriendNote`), so
+whichever path prints the tag carries it. `reportFriend()` sends the child,
+club and friend's name to the Worker (`POST /v1/cloud/friend`) for the
+night's email, except for a cloud check-in, which the Worker recorded
+itself. The touch screen and phone.html ask "Friend's first name" under
+Brought a friend (`friendInput`); a sibling's card never copies the name.
+`scripts/test-barf.cjs`.
+
 **The still-here list and the phone's Check out (7.16.0, owner 2026-10-08).**
 The lobby's pickup list (shown from 7:30) is built HERE, not scraped:
 TwoTimTwo's Checkout page lists nobody at KVBC. `tonightHereNow()` is the

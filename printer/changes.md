@@ -1,4 +1,13 @@
-﻿## [8.0.0] - 2026-10-11
+﻿## [8.1.0] - 2026-10-11
+BARF Night: the BARFED tag, and the friend's name.
+
+**New: the BARFED tag (owner).** On BARF Night (Wednesday, October 14), a child checked in with Brought a friend gets a second name tag to choose from: a slime band dripping across the top with BARFED! in it, their first name, and who they brought ("brought Maya!", or "Brought A Real Friend" when no name was typed). It prints right after their own tag, from every way of checking in: the touch screen, a phone (on the Wi-Fi or at awana.kvbchurch.org/checkin) and TwoTimTwo's own check-in box at the desk. Other nights, Brought a friend prints the usual one tag. The date is `barfNights` in church-config.json, so next year's BARF Night is one date to change.
+
+**New: the friend's first name.** Tick Brought a friend on the touch screen or on a phone's card and a "Friend's first name" box opens under it. Each child has their own: a brother or sister's card starts with Brought a friend ticked as before, but never with the first child's friend's name.
+
+**Who brought whom goes to the sync service** for the night's 6:30 pm email (grouped by club): the child, their club and the friend's first name, or "name not given" for a friend ticked at TwoTimTwo's desk box, which has no name field. Only while this laptop is signed in to the service.
+
+## [8.0.0] - 2026-10-11
 The phone page checks children in through the cloud, and the laptop prints their tags at once.
 
 **New: cloud check-in from awana.kvbchurch.org/checkin (owner).** Check in on the phone page and the sync service (Cloudflare) checks the child in on TwoTimTwo itself, with the laptop on or off, and with Bible and Brought a friend as ticked on the child's card. When this laptop is on, the service then tells it to print the child's tag, and the tag prints within a second or two, with the welcome on the lobby screens, as before. With the laptop off the child is still checked in on TwoTimTwo; there is no tag until the Raspberry Pi print station exists (CLOUD-CHECKIN.md).

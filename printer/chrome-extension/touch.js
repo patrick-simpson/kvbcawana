@@ -461,6 +461,12 @@
     '.tile .cl{font-family:"Londrina Solid","Arial Narrow",sans-serif;font-size:18px;letter-spacing:.05em;text-transform:uppercase;color:var(--deep)}',
     '.tile .opts{margin:12px 0 0}',
     '.tile .opt{min-height:52px;font-size:19px;padding:0 16px}',
+    // BARF Night (8.1.0): the friend's first name, under Brought a friend.
+    '.fname{all:unset;box-sizing:border-box;display:block;width:100%;min-height:56px;margin:12px 0 0;padding:0 18px;border-radius:14px;',
+    '  border:3px solid var(--club,#4C72B8);background:#fff;color:#16243F;font:600 22px/1.2 "Figtree",system-ui,sans-serif}',
+    '.fname[hidden]{display:none}',
+    '.fname::placeholder{color:#6B7891}',
+    '.tile .fname{min-height:48px;font-size:19px}',
     '.tile .opt .box{width:26px;height:26px;font-size:17px}',
     '.tile .go1{all:unset;box-sizing:border-box;width:100%;cursor:pointer;display:grid;place-items:center;margin-top:12px;min-height:64px;border-radius:16px;',
     '  background:var(--club);color:#fff;font:400 24px "Paytone One","Figtree",sans-serif;transition:transform .1s ease}',
@@ -1060,6 +1066,22 @@
     return b;
   }
 
+  // BARF Night (8.1.0, owner): "Friend's first name", shown while Brought a
+  // friend is on. Typing stays in the box (never the page's search).
+  function friendInput(holder) {
+    var inp = el('input', 'fname');
+    inp.type = 'text';
+    inp.maxLength = 24;
+    inp.placeholder = 'Friend\u2019s first name';
+    inp.setAttribute('aria-label', 'Friend\u2019s first name');
+    inp.autocomplete = 'off';
+    inp.spellcheck = false;
+    inp.hidden = !holder.friend;
+    inp.addEventListener('input', function () { holder.friendName = inp.value; });
+    ['keydown', 'keyup', 'keypress'].forEach(function (k) { inp.addEventListener(k, function (e) { e.stopPropagation(); }); });
+    return inp;
+  }
+
   function openConfirm(p) {
     var club = clubFor(p.clubId, p.clubName);
     state.child = p;
@@ -1074,8 +1096,15 @@
     if (state.items.bible || state.items.friend) {
       var opts = el('div', 'opts');
       if (state.items.bible) opts.append(optButton('Bible', state.choice.bible, function (v) { state.choice.bible = v; }));
-      if (state.items.friend) opts.append(optButton('Brought a friend', false, function (v) { state.choice.friend = v; }));
-      s.append(opts);
+      if (state.items.friend) {
+        var fname = friendInput(state.choice);
+        opts.append(optButton('Brought a friend', false, function (v) {
+          state.choice.friend = v;
+          fname.hidden = !v;
+          if (v) setTimeout(function () { try { fname.focus(); } catch (e) { /* ignore */ } }, 30);
+        }));
+        s.append(opts, fname);
+      } else s.append(opts);
     }
     var acts = el('div', 'acts');
     var no = el('button', 'btn no', 'Cancel');
@@ -1084,7 +1113,7 @@
     go.addEventListener('click', function () {
       if (go.disabled) return;
       go.disabled = true;
-      var choice = { bible: state.choice.bible, friend: state.choice.friend };
+      var choice = { bible: state.choice.bible, friend: state.choice.friend, friendName: state.choice.friendName || '' };
       closeConfirm();
       // Back at once (owner, 7.5.0): the check-in finishes in the background,
       // and the brothers and sisters' page, if any, comes up straight away.
@@ -1113,6 +1142,8 @@
     var items = itemsFor(p.clubId);
     if (items.bible) options.Bible = !!choice.bible;
     if (items.friend) options.Friend = !!choice.friend;
+    var friendName = String(choice.friendName || '').replace(/\s+/g, ' ').trim().slice(0, 24);
+    if (options.Friend && friendName) options.FriendName = friendName;
     // Counted as in from the tap (7.5.0: the screen goes back at once), so the
     // family leaves the list now; a failure puts the child back.
     recentlyIn[p.recid] = { name: p.name, clubName: p.clubName, clubId: p.clubId, at: new Date().toISOString() };
@@ -1189,8 +1220,12 @@
       if (items.bible || items.friend) {
         var o = el('div', 'opts');
         if (items.bible) o.append(optButton('Bible', mine.bible, function (v) { mine.bible = v; }));
-        if (items.friend) o.append(optButton('Brought a friend', mine.friend, function (v) { mine.friend = v; }));
-        t.append(o);
+        if (items.friend) {
+          // A brother or sister's friend is their own: the name is never copied.
+          var fn = friendInput(mine);
+          o.append(optButton('Brought a friend', mine.friend, function (v) { mine.friend = v; fn.hidden = !v; }));
+          t.append(o, fn);
+        } else t.append(o);
       }
       var go = el('button', 'go1', 'Check in');
       var entry = { c: c, mine: mine, t: t, go: go, state: 'ready' };
