@@ -385,7 +385,12 @@ export class SyncCore {
         }
         case 'GET /v1/relay/next': return json(await this.relayQueue.take());
         case 'POST /v1/relay/answer': {
-          const r = await this.relayQueue.answer(await this.body(request));
+          const ans = await this.body(request);
+          // The laptop's roster, with families filled in from TwoTimTwo when it
+          // has none yet (phone.js fillRoster).
+          const asked = typeof ans.id === 'string' ? (await this.relayQueue.queue()).find((x) => x.id === ans.id) : null;
+          if (asked && asked.path === '/phone/roster' && ans.status === 200) ans.body = await this.phone.fillRoster(ans.body);
+          const r = await this.relayQueue.answer(ans);
           return r.ok ? json({ ok: true }) : fail(r.error, r.status);
         }
         case 'GET /v1/relay/result': return json(await this.relayQueue.result(url.searchParams.get('id')));

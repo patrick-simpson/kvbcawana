@@ -4,7 +4,7 @@
 import { readFileSync } from 'node:fs';
 import { JSDOM } from 'jsdom';
 import { describe, expect, it } from 'vitest';
-import { CHECKIN_PAGE, LOGIN_PAGE, fakeTwoTimTwo, page, table } from './fixtures.js';
+import { CHECKIN_PAGE, HOUSEHOLD_CSV, LOGIN_PAGE, fakeTwoTimTwo, page, table } from './fixtures.js';
 import {
   LOGIN_BACKOFF_MS,
   TwoTimTwoClient,
@@ -12,6 +12,7 @@ import {
   parseCheckinPage,
   checkinReplyOk,
   parseCheckinReport,
+  parseHouseholdCsv,
   rowShape,
   twoTimTwoHost,
 } from '../src/twotimtwo.js';
@@ -135,6 +136,21 @@ describe('the row shape (for a report that reads short)', () => {
   it('a handler that carries text gives only its function name', () => {
     const html = page(table('Sparks ', []).replace('</thead>', "</thead><tr><td onclick=\"confirm('Undo Zed Uniquename?')\">x</td></tr>"));
     expect(JSON.stringify(rowShape(html))).not.toContain('Uniquename');
+  });
+});
+
+describe('the household export', () => {
+  it('keeps families of two or more, by the children\'s names, and nothing else', () => {
+    const families = parseHouseholdCsv(HOUSEHOLD_CSV);
+    expect(families).toEqual([['Sophie Tester', 'Cal Tester'], ['Ann Smith', 'Ben Smith', 'Cy Smith']]);
+    expect(JSON.stringify(families)).not.toMatch(/Elm|Oak|Pine|555|Pat|Kim|note/);
+  });
+
+  it('is not the export: the login form, a page, or another header', () => {
+    expect(parseHouseholdCsv(LOGIN_PAGE)).toBeNull();
+    expect(parseHouseholdCsv('<html><body>Not allowed</body></html>')).toBeNull();
+    expect(parseHouseholdCsv('"Name","Kids"\n"x","a, b"')).toBeNull();
+    expect(parseHouseholdCsv('')).toBeNull();
   });
 });
 

@@ -19,6 +19,7 @@ import { BIBLE_RE, FRIEND_RE } from './twotimtwo.js';
 /** TwoTimTwo's club ids (docs/TWOTIMTWO.md §2.1). */
 export const CLUB_BY_ID = Object.freeze({ 1: 'Cubbies', 2: 'Sparks', 3: 'T&T', 4: 'Puggles', 6: 'Trek', 7: 'Journey' });
 const ACTION_TTL_MS = 10 * 60 * 1000;   // the laptop's PENDING_TTL_MS: a status is asked for well within it
+const FAMILIES_TTL_MS = 30 * 60 * 1000;  // the extension re-reads the household export every 30 minutes too
 
 /** Which clubs offer Bible / Brought a friend: the phone card's toggles. @param {{clubs: string[], label?: string, automatic: boolean}[]} events */
 export function itemClubs(events) {
@@ -43,6 +44,50 @@ export class CloudPhone {
     this.relay = relay;
     this.storage = storage;
     this.now = now;
+  }
+
+  /**
+   * The families (TwoTimTwo's households, names only) and which clubs offer
+   * Bible / Brought a friend, for grouping the page's roster by family (owner,
+   * 2026-10-11) with the laptop off, or on before it has shared its own.
+   * Held in this object's memory for FAMILIES_TTL_MS, never in storage. A
+   * failed read is an empty list: the page then shows children one by one.
+   * @param {{events: {clubs: string[], automatic: boolean, label?: string}[]}} [page] a check-in page already read
+   */
+  async families(page) {
+    const t = this.now();
+    if (this.familiesCache && t - this.familiesCache.at < FAMILIES_TTL_MS) return this.familiesCache;
+    const client = this.watcher.clientFor();
+    if (!client) return { households: [], items: { bible: [], friend: [] }, at: t };
+    const hh = await client.households();
+    let events = page ? page.events : null;
+    if (!events) {
+      const p = await client.checkinPage();
+      events = p.ok ? p.page.events : [];
+    }
+    const out = { households: hh.ok ? hh.households : [], items: itemClubs(events), at: t };
+    // Only a good read is kept: a failure is asked again next time.
+    if (hh.ok) this.familiesCache = out;
+    return out;
+  }
+
+  /**
+   * The laptop's roster answer, with families and the Bible / friend clubs
+   * filled in from TwoTimTwo when it has none (its touch screen shares them
+   * only once opened). Anything the laptop did send is kept as it is.
+   * @param {any} body
+   */
+  async fillRoster(body) {
+    if (!this.on || !body || typeof body !== 'object' || !Array.isArray(body.kids)) return body;
+    const noFamilies = !Array.isArray(body.households) || !body.households.length;
+    const noItems = !body.items || (!(body.items.bible || []).length && !(body.items.friend || []).length);
+    if (!noFamilies && !noItems) return body;
+    const f = await this.families();
+    return {
+      ...body,
+      ...(noFamilies ? { households: f.households } : {}),
+      ...(noItems ? { items: f.items } : {}),
+    };
   }
 
   /** Is cloud check-in on (shadow mode or later) with a TwoTimTwo user? */
@@ -110,10 +155,10 @@ export class CloudPhone {
   }
 
   /**
-   * The roster with the laptop off: everyone on TwoTimTwo's check-in page, and
-   * everyone on today's report as checked in. No families or recent
-   * attendance (those are the laptop's); Bible / friend clubs from TwoTimTwo's
-   * own check-in items.
+   * The roster with the laptop off: everyone on TwoTimTwo's check-in page,
+   * everyone on today's report as checked in, families from TwoTimTwo's
+   * households, and Bible / friend clubs from its own check-in items. No
+   * recent attendance (that is the laptop's ledger).
    */
   async roster() {
     const client = this.watcher.clientFor();
@@ -131,7 +176,8 @@ export class CloudPhone {
         if (e.name && !have.has(e.name.toLowerCase())) kids.push({ name: e.name, club: e.club, checkedIn: true, removedHere: false, inactive: false });
       }
     }
-    return { status: 200, body: { kids, households: [], items: itemClubs(page.page.events), recent: { ready: false, names: [] }, source: 'cloud' } };
+    const f = await this.families(page.page);
+    return { status: 200, body: { kids, households: f.households, items: itemClubs(page.page.events), recent: { ready: false, names: [] }, source: 'cloud' } };
   }
 
   /** Tonight with the laptop off: today's report, as the laptop's /phone/tonight shapes it. */

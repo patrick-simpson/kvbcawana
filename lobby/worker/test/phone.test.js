@@ -5,7 +5,7 @@ import { SyncCore } from '../src/sync.js';
 import { itemsToSend } from '../src/twotimtwo.js';
 import { itemClubs } from '../src/phone.js';
 import { LAPTOP_ONLINE_MS } from '../src/relay.js';
-import { fakeTwoTimTwo, page, table } from './fixtures.js';
+import { HOUSEHOLD_CSV, fakeTwoTimTwo, page, table } from './fixtures.js';
 
 const SUNDAY = Date.parse('2026-10-11T18:45:00Z');
 const ENV = { CLOUD_CHECKIN: 'shadow', TWOTIMTWO_USERNAME: 'checkin@example.org', TWOTIMTWO_PASSWORD: 'right-pass', INITIAL_PASSPHRASE: 'kennebec' };
@@ -36,9 +36,9 @@ function memoryStore() {
   };
 }
 
-async function setup({ laptopOn = false, env = ENV, report } = {}) {
+async function setup({ laptopOn = false, env = ENV, report, households = () => HOUSEHOLD_CSV } = {}) {
   let t = SUNDAY;
-  const tt = fakeTwoTimTwo({ checkin: () => CHECKIN, report: report || (() => page(table('Trek ', [{ id: 55, name: 'Tia Tester' }]))) });
+  const tt = fakeTwoTimTwo({ checkin: () => CHECKIN, households, report: report || (() => page(table('Trek ', [{ id: 55, name: 'Tia Tester' }]))) });
   tt.checkinName = 'Sophie Tester';
   const storage = memoryStore();
   const core = new SyncCore({ storage, env, fetchFn: tt.fetchFn, now: () => t });
@@ -143,7 +143,7 @@ describe('the roster and tonight with the laptop off', () => {
       { name: 'Tia Tester', club: 'Trek', checkedIn: true, removedHere: false, inactive: false },
     ]);
     expect(ans.body.items).toEqual({ bible: ['Sparks', 'T&T', 'Trek'], friend: ['Sparks', 'T&T', 'Trek'] });
-    expect(ans.body.households).toEqual([]);
+    expect(ans.body.households).toEqual([['Sophie Tester', 'Cal Tester'], ['Ann Smith', 'Ben Smith', 'Cy Smith']]);
   });
 
   it('tonight is today\'s report, in the laptop\'s shape', async () => {
@@ -166,5 +166,56 @@ describe('the roster and tonight with the laptop off', () => {
     s.tick(LAPTOP_ONLINE_MS + 1000);
     const ans = await s.relay('POST', '/phone/roster', {});
     expect(ans.body.kids.length).toBe(3);
+  });
+});
+
+describe('families on the roster (owner, 2026-10-11)', () => {
+  // The laptop answers a roster through the relay, as phone-relay.js does.
+  const laptopAnswers = async (s, body) => {
+    const sent = await s.call('POST', '/v1/relay', { method: 'POST', path: '/phone/roster', body: {} });
+    const next = await s.call('GET', '/v1/relay/next');
+    await s.call('POST', '/v1/relay/answer', { id: next.body.requests[0].id, status: 200, body });
+    return (await s.call('GET', `/v1/relay/result?id=${sent.body.id}`)).body;
+  };
+  const LAPTOP_ROSTER = { kids: [{ name: 'Sophie Tester', club: 'T&T', checkedIn: false }], households: [], items: { bible: [], friend: [] }, recent: { ready: true, names: [] } };
+
+  it('a laptop that has not shared families gets TwoTimTwo\'s, and the Bible / friend clubs', async () => {
+    const s = await setup({ laptopOn: true });
+    const got = await laptopAnswers(s, LAPTOP_ROSTER);
+    expect(got.status).toBe(200);
+    expect(got.body.households).toEqual([['Sophie Tester', 'Cal Tester'], ['Ann Smith', 'Ben Smith', 'Cy Smith']]);
+    expect(got.body.items).toEqual({ bible: ['Sparks', 'T&T', 'Trek'], friend: ['Sparks', 'T&T', 'Trek'] });
+    expect(got.body.recent).toEqual({ ready: true, names: [] });   // the laptop's own, kept
+  });
+
+  it('families the laptop did share are kept as they are', async () => {
+    const s = await setup({ laptopOn: true });
+    const mine = { ...LAPTOP_ROSTER, households: [['A One', 'B One']], items: { bible: ['Sparks'], friend: [] } };
+    const got = await laptopAnswers(s, mine);
+    expect(got.body.households).toEqual([['A One', 'B One']]);
+    expect(got.body.items).toEqual({ bible: ['Sparks'], friend: [] });
+    expect(s.tt.calls.some((c) => c.path === '/household/csv')).toBe(false);
+  });
+
+  it('the export is read once per half hour, not per roster', async () => {
+    const s = await setup();
+    await s.relay('POST', '/phone/roster', {});
+    await s.relay('POST', '/phone/roster', {});
+    expect(s.tt.calls.filter((c) => c.path === '/household/csv')).toHaveLength(1);
+  });
+
+  it('no export (no permission, TwoTimTwo down): children one by one, nothing breaks', async () => {
+    const s = await setup({ households: () => '<html><body>Not allowed</body></html>' });
+    const ans = await s.relay('POST', '/phone/roster', {});
+    expect(ans.status).toBe(200);
+    expect(ans.body.households).toEqual([]);
+    expect(ans.body.kids.length).toBe(3);
+  });
+
+  it('no address, phone or name reaches storage', async () => {
+    const s = await setup({ laptopOn: true });
+    await laptopAnswers(s, LAPTOP_ROSTER);
+    await s.relay('POST', '/phone/roster', {});
+    expect(JSON.stringify([...s.storage.map.values()])).not.toMatch(/Elm|555|Sophie|Smith|Pat Tester/);
   });
 });

@@ -37,7 +37,7 @@ export const CHECKIN_PAGE = '<html><body><div class="clubbers">' +
  * A stand-in TwoTimTwo: /site/login with a CSRF token and a session cookie,
  * a signed-in report, and the login form for anything without the cookie.
  */
-export function fakeTwoTimTwo({ password = 'right-pass', report = () => page(table('Sparks ', [{ id: 1, name: 'Ada Tester' }])), checkin = () => CHECKIN_PAGE } = {}) {
+export function fakeTwoTimTwo({ password = 'right-pass', report = () => page(table('Sparks ', [{ id: 1, name: 'Ada Tester' }])), checkin = () => CHECKIN_PAGE, households = null } = {}) {
   const calls = [];
   let session = 0;
   const live = new Set();
@@ -62,6 +62,7 @@ export function fakeTwoTimTwo({ password = 'right-pass', report = () => page(tab
     if (u.pathname === '/site/index') return new Response('<html><body>Welcome</body></html>', { status: 200 });
     if (u.pathname === '/clubber/checkin_report') return new Response(report(u.searchParams.get('date')), { status: 200 });
     if (u.pathname === '/clubber/checkin') return new Response(checkin(), { status: 200 });
+    if (u.pathname === '/household/csv' && households) return new Response(households(), { status: 200, headers: { 'Content-Type': 'application/csv' } });
     if (u.pathname === '/clubber/checkinclubber' && init.method === 'POST') {
       state.checkins.push(body);
       return new Response(state.checkinReply ?? `<b>${state.checkinName ?? 'Kit Tester'}</b> 6:02 pm`, { status: 200 });
@@ -70,3 +71,11 @@ export function fakeTwoTimTwo({ password = 'right-pass', report = () => page(tab
   };
   return state;
 }
+
+// TwoTimTwo's /household/csv shape (docs/TWOTIMTWO.md §3.3): household fields
+// denormalised, with addresses and phones, and the children in one column.
+export const HOUSEHOLD_CSV = '\uFEFF"Household ID","Parent/Guardian#1","Address1","Primary Phone","Active Clubbers","Billing Notes"\r\n' +
+  '"11","Pat Tester","1 Elm St","555-0101","Sophie Tester, Cal Tester",""\r\n' +
+  '"12","Lee Other","2 Oak Ave","555-0102","Only Child",""\r\n' +
+  '"13","Kim ""Q"" Smith","3 Pine Rd, Apt 4","555-0103","Ann Smith, Ben Smith, Cy Smith","note, with comma"\r\n' +
+  '"14","No Kids","4 Ash Ln","555-0104","",""\r\n';

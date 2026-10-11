@@ -288,6 +288,49 @@ export function itemsToSend(events, clubId, options = {}) {
   }).map((e) => e.id);
 }
 
+/**
+ * TwoTimTwo's /household/csv as families: each household's active children,
+ * by name, where it has two or more. That export also carries addresses and
+ * phone numbers; only the Household ID and Active Clubbers columns are read,
+ * as the extension's householdIndex() does, and nothing else survives.
+ * null when it is not that CSV (the login form, a page, a changed header).
+ * @param {string} text
+ * @returns {string[][] | null}
+ */
+export function parseHouseholdCsv(text) {
+  const t = String(text || '').replace(/^\uFEFF/, '');
+  if (!t || isLoginPage(t) || /^\s*</.test(t)) return null;
+  /** @type {string[][]} */
+  const rows = [];
+  let row = [];
+  let field = '';
+  let q = false;
+  for (let i = 0; i < t.length; i++) {
+    const c = t[i];
+    if (q) {
+      if (c === '"') { if (t[i + 1] === '"') { field += '"'; i++; } else q = false; } else field += c;
+    } else if (c === '"') q = true;
+    else if (c === ',') { row.push(field); field = ''; } else if (c === '\n' || c === '\r') {
+      if (c === '\r' && t[i + 1] === '\n') i++;
+      row.push(field); field = ''; rows.push(row); row = [];
+    } else field += c;
+  }
+  if (field || row.length) { row.push(field); rows.push(row); }
+  if (!rows.length) return null;
+  const head = rows[0].map((h) => squash(h).toLowerCase());
+  const idCol = head.indexOf('household id');
+  const kidsCol = head.indexOf('active clubbers');
+  if (idCol < 0 || kidsCol < 0) return null;
+  /** @type {string[][]} */
+  const out = [];
+  for (const r of rows.slice(1)) {
+    if (!String(r[idCol] || '').trim()) continue;
+    const kids = String(r[kidsCol] || '').split(',').map((k) => squash(k).slice(0, 80)).filter(Boolean);
+    if (kids.length >= 2) out.push(kids);
+  }
+  return out;
+}
+
 /** @param {string} html */
 export function loginToken(html) {
   const input = documentOf(html).querySelector('input[name="YII_CSRF_TOKEN"]');
@@ -474,6 +517,14 @@ export class TwoTimTwoClient {
     if (isLoginPage(res.html) || /\/site\/login/i.test(res.path)) return { ok: false, error: 'signed-out' };
     if (res.status !== 200) return { ok: false, error: res.status >= 500 ? 'twotimtwo-down' : `http-${res.status}` };
     return checkinReplyOk(res.html, c.name) ? { ok: true } : { ok: false, error: 'checkin-refused' };
+  }
+
+  /** The families, from TwoTimTwo's household export (names only kept). */
+  async households() {
+    const page = await this.page('/household/csv');
+    if (!page.ok) return page;
+    const list = parseHouseholdCsv(page.html);
+    return list ? { ok: /** @type {const} */ (true), households: list } : { ok: /** @type {const} */ (false), error: 'households-unreadable' };
   }
 
   async checkinPage() {
