@@ -20,6 +20,7 @@
 // and this one on the same pages and requires the same answer.
 
 import { parseHTML } from 'linkedom';
+import { parse, serialize } from 'parse5';
 
 export const DEFAULT_HOST = 'kvbchurch.twotimtwo.com';
 const HOST_RE = /^[a-z0-9][a-z0-9-]{0,62}\.twotimtwo\.com$/;
@@ -58,9 +59,17 @@ export function isLoginPage(html) {
   return LOGIN_FORM_RE.test(String(html || ''));
 }
 
-/** @param {string} html */
+/**
+ * The page as a browser builds it. linkedom's own parser takes tags as
+ * written: rows with no <tbody>, which Chrome wraps in one, stayed bare, so on
+ * the live report (2026-10-11) every club's Count: was read and not one child
+ * ("0 children checked in", partial). parse5 is the HTML standard's tree
+ * builder (jsdom's); its output, written back out, is markup linkedom reads
+ * into exactly the tree the extension's DOMParser sees in Chrome.
+ * @param {string} html
+ */
 function documentOf(html) {
-  return parseHTML(String(html || '')).document;
+  return parseHTML(serialize(parse(String(html || '')))).document;
 }
 
 /** @param {string} text */

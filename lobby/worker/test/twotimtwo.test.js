@@ -2,7 +2,7 @@
 // are built from the selectors in printer/docs/TWOTIMTWO.md, never captured:
 // obviously made-up names, no real data.
 import { readFileSync } from 'node:fs';
-import { DOMParser } from 'linkedom';
+import { JSDOM } from 'jsdom';
 import { describe, expect, it } from 'vitest';
 import { CHECKIN_PAGE, LOGIN_PAGE, fakeTwoTimTwo, page, table } from './fixtures.js';
 import {
@@ -33,10 +33,16 @@ const SAMPLES = {
   partial: page(table('Sparks ', [{ id: 10, name: 'Hal Tester' }], { count: 3 })),
   noFooter: page(table('Sparks ', [{ id: 11, name: 'Ivy Tester' }], { footer: false }), table('Trek ', [{ id: 12, name: 'Jo Tester' }])),
   empty: page(table('Sparks ', [])),
+  // Rows with no <tbody>, and a form around a table: a browser repairs both.
+  noTbody: page(table('Sparks ', [{ id: 13, name: 'Kim Tester' }, { id: 14, name: 'Lev Tester' }]).replace(/<tbody>/g, '')),
+  formAround: `<html><body><form>${table('Trek ', [{ id: 15, name: 'Max Tester' }])}</form>${table('Sparks ', [{ id: 16, name: 'Ned Tester' }])}</body></html>`,
 };
 
 // The extension's own parser, lifted out of content.js exactly as
-// printer/scripts/test-report-parse.cjs lifts it, run on linkedom's DOMParser.
+// printer/scripts/test-report-parse.cjs lifts it, run on jsdom's DOMParser:
+// a standard HTML tree builder, as Chrome is, so the agreement below is with
+// what the extension reads on the live site (on linkedom's own, laxer parser
+// it agreed with the Worker's first copy, which read no rows on 2026-10-11).
 function extensionParser() {
   const src = readFileSync(new URL('../../../printer/chrome-extension/content.js', import.meta.url), 'utf8');
   const start = src.indexOf('  function fetchCheckinReport(date) {');
@@ -46,7 +52,7 @@ function extensionParser() {
     `${src.slice(start, end)}\nreturn fetchCheckinReport;`);
   return (html) => factory(
     async () => ({ ok: true, url: `https://${HOST}/clubber/checkin_report`, text: async () => html }),
-    DOMParser, {}, () => '2026-10-07',
+    new JSDOM('').window.DOMParser, {}, () => '2026-10-07',
   )();
 }
 
@@ -60,6 +66,21 @@ describe('the check-in report parser', () => {
 
   it('never takes a summary cell for a name', () => {
     expect(parseCheckinReport(SAMPLES.summaryOnly).entries).toEqual([{ clubberId: '9', name: '', club: 'T&T' }]);
+  });
+
+  it('reads rows the way a browser builds them, <tbody> or not (the live report, 2026-10-11)', () => {
+    const r = parseCheckinReport(SAMPLES.noTbody);
+    expect(r.entries.map((e) => e.clubberId)).toEqual(['13', '14']);
+    expect(r.declared).toBe(2);
+    expect(parseCheckinReport(SAMPLES.formAround).entries.map((e) => e.club)).toEqual(['Trek', 'Sparks']);
+  });
+
+  it('a busy night (300 children) parses in well under a second', () => {
+    const kids = Array.from({ length: 300 }, (_, i) => ({ id: 1000 + i, name: `Kid${i} Tester`, summary: 'YES 1 Share 1 Point' }));
+    const html = page(table('Sparks ', kids.slice(0, 150)), table('T&amp;T ', kids.slice(150)));
+    const t0 = performance.now();
+    expect(parseCheckinReport(html).entries).toHaveLength(300);
+    expect(performance.now() - t0).toBeLessThan(1000);
   });
 
   it('a club table without a Count: footer makes declared unknown', () => {

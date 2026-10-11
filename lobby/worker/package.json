@@ -10,7 +10,8 @@
     "test": "cd .. && npx vitest run --config worker/vitest.config.js"
   },
   "dependencies": {
-    "linkedom": "^0.18.12"
+    "linkedom": "^0.18.12",
+    "parse5": "8.0.1"
   },
   "devDependencies": {
     "wrangler": "^4.40.0"
