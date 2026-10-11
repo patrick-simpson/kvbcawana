@@ -1,4 +1,17 @@
-﻿
+﻿## [9.0.0] - 2026-10-11
+One app for every computer: KVBC Awana, a print server, a display, or both. It also carries 8.3.0 (below), which was not released on its own.
+
+**Club Label Printer is now KVBC Awana (owner, UNIFIED-APP.md).** The same app, renamed in the Start menu, the tray and the installer (`KVBC-Awana-Setup.exe`). It keeps its identity underneath (`appId`, the install folder, `%APPDATA%\awana-label-printer`, the update feed), so the check-in laptop updates in place as always, keeps its roster, history and settings, stays a print server and never sees the new setup or the display. The installer renames its own shortcuts; the app offers to remove any old-named copy someone made.
+
+**Roles.** Each computer is a print server, a display, or both (`roles.json` in the app's data folder, with the computer's name). The print server (everything this app was) runs only when the print role is on; the display (the sound room app, Awana Lobby Display, moved in whole: club nights, the monitor, the three screens, the Settings window, the club-night shutdown) runs only when the display role is on. One tray for both; turning the print role off restarts the app.
+
+**A first-run setup on a new computer.** What it is for, the church passphrase (it signs the computer in to the sync service as the screens do; the sign-in is kept in Windows' protected storage, never a plain file, and the passphrase itself is not kept), a name, then the label printer (print server) and the screen, monitor and hours (display). The tray's **Set up this computer...** opens it again. With the print role it also signs the print server in with the same passphrase.
+
+**Display hours per computer.** A display shows on club nights within its own hours (default 5:00 to 8:00 pm), set in the setup and in its Settings window; cancelled weeks and the summer stay dark as before. /settings will edit them once computers register there.
+
+**Updates are checked every ten minutes** (it was once a day: the release ping went with the Pusher keys) and still install the moment they download, whatever the computer is doing (a label in flight gets its five seconds).
+
+**The sound room PC moves over by itself.** Awana Lobby Display 2.1.0 (its last release) installs KVBC Awana once this version is out, handing over its screen, monitor, shutdown and Start with Windows and its signed-in screens; KVBC Awana then uninstalls it and its login item.
 
 ## [8.3.0] - 2026-10-11
 The printer's settings open on awana.kvbchurch.org/settings, and the extension points there.
