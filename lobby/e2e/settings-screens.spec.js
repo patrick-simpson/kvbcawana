@@ -114,7 +114,7 @@ test('a KVBC Awana computer: turning its print server off says it waits for the 
   const PC = 'pc_cccccccccccccccccccc';
   const now = new Date().toISOString();
   page.w.screens[PC] = { id: PC, kind: 'computer', name: 'Check-in laptop', createdAt: now, lastSeen: now, online: true, live: false };
-  page.w.settings[PC] = { savedAt: now, settings: { printRole: true, displayRole: false, displayFrom: '17:00', displayUntil: '20:00' } };
+  page.w.settings[PC] = { savedAt: now, settings: { printRole: true, displayRole: true, displayFrom: '17:00', displayUntil: '20:00' } };
   const dialog = page.getByRole('dialog', { name: 'Settings' });
   await dialog.getByRole('tab', { name: 'Screens' }).click();
   await dialog.getByRole('button', { name: 'Open settings for Check-in laptop' }).click();
@@ -125,7 +125,25 @@ test('a KVBC Awana computer: turning its print server off says it waits for the 
   await expect.poll(() => page.w.settings[PC].settings.printRole).toBe(false);
   expect(asked).toMatch(/If a label is printing or waiting, it finishes first/);
   // The computer's next hello says it is holding the change.
-  page.w.screens[PC].pendingRoleChange = { printRole: false, displayRole: false };
+  page.w.screens[PC].pendingRoleChange = { printRole: false, displayRole: true };
   await dialog.getByRole('button', { name: 'Check again' }).click();
   await expect(row).toContainText('print server off once the last label prints');
+});
+
+test('a KVBC Awana computer keeps at least one role, and its hours run forward', async ({ page }) => {
+  const PC = 'pc_dddddddddddddddddddd';
+  const now = new Date().toISOString();
+  const before = { printRole: true, displayRole: false, displayFrom: '17:00', displayUntil: '20:00' };
+  page.w.screens[PC] = { id: PC, kind: 'computer', name: 'Desk', createdAt: now, lastSeen: now, online: true, live: false };
+  page.w.settings[PC] = { savedAt: now, settings: { ...before } };
+  const dialog = page.getByRole('dialog', { name: 'Settings' });
+  await dialog.getByRole('tab', { name: 'Screens' }).click();
+  await dialog.getByRole('button', { name: 'Open settings for Desk' }).click();
+  const row = dialog.locator(`[data-screen="${PC}"]`);
+  await row.getByRole('checkbox', { name: 'Print server' }).click();
+  await expect(row).toContainText('needs at least one role');
+  await row.getByLabel('Display from').fill('21:00');
+  await row.getByLabel('Display from').blur();
+  await expect(row).toContainText('has to be before');
+  expect(page.w.settings[PC].settings).toEqual(before);
 });
