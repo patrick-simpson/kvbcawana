@@ -1,10 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import { LEGACY_TABS, SECTIONS, openingSection, phaseWords, resolveSection } from './settingsSections.js';
+import { LAPTOP_SECTION, LEGACY_TABS, SECTIONS, openingSection, phaseWords, resolveSection, sectionsFor } from './settingsSections.js';
 
 describe('settings sections', () => {
   it('lists eight sections, everyday ones first and Setup last', () => {
     expect(SECTIONS.map((s) => s.id)).toEqual(['status', 'checkins', 'slides', 'screen', 'celebrations', 'pickup', 'look', 'setup']);
     for (const s of SECTIONS) expect(s.blurb.length).toBeGreaterThan(0);
+  });
+
+  it('lists the Laptop section on the settings page only, just before Setup', () => {
+    expect(sectionsFor(false)).toBe(SECTIONS);
+    const ids = sectionsFor(true).map((s) => s.id);
+    expect(ids).toEqual(['status', 'checkins', 'slides', 'screen', 'celebrations', 'pickup', 'look', 'laptop', 'setup']);
+    expect(LAPTOP_SECTION.blurb.length).toBeGreaterThan(0);
+    expect(resolveSection('laptop')).toBe('laptop');
   });
 
   it('maps every old tab id to the section that now holds its controls', () => {

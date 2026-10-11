@@ -1,0 +1,166 @@
+/* The settings page's Laptop section (SETTINGS.md phase 3). Its own file, so the
+   section's few rules travel with it; everything else is the panel's kit
+   (cards, fields, hints, toggles, ghost and primary buttons). */
+
+.panel .laptop-away__lead {
+  margin: 0 0 0.5rem;
+  font-size: 1.12rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+.panel .laptop-would {
+  margin: 0 0 1rem;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.35rem;
+}
+.panel .laptop-would li {
+  padding-left: 1.1rem;
+  position: relative;
+  color: var(--panel-muted);
+  line-height: 1.4;
+}
+.panel .laptop-would li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0.55em;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--panel-card-line);
+}
+.panel .laptop-would strong { color: var(--panel-ink); }
+
+.panel .laptop-status {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.8rem 1rem;
+  margin-bottom: 0.9rem;
+  border-radius: 12px;
+  background: var(--brand-tnt-tint);
+}
+.panel .laptop-status--warn { background: var(--brand-cream); }
+.panel .laptop-status > div { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.15rem; }
+.panel .laptop-status__dot {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--brand-tnt-deep);
+  box-shadow: 0 0 0 2px #ffffff;
+}
+.panel .laptop-status--warn .laptop-status__dot { background: var(--brand-sun); }
+.panel .laptop-warnings {
+  margin: 0 0 0.9rem;
+  padding-left: 1.2rem;
+  color: var(--brand-sparks-deep);
+  font-size: 0.95rem;
+  line-height: 1.45;
+}
+
+.panel .laptop-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0.2rem 0 1rem;
+}
+.panel .laptop-note { display: block; margin: -0.4rem 0 1rem; }
+
+.panel .laptop-diag {
+  margin: 0 0 1rem;
+  padding: 0;
+  list-style: none;
+  border-top: 1.5px solid var(--panel-card-line);
+}
+.panel .laptop-diag li {
+  display: grid;
+  grid-template-columns: 1.4rem minmax(0, 1fr);
+  column-gap: 0.4rem;
+  padding: 0.5rem 0;
+  border-bottom: 1.5px solid var(--panel-card-line);
+}
+.panel .laptop-diag .hint { grid-column: 2; }
+.panel .laptop-diag .is-ok .laptop-diag__mark { color: var(--brand-tnt-deep); }
+.panel .laptop-diag .is-bad .laptop-diag__mark { color: var(--brand-sparks-deep); }
+.panel .laptop-diag__mark { font-weight: 700; }
+.panel .laptop-diag .sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.panel .laptop-template {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0 1.5rem;
+}
+@media (min-width: 900px) {
+  .panel .laptop-template { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+}
+.panel .laptop-label {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin-bottom: 1rem;
+  border: 1.5px solid var(--panel-card-line);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.panel .laptop-clubs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.4rem;
+  margin-bottom: 1rem;
+}
+.panel label.laptop-club {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 400;
+}
+
+.panel .laptop-schedule { display: grid; gap: 0.5rem; margin-bottom: 1rem; }
+.panel .laptop-schedule__row {
+  display: grid;
+  grid-template-columns: minmax(5rem, 1fr) 4.5rem minmax(5rem, 1fr) minmax(6rem, 1.4fr) auto;
+  gap: 0.4rem;
+  align-items: center;
+}
+@media (max-width: 719px) {
+  .panel .laptop-schedule__row { grid-template-columns: 1fr 1fr; }
+  .panel .laptop-schedule__row button { grid-column: 1 / -1; justify-self: start; }
+}
+
+.panel .laptop-history {
+  margin: 0 0 1rem;
+  padding: 0;
+  list-style: none;
+}
+.panel .laptop-history li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: 'who act' 'meta act';
+  align-items: center;
+  column-gap: 0.75rem;
+  padding: 0.55rem 0;
+  border-top: 1.5px solid var(--panel-card-line);
+}
+.panel .laptop-history__who { grid-area: who; display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; }
+.panel .laptop-history .hint { grid-area: meta; }
+.panel .laptop-history button { grid-area: act; }
+.panel .laptop-tag {
+  padding: 0.15rem 0.5rem 0.1rem;
+  border-radius: 999px;
+  background: var(--brand-cloud);
+  font-family: var(--font-condensed);
+  font-size: 0.8rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}

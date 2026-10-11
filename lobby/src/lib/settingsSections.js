@@ -6,7 +6,7 @@
 // Everyday sections first (what a volunteer reaches for on a club night),
 // then the ones set once, then setup and tools.
 
-/** @typedef {'status' | 'checkins' | 'slides' | 'screen' | 'celebrations' | 'pickup' | 'look' | 'setup'} SectionId */
+/** @typedef {'status' | 'checkins' | 'slides' | 'screen' | 'celebrations' | 'pickup' | 'look' | 'setup' | 'laptop'} SectionId */
 
 /** @type {{ id: SectionId, label: string, blurb: string }[]} */
 export const SECTIONS = [
@@ -20,7 +20,21 @@ export const SECTIONS = [
   { id: 'setup', label: 'Setup', blurb: 'Connect this screen, keys, tools' },
 ];
 
-const IDS = new Set(SECTIONS.map((s) => s.id));
+// The settings page's own section (SETTINGS.md phase 3): the check-in laptop's
+// printer, labels, schedule and diagnostics, reached through localhost. A screen
+// has no use for it, so only the page lists it, just before Setup.
+/** @type {{ id: SectionId, label: string, blurb: string }} */
+export const LAPTOP_SECTION = { id: 'laptop', label: 'Laptop', blurb: 'Printer, labels, schedule, diagnostics' };
+
+/**
+ * The sections a surface lists.
+ * @param {boolean} page true on awana.kvbchurch.org/settings
+ */
+export function sectionsFor(page) {
+  return page ? [...SECTIONS.slice(0, -1), LAPTOP_SECTION, SECTIONS[SECTIONS.length - 1]] : SECTIONS;
+}
+
+const IDS = new Set([...SECTIONS, LAPTOP_SECTION].map((s) => s.id));
 
 // The old tab ids, from before the two-pane redesign: a caller (or a link in
 // old copy) asking for one lands on the section that now holds its controls.

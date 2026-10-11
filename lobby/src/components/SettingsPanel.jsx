@@ -9,7 +9,7 @@ import { useDisplayKey } from '../hooks/useDisplayKey.js';
 import { useDisplayLogin } from '../hooks/useDisplayLogin.js';
 import { useSync } from '../hooks/useSync.js';
 import { pageBuild } from '../lib/buildReload.js';
-import { SECTIONS, openingSection } from '../lib/settingsSections.js';
+import { openingSection, sectionsFor } from '../lib/settingsSections.js';
 import { isSharedKey, pickShared } from '../lib/sharedSettings.js';
 import { ZeroAnimationContext } from '../lib/motion.jsx';
 import {
@@ -17,6 +17,7 @@ import {
   SlidesSection, StatusSection, statusProblems,
 } from './settings/sections.jsx';
 import { FollowingContext, SettingsPageContext } from './settings/fields.jsx';
+import LaptopSection from './settings/laptop.jsx';
 import { CORNER_CLUB_IDS } from '../lib/clubs.js';
 import { celebrateChange } from '../lib/settingsJoy.js';
 import awanaClubsMark from '../../shared/brand/logos/awana-clubs-white.svg';
@@ -156,6 +157,7 @@ export default function SettingsPanel({
   const problems = statusProblems({ opsFailures, layerFaults, remoteConfigError, wakeLockStatus, demoActive, status });
 
   const { signedIn } = useSync();
+  const sections = sectionsFor(page);
   // The settings page opens on signing in until it is signed in: nothing
   // there reaches a screen without it.
   const [section, setSectionState] = useState(() => (page && !signedIn && !initialTab ? 'setup' : openingSection(initialTab, {
@@ -314,12 +316,12 @@ export default function SettingsPanel({
 
   // Rail keys: a vertical tablist, so Up/Down (Left/Right too), Home and End.
   const onNavKeyDown = (e) => {
-    const i = SECTIONS.findIndex((s) => s.id === section);
+    const i = sections.findIndex((s) => s.id === section);
     let next = null;
-    if (e.key === 'ArrowDown' || e.key === 'ArrowRight') next = SECTIONS[(i + 1) % SECTIONS.length].id;
-    else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') next = SECTIONS[(i - 1 + SECTIONS.length) % SECTIONS.length].id;
-    else if (e.key === 'Home') next = SECTIONS[0].id;
-    else if (e.key === 'End') next = SECTIONS[SECTIONS.length - 1].id;
+    if (e.key === 'ArrowDown' || e.key === 'ArrowRight') next = sections[(i + 1) % sections.length].id;
+    else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') next = sections[(i - 1 + sections.length) % sections.length].id;
+    else if (e.key === 'Home') next = sections[0].id;
+    else if (e.key === 'End') next = sections[sections.length - 1].id;
     if (next) {
       e.preventDefault();
       setSectionState(next);
@@ -376,7 +378,7 @@ export default function SettingsPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const current = SECTIONS.find((s) => s.id === section) ?? SECTIONS[0];
+  const current = sections.find((s) => s.id === section) ?? sections[0];
   const panicMode = (savedConfig ?? config)?.panicMode === true;
   const lowPowerForced = config?.reduceMotion === true && (savedConfig ?? config)?.reduceMotion !== true;
   const props = { form, set, update };
@@ -413,6 +415,8 @@ export default function SettingsPanel({
     body = <CelebrationsSection {...props} />;
   } else if (section === 'pickup') {
     body = <PickupSection {...props} onBoardDemo={onBoardDemo ? () => { flush(); onBoardDemo(); } : null} />;
+  } else if (section === 'laptop') {
+    body = <LaptopSection />;
   } else if (section === 'look') {
     body = <LookSection {...props} />;
   } else {
@@ -466,7 +470,7 @@ export default function SettingsPanel({
         <div className="settings-main">
           <nav className="settings-nav" aria-label="Settings sections">
             <div role="tablist" aria-orientation="vertical" aria-label="Settings sections" onKeyDown={onNavKeyDown}>
-              {SECTIONS.map((s) => {
+              {sections.map((s) => {
                 const badge = s.id === 'status' && problems.length ? problems.length
                   : s.id === 'setup' && (status === 'off' || !keyed) ? '!' : null;
                 return (
