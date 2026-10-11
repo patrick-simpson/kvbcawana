@@ -42,7 +42,10 @@ commits or files.
   lobby), with absolute URLs to this repo's release assets (Pages cannot host
   the 170 MB installers).
 - Bots: `lobby-update-calendar.yml` and `journey-update-lesson.yml` run
-  nightly, commit to `main` (rebase-and-retry) and dispatch `ci.yml`. The
+  nightly, commit to `main` (rebase-and-retry) and dispatch `ci.yml`. `clean-artifacts.yml` runs weekly (and by hand) and deletes
+  workflow artifacts older than a day: the account has 0.5 GB of Actions
+  storage, and the release workflows keep their installer artifacts only a
+  day (`retention-days: 1`); the Releases are what people download. The
   apps' own workflows under `lobby/.github/`, `journey/.github/`,
   `printer/.github/` are dormant.
 - Realtime: since 2026-10-03 every screen listens to the Worker's live channel
