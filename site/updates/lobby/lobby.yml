@@ -1,8 +1,8 @@
-version: 2.0.0
+version: 2.1.0
 files:
-  - url: https://github.com/patrick-simpson/kvbcawana/releases/download/desktop-v2.0.0/Awana-Lobby-Display-Setup.exe
-    sha512: 0NyHQCS+xM67pi4ZFlfZeo/aEe5KHIeP9GzDmv+B2hkflq2XbNADQar2QdFWGMJoBfe3Z5OfnZF5s1eXFruZyA==
-    size: 111637386
-path: https://github.com/patrick-simpson/kvbcawana/releases/download/desktop-v2.0.0/Awana-Lobby-Display-Setup.exe
-sha512: 0NyHQCS+xM67pi4ZFlfZeo/aEe5KHIeP9GzDmv+B2hkflq2XbNADQar2QdFWGMJoBfe3Z5OfnZF5s1eXFruZyA==
-releaseDate: '2026-10-07T20:06:36.215Z'
+  - url: https://github.com/patrick-simpson/kvbcawana/releases/download/desktop-v2.1.0/Awana-Lobby-Display-Setup.exe
+    sha512: UyrqDxTr5fl0RLgxCD3ORT1Q9rVhPrrhVvUbKANmwvQQ4nNanwvPjY8iUHvrRm2AgnEgvPYI3Br8vAxcHhM4cQ==
+    size: 111640026
+path: https://github.com/patrick-simpson/kvbcawana/releases/download/desktop-v2.1.0/Awana-Lobby-Display-Setup.exe
+sha512: UyrqDxTr5fl0RLgxCD3ORT1Q9rVhPrrhVvUbKANmwvQQ4nNanwvPjY8iUHvrRm2AgnEgvPYI3Br8vAxcHhM4cQ==
+releaseDate: '2026-10-11T23:03:32.288Z'
