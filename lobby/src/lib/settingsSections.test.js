@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { LAPTOP_SECTION, LEGACY_TABS, SECTIONS, openingSection, phaseWords, resolveSection, sectionsFor } from './settingsSections.js';
+import { LAPTOP_SECTION, LEGACY_TABS, SCREENS_SECTION, SECTIONS, openingSection, phaseWords, resolveSection, sectionsFor } from './settingsSections.js';
 
 describe('settings sections', () => {
   it('lists eight sections, everyday ones first and Setup last', () => {
@@ -10,7 +10,7 @@ describe('settings sections', () => {
   it('lists the Laptop section on the settings page only, just before Setup', () => {
     expect(sectionsFor(false)).toBe(SECTIONS);
     const ids = sectionsFor(true).map((s) => s.id);
-    expect(ids).toEqual(['status', 'checkins', 'slides', 'screen', 'celebrations', 'pickup', 'look', 'laptop', 'setup']);
+    expect(ids).toEqual(['status', 'screens', 'checkins', 'slides', 'screen', 'celebrations', 'pickup', 'look', 'laptop', 'setup']);
     expect(LAPTOP_SECTION.blurb.length).toBeGreaterThan(0);
     expect(resolveSection('laptop')).toBe('laptop');
   });
@@ -37,5 +37,15 @@ describe('settings sections', () => {
     expect(phaseWords('shutdown')).toBe('After club (pickup)');
     expect(phaseWords('something-new')).toBe('something-new');
     expect(phaseWords(null)).toBe('');
+  });
+});
+
+describe('the settings page\'s own sections', () => {
+  it('Screens comes after Status on the page only, never on a screen or a screen opened from the page', () => {
+    expect(sectionsFor(true).map((s) => s.id).slice(0, 2)).toEqual(['status', 'screens']);
+    expect(sectionsFor(false, { remote: false })).toBe(SECTIONS);
+    expect(sectionsFor(true, { remote: true })).toBe(SECTIONS);
+    expect(SCREENS_SECTION.blurb.length).toBeGreaterThan(0);
+    expect(resolveSection('screens')).toBe('screens');
   });
 });

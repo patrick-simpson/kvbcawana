@@ -90,6 +90,11 @@ export const FollowingContext = createContext(true);
 // screen, so a "This screen" card has nothing to set and is left out unless
 // it is marked `keep` (signing in, the slide editor).
 export const SettingsPageContext = createContext(false);
+// On the settings page, a screen opened from Screens (SETTINGS.md, phase 2):
+// {id, kind, name}, else null. Its "This screen" cards come back, reading and
+// writing that screen's settings in the sync Worker; a card about THIS device
+// (`local`: signing in, uploads, keys, tools) stays out.
+export const RemoteScreenContext = createContext(/** @type {null | {id: string, kind: string, name: string}} */ (null));
 
 /**
  * Where a card's settings apply: `shared` ones reach every screen through the
@@ -99,14 +104,16 @@ export const SettingsPageContext = createContext(false);
 function ScopeTag({ scope }) {
   const following = useContext(FollowingContext);
   const page = useContext(SettingsPageContext);
-  if (!scope || (page && scope === 'screen')) return null;
+  const remote = useContext(RemoteScreenContext);
+  if (!scope || (page && scope === 'screen' && !remote)) return null;
   const shared = scope === 'shared' && following;
   return (
     <span className={`scope-tag scope-tag--${shared ? 'shared' : 'screen'}`}
       title={shared
         ? 'Shared: a change here reaches every screen (made on the check-in computer).'
-        : scope === 'shared' ? 'This screen is not following the shared settings, so these stay on this screen.' : 'This screen only.'}>
-      {shared ? 'Every screen' : 'This screen'}
+        : scope === 'shared' ? 'This screen is not following the shared settings, so these stay on this screen.'
+          : remote ? `${remote.name} only.` : 'This screen only.'}>
+      {shared ? 'Every screen' : remote ? `${remote.name} only` : 'This screen'}
     </span>
   );
 }
@@ -115,9 +122,15 @@ function ScopeTag({ scope }) {
 // cards. A titled card names its section with the kit's corner tab (the
 // colour only tells the sections apart); the heading inside it is the same
 // <h3 className="section"> the tab always had.
-export function PanelCard({ title, tab = 'var(--brand-blue)', scope, keep = false, children }) {
+export function PanelCard({ title, tab = 'var(--brand-blue)', scope, keep = false, local = false, children }) {
   const page = useContext(SettingsPageContext);
-  if (page && scope === 'screen' && !keep) return null;
+  const remote = useContext(RemoteScreenContext);
+  const following = useContext(FollowingContext);
+  if (remote) {
+    // A screen opened from the settings page: its own cards, and the shared
+    // ones only while it follows them (else a change there would not reach it).
+    if (local || (scope === 'shared' && !following)) return null;
+  } else if (page && scope === 'screen' && !keep) return null;
   return (
     <div className="panel-card">
       {title ? (

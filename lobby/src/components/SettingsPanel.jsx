@@ -16,7 +16,8 @@ import {
   CelebrationsSection, CheckinsSection, LookSection, PickupSection, ScreenSection, SetupSection,
   SlidesSection, StatusSection, statusProblems,
 } from './settings/sections.jsx';
-import { FollowingContext, SettingsPageContext } from './settings/fields.jsx';
+import { FollowingContext, RemoteScreenContext, SettingsPageContext } from './settings/fields.jsx';
+import { ScreenOverviewSection, ScreensSection } from './settings/screens.jsx';
 import LaptopSection from './settings/laptop.jsx';
 import { CORNER_CLUB_IDS } from '../lib/clubs.js';
 import { celebrateChange } from '../lib/settingsJoy.js';
@@ -132,6 +133,10 @@ export default function SettingsPanel({
   onChange, onReplace, onReset, onClose, onTest, onResetTally, onOpenSlideEditor, onOpenDebug, onBoardDemo, onPreviewPromo, configure = false, page = false,
   syncedDeck, slidesStatus, onForgetSyncedDeck,
   shared = null, shareStatus = null, onShare,
+  // The settings page's Screens (SETTINGS.md, phase 2): `onOpenScreen` opens
+  // one from the list; `screen` is set when this panel IS that screen's
+  // (RemoteScreenPanel), with its note, actions, rename and forget.
+  onOpenScreen = null, screen = null, screenNote = null, onScreenAction, onScreenRenamed, onScreenForgotten,
 }) {
   const stored = savedConfig ?? config;
   const [initial] = useState(() => seedForm(stored));
@@ -157,7 +162,7 @@ export default function SettingsPanel({
   const problems = statusProblems({ opsFailures, layerFaults, remoteConfigError, wakeLockStatus, demoActive, status });
 
   const { signedIn } = useSync();
-  const sections = sectionsFor(page);
+  const sections = sectionsFor(page, { remote: Boolean(screen) });
   // The settings page opens on signing in until it is signed in: nothing
   // there reaches a screen without it.
   const [section, setSectionState] = useState(() => (page && !signedIn && !initialTab ? 'setup' : openingSection(initialTab, {
@@ -311,7 +316,9 @@ export default function SettingsPanel({
   const preview = () => {
     flush();
     onTest?.({ firstName: pick(SAMPLE_NAMES), club: 'Sparks' });
-    onClose(); // get out of the way so the banner is visible
+    // Get out of the way so the banner is visible (a screen opened from the
+    // settings page plays it over there, so this stays open).
+    if (!screen) onClose();
   };
 
   // Rail keys: a vertical tablist, so Up/Down (Left/Right too), Home and End.
@@ -384,7 +391,16 @@ export default function SettingsPanel({
   const props = { form, set, update };
 
   let body;
-  if (section === 'status') {
+  if (section === 'screens' && onOpenScreen) {
+    body = <ScreensSection onOpen={onOpenScreen} goTo={goTo} />;
+  } else if (section === 'status' && screen) {
+    body = (
+      <ScreenOverviewSection
+        screen={screen} following={form.followSharedSettings !== false} goTo={goTo}
+        onAction={(a) => { flush(); onScreenAction?.(a); }} onRenamed={onScreenRenamed} onForgotten={onScreenForgotten}
+      />
+    );
+  } else if (section === 'status') {
     body = (
       <StatusSection
         status={status} nameStatus={nameStatus} keyed={keyed} displayKey={displayKey} login={login}
@@ -438,7 +454,7 @@ export default function SettingsPanel({
   }
 
   // The settings page is not a screen: what matters there is the sign-in.
-  const pill = page ? (signedIn ? 'Signed in' : 'Not signed in') : {
+  const pill = screen ? (screen.online ? 'On now' : 'Off') : page ? (signedIn ? 'Signed in' : 'Not signed in') : {
     connected: keyed ? 'Connected' : 'Connected · not logged in',
     connecting: 'Connecting…',
     disconnected: 'Disconnected',
@@ -458,20 +474,24 @@ export default function SettingsPanel({
       >
         <div className="panel-header">
           <img className="panel-mark" src={awanaClubsMark} alt="" draggable="false" />
-          <h2>{page ? 'KVBC Awana Settings' : 'Settings'}</h2>
-          <div className={`status-line ${page ? (signedIn ? 'connected' : 'off') : status}`} role="status">
+          <h2>{screen ? screen.name : page ? 'KVBC Awana Settings' : 'Settings'}</h2>
+          <div className={`status-line ${screen ? (screen.online ? 'connected' : 'off') : page ? (signedIn ? 'connected' : 'off') : status}`} role="status">
             <span className="dot" />
-            <span>{pill}{problems.length ? ` · ${problems.length} to check` : ''}</span>
+            <span>{pill}{problems.length && !screen ? ` · ${problems.length} to check` : ''}</span>
           </div>
+          {screen && (
+            <button type="button" className="ghost small settings-screen-back" onClick={onClose}>← All screens</button>
+          )}
         </div>
 
         <SettingsPageContext.Provider value={page}>
+        <RemoteScreenContext.Provider value={screen ? { id: screen.id, kind: screen.kind, name: screen.name } : null}>
         <FollowingContext.Provider value={form.followSharedSettings !== false}>
         <div className="settings-main">
           <nav className="settings-nav" aria-label="Settings sections">
             <div role="tablist" aria-orientation="vertical" aria-label="Settings sections" onKeyDown={onNavKeyDown}>
               {sections.map((s) => {
-                const badge = s.id === 'status' && problems.length ? problems.length
+                const badge = screen ? null : s.id === 'status' && problems.length ? problems.length
                   : s.id === 'setup' && (status === 'off' || !keyed) ? '!' : null;
                 return (
                   <button
@@ -489,7 +509,7 @@ export default function SettingsPanel({
                     onClick={() => onNavClick(s.id)}
                   >
                     <span className="settings-nav__label" id={`tab-${s.id}-label`}>{s.label}</span>
-                    <span className="settings-nav__blurb" id={`tab-${s.id}-blurb`}>{s.blurb}</span>
+                    <span className="settings-nav__blurb" id={`tab-${s.id}-blurb`}>{screen && s.id === 'status' ? 'On or off, its name, its buttons' : s.blurb}</span>
                     {badge != null && <span className="settings-nav__badge" aria-label={`${badge} to check`}>{badge}</span>}
                   </button>
                 );
@@ -517,13 +537,16 @@ export default function SettingsPanel({
         </div>
 
         </FollowingContext.Provider>
+        </RemoteScreenContext.Provider>
         </SettingsPageContext.Provider>
 
         <div className="actions">
-          <span className={`hint settings-live${shareStatus?.state === 'failed' ? ' hint--warn' : ''}`} aria-live="polite">
-            {shareStatus?.state === 'sending' ? 'Sending to every screen…'
+          <span className={`hint settings-live${shareStatus?.state === 'failed' || screenNote?.warn ? ' hint--warn' : ''}`} aria-live="polite">
+            {screen && screenNote ? screenNote.text
+              : shareStatus?.state === 'sending' ? 'Sending to every screen…'
               : shareStatus?.state === 'sent' ? 'Sent to every screen.'
                 : shareStatus?.state === 'failed' ? 'This screen only (see Setup → Shared settings).'
+                  : screen ? `Changes reach ${screen.name} as you make them.`
                   : page ? (signedIn ? 'Changes reach every screen as you make them.' : 'Sign in under Setup to change every screen.')
                     : configure ? 'Changes go live on the screen as you make them.'
                     : changed ? 'Changes are live on this screen.' : 'Changes apply as you make them.'}

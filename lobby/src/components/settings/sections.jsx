@@ -15,7 +15,7 @@ import { phaseWords } from '../../lib/settingsSections.js';
 import {
   ChangePassphraseField, DisplayKeyField, DisplayLoginField, MilestoneListField, PanelCard, PptxUploadField,
   BarfBagsField, CloudCheckinTestField, FriendsListField, PublishTokenField, ReleaseNotesField, SettingsPageContext, SyncSignInField, TemplateField,
-  Toggle, VideoUploadField, ScreenNameField,
+  Toggle, VideoUploadField, ScreenNameField, RemoteScreenContext,
 } from './fields.jsx';
 
 // Radio order = the setup journey: the typed/published deck is the default
@@ -417,6 +417,7 @@ export function CheckinsSection({ form, set, update, onPreview }) {
 
 export function SlidesSection({ form, set, update, slideCount, onEditSlides, syncedDeck, today, onPreviewPromo }) {
   const page = useContext(SettingsPageContext);
+  const remote = useContext(RemoteScreenContext);
   const n = slideCount;
   const typedLine = form.backgroundSource === 'manual'
     ? (n === 0
@@ -491,8 +492,16 @@ export function SlidesSection({ form, set, update, slideCount, onEditSlides, syn
           </span>
         </div>
 
-        {form.backgroundSource === 'pptx' && <PptxUploadField />}
-        {form.backgroundSource === 'video' && <VideoUploadField />}
+        {/* An upload lives in the browser it was made in: from the settings
+            page it would land on the phone, not on the screen. */}
+        {remote && (form.backgroundSource === 'pptx' || form.backgroundSource === 'video') ? (
+          <p className="hint">The {form.backgroundSource === 'video' ? 'video' : 'deck'} file is uploaded on {remote.name} itself (its Settings → Slides): files stay on the screen that plays them.</p>
+        ) : (
+          <>
+            {form.backgroundSource === 'pptx' && <PptxUploadField />}
+            {form.backgroundSource === 'video' && <VideoUploadField />}
+          </>
+        )}
 
         {(form.backgroundSource === 'powerpoint' || form.backgroundSource === 'pptx') && (
           <div className="field">
@@ -536,7 +545,7 @@ export function SlidesSection({ form, set, update, slideCount, onEditSlides, syn
             Edit slides… (Ctrl+Shift+E)
           </button>
         </div>
-        {!page && <Toggle
+        {(!page || remote) && <Toggle
           checked={form.followPublishedSlides !== false}
           onChange={set('followPublishedSlides')}
           title="Follow published slides"
@@ -613,7 +622,7 @@ export function ScreenSection({ form, set, update, panicMode, onPanic, wakeLockS
 
   return (
     <>
-      <PanelCard title="Simplified mode" tab="var(--brand-sparks-deep)" scope="screen">
+      <PanelCard title="Simplified mode" tab="var(--brand-sparks-deep)" scope="screen" local>
         <Toggle
           checked={panicMode}
           onChange={(e) => onPanic(e.target.checked)}
@@ -942,6 +951,9 @@ function sharedLine(shared, viaSync = false) {
 
 function SharedSettingsCard({ form, set, shared, shareStatus, onShareNow, viaSync }) {
   const following = form.followSharedSettings !== false;
+  // Opened from the settings page, only the switch is that screen's; the
+  // line and the button below are about this browser.
+  const remote = useContext(RemoteScreenContext);
   const from = viaSync ? 'any signed-in screen' : 'the check-in computer';
   return (
     <PanelCard title="Shared settings" tab="var(--brand-blue)" scope="screen">
@@ -951,9 +963,9 @@ function SharedSettingsCard({ form, set, shared, shareStatus, onShareNow, viaSyn
         title="Follow the shared settings"
         hint={`Settings tagged EVERY SCREEN (banner times, celebrations, the pickup board, the look, the calendar and weather) come from ${from}, and a change made there reaches every screen. Turn off to keep this one screen on its own values. Settings tagged THIS SCREEN never travel.`}
       />
-      <p className="hint">{following ? sharedLine(shared, viaSync) : 'This screen keeps its own values for everything.'}</p>
+      {!remote && <p className="hint">{following ? sharedLine(shared, viaSync) : 'This screen keeps its own values for everything.'}</p>}
       {shareStatus?.state === 'failed' && <p className="hint hint--warn" role="status">{shareStatus.message}</p>}
-      {following && onShareNow && (
+      {following && onShareNow && !remote && (
         <div className="field">
           <button type="button" className="ghost section-jump" onClick={onShareNow}>
             Send this screen&rsquo;s shared settings to every screen
@@ -985,7 +997,7 @@ export function SetupSection({
 
   return (
     <>
-      <PanelCard title={page ? 'Sign in' : 'Connect this screen'} scope="screen" keep>
+      <PanelCard title={page ? 'Sign in' : 'Connect this screen'} scope="screen" keep local>
         {viaSync ? (
           <>
             <SyncSignInField secure={secure} />
@@ -1028,7 +1040,7 @@ export function SetupSection({
         viaSync={viaSync && syncState.signedIn}
       />
 
-      <PanelCard title="Publishing slides" tab="var(--brand-journey)" scope="screen">
+      <PanelCard title="Publishing slides" tab="var(--brand-journey)" scope="screen" local>
         {viaSync && syncState.signedIn
           ? <p className="hint">Signed in: Publish in the slide editor sends the deck to every screen from here. No token needed.</p>
           : <PublishTokenField />}
@@ -1051,7 +1063,7 @@ export function SetupSection({
       </PanelCard>
 
       {viaSync && syncState.signedIn && (
-        <PanelCard title="Cloud check-in" tab="var(--brand-sparks)">
+        <PanelCard title="Cloud check-in" tab="var(--brand-sparks)" local>
           <p className="hint">
             Being built to replace the check-in laptop: the sync service reads TwoTimTwo itself on club nights. For
             now it only watches and counts, beside the laptop.
@@ -1063,7 +1075,7 @@ export function SetupSection({
         </PanelCard>
       )}
 
-      <PanelCard title="Release notes" tab="var(--brand-trek)">
+      <PanelCard title="Release notes" tab="var(--brand-trek)" local>
         <p className="hint">Everything that has changed in the check-in laptop&rsquo;s Club Label Printer, newest first.</p>
         <ReleaseNotesField />
       </PanelCard>
@@ -1100,7 +1112,7 @@ export function SetupSection({
         </PanelCard>
       )}
 
-      <PanelCard title="Sound room app" tab="var(--brand-blue)">
+      <PanelCard title="Sound room app" tab="var(--brand-blue)" local>
         <p className="hint">
           <strong>Awana Lobby Display</strong> is a Windows app for the sound room PC. It puts this lobby screen full
           screen on the lobby TV on club nights, from 5:00 to 8:00 pm, starts with Windows and keeps itself up to date.

@@ -11,6 +11,7 @@ import NoticeBanner, { NOTICE_CHECK_MS, noticeShowing } from './components/Notic
 import CornerChip from './components/CornerChip.jsx';
 import StepChip from './components/brand/StepChip.jsx';
 import SettingsPanel from './components/SettingsPanel.jsx';
+import RemoteScreenPanel from './components/RemoteScreenPanel.jsx';
 import SlideEditorPanel from './components/SlideEditorPanel.jsx';
 import DebugPanel from './components/DebugPanel.jsx';
 import SetupCard, { useSetupCard } from './components/SetupCard.jsx';
@@ -852,6 +853,9 @@ export default function App() {
   // whether it was opened from Settings → Slides (so closing it goes back
   // there) or straight from the keyboard (so closing it returns to the stage).
   const [settingsTab, setSettingsTab] = useState(null);
+  // The settings page: a lobby TV opened from Screens, edited in the Worker.
+  const [managedScreen, setManagedScreen] = useState(null);
+  const backToScreens = () => { setSettingsTab('screens'); setManagedScreen(null); };
   const [editorFromSettings, setEditorFromSettings] = useState(false);
   const [debugOpen, setDebugOpen] = useState(false);
   const [gearIdle, setGearIdle] = useState(true);
@@ -1688,9 +1692,29 @@ export default function App() {
         </button>
       )}
 
-      {settingsOpen && (
+      {settingsOpen && SETTINGS_PAGE && managedScreen && (
+        <ErrorBoundary label="settings-panel" onError={backToScreens}>
+          <RemoteScreenPanel
+            screen={managedScreen}
+            shared={shared}
+            shareStatus={shareStatus}
+            onShare={shareSettings}
+            onBack={backToScreens}
+            onForgotten={backToScreens}
+            onRenamed={(name) => setManagedScreen((s) => (s ? { ...s, name } : s))}
+            onOpenSlideEditor={() => {
+              setSettingsOpen(false);
+              setEditorFromSettings(true);
+              setSlideEditorOpen(true);
+            }}
+          />
+        </ErrorBoundary>
+      )}
+
+      {settingsOpen && !(SETTINGS_PAGE && managedScreen) && (
         <ErrorBoundary label="settings-panel" onError={() => setSettingsOpen(false)}>
           <SettingsPanel
+            onOpenScreen={SETTINGS_PAGE ? setManagedScreen : null}
             config={config}
             savedConfig={storedConfig}
             overrides={overrides}

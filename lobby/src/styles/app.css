@@ -1518,6 +1518,56 @@ html, body, #root {
 }
 .panel .scope-tag--shared { background: var(--brand-blue); color: #ffffff; }
 .panel .scope-tag--screen { background: var(--brand-cloud); color: var(--panel-ink); box-shadow: inset 0 0 0 1.5px var(--panel-keyline); }
+
+/* The settings page's Screens (SETTINGS.md, phase 2): one row per device in
+   its kind's card, the device drawn in line on the kit's cloud tile, then its
+   name, whether it is on, and the way in. Rows are ruled like the printer
+   dashboard's lists, not boxed: the card is already the box. */
+.panel .screen-list {
+  list-style: none;
+  margin: 0 0 0.8rem;
+  padding: 0;
+}
+.panel .screen-row + .screen-row { border-top: 1.5px solid var(--panel-card-line); }
+.panel .screen-row__main {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.9rem;
+  padding: 0.75rem 0;
+}
+.panel .screen-row__glyph {
+  display: grid;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 12px;
+  background: var(--brand-cloud);
+  color: var(--brand-blue-deep, var(--panel-ink));
+}
+.panel .screen-row__text { display: grid; gap: 0.15rem; min-width: 0; }
+.panel .screen-row__name {
+  font-family: var(--font-condensed);
+  font-size: 1.15rem;
+  letter-spacing: 0.02em;
+  overflow-wrap: anywhere;
+}
+.panel .screen-row__meta { color: var(--panel-muted); font-size: 0.9rem; }
+.panel .screen-row__body { padding: 0 0 0.9rem 3.65rem; }
+.panel .screen-row.is-open .screen-row__glyph { background: var(--brand-blue); color: #ffffff; }
+.panel .screen-state { display: inline-flex; align-items: center; gap: 0.35rem; font-weight: 700; color: var(--panel-ink); }
+.panel .screen-state .dot { width: 0.6rem; height: 0.6rem; border-radius: 50%; background: var(--panel-keyline); }
+.panel .screen-state--on .dot { background: var(--brand-tnt); box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-tnt) 25%, transparent); }
+.panel .screen-overview__state { margin: 0 0 0.6rem; }
+.panel .screens-summary { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+/* A screen opened from the list: the way back sits under its name. */
+.panel--settings .panel-header .settings-screen-back { grid-column: 1 / -1; grid-row: 2; justify-self: start; }
+.panel--opening { display: grid; gap: 1rem; justify-items: start; }
+@media (max-width: 719px) {
+  .panel .screen-row__main { grid-template-columns: auto minmax(0, 1fr); }
+  .panel .screen-row__main > button { grid-column: 1 / -1; justify-self: start; }
+  .panel .screen-row__body { padding-left: 0; }
+}
 .panel-card__tab .brand-tab__content {
   padding: 0.75rem 0.7rem 1.3rem 1.4rem;
 }
