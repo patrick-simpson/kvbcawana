@@ -179,11 +179,23 @@ function KindSettings({ screen, onChanged, onGone }) {
     const ask = key === 'printRole' && value === false
       ? `Turn off the print server on ${screen.name}? If a label is printing or waiting, it finishes first; then ${screen.name} restarts without it.`
       : `${value ? 'Turn on' : 'Turn off'} ${words?.title.toLowerCase()} on ${screen.name}?`;
-    if (words?.confirm && !window.confirm(ask)) return;
     const next = sanitizeScreenSettings(screen.kind, { ...(settings || {}), [key]: value });
+    // A computer refuses both roles off and hours that end before they start
+    // (it would put its own copy back two minutes later), so say so here.
+    if (screen.kind === 'computer') {
+      if (next.printRole === false && next.displayRole === false) {
+        setNote({ warn: true, text: `${screen.name} needs at least one role: turn the other one on first.` });
+        return;
+      }
+      if (typeof next.displayFrom === 'string' && typeof next.displayUntil === 'string' && next.displayFrom >= next.displayUntil) {
+        setNote({ warn: true, text: 'Not saved: "Display from" has to be before "Display until", the same evening.' });
+        return;
+      }
+    }
+    if (words?.confirm && !window.confirm(ask)) return;
     setSettings(next);
     const res = await saveScreenSettings(screen.id, screen.kind, next);
-    setNote(res.ok ? { text: `Saved. ${screen.name} takes it within seconds${screen.online ? '' : ' of coming on'}.` } : { warn: true, text: res.message || 'Not saved.' });
+    setNote(res.ok ? { text: `Saved. ${screen.name} takes it ${screen.kind === 'computer' ? 'within 2 minutes' : 'within seconds'}${screen.online ? '' : ' of coming on'}.` } : { warn: true, text: res.message || 'Not saved.' });
   };
 
   const spec = /** @type {Record<string, any>} */ (SCREEN_SPECS[/** @type {'projector'} */ (screen.kind)] || {});
