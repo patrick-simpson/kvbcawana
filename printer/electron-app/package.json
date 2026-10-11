@@ -1,7 +1,7 @@
 {
   "name": "awana-label-printer",
   "version": "8.3.0",
-  "description": "Silent label printing for Awana check-in",
+  "description": "KVBC Awana: the print server and the screens, one app for every KVBC Awana computer",
   "main": "main.js",
   "scripts": {
     "dev": "electron .",
@@ -24,7 +24,7 @@
   },
   "build": {
     "appId": "com.kvbc.awana-label-printer",
-    "productName": "Club Label Printer",
+    "productName": "KVBC Awana",
     "publish": {
       "provider": "generic",
       "url": "https://awana.kvbchurch.org/updates/printer/"
@@ -39,12 +39,15 @@
       "runAfterFinish": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "artifactName": "Club-Label-Printer-Setup.exe"
+      "artifactName": "KVBC-Awana-Setup.exe",
+      "shortcutName": "KVBC Awana"
     },
     "files": [
       "main.js",
       "preload.js",
       "src/**",
+      "!src/**/*.test.*",
+      "static/**",
       "dist/**",
       "build/icon.png"
     ],

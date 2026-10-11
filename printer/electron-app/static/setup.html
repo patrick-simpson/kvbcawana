@@ -1,0 +1,459 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<!-- The brand kit is the print server's mirror (print-server/public/brand/,
+     byte-identical to lobby/shared/brand/). From this file it is two folders
+     up in both runs: electron-app/static -> printer/print-server in
+     development, and resources/app.asar/static -> resources/print-server in
+     the installed app (extraResources ships print-server/public/**). -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self' 'unsafe-inline' file:; font-src file:; img-src file:; script-src 'unsafe-inline'">
+<title>KVBC Awana: set up this computer</title>
+<link rel="stylesheet" href="../../print-server/public/brand/fonts.css">
+<link rel="stylesheet" href="../../print-server/public/brand/tokens.css">
+<style>
+  /* The wizard in the brand kit: Paytone One shouts the step, Londrina Solid
+     labels, Figtree is read. One blue rail with the Awana Clubs mark and the
+     steps; one paper panel with the question. The hex after each var() is the
+     kit's own value (tokens.css), for a stripped build. */
+  :root {
+    --blue: var(--brand-blue, #4C72B8);
+    --blue-deep: var(--brand-blue-deep, #34569A);
+    --ink: var(--brand-ink, #231F20);
+    --cloud: var(--brand-cloud, #D6EFF8);
+    --sun: var(--brand-sun, #FCB614);
+    --orange: var(--brand-orange, #FAA41D);
+    --orange-deep: var(--brand-orange-deep, #C97A08);
+    --cream: var(--brand-cream, #FFE8C2);
+    --tnt: var(--brand-tnt, #58BD79);
+    --tnt-deep: var(--brand-tnt-deep, #2F8A4E);
+    --tnt-tint: var(--brand-tnt-tint, #D0E9D5);
+    --cubbies-tint: var(--brand-cubbies-tint, #C4DDF3);
+    --sparks-deep: var(--brand-sparks-deep, #B82B32);
+    --sparks-tint: var(--brand-sparks-tint, #FDDACF);
+    --page: #F6F8FB;
+    --line: #E1E7EF;
+    --line-strong: #CFD8E3;
+    --ink-soft: #4A5160;
+    --ink-faint: #6B7280;
+    --f-shout: var(--brand-font-display, 'Paytone One', 'Arial Rounded MT Bold', sans-serif);
+    --f-label: var(--brand-font-label, 'Londrina Solid', 'Arial Narrow', sans-serif);
+    --f-read: var(--brand-font-body, 'Figtree', 'Segoe UI', system-ui, sans-serif);
+    --pop: var(--brand-ease-pop, cubic-bezier(0.34, 1.56, 0.64, 1));
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { margin: 0; height: 100%; }
+  body { display: grid; grid-template-columns: 236px 1fr; background: var(--page); color: var(--ink); font: 14px/1.45 var(--f-read); overflow: hidden; }
+  :focus-visible { outline: 3px solid var(--ink); outline-offset: 2px; }
+
+  /* ── The rail ── */
+  .rail { background: var(--blue); color: #fff; padding: 22px 20px 18px; display: flex; flex-direction: column; gap: 22px; }
+  .rail img { width: 104px; height: auto; display: block; }
+  .rail h1 { margin: 0; font: 400 26px/1.02 var(--f-shout); }
+  .rail h1 small { display: block; margin-top: 6px; font: 400 13px/1.2 var(--f-label); letter-spacing: .08em; text-transform: uppercase; color: var(--cloud); }
+  .steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; counter-reset: step; }
+  .steps li { counter-increment: step; display: flex; align-items: center; gap: 10px; padding: 6px 8px; border-radius: 10px;
+    font: 400 15px/1.1 var(--f-label); letter-spacing: .06em; text-transform: uppercase; color: var(--cloud); }
+  .steps li::before { content: counter(step); flex: none; width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center;
+    font: 400 14px/1 var(--f-shout); letter-spacing: 0; background: rgba(255,255,255,.14); color: #fff; }
+  .steps li.done::before { content: '\2713'; background: var(--tnt); }
+  .steps li.now { background: rgba(255,255,255,.12); color: #fff; }
+  .steps li.now::before { background: var(--sun); color: var(--ink); }
+  .rail .foot { margin-top: auto; font-size: 12px; color: var(--cloud); }
+
+  /* ── The panel ── */
+  main { display: grid; grid-template-rows: 1fr auto; min-width: 0; }
+  .step { padding: 30px 36px 8px; overflow-y: auto; }
+  .kicker { margin: 0 0 4px; font: 400 14px/1 var(--f-label); letter-spacing: .1em; text-transform: uppercase; color: var(--blue-deep); }
+  h2 { margin: 0 0 8px; font: 400 30px/1.05 var(--f-shout); color: var(--ink); }
+  .lede { margin: 0 0 22px; color: var(--ink-soft); max-width: 52ch; }
+
+  /* Role cards: a coloured tab across the top, the card presses in when on. */
+  .roles { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .role { position: relative; display: block; cursor: pointer; background: #fff; border: 2px solid var(--line-strong); border-radius: 16px;
+    padding: 0 0 16px; overflow: hidden; box-shadow: 0 4px 0 var(--line-strong); transition: transform .2s var(--pop), box-shadow .2s; }
+  .role:hover { transform: translateY(-1px); }
+  .role input { position: absolute; opacity: 0; pointer-events: none; }
+  .role .tab { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; font: 400 15px/1 var(--f-label);
+    letter-spacing: .08em; text-transform: uppercase; color: #fff; background: var(--tone); text-shadow: .07em .07em 0 var(--tone-deep); }
+  .role .tick { width: 22px; height: 22px; border-radius: 6px; border: 2px solid rgba(255,255,255,.8); display: grid; place-items: center; font: 900 14px/1 var(--f-read); text-shadow: none; }
+  .role b { display: block; margin: 14px 16px 4px; font: 400 21px/1.1 var(--f-shout); }
+  .role span.what { display: block; margin: 0 16px; color: var(--ink-soft); font-size: 13px; }
+  .role.print { --tone: var(--tnt-deep); --tone-deep: #1f5e35; }
+  .role.display { --tone: var(--orange-deep); --tone-deep: #8a5205; }
+  .role:has(input:checked) { border-color: var(--tone); box-shadow: 0 2px 0 var(--tone); transform: translateY(2px); }
+  .role:has(input:checked) .tick::after { content: '\2713'; }
+  .role:has(input:focus-visible) { outline: 3px solid var(--ink); outline-offset: 3px; }
+
+  label.field { display: block; margin: 0 0 6px; font-weight: 700; font-size: 13px; color: var(--ink-soft); }
+  input.text, select { width: 100%; max-width: 420px; padding: 10px 14px; border: 2px solid var(--line-strong); border-radius: 12px; background: #fff;
+    font: 15px/1.2 var(--f-read); color: var(--ink); }
+  input.text:focus, select:focus { border-color: var(--blue); outline: 3px solid var(--cloud); outline-offset: 0; }
+  .hint { margin: 6px 0 0; font-size: 12.5px; color: var(--ink-faint); max-width: 56ch; }
+  .group { margin-bottom: 20px; }
+  .msg { margin: 12px 0 0; padding: 9px 13px; border-radius: 10px; font-size: 13px; max-width: 420px; }
+  .msg.bad { background: var(--sparks-tint); border-left: 5px solid var(--sparks-deep); }
+  .msg.good { background: var(--tnt-tint); border-left: 5px solid var(--tnt-deep); }
+  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+
+  .chips { display: flex; flex-direction: column; gap: 8px; max-width: 460px; }
+  .chip { display: grid; grid-template-columns: 34px 1fr; gap: 10px; align-items: center; padding: 9px 12px; border: 2px solid var(--line-strong);
+    border-radius: 12px; background: #fff; cursor: pointer; }
+  .chip input { position: absolute; opacity: 0; pointer-events: none; }
+  .chip .n { width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; font: 400 16px/1 var(--f-shout); background: var(--cream); color: var(--orange-deep); }
+  .chip small { display: block; color: var(--ink-faint); font-size: 12px; }
+  .chip:has(input:checked) { border-color: var(--orange-deep); background: #FFF8EC; }
+  .chip:has(input:checked) .n { background: var(--orange); color: #fff; }
+  .chip:has(input:focus-visible) { outline: 3px solid var(--ink); outline-offset: 2px; }
+  .times { display: flex; gap: 10px; align-items: center; }
+  .times input { width: 140px; }
+
+  .summary { list-style: none; padding: 0; margin: 0; max-width: 480px; background: #fff; border-radius: 14px; box-shadow: 0 2px 0 var(--line); }
+  .summary li { display: flex; justify-content: space-between; gap: 14px; padding: 10px 16px; border-bottom: 1px solid var(--line); }
+  .summary li:last-child { border-bottom: 0; }
+  .summary span { font: 400 14px/1.3 var(--f-label); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-faint); }
+  .summary b { text-align: right; font-weight: 700; }
+  .check { display: flex; gap: 8px; align-items: center; margin-top: 16px; font-weight: 700; font-size: 13px; cursor: pointer; }
+  .check input { width: 16px; height: 16px; accent-color: var(--blue); margin: 0; }
+
+  /* ── The bar ── */
+  .bar { display: flex; align-items: center; gap: 12px; padding: 14px 36px 20px; }
+  .bar .spacer { flex: 1; }
+  .btn { display: inline-flex; align-items: center; gap: 6px; padding: 10px 20px; border: 2px solid var(--line-strong); border-radius: 999px; cursor: pointer;
+    font: 400 16px/1.1 var(--f-label); letter-spacing: .07em; text-transform: uppercase; background: #fff; color: var(--ink); box-shadow: 0 3px 0 var(--line-strong);
+    transition: transform .2s var(--pop); }
+  .btn:hover { transform: translateY(-1px); }
+  .btn:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--line-strong); }
+  .btn:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+  .btn.go { background: var(--blue); border-color: var(--blue); color: #fff; box-shadow: 0 3px 0 var(--blue-deep); }
+  .btn.go:active { box-shadow: 0 1px 0 var(--blue-deep); }
+  .btn.small { padding: 6px 14px; font-size: 14px; box-shadow: 0 2px 0 var(--line-strong); }
+  .link { background: none; border: 0; padding: 4px; cursor: pointer; font: 13px var(--f-read); color: var(--ink-soft); text-decoration: underline; text-underline-offset: 2px; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+  <aside class="rail">
+    <img src="../../print-server/public/brand/logos/awana-clubs-white.svg" alt="Awana Clubs" width="104" height="44">
+    <h1>KVBC Awana<small>Set up this computer</small></h1>
+    <ol class="steps" id="steps"></ol>
+    <div class="foot" id="version"></div>
+  </aside>
+
+  <main>
+    <!-- 1. Role -->
+    <section class="step" data-step="role">
+      <p class="kicker">What it does</p>
+      <h2>What is this computer for?</h2>
+      <p class="lede">Choose one or both. You can change this later from the tray icon, under Set up this computer.</p>
+      <div class="roles">
+        <label class="role print">
+          <input type="checkbox" id="r-print">
+          <span class="tab">Print server <span class="tick" aria-hidden="true"></span></span>
+          <b>Prints name tags</b>
+          <span class="what">The check-in computer with the label printer. Runs the print server for TwoTimTwo, the touch check-in and the phones.</span>
+        </label>
+        <label class="role display">
+          <input type="checkbox" id="r-display">
+          <span class="tab">Display <span class="tick" aria-hidden="true"></span></span>
+          <b>Puts a screen up</b>
+          <span class="what">The lobby signage, the projector or Journey, full screen on a TV or projector on club nights.</span>
+        </label>
+      </div>
+      <p class="msg bad" id="role-bad" hidden>Choose at least one.</p>
+    </section>
+
+    <!-- 2. Passphrase -->
+    <section class="step" data-step="signin" hidden>
+      <p class="kicker">Sign in</p>
+      <h2>The church passphrase</h2>
+      <p class="lede">The same word every screen uses. It signs this computer in to the sync service, so it can be found and changed from awana.kvbchurch.org/settings.</p>
+      <div class="group">
+        <label class="field" for="pass">Passphrase</label>
+        <div class="row">
+          <input class="text" id="pass" type="password" autocomplete="off" spellcheck="false" style="max-width:300px">
+          <button class="btn small" id="sign-in" type="button">Sign in</button>
+        </div>
+        <p class="msg good" id="sign-ok" hidden></p>
+        <p class="msg bad" id="sign-bad" hidden></p>
+        <p class="hint">Kept in Windows' protected storage for this user, never in a plain file. The passphrase itself is not kept.</p>
+      </div>
+    </section>
+
+    <!-- 3. Name -->
+    <section class="step" data-step="name" hidden>
+      <p class="kicker">Its name</p>
+      <h2>What should we call it?</h2>
+      <p class="lede">So you can tell the computers apart in the tray and on the settings page. Where it is works best.</p>
+      <div class="group">
+        <label class="field" for="name">Name</label>
+        <input class="text" id="name" maxlength="60" autocomplete="off" placeholder="Check-in desk, Sound room, Journey room...">
+      </div>
+    </section>
+
+    <!-- 4. Printer -->
+    <section class="step" data-step="printer" hidden>
+      <p class="kicker">Print server</p>
+      <h2>Which printer makes the name tags?</h2>
+      <p class="lede">The 4 x 2 label printer. Turn it on and plug it in first, then Refresh if it is not listed.</p>
+      <div class="group">
+        <label class="field" for="printer">Label printer</label>
+        <div class="row">
+          <select id="printer" style="max-width:340px"></select>
+          <button class="btn small" id="refresh" type="button">Refresh</button>
+        </div>
+        <p class="msg bad" id="printer-bad" hidden></p>
+      </div>
+      <div class="group">
+        <label class="field" for="checkin">Check-in page</label>
+        <input class="text" id="checkin" type="url" spellcheck="false">
+        <p class="hint">Opens in Chrome when the computer starts. TwoTimTwo's check-in page, unless you know otherwise.</p>
+      </div>
+    </section>
+
+    <!-- 5. Screen -->
+    <section class="step" data-step="screen" hidden>
+      <p class="kicker">Display</p>
+      <h2>Which screen, and where?</h2>
+      <div class="group">
+        <label class="field" for="screen">Screen</label>
+        <select id="screen" style="max-width:340px"></select>
+      </div>
+      <div class="group">
+        <div class="row" style="justify-content:space-between;max-width:460px;margin-bottom:6px">
+          <span class="field" style="margin:0">Monitor</span>
+          <button class="link" id="identify" type="button">Show the numbers on the monitors</button>
+        </div>
+        <div class="chips" id="monitors" role="radiogroup" aria-label="Monitor"></div>
+      </div>
+      <div class="group">
+        <span class="field">Hours on club nights</span>
+        <div class="times">
+          <input class="text" id="h-start" type="time" step="60" aria-label="From">
+          <span>to</span>
+          <input class="text" id="h-end" type="time" step="60" aria-label="To">
+        </div>
+        <p class="msg bad" id="hours-bad" hidden>The screen has to open before it closes, on the same day.</p>
+        <p class="hint">Only on club nights from the church calendar; cancelled weeks and the summer stay dark.</p>
+      </div>
+    </section>
+
+    <!-- 6. Done -->
+    <section class="step" data-step="done" hidden>
+      <p class="kicker">Ready</p>
+      <h2>All set. Check it over.</h2>
+      <ul class="summary" id="summary"></ul>
+      <label class="check"><input type="checkbox" id="boot" checked> Start with Windows</label>
+      <p class="msg bad" id="finish-bad" hidden></p>
+    </section>
+
+    <div class="bar">
+      <button class="btn" id="back" type="button">Back</button>
+      <span class="spacer"></span>
+      <button class="link" id="skip" type="button" hidden>Sign in later</button>
+      <button class="btn go" id="next" type="button">Next</button>
+    </div>
+  </main>
+
+<script>
+  const api = window.kvbcSetup;
+  const $ = (id) => document.getElementById(id);
+  const TITLES = { role: 'What it does', signin: 'Sign in', name: 'Its name', printer: 'The printer', screen: 'The screen', done: 'Ready' };
+  const DEFAULT_CHECKIN = 'https://kvbchurch.twotimtwo.com/clubber/checkin?#';
+  let state = null;
+  let signedIn = false;
+  let at = 0;
+
+  const steps = () => ['role', 'signin', 'name',
+    ...($('r-print').checked ? ['printer'] : []),
+    ...($('r-display').checked ? ['screen'] : []),
+    'done'];
+
+  function show() {
+    const list = steps();
+    at = Math.min(at, list.length - 1);
+    const current = list[at];
+    for (const s of document.querySelectorAll('[data-step]')) s.hidden = s.dataset.step !== current;
+    $('steps').textContent = '';
+    list.forEach((id, i) => {
+      const li = document.createElement('li');
+      li.textContent = TITLES[id];
+      if (i < at) li.className = 'done';
+      if (i === at) { li.className = 'now'; li.setAttribute('aria-current', 'step'); }
+      $('steps').append(li);
+    });
+    $('back').hidden = at === 0;
+    $('skip').hidden = current !== 'signin' || signedIn;
+    $('next').textContent = current === 'done' ? 'Finish' : current === 'signin' && !signedIn ? 'Sign in' : 'Next';
+    if (current === 'done') renderSummary();
+    const focus = { signin: 'pass', name: 'name', printer: 'printer', screen: 'screen' }[current];
+    if (focus) setTimeout(() => $(focus).focus(), 0);
+  }
+
+  function says(id, text) { $(id).hidden = !text; $(id).textContent = text || ''; }
+
+  async function signIn() {
+    says('sign-bad', '');
+    $('sign-in').disabled = true;
+    $('next').disabled = true;
+    try {
+      const r = await api.signIn($('pass').value);
+      if (r && r.ok) {
+        signedIn = true;
+        $('pass').value = '';
+        says('sign-ok', 'Signed in. This computer can now be found on the settings page.');
+        return true;
+      }
+      const left = r && Number.isFinite(r.triesLeft) ? ` ${r.triesLeft} tries left.` : '';
+      says('sign-bad', `${(r && r.error) || 'That did not work.'}${left}`);
+      return false;
+    } finally {
+      $('sign-in').disabled = false;
+      $('next').disabled = false;
+    }
+  }
+
+  async function loadPrinters() {
+    const list = await api.printers();
+    const sel = $('printer');
+    const keep = sel.value || state.config.printerName || '';
+    sel.textContent = '';
+    for (const p of list) {
+      const o = document.createElement('option');
+      o.value = p.name;
+      o.textContent = p.isDefault ? `${p.name} (Windows default)` : p.name;
+      sel.append(o);
+    }
+    if (keep && list.some((p) => p.name === keep)) sel.value = keep;
+    says('printer-bad', list.length ? '' : 'No printers found. Plug the label printer in, then Refresh.');
+  }
+
+  function renderMonitors() {
+    const box = $('monitors');
+    box.textContent = '';
+    const chosen = state.display.monitorId;
+    for (const m of state.monitors) {
+      const label = document.createElement('label');
+      label.className = 'chip';
+      label.innerHTML = '<input type="radio" name="monitor"><span class="n"></span><span><b></b><small></small></span>';
+      label.querySelector('input').value = String(m.id);
+      label.querySelector('input').checked = chosen === m.id || (chosen == null && state.monitors.length === 1);
+      label.querySelector('.n').textContent = String(m.n);
+      label.querySelector('b').textContent = m.label;
+      label.querySelector('small').textContent = `${m.size}${m.primary ? ', the main monitor' : ''}`;
+      box.append(label);
+    }
+  }
+
+  const pickedMonitor = () => {
+    const el = document.querySelector('input[name="monitor"]:checked');
+    return el ? Number(el.value) : null;
+  };
+
+  function hoursOk() {
+    const a = $('h-start').value; const b = $('h-end').value;
+    return /^\d\d:\d\d$/.test(a) && /^\d\d:\d\d$/.test(b) && a < b;
+  }
+
+  function clock(hhmm) {
+    const [h, m] = hhmm.split(':').map(Number);
+    return `${((h + 11) % 12) + 1}:${String(m).padStart(2, '0')} ${h < 12 ? 'am' : 'pm'}`;
+  }
+
+  function renderSummary() {
+    const rows = [];
+    const roles = [$('r-print').checked && 'Print server', $('r-display').checked && 'Display'].filter(Boolean).join(' and ');
+    rows.push(['This computer', $('name').value.trim() || state.hostname]);
+    rows.push(['Does', roles]);
+    rows.push(['Sync service', signedIn ? 'Signed in' : 'Not signed in']);
+    if ($('r-print').checked) rows.push(['Label printer', $('printer').value || 'None chosen']);
+    if ($('r-display').checked) {
+      const scr = state.screens.find((s) => s.id === $('screen').value);
+      const mon = state.monitors.find((m) => m.id === pickedMonitor());
+      rows.push(['Screen', scr ? scr.name : '']);
+      rows.push(['Monitor', mon ? `${mon.n}: ${mon.label}` : 'Choose later from the tray']);
+      rows.push(['Hours', `${clock($('h-start').value)} to ${clock($('h-end').value)}`]);
+    }
+    const ul = $('summary');
+    ul.textContent = '';
+    for (const [k, v] of rows) {
+      const li = document.createElement('li');
+      const s = document.createElement('span'); s.textContent = k;
+      const b = document.createElement('b'); b.textContent = v;
+      li.append(s, b);
+      ul.append(li);
+    }
+  }
+
+  async function next() {
+    const current = steps()[at];
+    if (current === 'role' && !$('r-print').checked && !$('r-display').checked) { says('role-bad', 'Choose at least one.'); return; }
+    says('role-bad', '');
+    if (current === 'signin' && !signedIn && !(await signIn())) return;
+    if (current === 'printer' && !$('printer').value) { says('printer-bad', 'Choose the label printer.'); return; }
+    if (current === 'screen' && !hoursOk()) { $('hours-bad').hidden = false; return; }
+    $('hours-bad').hidden = true;
+    if (current === 'done') { await finish(); return; }
+    at += 1;
+    show();
+  }
+
+  async function finish() {
+    says('finish-bad', '');
+    $('next').disabled = true;
+    $('next').textContent = 'Saving';
+    const r = await api.finish({
+      print: $('r-print').checked,
+      display: $('r-display').checked,
+      name: $('name').value.trim() || state.hostname,
+      printerName: $('printer').value,
+      checkinUrl: $('checkin').value.trim() || DEFAULT_CHECKIN,
+      screen: $('screen').value,
+      monitorId: pickedMonitor(),
+      hours: { start: $('h-start').value, end: $('h-end').value },
+      launchOnBoot: $('boot').checked,
+    });
+    if (r && r.ok) { $('next').textContent = 'Done'; setTimeout(() => api.close(), 900); return; }
+    $('next').disabled = false;
+    $('next').textContent = 'Finish';
+    says('finish-bad', (r && r.error) || 'It could not be saved. Try again.');
+  }
+
+  $('next').addEventListener('click', next);
+  $('back').addEventListener('click', () => { at = Math.max(0, at - 1); show(); });
+  $('skip').addEventListener('click', () => { at += 1; show(); });
+  $('sign-in').addEventListener('click', signIn);
+  $('pass').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); next(); } });
+  $('name').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); next(); } });
+  $('refresh').addEventListener('click', loadPrinters);
+  $('identify').addEventListener('click', () => api.identify());
+  for (const id of ['r-print', 'r-display']) $(id).addEventListener('change', () => { says('role-bad', ''); show(); });
+
+  (async () => {
+    state = await api.state();
+    $('version').textContent = `Version ${state.version}`;
+    $('r-print').checked = state.roles.print;
+    $('r-display').checked = state.roles.display;
+    $('name').value = state.roles.name || '';
+    $('name').placeholder = state.hostname;
+    signedIn = Boolean(state.sync && state.sync.signedIn);
+    if (signedIn) says('sign-ok', 'This computer is signed in. Type the passphrase again only to sign in afresh.');
+    $('checkin').value = state.config.checkinUrl || DEFAULT_CHECKIN;
+    $('boot').checked = state.config.launchOnBoot !== false;
+    for (const s of state.screens) {
+      const o = document.createElement('option');
+      o.value = s.id;
+      o.textContent = s.name;
+      $('screen').append(o);
+    }
+    $('screen').value = state.display.settings.screen;
+    $('h-start').value = state.display.settings.hours.start;
+    $('h-end').value = state.display.settings.hours.end;
+    renderMonitors();
+    show();
+    loadPrinters();
+  })();
+</script>
+</body>
+</html>
