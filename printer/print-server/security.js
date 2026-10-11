@@ -169,6 +169,66 @@ function isExactAllowedOrigin(origin, origins) {
   });
 }
 
+// ── The settings page (awana.kvbchurch.org/settings) ──────────────────────────
+// Owner, 2026-10-11: the print dashboard's settings live on the one settings
+// page, opened in the laptop's own browser, which reaches this server on
+// http://localhost (an https page may call it). That is a PUBLIC https origin
+// talking to a loopback server, so the rule is the slides publish's, widened by
+// as little as it can be:
+//   • ONE exact origin (never churchConfig.displayOrigins, which still names the
+//     archived github.io site, and never a wildcard);
+//   • a short table of paths and methods, not "the whole server";
+//   • every path but /health needs the publish token (the credential the page
+//     already holds for publishing slides) AND a loopback socket;
+//   • POST /config takes only the printer's own keys: nothing that holds a
+//     secret, opens the network or widens CORS can be changed from the page.
+// Everything the dashboard changes in a secret stays on the dashboard.
+const SETTINGS_PAGE_ORIGIN = 'https://awana.kvbchurch.org';
+
+// `open` routes answer without the token: the page probes /health to learn
+// whether this is the check-in laptop at all (it holds no names; the check-in
+// site's own scripts already read it).
+const SETTINGS_PAGE_ROUTES = {
+  '/health': { methods: ['GET'], open: true },
+  '/printers': { methods: ['GET'] },
+  '/config': { methods: ['GET', 'POST'] },
+  '/config/label-templates': { methods: ['GET', 'POST'] },
+  '/config/schedule': { methods: ['GET', 'POST'] },
+  '/clubs': { methods: ['GET'] },
+  '/history/today': { methods: ['GET'] },
+  '/reprint': { methods: ['POST'] },
+  '/diagnostics': { methods: ['GET'] },
+  '/failures': { methods: ['GET'] },
+  '/preview': { methods: ['GET'] },
+  '/canary': { methods: ['POST'] },
+  '/printer/clear-queue': { methods: ['POST'] },
+  '/play-tune': { methods: ['POST'] },
+};
+
+const SETTINGS_PAGE_CONFIG_KEYS = [
+  'printerName', 'backupPrinterName', 'cupsMedia', 'pickupClubs',
+  'labelFooter', 'lateGraceMin', 'seasonTheme', 'firstTimerInverted', 'trophyBand',
+  'connectCard', 'connectCardAutoFirstTimer', 'connectCardGreeting', 'musicalPrinter',
+];
+
+// The route this origin may use for `method` on `pathname`, or null. `method`
+// is the one the page asked for: a preflight names it in
+// Access-Control-Request-Method, so the caller passes that for OPTIONS.
+function settingsPageRoute(origin, pathname, method) {
+  if (!isExactAllowedOrigin(origin, [SETTINGS_PAGE_ORIGIN])) return null;
+  if (!Object.prototype.hasOwnProperty.call(SETTINGS_PAGE_ROUTES, pathname)) return null;
+  const route = SETTINGS_PAGE_ROUTES[pathname];
+  const m = String(method || 'GET').toUpperCase();
+  return route.methods.includes(m) ? route : null;
+}
+
+// The keys of a POST /config body the settings page may not set (empty means
+// the body is fine). A body that is not a plain object has nothing to allow.
+function settingsPageConfigRefusals(body) {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return ['(body)'];
+  return Object.keys(body).filter((k) => !SETTINGS_PAGE_CONFIG_KEYS.includes(k));
+}
+
 function sanitizeAllowedOrigins(value) {
   if (!Array.isArray(value)) return [];
   return value
@@ -390,6 +450,11 @@ module.exports = {
   isAllowedOrigin,
   isExactAllowedOrigin,
   sanitizeAllowedOrigins,
+  SETTINGS_PAGE_ORIGIN,
+  SETTINGS_PAGE_ROUTES,
+  SETTINGS_PAGE_CONFIG_KEYS,
+  settingsPageRoute,
+  settingsPageConfigRefusals,
   isMutatingMethod,
   timingSafeStringEqual,
   isAcceptablePin,

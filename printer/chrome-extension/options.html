@@ -11,20 +11,30 @@
     p { font-size: 13px; color: #475569; line-height: 1.5; margin: 0 0 16px 0; }
     .btn { display: inline-block; padding: 9px 20px; border-radius: 6px; font-size: 13px; font-weight: 500; background: #2563eb; color: white; text-decoration: none; }
     .btn:hover { background: #1d4ed8; }
+    .quiet { font-size: 12px; margin: 16px 0 0 0; }
+    .quiet a { color: #2563eb; }
   </style>
 </head>
 <body>
-  <!-- Every setting lives on the print dashboard (6.26.0): the printer, the
-       sync service, the display key. Step Up Night and Awana Store Night are
-       on the panel on the check-in page itself. This page only points there. -->
+  <!-- Every setting lives on the one settings page (8.3.0): the printer, the
+       backup printer, labels, the schedule, diagnostics. options.js sends the
+       tab there when this computer is online; this card is what shows when it
+       is not, or for a moment before it goes. The print dashboard on this
+       computer stays as the fallback for a night with no internet. -->
   <div class="card">
     <h2>KVBC Check-in</h2>
     <p>
-      All settings are on the print dashboard: which printer the name tags print on, the backup
-      printer, the sync service and everything else. Step Up Night and Awana Store Night are switched
-      on the panel on the TwoTimTwo check-in page.
+      Settings are on awana.kvbchurch.org now: which printer the name tags print on, the backup
+      printer, the labels and the schedule, and the rest. Open that page on this computer and it
+      finds the printer by itself. Step Up Night and Awana Store Night are switched on the panel
+      on the TwoTimTwo check-in page.
     </p>
-    <a class="btn" href="http://localhost:3456/#settings" target="_blank" rel="noopener">Open the print dashboard</a>
+    <a class="btn" id="open-settings" href="https://awana.kvbchurch.org/settings" target="_blank" rel="noopener">Open settings</a>
+    <p class="quiet">
+      No internet tonight? <a href="http://localhost:3456/#settings" target="_blank" rel="noopener">Open the print dashboard</a>
+      on this computer instead.
+    </p>
   </div>
+  <script src="options.js"></script>
 </body>
 </html>

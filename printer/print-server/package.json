@@ -1,6 +1,6 @@
 {
   "name": "club-print-server",
-  "version": "8.2.0",
+  "version": "8.3.0",
   "description": "Silent label print server for Awana check-in",
   "main": "server.js",
   "dependencies": {

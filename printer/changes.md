@@ -1,4 +1,13 @@
-﻿## [8.2.0] - 2026-10-11
+﻿## [8.3.0] - 2026-10-11
+The printer's settings open on awana.kvbchurch.org/settings, and the extension points there.
+
+**New: the laptop's settings on the one settings page (owner).** Open awana.kvbchurch.org/settings in Chrome on this laptop and its new Laptop section finds this print server by itself: the name tag printer and the backup printer, the label footer and the label options, each club's label layout (with a preview), the pickup clubs, the club schedule, tonight's prints with a Reprint on each, the system diagnostics, a test label and Clear print queue. On any other computer or phone it says to open the page on the check-in laptop. The page reaches the server with the publish token it already uses for slides (paste it once under Setup if the page has none); without the token it can read only whether the server is running. The dashboard on this computer is unchanged and stays the fallback for a night with no internet.
+
+**What the page can and cannot do.** One origin only (https://awana.kvbchurch.org, not the old github.io site, not any other), a short list of calls, and the server answers Chrome's Private Network Access preflight for exactly those. Everything that holds a secret or opens the network is still the dashboard's alone, whatever the token: the phone PIN, the display key and login passphrase, the Pusher keys, the Wi-Fi switch, the allowed-origins list and the check-in URL are refused from the page. The settings page can set the printer's own keys and nothing else (`printerName`, `backupPrinterName`, `pickupClubs`, the label options). The dashboard, the extension and the phone page are called exactly as before.
+
+**The extension's Settings open the settings page.** The options page sends an online tab straight to awana.kvbchurch.org/settings (with no internet it shows a card linking to the dashboard on this computer), the popup's Settings button opens it, and so does the "Change" beside "Printing to" on the check-in page. The popup keeps a small Print dashboard (offline) button. The dashboard's Settings tab now says where settings live.
+
+## [8.2.0] - 2026-10-11
 BARF Bag labels, and a simpler BARFED tag.
 
 **New: BARF Bag labels (owner).** In the lobby screen's Settings → Setup → Cloud check-in → BARF Night, Print BARF Bag labels prints one label for every child checked in with Brought a friend tonight and one for each friend whose name was typed: the first name in capitals, "SOPHIA’S", over a slime band reading BARF BAG. They print together as one job, each child followed by their friend. A friend ticked at TwoTimTwo's own desk box has no name, so no label (Settings says how many). The laptop must be on.

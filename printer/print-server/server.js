@@ -3939,7 +3939,13 @@ function corsPolicy(req, res, next) {
   const isSlidesPath = DISPLAY_PUBLISH_PATHS.has(req.path);
   const slidesOrigin = isSlidesPath && security.isExactAllowedOrigin(
     origin, security.sanitizeAllowedOrigins(churchConfig.displayOrigins));
-  const allowed = slidesOrigin || security.isAllowedOrigin(origin, {
+  // The settings page (awana.kvbchurch.org/settings, SETTINGS.md phase 3): one
+  // exact origin, a short table of routes (security.SETTINGS_PAGE_ROUTES).
+  // For a preflight the method is the one being asked for.
+  const settingsRoute = security.settingsPageRoute(
+    origin, req.path,
+    req.method === 'OPTIONS' ? req.headers['access-control-request-method'] : req.method);
+  const allowed = slidesOrigin || Boolean(settingsRoute) || security.isAllowedOrigin(origin, {
     port: PORT,
     extraOrigins: security.sanitizeAllowedOrigins(config.allowedOrigins),
   });
@@ -3953,16 +3959,17 @@ function corsPolicy(req, res, next) {
     // are authenticated by PIN (or by being loopback), never by cookie.
     res.setHeader('Access-Control-Allow-Origin', origin);
     res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
-    // Authorization is only ever needed (or granted) on the slides path — it
-    // carries the publish token from the display app's slide editor.
+    // Authorization is only ever needed (or granted) on the slides path and the
+    // settings page's routes: it carries the publish token.
     res.setHeader('Access-Control-Allow-Headers',
-      isSlidesPath ? 'Content-Type,Authorization' : 'Content-Type,X-Awana-Pin');
+      (isSlidesPath || settingsRoute) ? 'Content-Type,Authorization' : 'Content-Type,X-Awana-Pin');
     res.setHeader('Access-Control-Max-Age', '600');
     // Chrome's Private Network Access: a public https page fetching a local
     // server preflights with this request header, and the fetch is blocked
-    // unless we opt in. Scoped to the slides path — nothing else on this
-    // server is meant to be reachable from a public origin.
-    if (isSlidesPath && req.headers['access-control-request-private-network'] === 'true') {
+    // unless we opt in. Scoped to the slides path and the settings page's
+    // routes — nothing else on this server is meant to be reachable from a
+    // public origin.
+    if ((isSlidesPath || settingsRoute) && req.headers['access-control-request-private-network'] === 'true') {
       res.setHeader('Access-Control-Allow-Private-Network', 'true');
     }
   }
@@ -3976,6 +3983,26 @@ function corsPolicy(req, res, next) {
   if (origin && !allowed && security.isMutatingMethod(req.method)) {
     console.warn(`[security] Refused ${req.method} ${req.path} from disallowed origin ${origin}`);
     return res.status(403).json({ error: 'Origin not allowed' });
+  }
+
+  // The settings page proves itself like the slides editor does: the publish
+  // token, on top of a loopback socket (this computer's own browser). Only
+  // /health is open. What passes is marked on the request, so a route that
+  // accepts "the dashboard on this computer" can accept the page too
+  // (isTrustedOrSettingsPage), and the secret-holding routes, which never
+  // look at the mark, cannot.
+  if (settingsRoute && !settingsRoute.open) {
+    if (!security.isLoopbackRequest(req)) {
+      return res.status(403).json({ error: 'The settings page can only reach the print server on the computer it runs on' });
+    }
+    if (!config.slidesPublishToken) {
+      return res.status(403).json({ error: 'No publish token is set on the print server. Open its dashboard → Lobby slides → Generate publish token, then paste it into the settings page.' });
+    }
+    if (!slidesTokenOk(req)) {
+      console.warn(`[security] Refused settings-page ${req.method} ${req.path}: wrong or missing publish token`);
+      return res.status(403).json({ error: 'Wrong publish token. Compare it with the print server dashboard → Lobby slides.' });
+    }
+    req.settingsPage = true;
   }
 
   return next();
@@ -8831,6 +8858,13 @@ function isTrustedConfigOrigin(req) {
   }
 }
 
+// The dashboard on this computer, or the settings page that corsPolicy let in
+// with the publish token. For the routes that change what the PRINTER does;
+// never for a secret (those stay on isTrustedConfigOrigin alone).
+function isTrustedOrSettingsPage(req) {
+  return isTrustedConfigOrigin(req) || req.settingsPage === true;
+}
+
 app.get('/config', (req, res) => {
   let saved;
   try {
@@ -8907,6 +8941,12 @@ app.post('/config', (req, res) => {
   } = req.body || {};
   if (!isTrustedConfigOrigin(req) && SECRET_CONFIG_KEYS.some(k => (req.body || {})[k] !== undefined)) {
     return res.status(403).json({ error: 'Pusher/PIN/display-login settings can only be changed from the dashboard on this computer' });
+  }
+  if (req.settingsPage) {
+    const refused = security.settingsPageConfigRefusals(req.body);
+    if (refused.length) {
+      return res.status(403).json({ error: `The settings page can change the printer's own settings only; ${refused.join(', ')} can be changed from the dashboard on this computer` });
+    }
   }
   try {
     const next = loadConfigFile();
@@ -9186,7 +9226,7 @@ app.post('/rehearsal', (req, res) => {
 });
 
 app.post('/play-tune', async (req, res) => {
-  if (!isTrustedConfigOrigin(req)) {
+  if (!isTrustedOrSettingsPage(req)) {
     return res.status(403).json({ error: 'The tune button only works from the dashboard on this computer' });
   }
   if (config.musicalPrinter !== true) {
@@ -9209,7 +9249,7 @@ app.post('/play-tune', async (req, res) => {
 // The body is validated BEFORE the platform short-circuit, exactly as
 // POST /print-pdf does, so the 400s stay observable from Linux CI.
 app.post('/printer/clear-queue', async (req, res) => {
-  if (!isTrustedConfigOrigin(req)) {
+  if (!isTrustedOrSettingsPage(req)) {
     return res.status(403).json({ error: 'The print queue can only be cleared from the dashboard on this computer' });
   }
   const wanted = String((req.body || {}).printerName || '').trim();
@@ -9255,7 +9295,7 @@ app.get('/config/label-templates', (req, res) => {
 // to restyle every label. The dashboard and extension options page (both
 // loopback) are the only writers.
 app.post('/config/label-templates', (req, res) => {
-  if (!isTrustedConfigOrigin(req)) {
+  if (!isTrustedOrSettingsPage(req)) {
     return res.status(403).json({ error: 'Label templates can only be changed from the dashboard on this computer' });
   }
   const cleaned = sanitizeLabelTemplates((req.body || {}).templates);

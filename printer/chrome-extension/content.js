@@ -2,7 +2,7 @@
   if (window.__awanaPrinterLoaded) return;
   window.__awanaPrinterLoaded = true;
 
-  const EXTENSION_VERSION = '8.2.0';
+  const EXTENSION_VERSION = '8.3.0';
   const PRINT_COOLDOWN = 2000;
   // POST /print is synchronous on the server: PowerShell + a cold printer can
   // take 15-30 s (the server retries the spooler internally). This must sit
@@ -29,7 +29,7 @@
   const STORE_KEY      = 'awana_storeMode';  // 'auto' | 'on' | 'off'
 
   let selectedMode        = localStorage.getItem(STORAGE_KEY) || 'auto';
-  // The printer is chosen in ONE place, the print dashboard (6.26.0): every
+  // The printer is chosen in ONE place, the settings page (the print dashboard until 8.3.0): every
   // print goes to the printer the server is set to, so this is always empty
   // and a choice this browser saved before is forgotten (just below).
   const selectedPrinterName = '';
@@ -1145,7 +1145,7 @@
 
     var printerLabel = sectionLabel('Printing to');
 
-    // Read-only: the printer is set on the print dashboard, and only there.
+    // Read-only: the printer is set on the settings page (awana.kvbchurch.org/settings), and only there.
     var printingTo = document.createElement('div');
     printingTo.id = 'awana-printing-to';
     Object.assign(printingTo.style, {
@@ -1156,7 +1156,7 @@
     printingToName.id = 'awana-printing-to-name';
     printingToName.textContent = 'Checking...';
     var printingToChange = document.createElement('a');
-    printingToChange.href = PRINT_SERVER + '/#settings';
+    printingToChange.href = 'https://awana.kvbchurch.org/settings';
     printingToChange.target = '_blank';
     printingToChange.rel = 'noopener';
     printingToChange.textContent = 'Change';
