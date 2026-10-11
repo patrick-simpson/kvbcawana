@@ -1,0 +1,394 @@
+// The report watcher (CLOUD-CHECKIN.md, piece 2, phase 1: READ-ONLY SHADOW).
+//
+// During the club window a Durable Object alarm reads TwoTimTwo's check-in
+// report every 15 seconds (TwoTimTwo's agreed limit, never faster: a manual
+// "read now" shares the same clock) and compares it with the last read:
+//   - a child new on the report is a check-in made on TwoTimTwo (nothing
+//     checks in through Cloudflare yet), which phase 2 will print a label for;
+//   - a child gone from it was undone on TwoTimTwo.
+// Phase 1 PUBLISHES NOTHING. It logs the tally it would publish and keeps a
+// status (GET /v1/cloud/status) for the shadow night, whose numbers must match
+// the laptop's authoritativeTonight() before anything depends on this.
+//
+// The extension's safety rules carry over: a report that parses fewer children
+// than its own Count: footers is partial and changes nothing, and a read that
+// would drop more than half the room at once is refused (the print server's
+// mass-undo guard, reconcileHistoryWithReport).
+//
+// What is kept, and how (TwoTimTwo's condition: everything encrypted):
+//   cloud:status  counts, times and fixed error codes only: no names, no ids
+//   cloud:snap    last read's clubber ids and clubs, AES-256-GCM sealed under a
+//                 key derived from the TwoTimTwo password secret (so a copy of
+//                 the storage alone opens nothing). No names, ever.
+// The session cookie and the password never touch storage (twotimtwo.js).
+
+import { TwoTimTwoClient, credentialsFrom } from './twotimtwo.js';
+import { fromBase64, toBase64 } from './crypto.js';
+
+/** TwoTimTwo's agreed limit (2026-10-11): one report read per 15 seconds. */
+export const READ_INTERVAL_MS = 15 * 1000;
+/** The longest an idle alarm sleeps before it looks at the clock again. */
+export const IDLE_MAX_MS = 6 * 60 * 60 * 1000;
+/**
+ * The club nights, the printer's church-config.json `clubNights` (test pins
+ * them equal), widened like the printer's tally tick: TALLY_LEAD_MIN before,
+ * TALLY_GRACE_MIN after.
+ */
+export const CLUB_NIGHTS = [{ dow: 3, start: '17:30', end: '20:00' }];
+export const LEAD_MIN = 60;
+export const GRACE_MIN = 60;
+export const TIME_ZONE = 'America/New_York';
+const LOG_MAX = 40;
+const CHECKIN_PAGE_RETRY_MS = 5 * 60 * 1000;
+const STATE_SALT = 'kvbc-awana-cloud-checkin';
+const STATE_INFO = 'watcher-state-v1';
+
+/** @param {string} hm */
+function minutesOf(hm) {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(hm);
+  return m ? Number(m[1]) * 60 + Number(m[2]) : 0;
+}
+
+const WEEKDAYS = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+
+/**
+ * The church's local date, weekday and minute of the day.
+ * @param {number} ms
+ * @returns {{ date: string, dow: number, minutes: number }}
+ */
+export function localTime(ms) {
+  const parts = Object.fromEntries(new Intl.DateTimeFormat('en-US', {
+    timeZone: TIME_ZONE, year: 'numeric', month: '2-digit', day: '2-digit',
+    weekday: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+  }).formatToParts(new Date(ms)).map((p) => [p.type, p.value]));
+  return {
+    date: `${parts.year}-${parts.month}-${parts.day}`,
+    dow: WEEKDAYS[/** @type {keyof typeof WEEKDAYS} */ (parts.weekday)] ?? 0,
+    minutes: (Number(parts.hour) % 24) * 60 + Number(parts.minute),
+  };
+}
+
+/**
+ * Is the watch window open, and if not, about how long until it opens? The
+ * estimate counts local minutes, so across a clock change it can be an hour
+ * out: the caller caps the sleep and asks again.
+ * @param {number} ms
+ */
+export function watchWindow(ms) {
+  const t = localTime(ms);
+  let untilMin = Infinity;
+  for (const night of CLUB_NIGHTS) {
+    const open = Math.max(minutesOf(night.start) - LEAD_MIN, 0);
+    const close = Math.min(minutesOf(night.end) + GRACE_MIN, 24 * 60);
+    if (night.dow === t.dow && t.minutes >= open && t.minutes < close) return { open: true, date: t.date, untilMs: 0 };
+    let days = (night.dow - t.dow + 7) % 7;
+    if (days === 0 && t.minutes >= open) days = 7;
+    untilMin = Math.min(untilMin, days * 24 * 60 + open - t.minutes);
+  }
+  return { open: false, date: t.date, untilMs: Math.max(60 * 1000, untilMin * 60 * 1000) };
+}
+
+/** @param {string} secret */
+async function stateKey(secret) {
+  const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), 'HKDF', false, ['deriveKey']);
+  return crypto.subtle.deriveKey(
+    { name: 'HKDF', hash: 'SHA-256', salt: new TextEncoder().encode(STATE_SALT), info: new TextEncoder().encode(STATE_INFO) },
+    base, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt'],
+  );
+}
+
+/** @param {string} secret @param {unknown} value */
+export async function sealState(secret, value) {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = new Uint8Array(await crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv, additionalData: new TextEncoder().encode(STATE_INFO) },
+    await stateKey(secret), new TextEncoder().encode(JSON.stringify(value)),
+  ));
+  return { v: 1, iv: toBase64(iv), ct: toBase64(ct) };
+}
+
+/** null when it will not open (another password, damaged): a fresh start. @param {string} secret @param {any} sealed */
+export async function openState(secret, sealed) {
+  try {
+    if (!sealed || sealed.v !== 1) return null;
+    const iv = fromBase64(sealed.iv);
+    const ct = fromBase64(sealed.ct);
+    if (!iv || !ct) return null;
+    const pt = await crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv, additionalData: new TextEncoder().encode(STATE_INFO) }, await stateKey(secret), ct,
+    );
+    return JSON.parse(new TextDecoder().decode(pt));
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * One child per clubber id (the report's own rule for identity), each in the
+ * first club table it appears in. The tally counts these.
+ * @param {{clubberId: string, club: string}[]} entries
+ * @returns {Record<string, string>} clubber id -> club
+ */
+export function childrenOf(entries) {
+  /** @type {Record<string, string>} */
+  const out = {};
+  for (const e of entries) if (!(e.clubberId in out)) out[e.clubberId] = e.club;
+  return out;
+}
+
+/** @param {Record<string, string>} kids */
+export function countByClub(kids) {
+  /** @type {Record<string, number>} */
+  const byClub = {};
+  for (const club of Object.values(kids)) byClub[club || 'No club'] = (byClub[club || 'No club'] || 0) + 1;
+  return byClub;
+}
+
+/** @param {string[]} ids @param {Record<string, string>} kids */
+function clubsOf(ids, kids) {
+  /** @type {Record<string, number>} */
+  const out = {};
+  for (const id of ids) out[kids[id] || 'No club'] = (out[kids[id] || 'No club'] || 0) + 1;
+  return out;
+}
+
+/**
+ * Compare a fresh report with the last applied one. Pure.
+ * @param {Record<string, string>|null} prev the last applied read's children, null at the night's first read
+ * @param {{ entries: {clubberId: string, club: string}[], declared: number|null }} report
+ * @returns {{ verdict: 'baseline'|'applied'|'partial'|'mass-undo', kids: Record<string, string>,
+ *   added: string[], gone: string[] }}
+ */
+export function compareReport(prev, report) {
+  const kids = childrenOf(report.entries);
+  if (report.declared !== null && report.entries.length < report.declared) {
+    return { verdict: 'partial', kids, added: [], gone: [] };
+  }
+  if (!prev) return { verdict: 'baseline', kids, added: [], gone: [] };
+  const added = Object.keys(kids).filter((id) => !(id in prev));
+  const gone = Object.keys(prev).filter((id) => !(id in kids));
+  const before = Object.keys(prev).length;
+  if (before > 0 && gone.length > before / 2) return { verdict: 'mass-undo', kids, added: [], gone: [] };
+  return { verdict: 'applied', kids, added, gone };
+}
+
+/** The tally the screens would get (the print server's buildTally shape). @param {Record<string, string>} kids @param {number} now */
+export function wouldPublishTally(kids, now) {
+  const counts = countByClub(kids);
+  return { counts, total: Object.keys(kids).length, at: new Date(now).toISOString() };
+}
+
+export class Watcher {
+  /**
+   * @param {{ storage: { get(k: string): Promise<any>, put(k: string, v: any): Promise<void>, delete(k: string): Promise<any> },
+   *   env: Record<string, any>, fetchFn?: typeof fetch, now?: () => number,
+   *   alarms?: { set(atMs: number): Promise<void>|void, get(): Promise<number|null>|number|null },
+   *   log?: (line: string) => void }} deps
+   */
+  constructor({ storage, env, fetchFn, now, alarms, log }) {
+    this.storage = storage;
+    this.env = env || {};
+    this.fetchFn = fetchFn;
+    this.now = now || (() => Date.now());
+    this.alarms = alarms || { set() {}, get: () => null };
+    // warn, not log: the lint allows warn and error only, and `wrangler tail` shows both.
+    this.log = log || ((line) => console.warn(line));
+    /** @type {TwoTimTwoClient|null} */
+    this.client = null;
+    this.clientKey = '';
+    /** @type {Promise<any>|null} */
+    this.inFlight = null;
+  }
+
+  /** 'off' unless CLOUD_CHECKIN says shadow; phase 1 knows no other mode. */
+  get mode() {
+    return String(this.env.CLOUD_CHECKIN || '').trim().toLowerCase() === 'shadow' ? 'shadow' : 'off';
+  }
+
+  creds() { return credentialsFrom(this.env); }
+
+  /** One client per set of credentials (a changed secret starts a new session). */
+  clientFor() {
+    const creds = this.creds();
+    if (!creds) return null;
+    const key = `${creds.host}\n${creds.username}\n${creds.password}`;
+    if (!this.client || this.clientKey !== key) {
+      this.client = new TwoTimTwoClient(creds, { fetchFn: this.fetchFn, now: this.now });
+      this.clientKey = key;
+    }
+    return this.client;
+  }
+
+  async loadStatus() {
+    return (await this.storage.get('cloud:status')) || {
+      date: null, reads: 0, okReads: 0, lastReadAt: null, lastOkAt: null, lastError: null,
+      checkedIn: null, byClub: null, declared: null, verdict: null,
+      tonight: { baseline: 0, addedOnTwoTimTwo: 0, undoneOnTwoTimTwo: 0, partial: 0, massUndoRefused: 0 },
+      checkinPage: null, log: [],
+    };
+  }
+
+  /** @param {any} status @param {string} kind @param {Record<string, unknown>} [detail] */
+  note(status, kind, detail = {}) {
+    status.log = [...(status.log || []), { at: new Date(this.now()).toISOString(), kind, ...detail }].slice(-LOG_MAX);
+  }
+
+  /** What the owner sees: nothing that names or identifies a child. */
+  async status() {
+    const s = await this.loadStatus();
+    const w = watchWindow(this.now());
+    const creds = this.creds();
+    return {
+      mode: this.mode,
+      configured: !!creds,
+      host: creds ? creds.host : null,
+      windowOpen: w.open,
+      nextWindowInMin: w.open ? 0 : Math.round(w.untilMs / 60000),
+      readIntervalSec: READ_INTERVAL_MS / 1000,
+      signedIn: !!(this.client && this.client.cookies.size),
+      loginBlockedForSec: this.client && this.client.loginBlockedUntil > this.now()
+        ? Math.ceil((this.client.loginBlockedUntil - this.now()) / 1000) : 0,
+      ...s,
+    };
+  }
+
+  /** Make sure an alarm is set while the watcher is on (cron, and every status read). */
+  async arm() {
+    if (this.mode === 'off' || !this.creds()) return false;
+    const at = await this.alarms.get();
+    if (typeof at === 'number' && at > this.now()) return true;
+    await this.alarms.set(this.now() + 1000);
+    return true;
+  }
+
+  /** The alarm: read when the window is open, then set the next one. Never throws. */
+  async tick() {
+    if (this.mode === 'off' || !this.creds()) return { next: null };
+    const w = watchWindow(this.now());
+    let next;
+    if (!w.open) {
+      next = Math.min(w.untilMs, IDLE_MAX_MS);
+    } else {
+      try { await this.read(); } catch (err) { console.error('[cloud] watcher read failed', err); }
+      const s = await this.loadStatus();
+      const since = s.lastReadAt ? this.now() - Date.parse(s.lastReadAt) : READ_INTERVAL_MS;
+      next = Math.max(READ_INTERVAL_MS - since, 1000);
+      // A sign-in that is backing off waits it out instead of waking every 15 s.
+      if (this.client && this.client.loginBlockedUntil > this.now()) {
+        next = Math.max(next, this.client.loginBlockedUntil - this.now());
+      }
+    }
+    await this.alarms.set(this.now() + next);
+    return { next };
+  }
+
+  /** The owner's "read now" (a rehearsal on any day): the same 15 s clock. */
+  async readNow() {
+    if (this.mode === 'off') return { ok: false, error: 'off', status: await this.status() };
+    if (!this.creds()) return { ok: false, error: 'not-configured', status: await this.status() };
+    const r = await this.read();
+    return { ...r, status: await this.status() };
+  }
+
+  /**
+   * One read of tonight's report, applied by the rules above. Concurrent calls
+   * share one read, and no read starts within READ_INTERVAL_MS of the last.
+   * @returns {Promise<{ok: boolean, throttled?: boolean, error?: string, verdict?: string}>}
+   */
+  async read() {
+    if (this.inFlight) return this.inFlight;
+    this.inFlight = this.readOnce().finally(() => { this.inFlight = null; });
+    return this.inFlight;
+  }
+
+  async readOnce() {
+    const status = await this.loadStatus();
+    const now = this.now();
+    if (status.lastReadAt && now - Date.parse(status.lastReadAt) < READ_INTERVAL_MS) {
+      return { ok: true, throttled: true };
+    }
+    const client = this.clientFor();
+    if (!client) return { ok: false, error: 'not-configured' };
+    const date = localTime(now).date;
+    const creds = /** @type {{password: string}} */ (this.creds());
+
+    // A new night starts clean: tonight's counters and a fresh baseline.
+    let snap = await openState(creds.password, await this.storage.get('cloud:snap'));
+    if (status.date !== date) {
+      Object.assign(status, {
+        date, checkedIn: null, byClub: null, declared: null, verdict: null, checkinPage: null,
+        tonight: { baseline: 0, addedOnTwoTimTwo: 0, undoneOnTwoTimTwo: 0, partial: 0, massUndoRefused: 0 },
+      });
+      this.note(status, 'new-night');
+    }
+    if (!snap || snap.date !== date) snap = null;
+
+    const loginsBefore = client.logins;
+    status.reads += 1;
+    status.lastReadAt = new Date(now).toISOString();
+    const res = await client.report(date);
+    if (client.logins > loginsBefore) this.note(status, 'sign-in', { ok: res.ok || res.error !== 'login-refused' });
+    if (!res.ok) {
+      status.lastError = res.error;
+      this.note(status, 'error', { error: res.error });
+      this.log(`[cloud] shadow: report read failed (${res.error})`);
+      await this.storage.put('cloud:status', status);
+      return { ok: false, error: res.error };
+    }
+
+    const { verdict, kids, added, gone } = compareReport(snap ? snap.kids : null, res.report);
+    status.okReads += 1;
+    status.lastOkAt = status.lastReadAt;
+    status.lastError = null;
+    status.verdict = verdict;
+    status.declared = res.report.declared;
+    if (verdict === 'partial') {
+      status.tonight.partial += 1;
+      this.note(status, 'partial', { parsed: res.report.entries.length, declared: res.report.declared });
+      this.log(`[cloud] shadow: report partial (${res.report.entries.length} of ${res.report.declared}); nothing changed`);
+    } else if (verdict === 'mass-undo') {
+      status.tonight.massUndoRefused += 1;
+      this.note(status, 'mass-undo-refused', { before: Object.keys(snap?.kids || {}).length, now: Object.keys(kids).length });
+      this.log('[cloud] shadow: a read that would drop more than half the room was refused; nothing changed');
+    } else {
+      status.checkedIn = Object.keys(kids).length;
+      status.byClub = countByClub(kids);
+      if (verdict === 'baseline') {
+        status.tonight.baseline = status.checkedIn;
+        this.note(status, 'baseline', { checkedIn: status.checkedIn });
+      }
+      if (added.length) {
+        status.tonight.addedOnTwoTimTwo += added.length;
+        this.note(status, 'checked-in-on-twotimtwo', { count: added.length, clubs: clubsOf(added, kids) });
+        this.log(`[cloud] shadow: would print and greet ${added.length} check-in(s) made on TwoTimTwo`);
+      }
+      if (gone.length) {
+        status.tonight.undoneOnTwoTimTwo += gone.length;
+        this.note(status, 'undone-on-twotimtwo', { count: gone.length, clubs: clubsOf(gone, snap?.kids || {}) });
+        this.log(`[cloud] shadow: would stop counting ${gone.length} child(ren) undone on TwoTimTwo`);
+      }
+      if (verdict === 'baseline' || added.length || gone.length) {
+        this.log(`[cloud] shadow: would publish tally ${JSON.stringify(wouldPublishTally(kids, now))}`);
+      }
+      await this.storage.put('cloud:snap', await sealState(creds.password, { date, kids }));
+    }
+
+    // Once a night, the check-in page: proves tonight's meeting and its
+    // check-in items can be read (phase 4 posts with them). Ids and counts only.
+    // A failed read is tried again after CHECKIN_PAGE_RETRY_MS, never every tick.
+    const lastPage = status.checkinPage;
+    if (!lastPage || (!lastPage.ok && now - Date.parse(lastPage.at) >= CHECKIN_PAGE_RETRY_MS)) {
+      const page = await client.checkinPage();
+      const at = new Date(now).toISOString();
+      status.checkinPage = page.ok
+        ? { ok: true, at, calendarId: page.page.calendarId, events: page.page.events.length,
+          attendanceItem: page.page.events.some((e) => e.automatic), roster: page.page.roster.length }
+        : { ok: false, at, error: page.error };
+      this.note(status, 'checkin-page', { ok: page.ok });
+      if (!page.ok) this.log(`[cloud] shadow: check-in page unreadable (${page.error})`);
+    }
+
+    await this.storage.put('cloud:status', status);
+    return { ok: true, verdict };
+  }
+}

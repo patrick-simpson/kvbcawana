@@ -1,11 +1,18 @@
-# The Awana sync service. Deployed by .github/workflows/deploy-worker.yml;
-# its secrets (PUSHER_APP_ID, PUSHER_KEY, PUSHER_SECRET, PUSHER_CLUSTER,
-# INITIAL_PASSPHRASE) are set by that workflow from the repo's GitHub secrets.
+# The Awana sync service. Deployed by the root .github/workflows/ci.yml; its
+# secrets (PUSHER_*, INITIAL_PASSPHRASE, and TWOTIMTWO_USERNAME /
+# TWOTIMTWO_PASSWORD / TWOTIMTWO_HOST for cloud check-in) are set by that
+# workflow from the repo's GitHub secrets.
 name = "awana-sync"
 main = "src/index.js"
 compatibility_date = "2026-09-01"
 compatibility_flags = ["nodejs_compat"]
 workers_dev = true
+
+# Cloud check-in (CLOUD-CHECKIN.md). "shadow" is phase 1: the report watcher
+# reads TwoTimTwo every 15 s on club nights and publishes nothing; it stays
+# idle until the TWOTIMTWO_* secrets exist. "off" stops it.
+[vars]
+CLOUD_CHECKIN = "shadow"
 
 [[durable_objects.bindings]]
 name = "SYNC"

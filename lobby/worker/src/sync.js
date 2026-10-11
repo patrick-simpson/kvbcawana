@@ -41,6 +41,7 @@ import { trigger as pusherTrigger } from './pusher.js';
 import { DEFAULT_CALENDAR_URL, scrapeCalendar } from './calendar.js';
 import { DOORBELL_EVENT, REPLAYED, checkPublish, frameText, replayKey } from './live.js';
 import { Relay } from './relay.js';
+import { Watcher } from './watcher.js';
 
 export const IP_MAX_FAILS = 5;
 export const IP_LOCK_MS = 15 * 60 * 1000;
@@ -130,9 +131,10 @@ export class SyncCore {
   /**
    * @param {{ storage: Store, env: Record<string, any>, fetchFn?: typeof fetch, now?: () => number,
    *   publish?: (channel: string, event: string, payload: unknown) => Promise<{ok: boolean, error?: string}>,
-   *   broadcast?: (text: string) => number, closeAll?: (code: number, reason: string) => void }} deps
+   *   broadcast?: (text: string) => number, closeAll?: (code: number, reason: string) => void,
+   *   alarms?: { set(atMs: number): Promise<void>|void, get(): Promise<number|null>|number|null } }} deps
    */
-  constructor({ storage, env, fetchFn, now, publish, broadcast, closeAll }) {
+  constructor({ storage, env, fetchFn, now, publish, broadcast, closeAll, alarms }) {
     this.storage = storage;
     this.env = env || {};
     this.fetchFn = fetchFn || ((...args) => fetch(...args));
@@ -146,6 +148,13 @@ export class SyncCore {
     this.broadcast = broadcast || (() => 0);
     this.closeAll = closeAll || (() => {});
     this.relayQueue = new Relay(this.storage, this.now);
+    // Cloud check-in (CLOUD-CHECKIN.md), phase 1: the read-only report watcher.
+    this.watcher = new Watcher({ storage: this.storage, env: this.env, fetchFn: this.fetchFn, now: this.now, alarms });
+  }
+
+  /** The Durable Object's alarm: the watcher's 15 s read (it sets the next one). */
+  async alarm() {
+    return this.watcher.tick();
   }
 
   /** Send a frame to every live screen, and keep it for late joiners. */
@@ -345,6 +354,7 @@ export class SyncCore {
         'GET /v1/state', 'PUT /v1/settings', 'PUT /v1/slides', 'PUT /v1/template',
         'PUT /v1/journey', 'POST /v1/calendar/refresh', 'POST /v1/passphrase', 'POST /v1/publish',
         'POST /v1/relay', 'GET /v1/relay/next', 'POST /v1/relay/answer', 'GET /v1/relay/result',
+        'GET /v1/cloud/status', 'POST /v1/cloud/read-now',
       ]);
       if (!known.has(route)) return fail('Not found.', 404);
       if (!(await this.authorized(request))) {
@@ -370,6 +380,11 @@ export class SyncCore {
           return r.ok ? json({ ok: true }) : fail(r.error, r.status);
         }
         case 'GET /v1/relay/result': return json(await this.relayQueue.result(url.searchParams.get('id')));
+        // Cloud check-in, phase 1: counts and codes only, never a name or an id.
+        case 'GET /v1/cloud/status':
+          await this.watcher.arm();
+          return json(await this.watcher.status());
+        case 'POST /v1/cloud/read-now': return json(await this.watcher.readNow());
         default: return fail('Not found.', 404);
       }
     } catch (err) {
@@ -559,6 +574,9 @@ export class SyncCore {
   /** The scheduled run: keep the calendar fresh without anyone pressing a button. */
   async cron() {
     await this.relayQueue.purge();
+    // Keeps the watcher's alarm set (it sets its own after each run; this is
+    // the safety net if one was ever lost).
+    await this.watcher.arm();
     const res = await this.refreshCalendar();
     return res.status;
   }

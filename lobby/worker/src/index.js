@@ -50,6 +50,10 @@ export class SyncStore {
           try { ws.close(code, reason); } catch { /* already gone */ }
         }
       },
+      alarms: {
+        set: (at) => state.storage.setAlarm(at),
+        get: () => state.storage.getAlarm(),
+      },
     });
     // A screen's keep-alive "ping" is answered without waking this object, so
     // a room of idle TVs costs nothing between frames.
@@ -86,6 +90,17 @@ export class SyncStore {
       try { server.send(text); } catch { break; }
     }
     return new Response(null, { status: 101, webSocket: client });
+  }
+
+  /** The cloud check-in watcher's alarm. It never throws, so Cloudflare never retries it. */
+  async alarm() {
+    try {
+      await this.core.alarm();
+    } catch (err) {
+      console.error('[cloud] alarm failed', err);
+      // The watcher sets its own next alarm; one that died first is set here.
+      try { await this.state.storage.setAlarm(Date.now() + 60 * 1000); } catch { /* the cron re-arms it */ }
+    }
   }
 
   /** Screens only listen; anything they send but "ping" is ignored. */
