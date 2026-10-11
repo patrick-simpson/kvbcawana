@@ -238,8 +238,16 @@ Read this first if you are picking the work up in a new session.
   nothing; `GET /api/v1/cloud/status` (signed in with the passphrase) shows
   its counts, and `POST /api/v1/cloud/read-now` reads once on any day for a
   rehearsal. `CLOUD_CHECKIN = "shadow"` in `wrangler.toml`; `"off"` stops it.
-  Idle until the three secrets exist. Tests: `lobby/worker/test/twotimtwo.test.js`,
-  `watcher.test.js`. Not yet run against the live site.
+  Tests: `lobby/worker/test/twotimtwo.test.js`, `watcher.test.js`.
+- **Checked against the live site (2026-10-11):** the secrets are set and the
+  dedicated user signs in. Read as that user, the report for 2026-10-07 gave
+  all 94 children its Count: footers declare (Sparks 23, T&T 22, Trek 22,
+  Cubbies 16, Puggles 8, Journey 3), and the check-in page read (meeting
+  374, 5 check-in items). Two fixes it took: pages go through parse5 so
+  rows without a <tbody> are found as Chrome finds them, and this user's
+  report has no edit link per row, only the undo control (`undoCheckin(id)`),
+  which now identifies the child. Still to do: the shadow night itself,
+  holding the Worker's count against the laptop's on a Wednesday.
 - **To start the shadow night:** add the three GitHub secrets, then **Actions
   → CI → Run workflow** with "Redeploy the sync Worker" ticked (a Worker only
   gets new secrets when it deploys). Before Wednesday, on any lobby screen signed
