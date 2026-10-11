@@ -133,6 +133,29 @@ const PORT = 34575;
     check('so five slow answers take two rounds, not five', took < 5 * 120, `${took} ms`);
   }
 
+  console.log('\nphone relay: the service\'s own jobs (7.20.0, cloud check-in)');
+  {
+    check('a job may only print; a page\'s calls are still the phone routes alone',
+      relay.jobAllowed('POST', '/print') && !relay.jobAllowed('POST', '/config') && !relay.jobAllowed('POST', '/phone/undo')
+      && !relay.relayAllowed('POST', '/print'));
+    // A page asking for a print is refused at the service already...
+    const asked = await q.enqueue({ method: 'POST', path: '/print', body: { name: 'Ava Stone' } });
+    check('a page cannot queue a print', !asked.ok && asked.status === 400, JSON.stringify(asked));
+    // ...and a print that reaches the laptop unmarked is refused there too.
+    const queue = (await storage.get('relay:queue')) || [];
+    queue.push({ id: 'aaaaaaaaaaaaaaaaaaaaaaaa', method: 'POST', path: '/print', body: { name: 'Ava Stone' }, at: Date.now(), taken: 0 });
+    await storage.put('relay:queue', queue);
+    const job = await q.enqueueJob('/print', { name: 'Ava Stone', clubName: 'Sparks', clubberId: '1', cloud: true });
+    const bad = await q.enqueueJob('/config', { printerName: 'X' });
+    const once = await relay.relayOnce({ base: 'x', session, localBase, syncRequest });
+    const ans = async (id) => storage.get(`relay:ans:${id}`);
+    check('the laptop takes all three', once.handled === 3, JSON.stringify(once));
+    check('an unmarked print is refused on the laptop', (await ans('aaaaaaaaaaaaaaaaaaaaaaaa')).status === 403);
+    check('a job outside its list is refused', (await ans(bad.id)).status === 403);
+    const printed = await ans(job.id);
+    check('the service\'s print job runs the print route', printed && printed.status !== 403 && printed.status !== 404, JSON.stringify(printed));
+  }
+
   console.log('\nphone relay: the loop');
   {
     const r = await relay.relayOnce({ base: 'x', session: 'v1.1.1.nope', localBase, syncRequest });

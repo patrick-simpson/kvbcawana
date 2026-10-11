@@ -4052,7 +4052,8 @@ async function performCheckinPrint(input) {
     awanaShares   = null,
     clubberId     = null,
     suppressConnectCard = false,
-    demo          = false
+    demo          = false,
+    cloudCheckin  = false
   } = input || {};
 
   // ── Demo / training mode ────────────────────────────────────────────────────
@@ -4082,6 +4083,17 @@ async function performCheckinPrint(input) {
   // the name for walk-ins and older extensions that send no id.
   const dupKey = (clubberId ? `id:${String(clubberId).trim()}` : `${firstName} ${lastName}`)
     .toLowerCase().trim();
+  // Cloud check-in (7.20.0): the sync service checked this child in on
+  // TwoTimTwo and asked for the tag (cloudCheckin). The extension, which did
+  // not drive that check-in, finds the child later (its report check, or a
+  // roster diff after a reload) and asks again, past the 45 s window above,
+  // perhaps by name alone: that second tag is refused for the rest of the
+  // night. And the other way: a cloud job for a child whose tag already
+  // printed tonight is refused. An undone check-in counts for neither.
+  if (!isDemo && printedTonightFor(firstName, lastName, clubberId, cloudCheckin)) {
+    console.log(`[print] '${firstName} ${lastName}' already has tonight's tag (${cloudCheckin ? 'cloud job' : 'printed for a cloud check-in'}) — duplicate suppressed`);
+    return { status: 200, body: { success: true, duplicate: true } };
+  }
   // Demo mode skips the duplicate window: a trainer demonstrating the same
   // child twice in a row is the normal case, not a double-tap to suppress.
   if (!isDemo && isDuplicatePrint(dupKey)) {
@@ -4360,7 +4372,7 @@ async function performCheckinPrint(input) {
       addHistoryEntry({
         firstName, lastName, clubName: effectiveClubName, clubImageData,
         printer: effectivePrinter, success: true, visitor: !!visitor, clubberId,
-        trophyBook,
+        trophyBook, cloudCheckin: cloudCheckin === true,
       });
 
       publishTally();
@@ -4405,6 +4417,7 @@ app.post('/print', async (req, res) => {
     clubName: body.clubName, clubImageData: body.clubImageData, printerName: body.printerName,
     visitor: body.visitor, stepUpNight: body.stepUpNight, awanaShares: body.awanaShares,
     clubberId: body.clubberId, suppressConnectCard: body.suppressConnectCard, demo: body.demo,
+    cloudCheckin: body.cloud === true,
   });
   res.status(out.status).json(out.body);
 });
@@ -4727,6 +4740,18 @@ function stripDayFromLedger(keys, day) {
 // undo reconciliation, the checkout board's printed count, name-based reprint
 // lookup, the phone roster) — a missed exclusion at any of those sites means a
 // recognition print counts as a child, so they must all share this test.
+// Has this child a tag tonight that a cloud check-in stands behind? For a
+// cloud job (cloud = true): any successful, not-undone check-in row tonight.
+// For anyone else: such a row that a cloud job printed. Matched by id, or by
+// name when either side has none (historyRowMatches).
+function printedTonightFor(firstName, lastName, clubberId, cloud) {
+  const today = localDayISO();
+  return loadHistory().some((row) => row && row.success && !row.undone && !isNonCheckinRow(row)
+    && (cloud || row.cloudCheckin === true)
+    && isOnLocalDay(row.timestamp, today)
+    && historyRowMatches(row, firstName, lastName, clubberId));
+}
+
 function isNonCheckinRow(e) {
   return !!(e && (e.isAward || e.isConnectCard || e.isLeader || e.oneOff));
 }
@@ -4837,6 +4862,9 @@ function addHistoryEntry(entry) {
     isLeader: !!entry.isLeader,
     // A one-off name tag (7.18.0): printed and logged, never a check-in.
     ...(entry.oneOff ? { oneOff: true } : {}),
+    // A tag for a cloud check-in (7.20.0): the sync service checked the child
+    // in on TwoTimTwo. Marks the night's tag as printed (printedTonightFor).
+    ...(entry.cloudCheckin ? { cloudCheckin: true } : {}),
     // TwoTimTwo's own clubber id, when the caller knew it. Everything here was
     // keyed on a lowercased "first last" string, so two children who share a
     // name merged into one row — the same defect the extension already fixed on
@@ -9707,7 +9735,7 @@ module.exports = {
   // Tonight's count. authoritativeTonight() is THE definition every surface
   // reads; the setter exists so a test can put the server in report mode (and
   // in stale-report mode) without a scrape, a socket or a wall-clock wait.
-  authoritativeTonight, tonightHereNow, stillHereEntries, publishStillHere, REPORT_FRESH_MS, TALLY_GRACE_MIN, TALLY_LEAD_MIN,
+  printedTonightFor, authoritativeTonight, tonightHereNow, stillHereEntries, publishStillHere, REPORT_FRESH_MS, TALLY_GRACE_MIN, TALLY_LEAD_MIN,
   _setLastCheckinReportForTests(report) { lastCheckinReport = report; },
   _setStillHereWindowForTests(fn) { stillHereWindowForTests = fn; },
   _setCheckedOutForTests(date, ids, names) { checkedOutTonight = { date, ids: new Set(ids), names: new Set((names || []).map(normalizedName)) }; },

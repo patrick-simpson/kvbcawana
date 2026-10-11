@@ -1,4 +1,13 @@
-﻿## [7.19.0] - 2026-10-11
+﻿## [7.20.0] - 2026-10-11
+The phone page checks children in through the cloud, and the laptop prints their tags at once.
+
+**New: cloud check-in from awana.kvbchurch.org/checkin (owner).** Check in on the phone page and the sync service (Cloudflare) checks the child in on TwoTimTwo itself, with the laptop on or off, and with Bible and Brought a friend as ticked on the child's card. When this laptop is on, the service then tells it to print the child's tag, and the tag prints within a second or two, with the welcome on the lobby screens, as before. With the laptop off the child is still checked in on TwoTimTwo; there is no tag until the Raspberry Pi print station exists (CLOUD-CHECKIN.md).
+
+**One tag a night for a cloud check-in.** The extension did not drive that check-in, so it would find the child later (on its report check, or after the page reloads) and ask for a tag again. That second tag is now refused for the rest of the night, whether it asks by id or by name, and a cloud request for a child whose tag already printed tonight is refused too. A check-in that was undone does not count, so a child checked in again after an undo gets a new tag.
+
+**What the service may ask this laptop to do is unchanged for phones.** The tag request is the service's own job, and the laptop runs only one kind of job (print a tag); the phone page's list of calls is exactly what it was, so no phone can ask for a print on its own.
+
+## [7.19.0] - 2026-10-11
 The print server can run on a Raspberry Pi, printing through CUPS.
 
 **New: a Linux print path (the print station in CLOUD-CHECKIN.md).** With `AWANA_PRINT_BACKEND=cups` set, the print server sends each label to CUPS (`lp`) instead of Windows, and reads the printer list and its state (paused, out of labels, jammed, offline) from `lpstat`, so the dashboard's printer warnings work the same. The label itself is unchanged: the same renderer and the same PNG. The roll defaults to the DYMO 30256 (`w167h288`); `cupsMedia` in Settings names another. Nothing changes on Windows: the switch is never inferred from the operating system, so the Windows app prints exactly as before.

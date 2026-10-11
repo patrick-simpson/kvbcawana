@@ -30,6 +30,19 @@ const RELAY_ROUTES = Object.freeze([
   ['POST', /^\/reconcile$/],
 ]);
 
+// Jobs the sync service itself sends (7.20.0, cloud check-in): it checked a
+// child in on TwoTimTwo and asks for the tag. Marked `job` by the service,
+// which no phone page can make it do (the service's own enqueueJob), and only
+// these routes: a page's calls still go through RELAY_ROUTES alone.
+const JOB_ROUTES = Object.freeze([
+  ['POST', /^\/print$/],
+]);
+
+function jobAllowed(method, path) {
+  return typeof method === 'string' && typeof path === 'string'
+    && JOB_ROUTES.some(([m, re]) => m === method && re.test(path));
+}
+
 function relayAllowed(method, path) {
   return typeof method === 'string' && typeof path === 'string'
     && RELAY_ROUTES.some(([m, re]) => m === method && re.test(path));
@@ -57,7 +70,7 @@ async function relayOnce(o) {
   const runOne = async (req) => {
     let status = 502;
     let body = { error: 'The check-in laptop could not run that.' };
-    if (!relayAllowed(req.method, req.path)) {
+    if (!(req.job === true ? jobAllowed(req.method, req.path) : relayAllowed(req.method, req.path))) {
       status = 403;
       body = { error: 'Not something the phone page may ask.' };
     } else {
@@ -113,4 +126,4 @@ function startPhoneRelay({ signedIn, localBase, syncRequest, fetchFn, log, setTi
   return () => { stopped = true; if (timer) clearTimeout(timer); };
 }
 
-module.exports = { RELAY_ROUTES, relayAllowed, relayOnce, startPhoneRelay, RELAY_BUSY_MS, RELAY_IDLE_MS, RELAY_PARALLEL };
+module.exports = { RELAY_ROUTES, JOB_ROUTES, relayAllowed, jobAllowed, relayOnce, startPhoneRelay, RELAY_BUSY_MS, RELAY_IDLE_MS, RELAY_PARALLEL };
