@@ -20,6 +20,9 @@ import { BIBLE_RE, FRIEND_RE } from './twotimtwo.js';
 export const CLUB_BY_ID = Object.freeze({ 1: 'Cubbies', 2: 'Sparks', 3: 'T&T', 4: 'Puggles', 6: 'Trek', 7: 'Journey' });
 const ACTION_TTL_MS = 10 * 60 * 1000;   // the laptop's PENDING_TTL_MS: a status is asked for well within it
 const FAMILIES_TTL_MS = 30 * 60 * 1000;  // the extension re-reads the household export every 30 minutes too
+// A failed read is kept this long, so phones opening the roster never sign
+// in to TwoTimTwo once each while the export is refused.
+const FAMILIES_RETRY_MS = 5 * 60 * 1000;
 
 /** Which clubs offer Bible / Brought a friend: the phone card's toggles. @param {{clubs: string[], label?: string, automatic: boolean}[]} events */
 export function itemClubs(events) {
@@ -51,13 +54,15 @@ export class CloudPhone {
    * The families (TwoTimTwo's households, names only) and which clubs offer
    * Bible / Brought a friend, for grouping the page's roster by family (owner,
    * 2026-10-11) with the laptop off, or on before it has shared its own.
-   * Held in this object's memory for FAMILIES_TTL_MS, never in storage. A
-   * failed read is an empty list: the page then shows children one by one.
+   * Held in this object's memory for FAMILIES_TTL_MS (a failure for
+   * FAMILIES_RETRY_MS), never in storage. A failed read is an empty list: the
+   * page then shows children one by one.
    * @param {{events: {clubs: string[], automatic: boolean, label?: string}[]}} [page] a check-in page already read
    */
   async families(page) {
     const t = this.now();
-    if (this.familiesCache && t - this.familiesCache.at < FAMILIES_TTL_MS) return this.familiesCache;
+    const c = this.familiesCache;
+    if (c && t - c.at < (c.familiesError ? FAMILIES_RETRY_MS : FAMILIES_TTL_MS)) return c;
     const client = this.watcher.clientFor();
     if (!client) return { households: [], items: { bible: [], friend: [] }, at: t };
     const hh = await client.households();
@@ -69,8 +74,8 @@ export class CloudPhone {
     // Why there are no families, as a fixed code (never page text), so a roster
     // without them can be told apart from a household export that failed.
     const out = { households: hh.ok ? hh.households : [], items: itemClubs(events), at: t, ...(hh.ok ? {} : { familiesError: hh.error }) };
-    // Only a good read is kept: a failure is asked again next time.
-    if (hh.ok) this.familiesCache = out;
+    // A good read is kept half an hour, a failure five minutes.
+    this.familiesCache = out;
     return out;
   }
 

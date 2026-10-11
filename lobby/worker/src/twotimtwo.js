@@ -510,6 +510,10 @@ export class TwoTimTwoClient {
         return { ok: false, error: errorCode(err) };
       }
       if (isLoginPage(res.html) || /\/site\/login/i.test(res.path)) continue;
+      // A refusal is answered with one fresh sign-in: TwoTimTwo applies a
+      // permission granted to the user at its next sign-in, not to a session
+      // already open (the household export, 2026-10-11).
+      if (res.status === 403 && attempt === 0) continue;
       if (res.status !== 200) return { ok: false, error: res.status >= 500 ? 'twotimtwo-down' : `http-${res.status}` };
       return { ok: true, html: res.html };
     }

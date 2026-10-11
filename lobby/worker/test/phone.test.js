@@ -213,6 +213,22 @@ describe('families on the roster (owner, 2026-10-11)', () => {
     expect(ans.body.kids.length).toBe(3);
   });
 
+  it('a refused export (403) signs in once more, is asked again after five minutes, and families arrive once allowed', async () => {
+    let allowed = false;
+    const s = await setup({ households: () => (allowed ? HOUSEHOLD_CSV : new Response('Forbidden', { status: 403 })) });
+    const csv = () => s.tt.calls.filter((c) => c.path === '/household/csv').length;
+    const first = await s.relay('POST', '/phone/roster', {});
+    expect(first.body.familiesError).toBe('http-403');
+    expect(csv()).toBe(2);                     // refused, a fresh sign-in, refused again
+    allowed = true;                            // the owner grants the permission
+    await s.relay('POST', '/phone/roster', {});
+    expect(csv()).toBe(2);                     // within five minutes: not asked again
+    s.tick(5 * 60 * 1000 + 1);
+    const later = await s.relay('POST', '/phone/roster', {});
+    expect(later.body.familiesError).toBeUndefined();
+    expect(later.body.households).toEqual([['Sophie Tester', 'Cal Tester'], ['Ann Smith', 'Ben Smith', 'Cy Smith']]);
+  });
+
   it('no address, phone or name reaches storage', async () => {
     const s = await setup({ laptopOn: true });
     await laptopAnswers(s, LAPTOP_ROSTER);

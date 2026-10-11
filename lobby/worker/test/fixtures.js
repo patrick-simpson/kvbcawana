@@ -62,7 +62,11 @@ export function fakeTwoTimTwo({ password = 'right-pass', report = () => page(tab
     if (u.pathname === '/site/index') return new Response('<html><body>Welcome</body></html>', { status: 200 });
     if (u.pathname === '/clubber/checkin_report') return new Response(report(u.searchParams.get('date')), { status: 200 });
     if (u.pathname === '/clubber/checkin') return new Response(checkin(), { status: 200 });
-    if (u.pathname === '/household/csv' && households) return new Response(households(), { status: 200, headers: { 'Content-Type': 'application/csv' } });
+    if (u.pathname === '/household/csv' && households) {
+      const h = households();
+      if (h instanceof Response) return h;   // a refusal (403), as TwoTimTwo sends one
+      return new Response(h, { status: 200, headers: { 'Content-Type': 'application/csv' } });
+    }
     if (u.pathname === '/clubber/checkinclubber' && init.method === 'POST') {
       state.checkins.push(body);
       return new Response(state.checkinReply ?? `<b>${state.checkinName ?? 'Kit Tester'}</b> 6:02 pm`, { status: 200 });
