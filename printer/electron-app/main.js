@@ -1090,6 +1090,13 @@ async function startPrintRole({ fromWizard = false } = {}) {
     openExternalSafely(config.checkinUrl, fromWizard ? 'setup' : 'startup');
   }
 
+  // Not awaited: on an unattended start (an update's relaunch, Windows'
+  // sign-in) nobody clicks, and the display and /settings must not wait.
+  offerShortcutCleanup(migration, oldBrandShortcuts).catch((e) => console.warn('[shortcuts]', e && e.message));
+}
+
+/** The old-shortcut offers, once each. */
+async function offerShortcutCleanup(migration, oldBrandShortcuts) {
   // Legacy shortcuts re-launch the old script install on every boot and fight
   // this app for port 3456 — offer to remove them once.
   if (migration.shortcuts.length && (migration.migrated || migration.legacyDir)) {
@@ -1173,6 +1180,8 @@ async function applyRoles(next, { fromWizard = false } = {}) {
   refreshTray();
   if (deviceSync) deviceSync.nudge();
   if (relaunch) {
+    // The display comes back as it was, not as a person's launch (a three-hour Show now).
+    if (display.isRunning()) display.prepareInstall();
     setTimeout(() => {
       app.relaunch({ args: process.argv.slice(1).filter((a) => a !== '--auto-start') });
       app.isQuitting = true;
@@ -1443,7 +1452,11 @@ app.whenReady().then(async () => {
   buildTray(config);
 
   // 3. The roles.
-  if (roles.print) await startPrintRole();
+  // A print server that fails to start must not keep the display, the setup
+  // or /settings from starting.
+  try {
+    if (roles.print) await startPrintRole();
+  } catch (e) { console.error('[roles] print server failed to start:', e); }
   if (roles.display) display.start();
   refreshTray();
 

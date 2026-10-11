@@ -42,6 +42,12 @@ describe('decideStartRoles', () => {
     assert.deepEqual(d.roles, { print: false, display: true, name: 'Sound room', setupDone: true });
   });
 
+  it('a hand-off on a computer with printer data (no roles.json yet) keeps the print server', () => {
+    const d = roles.decideStartRoles({ saved: null, handoff: { name: 'Sound room' }, printerData: true });
+    assert.equal(d.source, 'handoff');
+    assert.deepEqual(d.roles, { print: true, display: true, name: 'Sound room', setupDone: true });
+  });
+
   it('a saved file always wins; a hand-off on a computer already set up only adds the display', () => {
     const saved = roles.normalizeRoles({ print: true, display: false, name: 'Desk', setupDone: true });
     assert.equal(roles.decideStartRoles({ saved, handoff: null, printerData: true }).source, 'file');

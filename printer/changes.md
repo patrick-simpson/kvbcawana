@@ -1,4 +1,15 @@
-﻿## [9.0.0] - 2026-10-11
+﻿## [9.0.1] - 2026-10-11
+Fixes from the 9.0.0 review.
+
+**Startup never waits on a question.** The offers to remove old-named shortcuts no longer hold up the display, the setup or the computer's row on /settings: on a start nobody is watching (an update's restart, Windows' sign-in) those used to wait until someone clicked.
+
+**A print server turned off from /settings restarts quietly.** On a computer that is also a display, the restart used to count as a person opening the app and put the screen up for three hours; it now comes back exactly as it was.
+
+**A computer with both old apps stays a print server.** If the sound room app hands over to KVBC Awana on a computer that also has the label printer's data, it is now a print server and a display, never a display only.
+
+**A print server that fails to start no longer stops the rest** (the display, the setup, /settings).
+
+## [9.0.0] - 2026-10-11
 One app for every computer: KVBC Awana, a print server, a display, or both. It also carries 8.3.0 (below), which was not released on its own.
 
 **Club Label Printer is now KVBC Awana (owner, UNIFIED-APP.md).** The same app, renamed in the Start menu, the tray and the installer (`KVBC-Awana-Setup.exe`). It keeps its identity underneath (`appId`, the install folder, `%APPDATA%\awana-label-printer`, the update feed), so the check-in laptop updates in place as always, keeps its roster, history and settings, stays a print server and never sees the new setup or the display. The installer renames its own shortcuts; the app offers to remove any old-named copy someone made.

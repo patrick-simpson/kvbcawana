@@ -152,7 +152,8 @@ function decideStartRoles({ saved, handoff, printerData }) {
   }
   if (saved) return { roles: saved, source: 'file', write: false };
   if (handoff) {
-    return { roles: normalizeRoles({ print: false, display: true, name: handoff.name, setupDone: true }), source: 'handoff', write: true };
+    // A computer that also holds the label printer's data stays a print server.
+    return { roles: normalizeRoles({ print: printerData === true, display: true, name: handoff.name, setupDone: true }), source: 'handoff', write: true };
   }
   if (printerData) {
     return { roles: normalizeRoles({ print: true, display: false, name: '', setupDone: true }), source: 'printer-upgrade', write: true };
