@@ -36,6 +36,10 @@ const SAMPLES = {
   empty: page(table('Sparks ', [])),
   // Rows with no <tbody>, and a form around a table: a browser repairs both.
   noTbody: page(table('Sparks ', [{ id: 13, name: 'Kim Tester' }, { id: 14, name: 'Lev Tester' }]).replace(/<tbody>/g, '')),
+  // What the church's check-in user sees (live, 2026-10-11): no edit link,
+  // only the undo control and the name in a span.
+  undoOnly: page(table('Sparks ', [{ id: 17, name: 'Oz Tester' }, { id: 18, name: 'Pia Tester' }], { count: 2 })
+    .replace(/<a class='noprint' href='\/meeting\/clubberCheckin\/\d+\?CAL=368'><i class='fa fa-pencil'><\/i><\/a> (\w+ \w+) /g, '<span class="name">$1</span>')),
   formAround: `<html><body><form>${table('Trek ', [{ id: 15, name: 'Max Tester' }])}</form>${table('Sparks ', [{ id: 16, name: 'Ned Tester' }])}</body></html>`,
 };
 
@@ -76,6 +80,16 @@ describe('the check-in report parser', () => {
     expect(parseCheckinReport(SAMPLES.formAround).entries.map((e) => e.club)).toEqual(['Trek', 'Sparks']);
   });
 
+  it('reads the check-in user\'s report, which has only the undo control (live, 2026-10-11)', () => {
+    expect(SAMPLES.undoOnly).not.toContain('clubberCheckin');
+    const r = parseCheckinReport(SAMPLES.undoOnly);
+    expect(r.entries).toEqual([
+      { clubberId: '17', name: 'Oz Tester', club: 'Sparks' },
+      { clubberId: '18', name: 'Pia Tester', club: 'Sparks' },
+    ]);
+    expect(r.declared).toBe(2);
+  });
+
   it('a busy night (300 children) parses in well under a second', () => {
     const kids = Array.from({ length: 300 }, (_, i) => ({ id: 1000 + i, name: `Kid${i} Tester`, summary: 'YES 1 Share 1 Point' }));
     const html = page(table('Sparks ', kids.slice(0, 150)), table('T&amp;T ', kids.slice(150)));
@@ -97,7 +111,9 @@ describe('the check-in report parser', () => {
     expect(parseCheckinReport(page())).toBeNull();
   });
 
-  it.each(Object.keys(SAMPLES))('agrees with the extension\'s own parser (%s)', async (name) => {
+  // The extension runs as the volunteer, whose report has edit links; the
+  // undo-only page is the check-in user's, which only this parser reads.
+  it.each(Object.keys(SAMPLES).filter((k) => k !== 'undoOnly'))('agrees with the extension\'s own parser (%s)', async (name) => {
     const ours = parseCheckinReport(SAMPLES[name]);
     const theirs = await extensionParser()(SAMPLES[name]);
     expect(ours.entries).toEqual([...theirs].map((e) => ({ clubberId: e.clubberId, name: e.name, club: e.club })));

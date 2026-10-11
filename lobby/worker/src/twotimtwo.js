@@ -82,8 +82,9 @@ const squash = (text) => String(text || '').trim().replace(/\s+/g, ' ');
  *
  * Rules, each from a bug (docs/TWOTIMTWO.md "the markup, exactly"): one table
  * per club, named only by its crest's alt; tables without a crest are skipped;
- * the name is the text of the cell holding the edit link with every link
- * removed, the next cell only when that is empty; a summary cell is never a
+ * a child is a row with an edit link or an undo control (the check-in user
+ * gets only the undo); the name is the text of the cell holding it with every
+ * link removed, the next cell only when that is empty; a summary cell is never a
  * name; `declared` is the sum of the Count: footers, or null when a club table
  * has none.
  *
@@ -114,10 +115,17 @@ export function parseCheckinReport(html) {
       if (row.closest('table') !== table) continue;
       const tds = row.querySelectorAll('td');
       if (!tds.length) continue;
-      const link = row.querySelector('a[href*="/meeting/clubberCheckin/"]');
-      if (!link) continue;
-      const idm = /\/meeting\/clubberCheckin\/(\d+)/.exec(link.getAttribute('href') || '');
+      // The child's id: the edit link, or the undo control. The church's
+      // dedicated check-in user (Record Checkin, 2026-10-11) sees the report
+      // with NO edit link, only [undo] Name, so the edit link alone read 0 of
+      // 94. Both carry the same clubber id (docs/TWOTIMTWO.md).
+      const edit = row.querySelector('a[href*="/meeting/clubberCheckin/"]');
+      const undo = row.querySelector('[onclick*="undoCheckin"]');
+      const byEdit = edit && /\/meeting\/clubberCheckin\/(\d+)/.exec(edit.getAttribute('href') || '');
+      const byUndo = undo && /undoCheckin\(\s*(\d+)\s*\)/.exec(undo.getAttribute('onclick') || '');
+      const idm = byEdit || byUndo;
       if (!idm) continue;
+      const link = /** @type {Element} */ (byEdit ? edit : undo);
       const cell = link.closest('td') || tds[0];
       const clone = cell.cloneNode(true);
       for (const a of clone.querySelectorAll('a')) a.remove();
