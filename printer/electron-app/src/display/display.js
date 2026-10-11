@@ -902,12 +902,13 @@ function createDisplay(opts) {
     const pcZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
     if (pcZone !== churchZone()) log(`warning: this PC's time zone is ${pcZone}, the church's is ${churchZone()}`);
 
-    // Started by hand rather than by Windows at sign-in: the person wants to
-    // see it. An update's relaunch (quietRelaunch, set by prepareInstall or
-    // the sound room's hand-off) is not a person.
-    const quiet = SMOKE || opts.quietStart || state.quietRelaunch === true;
+    // Started by hand rather than by Windows at sign-in, or just turned on in
+    // the wizard: the person wants to see it (and to sign the screen in). An
+    // update's relaunch (quietRelaunch, set by prepareInstall or the sound
+    // room's hand-off) is not a person.
+    const quiet = SMOKE || (opts.quietStart && !how.firstRun) || state.quietRelaunch === true;
     if (state.quietRelaunch) { delete state.quietRelaunch; saveState(); }
-    if (!quiet && !how.firstRun && !scheduledNow()) {
+    if (!quiet && !scheduledNow()) {
       state.overrides = showNow(state.overrides, now().getTime());
       saveState();
     }
