@@ -45,6 +45,12 @@ that." Ship it as v9, once the /settings work in progress (SETTINGS.md) is in.
 - 2026-10-11: **built, not released** (branch `kvbc-awana-v9`): printer
   9.0.0 is KVBC Awana and the sound room app 2.1.0 is its bridge. Not pushed:
   it lands after the /settings work, then the two releases below.
+- 2026-10-11: **/settings, the release workflow and the download link built**
+  (branch `kvbc-awana-v9-settings`, on `kvbc-awana-v9`; not pushed, nothing
+  released): every computer is a row on /settings (below, "On /settings"),
+  a print-off waits for the last label (`isBusy()`), `printer-release.yml`
+  builds and smoke-tests KVBC Awana, `/download/kvbc-awana` exists and the
+  signage's Setup card links it.
 
 ## How it is built (9.0.0)
 
@@ -85,31 +91,68 @@ Awana") has the rules.
   uninstaller (its uninstall key, GUID `fb4f7b93-33d6-55b2-a7fe-6244a2d4f44d`,
   else `%LOCALAPPDATA%\Programs\awana-lobby-display`) and deletes its login
   item, retrying each start until it is gone.
-- **The /settings hook**: `roles.json`, `sync-session.bin` and the
-  `roles:get` / `roles:set` IPC handlers in main.js (only for the app's own
-  file:// windows; nothing calls them yet). Phase 2's `computer` device
-  registers from `deviceSnapshot()` with the session as its bearer and applies
-  a role change through `roles:set`'s path.
+- **On /settings** (`src/device-sync.js`): set up and signed in, a computer
+  is the Worker's screen kind `computer` under `roles.json`'s `deviceId`
+  (made once). At start and every 2 minutes (no live socket) it POSTs
+  `/v1/screens/hello` and GETs its settings: `printRole`, `displayRole`,
+  `displayFrom`, `displayUntil`, reconciled against the last agreed copy
+  (`device-sync.json`) as a lobby TV does. A change from /settings goes
+  through `applyDeviceSettings` in main.js (the display's `configure` for
+  the hours, `checkRolesChange` + `applyRoles` for the roles: the wizard's
+  and `roles:set`'s path; print off restarts the app); a change made here
+  (the wizard, the display's Settings window) is PUT up within seconds.
+  Renames go both ways. Its bearer is the wizard's session, else on a print
+  server the print server's own sign-in (config.json), so the 8.x laptop is
+  listed without the wizard. 401: it stops, the tray says "signed out", and
+  it resumes when a different session appears.
+- **Never off mid-print.** `print-server/server.js` exports `isBusy()` (a
+  printing request still open, a job on the printer chain, a stretch
+  reprint, or a phone check-in not yet driven). A /settings print-off while
+  busy is held: everything else applies, the hello carries
+  `pendingRoleChange` (the Worker keeps it on the computer's record, the
+  /settings row says "print server off once the last label prints", its
+  confirm says it waits), and it applies once the server is idle. The same
+  `isBusy()` now gates an update's install (capped at a minute).
+
+## Done since (branch `kvbc-awana-v9-settings`)
+
+- **The release workflow.** `printer-release.yml` ("Release KVBC Awana")
+  carries the `KVBC-Awana-Setup` artifact, finds `KVBC Awana.exe` and fails
+  unless it is in `%LOCALAPPDATA%\Programs\awana-label-printer` (the 8.x
+  folder) from `KVBC-Awana-Setup.exe`, runs and stops the process `KVBC
+  Awana`, and after /health and /preview checks that the seeded laptop wrote
+  `roles.json` as print server, display off, setup done; the release is
+  titled KVBC Awana. `desktop-release.yml` works for 2.1.0 as it was (its
+  `--smoke-test` launch skips the hand-off and the updater); only its
+  release text changed.
+- **Downloads.** `site/lib/downloads.js`: `/download/kvbc-awana` and
+  `/download/club-label-printer` are both the newest installer
+  `printer/latest.yml` names (the regex takes `KVBC-Awana-Setup.exe`;
+  `site/test/downloads.test.mjs`); `/download/lobby-display` stays the
+  sound room app's. The signage's Settings → Setup card is now "KVBC Awana
+  for Windows", linking `/download/kvbc-awana`; the app's repair dialog
+  downloads from it too.
+- **/settings**: the `computer` row and the print-off hold (above).
 
 ## Still to do
 
 1. Land after /settings phases 2 and 3; merge the printer version (8.3.0 is
    on another branch: this is 9.0.0 on top of it).
-2. The release workflows (not changed here): `printer-release.yml`'s smoke
-   test looks for `Club Label Printer.exe` and the process `Club Label
-   Printer` (now `KVBC Awana.exe` / `KVBC Awana`; the install folder is
-   still `awana-label-printer`), its release title says Club Label Printer,
-   and a display smoke test (`--display-smoke-test`) could be added.
-   `desktop-release.yml` needs nothing new for 2.1.0.
-3. Release order: printer 9.0.0 first (the laptop updates), check it on the
+2. Release order: printer 9.0.0 first (the laptop updates), check it on the
    laptop, then sound room 2.1.0 (it hands over at its next check). The lobby
    feed then stays at 2.1.0 for good: never point `lobby.yml` at a KVBC Awana
-   installer (that would install it without a hand-off).
-4. The signage's Setup card and `DESKTOP_APP_DOWNLOAD_URL`
-   (`/download/lobby-display`) should point new displays at KVBC Awana.
-5. Phase 2's `computer` device (see the hook above), the hours and roles in
-   /settings, and "refused while printing" (the print server exports no busy
-   signal yet; `serverBusy()` is ready for one).
-6. On Windows, before the release: the wizard end to end, an 8.x laptop
-   upgrade (no wizard, no display, data kept), the sound room hand-off on a
-   2.0.0 PC (the profile copy, the uninstall, the login item).
+   installer (that would install it without a hand-off). Until 9.0.0 is
+   released, `/download/kvbc-awana` serves the 8.2.0 Club Label Printer
+   installer (the feed's newest), so the Setup card's link is only right once
+   9.0.0 is out: release it soon after this lands.
+3. A display smoke test in `printer-release.yml` (`--display-smoke-test`)
+   was not added: it needs a seeded `roles.json` with the display on and a
+   check of what the display loaded.
+4. On Windows, before the release: the wizard end to end, an 8.x laptop
+   upgrade (no wizard, no display, data kept, the old `Club Label
+   Printer.exe` gone from the folder), the sound room hand-off on a 2.0.0 PC
+   (the profile copy, the uninstall, the login item), and /settings against
+   the live Worker: the laptop's row appears with the print server's sign-in,
+   a display turned on from /settings shows, new hours apply, print off
+   while a label prints waits and then restarts the app, the tray's
+   "signed out" after a passphrase change.

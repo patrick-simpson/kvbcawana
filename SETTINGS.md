@@ -125,6 +125,11 @@ welcome. This is the plan; its status is at the end.
   - **For the owner**: a forgotten screen that is still running comes back at
     its next hello (by design); and a change made on /settings while the TV
     has an unsent change of its own wins over it.
+- 2026-10-11: **Computers follow too** (KVBC Awana 9.0.0, branch
+  `kvbc-awana-v9-settings`; UNIFIED-APP.md "On /settings"): the app says
+  hello as kind `computer` every 2 minutes and takes its row's switches and
+  hours; a hello may carry `pendingRoleChange` (a print-off held until the
+  last label prints), which the Worker keeps on the record and the row shows.
 - 2026-10-11: **Phase 3 built** (printer 8.3.0; not released, no dispatch).
   Inventory below; what was built and what is still the owner's call after it.
 

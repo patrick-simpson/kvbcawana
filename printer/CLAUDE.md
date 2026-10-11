@@ -68,8 +68,15 @@ build notes). The electron-app is one app with two roles:
   tests are `electron-app/test/*.test.cjs` on `node:test` (`npm run
   test:app`, part of `npm test`).
 - **Updates**: every 10 minutes for every role, installed the moment they
-  download (the sound room's rule). The print role adds no idle gate: the
-  5 s grace, or a capped busy poll if the server ever exports `isBusy()`.
+  download (the sound room's rule). The print role adds no idle gate beyond
+  a busy poll on the server's `isBusy()`, capped at a minute; a display-only
+  computer takes the 5 s grace.
+- **Busy** (`isBusy()` in `print-server/server.js`, exported, not on
+  /health): a request on a printing route (`/print*`, `/reprint*`,
+  `/canary`, `/play-tune`) still being answered, a job on the printer chain
+  (`withPrinter`), a stretch reprint, or a phone check-in the extension has
+  not driven yet (within the queue's 10-minute life).
+  `scripts/test-print-async.cjs` pins it.
 - **Start with Windows** is one login item for both roles: config.json's
   `launchOnBoot` (the tray's checkbox, the display's Settings, the wizard).
 - **The wizard** (`src/setup-wizard.js`, `static/setup.html`, a six-call
@@ -86,16 +93,29 @@ build notes). The electron-app is one app with two roles:
   `lobby/desktop` 2.1.0), and `src/old-app.js` uninstalls Awana Lobby
   Display afterwards. The format is shared with
   `lobby/desktop/src/handoff.js`: change both together.
-- **The /settings hook**: `roles:get` / `roles:set` in main.js (own file://
-  windows only), `deviceSnapshot()`, the session. Phase 2's `computer` device
-  builds on these.
+- **On /settings** (`src/device-sync.js`, `test/device-sync.test.cjs`): a
+  computer set up and signed in (the wizard's `sync-session.bin`, else on a
+  print server the print server's own config.json sign-in) is the Worker's
+  `computer` screen: `POST /v1/screens/hello` and `GET .../settings` at
+  start and every 2 minutes, under `roles.json`'s `deviceId` (made once).
+  The four keys (`printRole`, `displayRole`, `displayFrom`, `displayUntil`;
+  `SPEC` is pinned to `SCREEN_SPECS.computer`) are reconciled against the
+  last agreed copy (`device-sync.json`) like the lobby's `reconcileScreen`:
+  a /settings change goes through `applyDeviceSettings` (display.configure
+  for the hours, `checkRolesChange` + `applyRoles` for the roles, the
+  wizard's path), a local one (`applyRoles`, the display's Settings window)
+  is nudged up with PUT. A print-off while `isBusy()` is HELD: the rest
+  applies, `pendingRoleChange` rides the hello, and it applies once idle.
+  401 = signed out: it stops, the tray says so, and it resumes on a
+  different session. Renames go both ways. `roles:get` / `roles:set` stay
+  for the app's own file:// windows.
 
 ## Releasing the Windows app
 
 **Never create the release tag manually** (`git tag` + `git push`, or the GitHub web UI "Draft a new release" flow). It has failed repeatedly in practice: a Claude Code session's git access is commonly scoped to branches only (tag pushes rejected), and manual tagging has hit silent footguns (tag name case, a republished release reusing its old tag ref).
 
 Instead, once steps 1–5 are on `main`, dispatch **`.github/workflows/printer-release.yml`** (at the repo root) with the `version` input (e.g. `7.11.1`, no prefix; the tag it makes is `printer-v7.11.1`) and `ref` `main`:
-- **Human:** GitHub → Actions → "Release Club Label Printer" → Run workflow → enter the version. (9.0.0 renamed the app: the workflow's smoke test must look for `KVBC Awana.exe` and the process `KVBC Awana` first; see `UNIFIED-APP.md`, "Still to do".)
+- **Human:** GitHub → Actions → "Release KVBC Awana" → Run workflow → enter the version. (Since 9.0.0 its smoke test installs `KVBC-Awana-Setup.exe`, expects `KVBC Awana.exe` in `%LOCALAPPDATA%\Programs\awana-label-printer`, runs the process `KVBC Awana` and checks the upgraded laptop's `roles.json`.)
 - **Claude:** `mcp__github__actions_run_trigger` with `method: "run_workflow"`, `workflow_id: "printer-release.yml"`, `ref: "main"`, `inputs: {"version": "7.11.1", "ref": "main"}`.
 
 The workflow runs the test suites FIRST, then creates the tag (so a failing test never leaves a tag behind), builds the `.exe` on Windows, smoke-tests it (silent install, `/health`, `/preview`), publishes the GitHub Release with `make_latest: false`, and commits the update feed to `site/updates/printer/` (which `ci.yml` then publishes). **The feed is ours, not GitHub's "Latest"**: the app updates from awana.kvbchurch.org/updates/printer/, and the workflow refuses a version that would move the feed backwards. Watch it through with `mcp__github__actions_get`; a release is done when the run is green, the release has its assets, and the feed names the new version.

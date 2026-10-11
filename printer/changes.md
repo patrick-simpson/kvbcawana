@@ -7,9 +7,13 @@ One app for every computer: KVBC Awana, a print server, a display, or both. It a
 
 **A first-run setup on a new computer.** What it is for, the church passphrase (it signs the computer in to the sync service as the screens do; the sign-in is kept in Windows' protected storage, never a plain file, and the passphrase itself is not kept), a name, then the label printer (print server) and the screen, monitor and hours (display). The tray's **Set up this computer...** opens it again. With the print role it also signs the print server in with the same passphrase.
 
-**Display hours per computer.** A display shows on club nights within its own hours (default 5:00 to 8:00 pm), set in the setup and in its Settings window; cancelled weeks and the summer stay dark as before. /settings will edit them once computers register there.
+**Display hours per computer.** A display shows on club nights within its own hours (default 5:00 to 8:00 pm), set in the setup, in its Settings window and on awana.kvbchurch.org/settings; cancelled weeks and the summer stay dark as before.
 
-**Updates are checked every ten minutes** (it was once a day: the release ping went with the Pusher keys) and still install the moment they download, whatever the computer is doing (a label in flight gets its five seconds).
+**Every computer is on awana.kvbchurch.org/settings.** Signed in, a computer appears under Screens → Computers by its name, and its print server and display switches and display hours can be changed there from any device; it checks every two minutes and takes a change at once (turning the print server off restarts it). A change made on the computer (the setup, its Settings window) shows there too, and a rename on either side reaches the other. The check-in laptop is listed with the print server's own sign-in, without running the setup. If the passphrase changes, the tray says the computer is signed out until **Set up this computer...** signs it in again.
+
+**Never turned off mid-print.** Turned off from the settings page while a label is printing or waiting (or a phone check-in is still to be printed), the print server stays on until the last one is out, and the settings page says it is waiting; the rest of the change (the display, its hours) happens at once. The print server now tells the app when it is busy, so an update also waits for the label in flight (at most a minute) instead of a fixed five seconds.
+
+**Updates are checked every ten minutes** (it was once a day: the release ping went with the Pusher keys) and still install the moment they download, whatever the computer is doing.
 
 **The sound room PC moves over by itself.** Awana Lobby Display 2.1.0 (its last release) installs KVBC Awana once this version is out, handing over its screen, monitor, shutdown and Start with Windows and its signed-in screens; KVBC Awana then uninstalls it and its login item.
 
