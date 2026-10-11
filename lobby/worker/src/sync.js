@@ -354,7 +354,7 @@ export class SyncCore {
         'GET /v1/state', 'PUT /v1/settings', 'PUT /v1/slides', 'PUT /v1/template',
         'PUT /v1/journey', 'POST /v1/calendar/refresh', 'POST /v1/passphrase', 'POST /v1/publish',
         'POST /v1/relay', 'GET /v1/relay/next', 'POST /v1/relay/answer', 'GET /v1/relay/result',
-        'GET /v1/cloud/status', 'POST /v1/cloud/read-now',
+        'GET /v1/cloud/status', 'POST /v1/cloud/read-now', 'POST /v1/cloud/checkin',
       ]);
       if (!known.has(route)) return fail('Not found.', 404);
       if (!(await this.authorized(request))) {
@@ -384,6 +384,8 @@ export class SyncCore {
         case 'GET /v1/cloud/status':
           await this.watcher.arm();
           return json(await this.watcher.status());
+        // Check one child in on TwoTimTwo; a preview unless {confirm: true}.
+        case 'POST /v1/cloud/checkin': return json(await this.watcher.checkIn(await this.body(request)));
         case 'POST /v1/cloud/read-now': {
           // {test: true} is the Settings button: the most recent club night.
           const body = await this.body(request);

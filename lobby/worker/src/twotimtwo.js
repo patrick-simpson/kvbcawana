@@ -212,14 +212,42 @@ export function parseCheckinPage(html) {
       automatic: el.getAttribute('automatic') === '1',
     }))
     .filter((e) => /^\d{1,12}$/.test(e.id));
+  // Names are read for finding one child to check in (cloud check-in's
+  // owner-only route), in memory only: nothing that stores or logs this page's
+  // result keeps more than counts.
   const roster = [...doc.querySelectorAll('.clubber[recid]')]
-    .map((el) => ({
-      clubberId: String(el.getAttribute('recid') || '').trim(),
-      clubId: String(el.getAttribute('club_id') || '').trim(),
-      checkedIn: el.classList.contains('checked-in'),
-    }))
+    .map((el) => {
+      const crest = el.querySelector('.club img[alt]');
+      return {
+        clubberId: String(el.getAttribute('recid') || '').trim(),
+        clubId: String(el.getAttribute('club_id') || '').trim(),
+        name: squash(el.querySelector('.name')?.textContent).slice(0, 80),
+        club: crest ? String(crest.getAttribute('alt') || '').trim() : '',
+        checkedIn: el.classList.contains('checked-in'),
+      };
+    })
     .filter((r) => /^\d{1,20}$/.test(r.clubberId));
-  return { calendarId, events, roster };
+  // The meeting the page is on: its filter form's selected date (docs §8.2).
+  const picked = doc.querySelector('select[name="date"] option[selected]') || doc.querySelector('select[name="date"] option');
+  const meetingDate = picked ? squash(picked.getAttribute('value') || picked.textContent).slice(0, 30) : null;
+  return { calendarId, meetingDate, events, roster };
+}
+
+/**
+ * Did TwoTimTwo record a check-in? Its answer to POST /clubber/checkinclubber
+ * is the short #lastCheckin snippet naming the child: never a page, never the
+ * login form, never "Login Required". The extension's checkinReplyOk, rule for
+ * rule (a whole page once passed "names the child" and a refused post was
+ * taken for a check-in).
+ * @param {string} text @param {string} childName
+ */
+export function checkinReplyOk(text, childName) {
+  const t = typeof text === 'string' ? text.trim() : '';
+  if (!t || t.length > 4000) return false;
+  if (/<!doctype|<html[\s>]|<head[\s>]|<body[\s>]/i.test(t)) return false;
+  if (t === 'Login Required' || /name=["']LoginForm\[/.test(t) || /type=["']password["']/i.test(t)) return false;
+  const first = String(childName || '').trim().split(/\s+/)[0] || '';
+  return !!first && t.toLowerCase().includes(first.toLowerCase());
 }
 
 /** @param {string} html */
@@ -387,6 +415,27 @@ export class TwoTimTwoClient {
     return report
       ? { ok: /** @type {const} */ (true), report, html: page.html }
       : { ok: /** @type {const} */ (false), error: 'report-unreadable', shape: pageShape(page.html) };
+  }
+
+  /**
+   * Check one child in: TwoTimTwo's own POST, as the check-in page makes it.
+   * @param {{clubberId: string, calendarId: string, events: string[], name: string}} c
+   * @returns {Promise<{ok: true} | {ok: false, error: string}>}
+   */
+  async checkIn(c) {
+    const form = new URLSearchParams();
+    form.set('clubber_id', c.clubberId);
+    form.set('calendar_id', c.calendarId);
+    for (const id of c.events) form.append('events[]', id);
+    let res;
+    try {
+      res = await this.request('/clubber/checkinclubber', { method: 'POST', form });
+    } catch (err) {
+      return { ok: false, error: errorCode(err) };
+    }
+    if (isLoginPage(res.html) || /\/site\/login/i.test(res.path)) return { ok: false, error: 'signed-out' };
+    if (res.status !== 200) return { ok: false, error: res.status >= 500 ? 'twotimtwo-down' : `http-${res.status}` };
+    return checkinReplyOk(res.html, c.name) ? { ok: true } : { ok: false, error: 'checkin-refused' };
   }
 
   async checkinPage() {

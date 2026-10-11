@@ -10,6 +10,7 @@ import {
   TwoTimTwoClient,
   credentialsFrom,
   parseCheckinPage,
+  checkinReplyOk,
   parseCheckinReport,
   rowShape,
   twoTimTwoHost,
@@ -138,18 +139,27 @@ describe('the row shape (for a report that reads short)', () => {
 });
 
 describe('the check-in page parser', () => {
-  it('reads the meeting, its items with their clubs, and the roster without names', () => {
+  it('reads the meeting, its date, its items with their clubs, and the roster', () => {
     const p = parseCheckinPage(CHECKIN_PAGE);
     expect(p.calendarId).toBe('368');
+    expect(p.meetingDate).toBe('2026-10-14');
     expect(p.events).toEqual([
       { id: '707', clubs: ['2', '3', '6'], automatic: false },
       { id: '40', clubs: ['4', '1', '2', '3', '6'], automatic: true },
     ]);
     expect(p.roster).toEqual([
-      { clubberId: '662', clubId: '2', checkedIn: false },
-      { clubberId: '663', clubId: '3', checkedIn: true },
+      { clubberId: '662', clubId: '2', name: 'Kit Tester', club: 'Sparks', checkedIn: false },
+      { clubberId: '663', clubId: '3', name: 'Lu Tester', club: '', checkedIn: true },
     ]);
-    expect(JSON.stringify(p)).not.toMatch(/Tester/);
+  });
+
+  it('a check-in counts only on a short reply naming the child', () => {
+    expect(checkinReplyOk('<b>Kit Tester</b> 6:02 pm', 'Kit Tester')).toBe(true);
+    expect(checkinReplyOk('<b>Lu Tester</b>', 'Kit Tester')).toBe(false);
+    expect(checkinReplyOk('<html><body>Kit Tester and everyone</body></html>', 'Kit Tester')).toBe(false);
+    expect(checkinReplyOk('Login Required', 'Kit Tester')).toBe(false);
+    expect(checkinReplyOk(`Kit ${'x'.repeat(5000)}`, 'Kit Tester')).toBe(false);
+    expect(checkinReplyOk('', 'Kit Tester')).toBe(false);
   });
 
   it('no meeting id means it is not the check-in page', () => {

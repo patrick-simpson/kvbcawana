@@ -28,6 +28,7 @@ export const CHECKIN_PAGE = '<html><body><div class="clubbers">' +
   '<div class="clubber checkin-box girl checked-in" recid="663" club_id="3"><div class="name">Lu Tester</div></div>' +
   '</div><form id="checkinForm" style="display:none"><input id="checkinClubberId" name="clubber_id" value="">' +
   '<input name="calendar_id" id="calendar_id" value="368">' +
+  '<select name="date"><option value="2026-10-07">Oct 7</option><option value="2026-10-14" selected>Oct 14</option></select>' +
   '<input class="event" name="events[]" value="707" recid="707" clubs="2,3,6"><label> Bible</label>' +
   '<input class="event" name="events[]" value="40" automatic="1" clubs="4,1,2,3,6"><label>Attendance</label>' +
   '</form></body></html>';
@@ -40,7 +41,7 @@ export function fakeTwoTimTwo({ password = 'right-pass', report = () => page(tab
   const calls = [];
   let session = 0;
   const live = new Set();
-  const state = { expire() { live.clear(); }, calls, down: false, offsite: false };
+  const state = { expire() { live.clear(); }, calls, down: false, offsite: false, checkins: [] };
   state.fetchFn = async (url, init = {}) => {
     const u = new URL(url);
     const body = init.body ? new URLSearchParams(init.body) : null;
@@ -61,6 +62,10 @@ export function fakeTwoTimTwo({ password = 'right-pass', report = () => page(tab
     if (u.pathname === '/site/index') return new Response('<html><body>Welcome</body></html>', { status: 200 });
     if (u.pathname === '/clubber/checkin_report') return new Response(report(u.searchParams.get('date')), { status: 200 });
     if (u.pathname === '/clubber/checkin') return new Response(checkin(), { status: 200 });
+    if (u.pathname === '/clubber/checkinclubber' && init.method === 'POST') {
+      state.checkins.push(body);
+      return new Response(state.checkinReply ?? `<b>${state.checkinName ?? 'Kit Tester'}</b> 6:02 pm`, { status: 200 });
+    }
     return new Response('not found', { status: 404 });
   };
   return state;

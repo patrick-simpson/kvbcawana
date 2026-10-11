@@ -304,6 +304,45 @@ export class Watcher {
   }
 
   /**
+   * Check one child in on TwoTimTwo (CLOUD-CHECKIN.md phase 4's first piece,
+   * owner-only: a signed-in screen asks, never the watcher). Without
+   * `confirm: true` it only previews: who it found, their club, and the
+   * meeting the check-in would record on. Attendance and the other automatic
+   * items that apply to the child's club are sent, as the check-in page does.
+   * The answer names the child (the caller asked for them by name); nothing
+   * stored or logged does.
+   * @param {{name?: unknown, clubberId?: unknown, confirm?: unknown}} body
+   */
+  async checkIn(body) {
+    if (this.mode === 'off') return { ok: false, error: 'off' };
+    const client = this.clientFor();
+    if (!client) return { ok: false, error: 'not-configured' };
+    const wantId = /^\d{1,20}$/.test(String(body.clubberId ?? '')) ? String(body.clubberId) : '';
+    const wantName = String(body.name ?? '').trim().toLowerCase().replace(/\s+/g, ' ').slice(0, 80);
+    if (!wantId && !wantName) return { ok: false, error: 'no-child' };
+    const page = await client.checkinPage();
+    if (!page.ok) return { ok: false, error: page.error };
+    const found = page.page.roster.filter((r) => (wantId ? r.clubberId === wantId : r.name.toLowerCase() === wantName));
+    if (!found.length) return { ok: false, error: 'not-found' };
+    if (found.length > 1) return { ok: false, error: 'ambiguous', matches: found.length };
+    const child = found[0];
+    const events = page.page.events.filter((e) => e.automatic && (!e.clubs.length || e.clubs.includes(child.clubId)));
+    const preview = {
+      child: { name: child.name, club: child.club, clubberId: child.clubberId },
+      meeting: { calendarId: page.page.calendarId, date: page.page.meetingDate },
+      events: events.length,
+    };
+    if (child.checkedIn) return { ok: false, error: 'already-checked-in', ...preview };
+    if (!events.length) return { ok: false, error: 'no-attendance-item', ...preview };
+    if (body.confirm !== true) return { ok: true, preview: true, ...preview };
+    const res = await client.checkIn({ clubberId: child.clubberId, calendarId: page.page.calendarId, events: events.map((e) => e.id), name: child.name });
+    const status = await this.loadStatus();
+    this.note(status, 'cloud-check-in', { ok: res.ok, club: child.club });
+    await this.storage.put('cloud:status', status);
+    return res.ok ? { ok: true, checkedIn: true, ...preview } : { ok: false, error: res.error, ...preview };
+  }
+
+  /**
    * The Settings button's test: sign in and read the most recent club night's
    * report (today on a Wednesday), so it means something on any day. It
    * changes nothing the watcher keeps but the shared 15 s clock; the answer is

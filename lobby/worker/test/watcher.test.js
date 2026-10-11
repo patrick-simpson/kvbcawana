@@ -15,7 +15,7 @@ import {
   watchWindow,
 } from '../src/watcher.js';
 import { SyncCore } from '../src/sync.js';
-import { fakeTwoTimTwo, page, table } from './fixtures.js';
+import { CHECKIN_PAGE, fakeTwoTimTwo, page, table } from './fixtures.js';
 
 const WED_6PM = Date.parse('2026-10-14T22:00:00Z'); // 6:00 pm EDT, a club night
 const ENV = { CLOUD_CHECKIN: 'shadow', TWOTIMTWO_USERNAME: 'checkin@example.org', TWOTIMTWO_PASSWORD: 'right-pass' };
@@ -313,5 +313,58 @@ describe('the Settings test read', () => {
     const r = await w.testRead();
     expect(r.test).toMatchObject({ ok: false, error: 'report-unreadable', shape: { title: 'KVBC - Checkin Report', tables: 1, clubTables: 0, loginForm: false } });
     expect(JSON.stringify(r)).not.toContain('Uniquename');
+  });
+});
+
+describe('checking one child in (owner-only)', () => {
+  const SUNDAY = Date.parse('2026-10-11T18:45:00Z');
+  const make = (opts) => setup({ start: SUNDAY, ...opts });
+
+  it('previews first: who, their club and the meeting, and posts nothing', async () => {
+    const s = make();
+    const r = await s.w.checkIn({ name: '  kit   TESTER ' });
+    expect(r).toEqual({ ok: true, preview: true, child: { name: 'Kit Tester', club: 'Sparks', clubberId: '662' },
+      meeting: { calendarId: '368', date: '2026-10-14' }, events: 1 });
+    expect(s.tt.checkins).toHaveLength(0);
+  });
+
+  it('with confirm, posts TwoTimTwo\'s own form: the child, the meeting, the automatic items for the club', async () => {
+    const s = make();
+    const r = await s.w.checkIn({ clubberId: '662', confirm: true });
+    expect(r).toMatchObject({ ok: true, checkedIn: true, child: { name: 'Kit Tester' } });
+    expect(s.tt.checkins).toHaveLength(1);
+    const form = s.tt.checkins[0];
+    expect(form.get('clubber_id')).toBe('662');
+    expect(form.get('calendar_id')).toBe('368');
+    expect(form.getAll('events[]')).toEqual(['40']);
+    const stored = JSON.stringify([...s.storage.map.values()]);
+    expect(stored).toContain('cloud-check-in');
+    expect(stored).not.toMatch(/Kit|Tester|662/);
+  });
+
+  it('a reply that does not name the child is a refusal', async () => {
+    const s = make();
+    s.tt.checkinReply = '<html><body>Something went wrong</body></html>';
+    expect(await s.w.checkIn({ clubberId: '662', confirm: true })).toMatchObject({ ok: false, error: 'checkin-refused' });
+  });
+
+  it('never guesses: not found, two of the same name, or already in', async () => {
+    const s = make();
+    expect(await s.w.checkIn({ name: 'Nobody Here', confirm: true })).toEqual({ ok: false, error: 'not-found' });
+    expect(await s.w.checkIn({ name: 'Lu Tester', confirm: true })).toMatchObject({ ok: false, error: 'already-checked-in' });
+    expect(await s.w.checkIn({})).toEqual({ ok: false, error: 'no-child' });
+    const twins = setup({ start: SUNDAY });
+    twins.tt.fetchFn = fakeTwoTimTwo({ checkin: () => CHECKIN_PAGE.replace('recid="663"', 'recid="664"').replace('Lu Tester', 'Kit Tester') }).fetchFn;
+    const w2 = new Watcher({ storage: memoryStore(), env: ENV, fetchFn: twins.tt.fetchFn, now: () => SUNDAY, log: () => {} });
+    expect(await w2.checkIn({ name: 'Kit Tester', confirm: true })).toEqual({ ok: false, error: 'ambiguous', matches: 2 });
+    expect(s.tt.checkins).toHaveLength(0);
+  });
+
+  it('off or without a TwoTimTwo user it does nothing', async () => {
+    for (const env of [{ ...ENV, CLOUD_CHECKIN: 'off' }, { CLOUD_CHECKIN: 'shadow' }]) {
+      const s = make({ env });
+      expect((await s.w.checkIn({ clubberId: '662', confirm: true })).ok).toBe(false);
+      expect(s.tt.calls).toHaveLength(0);
+    }
   });
 });
