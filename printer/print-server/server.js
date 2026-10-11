@@ -2777,9 +2777,13 @@ function runPowerShell(args, { timeout = 15000, env } = {}) {
 // run one at a time, in the order they were asked for, while everything else
 // the server does carries on around them. A failed job never blocks the next.
 let printerChain = Promise.resolve();
+let printerJobs = 0;   // jobs on the chain: printing, or waiting their turn (isBusy)
 function withPrinter(fn) {
+  printerJobs += 1;
   const run = printerChain.then(fn, fn);
   printerChain = run.catch(() => {});
+  const done = () => { printerJobs -= 1; };
+  run.then(done, done);
   return run;
 }
 
@@ -4023,6 +4027,35 @@ function corsPolicy(req, res, next) {
   return next();
 }
 app.use(corsPolicy);
+
+// ── Busy: a label printing, or waiting to print (KVBC Awana 9.0.0) ──────────
+// The Electron shell asks isBusy() before it turns the print role off (a
+// change made on awana.kvbchurch.org/settings is held until this says no) and
+// before an update installs (capped there at a minute). Busy is: a request on
+// a printing route still being answered (its label is still being drawn, or a
+// stretch reprint is between labels), a job on the printer chain, or a phone
+// check-in the extension has not driven yet (its label is still to come).
+// Internal only: /health does not carry it.
+const PRINTING_ROUTE = /^\/(print|reprint|canary|play-tune)(\/|-|$)/;
+let printRequests = 0;
+app.use((req, res, next) => {
+  if (req.method !== 'POST' || !PRINTING_ROUTE.test(req.path)) return next();
+  printRequests += 1;
+  let open = true;
+  const end = () => { if (open) { open = false; printRequests -= 1; } };
+  res.on('finish', end);
+  res.on('close', end);
+  return next();
+});
+
+function isBusy() {
+  if (printRequests > 0 || printerJobs > 0 || reprintRun) return true;
+  // Within the queue's own lifetime: an action nobody drove is gone after
+  // PENDING_TTL_MS whether or not anything has pruned the list yet.
+  const cutoff = Date.now() - PENDING_TTL_MS;
+  return pendingActions.some((a) => actionType(a) === 'checkin' && (a.status === 'pending' || a.status === 'claimed')
+    && new Date(a.at).getTime() >= cutoff);
+}
 
 // Keep the GLOBAL body limit small so a hostile or buggy tab can't push
 // megabytes of JSON through a laptop that is mid-event. Exactly one route
@@ -10046,7 +10079,7 @@ function startListening(attempt = 1) {
 }
 
 module.exports = {
-  app, startListening, stopListening, resetRelayForTest, setUpdateHandler, setLatestVersion, setExtensionInfo, setOpsAlertHandler,
+  app, startListening, stopListening, isBusy, resetRelayForTest, setUpdateHandler, setLatestVersion, setExtensionInfo, setOpsAlertHandler,
   // For the Electron shell: this module is require-cached across settings
   // saves, so the shell pushes the freshly merged config.json and printer
   // name into the LIVE module instead of relying on load-time state.

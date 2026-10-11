@@ -62,6 +62,7 @@ const PORT = 34584;
       post('/print', { name: 'Mia Lee', clubberId: '3', clubName: 'T&T' }),
     ]);
     await new Promise((r) => setTimeout(r, 150));
+    check('busy while labels print or wait their turn (isBusy, KVBC Awana\'s print-off hold)', server.isBusy() === true);
     // Meanwhile: the event loop ticks, and /health answers at once.
     let ticks = 0;
     const ticker = setInterval(() => { ticks += 1; }, 20);
@@ -82,6 +83,18 @@ const PORT = 34584;
     check('three jobs reached the printer', starts.length === 3 && ends.length === 3, log.join(' | '));
     const overlapping = starts.slice(1).some((st, i) => st < ends[i]);
     check('and no job started before the one before it had finished', !overlapping);
+    check('idle again once the last label is out', server.isBusy() === false);
+  }
+
+  console.log('\nbusy: a phone check-in waiting for the extension is a label still to come');
+  {
+    check('idle with nothing queued', server.isBusy() === false);
+    const q = await post('/phone/checkin', { name: 'Ava Stone' });
+    check('the check-in is queued', q.status === 200 && q.body && q.body.queued === true, JSON.stringify(q));
+    check('busy while it waits', server.isBusy() === true);
+    const done = await post(`/pending-actions/${q.body.id}/result`, { ok: true });
+    check('the extension reports it', done.status === 200, JSON.stringify(done));
+    check('idle once it is driven (its label comes as a /print, counted there)', server.isBusy() === false);
   }
 
   console.log('\nroutes: a rejected async handler is a 500 at once, never a hang');
