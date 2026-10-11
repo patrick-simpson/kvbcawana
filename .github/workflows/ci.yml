@@ -12,6 +12,14 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
+    inputs:
+      deploy_worker:
+        # After adding or changing a Worker secret in GitHub (the TWOTIMTWO_*
+        # ones for cloud check-in): the Worker only redeploys, and so only
+        # receives its secrets, when this is ticked or its sources changed.
+        description: Redeploy the sync Worker and re-send its secrets (drops every screen's socket for a moment)
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -237,8 +245,14 @@ jobs:
         env:
           BEFORE: ${{ github.event.before }}
           EVENT: ${{ github.event_name }}
+          FORCE: ${{ github.event_name == 'workflow_dispatch' && inputs.deploy_worker == true }}
         run: |
           set -u
+          if [ "$FORCE" = "true" ]; then
+            echo "Asked to redeploy the Worker; deploying it."
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           BASE=""
           if [ "$EVENT" = "push" ] && [ -n "$BEFORE" ] && ! echo "$BEFORE" | grep -Eq '^0+$'; then
             git fetch -q --depth=1 origin "$BEFORE" && BASE="$BEFORE"
@@ -268,9 +282,15 @@ jobs:
           PUSHER_SECRET: ${{ secrets.PUSHER_SECRET }}
           PUSHER_CLUSTER: ${{ secrets.PUSHER_CLUSTER }}
           INITIAL_PASSPHRASE: ${{ secrets.SYNC_PASSPHRASE }}
+          # Cloud check-in (CLOUD-CHECKIN.md): the church's dedicated TwoTimTwo
+          # user. Never echoed; the Worker never stores or returns them.
+          TWOTIMTWO_USERNAME: ${{ secrets.TWOTIMTWO_USERNAME }}
+          TWOTIMTWO_PASSWORD: ${{ secrets.TWOTIMTWO_PASSWORD }}
+          TWOTIMTWO_HOST: ${{ secrets.TWOTIMTWO_HOST }}
         run: |
           node -e '
-            const names = ["PUSHER_APP_ID", "PUSHER_KEY", "PUSHER_SECRET", "PUSHER_CLUSTER", "INITIAL_PASSPHRASE"];
+            const names = ["PUSHER_APP_ID", "PUSHER_KEY", "PUSHER_SECRET", "PUSHER_CLUSTER", "INITIAL_PASSPHRASE",
+              "TWOTIMTWO_USERNAME", "TWOTIMTWO_PASSWORD", "TWOTIMTWO_HOST"];
             const out = {};
             for (const n of names) if (process.env[n]) out[n] = process.env[n];
             const missing = names.filter((n) => !out[n]);
