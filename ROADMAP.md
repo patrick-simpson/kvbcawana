@@ -529,6 +529,38 @@ The laptop keeps its own check-in and its own label path. What moves is the lapt
 
 - 2026-10-11: decided by the owner. Not built.
 
+### Inventory (2026-10-12): every dashboard feature, and where it goes
+
+Read off `printer/print-server/public/index.html` (every `fetch` it makes) against `security.js` (`SETTINGS_PAGE_ROUTES`, `SETTINGS_PAGE_CONFIG_KEYS`). The page may use a route only if the table lists it; a route that should take the page next to the dashboard calls `isTrustedOrSettingsPage`, one that holds a secret or opens the network keeps `isTrustedConfigOrigin` alone.
+
+| Dashboard feature | Routes it calls | Today | Decision |
+| --- | --- | --- | --- |
+| Name tag printer, backup printer | GET /printers, GET and POST /config | in /settings | kept there |
+| Label footer, visitor palette, trophy band, connect card, greeting | POST /config | in /settings | kept there |
+| Per-club label layout and preview | GET and POST /config/label-templates, GET /preview | in /settings | kept there |
+| Pickup clubs, schedule, late grace, screen season | POST /config, GET and POST /config/schedule | in /settings | kept there |
+| Print history, single reprint | GET /history/today, POST /reprint | in /settings | kept there |
+| Diagnostics, status and warnings, test label, clear queue, test tune | GET /diagnostics, GET /health, POST /canary, POST /printer/clear-queue, POST /play-tune | in /settings | kept there |
+| Leader tags (print, remembered leaders, forget) | POST /print-leader, GET /leaders, POST /leaders/forget, GET /clubs | dashboard only | **move** (new routes) |
+| One-off name tag | POST /print-oneoff | dashboard only | **move** (new route) |
+| Custom label | POST /print-custom | dashboard only | **move** (new route) |
+| Reprint a stretch | POST /reprint-range | dashboard only | **move** (new route) |
+| Attendance audit | GET /attendance-audit, POST /attendance-audit/apply | dashboard only | **move** (new routes) |
+| Rehearsal mode | POST /rehearsal | dashboard only (`isTrustedConfigOrigin`) | **move**, with a confirm; the page's sync sign-in is the proof |
+| Print failures tonight | GET /failures | route allowed, not drawn | **move** (drawn in the status card) |
+| Musical printer, update beacon, driven check-ins | POST /config `musicalPrinter`, `updateBeacon`, `enableDrivenCheckin` | musical key allowed, no switch; the others dashboard only | **move** (two new keys, three switches) |
+| Sync sign-in (this computer's own) | POST /config/sync-login, /config/sync-logout | dashboard only | **move sign-in** (the page's confirmed session; the address is fixed to the one this computer already uses, never one the page names); sign-out is **removed** (a laptop leaves the service by turning its print role off) |
+| Phone check-in PIN | POST /config `phonePin` | dashboard only | **removed** (no LAN phone page) |
+| Wi-Fi access for phones, LAN bind, PIN gate, firewall button, "Phones" address | POST /config `lanAccess`, `resolveBindHost`, the auth gate, the app's `enable-phone-checkin` | dashboard, app, server | **removed** (the server listens on loopback only) |
+| Allowed origins | POST /config `allowedOrigins` | no control on the dashboard | **removed** from the page's reach (it existed for the LAN phone page) |
+| Display key (generate, copy, clear) | POST /config `displayKey`, /config/display-key/generate | dashboard only | **removed**: the sync sign-in installs the service's key and is the only pipe; the warnings now say "sign this computer in" |
+| Publish token, lobby slides paste-and-publish | POST /config/slides-token/generate, GET and POST /api/lobby-slides | dashboard only | **removed**: the slide editor on /settings publishes through the sync service; a token already on the laptop still works as the page's fallback proof |
+| Check-in URL | POST /config `checkinUrl` | dashboard only | **kept in the app's setup wizard** ("Set up this computer..."), not on /settings: it is handed to the Windows shell |
+| Extension folder path | GET /health `extension.folder` (loopback only) | dashboard only | **kept in the tray** ("Open Chrome extension folder"); the path holds the Windows user name and is never sent to a web page |
+| History retention, fleet config URL | POST /config | no control on the dashboard | unchanged (config only) |
+| Tonight at a glance, roster count, welcome-screen privacy card, count check, update banner and "Update now", what's new | GET /stats/tonight, /roster-status, /reconcile, /whats-new, POST /update-now | dashboard only | **removed** (read-only monitoring: the screens show the count, /health's warnings carry every fault, the app updates itself every 10 minutes, release notes are a /settings card) |
+| Extension popup, options page, "Printing to Change" link | GET /health | open /settings | the offline "dashboard" fallback link goes |
+
 ### Still to do
 
 1. Move the dashboard-only tools (the [Settings track](#settings-page) inventory) to awana.kvbchurch.org/settings, through the same localhost route the Laptop section already uses.
