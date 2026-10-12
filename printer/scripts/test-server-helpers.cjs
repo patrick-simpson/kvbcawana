@@ -879,8 +879,9 @@ console.log('packaging — every print-server module must ship inside the Window
   check('allows the extension options page', allow('chrome-extension://abcdefghijklmnop') === true);
   check('allows the check-in site', allow('https://kvbchurch.twotimtwo.com') === true);
   check('allows another church subdomain (fork-friendly)', allow('https://other.twotimtwo.com') === true);
-  check('allows the dashboard over loopback', allow('http://localhost:3456') === true);
-  check('allows the phone page over a private LAN IP', allow('http://192.168.1.20:3456') === true);
+  check('allows our own page over loopback', allow('http://localhost:3456') === true && allow('http://127.0.0.1:3456') === true && allow('http://[::1]:3456') === true);
+  check('rejects a private LAN IP on our port (the Wi-Fi phone page is gone: that is somebody else\'s server)',
+    allow('http://192.168.1.20:3456') === false && allow('http://10.0.0.5:3456') === false && allow('http://laptop.local:3456') === false);
   check('rejects an unrelated site', allow('https://evil.example') === false);
   check('rejects the old port-suffix bypass', allow('http://evil.example:3456') === false);
   check('rejects a lookalike host', allow('https://twotimtwo.com.evil.example') === false);
@@ -899,81 +900,15 @@ console.log('packaging — every print-server module must ship inside the Window
   check('sanitizeAllowedOrigins tolerates junk input',
     arrEq(sec.sanitizeAllowedOrigins(null), []) && arrEq(sec.sanitizeAllowedOrigins('x'), []));
 
-  // PIN policy.
-  check('isAcceptablePin rejects empty', sec.isAcceptablePin('') === false);
-  check('isAcceptablePin rejects too short', sec.isAcceptablePin('123') === false);
-  check('isAcceptablePin accepts a 4-digit PIN', sec.isAcceptablePin('1234') === true);
-  check('isAcceptablePin accepts a passphrase', sec.isAcceptablePin('correct horse battery') === true);
-  check('isAcceptablePin rejects a control character', sec.isAcceptablePin('12\u00003') === false);
-  check('isAcceptablePin rejects over-long', sec.isAcceptablePin('x'.repeat(65)) === false);
+  // The PIN, its rate limiter and the LAN bind are gone (Online only): nothing
+  // here may quietly come back.
+  for (const gone of ['isAcceptablePin', 'createPinLimiter', 'resolveBindHost', 'PIN_MIN_LENGTH', 'PIN_MAX_LENGTH', 'isPrivateHostname']) {
+    check(`security.${gone} is retired`, !(gone in sec));
+  }
   check('timingSafeStringEqual matches equal strings', sec.timingSafeStringEqual('abcd', 'abcd') === true);
   check('timingSafeStringEqual rejects different strings', sec.timingSafeStringEqual('abcd', 'abce') === false);
   check('timingSafeStringEqual rejects a prefix', sec.timingSafeStringEqual('abc', 'abcd') === false);
   check('timingSafeStringEqual handles null', sec.timingSafeStringEqual(null, '') === true);
-
-  // Rate limiter.
-  {
-    const lim = sec.createPinLimiter({ maxFailures: 3, lockoutMs: 1000 });
-    const t0 = 1_000_000;
-    check('limiter starts unlocked', lim.retryAfterMs('1.2.3.4', t0) === 0);
-    lim.recordFailure('1.2.3.4', t0);
-    lim.recordFailure('1.2.3.4', t0);
-    check('limiter still open below the threshold', lim.retryAfterMs('1.2.3.4', t0) === 0);
-    lim.recordFailure('1.2.3.4', t0);
-    check('limiter locks at the threshold', lim.retryAfterMs('1.2.3.4', t0) > 0);
-    check('lockout is scoped per address', lim.retryAfterMs('5.6.7.8', t0) === 0);
-    check('lockout expires', lim.retryAfterMs('1.2.3.4', t0 + 1500) === 0);
-    lim.recordFailure('9.9.9.9', t0);
-    lim.recordSuccess('9.9.9.9');
-    check('a success clears the failure count', lim.retryAfterMs('9.9.9.9', t0) === 0);
-  }
-
-  // Rate limiter — identical-guess dedupe (a stale saved PIN retried by a
-  // phone, or Enter-mashing, must not out-count real distinct mistakes).
-  {
-    const lim = sec.createPinLimiter({ maxFailures: 8, lockoutMs: 1000 });
-    const t0 = 2_000_000;
-    for (let i = 0; i < 10; i++) lim.recordFailure('10.0.0.1', t0 + i, 'wrong-same');
-    check('identical wrong guess repeated N times counts once',
-      lim.retryAfterMs('10.0.0.1', t0 + 10) === 0);
-
-    const lim2 = sec.createPinLimiter({ maxFailures: 8, lockoutMs: 1000 });
-    for (let i = 0; i < 8; i++) lim2.recordFailure('10.0.0.2', t0 + i, 'guess-' + i);
-    check('distinct guesses still lock at the threshold', lim2.retryAfterMs('10.0.0.2', t0 + 8) > 0);
-
-    const lim3 = sec.createPinLimiter({ maxFailures: 3, lockoutMs: 1000 });
-    lim3.recordFailure('10.0.0.3', t0, 'aaaa');
-    lim3.recordFailure('10.0.0.3', t0, 'aaaa'); // repeat — should not increment
-    lim3.recordFailure('10.0.0.3', t0, 'bbbb'); // distinct — increments
-    check('a repeat guess does not advance toward lockout',
-      lim3.retryAfterMs('10.0.0.3', t0) === 0);
-    lim3.recordFailure('10.0.0.3', t0, 'cccc'); // 3rd distinct guess -> locks
-    check('distinct guesses after repeats still reach the threshold',
-      lim3.retryAfterMs('10.0.0.3', t0) > 0);
-
-    const lim4 = sec.createPinLimiter({ maxFailures: 3, lockoutMs: 1000 });
-    lim4.recordFailure('10.0.0.4', t0, 'zzzz');
-    lim4.recordFailure('10.0.0.4', t0, 'zzzz');
-    lim4.recordFailure('10.0.0.4', t0, 'zzzz');
-    lim4.recordSuccess('10.0.0.4');
-    check('success still clears a deduped record', lim4.retryAfterMs('10.0.0.4', t0) === 0);
-
-    const lim5 = sec.createPinLimiter({ maxFailures: 3, lockoutMs: 1000 });
-    for (let i = 0; i < 5; i++) lim5.recordFailure('10.0.0.5', t0 + i, 'same-guess');
-    check('per-address scoping intact alongside dedupe',
-      lim5.retryAfterMs('10.0.0.6', t0 + 5) === 0);
-  }
-
-  // Bind host — the property that keeps a default install off the network.
-  check('default bind is loopback', sec.resolveBindHost({}).host === '127.0.0.1');
-  check('lanAccess without a PIN stays loopback',
-    sec.resolveBindHost({ lanAccess: true, hasPin: false }).host === '127.0.0.1');
-  check('lanAccess with a PIN binds all interfaces',
-    sec.resolveBindHost({ lanAccess: true, hasPin: true }).host === '0.0.0.0');
-  check('AWANA_BIND_HOST overrides',
-    sec.resolveBindHost({ envHost: '10.0.0.5' }).host === '10.0.0.5');
-  check('an explicit loopback override is not reported as LAN',
-    sec.resolveBindHost({ envHost: '127.0.0.1' }).lan === false);
 
   // The shell.openExternal / Start-Process sink.
   for (const bad of ['file:///C:/Windows/System32/calc.exe', 'javascript:alert(1)',
@@ -1560,14 +1495,12 @@ console.log('spooler backlog (#256) — a jam must not look healthy');
     'a spool job title or a Windows username must never reach CORS-readable /health');
   check('neither queue script names DocumentName or UserName',
     !/\$j\.(DocumentName|UserName)/.test(spoolSrc));
-  const dash = require('fs').readFileSync(
-    path.join(__dirname, '..', 'print-server', 'public', 'index.html'), 'utf8');
-  check('the dashboard registers spoolerCheckFailed as a static description',
-    /spoolerCheckFailed:/.test(dash));
-  check('...but NOT spoolerBacklog, whose numbers must reach the screen',
-    !/spoolerBacklog:/.test(dash));
-  check('a backlog turns the traffic light red, not a mild yellow',
-    /hasError[\s\S]{0,220}spoolerBacklog/.test(dash));
+  // The settings page draws the warnings the server sends (laptop.jsx: healthSummary
+  // lists every `message`), so a backlog's numbers reach the screen in the server's own words.
+  const lobbyHealth = require('fs').readFileSync(
+    path.join(__dirname, '..', '..', 'lobby', 'src', 'lib', 'printServer.js'), 'utf8');
+  check('the settings page lists each warning by its message (never a bare string)',
+    /\(health\.warnings \|\| \[\]\)\.map\(\(w\) => w\.message\)/.test(lobbyHealth));
 }
 
 console.log('range reprint (#257) — which of tonight’s rows come back out');

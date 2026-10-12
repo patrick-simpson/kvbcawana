@@ -257,7 +257,7 @@ async function main() {
     const disk = savedConfig();
     check('...to disk', disk.printerName === 'Dock' && disk.backupPrinterName === 'Spare' && disk.labelFooter === 'KVBC Awana' && disk.lateGraceMin === 15
       && JSON.stringify(disk.pickupClubs) === JSON.stringify(['Sparks', 'T&T']), JSON.stringify(disk));
-    check('...and kept what it did not send (the PIN, the key, the token)', disk.phonePin === '4321' && Boolean(disk.displayKey) && disk.slidesPublishToken === token);
+    check('...and kept what it did not send (the key, the token)', disk.phonePin === '4321' && Boolean(disk.displayKey) && disk.slidesPublishToken === token);
 
     const sw = await post('/config', { updateBeacon: true, enableDrivenCheckin: false, musicalPrinter: true }, H);
     check('the three switches save from the page (update beacon, driven check-ins, musical printer)', sw.status === 200
@@ -270,8 +270,8 @@ async function main() {
       check(`POST /config ${JSON.stringify(Object.keys(body))} from the page is refused and changes nothing`,
         r.status === 403 && JSON.stringify(savedConfig()) === before, `${r.status} ${JSON.stringify(r.body)}`);
     }
-    const dashboardPin = await post('/config', { phonePin: '5555' });
-    check('the dashboard (no Origin) still sets the PIN', dashboardPin.status === 200 && savedConfig().phonePin === '5555');
+    const appKey = await post('/config', { displayKey: SERVICE_KEY });
+    check('the app on this computer (no Origin) still sets the display key, which the page cannot', appKey.status === 200 && savedConfig().displayKey === SERVICE_KEY);
 
     const tpl = await post('/config/label-templates', { templates: { spark: { showFooter: false } } }, H);
     check('label templates save from the page', tpl.status === 200 && savedConfig().labelTemplates && savedConfig().labelTemplates.spark.showFooter === false, JSON.stringify(tpl.body));
@@ -402,10 +402,12 @@ async function main() {
     const own = `http://127.0.0.1:${PORT}`;
     const fromDashboard = await post('/config', { printerName: 'Back' }, { Origin: own });
     check('the dashboard\'s own origin still saves', fromDashboard.status === 200 && savedConfig().printerName === 'Back');
-    const fromExtension = await post('/config', { phonePin: '6666' }, { Origin: 'chrome-extension://abcdefghijklmnop' });
-    check('the extension can still set the PIN', fromExtension.status === 200 && savedConfig().phonePin === '6666');
+    const KEY2 = Buffer.alloc(32, 9).toString('base64');
+    const fromExtension = await post('/config', { displayKey: KEY2 }, { Origin: 'chrome-extension://abcdefghijklmnop' });
+    check('the extension can still set a key', fromExtension.status === 200 && savedConfig().displayKey === KEY2);
     const noOrigin = await j('/config');
-    check('GET /config without an Origin still carries the secrets (this computer)', noOrigin.status === 200 && noOrigin.body.phonePin === '6666');
+    check('GET /config without an Origin still carries the secrets (this computer)', noOrigin.status === 200 && noOrigin.body.displayKey === KEY2);
+    check('...and a stale PIN left in an old config.json is never read, never written', noOrigin.body.phonePin === '4321' && savedConfig().phonePin === '4321');
     const evil = await post('/config', { printerName: 'Evil' }, { Origin: 'https://evil.example' });
     check('a stranger\'s origin is still refused', evil.status === 403 && savedConfig().printerName === 'Back');
     const slides = await fetch(`${BASE}/api/display-settings`, { method: 'OPTIONS', headers: { Origin: PAGE, 'Access-Control-Request-Method': 'POST', 'Access-Control-Request-Headers': 'content-type,authorization', 'Access-Control-Request-Private-Network': 'true' } });
@@ -423,7 +425,7 @@ async function main() {
     await j('/config', { headers: sync(GOOD_SESSION) });
     check('...and is asked about once, then remembered', syncChecks.length === before + 1, String(syncChecks.length - before));
     const cfg = await j('/config', { headers: sync(GOOD_SESSION) });
-    check('...and still sees no secret', cfg.status === 200 && cfg.body.phonePin === undefined && cfg.body.syncSession === undefined);
+    check('...and still sees no secret', cfg.status === 200 && cfg.body.phonePin === undefined && cfg.body.displayKey === undefined && cfg.body.syncSession === undefined);
     const pin = await post('/config', { phonePin: '1111' }, sync(GOOD_SESSION));
     check('...and still cannot change one', pin.status === 403);
     const bad = await j('/printers', { headers: sync('v1.3.1700000000000.notasessionnotasessionnotases') });
@@ -434,24 +436,30 @@ async function main() {
     check('/health still needs nothing', health.status === 200);
   }
 
-  console.log('settings page: every settings entry point goes to it');
+  console.log('settings page: every settings entry point goes to it, and there is no dashboard');
   {
     const read = (...p) => fs.readFileSync(path.join(__dirname, '..', ...p), 'utf8');
     const URL_ = 'https://awana.kvbchurch.org/settings';
     const options = read('chrome-extension', 'options.html');
     check('the options page links to the settings page', options.includes(`href="${URL_}"`));
-    check('...and keeps the dashboard as the offline fallback', options.includes('http://localhost:3456/#settings'));
+    check('...and no longer points at the dashboard', !options.includes('localhost:3456') && !/print dashboard/i.test(options.replace(/<!--[\s\S]*?-->/g, '')));
     const optionsJs = read('chrome-extension', 'options.js');
     check('options.js sends an online tab there', optionsJs.includes(URL_) && /location\.replace/.test(optionsJs));
-    check('...but not an offline one (the fallback link must stay readable)', /onLine\s*===\s*false/.test(optionsJs));
+    check('...but not an offline one (the card says the desk still prints)', /onLine\s*===\s*false/.test(optionsJs));
     check('options.html loads it (no inline script: Manifest V3 forbids it)', options.includes('src="options.js"') && !/<script>/.test(options));
-    check('the popup\'s Settings button opens the settings page', read('chrome-extension', 'popup.js').includes(`url: '${URL_}'`));
-    check('the popup still reaches the dashboard', read('chrome-extension', 'popup.js').includes("url: 'http://localhost:3456/'"));
+    const popupJs = read('chrome-extension', 'popup.js');
+    const popupHtml = read('chrome-extension', 'popup.html');
+    check('the popup\'s Settings button opens the settings page', popupJs.includes(`url: '${URL_}'`));
+    check('the popup has no dashboard button any more', !/dashboard/i.test(popupJs) && !/dashboard/i.test(popupHtml) && !popupJs.includes("localhost:3456/'"));
     check('the check-in page\'s "Printing to … Change" link opens the settings page', read('chrome-extension', 'content.js').includes(`printingToChange.href = '${URL_}'`));
-    const dash = read('print-server', 'public', 'index.html');
-    check('the dashboard\'s Settings tab says where settings live now', /id="settings-moved"/.test(dash) && dash.includes(`href="${URL_}"`));
+    check('the dashboard page is gone and the server serves none', !fs.existsSync(path.join(__dirname, '..', 'print-server', 'public', 'index.html')));
     const manifest = JSON.parse(read('chrome-extension', 'manifest.json'));
     check('the manifest still points options at options.html', manifest.options_ui.page === 'options.html');
+    const tray = read('electron-app', 'main.js');
+    check('the app\'s tray and status window open the settings page', tray.includes(`const SETTINGS_URL = '${URL_}'`)
+      && /openExternalSafely\(SETTINGS_URL, 'tray menu'\)/.test(tray) && /ipcMain\.handle\('open-settings'/.test(tray));
+    check('the app no longer offers a firewall rule or a LAN address for phones', !/FIREWALL_RULE|enable-phone-checkin|get-lan-address/.test(tray)
+      && !/enablePhone|getLanAddress|:3456\/phone/.test(read('electron-app', 'renderer', 'components', 'StatusPanel.jsx')));
   }
 
   console.log(`\n${passed} passed, ${failed} failed`);

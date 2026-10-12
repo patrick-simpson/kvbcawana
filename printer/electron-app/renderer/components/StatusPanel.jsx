@@ -10,9 +10,7 @@ export default function StatusPanel({ config, onReset }) {
   const [health, setHealth]         = useState(null);   // /health JSON or null
   const [healthErr, setHealthErr]   = useState(false);
   const [serverState, setServerState] = useState(null); // main-process view (load failure, update)
-  const [lanAddress, setLanAddress] = useState(null);
   const [testState, setTestState]   = useState('idle'); // idle | printing | ok | error
-  const [fwState, setFwState]       = useState('idle'); // idle | working | ok | error
   const [starting, setStarting]     = useState(false);  // Start Server button
   const [checking, setChecking]     = useState(false);  // Check for Updates button
   const [checkNote, setCheckNote]   = useState('');     // result of an explicit check
@@ -36,7 +34,6 @@ export default function StatusPanel({ config, onReset }) {
     }
     poll();
     const t = setInterval(poll, 5000);
-    window.awana.getLanAddress?.().then(a => { if (alive) setLanAddress(a); });
     return () => { alive = false; clearInterval(t); };
   }, []);
 
@@ -108,17 +105,6 @@ export default function StatusPanel({ config, onReset }) {
     setChecking(false);
   }
 
-  async function enablePhone() {
-    setFwState('working');
-    try {
-      const r = await window.awana.enablePhoneCheckin();
-      setFwState(r?.ok ? 'ok' : 'error');
-    } catch {
-      setFwState('error');
-    }
-    setTimeout(() => setFwState('idle'), 6000);
-  }
-
   const failed = serverState?.status === 'failed' || (healthErr && !health);
   const upd = serverState?.update || {};
   const updateReady = upd.downloaded;
@@ -128,7 +114,7 @@ export default function StatusPanel({ config, onReset }) {
   const csv = health?.csv;
   const warnings = health?.warnings || [];
 
-  // Same rule as the dashboard's header chip: PROBLEM when a warning means
+  // PROBLEM when a warning means
   // nothing is coming out of the printer.
   const printerProblem = warnings.some(w => w && (w.type === 'printerNotFound' || w.type === 'spoolerBacklog'
     || w.type === 'printerOffline'));
@@ -196,9 +182,7 @@ export default function StatusPanel({ config, onReset }) {
             <Row label="Server"   value={SERVER} mono />
             <Row label="Check-in" value={config.checkinUrl} small />
             <Row label="Roster"   value={csv ? `${csv.count} clubbers${csv.updatedAt ? ` — updated ${timeAgo(csv.updatedAt)}` : ''}` : '—'} />
-            {lanAddress && (
-              <Row label="Phones" value={`http://${lanAddress}:3456/phone`} mono small />
-            )}
+            <Row label="Settings" value="awana.kvbchurch.org/settings" mono small />
           </div>
         </div>
 
@@ -229,16 +213,8 @@ export default function StatusPanel({ config, onReset }) {
              : 'Print Test Label'}
           </button>
 
-          <button
-            className="btn"
-            onClick={enablePhone}
-            disabled={fwState === 'working'}
-            title="Adds a Windows Firewall rule (asks for administrator approval) so phones on your Wi-Fi can reach phone check-in"
-          >
-            {fwState === 'working' ? 'Waiting for approval…'
-             : fwState === 'ok'    ? '✓ Phone check-in enabled'
-             : fwState === 'error' ? '✗ Not enabled'
-             : 'Enable Phone Check-in (firewall)'}
+          <button className="btn" onClick={() => window.awana.openSettings()}>
+            Open Settings
           </button>
 
           <button className="btn btn-ghost" onClick={onReset}>

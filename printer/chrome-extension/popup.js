@@ -21,9 +21,7 @@
 }
 
 document.getElementById('check-btn').addEventListener('click', checkServer);
-// Settings live on the one settings page (8.3.0); the dashboard on this computer
-// is the fallback for a night with no internet.
+// Every setting and tool lives on the one settings page.
 document.getElementById('settings-btn').addEventListener('click', () => chrome.tabs.create({ url: 'https://awana.kvbchurch.org/settings' }));
-document.getElementById('dashboard-btn').addEventListener('click', () => chrome.tabs.create({ url: 'http://localhost:3456/' }));
 // Check status immediately when popup opens
 checkServer();

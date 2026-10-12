@@ -13,8 +13,8 @@ process.on('unhandledRejection', err => console.error('[fatal] Unhandled rejecti
 const express = require('express');
 const events  = require('./events');
 const feeds   = require('./feeds');
-// The whole trust model (loopback vs LAN vs the open web, PIN handling, origin
-// allowlist, bind host) lives in one pure module so it can be unit-tested.
+// The whole trust model (loopback vs the open web, the origin allowlist, the
+// settings page's route table) lives in one pure module so it can be unit-tested.
 const security = require('./security');
 // @napi-rs/canvas ships prebuilt N-API binaries, so the same node_modules
 // works under plain Node AND inside a packaged Electron app — the old `canvas`
@@ -194,7 +194,7 @@ if (events.setDisplayKey(config.displayKey)) {
 } else if (config.displayKey) {
   console.warn('[realtime] config.displayKey is INVALID — names will be published in the clear until it is fixed');
 } else {
-  console.warn('[realtime] No display key set — children\'s first names are published UNENCRYPTED on the live channel. Generate one in the dashboard (Realtime).');
+  console.warn('[realtime] No display key set — children\'s first names are published UNENCRYPTED on the live channel. Sign this computer in to the sync service (awana.kvbchurch.org/settings → Laptop → Sync service).');
 }
 
 // Display login state (the passphrase-derived wrapping key). The frame it
@@ -205,11 +205,6 @@ if (events.setDisplayLogin(config.displayLoginPassphrase, config.displayLoginSal
 } else if (config.displayLoginPassphrase) {
   console.warn('[login] config.displayLoginPassphrase is INVALID (12–128 characters, with its salt) — screens cannot log in until it is fixed');
 }
-
-// Brute-force protection for the phone PIN. Lives at module scope so the
-// failure counts survive across requests but not across restarts — a restart
-// mid-event must never leave a volunteer locked out.
-const pinLimiter = security.createPinLimiter();
 
 // ── Church configuration ──────────────────────────────────────────────────────
 // Per-church knobs (check-in URL, club-night windows, event-bus channel) live
@@ -3778,7 +3773,7 @@ function labelTemplateFor(clubName) {
 }
 
 // ── Phone check-in queue (#17b) ───────────────────────────────────────────────
-// A phone on the LAN posts a check-in request; the extension (which has the
+// A phone (through the sync Worker's relay) posts a check-in request; the extension (which has the
 // authenticated TwoTimTwo session) long-polls for pending actions and drives
 // the real check-in in the browser. The label then flows through the normal
 // detection path — for a ROSTER kid the phone page never prints directly, so
@@ -3786,7 +3781,7 @@ function labelTemplateFor(clubName) {
 // deliberate and cannot double-print: a visitor label (POST /phone/visitor)
 // is for a child with no TwoTimTwo row, whom roster-diff, reconcile and the
 // last-check-in observer can therefore never see; a leader tag (POST
-// /print-leader) is not a check-in at all. PIN-over-HTTP is LAN-trust only.
+// /print-leader) is not a check-in at all.
 let pendingActions = [];      // { id, type, name, at, status, detail } (type 'checkin' | 'undo')
 let pendingWaiters = [];      // long-poll responders
 const PENDING_MAX = 100;
@@ -3912,7 +3907,6 @@ function corsPolicy(req, res, next) {
     req.method === 'OPTIONS' ? req.headers['access-control-request-method'] : req.method);
   const allowed = slidesOrigin || Boolean(settingsRoute) || security.isAllowedOrigin(origin, {
     port: PORT,
-    extraOrigins: security.sanitizeAllowedOrigins(config.allowedOrigins),
   });
 
   // Vary so a proxy or the browser cache never reuses one origin's answer for
@@ -4032,27 +4026,26 @@ app.use((req, res, next) => {
   return globalJson(req, res, next);
 });
 
-// ── The auth gate ─────────────────────────────────────────────────────────────
-// Mounted BEFORE express.static and before every route, so nothing — not the
-// dashboard, not the roster, not /config — is reachable from the LAN without
-// the PIN. Loopback callers (the extension via localhost, the dashboard, the
-// Electron shell) pass through untouched, which is why this adds no friction to
-// the normal single-laptop setup.
-//
-// LAN_PUBLIC_PATHS is the one exception: the phone page itself is the PIN entry
-// form, so it must load before a PIN exists to send. It contains no roster
-// data — every byte of that arrives via POST /phone/roster, which is gated.
-const LAN_PUBLIC_PATHS = new Set(['/phone', '/phone/ym']);
+// ── The loopback gate ────────────────────────────────────────────────────────
+// Online only (owner, 2026-10-11): this server answers the computer it runs on
+// and nobody else. startListening() binds 127.0.0.1, so no other machine can
+// open a socket here at all; this refuses a non-loopback caller anyway, at the
+// one place every route passes through, so a later change to the bind can never
+// quietly expose the roster to the church Wi-Fi. There is no PIN and no LAN
+// page any more: phones use awana.kvbchurch.org/checkin, which the sync Worker
+// relays to /phone/* below (from this computer, so loopback).
+app.use((req, res, next) => {
+  if (security.isLoopbackRequest(req)) return next();
+  const addr = (req.socket && req.socket.remoteAddress) || 'unknown';
+  console.warn(`[security] Refused ${req.method} ${req.path} from ${addr}: this server only answers the computer it runs on`);
+  return res.status(403).json({ error: 'This server only answers on the computer it runs on.' });
+});
 
-// The brand kit (public/brand/, the byte-identical mirror of the signage repo's
-// shared/brand/) is public too, for the same reason: the phone page's fonts,
-// tokens, corner-tab shapes and the Awana Clubs mark must load on the PIN
-// screen, before any PIN exists, and a stylesheet's url() could never send one.
-// The kit ships in the public repo and the installer and carries no roster
-// data. Served from its own root, so no path can climb out of it (serve-static
-// refuses `..`), and only stylesheets, fonts and SVGs whose path is plain
-// letters, digits, dashes and slashes; anything else, and any miss, falls
-// through to the gate below exactly as before.
+// The brand kit mirror (public/brand/) is the only folder served over HTTP, to
+// loopback. Nothing here serves a page of its own: the print dashboard and the
+// Wi-Fi phone page are gone (settings live at awana.kvbchurch.org/settings;
+// phone.html stays in the repo only because site/build.mjs makes /checkin from
+// it). Only stylesheets, fonts and SVGs with plain paths.
 const BRAND_PUBLIC_PATH = /^\/[A-Za-z0-9_\-/]+\.(css|woff2|ttf|svg)$/;
 const brandStatic = express.static(path.join(__dirname, 'public', 'brand'), {
   index: false, redirect: false, dotfiles: 'ignore', fallthrough: true,
@@ -4062,44 +4055,16 @@ app.use('/brand', (req, res, next) => {
   return brandStatic(req, res, next);
 });
 
-app.use((req, res, next) => {
-  if (security.isLoopbackRequest(req)) return next();
-  if (LAN_PUBLIC_PATHS.has(req.path)) return next();
-
-  const addr = (req.socket && req.socket.remoteAddress) || 'unknown';
-  const pin = String(config.phonePin || '');
-
-  // Fail CLOSED. The old phonePinOk() returned true when no PIN was set, so a
-  // default install handed the whole roster to anyone on the venue network.
-  if (!pin) {
-    console.warn(`[security] Refused ${req.method} ${req.path} from ${addr} — no PIN is configured`);
-    return res.status(403).json({ error: 'This server is not accepting network requests. Set a PIN in Settings to enable phone check-in.' });
-  }
-
-  const now = Date.now();
-  const waitMs = pinLimiter.retryAfterMs(addr, now);
-  if (waitMs > 0) {
-    res.setHeader('Retry-After', String(Math.ceil(waitMs / 1000)));
-    return res.status(429).json({ error: `Too many wrong PINs — try again in ${Math.ceil(waitMs / 1000)}s` });
-  }
-
-  const supplied = String(
-    (req.body && req.body.pin) || req.headers['x-awana-pin'] || req.query.pin || ''
-  );
-  if (!supplied || !security.timingSafeStringEqual(supplied, pin)) {
-    // Pass the attempted PIN through so identical repeated wrong guesses
-    // (a phone retrying a stale saved PIN, Enter-mashing) count once instead
-    // of accumulating toward the lockout — see createPinLimiter's dedupe.
-    const rec = pinLimiter.recordFailure(addr, now, supplied);
-    console.warn(`[security] Wrong/missing PIN for ${req.method} ${req.path} from ${addr} (failure ${rec.failures})`);
-    return res.status(403).json({ error: 'Wrong PIN' });
-  }
-
-  pinLimiter.recordSuccess(addr);
-  return next();
+// GET / answers a tiny page that says where the settings went, for anyone who
+// opens http://localhost:3456 from habit (the old dashboard's address).
+const SETTINGS_URL = 'https://awana.kvbchurch.org/settings';
+app.get('/', (req, res) => {
+  res.type('html').send(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>KVBC Awana print server</title>
+<style>body{font:18px/1.5 system-ui,sans-serif;max-width:34rem;margin:12vh auto;padding:0 1.25rem;color:#1b2a3a}a{color:#0a5bd8}small{color:#566}</style></head>
+<body><h1>The print server is running</h1>
+<p>Its settings moved. Open <a href="${SETTINGS_URL}">awana.kvbchurch.org/settings</a> in Chrome on this computer: it finds this printer by itself.</p>
+<p><small>KVBC Awana ${SERVER_VERSION}. With no internet, check-in still prints at the desk; the settings wait until it is back.</small></p></body></html>`);
 });
-
-app.use(express.static(path.join(__dirname, 'public')));  // serve static files (brand kit, step-chip.js, phone.html)
 
 // Health endpoint defined below with enhanced warnings
 
@@ -6419,7 +6384,7 @@ app.post('/print-award', async (req, res) => {
 // roster. This route never calls recordAttendance, events.publish,
 // pushEventToBuffer or publishTally.
 //
-// Reachable from the phone page (PIN-gated on the LAN like every other route).
+// Reachable from the phone page (relayed, from loopback) and the settings page.
 // The phone-never-prints-directly rule exists to keep a KID's label from
 // double-printing through the extension's detection paths; a leader has
 // nothing to drive on TwoTimTwo, so there is nothing to double.
@@ -6768,9 +6733,8 @@ app.post('/print-leader', async (req, res) => {
 //   * no events.publish / publishTally, so nothing at all goes on the wire.
 // The console line below is the entire record it leaves, deliberately.
 //
-// PIN-gated like every other route (the global auth gate): it is emphatically
-// not LAN_PUBLIC_PATHS material — a stranger on the church WiFi has no business
-// making the door printer spit labels.
+// Loopback only like every other route (the global gate), and on the settings
+// page's table: nobody on the church WiFi can make the door printer spit labels.
 const CUSTOM_PRINT_TEXT_MAX = CUSTOM_TEXT_MAX_CHARS;
 
 // Pure, and exported, so the input rules are unit-tested without a printer.
@@ -7309,13 +7273,13 @@ app.post('/api/lobby-slides', (req, res) => {
     origin, security.sanitizeAllowedOrigins(churchConfig.displayOrigins));
   if (!isTrustedConfigOrigin(req) && !(fromDisplayOrigin && slidesTokenOk(req))) {
     if (fromDisplayOrigin && !config.slidesPublishToken) {
-      return res.status(403).json({ error: 'No publish token is set on the print server. Open its dashboard → Lobby slides → Generate publish token, and paste it into this display’s Settings.' });
+      return res.status(403).json({ error: 'No publish token is set on the print server. Publish the deck from awana.kvbchurch.org/settings instead: it needs none.' });
     }
     if (fromDisplayOrigin) {
-      return res.status(403).json({ error: 'Wrong publish token. Compare it with the print server dashboard → Lobby slides.' });
+      return res.status(403).json({ error: 'Wrong publish token. Publish the deck from awana.kvbchurch.org/settings instead: it needs none.' });
     }
     console.warn(`[security] Refused lobby-slides publish from ${origin || 'no-origin non-loopback caller'}`);
-    return res.status(403).json({ error: 'Lobby slides can be published from the printer dashboard or the display app’s slide editor on this computer.' });
+    return res.status(403).json({ error: 'Lobby slides can be published from awana.kvbchurch.org/settings or the display app’s slide editor on this computer.' });
   }
   if (signedInToSync()) return forwardToSync(res, 'slides', (req.body || {}).slides);
   const result = acceptLobbySlidesPublish((req.body || {}).slides);
@@ -7349,10 +7313,10 @@ app.post('/api/display-settings', (req, res) => {
     origin, security.sanitizeAllowedOrigins(churchConfig.displayOrigins));
   if (!isTrustedConfigOrigin(req) && !(fromDisplayOrigin && slidesTokenOk(req))) {
     if (fromDisplayOrigin && !config.slidesPublishToken) {
-      return res.status(403).json({ error: 'No publish token is set on the print server. Open its dashboard → Lobby slides → Generate publish token (the display login hands it to screens).' });
+      return res.status(403).json({ error: 'No publish token is set on the print server. Publish from awana.kvbchurch.org/settings instead: it needs none.' });
     }
     if (fromDisplayOrigin) {
-      return res.status(403).json({ error: 'Wrong publish token. Log this screen in again, or compare it with the print server dashboard → Lobby slides.' });
+      return res.status(403).json({ error: 'Wrong publish token. Log this screen in again, or publish from awana.kvbchurch.org/settings.' });
     }
     console.warn(`[security] Refused display-settings publish from ${origin || 'no-origin non-loopback caller'}`);
     return res.status(403).json({ error: 'Display settings can be published from the display app on this computer.' });
@@ -7911,7 +7875,7 @@ async function forwardToSync(res, kind, payload) {
   if (r.status === 0) return res.status(502).json({ error: 'Could not reach the sync service from this computer. Check its internet connection, then publish again.' });
   if (r.status === 401) {
     checkSyncSignIn().catch(() => {});
-    return res.status(502).json({ error: 'This computer is signed out of the sync service. Sign it in again (printer dashboard → Settings → Sync service).' });
+    return res.status(502).json({ error: 'This computer is signed out of the sync service. Sign it in again (awana.kvbchurch.org/settings → Laptop → Sync service).' });
   }
   if (!r.ok) return res.status(r.status).json({ error: (r.body && r.body.error) || `The sync service answered HTTP ${r.status}` });
   return res.json({ ok: true, viaSync: true, ...(r.body || {}) });
@@ -7954,7 +7918,7 @@ app.post('/config/sync-login', async (req, res) => {
 
 app.post('/config/sync-logout', (req, res) => {
   if (!isTrustedConfigOrigin(req)) {
-    return res.status(403).json({ error: 'This computer can only be signed out from its own dashboard' });
+    return res.status(403).json({ error: 'This computer can only be signed out from its own app' });
   }
   try {
     writeConfigPatch((next) => { delete next.syncSession; });
@@ -8048,7 +8012,7 @@ app.post('/contract-canary', (req, res) => {
     fireOpsAlert('Club Label Printer — site check failed',
       'The TwoTimTwo page no longer matches what the printer expects (' +
       (failing[0] || 'unknown check') + (failing.length > 1 ? ' +' + (failing.length - 1) + ' more' : '') +
-      '). Open the dashboard before club night.');
+      '). Check the status on awana.kvbchurch.org/settings before club night.');
   }
   res.json({ ok: true });
 });
@@ -8517,20 +8481,10 @@ app.get('/health', async (req, res) => {
       message: `The sync service is not answering, so live frames are not reaching screens through it (next try in ${Math.max(1, Math.ceil((relayBrokenUntil - Date.now()) / 1000))} s). Labels still print. Check the internet connection.`,
     });
   }
-  // Surface security misconfiguration where the operator already looks. A
-  // silently loopback-only server looks identical to a broken phone page, and
-  // "I turned on phone check-in and nothing happens" must not be a mystery.
-  //
-  // Every entry must be a {type, message} OBJECT. The dashboard renders
-  // `w.message`, so a bare string arrived as `undefined` and painted an EMPTY
-  // yellow box — the loudest warnings in the file were the invisible ones, and
-  // that is exactly why nobody found the display key.
-  if (config.lanAccess === true && !security.isAcceptablePin(config.phonePin)) {
-    warnings.push({
-      type: 'phonePinMissing',
-      message: 'Phone check-in is enabled but no PIN is set, so the server is only listening on this computer. Set a PIN in Settings and restart.',
-    });
-  }
+  // Every entry must be a {type, message} OBJECT. The settings page and the
+  // status window render `w.message`, so a bare string arrived as `undefined`
+  // and painted an EMPTY yellow box — the loudest warnings in the file were
+  // the invisible ones, and that is exactly why nobody found the display key.
   // Surface the realtime privacy mode where the operator already looks. An
   // unencrypted channel is not broken, so it cannot be an error — but it must
   // never be INVISIBLE, or "we set that up" becomes a belief rather than a fact.
@@ -8538,13 +8492,13 @@ app.get('/health', async (req, res) => {
   if (signedInToSync() && !keyState.configured) {
     warnings.push({
       type: 'displayKeyMissing',
-      message: "No display key is set, so children's first names are published unencrypted. Open Settings → Realtime privacy and press Generate display key.",
+      message: "No display key is set, so children's first names are published unencrypted. Sign this computer in to the sync service (awana.kvbchurch.org/settings → Laptop → Sync service): it installs the church's key.",
     });
   }
   if (config.displayKey && !keyState.configured) {
     warnings.push({
       type: 'displayKeyInvalid',
-      message: 'The saved display key is invalid, so names are going out in the clear. Open Settings → Realtime privacy and generate a new one.',
+      message: 'The saved display key is invalid, so names are going out in the clear. Sign this computer in to the sync service again (awana.kvbchurch.org/settings → Laptop → Sync service): it installs the church\'s key.',
     });
   }
   // #2: check-ins the extension could not verify as stuck on TwoTimTwo.
@@ -8732,20 +8686,20 @@ app.post('/update-now', (req, res) => {
 
 // ── Config endpoints ─────────────────────────────────────────────────────────
 
-// The phone PIN, the display key and the sync session are among the values
-// that must never leave this machine: the key and session let anyone publish
-// to the church's screens, and the PIN is what gates the roster on the LAN.
+// The display key and the sync session are among the values that must never
+// leave this machine: the key and session let anyone publish to the church's
+// screens. (A phone PIN from an old install is redacted the same way.)
 //
 // The previous version of this check had two holes, both closed here:
 //   • `origin.endsWith(':3456')` accepted ANY host on that port, so a page
 //     served from http://evil.example:3456 read both secrets cross-origin.
 //   • `if (!origin) return true` trusted every request without an Origin
-//     header — including a plain `curl` from any phone on the church WiFi,
-//     which made the PIN self-defeating (fetch the PIN, then use it).
+//     header — including a plain `curl` from any phone on the church WiFi
+//     (back when the server listened there).
 //
 // Now: the request must come from the loopback interface, AND its Origin (when
 // present) must be the extension or one of this server's own loopback pages.
-// A LAN caller never gets these fields even with a valid PIN.
+// A LAN caller never reaches this server at all.
 // pusherSecret: an old config.json may still hold one; it is never read, but it stays redacted.
 const SECRET_CONFIG_KEYS = ['pusherSecret', 'phonePin', 'displayKey', 'slidesPublishToken', 'displayLoginPassphrase', 'syncSession'];
 
@@ -8835,7 +8789,7 @@ app.get('/config', (req, res) => {
 // server has already replaced.
 app.post('/config/display-key/generate', (req, res) => {
   if (!isTrustedConfigOrigin(req)) {
-    return res.status(403).json({ error: 'The display key can only be generated from the dashboard on this computer' });
+    return res.status(403).json({ error: 'The display key can only be generated from this computer’s own app' });
   }
   const key = events.generateDisplayKey();
   console.log('[realtime] Generated a new display key (not yet saved)');
@@ -8850,7 +8804,7 @@ const SLIDES_TOKEN_RE = events.SLIDES_TOKEN_RE;
 
 app.post('/config/slides-token/generate', (req, res) => {
   if (!isTrustedConfigOrigin(req)) {
-    return res.status(403).json({ error: 'The publish token can only be generated from the dashboard on this computer' });
+    return res.status(403).json({ error: 'The publish token can only be generated from this computer’s own app' });
   }
   const token = crypto.randomBytes(24).toString('base64url');
   console.log('[slides] Generated a new publish token (not yet saved)');
@@ -8864,7 +8818,7 @@ app.post('/config/slides-token/generate', (req, res) => {
 // screen out of names it already holds, it only asks screens to log in again).
 app.post('/config/display-login/generate', (req, res) => {
   if (!isTrustedConfigOrigin(req)) {
-    return res.status(403).json({ error: 'The display passphrase can only be generated from the dashboard on this computer' });
+    return res.status(403).json({ error: 'The display passphrase can only be generated from this computer’s own app' });
   }
   const passphrase = events.generateLoginPassphrase();
   console.log('[login] Generated a new display passphrase (not yet saved)');
@@ -8874,15 +8828,15 @@ app.post('/config/display-login/generate', (req, res) => {
 app.post('/config', (req, res) => {
   const {
     printerName, checkinUrl,
-    phonePin, firstTimerInverted, connectCard, enableDrivenCheckin, lateGraceMin,
-    worksheetPrinter, lanAccess, allowedOrigins, historyRetentionDays, displayKey,
+    firstTimerInverted, connectCard, enableDrivenCheckin, lateGraceMin,
+    worksheetPrinter, historyRetentionDays, displayKey,
     labelFooter, connectCardAutoFirstTimer, connectCardGreeting, seasonTheme,
     musicalPrinter, updateBeacon, slidesPublishToken, displayLoginPassphrase,
     trophyBand, fleetConfigUrl, pickupClubs,
     backupPrinterName, cupsMedia,
   } = req.body || {};
   if (!isTrustedConfigOrigin(req) && SECRET_CONFIG_KEYS.some(k => (req.body || {})[k] !== undefined)) {
-    return res.status(403).json({ error: 'PIN/display-login settings can only be changed from the dashboard on this computer' });
+    return res.status(403).json({ error: 'Keys and tokens can only be changed from this computer’s own app, never from a web page' });
   }
   if (req.settingsPage) {
     const refused = security.settingsPageConfigRefusals(req.body);
@@ -8902,22 +8856,6 @@ app.post('/config', (req, res) => {
         return res.status(400).json({ error: 'checkinUrl must be a plain http(s) URL' });
       }
       next.checkinUrl = String(checkinUrl).trim();
-    }
-    // A PIN is the only thing between the LAN and the roster, so it has a
-    // minimum length now and the 12-char cap is gone (it discouraged
-    // passphrases). Clearing it is still allowed — that just turns LAN access
-    // off, because the auth gate fails closed without one.
-    if (phonePin !== undefined) {
-      const wanted = String(phonePin);
-      if (wanted === '') {
-        delete next.phonePin;
-      } else if (!security.isAcceptablePin(wanted)) {
-        return res.status(400).json({
-          error: `PIN must be ${security.PIN_MIN_LENGTH}–${security.PIN_MAX_LENGTH} characters`,
-        });
-      } else {
-        next.phonePin = wanted;
-      }
     }
     // The AES key that lets the church's own screens read children's names off
     // the live channel. Clearing it stops the three name-bearing events
@@ -8988,10 +8926,8 @@ app.post('/config', (req, res) => {
         next.fleetConfigUrl = wanted;
       }
     }
-    // Binding beyond loopback is an explicit choice, not a default. Takes
-    // effect on restart (the listening socket is already bound).
-    if (lanAccess !== undefined) next.lanAccess = !!lanAccess;
-    if (allowedOrigins !== undefined) next.allowedOrigins = security.sanitizeAllowedOrigins(allowedOrigins);
+    // (phonePin, lanAccess and allowedOrigins are gone with the Wi-Fi phone
+    // page: an old config.json may still hold them, and nothing reads them.)
     if (historyRetentionDays !== undefined) {
       next.historyRetentionDays = security.normalizeRetentionDays(historyRetentionDays);
     }
@@ -9003,7 +8939,7 @@ app.post('/config', (req, res) => {
     if (connectCard !== undefined) next.connectCard = !!connectCard;
     // Label footer (#8): one short operator line (church name, a verse, service
     // times) rendered along the bottom of every label. Clearing it deletes the
-    // key (same pattern as phonePin) so config.json stays clean.
+    // key so config.json stays clean.
     if (labelFooter !== undefined) {
       const lf = printableConfigLine(labelFooter, 60);
       if (lf === '') delete next.labelFooter;
@@ -9159,7 +9095,7 @@ app.post('/rehearsal', (req, res) => {
 
 app.post('/play-tune', async (req, res) => {
   if (!isTrustedOrSettingsPage(req)) {
-    return res.status(403).json({ error: 'The tune button only works from the dashboard on this computer' });
+    return res.status(403).json({ error: 'The tune button only works from this computer' });
   }
   if (config.musicalPrinter !== true) {
     return res.status(409).json({ error: 'Musical printer is off — enable it in Settings first' });
@@ -9182,7 +9118,7 @@ app.post('/play-tune', async (req, res) => {
 // POST /print-pdf does, so the 400s stay observable from Linux CI.
 app.post('/printer/clear-queue', async (req, res) => {
   if (!isTrustedOrSettingsPage(req)) {
-    return res.status(403).json({ error: 'The print queue can only be cleared from the dashboard on this computer' });
+    return res.status(403).json({ error: 'The print queue can only be cleared from this computer' });
   }
   const wanted = String((req.body || {}).printerName || '').trim();
   if (wanted && !isSafePrinterName(wanted)) {
@@ -9228,7 +9164,7 @@ app.get('/config/label-templates', (req, res) => {
 // loopback) are the only writers.
 app.post('/config/label-templates', (req, res) => {
   if (!isTrustedOrSettingsPage(req)) {
-    return res.status(403).json({ error: 'Label templates can only be changed from the dashboard on this computer' });
+    return res.status(403).json({ error: 'Label templates can only be changed from this computer' });
   }
   const cleaned = sanitizeLabelTemplates((req.body || {}).templates);
   if (!cleaned.ok) return res.status(400).json({ error: cleaned.error });
@@ -9246,29 +9182,11 @@ app.post('/config/label-templates', (req, res) => {
 });
 
 // ── Phone check-in (#17b) ─────────────────────────────────────────────────────
-// PIN enforcement for every non-loopback caller now lives in the app-level auth
-// gate near the top of the Express setup — one check, applied to every route,
-// rather than a per-route opt-in that was easy to forget on a new endpoint (and
-// was in fact missing from /stats/tonight, /history and /checkin-csv-export).
-//
-// The PIN still rides plain HTTP on the venue network, so it remains a
-// LAN-trust credential rather than a cryptographic one: it stops a bystander
-// reading the roster, not someone who can already sniff the church WiFi.
-
-app.get('/phone', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'phone.html'));
-});
-
-// The youth leaders' page (7.10.0): the same phone page, Trek and Journey only,
-// check-in only. Same PIN, same calls; the filter is the page's own.
-const YM_PAGE_FLAGS = "<script>window.AWANA_ONLY_CLUBS = ['trek', 'journey']; window.AWANA_SIMPLE = true;</script>\n";
-function ymPhonePage(page, extra = '') {
-  return page.replace('<script>\n// ── The touch check-in', `${extra}${YM_PAGE_FLAGS}<script>\n// ── The touch check-in`);
-}
-app.get('/phone/ym', (req, res) => {
-  const page = fs.readFileSync(path.join(__dirname, 'public', 'phone.html'), 'utf8');
-  res.type('html').send(ymPhonePage(page));
-});
+// The phone page is awana.kvbchurch.org/checkin (site/build.mjs makes it from
+// public/phone.html). The sync Worker answers most of it itself and relays the
+// rest, from the phone-relay loop on THIS computer, to the /phone/* routes
+// below: loopback callers, so no credential here. The Wi-Fi phone page
+// (/phone, /phone/ym) and its PIN were retired on 2026-10-12 (Online only).
 
 // Every identity key (id: and name:) of a child who came tonight, for the
 // phone's roster: the same children the count reads (TwoTimTwo's report when it
@@ -9289,7 +9207,6 @@ function rosterCheckedInKeys(tonight = tonightCheckins(), now = Date.now()) {
 
 // Roster + tonight's checked-in set for the phone page.
 app.post('/phone/roster', (req, res) => {
-  // PIN already verified by the auth gate for every non-loopback caller.
   clubbers = loadClubbers();
   // Same active set the tally counts (tonightCheckins): an undo made on
   // TwoTimTwo (R-1) or on a phone (Remove) frees the kid for re-check-in here
@@ -9420,7 +9337,7 @@ function queueTwoTimTwoUndo(ident, res) {
     return res.status(400).json({ error: 'This child has no TwoTimTwo id on the check-in laptop, so it cannot undo them there. Use Remove, and undo at the desk.' });
   }
   if (config.enableDrivenCheckin === false) {
-    return res.status(409).json({ error: 'Undo on TwoTimTwo is turned off with phone check-ins on the check-in laptop (printer dashboard → Settings → "Allow driven check-ins").' });
+    return res.status(409).json({ error: 'Undo on TwoTimTwo is turned off with phone check-ins on the check-in laptop (awana.kvbchurch.org/settings → Laptop → "Allow driven check-ins from phones").' });
   }
   prunePendingActions();
   // One undo in flight per child: a double-tap must not post twice.
@@ -9478,7 +9395,7 @@ function phoneCheckout(ident, res) {
     return res.json({ ok: true, checkedOut: true, local: true, checkedIn: st.checkedIn, byClub: st.byClub });
   }
   if (config.enableDrivenCheckin === false) {
-    return res.status(409).json({ error: 'Check-out on TwoTimTwo is turned off with phone check-ins on the check-in laptop (printer dashboard → Settings → "Allow driven check-ins").' });
+    return res.status(409).json({ error: 'Check-out on TwoTimTwo is turned off with phone check-ins on the check-in laptop (awana.kvbchurch.org/settings → Laptop → "Allow driven check-ins from phones").' });
   }
   prunePendingActions();
   const existing = pendingActions.find(a => actionType(a) === 'checkout' && a.clubberId === ident.clubberId
@@ -9572,14 +9489,13 @@ app.post('/phone/visitor', async (req, res) => {
 });
 
 app.post('/phone/checkin', (req, res) => {
-  // PIN already verified by the auth gate for every non-loopback caller.
   const name = String((req.body && req.body.name) || '').trim().slice(0, 80);
   if (!name) return res.status(400).json({ error: 'name is required' });
   // The dashboard's "Allow driven check-ins" switch. Off, the check-in page
   // never collects these, so a phone used to wait 90 s and hear "the laptop
   // is not answering"; it now hears what is really wrong, at once.
   if (config.enableDrivenCheckin === false) {
-    return res.status(409).json({ error: 'Phone check-ins are turned off on the check-in laptop (printer dashboard → Settings → "Allow driven check-ins").' });
+    return res.status(409).json({ error: 'Phone check-ins are turned off on the check-in laptop (awana.kvbchurch.org/settings → Laptop → "Allow driven check-ins from phones").' });
   }
   // Bible / Brought a friend from the phone's card (7.7.0): booleans only, and
   // only the two the laptop knows how to tick.
@@ -9893,34 +9809,21 @@ function startListening(attempt = 1) {
       setTimeoutFn: (fn, ms) => { const t = setTimeout(fn, ms); if (t.unref) t.unref(); return t; },
     });
   }
-  // Bind loopback-only unless the operator has explicitly enabled LAN access
-  // AND set a PIN. Previously this was a bare app.listen(PORT), which binds
-  // every interface — so the roster, the check-in history and the allergy list
-  // were readable by anything on the church WiFi.
-  const bind = security.resolveBindHost({
-    lanAccess: config.lanAccess === true,
-    hasPin: security.isAcceptablePin(config.phonePin),
-    envHost: process.env.AWANA_BIND_HOST,
-  });
+  // Loopback only, always (Online only, 2026-10-12): the roster, the check-in
+  // history and the allergy list never listen on the church Wi-Fi.
+  const bindHost = '127.0.0.1';
   let ready = null;
   if (attempt === 1) {
     ready = new Promise((resolve, reject) => { listenWaiter = { resolve, reject }; });
     ready.catch(() => {});   // a shell that does not await it must not see an unhandled rejection
   }
-  const server = app.listen(PORT, bind.host, () => {
+  const server = app.listen(PORT, bindHost, () => {
     liveServer = server;
     if (listenWaiter) { listenWaiter.resolve(server); listenWaiter = null; }
     console.log(`\n  Club Print Server v${SERVER_VERSION}  •  http://localhost:${PORT}`);
-    console.log(`  Dashboard : http://localhost:${PORT}/`);
+    console.log(`  Settings  : ${SETTINGS_URL} (open it on this computer)`);
     console.log(`  Printer   : ${PRINTER_NAME || '(system default)'}`);
-    console.log(`  Network   : bound to ${bind.host} — ${bind.reason}`);
-    if (bind.lan) {
-      console.log('              Phone check-in is reachable on this network; every');
-      console.log('              request from it must carry the PIN.');
-    } else if (config.lanAccess === true) {
-      console.log('              LAN access is ON in settings but no PIN is set, so the');
-      console.log('              server stayed loopback-only. Set a PIN and restart.');
-    }
+    console.log(`  Network   : bound to ${bindHost} (this computer only)`);
     console.log('  Waiting for check-ins. Press Ctrl+C to stop.\n');
   });
   server.on('error', (err) => {

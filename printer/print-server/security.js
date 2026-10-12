@@ -6,23 +6,25 @@
 // no I/O, no Express, no timers — so scripts/test-server-helpers.cjs can
 // exercise every rule directly.
 //
-// THE TRUST MODEL, in one sentence: the loopback interface is trusted, the
-// LAN is not, and the open internet is not.
+// THE TRUST MODEL, in one sentence: the loopback interface is trusted, and
+// nothing else is: not the LAN, not the open internet.
 //
 //   • Loopback (127.0.0.1 / ::1) — trusted. This is the Chrome extension
-//     talking to http://localhost:3456, the dashboard, and the Electron
-//     shell. No PIN required; these callers already run as the volunteer on
-//     the volunteer's own machine.
+//     talking to http://localhost:3456, the KVBC Awana app's windows, and the
+//     phone-relay loop that runs the Worker's check-in requests. No credential
+//     is required; these callers already run as the volunteer on the
+//     volunteer's own machine.
 //
-//   • The LAN — untrusted. Phone check-in genuinely needs it, so it stays
-//     reachable, but ONLY when the operator explicitly turns it on AND has
-//     set a PIN, and then every request must carry that PIN. A church WiFi
-//     (guest network included) is a room full of strangers' phones.
+//   • The LAN — not served. Online only (owner, 2026-10-11): the Wi-Fi phone
+//     page and its PIN are gone, the server binds 127.0.0.1 and refuses any
+//     non-loopback socket. Phones use awana.kvbchurch.org/checkin.
 //
 //   • Any other web page the volunteer has open — untrusted. It shares the
 //     loopback interface with the extension, so the socket address cannot
 //     tell them apart; the Origin header is what distinguishes them. Hence
-//     the origin allowlist below, applied to reads AND writes.
+//     the origin allowlist below, applied to reads AND writes. The one public
+//     page that may reach this server is awana.kvbchurch.org/settings, through
+//     SETTINGS_PAGE_ROUTES below.
 //
 // Why this shape: before v5.3.0 the server bound 0.0.0.0 with `cors()` wide
 // open and no authentication on the roster endpoints, so a child's name and
@@ -60,7 +62,7 @@ function stripControlChars(value, replacement) {
 // ── Loopback detection ────────────────────────────────────────────────────────
 // Deliberately reads the raw socket address and NEVER X-Forwarded-For or
 // req.ip: a forwarded header is attacker-supplied, and treating it as the peer
-// address would let any LAN caller claim to be loopback and skip the PIN. If
+// address would let any LAN caller claim to be loopback and be trusted. If
 // this server is ever put behind a real proxy, that proxy has to be modelled
 // explicitly — not inferred from a header.
 
@@ -91,23 +93,21 @@ function isLoopbackRequest(req) {
 //                               the extension's). Subdomain-wide because every
 //                               church has its own subdomain — a fork must work
 //                               without editing this list.
-//   • http://<loopback-or-private-host>:<our port>   the dashboard and the
-//                               phone page, which this server itself serves.
+//   • http://<loopback-or-private-host>:<our port>   a page this server
+//                               itself serves (the tiny GET / page; the
+//                               dashboard and Wi-Fi phone page are retired).
 //                               Same-origin fetches need no CORS header, but
 //                               browsers do send Origin on them and the
 //                               mutating-request check below inspects it.
 //   • anything in config.allowedOrigins (validated, opt-in)
 
-const PRIVATE_IPV4_RE = /^(?:10\.|127\.|169\.254\.|192\.168\.|172\.(?:1[6-9]|2\d|3[01])\.)/;
-
-function isPrivateHostname(hostname) {
+// A host that is this computer (Online only: the server listens on loopback and
+// serves no page to the LAN, so only a loopback host on our port is "our own
+// page"; a private LAN address on port 3456 is somebody else's server).
+function isLoopbackHostname(hostname) {
   if (!hostname) return false;
   const h = String(hostname).toLowerCase().replace(/^\[/, '').replace(/\]$/, '');
-  if (h === 'localhost' || h === '::1' || h.endsWith('.localhost')) return true;
-  if (h.endsWith('.local')) return true;               // mDNS / Bonjour name
-  if (PRIVATE_IPV4_RE.test(h)) return true;
-  if (h.startsWith('fe80:') || h.startsWith('fc') || h.startsWith('fd')) return true;  // link-local / ULA
-  return false;
+  return h === 'localhost' || h.endsWith('.localhost') || isLoopbackAddress(h);
 }
 
 function isTwoTimTwoOrigin(url) {
@@ -116,10 +116,10 @@ function isTwoTimTwoOrigin(url) {
   return h === 'twotimtwo.com' || h.endsWith('.twotimtwo.com');
 }
 
-// `extraOrigins` are exact, case-insensitive origin strings from
-// config.allowedOrigins — for a church serving the phone page through
-// something unusual. Wildcards are NOT accepted: an operator who pasted "*"
-// would silently restore the hole this function exists to close.
+// `extraOrigins` are exact, case-insensitive origin strings (nothing passes
+// any since Online only: config.allowedOrigins is no longer read). Wildcards
+// are NOT accepted: one pasted "*" would silently restore the hole this
+// function exists to close.
 function isAllowedOrigin(origin, opts) {
   if (!origin || typeof origin !== 'string') return false;
   const { port = 3456, extraOrigins = [] } = opts || {};
@@ -134,10 +134,10 @@ function isAllowedOrigin(origin, opts) {
 
   if (isTwoTimTwoOrigin(url)) return true;
 
-  // Our own pages. Requires BOTH our port and a private/loopback host, so a
-  // hostile site merely served on port 3456 does not qualify — the old
-  // `origin.endsWith(':3456')` check accepted http://evil.example:3456.
-  if (url.protocol === 'http:' && String(url.port) === String(port) && isPrivateHostname(url.hostname)) {
+  // Our own pages. Requires BOTH our port and a loopback host, so a hostile
+  // site merely served on port 3456 (or a LAN machine's) does not qualify — the
+  // old `origin.endsWith(':3456')` check accepted http://evil.example:3456.
+  if (url.protocol === 'http:' && String(url.port) === String(port) && isLoopbackHostname(url.hostname)) {
     return true;
   }
 
@@ -170,19 +170,23 @@ function isExactAllowedOrigin(origin, origins) {
 }
 
 // ── The settings page (awana.kvbchurch.org/settings) ──────────────────────────
-// Owner, 2026-10-11: the print dashboard's settings live on the one settings
-// page, opened in the laptop's own browser, which reaches this server on
+// Owner, 2026-10-11: the print dashboard's settings and tools live on the one
+// settings page (the dashboard is retired), opened in the laptop's own
+// browser, which reaches this server on
 // http://localhost (an https page may call it). That is a PUBLIC https origin
 // talking to a loopback server, so the rule is the slides publish's, widened by
 // as little as it can be:
 //   • ONE exact origin (never churchConfig.displayOrigins, which still names the
 //     archived github.io site, and never a wildcard);
 //   • a short table of paths and methods, not "the whole server";
-//   • every path but /health needs the publish token (the credential the page
-//     already holds for publishing slides) AND a loopback socket;
+//   • every path but /health needs the page's sync sign-in (confirmed with the
+//     sync service) or a publish token already on the laptop, AND a loopback
+//     socket;
 //   • POST /config takes only the printer's own keys: nothing that holds a
 //     secret, opens the network or widens CORS can be changed from the page.
-// Everything the dashboard changes in a secret stays on the dashboard.
+// No key or token is ever read, minted or set by the page: those routes are
+// not in the table, and only this computer's own app (no Origin, loopback)
+// reaches them.
 const SETTINGS_PAGE_ORIGIN = 'https://awana.kvbchurch.org';
 
 // `open` routes answer without the token: the page probes /health to learn
@@ -276,13 +280,9 @@ function isMutatingMethod(method) {
   return MUTATING_METHODS.has(String(method || '').toUpperCase());
 }
 
-// ── PIN verification ──────────────────────────────────────────────────────────
-// The PIN gates the roster on the LAN, so it must survive being guessed at by a
-// phone in the parking lot. Three properties the old check lacked:
-//   1. Fails CLOSED when unset. `if (!pin) return true` meant a default install
-//      served the whole roster to the LAN with no credential at all.
-//   2. Constant-time compare, so response timing does not leak the prefix.
-//   3. Rate limited, so a 4-digit PIN is not brute-forceable in seconds.
+// ── Constant-time compare ─────────────────────────────────────────────────────
+// For the publish token: a constant-time compare, so response timing does not
+// leak its prefix.
 
 function timingSafeStringEqual(a, b) {
   const ab = Buffer.from(String(a == null ? '' : a), 'utf8');
@@ -294,114 +294,6 @@ function timingSafeStringEqual(a, b) {
     return false;
   }
   return crypto.timingSafeEqual(ab, bb);
-}
-
-const PIN_MIN_LENGTH = 4;
-const PIN_MAX_LENGTH = 64;
-
-function isAcceptablePin(pin) {
-  const s = String(pin == null ? '' : pin);
-  return s.length >= PIN_MIN_LENGTH && s.length <= PIN_MAX_LENGTH && !hasControlChars(s);
-}
-
-// Per-remote-address failure tracking. Bounded so a spoofed-source flood cannot
-// grow it without limit; entries expire on their own.
-//
-// Repeated-identical-guess dedupe: a phone silently retrying the same stale
-// PIN, or a volunteer holding down Enter, must not cost more than ONE failure
-// per distinct wrong value — otherwise a handful of real mistakes plus a
-// flaky retry loop reach the lockout threshold before a human ever gets a
-// second try. Only the HASH of the last failed guess is kept (sha256 over a
-// per-process random salt + the guess) so the limiter never holds a
-// recoverable copy of an attempted PIN in memory. Distinct guesses always
-// still count — this dedupes retries, it does not raise maxFailures or widen
-// the brute-force window.
-function createPinLimiter(opts) {
-  const {
-    maxFailures = 8,
-    lockoutMs = 60 * 1000,
-    decayMs = 15 * 60 * 1000,
-    maxTracked = 512,
-  } = opts || {};
-  const byAddr = new Map();
-  const guessSalt = crypto.randomBytes(32);
-
-  function hashGuess(guess) {
-    return crypto.createHash('sha256').update(guessSalt).update(String(guess)).digest('hex');
-  }
-
-  function prune(now) {
-    for (const [addr, rec] of byAddr) {
-      if (now - rec.last > decayMs) byAddr.delete(addr);
-    }
-    if (byAddr.size > maxTracked) {
-      // Drop the least recently seen entries first.
-      const sorted = [...byAddr.entries()].sort((a, b) => a[1].last - b[1].last);
-      for (const [addr] of sorted.slice(0, byAddr.size - maxTracked)) byAddr.delete(addr);
-    }
-  }
-
-  return {
-    // Returns 0 when the caller may attempt, or the ms remaining on a lockout.
-    retryAfterMs(addr, now) {
-      const key = String(addr);
-      const rec = byAddr.get(key);
-      if (!rec || rec.failures < maxFailures) return 0;
-      const remaining = rec.lockedUntil - now;
-      if (remaining > 0) return remaining;
-      byAddr.delete(key);              // lockout served — start fresh
-      return 0;
-    },
-    // `guess` is the attempted PIN behind this failure. Omit it (existing
-    // callers/tests) to always count as a distinct failure — dedupe only
-    // engages when the caller actually has a guess to compare.
-    recordFailure(addr, now, guess) {
-      prune(now);
-      const key = String(addr);
-      const rec = byAddr.get(key) || { failures: 0, last: now, lockedUntil: 0, lastGuessHash: null };
-      const guessHash = guess === undefined || guess === null ? null : hashGuess(guess);
-      const isRepeatGuess = guessHash !== null && rec.lastGuessHash !== null && guessHash === rec.lastGuessHash;
-      if (!isRepeatGuess) {
-        rec.failures += 1;
-        if (guessHash !== null) rec.lastGuessHash = guessHash;
-      }
-      rec.last = now;
-      if (rec.failures >= maxFailures) rec.lockedUntil = now + lockoutMs;
-      byAddr.set(key, rec);
-      return rec;
-    },
-    recordSuccess(addr) {
-      byAddr.delete(String(addr));
-    },
-    get size() { return byAddr.size; },
-  };
-}
-
-// ── Bind host ─────────────────────────────────────────────────────────────────
-// The old code called app.listen(PORT) with no host, which binds 0.0.0.0 —
-// every interface — while the file header claimed "listens on
-// http://localhost:3456". Loopback is now the default and LAN exposure is an
-// explicit, PIN-gated opt-in.
-//
-// AWANA_BIND_HOST is an escape hatch for tests and for an operator who knows
-// exactly what they are doing; it is honoured verbatim and logged at startup.
-function resolveBindHost(opts) {
-  const { lanAccess = false, hasPin = false, envHost = '' } = opts || {};
-  const explicit = String(envHost || '').trim();
-  if (explicit) {
-    return {
-      host: explicit,
-      lan: !isLoopbackAddress(explicit),
-      reason: 'AWANA_BIND_HOST',
-    };
-  }
-  if (lanAccess && hasPin) {
-    return { host: '0.0.0.0', lan: true, reason: 'lanAccess enabled with a PIN set' };
-  }
-  if (lanAccess && !hasPin) {
-    return { host: '127.0.0.1', lan: false, reason: 'lanAccess requested but no PIN is set — refusing to expose the roster' };
-  }
-  return { host: '127.0.0.1', lan: false, reason: 'default (loopback only)' };
 }
 
 // ── Outbound URL validation ───────────────────────────────────────────────────
@@ -422,7 +314,7 @@ function isSafeExternalUrl(value) {
 
 // ── Stored field hygiene ──────────────────────────────────────────────────────
 // Names arrive from the request body and are persisted to print-history.json,
-// which the dashboard renders. The dashboard now escapes on output (that is the
+// which the settings page renders. The pages escape on output (that is the
 // actual fix for the stored-XSS chain); this caps length and strips control
 // characters so an unbounded or terminal-escape-laden value cannot bloat the
 // history file or mangle a console log. It deliberately does NOT strip angle
@@ -463,7 +355,7 @@ module.exports = {
   stripControlChars,
   isLoopbackAddress,
   isLoopbackRequest,
-  isPrivateHostname,
+  isLoopbackHostname,
   isAllowedOrigin,
   isExactAllowedOrigin,
   sanitizeAllowedOrigins,
@@ -474,15 +366,10 @@ module.exports = {
   settingsPageConfigRefusals,
   isMutatingMethod,
   timingSafeStringEqual,
-  isAcceptablePin,
-  createPinLimiter,
-  resolveBindHost,
   isSafeExternalUrl,
   sanitizeStoredText,
   pruneHistoryByAge,
   normalizeRetentionDays,
-  PIN_MIN_LENGTH,
-  PIN_MAX_LENGTH,
   STORED_NAME_MAX,
   DEFAULT_HISTORY_RETENTION_DAYS,
 };

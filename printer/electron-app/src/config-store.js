@@ -4,8 +4,8 @@
 // WHY THIS IS ITS OWN MODULE
 //
 // config.json has several writers with very different views of it. The print
-// server owns the security and realtime keys (phonePin, lanAccess,
-// allowedOrigins, displayKey, syncUrl/syncSession), the operator schedule, and
+// server owns the security and realtime keys (displayKey, syncUrl/syncSession,
+// the slides token, old phonePin/lanAccess leftovers), the operator schedule, and
 // assorted preferences (historyRetentionDays, connectCard,
 // connectCardAutoFirstTimer, connectCardGreeting, worksheetPrinter,
 // firstTimerInverted, labelFooter, labelTemplates). The Electron setup wizard
@@ -16,8 +16,7 @@
 // JSON.stringify(config))` with the renderer's three-key object. So a single
 // click on Save in the settings window deleted every server-owned key, and
 // because the caller restarts the server immediately afterwards, the loss went
-// live at once: the LAN auth gate fails closed with no PIN, so phone check-in
-// refused every request; the lobby display lost its display key and sync sign-in; and
+// live at once: the lobby display lost its display key and sync sign-in; and
 // late arrivals stopped being routed because the schedule was gone. The
 // realistic trigger is the worst possible moment — the printer jams mid-event,
 // a volunteer opens Settings to pick the backup printer, and clicks Save.

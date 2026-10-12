@@ -390,11 +390,18 @@ async function main() {
       /attendanceGrid: 0/.test(ext) && /attendanceGrid: runAttendanceGrid/.test(ext));
     check('the extension header no longer claims no full name leaves the script',
       /\/feed\/attendance-grid/.test(ext.slice(0, 2200)));
-    const dash = fs.readFileSync(path.join(__dirname, '..', 'print-server', 'public', 'index.html'), 'utf8');
-    check('the dashboard never paints agreement for an unknown grid',
-      /Not checked/.test(dash) && !/known[\s\S]{0,80}Agrees/.test(dash));
-    check('every child name the card renders goes through esc()',
-      /esc\(r\.name\)/.test(dash));
+    // The audit card lives on the settings page now (lobby/src/lib/printServer.js auditSummary,
+    // components/settings/laptop-tools.jsx).
+    const lobby = (...p) => fs.readFileSync(path.join(__dirname, '..', '..', 'lobby', 'src', ...p), 'utf8');
+    const summary = lobby('lib', 'printServer.js');
+    const card = lobby('components', 'settings', 'laptop-tools.jsx');
+    check('the settings page never paints agreement for an unknown grid',
+      /Not checked/.test(summary) && summary.indexOf('!v || !v.known') > 0
+      && summary.indexOf('!v || !v.known') < summary.indexOf('v.matches'));
+    check('applying asks first and only ever sends confirm:true (the server adds dates, never deletes)',
+      /window\.confirm\([\s\S]{0,80}season ledger/.test(card) && /'\/attendance-audit\/apply', \{ method: 'POST', body: \{ confirm: true \} \}/.test(card));
+    check('every child name the card renders is React text, never inner HTML',
+      !/dangerouslySetInnerHTML|innerHTML/.test(card));
   }
 
   listener.close();

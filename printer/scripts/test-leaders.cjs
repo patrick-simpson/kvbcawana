@@ -307,18 +307,20 @@ async function main() {
   {
     const read = (rel) => fs.readFileSync(path.join(__dirname, '..', rel), 'utf8');
     const ext = read('chrome-extension/content.js');
-    const dash = read('print-server/public/index.html');
+    // The dashboard is retired: its name-tag cards are the settings page's
+    // (lobby/src/components/settings/laptop-tools.jsx), served by /checkin's sibling page.
+    const dash = read('../lobby/src/components/settings/laptop-tools.jsx');
     const phone = read('print-server/public/phone.html');
 
     check('the check-in widget fetches /clubs', /\/clubs'/.test(ext) || ext.includes("+ '/clubs'"));
-    check('the dashboard fetches /clubs', dash.includes("'/clubs'"));
+    check('the settings page fetches /clubs', dash.includes("'/clubs'"));
     check('the phone page fetches /clubs', phone.includes("'/clubs'"));
 
     // The regression: a second hardcoded club list living in a dropdown. The
     // widget keeps ONE baked list as an offline fallback (named so it is
     // obviously a fallback); the two server-served pages keep none.
     const hardcodedOptions = (html) => (html.match(/<option>(?:Puggles|Cubbies|Sparks|Trek|Journey)<\/option>/g) || []).length;
-    check('the dashboard has no hardcoded club options', hardcodedOptions(dash) === 0);
+    check('the settings page has no hardcoded club options', hardcodedOptions(dash) === 0);
     check('the phone page has no hardcoded club options', hardcodedOptions(phone) === 0);
     check('the widget labels its offline list as a fallback', /CLUB_FALLBACK/.test(ext));
 

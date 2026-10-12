@@ -166,7 +166,7 @@ async function main() {
       warningTexts(h.body.warnings).some((w) => /unencrypted/i.test(w)),
       JSON.stringify(h.body.warnings));
     check('and the warning names the exact place to fix it',
-      warningTexts(h.body.warnings).some((w) => /Settings . Realtime privacy/i.test(w)),
+      warningTexts(h.body.warnings).some((w) => /settings . Laptop . Sync service/i.test(w)),
       JSON.stringify(h.body.warnings));
     fs.writeFileSync(cfgFile, unsigned);
     await post('/config', {});
@@ -341,23 +341,15 @@ async function main() {
       ck.length === 1 && !isSealed(ck[0].payload),
       JSON.stringify((ck[0] && ck[0].payload) || null).slice(0, 120));
 
-    // The same bug class, on the security control that matters most: an operator
-    // clearing a LEAKED PIN must actually revoke it, not merely appear to.
-    //
-    // Observed through the /health warning rather than a field, because that
-    // warning is derived from the LIVE `config` object at request time — exactly
-    // the thing the Object.assign bug left stale. With lanAccess on, /health warns
-    // if and only if the live config has no acceptable PIN.
+    // The phone PIN and LAN access are retired (Online only, 2026-10-12): the
+    // server listens on loopback only, so there is no PIN to clear and no
+    // "set a PIN" warning to show. A page that still sends them changes nothing.
     const pinWarning = async () => warningTexts((await j('/health')).body.warnings)
-      .some((w) => /no PIN is set/i.test(w));
-    await post('/config', { lanAccess: true, phonePin: '4821' });
-    check('with LAN on and a PIN set, /health does not warn about the PIN',
-      (await pinWarning()) === false);
-    await post('/config', { phonePin: '' });
-    check('a cleared PIN is gone from disk', !onDisk().phonePin);
-    check('AND the live auth gate no longer holds it',
-      (await pinWarning()) === true,
-      'the old PIN would still have been accepted until a restart');
+      .some((w) => /\bPIN\b/i.test(w));
+    const pinBefore = onDisk().phonePin;
+    await post('/config', { lanAccess: true, phonePin: '9999-new' });
+    check('POST /config no longer saves a PIN or LAN access', onDisk().phonePin === pinBefore && !onDisk().lanAccess, JSON.stringify(onDisk()));
+    check('and /health never warns about a PIN, with LAN access asked for or not', (await pinWarning()) === false);
   }
 
   // ── 5b. Clearing the passphrase clears it live and removes the salt ────────

@@ -1,6 +1,9 @@
 #!/usr/bin/env node
-// The operator surfaces in the brand kit: the dashboard, the phone page, and
-// the Windows status window and setup wizard.
+// The operator surfaces in the brand kit: the phone page (the source of
+// awana.kvbchurch.org/checkin) and the Windows status window and setup wizard.
+// (The print dashboard these checks were written for is retired, Online only,
+// 2026-10-12: its tools are the settings page's, tested in the lobby. The file
+// keeps its old name because phone.html and brand.css point at it.)
 //
 // Source-level, like the club-list checks in test-leaders.cjs: these pages are
 // plain DOM (and a React bundle) with no headless browser here, so the claims
@@ -13,7 +16,7 @@
 //
 // WHAT THIS GUARDS
 //
-// * Every colour fallback is the kit's own value. Each page reads the
+// * Every colour fallback is the kit's own value. Each surface reads the
 //   --brand-* tokens from the mirror (print-server/public/brand/tokens.css)
 //   and writes the kit's hex after each var() so a missing mirror still
 //   leaves a legible page. A fallback that drifts from the kit is exactly the
@@ -24,24 +27,17 @@
 // * One hot button per surface. The kit's hot red-orange marks the one thing
 //   that is special on a screen; two of them and neither is. Counted by the
 //   selector that paints it, in any class spelling, markup or script.
-// * The section tabs: after every switch exactly one tab is aria-selected,
-//   and it is the one showing (dashboard and phone page).
+// * The phone page's sheets: after every switch exactly one is up.
 // * A focus ring you can see: 3:1 against every surface a control sits on.
-// * The #display-key deep link is still marked under reduced motion, and a
-//   card header wraps rather than clipping its button off a narrow card.
-// * The pages load only what they can reach: the phone page is on the Wi-Fi
-//   with no PIN yet, so everything it loads (markup, CSS and the URLs its
-//   scripts set) must live under /brand/ (served before the gate;
-//   test-server-security.cjs checks the LAN side).
+// * The phone page loads only the kit under /brand/: site/build.mjs rewrites
+//   exactly those paths to /checkin/brand/, so anything else would 404 there.
 // * The stepped chip geometry (print-server/public/step-chip.js, the one copy
-//   shared by the dashboard and the status window) keeps its silhouette.
+//   the status window draws with) keeps its silhouette.
 // * The chip says what /health says: PRINTER / ONLINE while the server
 //   answers, PROBLEM when a warning means nothing is coming out of the printer
-//   (printerNotFound, spoolerBacklog: the rule that turns the traffic light
-//   red), OFFLINE when it does not answer, and back again when things
-//   recover. The dashboard draws it in loadHealth() (with and without
-//   step-chip.js) and the status window in StatusPanel.jsx, by the same rule,
-//   so both are run through the same scenes.
+//   (printerNotFound, spoolerBacklog), OFFLINE when it does not answer, and
+//   back again when things recover. The status window draws it in
+//   StatusPanel.jsx, which is run through the scenes.
 //
 // Run: npm run test:dashboard
 
@@ -176,12 +172,11 @@ function resolveColour(value, vars, depth = 0) {
 }
 
 const SURFACES = {
-  dashboard: read('print-server', 'public', 'index.html'),
   phone: read('print-server', 'public', 'phone.html'),
   'status window': read('electron-app', 'renderer', 'brand.css'),
 };
 
-console.log('dashboard chrome: every colour fallback is the kit’s own value');
+console.log('surfaces chrome: every colour fallback is the kit’s own value');
 {
   check('the mirror’s tokens.css parses', Object.keys(TOKENS).length > 30, `${Object.keys(TOKENS).length} tokens`);
   for (const [name, src] of Object.entries(SURFACES)) {
@@ -196,8 +191,8 @@ console.log('dashboard chrome: every colour fallback is the kit’s own value');
   // The font fallbacks are the kit's too, and they are what a page draws in
   // when the kit's stylesheet has not arrived (or the WOFF2 is refused): each
   // surface's shout stack must start with the family tokens.css names, and no
-  // surface (nor the shared chip script the dashboard and the window draw
-  // with) may still name the face the kit dropped.
+  // surface (nor the chip script the window draws with) may still name the face
+  // the kit dropped.
   const kitShout = (TOKENS['--brand-font-display'] || '').match(/^'([^']+)'/);
   check('the kit’s shout family is readable from tokens.css', !!kitShout && kitShout[1] === 'Paytone One',
     TOKENS['--brand-font-display']);
@@ -213,12 +208,10 @@ console.log('dashboard chrome: every colour fallback is the kit’s own value');
     chipScript.includes(`(family || '${kitShout && kitShout[1]}')`) && !/galindo/i.test(chipScript));
   check('the window’s chip waits for the kit’s shout before it measures',
     chipView.includes(`load?.('400 24px "${kitShout && kitShout[1]}"')`) && !/galindo/i.test(chipView));
-  check('the dashboard’s chip waits for the kit’s shout too',
-    SURFACES.dashboard.includes(`document.fonts.load('400 24px "${kitShout && kitShout[1]}"')`));
 }
 
-console.log('\ndashboard chrome: nothing the scripts use went missing');
-for (const name of ['dashboard', 'phone']) {
+console.log('\nsurfaces chrome: nothing the scripts use went missing');
+for (const name of ['phone']) {
   const src = SURFACES[name];
   const ids = new Set([...src.matchAll(/\bid="([^"]+)"/g)].map((m) => m[1]));
   // getElementById('x'), or the phone page's $('x') shorthand for it.
@@ -228,39 +221,18 @@ for (const name of ['dashboard', 'phone']) {
     `missing: ${missing.join(', ')}`);
 }
 {
-  const dash = SURFACES.dashboard;
-  // The /health warning rule: {type, message} objects render their message,
-  // and a bare string still renders rather than painting an empty box.
-  check('the dashboard renders w.message for an unknown warning', /known \|\| esc\(w && w\.message\)/.test(dash));
-  check('the dashboard still renders a bare-string warning', /typeof w === 'string'/.test(dash));
+  // The /health warning rule: {type, message} objects render their message.
   const status = read('electron-app', 'renderer', 'components', 'StatusPanel.jsx');
   check('the status window renders w.message', /\{w\.message \|\| w\.type\}/.test(status));
-
-  const tabs = [...dash.matchAll(/<(\w+)[^>]*class="tab(?: active)?"[^>]*data-tab="([a-z]+)"/g)];
-  check('the dashboard has its five section tabs', tabs.length === 5, `${tabs.length} found`);
-  check('every section tab is a real button (keyboard reachable)', tabs.every((t) => t[1] === 'button'),
-    tabs.map((t) => t[1]).join(', '));
-  check('the season setting is labelled "Screen season"', />Screen season</.test(dash) && !/>Season theme</.test(dash));
-  check('the header carries the Awana Clubs mark and the product name',
-    /brand\/logos\/awana-clubs-white\.svg/.test(dash) && /<h1>Club Label Printer<\/h1>/.test(dash));
-  check('the stepped chip is drawn by the shared step-chip.js', /<script src="\/step-chip\.js"><\/script>/.test(dash));
-  check('the page still works without step-chip.js', /if \(window\.StepChip\)/.test(dash));
 }
 
-console.log('\ndashboard chrome: one hot button per surface');
+console.log('\nsurfaces chrome: one hot button per surface');
 {
   // Counted as the stylesheet sees them: every element the hot selector
   // matches, whatever else its class list says and in whatever order
   // (`btn btn-hot btn-sm` is the page's own house spelling for a small
   // button), plus any class list a script could hand out at run time.
   const count = (src, re) => (src.match(re) || []).length;
-  const dash = domOf(SURFACES.dashboard).document;
-  const dashHot = [...dash.querySelectorAll('.btn-hot')];
-  check('the dashboard has exactly one hot button (Print leader tag)',
-    dashHot.length === 1 && dashHot[0].getAttribute('onclick') === 'printLeaderTag()',
-    dashHot.map((b) => b.outerHTML.slice(0, 80)).join(' | '));
-  const dashScripted = classLiterals(inlineScripts(SURFACES.dashboard)).filter((t) => t.split(/\s+/).includes('btn-hot'));
-  check('no dashboard script builds a second hot button', dashScripted.length === 0, JSON.stringify(dashScripted));
   const phone = domOf(SURFACES.phone).document;
   const phoneHot = [...phone.querySelectorAll('.btn.hot')];
   check('the phone page has exactly one hot button (Print leader tag)',
@@ -274,44 +246,8 @@ console.log('\ndashboard chrome: one hot button per surface');
     && /btn-hot btn-block" onClick=\{\(\) => window\.awana\.openCheckinPage/.test(status));
 }
 
-console.log('\ndashboard chrome: the section tabs keep aria-selected in step');
+console.log('\nsurfaces chrome: the phone page keeps exactly one sheet up');
 {
-  // The shipped showTab() / setTab(), run against the page's own markup:
-  // after every switch exactly ONE tab says it is selected, and it is the
-  // one that is showing. The visible state rides a class, so nothing on
-  // screen would give a stale aria-selected away.
-  const selected = (doc) => [...doc.querySelectorAll('[role="tab"][aria-selected="true"]')];
-  {
-    const win = domOf(SURFACES.dashboard);
-    const doc = win.document;
-    const src = functionSource(SURFACES.dashboard, 'showTab');
-    check('the dashboard ships showTab()', !!src);
-    win.eval(src || '');
-    const names = [...doc.querySelectorAll('.tab[data-tab]')].map((t) => t.getAttribute('data-tab'));
-    const first = selected(doc);
-    check('the dashboard starts with one selected tab, the active one',
-      first.length === 1 && first[0].classList.contains('active'), first.map((t) => t.getAttribute('data-tab')).join(', '));
-    for (const n of [...names.slice().reverse(), ...names]) {
-      if (typeof win.showTab === 'function') win.showTab(n);
-      const sel = selected(doc);
-      const shown = doc.querySelector('.tab-content.active');
-      check(`dashboard showTab('${n}') leaves exactly that tab selected`,
-        sel.length === 1 && sel[0].getAttribute('data-tab') === n && sel[0].classList.contains('active')
-        && !!shown && shown.id === `tab-${n}`, sel.map((t) => t.getAttribute('data-tab')).join(', ') || 'none');
-    }
-    // The deep link (#display-key, the extension's link) lands on Settings
-    // with the one tab selected and the block marked for the highlight.
-    win.HTMLElement.prototype.scrollIntoView = function () {};
-    win.eval(functionSource(SURFACES.dashboard, 'jumpToDisplayKey') || '');
-    for (const [fn, id] of [['jumpToDisplayKey', 'display-key-section']]) {
-      if (typeof win.showTab === 'function') win.showTab('history');
-      if (typeof win[fn] === 'function') win[fn]();
-      const sel = selected(doc);
-      check(`${fn}() opens Settings, selected, and marks #${id} for the highlight`,
-        sel.length === 1 && sel[0].getAttribute('data-tab') === 'settings'
-        && !!doc.getElementById(id) && doc.getElementById(id).classList.contains('flash'));
-    }
-  }
   {
     // 7.7.0: the phone page has no tabs; Tonight, the + menu, the child's card
     // and the Remove confirmation are bottom sheets, and exactly one is ever
@@ -338,14 +274,12 @@ console.log('\ndashboard chrome: the section tabs keep aria-selected in step');
   }
 }
 
-console.log('\ndashboard chrome: a focus ring you can see (3:1 against what it sits on)');
+console.log('\nsurfaces chrome: a focus ring you can see (3:1 against what it sits on)');
 {
   // Every surface a keyboard control sits on, found by tabbing through each
   // page in Chromium: the ring is drawn 2px OUTSIDE the control, so what it
   // is read against is the field behind it, not the control's own fill.
   const ON = {
-    dashboard: { card: '#ffffff', page: 'var(--page)', 'leader chip': 'var(--c-cream)',
-      'failed history row': 'var(--bad-tint)', 'update banner': 'var(--c-sun)' },
     phone: { card: '#ffffff', page: 'var(--page)', header: 'var(--c-blue)', 'leader chip': 'var(--c-cream)' },
     'status window': { card: '#ffffff', page: 'var(--page)', 'failure notice': 'var(--c-sparks-tint)' },
   };
@@ -371,47 +305,12 @@ console.log('\ndashboard chrome: a focus ring you can see (3:1 against what it s
     `${toastRing} on ${toastBg}`);
 }
 
-console.log('\ndashboard chrome: the deep-link highlight under reduced motion');
-{
-  // #display-key lands on a block marked .flash, drawn as a
-  // ::after wash whose ONLY visible frames are its fade. The reduced-motion
-  // blanket rule cancels every animation, so without a still of its own a
-  // reduced-motion operator lands on an unmarked block.
-  const dash = SURFACES.dashboard;
-  const base = cssRule(dash, '.flash::after') || '';
-  const baseAnim = base.match(/animation:\s*([a-z-]+)\s+([\d.]+m?s)/);
-  const reduced = mediaBlocks(dash, 'prefers-reduced-motion: reduce').join('\n');
-  check('reduced motion still cancels every animation', /\*,\s*\*::before,\s*\*::after\s*\{[^}]*animation:\s*none !important/.test(reduced));
-  const still = cssRule(reduced, '.flash::after') || '';
-  const anim = still.match(/animation:\s*([a-z-]+)\s+([\d.]+m?s)([^;]*);/);
-  check('reduced motion gives the highlight a still of its own, winning over the blanket rule',
-    !!anim && /!important/.test(anim[3]) && !/infinite/.test(anim[3]), still.trim());
-  const frames = anim && (dash.match(new RegExp(`@keyframes ${anim[1]}\\s*\\{([\\s\\S]*?)\\n\\s*\\}`)) || [])[1];
-  const opacities = [...String(frames || '').matchAll(/opacity:\s*([\d.]+)/g)].map((x) => Number(x[1]));
-  check('that still is visible for its whole run and never changes (no in-between frames)',
-    opacities.length > 0 && opacities.every((o) => o > 0 && o === opacities[0]), JSON.stringify(opacities));
-  check('it lasts as long as the fade everyone else sees', !!anim && !!baseAnim && anim[2] === baseAnim[2],
-    `${anim && anim[2]} vs ${baseAnim && baseAnim[2]}`);
-}
-
-console.log('\ndashboard chrome: card headers reflow instead of clipping');
-{
-  // A card clips (overflow: hidden, for the corner tab), so a header control
-  // that cannot sit beside its tab must wrap under it: at 320 CSS px (400%
-  // zoom) "Set up the display key" was cut off the privacy card.
-  const dash = SURFACES.dashboard;
-  check('cards clip their overflow (why the header must wrap)', /overflow:\s*hidden/.test(cssRule(dash, '.card') || ''));
-  check('a card header wraps', /flex-wrap:\s*wrap/.test(cssRule(dash, '.card-header') || ''), cssRule(dash, '.card-header'));
-  check('a wrapped header control stays right-aligned, inside the card',
-    /margin-left:\s*auto/.test(cssRule(dash, '.card-header > :not(.corner-tab)') || ''));
-  check('a header button keeps its label on one line', /white-space:\s*nowrap/.test(cssRule(dash, '.card-header .btn') || ''));
-}
-
-console.log('\ndashboard chrome: the phone page loads only what the Wi-Fi can reach');
+console.log('\nsurfaces chrome: the phone page loads only the kit under /brand/');
 {
   // Markup attributes, CSS url()s, and every URL a script assigns to .src /
   // .href or through setAttribute: the tab-shape probe is one of those, and a
-  // script-set path outside /brand/ 403s on the Wi-Fi exactly like a tag's.
+  // script-set path outside /brand/ would 404 on /checkin exactly like a tag's
+  // (site/build.mjs rewrites only "/brand/ to "/checkin/brand/).
   const refs = pageAssetRefs(SURFACES.phone).filter((r) => !/^(https?:|data:|javascript:)/.test(r.url));
   const local = refs.map((r) => r.url);
   check('the phone page draws the Awana Clubs mark from the kit', local.includes('/brand/logos/awana-clubs-white.svg'), JSON.stringify(local));
@@ -421,14 +320,15 @@ console.log('\ndashboard chrome: the phone page loads only what the Wi-Fi can re
   const exists = local.map((r) => r.split('#')[0]).filter((r) => !fs.existsSync(path.join(root, 'print-server', 'public', r)));
   check('every one of them is in the mirror', exists.length === 0, exists.join(', '));
   const server = read('print-server', 'server.js');
-  const mount = server.indexOf("app.use('/brand'");
-  const gate = server.indexOf('if (LAN_PUBLIC_PATHS.has(req.path)) return next();');
-  check('the brand mount sits before the PIN gate', mount > 0 && gate > mount);
+  check('the print server still mounts the kit, to loopback only, after the loopback gate',
+    server.indexOf("app.use('/brand'") > server.indexOf('security.isLoopbackRequest(req)') && server.indexOf('security.isLoopbackRequest(req)') > 0);
   check('the brand mount serves only css, fonts and svg with plain paths',
     /BRAND_PUBLIC_PATH = \/\^\\\/\[A-Za-z0-9_\\-\/\]\+\\\.\(css\|woff2\|ttf\|svg\)\$\//.test(server));
+  const build = read('..', 'site', 'build.mjs');
+  check('site/build.mjs still makes /checkin from phone.html and its kit', /replaceAll\('"\/brand\/', '"\/checkin\/brand\/'\)/.test(build));
 }
 
-console.log('\ndashboard chrome: the Windows windows ship their own copy of the kit');
+console.log('\nsurfaces chrome: the Windows windows ship their own copy of the kit');
 {
   const css = SURFACES['status window'];
   const urls = [...css.matchAll(/@import '([^']+)'|url\('([^']+)'\)/g)].map((m) => (m[1] || m[2]).split('#')[0]);
@@ -452,7 +352,7 @@ console.log('\ndashboard chrome: the Windows windows ship their own copy of the 
     /brand\/shapes\/tab-b-sparks\.svg\?raw/.test(tab) && /preserveAspectRatio="none"/.test(tab));
 }
 
-console.log('\ndashboard chrome: the stepped chip');
+console.log('\nsurfaces chrome: the stepped chip');
 {
   const { StepChip } = require(path.join(root, 'print-server', 'public', 'step-chip.js'));
   check('step-chip.js exposes geometry, measureEm and svg', !!StepChip && typeof StepChip.geometry === 'function'
@@ -470,15 +370,12 @@ console.log('\ndashboard chrome: the stepped chip');
 }
 
 // ── The chip says what /health says ─────────────────────────────────────────
-// The header chip is the one status line at the top of both windows, and on
-// the dashboard nothing else draws it while the server answers (the old badge
-// was written at the top of loadHealth's .then; this call replaced it). A
-// chip that stays blank, or stays OFFLINE after the server comes back, would
-// pass every static check above, so both surfaces are RUN here.
+// The header chip is the status line at the top of the status window. A chip
+// that stays blank, or stays OFFLINE after the server comes back, would pass
+// every static check above, so the window is RUN here.
 //
-// In order, on one dashboard: each scene follows the last, so a chip that
-// never leaves a state (PROBLEM after the printer is back, OFFLINE after the
-// server is) fails too. Only printerNotFound, spoolerBacklog and
+// Each scene follows the last, so a chip that never leaves a state (PROBLEM
+// after the printer is back, OFFLINE after the server is) fails too. Only printerNotFound, spoolerBacklog and
 // printerOffline mean nothing is printing; any other warning is "attention", and the chip stays ONLINE.
 const HEALTHY = { status: 'ok', version: '6.16.0', printer: 'Zebra ZD421', uptime: 3600, warnings: [] };
 const answers = (body) => () => Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(body) });
@@ -510,26 +407,6 @@ function pageConsole() {
   const virtualConsole = new VirtualConsole();
   virtualConsole.on('jsdomError', (e) => { if (!/^Not implemented:/.test(e.message)) errors.push(e.message); });
   return { errors, virtualConsole };
-}
-
-// The dashboard with its own scripts running. fetch is stubbed: /health
-// answers the way the current scene says, and every other loader waits
-// forever so nothing else touches the page. With `stepChip`, step-chip.js is
-// run exactly where its <script> tag sits (jsdom loads no files by itself).
-function runDashboard(stepChip) {
-  let health = () => new Promise(() => {});
-  const { errors, virtualConsole } = pageConsole();
-  const tag = '<script src="/step-chip.js"></script>';
-  const html = stepChip
-    ? SURFACES.dashboard.replace(tag, () => `<script>${read('print-server', 'public', 'step-chip.js')}</script>`)
-    : SURFACES.dashboard;
-  const { window: win } = new JSDOM(html, {
-    runScripts: 'dangerously',
-    url: 'http://localhost:3456/',
-    virtualConsole,
-    beforeParse(w) { w.fetch = (url) => (/\/health$/.test(String(url)) ? health() : new Promise(() => {})); },
-  });
-  return { win, errors, answer(fn) { health = fn; } };
 }
 
 // The status window's own StatusPanel.jsx, bundled the way Vite builds it
@@ -578,7 +455,6 @@ async function statusWindowChip(bundle, health, serverState) {
   win.fetch = () => health();
   win.awana = {
     getServerState: () => { polled(); return Promise.resolve(serverState); },
-    getLanAddress: () => Promise.resolve(null),
   };
   try {
     win.eval(bundle);
@@ -601,33 +477,7 @@ async function statusWindowChip(bundle, health, serverState) {
 }
 
 async function chipSections() {
-  console.log('\ndashboard chrome: the header chip says what /health says (the dashboard)');
-  for (const stepChip of [true, false]) {
-    const page = runDashboard(stepChip);
-    const doc = page.win.document;
-    const how = stepChip ? 'as the stepped chip' : 'in plain words (no step-chip.js)';
-    check(`the dashboard’s own scripts run ${stepChip ? 'with' : 'without'} step-chip.js`,
-      typeof page.win.loadHealth === 'function' && page.errors.length === 0, page.errors.join('; '));
-    for (const [scene, health, state] of CHIP_SCENES) {
-      page.answer(health);
-      if (typeof page.win.loadHealth === 'function') page.win.loadHealth();
-      await new Promise((r) => setTimeout(r, 0));
-      const el = doc.getElementById('status-badge');
-      const want = CHIP[state];
-      const say = el.getAttribute('aria-label');
-      const drawn = stepChip
-        ? !!el.querySelector('svg') && el.innerHTML.includes(`>${want.word}</text>`) && el.innerHTML.includes(`style="fill:${want.plate}"`)
-        : el.textContent === `Printer \u00B7 ${want.word[0]}${want.word.slice(1).toLowerCase()}`;
-      check(`dashboard, ${scene}: the header chip reads PRINTER / ${want.word} ${how}`,
-        say === want.say && el.title === want.say && drawn,
-        `aria-label ${JSON.stringify(say)}: ${el.innerHTML.slice(0, 200) || '(blank)'}`);
-    }
-    check(`the dashboard’s scripts raised no error through the scenes (${stepChip ? 'with' : 'without'} step-chip.js)`,
-      page.errors.length === 0, page.errors.join('; '));
-    page.win.close();
-  }
-
-  console.log('\ndashboard chrome: the header chip says what /health says (the status window)');
+  console.log('\nsurfaces chrome: the header chip says what /health says (the status window)');
   let bundle = null;
   try {
     bundle = await statusWindowBundle();
