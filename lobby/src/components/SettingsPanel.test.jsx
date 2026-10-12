@@ -9,12 +9,10 @@ import { saveDisplayKey } from '../lib/displayKey.js';
 // The display-login store is exercised in its own suite; here it is a
 // settable snapshot so every UI branch can be reached synchronously.
 const loginState = vi.hoisted(() => ({
-  frameStatus: 'waiting',
   loginStatus: 'logged-out',
   kid: null,
-  pendingLogin: false,
   hasLoginKey: false,
-  login: vi.fn(async () => 'no-frame'),
+  login: vi.fn(async () => 'wrong'),
   logout: vi.fn(),
 }));
 vi.mock('../hooks/useDisplayLogin.js', () => ({
@@ -42,9 +40,9 @@ afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 beforeEach(() => {
   localStorage.clear();
   Object.assign(loginState, {
-    frameStatus: 'waiting', loginStatus: 'logged-out', kid: null, pendingLogin: false, hasLoginKey: false,
+    loginStatus: 'logged-out', kid: null, hasLoginKey: false,
   });
-  loginState.login.mockReset().mockImplementation(async () => 'no-frame');
+  loginState.login.mockReset().mockImplementation(async () => 'wrong');
   loginState.logout.mockReset();
 });
 
@@ -412,21 +410,15 @@ describe('Setup: connecting this screen', () => {
     expect(input.type).toBe('password');
   });
 
-  it('a parked passphrase says it will be tried automatically', () => {
-    Object.assign(loginState, { pendingLogin: true });
-    render(<SettingsPanel {...{ ...baseProps(), status: 'connected' }} />);
-    expect(screen.getByText(/tried automatically the moment it arrives/)).toBeTruthy();
-  });
-
   it('a wrong passphrase is called out and the box stays usable', () => {
-    Object.assign(loginState, { frameStatus: 'received', loginStatus: 'wrong' });
+    Object.assign(loginState, { loginStatus: 'wrong' });
     render(<SettingsPanel {...{ ...baseProps(), status: 'connected' }} />);
     expect(screen.getByText(/does not match the print server/)).toBeTruthy();
     expect(screen.getByLabelText('Display login').disabled).toBe(false);
   });
 
   it('a logged-in screen shows its kid and offers Log out behind a confirm', () => {
-    Object.assign(loginState, { frameStatus: 'received', loginStatus: 'logged-in', kid: '2c366156' });
+    Object.assign(loginState, { loginStatus: 'logged-in', kid: '2c366156' });
     vi.spyOn(window, 'confirm').mockReturnValue(true);
     render(<SettingsPanel {...{ ...baseProps(), status: 'connected', initialTab: 'setup' }} />);
     expect(screen.getByText('logged in · key 2c366156')).toBeTruthy();

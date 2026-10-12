@@ -32,7 +32,7 @@ export const FLEET_CONFIG_URL_STORAGE = 'awanaFleetConfigUrl.v1';
 /** Name of the event fired when the URL changes in THIS tab. */
 export const FLEET_CONFIG_URL_CHANGE_EVENT = 'awana-fleet-config-url-change';
 
-/** The provision contract's cap — pinned in envelope-vectors.json. */
+/** The cap the print server applies when it saves the URL (events.js). */
 export const FLEET_CONFIG_URL_MAX = 200;
 
 /**

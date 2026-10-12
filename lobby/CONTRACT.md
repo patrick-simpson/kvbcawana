@@ -17,13 +17,9 @@ and every repo's contract tests in the same change.
   `pusherAppKey` / `pusherCluster` setting is simply dropped.
 - Consumer code: `src/hooks/useSocket.js`, which binds every event through
   its own strict allowlist sanitizer in `src/lib/eventSanitizers.js`.
-- The legacy **`provision`** frame (the display key and slide-publish token
-  sealed under a passphrase-derived key, once published on the Pusher cache
-  channel `cache-awana-channel-provision`) no longer reaches a screen: a screen
-  now signs in through the sync service, which hands it the display key.
-  `src/lib/displayLogin.js` still knows how to open such a frame, and the
-  `provision` section of `envelope-vectors.json` still pins its shape and KDF
-  (the authoritative description is the printer repo's CONTRACT.md).
+- The legacy **`provision`** display-login frame is gone (removed 2026-10-12,
+  with its section of `envelope-vectors.json`): a screen signs in through the
+  sync service, which hands it the display key.
 
 ## Privacy invariant — do not relax
 

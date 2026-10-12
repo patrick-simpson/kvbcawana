@@ -71,9 +71,10 @@ commits or files.
   (sign-in with the church passphrase; names stay sealed end to end; the same
   events and sanitizers as the Pusher design). The Pusher keys are cleared and
   the printer relays every frame to the Worker. The printer's Pusher publisher
-  and the electron app's Pusher client are removed (2026-10-12); what still
-  names Pusher outside `printer/` is the lobby's code and the Worker's
-  `pusher.js`, and `printer-release.yml`'s and `ci.yml`'s `PUSHER_*` blocks.
+  and the electron app's Pusher client are removed (2026-10-12), and so are the
+  Worker's `pusher.js`, `ci.yml`'s `PUSHER_*` block and the legacy `provision`
+  display login. Only the owner's manual step remains: delete the `PUSHER_*`
+  GitHub secrets and the Pusher app.
 - **The three old repos are archived** (2026-10-11, after switch day): every
   screen runs on awana.kvbchurch.org and both installed apps update from its
   feeds (their bridge releases, printer 6.22.0 and sound room 1.1.0, went out

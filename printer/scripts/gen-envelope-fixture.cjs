@@ -3,7 +3,8 @@
 //
 // Run ONLY when the envelope framing itself changes (version, AAD, padding,
 // length prefix), and then mirror the output into the display repo in the same
-// commit. `npm run test:envelope` fails loudly if the two drift.
+// commit (the mirror is written for you; `node scripts/check-mirrors.mjs` at the
+// repo root fails if the two drift).
 //
 // WHY A COMMITTED FIXTURE RATHER THAN EACH SIDE TESTING ITSELF
 //
@@ -65,56 +66,6 @@ cases.push({
   envelope: events.seal('recap', { entries: [], at: '2026-08-01T23:30:00.000Z' }),
 });
 
-// ── Display login (device provisioning) ──────────────────────────────────────
-// A deterministic passphrase + salt pin the KDF (PBKDF2-SHA256, the iteration
-// count, trim → NFKC → UTF-8 normalisation) between the Node derivation here
-// and the display's WebCrypto derivation. Lives OUTSIDE `cases`: every case is
-// sealed under testKey, and both repos' loops assert exactly that; this frame
-// is sealed under the passphrase-derived key instead.
-const TEST_PASSPHRASE = 'abcd-efgh-ijkm-npqr';
-const TEST_SALT = Buffer.from(Array.from({ length: 16 }, (_, i) => 0x10 + i)).toString('base64');
-if (!events.setDisplayLogin(TEST_PASSPHRASE, TEST_SALT)) {
-  console.error('The fixed test passphrase was rejected by setDisplayLogin.');
-  process.exit(1);
-}
-const derivedKey = events.deriveLoginKey(TEST_PASSPHRASE, TEST_SALT);
-const provisionBundle = {
-  v: 1,
-  displayKey: TEST_KEY,
-  slidesPublishToken: 'tok_AbCdEfGhIjKlMnOpQrStUvWx',
-  issuedAt: '2026-09-16T22:00:00.000Z',
-  // NON-SECRET (#394): the fleet-config URL the same login hands a screen.
-  // Key order matters — both repos compare the opened bundle to this object
-  // verbatim — so it goes LAST, exactly where buildProvisionFrame puts it.
-  configUrl: 'https://example.org/awana-display.json',
-};
-const provisionFrame = events.buildProvisionFrame(provisionBundle);
-if (!provisionFrame) {
-  console.error('Could not build the provision frame — refusing to write a partial fixture.');
-  process.exit(1);
-}
-const provision = {
-  channel: 'cache-<pusherChannel>-provision',
-  event: events.PROVISION_EVENT,
-  aad: `utf8("${events.ENVELOPE_VERSION}:${events.PROVISION_EVENT}")`,
-  kdf: {
-    name: events.PROVISION_KDF_NAME,
-    iterations: events.PROVISION_KDF_ITERATIONS,
-    saltBytes: events.PROVISION_SALT_BYTES,
-    passphraseNormalization: 'trim, then Unicode NFKC, then UTF-8',
-    keyBytes: 32,
-  },
-  bundleShape: '{ v:1, displayKey (base64 32 B), slidesPublishToken (\'\' or 24-64 [A-Za-z0-9_-]), issuedAt (ISO 8601), configUrl (\'\' or an https URL of at most 200 chars) }',
-  configUrlRule: 'NON-SECRET. https only, <=200 characters, no credentials in the URL; anything else is coerced to the empty string by the publisher and refused by the consumer. It is applied through the display\'s existing remote-config path (the one ?config= uses) and lands in its OWN storage entry, never in the settings object.',
-  replayRule: 'a display ignores a bundle whose issuedAt is older than the last one it applied',
-  testPassphrase: TEST_PASSPHRASE,
-  testSalt: TEST_SALT,
-  derivedKey: derivedKey.toString('base64'),
-  kid: events.kidFor(derivedKey),
-  bundle: provisionBundle,
-  frame: provisionFrame,
-};
-
 const out = {
   note: [
     'Cross-implementation interop fixture for the sealed-envelope transport.',
@@ -137,11 +88,10 @@ const out = {
   slidesPadLadder: events.SLIDES_PAD_LADDER,
   testKey: TEST_KEY,
   cases,
-  provision,
 };
 
 const canonical = path.join(__dirname, '..', 'envelope-vectors.json');
-const mirror = '/home/user/Awana-Check-in-Display/src/lib/__fixtures__/envelope-vectors.json';
+const mirror = path.join(__dirname, '..', '..', 'lobby', 'src', 'lib', '__fixtures__', 'envelope-vectors.json');
 const json = `${JSON.stringify(out, null, 2)}\n`;
 fs.writeFileSync(canonical, json);
 console.log(`wrote ${canonical} (${cases.length} cases)`);
@@ -149,5 +99,5 @@ if (fs.existsSync(path.dirname(mirror))) {
   fs.writeFileSync(mirror, json);
   console.log(`mirrored to ${mirror}`);
 } else {
-  console.warn(`display repo not present — mirror ${path.basename(mirror)} by hand`);
+  console.warn(`lobby fixtures folder not present — mirror ${path.basename(mirror)} by hand`);
 }

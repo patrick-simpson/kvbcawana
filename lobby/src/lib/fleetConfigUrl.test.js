@@ -10,7 +10,6 @@ import {
 } from './fleetConfigUrl.js';
 import { sanitizeOverrides } from '../hooks/useConfig.js';
 import { parseUrlFlags } from './urlFlags.js';
-import fixture from './__fixtures__/envelope-vectors.json';
 
 // The fleet-config URL (#394) is NOT a secret — it is an address, and the
 // public JSON it points at holds display preferences, never child data. It
@@ -22,7 +21,7 @@ import fixture from './__fixtures__/envelope-vectors.json';
 // repoint the screen at a DIFFERENT remote config file with no operator in
 // the loop, and would put the URL into every exported settings file.
 
-const URL_ = fixture.provision.bundle.configUrl;
+const URL_ = 'https://example.org/awana-display.json';
 
 beforeEach(() => {
   localStorage.clear();

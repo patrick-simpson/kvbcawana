@@ -129,18 +129,14 @@ nothing that identifies a child to a stranger) and why names are sealed with
 AES-256-GCM under the display key. Both rules stand on the new channel. The
 Pusher publisher is gone from this server (2026-10-12).
 
-## Display login (retired)
+## Display login (removed)
 
-Screens used to be provisioned with a single church passphrase: the server
-derived a wrapping key from it (PBKDF2-SHA256, 600,000 iterations, a 16-byte
-salt), sealed `{ displayKey, slidesPublishToken, issuedAt, configUrl }` under it
-and published that frame as `provision` on a Pusher cache channel. Screens now
-sign in to the sync service instead, and **nothing publishes the frame any
-more**. What remains in `print-server/events.js` is the frame builder and the
-KDF, pinned by the `provision` section of `envelope-vectors.json` (mirrored
-into the display repo so the Node and WebCrypto derivations cannot drift), and
-`displayLoginPassphrase` is still in the server's secret set: never returned by
-`GET /config` off-loopback, never settable from the LAN.
+Screens used to be provisioned with a single church passphrase through a
+`provision` frame on a Pusher cache channel. Screens sign in to the sync
+service instead, and the frame builder, the KDF and the fixture section are
+gone. `displayLoginPassphrase` stays in the server's secret set so an old
+config.json never leaks it (never returned by `GET /config` off-loopback,
+never settable from the LAN), and any save scrubs it from disk.
 
 ## Reporting a vulnerability
 

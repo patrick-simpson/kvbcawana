@@ -213,38 +213,21 @@ async function main() {
       events.getDisplayKeyState().configured === true);
   }
 
-  // ── 2b. Display login state (nothing publishes its frame any more) ────────
-  console.log('realtime: display login state');
-  let PASSPHRASE;
+  // ── 2b. The display login is retired ──────────────────────────────────────
+  console.log('realtime: the retired display login');
   {
     check('nothing was provisioned: no provision frame is ever published', wire.filter((w) => w.event === 'provision').length === 0);
-    const gen = await post('/config/display-login/generate');
-    PASSPHRASE = gen.body && gen.body.passphrase;
-    check('generate returns a 4x4 passphrase from the unambiguous alphabet',
-      gen.status === 200 && /^[a-z3-9]{4}(-[a-z3-9]{4}){3}$/.test(PASSPHRASE || ''), JSON.stringify(gen.body));
-    check('generate does not save it', !onDisk().displayLoginPassphrase);
-    check('a too-short passphrase is refused with 400', (await post('/config', { displayLoginPassphrase: 'short' })).status === 400);
-    check('a refused passphrase leaves login unconfigured', events.getDisplayLoginState().configured === false);
-
-    check('saving the passphrase is accepted', (await post('/config', { displayLoginPassphrase: PASSPHRASE })).status === 200);
-    const disk1 = onDisk();
-    check('the passphrase is persisted', disk1.displayLoginPassphrase === PASSPHRASE);
-    check('a 16-byte salt was minted alongside it',
-      typeof disk1.displayLoginSalt === 'string' && Buffer.from(disk1.displayLoginSalt, 'base64').length === 16, JSON.stringify(disk1.displayLoginSalt));
-    check('and it takes effect immediately, with no restart', events.getDisplayLoginState().configured === true);
+    check('the generate route is gone', (await post('/config/display-login/generate')).status === 404);
+    // An old config.json may still hold a passphrase and salt: any save scrubs them.
+    const cfg = onDisk();
+    cfg.displayLoginPassphrase = 'a-legacy-passphrase-left-on-disk';
+    cfg.displayLoginSalt = Buffer.alloc(16, 7).toString('base64');
+    fs.writeFileSync(configFile, JSON.stringify(cfg, null, 2));
+    check('saving a (ignored) passphrase is still accepted', (await post('/config', { displayLoginPassphrase: 'ignored passphrase here' })).status === 200);
+    const d = onDisk();
+    check('the legacy passphrase and its salt are gone from disk', !d.displayLoginPassphrase && !d.displayLoginSalt, JSON.stringify(d));
     await new Promise((r) => setTimeout(r, 50));
-    check('saving it still publishes no provision frame', wire.filter((w) => w.event === 'provision').length === 0);
-
-    // Re-saving the same passphrase must not rotate the salt.
-    await post('/config', { displayLoginPassphrase: PASSPHRASE });
-    check('re-saving the same passphrase keeps the salt byte-identical', onDisk().displayLoginSalt === disk1.displayLoginSalt);
-
-    // A different passphrase rotates the salt.
-    const gen2 = await post('/config/display-login/generate');
-    await post('/config', { displayLoginPassphrase: gen2.body.passphrase });
-    check('a different passphrase mints a new salt', onDisk().displayLoginSalt !== disk1.displayLoginSalt);
-    // ...and put the first one back so later phases can keep using it.
-    await post('/config', { displayLoginPassphrase: PASSPHRASE });
+    check('and no provision frame was published', wire.filter((w) => w.event === 'provision').length === 0);
     await post('/config', { slidesPublishToken: '' });
 
     // ── The fleet-config URL (#394) ────────────────────────────────────────
@@ -358,17 +341,6 @@ async function main() {
     check('AND the live auth gate no longer holds it',
       (await pinWarning()) === true,
       'the old PIN would still have been accepted until a restart');
-  }
-
-  // ── 5b. Clearing the passphrase clears it live and removes the salt ────────
-  console.log('realtime: clearing the display passphrase');
-  {
-    await post('/config', { displayLoginPassphrase: '' });
-    const d = onDisk();
-    check('the passphrase and its salt are both gone from disk', !d.displayLoginPassphrase && !d.displayLoginSalt, JSON.stringify(d));
-    check('AND the live login state is cleared', events.getDisplayLoginState().configured === false);
-    // Restore it for the remaining phases (phase 6 restores the key).
-    await post('/config', { displayLoginPassphrase: PASSPHRASE });
   }
 
   // ── 6. Encryption never blocks a label ─────────────────────────────────────

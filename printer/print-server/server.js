@@ -197,15 +197,6 @@ if (events.setDisplayKey(config.displayKey)) {
   console.warn('[realtime] No display key set — children\'s first names are published UNENCRYPTED on the live channel. Generate one in the dashboard (Realtime).');
 }
 
-// Display login state (the passphrase-derived wrapping key). The frame it
-// builds used to be published on a Pusher cache channel; nothing publishes it
-// now that screens sign in to the sync service instead — see events.js.
-if (events.setDisplayLogin(config.displayLoginPassphrase, config.displayLoginSalt)) {
-  console.log(`[login] Display login configured (kid ${events.getDisplayLoginState().kid}) — screens can log in with the passphrase`);
-} else if (config.displayLoginPassphrase) {
-  console.warn('[login] config.displayLoginPassphrase is INVALID (12–128 characters, with its salt) — screens cannot log in until it is fixed');
-}
-
 // Brute-force protection for the phone PIN. Lives at module scope so the
 // failure counts survive across requests but not across restarts — a restart
 // mid-event must never leave a volunteer locked out.
@@ -7746,7 +7737,7 @@ function onTallyWindow(fn) {
 // ── The sync service (one passphrase for every screen) ────────────────────────
 // Signed in (config.syncSession + config.syncUrl, both written only by
 // POST /config/sync-login below), this server seals with the service's display
-// key, stops the `provision` login frame and the deck / settings rebroadcasts,
+// key, stops the deck / settings rebroadcasts,
 // and forwards a publish made on this computer to the service. Nothing here
 // touches the network until someone signs in, so a server that never does
 // behaves exactly as before. See print-server/sync-client.js.
@@ -7766,7 +7757,7 @@ function writeConfigPatch(mutate) {
 // Every live frame (check-ins, tally, recap, birthdays, …) also goes to the
 // sync service's channel while signed in, one at a time and in order, so a
 // check-in never lands after the tally that counts it any more than the channel
-// would. Only the display channel's events: never the provision frame.
+// would. Only the display channel's events.
 //
 // A QUEUE WITH LIMITS, not an endless chain (7.11.1). With the church Wi-Fi
 // up and the internet down, every frame waited its 15 s timeout behind every
@@ -8741,7 +8732,7 @@ app.post('/update-now', (req, res) => {
 // Now: the request must come from the loopback interface, AND its Origin (when
 // present) must be the extension or one of this server's own loopback pages.
 // A LAN caller never gets these fields even with a valid PIN.
-// pusherSecret: an old config.json may still hold one; it is never read, but it stays redacted.
+// pusherSecret and displayLoginPassphrase: an old config.json may still hold one; neither is ever read, but both stay redacted.
 const SECRET_CONFIG_KEYS = ['pusherSecret', 'phonePin', 'displayKey', 'slidesPublishToken', 'displayLoginPassphrase', 'syncSession'];
 
 // Operator text that ends up printed on a label (labelFooter, the connect-card
@@ -8776,8 +8767,6 @@ function applySavedConfig(next) {
   // volunteer fixing a name outage mid-event must not have to restart the server
   // that is currently printing labels.
   events.setDisplayKey(config.displayKey);
-  // Same for the display login state.
-  events.setDisplayLogin(config.displayLoginPassphrase, config.displayLoginSalt);
 }
 
 function isTrustedConfigOrigin(req) {
@@ -8852,27 +8841,13 @@ app.post('/config/slides-token/generate', (req, res) => {
   res.json({ token });
 });
 
-// The display login passphrase: what a volunteer types once on each screen.
-// Loopback-only mint like the other two — this is the one string that unlocks
-// the display key. Not saved here; the dashboard saves it via POST /config
-// (save-on-generate, like the slides token: rotating it can never lock a
-// screen out of names it already holds, it only asks screens to log in again).
-app.post('/config/display-login/generate', (req, res) => {
-  if (!isTrustedConfigOrigin(req)) {
-    return res.status(403).json({ error: 'The display passphrase can only be generated from the dashboard on this computer' });
-  }
-  const passphrase = events.generateLoginPassphrase();
-  console.log('[login] Generated a new display passphrase (not yet saved)');
-  res.json({ passphrase });
-});
-
 app.post('/config', (req, res) => {
   const {
     printerName, checkinUrl,
     phonePin, firstTimerInverted, connectCard, enableDrivenCheckin, lateGraceMin,
     worksheetPrinter, lanAccess, allowedOrigins, historyRetentionDays, displayKey,
     labelFooter, connectCardAutoFirstTimer, connectCardGreeting, seasonTheme,
-    musicalPrinter, updateBeacon, slidesPublishToken, displayLoginPassphrase,
+    musicalPrinter, updateBeacon, slidesPublishToken,
     trophyBand, fleetConfigUrl, pickupClubs,
     backupPrinterName, cupsMedia,
   } = req.body || {};
@@ -8945,39 +8920,21 @@ app.post('/config', (req, res) => {
         next.slidesPublishToken = wanted;
       }
     }
-    // The display login passphrase (nothing publishes its frame any more). A
-    // NEW salt is minted only when the passphrase actually changes; clearing
-    // it removes both.
-    if (displayLoginPassphrase !== undefined) {
-      const wanted = events.normalizePassphrase(displayLoginPassphrase);
-      if (wanted === '') {
-        delete next.displayLoginPassphrase;
-        delete next.displayLoginSalt;
-      } else if (!events.isValidLoginPassphrase(wanted)) {
-        return res.status(400).json({
-          error: `Display passphrase must be ${events.LOGIN_PASSPHRASE_MIN}–${events.LOGIN_PASSPHRASE_MAX} characters — use Generate, or type a sentence`,
-        });
-      } else {
-        if (wanted !== next.displayLoginPassphrase || !events.isValidLoginSalt(next.displayLoginSalt)) {
-          next.displayLoginSalt = events.generateLoginSalt();
-        }
-        next.displayLoginPassphrase = wanted;
-      }
-    }
-    // The fleet-config URL handed to screens by the display login (#394).
-    // NOT a secret — it is the same address an operator can already put in a
-    // screen's `?config=` — but it is https-only and length-capped here, at
-    // the point it is PERSISTED, so a bad value can never be poisoned once
-    // and shipped to every screen on the next provision heartbeat. Clearing
-    // it deletes the key and the next frame carries '' , which is how a
-    // cleared URL reaches screens that already applied one.
+    // The retired display-login passphrase and salt: an old config.json may
+    // still hold them. Nothing reads them; any save scrubs them from disk.
+    delete next.displayLoginPassphrase;
+    delete next.displayLoginSalt;
+    // The fleet-config URL (#394). NOT a secret: it is the same address an
+    // operator can already put in a screen's `?config=`. It is https-only and
+    // length-capped here, at the point it is PERSISTED, so a bad value is
+    // never stored. Clearing it deletes the key.
     if (fleetConfigUrl !== undefined) {
       const wanted = String(fleetConfigUrl).trim();
       if (wanted === '') {
         delete next.fleetConfigUrl;
       } else if (!events.isValidFleetConfigUrl(wanted)) {
         return res.status(400).json({
-          error: `Settings URL must be an https:// link of at most ${events.PROVISION_CONFIG_URL_MAX} characters`,
+          error: `Settings URL must be an https:// link of at most ${events.FLEET_CONFIG_URL_MAX} characters`,
         });
       } else {
         next.fleetConfigUrl = wanted;
