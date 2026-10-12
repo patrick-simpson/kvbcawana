@@ -13,6 +13,8 @@ import { useEffect, useState } from 'react';
 //   'unsupported' — this browser has no Wake Lock API
 //   'requesting'  — asked, no answer yet
 //   'off'         — the feature is disabled in config
+const REACQUIRE_MS = 5000;
+
 export function useWakeLock(enabled) {
   const supported = typeof navigator !== 'undefined' && !!navigator.wakeLock?.request;
   // Only the async outcome lives in state; 'off'/'unsupported' are
@@ -24,6 +26,7 @@ export function useWakeLock(enabled) {
 
     let lock = null;
     let disposed = false;
+    let retry = null;
 
     const acquire = async () => {
       if (disposed || document.visibilityState !== 'visible') return;
@@ -36,8 +39,12 @@ export function useWakeLock(enabled) {
         setLockState('active');
         // The OS may revoke the lock later (tab hidden, power saver);
         // reflect that so the panel never over-promises.
+        // A kiosk tab is always visible, so visibilitychange never fires:
+        // ask again a few seconds after the OS lets go.
         lock.addEventListener?.('release', () => {
-          if (!disposed) setLockState('denied');
+          if (disposed) return;
+          setLockState('denied');
+          retry = setTimeout(acquire, REACQUIRE_MS);
         });
       } catch {
         if (!disposed) setLockState('denied');
@@ -49,6 +56,7 @@ export function useWakeLock(enabled) {
 
     return () => {
       disposed = true;
+      clearTimeout(retry);
       document.removeEventListener('visibilitychange', acquire);
       lock?.release().catch(() => {});
     };
