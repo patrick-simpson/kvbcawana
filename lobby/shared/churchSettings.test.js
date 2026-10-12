@@ -6,7 +6,7 @@ describe('the church settings allowlist (routes.md 10.3)', () => {
     expect(CHURCH_KEYS).toEqual([
       'labelFooter', 'firstTimerInverted', 'trophyBand', 'connectCard', 'connectCardAutoFirstTimer',
       'connectCardGreeting', 'enableDrivenCheckin', 'labelTemplates', 'schedule', 'lateGraceMin',
-      'pickupClubs', 'seasonTheme', 'barfNights',
+      'pickupClubs', 'seasonTheme', 'barfNights', 'leaders',
     ]);
     expect(Object.keys(CHURCH_SPEC)).toEqual(CHURCH_KEYS);
     expect(CHURCH_JSON_MAX).toBe(24576);
@@ -78,6 +78,19 @@ describe('the church settings allowlist (routes.md 10.3)', () => {
     expect(sanitizeChurch({ seasonTheme: 'summer' }).dropped).toEqual(['seasonTheme']);
     const nights = sanitizeChurch({ barfNights: ['2026-10-14', '2026-09-30', '2026-10-14', 'tomorrow', 7] }).settings.barfNights;
     expect(nights).toEqual(['2026-09-30', '2026-10-14']);
+  });
+
+  it('keeps the remembered leaders: names, club, last print, count; unique, at most 80', () => {
+    const many = Array.from({ length: 90 }, (_, i) => ({ firstName: `Lee${i}`, lastName: 'Ader' }));
+    const { settings } = sanitizeChurch({
+      leaders: [
+        { firstName: ' Pat\n', lastName: 'Simpson', clubName: 'Sparks', lastPrintedAt: 1760000000000, printCount: 4, key: 'x', phone: '555' },
+        { firstName: 'pat', lastName: 'SIMPSON' }, { firstName: '', lastName: '' }, 'junk', ...many,
+      ],
+    });
+    expect(settings.leaders[0]).toEqual({ firstName: 'Pat', lastName: 'Simpson', clubName: 'Sparks', lastPrintedAt: 1760000000000, printCount: 4 });
+    expect(settings.leaders).toHaveLength(80);
+    expect(sanitizeChurch({ leaders: 'Pat' }).dropped).toEqual(['leaders']);
   });
 
   it('keeps null only as an edit\'s delete', () => {

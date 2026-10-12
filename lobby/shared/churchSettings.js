@@ -40,6 +40,9 @@ export const CHURCH_TEMPLATE_SWITCHES = Object.freeze([
  *   pickup    pickup.js normalizePickupClubs (null: the default list)
  *   season    one of CHURCH_SEASONS
  *   dates     at most 20 unique sorted YYYY-MM-DD
+ *   leaders   the remembered leaders (adult volunteers' names for the leader-tag
+ *             chips; owner 2026-10-12): at most 80 unique
+ *             {firstName, lastName, clubName, lastPrintedAt, printCount}
  */
 export const CHURCH_SPEC = Object.freeze({
   labelFooter: Object.freeze({ type: 'line', max: 60 }),
@@ -55,6 +58,7 @@ export const CHURCH_SPEC = Object.freeze({
   pickupClubs: Object.freeze({ type: 'pickup' }),
   seasonTheme: Object.freeze({ type: 'season' }),
   barfNights: Object.freeze({ type: 'dates', max: 20 }),
+  leaders: Object.freeze({ type: 'leaders', max: 80, name: 80, club: 40 }),
 });
 
 /** Every key, in the table's order. */
@@ -134,6 +138,29 @@ function cleanValue(key, value) {
       if (!Array.isArray(value)) return DROP;
       const days = value.filter((d) => typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d) && !Number.isNaN(Date.parse(`${d}T00:00:00Z`)));
       return [...new Set(days)].sort().slice(0, rule.max);
+    }
+    case 'leaders': {
+      if (!Array.isArray(value)) return DROP;
+      const out = [];
+      const seen = new Set();
+      for (const r of value) {
+        if (out.length >= rule.max) break;
+        if (!isPlainObject(r)) continue;
+        const firstName = typeof r.firstName === 'string' ? oneLine(r.firstName, rule.name) : '';
+        const lastName = typeof r.lastName === 'string' ? oneLine(r.lastName, rule.name) : '';
+        const key = `${firstName} ${lastName}`.toLowerCase().replace(/\s+/g, ' ').trim();
+        if (!key || seen.has(key)) continue;
+        seen.add(key);
+        const at = Math.round(Number(r.lastPrintedAt));
+        const count = Math.round(Number(r.printCount));
+        out.push({
+          firstName, lastName,
+          clubName: typeof r.clubName === 'string' ? oneLine(r.clubName, rule.club) : '',
+          lastPrintedAt: Number.isFinite(at) && at > 0 ? at : 0,
+          printCount: Number.isFinite(count) && count >= 1 ? count : 1,
+        });
+      }
+      return out;
     }
     default:
       return DROP;

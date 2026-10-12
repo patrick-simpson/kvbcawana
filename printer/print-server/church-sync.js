@@ -54,8 +54,13 @@ function cleanSwitches(raw) {
   return out;
 }
 
-/** The church part of a config.json, for the first-run seed. */
-function seedFrom(cfg, churchConfig) {
+// Keys that do not live in config.json: the remembered leaders are leaders.json's
+// (the station's applyPatch writes them there). A doc that drops one leaves the
+// local copy alone (an empty list is how the doc says "none").
+const NOT_IN_CONFIG = ['leaders'];
+
+/** The church part of a config.json (and the leaders list), for the first-run seed. */
+function seedFrom(cfg, churchConfig, extras) {
   const raw = {};
   const c = cfg && typeof cfg === 'object' ? cfg : {};
   for (const key of church.CHURCH_KEYS) {
@@ -65,6 +70,8 @@ function seedFrom(cfg, churchConfig) {
     } else if (key === 'barfNights') {
       if (Array.isArray(c.barfNights)) raw.barfNights = c.barfNights;
       else if (churchConfig && Array.isArray(churchConfig.barfNights)) raw.barfNights = churchConfig.barfNights;
+    } else if (NOT_IN_CONFIG.includes(key)) {
+      if (extras && extras[key] !== undefined && extras[key] !== null) raw[key] = extras[key];
     } else if (c[key] !== undefined && c[key] !== null) {
       raw[key] = c[key];
     }
@@ -80,6 +87,7 @@ function seedFrom(cfg, churchConfig) {
  *   stationId: () => (string | null),
  *   readConfig: () => any,
  *   churchConfig?: () => any,
+ *   seedExtras?: () => Record<string, any>,
  *   localOff?: () => boolean,
  *   applyPatch: (patch: Record<string, any>, deletes: string[]) => { errors: {key: string, error: string}[], changed: string[], pickupChanged: boolean, seasonChanged: boolean },
  *   onApplied?: (result: any) => void,
@@ -109,6 +117,7 @@ function createChurchSync(o) {
   let switchesRev = applied.switchesRev;
   let paused = false;
   let lastOk = false;
+  let lastDoc = null;   // {rev, settings}: the Worker's doc as last seen (for this computer's own edits)
   let seenRev = -1;
   let busy = null;
   let again = false;
@@ -147,9 +156,9 @@ function createChurchSync(o) {
     const deletes = [];
     for (const key of church.CHURCH_KEYS) {
       if (Object.prototype.hasOwnProperty.call(settings, key)) {
-        if (settings[key] === null) deletes.push(key);
+        if (settings[key] === null) { if (!NOT_IN_CONFIG.includes(key)) deletes.push(key); }
         else patch[key] = settings[key];
-      } else if (applied.keys.includes(key) && !dropped.includes(key)) {
+      } else if (applied.keys.includes(key) && !dropped.includes(key) && !NOT_IN_CONFIG.includes(key)) {
         deletes.push(key);   // the doc held it at the last apply and no longer does: back to the default
       }
     }
@@ -180,11 +189,12 @@ function createChurchSync(o) {
   }
 
   async function seed(depth) {
-    const settings = seedFrom(o.readConfig(), o.churchConfig ? o.churchConfig() : null);
+    const settings = seedFrom(o.readConfig(), o.churchConfig ? o.churchConfig() : null, o.seedExtras ? o.seedExtras() : null);
     if (JSON.stringify(settings).length > church.CHURCH_JSON_MAX) { lastError = 'the settings are too large to send'; return 'too-large'; }
     const r = await call('PUT', { seed: true, settings });
     if (r.status === 201) {
       seenRev = revOf(r.body && r.body.rev) || 1;
+      lastDoc = { rev: seenRev, settings };
       applied = { rev: seenRev, switchesRev, appliedAt: new Date(now()).toISOString(), keys: Object.keys(settings) };
       save();
       log(`[church] Sent this computer's settings to awana.kvbchurch.org (the first copy, rev ${applied.rev})`);
@@ -214,6 +224,7 @@ function createChurchSync(o) {
     if (localOff()) return 'local-off';
     if (paused) return 'paused';
     const rev = revOf(doc.rev);
+    if (doc.settings && typeof doc.settings === 'object' && rev > 0) lastDoc = { rev, settings: doc.settings };
     if (rev === 0 || !doc.settings || typeof doc.settings !== 'object') {
       return o.isStation() ? seed(depth) : 'not-seeded';
     }
@@ -234,6 +245,40 @@ function createChurchSync(o) {
       return out;
     })().finally(() => { busy = null; });
     return busy;
+  }
+
+  /**
+   * This computer's own change to the church doc (a new remembered leader): the
+   * edit route, `{baseRev, settings: patch}` where `build(docSettings)` makes the
+   * patch from the doc as the Worker holds it (null: nothing to change). A stale
+   * base applies the Worker's newer doc first and builds again, at most twice.
+   * Only while the Worker is the one writer; never throws, never awaited by a print.
+   * @param {(settings: Record<string, any>) => (Record<string, any> | null)} build
+   */
+  async function edit(build) {
+    if (!managed()) return 'not-managed';
+    for (let attempt = 0; attempt < 3; attempt++) {
+      if (busy) { try { await busy; } catch { /* its own result */ } }
+      if (!lastDoc) { const f = await syncNow(); if (!lastDoc) return f; }
+      const patch = build({ ...lastDoc.settings });
+      if (!patch) return 'unchanged';
+      const base = lastDoc.rev;
+      const r = await call('PUT', { baseRev: base, settings: patch });
+      if (r.ok && r.body) {
+        const rev = revOf(r.body.rev);
+        const merged = r.body.settings && typeof r.body.settings === 'object' ? r.body.settings : church.mergeChurch(lastDoc.settings, patch);
+        lastDoc = { rev, settings: merged };
+        seenRev = rev;
+        // Our own change: config / leaders.json already hold it. Counted as applied only when
+        // nothing else landed in between (else the next fetch applies the whole doc).
+        if (applied.rev === base) { applied = { ...applied, rev, appliedAt: new Date(now()).toISOString() }; save(); }
+        return 'saved';
+      }
+      if (r.status === 409 && r.body && r.body.reason === 'stale') { await syncNow(); continue; }
+      lastError = r.status ? `the change was refused (HTTP ${r.status})` : 'the service is unreachable';
+      return 'failed';
+    }
+    return 'stale';
   }
 
   /** The print lease's `church: {rev, switchesRev}`: fetch when either moved. */
@@ -276,7 +321,7 @@ function createChurchSync(o) {
   }
 
   return {
-    syncNow, onChurch, tick, start, managed, status,
+    syncNow, onChurch, tick, start, managed, status, edit,
     appliedRev: () => applied.rev,
     switches: () => (switches ? { ...switches } : null),
     warnings: () => warnings.slice(),
@@ -284,4 +329,4 @@ function createChurchSync(o) {
   };
 }
 
-module.exports = { createChurchSync, seedFrom, cleanSwitches, SWITCH_NAMES, START_DELAY_MS, POLL_MS, TICK_MS };
+module.exports = { createChurchSync, seedFrom, NOT_IN_CONFIG, cleanSwitches, SWITCH_NAMES, START_DELAY_MS, POLL_MS, TICK_MS };

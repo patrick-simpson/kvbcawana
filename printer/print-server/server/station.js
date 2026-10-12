@@ -21,6 +21,7 @@ const $publishers = lazy('./publishers');
 const $relay = lazy('./relay');
 const $spooler = lazy('./spooler');
 const $configRoutes = lazy('./config-routes');
+const $leaders = lazy('./leaders');
 const app = $http.app;
 
 // What other modules (and server.js) read from this one; live bindings, so cycles are safe.
@@ -185,8 +186,13 @@ const CHURCH_APPLIED_FILE = () => path.join($config.DATA_DIR, 'church-applied.js
 let churchSync = null;
 let churchSyncStop = null;
 
-/** Write the Worker's values into config.json through the print server's own cleaner, once. */
-function applyChurchPatch(patch, deletes) {
+/**
+ * Write the Worker's values into config.json through the print server's own cleaner,
+ * once; the remembered leaders go to leaders.json (their own file, as ever).
+ */
+function applyChurchPatch(fullPatch, deletes) {
+  const { leaders, ...patch } = fullPatch;
+  const leadersChanged = leaders !== undefined ? $leaders.applyLeaderList(leaders) : false;
   const next = $config.loadConfigFile();
   const before = JSON.stringify(next);
   const keysBefore = {};
@@ -201,7 +207,7 @@ function applyChurchPatch(patch, deletes) {
   }
   return {
     errors: r.errors,
-    changed: Object.keys(keysBefore).filter((k) => JSON.stringify(next[k]) !== keysBefore[k]),
+    changed: [...Object.keys(keysBefore).filter((k) => JSON.stringify(next[k]) !== keysBefore[k]), ...(leadersChanged ? ['leaders'] : [])],
     pickupChanged: JSON.stringify(pickup.pickupClubsOf(next)) !== pickupBefore,
     seasonChanged: next.seasonTheme !== seasonBefore,
   };
@@ -217,6 +223,7 @@ function churchSyncInstance() {
     stationId: () => ($config.cloudStation ? $config.cloudStation.stationIdFn() : null),
     readConfig: () => $config.loadConfigFile(),
     churchConfig: () => $config.churchConfig,
+    seedExtras: () => ({ leaders: $leaders.leadersForChurch() }),
     // The local last resort (never written by any UI): config.json alone.
     localOff: () => $config.config.churchSync === false,
     applyPatch: applyChurchPatch,

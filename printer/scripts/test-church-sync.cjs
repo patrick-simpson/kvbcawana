@@ -48,6 +48,12 @@ function makeWorker() {
       w.rev = 1; w.doc = { ...body.settings };
       return { ok: true, status: 201, body: { rev: 1 } };
     }
+    if (method === 'PUT' && body && body.baseRev !== undefined) {   // the edit route
+      w.edits = (w.edits || 0) + 1;
+      if (body.baseRev !== w.rev) return { ok: false, status: 409, body: { reason: 'stale', rev: w.rev, settings: w.doc } };
+      w.doc = { ...w.doc, ...body.settings }; w.rev++;
+      return { ok: true, status: 200, body: { ok: true, rev: w.rev, settings: { ...w.doc } } };
+    }
     return { ok: false, status: 400, body: null };
   };
   return w;
@@ -219,6 +225,8 @@ function makeWorker() {
     if (p.startsWith('/v1/print/next')) return { ok: true, status: 200, body: { jobs: [], leaseMs: 90000, church: { rev: w.rev, switchesRev: w.switchesRev } } };
     return { ok: true, status: 200, body: { ok: true } };
   };
+  // A remembered leader on this laptop before 9.3.0: the seed carries the list.
+  fs.writeFileSync(path.join(dataDir, 'leaders.json'), JSON.stringify([{ key: 'pat simpson', firstName: 'Pat', lastName: 'Simpson', clubName: 'Sparks', lastPrintedAt: Date.now() - 86400000, printCount: 3 }]));
   const reconfigure = () => server.configureCloud({ stationId: 'station-aaaaaaaa', ring: async () => null, request: stationRequest, start: false, journalFile: null });
   check('this computer is a station', reconfigure().ok === true);
   {
@@ -229,6 +237,7 @@ function makeWorker() {
     check('with config.json\'s church part: its schedule, footer, greeting, pickup list, late grace, BARF nights from church-config.json',
       put.body.settings.labelFooter === 'Laptop footer' && put.body.settings.connectCardGreeting === 'Welcome!' && JSON.stringify(put.body.settings.pickupClubs) === '["Sparks"]'
       && put.body.settings.schedule.length === 1 && put.body.settings.lateGraceMin === 120 && Array.isArray(put.body.settings.barfNights), JSON.stringify(put.body.settings));
+    check('and the remembered leaders (leaders.json), names and counts only', JSON.stringify(put.body.settings.leaders) === JSON.stringify([{ firstName: 'Pat', lastName: 'Simpson', clubName: 'Sparks', lastPrintedAt: put.body.settings.leaders[0].lastPrintedAt, printCount: 3 }]), JSON.stringify(put.body.settings.leaders));
     check('and NOTHING else: no printer, no key, no session', !/Fake|syncSession|displayKey|printerName|oWr6n92/.test(JSON.stringify(put.body)), JSON.stringify(put.body));
     check('config.json is not rewritten by the seed', fs.statSync(configFile).mtimeMs === mtime);
     const appliedFile = JSON.parse(fs.readFileSync(path.join(dataDir, 'church-applied.json'), 'utf8'));
@@ -331,6 +340,62 @@ function makeWorker() {
     await live.cloudStation.puller.tick();
     await sleep(50);
     check('a lease naming the applied rev asks for nothing more', !stationCalls.some((c) => c.p === '/v1/church/settings'), JSON.stringify(stationCalls.map((c) => c.p)));
+  }
+
+  console.log('\nthe remembered leaders are a church setting (owner, 2026-10-12)');
+  {
+    const leadersFile = path.join(dataDir, 'leaders.json');
+    const local = () => JSON.parse(fs.readFileSync(leadersFile, 'utf8'));
+    const names = (list) => list.map((l) => `${l.firstName} ${l.lastName}`).sort().join();
+    const patLocal = local().find((l) => l.firstName === 'Pat');
+    // Another device added a leader; the Worker's copy of Pat is older than this laptop's.
+    w.rev++; w.doc = { ...w.doc, leaders: [{ firstName: 'Pat', lastName: 'Simpson', clubName: 'Sparks', lastPrintedAt: 1000, printCount: 1 }, { firstName: 'Lee', lastName: 'Ader', clubName: 'Cubbies', lastPrintedAt: Date.now() - 1000, printCount: 2 }] };
+    await sync.syncNow();
+    const after = local();
+    check('the Worker\'s list is applied over the local one, written through to leaders.json', names(after) === 'Lee Ader,Pat Simpson', JSON.stringify(after));
+    check('a leader both hold keeps the newer last print and the larger count', after.find((l) => l.firstName === 'Pat').lastPrintedAt === patLocal.lastPrintedAt && after.find((l) => l.firstName === 'Pat').printCount === 3);
+    const chips = await (await fetch(`${base}/leaders`)).json();
+    check('the chips (GET /leaders) show both', names(chips.leaders) === 'Lee Ader,Pat Simpson', JSON.stringify(chips));
+    check('config.json never holds the leaders', !('leaders' in disk()));
+
+    const edits = w.edits || 0;
+    const revBefore = w.rev;
+    const p1 = await post('/print-leader', { firstName: 'Max', lastName: 'Newman', clubName: 'Trek' });
+    await sleep(150);
+    check('a leader tag with a NEW name prints', p1.status === 200 && p1.body.success === true, JSON.stringify(p1.body));
+    check('...and adds them to the Worker\'s list through the edit route (baseRev), keeping the others', w.edits === edits + 1 && w.rev === revBefore + 1
+      && names(w.doc.leaders) === 'Lee Ader,Max Newman,Pat Simpson', JSON.stringify(w.doc.leaders));
+    check('...counted as applied (this computer already holds it): no second fetch needed', sync.appliedRev() === w.rev);
+    const p2 = await post('/print-leader', { firstName: 'Max', lastName: 'Newman', clubName: 'Trek', printerName: '' });
+    await sleep(150);
+    check('a name already remembered is not sent again', p2.status === 200 && w.edits === edits + 1);
+
+    // A race: someone else saved the doc a moment before this laptop's add.
+    w.rev++; w.doc = { ...w.doc, labelFooter: 'Changed elsewhere' };
+    await post('/print-leader', { firstName: 'Ana', lastName: 'Race', clubName: 'Sparks' });
+    await sleep(200);
+    check('a stale base is read again (the other change applied) and the add tried again: both land', names(w.doc.leaders) === 'Ana Race,Lee Ader,Max Newman,Pat Simpson'
+      && w.doc.labelFooter === 'Changed elsewhere' && disk().labelFooter === 'Changed elsewhere', JSON.stringify(w.doc));
+
+    // No internet: the tag prints, the name is kept here, and reaches the Worker later.
+    w.down = true;
+    const p3 = await post('/print-leader', { firstName: 'Ola', lastName: 'Offline', clubName: 'Sparks' });
+    await sleep(150);
+    check('offline: the leader tag prints and the name is remembered here', p3.body.success === true && names(local()).includes('Ola Offline'));
+    w.down = false;
+    w.rev++; w.doc = { ...w.doc, labelFooter: 'Back online' };
+    await sync.syncNow();
+    check('an apply that lands before the add keeps the pending name', names(local()).includes('Ola Offline'));
+    await sleep(200);
+    check('...and the add is tried again then, and lands', names(w.doc.leaders).includes('Ola Offline'), JSON.stringify(w.doc.leaders));
+
+    // A forget elsewhere is a forget here; a forget here is a forget there.
+    w.rev++; w.doc = { ...w.doc, leaders: w.doc.leaders.filter((l) => l.firstName !== 'Lee') };
+    await sync.syncNow();
+    check('a leader the Worker\'s list no longer holds is forgotten here', !names(local()).includes('Lee Ader'));
+    const f = await post('/leaders/forget', { key: 'ana race' });
+    await sleep(150);
+    check('the × here forgets them in the Worker\'s list too', f.body.removed === true && !names(w.doc.leaders).includes('Ana Race') && !names(local()).includes('Ana Race'), JSON.stringify(w.doc.leaders));
   }
 
   globalThis.fetch = realFetch;
