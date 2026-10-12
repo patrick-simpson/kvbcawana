@@ -281,6 +281,18 @@ function makeWorker() {
     check('and it clears when the doc is good again', disk().seasonTheme === 'fall' && !(await health()).warnings.some((x) => x.type === 'church-settings'));
   }
 
+  console.log('\nthe season reaches the tally when this station publishes it (SINGLE_PUBLISHER off)');
+  {
+    published.length = 0;
+    w.switches.SINGLE_PUBLISHER = 'off'; w.switchesRev = 2;
+    w.rev = 6; w.doc = { ...w.doc, seasonTheme: 'winter' };
+    await sync.syncNow();
+    await sleep(150);
+    check('a season change publishes a tally at once', published.includes('tally'), JSON.stringify(published));
+    w.switches.SINGLE_PUBLISHER = 'on'; w.switchesRev = 3;
+    await sync.syncNow();
+  }
+
   console.log('\noffline: the last applied values print');
   {
     w.down = true;

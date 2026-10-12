@@ -13,6 +13,7 @@ const $printing = lazy('./printing');
 const $tunes = lazy('./tunes');
 const $http = lazy('./http');
 const $relay = lazy('./relay');
+const $station = lazy('./station');
 const app = $http.app;
 
 // ── Selector self-test receiver ───────────────────────────────────────────────
@@ -149,11 +150,13 @@ app.post('/canary', async (req, res) => {
 // ── Church config (read-only) ─────────────────────────────────────────────────
 // The extension fetches this once at startup so club-night windows, the
 // check-in URL, and shares club ids live in one place instead of hardcodes.
-// While this computer is the Worker's print station (configureCloud, station.js) the
-// Worker does the Trek/Journey youth check-out (YM_CHECKOUT, lobby/worker/src/ymcheckout.js),
-// so the extension is told its own sweep is off; stopCloud() hands it back.
+// While this computer is the Worker's print station (configureCloud, station.js) and the
+// Worker's YM_CHECKOUT switch is on (or not yet known: the 9.2 behaviour), the Worker does the
+// Trek/Journey youth check-out (lobby/worker/src/ymcheckout.js), so the extension is told its
+// own sweep is off; stopCloud(), or the switch turned off at runtime, hands it back (the
+// extension reads this at its start-up: a TwoTimTwo tab reload picks the change up).
 app.get('/config/church', (req, res) => {
   const cfg = $config.churchConfig;
-  if (!$config.cloudStation) return res.json(cfg);
+  if (!$station.ymHandedOff()) return res.json(cfg);
   res.json({ ...cfg, ymCheckout: { ...(cfg.ymCheckout && typeof cfg.ymCheckout === 'object' ? cfg.ymCheckout : {}), enabled: false } });
 });

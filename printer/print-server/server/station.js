@@ -231,7 +231,7 @@ function churchSyncInstance() {
       const wasSilent = !prev || prev.SINGLE_PUBLISHER !== 'off';
       if ($config.cloudStation && wasSilent && next.SINGLE_PUBLISHER === 'off') {
         console.log('[station] The service no longer publishes the count: this computer publishes the tally and the pickup list again.');
-        $publishers.onTallyWindow(() => { $publishers.publishTally(); $publishers.publishStillHere(); })();
+        if ($publishers.inTallyWindow()) { $publishers.publishTally(); $publishers.publishStillHere(); }
       } else if ($config.cloudStation && !wasSilent && next.SINGLE_PUBLISHER !== 'off') {
         console.log('[station] The service publishes the count again: this computer stops publishing the tally and the pickup list.');
       }

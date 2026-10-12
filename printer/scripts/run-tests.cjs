@@ -72,6 +72,7 @@ const SUITES = [
   ['test-job-puller', 10],
   ['test-cloud-e2e', 10],
   ['test-station-greeting', 10],
+  ['test-church-sync', 5],
   ['test-barf', 10],
   ['test-listen', 22],
   ['test-print-async', 10],
