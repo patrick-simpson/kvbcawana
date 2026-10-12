@@ -55,9 +55,9 @@ export function statusSentence(status, keyed) {
     connected: keyed
       ? 'Connected — check-ins will appear instantly'
       : 'Connected — not logged in yet (Setup → Connect this screen)',
-    connecting: 'Connecting to Pusher…',
-    disconnected: 'Disconnected — check the network, then the App Key and Cluster under Setup → Advanced',
-    off: 'Not set up yet — add the Pusher App Key under Setup → Advanced',
+    connecting: 'Connecting…',
+    disconnected: 'Disconnected — check the network',
+    off: 'Not set up yet — sign in under Setup → Connect this screen',
   }[status] || status;
 }
 
@@ -184,7 +184,7 @@ export function StatusSection({
     connected: 'connected',
     connecting: 'connecting…',
     disconnected: 'disconnected',
-    off: 'not set up — no Pusher App Key',
+    off: 'not set up — not signed in',
   }[status] || status;
   const lastSeen = lastEventAt
     ? `${new Date(lastEventAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} (${Math.max(0, Math.round((openedAt - lastEventAt) / 60000))} min ago)`
@@ -987,7 +987,7 @@ export function SetupSection({
   shared, shareStatus, onShareNow,
 }) {
   // The by-hand fields fold away behind the login — unless they are the
-  // fix: no Pusher connection, or no secure crypto.
+  // fix: no connection, or no secure crypto.
   const [advancedOpen, setAdvancedOpen] = useState(() => status === 'off' || status === 'disconnected' || !secure);
   // Once the site names a sync service, the passphrase signs in through it;
   // until then the print server's display login, exactly as before.
@@ -1014,23 +1014,9 @@ export function SetupSection({
         >
           <summary>Advanced — paste keys by hand</summary>
           <span className="hint">
-            Only needed when this screen cannot log in — no Pusher App Key yet, no print server on this network,
+            Only needed when this screen cannot log in — no print server on this network,
             or a page not served over https. A logged-in screen fills the display key and publish token in by itself.
           </span>
-          <div className="field">
-            <label htmlFor="pkey">Pusher App Key</label>
-            <input id="pkey" type="text" value={form.pusherAppKey} onChange={set('pusherAppKey')} placeholder="abcdef1234567890" />
-            <span className="hint">
-              From your Pusher Channels app's <code>App Keys</code> page — the <code>key</code> value (public, safe to
-              ship). Must be the <strong>same app</strong> the label print server uses. A site built with the
-              repository variables (see the README) has this filled in already.
-            </span>
-          </div>
-          <div className="field">
-            <label htmlFor="pcluster">Pusher Cluster</label>
-            <input id="pcluster" type="text" value={form.pusherCluster} onChange={set('pusherCluster')} placeholder="us2" />
-            <span className="hint">From the same page (e.g. <code>us2</code>, <code>eu</code>, <code>ap1</code>) — must also match the print server.</span>
-          </div>
           <DisplayKeyField secure={secure} />
         </details>
       </PanelCard>

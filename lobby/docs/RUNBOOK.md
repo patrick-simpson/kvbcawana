@@ -45,20 +45,21 @@ worker keeps art, slides, and the schedule cached on the device.
 - **Background looks broken / weird slide junk** → Ctrl+Shift+X
   (panic mode). Kids still get their banners; sort the background out
   after club. Ctrl+Shift+X again to restore.
-- **"Signal: disconnected" in the corner** → the display lost Pusher.
+- **"Signal: disconnected" in the corner** → the display lost its live connection.
   It retries on its own (the sticker shows the retry countdown) and
   the page self-reloads after a long outage. Meanwhile check-ins are
   NOT lost: on reconnect, the print server's recap replays anyone
   missed in the last ~20 minutes with quiet banners.
-- **"Signal: not set up"** → no Pusher key on this device. Settings →
-  Connection → paste the App Key + Cluster (from the same Pusher app
-  the print server uses).
+- **"Signal: not set up"** → this device is not signed in. Settings →
+  Setup → Sign in with the church passphrase (the same word signs in
+  every screen).
 - **"⚠ N" printer-problem count on the Signal sticker** → labels are
   failing at the door. That's a print-server issue — check its
   dashboard; the display is just the messenger.
-- **Names not appearing but the Pusher Debug Console shows events** →
-  channel/event mismatch (`awana-channel` / `checkin`), or the wrong
-  Pusher app's key on one side.
+- **Names not appearing but the screen says "connected"** → the display
+  key: Settings → Status says whether names can be opened. Sign in
+  again to pick up the current key, and check the print server is
+  running and relaying.
 - **Frozen / black / anything else inexplicable** → reload the page
   (F5). Tonight's tally and seen-events survive a reload; the recap
   buffer refills anyone missed. Still wrong → reboot the stick.
@@ -85,7 +86,7 @@ worker keeps art, slides, and the schedule cached on the device.
    clock / enable network time; nothing else will look right until
    you do.
 2. Hover the **top-right corner** for the hidden operator menu
-   (QuickNav): jump to any window, set the Pusher key, toggle
+   (QuickNav): jump to any window, sign in with the church passphrase, toggle
    Low-power mode (weak hardware) or countdown sounds (off by
    default). Birthdays sync themselves from the print server's
    broadcast once the key is set — there is nothing to upload.
@@ -170,8 +171,8 @@ Facts worth knowing:
 
 Settings on a device live in that device's browser. To clone a lobby
 display: Settings → **Export**, then **Import** on the new machine.
-For the projector page: enter the Pusher key via QuickNav (a corner
-note appears on fresh devices until it is set); birthdays and live
+For the projector page: sign in via QuickNav (a corner
+note appears on fresh devices until it is done); birthdays and live
 counts then sync themselves from the print server's broadcasts.
 
 ## Deploy facts worth knowing
@@ -191,5 +192,5 @@ The screens show **first names only** — ever. Every event from the
 check-in system is stripped to an allowlist before anything renders
 (see `CONTRACT.md`). If you ever see more than a first name and club on
 screen, treat it as an incident: panic mode (Ctrl+Shift+X does not
-affect banners — instead pull the Pusher key in Settings to stop the
-feed), then report it.
+affect banners — instead sign this screen out in Settings → Setup to
+stop the feed), then report it.

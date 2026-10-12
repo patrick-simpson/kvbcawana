@@ -10,18 +10,8 @@ import { EMBED_FULLSCREEN_MESSAGE } from './lib/constants.js';
 // request is handed up to the parent page instead. A whole-App test because
 // the behaviour lives in the stage's own onDoubleClick handler.
 
-let bound = {};
-vi.mock('pusher-js', () => ({
-  default: class FakePusher {
-    constructor() {
-      this.connection = { state: 'connected', bind: () => {}, unbind: () => {} };
-    }
-    subscribe() { return { bind: (evt, fn) => { bound[evt] = fn; }, unbind_all: () => {} }; }
-    unsubscribe() {}
-    disconnect() {}
-    connect() {}
-  },
-}));
+import { fakeLive } from './lib/__fixtures__/fakeLive.js';
+const live = fakeLive();
 
 const App = (await import('./App.jsx')).default;
 const cfg = await import('./hooks/useConfig.js');
@@ -35,12 +25,11 @@ async function mount() {
 let requestFullscreen;
 
 beforeEach(() => {
-  bound = {};
+  live.reset();
   localStorage.clear();
+  live.signIn();
   sessionStorage.clear();
   localStorage.setItem('awanaConfig.v1', JSON.stringify({
-    pusherAppKey: 'k',
-    pusherCluster: 'us2',
     confettiLevel: 'off',
     firstArrivalMoment: false,
   }));

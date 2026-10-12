@@ -1,5 +1,4 @@
 import { expect, test } from '@playwright/test';
-import { fakePusher } from './fakePusher.js';
 
 // The lobby's first-run card against the things that come and go over it.
 //
@@ -7,7 +6,8 @@ import { fakePusher } from './fakePusher.js';
 // not keyed yet always wants it, so it has to give way, and give way in step
 // with what the ROOM sees, not with the flags that lead it:
 //
-//  - A name. `currentEvent` goes null the moment a run's hold ends, but the run
+//  - A name (now pinned by src/App.director.test.jsx alone, see "Names" below).
+//    `currentEvent` goes null the moment a run's hold ends, but the run
 //    is still leaving for ~700 ms and the next may be a second away; judged by
 //    it alone the white card came back over "WELCOME NOAH" and the club's mark
 //    as they left, and popped in and out between children a few seconds apart.
@@ -57,64 +57,12 @@ const QUIET_MS = 5000; // SETUP_CARD_QUIET_MS
 
 /* ── Names ───────────────────────────────────────────────────────────── */
 
-for (const query of ['', '?lowPower=1']) {
-  test(`the card never stands over a name or its exit, nor pops in between two names a few seconds apart ${query || '(with motion)'}`, async ({ page }) => {
-    test.setTimeout(75_000);
-    const send = await fakePusher(page);
-    await page.addInitScript(record);
-    await page.addInitScript((config) => {
-      localStorage.setItem('awanaConfig.v1', JSON.stringify(config));
-    }, {
-      pusherAppKey: 'e2e-key',
-      pusherCluster: 'us2',
-      backgroundSource: 'manual',
-      calendarEnabled: false,
-      seasonPromos: false,
-      manualSlides: [{ id: 's_names', eyebrow: 'Tonight', text: 'HELLO FRIENDS', theme: 'sky', durationSec: 0 }],
-      showClock: false,
-      particleEffect: 'off',
-      confettiLevel: 'off',
-      firstArrivalMoment: false,
-      standardDisplayMs: 2000,
-    });
-    await page.goto(`/index.html${query}`);
-    await expect(page.locator('.setup-card')).toBeVisible();
-    await page.evaluate(() => document.fonts.ready);
-
-    const child = (name, n) => ({ id: `${name}-${n}`, firstName: name, club: 'tnt', at: new Date().toISOString(), isBirthday: false, isFirstTimer: false });
-    await send('checkin', child('Ava', 1));
-    await expect(page.locator('.checkin')).toBeVisible();
-    await expect(page.locator('.setup-card')).toHaveCount(0);
-    // Ava's 2 s, her exit and the gap: the stage is empty and the room is quiet.
-    await expect(page.locator('.checkin')).toHaveCount(0, { timeout: 8000 });
-    // A second and a half later, well inside the quiet beat, the next child comes.
-    await page.waitForTimeout(1500);
-    await expect(page.locator('.setup-card')).toHaveCount(0);
-    await send('checkin', child('Liam', 2));
-    await expect(page.locator('.checkin')).toBeVisible();
-    await expect(page.locator('.checkin')).toHaveCount(0, { timeout: 8000 });
-    // And then the room is quiet for good: the card is back, but not at once.
-    await expect(page.locator('.setup-card')).toBeVisible({ timeout: QUIET_MS + 4000 });
-
-    const f = await frames(page);
-    const t = (pred) => f.find(pred)?.t;
-    const firstMoment = t((x) => x.moment);
-    const lastMomentEnd = f.filter((x, i) => !x.moment && f[i - 1]?.moment).at(-1)?.t;
-    expect(firstMoment).toBeDefined();
-    expect(lastMomentEnd).toBeGreaterThan(firstMoment);
-
-    // Not one frame with the card and a name together...
-    expect(f.filter((x) => x.card && x.moment)).toEqual([]);
-    // ...and not one with the card up anywhere from Ava's first frame to Liam's last.
-    const cardBetween = f.filter((x) => x.card && x.t > firstMoment && x.t < lastMomentEnd);
-    expect(cardBetween).toEqual([]);
-    // It waits a quiet beat after the last name has gone, then returns.
-    const back = t((x) => x.card && x.t >= lastMomentEnd);
-    expect(back).toBeDefined();
-    expect(back - lastMomentEnd).toBeGreaterThanOrEqual(QUIET_MS - 300);
-    expect(back - lastMomentEnd).toBeLessThan(QUIET_MS + 3000);
-  });
-}
+// There is no browser case for a name over the card any more: the card is for a
+// screen that has not signed in, and only a signed-in screen hears the live
+// channel that delivers names (Pusher, which let an unkeyed screen listen, is
+// retired). The rule itself (a name, its exit and a quiet beat after it hold the
+// card down) is still in the code and still pinned, against a connected screen
+// whose login reads "logged out", by src/App.director.test.jsx.
 
 /* ── A held slide ────────────────────────────────────────────────────── */
 
@@ -138,12 +86,11 @@ for (const [label, query, cpu] of CASES) {
       const cdp = await page.context().newCDPSession(page);
       await cdp.send('Emulation.setCPUThrottlingRate', { rate: cpu });
     }
-    await page.route(/open-meteo|pusher|twotimtwo|sockjs/, (route) => route.abort());
+    await page.route(/open-meteo|twotimtwo|sockjs/, (route) => route.abort());
     await page.addInitScript(record);
     await page.addInitScript((config) => {
       localStorage.setItem('awanaConfig.v1', JSON.stringify(config));
     }, {
-      pusherAppKey: '',
       backgroundSource: 'manual',
       calendarEnabled: false,
       seasonPromos: false,

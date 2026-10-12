@@ -11,7 +11,7 @@ const CHECK_MS = 60 * 1000;
  * `watchdogReloadMin` minutes (0 disables), reload the page once —
  * capped at WATCHDOG_MAX_RELOADS_PER_HOUR per hour via a sessionStorage
  * ledger so a genuinely dead network can't put the screen in a reload
- * loop. A display with no Pusher key configured (status 'off') is never
+ * loop. A display not signed in to the live channel (status 'off') is never
  * reloaded: nothing to heal.
  *
  * "Not connected" is anything but 'connected': both transports pass

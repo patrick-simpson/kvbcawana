@@ -153,7 +153,7 @@ export default function App() {
   const { config: effectiveConfig, storedConfig, overrides, shared, updateConfig, replaceConfig, resetConfig } = useConfig();
 
   // Layering — baked defaults < ?config= remote < this device's overrides <
-  // ?key=/?cluster=/?lowPower=1 URL flags — lives in useConfig.js so EVERY
+  // ?lowPower=1 URL flag — lives in useConfig.js so EVERY
   // consumer (the socket included) sees the same effective config. Only the
   // panic mask is applied here, last, because the stage is the only thing that
   // renders it: Settings edits `storedConfig`, and the socket reads the
@@ -533,7 +533,7 @@ export default function App() {
     if (meta?.countsTowardTally !== false && !payload.oneOff) bump(payload.at);
     // `count` and the config flag are read above, so they belong in the deps.
     // Re-identifying this handler is free: useSocket keeps handlers in a ref
-    // it re-points every render, so the Pusher subscription never churns.
+    // it re-points every render, so the live socket never churns.
   }, [enqueue, bump, hasSeen, markSeen, enqueueCelebration, count, config.firstArrivalMoment]);
 
   // Recap replay: after a reconnect, celebrate the kids this display
@@ -632,7 +632,7 @@ export default function App() {
   // next one is a baseline, never a room full of "has checked out".
   useEffect(() => { leaveBaselineRef.current = null; }, [status]);
   // The sync service's state (shared settings, the published deck) enters
-  // through the same sanitizing dispatch path as a Pusher frame.
+  // through the same sanitizing dispatch path as a live frame.
   const syncStore = useMemo(() => ({ config: effectiveConfig, overrides, updateConfig }), [effectiveConfig, overrides, updateConfig]);
   useSyncDriver({ handlers: liveHandlers, dispatch: dispatchEvent, store: syncStore });
 
@@ -1540,7 +1540,7 @@ export default function App() {
                 <span className="dot" />
                 <span className="status-word">
                   {status === 'off' ? 'not set up' : status}
-                  {/* While the pipe is down, show what pusher-js is doing
+                  {/* While the pipe is down, show what the socket is doing
                       about it — "disconnected" alone reads as dead-forever. */}
                   {status !== 'connected' && retry
                     ? ` · retry ${retry.attempts}${retry.delaySec ? ` in ~${retry.delaySec}s` : '…'}`

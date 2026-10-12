@@ -1,4 +1,5 @@
 import { expect } from '@playwright/test';
+import { liveChannel } from './liveChannel.js';
 
 // The stand-in Journey host for the embedded e2e specs (embedded.spec.js,
 // embedded.events.spec.js): a page that shows the signage full-screen in an
@@ -35,8 +36,9 @@ export const hostPage = (src) => `<!doctype html><html><head><meta charset="utf-
 <button class="host host--toggle" aria-label="Switch display"></button><button class="host host--gear" aria-label="Video settings"></button></body></html>`;
 
 /** Boot the signage inside the stand-in host (the first-run card dismissed unless `setupCard`). Returns the signage's frame. */
-export async function embed(page, { config = {}, weather = null, tally = 0, query = '?lowPower=1', setupCard = false } = {}) {
-  await page.route(/pusher|twotimtwo|sockjs/, (route) => route.abort());
+export async function embed(page, { config = {}, weather = null, tally = 0, query = '?lowPower=1', setupCard = false, signedIn = true } = {}) {
+  if (signedIn) await liveChannel(page);
+  await page.route(/twotimtwo|sockjs/, (route) => route.abort());
   await page.route(/open-meteo/, (route) => (weather == null ? route.abort() : route.fulfill({
     body: JSON.stringify({ current: { temperature_2m: 56, apparent_temperature: 54, weather_code: weather, is_day: 1 } }),
     contentType: 'application/json',
@@ -52,7 +54,7 @@ export async function embed(page, { config = {}, weather = null, tally = 0, quer
     const d = new Date();
     const pad = (n) => String(n).padStart(2, '0');
     if (count) localStorage.setItem('awanaTally.v1', JSON.stringify({ date: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`, count }));
-  }, { cfg: { pusherAppKey: 'e2e-key', pusherCluster: 'us2', ...config }, count: tally, card: setupCard });
+  }, { cfg: { ...config }, count: tally, card: setupCard });
   await page.goto('/journey-host.html');
   const frame = await (await page.waitForSelector('iframe')).contentFrame();
   await expect(frame.locator('.stage')).toBeVisible();

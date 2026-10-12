@@ -1,24 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { renderHook, waitFor, act, cleanup } from '@testing-library/react';
 
-// The sync Worker's live channel as useSocket's transport (the one-site move,
-// step 3). Signed in, a screen listens there INSTEAD of Pusher, and every
-// frame goes through the same per-event handler: decryption in front of
-// dispatchEvent, the anti-downgrade refusal, the allowlist sanitizers.
-
-let pushers = 0;
-vi.mock('pusher-js', () => ({
-  default: class FakePusher {
-    constructor() {
-      pushers += 1;
-      this.connection = { state: 'connected', bind: () => {}, unbind: () => {} };
-    }
-    subscribe() { return { bind: () => {}, unbind_all: () => {} }; }
-    unsubscribe() {}
-    disconnect() {}
-    connect() {}
-  },
-}));
+// The sync Worker's live channel, useSocket's only transport (Pusher is retired).
+// Signed in, a screen listens there, and every frame goes through the same
+// per-event handler: decryption in front of dispatchEvent, the anti-downgrade
+// refusal, the allowlist sanitizers. Not signed in, it listens to nothing.
 
 /** @type {FakeSocket[]} */
 let sockets = [];
@@ -48,13 +34,11 @@ const KEY = 'AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA=';
 const realFetch = globalThis.fetch;
 
 function signedIn() {
-  localStorage.setItem('awanaConfig.v1', JSON.stringify({ pusherAppKey: 'testkey', pusherCluster: 'us2' }));
   saveSyncSession(SESSION);
   sync._resetSyncForTest();
 }
 
 beforeEach(() => {
-  pushers = 0;
   sockets = [];
   localStorage.clear();
   cfg._resetForTest();
@@ -72,8 +56,8 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe('the live channel replaces Pusher once a screen is signed in', () => {
-  it('opens one socket to the service with the session, and no Pusher', async () => {
+describe('the live channel is the only transport', () => {
+  it('opens one socket to the service with the session once a screen is signed in', async () => {
     signedIn();
     const { result } = renderHook(() => useSocket({}));
     await waitFor(() => expect(sockets).toHaveLength(1));
@@ -82,16 +66,22 @@ describe('the live channel replaces Pusher once a screen is signed in', () => {
     act(() => sockets[0].openNow());
     expect(result.current.status).toBe('connected');
     expect(result.current.transport).toBe('live');
-    expect(pushers).toBe(0);
   });
 
-  it('a screen that is not signed in keeps Pusher', async () => {
+  it('a screen that is not signed in listens to nothing, even with the old Pusher settings and flags', async () => {
     localStorage.setItem('awanaConfig.v1', JSON.stringify({ pusherAppKey: 'testkey', pusherCluster: 'us2' }));
+    window.history.replaceState({}, '', '/?key=abc&cluster=eu');
+    cfg._resetForTest();
     sync._resetSyncForTest();
-    const { result } = renderHook(() => useSocket({}));
-    await waitFor(() => expect(pushers).toBe(1));
-    expect(sockets).toHaveLength(0);
-    expect(result.current.transport).toBe('pusher');
+    try {
+      const { result } = renderHook(() => useSocket({}));
+      await new Promise((r) => setTimeout(r, 20));
+      expect(sockets).toHaveLength(0);
+      expect(result.current.status).toBe('off');
+      expect(result.current.transport).toBe('off');
+    } finally {
+      window.history.replaceState({}, '', '/');
+    }
   });
 
   it('frames reach the same sanitized handlers, sealed ones opened first', async () => {

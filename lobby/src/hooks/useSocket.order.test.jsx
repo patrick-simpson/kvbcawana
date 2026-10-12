@@ -6,7 +6,7 @@ import { renderHook, waitFor, act, cleanup } from '@testing-library/react';
 //
 // Why this exists as a separate, deliberately artificial test: sealing made the
 // name events async. `crypto.subtle.decrypt` returns a promise inside what
-// pusher-js calls as a SYNCHRONOUS handler, so ten children arriving in a burst
+// the socket calls as a SYNCHRONOUS handler, so ten children arriving in a burst
 // become ten in-flight decrypts. If they are dispatched as they resolve rather
 // than in arrival order, the lobby wall greets the wrong child first — a bug
 // nobody would reproduce at a desk and everybody would notice at 6:05pm.
@@ -21,19 +21,9 @@ import { renderHook, waitFor, act, cleanup } from '@testing-library/react';
 let latency = {};
 /** Names whose decrypt should THROW rather than resolve. */
 let throwFor = new Set();
-let bound = {};
-
-vi.mock('pusher-js', () => ({
-  default: class FakePusher {
-    constructor() {
-      this.connection = { state: 'connected', bind: () => {}, unbind: () => {} };
-    }
-    subscribe() { return { bind: (evt, fn) => { bound[evt] = fn; }, unbind_all: () => {} }; }
-    unsubscribe() {}
-    disconnect() {}
-    connect() {}
-  },
-}));
+import { fakeLive } from '../lib/__fixtures__/fakeLive.js';
+const live = fakeLive();
+const bound = live.bound;
 
 vi.mock('../lib/envelope.js', async (importOriginal) => {
   const actual = await importOriginal();
@@ -57,10 +47,11 @@ const cfg = await import('./useConfig.js');
 const { saveDisplayKey } = await import('../lib/displayKey.js');
 
 beforeEach(() => {
-  bound = {};
+  live.reset();
   latency = {};
   throwFor = new Set();
   localStorage.clear();
+  live.signIn();
   cfg._resetForTest(); // one config store per page — start each case clean
   vi.spyOn(console, 'warn').mockImplementation(() => {});
   vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -70,9 +61,6 @@ afterEach(() => { cleanup(); /* no global RTL cleanup in this repo — hooks sha
 describe('arrival order survives out-of-order decrypts', () => {
   it('greets children in the order they arrived, not the order they decrypted', async () => {
     saveDisplayKey('AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA=');
-    localStorage.setItem('awanaConfig.v1', JSON.stringify({
-      pusherAppKey: 'k', pusherCluster: 'us2',
-    }));
     const seen = [];
     const { result } = renderHook(() => useSocket({ onCheckin: (c) => seen.push(c.firstName) }));
     await waitFor(() => expect(bound.checkin).toBeTypeOf('function'));
@@ -94,9 +82,6 @@ describe('arrival order survives out-of-order decrypts', () => {
 
   it('a failed decrypt does not stall every later frame of that event', async () => {
     saveDisplayKey('AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA=');
-    localStorage.setItem('awanaConfig.v1', JSON.stringify({
-      pusherAppKey: 'k', pusherCluster: 'us2',
-    }));
     const seen = [];
     const { result } = renderHook(() => useSocket({ onCheckin: (c) => seen.push(c.firstName) }));
     await waitFor(() => expect(bound.checkin).toBeTypeOf('function'));

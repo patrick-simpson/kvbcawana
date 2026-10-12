@@ -77,12 +77,12 @@ export default function SetupCard({ card, onOpenSettings }) {
       </div>
       <ol>
         <li className={connected ? 'done' : ''}>
-          Connect to Pusher — Settings → Setup → <strong>Advanced</strong>: paste the App Key and Cluster
-          from the print-server dashboard (Settings → Pusher Integration).
+          Sign in with the church&rsquo;s passphrase — Settings → Setup → <strong>Sign in</strong>.
+          That connects this screen to the live channel.
         </li>
         <li className={keyed ? 'done' : ''}>
-          Log in with the church&rsquo;s display passphrase — Settings → Setup → <strong>Display login</strong>.
-          The passphrase is on the print-server dashboard (Settings → Display login).
+          Names need the display key. Signing in fills it in; to paste one by hand, use{' '}
+          Settings → Setup → <strong>Advanced</strong>.
         </li>
       </ol>
       <div className="actions">

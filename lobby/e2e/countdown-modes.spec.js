@@ -69,18 +69,18 @@ test('quick-nav hover affordance exists', async ({ page }) => {
 });
 
 // Display Settings on the projector page: the passphrase box is typeable
-// before any frame arrives, and — with no live-data key yet — the Advanced
+// before any frame arrives, and — while not connected — the Advanced
 // fold is open and carries a display-key row, so the projector can be keyed
 // by hand without a second copy of the key slot.
 test('display settings: passphrase typeable, advanced fold holds the display key', async ({ page }) => {
-  await page.route(/open-meteo|pusher|twotimtwo/, (route) => route.abort());
-  // A deployed build may carry a baked Pusher key; this test wants a screen with none.
-  await page.addInitScript(() => localStorage.setItem('awanaConfig.v1', JSON.stringify({ pusherAppKey: '' })));
+  await page.route(/open-meteo|twotimtwo/, (route) => route.abort());
+  // A screen with no saved overrides.
+  await page.addInitScript(() => localStorage.setItem('awanaConfig.v1', JSON.stringify({})));
   await page.goto('/countdown.html?now=2026-09-15T18:30:00');
   await page.locator('body').hover({ position: { x: 1900, y: 20 } });
   await page.getByRole('button', { name: /Display Settings/ }).click();
   await expect(page.getByLabel('Display passphrase')).toBeEnabled();
-  await expect(page.getByText(/add the live data key under Advanced first/i)).toBeVisible();
+  await expect(page.getByText(/Not connected — sign in with the passphrase/i)).toBeVisible();
   await expect(page.getByPlaceholder('paste the 44-character key')).toBeVisible();
 });
 
@@ -102,7 +102,7 @@ test('the Upcoming Awana Nights slide keeps every night it shows inside the wall
     'Awana meeting',
     'Awana meeting',
   ];
-  await page.route(/open-meteo|pusher|twotimtwo/, (route) => route.abort());
+  await page.route(/open-meteo|twotimtwo/, (route) => route.abort());
   await page.route('**/calendar-feed.json', (route) => route.fulfill({
     contentType: 'application/json',
     body: JSON.stringify({

@@ -9,22 +9,21 @@ and every repo's contract tests in the same change.
 
 ## Transport
 
-- **Pusher Channels**, channel **`awana-channel`**.
-- Only the print server holds the publish secret; this display subscribes
-  with the public key (`pusherAppKey` + `pusherCluster` in settings).
+- The sync service's **live channel** (`/api/v1/live` on the Worker in
+  `worker/`): one WebSocket per signed-in screen, every frame `{e, d}` with the
+  event name and payload below. A screen signs in with the church passphrase.
+  Until 2026-10-11 the same events also rode Pusher Channels (channel
+  `awana-channel`); that transport is retired and the client is gone, so an old
+  `pusherAppKey` / `pusherCluster` setting is simply dropped.
 - Consumer code: `src/hooks/useSocket.js`, which binds every event through
   its own strict allowlist sanitizer in `src/lib/eventSanitizers.js`.
-- A second channel, **`cache-awana-channel-provision`** (a Pusher cache
-  channel), carries one `provision` frame: the display key and slide-publish
-  token sealed under a passphrase-derived key — plus an optional, NON-secret
-  `configUrl`, the fleet-config address a screen already accepts as
-  `?config=` — for the display login. It is
-  **transport/provisioning, not a display event** — never sanitized, never
-  dispatched, never rendered, opened only by `src/lib/displayLogin.js`, which
-  writes solely into the display-key, publish-token and fleet-config-URL
-  storage slots (never into the settings object). Shape and KDF are pinned by
-  the `provision` section of `envelope-vectors.json`; the authoritative
-  description is the printer repo's CONTRACT.md.
+- The legacy **`provision`** frame (the display key and slide-publish token
+  sealed under a passphrase-derived key, once published on the Pusher cache
+  channel `cache-awana-channel-provision`) no longer reaches a screen: a screen
+  now signs in through the sync service, which hands it the display key.
+  `src/lib/displayLogin.js` still knows how to open such a frame, and the
+  `provision` section of `envelope-vectors.json` still pins its shape and KDF
+  (the authoritative description is the printer repo's CONTRACT.md).
 
 ## Privacy invariant — do not relax
 
@@ -52,7 +51,7 @@ survive intact, dirty-PII vectors are scrubbed, garbage is rejected).
 - One `checkin` per successful new label print. The printer suppresses
   duplicates (25-second window); reprints and canary test prints do not
   broadcast.
-- Pusher does not replay missed events by itself — `recap` (published
+- The live channel does not replay missed events by itself — `recap` (published
   every ~2 min during club hours) is the replay mechanism, deduped on
   `id` against the sessionStorage seen-ledger (`useSeenEvents`).
 - New fields must stay optional for consumers for at least one release

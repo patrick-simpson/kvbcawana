@@ -6,8 +6,7 @@ import { act, cleanup, fireEvent, render, screen, within } from '@testing-librar
 // one dismissal shared by the note on the wall and its copy in the menu.
 // (SetupChecklist.test.jsx is the PC's note, and stays as it was.)
 
-const state = vi.hoisted(() => ({ pusherAppKey: '', loginStatus: 'logged-out' }));
-vi.mock('../../hooks/useConfig.js', () => ({ useConfig: () => ({ config: { pusherAppKey: state.pusherAppKey } }) }));
+const state = vi.hoisted(() => ({ loginStatus: 'logged-out' }));
 vi.mock('../../hooks/useDisplayLogin.js', () => ({ useDisplayLogin: () => ({ loginStatus: state.loginStatus }) }));
 vi.mock('../lib/flags.js', () => ({ FLAGS: { vr: false } }));
 
@@ -15,7 +14,7 @@ const { SetupChecklist } = await import('./SetupChecklist.jsx');
 
 beforeEach(() => {
   localStorage.clear();
-  Object.assign(state, { pusherAppKey: '', loginStatus: 'logged-out' });
+  Object.assign(state, { loginStatus: 'logged-out' });
 });
 afterEach(cleanup);
 
@@ -25,8 +24,8 @@ describe('the setup note on touch', () => {
     const { container } = render(<SetupChecklist touch onSetUp={onSetUp} />);
     const note = screen.getByRole('region', { name: 'Display setup' });
     expect(note.hasAttribute('data-setup-checklist')).toBe(true);
-    expect(note.textContent).toMatch(/two quick setup steps/);
-    expect(note.textContent).toMatch(/Live data key/);
+    expect(note.textContent).toMatch(/one quick setup step/i);
+    expect(note.textContent).toMatch(/Log in with the display passphrase/);
     expect(container.textContent).not.toMatch(/[Hh]over/);
     fireEvent.click(within(note).getByRole('button', { name: 'Set up' }));
     expect(onSetUp).toHaveBeenCalledTimes(1);
@@ -57,8 +56,7 @@ describe('the setup note on touch', () => {
     expect(screen.queryByRole('region', { name: 'Display setup' })).toBeNull();
   });
 
-  it('is gone once the screen is keyed and logged in', () => {
-    state.pusherAppKey = 'k';
+  it('is gone once the screen is logged in', () => {
     state.loginStatus = 'logged-in';
     expect(render(<SetupChecklist touch onSetUp={() => {}} />).container.innerHTML).toBe('');
   });

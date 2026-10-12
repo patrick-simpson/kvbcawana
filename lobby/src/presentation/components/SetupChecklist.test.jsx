@@ -3,8 +3,7 @@ import { resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 
-const state = vi.hoisted(() => ({ pusherAppKey: '', loginStatus: 'logged-out', vr: false }));
-vi.mock('../../hooks/useConfig.js', () => ({ useConfig: () => ({ config: { pusherAppKey: state.pusherAppKey } }) }));
+const state = vi.hoisted(() => ({ loginStatus: 'logged-out', vr: false }));
 vi.mock('../../hooks/useDisplayLogin.js', () => ({ useDisplayLogin: () => ({ loginStatus: state.loginStatus }) }));
 vi.mock('../lib/flags.js', () => ({ FLAGS: { get vr() { return state.vr; } } }));
 
@@ -15,40 +14,24 @@ const css = readFileSync(resolve(__dirname, '../index.css'), 'utf8');
 
 beforeEach(() => {
   localStorage.clear();
-  Object.assign(state, { pusherAppKey: '', loginStatus: 'logged-out', vr: false });
+  Object.assign(state, { loginStatus: 'logged-out', vr: false });
 });
 afterEach(cleanup);
 
 describe('the projector\'s first-run setup note', () => {
-  it('names two steps on a screen with neither the key nor the login', () => {
+  it('names the one step on a screen that is not logged in', () => {
     render(<SetupChecklist />);
-    expect(screen.getByText(/two quick setup steps/)).toBeTruthy();
-    expect(screen.getByText(/Live data key/)).toBeTruthy();
-    expect(screen.getByText(/Log in with the display passphrase/)).toBeTruthy();
+    expect(screen.getByText(/one quick setup step/i)).toBeTruthy();
+    expect(screen.queryByText(/Live data key/)).toBeNull();
+    expect(screen.getByText(/Log in with the display passphrase/).textContent.startsWith('⬜')).toBe(true);
     expect(screen.getByRole('region', { name: 'Display setup' }).textContent).toMatch(/Display Settings/);
     expect(screen.getByRole('region', { name: 'Display setup' }).textContent).toMatch(/Settings → Display login/);
   });
 
-  it('drops the key step once the build carries one, and ticks the login when it is done', () => {
-    state.pusherAppKey = 'k';
-    const { rerender } = render(<SetupChecklist />);
-    expect(screen.getByText(/one quick setup step/)).toBeTruthy();
-    expect(screen.queryByText(/Live data key/)).toBeNull();
-    expect(screen.getByText(/Log in with the display passphrase/).textContent.startsWith('⬜')).toBe(true);
-    // Logged in but with no key yet: the login is ticked, the key still asked for.
-    state.pusherAppKey = '';
-    state.loginStatus = 'logged-in';
-    rerender(<SetupChecklist />);
-    expect(screen.getByText(/Log in with the display passphrase/).textContent.startsWith('✅')).toBe(true);
-    expect(screen.getByText(/Live data key/)).toBeTruthy();
-  });
-
-  it('is gone once the screen is keyed and logged in, and never shows in screenshot mode', () => {
-    state.pusherAppKey = 'k';
+  it('is gone once the screen is logged in, and never shows in screenshot mode', () => {
     state.loginStatus = 'logged-in';
     expect(render(<SetupChecklist />).container.innerHTML).toBe('');
     cleanup();
-    state.pusherAppKey = '';
     state.loginStatus = 'logged-out';
     state.vr = true;
     expect(render(<SetupChecklist />).container.innerHTML).toBe('');

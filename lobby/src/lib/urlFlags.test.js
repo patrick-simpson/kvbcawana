@@ -4,7 +4,7 @@ import { parseUrlFlags } from './urlFlags.js';
 describe('parseUrlFlags', () => {
   it('defaults to normal signage mode', () => {
     expect(parseUrlFlags('')).toEqual({
-      overlay: false, chroma: null, pusherAppKey: null, pusherCluster: null, configUrl: null, lowPower: false,
+      overlay: false, chroma: null, configUrl: null, lowPower: false,
     });
     expect(parseUrlFlags('?foo=bar').overlay).toBe(false);
   });
@@ -29,10 +29,9 @@ describe('parseUrlFlags', () => {
     expect(parseUrlFlags('?chroma=green').overlay).toBe(false);
   });
 
-  it('reads Pusher key and cluster overrides', () => {
+  it('ignores the retired Pusher ?key= and ?cluster= of an old OBS / ProPresenter link', () => {
     const flags = parseUrlFlags('?overlay=1&key=abc123&cluster=eu');
-    expect(flags.pusherAppKey).toBe('abc123');
-    expect(flags.pusherCluster).toBe('eu');
+    expect(flags).toEqual({ overlay: true, chroma: null, configUrl: null, lowPower: false });
   });
 
   it('enables low-power mode via ?lowPower=1/true/yes, off by default', () => {

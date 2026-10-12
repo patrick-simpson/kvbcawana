@@ -11,18 +11,18 @@ import { NOTICE_MAX_AGE_MS } from './lib/constants.js';
 // clock. Events go in through the real
 // socket seam (sanitizers and all), as in App.tally.test.jsx.
 
-let bound = {};
-vi.mock('pusher-js', () => ({
-  default: class FakePusher {
-    constructor() {
-      this.connection = { state: 'connected', bind: () => {}, unbind: () => {} };
-    }
-    subscribe() { return { bind: (evt, fn) => { bound[evt] = fn; }, unbind_all: () => {} }; }
-    unsubscribe() {}
-    disconnect() {}
-    connect() {}
-  },
-}));
+import { fakeLive } from './lib/__fixtures__/fakeLive.js';
+
+// Signing in is what connects a screen AND what keys it, so a screen that is
+// connected but not logged in no longer happens on its own. These tests are
+// about the first-run card on a connected screen that is still unkeyed (what
+// every one of them was written against), so the login reads "logged out".
+vi.mock('./hooks/useDisplayLogin.js', async (importOriginal) => {
+  const actual = await importOriginal();
+  return { ...actual, useDisplayLogin: () => ({ ...actual.useDisplayLogin(), loginStatus: 'logged-out' }) };
+});
+const live = fakeLive();
+const bound = live.bound;
 
 const App = (await import('./App.jsx')).default;
 const cfg = await import('./hooks/useConfig.js');
@@ -35,8 +35,6 @@ function clockAt(h, m, extra = []) {
 
 function setup(config = {}) {
   localStorage.setItem('awanaConfig.v1', JSON.stringify({
-    pusherAppKey: 'k',
-    pusherCluster: 'us2',
     confettiLevel: 'off',
     firstArrivalMoment: false,
     sharedScheduleUrl: '',
@@ -63,8 +61,9 @@ const has = (c, cls) => stage(c).classList.contains(cls);
 const kids = (n) => Array.from({ length: n }, (_, i) => ({ firstName: `Kid${i}`, club: ['Sparks', 'T&T', 'Cubbies'][i % 3] }));
 
 beforeEach(() => {
-  bound = {};
+  live.reset();
   localStorage.clear();
+  live.signIn();
   sessionStorage.clear();
   vi.stubGlobal('fetch', vi.fn(() => Promise.reject(new Error('offline'))));
   vi.spyOn(console, 'warn').mockImplementation(() => {});
@@ -98,7 +97,9 @@ describe('the room rules, wired up', () => {
     expect(pickup.container.querySelector('.manual-slideshow .manual-slide-copy')).not.toBeNull();
     cleanup();
 
-    bound = {};
+    live.reset();
+
+    live.signIn();
     clockAt(18, 0);
     setup();
     const early = await mount();
@@ -183,7 +184,9 @@ describe('the room rules, wired up', () => {
     cleanup();
     vi.useRealTimers();
 
-    bound = {};
+    live.reset();
+
+    live.signIn();
     clockAt(18, 0);
     setup();
     const early = await mount();
@@ -292,7 +295,9 @@ describe('the first-run card\'s seat', () => {
     expect(card(list.container)).toBeNull();
     cleanup();
 
-    bound = {};
+    live.reset();
+
+    live.signIn();
     clockAt(19, 45);
     setup();
     const line = await mount();

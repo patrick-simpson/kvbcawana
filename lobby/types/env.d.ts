@@ -5,10 +5,6 @@ interface ImportMetaEnv {
   readonly PROD: boolean;
   readonly DEV: boolean;
   readonly MODE: string;
-  // Baked Pusher subscribe key + cluster (deploy.yml passes the repository
-  // variables PUSHER_APP_KEY / PUSHER_CLUSTER through as these).
-  readonly VITE_PUSHER_APP_KEY?: string;
-  readonly VITE_PUSHER_CLUSTER?: string;
 }
 
 interface ImportMeta {

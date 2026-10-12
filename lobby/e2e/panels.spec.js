@@ -5,10 +5,10 @@ import { expect, test } from '@playwright/test';
 // checked in a real browser. Keyboard focus must stay visible, and
 // ?lowPower=1 must mean zero animation.
 
-const NO_KEY = () => localStorage.setItem('awanaConfig.v1', JSON.stringify({ pusherAppKey: '' }));
+const NO_KEY = () => localStorage.setItem('awanaConfig.v1', JSON.stringify({}));
 
 async function boot(page, query = '') {
-  await page.route(/open-meteo|pusher|twotimtwo/, (route) => route.abort());
+  await page.route(/open-meteo|twotimtwo/, (route) => route.abort());
   await page.addInitScript(NO_KEY);
   await page.goto(`/index.html${query}`);
   await expect(page.locator('.stage')).toBeVisible();

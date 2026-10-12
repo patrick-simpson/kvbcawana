@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { liveChannel } from './liveChannel.js';
 
 // The permanent flagship slide (src/lib/flagship.js, FlagshipSlide.jsx): the
 // first thing a typed-deck screen shows. Under ?lowPower=1 (which is also how
@@ -6,8 +7,6 @@ import { expect, test } from '@playwright/test';
 // keyframe, so the finished slide must be on screen at once.
 
 const CONFIG = {
-  pusherAppKey: 'e2e-key',
-  pusherCluster: 'us2',
   backgroundSource: 'manual',
   calendarEnabled: false,
   seasonPromos: false,
@@ -25,7 +24,8 @@ async function boot(page, query = '?lowPower=1', config = CONFIG) {
   // clock (src/lib/flagship.js): pin a morning so these tests hold at any
   // real hour, including a club night's.
   await page.clock.install({ time: new Date('2026-09-23T10:00:00-04:00') });
-  await page.route(/open-meteo|pusher/, (r) => r.abort());
+  await page.route(/open-meteo/, (r) => r.abort());
+  await liveChannel(page);
   await page.addInitScript((c) => {
     localStorage.setItem('awanaConfig.v1', JSON.stringify(c));
     localStorage.setItem('awanaSetupCardDismissed.v1', '1');

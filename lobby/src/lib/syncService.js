@@ -13,7 +13,7 @@
 // credential must ride none of them. syncService.test.js pins that.
 //
 // Nothing the Worker sends is trusted as-is: shared settings and the slide
-// deck go through the SAME allowlist sanitizers as a Pusher frame (the caller
+// deck go through the SAME allowlist sanitizers as a live frame (the caller
 // hands them to dispatchEvent), the calendar through sanitizeFeed, and the
 // template through sanitizeTemplate.
 
@@ -139,13 +139,13 @@ export async function syncRequest(base, path, opts = {}) {
 }
 
 /**
- * @typedef {{ok: true, displayKey: string, pusher: {key: string, cluster: string}, state: any, template: Record<string, unknown>}} LoginOk
+ * @typedef {{ok: true, displayKey: string, state: any, template: Record<string, unknown>}} LoginOk
  * @typedef {{ok: false, reason: 'wrong'|'locked'|'unreachable'|'not-set-up'|'storage'|'rejected', message: string, triesLeft?: number, retryAfterSec?: number}} LoginErr
  */
 
 /**
  * Sign this screen in. On success the session and the display key are saved
- * in their own slots; the caller applies the Pusher keys, the template and the
+ * in their own slots; the caller applies the template and the
  * state (it owns the config store and the dispatch path).
  * @param {string} base
  * @param {string} passphrase
@@ -174,14 +174,9 @@ export async function syncLogin(base, passphrase, opts = {}) {
   if (!saveDisplayKey(b.displayKey) || !saveSyncSession(b.session)) {
     return { ok: false, reason: 'storage', message: 'This screen cannot save its sign-in. Browser storage is blocked.' };
   }
-  const pusher = {
-    key: typeof b.pusher?.key === 'string' ? b.pusher.key.trim().slice(0, 64) : '',
-    cluster: typeof b.pusher?.cluster === 'string' ? b.pusher.cluster.trim().slice(0, 32) : '',
-  };
   return {
     ok: true,
     displayKey: b.displayKey,
-    pusher,
     state: b.state || null,
     template: sanitizeTemplate(b.state?.template?.config),
   };
@@ -210,7 +205,7 @@ export function templatePatch(template, deviceOverrides) {
 
 /**
  * Turn the Worker's state into the two wire payloads the screen already knows
- * how to take, so they pass the same sanitizers a Pusher frame does: one
+ * how to take, so they pass the same sanitizers a live frame does: one
  * `settings` payload and one single-chunk `slides` payload (or null).
  * @param {any} state
  */

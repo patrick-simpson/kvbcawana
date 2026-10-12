@@ -1,96 +1,60 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { renderHook, act, cleanup } from '@testing-library/react';
+import { renderHook, act, waitFor, cleanup } from '@testing-library/react';
 
-// The socket must follow the CONFIG STORE, not a private copy of it: saving
-// the Pusher key in Settings, a ?key= URL flag, or a ?config= remote file all
-// have to reach `new Pusher(...)` in the same tab, without a reload. Both of
-// the setup-blocking bugs this pins shipped with every other test green.
+// The socket must follow the SIGN-IN, not a private copy of it: signing out in
+// Settings has to close the live socket in the same tab, without a reload. Pusher's key and cluster settings are retired; a screen
+// that still carries them, or a link that still has ?key= and ?cluster=, just
+// ignores them.
 
-let constructed = [];
-const disconnect = vi.fn();
+import { fakeLive } from '../lib/__fixtures__/fakeLive.js';
 
-vi.mock('pusher-js', () => ({
-  default: class FakePusher {
-    constructor(key, opts) {
-      constructed.push({ key, cluster: opts?.cluster });
-      this.connection = { state: 'connected', bind: () => {}, unbind: () => {} };
-    }
-    subscribe() { return { bind: () => {}, unbind_all: () => {} }; }
-    unsubscribe() {}
-    disconnect() { disconnect(); }
-    connect() {}
-  },
-}));
-
+const live = fakeLive();
 const { useSocket } = await import('./useSocket.js');
 const cfg = await import('./useConfig.js');
-const login = await import('../lib/displayLogin.js');
+const sync = await import('./useSync.js');
 
 const atUrl = (search) => window.history.replaceState({}, '', `/${search}`);
 
 beforeEach(() => {
-  constructed = [];
-  disconnect.mockReset();
+  live.reset();
   localStorage.clear();
   atUrl('');
   cfg._resetForTest();
-  login._resetForTest();
+  sync._resetSyncForTest();
   vi.spyOn(console, 'error').mockImplementation(() => {});
+  vi.spyOn(console, 'warn').mockImplementation(() => {});
 });
 afterEach(() => { cleanup(); /* no global RTL cleanup in this repo — hooks share one config store */ atUrl(''); cfg._resetForTest(); vi.restoreAllMocks(); });
 
-describe('useSocket follows the config store', () => {
-  it('a key saved in Settings re-keys the socket in the same tab, no reload', () => {
+describe('useSocket follows the sign-in', () => {
+  it('a signed-in screen opens the socket, and signing out closes it in the same tab', async () => {
+    live.signIn();
     const socket = renderHook(() => useSocket({}));
-    expect(constructed).toEqual([]);
-    expect(socket.result.current.status).toBe('off');
+    await waitFor(() => expect(live.sockets).toHaveLength(1));
+    await waitFor(() => expect(socket.result.current.status).toBe('connected'));
 
-    const settings = renderHook(() => cfg.useConfig());
-    act(() => settings.result.current.updateConfig({ pusherAppKey: 'k1', pusherCluster: 'us2' }));
-    expect(constructed).toEqual([{ key: 'k1', cluster: 'us2' }]);
-    expect(socket.result.current.status).not.toBe('off');
+    act(() => sync.signOut());
+    await waitFor(() => expect(live.sockets[0].closed).toBe(1000));
+    expect(socket.result.current.status).toBe('off');
   });
 
-  it('the ?key= flag wins over the saved key', () => {
+  it('a saved Pusher key, ?key= and ?cluster= open nothing', async () => {
     localStorage.setItem('awanaConfig.v1', JSON.stringify({ pusherAppKey: 'stored', pusherCluster: 'us2' }));
     atUrl('?key=abc&cluster=eu');
     cfg._resetForTest();
-    renderHook(() => useSocket({}));
-    expect(constructed).toEqual([{ key: 'abc', cluster: 'eu' }]);
-  });
-
-  it('?key= without ?cluster= keeps the saved cluster', () => {
-    localStorage.setItem('awanaConfig.v1', JSON.stringify({ pusherAppKey: 'stored', pusherCluster: 'ap1' }));
-    atUrl('?key=abc');
-    cfg._resetForTest();
-    renderHook(() => useSocket({}));
-    expect(constructed).toEqual([{ key: 'abc', cluster: 'ap1' }]);
-  });
-
-  it('a ?config= remote key reaches the socket, and a saved key still wins over it', () => {
-    renderHook(() => useSocket({}));
-    expect(constructed).toEqual([]);
-    act(() => cfg.setRemoteDefaults({ pusherAppKey: 'remote', pusherCluster: 'us2' }));
-    expect(constructed.map((c) => c.key)).toEqual(['remote']);
-    act(() => cfg.updateConfig({ pusherAppKey: 'device' }));
-    expect(constructed.map((c) => c.key)).toEqual(['remote', 'device']);
-    expect(disconnect).toHaveBeenCalledTimes(1);
-  });
-
-  it('resetConfig turns the socket back off', () => {
-    localStorage.setItem('awanaConfig.v1', JSON.stringify({ pusherAppKey: 'stored', pusherCluster: 'us2' }));
     const socket = renderHook(() => useSocket({}));
-    expect(constructed).toHaveLength(1);
-    act(() => cfg.resetConfig());
+    await act(async () => { await new Promise((r) => setTimeout(r, 10)); });
+    expect(live.sockets).toHaveLength(0);
     expect(socket.result.current.status).toBe('off');
-    expect(disconnect).toHaveBeenCalledTimes(1);
   });
 
-  it('a config change that does not touch the key does not reconnect', () => {
-    localStorage.setItem('awanaConfig.v1', JSON.stringify({ pusherAppKey: 'stored', pusherCluster: 'us2' }));
+  it('a config change that is not the sign-in does not reconnect', async () => {
+    live.signIn();
     renderHook(() => useSocket({}));
+    await waitFor(() => expect(live.sockets).toHaveLength(1));
     act(() => cfg.updateConfig({ audioMuted: true }));
-    expect(constructed).toHaveLength(1);
-    expect(disconnect).not.toHaveBeenCalled();
+    act(() => cfg.setRemoteDefaults({ showClock: false }));
+    expect(live.sockets).toHaveLength(1);
+    expect(live.sockets[0].closed).toBeNull();
   });
 });

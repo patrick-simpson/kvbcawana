@@ -18,12 +18,19 @@ with a clear message, and `git push origin HEAD:main` (no PR, no other branch).
 
 **Where the screens are (since 2026-10-03).** Every screen listens to the
 sync Worker's live channel (`/api/v1/live`, `lobby/worker/`), signed in with
-the church passphrase; the Pusher keys are cleared and Pusher is off
-(SWITCH.md). The wire design below was written for a public Pusher channel
-and applies unchanged to the live channel: the same events, the same
-allowlist sanitizers, the same sealed envelopes and anti-downgrade rule.
-Where this file says "the Pusher channel", read "the live channel" too. The
-print server still carries the Pusher publisher until switch day's cleanup.
+the church passphrase. **Pusher is retired (2026-10-11, after switch day):
+this app has no Pusher client** (`pusher-js` is not a dependency, `useSocket.js`
+opens only the live channel, and the Pusher key / cluster settings, the
+`?key=` / `?cluster=` URL flags and the baked `VITE_PUSHER_*` defaults are
+gone; a saved override or an old OBS link that still carries them is ignored).
+A screen that is not signed in listens to nothing (status `off`). The wire
+design below was written for a public Pusher channel and applies unchanged to
+the live channel: the same events, the same allowlist sanitizers, the same
+sealed envelopes and anti-downgrade rule. Where this file says "the Pusher
+channel", read "the live channel". Leftovers outside this app: the Worker still
+carries `worker/src/pusher.js` (a live, secrets-gated mirror in `sync.js`) and
+the print server still carries the Pusher publisher; `src/lib/displayLogin.js`
+still opens a legacy `provision` frame, but nothing delivers one any more.
 
 ## Embedding on weaker hardware — `?lowPower=1`
 
@@ -32,8 +39,8 @@ Raspberry Pi Zero — hardware far weaker than the other, standalone
 devices running this same signage app elsewhere. `src/lib/urlFlags.js`'s
 `?lowPower=1` flag forces `confettiLevel: 'off'` and `reduceMotion: true`
 for that one embed's URL only, winning over even this device's saved
-Settings — the same way `?key=`/`?cluster=` already do for OBS/
-ProPresenter embeds. `confettiLevel`/`reduceMotion` in `src/config.js`
+Settings — the same way it would for an OBS/
+ProPresenter embed. `confettiLevel`/`reduceMotion` in `src/config.js`
 default to full effects (`'full'` / `false`) for everyone else — **do
 not** change those defaults to accommodate one weak embed again; that's
 exactly the mistake this flag exists to avoid repeating. Journey
@@ -264,7 +271,7 @@ and `doodles/`. Read its README before changing it.
   `margin-top`, the name's padding, the chip's seat, the toast's padding and
   the board chip's `--seat`), `lobby-fit.spec.js` measures real ink on real
   rows under `?lowPower=1`, and `signage.events.spec.js` ("marks on the
-  overlays") sends marked names over a stand-in Pusher socket and checks the
+  overlays") sends marked names over a stand-in live socket and checks the
   toast's and the board's painted pixels at 720p, 1080p and 4K.
 
 - **Three spellings of one palette.** `tokens.json`, `tokens.css` and
@@ -316,7 +323,7 @@ and `doodles/`. Read its README before changing it.
 
 - React 19 + Vite (plain JavaScript); the `M` wrapper takes `ref` as a plain prop (no forwardRef)
 - framer-motion, canvas-confetti
-- pusher-js for realtime check-in events (no backend in this repo)
+- the sync Worker's live channel (a plain WebSocket, `src/hooks/useSocket.js`) for realtime check-in events; no Pusher client (retired 2026-10-11)
 - Vite `base: './'` so assets use relative paths and work under any URL
 - Two independent HTML entries: `index.html` (signage) and
   `countdown.html` (presentation tool, `src/presentation/`)
@@ -1445,7 +1452,7 @@ tab ids, which section it opens on, the phase in plain words).
   (`LEGACY_TABS`), so a caller or old copy lands on the right section.
 - **It opens where the volunteer needs to be** (`openingSection`): an explicit
   request (the first-run card asks for `setup`, the slide editor returns to
-  `slides`), else Setup when the screen cannot work yet (no Pusher app, or no
+  `slides`), else Setup when the screen cannot work yet (not signed in, or no
   key), else Status when anything is wrong (the rail counts it), else
   Check-ins. App passes `initialTab: null` from the gear and Ctrl+Shift+S.
 - **Live apply, Undo and Done (no Save, no Cancel).** A box, radio or menu
@@ -1495,7 +1502,7 @@ one table of SHARED keys (`SHARED_SPEC`, rule for rule the printer's
 `SETTINGS_SPEC` and the contract's `events.settings.keys`;
 `sharedSettings.test.js` fails if they drift). Everything else is per-screen:
 what plays behind the names (and its uploads), this TV's chime, motion,
-confetti, wake lock and connection sticker, simplified mode, the Pusher keys,
+confetti, wake lock and connection sticker, simplified mode,
 `followPublishedSlides` / `followSharedSettings`, the fleet URLs.
 
 - **The path is the slide deck's.** Settings, live-applying a shared change,
@@ -1554,8 +1561,8 @@ setup guide and the API. The owner's calls:
   screen out and replaces the display key.
 - **The Worker is the one home** (choice A): signed in, Settings and the slide
   editor publish to it (`publishViaSync`), it seals the same `settings` /
-  `slides` frames (contract v5 / v6) and publishes them with the Pusher REST
-  API. Check-ins never pass through it.
+  `slides` frames (contract v5 / v6) and publishes them on the live channel
+  (and, while its Pusher secrets are still set, mirrors them to Pusher). Check-ins never pass through it.
 - **Found by `shared/sync.json`** (`{url}`), written when the Worker was first
   deployed (today the root `ci.yml` deploys it, only when its sources changed,
   because every deploy restarts the Durable Object and drops every screen's
@@ -1566,11 +1573,11 @@ setup guide and the API. The owner's calls:
   display key: never config, an export or a URL (`syncService.test.js`).
 - **Nothing it returns is trusted as-is.** `/v1/state` is turned into a
   `settings` payload and a one-chunk `slides` payload (`wirePayloads`) and goes
-  through `dispatchEvent`, the same sanitizers as a Pusher frame
+  through `dispatchEvent`, the same sanitizers as a live frame
   (`useSyncDriver` in App). The template passes `sanitizeTemplate`, the
   calendar `sanitizeFeed`. `src/lib/syncSpecs.js` (the template and Journey
   allowlists) is shared byte for byte with the Worker, which imports it.
-- **The template** (`TEMPLATE_SPEC`, per-screen keys only, never Pusher keys,
+- **The template** (`TEMPLATE_SPEC`, per-screen keys only, never keys or secrets,
   panic mode or secrets) is applied at sign-in only to keys the screen has no
   override for (`templatePatch`), so signing an existing screen in never undoes
   a choice made on it. Settings → Setup → "Use this screen as the template".
@@ -1578,7 +1585,7 @@ setup guide and the API. The owner's calls:
   `SYNC_POLL_MS` and on `online`; a 401 means the word changed (phase
   `expired`, the session is dropped, names keep working on the old key until the
   laptop seals with the new one). The doorbell `changed` `{what}` on
-  `awana-sync` (bound in `useSocket.js` beside `provision`, never through
+  `awana-sync` (heard on the live channel in `useSocket.js`, never through
   dispatchEvent) refetches the template or the calendar.
 - **The calendar** (`useCalendar` source `sync`, first in line): the Worker reads
   the church page itself (linkedom + the same `calendarParse.js`), every six
@@ -1643,7 +1650,7 @@ so a child sees the number move within a second of their own check-in.
 - **Settings → "Preview a check-in" never moves the public count.** It is a
   rehearsal for the operator: banner yes, demo badge yes, number no. The hint
   rides a local-only fourth argument to `dispatchEvent`/`simulateEvent`
-  (`{ countsTowardTally: false }`) that the live Pusher binding never passes.
+  (`{ countsTowardTally: false }`) that the live-channel binding never passes.
   Deliberately NOT a payload field: on the wire any publisher could set it,
   and the sanitizer would have to allowlist something the contract has no
   word for. The debug panel's simulators still count, on purpose: that panel
@@ -1750,7 +1757,7 @@ The full Awana Presentation Tool, migrated from KVBC-Awana-Countdown
   `src/lib/displayKey.js` (`maskDisplayKey`), `src/lib/envelope.js`
   (`isPlausibleKey`), `src/lib/configureRelay.js` and `src/hooks/useScreenSync.js`
   (the screen registry, SETTINGS.md phase 2). Its realtime data must flow through the sanitized
-  socket — never a second Pusher stack; the wake-lock, Open-Meteo
+  socket — never a second realtime stack; the wake-lock, Open-Meteo
   fetcher, skin table, birthday art, self-update poller and the display
   key / login slots are shared so the two pages can't drift apart (the
   projector page must never grow a second copy of a key slot, and one
@@ -2023,7 +2030,7 @@ does not change at all**.
 
 **One strict allowlist sanitizer per event type** — see
 `src/lib/eventSanitizers.js` (bound per-event in
-`src/hooks/useSocket.js`). Each incoming payload on the Pusher channel
+`src/hooks/useSocket.js`). Each incoming payload on the live channel
 (`checkin`, `recap`, `checkout`, `tally`, `birthdays`, `ops`, `canary`,
 `tonight`, `points`, `schedule`, `notice`, `slides`, `settings`) is reduced
 to exactly its allowlisted fields before anything else sees it: first
@@ -2057,15 +2064,17 @@ change:
   the key. `displayKey.test.js` guards all three paths.
 - Decrypts are serialized through one promise chain per event, or a burst
   of arrivals greets children out of order.
-- **Display login** (`src/lib/displayLogin.js`): `provision` frames on the
+- **Display login** (`src/lib/displayLogin.js`, legacy: the Pusher cache channel
+  that carried it is gone, so no screen receives one now; signing in through
+  the sync service replaces it): `provision` frames on the
   `cache-awana-channel-provision` cache channel are opened with a
   passphrase-derived key (PBKDF2-SHA256, params pinned in the fixture's
   `provision` section) and write ONLY into the displayKey/publishToken
   storage slots — never into config, never through `dispatchEvent`, never
   rendered. The derived login key lives in its own `awanaLoginKey.v1` entry
   with the same three leak-path tests as the display key. `useSocket.js` is
-  still the only file that imports pusher-js, which is why the subscription
-  lives there.
+  the only file that opens the live channel (`privacyGuard.test.js` pins that,
+  and that nothing imports pusher-js).
 - The other events stay plaintext **on purpose**: their readability
   is what lets a screen distinguish "pipe down" from "cannot read names"
   from "quiet night". See SECURITY.md.

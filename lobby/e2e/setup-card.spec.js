@@ -18,7 +18,7 @@ import { expect, test } from './pastFlagship.js';
 // against the card's own, at the sizes the screens actually run at.
 
 const SIZES = [[1024, 768], [1280, 720], [1366, 768], [1920, 1080], [3840, 2160]];
-const NO_KEY = () => localStorage.setItem('awanaConfig.v1', JSON.stringify({ pusherAppKey: '' }));
+const NO_KEY = () => localStorage.setItem('awanaConfig.v1', JSON.stringify({}));
 
 /** Do two boxes {left, top, right, bottom} share any area? Touching is not overlap. */
 const overlaps = (a, b) => a.left < b.right - 0.5 && a.right > b.left + 0.5 && a.top < b.bottom - 0.5 && a.bottom > b.top + 0.5;
@@ -36,11 +36,10 @@ const LOBBY = {
 };
 
 async function showLobby(page, { eyebrow, text }) {
-  await page.route(/open-meteo|pusher|twotimtwo|sockjs/, (route) => route.abort());
+  await page.route(/open-meteo|twotimtwo|sockjs/, (route) => route.abort());
   await page.addInitScript((cfg) => {
     localStorage.setItem('awanaConfig.v1', JSON.stringify(cfg));
   }, {
-    pusherAppKey: '',
     backgroundSource: 'manual',
     calendarEnabled: false,
     seasonPromos: false,
@@ -137,9 +136,9 @@ test.describe('the lobby\'s first-run card, 1280x720', () => {
   test('gives the foot to the tonight strip while it has counts, and never draws over it', async ({ page }) => {
     // Content over instructions: the strip is what the room is looking at,
     // and the debug panel's simulator must show it on a fresh screen too.
-    await page.route(/open-meteo|pusher|twotimtwo|sockjs/, (route) => route.abort());
+    await page.route(/open-meteo|twotimtwo|sockjs/, (route) => route.abort());
     // The strip is off by default (7.15.0): this screen has turned it on.
-    await page.addInitScript(() => localStorage.setItem('awanaConfig.v1', JSON.stringify({ pusherAppKey: '', showTonightTicker: true })));
+    await page.addInitScript(() => localStorage.setItem('awanaConfig.v1', JSON.stringify({ showTonightTicker: true })));
     await page.goto('/index.html?lowPower=1');
     await expect(page.locator('.setup-card')).toBeVisible();
     await page.keyboard.press('Control+Shift+D');
@@ -163,7 +162,7 @@ test.describe('the lobby\'s first-run card, 1280x720', () => {
   // Plain `test`: the card must be there on the very first frame, over the flagship.
   plain('is still there, and still in the foot, when the zero-animation flag is off', async ({ page }) => {
     // The card has no motion of its own; ?lowPower=1 changes nothing about where it stands.
-    await page.route(/open-meteo|pusher|twotimtwo|sockjs/, (route) => route.abort());
+    await page.route(/open-meteo|twotimtwo|sockjs/, (route) => route.abort());
     await page.addInitScript(NO_KEY);
     await page.goto('/index.html');
     await expect(page.locator('.setup-card')).toBeVisible();
@@ -190,7 +189,7 @@ const NIGHTS = [
 ];
 
 async function showWall(page, { now, coming = false }) {
-  await page.route(/open-meteo|pusher|twotimtwo/, (route) => route.abort());
+  await page.route(/open-meteo|twotimtwo/, (route) => route.abort());
   await page.route('**/calendar-feed.json', (route) => route.fulfill({
     contentType: 'application/json',
     body: JSON.stringify({
@@ -325,7 +324,7 @@ test.describe('the projector\'s setup note, 1280x720', () => {
   test.use({ viewport: { width: 1280, height: 720 } });
 
   test('stays out of the screenshot mode and goes for good with "Don\'t show again"', async ({ page }) => {
-    await page.route(/open-meteo|pusher|twotimtwo/, (route) => route.abort());
+    await page.route(/open-meteo|twotimtwo/, (route) => route.abort());
     await page.addInitScript(NO_KEY);
     await page.goto('/countdown.html?now=2026-09-15T18:30:00&vr=1');
     await expect(page.locator('[data-mode="countdown"]')).toBeVisible();
@@ -355,7 +354,7 @@ const OPENING_DECK = '/countdown.html?now=2026-09-16T18:00:30';
 const NOTE = '[data-setup-checklist]';
 
 async function showOpeningDeck(page) {
-  await page.route(/open-meteo|pusher|twotimtwo/, (route) => route.abort());
+  await page.route(/open-meteo|twotimtwo/, (route) => route.abort());
   await page.addInitScript(NO_KEY);
   await page.goto(OPENING_DECK);
   await expect(page.locator(NOTE)).toBeVisible();
@@ -421,7 +420,7 @@ for (const [width, height] of [[1280, 720], [1920, 1080]]) {
 
     test('the projector\'s note gives way to the watchdog\'s "back to schedule" pill, and comes back when it goes', async ({ page }) => {
       await page.clock.install();
-      await page.route(/open-meteo|pusher|twotimtwo/, (route) => route.abort());
+      await page.route(/open-meteo|twotimtwo/, (route) => route.abort());
       await page.addInitScript(NO_KEY);
       await page.goto('/countdown.html?now=2026-09-15T18:30:00');
       await expect(page.locator(NOTE)).toBeVisible();

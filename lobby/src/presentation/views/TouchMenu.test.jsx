@@ -125,8 +125,8 @@ describe('the touch menu', () => {
     expect(pass.getAttribute('autocapitalize')).toBe('none');
     expect(pass.closest('form')).not.toBeNull();
     expect(pass.className).toMatch(/pj-sheet__input/);
-    // With no live-data key yet the by-hand fold is open, as on the PC.
-    expect(within(sheet()).getByLabelText('Pusher app key').closest('form')).not.toBeNull();
+    // Not connected yet, so the by-hand fold is open, as on the PC.
+    expect(within(sheet()).queryByLabelText('Pusher app key')).toBeNull();
     expect(within(sheet()).getByLabelText('Display key').closest('form')).not.toBeNull();
     // Every control in a form that is not its submit says so, or a tap on "Show" would submit.
     for (const b of sheet().querySelectorAll('form button')) expect(['button', 'submit']).toContain(b.getAttribute('type'));

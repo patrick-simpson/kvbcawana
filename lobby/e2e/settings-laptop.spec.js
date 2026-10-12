@@ -32,7 +32,7 @@ async function stubLaptop(page, { saved }) {
 }
 
 test.beforeEach(async ({ page }) => {
-  await page.route(/open-meteo|pusher|twotimtwo|kvbchurch\.org/, (route) => route.abort());
+  await page.route(/open-meteo|twotimtwo|kvbchurch\.org/, (route) => route.abort());
 });
 
 test('with no print server it says to open the page on the check-in laptop', async ({ page }) => {

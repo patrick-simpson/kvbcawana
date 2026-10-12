@@ -32,8 +32,6 @@ const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
 // moment it is flipped (like Ctrl+Shift+X), and read live from savedConfig.
 export function seedForm(c) {
   return {
-    pusherAppKey: c.pusherAppKey || '',
-    pusherCluster: c.pusherCluster || 'us2',
     backgroundSource: ['powerpoint', 'pptx', 'video'].includes(c.backgroundSource) ? c.backgroundSource : 'manual',
     powerpointEmbedUrl: c.powerpointEmbedUrl || '',
     slideshowDelaySec: c.slideshowDelaySec ?? 5,

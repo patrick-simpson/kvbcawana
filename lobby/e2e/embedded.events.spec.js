@@ -1,6 +1,6 @@
 import { expect, test } from './pastFlagship.js';
 import { boxes, embed, expectClear, hits, hostSquares } from './embedHost.js';
-import { fakePusher } from './fakePusher.js';
+import { liveChannel } from './liveChannel.js';
 
 // Embedded in the Journey kiosk, the corners that only events bring up
 // (embedded.spec.js has the static ones), against Journey's column of two
@@ -38,7 +38,7 @@ async function simulate(page, frame, name, times = 1) {
 
 /** A status sticker with a fault strip on it: a key on this screen, and a plaintext name refused. */
 async function tallSticker(page, config) {
-  const send = await fakePusher(page);
+  const send = await liveChannel(page);
   await page.addInitScript((key) => {
     if (location.pathname.endsWith('/index.html')) localStorage.setItem('awanaDisplayKey.v1', key);
   }, DISPLAY_KEY);
@@ -135,7 +135,7 @@ for (const [width, height] of [[640, 480], [1280, 720], [1920, 1080]]) {
     // A name long enough to fill the 71u column ended at 95.6u, under the
     // host's toggle on every screen; embedded, the column ends short of it.
     test('a name that fills the column ends short of the host\'s buttons', async ({ page }) => {
-      const send = await fakePusher(page);
+      const send = await liveChannel(page);
       const frame = await embed(page, { config: { standardDisplayMs: 60_000, firstArrivalMoment: false, showClock: false } });
       await send('checkin', { id: 'e2e-long', firstName: 'Maximiliana Wolfeschlegel', club: 'Sparks', at: new Date().toISOString() });
       const name = frame.locator('.checkin__name');

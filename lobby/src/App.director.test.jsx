@@ -30,18 +30,18 @@ async function tick(ms) {
   if (ms === 0) await act(async () => { await vi.advanceTimersByTimeAsync(0); });
 }
 
-let bound = {};
-vi.mock('pusher-js', () => ({
-  default: class FakePusher {
-    constructor() {
-      this.connection = { state: 'connected', bind: () => {}, unbind: () => {} };
-    }
-    subscribe() { return { bind: (evt, fn) => { bound[evt] = fn; }, unbind_all: () => {} }; }
-    unsubscribe() {}
-    disconnect() {}
-    connect() {}
-  },
-}));
+import { fakeLive } from './lib/__fixtures__/fakeLive.js';
+
+// Signing in is what connects a screen AND what keys it, so a screen that is
+// connected but not logged in no longer happens on its own. These tests are
+// about the first-run card on a connected screen that is still unkeyed (what
+// every one of them was written against), so the login reads "logged out".
+vi.mock('./hooks/useDisplayLogin.js', async (importOriginal) => {
+  const actual = await importOriginal();
+  return { ...actual, useDisplayLogin: () => ({ ...actual.useDisplayLogin(), loginStatus: 'logged-out' }) };
+});
+const live = fakeLive();
+const bound = live.bound;
 
 // The self-update poller, captured rather than run: the test asks the same
 // "may this screen reload right now?" question the poller would.
@@ -68,8 +68,6 @@ const B = { id: 's_b', text: 'Slide B', durationSec: 5 };
 
 function configure(over = {}) {
   localStorage.setItem('awanaConfig.v1', JSON.stringify({
-    pusherAppKey: 'k',
-    pusherCluster: 'us2',
     confettiLevel: 'off',
     firstArrivalMoment: false,
     reduceMotion: true,
@@ -114,9 +112,10 @@ beforeEach(() => {
     // A Tuesday noon: the flagship is off the air Wednesday 6:30-8:30 pm, and
     // these tests must not depend on when they happen to run.
     now: new Date(2026, 8, 29, 12, 0) });
-  bound = {};
+  live.reset();
   reloadBusy = null;
   localStorage.clear();
+  live.signIn();
   sessionStorage.clear();
   vi.stubGlobal('fetch', vi.fn(() => Promise.reject(new Error('offline'))));
   vi.spyOn(console, 'warn').mockImplementation(() => {});
@@ -433,7 +432,8 @@ describe('embedded in the Journey kiosk\'s frame', { timeout: 20_000 }, () => {
     cleanup();
 
     framed();
-    bound = {};
+    live.reset();
+    live.signIn();
     configure();
     await mount();
     expect(html()).toBe(true);

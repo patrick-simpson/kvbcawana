@@ -21,9 +21,8 @@
 //      This is the normal "set up the second screen" workflow, and that file
 //      gets emailed and dropped in shared drives.
 //
-//   3. `?key=` — urlFlags.js already accepts the PUSHER app key on the query
-//      string so an OBS/ProPresenter embed with no localStorage can connect.
-//      A URL is the worst possible place for this secret: browser history,
+//   3. the URL — OBS/ProPresenter embeds are configured by link (urlFlags.js,
+//      and `?passphrase=`, which signs in rather than carrying a key). A URL is the worst possible place for this secret: browser history,
 //      server logs, screenshots, the kiosk shortcut someone tapes to the wall.
 //
 // Three deny-lists would each have been one forgotten line away from a leak.

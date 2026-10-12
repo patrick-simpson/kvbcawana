@@ -1,14 +1,12 @@
 import React, { useSyncExternalStore } from 'react';
 import { FLAGS } from '../lib/flags.js';
-import { useConfig } from '../../hooks/useConfig.js';
 import { useDisplayLogin } from '../../hooks/useDisplayLogin.js';
 
-// First-run helper: a new screen needs (a) the Pusher key — baked into the
-// build when the repository variables are set, else typed — and (b) to be
-// logged in with the church's display passphrase, which provisions the
-// display key (sealed birthdays) and the publish token. Until both are
-// true (or the operator dismisses it), show a quiet note that points at the
-// QuickNav menu. Dismissal is remembered per device.
+// First-run helper: a new screen needs to be logged in with the church's
+// passphrase, which connects it to the live channel and provisions the
+// display key (sealed birthdays) and the publish token. Until then (or until
+// the operator dismisses it), show a quiet note that points at the QuickNav
+// menu. Dismissal is remembered per device.
 const DISMISS_KEY = 'awanaSetupChecklistDismissed.v1';
 
 /**
@@ -69,17 +67,15 @@ export function dismissSetup() {
 }
 
 /**
- * Whether this screen still needs setting up, and what it still needs.
+ * Whether this screen still needs setting up.
  * `show` is false once it is keyed and logged in, once dismissed, and always
  * in screenshot mode (?vr=1): operator chrome stays out of it.
  */
 export function useSetupNeeded() {
-  const { config } = useConfig();
   const { loginStatus } = useDisplayLogin();
   const hidden = useSyncExternalStore(subscribe, dismissed, dismissed);
-  const hasKey = Boolean(config.pusherAppKey);
   const loggedIn = loginStatus === 'logged-in';
-  return { show: !FLAGS.vr && !hidden && !(hasKey && loggedIn), hasKey, loggedIn };
+  return { show: !FLAGS.vr && !hidden && !loggedIn, loggedIn };
 }
 
 /**
@@ -90,7 +86,7 @@ export function useSetupNeeded() {
  * happens (on a phone on its side the wall has no room for it at all).
  */
 export const SetupChecklist = ({ touch = false, inSheet = false, onSetUp }) => {
-  const { show, hasKey, loggedIn } = useSetupNeeded();
+  const { show, loggedIn } = useSetupNeeded();
   if (!show) return null;
 
   if (touch) {
@@ -104,15 +100,14 @@ export const SetupChecklist = ({ touch = false, inSheet = false, onSetUp }) => {
       >
         <div className="pj-setup-note__text">
           <p className="pj-kicker pj-setup-note__kicker">
-            New display? {hasKey ? 'one quick setup step' : 'two quick setup steps'}
+            New display? One quick setup step
           </p>
           <ul className="pj-panel-note pj-setup-note__steps">
-            {!hasKey && <li>⬜ Live data key (under Advanced)</li>}
             <li>{loggedIn ? '✅' : '⬜'} Log in with the display passphrase</li>
           </ul>
           {inSheet && (
             <p className="pj-panel-note pj-setup-note__where">
-              Both are in Display Settings, below. The passphrase is on the print-server dashboard
+              It is in Display Settings, below. The passphrase is on the print-server dashboard
               (Settings → Display login).
             </p>
           )}
@@ -135,10 +130,9 @@ export const SetupChecklist = ({ touch = false, inSheet = false, onSetUp }) => {
     <div className="pj-panel pj-setup-note" role="region" aria-label="Display setup" data-setup-checklist>
       <div className="pj-setup-note__text">
         <p className="pj-kicker pj-setup-note__kicker">
-          New display? {hasKey ? 'one quick setup step' : 'two quick setup steps'}
+          New display? One quick setup step
         </p>
         <ul className="pj-panel-note pj-setup-note__steps">
-          {!hasKey && <li>⬜ Live data key (under Advanced)</li>}
           <li>{loggedIn ? '✅' : '⬜'} Log in with the display passphrase</li>
         </ul>
         <p className="pj-panel-note pj-setup-note__where">
