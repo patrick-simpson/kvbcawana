@@ -18,9 +18,9 @@ import { timedFetch } from './timedFetch.js';
 
 const RELS_NS = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
 
-// Bumped whenever the slide model shape changes so cached models
-// (pptxStore 'models') from an older parser are re-parsed, not reused.
-export const PARSER_VERSION = 2;
+// The model cache's parser version lives in its own tiny module, so the cache
+// check (pptxModel.js) never has to load this parser to compare it.
+export { PARSER_VERSION } from './pptxParserVersion.js';
 
 /**
  * Convert OneDrive embed/share URL to download URL

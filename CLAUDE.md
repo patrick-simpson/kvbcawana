@@ -27,6 +27,5 @@ Every piece runs on a free plan, now and later (Cloudflare Workers FREE with 10 
 
 ## Deferred work (owner's call or prerequisite missing; do not start unasked)
 - Split big files: `printer/chrome-extension/content.js` (~5,200 lines), plus a jsdom harness for the extension. (`printer/print-server/server.js` is done: entry + exports, code in `printer/print-server/server/`.)
-- Lobby code splitting: `React.lazy` panels and PowerPoint parser on demand; App suites open panels synchronously and `pptxModel.js` imports the parser statically, so rework those suites first.
 - Pusher removal from the print server: see `ROADMAP.md#switch-day-cleanup`.
 - Audit Lows still open (the rest fixed 2026-10-12): `workers_dev = true` in `lobby/worker/wrangler.toml` keeps a second public Worker address (owner confirms no device holds it, then false); lobby `e2e:events` and `e2e:visual` are not in CI (baselines come only from CI, so adding the jobs is the owner's call); the extension's localhost calls come from the content script (Chrome Local Network Access; needs a background-script relay); the repair installer download has a length check but no hash check (no hash source on the download link).

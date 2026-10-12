@@ -10,10 +10,13 @@ import CheckoutBanner from './components/CheckoutBanner.jsx';
 import NoticeBanner, { NOTICE_CHECK_MS, noticeShowing } from './components/NoticeBanner.jsx';
 import CornerChip from './components/CornerChip.jsx';
 import StepChip from './components/brand/StepChip.jsx';
-import SettingsPanel from './components/SettingsPanel.jsx';
-import RemoteScreenPanel from './components/RemoteScreenPanel.jsx';
-import SlideEditorPanel from './components/SlideEditorPanel.jsx';
-import DebugPanel from './components/DebugPanel.jsx';
+// Operator panels load on demand (their own chunks): see operatorPanels.jsx.
+// Their stylesheets stay in the main CSS, in the order they always had (before
+// app.css): a lazily appended sheet would land AFTER app.css and win ties.
+import './styles/settings-overhaul.css';
+import './styles/laptop.css';
+import './styles/history.css';
+import { DebugOpening, DebugPanel, PanelOpening, RemoteScreenPanel, SettingsPanel, SlideEditorPanel } from './components/operatorPanels.jsx';
 import SetupCard, { useSetupCard } from './components/SetupCard.jsx';
 import { ErrorBoundary } from './components/ErrorBoundary.jsx';
 import StickerChip from './components/StickerChip.jsx';
@@ -106,6 +109,14 @@ const SETTINGS_PAGE = isSettingsPage();
 // The live screen's side of the relay: what a configure page may ask of it.
 const RELAYED = ['preview-checkin', 'reset-tally', 'board-demo', 'media-changed'];
 const noop = () => {};
+// Configure mode and the settings page open Settings on the first render, so
+// its chunk is asked for now, beside the main one, not after it has run.
+// A screen asks for nothing here: its panels load when a volunteer reaches
+// for them (the gear's hover, focus or press, a shortcut, the first-run card).
+if (CONFIGURE) {
+  SettingsPanel.preload();
+  if (SETTINGS_PAGE) RemoteScreenPanel.preload();
+}
 
 // The WAITING chip pops in on the kit's curve and squashes at the pop's peak
 // (the soft squish, src/lib/squish.js). A constant: the chip stays mounted
@@ -879,6 +890,24 @@ export default function App() {
   const [editorFromSettings, setEditorFromSettings] = useState(false);
   const [debugOpen, setDebugOpen] = useState(false);
   const [gearIdle, setGearIdle] = useState(true);
+  // The slide editor goes back where it came from: Settings → Slides & look,
+  // or the stage when the keyboard opened it.
+  const closeSlideEditor = () => {
+    setSlideEditorOpen(false);
+    if (editorFromSettings) {
+      SettingsPanel.preload();
+      setEditorFromSettings(false);
+      setSettingsTab('slides');
+      setSettingsOpen(true);
+    }
+  };
+  // Settings open = a volunteer at work: the panels it opens (the slide
+  // editor, the debug panel) are fetched now, so they open at once.
+  useEffect(() => {
+    if (!settingsOpen) return;
+    SlideEditorPanel.preload();
+    if (!CONFIGURE) DebugPanel.preload();
+  }, [settingsOpen]);
 
   // The first-run card: still wanted on this screen (useSetupCard), and does
   // the room have space for it right now (setupUp: not over a name, a poster,
@@ -1183,11 +1212,14 @@ export default function App() {
       if (!action) return;
       e.preventDefault();
       if (action === 'debug') {
+        DebugPanel.preload();
         setDebugOpen((v) => !v);
       } else if (action === 'settings') {
+        SettingsPanel.preload();
         setSettingsTab(null);
         setSettingsOpen(true);
       } else if (action === 'editor') {
+        SlideEditorPanel.preload();
         setEditorFromSettings(false);
         setSlideEditorOpen(true);
       } else {
@@ -1680,14 +1712,19 @@ export default function App() {
       {setupSeated && !CONFIGURE && (
         <SetupCard
           card={setupCard}
-          onOpenSettings={() => { setSettingsTab('setup'); setSettingsOpen(true); }}
+          onOpenSettings={() => { SettingsPanel.preload(); setSettingsTab('setup'); setSettingsOpen(true); }}
         />
       )}
 
       {!overlay && !CONFIGURE && (
         <button
           className={`settings-gear ${gearIdle ? 'idle' : ''}`}
-          onClick={() => { setSettingsTab(null); setSettingsOpen(true); }}
+          onClick={() => { SettingsPanel.preload(); setSettingsTab(null); setSettingsOpen(true); }}
+          // Reaching for the gear starts loading Settings, so it is usually
+          // in hand by the click and opens with no "Opening…" card at all.
+          onPointerEnter={SettingsPanel.preload}
+          onFocus={SettingsPanel.preload}
+          onPointerDown={SettingsPanel.preload}
           title="Settings (Ctrl+Shift+S)"
           aria-label="Open settings"
         >
@@ -1698,6 +1735,7 @@ export default function App() {
       {settingsOpen && SETTINGS_PAGE && managedScreen && (
         <ErrorBoundary label="settings-panel" onError={backToScreens}>
           <RemoteScreenPanel
+            fallback={<PanelOpening label="Settings" onClose={backToScreens} />}
             screen={managedScreen}
             shared={shared}
             shareStatus={shareStatus}
@@ -1706,6 +1744,7 @@ export default function App() {
             onForgotten={backToScreens}
             onRenamed={(name) => setManagedScreen((s) => (s ? { ...s, name } : s))}
             onOpenSlideEditor={() => {
+              SlideEditorPanel.preload();
               setSettingsOpen(false);
               setEditorFromSettings(true);
               setSlideEditorOpen(true);
@@ -1717,6 +1756,7 @@ export default function App() {
       {settingsOpen && !(SETTINGS_PAGE && managedScreen) && (
         <ErrorBoundary label="settings-panel" onError={() => setSettingsOpen(false)}>
           <SettingsPanel
+            fallback={<PanelOpening label="Settings" onClose={CONFIGURE ? noop : () => setSettingsOpen(false)} />}
             onOpenScreen={SETTINGS_PAGE ? setManagedScreen : null}
             mission={SETTINGS_PAGE ? mission : null}
             tonightTitle={tonightTitle}
@@ -1754,11 +1794,12 @@ export default function App() {
             onTest={SETTINGS_PAGE ? undefined : CONFIGURE ? (p) => relayToScreen('lobby', 'preview-checkin', p) : previewCheckIn}
             onResetTally={SETTINGS_PAGE ? undefined : CONFIGURE ? () => relayToScreen('lobby', 'reset-tally') : resetTonight}
             onOpenSlideEditor={() => {
+              SlideEditorPanel.preload();
               setSettingsOpen(false);
               setEditorFromSettings(true);
               setSlideEditorOpen(true);
             }}
-            onOpenDebug={CONFIGURE ? undefined : () => { setSettingsOpen(false); setDebugOpen(true); }}
+            onOpenDebug={CONFIGURE ? undefined : () => { DebugPanel.preload(); setSettingsOpen(false); setDebugOpen(true); }}
             onPreviewPromo={CONFIGURE ? undefined : (key) => {
               // Like the board demo: close Settings so the TV shows it.
               startPromoPreview(key);
@@ -1778,17 +1819,11 @@ export default function App() {
       {slideEditorOpen && (
         <ErrorBoundary label="slide-editor" onError={() => setSlideEditorOpen(false)}>
           <SlideEditorPanel
+            fallback={<PanelOpening label="Typed slides" onClose={closeSlideEditor} />}
             config={storedConfig}
             syncedDeck={followPublishedSlides ? syncedDeck : null}
             onChange={updateConfig}
-            onClose={() => {
-              setSlideEditorOpen(false);
-              if (editorFromSettings) {
-                setEditorFromSettings(false);
-                setSettingsTab('slides');
-                setSettingsOpen(true);
-              }
-            }}
+            onClose={closeSlideEditor}
           />
         </ErrorBoundary>
       )}
@@ -1796,6 +1831,7 @@ export default function App() {
       {debugOpen && (
         <ErrorBoundary label="debug-panel" onError={() => setDebugOpen(false)}>
           <DebugPanel
+            fallback={<DebugOpening />}
             onSimulate={(p) => simulate('checkin', p)}
             onSimulateRecap={(p) => simulate('recap', p)}
             onSimulateOps={(p) => simulate('ops', p)}

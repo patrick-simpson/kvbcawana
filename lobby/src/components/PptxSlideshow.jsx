@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import { M } from '../lib/motion.jsx';
-import { downloadPptx, parsePptxToModel } from '../lib/pptxHandler.js';
 import { getStoredDeckModel } from '../lib/pptxModel.js';
 import CatalogScene from './CatalogScene.jsx';
 import { ErrorBoundary } from './ErrorBoundary.jsx';
@@ -36,6 +35,9 @@ export default function PptxSlideshow({ url, source = 'url', slideshowDelaySec =
         if (source === 'store') {
           model = await getStoredDeckModel();
         } else {
+          // The parser is its own chunk (JSZip): loaded only for a deck,
+          // inside this same "Loading presentation…" wait.
+          const { downloadPptx, parsePptxToModel } = await import('../lib/pptxHandler.js');
           model = await parsePptxToModel(await downloadPptx(url));
         }
         if (!cancelled) setResult({ key, status: 'ready', model });

@@ -10,8 +10,13 @@
 // costs a re-parse per boot, never a failure.
 // ─────────────────────────────────────────────────────────────
 
-import { PARSER_VERSION, parsePptxToModel } from './pptxHandler.js';
+import { PARSER_VERSION } from './pptxParserVersion.js';
 import { getDeck, getModel, putModel } from './pptxStore.js';
+
+// The parser (pptxHandler.js, with JSZip) is its own chunk, fetched only when
+// a deck actually has to be parsed: a cached model, and every screen that
+// shows no .pptx at all, never download or run it.
+const parsePptxToModel = async (/** @type {Blob} */ blob) => (await import('./pptxHandler.js')).parsePptxToModel(blob);
 
 /**
  * The slide model for the deck uploaded on this device: the cached
