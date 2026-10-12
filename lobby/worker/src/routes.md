@@ -427,7 +427,8 @@ undo): the station ends it quietly.
   (`DOWN_BACKOFF_MS`; answered `twotimtwo-down` with `retryAfterMs` meanwhile; a
   refused password keeps its own 5 / 15 / 60 minutes). The check-in, undo and
   check-out posts themselves are writes and take no slot.
-- **Switches** (`wrangler.toml [vars]`, both `"off"` until the shadow night):
+- **Switches** (`wrangler.toml [vars]` are the DEFAULTS since the settings
+  overhaul: a stored switch overrides one at runtime, section 10.2):
   `CLOUD_PRINT` (jobs for TwoTimTwo-page check-ins) and `SINGLE_PUBLISHER`
   (in cloud mode the Worker publishes `tally`, `tonight` and the still-here
   list itself, and `POST /v1/publish` drops the laptop's `tally`, `tonight`,
@@ -571,7 +572,13 @@ out with the Checkout page's own `POST /clubber/checkout` (`calendar_id` +
   stops sweeping (it reads that at start-up); `stopCloud` hands it back. So turn
   `YM_CHECKOUT` on before, or with, the station role.
 
-## 10. Settings overhaul: switches, church settings, notices, change log, overview (SPEC, not built)
+## 10. Settings overhaul: switches, church settings, notices, change log, overview (BUILT)
+
+Built (Track A): `src/device.js` (10.1), `src/switches.js` (10.2), `src/church.js`
+(10.3), `src/notice.js` (10.4), `src/changes.js` (10.5), `src/overview.js` (10.6),
+each mounted with one line in `SyncCore`; tests `test/{changes,switches,church,notice,overview}.test.js`
+and `lobby/shared/churchSettings.test.js`. Where the build settled something the
+spec left open, or corrected it, the text below says so ("Built:").
 
 Design and build split: `docs/SETTINGS-OVERHAUL.md` (repo root). Section 9 is the
 youth check-out (`YM_CHECKOUT`, branch `worker-ymcheckout`); this section assumes
@@ -592,7 +599,12 @@ Both optional (missing = `{kind: 'unknown', name: 'Unknown device'}`). A
 registered `X-Station` wins: `{kind: 'station', id, name}` from the registry; an
 `X-Device` that is a registered screen id is `{kind: 'screen'}` with the
 registry's name; anything else `{kind: 'page'}`. Never an IP, user agent or
-session. Same origin (`/api`): no CORS change.
+session. Built: an `X-Device-Name` with no `X-Device` is still `{kind: 'page',
+name}`; a page id with no name is named "Unnamed device"; an `X-Station` that is
+not registered falls through to the other headers. The page is same origin
+(`/api`), but the Worker's CORS preflight now also allows `X-Device` and
+`X-Device-Name` (it allowed `X-Station` only), so a preview deploy calling the
+Worker cross-origin is not refused for sending them.
 
 ### 10.2 Switches (runtime, stored; `wrangler.toml [vars]` become the defaults)
 
@@ -622,7 +634,7 @@ Storage `switches` = `{v: 1, rev, updatedAt, by, values: {NAME: 'on'|'off'}}`
 | Route | Auth | Request | Answer |
 | --- | --- | --- | --- |
 | `GET /v1/switches` | session | | `{rev, updatedAt, by, stored, switches: [{name, group, value, default, source: 'worker'\|'default'}], stations: [{stationId, name, lastSeenAt, version\|null, churchRev\|null}]}` |
-| `PUT /v1/switches` | session | `{name, value: 'on'\|'off'\|'default', rev?}` | `{ok, rev, switch, warnings: [code]}`. 400 `bad-name` / `bad-value`; 409 `{reason: 'stale', rev}` when `rev` is sent and differs; 409 `stored-off`. `default` deletes the stored value. Rings `changed {what: 'switches', rev}`; logs `switch` (10.5) |
+| `PUT /v1/switches` | session | `{name, value: 'on'\|'off'\|'default', rev?, dryRun?: true}` | `{ok, rev, switch, warnings: [code]}`. 400 `bad-name` / `bad-value` / `bad-rev`; 409 `{reason: 'stale', rev}` when `rev` is sent and differs; 409 `stored-off`. `default` deletes the stored value. Rings `changed {what: 'switches', rev}`; logs `switch` (10.5) with the STORED value before and after (`null` = following the default). Built: `dryRun: true` answers `{ok, dryRun: true, rev, switch (as it would be), warnings}` and writes nothing, so the page's confirm can list the warnings BEFORE the flip; the same stored value again writes nothing (`warnings: []`, no ring, no entry) |
 
 Warnings (never refusals; the page shows them in its confirm): `no-station` (no
 station heartbeat in 2 min), `station-old` (a station seen in 2 min reports no
@@ -631,7 +643,12 @@ runtime `SINGLE_PUBLISHER` / `YM_CHECKOUT` change), `window-open` (the watch
 window is open now), `ym-tab-reload` (`YM_CHECKOUT` turned OFF while a station
 holds the extension's sweep: the TwoTimTwo tab must be reloaded before the
 extension sweeps again). Turning `SINGLE_PUBLISHER` off does not purge
-`tonight:book` (the end-of-window purge does).
+`tonight:book` (the end-of-window purge does). Built: warnings only when the
+EFFECTIVE value changes; `no-station` for the online group only, `station-old`
+for `SINGLE_PUBLISHER` / `YM_CHECKOUT` only, `window-open` for any switch,
+`ym-tab-reload` whenever any station is registered (the Worker cannot see which
+computer's extension stood down). An env value other than `on` / `off` (or
+none) is the switch's own fallback. `SWITCHES_STORED` unset counts as `on`.
 
 ### 10.3 Church settings (the laptop's church-wide printing settings, edited from anywhere)
 
@@ -687,6 +704,15 @@ Storage `church` = `{v: 1, rev, savedAt, by, seededBy: {stationId, name, at} | n
 | `GET /v1/print/next` (changed, additive) | station | | adds `church: {rev, switchesRev}`; an older puller ignores it |
 | `POST /v1/print/heartbeat` (changed, additive) | station | adds `version?: 'X.Y.Z'`, `churchRev?: int` | unchanged; both kept on the station record (they ride `touch`'s throttled write; a CHANGED value forces it) |
 
+Built: `seeded` is true only for a station's seed (`seededBy`), not for "Start
+from defaults" (`rev` says whether a doc exists); a seed while `CHURCH_SETTINGS`
+is off is refused 503 `church-off` like an edit (a paused station does not seed);
+a seed from a session that is not a registered station is 403
+`unknown-station`; an edit with no `baseRev` is 400 `bad-rev`; an edit that
+changes nothing writes nothing (same rev, no ring, no entry); `dropped` names
+the keys an edit could not keep when others were kept; a value its rule refuses
+is a dropped key (the old value stays).
+
 The station's side (precedence, offline fallback, first-run migration):
 `docs/SETTINGS-OVERHAUL.md` section 4.
 
@@ -716,6 +742,17 @@ Storage `notice:current` = `{payload: {level, message, at, durationSec}, until, 
   as before.
 - Validation is the Worker's own (`shared/text.js` `plainText`), not an import
   of `src/lib/eventSanitizers.js`; the screen's sanitizer still checks every frame.
+- Built: a bad `durationMin` (not an integer 5..240) is 400 `bad-duration`
+  (`bad-level`, `no-message` for the other two). The replay is built from
+  `notice:current` itself (so a passphrase change, which clears `live:notice`,
+  does not lose the owner's notice); the gate forgets an expired
+  `notice:current` before relaying the laptop's frame, and the replay deletes
+  `live:notice` with it only when that copy IS the owner's frame. `DELETE` also
+  takes down a laptop notice (no `notice:current`: the text of `live:notice`) and
+  works with `NOTICES` off; `cleared: false` when there was nothing. Its log
+  entry is NOT undoable (re-sending an old notice is not "cheap"); a POST's
+  entry is (undo = take down, while that notice is still the current one,
+  else 409 `changed-since`).
 
 ### 10.5 Change log (last 200; undo where cheap)
 
@@ -757,6 +794,21 @@ no entry), `putSlides`, `putTemplate`, `putJourney`, `changePassphrase`,
 `screens.putSettings` / `rename` / `forget`, station `register` / `DELETE`,
 10.2, 10.3, 10.4.
 
+Built: a bucket is stored as `{base, entries}` and reset whenever its `base` is
+not `floor(n / 20) * 20` (a later lap), so between 181 and 200 entries are kept;
+appends (and undo marks) run one at a time through a promise chain and the
+buckets stay in memory once read. A dropped big `after` keeps `afterSig` (an
+FNV-1a fingerprint of its canonical JSON, not cryptography), so Undo still
+answers `changed-since` correctly. `before` / `after` hold `null` for an absent
+key; JSON compares are key-order-blind. `template` / `journey` / screen
+settings / screen names log only when something changed. `station` entries
+carry `keys: ['register'|'remove']` and the station's name. Undo answers 404
+`not-found` for a number never written, 410 `gone` for one rotated out or whose
+`logv` slot has moved on (20 entries later), or whose screen was forgotten; two
+Undo presses at once run once (the second is 409 `already-undone`,
+`undoneBy: null`). With `CHANGE_LOG` off an undo still works but marks nothing.
+`limit` defaults to 20; a bad `before` / `limit` is 400.
+
 ### 10.6 Tonight overview (mission control's one poll)
 
 | Route | Auth | Answer |
@@ -776,6 +828,10 @@ no entry), `putSlides`, `putTemplate`, `putJourney`, `changePassphrase`,
   history:  {db, pending},
   changes:  {head, last: Entry | null} }
 ```
+
+Built: `print.checkThePrinter` is a COUNT (the job ids stay on `GET
+/v1/print/status`); `window.closesInMin` is null while closed; each part is
+computed on its own and is `null` if it throws, the rest still answer.
 
 No TwoTimTwo read, no seal: storage reads and in-memory state only. The page
 polls it every 10 s while Tonight is open and the tab visible, every 60 s

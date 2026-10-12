@@ -172,6 +172,16 @@ replayed to a screen that connects later): `changed` `{what:
 screen's live socket carries its id (`/v1/live?session=…&screen=<id>`), which
 is how the list knows it is on the channel.
 
+### The settings page's own routes (`src/routes.md` section 10)
+
+| Route | |
+| --- | --- |
+| `GET` / `PUT /v1/switches` | the runtime switches (`src/switches.js`): `wrangler.toml [vars]` are the defaults, a stored value overrides one; `SWITCHES_STORED = "off"` is the deploy kill |
+| `GET` / `PUT /v1/church/settings` | the laptop's church-wide printing settings and the remembered leaders (`src/church.js`, allowlist `shared/churchSettings.js`): seeded once by a print station, edited with `baseRev` |
+| `GET` / `POST` / `DELETE /v1/notice` | a notice to every screen for 5 min to 4 h, and "Take it down" (`src/notice.js`) |
+| `GET /v1/changes`, `POST /v1/changes/<seq>/undo` | the last 200 changes, who made them (`X-Device`, `X-Device-Name`) and Undo (`src/changes.js`) |
+| `GET /v1/tonight/overview` | mission control's one poll: counts, codes, times and station names only (`src/overview.js`) |
+
 ## The phone check-in relay (printer 7.9.0)
 
 `awana.kvbchurch.org/checkin` is the print app's phone page, online. It signs in
