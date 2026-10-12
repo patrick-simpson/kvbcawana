@@ -46,7 +46,8 @@ jobs:
   #           whose lint moved into their own jobs below)
   #   printer reads printer/, plus lobby/worker/src/relay.js
   #           (test-phone-relay), site/build.mjs (test-phone-touch) and
-  #           lobby/src/lib/syncSpecs.js (electron-app's device-sync test)
+  #           lobby/src/lib/syncSpecs.js and the lobby/shared/sync-protocol.js it
+  #           re-exports (electron-app's device-sync test)
   changes:
     name: What changed
     runs-on: ubuntu-latest
@@ -83,7 +84,7 @@ jobs:
                 *) lobby=true ;;
               esac
               case "$f" in
-                lobby/worker/src/relay.js|lobby/src/lib/syncSpecs.js|site/build.mjs) printer=true ;;
+                lobby/worker/src/relay.js|lobby/src/lib/syncSpecs.js|lobby/shared/sync-protocol.js|site/build.mjs) printer=true ;;
                 lobby/*|journey/*|site/updates/*|.github/workflows/*) ;;
                 *) printer=true ;;
               esac
@@ -384,7 +385,7 @@ jobs:
           if [ -z "$BASE" ]; then
             echo "No base commit to compare against; deploying the Worker."
             echo "changed=true" >> "$GITHUB_OUTPUT"
-          elif git diff --quiet "$BASE" HEAD -- lobby/worker lobby/src/lib .github/workflows/ci.yml; then
+          elif git diff --quiet "$BASE" HEAD -- lobby/worker lobby/src/lib lobby/shared/sync-protocol.js .github/workflows/ci.yml; then
             echo "Nothing the Worker is built from changed since $BASE; its deploy is skipped."
             echo "changed=false" >> "$GITHUB_OUTPUT"
           else

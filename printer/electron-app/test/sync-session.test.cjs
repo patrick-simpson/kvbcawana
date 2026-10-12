@@ -27,7 +27,7 @@ function fakeFetch({ login = 200, triesLeft } = {}) {
     const json = (status, body) => ({ ok: status >= 200 && status < 300, status, json: async () => body });
     if (url.endsWith('/lobby/shared/sync.json')) return json(200, { url: 'https://awana.kvbchurch.org/api' });
     if (url === 'https://awana.kvbchurch.org/api/v1/login') {
-      if (login === 200) return json(200, { session: SESSION, displayKey: 'k'.repeat(43) });
+      if (login === 200) return json(200, { session: SESSION, displayKey: `${'k'.repeat(43)}=` });
       return json(login, { triesLeft });
     }
     return json(404, {});

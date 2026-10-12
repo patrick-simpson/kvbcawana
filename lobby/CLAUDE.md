@@ -1571,6 +1571,13 @@ setup guide and the API. The owner's calls:
   socket). `url: ""` means no service yet: every screen keeps the
   print server's display login exactly as before (the Setup card and the
   projector's menu switch on `useSync().url`).
+- **One protocol for every client** (`shared/sync-protocol.js`): the address
+  and session rules (one URL maximum, 200), request building and the login
+  answer are read in one dependency-free module that `src/lib/syncService.js`
+  imports and the print server and the Electron app run as a generated
+  CommonJS copy (`printer/print-server/sync-protocol.js`; regenerate with
+  `node scripts/gen-sync-protocol.mjs`, `check-mirrors.mjs` keeps it current).
+  Each client keeps its own storage and offline cache.
 - **The session is a secret** in its own slot (`awanaSyncSession.v1`), like the
   display key: never config, an export or a URL (`syncService.test.js`).
 - **Nothing it returns is trusted as-is.** `/v1/state` is turned into a

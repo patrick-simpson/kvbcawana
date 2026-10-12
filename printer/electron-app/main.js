@@ -1254,6 +1254,7 @@ app.whenReady().then(async () => {
       return roles.deviceId;
     },
     session: deviceSession,
+    protocol: syncClient.protocol,
     request: (base, p, opts) => syncClient.syncRequest(base, p, opts),
     name: () => roles.name || os.hostname(),
     setName: async (name) => {

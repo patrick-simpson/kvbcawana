@@ -56,13 +56,9 @@ const JOURNEY_WEEKS_MAX = 80;
 export const PASSPHRASE_MIN = 6;
 export const PASSPHRASE_MAX = 128;
 
-/**
- * Both the screens and the Worker apply exactly this before comparing.
- * @param {unknown} p
- */
-export function normalizeSyncPassphrase(p) {
-  return String(p == null ? '' : p).trim().normalize('NFKC').toLowerCase();
-}
+// Both the screens and the Worker apply exactly this before comparing: the
+// sync protocol's one definition (shared/sync-protocol.js).
+export { normalizeSyncPassphrase } from '../../shared/sync-protocol.js';
 
 /**
  * @param {SimpleRule} rule

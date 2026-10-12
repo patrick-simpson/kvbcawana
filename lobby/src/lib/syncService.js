@@ -17,9 +17,19 @@
 // hands them to dispatchEvent), the calendar through sanitizeFeed, and the
 // template through sanitizeTemplate.
 
+import {
+  buildLoginBody,
+  buildRequest,
+  isValidSession,
+  isValidSyncUrl,
+  parseLoginResponse,
+  parseSyncIndex,
+  publishRequest,
+  readResponse,
+  UNREACHABLE,
+} from '../../shared/sync-protocol.js';
 import { saveDisplayKey } from './displayKey.js';
-import { isPlausibleKey } from './envelope.js';
-import { normalizeSyncPassphrase, sanitizeTemplate } from './syncSpecs.js';
+import { sanitizeTemplate } from './syncSpecs.js';
 import { timedFetch } from './timedFetch.js';
 
 export const SYNC_SESSION_STORAGE = 'awanaSyncSession.v1';
@@ -33,25 +43,17 @@ export const SYNC_EVENT = 'changed';
 /** How often a signed-in screen re-reads the state, whatever the doorbell said. */
 export const SYNC_POLL_MS = 10 * 60 * 1000;
 
-const SESSION_RE = /^v1\.\d+\.\d+\.[A-Za-z0-9_-]{20,}$/;
-const URL_MAX = 200;
-
-/** @param {unknown} value */
-export function isValidSyncUrl(value) {
-  if (typeof value !== 'string' || !value || value.length > URL_MAX) return false;
-  try {
-    const u = new URL(value);
-    return u.protocol === 'https:' && !u.search && !u.hash && !u.username && !u.password;
-  } catch {
-    return false;
-  }
-}
+// The address / session rules, request building and answer parsing are the
+// family's one sync protocol (shared/sync-protocol.js, which the print server
+// and the Electron app use too); this file adds the browser's storage, its
+// offline URL cache and its fetch.
+export { isValidSyncUrl };
 
 /** @returns {string} */
 export function loadSyncSession() {
   try {
     const s = String(localStorage.getItem(SYNC_SESSION_STORAGE) || '').trim();
-    return SESSION_RE.test(s) ? s : '';
+    return isValidSession(s) ? s : '';
   } catch {
     return '';
   }
@@ -98,9 +100,8 @@ export async function resolveSyncUrl(opts = {}) {
   try {
     const res = await fetchFn(`${base}shared/sync.json`, { cache: 'no-cache' });
     if (res.ok) {
-      const body = await res.json();
-      const url = typeof body?.url === 'string' ? body.url.trim().replace(/\/+$/, '') : '';
-      if (url === '' || isValidSyncUrl(url)) {
+      const url = parseSyncIndex(await res.json());
+      if (url !== null) {
         cacheUrl(url);
         return url;
       }
@@ -118,23 +119,11 @@ export async function resolveSyncUrl(opts = {}) {
  */
 export async function syncRequest(base, path, opts = {}) {
   const fetchFn = opts.fetchFn || timedFetch;
-  /** @type {Record<string, string>} */
-  const headers = {};
-  if (opts.body !== undefined) headers['Content-Type'] = 'application/json';
-  if (opts.session) headers.Authorization = `Bearer ${opts.session}`;
+  const req = buildRequest(base, path, opts);
   try {
-    const res = await fetchFn(`${base}${path}`, {
-      method: opts.method || 'GET',
-      headers,
-      body: opts.body === undefined ? undefined : JSON.stringify(opts.body),
-      cache: 'no-store',
-    });
-    /** @type {any} */
-    let body = null;
-    try { body = await res.json(); } catch { /* not JSON */ }
-    return { ok: res.ok, status: res.status, body };
+    return await readResponse(await fetchFn(req.url, { ...req.init, cache: 'no-store' }));
   } catch {
-    return { ok: false, status: 0, body: null };
+    return { ...UNREACHABLE };
   }
 }
 
@@ -153,32 +142,26 @@ export async function syncRequest(base, path, opts = {}) {
  * @returns {Promise<LoginOk | LoginErr>}
  */
 export async function syncLogin(base, passphrase, opts = {}) {
-  /** @type {Record<string, unknown>} */
-  const body = { passphrase: normalizeSyncPassphrase(passphrase) };
-  if (opts.seedKey) body.seedKey = opts.seedKey;
-  const res = await syncRequest(base, '/v1/login', { method: 'POST', body, fetchFn: opts.fetchFn });
-  if (res.status === 0) return { ok: false, reason: 'unreachable', message: 'Could not reach the sync service. Check this screen\'s internet connection.' };
-  if (res.status === 401) {
-    const triesLeft = Number(res.body?.triesLeft);
-    return { ok: false, reason: 'wrong', message: 'That is not the passphrase.', ...(Number.isFinite(triesLeft) ? { triesLeft } : {}) };
+  const res = await syncRequest(base, '/v1/login', { method: 'POST', body: buildLoginBody(passphrase, opts.seedKey), fetchFn: opts.fetchFn });
+  const r = parseLoginResponse(res, { who: 'screen' });
+  if (!r.ok) {
+    const { reason, message } = r;
+    return {
+      ok: false,
+      reason,
+      message,
+      ...(r.triesLeft !== undefined ? { triesLeft: r.triesLeft } : {}),
+      ...(r.retryAfterSec !== undefined ? { retryAfterSec: r.retryAfterSec } : {}),
+    };
   }
-  if (res.status === 429) {
-    const retryAfterSec = Number(res.body?.retryAfterSec) || 900;
-    return { ok: false, reason: 'locked', message: 'Too many wrong tries.', retryAfterSec };
-  }
-  if (res.status === 503) return { ok: false, reason: 'not-set-up', message: 'The sync service has no passphrase yet. Finish its setup (worker/README.md).' };
-  const b = res.body || {};
-  if (!res.ok || typeof b.session !== 'string' || !SESSION_RE.test(b.session) || !isPlausibleKey(b.displayKey)) {
-    return { ok: false, reason: 'rejected', message: typeof b.error === 'string' ? b.error : `The sync service answered HTTP ${res.status}.` };
-  }
-  if (!saveDisplayKey(b.displayKey) || !saveSyncSession(b.session)) {
+  if (!saveDisplayKey(r.displayKey) || !saveSyncSession(r.session)) {
     return { ok: false, reason: 'storage', message: 'This screen cannot save its sign-in. Browser storage is blocked.' };
   }
   return {
     ok: true,
-    displayKey: b.displayKey,
-    state: b.state || null,
-    template: sanitizeTemplate(b.state?.template?.config),
+    displayKey: r.displayKey,
+    state: r.state,
+    template: sanitizeTemplate(r.state?.template?.config),
   };
 }
 
@@ -232,12 +215,8 @@ export function wirePayloads(state) {
  * @param {{fetchFn?: typeof fetch}} [opts]
  */
 export async function syncPublish(base, session, kind, payload, opts = {}) {
-  const res = await syncRequest(base, `/v1/${kind}`, {
-    method: 'PUT',
-    body: kind === 'settings' ? { settings: payload } : { slides: payload },
-    session,
-    fetchFn: opts.fetchFn,
-  });
+  const { path, method, body } = publishRequest(kind, payload);
+  const res = await syncRequest(base, path, { method, body, session, fetchFn: opts.fetchFn });
   if (res.status === 0) {
     return { ok: false, reason: 'unreachable', message: 'Could not reach the sync service, so this change stayed on this screen. It is sent the next time you change something with the internet up.' };
   }

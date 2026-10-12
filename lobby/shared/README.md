@@ -64,3 +64,23 @@ they drift.
 `version` is bumped only on breaking shape changes. Additive fields are fine
 without a bump. When bumping, update every consumer in the same change
 set — the schedule/theme tests in this repo pin these shapes.
+
+## `sync-protocol.js` (the one sync client's protocol)
+
+The sync service's wire protocol for every client: address validation (https,
+at most `SYNC_URL_MAX` = 200 characters), session and display-key shapes, the
+passphrase normalization, request building, and reading the login / session /
+publish answers. Dependency-free (no imports, DOM, Node or storage): each
+client keeps its own transport, storage (browser localStorage, Electron
+safeStorage, config.json) and offline cache.
+
+- The lobby imports it (`src/lib/syncService.js`, `src/lib/syncSpecs.js`, which
+  the Worker also imports).
+- The print server and the Electron app (`printer/print-server/sync-client.js`,
+  `printer/electron-app/src/sync-session.js`, `device-sync.js`) run a
+  **generated CommonJS copy**, `printer/print-server/sync-protocol.js`: the
+  packaged Windows app has no `lobby/` folder and cannot `require` an ES module.
+  After editing the canonical file run `node scripts/gen-sync-protocol.mjs`;
+  `node scripts/check-mirrors.mjs` fails CI when the copy is stale.
+- Journey's `public/src/sync.js` is a browser script with its own copy of the
+  session pattern; it is not on this module yet.

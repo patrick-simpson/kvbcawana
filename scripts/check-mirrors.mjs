@@ -8,12 +8,17 @@
 //   the brand kit                 lobby/shared/brand/  ->  journey/public/brand/,
 //                                                          printer/print-server/public/brand/
 //   family.css                    printer/styles/  ->  lobby/public/, journey/public/
+//   the sync protocol             lobby/shared/sync-protocol.js  ->  a GENERATED CommonJS
+//                                 copy, printer/print-server/sync-protocol.js
+//                                 (scripts/gen-sync-protocol.mjs; the packaged Windows app
+//                                 cannot import the ES module)
 //
 // Until the one-site build serves a single copy of each (step 2), the copies
 // stay, and this keeps them honest.
 import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { SOURCE as SYNC_PROTOCOL_SOURCE, TARGET as SYNC_PROTOCOL_COPY, expectedCopy } from './gen-sync-protocol.mjs';
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const rel = (p) => path.relative(ROOT, p);
@@ -51,9 +56,17 @@ sameTree('lobby/shared/brand', 'printer/print-server/public/brand');
 same('printer/styles/family.css', 'lobby/public/family.css');
 same('printer/styles/family.css', 'journey/public/family.css');
 
+// The sync protocol's CommonJS copy is generated, so it is compared with what
+// the generator would write now, not byte-for-byte with the source.
+{
+  const copy = path.join(ROOT, SYNC_PROTOCOL_COPY);
+  if (!existsSync(copy)) problems.push(`${SYNC_PROTOCOL_COPY} is missing (generate it from ${SYNC_PROTOCOL_SOURCE}: node scripts/gen-sync-protocol.mjs)`);
+  else if (readFileSync(copy, 'utf8') !== expectedCopy()) problems.push(`${SYNC_PROTOCOL_COPY} is stale (run: node scripts/gen-sync-protocol.mjs)`);
+}
+
 if (problems.length) {
   console.error(`✗ ${problems.length} copy problem(s):\n  ${problems.join('\n  ')}`);
-  console.error('Change the canonical file, then copy it over the others (never the other way round).');
+  console.error('Change the canonical file, then copy it over the others (never the other way round); the sync protocol copy is regenerated, not copied.');
   process.exit(1);
 }
-console.log('✓ contract vectors, envelope vectors, the brand kit and family.css match across the three apps');
+console.log('✓ contract vectors, envelope vectors, the brand kit, family.css and the sync protocol copy match across the three apps');
