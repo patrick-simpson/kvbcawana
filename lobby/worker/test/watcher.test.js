@@ -143,17 +143,33 @@ describe('the watcher', () => {
     expect(near.alarm.at - near.now()).toBe(10 * 60 * 1000);
   });
 
-  it('reads every 15 seconds in the window and never faster, even with read-now', async () => {
+  it('reads every 5 seconds in the window and never faster, even with read-now', async () => {
+    expect(READ_INTERVAL_MS).toBe(5000);
     const s = setup({ kids: [kid(1)] });
     await s.w.tick();
     expect(reportReads(s)).toBe(1);
     expect(s.alarm.at - s.now()).toBe(READ_INTERVAL_MS);
-    s.tick(5000);
+    s.tick(2000);
     expect((await s.w.readNow()).throttled).toBe(true);
     await s.w.tick();
     expect(reportReads(s)).toBe(1);
-    expect(s.alarm.at - s.now()).toBe(READ_INTERVAL_MS - 5000);
-    s.tick(10000);
+    expect(s.alarm.at - s.now()).toBe(READ_INTERVAL_MS - 2000);
+    s.tick(3000);
+    await s.w.tick();
+    expect(reportReads(s)).toBe(2);
+  });
+
+  it('any other read on the session (a phone\'s roster) holds the watcher off for 5 s', async () => {
+    const s = setup({ kids: [kid(1)] });
+    await s.w.tick();
+    s.tick(READ_INTERVAL_MS);
+    const client = /** @type {any} */ (s.w.clientFor());
+    await client.checkinPage();
+    s.tick(1000);
+    await s.w.tick();
+    expect(reportReads(s)).toBe(1);
+    expect(s.alarm.at - s.now()).toBe(READ_INTERVAL_MS - 1000);
+    s.tick(READ_INTERVAL_MS - 1000);
     await s.w.tick();
     expect(reportReads(s)).toBe(2);
   });
@@ -185,7 +201,7 @@ describe('the watcher', () => {
     expect(st.log.map((l) => l.kind)).toEqual(expect.arrayContaining(['new-night', 'sign-in', 'baseline', 'checked-in-on-twotimtwo', 'undone-on-twotimtwo']));
     const tallies = s.lines.filter((l) => l.includes('would publish tally'));
     expect(JSON.parse(tallies.at(-1).split('tally ')[1])).toMatchObject({ counts: { Sparks: 2, 'T&T': 1 }, total: 3 });
-    // The check-in page is read once a night, not every 15 s.
+    // The check-in page is read once a night, not every 5 s.
     expect(s.tt.calls.filter((c) => c.path === '/clubber/checkin')).toHaveLength(1);
   });
 

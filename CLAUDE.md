@@ -94,7 +94,8 @@ commits or files.
   laptop: the sync Worker talks to TwoTimTwo itself, a Raspberry Pi at church
   prints the labels. Phased, shadow-tested beside the laptop; read it before
   touching check-in, the relay or the print path. TwoTimTwo (Devin) allowed
-  it on 2026-10-11: everything encrypted, reads no faster than every 15 s, no
+  it on 2026-10-11: everything encrypted, ONE read every 5 s with all reads
+  combined (it was 15 s at first), no
   vendor support. Phase 1 (the Worker's read-only report watcher,
   `lobby/worker/src/twotimtwo.js` / `watcher.js`) is built and idle until the
   `TWOTIMTWO_*` secrets are set.

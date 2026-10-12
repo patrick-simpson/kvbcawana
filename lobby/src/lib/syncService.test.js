@@ -201,8 +201,8 @@ describe('the cloud check-in test button\'s words', () => {
     expect(ok({ ok: false, error: 'something-new', status: {} }).text).toContain('(something-new)');
   });
 
-  it('a press inside TwoTimTwo\'s 15 seconds reports the read just made', () => {
-    expect(ok({ ok: true, throttled: true, status: { checkedIn: 2, checkinPage: page } }).text).toMatch(/^Read 15 seconds ago .*2 children checked in/);
+  it('a press inside TwoTimTwo\'s 5 seconds reports the read just made', () => {
+    expect(ok({ ok: true, throttled: true, status: { checkedIn: 2, checkinPage: page } }).text).toMatch(/^Read a moment ago \(TwoTimTwo allows one read every 5 s\): .*2 children checked in/);
     expect(ok({ ok: true, throttled: true, status: { lastError: 'login-refused' } })).toMatchObject({ ok: false });
   });
 });
