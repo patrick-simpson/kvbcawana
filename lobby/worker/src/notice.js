@@ -28,6 +28,19 @@ export const NOTICE_LEVELS = Object.freeze(['info', 'warn', 'critical']);
 export const NOTICE_MESSAGE_MAX = 200;
 export const NOTICE_MIN_MIN = 5;
 export const NOTICE_MAX_MIN = 240;
+/**
+ * How far back a take-down frame's `at` is stamped. A screen that predates
+ * `durationSec` ignores the field and ages a notice from its ARRIVAL unless its
+ * `at` is more than CLOCK_SKEW_TOLERANCE_MS (2 h) behind its clock, then from
+ * `at`, hiding it after NOTICE_MAX_AGE_MS (4 h). A take-down stamped `at: now`
+ * (or with the original, still recent `at`) therefore SHOWED the notice for
+ * another 4 h, and revived a laptop notice those screens had already dropped.
+ * Stamped 7 h back (4 h ceiling + 2 h skew tolerance + 1 h spare), an old
+ * screen reads it as stale and drops it even with its clock 2 h slow; a newer
+ * screen takes it down on `durationSec: 0`. Pinned against the lobby's own
+ * constants in test/notice.test.js.
+ */
+export const TAKEDOWN_AGE_MS = 7 * 60 * 60 * 1000;
 const LIVE = replayKey('notice');
 
 export class Notices {
@@ -106,7 +119,10 @@ export function mountNotice(registry, core) {
 
   /**
    * Take down whatever notice the screens hold (the owner's, or the laptop's
-   * replayed one): the SAME text with durationSec 0, then both copies go.
+   * replayed one): the SAME text with durationSec 0 and an `at` no newer than
+   * TAKEDOWN_AGE_MS ago (the original `at` when that is older still), so a
+   * screen that ignores durationSec reads it as stale and drops it; then both
+   * copies go.
    * @param {any} device @param {number} [undoOf]
    */
   const takeDown = async (device, undoOf) => {
@@ -118,7 +134,10 @@ export function mountNotice(registry, core) {
       try { payload = typeof text === 'string' ? JSON.parse(text).d : null; } catch { payload = null; }
     }
     if (!payload || typeof payload.message !== 'string') return { cleared: false, seq: null, screens: 0 };
-    const down = { level: payload.level, message: payload.message, at: new Date(core.now()).toISOString(), durationSec: 0 };
+    const was = typeof payload.at === 'number' ? payload.at : typeof payload.at === 'string' ? Date.parse(payload.at) : NaN;
+    const stale = core.now() - TAKEDOWN_AGE_MS;
+    const at = new Date(Number.isFinite(was) ? Math.min(was, stale) : stale).toISOString();
+    const down = { level: payload.level, message: payload.message, at, durationSec: 0 };
     const screens = core.broadcast(frameText('notice', down));
     await core.storage.delete(LIVE);
     await notices.doc.drop();

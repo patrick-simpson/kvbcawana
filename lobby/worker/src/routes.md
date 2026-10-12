@@ -735,7 +735,7 @@ Storage `notice:current` = `{payload: {level, message, at, durationSec}, until, 
 | Route | Auth | Request | Answer |
 | --- | --- | --- | --- |
 | `POST /v1/notice` | session | `{level: 'info'\|'warn'\|'critical', message, durationMin: 5..240}` | builds `{level, message: plainText(message, 200), at: ISO now, durationSec}` (unknown level or empty message: 400), `relay('notice', payload)` (replayed), stores `notice:current`. `{ok, notice, until, screens}`. 503 `{reason: 'notices-off'}`. Logs `notice` (undo = take down) |
-| `DELETE /v1/notice` | session | | publishes `{level, message, at: now, durationSec: 0}` (the SAME text: an older screen at worst keeps what it already shows), then deletes `live:notice` and `notice:current`. `{ok, cleared}`. Logs `notice` |
+| `DELETE /v1/notice` | session | | publishes `{level, message, at, durationSec: 0}`: the SAME text with `at` = the earlier of its original `at` and now - 7 h (`TAKEDOWN_AGE_MS`), so a screen that ignores `durationSec` reads it as stale and drops it (an `at: now` re-showed it for 4 h and revived a laptop notice those screens had already dropped), then deletes `live:notice` and `notice:current`. `{ok, cleared}`. Logs `notice` |
 | `GET /v1/notice` | session | | `{notice: {...payload, until, by} \| null}` |
 
 - **Gate.** `POST /v1/publish` with `event: 'notice'` while `notice:current` is

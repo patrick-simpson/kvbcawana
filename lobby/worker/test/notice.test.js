@@ -1,6 +1,18 @@
 // A notice to every screen (routes.md 10.4).
 import { describe, expect, it } from 'vitest';
 import { rig } from './rig.js';
+import { TAKEDOWN_AGE_MS } from '../src/notice.js';
+import { sanitizeNotice } from '../../src/lib/eventSanitizers.js';
+import { CLOCK_SKEW_TOLERANCE_MS, isFresh, stampOf, stampReceived } from '../../src/lib/freshness.js';
+import { NOTICE_MAX_AGE_MS } from '../../src/lib/constants.js';
+
+// What a screen that predates `durationSec` does with a frame (App's
+// handleNotice + NoticeBanner's noticeShowing): sanitize, stamp on arrival,
+// judge by its own clock.
+const oldScreenShows = (d, now) => {
+  const n = sanitizeNotice(d);
+  return Boolean(n?.message) && isFresh(stampOf(stampReceived(n, now)), NOTICE_MAX_AGE_MS, now);
+};
 
 const SUNDAY = Date.parse('2026-10-11T16:00:00Z');
 const PAGE = { 'X-Device': 'page_aaaaaaaaaaaaaaaa', 'X-Device-Name': 'Home%20PC' };
@@ -76,13 +88,41 @@ describe('DELETE /v1/notice (take it down)', () => {
     r.clock.tick(60 * 1000);
     const frames = r.sent.length;
     expect((await r.call('DELETE', '/v1/notice', undefined, PAGE)).body).toEqual({ ok: true, cleared: true });
-    expect(r.sent.slice(frames)).toEqual([{ e: 'notice', d: { level: 'warn', message: 'Pickup is in the gym tonight', at: new Date(r.clock.t).toISOString(), durationSec: 0 } }]);
+    expect(r.sent.slice(frames)).toEqual([{ e: 'notice', d: { level: 'warn', message: 'Pickup is in the gym tonight', at: new Date(r.clock.t - TAKEDOWN_AGE_MS).toISOString(), durationSec: 0 } }]);
     expect(r.storage.map.has('live:notice')).toBe(false);
     expect(r.storage.map.has('notice:current')).toBe(false);
     expect(await replayed(r)).toEqual([]);
     expect((await r.call('DELETE', '/v1/notice')).body).toEqual({ ok: true, cleared: false });
     const e = (await r.call('GET', '/v1/changes?limit=1')).body.entries[0];
     expect(e).toMatchObject({ what: 'notice', before: { notice: { message: 'Pickup is in the gym tonight' } }, after: { notice: null }, undoable: false });
+  });
+
+  it('an older screen (no durationSec) drops the take-down instead of showing it 4 h more', async () => {
+    expect(TAKEDOWN_AGE_MS).toBeGreaterThan(NOTICE_MAX_AGE_MS + CLOCK_SKEW_TOLERANCE_MS);
+    const r = await rig({ start: SUNDAY });
+    await send(r, {});
+    const up = r.sent.at(-1).d;
+    expect(oldScreenShows(up, r.clock.t)).toBe(true);
+    r.clock.tick(60 * 1000);
+    const frames = r.sent.length;
+    await r.call('DELETE', '/v1/notice');
+    const down = r.sent.slice(frames)[0].d;
+    // On time, and with the screen's clock up to the skew tolerance either way.
+    for (const skew of [0, -CLOCK_SKEW_TOLERANCE_MS, CLOCK_SKEW_TOLERANCE_MS]) {
+      expect(oldScreenShows(down, r.clock.t + skew)).toBe(false);
+    }
+  });
+
+  it('never revives a laptop notice an older screen already dropped', async () => {
+    const r = await rig({ start: SUNDAY });
+    const at = new Date(r.clock.t).toISOString();
+    await r.call('POST', '/v1/publish', { event: 'notice', payload: { level: 'info', message: 'From TwoTimTwo', at } });
+    r.clock.tick(NOTICE_MAX_AGE_MS + 60 * 1000);
+    const frames = r.sent.length;
+    await r.call('DELETE', '/v1/notice');
+    const down = r.sent.slice(frames)[0].d;
+    expect(Date.parse(down.at)).toBeLessThanOrEqual(Date.parse(at));
+    expect(oldScreenShows(down, r.clock.t)).toBe(false);
   });
 
   it('takes down a laptop notice too', async () => {
