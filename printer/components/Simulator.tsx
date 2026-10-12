@@ -74,8 +74,8 @@ export const Simulator: React.FC = () => {
           <p className="kv-tabkicker kv-tabkicker--light">Try it</p>
           <h2 className="kv-h2" id="sim-title">Check a child in</h2>
           <p className="kv-lede">
-            Pick a name on this copy of a TwoTimTwo check-in page and press <b>Checkin</b>. On club night the same
-            click on your church’s own page prints the label and greets the child in the lobby.
+            Pick a name on this copy of a TwoTimTwo check-in page and press <b>Checkin</b>. On club night a check-in on
+            TwoTimTwo prints the label with the KVBC Awana app and greets the child in the lobby.
           </p>
         </div>
 
@@ -139,7 +139,7 @@ export const Simulator: React.FC = () => {
                 : 'The label printer, acted out: waiting for a check-in.'} />
           </div>
         </div>
-        <p className="kv-sim__note">A copy of a TwoTimTwo check-in page, with the same page structure the extension watches. Names are examples.</p>
+        <p className="kv-sim__note">A copy of a TwoTimTwo check-in page. Names are examples.</p>
       </div>
 
       <CheckinModal clubber={selectedClubber} onClose={closeModal} onConfirm={handleCheckin} />
