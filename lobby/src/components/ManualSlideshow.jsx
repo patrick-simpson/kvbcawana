@@ -192,7 +192,7 @@ export default function ManualSlideshow({ slides, slideshowDelaySec, clubTint = 
   const zero = useContext(ZeroAnimationContext);
 
   // The hold timer, pausable: time already spent on this slide survives a
-  // pause, so names on screen stop the clock instead of resetting it. Timed on
+  // pause, so names on screen stop the clock instead of resetting it.
   // the monotonic clock: a wall-clock step (NTP) must not bend the hold.
   const timing = useRef({ key: '', spent: 0, startedAt: 0 });
   useEffect(() => {
@@ -202,11 +202,11 @@ export default function ManualSlideshow({ slides, slideshowDelaySec, clubTint = 
       t.spent = 0;
     }
     if (holdMs == null || paused) return undefined;
-    t.startedAt = Date.now();
+    t.startedAt = performance.now();
     const timer = setTimeout(advance, Math.max(0, holdMs - t.spent));
     return () => {
       clearTimeout(timer);
-      t.spent += Date.now() - t.startedAt;
+      t.spent += performance.now() - t.startedAt;
     };
   }, [holdMs, slideKey, paused, advance]);
 
