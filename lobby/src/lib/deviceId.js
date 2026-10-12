@@ -32,7 +32,9 @@ export function defaultDeviceName(ua = typeof navigator !== 'undefined' ? naviga
 
 /** @param {unknown} name */
 export function cleanDeviceName(name) {
-  return String(name ?? '').replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, DEVICE_NAME_MAX);
+  // \s covers tabs and newlines; any other control character is dropped.
+  return [...String(name ?? '')].map((c) => (c.charCodeAt(0) < 32 || c.charCodeAt(0) === 127 ? ' ' : c)).join('')
+    .replace(/\s+/g, ' ').trim().slice(0, DEVICE_NAME_MAX);
 }
 
 /** @returns {{id: string, name: string} | null} */
