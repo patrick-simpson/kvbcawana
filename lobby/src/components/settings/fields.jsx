@@ -759,7 +759,7 @@ export function PublishTokenField() {
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') commit(); }}
-              placeholder="paste the token from the printer dashboard"
+              placeholder="paste a publish token"
             />
             <button type="button" className="ghost" disabled={!draft.trim()} onClick={commit}>Save</button>
             <button type="button" className="ghost" onClick={() => { setEditing(false); setDraft(''); }}>Cancel</button>
@@ -794,8 +794,7 @@ export function PublishTokenField() {
       )}
       <span className="hint">
         Only needed on the machine that edits slides, and filled in automatically on a logged-in screen.
-        By hand: print-server dashboard → <strong>Lobby Slides</strong> → Generate. It stays on this machine —
-        never in a settings export, a <code>?config=</code> file, or a URL.
+        It stays on this machine — never in a settings export, a <code>?config=</code> file, or a URL.
       </span>
     </div>
   );

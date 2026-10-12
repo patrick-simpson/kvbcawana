@@ -9,6 +9,14 @@
 // network switch or the CORS list can never be changed from it; and that the
 // dashboard's own calls (no Origin, same origin) are exactly what they were.
 //
+// Online only (2026-10-12): the dashboard is gone, so every tool it had that is
+// still needed is a route here (leader tags, one-off and custom labels, a
+// stretch reprint, the attendance audit, rehearsal mode, this computer's own
+// sync sign-in). Each is pinned below: listed, preflighted, refused without
+// proof, allowed with it. The secrets are not: the display key, the publish
+// token and the session are never in the table, never readable and never
+// settable from the page.
+//
 // Run: node scripts/test-settings-page.cjs
 
 'use strict';
@@ -32,7 +40,11 @@ const PAGE = 'https://awana.kvbchurch.org';
 const OLD_SITE = 'https://patrick-simpson.github.io';
 const SYNC = 'https://sync.example.org';
 const GOOD_SESSION = 'v1.2.1700000000000.settingspagesettingspagesettings';
+const GOOD_SESSION_B = 'v1.2.1700000000001.settingspagesecondsessionsecond';
 const syncChecks = [];
+const loginUrls = [];
+const NEW_SESSION = 'v1.9.1700000000000.printserverrelogin0000000000';
+const SERVICE_KEY = Buffer.alloc(32, 7).toString('base64');
 
 let passed = 0;
 let failed = 0;
@@ -77,15 +89,29 @@ async function main() {
     check('only that exact origin', !r(OLD_SITE, '/health', 'GET') && !r('https://awana.kvbchurch.org.evil.example', '/health', 'GET')
       && !r('http://awana.kvbchurch.org', '/health', 'GET') && !r('https://evil.example', '/health', 'GET') && !r(undefined, '/health', 'GET'));
     check('nothing outside the table', !r(PAGE, '/stats/tonight', 'GET') && !r(PAGE, '/phone/roster', 'POST')
-      && !r(PAGE, '/rehearsal', 'POST') && !r(PAGE, '/api/lobby-slides', 'GET') && !r(PAGE, '/config/display-key/generate', 'POST')
-      && !r(PAGE, '/config/sync-login', 'POST') && !r(PAGE, '/constructor', 'GET') && !r(PAGE, '/__proto__', 'GET'));
+      && !r(PAGE, '/api/lobby-slides', 'GET') && !r(PAGE, '/config/display-key/generate', 'POST')
+      && !r(PAGE, '/config/slides-token/generate', 'POST') && !r(PAGE, '/config/display-login/generate', 'POST')
+      && !r(PAGE, '/config/sync-logout', 'POST') && !r(PAGE, '/update-now', 'POST') && !r(PAGE, '/reconcile', 'GET')
+      && !r(PAGE, '/constructor', 'GET') && !r(PAGE, '/__proto__', 'GET'));
+    // The tools that moved here from the dashboard (Online only): each is a row of its own.
+    check('the moved tools are in the table, with their own methods', [
+      ['/leaders', 'GET'], ['/leaders/forget', 'POST'], ['/print-leader', 'POST'], ['/print-oneoff', 'POST'], ['/print-custom', 'POST'],
+      ['/reprint-range', 'POST'], ['/attendance-audit', 'GET'], ['/attendance-audit/apply', 'POST'], ['/rehearsal', 'POST'],
+      ['/config/sync-login', 'POST'],
+    ].every(([p, m]) => r(PAGE, p, m) && !r(PAGE, p, 'DELETE') && !r(PAGE, p, m === 'GET' ? 'POST' : 'GET') && !r(PAGE, p, m).open));
+    check('...and none of them is open (each needs the sign-in)', Object.keys(security.SETTINGS_PAGE_ROUTES).filter((p) => security.SETTINGS_PAGE_ROUTES[p].open).join() === '/health');
+    check('...a secret-minting or secret-reading route is never in the table', !['/config/display-key/generate', '/config/slides-token/generate', '/config/display-login/generate', '/config/sync-logout', '/api/lobby-slides', '/api/display-settings']
+      .some((p) => Object.prototype.hasOwnProperty.call(security.SETTINGS_PAGE_ROUTES, p)));
+    check('the Wi-Fi phone page is not in the table', !r(PAGE, '/phone', 'GET') && !r(PAGE, '/phone/ym', 'GET'));
     const refusals = security.settingsPageConfigRefusals;
     check('the printer keys pass', refusals({ printerName: 'A', backupPrinterName: '', pickupClubs: ['Sparks'], labelFooter: 'x' }).length === 0);
     check('every secret key is refused', ['pusherSecret', 'phonePin', 'displayKey', 'slidesPublishToken', 'displayLoginPassphrase', 'syncSession']
       .every((k) => refusals({ [k]: 'x' }).includes(k)));
     check('so is the network, CORS and the check-in URL',
-      ['lanAccess', 'allowedOrigins', 'checkinUrl', 'fleetConfigUrl', 'enableDrivenCheckin', 'historyRetentionDays']
+      ['lanAccess', 'allowedOrigins', 'checkinUrl', 'fleetConfigUrl', 'historyRetentionDays']
         .every((k) => refusals({ [k]: 'x' }).includes(k)));
+    check('the two switches that moved here pass (update beacon, driven check-ins)',
+      refusals({ updateBeacon: true, enableDrivenCheckin: false, musicalPrinter: true }).length === 0);
     check('one bad key refuses the whole body', refusals({ printerName: 'A', phonePin: '1234' }).join() === 'phonePin');
     check('a body that is not an object has nothing to allow', refusals(null).length > 0 && refusals([]).length > 0 && refusals('x').length > 0);
     check('none of the secrets is in the allowed list',
@@ -108,7 +134,13 @@ async function main() {
     const auth = (opts && opts.headers && (opts.headers.Authorization || opts.headers.authorization)) || '';
     if (String(url) === `${SYNC}/v1/state`) {
       syncChecks.push(auth);
-      return new Response(JSON.stringify({}), { status: auth === `Bearer ${GOOD_SESSION}` || /printserver/.test(auth) ? 200 : 401 });
+      return new Response(JSON.stringify({}), { status: auth === `Bearer ${GOOD_SESSION}` || auth === `Bearer ${GOOD_SESSION_B}` || /printserver/.test(auth) ? 200 : 401 });
+    }
+    if (String(url) === `${SYNC}/v1/login`) {
+      loginUrls.push(String(url));
+      const said = JSON.parse((opts && opts.body) || '{}').passphrase;
+      if (said !== 'kennebec') return new Response(JSON.stringify({ error: 'no', triesLeft: 4 }), { status: 401 });
+      return new Response(JSON.stringify({ session: NEW_SESSION, displayKey: SERVICE_KEY }), { status: 200 });
     }
     return new Response(JSON.stringify({ error: 'not here' }), { status: 404 });
   };
@@ -140,13 +172,24 @@ async function main() {
 
     // The same page may not use anything outside its table, or a method the
     // table does not list for a path.
-    for (const [p, m] of [['/stats/tonight', 'GET'], ['/phone/roster', 'POST'], ['/rehearsal', 'POST'],
-      ['/config/display-key/generate', 'POST'], ['/config/sync-login', 'POST'],
-      ['/update-csv', 'POST'], ['/print', 'POST'], ['/health', 'POST'], ['/printers', 'POST']]) {
+    for (const [p, m] of [['/stats/tonight', 'GET'], ['/phone/roster', 'POST'], ['/phone', 'GET'],
+      ['/config/display-key/generate', 'POST'], ['/config/sync-logout', 'POST'], ['/config/slides-token/generate', 'POST'],
+      ['/update-csv', 'POST'], ['/print', 'POST'], ['/health', 'POST'], ['/printers', 'POST'],
+      ['/rehearsal', 'GET'], ['/print-leader', 'GET'], ['/attendance-audit', 'POST']]) {
       const r = await preflight(p, m, PAGE);
       check(`preflight for ${m} ${p} is refused`, r.status === 403 && !r.headers.get('access-control-allow-origin'), String(r.status));
     }
-    // Never widened to another origin, the archived github.io site included.
+    // The moved tools are preflighted for the page, with Private Network Access, and for nobody else.
+    for (const [p, m] of [['/leaders', 'GET'], ['/leaders/forget', 'POST'], ['/print-leader', 'POST'], ['/print-oneoff', 'POST'],
+      ['/print-custom', 'POST'], ['/reprint-range', 'POST'], ['/attendance-audit', 'GET'], ['/attendance-audit/apply', 'POST'],
+      ['/rehearsal', 'POST'], ['/config/sync-login', 'POST']]) {
+      const r = await preflight(p, m, PAGE);
+      check(`preflight for ${m} ${p} is answered for the page`, r.status === 204 && r.headers.get('access-control-allow-origin') === PAGE
+        && r.headers.get('access-control-allow-private-network') === 'true', String(r.status));
+      const other = await preflight(p, m, 'https://evil.example');
+      check(`...and refused for another origin (${p})`, other.status === 403 && !other.headers.get('access-control-allow-origin'), String(other.status));
+    }
+    // Never widened to another origin, the archived display site included.
     for (const origin of [OLD_SITE, 'https://awana.kvbchurch.org.evil.example', 'http://awana.kvbchurch.org', 'https://evil.example', 'null']) {
       const r = await preflight('/config', 'POST', origin);
       check(`preflight from ${origin} is refused`, r.status === 403 && !r.headers.get('access-control-allow-origin'), String(r.status));
@@ -161,7 +204,7 @@ async function main() {
     check('/health gives the page no folder path', !open.body.extension || !open.body.extension.folder);
 
     const none = await j('/printers', { headers: { Origin: PAGE } });
-    check('no publish token on the server yet: 403 with the way to make one', none.status === 403 && /Generate publish token/i.test(none.body.error), JSON.stringify(none.body));
+    check('no publish token on the server yet: 403 saying to sign in', none.status === 403 && /sign in to the settings page/i.test(none.body.error), JSON.stringify(none.body));
 
     const gen = await post('/config/slides-token/generate');
     const token = gen.body.token;
@@ -180,8 +223,10 @@ async function main() {
     check('another origin is refused even WITH the token', stranger.status === 403 && savedConfig().printerName === 'Fake');
     const oldSite = await post('/config', { printerName: 'Evil' }, { Origin: OLD_SITE, Authorization: `Bearer ${token}` });
     check('the archived display site is refused even WITH the token', oldSite.status === 403 && savedConfig().printerName === 'Fake');
-    const outside = await post('/rehearsal', { on: true }, { Origin: PAGE, Authorization: `Bearer ${token}` });
+    const outside = await post('/config/display-key/generate', {}, { Origin: PAGE, Authorization: `Bearer ${token}` });
     check('a route outside the table is refused even WITH the token', outside.status === 403);
+    const outside2 = await post('/config/slides-token/generate', {}, { Origin: PAGE, Authorization: `Bearer ${token}` });
+    check('so is minting a publish token', outside2.status === 403);
     const roster = await j('/stats/tonight', { headers: { Origin: PAGE, Authorization: `Bearer ${token}` } });
     check('a read outside the table carries no CORS header, so the page cannot read it', !roster.headers.get('access-control-allow-origin'));
     const deck = await j('/api/lobby-slides', { headers: { Origin: PAGE, Authorization: `Bearer ${token}` } });
@@ -214,6 +259,10 @@ async function main() {
       && JSON.stringify(disk.pickupClubs) === JSON.stringify(['Sparks', 'T&T']), JSON.stringify(disk));
     check('...and kept what it did not send (the PIN, the key, the token)', disk.phonePin === '4321' && Boolean(disk.displayKey) && disk.slidesPublishToken === token);
 
+    const sw = await post('/config', { updateBeacon: true, enableDrivenCheckin: false, musicalPrinter: true }, H);
+    check('the three switches save from the page (update beacon, driven check-ins, musical printer)', sw.status === 200
+      && savedConfig().updateBeacon === true && savedConfig().enableDrivenCheckin === false && savedConfig().musicalPrinter === true, JSON.stringify(sw.body));
+    await post('/config', { musicalPrinter: false, enableDrivenCheckin: true, updateBeacon: false }, H);
     for (const body of [{ phonePin: '9999' }, { displayKey: '' }, { slidesPublishToken: 'x' }, { pusherSecret: 'x' }, { displayLoginPassphrase: 'x' },
       { lanAccess: true }, { allowedOrigins: ['https://evil.example'] }, { checkinUrl: 'https://evil.example/' }, { printerName: 'Dock', phonePin: '9999' }]) {
       const before = JSON.stringify(savedConfig());
@@ -246,7 +295,109 @@ async function main() {
     check('the test print is allowed through', (await post('/canary', {}, H)).status !== 403);
   }
 
-  console.log('settings page: the dashboard and the extension are unchanged');
+  console.log('settings page: the tools that moved here from the dashboard');
+  {
+    const token = savedConfig().slidesPublishToken;
+    const H = { Origin: PAGE, Authorization: `Bearer ${token}` };
+    const noProof = { Origin: PAGE };
+    const WRONG = { Origin: PAGE, Authorization: 'Bearer nope-nope-nope-nope-nope-nope' };
+    const STRANGER = { Origin: 'https://evil.example', Authorization: `Bearer ${token}` };
+    // Every one of them: refused without proof, and answered (not a 403) with it.
+    const calls = [
+      ['GET', '/leaders'], ['POST', '/leaders/forget'], ['POST', '/print-leader'], ['POST', '/print-oneoff'], ['POST', '/print-custom'],
+      ['POST', '/reprint-range'], ['GET', '/attendance-audit'], ['POST', '/attendance-audit/apply'], ['POST', '/rehearsal'],
+    ];
+    const call = (m, p, headers) => (m === 'GET' ? j(p, { headers }) : post(p, {}, headers));
+    for (const [m, p] of calls) {
+      const bare = await call(m, p, noProof);
+      check(`${m} ${p} without proof is refused`, bare.status === 403, String(bare.status));
+      const wrong = await call(m, p, WRONG);
+      check(`${m} ${p} with a wrong token is refused`, wrong.status === 403, String(wrong.status));
+      const stranger = await call(m, p, STRANGER);
+      // A write from a stranger is refused outright; a read carries no CORS header, so the browser never lets the page see it.
+      check(`${m} ${p} from another origin is refused even WITH the token`, !stranger.headers.get('access-control-allow-origin') && (m === 'GET' || stranger.status === 403), String(stranger.status));
+    }
+    const leaders = await j('/leaders', { headers: H });
+    check('the remembered leaders read', leaders.status === 200 && Array.isArray(leaders.body.leaders) && Array.isArray(leaders.body.clubs), JSON.stringify(leaders.body));
+    check('...with CORS for the page', leaders.headers.get('access-control-allow-origin') === PAGE);
+    const forget = await post('/leaders/forget', { key: 'nobody' }, H);
+    check('forgetting a leader is allowed through (nobody to forget)', forget.status === 200 && forget.body.removed === false, JSON.stringify(forget.body));
+    check('...and still wants a key', (await post('/leaders/forget', {}, H)).status === 400);
+    const tag = await post('/print-leader', { name: '', clubName: 'Sparks' }, H);
+    check('a leader tag is allowed through (400: no name)', tag.status === 400, `${tag.status} ${JSON.stringify(tag.body)}`);
+    const one = await post('/print-oneoff', { firstName: '', clubName: 'Sparks' }, H);
+    check('a one-off tag is allowed through (400: no name)', one.status === 400, `${one.status} ${JSON.stringify(one.body)}`);
+    const custom = await post('/print-custom', { text: '' }, H);
+    check('a custom label is allowed through (400: no text)', custom.status === 400, `${custom.status} ${JSON.stringify(custom.body)}`);
+    const range = await post('/reprint-range', { fromTs: 'x', toTs: 'y' }, H);
+    check('a stretch reprint is allowed through (400: not times)', range.status === 400, `${range.status} ${JSON.stringify(range.body)}`);
+    const audit = await j('/attendance-audit', { headers: H });
+    check('the attendance audit reads', audit.status === 200 && audit.body && typeof audit.body === 'object', String(audit.status));
+    const applyNo = await post('/attendance-audit/apply', {}, H);
+    check('applying it is allowed through and still needs confirm:true', applyNo.status === 400, `${applyNo.status} ${JSON.stringify(applyNo.body)}`);
+
+    // Rehearsal: the page arms and disarms it (before this it was the dashboard's alone).
+    const arm = await post('/rehearsal', { on: true }, H);
+    check('rehearsal mode arms from the page', arm.status === 200 && arm.body.rehearsal === true, `${arm.status} ${JSON.stringify(arm.body)}`);
+    const armed = await j('/health', { headers: { Origin: PAGE } });
+    check('...and /health says so', armed.body.rehearsal === true);
+    const disarm = await post('/rehearsal', { on: false }, H);
+    check('...and disarms', disarm.status === 200 && disarm.body.rehearsal === false && (await j('/health')).body.rehearsal === false);
+    check('a wrong token cannot arm it', (await post('/rehearsal', { on: true }, WRONG)).status === 403
+      && (await j('/health')).body.rehearsal === false);
+    check('the app on this computer (no Origin) still can', (await post('/rehearsal', { on: false })).status === 200);
+
+    // The page may NOT mint or read the other secrets.
+    for (const [m, p] of [['POST', '/config/display-key/generate'], ['POST', '/config/slides-token/generate'], ['POST', '/config/display-login/generate'],
+      ['POST', '/config/sync-logout'], ['GET', '/api/lobby-slides']]) {
+      const r = await call(m, p, H);
+      check(`${m} ${p} stays refused for the page`, r.status === 403, String(r.status));
+    }
+  }
+
+  console.log('settings page: this computer\'s sync sign-in from the page');
+  {
+    const sync = (s) => ({ Origin: PAGE, Authorization: `Sync ${s}` });
+    const before = JSON.stringify(savedConfig());
+    const none = await post('/config/sync-login', { passphrase: 'kennebec' }, { Origin: PAGE });
+    check('without proof it is refused', none.status === 403 && JSON.stringify(savedConfig()) === before);
+    const bad = await post('/config/sync-login', { passphrase: 'kennebec' }, sync('v1.3.1700000000000.notasessionnotasessionnotases'));
+    check('a session the sync service refuses is refused', bad.status === 403 && JSON.stringify(savedConfig()) === before);
+    const wrong = await post('/config/sync-login', { passphrase: 'wrong words' }, sync(GOOD_SESSION_B));
+    check('a wrong passphrase is the service\'s 401, and nothing changes', wrong.status === 401 && JSON.stringify(savedConfig()) === before, `${wrong.status} ${JSON.stringify(wrong.body)}`);
+    const blank = await post('/config/sync-login', { passphrase: '  ' }, sync(GOOD_SESSION_B));
+    check('a blank passphrase is a 400', blank.status === 400);
+    // The page never names the service: a url in the body is ignored for it.
+    loginUrls.length = 0;
+    const ok = await post('/config/sync-login', { passphrase: '  Kennebec ', url: 'https://evil.example' }, sync(GOOD_SESSION_B));
+    check('a confirmed session and the passphrase sign this computer in again', ok.status === 200 && ok.body.ok === true, `${ok.status} ${JSON.stringify(ok.body)}`);
+    check('...to the service this computer already uses, never one the page named', loginUrls.length === 1 && loginUrls[0].startsWith(SYNC) && !loginUrls.some((u) => /evil/.test(u)), loginUrls.join());
+    check('...saving the new session', savedConfig().syncSession === NEW_SESSION && savedConfig().syncUrl === SYNC);
+    check('...and answering with no secret in it', Object.keys(ok.body).sort().join() === 'changedKey,kid,ok', JSON.stringify(ok.body));
+
+    // Signed out (the passphrase was changed elsewhere): the address is still known, so the page's own
+    // new session is still confirmed and it can sign the laptop in again.
+    const cfg = savedConfig();
+    delete cfg.syncSession;
+    fs.writeFileSync(path.join(dataDir, 'config.json'), JSON.stringify(cfg, null, 2));
+    server.applySavedConfig(cfg);
+    const signedOut = await post('/config/sync-login', { passphrase: 'kennebec' }, sync(GOOD_SESSION_B));
+    check('signed out of the service, a session the service confirms can sign it back in', signedOut.status === 200 && savedConfig().syncSession === NEW_SESSION, `${signedOut.status} ${JSON.stringify(signedOut.body)}`);
+
+    // Never set up: no address to confirm anything against, so the page cannot start from nothing.
+    const bare = savedConfig();
+    delete bare.syncSession; delete bare.syncUrl;
+    fs.writeFileSync(path.join(dataDir, 'config.json'), JSON.stringify(bare, null, 2));
+    server.applySavedConfig(bare);
+    const none2 = await post('/config/sync-login', { passphrase: 'kennebec', url: SYNC }, sync(GOOD_SESSION_B));
+    check('a computer with no sync service on record cannot be signed in from the page (the app\'s Set up does that)', none2.status === 403 && !savedConfig().syncSession && /Set up this computer/i.test(none2.body.error), `${none2.status} ${JSON.stringify(none2.body)}`);
+    const dash = await post('/config/sync-login', { passphrase: 'kennebec', url: SYNC });
+    check('the app\'s own wizard (loopback, no Origin) still can, naming the address', dash.status === 200 && savedConfig().syncUrl === SYNC && savedConfig().syncSession === NEW_SESSION);
+    const evil = await post('/config/sync-login', { passphrase: 'kennebec', url: SYNC }, { Origin: 'https://evil.example' });
+    check('a stranger\'s origin is refused', evil.status === 403);
+  }
+
+  console.log('settings page: the app and the extension are unchanged');
   {
     const own = `http://127.0.0.1:${PORT}`;
     const fromDashboard = await post('/config', { printerName: 'Back' }, { Origin: own });

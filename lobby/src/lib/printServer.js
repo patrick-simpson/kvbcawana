@@ -1,18 +1,18 @@
 // @ts-check
 // The settings page's way to the check-in laptop's print server (ROADMAP.md#settings-page
 // phase 3). An https page may call http://localhost, so on the laptop itself
-// awana.kvbchurch.org/settings reaches the server the dashboard talks to; on
+// awana.kvbchurch.org/settings reaches the print server on this computer; on
 // any other device nothing answers and the page says so.
 //
 // The server decides what the page may do (print-server/security.js,
-// SETTINGS_PAGE_ROUTES): /health is open, everything else needs the publish
-// token this page already holds for slides, and POST /config takes only the
-// printer's own keys. This file is the client half and the pure helpers the
-// Laptop section draws from; it never throws.
+// SETTINGS_PAGE_ROUTES): /health is open, everything else needs this page's
+// sync sign-in (or a publish token already on the laptop), and POST /config
+// takes only the printer's own keys. Since Online only (2026-10-12) there is
+// no print dashboard: every tool the laptop has is on this page. This file is
+// the client half and the pure helpers the Laptop section draws from; it
+// never throws.
 
 export const PRINT_SERVER = 'http://localhost:3456';
-/** The dashboard on the laptop: the fallback, and where the PIN and keys are set. */
-export const PRINT_DASHBOARD_URL = `${PRINT_SERVER}/#settings`;
 
 /** How long the probe waits: a laptop answers in milliseconds, nothing else ever does. */
 export const PROBE_TIMEOUT_MS = 2500;
@@ -106,7 +106,7 @@ export async function callPrintServer(path, opts) {
   let body = null;
   try { body = await res.json(); } catch { /* not JSON */ }
   const error = body && typeof body.error === 'string' ? body.error : `HTTP ${res.status}`;
-  if (res.status === 403 && /No publish token/i.test(error)) return { ok: false, reason: 'no-token-on-server', status: 403, error };
+  if (res.status === 403 && /No publish token|Sign in to the settings page with the church passphrase first/i.test(error)) return { ok: false, reason: 'no-token-on-server', status: 403, error };
   if (res.status === 403 && /Wrong publish token/i.test(error)) return { ok: false, reason: 'wrong-token', status: 403, error };
   if (res.status === 403 && !token && /sync service|sign in/i.test(error)) return { ok: false, reason: 'sign-in-refused', status: 403, error };
   if (res.status === 403) return { ok: false, reason: 'refused', status: 403, error };
@@ -117,8 +117,7 @@ export async function callPrintServer(path, opts) {
 
 /**
  * The options for a printer menu: Windows' list, plus the saved choice even
- * when Windows is not listing it right now, so saving can never drop it (the
- * dashboard does the same).
+ * when Windows is not listing it right now, so saving can never drop it.
  * @param {{ name: string, isWindowsDefault?: boolean }[] | null | undefined} printers
  * @param {string} saved
  * @returns {{ value: string, label: string }[]}
@@ -250,4 +249,44 @@ export function historyTags(e) {
 /** A row the reprint button can send (award slips and connect cards cannot). @param {any} e */
 export function canReprint(e) {
   return !(e.isAward || e.isConnectCard || e.isLeader || e.oneOff) && Boolean(e.firstName);
+}
+
+/**
+ * A time typed as H:MM, today, as an ISO instant: the boundary of a stretch
+ * reprint. The inputs are the wall clock's; the history is ISO/UTC. From takes
+ * :00 seconds and To :59, so both ends hold the whole minute that was typed.
+ * @param {string} hhmm
+ * @param {boolean} endOfMinute
+ * @param {Date} [now]
+ * @returns {string | null}
+ */
+export function timeToday(hhmm, endOfMinute, now = new Date()) {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(String(hhmm || '').trim());
+  if (!m || Number(m[1]) > 23 || Number(m[2]) > 59) return null;
+  const d = new Date(now.getFullYear(), now.getMonth(), now.getDate(), Number(m[1]), Number(m[2]), endOfMinute ? 59 : 0, endOfMinute ? 999 : 0);
+  return d.toISOString();
+}
+
+/** @param {number} ms the age of the attendance grid @returns {number} whole days */
+export function auditDays(ms) {
+  return Math.max(0, Math.floor((Number(ms) || 0) / 86400000));
+}
+
+/**
+ * What the attendance audit says, in words. The server's own answer (`known`,
+ * `matches`, `totals`, `reason`) decides; this only phrases it.
+ * @param {any} v
+ * @returns {{ tone: 'ok' | 'warn' | 'none', text: string }}
+ */
+export function auditSummary(v) {
+  if (!v || !v.known) {
+    if (v && v.reason === 'stale') return { tone: 'none', text: `Not checked: the last grid read is ${auditDays(v.ageMs)} day(s) old, too stale to trust. It refreshes on its own from a TwoTimTwo tab.` };
+    if (v && v.reason === 'no-meetings') return { tone: 'none', text: 'Not checked: the grid held no past meeting dates, so there is nothing to compare.' };
+    return { tone: 'none', text: 'Not checked: no attendance grid has been read yet. Open TwoTimTwo in Chrome with the extension loaded (outside club hours) and this fills in on its own.' };
+  }
+  if (v.matches) return { tone: 'ok', text: `Agrees with TwoTimTwo across ${v.scopeDates} meeting(s).` };
+  return {
+    tone: 'warn',
+    text: `${v.totals?.missing ?? 0} night(s) TwoTimTwo has that this ledger does not, and ${v.totals?.ledgerOnly ?? 0} this ledger has that TwoTimTwo does not. A night only this machine knows about is usually a walk-in guest, and is never removed.`,
+  };
 }

@@ -222,7 +222,7 @@ export function StatusSection({
       <div className="status-alert" key="printer">
         <strong>The printer reported {opsFailures.length} problem{opsFailures.length > 1 ? 's' : ''} tonight</strong>
         {latest?.at ? <> (latest{latest.club ? `: ${latest.club}` : ''} at {new Date(latest.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })})</> : null}
-        {' '}— check the print server dashboard.
+        {' '}— see Laptop on awana.kvbchurch.org/settings.
       </div>,
     );
   }

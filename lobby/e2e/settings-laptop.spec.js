@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-// The settings page's Laptop section (ROADMAP.md#settings-page phase 3): it looks for the
+// The settings page's Laptop section (ROADMAP.md#settings-page phase 3, #online-only): it looks for the
 // print server on http://localhost:3456 when opened. The server is stubbed
 // with page.route (a stand-in for the laptop), once absent and once present.
 
@@ -27,6 +27,9 @@ async function stubLaptop(page, { saved }) {
     if (path === '/config/label-templates') return route.fulfill(reply({ templates: {}, knownClubs: ['spark'] }));
     if (path === '/config/schedule') return route.fulfill(reply({ schedule: [], lateGraceMin: 10 }));
     if (path === '/history/today') return route.fulfill(reply([]));
+    if (path === '/clubs') return route.fulfill(reply({ clubs: ['Puggles', 'Sparks'] }));
+    if (path === '/leaders') return route.fulfill(reply({ leaders: [], hidden: 0, clubs: [] }));
+    if (path === '/attendance-audit') return route.fulfill(reply({ known: false }));
     return route.fulfill(reply({ error: 'not stubbed' }, 404));
   });
 }
@@ -58,7 +61,11 @@ test('on the laptop it shows the printer and saves a pick with the token', async
   await printer.selectOption('Spare');
   await expect(dialog.getByText('Saved. The next label prints there.')).toBeVisible();
   expect(saved).toEqual([{ printerName: 'Spare' }]);
-  await expect(dialog.getByRole('link', { name: 'Open the print dashboard' })).toBeVisible();
+  // The print dashboard is retired (Online only): its tools are cards here, and there is no link to it.
+  await expect(dialog.getByRole('link', { name: /print dashboard/i })).toHaveCount(0);
+  await expect(dialog.getByText('Name tags and labels')).toBeVisible();
+  await expect(dialog.getByText('Attendance audit')).toBeVisible();
+  await expect(dialog.getByRole('button', { name: 'Rehearsal mode' })).toBeVisible();
 });
 
 test('the Laptop section is not on a screen\'s own Settings', async ({ page }) => {

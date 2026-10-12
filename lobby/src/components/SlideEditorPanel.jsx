@@ -259,12 +259,12 @@ export default function SlideEditorPanel({ config, syncedDeck, onChange, onClose
         message: `Published rev ${result.deckRev} (${plural(result.slideCount, 'slide')}). When this screen shows the new deck, the whole pipe is confirmed — every online display receives the same broadcast, and screens that are off catch up within ~5 minutes of coming back.`,
       });
     } else {
-      // Export-and-paste is a real workaround only when the TOKEN is the
-      // problem (the dashboard needs none). A deck the server rejected as
-      // too large fails identically through the dashboard, so say nothing
-      // extra there — the server's message already says what to shorten.
+      // Another way in is a real workaround only when the TOKEN is the
+      // problem. A deck the server rejected as too large fails the same way
+      // anywhere, so say nothing extra there — the server's message already
+      // says what to shorten.
       const fallback = result.reason === 'auth' && !viaSync
-        ? ' This machine has no valid publish token — log in under Settings → Setup → Connect this screen, or paste a token under Settings → Setup → Publishing slides. Or press Export and paste the file into the print-server dashboard → Lobby Slides → Publish.'
+        ? ' This machine has no valid publish token — log in under Settings → Setup → Connect this screen, or paste a token under Settings → Setup → Publishing slides.'
         : '';
       setPublishState({ phase: 'err', message: `${result.message}${fallback}`, deckRev: null });
     }

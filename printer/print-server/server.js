@@ -3967,20 +3967,20 @@ function corsPolicy(req, res, next) {
       return settingsPageSessionOk(req).then((ok) => {
         if (!ok) {
           console.warn(`[security] Refused settings-page ${req.method} ${req.path}: the sync service did not confirm the sign-in`);
-          return res.status(403).json({ error: signedInToSync()
+          return res.status(403).json({ error: syncClient.isValidSyncUrl(config.syncUrl)
             ? 'Sign in to the settings page again: the sync service did not accept its sign-in.'
-            : 'This print server is not signed in to the sync service. Sign it in on its dashboard, or paste the publish token.' });
+            : 'This computer has no sync service on record. Open the KVBC Awana app on it (tray icon, Set up this computer) and sign in there.' });
         }
         req.settingsPage = true;
         return next();
       }, () => res.status(403).json({ error: 'Could not check the sign-in with the sync service. Try again.' }));
     }
     if (!config.slidesPublishToken) {
-      return res.status(403).json({ error: 'No publish token is set on the print server. Open its dashboard → Lobby slides → Generate publish token, then paste it into the settings page.' });
+      return res.status(403).json({ error: 'Sign in to the settings page with the church passphrase first (Setup), then try again.' });
     }
     if (!slidesTokenOk(req)) {
       console.warn(`[security] Refused settings-page ${req.method} ${req.path}: wrong or missing publish token`);
-      return res.status(403).json({ error: 'Wrong publish token. Compare it with the print server dashboard → Lobby slides.' });
+      return res.status(403).json({ error: 'Wrong publish token. Sign in to the settings page with the church passphrase instead.' });
     }
     req.settingsPage = true;
   }
@@ -7277,14 +7277,15 @@ app.post('/feed/completed-books', (req, res) => {
 // The settings page's sync sessions the sync service has confirmed, by their
 // SHA-256 (never the session itself), each good for SETTINGS_SESSION_OK_MS so
 // a page's dozen calls cost one check. Only for this computer's own browser
-// (corsPolicy checks the socket first), and only while this print server is
-// signed in to the same service: the page's session is checked against
-// config.syncUrl, never an address the request names.
+// (corsPolicy checks the socket first), and only while this print server
+// has a sync service on record (a sign-in that was since dropped keeps its
+// address, so the page can sign the computer back in): the page's session is
+// checked against config.syncUrl, never an address the request names.
 const SETTINGS_SESSION_OK_MS = 10 * 60 * 1000;
 const settingsPageSessions = new Map();
 async function settingsPageSessionOk(req) {
   const m = /^Sync\s+(\S+)$/i.exec(String(req.headers.authorization || ''));
-  if (!m || !syncClient.isValidSession(m[1]) || !signedInToSync()) return false;
+  if (!m || !syncClient.isValidSession(m[1]) || !syncClient.isValidSyncUrl(config.syncUrl)) return false;
   const key = crypto.createHash('sha256').update(m[1]).digest('hex');
   const until = settingsPageSessions.get(key);
   if (until && until > Date.now()) return true;
@@ -7917,11 +7918,15 @@ async function forwardToSync(res, kind, payload) {
 }
 
 app.post('/config/sync-login', async (req, res) => {
-  if (!isTrustedConfigOrigin(req)) {
-    return res.status(403).json({ error: 'This computer can only be signed in from its own dashboard' });
+  // This computer's own app (the setup wizard), or the settings page once its
+  // session is confirmed (corsPolicy). The page never names the service: it
+  // signs this computer in again to the one it already uses.
+  const fromApp = isTrustedConfigOrigin(req);
+  if (!fromApp && req.settingsPage !== true) {
+    return res.status(403).json({ error: 'This computer can only be signed in from the settings page on it, or its own app' });
   }
   const { passphrase, url } = req.body || {};
-  const base = String(url || '').trim().replace(/\/+$/, '');
+  const base = String(fromApp ? (url || '') : (config.syncUrl || '')).trim().replace(/\/+$/, '');
   if (!syncClient.isValidSyncUrl(base)) return res.status(400).json({ error: 'That is not a sync service address (https only).' });
   if (!syncClient.normalizeSyncPassphrase(passphrase)) return res.status(400).json({ error: 'Type the passphrase first.' });
   const r = await syncClient.syncLogin(base, passphrase, { seedKey: events.getDisplayKeyState().configured ? config.displayKey : '' });
@@ -8882,7 +8887,7 @@ app.post('/config', (req, res) => {
   if (req.settingsPage) {
     const refused = security.settingsPageConfigRefusals(req.body);
     if (refused.length) {
-      return res.status(403).json({ error: `The settings page can change the printer's own settings only; ${refused.join(', ')} can be changed from the dashboard on this computer` });
+      return res.status(403).json({ error: `The settings page can change the printer's own settings only; ${refused.join(', ')} cannot be changed from a web page` });
     }
   }
   try {
@@ -9139,8 +9144,9 @@ function isRehearsalActive(now = Date.now()) {
 }
 
 app.post('/rehearsal', (req, res) => {
-  if (!isTrustedConfigOrigin(req)) {
-    return res.status(403).json({ error: 'Rehearsal mode can only be toggled from the dashboard on this computer' });
+  // This computer's own app, or the settings page proven by its sync sign-in.
+  if (!isTrustedOrSettingsPage(req)) {
+    return res.status(403).json({ error: 'Rehearsal mode can only be toggled from the settings page on this computer' });
   }
   const on = (req.body || {}).on === true;
   rehearsalState = on ? { on: true, armedAt: Date.now() } : { on: false, armedAt: 0 };

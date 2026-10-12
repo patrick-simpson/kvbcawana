@@ -17,7 +17,7 @@
 // if it leaks anyway: the holder must ALSO reach the print server's loopback
 // interface from an allowlisted origin, and even then can only put
 // length-capped, allowlist-sanitized text slides on the lobby TVs — then the
-// operator regenerates the token on the printer dashboard and it is revoked.
+// operator clears the token on the print server and it is revoked.
 // publishToken.test.js pins all three paths shut, like displayKey.test.js.
 
 const STORAGE_KEY = 'awanaPublishToken.v1';
