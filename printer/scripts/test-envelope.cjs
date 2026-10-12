@@ -250,63 +250,12 @@ console.log('envelope: key validation and fail-closed behaviour');
 }
 
 // ── 5. publish() integration ─────────────────────────────────────────────────
-// ── 4b. Display login: the passphrase-derived provision frame ─────────────────
-// The KDF is implemented twice (Node crypto here, WebCrypto on the display), so
-// the fixture pins a deterministic passphrase+salt → derived key → kid, and a
-// sealed frame both sides must open to the same bundle.
-console.log('envelope: display login (provision) derives, seals and opens per the fixture');
+// ── 4b. The fleet-config URL rule ────────────────────────────────────────────
+// NON-SECRET: https only, at most 200 characters, no credentials. (The display
+// login that once carried it is retired; the dashboard still saves the URL.)
+console.log('envelope: the fleet-config URL rule');
 {
-  const P = FIXTURE.provision;
-  check('the fixture carries a provision section', P && P.frame && P.kdf, 'regenerate with scripts/gen-envelope-fixture.cjs AND mirror it');
-  check('fixture declares this build\'s KDF parameters',
-    P.event === events.PROVISION_EVENT && P.kdf.name === events.PROVISION_KDF_NAME
-    && P.kdf.iterations === events.PROVISION_KDF_ITERATIONS && P.kdf.saltBytes === events.PROVISION_SALT_BYTES);
-
-  const derived = events.deriveLoginKey(P.testPassphrase, P.testSalt, P.kdf.iterations);
-  check('PBKDF2-SHA256 derivation matches the fixture byte for byte', derived.toString('base64') === P.derivedKey);
-  check('kid = first 8 hex of SHA-256(derived key), and it is what the frame carries',
-    events.kidFor(derived) === P.kid && P.frame.envelope.kid === P.kid);
-  let opened = null;
-  try { opened = events.openProvisionForTest(P.testPassphrase, P.frame); } catch (e) { /* reported */ }
-  check('the fixture frame opens to the fixture bundle', opened && JSON.stringify(opened) === JSON.stringify(P.bundle), JSON.stringify(opened));
-  rejects('the wrong passphrase does not open it', () => events.openProvisionForTest('wrong-passphrase-here', P.frame));
-
-  // Normalisation: both sides trim, NFKC, then UTF-8 — so a fullwidth letter or
-  // stray whitespace typed on a TV remote still logs in.
-  const fullwidth = P.testPassphrase.replace('a', '\uff41');   // 'ａ'
-  check('NFKC: a fullwidth letter derives the same key', events.deriveLoginKey(fullwidth, P.testSalt).toString('base64') === P.derivedKey);
-  check('whitespace around the passphrase is ignored', events.deriveLoginKey(`  ${P.testPassphrase}\n`, P.testSalt).toString('base64') === P.derivedKey);
-  check('a different salt derives a different key', events.deriveLoginKey(P.testPassphrase, Buffer.alloc(16, 9).toString('base64')).toString('base64') !== P.derivedKey);
-
-  // buildProvisionFrame fails closed.
-  events.setDisplayLogin('', '');
-  check('with no login configured, no frame', events.buildProvisionFrame({ displayKey: KEY, slidesPublishToken: '' }) === null);
-  check('setDisplayLogin refuses a short passphrase', events.setDisplayLogin('short', P.testSalt) === false && events.getDisplayLoginState().configured === false);
-  check('setDisplayLogin refuses a bad salt', events.setDisplayLogin(P.testPassphrase, 'AAAA') === false);
-  check('setDisplayLogin accepts the fixture pair', events.setDisplayLogin(P.testPassphrase, P.testSalt) === true && events.getDisplayLoginState().kid === P.kid);
-  check('an invalid display key yields no frame (never an authenticated downgrade)', events.buildProvisionFrame({ displayKey: 'nope', slidesPublishToken: '' }) === null);
-  check('an empty display key yields no frame', events.buildProvisionFrame({ displayKey: '', slidesPublishToken: 'tok_AbCdEfGhIjKlMnOpQrStUvWx' }) === null);
-  const junkTok = events.openProvisionForTest(P.testPassphrase, events.buildProvisionFrame({ displayKey: KEY, slidesPublishToken: 'not a token!' }));
-  check('a junk token is coerced to the empty string, not shipped', junkTok.slidesPublishToken === '');
-  const frame = events.buildProvisionFrame({ displayKey: KEY, slidesPublishToken: '' });
-  check('the frame carries exactly v, kdf, envelope', JSON.stringify(Object.keys(frame).sort()) === JSON.stringify(['envelope', 'kdf', 'v']));
-
-  // ── The fleet-config URL (#394) ────────────────────────────────────────────
-  // NON-SECRET, sealed with the rest simply because the bundle is already
-  // going to that screen. It must never be able to turn a good frame into no
-  // frame: an unusable value becomes '', it is never shipped and never fatal.
-  const withUrl = events.openProvisionForTest(P.testPassphrase, events.buildProvisionFrame({
-    displayKey: KEY, slidesPublishToken: '', configUrl: 'https://example.org/awana-display.json',
-  }));
-  check('a valid https config URL rides inside the sealed bundle',
-    withUrl.configUrl === 'https://example.org/awana-display.json');
-  check('the bundle key set is exactly the fixture\'s',
-    JSON.stringify(Object.keys(withUrl).sort()) === JSON.stringify(Object.keys(P.bundle).sort()),
-    Object.keys(withUrl).join(','));
-  check('the config URL is NOT in the clear on the wire',
-    !JSON.stringify(events.buildProvisionFrame({
-      displayKey: KEY, slidesPublishToken: '', configUrl: 'https://example.org/awana-display.json',
-    })).includes('example.org'));
+  check('an https URL is valid', events.isValidFleetConfigUrl('https://example.org/a.json') === true);
   for (const bad of [
     'http://example.org/a.json',                    // plain http: mixed-content-blocked, and tamperable
     'ftp://example.org/a.json',
@@ -314,49 +263,14 @@ console.log('envelope: display login (provision) derives, seals and opens per th
     '//example.org/a.json',
     'https://user:pw@example.org/a.json',           // credentials in the URL
     `https://example.org/${'a'.repeat(200)}.json`,  // over the 200-char cap
-    'https://example.org/a\nb.json',                // interior control character —
-                                                    // WHATWG URL silently STRIPS \n, so the
-                                                    // check has to run before parsing
+    'https://example.org/a\nb.json',                // interior control character: WHATWG URL
+                                                    // silently STRIPS \n, so the check runs first
     '   ', '', null, undefined, 42, {},
   ]) {
-    const opened = events.openProvisionForTest(P.testPassphrase, events.buildProvisionFrame({
-      displayKey: KEY, slidesPublishToken: '', configUrl: bad,
-    }));
-    check(`a bad config URL (${JSON.stringify(bad)}) is coerced to '' — never shipped, never fatal`,
-      opened && opened.configUrl === '' && opened.displayKey === KEY, JSON.stringify(opened && opened.configUrl));
+    check(`a bad config URL (${JSON.stringify(bad)}) is refused`, events.isValidFleetConfigUrl(bad) === false);
   }
-  check('isValidFleetConfigUrl agrees on the https-only rule',
-    events.isValidFleetConfigUrl('https://example.org/a.json') === true
-    && events.isValidFleetConfigUrl('http://example.org/a.json') === false
-    && events.isValidFleetConfigUrl(`https://example.org/${'a'.repeat(200)}`) === false
-    && events.PROVISION_CONFIG_URL_MAX === 200);
-  check('a config URL does not change the pad rung — the frame still fits the ceiling',
-    Buffer.byteLength(JSON.stringify(events.buildProvisionFrame({
-      displayKey: KEY, slidesPublishToken: 'tok_AbCdEfGhIjKlMnOpQrStUvWx',
-      configUrl: `https://example.org/${'a'.repeat(170)}`,
-    }))) < events.FRAME_MAX_BYTES);
-  check('fail closed still wins: no login configured, no frame, URL or not',
-    (() => {
-      events.setDisplayLogin('', '');
-      const none = events.buildProvisionFrame({ displayKey: KEY, configUrl: 'https://example.org/a.json' });
-      events.setDisplayLogin(P.testPassphrase, P.testSalt);
-      const noKey = events.buildProvisionFrame({ displayKey: '', configUrl: 'https://example.org/a.json' });
-      return none === null && noKey === null;
-    })());
-  check('the frame stays under the frame ceiling', Buffer.byteLength(JSON.stringify(frame)) < events.FRAME_MAX_BYTES);
-  check('a provision bundle pads onto the first ladder rung (2048)', events.paddedSize('provision', 200) === 2048);
-  check('provision is NOT one of the display-key-sealed events', !events.ENCRYPTED_EVENTS.has('provision'));
-  check('the frame never carries the display key in the clear', !JSON.stringify(frame).includes(KEY));
-
-  // Passphrase generator/validator.
-  const g1 = events.generateLoginPassphrase();
-  const g2 = events.generateLoginPassphrase();
-  check('generated passphrases are 4x4 from the unambiguous alphabet', /^[a-z3-9]{4}(-[a-z3-9]{4}){3}$/.test(g1) && !/[l012]/.test(g1));
-  check('two generated passphrases differ', g1 !== g2);
-  check('validator: 11 chars rejected, 12 accepted', events.isValidLoginPassphrase('abcdefghijk') === false && events.isValidLoginPassphrase('abcdefghijkl') === true);
-  check('validator: control characters rejected', events.isValidLoginPassphrase('abcdefghijkl\u0007') === false);
-  check('validator: 129 chars rejected', events.isValidLoginPassphrase('a'.repeat(129)) === false);
-  events.setDisplayLogin('', '');
+  check('the cap is 200', events.FLEET_CONFIG_URL_MAX === 200);
+  check('the retired provision frame is gone', events.buildProvisionFrame === undefined && events.setDisplayLogin === undefined);
 }
 
 console.log('envelope: publish() seals the right events and only those');

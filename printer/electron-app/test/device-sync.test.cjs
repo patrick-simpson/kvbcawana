@@ -77,6 +77,7 @@ function computer({ worker = fakeWorker(), print = true, display = false, name =
     userData: dir,
     deviceId: () => { pc.roles = rolesStore.ensureDeviceId(dir, pc.roles); return pc.roles.deviceId; },
     session: () => pc.session,
+    protocol: require('../../print-server/sync-protocol.js'),
     request: worker.request,
     name: () => pc.roles.name || 'DESKTOP-1',
     setName: (n) => { pc.roles = { ...pc.roles, name: n }; },

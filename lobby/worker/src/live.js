@@ -31,7 +31,7 @@ export const REPLAYED = Object.freeze([
   'recap', 'checkout', 'tally', 'birthdays', 'tonight', 'points', 'schedule', 'notice', 'settings',
 ]);
 
-/** Pusher's per-message ceiling, kept so nothing the screens accept changes. */
+/** The per-message ceiling (the one Pusher had), so nothing the screens accept changes. */
 export const LIVE_MAX_BYTES = 10240;
 
 /** The doorbell for things screens fetch (calendar, template, Journey). */

@@ -38,7 +38,6 @@ import {
   sanitizeTemplate,
 } from '../../src/lib/syncSpecs.js';
 import { fromBase64, hmac, kidFor, newDisplayKey, randomBytes, safeEqual, seal, toBase64, toBase64Url } from './crypto.js';
-import { trigger as pusherTrigger } from './pusher.js';
 import { DEFAULT_CALENDAR_URL, scrapeCalendar } from './calendar.js';
 import { DOORBELL_EVENT, REPLAYED, checkPublish, frameText, replayKey } from './live.js';
 import { Relay } from './relay.js';
@@ -59,11 +58,6 @@ export const SLIDES_CHUNK_JSON_BUDGET = 3900;
 export const SLIDES_TOTAL_MAX = 12;
 export const BODY_MAX = 128 * 1024;   // bytes; the entry point refuses a longer Content-Length before reading
 
-/** The channel the screens already listen on for check-ins. */
-export const DISPLAY_CHANNEL = 'awana-channel';
-/** A plaintext doorbell: "something you fetch from me changed". No content. */
-export const SYNC_CHANNEL = 'awana-sync';
-export const SYNC_EVENT = 'changed';
 
 /**
  * @typedef {{ get(key: string): Promise<any>, put(key: string, value: any): Promise<void>, delete(key: string): Promise<any> }} Store
@@ -134,22 +128,16 @@ export function buildSlidesChunks(deck, deckRev, publishedAt) {
 export class SyncCore {
   /**
    * @param {{ storage: Store, env: Record<string, any>, fetchFn?: typeof fetch, now?: () => number,
-   *   publish?: (channel: string, event: string, payload: unknown) => Promise<{ok: boolean, error?: string}>,
    *   broadcast?: (text: string) => number, closeAll?: (code: number, reason: string) => void,
    *   alarms?: { set(atMs: number): Promise<void>|void, get(): Promise<number|null>|number|null },
    *   liveScreens?: () => Set<string> }} deps
    */
-  constructor({ storage, env, fetchFn, now, publish, broadcast, closeAll, alarms, liveScreens }) {
+  constructor({ storage, env, fetchFn, now, broadcast, closeAll, alarms, liveScreens }) {
     this.storage = storage;
     this.env = env || {};
     this.fetchFn = fetchFn || ((...args) => fetch(...args));
     this.now = now || (() => Date.now());
-    this.publish = publish || ((channel, event, payload) =>
-      pusherTrigger(this.env, channel, event, payload, { fetchFn: this.fetchFn }));
-    // The live channel: every screen's socket (index.js). While the Pusher
-    // secrets are set, everything also goes to Pusher, so screens on either
-    // transport agree; with them removed (Pusher retired, 2026-10-03) the
-    // live channel alone carries it.
+    // The live channel: every screen's socket (index.js) carries everything.
     this.broadcast = broadcast || (() => 0);
     this.closeAll = closeAll || (() => {});
     this.relayQueue = new Relay(this.storage, this.now);
@@ -335,15 +323,12 @@ export class SyncCore {
     const envelope = await seal(await this.displayKey(), event, payload);
     if (!envelope) return { ok: false, error: 'cannot-seal' };
     await this.relay(event, envelope);
-    const sent = await this.publish(DISPLAY_CHANNEL, event, envelope);
-    // No Pusher at all is not a failed broadcast: the live channel carried it.
-    return sent.error === 'pusher-not-configured' ? { ok: true } : sent;
+    return { ok: true };
   }
 
   /** @param {'calendar'|'journey'|'template'} what @param {string} at */
   async ring(what, at) {
     this.broadcast(frameText(DOORBELL_EVENT, { what, at }));
-    return this.publish(SYNC_CHANNEL, SYNC_EVENT, { what, at });
   }
 
   // ── routes ─────────────────────────────────────────────────────────────────
@@ -528,7 +513,6 @@ export class SyncCore {
     return json({
       session: await this.mintSession(auth.epoch),
       displayKey: await this.displayKey(),
-      pusher: { key: this.env.PUSHER_KEY || '', cluster: this.env.PUSHER_CLUSTER || '' },
       state: await this.state(),
     });
   }

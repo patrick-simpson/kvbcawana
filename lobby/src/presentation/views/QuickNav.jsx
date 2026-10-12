@@ -516,7 +516,7 @@ const DisplaySettings = ({ socketStatus, touch = false, initialOpen = false }) =
   // Display login: one passphrase provisions the display key + publish token
   // (the sealed birthday list needs the key). Same store the signage page's
   // Settings uses — src/lib/displayLogin.js.
-  const { frameStatus, loginStatus, kid, pendingLogin, login, logout, viaSync } = useDisplayLogin();
+  const { loginStatus, kid, login, logout, viaSync } = useDisplayLogin();
   const [passphrase, setPassphrase] = useState('');
   const [reveal, setReveal] = useState(false);
   const [loginNote, setLoginNote] = useState('');
@@ -538,9 +538,8 @@ const DisplaySettings = ({ socketStatus, touch = false, initialOpen = false }) =
     if (result === 'logged-in') setPassphrase('');
     const notes = {
       'logged-in': ['Logged in — birthdays + names unlocked', 'ok'],
-      wrong: [viaSync ? 'That is not the passphrase' : 'Wrong passphrase — check the dashboard (Settings → Display login)', 'bad'],
+      wrong: ['That is not the passphrase', 'bad'],
       locked: ['Too many wrong tries — wait 15 minutes, then try again', 'bad'],
-      'no-frame': ['Waiting for the print server — will log in when its frame arrives', 'muted'],
       unsupported: ['Insecure page — open this page over https:// to log in', 'bad'],
       storage: ['Could not save (storage blocked)', 'bad'],
     };
@@ -549,8 +548,6 @@ const DisplaySettings = ({ socketStatus, touch = false, initialOpen = false }) =
     setLoginTone(tone);
   };
 
-  // Status first: the print server is usually fine and the screen is simply
-  // not connected yet — the old line blamed the server for every wait.
   let loginLine;
   let lineTone = 'muted';
   if (!secure) { loginLine = 'Insecure page — open over https:// to log in'; lineTone = 'bad'; }
@@ -562,10 +559,7 @@ const DisplaySettings = ({ socketStatus, touch = false, initialOpen = false }) =
   else if (socketStatus === 'disconnected') { loginLine = 'Not connected — check the network'; lineTone = 'bad'; }
   else if (socketStatus === 'connecting') loginLine = 'Connecting…';
   else if (loginStatus === 'wrong') { loginLine = 'Wrong passphrase'; lineTone = 'bad'; }
-  else if (pendingLogin) loginLine = 'Will log in when the print server is heard';
-  else if (frameStatus === 'received') loginLine = 'Type the display passphrase';
-  else if (frameStatus === 'miss') loginLine = 'Print server has not published lately';
-  else loginLine = 'Waiting for the print server…';
+  else loginLine = 'Type the church passphrase to set this screen up';
   const tone = loginNote ? loginTone : lineTone;
   const toneClass = tone === 'ok' ? 'text-[var(--brand-tnt)]' : tone === 'bad' ? 'text-[var(--brand-hot)]' : 'text-white/60';
 

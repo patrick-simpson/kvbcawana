@@ -92,6 +92,15 @@ build notes). The electron-app is one app with two roles:
   `lobby/desktop` 2.1.0), and `src/old-app.js` uninstalls Awana Lobby
   Display afterwards. The format is shared with
   `lobby/desktop/src/handoff.js`: change both together.
+- **The sync protocol is shared** (address and session rules, request building,
+  login answers): `print-server/sync-client.js`, `sync-session.js` and
+  `device-sync.js` run on `print-server/sync-protocol.js`, a GENERATED CommonJS
+  copy of `lobby/shared/sync-protocol.js` (never edit it; run
+  `node scripts/gen-sync-protocol.mjs` at the repo root, which
+  `check-mirrors.mjs` enforces). It is a copy, not a runtime import of
+  `lobby/`, because the packaged app ships `print-server/*.js` and has no
+  `lobby/` folder; main.js hands `syncClient.protocol` to device-sync because
+  the asar cannot require print-server.
 - **On /settings** (`src/device-sync.js`, `test/device-sync.test.cjs`): a
   computer set up and signed in (the wizard's `sync-session.bin`, else on a
   print server the print server's own config.json sign-in) is the Worker's
@@ -417,11 +426,11 @@ Pusher publisher, its npm package and the cache-channel `provision` frame are
 gone (2026-10-12), and so are the dashboard's Pusher fields; the electron app's
 Pusher release-ping client went with them (updates poll the feed every 10
 minutes). Old config.json files may still hold `pusher*` keys: they are never
-read, and `pusherSecret` stays redacted from GET /config. The display-login
-state and `buildProvisionFrame` stay in `events.js` (the KDF is pinned by
-`envelope-vectors.json`, mirrored with the lobby) and POST /config still takes
-the passphrase, but nothing publishes the frame and the dashboard has no
-Display login section. `/health` reports the
+read, and `pusherSecret` stays redacted from GET /config. The display
+login is gone too (the passphrase state, `buildProvisionFrame`, the KDF,
+`/config/display-login/generate` and the `provision` section of
+`envelope-vectors.json`); an old `displayLoginPassphrase` stays redacted and any
+POST /config scrubs it from disk. `/health` reports the
 channel as `live` (`configured` means signed in), and the church-config key
 `pusherChannel` keeps its old name because it is the relay's channel name.
 Names stay sealed end to end under the old design's rules. Rules that must

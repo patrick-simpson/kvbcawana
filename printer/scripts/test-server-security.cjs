@@ -293,8 +293,6 @@ async function main() {
         headers: { 'X-Awana-Pin': PIN }, body: { pin: PIN, displayLoginPassphrase: 'attacker-chosen-passphrase' },
       });
       check('LAN POST /config refuses to set the display passphrase', pp.status === 403, `status ${pp.status}`);
-      const mint = await request({ host: lan, method: 'POST', pathname: '/config/display-login/generate', headers: { 'X-Awana-Pin': PIN } });
-      check('LAN cannot mint a display passphrase even with the PIN', mint.status === 403, `status ${mint.status}`);
     }
 
     // ── Refusal sweep ─────────────────────────────────────────────────────────

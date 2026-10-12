@@ -1,5 +1,5 @@
 # The Awana sync service. Deployed by the root .github/workflows/ci.yml; its
-# secrets (PUSHER_*, INITIAL_PASSPHRASE, and TWOTIMTWO_USERNAME /
+# secrets (INITIAL_PASSPHRASE, and TWOTIMTWO_USERNAME /
 # TWOTIMTWO_PASSWORD / TWOTIMTWO_HOST for cloud check-in) are set by that
 # workflow from the repo's GitHub secrets.
 name = "awana-sync"

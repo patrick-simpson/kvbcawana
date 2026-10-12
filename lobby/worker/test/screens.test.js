@@ -32,7 +32,6 @@ function setup({ start = Date.parse('2026-10-11T18:00:00Z') } = {}) {
     storage,
     env: { INITIAL_PASSPHRASE: 'kennebec' },
     now: () => t,
-    publish: async () => ({ ok: true }),
     broadcast: (text) => { frames.push(JSON.parse(text)); return 1; },
     liveScreens: () => live,
   });

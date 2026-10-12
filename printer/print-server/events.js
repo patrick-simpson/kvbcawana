@@ -816,10 +816,7 @@ function seal(event, payload) {
 }
 
 /**
- * The same envelope under an explicit key — the display-login provision frame
- * is sealed with a passphrase-derived wrapping key rather than the display key.
- * Identical framing on purpose, so the display opens it with the one
- * openEnvelope() it already has.
+ * The envelope under an explicit key (seal() passes the display key).
  */
 function sealWith(keyBytes, kid, event, payload) {
   const json = Buffer.from(JSON.stringify(payload), 'utf8');
@@ -860,47 +857,18 @@ function openWithForTest(key, event, envelope) {
   return JSON.parse(plain.subarray(LEN_PREFIX, LEN_PREFIX + len).toString('utf8'));
 }
 
-// ── Display login (device provisioning) ───────────────────────────────────────
-// One church passphrase logs every screen in. The server derives a 32-byte
-// wrapping key from it with PBKDF2-SHA256 (the one KDF WebCrypto also has), and
-// publishes the display key + the slides publish token sealed under that key —
-// the SAME envelope framing as every other sealed event, so a screen opens it
-// with the openEnvelope() it already trusts. It was delivered as event `provision` on a
-// Pusher cache channel; nothing publishes it any more (the sync service's
-// sign-in replaced it), so only the frame builder and its KDF remain here.
-//
-// The frame is public ciphertext on a public channel. The passphrase's strength
-// is the ONLY thing protecting the display key: generated passphrases are 80
-// bits; typed ones must be at least 12 characters. A leaked passphrase is a
-// leaked display key and publish token — rotate all three (SECURITY.md).
-//
-// `provision` is deliberately NOT in ENCRYPTED_EVENTS: it is sealed here with
-// the wrapping key, never the display key, and it is transport/provisioning,
-// not one of the display-contract events a screen ever renders.
-const PROVISION_EVENT = 'provision';
-const PROVISION_KDF_NAME = 'PBKDF2-SHA256';
-const PROVISION_KDF_ITERATIONS = 600000;   // OWASP's SHA-256 figure; ~0.3s here
-const PROVISION_SALT_BYTES = 16;
-const LOGIN_PASSPHRASE_MIN = 12;
-const LOGIN_PASSPHRASE_MAX = 128;
 // What the lobby-slides publish token must look like (server.js validates the
-// operator's value with it; the bundle refuses to carry anything else).
+// operator's value with it).
 const SLIDES_TOKEN_RE = /^[A-Za-z0-9_-]{24,64}$/;
-// The optional FLEET-CONFIG URL the same login can hand a new screen (#394):
-// where that screen fetches its display settings JSON from — the address the
-// display already accepts as `?config=<url>`. NOT a secret; it rides inside
-// the sealed bundle only because it is already there, which turns "type the
-// sync key, log in, then hand-configure weather/calendar/widgets" into one
-// step. https ONLY (a display served over https cannot fetch http without
+// The optional FLEET-CONFIG URL (#394): where a screen fetches its display
+// settings JSON from, the address a display accepts as `?config=<url>`. NOT a
+// secret. https ONLY (a display served over https cannot fetch http without
 // mixed-content blocking, and an http URL is trivially tamperable in a church
-// lobby) and length-capped, with credentials-in-URL refused. Anything else is
-// DROPPED — a screen that gets no config URL is exactly today's behaviour,
-// while a bad one would be a fleet-wide fetch failure nobody would think to
-// look for.
-const PROVISION_CONFIG_URL_MAX = 200;
+// lobby), length-capped, credentials-in-URL refused.
+const FLEET_CONFIG_URL_MAX = 200;
 function isValidFleetConfigUrl(value) {
   const s = String(value == null ? '' : value).trim();
-  if (!s || s.length > PROVISION_CONFIG_URL_MAX) return false;
+  if (!s || s.length > FLEET_CONFIG_URL_MAX) return false;
   // eslint-disable-next-line no-control-regex
   if (/[\x00-\x1f\x7f]/.test(s)) return false;
   let url;
@@ -908,124 +876,6 @@ function isValidFleetConfigUrl(value) {
   if (url.protocol !== 'https:') return false;
   if (url.username || url.password) return false;
   return true;
-}
-
-/** Both sides apply exactly this before UTF-8 encoding — pinned in the fixture. */
-function normalizePassphrase(p) {
-  return String(p == null ? '' : p).trim().normalize('NFKC');
-}
-
-function isValidLoginPassphrase(p) {
-  const s = normalizePassphrase(p);
-  if (s.length < LOGIN_PASSPHRASE_MIN || s.length > LOGIN_PASSPHRASE_MAX) return false;
-  // eslint-disable-next-line no-control-regex
-  return !/[\x00-\x1f\x7f]/.test(s);
-}
-
-// 4 groups of 4 from a 32-letter alphabet with no l/0/1/2 (the four that get
-// misread from across a room): 5 bits a character, 80 bits a passphrase.
-const PASSPHRASE_ALPHABET = 'abcdefghijkmnopqrstuvwxyz3456789';
-function generateLoginPassphrase() {
-  const groups = [];
-  for (let g = 0; g < 4; g++) {
-    let s = '';
-    for (let i = 0; i < 4; i++) s += PASSPHRASE_ALPHABET[crypto.randomInt(PASSPHRASE_ALPHABET.length)];
-    groups.push(s);
-  }
-  return groups.join('-');
-}
-
-function generateLoginSalt() {
-  return crypto.randomBytes(PROVISION_SALT_BYTES).toString('base64');
-}
-
-function isValidLoginSalt(saltB64) {
-  try {
-    const n = Buffer.from(String(saltB64 || ''), 'base64').length;
-    return n >= 16 && n <= 32;
-  } catch { return false; }
-}
-
-function deriveLoginKey(passphrase, saltB64, iterations = PROVISION_KDF_ITERATIONS) {
-  return crypto.pbkdf2Sync(
-    Buffer.from(normalizePassphrase(passphrase), 'utf8'),
-    Buffer.from(String(saltB64), 'base64'),
-    iterations, 32, 'sha256');
-}
-
-let loginState = null;   // { salt, iterations, keyBytes, kid } or null
-
-/**
- * Install (or clear) the display login. Derives once (~0.3 s) and caches; an
- * invalid passphrase or salt CLEARS, like setDisplayKey. Returns true when set.
- */
-function setDisplayLogin(passphrase, saltB64) {
-  if (!isValidLoginPassphrase(passphrase) || !isValidLoginSalt(saltB64)) {
-    loginState = null;
-    return false;
-  }
-  if (loginState && loginState.salt === saltB64 && loginState.passphrase === normalizePassphrase(passphrase)) return true;
-  const keyBytes = deriveLoginKey(passphrase, saltB64);
-  loginState = {
-    passphrase: normalizePassphrase(passphrase),
-    salt: saltB64,
-    iterations: PROVISION_KDF_ITERATIONS,
-    keyBytes,
-    kid: kidFor(keyBytes),
-  };
-  return true;
-}
-
-function getDisplayLoginState() {
-  return loginState
-    ? { configured: true, kid: loginState.kid, iterations: loginState.iterations }
-    : { configured: false, kid: null, iterations: PROVISION_KDF_ITERATIONS };
-}
-
-/**
- * The sealed provisioning frame, or null when it must not go out: no login
- * configured, or no usable display key. Publishing a bundle with an EMPTY
- * display key would make every logged-in screen drop its key and fall back to
- * plaintext — an authenticated downgrade — so the whole frame fails closed.
- *
- * FAIL CLOSED IS THE WHOLE RULE HERE: if the seal cannot be produced, nothing
- * is published — never a plaintext bundle, never a partial one. The optional
- * configUrl rides inside the same sealed bundle and can never change that: an
- * unusable URL becomes '', it never turns a good frame into no frame.
- */
-function buildProvisionFrame({ displayKey, slidesPublishToken, issuedAt, configUrl } = {}) {
-  if (!loginState) return null;
-  const key = String(displayKey == null ? '' : displayKey).trim();
-  if (!isValidDisplayKey(key)) return null;
-  const token = String(slidesPublishToken == null ? '' : slidesPublishToken).trim();
-  const url = String(configUrl == null ? '' : configUrl).trim();
-  const bundle = {
-    v: 1,
-    displayKey: key,
-    slidesPublishToken: SLIDES_TOKEN_RE.test(token) ? token : '',
-    issuedAt: issuedAt || nowIso(),
-    // ALWAYS present, '' when unset or refused — the empty string is how a
-    // cleared URL propagates to screens that already applied one. (A bundle
-    // from a publisher that predates the field simply omits it, and a display
-    // treats that as "no news" rather than a clear.) A junk value is coerced
-    // to '' rather than shipped, exactly like the publish token above.
-    configUrl: isValidFleetConfigUrl(url) ? url : '',
-  };
-  const envelope = sealWith(loginState.keyBytes, loginState.kid, PROVISION_EVENT, bundle);
-  if (!envelope) return null;
-  return {
-    v: 1,
-    kdf: { name: PROVISION_KDF_NAME, iterations: loginState.iterations, salt: loginState.salt },
-    envelope,
-  };
-}
-
-/** Test seam: what a screen does with the frame once the passphrase is typed. */
-function openProvisionForTest(passphrase, frame) {
-  if (!frame || !frame.kdf || frame.kdf.name !== PROVISION_KDF_NAME) throw new Error('not a provision frame');
-  const key = deriveLoginKey(passphrase, frame.kdf.salt, frame.kdf.iterations);
-  if (kidFor(key) !== frame.envelope.kid) throw new Error('kid mismatch (wrong passphrase)');
-  return openWithForTest(key, PROVISION_EVENT, frame.envelope);
 }
 
 // ── Publisher ─────────────────────────────────────────────────────────────────
@@ -1149,24 +999,7 @@ module.exports = {
   sealWith,
   kidFor,
   openForTest,
-  // Display login (device provisioning) — see the block above publish().
-  PROVISION_EVENT,
-  PROVISION_KDF_NAME,
-  PROVISION_KDF_ITERATIONS,
-  PROVISION_SALT_BYTES,
-  LOGIN_PASSPHRASE_MIN,
-  LOGIN_PASSPHRASE_MAX,
   SLIDES_TOKEN_RE,
-  PROVISION_CONFIG_URL_MAX,
+  FLEET_CONFIG_URL_MAX,
   isValidFleetConfigUrl,
-  normalizePassphrase,
-  isValidLoginPassphrase,
-  generateLoginPassphrase,
-  generateLoginSalt,
-  isValidLoginSalt,
-  deriveLoginKey,
-  setDisplayLogin,
-  getDisplayLoginState,
-  buildProvisionFrame,
-  openProvisionForTest,
 };

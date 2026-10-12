@@ -3,6 +3,9 @@
 //
 //   contract / envelope vectors   printer/  ->  lobby/src/lib/__fixtures__/
 //                                 still committed, byte-identical mirrors (canonical first)
+//   the sync protocol             lobby/shared/sync-protocol.js  ->  a GENERATED CommonJS
+//                                 copy, printer/print-server/sync-protocol.js
+//                                 (scripts/gen-sync-protocol.mjs)
 //
 //   shared modules                lobby/shared/*.js  ->  generated copies for the packaged apps
 //                                 (scripts/shared-copies.mjs lists them; committed, checked for drift)
@@ -22,6 +25,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { checkAssets, COPIES } from './family-assets.mjs';
 import { drift as sharedDrift } from './shared-copies.mjs';
+import { SOURCE as SYNC_PROTOCOL_SOURCE, TARGET as SYNC_PROTOCOL_COPY, expectedCopy } from './gen-sync-protocol.mjs';
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 
@@ -72,10 +76,18 @@ textStep('.github/workflows/ci.yml', /family-assets\.mjs/, 'runs the copy step i
 
 for (const d of sharedDrift()) problems.push(`${d.dest} differs from what ${d.src} generates (run node scripts/shared-copies.mjs)`);
 
+// The sync protocol's CommonJS copy is generated, so it is compared with what
+// the generator would write now, not byte-for-byte with the source.
+{
+  const copy = path.join(ROOT, SYNC_PROTOCOL_COPY);
+  if (!existsSync(copy)) problems.push(`${SYNC_PROTOCOL_COPY} is missing (generate it from ${SYNC_PROTOCOL_SOURCE}: node scripts/gen-sync-protocol.mjs)`);
+  else if (readFileSync(copy, 'utf8') !== expectedCopy()) problems.push(`${SYNC_PROTOCOL_COPY} is stale (run: node scripts/gen-sync-protocol.mjs)`);
+}
+
 if (problems.length) {
   console.error(`✗ ${problems.length} problem(s):\n  ${problems.join('\n  ')}`);
   console.error('Vectors: change the canonical file, then copy it over the other (never the other way round).');
-  console.error('Brand kit and family.css: change the canonical file, then run node scripts/family-assets.mjs.');
+  console.error('Brand kit and family.css: change the canonical file, then run node scripts/family-assets.mjs; the sync protocol copy: node scripts/gen-sync-protocol.mjs.');
   process.exit(1);
 }
-console.log('✓ contract and envelope vectors match; the brand kit and family.css copies are generated, ignored and match their canonical files; the generated shared-module copies match lobby/shared');
+console.log('✓ contract and envelope vectors match; the brand kit and family.css copies are generated, ignored and match their canonical files; the generated shared-module copies match lobby/shared, and so does the sync protocol copy');

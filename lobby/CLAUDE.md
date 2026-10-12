@@ -28,10 +28,10 @@ A screen that is not signed in listens to nothing (status `off`). The wire
 design below was written for a public Pusher channel and applies unchanged to
 the live channel: the same events, the same allowlist sanitizers, the same
 sealed envelopes and anti-downgrade rule. Where this file says "the Pusher
-channel", read "the live channel". Leftovers outside this app: the Worker still
-carries `worker/src/pusher.js` (a live, secrets-gated mirror in `sync.js`) and
-the print server's Pusher publisher is gone (printer 9.0.2); `src/lib/displayLogin.js`
-still opens a legacy `provision` frame, but nothing delivers one any more.
+channel", read "the live channel". Pusher is gone from the whole repo
+(the Worker's `pusher.js` and the `PUSHER_*` secrets, the print server's
+publisher, the legacy `provision` display-login frame); the owner deletes the
+`PUSHER_*` GitHub secrets and the Pusher app by hand.
 
 ## Embedding on weaker hardware — `?lowPower=1`
 
@@ -1541,13 +1541,20 @@ setup guide and the API. The owner's calls:
 - **The Worker is the one home** (choice A): signed in, Settings and the slide
   editor publish to it (`publishViaSync`), it seals the same `settings` /
   `slides` frames (contract v5 / v6) and publishes them on the live channel
-  (and, while its Pusher secrets are still set, mirrors them to Pusher). Check-ins never pass through it.
+  Check-ins never pass through it.
 - **Found by `shared/sync.json`** (`{url}`), written when the Worker was first
   deployed (today the root `ci.yml` deploys it, only when its sources changed,
   because every deploy restarts the Durable Object and drops every screen's
   socket). `url: ""` means no service yet: every screen keeps the
   print server's display login exactly as before (the Setup card and the
   projector's menu switch on `useSync().url`).
+- **One protocol for every client** (`shared/sync-protocol.js`): the address
+  and session rules (one URL maximum, 200), request building and the login
+  answer are read in one dependency-free module that `src/lib/syncService.js`
+  imports and the print server and the Electron app run as a generated
+  CommonJS copy (`printer/print-server/sync-protocol.js`; regenerate with
+  `node scripts/gen-sync-protocol.mjs`, `check-mirrors.mjs` keeps it current).
+  Each client keeps its own storage and offline cache.
 - **The session is a secret** in its own slot (`awanaSyncSession.v1`), like the
   display key: never config, an export or a URL (`syncService.test.js`).
 - **Nothing it returns is trusted as-is.** `/v1/state` is turned into a
@@ -2057,17 +2064,13 @@ change:
   the key. `displayKey.test.js` guards all three paths.
 - Decrypts are serialized through one promise chain per event, or a burst
   of arrivals greets children out of order.
-- **Display login** (`src/lib/displayLogin.js`, legacy: the Pusher cache channel
-  that carried it is gone, so no screen receives one now; signing in through
-  the sync service replaces it): `provision` frames on the
-  `cache-awana-channel-provision` cache channel are opened with a
-  passphrase-derived key (PBKDF2-SHA256, params pinned in the fixture's
-  `provision` section) and write ONLY into the displayKey/publishToken
-  storage slots — never into config, never through `dispatchEvent`, never
-  rendered. The derived login key lives in its own `awanaLoginKey.v1` entry
-  with the same three leak-path tests as the display key. `useSocket.js` is
-  the only file that opens the live channel (`privacyGuard.test.js` pins that,
-  and that nothing imports pusher-js).
+- **Display login** is the sync service's sign-in (`src/hooks/useDisplayLogin.js`
+  wraps `useSync`); the old `provision` frame (a passphrase-derived key opened
+  on a Pusher cache channel) is gone, and `src/lib/displayLogin.js` is only the
+  logout that clears the display key, publish token and fleet-config URL (and
+  any old `awanaLoginKey.v1` entry). `useSocket.js` is the only file that opens
+  the live channel (`privacyGuard.test.js` pins that, and that nothing imports
+  pusher-js).
 - The other events stay plaintext **on purpose**: their readability
   is what lets a screen distinguish "pipe down" from "cannot read names"
   from "quiet night". See SECURITY.md.

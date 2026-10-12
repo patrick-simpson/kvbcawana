@@ -156,7 +156,7 @@ export function PanelCard({ title, tab = 'var(--brand-blue)', scope, keep = fals
  * export, a `?config=` file, or a URL.
  */
 export function DisplayLoginField({ status, secure, login }) {
-  const { frameStatus, loginStatus, kid, pendingLogin } = login;
+  const { loginStatus, kid } = login;
   const [draft, setDraft] = useState('');
   const [reveal, setReveal] = useState(false);
   const [note, setNote] = useState('');
@@ -171,7 +171,7 @@ export function DisplayLoginField({ status, secure, login }) {
     const result = await login.login(p);
     if (result === 'logged-in') { setDraft(''); setNote('Logged in. Names and published slides now work on this screen.'); }
     else if (result === 'storage') setNote('This screen cannot save the keys — browser storage is blocked.');
-    // 'wrong', 'no-frame' and 'unsupported' are described by the status line below.
+    // 'wrong', 'locked' and 'unsupported' are described by the status line below.
   };
 
   // In the order a volunteer needs them: the one thing nothing here can fix,
@@ -195,12 +195,6 @@ export function DisplayLoginField({ status, secure, login }) {
     statusCopy = <>Connecting… the login frame arrives as soon as the connection is up.</>;
   } else if (loginStatus === 'wrong') {
     statusCopy = <><strong>That passphrase does not match the print server’s.</strong> Check the dashboard → Settings → Display login and try again.</>;
-  } else if (pendingLogin) {
-    statusCopy = <><strong>Waiting for the print server’s login frame</strong> — this passphrase will be tried automatically the moment it arrives.</>;
-  } else if (frameStatus === 'waiting') {
-    statusCopy = <>Connected — waiting for the print server’s login frame. It must be running, with a display key <em>and</em> a display passphrase set (dashboard → Settings → Display login). You can type the passphrase now; it is tried as soon as the frame lands.</>;
-  } else if (frameStatus === 'miss') {
-    statusCopy = <><strong>The print server has not published a login frame in the last 30 minutes.</strong> Start it then try again.</>;
   } else {
     statusCopy = <>Type the church’s display passphrase from the print-server dashboard (Settings → Display login). This screen then receives the display key and publish token by itself.</>;
   }

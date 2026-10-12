@@ -129,6 +129,10 @@ function writeStore(userData, store) {
  *   userData: string,
  *   deviceId: () => string,                     roles.json's id, made once (rolesStore.ensureDeviceId)
  *   session: () => ({url: string, session: string} | null),   null: not signed in (or setup not done)
+ *   protocol: {SCREEN_HELLO_PATH: string, screenSettingsPath: (id: string) => string, screenNamePath: (id: string) => string},
+ *                                               the sync protocol's routes (print-server/sync-protocol.js, generated
+ *                                               from lobby/shared/; main.js passes syncClient.protocol: the packaged
+ *                                               app cannot require print-server from inside app.asar)
  *   request: (base: string, path: string, opts: object) => Promise<{ok: boolean, status: number, body: any}>,
  *   name: () => string,                         what to call it (roles.name, else the computer's own name)
  *   setName: (name: string) => Promise<void> | void,   a rename made on /settings
@@ -226,11 +230,11 @@ function createDeviceSync(deps) {
   function hello(s, id) {
     const body = { id, kind: KIND, name: screenName(deps.name()) || 'Computer' };
     if (held) body.pendingRoleChange = held;
-    return deps.request(s.url, '/v1/screens/hello', { method: 'POST', body, session: s.session });
+    return deps.request(s.url, deps.protocol.SCREEN_HELLO_PATH, { method: 'POST', body, session: s.session });
   }
 
   async function put(s, id, settings) {
-    const res = await deps.request(s.url, `/v1/screens/${id}/settings`, { method: 'PUT', body: { settings }, session: s.session });
+    const res = await deps.request(s.url, deps.protocol.screenSettingsPath(id), { method: 'PUT', body: { settings }, session: s.session });
     if (failed(res, s, 'Saving this computer\'s settings')) return false;
     store.synced = cleanRecord(res.body) || { savedAt: new Date().toISOString(), settings: cleanSettings(settings) };
     persist();
@@ -257,7 +261,7 @@ function createDeviceSync(deps) {
     }
     if (mine && mine !== store.name) {
       // Renamed here (the wizard).
-      const res = await deps.request(s.url, `/v1/screens/${id}/name`, { method: 'PUT', body: { name: mine }, session: s.session });
+      const res = await deps.request(s.url, deps.protocol.screenNamePath(id), { method: 'PUT', body: { name: mine }, session: s.session });
       if (res.ok && res.body && res.body.screen && typeof res.body.screen.name === 'string') {
         store.name = res.body.screen.name;
         persist();
@@ -285,7 +289,7 @@ function createDeviceSync(deps) {
     await syncName(s, id, hi.body && hi.body.screen ? hi.body.screen.name : undefined);
     if (failedToken) return;   // the rename was refused: signed out
 
-    const got = await deps.request(s.url, `/v1/screens/${id}/settings`, { session: s.session });
+    const got = await deps.request(s.url, deps.protocol.screenSettingsPath(id), { session: s.session });
     if (failed(got, s, 'Reading this computer\'s settings')) return;
 
     const local = cleanSettings(deps.local());

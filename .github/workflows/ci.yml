@@ -48,9 +48,10 @@ jobs:
   #           (the home page's stepped chips, aboutChips.test.js)
   #   printer reads printer/, plus lobby/worker/src/relay.js
   #           (test-phone-relay), site/build.mjs (test-phone-touch),
-  #           lobby/src/lib/syncSpecs.js (electron-app's device-sync test)
-  #           and lobby/shared/brand/ (the print server's brand kit is a
-  #           copy of it, made before the tests by scripts/family-assets.mjs)
+  #           lobby/src/lib/syncSpecs.js and the lobby/shared/sync-protocol.js it
+  #           re-exports (electron-app's device-sync test), and lobby/shared/brand/
+  #           (the print server's brand kit is a copy of it, made before the tests
+  #           by scripts/family-assets.mjs)
   changes:
     name: What changed
     runs-on: ubuntu-latest
@@ -105,7 +106,7 @@ jobs:
                 *) lobby=true ;;
               esac
               case "$f" in
-                lobby/worker/src/relay.js|lobby/src/lib/syncSpecs.js|lobby/shared/brand/*|site/build.mjs) printer=true ;;
+                lobby/worker/src/relay.js|lobby/src/lib/syncSpecs.js|lobby/shared/sync-protocol.js|lobby/shared/brand/*|site/build.mjs) printer=true ;;
                 lobby/*|journey/*|site/updates/*|.github/workflows/*) ;;
                 *) printer=true ;;
               esac
@@ -438,7 +439,7 @@ jobs:
           if [ -z "$BASE" ]; then
             echo "No base commit to compare against; deploying the Worker."
             echo "changed=true" >> "$GITHUB_OUTPUT"
-          elif git diff --quiet "$BASE" HEAD -- lobby/worker lobby/src/lib lobby/shared/text.js .github/workflows/ci.yml; then
+          elif git diff --quiet "$BASE" HEAD -- lobby/worker lobby/src/lib lobby/shared/text.js lobby/shared/sync-protocol.js .github/workflows/ci.yml; then
             echo "Nothing the Worker is built from changed since $BASE; its deploy is skipped."
             echo "changed=false" >> "$GITHUB_OUTPUT"
           else
@@ -453,10 +454,6 @@ jobs:
         if: steps.ready.outputs.ready == 'true' && steps.worker.outputs.changed == 'true'
         working-directory: lobby/worker
         env:
-          PUSHER_APP_ID: ${{ secrets.PUSHER_APP_ID }}
-          PUSHER_KEY: ${{ secrets.PUSHER_KEY }}
-          PUSHER_SECRET: ${{ secrets.PUSHER_SECRET }}
-          PUSHER_CLUSTER: ${{ secrets.PUSHER_CLUSTER }}
           INITIAL_PASSPHRASE: ${{ secrets.SYNC_PASSPHRASE }}
           # Cloud check-in (ROADMAP.md#cloud-check-in): the church's dedicated TwoTimTwo
           # user. Never echoed; the Worker never stores or returns them.
@@ -465,7 +462,7 @@ jobs:
           TWOTIMTWO_HOST: ${{ secrets.TWOTIMTWO_HOST }}
         run: |
           node -e '
-            const names = ["PUSHER_APP_ID", "PUSHER_KEY", "PUSHER_SECRET", "PUSHER_CLUSTER", "INITIAL_PASSPHRASE",
+            const names = ["INITIAL_PASSPHRASE",
               "TWOTIMTWO_USERNAME", "TWOTIMTWO_PASSWORD", "TWOTIMTWO_HOST"];
             const out = {};
             for (const n of names) if (process.env[n]) out[n] = process.env[n];
@@ -475,12 +472,6 @@ jobs:
             require("fs").writeFileSync(process.env.RUNNER_TEMP + "/unset.txt", missing.join("\n"));
           '
           npx wrangler secret bulk "$RUNNER_TEMP/secrets.json"
-          # Pusher is retired (2026-10-03): a PUSHER_* secret deleted here is
-          # deleted from the Worker too, so it stops sending to Pusher. Only
-          # those: INITIAL_PASSPHRASE counts once and is never removed.
-          grep '^PUSHER_' "$RUNNER_TEMP/unset.txt" | while read -r name; do
-            npx wrangler secret delete "$name" </dev/null >/dev/null 2>&1 && echo "Removed $name from the Worker." || true
-          done
           rm -f "$RUNNER_TEMP/secrets.json" "$RUNNER_TEMP/unset.txt"
       - name: Publish the site
         if: steps.ready.outputs.ready == 'true'

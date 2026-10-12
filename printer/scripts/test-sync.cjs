@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // Tests for signing this computer in to the Awana sync service (the
 // Awana-Check-in-Display repo's worker/): the sign-in route and who may call
-// it, adopting the service's display key, the old `provision` frame and the
-// deck / settings rebroadcasts going quiet, publishes forwarded to the
+// it, adopting the service's display key, the deck / settings rebroadcasts
+// going quiet, publishes forwarded to the
 // service, and a passphrase change elsewhere signing this computer out.
 //
 // The service is a stand-in on a patched global fetch; loopback requests to
@@ -190,14 +190,6 @@ async function main() {
     const src = fs.readFileSync(path.join(__dirname, '..', 'print-server', 'server.js'), 'utf8');
     check('the queue is bounded and old check-ins are left to the recap', /RELAY_QUEUE_MAX = 50/.test(src) && /RELAY_CHECKIN_MAX_AGE_MS = 2 \* 60 \* 1000/.test(src) && /RELAY_BREAK_MS = 30 \* 1000/.test(src));
     check('one sign-in check at a time', /if \(signInCheck\) return signInCheck;/.test(src));
-  }
-
-  console.log('sync: the old paths go quiet');
-  {
-    const mark = service.calls.length;
-    await post('/config', { displayLoginPassphrase: 'another twelve character passphrase' });
-    await settle();
-    check('no provision frame goes out when the display login changes', !service.calls.slice(mark).some((c) => c.route === '/v1/publish' && c.body.event === 'provision'));
   }
 
   console.log('sync: publishes are forwarded to the service');
