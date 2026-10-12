@@ -281,7 +281,7 @@ network call):
 **The print job the desk page seals** (`job`, a Bundle of `kind: 'print-job'`,
 `id` = the jobId, one `to` entry per registered station). Its sealed record is
 exactly what the print role runs:
-`{route: '/print', body: {firstName, lastName, clubName, clubberId, friend?}, clubberId, source: 'desk'}`.
+`{route: '/print', body: {name, clubName, clubberId?, visitor?, friend?, friendName?}, clubberId, source: 'desk'}` (`body` is the print server's own `POST /print` body: `name` is split there, a visitor has no `clubberId` and `visitor: true`; Bible is an `items` flag for TwoTimTwo and is not a print field).
 `route` is one of the print server's own print routes (`/print`, `/reprint`,
 `/print-barf-bags`, `/print-custom`, `/print-oneoff`, `/print-leader`,
 `/print-award`), `body` that route's own JSON. The page does NOT know the claim's

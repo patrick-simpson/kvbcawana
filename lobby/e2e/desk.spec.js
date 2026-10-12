@@ -134,9 +134,11 @@ test('sign in, search, check two siblings in together, undo one, check one out',
     expect(post.body.historyRow.kind).toBe('checkin');
   }
   const job = await cc.openAsStation(stationRing, sent['12'].job);
-  expect(job).toMatchObject({ clubberId: '12', name: 'Ben Tester', club: 'Sparks', bible: true, friend: true, friendName: 'Sam', source: 'desk' });
+  // exactly the print server's /print body, sealed to the station (routes.md section 5)
+  expect(job).toEqual({ route: '/print', body: { name: 'Ben Tester', clubName: 'Sparks', clubberId: '12', friend: true, friendName: 'Sam' }, clubberId: '12', source: 'desk' });
   const row = await cc.openRow(historyRing, sent['11'].historyRow);
-  expect(row).toMatchObject({ clubberId: '11', name: 'Ada Tester', club: 'Cubbies', source: 'desk' });
+  expect(row).toMatchObject({ first: 'Ada', last: 'Tester', club: 'Cubbies', clubberId: '11', source: 'desk' });
+  expect(typeof row.ts).toBe('number');
   await expect(page.locator('#print-led')).toHaveText('2 labels queued', { timeout: 15_000 });
   await expect(page.locator('#count-pill')).toHaveText('2 in');
 
@@ -148,14 +150,17 @@ test('sign in, search, check two siblings in together, undo one, check one out',
   await expect(page.locator('#toast')).toContainText('Ben Tester’s check-in is undone');
   const undo = world.posts.find((p) => p.path === '/v1/desk/undo');
   expect(undo.body.clubberId).toBe('12');
-  expect((await cc.openRow(historyRing, undo.body.historyRow)).name).toBe('Ben Tester');
+  expect(undo.body.club).toBe('Sparks');
+  expect(undo.body.historyRow.kind).toBe('undo');
+  expect(await cc.openRow(historyRing, undo.body.historyRow)).toMatchObject({ first: 'Ben', last: 'Tester', club: 'Sparks' });
   await expect(page.locator('#tonight-view .row')).toHaveCount(1);
   await page.locator('.row', { hasText: 'Ada Tester' }).getByRole('button', { name: 'Check out' }).click();
   await page.locator('#confirm-ok').click();
   await expect(page.locator('#toast')).toContainText('Ada Tester is checked out');
   expect(world.posts.at(-1).path).toBe('/v1/desk/checkout');
   expect(world.posts.at(-1).body.historyRow.kind).toBe('checkout');
-  expect((await cc.openRow(historyRing, world.posts.at(-1).body.historyRow)).name).toBe('Ada Tester');
+  expect(world.posts.at(-1).body.club).toBe('Cubbies');
+  expect(await cc.openRow(historyRing, world.posts.at(-1).body.historyRow)).toMatchObject({ first: 'Ada', last: 'Tester' });
   await expect(page.locator('#count-pill')).toHaveText('0 in');
   if (process.env.DESK_SHOTS) await page.screenshot({ path: `${process.env.DESK_SHOTS}/tonight.png` });
 });
@@ -176,6 +181,7 @@ test('a visitor is checked in by name and a one-off tag prints without a check-i
   await expect(page.locator('#toast')).toContainText('Mia Jones is checked in (visitor)');
   expect(world.posts[0].body.visitor).toEqual({ first: 'Mia', last: 'Jones', club: 'Cubbies' });
   expect(world.posts[0].body.clubberId).toBeUndefined();
+  expect(world.posts[0].body.historyRow.kind).toBe('visitor');
   await page.getByRole('button', { name: /More/ }).click();
   await page.getByLabel('Child’s first name').fill('Ava');
   await page.locator('#oneoff-clubs').getByRole('radio', { name: 'Puggles' }).click();

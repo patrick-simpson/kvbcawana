@@ -303,7 +303,8 @@ export function createDesk({ cc, fetch: fetchFn, store, base = DESK_API, now = D
   async function sealHistory(night, kind, record) {
     if (!history) throw new DeskError('no-history', 'The history key is not ready, so check-ins are off.');
     const id = cc.newRowId();
-    const sealed = await cc.sealRow(history.pub, { id, night, kind, record: { ts: new Date(now()).toISOString(), ...record } });
+    // `ts` is epoch MILLISECONDS inside the sealed record (routes.md section 3).
+    const sealed = await cc.sealRow(history.pub, { id, night, kind, record: { ts: now(), ...record } });
     if (!sealed) throw new DeskError('unsealed', refusalWords('unsealed'));
     return { id, night, kind, ...sealed };   // the Row wire shape (routes.md): the seal plus its id, night and kind
   }
@@ -327,10 +328,36 @@ export function createDesk({ cc, fetch: fetchFn, store, base = DESK_API, now = D
   }
   const night = () => cc.churchNight(now());
 
+  /** @param {string} name @returns {{ first: string, last: string }} */
+  function splitName(name) {
+    const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
+    return { first: parts[0] || '', last: parts.slice(1).join(' ') };
+  }
+  /**
+   * The sealed history record (routes.md section 3): `{ts, first, last, club,
+   * clubberId?, friend?, friendFirst?, source}`. `visitor` is the row's KIND,
+   * not a field, for a child with no clubber id.
+   * @param {{ clubberId?: string|null, name: string, club?: string, visitor?: boolean }} child
+   * @param {{ friend?: boolean, friendName?: string }} [extra]
+   */
+  function historyRecord(child, extra = {}) {
+    const { first, last } = splitName(child.name);
+    return {
+      first, last, club: child.club || '',
+      ...(child.clubberId && !child.visitor ? { clubberId: String(child.clubberId) } : {}),
+      ...(extra.friend ? { friend: true, ...(extra.friendName ? { friendFirst: extra.friendName } : {}) } : {}),
+      source: 'desk',
+    };
+  }
+
   /**
    * Check one child in: seal the print job and the history row here, post
    * both with the check-in. Several children are several calls; the page
    * sends siblings together.
+   *
+   * The job record is exactly what the print role runs (routes.md section 5):
+   * `{route: '/print', body: <the print server's /print body>, clubberId, source: 'desk'}`.
+   * The page does not know the claim's gen: the lease carries it.
    * @param {{ clubberId?: string|null, name: string, club?: string, visitor?: boolean }} child
    * @param {{ bible?: boolean, friend?: boolean, friendName?: string }} [choice]
    * @returns {Promise<{ already: boolean, jobId: string|null, gen?: number, history: string }>}
@@ -339,14 +366,18 @@ export function createDesk({ cc, fetch: fetchFn, store, base = DESK_API, now = D
     const n = night();
     const friendName = choice.friend ? String(choice.friendName || '').replace(/\s+/g, ' ').trim().slice(0, 24) : '';
     const items = { ...(choice.bible ? { Bible: true } : {}), ...(choice.friend ? { Friend: true } : {}) };
-    const record = {
-      clubberId: child.clubberId || null, name: child.name, club: child.club || '', visitor: !!child.visitor,
-      bible: !!choice.bible, friend: !!choice.friend, ...(friendName ? { friendName } : {}), source: 'desk',
+    const isVisitor = !!child.visitor || !child.clubberId;
+    const clubberId = isVisitor ? null : String(child.clubberId);
+    const printBody = {
+      name: child.name, clubName: child.club || '',
+      ...(clubberId ? { clubberId } : {}),
+      ...(isVisitor ? { visitor: true } : {}),
+      ...(choice.friend ? { friend: true, ...(friendName ? { friendName } : {}) } : {}),
     };
     const out = await sealedPost('/v1/desk/checkin', async (list) => ({
       night: n, ...who(child), items,
-      historyRow: await sealHistory(n, 'checkin', record),
-      job: await sealJob(list, n, { ...record, at: new Date(now()).toISOString() }),
+      historyRow: await sealHistory(n, isVisitor ? 'visitor' : 'checkin', historyRecord(child, { friend: choice.friend, friendName })),
+      job: await sealJob(list, n, { route: '/print', body: printBody, clubberId, source: 'desk' }),
     }));
     return { already: !!out.already, jobId: out.jobId ?? null, gen: out.gen, history: out.history || '' };
   }
@@ -354,9 +385,10 @@ export function createDesk({ cc, fetch: fetchFn, store, base = DESK_API, now = D
   /** @param {'undo'|'checkout'} what @param {{ clubberId?: string|null, name: string, club?: string, visitor?: boolean }} child */
   async function undoOrCheckout(what, child) {
     const n = night();
+    // `club` rides the post so the Worker can count the night_summary line.
     return sealedPost(`/v1/desk/${what}`, async () => ({
-      night: n, ...who(child),
-      historyRow: await sealHistory(n, what, { clubberId: child.clubberId || null, name: child.name, club: child.club || '', visitor: !!child.visitor, source: 'desk' }),
+      night: n, ...who(child), club: child.club || '',
+      historyRow: await sealHistory(n, what, historyRecord(child)),
     }));
   }
   const undo = (/** @type {any} */ child) => undoOrCheckout('undo', child);

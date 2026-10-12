@@ -161,15 +161,13 @@ describe('checking in', () => {
     assert.equal(post.job.to.length, 2);
     for (const s of [a, b]) {
       const job = await cc.openAsStation(s.ring, post.job);
-      assert.deepEqual(job, { clubberId: '662', name: 'Kit Tester', club: 'Sparks', visitor: false, bible: true, friend: true, friendName: 'Sam', source: 'desk', at: '2026-10-14T22:00:00.000Z' });
+      assert.deepEqual(job, { route: '/print', body: { name: 'Kit Tester', clubName: 'Sparks', clubberId: '662', friend: true, friendName: 'Sam' }, clubberId: '662', source: 'desk' });
     }
     assert.equal(post.historyRow.kind, 'checkin');
     assert.equal(post.historyRow.ct.length, 1388);
     assert.equal(post.historyRow.kid, historyKey.kid);
     const row = await cc.openRow(ring, post.historyRow);
-    assert.equal(row.name, 'Kit Tester');
-    assert.equal(row.friendName, 'Sam');
-    assert.equal(row.ts, '2026-10-14T22:00:00.000Z');
+    assert.deepEqual(row, { ts: Date.parse('2026-10-14T22:00:00.000Z'), first: 'Kit', last: 'Tester', club: 'Sparks', clubberId: '662', friend: true, friendFirst: 'Sam', source: 'desk' });
     assert.ok(!('allergies' in row) && !cc.hasMedicalKey(row));
   });
 
@@ -183,7 +181,10 @@ describe('checking in', () => {
     assert.equal(post.clubberId, undefined);
     assert.deepEqual(post.visitor, { first: 'Mia', last: 'Visitor Jones', club: 'Cubbies' });
     assert.deepEqual(post.items, {});
-    assert.equal((await cc.openAsStation(a.ring, post.job)).visitor, true);
+    assert.deepEqual((await cc.openAsStation(a.ring, post.job)).body, { name: 'Mia Visitor Jones', clubName: 'Cubbies', visitor: true });
+    assert.equal(post.historyRow.kind, 'visitor');
+    const vrow = await cc.openRow(ring, post.historyRow);
+    assert.deepEqual([vrow.first, vrow.last, vrow.clubberId], ['Mia', 'Visitor Jones', undefined]);
   });
 
   it('on 409 stations-changed it reseals to the list the Worker sends, so the new station can open the job', async () => {
@@ -198,7 +199,7 @@ describe('checking in', () => {
     assert.equal(w.calls.filter((c) => c.path === '/v1/desk/checkin').length, 2);
     const post = w.checkins[0];
     assert.equal(post.job.to.length, 2);
-    assert.equal((await cc.openAsStation(b.ring, post.job)).name, 'Kit Tester');
+    assert.equal((await cc.openAsStation(b.ring, post.job)).body.name, 'Kit Tester');
   });
 
   it('with no station registered the job is null and the row is still sealed', async () => {
@@ -267,7 +268,9 @@ describe('undo, check out and the one-off tag', () => {
     assert.equal(bodies[0][1].clubberId, '662');
     assert.equal(bodies[0][1].historyRow.kind, 'undo');
     assert.equal(bodies[1][1].historyRow.kind, 'checkout');
-    assert.equal((await cc.openRow(ring, bodies[1][1].historyRow)).name, 'Lu Tester');
+    assert.deepEqual(await cc.openRow(ring, bodies[1][1].historyRow), { ts: Date.parse('2026-10-14T22:00:00.000Z'), first: 'Lu', last: 'Tester', club: 'Sparks', clubberId: '700', source: 'desk' });
+    assert.equal(bodies[0][1].club, 'Sparks');
+    assert.equal(bodies[1][1].club, 'Sparks');
     assert.deepEqual(bodies[2][1].visitor, { first: 'Mia', last: 'Jones', club: 'Cubbies' });
     assert.ok(!/Lu|Tester/.test(JSON.stringify(bodies[1][1])));
   });
