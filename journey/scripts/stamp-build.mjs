@@ -30,9 +30,10 @@
  *
  * The committed files keep plain paths and content="dev": only the deployed
  * copy is rewritten, and public/version.json is gitignored. That matters most
- * for brand/, which must stay byte-identical to the signage repo's kit (see
- * test/brand-kit.test.mjs). Running this locally is safe and undone by
- * `git checkout public/index.html public/brand/fonts.css`.
+ * for brand/, a generated copy of lobby/shared/brand/ that must stay
+ * byte-identical to it (see test/brand-kit.test.mjs). Running this locally is
+ * safe and undone by `git checkout public/index.html` and `npm run assets`
+ * (which re-copies the kit over the stamped fonts.css).
  *
  * Usage: node scripts/stamp-build.mjs <build-id> [dir]   (dir defaults to public/)
  */

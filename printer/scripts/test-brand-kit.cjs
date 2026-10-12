@@ -1,24 +1,25 @@
 #!/usr/bin/env node
-// The brand kit on the label printer: the mirror, the packaging, and the
-// fail-open promise.
+// The brand kit on the label printer: the generated copy, the packaging, and
+// the fail-open promise.
 //
-//   1. DRIFT. print-server/public/brand/ must be byte-identical to the
-//      canonical kit (Awana-Check-in-Display/shared/brand/). The canonical repo
-//      is not here in CI, so the mirror is pinned by scripts/brand-kit.sha256
-//      and every file is checked against it: no missing file, no extra file, no
-//      changed byte. To take a new kit: `node scripts/gen-brand-manifest.cjs
-//      --from <canonical>` (see that script). Set BRAND_KIT_CANONICAL to a
-//      canonical checkout to compare against it directly as well.
+//   1. THE COPY. print-server/public/brand/ is not committed: it is a copy of
+//      the one canonical kit (lobby/shared/brand/) that
+//      scripts/family-assets.mjs makes before every test run, dev start and
+//      packaging (npm test's pretest, print-server's prestart, electron-app's
+//      predev / prebuild:renderer, release-app.yml). Here it must exist and be
+//      byte-identical to the canonical kit: no missing file, no extra file, no
+//      changed byte, no CR line ending.
 //   2. PACKAGING. The installer ships the kit because electron-builder's
 //      extraResources copies print-server/public/** and print-server/*.js
-//      (brand.js). If that filter ever narrows, the kit silently stops
+//      (brand.js), and the build scripts make the copy first. If that filter
+//      narrows or a script loses its copy step, the kit silently stops
 //      shipping and every label falls back; this fails first.
 //   3. FAIL-OPEN. A missing folder, a corrupt font, a broken mark: the kit
 //      reports what failed (as data and as {type, message} warnings on
 //      /health) and a label still renders, every time. A child at the door
 //      always gets a label.
 //
-// Run: npm run test:brand
+// Run: npm run test:brand   (after `npm run assets` if the copy is not there)
 
 'use strict';
 
@@ -34,7 +35,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
-const { MIRROR_DIR, MANIFEST_FILE, REPO, hashTree, parseManifest, filesWithCarriageReturns } = require('./brand-manifest.cjs');
+const { MIRROR_DIR, KIT_DIR, REPO, hashTree, filesWithCarriageReturns } = require('./brand-manifest.cjs');
 
 const PORT = Number(process.env.AWANA_TEST_PORT || 34603);
 const BASE = `http://127.0.0.1:${PORT}`;
@@ -50,59 +51,38 @@ function check(name, cond, detail) {
 }
 
 async function main() {
-  // ── 1. The mirror matches its pin ──────────────────────────────────────────
-  console.log('brand kit: the mirror is byte-identical to its pinned manifest');
+  // ── 1. The copy is the canonical kit ───────────────────────────────────────
+  console.log('brand kit: the print server\'s copy is byte-identical to the canonical kit');
   {
-    check('the mirror exists', fs.existsSync(MIRROR_DIR), MIRROR_DIR);
-    check('the manifest exists', fs.existsSync(MANIFEST_FILE), MANIFEST_FILE);
-    const pinned = parseManifest(fs.existsSync(MANIFEST_FILE) ? fs.readFileSync(MANIFEST_FILE, 'utf8') : '');
+    const HOW = 'run `npm run assets` (npm test does); the copy is generated from lobby/shared/brand, never edited here';
+    check('the canonical kit exists', fs.existsSync(KIT_DIR), KIT_DIR);
+    check('the copy exists', fs.existsSync(MIRROR_DIR), `${MIRROR_DIR} — ${HOW}`);
+    const canon = fs.existsSync(KIT_DIR) ? hashTree(KIT_DIR) : [];
     const actual = fs.existsSync(MIRROR_DIR) ? hashTree(MIRROR_DIR) : [];
-    const HOW = 're-copy the kit from Awana-Check-in-Display/shared/brand with scripts/gen-brand-manifest.cjs --from <it>; never edit the mirror here';
-    check('the manifest pins a real kit (fonts, marks, tokens)', pinned.size >= 60
-      && pinned.has('tokens.json') && pinned.has('fonts/PaytoneOne-Regular.ttf') && pinned.has('logos/sparks-black.svg'),
-      `${pinned.size} entries`);
+    const want = new Map(canon.map((e) => [e.file, e.sha256]));
+    check('the canonical kit is a real kit (fonts, marks, tokens)', want.size >= 60
+      && want.has('tokens.json') && want.has('fonts/PaytoneOne-Regular.ttf') && want.has('logos/sparks-black.svg'),
+      `${want.size} entries`);
     const seen = new Set();
     for (const { file, sha256 } of actual) {
       seen.add(file);
-      if (!pinned.has(file)) check(`mirror file ${file} is in the manifest`, false, `an extra file — ${HOW}`);
-      else check(`mirror file ${file} matches its pinned hash`, pinned.get(file) === sha256, `changed — ${HOW}`);
+      if (!want.has(file)) check(`copied file ${file} is in the canonical kit`, false, `an extra file — ${HOW}`);
+      else check(`copied file ${file} matches the canonical kit`, want.get(file) === sha256, `changed — ${HOW}`);
     }
-    for (const file of pinned.keys()) {
-      if (!seen.has(file)) check(`pinned file ${file} is in the mirror`, false, `missing — ${HOW}`);
+    for (const file of want.keys()) {
+      if (!seen.has(file)) check(`canonical file ${file} is in the copy`, false, `missing — ${HOW}`);
     }
-    // The hashes above only prove the mirror matches its own pin. A CRLF copy
-    // of the kit (a Windows checkout of the canonical repo, copied in and
-    // re-pinned) would match a CRLF pin just as well, so line endings are
-    // checked on their own: the kit's text files are LF, everywhere.
-    const crlf = fs.existsSync(MIRROR_DIR) ? filesWithCarriageReturns(MIRROR_DIR) : [];
-    check('no text file in the mirror has a CR line ending (the kit is LF only)', crlf.length === 0,
-      `${crlf.slice(0, 5).join(', ')} — ${HOW}, from a checkout made with core.autocrlf=false`);
+    // A CRLF checkout of the kit (Git for Windows' default) would be copied
+    // as CRLF and agree with itself, so line endings are checked on their own:
+    // the kit's text files are LF, everywhere.
+    const crlf = fs.existsSync(KIT_DIR) ? filesWithCarriageReturns(KIT_DIR) : [];
+    check('no text file in the kit has a CR line ending (the kit is LF only)', crlf.length === 0,
+      `${crlf.slice(0, 5).join(', ')} — check lobby/shared/brand out with core.autocrlf=false`);
 
-    const canonical = process.env.BRAND_KIT_CANONICAL;
-    if (canonical) {
-      console.log(`  (also comparing against BRAND_KIT_CANONICAL=${canonical})`);
-      const canon = fs.existsSync(canonical) ? hashTree(path.resolve(canonical)) : [];
-      check('the canonical folder exists', canon.length > 0, canonical);
-      const mine = new Map(actual.map((e) => [e.file, e.sha256]));
-      for (const { file, sha256 } of canon) {
-        check(`canonical ${file} is mirrored byte for byte`, mine.get(file) === sha256,
-          mine.has(file) ? 'differs' : 'missing from the mirror');
-      }
-      check('the mirror has no file the canonical kit does not', actual.every((e) => canon.some((c) => c.file === e.file)));
-      // Or a CRLF canonical checkout and a CRLF mirror would agree here too.
-      const canonCr = canon.length ? filesWithCarriageReturns(path.resolve(canonical)) : [];
-      check('the canonical checkout is LF too (not a CRLF Windows checkout)', canonCr.length === 0,
-        `${canonCr.slice(0, 5).join(', ')} — re-check it out with git -c core.autocrlf=false checkout -- shared/brand`);
-    }
-  }
-
-  // ── 1b. Line endings: the check, the regenerate script and git ─────────────
-  console.log('brand kit: a CRLF copy of the kit can be neither pinned nor committed');
-  {
+    // The detector: text files with a CR are listed, fonts (binary, full of
+    // 0x0D bytes) never are.
     const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'awana-brand-eol-'));
     try {
-      // The detector: text files with a CR are listed, fonts (binary, full of
-      // 0x0D bytes) never are.
       const probe = path.join(scratch, 'probe');
       fs.mkdirSync(path.join(probe, 'logos'), { recursive: true });
       fs.mkdirSync(path.join(probe, 'fonts'));
@@ -112,65 +92,26 @@ async function main() {
       const listed = filesWithCarriageReturns(probe);
       check('a CRLF SVG is caught, an LF stylesheet and a binary font are not',
         listed.length === 1 && listed[0] === 'logos/x.svg', JSON.stringify(listed));
-
-      // The regenerate script, pointed at scratch folders (--mirror/--manifest)
-      // so the real mirror is never at risk here.
-      const GEN = path.join(__dirname, 'gen-brand-manifest.cjs');
-      const gen = (...args) => spawnSync(process.execPath, [GEN, ...args], { encoding: 'utf8' });
-      const lfKit = path.join(scratch, 'lf-kit');
-      fs.cpSync(MIRROR_DIR, lfKit, { recursive: true });
-      const out1 = path.join(scratch, 'mirror-1');
-      const pin1 = path.join(scratch, 'pin-1.sha256');
-      const ok = gen('--from', lfKit, '--mirror', out1, '--manifest', pin1);
-      check('the regenerate script takes an LF kit', ok.status === 0, ok.stderr);
-      check('...and writes exactly the committed pin for it',
-        fs.existsSync(pin1) && fs.readFileSync(pin1, 'utf8') === fs.readFileSync(MANIFEST_FILE, 'utf8'));
-
-      // A Windows checkout of the canonical kit: every multi-line text file CRLF.
-      const crKit = path.join(scratch, 'crlf-kit');
-      fs.cpSync(MIRROR_DIR, crKit, { recursive: true });
-      let converted = 0;
-      for (const rel of ['tokens.css', 'tokens.json', 'README.md']) {
-        const f = path.join(crKit, rel);
-        if (!fs.existsSync(f)) continue;
-        fs.writeFileSync(f, fs.readFileSync(f, 'utf8').replace(/\n/g, '\r\n'));
-        converted++;
-      }
-      check('the CRLF fixture really has CRLF files', converted > 0 && filesWithCarriageReturns(crKit).length === converted);
-      const out2 = path.join(scratch, 'mirror-2');
-      fs.mkdirSync(out2);
-      fs.writeFileSync(path.join(out2, 'sentinel'), 'untouched');
-      const pin2 = path.join(scratch, 'pin-2.sha256');
-      const refused = gen('--from', crKit, '--mirror', out2, '--manifest', pin2);
-      check('the regenerate script refuses a CRLF kit', refused.status !== 0 && /CR/.test(refused.stderr), refused.stderr);
-      check('...before touching the mirror', fs.existsSync(path.join(out2, 'sentinel')) && fs.readdirSync(out2).length === 1);
-      check('...and pins nothing', !fs.existsSync(pin2));
-      // A CRLF copy made by hand, then pinned without --from.
-      const pin3 = path.join(scratch, 'pin-3.sha256');
-      const handCopy = gen('--mirror', crKit, '--manifest', pin3);
-      check('the regenerate script refuses to pin a CRLF mirror made by hand', handCopy.status !== 0 && !fs.existsSync(pin3),
-        handCopy.stderr);
-
-      // And git: the mirror's text types are LF in every checkout and
-      // normalised on commit; the fonts are binary. Checked only where this
-      // is a git work tree (it is in CI and in every clone).
-      const attr = spawnSync('git', ['check-attr', 'text', 'eol', '--',
-        'print-server/public/brand/tokens.css', 'print-server/public/brand/logos/sparks-black.svg',
-        'print-server/public/brand/fonts/PaytoneOne-Regular.ttf', 'scripts/brand-kit.sha256'], { cwd: REPO, encoding: 'utf8' });
-      if (attr.status === 0 && attr.stdout) {
-        const a = (file, name) => {
-          const m = attr.stdout.match(new RegExp(`^${file.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}: ${name}: (\\S+)$`, 'm'));
-          return m ? m[1] : null;
-        };
-        for (const file of ['print-server/public/brand/tokens.css', 'print-server/public/brand/logos/sparks-black.svg', 'scripts/brand-kit.sha256']) {
-          check(`git keeps ${file} LF (text, eol=lf)`, a(file, 'text') === 'set' && a(file, 'eol') === 'lf', attr.stdout);
-        }
-        check('git never converts a kit font (binary)', a('print-server/public/brand/fonts/PaytoneOne-Regular.ttf', 'text') === 'unset', attr.stdout);
-      } else {
-        console.log('  (not a git work tree here: .gitattributes check skipped)');
-      }
     } finally {
       try { fs.rmSync(scratch, { recursive: true, force: true }); } catch { /* best effort */ }
+    }
+
+    // And git: the canonical kit's text types are LF in every checkout and
+    // normalised on commit (lobby/.gitattributes); the fonts are binary.
+    // Checked only where this is a git work tree (it is in CI and in every clone).
+    const files = ['lobby/shared/brand/tokens.css', 'lobby/shared/brand/logos/sparks-black.svg', 'lobby/shared/brand/fonts/PaytoneOne-Regular.ttf'];
+    const attr = spawnSync('git', ['check-attr', 'text', 'eol', '--', ...files], { cwd: path.join(REPO, '..'), encoding: 'utf8' });
+    if (attr.status === 0 && attr.stdout) {
+      const a = (file, name) => {
+        const m = attr.stdout.match(new RegExp(`^${file.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}: ${name}: (\\S+)$`, 'm'));
+        return m ? m[1] : null;
+      };
+      for (const file of files.slice(0, 2)) {
+        check(`git keeps ${file} LF (text, eol=lf)`, a(file, 'text') === 'set' && a(file, 'eol') === 'lf', attr.stdout);
+      }
+      check('git never converts a kit font (binary)', a(files[2], 'text') === 'unset', attr.stdout);
+    } else {
+      console.log('  (not a git work tree here: .gitattributes check skipped)');
     }
   }
 
@@ -188,6 +129,14 @@ async function main() {
     check('...and *.js at its root (brand.js, the loader)', filter.includes('*.js'), JSON.stringify(filter));
     check('brand.js sits at the print-server root, where *.js matches it',
       fs.existsSync(path.join(REPO, 'print-server', 'brand.js')));
+    // The copy is generated, so every road to a build or a run must make it first.
+    const COPY = 'family-assets.mjs printer';
+    const scripts = (file) => JSON.parse(fs.readFileSync(path.join(REPO, file), 'utf8')).scripts || {};
+    check('npm test copies the kit first (printer pretest)', /family-assets\.mjs printer/.test(scripts('package.json').pretest || ''), COPY);
+    check('electron-app copies it before the renderer build and the installer (prebuild:renderer)',
+      /family-assets\.mjs printer/.test(scripts('electron-app/package.json')['prebuild:renderer'] || ''), COPY);
+    check('...before a dev start (electron-app predev)', /family-assets\.mjs printer/.test(scripts('electron-app/package.json').predev || ''), COPY);
+    check('...and before a bare server start (print-server prestart)', /family-assets\.mjs printer/.test(scripts('print-server/package.json').prestart || ''), COPY);
     check('no filter excludes the kit', !filter.some((f) => /^!/.test(f) && /public|brand|\.ttf|\.svg/.test(f)),
       JSON.stringify(filter));
   }

@@ -2,9 +2,9 @@ name: CI
 
 # One test run for the whole family. Each app keeps exactly the checks its
 # old repo ran; the copies the three used to compare over the network
-# (contract and envelope vectors, the brand kit, family.css) are compared
-# here directly. Nothing deploys from this repo yet: the apps' own workflows
-# sit dormant under their folders (GitHub reads only the root's) until the
+# (contract and envelope vectors) are compared here directly; the brand kit
+# and family.css are kept once and copied into each app at build time. Nothing deploys from this repo yet: the apps' own
+# workflows sit dormant under their folders (GitHub reads only the root's) until the
 # one-site move at awana.kvbchurch.org replaces them.
 
 on:
@@ -43,10 +43,13 @@ jobs:
   # Anything unknown runs everything: a manual run or a bot's dispatch, no
   # base to compare with, or a change to this file. The fast jobs always run.
   #   lobby   reads only lobby/ (its vitest excludes worker/ and desktop/,
-  #           whose lint moved into their own jobs below)
+  #           whose lint moved into their own jobs below), plus
+  #           printer/styles/family.css (its build copies it into public/)
   #   printer reads printer/, plus lobby/worker/src/relay.js
-  #           (test-phone-relay), site/build.mjs (test-phone-touch) and
+  #           (test-phone-relay), site/build.mjs (test-phone-touch),
   #           lobby/src/lib/syncSpecs.js (electron-app's device-sync test)
+  #           and lobby/shared/brand/ (the print server's brand kit is a
+  #           copy of it, made before the tests by scripts/family-assets.mjs)
   changes:
     name: What changed
     runs-on: ubuntu-latest
@@ -79,11 +82,12 @@ jobs:
               if [[ "$f" != */* && "$f" == *.md ]]; then continue; fi
               case "$f" in
                 journey/public/src/schedule.js) lobby=true ;;  # screenSpecs.test.js reads it
+                printer/styles/family.css) lobby=true ;;  # the lobby's build copies it into public/
                 lobby/worker/*|lobby/desktop/*|printer/*|journey/*|site/*|.github/workflows/*) ;;
                 *) lobby=true ;;
               esac
               case "$f" in
-                lobby/worker/src/relay.js|lobby/src/lib/syncSpecs.js|site/build.mjs) printer=true ;;
+                lobby/worker/src/relay.js|lobby/src/lib/syncSpecs.js|lobby/shared/brand/*|site/build.mjs) printer=true ;;
                 lobby/*|journey/*|site/updates/*|.github/workflows/*) ;;
                 *) printer=true ;;
               esac
@@ -102,6 +106,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      # The brand kit and family.css have one canonical file each; the apps'
+      # copies are generated (and gitignored), so make them, then check them.
+      - run: node scripts/family-assets.mjs
       - run: node scripts/check-mirrors.mjs
 
   lobby-checks:

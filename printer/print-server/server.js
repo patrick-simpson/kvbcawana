@@ -4044,8 +4044,7 @@ app.use((req, res, next) => {
 // data — every byte of that arrives via POST /phone/roster, which is gated.
 const LAN_PUBLIC_PATHS = new Set(['/phone', '/phone/ym']);
 
-// The brand kit (public/brand/, the byte-identical mirror of the signage repo's
-// shared/brand/) is public too, for the same reason: the phone page's fonts,
+// The brand kit (public/brand/, the generated copy of lobby/shared/brand/) is public too, for the same reason: the phone page's fonts,
 // tokens, corner-tab shapes and the Awana Clubs mark must load on the PIN
 // screen, before any PIN exists, and a stylesheet's url() could never send one.
 // The kit ships in the public repo and the installer and carries no roster
