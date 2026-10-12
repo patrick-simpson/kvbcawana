@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { proxyLarge, upstreamFor } from '../lib/proxyLarge.js';
 
-const FILES = { '/journey/current-lesson-video.mp4': 'https://raw.example/repo/journey/public/current-lesson-video.mp4' };
+const FILES = { '/journey/current-lesson-video.mp4': 'https://github.example/releases/download/journey-videos-v2/current-lesson-video.mp4' };
 const PREFIXES = { '/journey/videos/': 'https://github.example/releases/download/journey-videos-v2/' };
 const req = (path, headers = {}, method = 'GET') => new Request(`https://awana.kvbchurch.org${path}`, { method, headers });
 const upstream = (status, headers = {}, body = 'bytes') => async (url, init) => {

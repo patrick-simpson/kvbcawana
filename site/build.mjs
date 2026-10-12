@@ -30,7 +30,7 @@ import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { downloadRedirects } from './lib/downloads.js';
-import { REPO_FOLDERS, mustStream, repoPathFor } from './lib/largeFiles.js';
+import { REPO_FOLDERS, RELEASE_FILES, mustStream, releaseBase, releaseFiles, repoPathFor } from './lib/largeFiles.js';
 import { pageRedirects } from './lib/redirects.js';
 import { buildCheckinPages, CHECKIN_MODULES } from './checkin/checkin-page.mjs';
 
@@ -48,6 +48,10 @@ function hashTree(dir) {
       const p = path.join(d, name);
       if (statSync(p).isDirectory()) { walk(p); continue; }
       if (name === 'version.json') continue;
+      // The nightly lesson video is a release asset, never a committed file
+      // (gitignored); a local copy must not change the kiosk's build id. The
+      // pointer committed beside it (current-lesson-video.json) does.
+      if (name === 'current-lesson-video.mp4') continue;
       h.update(path.relative(dir, p)).update('\0').update(readFileSync(p)).update('\0');
     }
   };
@@ -205,6 +209,10 @@ writeFileSync(path.join(OUT, '_headers'), [
 //   /journey/videos/<file>.mp4  the picker's lesson videos, from the
 //                               journey-videos-v2 release (pi-encode.mjs keeps
 //                               every one under 25 MiB; functions/journey);
+//   /journey/current-lesson-video.mp4  this week's lesson, the asset of that
+//                               name on the same release (the nightly bot
+//                               replaces it; never in the tree, and a stray
+//                               local copy is dropped from the upload);
 //   any other journey/public video, the home page's film under /reel/
 //   (printer/public/reel, functions/reel), and any file over Pages' 25 MiB
 //   limit, from GitHub's copy of THIS commit, so it always matches the files
@@ -212,12 +220,13 @@ writeFileSync(path.join(OUT, '_headers'), [
 // Only files committed under those folders can be served that way; anything
 // else that big is a build output, and fails the build rather than the deploy.
 const REPO = process.env.GITHUB_REPOSITORY || 'patrick-simpson/kvbcawana';
-const VIDEO_PREFIXES = { '/journey/videos/': `https://github.com/${REPO}/releases/download/journey-videos-v2/` };
-const largeFiles = {};
+const VIDEO_PREFIXES = { '/journey/videos/': releaseBase(REPO) };
+const largeFiles = releaseFiles(REPO);
 const walk = (dir) => readdirSync(dir, { withFileTypes: true }).flatMap((d) =>
   d.isDirectory() ? walk(path.join(dir, d.name)) : [path.join(dir, d.name)]);
 for (const file of walk(OUT)) {
   const sitePath = '/' + path.relative(OUT, file).split(path.sep).join('/');
+  if (Object.prototype.hasOwnProperty.call(RELEASE_FILES, sitePath)) { rmSync(file); continue; }
   if (!mustStream(sitePath, statSync(file).size)) continue;
   const repoPath = repoPathFor(sitePath);
   if (!repoPath) throw new Error(`${sitePath} is a video or over 25 MiB, and only files committed under ${Object.values(REPO_FOLDERS).join(' or ')} can be served from the repo`);

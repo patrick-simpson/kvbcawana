@@ -11,10 +11,36 @@
 // film (/reel/, functions/reel; printer/public/reel, made by printer/reel/).
 // Anything else that big, or any other video, is a build output, and fails
 // the build rather than the deploy.
+//
+// The Journey lesson videos are not in the repo at all: they are assets on the
+// `journey-videos-v2` release (owner, 2026-10-12: the nightly copy left the tree,
+// where every lesson added ~20 MB to history). VIDEO_RELEASE_TAG is that release,
+// RELEASE_FILES the site paths served from one of its assets by a fixed name.
 export const REPO_FOLDERS = {
   '/journey/': 'journey/public/',
   '/reel/': 'printer/public/reel/',
 };
+
+export const VIDEO_RELEASE_TAG = 'journey-videos-v2';
+
+// This week's lesson, re-encoded for the Pi by the nightly bot
+// (.github/workflows/journey-update-lesson.yml), which replaces the asset in
+// place under this one name and commits journey/public/current-lesson-video.json
+// (its sha256) beside current-lesson.json. The Pi asks for the same URL it
+// always did.
+export const RELEASE_FILES = {
+  '/journey/current-lesson-video.mp4': 'current-lesson-video.mp4',
+};
+
+/** The release download folder for `repo` (owner/name), ending in a slash. */
+export function releaseBase(repo) {
+  return `https://github.com/${repo}/releases/download/${VIDEO_RELEASE_TAG}/`;
+}
+
+/** Site path -> upstream URL for every RELEASE_FILES entry. */
+export function releaseFiles(repo) {
+  return Object.fromEntries(Object.entries(RELEASE_FILES).map(([sitePath, name]) => [sitePath, releaseBase(repo) + name]));
+}
 
 export const PAGES_FILE_MAX = 25 * 1024 * 1024;
 
