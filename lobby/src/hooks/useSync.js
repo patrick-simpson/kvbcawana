@@ -22,6 +22,7 @@ import {
 } from '../lib/syncService.js';
 import { normalizeSyncPassphrase, sanitizeTemplate, PASSPHRASE_MIN } from '../lib/syncSpecs.js';
 import { saveDisplayKey } from '../lib/displayKey.js';
+import { historyWrapLanded, lockHistory, rewrapHistoryKey } from '../lib/historyCrypto.js';
 
 /**
  * @typedef {{
@@ -194,6 +195,7 @@ export async function signIn(passphrase, store) {
 
 export function signOut() {
   syncLogout();
+  lockHistory();
   update({ signedIn: false, phase: 'idle' });
 }
 
@@ -288,7 +290,13 @@ export async function changePassphrase(current, next) {
     return { ok: false, message: `The new passphrase needs at least ${PASSPHRASE_MIN} characters.` };
   }
   const url = await ensureUrl();
-  const res = await syncRequest(url, '/v1/passphrase', { method: 'POST', body: { current, next }, session: loadSyncSession() });
+  // The saved history is wrapped under the passphrase: re-wrap it under the new
+  // word first (proved before anything is sent), then send it in the SAME
+  // request, so the Worker changes both at once. If it cannot be moved, the
+  // passphrase is not changed (historyCrypto.js).
+  const wrap = await rewrapHistoryKey(url, loadSyncSession(), current, next);
+  if (!wrap.ok) return { ok: false, message: wrap.message };
+  const res = await syncRequest(url, '/v1/passphrase', { method: 'POST', body: wrap.wrapped ? { current, next, wrapped: wrap.wrapped } : { current, next }, session: loadSyncSession() });
   if (res.status === 0) return { ok: false, message: 'Could not reach the sync service.' };
   if (!res.ok) {
     if (res.status === 429) return { ok: false, message: 'Too many wrong tries. Wait a little, then try again.' };
@@ -297,7 +305,8 @@ export async function changePassphrase(current, next) {
   saveDisplayKey(res.body.displayKey);
   saveSyncSession(res.body.session);
   update({ signedIn: true });
-  return { ok: true, rotatedKey: Boolean(res.body.rotatedKey) };
+  const landed = !wrap.wrapped || await historyWrapLanded(url, res.body.session, wrap.wrapped);
+  return { ok: true, rotatedKey: Boolean(res.body.rotatedKey), ...(landed ? {} : { historyNote: 'The passphrase changed, but the sync service did not keep the saved history under the new word yet. Ask for the service to be updated before the next club night.' }) };
 }
 
 /** The ?passphrase= (or ?p=) a feed's link carries, or ''. */

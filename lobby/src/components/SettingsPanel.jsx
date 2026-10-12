@@ -19,6 +19,7 @@ import {
 import { FollowingContext, RemoteScreenContext, SettingsPageContext } from './settings/fields.jsx';
 import { ScreenOverviewSection, ScreensSection } from './settings/screens.jsx';
 import LaptopSection from './settings/laptop.jsx';
+import HistorySection from './settings/history.jsx';
 import { CORNER_CLUB_IDS } from '../lib/clubs.js';
 import { celebrateChange } from '../lib/settingsJoy.js';
 import awanaClubsMark from '../../shared/brand/logos/awana-clubs-white.svg';
@@ -431,6 +432,8 @@ export default function SettingsPanel({
     body = <PickupSection {...props} onBoardDemo={onBoardDemo ? () => { flush(); onBoardDemo(); } : null} />;
   } else if (section === 'laptop') {
     body = <LaptopSection />;
+  } else if (section === 'history') {
+    body = <HistorySection />;
   } else if (section === 'look') {
     body = <LookSection {...props} />;
   } else {

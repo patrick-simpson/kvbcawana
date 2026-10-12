@@ -10,9 +10,10 @@ describe('settings sections', () => {
   it('lists the Laptop section on the settings page only, just before Setup', () => {
     expect(sectionsFor(false)).toBe(SECTIONS);
     const ids = sectionsFor(true).map((s) => s.id);
-    expect(ids).toEqual(['status', 'screens', 'checkins', 'slides', 'screen', 'celebrations', 'pickup', 'look', 'laptop', 'setup']);
+    expect(ids).toEqual(['status', 'screens', 'checkins', 'slides', 'screen', 'celebrations', 'pickup', 'look', 'laptop', 'history', 'setup']);
     expect(LAPTOP_SECTION.blurb.length).toBeGreaterThan(0);
     expect(resolveSection('laptop')).toBe('laptop');
+    expect(resolveSection('history')).toBe('history');
   });
 
   it('maps every old tab id to the section that now holds its controls', () => {
