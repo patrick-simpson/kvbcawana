@@ -41,6 +41,15 @@ function rig({ running = true, installed = true, dies = true } = {}) {
     && JSON.stringify(r.spawned.args) === JSON.stringify(['--hide-crash-restore-bubble', '--new-window', URL]) && out.launched === 'chrome', JSON.stringify(r.spawned));
   check('launched detached, so it outlives the app', r.spawned && r.spawned.opts.detached === true);
 
+  r = rig();
+  const { EventEmitter } = require('events');
+  const child = Object.assign(new EventEmitter(), { unref() {} });
+  r.spawn = () => child;
+  out = await cr.restartChrome({ url: URL, env: ENV, platform: 'win32', ...r });
+  let threw = false;
+  try { child.emit('error', new Error('spawn ENOENT')); } catch { threw = true; }
+  check('a launch that fails after spawn is handled and falls back to the default browser', !threw && r.opened === URL);
+
   r = rig({ running: false });
   out = await cr.restartChrome({ url: URL, env: ENV, platform: 'win32', ...r });
   check('Chrome not running: nothing to close, it is opened on the check-in page', !r.calls.some(c => c.startsWith('taskkill')) && r.spawned && out.launched === 'chrome');
