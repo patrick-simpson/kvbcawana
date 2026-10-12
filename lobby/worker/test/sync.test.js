@@ -4,7 +4,6 @@ import {
   GLOBAL_MAX_FAILS,
   IP_LOCK_MS,
   IP_MAX_FAILS,
-  SYNC_CHANNEL,
   SyncCore,
   buildDeck,
   buildSlidesChunks,
@@ -25,16 +24,16 @@ function memoryStore() {
   };
 }
 
-function setup({ env = {}, html = CALENDAR_HTML, start = Date.parse('2026-10-01T18:00:00Z'), publish } = {}) {
+function setup({ env = {}, html = CALENDAR_HTML, start = Date.parse('2026-10-01T18:00:00Z') } = {}) {
   let t = start;
   const sent = [];
   const fetched = [];
   const storage = memoryStore();
   const core = new SyncCore({
     storage,
-    env: { INITIAL_PASSPHRASE: 'kennebec', PUSHER_KEY: 'pk', PUSHER_CLUSTER: 'us2', ...env },
+    env: { INITIAL_PASSPHRASE: 'kennebec', ...env },
     now: () => t,
-    publish: publish || (async (channel, event, payload) => { sent.push({ channel, event, payload }); return { ok: true }; }),
+    broadcast: (text) => { const f = JSON.parse(text); sent.push({ event: f.e, payload: f.d }); return 1; },
     fetchFn: async (url) => {
       fetched.push(String(url));
       return new Response(html, { status: 200 });
@@ -59,7 +58,7 @@ describe('login with the passphrase', () => {
     expect(res.status).toBe(200);
     expect(body.session).toMatch(/^v1\.1\.\d+\.[A-Za-z0-9_-]+$/);
     expect(body.displayKey).toMatch(/^[A-Za-z0-9+/]{43}=$/);
-    expect(body.pusher).toEqual({ key: 'pk', cluster: 'us2' });
+    expect(body).not.toHaveProperty('pusher');
     expect(body.state).toMatchObject({ settings: null, slides: null, calendar: null });
     expect(body.state.kid).toMatch(/^[0-9a-f]{8}$/);
   });
@@ -161,17 +160,6 @@ describe('sessions', () => {
 });
 
 describe('shared settings', () => {
-  it('with Pusher retired (no secrets), a save still reports its broadcast: the live channel carried it', async () => {
-    const s = setup({ publish: async () => ({ ok: false, error: 'pusher-not-configured' }) });
-    const { body: login } = await s.login();
-    const out = await (await s.call('PUT', '/v1/settings', { settings: { checkoutBoardNamesAbove: 7 } }, login.session)).json();
-    expect(out.broadcast).toBe(true);
-    const failing = setup({ publish: async () => ({ ok: false, status: 500, error: 'pusher-500' }) });
-    const { body: login2 } = await failing.login();
-    const out2 = await (await failing.call('PUT', '/v1/settings', { settings: { checkoutBoardNamesAbove: 7 } }, login2.session)).json();
-    expect(out2.broadcast).toBe(false);
-  });
-
   it('stores the allowlisted keys, seals a settings frame every screen can open, and orders it', async () => {
     const s = setup();
     const { body: login } = await s.login();
@@ -182,7 +170,6 @@ describe('shared settings', () => {
     expect(out).toMatchObject({ rev: 1, keyCount: 1, broadcast: true });
 
     const frame = s.sent.find((m) => m.event === 'settings');
-    expect(frame.channel).toBe('awana-channel');
     const opened = await openEnvelope(await importDisplayKey(login.displayKey), 'settings', frame.payload);
     expect(opened.ok).toBe(true);
     expect(sanitizeSettings(opened.payload)).toMatchObject({ rev: 1, settings: { checkoutBoardNamesAbove: 7 } });
@@ -240,7 +227,7 @@ describe('template and Journey settings', () => {
       config: { audioMuted: true, confettiLevel: 'reduced', pusherAppKey: 'steal', panicMode: true, checkoutBoardMode: 'always' },
     }, login.session)).json();
     expect(out.config).toEqual({ audioMuted: true, confettiLevel: 'reduced' });
-    expect(s.sent.at(-1)).toMatchObject({ channel: SYNC_CHANNEL, payload: { what: 'template' } });
+    expect(s.sent.at(-1)).toMatchObject({ event: 'changed', payload: { what: 'template' } });
   });
 
   it('keeps Journey\'s room settings, never video quality', async () => {
@@ -259,7 +246,7 @@ describe('template and Journey settings', () => {
       slideExtras: { questions: false, takeaways: true },
       slideNotes: { 12: { questions: ['What is grace?', 'x'.repeat(80)] } },
     });
-    expect(s.sent.at(-1)).toMatchObject({ channel: SYNC_CHANNEL, payload: { what: 'journey' } });
+    expect(s.sent.at(-1)).toMatchObject({ event: 'changed', payload: { what: 'journey' } });
   });
 });
 
@@ -273,7 +260,7 @@ describe('the calendar', () => {
     expect(out).toMatchObject({ changed: true });
     expect(out.clubCount).toBeGreaterThanOrEqual(5);
     expect(s.fetched).toEqual(['https://kvbchurch.twotimtwo.com/calendar/index']);
-    expect(s.sent.at(-1)).toMatchObject({ channel: SYNC_CHANNEL, payload: { what: 'calendar' } });
+    expect(s.sent.at(-1)).toMatchObject({ event: 'changed', payload: { what: 'calendar' } });
 
     // Public, so a screen not yet signed in still gets club nights.
     const feed = await (await s.call('GET', '/v1/calendar')).json();

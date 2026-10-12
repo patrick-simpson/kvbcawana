@@ -25,7 +25,7 @@ function fakeService(overrides = {}) {
   const routes = {
     'shared/sync.json': () => [200, { url: BASE }],
     '/v1/login': (init) => (JSON.parse(init.body).passphrase === 'kennebec'
-      ? [200, { session: SESSION, displayKey: KEY, pusher: { key: 'pk', cluster: 'us2' }, state: STATE }]
+      ? [200, { session: SESSION, displayKey: KEY, state: STATE }]
       : [401, { reason: 'wrong', triesLeft: 4 }]),
     '/v1/state': () => [200, STATE],
     ...overrides,

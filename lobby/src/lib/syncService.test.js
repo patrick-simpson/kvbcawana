@@ -82,7 +82,7 @@ describe('finding the service', () => {
 describe('signing in', () => {
   it('saves the session and the display key, and returns the rest for the caller', async () => {
     const fetchFn = answer(200, {
-      session: SESSION, displayKey: KEY, pusher: { key: 'pk', cluster: 'us2' },
+      session: SESSION, displayKey: KEY,
       state: { template: { savedAt: 'x', config: { audioMuted: true, pusherAppKey: 'no' } } },
     });
     const res = await syncLogin(BASE, 'kennebec', { fetchFn });

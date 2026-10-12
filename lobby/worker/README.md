@@ -9,7 +9,7 @@ the check-in laptop being switched on:
   (for a lobby TV) the "new screen" template.
 - **Any signed-in screen can change things for every screen**: shared
   settings, the slide deck, the template, Journey's room settings. Changes
-  reach the other screens within seconds over Pusher.
+  reach the other screens within seconds over the live channel.
 - **"Refresh calendar now" really reads the church calendar**, and the service
   also reads it by itself every six hours.
 
@@ -46,13 +46,7 @@ In this repository on GitHub: **Settings** → **Secrets and variables** →
 | --- | --- |
 | `CLOUDFLARE_API_TOKEN` | the token from step 2 |
 | `CLOUDFLARE_ACCOUNT_ID` | the Account ID from step 1 |
-| `PUSHER_APP_ID` | from the Pusher dashboard → your app → **App Keys** (`app_id`) |
-| `PUSHER_KEY` | the same page (`key`) |
-| `PUSHER_SECRET` | the same page (`secret`) |
-| `PUSHER_CLUSTER` | the same page (`cluster`, for example `us2`) |
 | `SYNC_PASSPHRASE` | the church passphrase, for example `kennebec` |
-
-The Pusher values are the ones the printer app already uses.
 
 For cloud check-in (`ROADMAP.md#cloud-check-in` at the repo root), three more:
 
@@ -124,7 +118,7 @@ npx vitest run --config worker/vitest.config.js   # from the repo root
 cd worker && npx wrangler dev                      # a local copy on :8787
 ```
 
-For `wrangler dev`, put `INITIAL_PASSPHRASE=kennebec` (and any `PUSHER_*`) in
+For `wrangler dev`, put `INITIAL_PASSPHRASE=kennebec` in
 `worker/.dev.vars` (git-ignored).
 
 ## The API
@@ -135,7 +129,7 @@ All JSON. Every route but the first three needs `Authorization: Bearer
 | Route | |
 | --- | --- |
 | `GET /v1/health` | `{ok: true}` |
-| `POST /v1/login` `{passphrase, seedKey?}` | `{session, displayKey, pusher: {key, cluster}, state}`; 401 `{reason: 'wrong', triesLeft}`; 429 `{retryAfterSec}` |
+| `POST /v1/login` `{passphrase, seedKey?}` | `{session, displayKey, state}`; 401 `{reason: 'wrong', triesLeft}`; 429 `{retryAfterSec}` |
 | `GET /v1/calendar` | the calendar feed (`calendar-feed.json`'s shape, plus `checkedAt`) |
 | `GET /v1/state` | `{settings, slides, template, journey, calendar, kid}` |
 | `PUT /v1/settings` `{settings}` | `{rev, publishedAt, keyCount, broadcast}`; seals a `settings` frame (contract v6) |
@@ -149,7 +143,7 @@ All JSON. Every route but the first three needs `Authorization: Bearer
 | `POST /v1/cloud/read-now` | one report read now, on any day (a rehearsal), never within 15 s of the last: `{ok, verdict?, error?, throttled?, status}` |
 
 Changes to the template, Journey's settings and the calendar ring a plaintext
-doorbell, `changed` `{what, at}` on the `awana-sync` Pusher channel; it carries
+doorbell, `changed` `{what, at}` on the live channel; it carries
 no content, and a screen that hears it fetches from here.
 
 ### Screens (`src/screens.js`, ROADMAP.md#settings-page phase 2)
@@ -157,7 +151,7 @@ no content, and a screen that hears it fetches from here.
 Every lobby TV, projector, Journey kiosk and KVBC Awana computer registers here under an id it made
 once and keeps in its own storage, so awana.kvbchurch.org/settings can list
 them and change each one's OWN settings (its chime, motion, what plays behind
-the names; never a shared setting, a Pusher key, panic mode or a secret: the
+the names; never a shared setting, panic mode or a secret: the
 allowlist is `SCREEN_SPECS` in `src/lib/syncSpecs.js`, which the screens
 apply too). At most 40 screens; a full registry makes room only by forgetting
 one silent for a month.
@@ -173,7 +167,7 @@ one silent for a month.
 | `DELETE /v1/screens/<id>` | `{forgotten}`; a screen still running comes back at its next hello |
 
 A settings change, a rename and an action ring the live channel only (never
-Pusher, never replayed to a screen that connects later): `changed` `{what:
+replayed to a screen that connects later): `changed` `{what:
 'screen', id, at}` or `{what: 'screen-action', id, action, data?, at}`. A
 screen's live socket carries its id (`/v1/live?session=…&screen=<id>`), which
 is how the list knows it is on the channel.

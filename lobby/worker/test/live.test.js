@@ -20,7 +20,6 @@ function setup() {
   const core = new SyncCore({
     storage: memoryStore(),
     env: { INITIAL_PASSPHRASE: 'kennebec' },
-    publish: async () => ({ ok: true }),
     broadcast: (text) => { frames.push(JSON.parse(text)); return 3; },
     closeAll: (code) => { closed = code; },
   });
