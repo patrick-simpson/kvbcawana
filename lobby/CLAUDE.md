@@ -1507,6 +1507,16 @@ what plays behind the names (and its uploads), this TV's chime, motion,
 confetti, wake lock and connection sticker, simplified mode,
 `followPublishedSlides` / `followSharedSettings`, the fleet URLs.
 
+- **One vocabulary of rules.** `src/lib/settingRules.js` (pure, no imports)
+  holds the rule types (bool, int / number with clamp, enum, string, url,
+  time, slug, intList, phrases) and the two checks over them: `cleanRule` /
+  `cleanSpec` (the wire: clean or drop, used by `SHARED_SPEC`, `TEMPLATE_SPEC`
+  and `SCREEN_SPECS`) and `matchesRule` (the device layer: pass as it stands,
+  used by `useConfig`'s `VALIDATORS`). Each table is data over it and keeps its
+  own keys and limits; a new rule type goes there once. The Worker bundles it
+  through `syncSpecs.js`. The projector reaches it only through `useConfig.js`,
+  so the isolation allowlist is unchanged. `shared-config.js` parses the
+  schedule and theme JSON, a different job, and is not a rule table.
 - **The path is the slide deck's.** Settings, live-applying a shared change,
   calls App's `shareSettings` with this screen's whole shared set
   (`pickShared`): it lands in the store's shared layer at once
