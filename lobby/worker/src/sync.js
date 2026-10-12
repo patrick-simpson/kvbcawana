@@ -66,6 +66,7 @@ import { Publisher, mountPublisher } from './publisher.js';
 import { TonightBook } from './tonight.js';
 import { UNKNOWN_DEVICE, deviceOf } from './device.js';
 import { Changes, changedSince, changedSinceRefusal, diffKeys, mountChanges } from './changes.js';
+import { Switches, mountSwitches } from './switches.js';
 
 export { json };
 
@@ -144,7 +145,12 @@ export class SyncCore {
    */
   constructor({ storage, env, fetchFn, now, broadcast, closeAll, alarms, liveScreens, sleep }) {
     this.storage = storage;
-    this.env = env || {};
+    // The runtime switches (switches.js, routes.md 10.2): every module gets the
+    // EFFECTIVE env (wrangler.toml's values are the defaults, a stored switch
+    // overrides one), so their existing env reads need no edit.
+    this.rawEnv = env || {};
+    this.switches = new Switches({ storage: this.storage, rawEnv: this.rawEnv, now: now || (() => Date.now()) });
+    this.env = this.switches.effectiveEnv();
     this.fetchFn = fetchFn || ((...args) => fetch(...args));
     this.now = now || (() => Date.now());
     // The live channel: every screen's socket (index.js) carries everything.
@@ -215,6 +221,7 @@ export class SyncCore {
     this.undoers.shared = (u) => this.undoShared(u);
     this.undoers.screen = (u) => this.undoScreen(u);
     this.undoers['screen-name'] = (u) => this.undoScreenName(u);
+    mountSwitches(this.registry, this);   // /v1/switches (routes.md 10.2)
   }
 
   /**
@@ -251,6 +258,7 @@ export class SyncCore {
 
   /** The Durable Object's alarm: the watcher's 5 s read (it sets the next one). */
   async alarm() {
+    await this.switches.load();   // stored switches before anything reads env (a restart reloads them here)
     // An outbox waiting for D1 drains with nobody asking (cheap: nothing without HISTORY_DB).
     await this.history.flush().catch((err) => console.error('[history] flush failed', err));
     return this.watcher.tick();
@@ -482,6 +490,7 @@ export class SyncCore {
     const url = new URL(request.url);
     const route = `${request.method} ${url.pathname}`;
     try {
+      await this.switches.load();   // stored switches before anything reads env (memoized)
       switch (route) {
         case 'GET /v1/health':
           return json({ ok: true });
@@ -980,6 +989,7 @@ export class SyncCore {
 
   /** The scheduled run: keep the calendar fresh without anyone pressing a button. */
   async cron() {
+    await this.switches.load();
     await this.relayQueue.purge();
     // Keeps the watcher's alarm set (it sets its own after each run; this is
     // the safety net if one was ever lost).

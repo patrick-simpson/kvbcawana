@@ -39,6 +39,13 @@ CLOUD_PRINT = "on"
 SINGLE_PUBLISHER = "on"
 # ON with KVBC Awana 9.2.1 (owner, 2026-10-12: automatic check-outs via the Worker).
 YM_CHECKOUT = "on"
+# Stored switches override these defaults (src/routes.md 10.2): CLOUD_PRINT,
+# SINGLE_PUBLISHER and YM_CHECKOUT above, and the safety switches CHURCH_SETTINGS,
+# NOTICES and CHANGE_LOG (default "on" when unset), are flipped at runtime from
+# awana.kvbchurch.org/settings; "Back to default" there returns a switch to the
+# value here. SWITCHES_STORED = "off" is the deploy kill: stored values are ignored
+# (these defaults only) and the settings page cannot flip anything.
+SWITCHES_STORED = "on"
 # Passphrase v2 migration (src/routes.md section 1). "on": clients that still send
 # the passphrase itself keep signing in (and the first v2 sign-in upgrades the
 # stored verifier). Set "off" once auth:legacyLastAt is old (every screen, the app

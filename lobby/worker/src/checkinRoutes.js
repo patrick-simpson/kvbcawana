@@ -77,7 +77,7 @@ export function mountCheckin(registry, core) {
   /** Every 30 s (and during a print, every few seconds with the job id): the lease stays alive and the printer's state is noted. */
   const heartbeat = async (/** @type {string} */ stationId, /** @type {any} */ b) => {
     await loadAll();
-    await core.stations.touch(stationId, b.printer);
+    await core.stations.touch(stationId, b.printer, { version: b.version, churchRev: b.churchRev });
     if (b.jobId === undefined) return json({ ok: true });
     if (!validJobId(b.jobId)) return fail('That is not a job id.', 400);
     const r = await core.printq.heartbeat(b.jobId, stationId, lookup);
