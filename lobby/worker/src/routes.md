@@ -264,6 +264,10 @@ behaviour is `desk.js`, which the page calls through these routes.
 | `POST /v1/desk/checkout` **BUILT** | session | `{night, clubberId \| visitor, historyRow}` | TwoTimTwo check-out (accepted only on "OK"): `{ok}`. The claim is left as it is |
 | `GET /v1/desk/tonight` **BUILT (P5)** | session | | `{night, source: 'report' \| 'history', checkedIn, checkedOut, byClub, reportAgeMs, enabled}`: `authoritativeTonight()` from the Worker's own state (the shared module, not a port; section 8). Answers in shadow mode too, so the owner can compare it with the laptop's count |
 
+Since 2026-10-12 (owner) the page sends no `visitor`: a child not on the list gets
+a walk-in name tag (a `reprint:` job on `/print-oneoff`, never counted). The
+Worker keeps the `visitor` shape (and `visitorTag`) unchanged; nothing else sends it.
+
 **`POST /v1/desk/checkin`, in order** (nothing is checked-and-set across the
 network call):
 

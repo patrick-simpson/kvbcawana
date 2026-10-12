@@ -768,6 +768,19 @@ said); "Owner" is what only the owner can do.
     of a TwoTimTwo child, the laptop's count check. Visitors and
     who this page checked out are kept per tab for the night, as the desk did.
     `lobby/e2e/checkin.spec.js`, `site/test/checkin-page.test.mjs`.
+  - **Same day, later (owner, branch `late-barf`, not released).** (1) A tap queues the
+    child ("Checking in…", two at a time in tap order); "Checked in ✓" only after
+    TwoTimTwo confirms; busy = "Waiting for TwoTimTwo… Ns" and an automatic retry;
+    a refusal reverts that tile alone; undo and check-out ride the queue. (2) "Walk-in
+    name tag" replaces the one-off tag and the visitor check-in (one-off route: greeted,
+    never counted; Tonight lists "walk-in · not registered yet"). (3) The green BARF
+    button (BARF nights only): a friend who came with a child already checked in =
+    ONE Worker operation `POST /v1/desk/barf-late` (routes.md 5.1: the child held on
+    the report across TwoTimTwo's undo and redo, only the BARF tag printed, the friend
+    on the 6:30 list and the bags; a failed redo offers a one-tap re-check-in). The
+    tag's own route `/print-barf-tag` needs printer 9.3.1; a 9.3.0 station gets a
+    "BARFED! <first>" custom label. (4) `/checkin/ym` gets all of it (walk-in tag for
+    Trek and Journey, its own Tonight with Undo check-in, no Check out).
   - **`/checkin/classic`: DELETE after Wednesday 2026-10-14.** The relayed phone
     page exactly as /checkin served it on 2026-10-12 (`site/checkin/classic.html`,
     a frozen copy, pinned by its SHA-256 in `site/test/checkin-classic.test.mjs`),
