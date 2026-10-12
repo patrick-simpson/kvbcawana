@@ -1,100 +1,22 @@
 import { describe, expect, it } from 'vitest';
 import {
-  CHIP_HEIGHT_EM, SHOUT_BOX, chipGeometry, fitChipList, fitChipU, inkOverflow, markExtents, measureEm, widestDigits, wrapRows,
+  CHIP_HEIGHT_EM, chipGeometry, fitChipList, fitChipU, measureEm, widestDigits, wrapRows,
 } from './chip.js';
-// Test-only reach into the lobby's copy: the projector may not import it at
-// run time (the isolation rule), so this is what keeps the two stepped chips
-// the same shape.
-import {
-  SHOUT_BOX as LOBBY_SHOUT_BOX, chipGeometry as lobbyChipGeometry, inkOverflow as lobbyInkOverflow, markExtents as lobbyMarkExtents,
-} from '../../lib/brand.js';
+// The geometry is the one shared copy (shared/chipGeometry.js, tested there);
+// the projector's chip is that without the lobby's weather glyph.
+import { chipGeometry as sharedChipGeometry, markExtents } from '../../../shared/chipGeometry.js';
 
 describe('the projector\'s stepped chip', () => {
-  it('has exactly the lobby chip\'s geometry', () => {
-    const inks = [null, markExtents('7:56'), markExtents('ÉLODIE'), markExtents('ȘTEFAN & ÉLODIE'), { ascent: 1.161, descent: 0.02 }];
+  it('is the shared geometry, with no glyph', () => {
+    const inks = [null, markExtents('7:56'), markExtents('\u00c9LODIE'), markExtents('\u0218TEFAN & \u00c9LODIE'), { ascent: 1.161, descent: 0.02 }];
     for (const [l, v] of [[0, 0], [1.2, 2.5], [5.1, 1.1], [3.3, 9.8], [8, 4]]) {
       for (const ink of inks) {
-        // The lobby's chip can also carry a glyph (the weather's); with none
-        // it reports none, and every other number is the projector's.
-        const { icon, ...lobby } = lobbyChipGeometry(l, v, 0, ink);
+        const { icon, ...shared } = sharedChipGeometry(l, v, 0, ink);
         expect(icon).toBeNull();
-        expect(chipGeometry(l, v, ink)).toEqual(lobby);
+        expect(chipGeometry(l, v, ink)).toEqual(shared);
+        expect('icon' in chipGeometry(l, v, ink)).toBe(false);
       }
     }
-  });
-
-  it('widens with its value and always steps the value block out past the label', () => {
-    const narrow = chipGeometry(3, 1);
-    const wide = chipGeometry(3, 8);
-    expect(wide.width).toBeGreaterThan(narrow.width);
-    const pillEnd = Math.max(3 * 0.59 + 0.84, 2.2);
-    expect(narrow.width - 0.2).toBeGreaterThanOrEqual(pillEnd + 0.5 - 1e-9);
-  });
-
-  it('reads the shout\'s marks exactly as the lobby does', () => {
-    expect(SHOUT_BOX).toEqual(LOBBY_SHOUT_BOX);
-    for (const text of ['MAYA', 'JOSÉ', 'NGUYỄN', 'ȘTEFAN', 'ÇAĞLA', 'Å', 'आज', '']) {
-      expect(markExtents(text), text).toEqual(lobbyMarkExtents(text));
-      for (const lh of [0.93, 1, 1.4]) expect(inkOverflow(markExtents(text), lh, 0.05)).toEqual(lobbyInkOverflow(lobbyMarkExtents(text), lh, 0.05));
-    }
-  });
-
-  // Where the value's ink lands, in the chip's em: SVG's central baseline
-  // sits (ascent - descent) / 2 of the face above the alphabetic one.
-  const inkOf = (g, ink) => {
-    const baseline = g.value.y + ((SHOUT_BOX.ascent - SHOUT_BOX.descent) / 2) * g.value.size;
-    return { top: baseline - ink.ascent * g.value.size, bottom: baseline + ink.descent * g.value.size };
-  };
-  const BLOCK = { top: 1.05, bottom: 1.05 + 1.38 };
-
-  it('keeps a value\'s marks off the block\'s keylines, however tall they are', () => {
-    // Paytone One's own ink (canvas measurements) and the no-canvas estimate.
-    const inks = [
-      { ascent: 1.045, descent: 0.02 }, // É
-      { ascent: 1.161, descent: 0.02 }, // Ễ
-      { ascent: 0.688, descent: 0.351 }, // Ș
-      { ascent: 1.045, descent: 0.351 }, // Ștefan & Élodie
-      { ascent: 1.161, descent: 0.351 },
-      ...['ÉLODIE', 'NGUYỄN', 'ȘTEFAN', 'ÇAĞLA', 'ȘTEFAN & ÉLODIE', 'Ǻ'].map((t) => markExtents(t)),
-    ];
-    for (const ink of inks) {
-      const g = chipGeometry(3, 4, ink);
-      const at = inkOf(g, ink);
-      expect(at.top, JSON.stringify(ink)).toBeGreaterThanOrEqual(BLOCK.top + 0.06 - 1e-9);
-      expect(at.bottom, JSON.stringify(ink)).toBeLessThanOrEqual(BLOCK.bottom - 0.06 + 1e-9);
-    }
-  });
-
-  it('plain caps, figures and lowercase keep the catalog\'s seat', () => {
-    for (const ink of [markExtents('6:30 PM'), { ascent: 0.7, descent: 0 }, { ascent: 0.75, descent: 0.23 }]) {
-      expect(chipGeometry(3, 4, ink)).toEqual(chipGeometry(3, 4));
-    }
-  });
-
-  it('a mark on one side moves the value only as far as it must, at full size', () => {
-    const e = { ascent: 1.045, descent: 0.02 };
-    const g = chipGeometry(3, 4, e);
-    expect(g.value.size).toBe(1.06);
-    expect(inkOf(g, e).top).toBeCloseTo(BLOCK.top + 0.06, 9);
-    const s = { ascent: 0.688, descent: 0.351 };
-    const h = chipGeometry(3, 4, s);
-    expect(h.value.size).toBe(1.06);
-    expect(inkOf(h, s).bottom).toBeCloseTo(BLOCK.bottom - 0.06, 9);
-  });
-
-  it('marks above and below the block cannot hold at full size set the value as large as it can, and the block hugs it', () => {
-    const both = { ascent: 1.045, descent: 0.351 };
-    const g = chipGeometry(3, 4, both);
-    expect(g.value.size).toBeLessThan(1.06);
-    expect(g.value.size).toBeGreaterThan((1.38 - 0.12) / (1.045 + 0.351) - 0.002);
-    expect(g.value.width).toBeCloseTo(4 * g.value.size, 9);
-    expect(g.width).toBeLessThan(chipGeometry(3, 4).width);
-    expect(g.height).toBe(chipGeometry(3, 4).height);
-  });
-
-  it('measures without a canvas (tests) by a per-character estimate', () => {
-    expect(measureEm('GAME ENDS')).toBeGreaterThan(measureEm('GAME'));
-    expect(measureEm('6:30')).toBeCloseTo(0.64 * 3 + 0.3);
   });
 
   it('sizes a ticking value for its widest digits', () => {

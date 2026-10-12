@@ -113,6 +113,7 @@
  * @property {number} at Epoch ms.
  */
 
+import { cleanText, plainText } from '../../shared/text.js';
 import {
   MAX_DURATION_SEC,
   MAX_EYEBROW,
@@ -146,25 +147,11 @@ const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
  * @returns {string}
  */
 function cleanString(v, max) {
-  return typeof v === 'string' ? v.trim().slice(0, max) : '';
+  return cleanText(v, max);
 }
 
-/**
- * Bounded plain text for the one free-text display field (`notice`):
- * strips anything markup-shaped and collapses whitespace/newlines.
- * @param {unknown} v
- * @param {number} max
- * @returns {string}
- */
-function plainText(v, max) {
-  if (typeof v !== 'string') return '';
-  return v
-    .replace(/<[^>]*>/g, ' ')
-    .replace(/[<>]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, max);
-}
+// plainText (bounded, markup-free copy for the one free-text display field,
+// `notice`) is shared/text.js's, as is the cleaning above.
 
 /**
  * Whole non-negative count, or null when the value isn't a usable number
@@ -475,7 +462,7 @@ export function sanitizePoints(payload) {
  * @param {unknown} payload
  * @returns {ScheduleEvent | null}
  */
-export function sanitizeSchedule(payload) {
+export function sanitizeScheduleEvent(payload) {
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return null;
   const raw = /** @type {Record<string, unknown>} */ (payload);
   const at = toEpochMs(raw.at);

@@ -230,8 +230,9 @@ and `doodles/`. Read its README before changing it.
   face the mockup and every rule were drawn with, so chips' values sagged and
   names sank; the overrides keep the caps' centre where it was relative to
   the box and to SVG's central baseline, and keep the content box's height.
-  `SHOUT_BOX` in `src/lib/brand.js` (and its projector copy in `lib/chip.js`)
-  is the same pair for the fits' arithmetic; `promoFonts.test.js` pins it.
+  `SHOUT_BOX` (`shared/chipGeometry.js`, which `src/lib/brand.js` and the
+  projector's `lib/chip.js` both re-export) is the same pair for the fits'
+  arithmetic; `promoFonts.test.js` pins it.
 - **Sizes hold the mockup's cap heights, not its font sizes.** Paytone One's
   caps stand 5.7% shorter than Galindo's at one size (its figures 5%), so
   every shout size is the mockup's times 1.057 (1.05 for figures) and every
@@ -719,7 +720,10 @@ printer feed names): new displays get KVBC Awana, never this app. The owner's ca
   the page's own settings, display login and service-worker cache survive
   restarts. Nothing in the page knows it is in the app: `window.self ===
   window.top`, so it is not "embedded".
-- **Club nights are the signage's own** (`src/clubNight.js`, pure): a
+- **Club nights are the signage's own** (`src/clubNight.js`, pure, a
+  GENERATED copy of `shared/clubNight.js`: edit the source and run `node
+  scripts/shared-copies.mjs`; `check-mirrors.mjs` fails CI on drift, and the
+  KVBC Awana app carries the same rule): a
   `noClub` date in `shared/schedule.json` never shows; a specialDates entry
   with its own `windows` is a special meeting and does; with a
   `calendar-feed.json` (it lists the whole season), a date after its last
@@ -1731,7 +1735,12 @@ The full Awana Presentation Tool, migrated from KVBC-Awana-Countdown
   `src/hooks/useDisplayLogin.js`, `src/hooks/useDisplayKey.js`,
   `src/lib/displayKey.js` (`maskDisplayKey`), `src/lib/envelope.js`
   (`isPlausibleKey`), `src/lib/configureRelay.js` and `src/hooks/useScreenSync.js`
-  (the screen registry, ROADMAP.md#settings-page phase 2). Its realtime data must flow through the sanitized
+  (the screen registry, ROADMAP.md#settings-page phase 2), plus anything
+  under `shared/` (the family's folder: the data, the brand kit and the pure
+  shared modules `shared/chipGeometry.js` and `shared/motion.js`, which the
+  projector's `lib/chip.js` and `lib/motion-tokens.js` build on, so the
+  stepped chip's geometry and the kit's timing have ONE copy; the allowlist in
+  `isolation.test.js` needed no change, it already admits `shared/`). Its realtime data must flow through the sanitized
   socket — never a second realtime stack; the wake-lock, Open-Meteo
   fetcher, skin table, birthday art, self-update poller and the display
   key / login slots are shared so the two pages can't drift apart (the
@@ -1747,8 +1756,8 @@ The full Awana Presentation Tool, migrated from KVBC-Awana-Countdown
   repo's copy is the canonical one (KVBC-Awana-Countdown is retired).
 - Design tokens live in `src/presentation/index.css`; the `--dur-*`
   timing values are mirrored in `src/presentation/lib/motion-tokens.js`
-  — keep the two in sync (enforced by
-  `src/presentation/lib/motion-tokens.test.js`).
+  (the kit's entries come from `shared/motion.js`) — keep the two in sync
+  (enforced by `src/presentation/lib/motion-tokens.test.js`).
 - `shared/slides.json` (verse of the month, closing text) is validated
   in `lib/shared-config.js` like the other shared files — malformed
   content fails the build, never the projector.
@@ -1770,9 +1779,11 @@ type, the club colours and marks, the stepped chip and the edge waves.
   precaches one copy for both pages and nothing is fetched at showtime. The mark and the club wave come in as
   build assets / `?raw` from `shared/brand/`. It never imports
   `src/lib/brand.js`, `src/lib/motion.jsx` or `src/components/brand/*`:
-  `src/presentation/isolation.test.js` enforces the whole allowlist, and
-  `lib/chip.test.js` pins the projector's own stepped-chip geometry to the
-  lobby's so the two cannot drift.
+  `src/presentation/isolation.test.js` enforces the whole allowlist. The
+  stepped chip's geometry and the shout's ink are `shared/chipGeometry.js`,
+  the one copy both pages draw with (tested in `shared/chipGeometry.test.js`;
+  the projector's `chipGeometry` is that without the lobby's weather glyph),
+  and the timing is `shared/motion.js`.
 - **Units.** Everything is sized in `--u` (1% of the widest 16:9 frame
   that fits the window) off the mockup, on a centred `.pj-frame`; edge
   waves and the mark use the real screen edges.
@@ -2014,7 +2025,14 @@ photos — none of it can ever reach the screen. Payload shapes are
 pinned by `src/lib/__fixtures__/contract-vectors.json` (a byte-identical
 mirror of the printer repo's canonical copy) and enforced by
 `src/lib/eventSanitizers.test.js`. Preserve this invariant on every
-change to the socket layer, the sanitizers, or banner components.
+change to the socket layer, the sanitizers, or banner components. The
+string clean-up under them (`cleanString`, `plainText`) is
+`shared/text.js`, the one cleaner the print server's `cleanName`,
+`sanitizeStoredText` and `cleanFriendName` use too (generated copy
+`print-server/textClean.js`); the limits stay with each caller, and
+`shared/text.test.js` holds it to the old implementations' output. The
+`schedule` event's sanitizer is `sanitizeScheduleEvent`
+(`lib/schedule.js`'s `sanitizeSchedule` is the shared schedule.json parser).
 
 **The four name-bearing events arrive ENCRYPTED**, because the Pusher
 channel is public and Pusher public channels have no server-side

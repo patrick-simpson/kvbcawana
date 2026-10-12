@@ -13,6 +13,7 @@
 'use strict';
 
 const crypto = require('crypto');
+const { cleanText, plainText: sharedPlainText } = require('./textClean');
 
 const OPS_TYPES = ['print-failure', 'canary', 'selector-fail', 'update-ok'];
 const NOTICE_LEVELS = ['info', 'warn', 'critical'];
@@ -38,19 +39,14 @@ function nowIso() {
 }
 
 function cleanName(s) {
-  return String(s == null ? '' : s).trim().slice(0, NAME_MAX);
+  return cleanText(s, NAME_MAX, { coerce: true });
 }
 
 // Bounded plain text: strips anything markup-shaped and collapses whitespace
 // (including the newlines TwoTimTwo's textareas allow) so display copy can
 // never inject markup or blow up a fixed-height banner.
 function plainText(s, max) {
-  return String(s == null ? '' : s)
-    .replace(/<[^>]*>/g, ' ')
-    .replace(/[<>]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, max);
+  return sharedPlainText(s, max, { coerce: true });
 }
 
 // ── checkin ───────────────────────────────────────────────────────────────────

@@ -64,3 +64,29 @@ they drift.
 `version` is bumped only on breaking shape changes. Additive fields are fine
 without a bump. When bumping, update every consumer in the same change
 set — the schedule/theme tests in this repo pin these shapes.
+
+## Shared modules (`*.js`, with their tests)
+
+Pure code that more than one app must agree on. Each is self-contained (no
+imports, only `export const` / `export function`), and is **never served**
+(the lobby build copies this directory to `dist/shared/` without `.js` files).
+How each reader loads one:
+
+- **The lobby and the projector** import it through Vite
+  (`import ... from '../../shared/<name>.js'`); the projector may, see
+  "isolation" in `lobby/CLAUDE.md`.
+- **The packaged apps** (`lobby/desktop`, the sound room bridge, an ES module;
+  `printer/electron-app` and `printer/print-server`, CommonJS) ship in
+  installers that hold only their own folder, so each carries a **generated
+  copy** at a fixed path. `node scripts/shared-copies.mjs` rewrites them from
+  the sources (its `COPIES` table lists every pair); `scripts/check-mirrors.mjs`
+  (the `copies` CI job) fails when one has drifted. Edit the source, run the
+  script, commit both.
+
+| Module | Rule | Generated copies |
+| --- | --- | --- |
+| `clubNight.js` | When a club night is on and when a screen shows for it (Eastern, Wednesday, 5-8 pm, `noClub`, special dates, past-season summer, per-computer hours) | `lobby/desktop/src/clubNight.js`, `printer/electron-app/src/display/clubNight.js` |
+| `clubs.js` | The club table (ids, names, aliases, colors, mark names, label monograms) and its two matchers: the lobby's exact alias lookup, the print server's substring match on label text | `printer/print-server/clubTable.js` |
+| `text.js` | The trust-boundary text cleaner (control characters, trim, per-caller limits, the notice's plain text) behind the lobby's `cleanString`/`plainText` and the print server's `cleanName`, `stripControlChars`, `sanitizeStoredText` and `cleanFriendName`; the Worker reaches it through `sharedSettings.js` | `printer/print-server/textClean.js` |
+| `chipGeometry.js` | The stepped chip's geometry and the shout's ink (marks, measurement), for the lobby's chips and the projector's | none: Vite imports it (lobby and projector) |
+| `motion.js` | The brand kit's motion table (one beat, four curves, the durations) | none: Vite imports it (lobby and projector) |

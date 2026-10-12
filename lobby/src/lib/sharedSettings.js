@@ -1,7 +1,7 @@
 // @ts-check
 // The lobby screens' SHARED settings (contract v6): which settings follow the
 // check-in computer, and the strict allowlist sanitizer for the sealed
-// `settings` event that carries them. Pure (its one import, settingRules.js, is pure too), so the socket's
+// `settings` event that carries them. Pure (its one import, settingRules.js, is pure and itself imports only shared/text.js), so the socket's
 // sanitizer table and the config store can both use it.
 //
 // Owner, 2026-10-01: "settings changes should apply on all devices", except

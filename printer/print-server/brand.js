@@ -47,6 +47,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const { GlobalFonts } = require('@napi-rs/canvas');
+const { CLUB_TABLE } = require('./clubTable');
 
 const DEFAULT_BRAND_DIR = path.join(__dirname, 'public', 'brand');
 
@@ -64,19 +65,10 @@ const FONT_FILES = Object.freeze([
 // Keyed by server.js's clubKey(). One colour, black, because the label prints
 // black on a thermal printer; the converter re-inks it white on an inverted
 // label.
-const MARK_FILES = Object.freeze({
-  puggle:  'puggles-black.svg',
-  cubbie:  'cubbies-black.svg',
-  spark:   'sparks-black.svg',
-  't&t':   'tnt-black.svg',
-  trek:    'trek-black.svg',
-  journey: 'journey-black.svg',
-});
+const MARK_FILES = Object.freeze(Object.fromEntries(CLUB_TABLE.map((c) => [c.key, `${c.mark}-black.svg`])));
 
 // How the warnings name them to an operator.
-const MARK_NAMES = Object.freeze({
-  puggle: 'Puggles', cubbie: 'Cubbies', spark: 'Sparks', 't&t': 'T&T', trek: 'Trek', journey: 'Journey',
-});
+const MARK_NAMES = Object.freeze(Object.fromEntries(CLUB_TABLE.map((c) => [c.key, c.name])));
 
 // The long side, in pixels, a mark is rasterised at. The icon zone is 76 pt,
 // about 317 device px at 300 dpi; twice that gives the downscale real pixels

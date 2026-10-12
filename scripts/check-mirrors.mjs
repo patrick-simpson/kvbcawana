@@ -4,6 +4,9 @@
 //   contract / envelope vectors   printer/  ->  lobby/src/lib/__fixtures__/
 //                                 still committed, byte-identical mirrors (canonical first)
 //
+//   shared modules                lobby/shared/*.js  ->  generated copies for the packaged apps
+//                                 (scripts/shared-copies.mjs lists them; committed, checked for drift)
+//
 //   the brand kit                 canonical lobby/shared/brand/
 //   family.css                    canonical printer/styles/family.css
 //                                 NOT mirrored in git any more: each app gets its own copy at
@@ -18,6 +21,7 @@ import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { checkAssets, COPIES } from './family-assets.mjs';
+import { drift as sharedDrift } from './shared-copies.mjs';
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 
@@ -66,10 +70,12 @@ textStep('site/build.mjs', /family-assets\.mjs all/, 'makes the family copies be
 textStep('.github/workflows/release-app.yml', /family-assets\.mjs printer/, 'makes the brand kit copy before the printer installer is built');
 textStep('.github/workflows/ci.yml', /family-assets\.mjs/, 'runs the copy step in the copies job');
 
+for (const d of sharedDrift()) problems.push(`${d.dest} differs from what ${d.src} generates (run node scripts/shared-copies.mjs)`);
+
 if (problems.length) {
   console.error(`✗ ${problems.length} problem(s):\n  ${problems.join('\n  ')}`);
   console.error('Vectors: change the canonical file, then copy it over the other (never the other way round).');
   console.error('Brand kit and family.css: change the canonical file, then run node scripts/family-assets.mjs.');
   process.exit(1);
 }
-console.log('✓ contract and envelope vectors match; the brand kit and family.css copies are generated, ignored and match their canonical files');
+console.log('✓ contract and envelope vectors match; the brand kit and family.css copies are generated, ignored and match their canonical files; the generated shared-module copies match lobby/shared');

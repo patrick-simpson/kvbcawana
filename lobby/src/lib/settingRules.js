@@ -1,6 +1,6 @@
 // @ts-check
 // The one vocabulary for a settings table: rule TYPES and the two functions
-// that apply them. Pure and import-free, so the Worker bundles it (through
+// that apply them. Pure (its one import, shared/text.js, is pure and import-free), so the Worker bundles it (through
 // syncSpecs.js) and the signage and projector read the same rules.
 //
 //   cleanRule(rule, v)    the wire's check: the clean value (clamped, trimmed,
@@ -33,22 +33,10 @@
  * The device layer's rules (matchesRule).
  */
 
+import { plainText } from '../../shared/text.js';
+
 const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 const SLUG_RE = /^[a-z0-9][a-z0-9-]*$/;
-
-/**
- * The printer's plainText(): no markup, one line, capped.
- * @param {unknown} s
- * @param {number} max
- */
-export function plainText(s, max) {
-  return String(s == null ? '' : s)
-    .replace(/<[^>]*>/g, ' ')
-    .replace(/[<>]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, max);
-}
 
 /**
  * One value against its rule: the clean value, or undefined to drop it. Never
@@ -69,7 +57,7 @@ export function cleanRule(rule, v) {
     case 'enum':
       return typeof v === 'string' && rule.values.includes(v) ? v : undefined;
     case 'string':
-      return typeof v === 'string' ? plainText(v, rule.max) : undefined;
+      return typeof v === 'string' ? plainText(v, rule.max, { coerce: true }) : undefined;
     case 'url': {
       if (typeof v !== 'string') return undefined;
       const s = v.trim();
@@ -96,7 +84,7 @@ export function cleanRule(rule, v) {
       for (const [k, phrase] of Object.entries(v).slice(0, rule.maxKeys)) {
         const key = String(k).trim().toLowerCase().slice(0, rule.maxKey);
         if (!key || typeof phrase !== 'string') continue;
-        const text = plainText(phrase, rule.maxValue);
+        const text = plainText(phrase, rule.maxValue, { coerce: true });
         if (text) out[key] = text;
       }
       return out;

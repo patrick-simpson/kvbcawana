@@ -23,74 +23,28 @@ import pugglesMascot from '../assets/clubs/puggles-mascot.png';
 import cubbiesMascot from '../assets/clubs/cubbies-mascot.png';
 import sparksMascot from '../assets/clubs/sparks-mascot.png';
 import tntMascot from '../assets/clubs/tnt-mascot.png';
+import { CLUB_TABLE, clubIdByAlias } from '../../shared/clubs.js';
 
-const CLUBS = {
-  puggles: {
-    name: 'Puggles',
-    logo: pugglesLogo,
-    mascot: pugglesMascot,
-    primary: '#1DB6D9',
-    deep: '#1A627C',
-    accent: '#BCDCEE',
-    confetti: ['#1DB6D9', '#BCDCEE', '#FCB614', '#FFFFFF'],
-  },
-  cubbies: {
-    name: 'Cubbies',
-    logo: cubbiesLogo,
-    mascot: cubbiesMascot,
-    primary: '#4C72B8',
-    deep: '#2F4F8A',
-    accent: '#C4DDF3',
-    confetti: ['#4C72B8', '#C4DDF3', '#F15A28', '#FFFFFF'],
-  },
-  sparks: {
-    name: 'Sparks',
-    logo: sparksLogo,
-    mascot: sparksMascot,
-    primary: '#F04A4B',
-    deep: '#B82B32',
-    accent: '#FDDACF',
-    confetti: ['#F04A4B', '#FCB614', '#FFFFFF'],
-  },
-  't&t': {
-    name: 'T&T',
-    logo: tntLogo,
-    mascot: tntMascot,
-    primary: '#58BD79',
-    deep: '#2F8A4E',
-    accent: '#D0E9D5',
-    confetti: ['#58BD79', '#D0E9D5', '#FFFFFF'],
-  },
-  trek: {
-    name: 'Trek',
-    logo: trekLogo,
-    mascot: null,
-    primary: '#047E71',
-    deep: '#02554C',
-    accent: '#CCEAEC',
-    confetti: ['#047E71', '#CCEAEC', '#FFFFFF'],
-  },
-  journey: {
-    name: 'Journey',
-    logo: journeyLogo,
-    mascot: null,
-    primary: '#8A649D',
-    deep: '#56467F',
-    accent: '#DED5EA',
-    confetti: ['#8A649D', '#DED5EA', '#FCB614', '#FFFFFF'],
-  },
+// Each club's art, by id. Everything else about a club (name, colors, spellings)
+// is the one table in shared/clubs.js, which the print server reads too.
+const ART = {
+  puggles: { logo: pugglesLogo, mascot: pugglesMascot },
+  cubbies: { logo: cubbiesLogo, mascot: cubbiesMascot },
+  sparks: { logo: sparksLogo, mascot: sparksMascot },
+  't&t': { logo: tntLogo, mascot: tntMascot },
+  trek: { logo: trekLogo, mascot: null },
+  journey: { logo: journeyLogo, mascot: null },
 };
 
-// Common spellings the check-in system might send for the same club.
-const ALIASES = {
-  'truth & training': 't&t',
-  'truth and training': 't&t',
-  'tnt': 't&t',
-  't & t': 't&t',
-  'puggle': 'puggles',
-  'cubbie': 'cubbies',
-  'spark': 'sparks',
-};
+const CLUBS = Object.fromEntries(CLUB_TABLE.map((c) => [c.id, {
+  name: c.name,
+  logo: ART[c.id].logo,
+  mascot: ART[c.id].mascot,
+  primary: c.primary,
+  deep: c.deep,
+  accent: c.accent,
+  confetti: [...c.confetti],
+}]));
 
 const DEFAULT_CLUB = {
   name: '',
@@ -130,8 +84,7 @@ export function applyClubOverrides(overrides) {
 
 export function getClubPalette(clubName) {
   if (!clubName || typeof clubName !== 'string') return DEFAULT_CLUB;
-  const key = clubName.trim().toLowerCase();
-  const canonical = ALIASES[key] || aliasOverrides[key] || key;
+  const canonical = clubIdByAlias(clubName, aliasOverrides);
   const base = CLUBS[canonical];
   if (!base) return DEFAULT_CLUB;
   const override = clubOverrides[canonical];
@@ -147,8 +100,7 @@ export function getClubPalette(clubName) {
  */
 export function clubKey(name) {
   if (!name || typeof name !== 'string') return null;
-  const key = name.trim().toLowerCase();
-  const canonical = ALIASES[key] || aliasOverrides[key] || key;
+  const canonical = clubIdByAlias(name, aliasOverrides);
   return CLUBS[canonical] ? canonical : null;
 }
 
