@@ -1,4 +1,9 @@
-﻿## [9.2.0] - 2026-10-12
+﻿## [9.2.1] - 2026-10-12
+The automatic Trek and Journey check-out moves to the sync service.
+
+**The sync service checks Trek and Journey out.** On club nights from 7:15 pm to midnight it checks out every Trek and Journey child still checked in on TwoTimTwo, the same rule as before, one child every 15 seconds so TwoTimTwo never sees a burst. Tonight's count on every screen drops as they go. On a computer that is the print station, the Chrome extension's own check-out sweep now stays off (it starts again if the station role stops), so the two never both check a child out.
+
+## [9.2.0] - 2026-10-12
 Online check-in: this computer can be the print station for the desk page and TwoTimTwo's own page.
 
 **The laptop prints jobs from the sync service.** With the print role on and this computer signed in, KVBC Awana makes a station key (kept with Windows data protection), registers it with the sync service and takes sealed print jobs from it: check-ins from the desk page (awana.kvbchurch.org/desk), from TwoTimTwo's own check-in page and from the phone page. Each job prints at most once; a job whose outcome is unknown is never printed again and the tray says CHECK THE PRINTER. The Chrome extension still works exactly as before as the backup.
