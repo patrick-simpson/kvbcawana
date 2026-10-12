@@ -124,11 +124,22 @@
   .card .cl { font-family: var(--f-label); font-size: 15px; letter-spacing: .05em; text-transform: uppercase; color: var(--deep); }
   .card.in { background: #F1F5F9; box-shadow: none; cursor: default; }
   .card.in .nm, .card.in .cl { color: #94a3b8; }
+  /* BARF night (owner 2026-10-12): the green button at the top, and its lines (pending, or red: not checked in). */
+  .barf-btn { display: block; width: 100%; min-height: 52px; margin: 0 0 8px; border: none; border-radius: 16px; cursor: pointer;
+    background: var(--c-tnt-deep); color: #fff; font-family: var(--f-shout); font-size: 26px; letter-spacing: .04em; box-shadow: 0 3px 12px rgba(47,138,78,.3); }
+  .barf-alert { display: grid; gap: 6px; margin: 0 0 8px; }
+  .ba { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 12px; border-radius: 12px; font-weight: 700; font-size: 15px; line-height: 1.35; }
+  .ba.pending { background: var(--c-cream); color: var(--c-hot-deep); }
+  .ba.bad { background: #FDE2E2; color: #7A1F23; }
+  .ba button { border: none; cursor: pointer; border-radius: 10px; padding: 8px 12px; background: var(--bad); color: #fff; font-weight: 700; font-size: 15px; }
+  .barf-kid[disabled] { cursor: default; }
+  .btn.barf-go { background: var(--c-tnt-deep); }
   /* A tapped child: pending until TwoTimTwo confirms (owner 2026-10-12: "Checked in ✓" only then). */
   .kid.s-pending, .kid.s-waiting { color: var(--c-blue-deep); }
   .kid.s-done { color: var(--good); }
   .kid.s-failed { color: var(--bad); }
   .fam.has-pending { background: #F8FAFC; }
+  .kid[data-state] { white-space: normal; font-size: 13px; line-height: 1.2; }
   .kid .st { font-weight: 700; }
   .card .tag { margin-left: auto; font-family: var(--f-label); font-size: 14px; letter-spacing: .05em; text-transform: uppercase; padding: 3px 9px; border-radius: 999px; background: #E2E8F0; color: #475569; white-space: nowrap; }
   .away { margin-top: 18px; }
@@ -290,6 +301,8 @@
 
 <main id="main-screen" hidden>
   <div class="search">
+    <button class="barf-btn" id="barf-btn" type="button" hidden>BARF</button>
+    <div class="barf-alert" id="barf-alert" role="alert" hidden></div>
     <div class="box">
       <span class="mag" aria-hidden="true">🔍</span>
       <input type="search" id="search" placeholder="Type a first or last name" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="search" aria-label="Search by first or last name">
@@ -319,6 +332,12 @@
   <div class="check" id="tonight-check" hidden></div>
   <div id="tonight-list"></div>
   <div class="acts"><button class="btn ghost" id="signout" type="button">Sign out</button><button class="btn ghost" id="tonight-close" type="button">Close</button></div>
+</div>
+
+<div class="sheet" id="barf-sheet" role="dialog" aria-modal="true" aria-labelledby="barf-title">
+  <div class="grab"></div>
+  <h2 id="barf-title">Who brought the friend?</h2>
+  <div id="barf-body"></div>
 </div>
 
 <div class="sheet" id="menu-sheet" role="dialog" aria-modal="true">
@@ -749,6 +768,7 @@ function signOut(message) {
   if (desk) desk.signOut();
   stopQueue();
   STATE = {}; OPS = {};
+  BARF_LINES = {}; BARF_DONE = {}; applyBarf(null); renderBarfLines();
   KIDS = [];
   HOUSEHOLDS = null; familiesAt = 0;
   SERVER_TONIGHT = null;
@@ -775,6 +795,7 @@ function startSession() {
   $('nohistory').hidden = desk.hasHistory;
   fillClubSelects();
   render();
+  refreshBarf();
   startRosterPoll();
   if (SIMPLE) return;   // the youth page: check-in only
   refreshLeaders();
@@ -1554,7 +1575,7 @@ function refreshAll() {
     // the list. Ask again instead.
     if (epoch !== rosterEpoch) { rosterFetchInFlight = false; scheduleRosterPoll(0); return null; }
     applyRoster(data);
-    var more = [desk.tonight().then(function(t) { SERVER_TONIGHT = t; }, function() { /* the roster's own count stands */ })];
+    var more = [desk.tonight().then(function(t) { SERVER_TONIGHT = t; }, function() { /* the roster's own count stands */ }), refreshBarf()];
     if (Date.now() - familiesAt > FAMILIES_EVERY_MS) {
       more.push(desk.families().then(applyFamilies, function(e) { if (e && e.code === 'busy') familiesAt = Date.now() - FAMILIES_EVERY_MS + 20000; }));
     }
@@ -1968,6 +1989,192 @@ function printOneOff() {
 $('oneoff-print').addEventListener('click', printOneOff);
 $('oneoff-name').addEventListener('input', function() { $('oneoff-status').textContent = ''; syncOneOff(); });
 $('oneoff-name').addEventListener('keydown', function(e) { if (e.key === 'Enter') printOneOff(); });
+
+// ── BARF: a friend who came with a child already checked in ────────────────
+// Owner 2026-10-12. The green BARF button at the top shows ONLY on a BARF night
+// (the church settings' barfNights, the station's own rule, from the Worker's
+// GET /v1/desk/barf; hidden when unknown). Tap -> tonight's checked-in children
+// ("Who brought the friend?"; one who already has a friend is greyed out) -> the
+// friend's first name -> confirm. ONE Worker operation (POST /v1/desk/barf-late,
+// lobby/worker/src/routes.md 5.1) redoes the child's TwoTimTwo check-in with the
+// same items plus Brought a friend, prints ONLY the child's BARF tag (no second
+// name tag, no second greeting) and puts the friend on the 6:30 list and the BARF
+// bags. The friend is not checked in. It rides the page's queue (a busy Worker is
+// a countdown and an automatic retry). When TwoTimTwo would not take the redo the
+// child is NOT checked in there: a red line at the top says so, with one tap to
+// check them in again (the same items plus Brought a friend, no label).
+var BARF = { barfNight: null, friends: {}, tagRoute: '/print-custom' };
+var BARF_LINES = {};           // clubberId -> { kind: 'pending'|'bad', text, child, items? }
+function applyBarf(info) {
+  BARF.barfNight = info ? info.barfNight : null;
+  BARF.friends = {};
+  if (info) {
+    info.friends.forEach(function(id) { BARF.friends[id] = true; });
+    BARF.tagRoute = info.tagRoute;
+  }
+  Object.keys(BARF_DONE).forEach(function(id) { BARF.friends[id] = true; });
+  $('barf-btn').hidden = BARF.barfNight !== true;
+}
+var BARF_DONE = {};            // children this page recorded a friend for tonight
+function refreshBarf() {
+  if (!desk || !unlockedState) return Promise.resolve();
+  return desk.barfInfo().then(applyBarf, function(e) { if (e && e.code === 'signed-out') signOut(e.message); });
+}
+function renderBarfLines() {
+  var box = $('barf-alert');
+  box.textContent = '';
+  var ids = Object.keys(BARF_LINES);
+  box.hidden = !ids.length;
+  ids.forEach(function(id) {
+    var l = BARF_LINES[id];
+    var line = el('div', 'ba ' + l.kind);
+    line.dataset.id = id;
+    line.appendChild(el('span', null, l.text));
+    if (l.kind === 'bad' && l.items) {
+      var b = el('button', null, 'Check ' + l.child.name.split(' ')[0] + ' in again'); b.type = 'button';
+      b.addEventListener('click', function() { barfRecheck(l.child, l.items); });
+      line.appendChild(b);
+    }
+    box.appendChild(line);
+  });
+}
+function barfLine(id, line) { if (line) BARF_LINES[id] = line; else delete BARF_LINES[id]; renderBarfLines(); }
+
+function barfStep(build) {
+  var body = $('barf-body');
+  body.textContent = '';
+  build(body);
+  showSheet('barf-sheet');
+}
+function openBarf() {
+  refreshBarf();
+  var kids = KIDS.filter(function(k) { return k.checkedIn; }).slice().sort(function(a, b) { return a.name.localeCompare(b.name); });
+  $('barf-title').textContent = 'Who brought the friend?';
+  barfStep(function(body) {
+    if (!kids.length) body.appendChild(el('div', 'note', 'No one is checked in yet tonight.'));
+    var list = el('div', 'grid');
+    kids.forEach(function(k) {
+      var club = clubOf(k.club), had = !!BARF.friends[k.clubberId] || !!BARF_LINES[k.clubberId];
+      var b = el('button', 'card barf-kid' + (had ? ' in' : ''));
+      b.type = 'button';
+      b.style.setProperty('--club', had ? '#CBD5E1' : club.color);
+      b.style.setProperty('--deep', club.deep);
+      var txt = el('div'); txt.style.cssText = 'flex:1;min-width:0';
+      txt.appendChild(el('div', 'nm', k.name));
+      txt.appendChild(el('div', 'cl', k.club || ''));
+      b.appendChild(txt);
+      if (had) { b.appendChild(el('span', 'tag', 'Has a friend')); b.disabled = true; b.setAttribute('aria-disabled', 'true'); }
+      else b.addEventListener('click', function() { barfName(k); });
+      list.appendChild(b);
+    });
+    body.appendChild(list);
+    var acts = el('div', 'acts');
+    var no = el('button', 'btn ghost', 'Cancel'); no.type = 'button';
+    no.addEventListener('click', hideSheet);
+    acts.appendChild(no);
+    body.appendChild(acts);
+  });
+}
+function cleanFriend(v) { return String(v || '').replace(/[\u0000-\u001f\u007f<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, 24); }
+function barfName(k, typed) {
+  $('barf-title').textContent = k.name + '’s friend';
+  barfStep(function(body) {
+    var holder = { friend: true, friendName: typed || '' };
+    var inp = friendInput(holder);
+    inp.value = typed || '';
+    inp.required = true;
+    body.appendChild(el('p', 'check', 'Who did ' + k.name.split(' ')[0] + ' bring? Their first name goes on tonight’s BARF list.'));
+    body.appendChild(inp);
+    var err = el('p', 'err'); err.setAttribute('role', 'alert');
+    body.appendChild(err);
+    var acts = el('div', 'acts');
+    var back = el('button', 'btn ghost', 'Back'); back.type = 'button';
+    back.addEventListener('click', openBarf);
+    var next = el('button', 'btn go barf-go', 'Next'); next.type = 'button';
+    var go = function() {
+      var name = cleanFriend(inp.value);
+      if (!name) { err.textContent = 'Type the friend’s first name.'; inp.focus(); return; }
+      barfConfirm(k, name);
+    };
+    next.addEventListener('click', go);
+    inp.addEventListener('keydown', function(e) { if (e.key === 'Enter') go(); });
+    acts.appendChild(back); acts.appendChild(next);
+    body.appendChild(acts);
+    setTimeout(function() { try { inp.focus(); } catch (e) { /* ignore */ } }, 30);
+  });
+}
+function barfConfirm(k, friend) {
+  var first = k.name.split(' ')[0];
+  $('barf-title').textContent = k.name + ' brought ' + friend;
+  barfStep(function(body) {
+    body.appendChild(el('p', 'check', 'TwoTimTwo’s check-in for ' + first + ' gets Brought a friend, ' + first + '’s BARF tag prints, and ' + friend +
+      ' goes on tonight’s BARF list. ' + first + '’s name tag does not print again. ' + friend + ' is not checked in.'));
+    var acts = el('div', 'acts');
+    var back = el('button', 'btn ghost', 'Back'); back.type = 'button';
+    back.addEventListener('click', function() { barfName(k, friend); });
+    var ok = el('button', 'btn go barf-go', 'Confirm'); ok.type = 'button';
+    ok.addEventListener('click', function() { hideSheet(); barfLate(k, friend); });
+    acts.appendChild(back); acts.appendChild(ok);
+    body.appendChild(acts);
+  });
+}
+function barfLate(k, friend) {
+  var id = k.clubberId, first = k.name.split(' ')[0];
+  var child = { clubberId: k.clubberId, name: k.name, club: k.club };
+  enqueue({
+    id: 'b:' + id,
+    go: function() { return desk.barfLate(child, friend, BARF.tagRoute); },
+    onState: function(status, left) {
+      barfLine(id, { kind: 'pending', child: child, text: status === 'waiting' ? 'Waiting for TwoTimTwo… ' + left + 's (' + first + '’s friend ' + friend + ')' : 'Adding ' + friend + ' as ' + first + '’s friend…' });
+    },
+    onDone: function(r) {
+      BARF_DONE[id] = true;
+      BARF.friends[id] = true;
+      setTimeout(refreshStatus, 800);
+      if (r.checkedIn) {
+        barfLine(id, null);
+        toast(first + '’s BARF tag is printing. ' + friend + ' is on the BARF list.', 5000, null, null, 'good');
+        return;
+      }
+      // TwoTimTwo did not take the redo: the child is NOT checked in there.
+      k.checkedIn = false;
+      rosterEpoch += 1;
+      barfLine(id, { kind: 'bad', child: child, items: r.items, text: k.name + ' is NOT checked in on TwoTimTwo — check them in again.' });
+      paint();
+    },
+    onFail: function(e) {
+      barfLine(id, null);
+      if (commonError(e, 'BARF not recorded: ')) return;
+      toast('BARF not recorded for ' + k.name + ': ' + (e && e.message ? e.message : 'try again.'), 9000, null, null, 'bad');
+    },
+    onCancel: function() { barfLine(id, null); },
+  });
+}
+function barfRecheck(child, items) {
+  var id = child.clubberId, first = child.name.split(' ')[0];
+  var bad = function(text) { barfLine(id, { kind: 'bad', child: child, items: items, text: text }); };
+  enqueue({
+    id: 'r:' + id,
+    go: function() { return desk.barfRecheck(child, items); },
+    onState: function(status, left) {
+      barfLine(id, { kind: 'pending', child: child, text: status === 'waiting' ? 'Waiting for TwoTimTwo… ' + left + 's (' + first + ')' : 'Checking ' + first + ' in again…' });
+    },
+    onDone: function(r) {
+      if (!r.checkedIn) { bad(child.name + ' is still NOT checked in on TwoTimTwo — try again, or check them in on TwoTimTwo itself.'); return; }
+      barfLine(id, null);
+      KIDS.forEach(function(k) { if (k.clubberId === id) k.checkedIn = true; });
+      rosterEpoch += 1;
+      paint();
+      toast(child.name + ' is checked in on TwoTimTwo again.', 4000, null, null, 'good');
+    },
+    onFail: function(e) {
+      if (e && e.code === 'signed-out') return;
+      bad(child.name + ' is NOT checked in on TwoTimTwo — ' + (e && e.message ? e.message : 'try again.'));
+    },
+    onCancel: function() { bad(child.name + ' is NOT checked in on TwoTimTwo — check them in again.'); },
+  });
+}
+$('barf-btn').addEventListener('click', openBarf);
 
 // ── Start ──────────────────────────────────────────────────────────────────
 // A sign-in already in this browser (the screens', /settings', this page's) is

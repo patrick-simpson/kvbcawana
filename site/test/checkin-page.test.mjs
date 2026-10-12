@@ -35,7 +35,8 @@ describe('the check-in page', () => {
   it('is on the desk\'s path: the transport for every call, no relay, no laptop PIN', () => {
     assert.ok(!/AWANA_RELAY|\/v1\/relay|\/phone\/|X-Awana-Pin|postJson\(/.test(src), 'nothing of the relayed page is left');
     for (const call of ['desk.signIn(', 'desk.restore()', 'desk.roster()', 'desk.families()', 'desk.tonight()', 'desk.printStatus()',
-      'desk.checkIn(', 'desk.undo(', 'desk.checkout(', 'desk.oneOffTag(', 'desk.leaderTag(', 'desk.customLabel(']) {
+      'desk.checkIn(', 'desk.undo(', 'desk.checkout(', 'desk.oneOffTag(', 'desk.leaderTag(', 'desk.customLabel(',
+      'desk.barfInfo()', 'desk.barfLate(', 'desk.barfRecheck(']) {
       assert.ok(src.includes(call), call);
     }
   });

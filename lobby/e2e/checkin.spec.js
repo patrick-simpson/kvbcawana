@@ -28,6 +28,11 @@ const PAGES = buildCheckinPages();
 // Screenshots of the flows at 390x844 (CHECKIN_SHOTS names a folder; else the test's own output folder).
 const SHOTS = process.env.CHECKIN_SHOTS || '';
 const shot = (name) => (SHOTS ? path.join(SHOTS, name) : test.info().outputPath(name));
+/** A screenshot once the sheets and pages have finished sliding. */
+async function snap(page, name) {
+  await page.waitForTimeout(700);
+  await page.screenshot({ path: shot(name) });
+}
 
 async function stubSite(page, { kids } = {}) {
   const history = await cc.createHistoryKey(PASS);
@@ -47,6 +52,8 @@ async function stubSite(page, { kids } = {}) {
     history: null, historyCalls: [], church: null, churchPuts: [],
     /** A promise the desk routes wait on (a slow TwoTimTwo), per-child 429s, per-child refusals. */
     gate: null, busyFor: {}, refuseFor: {},
+    /** GET /v1/desk/barf's answer (null: no route), and how the late-BARF redo goes ('ok' | 'fail'). */
+    barf: null, barfRedo: 'ok', barfPosts: [],
   };
   const api = async (route, req) => {
     const u = new URL(req.url());
@@ -86,6 +93,15 @@ async function stubSite(page, { kids } = {}) {
         return route.fulfill(json(200, { ok: true, rev: world.church.rev, settings: world.church.settings }));
       }
       return route.fulfill(json(200, { rev: world.church.rev, settings: world.church.settings, switches: {} }));
+    }
+    if (p === '/v1/desk/barf') return route.fulfill(world.barf ? json(200, world.barf) : json(404, { error: 'Not found.' }));
+    if (p === '/v1/desk/barf-late') {
+      world.barfPosts.push(body);
+      const items = { Bible: true, Friend: true };
+      if (body.recheck) { const k = world.kids.find((x) => x.clubberId === body.clubberId); if (k) k.checkedIn = true; return route.fulfill(json(200, { ok: true, checkedIn: true, items: body.items })); }
+      if (world.barf) world.barf.friends = [...world.barf.friends, body.clubberId];
+      if (world.barfRedo === 'fail') { const k = world.kids.find((x) => x.clubberId === body.clubberId); if (k) k.checkedIn = false; return route.fulfill(json(200, { ok: true, checkedIn: false, items, jobId: body.tagJob.jobId, reason: 'checkin-refused', tries: 3 })); }
+      return route.fulfill(json(200, { ok: true, checkedIn: true, items, jobId: body.tagJob.jobId, history: 'kept' }));
     }
     if (p === '/v1/print/reprint') { world.tags.push(body); return route.fulfill(json(200, { ok: true, jobId: body.jobId, existing: false })); }
     if (p === '/v1/desk/checkin' || p === '/v1/desk/undo' || p === '/v1/desk/checkout') {
@@ -237,7 +253,7 @@ test('a walk-in name tag prints and is welcomed but never counted; leader and cu
   await expect(page.locator('#visitor-form')).toHaveCount(0);
   await page.getByLabel('Child’s first name').fill('Ava');
   await page.locator('#oneoff-clubs').getByRole('radio', { name: 'Puggles' }).click();
-  await page.screenshot({ path: shot('walkin-menu.png') });
+  await snap(page, 'walkin-menu.png');
   await page.locator('#oneoff-print').click();
   await expect(page.locator('#toast')).toContainText('Printing Ava’s tag');
   await page.getByLabel('Leader\'s name').fill('Pat Leader');
@@ -266,7 +282,7 @@ test('a walk-in name tag prints and is welcomed but never counted; leader and cu
   await expect(row).toContainText('walk-in · not registered yet');
   await expect(row.locator('button')).toHaveCount(0);
   await expect(page.locator('#tonight-total')).toHaveText('0 here now · 1 walk-in');
-  await page.screenshot({ path: shot('walkin-tonight.png') });
+  await snap(page, 'walkin-tonight.png');
 });
 
 test('/checkin/ym: the + menu is the walk-in tag alone, for Trek and Journey', async ({ page }) => {
@@ -282,7 +298,7 @@ test('/checkin/ym: the + menu is the walk-in tag alone, for Trek and Journey', a
   await expect(page.locator('#oneoff-clubs').getByRole('radio')).toHaveText(['Trek', 'Journey']);
   await page.getByLabel('Child’s first name').fill('Rex');
   await page.locator('#oneoff-clubs').getByRole('radio', { name: 'Journey' }).click();
-  await page.screenshot({ path: shot('ym-walkin-menu.png') });
+  await snap(page, 'ym-walkin-menu.png');
   await page.locator('#oneoff-print').click();
   await expect(page.locator('#toast')).toContainText('Printing Rex’s tag');
   expect((await cc.openAsStation(stationRing, world.tags[0].bundle)).body).toEqual({ firstName: 'Rex', clubName: 'Journey' });
@@ -482,7 +498,7 @@ for (const where of ['/checkin/', '/checkin/ym/']) {
     await expect(kidState(page, refused[1])).toHaveText('Checking in…');
     await expect(page.locator('#list')).not.toContainText('Checked in ✓');
     await expect(page.locator('#count-pill')).toHaveText('0 in');
-    await page.screenshot({ path: shot(`${ym ? 'ym-' : ''}queue-pending.png`) });
+    await snap(page, `${ym ? 'ym-' : ''}queue-pending.png`);
     // At most two at the Worker at once, in tap order.
     expect(world.posts.map((p) => p.body.clubberId)).toEqual([refused[0], busy[0]]);
 
@@ -494,7 +510,7 @@ for (const where of ['/checkin/', '/checkin/ym/']) {
     await expect(page.locator('#toast')).toContainText(`Couldn’t check in ${refused[1]}: TwoTimTwo has no attendance item for that club tonight.`);
     // The busy one: a calm countdown, then the page tries again by itself.
     await expect(kidState(page, busy[1])).toContainText(/Waiting for TwoTimTwo… \d+s/);
-    await page.screenshot({ path: shot(`${ym ? 'ym-' : ''}queue-waiting.png`) });
+    await snap(page, `${ym ? 'ym-' : ''}queue-waiting.png`);
     await expect(kidState(page, busy[1])).toHaveText('Checked in ✓', { timeout: 8000 });
     await expect(page.locator('#count-pill')).toHaveText(ym ? '2 in' : '3 in', { timeout: 8000 });
     const order = world.posts.filter((p) => p.path === '/v1/desk/checkin').map((p) => p.body.clubberId);
@@ -512,5 +528,92 @@ for (const where of ['/checkin/', '/checkin/ym/']) {
     await expect(row).toContainText(/Waiting for TwoTimTwo… \d+s/);
     await expect(page.locator('#toast')).toContainText(`${third[1]}’s check-in is undone`, { timeout: 8000 });
     expect(world.posts.filter((p) => p.path === '/v1/desk/undo')).toHaveLength(2);
+  });
+}
+
+for (const where of ['/checkin/', '/checkin/ym/']) {
+  const ym = where === '/checkin/ym/';
+  const tag = ym ? 'ym-' : '';
+  test(`BARF on ${where}: the green button only on a BARF night; a late friend redoes the check-in, prints the BARF tag, and a failed redo offers one tap`, async ({ page }) => {
+    test.setTimeout(90_000);
+    const kids = ym ? [
+      { clubberId: '21', first: 'Tia', last: 'Youth', club: 'Trek', clubId: '6', checkedIn: true },
+      { clubberId: '22', first: 'Jo', last: 'Journey', club: 'Journey', clubId: '7', checkedIn: true },
+      { clubberId: '23', first: 'Max', last: 'Trekker', club: 'Trek', clubId: '6', checkedIn: true },
+      { clubberId: '24', first: 'Una', last: 'Late', club: 'Journey', clubId: '7', checkedIn: false },
+    ] : [
+      { clubberId: '11', first: 'Ada', last: 'Tester', club: 'Cubbies', clubId: '1', checkedIn: true },
+      { clubberId: '12', first: 'Ben', last: 'Tester', club: 'Sparks', clubId: '2', checkedIn: true },
+      { clubberId: '13', first: 'Cy', last: 'Other', club: 'T&T', clubId: '3', checkedIn: true },
+      { clubberId: '14', first: 'Tia', last: 'Youth', club: 'Trek', clubId: '6', checkedIn: false },
+    ];
+    const [pick, hasFriend, failing] = ym ? [['21', 'Tia Youth', 'Tia', 'Trek'], ['22', 'Jo Journey'], ['23', 'Max Trekker']] : [['11', 'Ada Tester', 'Ada', 'Cubbies'], ['12', 'Ben Tester'], ['13', 'Cy Other']];
+    const { world, stationRing, historyRing } = await stubSite(page, { kids });
+    world.busyFirst = false;
+
+    // Not a BARF night, or the Worker cannot say: no button.
+    world.barf = { night: '2026-10-14', barfNight: false, friends: [], tagRoute: '/print-barf-tag', stations: 1 };
+    await signIn(page, where);
+    await expect(page.locator('#list')).toContainText(/still to come|Everyone/, { timeout: 10_000 });
+    await expect(page.locator('#barf-btn')).toBeHidden();
+    world.barf = null;
+    await page.reload();
+    await expect(page.locator('#list')).toContainText(/still to come|Everyone/, { timeout: 10_000 });
+    await expect(page.locator('#barf-btn')).toBeHidden();
+
+    // A BARF night: the green button at the top.
+    world.barf = { night: '2026-10-14', barfNight: true, friends: [hasFriend[0]], tagRoute: '/print-barf-tag', stations: 1 };
+    await page.reload();
+    await expect(page.locator('#barf-btn')).toBeVisible({ timeout: 10_000 });
+    await snap(page, `${tag}barf-button.png`);
+    await page.locator('#barf-btn').click();
+    await expect(page.locator('#barf-title')).toHaveText('Who brought the friend?');
+    // Tonight's checked-in children; one who already brought a friend is greyed out; nobody not checked in.
+    const kidsListed = page.locator('#barf-body .barf-kid');
+    await expect(kidsListed).toHaveCount(3);
+    await expect(page.locator('.barf-kid', { hasText: hasFriend[1] })).toBeDisabled();
+    await expect(page.locator('.barf-kid', { hasText: hasFriend[1] })).toContainText('Has a friend');
+    await snap(page, `${tag}barf-who.png`);
+    await page.locator('.barf-kid', { hasText: pick[1] }).click();
+    // The friend's first name is required.
+    await page.locator('#barf-body').getByRole('button', { name: 'Next' }).click();
+    await expect(page.locator('#barf-body .err')).toHaveText('Type the friend’s first name.');
+    await page.locator('#barf-body').getByLabel('Friend’s first name').fill('  Sam  ');
+    await snap(page, `${tag}barf-friend-name.png`);
+    await page.locator('#barf-body').getByRole('button', { name: 'Next' }).click();
+    await expect(page.locator('#barf-title')).toHaveText(`${pick[1]} brought Sam`);
+    await snap(page, `${tag}barf-confirm.png`);
+    await page.locator('#barf-body').getByRole('button', { name: 'Confirm' }).click();
+    await expect(page.locator('#toast')).toContainText(`${pick[2]}’s BARF tag is printing. Sam is on the BARF list.`);
+    await snap(page, `${tag}barf-done.png`);
+    // What was sent: the child's id, the friend's first name, the BARF tag sealed to the station, the row to the history key.
+    const sent = world.barfPosts[0];
+    expect(sent.clubberId).toBe(pick[0]);
+    expect(sent.friendName).toBe('Sam');
+    const { tagJob: _j, historyRow: _r, ...plain } = sent;
+    expect(JSON.stringify(plain)).not.toContain(pick[2]);
+    expect(sent.tagJob.jobId).toMatch(/^reprint:/);
+    const job = await cc.openAsStation(stationRing, sent.tagJob.bundle);
+    expect([job.route, job.body]).toEqual(['/print-barf-tag', { firstName: pick[2], clubName: pick[3] }]);
+    expect(sent.historyRow.kind).toBe('barf-friend');
+    expect(await cc.openRow(historyRing, sent.historyRow)).toMatchObject({ first: pick[2], clubberId: pick[0], friend: true, friendFirst: 'Sam' });
+    expect(world.posts).toHaveLength(0);   // no check-in of the friend, no second check-in of the child
+
+    // The redo does not take: a red line, and one tap checks them in again (no label).
+    world.barfRedo = 'fail';
+    await page.locator('#barf-btn').click();
+    await expect(page.locator('.barf-kid', { hasText: pick[1] })).toBeDisabled();   // a second friend: not offered
+    await page.locator('.barf-kid', { hasText: failing[1] }).click();
+    await page.locator('#barf-body').getByLabel('Friend’s first name').fill('Lu');
+    await page.locator('#barf-body').getByRole('button', { name: 'Next' }).click();
+    await page.locator('#barf-body').getByRole('button', { name: 'Confirm' }).click();
+    const red = page.locator('#barf-alert .ba.bad');
+    await expect(red).toContainText(`${failing[1]} is NOT checked in on TwoTimTwo — check them in again.`);
+    await snap(page, `${tag}barf-not-checked-in.png`);
+    await red.getByRole('button', { name: `Check ${failing[1].split(' ')[0]} in again` }).click();
+    await expect(page.locator('#toast')).toContainText(`${failing[1]} is checked in on TwoTimTwo again.`);
+    await expect(page.locator('#barf-alert')).toBeHidden();
+    expect(world.barfPosts.at(-1)).toMatchObject({ clubberId: failing[0], recheck: true, items: { Bible: true, Friend: true } });
+    expect(world.barfPosts.at(-1).tagJob).toBeUndefined();
   });
 }
