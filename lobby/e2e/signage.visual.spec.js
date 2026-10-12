@@ -12,7 +12,7 @@ import { expect, test } from '@playwright/test';
 //                         scene scatters its doodles at random
 //   fixture calendar    — the nightly Action rewrites the real feed
 // Baselines are Linux-Chromium only; regenerate them with the
-// update-snapshots workflow (or `npm run e2e:update` on Linux).
+// lobby-update-snapshots workflow (or `npm run e2e:update` on Linux).
 
 test.skip(process.platform !== 'linux', 'baselines are Linux-Chromium only');
 

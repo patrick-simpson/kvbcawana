@@ -1017,11 +1017,10 @@ directly):
   clauses like "The doctor told me") and cut cue counts by roughly a
   third because cues now follow speech instead of split sentences.
   **Re-transcribing renumbers every cue**, and `data/leader-transcript-
-  prose.json` addresses cues by number — run
-  `scripts/remap-transcript-prose-cues.py <dir-of-old-vtts>` before the
-  prose validator, which mapped each paragraph boundary by time onto the
-  new numbering (keep a copy of the old VTTs for exactly this; the remap
-  script was removed, its job is done).
+  prose.json` addresses cues by number. The remap that moved each
+  paragraph boundary onto the new numbering by time was run before the
+  prose validator (its script is removed; keep a copy of the old VTTs
+  if a re-transcription is ever needed again).
   Two names both whisper passes garbled and the review pass now knows:
   the Awana Youth Ministries site is **AwanaYM.org**, and the author of
   *Questioning the Bible* is **Jonathan Morrow**.
