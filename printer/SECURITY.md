@@ -58,6 +58,13 @@ Be clear-eyed about the limits:
   page can print labels, reprint, arm rehearsal mode and change the printer's
   own settings once signed in with the passphrase; anyone who has the passphrase
   could do the same from the laptop's browser.
+- **Any signed-in session changes the church-wide controls.** The sync
+  service's runtime switches (CLOUD_PRINT, SINGLE_PUBLISHER, YM_CHECKOUT and
+  the safety switches), the church settings this computer applies to
+  config.json, notices and the change log's undo need only the passphrase
+  (`lobby/worker/src/routes.md` section 10), including the session an OBS /
+  ProPresenter `?passphrase=` link makes. The owner decided this on 2026-10-12
+  after the risk was explained; there is no owner-only role.
 - **The data at rest is not encrypted.** `clubbers.csv`, `print-history.json`
   and `leaders.json` are plain files in the data directory, protected only by
   the OS account. Keep the check-in laptop locked and its disk encrypted.

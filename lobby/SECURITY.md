@@ -161,6 +161,13 @@ service**:
   template its own allowlist, the calendar `sanitizeFeed`.
 - Its doorbell (`changed` `{what}` on `awana-sync`) is plaintext and carries no
   content; a screen that hears it fetches from the service.
+- **Every signed-in session may change the church-wide controls** (owner
+  decision, 2026-10-12, risk accepted after it was explained): the runtime
+  switches, the church settings, notices to every screen and the change log's
+  undo need only a passphrase session (routes.md section 10), including one
+  made by an OBS / ProPresenter `?passphrase=` link. Whoever holds such a link
+  holds the passphrase and can do all of that; each change is logged with its
+  device and most can be undone.
 - **One exception holds names in the clear: the remembered leaders** (owner
   approved, 2026-10-12). The church settings' `leaders` list (routes.md 10.3)
   keeps adult volunteers' FULL names (first and last, club, last printed,

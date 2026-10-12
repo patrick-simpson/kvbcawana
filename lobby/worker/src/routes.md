@@ -591,6 +591,15 @@ work in the Worker, counts / codes / church-authored text only, one synchronous
 check-and-set with write-through, `BODY_MAX` unless said. Mark each route BUILT
 here when it lands.
 
+**Auth (owner decision, 2026-10-12).** The switches (10.2), the church settings
+(10.3), notices (10.4) and the change log's undo (10.5) stay `session`: any
+session signed in with the passphrase may change them, including a session
+made by an OBS / ProPresenter `?passphrase=` link. There is no owner-only role
+or second word; the owner accepted that risk after it was explained (anyone
+holding a feed link can flip a switch, edit the church settings, post or take
+down a notice, or undo a change). Every write is logged with its device (10.1)
+and undoable where 10.5 says.
+
 ### 10.1 Device identity (every write below, and `PUT /v1/settings|slides|template|journey`, `/v1/screens/*`)
 
 | Header | Value | Use |
