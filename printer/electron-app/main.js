@@ -18,6 +18,7 @@ const { execFile, execFileSync, spawn } = require('child_process');
 const { removeShortcuts, findOldBrandShortcuts } = require('./src/shortcuts');
 const configStore = require('./src/config-store');
 const extensionSync = require('./src/extension-sync');
+const updateProgress = require('./src/update-progress');
 const chromeRestart = require('./src/chrome-restart');
 const rolesStore = require('./src/roles');
 const handoff = require('./src/handoff');
@@ -128,7 +129,15 @@ let serverState = { status: 'starting', error: null };
 //   checking → available (downloading, percent) → downloaded (restart to apply)
 // upToDate is set by an explicit check that found nothing, so the UI can say
 // "✓ up to date" instead of silently doing nothing.
-let updateState = { checking: false, available: null, downloaded: null, percent: null, upToDate: false };
+let updateState = { checking: false, available: null, downloaded: null, percent: null, upToDate: false,
+  // Text for the tray and status window while a download runs (src/update-progress.js).
+  progressLine: null, progressDetail: null, error: null };
+const downloadProgress = updateProgress.createProgress();
+function syncProgressText() {
+  updateState.percent = downloadProgress.percent();
+  updateState.progressLine = downloadProgress.line();
+  updateState.progressDetail = downloadProgress.detail();
+}
 // The managed copy of the Chrome extension — see src/extension-sync.js. Filled
 // in once at startup and then reported verbatim to the tray, the settings
 // window and /health, so the folder the operator must load unpacked is never
@@ -291,6 +300,7 @@ function setupAutoUpdater() {
     updateState.checking = false;
     updateState.available = info.version;
     updateState.upToDate = false;
+    updateState.error = null;
     if (serverModule && serverModule.setLatestVersion) serverModule.setLatestVersion(info.version);
     refreshTray();  // shows "Downloading update vX…"
   });
@@ -301,18 +311,31 @@ function setupAutoUpdater() {
     refreshTray();  // shows "✓ Up to date"
   });
   autoUpdater.on('download-progress', (p) => {
-    // Settings window polls this via get-server-state; no tray rebuild per tick.
-    updateState.percent = Math.round(p.percent || 0);
+    // The status window polls get-server-state; the tray is repainted at most
+    // about once a second (the module decides).
+    const repaint = downloadProgress.update(p);
+    syncProgressText();
+    if (repaint) refreshTray();
   });
   autoUpdater.on('update-downloaded', (info) => {
     updateState.checking = false;
     updateState.downloaded = info.version;
+    downloadProgress.reset();
+    syncProgressText();
     refreshTray();  // shows "Updating to vX… restarting"
     scheduleAutoInstall(info);
   });
   autoUpdater.on('error', (e) => {
     updateState.checking = false;
     console.warn('[update] ', e && e.message);
+    // Only a download that was under way is worth a message; a failed check
+    // while offline stays quiet, as before.
+    if (downloadProgress.active()) {
+      updateState.error = 'The update could not finish downloading. It will try again soon.';
+      updateState.available = null;
+    }
+    downloadProgress.reset();
+    syncProgressText();
     refreshTray();
   });
 
@@ -428,6 +451,8 @@ function buildTray(config) {
   const dev = deviceSync ? deviceSync.status() : null;
   if (dev && dev.state === 'signed-out') tip.push('Signed out: /settings cannot reach it');
   if (dev && dev.pending) tip.push('Print server off once the last label prints');
+  if (updateState.downloaded) tip.push('Update ready, restarting...');
+  else if (updateState.progressLine) tip.push(updateState.progressLine);
   // Windows cuts a tray tooltip at 127 characters.
   tray.setToolTip(tip.join('\n').slice(0, 127));
 
@@ -506,11 +531,13 @@ function buildTray(config) {
       // Automatic now (see scheduleAutoInstall) — this is no longer a click
       // target, just a status line for "yes, it's about to restart itself".
       template.push({
-        label: `⬇ Updating to v${updateState.downloaded}… restarting`,
+        label: 'Update ready, restarting...',
         enabled: false
       });
     } else if (updateState.available) {
-      template.push({ label: `Downloading update v${updateState.available}…`, enabled: false });
+      template.push({ label: updateState.progressLine || `Downloading update v${updateState.available}...`, enabled: false });
+    } else if (updateState.error) {
+      template.push({ label: updateState.error, enabled: false });
     } else if (updateState.checking) {
       template.push({ label: 'Checking for updates…', enabled: false });
     } else {

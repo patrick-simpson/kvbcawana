@@ -152,21 +152,22 @@ export default function StatusPanel({ config, onReset }) {
         {/* Updates: always visible, always says where the updater is */}
         {updateReady ? (
           <div className="notice update">
-            <span>Update v{updateReady} is downloaded and ready.</span>
+            <span>Update ready, restarting...</span>
             <button className="btn btn-primary btn-sm" onClick={() => window.awana.installUpdate()}>Restart to update</button>
           </div>
         ) : updateAvailable ? (
           <div className="notice update">
             <span>
-              Version {updateAvailable} is available — downloading
-              {upd.percent != null ? ` (${upd.percent}%)` : ' in the background'}…
+              {upd.progressDetail
+                ? upd.progressDetail
+                : `Version ${updateAvailable} is available, downloading in the background...`}
             </span>
           </div>
         ) : (
           <div className="notice update">
             <span>
               {appVersion ? `Version ${appVersion}` : 'Version …'}
-              {checkNote ? ` — ${checkNote}` : upd.upToDate ? ' — ✓ up to date' : ''}
+              {upd.error ? ` — ${upd.error}` : checkNote ? ` — ${checkNote}` : upd.upToDate ? ' — ✓ up to date' : ''}
             </span>
             <button className="btn btn-sm" onClick={checkForUpdatesNow} disabled={checking}>
               {checking ? 'Checking…' : 'Check for Updates'}
