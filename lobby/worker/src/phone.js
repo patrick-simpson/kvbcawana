@@ -16,7 +16,7 @@
 import { localTime } from './watcher.js';
 import { BIBLE_RE, FRIEND_RE } from './twotimtwo.js';
 
-/** TwoTimTwo's club ids (docs/TWOTIMTWO.md §2.1). */
+/** TwoTimTwo's club ids (printer/docs/TWOTIMTWO.md §2.1). */
 export const CLUB_BY_ID = Object.freeze({ 1: 'Cubbies', 2: 'Sparks', 3: 'T&T', 4: 'Puggles', 6: 'Trek', 7: 'Journey' });
 const ACTION_TTL_MS = 10 * 60 * 1000;   // the laptop's PENDING_TTL_MS: a status is asked for well within it
 const FAMILIES_TTL_MS = 30 * 60 * 1000;  // the extension re-reads the household export every 30 minutes too

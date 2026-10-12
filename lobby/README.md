@@ -50,10 +50,26 @@ by a pure, tested schedule engine over `shared/schedule.json`.
   art) is served at `/shared/` for the whole Awana app family. See
   `MIGRATION.md` for the plan to retire the old repo.
 
-> **Running the displays on club night?** The step-by-step operator
-> guide — pre-club checks, panic mode, the "screen is wrong at
-> 5:55 PM" decision tree — lives in
-> [docs/RUNBOOK.md](docs/RUNBOOK.md).
+### Running the screens on club night
+
+- **Before club:** open the lobby page fullscreen (double-click). On the
+  projector, the countdown should show the right time to Wednesday 6:00 PM;
+  an amber "clock off" chip means the device clock is wrong, so fix that first.
+- **Operator keys (lobby page):** Ctrl+Shift+S settings, Ctrl+Shift+E slide
+  editor, Ctrl+Shift+D debug panel, Ctrl+Shift+X panic mode (strips the page to
+  its core; check-in banners keep working).
+- **Projector schedule** (`shared/schedule.json`): opening 18:00, game time
+  19:00 to 19:30 by club, closing 19:30, shutdown 19:35. A manual override
+  hands back to the schedule on its own; "Stay" keeps it.
+- **Skip a holiday:** QuickNav → Skip Weeks applies to that one device. For
+  every screen, edit `shared/schedule.json` (CI validates it).
+- **Closing text:** `shared/slides.json`. A malformed edit fails the build.
+- **Connection lost:** screens reconnect on their own, and check-ins missed
+  while offline replay on reconnect. Still wrong: reload (F5), then reboot.
+- **Privacy:** screens show first names only. If anything more appears, treat
+  it as an incident and report it.
+- **Calendar:** the church feed refreshes nightly; a screen keeps its last good copy.
+- **Deploys:** every push to `main` redeploys; screens pick it up on their next load.
 
 ---
 
