@@ -11,7 +11,7 @@ Labels wear the official club logos and their clubs' own lettering, and a friend
 
 **App reliability.** The hidden printing window comes back by itself after a crash; a Chrome launch that fails is handled; a failed extension update is retried; the repair download refuses an incomplete file; the setup wizard saves only its own settings; the TV role saves its state safely; and a second start at sign-in no longer pops the window open.
 
-## [9.3.0] - 2026-10-13
+## [9.3.0] - 2026-10-12
 The new settings page: printing settings from anywhere.
 
 **Printing settings live on awana.kvbchurch.org.** Label options and layouts, the club-night schedule and late grace, the pickup-list clubs, the season, BARF nights and the remembered leaders are edited in Settings, Printing, from any phone or computer. This computer takes them from the sync service and writes them to its own files, so it still prints with no internet. The first print station sends its current settings and leaders when it starts.
