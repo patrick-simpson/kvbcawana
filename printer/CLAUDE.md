@@ -34,7 +34,7 @@ Every functional change requires:
 1. **Version bump** — `node scripts/bump-version.cjs <X.Y.Z>` (server.js changes). Auto-updates all files + extension. Also regenerate lockfiles (`npm install --package-lock-only` in `print-server/` and `electron-app/`) — the bump script doesn't touch their `version` field.
 2. **changes.md** — Add entry at top with version, date, and what changed + why.
 3. **Website/UI** — Update React components if affecting user install/usage.
-4. **Build** — `npm run build` to sync bookmarklet and dist.
+4. **Build** — `npm run build` to rebuild the site (`dist`).
 5. **Commit & push** — Never leave uncommitted. Changes only done when deployed.
 6. **Push to `main`** — the owner's rule for this repo (the old printer repo
    used PRs). Nothing is live until it is on `main`: the root `ci.yml` runs
@@ -297,7 +297,7 @@ web copies were Latin subsets until the 6.18.0 kit). What that means here:
   `inkReach(..., 'alphabetic')`.
 - **One name in three places.** The family string is `FONT_FILES[0]` in
   `brand.js`, `--brand-font-display` / `fonts.css` in the kit, and each
-  surface's `--f-shout` fallback (dashboard, phone, bookmarklet, the status
+  surface's `--f-shout` fallback (dashboard, phone, the status
   window) plus `step-chip.js`'s measuring family; `test-brand-kit.cjs` and
   `test-dashboard-chrome.cjs` fail if they drift. The installer's `/health`
   smoke check still needs 4 loaded fonts (Paytone One, Londrina Solid, Londrina
@@ -500,7 +500,7 @@ genuine reads (`checkoutDisappearances`) and posts ids with
 `scripts/test-pickup-board.cjs`.
 
 **Data Flow:**
-- Bookmarklet fetches CSV → POST /update-csv
+- The extension fetches the CSV → POST /update-csv
 - Server reloads clubbers.csv on every print request
 - Enrichment: Match firstName+lastName to allergies (Notes field)
 

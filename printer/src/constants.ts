@@ -33,7 +33,7 @@ export const LABEL_DPI = 300;
 export const DEFAULT_CHECKIN_URL = 'https://kvbchurch.twotimtwo.com/clubber/checkin?#';
 
 // DOM Selectors (if used in React, keep documented here)
-// Note: These are used by the bookmarklet, not the React app itself
+// Note: These are used by the extension, not the React app itself
 export const DOM_SELECTORS = {
   LAST_CHECKIN: '#lastCheckin div', // The "Last Checked In" element
   CLUBBER: '.clubber', // Child/clubber container

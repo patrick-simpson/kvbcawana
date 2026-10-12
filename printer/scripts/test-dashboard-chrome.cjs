@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// The operator surfaces in the brand kit: the dashboard, the phone page, the
-// bookmarklet page, and the Windows status window and setup wizard.
+// The operator surfaces in the brand kit: the dashboard, the phone page, and
+// the Windows status window and setup wizard.
 //
 // Source-level, like the club-list checks in test-leaders.cjs: these pages are
 // plain DOM (and a React bundle) with no headless browser here, so the claims
@@ -178,7 +178,6 @@ function resolveColour(value, vars, depth = 0) {
 const SURFACES = {
   dashboard: read('print-server', 'public', 'index.html'),
   phone: read('print-server', 'public', 'phone.html'),
-  bookmarklet: read('print-server', 'public', 'bookmarklet.html'),
   'status window': read('electron-app', 'renderer', 'brand.css'),
 };
 
@@ -219,7 +218,7 @@ console.log('dashboard chrome: every colour fallback is the kit’s own value');
 }
 
 console.log('\ndashboard chrome: nothing the scripts use went missing');
-for (const name of ['dashboard', 'phone', 'bookmarklet']) {
+for (const name of ['dashboard', 'phone']) {
   const src = SURFACES[name];
   const ids = new Set([...src.matchAll(/\bid="([^"]+)"/g)].map((m) => m[1]));
   // getElementById('x'), or the phone page's $('x') shorthand for it.
@@ -349,7 +348,6 @@ console.log('\ndashboard chrome: a focus ring you can see (3:1 against what it s
     dashboard: { card: '#ffffff', page: 'var(--page)', 'leader chip': 'var(--c-cream)',
       'failed history row': 'var(--bad-tint)', 'update banner': 'var(--c-sun)' },
     phone: { card: '#ffffff', page: 'var(--page)', header: 'var(--c-blue)', 'leader chip': 'var(--c-cream)' },
-    bookmarklet: { card: '#ffffff', page: 'var(--page)' },
     'status window': { card: '#ffffff', page: 'var(--page)', 'failure notice': 'var(--c-sparks-tint)' },
   };
   for (const [name, css] of Object.entries(SURFACES)) {

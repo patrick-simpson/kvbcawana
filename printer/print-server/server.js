@@ -41,7 +41,7 @@ const fs    = require('fs');
 const path  = require('path');
 const os    = require('os');
 
-// 3456 is the port the extension, the bookmarklet and the installer all
+// 3456 is the port the extension and the app all
 // hardcode, so it stays the default. AWANA_PORT exists only so the test suite
 // can bind somewhere else without colliding with a real install on the machine.
 const PORT         = Number(process.env.AWANA_PORT) || 3456;
@@ -4138,7 +4138,7 @@ app.use((req, res, next) => {
   return next();
 });
 
-app.use(express.static(path.join(__dirname, 'public')));  // serve static files (bookmarklet.html, etc)
+app.use(express.static(path.join(__dirname, 'public')));  // serve static files (brand kit, step-chip.js, phone.html)
 
 // Health endpoint defined below with enhanced warnings
 
@@ -4172,26 +4172,8 @@ app.get('/printers', async (req, res) => {
   }
 });
 
-// Explicit route for bookmarklet page
-app.get('/bookmarklet.html', (req, res) => {
-  const bookmarkletPath = path.join(__dirname, 'public', 'bookmarklet.html');
-  res.sendFile(bookmarkletPath);
-});
-
-// Serve bookmarklet JS files from project root (one level up from print-server/)
-app.get('/bookmarklet.min.js', (req, res) => {
-  const filePath = path.join(__dirname, 'public', 'bookmarklet.min.js');
-  if (fs.existsSync(filePath)) return res.type('js').sendFile(filePath);
-  res.status(404).send('bookmarklet.min.js not found');
-});
-app.get('/bookmarklet.js', (req, res) => {
-  const filePath = path.join(__dirname, 'public', 'bookmarklet.js');
-  if (fs.existsSync(filePath)) return res.type('js').sendFile(filePath);
-  res.status(404).send('bookmarklet.js not found');
-});
-
-// ── Receive CSV from the bookmarklet (authenticated browser session) ─────────
-// The bookmarklet fetches /clubber/csv from the same origin (which has the
+// ── Receive CSV from the extension (authenticated browser session) ───────────
+// The extension fetches /clubber/csv from the same origin (which has the
 // user's session cookies) and POSTs the raw CSV text here so the server can
 // write it to clubbers.csv for enriched label data.
 app.post('/update-csv', (req, res) => {

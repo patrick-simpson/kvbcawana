@@ -204,8 +204,8 @@ the laptop on a club night before anything depends on it.
    greetings (laptop's publishing turned off for the night).
 4. **Check-in writes.** Phone page and touch screen check in, undo, check out
    and register visitors through the Worker.
-5. **Switch night.** The laptop stays home (kept as the spare); the extension,
-   the bookmarklet and the relay are retired afterwards.
+5. **Switch night.** The laptop stays home (kept as the spare); the extension
+   and the relay are retired afterwards.
 
 ## What Claude sessions can and cannot do here
 

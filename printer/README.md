@@ -30,7 +30,7 @@ No PowerShell, no Node.js install, no terminal window.
 
 ### Fallback Behavior
 
-If the server isn't running or can't reach the printer, the bookmarklet automatically falls back to a normal print dialog. This means:
+If the server isn't running or can't reach the printer, the extension falls back to a plain label through the browser's normal print dialog. This means:
 - Users can still print manually if needed
 - Setup failures are graceful, not blocking
 - The tool degrades but doesn't break the check-in workflow
@@ -48,7 +48,7 @@ See [TROUBLESHOOTING.md](./TROUBLESHOOTING.md) for solutions to common issues:
 ### Architecture
 
 - **KVBC Awana app** (`electron-app/`) - Windows installer, tray app and auto-updater that runs the print server
-- **Bookmarklet** - JavaScript that runs on TwoTimTwo.com and detects check-ins
+- **Chrome extension** - runs on TwoTimTwo.com, detects check-ins and drives the print server
 - **Node.js print server** - Runs on localhost:3456, generates PDFs and prints silently
 - **React web UI** (optional) - Simulator and configuration reference
 
@@ -73,7 +73,7 @@ Total install size: ~300 MB (Puppeteer/Chromium is large, but one-time download)
 
 - **Windows only** - the app requires Windows 10+ (a Raspberry Pi print station runs the server under CUPS)
 - **Printer must be Windows-compatible** - Uses Windows printer drivers
-- **TwoTimTwo.com structure** - If the site's HTML changes, the bookmarklet may need updates
+- **TwoTimTwo.com structure** - If the site's HTML changes, the extension may need updates
 - **Local network only** - Server runs on localhost, no remote access
 
 ## Disclaimer
@@ -121,7 +121,6 @@ Built with:
 - [Vite](https://vitejs.dev/) for fast builds
 - [Express.js](https://expressjs.com/) for the print server
 - [pdf-to-printer](https://github.com/npm2s/pdf-to-printer) for Windows printing
-- [jsPDF](https://github.com/parallax/jsPDF) for the bookmarklet
 
 ## License
 

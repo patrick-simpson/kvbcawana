@@ -103,7 +103,7 @@ install folder. (That folder is still named after the app's pre-v5.9.0 name,
 
 ### "Connection refused" or "Server not reachable"
 
-**Problem:** Bookmarklet or test button says server can't be reached.
+**Problem:** The extension or the test button says the server can't be reached.
 
 **Solution:**
 1. Make sure the KVBC Awana app is running (its tray icon); launch it again if not
@@ -135,40 +135,6 @@ install folder. (That folder is still named after the app's pre-v5.9.0 name,
 
 ---
 
-## Bookmarklet Issues
-
-### Bookmarklet button doesn't appear
-
-**Problem:** The red "AUTO PRINT" button doesn't show up on the check-in page.
-
-**Causes:**
-1. Bookmarklet wasn't installed correctly
-2. You're on a different browser (bookmarklets only work in the browser where they were added)
-3. JavaScript is disabled
-
-**Solution:**
-1. Go back to the Club Label Printer web simulator
-2. Find the BookmarkletInfo section (red box with instructions)
-3. Drag the button again to your bookmarks
-4. Try clicking it on the TwoTimTwo page
-
----
-
-### Bookmarklet button appears but doesn't work
-
-**Problem:** Button shows up, but clicking it doesn't arm the auto-printer.
-
-**Solution:**
-1. Open **Developer Tools (F12)** → **Console**
-2. Click the bookmarklet button
-3. Look for error messages
-4. If you see `"Uncaught SyntaxError"` → The bookmarklet code may be corrupted
-   - Re-install by dragging the button from the web simulator again
-5. If you see `"Fetch failed"` → The print server isn't running
-   - Launch the KVBC Awana app again
-
----
-
 ## General Debugging
 
 ### How to check server logs
@@ -184,20 +150,8 @@ The print server's own status window (tray icon → the print server's status) a
 
 1. Open the React app: Run `npm run dev` in a terminal
 2. You'll see a simulator with fake check-in data
-3. Click "Check In" to test the bookmarklet logic
+3. Click "Check In" to try the simulator
 4. The Test Connection button verifies the server is running
-
----
-
-### How to enable debug logging
-
-1. Open **Developer Tools (F12)** in your browser
-2. Go to **Console** tab
-3. Add this to your bookmarklet or the extension to see detailed logs:
-   ```javascript
-   window.DEBUG_PRINT = true;
-   ```
-4. Then do a check-in - you'll see detailed logs in the Console
 
 ---
 
