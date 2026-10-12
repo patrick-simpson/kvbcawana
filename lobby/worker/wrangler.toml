@@ -13,8 +13,11 @@ workers_dev = true
 # idle until the TWOTIMTWO_* secrets exist. "off" stops it.
 [vars]
 CLOUD_CHECKIN = "shadow"
-# Online check-in (ROADMAP.md#online-check-in). Both stay "off" until the owner's
-# shadow night, so a deploy changes nothing at church:
+# Online check-in (ROADMAP.md#online-check-in). Both ON since 2026-10-12 (owner:
+# first live night Wednesday 10/14, the laptop on KVBC Awana 9.2.0 as the one
+# print station, the extension tab open as the backup; the station's
+# printedTonightFor() keeps a child the extension also prints to one label).
+# "off" puts either back as it was:
 #   CLOUD_PRINT      "on": a child the watcher finds on TwoTimTwo's report (checked
 #                    in on TwoTimTwo's own page) gets a print job, sealed to the
 #                    stations in the Worker. Stations lease it, so turn it on only
@@ -26,8 +29,8 @@ CLOUD_CHECKIN = "shadow"
 #                    job). It then keeps tonight's first names + clubs, sealed, until the
 #                    window closes (routes.md section 8). Turn it on only on the shadow
 #                    night, with the station running.
-CLOUD_PRINT = "off"
-SINGLE_PUBLISHER = "off"
+CLOUD_PRINT = "on"
+SINGLE_PUBLISHER = "on"
 # Passphrase v2 migration (src/routes.md section 1). "on": clients that still send
 # the passphrase itself keep signing in (and the first v2 sign-in upgrades the
 # stored verifier). Set "off" once auth:legacyLastAt is old (every screen, the app
