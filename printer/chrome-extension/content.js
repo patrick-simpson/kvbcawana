@@ -3736,7 +3736,7 @@
     // gate on a global time cooldown here — that was the v3.0.4 regression
     // that dropped the second of any two prints within 2 s.
     if (batchPrintedNames.has(key)) return; // already printed in batch
-    if (printedNames.has(key)) return; // already printed this session (local or remote)
+    if (isPrinted(name)) return; // already printed this session (local or remote), by id or by name
 
     var cachedMeta = rosterLookupByName(name);
     markPrinted(name, cachedMeta && cachedMeta.recid);

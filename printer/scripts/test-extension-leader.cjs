@@ -251,6 +251,29 @@ const pruneSharedDedup = new Function('SHARED_DEDUP_PREFIX', extractFunction('pr
     check('...so the set empties and the reload is no longer held', inFlight.size === 0);
   }
 
+  console.log('\nonCheckin: the same dedup as isPrinted');
+  {
+    const printedNames = new Set(['nm:ava stone']);
+    const printed = [];
+    const onCheckin = new Function('env', `
+      const selectedMode = 'on';
+      const batchPrintedNames = new Set();
+      const printedNames = env.printedNames;
+      const resolveIdentityKey = () => 'id:77';
+      const isPrinted = (n) => env.printedNames.has('id:77') || env.printedNames.has('nm:' + n.toLowerCase());
+      const rosterLookupByName = () => null;
+      const markPrinted = () => {};
+      const lookupClub = () => ({ clubName: 'Sparks', clubImageData: null });
+      const doPrint = (n) => env.printed.push(n);
+      ${extractFunction('onCheckin')}
+      return onCheckin;
+    `)({ printedNames, printed });
+    onCheckin('Ava Stone');
+    check('a child printed under a name key is not printed again once an id resolves', printed.length === 0, printed.join());
+    onCheckin('Eli Stone');
+    check('a child not printed yet still prints', printed.join() === 'Eli Stone');
+  }
+
   console.log('\nfetches that must not hang');
   {
     check('the share-balance and roster fetches carry a timeout (a hung one pinned the guard flag for the night)',
