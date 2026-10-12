@@ -389,22 +389,26 @@ name; ONE Worker operation does the rest, so nothing prints, greets or counts tw
 | `POST /v1/desk/barf-late` (recheck) | session | `{night, clubberId, recheck: true, items}` (the `items` the failed answer gave) | the redo alone: `{ok, checkedIn, items, reason?}`. No label, no list, no row |
 
 In order: refuse early (above; the friend check and the mark are one synchronous
-step per child); ONE report read on the 5 s clock (the child must be on it; YES
-under Bible is `items.Bible`); **hold** the child on the report
+step per child); ONE report read on the 15 s read clock (section 7), URGENT like
+every desk action's read (the head of the queue; the child must be on it; YES
+under Bible is `items.Bible`); the check-in page is the one held for the night
+(no read unless none is held; then urgent too); **hold** the child on the report
 (`watcher.hold`: every read until the hold ends lists them, memory only); TwoTimTwo's
 undo (an ambiguous one is checked on the check-in page: still checked in = 504
 `unsure`, nothing changed), then its check-in with the same items plus Brought a
-friend, up to 3 tries (writes, no read slot). So a watcher read in the gap sees no
+friend, up to 3 tries (desk writes, no read slot; a lapsed session signs in again
+urgently). So a watcher read in the gap sees no
 child leave and none arrive: no claim undone (same gen, same state), no job
 dropped, no TwoTimTwo-page check-in adopted, no greeting, the count unchanged.
 Then, whatever the redo did: the BARF tag job is queued as a `reprint:` job
 (no claim; the station journals it, at most once; nothing greets), the friend goes
 on the friends list (`friends.record`: the 6:30 email and `bagNames`, the BARF
 bags), the sealed row is kept (no `night_summary` line). A redo that took keeps
-the hold 30 s more; one that never took lets it go at once (the next read sees
+the hold 45 s more (`HOLD_AFTER_MS`: the report every 30 s, pushed back one
+15 s slot at most, so at least one report read after the redo is read held); one that never took lets it go at once (the next read sees
 the truth: the claim undone, the count down) and answers `checkedIn: false` with
 `reason`; the page shows "<Child> is NOT checked in on TwoTimTwo" and a one-tap
-recheck, which makes the claim live (queued, no job) and holds the child BEFORE
+recheck (the page held when it is one slot young, else one urgent read), which makes the claim live (queued, no job) and holds the child BEFORE
 its post, so the watcher never adopts them as new; a failed recheck undoes that
 claim again. The child's name tag is never reprinted.
 

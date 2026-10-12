@@ -4,7 +4,8 @@
 // tag, and records the friend for the 6:30 email and the BARF bags.
 import { describe, expect, it } from 'vitest';
 import { openAsStation } from '../../shared/cloud-crypto.js';
-import { BARF_TAG_FALLBACK, BARF_TAG_ROUTE, REDO_TRIES, barfTagRoute, versionAtLeast } from '../src/barf.js';
+import { BARF_TAG_FALLBACK, BARF_TAG_ROUTE, HOLD_AFTER_MS, REDO_TRIES, barfTagRoute, versionAtLeast } from '../src/barf.js';
+import { READ_INTERVAL_MS } from '../src/readbudget.js';
 import { SPILL_MS, WATCH_INTERVAL_MS } from '../src/watcher.js';
 import { CHECKIN_PAGE } from './fixtures.js';
 import { everything, plainWords, sealJob } from './helpers.js';
@@ -136,6 +137,30 @@ describe('POST /v1/desk/barf-late', () => {
     expect((await t.call('GET', '/v1/desk/barf')).body.friends).toContain('662');
     // Nothing named rests in storage outside the sealed lists.
     expect(everything(t.storage)).not.toMatch(plainWords(['Kit', 'Tester', 'Sam']));
+  });
+
+  it('reads as a desk action on the 15 s clock: one urgent report read, the night\'s check-in page held, the hold outlasting a pushed-back report', async () => {
+    const { t, st } = await barfNight();
+    // A page asked for the roster: the check-in page is held for the night.
+    expect((await t.call('GET', '/v1/desk/roster')).status).toBe(200);
+    expect(t.core.desk.hasNightPage()).toBe(true);
+    t.clock.tick(READ_INTERVAL_MS);
+    const before = t.reads.length;
+    const urgentBefore = t.core.watcher.budget.taken['desk-barf'] || 0;
+    followPosts(t, { readDuringGap: false });
+    const res = await t.call('POST', '/v1/desk/barf-late', await body(st));
+    expect(res.body).toMatchObject({ ok: true, checkedIn: true });
+    // ONE read: the report. The check-in page came from what the desk held.
+    expect(t.reads.slice(before).map((r) => r.path)).toEqual(['/clubber/checkin_report']);
+    expect(t.core.watcher.budget.taken['desk-barf']).toBe(urgentBefore + 1);
+    // Every read of the night kept the clock's spacing.
+    for (let i = 1; i < t.reads.length; i++) expect(t.reads[i].at - t.reads[i - 1].at).toBeGreaterThanOrEqual(READ_INTERVAL_MS);
+    // The hold lasts one report cadence plus one slot past the redo (a report pushed back once).
+    expect(HOLD_AFTER_MS).toBe(WATCH_INTERVAL_MS + READ_INTERVAL_MS);
+    t.clock.tick(HOLD_AFTER_MS - 1000);
+    expect(t.core.watcher.held('662')).toBe(true);
+    t.clock.tick(2000);
+    expect(t.core.watcher.held('662')).toBe(false);
   });
 
   it('a second friend for the same child is refused (the list, or YES on the report), and nothing is posted', async () => {

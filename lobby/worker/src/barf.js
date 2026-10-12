@@ -8,14 +8,20 @@
 //      to every station, the child has no friend recorded yet (friends.js, or YES
 //      under the report's Brought a friend column), and no other operation or
 //      desk check-in of theirs is under way (one synchronous check-and-set)
-//   2. ONE report read through the shared 5 s clock: the child must be on it, and
-//      the items they had (YES under Bible) are what the redo sends again
+//   2. ONE report read through the shared read clock (readbudget.js: one read
+//      every 15 s), URGENT like every desk action's read (the head of the queue,
+//      never behind the roster's or the watcher's background reads): the child
+//      must be on it, and the items they had (YES under Bible) are what the redo
+//      sends again. The check-in page (the meeting's id, the child's club, the
+//      items offered) is the one desk.js holds for the night: no read for it
+//      unless nothing is held (then urgent too)
 //   3. HOLD the child on the report (watcher.hold): every read until the hold ends
 //      lists them, so the watcher never sees the gap between the undo and the redo:
 //      no claim undone, no job dropped, no new TwoTimTwo-page check-in adopted (no
 //      second name tag, no second greeting), the count never moves
 //   4. TwoTimTwo's undo, then its check-in with the same items plus Brought a
-//      friend, the check-in tried up to REDO_TRIES times (writes: no read slot)
+//      friend, the check-in tried up to REDO_TRIES times (writes: no read slot;
+//      desk writes, so a lapsed session signs in again at the head of the queue)
 //   5. whatever the redo did: the BARF tag's job is queued (a `reprint:` job, so
 //      it bypasses the claims and the station journals it: printed at most once),
 //      the friend goes on the friends list (the 6:30 email and the BARF bags), and
@@ -32,6 +38,7 @@
 import { churchNight } from '../../shared/cloud-crypto.js';
 import { json } from './http.js';
 import { INTERACTIVE_WAIT_MS, READ_INTERVAL_MS } from './readbudget.js';
+import { WATCH_INTERVAL_MS } from './watcher.js';
 import { BIBLE_RE, FRIEND_RE, itemsToSend } from './twotimtwo.js';
 import { PRINT_JOB_KIND } from './adopt.js';
 import { CALENDAR_TTL_MS } from './desk.js';
@@ -45,9 +52,15 @@ export const BARF_TAG_MIN_VERSION = '9.3.1';
 /** The redo: tries, and the pause before the next (times the try number). */
 export const REDO_TRIES = 3;
 export const REDO_GAP_MS = 2000;
-/** How long the hold lasts at most while the posts are out, and after a redo that took. */
+/** How long the hold lasts at most while the posts are out. */
 export const HOLD_MAX_MS = 2 * 60 * 1000;
-export const HOLD_AFTER_MS = 30 * 1000;
+/**
+ * How long it lasts after a redo that took: the longest the watcher's next report
+ * can be away (every WATCH_INTERVAL_MS, pushed back one read slot at most when a
+ * waiting desk request took its turn: readbudget.js), so at least one report read
+ * after the redo is read while the child is still held.
+ */
+export const HOLD_AFTER_MS = WATCH_INTERVAL_MS + READ_INTERVAL_MS;
 export const HISTORY_KIND = 'barf-friend';
 
 const ID_RE = /^\d{1,12}$/;
@@ -185,7 +198,7 @@ export class BarfLate {
     if (!client || watcher.mode === 'off') return refuse(503, { reason: 'not-configured' });
     if ((await this.friendIds(night)).includes(clubberId)) return refuse(409, { reason: 'already-friend' });
     // The report: on it (checked in), not marked yet, and which items the child had.
-    const rep = await client.report(night, { waitMs: INTERACTIVE_WAIT_MS, kind: 'desk-barf' });
+    const rep = await client.report(night, { waitMs: INTERACTIVE_WAIT_MS, kind: 'desk-barf', urgent: true });
     if (!rep.ok) return desk.pageFailure({ ok: false, error: rep.error, ...('retryAfterMs' in rep ? { retryAfterMs: rep.retryAfterMs } : {}) });
     const entry = rep.report.entries.find((/** @type {any} */ e) => e.clubberId === clubberId);
     if (!entry) return refuse(409, { reason: 'not-on-report' });
@@ -204,12 +217,12 @@ export class BarfLate {
 
     // The hold: from before the undo to well after the redo, the watcher reads them as here.
     watcher.hold({ clubberId, name: entry.name || name, club: entry.club, friend: true, ...(entry.bible ? { bible: true } : {}) }, core.now() + HOLD_MAX_MS);
-    const undone = await client.undoCheckIn({ clubberId, calendarId: page.calendarId });
+    const undone = await client.undoCheckIn({ clubberId, calendarId: page.calendarId }, { desk: true });
     if (!undone.ok) {
       let stillIn = true;
       if (AMBIGUOUS.has(undone.error)) {
-        // Did it go through? The check-in page says (one read; unknown counts as "went through").
-        const again = await desk.page(0, true);
+        // Did it go through? The check-in page says (one urgent read; unknown counts as "went through").
+        const again = await desk.page(0, true, true);
         const k = again.ok ? again.page.roster.find((/** @type {any} */ r) => r.clubberId === clubberId) : null;
         stillIn = !!(again.ok && !again.stale && k && k.checkedIn);
       }
@@ -223,7 +236,7 @@ export class BarfLate {
     let tries = 0;
     while (tries < REDO_TRIES) {
       tries += 1;
-      redo = await client.checkIn({ clubberId, calendarId: page.calendarId, events, name });
+      redo = await client.checkIn({ clubberId, calendarId: page.calendarId, events, name }, { desk: true });
       if (redo.ok) break;
       if (tries < REDO_TRIES) await core.sleep(REDO_GAP_MS * tries);
     }
@@ -263,7 +276,9 @@ export class BarfLate {
     if (!client || watcher.mode === 'off') return refuse(503, { reason: 'not-configured' });
     const tag = /** @type {string} */ (await core.tags.identity(night, clubberId));
     const items = { Bible: !!(body.items && body.items.Bible === true), Friend: true };
-    const fresh = await core.desk.page(READ_INTERVAL_MS, true);
+    // The page held for the night when it is one slot young, else one urgent read:
+    // whether TwoTimTwo has the child already (a redo that timed out may have taken).
+    const fresh = await core.desk.page(READ_INTERVAL_MS, false, true);
     if (!fresh.ok) return core.desk.pageFailure(fresh);
     const found = await this.child(clubberId);
     if (!found.ok) return found.error === 'not-found' ? refuse(409, { reason: 'not-found' }) : core.desk.pageFailure(found);
@@ -277,7 +292,7 @@ export class BarfLate {
     let error = '';
     if (!ok) {
       const events = itemsToSend(page.events, child.clubId, items);
-      const r = await client.checkIn({ clubberId, calendarId: page.calendarId, events, name: child.name });
+      const r = await client.checkIn({ clubberId, calendarId: page.calendarId, events, name: child.name }, { desk: true });
       ok = r.ok;
       error = r.ok ? '' : r.error;
     }
