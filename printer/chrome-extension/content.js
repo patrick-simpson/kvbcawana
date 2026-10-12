@@ -395,7 +395,7 @@
   function isAwanaStoreNight() {
     if (storeMode === 'on')  return true;
     if (storeMode === 'off') return false;
-    return scanCalendarFor(/store/i);
+    return scanCalendarFor(/\bstore\b/i);
   }
 
   // Share-balance cache. Populated by fetchShareBalances() when a Store

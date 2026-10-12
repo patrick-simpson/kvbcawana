@@ -274,6 +274,14 @@ const pruneSharedDedup = new Function('SHARED_DEDUP_PREFIX', extractFunction('pr
     check('a child not printed yet still prints', printed.join() === 'Eli Stone');
   }
 
+  console.log('\nstore night detection');
+  {
+    const rx = SRC.match(/return scanCalendarFor\((\/\\bstore\\b\/i)\);/);
+    check('Store Night is a whole word on the page, not any "store" inside another word', !!rx);
+    const re = new RegExp('\\bstore\\b', 'i');
+    check('"Awana Store Night" matches; "Restore", "Storey" and "Bookstore" do not', re.test('Awana Store Night') && !re.test('Restore your password') && !re.test('Storey') && !re.test('Bookstore'));
+  }
+
   console.log('\nfetches that must not hang');
   {
     check('the share-balance and roster fetches carry a timeout (a hung one pinned the guard flag for the night)',
