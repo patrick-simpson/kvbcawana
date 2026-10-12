@@ -50,7 +50,7 @@ export function cleanPrinter(p) {
 
 /** An app version a heartbeat reports, 'X.Y.Z', or null. @param {unknown} v */
 export function cleanVersion(v) {
-  return typeof v === 'string' && /^\d{1,4}\.\d{1,4}\.\d{1,5}$/.test(v) ? v : null;
+  return typeof v === 'string' && /^\d{1,4}\.\d{1,5}\.\d{1,6}$/.test(v) ? v : null;
 }
 
 /** The church-settings rev a station applied, or null. @param {unknown} v */

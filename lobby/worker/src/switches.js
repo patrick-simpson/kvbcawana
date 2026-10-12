@@ -51,7 +51,7 @@ function onOff(v) {
 
 /** Is version `a` older than `b` (X.Y.Z)? A missing or odd version is older. @param {unknown} a @param {string} b */
 export function olderThan(a, b) {
-  const m = typeof a === 'string' ? /^(\d{1,4})\.(\d{1,4})\.(\d{1,5})$/.exec(a) : null;
+  const m = typeof a === 'string' ? /^(\d{1,4})\.(\d{1,5})\.(\d{1,6})$/.exec(a) : null;
   if (!m) return true;
   const want = b.split('.').map(Number);
   for (let i = 0; i < 3; i += 1) {
