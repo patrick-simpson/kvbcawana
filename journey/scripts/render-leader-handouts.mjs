@@ -42,7 +42,9 @@
 import { chromium } from 'playwright-core';
 import { writeLeaderPrep, questionSets } from './build-leader-prep.mjs';
 import { worstCaseSummary } from './handout-limits.mjs';
-import { readFileSync, mkdirSync, existsSync } from 'node:fs';
+import { readFileSync, mkdirSync, existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 
 const REPO = path.dirname(path.dirname(new URL(import.meta.url).pathname));
@@ -80,10 +82,46 @@ function art(rel, color, extra = (svg) => svg) {
 const stretch = (svg) => svg.replace('<svg ', '<svg preserveAspectRatio="none" ');
 const svgURI = (rel) => `data:image/svg+xml;base64,${kitFile(rel).toString('base64')}`;
 
+// Figtree is a variable font, and Chromium's PDF export draws a variable
+// font as Type 3 glyphs (pictures, not a real font: soft on some viewers,
+// poorer for assistive tech). So the weights page 1 uses are instanced from
+// the kit's full variable TTF into static TrueType files (fontTools; Figtree
+// reserves no font name, so an instance is fine under its OFL; see the kit
+// README). Without fontTools it falls back to the variable file, with a
+// warning. Paytone One and Londrina Solid are static and go in as they are.
+const FIGTREE_WEIGHTS = [400, 600, 700];
+function figtreeFaces() {
+  const dir = mkdtempSync(path.join(tmpdir(), 'handout-figtree-'));
+  const src = path.join(KIT, 'fonts', 'Figtree-Variable.ttf');
+  const py = [
+    'import sys',
+    'from fontTools.ttLib import TTFont',
+    'from fontTools.varLib.instancer import instantiateVariableFont',
+    'src, out = sys.argv[1], sys.argv[2]',
+    'for w in sys.argv[3:]:',
+    '    f = instantiateVariableFont(TTFont(src), {"wght": int(w)}, updateFontNames=True)',
+    '    f.save(f"{out}/Figtree-{w}.ttf")',
+  ].join('\n');
+  try {
+    execFileSync('python3', ['-I', '-c', py, src, dir, ...FIGTREE_WEIGHTS.map(String)], { stdio: ['ignore', 'ignore', 'pipe'] });
+    const faces = FIGTREE_WEIGHTS.map((w) => {
+      const uri = `data:font/ttf;base64,${readFileSync(path.join(dir, `Figtree-${w}.ttf`)).toString('base64')}`;
+      return `@font-face { font-family: 'Figtree'; font-weight: ${w}; src: url(${uri}) format('truetype'); }`;
+    });
+    return faces.join('\n  ');
+  } catch (e) {
+    console.warn(`Figtree: could not instance static weights (${String(e.stderr || e.message).trim().split('\n').pop()}); ` +
+      'using the variable font, which the PDF draws as Type 3. pip install fonttools to fix.');
+    return `@font-face { font-family: 'Figtree'; font-weight: 300 900; src: url(${fontURI('Figtree-Variable.ttf')}) format('truetype'); }`;
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
 const FONTS = `
   @font-face { font-family: 'Paytone One'; font-weight: 400; src: url(${fontURI('PaytoneOne-Regular.ttf')}) format('truetype'); }
   @font-face { font-family: 'Londrina Solid'; font-weight: 400; src: url(${fontURI('LondrinaSolid-Regular.ttf')}) format('truetype'); }
-  @font-face { font-family: 'Figtree'; font-weight: 300 900; src: url(${fontURI('Figtree-Variable.ttf')}) format('truetype'); }`;
+  ${figtreeFaces()}`;
 
 const ART = {
   // The wave twice, as on the kiosk: the deep shade mirrored behind, then the
@@ -363,9 +401,7 @@ async function load(page, d) {
 }
 
 async function screenshots(browser, pdfPath, week, dir) {
-  // Pages 1-2 as PNG, drawn by Chromium's own PDF viewer is not scriptable,
-  // so render through pdftoppm when it is installed.
-  const { execFileSync } = await import('node:child_process');
+  // Pages 1-2 as PNG, through poppler's pdftoppm.
   mkdirSync(dir, { recursive: true });
   execFileSync('pdftoppm', ['-png', '-r', '110', '-f', '1', '-l', '2', pdfPath, path.join(dir, `week-${pad(week)}-page`)]);
 }
@@ -384,7 +420,6 @@ async function fitCheck() {
       mkdirSync(dir, { recursive: true });
       const out = path.join(dir, `fit-check-${variant.questions.forGroup.length ? 'both' : 'single'}.pdf`);
       await page.pdf({ path: out, preferCSSPageSize: true, printBackground: true, tagged: true });
-      const { execFileSync } = await import('node:child_process');
       execFileSync('pdftoppm', ['-png', '-r', '80', '-f', '1', '-l', '1', out, out.replace(/\.pdf$/, '')]);
     }
   }
