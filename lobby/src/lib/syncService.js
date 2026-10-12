@@ -235,7 +235,7 @@ export async function syncPublish(base, session, kind, payload, opts = {}) {
     return { ok: false, reason: 'unreachable', message: 'Could not reach the sync service, so this change stayed on this screen. It is sent the next time you change something with the internet up.' };
   }
   if (res.status === 401) {
-    return { ok: false, reason: 'auth', message: 'This screen is signed out of the sync service. Settings → Setup: type the passphrase again.' };
+    return { ok: false, reason: 'auth', message: 'This screen is signed out of the sync service. Settings → Account & app: type the passphrase again.' };
   }
   if (!res.ok) {
     return { ok: false, reason: 'rejected', message: typeof res.body?.error === 'string' ? res.body.error : `HTTP ${res.status}` };

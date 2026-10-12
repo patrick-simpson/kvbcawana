@@ -202,7 +202,7 @@ async function checkSyncSignInNow() {
     // display key: check-ins sealed with ours no longer open on screens that
     // signed in again. Say so loudly; the session is dropped, so the old
     // heartbeats resume until someone signs this computer in again.
-    console.error('[sync] Signed out by the sync service (the passphrase was changed). Sign this computer in again: Settings → Sync service.');
+    console.error('[sync] Signed out by the sync service (the passphrase was changed). Sign this computer in again: awana.kvbchurch.org/settings → Printing → At the laptop → This laptop’s sign-in.');
     try {
       writeConfigPatch((next) => { delete next.syncSession; });
     } catch (e) { console.warn('[sync] Could not clear the session:', e.message); }
@@ -215,7 +215,7 @@ async function forwardToSync(res, kind, payload) {
   if (r.status === 0) return res.status(502).json({ error: 'Could not reach the sync service from this computer. Check its internet connection, then publish again.' });
   if (r.status === 401) {
     checkSyncSignIn().catch(() => {});
-    return res.status(502).json({ error: 'This computer is signed out of the sync service. Sign it in again (awana.kvbchurch.org/settings → Laptop → Sync service).' });
+    return res.status(502).json({ error: 'This computer is signed out of the sync service. Sign it in again (awana.kvbchurch.org/settings → Printing → At the laptop → This laptop’s sign-in).' });
   }
   if (!r.ok) return res.status(r.status).json({ error: (r.body && r.body.error) || `The sync service answered HTTP ${r.status}` });
   return res.json({ ok: true, viaSync: true, ...(r.body || {}) });

@@ -144,13 +144,13 @@ app.get('/health', async (req, res) => {
   if ($relay.signedInToSync() && !keyState.configured) {
     warnings.push({
       type: 'displayKeyMissing',
-      message: "No display key is set, so children's first names are published unencrypted. Sign this computer in to the sync service (awana.kvbchurch.org/settings → Laptop → Sync service): it installs the church's key.",
+      message: "No display key is set, so children's first names are published unencrypted. Sign this computer in to the sync service (awana.kvbchurch.org/settings → Printing → At the laptop → This laptop’s sign-in): it installs the church's key.",
     });
   }
   if ($config.config.displayKey && !keyState.configured) {
     warnings.push({
       type: 'displayKeyInvalid',
-      message: 'The saved display key is invalid, so names are going out in the clear. Sign this computer in to the sync service again (awana.kvbchurch.org/settings → Laptop → Sync service): it installs the church\'s key.',
+      message: 'The saved display key is invalid, so names are going out in the clear. Sign this computer in to the sync service again (awana.kvbchurch.org/settings → Printing → At the laptop → This laptop’s sign-in): it installs the church\'s key.',
     });
   }
   // #2: check-ins the extension could not verify as stuck on TwoTimTwo.

@@ -40,8 +40,9 @@ install folder. (That folder is still named after the app's pre-v5.9.0 name,
 
 **Phone says "No answer"** — the check-in page must be open on the
 main laptop with the extension loaded for the undo and check-out the laptop
-drives. Also check awana.kvbchurch.org/settings → Laptop → "Allow driven
-check-ins from phones" is on (open it in Chrome on the laptop).
+drives. Also check awana.kvbchurch.org/settings → Printing → Labels → "Let the
+check-in laptop’s Chrome extension check children in on TwoTimTwo directly" is
+on (it works from any phone or computer).
 
 **Phone shows a kid as not checked in when they are (or vice versa)** —
 since 5.7.0 the phone re-fetches the roster every ~12 seconds, so
@@ -63,7 +64,7 @@ typo or an old one; too many wrong tries locks that phone out for a few minutes.
 The extension's selector self-test failed — TwoTimTwo shipped new
 page markup and automatic detection may be blind. Check kids in
 normally; print labels via widget search or Walk-in Guest. Then check
-awana.kvbchurch.org/settings → Laptop → *Run diagnostics* for which selector broke, and file
+awana.kvbchurch.org/settings → Printing → At the laptop → *Run diagnostics* for which selector broke, and file
 an issue / update the extension.
 
 ### Labels print but look wrong
@@ -136,7 +137,7 @@ an issue / update the extension.
 
 ### How to check server logs
 
-The app's status window (tray icon → *Print server status...*) and awana.kvbchurch.org/settings → Laptop → *Run diagnostics* show what it is doing. Look for:
+The app's status window (tray icon → *Print server status...*) and awana.kvbchurch.org/settings → Printing → At the laptop → *Run diagnostics* show what it is doing. Look for:
 - `Printer: DYMO LabelWriter 450` → Printer is configured
 - `POST /print` → Someone just tried to print
 - `Error: ...` → Something went wrong

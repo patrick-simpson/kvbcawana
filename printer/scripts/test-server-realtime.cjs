@@ -184,7 +184,7 @@ async function main() {
       warningTexts(h.body.warnings).some((w) => /unencrypted/i.test(w)),
       JSON.stringify(h.body.warnings));
     check('and the warning names the exact place to fix it',
-      warningTexts(h.body.warnings).some((w) => /settings . Laptop . Sync service/i.test(w)),
+      warningTexts(h.body.warnings).some((w) => /settings . Printing . At the laptop . This laptop.s sign-in/i.test(w)),
       JSON.stringify(h.body.warnings));
     fs.writeFileSync(cfgFile, unsigned);
     await post('/config', {});

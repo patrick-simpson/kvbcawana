@@ -352,7 +352,7 @@ export default function SlideEditorPanel({ config, syncedDeck, onChange, onClose
             files. Videos are stored on <strong>this device only</strong> and never uploaded.
             {config.backgroundSource !== 'manual' && (
               <> This screen&rsquo;s background source is not <strong>Typed slides</strong> — switch it in
-              Settings → Slides to put these on screen.</>
+              Settings → Slides &amp; look to put these on screen.</>
             )}
           </div>
 

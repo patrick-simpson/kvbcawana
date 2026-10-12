@@ -138,7 +138,7 @@ run(`node scripts/stamp-build.mjs ${journeyBuild} ${JSON.stringify(journeyOut)}`
 mkdirSync(path.join(ROOT, 'site', 'updates'), { recursive: true });
 cpSync(path.join(ROOT, 'site', 'updates'), path.join(OUT, 'updates'), { recursive: true });
 
-// The Club Label Printer's release notes, for the lobby's Settings → Setup →
+// The Club Label Printer's release notes, for the settings page's Account & app →
 // Release notes (owner, 2026-10-11): printer/changes.md as it is.
 mkdirSync(path.join(OUT, 'release-notes'), { recursive: true });
 cpSync(path.join(ROOT, 'printer', 'changes.md'), path.join(OUT, 'release-notes', 'printer.md'));

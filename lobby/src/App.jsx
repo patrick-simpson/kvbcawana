@@ -1559,7 +1559,7 @@ export default function App() {
                   tells an operator to look at the network; a silent absence of
                   banners tells them nothing, so this says which side to fix. */}
               {nameFaultText && (
-                <span className="name-fault" title="Children's names arrive encrypted — see Settings → Setup">
+                <span className="name-fault" title="Children's names arrive encrypted — see Settings → Account & app">
                   {nameFaultText}
                 </span>
               )}
@@ -1654,7 +1654,7 @@ export default function App() {
       {flagsUp && (
         <div className={`top-flags${flagCount > 2 ? ' top-flags--tight' : ''}`}>
           {panicUp && (
-            <div className="panic-pill" title="Simplified mode is on — toggle with Ctrl+Shift+X or in Settings → Screen & corner">
+            <div className="panic-pill" title="Simplified mode is on — toggle with Ctrl+Shift+X or in Settings → What screens show">
               simplified mode
             </div>
           )}

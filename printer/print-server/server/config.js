@@ -195,7 +195,7 @@ if (events.setDisplayKey(config.displayKey)) {
 } else if (config.displayKey) {
   console.warn('[realtime] config.displayKey is INVALID — names will be published in the clear until it is fixed');
 } else {
-  console.warn('[realtime] No display key set — children\'s first names are published UNENCRYPTED on the live channel. Sign this computer in to the sync service (awana.kvbchurch.org/settings → Laptop → Sync service).');
+  console.warn('[realtime] No display key set — children\'s first names are published UNENCRYPTED on the live channel. Sign this computer in to the sync service (awana.kvbchurch.org/settings → Printing → At the laptop → This laptop’s sign-in).');
 }
 
 

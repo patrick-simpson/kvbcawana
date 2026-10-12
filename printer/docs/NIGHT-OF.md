@@ -9,7 +9,7 @@ Print this page and tape it near the check-in laptop. Setup is in [SETUP.md](SET
 2. **Open the check-in page** — it opens automatically; sign in to
    TwoTimTwo if asked. The green **Club Print widget** appears top-right.
 3. **Run the night test** — widget → **Night Test** (or
-   awana.kvbchurch.org/settings → Laptop → *Print a test label*). You should get:
+   awana.kvbchurch.org/settings → Printing → At the laptop → *Print a test label*). You should get:
    - ✅ page selectors
    - ✅ print — a label with a big **TEST** band comes out
    - ✅ live channel — the lobby display is listening

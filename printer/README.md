@@ -26,7 +26,7 @@ No PowerShell, no Node.js install, no terminal window.
 - **Prints automatically** when a kid checks in — on this laptop, another device, or a volunteer's phone (see [SETUP.md](docs/SETUP.md#4-phone-check-in-optional-off-by-default)).
 - **Enriched labels**: set in the Awana 2026-27 catalog's fonts (Paytone One, Londrina Solid, Figtree — bundled, so every PC prints the same label) with the club's TwoTimTwo logo or, when that can't be fetched, its official one-colour club mark; handbook group, allergy/birthday/no-photo icons, store-night share balances, Step Up Night, attendance milestones ("10th club night!"), and a "Go to:" line for late arrivals (from the dashboard's group schedule).
 - **Broadcasts the party**: the lobby welcome display and the countdown app's live per-club counts are fed from this server's live-channel events (first names only, ever — see CONTRACT.md).
-- **Tells you when it's sick**: selector self-tests, an end-to-end "Night Test" canary, visible print failures, and a status card on the settings page (awana.kvbchurch.org/settings → Laptop).
+- **Tells you when it's sick**: selector self-tests, an end-to-end "Night Test" canary, visible print failures, and a status card on the settings page (awana.kvbchurch.org/settings → Printing → At the laptop).
 
 ### Fallback Behavior
 

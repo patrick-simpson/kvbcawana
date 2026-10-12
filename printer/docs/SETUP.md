@@ -31,35 +31,37 @@ Details in `EXTENSION.md`.
 
 Everything is set on the one settings page. Open it in Chrome **on this
 computer** (the tray's *Settings*, the extension's Settings button and its
-options page all open it): its **Laptop** section finds the print server on
-`localhost:3456` by itself, after you sign in under Setup with the church
-passphrase. Chrome may ask once to let the site connect to devices on your
-computer: allow it. Opened on any other device, the Laptop section says to
-open the page on the check-in laptop; everything else on the page works from
-anywhere.
+options page all open it): the **Printing** section's *At the laptop* card
+finds the print server on `localhost:3456` by itself, after you sign in under
+Account & app with the church passphrase. Chrome may ask once to let the site
+connect to devices on your computer: allow it. Opened on any other device, *At
+the laptop* says to open the page on the check-in laptop; everything else on
+the page, the rest of Printing included, works from anywhere.
 
 The print dashboard that used to be at `http://localhost:3456` is retired
 (owner, 2026-10-11: online only). **With no internet the desk still prints:
 check-in and the extension talk to this computer only. There are no phones and
 no settings changes until the internet is back.**
 
-What the Laptop section holds:
+What Printing holds (the church-wide settings work from any device; *At the laptop* needs this computer):
 
 - **This laptop** — status and warnings, a test label, diagnostics, *Clear
   print queue*, the test tune, **Rehearsal mode** (every label a TEST label,
   nothing recorded, off by itself after 2 hours), and tonight's print failures.
-- **Sync service** — this laptop's own sign-in. If the church passphrase is
+- **This laptop’s sign-in** (At the laptop) — this laptop's own sign-in. If the church passphrase is
   ever changed, sign the laptop in again here with the new one. (A computer
   that has never been signed in is signed in by the app's setup wizard: tray →
   *Set up this computer...*.) Signing in installs the church's display key, so
   names go out sealed; there is no key to generate or paste any more.
 - **Printers** — the name tag printer and the backup ("if it fails, print on").
-- **Labels** — the footer, the visitor palette, the trophy band, connect cards,
-  *Allow driven check-ins from phones* (the kill switch for the phone page's
-  check-in, undo and check-out), the musical printer and the update beacon, and
-  each club's label layout with a live preview.
-- **Pickup list**, **Club night** (the schedule, the late grace, the screen
-  season). The schedule has one row per slot of the night (club, from,
+- **Labels** — the footer, the visitor palette, the trophy band, connect cards
+  and *Let the check-in laptop’s Chrome extension check children in on
+  TwoTimTwo directly* (the kill switch for the phone page's check-in, undo and
+  check-out); **Each club’s label** — each club's layout. Church-wide: saved in
+  the sync service and followed by the laptop. The musical printer and the
+  update beacon stay with this laptop (At the laptop).
+- **Pickup list**, **Club night** (the schedule and the late grace; the
+  season is the one Season choice under Slides & look). The schedule has one row per slot of the night (club, from,
   activity, place), filled in with the church's 2026-27 schedule until you
   change it; a late check-in's label gets a "Go to:" line naming where the club
   is now.
