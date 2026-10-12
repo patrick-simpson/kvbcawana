@@ -96,6 +96,22 @@ test('over the Check-in Display both corner buttons keep to the one bottom-right
         }
       }
 
+      // Journey's count chip sits just left of the gear in the top-right,
+      // top-aligned with it and clearly apart, never under it.
+      await page.evaluate(() => {
+        document.getElementById('journey-chip-count').textContent = '128';
+        document.getElementById('journey-chip').classList.remove('hidden');
+      });
+      const jchip = await page.evaluate(() => {
+        const r = document.getElementById('journey-chip').getBoundingClientRect();
+        return { left: r.left, top: r.top, right: r.right, bottom: r.bottom };
+      });
+      const gear = (await measure())['settings-btn'];
+      assert.ok(near(jchip.top, gear.top), `${width}x${height}: the Journey chip is top-aligned with the gear`);
+      assert.ok(jchip.right <= gear.left - 12, `${width}x${height}: the Journey chip ends ${gear.left - jchip.right}px left of the gear`);
+      assert.ok(jchip.left >= 0, `${width}x${height}: the Journey chip is on screen`);
+      await page.evaluate(() => document.getElementById('journey-chip').classList.add('hidden'));
+
       // Trek's small group card (club nights 7:00-7:30) keeps the column too:
       // its top-right is the Trek count chip, which must stay clear of the gear.
       await page.evaluate(() => {

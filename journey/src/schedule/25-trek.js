@@ -21,6 +21,11 @@
      Lesson 4: <title>"), uncancelled, and only when exactly one title
      matches. Anything else shows no title: never a guess.
 
+   Journey's own count chip (owner 2026-10-12) reads the same entry
+   (byClub.journey): over the Journey view (splash, slides, the menus) but
+   never while a lesson video is up (playing, paused or loading), a reading
+   overlay is open, or the Trek card shows (renderJourneyChip()).
+
    The schedule side (scheduledPhase() 'trek', the poll waiting for a running
    lesson, lessonDoneView()) lives with the other views; this file only knows
    the night and draws the card. */
@@ -85,6 +90,11 @@ function journeyLessonRunning() {
  * Pure: the raw localStorage string and the time.
  */
 function trekCountFrom(raw, nowMs) {
+  return clubCountFrom(raw, nowMs, 'trek');
+}
+
+/** Tonight's count for one club id ('trek', 'journey') from the stored entry, or null. */
+function clubCountFrom(raw, nowMs, club) {
   if (typeof raw !== 'string') return null;
   let entry;
   try {
@@ -96,7 +106,7 @@ function trekCountFrom(raw, nowMs) {
   const age = nowMs - entry.at;
   if (age > TREK_COUNT_MAX_AGE_MS || age < -TREK_COUNT_SKEW_MS) return null;
   if (new Date(entry.at).toDateString() !== new Date(nowMs).toDateString()) return null;
-  const n = entry.byClub && entry.byClub.trek;
+  const n = entry.byClub && entry.byClub[club];
   return Number.isInteger(n) && n >= 0 && n <= 999 ? n : null;
 }
 
@@ -140,6 +150,27 @@ function renderTrekCard() {
   const title = trekNight.feed ? trekLessonTitleFor(trekNight.feed.events, trekDateKey(now)) : null;
   if (trekLessonTitle.textContent !== (title || '')) trekLessonTitle.textContent = title || '';
   trekLesson.classList.toggle('hidden', !title);
+}
+
+/* Journey's count chip: up only while the Journey view shows something that
+   is not a lesson video (the splash, the placeholder, the teaching slides,
+   the caption question, the Settings menus over them), and a count is
+   known. Cheap; re-asked whenever one of the layers it depends on changes. */
+function journeyChipWanted() {
+  return (
+    !journeyView.classList.contains('hidden') &&
+    trekView.classList.contains('hidden') &&
+    journeyVideo.classList.contains('hidden') &&
+    journeyLoading.classList.contains('hidden') &&
+    !readerOverlayOpen()
+  );
+}
+
+function renderJourneyChip() {
+  const count = journeyChipWanted() ? clubCountFrom(readClubCounts(), Date.now(), 'journey') : null;
+  const text = count == null ? '' : String(count);
+  if (journeyChipCount.textContent !== text) journeyChipCount.textContent = text;
+  journeyChip.classList.toggle('hidden', count == null);
 }
 
 const isPlainObject = (data) => !!data && typeof data === 'object' && !Array.isArray(data);
@@ -215,9 +246,19 @@ if (!CONFIGURE_MODE) {
   window.addEventListener('storage', (event) => {
     if (event.key !== null && event.key !== CLUB_COUNTS_KEY) return;
     if (!trekView.classList.contains('hidden')) renderTrekCard();
+    renderJourneyChip();
   });
   // And a slow redraw, for a write the event missed and a count going stale.
   setInterval(() => {
     if (!trekView.classList.contains('hidden')) renderTrekCard();
+    renderJourneyChip();
   }, POLL_INTERVAL_MS);
+  // Journey's chip follows the layers it depends on: one observer on their
+  // `hidden` classes (no per-frame work), so no code that changes a view has
+  // to remember it, and the chip is gone in the same task the video shows.
+  const chipLayers = new MutationObserver(renderJourneyChip);
+  for (const el of [journeyView, trekView, journeyVideo, journeyLoading, prepView, handoutView]) {
+    chipLayers.observe(el, { attributes: true, attributeFilter: ['class'] });
+  }
+  renderJourneyChip();
 }

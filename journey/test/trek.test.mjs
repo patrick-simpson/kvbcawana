@@ -365,3 +365,74 @@ test('the Pi gets a still card; a desktop gets no Check-in stinger over it', asy
     mac.close();
   }
 });
+
+/* Journey's own count chip (owner 2026-10-12): same entry, byClub.journey. */
+const chipUp = (k) => shown(k, 'journey-chip');
+const chipText = (k) => k.document.getElementById('journey-chip-count').textContent;
+
+test('the Journey chip: on the splash, gone while the video plays, back on the slides', async () => {
+  const k = boot(at(18, 40), { prefs: { 'awanaClubCounts.v1': counts({ journey: 11, trek: 4 }, at(18, 39)) } });
+  try {
+    await ticks();
+    assert.equal(view(k), 'journey');
+    assert.equal(shown(k, 'journey-splash'), true);
+    assert.equal(chipUp(k), true, 'on the splash');
+    assert.equal(chipText(k), '11');
+    k.document.getElementById('journey-splash-play-btn').click();
+    await ticks();
+    assert.ok(k.video.hasAttribute('src'));
+    assert.equal(chipUp(k), false, 'never over the lesson video');
+    k.video.dispatchEvent(new k.window.Event('ended'));
+    await ticks(1);
+    assert.equal(shown(k, 'slides-view'), true);
+    assert.equal(chipUp(k), true, 'back over the teaching slides');
+    // The lobby writes a new tally.
+    k.window.localStorage.setItem('awanaClubCounts.v1', counts({ journey: 12 }, at(18, 41)));
+    k.window.dispatchEvent(new k.window.StorageEvent('storage', { key: 'awanaClubCounts.v1' }));
+    assert.equal(chipText(k), '12');
+    // The menus: Settings opens over it and the chip stays.
+    k.document.getElementById('settings-btn').click();
+    await ticks(1);
+    assert.equal(chipUp(k), true, 'with the lesson picker open');
+  } finally {
+    k.close();
+  }
+});
+
+test('the Journey chip stays away from reading overlays, the Trek card, the Check-in Display, and with no count', async () => {
+  const k = boot(at(18, 40), { prefs: { 'awanaClubCounts.v1': counts({ journey: 11, trek: 4 }, at(18, 39)) } });
+  try {
+    await ticks();
+    assert.equal(chipUp(k), true);
+    k.document.getElementById('prep-view').classList.remove('hidden');
+    await ticks(1);
+    assert.equal(chipUp(k), false, 'Read Prep');
+    k.document.getElementById('prep-view').classList.add('hidden');
+    k.document.getElementById('handout-view').classList.remove('hidden');
+    await ticks(1);
+    assert.equal(chipUp(k), false, 'the handout');
+    k.document.getElementById('handout-view').classList.add('hidden');
+    await ticks(1);
+    assert.equal(chipUp(k), true);
+    k.document.getElementById('toggle-btn').click();
+    await ticks(1);
+    assert.equal(view(k), 'checkin');
+    assert.equal(chipUp(k), false, 'not over the Check-in Display');
+    pinClock(k.window, at(19, 5));
+    k.window.pollSchedule();
+    await ticks(1);
+    assert.equal(view(k), 'trek');
+    assert.equal(chipUp(k), false, 'the Trek card shows Trek’s count instead');
+    assert.equal(k.document.getElementById('trek-chip-count').textContent, '4');
+  } finally {
+    k.close();
+  }
+  const none = boot(at(18, 40), { prefs: { 'awanaClubCounts.v1': counts({ trek: 4 }, at(18, 39)) } });
+  try {
+    await ticks();
+    assert.equal(view(none), 'journey');
+    assert.equal(chipUp(none), false, 'no Journey entry: no chip');
+  } finally {
+    none.close();
+  }
+});

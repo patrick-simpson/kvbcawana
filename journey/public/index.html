@@ -42,6 +42,14 @@
     </script>
   </div>
 
+  <!-- Tonight's Journey count (club purple), over the Journey view except
+       while a lesson video plays (src/schedule/25-trek.js); hidden with no
+       count. Before #journey-view so its CSS can step the splash doodles out. -->
+  <div id="journey-chip" class="jr-chip hidden" role="status">
+    <span class="jr-chip-label">Checked in</span>
+    <span class="jr-chip-block"><span id="journey-chip-count" class="jr-chip-count"></span></span>
+  </div>
+
   <div id="journey-view" class="view hidden">
     <div id="journey-placeholder">
       <span><img src="brand/logos/journey-white.svg" alt="Journey" draggable="false" /></span>
@@ -117,9 +125,9 @@
   <div id="trek-view" class="view hidden">
     <div id="trek-card">
       <div id="trek-tab">Small Group Time</div>
-      <div id="trek-chip" class="hidden" role="status">
-        <span id="trek-chip-label">Checked in</span>
-        <span id="trek-chip-block"><span id="trek-chip-count"></span></span>
+      <div id="trek-chip" class="jr-chip hidden" role="status">
+        <span id="trek-chip-label" class="jr-chip-label">Checked in</span>
+        <span id="trek-chip-block" class="jr-chip-block"><span id="trek-chip-count" class="jr-chip-count"></span></span>
       </div>
       <div id="trek-wordmark"><img src="brand/logos/trek-white.svg" alt="Trek" draggable="false" /></div>
       <div id="trek-lesson" class="hidden">

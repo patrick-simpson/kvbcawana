@@ -148,6 +148,8 @@ const trekChip = document.getElementById('trek-chip');
 const trekChipCount = document.getElementById('trek-chip-count');
 const trekLesson = document.getElementById('trek-lesson');
 const trekLessonTitle = document.getElementById('trek-lesson-title');
+const journeyChip = document.getElementById('journey-chip');
+const journeyChipCount = document.getElementById('journey-chip-count');
 
 // What the Trek card knows about tonight (25-trek.js fills it in). Declared up
 // here because scheduledPhase() reads it from the very first setView() call,

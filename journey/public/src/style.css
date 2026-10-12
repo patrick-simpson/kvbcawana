@@ -76,6 +76,7 @@
   --jr-art-wave-trek: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 576 324' preserveAspectRatio='none'><path fill='%23047E71' transform='matrix(-1.06 0 0 1 593.28 0)' d='M-50.16,331.97C-38.71,304.22 -37.83,274.24 -25.90,246.62C-13.97,219.00 14.43,192.19 51.34,191.79C63.52,191.65 75.40,194.42 87.38,196.14C105.01,198.68 123.16,198.95 140.90,196.95C157.84,195.03 174.94,190.82 187.82,181.91C201.50,172.45 209.03,158.78 217.00,145.87C231.93,121.70 251.46,97.45 282.04,85.70C309.81,75.02 342.44,76.32 372.91,80.22C403.39,84.11 433.84,90.38 464.65,88.86C520.60,86.10 575.00,41.71 594.00,0.00L594.00,342.00L-50.40,342.00L-50.16,331.97'/><path fill='%23CCEAEC' transform='matrix(1 0 0 0.7143 0 92.57)' d='M-50.16,331.97C-38.71,304.22 -37.83,274.24 -25.90,246.62C-13.97,219.00 14.43,192.19 51.34,191.79C63.52,191.65 75.40,194.42 87.38,196.14C105.01,198.68 123.16,198.95 140.90,196.95C157.84,195.03 174.94,190.82 187.82,181.91C201.50,172.45 209.03,158.78 217.00,145.87C231.93,121.70 251.46,97.45 282.04,85.70C309.81,75.02 342.44,76.32 372.91,80.22C403.39,84.11 433.84,90.38 464.65,88.86C520.60,86.10 575.00,41.71 594.00,0.00L594.00,342.00L-50.40,342.00L-50.16,331.97'/></svg>");
   --jr-art-tab-trek: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 205.36 132.53' preserveAspectRatio='none'><path fill='%23047E71' d='M205.36,-35.10L-28.80,-35.10L-28.80,126.63C-17.85,129.47 -6.87,132.53 4.35,130.10C28.16,126.59 40.51,100.98 63.35,96.02C81.82,91.84 100.10,101.46 118.57,100.45C133.31,100.09 146.80,91.64 152.55,77.99C159.60,61.70 157.79,42.01 169.08,27.40C180.32,12.54 196.95,1.11 201.97,-17.74C203.57,-23.29 204.71,-29.13 205.36,-35.10'/></svg>");
   --jr-art-chip-trek: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 146.05 84.78' preserveAspectRatio='none'><path fill='%23047E71' d='M144.05,35.87L144.05,69.39C144.05,76.78 138.05,82.78 130.65,82.78L37.89,82.78C32.81,82.78 28.70,78.67 28.70,73.60L28.70,39.75L20.27,39.75C9.52,39.75 0.80,31.03 0.80,20.27C0.80,9.52 9.52,0.80 20.27,0.80L81.06,0.80C91.81,0.80 100.53,9.52 100.53,20.27L100.53,35.87L144.05,35.87'/><path fill='none' stroke='%23fff' stroke-width='0.90' d='M144.65,36.47L144.65,69.99C144.65,77.38 138.65,83.38 131.25,83.38L38.49,83.38C33.41,83.38 29.30,79.27 29.30,74.20L29.30,40.35L20.88,40.35C10.12,40.35 1.40,31.63 1.40,20.88C1.40,10.12 10.12,1.40 20.88,1.40L81.66,1.40C92.41,1.40 101.13,10.12 101.13,20.88L101.13,36.47L144.65,36.47'/></svg>");
+  --jr-art-chip-journey: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 146.05 84.78' preserveAspectRatio='none'><path fill='%238A649D' d='M144.05,35.87L144.05,69.39C144.05,76.78 138.05,82.78 130.65,82.78L37.89,82.78C32.81,82.78 28.70,78.67 28.70,73.60L28.70,39.75L20.27,39.75C9.52,39.75 0.80,31.03 0.80,20.27C0.80,9.52 9.52,0.80 20.27,0.80L81.06,0.80C91.81,0.80 100.53,9.52 100.53,20.27L100.53,35.87L144.05,35.87'/><path fill='none' stroke='%23fff' stroke-width='0.90' d='M144.65,36.47L144.65,69.99C144.65,77.38 138.65,83.38 131.25,83.38L38.49,83.38C33.41,83.38 29.30,79.27 29.30,74.20L29.30,40.35L20.88,40.35C10.12,40.35 1.40,31.63 1.40,20.88C1.40,10.12 10.12,1.40 20.88,1.40L81.66,1.40C92.41,1.40 101.13,10.12 101.13,20.88L101.13,36.47L144.65,36.47'/></svg>");
 }
 
 * {
@@ -616,20 +617,18 @@ html.cursor-hidden * {
 /* The kit's stepped chip (shapes/chip-plate.svg + chip-keyline.svg, baked):
    "CHECKED IN" on its pill, the count on the block stepping out beneath.
    Everything inside is in em of the chip's own font size, so the text sits
-   on the plate's two tiers at any size (8em wide = the plate's 146.05). */
-#trek-chip {
-  position: absolute;
-  top: max(3vh, 24px);
-  right: max(3vw, 24px);
+   on the plate's two tiers at any size (8em wide = the plate's 146.05).
+   Two of them: Trek's on its card (Trek teal) and Journey's over the
+   Journey view (club purple, #journey-chip below). */
+.jr-chip {
   width: 8em;
   height: 4.644em;
   font-size: clamp(1rem, 2.1 * var(--u), 2.6rem);
-  background: var(--jr-art-chip-trek) left top / 100% 100% no-repeat;
   color: #ffffff;
   pointer-events: none;
 }
 
-#trek-chip-label {
+.jr-chip-label {
   position: absolute;
   left: 0.05em;
   top: 0.05em;
@@ -647,7 +646,7 @@ html.cursor-hidden * {
   white-space: nowrap;
 }
 
-#trek-chip-block {
+.jr-chip-block {
   position: absolute;
   left: 1.57em;
   top: 1.97em;
@@ -658,12 +657,42 @@ html.cursor-hidden * {
   justify-content: center;
 }
 
-#trek-chip-count {
+.jr-chip-count {
   position: relative;
   top: -0.04em;
   font-family: var(--jr-font-shout);
   font-size: calc(1.9em * var(--jr-shout-fit));
   line-height: 1;
+}
+
+#trek-chip {
+  position: absolute;
+  top: max(3vh, 24px);
+  right: max(3vw, 24px);
+  background: var(--jr-art-chip-trek) left top / 100% 100% no-repeat;
+}
+
+/* Journey's own count (owner 2026-10-12): tonight's Journey kids, over the
+   splash, the teaching slides and the menus, never over a lesson video, a
+   reading overlay or the Trek card (25-trek.js decides; hidden with no
+   count). The gear keeps the top-right corner there, so the chip sits just
+   left of it, 16px clear, top-aligned with it; under the toggle and the
+   gear (z-index 10) and the Settings panel (20), over every Journey layer.
+   While it is up the splash's top-right doodle cluster, which it would sit
+   on, steps out. */
+#journey-chip {
+  position: fixed;
+  top: max(3vh, 24px);
+  right: calc(max(3vw, 24px) + 48px + 16px);
+  z-index: 9;
+  /* A size smaller than Trek's: it shares the top edge with the splash's
+     wordmark, which it must clear on the Pi's 640x480. */
+  font-size: clamp(0.8rem, 1.7 * var(--u), 2.2rem);
+  background: var(--jr-art-chip-journey) left top / 100% 100% no-repeat;
+}
+
+#journey-chip:not(.hidden) ~ #journey-view #journey-splash::before {
+  display: none;
 }
 
 /* Loading indicator — shown while a lesson video is fetching/buffering, so a
@@ -2463,6 +2492,10 @@ html.cursor-hidden #slide-controls {
   }
   html.motion-full #trek-lesson-title {
     animation: jm-slam-hard 520ms var(--jm-settle) 620ms backwards;
+  }
+  html.motion-full #journey-chip {
+    transform-origin: right top;
+    animation: jm-pop-up 460ms var(--jm-pop) 300ms backwards;
   }
   html.motion-full #trek-chip {
     transform-origin: right top;
