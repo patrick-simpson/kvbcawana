@@ -4,12 +4,12 @@
 > **KVBC-Awana-Countdown** repo; edit schedule/theme data here.
 
 This directory is the **single source of truth** for shared Awana app
-data. It is copied into `dist/shared/` at build time and served by
-GitHub Pages at:
+data. It is copied into `lobby/dist/shared/` at build time; the one site
+(`site/build.mjs`) copies that under `/lobby/`, so it is served at:
 
-    https://<owner>.github.io/Awana-Check-in-Display/shared/schedule.json
-    https://<owner>.github.io/Awana-Check-in-Display/shared/theme.json
-    https://<owner>.github.io/Awana-Check-in-Display/shared/art/<file>.png
+    https://awana.kvbchurch.org/lobby/shared/schedule.json
+    https://awana.kvbchurch.org/lobby/shared/theme.json
+    https://awana.kvbchurch.org/lobby/shared/art/<file>.png
 
 Consumers:
 

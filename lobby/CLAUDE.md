@@ -9,7 +9,8 @@ pushes to `main`. The root `.github/workflows/ci.yml` runs this app's
 checks (lint, typecheck, vitest, build, the Playwright smoke suite) on every
 push and then publishes the one site, so each green push redeploys
 https://awana.kvbchurch.org/lobby/ (the signage) and `/lobby/countdown` (the
-projector). This folder's own `.github/` workflows are dormant.
+projector). The old `lobby/.github/` workflows are deleted; the manual
+visual-baseline workflow is the root `lobby-update-snapshots.yml`.
 
 Concretely, after editing any file: run the checks a contributor runs
 (`npm run lint`, `npm run typecheck`, `npx vitest run`, `npm run build`, and
@@ -315,7 +316,8 @@ and `doodles/`. Read its README before changing it.
 - **The lobby has its own visual suite**, `e2e/signage.visual.spec.js`: a
   paused Playwright clock (install() alone lets time run), Math.random
   reseeded at every click, a fixture calendar and `?lowPower=1`. Regenerate
-  its baselines with the update-snapshots workflow, never from a sandbox.
+  its baselines with the `lobby-update-snapshots.yml` workflow (dispatch it
+  by hand), never from a sandbox.
 
 ## Tech stack snapshot
 
@@ -342,7 +344,7 @@ and `doodles/`. Read its README before changing it.
   `@ts-check` seams, vitest with coverage thresholds, build, and the
   Playwright smoke suite; visual regression runs in ci.yml only
   (baselines under `e2e/__screenshots__`, regenerate via the
-  update-snapshots workflow)
+  `lobby-update-snapshots.yml` workflow)
 - There is no `@types/react` or `@types/react-dom`, and `tsc` (TypeScript 7,
   whose program load runs in parallel) must never infer either from its own
   JS: whether it reads `react/index.js`' or `react-dom/index.js`' `cjs/`
@@ -818,13 +820,13 @@ printer feed names): new displays get KVBC Awana, never this app. The owner's ca
   upgrade identity: never rename them.
 - **Releasing:** bump `desktop/package.json` (and `npm install
   --package-lock-only` there), push to main, then dispatch
-  `create-desktop-release.yml` with the version (`mcp__github__actions_run_trigger`,
-  ref main). It creates `desktop-vX.Y.Z` and dispatches `build-desktop.yml`
-  against it (a GITHUB_TOKEN tag push fires nothing by itself): tests + lint,
+  `desktop-release.yml` at the repo root with the version (`mcp__github__actions_run_trigger`,
+  ref main). It creates `desktop-vX.Y.Z` and runs its build jobs against it
+  (a GITHUB_TOKEN tag push fires nothing by itself): tests + lint,
   Windows build, silent install and a `--smoke-test` launch that must load
   the live page with the right version, then the release with the `.exe`,
   its blockmap and `lobby.yml`, and a check that `releases/latest` is the new
-  tag. Never tag by hand; a stray release goes with `delete-desktop-release.yml`.
+  tag. Never tag by hand; a stray release goes with the root `desktop-delete-release.yml`.
 - **One of three screens** (owner, 2026-10-07; `src/screens.js`, pure): the
   lobby (`/lobby/index.html`), the projector (`/lobby/countdown.html`) or
   Journey (`/journey/`), one at a time, in the same `persist:lobby` profile (one
@@ -855,7 +857,7 @@ printer feed names): new displays get KVBC Awana, never this app. The owner's ca
   woken or restarted after that is left alone; an armed shutdown keeps the PC
   awake past the close. It runs `shutdown.exe /s /t 0` (no `/f`: an app with
   unsaved work may ask), only packaged on Windows; a development run logs it.
-- **Gates.** The desktop tests run in `build-desktop.yml`
+- **Gates.** The desktop tests run in `desktop-release.yml`
   (`npx vitest run --config desktop/vitest.config.js`), NOT in the website's
   deploy gate: the root vitest excludes `desktop/**`, so a desktop test can
   never block an urgent site redeploy (a lint error in desktop/ still does). The root `eslint .` does lint

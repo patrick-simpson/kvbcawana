@@ -76,7 +76,7 @@ export function fakeTwoTimTwo({ password = 'right-pass', report = () => page(tab
   return state;
 }
 
-// TwoTimTwo's /household/csv shape (docs/TWOTIMTWO.md §3.3): household fields
+// TwoTimTwo's /household/csv shape (printer/docs/TWOTIMTWO.md §3.3): household fields
 // denormalised, with addresses and phones, and the children in one column.
 export const HOUSEHOLD_CSV = '\uFEFF"Household ID","Parent/Guardian#1","Address1","Primary Phone","Active Clubbers","Billing Notes"\r\n' +
   '"11","Pat Tester","1 Elm St","555-0101","Sophie Tester, Cal Tester",""\r\n' +

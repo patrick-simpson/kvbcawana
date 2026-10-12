@@ -15,7 +15,7 @@
 //     never hammers their login or locks the account.
 //
 // The parsers follow the extension's own (chrome-extension/content.js
-// fetchCheckinReport, and docs/TWOTIMTWO.md for every selector), on linkedom
+// fetchCheckinReport, and printer/docs/TWOTIMTWO.md for every selector), on linkedom
 // instead of a browser DOM; test/twotimtwo.test.js runs the extension's copy
 // and this one on the same pages and requires the same answer.
 
@@ -80,7 +80,7 @@ const squash = (text) => String(text || '').trim().replace(/\s+/g, ' ');
  * "who is checked in tonight". null when the page is not a report at all (the
  * login form, a changed layout): never an empty night.
  *
- * Rules, each from a bug (docs/TWOTIMTWO.md "the markup, exactly"): one table
+ * Rules, each from a bug (printer/docs/TWOTIMTWO.md "the markup, exactly"): one table
  * per club, named only by its crest's alt; tables without a crest are skipped;
  * a child is a row with an edit link or an undo control (the check-in user
  * gets only the undo); the name is the text of the cell holding it with every
@@ -118,7 +118,7 @@ export function parseCheckinReport(html) {
       // The child's id: the edit link, or the undo control. The church's
       // dedicated check-in user (Record Checkin, 2026-10-11) sees the report
       // with NO edit link, only [undo] Name, so the edit link alone read 0 of
-      // 94. Both carry the same clubber id (docs/TWOTIMTWO.md).
+      // 94. Both carry the same clubber id (printer/docs/TWOTIMTWO.md).
       const edit = row.querySelector('a[href*="/meeting/clubberCheckin/"]');
       const undo = row.querySelector('[onclick*="undoCheckin"]');
       const byEdit = edit && /\/meeting\/clubberCheckin\/(\d+)/.exec(edit.getAttribute('href') || '');

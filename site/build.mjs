@@ -3,7 +3,6 @@
 //
 //   /            the Club Label Printer's public site (printer/, built at base /)
 //   /lobby/      the lobby signage (lobby/ build; countdown.html is the projector)
-//   /projector   a redirect to /lobby/countdown.html
 //   /settings    a redirect to /lobby/settings.html, one settings page (SETTINGS.md)
 //   /journey/    the Journey kiosk (journey/public, build-stamped)
 //   /checkin     the phone check-in, online (the print app's phone page, relayed)
@@ -127,8 +126,6 @@ const readFeed = (feed) => {
 writeFileSync(path.join(OUT, '_redirects'), [
   ...downloadRedirects(readFeed, RELEASES),
   // Pages serves foo.html at /foo (and 308s the .html form there).
-  '/projector /lobby/countdown 302',
-  '/projector/ /lobby/countdown 302',
   // The one settings page for every screen (SETTINGS.md).
   '/settings /lobby/settings 302',
   '/settings/ /lobby/settings 302',

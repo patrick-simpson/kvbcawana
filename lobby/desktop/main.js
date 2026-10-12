@@ -53,7 +53,7 @@ const CLOCK_OFFSET = (() => {
   return Number.isFinite(fake) ? fake - Date.now() : 0;
 })();
 const now = () => new Date(Date.now() + CLOCK_OFFSET);
-// The release pipeline's install check (build-desktop.yml): open the lobby at
+// The release pipeline's install check (desktop-release.yml): open the lobby at
 // once whatever the clock says, write what loaded to smoke.json in userData,
 // and touch nothing else (no login item, no saved overrides, no updates).
 const SMOKE = process.argv.includes('--smoke-test');

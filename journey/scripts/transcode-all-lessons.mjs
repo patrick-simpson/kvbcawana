@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // ─────────────────────────────────────────────────────────────
 // One-time (re-runnable) batch transcode of EVERY lesson video in
-// public/lessons.json — run by .github/workflows/transcode-all-lessons.yml
+// public/lessons.json — run by .github/workflows/journey-transcode-all-lessons.yml
 // (workflow_dispatch), or by hand on a machine with ffmpeg + gh:
 //
 //   node scripts/transcode-all-lessons.mjs

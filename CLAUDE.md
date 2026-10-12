@@ -62,8 +62,10 @@ commits or files.
   workflow artifacts older than a day: the account has 0.5 GB of Actions
   storage, and the release workflows keep their installer artifacts only a
   day (`retention-days: 1`); the Releases are what people download. The
-  apps' own workflows under `lobby/.github/`, `journey/.github/`,
-  `printer/.github/` are dormant.
+  per-app `.github/` folders are gone (their workflows were dormant and are
+  deleted; the one manual workflow they held that still matters is
+  `lobby-update-snapshots.yml`, which regenerates the lobby's visual
+  baselines and is dispatched by hand).
 - Realtime: since 2026-10-03 every screen listens to the Worker's live channel
   (sign-in with the church passphrase; names stay sealed end to end; the same
   events and sanitizers as the Pusher design). The Pusher keys are cleared and
@@ -91,19 +93,38 @@ commits or files.
   (`lobby/desktop/`) ends at 2.1.0, which hands the sound room PC over to it.
   Built on branch `kvbc-awana-v9`, not yet released; its "Still to do" lists
   what the release workflows must change for the rename.
-- `AUDIT-2026-10-04.md` is the stability and performance audit; its status
-  section says what was fixed on 2026-10-04/05 and what is deferred.
+- The stability and performance audit of 2026-10-04 is fixed except for the
+  items under "Deferred work" below (its file was removed; the repo history has it).
 
 ## The move in progress (owner's plan, 2026-10-01)
 
 1. This repo, with history (done).
 2. One Cloudflare Pages site at **awana.kvbchurch.org** (done; the printer's
-   public site and one About page at `/`, `/lobby`, `/projector` → `/lobby/countdown`,
+   public site and one About page at `/`, `/lobby`, `/lobby/countdown`,
    `/journey`, `/api`).
 3. Pusher replaced by the Worker's own live channel (done 2026-10-03).
 4. Every installed app repointed (printer and sound room update feeds, the Pi
    kiosk, Journey's embed, cross-links), one last release from each old repo
    (done by 2026-10-03).
-5. A full rehearsal, then ONE switch day (`SWITCH.md` is the runbook) the owner
+5. A full rehearsal, then ONE switch day (done; `SWITCH.md` is the cleanup checklist that follows) the owner
    picks (never a Wednesday). OBS / ProPresenter feeds carry the passphrase in
    their link (owner's choice). No forwarding from the old github.io addresses.
+
+## Deferred work
+
+Still open from the 2026-10-04 audit, deferred on purpose (the owner's call
+or a prerequisite is missing):
+
+- **Nightly lesson video in the repo.** `journey-update-lesson.yml` commits
+  `journey/public/current-lesson-video.mp4` into history each change (about
+  20 MB). Moving it to the `journey-videos-v2` release changes where the Pi's
+  bundle comes from, so it waits for the owner.
+- **Split the big files.** `printer/print-server/server.js` (about 9,300
+  lines) and `printer/chrome-extension/content.js` (about 5,200), plus a jsdom
+  harness for the extension. Some logic is already lifted out for tests.
+- **Lobby code splitting.** `React.lazy` for the panels and the PowerPoint
+  parser on demand. The App suites open panels synchronously and
+  `pptxModel.js` imports the parser statically, so those suites need reworking first.
+- **Pusher removal from the print server.** See `SWITCH.md`.
+- **Remaining Low findings** from the audit's per-area lists. They are not
+  carried one by one here; the repo history has the original file.

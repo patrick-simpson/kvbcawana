@@ -51,6 +51,8 @@ that." Ship it as v9, once the /settings work in progress (SETTINGS.md) is in.
   a print-off waits for the last label (`isBusy()`), `printer-release.yml`
   builds and smoke-tests KVBC Awana, `/download/kvbc-awana` exists and the
   signage's Setup card links it.
+- After the sound room PC shows on /settings as a KVBC Awana computer: remove
+  lobby/desktop and /download/lobby-display (owner, 2026-10-11).
 
 ## How it is built (9.0.0)
 

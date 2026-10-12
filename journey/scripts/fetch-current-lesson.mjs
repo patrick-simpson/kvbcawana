@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // ─────────────────────────────────────────────────────────────
 // Nightly "current lesson" resolver (run by
-// .github/workflows/update-lesson.yml, or by hand):
+// .github/workflows/journey-update-lesson.yml, or by hand):
 //
 //   node scripts/fetch-current-lesson.mjs
 //   node scripts/fetch-current-lesson.mjs --from-file sample.html
