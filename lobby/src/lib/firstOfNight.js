@@ -15,6 +15,8 @@
 // count, no club. The toast copy is composed at render time from the arriving
 // payload's already-allowlisted first name and is never stored.
 
+import { dateKey } from './time.js';
+
 const STORAGE_KEY = 'awanaFirstOfNight.v1';
 
 export { STORAGE_KEY as FIRST_OF_NIGHT_KEY };
@@ -26,21 +28,6 @@ export { STORAGE_KEY as FIRST_OF_NIGHT_KEY };
  * what actually blocks the boots-late-at-night case.
  */
 const FIRST_OF_NIGHT_PHASES = ['countdown', 'off'];
-
-/**
- * Local YYYY-MM-DD key. A verbatim mirror of the private `todayKey()` in
- * src/hooks/useTally.js (lines 9-12), duplicated rather than exported from
- * there on purpose: that helper is module-private and widening useTally's
- * public surface for one string formatter would be a worse trade than four
- * repeated lines. schedule.js's own `dateKey()` makes the same call.
- *
- * @param {Date} [now]
- * @returns {string}
- */
-function todayKey(now = new Date()) {
-  const pad = (/** @type {number} */ n) => String(n).padStart(2, '0');
-  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
-}
 
 /**
  * May this arrival claim the night's first check-in?
@@ -80,7 +67,7 @@ export function isFirstOfNight({ count, phase, presentation, alreadyFired } = {}
 export function hasFiredToday(now = new Date()) {
   try {
     const raw = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? 'null');
-    return !!raw && raw.date === todayKey(now);
+    return !!raw && raw.date === dateKey(now);
   } catch {
     return false;
   }
@@ -94,7 +81,7 @@ export function hasFiredToday(now = new Date()) {
  */
 export function markFiredToday(now = new Date()) {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ date: todayKey(now) }));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ date: dateKey(now) }));
   } catch {
     /* storage may be blocked; the in-memory latch still holds for this session */
   }

@@ -1,20 +1,17 @@
 import { useCallback, useRef, useState } from 'react';
 import { TALLY_EARLIER_NIGHT_MS, TALLY_BUMP_GRACE_MS, TALLY_REORDER_MS } from '../lib/constants.js';
+import { dateKey } from '../lib/time.js';
 
 const STORAGE_KEY = 'awanaTally.v1';
 
 // "Tonight's" tally is really "today's" — it survives an accidental page
 // refresh mid-club but resets by itself the next time the display is used
 // on a different day. Only a number is stored: no names, ever.
-function todayKey(now = new Date()) {
-  const pad = (n) => String(n).padStart(2, '0');
-  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
-}
 
 function load() {
   try {
     const raw = JSON.parse(localStorage.getItem(STORAGE_KEY));
-    if (raw && raw.date === todayKey() && Number.isInteger(raw.count) && raw.count >= 0) {
+    if (raw && raw.date === dateKey() && Number.isInteger(raw.count) && raw.count >= 0) {
       return raw.count;
     }
   } catch {
@@ -25,7 +22,7 @@ function load() {
 
 function save(count) {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ date: todayKey(), count }));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ date: dateKey(), count }));
   } catch {
     /* storage may be blocked; in-memory count still works for tonight */
   }

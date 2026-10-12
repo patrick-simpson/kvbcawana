@@ -14,6 +14,7 @@
 // up, because a dead pipe must never be silent.
 
 import { weatherPresentation } from './weather.js';
+import { pad2 } from './time.js';
 
 /**
  * 12-hour clock parts for a timestamp, in the screen's own local time.
@@ -25,7 +26,7 @@ export function formatClock(ms) {
   const hours24 = d.getHours();
   const meridiem = hours24 >= 12 ? 'PM' : 'AM';
   const hours12 = hours24 % 12 || 12;
-  const minutes = String(d.getMinutes()).padStart(2, '0');
+  const minutes = pad2(d.getMinutes());
   return { time: `${hours12}:${minutes}`, meridiem };
 }
 

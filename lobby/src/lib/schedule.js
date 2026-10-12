@@ -8,6 +8,8 @@
 // styling and the chime ducks, so a straggler's arrival doesn't blast
 // over the pledges happening in the next room.
 
+import { dateKey } from './time.js';
+
 export const PHASES = ['off', 'countdown', 'ceremony', 'game-time', 'closing', 'shutdown'];
 
 // shared/schedule.json window `kind` → display phase.
@@ -52,20 +54,6 @@ function isRealDateKey(key) {
 // A shared file with hundreds of exceptions is a mistake, not a schedule;
 // cap it so a runaway generator can't bloat this device's cache.
 const MAX_SPECIAL_DATES = 400;
-
-/**
- * Local-time YYYY-MM-DD key for a Date — the same recipe as
- * calendarLogic.localDateStr and useTally.todayKey, repeated here rather than
- * imported so this module stays dependency-free (it is the phase engine the
- * whole stage's timing hangs off).
- *
- * @param {Date} d
- * @returns {string}
- */
-function dateKey(d) {
-  const pad = (/** @type {number} */ n) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-}
 
 /**
  * Parse `specialDates` out of a fetched shared/schedule.json.

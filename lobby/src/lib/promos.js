@@ -31,6 +31,7 @@
 import { clubNights, formatLongDate } from './calendarLogic.js';
 import { showDate, slideInWindow } from './slides.js';
 import { SNOW_ALERT_SEC, SNOW_CADENCE, inSnowSeason, snowOutlook } from './snowAlerts.js';
+import { dateKey } from './time.js';
 
 /**
  * @typedef {Object} SeasonPromo
@@ -336,5 +337,5 @@ function nextClubNightOrWednesday(events, today, specialDates) {
   const [y, m, d] = today.split('-').map(Number);
   const date = new Date(y, m - 1, d);
   date.setDate(date.getDate() + ((3 - date.getDay() + 7) % 7));
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+  return dateKey(date);
 }

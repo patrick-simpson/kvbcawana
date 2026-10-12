@@ -21,6 +21,7 @@
 // ─────────────────────────────────────────────────────────────
 
 import { clubNights, daysBetween } from './calendarLogic.js';
+import { dateKey, pad2 } from './time.js';
 
 /** Month-day keys, inclusive, wrapping the new year. */
 export const SNOW_SEASON = Object.freeze({ from: '11-01', until: '03-31' });
@@ -74,7 +75,7 @@ export function inSnowSeason(todayStr) {
 function addDays(dateStr, n) {
   const [y, m, d] = String(dateStr).split('-').map(Number);
   const date = new Date(y, m - 1, d + n);
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+  return dateKey(date);
 }
 
 /** @param {string} dateStr */
@@ -153,7 +154,7 @@ export function snowAlertCopy(outlook) {
  * @returns {{ weekday: string, lockDate: string, text: string }}
  */
 export function sampleAlertText(now) {
-  const yy = String(now.getFullYear() % 100).padStart(2, '0');
+  const yy = pad2(now.getFullYear() % 100);
   const date = `${now.getMonth() + 1}/${now.getDate()}/${yy}`;
   const wd = now.toLocaleDateString('en-US', { weekday: 'short' });
   const mon = now.toLocaleDateString('en-US', { month: 'short' });
@@ -172,7 +173,7 @@ export function sampleAlertText(now) {
  */
 export function lockTime(now) {
   const h = now.getHours() % 12 || 12;
-  return `${h}:${String(now.getMinutes()).padStart(2, '0')}`;
+  return `${h}:${pad2(now.getMinutes())}`;
 }
 
 /**
