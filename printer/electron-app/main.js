@@ -729,18 +729,31 @@ function downloadAndRunRepairInstaller() {
   const dest = path.join(os.tmpdir(), 'KVBC-Awana-Setup.exe');
   const file = fs.createWriteStream(dest);
   const request = electronNet.request(REPAIR_INSTALLER_URL);
+  let failed = false;
   const fail = (why) => {
-    try { file.close(); } catch { /* ignore */ }
+    if (failed) return;
+    failed = true;
+    try { file.destroy(); } catch { /* ignore */ }
+    try { fs.unlinkSync(dest); } catch { /* a half file must never be run */ }
     dialog.showErrorBox(
       'Repair download failed',
       why + '\n\nDownload it manually instead:\n' + REPAIR_INSTALLER_URL
     );
   };
+  // A full disk or a locked temp file is an 'error' on the stream; with no
+  // listener it would be an uncaught exception in the main process.
+  file.on('error', (err) => fail(err.message || 'could not write the installer'));
   request.on('response', (response) => {
     if (response.statusCode !== 200) { fail('HTTP ' + response.statusCode); return; }
-    response.on('data', (chunk) => file.write(chunk));
+    const expected = Number([].concat(response.headers['content-length'] || [])[0]) || 0;
+    let received = 0;
+    response.on('data', (chunk) => { received += chunk.length; file.write(chunk); });
     response.on('end', () => {
+      if (failed) return;
+      // A connection cut short can still end cleanly: running half an installer is worse than none.
+      if (expected && received !== expected) { fail('download incomplete'); return; }
       file.end(() => {
+        if (failed) return;
         shell.openPath(dest).then((openErr) => {
           if (openErr) { fail(openErr); return; }
           app.isQuitting = true;

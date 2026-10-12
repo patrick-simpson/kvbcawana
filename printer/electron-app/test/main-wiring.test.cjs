@@ -65,3 +65,13 @@ describe('the wizard', () => {
     assert.doesNotMatch(main, /saveConfig\(\{[^}]*passphrase/);
   });
 });
+
+describe('the repair installer download', () => {
+  const start = main.indexOf('function downloadAndRunRepairInstaller');
+  const body = main.slice(start, main.indexOf('function probeServer', start));
+  it('handles a write error and never runs an incomplete file', () => {
+    assert.match(body, /file\.on\('error'/);
+    assert.match(body, /received !== expected/);
+    assert.match(body, /fs\.unlinkSync\(dest\)/);
+  });
+});
