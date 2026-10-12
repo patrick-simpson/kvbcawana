@@ -75,14 +75,48 @@ function sweepIn(root, accent, color, from = 'right') {
   };
 }
 
-/** Words landing one by one: drop in, spring past full size, settle. */
+/**
+ * How far past full width each piece may spring, as a share of its width:
+ * 15% of the room on its tighter side (the gap, plus a little of the
+ * letters' own side bearings) on each of its sides, so a word gap keeps over
+ * two thirds of its width even when both neighbours peak at once (measured
+ * with the room unlimited: two words of a caption closed to 2 px of each
+ * other and read as one). Measured once per headline: layout ignores
+ * transforms, so the answer is the same on every frame.
+ */
+const ROOM = new WeakMap();
+function sideRoom(parts) {
+  if (ROOM.has(parts)) return ROOM.get(parts);
+  const box = parts.map((p) => ({ x: p.offsetLeft, y: p.offsetTop, w: p.offsetWidth, em: parseFloat(getComputedStyle(p).fontSize) || 0 }));
+  if (box.every((b) => b.w === 0)) return null; // not laid out yet
+  const room = box.map((b, i) => {
+    const prev = box[i - 1], next = box[i + 1];
+    const left = prev && prev.y === b.y ? b.x - (prev.x + prev.w) : Infinity;
+    const right = next && next.y === b.y ? next.x - (b.x + b.w) : Infinity;
+    const gap = Math.max(0, Math.min(left, right, b.w));
+    return b.w > 0 ? (2 * 0.15 * (gap + 0.04 * b.em)) / b.w : 1;
+  });
+  ROOM.set(parts, room);
+  return room;
+}
+
+/** The overshoot v (past 1) eased into a ceiling c: untouched up to c/2. */
+const ceil = (v, c) => (v <= c / 2 ? v : c / 2 + (c / 2) * Math.tanh((v - c / 2) / (c / 2)));
+
+/**
+ * Words landing one by one: drop in, spring past full size, settle. The
+ * spring stretches each word tall freely, but wide only as far as the room
+ * beside it, so neighbours never run together mid-bounce.
+ */
 function land(parts, t, t0, { gap = 0.07, drop = 60, from = 0.55, speed = 1.15, fade = 0.1 } = {}) {
+  const room = sideRoom(parts);
   parts.forEach((p, i) => {
     const ti = t0 + i * gap;
     if (t < ti) { put(p, { o: 0 }); return; }
     const s = lerp(from, 1, spring(t, ti, speed));
     const [sx, sy] = squish(t, ti + 0.16, 0.1, 1.1);
-    put(p, { y: (1 - E.settle(prog(t, ti, 0.42))) * drop, s, sx, sy, o: prog(t, ti, fade) });
+    const wide = s * sx - 1;
+    put(p, { y: (1 - E.settle(prog(t, ti, 0.42))) * drop, sx: 1 + (room && wide > 0 ? ceil(wide, room[i]) : wide), sy: s * sy, o: prog(t, ti, fade) });
   });
 }
 

@@ -25,7 +25,8 @@ export async function render({ fps = 60, scale = 1, from = 0, to = null, out = p
   const context = await browser.newContext({ viewport: { width: 1920, height: 1080 }, deviceScaleFactor: scale });
   const page = await context.newPage();
   page.on('pageerror', (e) => console.warn(`  [film error] ${e}`));
-  page.on('console', (m) => { if (m.type() === 'error') console.warn(`  [film console] ${m.text()}`); });
+  page.on('console', (m) => { if (m.type() === 'error' && !/^Failed to load resource/.test(m.text())) console.warn(`  [film console] ${m.text()}`); });
+  page.on('response', (r) => { if (r.status() >= 400) console.warn(`  [film] ${r.status()} ${new URL(r.url()).pathname}`); });
   await page.goto(`${srv.origin}/film/index.html`);
   await page.waitForFunction(() => window.film && window.film.ready, null, { timeout: 60000 });
   await page.evaluate(() => window.film.ready);
