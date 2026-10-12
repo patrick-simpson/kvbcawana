@@ -202,7 +202,7 @@ exit 0
     const events = require(path.join(__dirname, '..', 'print-server', 'events.js'));
     const sent = [];
     const realPublish = events.publish;
-    events.publish = (pusher, channel, name, payload) => { sent.push({ name, payload }); return realPublish(pusher, channel, name, payload); };
+    events.publish = (channel, name, payload) => { sent.push({ name, payload }); return realPublish(channel, name, payload); };
     const before = (await post('/phone/tonight', {})).body.checkedIn;
     const histBefore = (await (await fetch(BASE + '/history/today')).json());
     let n = jobs().length;

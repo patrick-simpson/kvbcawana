@@ -42,7 +42,7 @@ export default function StatusPanel({ config, onReset }) {
 
   // While this window is open and on screen, look for an update every 30 s
   // (owner, 7.4.1): the release ping that used to make updates near-instant
-  // went with Pusher, so the app's own poll is once a day. Quiet: no spinner,
+  // is gone, so the app's own poll is once a day. Quiet: no spinner,
   // the version line just says when it last looked. Stops once an update is
   // found (it downloads on its own) and while the window is minimized.
   useEffect(() => {

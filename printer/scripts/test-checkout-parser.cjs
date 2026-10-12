@@ -305,13 +305,13 @@ console.log('checkout transport: the board is sealed like a check-in');
   try { events.openForTest(fixture.testKey, 'checkin', sealed); replayed = true; } catch { /* expected */ }
   check('a checkout frame cannot be replayed as a checkin', replayed === false);
 
-  // Realistic worst case must stay under Pusher's per-event ceiling.
+  // Realistic worst case must stay under the per-frame ceiling.
   const big = events.seal('checkout', events.buildCheckout(
     Array.from({ length: events.CHECKOUT_MAX }, () => ({
       firstName: 'Nathaniel', club: 'Truth & Training' })), 200));
   const bytes = Buffer.from(JSON.stringify(big), 'utf8').length;
-  check(`a full ${events.CHECKOUT_MAX}-child board stays under Pusher's ceiling`,
-    bytes < events.PUSHER_MAX_BYTES, `${bytes} bytes`);
+  check(`a full ${events.CHECKOUT_MAX}-child board stays under the frame ceiling`,
+    bytes < events.FRAME_MAX_BYTES, `${bytes} bytes`);
 }
 
 console.log('');

@@ -303,8 +303,7 @@ console.log('\ndashboard chrome: the section tabs keep aria-selected in step');
     // with the one tab selected and the block marked for the highlight.
     win.HTMLElement.prototype.scrollIntoView = function () {};
     win.eval(functionSource(SURFACES.dashboard, 'jumpToDisplayKey') || '');
-    win.eval(functionSource(SURFACES.dashboard, 'jumpToDisplayLogin') || '');
-    for (const [fn, id] of [['jumpToDisplayKey', 'display-key-section'], ['jumpToDisplayLogin', 'display-login-section']]) {
+    for (const [fn, id] of [['jumpToDisplayKey', 'display-key-section']]) {
       if (typeof win.showTab === 'function') win.showTab('history');
       if (typeof win[fn] === 'function') win[fn]();
       const sel = selected(doc);
@@ -374,7 +373,7 @@ console.log('\ndashboard chrome: a focus ring you can see (3:1 against what it s
 
 console.log('\ndashboard chrome: the deep-link highlight under reduced motion');
 {
-  // #display-key / #display-login land on a block marked .flash, drawn as a
+  // #display-key lands on a block marked .flash, drawn as a
   // ::after wash whose ONLY visible frames are its fade. The reduced-motion
   // blanket rule cancels every animation, so without a still of its own a
   // reduced-motion operator lands on an unmarked block.

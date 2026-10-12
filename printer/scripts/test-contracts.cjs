@@ -546,23 +546,25 @@ console.log('isClubNightNow');
 
 console.log('publish() resilience');
 {
-  // A pusher whose trigger rejects must never reject the publish() promise.
-  const rejecting = { trigger: () => Promise.reject(new Error('network down')) };
-  const throwing = { trigger: () => { throw new Error('sync throw'); } };
-  Promise.all([
-    events.publish(rejecting, 'awana-channel', 'tally', events.buildTally({}, 0)),
-    events.publish(throwing, 'awana-channel', 'tally', events.buildTally({}, 0)),
-    events.publish(null, 'awana-channel', 'tally', events.buildTally({}, 0)),
-  ]).then(([a, b, c]) => {
-    check('rejecting trigger → false', a === false);
-    check('throwing trigger → false', b === false);
-    check('null pusher → false', c === false);
-    const st = events.getPublishState();
-    check('failure recorded for /health', st.lastPublishOk === false && !!st.lastError);
+  // A relay that rejects or throws must never reject the publish() promise.
+  const results = [];
+  const run = async (relay) => { events.setRelay(relay); return events.publish('awana-channel', 'tally', events.buildTally({}, 0)); };
+  (async () => {
+    const a = await run(() => Promise.reject(new Error('network down')));
+    const failure = events.getPublishState();
+    const b = await run(() => { throw new Error('sync throw'); });
+    const c = await run(null);
+    const d = await run(() => Promise.resolve(true));
+    results.push(a, b, c, d);
+    check('rejecting relay \u2192 false', a === false);
+    check('failure recorded for /health', failure.lastPublishOk === false && !!failure.lastError);
+    check('throwing relay \u2192 false', b === false);
+    check('no relay \u2192 false', c === false);
+    check('a relay that takes it \u2192 true', d === true);
     finish();
-  }).catch(e => {
+  })().catch(e => {
     failed++;
-    console.error('  ✗ publish() rejected — it must NEVER reject:', e.message);
+    console.error('  \u2717 publish() rejected \u2014 it must NEVER reject:', e.message);
     finish();
   });
 }

@@ -57,23 +57,9 @@ function check(name, cond, detail) {
   }
 }
 
-// Intercept the pusher module so nothing reaches the network and every
-// publish is recorded (same Module._load patch as test-server-realtime.cjs,
-// and for the same reason: a stub file in node_modules is never resolved).
+// Every publish is recorded: the server's relay is replaced once it is
+// required (see test-server-realtime.cjs), so nothing reaches the network.
 const wire = [];
-const realLoad = Module._load;
-Module._load = function patched(request) {
-  if (request === 'pusher') {
-    return class FakePusher {
-      trigger(channel, event, payload) {
-        wire.push({ channel, event, payload });
-        return Promise.resolve();
-      }
-    };
-  }
-  // eslint-disable-next-line prefer-rest-params
-  return realLoad.apply(this, arguments);
-};
 
 async function j(pathname, opts) {
   const res = await fetch(BASE + pathname, opts);
@@ -95,16 +81,17 @@ async function main() {
   process.env.AWANA_DATA_DIR = dataDir;
   process.env.AWANA_PORT = String(PORT);
 
-  // Pusher creds so the publisher is configured (the FakePusher above is what
-  // actually gets constructed). Deliberately NO display key: plaintext events
+  // Deliberately NO display key: plaintext events
   // make the payload assertions direct; the sealed path has its own suites.
   fs.writeFileSync(path.join(dataDir, 'config.json'), JSON.stringify({
     printerName: 'Fake',
     checkinUrl: 'https://example.com/checkin',
-    pusherAppId: '1', pusherKey: 'k', pusherSecret: 's', pusherCluster: 'us2',
   }));
 
   const server = require(path.join(__dirname, '..', 'print-server', 'server.js'));
+
+  // The relay is the only pipe: record what the server hands it, as the wire.
+  require(path.join(__dirname, '..', 'print-server', 'events.js')).setRelay((channel, event, body) => { wire.push({ channel, event, payload: body }); return Promise.resolve(true); });
   const listener = server.startListening();
   await new Promise((resolve) => {
     if (listener.listening) return resolve();

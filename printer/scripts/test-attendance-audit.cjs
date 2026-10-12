@@ -33,7 +33,6 @@ process.on('exit', (code) => {
 });
 
 const fs = require('fs');
-const Module = require('module');
 const os = require('os');
 const path = require('path');
 
@@ -50,14 +49,6 @@ function check(name, cond, detail) {
   }
 }
 
-const realLoad = Module._load;
-Module._load = function patched(request) {
-  if (request === 'pusher') {
-    return class FakePusher { trigger() { return Promise.resolve(); } };
-  }
-  // eslint-disable-next-line prefer-rest-params
-  return realLoad.apply(this, arguments);
-};
 
 async function j(pathname, opts) {
   const res = await fetch(BASE + pathname, opts);
@@ -137,6 +128,9 @@ async function main() {
   process.env.AWANA_BIND_HOST = '127.0.0.1';
 
   const server = require(path.join(__dirname, '..', 'print-server', 'server.js'));
+
+  // The relay is the only pipe: record what the server hands it, as the wire.
+  require(path.join(__dirname, '..', 'print-server', 'events.js')).setRelay((channel, event, body) => { return Promise.resolve(true); });
   const { auditAttendance, ATTENDANCE_GRID_STALE_MS } = server;
   const listener = server.startListening();
   await new Promise((r) => (listener.listening ? r() : listener.once('listening', r)));

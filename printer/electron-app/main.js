@@ -18,7 +18,6 @@ const { execFile, execFileSync, spawn } = require('child_process');
 const { removeShortcuts, findOldBrandShortcuts } = require('./src/shortcuts');
 const configStore = require('./src/config-store');
 const extensionSync = require('./src/extension-sync');
-const updatePush = require('./src/update-push');
 const chromeRestart = require('./src/chrome-restart');
 const rolesStore = require('./src/roles');
 const handoff = require('./src/handoff');
@@ -313,11 +312,10 @@ function setupAutoUpdater() {
 
   const check = () => autoUpdater.checkForUpdates().catch(() => { /* offline is fine */ });
   check();
-  // Every ten minutes, the sound room app's rhythm (v9). The Pusher release
-  // ping (setupUpdatePush) was the laptop's fast path, and the Pusher keys are
-  // cleared since 2026-10-03, so the old daily poll was in practice the only
-  // one: a release reached the check-in laptop up to a day late. The feed is a
-  // static file on the site, so asking often costs nothing.
+  // Every ten minutes, the sound room app's rhythm (v9). A Pusher release
+  // ping used to be the laptop's fast path; it is gone, so this poll is the
+  // only path: a release reaches the check-in laptop within ten minutes. The
+  // feed is a static file on the site, so asking often costs nothing.
   setInterval(check, UPDATE_EVERY_MS);
 }
 
@@ -332,106 +330,6 @@ function installUpdateNow() {
       performQuitAndInstall('Manual install requested — download just finished');
     });
     autoUpdater.checkForUpdates().catch(() => { /* offline */ });
-  }
-}
-
-// ─── Push notification of new releases (Pusher) ─────────────────────────────
-// The release workflow (.github/workflows/build-electron.yml) pings the
-// SAME public Pusher channel the print server already publishes
-// checkin/tally/etc. on, with an `update` event carrying nothing but
-// `{ version, at }` — see CONTRACT.md's "`update` event (laptop-internal)"
-// section. This is the primary path to a fast auto-update; the 24h poll in
-// setupAutoUpdater() above is only the safety net for a laptop that was
-// offline (or never relaunched) when the ping fired.
-//
-// This subscribes with the SAME app key + cluster + channel the server-side
-// `pusher` package already publishes with (config.json's
-// pusherKey/pusherCluster, church-config.json's pusherChannel) — no new
-// config is invented for this. The server holds the Pusher SECRET and is the
-// only thing that can ever publish; this is a subscribe-only client using the
-// public key, exactly like the display app.
-let pusherClient = null;
-let lastUpdatePushVersion = null;
-let lastUpdatePushAt = 0;
-const UPDATE_PUSH_DEBOUNCE_MS = 30000;
-
-// Mirrors print-server/server.js's own CHURCH_CONFIG_FILE resolution (prefer
-// a church-config.json in the data dir so it survives app updates; fall back
-// to the copy shipped next to the print server) so a fork that has
-// customised its channel via that file is honoured here too, without this
-// module needing to require the full server (which starts side effects of
-// its own — see startServer()).
-function resolveUpdateChannel() {
-  const DEFAULT_CHANNEL = 'awana-channel'; // print-server/church-config.json's baked default
-  const dataDirFile = path.join(app.getPath('userData'), 'church-config.json');
-  const bundledFile = app.isPackaged
-    ? path.join(process.resourcesPath, 'print-server', 'church-config.json')
-    : path.join(__dirname, '..', 'print-server', 'church-config.json');
-  const file = fs.existsSync(dataDirFile) ? dataDirFile : bundledFile;
-  try {
-    if (fs.existsSync(file)) {
-      const parsed = JSON.parse(fs.readFileSync(file, 'utf8'));
-      if (parsed && typeof parsed.pusherChannel === 'string' && parsed.pusherChannel) {
-        return parsed.pusherChannel;
-      }
-    }
-  } catch { /* malformed church-config.json — fall through to the baked default */ }
-  return DEFAULT_CHANNEL;
-}
-
-function handleUpdatePushEvent(payload) {
-  const decision = updatePush.decideOnUpdateEvent(payload, {
-    now: Date.now(),
-    lastVersion: lastUpdatePushVersion,
-    lastAt: lastUpdatePushAt,
-    debounceMs: UPDATE_PUSH_DEBOUNCE_MS,
-  });
-  if (!decision.act) {
-    console.log(`[update-push] Ignoring event: ${decision.reason}`);
-    return;
-  }
-  lastUpdatePushVersion = decision.version;
-  lastUpdatePushAt = Date.now();
-  console.log(`[update-push] Release ping received for v${decision.version} — checking for updates.`);
-  if (autoUpdater && app.isPackaged) {
-    // This is the ONLY thing a ping ever does. A spoofed event (the channel
-    // is public) cannot forge a release: it can only make the app ask
-    // electron-updater to look at the real GitHub release feed, which it
-    // verifies independently — worst case is a harmless extra check.
-    autoUpdater.checkForUpdates().catch(() => { /* offline is fine — the poll covers it */ });
-  }
-}
-
-// Must never throw or crash the app: a dev install with no Pusher configured
-// (or one that fails to reach Pusher entirely) is expected to fall back to
-// the periodic poll silently, exactly like the display app's own connection
-// handling.
-function setupUpdatePush() {
-  if (!app.isPackaged) return;  // dev install — the periodic poll is enough
-  let PusherClient;
-  try {
-    PusherClient = require('pusher-js');
-  } catch (e) {
-    console.warn('[update-push] pusher-js unavailable — falling back to periodic checks:', e.message);
-    return;
-  }
-  const config = currentConfig || loadConfig() || {};
-  if (!config.pusherKey) {
-    console.log('[update-push] No Pusher key configured — relying on periodic update checks only.');
-    return;
-  }
-  try {
-    pusherClient = new PusherClient(config.pusherKey, {
-      cluster: config.pusherCluster || 'us2',
-    });
-    pusherClient.connection.bind('error', (err) => {
-      console.warn('[update-push] Pusher connection error (periodic checks still cover this):', err && err.message);
-    });
-    const channel = pusherClient.subscribe(resolveUpdateChannel());
-    channel.bind('update', handleUpdatePushEvent);
-  } catch (e) {
-    console.warn('[update-push] Failed to subscribe — falling back to periodic checks:', e && e.message);
-    pusherClient = null;
   }
 }
 
@@ -709,8 +607,8 @@ function startServer(config) {
     else serverInstance.close();
     serverInstance = null;
   }
-  // The FULL print server (roster enrichment, dedup, history, Pusher event
-  // bus, phone check-in) is the ONLY server. @napi-rs/canvas ships prebuilt
+  // The FULL print server (roster enrichment, dedup, history, live-channel relay,
+  // phone check-in) is the ONLY server. @napi-rs/canvas ships prebuilt
   // N-API binaries, so the old "native module didn't load" failure mode is
   // gone — and if the server still fails, we show it loudly instead of
   // silently degrading to a feature-poor fallback like pre-5.0 builds did.
@@ -903,7 +801,7 @@ ipcMain.handle('get-config', () => loadConfig());
 
 ipcMain.handle('save-config', (event, patch) => {
   // Act on the MERGED config, not the renderer's patch — startServer needs the
-  // Pusher credentials and the PIN, and buildTray needs the printer name, none
+  // sync session and the PIN, and buildTray needs the printer name, none
   // of which the setup wizard sends.
   const config = saveConfig(patch);
   currentConfig = config;
@@ -1043,12 +941,6 @@ async function startPrintRole({ fromWizard = false } = {}) {
   // chosen one.
   startServer(config);
   buildTray(config);
-
-  // After currentConfig is populated (needs pusherKey/pusherCluster) and the
-  // server has started (which is what would normally hold the Pusher config
-  // fresh from a just-completed setup save, though this reads config.json
-  // directly and does not depend on the server module at all).
-  setupUpdatePush();
 
   // A new version landed this launch (the app wrote a newer extension to its
   // folder): restart Chrome so it loads it, on the check-in page only, at any
@@ -1459,5 +1351,4 @@ app.on('before-quit', () => {
   if (serverModule && serverModule.stopListening) serverModule.stopListening();
   else if (serverInstance) serverInstance.close();
   if (pdfWindow && !pdfWindow.isDestroyed()) pdfWindow.destroy();
-  if (pusherClient) { try { pusherClient.disconnect(); } catch { /* quitting anyway */ } }
 });

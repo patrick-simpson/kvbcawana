@@ -5,7 +5,7 @@
 // reports (check-in report, meeting report CSV, completed-books report,
 // attendance grid, color-group points, calendar iCal feed, admin messages,
 // household CSV, handbook PDFs) and POSTs compact JSON to the local print server, which is
-// the only publisher on the shared Pusher channel feeding lobby signage /
+// the only publisher on the live channel feeding lobby signage /
 // projector.
 //
 // Hard rules:
@@ -18,7 +18,7 @@
 //     church-authored announcement text and (for the sealed checkout board,
 //     children's FIRST names; since 7.16.0 the print server builds that list
 //     itself and this file posts the Checkout page's clubber ids only) ever
-//     reach the Pusher channel. Never last names,
+//     reach the live channel. Never last names,
 //     allergy/contact info, birth years, or calendar attendee/organizer/
 //     location data.
 //   - Three posts DO carry a child's full name, and all go to LOCALHOST ONLY
@@ -455,7 +455,7 @@
       if (!parsed) return;
       // TwoTimTwo's own numbers, kept LOCAL to the print server so it can
       // check its tally against them (GET /reconcile). Deliberately not part
-      // of the `tonight` Pusher payload below: that contract is mirrored in
+      // of the `tonight` payload below: that contract is mirrored in
       // the display repo and pinned by the shared vectors, and a mismatch
       // between two operator tools is an operator's business, not something
       // the lobby TV should carry.

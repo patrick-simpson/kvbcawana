@@ -56,28 +56,12 @@ function check(name, cond, detail) {
   }
 }
 
-// ── Intercept `pusher` so nothing reaches the network ─────────────────────────
-// Every trigger is recorded instead, which is the only way to assert what
-// actually went ON THE WIRE. Patching Module._load rather than dropping a stub
-// in node_modules: Node resolves bare specifiers from the requiring file's own
-// node_modules first, so a stub elsewhere is simply never seen — and the server
-// would genuinely try to publish to pusher.com while this file quietly asserted
-// nothing. (I hit exactly that.)
+// ── Record the wire ───────────────────────────────────────────────────────────
+// The server hands every frame, after sealing, to the relay it installs at
+// load. Replacing that relay (below, once the server is required) records each
+// frame instead of sending it, which is the only way to assert what actually
+// went ON THE WIRE.
 const wire = [];
-const realLoad = Module._load;
-Module._load = function patched(request) {
-  if (request === 'pusher') {
-    return class FakePusher {
-      constructor(opts) { globalThis.__pusherOpts = opts; }
-      trigger(channel, event, payload) {
-        wire.push({ channel, event, payload });
-        return Promise.resolve();
-      }
-    };
-  }
-  // eslint-disable-next-line prefer-rest-params
-  return realLoad.apply(this, arguments);
-};
 
 const events = require(path.join(__dirname, '..', 'print-server', 'events.js'));
 // Same module instance server.js requires internally (Node's require cache is
@@ -125,12 +109,9 @@ async function main() {
     + 'Dana,Tester,,,Sparks A,y,\n'
     + 'Erin,Former,,,Sparks A,y,y\n');
 
-  // Pusher credentials so the publisher is "configured" — the FakePusher above
-  // is what actually gets constructed.
   fs.writeFileSync(path.join(dataDir, 'config.json'), JSON.stringify({
     printerName: 'Fake',
     checkinUrl: 'https://example.com/checkin',
-    pusherAppId: '1', pusherKey: 'k', pusherSecret: 's', pusherCluster: 'us2',
     phonePin: '4821',
   }, null, 2));
 
@@ -139,6 +120,9 @@ async function main() {
   process.env.AWANA_BIND_HOST = '127.0.0.1';
 
   const server = require(path.join(__dirname, '..', 'print-server', 'server.js'));
+
+  // The relay is the only pipe: record what the server hands it, as the wire.
+  require(path.join(__dirname, '..', 'print-server', 'events.js')).setRelay((channel, event, body) => { wire.push({ channel, event, payload: body }); return Promise.resolve(true); });
   const listener = server.startListening();
   await new Promise((resolve) => {
     if (listener.listening) return resolve();
@@ -168,12 +152,24 @@ async function main() {
     let h = await j('/health');
     check('/health reports no display key', h.body.displayKeyConfigured === false);
     check('/health reports it is not encrypting', h.body.encryptingNames === false);
-    check('/health warns that names are unencrypted',
+    check('not signed in to the sync service, nothing is published, so there is no unencrypted-names warning',
+      !warningTexts(h.body.warnings).some((w) => /unencrypted/i.test(w)),
+      JSON.stringify(h.body.warnings));
+    // Signed in (a session on disk, applied by a config save), the live channel
+    // is open, so a missing key is a warning. Signed out again right after.
+    const cfgFile = path.join(dataDir, 'config.json');
+    const unsigned = fs.readFileSync(cfgFile, 'utf8');
+    fs.writeFileSync(cfgFile, JSON.stringify({ ...JSON.parse(unsigned), syncUrl: 'https://awana-sync.test.workers.dev', syncSession: 'v1.1.1790839331729.oWr6n92IJW5ldPGmtiyjPHAZpca-QGToNlKGXlKI6vc' }));
+    await post('/config', {});
+    h = await j('/health');
+    check('signed in with no display key, /health warns that names are unencrypted',
       warningTexts(h.body.warnings).some((w) => /unencrypted/i.test(w)),
       JSON.stringify(h.body.warnings));
     check('and the warning names the exact place to fix it',
       warningTexts(h.body.warnings).some((w) => /Settings . Realtime privacy/i.test(w)),
       JSON.stringify(h.body.warnings));
+    fs.writeFileSync(cfgFile, unsigned);
+    await post('/config', {});
 
     amyPrintedAt = Date.now(); // phase 7 (R-1 undo detection) reuses her to prove the
     // duplicate-print window doesn't block a re-check-in "minutes later" —
@@ -190,13 +186,6 @@ async function main() {
   }
 
   // ── 2. Generating and saving a key ─────────────────────────────────────────
-  console.log('realtime: the Pusher client never waits forever');
-  {
-    const opts = globalThis.__pusherOpts || {};
-    check('the REST client is built with a 10 s request timeout (it had none: a dead internet hung every publish for the socket\'s two minutes)',
-      opts.timeout === 10000 && opts.cluster === 'us2', JSON.stringify(opts));
-  }
-
   console.log('realtime: generating and saving a key');
   let KEY;
   {
@@ -224,15 +213,11 @@ async function main() {
       events.getDisplayKeyState().configured === true);
   }
 
-  // ── 2b. Display login: one passphrase provisions every screen ─────────────
-  console.log('realtime: display login publishes a sealed provision frame');
+  // ── 2b. Display login state (nothing publishes its frame any more) ────────
+  console.log('realtime: display login state');
   let PASSPHRASE;
   {
-    const provisionFrames = () => wire.filter((w) => w.event === 'provision');
-    let h = await j('/health');
-    check('/health reports no display login yet', h.body.displayLogin && h.body.displayLogin.configured === false, JSON.stringify(h.body.displayLogin));
-    check('nothing was provisioned before a passphrase existed', provisionFrames().length === 0, `saw ${provisionFrames().length}`);
-
+    check('nothing was provisioned: no provision frame is ever published', wire.filter((w) => w.event === 'provision').length === 0);
     const gen = await post('/config/display-login/generate');
     PASSPHRASE = gen.body && gen.body.passphrase;
     check('generate returns a 4x4 passphrase from the unambiguous alphabet',
@@ -241,55 +226,18 @@ async function main() {
     check('a too-short passphrase is refused with 400', (await post('/config', { displayLoginPassphrase: 'short' })).status === 400);
     check('a refused passphrase leaves login unconfigured', events.getDisplayLoginState().configured === false);
 
-    const framesBefore = provisionFrames().length;
     check('saving the passphrase is accepted', (await post('/config', { displayLoginPassphrase: PASSPHRASE })).status === 200);
     const disk1 = onDisk();
     check('the passphrase is persisted', disk1.displayLoginPassphrase === PASSPHRASE);
     check('a 16-byte salt was minted alongside it',
       typeof disk1.displayLoginSalt === 'string' && Buffer.from(disk1.displayLoginSalt, 'base64').length === 16, JSON.stringify(disk1.displayLoginSalt));
     check('and it takes effect immediately, with no restart', events.getDisplayLoginState().configured === true);
-
-    // applySavedConfig republishes; the wire is synchronous through FakePusher.
     await new Promise((r) => setTimeout(r, 50));
-    const frames = provisionFrames();
-    check('a provision frame went out on the cache channel', frames.length === framesBefore + 1 && frames[frames.length - 1].channel === 'cache-awana-channel-provision',
-      JSON.stringify(frames.map((f) => f.channel)));
-    const frame = frames[frames.length - 1].payload;
-    check('the frame carries exactly kdf + envelope (nothing in the clear)',
-      JSON.stringify(Object.keys(frame).sort()) === JSON.stringify(['envelope', 'kdf', 'v']), JSON.stringify(Object.keys(frame)));
-    check('the kdf block names PBKDF2-SHA256 with the salt on disk',
-      frame.kdf.name === 'PBKDF2-SHA256' && frame.kdf.salt === disk1.displayLoginSalt && frame.kdf.iterations === events.PROVISION_KDF_ITERATIONS, JSON.stringify(frame.kdf));
-    let opened = null;
-    try { opened = events.openProvisionForTest(PASSPHRASE, frame); } catch (e) { opened = { error: e.message }; }
-    check('the passphrase opens it to the display key (and no token yet)',
-      opened && opened.displayKey === KEY && opened.slidesPublishToken === '' && typeof opened.issuedAt === 'string', JSON.stringify(opened));
-    let wrong = null;
-    try { wrong = events.openProvisionForTest('not-the-passphrase-at-all', frame); } catch (e) { wrong = e.message; }
-    check('the wrong passphrase does NOT open it', typeof wrong === 'string' && /kid mismatch/.test(wrong), JSON.stringify(wrong));
-    check('the frame body never contains the display key or passphrase in the clear',
-      !JSON.stringify(frame).includes(KEY) && !JSON.stringify(frame).includes(PASSPHRASE));
+    check('saving it still publishes no provision frame', wire.filter((w) => w.event === 'provision').length === 0);
 
-    // Re-saving the same passphrase (the Settings form does this) must not rotate the salt.
+    // Re-saving the same passphrase must not rotate the salt.
     await post('/config', { displayLoginPassphrase: PASSPHRASE });
     check('re-saving the same passphrase keeps the salt byte-identical', onDisk().displayLoginSalt === disk1.displayLoginSalt);
-
-    // A token save re-provisions with the token inside the bundle.
-    const tok = await post('/config/slides-token/generate');
-    const before2 = provisionFrames().length;
-    await post('/config', { slidesPublishToken: tok.body.token });
-    await new Promise((r) => setTimeout(r, 50));
-    const f2 = provisionFrames();
-    let opened2 = null;
-    try { opened2 = events.openProvisionForTest(PASSPHRASE, f2[f2.length - 1].payload); } catch (e) { opened2 = { error: e.message }; }
-    check('saving a publish token republishes a bundle carrying it',
-      f2.length === before2 + 1 && opened2 && opened2.slidesPublishToken === tok.body.token, JSON.stringify(opened2));
-    check('issuedAt is fresh per publish (newer than the first frame)',
-      opened && opened2 && Date.parse(opened2.issuedAt) >= Date.parse(opened.issuedAt));
-
-    h = await j('/health');
-    check('/health reports display login configured with a kid, never the passphrase',
-      h.body.displayLogin.configured === true && /^[0-9a-f]{8}$/.test(h.body.displayLogin.kid) && typeof h.body.displayLogin.lastPublishedAt === 'string'
-        && !JSON.stringify(h.body).includes(PASSPHRASE), JSON.stringify(h.body.displayLogin));
 
     // A different passphrase rotates the salt.
     const gen2 = await post('/config/display-login/generate');
@@ -300,9 +248,7 @@ async function main() {
     await post('/config', { slidesPublishToken: '' });
 
     // ── The fleet-config URL (#394) ────────────────────────────────────────
-    // Non-secret, but it is persisted and shipped to every screen, so it is
-    // validated where it is STORED — a poisoned value must never be able to
-    // reach the fleet on the next heartbeat.
+    // Non-secret, but it is persisted, so it is validated where it is STORED.
     check('a non-https settings URL is refused with 400 and NOT persisted',
       (await post('/config', { fleetConfigUrl: 'http://example.org/a.json' })).status === 400
       && !onDisk().fleetConfigUrl);
@@ -310,32 +256,11 @@ async function main() {
       (await post('/config', { fleetConfigUrl: 'https://u:p@example.org/a.json' })).status === 400);
     check('an over-long settings URL is refused',
       (await post('/config', { fleetConfigUrl: `https://example.org/${'a'.repeat(200)}` })).status === 400);
-
-    const before3 = provisionFrames().length;
     check('a valid https settings URL is accepted',
       (await post('/config', { fleetConfigUrl: 'https://example.org/awana-display.json' })).status === 200);
     check('and persisted', onDisk().fleetConfigUrl === 'https://example.org/awana-display.json');
-    await new Promise((r) => setTimeout(r, 50));
-    const f3 = provisionFrames();
-    let opened3 = null;
-    try { opened3 = events.openProvisionForTest(PASSPHRASE, f3[f3.length - 1].payload); } catch (e) { opened3 = { error: e.message }; }
-    check('saving it republishes a bundle carrying it, still sealed',
-      f3.length === before3 + 1 && opened3 && opened3.configUrl === 'https://example.org/awana-display.json',
-      JSON.stringify(opened3));
-    check('the display key still rides the same bundle — the URL changed nothing else',
-      opened3 && opened3.displayKey === KEY);
-    check('the settings URL is not readable on the wire',
-      !JSON.stringify(f3[f3.length - 1].payload).includes('example.org'));
-
-    const before4 = provisionFrames().length;
     await post('/config', { fleetConfigUrl: '' });
-    await new Promise((r) => setTimeout(r, 50));
-    const f4 = provisionFrames();
-    let opened4 = null;
-    try { opened4 = events.openProvisionForTest(PASSPHRASE, f4[f4.length - 1].payload); } catch (e) { opened4 = { error: e.message }; }
-    check('clearing it deletes the key and ships an EMPTY string, which is how screens clear theirs',
-      !onDisk().fleetConfigUrl && f4.length === before4 + 1 && opened4 && opened4.configUrl === '',
-      JSON.stringify(opened4));
+    check('clearing it deletes the key', !onDisk().fleetConfigUrl);
     check('/health never carries the settings URL to a CORS-readable caller',
       !JSON.stringify((await j('/health')).body).includes('awana-display.json'));
   }
@@ -409,19 +334,6 @@ async function main() {
     check('AND gone from the live publisher, not just the file',
       events.getDisplayKeyState().configured === false,
       'this is the Object.assign-cannot-delete bug');
-    // Fail closed: with no display key the provision frame must NOT go out (a
-    // bundle with an empty key would make every logged-in screen drop its key).
-    {
-      const before = wire.filter((w) => w.event === 'provision').length;
-      await post('/config', { lateGraceMin: 11 });
-      await new Promise((r) => setTimeout(r, 50));
-      check('with the display key cleared, config saves publish NO provision frame',
-        wire.filter((w) => w.event === 'provision').length === before);
-      const h = await j('/health');
-      check('/health warns that the passphrase is set but there is no key to provision',
-        warningTexts(h.body.warnings).some((w) => /display passphrase is set but there is no display key/i.test(w)), JSON.stringify(h.body.warnings));
-    }
-
     const before = wire.length;
     await post('/print', { firstName: 'Cody', lastName: 'Tester', clubName: 'Sparks' });
     const ck = wire.slice(before).filter((w) => w.event === 'checkin');
@@ -455,7 +367,6 @@ async function main() {
     const d = onDisk();
     check('the passphrase and its salt are both gone from disk', !d.displayLoginPassphrase && !d.displayLoginSalt, JSON.stringify(d));
     check('AND the live login state is cleared', events.getDisplayLoginState().configured === false);
-    check('/health reports login unconfigured', (await j('/health')).body.displayLogin.configured === false);
     // Restore it for the remaining phases (phase 6 restores the key).
     await post('/config', { displayLoginPassphrase: PASSPHRASE });
   }
@@ -464,7 +375,7 @@ async function main() {
   console.log('realtime: printing is never gated on the realtime pipe');
   {
     // The printing guarantee outranks everything else here: a child at the door
-    // must get a label even if the pipe, the key or Pusher itself is broken.
+    // must get a label even if the pipe or the key is broken.
     events.setDisplayKey(KEY);
     const res = await post('/print', { firstName: 'Dana', lastName: 'Tester', clubName: 'Sparks' });
     check('a print succeeds with encryption on', res.body && res.body.success === true,

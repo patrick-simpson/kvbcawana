@@ -12,7 +12,7 @@ Print this page and tape it near the check-in laptop.
    *Test Night Systems*). You should get:
    - ✅ page selectors
    - ✅ print — a label with a big **TEST** band comes out
-   - ✅ pusher — the lobby display is listening
+   - ✅ live channel — the lobby display is listening
 4. **Glance at the dashboard** — `http://localhost:3456` → *Night
    Status* card should be all green.
 

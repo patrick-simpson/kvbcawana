@@ -11,7 +11,6 @@ process.on('uncaughtException',  err => console.error('[fatal] Uncaught exceptio
 process.on('unhandledRejection', err => console.error('[fatal] Unhandled rejection (server kept alive):', err));
 
 const express = require('express');
-const Pusher  = require('pusher');
 const events  = require('./events');
 const feeds   = require('./feeds');
 // The whole trust model (loopback vs LAN vs the open web, PIN handling, origin
@@ -185,7 +184,7 @@ function writeConfigFile(next) {
 let config = loadConfigFile();
 
 // Install the display key into the publisher. The three name-bearing events
-// (checkin, recap, birthdays) are sealed with it so the PUBLIC Pusher channel
+// (checkin, recap, birthdays) are sealed with it so the live channel
 // carries ciphertext instead of children's first names — see the sealed-envelope
 // block in events.js. With no key set the publisher stays plaintext, which is
 // what makes the rollout safe in either order; /health says which mode we are in
@@ -195,12 +194,12 @@ if (events.setDisplayKey(config.displayKey)) {
 } else if (config.displayKey) {
   console.warn('[realtime] config.displayKey is INVALID — names will be published in the clear until it is fixed');
 } else {
-  console.warn('[realtime] No display key set — children\'s first names are published UNENCRYPTED on a public channel. Generate one in the dashboard (Realtime).');
+  console.warn('[realtime] No display key set — children\'s first names are published UNENCRYPTED on the live channel. Generate one in the dashboard (Realtime).');
 }
 
-// Display login: one church passphrase provisions every screen with the key
-// above (and the slides publish token) over a Pusher cache channel — see the
-// display-login block in events.js and publishProvision() below.
+// Display login state (the passphrase-derived wrapping key). The frame it
+// builds used to be published on a Pusher cache channel; nothing publishes it
+// now that screens sign in to the sync service instead — see events.js.
 if (events.setDisplayLogin(config.displayLoginPassphrase, config.displayLoginSalt)) {
   console.log(`[login] Display login configured (kid ${events.getDisplayLoginState().kid}) — screens can log in with the passphrase`);
 } else if (config.displayLoginPassphrase) {
@@ -247,38 +246,8 @@ try {
 } catch (e) {
   console.warn('[church] Failed to load church-config.json — using baked defaults:', e.message);
 }
+// (The key keeps its old name: church-config.json files in the field carry it.)
 const EVENT_CHANNEL = churchConfig.pusherChannel || 'awana-channel';
-// Device provisioning rides a separate CACHE channel so a screen that has just
-// been switched on receives the last frame at once (see publishProvision()).
-const PROVISION_CHANNEL = events.provisionChannelFor(EVENT_CHANNEL);
-
-const PUSHER_TIMEOUT_MS = 10000;
-const pusher = (config.pusherAppId && config.pusherKey && config.pusherSecret)
-  ? new Pusher({
-      appId:   config.pusherAppId,
-      key:     config.pusherKey,
-      secret:  config.pusherSecret,
-      cluster: config.pusherCluster || 'us2',
-      // The REST publish has no timeout of its own: with the internet down
-      // but DNS up, each trigger() hung for the socket's two minutes and the
-      // publisher's await chain hung with it. Ten seconds is generous for one
-      // small frame; a frame that misses it is lost the way a dropped one is
-      // (the recap carries the check-in two minutes later).
-      timeout: PUSHER_TIMEOUT_MS,
-    })
-  : null;
-
-// Tell the event module the truth at STARTUP rather than letting it infer
-// "configured" from the first publish. /health's privacy banner keys off this,
-// and a church with a screen but no display key has to be warned before the
-// first child checks in — not after their name has already gone out plaintext.
-events.setPublisherConfigured(Boolean(pusher));
-
-if (pusher) {
-  console.log(`[pusher] Initialized with App ID: ${config.pusherAppId}`);
-} else {
-  console.log('[pusher] Not configured (Joyful Welcome Screen disabled)');
-}
 
 // ── Tonight's event buffer ────────────────────────────────────────────────────
 // The last ~50 checkin events, persisted so a mid-event server restart doesn't
@@ -347,14 +316,14 @@ function pushEventToBuffer(checkinEvent) {
 // The server used to record only successes; a jammed printer was invisible
 // beyond the extension's toast. Failures now land in history (ok:false), in
 // this in-memory list for the dashboard, and on the event bus as an `ops`
-// event (type/club/at only — never a name on Pusher).
+// event (type/club/at only — never a name on the channel).
 const printFailures = [];  // { name, club, at, error } — name stays LOCAL only
 const PRINT_FAILURES_MAX = 20;
 
 function recordPrintFailure(name, club, error) {
   printFailures.unshift({ name, club: club || '', at: new Date().toISOString(), error: String(error || '').slice(0, 200) });
   if (printFailures.length > PRINT_FAILURES_MAX) printFailures.length = PRINT_FAILURES_MAX;
-  events.publish(pusher, EVENT_CHANNEL, 'ops', events.buildOps('print-failure', club));
+  events.publish(EVENT_CHANNEL, 'ops', events.buildOps('print-failure', club));
 }
 
 // ── Selector self-test + canary state ────────────────────────────────────────
@@ -4642,7 +4611,7 @@ async function performCheckinPrint(input) {
         firstName, club: effectiveClubName, isBirthday: !!birthday, isFirstTimer: isFirstTimerTonight,
         welcomeBack, milestone: milestoneCount,
       });
-      events.publish(pusher, EVENT_CHANNEL, 'checkin', checkinEvent);
+      events.publish(EVENT_CHANNEL, 'checkin', checkinEvent);
       pushEventToBuffer(checkinEvent);
 
       // Log to print history. trophyBook is the once-per-night marker for
@@ -5560,7 +5529,7 @@ app.get('/stats/tonight', (req, res) => {
 //
 // The extension already fetches TwoTimTwo's /clubber/checkin_report every
 // ~60s for undo detection; it now posts that report's per-club counts here
-// too. Kept deliberately LOCAL: this never becomes a Pusher event, so the
+// too. Kept deliberately LOCAL: this never becomes a live-channel event, so the
 // display contract (and its mirrored vectors) is untouched, and the lobby TV
 // never carries a disagreement between two staff tools.
 //
@@ -5745,7 +5714,7 @@ const ATTENDANCE_GRID_MAX_DATES = 60;
 
 // Validated INLINE like /feed/source-count, and deliberately NOT registered in
 // FEED_NAMES / routed through makeFeedRoute(): that helper publishes every
-// registered feed to the PUBLIC Pusher channel, and these rows carry full
+// registered feed to the live channel, and these rows carry full
 // names. Same never-published class as /feed/checkin-report,
 // /feed/unverified-checkins and /feed/completed-books.
 app.post('/feed/attendance-grid', (req, res) => {
@@ -6660,7 +6629,7 @@ async function performOneOffPrint(input) {
     recordPrint(dupKey);
     addHistoryEntry({ firstName, lastName: '', clubName, printer: effectivePrinter, success: true, oneOff: true });
     // The welcome, never the count: no recap buffer, no tally change.
-    events.publish(pusher, EVENT_CHANNEL, 'checkin', events.buildCheckin({
+    events.publish(EVENT_CHANNEL, 'checkin', events.buildCheckin({
       firstName, club: clubName, isBirthday: false, isFirstTimer: false, oneOff: true,
     }));
     console.log(`[print-oneoff] ${firstName} — ${clubName}`);
@@ -7115,7 +7084,7 @@ app.get('/checkin-csv-export', (req, res) => {
 // ── Feed receive endpoints (contract v3) ──────────────────────────────────────
 // The extension scrapes TwoTimTwo's own report CSVs / iCal / admin messages
 // and POSTs the results here; feeds.js validates + throttles (max one publish
-// per 5s per feed) and this thin route does the actual Pusher publish.
+// per 5s per feed) and this thin route does the actual publish.
 function makeFeedRoute(feedName) {
   return async (req, res) => {
     const result = feeds.submitFeed(feedName, req.body, Date.now());
@@ -7124,7 +7093,7 @@ function makeFeedRoute(feedName) {
 
     let published = false;
     try {
-      published = await events.publish(pusher, EVENT_CHANNEL, feedName, result.payload);
+      published = await events.publish(EVENT_CHANNEL, feedName, result.payload);
     } catch (e) { published = false; }
     feeds.recordPublishOutcome(feedName, published);
     res.json({ ok: true, published });
@@ -7163,7 +7132,7 @@ app.post('/feed/checkout', (req, res) => {
 // is checked in.
 //
 // Deliberately NOT routed through makeFeedRoute()/feeds.submitFeed(): this
-// never publishes a Pusher event itself (no new event type, per the contract
+// never publishes a live-channel event itself (no new event type, per the contract
 // freeze) — it mutates history, and only if that mutation actually changed
 // anything does it call publishTally() immediately, so a display isn't stuck
 // on a stale headcount until the next 60s tick.
@@ -7279,7 +7248,7 @@ app.post('/feed/unverified-checkins', (req, res) => {
 // carries a trophy band. Carries full names and is therefore in the same
 // loopback/PIN-gated, NEVER-published class as the two feeds above —
 // deliberately NOT registered in FEED_NAMES/makeFeedRoute, which publishes to
-// the public Pusher channel. Merge semantics: the extension posts one payload
+// the live channel. Merge semantics: the extension posts one payload
 // per club, so a second club's post must not wipe the first's.
 app.post('/feed/completed-books', (req, res) => {
   const result = feeds.submitCompletedBooks(req.body, Date.now());
@@ -7298,7 +7267,7 @@ app.post('/feed/completed-books', (req, res) => {
 // ── Lobby slides endpoints ────────────────────────────────────────────────────
 // Two callers, two credentials:
 //   • The dashboard's "Lobby slides" card — trusted like every other loopback
-//     origin (the same trust that can already set the Pusher secret).
+//     origin (the same trust that can already set the phone PIN).
 //   • The display app's slide editor ("Publish to all displays") — a PUBLIC
 //     https origin, so it is scoped to exactly this path in corsPolicy and must
 //     additionally present the publish token. The token is the credential; the
@@ -7460,7 +7429,7 @@ app.post('/reset-tonight', (req, res) => {
 // ── Event-bus publishers ──────────────────────────────────────────────────────
 // Interval publishers are gated by the church-config club-night window so the
 // channel stays quiet the other ~165 hours a week. Every publisher is wrapped:
-// a Pusher outage can never disturb printing.
+// a channel outage can never disturb printing.
 
 function publishTally() {
   try {
@@ -7469,7 +7438,7 @@ function publishTally() {
     // resolved: pinned, calendar, or '' when the operator turned it off), so
     // the screens follow a change within a minute - and a display that boots
     // mid-night picks it up on the next tally without any handshake.
-    events.publish(pusher, EVENT_CHANNEL, 'tally', events.buildTally(st.byClub, st.checkedIn, {
+    events.publish(EVENT_CHANNEL, 'tally', events.buildTally(st.byClub, st.checkedIn, {
       season: currentScreenSeason(),
       rehearsal: isRehearsalActive(),
     }));
@@ -7513,7 +7482,7 @@ function publishStillHere() {
     const entries = stillHereEntries();
     const payload = events.buildCheckout(entries, distinctChildrenPrintedToday());
     lastStillHereSig = JSON.stringify(payload.entries);
-    events.publish(pusher, EVENT_CHANNEL, 'checkout', payload);
+    events.publish(EVENT_CHANNEL, 'checkout', payload);
   } catch (e) { console.warn('[events] still-here publish skipped:', e.message); }
 }
 
@@ -7542,7 +7511,7 @@ function publishRecap() {
     // The consumer's handleRecap iterates `entries`, so [] is a clean no-op.
     pruneEventBuffer();
     if (!eventBuffer.length && !events.getDisplayKeyState().configured) return;
-    events.publish(pusher, EVENT_CHANNEL, 'recap', events.buildRecap(eventBuffer));
+    events.publish(EVENT_CHANNEL, 'recap', events.buildRecap(eventBuffer));
   } catch (e) { console.warn('[events] recap publish skipped:', e.message); }
 }
 
@@ -7561,7 +7530,7 @@ function publishBirthdays() {
         day: bd.getDate(),
       });
     }
-    events.publish(pusher, EVENT_CHANNEL, 'birthdays', events.buildBirthdays(entries));
+    events.publish(EVENT_CHANNEL, 'birthdays', events.buildBirthdays(entries));
   } catch (e) { console.warn('[events] birthdays publish skipped:', e.message); }
 }
 
@@ -7611,7 +7580,7 @@ async function publishLobbySlides() {
   for (const chunk of chunks) {
     // Sequential on purpose: chunks of one deck should not race each other.
     // publish() seals (slides is an ENCRYPTED_EVENT) and never throws.
-    ok = (await events.publish(pusher, EVENT_CHANNEL, 'slides', chunk)) && ok;
+    ok = (await events.publish(EVENT_CHANNEL, 'slides', chunk)) && ok;
   }
   return ok;
 }
@@ -7704,7 +7673,7 @@ async function publishDisplaySettings() {
     return false;
   }
   // publish() seals (settings is an ENCRYPTED_EVENT) and never throws.
-  return events.publish(pusher, EVENT_CHANNEL, 'settings', payload);
+  return events.publish(EVENT_CHANNEL, 'settings', payload);
 }
 
 /** Accept a publish: sanitize, gate on size, stamp, persist, broadcast. */
@@ -7774,47 +7743,6 @@ function onTallyWindow(fn) {
 // Club-night publish timers are started by startListening() so a bare
 // require() of this module never spins up background work — but embedders
 // (the Electron shell) still get them the moment the server actually starts.
-// Display login (device provisioning): the display key + slides publish
-// token, sealed under the passphrase-derived key, on the cache channel. No-op
-// (nothing published, fail closed) unless Pusher, a passphrase AND a display
-// key are all configured — a bundle carrying an empty key would tell every
-// logged-in screen to drop its key. Pusher keeps the cached frame ~30 min, so
-// the 5-minute heartbeat below is what lets a screen log in at all; every
-// config save republishes too, so a rotated key or token reaches logged-in
-// screens within seconds.
-let lastProvisionAt = null;
-let provisionQuietReason = null;
-async function publishProvision() {
-  const reason = signedInToSync() ? 'replaced by the sync service'
-    : !pusher ? 'no pusher'
-    : !events.getDisplayLoginState().configured ? 'no passphrase'
-      : !events.getDisplayKeyState().configured ? 'no display key' : null;
-  if (reason) {
-    if (provisionQuietReason !== reason) console.log(`[login] Provision frame not published (${reason})`);
-    provisionQuietReason = reason;
-    return false;
-  }
-  const frame = events.buildProvisionFrame({
-    displayKey: config.displayKey,
-    slidesPublishToken: config.slidesPublishToken || '',
-    issuedAt: new Date().toISOString(),
-    // NON-SECRET (#394): where a screen fetches its display settings JSON.
-    // It rides inside the same sealed bundle purely because the bundle is
-    // already going there — one passphrase now sets a replacement screen up
-    // completely instead of leaving weather/calendar/widgets to be typed.
-    configUrl: config.fleetConfigUrl || '',
-  });
-  if (!frame) return false;
-  const ok = await events.publish(pusher, PROVISION_CHANNEL, events.PROVISION_EVENT, frame);
-  if (ok) {
-    lastProvisionAt = new Date().toISOString();
-    if (provisionQuietReason !== null) console.log(`[login] Provision frame published on ${PROVISION_CHANNEL} (kid ${events.getDisplayLoginState().kid})`);
-    provisionQuietReason = null;
-  }
-  return ok;
-}
-
-
 // ── The sync service (one passphrase for every screen) ────────────────────────
 // Signed in (config.syncSession + config.syncUrl, both written only by
 // POST /config/sync-login below), this server seals with the service's display
@@ -7837,7 +7765,7 @@ function writeConfigPatch(mutate) {
 
 // Every live frame (check-ins, tally, recap, birthdays, …) also goes to the
 // sync service's channel while signed in, one at a time and in order, so a
-// check-in never lands after the tally that counts it any more than Pusher
+// check-in never lands after the tally that counts it any more than the channel
 // would. Only the display channel's events: never the provision frame.
 //
 // A QUEUE WITH LIMITS, not an endless chain (7.11.1). With the church Wi-Fi
@@ -8038,17 +7966,12 @@ function startClubNightTimers() {
   setInterval(onTallyWindow(publishTally), 60 * 1000);
   setInterval(onTallyWindow(publishStillHere), 60 * 1000);
   setInterval(onClubNight(publishBirthdays), 10 * 60 * 1000);
-  // Provision heartbeat: NOT club-night-gated and load-bearing — Pusher's cache
-  // holds the last frame for ~30 minutes, so this is what a screen switched on
-  // at 5 pm on a Saturday logs in against. Startup publish included.
-  setInterval(() => { publishProvision().catch(() => {}); }, 5 * 60 * 1000);
-  publishProvision().catch(() => {});
   // Slides heartbeat is deliberately NOT club-night-gated: this server mostly
   // runs around club time anyway, and while it IS running, a screen that
   // reboots (or a brand-new one) must converge on the current deck within
   // minutes on any day — Saturday setup included. Publishes only when a deck
   // has ever been published; ~300 sealed frames/day worst case, far under
-  // Pusher's quota. Startup broadcast included so a restart re-seeds quickly.
+  // the relay's quota. Startup broadcast included so a restart re-seeds quickly.
   setInterval(() => { publishLobbySlides().catch(() => {}); }, 5 * 60 * 1000);
   publishLobbySlides().catch(() => {});
   setInterval(() => { publishDisplaySettings().catch(() => {}); }, 5 * 60 * 1000);
@@ -8082,7 +8005,7 @@ app.post('/selftest', (req, res) => {
   recordExtensionReport(body.extensionVersion);
   if (!lastSelfTest.ok && wasOk) {
     console.warn('[selftest] Extension reports selector failure — check-in page markup may have changed');
-    events.publish(pusher, EVENT_CHANNEL, 'ops', events.buildOps('selector-fail'));
+    events.publish(EVENT_CHANNEL, 'ops', events.buildOps('selector-fail'));
   }
   res.json({ ok: true });
 });
@@ -8116,7 +8039,7 @@ app.post('/contract-canary', (req, res) => {
   if (!lastContractCanary.ok && wasOk) {
     const failing = lastContractCanary.results.filter(r => !r.passed && !r.soft).map(r => r.check);
     console.warn('[contract-canary] TwoTimTwo contract drift detected: ' + failing.join(', '));
-    events.publish(pusher, EVENT_CHANNEL, 'ops', events.buildOps('selector-fail'));
+    events.publish(EVENT_CHANNEL, 'ops', events.buildOps('selector-fail'));
     fireOpsAlert('Club Label Printer — site check failed',
       'The TwoTimTwo page no longer matches what the printer expects (' +
       (failing[0] || 'unknown check') + (failing.length > 1 ? ' +' + (failing.length - 1) + ' more' : '') +
@@ -8152,15 +8075,16 @@ app.post('/canary', async (req, res) => {
     if (pngPath) fs.unlink(pngPath, () => {});
   }
 
-  const published = await events.publish(pusher, EVENT_CHANNEL, 'canary', events.buildCanary());
+  const published = await events.publish(EVENT_CHANNEL, 'canary', events.buildCanary());
   stages.push({
-    stage: 'pusher',
+    stage: 'live channel',
     passed: published,
-    detail: pusher ? (published ? `canary event on ${EVENT_CHANNEL}` : 'publish failed') : 'Pusher not configured',
+    detail: published ? `canary event on ${EVENT_CHANNEL}`
+      : (signedInToSync() ? 'publish failed' : 'This computer is not signed in to the sync service'),
   });
 
   // Third stage: prove the ENCRYPTED path works, not just the channel. A screen
-  // that can reach Pusher but cannot open a sealed frame shows no banners, and
+  // that can reach the channel but cannot open a sealed frame shows no banners, and
   // without this stage the only symptom is "the wall stopped welcoming children"
   // — discovered mid-service rather than at 5:45.
   const keyState = events.getDisplayKeyState();
@@ -8168,7 +8092,7 @@ app.post('/canary', async (req, res) => {
     // An empty recap on purpose: the consumer's handleRecap iterates entries, so
     // [] is a clean no-op that still exercises seal -> publish -> open.
     const sealedOk = await events.publish(
-      pusher, EVENT_CHANNEL, 'recap', events.buildRecap([]));
+      EVENT_CHANNEL, 'recap', events.buildRecap([]));
     stages.push({
       stage: 'display key',
       passed: sealedOk,
@@ -8581,9 +8505,7 @@ app.get('/health', async (req, res) => {
   const saveWarning = dataSaveWarning();
   if (saveWarning) warnings.push(saveWarning);
   // The live-channel relay's breaker is open: frames to the sync service are
-  // being dropped. With Pusher also configured the screens still get them that
-  // way, which is why this used to be a console line nobody saw; without
-  // Pusher it was the only pipe. Either way the operator should know.
+  // being dropped, and it is the only pipe, so the operator should know.
   if (signedInToSync() && Date.now() < relayBrokenUntil) {
     warnings.push({
       type: 'syncRelay',
@@ -8608,17 +8530,10 @@ app.get('/health', async (req, res) => {
   // unencrypted channel is not broken, so it cannot be an error — but it must
   // never be INVISIBLE, or "we set that up" becomes a belief rather than a fact.
   const keyState = events.getDisplayKeyState();
-  const loginState = events.getDisplayLoginState();
-  if (loginState.configured && !keyState.configured) {
-    warnings.push({
-      type: 'displayLoginNeedsKey',
-      message: 'A display passphrase is set but there is no display key, so screens cannot be logged in. Generate the display key (Settings → Realtime privacy) and Save.',
-    });
-  }
-  if (pusher && !keyState.configured) {
+  if (signedInToSync() && !keyState.configured) {
     warnings.push({
       type: 'displayKeyMissing',
-      message: "No display key is set, so children's first names are published unencrypted on a channel anyone can subscribe to. Open Settings → Realtime privacy and press Generate display key.",
+      message: "No display key is set, so children's first names are published unencrypted. Open Settings → Realtime privacy and press Generate display key.",
     });
   }
   if (config.displayKey && !keyState.configured) {
@@ -8718,7 +8633,8 @@ app.get('/health', async (req, res) => {
       at: tallyNow.at ? new Date(tallyNow.at).toISOString() : null,
       ageMs: tallyNow.ageMs,
     },
-    pusher: events.getPublishState(),
+    // The live channel (the sync service): `configured` means signed in.
+    live: { ...events.getPublishState(), configured: signedInToSync() },
     // Never the key itself — only whether one is installed, plus its public
     // `kid` fingerprint, which is what lets a screen confirm it holds the SAME
     // key rather than merely some key. "Are we actually encrypted?" has to be
@@ -8776,8 +8692,6 @@ app.get('/health', async (req, res) => {
       publishedAt: displaySettings.publishedAt || null,
       keyCount: Object.keys(displaySettings.settings).length,
     },
-    // Display login: whether screens can log in with the passphrase, and the
-    // fingerprint of the wrapping key — never the passphrase, never the key.
     // The sync service: whether this computer is signed in, never the session.
     sync: {
       signedIn: signedInToSync(),
@@ -8786,17 +8700,10 @@ app.get('/health', async (req, res) => {
       checkedAt: syncStatus.checkedAt,
       error: syncStatus.error,
     },
-    displayLogin: {
-      retired: signedInToSync(),
-      configured: loginState.configured,
-      kid: loginState.kid,
-      iterations: loginState.iterations,
-      lastPublishedAt: lastProvisionAt,
-    },
   });
 });
 
-// Recent print failures for the dashboard (names stay local — never on Pusher)
+// Recent print failures for the dashboard (names stay local — never on the channel)
 app.get('/failures', (req, res) => {
   res.json(printFailures);
 });
@@ -8820,9 +8727,9 @@ app.post('/update-now', (req, res) => {
 
 // ── Config endpoints ─────────────────────────────────────────────────────────
 
-// The Pusher app secret and the phone PIN are the two values that must never
-// leave this machine: the secret lets anyone publish to the church's screens,
-// and the PIN is what gates the roster on the LAN.
+// The phone PIN, the display key and the sync session are among the values
+// that must never leave this machine: the key and session let anyone publish
+// to the church's screens, and the PIN is what gates the roster on the LAN.
 //
 // The previous version of this check had two holes, both closed here:
 //   • `origin.endsWith(':3456')` accepted ANY host on that port, so a page
@@ -8834,6 +8741,7 @@ app.post('/update-now', (req, res) => {
 // Now: the request must come from the loopback interface, AND its Origin (when
 // present) must be the extension or one of this server's own loopback pages.
 // A LAN caller never gets these fields even with a valid PIN.
+// pusherSecret: an old config.json may still hold one; it is never read, but it stays redacted.
 const SECRET_CONFIG_KEYS = ['pusherSecret', 'phonePin', 'displayKey', 'slidesPublishToken', 'displayLoginPassphrase', 'syncSession'];
 
 // Operator text that ends up printed on a label (labelFooter, the connect-card
@@ -8868,11 +8776,8 @@ function applySavedConfig(next) {
   // volunteer fixing a name outage mid-event must not have to restart the server
   // that is currently printing labels.
   events.setDisplayKey(config.displayKey);
-  // Same for the display login; and any change to the key, the token or the
-  // passphrase re-provisions every logged-in screen right away (the Electron
-  // shell calls this directly, so the hook lives here, not in the route).
+  // Same for the display login state.
   events.setDisplayLogin(config.displayLoginPassphrase, config.displayLoginSalt);
-  publishProvision().catch(() => {});
 }
 
 function isTrustedConfigOrigin(req) {
@@ -8964,7 +8869,6 @@ app.post('/config/display-login/generate', (req, res) => {
 app.post('/config', (req, res) => {
   const {
     printerName, checkinUrl,
-    pusherAppId, pusherKey, pusherSecret, pusherCluster,
     phonePin, firstTimerInverted, connectCard, enableDrivenCheckin, lateGraceMin,
     worksheetPrinter, lanAccess, allowedOrigins, historyRetentionDays, displayKey,
     labelFooter, connectCardAutoFirstTimer, connectCardGreeting, seasonTheme,
@@ -8973,7 +8877,7 @@ app.post('/config', (req, res) => {
     backupPrinterName, cupsMedia,
   } = req.body || {};
   if (!isTrustedConfigOrigin(req) && SECRET_CONFIG_KEYS.some(k => (req.body || {})[k] !== undefined)) {
-    return res.status(403).json({ error: 'Pusher/PIN/display-login settings can only be changed from the dashboard on this computer' });
+    return res.status(403).json({ error: 'PIN/display-login settings can only be changed from the dashboard on this computer' });
   }
   if (req.settingsPage) {
     const refused = security.settingsPageConfigRefusals(req.body);
@@ -8994,10 +8898,6 @@ app.post('/config', (req, res) => {
       }
       next.checkinUrl = String(checkinUrl).trim();
     }
-    if (pusherAppId !== undefined) next.pusherAppId = pusherAppId;
-    if (pusherKey !== undefined) next.pusherKey = pusherKey;
-    if (pusherSecret !== undefined) next.pusherSecret = pusherSecret;
-    if (pusherCluster !== undefined) next.pusherCluster = pusherCluster;
     // A PIN is the only thing between the LAN and the roster, so it has a
     // minimum length now and the 12-char cap is gone (it discouraged
     // passphrases). Clearing it is still allowed — that just turns LAN access
@@ -9015,7 +8915,7 @@ app.post('/config', (req, res) => {
       }
     }
     // The AES key that lets the church's own screens read children's names off
-    // the public Pusher channel. Clearing it stops the three name-bearing events
+    // the live channel. Clearing it stops the three name-bearing events
     // from being published at all (they fail closed rather than reverting to
     // plaintext) — which is the whole-system rollback lever, no deploy needed.
     if (displayKey !== undefined) {
@@ -9045,10 +8945,9 @@ app.post('/config', (req, res) => {
         next.slidesPublishToken = wanted;
       }
     }
-    // The display login passphrase (see publishProvision). A NEW salt is
-    // minted only when the passphrase actually changes, so re-saving the
-    // Settings form never silently rotates the wrapping key under every
-    // screen; clearing it removes both and stops the provision frames.
+    // The display login passphrase (nothing publishes its frame any more). A
+    // NEW salt is minted only when the passphrase actually changes; clearing
+    // it removes both.
     if (displayLoginPassphrase !== undefined) {
       const wanted = events.normalizePassphrase(displayLoginPassphrase);
       if (wanted === '') {
@@ -9173,7 +9072,7 @@ app.post('/config', (req, res) => {
 
     writeConfigFile(next);
     // Keep the live process in sync so schedule/PIN/toggle/key changes apply
-    // without a restart (Pusher creds still need one — noted in the UI).
+    // without a restart.
     applySavedConfig(next);
     if (pickupChanged) stillHereChanged();
     console.log('[config] Saved');
@@ -9826,7 +9725,7 @@ app.use((err, req, res, next) => {
 // ── Start up ──────────────────────────────────────────────────────────────────
 // The full server is also requireable (#16): the Electron app requires this
 // module and calls startListening() so its users get the whole feature set —
-// roster enrichment, dedup, history, Pusher, phone check-in. A bare `require`
+// roster enrichment, dedup, history, the relay, phone check-in. A bare `require`
 // has ZERO side effects — no port bind, no timers, no network. Everything the
 // running server needs (temp-file sweep, roster load, publish timers, birthday
 // push, prewarm) happens inside startListening(); only the legacy VERSION-poll
@@ -9937,7 +9836,7 @@ function recordBootVersionAndMaybeBeacon() {
   if (shouldSendUpdateBeacon(prev, SERVER_VERSION, config.updateBeacon === true)) {
     console.log(`[update-beacon] Updated ${prev} → ${SERVER_VERSION} and came back cleanly — publishing ops update-ok`);
     try {
-      events.publish(pusher, EVENT_CHANNEL, 'ops', events.buildOps('update-ok', null, { version: SERVER_VERSION }));
+      events.publish(EVENT_CHANNEL, 'ops', events.buildOps('update-ok', null, { version: SERVER_VERSION }));
     } catch (e) { console.warn('[update-beacon] publish skipped:', e.message); }
   }
 }
@@ -9972,11 +9871,11 @@ function startListening(attempt = 1) {
     startClubNightTimers();
     // Publish the birthday roster once at startup so displays that boot before
     // the first club-night interval still get the list. Delayed a few seconds
-    // so the CSV is loaded and Pusher has settled.
+    // so the CSV is loaded.
     setTimeout(() => { try { publishBirthdays(); } catch (e) { /* ignore */ } }, 5000);
     prewarmPrinterIfConfigured();
     // Update health beacon (#5): delayed so config.json is loaded and the
-    // Pusher client has settled — same reasoning as the birthday publish.
+    // relay has settled — same reasoning as the birthday publish.
     setTimeout(() => { try { recordBootVersionAndMaybeBeacon(); } catch (e) { /* never blocks boot */ } }, 4000);
     // The phone check-in relay (7.9.0): awana.kvbchurch.org/checkin's requests,
     // collected from the sync service and run here, while signed in to it.

@@ -5,7 +5,7 @@
 // WHAT THIS GUARDS
 //
 // * A custom label RECORDS NOTHING. No history row, no attendance ledger
-//   entry, no Pusher frame, no change to tonight's count. That is the whole
+//   entry, no live frame, no change to tonight's count. That is the whole
 //   contract of the feature: it is a piece of tape with a word on it, not a
 //   person arriving. Every other print path in this server writes at least one
 //   of those, so "it wrote nothing" has to be asserted, not assumed.
@@ -36,7 +36,6 @@ process.on('exit', (code) => {
 });
 
 const fs = require('fs');
-const Module = require('module');
 const os = require('os');
 const path = require('path');
 
@@ -55,22 +54,9 @@ function check(name, cond, detail) {
 }
 
 // Record every trigger instead of reaching the network, so "publishes nothing"
-// is checked against what would actually have gone ON THE WIRE. Pusher is
-// configured below precisely so a stray publish WOULD land here.
+// is checked against what would actually have gone ON THE WIRE. The relay is
+// replaced below precisely so a stray publish WOULD land here.
 const wire = [];
-const realLoad = Module._load;
-Module._load = function patched(request) {
-  if (request === 'pusher') {
-    return class FakePusher {
-      trigger(channel, event, payload) {
-        wire.push({ channel, event, payload });
-        return Promise.resolve();
-      }
-    };
-  }
-  // eslint-disable-next-line prefer-rest-params
-  return realLoad.apply(this, arguments);
-};
 
 async function j(pathname, opts) {
   const res = await fetch(BASE + pathname, opts);
@@ -97,7 +83,6 @@ async function main() {
     printerName: 'Fake',
     // Configured so that a stray publish would be visible in `wire`. A test
     // that asserts silence against a disconnected pipe asserts nothing.
-    pusherAppId: '1', pusherKey: 'k', pusherSecret: 's', pusherCluster: 'us2',
   }, null, 2));
 
   process.env.AWANA_DATA_DIR = dataDir;
@@ -105,6 +90,9 @@ async function main() {
   process.env.AWANA_BIND_HOST = '127.0.0.1';
 
   const server = require(path.join(__dirname, '..', 'print-server', 'server.js'));
+
+  // The relay is the only pipe: record what the server hands it, as the wire.
+  require(path.join(__dirname, '..', 'print-server', 'events.js')).setRelay((channel, event, body) => { wire.push({ channel, event, payload: body }); return Promise.resolve(true); });
   const {
     generateLabel, normalizeCustomText, splitCustomTextInTwo,
     CUSTOM_TEXT_MAX_CHARS, computeTonightStats,

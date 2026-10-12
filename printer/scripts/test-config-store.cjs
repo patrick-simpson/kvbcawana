@@ -10,7 +10,7 @@
 // object, which deleted:
 //
 //   phonePin, lanAccess, allowedOrigins   — the v5.3.0 LAN auth gate
-//   pusherAppId/Key/Secret/Cluster        — the lobby display's feed
+//   displayKey, syncUrl, syncSession      — the screens' sealed feed
 //   schedule                              — late-arrival routing
 //   historyRetentionDays, connectCard, worksheetPrinter, firstTimerInverted
 //
@@ -75,10 +75,9 @@ function serverOwnedConfig() {
     phonePin: '4821',
     lanAccess: true,
     allowedOrigins: ['https://kvbchurch.twotimtwo.com'],
-    pusherAppId: '1234567',
-    pusherKey: 'abcdef0123456789abcd',
-    pusherSecret: 'fedcba9876543210fedc',
-    pusherCluster: 'us2',
+    displayKey: 'abcdef0123456789abcdef0123456789abcdef01234=',
+    syncUrl: 'https://awana-sync.example.workers.dev',
+    syncSession: 'v1.1.1790839331729.oWr6n92IJW5ldPGmtiyjPHAZpca-QGToNlKGXlKI6vc',
     historyRetentionDays: 45,
     firstTimerInverted: true,
     worksheetPrinter: 'Office Laser',
@@ -102,7 +101,7 @@ function serverOwnedConfig() {
 // all of these vanish and the assertions below fail by name.
 const SERVER_OWNED_KEYS = [
   'phonePin', 'lanAccess', 'allowedOrigins',
-  'pusherAppId', 'pusherKey', 'pusherSecret', 'pusherCluster',
+  'displayKey', 'syncUrl', 'syncSession',
   'historyRetentionDays', 'firstTimerInverted', 'worksheetPrinter',
   'connectCard', 'connectCardAutoFirstTimer', 'connectCardGreeting',
   'labelFooter', 'labelTemplates', 'seasonTheme', 'collectibleIcons', 'musicalPrinter', 'updateBeacon', 'schedule',

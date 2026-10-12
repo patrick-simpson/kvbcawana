@@ -21,7 +21,6 @@ process.on('exit', (code) => {
 });
 
 const fs = require('fs');
-const Module = require('module');
 const os = require('os');
 const path = require('path');
 
@@ -39,18 +38,6 @@ function check(name, cond, detail) {
   else { failed++; console.error(`  ✗ ${name}${detail ? ' — ' + detail : ''}`); }
 }
 
-const wire = [];
-const realLoad = Module._load;
-Module._load = function patched(request) {
-  if (request === 'pusher') {
-    return class FakePusher {
-      trigger(channel, event, payload) { wire.push({ channel, event, payload }); return Promise.resolve(); }
-    };
-  }
-  // eslint-disable-next-line prefer-rest-params
-  return realLoad.apply(this, arguments);
-};
-
 // The stand-in service.
 const service = { calls: [], key: SERVICE_KEY, stateStatus: 200, publishStatus: 200 };
 const realFetch = globalThis.fetch;
@@ -63,7 +50,7 @@ globalThis.fetch = async (url, init = {}) => {
   const reply = (status, b) => new Response(JSON.stringify(b), { status, headers: { 'Content-Type': 'application/json' } });
   if (route === '/v1/login') {
     if (body.passphrase !== 'kennebec') return reply(401, { reason: 'wrong', triesLeft: 4 });
-    return reply(200, { session: SESSION, displayKey: service.key, pusher: { key: 'k', cluster: 'us2' }, state: {} });
+    return reply(200, { session: SESSION, displayKey: service.key, state: {} });
   }
   if (route === '/v1/state') return reply(service.stateStatus, {});
   if (route === '/v1/publish') { if (service.publishDelayMs) await new Promise((r) => setTimeout(r, service.publishDelayMs)); return reply(service.livePublishStatus || 200, { ok: true, screens: 2 }); }
@@ -88,7 +75,6 @@ async function main() {
   fs.writeFileSync(path.join(dataDir, 'config.json'), JSON.stringify({
     printerName: 'Fake',
     checkinUrl: 'https://example.com/checkin',
-    pusherAppId: '1', pusherKey: 'k', pusherSecret: 's', pusherCluster: 'us2',
     displayKey: OLD_KEY,
   }, null, 2));
   process.env.AWANA_DATA_DIR = dataDir;
@@ -105,10 +91,6 @@ async function main() {
     const h = await j('/health');
     check('/health says not signed in', h.body.sync && h.body.sync.signedIn === false && h.body.sync.url === null);
     check('nothing has talked to the service', service.calls.length === 0);
-    // The old login keeps working until the service takes over.
-    await post('/config', { displayLoginPassphrase: 'a twelve character passphrase' });
-    await settle();
-    check('the provision frame still goes out', wire.some((w) => w.event === 'provision'));
   }
 
   console.log('sync: who may sign this computer in');
@@ -142,17 +124,15 @@ async function main() {
   {
     const events = require(path.join(__dirname, '..', 'print-server', 'events.js'));
     const before = service.calls.length;
-    const pusher = { trigger: () => Promise.resolve() };
-    await events.publish(pusher, 'awana-channel', 'checkin', events.buildCheckin({ id: 'c1', firstName: 'Noah', lastName: 'Secret', club: 'Sparks' }) || { id: 'c1', firstName: 'Noah', club: 'Sparks', at: new Date().toISOString() });
-    await events.publish(pusher, 'awana-channel', 'tally', { counts: { Sparks: 4 }, total: 4, at: new Date().toISOString() });
-    await events.publish(pusher, 'cache-awana-channel-provision', 'provision', { v: 1 });
+    await events.publish('awana-channel', 'checkin', events.buildCheckin({ id: 'c1', firstName: 'Noah', lastName: 'Secret', club: 'Sparks' }) || { id: 'c1', firstName: 'Noah', club: 'Sparks', at: new Date().toISOString() });
+    await events.publish('awana-channel', 'tally', { counts: { Sparks: 4 }, total: 4, at: new Date().toISOString() });
     await settle(150);
     const sent = service.calls.slice(before).filter((c) => c.route === '/v1/publish');
-    check('two frames relayed, in order, never the provision channel', sent.length === 2 && sent[0].body.event === 'checkin' && sent[1].body.event === 'tally', JSON.stringify(sent.map((c) => c.body.event)));
+    check('two frames relayed, in order', sent.length === 2 && sent[0].body.event === 'checkin' && sent[1].body.event === 'tally', JSON.stringify(sent.map((c) => c.body.event)));
     check('with the session', sent.every((c) => c.auth === `Bearer ${SESSION}`));
     check('the check-in is sealed on the way (no name in the clear)', sent[0] && sent[0].body.payload.v === 1 && !JSON.stringify(sent[0].body).includes('Noah'));
-    const alone = await events.publish(null, 'awana-channel', 'tally', { counts: {}, total: 0, at: new Date().toISOString() });
-    check('with no Pusher at all, the service is the path', alone === true);
+    const alone = await events.publish('awana-channel', 'tally', { counts: {}, total: 0, at: new Date().toISOString() });
+    check('signed in, the service is the path', alone === true);
   }
 
   console.log('sync: the relay queue has limits');
@@ -164,21 +144,21 @@ async function main() {
     // everyone who published hears how it fared.
     service.publishDelayMs = 120;
     let before = service.calls.length;
-    const results = await Promise.all([1, 2, 3, 4, 5].map((n) => events.publish(null, 'awana-channel', 'tally', { counts: { Sparks: n }, total: n, at: now() })));
+    const results = await Promise.all([1, 2, 3, 4, 5].map((n) => events.publish('awana-channel', 'tally', { counts: { Sparks: n }, total: n, at: now() })));
     service.publishDelayMs = 0;
     const tallies = service.calls.slice(before).filter((c) => c.route === '/v1/publish' && c.body.event === 'tally');
     check('a burst of five tallies behind a slow service sends two at most: the one in flight and the newest', tallies.length <= 2 && tallies[tallies.length - 1].body.payload.total === 5, JSON.stringify(tallies.map((c) => c.body.payload.total)));
     check('every publisher was answered, and with success', results.every((r) => r === true), JSON.stringify(results));
     // Check-ins are never coalesced: each child is greeted.
     before = service.calls.length;
-    await Promise.all(['a', 'b', 'c'].map((id) => events.publish(null, 'awana-channel', 'checkin', { id, firstName: 'Kid', club: 'Sparks', at: now() })));
+    await Promise.all(['a', 'b', 'c'].map((id) => events.publish('awana-channel', 'checkin', { id, firstName: 'Kid', club: 'Sparks', at: now() })));
     check('three check-ins are three frames', service.calls.slice(before).filter((c) => c.body && c.body.event === 'checkin').length === 3);
     // The breaker: three outages in a row and the relay fails fast.
     service.livePublishStatus = 503;
     before = service.calls.length;
-    for (let i = 0; i < 3; i++) await events.publish(null, 'awana-channel', 'checkin', { id: 'x' + i, firstName: 'Kid', club: 'Sparks', at: now() });
+    for (let i = 0; i < 3; i++) await events.publish('awana-channel', 'checkin', { id: 'x' + i, firstName: 'Kid', club: 'Sparks', at: now() });
     const tried = service.calls.slice(before).filter((c) => c.route === '/v1/publish').length;
-    const fast = await events.publish(null, 'awana-channel', 'checkin', { id: 'y', firstName: 'Kid', club: 'Sparks', at: now() });
+    const fast = await events.publish('awana-channel', 'checkin', { id: 'y', firstName: 'Kid', club: 'Sparks', at: now() });
     check('three failures try the service, the fourth frame fails fast without a call', tried === 3 && fast === false && service.calls.length === before + 3, `tried ${tried}, calls after ${service.calls.length - before}`);
     const health = await j('/health');
     const w = (health.body.warnings || []).find((x) => x && x.type === 'syncRelay');
@@ -187,12 +167,12 @@ async function main() {
     server.resetRelayForTest();
     const healthAfter = await j('/health');
     check('and the warning goes with the breaker', !(healthAfter.body.warnings || []).some((x) => x && x.type === 'syncRelay'));
-    const back = await events.publish(null, 'awana-channel', 'tally', { counts: {}, total: 1, at: now() });
+    const back = await events.publish('awana-channel', 'tally', { counts: {}, total: 1, at: now() });
     check('closed again, frames flow', back === true);
     // 7.13.0: a tally that did not get through is sent again once the service
     // answers, instead of leaving the screens on the last number they had.
     service.livePublishStatus = 503;
-    await events.publish(null, 'awana-channel', 'tally', { counts: { Sparks: 7 }, total: 7, at: now() });
+    await events.publish('awana-channel', 'tally', { counts: { Sparks: 7 }, total: 7, at: now() });
     service.livePublishStatus = 200;
     before = service.calls.length;
     await settle(5600);
@@ -200,9 +180,9 @@ async function main() {
     check('a failed tally is sent again when the service is back', retried.length === 1 && retried[0].body.payload.total === 7, JSON.stringify(retried.map((c) => c.body.payload.total)));
     // ...but not once a newer one has got through.
     service.livePublishStatus = 503;
-    await events.publish(null, 'awana-channel', 'tally', { counts: { Sparks: 8 }, total: 8, at: now() });
+    await events.publish('awana-channel', 'tally', { counts: { Sparks: 8 }, total: 8, at: now() });
     service.livePublishStatus = 200;
-    await events.publish(null, 'awana-channel', 'tally', { counts: { Sparks: 9 }, total: 9, at: now() });
+    await events.publish('awana-channel', 'tally', { counts: { Sparks: 9 }, total: 9, at: now() });
     before = service.calls.length;
     await settle(5600);
     check('an owed tally a newer one overtook is not resent', !service.calls.slice(before).some((c) => c.route === '/v1/publish' && c.body.event === 'tally'));
@@ -214,17 +194,15 @@ async function main() {
 
   console.log('sync: the old paths go quiet');
   {
-    wire.length = 0;
+    const mark = service.calls.length;
     await post('/config', { displayLoginPassphrase: 'another twelve character passphrase' });
     await settle();
-    check('no provision frame once signed in', !wire.some((w) => w.event === 'provision'));
-    const h = await j('/health');
-    check('/health marks the display login retired', h.body.displayLogin.retired === true);
+    check('no provision frame goes out when the display login changes', !service.calls.slice(mark).some((c) => c.route === '/v1/publish' && c.body.event === 'provision'));
   }
 
   console.log('sync: publishes are forwarded to the service');
   {
-    wire.length = 0;
+    const mark = service.calls.length;
     const slides = await post('/api/lobby-slides', { slides: [{ text: 'Store next week' }] });
     check('the deck went to the service', slides.status === 200 && slides.body.viaSync === true && slides.body.deckRev === 5, JSON.stringify(slides.body));
     const call = service.calls.filter((c) => c.route === '/v1/slides').at(-1);
@@ -232,7 +210,7 @@ async function main() {
     const settings = await post('/api/display-settings', { settings: { showClock: false } });
     check('the shared settings too', settings.status === 200 && settings.body.viaSync === true && settings.body.rev === 3);
     await settle();
-    check('nothing was rebroadcast from here', !wire.some((w) => w.event === 'slides' || w.event === 'settings'));
+    check('nothing was rebroadcast from here', !service.calls.slice(mark).some((c) => c.route === '/v1/publish' && (c.body.event === 'slides' || c.body.event === 'settings')));
   }
 
   console.log('sync: a passphrase change elsewhere signs this computer out');

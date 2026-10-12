@@ -2,7 +2,7 @@
 //
 // POST /feed/tonight, /feed/points, /feed/schedule, /feed/notice let the
 // Chrome extension (which scrapes TwoTimTwo's own report CSVs / iCal / admin
-// messages) push aggregate content to the shared Pusher channel without the
+// messages) push aggregate content to the live channel without the
 // print server having to know how any of that scraping works.
 //
 // Every feed mirrors exactly one contract-v3 builder in ./events.js:
@@ -13,10 +13,10 @@
 //   checkout -> events.buildCheckout   (contract v4)
 //
 // This module is deliberately Express-free — server.js owns the HTTP layer
-// (routes, req/res, the actual pusher.trigger() call) and calls submitFeed()
+// (routes, req/res, the actual publish call) and calls submitFeed()
 // per request. Keeping validation + throttle decisions here means
 // scripts/test-server-helpers.cjs can unit test them directly without
-// booting Express or configuring Pusher.
+// booting Express or configuring the relay.
 //
 // PRIVACY: the original four feeds only ever carry aggregate counters / team
 // names / calendar facts / church-authored notice text — never a child's name.
@@ -37,7 +37,7 @@
 const events = require('./events');
 
 // One publish per feed per this many ms — a runaway or buggy content script
-// re-scraping in a tight loop must not flood the shared Pusher channel.
+// re-scraping in a tight loop must not flood the live channel.
 const THROTTLE_MS = 5000;
 
 const FEED_NAMES = ['tonight', 'points', 'schedule', 'notice', 'checkout'];
@@ -165,7 +165,7 @@ const VALIDATORS = {
 };
 
 // ── POST /feed/checkin-report — undo detection ──────────────────────────────
-// NOT one of the five contract-v3/v4 feeds above: it never publishes a Pusher
+// NOT one of the five contract-v3/v4 feeds above: it never publishes a live-channel
 // event of its own (no new event type — the display contract is pinned), so
 // it deliberately sits outside VALIDATORS/submitFeed. It carries the SAME
 // /clubber/checkin_report scrape content.js's R-1 reconcile pass already fetches
@@ -311,7 +311,7 @@ function getUnverifiedCheckins(now = Date.now()) {
 // /report/completed_books. Same standalone, loopback-only, NEVER-PUBLISHED
 // class as the two feeds above: it is deliberately outside FEED_NAMES /
 // VALIDATORS / submitFeed, because makeFeedRoute() publishes every registered
-// feed to the PUBLIC Pusher channel and these rows carry children's full
+// feed to the live channel and these rows carry children's full
 // names. They live in memory here, are never written to disk, and are read
 // only at print time to decorate that child's next label.
 //
@@ -422,7 +422,7 @@ let lastCheckinReportAt = 0;
 
 // Same shape as submitFeed()'s return ({valid, status, reason} | {valid:true,
 // throttled, payload}) so server.js's route reads identically to the other
-// feed routes, minus the Pusher publish step that route does itself.
+// feed routes, minus the publish step that route does itself.
 function submitCheckinReport(body, now = Date.now()) {
   const result = validateCheckinReportBody(body);
   if (!result.ok) return { valid: false, status: 400, reason: result.reason };
@@ -448,10 +448,10 @@ FEED_NAMES.forEach(f => { lastPublishAt[f] = 0; feedState[f] = freshState(); });
 
 // The single entry point server.js calls per POST /feed/<name>. Validates
 // the body, decides whether this submission should be throttled, and
-// records the last-received payload for /health. Does NOT touch Pusher —
+// records the last-received payload for /health. Does NOT touch the channel —
 // server.js does the actual events.publish() call with the payload this
 // returns, then reports the outcome back via recordPublishOutcome() so a
-// Pusher hiccup can never live inside this module.
+// channel hiccup can never live inside this module.
 function submitFeed(feedName, body, now = Date.now()) {
   const validator = VALIDATORS[feedName];
   if (!validator) return { valid: false, status: 400, reason: `unknown feed: ${feedName}` };
@@ -475,7 +475,7 @@ function submitFeed(feedName, body, now = Date.now()) {
   return { valid: true, throttled: false, payload: result.payload };
 }
 
-// Called by server.js after it attempts the actual Pusher publish, so
+// Called by server.js after it attempts the actual publish, so
 // GET /health can show whether the last attempt actually succeeded.
 function recordPublishOutcome(feedName, published) {
   if (feedState[feedName]) feedState[feedName].lastPublishOk = !!published;

@@ -5,7 +5,7 @@
 //
 // config.json has several writers with very different views of it. The print
 // server owns the security and realtime keys (phonePin, lanAccess,
-// allowedOrigins, pusherAppId/Key/Secret/Cluster), the operator schedule, and
+// allowedOrigins, displayKey, syncUrl/syncSession), the operator schedule, and
 // assorted preferences (historyRetentionDays, connectCard,
 // connectCardAutoFirstTimer, connectCardGreeting, worksheetPrinter,
 // firstTimerInverted, labelFooter, labelTemplates). The Electron setup wizard
@@ -17,7 +17,7 @@
 // click on Save in the settings window deleted every server-owned key, and
 // because the caller restarts the server immediately afterwards, the loss went
 // live at once: the LAN auth gate fails closed with no PIN, so phone check-in
-// refused every request; the lobby display lost its Pusher credentials; and
+// refused every request; the lobby display lost its display key and sync sign-in; and
 // late arrivals stopped being routed because the schedule was gone. The
 // realistic trigger is the worst possible moment — the printer jams mid-event,
 // a volunteer opens Settings to pick the backup printer, and clicks Save.

@@ -22,7 +22,6 @@ process.on('exit', (code) => {
 });
 
 const fs = require('fs');
-const Module = require('module');
 const os = require('os');
 const path = require('path');
 
@@ -41,21 +40,8 @@ function check(name, cond, detail) {
   }
 }
 
-// Intercept `pusher` so nothing reaches the network.
+// Every publish is recorded: the relay is replaced once the server is required.
 const wire = [];
-const realLoad = Module._load;
-Module._load = function patched(request) {
-  if (request === 'pusher') {
-    return class FakePusher {
-      trigger(channel, event, payload) {
-        wire.push({ channel, event, payload });
-        return Promise.resolve();
-      }
-    };
-  }
-  // eslint-disable-next-line prefer-rest-params
-  return realLoad.apply(this, arguments);
-};
 
 const events = require(path.join(__dirname, '..', 'print-server', 'events.js'));
 
@@ -85,7 +71,6 @@ async function main() {
   fs.writeFileSync(path.join(dataDir, 'config.json'), JSON.stringify({
     printerName: 'Fake',
     checkinUrl: 'https://example.com/checkin',
-    pusherAppId: '1', pusherKey: 'k', pusherSecret: 's', pusherCluster: 'us2',
     displayKey: TEST_KEY,
   }, null, 2));
 
@@ -94,6 +79,9 @@ async function main() {
   process.env.AWANA_BIND_HOST = '127.0.0.1';
 
   const server = require(path.join(__dirname, '..', 'print-server', 'server.js'));
+
+  // The relay is the only pipe: record what the server hands it, as the wire.
+  require(path.join(__dirname, '..', 'print-server', 'events.js')).setRelay((channel, event, body) => { wire.push({ channel, event, payload: body }); return Promise.resolve(true); });
   const listener = server.startListening();
   await new Promise((resolve) => {
     if (listener.listening) return resolve();

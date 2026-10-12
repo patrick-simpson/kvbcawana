@@ -457,7 +457,7 @@
   </div>
 
   <!-- Realtime privacy — top level on purpose. This used to live only inside
-       the Settings tab, below Pusher, where you had to already know it existed
+       the Settings tab, where you had to already know it existed
        to find it. Whether children's names go out encrypted is a front-page
        fact, not a preference. -->
   <div class="card" id="privacy-card">
@@ -680,35 +680,11 @@
               <label>Check-in URL</label>
               <input type="text" id="settings-url" placeholder="https://yourchurch.twotimtwo.com/clubber/checkin">
             </div>
-            <div style="margin-top:12px; border-top: 1px solid #e2e8f0; padding-top: 12px;">
-              <label class="section-label">Pusher Integration (Joyful Welcome Screen)</label>
-              <p style="font-size:11px; color:#64748b; margin-bottom:8px">Get these from your Pusher Channels dashboard</p>
-              <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                <div>
-                  <label>App ID</label>
-                  <input type="text" id="settings-pusher-id" placeholder="123456">
-                </div>
-                <div>
-                  <label>Cluster</label>
-                  <input type="text" id="settings-pusher-cluster" placeholder="us2">
-                </div>
-                <div>
-                  <label>Key</label>
-                  <input type="text" id="settings-pusher-key" placeholder="abc123def456">
-                </div>
-                <div>
-                  <label>Secret</label>
-                  <input type="text" id="settings-pusher-secret" placeholder="**********">
-                </div>
-              </div>
-            </div>
             <div id="display-key-section" style="margin-top:12px; border-top: 1px solid #e2e8f0; padding-top: 12px;">
               <label class="section-label">Realtime privacy &mdash; display key</label>
               <p style="font-size:11px; color:#64748b; margin-bottom:8px">
-                The Pusher channel is <strong>public</strong>: anyone who views a screen's page source can
-                subscribe to it from anywhere. So children's first names are <strong>encrypted</strong> before
-                they leave this PC &mdash; and so is the published lobby slide deck, since it is
-                free-typed church copy. Generate the key once, then paste the same value into every
+                Children's first names are <strong>encrypted</strong> before they leave this PC &mdash; and
+                so is the published lobby slide deck, since it is free-typed church copy. Generate the key once, then paste the same value into every
                 screen (Settings &rarr; Connection &rarr; Display key). Counts, clock and countdown never
                 need it &mdash; without it the welcome banners and slide sync stop.
               </p>
@@ -739,43 +715,6 @@
                 <button type="button" class="btn btn-secondary btn-sm" onclick="syncSignOut()">Sign out</button>
               </div>
               <p id="sync-note" style="font-size:10px;color:#94a3b8;margin-top:6px"></p>
-            </div>
-            <div id="display-login-section" style="margin-top:12px; border-top: 1px solid #e2e8f0; padding-top: 12px;">
-              <label class="section-label">Display login &mdash; one passphrase for every screen</label>
-              <p style="font-size:11px; color:#64748b; margin-bottom:8px">
-                Instead of pasting the display key into each screen, a volunteer types this passphrase once on
-                each screen &mdash; lobby TV: Settings &rarr; Connection &rarr; <em>Display login</em>; projector
-                page: Display Settings &rarr; <em>Log in</em>. The screen then receives the display key and the
-                slide-publish token automatically, and keeps working when you rotate either. Changing the
-                passphrase does <strong>not</strong> log screens out: each keeps working with the keys it already
-                holds, shows &ldquo;log in again&rdquo; in its settings, and needs the new passphrase before it can
-                follow the <em>next</em> key rotation. The screen needs the print server running to log in;
-                pasting keys by hand still works under the screen&rsquo;s <em>Advanced</em> section.
-              </p>
-              <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap">
-                <input type="text" id="settings-display-login" placeholder="none &mdash; screens paste keys by hand" autocomplete="off" style="flex:1 1 240px">
-                <button type="button" class="btn btn-secondary btn-sm" onclick="generateDisplayLogin()">Generate</button>
-                <button type="button" class="btn btn-secondary btn-sm" onclick="saveDisplayLogin()">Save passphrase</button>
-                <button type="button" class="btn btn-secondary btn-sm" onclick="copyDisplayLogin()">Copy</button>
-                <button type="button" class="btn btn-secondary btn-sm" onclick="clearDisplayLogin()">Clear</button>
-              </div>
-              <p id="display-login-note" style="font-size:10px;color:#94a3b8;margin-top:6px"></p>
-              <div style="margin-top:10px">
-                <label style="font-size:11px">Screen settings URL (optional)</label>
-                <p style="font-size:11px; color:#64748b; margin-bottom:6px">
-                  Hand every screen its settings file too, so weather, calendar and corner widgets set
-                  themselves up instead of being typed in one at a time. This is the same address a screen
-                  accepts as <code>?config=</code> &mdash; a plain JSON file of display settings, <strong>not</strong>
-                  a secret and never children&rsquo;s data. It rides inside the same sealed login frame simply
-                  because that frame is already going there. <strong>https only</strong>, up to 200 characters;
-                  leave it blank and screens are set up by hand exactly as before. Clearing it here clears it on
-                  every logged-in screen at the next heartbeat.
-                </p>
-                <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap">
-                  <input type="text" id="settings-fleet-config-url" placeholder="https://example.org/awana-display.json" autocomplete="off" style="flex:1 1 240px">
-                </div>
-                <p style="font-size:10px;color:#94a3b8;margin-top:6px">Saved with <strong>Save Settings</strong> below.</p>
-              </div>
             </div>
             <div style="margin-top:12px; border-top: 1px solid #e2e8f0; padding-top: 12px;">
               <label class="section-label">Check-in Features</label>
@@ -957,7 +896,7 @@ const BASE = '';
 // This is not theoretical. POST /print writes firstName/lastName straight into
 // print-history.json, and this page rendered them raw, so a crafted name became
 // script running on http://localhost:3456 — the one origin the server trusts
-// with the Pusher secret and the phone PIN. Escaping here is the fix; the
+// with the sync session and the phone PIN. Escaping here is the fix; the
 // server-side length/control-char capping is only belt and braces.
 //
 // Prefer textContent when setting a whole element's text. Use esc() when
@@ -1064,20 +1003,9 @@ function jumpToDisplayKey() {
 
 // http://localhost:3456/#display-key — the deep link the extension points at,
 // so "where is this thing?" is answerable by clicking rather than by explaining.
-function jumpToDisplayLogin() {
-  showTab('settings');
-  var section = document.getElementById('display-login-section');
-  if (!section) return;
-  section.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  section.classList.remove('flash');
-  void section.offsetWidth;
-  section.classList.add('flash');
-}
-
 function applyHashRoute() {
   var hash = (location.hash || '').replace('#', '');
   if (hash === 'display-key' || hash === 'privacy') jumpToDisplayKey();
-  else if (hash === 'display-login') jumpToDisplayLogin();
   else if (hash === 'extension') { showTab('diagnostics'); }
   else if (hash) showTab(hash);
 }
@@ -2088,10 +2016,6 @@ function loadSettings() {
   // Load config
   fetch(BASE + '/config').then(function(r) { return r.json(); }).then(function(config) {
     document.getElementById('settings-url').value = config.checkinUrl || '';
-    document.getElementById('settings-pusher-id').value = config.pusherAppId || '';
-    document.getElementById('settings-pusher-cluster').value = config.pusherCluster || 'us2';
-    document.getElementById('settings-pusher-key').value = config.pusherKey || '';
-    document.getElementById('settings-pusher-secret').value = config.pusherSecret || '';
     document.getElementById('settings-phone-pin').value = config.phonePin || '';
     document.getElementById('settings-late-grace').value = config.lateGraceMin != null ? config.lateGraceMin : 10;
     document.getElementById('settings-label-footer').value = config.labelFooter || '';
@@ -2108,13 +2032,11 @@ function loadSettings() {
     document.getElementById('settings-driven-checkin').checked = config.enableDrivenCheckin !== false;
     renderPickupClubs(config.pickupClubs);
     document.getElementById('settings-lan-access').checked = config.lanAccess === true;
-    // GET /config redacts displayKey like the Pusher secret, so we render its
+    // GET /config redacts displayKey like the other secrets, so we render its
     // STATE rather than its value. Showing a fake masked string would invite
     // someone to "copy" it into a screen.
     setDisplayKeyState(config.displayKey || '');
-    setDisplayLoginState(config.displayLoginPassphrase || '');
     initSyncSection();
-    document.getElementById('settings-fleet-config-url').value = config.fleetConfigUrl || '';
     var body = document.getElementById('schedule-body');
     body.innerHTML = '';
     (config.schedule || []).forEach(addScheduleRow);
@@ -2157,7 +2079,7 @@ function fillPrinterSelects(printers) {
 
 // ── Display key ───────────────────────────────────────────────────────────────
 // The AES key that lets the church's own screens read children's first names off
-// the PUBLIC Pusher channel. Shown in full on purpose: this page is served to
+// the live channel. Shown in full on purpose: this page is served to
 // loopback only, and a volunteer has to be able to READ the key to type it into
 // a TV stick that has no clipboard. Never rendered anywhere else, never logged,
 // and GET /config redacts it for any non-loopback caller.
@@ -2362,7 +2284,7 @@ function clearDisplayKey() {
 // ── Sync service ──────────────────────────────────────────────────────────────
 // Where it is comes from the display site's shared/sync.json (GitHub Pages
 // answers it to any origin). Until it names a service this section stays
-// hidden and the display login below is how screens are set up.
+// hidden.
 var SYNC_INDEX = 'https://awana.kvbchurch.org/lobby/shared/sync.json';
 var syncUrl = '';
 
@@ -2374,11 +2296,9 @@ function initSyncSection() {
       if (!/^https:\/\/[^\s?#]+$/.test(url)) return;
       syncUrl = url;
       document.getElementById('sync-section').style.display = 'block';
-      // Replaced: screens sign in through the service now.
-      document.getElementById('display-login-section').style.display = 'none';
       loadHealth();
     })
-    .catch(function() { /* offline: the old display login stays */ });
+    .catch(function() { /* offline: the section stays hidden */ });
 }
 
 function setSyncState(sync) {
@@ -2387,7 +2307,6 @@ function setSyncState(sync) {
   if (sync.url && !syncUrl) {
     syncUrl = sync.url;
     document.getElementById('sync-section').style.display = 'block';
-    document.getElementById('display-login-section').style.display = 'none';
   }
   document.getElementById('sync-signin-row').style.display = signedIn ? 'none' : 'flex';
   document.getElementById('sync-signed-in-row').style.display = signedIn ? 'flex' : 'none';
@@ -2435,78 +2354,6 @@ function syncSignOut() {
     .catch(function() {});
 }
 
-// ── Display login ─────────────────────────────────────────────────────────────
-// The one passphrase a volunteer types on each screen to receive the display key
-// and publish token. Shown in full for the same reason the display key is: this
-// page is loopback-only and someone has to read it aloud across a lobby.
-function setDisplayLoginState(value) {
-  var input = document.getElementById('settings-display-login');
-  var note = document.getElementById('display-login-note');
-  input.value = value || '';
-  if (value) {
-    note.textContent = 'Set. Screens log in with this passphrase — lobby TV: Settings → Connection → Display login; projector: Display Settings → Log in. Keep it with the Wi-Fi password; rotate it — and the display key — if it leaks.';
-    note.style.color = '#16a34a';
-  } else {
-    note.textContent = 'Not set: each screen needs the display key and publish token pasted by hand. Press Generate (or type a 12+ character sentence) and Save passphrase.';
-    note.style.color = '#b45309';
-  }
-}
-
-function postDisplayLogin(value, okNote) {
-  var note = document.getElementById('display-login-note');
-  return fetch(BASE + '/config', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ displayLoginPassphrase: value }),
-  }).then(function(r) { return r.json().then(function(b) { return { ok: r.ok, body: b || {} }; }); })
-    .then(function(res) {
-      if (!res.ok) { note.textContent = res.body.error || 'Save failed'; note.style.color = '#dc2626'; return false; }
-      setDisplayLoginState(value);
-      if (okNote) { note.textContent = okNote; note.style.color = '#16a34a'; }
-      loadHealth();
-      return true;
-    })
-    .catch(function() { note.textContent = 'Could not save — is the server running on this computer?'; note.style.color = '#dc2626'; return false; });
-}
-
-function generateDisplayLogin() {
-  var input = document.getElementById('settings-display-login');
-  if (input.value && !confirm('Replace the display passphrase?\n\nScreens already logged in keep working with the keys they hold. Each one shows "log in again" in its settings and needs the new passphrase before it can follow the next key rotation.')) return;
-  fetch(BASE + '/config/display-login/generate', { method: 'POST' })
-    .then(function(r) { if (!r.ok) throw new Error('generate failed'); return r.json(); })
-    .then(function(d) {
-      return postDisplayLogin(d.passphrase, 'Saved. Type it on each screen — lobby TV: Settings → Connection → Display login; projector: Display Settings → Log in. Screens then receive the display key and publish token by themselves.');
-    })
-    .catch(function() {
-      var note = document.getElementById('display-login-note');
-      note.textContent = 'Could not generate a passphrase — is the server running on this computer?'; note.style.color = '#dc2626';
-    });
-}
-
-function saveDisplayLogin() {
-  var value = document.getElementById('settings-display-login').value.trim();
-  if (!value) { clearDisplayLogin(); return; }
-  postDisplayLogin(value, 'Saved. Type it on each screen — lobby TV: Settings → Connection → Display login; projector: Display Settings → Log in.');
-}
-
-function copyDisplayLogin() {
-  var input = document.getElementById('settings-display-login');
-  var note = document.getElementById('display-login-note');
-  if (!input.value) { note.textContent = 'Nothing to copy yet — press Generate first.'; note.style.color = '#b45309'; return; }
-  var done = function() { note.textContent = 'Copied.'; note.style.color = '#16a34a'; };
-  if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(input.value).then(done, function() { input.select(); });
-  } else {
-    input.select();
-    try { document.execCommand('copy'); done(); } catch (e) { /* leave it selected */ }
-  }
-}
-
-function clearDisplayLogin() {
-  if (!confirm('Clear the display passphrase?\n\nScreens already logged in keep their keys; no new screen can log in until you set one again.')) return;
-  postDisplayLogin('', 'Cleared — screens paste keys by hand until a passphrase is set.');
-}
-
 // "Clubs on the pickup list" (7.16.0): config.json `pickupClubs`, the one
 // setting every lobby screen's still-here list follows. Not saved yet means
 // the default: every club but Trek and Journey (print-server/pickup.js).
@@ -2541,10 +2388,6 @@ function saveSettings() {
   // printerName is the Windows printer every 4×2 print path uses.
   var printerName = document.getElementById('settings-printer').value;
   var checkinUrl = document.getElementById('settings-url').value.trim();
-  var pusherAppId = document.getElementById('settings-pusher-id').value.trim();
-  var pusherCluster = document.getElementById('settings-pusher-cluster').value.trim();
-  var pusherKey = document.getElementById('settings-pusher-key').value.trim();
-  var pusherSecret = document.getElementById('settings-pusher-secret').value.trim();
 
   fetch(BASE + '/config', {
     method: 'POST',
@@ -2552,10 +2395,6 @@ function saveSettings() {
     body: JSON.stringify({
       printerName: printerName,
       checkinUrl: checkinUrl,
-      pusherAppId: pusherAppId,
-      pusherCluster: pusherCluster,
-      pusherKey: pusherKey,
-      pusherSecret: pusherSecret,
       phonePin: document.getElementById('settings-phone-pin').value.trim(),
       lateGraceMin: Number(document.getElementById('settings-late-grace').value) || 10,
       labelFooter: document.getElementById('settings-label-footer').value.trim(),
@@ -2571,9 +2410,7 @@ function saveSettings() {
       enableDrivenCheckin: document.getElementById('settings-driven-checkin').checked,
       pickupClubs: readPickupClubs(),
       lanAccess: document.getElementById('settings-lan-access').checked,
-      displayKey: document.getElementById('settings-display-key').value.trim(),
-      displayLoginPassphrase: document.getElementById('settings-display-login').value.trim(),
-      fleetConfigUrl: document.getElementById('settings-fleet-config-url').value.trim()
+      displayKey: document.getElementById('settings-display-key').value.trim()
     })
   }).then(function(r) {
     if (!r.ok) {
@@ -2605,15 +2442,15 @@ function saveSettings() {
 // Night Status — event-bus + selector health from the extended /health payload
 // Every caller passes plain text (emoji included) — never HTML — so escaping
 // here covers the server-derived bits that ride along in `detail`, such as a
-// Pusher error string or a failing selector list.
+// publish error string or a failing selector list.
 function statusRow(icon, label, detail) {
   return '<div class="diag-item"><span class="diag-icon">' + esc(icon) + '</span><span>' + esc(label) + '</span><span class="diag-detail">' + esc(detail || '') + '</span></div>';
 }
 
 // ── Front-page privacy banner ────────────────────────────────────────────────
 // Answers one question without a click: are children's first names leaving this
-// PC encrypted? Three states, and "no Pusher at all" is deliberately NOT a
-// warning — a church with no welcome screen has nothing to encrypt.
+// PC encrypted? Three states, and "not signed in to the sync service" is deliberately NOT a
+// warning — nothing is broadcast, so there is nothing to encrypt.
 function renderPrivacy(h) {
   var card = document.getElementById('privacy-card');
   var banner = document.getElementById('privacy-banner');
@@ -2622,13 +2459,13 @@ function renderPrivacy(h) {
   var detail = document.getElementById('privacy-detail');
   if (!card) return;
 
-  var pusherOn = h.pusher && h.pusher.configured;
-  if (!pusherOn) {
+  var liveOn = h.live && h.live.configured;
+  if (!liveOn) {
     banner.className = 'traffic-light green';
     dot.className = 'traffic-dot green';
     text.textContent = 'No welcome screen connected';
     setWelcomeStat('Not connected', 'no welcome screen', 'muted');
-    detail.textContent = 'Nothing is being broadcast, so there are no names to protect. Set up Pusher first if you want the lobby TV.';
+    detail.textContent = 'Nothing is being broadcast, so there are no names to protect. Sign this computer in to the sync service (Settings) if you want the lobby TV.';
     return;
   }
 
@@ -2644,8 +2481,7 @@ function renderPrivacy(h) {
     dot.className = 'traffic-dot red';
     text.textContent = '⚠ Names are NOT encrypted';
     setWelcomeStat('Not sealed', 'no display key', 'bad');
-    detail.textContent = "The Pusher channel is public: anyone who views a screen's page source can subscribe from anywhere "
-      + "and read every child's first name. Press “Set up the display key” above — it takes about a minute.";
+    detail.textContent = "Children's first names are going out in the clear. Press “Set up the display key” above — it takes about a minute.";
   }
 }
 
@@ -2688,15 +2524,15 @@ function renderNightStatus(h) {
     h.clubNight ? 'Club night window — live broadcasts active' : 'Outside club-night window — broadcasts idle',
     '');
 
-  var p = h.pusher || {};
+  var p = h.live || {};
   if (!p.configured) {
-    rows += statusRow('⚪', 'Event bus (Pusher)', 'not configured');
+    rows += statusRow('⚪', 'Live channel', 'not signed in to the sync service');
   } else if (p.lastPublishOk === null) {
-    rows += statusRow('🟡', 'Event bus (Pusher)', 'configured — nothing published yet');
+    rows += statusRow('🟡', 'Live channel', 'signed in — nothing published yet');
   } else if (p.lastPublishOk) {
-    rows += statusRow('✅', 'Event bus (Pusher)', 'last publish (' + (p.lastEvent || '?') + ') at ' + formatTime(p.lastPublishAt));
+    rows += statusRow('✅', 'Live channel', 'last publish (' + (p.lastEvent || '?') + ') at ' + formatTime(p.lastPublishAt));
   } else {
-    rows += statusRow('❌', 'Event bus (Pusher)', (p.lastError || 'publish failed') + ' at ' + formatTime(p.lastPublishAt));
+    rows += statusRow('❌', 'Live channel', (p.lastError || 'publish failed') + ' at ' + formatTime(p.lastPublishAt));
   }
 
   var st = h.selectorSelfTest;
@@ -2753,16 +2589,6 @@ function renderNightStatus(h) {
       h.sync.state === 'unreachable' ? 'signed in — the service could not be reached at the last check' : 'signed in — screens sync without this computer');
   } else if (h.sync && h.sync.state === 'signed-out') {
     rows += statusRow('❌', 'Sync service', 'signed out — the passphrase was changed; sign in again (Settings → Sync service)');
-  }
-  if (h.displayLogin && h.displayLogin.retired) {
-    // replaced by the sync service: nothing to show
-  } else if (h.displayLogin && h.displayLogin.configured) {
-    rows += statusRow(h.displayLogin.lastPublishedAt ? '🔑' : '🟡', 'Display login',
-      'passphrase set (key ' + (h.displayLogin.kid || '?') + ')'
-      + (h.displayLogin.lastPublishedAt ? ' — login frame published ' + formatTime(h.displayLogin.lastPublishedAt)
-        : ' — no login frame yet (needs the display key and Pusher)'));
-  } else {
-    rows += statusRow('⚪', 'Display login', 'not set — screens paste the display key by hand');
   }
 
   el.innerHTML = rows;

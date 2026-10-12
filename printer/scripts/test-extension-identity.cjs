@@ -231,11 +231,11 @@ console.log('extension privacy badge');
 
   // No welcome screen means no names on the wire. Silence is correct — a badge
   // here would be noise on every check-in page at a church that has no TV.
-  const none = render({ pusher: { configured: false } });
-  check('with no Pusher configured the badge is hidden', none.style.display === 'none');
+  const none = render({ live: { configured: false } });
+  check('with no live channel configured the badge is hidden', none.style.display === 'none');
   check('...and says nothing at all', none.textContent === '');
 
-  const missing = render({ pusher: { configured: true }, displayKeyConfigured: false });
+  const missing = render({ live: { configured: true }, displayKeyConfigured: false });
   check('with a screen but no key the badge is shown', missing.style.display === 'block');
   check('...and says names are NOT encrypted', /NOT encrypted/.test(missing.textContent),
     missing.textContent);
@@ -247,7 +247,7 @@ console.log('extension privacy badge');
     !!link && link.target === '_blank' && /noopener/.test(link.rel || ''));
 
   const ok = render({
-    pusher: { configured: true }, displayKeyConfigured: true, displayKeyId: 'a1b2c3d4',
+    live: { configured: true }, displayKeyConfigured: true, displayKeyId: 'a1b2c3d4',
   });
   check('with a key the badge confirms encryption', /encrypted/i.test(ok.textContent),
     ok.textContent);
@@ -260,7 +260,7 @@ console.log('extension privacy badge');
   // twotimtwo.com can read.
   const SECRET = 'kAyO1YHu9r7vQ2mWxZs4tE6bN8pL0cJd5fG3hR7uT1o=';
   const leaky = render({
-    pusher: { configured: true }, displayKeyConfigured: true,
+    live: { configured: true }, displayKeyConfigured: true,
     displayKeyId: 'a1b2c3d4', displayKey: SECRET, key: SECRET,
   });
   check('the key is NEVER rendered into the page, even if /health sent one',

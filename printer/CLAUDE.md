@@ -336,16 +336,24 @@ free text on a blank label and records nothing at all: no `addHistoryEntry`, no
 `recordAttendance`, no `publishTally`, no `events.publish*`. It is not a
 check-in in any mode, so it carries no TEST band either.
 
-**Realtime privacy:** the screens' channel was a PUBLIC Pusher channel, which
-has no server-side authorization primitive, so `checkin`, `recap` and
-`birthdays` are sealed with AES-256-GCM before publish (`print-server/events.js`;
-consumer half is `lobby/src/lib/envelope.js`). Since 2026-10-03 the screens
-listen to the sync Worker's live channel instead and the Pusher keys are
-cleared on the dashboard (SWITCH.md); the printer relays every frame to the
-Worker (`events.setRelay`, a bounded queue with a breaker, `/health` warns
-while it is open) under exactly the same sealing rules, and the Pusher
-publisher stays until switch day's cleanup. Rules that must survive any
-change, for whichever pipe is on:
+**Realtime:** the screens' channel is the sync Worker's live channel. The
+print server's `events.publish()` seals a frame and hands it to the relay
+(`events.setRelay`, installed by `server.js`: a bounded queue with a breaker,
+and an OWED resend of state frames; `/health` warns while the breaker is open),
+which only works while this computer is signed in to the sync service. The
+Pusher publisher, its npm package and the cache-channel `provision` frame are
+gone (2026-10-12), and so are the dashboard's Pusher fields; the electron app's
+Pusher release-ping client went with them (updates poll the feed every 10
+minutes). Old config.json files may still hold `pusher*` keys: they are never
+read, and `pusherSecret` stays redacted from GET /config. The display-login
+state and `buildProvisionFrame` stay in `events.js` (the KDF is pinned by
+`envelope-vectors.json`, mirrored with the lobby) and POST /config still takes
+the passphrase, but nothing publishes the frame and the dashboard has no
+Display login section. `/health` reports the
+channel as `live` (`configured` means signed in), and the church-config key
+`pusherChannel` keeps its old name because it is the relay's channel name.
+Names stay sealed end to end under the old design's rules. Rules that must
+survive any change:
 - **Fail closed, never plaintext.** If a key is configured but a payload cannot
   be sealed, publish NOTHING. A silent downgrade is the worst outcome available.
 - With **no** key configured the publisher stays plaintext on purpose (an

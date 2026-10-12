@@ -525,7 +525,7 @@
     // Drop any queued item whose target was already printed in this session
     // (or carried over via sessionStorage). Without this, a queue persisted in
     // localStorage across a browser crash can replay a label that another path
-    // (onCheckin / roster diff / Pusher) has already produced.
+    // (onCheckin / roster diff / the live channel) has already produced.
     var hasName = !!(item && item.name);
     var idKey = hasName ? resolveIdentityKey(item.name, item.clubberId) : null;
     if (idKey && printedNames.has(idKey)) {
@@ -1095,7 +1095,7 @@
     });
 
     // Night-systems canary: exercises the whole pipeline — server → TEST
-    // label print → Pusher canary event — plus this page's selectors.
+    // label print → live-channel canary event — plus this page's selectors.
     var nightTestBtn = document.createElement('button');
     nightTestBtn.textContent = 'Night Test';
     Object.assign(nightTestBtn.style, {
@@ -3053,9 +3053,9 @@
   function renderPrivacyStatus(data) {
     var el = document.getElementById('awana-privacy-status');
     if (!el) return;
-    // No welcome screen configured means no names on the wire and nothing to
+    // Not signed in to the sync service means no names on the wire and nothing to
     // warn about. Silence is the correct output, not a green badge.
-    if (!data.pusher || !data.pusher.configured) { el.style.display = 'none'; return; }
+    if (!data.live || !data.live.configured) { el.style.display = 'none'; return; }
     el.style.display = 'block';
     el.textContent = '';
     if (data.displayKeyConfigured) {
@@ -3069,7 +3069,7 @@
       el.style.border = '1px solid #fecaca';
       el.style.color = '#991b1b';
       var msg = document.createElement('span');
-      msg.textContent = "⚠ Names are NOT encrypted — anyone can subscribe to the welcome screen's channel. ";
+      msg.textContent = "⚠ Names are NOT encrypted on the welcome screen's channel. ";
       var link = document.createElement('a');
       link.href = PRINT_SERVER + '/#display-key';
       link.target = '_blank';

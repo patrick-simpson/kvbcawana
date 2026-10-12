@@ -69,8 +69,10 @@ commits or files.
 - Realtime: since 2026-10-03 every screen listens to the Worker's live channel
   (sign-in with the church passphrase; names stay sealed end to end; the same
   events and sanitizers as the Pusher design). The Pusher keys are cleared and
-  the printer relays every frame to the Worker; the Pusher publisher code
-  stays until switch day's cleanup.
+  the printer relays every frame to the Worker. The printer's Pusher publisher
+  and the electron app's Pusher client are removed (2026-10-12); what still
+  names Pusher outside `printer/` is the lobby's code and the Worker's
+  `pusher.js`, and `printer-release.yml`'s and `ci.yml`'s `PUSHER_*` blocks.
 - **The three old repos are archived** (2026-10-11, after switch day): every
   screen runs on awana.kvbchurch.org and both installed apps update from its
   feeds (their bridge releases, printer 6.22.0 and sound room 1.1.0, went out

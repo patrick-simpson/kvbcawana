@@ -1,7 +1,8 @@
 // Awana event bus — pure payload builders + resilient publisher.
 //
-// The print server is the ONLY publisher on the shared Pusher channel; the
-// check-in display and the countdown app are subscribe-only consumers.
+// The print server is the ONLY publisher on the live channel (it relays every
+// frame to the sync Worker, which fans it out); the check-in display and the
+// countdown app are subscribe-only consumers.
 // Every payload shape here is pinned by contract-vectors.json (validated by
 // scripts/test-contracts.cjs) and mirrored in the consumer repos.
 //
@@ -311,8 +312,8 @@ function buildNotice(level, message) {
 // drops them (and any unknown type) rather than publishing a dead reference.
 //
 // The deck is arbitrary operator-authored copy ("Pray for the Smiths"), so the
-// event rides SEALED like the name-bearing four. One deck can exceed Pusher's
-// per-message ceiling, so it is split into chunks; every chunk of one publish
+// event rides SEALED like the name-bearing four. One deck can exceed the
+// per-frame ceiling (FRAME_MAX_BYTES), so it is split into chunks; every chunk of one publish
 // carries identical {deckRev, publishedAt} and its {seq, total}. publishedAt is
 // the ONE ordering authority on the consumer (deckRev is an operator-facing
 // counter that restarts harmlessly if this server loses its state file), so
@@ -494,7 +495,7 @@ function buildSlidesChunks(slides, deckRev, publishedAt) {
 // on the check-in computer (POST /api/display-settings) and mirrored to every
 // screen over the sealed `settings` event, so a change made once reaches every
 // screen. Per-screen settings (what plays behind the names, the uploads, this
-// TV's sound, motion, confetti and wake lock, simplified mode, the Pusher keys)
+// TV's sound, motion, confetti and wake lock, simplified mode, the sync keys)
 // are not in this table and can never ride the wire.
 //
 // One table, mirrored in contract-vectors.json `events.settings.keys` (and in
@@ -680,12 +681,11 @@ function isClubNightNow(clubNights, date, graceMinutes = 0, leadMinutes = 0) {
 // Awana-Check-in-Display/src/lib/envelope.js and the framing below MUST stay
 // byte-compatible with it.
 //
-// WHY: the Pusher channel is PUBLIC. Subscription is granted by possession of
-// the app key, which has to ship in the display's public bundle for a screen to
-// connect at all, so anyone who views source can subscribe from anywhere in the
-// world and read every event forever. Pusher public channels have no
-// server-side authorization primitive to switch on — it is absent from the
-// product, not merely unconfigured. The first-names-only rule above is still
+// WHY: the screens' channel was a PUBLIC Pusher channel (retired 2026-10-03),
+// where anyone who viewed a screen's source could subscribe from anywhere in
+// the world and read every event forever, and the design has no server-side
+// authorization primitive. The sync Worker's channel is signed in, but names
+// stay sealed end to end under the same rules. The first-names-only rule above is still
 // the primary defence and still holds, but "a stranger can read every child's
 // first name and club, live, from anywhere" was never acceptable.
 //
@@ -709,8 +709,8 @@ const ENCRYPTED_EVENTS = new Set(['checkin', 'recap', 'birthdays', 'checkout', '
 // in UTF-8, so the worst case is ~380 bytes, not the ~220 that ASCII suggests.
 const CHECKIN_PAD = 512;
 // The bulk events (recap, birthdays) are periodic rebroadcasts of many entries
-// and cannot use a fixed pad: Pusher rejects any event over PUSHER_MAX_BYTES,
-// and their worst case padded to a single size would exceed it. They get a
+// and cannot use a fixed pad: a frame over FRAME_MAX_BYTES is refused, and
+// their worst case padded to a single size would exceed it. They get a
 // coarse ladder instead, which hides the exact byte size — so name lengths
 // within a rung are indistinguishable — while leaking a rough bucket of the
 // entry count. That bucket is not sensitive: the PLAINTEXT tally already
@@ -719,16 +719,17 @@ const CHECKIN_PAD = 512;
 // The ladder starts high on purpose, so realistic recaps all land in one rung.
 const PAD_LADDER = [2048, 4096, 8192];
 // `slides` gets its own SHORTER ladder with NO round-up past the top rung: an
-// 8192-padded plaintext base64-inflates past Pusher's 10 KB ceiling, so a rung
+// 8192-padded plaintext base64-inflates past the 10 KB frame ceiling, so a rung
 // the transport cannot actually deliver must not exist for this event. The
 // chunker guarantees every chunk fits 4096; if one ever did not, publish()
 // fails closed rather than leaking a bigger-than-declared frame.
 const SLIDES_PAD_LADDER = [2048, 4096];
 const LEN_PREFIX = 4;
-// Pusher's per-event ceiling (10 KB on the Sandbox plan). Base64 inflates by
-// 4/3, so a padded plaintext above ~7 KB produces a message Pusher refuses.
-// Asserted against realistic worst cases in scripts/test-envelope.cjs.
-const PUSHER_MAX_BYTES = 10240;
+// The per-frame ceiling (10 KB, the old channel's limit, kept as the budget the
+// padding ladders were designed against). Base64 inflates by 4/3, so a padded
+// plaintext above ~7 KB would not fit. Asserted against realistic worst cases
+// in scripts/test-envelope.cjs.
+const FRAME_MAX_BYTES = 10240;
 
 // PADDING IS NOT OPTIONAL. GCM is CTR-based and adds no padding of its own, so
 // an unpadded envelope reveals len(firstName) + len(club) exactly. Club is
@@ -747,7 +748,7 @@ function paddedSize(event, jsonByteLength) {
     return needed <= CHECKIN_PAD ? CHECKIN_PAD : null;
   }
   // `settings` (contract v6) rides the same short ladder for the same reason:
-  // one frame, capped well under 4096, and no rung Pusher cannot deliver.
+  // one frame, capped well under 4096, and no rung the frame ceiling forbids.
   if (event === 'slides' || event === 'settings') {
     for (const rung of SLIDES_PAD_LADDER) if (needed <= rung) return rung;
     return null;   // fail closed — see SLIDES_PAD_LADDER above
@@ -868,11 +869,9 @@ function openWithForTest(key, event, envelope) {
 // wrapping key from it with PBKDF2-SHA256 (the one KDF WebCrypto also has), and
 // publishes the display key + the slides publish token sealed under that key —
 // the SAME envelope framing as every other sealed event, so a screen opens it
-// with the openEnvelope() it already trusts. Delivered as event `provision` on a
-// Pusher CACHE channel (cache-<channel>-provision): a screen that subscribes
-// receives the last frame immediately, or `pusher:cache_miss` if the server has
-// not published in the last ~30 minutes. The 5-minute heartbeat in server.js is
-// therefore the delivery mechanism, not a nicety.
+// with the openEnvelope() it already trusts. It was delivered as event `provision` on a
+// Pusher cache channel; nothing publishes it any more (the sync service's
+// sign-in replaced it), so only the frame builder and its KDF remain here.
 //
 // The frame is public ciphertext on a public channel. The passphrase's strength
 // is the ONLY thing protecting the display key: generated passphrases are 80
@@ -895,7 +894,7 @@ const SLIDES_TOKEN_RE = /^[A-Za-z0-9_-]{24,64}$/;
 // where that screen fetches its display settings JSON from — the address the
 // display already accepts as `?config=<url>`. NOT a secret; it rides inside
 // the sealed bundle only because it is already there, which turns "type the
-// Pusher key, log in, then hand-configure weather/calendar/widgets" into one
+// sync key, log in, then hand-configure weather/calendar/widgets" into one
 // step. https ONLY (a display served over https cannot fetch http without
 // mixed-content blocking, and an http URL is trivially tamperable in a church
 // lobby) and length-capped, with credentials-in-URL refused. Anything else is
@@ -913,10 +912,6 @@ function isValidFleetConfigUrl(value) {
   if (url.protocol !== 'https:') return false;
   if (url.username || url.password) return false;
   return true;
-}
-
-function provisionChannelFor(channel) {
-  return `cache-${channel}-provision`;
 }
 
 /** Both sides apply exactly this before UTF-8 encoding — pinned in the fixture. */
@@ -1038,8 +1033,9 @@ function openProvisionForTest(passphrase, frame) {
 }
 
 // ── Publisher ─────────────────────────────────────────────────────────────────
-// Wraps pusher.trigger so a Pusher outage can never take a print down with
-// it: publish() NEVER throws and never rejects. Health state is recorded for
+// Seals a frame and hands it to the relay (the sync service's live channel,
+// installed by server.js): publish() NEVER throws and never rejects, so an
+// outage can never take a print down with it. Health state is recorded for
 // /health so the dashboard can show "last publish OK / failed at HH:MM".
 const publishState = {
   configured: false,
@@ -1054,30 +1050,19 @@ function getPublishState() {
   return { ...publishState };
 }
 
-// `configured` used to be set only by publish(), so it stayed FALSE from
-// startup until the first event of the night. That reads as "no welcome screen
-// connected" — and the whole point of the privacy banner is to warn a church
-// with a screen but no key BEFORE the first child arrives, not after their
-// first name has already gone out in the clear. The server calls this once at
-// startup with the real client, so "configured" means configured.
-function setPublisherConfigured(isConfigured) {
-  publishState.configured = !!isConfigured;
-}
-
-// The sync service's live channel (server.js installs this while the
-// computer is signed in): every frame publish() sends, after sealing, goes
-// there too, so screens listening on the Worker get exactly what Pusher
-// carries. With no Pusher at all (after switch day) it is the only path.
+// The sync service's live channel (server.js installs this): every frame
+// publish() sends, after sealing, goes there. It is the only pipe.
 let relay = null;
 function setRelay(fn) {
   relay = typeof fn === 'function' ? fn : null;
+  publishState.configured = !!relay;
 }
 
-function publish(pusher, channel, event, payload) {
-  publishState.configured = !!pusher || !!relay;
-  if ((!pusher && !relay) || !payload) return Promise.resolve(false);
+function publish(channel, event, payload) {
+  publishState.configured = !!relay;
+  if (!relay || !payload) return Promise.resolve(false);
 
-  // Seal the three name-bearing events. FAIL CLOSED: if a display key is
+  // Seal the name-bearing events. FAIL CLOSED: if a display key is
   // configured-but-unusable, or the payload somehow will not fit its fixed
   // padding, we publish NOTHING rather than falling back to plaintext. A
   // silent downgrade would be the worst outcome available — every screen would
@@ -1096,7 +1081,7 @@ function publish(pusher, channel, event, payload) {
         publishState.lastPublishAt = nowIso();
         publishState.lastEvent = event;
         publishState.lastError = `could not seal ${event} — NOT published (fail closed)`;
-        console.error(`[pusher] ${publishState.lastError}`);
+        console.error(`[publish] ${publishState.lastError}`);
         return Promise.resolve(false);
       }
       publishState.encrypting = true;
@@ -1104,46 +1089,17 @@ function publish(pusher, channel, event, payload) {
     }
   }
 
-  // The relay gets the frame exactly as Pusher does: sealed when sealed.
-  const relayed = relay
-    ? Promise.resolve().then(() => relay(channel, event, body)).then((ok) => ok === true, () => false)
-    : null;
-  if (!pusher) {
-    return relayed.then((ok) => {
-      publishState.lastPublishOk = ok;
-      publishState.lastPublishAt = nowIso();
-      publishState.lastEvent = event;
-      publishState.lastError = ok ? null : 'the sync service did not take it';
-      return ok;
-    });
-  }
-
-  try {
-    return Promise.resolve(pusher.trigger(channel, event, body)).then(
-      () => {
-        publishState.lastPublishOk = true;
-        publishState.lastPublishAt = nowIso();
-        publishState.lastEvent = event;
-        publishState.lastError = null;
-        return true;
-      },
-      (e) => {
-        publishState.lastPublishOk = false;
-        publishState.lastPublishAt = nowIso();
-        publishState.lastEvent = event;
-        publishState.lastError = (e && e.message) || 'publish failed';
-        console.warn(`[pusher] ${event} publish failed:`, publishState.lastError);
-        return false;
-      }
-    );
-  } catch (e) {
-    publishState.lastPublishOk = false;
+  // Handed over synchronously (the frame is on its way before publish() returns);
+  // a throwing or rejecting relay is just a failed publish.
+  let handed;
+  try { handed = Promise.resolve(relay(channel, event, body)); } catch (e) { handed = Promise.resolve(false); }
+  return handed.then((ok) => ok === true, () => false).then((ok) => {
+    publishState.lastPublishOk = ok;
     publishState.lastPublishAt = nowIso();
     publishState.lastEvent = event;
-    publishState.lastError = (e && e.message) || 'publish threw';
-    console.warn(`[pusher] ${event} publish threw:`, publishState.lastError);
-    return Promise.resolve(false);
-  }
+    publishState.lastError = ok ? null : 'the sync service did not take it';
+    return ok;
+  });
 }
 
 module.exports = {
@@ -1180,7 +1136,6 @@ module.exports = {
   parseHM,
   publish,
   getPublishState,
-  setPublisherConfigured,
   setRelay,
   // Sealed envelopes — see the block above publish().
   ENVELOPE_VERSION,
@@ -1188,7 +1143,7 @@ module.exports = {
   CHECKIN_PAD,
   PAD_LADDER,
   SLIDES_PAD_LADDER,
-  PUSHER_MAX_BYTES,
+  FRAME_MAX_BYTES,
   paddedSize,
   isValidDisplayKey,
   generateDisplayKey,
@@ -1208,7 +1163,6 @@ module.exports = {
   SLIDES_TOKEN_RE,
   PROVISION_CONFIG_URL_MAX,
   isValidFleetConfigUrl,
-  provisionChannelFor,
   normalizePassphrase,
   isValidLoginPassphrase,
   generateLoginPassphrase,

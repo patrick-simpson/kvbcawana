@@ -1,8 +1,9 @@
 ﻿# Club Event Bus Contract (v6)
 
-This document pins the payload schemas for every event on the shared Pusher
-channel **`awana-channel`**. The **print server in this repo is the ONLY
-publisher** (it holds the Pusher secret); the consumer is
+This document pins the payload schemas for every event on the live channel
+**`awana-channel`** (the sync Worker's; it was a public Pusher channel until
+2026-10-03). The **print server in this repo is the ONLY publisher** (it
+relays every frame to the Worker while signed in to it); the consumer is
 the lobby app ([`lobby/`](../lobby/) in this repo, was Awana-Check-in-Display) —
 both its signage page and its presentation page (`/countdown.html`, which
 absorbed the retired KVBC-Awana-Countdown app) — subscribing with the
@@ -105,7 +106,7 @@ device's own storage, so the publisher strips them and every consumer's
 sanitizer drops them. The deck is arbitrary operator-authored copy, which is
 why this event rides **sealed** like the name-bearing four.
 
-One publish is split into chunks to stay under Pusher's per-message ceiling.
+One publish is split into chunks to stay under the per-frame ceiling (`FRAME_MAX_BYTES`, 10 KB).
 Every chunk of a publish carries identical `deckRev` + `publishedAt`:
 
 | Field | Type | Notes |
@@ -152,7 +153,7 @@ deck that cannot be broadcast within the 12-chunk ceiling (greedy packing
 can strand slack per chunk, so a raw byte cap alone is not a guarantee),
 and also caps a whole deck's serialized JSON at 40 000 bytes. Every chunk
 of an accepted publish seals into the `slides` pad ladder (`[2048, 4096]`,
-**fail closed** above — the 8192 rung would base64-inflate past Pusher's
+**fail closed** above — the 8192 rung would base64-inflate past the frame
 ceiling, so it must not exist for this event).
 
 ### `settings` — the lobby screens' shared settings (v6, sealed, one frame)
@@ -171,7 +172,7 @@ copy (the welcome wording and one short line per club).
 | `settings` | object | ONLY keys from `events.settings.keys` in the vectors, each checked against its rule (bool, a clamped int or number, an enum, a capped plain string, an https URL, an `HH:MM` time, a lowercase skin id, a repaired list of thresholds, or up to 15 club lines of 80 characters). Every key is optional. |
 
 **Shared, not per-screen.** What plays behind the names, the uploads, this
-TV's sound, motion, confetti, wake lock and simplified mode, and the Pusher
+TV's sound, motion, confetti, wake lock and simplified mode, and the sync
 keys are per-screen and are not in the table, so they can never ride the
 wire; the publisher drops them, and so does every consumer. A consumer that
 lacks a key keeps its own value. **No names, ever:** thresholds, switches,
@@ -180,38 +181,12 @@ times and church copy. The publisher caps the settings object's JSON at
 anything bigger with a 413 before committing, so every accepted frame seals
 into the `[2048, 4096]` ladder `slides` uses, fail closed above.
 
-### `update` — laptop-internal release ping (NOT part of the display contract)
+### `update` — retired
 
-Published once by the release workflow (`.github/workflows/build-electron.yml`)
-after a new Windows build's installer + `latest.yml` are already live on the
-GitHub Release, so the Electron shell can auto-update within a minute or two
-of a release instead of waiting on its periodic poll.
-
-| Field | Type | Notes |
-|---|---|---|
-| `version` | string | The released semver, e.g. `"5.8.0"` — no `v` prefix. |
-| `at` | string (ISO 8601) | Publish time. Logged only, never used for any decision. |
-
-**This event is consumed only by the Electron print-server app itself**
-(`electron-app/main.js` subscribes to it and calls `checkForUpdates()`), not
-by any display. It rides the same public channel as every other event above
-purely because that channel and its key already exist — a fork's displays
-bind only the event names they know about, so an extra event name on the
-channel is invisible to them by construction, but the rule is stated here
-explicitly rather than left implicit:
-
-- **Never anything but a version string and a timestamp.** No child or
-  household data is even reachable from the release workflow that publishes
-  this, but the same discipline applies as every other event: if a future
-  change ever wants to put more on this event, it still may not carry PII.
-- **Displays MUST ignore it.** No display-side sanitizer or contract vector
-  covers `update`, and none should ever be added — a display binding this
-  event would be relying on undocumented behaviour outside this contract.
-- **It cannot forge a release.** The channel is public, so anyone can see or
-  even publish a fake `update` event with a bogus version — but all that
-  triggers is a normal `checkForUpdates()`, which electron-updater then
-  verifies independently against the real GitHub Releases feed. Worst case is
-  one harmless extra check, not a forced install of anything.
+The laptop-internal release ping (the release workflow publishing `{ version,
+at }` so the Electron shell could check for an update sooner) is retired: the
+app no longer listens for it and polls the update feed every ten minutes. No
+display ever bound it, and none should.
 
 ## Validation
 
@@ -235,9 +210,10 @@ exact key sets, correct types, PII structurally impossible, plus the
 
 ## The transport: sealed envelopes
 
-The Pusher channel is **public**, and Pusher public channels have no
-server-side authorization primitive — subscription is granted by possession of
-the app key, which must ship in the display's public bundle. So the four
+The channel was a **public** Pusher channel, which has no server-side
+authorization primitive — subscription was granted by possession of the app
+key, which had to ship in the display's public bundle. The Worker's channel is
+signed in, and the rules below stand unchanged. So the four
 name-bearing events (`checkin`, `recap`, `birthdays`, `checkout`), the
 operator-authored `slides` deck and the shared `settings` are **encrypted** with AES-256-GCM before
 publish; the remaining events ride in the clear on purpose.
@@ -268,17 +244,14 @@ headcount, irreducibly) and for the operator-facing setup and rollback.
 
 ### `provision` — display login (device provisioning, NOT a display event)
 
-A second, separate channel carries one more sealed frame so a screen can be
+**Retired (2026-10-12): nothing publishes this frame any more** (screens sign
+in to the sync service instead). The frame format and its KDF stay documented
+here because `envelope-vectors.json` still pins them and the display repo still
+opens them. It used to carry one more sealed frame so a screen could be
 provisioned by typing a passphrase instead of pasting keys:
 
-- **Channel:** `cache-<channel>-provision` (a Pusher *cache* channel — a new
-  subscriber receives the last published frame immediately, or
-  `pusher:cache_miss`). With the default channel that is
-  `cache-awana-channel-provision`.
-- **Event:** `provision`. Published at startup, on every config save that
-  touches the display key / publish token / passphrase, and every 5 minutes
-  (Pusher's cache keeps a frame ~30 minutes, so the heartbeat is the delivery
-  path). Published **only** when both a passphrase and a display key exist.
+- **Channel:** `cache-<channel>-provision` (a Pusher *cache* channel).
+- **Event:** `provision`.
 - **Frame:** `{ v: 1, kdf: { name: "PBKDF2-SHA256", iterations, salt },
   envelope: { v: 1, kid, iv, ct } }`. The envelope is the standard framing
   above, sealed under `PBKDF2-SHA256(NFKC(trim(passphrase)), salt,

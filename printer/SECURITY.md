@@ -14,7 +14,7 @@ enforced by an app-level gate ahead of every route.
 | Caller | Trust | What it can reach |
 |---|---|---|
 | **Loopback** (`127.0.0.1`, `::1`) — the Chrome extension via `http://localhost:3456`, the dashboard, the Electron shell | Trusted | Everything |
-| **The LAN** — phones running the check-in page | Untrusted; PIN required on **every** request | Everything except the Pusher secret and the PIN itself |
+| **The LAN** — phones running the check-in page | Untrusted; PIN required on **every** request | Everything except the secrets (the PIN, the display key, the sync session) and the PIN itself |
 | **Any website open in the volunteer's browser** | Untrusted | Nothing, unless its origin is on the allowlist |
 
 Three consequences worth stating plainly:
@@ -72,13 +72,13 @@ It is reachable only from loopback or with the phone PIN, like the roster.
 That second case is why `.gitignore` covers `config.json`, `print-history.json`,
 `attendance.json`, `leaders.json` and `events-buffer.json` as well as `clubbers*.csv` (and
 `households*.csv`, kept ignored for any old install that still has one on
-disk). `config.json` holds the **Pusher app secret and the phone PIN**; the
+disk). `config.json` holds the **phone PIN, the display key and the sync session** (and, in old files, a Pusher secret); the
 CSVs hold children's and guardians' personal data.
 
 > **If you have ever run the server from a clone of this repo,
 > check `git status` before committing anything.** Prior to v5.3.0 only
 > `clubbers*.csv` was ignored, so a `git add -A` could commit the church's
-> Pusher secret, the phone PIN, the full household export and every child's
+> display key, the phone PIN, the full household export and every child's
 > check-in history.
 
 ## Forking this repo
@@ -94,19 +94,20 @@ Work through this list before you run a fork in production.
    in a later commit is not enough — forks and clones keep the old objects.
 
 2. **Rotate anything the upstream repo might have seen.** Generate your own
-   Pusher app; never reuse a key or secret from another church's install.
+   display key and sign in to your own sync service; never reuse a key or
+   secret from another church's install.
 
 3. **Set your own church identity.** `print-server/church-config.json`
    (`churchName`, `subdomain`, `checkinUrl`, `pusherChannel`, `clubNights`).
    The baked defaults in `server.js` point at KVBC, so a fork that skips this
    opens another church's check-in page.
 
-4. **Never commit a Pusher app secret**, in `config.json`, in a workflow file,
-   or in a README example. The secret allows publishing to your church's
-   screens.
+4. **Never commit a secret** (the display key, the sync session, an old
+   Pusher secret), in `config.json`, in a workflow file, or in a README
+   example. They allow publishing to your church's screens.
 
 5. **Keep the sanitizer contract intact.** `contract-vectors.json` is the
-   canonical definition of what may ride the Pusher channel, mirrored
+   canonical definition of what may ride the live channel, mirrored
    byte-identically into the display repo. Only first names ever go on the
    wire — never last names, allergies, contact details or birth years. See
    `CONTRACT.md`.
@@ -117,72 +118,29 @@ Work through this list before you run a fork in production.
    bind logic or the dashboard's output escaping, that suite is what tells you
    whether you broke the roster's protection.
 
-## The Pusher channel is public by design
+## The live channel
 
-The display app subscribes to a **public** Pusher channel, so its app key is
-necessarily readable by anyone who views the signage page's source. That is why
-the payload contract is PII-free: the channel carries first names, club names,
-aggregate counts, and birthday month/day — nothing that identifies a child to a
-stranger. Anyone with the key can subscribe and see that much. Decide
-consciously whether that is acceptable for your church; see the display repo's
-`SECURITY.md` for the details and the private-channel alternative.
+Screens get their frames from the sync Worker's live channel, which this server
+feeds by relaying every frame it publishes (`events.setRelay`). Until
+2026-10-03 the channel was a **public** Pusher channel, whose app key anyone
+could read from a screen's page source; that is why the payload contract is
+PII-free (first names, club names, aggregate counts, birthday month/day —
+nothing that identifies a child to a stranger) and why names are sealed with
+AES-256-GCM under the display key. Both rules stand on the new channel. The
+Pusher publisher is gone from this server (2026-10-12).
 
-## Display login (one passphrase for every screen)
+## Display login (retired)
 
-Screens can be provisioned with a single church passphrase instead of pasting
-the display key and the slide-publish token into each one. The server derives a
-32-byte wrapping key from the passphrase with **PBKDF2-SHA256** (600,000
-iterations, a random 16-byte salt minted whenever the passphrase changes,
-passphrase normalised trim → NFKC → UTF-8), seals `{ displayKey,
-slidesPublishToken, issuedAt, configUrl }` under it with the same AES-256-GCM envelope as
-every other sealed event, and publishes that frame as `provision` on a Pusher
-**cache channel** (`cache-<channel>-provision`) at startup, on every config
-save and every five minutes. A screen that subscribes gets the last frame at
-once, derives the same key from the typed passphrase, opens the frame and
-stores the key and token in their own storage slots. Nothing about a display
-ever reaches this server for it to work.
-
-What that means for the threat model:
-
-- **The frame is public ciphertext on a public channel.** Anyone can capture
-  it and test passphrase guesses offline at PBKDF2 cost. The passphrase's
-  strength is the *only* thing protecting the display key. Generated
-  passphrases are 80 bits (`xxxx-xxxx-xxxx-xxxx` from a 32-letter alphabet).
-  A typed passphrase must be at least 12 characters — prefer Generate.
-- **A leaked passphrase is a leaked display key and publish token.** Rotate
-  all three: set a new passphrase (a new salt is minted), generate a new
-  display key, generate a new publish token. Screens that hold the old
-  passphrase-derived key then see the new frame's kid mismatch and ask to be
-  logged in again; screens already keyed keep the *old* key until they are.
-- **Fail closed.** No frame is published unless a passphrase *and* a display
-  key are both configured — a frame carrying an empty key would tell every
-  logged-in screen to drop its key (an authenticated downgrade). A junk
-  publish token is coerced to empty, never shipped.
-- **`configUrl` is not a secret and is not treated as one.** It is the
-  fleet-config address a screen already accepts as `?config=` — a public JSON
-  file of display preferences, never child data — and it rides inside the
-  sealed bundle only because that bundle is already going to that screen. It
-  is **https only**, at most 200 characters, no credentials in the URL,
-  validated where it is persisted *and* where it is sealed; anything else
-  becomes the empty string rather than being shipped, and a bad value can
-  never turn a good frame into no frame. It is not in the server's secret set
-  (it is an address, and hiding it would only make it harder to check), but
-  `/health` does not carry it either — `/health` is CORS-readable from the
-  check-in site and this is nobody's business but the operator's. On the
-  display it lands in its own storage entry, never in the settings object, so
-  it cannot ride a Settings export.
-- **Replay.** Every frame stamps `issuedAt`; a screen ignores a bundle older
-  than the one it last applied, so a captured frame cannot roll screens back
-  to a rotated key.
-- **Read/write surface.** `displayLoginPassphrase` is in the server's secret
-  set: never returned by `GET /config` off-loopback, never settable from the
-  LAN, mintable only from the dashboard. The salt is public by construction
-  (it rides in the frame) and is not a secret. `/health` exposes only the
-  wrapping key's kid and the last publish time.
-
-The KDF parameters and a deterministic passphrase → key → kid vector are
-pinned in `envelope-vectors.json` (`provision` section) and mirrored into the
-display repo, so the Node and WebCrypto derivations cannot drift apart.
+Screens used to be provisioned with a single church passphrase: the server
+derived a wrapping key from it (PBKDF2-SHA256, 600,000 iterations, a 16-byte
+salt), sealed `{ displayKey, slidesPublishToken, issuedAt, configUrl }` under it
+and published that frame as `provision` on a Pusher cache channel. Screens now
+sign in to the sync service instead, and **nothing publishes the frame any
+more**. What remains in `print-server/events.js` is the frame builder and the
+KDF, pinned by the `provision` section of `envelope-vectors.json` (mirrored
+into the display repo so the Node and WebCrypto derivations cannot drift), and
+`displayLoginPassphrase` is still in the server's secret set: never returned by
+`GET /config` off-loopback, never settable from the LAN.
 
 ## Reporting a vulnerability
 

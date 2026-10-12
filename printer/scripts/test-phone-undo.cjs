@@ -31,7 +31,6 @@ process.on('exit', (code) => {
 });
 
 const fs = require('fs');
-const Module = require('module');
 const os = require('os');
 const path = require('path');
 
@@ -64,18 +63,8 @@ function extractFunction(name) {
 }
 const UNDO_SAY_SRC = SRC.slice(SRC.indexOf('var UNDO_SAY = {'), SRC.indexOf('};', SRC.indexOf('var UNDO_SAY = {')) + 2);
 
-// Every tally the server publishes, instead of a trip to pusher.com.
+// Every tally the server publishes, instead of a trip to the network.
 const wire = [];
-const realLoad = Module._load;
-Module._load = function patched(request) {
-  if (request === 'pusher') {
-    return class FakePusher {
-      trigger(channel, event, payload) { wire.push({ channel, event, payload }); return Promise.resolve(); }
-    };
-  }
-  // eslint-disable-next-line prefer-rest-params
-  return realLoad.apply(this, arguments);
-};
 
 const tick = (ms = 0) => new Promise((r) => setTimeout(r, ms));
 
@@ -186,8 +175,7 @@ async function serverSuite() {
   process.env.PATH = `${binDir}${path.delimiter}${process.env.PATH}`;
   fs.writeFileSync(path.join(dataDir, 'clubbers.csv'), 'ClubberID,FirstName,LastName,Club\n4821,Ava,Stone,Sparks\n77,Mia,Reed,T&T\n');
   fs.writeFileSync(path.join(dataDir, 'config.json'), JSON.stringify({
-    printerName: 'Fake', pusherAppId: '1', pusherKey: 'k', pusherSecret: 's', pusherCluster: 'us2',
-  }, null, 2));
+    printerName: 'Fake',  }, null, 2));
   const now = Date.now();
   const row = (r, minsAgo) => Object.assign({ clubName: 'Sparks', printer: 'Fake', success: true, timestamp: new Date(now - minsAgo * 60000).toISOString() }, r);
   fs.writeFileSync(path.join(dataDir, 'print-history.json'), JSON.stringify([
@@ -198,6 +186,9 @@ async function serverSuite() {
   Object.assign(process.env, { AWANA_DATA_DIR: dataDir, AWANA_PORT: String(PORT), AWANA_BIND_HOST: '127.0.0.1', PRINTER_NAME: 'Fake' });
 
   const server = require(path.join(root, 'print-server', 'server.js'));
+
+  // The relay is the only pipe: record what the server hands it, as the wire.
+  require(path.join(root, 'print-server', 'events.js')).setRelay((channel, event, body) => { wire.push({ channel, event, payload: body }); return Promise.resolve(true); });
   const listener = server.startListening();
   await new Promise((r) => { if (listener.listening) return r(); listener.once('listening', r); });
   const j = async (p, opts) => { const res = await fetch(BASE + p, opts); return { status: res.status, body: await res.json().catch(() => null) }; };

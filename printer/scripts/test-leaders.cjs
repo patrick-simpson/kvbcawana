@@ -31,7 +31,6 @@ process.on('exit', (code) => {
 });
 
 const fs = require('fs');
-const Module = require('module');
 const os = require('os');
 const path = require('path');
 
@@ -49,22 +48,9 @@ function check(name, cond, detail) {
   }
 }
 
-// Keep Pusher off the network and record what would have gone out, so the
+// Record what would have gone out (the relay is replaced below), so the
 // "leader tags never reach the display" claim is checked, not assumed.
 const wire = [];
-const realLoad = Module._load;
-Module._load = function patched(request) {
-  if (request === 'pusher') {
-    return class FakePusher {
-      trigger(channel, event, payload) {
-        wire.push({ channel, event, payload });
-        return Promise.resolve();
-      }
-    };
-  }
-  // eslint-disable-next-line prefer-rest-params
-  return realLoad.apply(this, arguments);
-};
 
 async function j(pathname, opts) {
   const res = await fetch(BASE + pathname, opts);
@@ -99,6 +85,9 @@ async function main() {
   process.env.AWANA_BIND_HOST = '127.0.0.1';
 
   const server = require(path.join(__dirname, '..', 'print-server', 'server.js'));
+
+  // The relay is the only pipe: record what the server hands it, as the wire.
+  require(path.join(__dirname, '..', 'print-server', 'events.js')).setRelay((channel, event, body) => { wire.push({ channel, event, payload: body }); return Promise.resolve(true); });
   const {
     CLUB_LIST, CLUB_DISPLAY_NAMES, CLUB_MONOGRAM, LEADERS_MAX, LEADER_ACTIVE_DAYS,
     rememberLeader, forgetLeader, activeLeaders, loadLeaders, saveLeaders, leaderKey,

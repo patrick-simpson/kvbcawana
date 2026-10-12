@@ -134,7 +134,7 @@ console.log('envelope: ciphertext length leaks nothing about the name');
   check('a short name and a long name in the same recap are indistinguishable',
     recapOf(4, 'Amy').ct.length === recapOf(4, 'Bartholomew').ct.length);
 
-  // Pusher rejects any event over its per-message ceiling, so padding must not
+  // A frame over the per-frame ceiling is refused, so padding must not
   // push a REALISTIC payload past it. Base64 inflates by 4/3, and the envelope
   // carries the iv and kid too — measure the whole serialized frame.
   const frameBytes = (env) => Buffer.from(JSON.stringify(env), 'utf8').length;
@@ -152,8 +152,8 @@ console.log('envelope: ciphertext length leaks nothing about the name');
   ];
   for (const [label, env] of realisticWorst) {
     const size = frameBytes(env);
-    check(`${label} stays under Pusher's ${events.PUSHER_MAX_BYTES}-byte event ceiling`,
-      size < events.PUSHER_MAX_BYTES, `frame is ${size} bytes`);
+    check(`${label} stays under the ${events.FRAME_MAX_BYTES}-byte frame ceiling`,
+      size < events.FRAME_MAX_BYTES, `frame is ${size} bytes`);
   }
 }
 
@@ -330,11 +330,11 @@ console.log('envelope: display login (provision) derives, seals and opens per th
     && events.isValidFleetConfigUrl('http://example.org/a.json') === false
     && events.isValidFleetConfigUrl(`https://example.org/${'a'.repeat(200)}`) === false
     && events.PROVISION_CONFIG_URL_MAX === 200);
-  check('a config URL does not change the pad rung — the frame still fits Pusher',
+  check('a config URL does not change the pad rung — the frame still fits the ceiling',
     Buffer.byteLength(JSON.stringify(events.buildProvisionFrame({
       displayKey: KEY, slidesPublishToken: 'tok_AbCdEfGhIjKlMnOpQrStUvWx',
       configUrl: `https://example.org/${'a'.repeat(170)}`,
-    }))) < events.PUSHER_MAX_BYTES);
+    }))) < events.FRAME_MAX_BYTES);
   check('fail closed still wins: no login configured, no frame, URL or not',
     (() => {
       events.setDisplayLogin('', '');
@@ -343,7 +343,7 @@ console.log('envelope: display login (provision) derives, seals and opens per th
       const noKey = events.buildProvisionFrame({ displayKey: '', configUrl: 'https://example.org/a.json' });
       return none === null && noKey === null;
     })());
-  check('the frame stays under Pusher\'s ceiling', Buffer.byteLength(JSON.stringify(frame)) < events.PUSHER_MAX_BYTES);
+  check('the frame stays under the frame ceiling', Buffer.byteLength(JSON.stringify(frame)) < events.FRAME_MAX_BYTES);
   check('a provision bundle pads onto the first ladder rung (2048)', events.paddedSize('provision', 200) === 2048);
   check('provision is NOT one of the display-key-sealed events', !events.ENCRYPTED_EVENTS.has('provision'));
   check('the frame never carries the display key in the clear', !JSON.stringify(frame).includes(KEY));
@@ -356,14 +356,13 @@ console.log('envelope: display login (provision) derives, seals and opens per th
   check('validator: 11 chars rejected, 12 accepted', events.isValidLoginPassphrase('abcdefghijk') === false && events.isValidLoginPassphrase('abcdefghijkl') === true);
   check('validator: control characters rejected', events.isValidLoginPassphrase('abcdefghijkl\u0007') === false);
   check('validator: 129 chars rejected', events.isValidLoginPassphrase('a'.repeat(129)) === false);
-  check('provisionChannelFor derives the cache channel name', events.provisionChannelFor('awana-channel') === 'cache-awana-channel-provision');
   events.setDisplayLogin('', '');
 }
 
 console.log('envelope: publish() seals the right events and only those');
 {
   const sent = [];
-  const fakePusher = { trigger: (ch, ev, body) => { sent.push({ ev, body }); return Promise.resolve(); } };
+  events.setRelay((ch, ev, body) => { sent.push({ ev, body }); return Promise.resolve(true); });
   const isSealed = (b) => b && b.v === events.ENVELOPE_VERSION && typeof b.ct === 'string';
 
   events.setDisplayKey(KEY);
@@ -381,7 +380,7 @@ console.log('envelope: publish() seals the right events and only those');
   };
   return (async () => {
     for (const [ev, payload] of Object.entries(cases)) {
-      await events.publish(fakePusher, 'awana-channel', ev, payload);
+      await events.publish('awana-channel', ev, payload);
     }
     for (const { ev, body } of sent) {
       const shouldSeal = events.ENCRYPTED_EVENTS.has(ev);
@@ -412,7 +411,7 @@ console.log('envelope: publish() seals the right events and only those');
     // silent downgrade impossible once a screen IS keyed.
     sent.length = 0;
     events.setDisplayKey('');
-    await events.publish(fakePusher, 'awana-channel', 'checkin', cases.checkin);
+    await events.publish('awana-channel', 'checkin', cases.checkin);
     check('with no key, checkin publishes plaintext (rollout mode)',
       sent.length === 1 && !isSealed(sent[0].body) && sent[0].body.firstName === 'Amy');
     check('and publishState records that it is NOT encrypting',
@@ -423,7 +422,7 @@ console.log('envelope: publish() seals the right events and only those');
     sent.length = 0;
     events.setDisplayKey(KEY);
     const huge = { firstName: 'A'.repeat(300), club: 'B'.repeat(300), id: 'x', at: 'y' };
-    const ok = await events.publish(fakePusher, 'awana-channel', 'checkin', huge);
+    const ok = await events.publish('awana-channel', 'checkin', huge);
     check('an unsealable checkin publishes NOTHING (fail closed)',
       ok === false && sent.length === 0,
       'it must never fall back to plaintext');
@@ -432,11 +431,11 @@ console.log('envelope: publish() seals the right events and only those');
 
     // publish() must still never throw — printing depends on that.
     events.setDisplayKey(KEY);
-    const throwing = { trigger: () => { throw new Error('pusher exploded'); } };
+    events.setRelay(() => { throw new Error('relay exploded'); });
     let threw = false;
     try {
       check('publish never rejects even when the transport throws',
-        (await events.publish(throwing, 'awana-channel', 'checkin', cases.checkin)) === false);
+        (await events.publish('awana-channel', 'checkin', cases.checkin)) === false);
     } catch { threw = true; }
     check('publish did not throw synchronously either', threw === false);
 

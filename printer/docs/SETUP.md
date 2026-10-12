@@ -16,15 +16,8 @@ out — deliberately even mid-club-night**, since a release that ships
 while a club is running is almost always an urgent fix. The app waits a
 few seconds for any in-flight label print to finish, then restarts on
 its own; the print server comes back up unattended. This needs no setup
-to work at all (every launch, and every 24 hours after that, checks for
-updates on its own) — but for it to happen within *a minute or two*
-rather than up to a day, the repo needs `PUSHER_APP_ID`, `PUSHER_KEY`,
-`PUSHER_SECRET` and `PUSHER_CLUSTER` set as GitHub Actions secrets (the
-same Pusher app already used for the lobby display; never reuse another
-church's), plus optionally `PUSHER_CHANNEL` if you changed
-`pusherChannel` away from the default in `church-config.json`. Missing
-any of those simply falls back to the 24-hour poll — the release step
-that pings them is skipped silently, never fails the build.
+(every launch, and every ten minutes after that, the app checks the
+update feed on awana.kvbchurch.org on its own).
 
 ## 2. Chrome extension
 
@@ -46,24 +39,14 @@ Details in `EXTENSION.md`.
   button straight to the setting. If you run a lobby TV, this is the one
   to green before club night; see `SECURITY.md`.
 - **Printer + check-in URL** — set once.
-- **Pusher** (optional) — powers the lobby welcome display and the
-  countdown app's live counts. Only this server holds the secret.
+- **Sync service** (Settings tab) — sign this computer in with the church
+  passphrase so the lobby welcome display and the countdown app's live
+  counts get their frames; names stay sealed under the display key.
 - **Realtime privacy → display key** (Settings tab) — *Generate display
   key*, **Copy**, paste the same value into every screen (their Settings
   → Connection → Display key), *then* **Save Settings**. That order means
   a mistyped paste cannot lock every screen out at once. Without a key the
-  names ride a public channel in the clear.
-- **Display login** (Settings tab, under the display key) — the easy way
-  to set up screens: **Generate** a passphrase (it saves immediately),
-  then type it once on each screen — lobby TV: Settings → Connection →
-  **Display login**; projector page: Display Settings → **Log in**. The
-  screen receives the display key and the slide-publish token by itself and
-  keeps working when you rotate either. Needs a display key to exist and the
-  print server to be running while the screen logs in. Changing the
-  passphrase does **not** log screens out — each keeps the keys it holds,
-  shows "log in again" in its settings, and needs the new passphrase before
-  it can follow the next key rotation. Pasting the key by hand (above) still
-  works under the screen's *Advanced* section.
+  names go out in the clear.
 - **Check-in Features** — phone PIN, late-arrival grace, visitor label
   style, connect cards, and the driven-check-in kill switch.
 - **Club Schedule** — one row per slot of the night (club, from, activity,
@@ -90,7 +73,7 @@ Find the laptop's IP with `ipconfig` (Wireless LAN → IPv4).
 including the roster fetch — and wrong PINs are rate-limited. But the
 PIN rides plain HTTP, so it stops a bystander reading the roster, not
 someone who can already sniff the network. Use the church's private
-Wi-Fi, not an open guest network. The Pusher secret and the PIN itself
+Wi-Fi, not an open guest network. The display key, the sync session and the PIN itself
 are never readable over the network, even with a valid PIN.
 
 For a roster kid the phone page never prints directly; it queues the
@@ -120,7 +103,7 @@ deliberately does not defend against, and the fork checklist.
 ## 5. Church configuration
 
 `print-server/church-config.json` — check-in URL, club-night windows
-(when live broadcasts run), shares club ids, Pusher channel. Baked
+(when live broadcasts run), shares club ids, the live channel's name (`pusherChannel`). Baked
 KVBC defaults apply if the file is missing. Forks change this one file.
 
 ## Per-night knobs (widget)
