@@ -8015,6 +8015,11 @@ function configureCloud(opts) {
   return { ok: true };
 }
 
+/** "I looked at the printer": clears the CHECK THE PRINTER warning. */
+function clearCheckThePrinter() {
+  if (cloudStation) cloudStation.puller.clearChecks();
+}
+
 function cloudStatus() {
   if (!cloudStation) return { station: false };
   return {
@@ -8048,7 +8053,7 @@ app.get('/cloud/print-status', (req, res) => {
 // "I looked at the printer": clears the CHECK THE PRINTER warning.
 app.post('/cloud/print-status/clear', (req, res) => {
   if (!isTrustedOrSettingsPage(req)) return res.status(403).json({ error: 'The check-in laptop only' });
-  if (cloudStation) cloudStation.puller.clearChecks();
+  clearCheckThePrinter();
   res.json(cloudStatus());
 });
 
@@ -9940,7 +9945,7 @@ function startListening(attempt = 1) {
 }
 
 module.exports = {
-  configureCloud, stopCloud, cloudStatus, importLaptopHistory, mergeAttendance,
+  configureCloud, stopCloud, cloudStatus, clearCheckThePrinter, importLaptopHistory, mergeAttendance,
   app, startListening, stopListening, isBusy, resetRelayForTest, setUpdateHandler, setLatestVersion, setExtensionInfo, setOpsAlertHandler,
   // For the Electron shell: this module is require-cached across settings
   // saves, so the shell pushes the freshly merged config.json and printer
