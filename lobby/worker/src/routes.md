@@ -697,6 +697,16 @@ Never here: printers, `cupsMedia`, `musicalPrinter`, `updateBeacon`,
 `SECRET_CONFIG_KEYS` key. Values are church-authored or adult volunteers' names
 (`leaders`), never child data.
 
+**The leaders' names are stored in the clear (owner-approved exception,
+2026-10-12).** Unlike every child name, which the Worker holds only sealed, the
+remembered leaders' (adults') FULL names (first + last, club, last printed,
+count) sit UNENCRYPTED in the `church` doc and in its change log (`church`
+entries for key `leaders`: `before` in `logv`), and any signed-in session reads
+them (`GET /v1/church/settings`, `GET /v1/changes`). That is the price of chips
+on any phone with no key step; the owner accepted it. Never put a child's name,
+or anything beyond a leader row's fields, in this list. `printer/SECURITY.md`
+and `lobby/SECURITY.md` say the same.
+
 **The remembered leaders from any phone.** Remember (after a leader tag prints)
 and Forget (the × on a chip) are church edits of the WHOLE `leaders` list with
 `baseRev` (409 `stale` → re-read, re-apply, send again); each is logged as a

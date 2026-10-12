@@ -168,6 +168,21 @@ accepted a short passphrase; there is no recovery), is written down once in
 same cryptography as `print-server/cloud-crypto.js`, generated from
 `lobby/shared/cloud-crypto.js`.
 
+## Remembered leaders in the sync service (owner-approved exception)
+
+Since 9.3.0 the remembered leaders (the leader-tag chips) live in the sync
+Worker's church settings (`lobby/worker/src/routes.md` section 10.3), so any
+phone or computer signed in with the passphrase shows the same chips. Those are
+adult volunteers' **full names** (first and last, club, when last printed, how
+many times), and they are stored **unencrypted**: in the Worker's church
+settings document and in its change log (each Remember or Forget is a logged
+edit with the list before it). Any signed-in session can read them. This is the
+one place the service keeps a person's name in the clear; every child's name
+stays sealed. The owner approved this exception on 2026-10-12. The print
+server's `leaders.json` stays the offline copy, and the list never carries a
+child's name, a phone number or a birthdate (`sanitizeChurch` keeps only the
+row's fields).
+
 ## Reporting a vulnerability
 
 Open a GitHub issue for anything non-sensitive. For something that would expose

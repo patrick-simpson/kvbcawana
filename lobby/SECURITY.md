@@ -161,6 +161,12 @@ service**:
   template its own allowlist, the calendar `sanitizeFeed`.
 - Its doorbell (`changed` `{what}` on `awana-sync`) is plaintext and carries no
   content; a screen that hears it fetches from the service.
+- **One exception holds names in the clear: the remembered leaders** (owner
+  approved, 2026-10-12). The church settings' `leaders` list (routes.md 10.3)
+  keeps adult volunteers' FULL names (first and last, club, last printed,
+  count) UNENCRYPTED in the Worker's church settings and in its change log,
+  readable by any signed-in session. Every child's name stays sealed; never put
+  a child in that list.
 
 Until `shared/sync.json` names a service, everything below is how screens are
 set up.
