@@ -22,6 +22,21 @@ class_name = "SyncStore"
 tag = "v1"
 new_sqlite_classes = ["SyncStore"]
 
+# Online check-in history (ROADMAP.md#online-check-in): a FREE Cloudflare D1
+# database, binding HISTORY_DB, holding only sealed rows and plaintext counts
+# (migrations/0001_history.sql). Left commented until the database exists, so a
+# deploy never needs one. To set it up (the owner, once):
+#   cd lobby/worker
+#   npx wrangler d1 create awana-history        # prints a database_id
+#   (paste it below and uncomment the block)
+#   npx wrangler d1 migrations apply awana-history --remote
+# Code must treat a missing env.HISTORY_DB as "history is off", never an error.
+# [[d1_databases]]
+# binding = "HISTORY_DB"
+# database_name = "awana-history"
+# database_id = "<from wrangler d1 create>"
+# migrations_dir = "migrations"
+
 # Read the church calendar every six hours (UTC), so it is fresh without
 # anyone pressing Refresh.
 [triggers]
