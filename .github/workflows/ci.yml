@@ -24,16 +24,15 @@ on:
 permissions:
   contents: read
 
-# A newer push to the same PR replaces its run. On main a run is never
-# cancelled: every push to main is followed within minutes by another (the
-# release workflows and the nightly bots commit a feed or a lesson and
-# dispatch this workflow), and cancelling the run in flight killed its deploy
-# job between the Worker and the site, or starved the deploy altogether while
-# commits kept landing. The deploy job's own group below keeps main's deploys
-# in order, newest pending only.
-concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+# A newer run replaces an older one's TEST jobs (job-level groups below), so
+# a burst of pushes to main no longer queues, one run after another, behind
+# the first. It is done per job and not here, on purpose: a workflow-level
+# `cancel-in-progress` cancels the whole older run, and a deploy job that had
+# started (the Worker shipped, the site not yet published) would be cut off
+# half way. The deploy job has its own group and is never cancelled.
+# Because the older run's tests may have been the only ones to see a change,
+# "What changed" compares with the last GREEN run of this workflow, not with
+# the previous commit, so nothing a cancelled run was checking goes untested.
 
 jobs:
   # Which slow suites this push can affect. The lobby's (7.5 min, mostly the
@@ -51,9 +50,13 @@ jobs:
     name: What changed
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read   # list this workflow's earlier runs
     outputs:
       lobby: ${{ steps.pick.outputs.lobby }}
       printer: ${{ steps.pick.outputs.printer }}
+      base: ${{ steps.pick.outputs.base }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -63,10 +66,22 @@ jobs:
           EVENT: ${{ github.event_name }}
           BEFORE: ${{ github.event.before }}
           PR_BASE: ${{ github.event.pull_request.base.sha }}
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
         run: |
           set -u
           base=""
-          if [ "$EVENT" = "push" ] && [ -n "$BEFORE" ] && ! echo "$BEFORE" | grep -Eq '^0+$'; then base="$BEFORE"
+          if [ "$EVENT" = "push" ] && [ -n "$BEFORE" ] && ! echo "$BEFORE" | grep -Eq '^0+$'; then
+            base="$BEFORE"
+            # A newer push cancels the older run's tests, so the commit before
+            # this one may never have been tested. The newest earlier run of
+            # this workflow on main that finished green, and whose commit is
+            # an ancestor of this one, is the last tree known good: compare
+            # with that, so every change since it is covered by this run.
+            green="$(gh api "repos/$REPO/actions/workflows/ci.yml/runs?branch=main&status=success&per_page=30" --jq '.workflow_runs[].head_sha' 2>/dev/null || true)"
+            for sha in $green; do
+              if [ "$sha" != "$GITHUB_SHA" ] && git cat-file -e "$sha^{commit}" 2>/dev/null && git merge-base --is-ancestor "$sha" HEAD; then base="$sha"; break; fi
+            done
           elif [ "$EVENT" = "pull_request" ] && [ -n "$PR_BASE" ]; then base="$PR_BASE"; fi
           files=""
           if [ -n "$base" ] && git cat-file -e "$base^{commit}" 2>/dev/null; then files="$(git diff --name-only "$base" HEAD)"; fi
@@ -92,6 +107,7 @@ jobs:
           echo "Changed since ${base:-unknown}: $(printf '%s\n' "$files" | grep -c . || true) file(s). Lobby tests: $lobby. Printer tests: $printer."
           echo "lobby=$lobby" >> "$GITHUB_OUTPUT"
           echo "printer=$printer" >> "$GITHUB_OUTPUT"
+          if [ "$EVENT" = "push" ]; then echo "base=$base" >> "$GITHUB_OUTPUT"; fi
 
   copies:
     name: Family copies match
@@ -113,6 +129,9 @@ jobs:
     if: needs.changes.outputs.lobby == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    concurrency:
+      group: lobby-checks-${{ github.ref }}
+      cancel-in-progress: true
     defaults:
       run:
         working-directory: lobby
@@ -127,11 +146,23 @@ jobs:
       - run: npm run test:coverage
 
   lobby-e2e:
-    name: Lobby + projector (build, browser smoke)
+    # The smoke suite (237 tests, 4 minutes on one runner) in 4 shards. The
+    # shards split by test (--fully-parallel): touch.spec.js alone holds 88
+    # of them, and by file the shards would be 74 / 75 / 88 / 0. Every shard
+    # builds and installs on its own; the deploy job needs the job, so it
+    # waits for all four.
+    name: Lobby + projector (browser smoke ${{ matrix.shard }}/4)
     needs: changes
     if: needs.changes.outputs.lobby == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    concurrency:
+      group: lobby-e2e-${{ matrix.shard }}-${{ github.ref }}
+      cancel-in-progress: true
     defaults:
       run:
         working-directory: lobby
@@ -162,12 +193,12 @@ jobs:
         if: steps.pwcache.outputs.cache-hit == 'true'
         run: npx playwright install-deps chromium
       - name: E2E smoke
-        run: npm run e2e
+        run: npm run e2e -- --fully-parallel --shard=${{ matrix.shard }}/4
       - name: Upload Playwright report
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: lobby-playwright-report
+          name: lobby-playwright-report-${{ matrix.shard }}
           path: lobby/playwright-report
           retention-days: 7
 
@@ -230,6 +261,9 @@ jobs:
     if: needs.changes.outputs.printer == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    concurrency:
+      group: printer-${{ github.ref }}
+      cancel-in-progress: true
     defaults:
       run:
         working-directory: printer
@@ -291,6 +325,7 @@ jobs:
           include-hidden-files: true
           if-no-files-found: error
           retention-days: 1
+          compression-level: 1   # the deploy job waits on this upload and download
 
   deploy:
     # The site is built first (its failures are the cheap ones), then the
@@ -302,10 +337,14 @@ jobs:
     name: Deploy to Cloudflare
     # A suite "What changed" skipped is not a failure: !failure() and
     # !cancelled() let the deploy run past it, and still stop on any red job.
-    if: ${{ !failure() && !cancelled() && github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}
+    # A test job a newer run cancelled is neither failed nor skipped, so it is
+    # named: without that this older run would deploy untested.
+    if: ${{ !failure() && !cancelled() && !contains(needs.*.result, 'cancelled') && github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}
     needs: [changes, copies, lobby-checks, lobby-e2e, worker, desktop, journey, printer, site]
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    # Deploys take turns and are never cancelled; of several waiting, only
+    # the newest stays (GitHub replaces an older pending job in a group).
     concurrency:
       group: deploy
       cancel-in-progress: false
@@ -368,6 +407,9 @@ jobs:
           BEFORE: ${{ github.event.before }}
           EVENT: ${{ github.event_name }}
           FORCE: ${{ github.event_name == 'workflow_dispatch' && inputs.deploy_worker == true }}
+          # The last green commit "What changed" found (a push only): the
+          # Worker may have changed in a run a newer push cancelled.
+          GREEN_BASE: ${{ needs.changes.outputs.base }}
         run: |
           set -u
           if [ "$FORCE" = "true" ]; then
@@ -376,7 +418,9 @@ jobs:
             exit 0
           fi
           BASE=""
-          if [ "$EVENT" = "push" ] && [ -n "$BEFORE" ] && ! echo "$BEFORE" | grep -Eq '^0+$'; then
+          if [ "$EVENT" = "push" ] && [ -n "$GREEN_BASE" ] && git fetch -q --depth=1 origin "$GREEN_BASE"; then
+            BASE="$GREEN_BASE"
+          elif [ "$EVENT" = "push" ] && [ -n "$BEFORE" ] && ! echo "$BEFORE" | grep -Eq '^0+$'; then
             git fetch -q --depth=1 origin "$BEFORE" && BASE="$BEFORE"
           else
             git fetch -q --deepen=1 origin && BASE="$(git rev-parse --verify -q HEAD~1 || true)"
