@@ -34,31 +34,42 @@ import { useTheme } from './hooks/useTheme.js';
 import { useCalendar } from './hooks/useCalendar.js';
 import { useWeather } from './hooks/useWeather.js';
 import { useSnowForecast } from './hooks/useSnowForecast.js';
-import { inSnowSeason } from './lib/snowAlerts.js';
 import { LobbyLiveContext } from './lib/lobbyLive.jsx';
-import { buildCalendarSlides, deriveClubInfo, localDateStr } from './lib/calendarLogic.js';
-import { buildPromoSlot, previewPromo } from './lib/promos.js';
+import { localDateStr } from './lib/calendarLogic.js';
+import { previewPromo } from './lib/promos.js';
 import PromoSlide from './components/PromoSlide.jsx';
 import { fireMilestone, setConfettiLevel, setConfettiLoad, setConfettiSkin } from './lib/confetti.js';
 import { resolveSkin, sceneForSkin, SKIN_TABLE } from './lib/skins.js';
-import { BOARD_HIDDEN, decideBoard, demoCheckout, pickupNow, stillHereCount } from './lib/checkoutBoard.js';
+import { BOARD_HIDDEN, decideBoard, demoCheckout, pickupNow } from './lib/checkoutBoard.js';
 import { SAMPLE_BOARD_NAMES, SAMPLE_NAMES, pick } from './lib/demoNames.js';
 import { useScreenSync } from './hooks/useScreenSync.js';
-import { countForClub, getAllClubs } from './lib/clubs.js';
-import { OVERLAY, lobbyRoom, setupUp } from './lib/overlayFit.js';
+import { getAllClubs } from './lib/clubs.js';
+import { OVERLAY, setupUp } from './lib/overlayFit.js';
+import {
+  autoSlideDeck, calendarSlidesFor, effectiveManualSlides, isSlideDriven, promoSlotFor, promosAreOn,
+  snowPhoneAsksWeather, tonightTitleOf, visibleManualSlides, wantsSnowForecast,
+} from './lib/lobbyDeck.js';
+import {
+  activeFaults, checkInsHeldNow, cornerFallbackMs, cornerSlots, cornerSources, flagTabs, isAprilFools,
+  nameFaultWords, posterIsHeld, reloadIsBusy, roomFor, shortcutFor, shouldShowStatus, stageClassName,
+  statusAriaLabel, tickerIsActive, visibleCornerItem,
+} from './lib/lobbyDirector.js';
+import {
+  clubMilestoneCrossings, freshCrossings, isPrinterFailure, recapInWindow, tallyMilestoneHit,
+} from './lib/lobbyEvents.js';
 import { STINGER_SEC, holdThenLand } from './lib/lobbyMotion.js';
 import { squishLand, withSquish } from './lib/squish.js';
 import { birthdayRibbon } from './lib/birthdayWeek.js';
 import { autoParticleEffect, weatherMood } from './lib/weather.js';
 import { useCelebrationQueue } from './hooks/useCelebrationQueue.js';
 import { timedFetch } from './lib/timedFetch.js';
-import { CLOCK_SKEW_TOLERANCE_MS, isFresh, stampOf, stampReceived } from './lib/freshness.js';
+import { isFresh, stampOf, stampReceived } from './lib/freshness.js';
 import { COUNT_WATCH_START, countsWithoutNamesNow, nameArrived, watchCounts } from './lib/countsWithoutNames.js';
 import { leavesFor, listFresh } from './lib/checkoutLeaves.js';
 import { useCheckoutBanners } from './hooks/useCheckoutBanners.js';
 import {
   AWARD_MILESTONES, BOOK_MILESTONES, awardMilestoneCopy, bookMilestoneCopy,
-  crossedMilestones, isBigMilestone, nightMilestoneCopy,
+  isBigMilestone, nightMilestoneCopy,
 } from './lib/milestones.js';
 import { receiveSharedSettings, setRemoteDefaults, setSharedLocally } from './hooks/useConfig.js';
 import { publishSettings } from './lib/publishSettings.js';
@@ -67,7 +78,6 @@ import { loadPublishToken } from './lib/publishToken.js';
 import { FLEET_CONFIG_URL_CHANGE_EVENT, loadFleetConfigUrl, resolveRemoteConfigUrl } from './lib/fleetConfigUrl.js';
 import { getClubPalette } from './lib/clubs.js';
 import { clubTintFor } from './lib/clubTint.js';
-import { mergeSyncedDeck, visibleSlides } from './lib/slides.js';
 import { parseUrlFlags } from './lib/urlFlags.js';
 import { applyPanicMode } from './lib/panic.js';
 import { isLatePhase } from './lib/schedule.js';
@@ -173,7 +183,7 @@ export default function App() {
   // WAITING chip, then play in full), so a rehearsal never hides a child.
   const [promoPreview, setPromoPreview] = useState(/** @type {{ promo: any, at: number } | null} */ (null));
   const previewUp = !FLAGS.overlay && promoPreview != null;
-  const checkInsHeld = !FLAGS.overlay && (slideInfo.special || previewUp);
+  const checkInsHeld = checkInsHeldNow({ overlay: FLAGS.overlay, slideSpecial: slideInfo.special, previewUp });
   const {
     currentEvent, run: checkInRun, step: checkInStep, enqueue, skipCurrent, pending, gap: checkInGap,
   } = useCheckInQueue(config, { held: checkInsHeld });
@@ -302,9 +312,10 @@ export default function App() {
   // Who holds which part of the room (src/lib/overlayFit.js lobbyRoom): the
   // pickup board in the foot (never the middle, owner 2026-10-07), and a
   // critical notice in the middle or, on an OBS feed, the top band.
-  const room = lobbyRoom({
+  const room = roomFor({
     overlay: FLAGS.overlay,
-    criticalLive: noticeUp && notice?.level === 'critical',
+    notice,
+    noticeUp,
     boardState: boardDecision.state,
     checkInUp: currentEvent != null,
     leaveUp: leaveNow != null,
@@ -370,19 +381,11 @@ export default function App() {
     // choice standing rather than snapping the room back to a guess.
     setPrinterSeason(tally.season ?? null);
     setRehearsalActive(tally.rehearsal === true);
-    const every = config.clubMilestoneEvery;
     const prevCounts = clubCountsRef.current;
-    if (every > 0) {
-      for (const [club, n] of Object.entries(tally.counts)) {
-        const prev = prevCounts[club] ?? n; // first sight is baseline, not a crossing
-        if (n > prev && Math.floor(n / every) > Math.floor(prev / every)) {
-          const count = Math.floor(n / every) * every;
-          const key = `${club}:${count}`;
-          if (!firedClubMilestonesRef.current.has(key)) {
-            firedClubMilestonesRef.current.add(key);
-            enqueueCelebration({ kind: 'club', club, count });
-          }
-        }
+    for (const { club, count, key } of clubMilestoneCrossings(prevCounts, tally.counts, config.clubMilestoneEvery)) {
+      if (!firedClubMilestonesRef.current.has(key)) {
+        firedClubMilestonesRef.current.add(key);
+        enqueueCelebration({ kind: 'club', club, count });
       }
     }
     clubCountsRef.current = { ...prevCounts, ...tally.counts };
@@ -418,7 +421,7 @@ export default function App() {
   // training operators to ignore the count real print-failures depend on.
   const [opsFailures, setOpsFailures] = useState([]);
   const recordOps = useCallback((ops) => {
-    if (ops.type !== 'print-failure' && ops.type !== 'selector-fail') return;
+    if (!isPrinterFailure(ops)) return;
     setOpsFailures((prev) => [ops, ...prev].slice(0, OPS_FAILURES_MAX));
   }, []);
 
@@ -451,9 +454,8 @@ export default function App() {
       if (typeof value !== 'number') return;
       const prev = prevRef.current;
       prevRef.current = value;
-      if (prev == null) return;                     // first sight = baseline
-      for (const threshold of crossedMilestones(prev, value, thresholds)) {
-        if (firedRef.current.has(threshold)) continue;
+      // First sight (prev unset) is a baseline, never a crossing.
+      for (const threshold of freshCrossings(prev, value, firedRef.current, thresholds)) {
         firedRef.current.add(threshold);
         enqueueCelebration({ kind, count: threshold, ...copy(threshold) });
       }
@@ -540,19 +542,10 @@ export default function App() {
   // missed — quiet variant, skipping ids already seen live and anything
   // older than the replay window.
   const handleRecap = useCallback((recap) => {
-    const maxAgeMs = (config.recapMaxAgeMin ?? 20) * 60 * 1000;
-    // The window is measured from the recap's own newest entry, never from
-    // this screen's clock: a TV twenty minutes fast used to discard every
-    // child a recap carried. The printer stamps every entry on one clock.
-    // This clock still bounds it (CLOCK_SKEW_TOLERANCE_MS): the Worker
-    // replays the last recap to a screen that connects, and last Wednesday's
-    // must not greet last Wednesday's children on Thursday.
-    const newest = recap.entries.reduce((m, e) => (Number.isFinite(e.at) && e.at > m ? e.at : m), -Infinity);
-    const now = Date.now();
-    for (const entry of recap.entries) {
+    // The age window is lobbyEvents.js recapInWindow (the recap's own newest
+    // entry, bounded by this clock).
+    for (const entry of recapInWindow(recap.entries, { maxAgeMin: config.recapMaxAgeMin, now: Date.now() })) {
       if (hasSeen(entry.id)) continue;
-      if (newest - entry.at > maxAgeMs) continue;
-      if (now - entry.at > maxAgeMs + CLOCK_SKEW_TOLERANCE_MS) continue;
       markSeen(entry.id, entry.at);
       enqueue({ ...entry, presentation: 'replay' });
       bump(entry.at);
@@ -644,10 +637,8 @@ export default function App() {
   // their bytes exist only in this browser and can never ride a publish, so
   // following the published deck must not silently drop them.
   const followPublishedSlides = config.followPublishedSlides !== false;
-  const effectiveManualSlides = useMemo(
-    () => ((followPublishedSlides && syncedDeck)
-      ? mergeSyncedDeck(syncedDeck.slides, config.manualSlides)
-      : config.manualSlides),
+  const manualSlides = useMemo(
+    () => effectiveManualSlides(followPublishedSlides, syncedDeck, config.manualSlides),
     [followPublishedSlides, syncedDeck, config.manualSlides]
   );
 
@@ -737,7 +728,7 @@ export default function App() {
   const particleAuto = config.particleEffect === 'auto';
   // The snow slide's phone shows the weather too, so it asks while that
   // slide can air.
-  const snowPhone = config.calendarEnabled && config.seasonPromos !== false && inSnowSeason(todayStr);
+  const snowPhone = snowPhoneAsksWeather(config, todayStr);
   const weather = useWeather(config, (showWeatherChip || weatherTheme || particleAuto || snowPhone) && !FLAGS.overlay);
   const lobbyLive = useMemo(() => ({ weather, checkedIn: count }), [weather, count]);
   // 'auto' matches the particles to the sky outside: snowfall when it's
@@ -749,10 +740,16 @@ export default function App() {
   // every render used to restart the background slideshow's hold timer on
   // every App re-render (i.e. every event), stalling the show on one slide.
   const { calendarEnabled, calendarWelcomeText, calendarShowWelcome, calendarShowNextWeek, calendarShowRemaining } = config;
-  const calendarSlides = useMemo(() => (calendarEnabled
-    ? buildCalendarSlides(deriveClubInfo(calendar.events, todayStr, specialDates),
-      { calendarWelcomeText, calendarShowWelcome, calendarShowNextWeek, calendarShowRemaining })
-    : []), [calendarEnabled, calendar.events, todayStr, specialDates, calendarWelcomeText, calendarShowWelcome, calendarShowNextWeek, calendarShowRemaining]);
+  const calendarSlides = useMemo(() => calendarSlidesFor({
+    enabled: calendarEnabled,
+    events: calendar.events,
+    todayStr,
+    specialDates,
+    welcomeText: calendarWelcomeText,
+    showWelcome: calendarShowWelcome,
+    showNextWeek: calendarShowNextWeek,
+    showRemaining: calendarShowRemaining,
+  }), [calendarEnabled, calendar.events, todayStr, specialDates, calendarWelcomeText, calendarShowWelcome, calendarShowNextWeek, calendarShowRemaining]);
 
   // This season's event promos (src/lib/promos.js) — ONE slot however many are
   // live today, because three extra slides in an eight-slide deck would turn
@@ -764,15 +761,10 @@ export default function App() {
   // The snow-alerts slide's forecast (src/lib/snowAlerts.js): asked for only in
   // the snow season and only when the slide could show, so a September screen
   // or an OBS overlay never calls the weather API for it.
-  const promosOn = calendarEnabled && seasonPromos !== false;
-  const snowForecast = useSnowForecast(config, promosOn && inSnowSeason(todayStr) && !FLAGS.overlay);
+  const promosOn = promosAreOn(calendarEnabled, seasonPromos);
+  const snowForecast = useSnowForecast(config, wantsSnowForecast(promosOn, todayStr, FLAGS.overlay));
   const promoSlot = useMemo(
-    () => buildPromoSlot(calendar.events, todayStr, {
-      specialDates,
-      enabled: promosOn,
-      snowAlerts: true,
-      snowForecast,
-    }),
+    () => promoSlotFor(calendar.events, todayStr, { specialDates, enabled: promosOn, snowForecast }),
     [calendar.events, todayStr, specialDates, promosOn, snowForecast]
   );
 
@@ -799,7 +791,7 @@ export default function App() {
   // One array identity per (calendarSlides, promoSlot) pair, for the same
   // reason the memo above exists — see BackgroundIframe's `deck`.
   const autoSlides = useMemo(
-    () => (promoSlot ? [...calendarSlides, promoSlot] : calendarSlides),
+    () => autoSlideDeck(calendarSlides, promoSlot),
     [calendarSlides, promoSlot]
   );
 
@@ -814,9 +806,9 @@ export default function App() {
   // blank background. The editor is deliberately NOT filtered: it shows every
   // slide with an "expired" badge, because the operator has to be able to see
   // and fix the one that stopped showing.
-  const visibleManualSlides = useMemo(
-    () => visibleSlides(effectiveManualSlides, todayStr),
-    [effectiveManualSlides, todayStr]
+  const shownManualSlides = useMemo(
+    () => visibleManualSlides(manualSlides, todayStr),
+    [manualSlides, todayStr]
   );
 
   // Thin the confetti while a rush is draining so cheap signage sticks
@@ -842,8 +834,7 @@ export default function App() {
     // bypassing bump() — never a real one-at-a-time arrival, so it must
     // never read as crossing a milestone.
     if (tallySyncedRef.current) { tallySyncedRef.current = false; return; }
-    const every = config.milestoneEvery;
-    if (!every || count <= prev || count % every !== 0) return;
+    if (!tallyMilestoneHit(prev, count, config.milestoneEvery)) return;
     enqueueCelebration({ kind: 'tally', count });
   }, [count, config.milestoneEvery, enqueueCelebration]);
 
@@ -876,7 +867,7 @@ export default function App() {
   }, [tonight]);   // re-stamp on new data so a fresh payload is never judged aged
   // The strip rides the waves in the foot, where the pickup board stands: it
   // steps away while the board is up, as it does for a name.
-  const tickerActive = !currentEvent && !checkInsHeld && room.board == null && room.banner == null;
+  const tickerActive = tickerIsActive({ checkInUp: currentEvent != null, held: checkInsHeld, room });
   const setupCard = useSetupCard({ status, hasDisplayKey });
   // Two of the facts setupUp judges flip before the room can see it, and the
   // card is judged by what the room sees:
@@ -923,11 +914,7 @@ export default function App() {
   // regardless of the setting, and says which half is broken, because the fixes
   // differ (paste the key on this screen vs. set one on the print server).
   const nameFault = nameStatus && nameStatus !== 'ok';
-  const nameFaultText = {
-    'no-key': 'DISPLAY KEY NOT SET',
-    'bad-key': 'NAMES UNREADABLE — CHECK DISPLAY KEY',
-    downgraded: 'NAMES REFUSED — SENT UNENCRYPTED',
-  }[nameStatus] || null;
+  const nameFaultText = nameFaultWords(nameStatus);
 
   // Cross-check for the other direction: if the PRINT SERVER is the side
   // missing its key, it publishes nothing on the name events, so this screen
@@ -973,7 +960,7 @@ export default function App() {
     setLayerFaults((prev) => ({ ...prev, [label]: { count: (prev[label]?.count ?? 0) + 1, lastAt: Date.now() } }));
   }, []);
   const activeLayerFaults = useMemo(
-    () => Object.keys(layerFaults).filter((l) => boardNow - layerFaults[l].lastAt < LAYER_FAULT_SHOW_MS),
+    () => activeFaults(layerFaults, boardNow, LAYER_FAULT_SHOW_MS),
     [layerFaults, boardNow]
   );
   // Self-updating (see CLAUDE.md, "Self-updating pages"): a lobby TV that has
@@ -988,31 +975,35 @@ export default function App() {
   // can be empty for minutes with children in line, and the line lives only
   // in memory. A reload then would drop them for good (they are already
   // marked seen, so no recap brings them back).
-  const buildReloadBusy = useCallback(() => (
-    currentEvent != null
-    || pending > 0
-    || celebration != null
-    || celebrationDepth() > 0
-    || settingsOpen
-    || previewUp
-    || slideEditorOpen
-    || debugOpen
-    || boardDecision.state !== BOARD_HIDDEN
-    || leaveNow != null
-    || (lastEventAt != null && Date.now() - lastEventAt < BUILD_QUIET_MS)
-  ), [currentEvent, pending, celebration, celebrationDepth, settingsOpen, previewUp, slideEditorOpen, debugOpen,
+  const buildReloadBusy = useCallback(() => reloadIsBusy({
+    checkInUp: currentEvent != null,
+    pending,
+    celebrationUp: celebration != null,
+    celebrationsQueued: celebrationDepth(),
+    settingsOpen,
+    previewUp,
+    slideEditorOpen,
+    debugOpen,
+    boardVisible: boardDecision.state !== BOARD_HIDDEN,
+    leaveUp: leaveNow != null,
+    lastEventAt,
+    now: Date.now(),
+    quietMs: BUILD_QUIET_MS,
+  }), [currentEvent, pending, celebration, celebrationDepth, settingsOpen, previewUp, slideEditorOpen, debugOpen,
     boardDecision.state, leaveNow, lastEventAt]);
   useBuildReload(buildReloadBusy);
 
   // Printer trouble also forces the sticker visible — a kid at the door
   // with no label is exactly when the operator needs the red count.
-  const showStatus = config.showConnectionStatus
-    || status === 'off'
-    || activeLayerFaults.length > 0
-    || (droppedLong && status === 'disconnected')
-    || opsFailures.length > 0
-    || Boolean(nameFault)
-    || countsWithoutNames;
+  const showStatus = shouldShowStatus({
+    configured: config.showConnectionStatus,
+    status,
+    layerFaults: activeLayerFaults.length,
+    droppedLong,
+    opsFailures: opsFailures.length,
+    nameFault: Boolean(nameFault),
+    countsWithoutNames,
+  });
 
   // The corner info: ONE item at a time (the time, tonight's tally or the
   // weather), moving on with each slide load and frozen in between (owner,
@@ -1044,25 +1035,20 @@ export default function App() {
   // rotation, the WAITING chip comes down to the bottom corner), and the
   // stack keeps its 14u budget. A tall sticker (a fault strip) outranks it,
   // as it outranks the sky. Hidden until a tally has the club in it.
-  const cornerClubCount = config.cornerClub ? countForClub(tallyCounts, config.cornerClub) : null;
-  const clubChipUp = !FLAGS.overlay && cornerClubCount != null && !stickerTall;
-  const topTaken = stickerTall || clubChipUp;
-  const slideDriven = !FLAGS.overlay && config.backgroundSource === 'manual'
-    && (autoSlides.length + visibleManualSlides.length) > 1;
+  const { count: cornerClubCount, chipUp: clubChipUp, topTaken } = cornerSlots({
+    overlay: FLAGS.overlay, cornerClub: config.cornerClub, tallyCounts, stickerTall,
+  });
+  const slideDriven = isSlideDriven({
+    overlay: FLAGS.overlay,
+    backgroundSource: config.backgroundSource,
+    autoCount: autoSlides.length,
+    manualCount: shownManualSlides.length,
+  });
   const corner = useCornerItem(
+    // What the rotation may show (lobbyDirector.js cornerSources).
+    cornerSources({ config, count, weather, showWeatherChip, topTaken, tallySync, boardDecision, boardData, pickup }),
     {
-      clock: config.showClock === true,
-      tally: config.showTally ? count : 0,
-      // During pickup, while the board names children, the tally's slot
-      // counts down how many are not checked out yet (cornerInfo.js).
-      stillHere: config.showTally && config.cornerStillHere !== false
-        ? stillHereCount(boardDecision, boardData, pickup)
-        : null,
-      weather: showWeatherChip && !topTaken ? weather : null,
-      correction: config.showTally ? tallySync : null,
-    },
-    {
-      fallbackMs: slideDriven ? null : Math.max(5000, (Number(config.slideshowDelaySec) || 8) * 1000),
+      fallbackMs: cornerFallbackMs(slideDriven, config.slideshowDelaySec),
       // The correction has reached the corner, frozen into this tally
       // snapshot, so the latch is spent; the next tally load is ordinary.
       onShown: clearShownCorrection,
@@ -1084,7 +1070,7 @@ export default function App() {
   // While the sticker stands tall (stickerTall, above) the top slot has no
   // room under it: the weather sits out, and one already up leaves now
   // rather than at the next load.
-  const cornerItem = topTaken && corner.item?.corner === 'top' ? null : corner.item;
+  const cornerItem = visibleCornerItem(corner.item, topTaken);
 
   // The sync note is opt-out (#351). Gated at RENDER, not at capture, so
   // turning it off in Settings hides one that is already up rather than
@@ -1103,15 +1089,13 @@ export default function App() {
   // specialDates too means a cancelled night can't dress the room for an
   // event that isn't happening.
   const tonightTitle = useMemo(
-    () => deriveClubInfo(calendar.events, todayStr, specialDates)?.tonight?.title ?? null,
+    () => tonightTitleOf(calendar.events, todayStr, specialDates),
     [calendar.events, todayStr, specialDates],
   );
   // April Fools (#21): screens only, and only does anything on April 1st —
   // a toggle left on all year is inert 364 days. The settings panel and gear
   // counter-rotate in CSS so the operator can always find the exit.
-  const noonToday = new Date(`${todayStr}T12:00:00`);
-  const aprilFools = config.aprilFools === true
-    && noonToday.getMonth() === 3 && noonToday.getDate() === 1;
+  const aprilFools = isAprilFools(config.aprilFools === true, todayStr);
 
   const skin = resolveSkin(
     config.nightTheme,
@@ -1166,23 +1150,18 @@ export default function App() {
   // to flip panic mode).
   useEffect(() => {
     const onKey = (e) => {
-      if (!e.ctrlKey || !e.shiftKey) return;
-      const t = e.target;
-      if (t instanceof HTMLElement && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
-      const k = e.key.toLowerCase();
-      if (k === 'd') {
-        e.preventDefault();
+      const action = shortcutFor(e);
+      if (!action) return;
+      e.preventDefault();
+      if (action === 'debug') {
         setDebugOpen((v) => !v);
-      } else if (k === 's') {
-        e.preventDefault();
+      } else if (action === 'settings') {
         setSettingsTab(null);
         setSettingsOpen(true);
-      } else if (k === 'e') {
-        e.preventDefault();
+      } else if (action === 'editor') {
         setEditorFromSettings(false);
         setSlideEditorOpen(true);
-      } else if (k === 'x') {
-        e.preventDefault();
+      } else {
         updateConfig({ panicMode: !storedConfig.panicMode });
       }
     };
@@ -1329,22 +1308,17 @@ export default function App() {
   // top band down under them.
   // The simplified-mode confirmation hangs there too: at the bottom it sat
   // on the tonight strip, which simplified mode keeps.
-  const panicUp = !overlay && config.panicMode === true;
-  const flagCount = [panicUp, demoActive, rehearsalActive].filter(Boolean).length;
-  const flagsUp = flagCount > 0;
+  const { panicUp, flagCount, flagsUp } = flagTabs({
+    overlay, panicMode: config.panicMode, demoActive, rehearsalActive,
+  });
   const bandNoticeUp = noticeUp && notice?.level !== 'critical';
   // A promo poster is full-bleed art with its own header where the band
   // sits: a band notice steps aside for it as it does for a toast (a poster
   // always moves on, since it holds check-ins), and comes back after.
-  const posterHeld = checkInsHeld && (slideInfo.poster === true || previewUp);
-  const stageClass = [
-    'stage',
-    overlay && 'overlay',
-    aprilFools && 'april-fools',
-    currentEvent && !overlay && 'checkin-active',
-    room.critical === 'centre' && 'notice-takeover',
-    flagsUp && 'has-flags',
-  ].filter(Boolean).join(' ');
+  const posterHeld = posterIsHeld({ checkInsHeld, slidePoster: slideInfo.poster, previewUp });
+  const stageClass = stageClassName({
+    overlay, aprilFools, checkInUp: currentEvent != null, critical: room.critical, flagsUp,
+  });
 
   // Arrivals held behind a poster or a marked slide: say how many are
   // waiting, so the room knows the names are coming. It lives in the top
@@ -1406,7 +1380,7 @@ export default function App() {
             slideshowDelaySec={config.slideshowDelaySec}
             useLocalSlideshow={config.useLocalSlideshow}
             backgroundSource={config.backgroundSource}
-            manualSlides={visibleManualSlides}
+            manualSlides={shownManualSlides}
             calendarSlides={autoSlides}
             sceneTheme={sceneTheme ?? 'sky'}
             cozy={mood.cozy}
@@ -1531,7 +1505,7 @@ export default function App() {
               className={`status-dot ${status}`}
               label="Signal"
               aria-live="polite"
-              aria-label={`Connection status: ${status}${opsFailures.length ? `, ${opsFailures.length} printer problem(s)` : ''}`}
+              aria-label={statusAriaLabel(status, opsFailures.length)}
             >
               {/* The kit chip (StepPlate): SIGNAL on the pill, the state on the
                   block. One line for the pipe (and the printer's count),

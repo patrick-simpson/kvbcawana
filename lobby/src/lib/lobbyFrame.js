@@ -11,6 +11,7 @@
 // thumbnail.
 
 import { chipGeometry, inkOverflow, markExtents } from './brand.js';
+import { sizeLadder } from './sizeSearch.js';
 
 /* ── The layout box ──────────────────────────────────────────────── */
 
@@ -853,13 +854,6 @@ function rowTexts(tokens, starts) {
  * }} FrameFit
  */
 
-/** @param {number} max @param {number} min @param {number} step */
-function sizes(max, min, step) {
-  const out = [];
-  for (let s = max; s >= min - 1e-9; s -= step) out.push(Math.round(s * 100) / 100);
-  return out;
-}
-
 /**
  * The kicker: one line at its size if it fits the layout's width, else
  * shrunk to fit down to KICKER.min, else two balanced lines, shrunk only as
@@ -924,7 +918,7 @@ export function fitFrame(frame, measure = measureText, ink = measureInk) {
   let sub = null;
   if (frame.sub) {
     const m = measured([tokenize(frame.sub).flat()], 'body', measure);
-    for (const s of sizes(SUB.size, SUB.min, SUB.step)) {
+    for (const s of sizeLadder(SUB.size, SUB.min, SUB.step)) {
       const { rows } = layRows(m, SUB.width / s);
       sub = { size: s, lines: rows.map((r) => r.text) };
       if (rows.length <= SUB.maxLines) break;
@@ -998,7 +992,7 @@ function fitHeadline(paras, textSize, room, measure, ink, kicker) {
     };
   }
   const shouts = textSize !== 'md' && !tokens.some((t) => STACKED.test(t.text));
-  return (shouts && fitShout(paras, textSize, room, measure, ink, kicker)) || fitRead(paras, room, measure);
+  return (shouts && fitShoutHeadline(paras, textSize, room, measure, ink, kicker)) || fitRead(paras, room, measure);
 }
 
 /** @param {number[]} list */
@@ -1049,7 +1043,7 @@ export function shoutBox(lines, inkOf, size, kicker) {
  * @param {boolean} kicker
  * @returns {HeadlineFit | null}
  */
-function fitShout(paras, textSize, room, measure, ink, kicker) {
+function fitShoutHeadline(paras, textSize, room, measure, ink, kicker) {
   const ceiling = SHOUT.ceiling[textSize] ?? SHOUT.max;
   const m = measured(paras, 'shout', measure, (t) => t.toUpperCase());
   /** @type {Map<string, { ascent: number, descent: number }>} */
@@ -1070,8 +1064,8 @@ function fitShout(paras, textSize, room, measure, ink, kicker) {
   // lines of caps are a wall, and a headline that long reads better in the
   // read layout.
   const passes = [
-    ...sizes(ceiling, Math.min(ceiling, SHOUT.measured), SHOUT.step).map((s) => [s, LAYOUT.measure, SHOUT.maxLines]),
-    ...sizes(ceiling, SHOUT.min, SHOUT.step).map((s) => [s, LAYOUT.width, SHOUT.wideLines]),
+    ...sizeLadder(ceiling, Math.min(ceiling, SHOUT.measured), SHOUT.step).map((s) => [s, LAYOUT.measure, SHOUT.maxLines]),
+    ...sizeLadder(ceiling, SHOUT.min, SHOUT.step).map((s) => [s, LAYOUT.width, SHOUT.wideLines]),
   ];
   for (const [s, limit, most] of passes) {
     if (s * SHOUT.lineHeight * paras.length > room) continue;
@@ -1110,7 +1104,7 @@ function fitShout(paras, textSize, room, measure, ink, kicker) {
 function readFit(m, room, max, min) {
   /** @type {null | { size: number, rows: Array<{ start: number, text: string }>, wide: number[] }} */
   let cut = null;
-  for (const s of sizes(max, min, READ.step)) {
+  for (const s of sizeLadder(max, min, READ.step)) {
     const { rows, wide } = layRows(m, READ.width / s - READ.shadow);
     const fits = rows.length * s * READ.lineHeight + s * READ.shadow <= room + 1e-9;
     if (fits && !wide.length) return { size: s, rows, wide };

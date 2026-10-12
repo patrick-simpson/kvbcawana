@@ -10,6 +10,7 @@
 
 import { SHOUT_BOX } from './brand.js';
 import { measureText } from './lobbyFrame.js';
+import { stepDown } from './sizeSearch.js';
 import { BOARD_ANONYMOUS, BOARD_EMPTY, BOARD_NAMES, BOARD_STALE } from './checkoutBoard.js';
 
 /** @typedef {import('./lobbyFrame.js').Face} Face */
@@ -379,7 +380,7 @@ export function fitParagraph(text, {
     const hug = lines.every((l) => measure(l, face) * size <= width + 1e-6);
     return { size: Number(size.toFixed(3)), lines: count, fits, text: lines, hug };
   };
-  for (let s = max; s >= min - 1e-9; s = Number((s - step).toFixed(3))) {
+  for (const s of stepDown(max, min, step, 3)) {
     const lines = wrapLines(text, s, width, face, measure).length;
     if (lines <= maxLines && lines * s * lineHeight <= height + 1e-9) return done(s, lines, true);
   }
@@ -558,7 +559,7 @@ export function fitFoot(groups, { width, height, max, min, step = 0.05 }, measur
     footHeight(footPieces(groups, hidden, s, width, measure), s, width) <= height + 1e-9;
   const top = Math.max(min, max);
   const stepAt = step > 0 ? step : 0.05;
-  for (let s = top; s >= min - 1e-9; s = Number((s - stepAt).toFixed(4))) {
+  for (const s of stepDown(top, min, stepAt, 4)) {
     if (fitsAt(s, none)) return { size: Number(s.toFixed(3)), hidden: none, fits: true };
   }
   const hidden = [...none];
