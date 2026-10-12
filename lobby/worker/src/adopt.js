@@ -38,6 +38,22 @@ import { newRowId, sealForStations } from '../../shared/cloud-crypto.js';
 import { Doc } from './doc.js';
 import { openState, sealState, SEAL_PER_TICK } from './watcher.js';
 
+/**
+ * The record a TwoTimTwo-page job carries, exactly what the print role runs
+ * (printer/print-server/job-puller.js, routes.md section 6): the print route and
+ * its own JSON body, the child, the claim's generation and where it came from.
+ * @param {{ id: string, name: string, club: string }} e @param {number} gen
+ */
+export function printRecord(e, gen) {
+  return {
+    route: '/print',
+    body: { name: e.name, ...(e.club ? { clubName: e.club } : {}), clubberId: e.id },
+    clubberId: e.id,
+    gen,
+    source: 'ttt',
+  };
+}
+
 /** The most children one read may add to the backlog (a runaway report cannot fill storage). */
 export const BACKLOG_MAX = 200;
 export const PRINT_JOB_KIND = 'print-job';
@@ -50,7 +66,7 @@ export class Adopter {
    *   storage: { get(k: string): Promise<any>, put(k: string, v: any): Promise<void>, delete(k: string): Promise<any> },
    *   log?: (line: string) => void }} deps
    */
-  constructor({ ledger, printq, stations, tags, secret, env, now, storage, log }) {
+  constructor({ ledger, printq, stations, tags, secret, env, now, storage, log, greet }) {
     this.ledger = ledger;
     this.printq = printq;
     this.stations = stations;
@@ -59,6 +75,8 @@ export class Adopter {
     this.env = env;
     this.now = now;
     this.log = log || ((line) => console.warn(line));
+    /** One greeting for a child found on TwoTimTwo's page (a no-op until the Worker is the one publisher). @type {(g: { name: string, club: string, id: string }) => Promise<unknown>} */
+    this.greet = greet || (async () => false);
     /** The children waiting to be adopted: {sealed} is the stored form. */
     this.backlogDoc = new Doc(storage, 'adopt:backlog', () => ({ sealed: null }));
     /** In memory, authoritative while the object runs. @type {{ tag: string, id: string, name: string, club: string, night: string }[]|null} */
@@ -165,7 +183,8 @@ export class Adopter {
     const jobId = newRowId();
     const c = await this.ledger.claim(e.night, e.tag, { source: 'ttt', initial: 'queued', jobId });
     if (!c.ok) return 'already';
-    const record = { clubberId: e.id, name: e.name, club: e.club, source: 'ttt' };
+    const record = printRecord(e, c.gen);
+    try { await this.greet({ name: e.name, club: e.club, id: jobId }); } catch (err) { console.error('[cloud] greeting failed', err); }
     const targets = this.stations.sealTargets();
     if (targets.length) {
       const bundle = await sealForStations(targets, { id: jobId, night: e.night, kind: PRINT_JOB_KIND, record });

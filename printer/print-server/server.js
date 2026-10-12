@@ -4223,6 +4223,7 @@ async function performCheckinPrint(input) {
     suppressConnectCard = false,
     demo          = false,
     cloudCheckin  = false,
+    regen         = false,
     broughtFriend = false,
     friendName    = ''
   } = input || {};
@@ -4261,13 +4262,16 @@ async function performCheckinPrint(input) {
   // perhaps by name alone: that second tag is refused for the rest of the
   // night. And the other way: a cloud job for a child whose tag already
   // printed tonight is refused. An undone check-in counts for neither.
-  if (!isDemo && printedTonightFor(firstName, lastName, clubberId, cloudCheckin)) {
+  // `regen` (a pulled job of a later generation: the child was undone and checked
+  // in again) is a new tag; the Worker's claim and the job journal already hold
+  // one label to a generation.
+  if (!isDemo && !regen && printedTonightFor(firstName, lastName, clubberId, cloudCheckin)) {
     console.log(`[print] '${firstName} ${lastName}' already has tonight's tag (${cloudCheckin ? 'cloud job' : 'printed for a cloud check-in'}) — duplicate suppressed`);
     return { status: 200, body: { success: true, duplicate: true } };
   }
   // Demo mode skips the duplicate window: a trainer demonstrating the same
   // child twice in a row is the normal case, not a double-tap to suppress.
-  if (!isDemo && isDuplicatePrint(dupKey)) {
+  if (!isDemo && !regen && isDuplicatePrint(dupKey)) {
     console.log(`[print] '${firstName} ${lastName}' already printed within ${DUPLICATE_WINDOW_MS / 1000}s — duplicate suppressed`);
     return { status: 200, body: { success: true, duplicate: true } };
   }
@@ -4634,6 +4638,7 @@ app.post('/print', async (req, res) => {
     visitor: body.visitor, stepUpNight: body.stepUpNight, awanaShares: body.awanaShares,
     clubberId: body.clubberId, suppressConnectCard: body.suppressConnectCard, demo: body.demo,
     cloudCheckin: body.cloud === true,
+    regen: body.regen === true,
     broughtFriend: body.friend === true, friendName: cleanFriendName(body.friendName),
   });
   res.status(out.status).json(out.body);
@@ -7985,15 +7990,9 @@ function configureCloud(opts) {
     signedIn, stationId, ring: opts.ring, localBase, request, journal, fetchFn: opts.fetchFn, now: opts.now, log, heartbeatMs: opts.heartbeatMs,
     // A check-in made on TwoTimTwo's own page: the Worker cannot seal a history
     // row for it, so the station that prints it does.
-    onPrinted: async ({ record, night }) => {
-      if (record.source !== 'ttt-page') return;
-      const b = record.body || {};
-      const who = b.firstName !== undefined ? { firstName: b.firstName, lastName: b.lastName || '' } : splitFullName(b.name);
-      await writer.record('checkin', {
-        ts: new Date().toISOString(), first: who.firstName, last: who.lastName, club: String(b.clubName || ''),
-        ...(b.clubberId ? { clubberId: String(b.clubberId) } : {}), ...(b.visitor ? { visitor: true } : {}),
-        ...(b.friend === true ? { friend: true } : {}), source: 'ttt-page',
-      }, night);
+    onPrinted: async (info) => {
+      const row = historySync.rowForPrinted(info, opts.now);
+      if (row) await writer.record(row.kind, row.record, row.night);
     },
   });
   const bundles = jobPuller.createBundleSync({ signedIn, stationId, ring: opts.ring, localBase, request, fetchFn: opts.fetchFn, now: opts.now, log });

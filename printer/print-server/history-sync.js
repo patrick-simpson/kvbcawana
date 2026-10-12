@@ -28,6 +28,10 @@ const IMPORT_POST_MAX = 500;
 const DATES_PER_ROW = 50;
 const ROUTE_MISSING = (s) => s === 404 || s === 405 || s === 501;
 const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
+/** The row kinds that mean a child was here (routes.md section 3): `visitor` is a check-in of a child with no id. */
+const PRESENT_KINDS = new Set(['checkin', 'visitor', 'import-checkin']);
+/** A record's `ts` is epoch milliseconds (an ISO string is tolerated). @param {unknown} v */
+const tsOf = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : (Date.parse(String(v)) || 0));
 
 /** A row id that is the same for the same content: base64url of the first 16 bytes of SHA-256. */
 async function stableId(...parts) {
@@ -80,6 +84,35 @@ function createHistoryWriter(o) {
   return { record, flush, status: () => ({ ...stats, queued: queue.length }) };
 }
 
+/**
+ * The history row a station writes when it prints a check-in made on TwoTimTwo's
+ * own page (source 'ttt'; the Worker could not seal a row for it: no ECDH there).
+ * A job from the desk page needs none (the page sealed its row), so null.
+ * `ts` is epoch milliseconds, `kind` is `checkin` (routes.md section 3).
+ * @param {{ record: any, night: string }} info @param {() => number} [now]
+ * @returns {{ kind: string, record: Record<string, any>, night: string }|null}
+ */
+function rowForPrinted({ record, night }, now = Date.now) {
+  if (!record || record.source !== 'ttt') return null;
+  const b = record.body || {};
+  let first = b.firstName;
+  let last = b.lastName;
+  if (first === undefined) {
+    const parts = String(b.name == null ? '' : b.name).trim().split(/\s+/).filter(Boolean);
+    first = parts[0] || '';
+    last = parts.slice(1).join(' ');
+  }
+  return {
+    kind: 'checkin',
+    night,
+    record: {
+      ts: now(), first: String(first || ''), last: String(last || ''), club: String(b.clubName || ''),
+      ...(b.clubberId ? { clubberId: String(b.clubberId) } : {}), ...(b.visitor ? { visitor: true } : {}),
+      ...(b.friend === true ? { friend: true } : {}), source: 'ttt',
+    },
+  };
+}
+
 // ── the one-time import ─────────────────────────────────────────────────────
 
 /** Rows for print-history.json: one `import-checkin` per real check-in. */
@@ -91,7 +124,7 @@ async function importCheckinRows(pub, history) {
     if (!Number.isFinite(ts)) continue;
     const night = cc.churchNight(ts);
     const record = {
-      ts: new Date(ts).toISOString(), first: String(h.firstName || ''), last: String(h.lastName || ''), club: String(h.clubName || ''),
+      ts, first: String(h.firstName || ''), last: String(h.lastName || ''), club: String(h.clubName || ''),
       ...(h.clubberId ? { clubberId: String(h.clubberId) } : {}),
       ...(h.visitor ? { visitor: true } : {}),
       ...(h.undone ? { undone: true } : {}),
@@ -191,6 +224,8 @@ function createAttendanceReader(o) {
       for (const d of dates) if (ISO_DAY.test(d) && d <= today) e.dates.add(d);
       found.set(key, e);
     };
+    /** @type {{ key: string, id: string|null, name: string, night: string, present: boolean, at: number }[]} */
+    const events = [];
     let readNights = 0;
     for (const n of nights.body) {
       if (!n || !ISO_DAY.test(n.night)) continue;
@@ -206,8 +241,12 @@ function createAttendanceReader(o) {
           const rec = await cc.openRow(ring, row);
           if (!rec) { stats.unreadable++; continue; }
           if (rec.undone === true) continue;
-          if (row.kind === 'checkin' || row.kind === 'import-checkin') {
-            add(rec.clubberId, rec.name || `${rec.first || ''} ${rec.last || ''}`, [row.night]);
+          if (PRESENT_KINDS.has(row.kind) || row.kind === 'undo') {
+            // A desk undo takes the child back out: the LAST of a child's check-in / undo rows (by time) decides.
+            const nm = rec.name || `${rec.first || ''} ${rec.last || ''}`;
+            const id = rec.clubberId != null && String(rec.clubberId).trim() ? String(rec.clubberId).trim() : null;
+            const key = id ? `id:${id.toLowerCase()}` : String(nm).trim().toLowerCase();
+            if (key) events.push({ key, id, name: nm, night: row.night, present: row.kind !== 'undo', at: tsOf(rec.ts) });
           } else if (row.kind === 'import-attendance' && Array.isArray(rec.dates)) {
             const m = /^id:(.+)$/.exec(String(rec.k || ''));
             add(m ? m[1] : null, rec.name, rec.dates);
@@ -218,6 +257,10 @@ function createAttendanceReader(o) {
       }
       if (count >= 0) { seen.set(n.night, n.rows); readNights++; }
     }
+    // Resolve check-ins against undos, per child per night, in the order they happened.
+    const last = new Map();
+    for (const e of events.sort((a, b) => a.at - b.at)) last.set(`${e.night}|${e.key}`, e);
+    for (const e of last.values()) if (e.present) add(e.id, e.name, [e.night]);
     const entries = [...found.values()].map((e) => ({ key: e.key, clubberId: e.clubberId, name: e.name, dates: [...e.dates].sort() }));
     if (entries.length) o.merge(entries);
     stats.nights += readNights; stats.rows += entries.length; stats.lastAt = now();
@@ -228,4 +271,4 @@ function createAttendanceReader(o) {
   return { syncOnce, status: () => ({ ...stats }) };
 }
 
-module.exports = { createHistoryWriter, importLaptopHistory, createAttendanceReader, importCheckinRows, importAttendanceRows, seasonStart, stableId };
+module.exports = { rowForPrinted, createHistoryWriter, importLaptopHistory, createAttendanceReader, importCheckinRows, importAttendanceRows, seasonStart, stableId };

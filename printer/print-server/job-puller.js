@@ -1,20 +1,24 @@
 // The print role's half of online check-in (ROADMAP.md#online-check-in, P2):
 // this computer, a registered STATION, takes ALL its print jobs from the sync
 // Worker instead of the Chrome extension or the phone relay's job route. The
-// Worker's side is lobby/worker/src/routes.md section 6 (lease / ack / hello);
-// the loop is modelled on phone-relay.js.
+// Worker's side is lobby/worker/src/routes.md section 6 (the one truth); the
+// loop is modelled on phone-relay.js.
 //
-//   lease    POST /v1/print/lease {max: 1}  -> {jobs: [{jobId, bundle | raw, leaseUntil}]}
-//   ack      POST /v1/print/ack {jobId, result: printed | already-spooled | failed, error?}
-//   hello    POST /v1/print/hello {printer: {state, detail?}} every 30 s, and while
-//            a job prints (the heartbeat that keeps a long print's lease)
+//   next       GET  /v1/print/next?max=1   -> {jobs: [{jobId, kind, night, gen, bundle, leaseUntil, attempt}], leaseMs}
+//   done       POST /v1/print/done {jobId, result: printed | already-spooled}
+//   failed     POST /v1/print/failed {jobId, error?}   (frees the job for another lease)
+//   heartbeat  POST /v1/print/heartbeat {printer: {state, detail?}, jobId?}   every 30 s, and
+//              every HEARTBEAT_MS while a job prints: with a jobId it EXTENDS the
+//              90 s lease (a long print keeps it); {ok: false, reason} says stop
 //
 // A job's `bundle` is sealed to the stations' keys (cloud-crypto openAsStation);
 // its record is {route, body, clubberId?, gen?, source?}: the route is one of
 // JOB_PULL_ROUTES (the print routes this computer already has), the body is
-// that route's own JSON. A `raw` job (a check-in made on TwoTimTwo's own page,
-// which the Worker cannot seal) arrives opened by the Worker over TLS as
-// {firstName, lastName, clubberId?, clubName?, friend?, friendName?, gen?}.
+// that route's own JSON. A check-in job's `jobId` is its bundle's id; a reprint's
+// is `reprint:<uuid>` and its bundle keeps its own 22-character id. The Worker
+// seals a TwoTimTwo-page check-in itself with source 'ttt'. `gen` comes from the
+// LEASE (the Worker's own claim generation, plaintext); a record's own gen is
+// only the fallback.
 // The route runs on THIS print server, from loopback, so every existing rule
 // (dedup, enrichment, history, attendance, the label itself) applies unchanged.
 //
@@ -55,7 +59,7 @@ const JOB_PULL_ROUTES = Object.freeze([
 const jobPullAllowed = (method, p) => typeof method === 'string' && typeof p === 'string'
   && JOB_PULL_ROUTES.some(([m, re]) => m === method && re.test(p));
 
-const JOB_ID_RE = /^[A-Za-z0-9_-]{22}$/;
+const JOB_ID_RE = /^(?:[A-Za-z0-9_-]{22}|reprint:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/;
 const IDLE_MS = 5 * 1000;
 const BUSY_MS = 1000;
 const SIGNED_OUT_MS = 60 * 1000;
@@ -67,6 +71,9 @@ const LOCAL_TIMEOUT_MS = 60 * 1000;
 const JOURNAL_KEEP_MS = 4 * 24 * 60 * 60 * 1000;
 const ACK_TRIES_MAX = 30;
 const BUNDLE_MS = 60 * 1000;
+
+/** The Worker keeps an error as a short code (a-z, 0-9, hyphen, 32 at most), else just 'failed'. */
+const shortCode = (e) => String(e).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 32) || 'failed';
 
 // ── the journal ─────────────────────────────────────────────────────────────
 
@@ -143,21 +150,6 @@ function createJournal(file, now = Date.now) {
 
 // ── jobs ────────────────────────────────────────────────────────────────────
 
-/** A `raw` job (TwoTimTwo's own page) as the /print record it means. */
-function recordFromRaw(raw, night) {
-  const first = String(raw.firstName || '').trim();
-  const last = String(raw.lastName || '').trim();
-  const name = String(raw.name || '').trim();
-  if (!first && !name) return null;
-  const body = first ? { firstName: first, lastName: last } : { name };
-  if (raw.clubName || raw.club) body.clubName = String(raw.clubName || raw.club);
-  if (raw.clubberId != null && String(raw.clubberId).trim()) body.clubberId = String(raw.clubberId).trim();
-  if (raw.friend === true) { body.friend = true; if (raw.friendName) body.friendName = String(raw.friendName); }
-  if (raw.visitor === true) body.visitor = true;
-  body.cloud = true;
-  return { route: '/print', body, clubberId: body.clubberId, gen: raw.gen, night, source: 'ttt-page' };
-}
-
 /**
  * @param {{
  *   signedIn: () => ({ base: string, session: string } | null),
@@ -193,9 +185,10 @@ function createJobPuller(o) {
   };
 
   async function ack(jobId, result, error) {
-    const body = { jobId, result };
-    if (error) body.error = String(error).slice(0, 200);
-    const r = await call('/v1/print/ack', { method: 'POST', body });
+    const failed = result === 'failed';
+    const r = failed
+      ? await call('/v1/print/failed', { method: 'POST', body: { jobId, ...(error ? { error: shortCode(error) } : {}) } })
+      : await call('/v1/print/done', { method: 'POST', body: { jobId, result } });
     if (r.ok) { journal.set(jobId, { acked: true }); return true; }
     if (r.status === 404 || r.status === 409 || r.status === 410) {
       // The Worker no longer has the job (an undo dropped it, or another
@@ -219,20 +212,16 @@ function createJobPuller(o) {
   }
 
   async function openJob(job) {
-    if (job.bundle) {
-      if (job.bundle.id !== job.jobId) return { ok: false, error: 'bundle-id-mismatch' };
-      const ring = await o.ring();
-      if (!ring) return { ok: false, error: 'no-station-key' };
-      const rec = await cc.openAsStation(ring, job.bundle);
-      if (!rec || typeof rec !== 'object') return { ok: false, error: 'cannot-open' };
-      return { ok: true, record: { ...rec, night: job.bundle.night, source: rec.source || 'desk' } };
-    }
-    if (job.raw && typeof job.raw === 'object') {
-      const night = typeof job.raw.night === 'string' ? job.raw.night : cc.churchNight(now());
-      const rec = recordFromRaw(job.raw, night);
-      return rec ? { ok: true, record: rec } : { ok: false, error: 'raw-unreadable' };
-    }
-    return { ok: false, error: 'no-payload' };
+    if (!job.bundle) return { ok: false, error: 'no-payload' };
+    // A check-in job's id IS its bundle's id; a reprint's bundle keeps its own.
+    if (!job.jobId.startsWith('reprint:') && job.bundle.id !== job.jobId) return { ok: false, error: 'bundle-id-mismatch' };
+    const ring = await o.ring();
+    if (!ring) return { ok: false, error: 'no-station-key' };
+    const rec = await cc.openAsStation(ring, job.bundle);
+    if (!rec || typeof rec !== 'object') return { ok: false, error: 'cannot-open' };
+    // The Worker's own claim generation wins over anything the sealing client wrote.
+    const gen = Number.isInteger(job.gen) ? job.gen : rec.gen;
+    return { ok: true, record: { ...rec, gen, night: job.bundle.night, source: rec.source || 'desk' } };
   }
 
   async function localPost(route, body) {
@@ -287,6 +276,14 @@ function createJobPuller(o) {
     }
     const night = typeof rec.night === 'string' ? rec.night : cc.churchNight(now());
     if (rec.route === '/print' && night !== cc.churchNight(now())) return failJob(id, 'stale-night');
+    // Every /print this station pulls is a cloud check-in (the print server's own
+    // duplicate rule), and a second generation (an undo, then a new check-in)
+    // is a NEW tag: the Worker's gen and the journal below are what stop a
+    // second label of one generation, so the server's own rule steps aside.
+    if (rec.route === '/print') {
+      rec.body = { ...rec.body, cloud: true };
+      if (Number.isInteger(rec.gen) && rec.gen > 1) rec.body.regen = true;
+    }
 
     // The backstop: the same child, the same night, the same generation (an
     // undo and a new check-in is the next one) is one tag, whatever the jobId.
@@ -306,7 +303,10 @@ function createJobPuller(o) {
 
     journal.begin(id, { route: rec.route, night, key });   // on disk BEFORE the printer is touched
     const beat = setIntervalFn(() => {
-      call('/v1/print/hello', { method: 'POST', body: { printer: { state: 'printing' }, jobId: id } }).catch(() => {});
+      // Extends the lease (90 s) while the printer works; {ok: false} cannot stop a print already sent.
+      call('/v1/print/heartbeat', { method: 'POST', body: { printer: { state: 'busy', detail: 'printing' }, jobId: id } })
+        .then((r) => { if (r && r.body && r.body.ok === false) log(`[jobs] ${id}: the lease is gone (${r.body.reason}); the print carries on`); })
+        .catch(() => {});
     }, heartbeatMs);
     if (beat && beat.unref) beat.unref();
     let res;
@@ -351,7 +351,7 @@ function createJobPuller(o) {
     if (!force && now() - lastHelloAt < HELLO_MS) return;
     lastHelloAt = now();
     const check = journal.unchecked().length > 0;
-    await call('/v1/print/hello', { method: 'POST', body: { printer: check ? { state: 'check', detail: 'A label may not have come out' } : { state: 'ok' } } });
+    await call('/v1/print/heartbeat', { method: 'POST', body: { printer: check ? { state: 'error', detail: 'A label may not have come out' } : { state: 'ok' } } });
   }
 
   /** One round: acks owed, hello, lease, run. Never throws. */
@@ -362,7 +362,7 @@ function createJobPuller(o) {
       await flushAcks();
       await hello(false);
       if (now() < pausedUntil) return { wait: Math.min(IDLE_MS, pausedUntil - now()) || BUSY_MS, handled: 0 };
-      const r = await call('/v1/print/lease', { method: 'POST', body: { max: 1 } });
+      const r = await call('/v1/print/next?max=1', { method: 'GET' });
       stats.lastLeaseAt = now();
       if (r.status === 401) { stats.signedOut = true; return { wait: SIGNED_OUT_MS, handled: 0 }; }
       if (r.status === 404 || r.status === 405 || r.status === 501) { stats.routeMissing = true; return { wait: ROUTE_MISSING_MS, handled: 0 }; }
@@ -475,7 +475,7 @@ function startJobPuller({ puller, bundles, log, setTimeoutFn = setTimeout }) {
 }
 
 module.exports = {
-  JOB_PULL_ROUTES, jobPullAllowed, JOB_ID_RE, recordFromRaw,
+  JOB_PULL_ROUTES, jobPullAllowed, JOB_ID_RE,
   createJournal, createJobPuller, createBundleSync, startJobPuller,
   IDLE_MS, BUSY_MS, HELLO_MS, HEARTBEAT_MS, FAIL_PAUSE_MS,
 };

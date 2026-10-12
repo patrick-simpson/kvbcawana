@@ -316,14 +316,30 @@ describe('the print lease over HTTP', () => {
     expect((await st.call('POST', '/v1/print/done', { jobId: body.job.id, result: 'who-knows' })).status).toBe(400);
   });
 
-  it('the first-draft names (lease, ack, hello) answer too', async () => {
+  it('the first-draft names (lease, ack, hello) are gone: one set of routes', async () => {
+    const t = await rig();
+    const st = await t.station();
+    for (const p of ['/v1/print/lease', '/v1/print/ack', '/v1/print/hello']) {
+      expect((await st.call('POST', p, { max: 1 })).status).toBe(404);
+    }
+  });
+
+  it('a heartbeat with the jobId extends the 90 s lease, and the lease is 90 s', async () => {
     const t = await rig();
     const st = await t.station();
     const body = await t.deskBody([st]);
     await t.call('POST', '/v1/desk/checkin', body);
-    expect((await st.call('POST', '/v1/print/lease', { max: 3 })).body.jobs).toHaveLength(1);
-    expect((await st.call('POST', '/v1/print/hello', { printer: { state: 'ok' } })).body).toEqual({ ok: true });
-    expect((await st.call('POST', '/v1/print/ack', { jobId: body.job.id, result: 'printed' })).body).toMatchObject({ ok: true, already: false });
+    const next = await st.call('GET', '/v1/print/next');
+    expect(next.body.leaseMs).toBe(90000);
+    const until = next.body.jobs[0].leaseUntil;
+    t.clock.tick(60000);
+    const beat = await st.call('POST', '/v1/print/heartbeat', { jobId: body.job.id, printer: { state: 'busy', detail: 'printing' } });
+    expect(beat.body.ok).toBe(true);
+    expect(beat.body.leaseUntil).toBe(until + 60000);
+    t.clock.tick(60000);   // 120 s after the lease began: alive only because of the heartbeat
+    expect((await st.call('GET', '/v1/print/next')).body.jobs).toEqual([]);
+    t.clock.tick(91000);   // never renewed again: back in the queue
+    expect((await st.call('GET', '/v1/print/next')).body.jobs).toHaveLength(1);
   });
 
   it('a reprint bypasses the claims, and needs a bundle sealed to every station', async () => {

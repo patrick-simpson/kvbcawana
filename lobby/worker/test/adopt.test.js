@@ -3,6 +3,7 @@
 // work per alarm tick stays inside the free plan's 10 ms of CPU.
 import { describe, expect, it } from 'vitest';
 import { generateKeyPair, openAsStation, sealForStations } from '../../shared/cloud-crypto.js';
+import { printRecord } from '../src/adopt.js';
 import { SEAL_PER_TICK, SPILL_MS, WATCH_INTERVAL_MS } from '../src/watcher.js';
 import { everything } from './helpers.js';
 import { NIGHT, kid, rig } from './rig.js';
@@ -34,7 +35,7 @@ describe('a check-in made on TwoTimTwo\'s own page', () => {
     expect(jobs[0]).toMatchObject({ kind: 'checkin', gen: 1 });
     // sealed to BOTH stations, each opens it
     for (const st of sts) {
-      expect(await openAsStation(st.ring, jobs[0].bundle)).toEqual({ clubberId: '2', name: 'Ada Uniquename', club: 'Cubbies', source: 'ttt' });
+      expect(await openAsStation(st.ring, jobs[0].bundle)).toEqual({ route: '/print', body: { name: 'Ada Uniquename', clubName: 'Cubbies', clubberId: '2' }, clubberId: '2', gen: jobs[0].gen, source: 'ttt' });
     }
     expect((await t.call('GET', '/v1/print/status')).body.claims).toMatchObject({ queued: 1 });
     await sts[0].call('POST', '/v1/print/done', { jobId: jobs[0].jobId });
@@ -185,7 +186,7 @@ describe('a restart in the middle of a burst', () => {
     const jobs = await leased(sts[0]);
     expect(jobs).toHaveLength(2);
     const names = [];
-    for (const j of jobs) names.push((await openAsStation(sts[0].ring, j.bundle)).name);
+    for (const j of jobs) names.push((await openAsStation(sts[0].ring, j.bundle)).body.name);
     expect(names.sort()).toEqual(['Yan Uniquename', 'Zed Uniquename']);
   });
 });
@@ -194,7 +195,7 @@ describe('the free plan\'s 10 ms of CPU', () => {
   it('sealing one print job to 3 stations stays under it (Node: an upper bound on the Worker)', async () => {
     const stations = [];
     for (let i = 0; i < 3; i++) stations.push({ publicKey: (await generateKeyPair()).publicKey });
-    const record = { clubberId: '662', name: 'Maximiliana Wolfeschlegel-Uniquename', club: 'Trek', source: 'ttt' };
+    const record = printRecord({ id: '662', name: 'Maximiliana Wolfeschlegel-Uniquename', club: 'Trek' }, 1);
     await sealForStations(stations, { id: 'A'.repeat(22), night: NIGHT, kind: 'print-job', record });   // warm up
     const runs = [];
     for (let i = 0; i < 15; i++) {

@@ -6,10 +6,10 @@
 // Owners: the print role (P2) CALLS these; the desk page (P3) calls the
 // /v1/desk/* ones; history (P6) adds its own file and one `mountHistory` line.
 //
-// Names: `GET /v1/print/next`, `POST /v1/print/done|failed|heartbeat` are the
-// canonical lease routes. routes.md's first draft called them
-// `POST /v1/print/lease|ack|hello`; those answer too, as aliases, so a client
-// built from either document works.
+// Names: `GET /v1/print/next`, `POST /v1/print/done|failed|heartbeat` are THE
+// lease routes (the print role, printer/print-server/job-puller.js, calls exactly
+// these). The first draft's aliases (`POST /v1/print/lease|ack|hello`) are gone:
+// nothing used them.
 
 import { churchNight } from '../../shared/cloud-crypto.js';
 import { fail, json } from './http.js';
@@ -49,7 +49,6 @@ export function mountCheckin(registry, core) {
     return json({ jobs, leaseMs: LEASE_MS });
   };
   registry.add('GET', '/v1/print/next', 'station', ({ url, stationId }) => next(/** @type {string} */ (stationId), url.searchParams.get('max')));
-  registry.add('POST', '/v1/print/lease', 'station', async ({ stationId, body }) => next(/** @type {string} */ (stationId), (await body()).max));
 
   /** A station says a label is out ('printed') or was already spooled by an earlier try. */
   const done = async (/** @type {any} */ b) => {
@@ -70,10 +69,6 @@ export function mountCheckin(registry, core) {
   };
   registry.add('POST', '/v1/print/done', 'station', async ({ body }) => done(await body()));
   registry.add('POST', '/v1/print/failed', 'station', async ({ body }) => failed(await body()));
-  registry.add('POST', '/v1/print/ack', 'station', async ({ body }) => {
-    const b = await body();
-    return b.result === 'failed' ? failed(b) : done(b);
-  });
 
   /** Every 30 s (and during a print, every few seconds with the job id): the lease stays alive and the printer's state is noted. */
   const heartbeat = async (/** @type {string} */ stationId, /** @type {any} */ b) => {
@@ -85,7 +80,6 @@ export function mountCheckin(registry, core) {
     return json(r.ok ? { ok: true, leaseUntil: r.leaseUntil } : { ok: false, reason: r.reason });
   };
   registry.add('POST', '/v1/print/heartbeat', 'station', async ({ stationId, body }) => heartbeat(/** @type {string} */ (stationId), await body()));
-  registry.add('POST', '/v1/print/hello', 'station', async ({ stationId, body }) => heartbeat(/** @type {string} */ (stationId), await body()));
 
   registry.add('GET', '/v1/print/status', 'session', async () => {
     await loadAll();

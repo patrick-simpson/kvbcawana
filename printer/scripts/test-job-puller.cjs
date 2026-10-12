@@ -46,10 +46,12 @@ const PORT = 34610;
   const SESSION = 'v1.1760000000.1.abcdefghijklmnopqrstuvwxyz012345';
 
   /** A job as the desk page seals it: one bundle to the station, jobId = bundle id. */
-  const makeJob = async (record, { night = NIGHT, to = [{ publicKey: station.publicKey }] } = {}) => {
-    const jobId = cc.newRowId();
-    const bundle = await cc.sealForStations(to, { id: jobId, night, kind: 'print', record });
-    return { jobId, bundle, leaseUntil: Date.now() + 90000 };
+  const makeJob = async (record, { night = NIGHT, to = [{ publicKey: station.publicKey }], gen, kind = 'checkin' } = {}) => {
+    const bundleId = cc.newRowId();
+    const jobId = kind === 'reprint' ? `reprint:${require('crypto').randomUUID()}` : bundleId;
+    const bundle = await cc.sealForStations(to, { id: bundleId, night, kind: 'print-job', record });
+    // What GET /v1/print/next hands out (routes.md section 6).
+    return { jobId, kind, night, ...(gen !== undefined ? { gen } : {}), bundle, leaseUntil: Date.now() + 90000, attempt: 1 };
   };
   const printRec = (id, first, last, club, extra = {}) => ({
     route: '/print', body: { firstName: first, lastName: last, clubName: club, clubberId: String(id), cloud: true }, clubberId: String(id), gen: 0, ...extra,
@@ -61,16 +63,17 @@ const PORT = 34610;
     w.request = async (base, p, opts = {}) => {
       w.calls.push({ p, opts });
       if (opts.session !== SESSION) return { ok: false, status: 401, body: null };
-      if (p === '/v1/print/lease') {
+      if (p.startsWith('/v1/print/next')) {
+        if ((opts.method || 'GET') !== 'GET') return { ok: false, status: 405, body: null };
         if (w.leaseStatus !== 200) return { ok: false, status: w.leaseStatus, body: null };
-        return { ok: true, status: 200, body: { jobs: w.queue.splice(0, opts.body.max) } };
+        return { ok: true, status: 200, body: { jobs: w.queue.splice(0, Number(new URL(p, 'https://x.test').searchParams.get('max')) || 1), leaseMs: 90000 } };
       }
-      if (p === '/v1/print/ack') {
+      if (p === '/v1/print/done' || p === '/v1/print/failed') {
         const s = w.ackStatus.length ? w.ackStatus.shift() : 200;
-        if (s === 200) { w.acks.push(opts.body); return { ok: true, status: 200, body: { ok: true } }; }
+        if (s === 200) { w.acks.push(p === '/v1/print/failed' ? { ...opts.body, result: 'failed' } : opts.body); return { ok: true, status: 200, body: { ok: true } }; }
         return { ok: false, status: s, body: null };
       }
-      if (p === '/v1/print/hello') { w.hellos.push(opts.body); return { ok: true, status: 200, body: {} }; }
+      if (p === '/v1/print/heartbeat') { w.hellos.push(opts.body); return { ok: true, status: 200, body: { ok: true } }; }
       return { ok: false, status: 404, body: null };
     };
     return w;
@@ -100,8 +103,8 @@ const PORT = 34610;
     w.queue.push(await makeJob(printRec(1, 'Ava', 'Stone', 'Sparks')));
     const before = jobs();
     const r = await puller.tick();
-    const lease = w.calls.find((c) => c.p === '/v1/print/lease');
-    check('one lease of one job, with the station header', lease && lease.opts.body.max === 1 && lease.opts.station === 'dev-0123456789abcdef' && r.handled === 1, JSON.stringify(w.calls[0]));
+    const lease = w.calls.find((c) => c.p === '/v1/print/next?max=1');
+    check('one lease of one job, with the station header', lease && lease.opts.method === 'GET' && lease.opts.station === 'dev-0123456789abcdef' && r.handled === 1, JSON.stringify(w.calls[0]));
     check('the label reached the printer once', jobs() === before + 1, `${before} -> ${jobs()}`);
     check('acked printed, after', w.acks.length === 1 && w.acks[0].result === 'printed' && w.acks[0].jobId, JSON.stringify(w.acks));
     check('the journal holds it as printed and acked', journal.get(w.acks[0].jobId).state === 'printed' && journal.get(w.acks[0].jobId).acked === true);
@@ -155,7 +158,7 @@ const PORT = 34610;
     check('it is acked already-spooled', w3.acks[0].result === 'already-spooled' && w3.acks[0].jobId === crashed.jobId, JSON.stringify(w3.acks));
     check('and CHECK THE PRINTER is raised for it', p3.status().checkThePrinter.join() === crashed.jobId);
     await p3.tick();
-    check('the hello carries the check state to the Worker', w3.hellos.some((h) => h.printer && h.printer.state === 'check'), JSON.stringify(w3.hellos));
+    check('the hello carries the check state to the Worker', w3.hellos.some((h) => h.printer && h.printer.state === 'error'), JSON.stringify(w3.hellos));
     p3.clearChecks();
     check('someone looked at the printer: cleared, and it stays cleared after a restart', p3.status().checkThePrinter.length === 0 && jp.createJournal(file).unchecked().length === 0);
     check('the journal file is real JSON written before the print (no temp left)', JSON.parse(fs.readFileSync(file, 'utf8')).jobs[crashed.jobId] && !fs.existsSync(`${file}.tmp`));
@@ -205,7 +208,7 @@ const PORT = 34610;
     const { puller } = makePuller(w);
     const direct = await post('/print', { name: 'Zoe Ray', clubName: 'Cubbies', clubberId: '5' });
     const before = jobs();
-    const r = await puller.handle(await makeJob(printRec(5, 'Zoe', 'Ray', 'Cubbies', { gen: 7 })));
+    const r = await puller.handle(await makeJob(printRec(5, 'Zoe', 'Ray', 'Cubbies', { gen: 1 })));
     // Zoe printed earlier via the pull (clubber 5) or now directly: either way no second tag.
     check('a job for a child already tagged tonight prints nothing more', (direct.body.duplicate === true || direct.body.success === true) && jobs() === before && /^(printed-duplicate|already-printed|duplicate-key)$/.test(r), `${r} ${jobs() - before}`);
     check('and is acked printed, not failed', w.acks.at(-1).result === 'printed');
@@ -219,11 +222,11 @@ const PORT = 34610;
     const job = await makeJob(printRec(11, 'Ben', 'Ivy', 'Cubbies'));
     await puller.handle(job);
     const beats = w.hellos.filter((h) => h.jobId === job.jobId);
-    check('a slow print says hello with its jobId while it prints', beats.length >= 2 && beats.every((h) => h.printer.state === 'printing'), JSON.stringify(w.hellos));
+    check('a slow print says hello with its jobId while it prints', beats.length >= 2 && beats.every((h) => h.printer.state === 'busy'), JSON.stringify(w.hellos));
     const n = w.hellos.length;
     await sleep(120);
     check('and stops the moment it returns', w.hellos.length === n);
-    check('the ack came after the print and the beats', w.calls.findIndex((c) => c.p === '/v1/print/ack') > w.calls.findLastIndex((c) => c.p === '/v1/print/hello'));
+    check('the ack came after the print and the beats', w.calls.findIndex((c) => c.p === '/v1/print/done') > w.calls.findLastIndex((c) => c.p === '/v1/print/heartbeat'));
   }
 
   console.log('\njob puller: a failed print is acked failed and may run again');
@@ -280,7 +283,7 @@ const PORT = 34610;
     check('the ack is answered "gone": ended quietly, not retried', journal.get(job.jobId).acked === true && journal.get(job.jobId).dropped === true && journal.unacked().length === 0 && puller.status().dropped === 1);
     const n = w.calls.length;
     await puller.tick();
-    check('no retry round for it', w.calls.slice(n).every((c) => c.p !== '/v1/print/ack'));
+    check('no retry round for it', w.calls.slice(n).every((c) => c.p !== '/v1/print/done'));
     // A job that arrives already marked undone is never printed.
     const undone = { ...(await makeJob(printRec(14, 'Ivy', 'Roe', 'Sparks'))), undone: true };
     const r = await puller.handle(undone);
@@ -290,7 +293,7 @@ const PORT = 34610;
     check('a 404 on the ack ends it the same way', puller.status().dropped >= 2);
   }
 
-  console.log('\njob puller: every print route, and a TwoTimTwo-page (raw) job');
+  console.log('\njob puller: every print route, and a TwoTimTwo-page job');
   {
     const w = makeWorker();
     const printed = [];
@@ -304,12 +307,44 @@ const PORT = 34610;
     check('every result is acked (a leader tag too, printed or refused by its own route)', w.acks.length === 4 && w.acks.every((a) => a.result === 'printed' || a.result === 'failed'));
     printed.length = 0;
     fs.appendFileSync(path.join(dataDir, 'clubbers.csv'), '15,Tia,Lowe,Sparks\n');
-    const raw = { jobId: cc.newRowId(), raw: { firstName: 'Tia', lastName: 'Lowe', clubberId: '15', club: 'Sparks', friend: true, friendName: 'Sam' }, leaseUntil: Date.now() + 90000 };
+    // A TwoTimTwo-page check-in: the Worker (the watcher) seals this record itself, source 'ttt'.
+    const ttt = await makeJob({ route: '/print', body: { name: 'Tia Lowe', clubName: 'Sparks', clubberId: '15', friend: true }, clubberId: '15', gen: 1, source: 'ttt' }, { gen: 1 });
     const b4 = jobs();
-    const r = await puller.handle(raw);
-    check('a raw job prints through /print as a cloud check-in', r === 'printed' && jobs() >= b4 + 1 && printed.length === 1
-      && printed[0].record.source === 'ttt-page' && printed[0].record.body.cloud === true && printed[0].record.body.clubName === 'Sparks' && printed[0].record.body.friend === true, JSON.stringify(printed));
-    check('a raw job with a string payload (not opened by the Worker) fails', await puller.handle({ jobId: cc.newRowId(), raw: 'sealed-by-the-worker' }) === 'failed');
+    const r = await puller.handle(ttt);
+    check('a TwoTimTwo-page job prints through /print as a cloud check-in', r === 'printed' && jobs() >= b4 + 1 && printed.length === 1
+      && printed[0].record.source === 'ttt' && printed[0].record.body.cloud === true && printed[0].record.body.clubName === 'Sparks' && printed[0].record.body.friend === true && !printed[0].record.body.regen, JSON.stringify(printed));
+    check('a job with no bundle fails (the Worker never leases one)', await puller.handle({ jobId: cc.newRowId() }) === 'failed');
+    check('and a raw payload is no longer a thing', await puller.handle({ jobId: cc.newRowId(), raw: { firstName: 'Tia' } }) === 'failed');
+  }
+
+  console.log('\njob puller: the lease names the generation (an undo, then a new check-in, is a new tag)');
+  {
+    const w = makeWorker();
+    const printed = [];
+    const { puller, journal } = makePuller(w, { onPrinted: async (i) => { printed.push(i); } });
+    fs.appendFileSync(path.join(dataDir, 'clubbers.csv'), '16,Uma,Fox,Sparks\n');
+    const rec = { route: '/print', body: { firstName: 'Uma', lastName: 'Fox', clubName: 'Sparks', clubberId: '16' }, clubberId: '16', source: 'desk' };
+    const b4 = jobs();
+    const first = await puller.handle(await makeJob(rec, { gen: 1 }));
+    check('generation 1 prints', first === 'printed' && jobs() === b4 + 1 && journal.byKey(`${NIGHT}:16:1`) !== null, first);
+    const same = await puller.handle(await makeJob(rec, { gen: 1 }));
+    check('a second job of the same generation (another jobId) prints nothing', same === 'duplicate-key' && jobs() === b4 + 1, same);
+    const next = await puller.handle(await makeJob(rec, { gen: 3 }));
+    check('generation 3 (the claim after an undo) prints again, whatever the print server said before', next === 'printed' && jobs() === b4 + 2 && printed.at(-1).record.body.regen === true && printed.at(-1).record.gen === 3, `${next} ${jobs() - b4}`);
+    // The gen on the record is only the fallback: the lease's wins.
+    const won = await puller.handle(await makeJob({ ...rec, gen: 99 }, { gen: 5 }));
+    check('the lease\'s gen beats the record\'s', won === 'printed' && journal.byKey(`${NIGHT}:16:5`) !== null && journal.byKey(`${NIGHT}:16:99`) === null, won);
+  }
+
+  console.log('\njob puller: a reprint job (reprint:<uuid>, its bundle keeps its own id)');
+  {
+    const w = makeWorker();
+    const { puller } = makePuller(w);
+    const b4 = jobs();
+    const rp = await makeJob({ route: '/print-custom', body: { text: 'AGAIN' } }, { kind: 'reprint' });
+    const r = await puller.handle(rp);
+    check('it prints and is acked under its reprint id', r === 'printed' && jobs() === b4 + 1 && w.acks.at(-1).jobId === rp.jobId && rp.jobId.startsWith('reprint:'), `${r} ${JSON.stringify(w.acks.at(-1))}`);
+    check('and a second lease of it prints nothing', await puller.handle(rp) === 'already-printed' && jobs() === b4 + 1);
   }
 
   console.log('\njob puller: the loop (signed out, a route not built yet, a lost lease)');
@@ -406,7 +441,7 @@ const PORT = 34610;
       return { ok: false, status: 404, body: null };
     };
     const writer = hs.createHistoryWriter({ pub: () => hist.pub, signedIn: () => ({ base: 'b', session: SESSION }), request, stationId: () => 'dev-0123456789abcdef', log: () => {} });
-    const ok = await writer.record('checkin', { ts: new Date().toISOString(), first: 'Tia', last: 'Lowe', club: 'Sparks', clubberId: '15', source: 'ttt-page' }, NIGHT);
+    const ok = await writer.record('checkin', { ts: Date.now(), first: 'Tia', last: 'Lowe', club: 'Sparks', clubberId: '15', source: 'ttt' }, NIGHT);
     check('a missing route keeps the row (tolerated)', ok === true && writer.status().queued === 1 && writer.status().missing === true);
     rowsStatus = 200;
     await writer.flush();
@@ -447,7 +482,7 @@ const PORT = 34610;
     for (const row of imported) opened.push(await cc.openRow(histRing, row));
     check('every row opens with the history key, and with nothing else', opened.every(Boolean) && (await cc.openRow(ring, imported[0])) === null);
     const ava = opened.find((x) => x.first === 'Ava');
-    check('a check-in carries who, where and when (sealed)', ava && ava.last === 'Stone' && ava.club === 'Sparks' && ava.clubberId === '1' && ava.ts === '2026-09-23T22:10:00.000Z');
+    check('a check-in carries who, where and when (sealed)', ava && ava.last === 'Stone' && ava.club === 'Sparks' && ava.clubberId === '1' && ava.ts === Date.parse('2026-09-23T22:10:00.000Z'));
     const att = opened.filter((x) => x.k === 'id:1').flatMap((x) => x.dates);
     check('a kid\'s whole ledger comes across', att.length === 120 && new Set(att).size === 120);
     check('no plaintext name in any wire row', !JSON.stringify(imported).includes('Stone') && !JSON.stringify(imported).includes('Ava'));
@@ -475,6 +510,16 @@ const PORT = 34610;
     rowsByNight[yesterday] = [await seal(yesterday, 'checkin', { clubberId: '1', first: 'Ava', last: 'Stone' }), await seal(yesterday, 'checkin', { clubberId: '2', first: 'Eli', last: 'Stone', undone: true })];
     rowsByNight['2026-09-30'] = [await seal('2026-09-30', 'import-attendance', { k: 'id:1', name: 'Ava Stone', dates: ['2026-09-23', '2026-09-30'] }), await seal('2026-09-30', 'import-attendance', { k: 'mia lee', name: 'Mia Lee', dates: ['2026-09-30'] })];
     rowsByNight[NIGHT] = [await seal(NIGHT, 'checkin', { first: 'Zed', last: 'Nine' })];
+    // A desk check-in, an undo, and a later check-in (Noah stays); a check-in then an undo (Kai goes); rows come back in id order, not time order.
+    const t0 = Date.now() - 600000;
+    rowsByNight['2026-10-08'] = [
+      await seal('2026-10-08', 'undo', { ts: t0 + 2000, clubberId: '6', first: 'Kai', last: 'Moss' }),
+      await seal('2026-10-08', 'checkin', { ts: t0 + 3000, clubberId: '4', first: 'Noah', last: 'Park' }),
+      await seal('2026-10-08', 'checkin', { ts: t0, clubberId: '6', first: 'Kai', last: 'Moss' }),
+      await seal('2026-10-08', 'undo', { ts: t0 + 1000, clubberId: '4', first: 'Noah', last: 'Park' }),
+      await seal('2026-10-08', 'checkin', { ts: t0 - 500, clubberId: '4', first: 'Noah', last: 'Park' }),
+      await seal('2026-10-08', 'visitor', { ts: t0, first: 'Walk', last: 'In', club: 'Sparks' }),
+    ];
     let nightsStatus = 200;
     const seen = [];
     const request = async (base, p, opts) => {
@@ -488,7 +533,8 @@ const PORT = 34610;
     const reader = hs.createAttendanceReader({ historyRing: async () => histRing, signedIn: () => ({ base: 'b', session: SESSION }), request, stationId: () => 'dev-0123456789abcdef', merge: (e) => merged.push(...e), log: () => {} });
     const out = await reader.syncOnce();
     const byKey = Object.fromEntries(merged.map((e) => [e.key, e]));
-    check('the nights are read and merged', out.ok && out.nights === 3 && merged.length === 3, JSON.stringify(out));
+    check('the nights are read and merged', out.ok && out.nights === 4 && merged.length === 5, JSON.stringify(out));
+    check('a desk undo takes the check-in back out, whatever order the rows come in; a later check-in stands', !byKey['id:6'] && byKey['id:4'] && byKey['id:4'].dates.join() === '2026-10-08' && byKey['walk in'], JSON.stringify(byKey['id:4']));
     check('a child\'s nights add up across check-in rows and imported ledger rows', byKey['id:1'] && byKey['id:1'].dates.join() === '2026-09-23,2026-09-30,2026-10-07', JSON.stringify(byKey['id:1']));
     check('an undone check-in does not count', !byKey['id:2']);
     check('a name-only child merges by name', byKey['mia lee'] && byKey['mia lee'].dates.join() === '2026-09-30' && byKey['zed nine']);
