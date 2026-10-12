@@ -325,6 +325,7 @@ jobs:
           include-hidden-files: true
           if-no-files-found: error
           retention-days: 1
+          compression-level: 1   # the deploy job waits on this upload and download
 
   deploy:
     # The site is built first (its failures are the cheap ones), then the
