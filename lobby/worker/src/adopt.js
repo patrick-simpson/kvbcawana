@@ -66,7 +66,7 @@ export class Adopter {
    *   storage: { get(k: string): Promise<any>, put(k: string, v: any): Promise<void>, delete(k: string): Promise<any> },
    *   log?: (line: string) => void }} deps
    */
-  constructor({ ledger, printq, stations, tags, secret, env, now, storage, log, greet }) {
+  constructor({ ledger, printq, stations, tags, secret, env, now, storage, log }) {
     this.ledger = ledger;
     this.printq = printq;
     this.stations = stations;
@@ -75,8 +75,6 @@ export class Adopter {
     this.env = env;
     this.now = now;
     this.log = log || ((line) => console.warn(line));
-    /** One greeting for a child found on TwoTimTwo's page (a no-op until the Worker is the one publisher). @type {(g: { name: string, club: string, id: string }) => Promise<unknown>} */
-    this.greet = greet || (async () => false);
     /** The children waiting to be adopted: {sealed} is the stored form. */
     this.backlogDoc = new Doc(storage, 'adopt:backlog', () => ({ sealed: null }));
     /** In memory, authoritative while the object runs. @type {{ tag: string, id: string, name: string, club: string, night: string }[]|null} */
@@ -184,7 +182,6 @@ export class Adopter {
     const c = await this.ledger.claim(e.night, e.tag, { source: 'ttt', initial: 'queued', jobId });
     if (!c.ok) return 'already';
     const record = printRecord(e, c.gen);
-    try { await this.greet({ name: e.name, club: e.club, id: jobId }); } catch (err) { console.error('[cloud] greeting failed', err); }
     const targets = this.stations.sealTargets();
     if (targets.length) {
       const bundle = await sealForStations(targets, { id: jobId, night: e.night, kind: PRINT_JOB_KIND, record });

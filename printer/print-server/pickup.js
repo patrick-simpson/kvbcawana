@@ -1,3 +1,6 @@
+// GENERATED from lobby/shared/pickup.js by scripts/shared-copies.mjs: do not edit; edit the source and run
+// `node scripts/shared-copies.mjs`. scripts/check-mirrors.mjs fails when this copy drifts.
+'use strict';
 // The lobby's "still here" list (7.16.0, owner 2026-10-08) — pure helpers.
 //
 // At 7:30 pm each club night the lobby screens show the children not yet
@@ -13,7 +16,9 @@
 // (first name + club, nothing else) in a sealed `checkout` frame, exactly as
 // the old scraped board did.
 
-'use strict';
+// SHARED (ROADMAP.md#online-check-in, P5): the print server and the sync Worker both
+// compose the still-here list with this one source (the print server through its
+// generated copy, print-server/pickup.js).
 
 const { clubKeyByLabel } = require('./clubTable');
 
@@ -30,6 +35,7 @@ function pickupClubKey(name) {
   return clubKeyByLabel(n);
 }
 
+const NAME_ORDER = new Intl.Collator('en', { sensitivity: 'base' });
 const CANONICAL_BY_KEY = new Map(PICKUP_CLUBS.map((c) => [pickupClubKey(c), c]));
 
 /**
@@ -90,8 +96,9 @@ function buildStillHere(children, clubs, max) {
     if (!onPickupList(club, clubs)) return;
     out.push({ firstName, club: CANONICAL_BY_KEY.get(pickupClubKey(club)) || club });
   });
-  out.sort((a, b) => a.firstName.localeCompare(b.firstName, 'en', { sensitivity: 'base' })
-    || a.club.localeCompare(b.club));
+  // One collator for the whole sort: localeCompare(..., 'en', {...}) builds one per comparison
+  // (about 4 ms for 150 children, too much for the Worker's 10 ms); the order is the same.
+  out.sort((a, b) => NAME_ORDER.compare(a.firstName, b.firstName) || a.club.localeCompare(b.club));
   return Number.isInteger(max) && max >= 0 ? out.slice(0, max) : out;
 }
 

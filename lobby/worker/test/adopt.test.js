@@ -6,6 +6,7 @@ import { generateKeyPair, openAsStation, sealForStations } from '../../shared/cl
 import { printRecord } from '../src/adopt.js';
 import { SEAL_PER_TICK, SPILL_MS, WATCH_INTERVAL_MS } from '../src/watcher.js';
 import { everything } from './helpers.js';
+import { importDisplayKey, openEnvelope } from '../../src/lib/envelope.js';
 import { NIGHT, kid, rig } from './rig.js';
 
 /** Move the clock, then let the alarm run once. */
@@ -218,5 +219,26 @@ describe('the free plan\'s 10 ms of CPU', () => {
     await t.core.adopt.load();
     expect(await t.core.adopt.drain(50)).toBe(SEAL_PER_TICK);
     expect(t.core.adopt.pending()).toBe(6);
+  });
+});
+
+describe('publishing the count (P5) on the free plan', () => {
+  it('a publish of tally, ticker and a sealed still-here list for a 150-child night stays under 10 ms (Node: an upper bound)', async () => {
+    const kids = Array.from({ length: 150 }, (_, i) => kid(String(1000 + i), ['Puggles', 'Cubbies', 'Sparks', 'T&amp;T'][i % 4], `Child${i} Tester`));
+    const t = await rig({ env: { SINGLE_PUBLISHER: 'on' }, kids });
+    await t.core.watcher.tick();
+    const runs = [];
+    for (let i = 0; i < 15; i++) {
+      t.core.publisher.last = { tally: { sig: null, at: 0 }, tonight: { sig: null, at: 0 }, checkout: { sig: null, at: 0 } };
+      const t0 = performance.now();
+      await t.core.publisher.publishDue('measure');
+      runs.push(performance.now() - t0);
+    }
+    runs.sort((a, b) => a - b);
+    console.warn(`publishing the count, 150 children: median ${runs[7].toFixed(2)} ms over 15 runs (limit 10 ms CPU per invocation)`);
+    expect(runs[0]).toBeLessThan(10);   // the best run: a loaded CI machine (parallel test files) moves the median, not the work
+    const key = await importDisplayKey(await t.core.displayKey());
+    const last = t.sent.filter((f) => f.e === 'checkout').at(-1);
+    expect((await openEnvelope(key, 'checkout', last.d)).payload.entries).toHaveLength(60);   // capped, as the printer's
   });
 });

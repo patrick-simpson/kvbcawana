@@ -75,6 +75,34 @@ welcome. This is the plan; its status is at the end of this track.
 4. **The sound room app** and the last per-device bits; the old panels shrink
    to a "Settings moved" card linking to /settings.
 
+### P5: how the Worker names children without reading history (2026-10-12)
+
+The Worker never holds the history key, so it cannot read a name from history, yet the
+pickup board names first names and a greeting names a child with a birthday or a milestone.
+Chosen, safest first, all on the free plan:
+
+- **Still-here list: the Worker keeps tonight's FIRST names and clubs, sealed, for the night
+  only.** One AES-GCM blob under the state key (HKDF from the TwoTimTwo password secret, like
+  the watcher's snapshot and the claims' tags): from the applied report (clubber id, first
+  name, club) and the desk's rows (first name, club; a visitor's HMAC tag stands in for a
+  surname). Never a last name, birthday or note. Purged with the claims when the watch window
+  closes; written only on a change; kept only while `SINGLE_PUBLISHER` is on (the shadow
+  night's counts need ids and clubs only). It is the second sealed-names exception after the
+  friend list, and the Worker already sees these names in memory for every child it prints or
+  greets, so it adds an at-rest copy, not a reader. Rejected: the station publishing the
+  still-here list (a laptop that sleeps or restarts mid-night would leave the pickup board
+  stale, and a list built from its jobs would miss every child already on the report).
+- **Greeting: the print station.** It opens the job and holds the roster and the history key,
+  so it alone can say birthday, first-timer, welcome back or milestone. It publishes the
+  sealed `checkin` through `POST /v1/publish` with `X-Station` and `X-Job`; the relay's
+  `SINGLE_PUBLISHER` gate lets exactly one greeting per print job through (the job is marked
+  `greeted`) and drops every other `checkin`. The Worker greets nobody itself.
+- What the Worker cannot know it is told, plaintext and non-personal: the station posts the
+  Screen season, the rehearsal flag and the pickup list's clubs (`POST /v1/station/extras`);
+  the laptop's dropped `tonight` frame hands over the books and awards counts.
+
+Full contract: `lobby/worker/src/routes.md` section 8.
+
 ### Status and hand-off
 
 - 2026-10-11: plan written (this track).
@@ -598,7 +626,7 @@ said); "Owner" is what only the owner can do.
 | **P2** Desk page + history rows | The desk page (`/desk`, lobby build): roster, check in, undo, check out, visitors, a sealed history row with every action; `/v1/desk/*`, `/v1/history/rows`, `night_summary`; claims keyed and purged nightly. | Claude: lobby + Worker | Bind `HISTORY_DB`; try the desk page on a test child. |
 | **P3** Stations | KVBC Awana's print role registers a station key (safeStorage, refused without it); `/v1/station/*`; the roster CSV read through the Worker and sealed by the station to every station; completed books. | Claude: printer (release) + Worker | Install on the check-in laptop (and any second printer). |
 | **P4** Print lease | The station leases and prints EVERY job from the Worker, journals jobIds (at most once, "check the printer" on a retried spooled job), reports printer state; the desk page and TVs show it. | Claude: printer (release) + Worker | Shadow night: every label printed from a lease, compared with the extension's. |
-| **P5** One publisher, one count, the fallback | The shared `authoritativeTonight()` module (Worker + generated copy for the printer); the Worker publishes `tally`, `tonight`, the pickup list and the greetings; the relay drops the laptop's tally / still-here frames in cloud mode; TwoTimTwo-page check-ins found by the watcher become jobs (BARFED tag without the friend's name); the watcher seals each such job to the stations itself (`sealForStations`) and the station writes the history row when it prints. | Claude: lobby/shared + Worker + printer | Shadow night: the Worker's count against the laptop's. |
+| **P5** One publisher, one count, the fallback | The shared `authoritativeTonight()` module (Worker + generated copy for the printer); the Worker publishes `tally`, `tonight`, the pickup list and the greetings; the relay drops the laptop's tally / still-here frames in cloud mode; TwoTimTwo-page check-ins found by the watcher become jobs (BARFED tag without the friend's name); the watcher seals each such job to the stations itself (`sealForStations`) and the station writes the history row when it prints. | Claude: lobby/shared + Worker + printer | Shadow night: the Worker's count against the laptop's. **Built (2026-10-12, not released):** step 1 `lobby/shared/tonight.js` (+ `printer/print-server/tonight.js`) and `shared/pickup.js`; step 2 the Worker publishes (`publisher.js`); step 3 the station greets; step 4 BARFED on the fallback. Design below. |
 | **P6** History | History and summary views in /settings (unwrapped in the browser); `POST /v1/history/import` of the laptop's past nights, sealed by the KVBC Awana app. | Claude: lobby + Worker + printer | Look over the history and summary views. **Built (lobby + Worker half):** `worker/src/history.js`, `historyCrypto.js`, the History section; the printer's import of the laptop's past nights is not. |
 | **P7** Switch | Retire the Chrome extension (and the relay's laptop paths it served); the paper-sheet drill; remove the legacy hash; docs and SECURITY.md final. Never on a Wednesday. | Claude + owner | Pick the night; keep the paper sheet and blank tags at the desk. |
 

@@ -7223,7 +7223,10 @@ function publishStillHere() {
 
 /** Something that may change the list happened: publish soon if it did. */
 function stillHereChanged() {
-  if (cloudStation || stillHereTimer) return;
+  // A station does not publish the list; it keeps the Worker's copy of what only this computer
+  // knows (season, rehearsal, pickup clubs) current instead.
+  if (cloudStation) { sendStationExtras().catch(() => {}); return; }
+  if (stillHereTimer) return;
   stillHereTimer = setTimeout(() => {
     stillHereTimer = null;
     try {
@@ -7743,7 +7746,42 @@ function mergeAttendance(entries) {
   return changed;
 }
 
+// P5, the one publisher (lobby/worker/src/routes.md section 8): the Worker makes the tally, the
+// ticker and the still-here list, but three of their inputs live only in this computer's config:
+// the Screen season and rehearsal flag that ride the tally, and the clubs on the pickup list.
+// Plaintext, non-personal; sent when one changes and at least once a minute.
+const STATION_EXTRAS_EVERY_MS = 60 * 1000;
+let stationExtrasSig = null;
+let stationExtrasAt = 0;
+let stationExtrasBusy = false;
+
+/** The settings this computer tells the Worker. */
+function stationExtrasBody() {
+  return { season: currentScreenSeason(), rehearsal: isRehearsalActive(), pickupClubs: pickup.pickupClubsOf(config) };
+}
+
+/** @returns {Promise<boolean>} whether the Worker has the current settings */
+async function sendStationExtras(force = false) {
+  if (!cloudStation || stationExtrasBusy) return false;
+  const body = stationExtrasBody();
+  const sig = JSON.stringify(body);
+  const now = Date.now();
+  if (!force && sig === stationExtrasSig && now - stationExtrasAt < STATION_EXTRAS_EVERY_MS) return true;
+  const where = cloudStation.signedIn();
+  if (!where) return false;
+  stationExtrasBusy = true;
+  try {
+    const r = await cloudStation.request(where.base, '/v1/station/extras', {
+      method: 'POST', body, session: where.session, station: cloudStation.stationIdFn(),
+    });
+    if (r.ok) { stationExtrasSig = sig; stationExtrasAt = now; }
+    return !!r.ok;
+  } catch { return false; } finally { stationExtrasBusy = false; }
+}
+
 function stopCloud() {
+  stationExtrasSig = null;
+  stationExtrasAt = 0;
   if (cloudStop) { try { cloudStop(); } catch { /* best effort */ } }
   cloudStop = null;
   cloudStation = null;
@@ -7788,9 +7826,10 @@ function configureCloud(opts) {
     const readAttendance = () => attendance.syncOnce().catch(() => {});
     const first = setTimeout(readAttendance, 20 * 1000);
     const every = setInterval(() => { readAttendance(); writer.flush().catch(() => {}); }, CLOUD_ATTENDANCE_MS);
-    if (first.unref) first.unref();
-    if (every.unref) every.unref();
-    cloudStop = () => { stopPull(); clearTimeout(first); clearInterval(every); };
+    const extrasFirst = setTimeout(() => { sendStationExtras(true).catch(() => {}); }, 5 * 1000);
+    const extrasEvery = setInterval(() => { sendStationExtras().catch(() => {}); }, STATION_EXTRAS_EVERY_MS);
+    for (const t of [first, every, extrasFirst, extrasEvery]) if (t.unref) t.unref();
+    cloudStop = () => { stopPull(); clearTimeout(first); clearInterval(every); clearTimeout(extrasFirst); clearInterval(extrasEvery); };
   }
   console.log(`[station] This computer is print station ${opts.stationId}: print jobs come from the service; the tally and pickup list are the service's to publish.`);
   return { ok: true };
@@ -9749,7 +9788,7 @@ module.exports = {
   // Tonight's count. authoritativeTonight() is THE definition every surface
   // reads; the setter exists so a test can put the server in report mode (and
   // in stale-report mode) without a scrape, a socket or a wall-clock wait.
-  printedTonightFor, authoritativeTonight, tonightHereNow, stillHereEntries, publishStillHere, REPORT_FRESH_MS, TALLY_GRACE_MIN, TALLY_LEAD_MIN,
+  printedTonightFor, authoritativeTonight, tonightHereNow, stillHereEntries, publishStillHere, sendStationExtras, REPORT_FRESH_MS, TALLY_GRACE_MIN, TALLY_LEAD_MIN,
   _setLastCheckinReportForTests(report) { lastCheckinReport = report; },
   _setStillHereWindowForTests(fn) { stillHereWindowForTests = fn; },
   _setCheckedOutForTests(date, ids, names) { checkedOutTonight = { date, ids: new Set(ids), names: new Set((names || []).map(normalizedName)) }; },

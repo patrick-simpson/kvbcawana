@@ -54,6 +54,8 @@ import { Adopter } from './adopt.js';
 import { Desk } from './desk.js';
 import { mountCheckin } from './checkinRoutes.js';
 import { History, mountHistory } from './history.js';
+import { Publisher, mountPublisher } from './publisher.js';
+import { TonightBook } from './tonight.js';
 
 export { json };
 
@@ -67,8 +69,6 @@ export const SETTINGS_JSON_MAX = 3800;
 /** The slide chunker's budget and count (print-server/events.js). */
 export const SLIDES_CHUNK_JSON_BUDGET = 3900;
 export const SLIDES_TOTAL_MAX = 12;
-/** The events the laptop may not publish while the Worker is the one publisher (live.js names them). */
-export const SINGLE_PUBLISHER_DROPS = Object.freeze(['tally', 'checkout', 'checkin']);
 export const BODY_MAX = 128 * 1024;   // bytes; the entry point refuses a longer Content-Length before reading
 
 
@@ -159,15 +159,26 @@ export class SyncCore {
     this.adopt = new Adopter({
       ledger: this.ledger, printq: this.printq, stations: this.stations, tags: this.tags,
       secret: () => this.watcher.creds()?.password, env: this.env, now: this.now, storage: this.storage,
-      greet: (g) => this.greet(g),
     });
     this.watcher.adopt = this.adopt;
     this.desk = new Desk({ watcher: this.watcher, ledger: this.ledger, printq: this.printq, stations: this.stations, tags: this.tags, now: this.now });
     mountCheckin(this.registry, this);   // stations, print lease, desk (routes.md 4, 5, 6)
     this.history = new History({ storage: this.storage, env: this.env, now: this.now });
-    // A greeting for a desk check-in, from the Worker, once SINGLE_PUBLISHER is on.
-    this.desk.hooks.afterCheckin.push((e) => this.greet({ name: e.name, club: e.club, id: e.jobId || e.historyRow?.id }));
     mountHistory(this.registry, this);   // history routes, the desk's row check and hooks (routes.md 2, 3)
+    // P5, the one publisher (publisher.js): tonight's book (first names + clubs, sealed under
+    // the state key, purged at the end of the night), the tally / tonight / still-here frames
+    // and the /v1/publish gate. The watcher feeds it each applied report, the desk its hooks.
+    this.book = new TonightBook({ storage: this.storage, secret: () => this.watcher.creds()?.password, now: this.now, names: () => this.singlePublisher });
+    this.publisher = new Publisher({
+      storage: this.storage, book: this.book, stations: this.stations, printq: this.printq, ledger: this.ledger,
+      now: this.now, enabled: () => this.singlePublisher,
+      publish: (event, payload, sealed) => (sealed ? this.publishSealed(event, payload) : this.relay(event, payload)),
+    });
+    this.watcher.publisher = this.publisher;
+    this.desk.hooks.afterCheckin.push((e) => this.publisher.deskCheckin(e));
+    this.desk.hooks.afterUndo.push((e) => this.publisher.deskUndo(e));
+    this.desk.hooks.afterCheckout.push((e) => this.publisher.deskCheckout(e));
+    mountPublisher(this.registry, this);   // /v1/desk/tonight, /v1/station/extras, /v1/publisher/status (routes.md 8)
     // The screen registry (ROADMAP.md#settings-page, phase 2): its doorbells ride the live
     // channel only, for the one screen they name.
     this.screens = new Screens({
@@ -339,25 +350,6 @@ export class SyncCore {
       calendar: calendar || null,
       kid: key ? await kidFor(fromBase64(key) || new Uint8Array(0)) : null,
     };
-  }
-
-  /**
-   * ONE greeting for a cloud check-in (a desk check-in, or a child the watcher
-   * found on TwoTimTwo's page), sealed with the display key like the laptop's.
-   * Only while the Worker is the one publisher (`singlePublisher`): until then the
-   * print server's own greeting (with birthdays and milestones) is the one. The
-   * name is in memory for this call only.
-   * @param {{ name: string, club?: string, id?: string }} g
-   */
-  async greet(g) {
-    if (!this.singlePublisher) return false;
-    const firstName = String(g.name || '').trim().split(/\s+/)[0];
-    if (!firstName) return false;
-    const res = await this.publishSealed('checkin', {
-      firstName, club: String(g.club || ''), isBirthday: false, isFirstTimer: false,
-      ...(g.id ? { id: g.id } : {}), at: new Date(this.now()).toISOString(),
-    });
-    return res.ok;
   }
 
   /** @param {string} event @param {unknown} payload */
@@ -719,12 +711,12 @@ export class SyncCore {
   async livePublish(request) {
     const res = checkPublish(await this.body(request));
     if (!res.ok) return fail(res.error, res.status);
-    // ONE publisher (ROADMAP.md#online-check-in): in cloud mode the Worker
-    // publishes the tally and the still-here list itself, so the laptop's are
-    // dropped, answered 200 so the print server does not owe a resend.
-    if (this.singlePublisher && SINGLE_PUBLISHER_DROPS.includes(res.event)) {
-      return json({ ok: true, screens: 0, dropped: true, reason: 'single-publisher' });
-    }
+    // ONE publisher (ROADMAP.md#online-check-in, publisher.js gate): in cloud mode the
+    // Worker publishes the tally, the ticker and the still-here list itself, so the
+    // laptop's are dropped (answered 200 so the print server owes no resend), and so
+    // is every greeting but the one a registered station sends with its print job.
+    const dropped = await this.publisher.gate(request, res.event, res.payload);
+    if (dropped) return json(dropped);
     const screens = await this.relay(res.event, res.payload);
     return json({ ok: true, screens });
   }

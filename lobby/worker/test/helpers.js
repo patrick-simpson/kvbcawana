@@ -21,9 +21,27 @@ export function fakeClock(start = Date.parse('2026-10-14T22:00:00Z')) {
   return c;
 }
 
+const RANDOM_LOOKING = /^[A-Za-z0-9+/_=-]{60,}$/;
+/**
+ * Storage as plain data: a long base64-looking string (a sealed blob, 60+ characters; tags and ids stay visible) is
+ * replaced by `~`, and JSON kept inside a string (a replayed frame) is opened. What is
+ * left is what a reader of the storage could read, and a test's "no name here" check
+ * cannot be fooled by a name that happens to occur in random ciphertext.
+ * @param {any} v
+ */
+function readable(v) {
+  if (typeof v === 'string') {
+    if (v.startsWith('{')) { try { return readable(JSON.parse(v)); } catch { /* not JSON */ } }
+    return RANDOM_LOOKING.test(v) ? '~' : v;
+  }
+  if (Array.isArray(v)) return v.map(readable);
+  if (v && typeof v === 'object') return Object.fromEntries(Object.entries(v).map(([k, x]) => [RANDOM_LOOKING.test(k) ? '~' : k, readable(x)]));
+  return v;
+}
+
 /** Every key a storage holds, as one string: for "no plaintext id or name" checks. */
 export function everything(store) {
-  return JSON.stringify([...store.map.entries()]);
+  return JSON.stringify(readable([...store.map.entries()]));
 }
 
 /** A station with a real key pair: {body} to register, and a ring to open bundles with. */
