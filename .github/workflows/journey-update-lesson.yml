@@ -11,11 +11,20 @@ name: Update current lesson (Journey)
 # heartbeat for staleness), so most nights commit nothing.
 #
 # Also transcodes that lesson's video down to something the kiosk's weak
-# Raspberry Pi Zero can actually decode smoothly (journey/public/current-lesson-
-# video.mp4, ~5x smaller than Awana's original) — see the top of
-# journey/scripts/transcode-lesson-video.mjs for the full rationale, including the
-# deliberate, informed exception this makes to this project's normal
-# "never re-host the original video files" rule (journey/CLAUDE.md).
+# Raspberry Pi Zero can actually decode smoothly (~5x smaller than Awana's
+# original) — see the top of journey/scripts/transcode-lesson-video.mjs for the
+# full rationale, including the deliberate, informed exception this makes to
+# this project's normal "never re-host the original video files" rule
+# (journey/CLAUDE.md).
+#
+# The video is never committed (owner, 2026-10-12; every lesson added ~20 MB to
+# history): it replaces the asset current-lesson-video.mp4 on the
+# journey-videos-v2 release (the same release as every lesson's 480p copy), and
+# the site streams that asset at /journey/current-lesson-video.mp4, the URL the
+# Pi always used. What is committed is journey/public/current-lesson-video.json
+# (its sha256), so Journey's build hash moves when the lesson does. The upload
+# comes BEFORE the commit: if it fails the job fails and nothing is committed,
+# so the deployed JSON never names a video the release does not hold.
 
 on:
   schedule:
@@ -23,7 +32,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write # commit the refreshed feed
+  contents: write # commit the refreshed feed, replace the release asset
   actions: write  # dispatch ci.yml (GITHUB_TOKEN pushes don't self-trigger it)
 
 concurrency:
@@ -56,11 +65,51 @@ jobs:
         # yet — the last good committed lesson keeps serving either way.
         run: npm run fetch-lesson
 
+      - name: Check the release copy of the lesson video
+        # The sha256 GitHub records for the asset (empty when there is none).
+        # The transcode below is skipped only when it equals the committed
+        # pointer's, so a lost or half-done upload is made again. If GitHub
+        # cannot be asked, the release is not checked (checked=0) rather than
+        # treated as empty, which would re-encode a video that is fine.
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if digest="$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/journey-videos-v2" --jq '[.assets[] | select(.name == "current-lesson-video.mp4") | .digest // ""] | first // ""')"; then
+            echo "checked=1" >> "$GITHUB_OUTPUT"
+            echo "sha256=${digest#sha256:}" >> "$GITHUB_OUTPUT"
+            echo "Release copy: ${digest:-none}"
+          else
+            echo "::warning::Could not read the journey-videos-v2 release; trusting the committed pointer."
+            echo "checked=0" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Transcode the lesson video
         # Never fails the job on its own (see the script's own comments) —
         # a transcode failure just leaves current-lesson.json's downloadUrl
         # pointing at the original, full-size, still-playable source.
+        # Writes build/current-lesson-video.mp4 only when it made a new one.
         run: npm run transcode-lesson
+        env:
+          RELEASE_VIDEO_CHECKED: ${{ steps.release.outputs.checked }}
+          RELEASE_VIDEO_SHA256: ${{ steps.release.outputs.sha256 }}
+
+      - name: Upload the new lesson video to the release
+        # Replaces the one asset in place (same name, so the site's URL never
+        # changes), then checks GitHub holds exactly the bytes the pointer
+        # names. Fails the job before the commit when it does not.
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ ! -f build/current-lesson-video.mp4 ]; then echo 'No new video to upload.'; exit 0; fi
+          gh release upload journey-videos-v2 build/current-lesson-video.mp4 --clobber --repo "$GITHUB_REPOSITORY"
+          want="$(node -p "require('./public/current-lesson-video.json').sha256")"
+          got="$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/journey-videos-v2" --jq '.assets[] | select(.name == "current-lesson-video.mp4") | .digest')"
+          if [ "$got" != "sha256:$want" ]; then
+            echo "::error::Release asset is ${got:-missing}, expected sha256:$want"
+            exit 1
+          fi
+          echo "Uploaded sha256:$want"
 
       - name: Commit the refreshed lesson, if anything changed
         # Pushes made with the default GITHUB_TOKEN deliberately do NOT
@@ -74,7 +123,7 @@ jobs:
         with:
           bot-name: lesson-bot
           working-directory: journey
-          paths: public/current-lesson.json public/current-lesson-video.mp4
+          paths: public/current-lesson.json public/current-lesson-video.json
           message: 'chore: refresh current lesson'
           only-if-changed: 'true'
           unchanged-message: Lesson unchanged — nothing to commit.

@@ -2,3 +2,6 @@ node_modules/
 __pycache__/
 # Written at deploy time by scripts/stamp-build.mjs, never committed.
 public/version.json
+# The nightly lesson video (scripts/transcode-lesson-video.mjs) before it is
+# uploaded to the journey-videos-v2 release; never committed.
+build/
