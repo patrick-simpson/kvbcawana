@@ -56,4 +56,4 @@ two can run side by side for as long as needed.
 - ~~Retire the signage corner `CountdownTimer.jsx` chip~~ — **done
   2026-07-18**: removed from the DataCycle rotation and sticker layout;
   the presentation tool owns countdown duty. The component file and its
-  `resolveTarget` tests remain one release for easy revert.
+  `resolveTarget` tests were deleted later (2026-10-12).

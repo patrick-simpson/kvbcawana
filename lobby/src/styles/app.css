@@ -71,31 +71,6 @@
   src: url('../../shared/brand/fonts/londrina-solid-full-400-normal.woff2') format('woff2'),
        url('../../shared/brand/fonts/LondrinaSolid-Regular.ttf') format('truetype');
 }
-/* The shout at the pre-rebrand footprint, for a rule still written against
-   --font-display: one sized for Baloo 2 ExtraBold, which Paytone One sets
-   about 9% wider than (the median over names, headlines and figures; 19% on
-   a short mixed-case name like Emma) with 11.5% taller caps. This alias
-   draws the same files at 88%, which lands at Baloo's median width less 4%,
-   its cap height less 2%, and about 5% over on the widest names: the
-   envelope the old 82% Galindo alias kept. It is transitional, and nearly
-   done: every stage that rebuilt a surface on the kit moved it onto
-   --font-shout (true-size Paytone One) and sized it for Paytone One (the
-   slide headlines, the check-in name, the sticker, the toasts and the
-   doors-open flourish, the ticker, the pickup board). The one rule left on
-   it is .countdown .time (CountdownTimer.jsx, which no screen renders). */
-@font-face {
-  font-family: 'Shout Fit';
-  font-style: normal;
-  font-display: swap;
-  font-weight: 100 900;
-  size-adjust: 88%;
-  ascent-override: 96%;
-  descent-override: 43.6%;
-  line-gap-override: 0%;
-  src: url('../../shared/brand/fonts/paytone-one-full-400-normal.woff2') format('woff2'),
-       url('../../shared/brand/fonts/PaytoneOne-Regular.ttf') format('truetype');
-}
-
 :root {
   /* Catalog palette */
   --awana-orange: #f7a41c;
@@ -116,7 +91,6 @@
   --glass-bg: rgba(24, 30, 44, 0.62);
   --glass-border: rgba(255, 255, 255, 0.18);
   --text-on-glass: #ffffff;
-  --text-on-glass-muted: rgba(255, 255, 255, 0.75);
   --status-ok: #4caf50;
   --status-idle: #9e9e9e;
 
@@ -124,7 +98,6 @@
      every fixed widget (see .sticker-chip). */
   --sticker-bg: rgba(28, 34, 48, 0.72);
   --sticker-edge: rgba(255, 246, 227, 0.92);
-  --sticker-edge-halo: rgba(255, 246, 227, 0.3);
   --sticker-radius: 18px;
 
   --radius-lg: 32px;
@@ -138,16 +111,13 @@
      RugFish; @font-face above, from the kit's own files). --font-shout is
      Paytone One at true size, for everything built from the kit
      (src/components/brand/ and every surface a stage has rebuilt: all of
-     the lobby's shouts); --font-display is the same face at the old Baloo
-     footprint for a rule not rebuilt yet (the 'Shout Fit' @font-face
-     above; only .countdown .time is left on it). Paytone draws
+     the lobby's shouts). Paytone draws
      every Latin letter a name has needed, Ș, Ț and Vietnamese included;
      Baloo 2 stays behind it for Devanagari, so a Hindi or Marathi name still
      shouts in a chunky face (and the lobby fit's STACKED rule relies on it).
      A script neither draws (Cyrillic, Greek, Hebrew, CJK) falls to the
      system face. */
   --font-shout: 'Paytone One', 'Baloo 2 Variable', 'Arial Rounded MT Bold', 'Segoe UI', system-ui, sans-serif;
-  --font-display: 'Shout Fit', 'Baloo 2 Variable', 'Arial Rounded MT Bold', 'Segoe UI', system-ui, sans-serif;
   /* Figtree is read: body copy, settings, notices (for Gibson). */
   --font-body: 'Figtree Variable', 'Figtree', 'Segoe UI', system-ui, sans-serif;
   /* Londrina Solid labels: kickers, tabs, chips' small line, buttons
@@ -1139,64 +1109,6 @@ html, body, #root {
   display: block;
   width: 100%;
   height: auto;
-}
-
-/* ── Countdown timer ───────────────────────────────────── */
-/* Big sibling of the corner sticker chips: same die-cut treatment,
-   with its "Club starts in" line as the overlapping label tab. */
-.countdown {
-  position: absolute;
-  right: var(--safe-inset);
-  bottom: var(--safe-inset);
-  padding: 1.05rem 1.9rem 1rem;
-  min-width: 240px;
-  background: var(--sticker-bg);
-  border: 3px solid var(--sticker-edge);
-  border-radius: calc(var(--sticker-radius) + 6px);
-  outline: 2px solid var(--sticker-edge-halo);
-  outline-offset: 3px;
-  backdrop-filter: blur(20px) saturate(140%);
-  -webkit-backdrop-filter: blur(20px) saturate(140%);
-  text-align: center;
-  box-shadow: var(--shadow-soft), 0 1px 0 rgba(255, 255, 255, 0.1) inset;
-}
-.countdown .label {
-  position: absolute;
-  top: -0.85em;
-  left: 16px;
-  padding: 0.14em 0.65em 0.18em;
-  font-family: var(--font-condensed);
-  font-size: 0.82rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.13em;
-  white-space: nowrap;
-  color: #fff;
-  background: linear-gradient(135deg, var(--awana-orange) 0%, var(--awana-orange-deep) 100%);
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(20, 26, 40, 0.35);
-  transform: rotate(-2deg);
-}
-.countdown .time {
-  font-family: var(--font-display);
-  font-size: 2.9rem;
-  font-weight: 800;
-  font-variant-numeric: tabular-nums;
-  letter-spacing: 0.04em;
-  line-height: 1.1;
-  background: linear-gradient(180deg, var(--awana-gold-pale) 10%, var(--awana-orange) 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-}
-.countdown .tomorrow-label {
-  display: block;
-  font-size: 0.75rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.14em;
-  color: var(--text-on-glass-muted);
-  margin-top: 0.2rem;
 }
 
 /* ── Settings gear button ──────────────────────────────────
@@ -2654,15 +2566,6 @@ input:focus-visible {
 /* ── Narrow screens: compact chrome, wrappable banner ────── */
 @media (max-width: 700px) {
   .corner-stack { gap: 0.85rem; }
-  .countdown {
-    min-width: 0;
-    padding: 0.6rem 1rem 0.65rem;
-    border-width: 2px;
-    border-radius: 16px;
-  }
-  .countdown .label { font-size: 0.62rem; letter-spacing: 0.1em; }
-  .countdown .time { font-size: 1.8rem; }
-
   .first-time-burst { width: clamp(72px, 20vw, 110px); top: -22%; }
   .welcome-back-seal { width: clamp(72px, 20vw, 110px); top: -22%; }
   .first-time-burst span { font-size: clamp(0.7rem, 2.6vw, 0.95rem); }
@@ -2755,15 +2658,6 @@ input:focus-visible {
    height on a short screen, so it needs nothing here. ─────── */
 @media (max-height: 560px) {
   .corner-stack { gap: 0.8rem; }
-  .countdown {
-    min-width: 0;
-    padding: 0.55rem 0.95rem 0.6rem;
-    border-width: 2px;
-    border-radius: 14px;
-  }
-  .countdown .label { font-size: 0.58rem; letter-spacing: 0.1em; }
-  .countdown .time { font-size: 1.6rem; }
-
 }
 
 /* ── Season promo slides (fall 2026) ───────────────────────

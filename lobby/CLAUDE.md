@@ -292,14 +292,9 @@ and `doodles/`. Read its README before changing it.
   calendar slides' headlines (sized by the fit in `src/lib/lobbyFrame.js`),
   the check-in name, the sticker, and the 4b-2 overlays (the milestone toasts
   and the doors-open flourish, the ticker, the pickup board's names and
-  count), each sized for Paytone One. `--font-display` is the same files drawn
-  at 88% (the `'Shout Fit'` @font-face in app.css), for a rule still sized for
-  the old Baloo 2: Paytone sets ~9% wider than Baloo 2 ExtraBold with 11.5%
-  taller caps, and 88% lands at Baloo's median width less 4%, its caps less 2%
-  and no more than ~5% over on the widest names (the envelope the 82% Galindo
-  alias kept). Only `.countdown .time` is left on it (`CountdownTimer.jsx`,
-  which no screen renders). Move a rule to `--font-shout` only when you
-  re-size it. Both stacks fall back to Baloo 2 for Devanagari,
+  count), each sized for Paytone One. (The old `--font-display` / `'Shout Fit'`
+  88% alias went with the retired countdown chip.) The stack falls back to
+  Baloo 2 for Devanagari,
   the one script a name may use that Paytone lacks and a chunky face draws,
   which (with the promos) is why the Baloo import stays.
 - **The posters keep their own faces.** `--promo-font-*` and `--font-poster`
