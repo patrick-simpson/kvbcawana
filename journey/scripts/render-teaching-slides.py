@@ -4,16 +4,25 @@ kiosk-ready images under public/slides/week-NN/.
 
 Per week this writes:
   slide-1.jpg .. slide-4.jpg  Awana's own four teaching slides (title, core
-                              verse, misconception, illumination), 1280x960
-                              JPEG q85 — JPEG decodes cheaply and
-                              the source art is photographic texture anyway.
+                              verse, misconception, illumination), 1920x1440
+                              JPEG q88 (2026-10-12, PC kiosk on a 1080p/4K TV:
+                              the 4:3 stage is 1440x1080 at 1080p, so the old
+                              1280x960 was upscaled and the text went soft; the
+                              text and heading art are vector/2400px in the
+                              deck, so they really are sharper at this size).
+                              JPEG decodes cheaply and the background art is
+                              photographic texture anyway.
   template.jpg                the bare background of the deck's fifth slide
                               (Awana's blank "TEMPLATE" — heading + three
                               empty bullets). The kiosk renders the generated
                               Talk About It / Remember This / This Week
                               slides as HTML text over this, so their copy in
                               public/teaching-slides.json stays editable and
-                              crisp at any size.
+                              crisp at any size. Same 1920x1440 q88 as the
+                              slides when the deck's picture has that much
+                              detail (2200x1650 in weeks 7-32); weeks 1-6 carry
+                              only a 960x720 picture, so theirs stays 1280x960
+                              q85 as before (bigger would be invented pixels).
 
 Every deck on the real Advocates page has exactly five slides (verified for
 all 32 on 2026-09-06); the fifth is never copied as an image because it is the
@@ -44,7 +53,11 @@ from PIL import Image
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MANIFEST = os.path.join(REPO, 'public', 'teaching-slides.json')
 OUT_ROOT = os.path.join(REPO, 'public', 'slides')
-WIDTH, HEIGHT = 1280, 960  # the decks are 10in x 7.5in (4:3)
+WIDTH, HEIGHT = 1920, 1440  # the decks are 10in x 7.5in (4:3); slides 1-4
+SLIDE_QUALITY = 88
+# A template picture smaller than the slide size is never blown up to it:
+# it is written at the size it always had (more pixels, no more detail).
+SMALL_TEMPLATE = (1280, 960, 85)
 DECK_SLIDES = 4            # slides 1-4 are Awana's; 5 is the blank template
 
 
@@ -66,7 +79,7 @@ def render_week(week, url, workdir):
     for i in range(DECK_SLIDES):
         page = pdf[i]
         img = page.render(scale=WIDTH / page.get_width()).to_pil().convert('RGB')
-        img.save(os.path.join(out, f'slide-{i + 1}.jpg'), 'JPEG', quality=85, optimize=True, progressive=True)
+        img.save(os.path.join(out, f'slide-{i + 1}.jpg'), 'JPEG', quality=SLIDE_QUALITY, optimize=True, progressive=True)
     # The template's background is the largest image the last slide references.
     z = zipfile.ZipFile(pptx)
     rels = z.read(f'ppt/slides/_rels/slide{n}.xml.rels').decode()
@@ -74,9 +87,11 @@ def render_week(week, url, workdir):
     if not media:
         raise SystemExit(f'{tag}: template slide references no background image')
     biggest = max(media, key=lambda m: z.getinfo(m).file_size)
-    bg = Image.open(io.BytesIO(z.read(biggest))).convert('RGB').resize((WIDTH, HEIGHT), Image.LANCZOS)
-    bg.save(os.path.join(out, 'template.jpg'), 'JPEG', quality=85, optimize=True, progressive=True)
-    print(f'{tag}: {DECK_SLIDES} slides + template written')
+    src = Image.open(io.BytesIO(z.read(biggest)))
+    w, h, q = (WIDTH, HEIGHT, SLIDE_QUALITY) if src.size[0] >= WIDTH else SMALL_TEMPLATE
+    bg = src.convert('RGB').resize((w, h), Image.LANCZOS)
+    bg.save(os.path.join(out, 'template.jpg'), 'JPEG', quality=q, optimize=True, progressive=True)
+    print(f'{tag}: {DECK_SLIDES} slides + template written (template source {src.size[0]}x{src.size[1]})')
 
 
 def require_fonts():
