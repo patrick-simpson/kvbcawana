@@ -29,17 +29,18 @@ const FULL = {
   pickupClubs: ['Puggles', 'Cubbies', 'Sparks', 'T&T'],
   seasonTheme: 'fall',
   barfNights: ['2026-10-21', '2026-11-04'],
+  leaders: [{ firstName: 'Ann', lastName: 'Leader', clubName: 'Sparks', lastPrintedAt: 1760000000000, printCount: 3 }],
 };
 
 describe('churchSettings', () => {
   it('names exactly the keys routes.md 10.3 lists', () => {
     expect([...CHURCH_KEYS].sort()).toEqual([
       'barfNights', 'connectCard', 'connectCardAutoFirstTimer', 'connectCardGreeting', 'enableDrivenCheckin',
-      'firstTimerInverted', 'labelFooter', 'labelTemplates', 'lateGraceMin', 'pickupClubs', 'schedule',
+      'firstTimerInverted', 'labelFooter', 'labelTemplates', 'lateGraceMin', 'leaders', 'pickupClubs', 'schedule',
       'seasonTheme', 'trophyBand',
     ]);
     expect(CHURCH_KEYS).toEqual(Object.keys(CHURCH_SPEC));
-    expect(CHURCH_JSON_MAX).toBe(24576);
+    expect(CHURCH_JSON_MAX).toBe(65536);
     expect(CHURCH_SEASONS).toEqual(['auto', 'off', 'back-to-school', 'fall', 'thanksgiving', 'christmas', 'winter', 'spring', 'easter', 'vbs-summer']);
   });
 
@@ -131,6 +132,26 @@ describe('churchSettings', () => {
     expect(cleanChurchValue('barfNights', days.slice(0, 20)).value).toHaveLength(20);
   });
 
+  it('leaders: leaders.json rows, adults\' names only, one per name, newest first, at most 200', () => {
+    const r = cleanChurchValue('leaders', [
+      { firstName: ' Ann ', lastName: 'Leader', clubName: 'Sparks', lastPrintedAt: 100, printCount: 2, key: 'ann leader', phone: '555-1234', birthday: '1980-01-01' },
+      { firstName: 'ANN', lastName: 'leader', lastPrintedAt: 50 },                     // the same person again: dropped
+      { firstName: '<b>Bo</b>', lastName: '', clubName: 7, lastPrintedAt: 'x', printCount: 0 },
+      { firstName: '', lastName: '' },
+      'junk',
+    ]);
+    expect(r).toEqual({ ok: true, value: [
+      { firstName: 'Ann', lastName: 'Leader', clubName: 'Sparks', lastPrintedAt: 100, printCount: 2 },
+      { firstName: 'bBo/b', lastName: '', clubName: '', lastPrintedAt: 0, printCount: 1 },
+    ] });
+    expect(cleanChurchValue('leaders', [{ firstName: 'x'.repeat(90) }]).value[0].firstName).toHaveLength(40);
+    const many = Array.from({ length: 250 }, (_, i) => ({ firstName: `Leader${i}`, lastName: 'L', lastPrintedAt: i }));
+    const kept = cleanChurchValue('leaders', many).value;
+    expect(kept).toHaveLength(200);
+    expect(kept[0].firstName).toBe('Leader249');
+    expect(cleanChurchValue('leaders', {})).toEqual({ ok: false });
+  });
+
   it('junk in, nothing out', () => {
     for (const junk of [null, undefined, 'x', 5, [], [FULL]]) expect(sanitizeChurch(junk)).toEqual({ settings: {}, dropped: [] });
     expect(sanitizeChurch(JSON.parse('{"__proto__": {"x": 1}, "constructor": 1}')).settings).toEqual({});
@@ -142,6 +163,7 @@ describe('churchSettings', () => {
       schedule: Array.from({ length: 60 }, (_, i) => ({ club: `Club ${i}`.padEnd(30, 'x'), startTime: '18:00', location: 'L'.repeat(40), room: 'R'.repeat(40) })),
       labelTemplates: Object.fromEntries(['default', 'puggle', 'cubbie', 'spark', 't&t', 'trek', 'journey'].map((k) => [k, { version: 1, showIconPanel: false, showLastName: false, showClubLine: false, showGroupLine: false, showVisitorPill: false, showFooter: false, nameMaxPt: 30 }])),
       barfNights: Array.from({ length: 20 }, (_, i) => `2027-01-${String(i + 1).padStart(2, '0')}`),
+      leaders: Array.from({ length: 200 }, (_, i) => ({ firstName: `${i}`.padEnd(40, 'f'), lastName: 'l'.repeat(40), clubName: 'c'.repeat(40), lastPrintedAt: 1760000000000 + i, printCount: 999999 })),
     };
     const s = sanitizeChurch(big).settings;
     expect(new TextEncoder().encode(JSON.stringify(s)).length).toBeLessThan(CHURCH_JSON_MAX);

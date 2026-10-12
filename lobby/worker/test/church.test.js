@@ -151,6 +151,42 @@ describe('editing', () => {
   });
 });
 
+describe('the remembered leaders (church key `leaders`)', () => {
+  it('seeded with the laptop\'s leaders.json, remembered and forgotten from any phone, each change logged', async () => {
+    const r = await rig({ env: PROD, start: SUNDAY });
+    const st = await r.station();
+    const ann = { firstName: 'Ann', lastName: 'Leader', clubName: 'Sparks', lastPrintedAt: 1760000000000, printCount: 4 };
+    await st.call('PUT', '/v1/church/settings', { seed: true, settings: { ...LAPTOP, leaders: [ann] } });
+    expect((await r.call('GET', '/v1/church/settings')).body.settings.leaders).toEqual([ann]);
+    // A phone remembers a new leader: the whole list, newest first, with baseRev.
+    const bo = { firstName: 'Bo', lastName: 'Helper', clubName: '', lastPrintedAt: 1760000500000, printCount: 1, phone: '555' };
+    const put = await r.call('PUT', '/v1/church/settings', { baseRev: 1, settings: { leaders: [bo, ann] } }, PAGE);
+    expect(put.body.settings.leaders).toEqual([{ firstName: 'Bo', lastName: 'Helper', clubName: '', lastPrintedAt: 1760000500000, printCount: 1 }, ann]);
+    const e = (await r.call('GET', '/v1/changes?limit=1')).body.entries[0];
+    expect(e).toMatchObject({ what: 'church', keys: ['leaders'], undoable: true, device: { kind: 'page' } });
+    // Forget Ann.
+    await r.call('PUT', '/v1/church/settings', { baseRev: 2, settings: { leaders: put.body.settings.leaders.slice(0, 1) } });
+    expect(r.storage.map.get('church').settings.leaders.map((l) => l.firstName)).toEqual(['Bo']);
+    // Undo the forget: Ann is back.
+    const seq = (await r.call('GET', '/v1/changes?limit=1')).body.entries[0].seq;
+    expect((await r.call('POST', `/v1/changes/${seq}/undo`)).status).toBe(200);
+    expect(r.storage.map.get('church').settings.leaders.map((l) => l.firstName)).toEqual(['Bo', 'Ann']);
+  });
+
+  it('a full list of 200 leaders fits, and its change log entry stays under 2 KB (before in logv)', async () => {
+    const { r } = await seeded();
+    const leaders = Array.from({ length: 200 }, (_, i) => ({ firstName: `Leader${i}`, lastName: 'Volunteer', clubName: 'T&T', lastPrintedAt: 1760000000000 + i, printCount: 2 }));
+    expect((await r.call('PUT', '/v1/church/settings', { baseRev: 1, settings: { leaders } })).status).toBe(200);
+    expect((await r.call('PUT', '/v1/church/settings', { baseRev: 2, settings: { leaders: leaders.slice(1) } })).status).toBe(200);
+    const e = (await r.call('GET', '/v1/changes?limit=1')).body.entries[0];
+    expect(e.bigBefore).toBe(true);
+    expect(e.after).toBeNull();
+    expect(new TextEncoder().encode(JSON.stringify(e)).length).toBeLessThanOrEqual(2048);
+    expect((await r.call('POST', `/v1/changes/${e.seq}/undo`)).status).toBe(200);
+    expect(r.storage.map.get('church').settings.leaders).toHaveLength(200);
+  });
+});
+
 describe('the station learns of a change from GET /v1/print/next', () => {
   it('church: {rev, switchesRev}, moving with each edit and each flip', async () => {
     const { r, st } = await seeded();

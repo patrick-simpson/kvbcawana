@@ -642,7 +642,9 @@ checked by `check-mirrors.mjs`): `CHURCH_SPEC`, `CHURCH_KEYS`,
 kept nor dropped: it means the default), `mergeChurch(prev, patch) -> settings`
 (a new object: a key sent as `null` is deleted, a value its rule refuses leaves
 the old one), `cleanChurchValue(key, v) -> {ok, value?}` (one key's rule),
-`CHURCH_SEASONS`, `CHURCH_JSON_MAX` = 24576 bytes (BUILT, with
+`CHURCH_SEASONS`, `LEADERS_MAX` = 200, `CHURCH_JSON_MAX` = 65536 bytes (raised
+from 24576 for the leader list: 200 rows at the longest names plus a full schedule
+stay under it; a Durable Object value holds 128 KB) (BUILT, with
 `churchSettings.test.js`; the `shared-copies.mjs` / `check-mirrors.mjs` lines
 are Track B's). It imports
 only `./pickup.js`, `./clubs.js` and `./text.js` (each already in `COPIES`, so
@@ -658,11 +660,22 @@ and uses only `export const` / `export function`.
 | `lateGraceMin` | int 0..120 |
 | `pickupClubs` | `pickup.js normalizePickupClubs` (`null` = the default list) |
 | `seasonTheme` | `auto` \| `off` \| `back-to-school` \| `fall` \| `thanksgiving` \| `christmas` \| `winter` \| `spring` \| `easter` \| `vbs-summer` |
-| `barfNights` | array of at most 20 unique sorted `YYYY-MM-DD` |
+| `barfNights` | array of at most 20 unique sorted `YYYY-MM-DD` (more than 20 valid dates: the key is dropped) |
+| `leaders` | the remembered leaders (owner 2026-10-12, moved from the print server's `leaders.json`): array of rows `{firstName: ..40, lastName: ..40, clubName: ..40, lastPrintedAt: ms (0 when unknown), printCount: int >= 1}` (one line each, no `<` `>`), one row per name (first + last, case-folded; the first wins), sorted newest `lastPrintedAt` first, at most `LEADERS_MAX` (200: the newest kept). Anything else on a row (`key`, a phone number, a birthdate) is never kept. ADULT volunteers' names only |
 
 Never here: printers, `cupsMedia`, `musicalPrinter`, `updateBeacon`,
 `worksheetPrinter`, `checkinUrl`, `historyRetentionDays`, `fleetConfigUrl`, any
-`SECRET_CONFIG_KEYS` key. Values are church-authored, never child data.
+`SECRET_CONFIG_KEYS` key. Values are church-authored or adult volunteers' names
+(`leaders`), never child data.
+
+**The remembered leaders from any phone.** Remember (after a leader tag prints)
+and Forget (the × on a chip) are church edits of the WHOLE `leaders` list with
+`baseRev` (409 `stale` → re-read, re-apply, send again); each is logged as a
+`church` entry with key `leaders` (a long list's `before` lands in `logv`, its
+`after` as a signature) and undoes like any other. The print server's
+`/leaders` routes read and write this copy while church sync is active (Track B;
+its `leaders.json` stays the offline copy), and a station's seed carries its
+`leaders.json`. The 270-day "active" filter stays a reader's rule, not storage.
 
 Storage `church` = `{v: 1, rev, savedAt, by, seededBy: {stationId, name, at} | null, settings}`.
 

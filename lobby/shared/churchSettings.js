@@ -10,7 +10,8 @@
 //   - the settings page shows and edits exactly these keys.
 //
 // Values are church-authored (a label footer, a schedule, which clubs are on the
-// pickup list), never child data. Never here: printers, cupsMedia, musicalPrinter,
+// pickup list) plus the remembered leaders (adult volunteers' names, `leaders`),
+// never child data. Never here: printers, cupsMedia, musicalPrinter,
 // updateBeacon, worksheetPrinter, checkinUrl, historyRetentionDays, fleetConfigUrl,
 // or any secret.
 //
@@ -21,8 +22,11 @@ import { normalizePickupClubs } from './pickup.js';
 import { clubKeyByLabel } from './clubs.js';
 import { cleanText } from './text.js';
 
-/** The whole church document, as JSON, at most this many bytes. */
-export const CHURCH_JSON_MAX = 24576;
+/**
+ * The whole church document, as JSON, at most this many bytes (64 KB: room for
+ * the full leader list beside a full schedule; a Durable Object value holds 128 KB).
+ */
+export const CHURCH_JSON_MAX = 65536;
 
 /** The Screen seasons `seasonTheme` may name (the print server's SEASON_KEYS), plus auto and off. */
 export const CHURCH_SEASONS = Object.freeze([
@@ -36,6 +40,16 @@ export const LABEL_TEMPLATE_SWITCHES = Object.freeze([
 export const LABEL_TEMPLATES_MAX = 12;
 export const SCHEDULE_ROWS_MAX = 60;
 export const BARF_NIGHTS_MAX = 20;
+/**
+ * The remembered leaders (owner, 2026-10-12: moved from the print server's
+ * leaders.json so a leader-tag chip works from any phone): ADULT volunteers'
+ * names only, never a child's, and nothing else about them (no contact, no
+ * birthdate, no attendance). Rows `{firstName, lastName, clubName,
+ * lastPrintedAt, printCount}` as leaders.json keeps them, at most LEADERS_MAX,
+ * one per name (first + last, case and spacing folded), newest print first.
+ */
+export const LEADERS_MAX = 200;
+export const LEADER_NAME_MAX = 40;
 
 /**
  * Every key and its rule. `type` names the cleaner below; the table is what a
@@ -55,6 +69,7 @@ export const CHURCH_SPEC = Object.freeze({
   pickupClubs: Object.freeze({ type: 'pickupClubs' }),
   seasonTheme: Object.freeze({ type: 'enum', values: CHURCH_SEASONS }),
   barfNights: Object.freeze({ type: 'dates', max: BARF_NIGHTS_MAX }),
+  leaders: Object.freeze({ type: 'leaders', max: LEADERS_MAX }),
 });
 
 export const CHURCH_KEYS = Object.freeze(Object.keys(CHURCH_SPEC));
@@ -140,6 +155,30 @@ export function cleanChurchValue(key, v) {
         });
       }
       return { ok: true, value: rows };
+    }
+    case 'leaders': {
+      if (!Array.isArray(v)) return { ok: false };
+      const seen = new Set();
+      const rows = [];
+      for (const r of v) {
+        if (!isPlainObject(r)) continue;
+        const firstName = cleanText(r.firstName, LEADER_NAME_MAX, { control: ' ', angle: true, collapse: true });
+        const lastName = cleanText(r.lastName, LEADER_NAME_MAX, { control: ' ', angle: true, collapse: true });
+        const key = `${firstName} ${lastName}`.toLowerCase().trim();
+        if (!key || seen.has(key)) continue;
+        seen.add(key);
+        const at = Number(r.lastPrintedAt);
+        const count = Math.round(Number(r.printCount));
+        rows.push({
+          firstName,
+          lastName,
+          clubName: cleanText(r.clubName, 40, { control: ' ', angle: true, collapse: true }),
+          lastPrintedAt: Number.isFinite(at) && at > 0 ? Math.floor(at) : 0,
+          printCount: Number.isFinite(count) ? Math.min(Math.max(count, 1), 1e6) : 1,
+        });
+      }
+      rows.sort((a, b) => b.lastPrintedAt - a.lastPrintedAt);
+      return { ok: true, value: rows.slice(0, rule.max) };
     }
     case 'dates': {
       if (!Array.isArray(v)) return { ok: false };
