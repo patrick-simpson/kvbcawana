@@ -1,23 +1,18 @@
 # Setup guide
 
-## 1. Print server (the main laptop)
+First-time setup, after the install in [the README](../README.md#install). Problems: [TROUBLESHOOTING.md](../TROUBLESHOOTING.md). The club-night checklist: [NIGHT-OF.md](NIGHT-OF.md).
 
-Install the Windows app: download **Club-Label-Printer-Setup.exe**
-from the [download link](https://awana.kvbchurch.org/download/club-label-printer),
-run it (SmartScreen: *More info → Run anyway*), pick your printer and
-check-in URL. The app lives in the system tray, hosts the full server
-on port **3456**, starts with Windows, auto-updates, and can print a
-test label from Settings. When Windows asks about network access,
-click **Allow** (needed for phone check-in); or use Settings →
-*Enable Phone Check-in (firewall)*.
+## 1. First start, and updates
 
-**Updates install themselves within a minute or two of a release going
-out — deliberately even mid-club-night**, since a release that ships
-while a club is running is almost always an urgent fix. The app waits a
-few seconds for any in-flight label print to finish, then restarts on
-its own; the print server comes back up unattended. This needs no setup
-(every launch, and every ten minutes after that, the app checks the
-update feed on awana.kvbchurch.org on its own).
+The app opens its setup wizard on first start: the role (print server, display, or both), the church passphrase (which signs this computer in to the sync service), a name for the computer, then the printer (print server) and the screen, monitor and hours (display). The app then lives in the system tray and starts with Windows. Start with Windows is one setting for both roles; the tray, the display's Settings and the wizard all set it.
+
+A laptop upgrading from an 8.x install is a print server with the display off and setup done, so it never sees the wizard or the display. Windows may ask about network access the first time; for phone check-in see [section 4](#4-phone-check-in-optional-off-by-default).
+
+The tray's **Settings** can print a test label.
+
+**Updates.** The app checks the update feed at awana.kvbchurch.org/updates/printer/ on every launch and every ten minutes after that, so a release reaches a laptop within about ten minutes. Nothing needs setting up.
+
+Updates install themselves within a minute or two of a release going out, **deliberately even mid-club-night**, since a release that ships while a club is running is almost always an urgent fix. A print server waits only while a label is in flight (a printing request still open, a job on the printer chain, a stretch reprint, or a phone check-in the extension has not driven yet), capped at a minute; a display-only computer waits five seconds. The tray icon shows "Updating to vX… restarting" for those few seconds. The print server comes back up on its own within seconds; nobody needs to touch the laptop.
 
 ## 2. Chrome extension
 
@@ -33,6 +28,8 @@ and the dashboard's Diagnostics tab has a **Copy folder path** button.
 Details in `EXTENSION.md`.
 
 ## 3. Dashboard settings (`http://localhost:3456`)
+
+The dashboard is the print server's page on this computer. Retiring it is decided and not yet built ([ROADMAP.md, Online only](../../ROADMAP.md#online-only)); until then, these are set here.
 
 - **Names on the Welcome Screen** — front page, above the fold. Says
   whether children's first names are leaving this PC encrypted, with a
@@ -67,7 +64,9 @@ you need BOTH, in Settings → Check-in Features:
    because the listening socket is bound at startup.
 
 Then any phone on the same Wi-Fi: `http://<laptop-ip>:3456/phone`.
-Find the laptop's IP with `ipconfig` (Wireless LAN → IPv4).
+Find the laptop's IP with `ipconfig` (Wireless LAN → IPv4). If the page
+will not load, the firewall rule may be missing; see
+[TROUBLESHOOTING.md](../TROUBLESHOOTING.md#phones-cant-reach-the-phone-page).
 
 **Trust model:** every request from the network must carry the PIN —
 including the roster fetch — and wrong PINs are rate-limited. But the
@@ -78,24 +77,20 @@ are never readable over the network, even with a valid PIN.
 
 For a roster kid the phone page never prints directly; it queues the
 check-in for the main laptop, which does the real TwoTimTwo check-in and
-prints through the normal (deduplicated) path. Its **Tonight** tab shows
-exactly who this server is counting (the same list the lobby screens
-total), with **Remove** (local only — it does not undo the check-in on
-TwoTimTwo) and **Add back**. Two things do print straight from the
-phone, because neither can double-print: a **visitor label** for someone
-not on the roster, and a **Leader tag** for an adult volunteer (never
-counted as a check-in).
+prints through the normal (deduplicated) path. Two things do print straight
+from the phone, because neither can double-print: a **visitor label** for
+someone not on the roster, and a **Leader tag** for an adult volunteer
+(never counted as a check-in). The Tonight tab shows who this server is
+counting; its Remove is local only and does not undo the check-in on
+TwoTimTwo. How volunteers use it on club night is in [NIGHT-OF.md](NIGHT-OF.md).
 
-Every leader whose tag has printed is remembered on this server
+Leaders who have had a tag printed are remembered on this server
 (`leaders.json` in the data folder — names only, no contact details) and
-offered back as a one-tap chip on the phone page, the dashboard and the
-check-in widget, so nobody types the same volunteer's name twice. Tick
-several and **Print selected** tags a whole team. The **×** on a chip
-forgets that leader; anyone not printed for a season hides itself
-without being forgotten. Every club dropdown on all three surfaces is
-served by the server (`GET /clubs`), so a club can never be missing from
-one of them — which is exactly how the widget's walk-in dropdown ended
-up as the only one without Journey.
+offered back as chips on the phone page, the dashboard and the check-in
+widget. Every club dropdown on all three surfaces is served by the server
+(`GET /clubs`), so a club can never be missing from one of them — which is
+exactly how the widget's walk-in dropdown ended up as the only one without
+Journey.
 
 See [SECURITY.md](../SECURITY.md) for the full trust model, what it
 deliberately does not defend against, and the fork checklist.
