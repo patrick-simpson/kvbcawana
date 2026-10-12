@@ -234,6 +234,8 @@ export class Watcher {
     this.adopt = null;
     /** The one publisher (publisher.js): set by SyncCore; the watcher feeds it each applied report and its tick. @type {import('./publisher.js').Publisher|null} */
     this.publisher = null;
+    /** The youth check-out (ymcheckout.js): set by SyncCore; the watcher hands it each applied report and a turn of its alarm. @type {import('./ymcheckout.js').YmCheckout|null} */
+    this.ym = null;
     this.alarms = alarms || { set() {}, get: () => null };
     // warn, not log: the lint allows warn and error only, and `wrangler tail` shows both.
     this.log = log || ((line) => console.warn(line));
@@ -323,6 +325,13 @@ export class Watcher {
       // The window has closed: tonight's claims and jobs are forgotten.
       try { await this.adopt?.endOfNight(); } catch (err) { console.error('[cloud] end-of-night purge failed', err); }
       try { await this.publisher?.endOfNight(); } catch (err) { console.error('[cloud] end-of-night purge of the names failed', err); }
+      // The youth check-out runs on to midnight (7:15 pm to midnight, past the
+      // watch window): it sweeps from the last applied report and the Checkout page.
+      if (this.ym && this.ym.due()) {
+        await this.budget.load();
+        try { await this.ym.step(); } catch (err) { console.error('[cloud] youth check-out failed', err); }
+        next = this.ymWake(next);
+      }
     } else {
       await this.budget.load();
       await this.adopt?.load();
@@ -334,6 +343,8 @@ export class Watcher {
         try { await this.probeCheckinPage(); } catch (err) { console.error('[cloud] check-in page probe failed', err); }
       } else if (this.adopt && this.adopt.pending() > 0) {
         try { await this.adopt.drain(SEAL_PER_TICK); } catch (err) { console.error('[cloud] sealing a job failed', err); }
+      } else if (this.ym && this.ym.due() && await this.ym.step().catch((err) => { console.error('[cloud] youth check-out failed', err); return false; })) {
+        // A Checkout page read or ONE check-out post (at most one every 15 s, ymcheckout.js).
       } else if (this.publisher) {
         // The minute's tally / ticker / still-here list, and anything a change left
         // waiting. (A tick that read the report published from onReport already; one
@@ -344,6 +355,7 @@ export class Watcher {
       next = Math.max(this.lastWatcherRead(s) + WATCH_INTERVAL_MS - this.now(), this.budget.peek(), 1000);
       // Jobs still waiting to be sealed: the next tick (not the next read) seals one.
       if (this.adopt && this.adopt.pending() > 0) next = Math.min(next, SPILL_MS);
+      next = this.ymWake(next);
       // A sign-in that is backing off waits it out instead of waking every 5 s.
       if (this.client && this.client.loginBlockedUntil > this.now()) {
         next = Math.max(next, this.client.loginBlockedUntil - this.now());
@@ -355,6 +367,20 @@ export class Watcher {
     }
     await this.alarms.set(this.now() + next);
     return { next };
+  }
+
+  /**
+   * The next alarm, brought forward for the youth check-out's next page read or
+   * post, and pushed back for a sign-in that is backing off.
+   * @param {number} next
+   */
+  ymWake(next) {
+    const y = this.ym ? this.ym.wakeInMs() : null;
+    if (y === null) return next;
+    let n = Math.min(next, Math.max(y, 1000));
+    if (this.client && this.client.loginBlockedUntil > this.now()) n = Math.max(n, this.client.loginBlockedUntil - this.now());
+    if (this.client && this.client.downUntil > this.now()) n = Math.max(n, this.client.downUntil - this.now());
+    return n;
   }
 
   /** When the watcher last read the report (ms; 0 never). @param {{ lastReadAt?: string|null }} status */
@@ -543,6 +569,8 @@ export class Watcher {
         this.log(`[cloud] shadow: would publish tally ${JSON.stringify(wouldPublishTally(kids, now))}`);
       }
       await this.storage.put('cloud:snap', await sealState(creds.password, { date, kids }));
+      // Who is in, for the youth check-out (in memory; it reads no report of its own).
+      this.ym?.onReport({ date, kids });
       // The count's own state (tonight.js): what an applied report says, first names and clubs only.
       if (this.publisher) {
         try { await this.publisher.onReport({ night: date, at: now, entries: res.report.entries }); } catch (err) { console.error('[cloud] publishing the count failed', err); }

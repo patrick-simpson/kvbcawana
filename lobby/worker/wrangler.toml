@@ -29,8 +29,16 @@ CLOUD_CHECKIN = "shadow"
 #                    job). It then keeps tonight's first names + clubs, sealed, until the
 #                    window closes (routes.md section 8). Turn it on only on the shadow
 #                    night, with the station running.
+#   YM_CHECKOUT      "on": the Worker does the youth check-out (src/ymcheckout.js): on
+#                    club nights from 7:15 pm to midnight every Trek and Journey child
+#                    still checked in is checked out on TwoTimTwo, one post every 15 s,
+#                    3 tries each. A computer that is the Worker's print station tells
+#                    its extension to stop its own sweep, so turn this on before (or
+#                    with) the station, or nobody checks them out.
 CLOUD_PRINT = "on"
 SINGLE_PUBLISHER = "on"
+# ON with KVBC Awana 9.2.1 (owner, 2026-10-12: automatic check-outs via the Worker).
+YM_CHECKOUT = "on"
 # Passphrase v2 migration (src/routes.md section 1). "on": clients that still send
 # the passphrase itself keep signing in (and the first v2 sign-in upgrades the
 # stored verifier). Set "off" once auth:legacyLastAt is old (every screen, the app

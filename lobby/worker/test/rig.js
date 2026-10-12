@@ -5,7 +5,7 @@
 // read is timed (the 5 s clock is checked against it).
 import { newRowId } from '../../shared/cloud-crypto.js';
 import { SyncCore } from '../src/sync.js';
-import { CHECKIN_PAGE, fakeTwoTimTwo, page, table } from './fixtures.js';
+import { CHECKIN_PAGE, checkoutPage, fakeTwoTimTwo, page, table } from './fixtures.js';
 import { fakeClock, makeStation, memoryStore, sealJob } from './helpers.js';
 
 export const WED_6PM = Date.parse('2026-10-14T22:00:00Z');
@@ -21,7 +21,7 @@ export const row = (kind = 'checkin', night = NIGHT) => ({
 });
 
 export async function rig({ env = {}, kids = [], households = null, start = WED_6PM, storage = memoryStore(), clock = fakeClock(start) } = {}) {
-  const night = { kids: [...kids], count: null };
+  const night = { kids: [...kids], count: null, /** rows the Checkout page lists */ out: [] };
   const render = () => {
     const clubs = [...new Set(night.kids.map((k) => k.club))];
     return page(...clubs.map((club) => {
@@ -29,19 +29,20 @@ export async function rig({ env = {}, kids = [], households = null, start = WED_
       return table(`${club} `, these.map((k) => ({ id: k.id, name: k.name, friend: k.friend })), { count: night.count ?? these.length });
     }), clubs.length ? '' : table('Sparks ', []));
   };
-  const tt = fakeTwoTimTwo({ report: render, checkin: () => CHECKIN_PAGE, households });
+  const tt = fakeTwoTimTwo({ report: render, checkin: () => CHECKIN_PAGE, checkout: () => checkoutPage({ rows: night.out }), households });
   tt.checkinName = 'Kit Tester';
-  const faults = { checkin: null, undo: null, checkout: null };
+  /** checkoutReply: what TwoTimTwo answers a check-out post instead of "OK". */
+  const faults = { checkin: null, undo: null, checkout: null, checkoutReply: null };
   /** When each data page was read: the clock's invariant. */
   const reads = [];
-  const posts = { undo: [], checkout: [] };
+  const posts = { undo: [], checkout: [], /** when each check-out post was made */ checkoutAt: [] };
   const fetchFn = async (url, init = {}) => {
     const u = new URL(url);
     const method = init.method || 'GET';
     if (method === 'GET' && !u.pathname.startsWith('/site/')) reads.push({ at: clock.t, path: u.pathname });
     const fault = (u.pathname === '/clubber/checkinclubber' && faults.checkin)
       || (u.pathname === '/clubber/checkinclubberundo' && faults.undo)
-      || (u.pathname === '/clubber/checkout' && faults.checkout);
+      || (u.pathname === '/clubber/checkout' && method === 'POST' && faults.checkout);
     if (fault === 'timeout') throw Object.assign(new Error('timed out'), { name: 'TimeoutError' });
     if (u.pathname === '/clubber/checkinclubberundo' && method === 'POST') {
       posts.undo.push(new URLSearchParams(init.body));
@@ -49,6 +50,8 @@ export async function rig({ env = {}, kids = [], households = null, start = WED_
     }
     if (u.pathname === '/clubber/checkout' && method === 'POST') {
       posts.checkout.push(new URLSearchParams(init.body));
+      posts.checkoutAt.push(clock.t);
+      if (faults.checkoutReply != null && !fault) return new Response(faults.checkoutReply, { status: 200 });
       return new Response(fault === 'refuse' ? 'no' : 'OK', { status: 200 });
     }
     if (fault === 'refuse') return new Response('<html><body>Something went wrong</body></html>', { status: 200 });

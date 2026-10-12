@@ -432,7 +432,8 @@ undo): the station ends it quietly.
   (in cloud mode the Worker publishes `tally`, `tonight` and the still-here
   list itself, and `POST /v1/publish` drops the laptop's `tally`, `tonight`,
   `checkout` and `checkin` frames with 200 `{dropped: true}`, except the one
-  greeting per print job a station sends; section 8).
+  greeting per print job a station sends; section 8). `YM_CHECKOUT` (the
+  Worker does the Trek/Journey youth check-out; section 9).
 
 ## 8. The one publisher (P5: BUILT)
 
@@ -518,10 +519,9 @@ names. Chosen:
   With `SINGLE_PUBLISHER` off the gate passes every greeting as before and drops
   only a `late` one (`reason: 'late'`: the laptop already greeted the child).
   Undo then a new check-in is the same child: not greeted again.
-- Not carried (known, owner's call at P7): the extension's youth check-out sweep
-  posts check-outs to the laptop only; a Trek / Journey child checked out that
-  way stays on the count here until the extension is retired. The desk's
-  check-out and TwoTimTwo's own report are honoured.
+- The youth check-out: with `YM_CHECKOUT = "on"` the Worker does it itself and each
+  child comes off this count (section 9). Off, the extension's sweep posts to the
+  laptop only and such a child stays on the count here.
 
 **BARF on the TwoTimTwo-page fallback.** The parsed report marks a child
 `friend: true` when their row says YES under a Brought a friend column (the
@@ -536,3 +536,37 @@ for the 6:30 pm email (`friends.record`, friend's name empty), because a cloud j
 the station not to report it again; a desk check-in with the Friend item ticked is
 recorded the same way (the desk page's sealed job carries the friend's name to the
 tag). The same flag counts in the `tonight` frame's `friendsBrought`.
+
+## 9. The youth check-out (BUILT, `YM_CHECKOUT`)
+
+`src/ymcheckout.js`, from the watcher's alarm (no second loop, no new route). The
+extension's `ymSweep` rules exactly: club nights (`CLUB_NIGHTS`' weekday) from
+**7:15 pm to midnight** Eastern (`YM_AT`; it runs on past the 9 pm watch window),
+clubs **Trek and Journey** (`ymClubOf`: a substring of the lowercased club), every
+child the watcher's LATEST applied report lists (handed over in memory; it reads
+no report of its own), plus any such row the Checkout page lists. Each is checked
+out with the Checkout page's own `POST /clubber/checkout` (`calendar_id` +
+`clubber_id`, `TwoTimTwoClient.checkOut`), counted only on an exact `OK`; at most
+**3 tries** a child a night (`YM_MAX_FAILS`; a signed-out answer is not a try), a
+**done list** a night (the report keeps listing a child after a check-out).
+
+- **Pace (owner, 2026-10-12): at most ONE post every 15 s** (`YM_CHECKOUT_GAP_MS`),
+  a refused one included: the next allowed moment is claimed in memory in one
+  synchronous step and written through (`ym:status.nextPostAt`) before the post, so
+  a restart never bursts. Forty children take about ten minutes.
+- **Reads.** The Checkout page (`GET /clubber/checkout`: `calendar_id` from its
+  script, the date from `select#date`, rows `a.checkout[clubber_id]`) at most every
+  30 s (`YM_PAGE_MS`) and only while due, on the one read clock with `waitMs` 0.
+  With the watcher's report every 15 s that is 6 reads a minute of the 12 allowed.
+- **Count.** Each check-out goes into tonight's book as a desk check-out does
+  (`publisher.deskCheckout`), while the watch window is open (the book is purged
+  when it closes): the tally and still-here list drop with `SINGLE_PUBLISHER` on.
+- **Storage.** `ym:state` (the night, meeting, page rows, done list, tries) is one
+  blob sealed under the state key (`sealState`); `ym:status` counts and times only.
+- **Status.** `GET /v1/cloud/status` carries `ymCheckout: {enabled, due, at, clubs,
+  gapSec, maxTries, night, checkedOut, failed, gaveUp, pending, meeting, lastSweep,
+  lastPageAt, lastError}`: no name, no id.
+- **Hand-off.** A computer that is the Worker's print station (`configureCloud`)
+  answers `GET /config/church` with `ymCheckout.enabled: false`, so its extension
+  stops sweeping (it reads that at start-up); `stopCloud` hands it back. So turn
+  `YM_CHECKOUT` on before, or with, the station role.

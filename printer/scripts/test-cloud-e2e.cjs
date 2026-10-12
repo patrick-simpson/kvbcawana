@@ -22,6 +22,8 @@
 // and an extension check-in are greeted once too, when the watcher's job meets their label
 // (no second label, a LATE greeting only if none got through), the Worker's tally counts them,
 // its sealed still-here list names them, and the station's season / pickup clubs reach it.
+// Then the youth check-out: the Worker checks a Trek child out at 7:15 pm and its tally drops,
+// while the station's print server tells the extension its own sweep is off.
 //
 // The Worker is ESM and this is CommonJS, so it is loaded with import(). Its
 // two runtime packages (linkedom, parse5) come from lobby/worker/node_modules
@@ -411,7 +413,25 @@ const fakeSafe = {
     check('the Worker\'s tally and the printer\'s builder agree on the shape', JSON.stringify(Object.keys(tally).sort()) === JSON.stringify(Object.keys(events.buildTally({ Sparks: 1, Cubbies: 1 }, 2, { season: server.currentScreenSeason() })).sort()));
     check('and so do the ticker\'s and the list\'s', JSON.stringify(Object.keys(frames('tonight').at(-1).d).sort()) === JSON.stringify(Object.keys(events.buildTonight({ checkedIn: 2 })).sort())
       && JSON.stringify(Object.keys(still).sort()) === JSON.stringify(Object.keys(events.buildCheckout([{ firstName: 'Kit', club: 'Sparks' }], 2)).sort()));
+
+    // The youth check-out (YM_CHECKOUT on): the Worker sweeps Trek and Journey from 7:15 pm,
+    // and the station's print server tells its extension that its own sweep is off.
+    const church = await (await real(`http://127.0.0.1:${E2E_PORT}/config/church`)).json();
+    check('the station\'s print server turns the extension\'s youth check-out off', church.ymCheckout && church.ymCheckout.enabled === false, JSON.stringify(church.ymCheckout));
+    t2.core.env.YM_CHECKOUT = 'on';
+    t2.night.kids.push({ id: '706', club: 'Trek', name: 'Tom Trekker' });
+    t2.clock.t = Date.parse('2026-10-14T23:15:00Z');   // 7:15 pm Eastern
+    const before = t2.posts.checkout.length;
+    for (let i = 0; i < 20 && t2.posts.checkout.length === before; i++) {
+      await t2.core.watcher.tick();
+      t2.clock.t = Math.max(t2.clock.t + 1000, t2.alarm.at);
+    }
+    const ym = (await t2.call('GET', '/v1/cloud/status')).body.ymCheckout;
+    check('the Worker checks the Trek child out on TwoTimTwo with the Checkout page\'s own post', t2.posts.checkout.length === before + 1 && t2.posts.checkout.at(-1).get('clubber_id') === '706' && ym.checkedOut === 1, JSON.stringify(ym));
+    check('and takes them off its tally', frames('tally').at(-1).d.total === 5 && !frames('tally').at(-1).d.counts.Trek, JSON.stringify(frames('tally').at(-1).d));
     server.stopCloud();
+    const back = await (await real(`http://127.0.0.1:${E2E_PORT}/config/church`)).json();
+    check('stopCloud hands the sweep back to the extension', !back.ymCheckout || back.ymCheckout.enabled !== false);
     listener.close();
   }
 
