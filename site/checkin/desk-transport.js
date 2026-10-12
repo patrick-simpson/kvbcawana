@@ -63,6 +63,11 @@ export function refusalWords(reason) {
     case 'not-configured': return 'The check-in service is not set up to read TwoTimTwo yet.';
     case 'twotimtwo-unreadable': return 'TwoTimTwo could not be read. Try again, or check in on TwoTimTwo itself.';
     case 'unsealed': return 'The label or the record could not be sealed, so nothing was sent.';
+    case 'already-friend': return 'That child already has a friend recorded tonight.';
+    case 'not-barf-night': return 'Tonight is not a BARF night.';
+    case 'not-on-report': return 'TwoTimTwo does not show that child checked in yet. Try again in a moment.';
+    case 'no-friend-item': return 'TwoTimTwo has no Brought a friend item for that club tonight.';
+    case 'busy': return 'That child is being checked in right now. Try again in a moment.';
     default: return `TwoTimTwo or the service refused it (${reason}).`;
   }
 }
@@ -456,6 +461,68 @@ export function createDesk({ cc, fetch: fetchFn, store, base = DESK_API, now = D
     return reprintJob('/print-custom', { text });
   }
 
+  // ── a late BARF friend (routes.md 5.1) ──────────────────────────────────────
+
+  /**
+   * Is tonight a BARF night, who already brought a friend, and which route the
+   * BARF tag is sealed to. Null when the Worker cannot say (the page hides the button).
+   * @returns {Promise<{ barfNight: boolean|null, friends: string[], tagRoute: string }|null>}
+   */
+  async function barfInfo() {
+    try {
+      const r = await request('GET', '/v1/desk/barf');
+      if (r.status !== 200 || !r.body || typeof r.body !== 'object') return null;
+      return {
+        barfNight: typeof r.body.barfNight === 'boolean' ? r.body.barfNight : null,
+        friends: Array.isArray(r.body.friends) ? r.body.friends.map(String) : [],
+        tagRoute: r.body.tagRoute === '/print-barf-tag' ? '/print-barf-tag' : '/print-custom',
+      };
+    } catch (e) {
+      if (e instanceof DeskError && e.code === 'signed-out') throw e;
+      return null;
+    }
+  }
+
+  /** The friend's first name as every path keeps it (cleanFriendName: one line, 24). @param {unknown} v */
+  const friendFirst = (v) => Array.from(String(v || '')).filter((c) => c.charCodeAt(0) >= 32 && c.charCodeAt(0) !== 127 && c !== '<' && c !== '>')
+    .join('').replace(/\s+/g, ' ').trim().slice(0, 24);
+
+  /**
+   * A child already checked in tonight brought a friend: ONE Worker operation redoes
+   * their TwoTimTwo check-in with Brought a friend, prints only the BARF tag (sealed
+   * here to every station: the tag's own route, or a "BARFED! <first>" custom label
+   * for a station older than 9.3.1), and records the friend. `checkedIn: false` in
+   * the answer = TwoTimTwo did not take the redo: offer barfRecheck(child, items).
+   * @param {{ clubberId: string, name: string, club?: string }} child @param {string} friendName @param {string} [tagRoute]
+   * @returns {Promise<{ checkedIn: boolean, items: { Bible: boolean, Friend: boolean }, jobId: string|null, reason?: string }>}
+   */
+  async function barfLate(child, friendName, tagRoute) {
+    const friend = friendFirst(friendName);
+    if (!friend) throw new DeskError('refused', 'Type the friend’s first name.', { reason: 'no-friend-name' });
+    if (!child || !child.clubberId) throw new DeskError('refused', 'Pick the child who brought the friend.', { reason: 'no-child' });
+    const n = night();
+    const { first } = splitName(child.name);
+    const route = tagRoute === '/print-barf-tag' ? '/print-barf-tag' : '/print-custom';
+    const body = route === '/print-barf-tag' ? { firstName: first, clubName: child.club || '' } : { text: `BARFED! ${first}` };
+    const out = await sealedPost('/v1/desk/barf-late', async (list) => ({
+      night: n, clubberId: String(child.clubberId), friendName: friend,
+      historyRow: await sealHistory(n, 'barf-friend', historyRecord(child, { friend: true, friendName: friend })),
+      tagJob: list.length ? { jobId: `reprint:${crypto.randomUUID()}`, bundle: await sealJob(list, n, { route, body, source: 'desk', at: new Date(now()).toISOString() }) } : null,
+    }));
+    return { checkedIn: out.checkedIn === true, items: { Bible: !!(out.items && out.items.Bible), Friend: true }, jobId: out.jobId ?? null, ...(out.reason ? { reason: String(out.reason) } : {}) };
+  }
+
+  /**
+   * The one-tap re-check-in after a late BARF friend's redo never took: TwoTimTwo's
+   * check-in alone, the same items plus Brought a friend. No label, no list.
+   * @param {{ clubberId: string }} child @param {{ Bible?: boolean }} [items]
+   */
+  async function barfRecheck(child, items = {}) {
+    const r = await request('POST', '/v1/desk/barf-late', { night: night(), clubberId: String(child.clubberId), recheck: true, items: { Bible: !!items.Bible, Friend: true } });
+    if (r.status === 200 && r.body && r.body.ok !== false) return { checkedIn: r.body.checkedIn === true, ...(r.body.reason ? { reason: String(r.body.reason) } : {}) };
+    throw httpError(r);
+  }
+
   // ── who was here lately (the history, opened in the browser) ───────────────
 
   /**
@@ -603,6 +670,7 @@ export function createDesk({ cc, fetch: fetchFn, store, base = DESK_API, now = D
 
   return {
     signIn, restore, signOut, roster, families, printStatus, tonight, loadStations, checkIn, undo, checkout, oneOffTag, leaderTag, customLabel,
+    barfInfo, barfLate, barfRecheck,
     recentAttendance, churchLeaders, rememberLeader, forgetLeader,
     get signedIn() { return !!session; },
     get hasHistory() { return !!history; },

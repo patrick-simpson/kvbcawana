@@ -75,6 +75,12 @@ function worker({ stations = [], params = 'v2', history = 'login', legacy = fals
       w.stations = next;
       return json(409, { ok: false, reason: 'stations-changed', what: 'job', stations: asList(next) });
     }
+    if (path === '/v1/desk/barf') return w.barf ? json(200, w.barf) : json(404, { error: 'Not found.' });
+    if (path === '/v1/desk/barf-late') {
+      (w.barfPosts = w.barfPosts || []).push(body);
+      if (check) { const verdict = check(path, body, w); if (verdict) return verdict; }
+      return json(200, body.recheck ? { ok: true, checkedIn: true, items: body.items } : { ok: true, checkedIn: true, items: { Bible: true, Friend: true }, jobId: body.tagJob ? body.tagJob.jobId : null, history: 'kept' });
+    }
     if (path === '/v1/desk/checkin' || path === '/v1/desk/undo' || path === '/v1/desk/checkout' || path === '/v1/print/reprint') {
       if (check) { const verdict = check(path, body, w); if (verdict) return verdict; }
       if (path === '/v1/desk/checkin') w.checkins.push(body);
@@ -352,6 +358,54 @@ describe('undo, check out and the one-off tag', () => {
     await desk.signIn(PASS);
     await desk.checkIn(kid, { bible: true, friend: false, friendName: 'Sam' });
     assert.ok(!('friendName' in w.checkins[0]));
+  });
+});
+
+describe('a late BARF friend (routes.md 5.1)', () => {
+  it('barfInfo: the Worker\'s answer, or null (no route: the button stays hidden)', async () => {
+    const w = worker();
+    const { desk } = make(w);
+    await desk.signIn(PASS);
+    assert.equal(await desk.barfInfo(), null);
+    w.barf = { night: NIGHT, barfNight: true, friends: ['12'], tagRoute: '/print-barf-tag', stations: 1 };
+    assert.deepEqual(await desk.barfInfo(), { barfNight: true, friends: ['12'], tagRoute: '/print-barf-tag' });
+    w.barf = { barfNight: null, tagRoute: 'nonsense' };
+    assert.deepEqual(await desk.barfInfo(), { barfNight: null, friends: [], tagRoute: '/print-custom' });
+  });
+
+  it('seals the BARF tag to every station (its own route, or a custom label for an older station) and a barf-friend row; only the friend\'s first name in clear', async () => {
+    const a = await station('station-aaaaaaaa');
+    const w = worker({ stations: [a] });
+    const { desk } = make(w);
+    await desk.signIn(PASS);
+    const out = await desk.barfLate(kid, '  <Sam>  ', '/print-barf-tag');
+    assert.equal(out.checkedIn, true);
+    const post = w.barfPosts[0];
+    assert.equal(post.friendName, 'Sam');
+    assert.equal(post.clubberId, '662');
+    assert.match(post.tagJob.jobId, /^reprint:/);
+    const { tagJob: _j, historyRow: _r, ...plain } = post;
+    assert.ok(!/Kit|Tester/.test(JSON.stringify(plain)));
+    const rec = await cc.openAsStation(a.ring, post.tagJob.bundle);
+    assert.deepEqual([rec.route, rec.body], ['/print-barf-tag', { firstName: 'Kit', clubName: 'Sparks' }]);
+    assert.equal(post.historyRow.kind, 'barf-friend');
+    const row = await cc.openRow(ring, post.historyRow);
+    assert.deepEqual([row.first, row.last, row.clubberId, row.friend, row.friendFirst], ['Kit', 'Tester', '662', true, 'Sam']);
+    // A 9.3.0 station: a custom label it already runs.
+    await desk.barfLate(kid, 'Sam', '/print-custom');
+    const old = await cc.openAsStation(a.ring, w.barfPosts[1].tagJob.bundle);
+    assert.deepEqual([old.route, old.body], ['/print-custom', { text: 'BARFED! Kit' }]);
+  });
+
+  it('a friend\'s name is required; a refusal is worded; the recheck sends the items back, nothing sealed', async () => {
+    const w = worker({ check: (path, body) => (path === '/v1/desk/barf-late' && body.friendName === 'Max' ? new Response(JSON.stringify({ ok: false, reason: 'already-friend' }), { status: 409 }) : null) });
+    const { desk } = make(w);
+    await desk.signIn(PASS);
+    await assert.rejects(desk.barfLate(kid, '   ', '/print-custom'), { code: 'refused', reason: 'no-friend-name' });
+    await assert.rejects(desk.barfLate(kid, 'Max', '/print-custom'), (e) => e.code === 'refused' && /already has a friend/.test(e.message));
+    const r = await desk.barfRecheck(kid, { Bible: true });
+    assert.equal(r.checkedIn, true);
+    assert.deepEqual(w.barfPosts.at(-1), { night: NIGHT, clubberId: '662', recheck: true, items: { Bible: true, Friend: true } });
   });
 });
 
