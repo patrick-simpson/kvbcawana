@@ -1,48 +1,23 @@
 # Troubleshooting Guide
 
-Having issues with Club Label Printer? This guide covers common problems and solutions.
+Having issues with Club Label Printer? This guide covers common problems and solutions. Settings are explained in [SETUP.md](docs/SETUP.md); the club-night checklist is [NIGHT-OF.md](docs/NIGHT-OF.md).
 
 ## Windows App (.exe) Issues
 
-### "Windows protected your PC" (SmartScreen) when running the installer
+### SmartScreen "Windows protected your PC"
 
 This is Windows being cautious about a new community-built app — the installer is not signed with a
-paid certificate. Click **More info**, then **Run anyway**. It only appears on first install;
-after that the app updates itself silently — usually within a minute or two of a release going out,
-**including mid-club-night**. That is deliberate: a release that ships while a club is running is
-almost always an urgent fix, so the app downloads it, gives any in-flight label print a few seconds
-to finish, and restarts itself. The print server comes back up on its own within seconds; nobody
-needs to touch the laptop. If you'd rather it not surprise you, watch the tray icon — it shows
-"Updating to vX… restarting" for the few seconds before it happens.
+paid certificate. Click **More info**, then **Run anyway** (the install steps are in the [README](README.md#install)). It only appears on first install.
 
-The app checks the update feed on awana.kvbchurch.org every launch and every ten minutes after
-that, so a release reaches a laptop within about ten minutes. Nothing needs to be set up for
-updates to work.
+After that the app updates itself, including mid-club-night (how it does so is in [SETUP.md §1](docs/SETUP.md#1-first-start-and-updates)). If you'd rather it not surprise you, watch the tray icon — it shows "Updating to vX… restarting" for the few seconds before it happens.
 
-### Phones can't reach phone check-in (`http://<laptop-ip>:3456/phone`)
+### Phones can't reach the phone page
 
-**Check this first (changed in 5.3.0):** the server now listens only on the
-laptop itself unless you explicitly allow network access, so that the roster and
-allergy list aren't readable by everything on the church Wi-Fi. Open **Settings →
-Check-in Features** and confirm both:
+Phone check-in is off unless you turn it on, and the server listens only on the laptop until you do. The settings are in [SETUP.md §4](docs/SETUP.md#4-phone-check-in-optional-off-by-default). Check them first:
 
-1. A **Phone check-in PIN** is set (at least 4 characters), and
-2. **"Let phones on this Wi-Fi reach this PC"** is checked.
-
-Then **restart the app** — the listening socket is bound at startup, so the
-change does not apply until it restarts.
-
-If the PIN is missing, the checkbox has no effect: the server refuses to expose
-the roster without one, logs that at startup, and shows a warning on the
-dashboard. Set a PIN and restart.
-
-Once that is right, it may still be the firewall:
-
-1. The first time the server starts, Windows shows an **Allow access** prompt — click **Allow**.
-   (Make sure "Private networks" is checked.)
-2. Missed the prompt? Open the app's **Settings** (tray icon → Settings) and click
-   **Enable Phone Check-in (firewall)** — approve the administrator prompt.
-3. Both devices must be on the same Wi-Fi network.
+1. **Settings → Check-in Features:** a **Phone check-in PIN** is set (at least 4 characters), and **"Let phones on this Wi-Fi reach this PC"** is checked. Then **restart the app** — the listening socket is bound at startup. A missing PIN makes the checkbox do nothing: the server refuses to expose the roster without one, says so at startup, and shows a warning on the dashboard.
+2. **Firewall:** the first time the server starts, Windows shows an **Allow access** prompt — click **Allow** (make sure "Private networks" is checked). Missed it? Open the app's **Settings** (tray icon → Settings) and click **Enable Phone Check-in (firewall)**, then approve the administrator prompt.
+3. **Wi-Fi:** both devices must be on the same network. Use the laptop's IPv4 from `ipconfig` (Wireless LAN), e.g. `http://192.168.1.20:3456/phone`.
 
 ### "Port 3456 is in use" dialog at startup
 
@@ -61,7 +36,44 @@ install folder. (That folder is still named after the app's pre-v5.9.0 name,
 
 ---
 
+## Phone check-in problems
+
+**Phone can't open the page** — see [Phones can't reach the phone page](#phones-cant-reach-the-phone-page) above.
+
+**Phone says "No answer"** — the check-in page must be open on the
+main laptop with the extension loaded; that's what performs the real
+check-in. Also check Settings → "Allow driven check-ins" is on.
+
+**Phone shows a kid as not checked in when they are (or vice versa)** —
+since 5.7.0 the phone re-fetches the roster every ~12 seconds, so
+check-ins made on other devices (and undos made on TwoTimTwo) appear on
+their own. If a phone seems frozen anyway, its Wi-Fi likely dropped —
+the page backs off polling while unreachable and catches up as soon as
+the server answers again.
+
+**Wrong PIN** — the PIN is set on the dashboard (Settings → Check-in
+Features), and must be at least 4 characters. A blank PIN no longer means
+"no PIN required": it means phones cannot connect at all, because the server
+will not expose the roster without one.
+
+**"Too many wrong PINs"** — after 8 *different* wrong attempts that phone is
+locked out for a minute; the page shows a live countdown and lets you back in
+when it hits zero. Retyping the same wrong PIN (or mashing the button while it
+sends) no longer digs the hole deeper — only distinct guesses count. (The
+lockout itself is deliberate: without it a 4-digit PIN could be guessed in
+seconds.)
+
+---
+
 ## Runtime Issues
+
+### Red banner: the check-in page layout has changed
+
+The extension's selector self-test failed — TwoTimTwo shipped new
+page markup and automatic detection may be blind. Check kids in
+normally; print labels via widget search or Walk-in Guest. Then check
+the dashboard's Night Status card for which selector broke, and file
+an issue / update the extension.
 
 ### Labels print but look wrong
 
@@ -149,6 +161,16 @@ The print server's own status window (tray icon → the print server's status) a
 
 ---
 
+## Quick Checklist
+
+Before getting help, verify:
+- [ ] Windows 10+ is running
+- [ ] Printer is connected and appears in Windows Settings
+- [ ] Printer has paper
+- [ ] The KVBC Awana app is running (tray icon)
+- [ ] No other application is using port 3456
+- [ ] Running on the TwoTimTwo.com check-in page (not a different page)
+
 ## Still Stuck?
 
 If none of these solutions work:
@@ -163,56 +185,3 @@ If none of these solutions work:
    - Your issue might already be documented
 
 3. **Create a new issue** with the information above
-
----
-
-## Quick Checklist
-
-Before getting help, verify:
-- [ ] Windows 10+ is running
-- [ ] Printer is connected and appears in Windows Settings
-- [ ] Printer has paper
-- [ ] The KVBC Awana app is running (tray icon)
-- [ ] No other application is using port 3456
-- [ ] Running on the TwoTimTwo.com check-in page (not a different page)
-
-## Phone check-in problems
-
-**Phone can't open the page** — first check Settings → Check-in Features has a
-**PIN set** and **"Let phones on this Wi-Fi reach this PC"** checked, then
-restart the app. Since 5.3.0 network access is off by default, so this is the
-most likely cause. Next: same Wi-Fi as the laptop? Use the laptop's IPv4 from
-`ipconfig`, e.g. `http://192.168.1.20:3456/phone`. If it still won't load, the
-firewall rule is missing — use **Enable Phone Check-in (firewall)** in the app's
-Settings and approve the administrator prompt.
-
-**Phone says "No answer"** — the check-in page must be open on the
-main laptop with the extension loaded; that's what performs the real
-check-in. Also check Settings → "Allow driven check-ins" is on.
-
-**Phone shows a kid as not checked in when they are (or vice versa)** —
-since 5.7.0 the phone re-fetches the roster every ~12 seconds, so
-check-ins made on other devices (and undos made on TwoTimTwo) appear on
-their own. If a phone seems frozen anyway, its Wi-Fi likely dropped —
-the page backs off polling while unreachable and catches up as soon as
-the server answers again.
-
-**Wrong PIN** — the PIN is set on the dashboard (Settings → Check-in
-Features), and must be at least 4 characters. A blank PIN no longer means
-"no PIN required": it means phones cannot connect at all, because the server
-will not expose the roster without one.
-
-**"Too many wrong PINs"** — after 8 *different* wrong attempts that phone is
-locked out for a minute; the page shows a live countdown and lets you back in
-when it hits zero. Retyping the same wrong PIN (or mashing the button while it
-sends) no longer digs the hole deeper — only distinct guesses count. (The
-lockout itself is deliberate: without it a 4-digit PIN could be guessed in
-seconds.)
-
-## Red banner: "the check-in page layout has changed"
-
-The extension's selector self-test failed — TwoTimTwo shipped new
-page markup and automatic detection may be blind. Check kids in
-normally; print labels via widget search or Walk-in Guest. Then check
-the dashboard's Night Status card for which selector broke, and file
-an issue / update the extension.

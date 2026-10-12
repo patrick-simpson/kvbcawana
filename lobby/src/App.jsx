@@ -89,7 +89,7 @@ const FLAGS = parseUrlFlags();
 // the live screen through storage; its own buttons are relayed to it. Names,
 // sound and confetti never play here, and it holds no wake lock.
 const CONFIGURE = isConfigureMode();
-// awana.kvbchurch.org/settings (SETTINGS.md): configure mode on a device that
+// awana.kvbchurch.org/settings (ROADMAP.md#settings-page): configure mode on a device that
 // is not a screen, so nothing is relayed and this browser's own cards hide.
 const SETTINGS_PAGE = isSettingsPage();
 // The live screen's side of the relay: what a configure page may ask of it.
@@ -1248,7 +1248,7 @@ export default function App() {
     });
   }, [previewCheckIn, resetTonight, startBoardDemo]);
 
-  // Managed from /settings (SETTINGS.md, phase 2): a real screen registers
+  // Managed from /settings (ROADMAP.md#settings-page, phase 2): a real screen registers
   // with the sync Worker, follows its own settings there as its device layer,
   // and does what /settings asks of it, as its own buttons would. The preview
   // picks its own sample name: nothing name-shaped crosses the wire for it.

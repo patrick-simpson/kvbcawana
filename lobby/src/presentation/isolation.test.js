@@ -26,7 +26,7 @@ const ALLOWED = new Set([
   'src/lib/displayKey.js',
   'src/lib/envelope.js',
   'src/lib/configureRelay.js',
-  // The screen registry (SETTINGS.md, phase 2): one copy of "register, follow
+  // The screen registry (ROADMAP.md#settings-page, phase 2): one copy of "register, follow
   // my own settings, obey /settings" for the lobby TV and the projector.
   'src/hooks/useScreenSync.js',
 ]);

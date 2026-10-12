@@ -97,7 +97,7 @@ minutes, with no SSH and no keyboard.
 
 The only correct kiosk address is `https://awana.kvbchurch.org/journey/`
 (never `/public/index.html`, never a github.io address: the old sites are not
-forwarded, see SWITCH.md). The site is Cloudflare Pages now, published by the
+forwarded, see ROADMAP.md#switch-day-cleanup). The site is Cloudflare Pages now, published by the
 root `ci.yml`, so the old GitHub Pages "source must be GitHub Actions" setting
 no longer exists. What survives from the 2026-08-22 outage it caused: **a
 kiosk that recovers on its own is not evidence it is configured right.** The

@@ -1,4 +1,4 @@
-// The report watcher (CLOUD-CHECKIN.md, piece 2, phase 1: READ-ONLY SHADOW).
+// The report watcher (ROADMAP.md#cloud-check-in, piece 2, phase 1: READ-ONLY SHADOW).
 //
 // During the club window a Durable Object alarm reads TwoTimTwo's check-in
 // report every 15 seconds (TwoTimTwo's agreed limit, never faster: a manual
@@ -304,7 +304,7 @@ export class Watcher {
   }
 
   /**
-   * Check one child in on TwoTimTwo (CLOUD-CHECKIN.md phase 4's first piece,
+   * Check one child in on TwoTimTwo (ROADMAP.md#cloud-check-in phase 4's first piece,
    * owner-only: a signed-in screen asks, never the watcher). Without
    * `confirm: true` it only previews: who it found, their club, and the
    * meeting the check-in would record on. It sends what the check-in page

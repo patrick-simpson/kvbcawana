@@ -1,5 +1,5 @@
 // The Linux print path (print-server/cups.js): the Raspberry Pi print station
-// in CLOUD-CHECKIN.md prints the same label PNG through CUPS. The parsers are
+// in ROADMAP.md#cloud-check-in prints the same label PNG through CUPS. The parsers are
 // checked on lpstat's real wording, and the runners against stand-in `lp` /
 // `lpstat` programs on PATH, so the arguments a real print would get are
 // exactly the ones checked here. No printer needed.

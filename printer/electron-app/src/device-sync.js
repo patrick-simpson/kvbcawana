@@ -1,5 +1,5 @@
 // This computer's row on awana.kvbchurch.org/settings (KVBC Awana v9,
-// UNIFIED-APP.md; SETTINGS.md phase 2's screen registry, kind 'computer').
+// ROADMAP.md#kvbc-awana-one-app; ROADMAP.md#settings-page phase 2's screen registry, kind 'computer').
 // Electron-free, like roles.js: main.js hands it the session, the request
 // helper and the two halves of "what this computer is", and
 // test/device-sync.test.cjs drives it with stand-ins.

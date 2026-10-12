@@ -9,7 +9,7 @@
 // to this Windows user) in userData\sync-session.bin, never in a plain file.
 // Where safeStorage cannot encrypt, it is held in memory only, for this run.
 //
-// What it is for: the hook for /settings (UNIFIED-APP.md, "each computer
+// What it is for: the hook for /settings (ROADMAP.md#kvbc-awana-one-app, "each computer
 // registers as a device, kind `computer`"). Nothing reads it yet beyond
 // status(); the device registration will use session() as its bearer.
 'use strict';

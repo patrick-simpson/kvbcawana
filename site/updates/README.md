@@ -11,7 +11,7 @@ with `Cache-Control: no-cache`.
 
 The sound room app's last release, 2.1.0, also reads `printer/latest.yml`:
 once it names 9.0.0 or later, it installs KVBC Awana and hands the PC over
-(UNIFIED-APP.md). `lobby/lobby.yml` then stays at 2.1.0; never point it at a
+(ROADMAP.md#kvbc-awana-one-app). `lobby/lobby.yml` then stays at 2.1.0; never point it at a
 KVBC Awana installer, which would install it without the hand-off.
 
 **Both are empty until the first release cut from this repo.** An installed

@@ -1,5 +1,5 @@
 // @ts-check
-// Moved from lobby/desktop/src (KVBC Awana v9, UNIFIED-APP.md); behaviour unchanged.
+// Moved from lobby/desktop/src (KVBC Awana v9, ROADMAP.md#kvbc-awana-one-app); behaviour unchanged.
 // The optional club-night shutdown (owner, 2026-10-07): off until someone
 // turns it on in the configurator, and then only on a club night, at the time
 // set there, after a two-minute warning that can cancel it. Pure, like the

@@ -7,7 +7,7 @@
 > this app. Nothing to do at the PC. KVBC Awana is one app for every KVBC
 > Awana computer: the check-in laptop's print server, a display, or both;
 > its guide is the printer's (`printer/README.md`) and the plan is
-> `UNIFIED-APP.md` at the repo root. For a NEW display, install KVBC Awana
+> `ROADMAP.md#kvbc-awana-one-app` at the repo root. For a NEW display, install KVBC Awana
 > (awana.kvbchurch.org/download/kvbc-awana) and choose Display in its
 > setup, not this app.
 

@@ -1,5 +1,5 @@
 // @ts-check
-// Moved from lobby/desktop/src (KVBC Awana v9, UNIFIED-APP.md); behaviour unchanged.
+// Moved from lobby/desktop/src (KVBC Awana v9, ROADMAP.md#kvbc-awana-one-app); behaviour unchanged.
 // Finding the remembered monitor again. Pure: main.js passes it
 // screen.getAllDisplays() and the saved choice.
 //

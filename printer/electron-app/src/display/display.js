@@ -1,4 +1,4 @@
-// The display role of KVBC Awana (v9, UNIFIED-APP.md): the sound room app's
+// The display role of KVBC Awana (v9, ROADMAP.md#kvbc-awana-one-app): the sound room app's
 // main process (lobby/desktop/main.js, Awana Lobby Display 2.0.0), moved in
 // as a module that main.js starts only when this computer's display role is
 // on and stops when it is turned off. Its behaviour is the sound room app's

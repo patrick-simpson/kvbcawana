@@ -16,7 +16,7 @@ const path = require('path');
 // "Club Label Printer.lnk" pointing at the same app. This only looks for the
 // OLD name; the new shortcuts are created fresh by the installer as normal.
 // v9.0.0 renamed it again, to "KVBC Awana" (one app for the print server and
-// the display, UNIFIED-APP.md). The installer renames the shortcuts it made
+// the display, ROADMAP.md#kvbc-awana-one-app). The installer renames the shortcuts it made
 // (electron-builder reads the old ShortcutName from its install key), so this
 // only finds a copy someone made by hand.
 const OLD_BRAND_SHORTCUT_NAMES = ['Awana Label Printer.lnk', 'Club Label Printer.lnk'];

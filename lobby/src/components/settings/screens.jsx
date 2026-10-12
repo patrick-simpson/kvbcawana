@@ -6,7 +6,7 @@ import {
 } from '../../hooks/useScreenSync.js';
 import { SCREEN_SPECS, sanitizeScreenSettings } from '../../lib/syncSpecs.js';
 
-// The settings page's Screens (SETTINGS.md, phase 2): every screen signed in
+// The settings page's Screens (ROADMAP.md#settings-page, phase 2): every screen signed in
 // with the passphrase, and the way into any one's own settings. A lobby TV
 // opens in the SAME Settings panel (RemoteScreenPanel in SettingsPanel's
 // place, its "This screen" cards reading and writing the TV's settings in the

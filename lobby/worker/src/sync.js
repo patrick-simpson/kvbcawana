@@ -153,13 +153,13 @@ export class SyncCore {
     this.broadcast = broadcast || (() => 0);
     this.closeAll = closeAll || (() => {});
     this.relayQueue = new Relay(this.storage, this.now);
-    // Cloud check-in (CLOUD-CHECKIN.md), phase 1: the read-only report watcher.
+    // Cloud check-in (ROADMAP.md#cloud-check-in), phase 1: the read-only report watcher.
     this.watcher = new Watcher({ storage: this.storage, env: this.env, fetchFn: this.fetchFn, now: this.now, alarms });
     // ...and the phone page's check-ins, answered here instead of by the laptop.
     // ...and who brought a friend tonight (BARF Night's email; friends.js).
     this.friends = new Friends({ storage: this.storage, watcher: this.watcher, now: this.now });
     this.phone = new CloudPhone({ watcher: this.watcher, relay: this.relayQueue, storage: this.storage, now: this.now, friends: this.friends });
-    // The screen registry (SETTINGS.md, phase 2): its doorbells ride the live
+    // The screen registry (ROADMAP.md#settings-page, phase 2): its doorbells ride the live
     // channel only, for the one screen they name.
     this.screens = new Screens({
       storage: this.storage,

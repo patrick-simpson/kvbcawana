@@ -1,5 +1,5 @@
 // Removing "Awana Lobby Display" once its hand-off is applied (KVBC Awana
-// v9, UNIFIED-APP.md). Windows only, packaged only; main.js calls it on every
+// v9, ROADMAP.md#kvbc-awana-one-app). Windows only, packaged only; main.js calls it on every
 // start until handoff.done.json says it is gone, so a removal that failed
 // (the PC shut down mid-way, the uninstaller was locked) is tried again.
 //

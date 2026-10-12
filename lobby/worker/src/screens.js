@@ -1,5 +1,5 @@
 // @ts-check
-// The screen registry (SETTINGS.md, phase 2; owner, 2026-10-11: "manage every
+// The screen registry (ROADMAP.md#settings-page, phase 2; owner, 2026-10-11: "manage every
 // screen from /settings"). Each lobby TV, projector and Journey kiosk says
 // hello under an id it made once and keeps in its own storage, and the Worker
 // keeps who it is and that screen's OWN settings, so awana.kvbchurch.org/settings
@@ -20,7 +20,7 @@
 // is worse than none), and neither goes to Pusher. No child's name is ever in
 // any of it: a screen's settings are its chime, motion and the like.
 //
-// A KVBC Awana computer (kind 'computer', UNIFIED-APP.md) never turns its
+// A KVBC Awana computer (kind 'computer', ROADMAP.md#kvbc-awana-one-app) never turns its
 // print server off while a label is printing or waiting: it holds that change
 // and says so in each hello as `pendingRoleChange` (the settings it is
 // waiting to apply), which the list shows until a hello without one.

@@ -1,4 +1,4 @@
-// KVBC Awana (v9, UNIFIED-APP.md): one app for every KVBC Awana computer.
+// KVBC Awana (v9, ROADMAP.md#kvbc-awana-one-app): one app for every KVBC Awana computer.
 // It was the Club Label Printer; it keeps that app's appId and "name", so the
 // check-in laptop upgrades in place from the printer feed and keeps its data.
 // Each computer has roles (src/roles.js, roles.json in userData): the PRINT
@@ -1024,7 +1024,7 @@ function signPrintServerIn(passphrase) {
 /**
  * Applies a checked roles change (rolesStore.checkRolesChange) and starts or
  * stops what it switches. The ONE path for a role change: the wizard today,
- * /settings' computer device (UNIFIED-APP.md) later, through 'roles:set'.
+ * /settings' computer device (ROADMAP.md#kvbc-awana-one-app) later, through 'roles:set'.
  * Turning print OFF restarts the app: the print server module, once loaded,
  * keeps club-night timers of its own that only a fresh process is rid of.
  */

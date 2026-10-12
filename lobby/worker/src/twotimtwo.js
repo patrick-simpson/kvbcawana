@@ -1,4 +1,4 @@
-// The sync Worker's TwoTimTwo client (CLOUD-CHECKIN.md, piece 1): signs in as
+// The sync Worker's TwoTimTwo client (ROADMAP.md#cloud-check-in, piece 1): signs in as
 // the church's dedicated check-in user and reads the pages the check-in laptop's
 // extension reads today. Phase 1 is READ-ONLY: nothing here posts a check-in,
 // an undo or a check-out.

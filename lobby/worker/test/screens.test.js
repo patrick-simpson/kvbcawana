@@ -4,7 +4,7 @@ import { ONLINE_MS, SCREENS_MAX, STALE_MS, screenSettingsKey } from '../src/scre
 import { SHARED_KEYS } from '../../src/lib/sharedSettings.js';
 import { SCREEN_SPECS } from '../../src/lib/syncSpecs.js';
 
-// The screen registry (SETTINGS.md, phase 2): screens say hello, /settings
+// The screen registry (ROADMAP.md#settings-page, phase 2): screens say hello, /settings
 // lists them and edits each one's OWN settings through the kind's allowlist,
 // and every change or action is a doorbell on the live channel for that one
 // screen.

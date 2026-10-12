@@ -133,7 +133,7 @@ export const FETCH_TIMEOUT_MS = 15_000;
 // blinks.
 export const BUILD_QUIET_MS = 5000;
 
-// KVBC Awana, the one Windows app for every church computer (UNIFIED-APP.md:
+// KVBC Awana, the one Windows app for every church computer (ROADMAP.md#kvbc-awana-one-app:
 // a display, the print server, or both; it replaced the sound room app,
 // desktop/). Settings → Setup links its installer: the site's stable link to
 // the newest one the printer feed names (site/lib/downloads.js).

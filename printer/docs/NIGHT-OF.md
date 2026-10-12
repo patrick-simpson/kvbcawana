@@ -1,11 +1,11 @@
 # Night-of one-pager — club label printing
 
-Print this page and tape it near the check-in laptop.
+Print this page and tape it near the check-in laptop. Setup is in [SETUP.md](SETUP.md); problems are in [TROUBLESHOOTING.md](../TROUBLESHOOTING.md).
 
 ## Before doors open (5 minutes)
 
-1. **Start the server** — double-click **Club Label Printer** on the desktop
-   (or the tray app). A green window appears.
+1. **Start the server** — double-click **KVBC Awana** on the desktop
+   (or its tray icon). A green window appears.
 2. **Open the check-in page** — it opens automatically; sign in to
    TwoTimTwo if asked. The green **Club Print widget** appears top-right.
 3. **Run the night test** — widget → **Night Test** (or dashboard →
@@ -13,8 +13,8 @@ Print this page and tape it near the check-in laptop.
    - ✅ page selectors
    - ✅ print — a label with a big **TEST** band comes out
    - ✅ live channel — the lobby display is listening
-4. **Glance at the dashboard** — `http://localhost:3456` → *Night
-   Status* card should be all green.
+4. **Glance at the dashboard** (SETUP.md §3) — *Night Status* card should
+   be all green.
 
 ## During check-in
 
@@ -23,11 +23,12 @@ Print this page and tape it near the check-in laptop.
 - **Label didn't print?** Widget → *Tonight* list → **Reprint**.
 - **Kid not in the system?** Widget → *Walk-in Guest* → type the name,
   pick a club, **Print**.
-- **Red banner across the top?** The website changed under us — check
-  kids in normally and use widget search / walk-in printing; labels
+- **Red banner across the top?** The check-in page changed under us
+  (see [TROUBLESHOOTING.md](../TROUBLESHOOTING.md#red-banner-the-check-in-page-layout-has-changed)).
+  Check kids in normally and use widget search / walk-in printing; labels
   still work.
-- **Phone check-in:** volunteers on the club Wi-Fi open
-  `http://<this-laptop-ip>:3456/phone`, enter the PIN, tap the kid.
+- **Phone check-in:** volunteers on the club Wi-Fi open the phone page
+  (address and PIN in SETUP.md §4), enter the PIN, tap the kid.
   The check-in and the label happen here automatically.
 - **Count looks wrong?** Phone → *Tonight* tab shows exactly who is
   being counted. **Remove** fixes the count here (still undo them on
@@ -67,10 +68,10 @@ never explained away that way.
 ## If printing stops
 
 1. Is the green server window still open? If not, double-click
-   **Club Label Printer** again — queued labels print on reconnect.
+   **KVBC Awana** again — queued labels print on reconnect.
 2. Printer on, paper in, USB seated? The server retries by itself.
-3. Dashboard (`http://localhost:3456`) shows exactly what's wrong —
-   *Night Status* + *Print Failures Tonight*.
+3. The dashboard (SETUP.md §3) shows exactly what's wrong — *Night Status* +
+   *Print Failures Tonight*. Then [TROUBLESHOOTING.md](../TROUBLESHOOTING.md).
 
 **The screen never blocks the door.** Worst case: check kids in on
 paper, print labels later from the widget's Tonight list.

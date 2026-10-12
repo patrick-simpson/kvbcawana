@@ -3,7 +3,7 @@ import SettingsPanel from './SettingsPanel.jsx';
 import { resolveStoredConfig } from '../hooks/useConfig.js';
 import { useRemoteScreen } from './settings/screens.jsx';
 
-// A lobby TV opened from the settings page's Screens (SETTINGS.md, phase 2):
+// A lobby TV opened from the settings page's Screens (ROADMAP.md#settings-page, phase 2):
 // the SAME Settings panel, its form seeded from the TV's own settings in the
 // sync Worker (over this page's shared layer, as the TV resolves them), and
 // every change written back there instead of to this browser. Shared changes

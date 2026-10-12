@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Tests for the settings page's way in (SETTINGS.md phase 3): the one https
+// Tests for the settings page's way in (ROADMAP.md#settings-page phase 3): the one https
 // origin awana.kvbchurch.org calling this server on localhost.
 //
 // What is pinned: the preflight (the exact origin, Authorization, Chrome's

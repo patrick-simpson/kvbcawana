@@ -86,11 +86,11 @@ export function Toggle({ checked, onChange, title, hint, disabled }) {
 // Whether this screen follows the shared settings (contract v6): the card tags
 // say "Every screen" only while it does.
 export const FollowingContext = createContext(true);
-// True on awana.kvbchurch.org/settings (SETTINGS.md): the device is not a
+// True on awana.kvbchurch.org/settings (ROADMAP.md#settings-page): the device is not a
 // screen, so a "This screen" card has nothing to set and is left out unless
 // it is marked `keep` (signing in, the slide editor).
 export const SettingsPageContext = createContext(false);
-// On the settings page, a screen opened from Screens (SETTINGS.md, phase 2):
+// On the settings page, a screen opened from Screens (ROADMAP.md#settings-page, phase 2):
 // {id, kind, name}, else null. Its "This screen" cards come back, reading and
 // writing that screen's settings in the sync Worker; a card about THIS device
 // (`local`: signing in, uploads, keys, tools) stays out.
@@ -438,7 +438,7 @@ export function ChangePassphraseField() {
 }
 
 /**
- * This screen's name on /settings (SETTINGS.md, phase 2). Shown once the
+ * This screen's name on /settings (ROADMAP.md#settings-page, phase 2). Shown once the
  * screen has registered with the sync service; saved on Enter or on leaving
  * the field.
  */
@@ -503,7 +503,7 @@ export function TemplateField() {
 }
 
 /**
- * Cloud check-in (CLOUD-CHECKIN.md): one button that has the sync service sign
+ * Cloud check-in (ROADMAP.md#cloud-check-in): one button that has the sync service sign
  * in to TwoTimTwo as the church's check-in user and read the most recent club
  * night's report once (today's has no club tables on any other day),
  * so the owner can prove the secrets work before a club night. Read-only, and

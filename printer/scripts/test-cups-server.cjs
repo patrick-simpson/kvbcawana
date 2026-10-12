@@ -1,5 +1,5 @@
 // The print server as the Raspberry Pi print station runs it
-// (AWANA_PRINT_BACKEND=cups, CLOUD-CHECKIN.md): a label goes to CUPS's `lp`,
+// (AWANA_PRINT_BACKEND=cups, ROADMAP.md#cloud-check-in): a label goes to CUPS's `lp`,
 // the printer list and the /health printer warnings come from `lpstat`.
 // Stand-in `lp` / `lpstat` programs on PATH record what they were given, so
 // this is the real server, the real renderer and the real arguments; only the

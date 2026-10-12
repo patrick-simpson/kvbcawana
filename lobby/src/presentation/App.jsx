@@ -164,7 +164,7 @@ export const App = () => {
     });
   }, [select, resume]);
 
-  // Managed from /settings (SETTINGS.md, phase 2): registered with the sync
+  // Managed from /settings (ROADMAP.md#settings-page, phase 2): registered with the sync
   // Worker, its two switches followed, a wall pick or Resume obeyed. Never
   // from the configure page itself.
   useProjectorScreen({

@@ -1,5 +1,5 @@
 // @ts-check
-// A screen's own settings, kept in the sync Worker (SETTINGS.md, phase 2) so
+// A screen's own settings, kept in the sync Worker (ROADMAP.md#settings-page, phase 2) so
 // awana.kvbchurch.org/settings can change them from any device. This is the
 // pure half and the one storage slot; useScreenSync is the hook.
 //

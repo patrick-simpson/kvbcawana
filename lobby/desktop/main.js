@@ -861,7 +861,7 @@ function checkForUpdates(byHand = false) {
 /* ── The hand-off to KVBC Awana (2.1.0, this app's last release) ───── */
 
 // KVBC Awana (the printer app, v9) replaces this app: one Windows app for
-// the print server and the screens (UNIFIED-APP.md). Once its feed names
+// the print server and the screens (ROADMAP.md#kvbc-awana-one-app). Once its feed names
 // 9.0.0 or later, this downloads its installer, checks the sha512 the feed
 // gives, writes the hand-off (this PC is a display; its screen, monitor,
 // shutdown, Start with Windows and where this app's browser profile is) to
