@@ -1,6 +1,6 @@
 {
-  "version": 1,
-  "note": "Page-1 content for each Leader Handout, written from that week's Leader Video transcript. Hand-edit here, then re-run scripts/render-leader-handouts.mjs.",
+  "version": 2,
+  "note": "Page-1 content for each Leader Handout, written from that week's Leader Video transcript. questions.forYou = the leader's own reflection; questions.forGroup = questions the leader asks the students (may be empty: that block is then left off). Hand-edit here, then re-run scripts/render-leader-handouts.mjs.",
   "weeks": {
     "1": {
       "week": 1,
@@ -20,12 +20,15 @@
         "Acts 4:20",
         "1 Corinthians 2"
       ],
-      "questions": [
-        "Why do you believe what you believe, and can you discuss those beliefs intelligently?",
-        "Do your students feel free to ask any question, including ones that voice doubt? What would make it safer?",
-        "How will you respond when a student asks something you cannot answer?",
-        "What resources or people could you draw on this year when hard questions come up?"
-      ]
+      "questions": {
+        "forYou": [
+          "Why do you believe what you believe, and can you discuss those beliefs intelligently?",
+          "Do your students feel free to ask any question, including ones that voice doubt? What would make it safer?",
+          "How will you respond when a student asks something you cannot answer?",
+          "What resources or people could you draw on this year when hard questions come up?"
+        ],
+        "forGroup": []
+      }
     },
     "2": {
       "week": 2,
@@ -44,12 +47,15 @@
         "John 20:30-31",
         "Hebrews 11:1"
       ],
-      "questions": [
-        "Do you have your own faith, or are you still believing what your parents or others told you to believe?",
-        "Have you considered the evidence God has given for who Jesus is? Is it enough?",
-        "How does trust between friends grow, and how is that like trusting Christ?",
-        "How can we help students move from accepting what we tell them to discovering it is true?"
-      ]
+      "questions": {
+        "forYou": [
+          "Do you have your own faith, or are you still believing what your parents or others told you to believe?",
+          "Have you considered the evidence God has given for who Jesus is? Is it enough?",
+          "How does trust between friends grow, and how is that like trusting Christ?",
+          "How can we help students move from accepting what we tell them to discovering it is true?"
+        ],
+        "forGroup": []
+      }
     },
     "3": {
       "week": 3,
@@ -67,12 +73,15 @@
       "scriptures": [
         "John 14:6"
       ],
-      "questions": [
-        "What is the difference between a subjective truth and an objective truth? Give an example of each.",
-        "Why do people put belief in Jesus on the subjective side, and why does John 14 not allow that?",
-        "Can something make sense and be practical but still not be true? How would you tell?",
-        "How does truth open the door to a life of genuine freedom in Christ?"
-      ]
+      "questions": {
+        "forYou": [
+          "What is the difference between a subjective truth and an objective truth? Give an example of each.",
+          "Why do people put belief in Jesus on the subjective side, and why does John 14 not allow that?",
+          "Can something make sense and be practical but still not be true? How would you tell?",
+          "How does truth open the door to a life of genuine freedom in Christ?"
+        ],
+        "forGroup": []
+      }
     },
     "4": {
       "week": 4,
@@ -90,12 +99,15 @@
       "scriptures": [
         "Matthew 22"
       ],
-      "questions": [
-        "Should faith make sense? What parts of faith seem confusing until you think them through?",
-        "What about your faith does not make sense to you, and what would it take to work through it?",
-        "How do you already use logic in your relationships to figure out what is true?",
-        "What is an argument against Christianity that sounds good, and does it hold up logically?"
-      ]
+      "questions": {
+        "forYou": [
+          "Should faith make sense? What parts of faith seem confusing until you think them through?",
+          "What about your faith does not make sense to you, and what would it take to work through it?",
+          "How do you already use logic in your relationships to figure out what is true?",
+          "What is an argument against Christianity that sounds good, and does it hold up logically?"
+        ],
+        "forGroup": []
+      }
     },
     "5": {
       "week": 5,
@@ -111,12 +123,15 @@
         "Do not expect students to change worldviews right away; changing how you see reality is a huge, anxious adjustment, so be patient and walk alongside them."
       ],
       "scriptures": [],
-      "questions": [
-        "What lenses are you already looking through, and where did they come from?",
-        "Where might your own worldview be a 'buffet,' with pieces that do not fit together?",
-        "How do movies, music, and media communicate naturalism or pantheism to you without saying so?",
-        "Is your group a place where students answer honestly rather than saying what leaders want to hear? How can you tell?"
-      ]
+      "questions": {
+        "forYou": [
+          "What lenses are you already looking through, and where did they come from?",
+          "Where might your own worldview be a 'buffet,' with pieces that do not fit together?",
+          "How do movies, music, and media communicate naturalism or pantheism to you without saying so?",
+          "Is your group a place where students answer honestly rather than saying what leaders want to hear? How can you tell?"
+        ],
+        "forGroup": []
+      }
     },
     "6": {
       "week": 6,
@@ -134,12 +149,15 @@
       "scriptures": [
         "Exodus 6:1-5"
       ],
-      "questions": [
-        "What changes between knowing God as 'God Almighty' and knowing him by name as Yahweh?",
-        "What would it look like to view the world as if one personal God cares about and pursues you individually?",
-        "How would a monotheistic worldview change your thoughts on morality, justice, love, and how you act at school?",
-        "How could Christians looking through this lens actually influence the culture, rather than just being influenced by it?"
-      ]
+      "questions": {
+        "forYou": [
+          "What changes between knowing God as 'God Almighty' and knowing him by name as Yahweh?",
+          "What would it look like to view the world as if one personal God cares about and pursues you individually?",
+          "How would a monotheistic worldview change your thoughts on morality, justice, love, and how you act at school?",
+          "How could Christians looking through this lens actually influence the culture, rather than just being influenced by it?"
+        ],
+        "forGroup": []
+      }
     },
     "7": {
       "week": 7,
@@ -155,12 +173,15 @@
         "A God who is distinct, holy, and outside ourselves gives us a standard for right and wrong, just and unjust, love and hate."
       ],
       "scriptures": [],
-      "questions": [
-        "Where do you see pantheistic ideas, like karma or a divine force, showing up in movies, music, or wellness culture?",
-        "Why does the distinction between Creator and creation matter so much? What is lost without it?",
-        "How does losing that distinction lead to idolatry, even in subtle forms like elevating self, people, or causes?",
-        "How can we show another worldview is inconsistent while still speaking in love, without making fun of it?"
-      ]
+      "questions": {
+        "forYou": [
+          "Where do you see pantheistic ideas, like karma or a divine force, showing up in movies, music, or wellness culture?",
+          "Why does the distinction between Creator and creation matter so much? What is lost without it?",
+          "How does losing that distinction lead to idolatry, even in subtle forms like elevating self, people, or causes?",
+          "How can we show another worldview is inconsistent while still speaking in love, without making fun of it?"
+        ],
+        "forGroup": []
+      }
     },
     "8": {
       "week": 8,
@@ -178,12 +199,15 @@
       "scriptures": [
         "Ecclesiastes 1:2-4"
       ],
-      "questions": [
-        "Where does naturalism show up in your school and classes, beyond just evolutionary science?",
-        "If only the natural world exists, where would justice, love, and morality come from?",
-        "Why do people without belief in God still care about clean water or helping others? What does that inclination suggest?",
-        "From a naturalistic worldview, what would give your work or efforts any meaning? Does that answer satisfy you?"
-      ]
+      "questions": {
+        "forYou": [
+          "Where does naturalism show up in your school and classes, beyond just evolutionary science?",
+          "If only the natural world exists, where would justice, love, and morality come from?",
+          "Why do people without belief in God still care about clean water or helping others? What does that inclination suggest?",
+          "From a naturalistic worldview, what would give your work or efforts any meaning? Does that answer satisfy you?"
+        ],
+        "forGroup": []
+      }
     },
     "9": {
       "week": 9,
@@ -199,12 +223,15 @@
         "We treat life like a two-story house, keeping Jesus in the private upstairs and school or work in the public sphere; bring Jesus into public space."
       ],
       "scriptures": [],
-      "questions": [
-        "Who in your congregation works in the sciences and could show students how they connect their field with their faith?",
-        "What are your students learning in school right now that you could help them see through a biblical lens?",
-        "Where have you kept your 'Jesus life' private and separate from your public school or work life?",
-        "Which of your students already love science, math, or technology, and how could this unit switch them on?"
-      ]
+      "questions": {
+        "forYou": [
+          "Who in your congregation works in the sciences and could show students how they connect their field with their faith?",
+          "What are your students learning in school right now that you could help them see through a biblical lens?",
+          "Where have you kept your 'Jesus life' private and separate from your public school or work life?",
+          "Which of your students already love science, math, or technology, and how could this unit switch them on?"
+        ],
+        "forGroup": []
+      }
     },
     "10": {
       "week": 10,
@@ -221,12 +248,15 @@
       "scriptures": [
         "Genesis"
       ],
-      "questions": [
-        "What does fine-tuning say about the character of God?",
-        "If you didn't have Scripture, what would nature itself tell you about God's design?",
-        "Did this world pop into existence by random chance, restarting until it worked, or was it crafted with the right conditions for life?",
-        "What does it mean that God made not just a habitable planet, but a home for us?"
-      ]
+      "questions": {
+        "forYou": [
+          "What does fine-tuning say about the character of God?",
+          "If you didn't have Scripture, what would nature itself tell you about God's design?",
+          "Did this world pop into existence by random chance, restarting until it worked, or was it crafted with the right conditions for life?",
+          "What does it mean that God made not just a habitable planet, but a home for us?"
+        ],
+        "forGroup": []
+      }
     },
     "11": {
       "week": 11,
@@ -242,12 +272,15 @@
         "Use the right examples to simplify difficult concepts; the best is Sean's use of simply describing a book to help us understand DNA."
       ],
       "scriptures": [],
-      "questions": [
-        "How are your relationships with students going, and do they feel safe being honest with you and one another?",
-        "Where are your students on the spectrum: nodding without understanding, fired up and asking great questions, or in between?",
-        "Which concepts from this unit might you need to slow down and revisit before moving forward?",
-        "What simple examples, like describing a book to explain DNA, could you use to simplify difficult concepts?"
-      ]
+      "questions": {
+        "forYou": [
+          "How are your relationships with students going, and do they feel safe being honest with you and one another?",
+          "Where are your students on the spectrum: nodding without understanding, fired up and asking great questions, or in between?",
+          "Which concepts from this unit might you need to slow down and revisit before moving forward?",
+          "What simple examples, like describing a book to explain DNA, could you use to simplify difficult concepts?"
+        ],
+        "forGroup": []
+      }
     },
     "12": {
       "week": 12,
@@ -263,12 +296,15 @@
         "Help eager students be patient about jumping into arguments, because there is so much more to learn."
       ],
       "scriptures": [],
-      "questions": [
-        "Which of your students are fired up to argue, and how can you help them challenge others in truth, love, and respect?",
-        "Which students are still unsure, and have you asked them plainly whether the evidence was enough or what questions remain?",
-        "How do fine-tuning, DNA, and design each point to God through science?",
-        "How can you help eager students stay patient when there is still so much more to learn?"
-      ]
+      "questions": {
+        "forYou": [
+          "Which of your students are fired up to argue, and how can you help them challenge others in truth, love, and respect?",
+          "Which students are still unsure, and have you asked them plainly whether the evidence was enough or what questions remain?",
+          "How do fine-tuning, DNA, and design each point to God through science?",
+          "How can you help eager students stay patient when there is still so much more to learn?"
+        ],
+        "forGroup": []
+      }
     },
     "13": {
       "week": 13,
@@ -284,12 +320,15 @@
         "Respond with grace and love: listen thoroughly, ask where their ideas come from, and don't be afraid to challenge their thinking without shooting them down."
       ],
       "scriptures": [],
-      "questions": [
-        "When you present what Scripture says as fact, how many of your students are hearing it as just your opinion?",
-        "Is 'all people are created equal' a fact or an opinion? What about murder being wrong?",
-        "Where are your students getting their ideas about right and wrong: classes, teachers, home, online, TV?",
-        "Why does needing a moral standard beyond ourselves point us to God?"
-      ]
+      "questions": {
+        "forYou": [
+          "When you present what Scripture says as fact, how many of your students are hearing it as just your opinion?",
+          "Is 'all people are created equal' a fact or an opinion? What about murder being wrong?",
+          "Where are your students getting their ideas about right and wrong: classes, teachers, home, online, TV?",
+          "Why does needing a moral standard beyond ourselves point us to God?"
+        ],
+        "forGroup": []
+      }
     },
     "14": {
       "week": 14,
@@ -305,12 +344,15 @@
         "Engage the silently skeptical student one-on-one, not publicly; the speaker's arms-folded student eventually admitted 'there's something to what you're saying.'"
       ],
       "scriptures": [],
-      "questions": [
-        "Where is each of your students now compared to the questions and beliefs they walked in with?",
-        "What recurring questions keep coming up, and do you need to pause and answer them head on before moving forward?",
-        "Which quiet student in the back seems to be 'not buying it,' and how could you engage them one-on-one?",
-        "Do you keep going as planned, or put the brakes on and revisit an old lesson before the next half of the year?"
-      ]
+      "questions": {
+        "forYou": [
+          "Where is each of your students now compared to the questions and beliefs they walked in with?",
+          "What recurring questions keep coming up, and do you need to pause and answer them head on before moving forward?",
+          "Which quiet student in the back seems to be 'not buying it,' and how could you engage them one-on-one?",
+          "Do you keep going as planned, or put the brakes on and revisit an old lesson before the next half of the year?"
+        ],
+        "forGroup": []
+      }
     },
     "15": {
       "week": 15,
@@ -326,12 +368,15 @@
         "Check that students feel safe to be honest, that small groups serve and care for one another, and consider serving together in the community."
       ],
       "scriptures": [],
-      "questions": [
-        "How do our choices, good or bad, actually reflect God?",
-        "What does the fact that we have free will tell us about God's existence?",
-        "Do students in your group feel safe to be honest, even when honesty is hard?",
-        "Is one student dominating discussion, or is everyone invited to participate? What adjustment would help?"
-      ]
+      "questions": {
+        "forYou": [
+          "How do our choices, good or bad, actually reflect God?",
+          "What does the fact that we have free will tell us about God's existence?",
+          "Do students in your group feel safe to be honest, even when honesty is hard?",
+          "Is one student dominating discussion, or is everyone invited to participate? What adjustment would help?"
+        ],
+        "forGroup": []
+      }
     },
     "16": {
       "week": 16,
@@ -347,12 +392,15 @@
         "Awana is there to help by email or social media, including the In Two Minutes video series where students can ask further questions."
       ],
       "scriptures": [],
-      "questions": [
-        "Where do you see redemptive or salvation themes in a favorite book or movie?",
-        "What does our love of storytelling suggest about the God whose image we reflect?",
-        "Which lesson from this year could you teach back to the group in your own words?",
-        "Which topic has your group been stuck or uncomfortable on, and what would help unstick it?"
-      ]
+      "questions": {
+        "forYou": [
+          "Where do you see redemptive or salvation themes in a favorite book or movie?",
+          "What does our love of storytelling suggest about the God whose image we reflect?",
+          "Which lesson from this year could you teach back to the group in your own words?",
+          "Which topic has your group been stuck or uncomfortable on, and what would help unstick it?"
+        ],
+        "forGroup": []
+      }
     },
     "17": {
       "week": 17,
@@ -370,12 +418,15 @@
       "scriptures": [
         "1 Kings 18"
       ],
-      "questions": [
-        "What is the most improbable event in human history you can think of?",
-        "What counts as a real miracle, and what is just an improbable or lucky event?",
-        "Are you convinced miracles are possible, and that they have happened around you? If not, what would it take?",
-        "Why might God heal one person and not another, and how do we walk with someone through that?"
-      ]
+      "questions": {
+        "forYou": [
+          "What is the most improbable event in human history you can think of?",
+          "What counts as a real miracle, and what is just an improbable or lucky event?",
+          "Are you convinced miracles are possible, and that they have happened around you? If not, what would it take?",
+          "Why might God heal one person and not another, and how do we walk with someone through that?"
+        ],
+        "forGroup": []
+      }
     },
     "18": {
       "week": 18,
@@ -393,12 +444,15 @@
       "scriptures": [
         "1 Corinthians 15"
       ],
-      "questions": [
-        "What would it mean for Christianity if Jesus had stayed in the grave?",
-        "How do we know about events like the Roman Empire or the Civil War, and how does the resurrection's evidence compare?",
-        "Are you convinced the evidence points to Jesus resurrecting? If not, what questions or roadblocks remain?",
-        "If you are convinced the resurrection happened, what does that mean for your life and what needs to change?"
-      ]
+      "questions": {
+        "forYou": [
+          "What would it mean for Christianity if Jesus had stayed in the grave?",
+          "How do we know about events like the Roman Empire or the Civil War, and how does the resurrection's evidence compare?",
+          "Are you convinced the evidence points to Jesus resurrecting? If not, what questions or roadblocks remain?",
+          "If you are convinced the resurrection happened, what does that mean for your life and what needs to change?"
+        ],
+        "forGroup": []
+      }
     },
     "19": {
       "week": 19,
@@ -417,12 +471,15 @@
         "John 8",
         "Matthew 16"
       ],
-      "questions": [
-        "Who do you say Jesus is, and why do you answer that way?",
-        "What evidence backs up who you think you are, and what evidence backs up who Jesus claims to be?",
-        "Why is it easier to accept Jesus as a good moral teacher than as God of the universe?",
-        "If you see Jesus as only a teacher, what would it take to see him as God: more evidence, or willingness?"
-      ]
+      "questions": {
+        "forYou": [
+          "Who do you say Jesus is, and why do you answer that way?",
+          "What evidence backs up who you think you are, and what evidence backs up who Jesus claims to be?",
+          "Why is it easier to accept Jesus as a good moral teacher than as God of the universe?",
+          "If you see Jesus as only a teacher, what would it take to see him as God: more evidence, or willingness?"
+        ],
+        "forGroup": []
+      }
     },
     "20": {
       "week": 20,
@@ -440,12 +497,15 @@
       "scriptures": [
         "Acts 4:20"
       ],
-      "questions": [
-        "How would you describe the conviction the apostles had for their message, and do you agree with it?",
-        "If you absolutely saw something and knew it was true, how far would you go to make sure the truth came out?",
-        "What fate did the apostles meet for spreading the gospel, and what does that mean for your faith?",
-        "Knowing all this about miracles, the resurrection, and the apostles, how will you live differently moving forward?"
-      ]
+      "questions": {
+        "forYou": [
+          "How would you describe the conviction the apostles had for their message, and do you agree with it?",
+          "If you absolutely saw something and knew it was true, how far would you go to make sure the truth came out?",
+          "What fate did the apostles meet for spreading the gospel, and what does that mean for your faith?",
+          "Knowing all this about miracles, the resurrection, and the apostles, how will you live differently moving forward?"
+        ],
+        "forGroup": []
+      }
     },
     "21": {
       "week": 21,
@@ -461,12 +521,15 @@
         "Critic Bart Ehrman calls these 'error-ridden copies,' but the evidence contradicts him; help students weigh such mainstream media voices critically — Jonathan Morrow's Questioning the Bible helps."
       ],
       "scriptures": [],
-      "questions": [
-        "What's the difference between an autograph and a manuscript, and why does that matter for the New Testament?",
-        "How does the New Testament's manuscript evidence compare with the ancient sources your textbooks treat as fact?",
-        "When someone like Bart Ehrman says the Bible is full of errors, how would you respond?",
-        "If the Bible really is reliable, what will that mean for your life today, tomorrow, and down the road?"
-      ]
+      "questions": {
+        "forYou": [
+          "What's the difference between an autograph and a manuscript, and why does that matter for the New Testament?",
+          "How does the New Testament's manuscript evidence compare with the ancient sources your textbooks treat as fact?",
+          "When someone like Bart Ehrman says the Bible is full of errors, how would you respond?",
+          "If the Bible really is reliable, what will that mean for your life today, tomorrow, and down the road?"
+        ],
+        "forGroup": []
+      }
     },
     "22": {
       "week": 22,
@@ -482,12 +545,15 @@
         "If this evidence is new to you too, say so; students need to see this is a journey you are walking together."
       ],
       "scriptures": [],
-      "questions": [
-        "Two weeks in, what does the manuscript and archaeological evidence do for how you see the Bible?",
-        "How does connecting a story to a physical artifact change how much you trust the story?",
-        "What archaeological finds mentioned this week surprised you, and why?",
-        "If the Bible is real history and not just stories, what difference does that make for your life?"
-      ]
+      "questions": {
+        "forYou": [
+          "Two weeks in, what does the manuscript and archaeological evidence do for how you see the Bible?",
+          "How does connecting a story to a physical artifact change how much you trust the story?",
+          "What archaeological finds mentioned this week surprised you, and why?",
+          "If the Bible is real history and not just stories, what difference does that make for your life?"
+        ],
+        "forGroup": []
+      }
     },
     "23": {
       "week": 23,
@@ -505,12 +571,15 @@
       "scriptures": [
         "Isaiah 52-53"
       ],
-      "questions": [
-        "Could Jesus fulfilling hundreds of prophecies really be coincidence or something manufactured? Why or why not?",
-        "What do Isaiah 52 and 53 say the Messiah would be like, and how did Jesus fulfill that?",
-        "Why did the Messiah Jesus actually was differ so much from the ruler Jewish leaders expected?",
-        "What questions about prophecy do you still have that we should research together?"
-      ]
+      "questions": {
+        "forYou": [
+          "Could Jesus fulfilling hundreds of prophecies really be coincidence or something manufactured? Why or why not?",
+          "What do Isaiah 52 and 53 say the Messiah would be like, and how did Jesus fulfill that?",
+          "Why did the Messiah Jesus actually was differ so much from the ruler Jewish leaders expected?",
+          "What questions about prophecy do you still have that we should research together?"
+        ],
+        "forGroup": []
+      }
     },
     "24": {
       "week": 24,
@@ -526,12 +595,15 @@
         "The aim: students appreciate the Bible more, read it more, and follow it better — equipping them to talk intelligently about it in coming conversations."
       ],
       "scriptures": [],
-      "questions": [
-        "If the Bible really is accurate, historical, and prophetic, what should change in how you live — now what?",
-        "How would you answer someone who says the Bible can't be God's word because men wrote it?",
-        "What conclusions have you come to over these four weeks about the Bible's reliability?",
-        "The Bible is the best-selling yet perhaps least-read book in history; what would help you actually read it more?"
-      ]
+      "questions": {
+        "forYou": [
+          "If the Bible really is accurate, historical, and prophetic, what should change in how you live — now what?",
+          "How would you answer someone who says the Bible can't be God's word because men wrote it?",
+          "What conclusions have you come to over these four weeks about the Bible's reliability?",
+          "The Bible is the best-selling yet perhaps least-read book in history; what would help you actually read it more?"
+        ],
+        "forGroup": []
+      }
     },
     "25": {
       "week": 25,
@@ -547,12 +619,15 @@
         "Small group will get real fast: expect 'why does God allow suffering?'; table questions carefully, write them down, and pose them yourself if needed."
       ],
       "scriptures": [],
-      "questions": [
-        "Why does God allow suffering, and why do bad things happen to good people?",
-        "If evil is the absence of good rather than a created thing, how does that change how you think about it?",
-        "How does the very existence of evil actually suggest that God exists?",
-        "What happens when we make ourselves our own moral compass instead of orienting to something external?"
-      ]
+      "questions": {
+        "forYou": [
+          "Why does God allow suffering, and why do bad things happen to good people?",
+          "If evil is the absence of good rather than a created thing, how does that change how you think about it?",
+          "How does the very existence of evil actually suggest that God exists?",
+          "What happens when we make ourselves our own moral compass instead of orienting to something external?"
+        ],
+        "forGroup": []
+      }
     },
     "26": {
       "week": 26,
@@ -568,12 +643,15 @@
         "God has morally justified reasons for allowing evil's temporary existence; as Paul says in 1 Corinthians, we only see things in part right now."
       ],
       "scriptures": [],
-      "questions": [
-        "What are some things it is actually impossible for God to do, and what do those limits show about his nature?",
-        "If God did not create evil, why does he allow it, even for a time?",
-        "What good can come from evil? Brainstorm examples together.",
-        "How can we look to God for hope instead of doubting him because of the evil around us?"
-      ]
+      "questions": {
+        "forYou": [
+          "What are some things it is actually impossible for God to do, and what do those limits show about his nature?",
+          "If God did not create evil, why does he allow it, even for a time?",
+          "What good can come from evil? Brainstorm examples together.",
+          "How can we look to God for hope instead of doubting him because of the evil around us?"
+        ],
+        "forGroup": []
+      }
     },
     "28": {
       "week": 28,
@@ -589,12 +667,15 @@
         "Students will ask how a good God who allows evil can also have hell; invite open discussion rather than Bible-thumping, and let them process patiently."
       ],
       "scriptures": [],
-      "questions": [
-        "Describe your favorite place, then remove everything good about it. What would be left, and what does that suggest hell is like?",
-        "If God is good and loving, why would hell exist as a consequence? Is that a contradiction?",
-        "Does God send people to hell, or do we send ourselves? What difference does that make?",
-        "How is God refusing to force us into relationship with him actually love in action?"
-      ]
+      "questions": {
+        "forYou": [
+          "Describe your favorite place, then remove everything good about it. What would be left, and what does that suggest hell is like?",
+          "If God is good and loving, why would hell exist as a consequence? Is that a contradiction?",
+          "Does God send people to hell, or do we send ourselves? What difference does that make?",
+          "How is God refusing to force us into relationship with him actually love in action?"
+        ],
+        "forGroup": []
+      }
     },
     "29": {
       "week": 29,
@@ -610,12 +691,15 @@
         "Jesus said people will know his disciples by their love; focus on relationships, not conversions, because our love is how some people only ever see Jesus."
       ],
       "scriptures": [],
-      "questions": [
-        "Think of a time you truly experienced love. What did it feel like, and how should others feel when you love them?",
-        "What does a conversation about faith look like with love, and what does it look like without it?",
-        "What are ways to love and connect with other people that you have never thought of?",
-        "Why should we focus on building relationships rather than getting conversions?"
-      ]
+      "questions": {
+        "forYou": [
+          "Think of a time you truly experienced love. What did it feel like, and how should others feel when you love them?",
+          "What does a conversation about faith look like with love, and what does it look like without it?",
+          "What are ways to love and connect with other people that you have never thought of?",
+          "Why should we focus on building relationships rather than getting conversions?"
+        ],
+        "forGroup": []
+      }
     },
     "30": {
       "week": 30,
@@ -631,12 +715,15 @@
         "Asking great questions shows love and builds relationship, so when a person receives Christ, discipleship can actually begin rather than just a conversion."
       ],
       "scriptures": [],
-      "questions": [
-        "What makes starting a spiritual conversation feel terrifying, and how could a plan of attack help you?",
-        "Why is it a mistake to think you must have all the answers before sharing your faith?",
-        "Practice: someone says 'God can't exist because there's too much evil.' How would you use the two questions in reply?",
-        "How does asking good questions show love and build relationship instead of just feeding someone your opinion?"
-      ]
+      "questions": {
+        "forYou": [
+          "What makes starting a spiritual conversation feel terrifying, and how could a plan of attack help you?",
+          "Why is it a mistake to think you must have all the answers before sharing your faith?",
+          "Practice: someone says 'God can't exist because there's too much evil.' How would you use the two questions in reply?",
+          "How does asking good questions show love and build relationship instead of just feeding someone your opinion?"
+        ],
+        "forGroup": []
+      }
     },
     "31": {
       "week": 31,
@@ -652,12 +739,15 @@
         "Make sure small group leaders are equipped, know it is okay to say 'I don't have an answer,' and use a storyteller who has walked through doubt."
       ],
       "scriptures": [],
-      "questions": [
-        "What is one question about God or faith you have been wrestling with?",
-        "Have you ever felt you were not allowed to ask a question about faith? What happened?",
-        "Why do you think doubts, when answered honestly, can actually make faith stronger?",
-        "Who could you talk to when a doubt feels bigger than you can handle alone?"
-      ]
+      "questions": {
+        "forYou": [
+          "What is one question about God or faith you have been wrestling with?",
+          "Have you ever felt you were not allowed to ask a question about faith? What happened?",
+          "Why do you think doubts, when answered honestly, can actually make faith stronger?",
+          "Who could you talk to when a doubt feels bigger than you can handle alone?"
+        ],
+        "forGroup": []
+      }
     },
     "32": {
       "week": 32,
@@ -673,12 +763,15 @@
         "Encourage students to be faithful to their own gifts; they will face unanswered questions and also the thrill of leading someone to Christ."
       ],
       "scriptures": [],
-      "questions": [
-        "Look back at your notes from lesson 1.1. How has your thinking changed since the year began?",
-        "Have the questions you had at the start been answered? What new questions do you have now?",
-        "Are you an excavator, a tree shaker, or something in between? How has God gifted you for sharing truth?",
-        "Seniors: do you feel ready for what is next, and what would help you be more ready?"
-      ]
+      "questions": {
+        "forYou": [
+          "Look back at your notes from lesson 1.1. How has your thinking changed since the year began?",
+          "Have the questions you had at the start been answered? What new questions do you have now?",
+          "Are you an excavator, a tree shaker, or something in between? How has God gifted you for sharing truth?",
+          "Seniors: do you feel ready for what is next, and what would help you be more ready?"
+        ],
+        "forGroup": []
+      }
     }
   }
 }

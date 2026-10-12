@@ -22,7 +22,7 @@ const LESSONS = {
 };
 
 const LEADER_PREP = {
-  version: 1,
+  version: 2,
   weeks: {
     1: {
       week: 1,
@@ -30,7 +30,10 @@ const LEADER_PREP = {
       bigIdea: 'Be ready to give a reason.',
       keyPoints: ['Apologetics is a defense.'],
       scriptures: ['1 Peter 3:15'],
-      questions: ['What is a reason you believe?'],
+      questions: {
+        forYou: ['What is a reason you believe?'],
+        forGroup: ['What would you say to a friend who asks why?'],
+      },
     },
   },
 };
@@ -103,6 +106,49 @@ test('a leader Read Prep shows the summary with the transcript collapsed', async
   assert.equal(toggle.textContent, 'Read the full transcript');
   assert.equal(toggle.getAttribute('aria-expanded'), 'false');
   assert.equal(document.querySelectorAll('.prep-para').length, 0);
+  kiosk.close();
+});
+
+/** Section heading -> its list items, read off the Read Prep overlay. */
+function prepSections(document) {
+  const out = {};
+  for (const section of document.querySelectorAll('#prep-body > section')) {
+    const h = section.querySelector('h3');
+    if (h) out[h.textContent] = [...section.querySelectorAll('li')].map((li) => li.textContent);
+  }
+  return out;
+}
+
+const withPrepQuestions = (questions) => ({
+  ...ROUTES,
+  'leader-prep.json': { json: { ...LEADER_PREP, weeks: { 1: { ...LEADER_PREP.weeks[1], questions } } } },
+});
+
+test('a leader Read Prep shows both question sets, each labelled', async () => {
+  const kiosk = bootKiosk(ROUTES, ANSWERED);
+  await openPrepVia(kiosk, 'leader');
+  const sections = prepSections(kiosk.document);
+  assert.deepEqual(sections['For you'], ['What is a reason you believe?']);
+  assert.deepEqual(sections['Ask your group'], ['What would you say to a friend who asks why?']);
+  assert.equal(sections['Discussion Questions'], undefined);
+  kiosk.close();
+});
+
+test('an empty "Ask your group" set leaves that section off', async () => {
+  const kiosk = bootKiosk(withPrepQuestions({ forYou: ['Only mine.'], forGroup: [] }), ANSWERED);
+  await openPrepVia(kiosk, 'leader');
+  const sections = prepSections(kiosk.document);
+  assert.deepEqual(sections['For you'], ['Only mine.']);
+  assert.equal('Ask your group' in sections, false);
+  kiosk.close();
+});
+
+test('a cached v1 leader-prep.json (one plain list) still reads, as "For you"', async () => {
+  const kiosk = bootKiosk(withPrepQuestions(['Old single list.']), ANSWERED);
+  await openPrepVia(kiosk, 'leader');
+  const sections = prepSections(kiosk.document);
+  assert.deepEqual(sections['For you'], ['Old single list.']);
+  assert.equal('Ask your group' in sections, false);
   kiosk.close();
 });
 
