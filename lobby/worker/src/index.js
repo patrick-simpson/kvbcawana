@@ -11,7 +11,6 @@ const SCREEN_TAG = 'screen:';
 
 /** The pages that may call this service from a browser. */
 const ALLOWED_ORIGINS = [
-  'https://patrick-simpson.github.io',
   // The one site (same origin through its /api, but a page served from a
   // preview deploy or the bare Worker address still calls in cross-origin).
   'https://awana.kvbchurch.org',
