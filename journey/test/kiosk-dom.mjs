@@ -48,8 +48,10 @@ export const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
 // agent only matters to a test that wants to show exactly that (pass
 // `device`, e.g. DESKTOP for a Mac).
 export const KIOSK_PC = {
+  // The app's Chromium says so in its user agent (Electron's default form);
+  // the saved-lessons downloader reads only that (automatic mode's default).
   userAgent:
-    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) KVBCAwana/9.0.0 Chrome/138.0.0.0 Electron/44.5.0 Safari/537.36',
 };
 
 export const DESKTOP = {
@@ -81,6 +83,8 @@ export function bootKiosk(routes = {}, prefs = {}, device = KIOSK_PC, setup = nu
     userAgent: device.userAgent,
   });
   const { window } = dom;
+  // jsdom 29 no longer applies the `userAgent` option above to navigator.
+  Object.defineProperty(window.navigator, 'userAgent', { get: () => device.userAgent, configurable: true });
 
   const fetchLog = [];
   window.fetch = (url, options = {}) => {
