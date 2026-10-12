@@ -242,6 +242,13 @@ export class History {
     return out({ pub: key.pub, kid: key.kid, wrapped, prev: prev && prev.until > this.now() ? prev : null });
   }
 
+  /** What a v2 login hands back (routes.md section 1): the stored key, or null when none yet. */
+  async keyForLogin() {
+    const key = await this.storage.get('history:pub');
+    const wrapped = await this.storage.get('history:wrapped');
+    return key && wrapped ? { pub: key.pub, kid: key.kid, wrapped } : null;
+  }
+
   /** First writer wins. @param {any} body */
   async putKey(body) {
     const kid = await kidOfPub(body.pub);

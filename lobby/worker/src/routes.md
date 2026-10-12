@@ -82,11 +82,11 @@ The passphrase never reaches the Worker once a client is on v2: clients send
 
 | Route | Auth | Request | Answer |
 | --- | --- | --- | --- |
-| `GET /v1/auth/params` | public | | `{v: 2, salt, iter, legacy}`: the PBKDF2 salt and count for `authKey`. The salt is made (and stored) on first ask, before any v2 verifier exists. `legacy` is true while the old HMAC hash is still kept. |
-| `POST /v1/login` (v2) | public, lockout as today | `{authKey}` | today's answer `{session, displayKey, state, pusher}` plus `history: {pub, kid, wrapped} \| null` |
+| `GET /v1/auth/params` | public | | `{v: 2, salt, iter, legacy, upgrade}`: the PBKDF2 salt and count for `authKey`. The salt is made (and stored) on first ask, before any v2 verifier exists. `legacy` is true while the old HMAC hash is still kept; `upgrade` is true while no v2 verifier is stored (a client then sends `{passphrase, authKey}` in its first sign-in). 503 with no passphrase configured. |
+| `POST /v1/login` (v2) | public, lockout as today | `{authKey}` | today's answer `{session, displayKey, state}` plus `history: {pub, kid, wrapped} \| null`. 401 `wrong` (counted) on a bad key; 401 `upgrade-needed` (not counted) while no verifier is stored and no passphrase came with it; 409 `no-params` before `GET /v1/auth/params` was ever asked; 400 `bad-authkey` for a malformed key |
 | `POST /v1/login` (upgrade) | public | `{passphrase, authKey}` when no v2 verifier exists | checks the passphrase against the OLD HMAC hash; on success stores `verifier = SHA-256(authKey)` under the params' salt, answers as v2 plus `upgraded: true`. The first v2 client to sign in after the deploy upgrades the store. |
-| `POST /v1/login` (legacy) | public | `{passphrase}` | as today, while the legacy hash exists; answers `legacy: true`, and the Worker keeps `auth:legacyLastAt` so the owner can see when the last old client signed in |
-| `POST /v1/passphrase` (v2) | public, lockout as today | `{currentAuthKey, next: {salt, iter, verifier}, wrapped}` (`wrapped` is the history key re-wrapped under the new word by `rewrapPrivateKey`, already proved; `null` only when no history key exists) | ONE atomic multi-key put: `auth` (new salt, iter, verifier, epoch + 1), `history:wrapped`, `history:wrapped:prev` (`{wrapped, until: now + 7 days}`), and the legacy hash deleted. Signs every screen out and rotates the display key as today. `{session, displayKey, rotatedKey}` |
+| `POST /v1/login` (legacy) | public | `{passphrase}` | as today, while the legacy hash exists; answers `legacy: true`, and the Worker keeps `auth:legacyLastAt` (shown in `GET /v1/cloud/status` as `auth: {v2, legacy, legacyOn, legacyLastAt}`) so the owner can see when the last old client signed in. With `AUTH_LEGACY = "off"` it answers 401 `legacy-off` (not counted) |
+| `POST /v1/passphrase` (v2) | session, lockout as today | `{currentAuthKey \| current, next: {salt, iter, verifier}, wrapped}` (`currentAuthKey` proves it against the stored verifier; a store that has no verifier yet accepts `current`, the passphrase, against the old hash) (`wrapped` is the history key re-wrapped under the new word by `rewrapPrivateKey`, already proved; `null` only when no history key exists) | ONE atomic multi-key put: `auth` (new salt, iter, verifier, epoch + 1), `history:wrapped`, `history:wrapped:prev` (`{wrapped, until: now + 7 days}`), and the legacy hash deleted. Signs every screen out and rotates the display key as today. `{session, displayKey, rotatedKey}` |
 
 **Migration.** Today's store is `auth = {salt, hash: HMAC(salt, passphrase),
 epoch}`. After the P1 deploy:
@@ -104,8 +104,20 @@ epoch}`. After the P1 deploy:
    longer, once, then keeps its session).
 4. The legacy hash is deleted by the first v2 passphrase change, or by the
    owner's switch (`AUTH_LEGACY = "off"` in `wrangler.toml`) once
-   `auth:legacyLastAt` is old. Until then the fast-hash weakness stays for
-   that one value; SECURITY.md says so.
+   `auth:legacyLastAt` is old (the next v2 sign-in then deletes it). Until then the
+   fast-hash weakness stays for that one value; SECURITY.md says so.
+5. An OLD-protocol passphrase change (`{current, next: string}`) still works
+   while the hash exists: it stores a new hash and clears the v2 verifier (the
+   Worker cannot derive it), so the next v2 client signs in with the upgrade
+   login again.
+
+**When the old path can be removed** (code and all): once `GET /v1/cloud/status`
+shows `auth.legacy: false` (a v2 passphrase change or an `AUTH_LEGACY = "off"`
+sign-in deleted the hash) and every installed client is on v2: the screens
+self-update within minutes, the KVBC Awana app within ten, the print server with
+its app. Then delete `checkPassphrase`' hash branch, the legacy login and the
+`{current, next: string}` change in `sync.js` in one commit. `iter` stays
+at 600000 (the floor `cloud-crypto.js` enforces on every client).
 
 ## 2. The history key (P1)
 

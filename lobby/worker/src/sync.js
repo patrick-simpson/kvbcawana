@@ -5,8 +5,14 @@
 //
 // WHAT IT HOLDS (owner, 2026-10-01: "type kennebec and have it sync
 // everything up", with the laptop off):
-//   auth       the passphrase's salted hash and its epoch (a change bumps it,
-//              which signs every screen out)
+//   auth       {epoch, changedAt, v2?: {salt, iter, verifier}, salt?, hash?}: the
+//              epoch (a change bumps it, which signs every screen out); the v2
+//              verifier SHA-256(authKey) a client derives from the passphrase
+//              (routes.md "Sign-in, passphrase v2"); and, until the owner's
+//              switch or the first v2 passphrase change deletes them, the old
+//              salted HMAC of the passphrase (`salt`, `hash`) so old clients
+//              keep working through the migration
+//   auth:legacyLastAt  when an old-protocol client last signed in
 //   secret     the session-signing secret, made on first use
 //   displayKey the church's sealing key; handed to a screen at login. The
 //              check-in laptop logs in like any screen and seals with it.
@@ -37,6 +43,7 @@ import {
   sanitizeJourney,
   sanitizeTemplate,
 } from '../../src/lib/syncSpecs.js';
+import { PBKDF2_ITER, PBKDF2_ITER_MAX, PBKDF2_ITER_MIN, authVerifier } from '../../shared/cloud-crypto.js';
 import { fromBase64, hmac, kidFor, newDisplayKey, randomBytes, safeEqual, seal, toBase64, toBase64Url } from './crypto.js';
 import { DEFAULT_CALENDAR_URL, scrapeCalendar } from './calendar.js';
 import { DOORBELL_EVENT, REPLAYED, checkPublish, frameText, replayKey } from './live.js';
@@ -251,24 +258,70 @@ export class SyncCore {
   }
 
   /**
-   * Is this the passphrase? The first ever check adopts INITIAL_PASSPHRASE
-   * (a Worker secret, set once at deploy) into storage; after that only the
-   * stored hash counts, so a later change survives redeploys.
+   * The stored auth, made from INITIAL_PASSPHRASE (a Worker secret, set once at
+   * deploy) the first time anything asks; after that only storage counts, so a
+   * later change survives redeploys. Null when there is neither.
+   * @returns {Promise<any|null>}
+   */
+  async ensureAuth() {
+    let auth = await this.storage.get('auth');
+    if (!auth) {
+      const initial = normalizeSyncPassphrase(this.env.INITIAL_PASSPHRASE);
+      if (!initial) return null;
+      const salt = toBase64(randomBytes(16));
+      auth = { salt, hash: await this.hashPassphrase(initial, salt), epoch: 1, changedAt: new Date(this.now()).toISOString() };
+      await this.storage.put('auth', auth);
+    }
+    return auth;
+  }
+
+  /** AUTH_LEGACY = "off" in wrangler.toml: old-protocol `{passphrase}` logins stop (the upgrade login and the stored hash are untouched). */
+  get legacyOn() {
+    return String(this.env.AUTH_LEGACY || 'on').trim().toLowerCase() !== 'off';
+  }
+
+  /**
+   * Is this the passphrase, by the OLD verifier (HMAC(salt, passphrase))? Used
+   * by old-protocol logins and by the one upgrade login of the first v2 client.
    * @param {unknown} raw
    * @returns {Promise<'ok'|'wrong'|'not-configured'>}
    */
   async checkPassphrase(raw) {
     const typed = normalizeSyncPassphrase(raw);
-    let auth = await this.storage.get('auth');
-    if (!auth) {
-      const initial = normalizeSyncPassphrase(this.env.INITIAL_PASSPHRASE);
-      if (!initial) return 'not-configured';
-      const salt = toBase64(randomBytes(16));
-      auth = { salt, hash: await this.hashPassphrase(initial, salt), epoch: 1, changedAt: new Date(this.now()).toISOString() };
+    const auth = await this.ensureAuth();
+    if (!auth) return 'not-configured';
+    if (!typed || !auth.hash || !auth.salt) return 'wrong';
+    return safeEqual(await this.hashPassphrase(typed, auth.salt), auth.hash) ? 'ok' : 'wrong';
+  }
+
+  /** For the owner (GET /v1/cloud/status): is the old hash still kept, and when did an old client last sign in. */
+  async authStatus() {
+    const auth = await this.storage.get('auth');
+    return { v2: !!(auth && auth.v2 && auth.v2.verifier), legacy: !!(auth && auth.hash), legacyOn: this.legacyOn, legacyLastAt: (await this.storage.get('auth:legacyLastAt')) || null };
+  }
+
+  /** An authKey field: 32 bytes of standard base64, or null. @param {unknown} v */
+  cleanAuthKey(v) {
+    if (typeof v !== 'string') return null;
+    const bytes = fromBase64(v.trim());
+    return bytes && bytes.length === 32 ? v.trim() : null;
+  }
+
+  /**
+   * GET /v1/auth/params: the PBKDF2 salt and count a client derives `authKey`
+   * from. The salt is made (and stored) on the first ask, before any verifier
+   * exists. `upgrade` is true while no v2 verifier is stored: the first client
+   * to sign in then sends {passphrase, authKey} once. `legacy` is true while the
+   * old hash is still kept.
+   */
+  async authParams() {
+    const auth = await this.ensureAuth();
+    if (!auth) return fail('The sync service has no passphrase yet. Finish its setup first.', 503);
+    if (!auth.v2) {
+      auth.v2 = { salt: toBase64(randomBytes(16)), iter: PBKDF2_ITER, verifier: null };
       await this.storage.put('auth', auth);
     }
-    if (!typed) return 'wrong';
-    return safeEqual(await this.hashPassphrase(typed, auth.salt), auth.hash) ? 'ok' : 'wrong';
+    return json({ v: 2, salt: auth.v2.salt, iter: auth.v2.iter, legacy: !!auth.hash, upgrade: !auth.v2.verifier });
   }
 
   /** @param {number} epoch */
@@ -389,6 +442,8 @@ export class SyncCore {
           return json({ ok: true });
         case 'POST /v1/login':
           return await this.login(request, ip);
+        case 'GET /v1/auth/params':
+          return await this.authParams();
         case 'GET /v1/calendar':
           return await this.getCalendar();
         // The scheduled email's read-only link: one night's report, no session.
@@ -447,7 +502,7 @@ export class SyncCore {
         // Cloud check-in, phase 1: counts and codes only, never a name or an id.
         case 'GET /v1/cloud/status':
           await this.watcher.arm();
-          return json(await this.watcher.status());
+          return json({ ...(await this.watcher.status()), auth: await this.authStatus() });
         // Who brought a friend (friends.js): recorded by the laptop, read by a
         // signed-in screen, and one read-only link for the scheduled email.
         case 'POST /v1/cloud/friend': {
@@ -556,16 +611,49 @@ export class SyncCore {
     }
   }
 
-  /** @param {Request} request @param {string} ip */
+  /**
+   * Sign in. Three shapes (routes.md section 1): `{authKey}` (v2), `{passphrase,
+   * authKey}` (the one upgrade, while no v2 verifier is stored) and the old
+   * `{passphrase}` (while the legacy hash is kept and AUTH_LEGACY is not "off").
+   * @param {Request} request @param {string} ip
+   */
   async login(request, ip) {
     const locked = await this.lockout(ip);
     if (locked) return locked;
     const body = await this.body(request);
-    const verdict = await this.checkPassphrase(body.passphrase);
-    if (verdict === 'not-configured') return fail('The sync service has no passphrase yet. Finish its setup first.', 503);
-    if (verdict === 'wrong') {
+    const auth = await this.ensureAuth();
+    if (!auth) return fail('The sync service has no passphrase yet. Finish its setup first.', 503);
+    const wrong = async () => {
       const triesLeft = await this.noteFailure(ip);
       return fail('That is not the passphrase.', 401, { reason: 'wrong', triesLeft });
+    };
+    /** @type {Record<string, any>} */
+    const extra = {};
+    const wantsV2 = body.authKey !== undefined;
+    if (wantsV2) {
+      const authKey = this.cleanAuthKey(body.authKey);
+      if (!authKey) return fail('That sign-in key is not the right shape.', 400, { reason: 'bad-authkey' });
+      if (!auth.v2) return fail('Ask GET /v1/auth/params first.', 409, { reason: 'no-params' });
+      const verifier = await authVerifier(authKey);
+      if (auth.v2.verifier) {
+        if (!safeEqual(verifier, auth.v2.verifier)) return wrong();
+        // The owner's switch is off and a v2 login proves the store is current: the old hash goes now.
+        if (!this.legacyOn && auth.hash) {
+          const { salt: _salt, hash: _hash, ...rest } = auth;
+          await this.storage.put('auth', rest);
+        }
+      } else {
+        // The upgrade: the passphrase once, against the old hash, with its authKey.
+        if (typeof body.passphrase !== 'string') return fail('Send the passphrase once with the sign-in key.', 401, { reason: 'upgrade-needed' });
+        if ((await this.checkPassphrase(body.passphrase)) !== 'ok') return wrong();
+        await this.storage.put('auth', { ...auth, v2: { ...auth.v2, verifier } });
+        extra.upgraded = true;
+      }
+    } else {
+      if (!this.legacyOn || !auth.hash) return fail('This service now needs the updated app or page. Reload it.', 401, { reason: 'legacy-off' });
+      if ((await this.checkPassphrase(body.passphrase)) !== 'ok') return wrong();
+      await this.storage.put('auth:legacyLastAt', new Date(this.now()).toISOString());
+      extra.legacy = true;
     }
     await this.storage.delete(`fails:${ip}`);
     // The check-in laptop signs in FIRST with the key it already seals with,
@@ -575,11 +663,13 @@ export class SyncCore {
       const bytes = fromBase64(body.seedKey.trim());
       if (bytes && bytes.length === 32) await this.storage.put('displayKey', body.seedKey.trim());
     }
-    const auth = await this.storage.get('auth');
+    const now = await this.storage.get('auth');
     return json({
-      session: await this.mintSession(auth.epoch),
+      session: await this.mintSession(now.epoch),
       displayKey: await this.displayKey(),
       state: await this.state(),
+      ...(wantsV2 ? { history: await this.history.keyForLogin() } : {}),
+      ...extra,
     });
   }
 
@@ -669,28 +759,58 @@ export class SyncCore {
    * limits), so a signed-in screen left unattended cannot lock the church out.
    * It signs EVERY screen out and, unless told otherwise, replaces the display
    * key, because whoever learned the old word also learned the old key.
+   *
+   * v2 (`{currentAuthKey, next: {salt, iter, verifier}, wrapped}`): the client
+   * derived everything, the Worker never sees a passphrase, and the legacy hash
+   * is deleted in the same atomic put. The old shape (`{current, next: string}`)
+   * still works while old clients exist: it makes a new legacy hash and clears
+   * the v2 verifier, so the next v2 client signs in with the upgrade login.
    * @param {Request} request @param {string} ip
    */
   async changePassphrase(request, ip) {
     const locked = await this.lockout(ip);
     if (locked) return locked;
     const body = await this.body(request);
-    const verdict = await this.checkPassphrase(body.current);
-    if (verdict !== 'ok') {
+    const v2 = !!body.next && typeof body.next === 'object';
+    const auth0 = await this.ensureAuth();
+    if (!auth0) return fail('The sync service has no passphrase yet. Finish its setup first.', 503);
+    const refuse = async () => {
       const triesLeft = await this.noteFailure(ip);
       return fail('The current passphrase is not right.', 401, { reason: 'wrong', triesLeft });
-    }
-    const next = normalizeSyncPassphrase(body.next);
-    if (next.length < PASSPHRASE_MIN || next.length > PASSPHRASE_MAX) {
-      return fail(`The new passphrase needs at least ${PASSPHRASE_MIN} characters.`, 400);
+    };
+    // Who is asking: the current authKey when a verifier exists, else the passphrase (the old check).
+    let proven = false;
+    const curKey = this.cleanAuthKey(body.currentAuthKey);
+    if (auth0.v2 && auth0.v2.verifier && curKey) proven = safeEqual(await authVerifier(curKey), auth0.v2.verifier);
+    else if (body.current !== undefined) proven = (await this.checkPassphrase(body.current)) === 'ok';
+    if (!proven) return refuse();
+
+    const prev = auth0;
+    const changedAt = new Date(this.now()).toISOString();
+    /** @type {any} */
+    let auth;
+    if (v2) {
+      const n = body.next;
+      const saltBytes = typeof n.salt === 'string' ? fromBase64(n.salt) : null;
+      const vBytes = typeof n.verifier === 'string' ? fromBase64(n.verifier) : null;
+      if (!saltBytes || saltBytes.length < 16 || saltBytes.length > 64 || !vBytes || vBytes.length !== 32
+        || !Number.isInteger(n.iter) || n.iter < PBKDF2_ITER_MIN || n.iter > PBKDF2_ITER_MAX) {
+        return fail('The new sign-in values are not the right shape.', 400, { reason: 'bad-next' });
+      }
+      auth = { epoch: prev.epoch + 1, changedAt, v2: { salt: n.salt, iter: n.iter, verifier: n.verifier } };
+    } else {
+      const next = normalizeSyncPassphrase(body.next);
+      if (next.length < PASSPHRASE_MIN || next.length > PASSPHRASE_MAX) {
+        return fail(`The new passphrase needs at least ${PASSPHRASE_MIN} characters.`, 400);
+      }
+      const salt = toBase64(randomBytes(16));
+      auth = { salt, hash: await this.hashPassphrase(next, salt), epoch: prev.epoch + 1, changedAt };
+      if (prev.v2) auth.v2 = { ...prev.v2, verifier: null };
     }
     // The history key's wrap changes in the SAME atomic put as the passphrase, or
     // the passphrase does not change (history.js rewrapWrites).
     const h = await this.history.rewrapWrites(body.wrapped);
     if (h.error) return h.error;
-    const prev = await this.storage.get('auth');
-    const salt = toBase64(randomBytes(16));
-    const auth = { salt, hash: await this.hashPassphrase(next, salt), epoch: prev.epoch + 1, changedAt: new Date(this.now()).toISOString() };
     await this.storage.put({ auth, ...h.writes });
     const rotateKey = body.rotateKey !== false;
     if (rotateKey) await this.storage.put('displayKey', newDisplayKey());
