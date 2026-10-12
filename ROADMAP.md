@@ -648,6 +648,24 @@ said); "Owner" is what only the owner can do.
     no birthday / first-timer / milestone; P5's single publisher of the tally,
     `tonight` and the pickup list; the release of the print role (version bump and
     changes.md); BARFED tags for the TwoTimTwo-page fallback.
+  - **Desk page built (2026-10-12, the desk-page task P3; ROADMAP's "P2 Desk page" row):**
+    awana.kvbchurch.org/desk, `site/desk/` (`index.html`, `desk.js` the screen,
+    `desk-transport.js` every Worker call and every seal, `desk-page.mjs` injects
+    the touch check-in's own touch-core block from `phone.html` so search, "did you
+    mean" and families are exactly the phone's and the laptop's). `site/build.mjs`
+    serves it with a copy of `lobby/shared/cloud-crypto.js` beside it. Signed in
+    with the passphrase (passphrase v2: `authKey` derived in the browser, never
+    stored; the history key is unwrapped once to prove it and its `pub` pinned in
+    `awanaDeskHistoryKey.v1`; the session is the screens' own slot). All sealing is
+    the browser's: the print job to the stations (resealed on `stations-changed`),
+    the history row to the history key. Shows printed / queued / check the printer
+    (`GET /v1/print/status`) and the tonight count (`GET /v1/desk/tonight` when P5
+    has it, else the roster's); 429 is "busy, try again in Ns". Worker additions:
+    `GET /v1/desk/families` and `items` on the roster. `lobby/e2e/desk.spec.js` and
+    `site/test/desk-*.test.mjs` pin it. Not built: a `/desk/ym` page (the youth
+    leaders have `/checkin/ym`), friend rows via `POST /v1/history/rows` (the
+    friend's name rides the sealed check-in row and the sealed job), and the
+    leader tag and custom label of the phone's + menu.
 
 ## Online only
 

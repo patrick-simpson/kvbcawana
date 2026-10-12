@@ -232,7 +232,7 @@ never unreadable to a station about to lease it. Medical notes are sealed ONLY
 to station keys, never to the history key (`sealRow` refuses a record with a
 medical key).
 
-## 5. The desk page (the Worker's claim API is BUILT; the page is P3's)
+## 5. The desk page (the Worker's claim API and the page, `site/desk/`, are BUILT)
 
 Our desk page (a browser at the desk, signed in) and the TwoTimTwo page
 fallback. The desk page derives keys at sign-in, fetches `/v1/stations` and
@@ -242,6 +242,7 @@ behaviour is `desk.js`, which the page calls through these routes.
 | Route | Auth | Request | Answer |
 | --- | --- | --- | --- |
 | `GET /v1/desk/roster` **BUILT** | session | | tonight's check-in page roster `{readAt, stale?, kids: [{clubberId, first, last, club, clubId, checkedIn}]}` (no medical data; plaintext over TLS, from the last read, held in memory, never stored). Read through the 5 s clock: a read within 5 s is the last one; a clock booked past 12 s answers the last read marked `stale`, or 429 `{reason: 'read-busy', retryAfterMs}` with none |
+| `GET /v1/desk/families` **BUILT** | session | | `{households: string[][], familiesError?}`: TwoTimTwo's households (names only, two or more active children each), one read of the export per 30 minutes through the 5 s clock, kept in memory only; a failed read is `[]` plus a fixed `familiesError` code (kept five minutes), a clock turn-away is 429 `{reason: 'read-busy', retryAfterMs}` and not kept. The roster answer also carries `items: {bible: [club], friend: [club]}` (which clubs offer them, from the page it already read) |
 | `POST /v1/desk/checkin` **BUILT** | session | `{night, clubberId \| visitor: {first, last, club}, items, historyRow: Row, job: Bundle \| null}`; `night` is the church's local date (else 400 `wrong-night`); `items` is `{Bible?, Friend?}` or `['Bible', 'Friend']`; `job.id` is the jobId, `job.kind` is `print-job`, `job.night` is `night`; `job` may be null only while no station is registered | see below |
 | `POST /v1/desk/undo` **BUILT** | session | `{night, clubberId \| visitor, historyRow}` | TwoTimTwo's undo (`checkinclubberundo`, accepted on "(checkin undone)"), then the claim goes `undone` (gen + 1) and every unprinted job of that child is dropped: `{ok, droppedJobs}`. A refusal is 409 `{reason}`, a timeout 504 `{reason: 'unsure'}`: nothing is changed here, and the watcher settles what TwoTimTwo has |
 | `POST /v1/desk/checkout` **BUILT** | session | `{night, clubberId \| visitor, historyRow}` | TwoTimTwo check-out (accepted only on "OK"): `{ok}`. The claim is left as it is |
