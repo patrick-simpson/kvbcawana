@@ -1,4 +1,13 @@
-﻿## [9.0.2] - 2026-10-11
+﻿## [9.1.0] - 2026-10-11
+Online only: the laptop's dashboard and its Wi-Fi phone page are retired; their tools live on awana.kvbchurch.org/settings.
+
+**Everything is on the settings page now.** Open awana.kvbchurch.org/settings on the check-in laptop (signed in with the church passphrase) for the printers, labels and templates, reprints (one or a whole stretch), leader tags, one-off name tags, custom labels, the attendance audit, rehearsal mode, print failures and diagnostics. The tray and the status window open it. With no internet the settings page can't load: check in on paper and enter the names once the internet is back.
+
+**Phones check in only at awana.kvbchurch.org/checkin.** The laptop no longer serves a phone page on the church Wi-Fi, so the phone PIN, the Wi-Fi switch and the allowed-origins list are gone. The print server now listens only on the laptop itself.
+
+**Also:** the sync sign-in now installs the screens' display key by itself (no key or token to copy), and the old Pusher and display-login settings are gone for good. Club names, club nights, the text cleaner and the sync sign-in now share one copy of their rules with the screens.
+
+## [9.0.2] - 2026-10-11
 A cleanup release: what nothing uses any more is gone.
 
 **Pusher is gone for good.** Every screen has listened to the sync service's live channel since October 3, so the print server's Pusher publisher, its settings on the dashboard and the app's Pusher release ping are removed. Check-ins, counts and names reach the screens exactly as before (sealed end to end), and updates are still checked every ten minutes.
