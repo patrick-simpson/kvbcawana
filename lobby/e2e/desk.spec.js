@@ -189,7 +189,8 @@ test('a visitor is checked in by name and a one-off tag prints without a check-i
   await page.locator('#oneoff-go').click();
   await expect(page.locator('#toast')).toContainText('Name tag sent');
   expect(tags[0].jobId).toMatch(/^reprint:/);
-  expect(await cc.openAsStation(stationRing, tags[0].bundle)).toMatchObject({ oneOff: true, name: 'Ava', club: 'Puggles' });
+  // the print server's own one-off route and its body: what the station's puller runs
+  expect(await cc.openAsStation(stationRing, tags[0].bundle)).toMatchObject({ route: '/print-oneoff', body: { firstName: 'Ava', clubName: 'Puggles' } });
   await page.locator('#count-pill').click();
   await expect(page.locator('#tonight-view .row')).toContainText('Mia Jones');
 });
