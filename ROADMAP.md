@@ -149,17 +149,14 @@ Full contract: `lobby/worker/src/routes.md` section 8.
   - **Projector** (`useProjectorScreen` in `presentation/App.jsx`): the same hook,
     Low power and the chimes as its layer, a wall pick or Resume obeyed;
     `useScreenSync.js` joined the isolation allowlist on purpose.
-  - **TODO, Journey** (not built): Journey has no live socket, so it would
-    follow by its hello alone. In `journey/public/src/sync.js`: keep the id in
-    the same `awanaScreens.v1` slot under `journey` (one origin, the lobby's
-    format), POST `/v1/screens/hello {id, kind: 'journey'}` every 2 minutes
-    while signed in and not in configure mode; add a case to
-    `test/sync.test.mjs`. 2026-10-12: Journey's one per-screen setting
-    (`playbackQuality`, the Pi mode switch) went with the Pi, so a kiosk row
-    would have nothing to edit; `SCREEN_SPECS.journey` in
-    `lobby/src/lib/syncSpecs.js` (and its `screenSpecs.test.js` case, which
-    reads `PLAYBACK_QUALITY_CHOICES` from Journey's schedule.js) still names
-    it until a lobby change drops it.
+  - **Journey** (2026-10-12, BUILT for status): `journey/public/src/sync.js`
+    says hello as kind `journey` every 2 minutes while signed in and not in
+    configure mode (id in the same `awanaScreens.v1` slot under `journey`),
+    carrying its saved lessons (`status`, `lobby/worker/src/routes.md` 10.7),
+    shown in its row on /settings. It follows no settings by hello:
+    `SCREEN_SPECS.journey` is `{}` since the Pi mode switch went with the Pi;
+    a future kiosk setting would be applied from the hello's answer (Journey
+    has no live socket).
   - **For the owner**: a forgotten screen that is still running comes back at
     its next hello (by design); and a change made on /settings while the TV
     has an unsent change of its own wins over it.

@@ -951,3 +951,43 @@ computed on its own and is `null` if it throws, the rest still answer.
 No TwoTimTwo read, no seal: storage reads and in-memory state only. The page
 polls it every 10 s while Tonight is open and the tab visible, every 60 s
 otherwise, and stops after 3 failures in a row (a "Try again" button restarts it).
+
+### 10.7 A screen's status in its hello (BUILT: a Journey kiosk's saved lessons)
+
+The screen registry (`screens.js`, `README.md` "Screens") takes one more
+optional field on `POST /v1/screens/hello`: `status`, for kind `journey`
+ONLY (any other kind's is ignored). The kiosk (`journey/public/src/sync.js`)
+sends it from `journeyDownloadStatus()`: how saving every lesson's
+full-quality video onto the kiosk is going. Numbers, switches and one short
+reason; never a name, a URL or a file path.
+
+```
+status: { lessons: { saved, total,            // videos, ints 0..999, saved <= total
+                     bytesSaved, bytesTotal,  // ints 0..1e13, bytesSaved <= bytesTotal
+                     downloading, waiting, paused, auto,   // true or false
+                     percent,                 // int 0..100
+                     currentWeek,             // int 1..99 while downloading, else null
+                     lastSavedAt,             // ISO time (normalized) or null
+                     error } }                // one line, control characters out, <= 120 characters, or null
+```
+
+- One allowlist, `sanitizeScreenStatus` in `src/lib/syncSpecs.js` (the file
+  the Worker bundles and /settings reads): anything else is dropped; a
+  status without numeric `saved` and `total` is junk and ignored.
+- A hello without `status` (or with junk) keeps the last one: a kiosk does
+  not know what is saved until it has read its disk a few minutes after
+  load, and its row must not blank on every reload.
+- Kept on the screen's record in the `screens` index (bounded: one small
+  object per kiosk, at most `SCREENS_MAX` screens) and returned as
+  `screen.status` in the hello's answer and in `GET /v1/screens`. Forgotten
+  with the screen.
+- Storage writes (free Durable Object allowance): the status rides the
+  existing once-a-minute `lastSeen` write (`SEEN_WRITE_MS`); sooner only when
+  it moved enough to matter (`screenStatusMoved`: `saved`, `total`, `error`,
+  `paused`, `downloading`, `waiting` or `auto` changed, or `percent` moved
+  10 or more). The newest status is also held in memory (`Screens.fresh`),
+  so the list shows it before storage does; a restart falls back to the
+  stored one.
+- The kiosk says hello every 2 minutes while signed in, and on a status
+  change, never twice within a minute; never in configure mode. No CPU-heavy
+  work: clamps and one string clean-up.

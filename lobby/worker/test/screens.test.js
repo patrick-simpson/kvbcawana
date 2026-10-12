@@ -230,6 +230,79 @@ describe('a screen\'s own settings', () => {
     expect(list.some((x) => 'pendingRoleChange' in x)).toBe(false);
   });
 
+  it('a Journey kiosk reports how its saved lessons are going, in one fixed shape', async () => {
+    const s = setup();
+    await s.signIn();
+    const res = await s.call('POST', '/v1/screens/hello', {
+      id: KIOSK, kind: 'journey', name: 'Journey kiosk',
+      status: {
+        lessons: {
+          saved: 24, total: 63, bytesSaved: 12e9, bytesTotal: 9e9, downloading: 'yes', waiting: true, paused: false,
+          percent: 142, currentWeek: 7.6, lastSavedAt: '2026-10-11T16:00:00Z', error: `Week 7\u0000 Leader Video:\n${'x'.repeat(300)}`,
+          auto: true, url: 'https://cdn.example/x.mp4', names: ['Ada'],
+        },
+        extra: 'dropped',
+      },
+    });
+    const lessons = res.body.screen.status.lessons;
+    expect(Object.keys(res.body.screen.status)).toEqual(['lessons']);
+    expect(lessons).toMatchObject({
+      saved: 24, total: 63, bytesSaved: 9e9, bytesTotal: 9e9, downloading: false, waiting: true, paused: false,
+      percent: 100, currentWeek: 7, lastSavedAt: '2026-10-11T16:00:00.000Z', auto: true,
+    });
+    expect(Object.keys(lessons).sort()).toEqual(['auto', 'bytesSaved', 'bytesTotal', 'currentWeek', 'downloading', 'error', 'lastSavedAt',
+      'paused', 'percent', 'saved', 'total', 'waiting']);
+    expect(lessons.error.startsWith('Week 7 Leader Video: xxx')).toBe(true);
+    expect(lessons.error.length).toBeLessThanOrEqual(120);
+    expect(JSON.stringify(res.body)).not.toContain('cdn.example');
+    expect((await s.call('GET', '/v1/screens')).body.screens[0].status).toEqual(res.body.screen.status);
+  });
+
+  it('a status only from a Journey kiosk; junk is no status, and a hello without one keeps the last', async () => {
+    const s = setup();
+    await s.signIn();
+    const status = { lessons: { saved: 3, total: 63, bytesSaved: 1, bytesTotal: 2, percent: 4 } };
+    await s.call('POST', '/v1/screens/hello', { id: TV, kind: 'lobby', status });
+    await s.call('POST', '/v1/screens/hello', { id: KIOSK, kind: 'journey', status: { lessons: { saved: 'lots' } } });
+    let list = (await s.call('GET', '/v1/screens')).body.screens;
+    expect(list.some((x) => 'status' in x)).toBe(false);
+    expect((await s.storage.get('screens'))[TV]).not.toHaveProperty('status');
+    await s.call('POST', '/v1/screens/hello', { id: KIOSK, kind: 'journey', status });
+    s.tick(5 * 60_000);
+    await s.call('POST', '/v1/screens/hello', { id: KIOSK, kind: 'journey' });
+    list = (await s.call('GET', '/v1/screens')).body.screens;
+    expect(list.find((x) => x.id === KIOSK).status.lessons).toMatchObject({ saved: 3, total: 63, error: null, currentWeek: null, lastSavedAt: null });
+  });
+
+  it('a status reaches storage with the once-a-minute write, or at once when it moved enough to matter', async () => {
+    const s = setup();
+    await s.signIn();
+    const at = (patch) => ({ lessons: { saved: 10, total: 63, bytesSaved: 4e9, bytesTotal: 9e9, downloading: true, paused: false, percent: 40, currentWeek: 7, auto: true, ...patch } });
+    const stored = async () => (await s.storage.get('screens'))[KIOSK].status?.lessons;
+    await s.call('POST', '/v1/screens/hello', { id: KIOSK, kind: 'journey', status: at({}) });
+    expect((await stored()).percent).toBe(40);
+    // A few points of progress inside the minute: the list is fresh, storage waits.
+    s.tick(20_000);
+    await s.call('POST', '/v1/screens/hello', { id: KIOSK, kind: 'journey', status: at({ percent: 45, bytesSaved: 4.2e9 }) });
+    expect((await stored()).percent).toBe(40);
+    expect((await s.call('GET', '/v1/screens')).body.screens[0].status.lessons.percent).toBe(45);
+    // Ten points, a lesson saved, an error, a pause: written at once.
+    s.tick(5_000);
+    await s.call('POST', '/v1/screens/hello', { id: KIOSK, kind: 'journey', status: at({ percent: 50 }) });
+    expect((await stored()).percent).toBe(50);
+    for (const patch of [{ percent: 50, saved: 11 }, { percent: 50, saved: 11, error: 'Week 8 Student Video: the internet went away' }, { percent: 50, saved: 11, paused: true, downloading: false }]) {
+      s.tick(1_000);
+      await s.call('POST', '/v1/screens/hello', { id: KIOSK, kind: 'journey', status: at(patch) });
+      expect(await stored()).toMatchObject(patch);
+    }
+    // After a restart (memory gone) the list still shows the last stored.
+    s.core.screens.fresh.clear();
+    expect((await s.call('GET', '/v1/screens')).body.screens[0].status.lessons).toMatchObject({ saved: 11, paused: true });
+    // Forgotten: nothing of it is kept.
+    await s.call('DELETE', `/v1/screens/${KIOSK}`);
+    expect(s.core.screens.fresh.size).toBe(0);
+  });
+
   it('a save rings that screen\'s doorbell on the live channel, stamped strictly after the last', async () => {
     const s = setup();
     await s.signIn();

@@ -35,6 +35,68 @@ export function seenWords(at, now = Date.now()) {
   return d.toLocaleString([], sameDay ? { hour: 'numeric', minute: '2-digit' } : { weekday: 'short', hour: 'numeric', minute: '2-digit' });
 }
 
+/** "just now", "12 min ago", "2 h ago", "3 days ago". @param {string | null} at @param {number} now */
+export function agoWords(at, now = Date.now()) {
+  const t = at ? Date.parse(at) : NaN;
+  if (!Number.isFinite(t)) return '';
+  const min = Math.max(0, Math.round((now - t) / 60000));
+  if (min < 1) return 'just now';
+  if (min < 60) return `${min} min ago`;
+  const h = Math.round(min / 60);
+  if (h < 48) return `${h} h ago`;
+  return `${Math.round(h / 24)} days ago`;
+}
+
+const GIB = 1024 ** 3;
+/** "11.2 GB" / "640 MB", as the kiosk's own Settings counts them. @param {number} n */
+export function lessonBytes(n) {
+  const v = Math.max(0, Number(n) || 0);
+  return v >= GIB ? `${(v / GIB).toFixed(1)} GB` : `${Math.round(v / 1024 ** 2)} MB`;
+}
+
+/**
+ * A Journey kiosk's saved lessons in plain words (its hello's `status.lessons`,
+ * sanitized by the Worker). null when there is nothing to say.
+ * @param {any} l
+ * @param {number} [now]
+ * @returns {{ done: boolean, count: string, state: string, error: string, saved: string } | null}
+ */
+export function lessonStatusWords(l, now = Date.now()) {
+  if (!l || typeof l !== 'object' || !(l.total > 0)) return null;
+  const done = l.saved >= l.total;
+  const count = done ? `${l.total} of ${l.total} · ${lessonBytes(l.bytesTotal)}` : `Lessons saved: ${l.saved} of ${l.total} · ${lessonBytes(l.bytesSaved)}`;
+  let state = '';
+  if (!done) {
+    if (l.downloading) state = `${l.percent}% · downloading${l.currentWeek ? ` Lesson ${l.currentWeek}` : ''}`;
+    else if (l.paused) state = 'Paused';
+    else if (l.waiting) state = 'Waiting: carries on by itself after the lesson';
+    else if (!l.auto) state = 'Automatic download is off';
+  }
+  const ago = agoWords(l.lastSavedAt, now);
+  return {
+    done,
+    count,
+    state,
+    error: typeof l.error === 'string' && l.error ? `Problem: ${l.error}` : '',
+    saved: ago ? `last saved ${ago}` : '',
+  };
+}
+
+/** The kiosk's saved lessons under its name; greyed while the kiosk is off (the last it said). @param {{lessons: any, stale: boolean}} props */
+function LessonStatus({ lessons, stale }) {
+  const w = lessonStatusWords(lessons);
+  if (!w) return null;
+  return (
+    <span className={`screen-row__status${stale ? ' screen-row__status--stale' : ''}`} data-lessons={w.done ? 'done' : 'saving'}>
+      {w.done && <><strong className="screen-row__done">All saved ✓</strong> · </>}
+      {w.count}
+      {w.state && <> · {w.state}</>}
+      {w.saved && <> · {w.saved}</>}
+      {w.error && <span className="screen-row__problem">{w.error}</span>}
+    </span>
+  );
+}
+
 /** A line drawing of the device, in the row's ink. @param {{kind: string}} props */
 function ScreenGlyph({ kind }) {
   const common = { width: 28, height: 28, viewBox: '0 0 28 28', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': true };
@@ -125,6 +187,7 @@ export function ScreensSection({ onOpen, goTo }) {
                     <span className="screen-row__name">{s.name}</span>
                     <span className="screen-row__meta"><ScreenState online={s.online} /> · {s.online ? 'seen' : 'last seen'} {seenWords(s.lastSeen)}
                       {s.pendingRoleChange?.printRole === false && <> · <span className="hint--warn">prints no labels once the last one is out</span></>}</span>
+                    {s.kind === 'journey' && <LessonStatus lessons={s.status?.lessons} stale={!s.online} />}
                   </span>
                   {s.kind === 'lobby' ? (
                     <button type="button" className="secondary small" onClick={() => onOpen(s)} aria-label={`Open settings for ${s.name}`}>

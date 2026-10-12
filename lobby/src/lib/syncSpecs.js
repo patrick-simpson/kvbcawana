@@ -14,7 +14,8 @@
 // stay on each device (they depend on that device and that leader).
 //
 // SCREEN_SPECS (below) is each registered screen's OWN settings, per kind,
-// which /settings edits through the Worker.
+// which /settings edits through the Worker; sanitizeScreenStatus what a
+// screen reports about itself (a Journey kiosk's saved lessons).
 
 import { cleanSpec } from './settingRules.js';
 
@@ -193,6 +194,94 @@ export function sanitizeScreenAction(kind, action, data) {
     return { action, data: { type: 'window', index: t.index } };
   }
   return null;
+}
+
+// ── A screen's status (what it reports in its hello; never a setting) ───────
+// Only a Journey kiosk reports one: how saving every lesson's full-quality
+// video onto the kiosk is going (journey/src/schedule/26-lesson-downloads.js
+// journeyDownloadStatus(), trimmed by journey/public/src/sync.js). Numbers,
+// switches and one short plain-words reason: never a name, never a URL. The
+// Worker keeps exactly this shape on the screen's record; /settings reads it.
+
+/** The longest error line kept (characters). */
+export const SCREEN_STATUS_ERROR_MAX = 120;
+const STATUS_COUNT_MAX = 999;
+const STATUS_BYTES_MAX = 1e13; // 10 TB: far past any kiosk's disk
+const STATUS_WEEK_MAX = 99;
+
+/**
+ * @typedef {{ saved: number, total: number, bytesSaved: number, bytesTotal: number,
+ *   downloading: boolean, waiting: boolean, paused: boolean, percent: number,
+ *   currentWeek: number | null, lastSavedAt: string | null, error: string | null, auto: boolean }} LessonsStatus
+ */
+
+/** @param {unknown} v @param {number} max */
+const clampInt = (v, max) => (typeof v === 'number' && Number.isFinite(v) ? Math.min(max, Math.max(0, Math.floor(v))) : 0);
+
+/** One line of plain words, at most SCREEN_STATUS_ERROR_MAX characters; null when nothing is left. @param {unknown} raw */
+function cleanStatusText(raw) {
+  if (typeof raw !== 'string') return null;
+  // eslint-disable-next-line no-control-regex
+  const flat = raw.slice(0, 1000).replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/g, ' ').replace(/\s+/g, ' ').trim();
+  const out = [...flat].slice(0, SCREEN_STATUS_ERROR_MAX).join('').trim();
+  return out || null;
+}
+
+/** An ISO time, normalized, or null. @param {unknown} raw */
+function cleanStatusTime(raw) {
+  if (typeof raw !== 'string' || raw.length > 40) return null;
+  const t = Date.parse(raw);
+  return Number.isFinite(t) && t > 0 ? new Date(t).toISOString() : null;
+}
+
+/**
+ * A screen's reported status, in the one fixed shape, or null (junk, or a
+ * kind that reports none). Every number clamped, every switch a real boolean.
+ * @param {unknown} kind
+ * @param {unknown} raw
+ * @returns {{ lessons: LessonsStatus } | null}
+ */
+export function sanitizeScreenStatus(kind, raw) {
+  if (kind !== 'journey' || !raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const l = /** @type {any} */ (raw).lessons;
+  if (!l || typeof l !== 'object' || Array.isArray(l)) return null;
+  if (typeof l.total !== 'number' || typeof l.saved !== 'number') return null;
+  const total = clampInt(l.total, STATUS_COUNT_MAX);
+  const bytesTotal = clampInt(l.bytesTotal, STATUS_BYTES_MAX);
+  const week = clampInt(l.currentWeek, STATUS_WEEK_MAX);
+  return {
+    lessons: {
+      saved: Math.min(total, clampInt(l.saved, STATUS_COUNT_MAX)),
+      total,
+      bytesSaved: Math.min(bytesTotal, clampInt(l.bytesSaved, STATUS_BYTES_MAX)),
+      bytesTotal,
+      downloading: l.downloading === true,
+      waiting: l.waiting === true,
+      paused: l.paused === true,
+      percent: clampInt(l.percent, 100),
+      currentWeek: week >= 1 ? week : null,
+      lastSavedAt: cleanStatusTime(l.lastSavedAt),
+      error: cleanStatusText(l.error),
+      auto: l.auto === true,
+    },
+  };
+}
+
+/**
+ * Has a status moved enough to be worth a storage write before the next
+ * once-a-minute one? (The free Durable Object allowance counts writes.) A
+ * lesson saved, the set changing, an error, pause, start, stop or wait, the
+ * automatic switch, or 10 points of progress. Both sanitized (or null).
+ * @param {{ lessons: LessonsStatus } | null | undefined} a
+ * @param {{ lessons: LessonsStatus } | null | undefined} b
+ */
+export function screenStatusMoved(a, b) {
+  if (!a || !b) return Boolean(a) !== Boolean(b);
+  const x = a.lessons;
+  const y = b.lessons;
+  return x.saved !== y.saved || x.total !== y.total || x.error !== y.error || x.paused !== y.paused
+    || x.downloading !== y.downloading || x.waiting !== y.waiting || x.auto !== y.auto
+    || Math.abs(x.percent - y.percent) >= 10;
 }
 
 /** @param {unknown} value */

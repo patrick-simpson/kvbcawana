@@ -7,7 +7,8 @@
 //
 // WHAT IT HOLDS
 //   screens        one index, {[id]: {id, kind, name, createdAt, lastSeen,
-//                  pending?}}, `pending` only for a computer (below),
+//                  pending?, status?}}, `pending` only for a computer and
+//                  `status` only for a Journey kiosk (below),
 //                  at most SCREENS_MAX entries (one key, so no storage listing)
 //   screen:<id>    that screen's settings, {savedAt, settings}, through the
 //                  kind's allowlist (SCREEN_SPECS in src/lib/syncSpecs.js, the
@@ -24,6 +25,13 @@
 // print server off while a label is printing or waiting: it holds that change
 // and says so in each hello as `pendingRoleChange` (the settings it is
 // waiting to apply), which the list shows until a hello without one.
+//
+// A Journey kiosk's hello may carry `status` (src/routes.md 10.7): how saving
+// the full-quality lessons is going, through sanitizeScreenStatus's one fixed
+// shape (numbers, switches, one short reason). The newest is kept in memory
+// for the list; storage takes it with the once-a-minute lastSeen write, or at
+// once when it moved enough to matter (screenStatusMoved). A hello without
+// one keeps the last.
 
 import {
   SCREEN_DEFAULT_NAMES,
@@ -32,6 +40,8 @@ import {
   isScreenKind,
   sanitizeScreenAction,
   sanitizeScreenSettings,
+  sanitizeScreenStatus,
+  screenStatusMoved,
 } from '../../src/lib/syncSpecs.js';
 
 /** How many screens the registry keeps. A church has a handful. */
@@ -51,7 +61,7 @@ export const screenSettingsKey = (id) => `screen:${id}`;
 
 /**
  * @typedef {{id: string, kind: import('../../src/lib/syncSpecs.js').ScreenKind, name: string, createdAt: string, lastSeen: number,
- *   pending?: Record<string, unknown>}} ScreenRecord
+ *   pending?: Record<string, unknown>, status?: {lessons: import('../../src/lib/syncSpecs.js').LessonsStatus}}} ScreenRecord
  * @typedef {{savedAt: string, settings: Record<string, unknown>}} ScreenSettings
  * @typedef {{ok: true, body: unknown} | {ok: false, status: number, error: string}} Result
  */
@@ -72,6 +82,8 @@ export class Screens {
     this.now = now;
     this.liveScreens = liveScreens || (() => new Set());
     this.ring = ring || (() => {});
+    /** The newest status each screen reported, ahead of storage (at most one per known screen). @type {Map<string, NonNullable<ScreenRecord['status']>>} */
+    this.fresh = new Map();
   }
 
   /** @returns {Promise<Record<string, ScreenRecord>>} */
@@ -98,6 +110,7 @@ export class Screens {
   /** The record as /settings sees it. @param {ScreenRecord} r @param {Set<string>} live */
   view(r, live) {
     const onLive = live.has(r.id);
+    const status = r.kind === 'journey' ? this.fresh.get(r.id) || r.status : undefined;
     return {
       id: r.id,
       kind: r.kind,
@@ -107,6 +120,7 @@ export class Screens {
       live: onLive,
       online: onLive || this.now() - r.lastSeen <= ONLINE_MS,
       ...(r.pending ? { pendingRoleChange: r.pending } : {}),
+      ...(status ? { status } : {}),
     };
   }
 
@@ -127,7 +141,7 @@ export class Screens {
   }
 
   /**
-   * POST /v1/screens/hello {id, kind, name?, pendingRoleChange?}: a screen says it is here. A new
+   * POST /v1/screens/hello {id, kind, name?, pendingRoleChange?, status?}: a screen says it is here. A new
    * screen is added (named `name`, else its kind's default); a known one only
    * moves its lastSeen (its name is changed by rename, never by a hello, so a
    * TV restarting cannot undo a name given on /settings). The answer carries
@@ -146,20 +160,26 @@ export class Screens {
     // A computer's held change, through its allowlist; nothing for any other kind.
     const held = kind === 'computer' ? sanitizeScreenSettings(kind, body.pendingRoleChange) : {};
     const pending = Object.keys(held).length ? held : undefined;
+    // A Journey kiosk's report; none (or junk) keeps the last one.
+    const status = sanitizeScreenStatus(kind, body.status);
     if (!r) {
       if (Object.keys(index).length >= SCREENS_MAX && !(await this.makeRoom(index))) {
         return refuse(409, 'The service already knows as many screens as it keeps. Forget an old one on the settings page.');
       }
       r = { id, kind, name: cleanScreenName(body.name) || SCREEN_DEFAULT_NAMES[kind], createdAt: new Date(t).toISOString(), lastSeen: t };
       if (pending) r.pending = pending;
+      if (status) r.status = status;
       index[id] = r;
       await this.saveIndex(index);
-    } else if (t - r.lastSeen >= SEEN_WRITE_MS || JSON.stringify(r.pending) !== JSON.stringify(pending)) {
+    } else if (t - r.lastSeen >= SEEN_WRITE_MS || JSON.stringify(r.pending) !== JSON.stringify(pending)
+      || (status && screenStatusMoved(r.status, status))) {
       r.lastSeen = t;
       if (pending) r.pending = pending;
       else delete r.pending;
+      if (status) r.status = status;
       await this.saveIndex(index);
     }
+    if (status) this.fresh.set(id, status);
     return { ok: true, body: { screen: this.view({ ...r, lastSeen: t }, this.liveScreens()), settings: await this.settingsOf(id) } };
   }
 
@@ -172,6 +192,7 @@ export class Screens {
     const oldest = Object.values(index).sort((a, b) => a.lastSeen - b.lastSeen)[0];
     if (!oldest || this.now() - oldest.lastSeen < STALE_MS) return false;
     delete index[oldest.id];
+    this.fresh.delete(oldest.id);
     await this.storage.delete(screenSettingsKey(oldest.id));
     return true;
   }
@@ -231,6 +252,7 @@ export class Screens {
     if (!isScreenId(id)) return refuse(404, 'There is no such screen.');
     const index = await this.index();
     const had = Boolean(Screens.pick(index, id));
+    this.fresh.delete(id);
     if (had) {
       delete index[id];
       await this.saveIndex(index);

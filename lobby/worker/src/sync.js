@@ -653,7 +653,7 @@ export class SyncCore {
   /**
    * The screen registry's routes (screens.js), all behind a session:
    *   GET    /v1/screens                  every screen
-   *   POST   /v1/screens/hello            {id, kind, name?}
+   *   POST   /v1/screens/hello            {id, kind, name?, pendingRoleChange?, status?}
    *   GET    /v1/screens/<id>/settings    {screen, settings}
    *   PUT    /v1/screens/<id>/settings    {settings}
    *   PUT    /v1/screens/<id>/name        {name}

@@ -1413,6 +1413,13 @@ html, body, #root {
   overflow-wrap: anywhere;
 }
 .panel .screen-row__meta { color: var(--panel-muted); font-size: 0.9rem; }
+/* A Journey kiosk's saved lessons; greyed while the kiosk is off (the last it said). */
+.panel .screen-row__status { color: var(--panel-ink); font-size: 0.9rem; overflow-wrap: anywhere; }
+.panel .screen-row__done { color: var(--brand-tnt-deep); }
+.panel .screen-row__problem { display: block; color: var(--brand-sparks-deep); font-weight: 700; }
+.panel .screen-row__status--stale,
+.panel .screen-row__status--stale .screen-row__done,
+.panel .screen-row__status--stale .screen-row__problem { color: var(--panel-muted); }
 .panel .screen-row__body { padding: 0 0 0.9rem 3.65rem; }
 .panel .screen-row.is-open .screen-row__glyph { background: var(--brand-blue); color: #ffffff; }
 .panel .screen-state { display: inline-flex; align-items: center; gap: 0.35rem; font-weight: 700; color: var(--panel-ink); }

@@ -2,7 +2,8 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
-  SCREEN_ACTIONS, SCREEN_SPECS, TEMPLATE_KEYS, cleanScreenName, isScreenId, sanitizeScreenAction, sanitizeScreenSettings,
+  SCREEN_ACTIONS, SCREEN_SPECS, SCREEN_STATUS_ERROR_MAX, TEMPLATE_KEYS, cleanScreenName, isScreenId, sanitizeScreenAction,
+  sanitizeScreenSettings, sanitizeScreenStatus, screenStatusMoved,
 } from './syncSpecs.js';
 import { sanitizeOverrides } from '../hooks/useConfig.js';
 import { SHARED_KEYS } from './sharedSettings.js';
@@ -74,6 +75,51 @@ describe('the other kinds', () => {
   it('an unknown kind keeps nothing', () => {
     expect(sanitizeScreenSettings('toaster', { audioMuted: true })).toEqual({});
     expect(sanitizeScreenSettings('lobby', null)).toEqual({});
+  });
+});
+
+describe("a Journey kiosk's status (its saved lessons)", () => {
+  const good = {
+    saved: 24, total: 63, bytesSaved: 12e9, bytesTotal: 13e9, downloading: true, waiting: false, paused: false,
+    percent: 42, currentWeek: 7, lastSavedAt: '2026-10-12T14:00:00.000Z', error: null, auto: true,
+  };
+
+  it('keeps exactly the fixed shape, nothing else', () => {
+    expect(sanitizeScreenStatus('journey', { lessons: { ...good, url: 'https://x', names: ['Ada'] }, other: 1 })).toEqual({ lessons: good });
+  });
+
+  it('only from a Journey kiosk, and junk is no status', () => {
+    expect(sanitizeScreenStatus('lobby', { lessons: good })).toBeNull();
+    expect(sanitizeScreenStatus('journey', null)).toBeNull();
+    expect(sanitizeScreenStatus('journey', { lessons: [] })).toBeNull();
+    expect(sanitizeScreenStatus('journey', { lessons: { ...good, total: '63' } })).toBeNull();
+  });
+
+  it('clamps every number and makes every switch a real boolean', () => {
+    const out = sanitizeScreenStatus('journey', {
+      lessons: { saved: 99, total: 63.9, bytesSaved: -5, bytesTotal: Infinity, downloading: 1, waiting: 'yes', paused: true,
+        percent: 250, currentWeek: 0, lastSavedAt: 'yesterday', auto: 'on' },
+    })?.lessons;
+    expect(out).toEqual({ saved: 63, total: 63, bytesSaved: 0, bytesTotal: 0, downloading: false, waiting: false, paused: true,
+      percent: 100, currentWeek: null, lastSavedAt: null, error: null, auto: false });
+  });
+
+  it('the error is one short line of plain words', () => {
+    const error = sanitizeScreenStatus('journey', { lessons: { ...good, error: `Week 7\u0000\u2028Leader Video:\n\t${'ü'.repeat(300)}` } })?.lessons.error;
+    expect(error?.startsWith('Week 7 Leader Video: üüü')).toBe(true);
+    expect([...(error || '')]).toHaveLength(SCREEN_STATUS_ERROR_MAX);
+    expect(sanitizeScreenStatus('journey', { lessons: { ...good, error: '  \n ' } })?.lessons.error).toBeNull();
+  });
+
+  it('moved enough to write at once: a lesson saved, an error, a pause, a start, or ten points', () => {
+    const a = { lessons: good };
+    expect(screenStatusMoved(a, { lessons: { ...good, percent: 51, bytesSaved: 13e9 } })).toBe(false);
+    expect(screenStatusMoved(a, { lessons: { ...good, percent: 52 } })).toBe(true);
+    expect(screenStatusMoved(a, { lessons: { ...good, saved: 25 } })).toBe(true);
+    expect(screenStatusMoved(a, { lessons: { ...good, error: 'x' } })).toBe(true);
+    expect(screenStatusMoved(a, { lessons: { ...good, paused: true } })).toBe(true);
+    expect(screenStatusMoved(undefined, a)).toBe(true);
+    expect(screenStatusMoved(undefined, null)).toBe(false);
   });
 });
 
