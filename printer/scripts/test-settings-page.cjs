@@ -45,6 +45,8 @@ const syncChecks = [];
 const loginUrls = [];
 const NEW_SESSION = 'v1.9.1700000000000.printserverrelogin0000000000';
 const SERVICE_KEY = Buffer.alloc(32, 7).toString('base64');
+// The Worker's church settings doc (routes.md 10.3); null: a Worker without the route.
+let churchDoc = null;
 
 let passed = 0;
 let failed = 0;
@@ -145,6 +147,7 @@ async function main() {
       if (said !== 'kennebec') return new Response(JSON.stringify({ error: 'no', triesLeft: 4 }), { status: 401 });
       return new Response(JSON.stringify({ session: NEW_SESSION, displayKey: SERVICE_KEY }), { status: 200 });
     }
+    if (String(url) === `${SYNC}/v1/church/settings` && churchDoc) return new Response(JSON.stringify(churchDoc), { status: 200 });
     return new Response(JSON.stringify({ error: 'not here' }), { status: 404 });
   };
 
@@ -437,6 +440,37 @@ async function main() {
     check('a malformed one is refused without asking the service', junk.status === 403);
     const health = await j('/health', { headers: { Origin: PAGE } });
     check('/health still needs nothing', health.status === 200);
+  }
+
+  console.log('settings page: the church-wide settings are the Worker\'s (409 church-managed)');
+  {
+    const sync = { Origin: PAGE, Authorization: `Sync ${GOOD_SESSION}` };
+    const SWITCHES = { CLOUD_PRINT: 'off', SINGLE_PUBLISHER: 'off', YM_CHECKOUT: 'off', CHURCH_SETTINGS: 'on', NOTICES: 'on', CHANGE_LOG: 'on' };
+    churchDoc = { rev: 3, savedAt: '2026-10-12T12:00:00.000Z', seeded: true, paused: false, settings: { labelFooter: 'From the Worker', lateGraceMin: 12 }, switches: SWITCHES, switchesRev: 1 };
+    check('this computer applies the Worker\'s church settings', (await server.churchSync.syncNow()) === 'applied' && savedConfig().labelFooter === 'From the Worker');
+    const footer = await post('/config', { labelFooter: 'Typed on the page' }, sync);
+    check('the page writing a church key directly is refused with 409 church-managed, and nothing is saved', footer.status === 409 && footer.body.reason === 'church-managed'
+      && /church-wide setting now: change it under Printing/.test(footer.body.error) && savedConfig().labelFooter === 'From the Worker', JSON.stringify(footer.body));
+    const mixed = await post('/config', { printerName: 'Mixed', pickupClubs: ['Sparks'] }, sync);
+    check('a body with a printer key AND a church key is refused whole', mixed.status === 409 && savedConfig().printerName !== 'Mixed');
+    const own = await post('/config', { printerName: 'Dock 2', musicalPrinter: false }, sync);
+    check('the printer\'s own keys still save from the page', own.status === 200 && savedConfig().printerName === 'Dock 2', JSON.stringify(own.body));
+    const sched = await post('/config/schedule', { schedule: [{ club: 'Sparks', startTime: '18:30' }] }, sync);
+    check('the schedule is refused from the page', sched.status === 409 && sched.body.reason === 'church-managed', JSON.stringify(sched.body));
+    const tmpl = await post('/config/label-templates', { templates: { Sparks: { showLastName: false } } }, sync);
+    check('and so are the label templates', tmpl.status === 409 && tmpl.body.reason === 'church-managed', JSON.stringify(tmpl.body));
+    const ext = await post('/config', { labelFooter: 'From the extension' });
+    check('this computer\'s own writes (the extension, the app: no Origin) still save', ext.status === 200 && savedConfig().labelFooter === 'From the extension');
+    const extSched = await post('/config/schedule', { schedule: [{ club: 'Sparks', startTime: '18:30' }] });
+    check('...the schedule too', extSched.status === 200 && savedConfig().schedule.length === 1);
+    churchDoc = { ...churchDoc, rev: 4, paused: true, switches: { ...SWITCHES, CHURCH_SETTINGS: 'off' }, switchesRev: 2 };
+    check('CHURCH_SETTINGS off (paused): nothing is applied', (await server.churchSync.syncNow()) === 'paused' && savedConfig().labelFooter === 'From the extension');
+    const paused = await post('/config', { labelFooter: 'Paused: the page edits here again' }, sync);
+    check('and the page may change the church keys here again (At the laptop)', paused.status === 200 && savedConfig().labelFooter === 'Paused: the page edits here again', JSON.stringify(paused.body));
+    const health = await j('/health', { headers: { Origin: PAGE } });
+    check('/health says where the church settings come from, with no values', health.body.church && health.body.church.paused === true && health.body.church.source === 'config'
+      && health.body.church.rev === 3 && !JSON.stringify(health.body.church).includes('Worker'), JSON.stringify(health.body.church));
+    server.stopChurchSync();
   }
 
   console.log('settings page: every settings entry point goes to it, and there is no dashboard');

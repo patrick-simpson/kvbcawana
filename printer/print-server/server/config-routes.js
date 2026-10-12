@@ -20,6 +20,8 @@ const $http = lazy('./http');
 const $customPdf = lazy('./custom-pdf');
 const $publishers = lazy('./publishers');
 const $spooler = lazy('./spooler');
+const $station = lazy('./station');
+const churchSettings = require('../churchSettings');
 const app = $http.app;
 
 // What other modules (and server.js) read from this one; live bindings, so cycles are safe.
@@ -120,6 +122,19 @@ const CONFIG_POST_CHURCH_KEYS = [
   'labelFooter', 'firstTimerInverted', 'trophyBand', 'connectCard', 'connectCardAutoFirstTimer',
   'connectCardGreeting', 'enableDrivenCheckin', 'lateGraceMin', 'pickupClubs', 'seasonTheme',
 ];
+
+// One writer (docs/SETTINGS-OVERHAUL.md section 4): while this computer applies the
+// Worker's church settings (signed in, CHURCH_SETTINGS on, a doc applied), the settings
+// page changes them under Printing, through the Worker; its direct write of a church key
+// here would be undone by the next apply, so it is refused. The extension's and the
+// app's own writes are unaffected (the offline fallback; config.json is theirs too).
+function refuseChurchManaged(req, res, keys) {
+  if (req.settingsPage !== true) return false;
+  if (!keys.some(k => churchSettings.CHURCH_KEYS.includes(k))) return false;
+  if (!$station.churchSync.managed()) return false;
+  res.status(409).json({ reason: 'church-managed', error: 'This is a church-wide setting now: change it under Printing.' });
+  return true;
+}
 
 function pickKeys(body, keys) {
   const out = {};
@@ -292,6 +307,7 @@ app.post('/config', (req, res) => {
       return res.status(403).json({ error: `The settings page can change the printer's own settings only; ${refused.join(', ')} cannot be changed from a web page` });
     }
   }
+  if (refuseChurchManaged(req, res, Object.keys(req.body || {}).filter(k => req.body[k] !== undefined))) return;
   try {
     const next = $config.loadConfigFile();
     if (printerName !== undefined) next.printerName = printerName;
@@ -418,6 +434,7 @@ app.get('/config/schedule', (req, res) => {
 
 app.post('/config/schedule', (req, res) => {
   const { schedule, lateGraceMin } = req.body || {};
+  if (refuseChurchManaged(req, res, ['schedule'])) return;
   if (!Array.isArray(schedule)) return res.status(400).json({ error: 'schedule must be an array' });
   const rows = cleanScheduleRows(schedule);
   try {
@@ -549,6 +566,7 @@ app.post('/config/label-templates', (req, res) => {
   if (!isTrustedOrSettingsPage(req)) {
     return res.status(403).json({ error: 'Label templates can only be changed from this computer' });
   }
+  if (refuseChurchManaged(req, res, ['labelTemplates'])) return;
   const cleaned = $tags.sanitizeLabelTemplates((req.body || {}).templates);
   if (!cleaned.ok) return res.status(400).json({ error: cleaned.error });
   try {

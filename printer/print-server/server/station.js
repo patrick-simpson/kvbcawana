@@ -7,7 +7,9 @@ const lazy = require('./lazy');
 const cloudRequest = require('../cloud-request');
 const jobPuller = require('../job-puller');
 const historySync = require('../history-sync');
+const churchSyncModule = require('../church-sync');
 const pickup = require('../pickup');
+const fs    = require('fs');
 const path  = require('path');
 const $config = lazy('./config');
 const $eventBuffer = lazy('./event-buffer');
@@ -23,14 +25,19 @@ const app = $http.app;
 
 // What other modules (and server.js) read from this one; live bindings, so cycles are safe.
 Object.defineProperties(exports, {
+  churchSync: { enumerable: true, get: () => churchSyncInstance() },
   clearCheckThePrinter: { enumerable: true, get: () => clearCheckThePrinter },
   cloudStatus: { enumerable: true, get: () => cloudStatus },
   configureCloud: { enumerable: true, get: () => configureCloud },
   importLaptopHistory: { enumerable: true, get: () => importLaptopHistory },
   mergeAttendance: { enumerable: true, get: () => mergeAttendance },
   sendStationExtras: { enumerable: true, get: () => sendStationExtras },
+  singlePublisherSilent: { enumerable: true, get: () => singlePublisherSilent },
+  startChurchSync: { enumerable: true, get: () => startChurchSync },
   startClubNightTimers: { enumerable: true, get: () => startClubNightTimers },
+  stopChurchSync: { enumerable: true, get: () => stopChurchSync },
   stopCloud: { enumerable: true, get: () => stopCloud },
+  ymHandedOff: { enumerable: true, get: () => ymHandedOff },
 });
 
 // ── Online check-in, P2: this computer as a print STATION ───────────────────
@@ -139,6 +146,9 @@ function configureCloud(opts) {
   const writer = historySync.createHistoryWriter({ pub: opts.historyPub || (() => null), signedIn, request, stationId, log, now: opts.now });
   const puller = jobPuller.createJobPuller({
     signedIn, stationId, ring: opts.ring, localBase, request, journal, fetchFn: opts.fetchFn, now: opts.now, log, heartbeatMs: opts.heartbeatMs,
+    // The lease says when the church settings or the switches moved (routes.md 10.3).
+    onChurch: (rev, switchesRev) => churchSyncInstance().onChurch(rev, switchesRev),
+    heartbeatExtras: () => ({ version: $config.SERVER_VERSION, churchRev: churchSyncInstance().appliedRev() }),
     // A check-in made on TwoTimTwo's own page: the Worker cannot seal a history
     // row for it, so the station that prints it does.
     onPrinted: async (info) => {
@@ -164,6 +174,105 @@ function configureCloud(opts) {
   }
   console.log(`[station] This computer is print station ${opts.stationId}: print jobs come from the service; the tally and pickup list are the service's to publish.`);
   return { ok: true };
+}
+
+// ── The church settings and the Worker's switches (docs/SETTINGS-OVERHAUL.md section 4) ──
+// Every signed-in print server, station or not, keeps its config.json in step with the
+// church-wide settings the Worker holds (church-sync.js). Fail open: an error is logged
+// and shown on /health, never thrown into a print; config.json always holds the last
+// values applied, so no internet prints exactly as last night.
+const CHURCH_APPLIED_FILE = () => path.join($config.DATA_DIR, 'church-applied.json');
+let churchSync = null;
+let churchSyncStop = null;
+
+/** Write the Worker's values into config.json through the print server's own cleaner, once. */
+function applyChurchPatch(patch, deletes) {
+  const next = $config.loadConfigFile();
+  const before = JSON.stringify(next);
+  const keysBefore = {};
+  for (const k of [...Object.keys(patch), ...deletes]) keysBefore[k] = JSON.stringify(next[k]);
+  const pickupBefore = JSON.stringify(pickup.pickupClubsOf(next));
+  const seasonBefore = next.seasonTheme;
+  for (const k of deletes) delete next[k];
+  const r = $configRoutes.cleanChurchPatch(next, patch);
+  if (JSON.stringify(next) !== before) {
+    $config.writeConfigFile(next);   // tmp + fsync + rename, .bak of the replaced file
+    $configRoutes.applySavedConfig(next);
+  }
+  return {
+    errors: r.errors,
+    changed: Object.keys(keysBefore).filter((k) => JSON.stringify(next[k]) !== keysBefore[k]),
+    pickupChanged: JSON.stringify(pickup.pickupClubsOf(next)) !== pickupBefore,
+    seasonChanged: next.seasonTheme !== seasonBefore,
+  };
+}
+
+function churchSyncInstance() {
+  if (churchSync) return churchSync;
+  churchSync = churchSyncModule.createChurchSync({
+    signedIn: () => ($relay.signedInToSync() ? { base: $config.config.syncUrl, session: $config.config.syncSession } : null),
+    // A station asks as the station (its own request, X-Station); any other computer with its session.
+    request: (b, p, o) => ($config.cloudStation ? $config.cloudStation.request : cloudRequest.cloudRequest)(b, p, o),
+    isStation: () => !!$config.cloudStation,
+    stationId: () => ($config.cloudStation ? $config.cloudStation.stationIdFn() : null),
+    readConfig: () => $config.loadConfigFile(),
+    churchConfig: () => $config.churchConfig,
+    // The local last resort (never written by any UI): config.json alone.
+    localOff: () => $config.config.churchSync === false,
+    applyPatch: applyChurchPatch,
+    onApplied: (r) => {
+      if (r.pickupChanged) $publishers.stillHereChanged();
+      if (r.pickupChanged || r.seasonChanged) sendStationExtras(true).catch(() => {});
+      if (r.seasonChanged) $publishers.publishTally();   // inert while the Worker is the one publisher
+    },
+    onSwitches: (prev, next) => {
+      // SINGLE_PUBLISHER turned off at runtime: this station publishes the tally and the
+      // still-here list again at once (inside the tally window), not a minute later.
+      const wasSilent = !prev || prev.SINGLE_PUBLISHER !== 'off';
+      if ($config.cloudStation && wasSilent && next.SINGLE_PUBLISHER === 'off') {
+        console.log('[station] The service no longer publishes the count: this computer publishes the tally and the pickup list again.');
+        $publishers.onTallyWindow(() => { $publishers.publishTally(); $publishers.publishStillHere(); })();
+      } else if ($config.cloudStation && !wasSilent && next.SINGLE_PUBLISHER !== 'off') {
+        console.log('[station] The service publishes the count again: this computer stops publishing the tally and the pickup list.');
+      }
+    },
+    loadApplied: () => {
+      const f = CHURCH_APPLIED_FILE();
+      return fs.existsSync(f) ? JSON.parse(fs.readFileSync(f, 'utf8')) : null;
+    },
+    saveApplied: (st) => { $config.saveFileAtomic(CHURCH_APPLIED_FILE(), JSON.stringify(st, null, 2)); },
+    log: (m) => console.log(m),
+  });
+  return churchSync;
+}
+
+/** The loop (started with the server; it waits for the sync sign-in). Returns its stop. */
+function startChurchSync() {
+  if (churchSyncStop) return churchSyncStop;
+  churchSyncStop = churchSyncInstance().start();
+  return churchSyncStop;
+}
+
+function stopChurchSync() {
+  if (churchSyncStop) { try { churchSyncStop(); } catch { /* best effort */ } }
+  churchSyncStop = null;
+}
+
+// routes.md 10.2: the station follows the Worker's runtime switches. Never fetched
+// (or a Worker without them) = the behaviour before 9.3.0: a station is silent and
+// hands the youth check-out to the Worker.
+/** True when this station must NOT publish the tally / still-here list (the Worker does). */
+function singlePublisherSilent() {
+  if (!$config.cloudStation) return false;
+  const sw = churchSync ? churchSync.switches() : null;
+  return !sw || sw.SINGLE_PUBLISHER !== 'off';
+}
+
+/** True when this station's extension must leave the Trek/Journey check-out to the Worker. */
+function ymHandedOff() {
+  if (!$config.cloudStation) return false;
+  const sw = churchSync ? churchSync.switches() : null;
+  return !sw || sw.YM_CHECKOUT !== 'off';
 }
 
 /** "I looked at the printer": clears the CHECK THE PRINTER warning. */

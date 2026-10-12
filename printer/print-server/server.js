@@ -55,7 +55,10 @@ const $lifecycle = require('./server/lifecycle');
 const app = $http.app;
 
 module.exports = {
-  configureCloud: $station.configureCloud, stopCloud: $station.stopCloud, cloudStatus: $station.cloudStatus, clearCheckThePrinter: $station.clearCheckThePrinter, importLaptopHistory: $station.importLaptopHistory, mergeAttendance: $station.mergeAttendance,
+  configureCloud: $station.configureCloud, stopCloud: $station.stopCloud,
+  // The church settings from the Worker (church-sync.js) and the switch-aware gates.
+  get churchSync() { return $station.churchSync; }, startChurchSync: $station.startChurchSync, stopChurchSync: $station.stopChurchSync,
+  singlePublisherSilent: $station.singlePublisherSilent, ymHandedOff: $station.ymHandedOff, cloudStatus: $station.cloudStatus, clearCheckThePrinter: $station.clearCheckThePrinter, importLaptopHistory: $station.importLaptopHistory, mergeAttendance: $station.mergeAttendance,
   app, startListening: $lifecycle.startListening, stopListening: $lifecycle.stopListening, isBusy: $http.isBusy, resetRelayForTest: $relay.resetRelayForTest, setUpdateHandler: $updates.setUpdateHandler, setLatestVersion: $updates.setLatestVersion, setExtensionInfo: $updates.setExtensionInfo, setOpsAlertHandler: $eventBuffer.setOpsAlertHandler,
   // For the Electron shell: this module is require-cached across settings
   // saves, so the shell pushes the freshly merged config.json and printer

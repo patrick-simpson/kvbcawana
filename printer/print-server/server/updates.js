@@ -26,6 +26,7 @@ const $publishers = lazy('./publishers');
 const $relay = lazy('./relay');
 const $spooler = lazy('./spooler');
 const $configRoutes = lazy('./config-routes');
+const $station = lazy('./station');
 const app = $http.app;
 
 // What other modules (and server.js) read from this one; live bindings, so cycles are safe.
@@ -122,6 +123,8 @@ app.get('/health', async (req, res) => {
   // A data file whose last save failed (saveFileAtomic), until one succeeds.
   const saveWarning = $config.dataSaveWarning();
   if (saveWarning) warnings.push(saveWarning);
+  // A church setting from the Worker this computer's cleaner refused (it keeps its own value).
+  warnings.push(...$station.churchSync.warnings());
   // The live-channel relay's breaker is open: frames to the sync service are
   // being dropped, and it is the only pipe, so the operator should know.
   if ($relay.signedInToSync() && Date.now() < $relay.relayBrokenUntil) {
@@ -308,6 +311,9 @@ app.get('/health', async (req, res) => {
       checkedAt: $relay.syncStatus.checkedAt,
       error: $relay.syncStatus.error,
     },
+    // The church-wide settings (church-sync.js): the rev applied, when, and whether
+    // the Worker or config.json alone decides them right now. Never the values.
+    church: $station.churchSync.status(),
   });
 });
 
