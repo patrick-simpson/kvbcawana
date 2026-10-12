@@ -596,3 +596,47 @@ genuine reads (`checkoutDisappearances`) and posts ids with
 - **Context-Aware:** PowerShell the print path shells out to must account for the parent process (the app, a CUPS station, or a bare `node server.js`).
 - **Never Crash:** uncaughtException handlers in server; silent failures for enrichment (print basic label).
 - **Cleanup:** Always unlink temp files in finally blocks.
+
+## The reel (the film at the top of the home page)
+
+Owner, 2026-10-11: a 60-90 s product film of the screens on a club night, the
+first thing on awana.kvbchurch.org. Its sources are `reel/` (the guide is
+`reel/README.md`); `npm run reel` rebuilds all of it (about 20 minutes; it
+builds the site first if `site/dist` is missing, and needs Chromium and
+ffmpeg):
+
+- **Real footage, never mock-ups.** `reel/record.mjs` + `reel/shots.mjs` film
+  the real screens from `site/dist` (the lobby's check-in moments, toasts and
+  pickup board, the projector, Journey, `/checkin` on a phone, `/settings`),
+  driven the way their own e2e suites drive them (the stand-in live channel,
+  a stand-in laptop behind the phone page), frame by frame on a virtual clock
+  (`reel/lib/vclock.mjs`), so the footage is an exact 60 fps. The labels are
+  the print server's own (`reel/labels.cjs`, through `/preview`). The motion
+  graphics and the edit are one page, `reel/film/`, rendered frame by frame
+  (`reel/render.mjs`); `reel/edit.mjs` mixes the soundtrack and encodes.
+- **What the page plays** (committed, never edited by hand):
+  `public/reel/reel-1080.mp4` (H.264, 1920x1080, 60 fps, under 20 MB),
+  `reel-720.mp4` (1280x720, 30 fps, for phones) and `poster.jpg` (the closing
+  title). Pages' static files ignore Range and Safari will not play a video
+  without it, so `site/build.mjs` leaves the films out of the upload and
+  `site/functions/reel` streams them (proxyLarge) from GitHub's copy of the
+  build's commit; `site/lib/largeFiles.js` says what is streamed (every video,
+  anything over 25 MiB) and from which folders (`journey/public/`,
+  `printer/public/reel/`), and `site/test/largeFiles.test.mjs` pins that and
+  the 20 MB cap.
+- **The owner's decision on art:** the real Awana logos and club marks may
+  appear INSIDE the film (in-house use), and its last card says "Awana® and
+  club marks are trademarks of Awana Clubs International, used here by a member
+  church. Not affiliated with or endorsed by Awana." Outside the film the page's
+  own art rules hold. Every name in it is made up, never a real child's.
+- **Its look is the 2026-27 catalog's**, from the one kit (`lobby/shared/brand`):
+  Paytone One shouts (declared with the screens' ascent/descent overrides, so
+  the stepped chips from `shared/chipGeometry.js` sit as on the TV), Londrina
+  Solid labels, Figtree is read; club waves, corner tabs, doodles in threes,
+  footage on a plate with an offset outline, hard offsets, never a blur.
+- **Cut to the music's beat.** "Incredible You" by Soft and Furious (CC0,
+  `reel/music/`, credits in `reel/README.md`), 120.25 BPM: `BEAT` in
+  `reel/film/film.js` and `MUSIC` in `reel/edit.mjs` are that grid. A re-timed
+  scene keeps its cuts on it.
+- **Claims track the code here too:** when a screen the film shows changes its
+  look or behaviour, run `npm run reel` and commit the new films.
