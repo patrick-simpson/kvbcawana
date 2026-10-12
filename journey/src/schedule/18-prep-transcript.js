@@ -427,6 +427,7 @@ function startPreview(url, title, fallbackUrl = null, week = null) {
   previewWeek = week;
   journeyView.classList.remove('hidden');
   checkinView.classList.add('hidden');
+  trekView.classList.add('hidden'); // a lesson or preview over Trek's card takes the screen
   journeyPlaceholder.classList.add('hidden');
   // The splash may be up when a preview starts (picking a lesson while the
   // scheduled window's "Large Group Time" screen is showing) — hide it, or

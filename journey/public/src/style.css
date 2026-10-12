@@ -33,6 +33,10 @@
   --jr-sun: var(--brand-sun, #FCB614);
   --jr-chip: var(--brand-chip, rgba(3, 4, 4, 0.5));
   --jr-night: var(--brand-ink, #231F20);
+  /* Trek's three, for its small group card (club nights 7:00-7:30). */
+  --jr-trek: var(--brand-trek, #047E71);
+  --jr-trek-deep: var(--brand-trek-deep, #02554C);
+  --jr-trek-tint: var(--brand-trek-tint, #CCEAEC);
   --jr-font-shout: var(--brand-font-display, 'Paytone One', 'Arial Rounded MT Bold', 'Trebuchet MS', sans-serif);
   --jr-font-label: var(--brand-font-label, 'Londrina Solid', 'Arial Narrow', 'Helvetica Neue', sans-serif);
   --jr-font-read: var(--brand-font-body, 'Figtree', 'Segoe UI', system-ui, sans-serif);
@@ -65,6 +69,13 @@
   --jr-art-tab: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 205.36 132.53' preserveAspectRatio='none'><path fill='%238A649D' d='M205.36,-35.10L-28.80,-35.10L-28.80,126.63C-17.85,129.47 -6.87,132.53 4.35,130.10C28.16,126.59 40.51,100.98 63.35,96.02C81.82,91.84 100.10,101.46 118.57,100.45C133.31,100.09 146.80,91.64 152.55,77.99C159.60,61.70 157.79,42.01 169.08,27.40C180.32,12.54 196.95,1.11 201.97,-17.74C203.57,-23.29 204.71,-29.13 205.36,-35.10'/></svg>");
   --jr-art-doodles-right: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='80 6.6 9.6 8.58'><svg x='80' y='8' width='2.4' height='2.4' viewBox='0 0 12.61 12.61'><path fill='%23fff' d='M8.25,4.75L11.26,5.74C11.82,5.91 11.82,6.70 11.26,6.88L8.25,7.86C8.06,7.92 7.92,8.06 7.86,8.25L6.88,11.26C6.70,11.82 5.92,11.82 5.73,11.26L4.75,8.25C4.69,8.06 4.55,7.92 4.37,7.86L1.36,6.88C0.80,6.70 0.80,5.91 1.36,5.74L4.37,4.75C4.55,4.69 4.69,4.55 4.75,4.37L5.73,1.35C5.92,0.80 6.70,0.80 6.88,1.35L7.86,4.37C7.92,4.55 8.06,4.69 8.25,4.75'/></svg><svg x='84.5' y='6.6' width='1' height='1.0325' viewBox='0 0 8.62 8.90'><path fill='%23fff' d='M7.82,4.45C7.82,6.47 6.25,8.10 4.31,8.10C2.37,8.10 0.80,6.47 0.80,4.45C0.80,2.43 2.37,0.80 4.31,0.80C6.25,0.80 7.82,2.43 7.82,4.45'/></svg><svg x='87' y='9.6' width='2.6' height='5.578' viewBox='0 0 46.94 100.70' overflow='visible'><path fill='none' stroke='%23fff' stroke-width='1.6' stroke-linecap='round' d='M1.50,1.72C9.83,1.50 16.86,10.90 14.30,18.83C12.77,23.59 8.49,27.69 9.06,32.65C9.67,37.92 15.41,40.95 20.61,41.98C25.81,43.01 31.51,43.11 35.73,46.32C40.83,50.20 42.06,57.43 41.32,63.79C40.58,70.15 38.29,76.29 37.93,82.68C37.56,89.07 39.74,96.28 45.44,99.20'/></svg></svg>");
   --jr-art-doodles-left: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='9 26 4.8 5.18'><svg x='12' y='26' width='1.8' height='1.8' viewBox='0 0 12.99 12.99'><path fill='%23fff' d='M6.12,9.87L2.27,11.83C1.56,12.19 0.80,11.43 1.16,10.72L3.12,6.87C3.24,6.63 3.24,6.36 3.12,6.12L1.16,2.27C0.80,1.56 1.56,0.80 2.27,1.16L6.12,3.12C6.36,3.24 6.63,3.24 6.87,3.12L10.72,1.16C11.43,0.80 12.19,1.56 11.83,2.27L9.86,6.12C9.75,6.36 9.75,6.63 9.86,6.87L11.83,10.72C12.19,11.43 11.43,12.19 10.72,11.83L6.87,9.87C6.62,9.95 6.36,9.75 6.12,9.87'/></svg><svg x='9' y='30' width='1.2' height='1.18' viewBox='0 0 6.52 6.41'><path fill='%23fff' d='M5.09,3.20C5.09,2.14 4.28,1.30 3.26,1.30C2.25,1.31 1.42,2.17 1.43,3.22C1.44,4.27 2.26,5.09 3.30,5.08C4.31,5.08 5.08,4.27 5.09,3.20M5.72,3.20C5.72,4.56 4.66,5.60 3.27,5.61C1.89,5.61 0.81,4.56 0.81,3.21C0.80,1.87 1.88,0.81 3.26,0.81C4.65,0.80 5.71,1.83 5.72,3.20'/></svg></svg>");
+  /* Trek's small group card wears Trek's own: the same kit wave (Trek's
+     path) with its club teal mirrored behind and its tint in front, the
+     same corner tab in the club teal, and the kit's stepped chip (plate and
+     keyline, both kit paths) in the club teal with the white keyline. */
+  --jr-art-wave-trek: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 576 324' preserveAspectRatio='none'><path fill='%23047E71' transform='matrix(-1.06 0 0 1 593.28 0)' d='M-50.16,331.97C-38.71,304.22 -37.83,274.24 -25.90,246.62C-13.97,219.00 14.43,192.19 51.34,191.79C63.52,191.65 75.40,194.42 87.38,196.14C105.01,198.68 123.16,198.95 140.90,196.95C157.84,195.03 174.94,190.82 187.82,181.91C201.50,172.45 209.03,158.78 217.00,145.87C231.93,121.70 251.46,97.45 282.04,85.70C309.81,75.02 342.44,76.32 372.91,80.22C403.39,84.11 433.84,90.38 464.65,88.86C520.60,86.10 575.00,41.71 594.00,0.00L594.00,342.00L-50.40,342.00L-50.16,331.97'/><path fill='%23CCEAEC' transform='matrix(1 0 0 0.7143 0 92.57)' d='M-50.16,331.97C-38.71,304.22 -37.83,274.24 -25.90,246.62C-13.97,219.00 14.43,192.19 51.34,191.79C63.52,191.65 75.40,194.42 87.38,196.14C105.01,198.68 123.16,198.95 140.90,196.95C157.84,195.03 174.94,190.82 187.82,181.91C201.50,172.45 209.03,158.78 217.00,145.87C231.93,121.70 251.46,97.45 282.04,85.70C309.81,75.02 342.44,76.32 372.91,80.22C403.39,84.11 433.84,90.38 464.65,88.86C520.60,86.10 575.00,41.71 594.00,0.00L594.00,342.00L-50.40,342.00L-50.16,331.97'/></svg>");
+  --jr-art-tab-trek: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 205.36 132.53' preserveAspectRatio='none'><path fill='%23047E71' d='M205.36,-35.10L-28.80,-35.10L-28.80,126.63C-17.85,129.47 -6.87,132.53 4.35,130.10C28.16,126.59 40.51,100.98 63.35,96.02C81.82,91.84 100.10,101.46 118.57,100.45C133.31,100.09 146.80,91.64 152.55,77.99C159.60,61.70 157.79,42.01 169.08,27.40C180.32,12.54 196.95,1.11 201.97,-17.74C203.57,-23.29 204.71,-29.13 205.36,-35.10'/></svg>");
+  --jr-art-chip-trek: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 146.05 84.78' preserveAspectRatio='none'><path fill='%23047E71' d='M144.05,35.87L144.05,69.39C144.05,76.78 138.05,82.78 130.65,82.78L37.89,82.78C32.81,82.78 28.70,78.67 28.70,73.60L28.70,39.75L20.27,39.75C9.52,39.75 0.80,31.03 0.80,20.27C0.80,9.52 9.52,0.80 20.27,0.80L81.06,0.80C91.81,0.80 100.53,9.52 100.53,20.27L100.53,35.87L144.05,35.87'/><path fill='none' stroke='%23fff' stroke-width='0.90' d='M144.65,36.47L144.65,69.99C144.65,77.38 138.65,83.38 131.25,83.38L38.49,83.38C33.41,83.38 29.30,79.27 29.30,74.20L29.30,40.35L20.88,40.35C10.12,40.35 1.40,31.63 1.40,20.88C1.40,10.12 10.12,1.40 20.88,1.40L81.66,1.40C92.41,1.40 101.13,10.12 101.13,20.88L101.13,36.47L144.65,36.47'/></svg>");
 }
 
 * {
@@ -471,6 +482,188 @@ html.cursor-hidden * {
   font-size: clamp(0.9rem, 1.5vw, 1.2rem);
   line-height: 1.4;
   text-align: left;
+}
+
+/* ── "Trek · Small Group Time" — club nights, 7:00-7:30 PM (25-trek.js).
+   The splash's craft in Trek's colours: the club's deep teal field, its wave
+   along the bottom, its corner tab (the splash's tab, in Trek's teal) naming
+   the time, the Trek wordmark centred, and tonight's Trek lesson under it
+   when the church calendar names one. Top right, the kit's stepped chip in
+   the club teal counts the Trek kids checked in tonight (hidden when no
+   count is known). The corner buttons keep to their bottom-right column
+   (below), so the chip has the top-right to itself. Static on the Pi: flat
+   fills, hard offsets, no animation (the full profile's entrance is in the
+   motion block). No countdown, by the owner's brief. */
+#trek-view {
+  background: #000000;
+}
+
+#trek-card {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 4vh 4vw 8.5vh;
+  overflow: hidden;
+  color: #ffffff;
+  font-family: var(--jr-font-read);
+  text-align: center;
+  background: var(--jr-art-wave-trek) left bottom / 100% 14% no-repeat, var(--jr-trek-deep);
+}
+
+/* The splash's two doodle clusters, the right one brought down beside the
+   wordmark: the top-right corner is the chip's, and lower down the lesson's
+   title and the corner buttons need the room. */
+#trek-card::before,
+#trek-card::after {
+  content: '';
+  position: absolute;
+  pointer-events: none;
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
+}
+
+#trek-card::before {
+  top: calc(16 * var(--u));
+  right: calc(6 * var(--u));
+  width: calc(9.6 * var(--u));
+  height: calc(8.58 * var(--u));
+  background-image: var(--jr-art-doodles-right);
+}
+
+#trek-card::after {
+  top: calc(50% - 8 * var(--u));
+  left: calc(9 * var(--u));
+  width: calc(4.8 * var(--u));
+  height: calc(5.18 * var(--u));
+  background-image: var(--jr-art-doodles-left);
+}
+
+@media (max-width: 600px) {
+  #trek-card::before,
+  #trek-card::after {
+    display: none;
+  }
+}
+
+/* The corner tab, exactly the splash's "Large Group Time" in Trek's teal. */
+#trek-tab {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 11.4em;
+  height: 7.4em;
+  padding: 1.14em 0 0 1.24em;
+  background: var(--jr-art-tab-trek) left top / 100% 100% no-repeat;
+  color: #ffffff;
+  font-family: var(--jr-font-label);
+  font-size: clamp(0.85rem, 2.1 * var(--u), 2.6rem);
+  line-height: 1;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  text-align: left;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+#trek-wordmark {
+  display: block;
+  line-height: 0;
+}
+
+#trek-wordmark img {
+  display: block;
+  width: clamp(14rem, 46 * var(--u), 56rem);
+  height: auto;
+}
+
+#trek-lesson {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(0.3rem, 0.8 * var(--u), 1rem);
+  margin-top: clamp(1.2rem, 4.4 * var(--u), 5.4rem);
+}
+
+#trek-lesson-kicker {
+  font-family: var(--jr-font-label);
+  font-size: clamp(0.85rem, 2 * var(--u), 2.5rem);
+  line-height: 1;
+  color: var(--jr-trek-tint);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+/* The lesson's title, shouted like the splash's lesson name, with Trek's
+   teal as the hard offset. Any length the calendar gives (up to 80
+   characters), so it is sized like the splash's long title and balanced. */
+#trek-lesson-title {
+  position: relative;
+  top: var(--jr-shout-lift);
+  max-width: min(80vw, calc(100vw - 30 * var(--u)));
+  font-family: var(--jr-font-shout);
+  font-weight: 400;
+  font-size: calc(clamp(1.4rem, 4.4 * var(--u), 5.4rem) * var(--jr-shout-fit));
+  line-height: 1.02;
+  text-transform: uppercase;
+  text-shadow: 0.06em 0.06em 0 var(--jr-trek);
+  text-wrap: balance;
+}
+
+/* The kit's stepped chip (shapes/chip-plate.svg + chip-keyline.svg, baked):
+   "CHECKED IN" on its pill, the count on the block stepping out beneath.
+   Everything inside is in em of the chip's own font size, so the text sits
+   on the plate's two tiers at any size (8em wide = the plate's 146.05). */
+#trek-chip {
+  position: absolute;
+  top: max(3vh, 24px);
+  right: max(3vw, 24px);
+  width: 8em;
+  height: 4.644em;
+  font-size: clamp(1rem, 2.1 * var(--u), 2.6rem);
+  background: var(--jr-art-chip-trek) left top / 100% 100% no-repeat;
+  color: #ffffff;
+  pointer-events: none;
+}
+
+#trek-chip-label {
+  position: absolute;
+  left: 0.05em;
+  top: 0.05em;
+  width: 5.45em;
+  height: 2.12em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-top: 0.08em;
+  font-family: var(--jr-font-label);
+  font-size: 1em;
+  line-height: 1;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+#trek-chip-block {
+  position: absolute;
+  left: 1.57em;
+  top: 1.97em;
+  width: 6.32em;
+  height: 2.56em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#trek-chip-count {
+  position: relative;
+  top: -0.04em;
+  font-family: var(--jr-font-shout);
+  font-size: calc(1.9em * var(--jr-shout-fit));
+  line-height: 1;
 }
 
 /* Loading indicator — shown while a lesson video is fetching/buffering, so a
@@ -959,9 +1152,12 @@ html.cursor-hidden #video-controls:not(.force-visible) {
    under them. The display keeps its bottom-right chips, ticker and a long
    child's name out of exactly this column (its src/lib/embed.js and the
    html.embedded rules in its app.css), and test/corner-buttons.test.mjs
-   pins the column. See CLAUDE.md, "The corner-button contract". Everywhere
-   else (the lesson, the splash, the slides) the gear keeps the top-right. */
-#checkin-view:not(.hidden) ~ #settings-btn {
+   pins the column. See CLAUDE.md, "The corner-button contract". Trek's small
+   group card takes the same column: its top-right is the Trek count chip.
+   Everywhere else (the lesson, the splash, the slides) the gear keeps the
+   top-right. */
+#checkin-view:not(.hidden) ~ #settings-btn,
+#trek-view:not(.hidden) ~ #settings-btn {
   top: auto;
   bottom: calc(max(3vh, 24px) + 48px + 8px);
 }
@@ -1053,6 +1249,7 @@ html.configure-mode body {
 
 html.configure-mode #checkin-view,
 html.configure-mode #journey-view,
+html.configure-mode #trek-view,
 html.configure-mode #toggle-btn,
 html.configure-mode #settings-btn,
 html.configure-mode #settings-backdrop,
@@ -2246,6 +2443,36 @@ html.cursor-hidden #slide-controls {
   }
   html.motion-full #journey-splash::after {
     animation: jm-spin-in 460ms var(--jm-pop) calc(var(--jm-lead) + 720ms) backwards;
+  }
+
+  /* Trek's small group card: the whole field wipes across, the tab drops
+     in, the Trek wordmark slams down, tonight's lesson wipes on and its
+     title slams hard, the count chip pops up out of its corner and the
+     doodles spin in. Entrance only; the 7:30 hand-back is instant. */
+  html.motion-full #trek-card {
+    animation: jm-wipe-right 420ms var(--jm-wipe) backwards;
+  }
+  html.motion-full #trek-tab {
+    animation: jm-drop-tab 460ms var(--jm-pop) 260ms backwards;
+  }
+  html.motion-full #trek-wordmark {
+    animation: jm-slam-hard 560ms var(--jm-settle) 220ms backwards;
+  }
+  html.motion-full #trek-lesson-kicker {
+    animation: jm-wipe-center 360ms var(--jm-settle) 520ms backwards;
+  }
+  html.motion-full #trek-lesson-title {
+    animation: jm-slam-hard 520ms var(--jm-settle) 620ms backwards;
+  }
+  html.motion-full #trek-chip {
+    transform-origin: right top;
+    animation: jm-pop-up 460ms var(--jm-pop) 760ms backwards;
+  }
+  html.motion-full #trek-card::before {
+    animation: jm-spin-in 460ms var(--jm-pop) 820ms backwards;
+  }
+  html.motion-full #trek-card::after {
+    animation: jm-spin-in 460ms var(--jm-pop) 880ms backwards;
   }
 
   /* No lesson yet: the wordmark alone, slammed in. */

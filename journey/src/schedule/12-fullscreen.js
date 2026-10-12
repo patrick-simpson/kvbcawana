@@ -102,7 +102,7 @@ function skipToTeachingSlides() {
   // splash, so a press that reaches this while it is open is not a press.
   if (!isAwaitingPlay() || !settingsPanel.classList.contains('hidden')) return false;
   const week = currentLesson && currentLesson.week;
-  if (!startTeachingSlides(week, () => setView('checkin'))) {
+  if (!startTeachingSlides(week, () => setView(lessonDoneView()))) {
     // No deck for this week at all: leave the splash exactly as it was
     // rather than tearing the screen down for nothing.
     console.warn('Journey: no teaching slides for week', week);

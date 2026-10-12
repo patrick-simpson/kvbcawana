@@ -318,6 +318,7 @@ function startTeachingSlides(week, onFinish) {
   journeyPlaceholder.classList.add('hidden');
   journeyView.classList.remove('hidden');
   checkinView.classList.add('hidden');
+  trekView.classList.add('hidden'); // a lesson or preview over Trek's card takes the screen
   slidesView.classList.remove('hidden');
   showSlide(0);
   return true;

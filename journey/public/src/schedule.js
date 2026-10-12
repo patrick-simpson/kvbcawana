@@ -4,6 +4,12 @@
 // constants, and for how the video content itself gets here.
 const JOURNEY_START_MINUTES = 18 * 60 + 30; // 6:30 PM
 const JOURNEY_END_MINUTES = 19 * 60 + 15; // 7:15 PM
+// Club nights only (the lobby's rule, lobby/shared/clubNight.js): Trek's small
+// group time, a full-screen title card from 7:00 to 7:30 PM. It takes the
+// Journey window's last quarter hour on those nights, but never cuts a lesson
+// that is still running (see 25-trek.js).
+const TREK_START_MINUTES = 19 * 60; // 7:00 PM
+const TREK_END_MINUTES = 19 * 60 + 30; // 7:30 PM
 const POLL_INTERVAL_MS = 15000;
 const LESSON_REFRESH_MS = 60 * 60 * 1000; // current-lesson.json only changes nightly
 const VIDEO_CACHE_NAME = 'journey-videos-v1';
@@ -137,6 +143,17 @@ const qualityButtons = {
   low: document.getElementById('quality-low'),
 };
 const qualityStatus = document.getElementById('quality-status');
+const trekView = document.getElementById('trek-view');
+const trekChip = document.getElementById('trek-chip');
+const trekChipCount = document.getElementById('trek-chip-count');
+const trekLesson = document.getElementById('trek-lesson');
+const trekLessonTitle = document.getElementById('trek-lesson-title');
+
+// What the Trek card knows about tonight (25-trek.js fills it in). Declared up
+// here because scheduledPhase() reads it from the very first setView() call,
+// long before that file's own lines have run. `ready` stays false until the
+// club-night rule itself has loaded: until then no night is a club night.
+const trekNight = { ready: false, rule: null, schedule: null, feed: null };
 
 /* ── Device profile: what this particular screen can cope with ────────
    This page runs in two very different places. The kiosk is a 2017
@@ -334,6 +351,12 @@ if (!CONFIGURE_MODE) {
 function scheduledPhase() {
   const now = new Date();
   const minutes = now.getHours() * 60 + now.getMinutes();
+  // Trek's small group time comes first: on a club night it takes 7:00-7:30,
+  // the Journey window's last quarter hour included (trekSmallGroupTime() in
+  // 25-trek.js; a lesson still running holds it off, see pollSchedule()).
+  if (minutes >= TREK_START_MINUTES && minutes < TREK_END_MINUTES && trekSmallGroupTime(now)) {
+    return 'trek';
+  }
   return minutes >= JOURNEY_START_MINUTES && minutes < JOURNEY_END_MINUTES
     ? 'journey'
     : 'checkin';
@@ -1355,6 +1378,7 @@ async function requestPlayback(captionUrl, proceed) {
   stopTeachingSlides(); // a slideshow left from the previous video must not sit over this one
   journeyView.classList.remove('hidden');
   checkinView.classList.add('hidden');
+  trekView.classList.add('hidden'); // a lesson or preview over Trek's card takes the screen
   journeyPlaceholder.classList.add('hidden');
   journeySplash.classList.add('hidden');
   showVideoLoading();
@@ -1599,15 +1623,34 @@ function stopJourneyContent() {
 
 /* ── View switching ──────────────────────────────────────────────── */
 
+/* Three views: the Check-in Display, the Journey lesson, and (club nights,
+   7:00-7:30) Trek's small group card. Every layer stays in the page; only
+   `hidden` moves, so the check-in frame stays connected under the other two. */
 function setView(phase) {
   const showJourney = phase === 'journey';
+  const showTrek = phase === 'trek';
   journeyView.classList.toggle('hidden', !showJourney);
-  checkinView.classList.toggle('hidden', showJourney);
+  trekView.classList.toggle('hidden', !showTrek);
+  checkinView.classList.toggle('hidden', showJourney || showTrek);
   if (showJourney) {
     showJourneyContent();
   } else {
     stopJourneyContent();
   }
+  if (showTrek) {
+    renderTrekCard();
+    // The card is shown only while it IS the scheduled phase (the poll, the
+    // end of a lesson, the toggle all ask scheduledPhase() first), so this is
+    // the schedule's own phase being adopted, never a fake flip.
+    if (scheduledPhase() === 'trek') lastPhase = 'trek';
+  }
+}
+
+/* Where a finished scheduled lesson (its video, then its slides) hands the
+   screen: Trek's card when it is Trek's time (a lesson that ran past 7:00
+   was waited for), else the Check-in Display, as always. */
+function lessonDoneView() {
+  return scheduledPhase() === 'trek' ? 'trek' : 'checkin';
 }
 
 // `lastPhase` tracks only the *scheduled* phase (for detecting a genuine
@@ -1631,14 +1674,20 @@ if (!CONFIGURE_MODE) setView(lastPhase);
 // toggle button). See "Manual video preview" below.
 let previewMode = false;
 
-setInterval(() => {
+function pollSchedule() {
   if (previewMode || CONFIGURE_MODE) return;
   const phase = scheduledPhase();
-  if (phase !== lastPhase) {
-    lastPhase = phase;
-    setView(phase);
-  }
-}, POLL_INTERVAL_MS);
+  if (phase === lastPhase) return;
+  // Trek's card never cuts a lesson: while the video or its slides are still
+  // going (or about to: the caption question, the loading overlay) the flip
+  // waits, lastPhase untouched so every poll asks again, and the lesson's own
+  // finish hands over to the card (lessonDoneView()). Only 7:30 ends it.
+  if (phase === 'trek' && journeyLessonRunning()) return;
+  lastPhase = phase;
+  setView(phase);
+}
+
+setInterval(pollSchedule, POLL_INTERVAL_MS);
 
 toggleBtn.addEventListener('click', () => {
   audioUnlocked = true;
@@ -1647,7 +1696,14 @@ toggleBtn.addEventListener('click', () => {
     return;
   }
   const showingJourney = !journeyView.classList.contains('hidden');
-  setView(showingJourney ? 'checkin' : 'journey');
+  const showingTrek = !trekView.classList.contains('hidden');
+  if (showingJourney || showingTrek) {
+    setView('checkin');
+    return;
+  }
+  // Back from the Check-in Display: to Trek's card in Trek's time, else the
+  // lesson (a lesson in Trek's time is still one press away in Settings).
+  setView(scheduledPhase() === 'trek' ? 'trek' : 'journey');
 });
 
 unmuteBtn.addEventListener('click', () => {
@@ -1759,7 +1815,7 @@ function skipToTeachingSlides() {
   // splash, so a press that reaches this while it is open is not a press.
   if (!isAwaitingPlay() || !settingsPanel.classList.contains('hidden')) return false;
   const week = currentLesson && currentLesson.week;
-  if (!startTeachingSlides(week, () => setView('checkin'))) {
+  if (!startTeachingSlides(week, () => setView(lessonDoneView()))) {
     // No deck for this week at all: leave the splash exactly as it was
     // rather than tearing the screen down for nothing.
     console.warn('Journey: no teaching slides for week', week);
@@ -1979,7 +2035,7 @@ function endOfLessonHandoff() {
       endPreview();
       return;
     }
-    setView('checkin');
+    setView(lessonDoneView());
   };
   const week = previewMode ? previewWeek : currentLesson && currentLesson.week;
   if (startTeachingSlides(week, finish)) return true;
@@ -2035,7 +2091,7 @@ journeyVideo.addEventListener('error', () => {
     // The lesson can't play, but this week's teaching slides are already on
     // this device — far better on the wall than a dead placeholder. Only a
     // week with no slides falls through to it.
-    if (startTeachingSlides(currentLesson && currentLesson.week, () => setView('checkin'))) return;
+    if (startTeachingSlides(currentLesson && currentLesson.week, () => setView(lessonDoneView()))) return;
     journeyVideo.classList.add('hidden');
     videoControls.classList.add('hidden');
     journeyPlaceholder.classList.remove('hidden');
@@ -2843,6 +2899,7 @@ function startPreview(url, title, fallbackUrl = null, week = null) {
   previewWeek = week;
   journeyView.classList.remove('hidden');
   checkinView.classList.add('hidden');
+  trekView.classList.add('hidden'); // a lesson or preview over Trek's card takes the screen
   journeyPlaceholder.classList.add('hidden');
   // The splash may be up when a preview starts (picking a lesson while the
   // scheduled window's "Large Group Time" screen is showing) — hide it, or
@@ -3624,6 +3681,7 @@ function startTeachingSlides(week, onFinish) {
   journeyPlaceholder.classList.add('hidden');
   journeyView.classList.remove('hidden');
   checkinView.classList.add('hidden');
+  trekView.classList.add('hidden'); // a lesson or preview over Trek's card takes the screen
   slidesView.classList.remove('hidden');
   showSlide(0);
   return true;
@@ -4084,6 +4142,9 @@ function startMotionWatchers() {
   const flip = new MutationObserver((records) => {
     const wasHidden = /(^|\s)hidden(\s|$)/.test(records[0].oldValue || '');
     const nowHidden = journeyView.classList.contains('hidden');
+    // Into Trek's card: the card has its own entrance (style.css), and a
+    // "Check-in" stinger over it would name the wrong screen.
+    if (nowHidden && !trekView.classList.contains('hidden')) return;
     if (wasHidden !== nowHidden) playViewStinger(nowHidden ? 'checkin' : 'journey');
   });
   flip.observe(journeyView, { attributes: true, attributeFilter: ['class'], attributeOldValue: true });
@@ -4293,3 +4354,226 @@ if (reducedMotionQuery) {
   }
 }
 applyMotionProfile();
+/* ── Trek: small group time (owner 2026-10-12) ─────────────────────────
+   On a CLUB NIGHT, 7:00-7:30 PM, the screen is Trek's title card ("TREK ·
+   SMALL GROUP TIME", #trek-view) instead of the Check-in Display. Three
+   things feed it, none of them a new connection of its own:
+
+   - Is tonight a club night? Exactly the lobby's answer: the shared rule
+     lobby/shared/clubNight.js (copied byte for byte beside this script by
+     scripts/family-assets.mjs, loaded once as an ES module) asked with the
+     lobby's own two files, its shared/schedule.json (noClub and special
+     dates) and its calendar-feed.json (the season, cancelled nights). Both
+     are same-origin under ../lobby/, read at startup and every six hours,
+     the last good copy kept in the asset cache for a dead connection. Until
+     the rule has loaded, no night is a club night (the card never guesses).
+   - How many Trek kids are here: the embedded lobby (the frame under this
+     page, which already holds the one live socket) leaves the latest tally's
+     per-club counts in this origin's localStorage (`awanaClubCounts.v1`,
+     numbers only: lobby/src/lib/clubCountsStore.js); its `storage` event
+     redraws the chip. A count from another day, or none, hides the chip.
+   - Tonight's Trek lesson: only a calendar entry on tonight's date that
+     names Trek in so many words ("Trek: <title>", "Trek - <title>", "Trek
+     Lesson 4: <title>"), uncancelled, and only when exactly one title
+     matches. Anything else shows no title: never a guess.
+
+   The schedule side (scheduledPhase() 'trek', the poll waiting for a running
+   lesson, lessonDoneView()) lives with the other views; this file only knows
+   the night and draws the card. */
+const CLUB_COUNTS_KEY = 'awanaClubCounts.v1';
+// A tally older than this (or from another day) is not tonight's count.
+const TREK_COUNT_MAX_AGE_MS = 12 * 60 * 60 * 1000;
+// The printer's clock may run a little ahead of the Pi's.
+const TREK_COUNT_SKEW_MS = 60 * 60 * 1000;
+const TREK_NIGHT_REFRESH_MS = 6 * 60 * 60 * 1000;
+const TREK_SCHEDULE_URL = new URL('shared/schedule.json', CHECKIN_DISPLAY_URL).href;
+const TREK_FEED_URL = new URL('calendar-feed.json', CHECKIN_DISPLAY_URL).href;
+// The rule sits beside this script (src/shared/clubNight.js) and is asked for
+// with this script's own ?v=, so a deploy never pairs new code with a stale
+// rule from the disk cache. (A test hands it over: window.journeyClubNightModule.)
+const CLUB_NIGHT_MODULE_URL = (() => {
+  const own = document.currentScript && document.currentScript.src;
+  const url = new URL('shared/clubNight.js', own || new URL('src/schedule.js', window.location.href).href);
+  if (own) url.search = new URL(own).search;
+  return url.href;
+})();
+// "Trek: <title>" / "Trek - <title>" / "Trek · <title>" / "Trek Lesson 4: <title>".
+const TREK_TITLE_PATTERN = /^\s*trek\b(?:\s*[:|·•–—-]\s*(.+?)|\s+(lesson\b.+?))\s*$/i;
+const TREK_TITLE_MAX = 80;
+
+/** True when `now` falls on a club night by the lobby's rule (time of day aside). */
+function trekSmallGroupTime(now) {
+  if (!trekNight.ready || !trekNight.rule) return false;
+  try {
+    return trekNight.rule.clubNightToday(now, { schedule: trekNight.schedule, feed: trekNight.feed }) === true;
+  } catch {
+    return false;
+  }
+}
+
+/** Tonight's date key in the church's zone (the calendar's dates), else the Pi's own. */
+function trekDateKey(now) {
+  if (trekNight.rule && typeof trekNight.rule.zonedParts === 'function') {
+    const zone = trekNight.schedule && typeof trekNight.schedule.timezone === 'string' ? trekNight.schedule.timezone : undefined;
+    try {
+      return trekNight.rule.zonedParts(now, zone).dateKey;
+    } catch {
+      /* the Pi's own date below */
+    }
+  }
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+}
+
+/** A lesson the Trek card must not cut: its video, its slides, or the steps just before. */
+function journeyLessonRunning() {
+  return (
+    slideshowActive() ||
+    journeyVideo.hasAttribute('src') ||
+    isCaptionPromptOpen() ||
+    !journeyLoading.classList.contains('hidden')
+  );
+}
+
+/**
+ * Tonight's Trek count from the lobby's stored entry, or null when there is
+ * none worth showing (missing, malformed, another day's, no Trek entry).
+ * Pure: the raw localStorage string and the time.
+ */
+function trekCountFrom(raw, nowMs) {
+  if (typeof raw !== 'string') return null;
+  let entry;
+  try {
+    entry = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  if (!entry || entry.v !== 1 || typeof entry.at !== 'number' || !Number.isFinite(entry.at)) return null;
+  const age = nowMs - entry.at;
+  if (age > TREK_COUNT_MAX_AGE_MS || age < -TREK_COUNT_SKEW_MS) return null;
+  if (new Date(entry.at).toDateString() !== new Date(nowMs).toDateString()) return null;
+  const n = entry.byClub && entry.byClub.trek;
+  return Number.isInteger(n) && n >= 0 && n <= 999 ? n : null;
+}
+
+/**
+ * Tonight's Trek lesson title from the calendar's events, or null. Only a
+ * title that says it is Trek's, on `dateKey`, not cancelled, and only one
+ * distinct such title (two different ones = no title).
+ */
+function trekLessonTitleFor(events, dateKey) {
+  if (!Array.isArray(events)) return null;
+  const titles = new Set();
+  for (const event of events) {
+    if (!event || event.date !== dateKey || event.isCancelled === true || typeof event.title !== 'string') continue;
+    const match = event.title.match(TREK_TITLE_PATTERN);
+    if (!match) continue;
+    const title = (match[1] || match[2] || '').replace(/\s+/g, ' ').trim();
+    if (title) titles.add(title);
+  }
+  if (titles.size !== 1) return null;
+  const [title] = titles;
+  return title.length <= TREK_TITLE_MAX ? title : null;
+}
+
+function readClubCounts() {
+  try {
+    return localStorage.getItem(CLUB_COUNTS_KEY);
+  } catch {
+    return null;
+  }
+}
+
+/* Draws what the card knows right now. Cheap (one storage read, no network)
+   and touches only what changed, so the chip's entrance never replays for
+   the same number. */
+function renderTrekCard() {
+  const now = new Date();
+  const count = trekCountFrom(readClubCounts(), now.getTime());
+  const countText = count == null ? '' : String(count);
+  if (trekChipCount.textContent !== countText) trekChipCount.textContent = countText;
+  trekChip.classList.toggle('hidden', count == null);
+  const title = trekNight.feed ? trekLessonTitleFor(trekNight.feed.events, trekDateKey(now)) : null;
+  if (trekLessonTitle.textContent !== (title || '')) trekLessonTitle.textContent = title || '';
+  trekLesson.classList.toggle('hidden', !title);
+}
+
+const isPlainObject = (data) => !!data && typeof data === 'object' && !Array.isArray(data);
+const isTrekFeed = (data) => isPlainObject(data) && Array.isArray(data.events);
+
+/* One same-origin JSON file: the network first (the calendar changes), the
+   last good copy (asset cache) when it cannot answer. A copy is stored only
+   after it parsed and passed `valid`. */
+async function trekJson(url, valid) {
+  try {
+    const res = await fetchWithTimeout(url, { cache: 'no-cache' }, 5000);
+    if (res.ok) {
+      const text = await res.text();
+      const data = JSON.parse(text);
+      if (valid(data)) {
+        if ('caches' in window) {
+          try {
+            const cache = await caches.open(ASSET_CACHE_NAME);
+            await cache.put(url, new Response(text, { headers: { 'content-type': 'application/json' } }));
+          } catch {
+            /* not storable now: still usable live */
+          }
+        }
+        return data;
+      }
+    }
+  } catch {
+    /* offline, timed out, or not JSON: the stored copy below */
+  }
+  if (!('caches' in window)) return null;
+  try {
+    const cache = await caches.open(ASSET_CACHE_NAME);
+    const hit = await cache.match(url);
+    const data = hit ? await hit.json() : null;
+    return valid(data) ? data : null;
+  } catch {
+    return null;
+  }
+}
+
+async function loadClubNightRule() {
+  if (window.journeyClubNightModule) return window.journeyClubNightModule;
+  try {
+    return await import(CLUB_NIGHT_MODULE_URL);
+  } catch {
+    return null;
+  }
+}
+
+/* Learns tonight (startup, then every six hours). A failed read keeps what
+   was known; a rule that never loads keeps every night an ordinary one. */
+async function loadTrekNight() {
+  const [rule, schedule, feed] = await Promise.all([
+    trekNight.rule || loadClubNightRule(),
+    trekJson(TREK_SCHEDULE_URL, isPlainObject),
+    trekJson(TREK_FEED_URL, isTrekFeed),
+  ]);
+  if (schedule) trekNight.schedule = schedule;
+  if (feed) trekNight.feed = feed;
+  if (rule && typeof rule.clubNightToday === 'function') {
+    trekNight.rule = rule;
+    trekNight.ready = true;
+  }
+  // A club night learned inside 7:00-7:30 flips now, not at the next poll.
+  pollSchedule();
+  if (!trekView.classList.contains('hidden')) renderTrekCard();
+}
+
+if (!CONFIGURE_MODE) {
+  loadTrekNight();
+  setInterval(loadTrekNight, TREK_NIGHT_REFRESH_MS);
+  // The lobby frame writing a new tally (another document, same origin).
+  window.addEventListener('storage', (event) => {
+    if (event.key !== null && event.key !== CLUB_COUNTS_KEY) return;
+    if (!trekView.classList.contains('hidden')) renderTrekCard();
+  });
+  // And a slow redraw, for a write the event missed and a count going stale.
+  setInterval(() => {
+    if (!trekView.classList.contains('hidden')) renderTrekCard();
+  }, POLL_INTERVAL_MS);
+}

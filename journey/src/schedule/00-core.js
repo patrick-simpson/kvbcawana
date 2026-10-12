@@ -4,6 +4,12 @@
 // constants, and for how the video content itself gets here.
 const JOURNEY_START_MINUTES = 18 * 60 + 30; // 6:30 PM
 const JOURNEY_END_MINUTES = 19 * 60 + 15; // 7:15 PM
+// Club nights only (the lobby's rule, lobby/shared/clubNight.js): Trek's small
+// group time, a full-screen title card from 7:00 to 7:30 PM. It takes the
+// Journey window's last quarter hour on those nights, but never cuts a lesson
+// that is still running (see 25-trek.js).
+const TREK_START_MINUTES = 19 * 60; // 7:00 PM
+const TREK_END_MINUTES = 19 * 60 + 30; // 7:30 PM
 const POLL_INTERVAL_MS = 15000;
 const LESSON_REFRESH_MS = 60 * 60 * 1000; // current-lesson.json only changes nightly
 const VIDEO_CACHE_NAME = 'journey-videos-v1';
@@ -137,4 +143,15 @@ const qualityButtons = {
   low: document.getElementById('quality-low'),
 };
 const qualityStatus = document.getElementById('quality-status');
+const trekView = document.getElementById('trek-view');
+const trekChip = document.getElementById('trek-chip');
+const trekChipCount = document.getElementById('trek-chip-count');
+const trekLesson = document.getElementById('trek-lesson');
+const trekLessonTitle = document.getElementById('trek-lesson-title');
+
+// What the Trek card knows about tonight (25-trek.js fills it in). Declared up
+// here because scheduledPhase() reads it from the very first setView() call,
+// long before that file's own lines have run. `ready` stays false until the
+// club-night rule itself has loaded: until then no night is a club night.
+const trekNight = { ready: false, rule: null, schedule: null, feed: null };
 

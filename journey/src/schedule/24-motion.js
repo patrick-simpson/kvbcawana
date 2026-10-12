@@ -64,6 +64,9 @@ function startMotionWatchers() {
   const flip = new MutationObserver((records) => {
     const wasHidden = /(^|\s)hidden(\s|$)/.test(records[0].oldValue || '');
     const nowHidden = journeyView.classList.contains('hidden');
+    // Into Trek's card: the card has its own entrance (style.css), and a
+    // "Check-in" stinger over it would name the wrong screen.
+    if (nowHidden && !trekView.classList.contains('hidden')) return;
     if (wasHidden !== nowHidden) playViewStinger(nowHidden ? 'checkin' : 'journey');
   });
   flip.observe(journeyView, { attributes: true, attributeFilter: ['class'], attributeOldValue: true });

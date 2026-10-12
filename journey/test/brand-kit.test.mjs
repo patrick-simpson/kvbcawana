@@ -64,6 +64,7 @@ test('the mirror carries everything this page loads, fonts with their licences',
     'tokens.json',
     'fonts.css',
     'logos/journey-white.svg',
+    'logos/trek-white.svg',
     'fonts/paytone-one-full-400-normal.woff2',
     'fonts/PaytoneOne-Regular.ttf',
     'fonts/londrina-solid-full-400-normal.woff2',
@@ -234,8 +235,16 @@ test("the baked art is the kit's own shapes, path for path", () => {
   const baked = [...styleCss.matchAll(/\sd='([^']+)'/g)].map((m) => m[1]);
   assert.ok(baked.length >= 8, 'the wave, the tab and the doodles are all baked in');
   for (const d of baked) assert.ok(kitPaths.has(d), `baked path ${d.slice(0, 24)}… is in the kit`);
-  // Journey's own wave and tab, not another club's.
-  for (const rel of ['shapes/wave-journey.svg', 'shapes/tab-c-journey.svg']) {
+  // Journey's own wave and tab, not another club's; and on Trek's small
+  // group card, Trek's wave and tab and the kit's stepped chip.
+  for (const rel of [
+    'shapes/wave-journey.svg',
+    'shapes/tab-c-journey.svg',
+    'shapes/wave-trek.svg',
+    'shapes/tab-c-trek.svg',
+    'shapes/chip-plate.svg',
+    'shapes/chip-keyline.svg',
+  ]) {
     const d = read(`brand/${rel}`).match(/\sd="([^"]+)"/)[1];
     assert.ok(baked.includes(d), `${rel} is on the page`);
   }

@@ -1,14 +1,33 @@
 /* ── View switching ──────────────────────────────────────────────── */
 
+/* Three views: the Check-in Display, the Journey lesson, and (club nights,
+   7:00-7:30) Trek's small group card. Every layer stays in the page; only
+   `hidden` moves, so the check-in frame stays connected under the other two. */
 function setView(phase) {
   const showJourney = phase === 'journey';
+  const showTrek = phase === 'trek';
   journeyView.classList.toggle('hidden', !showJourney);
-  checkinView.classList.toggle('hidden', showJourney);
+  trekView.classList.toggle('hidden', !showTrek);
+  checkinView.classList.toggle('hidden', showJourney || showTrek);
   if (showJourney) {
     showJourneyContent();
   } else {
     stopJourneyContent();
   }
+  if (showTrek) {
+    renderTrekCard();
+    // The card is shown only while it IS the scheduled phase (the poll, the
+    // end of a lesson, the toggle all ask scheduledPhase() first), so this is
+    // the schedule's own phase being adopted, never a fake flip.
+    if (scheduledPhase() === 'trek') lastPhase = 'trek';
+  }
+}
+
+/* Where a finished scheduled lesson (its video, then its slides) hands the
+   screen: Trek's card when it is Trek's time (a lesson that ran past 7:00
+   was waited for), else the Check-in Display, as always. */
+function lessonDoneView() {
+  return scheduledPhase() === 'trek' ? 'trek' : 'checkin';
 }
 
 // `lastPhase` tracks only the *scheduled* phase (for detecting a genuine
@@ -32,14 +51,20 @@ if (!CONFIGURE_MODE) setView(lastPhase);
 // toggle button). See "Manual video preview" below.
 let previewMode = false;
 
-setInterval(() => {
+function pollSchedule() {
   if (previewMode || CONFIGURE_MODE) return;
   const phase = scheduledPhase();
-  if (phase !== lastPhase) {
-    lastPhase = phase;
-    setView(phase);
-  }
-}, POLL_INTERVAL_MS);
+  if (phase === lastPhase) return;
+  // Trek's card never cuts a lesson: while the video or its slides are still
+  // going (or about to: the caption question, the loading overlay) the flip
+  // waits, lastPhase untouched so every poll asks again, and the lesson's own
+  // finish hands over to the card (lessonDoneView()). Only 7:30 ends it.
+  if (phase === 'trek' && journeyLessonRunning()) return;
+  lastPhase = phase;
+  setView(phase);
+}
+
+setInterval(pollSchedule, POLL_INTERVAL_MS);
 
 toggleBtn.addEventListener('click', () => {
   audioUnlocked = true;
@@ -48,7 +73,14 @@ toggleBtn.addEventListener('click', () => {
     return;
   }
   const showingJourney = !journeyView.classList.contains('hidden');
-  setView(showingJourney ? 'checkin' : 'journey');
+  const showingTrek = !trekView.classList.contains('hidden');
+  if (showingJourney || showingTrek) {
+    setView('checkin');
+    return;
+  }
+  // Back from the Check-in Display: to Trek's card in Trek's time, else the
+  // lesson (a lesson in Trek's time is still one press away in Settings).
+  setView(scheduledPhase() === 'trek' ? 'trek' : 'journey');
 });
 
 unmuteBtn.addEventListener('click', () => {
