@@ -346,6 +346,10 @@ export class Watcher {
       if (this.client && this.client.loginBlockedUntil > this.now()) {
         next = Math.max(next, this.client.loginBlockedUntil - this.now());
       }
+      // So does one that met TwoTimTwo down or no network (twotimtwo.js DOWN_BACKOFF_MS).
+      if (this.client && this.client.downUntil > this.now()) {
+        next = Math.max(next, this.client.downUntil - this.now());
+      }
     }
     await this.alarms.set(this.now() + next);
     return { next };
@@ -489,7 +493,8 @@ export class Watcher {
     const res = await client.report(date, { waitMs: 0, kind: 'watcher' });
     if (!res.ok && res.error === 'read-busy') return { ok: true, throttled: true, retryAfterMs: res.retryAfterMs };
     status.reads += 1;
-    status.lastReadAt = new Date(now).toISOString();
+    // When the report was read: after a sign-in (its own slots on the clock) that is later than `now`.
+    status.lastReadAt = new Date(Math.max(now, client.lastReadMs || 0)).toISOString();
     if (client.logins > loginsBefore) this.note(status, 'sign-in', { ok: res.ok || res.error !== 'login-refused' });
     if (!res.ok) {
       status.lastError = res.error;

@@ -30,7 +30,7 @@ async function setup({ laptopOn = false } = {}) {
   const tt = fakeTwoTimTwo({ checkin: () => CHECKIN, households: () => HOUSEHOLD_CSV, report: () => page(table('Sparks ', [])) });
   tt.checkinName = 'Sophie Tester';
   const storage = memoryStore();
-  const core = new SyncCore({ storage, env: ENV, fetchFn: tt.fetchFn, now: () => t });
+  const core = new SyncCore({ storage, env: ENV, fetchFn: tt.fetchFn, now: () => t, sleep: async (ms) => { t += ms; } });
   const login = await core.handle(new Request('https://sync.test/v1/login', { method: 'POST', body: JSON.stringify({ passphrase: 'kennebec' }) }));
   const { session } = await login.json();
   const call = async (method, path, body, auth = true) => {

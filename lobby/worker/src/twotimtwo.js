@@ -13,7 +13,13 @@
 //   - the password is a Worker secret and the session cookie lives in memory
 //     only: neither is ever stored, logged or returned;
 //   - a refused sign-in backs off (5, 15, then 60 minutes), so a wrong password
-//     never hammers their login or locks the account.
+//     never hammers their login or locks the account;
+//   - EVERY request that reads takes a slot from the one 5 s clock
+//     (readbudget.js): a page, each hop of the sign-in (the form, the post, a
+//     redirect) and every redirect hop. Only the check-in, undo and check-out
+//     posts themselves are writes and take none;
+//   - a sign-in that meets TwoTimTwo down or the network gone backs off too
+//     (30 s, 1, 2, then 5 minutes), so an outage is never a stream of logins.
 //
 // The parsers follow the extension's own (chrome-extension/content.js
 // fetchCheckinReport, and printer/docs/TWOTIMTWO.md for every selector), on linkedom
@@ -31,6 +37,10 @@ const MAX_REDIRECTS = 5;
 export const PAGE_MAX = 4 * 1024 * 1024;
 /** Sign-in back-off after each refused try in a row. */
 export const LOGIN_BACKOFF_MS = [5 * 60 * 1000, 15 * 60 * 1000, 60 * 60 * 1000];
+/** Sign-in back-off after each try in a row that met TwoTimTwo down (5xx) or no network. */
+export const DOWN_BACKOFF_MS = [30 * 1000, 60 * 1000, 2 * 60 * 1000, 5 * 60 * 1000];
+/** How long a request already under way (a sign-in's next hop, a redirect, the page after a sign-in) queues for its slot. */
+export const FOLLOW_WAIT_MS = 12 * 1000;
 const USER_AGENT = 'KVBC-Awana-CloudCheckin/1 (+https://awana.kvbchurch.org)';
 
 const LOGIN_FORM_RE = /name\s*=\s*["']LoginForm\[password\]["']/i;
@@ -418,6 +428,9 @@ export class TwoTimTwoClient {
     this.cookies = new Map();
     this.loginFails = 0;
     this.loginBlockedUntil = 0;
+    /** TwoTimTwo down or no network at the last sign-in: no sign-in before this (ms). */
+    this.downFails = 0;
+    this.downUntil = 0;
     this.logins = 0;
     /** When this session last asked for a signed-in page (ms; 0 never): the watcher's read clock reads it. */
     this.lastReadMs = 0;
@@ -444,17 +457,33 @@ export class TwoTimTwoClient {
   }
 
   /**
+   * A slot from the one clock, or a thrown `ReadBusy` (with retryAfterMs).
+   * No clock (the unit tests): nothing to wait for. @param {number} waitMs @param {string} kind
+   */
+  async slot(waitMs, kind) {
+    if (!this.budget) { this.lastReadMs = this.now(); return; }
+    const s = await this.budget.take(waitMs, kind);
+    if (!s.ok) throw Object.assign(new Error('read-busy'), { name: 'ReadBusy', retryAfterMs: s.retryAfterMs });
+    this.lastReadMs = this.now();
+  }
+
+  /**
    * One request, following redirects by hand so every hop's cookies are kept
-   * and no hop may leave the TwoTimTwo host.
-   * @param {string} path @param {{method?: string, form?: URLSearchParams}} [opts]
+   * and no hop may leave the TwoTimTwo host. `slot` makes the first hop take a
+   * slot from the clock (queueing up to its waitMs); every redirect hop takes one
+   * too (FOLLOW_WAIT_MS), a write's included.
+   * @param {string} path @param {{method?: string, form?: URLSearchParams, slot?: { waitMs: number, kind: string }}} [opts]
    * @returns {Promise<{status: number, path: string, html: string}>}
    */
   async request(path, opts = {}) {
     let url = new URL(path, this.origin);
     let method = opts.method || 'GET';
     let body = opts.form ? opts.form.toString() : undefined;
+    const kind = opts.slot ? opts.slot.kind : 'redirect';
     for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
       if (url.protocol !== 'https:' || url.host !== this.host) throw new Error('off-site-redirect');
+      if (hop > 0) await this.slot(FOLLOW_WAIT_MS, kind);
+      else if (opts.slot) await this.slot(opts.slot.waitMs, kind);
       /** @type {Record<string, string>} */
       const headers = { 'User-Agent': USER_AGENT, Accept: 'text/html,*/*' };
       const jar = this.cookieHeader();
@@ -476,38 +505,66 @@ export class TwoTimTwoClient {
     throw new Error('too-many-redirects');
   }
 
-  /** @returns {Promise<{ok: true} | {ok: false, error: string}>} */
-  async login() {
+  /**
+   * Sign in: the form, the post and any redirect, each on the one clock (the
+   * first queues up to `waitMs`, the rest up to FOLLOW_WAIT_MS).
+   * @param {{ waitMs?: number, kind?: string }} [opts]
+   * @returns {Promise<{ok: true} | {ok: false, error: string, retryAfterMs?: number}>}
+   */
+  async login(opts = {}) {
     const t = this.now();
     if (this.loginBlockedUntil > t) return { ok: false, error: 'login-backoff' };
+    if (this.downUntil > t) return { ok: false, error: 'twotimtwo-down', retryAfterMs: this.downUntil - t };
     this.cookies.clear();
-    this.logins += 1;
     let res;
     try {
-      const form = await this.request('/site/login');
+      const form = await this.request('/site/login', { slot: { waitMs: opts.waitMs ?? 0, kind: 'login' } });
+      this.logins += 1;
+      // TwoTimTwo down already on the form: no post into it.
+      if (form.status >= 500) {
+        this.cookies.clear();
+        this.noteDown();
+        return { ok: false, error: 'twotimtwo-down' };
+      }
       const params = new URLSearchParams();
       const token = loginToken(form.html);
       if (token) params.set('YII_CSRF_TOKEN', token);
       params.set('LoginForm[username]', this.username);
       params.set('LoginForm[password]', this.password);
       params.set('Login', '1');
-      res = await this.request('/site/login', { method: 'POST', form: params });
+      res = await this.request('/site/login', { method: 'POST', form: params, slot: { waitMs: FOLLOW_WAIT_MS, kind: 'login' } });
     } catch (err) {
-      // A network failure is not a refused password: no back-off for it.
-      return { ok: false, error: errorCode(err) };
+      this.cookies.clear();
+      const code = errorCode(err);
+      if (code === 'read-busy') return { ok: false, error: code, retryAfterMs: /** @type {any} */ (err).retryAfterMs };
+      // A network failure is not a refused password, but it is not a reason to try
+      // again at once either: the down back-off.
+      if (code === 'network' || code === 'timeout') this.noteDown();
+      return { ok: false, error: code };
     }
     if (res.status === 200 && !isLoginPage(res.html) && !/\/site\/login/i.test(res.path)) {
       this.loginFails = 0;
       this.loginBlockedUntil = 0;
+      this.downFails = 0;
+      this.downUntil = 0;
       return { ok: true };
     }
     this.cookies.clear();
-    // TwoTimTwo itself failing is not a refused password: no back-off for it.
-    if (res.status >= 500) return { ok: false, error: 'twotimtwo-down' };
+    // TwoTimTwo itself failing is not a refused password: the shorter down back-off.
+    if (res.status >= 500) {
+      this.noteDown();
+      return { ok: false, error: 'twotimtwo-down' };
+    }
     const wait = LOGIN_BACKOFF_MS[Math.min(this.loginFails, LOGIN_BACKOFF_MS.length - 1)];
     this.loginFails += 1;
     this.loginBlockedUntil = this.now() + wait;
     return { ok: false, error: 'login-refused' };
+  }
+
+  /** TwoTimTwo down or no network at a sign-in: wait 30 s, 1, 2, then 5 minutes before the next. */
+  noteDown() {
+    this.downUntil = this.now() + DOWN_BACKOFF_MS[Math.min(this.downFails, DOWN_BACKOFF_MS.length - 1)];
+    this.downFails += 1;
   }
 
   /**
@@ -521,22 +578,23 @@ export class TwoTimTwoClient {
    * @returns {Promise<{ok: true, html: string} | {ok: false, error: string, retryAfterMs?: number}>}
    */
   async page(path, opts = {}) {
+    // The caller's wait is for the first request; once one is made the rest queue
+    // behind it (FOLLOW_WAIT_MS): a sign-in is never left half done.
+    let waitMs = opts.waitMs ?? 0;
     for (let attempt = 0; attempt < 2; attempt++) {
       if (!this.cookies.size || attempt > 0) {
-        const signedIn = await this.login();
+        const signedIn = await this.login({ waitMs });
         if (!signedIn.ok) return signedIn;
+        waitMs = FOLLOW_WAIT_MS;
       }
       let res;
-      if (this.budget) {
-        const slot = await this.budget.take(opts.waitMs ?? 0, opts.kind || 'page');
-        if (!slot.ok) return { ok: false, error: 'read-busy', retryAfterMs: slot.retryAfterMs };
-      }
-      this.lastReadMs = this.now();
       try {
-        res = await this.request(path);
+        res = await this.request(path, { slot: { waitMs, kind: opts.kind || 'page' } });
       } catch (err) {
-        return { ok: false, error: errorCode(err) };
+        const code = errorCode(err);
+        return code === 'read-busy' ? { ok: false, error: code, retryAfterMs: /** @type {any} */ (err).retryAfterMs } : { ok: false, error: code };
       }
+      waitMs = FOLLOW_WAIT_MS;
       if (isLoginPage(res.html) || /\/site\/login/i.test(res.path)) continue;
       // A refusal is answered with one fresh sign-in: TwoTimTwo applies a
       // permission granted to the user at its next sign-in, not to a session
@@ -635,6 +693,7 @@ export class TwoTimTwoClient {
 function errorCode(err) {
   const msg = err instanceof Error ? err.message : '';
   if (msg === 'off-site-redirect' || msg === 'too-many-redirects' || msg === 'page-too-large') return msg;
+  if (err instanceof Error && err.name === 'ReadBusy') return 'read-busy';
   if (err instanceof Error && (err.name === 'TimeoutError' || err.name === 'AbortError')) return 'timeout';
   return 'network';
 }

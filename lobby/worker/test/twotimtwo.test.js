@@ -5,7 +5,9 @@ import { readFileSync } from 'node:fs';
 import { JSDOM } from 'jsdom';
 import { describe, expect, it } from 'vitest';
 import { CHECKIN_PAGE, HOUSEHOLD_CSV, LOGIN_PAGE, fakeTwoTimTwo, page, table } from './fixtures.js';
+import { ReadBudget, READ_INTERVAL_MS } from '../src/readbudget.js';
 import {
+  DOWN_BACKOFF_MS,
   LOGIN_BACKOFF_MS,
   TwoTimTwoClient,
   credentialsFrom,
@@ -270,12 +272,67 @@ describe('the TwoTimTwo client', () => {
     expect(tt.calls.every((x) => x.host === HOST)).toBe(true);
   });
 
-  it('TwoTimTwo down is a fixed code, with no back-off', async () => {
+  it('TwoTimTwo down is a fixed code, with no password back-off', async () => {
     const tt = fakeTwoTimTwo();
     tt.down = true;
     const c = new TwoTimTwoClient(CREDS, { fetchFn: tt.fetchFn });
     expect(await c.report('2026-10-14')).toEqual({ ok: false, error: 'twotimtwo-down' });
     expect(c.loginBlockedUntil).toBe(0);
+  });
+
+  it('every request of a sign-in (the form, the post, the redirect) and the page after it takes a slot on the one 5 s clock', async () => {
+    let t = Date.parse('2026-10-14T22:00:00Z');
+    const tt = fakeTwoTimTwo();
+    const at = [];
+    const fetchFn = (url, init) => { at.push(t); return tt.fetchFn(url, init); };
+    const budget = new ReadBudget({ now: () => t, sleep: async (ms) => { t += ms; } });
+    const c = new TwoTimTwoClient(CREDS, { fetchFn, now: () => t, budget });
+    const r = await c.report('2026-10-14', { waitMs: 0, kind: 'watcher' });
+    expect(r.ok).toBe(true);
+    // GET /site/login, POST /site/login, the redirect to /site/index, the report
+    expect(tt.calls.map((x) => `${x.method} ${x.path.split('?')[0]}`)).toEqual(['GET /site/login', 'POST /site/login', 'GET /site/index', 'GET /clubber/checkin_report']);
+    expect(at.slice(1).map((v, i) => v - at[i])).toEqual([READ_INTERVAL_MS, READ_INTERVAL_MS, READ_INTERVAL_MS]);
+    expect(budget.stats().taken).toEqual({ login: 3, watcher: 1 });
+    // a caller that will not wait finds the clock booked: no request, not even a sign-in
+    const busy = new TwoTimTwoClient(CREDS, { fetchFn, now: () => t, budget });
+    expect(await busy.report('2026-10-14', { waitMs: 0 })).toMatchObject({ ok: false, error: 'read-busy', retryAfterMs: READ_INTERVAL_MS });
+    expect(tt.calls).toHaveLength(4);
+  });
+
+  it('a sign-in that meets TwoTimTwo down or no network backs off 30 s, 1, 2, then 5 minutes; a good one clears it', async () => {
+    let t = 0;
+    let net = 'down';
+    const tt = fakeTwoTimTwo();
+    const fetchFn = async (url, init) => {
+      if (net === 'gone') throw new TypeError('fetch failed');
+      tt.down = net === 'down';
+      return tt.fetchFn(url, init);
+    };
+    const c = new TwoTimTwoClient(CREDS, { fetchFn, now: () => t });
+    const sent = () => tt.calls.length;
+    expect(await c.report('2026-10-14')).toEqual({ ok: false, error: 'twotimtwo-down' });
+    expect(sent()).toBe(1);
+    // a burst of reads during the outage sends nothing at all
+    for (let i = 0; i < 5; i++) expect(await c.report('2026-10-14')).toMatchObject({ ok: false, error: 'twotimtwo-down', retryAfterMs: DOWN_BACKOFF_MS[0] });
+    expect(sent()).toBe(1);
+    expect(c.loginBlockedUntil).toBe(0);   // never the wrong-password back-off
+    t += DOWN_BACKOFF_MS[0];
+    net = 'gone';
+    expect(await c.report('2026-10-14')).toEqual({ ok: false, error: 'network' });
+    expect(c.downUntil - t).toBe(DOWN_BACKOFF_MS[1]);
+    t += DOWN_BACKOFF_MS[1];
+    await c.report('2026-10-14');
+    expect(c.downUntil - t).toBe(DOWN_BACKOFF_MS[2]);
+    t += DOWN_BACKOFF_MS[2];
+    await c.report('2026-10-14');
+    t += DOWN_BACKOFF_MS[3];
+    await c.report('2026-10-14');
+    expect(c.downUntil - t).toBe(DOWN_BACKOFF_MS[3]);
+    t += DOWN_BACKOFF_MS[3];
+    net = 'up';
+    expect((await c.report('2026-10-14')).ok).toBe(true);
+    expect(c.downUntil).toBe(0);
+    expect(c.downFails).toBe(0);
   });
 
   it('a network failure is a fixed code, never the error\'s own text', async () => {

@@ -215,7 +215,7 @@ describe('the watcher', () => {
     const s = setup({ kids: [kid(1)] });
     for (let i = 0; i < 4; i++) { await s.w.tick(); s.tick(WATCH_INTERVAL_MS); }
     expect(s.tt.calls.filter((c) => c.method === 'POST').every((c) => c.path === '/site/login')).toBe(true);
-    const core = new SyncCore({ storage: memoryStore(), env: ENV, fetchFn: s.tt.fetchFn, now: s.now,
+    const core = new SyncCore({ storage: memoryStore(), env: ENV, fetchFn: s.tt.fetchFn, now: s.now, sleep: async (ms) => { s.tick(ms); },
       publish: async () => { throw new Error('published'); }, broadcast: () => { throw new Error('broadcast'); } });
     await core.alarm();
   });
@@ -281,7 +281,7 @@ describe('the watcher', () => {
 describe('the status routes', () => {
   it('need a signed-in screen, and show counts only', async () => {
     const s = setup({ kids: [kid(1)] });
-    const core = new SyncCore({ storage: memoryStore(), env: { ...ENV, INITIAL_PASSPHRASE: 'kennebec' }, fetchFn: s.tt.fetchFn, now: s.now });
+    const core = new SyncCore({ storage: memoryStore(), env: { ...ENV, INITIAL_PASSPHRASE: 'kennebec' }, fetchFn: s.tt.fetchFn, now: s.now, sleep: async (ms) => { s.tick(ms); } });
     const call = (method, path, token) => core.handle(new Request(`https://sync.test${path}`, {
       method, headers: token ? { Authorization: `Bearer ${token}` } : {},
     }));
@@ -299,6 +299,8 @@ describe('the status routes', () => {
 
 describe('the Settings test read', () => {
   const SUNDAY = Date.parse('2026-10-11T18:45:00Z');
+  /** The time a read waited for its slot on the one clock (a sign-in takes slots too). */
+  const slept = { ms: 0 };
 
   it('reads the most recent club night: today on a Wednesday, else the last one', () => {
     expect(lastClubNight(SUNDAY)).toBe('2026-10-07');
@@ -331,7 +333,7 @@ describe('the Settings test read', () => {
   it('an unreadable page is described by its shape, never its text', async () => {
     const tt = fakeTwoTimTwo({ report: () => '<html><head><title>KVBC - Checkin Report</title></head><body><table><tr><td>Zed Uniquename</td></tr></table></body></html>' });
     const alarm = { at: null };
-    const w = new Watcher({ storage: memoryStore(), env: ENV, fetchFn: tt.fetchFn, now: () => SUNDAY, alarms: { set: (a) => { alarm.at = a; }, get: () => alarm.at }, log: () => {} });
+    const w = new Watcher({ storage: memoryStore(), env: ENV, fetchFn: tt.fetchFn, now: () => SUNDAY + slept.ms, sleep: async (ms) => { slept.ms += ms; }, alarms: { set: (a) => { alarm.at = a; }, get: () => alarm.at }, log: () => {} });
     const r = await w.testRead();
     expect(r.test).toMatchObject({ ok: false, error: 'report-unreadable', shape: { title: 'KVBC - Checkin Report', tables: 1, clubTables: 0, loginForm: false } });
     expect(JSON.stringify(r)).not.toContain('Uniquename');
@@ -340,6 +342,8 @@ describe('the Settings test read', () => {
 
 describe('checking one child in (owner-only)', () => {
   const SUNDAY = Date.parse('2026-10-11T18:45:00Z');
+  /** The time a read waited for its slot on the one clock (a sign-in takes slots too). */
+  const slept = { ms: 0 };
   const make = (opts) => setup({ start: SUNDAY, ...opts });
 
   it('previews first: who, their club and the meeting, and posts nothing', async () => {
@@ -377,7 +381,7 @@ describe('checking one child in (owner-only)', () => {
     expect(await s.w.checkIn({})).toEqual({ ok: false, error: 'no-child' });
     const twins = setup({ start: SUNDAY });
     twins.tt.fetchFn = fakeTwoTimTwo({ checkin: () => CHECKIN_PAGE.replace('recid="663"', 'recid="664"').replace('Lu Tester', 'Kit Tester') }).fetchFn;
-    const w2 = new Watcher({ storage: memoryStore(), env: ENV, fetchFn: twins.tt.fetchFn, now: () => SUNDAY, log: () => {} });
+    const w2 = new Watcher({ storage: memoryStore(), env: ENV, fetchFn: twins.tt.fetchFn, now: () => SUNDAY + slept.ms, sleep: async (ms) => { slept.ms += ms; }, log: () => {} });
     expect(await w2.checkIn({ name: 'Kit Tester', confirm: true })).toEqual({ ok: false, error: 'ambiguous', matches: 2 });
     expect(s.tt.checkins).toHaveLength(0);
   });

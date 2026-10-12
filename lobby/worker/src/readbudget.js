@@ -13,7 +13,10 @@
 //   a few seconds  a desk or phone request: it queues behind what is already
 //                  booked, and past that is refused with retryAfterMs (the
 //                  caller answers from its last read, or 429)
-// Writes (a check-in post, an undo, a check-out) are not reads and take no slot.
+// Every other request to TwoTimTwo takes one too (twotimtwo.js): each hop of a
+// sign-in (the form, the post, its redirect) and every redirect hop, queueing
+// behind the request that began them. Writes (a check-in post, an undo, a
+// check-out) are not reads and take no slot themselves.
 //
 // The next free moment is also kept in storage, so a restarted Durable
 // Object does not start a read inside the interval of the one before it.

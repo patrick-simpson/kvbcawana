@@ -419,8 +419,14 @@ undo): the station ends it quietly.
   (it skips its turn), `INTERACTIVE_WAIT_MS` (12 s) for a desk or phone request,
   and a refusal is `{error: 'read-busy', retryAfterMs}`. The watcher's report is
   read about every 10 s (`WATCH_INTERVAL_MS`), the rest of the slots are the
-  others'. The clock survives a restart (`read:next` in storage). Posts are
-  writes and take no slot.
+  others'. The clock survives a restart (`read:next` in storage). The sign-in
+  takes slots too, one per request (the form, the login post, its redirect),
+  and so does every redirect hop: the first request of a call queues for the
+  caller's `waitMs`, the rest behind it (`FOLLOW_WAIT_MS`, 12 s). A sign-in that
+  meets TwoTimTwo down (5xx) or no network backs off 30 s, 1, 2, then 5 minutes
+  (`DOWN_BACKOFF_MS`; answered `twotimtwo-down` with `retryAfterMs` meanwhile; a
+  refused password keeps its own 5 / 15 / 60 minutes). The check-in, undo and
+  check-out posts themselves are writes and take no slot.
 - **Switches** (`wrangler.toml [vars]`, both `"off"` until the shadow night):
   `CLOUD_PRINT` (jobs for TwoTimTwo-page check-ins) and `SINGLE_PUBLISHER`
   (in cloud mode the Worker publishes `tally`, `tonight` and the still-here
