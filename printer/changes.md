@@ -1,4 +1,15 @@
-﻿## [9.1.0] - 2026-10-11
+﻿## [9.2.0] - 2026-10-12
+Online check-in: this computer can be the print station for the desk page and TwoTimTwo's own page.
+
+**The laptop prints jobs from the sync service.** With the print role on and this computer signed in, KVBC Awana makes a station key (kept with Windows data protection), registers it with the sync service and takes sealed print jobs from it: check-ins from the desk page (awana.kvbchurch.org/desk), from TwoTimTwo's own check-in page and from the phone page. Each job prints at most once; a job whose outcome is unknown is never printed again and the tray says CHECK THE PRINTER. The Chrome extension still works exactly as before as the backup.
+
+**The lobby TVs greet each child once.** The station sends each child's welcome (birthday, first time, welcome back, milestones) with its print job, and the sync service lets one greeting per child through a night.
+
+**History.** Check-ins are saved, encrypted with the church passphrase, to the sync service's history (Settings, History). Set up this computer once (tray, Set up this computer...) to unlock it; the tray's Import laptop history copies the old history in.
+
+**Also:** the sign-in now uses the passphrase's derived key (the word itself never leaves this computer), the print server's code is split into smaller files, and the tests run four at a time.
+
+## [9.1.0] - 2026-10-11
 Online only: the laptop's dashboard and its Wi-Fi phone page are retired; their tools live on awana.kvbchurch.org/settings.
 
 **Everything is on the settings page now.** Open awana.kvbchurch.org/settings on the check-in laptop (signed in with the church passphrase) for the printers, labels and templates, reprints (one or a whole stretch), leader tags, one-off name tags, custom labels, the attendance audit, rehearsal mode, print failures and diagnostics. The tray and the status window open it. With no internet the settings page can't load: check in on paper and enter the names once the internet is back.
