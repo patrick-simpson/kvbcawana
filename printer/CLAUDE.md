@@ -308,14 +308,13 @@ receipt-printer trial (Star TSP100 / Rongta, `receipt.js`, printerType
 `receipt`/`receipt-usb`, `/receipt/*`, "Printer jammed" and `/jam-reprint`,
 `/touch/jam`) was removed for good: do not bring any of it back. `printLabel()`
 is `printImage()` on the name tag printer with the backup printer
-(`backupPrinter()`) as its only fallback. `RETIRED_PRINTER_KEYS` are ignored,
-a backup naming the old `receiptPrinterName` is not used, and POST /config
-drops them all. A late child (`lateGoToLine` answers) gets a plain name tag and
+(`backupPrinter()`) as its only fallback. Any receipt keys left in an old
+config.json are never read. A late child (`lateGoToLine` answers) gets a plain name tag and
 the household ONE drop-off label (`dropOffTagFor` / `generateDropOffTag`, once
 per family per night) on the label printer. The card's band says GO TO and the time, never "late", and the child's own tag is identical to everyone's (owner: nothing singles a child out). `printerSetupWarnings()` (pure)
 judges the setup: `printerUnset`, `printerNotFound`, `printerOffline`
-(Get-Printer PrinterStatus), `printerLooksLikeReceipt`; the dashboard and the
-status window read offline and receipt-like as PROBLEM.
+(Get-Printer PrinterStatus); the dashboard and the
+status window read offline as PROBLEM.
 `scripts/test-label-printer.cjs`.
 
 **One-off name tags (7.18.0, owner 2026-10-08).** `POST /print-oneoff`

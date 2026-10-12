@@ -1188,11 +1188,10 @@ function loadHealth() {
 
     // A jam is at least as bad as a missing printer: in both cases nothing is
     // coming out of the printer, so it reads RED rather than a mild yellow. So
-    // does a printer Windows calls offline, and a name tag printer that looks
-    // like the retired receipt printer (labels would not reach the D450).
+    // does a printer Windows calls offline.
     var hasError = warnings.some(function(w) {
       return w.type === 'printerNotFound' || w.type === 'spoolerBacklog'
-        || w.type === 'printerOffline' || w.type === 'printerLooksLikeReceipt';
+        || w.type === 'printerOffline';
     });
     var hasWarning = warnings.length > 0;
     renderStatusChip(hasError ? 'problem' : 'online');

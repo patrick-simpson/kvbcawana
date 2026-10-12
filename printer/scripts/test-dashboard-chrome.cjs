@@ -479,9 +479,8 @@ console.log('\ndashboard chrome: the stepped chip');
 //
 // In order, on one dashboard: each scene follows the last, so a chip that
 // never leaves a state (PROBLEM after the printer is back, OFFLINE after the
-// server is) fails too. Only printerNotFound, spoolerBacklog, printerOffline
-// and printerLooksLikeReceipt mean nothing
-// is printing; any other warning is "attention", and the chip stays ONLINE.
+// server is) fails too. Only printerNotFound, spoolerBacklog and
+// printerOffline mean nothing is printing; any other warning is "attention", and the chip stays ONLINE.
 const HEALTHY = { status: 'ok', version: '6.16.0', printer: 'Zebra ZD421', uptime: 3600, warnings: [] };
 const answers = (body) => () => Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(body) });
 const warns = (...warnings) => answers({ ...HEALTHY, warnings });

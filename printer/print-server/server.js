@@ -2919,8 +2919,8 @@ function printImages(paths, printerName) {
 // misses a tag. Only when both fail does the caller see an error, and it
 // records the failure as it always has (the dashboard's failures list and its
 // Reprint button). The receipt-printer trial (Star / Rongta, 6.22-7.16) is
-// gone (owner, 2026-10-08): its config keys are ignored and dropped on the
-// next save (RETIRED_PRINTER_KEYS).
+// gone (owner, 2026-10-08); any of its keys still in an old config.json are
+// never read.
 
 // Is the named printer installed and not offline? On Windows a job sent to a
 // disconnected USB printer just waits in the queue, which would look like
@@ -2948,18 +2948,10 @@ async function fallbackPrinterReady(name) {
   }
 }
 
-// Settings the receipt trial wrote. Nothing reads them; POST /config drops
-// them, so the next save leaves a clean file.
-const RETIRED_PRINTER_KEYS = ['printerType', 'receiptHost', 'receiptPort', 'receiptDots', 'receiptCut', 'receiptPrinterName'];
-
 // The backup printer ("If it fails, print on", 6.26.0): set on the dashboard
-// beside the name tag printer, '' for none. Never the retired receipt printer
-// (a receipt-mode config could name the Star as its own backup).
+// beside the name tag printer, '' for none.
 function backupPrinter() {
-  const backup = String(config.backupPrinterName || '').trim();
-  const retired = String(config.receiptPrinterName || '').trim();
-  if (backup && retired && backup.toLowerCase() === retired.toLowerCase()) return '';
-  return backup;
+  return String(config.backupPrinterName || '').trim();
 }
 
 // Where labels print, in words, for the extension's panel and the dashboard.
@@ -8399,22 +8391,17 @@ const SPOOLER_UNKNOWN = Object.freeze(
 // rows (null when the query failed). Pure, so every case is tested off
 // Windows. A missing printer and an offline one both mean labels are not
 // coming out; no printer chosen means they go to whatever Windows' default
-// printer is (a PDF writer, or the retired receipt printer); and a chosen
-// printer that looks like the retired receipt printer is said out loud.
+// printer is (a PDF writer, or whatever else is installed).
 const PRINTER_STATUS_PROBLEMS = {
   1: 'paused', 2: 'in an error state', 4: 'reporting a paper jam', 5: 'out of labels',
   7: 'reporting a paper problem', 8: 'offline (check its USB cable and power)',
 };
-const RECEIPT_LIKE_NAME = /\bstar\b|\btsp\s?\d|rongta|receipt|\b80\s?mm\b|\bpos[- ]?\d/i;
 function printerSetupWarnings(name, printers) {
   const chosen = String(name || '').trim();
   if (!chosen) {
     return [{ type: 'printerUnset', message: 'No name tag printer is chosen, so labels go to Windows\' default printer. Pick the label printer (the D450) in Settings \u2192 Printer.' }];
   }
   const out = [];
-  if (RECEIPT_LIKE_NAME.test(chosen)) {
-    out.push({ type: 'printerLooksLikeReceipt', message: `The name tag printer is "${chosen}", which looks like the retired receipt printer. Pick the label printer (the D450) in Settings \u2192 Printer.` });
-  }
   if (printers === null) {
     out.push({ type: 'printerCheckFailed', message: 'Could not query printers' });
     return out;
@@ -9150,11 +9137,6 @@ app.post('/config', (req, res) => {
       if (!isSafePrinterName(bp)) return res.status(400).json({ error: 'backupPrinterName contains unsupported characters' });
       next.backupPrinterName = bp;
     }
-    // The receipt-printer trial's settings leave the file on this save, and a
-    // backup that named the receipt printer goes with them.
-    const retiredReceipt = String(next.receiptPrinterName || '').trim().toLowerCase();
-    RETIRED_PRINTER_KEYS.forEach((k) => { delete next[k]; });
-    if (retiredReceipt && String(next.backupPrinterName || '').trim().toLowerCase() === retiredReceipt) next.backupPrinterName = '';
     // The label roll on a Linux print station (cups.js): a CUPS media keyword,
     // '' for the DYMO 30256 default.
     if (cupsMedia !== undefined) {
@@ -10127,7 +10109,7 @@ module.exports = {
   // Musical printer (#11/#12) — the TSPL compiler is the testable artifact.
   buildTuneTspl, nextTuneName, TUNE_NAMES, TUNE_ROTATION,
   // The dispatcher every label print goes through (with its backup printer).
-  printLabel, printerFallbackWarnings, backupPrinter, RETIRED_PRINTER_KEYS, printerSetupWarnings,
+  printLabel, printerFallbackWarnings, backupPrinter, printerSetupWarnings,
   // Spooler backlog (#256). The verdict and both parsers are PURE so the one
   // piece of judgement here is exhaustively testable on a machine with no
   // Windows spooler at all — which is every CI runner this repo has.

@@ -123,21 +123,12 @@ exit 0
 
   origLog('label printer: nothing is left of the receipt-printer trial');
   {
-    useConfig({ printerType: 'receipt-usb', receiptPrinterName: 'Star TSP100 Cutter', backupPrinterName: 'star tsp100 cutter',
-      receiptHost: '192.168.1.50', receiptPort: 9100, receiptDots: 576, receiptCut: 'partial' });
+    useConfig({ printerName: 'Fake', backupPrinterName: '' });
     const n = jobs().length;
     let r = await post('/print-custom', { text: 'Old config' });
-    check('a receipt-trial config prints on the label printer', r.status === 200 && jobs()[n] === 'job Fake', JSON.stringify(jobs().slice(n)));
-    check('a backup that named the receipt printer is not used', server.backupPrinter() === '');
+    check('a label prints on the label printer', r.status === 200 && jobs()[n] === 'job Fake', JSON.stringify(jobs().slice(n)));
     const h = await health();
     check('/health no longer reports a receipt printer', !('receiptPrinter' in h) && !(h.warnings || []).some((w) => w && /^receipt/.test(w.type)), JSON.stringify(h.warnings));
-    r = await post('/config', { backupPrinterName: 'Star TSP100 Cutter' });
-    const saved = JSON.parse(fs.readFileSync(cfgPath, 'utf8'));
-    check('the next save drops every receipt key', r.status === 200 && server.RETIRED_PRINTER_KEYS.every((k) => !(k in saved)), JSON.stringify(saved));
-    check('and the backup that named the receipt printer with them', saved.backupPrinterName === '', JSON.stringify(saved.backupPrinterName));
-    r = await post('/config', { printerType: 'receipt', receiptHost: '10.0.0.9' });
-    const again = JSON.parse(fs.readFileSync(cfgPath, 'utf8'));
-    check('an old dashboard posting receipt fields saves, and they go nowhere', r.status === 200 && !('printerType' in again) && !('receiptHost' in again), JSON.stringify(again));
     for (const [m, p] of [['POST', '/receipt/test'], ['POST', '/receipt/discover'], ['POST', '/jam-reprint'], ['GET', '/touch/jam']]) {
       const res = await fetch(BASE + p, { method: m, headers: { 'Content-Type': 'application/json' }, body: m === 'POST' ? '{}' : undefined });
       check(`${m} ${p} is gone`, res.status === 404, String(res.status));
@@ -159,9 +150,7 @@ exit 0
     check('out of labels and paused are printerOffline too',
       [5, 1].every((st) => types(w('D450', [{ Name: 'D450', PrinterStatus: st }])) === 'printerOffline'));
     check('a failed query is printerCheckFailed, never "fine"', types(w('D450', null)) === 'printerCheckFailed');
-    check('a receipt-looking name is said out loud',
-      ['Star TSP100 Cutter (TSP143)', 'RONGTA 80mm Series Printer', 'POS-80 Receipt'].every((n) => w(n, [{ Name: n, PrinterStatus: 0 }]).some((x) => x.type === 'printerLooksLikeReceipt')));
-    check('and a label printer\'s name is not', !['Phomemo D450', 'Zebra ZD421', 'DYMO LabelWriter 450'].some((n) => w(n, [{ Name: n, PrinterStatus: 0 }]).length));
+    check('a label printer\'s name draws no warning of its own', !['Phomemo D450', 'Zebra ZD421', 'DYMO LabelWriter 450'].some((n) => w(n, [{ Name: n, PrinterStatus: 0 }]).length));
   }
 
   origLog('label printer: the drop-off label for a late arrival');
