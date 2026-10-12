@@ -420,7 +420,8 @@ async function serverSuite() {
       // Since 2026-10-12 /checkin checks out through the Worker's desk route (TwoTimTwo's own
       // check-out, a sealed history row); /phone/undo checkout:true stays for the touch screen.
       check('Check out goes through the Worker\'s desk route', /desk\.checkout\(childOf\(entry\)\)/.test(phone));
-      check('and is never offered on a child already checked out', /if \(!e\.checkedOut\) \{\n\s+var cb = el\('button', 'tt'/.test(phone));
+      // (nor on a walk-in, nor on the youth page, where the Worker checks Trek and Journey out: 2026-10-12)
+      check('and is never offered on a child already checked out', /if \(!e\.checkedOut && !e\.walkin\) \{[\s\S]{0,600}if \(!SIMPLE\) \{\n\s+var cb = el\('button', 'tt'/.test(phone));
       check('it asks first, naming the child', /function askCheckout\(entry\)/.test(phone) && /'Check out ' \+ name \+ '\?'/.test(phone));
       const relay = require(path.join(root, 'print-server', 'phone-relay.js'));
       check('the website\'s relay already carries it', relay.relayAllowed('POST', '/phone/undo') && relay.relayAllowed('GET', '/phone/status/0f8c1a2b-3c4d-4e5f-8a9b-0c1d2e3f4a5b'));
