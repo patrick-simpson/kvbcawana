@@ -21,6 +21,7 @@ import { Moment, PrinterArt, Tv } from './home/Screens';
  * somebody else's website.
  */
 const first = (name: string) => name.trim().split(/\s+/)[0];
+const last = (name: string) => name.trim().split(/\s+/).slice(1).join(' ');
 
 export const Simulator: React.FC = () => {
   const [selectedClubber, setSelectedClubber] = useState<Clubber | null>(null);
@@ -133,7 +134,7 @@ export const Simulator: React.FC = () => {
               idle={!shown || !club}
               wait="The label prints here"
               run={runs}
-              spec={{ first: shown ? first(shown.name) : '', club: club || clubByName('Sparks') }}
+              spec={{ first: shown ? first(shown.name) : '', last: shown ? last(shown.name) : '', club: club || clubByName('Sparks') }}
               label={shown && club
                 ? `The label printer, acted out: a name label for ${first(shown.name)}, ${club.name}, comes out of the top.`
                 : 'The label printer, acted out: waiting for a check-in.'} />

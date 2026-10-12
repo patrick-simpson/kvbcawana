@@ -2,7 +2,7 @@ import React from 'react';
 import { useInView } from './Chrome';
 import { Ico, IcoName } from './Icons';
 import { CLUBS, ClubId, Doodle, DoodleName, Shape, Sticker } from './Kit';
-import { AppArt, KioskArt, LobbyArt, PhoneArt, PrinterArt, ProjectorArt } from './Screens';
+import { AppArt, KioskArt, LabelsArt, LobbyArt, PhoneArt, ProjectorArt } from './Screens';
 
 /*
  * The six parts of one club night, each a catalog "club opener" card in one
@@ -31,12 +31,8 @@ const PARTS: Part[] = [
     id: 'labels', club: 'puggles', num: '01', kicker: 'At the check-in table', icon: 'label',
     title: 'Labels print themselves',
     body: <>Check a child in on TwoTimTwo and a 4×2 name label prints by itself, with the allergy, the birthday and the photo wishes a leader needs to see at a glance.</>,
-    facts: ['A new collectible icon every week', 'One label per child, even on a double tap'],
-    art: (on) => (
-      <PrinterArt run={on ? 'in' : 'out'} idle={!on}
-        spec={{ first: 'Micah', club: CLUBS[2], icons: [{ icon: 'cake', words: 'Turning 7!' }, { icon: 'peanut' }, { icon: 'nocam' }] }} noPhotos
-        label="Recreation of a 4 by 2 inch name label coming out of a thermal printer: the Sparks mark in a panel on the left, a small leaf for the season, the first name Micah in big bold type with Sparks beneath it, and along the bottom this week's rocket icon, a birthday cake that says Turning 7, a peanut for a nut allergy and a crossed-out camera for no photos, with a black bar down the right edge, also meaning no photos." />
-    ),
+    facts: ['Each club’s own mark on its labels', 'One label per child, even on a double tap'],
+    art: (on) => <LabelsArt on={on} />,
     doodles: ['sparkle-4pt', 'dot', 'squiggle-s'],
   },
   {
@@ -58,9 +54,9 @@ const PARTS: Part[] = [
   {
     id: 'journey', club: 'journey', num: '04', kicker: 'In the youth room', icon: 'kiosk',
     title: 'The lesson, ready when the room is',
-    body: <>A little kiosk shows the lobby welcome most of the evening. At 6:30 it turns to the week’s Journey lesson and waits for a leader to press Begin, with captions and teaching slides ready for the students.</>,
-    facts: ['Runs on a PC in the youth room', 'Curriculum the church already licenses through its own Awana Ministry Membership'],
-    art: () => <KioskArt />,
+    body: <>The youth room’s PC shows the lobby welcome most of the evening. At 6:30 it turns to the week’s Journey lesson and waits for a leader to press Begin, with captions and teaching slides ready for the students.</>,
+    facts: ['Lessons saved on the PC, so slow internet never interrupts one', 'Curriculum the church already licenses through its own Awana Ministry Membership'],
+    art: (on) => <KioskArt on={on} />,
     doodles: ['squiggle-wave', 'sparkle-4pt-x', 'ring'],
   },
   {

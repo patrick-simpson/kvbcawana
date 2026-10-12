@@ -5,7 +5,7 @@
    depth (a hard offset, never a blur). Paytone One shouts, Londrina Solid
    labels, Figtree is read.
 
-   Prefixes: kv- (the pages), kv-scr- / kv-tv / kv-proj / kv-kiosk / kv-phone /
+   Prefixes: kv- (the pages), kv-scr- / kv-tv / kv-proj / kv-kiosk / kv-jv / kv-phone /
    kv-app / kv-label / kv-moment / kv-scene / kv-pickup (the screen
    recreations, sized in container units), tt- (the TwoTimTwo replica).
 
@@ -467,24 +467,96 @@ sup { font-size: .55em; line-height: 0; vertical-align: .9em; }
 .kv-proj__chip--amber { position: absolute; right: 4cqw; bottom: 6cqw; margin: 0; }
 .kv-proj__chip--amber .kv-step__value { background: rgba(252, 182, 20, .95); color: var(--ink); }
 
-/* The Journey kiosk */
-.kv-kiosk { padding-bottom: 4%; }
+/* The Journey screen (a PC and its monitor). Inside the screen --u is one
+   hundredth of the screen's width, the unit journey/public/src/style.css is
+   drawn in (19.2 px at 1080p), so its sizes carry over as numbers; only the
+   smallest type is set a little larger to read at this size. */
+.kv-kiosk { padding-bottom: 5%; }
 .kv-kiosk__bezel { position: relative; z-index: 1; background: #1d1b20; border-radius: 2.4cqw; padding: 1.6cqw; box-shadow: 1.6cqw 1.6cqw 0 rgba(35, 31, 32, .22); }
-.kv-kiosk__screen { position: relative; aspect-ratio: 16 / 10; overflow: hidden; border-radius: 1cqw; background: var(--brand-journey-ink); display: flex; flex-direction: column; align-items: center; justify-content: center; isolation: isolate; padding-bottom: 6%; }
-.kv-kiosk__tab { position: absolute; left: 0; top: 0; width: 34cqw; height: auto; color: var(--brand-journey); overflow: visible; }
-.kv-kiosk__tabtext { position: absolute; left: 2.6cqw; top: 2.2cqw; font: 400 2.8cqw/1 var(--label); letter-spacing: .1em; text-transform: uppercase; color: #fff; }
-.kv-kiosk__wave { position: absolute; z-index: -1; left: -4%; width: 108%; bottom: -1px; height: 26%; color: var(--brand-journey); transform: scaleX(-1); opacity: .9; }
-.kv-kiosk__d1 { position: absolute; width: 3.4cqw; right: 9cqw; top: 8cqw; color: #fff; }
-.kv-kiosk__d2 { position: absolute; width: 7cqw; right: 4cqw; top: 15cqw; color: var(--brand-journey-tint); }
-.kv-kiosk__mark { width: 40cqw; height: auto; }
-.kv-kiosk__week { font: 400 3cqw/1 var(--label); letter-spacing: .16em; text-transform: uppercase; color: var(--brand-journey-tint); margin-top: 3.4cqw; }
-.kv-kiosk__title { font: 400 9cqw/1 var(--shout); text-transform: uppercase; color: #fff; margin-top: .8cqw; }
-.kv-kiosk__actions { display: flex; gap: 2cqw; margin-top: 3cqw; }
-.kv-kiosk__begin, .kv-kiosk__skip { display: inline-flex; align-items: center; gap: 1cqw; font: 400 3cqw/1 var(--label); letter-spacing: .05em; text-transform: uppercase; border-radius: 999px; padding: 1.3cqw 2.6cqw; }
-.kv-kiosk__begin { background: #cf4518; color: #fff; position: relative; }
-.kv-kiosk__begin .kv-ico { width: 2.8cqw; height: 2.8cqw; }
-.kv-kiosk__skip { color: #fff; box-shadow: inset 0 0 0 .35cqw rgba(255, 255, 255, .7); }
-.kv-kiosk__foot { position: absolute; left: 42%; right: 42%; bottom: 0; height: 4.4cqw; background: linear-gradient(#2a272c, #151316); clip-path: polygon(20% 0, 80% 0, 100% 100%, 0 100%); }
+.kv-kiosk__screen { --u: .968cqw; position: relative; aspect-ratio: 16 / 9; overflow: hidden; border-radius: 1cqw; background: var(--brand-journey-ink); isolation: isolate; }
+.kv-kiosk__stand { position: absolute; left: 41%; right: 41%; bottom: 0; height: 5.4cqw; background: linear-gradient(#2a272c, #151316); clip-path: polygon(30% 0, 70% 0, 100% 100%, 0 100%); }
+.kv-kiosk__corner { position: absolute; z-index: 6; right: 2.8cqw; width: 3.4cqw; height: 3.4cqw; display: grid; place-items: center; border-radius: 50%; background: #2b2752; color: #fff; }
+.kv-kiosk__corner .kv-ico { width: 2cqw; height: 2cqw; }
+.kv-kiosk__corner--gear { top: 2cqw; }
+.kv-kiosk__corner--swap { bottom: 2cqw; background: #4a3f6e; }
+
+/* One view at a time; every view fills the screen. */
+.kv-jv { position: absolute; inset: 0; z-index: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; overflow: hidden; background: var(--brand-journey-ink); color: #fff; }
+.kv-jv__wave { position: absolute; left: 0; width: 100%; bottom: -1px; }
+.kv-jv__wave--back { height: 14%; color: var(--brand-journey-deep); transform: scaleX(-1); }
+.kv-jv__wave--front { height: 10%; color: var(--brand-journey); }
+
+/* The start screen */
+.kv-jv--splash { padding-bottom: 6%; }
+.kv-jv__tab { position: absolute; left: 0; top: 0; width: calc(23.9 * var(--u)); height: calc(15.5 * var(--u)); color: var(--brand-journey); overflow: visible; }
+.kv-jv__tabtext { position: absolute; left: calc(2.6 * var(--u)); top: calc(2.4 * var(--u)); font: 400 calc(2.1 * var(--u))/1 var(--label); letter-spacing: .06em; text-transform: uppercase; white-space: nowrap; }
+.kv-jv__d { position: absolute; color: #fff; }
+.kv-jv__d--1 { width: calc(2.4 * var(--u)); right: calc(17.6 * var(--u)); top: calc(8 * var(--u)); }
+.kv-jv__d--2 { width: calc(1 * var(--u)); right: calc(14.5 * var(--u)); top: calc(6.6 * var(--u)); }
+.kv-jv__d--3 { width: calc(2.6 * var(--u)); right: calc(10.4 * var(--u)); top: calc(9.6 * var(--u)); }
+.kv-jv__d--4 { width: calc(1.8 * var(--u)); left: calc(12 * var(--u)); top: calc(26 * var(--u)); }
+.kv-jv__d--5 { width: calc(1 * var(--u)); left: calc(9 * var(--u)); top: calc(30 * var(--u)); }
+.kv-jv__mark { width: calc(36 * var(--u)); height: auto; }
+.kv-jv__study { font: 400 calc(2.4 * var(--u))/1 var(--label); letter-spacing: .34em; padding-left: .34em; text-transform: uppercase; color: var(--brand-journey-tint); margin-top: calc(2 * var(--u)); }
+.kv-jv__week { font: 400 calc(2.2 * var(--u))/1 var(--label); letter-spacing: .1em; text-transform: uppercase; color: var(--brand-journey-tint); margin-top: calc(3.6 * var(--u)); }
+.kv-jv__title { font: 400 calc(6.9 * var(--u))/.98 var(--shout); text-transform: uppercase; text-shadow: .06em .06em 0 var(--brand-journey-deep); margin-top: calc(.3 * var(--u)); }
+.kv-jv__actions { display: flex; align-items: center; gap: calc(1.4 * var(--u)); margin-top: calc(4.2 * var(--u)); }
+.kv-jv__begin, .kv-jv__skip { display: inline-flex; align-items: center; gap: .45em; border-radius: 999px; font: 400 calc(2.3 * var(--u))/1 var(--label); letter-spacing: .06em; white-space: nowrap; }
+.kv-jv__begin { padding: .435em 1.13em; background: var(--hot-btn); color: #fff; box-shadow: .13em .13em 0 var(--brand-hot-deep); }
+.kv-jv__begin .kv-ico { width: .8em; height: .8em; }
+.kv-jv__skip { font-size: calc(2 * var(--u)); padding: .45em 1.1em; color: var(--brand-journey-tint); box-shadow: inset 0 0 0 max(1px, .11em) rgba(222, 213, 234, .6); }
+.kv-jv__hint { font: 400 calc(1.6 * var(--u))/1 var(--read); color: rgba(255, 255, 255, .85); opacity: .6; margin-top: calc(2.2 * var(--u)); white-space: nowrap; }
+
+/* The title cards */
+.kv-jv--advocates { background: var(--brand-journey); }
+.kv-jv--lesson { background: var(--brand-journey-deep); }
+.kv-jv__bigmark { width: calc(52 * var(--u)); height: auto; margin-bottom: 4%; }
+.kv-jv__kicker { font: 400 calc(2.6 * var(--u))/1 var(--label); letter-spacing: .3em; padding-left: .3em; text-transform: uppercase; color: var(--brand-journey-tint); }
+.kv-jv__shout { font: 400 calc(10.5 * var(--u))/1 var(--shout); text-transform: uppercase; white-space: nowrap; text-shadow: .06em .06em 0 var(--brand-journey-deep); margin-top: calc(1.6 * var(--u)); }
+.kv-jv--lesson .kv-jv__shout { text-shadow: .06em .06em 0 var(--brand-journey-ink); }
+.kv-jv__shout--lgt { font-size: calc(7.35 * var(--u)); margin: 0 0 calc(2.4 * var(--u)); }
+.kv-jv__rule { display: block; width: calc(22 * var(--u)); height: calc(.9 * var(--u)); background: var(--brand-hot); margin-bottom: 4%; }
+
+/* The lesson playing: the picture is left out (the Journey mark holds its
+   place), a caption line, the control bar. */
+.kv-jv--play { background: #17142b; }
+.kv-jv__ghost { width: calc(36 * var(--u)); height: auto; opacity: .12; }
+.kv-jv__caption { position: absolute; left: 50%; bottom: calc(10.6 * var(--u)); transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: calc(.9 * var(--u)); padding: calc(1 * var(--u)) calc(1.8 * var(--u)); border-radius: calc(.4 * var(--u)); background: rgba(64, 58, 119, .8); }
+.kv-jv__caption i { display: block; width: calc(52 * var(--u)); height: calc(1.6 * var(--u)); border-radius: 99px; background: rgba(255, 255, 255, .92); }
+.kv-jv__caption i + i { width: calc(34 * var(--u)); }
+.kv-jv__bar, .kv-jv__slidebar { position: absolute; z-index: 2; left: calc(3 * var(--u)); right: calc(7.6 * var(--u)); bottom: calc(1.7 * var(--u)); display: flex; align-items: center; gap: calc(.7 * var(--u)); padding: calc(.55 * var(--u)) calc(.85 * var(--u)); border-radius: 999px; background: rgba(64, 58, 119, .9); }
+.kv-jv__bar b { flex: none; font: 400 calc(1.5 * var(--u))/1 var(--label); letter-spacing: .04em; color: var(--brand-journey-ink); background: var(--brand-journey-tint); border-radius: 999px; padding: calc(.55 * var(--u)) calc(.9 * var(--u)); white-space: nowrap; }
+.kv-jv__scrub { position: relative; flex: 1; height: calc(.45 * var(--u)); border-radius: 99px; background: rgba(222, 213, 234, .45); }
+.kv-jv__knob { position: absolute; left: 84%; top: 50%; width: calc(1.5 * var(--u)); height: calc(1.5 * var(--u)); margin: calc(-.75 * var(--u)) 0 0 calc(-.75 * var(--u)); border-radius: 50%; background: #fff; }
+.kv-jv__time { flex: none; font: 600 calc(1.3 * var(--u))/1 var(--read); color: #fff; white-space: nowrap; }
+
+/* The teaching slides: a 4:3 stage on black (the slide itself is left out),
+   Back and Next in the bar. */
+.kv-jv--slides { background: #000; }
+.kv-jv__stage { position: relative; height: 100%; aspect-ratio: 4 / 3; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: calc(2.2 * var(--u)); background: #2a2148; padding-bottom: 8%; }
+.kv-jv__stage i { display: block; width: 62%; height: calc(1.9 * var(--u)); border-radius: 99px; background: rgba(255, 255, 255, .78); }
+.kv-jv__stage i + i + i { width: 44%; }
+.kv-jv__stage .kv-jv__head { width: 74%; height: calc(4.4 * var(--u)); border-radius: calc(.6 * var(--u)); background: #fff; margin-bottom: calc(3 * var(--u)); }
+.kv-jv__slidebar { justify-content: space-between; }
+.kv-jv__slidebar b { font: 400 calc(1.6 * var(--u))/1.1 var(--label); letter-spacing: .05em; border-radius: 999px; padding: calc(.6 * var(--u)) calc(1.4 * var(--u)); min-width: 7.5em; text-align: center; white-space: nowrap; }
+.kv-jv__back { background: var(--brand-journey-tint); color: var(--brand-journey-ink); }
+.kv-jv__next { background: var(--hot-btn); color: #fff; box-shadow: calc(.16 * var(--u)) calc(.16 * var(--u)) 0 var(--brand-hot-deep); }
+
+/* The carry (resting = its last frame, gone past the right edge): the band,
+   four stripes trailing to leading (hot, ink, deep, purple) with a slanted
+   trailing edge and a square leading one, and the old picture hung on that
+   edge. The band is 34% of the screen wide. */
+.kv-kiosk__carry { position: absolute; z-index: 4; top: 0; bottom: 0; left: -34%; width: 134%; display: flex; transform: translateX(100%); pointer-events: none; }
+.kv-kiosk__band { position: relative; flex: 0 0 25.37%; }
+.kv-kiosk__band i { position: absolute; inset: 0; background: var(--brand-hot); clip-path: polygon(22% 0, 100% 0, 100% 100%, 0 100%); }
+.kv-kiosk__band i:nth-child(2) { background: var(--brand-journey-ink); clip-path: polygon(27% 0, 100% 0, 100% 100%, 5% 100%); }
+.kv-kiosk__band i:nth-child(3) { background: var(--brand-journey-deep); clip-path: polygon(35% 0, 100% 0, 100% 100%, 13% 100%); }
+.kv-kiosk__band i:nth-child(4) { background: var(--brand-journey); clip-path: polygon(46% 0, 100% 0, 100% 100%, 24% 100%); }
+.kv-kiosk__old { position: relative; flex: 1; }
+/* A card that wipes in carries a slanted lip on its leading edge (past the
+   screen's right edge at rest). */
+.kv-jv.is-wipe { overflow: visible; }
+.kv-jv.is-wipe::after { content: ""; position: absolute; left: calc(100% - 1px); top: 0; bottom: 0; width: 9%; background: inherit; clip-path: polygon(0 0, 100% 0, 0 100%); }
 
 /* The phone page */
 .kv-phone { display: flex; justify-content: center; height: 100%; }
@@ -544,7 +616,7 @@ sup { font-size: .55em; line-height: 0; vertical-align: .9em; }
 
 /* The label printer and its label */
 .kv-scr-printer { display: flex; flex-direction: column; align-items: center; }
-.kv-scr-printer__feed { position: relative; z-index: 1; width: 78cqw; height: 40cqw; overflow: hidden; margin-bottom: -2.4cqw; display: flex; align-items: flex-end; }
+.kv-scr-printer__feed { position: relative; z-index: 1; width: 78cqw; height: 42.6cqw; overflow: hidden; margin-bottom: -2.4cqw; display: flex; align-items: flex-end; }
 .kv-scr-printer__paper { width: 100%; padding: 0 0 3cqw; }
 .kv-scr-printer__wait { width: 100%; aspect-ratio: 2 / 1; margin-bottom: .6cqw; display: grid; place-items: center; border: .7cqw dashed rgba(255, 255, 255, .7); border-radius: 1.6cqw; font: 400 5cqw/1 var(--label); letter-spacing: .06em; text-transform: uppercase; color: #fff; }
 .kv-scr-printer__body { position: relative; z-index: 2; width: 92cqw; height: 26cqw; border-radius: 4cqw 4cqw 3cqw 3cqw; background: linear-gradient(#4a4952, #2e2d34); box-shadow: 1.6cqw 1.6cqw 0 rgba(35, 31, 32, .22); }
@@ -554,20 +626,33 @@ sup { font-size: .55em; line-height: 0; vertical-align: .9em; }
 .kv-scr-printer__btn { position: absolute; right: 14cqw; bottom: 4.2cqw; width: 6cqw; height: 3cqw; border-radius: 99px; background: #6a6973; }
 .kv-scr-printer__shadow { width: 96cqw; height: 2cqw; }
 
-.kv-label { position: relative; display: flex; width: 100%; aspect-ratio: 2 / 1; background: #fff; border-radius: 1.6cqw; box-shadow: 0 0 0 .3cqw rgba(35, 31, 32, .12), .8cqw .8cqw 0 rgba(35, 31, 32, .12); overflow: hidden; color: #111; }
-.kv-label__art { flex: none; width: 24%; display: grid; place-items: center; background: #e9e8e5; padding: 2cqw; }
-.kv-label__art img { width: 100%; height: auto; max-height: 26cqw; object-fit: contain; }
-.kv-label__art--turn img { flex: none; width: 44cqw; max-width: none; height: 20cqw; max-height: none; transform: rotate(-90deg); }
-.kv-label__main { position: relative; flex: 1; display: flex; flex-direction: column; justify-content: center; padding: 2.4cqw 4cqw 2.4cqw 4.4cqw; }
-.kv-label--nophoto .kv-label__main { margin-right: 3.4cqw; }
-.kv-label--nophoto::after { content: ""; position: absolute; right: 0; top: 0; bottom: 0; width: 3.4cqw; background: #111; }
-.kv-label__motif { position: absolute; top: 2.2cqw; left: 4.4cqw; width: 3.6cqw; height: 3.6cqw; }
-.kv-label__name { font: 400 10cqw/1 var(--shout); letter-spacing: -.01em; margin-top: 2.4cqw; white-space: nowrap; }
-.kv-label__club { font: 700 3.2cqw/1 var(--read); margin-top: .6cqw; }
-.kv-label__icons { position: absolute; right: 3cqw; bottom: 2.4cqw; display: flex; align-items: center; gap: 1.4cqw; }
-.kv-label__icons .kv-ico { width: 4.2cqw; height: 4.2cqw; }
-.kv-label__glyph { display: inline-flex; align-items: center; gap: .6cqw; }
-.kv-label__glyph b { font: 400 2.8cqw/1 var(--label); text-transform: uppercase; letter-spacing: .03em; }
+/* The label, as generateLabel() draws it (print-server/server/label-render.js,
+   label-layout.js). The label is its own container: 1cqw = 1% of its width =
+   2.88 pt of the renderer's 288 x 144 pt page, so every number below is the
+   renderer's (pt / 2.88). Badge inset 6 pt, corner 12 pt, the icon panel to
+   DIVIDER_X (90 pt) with the wave edge, text from 98 pt, no-photo bar 9 pt. */
+.kv-label { container-type: inline-size; position: relative; width: 100%; aspect-ratio: 2 / 1; background: #fff; border-radius: 1.6%/3.2%; box-shadow: 0 0 0 1px rgba(35, 31, 32, .12), 3px 3px 0 rgba(35, 31, 32, .12); overflow: hidden; color: #000; }
+.kv-label__art { position: absolute; left: 2.08cqw; top: 2.08cqw; bottom: 2.08cqw; width: 30.21cqw; border-radius: 4.17cqw 0 0 4.17cqw; overflow: hidden; }
+.kv-label__line, .kv-label__fill { position: absolute; inset: 0; }
+.kv-label__line { background: #bbb; }
+.kv-label__fill { background: #f4f4f4; }
+/* The mark fits the panel; turned marks are laid out unturned (long side
+   along the panel's height), then turned a quarter counter-clockwise. */
+.kv-label__mark { position: absolute; left: 48.3%; top: 50%; width: 28.4cqw; height: 28.4cqw; object-fit: contain; transform: translate(-50%, -50%); }
+.kv-label__mark--turn { width: 27.5cqw; height: 21cqw; transform: translate(-50%, -50%) rotate(-90deg); }
+.kv-label__text { position: absolute; left: 34.03cqw; right: 2.08cqw; top: 6.6cqw; display: flex; flex-direction: column; align-items: center; text-align: center; }
+.kv-label--nophoto .kv-label__text { right: 4.51cqw; }
+.kv-label__name { font: 400 min(16.9cqw, calc(61cqw / (var(--n) * .6)))/1 var(--shout); white-space: nowrap; }
+.kv-label__last { font: 400 6.4cqw/1 var(--read); color: #111; margin-top: 4.1cqw; white-space: nowrap; }
+/* Clubs whose labels print Comic Neue or Playfair Display (label-only faces,
+   never on a screen): the read voice stands in. */
+.kv-label[data-face="comic"] .kv-label__name, .kv-label[data-face="serif"] .kv-label__name { font-family: var(--read); font-weight: 800; letter-spacing: -.01em; }
+.kv-label__icons { position: absolute; right: 4.6cqw; bottom: 2.3cqw; display: flex; align-items: flex-end; gap: 1.6cqw; }
+.kv-label--nophoto .kv-label__icons { right: 6.6cqw; }
+.kv-label__icons .kv-ico { width: 9.4cqw; height: 9.4cqw; }
+.kv-label__glyph { display: inline-flex; align-items: flex-end; gap: 2cqw; }
+.kv-label__glyph b { font: 600 3.6cqw/1 var(--read); white-space: nowrap; padding-bottom: 1.3cqw; }
+.kv-label--nophoto::after { content: ""; position: absolute; right: 0; top: 0; bottom: 0; width: 3.13cqw; background: #000; }
 
 /* ── Try it: the simulator ──────────────────────────────────────────────── */
 .kv-sim { position: relative; background: var(--sim-red); color: #fff; padding: clamp(70px, 8vw, 120px) 0 clamp(60px, 7vw, 100px); overflow: hidden; isolation: isolate; }
@@ -722,7 +807,11 @@ sup { font-size: .55em; line-height: 0; vertical-align: .9em; }
   @keyframes kv-fade { 0% { opacity: 0; } 100% { opacity: 1; } }
   @keyframes kv-feed { 0% { transform: translateY(100%); } 100% { transform: none; } }
   @keyframes kv-blink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
-  @keyframes kv-ring { 0% { box-shadow: 0 0 0 0 rgba(207, 69, 24, .6); } 100% { box-shadow: 0 0 0 2.4cqw rgba(207, 69, 24, 0); } }
+  @keyframes kv-carry { 0% { transform: translateX(0); } 100% { transform: translateX(100%); } }
+  @keyframes kv-slide-in { 0% { transform: translateX(-112%); } 100% { transform: none; } }
+  @keyframes kv-slam { 0% { opacity: 0; transform: scale(2.2) rotate(-4deg); } 55% { opacity: 1; transform: scale(.94); } 75% { transform: scale(1.03); } 100% { opacity: 1; transform: none; } }
+  @keyframes kv-grow-x { 0% { transform: scaleX(0); } 100% { transform: none; } }
+  @keyframes kv-pulse { 0%, 100% { opacity: .45; } 50% { opacity: .9; } }
   @keyframes kv-twinkle { 0%, 100% { opacity: 1; } 50% { opacity: .2; } }
   @keyframes kv-led { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
   @keyframes kv-sticker { 0% { transform: rotate(12deg) scale(0); } 70% { transform: rotate(12deg) scale(1.08); } 100% { transform: rotate(12deg) scale(1); } }
@@ -761,7 +850,15 @@ sup { font-size: .55em; line-height: 0; vertical-align: .9em; }
   .kv-proj__star { animation: kv-twinkle 2.4s ease-in-out infinite; }
   .kv-proj__star--b { animation-delay: -.8s; } .kv-proj__star--c { animation-delay: -1.6s; }
   .kv-proj__game .kv-proj__wave--bottom { animation: kv-rise .64s var(--wipe) both; }
-  .kv-kiosk__begin { animation: kv-ring 1.8s ease-out infinite; }
+  /* The Journey screen: the carry, the cards' slanted wipe and slams, the start screen's hint pulse. */
+  .kv-kiosk__carry { animation: kv-carry .9s var(--wipe) both; }
+  .kv-jv.is-wipe { animation: kv-slide-in .52s var(--wipe) both; }
+  .kv-jv.is-cut .kv-jv__bigmark { animation: kv-slam .64s var(--settle) .08s both; }
+  .kv-jv.is-wipe .kv-jv__shout { animation: kv-slam .56s var(--settle) .22s both; }
+  .kv-jv.is-wipe .kv-jv__kicker { animation: kv-fade .38s .26s both; }
+  .kv-jv.is-wipe .kv-jv__rule { transform-origin: left center; animation: kv-grow-x .36s var(--settle) .46s both; }
+  .kv-jv.is-carry .kv-jv__bar, .kv-jv.is-carry .kv-jv__slidebar { animation: kv-settle .42s var(--settle) .5s both; }
+  .kv-jv__hint { animation: kv-pulse 2.4s ease-in-out infinite; }
   .kv-phone__caret { animation: kv-blink 1s steps(1) infinite; }
   .kv-scr-printer__paper { animation: kv-feed 1.5s steps(14, end) .2s both; }
   .kv-scr-printer__led { animation: kv-led 1.2s ease-in-out infinite; }
