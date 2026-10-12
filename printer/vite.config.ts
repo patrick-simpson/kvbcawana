@@ -13,6 +13,9 @@ export default defineConfig(({ mode }) => {
       server: {
         port: 3000,
         host: '0.0.0.0',
+        // The home page draws the lobby's brand kit (lobby/shared/brand: its
+        // shapes, doodles and club marks), imported from its one copy.
+        fs: { allow: ['..'] },
       },
       plugins: [
         react(),
@@ -22,10 +25,12 @@ export default defineConfig(({ mode }) => {
       ],
       build: {
         rollupOptions: {
-          // Two pages: the marketing SPA (index) and the capabilities/roadmap
-          // reference (capabilities). Both ship to GitHub Pages.
+          // The public pages: the home page (index: the demo reel, the six
+          // parts and the simulator), the install guide and FAQ (help, served
+          // at /help) and the capabilities/roadmap reference (capabilities).
           input: {
             main: path.resolve(__dirname, 'index.html'),
+            help: path.resolve(__dirname, 'help.html'),
             capabilities: path.resolve(__dirname, 'capabilities.html'),
           },
         },

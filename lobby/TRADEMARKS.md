@@ -57,6 +57,16 @@ below still applies; allow 2–3 weeks for processing. If Awana ever asks
 for the art to come down, remove `shared/brand/logos/` and the older art
 and the screens fall back to text club names in club colors.
 
+On 2026-10-11 the owner extended that decision to the public pages
+(awana.kvbchurch.org/ and /help, printer/CLAUDE.md "Public website"):
+the Awana Clubs mark and the club marks may appear there too, with the
+line "Awana® and club marks are trademarks of Awana Clubs International,
+used here by a member church. Not affiliated with or endorsed by Awana."
+in the disclaimer bar, the footer and the meta description. That is public
+use of the logos, which the guidelines above tie to written permission;
+the same draft request below covers it. If the art must come down, the
+pages' marks are the imports in `printer/components/home/Kit.tsx`.
+
 **If you fork this repository:** the owner's decision covers this church
 only. Before deploying a fork that shows the bundled art, request your
 own permission from <permission@awana.org>, or remove the art.

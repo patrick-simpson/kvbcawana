@@ -43,8 +43,7 @@ jobs:
   # base to compare with, or a change to this file. The fast jobs always run.
   #   lobby   reads only lobby/ (its vitest excludes worker/ and desktop/,
   #           whose lint moved into their own jobs below), plus
-  #           journey/public/src/schedule.js and printer/components/Lobby.tsx
-  #           (the home page's stepped chips, aboutChips.test.js)
+  #           journey/public/src/schedule.js
   #           site/desk/ and printer/print-server/public/phone.html (e2e/desk.spec.js
   #           serves the desk page, with the phone page's touch core, from a stub origin)
   #   printer reads printer/, plus lobby/worker/src/relay.js
@@ -60,7 +59,8 @@ jobs:
   #           lobby/src/lib/syncSpecs.js and the lobby/shared/sync-protocol.js it
   #           re-exports (electron-app's device-sync test), and lobby/shared/brand/
   #           (the print server's brand kit is a copy of it, made before the tests
-  #           by scripts/family-assets.mjs)
+  #           by scripts/family-assets.mjs; the home page imports its shapes,
+  #           doodles and club marks, and test-about-page reads them)
   #           and the settings page's laptop cards, which replaced the
   #           print dashboard (lobby/src/lib/printServer.js and
   #           lobby/src/components/settings/laptop*.jsx: test-leaders,
@@ -117,7 +117,6 @@ jobs:
               if [[ "$f" != */* && "$f" == *.md ]]; then continue; fi
               case "$f" in
                 journey/public/src/schedule.js) lobby=true ;;  # screenSpecs.test.js reads it
-                printer/components/Lobby.tsx) lobby=true ;;  # aboutChips.test.js reads the home page's chips
                 site/desk/*|printer/print-server/public/phone.html) lobby=true ;;  # e2e/desk.spec.js serves the desk page (site/desk/desk-page.mjs injects the touch core)
                 lobby/worker/*|lobby/desktop/*|printer/*|journey/*|site/*|.github/workflows/*) ;;
                 *) lobby=true ;;

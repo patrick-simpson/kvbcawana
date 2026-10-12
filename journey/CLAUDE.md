@@ -272,55 +272,10 @@ Read Prep, captions).
   `#slide-template*`) declaration for declaration, and fails if any other
   rule names those elements.
 
-## About page: now the `#journey` section of the home page
+## About page: the `#journey` part of the home page
 
-The static `public/about.html` and `test/about-page.test.mjs` are gone: on
-2026-10-12 the three family about pages became ONE page, the printer's React
-site at awana.kvbchurch.org/ (printer/CLAUDE.md, "Public website"), and
-Journey's part of it is its `#journey` section: `printer/components/Journey.tsx`
-with `printer/styles/journey.css` (classes `jd-`). `/journey/about.html` 301s
-to `/#journey` (`site/lib/redirects.js`). The kiosk never loaded the page and
-still loads nothing of it (`index.html` does not link `family.css`, and
-no copy of it is made). The rules that came with the page live
-on, checked by `printer/scripts/test-about-page.cjs` (printer `npm test`):
-
-- **The 6:30 start screen (Fig. 1 and the resume card) is drawn in the kit, with
-  the kit's own faces**, loaded from the kit's `fonts.css` (the home page links
-  `/lobby/shared/brand/fonts.css`; full, unmodified fonts) beside Google's
-  stylesheet for the editorial faces only (Fraunces, Source Sans 3, IBM Plex
-  Mono): never Galindo (owner, 2026-09-29), never a Google or subset copy of a
-  brand face, nothing else from another host. The recreation follows
-  `public/src/style.css`'s splash: the deep ink field, the club purple corner tab
-  and waves, Paytone One for the shout (with `1.05` fit and the `-.15em` lift),
-  Londrina Solid for labels and buttons, Figtree for the hint. The test pins
-  its palette to the kit's `tokens.css`, the loaded faces, the one deliberate
-  departure (the Begin Video orange is `#CF4518`, not the kit's `#F15A28`, so its
-  white label passes AA at mock size) and the no-image rule. Its art is drawn
-  fresh (no kit file, no `<img>`), and "Journey" is set as plain text, not the
-  wordmark: no Awana logo on the page. The playback, slide-bar and Read Prep
-  recreations are still the pre-kit black / red / system-ui drawings; redraw
-  them the same way when they are next touched.
-- **Licensing wording is strict** (see "Licensing boundary" above): the section
-  says the kiosk plays curriculum the church already licenses through its own
-  Awana Ministry Membership, used only within the church's own program (its
-  kiosk and its leaders) and never shared or offered anywhere else, and that
-  each lesson is prepared so even the little Pi plays it smoothly. It never says
-  the kiosk plays "a copy", a "smaller copy", or anything "re-encoded" or
-  "transcoded", and never implies the Pi plays full quality. It must never link
-  to, name the URL or filename of, or advertise any lesson video, transcoded
-  copy, Release asset, transcript, handout or slide image, and never say
-  "re-host", "mirror", or "download" anywhere near the videos (the phrase is
-  "saved ahead on the kiosk itself"). Screen mocks are CSS recreations with
-  placeholder text: no video frames, no slide artwork, no curriculum text or
-  imagery, no Awana logos.
-- **The room is students.** Journey is the high-school ministry, so the section
-  says "students", never "children", about the people watching the lesson.
-- **Never link to the live kiosk.** Links out go to the three GitHub repos, the
-  app's downloads and the page's own sections, never to `/journey/` or
-  `index.html`, and never to the lobby's root or `countdown.html`.
-- Trademark: the "Not affiliated with or endorsed by Awana® Clubs International"
-  line sits in the disclaimer bar, the meta description and the footer's full
-  disclaimer.
+The kiosk serves no about page: Journey is the `#journey` part of awana.kvbchurch.org/ (`/journey/about.html` 301s to `/#journey`), with a live miniature of the 6:30 start screen in `printer/components/home/Screens.tsx`; its rules are printer/CLAUDE.md's "Public website".
+The licensing boundary below binds that part too (`printer/scripts/test-about-page.cjs` checks it): it says the kiosk plays curriculum the church already licenses through its own Awana Ministry Membership, never links to, names or advertises a lesson video, copy, release asset, transcript, handout or slide image, and its room is students, never children.
 
 ## Daily schedule
 

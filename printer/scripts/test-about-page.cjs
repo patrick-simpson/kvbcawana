@@ -1,31 +1,32 @@
-// The family's one public page (the React site at awana.kvbchurch.org/: the
-// label printer, the lobby signage + projector at #lobby, the Journey kiosk at
-// #journey) keeps the rules of the three static about pages it replaced
-// (printer/CLAUDE.md, "Public website"). The site has no browser test of its
-// own, so these read its sources: nothing here would otherwise notice a screen
-// recreation drifting from the kit, a brand face coming from Google, or an
-// Awana logo slipping onto a public page.
-//
-// Reads only printer/ (the kit's mirror in print-server/public/brand/ is
-// byte-identical to the lobby's canonical shared/brand/).
+// The public pages of awana.kvbchurch.org: the home page (/, a demo reel page
+// in the 2026-27 catalog look) and /help (the install guide and the FAQ), plus
+// the capabilities reference. The site has no browser test of its own, so
+// these read the sources for the rules in printer/CLAUDE.md, "Public website":
+// the kit's own faces and nothing from another host, the kit's art from its
+// one copy, the trademark line, the reel's contract, motion that stops for
+// reduced motion, AA colour pairs, the anchors people link to, the Simulator's
+// DOM contract, Journey's licensing wording and where links may go.
 const assert = require('node:assert/strict');
-const { existsSync, readFileSync } = require('node:fs');
+const { existsSync, readFileSync, readdirSync } = require('node:fs');
 const path = require('node:path');
 
 const ROOT = path.resolve(__dirname, '..');
+const REPO = path.resolve(ROOT, '..');
 const read = (rel) => readFileSync(path.join(ROOT, rel), 'utf8');
 // What the browser acts on: the story a comment tells is allowed.
 const live = (s) => s.replace(/<!--[\s\S]*?-->/g, '').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
 
-const PAGES = ['index.html', 'capabilities.html'];
-const CSS = ['styles/site.css', 'styles/page.css', 'styles/lobby.css', 'styles/journey.css'];
-const SECTIONS = ['components/Lobby.tsx', 'components/Journey.tsx'];
-const COMPONENTS = ['App.tsx', 'components/Lobby.tsx', 'components/Journey.tsx', 'components/Features.tsx', 'components/Hero.tsx',
-  'components/Showcase.tsx', 'components/Mocks.tsx', 'components/family/Family.tsx', 'components/family/ScreenIcons.tsx'];
-const lobbyCss = live(read('styles/lobby.css'));
-const journeyCss = live(read('styles/journey.css'));
-const kitTokens = read('print-server/public/brand/tokens.css');
-const kitFonts = read('print-server/public/brand/fonts.css');
+const PAGES = ['index.html', 'help.html'];
+const HOME = ['App.tsx', 'HelpPage.tsx', 'components/Simulator.tsx', 'components/ClubberList.tsx', 'components/CheckinModal.tsx',
+  'components/InstallGuide.tsx', 'components/Faq.tsx',
+  ...readdirSync(path.join(ROOT, 'components/home')).filter((f) => f.endsWith('.tsx')).map((f) => `components/home/${f}`)];
+const HOME_PAGE = ['App.tsx', 'components/Simulator.tsx', 'components/ClubberList.tsx', 'components/CheckinModal.tsx',
+  'components/home/Chrome.tsx', 'components/home/Parts.tsx', 'components/home/Reel.tsx', 'components/home/Screens.tsx'];
+const HELP_PAGE = ['HelpPage.tsx', 'components/InstallGuide.tsx', 'components/Faq.tsx', 'components/home/Chrome.tsx'];
+const CSS = 'styles/home.css';
+const css = read(CSS);
+const kitTokens = readFileSync(path.join(REPO, 'lobby/shared/brand/tokens.css'), 'utf8');
+const kitFonts = readFileSync(path.join(REPO, 'lobby/shared/brand/fonts.css'), 'utf8');
 
 let n = 0;
 const test = (name, fn) => { fn(); n += 1; console.log(`ok - ${name}`); };
@@ -34,7 +35,7 @@ const attr = (tag, name) => {
   const m = tag.match(new RegExp(`\\b${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s>]+))`, 'i'));
   return (m && (m[1] ?? m[2] ?? m[3]) || '').trim();
 };
-const token = (css, name) => (css.match(new RegExp(`${name}:\\s*([^;]+);`)) || [])[1]?.trim();
+const isExternal = (url) => /^(?:[a-z][a-z0-9+.-]*:)?\/\//i.test(url);
 const luminance = (hex) => {
   const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255)
     .map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
@@ -44,207 +45,251 @@ const contrast = (a, b) => {
   const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
   return (hi + 0.05) / (lo + 0.05);
 };
+// A colour as home.css means it: its own value, a var() of home.css or of the kit's tokens.css.
+const declared = (name) => {
+  const m = live(css).match(new RegExp(`${name}:\\s*([^;]+);`)) || kitTokens.match(new RegExp(`${name}:\\s*([^;]+);`));
+  assert.ok(m, `${name} is declared`);
+  const v = m[1].trim();
+  const ref = v.match(/^var\((--[a-z0-9-]+)\)$/i);
+  return ref ? declared(ref[1]) : v.toLowerCase();
+};
+const club = (id, prop) => {
+  const rule = live(css).match(new RegExp(`\\[data-club="${id}"\\]\\s*\\{([^}]*)\\}`))[1];
+  const v = rule.match(new RegExp(`${prop}:\\s*([^;]+);`))[1].trim();
+  const ref = v.match(/^var\((--[a-z0-9-]+)\)$/i);
+  return (ref ? declared(ref[1]) : v).toLowerCase();
+};
 
-// ── The faces: the kit's own, never Google's (owner, 2026-09-29) ──────────────
-test('no page, section or style names Galindo or Lilita One', () => {
-  // Galindo "looks too much like SpongeBob"; the projector retired Lilita One.
-  for (const rel of [...PAGES, ...CSS, ...COMPONENTS]) {
+// ── Faces and hosts: the kit's own files, nothing from another host ──────────
+test('no page, style or component names Galindo or Lilita One', () => {
+  // Galindo "looks too much like SpongeBob" (owner, 2026-09-29); the projector retired Lilita One.
+  for (const rel of [...PAGES, 'capabilities.html', CSS, ...HOME]) {
     const text = live(read(rel));
     assert.doesNotMatch(text, /galindo/i, `${rel} names Galindo`);
     assert.doesNotMatch(text, /lilita/i, `${rel} names Lilita One`);
   }
 });
 
-test('Google Fonts is asked only for the editorial faces, never a brand face', () => {
+test('the two pages load Paytone One, Londrina Solid and Figtree from the kit\'s own fonts.css, and nothing from another host', () => {
   for (const rel of PAGES) {
-    const families = [...live(read(rel)).matchAll(/fonts\.googleapis\.com\/css2\?([^"']+)/g)]
-      .flatMap(([, query]) => [...query.replace(/&amp;/g, '&').matchAll(/family=([^:&@]+)/g)].map((m) => m[1]));
-    assert.deepEqual(families.sort(), ['Fraunces', 'IBM+Plex+Mono', 'Source+Sans+3'], rel);
+    const page = live(read(rel));
+    assert.match(page, /<link[^>]+rel="stylesheet"[^>]+href="\/lobby\/shared\/brand\/fonts\.css"/, rel);
+    const external = [...page.matchAll(/<(?:link|script|img|source|video|iframe)\b[^>]*>/gi)]
+      .map(([tag]) => attr(tag, 'href') || attr(tag, 'src')).filter(isExternal);
+    assert.deepEqual(external, [], `${rel} fetches from another host`);
+    assert.doesNotMatch(page, /fonts\.googleapis|fonts\.gstatic/, rel);
   }
-});
-
-test('Paytone One, Londrina Solid and Figtree load from the kit\'s own fonts.css', () => {
-  assert.match(live(read('index.html')), /<link[^>]+rel="stylesheet"[^>]+href="\/lobby\/shared\/brand\/fonts\.css"/);
   for (const family of ['Paytone One', 'Londrina Solid', 'Figtree']) {
     assert.match(kitFonts, new RegExp(`font-family:\\s*'${family}'`));
   }
-  // Every file the sheet names is really in the kit.
-  for (const [, file] of kitFonts.matchAll(/url\('([^']+)'\)/g)) {
-    assert.ok(existsSync(path.join(ROOT, 'print-server/public/brand', file)), `${file} is in the kit`);
-  }
 });
 
-test('the lobby section names its three voices once, shout first, and no other family', () => {
-  const voice = (name) => token(lobbyCss, `--cid-${name}`);
-  assert.match(voice('shout'), /^"Paytone One"/);
-  assert.match(voice('label'), /^"Londrina Solid"/);
-  assert.match(voice('read'), /^"Figtree"/);
-  assert.doesNotMatch(lobbyCss, /--cid-poster/);
-  const allowed = new Set(['Paytone One', 'Arial Rounded MT Bold', 'Londrina Solid', 'Arial Narrow', 'Figtree', 'Segoe UI']);
-  const named = [...lobbyCss.matchAll(/(?:--cid-(?:shout|label|read)|font(?:-family)?)\s*:[^;}]+/g)]
-    .flatMap(([decl]) => [...decl.matchAll(/"([^"]+)"/g)].map((m) => m[1]));
-  assert.deepEqual(new Set(named), allowed);
+test('the capabilities reference asks Google only for its editorial faces, never a brand face', () => {
+  const page = live(read('capabilities.html'));
+  const families = [...page.matchAll(/fonts\.googleapis\.com\/css2\?([^"']+)/g)]
+    .flatMap(([, query]) => [...query.replace(/&amp;/g, '&').matchAll(/family=([^:&@]+)/g)].map((m) => m[1]));
+  assert.deepEqual(families.sort(), ['Fraunces', 'IBM+Plex+Mono', 'Source+Sans+3']);
 });
 
-test('a one-weight brand face is never asked for a bold it does not have', () => {
-  assert.match(lobbyCss, /\.cid-scr\s*\{[^}]*font-synthesis-weight:\s*none/);
-  assert.match(lobbyCss, /\.cid-slide__text\s*\{[^}]*font:\s*400\b/); // the lobby headline is 400, as on the screens
-  assert.match(journeyCss, /\.jd-ink\s*\{[^}]*font-synthesis-weight:\s*none/);
+test('home.css declares no font, imports only the kit\'s tokens and reaches no other host', () => {
+  const sheet = live(css);
+  assert.doesNotMatch(sheet, /@font-face\b/i);
+  const imports = [...sheet.matchAll(/@import\s+(?:url\()?["']?([^"')\s;]+)/gi)].map((m) => m[1]);
+  assert.deepEqual(imports, ['../../lobby/shared/brand/tokens.css']);
+  const urls = [...sheet.matchAll(/url\(\s*(?:"([^"]*)"|'([^']*)'|([^)\s]*))\s*\)/gi)].map((m) => (m[1] ?? m[2] ?? m[3]).trim());
+  assert.deepEqual(urls.filter(isExternal), []);
+  // The three voices come from the kit's tokens, never a family named here.
+  assert.match(sheet, /--shout:\s*var\(--brand-font-display\)/);
+  assert.match(sheet, /--label:\s*var\(--brand-font-label\)/);
+  assert.match(sheet, /--read:\s*var\(--brand-font-body\)/);
+  assert.doesNotMatch(sheet.replace(/font:[^;]*(ui-monospace|system-ui)[^;]*;/g, ''), /font(?:-family)?:[^;]*["'](?:Paytone|Londrina|Figtree)/i);
 });
 
-test('the three journey voices lead with the kit\'s families, in the kit\'s roles', () => {
-  const voice = (name) => token(journeyCss, `--jd-${name}`);
-  assert.match(voice('shout'), /^"Paytone One"/);
-  assert.match(voice('label'), /^"Londrina Solid"/);
-  assert.match(voice('read'), /^"Figtree"/);
-  assert.match(token(kitTokens, '--brand-font-display'), /^'Paytone One'/);
-  assert.match(token(kitTokens, '--brand-font-label'), /^'Londrina Solid'/);
-  assert.match(token(kitTokens, '--brand-font-body'), /^'Figtree'/);
-});
-
-// The Google check above pins the css2 request's family list, but a brand face
-// could reach the page by any other road: the v1 API (css?family=Paytone+One),
-// a third-party mirror, a preload of a woff2, an @import, a page-local
-// @font-face. Paytone One's and Londrina's licenses reserve their names, so the
-// only copy this page may draw is the kit's own full file. So these list
-// everything the pages fetch from another host and allow exactly one thing:
-// the Google stylesheet for the editorial faces (and its preconnects).
-const isExternal = (url) => /^(?:[a-z][a-z0-9+.-]*:)?\/\//i.test(url); // absolute or protocol-relative
-const isEditorialSheet = (l) => l.rel === 'stylesheet' && /^https:\/\/fonts\.googleapis\.com\/css2\?/.test(l.href);
-const isGooglePreconnect = (l) => l.rel === 'preconnect' && ['https://fonts.googleapis.com', 'https://fonts.gstatic.com'].includes(l.href);
-
-test('every <link> to another host is the one editorial Google stylesheet or a Google preconnect', () => {
-  for (const rel of PAGES) {
-    const links = [...live(read(rel)).matchAll(/<link\b[^>]*>/gi)].map(([tag]) => ({ rel: attr(tag, 'rel').toLowerCase(), href: attr(tag, 'href') }));
-    assert.deepEqual(links.filter((l) => isExternal(l.href) && !isEditorialSheet(l) && !isGooglePreconnect(l)), [], rel);
-    assert.equal(links.filter(isEditorialSheet).length, 1, rel);
-  }
-});
-
-test('no @import, no page-local @font-face, no url() to another host in the site\'s styles', () => {
-  for (const rel of CSS) {
-    const css = live(read(rel));
-    // site.css imports its own stylesheets and Tailwind; nothing else may be imported.
-    const imports = [...css.matchAll(/@import\s+(?:url\()?["']?([^"')\s;]+)/gi)].map((m) => m[1]);
-    assert.deepEqual(imports.filter((i) => i !== 'tailwindcss' && !i.startsWith('./')), [], `${rel} @import`);
-    assert.doesNotMatch(css, /@font-face\b/i, `${rel} declares a font`);
-    const urls = [...css.matchAll(/url\(\s*(?:"([^"]*)"|'([^']*)'|([^)\s]*))\s*\)/gi)].map((m) => (m[1] ?? m[2] ?? m[3]).trim());
-    assert.deepEqual(urls.filter(isExternal), [], `${rel} url()`);
-  }
-});
-
-test('no address on the page names a brand face', () => {
-  let found = 0;
-  for (const rel of [...PAGES, ...COMPONENTS]) {
+test('no address on the pages names a brand face', () => {
+  for (const rel of [...PAGES, ...HOME]) {
     const addresses = live(read(rel)).match(/(?:https?:)?\/\/[^\s"'<>)]+/gi) || [];
-    found += addresses.length;
     assert.deepEqual(addresses.filter((a) => /paytone|londrina|figtree|galindo|lilita/i.test(a)), [], rel);
   }
-  assert.ok(found > 0, 'found the page\'s addresses');
 });
 
-// ── The Journey start screen is the kit's ────────────────────────────────────
-test('the Journey start-screen recreation is drawn in the kit\'s Journey colours', () => {
-  const same = (mine, kit) => assert.equal(token(journeyCss, mine).toLowerCase(), token(kitTokens, kit).toLowerCase(), `${mine} is ${kit}`);
-  same('--jd-ink', '--brand-journey-ink');
-  same('--jd-purple', '--brand-journey');
-  same('--jd-deep', '--brand-journey-deep');
-  same('--jd-tint', '--brand-journey-tint');
-  same('--jd-hot-deep', '--brand-hot-deep');
-  // The button's orange is the one deliberate departure: a shade deeper than
-  // the kit's hot, so its white label passes AA at the size a mock draws it.
-  const hot = token(journeyCss, '--jd-hot');
-  assert.notEqual(hot.toLowerCase(), token(kitTokens, '--brand-hot').toLowerCase());
-  assert.ok(contrast('#ffffff', hot) >= 4.5, `white on ${hot} passes AA`);
-  assert.ok(contrast('#ffffff', token(kitTokens, '--brand-hot')) < 4.5, 'and the kit\'s own would not, which is why');
-});
-
-test('the Journey start-screen rules use the kit, not the pre-kit black, red, gold and system font', () => {
-  const splash = [...journeyCss.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
-    .map(([, selector, body]) => ({ selector: selector.trim(), body }))
-    .filter(({ selector }) => /\.jd-(splash|kbtn|ink|wave|doodles|art|demo-splash)/.test(selector));
-  assert.ok(splash.length >= 15, 'found the start screen\'s rules');
-  for (const { selector, body } of splash) {
-    assert.doesNotMatch(body, /--jd-red|--jd-gold|--jd-kiosk-font|#000\b|#c8102e|#f2b705/i, selector);
+// ── The kit's art, from its one copy; Awana marks with the trademark line ────
+test('every shape, doodle and club mark is the kit\'s own file, imported from lobby/shared/brand', () => {
+  const kit = read('components/home/Kit.tsx');
+  const imports = [...kit.matchAll(/from\s+'([^']+\.svg)'/g)].map((m) => m[1]);
+  assert.ok(imports.length >= 18, 'the club marks are imported');
+  for (const rel of imports) {
+    assert.match(rel, /^\.\.\/\.\.\/\.\.\/lobby\/shared\/brand\/logos\/[a-z-]+\.svg$/, rel);
+    assert.ok(existsSync(path.join(ROOT, 'components/home', rel)), `${rel} is in the kit`);
   }
-  // Fig. 1 sits on the indigo field, not the black one the other recreations keep.
-  assert.match(live(read('components/Journey.tsx')), /className="fam-frame__screen jd-ink"[^>]*>\s*<div className="jd-splash">/);
-});
-
-test('the lobby recreations keep the lobby\'s two deliberate AA departures', () => {
-  assert.match(lobbyCss, /\.cid-moment__kicker\s*\{[^}]*color:\s*#fff/); // white on the club's deep wave, not its pale tint
-  assert.match(lobbyCss, /--cid-hot:\s*#cf4518/i); // not the kit's #F15A28
-  assert.ok(contrast('#ffffff', '#cf4518') >= 4.5);
-});
-
-// ── The public page's own rules ──────────────────────────────────────────────
-test('the page draws its own art: no image, no Awana wordmark, nothing copied from the kit', () => {
-  for (const rel of [...COMPONENTS, 'index.html']) {
-    const text = live(read(rel));
-    assert.doesNotMatch(text, /<img\b/i, `${rel} has an <img>`);
-    assert.doesNotMatch(text, /brand\/(logos|shapes|doodles)\//, `${rel} reaches into the kit's art`);
-    assert.doesNotMatch(text, /Awana-?Clubs-?(logo|mark)|awana-logo|club-?mark/i, `${rel} names an Awana mark`);
+  for (const folder of ['doodles', 'shapes']) {
+    assert.match(kit, new RegExp(`import\\.meta\\.glob<string>\\('\\.\\./\\.\\./\\.\\./lobby/shared/brand/${folder}/\\*\\.svg'`), folder);
+  }
+  // Every shape and doodle name the pages ask for is a file in the kit.
+  const names = new Set();
+  for (const rel of HOME) {
+    for (const [, kind, name] of live(read(rel)).matchAll(/<(Doodle|Shape)\s+(?:key=\{[^}]*\}\s+)?name=["']([a-z0-9-]+)["']/g)) names.add(`${kind === 'Doodle' ? 'doodles' : 'shapes'}/${name}`);
+  }
+  assert.ok(names.size >= 12, 'found the pages\' shapes and doodles');
+  for (const n of names) assert.ok(existsSync(path.join(REPO, 'lobby/shared/brand', `${n}.svg`)), `${n}.svg is in the kit`);
+  // Nothing else on the pages is an image from elsewhere: every <img> draws a kit mark.
+  for (const rel of HOME) {
+    for (const [tag] of live(read(rel)).matchAll(/<img\b[^>]*>/g)) {
+      const src = attr(tag, 'src');
+      if (!src && /\bhidden\b/.test(tag)) continue; // the replica's empty club image (the extension reads its alt)
+      assert.match(src, /^\{(?:AWANA_WHITE|c\.(?:color|white)|spec\.club\.black|club\('[a-z]+'\)\.white)\}$/, `${rel}: ${tag}`);
+      assert.ok(/\balt=/.test(tag), `${rel}: ${tag} has alt`);
+    }
   }
 });
 
-test('the not-affiliated line is in the disclaimer bar, the meta description and the footer', () => {
-  const family = read('components/family/Family.tsx');
-  assert.match(family, /<p className="fam-disclaimer"[\s\S]*Not affiliated with or endorsed by Awana<sup>®<\/sup> Clubs International/);
-  assert.match(family, /<div className="fam-footer__legal">[\s\S]*NOT AFFILIATED WITH OR ENDORSED BY AWANA CLUBS INTERNATIONAL/);
+test('the trademark line is in the disclaimer bar, the footer and both meta descriptions, word for word', () => {
+  const LINE = 'Awana® and club marks are trademarks of Awana Clubs International, used here by a member church. Not affiliated with or endorsed by Awana.';
+  const chrome = read('components/home/Chrome.tsx');
+  assert.ok(chrome.includes(`export const TRADEMARK = '${LINE}';`));
+  assert.match(chrome, /<p className="kv-disclaimer" role="note">\{TRADEMARK\}<\/p>/);
+  assert.match(chrome, /<footer className="kv-footer">[\s\S]*<strong>\{TRADEMARK\}<\/strong>/);
   for (const rel of PAGES) {
     const description = live(read(rel)).match(/<meta name="description" content="([^"]*)"/)[1];
-    assert.match(description, /Not affiliated with or endorsed by Awana® Clubs International\./, rel);
+    assert.ok(description.includes(LINE), rel);
+  }
+  // Both pages render the header and the footer.
+  for (const rel of ['App.tsx', 'HelpPage.tsx']) {
+    assert.match(read(rel), /<Header page="(?:home|help)" \/>[\s\S]*<Footer \/>/, rel);
   }
 });
 
-test('links out go only to the three repos, this app\'s own downloads and this page\'s own sections, never to a live screen', () => {
-  for (const rel of [...COMPONENTS, 'components/InstallGuide.tsx', 'components/Faq.tsx']) {
+// ── The reel ─────────────────────────────────────────────────────────────────
+test('the reel plays /reel/ muted and inline, ends on its poster, waits under reduced motion, and has a stand-in', () => {
+  const reel = live(read('components/home/Reel.tsx'));
+  assert.match(reel, /wide: '\/reel\/reel-1080\.mp4'/);
+  assert.match(reel, /narrow: '\/reel\/reel-720\.mp4'/);
+  assert.match(reel, /POSTER = '\/reel\/poster\.jpg'/);
+  for (const f of ['reel-1080.mp4', 'reel-720.mp4', 'poster.jpg']) assert.ok(require('fs').existsSync(require('path').join(__dirname, '..', 'public', 'reel', f)), `public/reel/${f} is committed, so the page never shows Coming soon`);
+  assert.match(reel, /matchMedia\('\(max-width: 720px\)'\)/);
+  assert.match(reel, /<video[\s\S]*playsInline[\s\S]*muted[\s\S]*\/>/);
+  assert.match(reel, /prefers-reduced-motion: reduce/);
+  assert.match(reel, /onEnded=\{\(e\) => \{ setMode\('ended'\); e\.currentTarget\.load\(\);/);
+  assert.match(reel, /onError=\{\(\) => setMode\('missing'\)\}/);
+  assert.match(reel, /Tap for sound/);
+  assert.match(reel, /aria-label=\{mode === 'paused' \? 'Play' : 'Pause'\}/, 'anything moving longer than five seconds can be paused');
+  assert.match(read('App.tsx'), /<section id="reel"[\s\S]*<Reel \/>/);
+});
+
+// ── Motion ───────────────────────────────────────────────────────────────────
+test('every animation lives under prefers-reduced-motion: no-preference', () => {
+  const sheet = live(css);
+  const start = sheet.indexOf('@media (prefers-reduced-motion: no-preference) {');
+  assert.ok(start > 0, 'the motion block exists');
+  let depth = 0, end = start;
+  for (let i = sheet.indexOf('{', start); i < sheet.length; i += 1) {
+    if (sheet[i] === '{') depth += 1;
+    if (sheet[i] === '}') { depth -= 1; if (depth === 0) { end = i; break; } }
+  }
+  const outside = sheet.slice(0, start) + sheet.slice(end + 1);
+  assert.doesNotMatch(outside, /@keyframes|\banimation(?:-name)?\s*:/, 'an animation outside the no-preference block');
+  assert.ok((sheet.slice(start, end).match(/@keyframes/g) || []).length >= 8);
+  // Script-driven motion checks the same preference.
+  for (const rel of ['components/home/Screens.tsx', 'components/home/Chrome.tsx', 'components/Simulator.tsx']) {
+    assert.match(read(rel), /prefers-reduced-motion: reduce/, rel);
+  }
+});
+
+// ── Colour: AA for text ──────────────────────────────────────────────────────
+test('the text colour pairs pass AA', () => {
+  const white = '#ffffff';
+  const pairs = [
+    ['white on the hot buttons', white, declared('--hot-btn')],
+    ['white on the simulator red', white, declared('--sim-red')],
+    ['navy on the sky', declared('--navy'), declared('--sky')],
+    ['ink on the sun band', declared('--ink'), declared('--sun')],
+    ['white on the footer', white, declared('--footer')],
+    ['ink-2 on paper', declared('--ink-2'), declared('--paper')],
+  ];
+  for (const id of ['puggles', 'cubbies', 'sparks', 'tnt', 'trek', 'journey']) {
+    pairs.push([`${id} text on white`, club(id, '--c-text'), white]);
+    pairs.push([`white on the ${id} plate`, white, club(id, '--c-text')]);
+  }
+  // Plates with white text sit on --c-text, never the kit's deep (T&T's fails).
+  assert.doesNotMatch(live(css), /background:\s*var\(--c-deep\)/);
+  for (const [what, fg, bg] of pairs) assert.ok(contrast(fg, bg) >= 4.5, `${what}: ${fg} on ${bg} is ${contrast(fg, bg).toFixed(2)}`);
+  // The hot button is the one deliberate departure: the kit's own hot would fail.
+  assert.ok(contrast(white, declared('--brand-hot')) < 4.5);
+});
+
+// ── Anchors and links ────────────────────────────────────────────────────────
+const ids = (files) => files.map((rel) => live(read(rel))).join('\n').match(/\bid=["']([^"']+)["']/g).map((m) => m.slice(4, -1));
+const partIds = [...live(read('components/home/Parts.tsx')).matchAll(/\bid: '([a-z]+)'/g)].map((m) => m[1]);
+
+test('the anchors people link to resolve: the home page\'s sections, the old about pages\' targets, /help\'s two', () => {
+  const home = new Set([...ids(HOME_PAGE), ...partIds]);
+  for (const id of ['reel', 'features', 'simulator', 'lobby', 'journey', 'labels', 'projector', 'phone', 'app', 'main']) assert.ok(home.has(id), `#${id} on /`);
+  const help = new Set(ids(HELP_PAGE));
+  for (const id of ['install', 'faq', 'main']) assert.ok(help.has(id), `#${id} on /help`);
+  // The old about pages' redirects land on sections that exist.
+  const redirects = readFileSync(path.join(REPO, 'site/lib/redirects.js'), 'utf8');
+  for (const [, id] of redirects.matchAll(/'\/#([a-z-]+)'/g)) assert.ok(home.has(id), `/#${id} (site/lib/redirects.js)`);
+  // Old links to the install guide and the FAQ go to /help.
+  const index = read('index.html');
+  for (const hash of ['#install', '#how-it-works', '#faq']) assert.match(index, new RegExp(`'${hash}': '/help#(?:install|faq)'`), hash);
+  // Every in-page link has a target on its page.
+  for (const [files, have] of [[HOME_PAGE, home], [HELP_PAGE, help]]) {
+    const missing = files.flatMap((rel) => [...live(read(rel)).matchAll(/href=["']#([^"']+)["']/g)].map((m) => m[1]))
+      .filter((id) => !id.startsWith('kv-') && !have.has(id));
+    assert.deepEqual([...new Set(missing)], []);
+  }
+});
+
+test('no id repeats on a page', () => {
+  for (const files of [HOME_PAGE, HELP_PAGE]) {
+    const all = [...ids(files).filter((id) => !/\$\{/.test(id)), ...partIds];
+    const dupes = all.filter((id, i) => all.indexOf(id) !== i);
+    assert.deepEqual(dupes, []);
+  }
+});
+
+test('links out go only to the repo, the app\'s own downloads, this site\'s pages and sections, never to a live screen', () => {
+  for (const rel of HOME) {
     const text = live(read(rel));
     for (const [, url] of text.matchAll(/(?:href=|=\s*|:\s*)["'`{]?(https?:\/\/[^\s"'`}<)]+)/g)) {
-      if (/awana\.kvbchurch\.org/.test(url)) {
-        // the home page itself, with a section, and the app's stable download links
-        assert.match(url, /^https:\/\/awana\.kvbchurch\.org\/(?:#[a-z-]*|download\/[a-z-]+)?$/, `${rel}: ${url}`);
-      }
-      if (/awana\.kvbchurch\.org/.test(url)) assert.doesNotMatch(url, /countdown\.html|\/lobby\/?(?:index\.html)?$|\/journey\/?(?:index\.html)?$/, `${rel}: ${url} is a live screen`);
+      assert.match(url, /^https:\/\/(?:github\.com\/patrick-simpson\/kvbcawana(?:\/tree\/main\/(?:printer|lobby|journey))?|awana\.kvbchurch\.org\/(?:download\/[a-z-]+)?)$/, `${rel}: ${url}`);
     }
-    assert.doesNotMatch(text, /href=["'](?:\.\.?\/)?(?:lobby|journey)\/?(?:index\.html|countdown\.html)?["']/, `${rel} links a live screen`);
+    for (const [, href] of text.matchAll(/href=["']([^"'#][^"']*)["']/g)) {
+      assert.match(href, /^(?:\/|\/help(?:#[a-z]+)?|\/#[a-z]+|\/capabilities\.html|\/download\/[a-z-]+|\/chrome-extension\.zip)$/, `${rel}: ${href}`);
+    }
+    assert.doesNotMatch(text, /["'`]\/(?:lobby|journey)\/?(?:index\.html|countdown(?:\.html)?)?["'`]/, `${rel} links a live screen`);
   }
 });
 
-test('the Journey section keeps the licensing wording strict and the room students', () => {
-  const text = live(read('components/Journey.tsx'));
-  // Never links to, names or advertises a lesson video, transcoded copy, release asset, transcript file, handout or slide image.
-  assert.doesNotMatch(text, /\.mp4|\.vtt|releases\/download|journey-videos|<video\b|<source\b/i);
-  assert.doesNotMatch(text, /re-?host|mirror|re-?encod|transcod|a smaller copy|a copy of/i);
-  assert.match(text, /already licenses through its own Awana/);
-  // (the one use is the Check-in Display's own line in the day's timeline: it welcomes children at the lobby)
-  assert.doesNotMatch(text.replace('welcoming children by first name', ''), /\bchildren\b/i, 'Journey is the high-school ministry: students, never children');
+// ── The Simulator's DOM contract (src/constants.ts DOM_SELECTORS) ────────────
+test('the Simulator keeps the DOM the extension watches', () => {
+  const sim = read('components/Simulator.tsx');
+  assert.match(sim, /<div id="lastCheckin"[^>]*>[\s\S]*?<div className="tt-last__who">[\s\S]*?\{lastCheckin\?\.name\}/, '#lastCheckin div holds the name');
+  assert.match(sim, /<div className="clubbers">\s*<ClubberList/);
+  const list = read('components/ClubberList.tsx');
+  assert.match(list, /className=\{`clubber /, '.clubber');
+  assert.match(list, /<div className="name [^"]*">\{clubber\.name\}<\/div>/, '.name');
+  assert.match(list, /<div className="club [^"]*">\s*<span><img alt=\{clubber\.club\}/, '.club img alt');
+  const modal = read('components/CheckinModal.tsx');
+  assert.match(modal, /id="checkin-modal"/);
+  assert.match(modal, /<button id="checkin"/);
+  const constants = read('src/constants.ts');
+  for (const sel of ["'#lastCheckin div'", "'.clubber'", "'.name'", "'.club img'"]) assert.ok(constants.includes(sel), sel);
 });
 
-test('the anchors people link to still resolve, and so do the page\'s own links', () => {
-  const sources = [...COMPONENTS, 'components/Simulator.tsx', 'components/InstallGuide.tsx', 'components/Faq.tsx'].map((rel) => live(read(rel))).join('\n');
-  const ids = new Set([...sources.matchAll(/\bid=["']([^"']+)["']/g)].map((m) => m[1]));
-  for (const id of ['install', 'simulator', 'faq', 'features', 'how-it-works', 'family', 'lobby', 'journey']) {
-    assert.ok(ids.has(id), `#${id} exists`);
+// ── Journey's wording (journey/CLAUDE.md, "Licensing boundary") ──────────────
+test('the Journey part keeps the licensing wording strict and the room students', () => {
+  const parts = live(read('components/home/Parts.tsx'));
+  const journey = parts.slice(parts.indexOf("id: 'journey'"), parts.indexOf("id: 'phone'"));
+  assert.ok(journey.length > 200, 'found the Journey part');
+  assert.match(journey, /already licenses through its own Awana Ministry Membership/);
+  assert.match(journey, /students/);
+  assert.doesNotMatch(journey, /\bchildren\b|\bkids\b/i, 'Journey is the high-school ministry: students');
+  // Never links to, names or advertises a lesson video, copy, release asset, transcript, handout or slide image.
+  for (const rel of ['components/home/Parts.tsx', 'components/home/Screens.tsx']) {
+    const text = live(read(rel));
+    assert.doesNotMatch(text, /\.mp4|\.vtt|releases\/download|journey-videos|<video\b|<source\b/i, rel);
+    assert.doesNotMatch(text, /re-?host|mirror|re-?encod|transcod|a smaller copy|a copy of the|download the lesson/i, rel);
   }
-  const missing = [...sources.matchAll(/href=["']#([^"']+)["']/g)].map((m) => m[1]).filter((id) => !id.startsWith('i-') && !ids.has(id)); // (#i-… are sprite symbols)
-  assert.deepEqual([...new Set(missing)], []);
-});
-
-test('no id repeats on the home page, so every anchor has one target', () => {
-  const sources = ['App.tsx', 'components/Hero.tsx', 'components/Showcase.tsx', 'components/Features.tsx', 'components/Simulator.tsx',
-    'components/InstallGuide.tsx', 'components/Faq.tsx', 'components/Lobby.tsx', 'components/Journey.tsx']
-    .map((rel) => live(read(rel))).join('\n');
-  const all = [...sources.matchAll(/\bid=["']([^"']+)["']/g)].map((m) => m[1]);
-  const dupes = all.filter((id, i) => all.indexOf(id) !== i);
-  assert.deepEqual(dupes, []);
-});
-
-test('the two sections are the ones the old about pages redirect to', () => {
-  for (const [rel, id] of [['components/Lobby.tsx', 'lobby'], ['components/Journey.tsx', 'journey']]) {
-    assert.match(read(rel), new RegExp(`<section id="${id}"`));
-  }
-  assert.equal(SECTIONS.length, 2);
 });
 
 console.log(`\n${n} checks passed`);

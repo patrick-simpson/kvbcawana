@@ -78,3 +78,7 @@ label-golden-out/
 # The render smoke's output (scripts/render-smoke.cjs); CI uploads it as an artifact
 scripts/render-smoke-out/
 render-smoke-out/
+
+# The reel's intermediate frames, footage and clips (reel/README.md); only
+# the finished films in public/reel/ are committed
+reel/.work/

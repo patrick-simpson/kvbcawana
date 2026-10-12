@@ -1,19 +1,25 @@
 <!DOCTYPE html>
-<html lang="en" data-accent="labels">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Club Label Printer, Check-in Display and Journey Display</title>
-    <meta name="description" content="Three free tools for a church club night: Club Label Printer prints a 4×2 name label the moment a child is checked in on TwoTimTwo.com, the Check-in Display welcomes each child by first name on the lobby TV and runs the projector, and Journey Display runs large group on a tiny kiosk. Made at Kennebec Valley Baptist Church. Not affiliated with or endorsed by Awana® Clubs International." />
-    <meta name="color-scheme" content="light dark" />
+    <title>KVBC Awana: club night, run by name</title>
+    <meta name="description" content="Free club night tools from Kennebec Valley Baptist Church: name labels that print at check-in, a lobby TV that welcomes every child by first name, a projector that keeps game time, a lesson kiosk, phone check-in and one Windows app. Awana® and club marks are trademarks of Awana Clubs International, used here by a member church. Not affiliated with or endorsed by Awana." />
+    <meta name="color-scheme" content="light" />
+    <meta name="theme-color" content="#B3D0E7" />
     <link rel="icon" type="image/png" href="/icon128.png">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght,SOFT,WONK@0,9..144,300..700,100,0;1,9..144,300..700,100,1&family=Source+Sans+3:ital,wght@0,400..900;1,400..700&family=IBM+Plex+Mono:wght@400;500&display=swap">
-    <!-- The screen recreations wear the family kit's three faces (Paytone One, Londrina Solid, Figtree), from the lobby's own kit files served on this site: the full, unmodified fonts (their licenses reserve the names, so never a Google subset). Google is asked only for the editorial faces above. -->
+    <link rel="preload" href="/reel/poster.jpg" as="image">
+    <!-- The kit's own faces (Paytone One, Londrina Solid, Figtree): the full, unmodified files the lobby serves on this site. Nothing comes from another host. -->
     <link rel="stylesheet" href="/lobby/shared/brand/fonts.css">
+    <script>
+      // The install guide and the FAQ live on /help now: old links to them land there.
+      (function () {
+        var to = { '#install': '/help#install', '#how-it-works': '/help#install', '#faq': '/help#faq' }[location.hash];
+        if (to) location.replace(to);
+      })();
+    </script>
   </head>
-  <body class="fam-page">
+  <body class="kv-page">
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>
   </body>
