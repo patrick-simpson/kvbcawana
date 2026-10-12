@@ -251,27 +251,40 @@ const pruneSharedDedup = new Function('SHARED_DEDUP_PREFIX', extractFunction('pr
     check('...so the set empties and the reload is no longer held', inFlight.size === 0);
   }
 
-  console.log('\nonCheckin: the same dedup as isPrinted');
+  console.log('\nonCheckin: id first, the name fallback only with no clubber id');
   {
-    const printedNames = new Set(['nm:ava stone']);
-    const printed = [];
-    const onCheckin = new Function('env', `
-      const selectedMode = 'on';
-      const batchPrintedNames = new Set();
-      const printedNames = env.printedNames;
-      const resolveIdentityKey = () => 'id:77';
-      const isPrinted = (n) => env.printedNames.has('id:77') || env.printedNames.has('nm:' + n.toLowerCase());
-      const rosterLookupByName = () => null;
-      const markPrinted = () => {};
-      const lookupClub = () => ({ clubName: 'Sparks', clubImageData: null });
-      const doPrint = (n) => env.printed.push(n);
-      ${extractFunction('onCheckin')}
-      return onCheckin;
-    `)({ printedNames, printed });
-    onCheckin('Ava Stone');
-    check('a child printed under a name key is not printed again once an id resolves', printed.length === 0, printed.join());
-    onCheckin('Eli Stone');
-    check('a child not printed yet still prints', printed.join() === 'Eli Stone');
+    const make = (printedNames, index) => {
+      const printed = [];
+      const onCheckin = new Function('env', `
+        const selectedMode = 'on';
+        const batchPrintedNames = new Set();
+        const printedNames = env.printedNames;
+        const ROSTER_NAME_INDEX = env.index;
+        const AMBIGUOUS_NAME = '__ambiguous__';
+        ${['nameKeyOf', 'identityKey', 'resolveIdentityKey', 'isPrinted'].map(extractFunction).join('\n')}
+        const rosterLookupByName = () => null;
+        const markPrinted = () => {};
+        const lookupClub = () => ({ clubName: 'Sparks', clubImageData: null });
+        const doPrint = (n) => env.printed.push(n);
+        ${extractFunction('onCheckin')}
+        return onCheckin;
+      `)({ printedNames, printed, index });
+      return { onCheckin, printed };
+    };
+    // A Sam Lee printed with no id known (a walk-in); a DIFFERENT Sam Lee (clubber 2) checks in.
+    let h = make(new Set(['nm:sam lee']), { 'sam lee': 'id:2' });
+    h.onCheckin('Sam Lee');
+    check('a second child with the same full name but their own clubber id still prints', h.printed.join() === 'Sam Lee', h.printed.join());
+    // The same clubber again: never twice.
+    h = make(new Set(['id:2']), { 'sam lee': 'id:2' });
+    h.onCheckin('Sam Lee');
+    check('the same clubber id is not printed again', h.printed.length === 0, h.printed.join());
+    // No id known for the check-in: the name decides.
+    h = make(new Set(['nm:ava stone']), {});
+    h.onCheckin('Ava Stone');
+    check('with no clubber id, a name already printed is not printed again', h.printed.length === 0, h.printed.join());
+    h.onCheckin('Eli Stone');
+    check('a child not printed yet still prints', h.printed.join() === 'Eli Stone', h.printed.join());
   }
 
   console.log('\nthe #lastCheckin watcher');

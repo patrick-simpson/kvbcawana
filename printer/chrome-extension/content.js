@@ -3739,7 +3739,11 @@
     // gate on a global time cooldown here — that was the v3.0.4 regression
     // that dropped the second of any two prints within 2 s.
     if (batchPrintedNames.has(key)) return; // already printed in batch
-    if (isPrinted(name)) return; // already printed this session (local or remote), by id or by name
+    // Already printed this session (local or remote). Id first: a child the roster
+    // knows by clubber id is judged by that id alone (two different clubber ids are
+    // always two children, so a second child with the same full name still prints);
+    // the name fallback only when no id is known for this check-in.
+    if (key.indexOf('id:') === 0 ? printedNames.has(key) : isPrinted(name)) return;
 
     var cachedMeta = rosterLookupByName(name);
     markPrinted(name, cachedMeta && cachedMeta.recid);

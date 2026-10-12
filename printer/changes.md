@@ -7,7 +7,7 @@ Labels wear the official club logos and their clubs' own lettering, and a friend
 
 **The BARFED tag for a late friend.** When a child already checked in turns out to have brought a friend, the BARF button on awana.kvbchurch.org/checkin prints just the BARFED tag with the child's first name at this computer (the child's name tag is not printed again), and the friend goes on the BARF list. If TwoTimTwo will not take the child's check-in again, the page's red "check them in again" line stays (after a reload too), and tapping the child checks them in on TwoTimTwo without printing a second name tag.
 
-**Chrome extension, sturdier.** It keeps seeing new check-ins when TwoTimTwo redraws its page, finds Store Night only as a whole word, never prints a child twice through its name fallback, gives up on a slow health or roster check instead of waiting forever, and forgets a phone action once it is answered.
+**Chrome extension, sturdier.** It keeps seeing new check-ins when TwoTimTwo redraws its page, finds Store Night only as a whole word, never prints a child twice through its name fallback (while two different children with the same name both print), gives up on a slow health or roster check instead of waiting forever, and forgets a phone action once it is answered.
 
 **App reliability.** The hidden printing window comes back by itself after a crash; a Chrome launch that fails is handled; a failed extension update is retried; the repair download refuses an incomplete file; the setup wizard saves only its own settings; the TV role saves its state safely; and a second start at sign-in no longer pops the window open.
 
