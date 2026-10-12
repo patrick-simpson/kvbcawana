@@ -376,6 +376,41 @@ const PORT = Number(process.env.AWANA_TEST_PORT || require('./free-port.cjs')())
     check('the loop runs and stops', seen >= 2 && timers.length === seen);
   }
 
+  console.log('\njob puller: the lease\'s church field and what every heartbeat carries (routes.md 10.3)');
+  {
+    const w = makeWorker();
+    const seen = [];
+    let churchRev = 4;
+    const realRequest = w.request;
+    w.request = async (base, p, opts) => {
+      const r = await realRequest(base, p, opts);
+      if (p.startsWith('/v1/print/next') && r.ok) r.body.church = { rev: 5, switchesRev: 2 };
+      return r;
+    };
+    const { puller } = makePuller(w, {
+      onChurch: (rev, switchesRev) => { seen.push([rev, switchesRev]); return new Promise(() => {}); },   // never settles: the puller must not wait on it
+      heartbeatExtras: () => ({ version: '9.3.0', churchRev }),
+    });
+    const r = await puller.tick();
+    check('the lease\'s church field is handed on (rev, switchesRev), and the tick does not wait for it', r.wait === jp.IDLE_MS && JSON.stringify(seen) === '[[5,2]]', JSON.stringify({ r, seen }));
+    const hello = w.hellos.at(-1);
+    check('the heartbeat carries the app version and the applied church rev', hello && hello.version === '9.3.0' && hello.churchRev === 4 && hello.printer.state === 'ok', JSON.stringify(hello));
+    fs.appendFileSync(path.join(dataDir, 'clubbers.csv'), '21,Ivo,Lark,Sparks\n');
+    churchRev = 5;
+    const { puller: slow } = makePuller(w, { fetchFn: async (...a) => { await sleep(80); return fetch(...a); }, heartbeatExtras: () => ({ version: '9.3.0', churchRev }) });
+    const job = await makeJob(printRec(21, 'Ivo', 'Lark', 'Sparks'));
+    await slow.handle(job);
+    const beat = w.hellos.find((h) => h.jobId === job.jobId);
+    check('and so does the beat that extends a lease while a job prints', beat && beat.version === '9.3.0' && beat.churchRev === 5, JSON.stringify(w.hellos.slice(-3)));
+    const w2 = makeWorker();
+    await makePuller(w2, { heartbeatExtras: () => { throw new Error('no'); } }).puller.tick();
+    await makePuller(w2, { heartbeatExtras: () => ({ version: 'nine', churchRev: -1 }) }).puller.tick();
+    check('a hook that throws, or junk, adds nothing and breaks nothing', w2.hellos.length === 2 && w2.hellos.every((h) => !('version' in h) && !('churchRev' in h)), JSON.stringify(w2.hellos));
+    const w3 = makeWorker();
+    const { puller: oldWorker } = makePuller(w3, { onChurch: () => { throw new Error('should not be called'); } });
+    check('a Worker that sends no church field is fine (an older one)', (await oldWorker.tick()).wait === jp.IDLE_MS);
+  }
+
   console.log('\nstation: the roster and the completed books arrive sealed');
   {
     const w = makeWorker();
