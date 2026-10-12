@@ -168,7 +168,7 @@ export class SyncCore {
       secret: () => this.watcher.creds()?.password, env: this.env, now: this.now, storage: this.storage, friends: this.friends,
     });
     this.watcher.adopt = this.adopt;
-    this.desk = new Desk({ watcher: this.watcher, ledger: this.ledger, printq: this.printq, stations: this.stations, tags: this.tags, now: this.now });
+    this.desk = new Desk({ watcher: this.watcher, ledger: this.ledger, printq: this.printq, stations: this.stations, tags: this.tags, now: this.now, adopt: this.adopt });
     mountCheckin(this.registry, this);   // stations, print lease, desk (routes.md 4, 5, 6)
     this.history = new History({ storage: this.storage, env: this.env, now: this.now });
     mountHistory(this.registry, this);   // history routes, the desk's row check and hooks (routes.md 2, 3)

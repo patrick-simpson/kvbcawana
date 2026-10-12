@@ -222,6 +222,21 @@ export class Adopter {
     return this.printq.attach(job.jobId, bundle);
   }
 
+  /**
+   * The desk undid this child: one waiting to be adopted (a TwoTimTwo-page check-in
+   * still on the backlog) must not be adopted, or a label prints for a child who
+   * is not here. @param {string} night @param {string} tag @returns {Promise<number>} how many were forgotten
+   */
+  async forget(night, tag) {
+    await this.load();
+    if (!this.entries) return 0;
+    const before = this.entries.length;
+    this.entries = this.entries.filter((x) => !(x.tag === tag && x.night === night));
+    const n = before - this.entries.length;
+    if (n) await this.saveBacklog();
+    return n;
+  }
+
   /** The window has closed: every claim, job and waiting child of the night is forgotten. */
   async endOfNight() {
     await this.load();

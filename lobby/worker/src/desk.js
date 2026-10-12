@@ -72,10 +72,13 @@ export class Desk {
   /**
    * @param {{ watcher: import('./watcher.js').Watcher, ledger: import('./ledger.js').Ledger,
    *   printq: import('./printq.js').PrintQueue, stations: import('./stations.js').Stations,
-   *   tags: import('./ledger.js').Tags, now: () => number, log?: (line: string) => void }} deps
+   *   tags: import('./ledger.js').Tags, now: () => number, log?: (line: string) => void,
+   *   adopt?: import('./adopt.js').Adopter }} deps
    */
-  constructor({ watcher, ledger, printq, stations, tags, now, log }) {
+  constructor({ watcher, ledger, printq, stations, tags, now, log, adopt }) {
     this.watcher = watcher;
+    /** The watcher's backlog of TwoTimTwo-page check-ins: an undo takes the child off it. */
+    this.adopt = adopt || null;
     this.ledger = ledger;
     this.printq = printq;
     this.stations = stations;
@@ -333,9 +336,11 @@ export class Desk {
     const tag = await this.tagFor(who, night);
     if (!tag) return refuse(503, { reason: 'not-configured' });
     await Promise.all([this.ledger.load(), this.printq.load()]);
-    // The claim goes, and so does a job that has not printed (the child is not here).
+    // The claim goes, and so does a job that has not printed (the child is not here),
+    // and so does a TwoTimTwo-page check-in of theirs still waiting to be adopted.
     await this.ledger.undo(night, tag);
     const dropped = await this.printq.dropForTag(tag);
+    if (this.adopt) await this.adopt.forget(night, tag);
     await this.fire('afterUndo', { night, tag, clubberId: 'clubberId' in who ? who.clubberId : undefined, club: clean(body.club, 24), historyRow: body.historyRow, source: 'desk', visitor: 'visitor' in who });
     return json({ ok: true, droppedJobs: dropped });
   }

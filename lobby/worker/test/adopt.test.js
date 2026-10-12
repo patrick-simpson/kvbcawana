@@ -7,7 +7,7 @@ import { printRecord } from '../src/adopt.js';
 import { SEAL_PER_TICK, SPILL_MS, WATCH_INTERVAL_MS } from '../src/watcher.js';
 import { everything } from './helpers.js';
 import { importDisplayKey, openEnvelope } from '../../src/lib/envelope.js';
-import { NIGHT, kid, rig } from './rig.js';
+import { NIGHT, kid, rig, row } from './rig.js';
 
 /** Move the clock, then let the alarm run once. */
 const step = async (t, ms) => { t.clock.tick(ms); await t.core.watcher.tick(); };
@@ -133,6 +133,27 @@ describe('a check-in made on TwoTimTwo\'s own page', () => {
     const again = await leased(sts[0]);
     expect(again).toHaveLength(1);
     expect(again[0].gen).toBe(3);                                         // 1, undone -> 2, re-check-in -> 3
+  });
+
+  it('a child undone at the desk while still waiting to be adopted is never adopted: no claim, no job, no label', async () => {
+    const { t, sts } = await night({ stations: 1 });
+    t.night.kids.push(kid(2, 'Cubbies', 'Ada Uniquename'), kid(3, 'Sparks', 'Bo Uniquename'));
+    await readReport(t);
+    expect(t.core.adopt.pending()).toBe(2);   // both wait on the backlog (one seal per tick)
+    // the desk undoes kid 2 before the watcher gets to them
+    const undo = await t.call('POST', '/v1/desk/undo', { night: NIGHT, clubberId: '2', historyRow: row('undo') });
+    expect(undo.body).toMatchObject({ ok: true });
+    expect(t.core.adopt.pending()).toBe(1);
+    t.night.kids = t.night.kids.filter((k) => k.id !== 2);
+    for (let i = 0; i < 4; i++) await step(t, SPILL_MS);
+    const jobs = await leased(sts[0]);
+    expect(jobs).toHaveLength(1);
+    const opened = await openAsStation(sts[0].ring, jobs[0].bundle);
+    expect(opened.clubberId).toBe('3');
+    // and the stored backlog agrees after a restart
+    t.restart();
+    await t.core.adopt.load();
+    expect(t.core.adopt.pending()).toBe(0);
   });
 
   it('is switched by CLOUD_PRINT: off makes no job from a report (claims still follow the desk)', async () => {
