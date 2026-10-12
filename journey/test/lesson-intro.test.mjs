@@ -1,6 +1,6 @@
-// The 6:30 show's lesson intro (src/schedule/06-lesson-intro.js): four cards
-// over the video while it buffers, only when the scheduled show begins from
-// the top in its own window; held for the video at most holdMaxMs; never in
+// The lesson intro (src/schedule/06-lesson-intro.js): four cards
+// over the video while it buffers, only when the splash's Begin starts the
+// lesson from the top (any time of day); held for the video at most holdMaxMs; never in
 // the way of playback (errors, ⇄, skips). jsdom drives the logic with the
 // timing shrunk through window.journeyIntroTiming; real Chromium checks the
 // Pi's cards never animate and the full profile's do.
@@ -146,16 +146,16 @@ test('the default hold is capped at 15 seconds after a ~5 second sequence', asyn
   assert.ok(minMs >= 4000 && minMs <= 5500, `cards last about five seconds (${minMs} ms)`);
 });
 
-test('only the scheduled show from the top: not at noon, not a resume, not Start over', async () => {
-  // Noon: ⇄ to the Journey view, Begin plays as it always has.
+test('the splash Begin from the top at any time (noon too), not a resume, not Start over', async () => {
+  // Noon: ⇄ to the Journey view, Begin still gets the intro (owner 2026-10-12).
   const noon = await boot({ now: NOON });
   try {
     noon.$('toggle-btn').click();
     await ticks(8);
     noon.$('journey-splash-play-btn').click();
     await ticks(8);
-    assert.equal(shown(noon.$('journey-intro')), false, 'no intro outside the 6:30 window');
-    assert.equal(noon.media.plays, 1);
+    assert.equal(shown(noon.$('journey-intro')), true, 'the intro plays at noon too');
+    assert.equal(noon.media.plays, 0, 'the video waits for the cards');
   } finally {
     noon.k.close();
   }

@@ -719,8 +719,8 @@ async function swapToCachedCopy() {
 }
 
 /* ── Lesson intro: the scheduled show's opening cards (owner 2026-10-12) ──
-   When the 6:30 show begins (Begin Video, Space or → on the splash, inside
-   the scheduled Journey window, nothing to resume) four cards come up one
+   When the show begins (Begin Video, Space or → on the splash, at any time
+   of day (owner 2026-10-12), nothing to resume) four cards come up one
    after another before the video: "Journey", "Advocates" (this year's
    study), the lesson's name, "Large Group Time". About five seconds, and
    they are there to hide buffering: the video is attached (paused, muted
@@ -732,8 +732,7 @@ async function swapToCachedCopy() {
    from there).
 
    Everything else starts as before: a resume, Start over, a lesson picked
-   from Settings, the splash outside the scheduled window (⇄ at noon), the
-   Skip to slides path. The intro never stands between the room and the
+   from Settings, the Skip to slides path. The intro never stands between the room and the
    lesson: any error (the video's own, or a throw in here) ends it at once
    and plays as today; ⇄, a Settings pick, the slides, a teardown all cancel
    it (cancelLessonIntro()). Space, →, Enter or a tap on it skips to the
@@ -771,10 +770,9 @@ function lessonIntroActive() {
   return lessonIntro !== null;
 }
 
-// The intro is the scheduled show's, at its scheduled time, from the top.
+// The intro is the splash's Begin from the top, at any time of day.
 function lessonIntroWanted(resumeAt) {
-  return !!lessonIntroEl && lessonIntroCards.length === 4 && !(resumeAt > 0) && !previewMode
-    && scheduledPhase() === 'journey';
+  return !!lessonIntroEl && lessonIntroCards.length === 4 && !(resumeAt > 0) && !previewMode;
 }
 
 // Can the attached video play through from here without stopping?
@@ -1212,7 +1210,7 @@ function showQualityNote(lesson) {
   journeySplashQuality.classList.toggle('hidden', !degraded);
 }
 
-// `withIntro`: the 6:30 show's Begin (beginScheduledPlay); the lesson intro
+// `withIntro`: the splash's plain Begin (beginScheduledPlay); the lesson intro
 // (06-lesson-intro.js) covers the first seconds while the video, attached at
 // once, buffers underneath, and starts it when it is ready.
 async function playCurrentLesson(resumeAt = 0, withIntro = false) {
@@ -2133,8 +2131,8 @@ journeySplashSlidesBtn.addEventListener('click', () => {
 // offer. requestPlayback() asks about captions only if this device has never
 // answered, then starts playback either way.
 // `intro`: the plain Begin (button, Space, →) with nothing to resume, which
-// is the 6:30 show starting; playCurrentLesson() still checks it is the
-// scheduled window. Resume and Start over begin as they always have.
+// starts the lesson intro at any time of day. Resume and Start over begin
+// as they always have.
 function beginScheduledPlay(resumeAt = 0, intro = false) {
   if (!currentLesson) return;
   requestPlayback(captionUrlFor(currentLesson.week, 'student'), () => playCurrentLesson(resumeAt, intro && !(resumeAt > 0)));

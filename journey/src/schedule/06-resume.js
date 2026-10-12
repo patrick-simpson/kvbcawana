@@ -245,7 +245,7 @@ function showQualityNote(lesson) {
   journeySplashQuality.classList.toggle('hidden', !degraded);
 }
 
-// `withIntro`: the 6:30 show's Begin (beginScheduledPlay); the lesson intro
+// `withIntro`: the splash's plain Begin (beginScheduledPlay); the lesson intro
 // (06-lesson-intro.js) covers the first seconds while the video, attached at
 // once, buffers underneath, and starts it when it is ready.
 async function playCurrentLesson(resumeAt = 0, withIntro = false) {

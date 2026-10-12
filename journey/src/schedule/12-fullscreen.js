@@ -121,8 +121,8 @@ journeySplashSlidesBtn.addEventListener('click', () => {
 // offer. requestPlayback() asks about captions only if this device has never
 // answered, then starts playback either way.
 // `intro`: the plain Begin (button, Space, →) with nothing to resume, which
-// is the 6:30 show starting; playCurrentLesson() still checks it is the
-// scheduled window. Resume and Start over begin as they always have.
+// starts the lesson intro at any time of day. Resume and Start over begin
+// as they always have.
 function beginScheduledPlay(resumeAt = 0, intro = false) {
   if (!currentLesson) return;
   requestPlayback(captionUrlFor(currentLesson.week, 'student'), () => playCurrentLesson(resumeAt, intro && !(resumeAt > 0)));
