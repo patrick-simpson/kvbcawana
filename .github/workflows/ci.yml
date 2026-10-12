@@ -117,12 +117,12 @@ jobs:
               if [[ "$f" != */* && "$f" == *.md ]]; then continue; fi
               case "$f" in
                 journey/public/src/schedule.js) lobby=true ;;  # screenSpecs.test.js reads it
-                site/desk/*|printer/print-server/public/phone.html) lobby=true ;;  # e2e/desk.spec.js serves the desk page (site/desk/desk-page.mjs injects the touch core)
+                site/desk/*|printer/print-server/public/phone.html|printer/print-server/sync-protocol.js) lobby=true ;;  # e2e/desk.spec.js serves the desk page (site/desk/desk-page.mjs injects the touch core)
                 lobby/worker/*|lobby/desktop/*|printer/*|journey/*|site/*|.github/workflows/*) ;;
                 *) lobby=true ;;
               esac
               case "$f" in
-                lobby/worker/src/*|lobby/worker/migrations/*|lobby/worker/test/rig.js|lobby/worker/test/helpers.js|lobby/worker/test/fixtures.js|lobby/worker/test/d1stub.js|lobby/worker/package.json|lobby/worker/package-lock.json|lobby/src/lib/calendarParse.js|lobby/src/lib/envelope.js|lobby/src/lib/settingRules.js|lobby/src/lib/sharedSettings.js|lobby/src/lib/slides.js|lobby/src/lib/syncSpecs.js|lobby/shared/text.js|lobby/shared/sync-protocol.js|lobby/shared/brand/*|lobby/shared/cloud-crypto.js|lobby/shared/cloud-vectors.json|lobby/shared/tonight.js|lobby/src/lib/printServer.js|lobby/src/components/settings/laptop*.jsx|site/build.mjs) printer=true ;;
+                lobby/worker/src/*|lobby/worker/migrations/*|lobby/worker/test/rig.js|lobby/worker/test/helpers.js|lobby/worker/test/fixtures.js|lobby/worker/test/d1stub.js|lobby/worker/package.json|lobby/worker/package-lock.json|lobby/src/lib/calendarParse.js|lobby/src/lib/envelope.js|lobby/src/lib/settingRules.js|lobby/src/lib/sharedSettings.js|lobby/src/lib/slides.js|lobby/src/lib/syncSpecs.js|lobby/shared/text.js|lobby/shared/sync-protocol.js|lobby/shared/brand/*|lobby/shared/cloud-crypto.js|lobby/shared/cloud-vectors.json|lobby/shared/tonight.js|lobby/shared/pickup.js|lobby/shared/clubs.js|lobby/shared/clubNight.js|lobby/src/lib/printServer.js|lobby/src/components/settings/laptop*.jsx|site/build.mjs) printer=true ;;
                 lobby/*|journey/*|site/updates/*|.github/workflows/*) ;;
                 *) printer=true ;;
               esac
@@ -460,7 +460,7 @@ jobs:
           if [ -z "$BASE" ]; then
             echo "No base commit to compare against; deploying the Worker."
             echo "changed=true" >> "$GITHUB_OUTPUT"
-          elif git diff --quiet "$BASE" HEAD -- lobby/worker lobby/worker/migrations lobby/src/lib lobby/shared/text.js lobby/shared/sync-protocol.js lobby/shared/cloud-crypto.js lobby/shared/tonight.js .github/workflows/ci.yml; then
+          elif git diff --quiet "$BASE" HEAD -- lobby/worker lobby/worker/migrations lobby/src/lib lobby/shared/text.js lobby/shared/sync-protocol.js lobby/shared/cloud-crypto.js lobby/shared/tonight.js lobby/shared/pickup.js lobby/shared/clubs.js .github/workflows/ci.yml; then
             echo "Nothing the Worker is built from changed since $BASE; its deploy is skipped."
             echo "changed=false" >> "$GITHUB_OUTPUT"
           else
