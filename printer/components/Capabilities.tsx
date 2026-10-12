@@ -154,9 +154,9 @@ const EFFORT_LABEL = { S: 'Small', M: 'Medium', L: 'Large' } as const;
 
 const SUB_LINKS = [
   { href: './', label: 'Home' },
-  { href: './#features', label: 'Showcase' },
-  { href: './#install', label: 'Install' },
-  { href: './#faq', label: 'FAQ' },
+  { href: './#features', label: 'What it does' },
+  { href: './help#install', label: 'Install' },
+  { href: './help#faq', label: 'FAQ' },
   { href: './capabilities.html', label: 'TwoTimTwo reference', current: true },
 ];
 

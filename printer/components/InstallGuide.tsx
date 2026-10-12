@@ -1,22 +1,21 @@
 import React, { useState } from 'react';
 import { HEALTH_CHECK_ENDPOINT, HEALTH_CHECK_TIMEOUT } from '../src/constants';
-import { Icon } from './family/Icons';
+import { Ico } from './home/Icons';
+import { StepChip } from './home/Kit';
 
 type ConnectionStatus = 'idle' | 'checking' | 'connected' | 'error';
 
-const INSTALLER_URL = 'https://awana.kvbchurch.org/download/club-label-printer';
+const INSTALLER_URL = 'https://awana.kvbchurch.org/download/kvbc-awana';
 
-const Step: React.FC<{ n: number; title: string; children: React.ReactNode }> = ({ n, title, children }) => (
-  <li className="lbl-install__step">
-    <span className="lbl-install__num" aria-hidden="true">{n}</span>
-    <h3 className="lbl-install__title"><span className="fam-sr">Step {n}: </span>{title}</h3>
-    <div className="lbl-install__body">{children}</div>
+const Step: React.FC<{ n: number; title: string; club: string; children: React.ReactNode }> = ({ n, title, club, children }) => (
+  <li className="kv-step-card" data-club={club}>
+    <StepChip className="kv-step-card__chip" label="Step" value={String(n)} />
+    <h3 className="kv-step-card__title"><span className="kv-sr">Step {n}: </span>{title}</h3>
+    <div className="kv-step-card__body">{children}</div>
   </li>
 );
 
-const Code: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <code className="lbl-code">{children}</code>
-);
+const Code: React.FC<{ children: React.ReactNode }> = ({ children }) => <code className="kv-code">{children}</code>;
 
 export const InstallGuide: React.FC = () => {
   const [connStatus, setConnStatus] = useState<ConnectionStatus>('idle');
@@ -37,29 +36,29 @@ export const InstallGuide: React.FC = () => {
   };
 
   return (
-    <section id="install" className="lbl-part" aria-labelledby="install-title">
-      <div className="fam-wrap">
-        <div className="lbl-part__head">
-          <p className="fam-kicker">Install</p>
-          <h2 className="lbl-part__title" id="install-title">Set it up in a few minutes</h2>
-          <p className="lbl-part__lede">
+    <section id="install" className="kv-install" aria-labelledby="install-title">
+      <div className="kv-wrap">
+        <div className="kv-head">
+          <p className="kv-tabkicker">Install</p>
+          <h2 className="kv-h2" id="install-title">Set it up in a few minutes</h2>
+          <p className="kv-lede">
             A Windows PC and any thermal label printer that takes 4×2 inch labels. One installer, with no
             Node.js and no scripts.
           </p>
-          <p className="lbl-note">
-            <Icon name="shield" className="lbl-note__icon" />
-            <span><strong>An independent tool.</strong> Club Label Printer is not affiliated with or endorsed by
+          <p className="kv-note">
+            <Ico name="shield" />
+            <span><strong>An independent tool.</strong> KVBC Awana is not affiliated with or endorsed by
             TwoTimTwo.com. It is a companion made by a church that works alongside their check-in system.</span>
           </p>
         </div>
 
-        <ol className="lbl-install">
-          <Step n={1} title="Install the app">
-            <p className="flex flex-wrap items-center gap-x-4 gap-y-2">
-              <a href={INSTALLER_URL} className="fam-btn"><Icon name="download" />Download KVBC Awana for Windows</a>
-              <span className="text-step--1 text-ink-3">then run the downloaded file</span>
+        <ol className="kv-steps">
+          <Step n={1} title="Install the app" club="puggles">
+            <p className="kv-steps__cta">
+              <a href={INSTALLER_URL} className="kv-btn kv-btn--hot"><Ico name="download" />Download KVBC Awana for Windows</a>
+              <span>then run the downloaded file</span>
             </p>
-            <div className="lbl-note lbl-note--block">
+            <div className="kv-callout">
               <p><strong>Windows may show a blue “Windows protected your PC” screen.</strong></p>
               <p>
                 That’s SmartScreen being cautious about a new community app. Click{' '}
@@ -77,37 +76,37 @@ export const InstallGuide: React.FC = () => {
               ran Club Label Printer updates to KVBC Awana by itself and stays a print server, with no
               setup to redo.
             </p>
-            <p className="lbl-small">
+            <p className="kv-small">
               Server not running for any reason? Launch <strong>KVBC Awana</strong> from the desktop
               or Start menu again: every launch checks the server and starts it if it’s down. There’s also a{' '}
               <strong>Start print server</strong> button in the tray menu and in the print server window.
             </p>
-            <p className="lbl-small">
-              Settings live at <strong>awana.kvbchurch.org/settings</strong> (the tray’s <strong>Settings</strong>
+            <p className="kv-small">
+              Settings live at <strong>awana.kvbchurch.org/settings</strong> (the tray’s <strong>Settings</strong>{' '}
               opens it): open it in Chrome on this computer and it finds the printer by itself. The print server
               answers only this computer, so Windows has nothing to ask about the network, and phones check in at
               awana.kvbchurch.org/checkin.
             </p>
           </Step>
 
-          <Step n={2} title="Load the browser extension">
+          <Step n={2} title="Load the browser extension" club="sparks">
             <p>
               The app already installed the extension’s files for you. You just have to point your browser
               at them <em>once</em>.
             </p>
-            <div className="lbl-note lbl-note--block">
+            <div className="kv-callout">
               <p><strong>In Edge or Chrome:</strong></p>
-              <ol className="lbl-olist">
+              <ol className="kv-olist">
                 <li>Open <Code>edge://extensions</Code> or <Code>chrome://extensions</Code></li>
                 <li>Turn on <strong>Developer Mode</strong> (top right)</li>
                 <li>Click <strong>Load unpacked</strong> and pick <Code>%APPDATA%\awana-label-printer\chrome-extension</Code></li>
               </ol>
-              <p className="lbl-small">
+              <p className="kv-small">
                 Can’t find it? The tray menu has <strong>Open Chrome extension folder</strong>, which opens it
                 in Explorer so you can drag it onto the dialog.
               </p>
             </div>
-            <div className="lbl-note lbl-note--block lbl-note--accent">
+            <div className="kv-callout kv-callout--tint">
               <p><strong>Why that folder and not a download</strong></p>
               <p>
                 The app rewrites that folder every time it starts, so when the app updates itself the
@@ -116,50 +115,41 @@ export const InstallGuide: React.FC = () => {
                 quietly drifts behind the print server.
               </p>
             </div>
-            <p className="lbl-small">
+            <p className="kv-small">
               The green <strong>Club Print</strong> widget appears on your check-in page once it’s loaded.
-              (<a href="chrome-extension.zip" download>The zip</a> is still there for anyone not using the
+              (<a href="/chrome-extension.zip" download>The zip</a> is still there for anyone not using the
               Windows app.)
             </p>
           </Step>
 
-          <Step n={3} title="Enrich labels from your roster (automatic)">
+          <Step n={3} title="Enrich labels from your roster (automatic)" club="tnt">
             <p>
               The extension syncs your TwoTimTwo roster to the print server on every visit, which unlocks
               allergy icons, birthday cakes, handbook groups and the no-photo flag. You can also drop a{' '}
               <Code>clubbers.csv</Code> next to the server with these columns:
             </p>
-            <div className="lbl-scroll" tabIndex={0} role="region" aria-label="CSV columns">
+            <div className="kv-scroll" tabIndex={0} role="region" aria-label="CSV columns">
               <Code>FirstName, LastName, Birthdate, Allergies, HandbookGroup, MedRelease</Code>
             </div>
-            <p className="lbl-small">
+            <p className="kv-small">
               A “no” in <strong>MedRelease</strong> (or TwoTimTwo’s photo-release column) prints a crossed-out
               camera on that child’s label, so volunteers know not to photograph them. Unknown children still
               get a basic label; nothing ever crashes.
             </p>
           </Step>
 
-          <Step n={4} title="Test the connection">
+          <Step n={4} title="Test the connection" club="journey">
             <p>With the app running on this computer, check that everything is wired up:</p>
-            <div className="flex items-center gap-x-4 gap-y-3 flex-wrap">
-              <button
-                type="button"
-                onClick={testConnection}
-                disabled={connStatus === 'checking'}
-                className="fam-btn fam-btn--ghost disabled:opacity-60 disabled:cursor-wait"
-              >
-                {connStatus === 'checking' ? 'Checking…' : 'Test Connection'}
+            <div className="kv-conn">
+              <button type="button" onClick={testConnection} disabled={connStatus === 'checking'} className="kv-btn kv-btn--line">
+                {connStatus === 'checking' ? 'Checking…' : 'Test connection'}
               </button>
-              <span role="status" className="min-w-0">
-                {connStatus === 'connected' && (
-                  <span className="lbl-conn lbl-conn--ok"><Icon name="check" />Connected: {connDetail}</span>
-                )}
-                {connStatus === 'error' && (
-                  <span className="lbl-conn lbl-conn--err"><Icon name="alarm" />{connDetail}</span>
-                )}
+              <span role="status">
+                {connStatus === 'connected' && <span className="kv-conn__ok"><Ico name="check" />Connected: {connDetail}</span>}
+                {connStatus === 'error' && <span className="kv-conn__err"><Ico name="close" />{connDetail}</span>}
               </span>
             </div>
-            <p className="lbl-small">
+            <p className="kv-small">
               Then open your church’s TwoTimTwo check-in page in Chrome and check a child in. A real label
               should print. (The settings page’s test label works too.)
             </p>

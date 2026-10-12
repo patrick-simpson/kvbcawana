@@ -1,5 +1,5 @@
 import React from 'react';
-import { Icon } from './family/Icons';
+import { Ico } from './home/Icons';
 
 const QA: { q: string; a: React.ReactNode }[] = [
   {
@@ -24,29 +24,29 @@ const QA: { q: string; a: React.ReactNode }[] = [
   },
   {
     q: 'Is this an official Awana or TwoTimTwo product?',
-    a: 'No. Club Label Printer is an independent project made at Kennebec Valley Baptist Church. It is not affiliated with or endorsed by Awana Clubs International or TwoTimTwo.com; it simply works alongside TwoTimTwo’s check-in page.',
+    a: 'No. KVBC Awana is an independent project made at Kennebec Valley Baptist Church, a member church that uses the Awana marks to describe what it works alongside. It is not affiliated with or endorsed by Awana Clubs International or TwoTimTwo.com; it simply works alongside TwoTimTwo’s check-in page.',
   },
   {
     q: 'Something isn’t printing. Help?',
-    a: <>Click <strong>Help — Not Working?</strong> in the widget for automatic diagnostics, or open <code className="lbl-code">awana.kvbchurch.org/settings</code> in Chrome on the laptop for a health check, plain-language warnings, diagnostics and a test label.</>,
+    a: <>Click <strong>Help — Not Working?</strong> in the widget for automatic diagnostics, or open <code className="kv-code">awana.kvbchurch.org/settings</code> in Chrome on the laptop for a health check, plain-language warnings, diagnostics and a test label.</>,
   },
 ];
 
 export const Faq: React.FC = () => (
-  <section id="faq" className="lbl-part" aria-labelledby="faq-title">
-    <div className="fam-wrap">
-      <div className="lbl-part__head">
-        <p className="fam-kicker">FAQ</p>
-        <h2 className="lbl-part__title" id="faq-title">Questions volunteers ask</h2>
+  <section id="faq" className="kv-faq" aria-labelledby="faq-title">
+    <div className="kv-wrap kv-faq__inner">
+      <div className="kv-head">
+        <p className="kv-tabkicker">Questions</p>
+        <h2 className="kv-h2" id="faq-title">Questions volunteers ask</h2>
       </div>
-      <div className="lbl-faq">
+      <div className="kv-faq__list">
         {QA.map(item => (
-          <details key={item.q} className="lbl-faq__item">
-            <summary className="lbl-faq__q">
+          <details key={item.q} className="kv-faq__item">
+            <summary className="kv-faq__q">
               <span>{item.q}</span>
-              <Icon name="chev" className="lbl-faq__chev" />
+              <span className="kv-faq__chev" aria-hidden="true"><Ico name="chev" /></span>
             </summary>
-            <p className="lbl-faq__a">{item.a}</p>
+            <p className="kv-faq__a">{item.a}</p>
           </details>
         ))}
       </div>

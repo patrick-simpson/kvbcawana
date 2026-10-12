@@ -1,8 +1,11 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import { ClubberList } from './ClubberList';
 import { CheckinModal } from './CheckinModal';
 import { mockClubbers } from '../data';
 import { Clubber } from '../types';
+import { Ico } from './home/Icons';
+import { Doodle, Shape, clubByName } from './home/Kit';
+import { Moment, PrinterArt, Tv } from './home/Screens';
 
 /**
  * A working replica of the TwoTimTwo check-in page. It renders the exact DOM
@@ -10,18 +13,22 @@ import { Clubber } from '../types';
  * .club img, plus #checkin-modal / button#checkin — see src/constants.ts
  * DOM_SELECTORS and chrome-extension/content.js). The extension's content
  * script only runs on *.twotimtwo.com (manifest.json content_scripts), so no
- * label prints from this page on github.io: it shows a volunteer what the
- * table looks like, and keeps the DOM contract documented in one place.
- * Restyle freely around it; never change that DOM.
+ * label prints from this page: beside the replica, a lobby TV and a printer
+ * act out what a real check-in sets off. Restyle freely around it; never
+ * change that DOM.
  *
- * The replica keeps TwoTimTwo's own light colours in both themes, because it
- * is a picture of somebody else's website.
+ * The replica keeps TwoTimTwo's own light colours, because it is a picture of
+ * somebody else's website.
  */
+const first = (name: string) => name.trim().split(/\s+/)[0];
+
 export const Simulator: React.FC = () => {
   const [selectedClubber, setSelectedClubber] = useState<Clubber | null>(null);
   const [lastCheckin, setLastCheckin] = useState<Clubber | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [filter, setFilter] = useState('');
+  const [runs, setRuns] = useState(0);
+  const outRef = useRef<HTMLDivElement>(null);
 
   const visibleClubbers = [...mockClubbers]
     .filter(c => c.name.toLowerCase().includes(filter.toLowerCase().trim()))
@@ -34,6 +41,13 @@ export const Simulator: React.FC = () => {
     setTimeout(() => {
       setIsLoading(false);
       setLastCheckin(clubber);
+      setRuns((r) => r + 1);
+      // On a narrow screen the TV and the printer are below the list: bring them up.
+      const out = outRef.current;
+      if (out && out.getBoundingClientRect().top > window.innerHeight * 0.6) {
+        const reduce = typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        out.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'center' });
+      }
     }, 600);
   };
 
@@ -46,87 +60,89 @@ export const Simulator: React.FC = () => {
     }
   };
 
+  const shown = lastCheckin && !isLoading ? lastCheckin : null;
+  const club = shown ? clubByName(shown.club) : null;
+
   return (
-    <section id="simulator" className="lbl-part" aria-labelledby="sim-title">
-      <div className="fam-wrap">
-        <div className="lbl-part__head">
-          <p className="fam-kicker">Try it</p>
-          <h2 className="lbl-part__title" id="sim-title">A check-in page you can click</h2>
-          <p className="lbl-part__lede">
-            This is a replica of a TwoTimTwo check-in page, built with the same page structure the
-            extension watches. Click a child to see what a volunteer sees at the table; on club night, the
-            same click on your church’s own TwoTimTwo check-in page is what prints the label.
+    <section id="simulator" className="kv-sim" aria-labelledby="sim-title">
+      <Shape name="wave-sparks" stretch className="kv-sim__edge" />
+      <Doodle name="sparkle-4pt" className="kv-sim__d1" />
+      <Doodle name="loop" className="kv-sim__d2" />
+      <Doodle name="ring" className="kv-sim__d3" />
+      <div className="kv-wrap">
+        <div className="kv-head kv-head--inverse">
+          <p className="kv-tabkicker kv-tabkicker--light">Try it</p>
+          <h2 className="kv-h2" id="sim-title">Check a child in</h2>
+          <p className="kv-lede">
+            Pick a name on this copy of a TwoTimTwo check-in page and press <b>Checkin</b>. On club night the same
+            click on your church’s own page prints the label and greets the child in the lobby.
           </p>
         </div>
 
-        <div className="lbl-sim">
-          {/* Fake site chrome */}
-          <div className="lbl-sim__chrome" aria-hidden="true">
-            <span></span><span></span><span></span>
-            <code>yourchurch.twotimtwo.com/clubber/checkin</code>
+        <div className="kv-sim__grid">
+          <div className="tt-site">
+            <div className="tt-site__chrome" aria-hidden="true">
+              <span /><span /><span />
+              <code>yourchurch.twotimtwo.com/clubber/checkin</code>
+            </div>
+            <div className="tt-site__page">
+              <div className="tt-filters">
+                <label htmlFor="sim-meeting">Meeting:</label>
+                <select id="sim-meeting"><option>2026-10-14</option></select>
+                <label htmlFor="sim-filter">Only show names that match:</label>
+                <input id="sim-filter" value={filter} onChange={e => setFilter(e.target.value)} placeholder="Search…" />
+              </div>
+
+              <div aria-live="polite">
+                {isLoading && <div className="tt-loading">Checking in...</div>}
+              </div>
+
+              {/* The DOM the extension watches — keep this structure intact */}
+              <div id="lastCheckin" className={shown ? 'tt-last' : ''} style={!shown ? { display: 'none' } : {}}>
+                <span className="tt-last__label">Last checked in:</span>
+                <div className="tt-last__who">
+                  {lastCheckin?.name}
+                  <a href="#" onClick={handleUndo} className="tt-last__undo">undo</a>
+                </div>
+              </div>
+
+              <div className="clubbers">
+                <ClubberList clubbers={visibleClubbers} onSelect={setSelectedClubber} />
+              </div>
+            </div>
           </div>
 
-          <div className="p-4 sm:p-5">
-            {/* Filters simulation */}
-            <div className="flex flex-wrap gap-x-5 gap-y-3 mb-4 items-center bg-[#f8fafc] border border-[#e2e8f0] p-3 rounded-md text-sm">
-              <div className="flex items-center gap-2">
-                <label htmlFor="sim-meeting" className="text-[#475569] font-semibold">Meeting:</label>
-                <select id="sim-meeting" className="border border-[#cbd5e1] rounded-sm px-2 py-1 text-sm bg-white text-[#1e293b]">
-                  <option>2026-07-15</option>
-                </select>
+          <div className="kv-sim__out" aria-live="polite" ref={outRef}>
+            <p className="kv-sim__status">
+              {shown && club
+                ? <><Ico name="sparkle" /><span><b>{first(shown.name)}</b> is checked in: the label prints and the lobby says welcome.</span></>
+                : <><Ico name="arrowDown" className="kv-sim__point" /><span>Nothing prints from this page. Pick a name to see what would happen.</span></>}
+            </p>
+            <Tv className="kv-sim__tv" label={shown && club
+              ? `The lobby TV, acted out: ${club.name}'s wave rises and carries the name ${first(shown.name)} under the word Welcome.`
+              : 'The lobby TV, acted out: its welcome slide, waiting for a check-in.'}>
+              <div className={`kv-scene${shown ? ' is-dim' : ''}`}>
+                <span className="kv-scene__blob kv-scene__blob--a" />
+                <span className="kv-scene__blob kv-scene__blob--b" />
+                <span className="kv-scene__kicker">Tonight</span>
+                <span className="kv-scene__title">Welcome to Awana!</span>
               </div>
-              <div className="flex flex-wrap items-center gap-2 min-w-0">
-                <label htmlFor="sim-filter" className="text-[#475569] font-semibold">Only show names that match:</label>
-                <input
-                  id="sim-filter"
-                  value={filter}
-                  onChange={e => setFilter(e.target.value)}
-                  className="border border-[#cbd5e1] rounded-sm px-2 py-1 text-sm bg-white text-[#1e293b] placeholder:text-[#64748b] min-w-0 w-44"
-                  placeholder="Search…"
-                />
-              </div>
-            </div>
-
-            <div aria-live="polite">
-              {isLoading && (
-                <div className="bg-[#fef3c7] text-[#92400e] p-2 mb-4 font-bold animate-pulse rounded-sm">
-                  Checking in...
-                </div>
-              )}
-            </div>
-
-            {/* The DOM the extension watches — keep this structure intact */}
-            <div
-              id="lastCheckin"
-              className={lastCheckin && !isLoading ? 'mb-4 bg-[#f1f5f9] p-2 rounded-sm flex flex-wrap items-center gap-2 text-[#334155]' : ''}
-              style={!lastCheckin || isLoading ? { display: 'none' } : {}}
-            >
-              <span className="text-[#475569]">Last checked in:</span>
-              <div className="bg-[#fef3c7] border border-[#fde68a] px-3 py-1 font-bold text-[#14532d] rounded-sm">
-                {lastCheckin?.name}
-                <a href="#" onClick={handleUndo} className="ml-3 text-xs font-normal text-[#1d4ed8] hover:underline bg-white px-2 py-0.5 border border-[#cbd5e1] rounded-sm">
-                  undo
-                </a>
-              </div>
-            </div>
-
-            {/* Clubber grid */}
-            <div className="clubbers">
-              <ClubberList clubbers={visibleClubbers} onSelect={setSelectedClubber} />
-            </div>
+              {shown && club && <Moment name={first(shown.name)} club={club} run={runs} />}
+            </Tv>
+            <PrinterArt
+              idle={!shown || !club}
+              wait="The label prints here"
+              run={runs}
+              spec={{ first: shown ? first(shown.name) : '', club: club || clubByName('Sparks') }}
+              label={shown && club
+                ? `The label printer, acted out: a name label for ${first(shown.name)}, ${club.name}, comes out of the top.`
+                : 'The label printer, acted out: waiting for a check-in.'} />
           </div>
         </div>
-        <p className="fam-frame__caption">
-          <b>Fig. 7</b> A working replica of a TwoTimTwo check-in page, with the same page structure the extension watches for.
-          <span className="fam-frame__recreated">Recreated for illustration. Names are examples.</span>
-        </p>
+        <p className="kv-sim__note">A copy of a TwoTimTwo check-in page, with the same page structure the extension watches. Names are examples.</p>
       </div>
 
-      <CheckinModal
-        clubber={selectedClubber}
-        onClose={closeModal}
-        onConfirm={handleCheckin}
-      />
+      <CheckinModal clubber={selectedClubber} onClose={closeModal} onConfirm={handleCheckin} />
     </section>
   );
 };
