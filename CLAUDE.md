@@ -27,6 +27,5 @@ Every piece runs on a free plan, now and later (Cloudflare Workers FREE with 10 
 ## Deferred work (owner's call or prerequisite missing; do not start unasked)
 - Nightly lesson video in repo: `journey-update-lesson.yml` commits `journey/public/current-lesson-video.mp4` (~20 MB per change) into history; moving it to release `journey-videos-v2` changes where the Pi's bundle comes from: waits for owner.
 - Split big files: `printer/chrome-extension/content.js` (~5,200 lines), plus a jsdom harness for the extension. (`printer/print-server/server.js` is done: entry + exports, code in `printer/print-server/server/`.)
-- Lobby code splitting: `React.lazy` panels and PowerPoint parser on demand; App suites open panels synchronously and `pptxModel.js` imports the parser statically, so rework those suites first.
 - Pusher removal from the print server: see `ROADMAP.md#switch-day-cleanup`.
 - Remaining Low findings of the audit: not carried here (history).
