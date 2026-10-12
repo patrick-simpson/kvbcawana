@@ -22,6 +22,9 @@
 // and an extension check-in are greeted once too, when the watcher's job meets their label
 // (no second label, a LATE greeting only if none got through), the Worker's tally counts them,
 // its sealed still-here list names them, and the station's season / pickup clubs reach it.
+// Then the church settings (routes.md 10.3): the station seeds the empty doc, an edit on the
+// page reaches its config.json through the lease's church field, and SINGLE_PUBLISHER turned
+// off at runtime makes it publish the tally and the still-here list again (on: silent).
 // Then the youth check-out: the Worker checks a Trek child out at 7:15 pm and its tally drops,
 // while the station's print server tells the extension its own sweep is off.
 //
@@ -413,6 +416,103 @@ const fakeSafe = {
     check('the Worker\'s tally and the printer\'s builder agree on the shape', JSON.stringify(Object.keys(tally).sort()) === JSON.stringify(Object.keys(events.buildTally({ Sparks: 1, Cubbies: 1 }, 2, { season: server.currentScreenSeason() })).sort()));
     check('and so do the ticker\'s and the list\'s', JSON.stringify(Object.keys(frames('tonight').at(-1).d).sort()) === JSON.stringify(Object.keys(events.buildTonight({ checkedIn: 2 })).sort())
       && JSON.stringify(Object.keys(still).sort()) === JSON.stringify(Object.keys(events.buildCheckout([{ firstName: 'Kit', club: 'Sparks' }], 2)).sort()));
+
+    // ── The church settings and the runtime switches (routes.md 10.2, 10.3) ──
+    // The station pulls the church settings (seeding an empty doc first) and follows the
+    // Worker's SINGLE_PUBLISHER switch at runtime. When this Worker has no church or
+    // switches routes yet (404), a stand-in that speaks routes.md 10.3 answers them, with
+    // the switches read from the Worker's own env, so the station's half is proven either way.
+    console.log('\nthe station pulls the church settings and follows the Worker\'s switches');
+    {
+      const publishers = require(path.join(root, 'print-server', 'server', 'publishers.js'));
+      const stand = { rev: 0, settings: null, switchesRev: 1, used: false };
+      const SWITCH_DEFAULTS = { CLOUD_PRINT: 'off', SINGLE_PUBLISHER: 'off', YM_CHECKOUT: 'off', CHURCH_SETTINGS: 'on', NOTICES: 'on', CHANGE_LOG: 'on' };
+      const effective = () => Object.fromEntries(Object.keys(SWITCH_DEFAULTS).map((k) => [k, t2.core.env[k] || SWITCH_DEFAULTS[k]]));
+      const standIn = (method, body, station) => {
+        stand.used = true;
+        if (method === 'GET') return { ok: true, status: 200, body: { rev: stand.rev, seeded: stand.rev > 0, paused: false, settings: stand.rev ? stand.settings : null, switches: effective(), switchesRev: stand.switchesRev } };
+        if (body && body.seed === true) {
+          if (!station) return { ok: false, status: 403, body: null };
+          if (stand.rev) return { ok: true, status: 200, body: { already: true, rev: stand.rev } };
+          stand.rev = 1; stand.settings = body.settings;
+          return { ok: false, status: 201, body: { rev: 1 } };
+        }
+        if (body && body.baseRev === stand.rev) { stand.rev++; stand.settings = { ...stand.settings, ...body.settings }; return { ok: true, status: 200, body: { ok: true, rev: stand.rev } }; }
+        return { ok: false, status: 409, body: { reason: 'stale', rev: stand.rev } };
+      };
+      const churchCalls = [];
+      const request3 = async (b, p, o = {}) => {
+        if (p === '/v1/church/settings') {
+          churchCalls.push(o.method || 'GET');
+          const real = await request2(b, p, o);
+          return real.status === 404 ? standIn(o.method || 'GET', o.body, o.station) : real;
+        }
+        const r = await request2(b, p, o);
+        // The lease's church field (additive): the stand-in's when the Worker has none yet.
+        if (p.startsWith('/v1/print/next') && r.ok && r.body && !r.body.church) r.body.church = { rev: stand.rev, switchesRev: stand.switchesRev };
+        return r;
+      };
+      const setSwitch = async (name, value) => {
+        const r = await t2.call('PUT', '/v1/switches', { name, value });
+        if (r.status === 404) { t2.core.env[name] = value; stand.switchesRev++; }
+      };
+      const editChurch = async (settings) => {
+        const r = await t2.call('PUT', '/v1/church/settings', { baseRev: stand.used ? stand.rev : (await t2.call('GET', '/v1/church/settings')).body.rev, settings });
+        if (r.status === 404) standIn('PUT', { baseRev: stand.rev, settings }, null);
+      };
+      // The laptop's own relay (a station that publishes again) reaches this Worker too.
+      const laptopPublishes = [];
+      const fetchBefore = globalThis.fetch;
+      globalThis.fetch = async (url, init = {}) => {
+        if (!String(url).startsWith(BASE)) return fetchBefore(url, init);
+        try { laptopPublishes.push(JSON.parse(init.body).event); } catch { /* not a publish */ }
+        return t2.core.handle(new Request(String(url), { method: init.method, headers: init.headers, body: init.body }));
+      };
+      server.stopChurchSync();
+      server.configureCloud({ stationId: STATION, ring: async () => st.ring, request: request3, start: false, journalFile: null });
+      const puller3 = jp.createJobPuller({
+        signedIn: () => ({ base: BASE, session: t2.session }), stationId: () => STATION, ring: async () => st.ring, localBase: 'http://127.0.0.1:' + E2E_PORT,
+        request: request3, journal: jp.createJournal(null, t2.clock.now), fetchFn: real, now: t2.clock.now, log: () => {},
+        onChurch: (rev, sr) => server.churchSync.onChurch(rev, sr),
+        heartbeatExtras: () => ({ version: '9.3.0', churchRev: server.churchSync.appliedRev() }),
+      });
+      const cfgFile = path.join(data, 'config.json');
+      fs.writeFileSync(cfgFile, JSON.stringify({ ...JSON.parse(fs.readFileSync(cfgFile, 'utf8')), labelFooter: 'Laptop footer', pickupClubs: ['Sparks', 'Cubbies'] }, null, 2));
+      server.applySavedConfig(JSON.parse(fs.readFileSync(cfgFile, 'utf8')));
+      check('the first station seeds the empty church doc with its config.json', (await server.churchSync.syncNow()) === 'seeded' && churchCalls.join() === 'GET,PUT' && server.churchSync.appliedRev() === 1, churchCalls.join());
+      check('and knows the Worker\'s switches (SINGLE_PUBLISHER on: it stays silent)', server.churchSync.switches().SINGLE_PUBLISHER === 'on' && server.singlePublisherSilent() === true);
+      await editChurch({ labelFooter: 'Set on the settings page' });
+      churchCalls.length = 0;
+      await puller3.tick();
+      await settle();
+      const cfgNow = JSON.parse(fs.readFileSync(cfgFile, 'utf8'));
+      check('an edit on the page reaches the station through the lease\'s church field, within one tick', churchCalls.join() === 'GET' && cfgNow.labelFooter === 'Set on the settings page' && server.churchSync.appliedRev() === 2, `${churchCalls.join()} ${cfgNow.labelFooter}`);
+      check('the per-laptop keys are untouched', cfgNow.printerName === 'Fake' && cfgNow.syncSession === t2.session);
+
+      const tallies = frames('tally').length;
+      server._setStillHereWindowForTests(() => true);   // inside the tally window
+      await setSwitch('SINGLE_PUBLISHER', 'off');
+      server.resetRelayForTest();   // the laptop's relay gave up on https://sync.test earlier in this suite
+      laptopPublishes.length = 0;
+      await puller3.tick();
+      await settle();
+      check('SINGLE_PUBLISHER turned off at runtime: the station publishes the tally and still-here list again, at once', server.singlePublisherSilent() === false
+        && laptopPublishes.includes('tally') && laptopPublishes.includes('checkout') && frames('tally').length > tallies, `${JSON.stringify(laptopPublishes)} ${frames('tally').length}`);
+      check('and the Worker passes the laptop\'s tally to the screens (it is no longer the one publisher)', frames('tally').at(-1).d.total === 5, JSON.stringify(frames('tally').at(-1).d));
+      await setSwitch('SINGLE_PUBLISHER', 'on');
+      await puller3.tick();
+      await settle();
+      laptopPublishes.length = 0;
+      publishers.publishTally();
+      publishers.publishStillHere();
+      await settle();
+      check('turned on again: the station is silent again', server.singlePublisherSilent() === true && !laptopPublishes.includes('tally') && !laptopPublishes.includes('checkout'), JSON.stringify(laptopPublishes));
+      server._setStillHereWindowForTests(null);
+      // The youth check-out below: YM_CHECKOUT on, and the station knows it.
+      await setSwitch('YM_CHECKOUT', 'on');
+      await server.churchSync.syncNow();
+      globalThis.fetch = fetchBefore;
+    }
 
     // The youth check-out (YM_CHECKOUT on): the Worker sweeps Trek and Journey from 7:15 pm,
     // and the station's print server tells its extension that its own sweep is off.

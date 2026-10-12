@@ -30,6 +30,7 @@
     "test:job-puller": "node scripts/test-job-puller.cjs",
     "test:cloud-e2e": "node scripts/test-cloud-e2e.cjs",
     "test:station-greeting": "node scripts/test-station-greeting.cjs",
+    "test:church-sync": "node scripts/test-church-sync.cjs",
     "test:realtime": "node scripts/test-server-realtime.cjs",
     "test:slides": "node scripts/test-lobby-slides.cjs",
     "test:settings": "node scripts/test-display-settings.cjs",

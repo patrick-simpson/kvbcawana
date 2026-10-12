@@ -4,10 +4,11 @@
 // Worker's side is lobby/worker/src/routes.md section 6 (the one truth); the
 // loop is modelled on phone-relay.js.
 //
-//   next       GET  /v1/print/next?max=1   -> {jobs: [{jobId, kind, night, gen, bundle, leaseUntil, attempt}], leaseMs}
+//   next       GET  /v1/print/next?max=1   -> {jobs: [{jobId, kind, night, gen, bundle, leaseUntil, attempt}], leaseMs,
+//                                              church?: {rev, switchesRev}}   (handed to onChurch, never awaited)
 //   done       POST /v1/print/done {jobId, result: printed | already-spooled}
 //   failed     POST /v1/print/failed {jobId, error?}   (frees the job for another lease)
-//   heartbeat  POST /v1/print/heartbeat {printer: {state, detail?}, jobId?}   every 30 s, and
+//   heartbeat  POST /v1/print/heartbeat {printer: {state, detail?}, jobId?, version?, churchRev?}   every 30 s, and
 //              every HEARTBEAT_MS while a job prints: with a jobId it EXTENDS the
 //              90 s lease (a long print keeps it); {ok: false, reason} says stop
 //
@@ -166,6 +167,8 @@ function createJournal(file, now = Date.now) {
  *   heartbeatMs?: number,
  *   setIntervalFn?: typeof setInterval,
  *   onPrinted?: (info: { jobId: string, record: any, night: string, result: any }) => any,
+ *   onChurch?: (rev: number, switchesRev: number) => any,
+ *   heartbeatExtras?: () => ({ version?: string, churchRev?: number }),
  * }} o
  */
 function createJobPuller(o) {
@@ -179,6 +182,20 @@ function createJobPuller(o) {
   let pausedUntil = 0;
   let lastHelloAt = 0;
   const stats = { lastLeaseAt: 0, printed: 0, failed: 0, dropped: 0, duplicates: 0, signedOut: false, routeMissing: false, lastError: '' };
+
+  // What every heartbeat adds (routes.md 10.3): this app's version and the church
+  // settings rev it has applied, so /settings can tell a station that cannot follow
+  // a runtime switch, or one that has not applied the newest church settings.
+  const extras = () => {
+    if (typeof o.heartbeatExtras !== 'function') return {};
+    try {
+      const x = o.heartbeatExtras() || {};
+      const out = {};
+      if (typeof x.version === 'string' && /^\d{1,4}\.\d{1,5}\.\d{1,6}$/.test(x.version)) out.version = x.version;
+      if (Number.isInteger(x.churchRev) && x.churchRev >= 0) out.churchRev = x.churchRev;
+      return out;
+    } catch { return {}; }
+  };
 
   const call = (p, opts = {}) => {
     const s = o.signedIn();
@@ -310,7 +327,7 @@ function createJobPuller(o) {
     journal.begin(id, { route: rec.route, night, key });   // on disk BEFORE the printer is touched
     const beat = setIntervalFn(() => {
       // Extends the lease (90 s) while the printer works; {ok: false} cannot stop a print already sent.
-      call('/v1/print/heartbeat', { method: 'POST', body: { printer: { state: 'busy', detail: 'printing' }, jobId: id } })
+      call('/v1/print/heartbeat', { method: 'POST', body: { printer: { state: 'busy', detail: 'printing' }, jobId: id, ...extras() } })
         .then((r) => { if (r && r.body && r.body.ok === false) log(`[jobs] ${id}: the lease is gone (${r.body.reason}); the print carries on`); })
         .catch(() => {});
     }, heartbeatMs);
@@ -357,7 +374,7 @@ function createJobPuller(o) {
     if (!force && now() - lastHelloAt < HELLO_MS) return;
     lastHelloAt = now();
     const check = journal.unchecked().length > 0;
-    await call('/v1/print/heartbeat', { method: 'POST', body: { printer: check ? { state: 'error', detail: 'A label may not have come out' } : { state: 'ok' } } });
+    await call('/v1/print/heartbeat', { method: 'POST', body: { printer: check ? { state: 'error', detail: 'A label may not have come out' } : { state: 'ok' }, ...extras() } });
   }
 
   /** One round: acks owed, hello, lease, run. Never throws. */
@@ -374,6 +391,12 @@ function createJobPuller(o) {
       if (r.status === 404 || r.status === 405 || r.status === 501) { stats.routeMissing = true; return { wait: ROUTE_MISSING_MS, handled: 0 }; }
       stats.routeMissing = false;
       if (!r.ok || !r.body) return { wait: IDLE_MS, handled: 0 };
+      // routes.md 10.3: the lease also says which church settings and switches are current.
+      // Handed on, never awaited: printing never waits on the church settings.
+      const ch = r.body.church;
+      if (ch && typeof ch === 'object' && typeof o.onChurch === 'function') {
+        try { Promise.resolve(o.onChurch(Number(ch.rev) || 0, Number(ch.switchesRev) || 0)).catch(() => {}); } catch (e) { log(`[jobs] church hook: ${e && e.message}`); }
+      }
       const jobs = Array.isArray(r.body.jobs) ? r.body.jobs : [];
       let handled = 0;
       for (const job of jobs) { await handle(job); handled++; }

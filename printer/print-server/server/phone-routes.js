@@ -182,7 +182,7 @@ function queueTwoTimTwoUndo(ident, res) {
     return res.status(400).json({ error: 'This child has no TwoTimTwo id on the check-in laptop, so it cannot undo them there. Use Remove, and undo at the desk.' });
   }
   if ($config.config.enableDrivenCheckin === false) {
-    return res.status(409).json({ error: 'Undo on TwoTimTwo is turned off with phone check-ins on the check-in laptop (awana.kvbchurch.org/settings → Laptop → "Allow driven check-ins from phones").' });
+    return res.status(409).json({ error: 'Undo on TwoTimTwo is turned off for the check-in laptop (awana.kvbchurch.org/settings → Printing → Labels → "Let the check-in laptop\'s Chrome extension check children in on TwoTimTwo directly").' });
   }
   $pendingActions.prunePendingActions();
   // One undo in flight per child: a double-tap must not post twice.
@@ -240,7 +240,7 @@ function phoneCheckout(ident, res) {
     return res.json({ ok: true, checkedOut: true, local: true, checkedIn: st.checkedIn, byClub: st.byClub });
   }
   if ($config.config.enableDrivenCheckin === false) {
-    return res.status(409).json({ error: 'Check-out on TwoTimTwo is turned off with phone check-ins on the check-in laptop (awana.kvbchurch.org/settings → Laptop → "Allow driven check-ins from phones").' });
+    return res.status(409).json({ error: 'Check-out on TwoTimTwo is turned off for the check-in laptop (awana.kvbchurch.org/settings → Printing → Labels → "Let the check-in laptop\'s Chrome extension check children in on TwoTimTwo directly").' });
   }
   $pendingActions.prunePendingActions();
   const existing = $pendingActions.pendingActions.find(a => $pendingActions.actionType(a) === 'checkout' && a.clubberId === ident.clubberId
@@ -336,11 +336,11 @@ app.post('/phone/visitor', async (req, res) => {
 app.post('/phone/checkin', (req, res) => {
   const name = String((req.body && req.body.name) || '').trim().slice(0, 80);
   if (!name) return res.status(400).json({ error: 'name is required' });
-  // The dashboard's "Allow driven check-ins" switch. Off, the check-in page
+  // The church setting enableDrivenCheckin (Printing → Labels on the settings page). Off, the check-in page
   // never collects these, so a phone used to wait 90 s and hear "the laptop
   // is not answering"; it now hears what is really wrong, at once.
   if ($config.config.enableDrivenCheckin === false) {
-    return res.status(409).json({ error: 'Phone check-ins are turned off on the check-in laptop (awana.kvbchurch.org/settings → Laptop → "Allow driven check-ins from phones").' });
+    return res.status(409).json({ error: 'Phone check-ins are turned off on the check-in laptop (awana.kvbchurch.org/settings → Printing → Labels → "Let the check-in laptop\'s Chrome extension check children in on TwoTimTwo directly").' });
   }
   // Bible / Brought a friend from the phone's card (7.7.0): booleans only, and
   // only the two the laptop knows how to tick.

@@ -17,7 +17,10 @@
 //     unreachable Worker is, three times;
 //   * the station tells the Worker its season, rehearsal flag and pickup clubs;
 //   * while it is a station, GET /config/church tells the extension its youth
-//     check-out is off (the Worker sweeps; stopCloud hands it back).
+//     check-out is off (the Worker sweeps; stopCloud hands it back);
+//   * the station follows the Worker's runtime switches (routes.md 10.2): SINGLE_PUBLISHER
+//     off makes it publish the tally and the still-here list again (at once, inside the
+//     window), on makes it silent; YM_CHECKOUT off hands the youth check-out back.
 'use strict';
 const fs = require('fs');
 const os = require('os');
@@ -55,6 +58,7 @@ const JOB_C = 'C'.repeat(22);
   events.setDisplayKey(key);
   const listener = server.startListening();
   await listener.ready;
+  server.stopChurchSync();   // this suite drives the church sync by hand
   const base = `http://127.0.0.1:${PORT}`;
   const post = (p, body) => fetch(`${base}${p}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
     .then(async (r) => ({ status: r.status, body: await r.json().catch(() => null) }));
@@ -179,6 +183,49 @@ const JOB_C = 'C'.repeat(22);
     const off = await church();
     check('stopCloud hands the sweep back to the extension', !off.ymCheckout || off.ymCheckout.enabled !== false, JSON.stringify(off.ymCheckout));
     server.configureCloud({ stationId: 'station-aaaaaaaa', ring: async () => null, request, start: false, journalFile: null });
+  }
+
+  console.log('\nthe station follows the Worker\'s switches at runtime (routes.md 10.2)');
+  {
+    const publishers = require(path.join(root, 'print-server', 'server', 'publishers.js'));
+    const church = async () => (await fetch(`${base}/config/church`)).json();
+    let sw = { CLOUD_PRINT: 'on', SINGLE_PUBLISHER: 'on', YM_CHECKOUT: 'on', CHURCH_SETTINGS: 'on', NOTICES: 'on', CHANGE_LOG: 'on' };
+    let swRev = 1;
+    answer = (p) => (p === '/v1/church/settings'
+      ? { ok: true, status: 200, body: { rev: 0, paused: false, settings: null, switches: sw, switchesRev: swRev } }
+      : { ok: true, status: 200, body: { ok: true } });
+    await server.churchSync.syncNow();
+    plain.length = 0;
+    publishers.publishTally();
+    publishers.publishStillHere();
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    check('SINGLE_PUBLISHER on: the station publishes no tally and no still-here list', !plain.includes('tally') && !plain.includes('checkout') && server.singlePublisherSilent() === true, JSON.stringify(plain));
+    check('YM_CHECKOUT on: the extension\'s sweep is off', (await church()).ymCheckout.enabled === false);
+
+    server._setStillHereWindowForTests(() => true);   // inside the tally window
+    server.resetRelayForTest();
+    sw = { ...sw, SINGLE_PUBLISHER: 'off', YM_CHECKOUT: 'off' }; swRev = 2;
+    await server.churchSync.syncNow();   // what the lease's church.switchesRev makes happen within ~5 s
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    check('SINGLE_PUBLISHER turned off: the station publishes the tally and the still-here list at once', plain.includes('tally') && plain.includes('checkout') && server.singlePublisherSilent() === false, JSON.stringify(plain));
+    plain.length = 0;
+    server.resetRelayForTest();   // the stand-in service answers 503: let the relay try again at once
+    publishers.publishTally();
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    check('...and keeps publishing it (the minute timer, a print)', plain.includes('tally'), JSON.stringify(plain));
+    const ym = await church();
+    check('YM_CHECKOUT turned off: the extension\'s own sweep is handed back', !ym.ymCheckout || ym.ymCheckout.enabled !== false, JSON.stringify(ym.ymCheckout));
+
+    sw = { ...sw, SINGLE_PUBLISHER: 'on', YM_CHECKOUT: 'on' }; swRev = 3;
+    await server.churchSync.syncNow();
+    plain.length = 0;
+    server.resetRelayForTest();
+    publishers.publishTally();
+    publishers.publishStillHere();
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    check('turned on again: silent again, and the sweep is the Worker\'s again', !plain.includes('tally') && !plain.includes('checkout') && (await church()).ymCheckout.enabled === false, JSON.stringify(plain));
+    server._setStillHereWindowForTests(null);
+    answer = { ok: true, status: 200, body: { ok: true } };
   }
 
   console.log('\nonly a station greets this way');

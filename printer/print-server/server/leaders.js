@@ -26,11 +26,17 @@ const $http = lazy('./http');
 const $history = lazy('./history');
 const $customPdf = lazy('./custom-pdf');
 const $configRoutes = lazy('./config-routes');
+const $station = lazy('./station');
 const app = $http.app;
 
 // What other modules (and server.js) read from this one; live bindings, so cycles are safe.
 Object.defineProperties(exports, {
   activeLeaders: { enumerable: true, get: () => activeLeaders },
+  applyLeaderList: { enumerable: true, get: () => applyLeaderList },
+  leadersForChurch: { enumerable: true, get: () => leadersForChurch },
+  pendingLeaderKeys: { enumerable: true, get: () => () => [...pendingLeaders.keys()] },
+  shareLeaderAdd: { enumerable: true, get: () => shareLeaderAdd },
+  shareLeaderForget: { enumerable: true, get: () => shareLeaderForget },
   forgetLeader: { enumerable: true, get: () => forgetLeader },
   LEADER_ACTIVE_DAYS: { enumerable: true, get: () => LEADER_ACTIVE_DAYS },
   leaderKey: { enumerable: true, get: () => leaderKey },
@@ -173,6 +179,103 @@ function forgetLeader(key, list = loadLeaders()) {
   return { removed, leaders: next };
 }
 
+// ── The remembered leaders are a church setting (owner, 2026-10-12) ─────────
+// The list lives in the Worker's church settings as `leaders` (routes.md 10.3), so a
+// leader remembered on any device is a chip everywhere. leaders.json stays THIS
+// computer's copy: the offline fallback the chips and tags read, written through on
+// every apply (church-sync.js). The first station seeds the Worker's list from it.
+//
+// A NEW name printed here is added to the Worker's list through the church settings'
+// edit route (church-sync edit: baseRev, a stale base re-read and tried again), and
+// kept as PENDING until the Worker has it, so an apply that lands first (or an add
+// made with no internet) never drops it; a forget here removes it there too.
+const pendingLeaders = new Map();   // key -> entry not yet in the Worker's list
+const sharing = new Set();          // keys being added right now
+
+/** The list as the church settings hold it (no derived key). */
+function leadersForChurch(list = loadLeaders()) {
+  return list.map(({ firstName, lastName, clubName, lastPrintedAt, printCount }) => ({ firstName, lastName, clubName, lastPrintedAt, printCount }));
+}
+
+/**
+ * The Worker's list over the local one: the Worker decides WHO is remembered (a
+ * forget anywhere is a forget here); for a leader both hold, the newer last print
+ * and the larger count are kept (a print here may not have reached the Worker);
+ * a pending add is kept until the Worker has it. Written through to leaders.json.
+ * @returns {boolean} whether leaders.json changed
+ */
+function applyLeaderList(workerList) {
+  if (!Array.isArray(workerList)) return false;
+  const local = loadLeaders();
+  const byKey = new Map(local.map((l) => [l.key, l]));
+  const next = [];
+  const seen = new Set();
+  for (const w of workerList) {
+    const firstName = security.sanitizeStoredText((w && w.firstName) || '', 80);
+    const lastName = security.sanitizeStoredText((w && w.lastName) || '', 80);
+    const key = leaderKey(firstName, lastName);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    pendingLeaders.delete(key);
+    const mine = byKey.get(key);
+    const at = Number(w.lastPrintedAt) || 0;
+    const count = Math.max(1, Math.round(Number(w.printCount) || 1));
+    next.push({
+      key, firstName, lastName,
+      clubName: security.sanitizeStoredText((mine && mine.lastPrintedAt > at ? mine.clubName : w.clubName) || '', 40),
+      lastPrintedAt: Math.max(at, mine ? mine.lastPrintedAt : 0),
+      printCount: Math.max(count, mine ? mine.printCount : 1),
+    });
+  }
+  for (const [key, entry] of pendingLeaders) {
+    if (seen.has(key)) continue;
+    next.push(entry); seen.add(key);
+    // Not in the Worker's list yet (an add made offline, or one that lost a race): try again.
+    if (!sharing.has(key)) setImmediate(() => { shareLeaderAdd(entry).catch(() => {}); });
+  }
+  next.sort((a, b) => b.lastPrintedAt - a.lastPrintedAt);
+  const capped = next.slice(0, LEADERS_MAX);
+  if (JSON.stringify(capped) === JSON.stringify(local)) return false;
+  saveLeaders(capped);
+  return true;
+}
+
+/** A new leader printed here: add them to the Worker's list. Never throws, never awaited by a print. */
+async function shareLeaderAdd(entry) {
+  if (!entry || !entry.key) return 'none';
+  pendingLeaders.set(entry.key, entry);
+  if (sharing.has(entry.key)) return 'busy';
+  sharing.add(entry.key);
+  try {
+    const out = await $station.churchSync.edit((settings) => {
+      const list = Array.isArray(settings.leaders) ? settings.leaders : [];
+      if (list.some((l) => l && leaderKey(l.firstName, l.lastName) === entry.key)) return null;
+      return { leaders: [leadersForChurch([entry])[0], ...list].slice(0, LEADERS_MAX) };
+    });
+    if (out === 'saved' || out === 'unchanged') pendingLeaders.delete(entry.key);
+    return out;
+  } catch (e) {
+    console.warn('[leaders] Could not add to the church settings:', e && e.message);
+    return 'error';
+  } finally {
+    sharing.delete(entry.key);
+  }
+}
+
+/** The × on a chip here: forget them in the Worker's list too. */
+async function shareLeaderForget(key) {
+  pendingLeaders.delete(key);
+  try {
+    return await $station.churchSync.edit((settings) => {
+      const list = Array.isArray(settings.leaders) ? settings.leaders : [];
+      const next = list.filter((l) => !l || leaderKey(l.firstName, l.lastName) !== key);
+      return next.length === list.length ? null : { leaders: next };
+    });
+  } catch (e) {
+    return 'error';
+  }
+}
+
 /** Chips worth showing: printed within a season, newest first. */
 function activeLeaders(list = loadLeaders(), now = Date.now()) {
   const cutoff = now - LEADER_ACTIVE_DAYS * 24 * 60 * 60 * 1000;
@@ -208,6 +311,7 @@ app.post('/leaders/forget', (req, res) => {
   const key = String((req.body && req.body.key) || '');
   if (!key.trim()) return res.status(400).json({ error: 'key is required' });
   const { removed, leaders } = forgetLeader(key);
+  shareLeaderForget(String(key).toLowerCase().replace(/\s+/g, ' ').trim()).catch(() => {});
   const active = activeLeaders(leaders);
   console.log(`[leaders] ${removed ? 'Forgot' : 'No such remembered leader:'} '${key}'`);
   res.json({ ok: true, removed, leaders: active, hidden: leaders.length - active.length });
@@ -336,7 +440,10 @@ async function performLeaderPrint(input) {
     $history.addHistoryEntry({ firstName, lastName, clubName, printer: effectivePrinter, success: true, isLeader: true });
     // Remembered only after the tag actually reached the printer: a failed
     // print must not seed the chips with a name nobody has a tag for.
-    rememberLeader({ firstName, lastName, clubName });
+    const isNew = !loadLeaders().some((l) => l.key === leaderKey(firstName, lastName));
+    const remembered = rememberLeader({ firstName, lastName, clubName });
+    // A new name joins the church's list (every device's chips); not awaited.
+    if (isNew) shareLeaderAdd(remembered.find((l) => l.key === leaderKey(firstName, lastName))).catch(() => {});
     console.log(`[print-leader] ${firstName} ${lastName}${clubName ? ' — ' + clubName : ''}`);
     return { status: 200, body: { success: true } };
   } catch (err) {

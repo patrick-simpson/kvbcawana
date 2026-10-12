@@ -23,6 +23,7 @@ Object.defineProperties(exports, {
   acceptDisplaySettingsPublish: { enumerable: true, get: () => acceptDisplaySettingsPublish },
   acceptLobbySlidesPublish: { enumerable: true, get: () => acceptLobbySlidesPublish },
   displaySettings: { enumerable: true, get: () => displaySettings },
+  inTallyWindow: { enumerable: true, get: () => stillHereInWindow },
   lobbySlides: { enumerable: true, get: () => lobbySlides },
   onClubNight: { enumerable: true, get: () => onClubNight },
   onTallyWindow: { enumerable: true, get: () => onTallyWindow },
@@ -45,9 +46,11 @@ Object.defineProperties(exports, {
 // a channel outage can never disturb printing.
 
 function publishTally() {
-  // Online check-in (P2): with this computer a registered station, the Worker
-  // publishes the tally and the pickup list; ours stays quiet.
-  if ($config.cloudStation) return;
+  // Online check-in (P2/P5): with this computer a registered station and the Worker's
+  // SINGLE_PUBLISHER switch on (or not yet known: the 9.2 behaviour), the Worker
+  // publishes the tally and the pickup list; ours stays quiet. Switched off at
+  // runtime, the station publishes them again (routes.md 10.2).
+  if ($station.singlePublisherSilent()) return;
   try {
     const st = $tonightCount.computeTonightStats();
     // Unified theming (#18): every tally carries the Screen season (already
@@ -94,7 +97,7 @@ function stillHereInWindow() {
 
 /** Publish the list now (the minute timer's job, and a change's). */
 function publishStillHere() {
-  if ($config.cloudStation) return;   // the Worker publishes the pickup list in cloud mode
+  if ($station.singlePublisherSilent()) return;   // the Worker publishes the pickup list (SINGLE_PUBLISHER on)
   try {
     const entries = stillHereEntries();
     const payload = events.buildCheckout(entries, $feedRoutes.distinctChildrenPrintedToday());
@@ -105,9 +108,10 @@ function publishStillHere() {
 
 /** Something that may change the list happened: publish soon if it did. */
 function stillHereChanged() {
-  // A station does not publish the list; it keeps the Worker's copy of what only this computer
-  // knows (season, rehearsal, pickup clubs) current instead.
-  if ($config.cloudStation) { $station.sendStationExtras().catch(() => {}); return; }
+  // A station keeps the Worker's copy of what only this computer knows (season, rehearsal,
+  // pickup clubs) current; while the Worker is the one publisher it publishes no list itself.
+  if ($config.cloudStation) $station.sendStationExtras().catch(() => {});
+  if ($station.singlePublisherSilent()) return;
   if (stillHereTimer) return;
   stillHereTimer = setTimeout(() => {
     stillHereTimer = null;

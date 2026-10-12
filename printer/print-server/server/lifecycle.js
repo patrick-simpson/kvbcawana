@@ -194,6 +194,9 @@ function startListening(attempt = 1) {
       log: (m) => console.log(m),
       setTimeoutFn: (fn, ms) => { const t = setTimeout(fn, ms); if (t.unref) t.unref(); return t; },
     });
+    // The church-wide settings from the sync Worker (church-sync.js): waits for the
+    // sync sign-in, then keeps config.json in step. Never in a print's way.
+    $station.startChurchSync();
   }
   // Loopback only, always (Online only, 2026-10-12): the roster, the check-in
   // history and the allergy list never listen on the church Wi-Fi.
