@@ -718,6 +718,253 @@ async function swapToCachedCopy() {
   journeyVideo.play().catch(() => {});
 }
 
+/* ── Lesson intro: the scheduled show's opening cards (owner 2026-10-12) ──
+   When the 6:30 show begins (Begin Video, Space or → on the splash, inside
+   the scheduled Journey window, nothing to resume) four cards come up one
+   after another before the video: "Journey", "Advocates" (this year's
+   study), the lesson's name, "Large Group Time". About five seconds, and
+   they are there to hide buffering: the video is attached (paused, muted
+   state as usual, preload auto) the moment the intro starts, so by the last
+   card it has had five seconds to fill. If it still cannot play through
+   (lessonIntroVideoReady()), the last card holds, saying so, until it can,
+   at most LESSON_INTRO.holdMaxMs more; then the video starts anyway, the
+   way it always has (the loading overlay and the stall machinery take over
+   from there).
+
+   Everything else starts as before: a resume, Start over, a lesson picked
+   from Settings, the splash outside the scheduled window (⇄ at noon), the
+   Skip to slides path. The intro never stands between the room and the
+   lesson: any error (the video's own, or a throw in here) ends it at once
+   and plays as today; ⇄, a Settings pick, the slides, a teardown all cancel
+   it (cancelLessonIntro()). Space, →, Enter or a tap on it skips to the
+   video.
+
+   The same cards on every device. Full profile: bold entrances and a band
+   that carries the last card off into the video (style.css motion block,
+   24-motion.js carryIntroOff()). Low profile (the Pi) and reduced motion:
+   instant swaps, nothing animated, the paint budget untouched. While it is
+   up the video element is shown (under the cards), so the count chip, the
+   reload check and the Trek poll all read it as the lesson it is.
+
+   Timing is LESSON_INTRO; a test may override any of it through
+   window.journeyIntroTiming (read at each start). */
+const LESSON_INTRO = {
+  cardsAt: [0, 1100, 2200, 3600], // Journey, Advocates, lesson, Large Group Time
+  minMs: 4600, // the last card's earliest end (the full profile's carry adds ~0.8s)
+  holdMaxMs: 15000, // then the video starts whether it is ready or not
+  pollMs: 250,
+  aheadS: 8, // seconds buffered past the playhead that count as "ready"
+};
+const lessonIntroEl = document.getElementById('journey-intro');
+const lessonIntroCards = lessonIntroEl ? [...lessonIntroEl.querySelectorAll('.journey-intro-card')] : [];
+const lessonIntroWeek = document.getElementById('journey-intro-week');
+const lessonIntroTitle = document.getElementById('journey-intro-title');
+const lessonIntroWait = document.getElementById('journey-intro-wait');
+let lessonIntro = null; // { token, timers, attached, onDone, ... } while one runs
+
+function lessonIntroTiming() {
+  const o = window.journeyIntroTiming;
+  return o && typeof o === 'object' ? { ...LESSON_INTRO, ...o } : LESSON_INTRO;
+}
+
+function lessonIntroActive() {
+  return lessonIntro !== null;
+}
+
+// The intro is the scheduled show's, at its scheduled time, from the top.
+function lessonIntroWanted(resumeAt) {
+  return !!lessonIntroEl && lessonIntroCards.length === 4 && !(resumeAt > 0) && !previewMode
+    && scheduledPhase() === 'journey';
+}
+
+// Can the attached video play through from here without stopping?
+// HAVE_ENOUGH_DATA, or HAVE_FUTURE_DATA with aheadS seconds (or the rest of
+// the file) buffered past the playhead.
+function lessonIntroVideoReady(aheadS = lessonIntroTiming().aheadS) {
+  const v = journeyVideo;
+  if (!v.getAttribute('src') || v.error) return false;
+  if (v.readyState >= 4) return true;
+  if (v.readyState < 3) return false;
+  const t = v.currentTime || 0;
+  const d = v.duration;
+  const ranges = v.buffered;
+  for (let i = 0; ranges && i < ranges.length; i += 1) {
+    if (ranges.start(i) <= t + 0.1 && ranges.end(i) >= t) {
+      const end = ranges.end(i);
+      return end - t >= aheadS || (Number.isFinite(d) && d > 0 && end >= d - 0.5);
+    }
+  }
+  return false;
+}
+
+function showLessonIntroCard(index) {
+  // The new card on top, the one before it left under it (its entrance wipes
+  // over it on the full profile); anything older goes.
+  lessonIntroCards.forEach((card, i) => card.classList.toggle('hidden', i > index || i < index - 1));
+  if (lessonIntro) lessonIntro.card = index;
+}
+
+function lessonIntroText(lesson) {
+  const text = splashLessonText(lesson);
+  lessonIntroWeek.textContent = text.kicker;
+  lessonIntroTitle.textContent = text.headline;
+  lessonIntroTitle.classList.toggle('is-long', text.headline.length > 14);
+}
+
+// Starts the cards for `token` (a playCurrentLesson request). Returns false
+// (and the caller plays as today) when it should not or cannot run.
+function startLessonIntro(token, lesson) {
+  try {
+    cancelLessonIntro();
+    const timing = lessonIntroTiming();
+    lessonIntroText(lesson);
+    const intro = { token, timers: [], attached: false, onDone: null, card: 0, holding: false, startedAt: Date.now(), timing };
+    lessonIntro = intro;
+    lessonIntroWait.classList.add('hidden');
+    lessonIntroEl.classList.remove('is-holding');
+    showLessonIntroCard(0);
+    lessonIntroEl.classList.remove('hidden');
+    timing.cardsAt.forEach((at, i) => {
+      if (i > 0) intro.timers.push(setTimeout(() => lessonIntro === intro && showLessonIntroCard(i), at));
+    });
+    intro.timers.push(setTimeout(() => lessonIntroCheck(intro), timing.minMs));
+    return true;
+  } catch (err) {
+    console.warn('Journey: lesson intro could not start —', err);
+    cancelLessonIntro();
+    return false;
+  }
+}
+
+// playCurrentLesson() has attached the video: `start` plays it. Runs it at
+// once if the intro has already gone.
+function lessonIntroVideoAttached(token, start) {
+  const intro = lessonIntro;
+  if (!intro || intro.token !== token) {
+    if (token === journeyRequestToken) start();
+    return;
+  }
+  intro.attached = true;
+  intro.onDone = start;
+  journeyVideo.preload = 'auto';
+  if (intro.ready) finishLessonIntro(intro);
+}
+
+// A throw anywhere in the intro's own steps: drop it and start the video
+// the way it starts without one.
+function lessonIntroFailed(intro, err) {
+  console.warn('Journey: lesson intro failed, starting the video —', err);
+  if (lessonIntro !== intro) return;
+  lessonIntro = null;
+  for (const timer of intro.timers) clearTimeout(timer);
+  try {
+    hideLessonIntro();
+  } catch {
+    // nothing left to tidy that matters more than the video
+  }
+  if (intro.token !== journeyRequestToken) return;
+  videoControls.classList.remove('hidden');
+  showVideoLoading();
+  if (typeof intro.onDone === 'function') intro.onDone();
+}
+
+function lessonIntroCheck(intro) {
+  try {
+    lessonIntroStep(intro);
+  } catch (err) {
+    lessonIntroFailed(intro, err);
+  }
+}
+
+function lessonIntroStep(intro) {
+  if (lessonIntro !== intro) return;
+  if (intro.token !== journeyRequestToken) {
+    cancelLessonIntro();
+    return;
+  }
+  const waited = Date.now() - intro.startedAt - intro.timing.minMs;
+  if (lessonIntroVideoReady(intro.timing.aheadS) || waited >= intro.timing.holdMaxMs) {
+    intro.ready = true;
+    if (intro.attached) finishLessonIntro(intro);
+    else intro.timers.push(setTimeout(() => lessonIntroCheck(intro), intro.timing.pollMs)); // src still resolving
+    return;
+  }
+  if (!intro.holding) {
+    intro.holding = true;
+    showLessonIntroCard(lessonIntroCards.length - 1);
+    lessonIntroEl.classList.add('is-holding');
+    lessonIntroWait.classList.remove('hidden');
+  }
+  intro.timers.push(setTimeout(() => lessonIntroCheck(intro), intro.timing.pollMs));
+}
+
+// The cards go and the video starts: on the full profile the last card is
+// carried off first (the video, still paused, is what the band uncovers;
+// motion is never laid over a playing video).
+function finishLessonIntro(intro, { instant = false } = {}) {
+  if (lessonIntro !== intro || intro.finishing) return;
+  intro.finishing = true;
+  for (const timer of intro.timers) clearTimeout(timer);
+  const done = () => {
+    if (lessonIntro !== intro) return;
+    lessonIntro = null;
+    hideLessonIntro();
+    if (intro.token !== journeyRequestToken) return;
+    videoControls.classList.remove('hidden');
+    if (!lessonIntroVideoReady(0.5)) showVideoLoading();
+    if (typeof intro.onDone === 'function') intro.onDone();
+  };
+  try {
+    if (instant || !intro.attached) done();
+    else carryIntroOff(lessonIntroEl, done);
+  } catch (err) {
+    lessonIntroFailed(intro, err);
+  }
+}
+
+function hideLessonIntro() {
+  if (!lessonIntroEl) return;
+  lessonIntroEl.classList.add('hidden');
+  lessonIntroEl.classList.remove('is-holding');
+  for (const card of lessonIntroCards) card.classList.add('hidden');
+  lessonIntroWait.classList.add('hidden');
+}
+
+// Every way the screen is taken from the intro (⇄, a pick in Settings, the
+// slides, a newer playback request) ends it without starting anything.
+function cancelLessonIntro() {
+  const intro = lessonIntro;
+  if (!intro) return;
+  lessonIntro = null;
+  for (const timer of intro.timers) clearTimeout(timer);
+  cancelIntroCarry();
+  hideLessonIntro();
+}
+
+// Skip: straight to the video (once it is attached; until then, as soon as
+// it is).
+function skipLessonIntro() {
+  const intro = lessonIntro;
+  if (!intro) return false;
+  intro.ready = true;
+  if (intro.attached) finishLessonIntro(intro, { instant: true });
+  return true;
+}
+
+if (lessonIntroEl) {
+  lessonIntroEl.addEventListener('click', () => {
+    audioUnlocked = true;
+    skipLessonIntro();
+  });
+  // The video failing while the cards are up: the intro steps aside at once
+  // and the video's own error handling (slides, placeholder) runs as today.
+  journeyVideo.addEventListener('error', cancelLessonIntro);
+  // Ready early while holding: go now rather than at the next poll.
+  journeyVideo.addEventListener('canplaythrough', () => {
+    const intro = lessonIntro;
+    if (intro && intro.holding) lessonIntroCheck(intro);
+  });
+}
 /* ── Resume an interrupted lesson ─────────────────────────────────────
    A Pi brownout, an accidental hard refresh, or a stray press of the ⇄
    button used to cost the room the whole lesson so far: playCurrentLesson()
@@ -880,6 +1127,9 @@ function splashLessonText(lesson) {
 // by refreshLesson()/cacheLessonBundle() regardless of what's on screen, so
 // it's already "queued" and ready the moment playback is requested.
 async function showJourneyContent() {
+  // The lesson intro is the show already starting (its video attached or on
+  // the way): like a playing video, never pulled back to the splash.
+  if (lessonIntroActive()) return;
   ++journeyRequestToken; // invalidate any in-flight playCurrentLesson() call
   if (!currentLesson) {
     // No lesson resolved yet (or the nightly feed came back empty) —
@@ -962,14 +1212,23 @@ function showQualityNote(lesson) {
   journeySplashQuality.classList.toggle('hidden', !degraded);
 }
 
-async function playCurrentLesson(resumeAt = 0) {
+// `withIntro`: the 6:30 show's Begin (beginScheduledPlay); the lesson intro
+// (06-lesson-intro.js) covers the first seconds while the video, attached at
+// once, buffers underneath, and starts it when it is ready.
+async function playCurrentLesson(resumeAt = 0, withIntro = false) {
   const token = ++journeyRequestToken;
   if (!currentLesson) return;
   stopTeachingSlides();
   journeySplash.classList.add('hidden');
   journeyVideo.classList.remove('hidden');
-  videoControls.classList.remove('hidden');
-  showVideoLoading();
+  const intro = withIntro && lessonIntroWanted(resumeAt) && startLessonIntro(token, currentLesson);
+  if (intro) {
+    hideVideoLoading(); // the cards are the loading screen
+    videoControls.classList.add('hidden');
+  } else {
+    videoControls.classList.remove('hidden');
+    showVideoLoading();
+  }
   journeyVideo.loop = false; // plays once; falls back to Check-in Display on 'ended' below
   setMuted(!audioUnlocked);
   const plan = scheduledVideoPlan(currentLesson);
@@ -977,7 +1236,17 @@ async function playCurrentLesson(resumeAt = 0) {
     plan && plan.mode === 'release'
       ? plan.url // no transcode yet: the Release copy, never the 1080p original
       : await resolveVideoSrc(currentLesson, token); // this device's quality, cache first
-  if (!src || token !== journeyRequestToken) return; // a newer call has since taken over
+  if (!src || token !== journeyRequestToken) {
+    // Nothing to play after all: what the room would have seen without the
+    // intro (the loading overlay and its stall note).
+    if (intro && token === journeyRequestToken && lessonIntroActive()) {
+      cancelLessonIntro();
+      videoControls.classList.remove('hidden');
+      showVideoLoading();
+    }
+    return; // a newer call has since taken over
+  }
+  if (intro) journeyVideo.preload = 'auto';
   journeyVideo.src = src;
   // The seek is armed only after the token check above, so a stale resolve
   // can never drop a resume position onto a newer video.
@@ -988,6 +1257,14 @@ async function playCurrentLesson(resumeAt = 0) {
   // can't be offered last time's position.
   if (!(resumeAt > 0)) clearResumePoint();
   applyCaptions();
+  if (intro) {
+    lessonIntroVideoAttached(token, startLessonVideo);
+    return;
+  }
+  startLessonVideo();
+}
+
+function startLessonVideo() {
   journeyVideo.play().catch(() => {
     // Autoplay-with-sound can still be rejected in edge cases (e.g. the
     // browser's engagement heuristics disagree with our own tracking) —
@@ -1382,6 +1659,7 @@ function answerCaptionPrompt(on) {
    waits forever on a question nobody can see). */
 async function requestPlayback(captionUrl, proceed) {
   const token = ++journeyRequestToken;
+  cancelLessonIntro(); // a newer request owns the screen
   stopTeachingSlides(); // a slideshow left from the previous video must not sit over this one
   journeyView.classList.remove('hidden');
   checkinView.classList.add('hidden');
@@ -1605,6 +1883,7 @@ function stopJourneyContent() {
   // once the operator has torn the view down, a slow caption probe or cache
   // read resolving later must not restart playback into a hidden layer.
   ++journeyRequestToken;
+  cancelLessonIntro();
   stopTeachingSlides();
   journeyVideo.pause();
   // Release the cached video's blob URL and detach the element while the
@@ -1800,7 +2079,7 @@ journeyView.addEventListener('dblclick', (e) => {
 journeySplashPlayBtn.addEventListener('click', () => {
   if (!isAwaitingPlay()) return;
   audioUnlocked = true;
-  beginScheduledPlay();
+  beginScheduledPlay(0, true);
 });
 
 // Shown in place of "Begin Video" when an interrupted showing of THIS week's
@@ -1853,9 +2132,12 @@ journeySplashSlidesBtn.addEventListener('click', () => {
 // The scheduled show plays the Student Video, so that's the transcript to
 // offer. requestPlayback() asks about captions only if this device has never
 // answered, then starts playback either way.
-function beginScheduledPlay(resumeAt = 0) {
+// `intro`: the plain Begin (button, Space, →) with nothing to resume, which
+// is the 6:30 show starting; playCurrentLesson() still checks it is the
+// scheduled window. Resume and Start over begin as they always have.
+function beginScheduledPlay(resumeAt = 0, intro = false) {
   if (!currentLesson) return;
-  requestPlayback(captionUrlFor(currentLesson.week, 'student'), () => playCurrentLesson(resumeAt));
+  requestPlayback(captionUrlFor(currentLesson.week, 'student'), () => playCurrentLesson(resumeAt, intro && !(resumeAt > 0)));
 }
 
 document.addEventListener('keydown', (e) => {
@@ -1963,7 +2245,17 @@ document.addEventListener('keydown', (e) => {
     audioUnlocked = true;
     // Whatever the splash's primary button says: Resume when one is offered,
     // otherwise plain Begin Video. "Start over" stays a deliberate press.
-    beginScheduledPlay(offeredResumeAt);
+    beginScheduledPlay(offeredResumeAt, true);
+    return;
+  }
+  // The lesson intro's cards: Space, → or Enter skip straight to the video
+  // (never on to the slides: → only means that once the video is up).
+  if (lessonIntroActive() && (e.code === 'Space' || e.code === 'ArrowRight' || e.code === 'Enter')
+      && !typing && settingsPanel.classList.contains('hidden') && !readerOverlayOpen()) {
+    e.preventDefault();
+    if (e.repeat) return;
+    audioUnlocked = true;
+    skipLessonIntro();
     return;
   }
   // → moves the show on while a lesson video is up — playing, paused, or
@@ -2929,6 +3221,7 @@ function closeSettingsPanel() {
 
 function startPreview(url, title, fallbackUrl = null, week = null) {
   ++journeyRequestToken; // invalidate any in-flight showJourneyContent() call
+  cancelLessonIntro();
   stopTeachingSlides();
   previewMode = true;
   playingWeek = null; // a preview is never the scheduled show's resume point
@@ -3698,6 +3991,7 @@ function startTeachingSlides(week, onFinish) {
   if (!items.length) return false;
   stopTeachingSlides();
   ++journeyRequestToken; // nothing in flight should touch the video now
+  cancelLessonIntro();
   slideshow = { week, items, index: 0, onFinish, blobUrls: new Map(), errors: 0 };
   // Release the video the same way stopJourneyContent() does — a decoded
   // ~17MB blob has no business staying resident behind a slideshow.
@@ -4024,6 +4318,7 @@ function safeToReload() {
   return (
     !previewMode &&
     !slideshowActive() &&
+    !lessonIntroActive() &&
     journeyVideo.classList.contains('hidden') &&
     !journeyVideo.hasAttribute('src') &&
     !readerOverlayOpen() &&
@@ -4344,6 +4639,43 @@ function playViewFlip(from, to, keep = []) {
   }
 }
 
+/* The lesson intro's last card into the video (06-lesson-intro.js): the same
+   carry, the card hung on the band, the video (attached, still paused) what
+   it uncovers. The one place motion is waited on, because the intro is a
+   timed sequence of its own: `done` (which starts the video) runs when the
+   band has passed, at once without the full profile. */
+const CARRY_INTRO_MS = 820;
+let introCarry = null; // { el, sweep }
+
+function cancelIntroCarry() {
+  if (!introCarry) return;
+  introCarry.sweep.remove();
+  introCarry.el.classList.remove('jm-intro-out');
+  introCarry = null;
+}
+
+function carryIntroOff(el, done) {
+  cancelIntroCarry();
+  if (!motionOn()) {
+    done();
+    return;
+  }
+  const sweep = document.createElement('div');
+  sweep.className = 'jm-intro-sweep';
+  sweep.setAttribute('aria-hidden', 'true');
+  const band = buildCarryBand();
+  sweep.appendChild(band);
+  el.classList.add('jm-intro-out');
+  el.after(sweep);
+  const carry = { el, sweep };
+  introCarry = carry;
+  afterCarry(band, CARRY_INTRO_MS + 400, () => {
+    if (introCarry !== carry) return;
+    cancelIntroCarry();
+    done();
+  });
+}
+
 /* The slide change. The copy of the slide on screen is taken once that
    slide has landed (its picture resolved: the cache read showSlide started),
    so when the next press changes the stage the old slide is still in hand.
@@ -4594,6 +4926,7 @@ function trekDateKey(now) {
 function journeyLessonRunning() {
   return (
     slideshowActive() ||
+    lessonIntroActive() ||
     journeyVideo.hasAttribute('src') ||
     isCaptionPromptOpen() ||
     !journeyLoading.classList.contains('hidden')

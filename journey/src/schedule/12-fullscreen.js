@@ -67,7 +67,7 @@ journeyView.addEventListener('dblclick', (e) => {
 journeySplashPlayBtn.addEventListener('click', () => {
   if (!isAwaitingPlay()) return;
   audioUnlocked = true;
-  beginScheduledPlay();
+  beginScheduledPlay(0, true);
 });
 
 // Shown in place of "Begin Video" when an interrupted showing of THIS week's
@@ -120,9 +120,12 @@ journeySplashSlidesBtn.addEventListener('click', () => {
 // The scheduled show plays the Student Video, so that's the transcript to
 // offer. requestPlayback() asks about captions only if this device has never
 // answered, then starts playback either way.
-function beginScheduledPlay(resumeAt = 0) {
+// `intro`: the plain Begin (button, Space, →) with nothing to resume, which
+// is the 6:30 show starting; playCurrentLesson() still checks it is the
+// scheduled window. Resume and Start over begin as they always have.
+function beginScheduledPlay(resumeAt = 0, intro = false) {
   if (!currentLesson) return;
-  requestPlayback(captionUrlFor(currentLesson.week, 'student'), () => playCurrentLesson(resumeAt));
+  requestPlayback(captionUrlFor(currentLesson.week, 'student'), () => playCurrentLesson(resumeAt, intro && !(resumeAt > 0)));
 }
 
 document.addEventListener('keydown', (e) => {
@@ -230,7 +233,17 @@ document.addEventListener('keydown', (e) => {
     audioUnlocked = true;
     // Whatever the splash's primary button says: Resume when one is offered,
     // otherwise plain Begin Video. "Start over" stays a deliberate press.
-    beginScheduledPlay(offeredResumeAt);
+    beginScheduledPlay(offeredResumeAt, true);
+    return;
+  }
+  // The lesson intro's cards: Space, → or Enter skip straight to the video
+  // (never on to the slides: → only means that once the video is up).
+  if (lessonIntroActive() && (e.code === 'Space' || e.code === 'ArrowRight' || e.code === 'Enter')
+      && !typing && settingsPanel.classList.contains('hidden') && !readerOverlayOpen()) {
+    e.preventDefault();
+    if (e.repeat) return;
+    audioUnlocked = true;
+    skipLessonIntro();
     return;
   }
   // → moves the show on while a lesson video is up — playing, paused, or

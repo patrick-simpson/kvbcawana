@@ -437,6 +437,7 @@ function closeSettingsPanel() {
 
 function startPreview(url, title, fallbackUrl = null, week = null) {
   ++journeyRequestToken; // invalidate any in-flight showJourneyContent() call
+  cancelLessonIntro();
   stopTeachingSlides();
   previewMode = true;
   playingWeek = null; // a preview is never the scheduled show's resume point

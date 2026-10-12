@@ -111,6 +111,7 @@ function stopJourneyContent() {
   // once the operator has torn the view down, a slow caption probe or cache
   // read resolving later must not restart playback into a hidden layer.
   ++journeyRequestToken;
+  cancelLessonIntro();
   stopTeachingSlides();
   journeyVideo.pause();
   // Release the cached video's blob URL and detach the element while the

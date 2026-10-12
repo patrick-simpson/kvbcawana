@@ -116,6 +116,7 @@ function answerCaptionPrompt(on) {
    waits forever on a question nobody can see). */
 async function requestPlayback(captionUrl, proceed) {
   const token = ++journeyRequestToken;
+  cancelLessonIntro(); // a newer request owns the screen
   stopTeachingSlides(); // a slideshow left from the previous video must not sit over this one
   journeyView.classList.remove('hidden');
   checkinView.classList.add('hidden');

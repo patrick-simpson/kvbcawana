@@ -1858,6 +1858,107 @@ html.configure-mode #settings-card {
   transition: none;
 }
 
+/* ── Lesson intro: the 6:30 show's opening cards ─────────────────────
+   Journey, Advocates, the lesson's name, Large Group Time, one at a time
+   over the video while it buffers (src/schedule/06-lesson-intro.js). Each
+   card is a full-bleed flat field in the club's colours, opaque, so the one
+   on top is all that shows; the swap is instant. This is the Pi's version
+   too: no animation here (the full profile's entrances live in the motion
+   block), no blur, no gradients, hard offsets only. Over everything in the
+   Journey layer (video, bar, captions, loading), under the corner buttons
+   and Settings. A tap on it skips to the video. */
+#journey-intro {
+  position: absolute;
+  inset: 0;
+  z-index: 16;
+  overflow: hidden;
+  background: var(--jr-ink);
+  color: #ffffff;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.journey-intro-card {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(0.5rem, 1.6 * var(--u), 2rem);
+  padding: 6vh 5vw 10vh;
+  text-align: center;
+  background: var(--jr-art-wave) left bottom / 100% 14% no-repeat, var(--jr-ink);
+}
+
+#journey-intro-advocates {
+  background: var(--jr-purple);
+}
+
+#journey-intro-lesson {
+  background: var(--jr-deep);
+}
+
+#journey-intro-journey img {
+  display: block;
+  width: clamp(14rem, 52 * var(--u), 62rem);
+  height: auto;
+}
+
+/* Small tracked labels over the shouts, in Londrina, like the splash. */
+.journey-intro-kicker {
+  padding-left: 0.3em;
+  font-family: var(--jr-font-label);
+  font-size: clamp(1rem, 2.6 * var(--u), 3.2rem);
+  line-height: 1;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--jr-tint);
+}
+
+.journey-intro-shout {
+  position: relative;
+  top: var(--jr-shout-lift);
+  max-width: 90vw;
+  font-family: var(--jr-font-shout);
+  font-weight: 400;
+  font-size: calc(clamp(2.4rem, min(10 * var(--u), 10vw), 12rem) * var(--jr-shout-fit));
+  line-height: 1;
+  text-transform: uppercase;
+  text-wrap: balance;
+  text-shadow: 0.06em 0.06em 0 var(--jr-deep);
+}
+
+#journey-intro-lesson .journey-intro-shout {
+  text-shadow: 0.06em 0.06em 0 var(--jr-ink);
+}
+
+/* A title that is not one word (splashLessonText() kept the whole title). */
+#journey-intro-title.is-long {
+  font-size: calc(clamp(1.6rem, 4.6 * var(--u), 5.6rem) * var(--jr-shout-fit));
+  line-height: 1.05;
+}
+
+#journey-intro-lgt .journey-intro-shout {
+  font-size: calc(clamp(2rem, min(7 * var(--u), 7.5vw), 8.6rem) * var(--jr-shout-fit));
+}
+
+/* The hot rule under "Large Group Time". */
+.journey-intro-bar {
+  display: block;
+  width: clamp(6rem, 22 * var(--u), 26rem);
+  height: clamp(0.4rem, 0.9 * var(--u), 1.1rem);
+  background: var(--jr-hot);
+}
+
+/* Only while the card holds for the video: says why the screen waits. */
+#journey-intro-wait {
+  font-family: var(--jr-font-read);
+  font-size: clamp(1rem, 2 * var(--u), 2.4rem);
+  color: var(--jr-tint);
+}
+
 /* ── Teaching slides (after the lesson video) ──────────────────────────
    Awana's four 4:3 teaching slides for the lesson, then the generated
    Talk About It / Remember This / This Week slides, shown once the video
@@ -2757,6 +2858,53 @@ html.cursor-hidden #slide-controls {
     clip-path: polygon(calc(var(--jm-slant) + 24%) 0, 100% 0, 100% 100%, 24% 100%);
   }
 
+  /* The lesson intro (06-lesson-intro.js): each card after the first wipes
+     in over the one before on a slant, its words slam, kickers and the hot
+     rule wipe on; while the last card holds for the video its rule breathes
+     and the note fades up; then the carry takes the card off into the
+     (still paused) video. */
+  html.motion-full #journey-intro,
+  html.motion-full .jm-intro-sweep {
+    --jm-band-w: 40vw;
+    --jm-carry-ms: 820ms;
+  }
+  html.motion-full #journey-intro-advocates,
+  html.motion-full #journey-intro-lesson,
+  html.motion-full #journey-intro-lgt {
+    animation: jm-intro-wipe 520ms var(--jm-carry) backwards;
+  }
+  html.motion-full #journey-intro-journey img {
+    animation: jm-slam-hard 640ms var(--jm-settle) 80ms backwards;
+  }
+  html.motion-full .journey-intro-kicker {
+    animation: jm-wipe-center 380ms var(--jm-settle) 260ms backwards;
+  }
+  html.motion-full .journey-intro-shout {
+    animation: jm-slam-hard 560ms var(--jm-settle) 220ms backwards;
+  }
+  html.motion-full #journey-intro-title {
+    animation-delay: 380ms;
+  }
+  html.motion-full .journey-intro-bar {
+    animation: jm-wipe-right 360ms var(--jm-settle) 460ms backwards;
+  }
+  html.motion-full #journey-intro.is-holding .journey-intro-bar {
+    animation: jm-breathe 900ms var(--jm-wipe) infinite alternate;
+  }
+  html.motion-full #journey-intro-wait {
+    animation: jm-rise 420ms var(--jm-settle) backwards;
+  }
+  html.motion-full #journey-intro.jm-intro-out {
+    animation: jm-carry var(--jm-carry-ms) var(--jm-carry) both;
+  }
+  html.motion-full .jm-intro-sweep {
+    position: absolute;
+    inset: 0;
+    z-index: 17;
+    overflow: hidden;
+    pointer-events: none;
+  }
+
   /* The view flip (Check-in Display <-> Journey, both ways): the band layer
      over everything (click-through), and the OUTGOING layer shown again for
      the length of the carry (.jm-carry-out beats .hidden; its class stays,
@@ -2855,6 +3003,14 @@ html.cursor-hidden #slide-controls {
   @keyframes jm-carry {
     from { transform: translateX(0); }
     to { transform: translateX(calc(100vw + var(--jm-band-w))); }
+  }
+  @keyframes jm-intro-wipe {
+    from { clip-path: polygon(0 0, 0 0, -16vh 100%, -16vh 100%); }
+    to { clip-path: polygon(0 0, calc(100% + 16vh) 0, 100% 100%, -16vh 100%); }
+  }
+  @keyframes jm-breathe {
+    from { transform: scaleX(1); }
+    to { transform: scaleX(0.4); }
   }
   @keyframes jm-carry-back {
     from { transform: translateX(0); }

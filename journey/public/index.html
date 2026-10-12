@@ -102,6 +102,26 @@
       <input id="video-scrubber" type="range" min="0" max="0" step="0.1" value="0" aria-label="Seek" />
       <span id="video-time">0:00</span>
     </div>
+    <!-- The 6:30 show's opening cards, over the video while it buffers
+         (src/schedule/06-lesson-intro.js). One card at a time. -->
+    <div id="journey-intro" class="hidden" role="status">
+      <div id="journey-intro-journey" class="journey-intro-card hidden">
+        <img src="brand/logos/journey-white.svg" alt="Journey" draggable="false" />
+      </div>
+      <div id="journey-intro-advocates" class="journey-intro-card hidden">
+        <span class="journey-intro-kicker">This year&rsquo;s study</span>
+        <span class="journey-intro-shout">Advocates</span>
+      </div>
+      <div id="journey-intro-lesson" class="journey-intro-card hidden">
+        <span id="journey-intro-week" class="journey-intro-kicker"></span>
+        <span id="journey-intro-title" class="journey-intro-shout"></span>
+      </div>
+      <div id="journey-intro-lgt" class="journey-intro-card hidden">
+        <span class="journey-intro-shout">Large Group Time</span>
+        <span class="journey-intro-bar"></span>
+        <span id="journey-intro-wait" class="hidden">Getting the video ready&hellip;</span>
+      </div>
+    </div>
     <div id="slides-view" class="hidden" aria-label="Teaching slides">
       <div id="slide-stage">
         <img id="slide-image" alt="" draggable="false" />

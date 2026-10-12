@@ -54,6 +54,7 @@ function safeToReload() {
   return (
     !previewMode &&
     !slideshowActive() &&
+    !lessonIntroActive() &&
     journeyVideo.classList.contains('hidden') &&
     !journeyVideo.hasAttribute('src') &&
     !readerOverlayOpen() &&

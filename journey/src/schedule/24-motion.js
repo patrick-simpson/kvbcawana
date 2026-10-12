@@ -229,6 +229,43 @@ function playViewFlip(from, to, keep = []) {
   }
 }
 
+/* The lesson intro's last card into the video (06-lesson-intro.js): the same
+   carry, the card hung on the band, the video (attached, still paused) what
+   it uncovers. The one place motion is waited on, because the intro is a
+   timed sequence of its own: `done` (which starts the video) runs when the
+   band has passed, at once without the full profile. */
+const CARRY_INTRO_MS = 820;
+let introCarry = null; // { el, sweep }
+
+function cancelIntroCarry() {
+  if (!introCarry) return;
+  introCarry.sweep.remove();
+  introCarry.el.classList.remove('jm-intro-out');
+  introCarry = null;
+}
+
+function carryIntroOff(el, done) {
+  cancelIntroCarry();
+  if (!motionOn()) {
+    done();
+    return;
+  }
+  const sweep = document.createElement('div');
+  sweep.className = 'jm-intro-sweep';
+  sweep.setAttribute('aria-hidden', 'true');
+  const band = buildCarryBand();
+  sweep.appendChild(band);
+  el.classList.add('jm-intro-out');
+  el.after(sweep);
+  const carry = { el, sweep };
+  introCarry = carry;
+  afterCarry(band, CARRY_INTRO_MS + 400, () => {
+    if (introCarry !== carry) return;
+    cancelIntroCarry();
+    done();
+  });
+}
+
 /* The slide change. The copy of the slide on screen is taken once that
    slide has landed (its picture resolved: the cache read showSlide started),
    so when the next press changes the stage the old slide is still in hand.

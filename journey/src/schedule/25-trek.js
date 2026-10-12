@@ -78,6 +78,7 @@ function trekDateKey(now) {
 function journeyLessonRunning() {
   return (
     slideshowActive() ||
+    lessonIntroActive() ||
     journeyVideo.hasAttribute('src') ||
     isCaptionPromptOpen() ||
     !journeyLoading.classList.contains('hidden')

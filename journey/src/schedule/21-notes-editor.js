@@ -298,6 +298,7 @@ function startTeachingSlides(week, onFinish) {
   if (!items.length) return false;
   stopTeachingSlides();
   ++journeyRequestToken; // nothing in flight should touch the video now
+  cancelLessonIntro();
   slideshow = { week, items, index: 0, onFinish, blobUrls: new Map(), errors: 0 };
   // Release the video the same way stopJourneyContent() does — a decoded
   // ~17MB blob has no business staying resident behind a slideshow.

@@ -160,6 +160,9 @@ function splashLessonText(lesson) {
 // by refreshLesson()/cacheLessonBundle() regardless of what's on screen, so
 // it's already "queued" and ready the moment playback is requested.
 async function showJourneyContent() {
+  // The lesson intro is the show already starting (its video attached or on
+  // the way): like a playing video, never pulled back to the splash.
+  if (lessonIntroActive()) return;
   ++journeyRequestToken; // invalidate any in-flight playCurrentLesson() call
   if (!currentLesson) {
     // No lesson resolved yet (or the nightly feed came back empty) —
@@ -242,14 +245,23 @@ function showQualityNote(lesson) {
   journeySplashQuality.classList.toggle('hidden', !degraded);
 }
 
-async function playCurrentLesson(resumeAt = 0) {
+// `withIntro`: the 6:30 show's Begin (beginScheduledPlay); the lesson intro
+// (06-lesson-intro.js) covers the first seconds while the video, attached at
+// once, buffers underneath, and starts it when it is ready.
+async function playCurrentLesson(resumeAt = 0, withIntro = false) {
   const token = ++journeyRequestToken;
   if (!currentLesson) return;
   stopTeachingSlides();
   journeySplash.classList.add('hidden');
   journeyVideo.classList.remove('hidden');
-  videoControls.classList.remove('hidden');
-  showVideoLoading();
+  const intro = withIntro && lessonIntroWanted(resumeAt) && startLessonIntro(token, currentLesson);
+  if (intro) {
+    hideVideoLoading(); // the cards are the loading screen
+    videoControls.classList.add('hidden');
+  } else {
+    videoControls.classList.remove('hidden');
+    showVideoLoading();
+  }
   journeyVideo.loop = false; // plays once; falls back to Check-in Display on 'ended' below
   setMuted(!audioUnlocked);
   const plan = scheduledVideoPlan(currentLesson);
@@ -257,7 +269,17 @@ async function playCurrentLesson(resumeAt = 0) {
     plan && plan.mode === 'release'
       ? plan.url // no transcode yet: the Release copy, never the 1080p original
       : await resolveVideoSrc(currentLesson, token); // this device's quality, cache first
-  if (!src || token !== journeyRequestToken) return; // a newer call has since taken over
+  if (!src || token !== journeyRequestToken) {
+    // Nothing to play after all: what the room would have seen without the
+    // intro (the loading overlay and its stall note).
+    if (intro && token === journeyRequestToken && lessonIntroActive()) {
+      cancelLessonIntro();
+      videoControls.classList.remove('hidden');
+      showVideoLoading();
+    }
+    return; // a newer call has since taken over
+  }
+  if (intro) journeyVideo.preload = 'auto';
   journeyVideo.src = src;
   // The seek is armed only after the token check above, so a stale resolve
   // can never drop a resume position onto a newer video.
@@ -268,6 +290,14 @@ async function playCurrentLesson(resumeAt = 0) {
   // can't be offered last time's position.
   if (!(resumeAt > 0)) clearResumePoint();
   applyCaptions();
+  if (intro) {
+    lessonIntroVideoAttached(token, startLessonVideo);
+    return;
+  }
+  startLessonVideo();
+}
+
+function startLessonVideo() {
   journeyVideo.play().catch(() => {
     // Autoplay-with-sound can still be rejected in edge cases (e.g. the
     // browser's engagement heuristics disagree with our own tracking) —
