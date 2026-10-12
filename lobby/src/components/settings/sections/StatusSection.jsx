@@ -247,19 +247,28 @@ export function CalendarPhaseCard({
   );
 }
 
-/** The build, the self-update line and the trademark line. */
-export function AboutCard({ build }) {
+/**
+ * About. `part` 'screen': this screen's build and self-update line (a TV's
+ * Tonight); 'legal': the trademark line (Account & app, everywhere); 'all':
+ * both, as the classic Status section has them.
+ * @param {{ build?: string | null, part?: 'screen' | 'legal' | 'all' }} props
+ */
+export function AboutCard({ build, part = 'all' }) {
   return (
-    <PanelCard title="About" tab="var(--brand-trek)">
-      <p className="hint">
-        {build ? <>This screen is running build <code>{build}</code>. </> : null}
-        It updates itself within a few minutes of a new release, whenever nothing is on screen.
-      </p>
-      <p className="hint panel-legal">
-        Awana® and the Awana club names are trademarks of Awana Clubs International.
-        This display is an independent church project — NOT AFFILIATED OR ENDORSED BY
-        AWANA CLUBS INTERNATIONAL.
-      </p>
+    <PanelCard title={part === 'screen' ? 'About this screen' : 'About'} tab="var(--brand-trek)">
+      {part !== 'legal' && (
+        <p className="hint">
+          {build ? <>This screen is running build <code>{build}</code>. </> : null}
+          It updates itself within a few minutes of a new release, whenever nothing is on screen.
+        </p>
+      )}
+      {part !== 'screen' && (
+        <p className="hint panel-legal">
+          Awana® and the Awana club names are trademarks of Awana Clubs International.
+          This display is an independent church project — NOT AFFILIATED OR ENDORSED BY
+          AWANA CLUBS INTERNATIONAL.
+        </p>
+      )}
     </PanelCard>
   );
 }

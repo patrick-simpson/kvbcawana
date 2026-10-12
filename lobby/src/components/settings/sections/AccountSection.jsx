@@ -43,7 +43,7 @@ function DeviceCard() {
  * screen's tools (a TV) and the trademark line.
  */
 export function AccountSection({
-  form, set, secure, build, shared, shareStatus, onShareNow, onOpenDebug, onExport, onImport, onResetTally, onReset,
+  form, set, secure, shared, shareStatus, onShareNow, onOpenDebug, onExport, onImport, onResetTally, onReset,
 }) {
   const page = useContext(SettingsPageContext);
   const remote = useContext(RemoteScreenContext);
@@ -64,7 +64,7 @@ export function AccountSection({
       {!page && (
         <ToolsCard onOpenDebug={onOpenDebug} onExport={onExport} onImport={onImport} onResetTally={onResetTally} onReset={onReset} />
       )}
-      <AboutCard build={build} />
+      <AboutCard part="legal" />
     </>
   );
 }

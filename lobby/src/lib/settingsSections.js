@@ -124,8 +124,12 @@ export function classicSectionsFor(page, { remote = false } = {}) {
 }
 
 const CLASSIC_IDS = new Set([...CLASSIC_SECTIONS, CLASSIC_SCREENS_SECTION, CLASSIC_LAPTOP_SECTION, CLASSIC_HISTORY_SECTION].map((s) => s.id));
+// (and the new rail's ids, so a caller that speaks the new names still lands somewhere sensible)
 /** @type {Record<string, ClassicSectionId>} */
-const CLASSIC_LEGACY = { connection: 'setup', background: 'slides', banners: 'checkins', display: 'screen', calendar: 'slides' };
+const CLASSIC_LEGACY = {
+  connection: 'setup', background: 'slides', banners: 'checkins', display: 'screen', calendar: 'slides',
+  tonight: 'status', show: 'checkins', account: 'setup', printing: 'laptop',
+};
 
 /**
  * @param {unknown} id

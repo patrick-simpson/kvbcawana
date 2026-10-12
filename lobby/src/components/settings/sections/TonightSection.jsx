@@ -83,7 +83,7 @@ export function TonightSection({
       {live && <NoticeCard draft={noticeDraft} onDraft={onNoticeDraft} overviewNotice={overview ? overview.notice ?? null : undefined} />}
       {live && <RecentChangesCard goTo={goTo} />}
 
-      {!page && <AboutCard build={build} />}
+      {!page && <AboutCard build={build} part="screen" />}
     </>
   );
 }

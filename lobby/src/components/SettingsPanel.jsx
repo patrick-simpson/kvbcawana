@@ -178,7 +178,8 @@ export default function SettingsPanel({
     ? (page && !signedIn && !initialTab ? 'setup' : classicOpeningSection(initialTab, { status, keyed, problems: problems.length }))
     : openingSection(initialTab, { status, keyed, problems: problems.length, page, signedIn })));
   // The live TV preview (settings page only): what the draft would look like.
-  const [previewFocus, setPreviewFocus] = useState('slide');
+  // The focus belongs to the section it was set in: a new section starts on the slide.
+  const [focusState, setFocusState] = useState({ section: '', focus: 'slide' });
   const [previewOn, setPreviewOn] = useState(false);
   const [noticeDraft, setNoticeDraft] = useState(EMPTY_NOTICE);
   const [wide, setWide] = useState(() => (typeof window !== 'undefined' && window.matchMedia ? window.matchMedia('(min-width: 1200px)').matches : false));
@@ -516,16 +517,17 @@ export default function SettingsPanel({
   const showColumn = previewOnSection && wide;
   const showStrip = previewAllowed && !wide && ['show', 'look'].includes(section);
   const publishedSlide = syncedDeck?.slides?.find?.((sl) => sl && sl.type !== 'video' && !sl.videoId) ?? null;
+  const previewFocus = focusState.section === section ? focusState.focus : 'slide';
   const tvPreview = (
     <TvPreview
-      form={form} focus={section === 'tonight' ? 'notice' : previewFocus} noticeDraft={noticeDraft}
+      form={form} focus={previewFocus} noticeDraft={noticeDraft}
       publishedSlide={publishedSlide} today={today} tonightTitle={tonightTitle} onHide={() => setPreviewKilled(true)}
     />
   );
   // The focus is the card the pointer or keyboard focus is in (data-preview on PanelCard).
   const trackFocus = (e) => {
     const card = e.target?.closest?.('[data-preview]');
-    if (card?.dataset.preview) setPreviewFocus(card.dataset.preview);
+    if (card?.dataset.preview) setFocusState({ section, focus: card.dataset.preview });
   };
 
   // The settings page is not a screen: what matters there is the sign-in.

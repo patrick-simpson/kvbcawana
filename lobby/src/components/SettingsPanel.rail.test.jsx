@@ -190,6 +190,16 @@ describe('the new rail on a TV and on a screen opened from the page', () => {
     expect(calls).toEqual([]);
   });
 
+  it('a TV\'s Tonight ends with About this screen; the trademark line is under Account & app for everyone', () => {
+    open(baseProps({ initialTab: 'tonight' }));
+    expect(screen.getByRole('heading', { name: 'About this screen' })).toBeTruthy();
+    expect(screen.getByText(/It updates itself within a few minutes/)).toBeTruthy();
+    expect(screen.queryByText(/NOT AFFILIATED/)).toBeNull();
+    tab('Account & app');
+    expect(screen.getByText(/NOT AFFILIATED OR ENDORSED BY/)).toBeTruthy();
+    expect(screen.queryByText(/It updates itself within a few minutes/)).toBeNull();
+  });
+
   it('a TV\'s Account & app has its tools and the church-wide switch, not the change log', () => {
     open(baseProps({ initialTab: 'account' }));
     expect(screen.getByRole('heading', { name: "This screen's tools" })).toBeTruthy();

@@ -96,6 +96,34 @@ function RememberedLeaders({ api }) {
   );
 }
 
+/** The label as the laptop's printer would draw it, for a made-up name (GET /preview). */
+function LabelPreviewCard({ api }) {
+  const [first, setFirst] = useState('Maya');
+  const [visitor, setVisitor] = useState(false);
+  const [img, setImg] = useState('');
+  const [note, setNote] = useState('');
+  useEffect(() => () => { if (img) URL.revokeObjectURL(img); }, [img]);
+  const show = async () => {
+    setNote('');
+    const q = new URLSearchParams({ firstName: first || 'Preview', template: '{}' });
+    if (visitor) q.set('visitor', '1');
+    const r = await api(`/preview?${q}`, { raw: true });
+    if (r.ok) setImg(URL.createObjectURL(r.data)); else setNote(r.error);
+  };
+  return (
+    <PanelCard title="Label preview" tab="var(--brand-tnt)">
+      <div className="field">
+        <label htmlFor="at-laptop-preview-name">Preview name</label>
+        <input id="at-laptop-preview-name" type="text" value={first} maxLength={30} onChange={(e) => setFirst(e.target.value)} />
+      </div>
+      <Toggle title="Preview as a visitor" checked={visitor} onChange={(e) => setVisitor(e.target.checked)} />
+      <div className="laptop-actions"><button type="button" className="ghost" onClick={show}>Show the label</button></div>
+      {img && <img className="laptop-label" src={img} alt={`Label preview for ${first || 'a child'}`} width="384" />}
+      {note && <span className="hint hint--warn" role="status">{note}</span>}
+    </PanelCard>
+  );
+}
+
 function Found({ health, onRefresh, paused }) {
   const { api, signedIn, proof, problem } = useLaptopApi();
   const clubs = useClubs(api);
@@ -129,6 +157,7 @@ function Found({ health, onRefresh, paused }) {
         <Fragment key={proof}>
           <PrintersCard cfg={cfg} printers={printers} save={save} />
           <PanelCard title="This printer" tab="var(--brand-sparks)"><HardwareToggles cfg={cfg} save={save} /></PanelCard>
+          <LabelPreviewCard api={api} />
           <ReprintStretch api={api} clubs={clubs} />
           <RememberedLeaders api={api} />
           <AttendanceAuditCard api={api} />

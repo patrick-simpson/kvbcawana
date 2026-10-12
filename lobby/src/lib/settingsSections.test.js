@@ -69,7 +69,9 @@ describe('the classic rail (?rail=classic)', () => {
     expect(classicSectionsFor(true, { remote: true })).toBe(CLASSIC_SECTIONS);
     expect(resolveClassicSection('connection')).toBe('setup');
     expect(resolveClassicSection('laptop')).toBe('laptop');
-    expect(resolveClassicSection('tonight')).toBeNull();
+    expect(resolveClassicSection('tonight')).toBe('status');
+    expect(resolveClassicSection('account')).toBe('setup');
+    expect(resolveClassicSection('nope')).toBeNull();
   });
 
   it('opens as it always did', () => {
