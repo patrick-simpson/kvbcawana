@@ -718,7 +718,17 @@ said); "Owner" is what only the owner can do.
     `adopt.test.js`, `twotimtwo.test.js`, printer `test-tonight-shared.cjs`,
     `test-station-greeting.cjs`, `test-barf.cjs`, and `test-cloud-e2e.cjs` (the real
     print server behind the puller: one greeting per check-in, the tally, the list).
-    Known gap for P7: the extension's youth check-out sweep posts to the laptop only.
+    Known gap for P7: the extension's youth check-out sweep posts to the laptop only
+    (closed by the Worker's youth check-out below once `YM_CHECKOUT` is on).
+  - **Youth check-out in the Worker (2026-10-12, not released; `YM_CHECKOUT = "off"`).**
+    `lobby/worker/src/ymcheckout.js` runs the extension's Trek/Journey sweep from the
+    watcher's alarm with exactly its rules (club nights 7:15 pm to midnight, the
+    Checkout page's own POST, exact "OK", 3 tries, a done list), from the watcher's
+    latest report (no report read of its own; the Checkout page at most every 30 s),
+    at most ONE post every 15 s (owner), each child off the Worker's count. A print
+    station's `/config/church` turns the extension's sweep off; `stopCloud` hands it
+    back. Owner: set `YM_CHECKOUT = "on"` before (or with) the station role, and
+    release the print server change. routes.md section 9.
 
 ## Online only
 
