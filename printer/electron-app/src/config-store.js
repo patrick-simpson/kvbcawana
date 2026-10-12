@@ -93,4 +93,20 @@ function saveConfig(configPath, patch) {
   return merged;
 }
 
-module.exports = { loadConfig, saveConfig };
+/**
+ * What the setup wizard may change: its own three keys, each of the right
+ * type. The renderer is a web page; whatever else it sends (PIN, sync
+ * session, display key, schedule) is dropped, never merged into config.json.
+ * @param {unknown} patch
+ * @returns {{printerName?: string, checkinUrl?: string, launchOnBoot?: boolean}}
+ */
+function wizardPatch(patch) {
+  const p = patch && typeof patch === 'object' ? /** @type {Record<string, unknown>} */ (patch) : {};
+  const out = {};
+  if (typeof p.printerName === 'string' && p.printerName.length <= 200) out.printerName = p.printerName;
+  if (typeof p.checkinUrl === 'string' && p.checkinUrl.length <= 2000) out.checkinUrl = p.checkinUrl;
+  if (typeof p.launchOnBoot === 'boolean') out.launchOnBoot = p.launchOnBoot;
+  return out;
+}
+
+module.exports = { loadConfig, saveConfig, wizardPatch };

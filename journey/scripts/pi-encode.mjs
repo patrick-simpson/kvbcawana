@@ -12,7 +12,7 @@
 // little softer rather than missing.
 
 import { spawn } from 'node:child_process';
-import { mkdtempSync, rmSync, statSync } from 'node:fs';
+import { mkdtempSync, renameSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -52,15 +52,28 @@ export function fittingVideoKbps(seconds, maxBytes = PI_VIDEO_MAX_BYTES) {
 }
 
 /**
- * Encode `input` to `output` for the Pi, under PI_VIDEO_MAX_BYTES.
+ * Encode `input` to `output` for the Pi, under `maxBytes` (PI_VIDEO_MAX_BYTES).
  * @returns {Promise<{bytes: number, refit: boolean}>}
  */
-export async function encodeForPi(input, output) {
+export async function encodeForPi(input, output, maxBytes = PI_VIDEO_MAX_BYTES) {
+  // Written beside the live file and moved over it only once it is whole and
+  // under the cap: a failed or oversized encode never replaces a good video.
+  const partial = `${output}.partial.mp4`;
+  try {
+    const result = await encodeTo(input, partial, maxBytes);
+    renameSync(partial, output);
+    return result;
+  } finally {
+    rmSync(partial, { force: true });
+  }
+}
+
+async function encodeTo(input, output, maxBytes) {
   await run('ffmpeg', ['-y', '-hide_banner', '-loglevel', 'error', '-i', input, ...PICTURE,
     '-crf', '26', '-maxrate', '700k', '-bufsize', '1400k', ...SOUND, '-movflags', '+faststart', output]);
-  if (statSync(output).size < PI_VIDEO_MAX_BYTES) return { bytes: statSync(output).size, refit: false };
+  if (statSync(output).size < maxBytes) return { bytes: statSync(output).size, refit: false };
 
-  const kbps = fittingVideoKbps(await durationSec(input));
+  const kbps = fittingVideoKbps(await durationSec(input), maxBytes);
   console.log(`  ${(statSync(output).size / 1048576).toFixed(1)} MiB is over the cap: two passes at ${kbps} kbps`);
   const logDir = mkdtempSync(join(tmpdir(), 'pi-encode-'));
   const passlog = join(logDir, 'pass');
@@ -74,6 +87,6 @@ export async function encodeForPi(input, output) {
     rmSync(logDir, { recursive: true, force: true });
   }
   const bytes = statSync(output).size;
-  if (bytes >= PI_VIDEO_MAX_BYTES) throw new Error(`still ${(bytes / 1048576).toFixed(1)} MiB after the refit`);
+  if (bytes >= maxBytes) throw new Error(`still ${(bytes / 1048576).toFixed(1)} MiB after the refit`);
   return { bytes, refit: true };
 }

@@ -65,3 +65,36 @@ describe('the wizard', () => {
     assert.doesNotMatch(main, /saveConfig\(\{[^}]*passphrase/);
   });
 });
+
+describe('the repair installer download', () => {
+  const start = main.indexOf('function downloadAndRunRepairInstaller');
+  const body = main.slice(start, main.indexOf('function probeServer', start));
+  it('handles a write error and never runs an incomplete file', () => {
+    assert.match(body, /file\.on\('error'/);
+    assert.match(body, /received !== expected/);
+    assert.match(body, /fs\.unlinkSync\(dest\)/);
+  });
+});
+
+describe('the hidden printer window', () => {
+  it('is made again after a crash, and every use goes through getPdfWindow', () => {
+    assert.match(main, /function getPdfWindow\(\) \{\n  if \(!pdfWindow \|\| pdfWindow\.isDestroyed\(\)\) createPdfWindow\(\);/);
+    assert.match(main, /render-process-gone/);
+    assert.doesNotMatch(main, /[^t]pdfWindow\.webContents\.getPrintersAsync/);
+  });
+});
+
+describe('the display role saves its state durably', () => {
+  it('flushes the temp file to disk before renaming it into place', () => {
+    const i = display.indexOf('function writeJson');
+    const body = display.slice(i, display.indexOf('let state =', i));
+    assert.match(body, /fs\.fsyncSync\(fd\)/);
+    assert.ok(body.indexOf('fsyncSync') < body.indexOf('renameSync'));
+  });
+});
+
+describe('a second launch', () => {
+  it('ignores Windows\' own --autostart launch, so it never counts as a manual Show', () => {
+    assert.match(main, /app\.on\('second-instance', \(event, argv\) => \{\n(?:  \/\/.*\n)+  if \(Array\.isArray\(argv\) && argv\.includes\('--autostart'\)\) return;/);
+  });
+});

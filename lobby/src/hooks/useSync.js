@@ -67,10 +67,16 @@ function subscribe(fn) {
 }
 const getSnapshot = () => snapshot;
 
+const URL_RETRY_MS = 60 * 1000;
+let urlAskedAt = 0;
+
 /** Where the Worker is; resolved once per page load (null until known). */
 async function ensureUrl() {
-  if (snapshot.url !== null) return snapshot.url;
+  // An empty answer (sync.json unreachable at boot, nothing remembered) is
+  // asked again after URL_RETRY_MS, not kept for the life of the page.
+  if (snapshot.url !== null && (snapshot.url || Date.now() - urlAskedAt < URL_RETRY_MS)) return snapshot.url;
   const url = await resolveSyncUrl();
+  urlAskedAt = Date.now();
   update({ url });
   return url;
 }
@@ -359,6 +365,7 @@ export function _resetSyncForTest() {
   snapshot = { url: null, signedIn: Boolean(loadSyncSession()), phase: 'idle', lastSyncAt: null, template: null, kid: null };
   applier = null;
   inFlight = null;
+  urlAskedAt = 0;
   doorbellListeners.clear();
   listeners.forEach((fn) => fn());
 }

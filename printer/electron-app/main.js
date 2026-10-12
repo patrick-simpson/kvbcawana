@@ -354,6 +354,17 @@ function createPdfWindow() {
     webPreferences: { nodeIntegration: false, contextIsolation: true }
   });
   pdfWindow.loadURL('about:blank');
+  // A renderer crash leaves a dead window; forget it so the next use makes a new one.
+  pdfWindow.webContents.on('render-process-gone', () => {
+    try { if (pdfWindow && !pdfWindow.isDestroyed()) pdfWindow.destroy(); } catch { /* gone */ }
+    pdfWindow = null;
+  });
+}
+
+/** The hidden printer-enumeration window, made again if a crash took it. */
+function getPdfWindow() {
+  if (!pdfWindow || pdfWindow.isDestroyed()) createPdfWindow();
+  return pdfWindow;
 }
 
 function createSetupWindow() {
@@ -729,18 +740,31 @@ function downloadAndRunRepairInstaller() {
   const dest = path.join(os.tmpdir(), 'KVBC-Awana-Setup.exe');
   const file = fs.createWriteStream(dest);
   const request = electronNet.request(REPAIR_INSTALLER_URL);
+  let failed = false;
   const fail = (why) => {
-    try { file.close(); } catch { /* ignore */ }
+    if (failed) return;
+    failed = true;
+    try { file.destroy(); } catch { /* ignore */ }
+    try { fs.unlinkSync(dest); } catch { /* a half file must never be run */ }
     dialog.showErrorBox(
       'Repair download failed',
       why + '\n\nDownload it manually instead:\n' + REPAIR_INSTALLER_URL
     );
   };
+  // A full disk or a locked temp file is an 'error' on the stream; with no
+  // listener it would be an uncaught exception in the main process.
+  file.on('error', (err) => fail(err.message || 'could not write the installer'));
   request.on('response', (response) => {
     if (response.statusCode !== 200) { fail('HTTP ' + response.statusCode); return; }
-    response.on('data', (chunk) => file.write(chunk));
+    const expected = Number([].concat(response.headers['content-length'] || [])[0]) || 0;
+    let received = 0;
+    response.on('data', (chunk) => { received += chunk.length; file.write(chunk); });
     response.on('end', () => {
+      if (failed) return;
+      // A connection cut short can still end cleanly: running half an installer is worse than none.
+      if (expected && received !== expected) { fail('download incomplete'); return; }
       file.end(() => {
+        if (failed) return;
         shell.openPath(dest).then((openErr) => {
           if (openErr) { fail(openErr); return; }
           app.isQuitting = true;
@@ -806,7 +830,7 @@ async function ensureServerRunning(context) {
 ipcMain.handle('get-printers', async () => {
   try {
     // Use Electron's built-in printer enumeration — no subprocess, always works
-    const printers = await pdfWindow.webContents.getPrintersAsync();
+    const printers = await getPdfWindow().webContents.getPrintersAsync();
     return printers.map(p => ({ name: p.name, isDefault: p.isDefault }));
   } catch {
     return [];
@@ -815,7 +839,9 @@ ipcMain.handle('get-printers', async () => {
 
 ipcMain.handle('get-config', () => loadConfig());
 
-ipcMain.handle('save-config', (event, patch) => {
+ipcMain.handle('save-config', (event, rawPatch) => {
+  // Only the wizard's own keys, of the right type, ever reach config.json.
+  const patch = configStore.wizardPatch(rawPatch);
   // Act on the MERGED config, not the renderer's patch — startServer needs the
   // sync session and the PIN, and buildTray needs the printer name, none
   // of which the setup wizard sends.
@@ -1401,7 +1427,7 @@ app.whenReady().then(async () => {
     },
     printers: async () => {
       try {
-        const list = await pdfWindow.webContents.getPrintersAsync();
+        const list = await getPdfWindow().webContents.getPrintersAsync();
         return list.map((p) => ({ name: p.name, isDefault: p.isDefault }));
       } catch { return []; }
     },
@@ -1434,7 +1460,10 @@ app.whenReady().then(async () => {
   deviceSync.start();
 });
 
-app.on('second-instance', () => {
+app.on('second-instance', (event, argv) => {
+  // Windows' own start-at-sign-in launch (--autostart) reaching a copy that is
+  // already running is not a person opening the app: nothing to show.
+  if (Array.isArray(argv) && argv.includes('--autostart')) return;
   // Opening the app again (the Start menu or the desktop icon) while it runs
   // in the tray. A print server: almost always "it isn't printing", so make
   // sure the server is actually up, then show its window. A display: "show

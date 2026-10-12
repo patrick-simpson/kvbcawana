@@ -43,7 +43,9 @@ window.idleWatch = idleWatch;
 window.noteActivity = noteActivity;
 let cursorIdleTimer = null;
 function markActivity() {
+  const wasHidden = document.documentElement.classList.contains('cursor-hidden');
   document.documentElement.classList.remove('cursor-hidden');
+  if (wasHidden && typeof syncScrubber === 'function') syncScrubber(); // the bar is back: catch it up
   clearTimeout(cursorIdleTimer);
   cursorIdleTimer = setTimeout(() => {
     document.documentElement.classList.add('cursor-hidden');

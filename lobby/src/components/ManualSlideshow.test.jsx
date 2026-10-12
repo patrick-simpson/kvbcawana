@@ -158,6 +158,15 @@ describe('ManualSlideshow video slides', () => {
     expect(shows('Third slide')).toBe(true);
   });
 
+  it('does not call play() again when the parent re-renders', async () => {
+    const { container, rerender } = render(<ManualSlideshow slides={videoDeck} slideshowDelaySec={5} />);
+    await advanceToVideo(container);
+    const plays = window.HTMLMediaElement.prototype.play.mock.calls.length;
+    rerender(<ManualSlideshow slides={videoDeck} slideshowDelaySec={5} paused />);
+    rerender(<ManualSlideshow slides={videoDeck} slideshowDelaySec={5} />);
+    expect(window.HTMLMediaElement.prototype.play.mock.calls.length).toBe(plays);
+  });
+
   it('revokes the object URL when the video slide unmounts', async () => {
     const { container, unmount } = render(<ManualSlideshow slides={videoDeck} slideshowDelaySec={5} />);
     await advanceToVideo(container);

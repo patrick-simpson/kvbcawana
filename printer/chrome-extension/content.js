@@ -395,7 +395,7 @@
   function isAwanaStoreNight() {
     if (storeMode === 'on')  return true;
     if (storeMode === 'off') return false;
-    return scanCalendarFor(/store/i);
+    return scanCalendarFor(/\bstore\b/i);
   }
 
   // Share-balance cache. Populated by fetchShareBalances() when a Store
@@ -434,7 +434,7 @@
     var origin = location.origin;  // e.g. https://kvbchurch.twotimtwo.com
     return Promise.all(CHURCH_CFG.sharesClubIds.map(function(id) {
       var url = origin + '/report/shekelBalance?club_id=' + id + '&output=csv';
-      return fetch(url, { credentials: 'same-origin' })
+      return fetch(url, { credentials: 'same-origin', signal: AbortSignal.timeout(15000) })
         .then(function(r) { return r.ok ? r.text() : ''; })
         .then(function(txt) {
           parseShareCsv(txt).forEach(function(row) {
@@ -3521,8 +3521,11 @@
       debounceTimer = setTimeout(checkForChange, DEBOUNCE_MS);
     });
 
-    const watchTarget = document.querySelector('#lastCheckin') || document.body;
-    observer.observe(watchTarget, {
+    // The body, not #lastCheckin itself: if the page replaces that element, an
+    // observer bound to the old node would watch a detached tree for good.
+    // checkForChange re-queries the element each time, so the extra mutations
+    // cost one cheap lookup per debounce.
+    observer.observe(document.body, {
       childList: true,
       subtree: true,
       characterData: true
@@ -3736,7 +3739,7 @@
     // gate on a global time cooldown here — that was the v3.0.4 regression
     // that dropped the second of any two prints within 2 s.
     if (batchPrintedNames.has(key)) return; // already printed in batch
-    if (printedNames.has(key)) return; // already printed this session (local or remote)
+    if (isPrinted(name)) return; // already printed this session (local or remote), by id or by name
 
     var cachedMeta = rosterLookupByName(name);
     markPrinted(name, cachedMeta && cachedMeta.recid);
@@ -4020,7 +4023,7 @@
 
   function syncCsv() {
     setCsvStatus('Syncing roster...', '#94a3b8');
-    fetch('/clubber/csv')
+    fetch('/clubber/csv', { signal: AbortSignal.timeout(20000) })
       .then(function(r) {
         if (!r.ok) throw new Error('HTTP ' + r.status);
         var ct = r.headers.get('content-type') || '';
@@ -4391,6 +4394,10 @@
       body: JSON.stringify({ ok: ok, detail: detail || '' }),
       signal: AbortSignal.timeout(4000)
     }).catch(function() {});
+    // Answered: forget it after the server has had time to stop offering it, so
+    // the set neither grows all night nor holds the peak-window reload (which
+    // waits while size > 0) once the check-in is done.
+    setTimeout(function() { phoneActionsInFlight.delete(id); }, 30000);
   }
 
   // Does TwoTimTwo's own check-in report list this child tonight? The only

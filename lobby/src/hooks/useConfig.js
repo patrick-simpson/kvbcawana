@@ -332,8 +332,11 @@ export function receiveSharedSettings(payload) {
  */
 export function setSharedLocally(settings, stamp = null) {
   const held = getShared();
-  shared = stamp
-    ? { rev: stamp.rev, publishedAt: new Date(Date.parse(stamp.publishedAt)).toISOString(), settings: sanitizeSharedValues(settings) }
+  // A stamp without a readable publishedAt must not throw (toISOString on an
+  // invalid date) and strand the share on "sending": keep the held time.
+  const stampedAt = stamp ? Date.parse(stamp.publishedAt) : NaN;
+  shared = stamp && Number.isFinite(stampedAt)
+    ? { rev: stamp.rev, publishedAt: new Date(stampedAt).toISOString(), settings: sanitizeSharedValues(settings) }
     : { rev: held?.rev ?? 0, publishedAt: held?.publishedAt ?? null, settings: sanitizeSharedValues(settings), local: true };
   saveShared(shared);
   invalidate();

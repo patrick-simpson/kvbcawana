@@ -318,7 +318,9 @@ window.idleWatch = idleWatch;
 window.noteActivity = noteActivity;
 let cursorIdleTimer = null;
 function markActivity() {
+  const wasHidden = document.documentElement.classList.contains('cursor-hidden');
   document.documentElement.classList.remove('cursor-hidden');
+  if (wasHidden && typeof syncScrubber === 'function') syncScrubber(); // the bar is back: catch it up
   clearTimeout(cursorIdleTimer);
   cursorIdleTimer = setTimeout(() => {
     document.documentElement.classList.add('cursor-hidden');
@@ -1481,10 +1483,18 @@ function syncPlaybackUI() {
   // While paused, the bar must not fade away with the idle cursor —
   // a silent frozen frame with no visible controls reads as a crash.
   videoControls.classList.toggle('force-visible', paused);
+  syncScrubber(); // the bar may have just reappeared with a stale readout
+}
+
+/* The bar is invisible while the cursor is hidden (and not paused): do not
+   write the DOM four times a second for nobody to see. */
+function controlBarShowing() {
+  return !document.documentElement.classList.contains('cursor-hidden')
+    || videoControls.classList.contains('force-visible');
 }
 
 function syncScrubber() {
-  if (scrubbing) return;
+  if (scrubbing || !controlBarShowing()) return;
   const duration = journeyVideo.duration;
   if (Number.isFinite(duration) && duration > 0) {
     videoScrubber.max = String(duration);
@@ -1542,15 +1552,20 @@ journeyVideo.addEventListener('durationchange', syncScrubber);
 journeyVideo.addEventListener('click', togglePause);
 pauseBtn.addEventListener('click', togglePause);
 
+/* Dragging only moves the readout; the one seek happens on release. Seeking on
+   every input event made the Pi's decoder re-seek dozens of times a second. */
 videoScrubber.addEventListener('input', () => {
   scrubbing = true;
   const t = Number(videoScrubber.value);
   if (Number.isFinite(t)) {
-    journeyVideo.currentTime = t;
     videoTime.textContent = `${formatTime(t)} / ${formatTime(journeyVideo.duration)}`;
   }
 });
 videoScrubber.addEventListener('change', () => {
+  const t = Number(videoScrubber.value);
+  if (scrubbing && Number.isFinite(t)) {
+    try { journeyVideo.currentTime = t; } catch { /* not seekable yet */ }
+  }
   scrubbing = false;
 });
 

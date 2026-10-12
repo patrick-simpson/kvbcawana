@@ -175,6 +175,9 @@
       var journey = res.body.journey;
       if (!journey || typeof journey.savedAt !== 'string') return;
       if (journey.savedAt === get(APPLIED_KEY)) return;
+      // A change made here that has not gone up yet (its push is waiting, or
+      // failed) is newer than what the room holds: it is sent, not overwritten.
+      if (JSON.stringify(readRoom()) !== lastPushed) { push(); return; }
       applyRoom(journey.settings);
       set(APPLIED_KEY, journey.savedAt);
     });

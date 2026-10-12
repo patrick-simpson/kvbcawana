@@ -93,7 +93,15 @@ function createDisplay(opts) {
     try {
       fs.mkdirSync(path.dirname(file), { recursive: true });
       const tmp = `${file}.tmp`;
-      fs.writeFileSync(tmp, JSON.stringify(value, null, 2));
+      // Flushed to disk before the rename: a Windows sign-out or power cut right
+      // after a Hide/Show must not leave the old choice (or an empty file) behind.
+      const fd = fs.openSync(tmp, 'w');
+      try {
+        fs.writeSync(fd, JSON.stringify(value, null, 2));
+        fs.fsyncSync(fd);
+      } finally {
+        fs.closeSync(fd);
+      }
       fs.renameSync(tmp, file);
     } catch (err) { log('write failed', file, err); }
   }

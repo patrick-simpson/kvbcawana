@@ -235,6 +235,68 @@ const pruneSharedDedup = new Function('SHARED_DEDUP_PREFIX', extractFunction('pr
     check('the print server unreachable: driven anyway, as before', down.driven.join() === 'd4');
   }
 
+  console.log('\nphone actions: an answered action leaves the in-flight set');
+  {
+    const timers = [];
+    const inFlight = new Set(['z9']);
+    new Function('env', `
+      const PRINT_SERVER = 'x'; const phoneActionsInFlight = env.inFlight;
+      const fetch = () => Promise.resolve({});
+      const setTimeout = (fn, ms) => env.timers.push({ fn, ms });
+      ${extractFunction('reportPhoneAction')}
+      reportPhoneAction('z9', true, '');
+    `)({ inFlight, timers });
+    check('the id is forgotten 30 s after its result is sent, not before', inFlight.has('z9') && timers.length === 1 && timers[0].ms === 30000);
+    timers[0].fn();
+    check('...so the set empties and the reload is no longer held', inFlight.size === 0);
+  }
+
+  console.log('\nonCheckin: the same dedup as isPrinted');
+  {
+    const printedNames = new Set(['nm:ava stone']);
+    const printed = [];
+    const onCheckin = new Function('env', `
+      const selectedMode = 'on';
+      const batchPrintedNames = new Set();
+      const printedNames = env.printedNames;
+      const resolveIdentityKey = () => 'id:77';
+      const isPrinted = (n) => env.printedNames.has('id:77') || env.printedNames.has('nm:' + n.toLowerCase());
+      const rosterLookupByName = () => null;
+      const markPrinted = () => {};
+      const lookupClub = () => ({ clubName: 'Sparks', clubImageData: null });
+      const doPrint = (n) => env.printed.push(n);
+      ${extractFunction('onCheckin')}
+      return onCheckin;
+    `)({ printedNames, printed });
+    onCheckin('Ava Stone');
+    check('a child printed under a name key is not printed again once an id resolves', printed.length === 0, printed.join());
+    onCheckin('Eli Stone');
+    check('a child not printed yet still prints', printed.join() === 'Eli Stone');
+  }
+
+  console.log('\nthe #lastCheckin watcher');
+  {
+    check('it observes the body, so a replaced #lastCheckin cannot leave it watching a detached node',
+      /observer\.observe\(document\.body, \{/.test(extractFunction('watchCheckins')) && !/observe\(watchTarget/.test(SRC));
+  }
+
+  console.log('\nstore night detection');
+  {
+    const rx = SRC.match(/return scanCalendarFor\((\/\\bstore\\b\/i)\);/);
+    check('Store Night is a whole word on the page, not any "store" inside another word', !!rx);
+    const re = new RegExp('\\bstore\\b', 'i');
+    check('"Awana Store Night" matches; "Restore", "Storey" and "Bookstore" do not', re.test('Awana Store Night') && !re.test('Restore your password') && !re.test('Storey') && !re.test('Bookstore'));
+  }
+
+  console.log('\nfetches that must not hang');
+  {
+    check('the share-balance and roster fetches carry a timeout (a hung one pinned the guard flag for the night)',
+      /output=csv';\s*return fetch\(url, \{ credentials: 'same-origin', signal: AbortSignal\.timeout\(\d+\) \}\)/.test(SRC)
+      && /fetch\('\/clubber\/csv', \{ signal: AbortSignal\.timeout\(\d+\) \}\)/.test(SRC));
+    check('the popup\'s health check carries one too',
+      /fetch\('http:\/\/localhost:3456\/health', \{ signal: AbortSignal\.timeout\(\d+\) \}\)/.test(require('fs').readFileSync(require('path').join(__dirname, '..', 'chrome-extension', 'popup.js'), 'utf8')));
+  }
+
   console.log('\nyouth check-out: a refused child is tried three times a night, not every 30 s');
   {
     const ymStillToTry = new Function('YM_MAX_FAILS', extractFunction('ymStillToTry') + '; return ymStillToTry;')(3);

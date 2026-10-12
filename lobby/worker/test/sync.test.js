@@ -253,6 +253,21 @@ describe('template and Journey settings', () => {
   });
 });
 
+describe('guess counters', () => {
+  it('the scheduled run forgets counters whose window is long over, and keeps live ones', async () => {
+    const s = setup();
+    s.storage.list = async ({ prefix }) => new Map([...s.storage.map].filter(([k]) => k.startsWith(prefix)).map(([k, v]) => [k, structuredClone(v)]));
+    const t0 = s.now();
+    await s.storage.put('fails:1.2.3.4', { count: 2, first: t0 - 3 * 3600000, until: 0 });
+    await s.storage.put('fails:5.6.7.8', { count: 2, first: t0 - 60000, until: 0 });
+    await s.storage.put('fails:9.9.9.9', { count: 5, first: t0 - 3 * 3600000, until: t0 + 60000 });
+    expect(await s.core.pruneFails()).toBe(1);
+    expect(s.storage.map.has('fails:1.2.3.4')).toBe(false);
+    expect(s.storage.map.has('fails:5.6.7.8')).toBe(true);
+    expect(s.storage.map.has('fails:9.9.9.9')).toBe(true);
+  });
+});
+
 describe('the calendar', () => {
   it('Refresh reads the church page now, keeps it, and rings every screen', async () => {
     const s = setup();
@@ -283,6 +298,19 @@ describe('the calendar', () => {
     expect(s.sent.length).toBe(rings);
   });
 
+  it('a second Refresh within 30 s is answered without reading the page again', async () => {
+    const s = setup();
+    const { body: login } = await s.login();
+    await s.call('POST', '/v1/calendar/refresh', {}, login.session);
+    s.tick(5000);
+    const again = await (await s.call('POST', '/v1/calendar/refresh', {}, login.session)).json();
+    expect(again).toMatchObject({ changed: false, throttled: true });
+    expect(s.fetched.length).toBe(1);
+    s.tick(30000);
+    await s.call('POST', '/v1/calendar/refresh', {}, login.session);
+    expect(s.fetched.length).toBe(2);
+  });
+
   it('a page that stops parsing keeps the last good calendar and says why', async () => {
     const s = setup();
     const { body: login } = await s.login();
@@ -293,10 +321,27 @@ describe('the calendar', () => {
       get: s.storage.get, put: s.storage.put, delete: s.storage.delete,
     });
     broken.core.storage = s.storage;
+    broken.tick(60000);
     const res = await broken.call('POST', '/v1/calendar/refresh', {}, login.session);
     expect(res.status).toBe(502);
     expect((await res.json()).error).toMatch(/club nights/);
     expect((await (await s.call('GET', '/v1/calendar')).json()).events.length).toBeGreaterThan(5);
+  });
+
+  it('a failed read does not overwrite a calendar stored while it was running', async () => {
+    const s = setup();
+    const { body: login } = await s.login();
+    await s.call('POST', '/v1/calendar/refresh', {}, login.session);
+    s.tick(60000);
+    s.core.fetchFn = async () => {
+      // A concurrent refresh lands a newer calendar while this read is in flight.
+      const cur = await s.storage.get('calendar');
+      await s.storage.put('calendar', { ...cur, generatedAt: '2030-01-01T00:00:00.000Z' });
+      return new Response('<html><body>Redesigned!</body></html>', { status: 200 });
+    };
+    const res = await s.call('POST', '/v1/calendar/refresh', {}, login.session);
+    expect(res.status).toBe(502);
+    expect((await s.storage.get('calendar')).generatedAt).toBe('2030-01-01T00:00:00.000Z');
   });
 
   it('follows the shared calendarUrl when one is set', async () => {
@@ -358,7 +403,8 @@ describe('requests', () => {
   });
 
   it('allows only the family\'s own pages and localhost as browser origins', () => {
-    expect(allowedOrigin('https://patrick-simpson.github.io')).toBe('https://patrick-simpson.github.io');
+    // The retired github.io sites (archived repos) are no longer allowed.
+    expect(allowedOrigin('https://patrick-simpson.github.io')).toBeNull();
     expect(allowedOrigin('http://localhost:5173')).toBe('http://localhost:5173');
     expect(allowedOrigin('https://awana.kvbchurch.org')).toBe('https://awana.kvbchurch.org');
     expect(allowedOrigin('https://kvbcawana.pages.dev')).toBe('https://kvbcawana.pages.dev');

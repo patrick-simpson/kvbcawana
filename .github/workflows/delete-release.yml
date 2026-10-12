@@ -36,6 +36,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # The update feeds are ours (site/updates/**), not GitHub's "Latest": a
+      # feed still naming this tag's assets would keep offering a deleted
+      # installer. Say so loudly; the person decides whether to revert the feed.
+      - name: Does a feed still point at this tag?
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          if grep -rIl -- "/$TAG/" site/updates >/dev/null 2>&1; then
+            echo "::warning::A feed under site/updates still names $TAG. Revert that feed commit on main, or installed apps keep being offered deleted assets."
+            echo "WARNING: a feed under site/updates still points at $TAG; revert it on main." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
       - name: Delete release and tag
         env:
           GH_TOKEN: ${{ github.token }}

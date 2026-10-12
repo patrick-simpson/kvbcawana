@@ -84,6 +84,9 @@ export const SETTINGS_JSON_MAX = 3800;
 /** The slide chunker's budget and count (print-server/events.js). */
 export const SLIDES_CHUNK_JSON_BUDGET = 3900;
 export const SLIDES_TOTAL_MAX = 12;
+/** "Refresh calendar now" reads the church page at most this often (the 6-hour run is not held to it). */
+const CALENDAR_MANUAL_GAP_MS = 30 * 1000;
+
 export const BODY_MAX = 128 * 1024;   // bytes; the entry point refuses a longer Content-Length before reading
 
 
@@ -458,6 +461,25 @@ export class SyncCore {
     return Math.max(0, IP_MAX_FAILS - mine.count);
   }
 
+  /**
+   * Forget guess counters whose window and lock are long over, so a scan from
+   * many addresses cannot leave a key behind for each one for ever. Run by the
+   * scheduled run; a Store without list() (tests) has nothing to prune.
+   */
+  async pruneFails() {
+    if (!this.storage.list) return 0;
+    const t = this.now();
+    const keep = Math.max(IP_LOCK_MS, GLOBAL_WINDOW_MS, GLOBAL_LOCK_MS);
+    let dropped = 0;
+    for (const [key, v] of await this.storage.list({ prefix: 'fails:', limit: 1000 })) {
+      if (v && v.until > t) continue;
+      if (v && typeof v.first === 'number' && t - v.first <= keep) continue;
+      await this.storage.delete(key);
+      dropped += 1;
+    }
+    return dropped;
+  }
+
   /** @param {string} ip */
   async lockout(ip) {
     const ms = await this.lockedFor(ip);
@@ -544,7 +566,7 @@ export class SyncCore {
         case 'PUT /v1/slides': return await this.putSlides(request);
         case 'PUT /v1/template': return await this.putTemplate(request);
         case 'PUT /v1/journey': return await this.putJourney(request);
-        case 'POST /v1/calendar/refresh': return await this.refreshCalendar();
+        case 'POST /v1/calendar/refresh': return await this.refreshCalendar({ minGapMs: CALENDAR_MANUAL_GAP_MS });
         case 'POST /v1/passphrase': return await this.changePassphrase(request, ip);
         case 'POST /v1/publish': return await this.livePublish(request);
         // The phone check-in relay (relay.js): the page asks, the laptop answers.
@@ -883,15 +905,23 @@ export class SyncCore {
    * The URL is the shared settings' calendarUrl when set (https only, already
    * enforced by the settings allowlist), else the church's page.
    */
-  async refreshCalendar() {
+  async refreshCalendar({ minGapMs = 0 } = {}) {
     const settings = await this.storage.get('settings');
     const url = settings?.settings?.calendarUrl || DEFAULT_CALENDAR_URL;
     const prev = await this.storage.get('calendar');
+    // A button pressed again at once is answered from the copy just read, not
+    // another fetch of the church's page.
+    if (minGapMs && prev?.checkedAt && this.now() - Date.parse(prev.checkedAt) < minGapMs) {
+      return json({ changed: false, throttled: true, generatedAt: prev.generatedAt, checkedAt: prev.checkedAt, eventCount: prev.events?.length ?? 0 });
+    }
     const checkedAt = new Date(this.now()).toISOString();
     const res = await scrapeCalendar(url, { fetchFn: this.fetchFn, now: this.now });
     if (!res.ok) {
-      if (prev) await this.storage.put('calendar', { ...prev, checkedAt, lastError: res.error });
-      return fail(res.error, 502, { checkedAt, generatedAt: prev?.generatedAt || null });
+      // The read took a while: another refresh may have stored a newer calendar
+      // meanwhile, so the error is noted on what is stored NOW, not on `prev`.
+      const latest = (await this.storage.get('calendar')) || prev;
+      if (latest) await this.storage.put('calendar', { ...latest, checkedAt, lastError: res.error });
+      return fail(res.error, 502, { checkedAt, generatedAt: latest?.generatedAt || null });
     }
     const events = sanitizeEvents(res.feed.events);
     const changed = !prev || JSON.stringify(prev.events) !== JSON.stringify(events);
@@ -1010,6 +1040,7 @@ export class SyncCore {
   async cron() {
     await this.switches.load();
     await this.relayQueue.purge();
+    await this.pruneFails();
     // Keeps the watcher's alarm set (it sets its own after each run; this is
     // the safety net if one was ever lost).
     await this.watcher.arm();

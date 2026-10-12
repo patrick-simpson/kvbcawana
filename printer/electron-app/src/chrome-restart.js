@@ -69,6 +69,14 @@ async function restartChrome(o) {
   if (exe) {
     try {
       const child = o.spawn(exe, chromeArgs(o.url), { detached: true, stdio: 'ignore', windowsHide: false });
+      // A spawn that fails (ENOENT, EACCES) reports on the child's 'error' event,
+      // not by throwing: with no listener it is an uncaught exception in main.
+      if (child && child.on) {
+        child.on('error', (e) => {
+          log(`[chrome] Launch failed: ${e && e.message}`);
+          Promise.resolve(o.openExternal(o.url)).catch(() => {});
+        });
+      }
       if (child && child.unref) child.unref();
       log(`[chrome] Reopened Chrome on ${o.url}`);
       return { ok: true, closed, launched: 'chrome' };
