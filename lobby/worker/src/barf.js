@@ -14,7 +14,8 @@
 //      must be on it, and the items they had (YES under Bible) are what the redo
 //      sends again. The check-in page (the meeting's id, the child's club, the
 //      items offered) is the one desk.js holds for the night: no read for it
-//      unless nothing is held (then urgent too)
+//      unless nothing is held, the child is not on it or it lacks the items (then
+//      one urgent read)
 //   3. HOLD the child on the report (watcher.hold): every read until the hold ends
 //      lists them, so the watcher never sees the gap between the undo and the redo:
 //      no claim undone, no job dropped, no new TwoTimTwo-page check-in adopted (no
@@ -41,7 +42,6 @@ import { INTERACTIVE_WAIT_MS, READ_INTERVAL_MS } from './readbudget.js';
 import { WATCH_INTERVAL_MS } from './watcher.js';
 import { BIBLE_RE, FRIEND_RE, itemsToSend } from './twotimtwo.js';
 import { PRINT_JOB_KIND } from './adopt.js';
-import { CALENDAR_TTL_MS } from './desk.js';
 import { validJobId } from './printq.js';
 import { cleanFriendName } from './friends.js';
 
@@ -179,10 +179,15 @@ export class BarfLate {
     }
   }
 
-  /** The check-in page's child (cached for the meeting's id), read afresh once when not found. @param {string} clubberId */
-  async child(clubberId) {
+  /**
+   * The check-in page's child from the page desk.js holds for the night, read
+   * afresh once (urgent) when the child is not on it, or when what the held page
+   * says fails `usable` (tonight's items changed since it was read).
+   * @param {string} clubberId @param {(found: { child: any, page: any }) => boolean} [usable]
+   */
+  async child(clubberId, usable = () => true) {
     let found = await this.core.desk.find(clubberId, false);
-    if (!found.ok && found.error === 'not-found') found = await this.core.desk.find(clubberId, true);
+    if ((!found.ok && found.error === 'not-found') || (found.ok && !usable(found))) found = await this.core.desk.find(clubberId, true);
     return found;
   }
 
@@ -203,14 +208,18 @@ export class BarfLate {
     const entry = rep.report.entries.find((/** @type {any} */ e) => e.clubberId === clubberId);
     if (!entry) return refuse(409, { reason: 'not-on-report' });
     if (entry.friend) return refuse(409, { reason: 'already-friend' });
-    const found = await this.child(clubberId);
+    /** What the page lacks for this child's redo: '' when nothing. @param {{ child: any, page: any }} f */
+    const lacks = ({ child: k, page: p }) => {
+      const applies = (/** @type {any} */ e) => !e.clubs.length || e.clubs.includes(String(k.clubId));
+      if (!p.events.some((/** @type {any} */ e) => e.automatic && applies(e))) return 'no-attendance-item';
+      if (!p.events.some((/** @type {any} */ e) => !e.automatic && FRIEND_RE.test(e.label || '') && !BIBLE_RE.test(e.label || '') && applies(e))) return 'no-friend-item';
+      return '';
+    };
+    const found = await this.child(clubberId, (f) => !lacks(f));
     if (!found.ok) return found.error === 'not-found' ? refuse(409, { reason: 'not-found' }) : desk.pageFailure(found);
     const { child, page } = found;
-    const applies = (/** @type {any} */ e) => !e.clubs.length || e.clubs.includes(String(child.clubId));
-    if (!page.events.some((/** @type {any} */ e) => e.automatic && applies(e))) return refuse(409, { reason: 'no-attendance-item' });
-    if (!page.events.some((/** @type {any} */ e) => !e.automatic && FRIEND_RE.test(e.label || '') && !BIBLE_RE.test(e.label || '') && applies(e))) {
-      return refuse(409, { reason: 'no-friend-item' });
-    }
+    const missing = lacks(found);
+    if (missing) return refuse(409, { reason: missing });
     const items = { Bible: !!entry.bible, Friend: true };
     const events = itemsToSend(page.events, child.clubId, items);
     const name = child.name || entry.name;

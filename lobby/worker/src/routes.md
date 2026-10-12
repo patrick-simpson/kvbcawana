@@ -392,7 +392,7 @@ In order: refuse early (above; the friend check and the mark are one synchronous
 step per child); ONE report read on the 15 s read clock (section 7), URGENT like
 every desk action's read (the head of the queue; the child must be on it; YES
 under Bible is `items.Bible`); the check-in page is the one held for the night
-(no read unless none is held; then urgent too); **hold** the child on the report
+(no read unless none is held, the child is not on it or it lacks the items; then one urgent read); **hold** the child on the report
 (`watcher.hold`: every read until the hold ends lists them, memory only); TwoTimTwo's
 undo (an ambiguous one is checked on the check-in page: still checked in = 504
 `unsure`, nothing changed), then its check-in with the same items plus Brought a

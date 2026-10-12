@@ -428,7 +428,7 @@ const fakeSafe = {
       const onReport = () => t2.night.kids.some((k) => k.id === '662');
       checkinPage2 = () => CHECKIN_PAGE.replace('checkin-box boy"', onReport() ? 'checkin-box boy checked-in"' : 'checkin-box boy"')
         .replace('<label>Attendance</label>', '<label>Attendance</label><input class="event" name="events[]" value="808" clubs="2,3,6"><label>Brought a friend</label>');
-      t2.clock.tick(3 * 60 * 1000);   // the desk's cached check-in page is older than its two minutes
+      t2.clock.tick(3 * 60 * 1000);   // the page the desk holds lacks Brought a friend: the Worker reads it again once
       let gapRead = '';
       t2.on.undo = async () => { t2.night.kids = t2.night.kids.filter((k) => k.id !== '662'); };
       t2.on.checkin = async (form) => {
