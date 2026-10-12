@@ -272,6 +272,30 @@ describe('POST /v1/desk/barf-late', () => {
     expect((await t.call('POST', '/v1/desk/checkin', await t.deskBody([st]))).body).toMatchObject({ ok: true, already: true });
   });
 
+  it('a redo TwoTimTwo took but answered badly: the re-check-in reads the page afresh, sees the child checked in, and posts nothing', async () => {
+    const { t, st } = await barfNight();
+    const tag = await t.core.tags.identity(NIGHT, '662');
+    t.on.undo = async () => { t.night.kids = t.night.kids.filter((k) => k.id !== '662'); };
+    let posted = 0;
+    t.on.checkin = async () => {
+      posted += 1;
+      // TwoTimTwo keeps the check-in, but its answer never says so.
+      if (!t.night.kids.some((k) => k.id === '662')) t.night.kids.push({ ...KIT, friend: true });
+      return 'refuse';
+    };
+    const res = await t.call('POST', '/v1/desk/barf-late', await body(st));
+    expect(res.body).toMatchObject({ ok: true, checkedIn: false, tries: REDO_TRIES });
+    expect(posted).toBe(REDO_TRIES);
+    // At once (the page the desk holds is young, and says Kit is not checked in): a fresh read decides.
+    const before = t.reads.length;
+    const again = await t.call('POST', '/v1/desk/barf-late', { night: NIGHT, clubberId: '662', recheck: true, items: res.body.items });
+    expect(again.body).toMatchObject({ ok: true, checkedIn: true });
+    expect(posted).toBe(REDO_TRIES);                                   // no post: TwoTimTwo has Kit
+    expect(t.reads.slice(before).map((r) => r.path)).toContain('/clubber/checkin');
+    expect(t.core.ledger.peek(NIGHT, tag).recheck).toBeUndefined();
+    expect((await t.call('GET', '/v1/desk/barf')).body.recheck).toEqual([]);
+  });
+
   it('a TwoTimTwo that refuses the undo changes nothing', async () => {
     const { t, st } = await barfNight();
     t.faults.undo = 'refuse';

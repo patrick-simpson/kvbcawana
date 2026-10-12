@@ -338,13 +338,19 @@ export class BarfLate {
     const client = watcher.clientFor();
     if (!client || watcher.mode === 'off') return refuse(503, { reason: 'not-configured' });
     const tag = /** @type {string} */ (await core.tags.identity(night, clubberId));
-    // The page held for the night when it is one slot young, else one urgent read:
-    // whether TwoTimTwo has the child already (a redo that timed out may have taken).
-    const fresh = await core.desk.page(READ_INTERVAL_MS, false, true);
+    // Whether TwoTimTwo has the child already (a redo that timed out or answered
+    // badly may have taken): ONE urgent read, never the page held for the night (the
+    // late friend's redo marked the child there as not checked in, and a page read
+    // before it took says the same).
+    const fresh = await core.desk.page(0, true, true);
     if (!fresh.ok) return core.desk.pageFailure(fresh);
-    const found = await this.child(clubberId);
-    if (!found.ok) return found.error === 'not-found' ? refuse(409, { reason: 'not-found' }) : core.desk.pageFailure(found);
-    const { child, page } = found;
+    let child = fresh.page.roster.find((/** @type {any} */ k) => k.clubberId === clubberId);
+    let page = fresh.page;
+    if (!child) {
+      const found = await this.child(clubberId);
+      if (!found.ok) return found.error === 'not-found' ? refuse(409, { reason: 'not-found' }) : core.desk.pageFailure(found);
+      ({ child, page } = found);
+    }
     // One synchronous step: a live claim (made here only when there is none), then the hold.
     await core.ledger.load();
     const c = core.ledger.peek(night, tag);
