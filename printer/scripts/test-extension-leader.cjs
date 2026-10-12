@@ -251,6 +251,15 @@ const pruneSharedDedup = new Function('SHARED_DEDUP_PREFIX', extractFunction('pr
     check('...so the set empties and the reload is no longer held', inFlight.size === 0);
   }
 
+  console.log('\nfetches that must not hang');
+  {
+    check('the share-balance and roster fetches carry a timeout (a hung one pinned the guard flag for the night)',
+      /output=csv';\s*return fetch\(url, \{ credentials: 'same-origin', signal: AbortSignal\.timeout\(\d+\) \}\)/.test(SRC)
+      && /fetch\('\/clubber\/csv', \{ signal: AbortSignal\.timeout\(\d+\) \}\)/.test(SRC));
+    check('the popup\'s health check carries one too',
+      /fetch\('http:\/\/localhost:3456\/health', \{ signal: AbortSignal\.timeout\(\d+\) \}\)/.test(require('fs').readFileSync(require('path').join(__dirname, '..', 'chrome-extension', 'popup.js'), 'utf8')));
+  }
+
   console.log('\nyouth check-out: a refused child is tried three times a night, not every 30 s');
   {
     const ymStillToTry = new Function('YM_MAX_FAILS', extractFunction('ymStillToTry') + '; return ymStillToTry;')(3);

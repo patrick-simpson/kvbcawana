@@ -5,7 +5,7 @@
   text.textContent = 'Connecting...';
   dot.className = 'dot';
 
-  fetch('http://localhost:3456/health')
+  fetch('http://localhost:3456/health', { signal: AbortSignal.timeout(4000) })
     .then(response => {
       if (response.ok) {
         dot.className = 'dot online';

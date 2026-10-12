@@ -434,7 +434,7 @@
     var origin = location.origin;  // e.g. https://kvbchurch.twotimtwo.com
     return Promise.all(CHURCH_CFG.sharesClubIds.map(function(id) {
       var url = origin + '/report/shekelBalance?club_id=' + id + '&output=csv';
-      return fetch(url, { credentials: 'same-origin' })
+      return fetch(url, { credentials: 'same-origin', signal: AbortSignal.timeout(15000) })
         .then(function(r) { return r.ok ? r.text() : ''; })
         .then(function(txt) {
           parseShareCsv(txt).forEach(function(row) {
@@ -4020,7 +4020,7 @@
 
   function syncCsv() {
     setCsvStatus('Syncing roster...', '#94a3b8');
-    fetch('/clubber/csv')
+    fetch('/clubber/csv', { signal: AbortSignal.timeout(20000) })
       .then(function(r) {
         if (!r.ok) throw new Error('HTTP ' + r.status);
         var ct = r.headers.get('content-type') || '';
