@@ -142,6 +142,19 @@ into the display repo so the Node and WebCrypto derivations cannot drift), and
 `displayLoginPassphrase` is still in the server's secret set: never returned by
 `GET /config` off-loopback, never settable from the LAN.
 
+## Online check-in history
+
+The coming online check-in (root `ROADMAP.md#online-check-in`) keeps every
+night's check-ins in Cloudflare D1, each row sealed by a client to a history
+key that only the passphrase unwraps, and seals allergy notes only to the
+registered print stations (KVBC Awana's print role, its private key in
+Electron safeStorage). What that protects, and what it does not (the Worker
+sees names in memory; anyone with the public key can forge a row; the owner
+accepted a short passphrase; there is no recovery), is written down once in
+`lobby/SECURITY.md`, "Online check-in history". The print server loads the
+same cryptography as `print-server/cloud-crypto.js`, generated from
+`lobby/shared/cloud-crypto.js`.
+
 ## Reporting a vulnerability
 
 Open a GitHub issue for anything non-sensitive. For something that would expose

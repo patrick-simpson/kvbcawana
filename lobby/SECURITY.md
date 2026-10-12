@@ -141,7 +141,8 @@ service** instead of opening the print server's `provision` frame:
   an hour). It is never on a public channel, so it cannot be guessed offline,
   which is what makes a short dictionary word ("kennebec") reasonable here
   where the old frame needed 12+ characters. The service keeps only a salted
-  HMAC of it.
+  HMAC of it (until online check-in's P1 replaces it with a slow client-side
+  derivation: "Online check-in history" below).
 - A sign-in returns a session (its own storage slot, `awanaSyncSession.v1`,
   never config, never an export or a URL) and the display key.
   **Anyone with the word can read names and change every screen** (the owner's
@@ -312,6 +313,76 @@ the person standing at the screen outranks what the print server last handed it.
 It is https-only and length-capped on both sides, and re-validated on the way
 out of storage, so a hand-edited entry cannot point a screen at plain http.
 `src/lib/fleetConfigUrl.test.js` carries the same three leak-path tests.
+
+## Online check-in history (design, P0 built 2026-10-12)
+
+The plan is the root `ROADMAP.md#online-check-in`; the cryptography is
+`shared/cloud-crypto.js` (pinned by `shared/cloud-vectors.json`), the storage
+`worker/migrations/0001_history.sql`, the routes `worker/src/routes.md`. Only
+the module, its vectors and the schema exist so far; this section is the
+promise every later phase keeps. Say it in these words: names are **never
+stored readable**. That is not the same as "Cloudflare can never see a name".
+
+### What is protected
+
+- **Names at rest.** Every history row (a check-in, an undo, a check-out, a
+  visitor, a friend brought) is sealed by a CLIENT to the history public key
+  (ECIES on P-256: a fresh ephemeral key per row, HKDF-SHA256, AES-256-GCM)
+  before it is sent. D1 and the Durable Object hold only that ciphertext, its
+  random row id, the church's local night, its kind, and plaintext counts per
+  club (the numbers the plaintext `tally` already publishes). Every row pads to
+  the same 1024 bytes, so a row's length says nothing about the name in it.
+- **The history private key** exists outside a client's memory only wrapped:
+  AES-256-GCM under a key derived from the passphrase (PBKDF2-SHA256, at least
+  600000 iterations, a fresh salt per wrap, then HKDF). Clients unwrap it into
+  a non-extractable WebCrypto key and check it belongs to `history:pub` before
+  they trust either. The Worker never derives, seals or opens anything (it is
+  on Cloudflare's free plan, and the design keeps all key work off it).
+- **The passphrase itself** (from P1). Clients send `authKey`, an HKDF output
+  of the PBKDF2 result; the Worker stores SHA-256(authKey). A stolen store no
+  longer gives a fast offline test of the word (today's salted HMAC does), and
+  the Worker never receives the word once every client is on v2.
+- **Medical notes** (allergies) are sealed only to the registered print
+  stations' keys (private halves in Electron safeStorage on those computers),
+  never to the history key: someone who knows the passphrase can read the
+  history, not the allergy list. A history row carrying a medical field is
+  refused before it is sealed.
+- **Identifiers.** The Durable Object keys claims and print jobs by
+  HMAC(stateKey, night|clubberId), never the clubber id, and forgets them at
+  the end of the night.
+- **Binding.** Each sealed row's AAD names its id, night, kind, ephemeral key
+  and key id, so a row moved to another night or relabelled will not open.
+- **Fail closed.** A client that cannot seal writes nothing.
+
+### What is NOT protected (be plain about it)
+
+- **A compromised Worker sees names in memory.** It reads TwoTimTwo's pages
+  (names, ids, clubs) to check children in and to watch the report, and it
+  passes the roster CSV (allergies included) through to a station. Whoever
+  controls the Worker's code (the GitHub repo, the Cloudflare account) can log
+  what passes through it from then on. Encryption at rest does not stop that;
+  it stops a copy of the storage, a backup, or a later read of old nights.
+- **Anyone holding the public key can forge rows.** `history:pub` is not a
+  secret (every signed-in client fetches it), and a seal proves nothing about
+  who wrote it. A row that opens is well-formed, not authentic: treat history
+  as a record the church keeps, not as evidence.
+- **The passphrase is the one key, and its strength is the owner's call.**
+  Six characters are accepted (owner, 2026-10-11, risk accepted). PBKDF2 at
+  600000 iterations slows an offline guess of a stolen wrap, it does not save a
+  dictionary word: anyone who gets `history:wrapped` and guesses the word reads
+  every night. Anyone who knows the word can read the history (by design, like
+  the screens: choice B).
+- **No recovery.** There is no recovery code and no escrow (owner). Lose the
+  passphrase and the history is gone for good; a changed passphrase keeps it
+  (the key is re-wrapped), and the previous wrap is kept 7 days.
+- **Until the old hash is retired** (P1's migration) the store still holds the
+  fast salted HMAC of the passphrase beside the new verifier, so its weakness
+  lasts until every client has updated and the legacy hash is deleted.
+- **What is visible anyway.** Row counts per night and kind, the per-club
+  numbers in `night_summary`, the times rows arrive, and which station leased
+  which job. The same counts are already public on the `tally` frame.
+- **The screens are unchanged by this.** First names still reach the lobby by
+  design, sealed under the display key (above).
 
 ## What lives on the device
 
