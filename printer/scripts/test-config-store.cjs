@@ -245,6 +245,16 @@ console.log('config-store: nobody bypasses the store');
     /onSaved\(result\.config \|\| config\)/.test(wizardSrc));
 }
 
+{
+  const w = store.wizardPatch({ printerName: 'Zebra', checkinUrl: 'https://x.test/', launchOnBoot: false, pin: '1234', syncSession: 'v1.x', schedule: {} });
+  check('the wizard patch keeps only its own three keys',
+    JSON.stringify(Object.keys(w).sort()) === JSON.stringify(['checkinUrl', 'launchOnBoot', 'printerName']), JSON.stringify(w));
+  check('...and drops a key of the wrong type', JSON.stringify(store.wizardPatch({ printerName: 5, launchOnBoot: 'yes' })) === '{}');
+  check('...and anything that is not an object', JSON.stringify(store.wizardPatch(null)) === '{}' && JSON.stringify(store.wizardPatch('x')) === '{}');
+  check('the save-config IPC handler filters the renderer patch',
+    /configStore\.wizardPatch\(rawPatch\)/.test(fs.readFileSync(path.join(__dirname, '..', 'electron-app', 'main.js'), 'utf8')));
+}
+
 console.log('');
 console.log(`${passed} passed, ${failed} failed`);
 __suiteFinished = true;

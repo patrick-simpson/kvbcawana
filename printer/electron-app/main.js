@@ -828,7 +828,9 @@ ipcMain.handle('get-printers', async () => {
 
 ipcMain.handle('get-config', () => loadConfig());
 
-ipcMain.handle('save-config', (event, patch) => {
+ipcMain.handle('save-config', (event, rawPatch) => {
+  // Only the wizard's own keys, of the right type, ever reach config.json.
+  const patch = configStore.wizardPatch(rawPatch);
   // Act on the MERGED config, not the renderer's patch — startServer needs the
   // sync session and the PIN, and buildTray needs the printer name, none
   // of which the setup wizard sends.
