@@ -227,7 +227,7 @@ export class Desk {
         return refuse(409, { reason: 'superseded' });
       }
     }
-    await this.fire('afterCheckin', { night, tag, clubberId: 'clubberId' in who ? who.clubberId : undefined, gen: claim.gen, jobId, club, name, visitor: 'visitor' in who, historyRow: body.historyRow, source: 'desk' });
+    await this.fire('afterCheckin', { friend: Array.isArray(body.items) ? body.items.map(String).includes('Friend') : !!(body.items && body.items.Friend === true), night, tag, clubberId: 'clubberId' in who ? who.clubberId : undefined, gen: claim.gen, jobId, club, name, visitor: 'visitor' in who, historyRow: body.historyRow, source: 'desk' });
     return json({ ok: true, already: false, jobId, gen: claim.gen, history: this.hooks.afterCheckin.length ? 'hooked' : 'off' });
   }
 

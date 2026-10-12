@@ -327,7 +327,9 @@ alarm tick or per `GET /v1/print/next`** (`SEAL_PER_TICK = 1`), and while any
 wait the watcher asks for another tick `SPILL_MS` (1 s) later. With no station
 registered the job waits as a `raw` body (sealed under the state key; the Worker's
 own, never leased and never shown to a station) and `drain()` seals it to the
-stations once one registers. Brought a friend (BARFED, no friend's name) is the next commit's.
+stations once one registers. Brought a friend: a child the report marks Brought a friend gets `friend: true` in the
+job body, so the station also prints the BARFED tag on a BARF night (section 8, "BARF on
+the TwoTimTwo-page fallback").
 
 ## 6. Print (BUILT)
 
@@ -480,3 +482,17 @@ names. Chosen:
   posts check-outs to the laptop only; a Trek / Journey child checked out that
   way stays on the count here until the extension is retired. The desk's
   check-out and TwoTimTwo's own report are honoured.
+
+**BARF on the TwoTimTwo-page fallback.** The parsed report marks a child
+`friend: true` when their row says YES under a Brought a friend column (the
+extension's `friendsBrought` rule: the header is searched in every header row, the
+cell must read YES). The job the watcher seals for such a child carries `friend: true` in
+its `/print` body (`adopt.js printRecord`), so the station prints the BARFED tag after
+the child's own on a BARF night (`isBarfNight()`, the church's `barfNights`, which the
+print server keeps: the same place that already decides it for the desk and the phone)
+and on no other night, with NO friend's name (TwoTimTwo's box has no name field; the tag
+is the child's first name alone, as on the desk path). The Worker also records the child
+for the 6:30 pm email (`friends.record`, friend's name empty), because a cloud job tells
+the station not to report it again; a desk check-in with the Friend item ticked is
+recorded the same way (the desk page's sealed job carries the friend's name to the
+tag). The same flag counts in the `tonight` frame's `friendsBrought`.

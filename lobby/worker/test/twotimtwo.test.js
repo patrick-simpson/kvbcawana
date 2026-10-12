@@ -290,3 +290,17 @@ describe('the TwoTimTwo client', () => {
     expect(r.ok && r.page.calendarId).toBe('368');
   });
 });
+
+describe('the report\'s Brought a friend column (BARF Night)', () => {
+  it('marks a child whose row says YES, in any header row, and no one else', () => {
+    const r = parseCheckinReport(page(
+      table('Sparks ', [{ id: 1, name: 'Ada Tester', friend: true }, { id: 2, name: 'Bo Tester', friend: false }]),
+      table('Trek ', [{ id: 3, name: 'Cy Tester' }]),   // a club with no such column
+    ));
+    expect(r.entries).toEqual([
+      { clubberId: '1', name: 'Ada Tester', club: 'Sparks', friend: true },
+      { clubberId: '2', name: 'Bo Tester', club: 'Sparks' },
+      { clubberId: '3', name: 'Cy Tester', club: 'Trek' },
+    ]);
+  });
+});

@@ -192,6 +192,33 @@ describe('a restart in the middle of a burst', () => {
   });
 });
 
+describe('BARF on the TwoTimTwo-page fallback (the report marks Brought a friend)', () => {
+  it('the job asks the station for the BARFED tag (friend: true, no friend\'s name), and the child is on the 6:30 list', async () => {
+    const { t, sts } = await night({ kids: [kid(1)] });
+    t.night.kids.push({ ...kid(2, 'Sparks', 'Zed Brought'), friend: true }, { ...kid(3, 'Sparks', 'Yan Alone'), friend: false });
+    await readReport(t);
+    await step(t, SPILL_MS);
+    await step(t, SPILL_MS);
+    const jobs = await leased(sts[0]);
+    expect(jobs).toHaveLength(2);
+    const records = await Promise.all(jobs.map((j) => openAsStation(sts[0].ring, j.bundle)));
+    const zed = records.find((r) => r.clubberId === '2');
+    expect(zed.body).toEqual({ name: 'Zed Brought', clubName: 'Sparks', clubberId: '2', friend: true });
+    expect(zed.body.friendName).toBeUndefined();   // TwoTimTwo's box has no name field
+    expect(records.find((r) => r.clubberId === '3').body.friend).toBeUndefined();
+    // who brought a friend, for the email (sealed, one night)
+    expect((await t.call('GET', '/v1/cloud/friends')).body).toMatchObject({ total: 1, clubs: [{ club: 'Sparks', kids: [{ name: 'Zed Brought', friend: '' }] }] });
+    expect(everything(t.storage)).not.toContain('Zed');
+  });
+
+  it('a desk check-in with the Friend item ticked is on the same list', async () => {
+    const t = await rig({ kids: [kid('662', 'Sparks', 'Kit Tester')] });
+    const st = await t.station();
+    await t.call('POST', '/v1/desk/checkin', await t.deskBody([st], { items: { Friend: true } }));
+    expect((await t.call('GET', '/v1/cloud/friends')).body).toMatchObject({ total: 1 });
+  });
+});
+
 describe('the free plan\'s 10 ms of CPU', () => {
   it('sealing one print job to 3 stations stays under it (Node: an upper bound on the Worker)', async () => {
     const stations = [];

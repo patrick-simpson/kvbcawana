@@ -158,7 +158,7 @@ export class SyncCore {
     this.stations = new Stations({ storage: this.storage, now: this.now });
     this.adopt = new Adopter({
       ledger: this.ledger, printq: this.printq, stations: this.stations, tags: this.tags,
-      secret: () => this.watcher.creds()?.password, env: this.env, now: this.now, storage: this.storage,
+      secret: () => this.watcher.creds()?.password, env: this.env, now: this.now, storage: this.storage, friends: this.friends,
     });
     this.watcher.adopt = this.adopt;
     this.desk = new Desk({ watcher: this.watcher, ledger: this.ledger, printq: this.printq, stations: this.stations, tags: this.tags, now: this.now });
@@ -176,6 +176,10 @@ export class SyncCore {
     });
     this.watcher.publisher = this.publisher;
     this.desk.hooks.afterCheckin.push((e) => this.publisher.deskCheckin(e));
+    // A desk check-in with Brought a friend ticked: who, for the 6:30 BARF email (friends.js).
+    this.desk.hooks.afterCheckin.push(async (e) => {
+      if (e.friend && e.name) await this.friends.record({ name: e.name, club: e.club, clubberId: e.clubberId, friendName: '' });
+    });
     this.desk.hooks.afterUndo.push((e) => this.publisher.deskUndo(e));
     this.desk.hooks.afterCheckout.push((e) => this.publisher.deskCheckout(e));
     mountPublisher(this.registry, this);   // /v1/desk/tonight, /v1/station/extras, /v1/publisher/status (routes.md 8)

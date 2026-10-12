@@ -42,12 +42,14 @@ import { openState, sealState, SEAL_PER_TICK } from './watcher.js';
  * The record a TwoTimTwo-page job carries, exactly what the print role runs
  * (printer/print-server/job-puller.js, routes.md section 6): the print route and
  * its own JSON body, the child, the claim's generation and where it came from.
- * @param {{ id: string, name: string, club: string }} e @param {number} gen
+ * @param {{ id: string, name: string, club: string, friend?: boolean }} e @param {number} gen
  */
 export function printRecord(e, gen) {
   return {
     route: '/print',
-    body: { name: e.name, ...(e.club ? { clubName: e.club } : {}), clubberId: e.id },
+    // `friend` (the report marks Brought a friend): the station prints the BARFED tag too,
+    // on a BARF night only (its own isBarfNight()), and with no friend's name (TwoTimTwo's box has none).
+    body: { name: e.name, ...(e.club ? { clubName: e.club } : {}), clubberId: e.id, ...(e.friend ? { friend: true } : {}) },
     clubberId: e.id,
     gen,
     source: 'ttt',
@@ -64,9 +66,11 @@ export class Adopter {
    *   stations: import('./stations.js').Stations, tags: import('./ledger.js').Tags,
    *   secret: () => string|null|undefined, env: Record<string, any>, now: () => number,
    *   storage: { get(k: string): Promise<any>, put(k: string, v: any): Promise<void>, delete(k: string): Promise<any> },
-   *   log?: (line: string) => void }} deps
+   *   log?: (line: string) => void, friends?: import('./friends.js').Friends }} deps
    */
-  constructor({ ledger, printq, stations, tags, secret, env, now, storage, log }) {
+  constructor({ ledger, printq, stations, tags, secret, env, now, storage, log, friends }) {
+    /** Who brought a friend tonight (friends.js), for the 6:30 email: a TwoTimTwo-page child the report marks. */
+    this.friends = friends || null;
     this.ledger = ledger;
     this.printq = printq;
     this.stations = stations;
@@ -77,7 +81,7 @@ export class Adopter {
     this.log = log || ((line) => console.warn(line));
     /** The children waiting to be adopted: {sealed} is the stored form. */
     this.backlogDoc = new Doc(storage, 'adopt:backlog', () => ({ sealed: null }));
-    /** In memory, authoritative while the object runs. @type {{ tag: string, id: string, name: string, club: string, night: string }[]|null} */
+    /** In memory, authoritative while the object runs. @type {{ tag: string, id: string, name: string, club: string, night: string, friend?: boolean }[]|null} */
     this.entries = null;
     /** @type {Promise<void>|null} */
     this.loading = null;
@@ -115,7 +119,7 @@ export class Adopter {
 
   /**
    * An applied read. Cheap: an HMAC per child, no sealing.
-   * @param {{ night: string, added: { clubberId: string, name: string, club: string }[], gone: string[] }} r
+   * @param {{ night: string, added: { clubberId: string, name: string, club: string, friend?: boolean }[], gone: string[] }} r
    */
   async onReport({ night, added, gone }) {
     await this.load();
@@ -130,7 +134,7 @@ export class Adopter {
       if (this.entries?.some((x) => x.tag === tag && x.night === night)) continue;
       // A name no print server could print is not worth a label (the report's own rule).
       if (!e.name) continue;
-      this.entries?.push({ tag, id: e.clubberId, name: e.name, club: e.club, night });
+      this.entries?.push({ tag, id: e.clubberId, name: e.name, club: e.club, night, ...(e.friend ? { friend: true } : {}) });
       backlogChanged = true;
     }
     for (const id of gone) {
@@ -176,12 +180,16 @@ export class Adopter {
     return done;
   }
 
-  /** One child: claim, then a job (sealed to the stations, or kept raw until one exists). @param {{ tag: string, id: string, name: string, club: string, night: string }} e */
+  /** One child: claim, then a job (sealed to the stations, or kept raw until one exists). @param {{ tag: string, id: string, name: string, club: string, night: string, friend?: boolean }} e */
   async adopt(e) {
     const jobId = newRowId();
     const c = await this.ledger.claim(e.night, e.tag, { source: 'ttt', initial: 'queued', jobId });
     if (!c.ok) return 'already';
     const record = printRecord(e, c.gen);
+    // Who brought a friend, for the 6:30 email (the station skips it for a cloud job).
+    if (e.friend && this.friends) {
+      try { await this.friends.record({ name: e.name, club: e.club, clubberId: e.id, friendName: '' }); } catch (err) { console.error('[cloud] recording a friend failed', err); }
+    }
     const targets = this.stations.sealTargets();
     if (targets.length) {
       const bundle = await sealForStations(targets, { id: jobId, night: e.night, kind: PRINT_JOB_KIND, record });
