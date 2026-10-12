@@ -583,13 +583,20 @@ Worker as the one source of jobs.
   `electron-app/src/station.js` is the tray text. Station requests carry
   `X-Station` (`print-server/cloud-request.js`).
 - **Jobs** (`print-server/job-puller.js`, modelled on `phone-relay.js`):
-  `POST /v1/print/lease {max:1}`, open the bundle with `openAsStation`, run it
-  through a route in `JOB_PULL_ROUTES` (`/print /reprint /print-barf-bags
-  /print-custom /print-oneoff /print-leader /print-award`) on loopback, ack
-  AFTER the print returns, `POST /v1/print/hello` every 30 s and as a heartbeat
-  while a job prints. A job record is `{route, body, clubberId?, gen?, source?}`;
-  a `raw` job (a TwoTimTwo-page check-in, opened by the Worker over TLS) becomes
-  `/print {cloud: true}`. **At most once (owner):** every jobId is journalled in
+  `GET /v1/print/next?max=1` (the Worker's lease is 90 s), open the bundle with
+  `openAsStation`, run it through a route in `JOB_PULL_ROUTES` (`/print /reprint
+  /print-barf-bags /print-custom /print-oneoff /print-leader /print-award`) on
+  loopback, then `POST /v1/print/done` (or `/failed`) AFTER the print returns,
+  and `POST /v1/print/heartbeat` every 30 s and every 20 s while a job prints
+  (with the jobId it EXTENDS the lease). `lobby/worker/src/routes.md` section 6
+  is the one truth for these names; `scripts/test-cloud-e2e.cjs` runs the real
+  Worker handlers against this module. A job record is `{route, body,
+  clubberId?, gen?, source?}` (a reprint's jobId is `reprint:<uuid>`); the Worker
+  seals a TwoTimTwo-page check-in itself with `source: 'ttt'`, same record. The
+  `gen` comes from the lease (the Worker's claim generation); for `/print` the
+  puller adds `cloud: true`, and `regen: true` when gen > 1 (an undo, then a new
+  check-in), which makes `performCheckinPrint` skip its own duplicate rules for
+  that new tag. **At most once (owner):** every jobId is journalled in
   `print-journal.json` as `spooling` BEFORE the route is called, `printed` after.
   A journalled job is never printed again: acked `printed` when it came out,
   `already-spooled` when it was mid-print or its outcome is unknown, and those
@@ -604,8 +611,11 @@ Worker as the one source of jobs.
   /v1/station/roster|books?night=`, record `{csv}` / `{entries}`) and are fed to
   the existing `/update-csv` and `/feed/completed-books`.
 - **History** (`print-server/history-sync.js`; every route tolerated missing): a
-  job from a TwoTimTwo-page check-in gets a `checkin` row sealed with `sealRow`
-  and posted to `POST /v1/history/rows` (queued while the route is down); the
+  job from a TwoTimTwo-page check-in (`source: 'ttt'`, `rowForPrinted`) gets a
+  `checkin` row (record `ts` = epoch ms) sealed with `sealRow` and posted to
+  `POST /v1/history/rows` (queued while the route is down); row kinds are
+  routes.md section 3's table; attendance read back resolves a desk `undo` row
+  against the check-ins by time; the
   history key reads the season's rows back into the attendance ledger
   (`mergeAttendance`, additive) every 30 minutes for the milestone, first-time,
   twin and "Go to" fields; **Import laptop history** (tray item and `POST

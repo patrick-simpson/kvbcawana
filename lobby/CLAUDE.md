@@ -1650,6 +1650,16 @@ setup guide and the API. The owner's calls:
   `SyncCore`. The Worker never derives a key or opens a bundle; storage holds no
   clubber id or name (`sealState` for the one body that must wait). `CLOUD_PRINT`
   and `SINGLE_PUBLISHER` in `wrangler.toml` are `"off"` until the shadow night.
+  **Wired together (2026-10-12):** `history.js` is mounted through the registry
+  (`mountHistory`; the desk refuses a row not sealed to the current history key and
+  its hooks store the row the desk page sealed plus one `night_summary` count, the
+  passphrase change re-wraps the key in its one atomic put, `cron()` / `alarm()`
+  flush the outbox to D1), D1 is bound (`HISTORY_DB`, `awana-history`; `ci.yml`
+  applies the migrations before every Worker deploy), the print lease is
+  `GET /v1/print/next` + `POST /v1/print/done|failed|heartbeat` only, and with
+  `SINGLE_PUBLISHER` on the relay also drops the laptop's `checkin` greeting while
+  the Worker greets once. `printer/scripts/test-cloud-e2e.cjs` runs the Worker, the
+  station keys, the job puller and the history writer end to end.
 - **Gates:** the Worker's tests run in `ci.yml`'s `worker` job
   (`npx vitest run --config worker/vitest.config.js`), not this app's vitest
   (the root vitest excludes `worker/**`; the root lint covers it). Its relay

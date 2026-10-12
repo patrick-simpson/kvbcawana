@@ -635,6 +635,19 @@ said); "Owner" is what only the owner can do.
     `wrangler.toml` until the shadow night (P5 publishes the tally itself), and
     the desk's sealed history row is validated but stored only once the history
     module (P6) registers its hook.
+  - **P1 + P4 + P6 + P2 merged and reconciled (2026-10-12).** One print lease
+    contract (`GET /v1/print/next`, `POST done|failed|heartbeat`, 90 s, the
+    heartbeat extends it; no aliases); one job record
+    `{route, body, clubberId?, gen?, source?}` from the desk page AND the watcher;
+    the gen comes from the lease; history mounted in the Worker (hooks, key
+    re-wrap, outbox flush), D1 bound, one row-kind vocabulary, ts in epoch ms; the
+    relay drops the laptop's greeting under `SINGLE_PUBLISHER` and the Worker greets
+    once. `printer/scripts/test-cloud-e2e.cjs` proves one label per check-in, no
+    duplicate, a re-print after undo, no reprint after a lost ack, ciphertext only.
+    **Still open before the switch:** the desk page (P3); the Worker's greeting has
+    no birthday / first-timer / milestone; P5's single publisher of the tally,
+    `tonight` and the pickup list; the release of the print role (version bump and
+    changes.md); BARFED tags for the TwoTimTwo-page fallback.
 
 ## Online only
 
