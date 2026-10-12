@@ -50,7 +50,9 @@ export function mountCheckin(registry, core) {
     await core.adopt.load();
     if (core.adopt.pending() > 0) await core.adopt.drain(1);
     const jobs = await core.printq.lease(stationId, Math.min(LEASE_MAX, Number(max) || 1), lookup);
-    return json({ jobs, leaseMs: LEASE_MS });
+    // routes.md 10.3: how a station learns of a church-settings or switch change (within one poll).
+    await core.church.load();
+    return json({ jobs, leaseMs: LEASE_MS, church: { rev: core.church.rev, switchesRev: core.switches.rev } });
   };
   registry.add('GET', '/v1/print/next', 'station', ({ url, stationId }) => next(/** @type {string} */ (stationId), url.searchParams.get('max')));
 

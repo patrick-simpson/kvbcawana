@@ -67,6 +67,7 @@ import { TonightBook } from './tonight.js';
 import { UNKNOWN_DEVICE, deviceOf } from './device.js';
 import { Changes, changedSince, changedSinceRefusal, diffKeys, mountChanges } from './changes.js';
 import { Switches, mountSwitches } from './switches.js';
+import { Church, mountChurch } from './church.js';
 
 export { json };
 
@@ -222,6 +223,8 @@ export class SyncCore {
     this.undoers.screen = (u) => this.undoScreen(u);
     this.undoers['screen-name'] = (u) => this.undoScreenName(u);
     mountSwitches(this.registry, this);   // /v1/switches (routes.md 10.2)
+    this.church = new Church({ storage: this.storage, now: this.now });
+    mountChurch(this.registry, this);   // /v1/church/settings (routes.md 10.3)
   }
 
   /**
