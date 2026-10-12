@@ -170,6 +170,24 @@ Full contract: `lobby/worker/src/routes.md` section 8.
 - 2026-10-11: **Phase 3 built** (printer 8.3.0; not released, no dispatch).
   Inventory below; what was built and what is still the owner's call after it.
 
+- 2026-10-12: **Settings overhaul, Track C built (the lobby UI; `docs/SETTINGS-OVERHAUL.md`).**
+  The page's rail is seven sections (Tonight, Screens, What screens show, Slides &
+  look, Printing, History, Account & app); a TV's own panel lists four, a screen
+  opened from the page three; the old rail is behind `?rail=classic` (deleted the
+  release after Wednesday) and every old section id still resolves
+  (`LEGACY_TABS`). Tonight has mission control (the Worker's overview polled
+  every 10 s, plus the last five FIRST NAMES from the live frames, in memory
+  only), the online check-in switches, the notice composer (`durationSec` on the
+  `notice` event, screens hide it by themselves, 0 takes it down) and recent
+  changes with Undo. Slides & look has ONE Season control (two writes). The
+  live TV preview draws the real components in a scaled 1600x900 stage under
+  zero animation. Printing works from any device through the Worker's church
+  document and sealed tool jobs, with one collapsed "At the laptop" card for
+  localhost. Removed: the display login, the display key fold, the publish
+  token, "Other screens", the duplicate season and sign-in, the stale cloud
+  check-in card. Waiting on Track A (the Worker's routes) and Track B (KVBC
+  Awana 9.3.0): until they land the cards say "arrives with its next update".
+
 #### Inventory: every setting and tool, and where it lives now
 
 *As of phase 3 (2026-10-11). The "dashboard only" rows are historical: the
