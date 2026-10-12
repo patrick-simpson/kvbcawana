@@ -25,6 +25,9 @@ const app = $http.app;
 // What other modules (and server.js) read from this one; live bindings, so cycles are safe.
 Object.defineProperties(exports, {
   applySavedConfig: { enumerable: true, get: () => applySavedConfig },
+  cleanChurchPatch: { enumerable: true, get: () => cleanChurchPatch },
+  cleanScheduleRows: { enumerable: true, get: () => cleanScheduleRows },
+  CONFIG_POST_CHURCH_KEYS: { enumerable: true, get: () => CONFIG_POST_CHURCH_KEYS },
   isRehearsalActive: { enumerable: true, get: () => isRehearsalActive },
   isTrustedConfigOrigin: { enumerable: true, get: () => isTrustedConfigOrigin },
   isTrustedOrSettingsPage: { enumerable: true, get: () => isTrustedOrSettingsPage },
@@ -106,6 +109,123 @@ function isTrustedOrSettingsPage(req) {
   return isTrustedConfigOrigin(req) || req.settingsPage === true;
 }
 
+// ── The church-wide printing settings: one per-key cleaner ───────────────────
+// POST /config, /config/schedule, /config/label-templates and the church sync's
+// apply (church-sync.js: the Worker's church settings, routes.md 10.3) all write
+// these keys through cleanChurchPatch, so a value the Worker sends is held to
+// exactly the rules a value typed at this computer is.
+// The church keys POST /config takes (labelTemplates, schedule and barfNights
+// have their own routes, or none: barfNights only ever arrives from the Worker).
+const CONFIG_POST_CHURCH_KEYS = [
+  'labelFooter', 'firstTimerInverted', 'trophyBand', 'connectCard', 'connectCardAutoFirstTimer',
+  'connectCardGreeting', 'enableDrivenCheckin', 'lateGraceMin', 'pickupClubs', 'seasonTheme',
+];
+
+function pickKeys(body, keys) {
+  const out = {};
+  for (const k of keys) if (body && body[k] !== undefined) out[k] = body[k];
+  return out;
+}
+
+function cleanLateGrace(value) {
+  return Math.max(0, Math.min(120, Number(value) || 0));
+}
+
+// The schedule rows, as POST /config/schedule always kept them.
+function cleanScheduleRows(schedule) {
+  return schedule.slice(0, $ledger.SCHEDULE_MAX_ROWS).map(r => ({
+    club: String(r && r.club || '').slice(0, 30),
+    startTime: /^\d{1,2}:\d{2}$/.test(String(r && r.startTime || '')) ? String(r.startTime) : '',
+    location: String(r && r.location || '').slice(0, 40),
+    room: String(r && r.room || '').slice(0, 40),
+  })).filter(r => r.club);
+}
+
+/**
+ * Write the church keys `body` names into `next` (a config.json object), each
+ * through its own rule. A key the rule refuses is left as it was and named in
+ * `errors` ({key, error}); the caller decides whether that refuses the whole
+ * write (POST /config) or only that key (the church sync).
+ * @returns {{ errors: {key: string, error: string}[], changed: string[], pickupChanged: boolean, seasonChanged: boolean }}
+ */
+function cleanChurchPatch(next, body) {
+  const errors = [];
+  const before = JSON.stringify(pickup.pickupClubsOf(next));
+  const seasonBefore = next.seasonTheme;
+  const snapshot = {};
+  for (const k of Object.keys(body || {})) snapshot[k] = JSON.stringify(next[k]);
+  const b = body || {};
+  if (b.firstTimerInverted !== undefined) next.firstTimerInverted = !!b.firstTimerInverted;
+  // Trophy band (#293): the finished-handbook banner on a child's next
+  // label. Default ON (read as `config.trophyBand !== false` at the call
+  // site), so an operator who never opens Settings still gets it.
+  if (b.trophyBand !== undefined) next.trophyBand = !!b.trophyBand;
+  if (b.connectCard !== undefined) next.connectCard = !!b.connectCard;
+  // Label footer (#8): one short operator line (church name, a verse, service
+  // times) rendered along the bottom of every label. Clearing it deletes the
+  // key so config.json stays clean.
+  if (b.labelFooter !== undefined) {
+    const lf = printableConfigLine(b.labelFooter, 60);
+    if (lf === '') delete next.labelFooter;
+    else next.labelFooter = lf;
+  }
+  // Connect card auto-trigger + greeting (#10). An empty greeting deletes the
+  // key and the printed card falls back to the built-in default.
+  if (b.connectCardAutoFirstTimer !== undefined) next.connectCardAutoFirstTimer = !!b.connectCardAutoFirstTimer;
+  if (b.connectCardGreeting !== undefined) {
+    const cg = printableConfigLine(b.connectCardGreeting, 60);
+    if (cg === '') delete next.connectCardGreeting;
+    else next.connectCardGreeting = cg;
+  }
+  // Screen season (#16/#18; the key keeps its old name, seasonTheme): 'auto'
+  // is the default (and deletes the key), 'off' stops the broadcast so each
+  // screen follows its own skin setting, a known season pins it. Anything
+  // else is refused so a typo can't silently mean 'auto'.
+  if (b.seasonTheme !== undefined) {
+    const st = String(b.seasonTheme || 'auto');
+    if (st === 'auto') delete next.seasonTheme;
+    else if (st === 'off' || $eligibility.SEASON_KEYS.includes(st)) next.seasonTheme = st;
+    else errors.push({ key: 'seasonTheme', error: 'unknown seasonTheme' });
+  }
+  if (b.enableDrivenCheckin !== undefined) next.enableDrivenCheckin = !!b.enableDrivenCheckin;
+  // "Clubs on the pickup list" (7.16.0): the one setting every lobby
+  // screen's still-here list follows. null puts it back to the default
+  // (every club but Trek and Journey); a club name we do not know is refused.
+  if (b.pickupClubs !== undefined) {
+    const pc = pickup.normalizePickupClubs(b.pickupClubs);
+    if (!pc.ok) errors.push({ key: 'pickupClubs', error: pc.reason });
+    else if (pc.value === null) delete next.pickupClubs;
+    else next.pickupClubs = pc.value;
+  }
+  if (b.lateGraceMin !== undefined) next.lateGraceMin = cleanLateGrace(b.lateGraceMin);
+  // Per-club label templates (#1): overrides only; none at all deletes the key.
+  if (b.labelTemplates !== undefined) {
+    const cleaned = $tags.sanitizeLabelTemplates(b.labelTemplates);
+    if (!cleaned.ok) errors.push({ key: 'labelTemplates', error: cleaned.error });
+    else if (Object.keys(cleaned.value).length === 0) delete next.labelTemplates;
+    else next.labelTemplates = cleaned.value;
+  }
+  // The group schedule (#28).
+  if (b.schedule !== undefined) {
+    if (!Array.isArray(b.schedule)) errors.push({ key: 'schedule', error: 'schedule must be an array' });
+    else next.schedule = cleanScheduleRows(b.schedule);
+  }
+  // BARF Nights: config.json's list wins over church-config.json's (tags.js isBarfNight).
+  if (b.barfNights !== undefined) {
+    const ok = Array.isArray(b.barfNights) && b.barfNights.length <= 20
+      && b.barfNights.every(d => typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d));
+    if (!ok) errors.push({ key: 'barfNights', error: 'barfNights must be a list of dates (YYYY-MM-DD)' });
+    else next.barfNights = [...new Set(b.barfNights)].sort();
+  }
+  const changed = Object.keys(snapshot).filter(k => JSON.stringify(next[k]) !== snapshot[k]);
+  return {
+    errors,
+    changed,
+    pickupChanged: JSON.stringify(pickup.pickupClubsOf(next)) !== before,
+    seasonChanged: next.seasonTheme !== seasonBefore,
+  };
+}
+
 app.get('/config', (req, res) => {
   let saved;
   try {
@@ -158,11 +278,9 @@ app.post('/config/slides-token/generate', (req, res) => {
 app.post('/config', (req, res) => {
   const {
     printerName, checkinUrl,
-    firstTimerInverted, connectCard, enableDrivenCheckin, lateGraceMin,
     worksheetPrinter, historyRetentionDays, displayKey,
-    labelFooter, connectCardAutoFirstTimer, connectCardGreeting, seasonTheme,
     musicalPrinter, updateBeacon, slidesPublishToken,
-    trophyBand, fleetConfigUrl, pickupClubs,
+    fleetConfigUrl,
     backupPrinterName, cupsMedia,
   } = req.body || {};
   if (!isTrustedConfigOrigin(req) && SECRET_CONFIG_KEYS.some(k => (req.body || {})[k] !== undefined)) {
@@ -243,38 +361,10 @@ app.post('/config', (req, res) => {
     if (historyRetentionDays !== undefined) {
       next.historyRetentionDays = security.normalizeRetentionDays(historyRetentionDays);
     }
-    if (firstTimerInverted !== undefined) next.firstTimerInverted = !!firstTimerInverted;
-    // Trophy band (#293): the finished-handbook banner on a child's next
-    // label. Default ON (read as `config.trophyBand !== false` at the call
-    // site), so an operator who never opens Settings still gets it.
-    if (trophyBand !== undefined) next.trophyBand = !!trophyBand;
-    if (connectCard !== undefined) next.connectCard = !!connectCard;
-    // Label footer (#8): one short operator line (church name, a verse, service
-    // times) rendered along the bottom of every label. Clearing it deletes the
-    // key so config.json stays clean.
-    if (labelFooter !== undefined) {
-      const lf = printableConfigLine(labelFooter, 60);
-      if (lf === '') delete next.labelFooter;
-      else next.labelFooter = lf;
-    }
-    // Connect card auto-trigger + greeting (#10). An empty greeting deletes the
-    // key and the printed card falls back to the built-in default.
-    if (connectCardAutoFirstTimer !== undefined) next.connectCardAutoFirstTimer = !!connectCardAutoFirstTimer;
-    if (connectCardGreeting !== undefined) {
-      const cg = printableConfigLine(connectCardGreeting, 60);
-      if (cg === '') delete next.connectCardGreeting;
-      else next.connectCardGreeting = cg;
-    }
-    // Screen season (#16/#18; the key keeps its old name, seasonTheme): 'auto'
-    // is the default (and deletes the key), 'off' stops the broadcast so each
-    // screen follows its own skin setting, a known season pins it. Anything
-    // else is refused so a typo can't silently mean 'auto'.
-    if (seasonTheme !== undefined) {
-      const st = String(seasonTheme || 'auto');
-      if (st === 'auto') delete next.seasonTheme;
-      else if (st === 'off' || $eligibility.SEASON_KEYS.includes(st)) next.seasonTheme = st;
-      else return res.status(400).json({ error: 'unknown seasonTheme' });
-    }
+    // The church-wide printing settings (labels, connect card, season, pickup
+    // list, late grace): one cleaner, shared with the church sync's apply.
+    const churchResult = cleanChurchPatch(next, pickKeys(req.body || {}, CONFIG_POST_CHURCH_KEYS));
+    if (churchResult.errors.length) return res.status(400).json({ error: churchResult.errors[0].error });
     // `collectibleIcons` (the retired collectible of the week) is no longer
     // read from the body: a dashboard page cached from an older version that
     // still posts it saves fine, and the value goes nowhere.
@@ -296,20 +386,6 @@ app.post('/config', (req, res) => {
       if (m && !cups.isMediaKeyword(m)) return res.status(400).json({ error: 'cupsMedia is not a CUPS media name' });
       if (m) next.cupsMedia = m; else delete next.cupsMedia;
     }
-    if (enableDrivenCheckin !== undefined) next.enableDrivenCheckin = !!enableDrivenCheckin;
-    // "Clubs on the pickup list" (7.16.0): the one setting every lobby
-    // screen's still-here list follows. null puts it back to the default
-    // (every club but Trek and Journey); a club name we do not know is a 400.
-    let pickupChanged = false;
-    if (pickupClubs !== undefined) {
-      const pc = pickup.normalizePickupClubs(pickupClubs);
-      if (!pc.ok) return res.status(400).json({ error: pc.reason });
-      const before = JSON.stringify(pickup.pickupClubsOf(next));
-      if (pc.value === null) delete next.pickupClubs;
-      else next.pickupClubs = pc.value;
-      pickupChanged = JSON.stringify(pickup.pickupClubsOf(next)) !== before;
-    }
-    if (lateGraceMin !== undefined) next.lateGraceMin = Math.max(0, Math.min(120, Number(lateGraceMin) || 0));
     // Worksheets (POST /print-pdf) are letter-size, not 4x2 labels, so a
     // church running two printers can route them separately.
     if (worksheetPrinter !== undefined) {
@@ -327,7 +403,7 @@ app.post('/config', (req, res) => {
     // Keep the live process in sync so schedule/PIN/toggle/key changes apply
     // without a restart.
     applySavedConfig(next);
-    if (pickupChanged) $publishers.stillHereChanged();
+    if (churchResult.pickupChanged) $publishers.stillHereChanged();
     console.log('[config] Saved');
     res.json({ ok: true });
   } catch (e) {
@@ -343,16 +419,11 @@ app.get('/config/schedule', (req, res) => {
 app.post('/config/schedule', (req, res) => {
   const { schedule, lateGraceMin } = req.body || {};
   if (!Array.isArray(schedule)) return res.status(400).json({ error: 'schedule must be an array' });
-  const rows = schedule.slice(0, $ledger.SCHEDULE_MAX_ROWS).map(r => ({
-    club: String(r && r.club || '').slice(0, 30),
-    startTime: /^\d{1,2}:\d{2}$/.test(String(r && r.startTime || '')) ? String(r.startTime) : '',
-    location: String(r && r.location || '').slice(0, 40),
-    room: String(r && r.room || '').slice(0, 40),
-  })).filter(r => r.club);
+  const rows = cleanScheduleRows(schedule);
   try {
     const next = $config.loadConfigFile();
     next.schedule = rows;
-    if (lateGraceMin !== undefined) next.lateGraceMin = Math.max(0, Math.min(120, Number(lateGraceMin) || 0));
+    if (lateGraceMin !== undefined) next.lateGraceMin = cleanLateGrace(lateGraceMin);
     $config.writeConfigFile(next);
     applySavedConfig(next);
     res.json({ ok: true, schedule: rows });
