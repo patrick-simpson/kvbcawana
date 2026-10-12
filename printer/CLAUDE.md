@@ -1,790 +1,137 @@
-﻿# CLAUDE.md
+# printer/ (KVBC Awana Windows app `electron-app/`, print server `print-server/`, Chrome extension `chrome-extension/`, public site = this folder's React root) — agent rules
+Machine-oriented index. Rationale/history/dated owner decisions: `docs/DECISIONS.md`. Root rules: `../CLAUDE.md`. Section names below are cited by code/tests/other docs ("Public website", "Tonight's count", "Releasing the Windows app", "KVBC Awana (9.0.0)"): keep headings.
 
-Senior Software Engineer focused on **Technical Integrity, Quality, and Operational Excellence**. Surgical fixes addressing root causes, not workarounds.
+## Purpose
+Prints child check-in labels at Awana events from TwoTimTwo.com. App name = "KVBC Awana" since 9.0.0 (one app: print server, display, or both per computer); was "Club Label Printer" 5.9.0-8.x (trademark compliance); the public site still calls the print server that. Components: React site (root), Chrome extension (zipped by `scripts/bump-version.cjs`), Electron app, print server. Stance: surgical root-cause fixes, no workarounds.
 
-## Project
-Windows app for printing child check-in labels at Awana events from TwoTimTwo.com. Since **9.0.0 the Windows app is "KVBC Awana"**, one app for every KVBC Awana computer: a print server, a display (the sound room app moved in), or both (see "KVBC Awana (9.0.0)" below and the root `ROADMAP.md#kvbc-awana-one-app`). It was "Club Label Printer" from v5.9.0 (and "Awana Label Printer" before that — renamed for Awana Clubs International trademark compliance; see changes.md's 5.9.0 entry), and the public site still calls the print server that.
+## Identifiers: brand vs internal (never conflate)
+- `build.productName` (`electron-app/package.json`) = "KVBC Awana" (`APP_NAME` in `main.js`): every user-visible string matches it. Keep under `build` ONLY: a top-level `productName` moves userData (`electron-app/test/roles.test.cjs` fails).
+- `"name"` / `"appId"` stay `awana-label-printer` / `com.kvbc.awana-label-printer` (electron-builder derives install dir + `userData` from `name`; renaming orphans data and breaks NSIS upgrade-in-place). Real data path `%APPDATA%\awana-label-printer\chrome-extension`: never "fix" to a title-cased folder.
+- Also never renamed (internal, never shown): channel `awana-channel`, `AWANA_*` env vars, `X-Awana-Pin`, `window.awana`, church-config key `pusherChannel` (= the relay's channel name).
 
-**Components:** React Simulator (root) | Chrome Extension (chrome-extension/, zipped for download by bump-version.cjs) | Electron App (electron-app/) | Print Server (print-server/)
-
-**Branding vs. internal identifiers — don't conflate these when touching either:**
-`build.productName` (`electron-app/package.json`) is "KVBC Awana" since
-9.0.0 (`APP_NAME` in main.js) — every user-visible string in the app (window
-titles, tray, notifications, shortcuts, installer filename) should match it.
-It must stay under `build` only: a TOP-LEVEL `productName` would become
-Electron's app name and move userData (`electron-app/test/roles.test.cjs`
-fails if one appears). `"name"`/`"appId"` (`awana-label-printer` /
-`com.kvbc.awana-label-printer`) are **deliberately still the old name** —
-electron-builder derives the install directory and `app.getPath('userData')`
-from `"name"`, not `productName` (confirmed in `build-electron.yml`'s CI
-comment), so renaming it would orphan every existing install's data folder
-and break the NSIS upgrade-in-place registry lookup for zero user-visible
-benefit. `%APPDATA%\awana-label-printer\chrome-extension` is therefore the
-real, current path — don't "fix" it back to a title-cased `Club Label
-Printer` folder; it was never that, even under the old branding (that was a
-pre-existing doc bug, corrected in the 5.9.0 pass). Same reasoning protects
-the channel name `awana-channel` (the wire protocol shared with the lobby
-app in `lobby/`) and the `AWANA_*` env vars / `X-Awana-Pin`
-header / `window.awana` bridge (internal-only, never shown to a user) — none
-of these are part of the product's public branding, so none of them move if
-"Club Label Printer" ever changes again.
-
-## MANDATORY Checklist
-Every functional change requires:
-1. **Version bump** — `node scripts/bump-version.cjs <X.Y.Z>` (server.js changes). Auto-updates all files + extension. Also regenerate lockfiles (`npm install --package-lock-only` in `print-server/` and `electron-app/`) — the bump script doesn't touch their `version` field.
-2. **changes.md** — Add entry at top with version, date, and what changed + why.
-3. **Website/UI** — Update React components if affecting user install/usage.
-4. **Build** — `npm run build` to rebuild the site (`dist`).
-5. **Commit & push** — Never leave uncommitted. Changes only done when deployed.
-6. **Push to `main`** — the owner's rule for this repo (the old printer repo
-   used PRs). Nothing is live until it is on `main`: the root `ci.yml` runs
-   every app's checks on each push and then publishes the site (the home page,
-   `/checkin`, the update feeds) to awana.kvbchurch.org. A pushed branch
-   nobody merges is work stranded where the operator can't see it.
-7. **Cut the release** (if `electron-app/` or `print-server/` changed) — see "Releasing the Windows app" below. Don't stop at pushing to `main`; the `.exe` isn't live until the tagged build publishes.
-
-## KVBC Awana (9.0.0): roles, the display, the wizard
-
-Owner, 2026-10-11 (the root `ROADMAP.md#kvbc-awana-one-app` has the decisions and the full
-build notes). The electron-app is one app with two roles:
-
-- **`roles.json`** in userData (`src/roles.js`): `{print, display, name,
-  setupDone}`, decided ONCE on the first v9 start, before anything writes to
-  userData: a saved file wins; then the sound room's hand-off (a display);
-  then printer data already in userData (`PRINTER_DATA`: the check-in laptop
-  upgrading from 8.x is a print server with the display OFF and setup done,
-  so it never sees the wizard or the display); else a new install (the
-  wizard). Every write keeps `roles.json.bak`, read when the file is damaged.
-- **The print server runs only with the print role**: `startServer()` and
-  `ensureServerRunning()` return at once without it, and everything the app
-  did at launch is `startPrintRole()`. Turning print off relaunches the app
-  (the server module keeps timers of its own once loaded).
-- **The display** is `src/display/` (the sound room app's main process,
-  `createDisplay()`, started and stopped by the display role; the rules are
-  lobby/CLAUDE.md's "The sound room desktop app", except that the hours are
-  per computer, `settings.hours`, default 17:00-20:00, and the tray, updater,
-  login item and single-instance lock are main.js's). Its pure modules'
-  tests are `electron-app/test/*.test.cjs` on `node:test` (`npm run
-  test:app`, part of `npm test`).
-- **Updates**: every 10 minutes for every role, installed the moment they
-  download (the sound room's rule). The print role adds no idle gate beyond
-  a busy poll on the server's `isBusy()`, capped at a minute; a display-only
-  computer takes the 5 s grace.
-- **Busy** (`isBusy()` in `print-server/server.js`, exported, not on
-  /health): a request on a printing route (`/print*`, `/reprint*`,
-  `/canary`, `/play-tune`) still being answered, a job on the printer chain
-  (`withPrinter`), a stretch reprint, or a phone check-in the extension has
-  not driven yet (within the queue's 10-minute life).
-  `scripts/test-print-async.cjs` pins it.
-- **Start with Windows** is one login item for both roles: config.json's
-  `launchOnBoot` (the tray's checkbox, the display's Settings, the wizard).
-- **The wizard** (`src/setup-wizard.js`, `static/setup.html`, a six-call
-  preload): role, the church passphrase (signs in through
-  `print-server/sync-client.js`; the session goes to `sync-session.bin`
-  encrypted with safeStorage, memory only where it cannot encrypt, never a
-  plain file; the passphrase is held in memory until the wizard closes, to
-  sign the print server in too via its loopback `/config/sync-login`), a
-  name, the printer, the screen + monitor + hours. Tray: "Set up this
-  computer...". It styles itself from the print server's brand-kit copy,
-  two folders up from `static/` both unpackaged and packaged.
-- **The sound room hand-off**: `src/handoff.js` reads
-  `%APPDATA%\awana-label-printer\handoff.json` (written by
-  `lobby/desktop` 2.1.0), and `src/old-app.js` uninstalls Awana Lobby
-  Display afterwards. The format is shared with
-  `lobby/desktop/src/handoff.js`: change both together.
-- **The sync protocol is shared** (address and session rules, request building,
-  login answers): `print-server/sync-client.js`, `sync-session.js` and
-  `device-sync.js` run on `print-server/sync-protocol.js`, a GENERATED CommonJS
-  copy of `lobby/shared/sync-protocol.js` (never edit it; run
-  `node scripts/gen-sync-protocol.mjs` at the repo root, which
-  `check-mirrors.mjs` enforces). It is a copy, not a runtime import of
-  `lobby/`, because the packaged app ships `print-server/*.js` and has no
-  `lobby/` folder; main.js hands `syncClient.protocol` to device-sync because
-  the asar cannot require print-server.
-- **On /settings** (`src/device-sync.js`, `test/device-sync.test.cjs`): a
-  computer set up and signed in (the wizard's `sync-session.bin`, else on a
-  print server the print server's own config.json sign-in) is the Worker's
-  `computer` screen: `POST /v1/screens/hello` and `GET .../settings` at
-  start and every 2 minutes, under `roles.json`'s `deviceId` (made once).
-  The four keys (`printRole`, `displayRole`, `displayFrom`, `displayUntil`;
-  `SPEC` is pinned to `SCREEN_SPECS.computer`) are reconciled against the
-  last agreed copy (`device-sync.json`) like the lobby's `reconcileScreen`:
-  a /settings change goes through `applyDeviceSettings` (display.configure
-  for the hours, `checkRolesChange` + `applyRoles` for the roles, the
-  wizard's path), a local one (`applyRoles`, the display's Settings window)
-  is nudged up with PUT. A print-off while `isBusy()` is HELD: the rest
-  applies, `pendingRoleChange` rides the hello, and it applies once idle.
-  401 = signed out: it stops, the tray says so, and it resumes on a
-  different session. Renames go both ways. `roles:get` / `roles:set` stay
-  for the app's own file:// windows.
+## Workflow / checks
+- Push directly to `main`; no branches/PRs. No model names in commits/files. One finding per commit. Nothing is live until on `main`: root `ci.yml` runs every app's checks then publishes site (home, `/checkin`, update feeds) to awana.kvbchurch.org. Never leave uncommitted.
+- Every functional change: (1) `node scripts/bump-version.cjs <X.Y.Z>` (updates all files + extension; then `npm install --package-lock-only` in `print-server/` and `electron-app/`: the script skips lockfile `version`); (2) `changes.md` entry at top (version, date, what + why); (3) update React site components if user install/usage is affected; (4) `npm run build` (site `dist`); (5) commit, push `main`; (6) release if `electron-app/` or `print-server/` changed (below).
+- Commands: React `npm run dev` (3000) | `npm run build` (`site/build.mjs`, `SITE_BASE=/`); Electron `npm run dev` | `npm run dist` (NSIS); print server `PRINTER_NAME="Printer" node server.js` (3456; bare `node server.js` or a single `npm run test:*` needs `npm run assets` once); app unit tests `npm run test:app` (`node --test "electron-app/test/*.test.cjs"`, part of `npm test`); golden labels `npm run test:golden` / `test:golden:update` (baselines `scripts/__label_baselines__`).
+- `npm test` = `pretest` (`node ../scripts/family-assets.mjs printer`) then `scripts/run-tests.cjs`: every `scripts/test-*.cjs`, 4 at a time (what `ci.yml` and the release run); each suite takes its port from `scripts/free-port.cjs` (OS-assigned; no fixed ports in new suites); `npm test -- --serial` / `npm run test:serial` = one-by-one. Extension logic is tested by lifting functions out of `content.js` (`scripts/test-extension-*.cjs`). New suite = `scripts/test-*.cjs` + `package.json` script.
+- Suites that pin code by shape read `scripts/server-source.cjs` (whole server as one string, `$module.` prefixes removed).
+- Reliability: self-relaunching scripts MUST have recursion guards (never trust admin checks). PowerShell the print path shells out to must account for the parent process (app, CUPS station, bare `node server.js`). Server keeps `uncaughtException` handlers; enrichment fails silent (print the basic label). Always unlink temp files in `finally`.
 
 ## Releasing the Windows app
+- NEVER tag by hand (`git tag`/push, web "Draft a new release"): sessions' git is branch-scoped (tag pushes rejected), manual tagging hit silent footguns (tag case, republished release reusing a tag ref).
+- Steps 1-5 above on `main`, then dispatch `.github/workflows/printer-release.yml` (root) with `version` (no prefix, e.g. `7.11.1`; tag = `printer-v7.11.1`) and `ref: main`. Human: Actions -> "Release KVBC Awana" -> Run workflow. Claude: `mcp__github__actions_run_trigger` `method: "run_workflow"`, `workflow_id: "printer-release.yml"`, `ref: "main"`, `inputs: {"version": "...", "ref": "main"}`.
+- Pipeline (reusable `release-app.yml`): tests FIRST, then tag (failing test never leaves a tag), Windows build, smoke test (silent install of `KVBC-Awana-Setup.exe`, expects `KVBC Awana.exe` in `%LOCALAPPDATA%\Programs\awana-label-printer`, process `KVBC Awana`, `/health` with 4 loaded fonts: Paytone One, Londrina Solid, Londrina Solid Black, Figtree; `/preview`; upgraded laptop's `roles.json`), publish with `make_latest: false`, commit feed to `site/updates/printer/` (`ci.yml` publishes it). Feed is OURS not GitHub "Latest": app updates from awana.kvbchurch.org/updates/printer/; workflow refuses a version that moves the feed backwards.
+- Done = run green + release has assets + feed names the new version (watch with `mcp__github__actions_get`). Mistake: dispatch `.github/workflows/delete-release.yml` (`app` = printer, exact stray tag; removes release + tag), revert the feed commit if made.
 
-**Never create the release tag manually** (`git tag` + `git push`, or the GitHub web UI "Draft a new release" flow). It has failed repeatedly in practice: a Claude Code session's git access is commonly scoped to branches only (tag pushes rejected), and manual tagging has hit silent footguns (tag name case, a republished release reusing its old tag ref).
+## KVBC Awana (9.0.0): roles, display, wizard (`electron-app/`)
+- `roles.json` in userData (`src/roles.js`): `{print, display, name, setupDone}`, decided ONCE on first v9 start before anything writes userData, in order: saved file; sound-room hand-off (display); printer data already in userData (`PRINTER_DATA`: 8.x laptop = print on, display OFF, setup done, never sees wizard); else new install (wizard). Every write keeps `roles.json.bak` (read when damaged).
+- Print server runs ONLY with the print role: `startServer()` / `ensureServerRunning()` return at once without it; all launch work = `startPrintRole()`. Print off => app relaunches (server module keeps its own timers).
+- Display = `src/display/` (sound room's main process, `createDisplay()`, started/stopped by the display role; rules = `lobby/CLAUDE.md` "Sound room desktop app", except hours per computer `settings.hours` default 17:00-20:00; tray, updater, login item, single-instance lock are `main.js`'s). Pure modules tested in `electron-app/test/*.test.cjs` (`node:test`).
+- Updates: poll every 10 min, every role, install the moment downloaded. Print role: no idle gate beyond polling `isBusy()` (capped 1 min); display-only: 5 s grace.
+- `isBusy()` (`print-server/server/http.js`, exported, NOT on /health): true while a printing route (`/print*`, `/reprint*`, `/canary`, `/play-tune`) is being answered, a `withPrinter` job runs, a stretch reprint runs, or a phone check-in the extension has not driven (queue life 10 min). Pinned by `scripts/test-print-async.cjs`.
+- Start with Windows = ONE login item for both roles: config.json `launchOnBoot` (tray checkbox, display Settings, wizard).
+- Wizard (`src/setup-wizard.js`, `static/setup.html`, six-call preload): role, church passphrase (signs in via `print-server/sync-client.js`; session -> `sync-session.bin` encrypted with safeStorage, memory only where it cannot encrypt, NEVER a plain file; passphrase held in memory until wizard closes, to sign the print server in via loopback `/config/sync-login`), name, printer, screen + monitor + hours. Tray: "Set up this computer...". Styles itself from the print server's brand-kit copy (two folders up from `static/`, packaged or not).
+- Sound-room hand-off: `src/handoff.js` reads `%APPDATA%\awana-label-printer\handoff.json` (written by `lobby/desktop` 2.1.0); `src/old-app.js` uninstalls Awana Lobby Display afterwards. Format shared with `lobby/desktop/src/handoff.js`: change both together.
+- Sync protocol: `print-server/sync-client.js`, `sync-session.js`(electron-app), `device-sync.js` run on `print-server/sync-protocol.js`, a GENERATED CJS copy of `lobby/shared/sync-protocol.js` (never edit; `node scripts/gen-sync-protocol.mjs` at repo root; `check-mirrors.mjs` enforces). Copy, not runtime import: the package has no `lobby/`; `main.js` hands `syncClient.protocol` to device-sync (asar cannot require print-server).
+- /settings sync (`electron-app/src/device-sync.js`, `test/device-sync.test.cjs`): a computer set up + signed in (wizard's `sync-session.bin`, else print server's config.json sign-in) is the Worker's `computer` screen: `POST /v1/screens/hello` + `GET .../settings` at start and every 2 min under `roles.json` `deviceId` (made once). Keys `printRole`, `displayRole`, `displayFrom`, `displayUntil` (`SPEC` pinned to `SCREEN_SPECS.computer`) reconciled against last agreed copy `device-sync.json` (like lobby `reconcileScreen`): /settings change -> `applyDeviceSettings` (display.configure for hours, `checkRolesChange` + `applyRoles` for roles = wizard's path); local change (`applyRoles`, display Settings window) -> PUT. Print-off while `isBusy()` is HELD: rest applies, `pendingRoleChange` rides the hello, applies when idle. 401 = signed out: stop, tray says so, resume on a different session. Renames go both ways. `roles:get`/`roles:set` stay for the app's own file:// windows.
+- Extension distribution: extension is loaded UNPACKED, so Chrome never auto-updates it and a self-hosted `update_url` is not honoured: never claim silent update. `chrome-extension/` ships in `extraResources`; app syncs it to `%APPDATA%\awana-label-printer\chrome-extension` every launch (`electron-app/src/extension-sync.js`; update costs a Chrome restart). Target under userData, never `resources/`; write tmp+rename; prune files a new version drops (else manifest loads old code beside new). Folder path is loopback-only in `/health` (holds Windows username; `/health` is CORS-readable). Version not gated (extension needs it for the update banner).
+- Config writes: config.json has several writers. Live sync uses `applySavedConfig()` (`server/config-routes.js`; plain `Object.assign` cannot DELETE). Electron merges via `electron-app/src/config-store.js`, never writes the file whole. Every config.json write (both sides) = tmp + fsync + rename with `.bak` of the replaced file; damaged file restored from backup or moved aside, never written over, `/health` says so. Other data files: `saveFileAtomic()` (`server/config.js`; retrying rename, `/health` warning while saves fail). History + attendance ledger held in memory, re-read only on file change. Club logos stored once by hash (`club-icons.json`), never per history row.
+- Electron renders NO labels (only hidden BrowserWindow = printer enumeration); it `require()`s the print server in-process. Packaged app ships `print-server/server/` via `electron-app/package.json` `build.extraResources` (`"server/**"`; `test-server-helpers.cjs` fails if dropped).
 
-Instead, once steps 1–5 are on `main`, dispatch **`.github/workflows/printer-release.yml`** (at the repo root) with the `version` input (e.g. `7.11.1`, no prefix; the tag it makes is `printer-v7.11.1`) and `ref` `main`:
-- **Human:** GitHub → Actions → "Release KVBC Awana" → Run workflow → enter the version. (Since 9.0.0 its smoke test installs `KVBC-Awana-Setup.exe`, expects `KVBC Awana.exe` in `%LOCALAPPDATA%\Programs\awana-label-printer`, runs the process `KVBC Awana` and checks the upgraded laptop's `roles.json`.)
-- **Claude:** `mcp__github__actions_run_trigger` with `method: "run_workflow"`, `workflow_id: "printer-release.yml"`, `ref: "main"`, `inputs: {"version": "7.11.1", "ref": "main"}`.
+## Print server structure (`print-server/`)
+- `server.js` = entry: loads `server/*.js` in the old single-file order (middleware/routes register in that order), exports every name tests and Electron import, holds standalone start-up. New code goes in the module of its section; a new module needs a line in `server.js` at the position its routes should register. Cross-module reference = `$module.name` (`$config.config`, `$printing.printLabel(...)`); module `exports` are live getters (setters for state others assign); `server/lazy.js` requires the other module on first use (cycles safe).
+- `server/` owns: `config` (config load, `saveFileAtomic`), `clubbers` (CSV), `label-render` (`generateLabel`, `accentCharge`), `label-layout`, `label-type` (`labelType`, `customLineH`, `fitCustomLabelText`), `tags` (`labelTemplateFor`, BARF/drop-off tags, `cleanFriendName`), `printing` (`printLabel`, `printImage(s)`, `backupPrinter`, `withPrinter`), `spooler` (`printerSetupWarnings`), `http` (Express app, CORS `corsPolicy`, loopback gate, `isBusy`), `checkin-print` (`performCheckinPrint`), `history` (`addHistoryEntry`, `isNonCheckinRow`, `markManualUndo`, `printedTonightFor`), `ledger` (`recordAttendance`, `lateGoToLine`), `tonight-count` (`computeTonightStats`, wrappers over `tonight.js`), `reprint`, `leaders`, `feed-routes` (`/feed/*`, `markCheckedOut`, `settingsPageSessionOk`), `publishers` (`publishTally`, `publishStillHere`, `TALLY_LEAD_MIN`), `relay`, `station` (`configureCloud`, `stopCloud`, `sendStationExtras`), `config-routes` (`applySavedConfig`, `isTrustedConfigOrigin`, `isTrustedOrSettingsPage`, `SECRET_CONFIG_KEYS`), `phone-routes` (`/phone/*`, `rosterCheckedInKeys`, `applyTwoTimTwoUndo/Checkout`), `lifecycle` (`startListening`), `eligibility` (`clubKey`), plus `attendance-audit`, `canary`, `custom-pdf`, `diagnostics`, `event-buffer`, `images`, `pending-actions`, `tunes`, `updates`.
+- Top-level `print-server/*.js`: `brand.js` (kit fonts/marks), `cups.js`, `events.js` (sealed publish, `buildCheckout`), `cloud-crypto.js`, `cloud-request.js`, `station-keys.js`, `job-puller.js`, `history-sync.js`, `phone-relay.js` (`RELAY_ROUTES`, `JOB_ROUTES`), `sync-client.js`, `sync-protocol.js`*, `security.js` (`SETTINGS_PAGE_ROUTES`, `isAllowedOrigin`), `feeds.js` (`validateCheckinReportBody`, `checkoutDisappearances`), `pickup.js`, `tonight.js`*, `clubTable.js`*, `textClean.js`*, `church-config.json`, `clubbers-template.csv`, `public/` (`phone.html`, generated `brand/`). *=generated copy.
+- GENERATED copies of `lobby/shared/` (installer holds only this folder): `print-server/tonight.js` (THE count rules: `tonightHereNow()`, `authoritativeTonight()`, identity keys, `reportIsPartial`, mass-undo guard `massUndoRefused`, `REPORT_FRESH_MS`; the sync Worker imports the same source; `test-tonight-shared.cjs`), `print-server/clubTable.js` (club table + two matchers; `clubKey()` substring on purpose; `brand.js` `MARK_FILES`/`MARK_NAMES`/`CLUB_MONOGRAM` from same rows), `print-server/textClean.js` (`cleanName`, `stripControlChars`, `sanitizeStoredText`, `cleanFriendName` keep own limits), `electron-app/src/display/clubNight.js` (club-night rule, this computer's hours), `print-server/sync-protocol.js`. Never edit: change `lobby/shared/`, run `node scripts/shared-copies.mjs` (sync-protocol: `gen-sync-protocol.mjs`) from repo root, commit both; `scripts/check-mirrors.mjs` fails CI on drift.
+- Data flow: extension fetches CSV -> `POST /update-csv`; server reloads `clubbers.csv` every print; enrichment matches firstName+lastName to allergies (Notes field).
 
-The workflow runs the test suites FIRST, then creates the tag (so a failing test never leaves a tag behind), builds the `.exe` on Windows, smoke-tests it (silent install, `/health`, `/preview`), publishes the GitHub Release with `make_latest: false`, and commits the update feed to `site/updates/printer/` (which `ci.yml` then publishes). **The feed is ours, not GitHub's "Latest"**: the app updates from awana.kvbchurch.org/updates/printer/, and the workflow refuses a version that would move the feed backwards. Watch it through with `mcp__github__actions_get`; a release is done when the run is green, the release has its assets, and the feed names the new version.
+## Labels
+- ONE renderer: `generateLabel()` (`server/label-render.js`) draws a 1200x600 canvas PNG (4x2 @300dpi), printed via PowerShell `System.Drawing` (CUPS below). The extension's offline fallback label in `content.js` is a deliberately degraded safety artifact, NOT a second layout to keep in sync.
+- Per-club layout `config.labelTemplates` (overrides-only, keyed `clubKey()`), resolved by `labelTemplateFor()` in the HANDLERS and passed as `input.template`: renderer NEVER reads config (golden-suite purity). Fail open: broken template renders stock label. Safety content (allergy icons, no-photo camera, birthday) is NOT templatable.
+- One printer: the 4x2 label printer. Receipt printers are gone for good (`receipt.js`, printerType `receipt`/`receipt-usb`, `/receipt/*`, "Printer jammed", `/jam-reprint`, `/touch/jam`): never bring back; old receipt config keys never read. `printLabel()` = `printImage()` on name tag printer, `backupPrinter()` only fallback. `printerSetupWarnings()` (pure) judges `printerUnset`, `printerNotFound`, `printerOffline` (Get-Printer PrinterStatus); settings page and status window show offline as PROBLEM. `scripts/test-label-printer.cjs`.
+- Late child (`lateGoToLine` answers): plain name tag + household ONE drop-off label (`dropOffTagFor`/`generateDropOffTag`, once per family per night). Card band says GO TO + time, NEVER "late"; the child's own tag is identical to everyone's (nothing singles a child out).
+- Linux/CUPS (Pi print station): `print-server/cups.js` prints the same PNG via `lp` (argument arrays only; queue name with spaces refused), reads `lpstat -l -p -d` into the Get-Printer shape `printerSetupWarnings()` judges. ON only when `AWANA_PRINT_BACKEND=cups` (station service sets it + `PRINTER_NAME`); NEVER inferred from the OS (suites run on Linux with a stand-in `powershell`). `config.cupsMedia` = roll (default DYMO 30256 `w167h288`). Windows path untouched. `scripts/test-cups.cjs`, `test-cups-server.cjs`.
+- One-off tags: `POST /print-oneoff {firstName, clubName}` (typed name + club from `CLUB_LIST`, no roster lookup) prints the stock label, history row `oneOff: true` (kept by `addHistoryEntry`; `isNonCheckinRow()` keeps it out of every count, attendance, still-here list, reconcile), publishes sealed `checkin` `oneOff: true` (screens welcome, never count). Never into recap buffer, no `publishTally()`. `reprintRow` of a one-off stays one-off, greets nobody. Touch check-in, phone + menu (both relay allowlists carry it) and settings name-tag card call the same route.
+- Custom labels (`POST /print-custom`, one line of free text on a blank label) write NOTHING: no `addHistoryEntry`, `recordAttendance`, `publishTally`, `events.publish*`; no TEST band (not a check-in in any mode).
+- BARF Night: on a date in `barfNights` (church-config.json; config.json's wins, tests use it), `performCheckinPrint` with `broughtFriend` prints a second tag after the child's own (`generateBarfTag()`: slime band, BARFED!, the first name ALONE, no friend line), never in the way of the first. `/print` reads `friend: true` + `friendName` (`cleanFriendName`: one line, 24 chars); `/phone/checkin` keeps `options.FriendName` only with `Friend`. Extension leaves a friend note (`noteFriend`, by clubber id + name, 15 min) from touch bridge, a phone action, and a capture-phase click on TwoTimTwo's `#checkin` when Brought a friend is ticked (`friendBoxTicked`, no name); `doPrint` takes it (`takeFriendNote`). `reportFriend()` sends child, club, friend to Worker `POST /v1/cloud/friend` (night email) EXCEPT cloud check-ins (Worker recorded itself). Touch + phone.html ask "Friend's first name" (`friendInput`); a sibling's card never copies the name. `POST /print-barf-bags {names}` prints one BARF Bag label per name (`generateBarfBag`, `barfBagOwner`: "SOPHIA’S", "JAMES’") as ONE job: `printImages()` = one PrintDocument, page per label (Windows) / one `lp` with every file (CUPS); never retried. Worker JOB route, sent from lobby Settings. `scripts/test-barf.cjs`.
+- Brand kit (`print-server/public/brand/`): NOT committed; generated byte-identical copy of `lobby/shared/brand/` via `node ../scripts/family-assets.mjs printer` (`npm test` `pretest`, print-server `prestart`, electron-app `predev`/`pretest`/`prebuild:renderer` so `npm run dist` packages it, `release-app.yml` before render smoke). Change the kit in `lobby/shared/brand/`, never the copy. `scripts/test-brand-kit.cjs` fails on missing/differing copy, a build script losing its copy step, or a CR in a text file (LF only; `lobby/.gitattributes`). Golden baselines show what a changed font/mark draws.
+- `print-server/brand.js` registers Paytone One / Londrina Solid / Figtree with the canvas and loads one-colour club marks; EVERYTHING fails open: missing/damaged font or missing letter prints that word in the old Windows face; missing mark -> letter monogram; whole kit gone -> pre-rebrand label. `/health` reports `fonts`/`clubMarks`, warns `brandFonts`/`brandMarks` `{type, message}` (reasons fixed strings, never paths). Kit folder is the ONE static path served (`/brand/`, loopback only, only `.css .woff2 .ttf .svg`, plain paths): public brand files only. `site/build.mjs` copies the kit into `/checkin/brand/`.
+- Fonts: shout = Paytone One (first name, monogram, custom label, every headline); label voice Londrina Solid; read voice Figtree. OFL Reserved Font Names: ship FULL fonts + WOFF2 meeting the OFL WOFF exception; NEVER swap in a Google/`@fontsource` subset (Londrina too). Coverage: Paytone draws Ș Ț and precomposed Vietnamese; lacks Cyrillic, Greek, CJK, some Latin (Ewe ɔ) -> those fall back whole; Figtree lacks precomposed Vietnamese (e.g. "Nguyễn") -> falls back on its own (each voice decides). Tests about "a letter the shout face lacks" must use Cyrillic or Greek (`test-brand-kit.cjs` pins).
+- Name layout (kit face only; old-face fallback labels stay byte-identical, `fonts-fallback`/`kit-missing` baselines unchanged; golden "ink clear of badge and last name" checks measure pixels): name drawn `NAME_LIFT_BRAND` above its line box, box `NAME_LINE_H_BRAND`; layout measures the name's own ink (`labelType().inkReach`) and reserves room above/below for accents and the Ș comma; `'middle'`-baseline lines (custom label, monogram) centre on capitals via `labelType().capCentre`.
+- Mark room order: paper first, then block, then size. Rising mark may print as near as `NAME_INK_TOP` (4 pt) to the top edge; `accentCharge` charges the block only for what that margin cannot give. Past the 18 pt floor give room back in name size (at most `NAME_ROOM_SHRINK_MAX` under the floor), never land on the bottom band: the busiest step-up label (trophy chip, "Go to", milestone, twin hint) prints its callout exactly where an ordinary name does. DO NOT charge the whole room to `blockH` (cost accented names up to a quarter of size); DO NOT let leftover ride down (prints callout over the chip).
+- Wrapped custom labels: `customLineH` widens pitch to first line's lowest ink + second's highest + small gap when the whole label is kit face; `fitCustomLabelText` fits height with it (`lineH` in result). Old-face keeps 1.15 em exactly. Any other place stacking two kit lines needs the same, measured `inkReach(..., 'alphabetic')`.
+- One font name in three places: `FONT_FILES[0]` in `brand.js`, `--brand-font-display`/`fonts.css` in the kit, each surface's `--f-shout` fallback (phone page, status window) + `step-chip.js` measuring family; `test-brand-kit.cjs` and `test-dashboard-chrome.cjs` (old name kept) fail on drift.
 
-**Made a mistake?** Dispatch **`.github/workflows/delete-release.yml`** with `app` = printer and the exact stray tag; it removes the release and its tag with its own token (and revert the feed commit if one was made).
+## Privacy / realtime invariants — DO NOT relax
+- Screens' channel = sync Worker live channel. `events.publish()` seals a frame -> relay (`events.setRelay`, installed by `server.js`: bounded queue + breaker + OWED resend of state frames; `/health` warns while breaker open); works only while this computer is signed in to the sync service. `/health` channel = `live` (`configured` = signed in). Names sealed end to end.
+- Pusher (publisher, npm package, cache-channel `provision` frame, dashboard fields, electron release-ping client) and display login (passphrase state, `buildProvisionFrame`, KDF, `/config/display-login/generate`, `provision` section of `envelope-vectors.json`) are GONE: never restore. Old config keys `pusher*`, `displayLoginPassphrase` never read; `pusherSecret` and `displayLoginPassphrase` stay redacted from GET /config; any POST /config scrubs `displayLoginPassphrase` from disk.
+- FAIL CLOSED, never plaintext: key configured but payload cannot be sealed => publish NOTHING. With NO key configured the publisher stays plaintext on purpose (no banner breakage on auto-update) and `/health` says so loudly; anti-downgrade lives on the consumer.
+- Padding is spec: GCM leaks `len(firstName)+len(club)` without it (club inferable from plaintext `tally`). `npm run test:envelope` fails if two `checkin` frames differ in length.
+- Framing pinned by `envelope-vectors.json` (byte-identical mirror to lobby/journey; printer is canonical, first). Change = bump `ENVELOPE_VERSION`, `npm run gen:envelope-fixture`, land every app together (all agree or no name renders anywhere). Contract shapes: `contract-vectors.json`, `CONTRACT.md`.
+- PRINTING IS NEVER GATED ON THE PIPE: a child at the door gets a label even if key, live channel and network are all broken.
+- `/health` warnings MUST be `{type, message}` objects (settings status card and app status window render `w.message`; a bare string painted an empty box and hid privacy warnings). `warningTexts()` in `test-server-realtime.cjs` fails by name on strings.
+- Tally payload shape unchanged and must stay so. `checkin` frames carry first names only (see lobby/CLAUDE.md privacy invariant); `oneOff` is the only extra optional field.
 
-## Commands
+## Tonight's count (P5: one function)
+- Source of truth = TwoTimTwo's `/clubber/checkin_report` when fresh (received within `REPORT_FRESH_MS`, 12 min); printer history is the fallback; `/health` raises `{type:'tally-source'}` while the fallback is used and `report-partial` when partial.
+- `authoritativeTonight()` (rules `lobby/shared/tonight.js`; copy `print-server/tonight.js`; wrapper in `server/tonight-count.js`) is THE function: `publishTally()`, `computeTonightStats()` (`/stats/tonight`), `/phone/tonight`, `/health` all read it; none computes its own count.
+- Rules: keep only a report the reconcile pass APPLIED (one the mass-undo guard refused would zero a night); a row with `undoneBy` (phone Remove/Undo check-in, `/reset-tonight`) beats the report (TwoTimTwo keeps listing the child); unregistered visitors do not count while a report is fresh (they are not on it); identities match on BOTH clubber id and name so one child is never two, but two DIFFERENT clubber ids are always two children (7.13.0: shared bogus name "YES 1 Share 1 Point" merged 11 children into 2).
+- Report name = text of the cell holding the edit link ([edit] Name [undo]); a summary cell is never a name (extension and `validateCheckinReportBody` refuse one); a name-less entry is never printed. A report that parsed fewer children than its own `Count:` footers (`declared`) is PARTIAL: neither count nor undo list. `scripts/test-report-parse.cjs` runs the extension's parser on the live layout.
+- Tally tick runs `TALLY_LEAD_MIN` (60) before the club window to `TALLY_GRACE_MIN` after; a state frame (tally, recap, ...) the relay could not deliver is OWED and resent when the service answers.
+- Checked out tonight comes off EVERY count: extension youth check-out (`ymSweep`) posts all clubber ids for the meeting date to `POST /feed/checked-out` after every pass (replace semantics, merged so a shorter list never puts a child back); `authoritativeTonight()` omits them in both modes and reports `checkedOut`; `checkedIn` everywhere = "here now". Attendance ledger untouched.
+- Phone roster: `/phone/roster` `checkedIn` = `rosterCheckedInKeys()`: every identity key the count reads (`tonightHereNow()`), this printer's active rows, anyone checked out tonight, matched on CSV `ClubberID` + normalised name (never exact-name on own rows only). Report pass matches a row WITH an id on id only; a name-only row also on the report entry's name.
+- Still-here list: built HERE (TwoTimTwo's Checkout page lists nobody at KVBC). `tonightHereNow()` = the "who" (one child per identity, same rules, visitors only when history-built); `publishStillHere()` filters by config `pickupClubs` (`print-server/pickup.js`; default every club but Trek and Journey; settings "Pickup list") and publishes the existing sealed `checkout` via `events.buildCheckout` (shape unchanged, mirrored with lobby: entries {firstName, club} + `printed`). Every minute in the tally window + debounced on change (`publishTally()` calls `stillHereChanged()`); never outside the window. `POST /feed/checkout` validates, answers ok, NEVER publishes (empty scrape would clear the lobby). Check-outs on the Checkout page: `feeds.js` compares two genuine reads (`checkoutDisappearances`), posts ids `source: 'checkout-page'`; server skips ids whose newest row is undone. `scripts/test-pickup-board.cjs`.
 
-| Context | Command |
-|---------|---------|
-| React (root) | `npm run dev` (port 3000) \| `npm run build` |
-| Electron | `npm run dev` \| `npm run dist` (NSIS .exe) |
-| Print Server | `PRINTER_NAME="Printer" node server.js` (port 3456) |
-| Checks (root) | `npm test` runs every suite in `scripts/` (what `ci.yml` and the release run), 4 at a time through `scripts/run-tests.cjs` (each suite takes its port from `scripts/free-port.cjs`; `npm test -- --serial` is the old one-by-one order); extension logic is tested by lifting functions out of `content.js` (see `scripts/test-extension-*.cjs`) |
+## Phone actions (relay; `phone-relay.js`, `server/phone-routes.js`)
+- One printing tab: every TwoTimTwo tab runs `content.js`; only the holder of Web Lock `awana-print-leader` runs `startPrintMachinery`; dedup state = one localStorage copy keyed by day (`dedupStore`), never sessionStorage. A phone action is claimed on the server (`POST /pending-actions/:id/claim`, 90 s lease) before it is driven.
+- Remove (`POST /phone/undo`) is LOCAL: `markManualUndo(..., 'phone')`, ledger strip, `publishTally()`, nothing sent to TwoTimTwo. Undo check-in = same route `inTwoTimTwo: true` (relay allowlist already carries `/phone/undo` and `/phone/status/:id`; Worker's list is outside this folder: add no route): needs `clubberId` (400 otherwise: visitors/id-less rows get Remove only), obeys `enableDrivenCheckin` (409), queues `{type:'undo'}` that NOTHING applies until the extension reports `ok === true` (`applyTwoTimTwoUndo`: `undoneBy: 'twotimtwo'` so roster offers Check in again, never Add back). Undo actions go only to a poller with `?accept=undo` (older extension would answer "Already checked in", ok:true); fail with the reason if unclaimed in `UNDO_PICKUP_MS` or a claim's lease runs out (never re-driven); one result only. Extension (`undoCheckinOnTwoTimTwo`) posts `checkinclubberundo` with fresh `#calendar_id` + clubber id, counts only `undoReplyVerdict`'s short "(checkin undone)" (never a page, login form, "Login Required"), then requires the report not to list the child. Touch check-in's **Undo check-in** lists `/phone/tonight`, undoes via `/phone/undo` like the phone; a successful TwoTimTwo undo also `unmarkPrinted()`s the child (else a later check-in answers "Already checked in at this station"). `scripts/test-phone-undo.cjs`.
+- Check out = `/phone/undo` with `checkout: true`: with clubber id queues one-shot `{type:'checkout'}` (only for `?accept=...checkout`, same pickup/lease failures as undo), applied only on literal `ok === true` (`applyTwoTimTwoCheckout` -> `markCheckedOut` -> `publishTally`); extension `checkoutOnTwoTimTwo` uses youth sweep's `readCheckoutPage` + `postClubberCheckout`, accepts only exact "OK". Without id = local by-name mark (`checkedOutTonight.names`). `/phone/tonight` lists `features: ['checkout']` so a newer website phone page never offers it to an older laptop.
+- Cloud check-in (8.0.0): on awana.kvbchurch.org/checkin the Worker answers `POST /phone/checkin` itself (`lobby/worker/src/phone.js`: TwoTimTwo's own post, Bible + Brought a friend as ticked, laptop on or off); laptop online -> queues JOB `POST /print {name, clubName, clubberId, cloud: true}`. A job is `job: true`, only the Worker makes one (`enqueueJob`); `phone-relay.js` runs a job only from `JOB_ROUTES` (print only); `RELAY_ROUTES` stay the phone page's own calls and pin equal to the Worker's. `cloud: true` writes `cloudCheckin: true` on the history row; `printedTonightFor()` then refuses a later `/print` for that child tonight (by id or name) and refuses a cloud job for a child already printed tonight; an undone row counts for neither. `scripts/test-cloud-print.cjs`, `test-phone-relay.cjs`.
 
-## Public website (root React app: the home page of awana.kvbchurch.org and /help)
+## Online-only server + settings page (`security.js`, `server/http.js`, `server/config-routes.js`)
+- No server page of its own: dashboard (`public/index.html`), Wi-Fi phone page (GET `/phone`, `/phone/ym`, phone PIN, `lanAccess`, firewall rule, "Phones" address, `AWANA_BIND_HOST`) are gone. `startListening()` binds 127.0.0.1 only; app-level gate refuses non-loopback sockets on EVERY route (`test-server-security.cjs` proves it with a real LAN address, and that `0.0.0.0` / old `lanAccess` change nothing). `GET /` = tiny page linking to awana.kvbchurch.org/settings. Only static folder `/brand/` (loopback). Old keys `phonePin`, `lanAccess`, `allowedOrigins` never read (`phonePin` stays redacted); POST /config ignores the three; `isAllowedOrigin`'s "our own page" = loopback host on OUR port (a LAN address on 3456 is somebody else's server). `public/phone.html` STAYS (`site/build.mjs` makes /checkin from it; Worker relay reaches `/phone/*` over loopback, no credential). No internet: desk still prints (extension -> localhost); no phones, no settings changes until back.
+- Every dashboard tool lives on awana.kvbchurch.org/settings, Laptop section (`lobby/src/components/settings/laptop.jsx`, `laptop-tools.jsx`, `lib/printServer.js`; notes in `lobby/CLAUDE.md`). Page reaches this server on localhost: `security.SETTINGS_PAGE_ORIGIN` = the one exact origin (never `displayOrigins`); `SETTINGS_PAGE_ROUTES` = whole list of paths+methods; `SETTINGS_PAGE_CONFIG_KEYS` = only keys POST /config takes from it. Every route but /health needs a loopback socket AND either the page's sync session (`Authorization: Sync`, confirmed with the sync service by `settingsPageSessionOk` against `config.syncUrl`, which a dropped sign-in keeps) or a publish token already on the laptop (`corsPolicy` sets `req.settingsPage`); preflight answers Private Network Access for those routes only. Route accepting the page beside the app's own origin: `isTrustedOrSettingsPage`; anything holding a secret keeps `isTrustedConfigOrigin` alone.
+- A NEW route needs a row in the table and a check in `scripts/test-settings-page.cjs` FIRST. On the page: leader tags (`/print-leader`, `/leaders`, `/leaders/forget`), one-off + custom labels, stretch reprint (`/reprint-range`, dry run then confirm), attendance audit (`/attendance-audit`, apply needs `confirm`), rehearsal (`/rehearsal`), switches `updateBeacon`, `enableDrivenCheckin`, `musicalPrinter`, this computer's sync sign-in.
+- SECRETS NEVER GO THROUGH THE PAGE: display key, publish token, display-login mint/read routes, `sync-logout`, `/api/lobby-slides` are not in the table; POST /config refuses every `SECRET_CONFIG_KEYS` key from it; `/config/sync-login` from the page takes only the passphrase and signs in to `config.syncUrl` (never an address the page names; a computer with none on record is signed in by the wizard through the same route with no Origin). Left in the app on purpose: check-in URL (wizard; reaches Windows shell), extension folder (tray "Open Chrome extension folder"; path holds Windows user name). Extension options, popup and "Printing to Change" link open the settings page. `scripts/test-settings-page.cjs`.
 
-Built by `site/build.mjs` (`npm run build` here with `SITE_BASE=/`) and served
-at the one site's root; the lobby lives under `/lobby`, Journey under
-`/journey`, the phone page under `/checkin`. Owner, 2026-10-11: **a demo reel
-page in the look of the Awana Clubs 2026-27 catalog**, "to show off the cool
-things it does", kept SHORT (about 5,100 px tall at 1920 wide; the old family
-page was 38,648). Two pages, one stylesheet:
+## Check-in STATION (P2, `ROADMAP.md#online-check-in`; contract `lobby/worker/src/routes.md`)
+Extension and every old print path still work (P7 removes the extension); station adds the Worker as the one job source.
+- Keys (`print-server/station-keys.js`, Electron-free, `safeStorage` injected): ECDH P-256 station key made once; private JWK ONLY via safeStorage (`station-key.bin`); where safeStorage cannot encrypt it returns `REFUSED`, writes nothing (fail closed; tray: "cannot be a print station"). Public key registered `POST /v1/station/register` under `roles.json` `deviceId`, no pairing. History private key opened with the passphrase ONCE at the wizard (`unlockHistory`, like `unwrapPrivateKey` but JWK kept in safeStorage `history-key.bin`); passphrase never kept. `main.js` `ensureStation()`: make key, register, ONLY THEN server `configureCloud()`; `electron-app/src/station.js` = tray text. Station requests carry `X-Station` (`print-server/cloud-request.js`).
+- Jobs (`print-server/job-puller.js`, modelled on `phone-relay.js`): `GET /v1/print/next?max=1` (Worker lease 90 s), open bundle with `openAsStation`, run through a route in `JOB_PULL_ROUTES` (`/print /reprint /print-barf-bags /print-custom /print-oneoff /print-leader /print-award`) on loopback, then `POST /v1/print/done` (or `/failed`) AFTER the print returns; `POST /v1/print/heartbeat` every 30 s, every 20 s while printing (with jobId EXTENDS the lease). `routes.md` section 6 is the one truth for names; `scripts/test-cloud-e2e.cjs` runs the real Worker handlers against this module. Job record `{route, body, clubberId?, gen?, source?}` (reprint jobId `reprint:<uuid>`); Worker seals a TwoTimTwo-page check-in with `source: 'ttt'`, same record. `gen` from the lease; for `/print` puller adds `cloud: true`, and `regen: true` when gen > 1 (undo then new check-in) so `performCheckinPrint` skips its duplicate rules for that tag.
+- AT MOST ONCE (owner): every jobId journalled in `print-journal.json` as `spooling` BEFORE the route is called, `printed` after. A journalled job is never printed again: acked `printed` if it came out, `already-spooled` if mid-print/outcome unknown; those raise CHECK THE PRINTER (`GET /cloud/print-status`, tray, notification, cleared by `POST /cloud/print-status/clear`); a print with no answer is unknown the same way; only a definite HTTP refusal is acked `failed` and may run again. Second jobId for same `night:clubberId:gen` = one tag; duplicate jobId in flight dropped; `printedTonightFor()` still backstops. Failed ack retried each round (never a reprint); 404/409/410 = Worker dropped the job (an undo), end it. `scripts/test-job-puller.cjs`.
+- Rosters/books arrive sealed (`createBundleSync`: `GET /v1/station/roster|books?night=`, `{csv}` / `{entries}`) -> existing `/update-csv`, `/feed/completed-books`.
+- History (`print-server/history-sync.js`; every route tolerated missing): TwoTimTwo-page job (`source: 'ttt'`, `rowForPrinted`) -> `checkin` row (record `ts` = epoch ms) sealed with `sealRow`, posted `POST /v1/history/rows` (queued while down); row kinds = routes.md section 3 table; attendance read-back resolves a desk `undo` row against check-ins by time; history key reads the season's rows into the attendance ledger (`mergeAttendance`, additive) every 30 min (milestone, first-time, twin, "Go to" fields). **Import laptop history** (tray + `POST /cloud/import-history`, in `SETTINGS_PAGE_ROUTES`) seals `print-history.json` + `attendance.json` (content-derived row ids: second run stores nothing twice) -> `POST /v1/history/import`.
+- Publisher gate + greeting (P5, routes.md section 8): with `configureCloud()` active `publishTally`, `publishStillHere`, `stillHereChanged` publish NOTHING (Worker makes tally, ticker, still-here); `stopCloud()` restores. Station keeps Worker's copy of what only this computer knows: `sendStationExtras()` posts Screen season, rehearsal flag, pickup clubs to `POST /v1/station/extras` (on change, at least once a minute, `stillHereChanged` triggers). Greeting is the station's: puller adds `cloudJob: <jobId>` to a `/print` body; `performCheckinPrint` hands its `checkin` (birthday, first-timer, welcome back, milestone: only this computer has roster + history) to the relay with `{job}` meta; relay sends as the station (`X-Station`) with `X-Job` to `POST /v1/publish` (`sendGreeting`: 4xx or dropped answer final, unreachable Worker tried 3 times). Worker lets exactly one greeting per job through and drops every other `checkin`. On a station a `/print` with no job (phone page relay job, extension) greets as the station naming the child (`greet: {clubberId}` or visitor name + club); a cloud job that meets an already-printed label greets LATE with that label's own event (`late: true`); Worker greets each child once a night. Without the station role it greets via the laptop's relay queue. `scripts/test-station-greeting.cjs`.
 
-- **`/` (`index.html`, `App.tsx`)**, in this order: the header (the trademark
-  bar, the KVBC Awana wordmark, Watch / What it does / Try it / Install & help,
-  Download); **`#reel`**, the film framed like a catalog photo (offset outline,
-  corner tab, stepped chip, starburst sticker) and one line saying what this
-  is; the six clubs' colour marks; **`#features`**, the six parts as catalog
-  "club opener" cards (`components/home/Parts.tsx`: `#labels`, `#lobby`,
-  `#projector`, `#journey`, `#phone`, `#app`), each with a live miniature of
-  its screen; **`#simulator`**; a closing call; the footer.
-- **`/help` (`help.html`, `HelpPage.tsx`)**: `#install` (`InstallGuide.tsx`)
-  and `#faq` (`Faq.tsx`) in the same look. `index.html`'s inline script sends
-  old `/#install`, `/#how-it-works` and `/#faq` links there;
-  `/lobby/about.html` and `/journey/about.html` still 301 to `/#lobby` and
-  `/#journey` (`site/lib/redirects.js`, `site/test/redirects.test.mjs`).
-- **Files.** `components/home/`: `Kit.tsx` (the brand kit bridge), `Icons.tsx`
-  (the pages' own icon set, one sprite), `Chrome.tsx` (header, footer, the
-  trademark line, `useInView`), `Reel.tsx`, `Parts.tsx`, `Screens.tsx` (the
-  screen recreations). Styles: `styles/home.css` only (prefix `kv-`; the
-  replica's `tt-`). `capabilities.html` keeps the old family stylesheet
-  (`styles/site.css`: Tailwind, `family.css`, `page.css`) and its components.
-- **The reel** plays `/reel/reel-1080.mp4` (wider than 720 px) or
-  `/reel/reel-720.mp4`, poster `/reel/poster.jpg` (the films are another
-  piece of work: see "Reel" below if present; the page only references those
-  paths). Muted autoplay, `playsInline`, a Tap for sound button and a pause
-  button; it ends back on the poster with Watch again; under reduced motion it
-  never starts by itself (poster and a play button, which plays with sound);
-  a missing or failing film shows the stand-in (the kit's six club waves and the
-  Awana Clubs mark), which also sits behind the poster while it loads.
-- **The kit, from its one copy.** `Kit.tsx` imports the shapes and doodles of
-  `lobby/shared/brand/` as `?raw` (`import.meta.glob`) and the club marks as
-  URLs (Vite fingerprints them into `/assets/`), so nothing is redrawn or
-  copied (the old "no shape copied from the kit" rule is gone with the old
-  page). `vite.config.ts` lets the dev server read `..` for them.
-- **Awana marks are allowed** (owner, 2026-10-11): the Awana Clubs mark and
-  the club marks may appear wherever they make the page nicer, with the
-  trademark line word for word in the disclaimer bar, the footer and both
-  pages' meta description: "Awana® and club marks are trademarks of Awana
-  Clubs International, used here by a member church. Not affiliated with or
-  endorsed by Awana." (`TRADEMARK` in `Chrome.tsx`.)
-- **The screens are live miniatures, drawn in HTML/CSS** and sized in
-  container units (`cqw`; a container cannot size its OWN padding in its cq
-  units, they resolve against the viewport there, so roots use `%`): the
-  label coming out of a thermal printer (`generateLabel()`'s layout: the club's
-  black mark panel, the season motif, the first name, the club, the week's icon,
-  the birthday words and the allergy and no-photo icons, the no-photo bar), the
-  lobby TV (the check-in moment: the club wave rising with the first name and
-  the club's white mark, in turn the pick-up board in the foot), the projector
-  (the countdown, then game time with a ticking amber timer), the Journey
-  start screen (with its Pi), the phone page, the KVBC Awana setup window.
-  Each is `role="img"` with a full description and generic first names. When a
-  screen's look changes, redraw its miniature in the same commit.
-- **Claims track the code.** Every sentence is true of the current release
-  (phones check in at awana.kvbchurch.org/checkin, every screen's settings are
-  at /settings, one Windows app "KVBC Awana" that is a print server, a display or
-  both, everything free); a feature change the page describes updates it in
-  the same commit.
-- **Motion** is the kit's (a 100 ms beat, its four curves; only transform and
-  opacity), and lives entirely inside `@media (prefers-reduced-motion:
-  no-preference)`: every resting style is the final frame, so reduced motion
-  shows the finished design. The miniatures' cycles (`useCycle`) and the
-  timer check the same preference. Cards play when they scroll in
-  (`useInView`).
-- **AA.** White text sits on `--hot-btn` (`#CF4518`, the kit's hot is 3.4),
-  `--sim-red` (`#D63A3F`) or a club's `--c-text` plate, never on `--c-deep`
-  (T&T's kit deep is 4.3 under white; its `--c-text` is `#277A43`).
-- **Faces: the kit's own, nothing from another host.** Paytone One shouts,
-  Londrina Solid labels, Figtree is read, from `/lobby/shared/brand/fonts.css`
-  (the full files: their licenses reserve the names, so never a Google or
-  `@fontsource` subset). The two pages fetch nothing from another host at all
-  (no Google stylesheet); `capabilities.html` alone still asks Google for its
-  editorial faces. (A standalone `npm run dev` here has no
-  `/lobby/shared/brand/fonts.css`, so it falls back to system faces.)
-- **The Simulator's DOM is a contract.** `#lastCheckin` (a div holding the
-  name), `.clubber`, `.name` and `.club img` (alt = the club; see
-  `src/constants.ts` DOM_SELECTORS), `#checkin-modal` and `button#checkin`
-  mirror TwoTimTwo's real page, so keep that structure whenever it is restyled.
-  Beside it a lobby TV and a printer act out each check-in (nothing prints from
-  the page). Its roster (`data.ts`) is obviously fictional full names on purpose.
-- **Journey's licensing wording is strict** (journey/CLAUDE.md, "Licensing
-  boundary"): its part says the kiosk plays curriculum the church already
-  licenses through its own Awana Ministry Membership, and never links to, names
-  or advertises a lesson video, transcoded copy, release asset, transcript,
-  handout or slide image. Its room is students, never children.
-- **Links out go only** to the repo (and its three app folders), the app's
-  downloads (`/download/kvbc-awana`), the site's own pages and sections,
-  `/capabilities.html` and `/chrome-extension.zip`; never to a live screen
-  (`/lobby/`, the projector, the Journey kiosk).
-- **`scripts/test-about-page.cjs`** (part of `npm test`) checks all of the
-  above from the sources: the faces and hosts, the kit imports, the trademark
-  line, the reel's contract, the motion block, the AA pairs, the anchors and
-  redirect targets, unique ids, link targets, the Simulator's DOM and the
-  Journey wording. Check a changed page by eye at 1920, 1366, 768 and 390 wide.
+## Public website (root React app: awana.kvbchurch.org `/` and `/help`)
+- Built by `site/build.mjs` (`npm run build`, `SITE_BASE=/`), served at site root; lobby `/lobby`, Journey `/journey`, phone page `/checkin`. Demo-reel page in the look of the Awana Clubs 2026-27 catalog, kept SHORT (~5,100 px tall at 1920 wide). Two pages, one stylesheet.
+- `/` (`index.html`, `App.tsx`) order: header (trademark bar, KVBC Awana wordmark, Watch / What it does / Try it / Install & help, Download); `#reel` (film framed like a catalog photo: offset outline, corner tab, stepped chip, starburst sticker + one line); six clubs' colour marks; `#features` (six parts as club-opener cards, `components/home/Parts.tsx`: `#labels`, `#lobby`, `#projector`, `#journey`, `#phone`, `#app`, each with a live miniature); `#simulator`; closing call; footer.
+- `/help` (`help.html`, `HelpPage.tsx`): `#install` (`InstallGuide.tsx`), `#faq` (`Faq.tsx`). `index.html` inline script sends old `/#install`, `/#how-it-works`, `/#faq` there; `/lobby/about.html` and `/journey/about.html` 301 to `/#lobby`, `/#journey` (`site/lib/redirects.js`, `site/test/redirects.test.mjs`).
+- Files: `components/home/` = `Kit.tsx` (brand kit bridge), `Icons.tsx` (one sprite), `Chrome.tsx` (header, footer, `TRADEMARK`, `useInView`), `Reel.tsx`, `Parts.tsx`, `Screens.tsx` (screen recreations). Styles `styles/home.css` only (prefix `kv-`; the replica's `tt-`). `capabilities.html` + `capabilities.tsx` keep the old family stylesheet (`styles/site.css`: Tailwind, `family.css`, `page.css`) and `components/family/`.
+- Reel playback: `/reel/reel-1080.mp4` (wider than 720 px) or `/reel/reel-720.mp4`, poster `/reel/poster.jpg`; muted autoplay, `playsInline`, Tap for sound + pause buttons; ends on poster with Watch again; reduced motion = never autostarts (poster + play button, plays with sound); missing/failing film shows the stand-in (six club waves + Awana Clubs mark), also behind the poster while loading.
+- Kit from its ONE copy: `Kit.tsx` imports `lobby/shared/brand/` shapes/doodles as `?raw` (`import.meta.glob`) and club marks as URLs (Vite fingerprints to `/assets/`): nothing redrawn or copied. `vite.config.ts` lets the dev server read `..`.
+- Awana marks allowed (owner): Awana Clubs mark and club marks wherever they help, with the trademark line WORD FOR WORD in the disclaimer bar, footer and both pages' meta description: "Awana® and club marks are trademarks of Awana Clubs International, used here by a member church. Not affiliated with or endorsed by Awana." (`TRADEMARK` in `Chrome.tsx`).
+- Screens are live miniatures in HTML/CSS in container units (`cqw`; a container cannot size its OWN padding in its cq units: roots use `%`): label from a thermal printer (`generateLabel()` layout: club's black mark panel, season motif, first name, club, week's icon, birthday words, allergy + no-photo icons, no-photo bar), lobby TV (check-in moment: club wave rising with first name + white mark; pick-up board in the foot), projector (countdown, then game time with ticking amber timer), Journey start screen (with its Pi), phone page, KVBC Awana setup window. Each `role="img"` with full description and generic first names. Screen look changes => redraw its miniature in the same commit.
+- Claims track the code: every sentence true of the current release (phones check in at awana.kvbchurch.org/checkin; every screen's settings at /settings; one Windows app "KVBC Awana" = print server, display or both; everything free); a feature change the page describes updates it in the same commit.
+- Motion = kit's (100 ms beat, its four curves; only transform + opacity), ENTIRELY inside `@media (prefers-reduced-motion: no-preference)`: every resting style is the final frame. Miniature cycles (`useCycle`) and timer check the same preference. Cards play on scroll-in (`useInView`).
+- AA: white text on `--hot-btn` (`#CF4518`; kit hot is 3.4), `--sim-red` (`#D63A3F`) or a club's `--c-text` plate; NEVER on `--c-deep` (T&T's deep 4.3 under white; its `--c-text` `#277A43`).
+- Faces: kit's own, nothing from another host. Paytone One shouts, Londrina Solid labels, Figtree read, from `/lobby/shared/brand/fonts.css` (full files; never Google/`@fontsource` subset). The two pages fetch nothing from another host (no Google stylesheet); `capabilities.html` alone still asks Google for editorial faces. Standalone `npm run dev` has no `/lobby/shared/brand/fonts.css` -> system faces.
+- Simulator DOM is a contract: `#lastCheckin` (div holding the name), `.clubber`, `.name`, `.club img` (alt = club; `src/constants.ts` `DOM_SELECTORS`), `#checkin-modal`, `button#checkin` mirror TwoTimTwo's page: keep structure when restyling. A lobby TV + printer beside it act out each check-in (nothing prints from the page). Roster `data.ts` = obviously fictional full names.
+- Journey wording strict (`journey/CLAUDE.md` "Licensing boundary"): its part says the kiosk plays curriculum the church already licenses through its own Awana Ministry Membership; NEVER links to, names or advertises a lesson video, transcoded copy, release asset, transcript, handout or slide image. Its room = students, never children.
+- Links out ONLY to: the repo (and its three app folders), app downloads (`/download/kvbc-awana`), the site's own pages/sections, `/capabilities.html`, `/chrome-extension.zip`; NEVER a live screen (`/lobby/`, projector, Journey kiosk).
+- `scripts/test-about-page.cjs` (in `npm test`) checks all of the above from sources: faces and hosts, kit imports, trademark line, reel contract, motion block, AA pairs, anchors and redirect targets, unique ids, link targets, Simulator DOM, Journey wording. Also check a changed page by eye at 1920, 1366, 768, 390 wide.
 
-## Architecture
+## The reel (film at top of the home page; `reel/`, guide `reel/README.md`)
+- `npm run reel` rebuilds all (~20 min; builds site first if `site/dist` missing; needs Chromium + ffmpeg). Real footage, NEVER mock-ups: `reel/record.mjs` + `reel/shots.mjs` film the real screens from `site/dist` (lobby check-in moments, toasts, pickup board, projector, Journey, `/checkin` on a phone, `/settings`), driven like their own e2e suites (stand-in live channel, stand-in laptop behind phone page), frame by frame on a virtual clock (`reel/lib/vclock.mjs`, exact 60 fps). Labels = print server's own (`reel/labels.cjs` via `/preview`). Motion graphics + edit = one page `reel/film/` rendered by `reel/render.mjs`; `reel/edit.mjs` mixes soundtrack and encodes.
+- Committed outputs, never hand-edited: `public/reel/reel-1080.mp4` (H.264 1920x1080 60 fps, under 20 MB), `reel-720.mp4` (1280x720 30 fps), `poster.jpg` (closing title). Pages' static files ignore Range (Safari needs it): `site/build.mjs` leaves films out of the upload; `site/functions/reel` streams them (proxyLarge) from GitHub's copy of the build's commit; `site/lib/largeFiles.js` says what streams (every video, anything over 25 MiB) and from which folders (`journey/public/`, `printer/public/reel/`); `site/test/largeFiles.test.mjs` pins it and the 20 MB cap.
+- Real Awana logos/club marks allowed INSIDE the film (in-house use); last card carries the trademark line (as above). Outside the film the page's art rules hold. Every name in it made up, never a real child's.
+- Look = 2026-27 catalog from the one kit (`lobby/shared/brand`): Paytone One shouts (screens' ascent/descent overrides so `shared/chipGeometry.js` stepped chips sit as on the TV), Londrina Solid labels, Figtree read; club waves, corner tabs, doodles in threes, footage on a plate with offset outline, hard offsets, never a blur.
+- Cut to the music's beat: "Incredible You" by Soft and Furious (CC0, `reel/music/`, credits `reel/README.md`), 120.25 BPM: `BEAT` in `reel/film/film.js` and `MUSIC` in `reel/edit.mjs` are that grid; a re-timed scene keeps cuts on it.
+- Claims track the code: a screen the film shows changes look/behaviour => `npm run reel`, commit the new films.
 
-**The print server is split into modules (`print-server/server/`).** `server.js`
-is the entry: it loads `server/*.js` in the order the old single file ran (so
-middleware and routes register in the same order), exports every name the tests
-and the Electron shell import, and holds the standalone start-up. Each module is
-one section of the old file (`config`, `clubbers`, `label-render`, `printing`,
-`http` (the Express app, CORS, the loopback gate), `checkin-print`, `history`,
-`tonight-count`, `reprint`, `leaders`, `feed-routes`, `publishers`, `relay`,
-`station`, `config-routes`, `phone-routes`, `lifecycle`, ...). A name from
-another module is reached as `$module.name` (`$config.config`,
-`$printing.printLabel(...)`); each module's `exports` are live getters (setters
-for the state other modules assign), and `server/lazy.js` requires the other
-module on first use, so the load order stays server.js's and cycles are safe.
-New code goes in the module of its section; a new module needs a line in
-`server.js` in the position its routes should register. The packaged app ships
-the folder through `electron-app/package.json` `build.extraResources`
-(`"server/**"`; `scripts/test-server-helpers.cjs` fails if it is dropped). Suites
-that pin code by its shape read `scripts/server-source.cjs`, the whole server as
-one string with the `$module.` prefixes removed.
-
-**Label Generation:**
-- ONE renderer: `generateLabel()` in `print-server/server.js` draws a
-  1200×600 canvas PNG (4x2 @ 300dpi), printed via PowerShell
-  `System.Drawing`. Electron does NOT render labels — its only hidden
-  BrowserWindow is for printer enumeration; it require()s the print server
-  in-process. (The extension's offline fallback label in `content.js` is a
-  deliberately degraded safety artifact, not a second layout to keep in sync.)
-- Per-club layout: `config.labelTemplates` (overrides-only, keyed by
-  `clubKey()`), resolved by `labelTemplateFor()` in the HANDLERS and passed
-  in as `input.template` — the renderer never reads config (golden-suite
-  purity). Fail open: any broken template renders the stock label. Safety
-  content (allergy icons, no-photo camera, birthday) is not templatable.
-- **Four modules are GENERATED copies of `lobby/shared/`** (the installer
-  holds only this folder): `print-server/tonight.js` (THE count, P5: the pure
-  rules of `tonightHereNow()` / `authoritativeTonight()`, the identity keys,
-  `reportIsPartial` and the mass-undo guard `massUndoRefused`, which the sync
-  Worker imports from the same source; `server.js` only supplies its own rows,
-  report, check-outs and clock; `scripts/test-tonight-shared.cjs`),
-  `print-server/clubTable.js` (the club table and the
-  two matchers; `clubKey()` is the substring one on purpose, `brand.js`'s
-  `MARK_FILES` / `MARK_NAMES` and `CLUB_MONOGRAM` come from the same rows),
-  `print-server/textClean.js` (`cleanName`, `stripControlChars`,
-  `sanitizeStoredText`, `cleanFriendName` keep their own limits) and
-  `electron-app/src/display/clubNight.js` (the club-night rule, with this
-  computer's hours). Never edit them: change the source in `lobby/shared/`,
-  run `node scripts/shared-copies.mjs` from the repo root, commit both;
-  `scripts/check-mirrors.mjs` fails CI on drift.
-
-**Printing on Linux (7.19.0, ROADMAP.md#cloud-check-in's Raspberry Pi print station).**
-`print-server/cups.js` prints the same label PNG through CUPS (`lp`, argument
-arrays only, a queue name with spaces is refused) and reads `lpstat -l -p -d`
-into the Get-Printer shape `printerSetupWarnings()` already judges. It is ON
-only when `AWANA_PRINT_BACKEND=cups` (the station's service sets it, with
-`PRINTER_NAME`): never inferred from the OS, because the test suites run on
-Linux with a stand-in `powershell`. `config.cupsMedia` names the roll (default
-DYMO 30256, `w167h288`). The Windows path is untouched.
-`scripts/test-cups.cjs` (parsers, and the runners against stand-in `lp` /
-`lpstat`) and `scripts/test-cups-server.cjs` (the real server in station mode).
-
-**Tonight's count:** TwoTimTwo's own `/clubber/checkin_report` is the source of
-truth when it is fresh (received within `REPORT_FRESH_MS`, 12 minutes); the
-printer's own history is the fallback, and `/health` raises a
-`{type:'tally-source'}` warning whenever it is the one being used.
-`authoritativeTonight()` (its rules are `lobby/shared/tonight.js`, a generated copy
-in `print-server/tonight.js`; `server.js` holds a thin wrapper) is **the one function** —
-`publishTally()`, `computeTonightStats()` (so `/stats/tonight`),
-`/phone/tonight` and `/health` all read it, and none of them
-computes a count of its own. Rules: only a report the reconcile pass actually
-APPLIED is kept (one the mass-undo guard refused would zero a night); a row
-marked `undoneBy` — the phone's Remove or Undo check-in, or `/reset-tonight` — beats the report,
-because TwoTimTwo goes on listing that child all evening; unregistered visitors
-do not count while a report is fresh (owner's decision — they are not on it);
-identities match on BOTH the clubber id and the name, so one child is never two,
-but two DIFFERENT clubber ids are always two children (7.13.0: a shared bogus
-name, the report's "YES 1 Share 1 Point" cell, merged 11 children into 2). The
-report's name is the text of the cell holding the edit link (live since
-2026-10-03: [edit] Name [undo]); a summary cell is never a name (both the
-extension and `validateCheckinReportBody` refuse one), and a name-less entry is
-never printed. A report that parsed fewer children than its own `Count:` footers
-(`declared`) is PARTIAL: neither the count nor an undo list, and `/health` says
-`report-partial`. The tally's tick runs from `TALLY_LEAD_MIN` (60) before the
-club window to `TALLY_GRACE_MIN` after, and a state frame (tally, recap, …) the
-sync relay could not deliver is OWED and resent once the service answers.
-`scripts/test-report-parse.cjs` runs the extension's parser on the live layout.
-**Checked out tonight comes off every count (7.15.0, owner).** The extension's
-youth check-out (`ymSweep`) posts its whole list of clubber ids for the meeting
-date to `POST /feed/checked-out` after every pass (replace semantics, merged so
-a shorter list never puts a child back); `authoritativeTonight()` leaves those
-ids out in both modes and reports `checkedOut`, so `checkedIn` everywhere means
-"here now". The attendance ledger is untouched.
-The `tally` payload shape is unchanged and must stay so.
-**The phone's roster reads the same children (7.16.1).** `/phone/roster`'s
-`checkedIn` comes from `rosterCheckedInKeys()`: every identity key the count
-reads (`tonightHereNow()`), this printer's active rows, and anyone checked out
-tonight, matched on the CSV's `ClubberID` and the normalised name. It used to
-read only this printer's rows by exact name, so the youth page offered children
-checked in at the desk or on TwoTimTwo. The report pass matches a row WITH an
-id on its id only, and a name-only row on the report entry's name too.
-
-**The brand kit (6.17.0, shout face Paytone One since 6.18.0).**
-`print-server/public/brand/` is NOT committed: it is a generated, byte-identical
-copy of the one canonical kit in `lobby/shared/brand/`, made by
-`node ../scripts/family-assets.mjs printer` before anything reads it
-(`npm test`'s `pretest`, print-server's `prestart`, electron-app's `predev` /
-`pretest` / `prebuild:renderer` so `npm run dist` packages it, and
-`release-app.yml` before the render smoke test), so the server, the tests and
-the installer all hold a full local copy and nothing fetches it at runtime.
-`scripts/test-brand-kit.cjs` (in `npm test`) fails if the copy is missing or
-differs from the canonical kit, if any build script loses its copy step, or if
-a text file has a CR (the text files are LF only; `lobby/.gitattributes`
-keeps them so). Change the kit in `lobby/shared/brand/`, never the copy; a
-bare `node server.js` or an individual `npm run test:*` needs `npm run assets`
-once first. Golden label baselines show what a changed font or mark draws. `print-server/brand.js` registers Paytone One / Londrina Solid /
-Figtree with the canvas and loads the official one-colour club marks, and
-EVERYTHING in it fails open: a missing or damaged font, or a letter the font
-lacks, prints that word in the old Windows face; a missing mark falls back to
-the letter monogram; with the whole kit gone the label is the pre-rebrand one.
-`/health` reports `fonts` / `clubMarks` and raises `brandFonts` / `brandMarks`
-`{type, message}` warnings (reasons are fixed strings, never paths). The kit
-folder is the ONE static path the server serves (`/brand/`, to loopback only,
-only `.css`, `.woff2`, `.ttf`, `.svg` with plain paths); keep it to public
-brand files only. (It used to sit before the PIN gate for the Wi-Fi phone
-page's PIN screen; both are gone, and `site/build.mjs` copies the kit into
-`/checkin/brand/` for the online phone page.)
-
-**The shout is Paytone One (6.18.0), not Galindo.** Owner decision 2026-09-29:
-Galindo "looks too much like SpongeBob", so the first name, the monogram, a
-custom label and every screen's headline are Paytone One (OFL; its Reserved
-Font Names forbid a subset or re-encode, so the kit ships the FULL font and a
-WOFF2 built to meet the OFL's WOFF exception: never swap in a Google or
-@fontsource subset). Londrina Solid (label voice) and Figtree (read voice)
-stayed; Londrina reserves its name too, so it ships whole the same way (its
-web copies were Latin subsets until the 6.18.0 kit). What that means here:
-- **Coverage moved.** Paytone One draws Ș Ț and every precomposed Vietnamese
-  letter, which Galindo did not, so those first names and custom labels now
-  print in the kit. It still lacks Cyrillic, Greek, CJK and the rest, and a
-  few Latin letters (Ewe ɔ), which fall back whole. Figtree still lacks the
-  precomposed Vietnamese letters, so a last name like "Nguyễn" falls back on
-  its own (each voice decides for itself). Any test about "a letter the shout
-  face lacks" must use a letter its character map really lacks: Cyrillic or
-  Greek (`test-brand-kit.cjs` pins that they stay uncovered).
-- **The ink sits differently in its box.** Measured off the canvas at a 'top'
-  baseline: Paytone's capitals start 0.26 em down and its descenders are
-  shallower than Galindo's, so the name is drawn `NAME_LIFT_BRAND` above its
-  line box and the box is `NAME_LINE_H_BRAND`; and because it draws accents
-  and the Ș comma far outside that box (Ấ rises 0.23 em above the origin, the
-  comma hangs to 1.31 em), the layout also measures the name's own ink
-  (`labelType().inkReach`) and reserves room above and below when a glyph
-  needs it. `'middle'`-baseline lines (custom label, monogram) are centred on
-  the capitals with `labelType().capCentre`. All of that applies only when the
-  line prints in the kit face, so the old-Windows-face fallback labels are
-  byte-identical to before (`fonts-fallback` and `kit-missing` baselines did
-  not change), and the golden suite's "ink clear of the badge and the last
-  name" checks measure pixels, not the layout numbers.
-- **A mark's room comes from the paper first, then the block, then size.** A
-  rising mark (É, Ấ) may print as near as `NAME_INK_TOP` (4 pt, what 6.17.0
-  already printed) to the top edge; `accentCharge` charges the block only for
-  what that margin cannot give. Past the 18 pt floor the room a mark or a comma
-  asks for is given back in name size (at most `NAME_ROOM_SHRINK_MAX` under
-  the floor), never left to land on the bottom band: the busiest step-up label
-  (trophy chip, "Go to", milestone, twin hint) prints its callout exactly where
-  an ordinary name does. Do not charge the whole room to `blockH` again (it cost
-  accented names up to a quarter of their size on a crowded label), and do not
-  let the leftover ride down (it printed the callout over the chip).
-- **Wrapped custom labels set their pitch from the ink.** The marks are taller
-  than the old 1.15 em line pitch (Ấ 1.19-1.22 em), so `customLineH` widens the
-  pitch to the first line's lowest ink + the second's highest + a small gap
-  whenever the whole label is in the kit face, and `fitCustomLabelText` fits
-  the height with it (`lineH` in its result). Old-face labels keep 1.15 exactly.
-  Any other place that stacks two kit lines needs the same, measured with
-  `inkReach(..., 'alphabetic')`.
-- **One name in three places.** The family string is `FONT_FILES[0]` in
-  `brand.js`, `--brand-font-display` / `fonts.css` in the kit, and each
-  surface's `--f-shout` fallback (the phone page and the status
-  window) plus `step-chip.js`'s measuring family; `test-brand-kit.cjs` and
-  `test-dashboard-chrome.cjs` (kept under its old name; the dashboard it was
-  written for is retired) fail if they drift. The installer's `/health`
-  smoke check still needs 4 loaded fonts (Paytone One, Londrina Solid, Londrina
-  Solid Black, Figtree): the number is unchanged.
-
-**One printer: the 4x2 label printer (7.17.0, owner 2026-10-08).** The
-receipt-printer trial (Star TSP100 / Rongta, `receipt.js`, printerType
-`receipt`/`receipt-usb`, `/receipt/*`, "Printer jammed" and `/jam-reprint`,
-`/touch/jam`) was removed for good: do not bring any of it back. `printLabel()`
-is `printImage()` on the name tag printer with the backup printer
-(`backupPrinter()`) as its only fallback. Any receipt keys left in an old
-config.json are never read. A late child (`lateGoToLine` answers) gets a plain name tag and
-the household ONE drop-off label (`dropOffTagFor` / `generateDropOffTag`, once
-per family per night) on the label printer. The card's band says GO TO and the time, never "late", and the child's own tag is identical to everyone's (owner: nothing singles a child out). `printerSetupWarnings()` (pure)
-judges the setup: `printerUnset`, `printerNotFound`, `printerOffline`
-(Get-Printer PrinterStatus); the settings page and the
-status window read offline as PROBLEM.
-`scripts/test-label-printer.cjs`.
-
-**One-off name tags (7.18.0, owner 2026-10-08).** `POST /print-oneoff`
-{firstName, clubName} (typed name + a club from `CLUB_LIST`, no roster lookup)
-prints the club's stock label for that first name, logs a history row with
-`oneOff: true` (kept by `addHistoryEntry`; `isNonCheckinRow()` keeps it out of
-every count, attendance, the still-here list and the reconcile pass), and
-publishes a sealed `checkin` with `oneOff: true` (contract optional field):
-the screens welcome the child and never count them. Never into the recap
-buffer, no `publishTally()`. A reprint of a one-off (`reprintRow`) stays a
-one-off and greets nobody. The touch check-in, the phone's + menu (relayed:
-both allowlists carry it) and the settings page's name-tag card all call the same route.
-The touch check-in's **Undo check-in** (7.18.0, it replaced Printer jammed)
-lists `/phone/tonight` and undoes through `/phone/undo` exactly like the
-phone; a successful TwoTimTwo undo also `unmarkPrinted()`s the child, or a
-check-in after it was answered "Already checked in at this station".
-
-**Custom labels never write history.** `POST /print-custom` prints one line of
-free text on a blank label and records nothing at all: no `addHistoryEntry`, no
-`recordAttendance`, no `publishTally`, no `events.publish*`. It is not a
-check-in in any mode, so it carries no TEST band either.
-
-**Realtime:** the screens' channel is the sync Worker's live channel. The
-print server's `events.publish()` seals a frame and hands it to the relay
-(`events.setRelay`, installed by `server.js`: a bounded queue with a breaker,
-and an OWED resend of state frames; `/health` warns while the breaker is open),
-which only works while this computer is signed in to the sync service. The
-Pusher publisher, its npm package and the cache-channel `provision` frame are
-gone (2026-10-12), and so are the old dashboard's Pusher fields; the electron app's
-Pusher release-ping client went with them (updates poll the feed every 10
-minutes). Old config.json files may still hold `pusher*` keys: they are never
-read, and `pusherSecret` stays redacted from GET /config. The display
-login is gone too (the passphrase state, `buildProvisionFrame`, the KDF,
-`/config/display-login/generate` and the `provision` section of
-`envelope-vectors.json`); an old `displayLoginPassphrase` stays redacted and any
-POST /config scrubs it from disk. `/health` reports the
-channel as `live` (`configured` means signed in), and the church-config key
-`pusherChannel` keeps its old name because it is the relay's channel name.
-Names stay sealed end to end under the old design's rules. Rules that must
-survive any change:
-- **Fail closed, never plaintext.** If a key is configured but a payload cannot
-  be sealed, publish NOTHING. A silent downgrade is the worst outcome available.
-- With **no** key configured the publisher stays plaintext on purpose (an
-  operator who has not opted in must not have banners break on an auto-update),
-  and `/health` says so loudly. Anti-downgrade lives on the consumer.
-- Padding is part of the spec, not an optimisation — GCM leaks
-  `len(firstName) + len(club)` without it, and club is inferable from the
-  plaintext `tally`. `npm run test:envelope` fails the build if two `checkin`
-  frames differ in length.
-- The framing is pinned by `envelope-vectors.json`, mirrored byte-identically
-  into the display repo. Changing it means bumping `ENVELOPE_VERSION`,
-  `npm run gen:envelope-fixture`, and landing both repos together — there is no
-  partial failure, either the sides agree or no name renders anywhere.
-- **Printing is never gated on the pipe.** A child at the door gets a label even
-  if the key, Pusher and the network are all broken.
-
-**Extension distribution:** the extension is loaded UNPACKED, so Chrome never
-auto-updates it and a self-hosted `update_url` is not honoured — silent update
-is not available and must not be claimed. Instead `chrome-extension/` ships in
-`extraResources` and the app syncs it into
-`%APPDATA%\awana-label-printer\chrome-extension` on every launch
-(`electron-app/src/extension-sync.js`), so an update costs a Chrome restart.
-Rules: the target lives under **userData**, never `resources/` (an update
-replaces that wholesale and Chrome would be left pointing at nothing); files are
-written tmp+rename because Chrome may be reading them; files a new version drops
-are pruned, or manifest.json loads old code beside new. The folder path is
-loopback-only in `/health` — it contains the operator's Windows username and
-`/health` is CORS-readable from the check-in site. The version is not gated;
-the extension needs it for the update banner.
-
-**`/health` warnings must be `{type, message}` objects.** The settings page's
-status card and the app's status window render `w.message`, so a bare string
-painted an EMPTY yellow box — the privacy warnings were invisible for exactly
-this reason. `warningTexts()` in
-`test-server-realtime.cjs` fails by name if strings come back.
-
-**Config writes:** `config.json` has several writers with different views of it.
-Use `applySavedConfig()` for the live sync — plain `Object.assign` cannot DELETE,
-which is why clearing a key (the old phone PIN, once) used to leave the old one
-accepted until a restart. The Electron app must merge via `electron-app/src/config-store.js`,
-never write the file whole. Every write of config.json (both sides) is
-tmp + fsync + rename with a `.bak` of the file it replaces; a damaged file is
-restored from the backup or moved aside, never written over, and `/health`
-says so. Every other data file goes through `saveFileAtomic()` in server.js
-(retrying rename, a `/health` warning while a save keeps failing), the
-history and the attendance ledger are held in memory and re-read only when
-their file changes, and club logos are stored once by hash
-(`club-icons.json`), never in each history row.
-
-**One printing tab.** Every TwoTimTwo tab runs `content.js`, but only the
-tab holding the `awana-print-leader` Web Lock runs the print machinery
-(`startPrintMachinery`); the dedup state is one localStorage copy keyed by the
-day (`dedupStore`), never sessionStorage. A phone action is claimed on the
-server (`POST /pending-actions/:id/claim`, a 90 s lease) before it is driven.
-
-**The phone's Tonight list: Remove vs Undo check-in (7.14.0).** Remove
-(`POST /phone/undo`) is LOCAL: `markManualUndo(..., 'phone')`, the ledger strip,
-`publishTally()`, nothing sent to TwoTimTwo. Undo check-in is the same route
-with `inTwoTimTwo: true` (the website's relay allowlist already carries
-`/phone/undo` and `/phone/status/:id`, and the Worker's list lives outside this
-folder, so do not add a route for it): it needs a `clubberId` (400 otherwise:
-visitors and id-less rows get Remove only), obeys `enableDrivenCheckin` (409),
-and queues a `{type:'undo'}` pending action that NOTHING applies until the
-extension reports `ok === true` (`applyTwoTimTwoUndo`: `undoneBy: 'twotimtwo'`,
-so the roster offers Check in again, never Add back). Undo actions go only to a
-poller with `?accept=undo` (an older extension would answer "Already checked
-in", ok:true), fail with the reason if unclaimed in `UNDO_PICKUP_MS` or if a
-claim's lease runs out (never re-driven), and take one result only. The
-extension (`undoCheckinOnTwoTimTwo`) posts `checkinclubberundo` with the fresh
-`#calendar_id` and the clubber id, counts only `undoReplyVerdict`'s short
-"(checkin undone)" (never a page, the login form or "Login Required"), and
-then requires the report not to list the child. `scripts/test-phone-undo.cjs`.
-
-**Cloud check-in from the online phone page (8.0.0, owner 2026-10-11).** On
-awana.kvbchurch.org/checkin the sync Worker answers POST /phone/checkin itself
-(`lobby/worker/src/phone.js`): TwoTimTwo's own check-in post, with Bible and
-Brought a friend as ticked, laptop on or off. With the laptop online it then
-queues a JOB for it, `POST /print {name, clubName, clubberId, cloud: true}`.
-A job is marked `job: true`, only the Worker makes one (`enqueueJob`), and
-`phone-relay.js` runs a job only from `JOB_ROUTES` (print only), so
-`RELAY_ROUTES` stay the phone page's own calls and still pin equal to the
-Worker's. `cloud: true` writes `cloudCheckin: true` on the history row, and
-`printedTonightFor()` then refuses a later `/print` for that child tonight
-(the extension finding them by report or roster diff, by id or by name), and
-refuses a cloud job for a child already printed tonight; an undone row counts
-for neither. `scripts/test-cloud-print.cjs`, `test-phone-relay.cjs`.
-
-**BARF Night (8.1.0, owner 2026-10-11).** On a date in `barfNights`
-(church-config.json; config.json's own wins, which the tests use),
-`performCheckinPrint` with `broughtFriend` prints a second tag after the
-child's own, `generateBarfTag()` (slime band, BARFED!, the first name,
-`barfFriendLine()`), never in the way of the first. `/print` reads
-`friend: true` and `friendName` (`cleanFriendName`: one line, 24 chars);
-`/phone/checkin` keeps `options.FriendName` only with `Friend`. The extension
-leaves a friend note (`noteFriend`, by clubber id and name, 15 minutes) from
-the touch bridge, a phone action, and a capture-phase click on TwoTimTwo's
-own `#checkin` button when its Brought a friend box is ticked
-(`friendBoxTicked`, no name); `doPrint` takes it (`takeFriendNote`), so
-whichever path prints the tag carries it. `reportFriend()` sends the child,
-club and friend's name to the Worker (`POST /v1/cloud/friend`) for the
-night's email, except for a cloud check-in, which the Worker recorded
-itself. The touch screen and phone.html ask "Friend's first name" under
-Brought a friend (`friendInput`); a sibling's card never copies the name.
-8.2.0: the BARFED tag is the name alone (no friend line), and
-`POST /print-barf-bags {names}` prints one BARF Bag label per name
-(`generateBarfBag`, `barfBagOwner`: "SOPHIA’S", "JAMES’") as ONE job:
-`printImages()` is one PrintDocument with a page per label on Windows and one
-`lp` with every file under CUPS, never retried. It is a Worker JOB route
-(`JOB_ROUTES`), sent from the lobby's Settings. `scripts/test-barf.cjs`.
-
-**Online only: the print server has no page of its own (owner 2026-10-11,
-built 2026-10-12).** The print dashboard (`public/index.html`, localhost:3456)
-and the Wi-Fi phone page (GET `/phone`, `/phone/ym`, the phone PIN, `lanAccess`,
-the app's Windows firewall rule and "Phones" address, `AWANA_BIND_HOST`) are
-gone. `startListening()` binds 127.0.0.1 and nothing else, and an app-level gate
-refuses a non-loopback socket on every route (`test-server-security.cjs` proves
-both with a real LAN address, and that asking for `0.0.0.0` or an old
-`lanAccess` changes nothing); `GET /` answers a tiny page that links to
-awana.kvbchurch.org/settings; the only static folder is `/brand/`, to loopback.
-Old config.json keys `phonePin`, `lanAccess` and `allowedOrigins` are never read
-(`phonePin` stays redacted from GET /config), `isAllowedOrigin`'s "our own page"
-is a loopback host on our port (a LAN address on 3456 is somebody else's
-server), and POST /config ignores the three. `public/phone.html` STAYS:
-`site/build.mjs` makes awana.kvbchurch.org/checkin from it, and the Worker's
-relay reaches the `/phone/*` routes from this computer (loopback, no
-credential). With no internet the desk still prints (extension to localhost);
-there are no phones and no settings changes until it is back.
-
-**The print role is an online check-in STATION (P2, ROADMAP.md#online-check-in,
-built 2026-10-12).** Route contract: `lobby/worker/src/routes.md`. The extension
-and every old print path still work (P7 removes the extension); this adds the
-Worker as the one source of jobs.
-- **Keys** (`print-server/station-keys.js`, Electron-free, `safeStorage`
-  injected): an ECDH P-256 station key made once, its private JWK kept ONLY
-  through safeStorage (`station-key.bin`); where safeStorage cannot encrypt it
-  returns `REFUSED` and writes nothing (fail closed, the tray says "cannot be a
-  print station"). The public key is registered with `POST /v1/station/register`
-  under `roles.json`'s `deviceId`, no pairing step. The history private key is
-  opened with the passphrase once, at the wizard (`unlockHistory`, same
-  construction as `unwrapPrivateKey` but the JWK is kept, again in safeStorage,
-  `history-key.bin`); the passphrase is never kept. `main.js`: `ensureStation()`
-  makes the key, registers it, and only THEN calls the server's `configureCloud()`;
-  `electron-app/src/station.js` is the tray text. Station requests carry
-  `X-Station` (`print-server/cloud-request.js`).
-- **Jobs** (`print-server/job-puller.js`, modelled on `phone-relay.js`):
-  `GET /v1/print/next?max=1` (the Worker's lease is 90 s), open the bundle with
-  `openAsStation`, run it through a route in `JOB_PULL_ROUTES` (`/print /reprint
-  /print-barf-bags /print-custom /print-oneoff /print-leader /print-award`) on
-  loopback, then `POST /v1/print/done` (or `/failed`) AFTER the print returns,
-  and `POST /v1/print/heartbeat` every 30 s and every 20 s while a job prints
-  (with the jobId it EXTENDS the lease). `lobby/worker/src/routes.md` section 6
-  is the one truth for these names; `scripts/test-cloud-e2e.cjs` runs the real
-  Worker handlers against this module. A job record is `{route, body,
-  clubberId?, gen?, source?}` (a reprint's jobId is `reprint:<uuid>`); the Worker
-  seals a TwoTimTwo-page check-in itself with `source: 'ttt'`, same record. The
-  `gen` comes from the lease (the Worker's claim generation); for `/print` the
-  puller adds `cloud: true`, and `regen: true` when gen > 1 (an undo, then a new
-  check-in), which makes `performCheckinPrint` skip its own duplicate rules for
-  that new tag. **At most once (owner):** every jobId is journalled in
-  `print-journal.json` as `spooling` BEFORE the route is called, `printed` after.
-  A journalled job is never printed again: acked `printed` when it came out,
-  `already-spooled` when it was mid-print or its outcome is unknown, and those
-  raise CHECK THE PRINTER (`GET /cloud/print-status`, the tray, a notification,
-  cleared by `POST /cloud/print-status/clear`); a print that gets no answer is
-  unknown the same way; only a definite HTTP refusal is acked `failed` and may
-  run again. A second jobId for the same `night:clubberId:gen` is one tag; a
-  duplicate jobId in flight is dropped; `printedTonightFor()` still backstops.
-  An ack that fails is retried each round (never a reprint); 404/409/410 means
-  the Worker dropped the job (an undo) and ends it. `scripts/test-job-puller.cjs`.
-- **Rosters and books** arrive sealed (`createBundleSync`: `GET
-  /v1/station/roster|books?night=`, record `{csv}` / `{entries}`) and are fed to
-  the existing `/update-csv` and `/feed/completed-books`.
-- **History** (`print-server/history-sync.js`; every route tolerated missing): a
-  job from a TwoTimTwo-page check-in (`source: 'ttt'`, `rowForPrinted`) gets a
-  `checkin` row (record `ts` = epoch ms) sealed with `sealRow` and posted to
-  `POST /v1/history/rows` (queued while the route is down); row kinds are
-  routes.md section 3's table; attendance read back resolves a desk `undo` row
-  against the check-ins by time; the
-  history key reads the season's rows back into the attendance ledger
-  (`mergeAttendance`, additive) every 30 minutes for the milestone, first-time,
-  twin and "Go to" fields; **Import laptop history** (tray item and `POST
-  /cloud/import-history`, in `SETTINGS_PAGE_ROUTES`) seals `print-history.json`
-  and `attendance.json` (content-derived row ids, so a second run stores
-  nothing twice) and posts them to `POST /v1/history/import`.
-- **Publisher gate and the greeting** (P5, `lobby/worker/src/routes.md` section 8):
-  with `configureCloud()` active `publishTally`, `publishStillHere` and
-  `stillHereChanged` publish nothing (the Worker makes the tally, the ticker and the
-  still-here list); `stopCloud()` restores them. Instead the station keeps the Worker's
-  copy of what only this computer knows current: `sendStationExtras()` posts the Screen
-  season, the rehearsal flag and the pickup clubs to `POST /v1/station/extras` (on a
-  change, at least once a minute, `stillHereChanged` is its trigger). The **greeting** is
-  the station's: the job puller adds `cloudJob: <jobId>` to a `/print` body, and
-  `performCheckinPrint` hands its `checkin` (birthday, first-timer, welcome back,
-  milestone: only this computer has the roster and the history) to the relay with
-  `{job}` meta; the relay sends it as the station (`X-Station`) with `X-Job` to
-  `POST /v1/publish` (`sendGreeting`: a 4xx or a dropped answer is final, an unreachable
-  Worker is tried three times). The Worker lets exactly one greeting per job through and
-  drops every other `checkin`. On a station a `/print` with no job (the phone page's relay
-  job, the extension) greets as the station naming the child (`greet: {clubberId}` or a
-  visitor's name and club), and a cloud job that meets a label already printed greets
-  LATE with that label's own event (`late: true`): the Worker greets each child once a
-  night (routes.md section 8). Without the station role it greets through the laptop's
-  relay queue as before. `scripts/test-station-greeting.cjs`.
-
-**Every dashboard tool is on awana.kvbchurch.org/settings, Laptop section**
-(`lobby/src/components/settings/laptop.jsx` and `laptop-tools.jsx`,
-`lib/printServer.js`; the notes are in `lobby/CLAUDE.md`). The page reaches this
-server on localhost: `security.SETTINGS_PAGE_ORIGIN` is the one exact origin
-(never `displayOrigins`), `SETTINGS_PAGE_ROUTES` the whole list of paths and
-methods, `SETTINGS_PAGE_CONFIG_KEYS` the only keys POST /config takes from it;
-every route but /health needs a loopback socket and either the page's sync
-session (`Authorization: Sync`, confirmed with the sync service by
-`settingsPageSessionOk` against `config.syncUrl`, which a dropped sign-in keeps)
-or a publish token already on the laptop (`corsPolicy` sets `req.settingsPage`),
-and the preflight answers Private Network Access for those routes only. A route
-that should accept the page next to this computer's own app uses
-`isTrustedOrSettingsPage`; anything holding a secret keeps
-`isTrustedConfigOrigin` alone. **A new route needs a row in the table and a
-check in `scripts/test-settings-page.cjs` FIRST.** What moved: leader tags
-(`/print-leader`, `/leaders`, `/leaders/forget`), one-off and custom labels,
-a stretch reprint (`/reprint-range`, dry run then confirm), the attendance audit
-(`/attendance-audit`, apply needs `confirm`), rehearsal mode (`/rehearsal`),
-three more switches (`updateBeacon`, `enableDrivenCheckin`, `musicalPrinter`)
-and this computer's own sync sign-in. **Secrets never go through the page:** the
-display key, publish token and display-login mint/read routes, `sync-logout`
-and `/api/lobby-slides` are not in the table, POST /config refuses every
-`SECRET_CONFIG_KEYS` key from it, and `/config/sync-login` from the page takes
-only the passphrase and signs in to `config.syncUrl` (never an address the page
-names; a computer with none on record is signed in by the app's setup wizard,
-"Set up this computer...", through the same route with no Origin). Left in the
-app on purpose: the check-in URL (the wizard; it reaches the Windows shell) and
-the extension folder (tray, "Open Chrome extension folder"; the path holds the
-Windows user name). The extension's options, popup and "Printing to Change" link
-open the settings page. `scripts/test-settings-page.cjs`.
-
-**The still-here list and the phone's Check out (7.16.0, owner 2026-10-08).**
-The lobby's pickup list (shown from 7:30) is built HERE, not scraped:
-TwoTimTwo's Checkout page lists nobody at KVBC. `tonightHereNow()` is the
-"who" behind `authoritativeTonight()` (one child per identity, same rules,
-visitors only when history-built), and `publishStillHere()` filters it by
-config `pickupClubs` (`print-server/pickup.js`; default every club but Trek
-and Journey; the settings page's "Pickup list") and publishes the
-existing sealed `checkout` event through `events.buildCheckout` (shape
-unchanged and mirrored with the lobby: entries {firstName, club} plus
-`printed`). Every minute in the tally window and, debounced, on any change
-(`publishTally()` calls `stillHereChanged()`), never outside the window.
-`POST /feed/checkout` still validates and answers ok but NEVER publishes (an
-empty scrape would clear the lobby). Phone Check out = `/phone/undo` with
-`checkout: true` (same relay reasoning as Undo): with a clubber id it queues
-a `{type:'checkout'}` one-shot action (only for `?accept=...checkout`, same
-pickup/lease failures as undo) applied only on a literal `ok === true`
-(`applyTwoTimTwoCheckout` → `markCheckedOut` → `publishTally`); the extension
-(`checkoutOnTwoTimTwo`) uses the youth sweep's `readCheckoutPage` +
-`postClubberCheckout` and accepts only an exact "OK". Without an id it is a
-local by-name mark (`checkedOutTonight.names`). `/phone/tonight` lists
-`features: ['checkout']` so a newer website phone page never offers it to an
-older laptop. Check-outs made on the Checkout page: feeds.js compares two
-genuine reads (`checkoutDisappearances`) and posts ids with
-`source: 'checkout-page'`; the server skips ids whose newest row is undone.
-`scripts/test-pickup-board.cjs`.
-
-**Data Flow:**
-- The extension fetches the CSV → POST /update-csv
-- Server reloads clubbers.csv on every print request
-- Enrichment: Match firstName+lastName to allergies (Notes field)
-
-## Reliability Mandates
-- **Zero-Loop Policy:** Self-relaunching scripts MUST have recursion guards. Never assume admin checks are bulletproof.
-- **Context-Aware:** PowerShell the print path shells out to must account for the parent process (the app, a CUPS station, or a bare `node server.js`).
-- **Never Crash:** uncaughtException handlers in server; silent failures for enrichment (print basic label).
-- **Cleanup:** Always unlink temp files in finally blocks.
-
-## The reel (the film at the top of the home page)
-
-Owner, 2026-10-11: a 60-90 s product film of the screens on a club night, the
-first thing on awana.kvbchurch.org. Its sources are `reel/` (the guide is
-`reel/README.md`); `npm run reel` rebuilds all of it (about 20 minutes; it
-builds the site first if `site/dist` is missing, and needs Chromium and
-ffmpeg):
-
-- **Real footage, never mock-ups.** `reel/record.mjs` + `reel/shots.mjs` film
-  the real screens from `site/dist` (the lobby's check-in moments, toasts and
-  pickup board, the projector, Journey, `/checkin` on a phone, `/settings`),
-  driven the way their own e2e suites drive them (the stand-in live channel,
-  a stand-in laptop behind the phone page), frame by frame on a virtual clock
-  (`reel/lib/vclock.mjs`), so the footage is an exact 60 fps. The labels are
-  the print server's own (`reel/labels.cjs`, through `/preview`). The motion
-  graphics and the edit are one page, `reel/film/`, rendered frame by frame
-  (`reel/render.mjs`); `reel/edit.mjs` mixes the soundtrack and encodes.
-- **What the page plays** (committed, never edited by hand):
-  `public/reel/reel-1080.mp4` (H.264, 1920x1080, 60 fps, under 20 MB),
-  `reel-720.mp4` (1280x720, 30 fps, for phones) and `poster.jpg` (the closing
-  title). Pages' static files ignore Range and Safari will not play a video
-  without it, so `site/build.mjs` leaves the films out of the upload and
-  `site/functions/reel` streams them (proxyLarge) from GitHub's copy of the
-  build's commit; `site/lib/largeFiles.js` says what is streamed (every video,
-  anything over 25 MiB) and from which folders (`journey/public/`,
-  `printer/public/reel/`), and `site/test/largeFiles.test.mjs` pins that and
-  the 20 MB cap.
-- **The owner's decision on art:** the real Awana logos and club marks may
-  appear INSIDE the film (in-house use), and its last card says "Awana® and
-  club marks are trademarks of Awana Clubs International, used here by a member
-  church. Not affiliated with or endorsed by Awana." Outside the film the page's
-  own art rules hold. Every name in it is made up, never a real child's.
-- **Its look is the 2026-27 catalog's**, from the one kit (`lobby/shared/brand`):
-  Paytone One shouts (declared with the screens' ascent/descent overrides, so
-  the stepped chips from `shared/chipGeometry.js` sit as on the TV), Londrina
-  Solid labels, Figtree is read; club waves, corner tabs, doodles in threes,
-  footage on a plate with an offset outline, hard offsets, never a blur.
-- **Cut to the music's beat.** "Incredible You" by Soft and Furious (CC0,
-  `reel/music/`, credits in `reel/README.md`), 120.25 BPM: `BEAT` in
-  `reel/film/film.js` and `MUSIC` in `reel/edit.mjs` are that grid. A re-timed
-  scene keeps its cuts on it.
-- **Claims track the code here too:** when a screen the film shows changes its
-  look or behaviour, run `npm run reel` and commit the new films.
+## Where things are
+- Root React site: `index.html`+`App.tsx`, `help.html`+`HelpPage.tsx`+`help.tsx`, `capabilities.html`+`capabilities.tsx`, `index.tsx`, `components/` (`Simulator.tsx`, `CheckinModal.tsx`, `ClubberList.tsx`, `Capabilities.tsx`, `Faq.tsx`, `InstallGuide.tsx`, `family/`, `home/`), `styles/`, `src/constants.ts`, `data.ts`, `types.ts`, `vite.config.ts`, `public/` (`chrome-extension.zip`, `reel/`).
+- `electron-app/`: `main.js`, `preload.js`, `src/` (`roles.js`, `setup-wizard.js`, `handoff.js`, `old-app.js`, `device-sync.js`, `sync-session.js`, `config-store.js`, `extension-sync.js`, `chrome-restart.js`, `shortcuts.js`, `station.js`, `display/`), `static/`, `renderer/`, `test/`.
+- `chrome-extension/`: `content.js` (print machinery), `feeds.js`, `touch.js`, `background.js`, `options.*`, `popup.*`, `manifest.json`, `PRIVACY.md`, `README.md`.
+- Docs: `CONTRACT.md` (wire contract), `EXTENSION.md`, `SECURITY.md`, `TROUBLESHOOTING.md`, `README.md`, `changes.md`, `docs/` (`SETUP.md`, `NIGHT-OF.md`, `TWOTIMTWO.md`, `FAMILY-DESIGN.md`, `family-reference.html`, `DECISIONS.md`). Vectors: `contract-vectors.json`, `envelope-vectors.json`.
+- `scripts/`: `run-tests.cjs`, `free-port.cjs`, `server-source.cjs`, `bump-version.cjs`, `gen-envelope-fixture.cjs`, `render-smoke.cjs`, `brand-manifest.cjs`, `sync-touch-core.cjs`, `test-*.cjs`, `__label_baselines__/`, `fixtures/`. Repo-root generators: `scripts/family-assets.mjs`, `shared-copies.mjs`, `gen-sync-protocol.mjs`, `check-mirrors.mjs`.
