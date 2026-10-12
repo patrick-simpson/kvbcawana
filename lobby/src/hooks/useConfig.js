@@ -4,6 +4,7 @@ import { sanitizeSlides } from '../lib/slides.js';
 import { sanitizeMilestoneList } from '../lib/milestones.js';
 import { NIGHT_THEME_VALUES } from '../lib/skins.js';
 import { parseUrlFlags } from '../lib/urlFlags.js';
+import { matchesRule } from '../lib/settingRules.js';
 import { SHARED_KEYS, sanitizeSettingsPayload, sanitizeSharedValues } from '../lib/sharedSettings.js';
 
 const STORAGE_KEY = 'awanaConfig.v1';
@@ -12,79 +13,82 @@ const STORAGE_KEY = 'awanaConfig.v1';
 // so Export / ?config= / Reset this screen never see it as a device setting.
 const SHARED_STORAGE_KEY = 'awanaSharedSettings.v1';
 
-// Per-key validators for override values coming back out of
-// localStorage. Anything that fails its check is dropped so a corrupt
-// or stale entry (e.g. a string where a number belongs) can never
-// produce NaN timers or a broken screen on club night.
-const isBool = (v) => typeof v === 'boolean';
-const isString = (v) => typeof v === 'string';
-const numberBetween = (min, max) => (v) => typeof v === 'number' && Number.isFinite(v) && v >= min && v <= max;
+// Per-key rules for override values coming back out of localStorage, as data
+// over lib/settingRules.js (matchesRule: a value passes as it stands, nothing
+// is clamped). Anything that fails its rule is dropped so a corrupt or stale
+// entry (e.g. a string where a number belongs) can never produce NaN timers or
+// a broken screen on club night.
+const bool = { type: 'bool' };
+const string = { type: 'string' };
+const array = { type: 'array' };
+const between = (min, max) => ({ type: 'number', min, max });
+const oneOf = (...values) => ({ type: 'enum', values });
 
 const VALIDATORS = {
-  backgroundSource: (v) => ['powerpoint', 'manual', 'pptx', 'video'].includes(v),
-  manualSlides: Array.isArray,
-  powerpointEmbedUrl: isString,
-  slideshowDelaySec: numberBetween(0, 600),
-  useLocalSlideshow: isBool,
-  countdownTargetTime: isString,
-  standardDisplayMs: numberBetween(1000, 60000),
-  specialDisplayMs: numberBetween(1000, 60000),
-  gapBetweenBannersMs: numberBetween(0, 10000),
-  audioMuted: isBool,
-  showConnectionStatus: isBool,
-  showTally: isBool,
-  keepScreenAwake: isBool,
+  backgroundSource: oneOf('powerpoint', 'manual', 'pptx', 'video'),
+  manualSlides: array,
+  powerpointEmbedUrl: string,
+  slideshowDelaySec: between(0, 600),
+  useLocalSlideshow: bool,
+  countdownTargetTime: string,
+  standardDisplayMs: between(1000, 60000),
+  specialDisplayMs: between(1000, 60000),
+  gapBetweenBannersMs: between(0, 10000),
+  audioMuted: bool,
+  showConnectionStatus: bool,
+  showTally: bool,
+  keepScreenAwake: bool,
   // lib/clubs.js CORNER_CLUB_IDS, written out: the projector imports this
   // file, and clubs.js brings every club's art with it (useConfig.test.js
   // pins the two lists equal).
-  cornerClub: (v) => ['', 'puggles', 'cubbies', 'sparks', 'tnt', 'trek', 'journey'].includes(v),
-  milestoneEvery: numberBetween(0, 10000),
-  showTallySyncNote: isBool,
-  showTonightTicker: isBool,
+  cornerClub: oneOf('', 'puggles', 'cubbies', 'sparks', 'tnt', 'trek', 'journey'),
+  milestoneEvery: between(0, 10000),
+  showTallySyncNote: bool,
+  showTonightTicker: bool,
   // Threshold LISTS, repaired rather than rejected — see sanitizeMilestoneList
   // in lib/milestones.js. Array-shaped here, whole-number-repaired below.
-  bookMilestones: Array.isArray,
-  awardMilestones: Array.isArray,
-  showClock: isBool,
-  showWeatherChip: isBool,
-  showBirthdayWeekRibbon: isBool,
-  calendarEnabled: isBool,
-  calendarUrl: isString,
-  sharedScheduleUrl: isString,
-  sharedThemeUrl: isString,
-  recapMaxAgeMin: numberBetween(1, 240),
-  panicMode: isBool,
-  clubMilestoneEvery: numberBetween(0, 1000),
-  firstArrivalMoment: isBool,
-  clubTintBackground: isBool,
+  bookMilestones: array,
+  awardMilestones: array,
+  showClock: bool,
+  showWeatherChip: bool,
+  showBirthdayWeekRibbon: bool,
+  calendarEnabled: bool,
+  calendarUrl: string,
+  sharedScheduleUrl: string,
+  sharedThemeUrl: string,
+  recapMaxAgeMin: between(1, 240),
+  panicMode: bool,
+  clubMilestoneEvery: between(0, 1000),
+  firstArrivalMoment: bool,
+  clubTintBackground: bool,
   // Who's-still-here board. No mode or window since 2026-10-08: it comes on
   // by itself at 7:30 pm (checkoutBoard.js), so checkoutBoardMode / From /
   // Until are unknown keys here and a saved value is dropped.
-  checkoutBoardNamesAbove: numberBetween(0, 200),
-  checkoutBoardStaleMin: numberBetween(1, 120),
-  cornerStillHere: isBool,
+  checkoutBoardNamesAbove: between(0, 200),
+  checkoutBoardStaleMin: between(1, 120),
+  cornerStillHere: bool,
   // Reads the one skin table rather than repeating its ids — adding a season
   // used to mean editing this list, skins.js, the Settings dropdown and the CSS.
-  nightTheme: (v) => NIGHT_THEME_VALUES.includes(v),
-  followPrinterTheme: (v) => typeof v === 'boolean',
-  followPublishedSlides: isBool,
-  followSharedSettings: isBool,
-  aprilFools: (v) => typeof v === 'boolean',
-  particleEffect: (v) => ['auto', 'off', 'snow', 'rain', 'sparkle'].includes(v),
-  weatherTheme: isBool,
-  calendarWelcomeText: isString,
-  calendarShowWelcome: isBool,
-  calendarShowNextWeek: isBool,
-  calendarShowRemaining: isBool,
-  seasonPromos: isBool,
-  weatherLocationName: isString,
-  weatherLat: numberBetween(-90, 90),
-  weatherLon: numberBetween(-180, 180),
-  weatherUnits: (v) => v === 'fahrenheit' || v === 'celsius',
-  watchdogReloadMin: numberBetween(0, 1440),
-  clubPhrases: (v) => !!v && typeof v === 'object' && !Array.isArray(v),
-  confettiLevel: (v) => ['full', 'reduced', 'off'].includes(v),
-  reduceMotion: isBool,
+  nightTheme: { type: 'enum', values: NIGHT_THEME_VALUES },
+  followPrinterTheme: bool,
+  followPublishedSlides: bool,
+  followSharedSettings: bool,
+  aprilFools: bool,
+  particleEffect: oneOf('auto', 'off', 'snow', 'rain', 'sparkle'),
+  weatherTheme: bool,
+  calendarWelcomeText: string,
+  calendarShowWelcome: bool,
+  calendarShowNextWeek: bool,
+  calendarShowRemaining: bool,
+  seasonPromos: bool,
+  weatherLocationName: string,
+  weatherLat: between(-90, 90),
+  weatherLon: between(-180, 180),
+  weatherUnits: oneOf('fahrenheit', 'celsius'),
+  watchdogReloadMin: between(0, 1440),
+  clubPhrases: { type: 'record' },
+  confettiLevel: oneOf('full', 'reduced', 'off'),
+  reduceMotion: bool,
 };
 
 // Banner flavor text per club: keep only short strings, keyed
@@ -117,8 +121,8 @@ export function sanitizeOverrides(raw) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
   const clean = {};
   for (const [key, value] of Object.entries(raw)) {
-    const valid = VALIDATORS[key];
-    if (valid && valid(value)) clean[key] = TRANSFORMS[key] ? TRANSFORMS[key](value) : value;
+    const rule = Object.prototype.hasOwnProperty.call(VALIDATORS, key) ? VALIDATORS[key] : null;
+    if (rule && matchesRule(rule, value)) clean[key] = TRANSFORMS[key] ? TRANSFORMS[key](value) : value;
   }
   return clean;
 }
