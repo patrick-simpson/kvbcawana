@@ -106,8 +106,12 @@ async function cacheLessonBundle(lesson) {
   bundleInFlightSince = Date.now();
   try {
     const cache = await caches.open(VIDEO_CACHE_NAME);
+    // A Student Video saved by "Download all lessons" (04-lesson-store.js) is
+    // what plays, so the bundle keeps no second copy of it (and its old one
+    // goes with the next eviction, the saved copy being the better one).
+    const savedOnDisk = await lessonSavedOnDisk(lesson.week, 'student');
     const candidates = [
-      ...lessonVideoCandidates(lesson),
+      ...(savedOnDisk ? [] : lessonVideoCandidates(lesson)),
       { fetchUrl: captionUrlFor(lesson.week, 'student') },
       { fetchUrl: captionUrlFor(lesson.week, 'leader') },
       { fetchUrl: handoutUrl(lesson.week) },

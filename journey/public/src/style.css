@@ -2132,7 +2132,8 @@ html.cursor-hidden #slide-controls {
 /* Settings → teaching-slide preferences (10-foot sized like the rest). */
 #settings-slides,
 #settings-captions,
-#settings-sync {
+#settings-sync,
+#settings-downloads {
   margin-top: 1.5rem;
   padding-top: 1.25rem;
   border-top: 1px solid rgba(222, 213, 234, 0.25);
@@ -2144,7 +2145,8 @@ html.cursor-hidden #slide-controls {
 /* Section heads are Londrina kickers, as on the splash. */
 #settings-slides h3,
 #settings-captions h3,
-#settings-sync h3 {
+#settings-sync h3,
+#settings-downloads h3 {
   font-family: var(--jr-font-label);
   font-size: 1.7rem;
   font-weight: 400;
@@ -2404,6 +2406,153 @@ html.cursor-hidden #slide-controls {
 #notes-edit-status {
   font-size: 1.15rem;
   color: var(--jr-tint);
+}
+
+/* Settings -> Lessons on this computer (26-lesson-downloads.js): the hot
+   pill is the one thing to press; the overall bar, then one small row per
+   video (name, plain state, a thin bar), a few columns wide on a TV and
+   scrolling inside its own box. Flat fills only, like the rest. */
+.quality-btn.downloads-go {
+  background: var(--jr-hot);
+  border-color: var(--jr-hot);
+}
+
+.quality-btn.downloads-go:hover,
+.quality-btn.downloads-go:focus-visible {
+  border-color: #ffffff;
+}
+
+.quality-btn.downloads-go:active {
+  background: var(--jr-hot-deep);
+  border-color: var(--jr-hot-deep);
+  opacity: 1;
+}
+
+.quality-btn.downloads-danger {
+  border-color: #ffb4a8;
+  color: #ffb4a8;
+}
+
+.quality-btn.downloads-danger:hover,
+.quality-btn.downloads-danger:focus-visible {
+  border-color: #ffffff;
+  color: #ffffff;
+}
+
+.quality-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+#downloads-summary {
+  font-size: 1.35rem;
+  font-variant-numeric: tabular-nums;
+}
+
+#downloads-bar {
+  height: 14px;
+  border-radius: 999px;
+  background: rgba(222, 213, 234, 0.18);
+  overflow: hidden;
+}
+
+#downloads-bar-fill {
+  display: block;
+  width: 0;
+  height: 100%;
+  background: var(--jr-hot);
+}
+
+#downloads-summary:empty,
+#downloads-status:empty,
+#downloads-space:empty {
+  display: none;
+}
+
+#downloads-status[data-tone='bad'] { color: #ffb4a8; }
+#downloads-status[data-tone='ok'] { color: #c8f7c5; }
+
+#downloads-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 19rem), 1fr));
+  gap: 6px 12px;
+  align-items: start; /* a long failure grows its own row, not its neighbours */
+  max-height: 17rem;
+  overflow-y: auto;
+}
+
+#downloads-list:empty {
+  display: none;
+}
+
+.downloads-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: baseline;
+  column-gap: 0.6em;
+  padding: 0.45rem 0.7rem;
+  border-radius: 10px;
+  background: rgba(222, 213, 234, 0.08);
+  font-size: 1.1rem;
+}
+
+.downloads-row-name {
+  font-family: var(--jr-font-label);
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.downloads-row-state {
+  color: var(--jr-tint);
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.downloads-row-bar {
+  grid-column: 1 / -1;
+  height: 4px;
+  margin-top: 0.35rem;
+  border-radius: 999px;
+  background: rgba(222, 213, 234, 0.14);
+  overflow: hidden;
+}
+
+.downloads-row-fill {
+  display: block;
+  width: 0;
+  height: 100%;
+  background: var(--jr-tint);
+}
+
+.downloads-row[data-state='saved'] .downloads-row-state { color: #c8f7c5; }
+.downloads-row[data-state='saved'] .downloads-row-fill { background: #c8f7c5; }
+.downloads-row[data-state='active'] { background: rgba(241, 90, 40, 0.22); }
+.downloads-row[data-state='active'] .downloads-row-state { color: #ffffff; }
+.downloads-row[data-state='active'] .downloads-row-fill { background: var(--jr-hot); }
+.downloads-row[data-state='unavailable'] { opacity: 0.6; }
+
+/* A failure's reason takes the row's whole width under the name. */
+.downloads-row[data-state='failed'] .downloads-row-state {
+  grid-column: 1 / -1;
+  text-align: left;
+  color: #ffb4a8;
+}
+
+#downloads-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 1rem;
+  border: 2px solid #ffb4a8;
+  border-radius: 14px;
+}
+
+#downloads-confirm-text {
+  font-size: 1.3rem;
 }
 
 /* Phone: one scroller, not two. The card itself scrolls and the lesson list

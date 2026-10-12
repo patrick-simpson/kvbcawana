@@ -117,6 +117,26 @@ changes what plays automatically at 6:30 PM.
 - To stop a preview early, tap the switch-display (⇄) button — it
   returns to whatever should normally be showing right now.
 
+### Lessons Saved on This Computer
+
+The church's internet is slow, so the kiosk keeps every lesson's
+full-quality video on its own disk (about 8.5 GB with the Leader Videos).
+Settings → **Lessons on this computer**:
+
+- **Download lessons automatically** (on by default on the kiosk; off in a
+  normal web browser): the kiosk downloads
+  by itself, a few minutes after it starts, never during a lesson and never
+  from 5:30 to 8 PM. Nothing to press.
+- **Download all lessons (full quality)** starts it right now; **Pause**,
+  **Resume** and **Stop** do what they say. Finished videos always stay,
+  and an interrupted one carries on where it stopped.
+- The line under the buttons shows the progress ("Video 7 of 63 · 42% ·
+  3.1 of 8.5 GB · about 25 min left"), each video's state, and how much
+  disk space is free. "All 32 lessons saved ✓" means it is finished.
+- A saved lesson plays from the disk, even with the internet working.
+- **Delete downloaded lessons** (asks first) is the only thing that
+  removes them.
+
 ### How it's Built
 
 - `public/index.html` — the whole app. Two full-viewport layers (Check-in Display iframe, Journey video) are both always mounted; a small script toggles which one is visible.

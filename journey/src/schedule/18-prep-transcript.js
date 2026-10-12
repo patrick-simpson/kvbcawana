@@ -396,6 +396,11 @@ function openSettingsPanel() {
   notesEditToggle.setAttribute('aria-expanded', 'false');
   updateNotesEditedBadge();
   settingsPanel.classList.remove('hidden');
+  // "Lessons on this computer" (26-lesson-downloads.js): reads the disk in
+  // the background, never the network first. A microtask later, because the
+  // configure page opens the panel while schedule.js is still running, before
+  // that file's own state exists.
+  Promise.resolve().then(refreshDownloadsPanel);
   if (allLessons) {
     renderLessonList(allLessons);
     return;
@@ -541,7 +546,8 @@ function previewSources(week, variant, originalUrl) {
 async function playStudentPreview(lesson, seekTo = 0) {
   // The current week's Student Video is the one already pre-downloaded for
   // the 6:30 show, so play the local copy instead of re-streaming it: a
-  // same-week preview works with the network dead.
+  // same-week preview works with the network dead. (resolveVideoSrc() takes
+  // a saved copy first, then the stream, then the bundle.)
   const sameWeek = !!currentLesson && currentLesson.week === lesson.week;
   if (sameWeek) {
     const token = journeyRequestToken;
@@ -556,14 +562,28 @@ async function playStudentPreview(lesson, seekTo = 0) {
     armPreviewSeek(seekTo);
     return;
   }
-  const { url, fallback } = previewSources(lesson.week, 'student', lesson.downloadUrl);
-  startPreview(url, `${lesson.title} (Student Video)`, fallback, lesson.week);
-  armPreviewSeek(seekTo);
+  await playSavedOrStreamedPreview(lesson, 'student', 'Student Video', lesson.downloadUrl, seekTo);
 }
 
 function playLeaderPreview(lesson, seekTo = 0) {
-  const { url, fallback } = previewSources(lesson.week, 'leader', lesson.leaderDownloadUrl);
-  startPreview(url, `${lesson.title} (Leader Video)`, fallback, lesson.week);
+  return playSavedOrStreamedPreview(lesson, 'leader', 'Leader Video', lesson.leaderDownloadUrl, seekTo);
+}
+
+/* Any other picked video: the copy saved on this computer when there is one
+   (Settings "Download all lessons"), else Awana's original streamed, with the
+   480p Release copy as the one spare either way. A saved copy that will not
+   play goes to the original first (fallBackFromSavedCopy()), then the spare.
+   The saved-copy lookup is a local disk read, never the network. */
+async function playSavedOrStreamedPreview(lesson, role, label, originalUrl, seekTo) {
+  const token = journeyRequestToken;
+  const saved = await savedLessonObjectUrl(lesson.week, role, token, originalUrl);
+  if (token !== journeyRequestToken) return; // something newer took over
+  const { url, fallback } = previewSources(lesson.week, role, originalUrl);
+  if (saved) {
+    startPreview(saved, `${lesson.title} (${label})`, transcodedPreviewUrl(lesson.week, role), lesson.week);
+  } else {
+    startPreview(url, `${lesson.title} (${label})`, fallback, lesson.week);
+  }
   armPreviewSeek(seekTo);
 }
 

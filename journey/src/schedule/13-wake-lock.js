@@ -92,6 +92,9 @@ function videoNearEnd() {
 journeyVideo.addEventListener('error', () => {
   console.warn('Journey: video failed to load/play', journeyVideo.error);
   hideVideoLoading();
+  // A saved copy (04-lesson-store.js) that will not play goes over to the
+  // internet copy once, where the room got to, before anything below.
+  if (fallBackFromSavedCopy()) return;
   if (previewMode) {
     // A preview tries Awana's original first; if that errored, retry once
     // with the lesson's 480p release copy before giving up. Cleared

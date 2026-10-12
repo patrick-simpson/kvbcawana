@@ -1,4 +1,11 @@
-/* ── Stream first, play the cached copy only when streaming cannot ────
+/* ── A saved copy first, then stream, then the cached copy ─────────────
+   1. A lesson saved on this computer (Settings "Download all lessons",
+      04-lesson-store.js) plays from the disk, online or not: the church's
+      internet is slow, and saving them was the whole point (owner
+      2026-10-12). No probe, no stall swap (nothing to stall on). Only a
+      missing or damaged saved copy goes on to 2; one that fails while it
+      plays goes over to the network once (fallBackFromSavedCopy()).
+   2. Stream first, play the cached copy only when streaming cannot.
    The old kiosk computer played a picker video streamed over plain HTTP
    smoothly, and stuttered badly on the SAME encode served to the <video>
    element as a blob URL out of the Cache API (owner report, 2026-09-16, from
@@ -7,9 +14,11 @@
    has, and the cache goes back to being what it is good at: the safety net
    for an evening with no internet.
 
-   Nothing about cacheLessonBundle() changes. The bundle is still
-   pre-downloaded, still store-before-evict, and is still what plays when
-   the probe below says the network cannot answer. */
+   The bundle (cacheLessonBundle()) is still pre-downloaded, still
+   store-before-evict, and is still what plays when the probe below says the
+   network cannot answer (it skips its own copy of a video already saved).
+   The saved copy in 1 is also a blob URL, but of disk-backed files, never
+   the whole video in memory (04-lesson-store.js). */
 const STREAM_PROBE_MS = 2500;
 const STREAM_STALL_SWAP_MS = 8000;
 
@@ -49,8 +58,9 @@ async function blobUrlFromCacheHit(cached, token) {
   return blobUrl;
 }
 
-/* Resolves what the <video> element should play: the live URL when the
-   network can serve it, the cached copy as a blob URL otherwise. `token` is
+/* Resolves what the <video> element should play: the saved copy when this
+   computer has one, else the live URL when the network can serve it, the
+   cached copy as a blob URL otherwise. `token` is
    the caller's journeyRequestToken snapshot. If a teardown or newer request
    has bumped the token while the probe or the cache read was in flight, this
    returns null WITHOUT committing anything, so a stale resolve can neither
@@ -60,6 +70,10 @@ async function resolveVideoSrc(lesson, token) {
   const liveUrl = originalVideoUrl(lesson);
   const key = videoCacheKey(lesson);
   streamSwapCandidate = null;
+  // The scheduled show is always the Student Video.
+  const saved = await savedLessonObjectUrl(lesson.week, 'student', token, liveUrl);
+  if (token !== undefined && token !== journeyRequestToken) return null;
+  if (saved) return saved;
   if ('caches' in window) {
     try {
       const cache = await caches.open(VIDEO_CACHE_NAME);

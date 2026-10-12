@@ -3,6 +3,9 @@
 // stuttered on the same encode served as a blob URL (owner report 2026-09-16),
 // so this is a playback-quality property, not a plumbing detail, and it is driven
 // through the real splash button rather than by calling resolveVideoSrc.
+// A lesson SAVED on this computer (Settings "Download all lessons") comes
+// before all of this: test/lesson-downloads.test.mjs pins that it plays first,
+// online or not, and that a missing or damaged one falls through to here.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { bootKiosk, installCaches, tick, KIOSK_PC } from './kiosk-dom.mjs';

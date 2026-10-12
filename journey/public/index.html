@@ -265,6 +265,42 @@
           </div>
         </div>
       </div>
+      <!-- Every lesson's original video saved on this computer, so lessons
+           play from the disk, not the church's slow internet
+           (src/schedule/04-lesson-store.js, 26-lesson-downloads.js). -->
+      <div id="settings-downloads">
+        <h3>Lessons on this computer</h3>
+        <p class="settings-hint">
+          Save every lesson&rsquo;s full-quality video on this computer ahead of
+          time. Saved lessons then play from here instead of the internet. It
+          takes hours on the church&rsquo;s connection; the kiosk works as usual
+          meanwhile, and the download waits while a lesson plays. The button
+          below starts it right now.
+        </p>
+        <label class="settings-check"><input type="checkbox" id="downloads-auto" /> <span><strong>Download lessons automatically</strong> &mdash; <span id="downloads-auto-hint">by itself, never during a lesson or from 5:30 PM to 8:00 PM</span></span></label>
+        <label class="settings-check"><input type="checkbox" id="downloads-leaders" checked /> <span><strong>Include Leader Videos</strong> &mdash; for previewing in Settings (about 3.2&nbsp;GB more)</span></label>
+        <div id="downloads-actions" class="sync-row">
+          <button id="downloads-start-btn" type="button" class="quality-btn downloads-go">Download all lessons (full quality)</button>
+          <button id="downloads-pause-btn" type="button" class="quality-btn hidden">Pause</button>
+          <button id="downloads-resume-btn" type="button" class="quality-btn downloads-go hidden">Resume</button>
+          <button id="downloads-stop-btn" type="button" class="quality-btn hidden">Stop</button>
+        </div>
+        <p id="downloads-summary"></p>
+        <div id="downloads-bar" class="hidden" role="progressbar" aria-label="All lessons downloaded" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="downloads-bar-fill"></span></div>
+        <p id="downloads-status" class="settings-hint" role="status"></p>
+        <p id="downloads-space" class="settings-hint"></p>
+        <ol id="downloads-list" aria-label="Each video"></ol>
+        <div id="downloads-delete" class="sync-row">
+          <button id="downloads-delete-btn" type="button" class="quality-btn">Delete downloaded lessons</button>
+          <div id="downloads-confirm" class="hidden" role="group" aria-labelledby="downloads-confirm-text">
+            <p id="downloads-confirm-text"></p>
+            <div class="sync-row">
+              <button id="downloads-confirm-yes" type="button" class="quality-btn downloads-danger">Yes, delete them</button>
+              <button id="downloads-confirm-no" type="button" class="quality-btn">No, keep them</button>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
