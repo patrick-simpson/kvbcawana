@@ -18,7 +18,7 @@ commits or files.
 
 - `.github/workflows/ci.yml` runs on every push and PR: each app's checks as
   its old repo ran them (all on Node 22; its "What changed" job skips the
-  lobby's 7.5-minute suite and the printer's 3-minute one only when every
+  lobby's 7.5-minute suite and the printer's one-minute one only when every
   changed file is one that suite never reads, so a Worker-only change
   deploys in about 2 minutes; keep that job's lists in step when a suite
   starts reading another folder), `scripts/check-mirrors.mjs` (the
@@ -37,8 +37,13 @@ commits or files.
   `lobby-checks` (lint, typecheck, vitest) and `lobby-e2e` (build, browser
   smoke; Chromium cached by the `@playwright/test` version in
   `lobby/package-lock.json`). Every `setup-node` caches npm. The printer's
-  48 test scripts stay serial on purpose: many bind fixed ports that
-  collide across scripts (34573, 34575, 34581, 34583, 34586, 34588, 34597).
+  test scripts (`scripts/test-*.cjs`, listed in `printer/scripts/run-tests.cjs`)
+  run side by side, up to 4 at a time (`npm test`, about a minute): each asks
+  `printer/scripts/free-port.cjs` for its own TCP port instead of a fixed one,
+  and no two share a file. `npm test -- --serial` (or `TEST_SERIAL=1`) runs them
+  one after another as the old chain did (3.5 minutes), for reading one
+  suite's output or ruling parallelism out of a failure; a new suite must take
+  its port from `free-port.cjs` and be added to the runner's list.
 - `ci.yml`'s deploy job, on `main` only and once everything is green: takes
   the site the `site` job built (it does not rebuild; the `SITE_ORIGIN`
   repository variable is required, and the site job builds with that same

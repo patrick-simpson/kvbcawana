@@ -20,7 +20,7 @@ function check(name, cond, detail) {
   else { failed++; console.log(`  ✗ ${name}${detail ? ' — ' + detail : ''}`); }
 }
 const root = path.join(__dirname, '..');
-const PORT = 34586;
+const PORT = Number(process.env.AWANA_TEST_PORT || require('./free-port.cjs')());
 
 (async () => {
   const binDir = fs.mkdtempSync(path.join(os.tmpdir(), 'awana-psbin-'));

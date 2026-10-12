@@ -137,7 +137,7 @@ The workflow runs the test suites FIRST, then creates the tag (so a failing test
 | React (root) | `npm run dev` (port 3000) \| `npm run build` |
 | Electron | `npm run dev` \| `npm run dist` (NSIS .exe) |
 | Print Server | `PRINTER_NAME="Printer" node server.js` (port 3456) |
-| Checks (root) | `npm test` runs every suite in `scripts/` (what `ci.yml` and the release run); extension logic is tested by lifting functions out of `content.js` (see `scripts/test-extension-*.cjs`) |
+| Checks (root) | `npm test` runs every suite in `scripts/` (what `ci.yml` and the release run), 4 at a time through `scripts/run-tests.cjs` (each suite takes its port from `scripts/free-port.cjs`; `npm test -- --serial` is the old one-by-one order); extension logic is tested by lifting functions out of `content.js` (see `scripts/test-extension-*.cjs`) |
 
 ## Public website (root React app: the home page of awana.kvbchurch.org and /help)
 

@@ -28,7 +28,7 @@ const http = require('http');
 const os = require('os');
 const path = require('path');
 
-const PORT = Number(process.env.AWANA_TEST_PORT || 34575);
+const PORT = Number(process.env.AWANA_TEST_PORT || require('./free-port.cjs')());
 
 let passed = 0;
 let failed = 0;

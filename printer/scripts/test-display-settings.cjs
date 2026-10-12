@@ -25,7 +25,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
-const PORT = Number(process.env.AWANA_TEST_PORT || 34581);
+const PORT = Number(process.env.AWANA_TEST_PORT || require('./free-port.cjs')());
 const BASE = `http://127.0.0.1:${PORT}`;
 const DISPLAY_ORIGIN = 'https://patrick-simpson.github.io';
 

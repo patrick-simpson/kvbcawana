@@ -15,7 +15,7 @@ function check(name, ok, detail) {
   if (ok) { passed++; console.log(`  ✓ ${name}`); } else { failed++; console.log(`  ✗ ${name}${detail ? ` — ${detail}` : ''}`); }
 }
 
-const PORT = Number(process.env.AWANA_TEST_PORT || 34597);
+const PORT = Number(process.env.AWANA_TEST_PORT || require('./free-port.cjs')());
 const BASE = `http://127.0.0.1:${PORT}`;
 const QUEUE = 'DYMO_LabelWriter_450';
 

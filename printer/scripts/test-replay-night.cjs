@@ -43,7 +43,7 @@ const os = require('os');
 const path = require('path');
 const Module = require('module');
 
-const PORT = Number(process.env.AWANA_TEST_PORT || 34577);
+const PORT = Number(process.env.AWANA_TEST_PORT || require('./free-port.cjs')());
 const BASE = `http://127.0.0.1:${PORT}`;
 
 let passed = 0;

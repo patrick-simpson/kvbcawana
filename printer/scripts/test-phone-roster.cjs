@@ -22,7 +22,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
-const PORT = 34791;
+const PORT = Number(process.env.AWANA_TEST_PORT || require('./free-port.cjs')());
 const BASE = `http://127.0.0.1:${PORT}`;
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'awana-roster-'));
 const binDir = fs.mkdtempSync(path.join(os.tmpdir(), 'awana-roster-bin-'));

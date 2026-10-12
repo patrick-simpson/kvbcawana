@@ -29,7 +29,7 @@ function check(name, cond, detail) {
   else { failed++; console.log(`  ✗ ${name}${detail ? ' — ' + detail : ''}`); }
 }
 const root = path.join(__dirname, '..');
-const PORT = 34587;
+const PORT = Number(process.env.AWANA_TEST_PORT || require('./free-port.cjs')());
 const today = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; })();
 
 (async () => {

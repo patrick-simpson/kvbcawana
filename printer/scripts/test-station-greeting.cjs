@@ -28,7 +28,7 @@ function check(name, cond, detail) {
   else { failed++; console.log(`  ✗ ${name}${detail ? ' — ' + detail : ''}`); }
 }
 const root = path.join(__dirname, '..');
-const PORT = 34588;
+const PORT = Number(process.env.AWANA_TEST_PORT || require('./free-port.cjs')());
 const JOB_A = 'A'.repeat(22);
 const JOB_B = 'B'.repeat(22);
 const JOB_C = 'C'.repeat(22);

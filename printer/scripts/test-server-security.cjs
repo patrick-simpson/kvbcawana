@@ -35,7 +35,7 @@ const http = require('http');
 const os = require('os');
 const path = require('path');
 
-const PORT = Number(process.env.AWANA_TEST_PORT || 34561);
+const PORT = Number(process.env.AWANA_TEST_PORT || require('./free-port.cjs')());
 const PIN = 'test-pin-9182';
 
 let passed = 0;
@@ -165,7 +165,7 @@ async function main() {
     console.warn('  ! No non-loopback IPv4 address on this host — LAN cases SKIPPED');
     check('LAN cases were exercised', false, 'no non-loopback address available');
   } else {
-    const lanPort = PORT + 2;
+    const lanPort = require('./free-port.cjs')('0.0.0.0');
     const lanListener = http.createServer(server.app);
     await new Promise((resolve) => lanListener.listen(lanPort, '0.0.0.0', resolve));
     const lanReq = (o) => request({ ...o, host: lan, port: lanPort });
@@ -408,7 +408,7 @@ async function main() {
       fs.writeFileSync(path.join(defaultDir, 'config.json'), JSON.stringify({
         printerName: '', checkinUrl: 'https://example.twotimtwo.com/clubber/checkin', ...cfgExtra,
       }, null, 2));
-      const childPort = PORT + 1;
+      const childPort = require('./free-port.cjs')();
       const child = require('child_process').spawn(
         process.execPath,
         [path.join(__dirname, '..', 'print-server', 'server.js')],

@@ -24,7 +24,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
-const PORT = Number(process.env.AWANA_TEST_PORT || 34583);
+const PORT = Number(process.env.AWANA_TEST_PORT || require('./free-port.cjs')());
 const BASE = `http://127.0.0.1:${PORT}`;
 const SYNC = 'https://awana-sync.test.workers.dev';
 const OLD_KEY = 'AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA=';

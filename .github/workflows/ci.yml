@@ -307,6 +307,8 @@ jobs:
       # test-cloud-e2e.cjs runs the sync Worker in process: its two runtime
       # packages (linkedom, parse5), not wrangler.
       - run: npm ci --omit=dev --prefix ../lobby/worker
+      # The suites take their own ports (scripts/free-port.cjs), so the runner
+      # (scripts/run-tests.cjs) runs them 4 at a time; `-- --serial` is the old order.
       - run: npm test
       - run: npm run build
 

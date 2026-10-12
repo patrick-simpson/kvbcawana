@@ -13,8 +13,11 @@ function check(name, cond, detail) {
   if (cond) passed++;
   else { failed++; console.log(`  ✗ ${name}${detail ? ' — ' + detail : ''}`); }
 }
+// JSON of a wire row or post with every base64 value (the ciphertext, ids and keys) blanked: a
+// name check on the raw JSON failed now and then, when random base64 happened to spell "Tia".
+const plain = (v) => JSON.stringify(v, (k, x) => (typeof x === 'string' && /^[A-Za-z0-9_+/=-]{16,}$/.test(x) ? '·' : x));
 const root = path.join(__dirname, '..');
-const PORT = 34610;
+const PORT = Number(process.env.AWANA_TEST_PORT || require('./free-port.cjs')());
 
 (async () => {
   const binDir = fs.mkdtempSync(path.join(os.tmpdir(), 'awana-pullbin-'));
@@ -449,7 +452,7 @@ const PORT = 34610;
     const row = posted[0];
     const opened = await cc.openRow(histRing, row);
     check('the row has the wire shape and opens with the history key only', /^[A-Za-z0-9_-]{22}$/.test(row.id) && row.night === NIGHT && row.kind === 'checkin' && row.ct.length === 1388 && opened && opened.first === 'Tia' && opened.clubberId === '15', JSON.stringify(row).slice(0, 120));
-    check('its plaintext is nowhere in the wire row', !JSON.stringify(row).includes('Tia') && !JSON.stringify(row).includes('Lowe'));
+    check('its plaintext is nowhere in the wire row', !plain(row).includes('Tia') && !plain(row).includes('Lowe'));
     check('no medical key can be sealed', (await writer.record('checkin', { first: 'Tia', allergies: 'peanuts' }, NIGHT)) === false && writer.status().queued === 0);
     check('without the history key nothing is written', (await hs.createHistoryWriter({ pub: () => null, signedIn: () => null, request, stationId: () => 'x', log: () => {} }).record('checkin', { first: 'T' }, NIGHT)) === false);
   }
@@ -476,7 +479,7 @@ const PORT = 34610;
       && sent[1].rows.length === 1 && !('summary' in sent[1]) && sent[1].rows[0].kind === 'reprint'
       && sent[2].rows.length === 1 && sent[2].summary[0].club === 'Cubbies' && writer.status().queued === 0, JSON.stringify(bodies.map((b) => [b.rows.length, b.summary])));
     check('the retry after a lost answer is the very same post (same row id, same line): one batch id, counted once', JSON.stringify(bodies[0]) === JSON.stringify(sent[0]));
-    check('no line rides on the wire row itself, and no name is in a post', sent.every((b) => b.rows.every((r) => !('summary' in r))) && !/Tia|Lowe|Ann|Bee/.test(JSON.stringify(bodies)));
+    check('no line rides on the wire row itself, and no name is in a post', sent.every((b) => b.rows.every((r) => !('summary' in r))) && !/Tia|Lowe|Ann|Bee/.test(plain(bodies)));
   }
 
   console.log('\nhistory: "Import laptop history" seals print-history.json and attendance.json once');

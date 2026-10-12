@@ -15,7 +15,7 @@ function check(name, cond, detail) {
   else { failed++; console.log(`  ✗ ${name}${detail ? ' — ' + detail : ''}`); }
 }
 const root = path.join(__dirname, '..');
-const PORT = 34575;
+const PORT = Number(process.env.AWANA_TEST_PORT || require('./free-port.cjs')());
 
 (async () => {
   console.log('\nphone relay: the same routes on both sides');

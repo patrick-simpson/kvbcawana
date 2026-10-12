@@ -37,7 +37,7 @@ const path = require('path');
 const { spawnSync } = require('child_process');
 const { MIRROR_DIR, KIT_DIR, REPO, hashTree, filesWithCarriageReturns } = require('./brand-manifest.cjs');
 
-const PORT = Number(process.env.AWANA_TEST_PORT || 34603);
+const PORT = Number(process.env.AWANA_TEST_PORT || require('./free-port.cjs')());
 const BASE = `http://127.0.0.1:${PORT}`;
 
 let passed = 0;

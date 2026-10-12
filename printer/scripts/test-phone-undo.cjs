@@ -35,7 +35,7 @@ const os = require('os');
 const path = require('path');
 
 const root = path.join(__dirname, '..');
-const PORT = Number(process.env.AWANA_TEST_PORT || 34611);
+const PORT = Number(process.env.AWANA_TEST_PORT || require('./free-port.cjs')());
 const BASE = `http://127.0.0.1:${PORT}`;
 const SRC = fs.readFileSync(path.join(root, 'chrome-extension', 'content.js'), 'utf8');
 

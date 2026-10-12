@@ -29,6 +29,7 @@
 'use strict';
 
 const fs = require('fs');
+const E2E_PORT = Number(process.env.AWANA_TEST_PORT || require('./free-port.cjs')());
 const os = require('os');
 const path = require('path');
 const { pathToFileURL } = require('url');
@@ -253,7 +254,7 @@ const fakeSafe = {
       printerName: 'Fake', lateGraceMin: 24 * 60, syncUrl: BASE, syncSession: t2.session,
     }));
     fs.writeFileSync(path.join(data, 'clubbers.csv'), `Clubber ID,First Name,Last Name,Club,Birthdate\n662,Kit,Tester,Sparks,${today.getMonth() + 1}/${today.getDate()}/2016\n702,Ottoline,Quillfeather,Cubbies,3/3/2016\n`);
-    Object.assign(process.env, { AWANA_DATA_DIR: data, AWANA_PORT: '34590', AWANA_BIND_HOST: '127.0.0.1', PRINTER_NAME: 'Fake' });
+    Object.assign(process.env, { AWANA_DATA_DIR: data, AWANA_PORT: String(E2E_PORT), AWANA_BIND_HOST: '127.0.0.1', PRINTER_NAME: 'Fake' });
     const server = require(path.join(root, 'print-server', 'server.js'));
     const events = require(path.join(root, 'print-server', 'events.js'));
     const displayKey = await t2.core.displayKey();
@@ -274,7 +275,7 @@ const fakeSafe = {
       && (await t2.call('GET', '/v1/publisher/status')).body.pickupClubs.join() === 'Puggles,Cubbies,Sparks,T&T');
 
     const puller2 = jp.createJobPuller({
-      signedIn: () => ({ base: BASE, session: t2.session }), stationId: () => STATION, ring: async () => st.ring, localBase: 'http://127.0.0.1:34590',
+      signedIn: () => ({ base: BASE, session: t2.session }), stationId: () => STATION, ring: async () => st.ring, localBase: 'http://127.0.0.1:' + E2E_PORT,
       request: request2, journal: jp.createJournal(null, t2.clock.now), fetchFn: real, now: t2.clock.now, log: () => {},
     });
     const frames = (event) => t2.sent.filter((f) => f.e === event);
@@ -325,7 +326,7 @@ const fakeSafe = {
     // the phone page: the Worker checks the child in on TwoTimTwo and hands the station a relay
     // job (no print-queue job), the station prints and greets naming the child; then the
     // watcher (CLOUD_PRINT) finds the child on the report and makes a job, which meets the label
-    const local = (p, body) => real(`http://127.0.0.1:34590${p}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then((r) => r.json());
+    const local = (p, body) => real(`http://127.0.0.1:${E2E_PORT}${p}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then((r) => r.json());
     const beforePhone = labels();
     const phonePrint = await local('/print', { name: 'Pip Phonely', clubName: 'Sparks', clubberId: '703', cloud: true });
     await settle();
