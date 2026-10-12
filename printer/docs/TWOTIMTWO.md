@@ -391,8 +391,8 @@ page (`/capabilities.html`) for the ranked backlog of what to build next.
 A GET-only walk of ~140 URLs on the same tenant, logged in as the operator.
 Same discipline as the rest of this document: page paths, form field names,
 table headers and CSV header rows only — never data. Nothing here has been
-built against yet; it exists so the ideas page's feasibility badges rest on
-something observed rather than assumed.
+built against yet; it exists so feasibility claims rest on something observed
+rather than assumed.
 
 ### 8.1 The report catalogue
 

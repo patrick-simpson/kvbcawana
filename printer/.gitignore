@@ -74,3 +74,7 @@ example_files/
 
 # Golden-image diff output (regenerated on failure, never committed)
 label-golden-out/
+
+# The render smoke's output (scripts/render-smoke.cjs); CI uploads it as an artifact
+scripts/render-smoke-out/
+render-smoke-out/

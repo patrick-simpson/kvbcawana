@@ -74,18 +74,14 @@ files.forEach(file => {
   console.log('Updated:', file.path);
 });
 
-// Rebuild the downloadable extension zips so they can't drift from the
-// source we just stamped. (Found the hard way: the committed zips still
+// Rebuild the downloadable extension zip so it can't drift from the
+// source we just stamped. (Found the hard way: the committed zip still
 // contained the 4.0.0 extension while the repo was at 5.0.2 — the website's
 // "Download chrome-extension.zip" button served a two-major-versions-stale
 // extension because nothing regenerated them on bump.)
-function rebuildExtensionZips() {
-  const zipTargets = [
-    path.join(rootDir, 'chrome-extension.zip'),
-    path.join(rootDir, 'public', 'chrome-extension.zip'),
-  ];
+function rebuildExtensionZip() {
+  const primary = path.join(rootDir, 'public', 'chrome-extension.zip');
   const srcDir = path.join(rootDir, 'chrome-extension');
-  const primary = zipTargets[0];
   try {
     fs.rmSync(primary, { force: true });
     if (process.platform === 'win32') {
@@ -98,16 +94,13 @@ function rebuildExtensionZips() {
     } else {
       execSync(`zip -q -r '${primary}' chrome-extension -x '*.DS_Store'`, { cwd: rootDir, stdio: 'pipe' });
     }
-    for (const target of zipTargets.slice(1)) {
-      fs.copyFileSync(primary, target);
-    }
-    zipTargets.forEach(t => console.log('Rebuilt:', t));
+    console.log('Rebuilt:', primary);
   } catch (e) {
     console.error('ERROR: could not rebuild chrome-extension.zip:', e.message);
     console.error('Rebuild it manually before committing — the website serves this file.');
     process.exitCode = 1;
   }
 }
-rebuildExtensionZips();
+rebuildExtensionZip();
 
 console.log('Successfully bumped version to:', version);

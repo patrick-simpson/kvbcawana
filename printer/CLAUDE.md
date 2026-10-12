@@ -40,8 +40,7 @@ Every functional change requires:
    used PRs). Nothing is live until it is on `main`: the root `ci.yml` runs
    every app's checks on each push and then publishes the site (the home page,
    `/checkin`, the update feeds) to awana.kvbchurch.org. A pushed branch
-   nobody merges is work stranded where the operator can't see it (it
-   happened once, with the ideas page).
+   nobody merges is work stranded where the operator can't see it.
 7. **Cut the release** (if `electron-app/` or `print-server/` changed) — see "Releasing the Windows app" below. Don't stop at pushing to `main`; the `.exe` isn't live until the tagged build publishes.
 
 ## KVBC Awana (9.0.0): roles, the display, the wizard
