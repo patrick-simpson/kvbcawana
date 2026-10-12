@@ -598,6 +598,7 @@ var newRowId = null;
 var KIDS = [];                 // the roster: { clubberId, name, club, clubId, checkedIn }
 var HOUSEHOLDS = null;         // householdIndex()-shaped, from GET /v1/desk/families
 var familiesAt = 0;
+var familiesStamp = null;      // the Worker's `familiesAt` the page's households came with (optional field)
 var ITEMS = { bible: [], friend: [] };
 var CLUBS = ['Puggles', 'Cubbies', 'Sparks', 'T&T', 'Trek', 'Journey'];   // replaced by clubs.js's table when it loads
 var STATE = {};                // child key -> { status: 'pending'|'waiting'|'done'|'failed', left?, msg? } (the check-in queue)
@@ -770,7 +771,7 @@ function signOut(message) {
   STATE = {}; OPS = {};
   BARF_LINES = {}; BARF_DONE = {}; applyBarf(null); renderBarfLines();
   KIDS = [];
-  HOUSEHOLDS = null; familiesAt = 0;
+  HOUSEHOLDS = null; familiesAt = 0; familiesStamp = null;
   SERVER_TONIGHT = null;
   RECENT = null; recentAskedAt = 0;
   leaderSelection = {};
@@ -865,6 +866,7 @@ function applyFamilies(data) {
   });
   HOUSEHOLDS = Object.keys(members).length ? { byName: byName, members: members } : null;
   familiesAt = Date.now();
+  if (data.familiesAt !== undefined) familiesStamp = data.familiesAt;
 }
 
 // One person in the shape the touch core works with.
@@ -1576,8 +1578,13 @@ function refreshAll() {
     if (epoch !== rosterEpoch) { rosterFetchInFlight = false; scheduleRosterPoll(0); return null; }
     applyRoster(data);
     var more = [desk.tonight().then(function(t) { SERVER_TONIGHT = t; }, function() { /* the roster's own count stands */ }), refreshBarf()];
-    if (Date.now() - familiesAt > FAMILIES_EVERY_MS) {
-      more.push(desk.families().then(applyFamilies, function(e) { if (e && e.code === 'busy') familiesAt = Date.now() - FAMILIES_EVERY_MS + 20000; }));
+    // The Worker read the households again (a newly registered child joins their family):
+    // its roster answer says so with a new `familiesAt` (absent: the half-hour rule alone).
+    var newFamilies = data.familiesAt !== undefined && data.familiesAt !== familiesStamp;
+    if (newFamilies || Date.now() - familiesAt > FAMILIES_EVERY_MS) {
+      var stamp = data.familiesAt;
+      more.push(desk.families().then(function(d) { applyFamilies(d); if (stamp !== undefined) familiesStamp = stamp; },
+        function(e) { if (e && e.code === 'busy') familiesAt = Date.now() - FAMILIES_EVERY_MS + 20000; }));
     }
     return Promise.all(more).then(function() {
       rosterFetchInFlight = false;

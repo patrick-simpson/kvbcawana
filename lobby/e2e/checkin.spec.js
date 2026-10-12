@@ -54,6 +54,8 @@ async function stubSite(page, { kids } = {}) {
     gate: null, busyFor: {}, refuseFor: {},
     /** GET /v1/desk/barf's answer (null: no route), and how the late-BARF redo goes ('ok' | 'fail'). */
     barf: null, barfRedo: 'ok', barfPosts: [],
+    /** The households, and the Worker's optional `familiesAt` stamp (read-15s). */
+    households: [['Ada Tester', 'Ben Tester']], familiesAt: null, familiesCalls: 0,
   };
   const api = async (route, req) => {
     const u = new URL(req.url());
@@ -69,9 +71,12 @@ async function stubSite(page, { kids } = {}) {
     if (p === '/v1/desk/roster') {
       world.rosterCalls += 1;
       if (world.busyFirst) { world.busyFirst = false; return route.fulfill(json(429, { ok: false, reason: 'read-busy', retryAfterMs: 1500 })); }
-      return route.fulfill(json(200, { readAt: new Date().toISOString(), kids: world.kids, items: { bible: ['Cubbies', 'Sparks'], friend: ['Sparks'] } }));
+      return route.fulfill(json(200, { readAt: new Date().toISOString(), kids: world.kids, items: { bible: ['Cubbies', 'Sparks'], friend: ['Sparks'] }, ...(world.familiesAt ? { familiesAt: world.familiesAt } : {}) }));
     }
-    if (p === '/v1/desk/families') return route.fulfill(json(200, { households: [['Ada Tester', 'Ben Tester']] }));
+    if (p === '/v1/desk/families') {
+      world.familiesCalls += 1;
+      return route.fulfill(json(200, { households: world.households, ...(world.familiesAt ? { familiesAt: world.familiesAt } : {}) }));
+    }
     if (p === '/v1/desk/tonight') return route.fulfill(json(404, { error: 'Not found.' }));
     if (p === '/v1/stations') return route.fulfill(json(200, [station]));
     if (p === '/v1/print/status') {
@@ -617,3 +622,28 @@ for (const where of ['/checkin/', '/checkin/ym/']) {
     expect(world.barfPosts.at(-1).tagJob).toBeUndefined();
   });
 }
+
+test('a new familiesAt on the roster answer reads the families again, so a newly registered child joins their family', async ({ page }) => {
+  test.setTimeout(60_000);
+  const { world } = await stubSite(page);
+  world.busyFirst = false;
+  world.familiesAt = '2026-10-14T21:00:00.000Z';
+  await signIn(page);
+  await expect(page.locator('.fam', { hasText: 'Tester' })).toHaveCount(1, { timeout: 10_000 });
+  expect(world.familiesCalls).toBe(1);
+  // The same familiesAt on the next roster answer: no second read (the half-hour rule stands).
+  const before = world.rosterCalls;
+  await page.locator('.fam', { hasText: 'Cy Other' }).click();
+  await page.locator('#kid-sheet').getByRole('button', { name: 'Check in' }).click();   // the page re-reads the roster 6 s later
+  await expect.poll(() => world.rosterCalls, { timeout: 15_000 }).toBeGreaterThan(before);
+  expect(world.familiesCalls).toBe(1);
+  // Dee is registered on TwoTimTwo: the Worker's households change, and its roster says so.
+  world.kids.push({ clubberId: '15', first: 'Dee', last: 'Tester', club: 'Puggles', clubId: '4', checkedIn: false });
+  world.households = [['Ada Tester', 'Ben Tester', 'Dee Tester']];
+  world.familiesAt = '2026-10-14T22:05:00.000Z';
+  await page.locator('.fam', { hasText: 'Tia Youth' }).click();
+  await page.locator('#kid-sheet').getByRole('button', { name: 'Check in' }).click();
+  await expect.poll(() => world.familiesCalls, { timeout: 15_000 }).toBe(2);
+  await expect(page.locator('.fam', { hasText: 'Tester' })).toHaveCount(1);
+  await expect(page.locator('.fam', { hasText: 'Tester' })).toContainText('Dee');
+});
