@@ -39,6 +39,17 @@ function readable(v) {
   return v;
 }
 
+/**
+ * A pattern for "this word appears in plain text": the word, not inside a
+ * run of base64 characters (a random salt, hash or iv can spell "ZED" by
+ * chance, which once failed a "no name stored" check).
+ * @param {string[]} words
+ */
+export function plainWords(words) {
+  const edge = '[A-Za-z0-9+/=_-]';
+  return new RegExp(`(?<!${edge})(?:${words.join('|')})(?!${edge})`, 'i');
+}
+
 /** Every key a storage holds, as one string: for "no plaintext id or name" checks. */
 export function everything(store) {
   return JSON.stringify(readable([...store.map.entries()]));

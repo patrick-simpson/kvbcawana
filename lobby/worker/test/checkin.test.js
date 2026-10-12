@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { openAsStation } from '../../shared/cloud-crypto.js';
 import { Registry } from '../src/registry.js';
 import { LEASE_MS } from '../src/printq.js';
-import { everything } from './helpers.js';
+import { everything, plainWords } from './helpers.js';
 import { HOUSEHOLD_CSV } from './fixtures.js';
 import { NIGHT, kid, rig, row } from './rig.js';
 
@@ -228,7 +228,7 @@ describe('the desk check-in', () => {
     // the same visitor, spelled differently, is the same claim
     const again = await t.call('POST', '/v1/desk/checkin', await t.deskBody([st], { clubberId: undefined, visitor: { first: 'zed', last: ' VISITOR ', club: 'sparks' } }));
     expect(again.body).toMatchObject({ already: true });
-    expect(everything(t.storage)).not.toMatch(/zed|visitor/i);
+    expect(everything(t.storage)).not.toMatch(plainWords(['zed', 'visitor']));
   });
 
   it('hooks (history, tally) hear every check-in, undo and check-out; a failing hook fails nothing', async () => {
