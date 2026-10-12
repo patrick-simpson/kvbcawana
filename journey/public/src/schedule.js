@@ -238,6 +238,7 @@ function markActivity() {
   const wasHidden = document.documentElement.classList.contains('cursor-hidden');
   document.documentElement.classList.remove('cursor-hidden');
   if (wasHidden && typeof syncScrubber === 'function') syncScrubber(); // the bar is back: catch it up
+  if (wasHidden && typeof startScrubberLoop === 'function') startScrubberLoop(); // and glide from here
   clearTimeout(cursorIdleTimer);
   cursorIdleTimer = setTimeout(() => {
     document.documentElement.classList.add('cursor-hidden');
@@ -1737,13 +1738,24 @@ function isAwaitingPlay() {
    frames actually rendering — which for a manual preview (streaming a
    full-size original over church WiFi) can be long enough to look like a
    dead screen. Also re-shown by the video's 'waiting' event for mid-play
-   buffering stalls, and hidden again by 'playing'. */
+   buffering stalls, and hidden again by 'playing'.
+
+   A 'waiting' shows it only after LOADING_REVEAL_DELAY_MS: every seek (the
+   ±15s jumps, the scrubber) fires 'waiting' for a moment while the decoder
+   finds its feet, and flashing the full ink overlay over the picture on each
+   one read as the screen blinking. A real stall still shows it half a second
+   in; 'canplay' or 'playing' before then means it never appears. The stall
+   clock (the 12s note, the near-end watchdog) starts at the 'waiting' itself,
+   not at the reveal. A play request still shows it at once (that is the
+   acknowledgement of the press), and the lesson intro's own calls are
+   unchanged. */
 const LOADING_STALL_MS = 12000;
+const LOADING_REVEAL_DELAY_MS = 500;
 const LOADING_NOTE_DEFAULT = journeyLoadingNote.textContent;
 let loadingStallTimer = null;
+let loadingRevealTimer = null;
 
-function showVideoLoading() {
-  journeyLoading.classList.remove('hidden');
+function showVideoLoading(revealDelayMs = 0) {
   // If loading drags on, say so honestly instead of pulsing forever — a
   // stalled fetch on a dead connection never fires an error event, so
   // without this the overlay is indistinguishable from progress. The ⇄
@@ -1759,10 +1771,24 @@ function showVideoLoading() {
     journeyLoadingNote.textContent =
       'Still loading — the internet may be down. Press → for the teaching slides, or ⇄ (bottom right) to go back.';
   }, LOADING_STALL_MS);
+  clearTimeout(loadingRevealTimer);
+  loadingRevealTimer = null;
+  if (revealDelayMs > 0 && journeyLoading.classList.contains('hidden')) {
+    loadingRevealTimer = setTimeout(() => {
+      loadingRevealTimer = null;
+      // Data arrived without an event we heard (or the video went): no cover.
+      if (journeyVideo.classList.contains('hidden') || journeyVideo.readyState >= 3) return;
+      journeyLoading.classList.remove('hidden');
+    }, revealDelayMs);
+    return;
+  }
+  journeyLoading.classList.remove('hidden');
 }
 
 function hideVideoLoading() {
   clearTimeout(loadingStallTimer);
+  clearTimeout(loadingRevealTimer);
+  loadingRevealTimer = null;
   // Frames are arriving again (or the video is being torn down), so the
   // stall swap has nothing to answer for either.
   clearStreamStallSwap();
@@ -1773,10 +1799,21 @@ function hideVideoLoading() {
 journeyVideo.addEventListener('playing', hideVideoLoading);
 journeyVideo.addEventListener('waiting', () => {
   if (journeyVideo.classList.contains('hidden')) return;
-  showVideoLoading();
+  showVideoLoading(LOADING_REVEAL_DELAY_MS);
   // A stall on a streamed file is the one case where the cached copy is
   // worth its stutter: see swapToCachedCopy above.
   armStreamStallSwap();
+});
+// The short wait after a seek (or a paused seek, which never fires
+// 'playing'): the data is there, so the overlay that was about to cover it
+// is not needed, and neither is the stall clock that came with it. An overlay
+// already up (a play request, a real stall) stays until 'playing' as before.
+journeyVideo.addEventListener('canplay', () => {
+  if (!loadingRevealTimer) return;
+  clearTimeout(loadingRevealTimer);
+  loadingRevealTimer = null;
+  clearTimeout(loadingStallTimer);
+  clearStreamStallSwap();
 });
 
 function setMuted(muted) {
@@ -1819,17 +1856,60 @@ function controlBarShowing() {
 function syncScrubber() {
   if (scrubbing || !controlBarShowing()) return;
   const duration = journeyVideo.duration;
+  let text;
   if (Number.isFinite(duration) && duration > 0) {
     videoScrubber.max = String(duration);
     videoScrubber.value = String(journeyVideo.currentTime);
-    videoTime.textContent = `${formatTime(journeyVideo.currentTime)} / ${formatTime(duration)}`;
+    text = `${formatTime(journeyVideo.currentTime)} / ${formatTime(duration)}`;
   } else {
     // Duration unknown (still loading, or a stream that doesn't report
     // one) — show elapsed time only and leave the scrubber inert.
     videoScrubber.max = '0';
     videoScrubber.value = '0';
-    videoTime.textContent = formatTime(journeyVideo.currentTime);
+    text = formatTime(journeyVideo.currentTime);
   }
+  // Called every frame while playing (below): the readout changes once a
+  // second, so it is written once a second.
+  if (videoTime.textContent !== text) videoTime.textContent = text;
+}
+
+/* The scrubber's thumb glides with the video instead of stepping four times
+   a second with 'timeupdate': one requestAnimationFrame loop, running only
+   while the video plays AND the bar can be seen (it stops itself the frame
+   either stops being true: paused, faded out with the idle cursor, the video
+   put away, a hidden tab). 'timeupdate' still catches the readout up when
+   the loop is not running (a seek while paused). */
+let scrubberRaf = 0;
+
+function scrubberLoopWanted() {
+  return (
+    !journeyVideo.paused &&
+    !journeyVideo.classList.contains('hidden') &&
+    !videoControls.classList.contains('hidden') &&
+    controlBarShowing() &&
+    !document.hidden
+  );
+}
+
+function scrubberFrame() {
+  scrubberRaf = 0;
+  if (!scrubberLoopWanted()) return;
+  syncScrubber();
+  scrubberRaf = requestAnimationFrame(scrubberFrame);
+}
+
+function startScrubberLoop() {
+  if (scrubberRaf || typeof requestAnimationFrame !== 'function' || !scrubberLoopWanted()) return;
+  scrubberRaf = requestAnimationFrame(scrubberFrame);
+}
+
+function scrubberLoopRunning() {
+  return scrubberRaf !== 0;
+}
+
+function onVideoTimeUpdate() {
+  if (!scrubberRaf) syncScrubber();
+  startScrubberLoop();
 }
 
 function togglePause() {
@@ -1869,7 +1949,9 @@ fwd15Btn.addEventListener('click', () => seekBy(SEEK_STEP_S));
 
 journeyVideo.addEventListener('play', syncPlaybackUI);
 journeyVideo.addEventListener('pause', syncPlaybackUI);
-journeyVideo.addEventListener('timeupdate', syncScrubber);
+journeyVideo.addEventListener('timeupdate', onVideoTimeUpdate);
+journeyVideo.addEventListener('playing', startScrubberLoop);
+document.addEventListener('visibilitychange', startScrubberLoop);
 journeyVideo.addEventListener('timeupdate', recordResumePoint);
 journeyVideo.addEventListener('durationchange', syncScrubber);
 journeyVideo.addEventListener('click', togglePause);
@@ -4010,13 +4092,37 @@ function resolveSlideUrl(show, url) {
   return pending;
 }
 
+/* A slide's picture, fetched (cache first, above) AND decoded, memoized per
+   slideshow: { src } once the browser can paint it without a decode on the
+   frame it appears (the decoded Image is kept in the map so it stays warm).
+   A picture that will not decode still resolves, so the element gets its
+   src and its own 'error' handling (skip ahead) runs as before. showSlide()
+   puts a picture on screen only through this, the next slide is decoded
+   ahead through it, and the slide-change motion (24-motion.js) holds its
+   carry on the same promise, so a step never uncovers a half-loaded slide. */
+function slidePicture(show, url) {
+  if (!show.pictures) show.pictures = new Map();
+  if (show.pictures.has(url)) return show.pictures.get(url).ready;
+  const entry = { img: null, ready: null };
+  entry.ready = Promise.resolve(resolveSlideUrl(show, url)).then((src) => {
+    if (slideshow !== show || typeof Image !== 'function') return { src };
+    const img = new Image();
+    entry.img = img;
+    img.src = src;
+    if (typeof img.decode !== 'function') return { src };
+    return img.decode().then(() => ({ src }), () => ({ src }));
+  });
+  show.pictures.set(url, entry);
+  return entry.ready;
+}
+
 function startTeachingSlides(week, onFinish) {
   const items = buildSlideItems(week);
   if (!items.length) return false;
   stopTeachingSlides();
   ++journeyRequestToken; // nothing in flight should touch the video now
   cancelLessonIntro();
-  slideshow = { week, items, index: 0, onFinish, blobUrls: new Map(), errors: 0 };
+  slideshow = { week, items, index: 0, onFinish, blobUrls: new Map(), pictures: new Map(), errors: 0 };
   // Release the video the same way stopJourneyContent() does — a decoded
   // ~17MB blob has no business staying resident behind a slideshow.
   journeyVideo.pause();
@@ -4056,7 +4162,7 @@ function showSlide(index) {
     slideTemplate.classList.add('hidden');
     slideTemplate.style.backgroundImage = '';
     slideImage.classList.remove('hidden');
-    resolveSlideUrl(show, item.url).then((src) => {
+    slidePicture(show, item.url).then(({ src }) => {
       if (slideshow !== show || show.index !== index) return;
       slideImage.src = src;
     });
@@ -4072,20 +4178,14 @@ function showSlide(index) {
     }
     slideTemplate.classList.remove('hidden');
     fitTemplateText();
-    resolveSlideUrl(show, item.url).then((src) => {
+    slidePicture(show, item.url).then(({ src }) => {
       if (slideshow !== show || show.index !== index) return;
       slideTemplate.style.backgroundImage = `url("${src}")`;
     });
   }
-  // Warm the next slide so the step lands instantly.
+  // Fetch and decode the next slide now, so the step lands instantly.
   const next = show.items[index + 1];
-  if (next) {
-    resolveSlideUrl(show, next.url).then((src) => {
-      if (slideshow !== show) return;
-      const img = new Image();
-      img.src = src;
-    });
-  }
+  if (next) slidePicture(show, next.url);
   const sec = slidesAutoAdvanceSec();
   if (sec > 0) slideAutoTimer = setTimeout(nextSlide, sec * 1000);
 }
@@ -4487,13 +4587,45 @@ function motionOn() {
   return document.documentElement.classList.contains(MOTION_CLASS);
 }
 
+/* The splash (and Trek's card) can be on screen the moment the page starts,
+   while the kit's fonts are still arriving (index.html preloads them;
+   warmBrandFonts asks for them). An entrance played in the fallback face and
+   then swapped mid-slam reads as a glitch, so at startup those entrances are
+   held at their first frame (.jm-fonts-wait, style.css: paused, never
+   restyled) until document.fonts.ready, or FONTS_WAIT_MAX_MS at most: a font
+   that never comes never holds the screen. Startup only, motion only; nothing
+   waits on it. */
+const FONTS_WAIT_CLASS = 'jm-fonts-wait';
+const FONTS_WAIT_MAX_MS = 1200;
+let fontsWaitDone = false;
+
+function holdEntrancesForFonts() {
+  if (fontsWaitDone) return;
+  fontsWaitDone = true;
+  const fonts = document.fonts;
+  if (!fonts || !fonts.ready || typeof fonts.ready.then !== 'function' || fonts.status === 'loaded') return;
+  const root = document.documentElement;
+  root.classList.add(FONTS_WAIT_CLASS);
+  const release = () => root.classList.remove(FONTS_WAIT_CLASS);
+  const timer = setTimeout(release, FONTS_WAIT_MAX_MS);
+  fonts.ready.then(
+    () => {
+      clearTimeout(timer);
+      release();
+    },
+    () => {} // the timer releases it
+  );
+}
+
 function applyMotion() {
   const root = document.documentElement;
   if (motionWanted()) {
     root.classList.add(MOTION_CLASS);
+    holdEntrancesForFonts();
     startMotionWatchers();
     return;
   }
+  root.classList.remove(FONTS_WAIT_CLASS);
   if (!root.classList.contains(MOTION_CLASS)) return; // never touch a still page
   root.classList.remove(MOTION_CLASS);
   stopMotionWatchers();
@@ -4729,12 +4861,13 @@ function onSlideCounterChange() {
   slideGhostSource = null;
   // Take this slide's copy once its picture is in (the same memoized
   // promise showSlide is waiting on, so this runs right after it).
+  // (slidePicture: showSlide registered first on the same promise, so the
+  // new picture is already on the stage when the copy is taken.)
   const item = show.items[show.index];
-  if (item) {
-    resolveSlideUrl(show, item.url).then(() => {
-      if (slideshow === show && show.index === number - 1) captureSlideSource();
-    }, () => {});
-  }
+  const landed = item ? slidePicture(show, item.url) : Promise.resolve();
+  landed.then(() => {
+    if (slideshow === show && show.index === number - 1) captureSlideSource();
+  }, () => {});
   if (typeof slideCounter.animate === 'function') {
     slideCounter.animate(
       [{ opacity: 0, transform: 'scale(1.3)' }, { opacity: 1, transform: 'none' }],
@@ -4747,24 +4880,45 @@ function onSlideCounterChange() {
     animateSlideLayers(back, MOTION_LEAD_MS);
     return;
   }
+  // The old slide and the band go up at once, HELD at their first frame
+  // (.jm-hold: the old slide still covers the stage, the band still off
+  // screen), and the new slide's layers wait at theirs, until the new
+  // slide's picture is decoded: the carry never uncovers a black or
+  // half-painted stage. Never longer than SLIDE_HOLD_MAX_MS (a picture
+  // coming slowly from the network), and a new press replaces it all.
   const ghost = document.createElement('div');
-  ghost.className = back ? 'jm-slide-ghost is-back' : 'jm-slide-ghost';
+  ghost.className = back ? 'jm-slide-ghost jm-hold is-back' : 'jm-slide-ghost jm-hold';
   ghost.setAttribute('aria-hidden', 'true');
   ghost.inert = true;
   if (old) ghost.appendChild(old);
   const sweep = document.createElement('div');
-  sweep.className = back ? 'jm-slide-sweep is-back' : 'jm-slide-sweep';
+  sweep.className = back ? 'jm-slide-sweep jm-hold is-back' : 'jm-slide-sweep jm-hold';
   sweep.setAttribute('aria-hidden', 'true');
   const band = buildCarryBand();
   sweep.appendChild(band);
   slidesView.append(ghost, sweep);
   const carry = { ghost, sweep };
   slideCarry = carry;
-  afterCarry(band, CARRY_SLIDE_MS + 500, () => {
+  afterCarry(band, CARRY_SLIDE_MS + SLIDE_HOLD_MAX_MS + 500, () => {
     if (slideCarry === carry) clearSlideCarry();
   });
-  animateSlideLayers(back, 0);
+  const anims = animateSlideLayers(back, 0, { held: true });
+  let released = false;
+  const release = () => {
+    if (released || slideCarry !== carry) return;
+    released = true;
+    ghost.classList.remove('jm-hold');
+    sweep.classList.remove('jm-hold');
+    for (const anim of anims) {
+      // A cancelled one (a newer press) stays cancelled.
+      if (anim.playState === 'paused') anim.play();
+    }
+  };
+  setTimeout(release, SLIDE_HOLD_MAX_MS);
+  landed.then(release, release);
 }
+
+const SLIDE_HOLD_MAX_MS = 400;
 
 /* The new slide's own layers (owner 2026-10-12), timed to the band: the
    background drifts the last few percent in the band's direction (a little
@@ -4808,11 +4962,14 @@ function splitHeadingWords(heading) {
   return [...heading.querySelectorAll('.jm-word')];
 }
 
-function animateSlideLayers(back, lead) {
+function animateSlideLayers(back, lead, { held = false } = {}) {
   cancelSlideLayers();
-  if (typeof slideStage.animate !== 'function') return;
+  if (typeof slideStage.animate !== 'function') return [];
   const play = (el, frames, duration, easing, delay) => {
-    slideLayerAnims.push(el.animate(frames, { duration, easing, delay: lead + delay, fill: 'backwards' }));
+    const anim = el.animate(frames, { duration, easing, delay: lead + delay, fill: 'backwards' });
+    // Held: in place at its first frame until the picture is in (above).
+    if (held && typeof anim.pause === 'function') anim.pause();
+    slideLayerAnims.push(anim);
   };
   const template = !slideTemplate.classList.contains('hidden');
   const layer = template ? slideTemplate : slideImage;
@@ -4824,7 +4981,7 @@ function animateSlideLayers(back, lead) {
     MOTION_EASE.carry,
     0
   );
-  if (!template) return;
+  if (!template) return slideLayerAnims.slice();
   // The trailing edge reaches the bullets (left) before the heading
   // (centre) going forward, the other way round going back.
   const words = splitHeadingWords(slideTemplateHeading);
@@ -4854,6 +5011,7 @@ function animateSlideLayers(back, lead) {
       bulletsAt + i * 90
     );
   });
+  return slideLayerAnims.slice();
 }
 
 if (reducedMotionQuery) {

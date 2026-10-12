@@ -32,17 +32,60 @@ function controlBarShowing() {
 function syncScrubber() {
   if (scrubbing || !controlBarShowing()) return;
   const duration = journeyVideo.duration;
+  let text;
   if (Number.isFinite(duration) && duration > 0) {
     videoScrubber.max = String(duration);
     videoScrubber.value = String(journeyVideo.currentTime);
-    videoTime.textContent = `${formatTime(journeyVideo.currentTime)} / ${formatTime(duration)}`;
+    text = `${formatTime(journeyVideo.currentTime)} / ${formatTime(duration)}`;
   } else {
     // Duration unknown (still loading, or a stream that doesn't report
     // one) — show elapsed time only and leave the scrubber inert.
     videoScrubber.max = '0';
     videoScrubber.value = '0';
-    videoTime.textContent = formatTime(journeyVideo.currentTime);
+    text = formatTime(journeyVideo.currentTime);
   }
+  // Called every frame while playing (below): the readout changes once a
+  // second, so it is written once a second.
+  if (videoTime.textContent !== text) videoTime.textContent = text;
+}
+
+/* The scrubber's thumb glides with the video instead of stepping four times
+   a second with 'timeupdate': one requestAnimationFrame loop, running only
+   while the video plays AND the bar can be seen (it stops itself the frame
+   either stops being true: paused, faded out with the idle cursor, the video
+   put away, a hidden tab). 'timeupdate' still catches the readout up when
+   the loop is not running (a seek while paused). */
+let scrubberRaf = 0;
+
+function scrubberLoopWanted() {
+  return (
+    !journeyVideo.paused &&
+    !journeyVideo.classList.contains('hidden') &&
+    !videoControls.classList.contains('hidden') &&
+    controlBarShowing() &&
+    !document.hidden
+  );
+}
+
+function scrubberFrame() {
+  scrubberRaf = 0;
+  if (!scrubberLoopWanted()) return;
+  syncScrubber();
+  scrubberRaf = requestAnimationFrame(scrubberFrame);
+}
+
+function startScrubberLoop() {
+  if (scrubberRaf || typeof requestAnimationFrame !== 'function' || !scrubberLoopWanted()) return;
+  scrubberRaf = requestAnimationFrame(scrubberFrame);
+}
+
+function scrubberLoopRunning() {
+  return scrubberRaf !== 0;
+}
+
+function onVideoTimeUpdate() {
+  if (!scrubberRaf) syncScrubber();
+  startScrubberLoop();
 }
 
 function togglePause() {
@@ -82,7 +125,9 @@ fwd15Btn.addEventListener('click', () => seekBy(SEEK_STEP_S));
 
 journeyVideo.addEventListener('play', syncPlaybackUI);
 journeyVideo.addEventListener('pause', syncPlaybackUI);
-journeyVideo.addEventListener('timeupdate', syncScrubber);
+journeyVideo.addEventListener('timeupdate', onVideoTimeUpdate);
+journeyVideo.addEventListener('playing', startScrubberLoop);
+document.addEventListener('visibilitychange', startScrubberLoop);
 journeyVideo.addEventListener('timeupdate', recordResumePoint);
 journeyVideo.addEventListener('durationchange', syncScrubber);
 journeyVideo.addEventListener('click', togglePause);

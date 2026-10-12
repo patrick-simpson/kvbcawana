@@ -192,3 +192,63 @@ test('a stall on the last seconds hands over to the slides instead of swapping',
   assert.equal(kiosk.video.getAttribute('src'), CURRENT.sourceUrl, 'no swap this close to the end');
   kiosk.close();
 });
+
+/* A seek fires 'waiting' for a moment while the decoder finds its feet. The
+   ink loading overlay used to cover the picture on every one of those (the
+   screen blinked on every ±15s press); now a 'waiting' shows it only if the
+   wait lasts half a second, and 'canplay' or 'playing' first means it never
+   appears. A play request still shows it at once (it is the acknowledgement). */
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+test('a short wait after a seek never flashes the loading overlay; a real stall shows it after 500ms', async () => {
+  const kiosk = bootKiosk(ROUTES, ANSWERED, KIOSK_PC);
+  try {
+    await ticks();
+    await beginTheLesson(kiosk);
+    const overlay = kiosk.document.getElementById('journey-loading');
+    // The video is on screen and playing: the overlay is down.
+    kiosk.video.classList.remove('hidden');
+    kiosk.video.dispatchEvent(new kiosk.window.Event('playing'));
+    assert.equal(overlay.classList.contains('hidden'), true);
+
+    // A seek: 'waiting', then the data is there within the half second.
+    kiosk.video.dispatchEvent(new kiosk.window.Event('waiting'));
+    assert.equal(overlay.classList.contains('hidden'), true, 'not at once');
+    await sleep(100);
+    kiosk.video.dispatchEvent(new kiosk.window.Event('canplay'));
+    await sleep(550);
+    assert.equal(overlay.classList.contains('hidden'), true, 'never, for a wait that ended in time');
+
+    // A real stall: still waiting half a second later.
+    kiosk.video.dispatchEvent(new kiosk.window.Event('waiting'));
+    await sleep(300);
+    assert.equal(overlay.classList.contains('hidden'), true);
+    await sleep(300);
+    assert.equal(overlay.classList.contains('hidden'), false, 'shown once the wait is real');
+    kiosk.video.dispatchEvent(new kiosk.window.Event('playing'));
+    assert.equal(overlay.classList.contains('hidden'), true);
+
+    // Torn down mid-wait (⇄): nothing comes up afterwards.
+    kiosk.video.dispatchEvent(new kiosk.window.Event('waiting'));
+    kiosk.window.stopJourneyContent();
+    await sleep(600);
+    assert.equal(overlay.classList.contains('hidden'), true);
+  } finally {
+    kiosk.close();
+  }
+});
+
+test('the stall clock still starts at the waiting itself, not at the reveal', async () => {
+  const kiosk = bootKiosk(ROUTES, ANSWERED, KIOSK_PC);
+  try {
+    await ticks();
+    await beginTheLesson(kiosk);
+    kiosk.video.classList.remove('hidden');
+    kiosk.video.dispatchEvent(new kiosk.window.Event('playing'));
+    const timers = captureTimers(kiosk.window, () => kiosk.video.dispatchEvent(new kiosk.window.Event('waiting')));
+    assert.ok(timerAt(timers, 12000), 'the 12s note / near-end watchdog is armed at once');
+    assert.ok(timerAt(timers, 500), 'the overlay waits half a second');
+  } finally {
+    kiosk.close();
+  }
+});

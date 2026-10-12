@@ -132,13 +132,24 @@ function isAwaitingPlay() {
    frames actually rendering — which for a manual preview (streaming a
    full-size original over church WiFi) can be long enough to look like a
    dead screen. Also re-shown by the video's 'waiting' event for mid-play
-   buffering stalls, and hidden again by 'playing'. */
+   buffering stalls, and hidden again by 'playing'.
+
+   A 'waiting' shows it only after LOADING_REVEAL_DELAY_MS: every seek (the
+   ±15s jumps, the scrubber) fires 'waiting' for a moment while the decoder
+   finds its feet, and flashing the full ink overlay over the picture on each
+   one read as the screen blinking. A real stall still shows it half a second
+   in; 'canplay' or 'playing' before then means it never appears. The stall
+   clock (the 12s note, the near-end watchdog) starts at the 'waiting' itself,
+   not at the reveal. A play request still shows it at once (that is the
+   acknowledgement of the press), and the lesson intro's own calls are
+   unchanged. */
 const LOADING_STALL_MS = 12000;
+const LOADING_REVEAL_DELAY_MS = 500;
 const LOADING_NOTE_DEFAULT = journeyLoadingNote.textContent;
 let loadingStallTimer = null;
+let loadingRevealTimer = null;
 
-function showVideoLoading() {
-  journeyLoading.classList.remove('hidden');
+function showVideoLoading(revealDelayMs = 0) {
   // If loading drags on, say so honestly instead of pulsing forever — a
   // stalled fetch on a dead connection never fires an error event, so
   // without this the overlay is indistinguishable from progress. The ⇄
@@ -154,10 +165,24 @@ function showVideoLoading() {
     journeyLoadingNote.textContent =
       'Still loading — the internet may be down. Press → for the teaching slides, or ⇄ (bottom right) to go back.';
   }, LOADING_STALL_MS);
+  clearTimeout(loadingRevealTimer);
+  loadingRevealTimer = null;
+  if (revealDelayMs > 0 && journeyLoading.classList.contains('hidden')) {
+    loadingRevealTimer = setTimeout(() => {
+      loadingRevealTimer = null;
+      // Data arrived without an event we heard (or the video went): no cover.
+      if (journeyVideo.classList.contains('hidden') || journeyVideo.readyState >= 3) return;
+      journeyLoading.classList.remove('hidden');
+    }, revealDelayMs);
+    return;
+  }
+  journeyLoading.classList.remove('hidden');
 }
 
 function hideVideoLoading() {
   clearTimeout(loadingStallTimer);
+  clearTimeout(loadingRevealTimer);
+  loadingRevealTimer = null;
   // Frames are arriving again (or the video is being torn down), so the
   // stall swap has nothing to answer for either.
   clearStreamStallSwap();
@@ -168,10 +193,21 @@ function hideVideoLoading() {
 journeyVideo.addEventListener('playing', hideVideoLoading);
 journeyVideo.addEventListener('waiting', () => {
   if (journeyVideo.classList.contains('hidden')) return;
-  showVideoLoading();
+  showVideoLoading(LOADING_REVEAL_DELAY_MS);
   // A stall on a streamed file is the one case where the cached copy is
   // worth its stutter: see swapToCachedCopy above.
   armStreamStallSwap();
+});
+// The short wait after a seek (or a paused seek, which never fires
+// 'playing'): the data is there, so the overlay that was about to cover it
+// is not needed, and neither is the stall clock that came with it. An overlay
+// already up (a play request, a real stall) stays until 'playing' as before.
+journeyVideo.addEventListener('canplay', () => {
+  if (!loadingRevealTimer) return;
+  clearTimeout(loadingRevealTimer);
+  loadingRevealTimer = null;
+  clearTimeout(loadingStallTimer);
+  clearStreamStallSwap();
 });
 
 function setMuted(muted) {

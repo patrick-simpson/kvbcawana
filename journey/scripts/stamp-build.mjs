@@ -13,6 +13,9 @@
  *                           stylesheets, the brand kit's two stylesheets and
  *                           the wordmark) gets ?v=<sha>
  *   4. public/brand/fonts.css  every font URL gets ?v=<sha256 of that font>
+ *   5. public/index.html    each <link rel="preload"> of a kit font gets the
+ *                           SAME ?v= as point 4 (a different URL would make
+ *                           the preload a second, wasted download)
  *
  * Point 3 is what makes a reload actually pick up new code: GitHub Pages
  * serves every asset with max-age=600, and Chromium will happily reuse a
@@ -118,6 +121,24 @@ export function fontHasher(brandDir) {
   };
 }
 
+/* The page preloads the kit's fonts it draws first (index.html). A preload
+ * only helps when its URL is the very one brand/fonts.css asks for, so each
+ * gets the same ?v=<font hash> the sheet's url() gets. Throws for a preload of
+ * a font the sheet does not name (it would be a download nothing uses) and,
+ * through hashFor, for one the deploy does not carry. Idempotent. */
+export function stampFontPreloads(html, fontsCss, hashFor) {
+  const named = new Set(
+    [...fontsCss.matchAll(/url\((['"]?)(fonts\/[^'")?#]+)/g)].map((m) => m[2])
+  );
+  const pattern = /(<link\s[^>]*rel=["']preload["'][^>]*href=["'])brand\/(fonts\/[^"'?#]+)(?:\?v=[^"']*)?(["'])/g;
+  return html.replace(pattern, (_, head, rel, quote) => {
+    if (!named.has(rel)) {
+      throw new Error(`stamp-build: index.html preloads brand/${rel}, which ${FONTS_CSS} does not name`);
+    }
+    return `${head}brand/${rel}?v=${hashFor(rel)}${quote}`;
+  });
+}
+
 export function buildVersionJson(build, builtAt = new Date().toISOString()) {
   return `${JSON.stringify({ build, builtAt }, null, 2)}\n`;
 }
@@ -129,10 +150,12 @@ export function stampBuild(build, dir = path.join(REPO, 'public'), builtAt) {
     throw new Error('stamp-build: a build id (the commit SHA) is required');
   }
   const htmlPath = path.join(dir, 'index.html');
-  const html = stampHtml(readFileSync(htmlPath, 'utf8'), build);
   const fontsPath = path.join(dir, FONTS_CSS);
   if (!existsSync(fontsPath)) throw new Error(`stamp-build: ${FONTS_CSS} is missing from ${dir}`);
-  const fontsCss = stampFontsCss(readFileSync(fontsPath, 'utf8'), fontHasher(path.dirname(fontsPath)));
+  const hashFor = fontHasher(path.dirname(fontsPath));
+  const plainFontsCss = readFileSync(fontsPath, 'utf8');
+  const fontsCss = stampFontsCss(plainFontsCss, hashFor);
+  const html = stampFontPreloads(stampHtml(readFileSync(htmlPath, 'utf8'), build), plainFontsCss, hashFor);
   const version = buildVersionJson(build, builtAt);
   writeFileSync(htmlPath, html);
   writeFileSync(fontsPath, fontsCss);

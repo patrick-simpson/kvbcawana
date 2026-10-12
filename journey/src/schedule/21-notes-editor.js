@@ -293,13 +293,37 @@ function resolveSlideUrl(show, url) {
   return pending;
 }
 
+/* A slide's picture, fetched (cache first, above) AND decoded, memoized per
+   slideshow: { src } once the browser can paint it without a decode on the
+   frame it appears (the decoded Image is kept in the map so it stays warm).
+   A picture that will not decode still resolves, so the element gets its
+   src and its own 'error' handling (skip ahead) runs as before. showSlide()
+   puts a picture on screen only through this, the next slide is decoded
+   ahead through it, and the slide-change motion (24-motion.js) holds its
+   carry on the same promise, so a step never uncovers a half-loaded slide. */
+function slidePicture(show, url) {
+  if (!show.pictures) show.pictures = new Map();
+  if (show.pictures.has(url)) return show.pictures.get(url).ready;
+  const entry = { img: null, ready: null };
+  entry.ready = Promise.resolve(resolveSlideUrl(show, url)).then((src) => {
+    if (slideshow !== show || typeof Image !== 'function') return { src };
+    const img = new Image();
+    entry.img = img;
+    img.src = src;
+    if (typeof img.decode !== 'function') return { src };
+    return img.decode().then(() => ({ src }), () => ({ src }));
+  });
+  show.pictures.set(url, entry);
+  return entry.ready;
+}
+
 function startTeachingSlides(week, onFinish) {
   const items = buildSlideItems(week);
   if (!items.length) return false;
   stopTeachingSlides();
   ++journeyRequestToken; // nothing in flight should touch the video now
   cancelLessonIntro();
-  slideshow = { week, items, index: 0, onFinish, blobUrls: new Map(), errors: 0 };
+  slideshow = { week, items, index: 0, onFinish, blobUrls: new Map(), pictures: new Map(), errors: 0 };
   // Release the video the same way stopJourneyContent() does — a decoded
   // ~17MB blob has no business staying resident behind a slideshow.
   journeyVideo.pause();
@@ -339,7 +363,7 @@ function showSlide(index) {
     slideTemplate.classList.add('hidden');
     slideTemplate.style.backgroundImage = '';
     slideImage.classList.remove('hidden');
-    resolveSlideUrl(show, item.url).then((src) => {
+    slidePicture(show, item.url).then(({ src }) => {
       if (slideshow !== show || show.index !== index) return;
       slideImage.src = src;
     });
@@ -355,20 +379,14 @@ function showSlide(index) {
     }
     slideTemplate.classList.remove('hidden');
     fitTemplateText();
-    resolveSlideUrl(show, item.url).then((src) => {
+    slidePicture(show, item.url).then(({ src }) => {
       if (slideshow !== show || show.index !== index) return;
       slideTemplate.style.backgroundImage = `url("${src}")`;
     });
   }
-  // Warm the next slide so the step lands instantly.
+  // Fetch and decode the next slide now, so the step lands instantly.
   const next = show.items[index + 1];
-  if (next) {
-    resolveSlideUrl(show, next.url).then((src) => {
-      if (slideshow !== show) return;
-      const img = new Image();
-      img.src = src;
-    });
-  }
+  if (next) slidePicture(show, next.url);
   const sec = slidesAutoAdvanceSec();
   if (sec > 0) slideAutoTimer = setTimeout(nextSlide, sec * 1000);
 }

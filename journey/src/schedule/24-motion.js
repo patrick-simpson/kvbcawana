@@ -59,13 +59,45 @@ function motionOn() {
   return document.documentElement.classList.contains(MOTION_CLASS);
 }
 
+/* The splash (and Trek's card) can be on screen the moment the page starts,
+   while the kit's fonts are still arriving (index.html preloads them;
+   warmBrandFonts asks for them). An entrance played in the fallback face and
+   then swapped mid-slam reads as a glitch, so at startup those entrances are
+   held at their first frame (.jm-fonts-wait, style.css: paused, never
+   restyled) until document.fonts.ready, or FONTS_WAIT_MAX_MS at most: a font
+   that never comes never holds the screen. Startup only, motion only; nothing
+   waits on it. */
+const FONTS_WAIT_CLASS = 'jm-fonts-wait';
+const FONTS_WAIT_MAX_MS = 1200;
+let fontsWaitDone = false;
+
+function holdEntrancesForFonts() {
+  if (fontsWaitDone) return;
+  fontsWaitDone = true;
+  const fonts = document.fonts;
+  if (!fonts || !fonts.ready || typeof fonts.ready.then !== 'function' || fonts.status === 'loaded') return;
+  const root = document.documentElement;
+  root.classList.add(FONTS_WAIT_CLASS);
+  const release = () => root.classList.remove(FONTS_WAIT_CLASS);
+  const timer = setTimeout(release, FONTS_WAIT_MAX_MS);
+  fonts.ready.then(
+    () => {
+      clearTimeout(timer);
+      release();
+    },
+    () => {} // the timer releases it
+  );
+}
+
 function applyMotion() {
   const root = document.documentElement;
   if (motionWanted()) {
     root.classList.add(MOTION_CLASS);
+    holdEntrancesForFonts();
     startMotionWatchers();
     return;
   }
+  root.classList.remove(FONTS_WAIT_CLASS);
   if (!root.classList.contains(MOTION_CLASS)) return; // never touch a still page
   root.classList.remove(MOTION_CLASS);
   stopMotionWatchers();
@@ -301,12 +333,13 @@ function onSlideCounterChange() {
   slideGhostSource = null;
   // Take this slide's copy once its picture is in (the same memoized
   // promise showSlide is waiting on, so this runs right after it).
+  // (slidePicture: showSlide registered first on the same promise, so the
+  // new picture is already on the stage when the copy is taken.)
   const item = show.items[show.index];
-  if (item) {
-    resolveSlideUrl(show, item.url).then(() => {
-      if (slideshow === show && show.index === number - 1) captureSlideSource();
-    }, () => {});
-  }
+  const landed = item ? slidePicture(show, item.url) : Promise.resolve();
+  landed.then(() => {
+    if (slideshow === show && show.index === number - 1) captureSlideSource();
+  }, () => {});
   if (typeof slideCounter.animate === 'function') {
     slideCounter.animate(
       [{ opacity: 0, transform: 'scale(1.3)' }, { opacity: 1, transform: 'none' }],
@@ -319,24 +352,45 @@ function onSlideCounterChange() {
     animateSlideLayers(back, MOTION_LEAD_MS);
     return;
   }
+  // The old slide and the band go up at once, HELD at their first frame
+  // (.jm-hold: the old slide still covers the stage, the band still off
+  // screen), and the new slide's layers wait at theirs, until the new
+  // slide's picture is decoded: the carry never uncovers a black or
+  // half-painted stage. Never longer than SLIDE_HOLD_MAX_MS (a picture
+  // coming slowly from the network), and a new press replaces it all.
   const ghost = document.createElement('div');
-  ghost.className = back ? 'jm-slide-ghost is-back' : 'jm-slide-ghost';
+  ghost.className = back ? 'jm-slide-ghost jm-hold is-back' : 'jm-slide-ghost jm-hold';
   ghost.setAttribute('aria-hidden', 'true');
   ghost.inert = true;
   if (old) ghost.appendChild(old);
   const sweep = document.createElement('div');
-  sweep.className = back ? 'jm-slide-sweep is-back' : 'jm-slide-sweep';
+  sweep.className = back ? 'jm-slide-sweep jm-hold is-back' : 'jm-slide-sweep jm-hold';
   sweep.setAttribute('aria-hidden', 'true');
   const band = buildCarryBand();
   sweep.appendChild(band);
   slidesView.append(ghost, sweep);
   const carry = { ghost, sweep };
   slideCarry = carry;
-  afterCarry(band, CARRY_SLIDE_MS + 500, () => {
+  afterCarry(band, CARRY_SLIDE_MS + SLIDE_HOLD_MAX_MS + 500, () => {
     if (slideCarry === carry) clearSlideCarry();
   });
-  animateSlideLayers(back, 0);
+  const anims = animateSlideLayers(back, 0, { held: true });
+  let released = false;
+  const release = () => {
+    if (released || slideCarry !== carry) return;
+    released = true;
+    ghost.classList.remove('jm-hold');
+    sweep.classList.remove('jm-hold');
+    for (const anim of anims) {
+      // A cancelled one (a newer press) stays cancelled.
+      if (anim.playState === 'paused') anim.play();
+    }
+  };
+  setTimeout(release, SLIDE_HOLD_MAX_MS);
+  landed.then(release, release);
 }
+
+const SLIDE_HOLD_MAX_MS = 400;
 
 /* The new slide's own layers (owner 2026-10-12), timed to the band: the
    background drifts the last few percent in the band's direction (a little
@@ -380,11 +434,14 @@ function splitHeadingWords(heading) {
   return [...heading.querySelectorAll('.jm-word')];
 }
 
-function animateSlideLayers(back, lead) {
+function animateSlideLayers(back, lead, { held = false } = {}) {
   cancelSlideLayers();
-  if (typeof slideStage.animate !== 'function') return;
+  if (typeof slideStage.animate !== 'function') return [];
   const play = (el, frames, duration, easing, delay) => {
-    slideLayerAnims.push(el.animate(frames, { duration, easing, delay: lead + delay, fill: 'backwards' }));
+    const anim = el.animate(frames, { duration, easing, delay: lead + delay, fill: 'backwards' });
+    // Held: in place at its first frame until the picture is in (above).
+    if (held && typeof anim.pause === 'function') anim.pause();
+    slideLayerAnims.push(anim);
   };
   const template = !slideTemplate.classList.contains('hidden');
   const layer = template ? slideTemplate : slideImage;
@@ -396,7 +453,7 @@ function animateSlideLayers(back, lead) {
     MOTION_EASE.carry,
     0
   );
-  if (!template) return;
+  if (!template) return slideLayerAnims.slice();
   // The trailing edge reaches the bullets (left) before the heading
   // (centre) going forward, the other way round going back.
   const words = splitHeadingWords(slideTemplateHeading);
@@ -426,6 +483,7 @@ function animateSlideLayers(back, lead) {
       bulletsAt + i * 90
     );
   });
+  return slideLayerAnims.slice();
 }
 
 if (reducedMotionQuery) {

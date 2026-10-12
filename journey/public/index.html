@@ -12,6 +12,14 @@
   <!-- The Awana 2026-27 brand kit, mirrored byte for byte in brand/ (see
        CLAUDE.md, "Brand kit"): its colour tokens and its three self-hosted
        font families. Nothing on this page loads a font from the network. -->
+  <!-- The three faces the page draws (Londrina 900 and the TTFs are never
+       used), fetched with the page instead of after the stylesheet is
+       parsed, so the splash's first frame is already in the kit's type. The
+       deployed copy carries the same ?v=<font hash> as brand/fonts.css
+       (scripts/stamp-build.mjs), or the preload would be a second download. -->
+  <link rel="preload" href="brand/fonts/paytone-one-full-400-normal.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="preload" href="brand/fonts/londrina-solid-full-400-normal.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="preload" href="brand/fonts/figtree-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin />
   <link rel="stylesheet" href="brand/tokens.css" />
   <link rel="stylesheet" href="brand/fonts.css" />
   <link rel="stylesheet" href="src/style.css" />

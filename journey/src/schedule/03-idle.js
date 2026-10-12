@@ -46,6 +46,7 @@ function markActivity() {
   const wasHidden = document.documentElement.classList.contains('cursor-hidden');
   document.documentElement.classList.remove('cursor-hidden');
   if (wasHidden && typeof syncScrubber === 'function') syncScrubber(); // the bar is back: catch it up
+  if (wasHidden && typeof startScrubberLoop === 'function') startScrubberLoop(); // and glide from here
   clearTimeout(cursorIdleTimer);
   cursorIdleTimer = setTimeout(() => {
     document.documentElement.classList.add('cursor-hidden');

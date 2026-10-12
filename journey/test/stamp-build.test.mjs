@@ -12,6 +12,7 @@ import { fileURLToPath } from 'node:url';
 import {
   FONTS_CSS,
   stampBuild,
+  stampFontPreloads,
   stampFontsCss,
   stampHtml,
   STAMPED_ASSETS,
@@ -54,10 +55,17 @@ const localRefs = (page) =>
    old-page/new-asset mix the stamp exists to prevent. */
 function assertEveryLocalRefStamped(stamped, build) {
   const plain = localRefs(readFileSync(PAGE, 'utf8'));
+  // A preloaded font carries its own content hash (the one brand/fonts.css
+  // names it by), never the build id: see the preload test below.
+  const fontsDir = path.join(REPO, 'public', 'brand');
   assert.deepEqual(
     localRefs(stamped),
-    plain.map((url) => `${url}?v=${build}`),
-    'every local src/href, every copy, carries the build id'
+    plain.map((url) =>
+      url.startsWith('brand/fonts/')
+        ? `${url}?v=${shortHash(path.join(fontsDir, url.slice('brand/'.length)))}`
+        : `${url}?v=${build}`
+    ),
+    'every local src/href, every copy, carries the build id (a font, its own hash)'
   );
 }
 
@@ -179,6 +187,49 @@ test('stamping is idempotent, and a new build leaves no trace of the old one', (
   stampBuild('bbb222', dir, '2026-09-16T19:00:00.000Z');
   assert.equal(readFileSync(path.join(dir, FONTS_CSS), 'utf8'), fontsOnce);
   assert.equal(/\?v=[^'")]*\?v=/.test(fontsOnce), false, 'never a second ?v=');
+  rmSync(dir, { recursive: true, force: true });
+});
+
+test('the page preloads the fonts it draws, on the very URLs the font sheet asks for', () => {
+  const plainPage = readFileSync(PAGE, 'utf8');
+  const preloads = [...plainPage.matchAll(/<link\s[^>]*rel="preload"[^>]*>/g)].map((m) => m[0]);
+  const hrefs = preloads.map((tag) => tag.match(/href="([^"]+)"/)[1]);
+  // The three faces the page draws first; never Londrina 900 or a TTF (the
+  // page never uses them, so a preload would be a download for nothing).
+  assert.deepEqual(hrefs.sort(), [
+    'brand/fonts/figtree-latin-wght-normal.woff2',
+    'brand/fonts/londrina-solid-full-400-normal.woff2',
+    'brand/fonts/paytone-one-full-400-normal.woff2',
+  ]);
+  for (const tag of preloads) {
+    // Fonts are fetched in CORS mode: without crossorigin the preload is
+    // not reused and the font downloads twice.
+    assert.match(tag, /\sas="font"/);
+    assert.match(tag, /\stype="font\/woff2"/);
+    assert.match(tag, /\scrossorigin\b/);
+  }
+  // Ahead of the stylesheets, so the fetch starts before they are parsed.
+  assert.ok(plainPage.indexOf('rel="preload"') < plainPage.indexOf('rel="stylesheet"'));
+
+  const dir = scratchPublic();
+  const { html, fontsCss } = stampBuild('hhh888', dir, '2026-09-16T18:00:00.000Z');
+  const sheetUrls = new Set(fontUrls(fontsCss).map((url) => `brand/${url}`));
+  const stampedHrefs = [...html.matchAll(/<link\s[^>]*rel="preload"[^>]*href="([^"]+)"/g)].map((m) => m[1]);
+  assert.equal(stampedHrefs.length, 3);
+  for (const href of stampedHrefs) assert.ok(sheetUrls.has(href), `${href} is exactly a URL brand/fonts.css asks for`);
+  // Idempotent like the rest.
+  assert.equal(stampBuild('hhh888', dir, '2026-09-16T18:00:00.000Z').html, html);
+  rmSync(dir, { recursive: true, force: true });
+});
+
+test('a preload of a font the sheet does not name, or the deploy lacks, fails the deploy', () => {
+  const sheet = "src: url('fonts/a.woff2') format('woff2');";
+  const page = (rel) => `<link rel="preload" href="brand/${rel}" as="font" type="font/woff2" crossorigin />`;
+  assert.equal(stampFontPreloads(page('fonts/a.woff2'), sheet, () => 'h1'), page('fonts/a.woff2?v=h1'));
+  assert.throws(() => stampFontPreloads(page('fonts/b.woff2'), sheet, () => 'h1'), /does not name/);
+  const dir = scratchPublic();
+  rmSync(path.join(dir, 'brand', 'fonts', 'figtree-latin-wght-normal.woff2'));
+  assert.throws(() => stampBuild('iii999', dir), /figtree-latin-wght-normal\.woff2/);
   rmSync(dir, { recursive: true, force: true });
 });
 

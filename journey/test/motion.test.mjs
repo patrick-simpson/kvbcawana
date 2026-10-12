@@ -172,6 +172,144 @@ test('kiosk slides: the old slide rides off on the band, a step back runs the ot
 });
 
 
+/* Every slide picture is decoded before it is shown, and a step's carry waits
+   for it at its first frame (the old slide still covering the stage), so the
+   band never uncovers a black or half-painted slide. `decodes` holds each
+   pending Image.decode() so a test can finish one when it chooses. */
+function heldDecodes(window) {
+  const decodes = [];
+  window.HTMLImageElement.prototype.decode = function decode() {
+    return new Promise((resolve) => decodes.push({ src: this.getAttribute('src'), resolve }));
+  };
+  return decodes;
+}
+
+test('kiosk slides: the carry is held at its first frame until the new picture is decoded', async () => {
+  let decodes = [];
+  const k = bootKiosk(ROUTES, ANSWERED, KIOSK_PC, (window) => {
+    reduce(false)(window);
+    decodes = heldDecodes(window);
+  });
+  try {
+    await ticks();
+    k.window.startSlidesPreview(6);
+    await ticks(2);
+    band(stinger(k)).dispatchEvent(new k.window.Event('animationend'));
+    const realImage = k.document.getElementById('slide-image');
+    // Slide 1 is not put on the stage until it is decoded.
+    assert.equal(realImage.getAttribute('src'), null, 'no half-decoded picture on screen');
+    for (const d of decodes.splice(0)) d.resolve();
+    await ticks(2);
+    const firstSrc = realImage.getAttribute('src');
+    assert.match(firstSrc, /slide-1\.jpg$/);
+    // The next slide was decoded ahead already (asked for, at least).
+    await ticks(2);
+    for (const d of decodes.splice(0)) d.resolve();
+    await ticks(2);
+
+    k.window.nextSlide();
+    await ticks(1);
+    const ghost = k.document.querySelector('.jm-slide-ghost');
+    const sweep = k.document.querySelector('.jm-slide-sweep');
+    assert.ok(ghost && sweep);
+    // Slide 2 was decoded ahead, so the carry runs at once.
+    await ticks(2);
+    assert.equal(ghost.classList.contains('jm-hold'), false, 'a picture decoded ahead never holds the carry');
+    assert.match(realImage.getAttribute('src'), /slide-2\.jpg$/);
+
+    // Slide 3: its decode is still pending (asked for ahead, not done).
+    band(sweep).dispatchEvent(new k.window.Event('animationend'));
+    await ticks(2);
+    const pendingThird = decodes.filter((d) => /slide-3\.jpg$/.test(d.src));
+    assert.equal(pendingThird.length, 1, 'slide 3 is being decoded ahead');
+    k.window.nextSlide();
+    await ticks(2);
+    const held = k.document.querySelector('.jm-slide-ghost');
+    assert.equal(held.classList.contains('jm-hold'), true, 'the old slide holds, still covering the stage');
+    assert.equal(k.document.querySelector('.jm-slide-sweep').classList.contains('jm-hold'), true, 'the band waits off screen');
+    assert.match(held.querySelector('img').getAttribute('src'), /slide-2\.jpg$/, 'what covers the stage is the old slide');
+    assert.match(realImage.getAttribute('src'), /slide-2\.jpg$/, 'the new picture is not on the stage half-decoded');
+    assert.equal(k.document.getElementById('slide-counter').textContent, 'Slide 3 of 7', 'the press is acknowledged at once');
+    pendingThird[0].resolve();
+    await ticks(2);
+    assert.equal(held.classList.contains('jm-hold'), false, 'decoded: the carry goes');
+    assert.equal(k.document.querySelector('.jm-slide-sweep').classList.contains('jm-hold'), false);
+    assert.match(realImage.getAttribute('src'), /slide-3\.jpg$/);
+  } finally {
+    k.close();
+  }
+});
+
+test('kiosk slides: a picture that never decodes holds the carry 400ms at most, and still goes on screen', async () => {
+  const k = bootKiosk(ROUTES, ANSWERED, KIOSK_PC, (window) => {
+    reduce(false)(window);
+    heldDecodes(window); // never resolved
+  });
+  try {
+    await ticks();
+    k.window.startSlidesPreview(6);
+    await ticks(2);
+    band(stinger(k)).dispatchEvent(new k.window.Event('animationend'));
+    k.window.nextSlide();
+    await ticks(2);
+    const ghost = k.document.querySelector('.jm-slide-ghost');
+    assert.equal(ghost.classList.contains('jm-hold'), true);
+    await new Promise((r) => setTimeout(r, 450));
+    assert.equal(ghost.classList.contains('jm-hold'), false, 'the cap lets the carry go');
+  } finally {
+    k.close();
+  }
+});
+
+/* The splash's entrance waits for the kit's fonts at startup (never longer
+   than 1.2s), so it never slams in a fallback face and jumps. */
+function pendingFonts(window) {
+  let resolve;
+  const ready = new Promise((r) => (resolve = r));
+  Object.defineProperty(window.document, 'fonts', {
+    configurable: true,
+    value: { status: 'loading', ready, load: () => Promise.resolve([]) },
+  });
+  return () => resolve();
+}
+
+test('startup: the entrances wait for the fonts, and only with motion', async () => {
+  let fontsIn;
+  const k = bootKiosk(ROUTES, ANSWERED, KIOSK_PC, (window) => {
+    reduce(false)(window);
+    fontsIn = pendingFonts(window);
+  });
+  try {
+    const root = k.document.documentElement;
+    assert.equal(root.classList.contains('jm-fonts-wait'), true, 'held while the fonts load');
+    fontsIn();
+    await ticks(2);
+    assert.equal(root.classList.contains('jm-fonts-wait'), false, 'released when they are in');
+  } finally {
+    k.close();
+  }
+  const slow = bootKiosk(ROUTES, ANSWERED, KIOSK_PC, (window) => {
+    reduce(false)(window);
+    pendingFonts(window); // never ready
+  });
+  try {
+    assert.equal(slow.document.documentElement.classList.contains('jm-fonts-wait'), true);
+    await new Promise((r) => setTimeout(r, 1300));
+    assert.equal(slow.document.documentElement.classList.contains('jm-fonts-wait'), false, 'a font that never comes never holds the screen');
+  } finally {
+    slow.close();
+  }
+  const still = bootKiosk(ROUTES, ANSWERED, KIOSK_PC, (window) => {
+    reduce(true)(window);
+    pendingFonts(window);
+  });
+  try {
+    assert.doesNotMatch(still.document.documentElement.className, /motion|jm-/, 'reduced motion: no motion class at all');
+  } finally {
+    still.close();
+  }
+});
+
 test('reduced motion and configure mode switch it off; every device without them gets it', async () => {
   const reduced = bootKiosk(ROUTES, ANSWERED, KIOSK_PC, reduce(true));
   try {
@@ -417,3 +555,60 @@ test('in Chromium: the old picture is hung on the band the whole way (flip both 
   }
 });
 
+
+test('in Chromium: the slide stage clips the drift, so a step never slides over the pillarbox', { skip }, async () => {
+  const { chromium } = await import('playwright-core');
+  const browser = await chromium.launch({ executablePath: CHROMIUM });
+  try {
+    const { page, context } = await openPage(browser, KIOSK_PC); // 1280x720: stage 960 wide, bars 160
+    await page.evaluate(() => startSlidesPreview(6));
+    await page.waitForTimeout(1500);
+    const hit = await page.evaluate(async () => {
+      nextSlide();
+      // Let the held carry go (slide 2 was decoded ahead), then freeze every
+      // animation at its first frame: the new slide drifted 6% left.
+      await new Promise((r) => setTimeout(r, 100));
+      for (const a of document.getAnimations()) {
+        a.pause();
+        a.currentTime = 0;
+      }
+      document.querySelectorAll('.jm-slide-ghost, .jm-slide-sweep').forEach((el) => el.remove());
+      const img = document.getElementById('slide-image').getBoundingClientRect();
+      const stage = document.getElementById('slide-stage').getBoundingClientRect();
+      const at = document.elementFromPoint(stage.left - 20, 360);
+      return { imgLeft: img.left, stageLeft: stage.left, at: at && at.id };
+    });
+    assert.ok(hit.imgLeft < hit.stageLeft - 20, `the picture really is drifted past the stage (${hit.imgLeft} < ${hit.stageLeft})`);
+    assert.equal(hit.at, 'slides-view', 'what shows beside the stage is the black pillarbox, not the drifting slide');
+    await context.close();
+  } finally {
+    await browser.close();
+  }
+});
+
+test('in Chromium: while the fonts load the splash entrance waits at its first frame, then plays', { skip }, async () => {
+  const { chromium } = await import('playwright-core');
+  const browser = await chromium.launch({ executablePath: CHROMIUM });
+  try {
+    const { page, context } = await openPage(browser, KIOSK_PC);
+    const states = await page.evaluate(async () => {
+      const root = document.documentElement;
+      root.classList.add('jm-fonts-wait');
+      document.getElementById('toggle-btn').click();
+      await new Promise((r) => setTimeout(r, 50));
+      const title = document.getElementById('journey-splash-title');
+      const held = title.getAnimations().map((a) => a.playState);
+      const opacity = getComputedStyle(title).opacity;
+      root.classList.remove('jm-fonts-wait');
+      await new Promise((r) => setTimeout(r, 50));
+      return { held, opacity, after: title.getAnimations().map((a) => a.playState), cls: root.className };
+    });
+    assert.match(states.cls, /\bmotion-full\b/);
+    assert.deepEqual(states.held, ['paused'], 'the slam waits');
+    assert.equal(states.opacity, '0', 'at its first frame: not drawn in a fallback face');
+    assert.deepEqual(states.after, ['running'], 'and plays once the fonts are in');
+    await context.close();
+  } finally {
+    await browser.close();
+  }
+});

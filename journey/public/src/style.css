@@ -55,6 +55,16 @@
   --jr-shout-fit: 1.05;
   --jr-shout-lift: -0.15em;
   --u: min(1.25vw, 1.7778vh);
+  /* The video bar, the slide bar and the corner buttons were drawn in px for
+     a 1080p screen, where --u is exactly 19.2px. Each of their sizes is now
+     max(<that px size>, <the same size in --u>): identical up to 1080p
+     (every layout test's screen), and growing with the screen past it, so a
+     TV run at 4K without Windows scaling gets the same bar, twice as big,
+     not a strip of tiny pills. The corner buttons use --jr-corner-u, which
+     is --u except over the Check-in Display and Trek's card, where the
+     display's reserved column is a fixed 48px (the corner-button contract,
+     lobby src/lib/embed.js HOST_CONTROL) and they stay exactly that. */
+  --jr-corner-u: var(--u);
 
   /* Wrapper art, baked from the kit's own shapes so each is ONE static image
      (rasterised once, never repainted by anything that moves). The path data
@@ -665,7 +675,7 @@ html.cursor-hidden * {
 #journey-chip {
   position: fixed;
   top: max(3vh, 24px);
-  right: calc(max(3vw, 24px) + 48px + 16px);
+  right: calc(max(3vw, 24px) + max(48px, 2.5 * var(--u)) + max(16px, 0.8333 * var(--u)));
   z-index: 9;
   /* A size smaller than Trek's: it shares the top edge with the splash's
      wordmark, which it must clear at 640x480. */
@@ -731,12 +741,12 @@ html.cursor-hidden * {
 #video-controls {
   position: absolute;
   left: max(3vw, 24px);
-  right: calc(max(3vw, 24px) + 88px);
+  right: calc(max(3vw, 24px) + max(88px, 4.5833 * var(--u)));
   bottom: max(3vh, 24px);
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 10px 16px;
+  gap: max(12px, 0.625 * var(--u));
+  padding: max(10px, 0.5208 * var(--u)) max(16px, 0.8333 * var(--u));
   border-radius: 999px;
   background: rgba(64, 58, 119, 0.9);
   z-index: 10;
@@ -756,13 +766,13 @@ html.cursor-hidden #video-controls:not(.force-visible) {
 #fwd15-btn,
 #unmute-btn {
   flex: none;
-  padding: 10px 18px;
+  padding: max(10px, 0.5208 * var(--u)) max(18px, 0.9375 * var(--u));
   border: none;
   border-radius: 999px;
   background: var(--jr-tint);
   color: var(--jr-ink);
   font-family: var(--jr-font-label);
-  font-size: 1.2rem;
+  font-size: max(1.2rem, var(--u));
   font-weight: 400;
   line-height: 1.1;
   letter-spacing: 0.04em;
@@ -782,11 +792,12 @@ html.cursor-hidden #video-controls:not(.force-visible) {
   background: #ffffff;
 }
 
-/* Scrubber: sized for fingers (28px thumb), plain flat colors only. */
+/* Scrubber: sized for fingers (28px thumb at 1080p and below, growing with
+   the bar past it), plain flat colors only. */
 #video-scrubber {
   flex: 1;
   min-width: 0;
-  height: 28px;
+  height: max(28px, 1.4583 * var(--u));
   margin: 0;
   background: transparent;
   -webkit-appearance: none;
@@ -795,31 +806,31 @@ html.cursor-hidden #video-controls:not(.force-visible) {
 }
 
 #video-scrubber::-webkit-slider-runnable-track {
-  height: 8px;
-  border-radius: 4px;
+  height: max(8px, 0.4167 * var(--u));
+  border-radius: max(4px, 0.2083 * var(--u));
   background: rgba(222, 213, 234, 0.4);
 }
 
 #video-scrubber::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 28px;
-  height: 28px;
-  margin-top: -10px;
+  width: max(28px, 1.4583 * var(--u));
+  height: max(28px, 1.4583 * var(--u));
+  margin-top: calc(-1 * max(10px, 0.5208 * var(--u)));
   border-radius: 50%;
   border: none;
   background: #ffffff;
 }
 
 #video-scrubber::-moz-range-track {
-  height: 8px;
-  border-radius: 4px;
+  height: max(8px, 0.4167 * var(--u));
+  border-radius: max(4px, 0.2083 * var(--u));
   background: rgba(222, 213, 234, 0.4);
 }
 
 #video-scrubber::-moz-range-thumb {
-  width: 28px;
-  height: 28px;
+  width: max(28px, 1.4583 * var(--u));
+  height: max(28px, 1.4583 * var(--u));
   border-radius: 50%;
   border: none;
   background: #ffffff;
@@ -831,13 +842,13 @@ html.cursor-hidden #video-controls:not(.force-visible) {
    prompt asks once per device), so it must never be subtle. */
 #cc-btn {
   flex: none;
-  padding: 10px 16px;
+  padding: max(10px, 0.5208 * var(--u)) max(16px, 0.8333 * var(--u));
   border: none;
   border-radius: 999px;
   background: var(--jr-tint);
   color: var(--jr-ink);
   font-family: var(--jr-font-label);
-  font-size: 1.2rem;
+  font-size: max(1.2rem, var(--u));
   font-weight: 400;
   line-height: 1.1;
   letter-spacing: 0.06em;
@@ -872,6 +883,8 @@ html.cursor-hidden #video-controls:not(.force-visible) {
    so one expression covers a TV read across a room and a phone in either
    orientation; the clamp floor keeps it legible on the smallest screens and
    the ceiling stops it swallowing the picture on very large ones. The
+   ceiling is in --u (56px at 1080p, as it always was), so a 4K screen gets
+   the same caption twice as big rather than one stuck at 56px. The
    Settings size choice multiplies that expression through --caption-scale
    rather than replacing it, so every option keeps the same responsive
    behaviour (see applyCaptionDisplayPrefs() in schedule.js). */
@@ -894,7 +907,7 @@ html.cursor-hidden #video-controls:not(.force-visible) {
   background-color: rgba(64, 58, 119, 0.8);
   color: #ffffff;
   font-family: var(--jr-font-read);
-  font-size: calc(clamp(18px, 4.5vmin, 56px) * var(--caption-scale, 1));
+  font-size: calc(clamp(18px, 4.5vmin, 2.9167 * var(--u)) * var(--caption-scale, 1));
   font-weight: 600;
   line-height: 1.3;
   text-align: center;
@@ -1017,7 +1030,7 @@ html.cursor-hidden #video-controls:not(.force-visible) {
   flex: none;
   color: #ffffff;
   font-family: var(--jr-font-read);
-  font-size: 1.05rem;
+  font-size: max(1.05rem, 0.875 * var(--u));
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -1109,14 +1122,14 @@ html.cursor-hidden #video-controls:not(.force-visible) {
   position: fixed;
   bottom: max(3vh, 24px);
   right: max(3vw, 24px);
-  min-width: 48px;
-  min-height: 48px;
-  padding: 0 14px;
+  min-width: max(48px, 2.5 * var(--jr-corner-u));
+  min-height: max(48px, 2.5 * var(--jr-corner-u));
+  padding: 0 max(14px, 0.7292 * var(--jr-corner-u));
   border-radius: 999px;
   border: none;
   background: var(--jr-chip);
   color: #ffffff;
-  font-size: 1.4rem;
+  font-size: max(1.4rem, 1.1667 * var(--jr-corner-u));
   line-height: 1;
   cursor: pointer;
   z-index: 10;
@@ -1136,14 +1149,14 @@ html.cursor-hidden #video-controls:not(.force-visible) {
   position: fixed;
   top: max(3vh, 24px);
   right: max(3vw, 24px);
-  min-width: 48px;
-  min-height: 48px;
-  padding: 0 14px;
+  min-width: max(48px, 2.5 * var(--jr-corner-u));
+  min-height: max(48px, 2.5 * var(--jr-corner-u));
+  padding: 0 max(14px, 0.7292 * var(--jr-corner-u));
   border-radius: 999px;
   border: none;
   background: var(--jr-chip);
   color: #ffffff;
-  font-size: 1.4rem;
+  font-size: max(1.4rem, 1.1667 * var(--jr-corner-u));
   line-height: 1;
   cursor: pointer;
   z-index: 10;
@@ -1171,6 +1184,15 @@ html.cursor-hidden #video-controls:not(.force-visible) {
 #trek-view:not(.hidden) ~ #settings-btn {
   top: auto;
   bottom: calc(max(3vh, 24px) + 48px + 8px);
+}
+
+/* That column is the display's fixed 48px one at every screen size: the
+   corner buttons do not grow over the Check-in Display or Trek's card. */
+#checkin-view:not(.hidden) ~ #toggle-btn,
+#checkin-view:not(.hidden) ~ #settings-btn,
+#trek-view:not(.hidden) ~ #toggle-btn,
+#trek-view:not(.hidden) ~ #settings-btn {
+  --jr-corner-u: 0px;
 }
 
 /* ── Video settings panel ──────────────────────────────────────────
@@ -1947,7 +1969,10 @@ html.configure-mode #settings-card {
    ends. The stage is the largest 4:3 box that fits the screen (pillarboxed
    on a 16:9 TV, letterboxed on a phone); everything inside is sized
    relative to that box so the layout matches the deck at any screen size.
-   Static images + text only — no animation budget spent here at all. */
+   The stage clips (overflow: hidden, 2026-10-12): at rest nothing in it
+   reaches past its edges, but the slide-change drift (24-motion.js) moves
+   its layers a few percent sideways, and on a 16:9 TV that used to show
+   the slide's edge sliding over the black pillarbox bars. */
 #slides-view {
   position: absolute;
   inset: 0;
@@ -1962,6 +1987,7 @@ html.configure-mode #settings-card {
   position: relative;
   width: min(100vw, calc(100vh * 4 / 3));
   height: min(100vh, calc(100vw * 3 / 4));
+  overflow: hidden;
   background: #000000;
   cursor: pointer;
   user-select: none;
@@ -2033,13 +2059,13 @@ html.configure-mode #settings-card {
 #slide-controls {
   position: absolute;
   left: max(3vw, 24px);
-  right: calc(max(3vw, 24px) + 88px);
+  right: calc(max(3vw, 24px) + max(88px, 4.5833 * var(--u)));
   bottom: max(3vh, 24px);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 10px 16px;
+  gap: max(12px, 0.625 * var(--u));
+  padding: max(10px, 0.5208 * var(--u)) max(16px, 0.8333 * var(--u));
   border-radius: 999px;
   background: rgba(64, 58, 119, 0.9);
   z-index: 10;
@@ -2058,13 +2084,13 @@ html.cursor-hidden #slide-controls {
 #slide-next-btn {
   flex: none;
   min-width: 7.5em;
-  padding: 12px 22px;
+  padding: max(12px, 0.625 * var(--u)) max(22px, 1.1458 * var(--u));
   border: none;
   border-radius: 999px;
   background: var(--jr-tint);
   color: var(--jr-ink);
   font-family: var(--jr-font-label);
-  font-size: 1.3rem;
+  font-size: max(1.3rem, 1.0833 * var(--u));
   font-weight: 400;
   line-height: 1.1;
   letter-spacing: 0.05em;
@@ -2074,7 +2100,7 @@ html.cursor-hidden #slide-controls {
 
 #slide-next-btn {
   background: var(--jr-hot);
-  box-shadow: 3px 3px 0 var(--jr-hot-deep);
+  box-shadow: max(3px, 0.1563 * var(--u)) max(3px, 0.1563 * var(--u)) 0 var(--jr-hot-deep);
   color: #ffffff;
 }
 
@@ -2109,7 +2135,7 @@ html.cursor-hidden #slide-controls {
 #slide-counter {
   color: var(--jr-tint);
   font-family: var(--jr-font-label);
-  font-size: 1.3rem;
+  font-size: max(1.3rem, 1.0833 * var(--u));
   letter-spacing: 0.08em;
   text-transform: uppercase;
   font-variant-numeric: tabular-nums;
@@ -2688,6 +2714,18 @@ html.cursor-hidden #slide-controls {
     animation: jm-spin-in 460ms var(--jm-pop) calc(var(--jm-lead) + 720ms) backwards;
   }
 
+  /* At startup, until the kit's fonts are in (at most ~1.2s; 24-motion.js),
+     the splash's and Trek's card's entrances wait at their first frame, so
+     they never play out in a fallback face and jump when the font lands. */
+  html.motion-full.jm-fonts-wait #journey-splash *,
+  html.motion-full.jm-fonts-wait #journey-splash::before,
+  html.motion-full.jm-fonts-wait #journey-splash::after,
+  html.motion-full.jm-fonts-wait #trek-view *,
+  html.motion-full.jm-fonts-wait #trek-card::before,
+  html.motion-full.jm-fonts-wait #trek-card::after {
+    animation-play-state: paused;
+  }
+
   /* Trek's small group card: the whole field wipes across, the tab drops
      in, the Trek wordmark slams down, tonight's lesson wipes on and its
      title slams hard, the count chip pops up out of its corner and the
@@ -2848,6 +2886,18 @@ html.cursor-hidden #slide-controls {
     z-index: 9;
     overflow: hidden;
     pointer-events: none;
+  }
+  /* Held at the first frame (the old slide still covering the stage) until
+     the new slide's picture is decoded, at most 400ms (24-motion.js). Both
+     pieces exist only for the length of one step, so their will-change (a
+     layer ready before the first frame moves) lives exactly that long. */
+  html.motion-full .jm-slide-ghost.jm-hold,
+  html.motion-full .jm-slide-sweep.jm-hold > .jm-carry-band {
+    animation-play-state: paused;
+  }
+  html.motion-full .jm-slide-ghost,
+  html.motion-full .jm-slide-sweep > .jm-carry-band {
+    will-change: transform;
   }
   /* The template slide's heading, split into its words for the word-by-word
      settle (24-motion.js); a word must be a box to move. */

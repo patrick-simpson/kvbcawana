@@ -193,7 +193,15 @@ test('the headlines stacked over other lines sit on the cap line the design was 
 
 test('the page links the kit and loads nothing from the network', () => {
   const links = [...html.matchAll(/<link\b[^>]*href="([^"]+)"/g)].map((m) => m[1]);
-  assert.deepEqual(links, ['brand/tokens.css', 'brand/fonts.css', 'src/style.css']);
+  // The kit's three drawn faces are preloaded first (self-hosted, deployed
+  // copies; test/stamp-build.test.mjs pins their URLs to the font sheet's).
+  const preloads = [...html.matchAll(/<link\b[^>]*rel="preload"[^>]*href="([^"]+)"/g)].map((m) => m[1]);
+  assert.equal(preloads.length, 3);
+  for (const href of preloads) {
+    assert.match(href, /^brand\/fonts\/[\w-]+\.woff2$/);
+    assert.ok(existsSync(path.join(PUBLIC, href)), `${href} exists`);
+  }
+  assert.deepEqual(links, [...preloads, 'brand/tokens.css', 'brand/fonts.css', 'src/style.css']);
   for (const src of [...html.matchAll(/<(?:img|script)\b[^>]*src="([^"]+)"/g)].map((m) => m[1])) {
     assert.doesNotMatch(src, /^(https?:)?\/\//, `${src} is self-hosted`);
     assert.ok(existsSync(path.join(PUBLIC, src)), `${src} exists`);
@@ -282,6 +290,10 @@ const AWANA_DECK = {
     'position: relative',
     'width: min(100vw, calc(100vh * 4 / 3))',
     'height: min(100vh, calc(100vw * 3 / 4))',
+    // Added on purpose 2026-10-12: the stage clips the slide-change drift
+    // (24-motion.js) so it never slides over the pillarbox; at rest nothing
+    // in the stage reaches its edges, so the deck looks exactly as before.
+    'overflow: hidden',
     'background: #000000',
     'cursor: pointer',
     'user-select: none',
