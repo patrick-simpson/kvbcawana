@@ -299,6 +299,21 @@ describe('the calendar', () => {
     expect((await (await s.call('GET', '/v1/calendar')).json()).events.length).toBeGreaterThan(5);
   });
 
+  it('a failed read does not overwrite a calendar stored while it was running', async () => {
+    const s = setup();
+    const { body: login } = await s.login();
+    await s.call('POST', '/v1/calendar/refresh', {}, login.session);
+    s.core.fetchFn = async () => {
+      // A concurrent refresh lands a newer calendar while this read is in flight.
+      const cur = await s.storage.get('calendar');
+      await s.storage.put('calendar', { ...cur, generatedAt: '2030-01-01T00:00:00.000Z' });
+      return new Response('<html><body>Redesigned!</body></html>', { status: 200 });
+    };
+    const res = await s.call('POST', '/v1/calendar/refresh', {}, login.session);
+    expect(res.status).toBe(502);
+    expect((await s.storage.get('calendar')).generatedAt).toBe('2030-01-01T00:00:00.000Z');
+  });
+
   it('follows the shared calendarUrl when one is set', async () => {
     const s = setup();
     const { body: login } = await s.login();

@@ -884,8 +884,11 @@ export class SyncCore {
     const checkedAt = new Date(this.now()).toISOString();
     const res = await scrapeCalendar(url, { fetchFn: this.fetchFn, now: this.now });
     if (!res.ok) {
-      if (prev) await this.storage.put('calendar', { ...prev, checkedAt, lastError: res.error });
-      return fail(res.error, 502, { checkedAt, generatedAt: prev?.generatedAt || null });
+      // The read took a while: another refresh may have stored a newer calendar
+      // meanwhile, so the error is noted on what is stored NOW, not on `prev`.
+      const latest = (await this.storage.get('calendar')) || prev;
+      if (latest) await this.storage.put('calendar', { ...latest, checkedAt, lastError: res.error });
+      return fail(res.error, 502, { checkedAt, generatedAt: latest?.generatedAt || null });
     }
     const events = sanitizeEvents(res.feed.events);
     const changed = !prev || JSON.stringify(prev.events) !== JSON.stringify(events);
