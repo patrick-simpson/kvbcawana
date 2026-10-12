@@ -120,6 +120,23 @@ console.log('─'.repeat(60));
     sync.listFiles(target).join(','));
 }
 
+// ── A copy that dies half way must not look current ──────────────────────────
+{
+  const root = tmpdir();
+  const source = path.join(root, 'bundled');
+  const target = path.join(root, 'target');
+  makeSource(source, '5.6.0');
+  sync.syncExtension({ sourceDir: source, targetDir: target });
+  makeSource(source, '5.7.0');
+  // A directory where the last file must land makes that one rename fail.
+  fs.rmSync(path.join(target, 'sub', 'nested.js'));
+  fs.mkdirSync(path.join(target, 'sub', 'nested.js'));
+  const r = sync.syncExtension({ sourceDir: source, targetDir: target });
+  check('a copy that fails reports "failed"', r.action === 'failed', `got ${r.action}`);
+  check('...and the target still says the OLD version, so the next launch retries',
+    sync.readManifestVersion(target) === '5.6.0', `got ${sync.readManifestVersion(target)}`);
+}
+
 // ── Same version: do nothing ─────────────────────────────────────────────────
 {
   const root = tmpdir();

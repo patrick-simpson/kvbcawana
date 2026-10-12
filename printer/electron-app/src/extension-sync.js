@@ -118,10 +118,18 @@ function syncExtension({ sourceDir, targetDir, force = false } = {}) {
 
   try {
     let bytes = 0;
-    for (const rel of files) {
+    // manifest.json goes LAST: it is what the next launch reads to decide the
+    // folder is current, so a copy that dies half way must not have written it.
+    const manifestRel = 'manifest.json';
+    const ordered = [...files.filter((rel) => rel !== manifestRel), ...files.filter((rel) => rel === manifestRel)];
+    const written = [];
+    for (const rel of ordered) {
       const buf = fs.readFileSync(path.join(sourceDir, rel));
       bytes += buf.length;
       if (bytes > MAX_BYTES) throw new Error('bundled extension is implausibly large');
+      written.push([rel, buf]);
+    }
+    for (const [rel, buf] of written.filter(([rel]) => rel !== manifestRel)) {
       writeFileAtomic(path.join(targetDir, rel), buf);
     }
 
@@ -132,6 +140,9 @@ function syncExtension({ sourceDir, targetDir, force = false } = {}) {
     for (const rel of listFiles(targetDir)) {
       if (wanted.has(rel) || rel.endsWith('.tmp')) continue;
       try { fs.unlinkSync(path.join(targetDir, rel)); } catch { /* best effort */ }
+    }
+    for (const [rel, buf] of written.filter(([rel]) => rel === manifestRel)) {
+      writeFileAtomic(path.join(targetDir, rel), buf);
     }
 
     return {
