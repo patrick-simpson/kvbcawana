@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { expect, test } from '@playwright/test';
 import { buildCheckinPages, CHECKIN_MODULES } from '../../site/checkin/checkin-page.mjs';
 import * as cc from '../shared/cloud-crypto.js';
+import { mergeChurch, sanitizeChurch } from '../shared/churchSettings.js';
 
 // The one check-in page (awana.kvbchurch.org/checkin: the print app's phone page on
 // the desk's online path, ROADMAP.md#online-check-in) in a real browser against a
@@ -76,7 +77,7 @@ async function stubSite(page, { kids } = {}) {
       if (!world.church) return route.fulfill(json(404, { error: 'Not found.' }));
       if (method === 'PUT') {
         world.churchPuts.push(body);
-        world.church = { rev: world.church.rev + 1, settings: { ...world.church.settings, ...body.settings } };
+        world.church = { rev: world.church.rev + 1, settings: mergeChurch(world.church.settings, sanitizeChurch(body.settings).settings) };
         return route.fulfill(json(200, { ok: true, rev: world.church.rev, settings: world.church.settings }));
       }
       return route.fulfill(json(200, { rev: world.church.rev, settings: world.church.settings, switches: {} }));
@@ -371,7 +372,7 @@ test('remembered leaders come from the church settings; a new leader tag adds on
   test.setTimeout(60_000);
   const { world, stationRing } = await stubSite(page);
   world.busyFirst = false;
-  world.church = { rev: 3, settings: { labelFooter: 'Welcome', leaders: [{ name: 'Ann Lead', club: 'Cubbies' }] } };
+  world.church = { rev: 3, settings: sanitizeChurch({ labelFooter: 'Welcome', leaders: [{ firstName: 'Ann', lastName: 'Lead', clubName: 'Cubbies', lastPrintedAt: 1760000000000, printCount: 4 }] }).settings };
   await signIn(page);
   await expect(page.locator('#list')).toContainText('families still to come', { timeout: 10_000 });
   await page.locator('#menu-btn').click();
@@ -384,7 +385,10 @@ test('remembered leaders come from the church settings; a new leader tag adds on
   await page.locator('#leader-club').selectOption('Sparks');
   await page.locator('#leader-print').click();
   await expect(page.locator('#leader-chips .leader-chip')).toHaveCount(2);
-  expect(world.churchPuts).toEqual([{ baseRev: 3, settings: { leaders: [{ name: 'Ann Lead', club: 'Cubbies' }, { name: 'Pat Leader', club: 'Sparks' }] } }]);
+  expect(world.churchPuts).toEqual([{ baseRev: 3, settings: { leaders: [
+    { firstName: 'Ann', lastName: 'Lead', clubName: 'Cubbies', lastPrintedAt: 1760000000000, printCount: 4 },
+    { firstName: 'Pat', lastName: 'Leader', clubName: 'Sparks' },
+  ] } }]);
   expect(world.church.settings.labelFooter).toBe('Welcome');
   // Tick both and Print selected: one sealed leader job each.
   for (const chip of await page.locator('.leader-chip input[type=checkbox]').all()) await chip.check();

@@ -1658,19 +1658,20 @@ function renderLeaderChips(leaders) {
   if (!leaderCache.length) { wrap.hidden = true; return; }
   wrap.hidden = false;
   leaderCache.forEach(function(l) {
-    var key = l.name.toLowerCase();
+    var name = (l.firstName + ' ' + l.lastName).trim();
+    var key = name.toLowerCase();
     var chip = el('span', 'leader-chip');
     var pick = el('label');
     pick.style.cssText = 'display:inline-flex;align-items:center;gap:6px';
     var cb = el('input'); cb.type = 'checkbox'; cb.checked = !!leaderSelection[key];
     cb.addEventListener('change', function() { if (cb.checked) leaderSelection[key] = true; else delete leaderSelection[key]; });
     pick.appendChild(cb);
-    pick.appendChild(document.createTextNode(l.name + (l.club ? ' · ' + l.club : '')));
+    pick.appendChild(document.createTextNode(name + (l.clubName ? ' · ' + l.clubName : '')));
     var one = el('button', null, 'Print'); one.type = 'button';
     one.addEventListener('click', function() { printLeaders([l]); });
     var x = el('button', 'x', '×'); x.type = 'button';
-    x.setAttribute('aria-label', 'Forget ' + l.name);
-    x.addEventListener('click', function() { forgetLeader(l.name); });
+    x.setAttribute('aria-label', 'Forget ' + name);
+    x.addEventListener('click', function() { forgetLeader(l); });
     chip.appendChild(pick); chip.appendChild(one); chip.appendChild(x);
     list.appendChild(chip);
   });
@@ -1690,7 +1691,8 @@ function printLeaders(leaders) {
   var chain = Promise.resolve();
   leaders.forEach(function(l) {
     chain = chain.then(function() {
-      return desk.leaderTag({ name: l.name, club: l.club }).then(function() { sent++; }, function(e) { failedNames.push(l.name); if (e && e.code === 'signed-out') throw e; });
+      var name = (l.firstName + ' ' + l.lastName).trim();
+      return desk.leaderTag({ name: name, club: l.clubName }).then(function() { sent++; }, function(e) { failedNames.push(name); if (e && e.code === 'signed-out') throw e; });
     });
   });
   chain.then(function() {
@@ -1700,16 +1702,17 @@ function printLeaders(leaders) {
     setTimeout(refreshStatus, 800);
   }, function(e) { leaderInFlight = false; commonError(e, 'Could not print: '); });
 }
-function forgetLeader(name) {
+function forgetLeader(l) {
+  var name = (l.firstName + ' ' + l.lastName).trim();
   if (!confirm('Forget ' + name + '? Their tag can still be printed by typing the name.')) return;
   delete leaderSelection[name.toLowerCase()];
-  desk.forgetLeader(name).then(function(r) {
+  desk.forgetLeader(l).then(function(r) {
     if (r) renderLeaderChips(r.leaders);
     else $('leader-status').textContent = 'Could not update the remembered leaders. Try again.';
   });
 }
 $('leader-print-selected').addEventListener('click', function() {
-  printLeaders(leaderCache.filter(function(l) { return leaderSelection[l.name.toLowerCase()]; }));
+  printLeaders(leaderCache.filter(function(l) { return leaderSelection[(l.firstName + ' ' + l.lastName).trim().toLowerCase()]; }));
 });
 
 // Custom label: one line of free text. Records nothing at all.

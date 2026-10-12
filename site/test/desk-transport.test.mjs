@@ -5,6 +5,7 @@
 import assert from 'node:assert/strict';
 import { describe, it, before } from 'node:test';
 import * as cc from '../../lobby/shared/cloud-crypto.js';
+import { mergeChurch, sanitizeChurch } from '../../lobby/shared/churchSettings.js';
 import { createDesk, DeskError, HISTORY_PIN_STORAGE, printLabel, SESSION_STORAGE } from '../checkin/desk-transport.js';
 
 const PASS = 'kennebec';
@@ -29,7 +30,7 @@ before(async () => {
 
 /** A stand-in Worker: routes.md's shapes, in memory. */
 function worker({ stations = [], params = 'v2', history = 'login', legacy = false, upgrade = false, check } = {}) {
-  const w = { calls: [], stations, historyKey: history === 'none' ? null : historyKey, busy: 0, expire: false, stationsChangedOnce: null, checkins: [], verifier: null, churchPuts: [] };
+  const w = { calls: [], stations, historyKey: history === 'none' ? null : historyKey, busy: 0, expire: false, stationsChangedOnce: null, checkins: [], verifier: null, churchPuts: [], churchDropped: [] };
   w.fetch = async (url, init = {}) => {
     const path = String(url).replace(/^\/api/, '');
     const body = init.body ? JSON.parse(init.body) : undefined;
@@ -60,7 +61,10 @@ function worker({ stations = [], params = 'v2', history = 'login', legacy = fals
       if (init.method === 'PUT') {
         w.churchPuts.push(body);
         if (body.baseRev !== w.church.rev) return json(409, { reason: 'stale', rev: w.church.rev, settings: w.church.settings });
-        w.church = { rev: w.church.rev + 1, settings: { ...w.church.settings, ...body.settings } };
+        // what the Worker does (routes.md 10.3): the one allowlist, then the merge
+        const { settings, dropped } = sanitizeChurch(body.settings);
+        w.churchDropped.push(...dropped);
+        w.church = { rev: w.church.rev + 1, settings: mergeChurch(w.church.settings, settings) };
         return json(200, { ok: true, rev: w.church.rev, settings: w.church.settings });
       }
       return json(200, { rev: w.church.rev, settings: w.church.settings, switches: {} });
@@ -426,17 +430,28 @@ describe('remembered leaders (the church settings `leaders`)', () => {
     assert.equal(w.churchPuts.length, 0);
   });
 
-  it('reads the list, adds a new leader with the current rev (once more on a stale rev), never twice, and forgets one', async () => {
+  it('reads the list, adds a new leader in churchSettings.js\'s shape (names and club only), never twice, and forgets one', async () => {
     const w = worker({ stations: [] });
-    w.church = { rev: 4, settings: { labelFooter: 'Hi', leaders: [{ name: 'Ann Lead', club: 'Cubbies' }, 'Bo Helper', { firstName: 'Cy', lastName: 'Third', clubName: '' }, { name: 'ann lead' }] } };
+    w.church = { rev: 4, settings: sanitizeChurch({ labelFooter: 'Hi', leaders: [
+      { firstName: 'Ann', lastName: 'Lead', clubName: 'Cubbies', lastPrintedAt: 1760000000000, printCount: 7 },
+      { firstName: 'Bo', lastName: 'Helper', clubName: '' },
+    ] }).settings };
     const { desk } = make(w);
     await desk.signIn(PASS);
-    assert.deepEqual((await desk.churchLeaders()).leaders, [{ name: 'Ann Lead', club: 'Cubbies' }, { name: 'Bo Helper', club: '' }, { name: 'Cy Third', club: '' }]);
-    const saved = await desk.rememberLeader({ name: ' Pat  Leader ', club: 'Sparks' });
+    const read = (await desk.churchLeaders()).leaders;
+    assert.deepEqual(read.map((l) => [l.firstName, l.lastName, l.clubName]), [['Ann', 'Lead', 'Cubbies'], ['Bo', 'Helper', '']]);
+    const saved = await desk.rememberLeader({ name: ' Pat  Van Leader ', club: 'Sparks' });
     assert.equal(saved.rev, 5);
-    assert.deepEqual(w.churchPuts[0], { baseRev: 4, settings: { leaders: [{ name: 'Ann Lead', club: 'Cubbies' }, { name: 'Bo Helper', club: '' }, { name: 'Cy Third', club: '' }, { name: 'Pat Leader', club: 'Sparks' }] } });
-    assert.equal(w.church.settings.labelFooter, 'Hi', 'only the changed key is sent');
-    await desk.rememberLeader({ name: 'PAT LEADER' });
+    const sent = w.churchPuts[0];
+    assert.deepEqual(Object.keys(sent.settings), ['leaders'], 'only the leaders key is sent');
+    assert.equal(sent.baseRev, 4);
+    assert.deepEqual(sent.settings.leaders[0], { firstName: 'Ann', lastName: 'Lead', clubName: 'Cubbies', lastPrintedAt: 1760000000000, printCount: 7 }, 'a known leader goes back exactly as read');
+    assert.deepEqual(sent.settings.leaders[2], { firstName: 'Pat', lastName: 'Van Leader', clubName: 'Sparks' }, 'the page sets no print stamps');
+    assert.deepEqual(w.churchDropped, [], 'the real sanitizer keeps what the page sent');
+    assert.deepEqual(sanitizeChurch(sent.settings).settings.leaders, w.church.settings.leaders);
+    assert.deepEqual(w.church.settings.leaders[2], { firstName: 'Pat', lastName: 'Van Leader', clubName: 'Sparks', lastPrintedAt: 0, printCount: 1 });
+    assert.equal(w.church.settings.labelFooter, 'Hi');
+    await desk.rememberLeader({ name: 'PAT van leader' });
     assert.equal(w.churchPuts.length, 1, 'already remembered: nothing written');
     // someone else saved in between: the stale answer is read again and the edit made once more
     const fetchStale = w.fetch;
@@ -447,9 +462,19 @@ describe('remembered leaders (the church settings `leaders`)', () => {
     };
     const d2 = createDesk({ cc, fetch: w.fetch, store: memoryStore(), now: () => NOW });
     await d2.signIn(PASS);
-    const forgot = await d2.forgetLeader('bo helper');
-    assert.ok(forgot && !forgot.leaders.some((l) => l.name === 'Bo Helper'));
+    const forgot = await d2.forgetLeader({ firstName: 'bo', lastName: 'HELPER' });
+    assert.ok(forgot && !forgot.leaders.some((l) => l.firstName === 'Bo'));
     assert.equal(w.churchPuts.length, 3, 'one stale PUT, one that landed');
-    assert.ok(!w.church.settings.leaders.some((l) => l.name === 'Bo Helper'));
+    assert.deepEqual(w.church.settings.leaders.map((l) => l.firstName), ['Ann', 'Pat']);
+  });
+
+  it('a full list (80) takes no new name', async () => {
+    const w = worker({ stations: [] });
+    w.church = { rev: 1, settings: sanitizeChurch({ leaders: Array.from({ length: 90 }, (_, i) => ({ firstName: `L${i}`, lastName: 'X' })) }).settings };
+    assert.equal(w.church.settings.leaders.length, 80);
+    const { desk } = make(w);
+    await desk.signIn(PASS);
+    await desk.rememberLeader({ name: 'One More' });
+    assert.equal(w.churchPuts.length, 0);
   });
 });

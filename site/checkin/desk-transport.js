@@ -32,8 +32,8 @@ export const SESSION_STORAGE = 'awanaSyncSession.v1';
 export const HISTORY_PIN_STORAGE = 'awanaDeskHistoryKey.v1';
 /** A stations-changed answer is resealed at most this many times. */
 export const RESEAL_MAX = 3;
-/** The most remembered leaders the page keeps (church settings `leaders`). */
-export const LEADERS_MAX = 60;
+/** The most remembered leaders (church settings `leaders`, lobby/shared/churchSettings.js). */
+export const LEADERS_MAX = 80;
 /** A station not heard from for this long means "check the printer". */
 export const STATION_QUIET_MS = 2 * 60 * 1000;
 
@@ -520,46 +520,56 @@ export function createDesk({ cc, fetch: fetchFn, store, base = DESK_API, now = D
   }
 
   // ── remembered leaders (the church settings, routes.md 10.3) ───────────────
+  // `leaders` in lobby/shared/churchSettings.js: at most LEADERS_MAX unique
+  // {firstName, lastName, clubName, lastPrintedAt, printCount}. The page writes
+  // only the names and the club of a NEW leader; lastPrintedAt and printCount are
+  // the station's / Worker's (the sanitizer fills their defaults), and a leader
+  // already on the list is sent back exactly as it was read.
 
-  /** @param {unknown} list @returns {{ name: string, club: string }[]} */
-  function cleanLeaders(list) {
+  /** @param {any} l */
+  const leaderKey = (l) => `${l.firstName} ${l.lastName}`.toLowerCase().replace(/\s+/g, ' ').trim();
+  /** @param {unknown} list @returns {{ firstName: string, lastName: string, clubName: string, lastPrintedAt?: number, printCount?: number }[]} */
+  function readLeaders(list) {
     if (!Array.isArray(list)) return [];
-    /** @type {{ name: string, club: string }[]} */
+    /** @type {any[]} */
     const out = [];
     const seen = new Set();
     for (const l of list) {
-      const raw = typeof l === 'string' ? { name: l } : (l && typeof l === 'object' ? /** @type {any} */ (l) : null);
-      if (!raw) continue;
-      const name = oneLine(raw.name || `${raw.firstName || ''} ${raw.lastName || ''}`, 80);
-      const k = name.toLowerCase();
-      if (!name || seen.has(k)) continue;
+      if (!l || typeof l !== 'object' || typeof l.firstName !== 'string') continue;
+      const row = { ...l, firstName: oneLine(l.firstName, 80), lastName: typeof l.lastName === 'string' ? oneLine(l.lastName, 80) : '', clubName: typeof l.clubName === 'string' ? oneLine(l.clubName, 40) : '' };
+      const k = leaderKey(row);
+      if (!k || seen.has(k)) continue;
       seen.add(k);
-      out.push({ name, club: oneLine(raw.club ?? raw.clubName, 40) });
+      out.push(row);
       if (out.length >= LEADERS_MAX) break;
     }
     return out;
   }
+  /** A typed name as the list keeps it: the first word, then the rest. @param {string} name */
+  function splitLeader(name) {
+    const parts = oneLine(name, 160).split(' ').filter(Boolean);
+    return { firstName: oneLine(parts[0] || '', 80), lastName: oneLine(parts.slice(1).join(' '), 80) };
+  }
 
   /**
-   * The church's remembered leaders: `leaders` in the Worker's church settings
-   * (`GET /v1/church/settings`). Null when the route is not there yet (404),
-   * paused, or unreachable: the page then shows no chips.
-   * @returns {Promise<{ rev: number, leaders: { name: string, club: string }[] }|null>}
+   * The church's remembered leaders (`GET /v1/church/settings`, `settings.leaders`).
+   * Null when the route is not there yet (404), paused, or unreachable: the page
+   * then shows no chips.
    */
   async function churchLeaders() {
     try {
       const r = await request('GET', '/v1/church/settings');
       if (r.status !== 200 || !r.body || typeof r.body !== 'object') return null;
-      return { rev: Number(r.body.rev) || 0, leaders: cleanLeaders(r.body.settings && r.body.settings.leaders) };
+      return { rev: Number(r.body.rev) || 0, leaders: readLeaders(r.body.settings && r.body.settings.leaders) };
     } catch { return null; }
   }
 
   /**
-   * Change the remembered list through the church-settings edit (`PUT
-   * /v1/church/settings {baseRev, settings: {leaders}}`), once more on a stale
-   * rev. Never throws: null when it could not be written (route missing, not
-   * seeded yet, paused, offline).
-   * @param {(list: { name: string, club: string }[]) => { name: string, club: string }[]|null} change null = nothing to write
+   * Change the list through the church-settings edit (`PUT /v1/church/settings
+   * {baseRev, settings: {leaders}}`, only that key), once more on a stale rev.
+   * Never throws: null when it could not be written (route missing, not seeded,
+   * paused, offline).
+   * @param {(list: any[]) => any[]|null} change null = nothing to write
    */
   async function editLeaders(change) {
     for (let attempt = 0; attempt < 2; attempt++) {
@@ -568,23 +578,26 @@ export function createDesk({ cc, fetch: fetchFn, store, base = DESK_API, now = D
       const next = change(cur.leaders);
       if (!next) return cur;
       try {
-        const put = await request('PUT', '/v1/church/settings', { baseRev: cur.rev, settings: { leaders: cleanLeaders(next) } });
-        if (put.status === 200 && put.body) return { rev: Number(put.body.rev) || cur.rev + 1, leaders: cleanLeaders(next) };
+        const put = await request('PUT', '/v1/church/settings', { baseRev: cur.rev, settings: { leaders: next } });
+        if (put.status === 200 && put.body) {
+          const saved = put.body.settings && Array.isArray(put.body.settings.leaders) ? readLeaders(put.body.settings.leaders) : next;
+          return { rev: Number(put.body.rev) || cur.rev + 1, leaders: saved };
+        }
         if (!(put.status === 409 && put.body && put.body.reason === 'stale')) return null;
       } catch { return null; }
     }
     return null;
   }
-  /** Remember a leader whose tag just printed (nothing when already remembered). @param {{ name: string, club?: string }} leader */
+  /** Remember a leader whose tag just printed (nothing when already on the list). @param {{ name: string, club?: string }} leader */
   const rememberLeader = (leader) => {
-    const name = oneLine(leader.name, 80);
-    if (!name) return Promise.resolve(null);
-    return editLeaders((list) => (list.some((l) => l.name.toLowerCase() === name.toLowerCase()) ? null
-      : [...list, { name, club: oneLine(leader.club, 40) }].slice(-LEADERS_MAX)));
+    const row = { ...splitLeader(leader.name), clubName: oneLine(leader.club, 40) };
+    if (!row.firstName) return Promise.resolve(null);
+    return editLeaders((list) => (list.some((l) => leaderKey(l) === leaderKey(row)) ? null
+      : (list.length >= LEADERS_MAX ? null : [...list, row])));
   };
-  /** @param {string} name */
-  const forgetLeader = (name) => editLeaders((list) => {
-    const next = list.filter((l) => l.name.toLowerCase() !== String(name || '').toLowerCase());
+  /** @param {{ firstName: string, lastName: string }} leader */
+  const forgetLeader = (leader) => editLeaders((list) => {
+    const next = list.filter((l) => leaderKey(l) !== leaderKey(leader));
     return next.length === list.length ? null : next;
   });
 
