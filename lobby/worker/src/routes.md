@@ -384,7 +384,7 @@ name; ONE Worker operation does the rest, so nothing prints, greets or counts tw
 
 | Route | Auth | Request | Answer |
 | --- | --- | --- | --- |
-| `GET /v1/desk/barf` | session | | `{night, barfNight: true \| false \| null, friends: [clubberId], tagRoute, stations}`. `barfNight` = the church settings' `barfNights` (10.3) holds tonight, the station's own rule; `null` (the page hides the button) with no church settings or `CHURCH_SETTINGS` off. `friends`: children who already brought one tonight (the friends list and the applied report's YES). `tagRoute`: `/print-barf-tag` when EVERY registered station reports 9.3.1 or later, else `/print-custom` (what 9.3.0 runs: a job route it would refuse is never sent). No TwoTimTwo read |
+| `GET /v1/desk/barf` | session | | `{night, barfNight: true \| false \| null, friends: [clubberId], recheck: [{clubberId, items: {Bible, Friend: true}}], tagRoute, stations}`. `barfNight` = the church settings' `barfNights` (10.3) holds tonight, the station's own rule; `null` (the page hides the button) with no church settings or `CHURCH_SETTINGS` off. `friends`: children who already brought one tonight (the friends list and the applied report's YES). `tagRoute`: `/print-barf-tag` when EVERY registered station reports 9.3.1 or later, else `/print-custom` (what 9.3.0 runs: a job route it would refuse is never sent). `recheck`: children whose late-friend redo never took and who still wait to be checked in again (their claim is marked `recheck`), so a reloaded page shows the red line again. No TwoTimTwo read |
 | `POST /v1/desk/barf-late` | session | `{night, clubberId, friendName, historyRow: Row (kind 'barf-friend'), tagJob: {jobId: 'reprint:<uuid>', bundle} \| null}`; `tagJob` sealed to every station (record `{route: tagRoute, body: {firstName, clubName}}` or `{route: '/print-custom', body: {text: 'BARFED! <first>'}}`), null only with no station | `{ok, checkedIn, items: {Bible, Friend: true}, jobId, history, reason?, tries?}` (below). 400 `wrong-night` / `no-child` / `no-friend-name` / `unsealed` (`what`); 409 `not-barf-night`, `already-friend`, `busy` (another operation, or a desk check-in being posted), `not-on-report`, `not-found`, `no-friend-item`, `no-attendance-item`, `stations-changed`; 429 / 502 / 503 as 5 |
 | `POST /v1/desk/barf-late` (recheck) | session | `{night, clubberId, recheck: true, items}` (the `items` the failed answer gave) | the redo alone: `{ok, checkedIn, items, reason?}`. No label, no list, no row |
 
@@ -406,11 +406,16 @@ on the friends list (`friends.record`: the 6:30 email and `bagNames`, the BARF
 bags), the sealed row is kept (no `night_summary` line). A redo that took keeps
 the hold 45 s more (`HOLD_AFTER_MS`: the report every 30 s, pushed back one
 15 s slot at most, so at least one report read after the redo is read held); one that never took lets it go at once (the next read sees
-the truth: the claim undone, the count down) and answers `checkedIn: false` with
-`reason`; the page shows "<Child> is NOT checked in on TwoTimTwo" and a one-tap
-recheck (the page held when it is one slot young, else one urgent read), which makes the claim live (queued, no job) and holds the child BEFORE
-its post, so the watcher never adopts them as new; a failed recheck undoes that
-claim again. The child's name tag is never reprinted.
+the truth: the count down) and answers `checkedIn: false` with `reason`. The
+claim stays live, marked `recheck` (the child's Bible, nothing named): the report's
+gap never undoes it, nothing adopts the child as new, `GET /v1/desk/barf` lists them
+(`recheck`), and a NORMAL desk check-in tap on them (`POST /v1/desk/checkin`) is the
+re-check-in alone: `{ok, already: false, recheck: true, jobId: null, items}`, or 409
+`not-checked-in-again` (still waiting); no claim, job, row or greeting. The page shows
+"<Child> is NOT checked in on TwoTimTwo" and a one-tap recheck, which keeps (or makes:
+queued, no job) the live claim and holds the child BEFORE its post, so the watcher never
+adopts them as new; a recheck that went through clears `recheck`, a failed one leaves it
+(a claim it made itself is undone again). The child's name tag is never reprinted.
 
 ## 6. Print (BUILT)
 

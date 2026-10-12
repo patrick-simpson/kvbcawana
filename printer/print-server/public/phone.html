@@ -2011,8 +2011,8 @@ $('oneoff-name').addEventListener('keydown', function(e) { if (e.key === 'Enter'
 // child is NOT checked in there: a red line at the top says so, with one tap to
 // check them in again (the same items plus Brought a friend, no label).
 var BARF = { barfNight: null, friends: {}, tagRoute: '/print-custom' };
-var BARF_LINES = {};           // clubberId -> { kind: 'pending'|'bad', text, child, items? }
-function applyBarf(info) {
+var BARF_LINES = {};           // clubberId -> { kind: 'pending'|'bad', text, child, items?, at }
+function applyBarf(info, askedAt) {
   BARF.barfNight = info ? info.barfNight : null;
   BARF.friends = {};
   if (info) {
@@ -2021,11 +2021,31 @@ function applyBarf(info) {
   }
   Object.keys(BARF_DONE).forEach(function(id) { BARF.friends[id] = true; });
   $('barf-btn').hidden = BARF.barfNight !== true;
+  // The Worker's list of children waiting to be checked in again (a redo that never
+  // took): the red line comes back after a reload, and goes once they are checked in.
+  if (info && Array.isArray(info.recheck)) {
+    var waiting = {}, changed = false;
+    info.recheck.forEach(function(w) {
+      waiting[w.clubberId] = true;
+      if (BARF_LINES[w.clubberId]) return;
+      var k = KIDS.filter(function(x) { return String(x.clubberId) === w.clubberId; })[0];
+      if (!k) return;
+      BARF_LINES[w.clubberId] = { kind: 'bad', child: { clubberId: k.clubberId, name: k.name, club: k.club }, items: w.items, at: Date.now(),
+        text: k.name + ' is NOT checked in on TwoTimTwo — check them in again.' };
+      changed = true;
+    });
+    Object.keys(BARF_LINES).forEach(function(id) {
+      var l = BARF_LINES[id];
+      if (l.kind === 'bad' && !waiting[id] && (l.at || 0) < askedAt) { delete BARF_LINES[id]; changed = true; }
+    });
+    if (changed) renderBarfLines();
+  }
 }
 var BARF_DONE = {};            // children this page recorded a friend for tonight
 function refreshBarf() {
   if (!desk || !unlockedState) return Promise.resolve();
-  return desk.barfInfo().then(applyBarf, function(e) { if (e && e.code === 'signed-out') signOut(e.message); });
+  var askedAt = Date.now();
+  return desk.barfInfo().then(function(info) { applyBarf(info, askedAt); }, function(e) { if (e && e.code === 'signed-out') signOut(e.message); });
 }
 function renderBarfLines() {
   var box = $('barf-alert');
@@ -2045,7 +2065,7 @@ function renderBarfLines() {
     box.appendChild(line);
   });
 }
-function barfLine(id, line) { if (line) BARF_LINES[id] = line; else delete BARF_LINES[id]; renderBarfLines(); }
+function barfLine(id, line) { if (line) { line.at = Date.now(); BARF_LINES[id] = line; } else delete BARF_LINES[id]; renderBarfLines(); }
 
 function barfStep(build) {
   var body = $('barf-body');

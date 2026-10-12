@@ -99,6 +99,8 @@ export class Desk {
     };
     /** May be async: history.js replaces it with a check that knows the current kid. @type {(row: any, night: string) => boolean|Promise<boolean>} */
     this.checkRow = defaultRowCheck;
+    /** barf.js sets it: a tap on a child waiting to be checked in again after a late BARF friend. @type {((night: string, clubberId: string, wait: { bible: boolean }) => Promise<Response>)|null} */
+    this.barfRecheck = null;
     /** The check-in page, kept for the club night it was read on. @type {{ at: number, page: any, night: string }|null} */
     this.cache = null;
     /** @type {Promise<any>|null} */
@@ -277,6 +279,12 @@ export class Desk {
     }
     const tag = await this.tagFor(who, night);
     if (!tag) return refuse(503, { reason: 'not-configured' });
+
+    // A late BARF friend's redo never took (barf.js): the child's name tag printed and
+    // they wait to be checked in again on TwoTimTwo. A tap is that re-check-in alone:
+    // no claim, no job, no row, no greeting (never a second name tag).
+    const waiting = 'clubberId' in who ? this.ledger.recheckOf(night, tag) : null;
+    if (waiting && 'clubberId' in who && this.barfRecheck) return this.barfRecheck(night, who.clubberId, waiting);
 
     // 2. The claim: from here to the settle, no other desk can take this child.
     const claim = await this.ledger.claim(night, tag, { source: 'desk' });

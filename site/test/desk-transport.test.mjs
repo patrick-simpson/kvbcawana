@@ -368,9 +368,12 @@ describe('a late BARF friend (routes.md 5.1)', () => {
     await desk.signIn(PASS);
     assert.equal(await desk.barfInfo(), null);
     w.barf = { night: NIGHT, barfNight: true, friends: ['12'], tagRoute: '/print-barf-tag', stations: 1 };
-    assert.deepEqual(await desk.barfInfo(), { barfNight: true, friends: ['12'], tagRoute: '/print-barf-tag' });
+    assert.deepEqual(await desk.barfInfo(), { barfNight: true, friends: ['12'], tagRoute: '/print-barf-tag', recheck: null });
     w.barf = { barfNight: null, tagRoute: 'nonsense' };
-    assert.deepEqual(await desk.barfInfo(), { barfNight: null, friends: [], tagRoute: '/print-custom' });
+    assert.deepEqual(await desk.barfInfo(), { barfNight: null, friends: [], tagRoute: '/print-custom', recheck: null });
+    // Children waiting to be checked in again after a redo that never took (kept across a reload).
+    w.barf = { barfNight: true, friends: ['12'], tagRoute: '/print-barf-tag', recheck: [{ clubberId: '12', items: { Bible: true, Friend: true } }, { clubberId: 'x<' }, null] };
+    assert.deepEqual((await desk.barfInfo()).recheck, [{ clubberId: '12', items: { Bible: true, Friend: true } }]);
   });
 
   it('seals the BARF tag to every station (its own route, or a custom label for an older station) and a barf-friend row; only the friend\'s first name in clear', async () => {

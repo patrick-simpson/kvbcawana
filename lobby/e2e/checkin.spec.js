@@ -103,9 +103,18 @@ async function stubSite(page, { kids } = {}) {
     if (p === '/v1/desk/barf-late') {
       world.barfPosts.push(body);
       const items = { Bible: true, Friend: true };
-      if (body.recheck) { const k = world.kids.find((x) => x.clubberId === body.clubberId); if (k) k.checkedIn = true; return route.fulfill(json(200, { ok: true, checkedIn: true, items: body.items })); }
+      if (body.recheck) {
+        const k = world.kids.find((x) => x.clubberId === body.clubberId); if (k) k.checkedIn = true;
+        if (world.barf) world.barf.recheck = (world.barf.recheck || []).filter((w) => w.clubberId !== body.clubberId);
+        return route.fulfill(json(200, { ok: true, checkedIn: true, items: body.items }));
+      }
       if (world.barf) world.barf.friends = [...world.barf.friends, body.clubberId];
-      if (world.barfRedo === 'fail') { const k = world.kids.find((x) => x.clubberId === body.clubberId); if (k) k.checkedIn = false; return route.fulfill(json(200, { ok: true, checkedIn: false, items, jobId: body.tagJob.jobId, reason: 'checkin-refused', tries: 3 })); }
+      if (world.barfRedo === 'fail') {
+        const k = world.kids.find((x) => x.clubberId === body.clubberId); if (k) k.checkedIn = false;
+        // The Worker keeps the child waiting to be checked in again: GET /v1/desk/barf lists them.
+        if (world.barf) world.barf.recheck = [...(world.barf.recheck || []), { clubberId: body.clubberId, items }];
+        return route.fulfill(json(200, { ok: true, checkedIn: false, items, jobId: body.tagJob.jobId, reason: 'checkin-refused', tries: 3 }));
+      }
       return route.fulfill(json(200, { ok: true, checkedIn: true, items, jobId: body.tagJob.jobId, history: 'kept' }));
     }
     if (p === '/v1/print/reprint') { world.tags.push(body); return route.fulfill(json(200, { ok: true, jobId: body.jobId, existing: false })); }
@@ -615,6 +624,9 @@ for (const where of ['/checkin/', '/checkin/ym/']) {
     const red = page.locator('#barf-alert .ba.bad');
     await expect(red).toContainText(`${failing[1]} is NOT checked in on TwoTimTwo — check them in again.`);
     await snap(page, `${tag}barf-not-checked-in.png`);
+    // A reload keeps the red line: the Worker says who still waits to be checked in again.
+    await page.reload();
+    await expect(red).toContainText(`${failing[1]} is NOT checked in on TwoTimTwo — check them in again.`, { timeout: 15_000 });
     await red.getByRole('button', { name: `Check ${failing[1].split(' ')[0]} in again` }).click();
     await expect(page.locator('#toast')).toContainText(`${failing[1]} is checked in on TwoTimTwo again.`);
     await expect(page.locator('#barf-alert')).toBeHidden();

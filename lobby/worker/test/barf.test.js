@@ -205,10 +205,13 @@ describe('POST /v1/desk/barf-late', () => {
     expect(res.body).toMatchObject({ ok: true, checkedIn: false, items: { Bible: true, Friend: true }, jobId: b.tagJob.jobId, tries: REDO_TRIES });
     expect(t.tt.checkins.length).toBe(0);              // every try refused before TwoTimTwo kept it
     expect((await t.core.friends.bagNames(NIGHT)).names).toEqual(['Kit Tester', 'Sam']);
-    // The hold is gone: the next read sees the truth (Kit is not checked in), and the claim follows it.
+    // The hold is gone: the next read sees the truth (Kit is not checked in, the count down),
+    // but the claim stays live, waiting for the re-check-in (Kit's name tag printed).
     await readReport(t);
-    expect(t.core.ledger.peek(NIGHT, tag)).toMatchObject({ state: 'undone' });
+    await step(t, SPILL_MS);
+    expect(t.core.ledger.peek(NIGHT, tag)).toMatchObject({ state: 'printed', gen: 1, recheck: { bible: true } });
     expect((await t.call('GET', '/v1/desk/tonight')).body.checkedIn).toBe(1);
+    expect((await t.call('GET', '/v1/desk/barf')).body.recheck).toEqual([{ clubberId: '662', items: { Bible: true, Friend: true } }]);
     // The one-tap re-check-in: the same items plus Brought a friend, no label, no second list entry.
     followPosts(t, { readDuringGap: true });
     const again = await t.call('POST', '/v1/desk/barf-late', { night: NIGHT, clubberId: '662', recheck: true, items: res.body.items });
@@ -217,11 +220,56 @@ describe('POST /v1/desk/barf-late', () => {
     await readReport(t);
     await step(t, SPILL_MS);
     expect(t.core.adopt.pending()).toBe(0);
-    expect(t.core.ledger.peek(NIGHT, tag).state).toBe('queued');
+    expect(t.core.ledger.peek(NIGHT, tag)).toMatchObject({ state: 'printed', gen: 1 });
+    expect(t.core.ledger.peek(NIGHT, tag).recheck).toBeUndefined();
+    expect((await t.call('GET', '/v1/desk/barf')).body.recheck).toEqual([]);
     const jobs = await leased(st);
     expect(jobs.map((j) => j.kind)).toEqual(['reprint']);   // only the BARF tag, ever
     expect((await t.call('GET', '/v1/desk/tonight')).body.checkedIn).toBe(2);
     expect((await t.core.friends.bagNames(NIGHT)).names).toEqual(['Kit Tester', 'Sam']);
+  });
+
+  it('the redo fails every try, then a NORMAL desk tap on the child: the re-check-in alone, never a second name tag; a reload still shows the red state until it takes', async () => {
+    const { t, st } = await barfNight();
+    const tag = await t.core.tags.identity(NIGHT, '662');
+    followPosts(t, { refuse: REDO_TRIES, readDuringGap: false });
+    const b = await body(st);
+    expect((await t.call('POST', '/v1/desk/barf-late', b)).body).toMatchObject({ ok: true, checkedIn: false });
+    expect((await leased(st)).map((j) => j.jobId)).toEqual([b.tagJob.jobId]);   // the BARF tag, out of the way
+    await st.call('POST', '/v1/print/done', { jobId: b.tagJob.jobId });
+    // Reads after the failed redo (Kit gone from the report, then the spill): the claim is never undone.
+    await readReport(t);
+    await step(t, SPILL_MS);
+    await readReport(t);
+    expect(t.core.ledger.peek(NIGHT, tag)).toMatchObject({ state: 'printed', recheck: { bible: true } });
+    // A reloaded page (or a DO restart) learns Kit waits to be checked in again: the red line.
+    t.restart();
+    expect((await t.call('GET', '/v1/desk/barf')).body.recheck).toEqual([{ clubberId: '662', items: { Bible: true, Friend: true } }]);
+    // A normal tap that TwoTimTwo refuses again: refused, nothing queued, still waiting.
+    t.on.checkin = async () => 'refuse';
+    const failed = await t.call('POST', '/v1/desk/checkin', await t.deskBody([st]));
+    expect(failed.status).toBe(409);
+    expect(failed.body).toMatchObject({ ok: false, reason: 'not-checked-in-again' });
+    expect(await leased(st)).toEqual([]);
+    expect((await t.call('GET', '/v1/desk/barf')).body.recheck).toHaveLength(1);
+    // The next normal tap: TwoTimTwo's check-in with Kit's items plus Brought a friend, and NO job.
+    const sentBefore = t.sent.length;
+    followPosts(t, { readDuringGap: true });
+    const tap = await t.call('POST', '/v1/desk/checkin', await t.deskBody([st]));
+    expect(tap.status).toBe(200);
+    expect(tap.body).toMatchObject({ ok: true, already: false, recheck: true, jobId: null, items: { Bible: true, Friend: true } });
+    expect(t.tt.checkins.at(-1).getAll('events[]').sort()).toEqual(['40', '707', '808']);
+    await readReport(t);
+    await step(t, SPILL_MS);
+    await readReport(t);
+    await step(t, SPILL_MS);
+    expect(t.core.adopt.pending()).toBe(0);
+    expect(await leased(st)).toEqual([]);                     // no second name tag, ever
+    expect(t.sent.slice(sentBefore).filter((f) => f.e === 'checkin')).toEqual([]);   // no greeting
+    expect(t.core.ledger.peek(NIGHT, tag)).toMatchObject({ state: 'printed', gen: 1 });
+    expect((await t.call('GET', '/v1/desk/barf')).body.recheck).toEqual([]);   // the red state clears
+    // And now an ordinary tap is "already", as for any child checked in.
+    expect((await t.call('POST', '/v1/desk/checkin', await t.deskBody([st]))).body).toMatchObject({ ok: true, already: true });
   });
 
   it('a TwoTimTwo that refuses the undo changes nothing', async () => {

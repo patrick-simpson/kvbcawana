@@ -74,6 +74,7 @@ export function refusalWords(reason) {
     case 'not-on-report': return 'TwoTimTwo does not show that child checked in yet. Try again in a moment.';
     case 'no-friend-item': return 'TwoTimTwo has no Brought a friend item for that club tonight.';
     case 'busy': return 'That child is being checked in right now. Try again in a moment.';
+    case 'not-checked-in-again': return 'TwoTimTwo did not take the check-in again (after their BARF friend). Try again, or check them in on TwoTimTwo itself.';
     default: return `TwoTimTwo or the service refused it (${reason}).`;
   }
 }
@@ -472,7 +473,9 @@ export function createDesk({ cc, fetch: fetchFn, store, base = DESK_API, now = D
   /**
    * Is tonight a BARF night, who already brought a friend, and which route the
    * BARF tag is sealed to. Null when the Worker cannot say (the page hides the button).
-   * @returns {Promise<{ barfNight: boolean|null, friends: string[], tagRoute: string }|null>}
+   * `recheck`: children whose late BARF redo never took and who wait to be checked in
+   * again (the red line, after a reload too); null from a Worker that does not say.
+   * @returns {Promise<{ barfNight: boolean|null, friends: string[], tagRoute: string, recheck: { clubberId: string, items: { Bible: boolean, Friend: true } }[]|null }|null>}
    */
   async function barfInfo() {
     try {
@@ -482,6 +485,10 @@ export function createDesk({ cc, fetch: fetchFn, store, base = DESK_API, now = D
         barfNight: typeof r.body.barfNight === 'boolean' ? r.body.barfNight : null,
         friends: Array.isArray(r.body.friends) ? r.body.friends.map(String) : [],
         tagRoute: r.body.tagRoute === '/print-barf-tag' ? '/print-barf-tag' : '/print-custom',
+        recheck: Array.isArray(r.body.recheck)
+          ? r.body.recheck.filter((/** @type {any} */ x) => x && /^\d{1,12}$/.test(String(x.clubberId)))
+            .map((/** @type {any} */ x) => ({ clubberId: String(x.clubberId), items: { Bible: !!(x.items && x.items.Bible === true), Friend: /** @type {const} */ (true) } }))
+          : null,
       };
     } catch (e) {
       if (e instanceof DeskError && e.code === 'signed-out') throw e;

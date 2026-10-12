@@ -88,7 +88,7 @@ export class Tags {
 
 /**
  * @typedef {{ state: 'checking'|'queued'|'printed'|'undone', gen: number, source: string,
- *   at: number, until?: number, jobId?: string }} Claim
+ *   at: number, until?: number, jobId?: string, recheck?: { bible: boolean } }} Claim
  */
 
 export class Ledger {
@@ -235,8 +235,43 @@ export class Ledger {
     c.gen += 1;
     delete c.until;
     delete c.jobId;
+    delete c.recheck;
     await this.doc.save();
     return { ok: true, was, gen: c.gen };
+  }
+
+  /**
+   * A late BARF friend's redo never took (barf.js): TwoTimTwo does not have the
+   * child, but their name tag printed. The claim stays live (made live, queued
+   * with no job, when there is none) and carries `recheck` (the child's Bible,
+   * nothing named), so the report's gap never undoes it, nothing adopts them as
+   * new, and the desk's next tap on them is the re-check-in alone (no name tag).
+   * The synchronous half: no await. @param {string} night @param {string} tag @param {boolean} bible
+   */
+  markRecheckNow(night, tag, bible) {
+    const claims = this.claims(night);
+    if (!claims[tag] || claims[tag].state === 'undone') {
+      const r = this.claimNow(night, tag, { source: 'barf', initial: 'queued' });
+      if (!r.ok) return false;
+    }
+    claims[tag].recheck = { bible: !!bible };
+    return true;
+  }
+
+  /** The re-check-in a live claim waits for, or null. @param {string} night @param {string} tag (call after load) */
+  recheckOf(night, tag) {
+    const c = this.peek(night, tag);
+    return c && c.state !== 'undone' && c.recheck ? c.recheck : null;
+  }
+
+  /** The re-check-in went through: the claim is an ordinary live one again. @param {string} night @param {string} tag */
+  async clearRecheck(night, tag) {
+    await this.load();
+    const c = this.peek(night, tag);
+    if (!c || !c.recheck) return false;
+    delete c.recheck;
+    await this.doc.save();
+    return true;
   }
 
   /** Counts by state, for the status: never a tag. @param {string} night */

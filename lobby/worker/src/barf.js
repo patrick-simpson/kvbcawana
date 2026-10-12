@@ -29,8 +29,11 @@
 //      the sealed `barf-friend` history row is kept. A redo that never took lets
 //      the hold go at once (the truth: TwoTimTwo does not have the child) and
 //      answers `checkedIn: false` with the items, so the page can offer
-//      `{recheck: true}`: TwoTimTwo's check-in alone, no label, no list, and the
-//      claim made live again so the watcher does not adopt the child as new.
+//      `{recheck: true}`: TwoTimTwo's check-in alone, no label, no list. The claim
+//      stays live and marked `recheck` (ledger.js), so the report's gap never undoes
+//      it, the watcher never adopts the child as new, a normal desk tap on them is
+//      that re-check-in (never a second name tag), and GET /v1/desk/barf lists them
+//      (`recheck`) so a reloaded page shows the red line again.
 //
 // The Worker never seals or opens anything here (free plan CPU): the page sealed
 // the job and the row. Names stay in this call's memory and in the hold (memory
@@ -123,12 +126,31 @@ export class BarfLate {
     return [...ids];
   }
 
+  /**
+   * Children whose late BARF redo never took and who wait to be checked in again:
+   * among tonight's friends (every one of them has a friend recorded), the live
+   * claims marked `recheck`. @param {string} night @param {string[]} ids
+   */
+  async rechecks(night, ids) {
+    const { ledger, tags } = this.core;
+    await ledger.load();
+    /** @type {{ clubberId: string, items: { Bible: boolean, Friend: true } }[]} */
+    const out = [];
+    for (const id of ids) {
+      const tag = await tags.identity(night, id);
+      const r = tag ? ledger.recheckOf(night, tag) : null;
+      if (r) out.push({ clubberId: id, items: { Bible: !!r.bible, Friend: true } });
+    }
+    return out;
+  }
+
   /** GET /v1/desk/barf: what the page needs to show the BARF button. No TwoTimTwo read. */
   async info() {
     const night = churchNight(this.core.now());
     const barfNight = await this.barfNight(night);
     const stations = await this.core.stations.list();
-    return json({ night, barfNight, friends: barfNight ? await this.friendIds(night) : [], tagRoute: barfTagRoute(stations), stations: stations.length });
+    const friends = await this.friendIds(night);
+    return json({ night, barfNight, friends: barfNight ? friends : [], recheck: await this.rechecks(night, friends), tagRoute: barfTagRoute(stations), stations: stations.length });
   }
 
   /** POST /v1/desk/barf-late. @param {any} body */
@@ -253,7 +275,13 @@ export class BarfLate {
       child.checkedIn = true;
       watcher.unhold(clubberId, core.now() + HOLD_AFTER_MS);
     } else {
+      // The claim stays live and waits for the re-check-in (one synchronous step with
+      // the hold's end), so no read after it undoes the claim and no tap reprints.
+      const tag = /** @type {string} */ (await core.tags.identity(night, clubberId));
+      await core.ledger.load();
+      core.ledger.markRecheckNow(night, tag, !!entry.bible);
       watcher.unhold(clubberId);
+      await core.ledger.doc.save();
       console.warn('[desk] a late BARF friend: the redo did not take; the page offers a re-check-in');
     }
 
@@ -273,18 +301,43 @@ export class BarfLate {
 
   /**
    * {recheck: true}: the redo alone, after one that never took. No label, no list,
-   * no row. The claim is made live (queued, no job) and the child held BEFORE the
-   * post, so whatever the watcher reads meanwhile, the child is never adopted as a
-   * new check-in; a post that fails lets both go (the claim undone at gen + 1).
-   * @param {string} night @param {string} clubberId @param {any} body
+   * no row. The claim is live (kept marked `recheck` by the failed redo, or made
+   * here: queued, no job) and the child held BEFORE the post, so whatever the
+   * watcher reads meanwhile, the child is never adopted as a new check-in; a post
+   * that fails lets the hold go (a claim made here is undone at gen + 1, a marked
+   * one keeps waiting). @param {string} night @param {string} clubberId @param {any} body
    */
   async recheck(night, clubberId, body) {
+    const r = await this.recheckOnce(night, clubberId, { Bible: !!(body.items && body.items.Bible === true), Friend: true });
+    if (r instanceof Response) return r;
+    return json({ ok: true, checkedIn: r.ok, items: r.items, ...(r.ok ? {} : { reason: r.error || 'refused' }) });
+  }
+
+  /**
+   * A normal desk check-in tap on a child waiting to be checked in again (desk.js):
+   * the re-check-in, with the items the late friend's redo had. Never a name tag,
+   * a greeting, a row or a count line: the child was here all along.
+   * @param {string} night @param {string} clubberId @param {{ bible: boolean }} wait
+   */
+  fromDesk(night, clubberId, wait) {
+    return this.guard(clubberId, async () => {
+      const r = await this.recheckOnce(night, clubberId, { Bible: !!wait.bible, Friend: true });
+      if (r instanceof Response) return r;
+      if (!r.ok) return refuse(409, { reason: 'not-checked-in-again', error: r.error || 'refused', items: r.items });
+      return json({ ok: true, already: false, recheck: true, jobId: null, items: r.items });
+    });
+  }
+
+  /**
+   * @param {string} night @param {string} clubberId @param {{ Bible: boolean, Friend: true }} items
+   * @returns {Promise<Response | { ok: boolean, error: string, items: { Bible: boolean, Friend: true } }>}
+   */
+  async recheckOnce(night, clubberId, items) {
     const core = this.core;
     const watcher = core.watcher;
     const client = watcher.clientFor();
     if (!client || watcher.mode === 'off') return refuse(503, { reason: 'not-configured' });
     const tag = /** @type {string} */ (await core.tags.identity(night, clubberId));
-    const items = { Bible: !!(body.items && body.items.Bible === true), Friend: true };
     // The page held for the night when it is one slot young, else one urgent read:
     // whether TwoTimTwo has the child already (a redo that timed out may have taken).
     const fresh = await core.desk.page(READ_INTERVAL_MS, false, true);
@@ -293,6 +346,7 @@ export class BarfLate {
     if (!found.ok) return found.error === 'not-found' ? refuse(409, { reason: 'not-found' }) : core.desk.pageFailure(found);
     const { child, page } = found;
     // One synchronous step: a live claim (made here only when there is none), then the hold.
+    await core.ledger.load();
     const c = core.ledger.peek(night, tag);
     const made = !c || c.state === 'undone' ? core.ledger.claimNow(night, tag, { source: 'barf', initial: 'queued' }) : null;
     watcher.hold({ clubberId, name: child.name, club: child.club, friend: true, ...(items.Bible ? { bible: true } : {}) }, core.now() + HOLD_MAX_MS);
@@ -308,18 +362,21 @@ export class BarfLate {
     if (!ok) {
       watcher.unhold(clubberId);
       if (made && made.ok) await core.ledger.undo(night, tag);
-      return json({ ok: true, checkedIn: false, items, reason: error || 'refused' });
+      return { ok: false, error: error || 'refused', items };
     }
     child.checkedIn = true;
     watcher.unhold(clubberId, core.now() + HOLD_AFTER_MS);
+    await core.ledger.clearRecheck(night, tag);
     if (core.adopt) await core.adopt.forget(night, tag);
-    return json({ ok: true, checkedIn: true, items });
+    return { ok: true, error: '', items };
   }
 }
 
 /** @param {import('./registry.js').Registry} registry @param {any} core */
 export function mountBarf(registry, core) {
   core.barf = new BarfLate(core);
+  // A normal desk tap on a child waiting to be checked in again (ledger.js `recheck`).
+  core.desk.barfRecheck = (/** @type {string} */ night, /** @type {string} */ id, /** @type {{ bible: boolean }} */ wait) => core.barf.fromDesk(night, id, wait);
   registry.add('GET', '/v1/desk/barf', 'session', () => core.barf.info());
   registry.add('POST', '/v1/desk/barf-late', 'session', async ({ body }) => core.barf.handle(await body()));
 }

@@ -142,6 +142,9 @@ export class Adopter {
       if (!tag) continue;
       const c = this.ledger.peek(night, tag);
       if (!c || (c.state !== 'queued' && c.state !== 'printed')) continue;
+      // A late BARF friend's redo that never took (barf.js): the child is waiting to be
+      // checked in again, never undone (an undone claim would let a tap print a second name tag).
+      if (c.recheck) continue;
       await this.ledger.undo(night, tag);
       await this.printq.dropForTag(tag);
       // ...and it must not be adopted from the backlog either.
