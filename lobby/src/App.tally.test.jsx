@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from 'vitest';
 import { render, screen, cleanup, act, waitFor } from '@testing-library/react';
 
 // TONIGHT COUNTER: the four ways it used to drift ABOVE the printer's number.
@@ -14,7 +14,7 @@ import { render, screen, cleanup, act, waitFor } from '@testing-library/react';
 // not depend on which widget mode the display happens to be in.
 
 import { fakeLive } from './lib/__fixtures__/fakeLive.js';
-import { todayKey } from './test/appHarness.js';
+import { loadOperatorPanels, todayKey } from './test/appHarness.js';
 const live = fakeLive();
 const bound = live.bound;
 
@@ -52,6 +52,9 @@ beforeEach(() => {
   vi.spyOn(console, 'error').mockImplementation(() => {});
 });
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
+
+// Settings is its own chunk: have it in hand before the first click opens it.
+beforeAll(loadOperatorPanels);
 
 describe("tonight's counter never runs above the printer's total", () => {
   // O-1. Plaintext `tally` dispatches synchronously; sealed `checkin` goes

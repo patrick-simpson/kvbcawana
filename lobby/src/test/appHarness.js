@@ -5,6 +5,17 @@
 
 import { _resetForTest } from '../hooks/useConfig.js';
 import { dateKey } from '../lib/time.js';
+import { preloadOperatorPanels } from '../components/operatorPanels.jsx';
+
+/**
+ * Settings, the slide editor and the debug panel are chunks of their own
+ * (src/components/operatorPanels.jsx). Awaited once per file (`beforeAll`), a
+ * click on the gear mounts Settings in the same act() as before the split: a
+ * landed panel renders without suspending.
+ */
+export function loadOperatorPanels() {
+  return preloadOperatorPanels();
+}
 
 /** Local YYYY-MM-DD key for `now`: the day the screen's storage keys on. */
 export function todayKey(now = new Date()) {

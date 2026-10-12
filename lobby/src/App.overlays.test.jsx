@@ -1,7 +1,7 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from 'vitest';
 import { render, cleanup, act, waitFor } from '@testing-library/react';
 import { NOTICE_MAX_AGE_MS } from './lib/constants.js';
-import { kids, setup } from './test/appHarness.js';
+import { kids, loadOperatorPanels, setup } from './test/appHarness.js';
 
 // WHO HOLDS WHICH PART OF THE ROOM (rebrand stage 4b-2): whole-App tests of
 // the rules src/lib/overlayFit.js lobbyRoom decides and App wires up: the
@@ -53,6 +53,9 @@ beforeEach(() => {
   vi.spyOn(console, 'error').mockImplementation(() => {});
 });
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.restoreAllMocks(); vi.useRealTimers(); });
+
+// Settings is its own chunk: have it in hand before the first click opens it.
+beforeAll(loadOperatorPanels);
 
 describe('the room rules, wired up', () => {
   it('a critical notice takes the middle and the copy steps aside; clearing it brings the copy back', async () => {

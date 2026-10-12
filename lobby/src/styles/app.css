@@ -1261,6 +1261,10 @@ html, body, #root {
   animation-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1);
   animation-timing-function: linear(0, 0.213, 0.605, 0.93, 1.103, 1.142, 1.106, 1.05, 1.006, 0.984, 0.98, 0.986, 0.994, 1, 1.002, 1.003, 1);
 }
+/* The debug panel's stand-in while its chunk lands (src/components/
+   operatorPanels.jsx): there at once, like Settings' "Opening…" card, so the
+   real panel's entrance plays once, when it arrives. */
+.debug.debug--opening { animation: none; }
 /* The first-run card has no entrance: it must be there, whole, on the very
    first frame (e2e/setup-card.spec.js), and it only ever leaves in the commit
    that mounts a name. Its buttons still take the press. */

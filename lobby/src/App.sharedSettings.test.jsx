@@ -1,7 +1,7 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from 'vitest';
 import { render, cleanup, act, waitFor } from '@testing-library/react';
 import { NOTICE_MAX_AGE_MS } from './lib/constants.js';
-import { kids, setup } from './test/appHarness.js';
+import { kids, loadOperatorPanels, setup } from './test/appHarness.js';
 
 // (setup borrowed from App.overlays.test.jsx)
 // WHO HOLDS WHICH PART OF THE ROOM (rebrand stage 4b-2): whole-App tests of
@@ -44,6 +44,9 @@ beforeEach(() => {
   vi.spyOn(console, 'warn').mockImplementation(() => {});
 });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.useRealTimers(); cfg._resetForTest(); });
+
+// Settings is its own chunk: have it in hand before the first click opens it.
+beforeAll(loadOperatorPanels);
 
 describe('shared settings, wired up', () => {
   it('a settings frame sets the pickup board\'s naming guard here, and cannot touch a per-screen key', async () => {

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from 'vitest';
 import { render, cleanup, act } from '@testing-library/react';
 
 // THE LOBBY DIRECTOR (rebrand stage 4), wired end to end.
@@ -52,7 +52,7 @@ vi.mock('./hooks/useBuildReload.js', () => ({
 
 import { STINGER_SEC } from './lib/lobbyMotion.js';
 import { SETUP_CARD_QUIET_MS } from './lib/constants.js';
-import { todayKey } from './test/appHarness.js';
+import { loadOperatorPanels, todayKey } from './test/appHarness.js';
 
 const App = (await import('./App.jsx')).default;
 const cfg = await import('./hooks/useConfig.js');
@@ -128,6 +128,9 @@ afterEach(() => {
 // run of 20-odd screen seconds costs 2-4 s of wall clock on an idle machine:
 // too close to vitest's 5 s default for a busy one. The budget is wall clock
 // only; every assertion about screen time runs on the fake clock.
+// Settings is its own chunk: have it in hand before the first click opens it.
+beforeAll(loadOperatorPanels);
+
 describe('the lobby director, end to end', { timeout: 20_000 }, () => {
   // These two run FIRST on purpose. Started on the flagship slide (the boot
   // slide) after an earlier test in this file has played a held slide, a
