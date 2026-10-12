@@ -92,3 +92,9 @@ describe('the display role saves its state durably', () => {
     assert.ok(body.indexOf('fsyncSync') < body.indexOf('renameSync'));
   });
 });
+
+describe('a second launch', () => {
+  it('ignores Windows\' own --autostart launch, so it never counts as a manual Show', () => {
+    assert.match(main, /app\.on\('second-instance', \(event, argv\) => \{\n(?:  \/\/.*\n)+  if \(Array\.isArray\(argv\) && argv\.includes\('--autostart'\)\) return;/);
+  });
+});

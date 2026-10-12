@@ -1460,7 +1460,10 @@ app.whenReady().then(async () => {
   deviceSync.start();
 });
 
-app.on('second-instance', () => {
+app.on('second-instance', (event, argv) => {
+  // Windows' own start-at-sign-in launch (--autostart) reaching a copy that is
+  // already running is not a person opening the app: nothing to show.
+  if (Array.isArray(argv) && argv.includes('--autostart')) return;
   // Opening the app again (the Start menu or the desktop icon) while it runs
   // in the tray. A print server: almost always "it isn't printing", so make
   // sure the server is actually up, then show its window. A display: "show
