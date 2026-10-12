@@ -149,6 +149,11 @@ app.post('/canary', async (req, res) => {
 // ── Church config (read-only) ─────────────────────────────────────────────────
 // The extension fetches this once at startup so club-night windows, the
 // check-in URL, and shares club ids live in one place instead of hardcodes.
+// While this computer is the Worker's print station (configureCloud, station.js) the
+// Worker does the Trek/Journey youth check-out (YM_CHECKOUT, lobby/worker/src/ymcheckout.js),
+// so the extension is told its own sweep is off; stopCloud() hands it back.
 app.get('/config/church', (req, res) => {
-  res.json($config.churchConfig);
+  const cfg = $config.churchConfig;
+  if (!$config.cloudStation) return res.json(cfg);
+  res.json({ ...cfg, ymCheckout: { ...(cfg.ymCheckout && typeof cfg.ymCheckout === 'object' ? cfg.ymCheckout : {}), enabled: false } });
 });
