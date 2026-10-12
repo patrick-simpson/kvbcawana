@@ -536,3 +536,195 @@ for the 6:30 pm email (`friends.record`, friend's name empty), because a cloud j
 the station not to report it again; a desk check-in with the Friend item ticked is
 recorded the same way (the desk page's sealed job carries the friend's name to the
 tag). The same flag counts in the `tonight` frame's `friendsBrought`.
+
+## 10. Settings overhaul: switches, church settings, notices, change log, overview (SPEC, not built)
+
+Design and build split: `docs/SETTINGS-OVERHAUL.md` (repo root). Section 9 is the
+youth check-out (`YM_CHECKOUT`, branch `worker-ymcheckout`); this section assumes
+it is merged and names `YM_CHECKOUT` as a switch either way (stored but inert
+until `ymcheckout.js` exists). Every rule at the top of this file holds: no key
+work in the Worker, counts / codes / church-authored text only, one synchronous
+check-and-set with write-through, `BODY_MAX` unless said. Mark each route BUILT
+here when it lands.
+
+### 10.1 Device identity (every write below, and `PUT /v1/settings|slides|template|journey`, `/v1/screens/*`)
+
+| Header | Value | Use |
+| --- | --- | --- |
+| `X-Device` | 16..64 of `A-Za-z0-9_-`: the page's `awanaDevice.v1` id, a screen's `awanaScreens.v1` id | change log `device.id` |
+| `X-Device-Name` | `encodeURIComponent(name)`, decoded and cleaned with `cleanScreenName` (40) | change log `device.name` |
+
+Both optional (missing = `{kind: 'unknown', name: 'Unknown device'}`). A
+registered `X-Station` wins: `{kind: 'station', id, name}` from the registry; an
+`X-Device` that is a registered screen id is `{kind: 'screen'}` with the
+registry's name; anything else `{kind: 'page'}`. Never an IP, user agent or
+session. Same origin (`/api`): no CORS change.
+
+### 10.2 Switches (runtime, stored; `wrangler.toml [vars]` become the defaults)
+
+Storage `switches` = `{v: 1, rev, updatedAt, by, values: {NAME: 'on'|'off'}}`
+(a name absent from `values` follows its default).
+
+| Name | Group | Default | Read by |
+| --- | --- | --- | --- |
+| `CLOUD_PRINT` | online | `env.CLOUD_PRINT`, else `off` | `adopt.on` (jobs for TwoTimTwo-page check-ins) |
+| `SINGLE_PUBLISHER` | online | `env.SINGLE_PUBLISHER`, else `off` | `core.singlePublisher` (Worker publishes tally / tonight / still-here; the gate drops the laptop's) |
+| `YM_CHECKOUT` | online | `env.YM_CHECKOUT`, else `off` | `ym.enabled` (section 9) |
+| `CHURCH_SETTINGS` | safety | `env.CHURCH_SETTINGS`, else `on` | 10.3 edits allowed; stations apply 10.3 |
+| `NOTICES` | safety | `env.NOTICES`, else `on` | `POST /v1/notice` allowed |
+| `CHANGE_LOG` | safety | `env.CHANGE_LOG`, else `on` | 10.5 entries written |
+
+- **Effective within the request.** `SyncCore` keeps `this.rawEnv`; `this.env =
+  Object.create(rawEnv)` with own getters for the six names returning the
+  effective value, so every existing `this.env.CLOUD_PRINT` /
+  `SINGLE_PUBLISHER` / `YM_CHECKOUT` read (`adopt.js`, `sync.js`,
+  `ymcheckout.js`) needs no edit. `await core.switches.load()` (memoized) runs
+  first in `handle()`, `alarm()` and `cron()`. A PUT updates memory and
+  storage in one synchronous step before answering.
+- **Deploy kill.** `SWITCHES_STORED = "off"` in `[vars]` ignores `values`
+  (defaults only); the routes still answer (`source: 'default'`), PUT 409
+  `{reason: 'stored-off'}`.
+
+| Route | Auth | Request | Answer |
+| --- | --- | --- | --- |
+| `GET /v1/switches` | session | | `{rev, updatedAt, by, stored, switches: [{name, group, value, default, source: 'worker'\|'default'}], stations: [{stationId, name, lastSeenAt, version\|null, churchRev\|null}]}` |
+| `PUT /v1/switches` | session | `{name, value: 'on'\|'off'\|'default', rev?}` | `{ok, rev, switch, warnings: [code]}`. 400 `bad-name` / `bad-value`; 409 `{reason: 'stale', rev}` when `rev` is sent and differs; 409 `stored-off`. `default` deletes the stored value. Rings `changed {what: 'switches', rev}`; logs `switch` (10.5) |
+
+Warnings (never refusals; the page shows them in its confirm): `no-station` (no
+station heartbeat in 2 min), `station-old` (a station seen in 2 min reports no
+`version`, or one below `STATION_MIN_VERSION` = `9.3.0`: it cannot follow a
+runtime `SINGLE_PUBLISHER` / `YM_CHECKOUT` change), `window-open` (the watch
+window is open now), `ym-tab-reload` (`YM_CHECKOUT` turned OFF while a station
+holds the extension's sweep: the TwoTimTwo tab must be reloaded before the
+extension sweeps again). Turning `SINGLE_PUBLISHER` off does not purge
+`tonight:book` (the end-of-window purge does).
+
+### 10.3 Church settings (the laptop's church-wide printing settings, edited from anywhere)
+
+One allowlist, `lobby/shared/churchSettings.js` (pure; generated CommonJS copy
+`printer/print-server/churchSettings.js` via `scripts/shared-copies.mjs`,
+checked by `check-mirrors.mjs`): `CHURCH_SPEC`, `CHURCH_KEYS`,
+`sanitizeChurch(raw) -> {settings, dropped: [key]}`, `mergeChurch(prev, patch)`
+(a key sent as `null` is deleted), `CHURCH_JSON_MAX` = 24576 bytes. It imports
+only `./pickup.js`, `./clubs.js` and `./text.js` (each already in `COPIES`, so
+`shared-copies.mjs` rewrites the imports to `./pickup`, `./clubTable`, `./textClean`)
+and uses only `export const` / `export function`.
+
+| Key | Rule (what `sanitizeChurch` keeps) |
+| --- | --- |
+| `labelFooter`, `connectCardGreeting` | string, one printable line, at most 60 (`''` kept: none) |
+| `firstTimerInverted`, `trophyBand`, `connectCard`, `connectCardAutoFirstTimer`, `enableDrivenCheckin` | bool |
+| `labelTemplates` | object, at most 12 keys (`default` or a `shared/clubs.js` club key), each `{version: 1, showIconPanel?, showLastName?, showClubLine?, showGroupLine?, showVisitorPill?, showFooter?: false, nameMaxPt?: int 18..47}` (the print server's `sanitizeLabelTemplates` shape; a template with no override is dropped) |
+| `schedule` | array of at most 60 rows `{club: 1..30 chars, startTime: /^\d{1,2}:\d{2}$/ or '', location: ..40, room: ..40}` |
+| `lateGraceMin` | int 0..120 |
+| `pickupClubs` | `pickup.js normalizePickupClubs` (`null` = the default list) |
+| `seasonTheme` | `auto` \| `off` \| `back-to-school` \| `fall` \| `thanksgiving` \| `christmas` \| `winter` \| `spring` \| `easter` \| `vbs-summer` |
+| `barfNights` | array of at most 20 unique sorted `YYYY-MM-DD` |
+
+Never here: printers, `cupsMedia`, `musicalPrinter`, `updateBeacon`,
+`worksheetPrinter`, `checkinUrl`, `historyRetentionDays`, `fleetConfigUrl`, any
+`SECRET_CONFIG_KEYS` key. Values are church-authored, never child data.
+
+Storage `church` = `{v: 1, rev, savedAt, by, seededBy: {stationId, name, at} | null, settings}`.
+
+| Route | Auth | Request | Answer |
+| --- | --- | --- | --- |
+| `GET /v1/church/settings` | session (a station's session + `X-Station` too) | | `{rev, savedAt, by, seeded, paused, settings \| null, switches: {NAME: 'on'\|'off'} (effective, all six), switchesRev}`; `rev: 0, settings: null` before the seed. `paused` = `CHURCH_SETTINGS` off |
+| `PUT /v1/church/settings` (seed) | station | `{seed: true, settings}` (the station's whole config.json church part) | first writer wins: 201 `{rev: 1}` stored with `seededBy`; 200 `{already: true, rev}` when a doc exists. Logs `church` (`undoable: false`) |
+| `PUT /v1/church/settings` (edit) | session | `{baseRev, settings: {key: value \| null}}` (only the changed keys) | `{ok, rev, savedAt, settings}`. 409 `{reason: 'stale', rev, settings}` when `baseRev !== rev`; 409 `{reason: 'not-seeded'}` when `rev === 0` and the body lacks `fromDefaults: true`; 503 `{reason: 'church-off'}` while `CHURCH_SETTINGS` is off; 413 over `CHURCH_JSON_MAX`; 400 `{reason: 'bad-settings', dropped}` when every sent key was dropped. Rings `changed {what: 'church', rev}`; logs one `church` entry with the changed keys |
+| `GET /v1/print/next` (changed, additive) | station | | adds `church: {rev, switchesRev}`; an older puller ignores it |
+| `POST /v1/print/heartbeat` (changed, additive) | station | adds `version?: 'X.Y.Z'`, `churchRev?: int` | unchanged; both kept on the station record (they ride `touch`'s throttled write; a CHANGED value forces it) |
+
+The station's side (precedence, offline fallback, first-run migration):
+`docs/SETTINGS-OVERHAUL.md` section 4.
+
+### 10.4 Notice to every screen
+
+Wire (contract `events.notice`, printer canonical first): `optionalFields:
+["durationSec"]`, int 0..14400. A screen hides a notice `durationSec` after it
+RECEIVED it (`min(durationSec * 1000, NOTICE_MAX_AGE_MS)`); `0` = take down now.
+An older screen ignores the field (the 4 h ceiling as before). No
+`contractVersion` bump (additive optional; `test-contracts.cjs` `buildNotice`
+keeps its exact `fields`).
+
+Storage `notice:current` = `{payload: {level, message, at, durationSec}, until, by}`.
+
+| Route | Auth | Request | Answer |
+| --- | --- | --- | --- |
+| `POST /v1/notice` | session | `{level: 'info'\|'warn'\|'critical', message, durationMin: 5..240}` | builds `{level, message: plainText(message, 200), at: ISO now, durationSec}` (unknown level or empty message: 400), `relay('notice', payload)` (replayed), stores `notice:current`. `{ok, notice, until, screens}`. 503 `{reason: 'notices-off'}`. Logs `notice` (undo = take down) |
+| `DELETE /v1/notice` | session | | publishes `{level, message, at: now, durationSec: 0}` (the SAME text: an older screen at worst keeps what it already shows), then deletes `live:notice` and `notice:current`. `{ok, cleared}`. Logs `notice` |
+| `GET /v1/notice` | session | | `{notice: {...payload, until, by} \| null}` |
+
+- **Gate.** `POST /v1/publish` with `event: 'notice'` while `notice:current` is
+  unexpired answers 200 `{dropped: true, reason: 'owner-notice'}`: the laptop's
+  TwoTimTwo `/msg/admin` mirror never overwrites the owner's notice.
+- **Replay.** `replayFrames()` hands out `live:notice` only while its notice is
+  unexpired, with `durationSec` rewritten to the seconds left; an expired one is
+  deleted with `notice:current`. A laptop notice (no `notice:current`) replays
+  as before.
+- Validation is the Worker's own (`shared/text.js` `plainText`), not an import
+  of `src/lib/eventSanitizers.js`; the screen's sanitizer still checks every frame.
+
+### 10.5 Change log (last 200; undo where cheap)
+
+Storage: `log:meta` `{v: 1, seq}`; a ring of 10 buckets `log:b0`..`log:b9` of 20
+entries (entry `n` lives in bucket `floor(n / 20) % 10`; a bucket is reset when
+its first slot is written again); `logv:0`..`logv:19` hold a `before` too big
+for its entry (`{seq, before}`, slot `n % 20`). One entry = one bucket get + one
+multi-key put (bucket + meta [+ logv]). No `list()` needed (the `Store`
+interface has none).
+
+```
+Entry { seq, at, device: {kind: 'page'|'screen'|'station'|'unknown', id?, name},
+        what: 'shared'|'church'|'switch'|'notice'|'screen'|'screen-name'|'screen-forget'|
+              'slides'|'template'|'journey'|'passphrase'|'station',
+        target?: screenId | stationId | switch name,
+        keys: [<= 40], before?: {k: v}, after?: {k: v} | null, bigBefore?: true,
+        undoable, undoOf?: seq, undoneBy?: seq }
+```
+
+- Values only from allowlists (`SHARED_SPEC`, `CHURCH_SPEC`, `SCREEN_SPECS`,
+  switches, a notice's level and message): no child data can reach the log.
+  `slides`: `{after: {slideCount}}`; `template` / `journey`: keys only;
+  `passphrase`: no values; `station`: register / remove, name only. None of
+  those four is undoable. An entry is at most 2 KB: a larger `before` goes to
+  `logv`, a larger `after` is stored as `null` (undo still works; the page says
+  "changed").
+- `undoable`: `shared`, `church` (not the seed), `switch`, `notice`, `screen`,
+  `screen-name`.
+- `CHANGE_LOG` off: nothing written. A logging failure never fails the write it
+  describes (caught, `console.error`).
+
+| Route | Auth | Request | Answer |
+| --- | --- | --- | --- |
+| `GET /v1/changes?before=<seq>&limit=1..50` | session | | `{entries: [newest first], next: seq \| null, head, off}` |
+| `POST /v1/changes/<seq>/undo` | session | | every key must still hold its `after` (JSON compare); then its `before` is written through the SAME path the change took (rebroadcast, doorbell, a new entry with `undoOf`) and the old entry gets `undoneBy`. `{ok, seq}`. 409 `{reason: 'changed-since', keys}`, 409 `not-undoable`, 409 `{reason: 'already-undone', undoneBy}`, 410 `gone` (rotated out), 503 `church-off` / `notices-off` as that path would |
+
+Hooks: `putSettings` (diff of the shared set against the previous one; no change,
+no entry), `putSlides`, `putTemplate`, `putJourney`, `changePassphrase`,
+`screens.putSettings` / `rename` / `forget`, station `register` / `DELETE`,
+10.2, 10.3, 10.4.
+
+### 10.6 Tonight overview (mission control's one poll)
+
+| Route | Auth | Answer |
+| --- | --- | --- |
+| `GET /v1/tonight/overview` | session | below: counts, codes, times, station names only |
+
+```
+{ at, night, clubNight, window: {open, opensInMin, closesInMin},
+  count:    {source, checkedIn, checkedOut, byClub, reportAgeMs, enabled} | null,   // publisher.status()
+  read:     {mode, configured, signedIn, lastReadAt, lastOkAt, lastError, loginBlockedForSec, watchIntervalSec},
+  print:    {queued, leased, dead, checkThePrinter, claims, pendingToSeal,
+             stations: [{stationId, name, lastSeenAt, printer, version, churchRev}]},
+  ym:       {enabled, due, checkedOut, failed, gaveUp, pending, lastError} | null, // null before section 9 is merged
+  switches: [...as GET /v1/switches],
+  notice:   {level, message, at, until, by} | null,
+  church:   {rev, savedAt, seeded, paused},
+  history:  {db, pending},
+  changes:  {head, last: Entry | null} }
+```
+
+No TwoTimTwo read, no seal: storage reads and in-memory state only. The page
+polls it every 10 s while Tonight is open and the tab visible, every 60 s
+otherwise, and stops after 3 failures in a row (a "Try again" button restarts it).
