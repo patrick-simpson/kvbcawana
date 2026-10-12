@@ -111,6 +111,12 @@ jobs:
         if: inputs.app == 'printer'
         run: npm ci
         working-directory: printer/print-server
+      # test-cloud-e2e.cjs runs the sync Worker in process: its two runtime
+      # packages (linkedom, parse5), not wrangler (as ci.yml's printer job).
+      - name: Install the sync Worker's runtime packages
+        if: inputs.app == 'printer'
+        run: npm ci --omit=dev --prefix ../lobby/worker
+        working-directory: printer
       - name: Run the test suites
         if: inputs.app == 'printer'
         run: npm test
@@ -141,6 +147,25 @@ jobs:
         with:
           ref: ${{ needs.test.outputs.sha }}
           fetch-depth: 0
+
+      # The same check as the release job's, made BEFORE anything is tagged
+      # or published: a version at or below the live feed fails here, not
+      # after a public release already exists.
+      - name: The feed only ever moves forward (before tagging)
+        env:
+          VERSION: ${{ inputs.version }}
+          FEED: ${{ inputs.feed-path }}
+        run: |
+          set -euo pipefail
+          git fetch -q origin main
+          CURRENT="$(git show "origin/main:$FEED" 2>/dev/null | sed -nE 's/^version:[[:space:]]*([0-9][0-9.]*).*/\1/p' | head -1 || true)"
+          if [ -n "$CURRENT" ]; then
+            NEWEST="$(printf '%s\n%s\n' "$CURRENT" "$VERSION" | sort -V | tail -1)"
+            if [ "$CURRENT" = "$VERSION" ] || [ "$NEWEST" != "$VERSION" ]; then
+              echo "::error::$FEED on main already serves $CURRENT; pick a version above it."
+              exit 1
+            fi
+          fi
 
       - name: Validate version and create tag
         if: inputs.app == 'printer'
