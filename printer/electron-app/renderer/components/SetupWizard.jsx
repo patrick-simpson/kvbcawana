@@ -20,8 +20,7 @@ export default function SetupWizard({ onSaved }) {
         setPrinterName(first);
       }
     }).catch(() => setPrinters([]));
-    // Pre-fill from any existing (partial) config — including data migrated
-    // from an old script install (printer + URL carry over automatically).
+    // Pre-fill from any existing (partial) config.
     window.awana.getConfig().then(cfg => {
       if (cfg?.checkinUrl) setCheckinUrl(cfg.checkinUrl);
       if (cfg?.printerName) setPrinterName(cfg.printerName);

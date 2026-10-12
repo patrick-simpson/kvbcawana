@@ -50,7 +50,6 @@ const PRINTER_DATA = [
   'attendance.json',
   'events-buffer.json',
   'chrome-extension',
-  '.migrated-from-script-install',
 ];
 
 /** One line, trimmed, at most NAME_MAX characters, no control characters. */

@@ -52,11 +52,9 @@ Once that is right, it may still be the firewall:
 
 ### "Port 3456 is in use" dialog at startup
 
-A previous print server is still running — usually the old script install's auto-start shortcut.
-Click **Stop it and continue**. If it keeps coming back on every boot, delete
-`Awana Check In.lnk` from your Startup folder
-(`%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup`) — the app offers to do this for you
-the first time it detects an old install.
+Another print server is still running (a second copy of the app, or a leftover process).
+Click **Stop it and continue**. If it keeps coming back on every boot, find what starts it in
+Task Manager's **Startup apps** tab and turn it off.
 
 ### "Server failed to start" error box
 
@@ -66,67 +64,6 @@ Send a screenshot of the message to your administrator, or check
 release is safe: your roster and settings live in `%APPDATA%\awana-label-printer`, not in the
 install folder. (That folder is still named after the app's pre-v5.9.0 name,
 "Awana Label Printer" — see EXTENSION.md.)
-
-### Where did my data go after switching from the script install?
-
-The first run imports `config.json`, `clubbers.csv`, print history, and attendance from
-`C:\output\Print-TwoTimTwo-Labels\print-server` into `%APPDATA%\awana-label-printer`. The old
-folder is left untouched as a backup.
-
----
-
-## Installation Issues (legacy PowerShell script)
-
-### "PowerShell execution policy" error
-
-**Error:** `cannot be loaded because running scripts is disabled on this system`
-
-**Solution:**
-1. Right-click PowerShell → **Run as Administrator**
-2. Run: `Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser`
-3. Type `Y` and press Enter
-4. Now run `install-and-run.ps1` again
-
----
-
-### "Node.js not found" even after installation
-
-**Problem:** Node.js was installed but PATH wasn't refreshed.
-
-**Solution:**
-1. Close PowerShell completely
-2. Open a **new** PowerShell window
-3. Run: `node --version`
-4. If still not found, reinstall Node.js from https://nodejs.org
-
----
-
-### "npm install failed" or "Cannot find npm"
-
-**Problem:** npm packages couldn't be installed.
-
-**Solution:**
-1. Check that Node.js is actually installed: `node --version`
-2. Try running again - it may be a temporary network issue
-3. If it fails twice, manually navigate to the print-server folder and run:
-   ```powershell
-   npm install
-   ```
-
----
-
-### "No printers found"
-
-**Problem:** Script says no printers are detected.
-
-**Solution:**
-1. Go to **Settings → Bluetooth & devices → Printers & scanners**
-2. Make sure your label printer is listed there
-3. If not listed:
-   - Connect the printer via USB
-   - Wait 10 seconds for Windows to detect it
-   - Install drivers if needed (check printer manufacturer's website)
-4. Run `install-and-run.ps1` again
 
 ---
 
@@ -156,12 +93,10 @@ folder is left untouched as a backup.
 3. Browser might be blocking the action
 
 **Solution:**
-1. Check the PowerShell window where the server started - should say:
-   ```
-   Print server running at http://localhost:3456
-   ```
-2. If not running, look for error messages in the window
-3. Verify printer name is correct (check in PowerShell output)
+1. Check that the KVBC Awana app is running (its tray icon) and that
+   `http://localhost:3456/health` answers
+2. If not running, launch **KVBC Awana** again; an error box names the problem
+3. Verify the printer name in the app's Settings
 4. Try clicking the Test Connection button in the simulator (if you have it open)
 
 ---
@@ -171,15 +106,12 @@ folder is left untouched as a backup.
 **Problem:** Bookmarklet or test button says server can't be reached.
 
 **Solution:**
-1. Make sure `install-and-run.ps1` is still running (check PowerShell window)
-2. If the window closed, run the script again
-3. Check that port 3456 isn't blocked:
+1. Make sure the KVBC Awana app is running (its tray icon); launch it again if not
+2. Check that port 3456 isn't blocked:
    ```powershell
    netstat -ano | findstr 3456
    ```
-   If something is using it, either:
-   - Close that application
-   - Edit `install-and-run.ps1` and change line 108 from 3456 to 3457 (or another unused port)
+   If something else is using it, close that application
 
 ---
 
@@ -197,7 +129,7 @@ folder is left untouched as a backup.
    - `"POST failed"` → Network issue
 
 **Solutions:**
-- **If server not running:** Start `install-and-run.ps1` again
+- **If server not running:** Launch the KVBC Awana app again
 - **If printer error:** Check printer is online and default printer is set correctly
 - **If network issue:** Make sure you're accessing TwoTimTwo from localhost or same machine
 
@@ -233,7 +165,7 @@ folder is left untouched as a backup.
 4. If you see `"Uncaught SyntaxError"` → The bookmarklet code may be corrupted
    - Re-install by dragging the button from the web simulator again
 5. If you see `"Fetch failed"` → The print server isn't running
-   - Run `install-and-run.ps1` again
+   - Launch the KVBC Awana app again
 
 ---
 
@@ -241,7 +173,7 @@ folder is left untouched as a backup.
 
 ### How to check server logs
 
-The PowerShell window where you ran `install-and-run.ps1` shows all server output. Look for:
+The print server's own status window (tray icon → the print server's status) and the dashboard's Diagnostics tab show what it is doing. Look for:
 - `Printer: DYMO LabelWriter 450` → Printer is configured
 - `POST /print` → Someone just tried to print
 - `Error: ...` → Something went wrong
@@ -275,7 +207,7 @@ If none of these solutions work:
 
 1. **Collect information:**
    - Screenshot of the error message
-   - Output from the PowerShell window
+   - The dashboard's Diagnostics tab
    - Browser console errors (F12 → Console tab)
    - Windows printer name (Settings → Printers & scanners)
 
@@ -290,10 +222,9 @@ If none of these solutions work:
 
 Before getting help, verify:
 - [ ] Windows 10+ is running
-- [ ] Node.js is installed (`node --version` works in PowerShell)
 - [ ] Printer is connected and appears in Windows Settings
 - [ ] Printer has paper
-- [ ] install-and-run.ps1 PowerShell window is still open
+- [ ] The KVBC Awana app is running (tray icon)
 - [ ] No other application is using port 3456
 - [ ] Running on the TwoTimTwo.com check-in page (not a different page)
 
@@ -304,8 +235,8 @@ Before getting help, verify:
 restart the app. Since 5.3.0 network access is off by default, so this is the
 most likely cause. Next: same Wi-Fi as the laptop? Use the laptop's IPv4 from
 `ipconfig`, e.g. `http://192.168.1.20:3456/phone`. If it still won't load, the
-firewall rule is missing — re-run `install-and-run.ps1` once as admin (it adds
-"Awana Print Server (TCP 3456)").
+firewall rule is missing — use **Enable Phone Check-in (firewall)** in the app's
+Settings and approve the administrator prompt.
 
 **Phone says "No answer"** — the check-in page must be open on the
 main laptop with the extension loaded; that's what performs the real

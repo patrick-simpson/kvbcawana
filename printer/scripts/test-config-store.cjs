@@ -244,15 +244,6 @@ console.log('config-store: nobody bypasses the store');
     path.join(__dirname, '..', 'electron-app', 'renderer', 'components', 'SetupWizard.jsx'), 'utf8');
   check('the setup wizard renders from the merged config it gets back',
     /onSaved\(result\.config \|\| config\)/.test(wizardSrc));
-
-  // The deprecated PowerShell installer read-modify-writes correctly, but
-  // ConvertTo-Json defaults to depth 2 on PowerShell 5.1, which serialises
-  // config.schedule[].label as a type-name string instead of JSON.
-  const ps1 = fs.readFileSync(path.join(__dirname, '..', 'install-and-run.ps1'), 'utf8');
-  const converts = ps1.match(/ConvertTo-Json[^\r\n|]*/g) || [];
-  check('every ConvertTo-Json that writes config passes -Depth',
-    converts.length > 0 && converts.every((c) => /-Depth\s+\d+/.test(c)),
-    `found: ${JSON.stringify(converts)}`);
 }
 
 console.log('');

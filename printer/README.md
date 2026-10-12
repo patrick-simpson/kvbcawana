@@ -15,8 +15,7 @@ When a child checks in during club, automatically print a 4" × 2" label to your
 3. The app launches and guides you through first-time setup: pick your printer, confirm the check-in URL, print a test label
 4. Done — the server runs silently in your system tray, starts with Windows, and **updates itself** from GitHub Releases
 
-No PowerShell, no Node.js install, no terminal window. Upgrading from the old script install at `C:\output`?
-The app imports your printer, check-in URL, and roster automatically on first run and offers to remove the old shortcuts.
+No PowerShell, no Node.js install, no terminal window.
 
 > **More docs:** [docs/SETUP.md](docs/SETUP.md) (full setup incl. phone check-in),
 > [docs/NIGHT-OF.md](docs/NIGHT-OF.md) (print-and-tape one-pager for club night),
@@ -28,79 +27,6 @@ The app imports your printer, check-in URL, and roster automatically on first ru
 - **Enriched labels**: set in the Awana 2026-27 catalog's fonts (Paytone One, Londrina Solid, Figtree — bundled, so every PC prints the same label) with the club's TwoTimTwo logo or, when that can't be fetched, its official one-colour club mark; handbook group, allergy/birthday/no-photo icons, store-night share balances, Step Up Night, attendance milestones ("10th club night!"), and a "Go to:" line for late arrivals (from the dashboard's group schedule).
 - **Broadcasts the party**: the lobby welcome display and the countdown app's live per-club counts are fed from this server's Pusher events (first names only, ever — see CONTRACT.md).
 - **Tells you when it's sick**: selector self-tests, an end-to-end "Night Test" canary, visible print failures, and a Night Status dashboard card.
-
----
-
-## Alternative: PowerShell Script (Deprecated)
-
-> **Deprecated:** the script install still works in this release but will be removed in a future
-> version — use the `.exe` installer above. Existing script installs keep auto-updating and are
-> migrated automatically the first time the new app runs.
-
-If you prefer the terminal-based setup or need a portable version:
-
-### Step 1: Download
-Copy `install-and-run.ps1` from this folder (`printer/`). Retired: the one-line `irm https://awana.kvbchurch.org/install.ps1 | iex` now installs the Windows app above instead, since the old Print-TwoTimTwo-Labels repo it used to fetch from is archived.
-
-### Step 2: Run
-Right-click `install-and-run.ps1` → **Run with PowerShell**
-
-The script will:
-- Check for Node.js (install if missing)
-- Download the project files
-- Install dependencies (~300 MB, one-time only)
-- Ask you to select your label printer
-- Ask for your church's check-in URL
-- Start the server and open Edge at your check-in page
-
-### Step 3: Use It
-Once setup is complete, **double-click** `install-and-run.ps1` each session. It starts the server automatically in 5 seconds (press any key to change settings).
-
-Then just use TwoTimTwo check-in normally — labels print silently as children check in.
-
----
-
-## Requirements
-
-- **Windows 10 or 11** (PowerShell 5.0+)
-- **Label printer** (connected and working, e.g., DYMO LabelWriter, Brother QL series)
-- **Internet** (one-time download of ~300 MB for dependencies)
-
-The printer should appear in Windows Settings → Bluetooth & devices → Printers & scanners.
-
-## How It Works
-
-```
-Check-in happens on TwoTimTwo.com
-              ↓
-   Bookmarklet detects new check-in
-              ↓
-   Sends request to localhost:3456
-              ↓
-   Node.js server generates label PDF
-   (with name + club logo)
-              ↓
-   PDF sent silently to your configured
-   label printer (no dialog, no user action)
-              ↓
-   Label prints automatically
-```
-
-## Advanced Options
-
-### Command-Line Parameters
-
-Run the script with parameters to skip configuration:
-
-```powershell
-.\install-and-run.ps1 -PrinterName "DYMO LabelWriter 450" -CheckinUrl "https://yourchurch.twotimtwo.com/clubber/checkin"
-```
-
-Supported parameters:
-- `-PrinterName "Name"` - Printer to use (skip printer selection)
-- `-CheckinUrl "URL"` - Check-in URL (skip URL prompt)
-- `-InstallPath "C:\Path"` - Custom install location (default: %APPDATA%\Awana-Print)
-- `-SkipNodeCheck` - Skip Node.js check (if you know it's installed)
 
 ### Fallback Behavior
 
@@ -114,7 +40,6 @@ If the server isn't running or can't reach the printer, the bookmarklet automati
 See [TROUBLESHOOTING.md](./TROUBLESHOOTING.md) for solutions to common issues:
 - Printer not found
 - Extension not detected
-- PowerShell execution policy errors
 - Port already in use
 - And more...
 
@@ -122,7 +47,7 @@ See [TROUBLESHOOTING.md](./TROUBLESHOOTING.md) for solutions to common issues:
 
 ### Architecture
 
-- **install-and-run.ps1** - All-in-one Windows installer/launcher
+- **KVBC Awana app** (`electron-app/`) - Windows installer, tray app and auto-updater that runs the print server
 - **Bookmarklet** - JavaScript that runs on TwoTimTwo.com and detects check-ins
 - **Node.js print server** - Runs on localhost:3456, generates PDFs and prints silently
 - **React web UI** (optional) - Simulator and configuration reference
@@ -146,7 +71,7 @@ Total install size: ~300 MB (Puppeteer/Chromium is large, but one-time download)
 
 ## Limitations
 
-- **Windows only** - PowerShell script requires Windows 10+
+- **Windows only** - the app requires Windows 10+ (a Raspberry Pi print station runs the server under CUPS)
 - **Printer must be Windows-compatible** - Uses Windows printer drivers
 - **TwoTimTwo.com structure** - If the site's HTML changes, the bookmarklet may need updates
 - **Local network only** - Server runs on localhost, no remote access

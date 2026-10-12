@@ -1146,8 +1146,8 @@ function loadHealth() {
     document.getElementById('uptime-value').textContent = formatUptime(data.uptime || 0);
     setSyncState(data.sync);
 
-    // Update notice with one-click update: the server exits with a special
-    // code and the launcher (launch-awana.bat) re-runs the installer.
+    // Update notice with one-click update: the server hands the update to
+    // the app (electron-updater).
     if (data.latestVersion && data.latestVersion !== data.version) {
       var banner = document.getElementById('update-banner');
       if (banner.dataset.updating !== '1') {

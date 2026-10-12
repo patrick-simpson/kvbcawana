@@ -12,13 +12,6 @@ const rootDir = path.resolve(__dirname, '..');
 
 const files = [
   {
-    path: path.join(rootDir, 'install-and-run.ps1'),
-    patterns: [
-      { from: /# Version\s+:\s+\d+\.\d+\.\d+(\.\d+)?/g, to: '# Version    : ' + version },
-      { from: /\ = "\d+\.\d+\.\d+(\.\d+)?"/g, to: ' = "' + version + '"' }
-    ]
-  },
-  {
     path: path.join(rootDir, 'src', 'constants.ts'),
     patterns: [
       { from: /SERVER_VERSION = '\d+\.\d+\.\d+(\.\d+)?'/g, to: "SERVER_VERSION = '" + version + "'" }

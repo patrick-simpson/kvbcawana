@@ -15,7 +15,7 @@ const net = require('net');
 const http = require('http');
 const os = require('os');
 const { execFile, execFileSync, spawn } = require('child_process');
-const { runMigration, removeShortcuts, findOldBrandShortcuts } = require('./src/migrate');
+const { removeShortcuts, findOldBrandShortcuts } = require('./src/shortcuts');
 const configStore = require('./src/config-store');
 const extensionSync = require('./src/extension-sync');
 const updatePush = require('./src/update-push');
@@ -626,9 +626,9 @@ function setAutostart(on) {
 }
 
 // ─── Port conflict handling ──────────────────────────────────────────────────
-// A legacy script install's Startup shortcut (launch-awana.bat) races this app
-// for port 3456 on boot. Detect the squatter, name it, and offer a one-click
-// stop — the old behaviour was five silent retries and then nothing.
+// Another program (a second copy of the server, say) can hold port 3456 on
+// boot. Detect the squatter, name it, and offer a one-click stop — the old
+// behaviour was five silent retries and then nothing.
 
 function isPortFree(port) {
   return new Promise((resolve) => {
@@ -645,8 +645,7 @@ function findPortOwner(port) {
       $c = Get-NetTCPConnection -LocalPort ${port} -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
       if ($c) {
         $p = Get-Process -Id $c.OwningProcess -ErrorAction SilentlyContinue
-        $parent = (Get-CimInstance Win32_Process -Filter "ProcessId=$($c.OwningProcess)" -ErrorAction SilentlyContinue).ParentProcessId
-        @{ pid = $c.OwningProcess; name = $p.ProcessName; parentPid = $parent } | ConvertTo-Json -Compress
+        @{ pid = $c.OwningProcess; name = $p.ProcessName } | ConvertTo-Json -Compress
       }
     `], { timeout: 10000, windowsHide: true }).toString().trim();
     return out ? JSON.parse(out) : null;
@@ -657,19 +656,8 @@ function findPortOwner(port) {
 
 function stopPortOwner(owner) {
   try {
-    // Kill the process tree. If the parent is the legacy launch-awana.bat
-    // restart loop (cmd.exe), kill that tree instead or it respawns the
-    // server three seconds later.
-    let rootPid = owner.pid;
-    if (owner.parentPid) {
-      try {
-        const parentName = execFileSync('powershell', ['-NoProfile', '-Command',
-          `(Get-Process -Id ${owner.parentPid} -ErrorAction SilentlyContinue).ProcessName`
-        ], { timeout: 10000, windowsHide: true }).toString().trim();
-        if (parentName === 'cmd') rootPid = owner.parentPid;
-      } catch { /* parent gone — kill the node pid */ }
-    }
-    execFileSync('taskkill', ['/PID', String(rootPid), '/T', '/F'], { timeout: 10000, windowsHide: true });
+    // Kill the whole process tree.
+    execFileSync('taskkill', ['/PID', String(owner.pid), '/T', '/F'], { timeout: 10000, windowsHide: true });
     return true;
   } catch (e) {
     console.warn('[port] Could not stop process:', e.message);
@@ -1029,17 +1017,14 @@ let printRoleStarted = false;
 
 /**
  * Everything the printer app did at launch, now only when the print role is
- * on: the legacy import, the port check, the Chrome extension, the server,
- * the release ping, the check-in page, the old-shortcut offers.
+ * on: the port check, the Chrome extension, the server,
+ * the release ping, the check-in page, the old-shortcut offer.
  * `fromWizard`: the role was just turned on (the printer is already chosen).
  */
 async function startPrintRole({ fromWizard = false } = {}) {
   if (printRoleStarted) return;
   printRoleStarted = true;
 
-  // Import data from a legacy script install (C:\output) before anything
-  // reads config — makes .exe-over-script upgrades seamless.
-  const migration = runMigration(app.getPath('userData'));
   const oldBrandShortcuts = findOldBrandShortcuts();
 
   await resolvePortConflict();
@@ -1074,7 +1059,7 @@ async function startPrintRole({ fromWizard = false } = {}) {
   if (!config.printerName) {
     // A print server with no printer yet (the wizard was left before its
     // printer step, or an old config without one): the print server's own
-    // setup, prefilled from a legacy config if one was migrated.
+    // setup.
     if (roles.setupDone) createSetupWindow();
   } else if (restartChromeNow) {
     chromeRestart.restartChrome({
@@ -1092,30 +1077,14 @@ async function startPrintRole({ fromWizard = false } = {}) {
 
   // Not awaited: on an unattended start (an update's relaunch, Windows'
   // sign-in) nobody clicks, and the display and /settings must not wait.
-  offerShortcutCleanup(migration, oldBrandShortcuts).catch((e) => console.warn('[shortcuts]', e && e.message));
+  offerShortcutCleanup(oldBrandShortcuts).catch((e) => console.warn('[shortcuts]', e && e.message));
 }
 
 /** The old-shortcut offers, once each. */
-async function offerShortcutCleanup(migration, oldBrandShortcuts) {
-  // Legacy shortcuts re-launch the old script install on every boot and fight
-  // this app for port 3456 — offer to remove them once.
-  if (migration.shortcuts.length && (migration.migrated || migration.legacyDir)) {
-    const { response } = await dialog.showMessageBox({
-      type: 'question',
-      title: 'Old install found',
-      message: 'Remove the old "Awana Check In" shortcuts?',
-      detail: 'Your roster and settings were imported. The old desktop/startup shortcuts still point at the previous script-based install and can cause port conflicts:\n\n' + migration.shortcuts.join('\n'),
-      buttons: ['Remove old shortcuts', 'Keep them'],
-      defaultId: 0,
-      cancelId: 1,
-    });
-    if (response === 0) removeShortcuts(migration.shortcuts);
-  }
-
+async function offerShortcutCleanup(oldBrandShortcuts) {
   // The app was renamed ("Awana Label Printer" until 5.9.0, "Club Label
   // Printer" until 9.0.0). The installer renames the shortcuts it made
-  // itself, but not copies a person made; offer once, same pattern as the
-  // legacy-shortcut cleanup above.
+  // itself, but not copies a person made; offer once.
   if (oldBrandShortcuts.length) {
     const { response } = await dialog.showMessageBox({
       type: 'info',
@@ -1213,9 +1182,6 @@ async function finishSetup(choices) {
       const checkinUrl = typeof c.checkinUrl === 'string' ? c.checkinUrl.trim() : '';
       if (!printerName) return { ok: false, error: 'Choose the label printer.' };
       if (!isSafeExternalUrl(checkinUrl)) return { ok: false, error: 'The check-in page has to be a web address (https://...).' };
-      // A legacy script install's data first, so the wizard's keys merge over
-      // it rather than the other way round (runMigration never overwrites).
-      if (!roles.print) runMigration(app.getPath('userData'));
       printerChanged = roles.print && (loadConfig() || {}).printerName !== printerName;
       currentConfig = saveConfig({ printerName, checkinUrl, launchOnBoot });
     } else {

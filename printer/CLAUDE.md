@@ -5,7 +5,7 @@ Senior Software Engineer focused on **Technical Integrity, Quality, and Operatio
 ## Project
 Windows app for printing child check-in labels at Awana events from TwoTimTwo.com. Since **9.0.0 the Windows app is "KVBC Awana"**, one app for every KVBC Awana computer: a print server, a display (the sound room app moved in), or both (see "KVBC Awana (9.0.0)" below and the root `UNIFIED-APP.md`). It was "Club Label Printer" from v5.9.0 (and "Awana Label Printer" before that — renamed for Awana Clubs International trademark compliance; see changes.md's 5.9.0 entry), and the public site still calls the print server that.
 
-**Components:** React Simulator (root) | Chrome Extension (chrome-extension/, zipped for download by bump-version.cjs) | Electron App (electron-app/) | Print Server (print-server/) | Legacy Installer (install-and-run.ps1, deprecated)
+**Components:** React Simulator (root) | Chrome Extension (chrome-extension/, zipped for download by bump-version.cjs) | Electron App (electron-app/) | Print Server (print-server/)
 
 **Branding vs. internal identifiers — don't conflate these when touching either:**
 `build.productName` (`electron-app/package.json`) is "KVBC Awana" since
@@ -31,7 +31,7 @@ of these are part of the product's public branding, so none of them move if
 
 ## MANDATORY Checklist
 Every functional change requires:
-1. **Version bump** — `node scripts/bump-version.cjs <X.Y.Z>` (server.js or install-and-run.ps1 changes). Auto-updates all files + extension. Also regenerate lockfiles (`npm install --package-lock-only` in `print-server/` and `electron-app/`) — the bump script doesn't touch their `version` field.
+1. **Version bump** — `node scripts/bump-version.cjs <X.Y.Z>` (server.js changes). Auto-updates all files + extension. Also regenerate lockfiles (`npm install --package-lock-only` in `print-server/` and `electron-app/`) — the bump script doesn't touch their `version` field.
 2. **changes.md** — Add entry at top with version, date, and what changed + why.
 3. **Website/UI** — Update React components if affecting user install/usage.
 4. **Build** — `npm run build` to sync bookmarklet and dist.
@@ -506,7 +506,6 @@ genuine reads (`checkoutDisappearances`) and posts ids with
 
 ## Reliability Mandates
 - **Zero-Loop Policy:** Self-relaunching scripts MUST have recursion guards. Never assume admin checks are bulletproof.
-- **Context-Aware:** Batch/PowerShell must account for parent process (CMD vs PowerShell vs Electron).
+- **Context-Aware:** PowerShell the print path shells out to must account for the parent process (the app, a CUPS station, or a bare `node server.js`).
 - **Never Crash:** uncaughtException handlers in server; silent failures for enrichment (print basic label).
 - **Cleanup:** Always unlink temp files in finally blocks.
-- **Update Safety:** Clear port 3456 before file operations in install-and-run.ps1.

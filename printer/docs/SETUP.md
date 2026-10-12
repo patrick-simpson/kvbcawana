@@ -26,11 +26,6 @@ church's), plus optionally `PUSHER_CHANNEL` if you changed
 any of those simply falls back to the 24-hour poll — the release step
 that pings them is skipped silently, never fails the build.
 
-Upgrading from the legacy `install-and-run.ps1` install: the app
-imports your config and roster from `C:\output` on first run and
-offers to remove the old shortcuts. The script path still works but
-is deprecated.
-
 ## 2. Chrome extension
 
 `chrome://extensions` → Developer mode → *Load unpacked* → pick

@@ -1,5 +1,5 @@
 // Club Label Print Server
-// Started by install-and-run.ps1 — listens on http://localhost:3456
+// Started by the KVBC Awana app (or `node server.js`) — listens on http://localhost:3456
 // Accepts POST /print and silently prints a 4×2 in label as PNG via canvas.
 
 'use strict';
@@ -8533,7 +8533,7 @@ let latestVersion = null;
 const UPDATE_CHECK_INTERVAL = 6 * 3600000; // 6 hours
 
 // Embedders (the Electron shell) own the update lifecycle: they register a
-// handler that /update-now calls instead of the legacy exit-99 dance, and
+// handler that /update-now calls, and
 // they feed electron-updater's state into /health via setLatestVersion().
 let updateHandler = null;
 function setUpdateHandler(fn) { updateHandler = fn; }
@@ -8833,25 +8833,20 @@ app.get('/failures', (req, res) => {
 });
 
 // ── One-click update ──────────────────────────────────────────────────────────
-// Exits with code 99, which launch-awana.bat treats as "re-run the update
-// check": it downloads the latest installer, refreshes the project, and
-// starts the new server. Guarded so a stray call when no update exists can't
-// bounce the server mid-event for nothing.
+// Hands the update to the embedding app (electron-updater). Guarded so a stray
+// call when no update exists can't bounce the server mid-event for nothing.
 app.post('/update-now', (req, res) => {
   if (!isNewerVersion(latestVersion, SERVER_VERSION)) {
     return res.status(409).json({ error: 'Already on the latest version', version: SERVER_VERSION });
   }
-  res.json({ ok: true, updatingTo: latestVersion });
-  if (updateHandler) {
-    // Embedded in the Electron shell: hand the update to electron-updater.
-    console.log(`[update] Update to v${latestVersion} requested — delegating to the app shell`);
-    setTimeout(() => { try { updateHandler(latestVersion); } catch (e) { console.error('[update] Handler failed:', e.message); } }, 500);
-  } else {
-    // Legacy script install: exit 99 so launch-awana.bat re-runs the updater.
-    console.log(`[update] Update to v${latestVersion} requested — exiting so the launcher can update`);
-    // Let the response flush before the process exits.
-    setTimeout(() => process.exit(99), 500);
+  if (!updateHandler) {
+    // A standalone `node server.js` has no updater of its own.
+    return res.status(409).json({ error: 'This server has no updater; update the app instead', version: SERVER_VERSION });
   }
+  res.json({ ok: true, updatingTo: latestVersion });
+  // Embedded in the Electron shell: hand the update to electron-updater.
+  console.log(`[update] Update to v${latestVersion} requested — delegating to the app shell`);
+  setTimeout(() => { try { updateHandler(latestVersion); } catch (e) { console.error('[update] Handler failed:', e.message); } }, 500);
 });
 
 // ── Config endpoints ─────────────────────────────────────────────────────────
@@ -9020,8 +9015,7 @@ app.post('/config', (req, res) => {
   try {
     const next = loadConfigFile();
     if (printerName !== undefined) next.printerName = printerName;
-    // checkinUrl is handed to shell.openExternal() (Electron) and Start-Process
-    // (legacy installer), so an unvalidated value was an arbitrary URI aimed at
+    // checkinUrl is handed to shell.openExternal() (Electron), so an unvalidated value was an arbitrary URI aimed at
     // the Windows shell — and this route accepts writes from the extension's
     // origin. Same reasoning as worksheetPrinter below: refuse to PERSIST
     // anything unsafe, so it can never be poisoned once and fire later.
@@ -9896,8 +9890,8 @@ function prewarmPrinterIfConfigured() {
   } catch (e) { /* config parse error — ignore */ }
 }
 
-// Bind the port with retry: during updates, install-and-run.ps1 (or a
-// just-killed previous instance) can hold port 3456 for a few seconds.
+// Bind the port with retry: during updates a just-killed previous instance
+// can hold port 3456 for a few seconds.
 // Previously an EADDRINUSE here killed the process with no usable message.
 const LISTEN_MAX_ATTEMPTS = 5;
 // The Electron shell calls startListening() again every time settings are
@@ -10179,9 +10173,9 @@ module.exports = {
 
 if (require.main === module) {
   startListening();
-  // Legacy self-update: poll the repo VERSION file so /update-now + exit 99
-  // can hand off to launch-awana.bat. The Electron shell does NOT get this —
-  // electron-updater owns its update lifecycle (see setUpdateHandler above).
+  // Standalone only: poll the repo VERSION file for /health's update notice.
+  // The Electron shell does NOT get this — electron-updater owns its update
+  // lifecycle (see setUpdateHandler above).
   checkForUpdates();
   setInterval(checkForUpdates, UPDATE_CHECK_INTERVAL);
 }

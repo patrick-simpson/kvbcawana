@@ -66,16 +66,16 @@ It is reachable only from loopback or with the phone PIN, like the roster.
 
 - **Electron app** (the supported install): `%APPDATA%/awana-label-printer/`
   (`AWANA_DATA_DIR` is set to Electron's `userData` before the server loads).
-- **Legacy script install**: `print-server/` itself — i.e. **inside the git
+- **A bare `node server.js`** (development): `print-server/` itself — i.e. **inside the git
   working tree**.
 
 That second case is why `.gitignore` covers `config.json`, `print-history.json`,
 `attendance.json`, `leaders.json` and `events-buffer.json` as well as `clubbers*.csv` (and
-`households*.csv`, kept ignored for any legacy install that still has one on
+`households*.csv`, kept ignored for any old install that still has one on
 disk). `config.json` holds the **Pusher app secret and the phone PIN**; the
 CSVs hold children's and guardians' personal data.
 
-> **If you have ever run the legacy script install from a clone of this repo,
+> **If you have ever run the server from a clone of this repo,
 > check `git status` before committing anything.** Prior to v5.3.0 only
 > `clubbers*.csv` was ignored, so a `git add -A` could commit the church's
 > Pusher secret, the phone PIN, the full household export and every child's
@@ -101,22 +101,17 @@ Work through this list before you run a fork in production.
    The baked defaults in `server.js` point at KVBC, so a fork that skips this
    opens another church's check-in page.
 
-4. **Point the legacy installer at your fork.** `install-and-run.ps1` derives
-   its download URL from `$RepoSlug`, which still defaults to the upstream
-   repo. Change it, or pass `-RepoSlug your-org/your-fork`. Otherwise your
-   installer downloads upstream's code and silently discards your changes.
-
-5. **Never commit a Pusher app secret**, in `config.json`, in a workflow file,
+4. **Never commit a Pusher app secret**, in `config.json`, in a workflow file,
    or in a README example. The secret allows publishing to your church's
    screens.
 
-6. **Keep the sanitizer contract intact.** `contract-vectors.json` is the
+5. **Keep the sanitizer contract intact.** `contract-vectors.json` is the
    canonical definition of what may ride the Pusher channel, mirrored
    byte-identically into the display repo. Only first names ever go on the
    wire — never last names, allergies, contact details or birth years. See
    `CONTRACT.md`.
 
-7. **Run the tests.** `npm test` includes `scripts/test-server-security.cjs`,
+6. **Run the tests.** `npm test` includes `scripts/test-server-security.cjs`,
    which asserts the properties above end to end — including that a default
    install is unreachable on the LAN. If you change the middleware order, the
    bind logic or the dashboard's output escaping, that suite is what tells you

@@ -387,8 +387,7 @@ function resolveBindHost(opts) {
 }
 
 // ── Outbound URL validation ───────────────────────────────────────────────────
-// config.checkinUrl reaches shell.openExternal() in the Electron shell and
-// Start-Process in the legacy installer, and POST /config accepted it from any
+// config.checkinUrl reaches shell.openExternal() in the Electron shell, and POST /config accepted it from any
 // caller with no validation at all — so a poisoned config turned into an
 // arbitrary URI handed to the Windows shell. Only http(s) is ever legitimate
 // here (it is a check-in web page).

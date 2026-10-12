@@ -86,10 +86,6 @@ export const InstallGuide: React.FC = () => {
               If Windows asks about network access after setup, click <strong>Allow</strong>. That’s what lets
               phones on your Wi-Fi use phone check-in, once you turn it on and set a PIN.
             </p>
-            <p className="lbl-small">
-              Set up with the old PowerShell script at <Code>C:\output</Code>? Install the app above: it
-              imports that install automatically the first time it runs.
-            </p>
           </Step>
 
           <Step n={2} title="Load the browser extension">
@@ -120,8 +116,7 @@ export const InstallGuide: React.FC = () => {
             </div>
             <p className="lbl-small">
               The green <strong>Club Print</strong> widget appears on your check-in page once it’s loaded.
-              (Old script installs have the folder at <Code>C:\output\Print-TwoTimTwo-Labels\chrome-extension</Code>;{' '}
-              <a href="chrome-extension.zip" download>the zip</a> is still there for anyone not using the
+              (<a href="chrome-extension.zip" download>The zip</a> is still there for anyone not using the
               Windows app.)
             </p>
           </Step>
