@@ -180,6 +180,16 @@ pages with the Check-in Display's and Journey Display's `about.html`.
   in as `input.template` — the renderer never reads config (golden-suite
   purity). Fail open: any broken template renders the stock label. Safety
   content (allergy icons, no-photo camera, birthday) is not templatable.
+- **Three modules are GENERATED copies of `lobby/shared/`** (the installer
+  holds only this folder): `print-server/clubTable.js` (the club table and the
+  two matchers; `clubKey()` is the substring one on purpose, `brand.js`'s
+  `MARK_FILES` / `MARK_NAMES` and `CLUB_MONOGRAM` come from the same rows),
+  `print-server/textClean.js` (`cleanName`, `stripControlChars`,
+  `sanitizeStoredText`, `cleanFriendName` keep their own limits) and
+  `electron-app/src/display/clubNight.js` (the club-night rule, with this
+  computer's hours). Never edit them: change the source in `lobby/shared/`,
+  run `node scripts/shared-copies.mjs` from the repo root, commit both;
+  `scripts/check-mirrors.mjs` fails CI on drift.
 
 **Printing on Linux (7.19.0, ROADMAP.md#cloud-check-in's Raspberry Pi print station).**
 `print-server/cups.js` prints the same label PNG through CUPS (`lp`, argument
