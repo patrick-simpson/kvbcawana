@@ -1,0 +1,72 @@
+name: Commit and push to main
+description: >
+  Sets the bot git identity, commits the given paths and pushes HEAD to main,
+  rebasing and retrying when main moved (4 tries, sleeping 3, 6, 9 seconds).
+  The caller checks out first and runs `gh workflow run ci.yml` after it: a
+  push made with GITHUB_TOKEN fires no push trigger.
+
+inputs:
+  bot-name:
+    description: git user.name for the commit.
+    required: true
+  paths:
+    description: Space-separated paths to `git add`, relative to working-directory.
+    required: true
+  message:
+    description: Commit message.
+    required: true
+  working-directory:
+    description: Directory the git commands run in.
+    required: false
+    default: '.'
+  only-if-changed:
+    description: >
+      'true' commits and pushes only when `git status` shows a change in paths
+      (otherwise the step does nothing). 'false' always commits, so a clean
+      tree fails the step.
+    required: false
+    default: 'false'
+  unchanged-message:
+    description: What to print when only-if-changed is 'true' and nothing changed.
+    required: false
+    default: Nothing to commit.
+
+outputs:
+  committed:
+    description: "'true' when a commit was pushed, 'false' when there was nothing to commit."
+    value: ${{ steps.push.outputs.committed }}
+
+runs:
+  using: composite
+  steps:
+    - id: push
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        BOT_NAME: ${{ inputs.bot-name }}
+        PATHS: ${{ inputs.paths }}
+        MESSAGE: ${{ inputs.message }}
+        ONLY_IF_CHANGED: ${{ inputs.only-if-changed }}
+        UNCHANGED_MESSAGE: ${{ inputs.unchanged-message }}
+      run: |
+        set -euo pipefail
+        # $PATHS is a word list on purpose.
+        # shellcheck disable=SC2086
+        if [ "$ONLY_IF_CHANGED" = true ] && [ -z "$(git status --porcelain -- $PATHS)" ]; then
+          echo "$UNCHANGED_MESSAGE"
+          echo "committed=false" >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
+        git config user.name "$BOT_NAME"
+        git config user.email 'github-actions[bot]@users.noreply.github.com'
+        # shellcheck disable=SC2086
+        git add -- $PATHS
+        git commit -m "$MESSAGE"
+        # main can move while the job runs (a human push is routine, the
+        # repo's rule is push straight to main); rebase and retry.
+        for i in 1 2 3 4; do
+          if git push origin HEAD:main; then break
+          elif [ "$i" = 4 ]; then echo '::error::git push failed after retries'; exit 1
+          else git fetch origin main; git rebase origin/main; sleep $((i * 3)); fi
+        done
+        echo "committed=true" >> "$GITHUB_OUTPUT"

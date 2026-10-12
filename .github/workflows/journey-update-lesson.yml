@@ -41,15 +41,11 @@ jobs:
       - name: Check out the code
         uses: actions/checkout@v4
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      - name: Set up Node.js and install dependencies
+        uses: ./.github/actions/setup-app
         with:
-          node-version: '22'
-          cache: 'npm'
-          cache-dependency-path: journey/package-lock.json
-
-      - name: Install dependencies
-        run: npm ci
+          lockfile: journey/package-lock.json
+          working-directory: journey
 
       - name: Install ffmpeg
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
@@ -74,27 +70,14 @@ jobs:
         # concurrent human push during the time this job spends on
         # `npm ci`, the TwoTimTwo fetch, and the video download+transcode
         # is routine, not exceptional, and should not cost a night's work.
-        run: |
-          if [ -n "$(git status --porcelain public/current-lesson.json public/current-lesson-video.mp4)" ]; then
-            git config user.name 'lesson-bot'
-            git config user.email 'github-actions[bot]@users.noreply.github.com'
-            git add public/current-lesson.json public/current-lesson-video.mp4
-            git commit -m 'chore: refresh current lesson'
-            for i in 1 2 3 4; do
-              if git push; then
-                break
-              elif [ "$i" = 4 ]; then
-                echo '::error::git push failed after retries' >&2
-                exit 1
-              else
-                git fetch origin main
-                git rebase origin/main
-                sleep $((i * 3))
-              fi
-            done
-          else
-            echo 'Lesson unchanged — nothing to commit.'
-          fi
+        uses: ./.github/actions/push-main
+        with:
+          bot-name: lesson-bot
+          working-directory: journey
+          paths: public/current-lesson.json public/current-lesson-video.mp4
+          message: 'chore: refresh current lesson'
+          only-if-changed: 'true'
+          unchanged-message: Lesson unchanged — nothing to commit.
 
       - name: Redeploy
         # Dispatched on every run, not only when the lesson changed: the

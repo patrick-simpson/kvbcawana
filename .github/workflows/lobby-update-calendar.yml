@@ -33,15 +33,11 @@ jobs:
       - name: Check out the code
         uses: actions/checkout@v4
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      - name: Set up Node.js and install dependencies
+        uses: ./.github/actions/setup-app
         with:
-          node-version: '22'
-          cache: 'npm'
-          cache-dependency-path: lobby/package-lock.json
-
-      - name: Install dependencies
-        run: npm ci
+          lockfile: lobby/package-lock.json
+          working-directory: lobby
 
       - name: Fetch and parse the calendar
         # Exits 1 (failing the run, which emails the repo owner) if the
@@ -52,30 +48,18 @@ jobs:
         # Pushes made with the default GITHUB_TOKEN deliberately do NOT
         # trigger `on: push` workflows, so the deploy is dispatched
         # explicitly. ci.yml still runs every check before the deploy job.
-        run: |
-          if [ -n "$(git status --porcelain public/calendar-feed.json)" ]; then
-            git config user.name 'calendar-bot'
-            git config user.email 'github-actions[bot]@users.noreply.github.com'
-            git add public/calendar-feed.json
-            git commit -m 'chore: refresh calendar feed'
-            # A human push to main during the fetch is routine, not
-            # exceptional (the repo's rule is push straight to main), so a
-            # rejected push is rebased and retried, as the lesson bot does.
-            for i in 1 2 3 4; do
-              if git push; then
-                break
-              elif [ "$i" = 4 ]; then
-                echo '::error::git push failed after retries' >&2
-                exit 1
-              else
-                git fetch origin main
-                git rebase origin/main
-                sleep $((i * 3))
-              fi
-            done
-            gh workflow run ci.yml --repo "$GITHUB_REPOSITORY" --ref main
-          else
-            echo 'Feed unchanged — nothing to deploy.'
-          fi
+        id: commit
+        uses: ./.github/actions/push-main
+        with:
+          bot-name: calendar-bot
+          working-directory: lobby
+          paths: public/calendar-feed.json
+          message: 'chore: refresh calendar feed'
+          only-if-changed: 'true'
+          unchanged-message: Feed unchanged — nothing to deploy.
+
+      - name: Redeploy
+        if: steps.commit.outputs.committed == 'true'
+        run: gh workflow run ci.yml --repo "$GITHUB_REPOSITORY" --ref main
         env:
           GH_TOKEN: ${{ github.token }}
