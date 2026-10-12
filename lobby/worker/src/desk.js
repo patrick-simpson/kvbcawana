@@ -84,6 +84,7 @@ export class Desk {
       /** @type {((e: Record<string, any>) => Promise<void>|void)[]} */ afterUndo: [],
       /** @type {((e: Record<string, any>) => Promise<void>|void)[]} */ afterCheckout: [],
     };
+    /** May be async: history.js replaces it with a check that knows the current kid. @type {(row: any, night: string) => boolean|Promise<boolean>} */
     this.checkRow = defaultRowCheck;
     /** @type {{ at: number, page: any }|null} */
     this.cache = null;
@@ -174,7 +175,7 @@ export class Desk {
     if (body.night !== night) return refuse(400, { reason: 'wrong-night', night });
     const who = this.who(body);
     if (!who) return refuse(400, { reason: 'no-child' });
-    if (!this.checkRow(body.historyRow, night)) return refuse(400, { reason: 'unsealed', what: 'historyRow' });
+    if (!(await this.checkRow(body.historyRow, night))) return refuse(400, { reason: 'unsealed', what: 'historyRow' });
     await Promise.all([this.ledger.load(), this.printq.load(), this.stations.load()]);
     /** @type {any} */
     let job = body.job ?? null;
@@ -207,6 +208,7 @@ export class Desk {
     }
     // 4. TwoTimTwo. (Awaits the network: nothing is checked-and-set across it.)
     let club = 'visitor' in who ? who.visitor.club : '';
+    let name = 'visitor' in who ? `${who.visitor.first} ${who.visitor.last}`.trim() : '';
     if ('clubberId' in who) {
       const posted = await this.post(who.clubberId, body.items);
       if (!posted.ok) {
@@ -214,6 +216,7 @@ export class Desk {
         return posted.response;
       }
       club = posted.club;
+      name = posted.name;
     }
     const settled = await this.ledger.settle(night, tag, claim.gen, jobId ?? undefined);
     if (!settled.ok) {
@@ -224,14 +227,14 @@ export class Desk {
         return refuse(409, { reason: 'superseded' });
       }
     }
-    await this.fire('afterCheckin', { night, tag, gen: claim.gen, jobId, club, visitor: 'visitor' in who, historyRow: body.historyRow, source: 'desk' });
+    await this.fire('afterCheckin', { night, tag, gen: claim.gen, jobId, club, name, visitor: 'visitor' in who, historyRow: body.historyRow, source: 'desk' });
     return json({ ok: true, already: false, jobId, gen: claim.gen, history: this.hooks.afterCheckin.length ? 'hooked' : 'off' });
   }
 
   /**
    * The post to TwoTimTwo for one child.
    * @param {string} clubberId @param {any} items {Bible, Friend} or ['Bible', 'Friend']
-   * @returns {Promise<{ ok: true, club: string } | { ok: false, response: Response }>}
+   * @returns {Promise<{ ok: true, club: string, name: string } | { ok: false, response: Response }>}
    */
   async post(clubberId, items) {
     const client = this.watcher.clientFor();
@@ -245,14 +248,14 @@ export class Desk {
     }
     const { child, page } = found;
     // TwoTimTwo already has them (checked in on its own page a moment ago): that is success.
-    if (child.checkedIn) return { ok: true, club: child.club };
+    if (child.checkedIn) return { ok: true, club: child.club, name: child.name };
     const events = itemsToSend(page.events, child.clubId, { Bible: flag('Bible'), Friend: flag('Friend') });
     const hasAttendance = page.events.some((/** @type {any} */ e) => e.automatic && (!e.clubs.length || e.clubs.includes(child.clubId)));
     if (!hasAttendance) return { ok: false, response: refuse(409, { reason: 'no-attendance-item' }) };
     const res = await client.checkIn({ clubberId, calendarId: page.calendarId, events, name: child.name });
     if (res.ok) {
       child.checkedIn = true;
-      return { ok: true, club: child.club };
+      return { ok: true, club: child.club, name: child.name };
     }
     if (AMBIGUOUS.has(res.error)) {
       this.log('[desk] a check-in post timed out; the claim was released');
@@ -277,7 +280,7 @@ export class Desk {
     if (body.night !== night) return refuse(400, { reason: 'wrong-night', night });
     const who = this.who(body);
     if (!who) return refuse(400, { reason: 'no-child' });
-    if (!this.checkRow(body.historyRow, night)) return refuse(400, { reason: 'unsealed', what: 'historyRow' });
+    if (!(await this.checkRow(body.historyRow, night))) return refuse(400, { reason: 'unsealed', what: 'historyRow' });
     if ('clubberId' in who) {
       const sent = await this.postMeeting(who.clubberId, 'undo');
       if (!sent.ok) return sent.response;
@@ -289,7 +292,7 @@ export class Desk {
     // The claim goes, and so does a job that has not printed (the child is not here).
     await this.ledger.undo(night, tag);
     const dropped = await this.printq.dropForTag(tag);
-    await this.fire('afterUndo', { night, tag, historyRow: body.historyRow, source: 'desk', visitor: 'visitor' in who });
+    await this.fire('afterUndo', { night, tag, club: clean(body.club, 24), historyRow: body.historyRow, source: 'desk', visitor: 'visitor' in who });
     return json({ ok: true, droppedJobs: dropped });
   }
 
@@ -299,12 +302,12 @@ export class Desk {
     if (body.night !== night) return refuse(400, { reason: 'wrong-night', night });
     const who = this.who(body);
     if (!who) return refuse(400, { reason: 'no-child' });
-    if (!this.checkRow(body.historyRow, night)) return refuse(400, { reason: 'unsealed', what: 'historyRow' });
+    if (!(await this.checkRow(body.historyRow, night))) return refuse(400, { reason: 'unsealed', what: 'historyRow' });
     if ('clubberId' in who) {
       const sent = await this.postMeeting(who.clubberId, 'checkout');
       if (!sent.ok) return sent.response;
     }
-    await this.fire('afterCheckout', { night, historyRow: body.historyRow, source: 'desk', visitor: 'visitor' in who });
+    await this.fire('afterCheckout', { night, club: clean(body.club, 24), historyRow: body.historyRow, source: 'desk', visitor: 'visitor' in who });
     return json({ ok: true });
   }
 

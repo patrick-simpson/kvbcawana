@@ -53,6 +53,7 @@ import { Stations } from './stations.js';
 import { Adopter } from './adopt.js';
 import { Desk } from './desk.js';
 import { mountCheckin } from './checkinRoutes.js';
+import { History, mountHistory } from './history.js';
 
 export { json };
 
@@ -67,7 +68,7 @@ export const SETTINGS_JSON_MAX = 3800;
 export const SLIDES_CHUNK_JSON_BUDGET = 3900;
 export const SLIDES_TOTAL_MAX = 12;
 /** The events the laptop may not publish while the Worker is the one publisher (live.js names them). */
-export const SINGLE_PUBLISHER_DROPS = Object.freeze(['tally', 'checkout']);
+export const SINGLE_PUBLISHER_DROPS = Object.freeze(['tally', 'checkout', 'checkin']);
 export const BODY_MAX = 128 * 1024;   // bytes; the entry point refuses a longer Content-Length before reading
 
 
@@ -158,11 +159,15 @@ export class SyncCore {
     this.adopt = new Adopter({
       ledger: this.ledger, printq: this.printq, stations: this.stations, tags: this.tags,
       secret: () => this.watcher.creds()?.password, env: this.env, now: this.now, storage: this.storage,
+      greet: (g) => this.greet(g),
     });
     this.watcher.adopt = this.adopt;
     this.desk = new Desk({ watcher: this.watcher, ledger: this.ledger, printq: this.printq, stations: this.stations, tags: this.tags, now: this.now });
     mountCheckin(this.registry, this);   // stations, print lease, desk (routes.md 4, 5, 6)
-    // mountHistory(this.registry, this);   // P6: history rows, summary, key (one line each)
+    this.history = new History({ storage: this.storage, env: this.env, now: this.now });
+    // A greeting for a desk check-in, from the Worker, once SINGLE_PUBLISHER is on.
+    this.desk.hooks.afterCheckin.push((e) => this.greet({ name: e.name, club: e.club, id: e.jobId || e.historyRow?.id }));
+    mountHistory(this.registry, this);   // history routes, the desk's row check and hooks (routes.md 2, 3)
     // The screen registry (ROADMAP.md#settings-page, phase 2): its doorbells ride the live
     // channel only, for the one screen they name.
     this.screens = new Screens({
@@ -175,6 +180,8 @@ export class SyncCore {
 
   /** The Durable Object's alarm: the watcher's 5 s read (it sets the next one). */
   async alarm() {
+    // An outbox waiting for D1 drains with nobody asking (cheap: nothing without HISTORY_DB).
+    await this.history.flush().catch((err) => console.error('[history] flush failed', err));
     return this.watcher.tick();
   }
 
@@ -332,6 +339,25 @@ export class SyncCore {
       calendar: calendar || null,
       kid: key ? await kidFor(fromBase64(key) || new Uint8Array(0)) : null,
     };
+  }
+
+  /**
+   * ONE greeting for a cloud check-in (a desk check-in, or a child the watcher
+   * found on TwoTimTwo's page), sealed with the display key like the laptop's.
+   * Only while the Worker is the one publisher (`singlePublisher`): until then the
+   * print server's own greeting (with birthdays and milestones) is the one. The
+   * name is in memory for this call only.
+   * @param {{ name: string, club?: string, id?: string }} g
+   */
+  async greet(g) {
+    if (!this.singlePublisher) return false;
+    const firstName = String(g.name || '').trim().split(/\s+/)[0];
+    if (!firstName) return false;
+    const res = await this.publishSealed('checkin', {
+      firstName, club: String(g.club || ''), isBirthday: false, isFirstTimer: false,
+      ...(g.id ? { id: g.id } : {}), at: new Date(this.now()).toISOString(),
+    });
+    return res.ok;
   }
 
   /** @param {string} event @param {unknown} payload */
@@ -658,10 +684,14 @@ export class SyncCore {
     if (next.length < PASSPHRASE_MIN || next.length > PASSPHRASE_MAX) {
       return fail(`The new passphrase needs at least ${PASSPHRASE_MIN} characters.`, 400);
     }
+    // The history key's wrap changes in the SAME atomic put as the passphrase, or
+    // the passphrase does not change (history.js rewrapWrites).
+    const h = await this.history.rewrapWrites(body.wrapped);
+    if (h.error) return h.error;
     const prev = await this.storage.get('auth');
     const salt = toBase64(randomBytes(16));
     const auth = { salt, hash: await this.hashPassphrase(next, salt), epoch: prev.epoch + 1, changedAt: new Date(this.now()).toISOString() };
-    await this.storage.put('auth', auth);
+    await this.storage.put({ auth, ...h.writes });
     const rotateKey = body.rotateKey !== false;
     if (rotateKey) await this.storage.put('displayKey', newDisplayKey());
     // Every open socket was opened with the old word: close them all, so each
@@ -707,6 +737,7 @@ export class SyncCore {
     await this.watcher.arm();
     // Who brought a friend is kept a few nights, then deleted (friends.js).
     await this.friends.purge();
+    await this.history.flush().catch((err) => console.error('[history] flush failed', err));
     const res = await this.refreshCalendar();
     return res.status;
   }

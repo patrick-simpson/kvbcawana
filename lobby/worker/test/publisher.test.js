@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { seal } from '../src/crypto.js';
 import { SyncCore } from '../src/sync.js';
 import { fakeClock, memoryStore } from './helpers.js';
-import { ENV } from './rig.js';
+import { ENV, kid, rig } from './rig.js';
 
 async function core(env) {
   const clock = fakeClock();
@@ -36,5 +36,33 @@ describe('the single publisher gate', () => {
       expect(r.dropped).toBeUndefined();
       expect(sent).toEqual(['tally']);
     }
+  });
+});
+
+describe('the Worker is the greeter in single-publisher mode', () => {
+  it('drops the laptop\'s checkin greeting, and greets a desk check-in once itself', async () => {
+    const { c, sent, publish } = await core({ ...ENV, SINGLE_PUBLISHER: 'on' });
+    expect(await publish('checkin', await seal(await c.displayKey(), 'checkin', { firstName: 'Kit', club: 'Sparks' }))).toMatchObject({ dropped: true });
+    expect(sent).toEqual([]);
+
+    const t = await rig({ env: { SINGLE_PUBLISHER: 'on' }, kids: [kid('662', 'Sparks', 'Kit Tester')] });
+    const st = await t.station();
+    const res = await t.call('POST', '/v1/desk/checkin', await t.deskBody([st]));
+    expect(res.body.ok).toBe(true);
+    const greetings = t.sent.filter((f) => f.e === 'checkin');
+    expect(greetings).toHaveLength(1);
+    // sealed with the display key: the frame carries an envelope, never the name
+    expect(JSON.stringify(greetings[0])).not.toMatch(/Kit/);
+    expect(greetings[0].d).toMatchObject({ v: 1 });
+    // the same child again (a second desk) is not greeted twice
+    await t.call('POST', '/v1/desk/checkin', await t.deskBody([st]));
+    expect(t.sent.filter((f) => f.e === 'checkin')).toHaveLength(1);
+  });
+
+  it('greets nobody while the laptop is still the publisher (SINGLE_PUBLISHER off)', async () => {
+    const t = await rig({ kids: [kid('662', 'Sparks', 'Kit Tester')] });
+    const st = await t.station();
+    await t.call('POST', '/v1/desk/checkin', await t.deskBody([st]));
+    expect(t.sent.filter((f) => f.e === 'checkin')).toEqual([]);
   });
 });

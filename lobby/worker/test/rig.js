@@ -17,7 +17,7 @@ export const ENV = {
 
 /** A sealed-looking history row (the Worker only checks its shape). */
 export const row = (kind = 'checkin', night = NIGHT) => ({
-  id: newRowId(), night, kind, v: 1, kid: '0123456789abcdef', epk: 'AAAA', iv: 'AAAA', ct: 'A'.repeat(1388),
+  id: newRowId(), night, kind, v: 1, kid: '0123456789abcdef', epk: `BA${'A'.repeat(85)}=`, iv: 'A'.repeat(16), ct: 'A'.repeat(1388),
 });
 
 export async function rig({ env = {}, kids = [], start = WED_6PM, storage = memoryStore(), clock = fakeClock(start) } = {}) {
@@ -55,12 +55,15 @@ export async function rig({ env = {}, kids = [], start = WED_6PM, storage = memo
     return tt.fetchFn(url, init);
   };
   const alarm = { at: null };
+  /** Every frame the Worker broadcast to the live screens: [{e, p}]. */
+  const sent = [];
   const make = () => new SyncCore({
     storage, env: { ...ENV, ...env }, fetchFn, now: clock.now, sleep: clock.sleep,
     alarms: { set: (at) => { alarm.at = at; }, get: () => alarm.at },
+    broadcast: (text) => { sent.push(JSON.parse(text)); return 1; },
   });
   const r = {
-    clock, storage, tt, night, faults, reads, posts, alarm, core: make(), session: '',
+    clock, storage, tt, night, faults, reads, posts, alarm, sent, core: make(), session: '',
     /** A new object over the same storage: a Durable Object restart. */
     restart() { r.core = make(); r.wire(); return r.core; },
     wire() { r.watcher = r.core.watcher; },
@@ -88,6 +91,9 @@ export async function rig({ env = {}, kids = [], start = WED_6PM, storage = memo
       return { night: NIGHT, clubberId: '662', items: {}, historyRow: row(), job: bundle, ...extra };
     },
   };
+  // A history key is stored (the desk refuses a row with no key to check its kid against):
+  // a stand-in public value, since the Worker only compares the kid.
+  if (!(await storage.get('history:pub'))) await storage.put('history:pub', { pub: 'A'.repeat(87), kid: '0123456789abcdef' });
   const login = await r.core.handle(new Request('https://sync.test/v1/login', { method: 'POST', body: JSON.stringify({ passphrase: 'kennebec' }) }));
   r.session = (await login.json()).session;
   r.wire();

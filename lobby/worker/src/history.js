@@ -182,6 +182,45 @@ export class History {
     }
   }
 
+  /**
+   * The desk's row check (desk.checkRow): the shape, tonight's date and the
+   * CURRENT history kid. A Worker with no history key refuses every row (a
+   * client creates the key at sign-in, `PUT /v1/history/key`, first writer wins).
+   * @param {any} row @param {string} night
+   */
+  async checkRow(row, night) {
+    const key = await this.storage.get('history:pub');
+    return Boolean(key && row && row.night === night && cleanRow(row, key.kid));
+  }
+
+  /**
+   * One plaintext summary line (night_summary counts), or null when the club
+   * is not a name the table takes (a visitor with no club): the row is then
+   * stored without a line rather than refused.
+   * @param {string} night @param {unknown} club @param {Partial<Record<'checkedIn'|'checkedOut'|'undone'|'prints', number>>} counts
+   */
+  static summaryLine(night, club, counts) {
+    const line = { night, club: String(club ?? '').trim(), checkedIn: 0, checkedOut: 0, undone: 0, prints: 0, ...counts };
+    return cleanSummaryLine(line);
+  }
+
+  /**
+   * The desk's hook: keep a row the CLIENT already sealed (the Worker only
+   * checks its shape, never opens it). Never throws: a check-in is not undone
+   * because history had a bad moment; the answer says what happened.
+   * @param {any} row @param {ReturnType<typeof cleanSummaryLine>} [summary]
+   * @returns {Promise<{ ok: boolean, status: number }>}
+   */
+  async storeSealed(row, summary) {
+    try {
+      const res = await this.postRows({ rows: [row], summary: summary ? [summary] : [] }, 1);
+      return { ok: res.status < 300, status: res.status };
+    } catch (err) {
+      console.error('[history] could not keep a desk row', err);
+      return { ok: false, status: 500 };
+    }
+  }
+
   /** @param {Request} request @param {number} max */
   async readJson(request, max) {
     const text = await request.text();
@@ -426,4 +465,25 @@ export class History {
   off() {
     return fail('History storage is not set up yet.', 503, { reason: 'history-off' });
   }
+}
+
+/**
+ * The registry mount (ONE line in SyncCore's constructor, like mountCheckin):
+ * every history route behind a session, and the desk's two hooks: a check-in,
+ * undo or check-out stores the row the desk page sealed, and the desk refuses
+ * a row sealed to anything but the current history key. The Worker never
+ * seals a row itself (the free plan's CPU): a row only comes from a client.
+ * @param {import('./registry.js').Registry} registry @param {any} core the SyncCore (core.history, core.desk)
+ */
+export function mountHistory(registry, core) {
+  for (const route of ROUTES) {
+    const [method, pattern] = route.split(' ');
+    registry.add(method, pattern, 'session', ({ request, url }) => core.history.handle(request, url));
+  }
+  const desk = core.desk;
+  if (!desk) return;
+  desk.checkRow = (/** @type {any} */ row, /** @type {string} */ night) => core.history.checkRow(row, night);
+  desk.hooks.afterCheckin.push((/** @type {any} */ e) => core.history.storeSealed(e.historyRow, History.summaryLine(e.night, e.club, { checkedIn: 1 })));
+  desk.hooks.afterUndo.push((/** @type {any} */ e) => core.history.storeSealed(e.historyRow, History.summaryLine(e.night, e.club, { undone: 1 })));
+  desk.hooks.afterCheckout.push((/** @type {any} */ e) => core.history.storeSealed(e.historyRow, History.summaryLine(e.night, e.club, { checkedOut: 1 })));
 }
