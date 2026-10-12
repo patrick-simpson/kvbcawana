@@ -172,7 +172,25 @@ export function switchWarnings(name, from, to, stations, now) {
   if (watchWindow(now).open) out.push('window-open');
   // The extension's sweep stays off until its TwoTimTwo tab reloads (it reads /config/church at start).
   if (name === 'YM_CHECKOUT' && from === 'on' && to === 'off' && stations.length) out.push('ym-tab-reload');
+  // Any REGISTERED station below 9.3.0, seen lately or not (it may start up
+  // tonight): its extension still sweeps on its own, so turning the Worker's
+  // sweep on makes two; and it publishes only by its start-time switch, so
+  // turning SINGLE_PUBLISHER off can leave nobody publishing.
+  if (oldStations(stations).length) {
+    if (name === 'YM_CHECKOUT' && from === 'off' && to === 'on') out.push('station-old-sweep');
+    if (name === 'SINGLE_PUBLISHER' && from === 'on' && to === 'off') out.push('station-old-publish');
+  }
   return out;
+}
+
+/**
+ * The registered stations below STATION_MIN_VERSION (no version reported counts
+ * as below), as the page's confirm names them.
+ * @param {{ stationId?: string, name?: string|null, version?: string|null }[]} stations
+ */
+export function oldStations(stations) {
+  return stations.filter((s) => olderThan(s.version, STATION_MIN_VERSION))
+    .map((s) => ({ stationId: s.stationId ?? null, name: s.name ?? null, version: s.version ?? null }));
 }
 
 /** The stations as GET /v1/switches lists them. @param {any} core */
@@ -215,16 +233,18 @@ export function mountSwitches(registry, core) {
     const from = sw.value(name);
     const to = value === 'default' ? sw.defaultOf(name) : value;
     const warnings = switchWarnings(name, from, to, stations, core.now());
-    if (opts.dryRun) return { ok: true, body: { ok: true, dryRun: true, rev: sw.rev, switch: { ...sw.view(name), value: to }, warnings } };
+    // The stations a station warning is about, so the confirm can name them.
+    const old = warnings.some((w) => w.startsWith('station-old')) ? oldStations(stations) : [];
+    if (opts.dryRun) return { ok: true, body: { ok: true, dryRun: true, rev: sw.rev, switch: { ...sw.view(name), value: to }, warnings, oldStations: old } };
     const r = sw.set(name, value, device);
     if (!r.ok) return { ok: false, status: 409, reason: r.reason, error: 'Stored switches are off for this deploy (SWITCHES_STORED).' };
-    if (!r.changed) return { ok: true, body: { ok: true, rev: sw.rev, switch: sw.view(name), warnings: [] } };
+    if (!r.changed) return { ok: true, body: { ok: true, rev: sw.rev, switch: sw.view(name), warnings: [], oldStations: [] } };
     await sw.doc.save();
     core.broadcast(frameText(DOORBELL_EVENT, { what: 'switches', rev: sw.rev }));
     const seq = await core.logChange(null, { device, undoOf: opts.undoOf }, {
       what: 'switch', target: name, keys: [name], before: { [name]: r.before }, after: { [name]: r.after },
     });
-    return { ok: true, seq, body: { ok: true, rev: sw.rev, switch: sw.view(name), warnings } };
+    return { ok: true, seq, body: { ok: true, rev: sw.rev, switch: sw.view(name), warnings, oldStations: old } };
   };
 
   registry.add('GET', '/v1/switches', 'session', async () => json(await answer()));

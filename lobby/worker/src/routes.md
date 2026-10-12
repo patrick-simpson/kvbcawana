@@ -637,7 +637,7 @@ Storage `switches` = `{v: 1, rev, updatedAt, by, values: {NAME: 'on'|'off'}}`
 | Route | Auth | Request | Answer |
 | --- | --- | --- | --- |
 | `GET /v1/switches` | session | | `{rev, updatedAt, by, stored, switches: [{name, group, value, default, source: 'worker'\|'default'}], stations: [{stationId, name, lastSeenAt, version\|null, churchRev\|null}]}` |
-| `PUT /v1/switches` | session | `{name, value: 'on'\|'off'\|'default', rev?, dryRun?: true}` | `{ok, rev, switch, warnings: [code]}`. 400 `bad-name` / `bad-value` / `bad-rev`; 409 `{reason: 'stale', rev}` when `rev` is sent and differs; 409 `stored-off`. `default` deletes the stored value. Rings `changed {what: 'switches', rev}`; logs `switch` (10.5) with the STORED value before and after (`null` = following the default). Built: `dryRun: true` answers `{ok, dryRun: true, rev, switch (as it would be), warnings}` and writes nothing, so the page's confirm can list the warnings BEFORE the flip; the same stored value again writes nothing (`warnings: []`, no ring, no entry) |
+| `PUT /v1/switches` | session | `{name, value: 'on'\|'off'\|'default', rev?, dryRun?: true}` | `{ok, rev, switch, warnings: [code], oldStations}`. 400 `bad-name` / `bad-value` / `bad-rev`; 409 `{reason: 'stale', rev}` when `rev` is sent and differs; 409 `stored-off`. `default` deletes the stored value. Rings `changed {what: 'switches', rev}`; logs `switch` (10.5) with the STORED value before and after (`null` = following the default). Built: `dryRun: true` answers `{ok, dryRun: true, rev, switch (as it would be), warnings}` and writes nothing, so the page's confirm can list the warnings BEFORE the flip; the same stored value again writes nothing (`warnings: []`, no ring, no entry) |
 
 Warnings (never refusals; the page shows them in its confirm): `no-station` (no
 station heartbeat in 2 min), `station-old` (a station seen in 2 min reports no
@@ -645,7 +645,14 @@ station heartbeat in 2 min), `station-old` (a station seen in 2 min reports no
 runtime `SINGLE_PUBLISHER` / `YM_CHECKOUT` change), `window-open` (the watch
 window is open now), `ym-tab-reload` (`YM_CHECKOUT` turned OFF while a station
 holds the extension's sweep: the TwoTimTwo tab must be reloaded before the
-extension sweeps again). Turning `SINGLE_PUBLISHER` off does not purge
+extension sweeps again), `station-old-sweep` (`YM_CHECKOUT` turned ON while any
+REGISTERED station, seen lately or not, reports no `version` or one below
+`9.3.0`: its extension may still sweep, so there would be two),
+`station-old-publish` (`SINGLE_PUBLISHER` turned OFF while any registered
+station is below `9.3.0`: it publishes only by its start-time switch, so
+nobody may publish). Every PUT answer (dry run too) carries `oldStations:
+[{stationId, name, version|null}]`, the stations a `station-old*` warning is
+about (`[]` otherwise), so the confirm can name them. Turning `SINGLE_PUBLISHER` off does not purge
 `tonight:book` (the end-of-window purge does). Built: warnings only when the
 EFFECTIVE value changes; `no-station` for the online group only, `station-old`
 for `SINGLE_PUBLISHER` / `YM_CHECKOUT` only, `window-open` for any switch,

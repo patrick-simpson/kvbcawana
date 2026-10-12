@@ -139,7 +139,7 @@ describe('warnings', () => {
     expect(r.storage.map.has('switches')).toBe(false);
     const st = await r.station();
     await st.call('POST', '/v1/print/heartbeat', { printer: { state: 'ok' } });   // a 9.2.x station: no version
-    expect((await r.call('PUT', '/v1/switches', { name: 'SINGLE_PUBLISHER', value: 'off', dryRun: true })).body.warnings).toEqual(['station-old', 'window-open']);
+    expect((await r.call('PUT', '/v1/switches', { name: 'SINGLE_PUBLISHER', value: 'off', dryRun: true })).body.warnings).toEqual(['station-old', 'window-open', 'station-old-publish']);
     expect((await r.call('PUT', '/v1/switches', { name: 'CLOUD_PRINT', value: 'off', dryRun: true })).body.warnings).toEqual(['window-open']);
     await st.call('POST', '/v1/print/heartbeat', { version: '9.3.0', churchRev: 4 });
     const ym = await r.call('PUT', '/v1/switches', { name: 'YM_CHECKOUT', value: 'off' });
@@ -150,6 +150,33 @@ describe('warnings', () => {
     // Two minutes of silence: no station.
     r.clock.tick(3 * 60 * 1000);
     expect(switchWarnings('CLOUD_PRINT', 'on', 'off', [{ lastSeenAt: new Date(r.clock.t - 3 * 60 * 1000).toISOString() }], r.clock.t)).toContain('no-station');
+  });
+});
+
+describe('old stations (below 9.3.0), seen lately or not', () => {
+  it('YM_CHECKOUT off to on and SINGLE_PUBLISHER on to off warn and name them; a 9.3.0 station does not', async () => {
+    const r = await rig({ env: PROD, start: SUNDAY });   // Sunday: the watch window is shut
+    await r.call('PUT', '/v1/switches', { name: 'YM_CHECKOUT', value: 'off' });
+    const st = await r.station();
+    await st.call('POST', '/v1/print/heartbeat', { version: '9.2.1' });
+    r.clock.tick(60 * 60 * 1000);   // not seen lately: still registered, still old
+    const ym = (await r.call('PUT', '/v1/switches', { name: 'YM_CHECKOUT', value: 'on', dryRun: true })).body;
+    expect(ym.warnings).toEqual(['no-station', 'station-old-sweep']);
+    expect(ym.oldStations).toEqual([{ stationId: expect.any(String), name: expect.anything(), version: '9.2.1' }]);
+    const sp = (await r.call('PUT', '/v1/switches', { name: 'SINGLE_PUBLISHER', value: 'off', dryRun: true })).body;
+    expect(sp.warnings).toEqual(['no-station', 'station-old-publish']);
+    expect(sp.oldStations.map((s) => s.version)).toEqual(['9.2.1']);
+    // The real flip answers the same list.
+    expect((await r.call('PUT', '/v1/switches', { name: 'SINGLE_PUBLISHER', value: 'off' })).body).toMatchObject({ warnings: ['no-station', 'station-old-publish'], oldStations: [{ version: '9.2.1' }] });
+    // The other directions say nothing about old stations.
+    expect((await r.call('PUT', '/v1/switches', { name: 'SINGLE_PUBLISHER', value: 'on', dryRun: true })).body).toMatchObject({ warnings: ['no-station'], oldStations: [] });
+    await st.call('POST', '/v1/print/heartbeat', { version: '9.3.0' });
+    expect((await r.call('PUT', '/v1/switches', { name: 'YM_CHECKOUT', value: 'on', dryRun: true })).body).toMatchObject({ warnings: [], oldStations: [] });
+  });
+
+  it('a station that never reported a version counts as old', () => {
+    expect(switchWarnings('YM_CHECKOUT', 'off', 'on', [{ lastSeenAt: null }], SUNDAY)).toContain('station-old-sweep');
+    expect(switchWarnings('YM_CHECKOUT', 'off', 'on', [], SUNDAY)).not.toContain('station-old-sweep');
   });
 });
 
