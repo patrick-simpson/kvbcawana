@@ -7,6 +7,10 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { bootKiosk, tick } from './kiosk-dom.mjs';
+// The family's one sign-in (sync-protocol.js) and derivation (cloud-crypto.js): the page imports them as ES
+// modules from src/shared/ (family-assets copies); jsdom cannot import(), so the harness hands them over.
+import * as sp from '../../lobby/shared/sync-protocol.js';
+import * as cc from '../../lobby/shared/cloud-crypto.js';
 
 const REPO = path.dirname(new URL(import.meta.url).pathname).replace(/\/test$/, '');
 const SYNC_JS = readFileSync(path.join(REPO, 'public', 'src', 'sync.js'), 'utf8');
@@ -14,12 +18,16 @@ const SERVICE = 'https://awana-sync.test.workers.dev';
 const SESSION = 'v1.1.1790839331729.oWr6n92IJW5ldPGmtiyjPHAZpca-QGToNlKGXlKI6vc';
 const KEY = 'AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA=';
 
+const V2_PARAMS = { v: 2, salt: 'AAECAwQFBgcICQoLDA0ODw==', iter: 600000, legacy: true, upgrade: false };
+const V2_AUTHKEY = await cc.deriveAuthKey('kennebec', V2_PARAMS.salt, V2_PARAMS.iter);
+
 const settle = async () => { for (let i = 0; i < 8; i++) await tick(); };
 
 /** Boot the kiosk, then sync.js against a stand-in service. */
-function boot({ url = SERVICE, journey = null, prefs = {}, stateStatus = 200 } = {}) {
+function boot({ url = SERVICE, journey = null, prefs = {}, stateStatus = 200, v2 = false, modules = true } = {}) {
   const kiosk = bootKiosk({}, prefs);
   const { window } = kiosk;
+  if (modules) window.journeyAuthModules = { sp, cc };
   const calls = [];
   const inner = window.fetch;
   const reply = (status, body) => Promise.resolve({
@@ -34,6 +42,12 @@ function boot({ url = SERVICE, journey = null, prefs = {}, stateStatus = 200 } =
     const route = href.slice(SERVICE.length);
     const body = init.body ? JSON.parse(init.body) : null;
     calls.push({ route, method: init.method || 'GET', body, auth: (init.headers || {}).Authorization || null });
+    if (route === '/v1/auth/params') return v2 ? reply(200, V2_PARAMS) : reply(404, {});
+    if (route === '/v1/login' && body.authKey) {
+      return body.authKey === V2_AUTHKEY && !body.passphrase
+        ? reply(200, { session: SESSION, displayKey: KEY, state: { journey }, history: null })
+        : reply(401, { reason: 'wrong', triesLeft: 4 });
+    }
     if (route === '/v1/login') {
       if (body.passphrase !== 'kennebec') return reply(401, { triesLeft: 4 });
       return reply(200, { session: SESSION, displayKey: KEY, pusher: { key: 'pk', cluster: 'us2' }, state: { journey } });
@@ -151,5 +165,44 @@ test('a sign-in made in another window (the configure page) signs this screen in
   k.window.localStorage.removeItem('awanaSyncSession.v1');
   k.window.dispatchEvent(new k.window.StorageEvent('storage', { key: 'awanaSyncSession.v1' }));
   assert.ok(!doc.getElementById('sync-signin').classList.contains('hidden'));
+  k.close();
+});
+
+test('passphrase v2: the kiosk derives the authKey itself and sends only that', async () => {
+  const k = boot({ journey: ROOM, v2: true });
+  await settle();
+  const doc = k.document;
+  doc.getElementById('sync-passphrase').value = '  Kennebec ';
+  doc.getElementById('sync-signin-btn').click();
+  for (let i = 0; i < 40 && !k.window.localStorage.getItem('awanaSyncSession.v1'); i++) await new Promise((r) => setTimeout(r, 100));
+  assert.equal(k.window.localStorage.getItem('awanaSyncSession.v1'), SESSION);
+  assert.equal(k.window.localStorage.getItem('awanaDisplayKey.v1'), KEY);
+  const login = k.calls.find((c) => c.route === '/v1/login');
+  assert.deepEqual(Object.keys(login.body), ['authKey']);
+  assert.equal(JSON.stringify(k.calls).includes('ennebec'), false, 'the passphrase never leaves the kiosk');
+  k.close();
+});
+
+test('passphrase v2: a wrong word is refused and counted, and the session stays empty', async () => {
+  const k = boot({ journey: ROOM, v2: true });
+  await settle();
+  k.document.getElementById('sync-passphrase').value = 'kenebec';
+  k.document.getElementById('sync-signin-btn').click();
+  for (let i = 0; i < 40 && !/not the passphrase/.test(k.document.getElementById('sync-status').textContent); i++) await new Promise((r) => setTimeout(r, 100));
+  assert.match(k.document.getElementById('sync-status').textContent, /not the passphrase.*4 tries left/);
+  assert.equal(k.window.localStorage.getItem('awanaSyncSession.v1'), null);
+  k.close();
+});
+
+test('if the shared modules cannot load, the kiosk still signs in the old way', async () => {
+  const k = boot({ journey: ROOM, modules: false });
+  k.window.journeyAuthModules = undefined;
+  // jsdom cannot import(), so loading fails: that is the "old browser / missing file" case
+  await settle();
+  k.document.getElementById('sync-passphrase').value = 'kennebec';
+  k.document.getElementById('sync-signin-btn').click();
+  for (let i = 0; i < 40 && !k.window.localStorage.getItem('awanaSyncSession.v1'); i++) await new Promise((r) => setTimeout(r, 100));
+  assert.equal(k.window.localStorage.getItem('awanaSyncSession.v1'), SESSION);
+  assert.deepEqual(k.calls.find((c) => c.route === '/v1/login').body, { passphrase: 'kennebec' });
   k.close();
 });

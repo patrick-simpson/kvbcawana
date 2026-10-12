@@ -178,7 +178,83 @@ function parseLoginResponse(res, opts = {}) {
   if (!res.ok || !isValidSession(b.session) || !isPlausibleDisplayKey(b.displayKey)) {
     return { ok: false, status: res.status, reason: 'rejected', message: typeof b.error === 'string' ? b.error : `The sync service answered HTTP ${res.status}.` };
   }
-  return { ok: true, session: b.session, displayKey: b.displayKey.trim(), state: b.state || null };
+  return {
+    ok: true, session: b.session, displayKey: b.displayKey.trim(), state: b.state || null,
+    // a v2 login also hands back the history key {pub, kid, wrapped} (or null before one exists)
+    ...(b.history !== undefined ? { history: b.history && typeof b.history === 'object' ? b.history : null } : {}),
+  };
+}
+
+// ── passphrase v2 (lobby/worker/src/routes.md section 1) ─────────────────────
+// The passphrase never reaches the service once a client is on v2: the client
+// asks GET /v1/auth/params for the salt and count, derives `authKey` itself
+// (cloud-crypto.js deriveAuthKey: PBKDF2-SHA256 600000 rounds, then HKDF) and
+// signs in with it. This module keeps the dance in one place; each client
+// brings its own transport (`request`) and its own derivation (`derive`).
+
+/** GET: the PBKDF2 salt and count a client derives `authKey` from. */
+const AUTH_PARAMS_PATH = '/v1/auth/params';
+
+/**
+ * Read the answer to GET /v1/auth/params, or null when the service has no v2.
+ * `upgrade` is true while the service stores no v2 verifier yet: the first
+ * sign-in then sends the passphrase once, with its authKey.
+ * @param {{ok: boolean, status: number, body: any}} res
+ * @returns {{salt: string, iter: number, legacy: boolean, upgrade: boolean}|null}
+ */
+function parseAuthParams(res) {
+  const b = res && res.ok && res.body && typeof res.body === 'object' ? res.body : null;
+  if (!b || b.v !== 2 || typeof b.salt !== 'string' || !b.salt || !Number.isInteger(b.iter)) return null;
+  return { salt: b.salt, iter: b.iter, legacy: b.legacy === true, upgrade: b.upgrade === true };
+}
+
+/**
+ * Sign in with the passphrase by protocol v2, falling back to today's login
+ * for a service that has no v2 yet. `derived` is what an earlier call returned
+ * ({salt, iter, authKey}): a client that signs in AGAIN on its own (the print
+ * server, after a 401) keeps it IN MEMORY (never on disk) and re-signs in with
+ * one request and no 600000-round derivation. Pass it only for the passphrase it
+ * was derived from (the client's own stored one), never beside a freshly typed
+ * word. A stale `derived` (the passphrase changed) is answered 401 and replaced
+ * by a full sign-in when a passphrase was given.
+ * @param {{
+ *   request: (path: string, opts?: {method?: string, body?: unknown}) => Promise<{ok: boolean, status: number, body: any}>,
+ *   derive: (passphrase: string, salt: string, iter: number) => Promise<string>,
+ *   passphrase?: string,
+ *   seedKey?: string,
+ *   derived?: {salt: string, iter: number, authKey: string}|null,
+ * }} opts `request` returns {ok, status, body} (status 0 = unreachable) and never throws; `derive` returns authKey as base64
+ * @returns {Promise<{res: {ok: boolean, status: number, body: any}, derived: {salt: string, iter: number, authKey: string}|null}>}
+ */
+async function signInWithPassphrase(opts) {
+  const typed = normalizeSyncPassphrase(opts.passphrase);
+  const seedKey = opts.seedKey ? String(opts.seedKey).trim() : '';
+  /** @param {Record<string, string>} fields */
+  const login = (fields) => opts.request('/v1/login', { method: 'POST', body: seedKey ? { ...fields, seedKey } : fields });
+  const held = opts.derived && typeof opts.derived.authKey === 'string' ? opts.derived : null;
+  if (held) {
+    const res = await login({ authKey: held.authKey });
+    if (res.ok) return { res, derived: held };
+    if (res.status !== 401 || !typed) return { res, derived: null };
+  }
+  if (!typed) return { res: { ok: false, status: 401, body: { reason: 'wrong' } }, derived: null };
+  const pres = await opts.request(AUTH_PARAMS_PATH);
+  const params = parseAuthParams(pres);
+  if (!params) {
+    // Only an old service (no such route) gets today's login; unreachable, 503 and the rest are reported as they are.
+    if (pres.status !== 404) return { res: pres, derived: null };
+    return { res: await login({ passphrase: typed }), derived: null };
+  }
+  /** @type {string} */
+  let authKey;
+  try {
+    authKey = await opts.derive(typed, params.salt, params.iter);
+  } catch {
+    return { res: { ok: false, status: 400, body: { error: 'This device could not derive the sign-in key.' } }, derived: null };
+  }
+  let res = await login(params.upgrade ? { passphrase: typed, authKey } : { authKey });
+  if (res.status === 401 && res.body && res.body.reason === 'upgrade-needed') res = await login({ passphrase: typed, authKey });
+  return { res, derived: res.ok ? { salt: params.salt, iter: params.iter, authKey } : null };
 }
 
 /**
@@ -232,6 +308,9 @@ module.exports = {
   UNREACHABLE,
   buildLoginBody,
   parseLoginResponse,
+  AUTH_PARAMS_PATH,
+  parseAuthParams,
+  signInWithPassphrase,
   parseSessionCheck,
   publishRequest,
   SCREEN_HELLO_PATH,

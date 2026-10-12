@@ -23,6 +23,7 @@
 'use strict';
 
 const protocol = require('./sync-protocol');
+const cloudCrypto = require('./cloud-crypto');
 
 const DEFAULT_SYNC_INDEX = 'https://awana.kvbchurch.org/lobby/shared/sync.json';
 const { isValidSyncUrl, isValidSession, normalizeSyncPassphrase } = protocol;
@@ -59,15 +60,27 @@ async function syncRequest(base, path, { method, body, session, fetchFn } = {}) 
 }
 
 /**
- * Sign in. `seedKey` is the display key this server already seals with; the
- * service adopts it only if it has none yet.
- * @returns {Promise<{ok: true, session: string, displayKey: string}
+ * Sign in (passphrase v2, lobby/worker/src/routes.md section 1): the passphrase
+ * is turned into an authKey HERE (cloud-crypto's generated CommonJS copy, 600000
+ * PBKDF2 rounds, about 0.3 s on a PC) and only the authKey is sent; a service
+ * that has no v2 yet gets today's login. `seedKey` is the display key this
+ * server already seals with; the service adopts it only if it has none yet.
+ * `derived` (what an earlier call returned, kept IN MEMORY by a caller that has
+ * to sign in again on its own) signs in with one request and no derivation; pass
+ * it only with the passphrase it came from.
+ * @returns {Promise<{ok: true, session: string, displayKey: string, history: object|null|undefined, derived: object|null}
  *   | {ok: false, status: number, reason: string, error: string, triesLeft?: number, retryAfterSec?: number}>}
  */
-async function syncLogin(base, passphrase, { seedKey, fetchFn } = {}) {
-  const res = await syncRequest(base, '/v1/login', { method: 'POST', body: protocol.buildLoginBody(passphrase, seedKey), fetchFn });
-  const r = protocol.parseLoginResponse(res, { who: 'computer' });
-  if (r.ok) return { ok: true, session: r.session, displayKey: r.displayKey };
+async function syncLogin(base, passphrase, { seedKey, fetchFn, derived } = {}) {
+  const out = await protocol.signInWithPassphrase({
+    request: (path, o) => syncRequest(base, path, { ...o, fetchFn }),
+    derive: cloudCrypto.deriveAuthKey,
+    passphrase,
+    seedKey,
+    derived,
+  });
+  const r = protocol.parseLoginResponse(out.res, { who: 'computer' });
+  if (r.ok) return { ok: true, session: r.session, displayKey: r.displayKey, history: r.history, derived: out.derived };
   const { message, ...rest } = r;
   return { ...rest, error: message };
 }

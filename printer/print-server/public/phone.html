@@ -828,17 +828,37 @@ function unlock() {
   });
 }
 // Online: the sync passphrase gets a session, which every relayed call carries.
+// Passphrase v2 (lobby/worker/src/routes.md section 1): the passphrase is turned into
+// an authKey HERE (the family's one sign-in, lobby/shared/sync-protocol.js, and the
+// derivation, lobby/shared/cloud-crypto.js; site/build.mjs serves both at /checkin/)
+// and only the authKey is sent. A phone takes about a second for the 600000 rounds.
+var relayModules = null;
+function loadRelayModules() {
+  if (!relayModules) {
+    relayModules = Promise.all([import('/checkin/sync-protocol.js'), import('/checkin/cloud-crypto.js')])
+      .then(function(m) { return { sp: m[0], cc: m[1] }; }, function() { relayModules = null; return null; });
+  }
+  return relayModules;
+}
+function relayRequest(path, o) {
+  o = o || {};
+  return fetch(RELAY + path, { method: o.method || 'GET', headers: o.body === undefined ? {} : { 'Content-Type': 'application/json' }, body: o.body === undefined ? undefined : JSON.stringify(o.body) })
+    .then(function(r) { return r.json().catch(function() { return {}; }).then(function(d) { return { ok: r.ok, status: r.status, body: d }; }); },
+      function() { return { ok: false, status: 0, body: null }; });
+}
 function relayLogin(passphrase) {
-  return fetch(RELAY + '/v1/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ passphrase: passphrase }) })
-    .catch(function() { throw relayErr('network', 'No internet connection.'); })
-    .then(function(r) {
-      return r.json().catch(function() { return {}; }).then(function(d) {
-        if (r.status === 429) { var e = relayErr('locked'); e.retryAfter = d.retryAfterSec || 60; throw e; }
-        if (r.status === 401) throw relayErr('wrong');
-        if (!r.ok || !d.session) throw relayErr('network', d.error || 'The sync service did not answer.');
-        return d.session;
-      });
-    });
+  return loadRelayModules().then(function(m) {
+    // The modules did not load (an old phone, a cached page): today's login, which a service that still has the old hash accepts.
+    if (!m) return relayRequest('/v1/login', { method: 'POST', body: { passphrase: passphrase } });
+    return m.sp.signInWithPassphrase({ request: relayRequest, derive: m.cc.deriveAuthKey, passphrase: passphrase }).then(function(out) { return out.res; });
+  }).then(function(r) {
+    var d = r.body || {};
+    if (r.status === 0) throw relayErr('network', 'No internet connection.');
+    if (r.status === 429) { var e = relayErr('locked'); e.retryAfter = d.retryAfterSec || 60; throw e; }
+    if (r.status === 401) throw relayErr('wrong');
+    if (!r.ok || !d.session) throw relayErr('network', d.error || 'The sync service did not answer.');
+    return d.session;
+  });
 }
 if (RELAY) {
   $('pin').type = 'password';

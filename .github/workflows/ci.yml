@@ -46,6 +46,8 @@ jobs:
   #           printer/styles/family.css (its build copies it into public/)
   #           journey/public/src/schedule.js and printer/components/Lobby.tsx
   #           (the home page's stepped chips, aboutChips.test.js)
+  #           site/desk/ and printer/print-server/public/phone.html (e2e/desk.spec.js
+  #           serves the desk page, with the phone page's touch core, from a stub origin)
   #   printer reads printer/, plus lobby/worker/src/relay.js
   #           (test-phone-relay) and, since the online check-in end-to-end test
   #           (printer/scripts/test-cloud-e2e.cjs) runs the Worker in process,
@@ -117,6 +119,7 @@ jobs:
                 journey/public/src/schedule.js) lobby=true ;;  # screenSpecs.test.js reads it
                 printer/styles/family.css) lobby=true ;;  # the lobby's build copies it into public/
                 printer/components/Lobby.tsx) lobby=true ;;  # aboutChips.test.js reads the home page's chips
+                site/desk/*|printer/print-server/public/phone.html) lobby=true ;;  # e2e/desk.spec.js serves the desk page (site/desk/desk-page.mjs injects the touch core)
                 lobby/worker/*|lobby/desktop/*|printer/*|journey/*|site/*|.github/workflows/*) ;;
                 *) lobby=true ;;
               esac

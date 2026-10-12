@@ -109,34 +109,31 @@ const fakeSafe = {
   const printedFor = (id) => prints.filter((b) => String(b.clubberId) === String(id)).length;
   const status = async () => (await t.call('GET', '/v1/print/status')).body;
 
-  // ── "the desk page": seals in the browser, then posts ────────────────────
-  const stationsNow = async () => (await t.call('GET', '/v1/stations')).body.map((s) => ({ publicKey: s.pub }));
-  async function sealedRow(kind, record) {
-    const id = cc.newRowId();
-    return { id, night: NIGHT, kind, ...(await cc.sealRow(hkey.pub, { id, night: NIGHT, kind, record })) };
-  }
+  // ── "the desk page": the REAL site/desk/desk-transport.js, signed in by passphrase v2 ──
+  // It derives authKey, signs in (the one upgrade login the first time), proves the
+  // history key, then seals the job and the row in "the browser" and posts.
+  const esm = (...p) => import(pathToFileURL(path.join(root, '..', ...p)).href);
+  const esmCc = await esm('lobby', 'shared', 'cloud-crypto.js');
+  const { createDesk } = await esm('site', 'desk', 'desk-transport.js');
+  const deskFetch = async (url, init = {}) => t.core.handle(new Request(`${BASE}${String(url).replace(/^\/api/, '')}`, init));
+  const desk = createDesk({ cc: esmCc, fetch: deskFetch, now: t.clock.now });
+  await desk.signIn(PASS);
+  check('the desk page signs in with passphrase v2 and holds the history key', desk.signedIn === true && desk.hasHistory === true);
+  check('and the Worker upgraded its stored verifier from that one sign-in', !!(await storage.get('auth')).v2.verifier);
   async function deskCheckIn(clubberId, first, last, club) {
-    const jobId = cc.newRowId();
-    const job = await cc.sealForStations(await stationsNow(), {
-      id: jobId, night: NIGHT, kind: 'print-job',
-      record: { route: '/print', body: { firstName: first, lastName: last, clubName: club, clubberId }, clubberId, source: 'desk' },
-    });
-    const res = await t.call('POST', '/v1/desk/checkin', {
-      night: NIGHT, clubberId, items: {}, job,
-      historyRow: await sealedRow('checkin', { ts: t.clock.t, first, last, club, clubberId, source: 'desk' }),
-    });
-    return { res, jobId };
+    const out = await desk.checkIn({ clubberId, name: `${first} ${last}`, club }, {});
+    return { out, jobId: out.jobId };
   }
   const WATCHER = async (ms) => { t.clock.tick(ms); await t.core.watcher.tick(); };
   await t.core.watcher.tick();   // the baseline read: nobody is here
 
   console.log('\na desk check-in prints exactly one label');
   const first = await deskCheckIn('662', 'Kit', 'Zyxelquill', 'Sparks');
-  check('the desk check-in is accepted with a claim at gen 1 and a sealed job', first.res.body.ok === true && first.res.body.gen === 1 && first.res.body.jobId === first.jobId && first.res.body.history === 'hooked', JSON.stringify(first.res.body));
+  check('the desk check-in is accepted with a claim at gen 1 and a sealed job', first.out.already === false && first.out.gen === 1 && first.out.jobId === first.jobId && first.out.history === 'hooked', JSON.stringify(first.out));
   check('the claim is queued, one job waits, and the Worker holds only ciphertext for it', (await status()).claims.queued === 1 && (await status()).queued === 1);
   const r1 = await puller.tick();
   check('the real job puller leased it (GET /v1/print/next), opened it and printed it once', r1.handled === 1 && prints.length === 1 && printedFor('662') === 1, JSON.stringify(r1));
-  check('the stub printer got the cloud tag the print server wants (cloud: true, gen 1, no regen)', prints[0].cloud === true && !prints[0].regen && prints[0].firstName === 'Kit' && prints[0].clubName === 'Sparks', JSON.stringify(prints[0]));
+  check('the stub printer got the cloud tag the print server wants (cloud: true, gen 1, no regen)', prints[0].cloud === true && !prints[0].regen && prints[0].name === 'Kit Zyxelquill' && prints[0].clubName === 'Sparks' && prints[0].clubberId === '662', JSON.stringify(prints[0]));
   let s = await status();
   check('the ack (POST /v1/print/done) marked the job done and the claim printed', s.done === 1 && s.queued === 0 && s.leased === 0 && s.claims.printed === 1, JSON.stringify(s));
   check('the station was seen, its printer state noted', s.stations[0].stationId === STATION && s.stations[0].lastSeenAt);
@@ -148,19 +145,19 @@ const fakeSafe = {
   await WATCHER(SPILL_MS);
   check('the watcher saw the child on the report and adopted nothing (the claim is already ours)', t.core.adopt.pending() === 0 && (await status()).claims.printed === 1 && (await status()).queued === 0);
   const dup = await deskCheckIn('662', 'Kit', 'Zyxelquill', 'Sparks');
-  check('and a second desk checking the same child in is told "already", with no second job', dup.res.body.already === true && (await status()).queued === 0, JSON.stringify(dup.res.body));
+  check('and a second desk checking the same child in is told "already", with no second job', dup.out.already === true && (await status()).queued === 0, JSON.stringify(dup.out));
   await puller.tick();
   check('so the puller finds nothing and the label count is still 1', prints.length === 1);
 
   console.log('\nan undo, then a new check-in, prints again with a higher gen');
   t.night.kids = t.night.kids.filter((k) => k.id !== '662');
-  const undo = await t.call('POST', '/v1/desk/undo', { night: NIGHT, clubberId: '662', club: 'Sparks', historyRow: await sealedRow('undo', { ts: t.clock.t, first: 'Kit', last: 'Zyxelquill', clubberId: '662', source: 'desk' }) });
-  check('the undo is accepted', undo.body.ok === true, JSON.stringify(undo.body));
+  const undo = await desk.undo({ clubberId: '662', name: 'Kit Zyxelquill', club: 'Sparks' });
+  check('the undo is accepted', undo.ok === true, JSON.stringify(undo));
   await WATCHER(WATCH_INTERVAL_MS);
   const second = await deskCheckIn('662', 'Kit', 'Zyxelquill', 'Sparks');
-  check('the new check-in is a new claim: gen is higher than the first', second.res.body.ok === true && second.res.body.gen > first.res.body.gen, JSON.stringify(second.res.body));
+  check('the new check-in is a new claim: gen is higher than the first', second.out.already === false && second.out.gen > first.out.gen, JSON.stringify(second.out));
   const r2 = await puller.tick();
-  check('and prints a second label, flagged as the next generation', r2.handled === 1 && printedFor('662') === 2 && prints[1].cloud === true && prints[1].regen === true, JSON.stringify(prints.map((b) => b.regen)));
+  check('and prints a second label, flagged as the next generation', r2.handled === 1 && printedFor('662') === 2 && prints[1].cloud === true && prints[1].regen === true && prints[1].name === 'Kit Zyxelquill', JSON.stringify(prints.map((b) => b.regen)));
   check('the journal holds one tag per generation', Object.keys(JSON.parse(fs.readFileSync(journalFile, 'utf8')).keys).filter((k) => k.includes(':662:')).length === 2);
   t.night.kids.push({ id: '662', club: 'Sparks', name: 'Kit Zyxelquill' });
 

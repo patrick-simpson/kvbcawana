@@ -18,7 +18,6 @@
 // template through sanitizeTemplate.
 
 import {
-  buildLoginBody,
   buildRequest,
   isValidSession,
   isValidSyncUrl,
@@ -26,8 +25,10 @@ import {
   parseSyncIndex,
   publishRequest,
   readResponse,
+  signInWithPassphrase,
   UNREACHABLE,
 } from '../../shared/sync-protocol.js';
+import { deriveAuthKey } from '../../shared/cloud-crypto.js';
 import { saveDisplayKey } from './displayKey.js';
 import { sanitizeTemplate } from './syncSpecs.js';
 import { timedFetch } from './timedFetch.js';
@@ -133,16 +134,25 @@ export async function syncRequest(base, path, opts = {}) {
  */
 
 /**
- * Sign this screen in. On success the session and the display key are saved
- * in their own slots; the caller applies the template and the
- * state (it owns the config store and the dispatch path).
+ * Sign this screen in (passphrase v2: the passphrase is turned into an authKey
+ * HERE and only the authKey is sent, once the service is on v2). On success the
+ * session and the display key are saved in their own slots; the caller applies
+ * the template and the state (it owns the config store and the dispatch path).
+ * The derivation is one 600000-round PBKDF2 per typed passphrase (a sign-in is
+ * a person's act); nothing re-derives per request, because every later call
+ * rides the session.
  * @param {string} base
  * @param {string} passphrase
  * @param {{fetchFn?: typeof fetch, seedKey?: string}} [opts]
  * @returns {Promise<LoginOk | LoginErr>}
  */
 export async function syncLogin(base, passphrase, opts = {}) {
-  const res = await syncRequest(base, '/v1/login', { method: 'POST', body: buildLoginBody(passphrase, opts.seedKey), fetchFn: opts.fetchFn });
+  const { res } = await signInWithPassphrase({
+    request: (path, o) => syncRequest(base, path, { ...o, fetchFn: opts.fetchFn }),
+    derive: deriveAuthKey,
+    passphrase,
+    seedKey: opts.seedKey,
+  });
   const r = parseLoginResponse(res, { who: 'screen' });
   if (!r.ok) {
     const { reason, message } = r;

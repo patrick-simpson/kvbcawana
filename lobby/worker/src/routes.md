@@ -82,11 +82,11 @@ The passphrase never reaches the Worker once a client is on v2: clients send
 
 | Route | Auth | Request | Answer |
 | --- | --- | --- | --- |
-| `GET /v1/auth/params` | public | | `{v: 2, salt, iter, legacy}`: the PBKDF2 salt and count for `authKey`. The salt is made (and stored) on first ask, before any v2 verifier exists. `legacy` is true while the old HMAC hash is still kept. |
-| `POST /v1/login` (v2) | public, lockout as today | `{authKey}` | today's answer `{session, displayKey, state, pusher}` plus `history: {pub, kid, wrapped} \| null` |
+| `GET /v1/auth/params` | public | | `{v: 2, salt, iter, legacy, upgrade}`: the PBKDF2 salt and count for `authKey`. The salt is made (and stored) on first ask, before any v2 verifier exists. `legacy` is true while the old HMAC hash is still kept; `upgrade` is true while no v2 verifier is stored (a client then sends `{passphrase, authKey}` in its first sign-in). 503 with no passphrase configured. |
+| `POST /v1/login` (v2) | public, lockout as today | `{authKey}` | today's answer `{session, displayKey, state}` plus `history: {pub, kid, wrapped} \| null`. 401 `wrong` (counted) on a bad key; 401 `upgrade-needed` (not counted) while no verifier is stored and no passphrase came with it; 409 `no-params` before `GET /v1/auth/params` was ever asked; 400 `bad-authkey` for a malformed key |
 | `POST /v1/login` (upgrade) | public | `{passphrase, authKey}` when no v2 verifier exists | checks the passphrase against the OLD HMAC hash; on success stores `verifier = SHA-256(authKey)` under the params' salt, answers as v2 plus `upgraded: true`. The first v2 client to sign in after the deploy upgrades the store. |
-| `POST /v1/login` (legacy) | public | `{passphrase}` | as today, while the legacy hash exists; answers `legacy: true`, and the Worker keeps `auth:legacyLastAt` so the owner can see when the last old client signed in |
-| `POST /v1/passphrase` (v2) | public, lockout as today | `{currentAuthKey, next: {salt, iter, verifier}, wrapped}` (`wrapped` is the history key re-wrapped under the new word by `rewrapPrivateKey`, already proved; `null` only when no history key exists) | ONE atomic multi-key put: `auth` (new salt, iter, verifier, epoch + 1), `history:wrapped`, `history:wrapped:prev` (`{wrapped, until: now + 7 days}`), and the legacy hash deleted. Signs every screen out and rotates the display key as today. `{session, displayKey, rotatedKey}` |
+| `POST /v1/login` (legacy) | public | `{passphrase}` | as today, while the legacy hash exists; answers `legacy: true`, and the Worker keeps `auth:legacyLastAt` (shown in `GET /v1/cloud/status` as `auth: {v2, legacy, legacyOn, legacyLastAt}`) so the owner can see when the last old client signed in. With `AUTH_LEGACY = "off"` it answers 401 `legacy-off` (not counted) |
+| `POST /v1/passphrase` (v2) | session, lockout as today | `{currentAuthKey \| current, next: {salt, iter, verifier}, wrapped}` (`currentAuthKey` proves it against the stored verifier; a store that has no verifier yet accepts `current`, the passphrase, against the old hash) (`wrapped` is the history key re-wrapped under the new word by `rewrapPrivateKey`, already proved; `null` only when no history key exists) | ONE atomic multi-key put: `auth` (new salt, iter, verifier, epoch + 1), `history:wrapped`, `history:wrapped:prev` (`{wrapped, until: now + 7 days}`), and the legacy hash deleted. Signs every screen out and rotates the display key as today. `{session, displayKey, rotatedKey}` |
 
 **Migration.** Today's store is `auth = {salt, hash: HMAC(salt, passphrase),
 epoch}`. After the P1 deploy:
@@ -104,8 +104,20 @@ epoch}`. After the P1 deploy:
    longer, once, then keeps its session).
 4. The legacy hash is deleted by the first v2 passphrase change, or by the
    owner's switch (`AUTH_LEGACY = "off"` in `wrangler.toml`) once
-   `auth:legacyLastAt` is old. Until then the fast-hash weakness stays for
-   that one value; SECURITY.md says so.
+   `auth:legacyLastAt` is old (the next v2 sign-in then deletes it). Until then the
+   fast-hash weakness stays for that one value; SECURITY.md says so.
+5. An OLD-protocol passphrase change (`{current, next: string}`) still works
+   while the hash exists: it stores a new hash and clears the v2 verifier (the
+   Worker cannot derive it), so the next v2 client signs in with the upgrade
+   login again.
+
+**When the old path can be removed** (code and all): once `GET /v1/cloud/status`
+shows `auth.legacy: false` (a v2 passphrase change or an `AUTH_LEGACY = "off"`
+sign-in deleted the hash) and every installed client is on v2: the screens
+self-update within minutes, the KVBC Awana app within ten, the print server with
+its app. Then delete `checkPassphrase`' hash branch, the legacy login and the
+`{current, next: string}` change in `sync.js` in one commit. `iter` stays
+at 600000 (the floor `cloud-crypto.js` enforces on every client).
 
 ## 2. The history key (P1)
 
@@ -232,7 +244,7 @@ never unreadable to a station about to lease it. Medical notes are sealed ONLY
 to station keys, never to the history key (`sealRow` refuses a record with a
 medical key).
 
-## 5. The desk page (the Worker's claim API is BUILT; the page is P3's)
+## 5. The desk page (the Worker's claim API and the page, `site/desk/`, are BUILT)
 
 Our desk page (a browser at the desk, signed in) and the TwoTimTwo page
 fallback. The desk page derives keys at sign-in, fetches `/v1/stations` and
@@ -242,6 +254,7 @@ behaviour is `desk.js`, which the page calls through these routes.
 | Route | Auth | Request | Answer |
 | --- | --- | --- | --- |
 | `GET /v1/desk/roster` **BUILT** | session | | tonight's check-in page roster `{readAt, stale?, kids: [{clubberId, first, last, club, clubId, checkedIn}]}` (no medical data; plaintext over TLS, from the last read, held in memory, never stored). Read through the 5 s clock: a read within 5 s is the last one; a clock booked past 12 s answers the last read marked `stale`, or 429 `{reason: 'read-busy', retryAfterMs}` with none |
+| `GET /v1/desk/families` **BUILT** | session | | `{households: string[][], familiesError?}`: TwoTimTwo's households (names only, two or more active children each), one read of the export per 30 minutes through the 5 s clock, kept in memory only; a failed read is `[]` plus a fixed `familiesError` code (kept five minutes), a clock turn-away is 429 `{reason: 'read-busy', retryAfterMs}` and not kept. The roster answer also carries `items: {bible: [club], friend: [club]}` (which clubs offer them, from the page it already read) |
 | `POST /v1/desk/checkin` **BUILT** | session | `{night, clubberId \| visitor: {first, last, club}, items, historyRow: Row, job: Bundle \| null}`; `night` is the church's local date (else 400 `wrong-night`); `items` is `{Bible?, Friend?}` or `['Bible', 'Friend']`; `job.id` is the jobId, `job.kind` is `print-job`, `job.night` is `night`; `job` may be null only while no station is registered | see below |
 | `POST /v1/desk/undo` **BUILT** | session | `{night, clubberId \| visitor, historyRow}` | TwoTimTwo's undo (`checkinclubberundo`, accepted on "(checkin undone)"), then the claim goes `undone` (gen + 1) and every unprinted job of that child is dropped: `{ok, droppedJobs}`. A refusal is 409 `{reason}`, a timeout 504 `{reason: 'unsure'}`: nothing is changed here, and the watcher settles what TwoTimTwo has |
 | `POST /v1/desk/checkout` **BUILT** | session | `{night, clubberId \| visitor, historyRow}` | TwoTimTwo check-out (accepted only on "OK"): `{ok}`. The claim is left as it is |
@@ -280,7 +293,7 @@ network call):
 **The print job the desk page seals** (`job`, a Bundle of `kind: 'print-job'`,
 `id` = the jobId, one `to` entry per registered station). Its sealed record is
 exactly what the print role runs:
-`{route: '/print', body: {firstName, lastName, clubName, clubberId, friend?}, clubberId, source: 'desk'}`.
+`{route: '/print', body: {name, clubName, clubberId?, visitor?, friend?, friendName?}, clubberId, source: 'desk'}` (`body` is the print server's own `POST /print` body: `name` is split there, a visitor has no `clubberId` and `visitor: true`; Bible is an `items` flag for TwoTimTwo and is not a print field).
 `route` is one of the print server's own print routes (`/print`, `/reprint`,
 `/print-barf-bags`, `/print-custom`, `/print-oneoff`, `/print-leader`,
 `/print-award`), `body` that route's own JSON. The page does NOT know the claim's

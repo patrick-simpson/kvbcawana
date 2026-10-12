@@ -49,7 +49,8 @@ commits or files.
   kiosk at `#journey`; the old `/lobby/about.html` and `/journey/about.html`
   301 to those sections),
   `/lobby`, `/lobby/countdown` (the projector), `/journey`, `/checkin` (the
-  phone page), `/settings` (one settings page for every screen, `ROADMAP.md#settings-page`), `/api` (the Worker), `/updates` (the apps' update feeds).
+  phone page), `/desk` (the desk check-in, `site/desk/`: every seal is made in the
+  browser, `ROADMAP.md#online-check-in`), `/settings` (one settings page for every screen, `ROADMAP.md#settings-page`), `/api` (the Worker), `/updates` (the apps' update feeds).
   Journey is stamped with a hash of its own files, so only a Journey change
   reloads the kiosks.
 - Releases: `printer-release.yml` and `desktop-release.yml` (dispatch with

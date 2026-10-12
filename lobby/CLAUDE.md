@@ -1587,7 +1587,17 @@ setup guide and the API. The owner's calls:
   imports and the print server and the Electron app run as a generated
   CommonJS copy (`printer/print-server/sync-protocol.js`; regenerate with
   `node scripts/gen-sync-protocol.mjs`, `check-mirrors.mjs` keeps it current).
-  Each client keeps its own storage and offline cache.
+  Each client keeps its own storage and offline cache. **Passphrase v2** (2026-10-12,
+  `worker/src/routes.md` section 1): `signInWithPassphrase` is the one sign-in
+  every client runs (params, derive `authKey` with `cloud-crypto.js`'s
+  `deriveAuthKey`, login, the one upgrade login, a fallback to the old login for
+  a service without v2); the screens, the projector, OBS / ProPresenter
+  `?passphrase=` links, Settings' passphrase change (`changePassphrase` derives
+  the current key, a fresh salt and the new verifier, and re-wraps the history
+  key in the same request), the print server (`sync-client.js`), the Electron
+  wizard, the phone page and Journey all use it, so the word never reaches the
+  service (about 0.3 s on a PC, 1 s on a phone, a few seconds on a Pi Zero, once
+  per sign-in).
 - **The session is a secret** in its own slot (`awanaSyncSession.v1`), like the
   display key: never config, an export or a URL (`syncService.test.js`).
 - **Nothing it returns is trusted as-is.** `/v1/state` is turned into a

@@ -20,7 +20,7 @@ export const row = (kind = 'checkin', night = NIGHT) => ({
   id: newRowId(), night, kind, v: 1, kid: '0123456789abcdef', epk: `BA${'A'.repeat(85)}=`, iv: 'A'.repeat(16), ct: 'A'.repeat(1388),
 });
 
-export async function rig({ env = {}, kids = [], start = WED_6PM, storage = memoryStore(), clock = fakeClock(start) } = {}) {
+export async function rig({ env = {}, kids = [], households = null, start = WED_6PM, storage = memoryStore(), clock = fakeClock(start) } = {}) {
   const night = { kids: [...kids], count: null };
   const render = () => {
     const clubs = [...new Set(night.kids.map((k) => k.club))];
@@ -29,7 +29,7 @@ export async function rig({ env = {}, kids = [], start = WED_6PM, storage = memo
       return table(`${club} `, these.map((k) => ({ id: k.id, name: k.name })), { count: night.count ?? these.length });
     }), clubs.length ? '' : table('Sparks ', []));
   };
-  const tt = fakeTwoTimTwo({ report: render, checkin: () => CHECKIN_PAGE });
+  const tt = fakeTwoTimTwo({ report: render, checkin: () => CHECKIN_PAGE, households });
   tt.checkinName = 'Kit Tester';
   const faults = { checkin: null, undo: null, checkout: null };
   /** When each data page was read: the clock's invariant. */

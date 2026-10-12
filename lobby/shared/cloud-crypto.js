@@ -376,6 +376,17 @@ export async function deriveKeys(passphrase, salt, iter) {
   return { authKey, wrapKey };
 }
 
+/**
+ * The sign-in key a client sends (standard base64, 32 bytes) for a passphrase,
+ * the salt and count from GET /v1/auth/params. About 0.3 s on a PC, 1 s on a
+ * phone and several on a Pi Zero (600000 rounds): derive once, keep it in memory.
+ * @param {string} passphrase @param {Uint8Array|string} salt @param {number} iter
+ * @returns {Promise<string>}
+ */
+export async function deriveAuthKey(passphrase, salt, iter) {
+  return bytesToBase64((await deriveKeys(passphrase, salt, iter)).authKey);
+}
+
 /** What the Worker stores and compares: SHA-256(authKey), base64. @param {Uint8Array|string} authKey */
 export async function authVerifier(authKey) {
   const bytes = asBytes(authKey);
