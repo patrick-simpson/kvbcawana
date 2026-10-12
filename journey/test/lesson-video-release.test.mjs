@@ -4,6 +4,7 @@
 // before it commits the pointer. Plain node --test, no ffmpeg, no network.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -39,6 +40,15 @@ test('the committed pointer matches current-lesson.json', () => {
   if (!lesson.transcodedAt) return; // a lesson whose transcode failed plays its original
   assert.equal(lesson.downloadUrl, 'current-lesson-video.mp4');
   assert.equal(videoIsCurrent(lesson, pointer), true, `${DEFAULT_POINTER} is this lesson's transcode`);
+});
+
+test('the video itself is not in the tree, and is ignored', () => {
+  const tracked = execFileSync('git', ['ls-files', '--', 'journey/public/current-lesson-video.mp4'], { cwd: ROOT }).toString();
+  assert.equal(tracked, '');
+  // check-ignore exits 0 only when the path is ignored (it throws otherwise).
+  for (const file of ['journey/public/current-lesson-video.mp4', 'journey/build/current-lesson-video.mp4']) {
+    execFileSync('git', ['check-ignore', '-q', '--no-index', file], { cwd: ROOT });
+  }
 });
 
 test('the nightly workflow uploads to the release before it commits the pointer, never the video', () => {

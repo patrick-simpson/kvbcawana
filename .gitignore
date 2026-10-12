@@ -9,3 +9,6 @@ site/lib/large-files.generated.js
 journey/public/brand/
 journey/public/src/shared/
 printer/print-server/public/brand/
+# This week's lesson video is an asset on the journey-videos-v2 release
+# (journey/public/current-lesson-video.json is its pointer); never committed.
+journey/public/current-lesson-video.mp4
