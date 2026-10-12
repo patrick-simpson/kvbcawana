@@ -29,7 +29,7 @@ before(async () => {
 
 /** A stand-in Worker: routes.md's shapes, in memory. */
 function worker({ stations = [], params = 'v2', history = 'login', legacy = false, upgrade = false, check } = {}) {
-  const w = { calls: [], stations, historyKey: history === 'none' ? null : historyKey, busy: 0, expire: false, stationsChangedOnce: null, checkins: [], verifier: null };
+  const w = { calls: [], stations, historyKey: history === 'none' ? null : historyKey, busy: 0, expire: false, stationsChangedOnce: null, checkins: [], verifier: null, churchPuts: [] };
   w.fetch = async (url, init = {}) => {
     const path = String(url).replace(/^\/api/, '');
     const body = init.body ? JSON.parse(init.body) : undefined;
@@ -47,6 +47,24 @@ function worker({ stations = [], params = 'v2', history = 'login', legacy = fals
     if (path === '/v1/history/key' && (init.method || 'GET') === 'GET') return w.historyKey ? json(200, { ...w.historyKey, prev: null }) : json(404, { error: 'none' });
     if (path === '/v1/history/key' && init.method === 'PUT') { w.historyKey = body; return json(201, { ok: true }); }
     if (path === '/v1/stations') return json(200, asList(w.stations));
+    if (path === '/v1/history/nights') return w.nights ? json(200, w.nights) : json(503, { reason: 'history-off' });
+    if (path.startsWith('/v1/history/rows?')) {
+      const q = new URL(`https://x${path}`).searchParams;
+      const all = (w.rows && w.rows[q.get('night')]) || [];
+      const start = q.get('after') ? all.findIndex((r) => r.id === q.get('after')) + 1 : 0;
+      const page = all.slice(start, start + 2);   // two rows a page, so paging is exercised
+      return json(200, { rows: page, next: start + 2 < all.length ? page.at(-1).id : null });
+    }
+    if (path === '/v1/church/settings') {
+      if (!w.church) return json(404, { error: 'Not found.' });
+      if (init.method === 'PUT') {
+        w.churchPuts.push(body);
+        if (body.baseRev !== w.church.rev) return json(409, { reason: 'stale', rev: w.church.rev, settings: w.church.settings });
+        w.church = { rev: w.church.rev + 1, settings: { ...w.church.settings, ...body.settings } };
+        return json(200, { ok: true, rev: w.church.rev, settings: w.church.settings });
+      }
+      return json(200, { rev: w.church.rev, settings: w.church.settings, switches: {} });
+    }
     if (w.busy > 0 && path.startsWith('/v1/desk/')) { w.busy -= 1; return json(429, { ok: false, reason: 'read-busy', retryAfterMs: 4200 }); }
     if (w.stationsChangedOnce && path === '/v1/desk/checkin') {
       const next = w.stationsChangedOnce; w.stationsChangedOnce = null;
@@ -345,5 +363,93 @@ describe('the print status line', () => {
     assert.equal(printLabel({ stations: [] }, NOW).kind, 'check');
     assert.equal(printLabel({ stations: stations({ lastSeenAt: new Date(NOW - 5 * 60000).toISOString() }), queued: 1 }, NOW).kind, 'check');
     assert.equal(printLabel(null, NOW).kind, 'unknown');
+  });
+});
+
+/** One sealed history row, as the desk page or the laptop's import seals it. */
+async function sealed(night, kind, record) {
+  const id = cc.newRowId();
+  return { id, night, kind, ...(await cc.sealRow(historyKey.pub, { id, night, kind, record })) };
+}
+
+describe('who was here the last two club nights (the history, opened in the browser)', () => {
+  it('reads the last two earlier nights, opens every row with the key the sign-in unwrapped, and keeps an undo', async () => {
+    const w = worker({ stations: [] });
+    w.nights = [{ night: '2026-09-30', rows: 1 }, { night: '2026-10-07', rows: 4 }, { night: NIGHT, rows: 1 }, { night: '2026-09-23', rows: 1 }];
+    w.rows = {
+      '2026-10-07': [
+        await sealed('2026-10-07', 'checkin', { ts: 1, first: 'Kit', last: 'Tester', club: 'Sparks', clubberId: '662', source: 'desk' }),
+        await sealed('2026-10-07', 'checkin', { ts: 2, first: 'Lu', last: 'Undone', club: 'Sparks', clubberId: '700', source: 'desk' }),
+        await sealed('2026-10-07', 'undo', { ts: 3, first: 'Lu', last: 'Undone', club: 'Sparks', clubberId: '700', source: 'desk' }),
+        await sealed('2026-10-07', 'visitor', { ts: 4, first: 'Mia', last: 'Jones', club: 'Cubbies', source: 'desk' }),
+        { id: 'AAAAAAAAAAAAAAAAAAAAAA', night: '2026-10-07', kind: 'checkin', v: 1, kid: 'x', epk: 'x', iv: 'x', ct: 'x' },
+      ],
+      '2026-09-30': [await sealed('2026-09-30', 'import-attendance', { k: 'x', name: 'Old Timer', dates: ['2026-09-30'] })],
+      '2026-09-23': [await sealed('2026-09-23', 'checkin', { ts: 1, first: 'Too', last: 'Early', club: 'Sparks', clubberId: '9' })],
+      [NIGHT]: [await sealed(NIGHT, 'checkin', { ts: 1, first: 'Tonight', last: 'Only', club: 'Sparks', clubberId: '8' })],
+    };
+    const { desk } = make(w);
+    await desk.signIn(PASS);
+    assert.equal(desk.canReadHistory, true);
+    const got = await desk.recentAttendance();
+    assert.deepEqual(got.nights, ['2026-10-07', '2026-09-30']);
+    assert.deepEqual(got.names.sort(), ['Kit Tester', 'Mia Jones', 'Old Timer']);
+    assert.deepEqual(got.ids, ['662']);
+    assert.ok(w.calls.every((c) => !c.path.startsWith('/v1/desk/')), 'never a TwoTimTwo-backed route');
+  });
+
+  it('fails silent: a restored session has no key, history off or one earlier night is null', async () => {
+    const w = worker({ stations: [] });
+    const { desk, store } = make(w);
+    await desk.signIn(PASS);
+    assert.equal(await desk.recentAttendance(), null, 'history storage off (503)');
+    w.nights = [{ night: '2026-10-07', rows: 1 }];
+    w.rows = { '2026-10-07': [] };
+    assert.equal(await desk.recentAttendance(), null, 'only one earlier night');
+    const again = createDesk({ cc, fetch: w.fetch, store, now: () => NOW });
+    assert.equal(again.restore(), 'ready');
+    assert.equal(again.canReadHistory, false);
+    assert.equal(await again.recentAttendance(), null);
+    desk.signOut();
+    assert.equal(desk.canReadHistory, false, 'sign-out forgets the key');
+    assert.ok(!JSON.stringify([...store.m.entries()]).includes('privateKey'));
+  });
+});
+
+describe('remembered leaders (the church settings `leaders`)', () => {
+  it('no route yet (404): no list, and remembering writes nothing', async () => {
+    const w = worker({ stations: [] });
+    const { desk } = make(w);
+    await desk.signIn(PASS);
+    assert.equal(await desk.churchLeaders(), null);
+    assert.equal(await desk.rememberLeader({ name: 'Pat Leader', club: 'Sparks' }), null);
+    assert.equal(w.churchPuts.length, 0);
+  });
+
+  it('reads the list, adds a new leader with the current rev (once more on a stale rev), never twice, and forgets one', async () => {
+    const w = worker({ stations: [] });
+    w.church = { rev: 4, settings: { labelFooter: 'Hi', leaders: [{ name: 'Ann Lead', club: 'Cubbies' }, 'Bo Helper', { firstName: 'Cy', lastName: 'Third', clubName: '' }, { name: 'ann lead' }] } };
+    const { desk } = make(w);
+    await desk.signIn(PASS);
+    assert.deepEqual((await desk.churchLeaders()).leaders, [{ name: 'Ann Lead', club: 'Cubbies' }, { name: 'Bo Helper', club: '' }, { name: 'Cy Third', club: '' }]);
+    const saved = await desk.rememberLeader({ name: ' Pat  Leader ', club: 'Sparks' });
+    assert.equal(saved.rev, 5);
+    assert.deepEqual(w.churchPuts[0], { baseRev: 4, settings: { leaders: [{ name: 'Ann Lead', club: 'Cubbies' }, { name: 'Bo Helper', club: '' }, { name: 'Cy Third', club: '' }, { name: 'Pat Leader', club: 'Sparks' }] } });
+    assert.equal(w.church.settings.labelFooter, 'Hi', 'only the changed key is sent');
+    await desk.rememberLeader({ name: 'PAT LEADER' });
+    assert.equal(w.churchPuts.length, 1, 'already remembered: nothing written');
+    // someone else saved in between: the stale answer is read again and the edit made once more
+    const fetchStale = w.fetch;
+    let bumped = false;
+    w.fetch = async (url, init) => {
+      if (!bumped && init && init.method === 'PUT') { bumped = true; w.church = { ...w.church, rev: w.church.rev + 1 }; }
+      return fetchStale(url, init);
+    };
+    const d2 = createDesk({ cc, fetch: w.fetch, store: memoryStore(), now: () => NOW });
+    await d2.signIn(PASS);
+    const forgot = await d2.forgetLeader('bo helper');
+    assert.ok(forgot && !forgot.leaders.some((l) => l.name === 'Bo Helper'));
+    assert.equal(w.churchPuts.length, 3, 'one stale PUT, one that landed');
+    assert.ok(!w.church.settings.leaders.some((l) => l.name === 'Bo Helper'));
   });
 });
