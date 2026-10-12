@@ -638,8 +638,13 @@ extension sweeps again). Turning `SINGLE_PUBLISHER` off does not purge
 One allowlist, `lobby/shared/churchSettings.js` (pure; generated CommonJS copy
 `printer/print-server/churchSettings.js` via `scripts/shared-copies.mjs`,
 checked by `check-mirrors.mjs`): `CHURCH_SPEC`, `CHURCH_KEYS`,
-`sanitizeChurch(raw) -> {settings, dropped: [key]}`, `mergeChurch(prev, patch)`
-(a key sent as `null` is deleted), `CHURCH_JSON_MAX` = 24576 bytes. It imports
+`sanitizeChurch(raw) -> {settings, dropped: [key]}` (a `null` value is neither
+kept nor dropped: it means the default), `mergeChurch(prev, patch) -> settings`
+(a new object: a key sent as `null` is deleted, a value its rule refuses leaves
+the old one), `cleanChurchValue(key, v) -> {ok, value?}` (one key's rule),
+`CHURCH_SEASONS`, `CHURCH_JSON_MAX` = 24576 bytes (BUILT, with
+`churchSettings.test.js`; the `shared-copies.mjs` / `check-mirrors.mjs` lines
+are Track B's). It imports
 only `./pickup.js`, `./clubs.js` and `./text.js` (each already in `COPIES`, so
 `shared-copies.mjs` rewrites the imports to `./pickup`, `./clubTable`, `./textClean`)
 and uses only `export const` / `export function`.
