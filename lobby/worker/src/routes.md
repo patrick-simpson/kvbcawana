@@ -146,7 +146,7 @@ vocabulary for the desk page, the print role and the history views:
 
 | `kind` | Written by | Record (sealed JSON; the time is inside) |
 | --- | --- | --- |
-| `checkin` | the desk page (`source: 'desk'`) with `POST /v1/desk/checkin`; the print role for a TwoTimTwo-page check-in once it prints (`source: 'ttt'`, `history-sync.js rowForPrinted`) | `{ts, first, last, club, clubberId?, friend?, friendFirst?, source}`, `ts` epoch MILLISECONDS |
+| `checkin` | the desk page (`source: 'desk'`) with `POST /v1/desk/checkin`; the print role for a TwoTimTwo-page check-in once it prints (`source: 'ttt'`, `history-sync.js rowForPrinted`), posted with its own `summary` line `{checkedIn: 1}` for its club in a post holding only that row, so a retry is the same batch and counts once (a phone page check-in is counted here too: the watcher's job meets its label) | `{ts, first, last, club, clubberId?, friend?, friendFirst?, source}`, `ts` epoch MILLISECONDS |
 | `visitor` | the desk page, a visitor with no clubber id | as `checkin`, no `clubberId` (the trends count visitors from this kind) |
 | `undo` | the desk page with `POST /v1/desk/undo` | `{ts, first, last, club, clubberId?, source}`: the child is NOT here after it |
 | `checkout` | the desk page with `POST /v1/desk/checkout` | as `undo` |

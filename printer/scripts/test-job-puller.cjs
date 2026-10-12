@@ -454,6 +454,31 @@ const PORT = 34610;
     check('without the history key nothing is written', (await hs.createHistoryWriter({ pub: () => null, signedIn: () => null, request, stationId: () => 'x', log: () => {} }).record('checkin', { first: 'T' }, NIGHT)) === false);
   }
 
+  console.log('\nhistory: a TwoTimTwo-page row carries its night_summary line, in its own post, so a retry counts once');
+  {
+    const ttt = hs.rowForPrinted({ record: { route: '/print', body: { name: 'Tia Lowe', clubName: 'Sparks', clubberId: '15' }, source: 'ttt' }, night: NIGHT }, () => 1);
+    check('rowForPrinted gives the row and its line: one checked in for the club', ttt && JSON.stringify(ttt.summary) === JSON.stringify({ night: NIGHT, club: 'Sparks', checkedIn: 1, checkedOut: 0, undone: 0, prints: 0 }), JSON.stringify(ttt && ttt.summary));
+    check('a desk job has no row and so no line (the Worker counts the desk\'s)', hs.rowForPrinted({ record: { route: '/print', body: { name: 'Tia Lowe', clubName: 'Sparks' }, source: 'desk' }, night: NIGHT }) === null);
+    check('a club the summary table does not take gives a row with no line', !('summary' in hs.rowForPrinted({ record: { route: '/print', body: { name: 'Tia Lowe', clubName: '' }, source: 'ttt' }, night: NIGHT })));
+    const bodies = [];
+    let answer = { ok: false, status: 0, body: null };   // the first answer is lost
+    const request = async (base, p, opts) => { if (p === '/v1/history/rows') bodies.push(JSON.parse(JSON.stringify(opts.body))); return answer; };
+    const writer = hs.createHistoryWriter({ pub: () => hist.pub, signedIn: () => ({ base: 'b', session: SESSION }), request, stationId: () => 'dev-0123456789abcdef', log: () => {} });
+    await writer.record(ttt.kind, ttt.record, ttt.night, ttt.summary);
+    await writer.record('reprint', { ts: 2, first: 'Tia', last: 'Lowe', club: 'Sparks', source: 'desk' }, NIGHT);
+    const ttt2 = hs.rowForPrinted({ record: { route: '/print', body: { name: 'Ann Bee', clubName: 'Cubbies', clubberId: '16' }, source: 'ttt' }, night: NIGHT }, () => 3);
+    await writer.record(ttt2.kind, ttt2.record, ttt2.night, ttt2.summary);
+    answer = { ok: true, status: 200, body: { stored: 1, duplicates: 0 } };
+    await writer.flush();
+    const sent = bodies.slice(-3);
+    check('each line goes in a post with its own row only; a row without one goes on its own batch', sent.length === 3
+      && sent[0].rows.length === 1 && sent[0].summary.length === 1 && sent[0].summary[0].club === 'Sparks'
+      && sent[1].rows.length === 1 && !('summary' in sent[1]) && sent[1].rows[0].kind === 'reprint'
+      && sent[2].rows.length === 1 && sent[2].summary[0].club === 'Cubbies' && writer.status().queued === 0, JSON.stringify(bodies.map((b) => [b.rows.length, b.summary])));
+    check('the retry after a lost answer is the very same post (same row id, same line): one batch id, counted once', JSON.stringify(bodies[0]) === JSON.stringify(sent[0]));
+    check('no line rides on the wire row itself, and no name is in a post', sent.every((b) => b.rows.every((r) => !('summary' in r))) && !/Tia|Lowe|Ann|Bee/.test(JSON.stringify(bodies)));
+  }
+
   console.log('\nhistory: "Import laptop history" seals print-history.json and attendance.json once');
   {
     const imported = [];

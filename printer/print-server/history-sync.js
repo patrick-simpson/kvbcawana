@@ -30,6 +30,8 @@ const ROUTE_MISSING = (s) => s === 404 || s === 405 || s === 501;
 const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
 /** The row kinds that mean a child was here (routes.md section 3): `visitor` is a check-in of a child with no id. */
 const PRESENT_KINDS = new Set(['checkin', 'visitor', 'import-checkin']);
+/** The clubs `night_summary` takes (the Worker's history.js CLUB_RE): any other club, no summary line. */
+const SUMMARY_CLUB_RE = /^[A-Za-z0-9][A-Za-z0-9 &'.-]{0,23}$/;
 /** A record's `ts` is epoch milliseconds (an ISO string is tolerated). @param {unknown} v */
 const tsOf = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : (Date.parse(String(v)) || 0));
 
@@ -51,15 +53,20 @@ function createHistoryWriter(o) {
   /** @type {any[]} */ const queue = [];
   const stats = { sent: 0, queued: 0, dropped: 0, missing: false };
 
-  /** Seal one row and queue it. false when it could not be sealed (nothing is written). */
-  async function record(kind, recordJson, night) {
+  /**
+   * Seal one row and queue it. false when it could not be sealed (nothing is written).
+   * `summary` is the row's own `night_summary` line (plaintext counts, e.g. {checkedIn: 1}):
+   * it rides in the SAME post as its row and only that row, so a retried post is the same
+   * batch and the Worker counts it once.
+   */
+  async function record(kind, recordJson, night, summary) {
     const pub = o.pub();
     if (!pub) return false;
     const id = cc.newRowId();
     const n = night || cc.churchNight(now());
     const wire = await cc.sealRow(pub, { id, night: n, kind, record: recordJson });
     if (!wire) { log(`[history] a ${kind} row could not be sealed; nothing was written`); return false; }
-    queue.push({ id, night: n, kind, ...wire });
+    queue.push({ id, night: n, kind, ...wire, ...(summary ? { summary } : {}) });
     while (queue.length > QUEUE_MAX) { queue.shift(); stats.dropped++; }
     stats.queued = queue.length;
     await flush();
@@ -71,8 +78,17 @@ function createHistoryWriter(o) {
     const s = o.signedIn();
     if (!s) return;
     while (queue.length) {
-      const batch = queue.slice(0, ROWS_POST_MAX);
-      const r = await o.request(s.base, '/v1/history/rows', { method: 'POST', session: s.session, station: o.stationId(), body: { rows: batch } });
+      // A row with a summary line goes alone with it (the Worker's batch id is its row id and
+      // that line, so a retry can never count it twice); rows without one go together.
+      const head = queue[0];
+      let batch;
+      if (head.summary) batch = [head];
+      else {
+        const end = queue.findIndex((q) => q.summary);
+        batch = queue.slice(0, Math.min(ROWS_POST_MAX, end === -1 ? queue.length : end));
+      }
+      const body = { rows: batch.map(({ summary, ...row }) => row), ...(head.summary ? { summary: [head.summary] } : {}) };
+      const r = await o.request(s.base, '/v1/history/rows', { method: 'POST', session: s.session, station: o.stationId(), body });
       if (r.ok) { queue.splice(0, batch.length); stats.sent += batch.length; stats.missing = false; continue; }
       if (ROUTE_MISSING(r.status) || (r.status === 503)) { stats.missing = true; break; }     // not built yet / history off: keep them
       if (r.status === 400) { queue.splice(0, batch.length); stats.dropped += batch.length; log('[history] the service refused a batch of rows (400); dropped'); continue; }
@@ -88,9 +104,11 @@ function createHistoryWriter(o) {
  * The history row a station writes when it prints a check-in made on TwoTimTwo's
  * own page (source 'ttt'; the Worker could not seal a row for it: no ECDH there).
  * A job from the desk page needs none (the page sealed its row), so null.
- * `ts` is epoch milliseconds, `kind` is `checkin` (routes.md section 3).
+ * `ts` is epoch milliseconds, `kind` is `checkin` (routes.md section 3), and `summary` is
+ * the night_summary line it counts ({checkedIn: 1} for its club; none for a club the table
+ * does not take): a desk check-in's line is the Worker's own (its hook), so never this.
  * @param {{ record: any, night: string }} info @param {() => number} [now]
- * @returns {{ kind: string, record: Record<string, any>, night: string }|null}
+ * @returns {{ kind: string, record: Record<string, any>, night: string, summary?: Record<string, any> }|null}
  */
 function rowForPrinted({ record, night }, now = Date.now) {
   if (!record || record.source !== 'ttt') return null;
@@ -102,9 +120,11 @@ function rowForPrinted({ record, night }, now = Date.now) {
     first = parts[0] || '';
     last = parts.slice(1).join(' ');
   }
+  const club = String(b.clubName || '').trim();
   return {
     kind: 'checkin',
     night,
+    ...(SUMMARY_CLUB_RE.test(club) ? { summary: { night, club, checkedIn: 1, checkedOut: 0, undone: 0, prints: 0 } } : {}),
     record: {
       ts: now(), first: String(first || ''), last: String(last || ''), club: String(b.clubName || ''),
       ...(b.clubberId ? { clubberId: String(b.clubberId) } : {}), ...(b.visitor ? { visitor: true } : {}),

@@ -111,7 +111,7 @@ const fakeSafe = {
   const makePuller = () => jp.createJobPuller({
     signedIn, stationId: () => STATION, ring: () => keys.ring(), localBase: 'http://127.0.0.1:3456', request,
     journal: jp.createJournal(journalFile, t.clock.now), fetchFn: printServer, now: t.clock.now, log: () => {},
-    onPrinted: async (info) => { const row = hs.rowForPrinted(info, t.clock.now); if (row) await writer.record(row.kind, row.record, row.night); },
+    onPrinted: async (info) => { const row = hs.rowForPrinted(info, t.clock.now); if (row) await writer.record(row.kind, row.record, row.night, row.summary); },
   });
   let puller = makePuller();
   const printedFor = (id) => prints.filter((b) => String(b.clubberId) === String(id)).length;
@@ -206,7 +206,7 @@ const fakeSafe = {
   check('desk rows (check-in x2, undo) and the station\'s row for the TwoTimTwo-page child are all kept', byKind.checkin === 3 && byKind.undo === 1, JSON.stringify(byKind));
   const everyByte = `${db.dump()}\n${everything(storage)}`;
   check('no name and no clubber id is in D1 or in the Durable Object\'s storage', !/Zyxelquill|Quillfeather|Ottoline|"662"|"700"/.test(everyByte));
-  check('the night summary is plaintext counts by club (the desk\'s two check-ins and the undo)', JSON.stringify(db.query('SELECT club, checked_in AS i, undone AS u FROM night_summary ORDER BY club')) === JSON.stringify([{ club: 'Sparks', i: 2, u: 1 }]), JSON.stringify(db.query('SELECT * FROM night_summary')));
+  check('the night summary is plaintext counts by club (the desk\'s two check-ins and the undo, and the TwoTimTwo-page check-in the station wrote, once though its ack was lost)', JSON.stringify(db.query('SELECT club, checked_in AS i, undone AS u FROM night_summary ORDER BY club')) === JSON.stringify([{ club: 'Cubbies', i: 1, u: 0 }, { club: 'Sparks', i: 2, u: 1 }]), JSON.stringify(db.query('SELECT * FROM night_summary')));
   const hring = await keys.historyRing();
   const rows = (await t.call('GET', `/v1/history/rows?night=${NIGHT}&limit=500`)).body.rows;
   const opened = [];

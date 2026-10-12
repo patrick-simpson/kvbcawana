@@ -7890,7 +7890,7 @@ function configureCloud(opts) {
     // row for it, so the station that prints it does.
     onPrinted: async (info) => {
       const row = historySync.rowForPrinted(info, opts.now);
-      if (row) await writer.record(row.kind, row.record, row.night);
+      if (row) await writer.record(row.kind, row.record, row.night, row.summary);
     },
   });
   const bundles = jobPuller.createBundleSync({ signedIn, stationId, ring: opts.ring, localBase, request, fetchFn: opts.fetchFn, now: opts.now, log });
