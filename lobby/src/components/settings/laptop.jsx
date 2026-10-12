@@ -10,7 +10,7 @@ import {
 import { PanelCard, PublishTokenField, Toggle } from './fields.jsx';
 import '../../styles/laptop.css';
 
-// The Laptop section (SETTINGS.md phase 3): the check-in laptop's own settings,
+// The Laptop section (ROADMAP.md#settings-page phase 3): the check-in laptop's own settings,
 // the print dashboard's parts, on the one settings page. It looks for the print
 // server on http://localhost:3456 only when the section is opened (a browser
 // may ask the person before an https page talks to their own computer, so it

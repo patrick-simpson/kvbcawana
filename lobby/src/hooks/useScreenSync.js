@@ -1,5 +1,5 @@
 // @ts-check
-// A screen registered with the sync Worker (SETTINGS.md, phase 2): it says
+// A screen registered with the sync Worker (ROADMAP.md#settings-page, phase 2): it says
 // hello on start and every SCREEN_HELLO_MS, follows its own settings there
 // (the doorbell `changed` {what: 'screen', id} says when /settings changed
 // them), sends up a change made on the screen itself, and does what /settings

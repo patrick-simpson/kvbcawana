@@ -1,4 +1,4 @@
-// The sound room app's hand-off (KVBC Awana v9, UNIFIED-APP.md: "its last
+// The sound room app's hand-off (KVBC Awana v9, ROADMAP.md#kvbc-awana-one-app: "its last
 // update installs KVBC Awana as a display with its screen, monitor, hours and
 // shutdown carried over, then removes Awana Lobby Display").
 //

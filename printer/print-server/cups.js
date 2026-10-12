@@ -1,5 +1,5 @@
 'use strict';
-// Printing on Linux, through CUPS: the print station half of CLOUD-CHECKIN.md
+// Printing on Linux, through CUPS: the print station half of ROADMAP.md#cloud-check-in
 // (a Raspberry Pi at church with the label printer on USB). Windows keeps its
 // PowerShell path in server.js untouched; on Linux the same label PNG goes to
 // `lp`, and the printer list and its state come from `lpstat`.

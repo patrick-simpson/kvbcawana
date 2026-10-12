@@ -20,7 +20,7 @@ with a clear message, and `git push origin HEAD:main` (no PR, no other branch).
 **Where the screens are (since 2026-10-03).** Every screen listens to the
 sync Worker's live channel (`/api/v1/live`, `lobby/worker/`), signed in with
 the church passphrase; the Pusher keys are cleared and Pusher is off
-(SWITCH.md). The wire design below was written for a public Pusher channel
+(ROADMAP.md#switch-day-cleanup). The wire design below was written for a public Pusher channel
 and applies unchanged to the live channel: the same events, the same
 allowlist sanitizers, the same sealed envelopes and anti-downgrade rule.
 Where this file says "the Pusher channel", read "the live channel" too. The
@@ -728,7 +728,7 @@ over it. `src/lib/flagship.js` is the pure half (`FLAGSHIP_SLIDE`,
 
 ## The sound room desktop app (`desktop/`, Awana Lobby Display)
 
-**Being replaced by KVBC Awana (UNIFIED-APP.md, owner 2026-10-11).** Its main
+**Being replaced by KVBC Awana (ROADMAP.md#kvbc-awana-one-app, owner 2026-10-11).** Its main
 process and pure modules now live in `printer/electron-app/src/display/` as
 the display role of the one app (with per-computer hours); change the display
 THERE. This folder's 2.1.0 is the last release, the bridge
@@ -894,7 +894,7 @@ through `simulateEvent`'s sanitizers).
   `e2e/configure-projector.spec.js`.
 - **Journey** speaks the same channel as `screen: 'journey'` (journey/CLAUDE.md).
 - **The settings page** (`settings.html`, served at awana.kvbchurch.org/settings;
-  owner, 2026-10-11, the plan in the root `SETTINGS.md`) is this same bundle in
+  owner, 2026-10-11, the plan in the root `ROADMAP.md#settings-page`) is this same bundle in
   configure mode on a device that is NOT a screen: `isSettingsPage()` reads its
   `awana-page` meta, App passes `page` and no screen actions, and
   `SettingsPageContext` leaves out every `scope="screen"` card not marked
@@ -909,7 +909,7 @@ through `simulateEvent`'s sanitizers).
   `SETTINGS_PAGE_ROUTES`); a new call needs a row there and a test in
   `printer/scripts/test-settings-page.cjs` first. The phone PIN and the keys
   are not here on purpose. `e2e/settings-laptop.spec.js` stubs localhost.
-- **Screens, managed from /settings** (SETTINGS.md phase 2): a lobby TV and
+- **Screens, managed from /settings** (ROADMAP.md#settings-page phase 2): a lobby TV and
   the projector register with the sync Worker (`useScreenSync`,
   `lib/screenSync.js`, `worker/src/screens.js`) and follow their own settings
   there as their device layer; the one allowlist is `SCREEN_SPECS` in
@@ -1597,7 +1597,7 @@ setup guide and the API. The owner's calls:
   the Worker when one exists (`template: false`) and reports it in the old
   words, so `QuickNav` and the setup note barely changed and the isolation
   allowlist did not grow.
-- **Cloud check-in, phase 1** (`CLOUD-CHECKIN.md`, 2026-10-11): the Worker
+- **Cloud check-in, phase 1** (`ROADMAP.md#cloud-check-in`, 2026-10-11): the Worker
   signs in to TwoTimTwo as the church's dedicated user (`TWOTIMTWO_*` Worker
   secrets) and, on club nights 4:30 to 9:00 pm Eastern, reads the check-in
   report every 15 s from a Durable Object alarm (`worker/src/twotimtwo.js`,
@@ -1756,7 +1756,7 @@ The full Awana Presentation Tool, migrated from KVBC-Awana-Countdown
   `src/hooks/useDisplayLogin.js`, `src/hooks/useDisplayKey.js`,
   `src/lib/displayKey.js` (`maskDisplayKey`), `src/lib/envelope.js`
   (`isPlausibleKey`), `src/lib/configureRelay.js` and `src/hooks/useScreenSync.js`
-  (the screen registry, SETTINGS.md phase 2). Its realtime data must flow through the sanitized
+  (the screen registry, ROADMAP.md#settings-page phase 2). Its realtime data must flow through the sanitized
   socket — never a second Pusher stack; the wake-lock, Open-Meteo
   fetcher, skin table, birthday art, self-update poller and the display
   key / login slots are shared so the two pages can't drift apart (the

@@ -133,7 +133,7 @@ export default function SettingsPanel({
   onChange, onReplace, onReset, onClose, onTest, onResetTally, onOpenSlideEditor, onOpenDebug, onBoardDemo, onPreviewPromo, configure = false, page = false,
   syncedDeck, slidesStatus, onForgetSyncedDeck,
   shared = null, shareStatus = null, onShare,
-  // The settings page's Screens (SETTINGS.md, phase 2): `onOpenScreen` opens
+  // The settings page's Screens (ROADMAP.md#settings-page, phase 2): `onOpenScreen` opens
   // one from the list; `screen` is set when this panel IS that screen's
   // (RemoteScreenPanel), with its note, actions, rename and forget.
   onOpenScreen = null, screen = null, screenNote = null, onScreenAction, onScreenRenamed, onScreenForgotten,

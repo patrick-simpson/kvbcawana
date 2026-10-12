@@ -1,6 +1,6 @@
 // @ts-check
 // The bridge to KVBC Awana (2.1.0, the last release of this app; owner,
-// 2026-10-11, UNIFIED-APP.md: "the sound room app is replaced automatically:
+// 2026-10-11, ROADMAP.md#kvbc-awana-one-app: "the sound room app is replaced automatically:
 // its last update installs KVBC Awana as a display with its screen, monitor,
 // hours and shutdown carried over, then removes Awana Lobby Display").
 //

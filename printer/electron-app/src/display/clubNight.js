@@ -5,7 +5,7 @@
 // display.js hands it the time, the two files and the hours.
 //
 // Moved here from lobby/desktop/src/clubNight.js (the sound room app, KVBC
-// Awana v9, UNIFIED-APP.md). The one change: the window is this computer's
+// Awana v9, ROADMAP.md#kvbc-awana-one-app). The one change: the window is this computer's
 // hours (settings.hours, owner 2026-10-11: "hours per computer"), not a fixed
 // 5:00 to 8:00 pm. Without hours it is exactly the old window.
 //

@@ -28,7 +28,7 @@ const phoneRelay = require('./phone-relay');
 const pickup = require('./pickup');
 const { execFile } = require('child_process');
 const cups = require('./cups');
-// The Raspberry Pi print station (CLOUD-CHECKIN.md) prints through CUPS. It is
+// The Raspberry Pi print station (ROADMAP.md#cloud-check-in) prints through CUPS. It is
 // an explicit opt-in its service sets, never inferred from the OS: the test
 // suites run on Linux with a stand-in `powershell`, and the Windows app is
 // untouched either way.
@@ -233,7 +233,7 @@ const CHURCH_DEFAULTS = {
   // deployed display app, so its slide editor's "Publish to all displays"
   // button can reach this server from the check-in machine's own browser.
   // Exact origins only; a fork edits this like every other church knob. Both
-  // homes of the display are listed until switch day (SWITCH.md): the old
+  // homes of the display are listed until switch day (ROADMAP.md#switch-day-cleanup): the old
   // github.io site and awana.kvbchurch.org, so a screen on either can publish.
   displayOrigins: ['https://patrick-simpson.github.io', 'https://awana.kvbchurch.org'],
 };
@@ -3904,7 +3904,7 @@ function corsPolicy(req, res, next) {
   const isSlidesPath = DISPLAY_PUBLISH_PATHS.has(req.path);
   const slidesOrigin = isSlidesPath && security.isExactAllowedOrigin(
     origin, security.sanitizeAllowedOrigins(churchConfig.displayOrigins));
-  // The settings page (awana.kvbchurch.org/settings, SETTINGS.md phase 3): one
+  // The settings page (awana.kvbchurch.org/settings, ROADMAP.md#settings-page phase 3): one
   // exact origin, a short table of routes (security.SETTINGS_PAGE_ROUTES).
   // For a preflight the method is the one being asked for.
   const settingsRoute = security.settingsPageRoute(

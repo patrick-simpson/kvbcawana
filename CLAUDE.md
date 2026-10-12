@@ -41,7 +41,7 @@ commits or files.
   Durable Object and drops every screen's socket), then publishes the site to
   Cloudflare Pages at **awana.kvbchurch.org**: `/` the printer's public site,
   `/lobby`, `/lobby/countdown` (the projector), `/journey`, `/checkin` (the
-  phone page), `/settings` (one settings page for every screen, `SETTINGS.md`), `/api` (the Worker), `/updates` (the apps' update feeds).
+  phone page), `/settings` (one settings page for every screen, `ROADMAP.md#settings-page`), `/api` (the Worker), `/updates` (the apps' update feeds).
   Journey is stamped with a hash of its own files, so only a Journey change
   reloads the kiosks.
 - Releases: `printer-release.yml` and `desktop-release.yml` (dispatch with
@@ -81,7 +81,7 @@ commits or files.
   started in the old lobby repo on 2026-10-11 had to be ported here). Their
   github.io sites still serve the last build, and nothing reads from them (the
   lesson videos come from this repo's own `journey-videos-v2` release).
-- `CLOUD-CHECKIN.md` is the plan (owner, 2026-10-11) to retire the check-in
+- `ROADMAP.md#cloud-check-in` is the plan (owner, 2026-10-11) to retire the check-in
   laptop: the sync Worker talks to TwoTimTwo itself, a Raspberry Pi at church
   prints the labels. Phased, shadow-tested beside the laptop; read it before
   touching check-in, the relay or the print path. TwoTimTwo (Devin) allowed
@@ -89,7 +89,7 @@ commits or files.
   vendor support. Phase 1 (the Worker's read-only report watcher,
   `lobby/worker/src/twotimtwo.js` / `watcher.js`) is built and idle until the
   `TWOTIMTWO_*` secrets are set.
-- `UNIFIED-APP.md` (owner, 2026-10-11): ONE Windows app, **KVBC Awana**
+- `ROADMAP.md#kvbc-awana-one-app` (owner, 2026-10-11): ONE Windows app, **KVBC Awana**
   (printer 9.0.0, `printer/electron-app/`), a print server, a display or
   both per computer, set by a first-run wizard. The sound room app
   (`lobby/desktop/`) ends at 2.1.0, which hands the sound room PC over to it.
@@ -108,7 +108,7 @@ commits or files.
 4. Every installed app repointed (printer and sound room update feeds, the Pi
    kiosk, Journey's embed, cross-links), one last release from each old repo
    (done by 2026-10-03).
-5. A full rehearsal, then ONE switch day (done; `SWITCH.md` is the cleanup checklist that follows) the owner
+5. A full rehearsal, then ONE switch day (done; `ROADMAP.md#switch-day-cleanup` is the cleanup checklist that follows) the owner
    picks (never a Wednesday). OBS / ProPresenter feeds carry the passphrase in
    their link (owner's choice). No forwarding from the old github.io addresses.
 
@@ -127,6 +127,6 @@ or a prerequisite is missing):
 - **Lobby code splitting.** `React.lazy` for the panels and the PowerPoint
   parser on demand. The App suites open panels synchronously and
   `pptxModel.js` imports the parser statically, so those suites need reworking first.
-- **Pusher removal from the print server.** See `SWITCH.md`.
+- **Pusher removal from the print server.** See `ROADMAP.md#switch-day-cleanup`.
 - **Remaining Low findings** from the audit's per-area lists. They are not
   carried one by one here; the repo history has the original file.

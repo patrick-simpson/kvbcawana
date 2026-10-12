@@ -1,5 +1,5 @@
 // @ts-check
-// The settings page's way to the check-in laptop's print server (SETTINGS.md
+// The settings page's way to the check-in laptop's print server (ROADMAP.md#settings-page
 // phase 3). An https page may call http://localhost, so on the laptop itself
 // awana.kvbchurch.org/settings reaches the server the dashboard talks to; on
 // any other device nothing answers and the page says so.

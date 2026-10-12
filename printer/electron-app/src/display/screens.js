@@ -1,5 +1,5 @@
 // @ts-check
-// Moved from lobby/desktop/src (KVBC Awana v9, UNIFIED-APP.md); behaviour unchanged.
+// Moved from lobby/desktop/src (KVBC Awana v9, ROADMAP.md#kvbc-awana-one-app); behaviour unchanged.
 // The three screens the app can put up, one at a time (owner, 2026-10-07):
 // the lobby signage, the projector (countdown, ceremonies and game time) and
 // the Journey kiosk. All three live on the one site, on one origin, so they

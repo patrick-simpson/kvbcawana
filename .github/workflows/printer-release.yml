@@ -1,7 +1,7 @@
 name: Release KVBC Awana
 
 # One workflow cuts a printer release end to end. Since 9.0.0 the app is
-# "KVBC Awana" (UNIFIED-APP.md): build.productName names the installer
+# "KVBC Awana" (ROADMAP.md#kvbc-awana-one-app): build.productName names the installer
 # (KVBC-Awana-Setup.exe), the exe and the process ("KVBC Awana"); the
 # package "name" (awana-label-printer), the appId and so the install folder
 # (%LOCALAPPDATA%\Programs\awana-label-printer) and userData are unchanged,
@@ -444,7 +444,7 @@ jobs:
       - name: The feed only ever moves forward
         # electron-updater never downgrades: a feed that names a version at or
         # below what it already serves stops every updated laptop from
-        # updating, silently. (SWITCH.md once asked for exactly that.)
+        # updating, silently. (ROADMAP.md#switch-day-cleanup once asked for exactly that.)
         run: |
           set -euo pipefail
           FEED=site/updates/printer/latest.yml

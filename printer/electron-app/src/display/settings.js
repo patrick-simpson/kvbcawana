@@ -9,7 +9,7 @@
 // Moved from lobby/desktop/src/settings.js (KVBC Awana v9). New: `hours`, this
 // computer's display hours (owner, 2026-10-11: "club nights, hours per
 // computer", default 5:00 to 8:00 pm). /settings will edit them per computer
-// once computers register there (UNIFIED-APP.md); until then the Settings
+// once computers register there (ROADMAP.md#kvbc-awana-one-app); until then the Settings
 // window and the wizard do.
 'use strict';
 

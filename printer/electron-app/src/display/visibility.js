@@ -1,5 +1,5 @@
 // @ts-check
-// Moved from lobby/desktop/src (KVBC Awana v9, UNIFIED-APP.md); behaviour unchanged.
+// Moved from lobby/desktop/src (KVBC Awana v9, ROADMAP.md#kvbc-awana-one-app); behaviour unchanged.
 // Whether the lobby display is on screen, as one pure rule, so the tray's
 // overrides and the clock can never disagree about it:
 //

@@ -109,7 +109,7 @@ export function sanitizeTemplate(raw) {
   return out;
 }
 
-// ── Screens (SETTINGS.md, phase 2) ─────────────────────────────────────────
+// ── Screens (ROADMAP.md#settings-page, phase 2) ─────────────────────────────────────────
 // Every lobby TV, projector and Journey kiosk registers with the Worker under
 // a name, and /settings edits any one's OWN settings there; the screen applies
 // them as its device layer. SCREEN_SPECS is the one allowlist both sides
@@ -120,7 +120,7 @@ export function sanitizeTemplate(raw) {
 // never a secret. screenSpecs.test.js pins the lobby's against useConfig's
 // VALIDATORS and SHARED_SPEC.
 
-// `computer` is the KVBC Awana Windows app (UNIFIED-APP.md, v9): a computer
+// `computer` is the KVBC Awana Windows app (ROADMAP.md#kvbc-awana-one-app, v9): a computer
 // registers with its roles (print server, display, or both) and its display
 // hours, under the name its first-run wizard gave it. The app's side is
 // printer/electron-app/src/device-sync.js, whose copy of this kind's rules

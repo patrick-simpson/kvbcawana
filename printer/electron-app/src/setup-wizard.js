@@ -1,4 +1,4 @@
-// "Set up this computer" (KVBC Awana v9, UNIFIED-APP.md: "a full wizard:
+// "Set up this computer" (KVBC Awana v9, ROADMAP.md#kvbc-awana-one-app: "a full wizard:
 // role, the church passphrase, a name for the computer, then the printer
 // (print server) and/or the screen and monitor (display)").
 //

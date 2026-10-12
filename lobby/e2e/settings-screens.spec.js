@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-// The settings page's Screens (SETTINGS.md, phase 2), against a stand-in sync
+// The settings page's Screens (ROADMAP.md#settings-page, phase 2), against a stand-in sync
 // Worker: the list, a lobby TV opened in the same Settings panel with its
 // "This screen" cards back and writing to the Worker, the actions sent to it,
 // and a projector's switches edited in its row.

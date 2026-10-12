@@ -330,7 +330,7 @@ function describeClubNightTest(test, throttled, st) {
 
 /**
  * What the Setup card's "Test TwoTimTwo sign-in" says about the Worker's
- * answer to POST /v1/cloud/read-now (CLOUD-CHECKIN.md, phase 1). Pure. The
+ * answer to POST /v1/cloud/read-now (ROADMAP.md#cloud-check-in, phase 1). Pure. The
  * answer carries counts and fixed codes only, never a name.
  * @param {{ok: boolean, status: number, body: any}} res
  * @returns {{ok: boolean, text: string}}

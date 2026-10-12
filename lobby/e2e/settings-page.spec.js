@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 // The one settings page (awana.kvbchurch.org/settings → settings.html,
-// SETTINGS.md): configure mode on a device that is not a screen. Every
+// ROADMAP.md#settings-page): configure mode on a device that is not a screen. Every
 // screen's shared settings and signing in, none of this browser's own cards,
 // and no button that acts on a screen (those reach a chosen screen later).
 

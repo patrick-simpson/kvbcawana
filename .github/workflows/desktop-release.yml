@@ -278,7 +278,7 @@ jobs:
       - name: The feed only ever moves forward
         # electron-updater never downgrades: a feed that names a version at or
         # below what it already serves stops every updated sound room PC from
-        # updating, silently. (SWITCH.md once asked for exactly that.)
+        # updating, silently. (ROADMAP.md#switch-day-cleanup once asked for exactly that.)
         run: |
           set -euo pipefail
           FEED=site/updates/lobby/lobby.yml

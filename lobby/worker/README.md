@@ -54,7 +54,7 @@ In this repository on GitHub: **Settings** → **Secrets and variables** →
 
 The Pusher values are the ones the printer app already uses.
 
-For cloud check-in (`CLOUD-CHECKIN.md` at the repo root), three more:
+For cloud check-in (`ROADMAP.md#cloud-check-in` at the repo root), three more:
 
 | Name | Value |
 | --- | --- |
@@ -152,7 +152,7 @@ Changes to the template, Journey's settings and the calendar ring a plaintext
 doorbell, `changed` `{what, at}` on the `awana-sync` Pusher channel; it carries
 no content, and a screen that hears it fetches from here.
 
-### Screens (`src/screens.js`, SETTINGS.md phase 2)
+### Screens (`src/screens.js`, ROADMAP.md#settings-page phase 2)
 
 Every lobby TV, projector, Journey kiosk and KVBC Awana computer registers here under an id it made
 once and keeps in its own storage, so awana.kvbchurch.org/settings can list
@@ -201,7 +201,7 @@ signed in to this service.
 ## Cloud check-in: the report watcher (phase 1, shadow)
 
 `src/twotimtwo.js` (the client and parsers) and `src/watcher.js` (the
-watcher), CLOUD-CHECKIN.md pieces 1 and 2. With `CLOUD_CHECKIN = "shadow"`
+watcher), ROADMAP.md#cloud-check-in pieces 1 and 2. With `CLOUD_CHECKIN = "shadow"`
 (`wrangler.toml`) and the three `TWOTIMTWO_*` secrets set, a Durable Object
 alarm reads `/clubber/checkin_report?date=<today>` every 15 seconds on club
 nights from 4:30 to 9:00 pm Eastern (the printer's `clubNights`, an hour

@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-// The settings page's Laptop section (SETTINGS.md phase 3): it looks for the
+// The settings page's Laptop section (ROADMAP.md#settings-page phase 3): it looks for the
 // print server on http://localhost:3456 when opened. The server is stubbed
 // with page.route (a stand-in for the laptop), once absent and once present.
 

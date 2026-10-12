@@ -74,7 +74,7 @@ jobs:
           if [ -n "$base" ] && [ -n "$files" ] && ! printf '%s\n' "$files" | grep -qx '.github/workflows/ci.yml'; then
             lobby=false; printer=false
             while IFS= read -r f; do
-              # A note at the top level (CLOUD-CHECKIN.md, CLAUDE.md) is read by no
+              # A note at the top level (ROADMAP.md#cloud-check-in, CLAUDE.md) is read by no
               # suite. (In a case pattern * also matches "/", so this is a test.)
               if [[ "$f" != */* && "$f" == *.md ]]; then continue; fi
               case "$f" in
@@ -416,7 +416,7 @@ jobs:
           PUSHER_SECRET: ${{ secrets.PUSHER_SECRET }}
           PUSHER_CLUSTER: ${{ secrets.PUSHER_CLUSTER }}
           INITIAL_PASSPHRASE: ${{ secrets.SYNC_PASSPHRASE }}
-          # Cloud check-in (CLOUD-CHECKIN.md): the church's dedicated TwoTimTwo
+          # Cloud check-in (ROADMAP.md#cloud-check-in): the church's dedicated TwoTimTwo
           # user. Never echoed; the Worker never stores or returns them.
           TWOTIMTWO_USERNAME: ${{ secrets.TWOTIMTWO_USERNAME }}
           TWOTIMTWO_PASSWORD: ${{ secrets.TWOTIMTWO_PASSWORD }}

@@ -1,4 +1,4 @@
-// What this computer is (KVBC Awana v9, UNIFIED-APP.md): a print server, a
+// What this computer is (KVBC Awana v9, ROADMAP.md#kvbc-awana-one-app): a print server, a
 // display, or both, its name, and whether the first-run wizard is done.
 // Electron-free, like config-store.js, so it is tested without booting
 // Electron (test/roles.test.cjs).
@@ -22,7 +22,7 @@
 // guesses again (the print server's own files appear later on a new install
 // and must not turn it into a print server behind the wizard's back).
 //
-// THE HOOK FOR /settings (UNIFIED-APP.md: "each computer registers as a
+// THE HOOK FOR /settings (ROADMAP.md#kvbc-awana-one-app: "each computer registers as a
 // device, kind `computer`"): this file is the one record of a computer's
 // roles and name. main.js applies a change live through applyRoles(): the
 // wizard, IPC 'roles:set' and the /settings registration (device-sync.js) all
@@ -163,7 +163,7 @@ function decideStartRoles({ saved, handoff, printerData }) {
 /**
  * A change asked for (the wizard, later /settings), checked. At least one role
  * once setup is done; turning print off is refused while the print server is
- * printing (UNIFIED-APP.md: "turning off a print server is refused while it
+ * printing (ROADMAP.md#kvbc-awana-one-app: "turning off a print server is refused while it
  * is printing").
  * @returns {{ ok: true, roles: object } | { ok: false, error: string }}
  */

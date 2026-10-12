@@ -3,7 +3,7 @@
 Senior Software Engineer focused on **Technical Integrity, Quality, and Operational Excellence**. Surgical fixes addressing root causes, not workarounds.
 
 ## Project
-Windows app for printing child check-in labels at Awana events from TwoTimTwo.com. Since **9.0.0 the Windows app is "KVBC Awana"**, one app for every KVBC Awana computer: a print server, a display (the sound room app moved in), or both (see "KVBC Awana (9.0.0)" below and the root `UNIFIED-APP.md`). It was "Club Label Printer" from v5.9.0 (and "Awana Label Printer" before that — renamed for Awana Clubs International trademark compliance; see changes.md's 5.9.0 entry), and the public site still calls the print server that.
+Windows app for printing child check-in labels at Awana events from TwoTimTwo.com. Since **9.0.0 the Windows app is "KVBC Awana"**, one app for every KVBC Awana computer: a print server, a display (the sound room app moved in), or both (see "KVBC Awana (9.0.0)" below and the root `ROADMAP.md#kvbc-awana-one-app`). It was "Club Label Printer" from v5.9.0 (and "Awana Label Printer" before that — renamed for Awana Clubs International trademark compliance; see changes.md's 5.9.0 entry), and the public site still calls the print server that.
 
 **Components:** React Simulator (root) | Chrome Extension (chrome-extension/, zipped for download by bump-version.cjs) | Electron App (electron-app/) | Print Server (print-server/)
 
@@ -45,7 +45,7 @@ Every functional change requires:
 
 ## KVBC Awana (9.0.0): roles, the display, the wizard
 
-Owner, 2026-10-11 (the root `UNIFIED-APP.md` has the decisions and the full
+Owner, 2026-10-11 (the root `ROADMAP.md#kvbc-awana-one-app` has the decisions and the full
 build notes). The electron-app is one app with two roles:
 
 - **`roles.json`** in userData (`src/roles.js`): `{print, display, name,
@@ -181,7 +181,7 @@ pages with the Check-in Display's and Journey Display's `about.html`.
   purity). Fail open: any broken template renders the stock label. Safety
   content (allergy icons, no-photo camera, birthday) is not templatable.
 
-**Printing on Linux (7.19.0, CLOUD-CHECKIN.md's Raspberry Pi print station).**
+**Printing on Linux (7.19.0, ROADMAP.md#cloud-check-in's Raspberry Pi print station).**
 `print-server/cups.js` prints the same label PNG through CUPS (`lp`, argument
 arrays only, a queue name with spaces is refused) and reads `lpstat -l -p -d`
 into the Get-Printer shape `printerSetupWarnings()` already judges. It is ON

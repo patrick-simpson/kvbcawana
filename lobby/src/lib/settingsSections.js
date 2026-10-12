@@ -22,10 +22,10 @@ export const SECTIONS = [
 
 // The settings page's own sections: they are about other devices, so a
 // screen's own Settings, and a screen opened from the page, never list them.
-// Screens (SETTINGS.md phase 2): every registered screen, right after Status.
+// Screens (ROADMAP.md#settings-page phase 2): every registered screen, right after Status.
 /** @type {{ id: SectionId, label: string, blurb: string }} */
 export const SCREENS_SECTION = { id: 'screens', label: 'Screens', blurb: 'Every TV, projector and kiosk' };
-// Laptop (SETTINGS.md phase 3): the check-in laptop's printer, labels,
+// Laptop (ROADMAP.md#settings-page phase 3): the check-in laptop's printer, labels,
 // schedule and diagnostics, reached through localhost, just before Setup.
 /** @type {{ id: SectionId, label: string, blurb: string }} */
 export const LAPTOP_SECTION = { id: 'laptop', label: 'Laptop', blurb: 'Printer, labels, schedule, diagnostics' };
