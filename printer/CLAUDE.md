@@ -165,10 +165,9 @@ the extra icon sprite they use (never a symbol id the family sprite already has)
 - **This repo holds the family design system.** `styles/family.css` is the
   one committed stylesheet and `docs/FAMILY-DESIGN.md` its spec
   (`docs/family-reference.html` renders every component). The site bundles
-  it through `styles/site.css`. `node scripts/family-assets.mjs` (repo root)
-  still writes ignored copies to `lobby/public/family.css` and
-  `journey/public/family.css`, which nothing links now that the static about
-  pages are gone (to be dropped). Page-only styling goes in `styles/page.css`
+  it through `styles/site.css`. Nothing copies it any more: no lobby or
+  Journey file loads it, so `scripts/family-assets.mjs` makes only the brand
+  kit and sync-module copies. Page-only styling goes in `styles/page.css`
   (`lbl-` prefix), `styles/lobby.css` (`cid-`) and `styles/journey.css` (`jd-`).
 - **Tailwind v4 is compiled** (`@tailwindcss/vite`, `styles/site.css` with
   `source(none)` + explicit `@source` lines limited to the site's own files).

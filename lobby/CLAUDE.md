@@ -376,8 +376,8 @@ site at awana.kvbchurch.org/ (printer/CLAUDE.md, "Public website"), and the
 lobby's part of it is its `#lobby` section: `printer/components/Lobby.tsx`
 with `printer/styles/lobby.css` (classes `cid-`). `/lobby/about.html` 301s to
 `/#lobby` (`site/lib/redirects.js`). This app no longer serves any about page;
-`public/family.css` stays only as a byte-identical mirror that
-`scripts/check-mirrors.mjs` still compares. The rules that came with the page
+`public/family.css` is no longer copied: nothing here loads it, so the build
+makes no copy. The rules that came with the page
 live on, and are checked from there:
 
 - **No Awana art on the public page.** The owner uses the official Awana

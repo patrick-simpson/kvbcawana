@@ -215,14 +215,14 @@ Read Prep, captions).
   number in the shout face.
 
 - **`public/brand/` is a generated, ignored, byte-identical copy of the
-  whole kit** (so is `public/family.css`, below). The one canonical kit is
+  whole kit** (the sync modules under `public/src/shared/` are copies too). The one canonical kit is
   `lobby/shared/brand/` (read its README); never edit the copy. `npm run
   assets` (`node ../scripts/family-assets.mjs journey`) makes both, `npm test`
   runs it first (`pretest`) and `site/build.mjs` runs it before it copies
   `public/` into `/journey/` and hashes it for the build id (so a kit change
   reloads the kiosks). **The Pi serves nothing from this repo**: its Chromium
   loads the deployed `awana.kvbchurch.org/journey/` (`pi/journey-kiosk.sh`),
-  so the built site is where the kit and `family.css` live at runtime, from
+  so the built site is where the kit lives at runtime, from
   the same origin as the page and never from another app's address. Opening
   `public/` straight from a checkout (a dev server, a file) needs `npm run
   assets` first. `test/brand-kit.test.mjs` fails if the copy is missing or
@@ -280,9 +280,8 @@ site at awana.kvbchurch.org/ (printer/CLAUDE.md, "Public website"), and
 Journey's part of it is its `#journey` section: `printer/components/Journey.tsx`
 with `printer/styles/journey.css` (classes `jd-`). `/journey/about.html` 301s
 to `/#journey` (`site/lib/redirects.js`). The kiosk never loaded the page and
-still loads nothing of it (`index.html` does not link `family.css`;
-`public/family.css` stays only as a byte-identical mirror that
-`scripts/check-mirrors.mjs` compares). The rules that came with the page live
+still loads nothing of it (`index.html` does not link `family.css`, and
+no copy of it is made). The rules that came with the page live
 on, checked by `printer/scripts/test-about-page.cjs` (printer `npm test`):
 
 - **The 6:30 start screen (Fig. 1 and the resume card) is drawn in the kit, with

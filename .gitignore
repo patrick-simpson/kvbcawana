@@ -4,10 +4,8 @@ site/.wrangler
 site/lib/large-files.generated.js
 
 # Generated copies of the family's shared files (scripts/family-assets.mjs):
-# the brand kit and family.css each have ONE canonical file; every app gets its
-# own full local copy at build time. Never edit or commit these.
+# the brand kit and the sync modules each have ONE canonical file; every app gets
+# its own full local copy at build time. Never edit or commit these.
 journey/public/brand/
-journey/public/family.css
 journey/public/src/shared/
 printer/print-server/public/brand/
-lobby/public/family.css

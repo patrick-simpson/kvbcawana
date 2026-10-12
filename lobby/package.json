@@ -6,9 +6,7 @@
   "description": "Joyful digital signage welcome screen for Awana club check-ins. Not affiliated with or endorsed by Awana Clubs International.",
   "scripts": {
     "dev": "vite",
-    "predev": "node ../scripts/family-assets.mjs lobby",
     "build": "vite build",
-    "prebuild": "node ../scripts/family-assets.mjs lobby",
     "preview": "vite preview --host",
     "lint": "eslint .",
     "test": "vitest run",

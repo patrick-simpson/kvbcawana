@@ -23,13 +23,14 @@ commits or files.
   deploys in about 2 minutes; keep that job's lists in step when a suite
   starts reading another folder), `scripts/check-mirrors.mjs` (the
   contract and envelope vectors, byte-identical across the apps, the printer's
-  first; and that the brand kit and `family.css` copies exist and match: those
-  two have ONE committed copy each, the lobby's `shared/brand/` and
-  `printer/styles/family.css`, and `scripts/family-assets.mjs` copies them
-  into Journey's `public/`, the print server's `public/brand/` and the
-  lobby's `public/` at build time, so every screen still holds a full local
-  copy; the copies are ignored, and each app's `pretest` / `prebuild` /
-  `prestart`, `site/build.mjs` and `release-app.yml` make them), and a `site` job
+  first; and that the brand kit copies exist and match: the kit has ONE
+  committed copy, the lobby's `shared/brand/`, and `scripts/family-assets.mjs`
+  copies it into Journey's `public/` and the print server's `public/brand/` at
+  build time (and the sync modules into Journey's `public/src/shared/`), so
+  every screen still holds a full local copy; the copies are ignored, and
+  Journey's `pretest`, the printer's `pretest` / `prestart`, `site/build.mjs`
+  and `release-app.yml` make them; `printer/styles/family.css` is bundled by
+  the site alone and copied nowhere), and a `site` job
   that builds the one site (once per run: it uploads `site/dist` and
   `site/lib/large-files.generated.js` as a one-day `site-dist` artifact) and
   tests its Pages Function. The lobby runs as two parallel jobs,
