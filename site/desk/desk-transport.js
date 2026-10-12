@@ -403,9 +403,12 @@ export function createDesk({ cc, fetch: fetchFn, store, base = DESK_API, now = D
     const n = night();
     const first = String(tag.name || '').replace(/\s+/g, ' ').trim().slice(0, 40);
     if (!first) throw new DeskError('refused', 'Type the child’s first name.', { reason: 'no-name' });
+    const club = String(tag.club || '').trim();
+    if (!club) throw new DeskError('refused', 'Pick the child’s club.', { reason: 'no-club' });
     const jobId = `reprint:${crypto.randomUUID()}`;
+    // The record the print role runs: the print server's own POST /print-oneoff and its body.
     await sealedPost('/v1/print/reprint', async (list) => ({
-      jobId, bundle: await sealJob(list, n, { oneOff: true, name: first, club: tag.club || '', source: 'desk', at: new Date(now()).toISOString() }),
+      jobId, bundle: await sealJob(list, n, { route: '/print-oneoff', body: { firstName: first, clubName: club }, source: 'desk', at: new Date(now()).toISOString() }),
     }), { needJob: true });
     return { jobId };
   }

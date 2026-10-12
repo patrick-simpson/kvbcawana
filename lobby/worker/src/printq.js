@@ -37,6 +37,8 @@ export const LEASE_MAX = 10;
 const JOB_ID_RE = /^[A-Za-z0-9_-]{22}$/;
 const REPRINT_ID_RE = /^reprint:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const CODE_RE = /^[a-z0-9-]{1,32}$/;
+/** What a station says of a job no station can ever run (job-puller.js MALFORMED): dead at once, no retries. */
+export const MALFORMED_CODES = Object.freeze(['no-payload', 'bundle-id-mismatch', 'route-not-allowed', 'stale-night']);
 
 /** Is this a job id the queue takes? A check-in job's id is its bundle's 22 characters. @param {unknown} id */
 export function validJobId(id) {
@@ -224,7 +226,7 @@ export class PrintQueue {
     job.lastError = typeof error === 'string' && CODE_RE.test(error) ? error : 'failed';
     job.station = null;
     job.leaseUntil = 0;
-    job.state = job.fails >= MAX_FAILS ? 'dead' : 'queued';
+    job.state = job.fails >= MAX_FAILS || MALFORMED_CODES.includes(job.lastError) ? 'dead' : 'queued';
     await this.doc.save();
     return { ok: true, known: true, state: job.state };
   }

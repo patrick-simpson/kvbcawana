@@ -281,6 +281,7 @@ const fakeSafe = {
     const imported = await env.importDisplayKey(displayKey);
     const open = async (event, f) => (await env.openEnvelope(imported, event, f.d)).payload;
     const settle = () => new Promise((resolve) => setTimeout(resolve, 150));
+    const labels = () => fs.readFileSync(jobLog, 'utf8').trim().split('\n').length;
 
     // a desk check-in: the REAL desk page transport, signed in by passphrase v2 against this Worker
     const deskFetch2 = async (url, init = {}) => t2.core.handle(new Request(`${BASE}${String(url).replace(/^\/api/, '')}`, init));
@@ -324,7 +325,6 @@ const fakeSafe = {
     // the phone page: the Worker checks the child in on TwoTimTwo and hands the station a relay
     // job (no print-queue job), the station prints and greets naming the child; then the
     // watcher (CLOUD_PRINT) finds the child on the report and makes a job, which meets the label
-    const labels = () => fs.readFileSync(jobLog, 'utf8').trim().split('\n').length;
     const local = (p, body) => real(`http://127.0.0.1:34590${p}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then((r) => r.json());
     const beforePhone = labels();
     const phonePrint = await local('/print', { name: 'Pip Phonely', clubName: 'Sparks', clubberId: '703', cloud: true });
@@ -357,17 +357,56 @@ const fakeSafe = {
     await settle();
     check('an idle tick greets nobody again', frames('checkin').length === 4);
 
+    // the desk's TwoTimTwo post is refused (or slow) but the watcher had already seen the child
+    // on the report and promoted the claim: the job stays, prints once, greets once
+    const promL = labels();
+    const promG = frames('checkin').length;
+    t2.night.kids.push({ id: '705', club: 'Sparks', name: 'Tess Promoted' });
+    t2.faults.checkin = 'refuse';
+    const realPost = t2.core.desk.post.bind(t2.core.desk);
+    t2.core.desk.post = async (...args) => {
+      await t2.core.ledger.promote(NIGHT, await t2.core.tags.identity(NIGHT, '705'));
+      return realPost(...args);
+    };
+    const promoted = await desk2.checkIn({ clubberId: '705', name: 'Tess Promoted', club: 'Sparks' }, {});
+    t2.core.desk.post = realPost;
+    t2.faults.checkin = null;
+    check('a desk check-in the watcher promoted while its post was refused is a success, with its job', promoted.already === false && typeof promoted.jobId === 'string', JSON.stringify(promoted));
+    const r5 = await puller2.tick();
+    await settle();
+    check('and that job prints one label and greets once', r5.handled === 1 && labels() === promL + 1 && frames('checkin').length === promG + 1, `${JSON.stringify(r5)} ${labels()} ${frames('checkin').length}`);
+    check('a retry finds it already checked in: no second label', (await desk2.checkIn({ clubberId: '705', name: 'Tess Promoted', club: 'Sparks' }, {})).already === true && (await puller2.tick()).handled === 0 && labels() === promL + 1);
+
+    // a one-off name tag from the desk page: the print server's own /print-oneoff, at once
+    const l2 = labels();
+    const oneOff = await desk2.oneOffTag({ name: 'Wren', club: 'Cubbies' });
+    const r6 = await puller2.tick();
+    await settle();
+    const st6 = (await t2.call('GET', '/v1/print/status')).body;
+    check('a desk one-off tag prints on the first lease and is done (never stalls, never counted)', r6.handled === 1 && labels() === l2 + 1 && st6.dead === 0 && st6.queued === 0 && st6.leased === 0,
+      `${JSON.stringify(oneOff)} ${JSON.stringify(r6)} ${labels()} ${JSON.stringify(st6)}`);
+    // a malformed job (the old one-off shape: no route) is dead at once and the next job is not held up
+    const bad = await sealJob([st], { oneOff: true, name: 'Old', club: 'Sparks' }, { night: NIGHT, id: cc.newRowId() });
+    const badId = `reprint:${require('crypto').randomUUID()}`;
+    await t2.call('POST', '/v1/print/reprint', { jobId: badId, bundle: bad.bundle });
+    const nextTag = await desk2.oneOffTag({ name: 'Ivy', club: 'Sparks' });
+    const r7 = await puller2.tick();
+    const r8 = await puller2.tick();
+    const st7 = (await t2.call('GET', '/v1/print/status')).body;
+    check('a malformed job fails fast: dead on the Worker at once, and the tag behind it prints on the very next tick', st7.dead === 1 && labels() === l2 + 2 && r7.handled + r8.handled === 2, `${JSON.stringify(nextTag)} ${JSON.stringify([r7, r8])} ${JSON.stringify(st7)} ${labels()}`);
+    await settle();
+
     // the Worker's own tally, ticker and still-here list
     t2.clock.tick(WATCH_INTERVAL_MS);
     await t2.core.watcher.tick();
     const tally = frames('tally').at(-1).d;
-    check('the tally counts every child, by club, in the printer\'s shape', tally.total === 4 && tally.counts.Sparks === 2 && tally.counts.Cubbies === 2 && typeof tally.at === 'string', JSON.stringify(tally));
-    check('the ticker says four checked in', frames('tonight').at(-1).d.checkedIn === 4);
+    check('the tally counts every child, by club, in the printer\'s shape', tally.total === 5 && tally.counts.Sparks === 3 && tally.counts.Cubbies === 2 && typeof tally.at === 'string', JSON.stringify(tally));
+    check('the ticker says five checked in (a one-off tag is never counted)', frames('tonight').at(-1).d.checkedIn === 5);
     const still = await open('checkout', frames('checkout').at(-1));
-    check('the sealed still-here list names them: first name and club', still.entries.map((e) => `${e.firstName}/${e.club}`).sort().join() === 'Kit/Sparks,Ottoline/Cubbies,Pip/Sparks,Rue/Cubbies', JSON.stringify(still));
-    check('the count is the shared module\'s (GET /v1/desk/tonight)', (await t2.call('GET', '/v1/desk/tonight')).body.checkedIn === 4);
+    check('the sealed still-here list names them: first name and club', still.entries.map((e) => `${e.firstName}/${e.club}`).sort().join() === 'Kit/Sparks,Ottoline/Cubbies,Pip/Sparks,Rue/Cubbies,Tess/Sparks', JSON.stringify(still));
+    check('the count is the shared module\'s (GET /v1/desk/tonight)', (await t2.call('GET', '/v1/desk/tonight')).body.checkedIn === 5);
     const plainFrames = JSON.stringify(t2.sent.filter((f) => f.e === 'tally' || f.e === 'tonight'));
-    check('and no name or id of a child is readable in the Worker\'s storage, and none is on a plaintext frame', !/Tester|Quillfeather|Ottoline|Phonely|Extensia|"662"|"702"|"703"|"704"/.test(everything(t2.storage)) && !/Tester|Quillfeather|Ottoline|Kit|Pip|Rue/.test(plainFrames));
+    check('and no name or id of a child is readable in the Worker\'s storage, and none is on a plaintext frame', !/Tester|Quillfeather|Ottoline|Phonely|Extensia|Promoted|Wren|"662"|"702"|"703"|"704"|"705"/.test(everything(t2.storage)) && !/Tester|Quillfeather|Ottoline|Kit|Pip|Rue/.test(plainFrames));
     check('the Worker\'s tally and the printer\'s builder agree on the shape', JSON.stringify(Object.keys(tally).sort()) === JSON.stringify(Object.keys(events.buildTally({ Sparks: 1, Cubbies: 1 }, 2, { season: server.currentScreenSeason() })).sort()));
     check('and so do the ticker\'s and the list\'s', JSON.stringify(Object.keys(frames('tonight').at(-1).d).sort()) === JSON.stringify(Object.keys(events.buildTonight({ checkedIn: 2 })).sort())
       && JSON.stringify(Object.keys(still).sort()) === JSON.stringify(Object.keys(events.buildCheckout([{ firstName: 'Kit', club: 'Sparks' }], 2)).sort()));

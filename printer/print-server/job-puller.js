@@ -65,6 +65,8 @@ const BUSY_MS = 1000;
 const SIGNED_OUT_MS = 60 * 1000;
 const ROUTE_MISSING_MS = 60 * 1000;
 const FAIL_PAUSE_MS = 10 * 1000;
+/** Failure codes of a job that can never print, on any station: the Worker marks it dead at once. */
+const MALFORMED = new Set(['no-payload', 'bundle-id-mismatch', 'route-not-allowed', 'stale-night']);
 const HELLO_MS = 30 * 1000;
 const HEARTBEAT_MS = 20 * 1000;
 const LOCAL_TIMEOUT_MS = 60 * 1000;
@@ -241,7 +243,9 @@ function createJobPuller(o) {
   async function failJob(id, error) {
     stats.failed++;
     stats.lastError = String(error);
-    pausedUntil = now() + FAIL_PAUSE_MS;
+    // A job no station could ever run (malformed) is not the printer's fault: no pause,
+    // so the queue behind it moves on at once (and the Worker calls it dead at once).
+    if (!MALFORMED.has(error)) pausedUntil = now() + FAIL_PAUSE_MS;
     await ack(id, 'failed', error);
     return 'failed';
   }
@@ -479,5 +483,5 @@ function startJobPuller({ puller, bundles, log, setTimeoutFn = setTimeout }) {
 module.exports = {
   JOB_PULL_ROUTES, jobPullAllowed, JOB_ID_RE,
   createJournal, createJobPuller, createBundleSync, startJobPuller,
-  IDLE_MS, BUSY_MS, HELLO_MS, HEARTBEAT_MS, FAIL_PAUSE_MS,
+  IDLE_MS, BUSY_MS, HELLO_MS, HEARTBEAT_MS, FAIL_PAUSE_MS, MALFORMED,
 };

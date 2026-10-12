@@ -294,7 +294,9 @@ describe('undo, check out and the one-off tag', () => {
     const call = w.calls.find((c) => c.path === '/v1/print/reprint');
     assert.equal(call.body.jobId, r.jobId);
     assert.equal(call.body.bundle.kind, 'print-job');
-    assert.deepEqual(await cc.openAsStation(a.ring, call.body.bundle), { oneOff: true, name: 'Ava', club: 'Puggles', source: 'desk', at: '2026-10-14T22:00:00.000Z' });
+    // exactly what the print role runs: the print server's own one-off route and its body
+    assert.deepEqual(await cc.openAsStation(a.ring, call.body.bundle), { route: '/print-oneoff', body: { firstName: 'Ava', clubName: 'Puggles' }, source: 'desk', at: '2026-10-14T22:00:00.000Z' });
+    await assert.rejects(desk.oneOffTag({ name: 'Ava', club: '' }), { reason: 'no-club' });
     assert.equal(w.calls.filter((c) => c.path === '/v1/desk/checkin').length, 0);
     const none = worker({ stations: [] });
     const d2 = make(none).desk;
