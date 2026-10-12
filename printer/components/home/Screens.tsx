@@ -34,10 +34,11 @@ export interface LabelSpec {
   icons?: { icon: IcoName; words?: string }[];
 }
 
-/** The 4×2 label as generateLabel() lays it out: club art panel, motif, name, club, icons; a black bar for no photos. */
+/** The 4×2 label as generateLabel() lays it out: club art panel (the club's mark sideways, T&T upright), motif, name, club, icons; a black bar for no photos. */
 export const Label: React.FC<{ spec: LabelSpec; noPhotos?: boolean }> = ({ spec, noPhotos }) => (
   <div className={`kv-label${noPhotos ? ' kv-label--nophoto' : ''}`}>
-    <div className="kv-label__art"><img src={spec.club.black} alt="" /></div>
+    {/* The printed mark runs sideways (counter-clockwise) for every club but T&T: brand.MARK_ROTATE. */}
+    <div className={`kv-label__art${spec.club.id === 'tnt' ? '' : ' kv-label__art--turn'}`}><img src={spec.club.black} alt="" /></div>
     <div className="kv-label__main">
       <Ico name="leaf" className="kv-label__motif" />
       <span className="kv-label__name">{spec.first}</span>

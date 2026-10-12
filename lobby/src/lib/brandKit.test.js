@@ -55,6 +55,28 @@ const UPSTREAM_TTF = {
     sha256: '8c63a15e3fa34e0b362abeb903944a2bd45e71b1efa122486c0a47e295eae06f',
     bytes: 93408,
   },
+  // google/fonts ofl/playfairdisplay, PlayfairDisplay[wght].ttf (renamed only
+  // on disk: brackets have no place in a URL path), Version 1.203.
+  'PlayfairDisplay-Variable.ttf': {
+    sha256: 'c40f2293766a503bc70cce9e512ef844a4ccb7cbcde792fe2ea31d191917d8d6',
+    bytes: 300724,
+  },
+};
+// The label printer's club faces (owner 2026-10-12): Puggles and Cubbies in
+// Comic Neue, Trek and Journey in Playfair Display. Labels only, so no screen
+// loads them and fonts.css does not serve them; the print server's canvas
+// reads the TTFs from its copy of this kit. Pinned to the upstream files
+// (google/fonts ofl/comicneue, Version 2.003; Playfair Display above).
+const LABEL_ONLY_TTF = {
+  'ComicNeue-Regular.ttf': {
+    sha256: 'a0ee5a37c8b27c4db0700137d928598b1e23b0089e1546a8961909176b779360',
+    bytes: 57248,
+  },
+  'ComicNeue-Bold.ttf': {
+    sha256: '3e7e5fccfd7e0788f317b43312151c1bd5cf058c9697a8d83eac3939050bd61e',
+    bytes: 55716,
+  },
+  'PlayfairDisplay-Variable.ttf': UPSTREAM_TTF['PlayfairDisplay-Variable.ttf'],
 };
 // Each full-font WOFF2 and the TTF it must be the whole of.
 const FULL_WOFF2 = {
@@ -292,6 +314,21 @@ describe('shared/brand fonts', () => {
     expect(ofl).toContain('No Modified Version of the Font Software may use the Reserved Font');
   });
 
+  it('the label-only club faces are the pinned upstream files, each with its OFL', () => {
+    for (const [file, want] of Object.entries(LABEL_ONLY_TTF)) {
+      const ttf = readFont(file);
+      expect(ttf.length, file).toBe(want.bytes);
+      expect(sha256(ttf), file).toBe(want.sha256);
+    }
+    const comic = readFont('OFL-ComicNeue.txt').toString('utf8');
+    expect(comic).toContain('Copyright 2014 The Comic Neue Project Authors');
+    expect(comic).toContain('SIL OPEN FONT LICENSE Version 1.1');
+    const playfair = readFont('OFL-PlayfairDisplay.txt').toString('utf8');
+    expect(playfair).toContain('Copyright 2017 The Playfair Display Project Authors');
+    expect(playfair).toContain('with Reserved Font Name "Playfair Display"');
+    expect(playfair).toContain('SIL OPEN FONT LICENSE Version 1.1');
+  });
+
   it('OFL-LondrinaSolid.txt is the OFL 1.1 with its Reserved Font Name', () => {
     const ofl = readFont('OFL-LondrinaSolid.txt').toString('utf8');
     expect(ofl).toContain('Copyright 2011 The Londrina Solid Authors');
@@ -347,6 +384,8 @@ describe('shared/brand fonts', () => {
     expect(reserved['OFL-PaytoneOne.txt']).toEqual(['Paytone', 'Paytone One']);
     expect(reserved['OFL-LondrinaSolid.txt']).toEqual(['Londrina Solid']);
     expect(reserved['OFL-Figtree.txt']).toEqual([]);
+    expect(reserved['OFL-PlayfairDisplay.txt']).toEqual(['Playfair Display']);
+    expect(reserved['OFL-ComicNeue.txt']).toEqual([]);
     const names = Object.values(reserved).flat().map((n) => n.toLowerCase());
 
     const fonts = kitFonts();
@@ -377,7 +416,7 @@ describe('shared/brand fonts', () => {
     // A reserved-name face reaches the screens only through the kit's files. The
     // @fontsource (and Google) copies are latin subsets, i.e. Modified Versions.
     const names = Object.values(reservedFontNames()).flat().map(slug);
-    expect([...names].sort()).toEqual(['londrina-solid', 'paytone', 'paytone-one']);
+    expect([...names].sort()).toEqual(['londrina-solid', 'paytone', 'paytone-one', 'playfair-display']);
     const banned = (pkg) => names.some((n) => pkg.replace(/^@fontsource(-variable)?\//, '').startsWith(n));
 
     const pkg = JSON.parse(readFileSync(resolve(SHARED, '../package.json'), 'utf8'));
@@ -398,10 +437,13 @@ describe('shared/brand fonts', () => {
     }
   });
 
-  it('every font file in the kit is one fonts.css serves', () => {
+  it('every font file in the kit is one fonts.css serves, or a label-only club face', () => {
     const served = new Set([...fontsCss.matchAll(/url\('fonts\/([^']+)'\)/g)].map((m) => m[1]));
     const onDisk = readdirSync(FONTS).filter((f) => /\.(ttf|otf|woff2?)$/i.test(f));
-    expect([...served].sort()).toEqual(onDisk.sort());
+    expect([...served].sort()).toEqual(onDisk.filter((f) => !LABEL_ONLY_TTF[f]).sort());
+    // ...and no screen asks for a club face: they are the labels' alone.
+    for (const file of Object.keys(LABEL_ONLY_TTF)) expect(served.has(file), file).toBe(false);
+    expect(fontsCss).not.toMatch(/Comic Neue|Playfair/);
   });
 });
 
@@ -462,7 +504,7 @@ describe('shared/brand kit', () => {
     expect(urls.length).toBeGreaterThan(0);
     for (const u of urls) expect(existsSync(resolve(KIT, u)), u).toBe(true);
     const files = readdirSync(resolve(KIT, 'fonts'));
-    for (const lic of ['OFL-PaytoneOne.txt', 'OFL-LondrinaSolid.txt', 'OFL-Figtree.txt']) {
+    for (const lic of ['OFL-PaytoneOne.txt', 'OFL-LondrinaSolid.txt', 'OFL-Figtree.txt', 'OFL-ComicNeue.txt', 'OFL-PlayfairDisplay.txt']) {
       expect(files, lic).toContain(lic);
     }
   });

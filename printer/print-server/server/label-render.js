@@ -403,10 +403,10 @@ async function generateLabel(input) {
   // On step-up labels, drop the club icon entirely — the kid is leaving
   // that club, and the wider text area makes the message more obvious.
   // Otherwise the icon panel exists for any recognized club: it shows the
-  // real TwoTimTwo club logo when the client supplied one, the official
-  // one-colour club mark from the brand kit when it did not (or the logo was
-  // unusable), and the letter monogram as the last resort, so the icon zone
-  // never silently disappears.
+  // official one-colour club mark from the brand kit for the six known clubs;
+  // TwoTimTwo's downloaded club image only when the club has no kit mark (an
+  // unknown club) or the mark failed to load; and the letter monogram as the
+  // last resort, so the icon zone never silently disappears.
   const hasLogo     = !stepUp && !!clubImageBuffer && tplOn('showIconPanel');
   const hasEmblem   = !stepUp && !hasLogo && !!$images.CLUB_MONOGRAM[$eligibility.clubKey(clubName)] && tplOn('showIconPanel');
   const hasIcon     = hasLogo || hasEmblem;
@@ -428,6 +428,17 @@ async function generateLabel(input) {
   // as "no logo" there too.
   let logoDrawn = false;
   let markDrawn = false;
+  // The panel's art is CHOSEN here (the text area needs to know whether a
+  // mark or logo made it) but DRAWN after the text, by drawPanelArt: a line
+  // of the text area can reach into the panel (the handbook group, centred
+  // left of the icon row; the icon row itself when it is long), and the art
+  // must then end above it instead of printing under it. `panelTextTop` is the
+  // highest such line's top (pt), Infinity when nothing reaches in, in which
+  // case the art is drawn exactly where and as large as it always was.
+  let drawPanelArt = () => {};
+  let panelTextTop = Infinity;
+  const PANEL_RIGHT = $labelLayout.DIVIDER_X + $labelLayout.ICON_WAVE_MAX_DX;
+  const PANEL_TEXT_GAP = 3;
   if (hasIcon) {
     // The column's right edge is the catalog's wave, not a ruled line: filled
     // in the panel tone, and traced once more in the old divider's hairline so
@@ -468,21 +479,63 @@ async function generateLabel(input) {
     // Preserve aspect ratio within the 76pt square. Post-crop this is the
     // aspect of the ARTWORK — a wordmark on a padded square canvas used to fit
     // by its padding and shrink the art; now it fits by the art itself.
-    const drawArt = (art) => {
+    // `rotate` turns the art 90 degrees counter-clockwise (reads bottom to
+    // top) BEFORE fitting, so it fills the square by its sideways shape.
+    // `room` is the panel's free height when text reaches into it ({top,
+    // bottom} in pt): the art is fitted into the icon column's width and that
+    // height, centred in it. Without it, the 76 pt square as always.
+    const drawArt = (art, rotate = false, room = null) => {
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = 'high';
-      const aspect = art.width / art.height;
-      let drawW = iconSize, drawH = iconSize;
-      if (aspect > 1) { drawH = iconSize / aspect; }
-      else { drawW = iconSize * aspect; }
-      const dx = iconX + (iconSize - drawW) / 2;
-      const dy = iconY + (iconSize - drawH) / 2;
-      ctx.drawImage(art.canvas, dx, dy, drawW, drawH);
+      const artW = rotate ? art.height : art.width;
+      const artH = rotate ? art.width : art.height;
+      const aspect = artW / artH;
+      const boxW = iconSize;
+      const boxH = room ? Math.min(iconSize, room.bottom - room.top) : iconSize;
+      let drawW = boxW, drawH = boxW / aspect;
+      if (drawH > boxH) { drawH = boxH; drawW = boxH * aspect; }
+      if (!room) {
+        drawW = iconSize; drawH = iconSize;
+        if (aspect > 1) { drawH = iconSize / aspect; }
+        else { drawW = iconSize * aspect; }
+      }
+      const cx = iconX + iconSize / 2;
+      // Centred on the panel as always, unless that would reach the text:
+      // then as low as it can sit above it.
+      const cy = room ? Math.min(iconY + iconSize / 2, room.bottom - drawH / 2) : iconY + iconSize / 2;
+      if (!rotate) {
+        ctx.drawImage(art.canvas, cx - drawW / 2, cy - drawH / 2, drawW, drawH);
+        return;
+      }
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(-Math.PI / 2);
+      // Drawn in the turned frame: its width is the fitted HEIGHT.
+      ctx.drawImage(art.canvas, -drawH / 2, -drawW / 2, drawH, drawW);
+      ctx.restore();
     };
-    if (hasLogo) {
-      // Crop to the artwork and binarize for thermal — see
-      // prepareLogoForThermal. A null result (undecodable, or no ink at all)
-      // falls through to the official mark below.
+    {
+      // FIRST CHOICE for every club the kit knows: the official one-colour
+      // club mark (brand kit, logos/*-black.svg). Vector, so it rasterises
+      // crisply at icon size, and put through the same thermal converter as a
+      // downloaded logo (cropped to its ink, one solid ink colour, re-inked
+      // white on an inverted label). TwoTimTwo's small colour pictures come out
+      // distorted and dark in 1 bit, so the supplied image is NOT preferred.
+      // Fails open: an unknown club or a missing/undecodable mark falls
+      // through to the supplied image, then the monogram.
+      const key = $eligibility.clubKey(clubName);
+      const mark = await thermalClubMark(key, inkWhite);
+      if (mark) {
+        const rotate = !!brand.MARK_ROTATE[key];
+        drawPanelArt = (room) => drawArt(mark, rotate, room);
+        markDrawn = true;
+      }
+    }
+    if (hasLogo && !markDrawn) {
+      // Only for a club with no kit mark (or one that would not draw): crop
+      // to the artwork and binarize for thermal, see prepareLogoForThermal. A
+      // null result (undecodable, or no ink at all) falls through to the
+      // monogram below.
       const logo = await prepareLogoForThermal(clubImageBuffer, { ink });
       if (logo) {
         // The icon zone is 76pt ≈ 317 device px at 300 DPI. A logo whose
@@ -492,38 +545,25 @@ async function generateLabel(input) {
         // upscaled 4–5×, and the thermal printer then dithers the blurry
         // antialiased edges into speckle — the printed result is
         // recognisably worse than no logo at all. Below half the target
-        // resolution, the vector mark (or the solid-ink monogram) is the
-        // better label: skip the image and fall through to it.
+        // resolution, the solid-ink monogram is the better
+        // label: skip the image and fall through to it.
         const targetPx = iconSize * SCALE;
         if (Math.max(logo.sourceWidth, logo.sourceHeight) >= targetPx / 2) {
-          drawArt(logo);
+          drawPanelArt = (room) => drawArt(logo, false, room);
           logoDrawn = true;
         } else {
-          console.log(`[icon] Club artwork is ${logo.sourceWidth}x${logo.sourceHeight}px after cropping — too small for a ${Math.round(targetPx)}px icon zone, using the club mark instead`);
+          console.log(`[icon] Club artwork is ${logo.sourceWidth}x${logo.sourceHeight}px after cropping — too small for a ${Math.round(targetPx)}px icon zone, using the monogram instead`);
         }
       }
     }
-    if (!logoDrawn) {
-      // The official one-colour club mark (brand kit, logos/*-black.svg):
-      // vector, so it rasterises crisply at icon size, and put through the
-      // SAME thermal converter as a downloaded logo (cropped to its ink, one
-      // solid ink colour, re-inked white on an inverted label). Fails open: a
-      // missing or undecodable mark falls through to the monogram.
-      const key = $eligibility.clubKey(clubName);
-      const mark = await thermalClubMark(key, inkWhite);
-      if (mark) {
-        drawArt(mark);
-        markDrawn = true;
-      }
-    }
-    if (!logoDrawn && !markDrawn) {
+    if (!logoDrawn && !markDrawn) drawPanelArt = (room) => {
       // Monogram badge, the last resort: solid disc + club initials in the
       // shout voice. Solid ink stays crisp on thermal output where a
       // grayscale logo placeholder would just dither away.
       const monogram = $images.CLUB_MONOGRAM[$eligibility.clubKey(clubName)] || '?';
       const cx = $labelLayout.BX + $labelLayout.ICON_COL_W / 2;
-      const cy = $labelLayout.BY + $labelLayout.BH / 2;
-      const radius = 28;
+      const radius = room ? Math.max(12, Math.min(28, (room.bottom - room.top) / 2)) : 28;
+      const cy = room ? Math.min($labelLayout.BY + $labelLayout.BH / 2, room.bottom - radius) : $labelLayout.BY + $labelLayout.BH / 2;
       ctx.beginPath();
       ctx.arc(cx, cy, radius, 0, Math.PI * 2);
       ctx.fillStyle = COLOR.name;
@@ -539,7 +579,7 @@ async function generateLabel(input) {
         : cy + 1;
       type.fill(ctx, 'monogram', mSize, monogram, cx, mCentre);
       ctx.textBaseline = 'top';  // restore default used by the text area
-    }
+    };
   }
 
   // ── Text area ─────────────────────────────────────────────────────────────
@@ -618,9 +658,12 @@ async function generateLabel(input) {
   // the top, and the comma of Ș and Ț, or a cedilla or ogonek, hangs past the
   // bottom. An ordinary name reaches neither, so those two are 0 and the
   // layout is the same for every plain name.
+  // A club's own face (Comic Neue, Playfair Display) sits differently in its
+  // box from the stock shout, so the box is the face's own (labelType nameBox).
   const nameBrand = type.inBrand('name', displayFirst);
-  const nameLineH = nameBrand ? $labelLayout.NAME_LINE_H_BRAND : 1;
-  const nameLift = nameBrand ? $labelLayout.NAME_LIFT_BRAND : 0;
+  const box = nameBrand ? type.nameBox(ctx, 'name', displayFirst) : null;
+  const nameLineH = box ? box.lineH : 1;
+  const nameLift = box ? box.lift : 0;
   const reach = nameBrand ? type.inkReach(ctx, 'name', displayFirst) : null;
   const nameRoomAbove = reach ? Math.max(0, nameLift + reach.above) : 0;
   const nameRoomBelow = reach ? Math.max(0, reach.below - nameLift - nameLineH) : 0;
@@ -776,6 +819,9 @@ async function generateLabel(input) {
     groupStr = type.truncate(ctx, groupRole, fs4, groupStr, groupMaxW);
     ctx.fillStyle = COLOR.group;
     type.fill(ctx, groupRole, fs4, groupStr, groupCenterX, y);
+    if (hasIcon && groupCenterX - type.measure(ctx, groupRole, fs4, groupStr) / 2 < PANEL_RIGHT) {
+      panelTextTop = Math.min(panelTextTop, y);
+    }
     y += fs4;
   }
 
@@ -899,6 +945,8 @@ async function generateLabel(input) {
     iconRowLeftX = ex;
     const ey = $labelLayout.BY + $labelLayout.BH - PAD;  // shared baseline along the bottom padding line
     glyphs.forEach(function(g) {
+      // A long icon row runs into the panel: the art ends above it.
+      if (hasIcon && ex < PANEL_RIGHT) panelTextTop = Math.min(panelTextTop, ey - g.size);
       ctx.fillStyle = COLOR.name;  // share digits must stay light on step-up
       if (g.words) {
         type.fill(ctx, 'age', g.size, g.ch, ex, ey);
@@ -972,6 +1020,16 @@ async function generateLabel(input) {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
   }
+
+  // ── The icon panel's art ──────────────────────────────────────────────────
+  // Drawn now that the text area is laid out (see drawPanelArt): full size
+  // where nothing reached into the panel, else fitted to end PANEL_TEXT_GAP
+  // above the highest line that did.
+  ctx.save();
+  drawPanelArt(Number.isFinite(panelTextTop)
+    ? { top: $labelLayout.BY + 4, bottom: panelTextTop - PANEL_TEXT_GAP }
+    : null);
+  ctx.restore();
 
   // ── No-photo edge bar ─────────────────────────────────────────────────────
   // Drawn after the content (nothing reaches it; this is belt and braces) and

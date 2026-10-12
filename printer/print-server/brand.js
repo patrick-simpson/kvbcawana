@@ -21,7 +21,9 @@
 //     four holes. The character map of each TTF is read here, and
 //     fontCovers()/splitRuns() are how the renderer asks. A file cut short or
 //     corrupted is refused before it reaches the canvas (fontFileProblem):
-//     the canvas would register it and then draw every glyph empty.
+//     the canvas would register it and then draw every glyph empty. Four
+//     clubs set their labels in a face of their own (CLUB_FACES: Comic Neue,
+//     Playfair Display), with the three voices behind it.
 //
 //   * CLUB MARKS. The official one-colour marks (logos/*-black.svg) are the
 //     icon column's fallback when TwoTimTwo's own club image cannot be fetched.
@@ -60,12 +62,58 @@ const FONT_FILES = Object.freeze([
   { family: 'Londrina Solid',       file: 'LondrinaSolid-Regular.ttf' },
   { family: 'Londrina Solid Black', file: 'LondrinaSolid-Black.ttf' },
   { family: 'Figtree',              file: 'Figtree-Variable.ttf' },
+  // The club faces (owner 2026-10-12): labels only, never a screen.
+  { family: 'Comic Neue',           file: 'ComicNeue-Regular.ttf' },
+  { family: 'Comic Neue Bold',      file: 'ComicNeue-Bold.ttf' },
+  { family: 'Playfair Display',     file: 'PlayfairDisplay-Variable.ttf' },
 ]);
+
+// Clubs whose labels are set in a face of their own rather than the kit's
+// three voices (owner 2026-10-12, from previews he approved): Puggles and
+// Cubbies in Comic Neue, Trek and Journey in Playfair Display; Sparks and T&T
+// keep the stock voices. Keyed by club key, like MARK_ROTATE, so the renderer
+// names no club. Each set gives the face for the label's three weights of
+// text: `shout` (the first name, the monogram), `bold` (the club line, the
+// handbook group, "Go to", the pills, chips and bands) and `regular` (the last
+// name and every other small line). Playfair Display ships as one variable
+// font, so its weight travels as `wght` (fontVariationSettings, as Figtree's
+// does; measured: the canvas draws and measures each weight); Comic Neue's two
+// cuts are two families, like Londrina's.
+//
+// A set is used only while EVERY family in it loaded (clubFaces): a club whose
+// face is missing or damaged prints its whole label in the stock voices, never
+// half in one face and half in the other. A character the club face lacks
+// (Comic Neue has no Vietnamese, Ș, Ğ, İ or Cyrillic; Playfair Display no
+// Greek) falls back word by word to the stock voice and then to the old
+// Windows face (labelType in server/label-type.js).
+const comicNeue = () => Object.freeze({
+  shout:   Object.freeze({ family: 'Comic Neue Bold' }),
+  bold:    Object.freeze({ family: 'Comic Neue Bold' }),
+  regular: Object.freeze({ family: 'Comic Neue' }),
+});
+const playfairDisplay = () => Object.freeze({
+  shout:   Object.freeze({ family: 'Playfair Display', wght: 800 }),
+  bold:    Object.freeze({ family: 'Playfair Display', wght: 700 }),
+  regular: Object.freeze({ family: 'Playfair Display', wght: 400 }),
+});
+const CLUB_FACES = Object.freeze({
+  puggle:  comicNeue(),
+  cubbie:  comicNeue(),
+  trek:    playfairDisplay(),
+  journey: playfairDisplay(),
+});
 
 // Keyed by server.js's clubKey(). One colour, black, because the label prints
 // black on a thermal printer; the converter re-inks it white on an inverted
 // label.
 const MARK_FILES = Object.freeze(Object.fromEntries(CLUB_TABLE.map((c) => [c.key, `${c.mark}-black.svg`])));
+
+// Clubs whose mark prints SIDEWAYS on the label: rotated 90 degrees
+// counter-clockwise (reads bottom to top) so a wide wordmark fills the tall
+// icon panel instead of shrinking to a thin strip. Owner's choice 2026-10-12;
+// T&T stays upright. Only the kit mark turns: the supplied image and the
+// monogram fallbacks stay upright.
+const MARK_ROTATE = Object.freeze({ puggle: true, cubbie: true, spark: true, trek: true, journey: true });
 
 // How the warnings name them to an operator.
 const MARK_NAMES = Object.freeze(Object.fromEntries(CLUB_TABLE.map((c) => [c.key, c.name])));
@@ -422,21 +470,40 @@ function wordUnits(s) {
 // accented letter out of a base and a combining mark, but that is not
 // something to rely on for a child's name. One run of the whole string when
 // the font is not ready, so a caller can always just iterate.
+//
+// `family` may also be a list in order of preference (a club's face, then the
+// stock voice behind it): each word then goes to the FIRST family that draws
+// all of it, and every run names it (`family`, null for none; `brand` is
+// whether there is one). Families that did not load are skipped.
 function splitRuns(family, text) {
   const s = String(text == null ? '' : text);
-  const f = kit.fonts.get(family);
-  if (!f || !f.ok) return [{ text: s, brand: false }];
+  const list = (Array.isArray(family) ? family : [family])
+    .map((name) => ({ name, f: kit.fonts.get(name) }))
+    .filter(({ f }) => f && f.ok);
+  if (!list.length) return [{ text: s, brand: false, family: null }];
+  const draws = (f, unit) => {
+    for (const ch of unit) {
+      if (!rangesHave(f.ranges, ch.codePointAt(0))) return false;
+    }
+    return true;
+  };
   const runs = [];
   for (const unit of wordUnits(s)) {
-    let brand = true;
-    for (const ch of unit) {
-      if (!rangesHave(f.ranges, ch.codePointAt(0))) { brand = false; break; }
-    }
+    const pick = list.find(({ f }) => draws(f, unit));
+    const name = pick ? pick.name : null;
     const last = runs[runs.length - 1];
-    if (last && last.brand === brand) last.text += unit;
-    else runs.push({ text: unit, brand });
+    if (last && last.family === name) last.text += unit;
+    else runs.push({ text: unit, brand: !!name, family: name });
   }
-  return runs.length ? runs : [{ text: s, brand: true }];
+  return runs.length ? runs : [{ text: s, brand: true, family: list[0].name }];
+}
+
+// The club's own face set (CLUB_FACES) while every family in it loaded, else
+// null: the label is then set in the stock voices.
+function clubFaces(clubKey) {
+  const set = Object.prototype.hasOwnProperty.call(CLUB_FACES, clubKey) ? CLUB_FACES[clubKey] : null;
+  if (!set) return null;
+  return Object.values(set).every((v) => fontReady(v.family)) ? set : null;
 }
 
 // The mark's SVG, sized for rasterising, or null (no mark for this club, or
@@ -486,7 +553,7 @@ function warnings() {
     const list = st.fonts.failed.map((f) => `${f} (${st.fonts.reasons[f]})`).join(', ');
     out.push({
       type: 'brandFonts',
-      message: `Label fonts did not load: ${list}. Labels still print, with the older Windows fonts for that text. Reinstall or update Club Label Printer to restore them.`,
+      message: `Label fonts did not load: ${list}. Labels still print, with the older Windows fonts for that text (a club whose own face did not load prints in the standard label fonts). Reinstall or update Club Label Printer to restore them.`,
     });
   }
   if (st.marks.failed.length) {
@@ -512,9 +579,9 @@ function warnings() {
 }
 
 module.exports = {
-  DEFAULT_BRAND_DIR, FONT_FILES, MARK_FILES, MARK_RASTER_LONG_SIDE,
+  DEFAULT_BRAND_DIR, FONT_FILES, CLUB_FACES, MARK_FILES, MARK_ROTATE, MARK_RASTER_LONG_SIDE,
   loadBrandKit, status, warnings,
-  fontReady, fontCovers, splitRuns, clubMarkSvg, markFailed, kitGeneration,
+  fontReady, fontCovers, splitRuns, clubFaces, clubMarkSvg, markFailed, kitGeneration,
   // Pure helpers, exported for unit tests.
   readCmapRanges, svgAtSize, fontFileProblem,
 };

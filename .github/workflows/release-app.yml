@@ -513,7 +513,9 @@ jobs:
           # installed app. A label still prints without it (every piece falls
           # back), which is exactly why a packaging slip would otherwise go
           # unnoticed until someone looks at a label: fail the release here.
-          if (-not $health.fonts -or $health.fonts.failed.Count -ne 0 -or $health.fonts.loaded.Count -lt 4) {
+          # Seven faces: the four stock ones and the club faces (Comic Neue,
+          # Comic Neue Bold, Playfair Display).
+          if (-not $health.fonts -or $health.fonts.failed.Count -ne 0 -or $health.fonts.loaded.Count -lt 7) {
             throw "Label fonts did not load in the installed app: $($health.fonts | ConvertTo-Json -Compress)"
           }
           if (-not $health.clubMarks -or $health.clubMarks.failed.Count -ne 0 -or $health.clubMarks.loaded.Count -lt 6) {

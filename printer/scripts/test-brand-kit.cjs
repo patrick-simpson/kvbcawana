@@ -157,9 +157,32 @@ async function main() {
   console.log('brand kit: the shipped kit loads whole');
   {
     const st = brand.status();
-    check('all four label fonts loaded', st.fonts.loaded.length === 4 && st.fonts.failed.length === 0, JSON.stringify(st.fonts));
-    check('...by family: Paytone One, Londrina Solid (+ Black), Figtree',
-      ['Paytone One', 'Londrina Solid', 'Londrina Solid Black', 'Figtree'].every((f) => st.fonts.loaded.includes(f)));
+    check('all seven label fonts loaded', st.fonts.loaded.length === 7 && st.fonts.failed.length === 0, JSON.stringify(st.fonts));
+    check('...by family: Paytone One, Londrina Solid (+ Black), Figtree, and the club faces Comic Neue (+ Bold), Playfair Display',
+      ['Paytone One', 'Londrina Solid', 'Londrina Solid Black', 'Figtree', 'Comic Neue', 'Comic Neue Bold', 'Playfair Display']
+        .every((f) => st.fonts.loaded.includes(f)));
+    // The club faces (owner 2026-10-12) are the full upstream files, pinned:
+    // a subset or a changed file would print a different label, and Playfair
+    // Display carries a Reserved Font Name (lobby's brandKit.test.js holds it
+    // to the same whole-font rule as Paytone One and Londrina Solid).
+    const crypto = require('crypto');
+    const PINS = {
+      'ComicNeue-Regular.ttf': ['a0ee5a37c8b27c4db0700137d928598b1e23b0089e1546a8961909176b779360', 57248],
+      'ComicNeue-Bold.ttf': ['3e7e5fccfd7e0788f317b43312151c1bd5cf058c9697a8d83eac3939050bd61e', 55716],
+      'PlayfairDisplay-Variable.ttf': ['c40f2293766a503bc70cce9e512ef844a4ccb7cbcde792fe2ea31d191917d8d6', 300724],
+    };
+    for (const [file, [sha, bytes]] of Object.entries(PINS)) {
+      const buf = fs.readFileSync(path.join(MIRROR_DIR, 'fonts', file));
+      check(`${file} is the pinned upstream file (${bytes} bytes)`,
+        buf.length === bytes && crypto.createHash('sha256').update(buf).digest('hex') === sha, `${buf.length} bytes`);
+    }
+    check('each club face ships with its license', ['OFL-ComicNeue.txt', 'OFL-PlayfairDisplay.txt']
+      .every((f) => fs.existsSync(path.join(MIRROR_DIR, 'fonts', f))));
+    check('the club faces are keyed to Puggles, Cubbies, Trek and Journey, and every family they name is registered',
+      JSON.stringify(Object.keys(brand.CLUB_FACES).sort()) === JSON.stringify(['cubbie', 'journey', 'puggle', 'trek'])
+      && Object.values(brand.CLUB_FACES).every((set) => ['shout', 'bold', 'regular'].every((t) => brand.FONT_FILES.some((f) => f.family === set[t].family))));
+    check('...and each club face set is ready on the shipped kit', ['puggle', 'cubbie', 'trek', 'journey'].every((k) => brand.clubFaces(k))
+      && brand.clubFaces('spark') === null && brand.clubFaces('t&t') === null && brand.clubFaces(null) === null);
     // The shout is named in three places that must agree: the canvas
     // registration here, the kit's tokens (what the dashboard, the phone and
     // the status window ask for) and the @font-face the pages load. A family
@@ -225,8 +248,28 @@ async function main() {
     check('...or a keycap digit from its selector',
       keycap.length === 2 && keycap[1].text === '1\uFE0F\u20E3' && keycap[1].brand === false, JSON.stringify(keycap));
     check('no font has an emoji', !brand.fontCovers('Figtree', '⭐'));
-    check('every voice has the ellipsis truncation appends',
-      ['Paytone One', 'Londrina Solid', 'Londrina Solid Black', 'Figtree'].every((f) => brand.fontCovers(f, '…')));
+    check('every voice and club face has the ellipsis truncation appends',
+      ['Paytone One', 'Londrina Solid', 'Londrina Solid Black', 'Figtree', 'Comic Neue', 'Comic Neue Bold', 'Playfair Display']
+        .every((f) => brand.fontCovers(f, '…')));
+    // The club faces' coverage, which decides what falls back on their labels
+    // (each word the club face lacks goes to the stock voice, then the old
+    // face). Measured from the files; pinned so a changed file says so.
+    for (const f of ['Comic Neue', 'Comic Neue Bold']) {
+      check(`${f} draws a plain name and Latin-1 accents`, brand.fontCovers(f, 'Testkid Zoë José Ñandú Çelik'));
+      check(`${f} draws Polish and Czech (Ł Ž ř)`, brand.fontCovers(f, 'Łukasz Žofie Dvořák'));
+      check(`${f} lacks Ș (it has Ț), Ğ İ, precomposed Vietnamese, Cyrillic and Greek (those words fall back)`,
+        ['Ștefan', 'Ğ', 'İ', 'Thảo', 'Nguyễn', 'Дима', 'Γιώργος'].every((w) => !brand.fontCovers(f, w)));
+    }
+    check('Playfair Display draws Latin Extended-A, Romanian, Vietnamese and Cyrillic',
+      brand.fontCovers('Playfair Display', 'Łukasz Žofie Şener Ğ İ Ştefan Ștefan Țara Thảo Nguyễn Thị Ấn Дима Добро'));
+    check('Playfair Display lacks Greek and CJK (those words fall back)',
+      !brand.fontCovers('Playfair Display', 'Γιώργος') && !brand.fontCovers('Playfair Display', '李明'));
+    check('no club face has the Ewe ɔ or an emoji', ['Comic Neue', 'Comic Neue Bold', 'Playfair Display']
+      .every((f) => !brand.fontCovers(f, 'ɔ') && !brand.fontCovers(f, '⭐')));
+    const chain = brand.splitRuns(['Comic Neue', 'Paytone One'], 'Hi Ștefan Дима');
+    check('a list of families: each word goes to the first that draws it, else to none',
+      JSON.stringify(chain.map((r) => [r.text, r.family, r.brand])) === JSON.stringify([['Hi ', 'Comic Neue', true], ['Ștefan', 'Paytone One', true], [' ', 'Comic Neue', true], ['Дима', null, false]]),
+      JSON.stringify(chain));
     const runs = brand.splitRuns('Figtree', '⭐ 10th club night tonight!');
     check('a mixed line splits into a fallback run and a brand run',
       runs.length === 2 && runs[0].brand === false && runs[0].text === '⭐' && runs[1].brand === true,
@@ -408,7 +451,7 @@ async function main() {
     }
     if (name === 'missing' || name === 'empty') {
       check(`${name}: every font reported failed, as "file missing"`,
-        st.fonts.failed.length === 4 && Object.values(st.fonts.reasons).every((r) => r === 'file missing'), JSON.stringify(st.fonts));
+        st.fonts.failed.length === 7 && Object.values(st.fonts.reasons).every((r) => r === 'file missing'), JSON.stringify(st.fonts));
       check(`${name}: every mark reported failed`, st.marks.failed.length === 6, JSON.stringify(st.marks));
     }
     if (name === 'corruptFonts') {
@@ -489,7 +532,7 @@ async function main() {
     check('/health answers', ok.status === 200 && ok.body && ok.body.status === 'ok', JSON.stringify(ok.body).slice(0, 200));
     const b = ok.body || {};
     check('fonts: {loaded, failed} on a whole kit',
-      b.fonts && Array.isArray(b.fonts.loaded) && b.fonts.loaded.length === 4 && Array.isArray(b.fonts.failed) && b.fonts.failed.length === 0,
+      b.fonts && Array.isArray(b.fonts.loaded) && b.fonts.loaded.length === 7 && Array.isArray(b.fonts.failed) && b.fonts.failed.length === 0,
       JSON.stringify(b.fonts));
     check('clubMarks: all six loaded', b.clubMarks && b.clubMarks.loaded.length === 6 && b.clubMarks.failed.length === 0,
       JSON.stringify(b.clubMarks));
@@ -500,7 +543,7 @@ async function main() {
     const bad = await health();
     const bb = bad.body || {};
     check('fonts.failed names every font when the kit is gone',
-      bb.fonts && bb.fonts.failed.length === 4 && bb.fonts.loaded.length === 0, JSON.stringify(bb.fonts));
+      bb.fonts && bb.fonts.failed.length === 7 && bb.fonts.loaded.length === 0, JSON.stringify(bb.fonts));
     const brandWarnings = (bb.warnings || []).filter((w) => w && /^brand/.test(w.type));
     check('two brand warnings: fonts and marks',
       brandWarnings.map((w) => w.type).sort().join(',') === 'brandFonts,brandMarks', JSON.stringify(brandWarnings));
