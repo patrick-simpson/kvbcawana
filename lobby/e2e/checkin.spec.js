@@ -10,7 +10,7 @@ import { mergeChurch, sanitizeChurch } from '../shared/churchSettings.js';
 // the desk's online path, ROADMAP.md#online-check-in) in a real browser against a
 // stand-in Worker: sign in (passphrase v2), a busy 429, families-first search,
 // two siblings checked in together with Bible and Brought a friend, undo, check
-// out, a visitor, the one-off, leader and custom labels, the youth page, and the
+// out, the walk-in, leader and custom labels, the queue, a late BARF friend, the youth page, and the
 // error states (a refusal, already checked in, no internet, signed out). Every
 // seal is the page's: the stand-in opens what it was sent with the station's and
 // the history key's private keys, and checks that no child's name travelled in
@@ -221,25 +221,23 @@ test('sign in, search, check two siblings in with Bible and a friend, undo one, 
   await expect(page.locator('#count-pill')).toHaveText('1 in');
 });
 
-test('a visitor is checked in by name; one-off, leader and custom labels print without a check-in', async ({ page }) => {
+test('a walk-in name tag prints and is welcomed but never counted; leader and custom labels print without a check-in', async ({ page }) => {
   test.setTimeout(60_000);
   const { world, stationRing } = await stubSite(page);
   world.busyFirst = false;
   await signIn(page);
   await expect(page.locator('#list')).toContainText('families still to come', { timeout: 10_000 });
+  // Not on the list: the page points to the walk-in tag (no visitor check-in any more).
+  await search(page).fill('Zed');
+  await expect(page.locator('#list')).toContainText('Not on the list? Tap + for a walk-in name tag.');
+  await search(page).fill('');
 
   await page.locator('#menu-btn').click();
-  await page.getByLabel('Visitor\'s full name').fill('Mia Jones');
-  await page.locator('#visitor-club').selectOption('Cubbies');
-  await page.locator('#visitor-print').click();
-  await expect(page.locator('#toast')).toContainText('Mia is checked in (visitor)');
-  expect(world.posts[0].body.visitor).toEqual({ first: 'Mia', last: 'Jones', club: 'Cubbies' });
-  expect(world.posts[0].body.clubberId).toBeUndefined();
-  expect(world.posts[0].body.historyRow.kind).toBe('visitor');
-
-  await page.locator('#menu-btn').click();
+  await expect(page.locator('#oneoff-h')).toHaveText('Walk-in name tag');
+  await expect(page.locator('#visitor-form')).toHaveCount(0);
   await page.getByLabel('Child’s first name').fill('Ava');
   await page.locator('#oneoff-clubs').getByRole('radio', { name: 'Puggles' }).click();
+  await page.screenshot({ path: shot('walkin-menu.png') });
   await page.locator('#oneoff-print').click();
   await expect(page.locator('#toast')).toContainText('Printing Ava’s tag');
   await page.getByLabel('Leader\'s name').fill('Pat Leader');
@@ -250,7 +248,7 @@ test('a visitor is checked in by name; one-off, leader and custom labels print w
   await page.locator('#custom-print').click();
   await expect(page.locator('#toast')).toContainText('Custom label sent');
   expect(world.tags.map((t) => t.jobId)).toEqual([expect.stringMatching(/^reprint:/), expect.stringMatching(/^reprint:/), expect.stringMatching(/^reprint:/)]);
-  // the print server's own routes and bodies: what the station's puller runs
+  // the print server's own routes and bodies: what the station's puller runs (a walk-in is the one-off route: greeted, never counted)
   const opened = await Promise.all(world.tags.map((t) => cc.openAsStation(stationRing, t.bundle)));
   expect(opened.map((o) => [o.route, o.body])).toEqual([
     ['/print-oneoff', { firstName: 'Ava', clubName: 'Puggles' }],
@@ -258,15 +256,40 @@ test('a visitor is checked in by name; one-off, leader and custom labels print w
     ['/print-custom', { text: 'KITCHEN' }],
   ]);
   for (const t of world.tags) expect(JSON.stringify(t)).not.toMatch(/Ava|Pat|KITCHEN/);
-  expect(world.posts.filter((p) => p.path === '/v1/desk/checkin')).toHaveLength(1);   // only the visitor
+  expect(world.posts).toHaveLength(0);   // nothing checked in, nothing counted
 
+  // Tonight lists the walk-in so the volunteers remember to register them; the count stays 0.
+  await page.locator('#menu-close').click();
+  await expect(page.locator('#count-pill')).toHaveText('0 in');
+  await page.locator('#count-pill').click();
+  const row = page.locator('#tonight-list .row', { hasText: 'Ava' });
+  await expect(row).toContainText('walk-in · not registered yet');
+  await expect(row.locator('button')).toHaveCount(0);
+  await expect(page.locator('#tonight-total')).toHaveText('0 here now · 1 walk-in');
+  await page.screenshot({ path: shot('walkin-tonight.png') });
+});
+
+test('/checkin/ym: the + menu is the walk-in tag alone, for Trek and Journey', async ({ page }) => {
+  test.setTimeout(60_000);
+  const { world, stationRing } = await stubSite(page);
+  world.busyFirst = false;
+  await signIn(page, '/checkin/ym/');
+  await expect(page.locator('#list')).toContainText('still to come', { timeout: 10_000 });
+  await page.locator('#menu-btn').click();
+  await expect(page.locator('#oneoff-panel')).toBeVisible();
+  await expect(page.locator('#leader-panel')).toBeHidden();
+  await expect(page.locator('#custom-panel')).toBeHidden();
+  await expect(page.locator('#oneoff-clubs').getByRole('radio')).toHaveText(['Trek', 'Journey']);
+  await page.getByLabel('Child’s first name').fill('Rex');
+  await page.locator('#oneoff-clubs').getByRole('radio', { name: 'Journey' }).click();
+  await page.screenshot({ path: shot('ym-walkin-menu.png') });
+  await page.locator('#oneoff-print').click();
+  await expect(page.locator('#toast')).toContainText('Printing Rex’s tag');
+  expect((await cc.openAsStation(stationRing, world.tags[0].bundle)).body).toEqual({ firstName: 'Rex', clubName: 'Journey' });
   await page.locator('#menu-close').click();
   await page.locator('#count-pill').click();
-  await expect(page.locator('#tonight-list .row', { hasText: 'Mia Jones' })).toContainText('Visitor');
-  await page.locator('.row', { hasText: 'Mia Jones' }).getByRole('button', { name: 'Remove' }).click();
-  await page.locator('#confirm-ok').click();
-  await expect(page.locator('#toast')).toContainText('Mia Jones removed from tonight');
-  expect(world.posts.at(-1)).toMatchObject({ path: '/v1/desk/undo', body: { visitor: { first: 'Mia', last: 'Jones', club: 'Cubbies' } } });
+  await expect(page.locator('#tonight-list .row', { hasText: 'Rex' })).toContainText('walk-in · not registered yet');
+  await expect(page.locator('#count-pill')).toHaveText('0 in');
 });
 
 test('error states: a refusal puts the child back, no internet points to the paper sheet', async ({ page }) => {
@@ -295,7 +318,7 @@ test('error states: a refusal puts the child back, no internet points to the pap
   await expect(page.locator('.fam', { hasText: 'Cy Other' })).toHaveCount(1);
 });
 
-test('the youth leaders\' page shows Trek and Journey only, check-in only, on the same path', async ({ page }) => {
+test('the youth leaders\' page shows Trek and Journey only, on the same path', async ({ page }) => {
   const { world } = await stubSite(page);
   world.busyFirst = false;
   await signIn(page, '/checkin/ym/');
@@ -303,7 +326,7 @@ test('the youth leaders\' page shows Trek and Journey only, check-in only, on th
   await expect(page.locator('#list')).toContainText('1 family still to come', { timeout: 10_000 });
   await expect(page.locator('.fam')).toHaveText(/Tia Youth/);
   await expect(page.locator('#count-pill')).toBeVisible();   // its own Tonight, with Undo check-in
-  await expect(page.locator('#menu-btn')).toBeHidden();
+  await expect(page.locator('#menu-btn')).toBeVisible();   // the walk-in tag alone
   await page.locator('.fam').click();
   await page.locator('#kid-sheet').getByRole('button', { name: 'Check in' }).click();
   await expect(page.locator('#toast')).toContainText('Tia Youth is checked in');

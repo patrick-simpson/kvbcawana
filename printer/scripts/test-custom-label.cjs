@@ -285,7 +285,7 @@ async function main() {
 
     check('the phone page has a Custom label panel after the leader panel',
       phone.indexOf('id="custom-panel"') > phone.indexOf('id="leader-panel"')
-      && phone.indexOf('id="custom-panel"') < phone.indexOf('id="visitor-form"'));
+      && phone.indexOf('id="custom-panel"') < phone.indexOf('id="menu-close"'));
     check('it prints through the Worker as a sealed job on /print-custom (site/checkin/desk-transport.js)',
       /desk\.customLabel\(\{ text: text \}\)/.test(phone)
       && /reprintJob\('\/print-custom', \{ text \}\)/.test(read('..', 'site', 'checkin', 'desk-transport.js')));

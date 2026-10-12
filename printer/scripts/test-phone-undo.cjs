@@ -290,7 +290,8 @@ async function serverSuite() {
       // undo, a sealed history row); /phone/undo stays for the laptop's touch screen.
       check('the phone page undoes through the Worker\'s desk route (TwoTimTwo\'s own undo)', /desk\.undo\(childOf\(entry\)\)/.test(phone));
       check('a failure says why and changes nothing', /'Not undone in TwoTimTwo: '/.test(phone) && /delete OPS\[entry\.key\];\n\s+renderTonight\(\);/.test(phone));
-      check('Undo check-in is offered only on a child on TwoTimTwo; a visitor gets Remove', /e\.visitor \? 'Remove' : 'Undo check-in'/.test(phone));
+      // Owner 2026-10-12: no visitor check-in on the page any more; a walk-in (a one-off tag) is listed, never undone.
+      check('Undo check-in is offered on every checked-in child, never on a walk-in', /opText\('undo', 'Undo check-in', 'Undoing…'\)/.test(phone) && /if \(!e\.checkedOut && !e\.walkin\) \{/.test(phone));
       const relay = require(path.join(root, 'print-server', 'phone-relay.js'));
       check('the website\'s relay already carries both calls', relay.relayAllowed('POST', '/phone/undo') && relay.relayAllowed('GET', '/phone/status/0f8c1a2b-3c4d-4e5f-8a9b-0c1d2e3f4a5b'));
     }

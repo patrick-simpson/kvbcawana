@@ -274,7 +274,7 @@
   <img class="brand-mark" src="/brand/logos/awana-clubs-white.svg" alt="Awana Clubs">
   <h1>Check in</h1>
   <button class="pill" id="count-pill" type="button" hidden>0 in</button>
-  <button class="round" id="menu-btn" type="button" aria-label="More: one-off name tag, leader tag, custom label, visitor" hidden>+</button>
+  <button class="round" id="menu-btn" type="button" aria-label="More: walk-in name tag, leader tag, custom label" hidden>+</button>
 </header>
 
 <div class="pin" id="pin-screen">
@@ -324,13 +324,13 @@
 <div class="sheet" id="menu-sheet" role="dialog" aria-modal="true">
   <div class="grab"></div>
   <div class="menu-sec" id="oneoff-panel">
-    <h3 id="oneoff-h">One-off name tag</h3>
+    <h3 id="oneoff-h">Walk-in name tag</h3>
     <div class="field">
       <input type="text" id="oneoff-name" maxlength="40" placeholder="Child’s first name" autocomplete="off" autocorrect="off" autocapitalize="words" spellcheck="false" enterkeyhint="go" aria-label="Child’s first name">
       <div class="cpick" id="oneoff-clubs" role="radiogroup" aria-label="Child’s club"></div>
       <button class="btn go" id="oneoff-print" type="button" disabled>Print tag</button>
     </div>
-    <p class="quiet">Prints a name tag and welcomes them on the screens. It doesn’t count toward tonight.</p>
+    <p class="quiet">Not on the list yet? Prints a name tag and welcomes them on the screens. It doesn’t count tonight: register them on TwoTimTwo and check them in properly later.</p>
     <p class="err" id="oneoff-status" role="alert"></p>
   </div>
   <div class="menu-sec" id="leader-panel">
@@ -353,16 +353,6 @@
       <button class="btn" id="custom-print" type="button">Print custom label</button>
     </div>
     <p class="err" id="custom-status"></p>
-  </div>
-  <div class="menu-sec" id="visitor-form">
-    <h3>Visitor not on the list</h3>
-    <div class="field">
-      <input type="text" id="visitor-name" maxlength="80" placeholder="Visitor's full name" autocomplete="off" aria-label="Visitor's full name">
-      <select id="visitor-club" aria-label="Visitor's club"></select>
-      <button class="btn" id="visitor-print" type="button">Check in visitor</button>
-    </div>
-    <p class="quiet">Counted tonight and printed; a visitor is not on TwoTimTwo.</p>
-    <p class="err" id="visitor-status"></p>
   </div>
   <div class="acts"><button class="btn ghost" id="menu-close" type="button">Close</button></div>
 </div>
@@ -594,7 +584,7 @@ var CLUBS = ['Puggles', 'Cubbies', 'Sparks', 'T&T', 'Trek', 'Journey'];   // rep
 var STATE = {};                // child key -> { status: 'pending'|'waiting'|'done'|'failed', left?, msg? } (the check-in queue)
 var SERVER_TONIGHT = null;     // GET /v1/desk/tonight: the Worker's own count, when it answers
 var OPS = {};                  // Tonight row key -> { kind: 'undo'|'checkout', status: 'pending'|'waiting', left? } (the same queue)
-var LOCAL = { night: '', visitors: [], out: [], at: {} };   // what only this page knows tonight
+var LOCAL = { night: '', walkins: [], out: [], at: {} };   // what only this page knows tonight
 // Who was here the last two club nights: { names: {normName: true}, ids: {clubberId: true} }
 // or null. Built in THIS page's memory from the sealed history (desk.recentAttendance(),
 // opened with the history key the passphrase sign-in unwrapped), never stored; null
@@ -694,30 +684,26 @@ function loadModules() {
   return modules;
 }
 
-// What this page did tonight and the roster cannot say: visitors, who it
-// checked out, and when. Per night, per tab (sessionStorage); a reload keeps it.
+// What this page did tonight and the roster cannot say: the walk-ins it printed
+// (not registered yet, never counted), who it checked out, and when. Per night,
+// per tab (sessionStorage); a reload keeps it.
 function loadLocal() {
   try {
     var v = JSON.parse(sessionStorage.getItem(LOCAL_KEY) || 'null');
-    if (v && v.night === desk.night) return { night: v.night, visitors: v.visitors || [], out: v.out || [], at: v.at || {} };
+    if (v && v.night === desk.night) return { night: v.night, walkins: v.walkins || [], out: v.out || [], at: v.at || {} };
   } catch (e) { /* none */ }
-  return { night: desk.night, visitors: [], out: [], at: {} };
+  return { night: desk.night, walkins: [], out: [], at: {} };
 }
 function saveLocal() { try { sessionStorage.setItem(LOCAL_KEY, JSON.stringify(LOCAL)); } catch (e) { /* the list lasts this load */ } }
 
 // The one club list (lobby/shared/clubs.js, served beside this page), plus any club the roster names.
 function fillClubSelects() {
-  var lead = $('leader-club'), vis = $('visitor-club');
-  var keepL = lead.value, keepV = vis.value;
-  lead.textContent = ''; vis.textContent = '';
+  var lead = $('leader-club');
+  var keepL = lead.value;
+  lead.textContent = '';
   var none = el('option', null, 'No club'); none.value = ''; lead.appendChild(none);
-  var seen = {}, clubs = [];
-  CLUBS.forEach(function(c) { seen[c] = true; clubs.push(c); });
-  KIDS.forEach(function(k) { var c = (k.club || '').trim(); if (c && !seen[c]) { seen[c] = true; clubs.push(c); } });
   CLUBS.forEach(function(c) { var o = el('option', null, c); o.value = c; lead.appendChild(o); });
-  clubs.forEach(function(c) { var o = el('option', null, c); o.value = c; vis.appendChild(o); });
   if (keepL) lead.value = keepL;
-  if (keepV) vis.value = keepV;
   renderOneOffClubs();
 }
 
@@ -740,7 +726,10 @@ function showMainScreen() {
   $('main-screen').hidden = false;
   // The youth page too (owner 2026-10-12): its Tonight lists its own clubs, with Undo check-in.
   $('count-pill').hidden = false;
-  $('menu-btn').hidden = SIMPLE;
+  $('menu-btn').hidden = false;
+  // The youth page's + menu is the walk-in tag alone (its own clubs).
+  $('leader-panel').hidden = SIMPLE;
+  $('custom-panel').hidden = SIMPLE;
 }
 function showPinScreen(message) {
   closeAll();
@@ -1146,7 +1135,7 @@ function renderSearch(list, q) {
     list.appendChild(box);
   }
   if (!exact.length && !near.length && !kids.length && !away.length) {
-    list.appendChild(el('div', 'note', 'No child matches “' + q.trim() + '”. A visitor? Tap + for a visitor.'));
+    list.appendChild(el('div', 'note', 'No child matches “' + q.trim() + '”. Not on the list? Tap + for a walk-in name tag.'));
   }
 }
 
@@ -1608,24 +1597,24 @@ document.addEventListener('visibilitychange', function() {
 });
 
 // ── Tonight (the count pill) ───────────────────────────────────────────────
-// Who is in: the roster's checked-in children and the visitors this page
+// Who is in: the roster's checked-in children (and the walk-ins this page
 // checked in; the count is the Worker's own (GET /v1/desk/tonight) when it
 // answers, else this list's.
 function tonightRows() {
   var rows = KIDS.filter(function(k) { return k.checkedIn; }).map(function(k) {
     var parts = k.name.split(' ');
     return { key: kidKey(k), firstName: parts[0] || '', lastName: parts.slice(1).join(' '), clubName: k.club || '', clubberId: k.clubberId,
-      visitor: false, checkedOut: LOCAL.out.indexOf(kidKey(k)) !== -1, at: LOCAL.at[kidKey(k)] || null, kid: k };
+      checkedOut: LOCAL.out.indexOf(kidKey(k)) !== -1, at: LOCAL.at[kidKey(k)] || null, kid: k };
   });
-  LOCAL.visitors.forEach(function(v) {
-    var parts = v.name.split(' ');
-    rows.push({ key: v.key, firstName: parts[0] || '', lastName: parts.slice(1).join(' '), clubName: v.club || '', clubberId: null,
-      visitor: true, checkedOut: LOCAL.out.indexOf(v.key) !== -1, at: v.at || null });
+  // Tonight's walk-ins (a walk-in name tag from this page): listed so the volunteers
+  // remember to register them, never counted (owner 2026-10-12).
+  LOCAL.walkins.forEach(function(w) {
+    rows.push({ key: w.key, firstName: w.name || '', lastName: '', clubName: w.club || '', clubberId: null, walkin: true, checkedOut: false, at: w.at || null });
   });
   return rows;
 }
 function tonightCounts() {
-  var rows = tonightRows(), here = rows.filter(function(r) { return !r.checkedOut; });
+  var rows = tonightRows().filter(function(r) { return !r.walkin; }), here = rows.filter(function(r) { return !r.checkedOut; });
   var byClub = {};
   here.forEach(function(r) { var c = r.clubName || 'No club'; byClub[c] = (byClub[c] || 0) + 1; });
   // The Worker's count is the whole church's: the youth page counts its own clubs.
@@ -1642,11 +1631,11 @@ function renderCount() {
 }
 function renderTonight() {
   var t = tonightCounts();
-  var visitors = LOCAL.visitors.filter(function(v) { return LOCAL.out.indexOf(v.key) === -1; }).length;
-  // "Here now": children checked out tonight are off the count.
+  var walkins = LOCAL.walkins.length;
+  // "Here now": children checked out tonight are off the count; walk-ins never count.
   $('tonight-total').textContent = t.checkedIn + ' here now' +
     (t.checkedOut ? ' · ' + t.checkedOut + ' checked out' : '') +
-    (visitors ? ' · ' + visitors + ' visitor' + (visitors === 1 ? '' : 's') : '');
+    (walkins ? ' · ' + walkins + ' walk-in' + (walkins === 1 ? '' : 's') : '');
   var chips = $('tonight-chips');
   chips.textContent = '';
   Object.keys(t.byClub || {}).sort().forEach(function(club) {
@@ -1672,17 +1661,16 @@ function renderTonight() {
       var row = el('div', 'row'), who = el('div', 'who');
       row.dataset.name = (e.firstName + ' ' + e.lastName).trim();
       var b = el('b', null, (e.firstName + ' ' + e.lastName).trim());
-      if (e.visitor) b.appendChild(el('span', 'vtag', 'Visitor'));
+      if (e.walkin) b.appendChild(el('span', 'vtag', 'walk-in · not registered yet'));
       if (e.checkedOut) b.appendChild(el('span', 'vtag', 'Checked out'));
       who.appendChild(b);
       var d = e.at ? new Date(e.at) : null;
       who.appendChild(el('span', null, d && !isNaN(d.getTime()) ? d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : ''));
       var acts = el('div', 'rowacts');
       var op = OPS[e.key];
-      // Check out: on TwoTimTwo for a child with a TwoTimTwo id; a visitor is
-      // marked here (and off the service's count). Never twice. While either is
+      // Check out: on TwoTimTwo. Never twice. While either is
       // in the queue its button says so; a waiting one is stopped by a tap.
-      if (!e.checkedOut) {
+      if (!e.checkedOut && !e.walkin) {
         var opText = function(kind, idle, going) {
           if (!op || op.kind !== kind) return idle;
           return op.status === 'waiting' ? 'Waiting for TwoTimTwo… ' + op.left + 's' : going;
@@ -1694,8 +1682,8 @@ function renderTonight() {
           else cb.addEventListener('click', function() { askCheckout(e); });
           acts.appendChild(cb);
         }
-        // Undo check-in (TwoTimTwo's own undo) for a child on TwoTimTwo; Remove for a visitor.
-        var ub = el('button', e.visitor ? null : 'tt', opText('undo', e.visitor ? 'Remove' : 'Undo check-in', e.visitor ? 'Removing…' : 'Undoing…')); ub.type = 'button';
+        // Undo check-in: TwoTimTwo's own undo.
+        var ub = el('button', 'tt', opText('undo', 'Undo check-in', 'Undoing…')); ub.type = 'button';
         if (op) { ub.disabled = !(op.kind === 'undo' && op.status === 'waiting'); ub.addEventListener('click', function() { var j = jobFor('o:' + e.key); if (j) stopJob(j); }); }
         else ub.addEventListener('click', function() { askUndo(e); });
         acts.appendChild(ub);
@@ -1710,30 +1698,22 @@ $('tonight-close').addEventListener('click', hideSheet);
 
 // ── Tonight: undo / remove / check out ─────────────────────────────────────
 function displayName(entry) { return (entry.firstName + ' ' + entry.lastName).trim(); }
-function childOf(entry) { return { clubberId: entry.clubberId, name: displayName(entry), club: entry.clubName, visitor: entry.visitor }; }
+function childOf(entry) { return { clubberId: entry.clubberId, name: displayName(entry), club: entry.clubName }; }
 var pendingConfirm = null;     // { entry, mode: 'undo' | 'checkout' }
 function askUndo(entry) {
   var name = displayName(entry);
   pendingConfirm = { entry: entry, mode: 'undo' };
-  if (entry.visitor) {
-    $('confirm-title').textContent = 'Remove ' + name + ' from tonight?';
-    $('confirm-body').textContent = entry.firstName + ' is not on TwoTimTwo, so this only takes them off tonight’s count, and a label that has not printed yet is dropped.';
-    $('confirm-ok').textContent = 'Remove';
-  } else {
-    $('confirm-title').textContent = 'Undo ' + name + '’s check-in on TwoTimTwo?';
-    $('confirm-body').textContent = 'TwoTimTwo undoes it, and then ' + entry.firstName +
-      ' comes off tonight’s count and the lobby screens, and a label that has not printed yet is dropped. If TwoTimTwo does not confirm it, nothing changes and this page says why.';
-    $('confirm-ok').textContent = 'Undo check-in';
-  }
+  $('confirm-title').textContent = 'Undo ' + name + '’s check-in on TwoTimTwo?';
+  $('confirm-body').textContent = 'TwoTimTwo undoes it, and then ' + entry.firstName +
+    ' comes off tonight’s count and the lobby screens, and a label that has not printed yet is dropped. If TwoTimTwo does not confirm it, nothing changes and this page says why.';
+  $('confirm-ok').textContent = 'Undo check-in';
   showSheet('confirm-sheet');
 }
 function askCheckout(entry) {
   var name = displayName(entry);
   pendingConfirm = { entry: entry, mode: 'checkout' };
   $('confirm-title').textContent = 'Check out ' + name + '?';
-  $('confirm-body').textContent = entry.visitor
-    ? entry.firstName + ' is not on TwoTimTwo, so this only takes them off tonight’s count and the lobby’s still-here list.'
-    : 'TwoTimTwo checks ' + entry.firstName + ' out, and then they come off tonight’s count and the lobby’s still-here list. If TwoTimTwo does not answer OK, nothing changes and this page says why.';
+  $('confirm-body').textContent = 'TwoTimTwo checks ' + entry.firstName + ' out, and then they come off tonight’s count and the lobby’s still-here list. If TwoTimTwo does not answer OK, nothing changes and this page says why.';
   $('confirm-ok').textContent = 'Check out';
   showSheet('confirm-sheet');
 }
@@ -1771,14 +1751,13 @@ function rowJob(entry, kind, go, done, failWords) {
 function undoEntry(entry) {
   var name = displayName(entry);
   rowJob(entry, 'undo', function() { return desk.undo(childOf(entry)); }, function() {
-    if (entry.visitor) LOCAL.visitors = LOCAL.visitors.filter(function(v) { return v.key !== entry.key; });
-    else if (entry.kid) { entry.kid.checkedIn = false; rosterEpoch += 1; }
+    if (entry.kid) { entry.kid.checkedIn = false; rosterEpoch += 1; }
     saveLocal();
-    toast(entry.visitor ? name + ' removed from tonight.' : name + '’s check-in is undone.', 4000, null, null, 'good');
+    toast(name + '’s check-in is undone.', 4000, null, null, 'good');
     render(); renderTonight();
     setTimeout(refreshStatus, 800);
     scheduleRosterPoll(6000);
-  }, entry.visitor ? 'Not removed: ' : 'Not undone in TwoTimTwo: ');
+  }, 'Not undone in TwoTimTwo: ');
 }
 function checkoutEntry(entry) {
   var name = displayName(entry);
@@ -1791,10 +1770,10 @@ function checkoutEntry(entry) {
   }, 'Not checked out: ');
 }
 
-// ── The + menu: one-off name tag, leader tag, custom label, visitor ──────────
+// ── The + menu: walk-in name tag, leader tag, custom label ───────────────────
 // Every print here is a job sealed in this page to the print stations (a
-// reprint job, never a check-in, nothing sent to TwoTimTwo); a visitor is a
-// check-in like any other, named only inside the seals.
+// reprint job, never a check-in, nothing sent to TwoTimTwo). The youth page's
+// menu is the walk-in tag alone, for its own clubs.
 $('menu-btn').addEventListener('click', function() { refreshLeaders(); fillClubSelects(); showSheet('menu-sheet'); });
 $('menu-close').addEventListener('click', hideSheet);
 // A label's failure, in its own panel when it is not one every action words alike.
@@ -1916,25 +1895,30 @@ function printCustomLabel() {
 $('custom-print').addEventListener('click', printCustomLabel);
 $('custom-text').addEventListener('keydown', function(e) { if (e.key === 'Enter') printCustomLabel(); });
 
-// One-off name tag (7.18.0): a typed first name and a club, no roster lookup.
-// The screens welcome the child; the count never moves. After a print the
-// name clears and the club stays, so a run of tags is name, Print, name, Print.
+// Walk-in name tag (owner 2026-10-12; was the one-off tag and "Visitor not on the
+// list"): a typed first name and a club, no roster lookup, the print server's
+// /print-oneoff. The screens welcome the child; the count never moves; Tonight
+// lists them as "walk-in · not registered yet" until they are registered on
+// TwoTimTwo and checked in properly (then a normal check-in, tag and all). After a
+// print the name clears and the club stays: name, Print, name, Print.
 var oneOffClub = '';
 var oneOffInFlight = false;
 var oneOffClubsFor = '';
 // Rebuilt only when the club list changes (the roster poll calls this every
 // few seconds, and a chip swapped out under a finger would lose the tap).
+function walkinClubs() { return ONLY ? CLUBS.filter(function(c) { return ONLY.indexOf(clubKit(c)) !== -1; }) : CLUBS; }
 function renderOneOffClubs() {
   var box = $('oneoff-clubs');
-  if (oneOffClub && CLUBS.indexOf(oneOffClub) === -1) oneOffClub = '';
-  if (oneOffClubsFor === CLUBS.join('|')) {
+  var clubs = walkinClubs();
+  if (oneOffClub && clubs.indexOf(oneOffClub) === -1) oneOffClub = '';
+  if (oneOffClubsFor === clubs.join('|')) {
     Array.prototype.forEach.call(box.children, function(b) { b.setAttribute('aria-checked', b.textContent === oneOffClub ? 'true' : 'false'); });
     syncOneOff();
     return;
   }
-  oneOffClubsFor = CLUBS.join('|');
+  oneOffClubsFor = clubs.join('|');
   box.textContent = '';
-  CLUBS.forEach(function(c) {
+  clubs.forEach(function(c) {
     var kit = clubOf(c);
     var b = el('button', null, c);
     b.type = 'button';
@@ -1968,8 +1952,12 @@ function printOneOff() {
   oneOffInFlight = true;
   status.textContent = '';
   syncOneOff();
-  desk.oneOffTag({ name: firstName, club: oneOffClub }).then(function() {
+  var club = oneOffClub;
+  desk.oneOffTag({ name: firstName, club: club }).then(function() {
     oneOffInFlight = false;
+    LOCAL.walkins.push({ key: 'w:' + newRowId(), name: firstName, club: club, at: Date.now() });
+    saveLocal();
+    if (openSheet === 'tonight-sheet') renderTonight();
     toast('Printing ' + firstName + '’s tag.', 4000, null, null, 'good');
     input.value = '';
     syncOneOff();
@@ -1980,43 +1968,6 @@ function printOneOff() {
 $('oneoff-print').addEventListener('click', printOneOff);
 $('oneoff-name').addEventListener('input', function() { $('oneoff-status').textContent = ''; syncOneOff(); });
 $('oneoff-name').addEventListener('keydown', function(e) { if (e.key === 'Enter') printOneOff(); });
-
-// A visitor not on the roster: checked in by name (the Worker hashes it) and
-// printed, counted tonight.
-var visitorInFlight = false;
-function printVisitor() {
-  if (visitorInFlight) return;
-  var name = $('visitor-name').value.replace(/\s+/g, ' ').trim(), status = $('visitor-status');
-  if (!name || name.split(' ').length < 2) { status.textContent = 'Type the visitor’s first and last name.'; return; }
-  var club = $('visitor-club').value;
-  if (!club) { status.textContent = 'Pick the visitor’s club.'; return; }
-  var known = KIDS.filter(function(k) { return norm(k.name) === norm(name); })[0];
-  if (known) {
-    toast(known.name + ' is on TwoTimTwo’s list: check them in there.', 6000);
-    hideSheet();
-    $('search').value = name;
-    render();
-    return;
-  }
-  visitorInFlight = true;
-  status.textContent = '';
-  var btn = $('visitor-print');
-  btn.disabled = true;
-  desk.checkIn({ name: name, club: club, visitor: true }, {}).then(function(r) {
-    visitorInFlight = false; btn.disabled = false;
-    if (r.already) { toast('Already checked in (another phone or the desk got there first).'); return; }
-    var key = 'v:' + newRowId();
-    LOCAL.visitors.push({ key: key, name: name, club: club, at: Date.now() });
-    saveLocal();
-    toast(name.split(' ')[0] + ' is checked in (visitor).', 4000, null, null, 'good');
-    $('visitor-name').value = '';
-    hideSheet();
-    renderCount();
-    setTimeout(refreshStatus, 800);
-  }).catch(function(e) { visitorInFlight = false; btn.disabled = false; printFailed(e, status); });
-}
-$('visitor-print').addEventListener('click', printVisitor);
-$('visitor-name').addEventListener('keydown', function(e) { if (e.key === 'Enter') printVisitor(); });
 
 // ── Start ──────────────────────────────────────────────────────────────────
 // A sign-in already in this browser (the screens', /settings', this page's) is
