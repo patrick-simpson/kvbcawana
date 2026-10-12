@@ -103,6 +103,8 @@ run(`node scripts/stamp-build.mjs ${journeyBuild} ${JSON.stringify(journeyOut)}`
     throw new Error('site/build.mjs: phone.html no longer has the shape /checkin expects');
   }
   writeFileSync(path.join(checkinOut, 'index.html'), online);
+  // Passphrase v2: the page signs in with an authKey it derives itself (the canonical shared modules, byte for byte).
+  for (const f of ['sync-protocol.js', 'cloud-crypto.js']) cpSync(path.join(ROOT, 'lobby', 'shared', f), path.join(checkinOut, f));
   // The youth leaders' page (7.10.0): Trek and Journey only, check-in only.
   const ym = online.replace("<script>window.AWANA_RELAY = '/api';</script>\n",
     "<script>window.AWANA_RELAY = '/api';</script>\n<script>window.AWANA_ONLY_CLUBS = ['trek', 'journey']; window.AWANA_SIMPLE = true;</script>\n");
@@ -235,7 +237,7 @@ writeFileSync(path.join(OUT, '_routes.json'), `${JSON.stringify({
 writeFileSync(path.join(ROOT, 'site', 'lib', 'large-files.generated.js'),
   `// Written by site/build.mjs for build ${BUILD_ID}; not committed.\nexport const LARGE_FILES = ${JSON.stringify(largeFiles, null, 2)};\nexport const LARGE_PREFIXES = ${JSON.stringify(VIDEO_PREFIXES, null, 2)};\n`);
 
-for (const must of ['index.html', 'lobby/index.html', 'lobby/countdown.html', 'lobby/settings.html', 'journey/index.html', 'lobby/shared/sync.json', 'desk/index.html', 'desk/desk.js', 'desk/desk-transport.js', 'desk/cloud-crypto.js']) {
+for (const must of ['index.html', 'lobby/index.html', 'lobby/countdown.html', 'lobby/settings.html', 'journey/index.html', 'lobby/shared/sync.json', 'desk/index.html', 'desk/desk.js', 'desk/desk-transport.js', 'desk/cloud-crypto.js', 'checkin/sync-protocol.js', 'checkin/cloud-crypto.js']) {
   if (!existsSync(path.join(OUT, must))) throw new Error(`site build is missing ${must}`);
 }
 console.log(`\n✓ site/dist built for ${ORIGIN} (build ${BUILD_ID.slice(0, 7)})`);

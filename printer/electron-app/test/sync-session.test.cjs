@@ -20,13 +20,20 @@ const fakeSafe = (available = true) => ({
   },
 });
 
-function fakeFetch({ login = 200, triesLeft } = {}) {
+const SALT = 'AAECAwQFBgcICQoLDA0ODw==';
+
+function fakeFetch({ login = 200, triesLeft, v2Key } = {}) {
   const calls = [];
   const fn = async (url, init = {}) => {
     calls.push({ url, init });
     const json = (status, body) => ({ ok: status >= 200 && status < 300, status, json: async () => body });
     if (url.endsWith('/lobby/shared/sync.json')) return json(200, { url: 'https://awana.kvbchurch.org/api' });
+    if (url === 'https://awana.kvbchurch.org/api/v1/auth/params' && v2Key) return json(200, { v: 2, salt: SALT, iter: 600000, legacy: true, upgrade: false });
     if (url === 'https://awana.kvbchurch.org/api/v1/login') {
+      if (v2Key) {
+        const b = JSON.parse(init.body);
+        return b.authKey === v2Key && !b.passphrase ? json(200, { session: SESSION, displayKey: `${'k'.repeat(43)}=`, history: null }) : json(401, { triesLeft: 4 });
+      }
       if (login === 200) return json(200, { session: SESSION, displayKey: `${'k'.repeat(43)}=` });
       return json(login, { triesLeft });
     }
@@ -36,6 +43,22 @@ function fakeFetch({ login = 200, triesLeft } = {}) {
 }
 
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'kvbc-sync-'));
+
+describe('sync session, passphrase v2', () => {
+  it('derives the authKey on this computer and sends only that', async () => {
+    const v2Key = await require('../../print-server/cloud-crypto').deriveAuthKey('kennebec', SALT, 600000);
+    const dir = tmp();
+    const f = fakeFetch({ v2Key });
+    const s = createSyncSession({ userData: dir, safeStorage: fakeSafe(), syncClient, fetchFn: f.fn });
+    assert.deepEqual(await s.signIn('  Kennebec '), { ok: true, url: 'https://awana.kvbchurch.org/api', kept: 'encrypted' });
+    const login = f.calls.find((c) => c.url.endsWith('/v1/login'));
+    assert.deepEqual(Object.keys(JSON.parse(login.init.body)), ['authKey']);
+    assert.ok(!JSON.stringify(f.calls).includes('ennebec'));
+    const wrong = await s.signIn('kenebec');
+    assert.equal(wrong.ok, false);
+    assert.equal(wrong.triesLeft, 4);
+  });
+});
 
 describe('sync session', () => {
   it('signs in as the screens do and keeps only the session, encrypted', async () => {

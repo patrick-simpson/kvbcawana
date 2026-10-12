@@ -22,6 +22,8 @@ import {
 } from '../lib/syncService.js';
 import { normalizeSyncPassphrase, sanitizeTemplate, PASSPHRASE_MIN } from '../lib/syncSpecs.js';
 import { saveDisplayKey } from '../lib/displayKey.js';
+import { AUTH_PARAMS_PATH, parseAuthParams } from '../../shared/sync-protocol.js';
+import { PBKDF2_ITER, authVerifier, bytesToBase64, deriveAuthKey, randomBytes } from '../../shared/cloud-crypto.js';
 import { historyWrapLanded, lockHistory, rewrapHistoryKey } from '../lib/historyCrypto.js';
 
 /**
@@ -296,7 +298,27 @@ export async function changePassphrase(current, next) {
   // passphrase is not changed (historyCrypto.js).
   const wrap = await rewrapHistoryKey(url, loadSyncSession(), current, next);
   if (!wrap.ok) return { ok: false, message: wrap.message };
-  const res = await syncRequest(url, '/v1/passphrase', { method: 'POST', body: wrap.wrapped ? { current, next, wrapped: wrap.wrapped } : { current, next }, session: loadSyncSession() });
+  // Passphrase v2: derive everything HERE (the current authKey, a fresh salt and
+  // the new verifier) so the service never sees either word. A service that has
+  // no v2 yet gets the old request.
+  const params = parseAuthParams(await syncRequest(url, AUTH_PARAMS_PATH));
+  /** @type {Record<string, unknown>} */
+  let body = wrap.wrapped ? { current, next, wrapped: wrap.wrapped } : { current, next };
+  if (params) {
+    try {
+      const salt = bytesToBase64(randomBytes(16));
+      const nextKey = await deriveAuthKey(normalizeSyncPassphrase(next), salt, PBKDF2_ITER);
+      body = {
+        // while no verifier is stored the service checks the passphrase itself, once
+        ...(params.upgrade ? { current: normalizeSyncPassphrase(current) } : { currentAuthKey: await deriveAuthKey(normalizeSyncPassphrase(current), params.salt, params.iter) }),
+        next: { salt, iter: PBKDF2_ITER, verifier: await authVerifier(nextKey) },
+        ...(wrap.wrapped ? { wrapped: wrap.wrapped } : {}),
+      };
+    } catch {
+      return { ok: false, message: 'This device could not work out the new sign-in key.' };
+    }
+  }
+  const res = await syncRequest(url, '/v1/passphrase', { method: 'POST', body, session: loadSyncSession() });
   if (res.status === 0) return { ok: false, message: 'Could not reach the sync service.' };
   if (!res.ok) {
     if (res.status === 429) return { ok: false, message: 'Too many wrong tries. Wait a little, then try again.' };

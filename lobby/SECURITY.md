@@ -140,9 +140,12 @@ service**:
   tries lock one address out for 15 minutes; 30 in an hour pause sign-ins for
   an hour). It is never on a public channel, so it cannot be guessed offline,
   which is what makes a short dictionary word ("kennebec") reasonable here
-  where the old frame needed 12+ characters. The service keeps only a salted
-  HMAC of it (until online check-in's P1 replaces it with a slow client-side
-  derivation: "Online check-in history" below).
+  where the old frame needed 12+ characters. Every client is on passphrase v2
+  (built 2026-10-12): it derives `authKey` itself (PBKDF2-SHA256, 600000 rounds,
+  then HKDF) and the service keeps only SHA-256 of that, so the word never
+  reaches the service. The old salted HMAC of the word is kept only while an old
+  client may still sign in (`AUTH_LEGACY`, `auth:legacyLastAt`; routes.md
+  section 1 says when it goes): "Online check-in history" below.
 - A sign-in returns a session (its own storage slot, `awanaSyncSession.v1`,
   never config, never an export or a URL) and the display key.
   **Anyone with the word can read names and change every screen** (the owner's
@@ -352,7 +355,11 @@ stored readable**. That is not the same as "Cloudflare can never see a name".
   (the key is re-wrapped), and the previous wrap is kept 7 days.
 - **Until the old hash is retired** (P1's migration) the store still holds the
   fast salted HMAC of the passphrase beside the new verifier, so its weakness
-  lasts until every client has updated and the legacy hash is deleted.
+  lasts until the legacy hash is deleted: by the first v2 passphrase change, or
+  by the owner setting `AUTH_LEGACY = "off"` (the next v2 sign-in then deletes
+  it) once `GET /v1/cloud/status` shows `auth.legacyLastAt` is old. The first v2
+  sign-in after the deploy still sends the passphrase ONCE (to upgrade the
+  store), over TLS, as every sign-in did before.
 - **What is visible anyway.** Row counts per night and kind, the per-club
   numbers in `night_summary`, the times rows arrive, and which station leased
   which job. The same counts are already public on the `tally` frame.

@@ -29,6 +29,7 @@ const BASE = `http://127.0.0.1:${PORT}`;
 const SYNC = 'https://awana-sync.test.workers.dev';
 const OLD_KEY = 'AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA=';
 const SERVICE_KEY = Buffer.alloc(32, 9).toString('base64');
+const V2_SALT = 'AAECAwQFBgcICQoLDA0ODw==';
 const SESSION = 'v1.1.1790839331729.oWr6n92IJW5ldPGmtiyjPHAZpca-QGToNlKGXlKI6vc';
 
 let passed = 0;
@@ -48,6 +49,11 @@ globalThis.fetch = async (url, init = {}) => {
   const body = init.body ? JSON.parse(init.body) : null;
   service.calls.push({ route, method: init.method || 'GET', body, auth: (init.headers || {}).Authorization || null });
   const reply = (status, b) => new Response(JSON.stringify(b), { status, headers: { 'Content-Type': 'application/json' } });
+  if (route === '/v1/auth/params') return service.v2 ? reply(200, { v: 2, salt: V2_SALT, iter: 600000, legacy: true, upgrade: false }) : reply(404, {});
+  if (route === '/v1/login' && body.authKey) {
+    if (body.authKey !== service.v2Key || body.passphrase) return reply(401, { reason: 'wrong', triesLeft: 4 });
+    return reply(200, { session: SESSION, displayKey: service.key, state: {}, history: null });
+  }
   if (route === '/v1/login') {
     if (body.passphrase !== 'kennebec') return reply(401, { reason: 'wrong', triesLeft: 4 });
     return reply(200, { session: SESSION, displayKey: service.key, state: {} });
@@ -118,6 +124,24 @@ async function main() {
     check('/health: signed in, never the session', h.body.sync.signedIn === true && !JSON.stringify(h.body).includes(SESSION));
     const cfg = await j('/config', { headers: { Origin: 'https://patrick-simpson.github.io' } });
     check('the session is a secret: not in /config for anyone else', cfg.body && cfg.body.syncSession === undefined);
+  }
+
+  console.log('sync: signing in by passphrase v2 (the passphrase never leaves this computer)');
+  {
+    service.v2 = true;
+    service.v2Key = await require('../print-server/cloud-crypto').deriveAuthKey('kennebec', V2_SALT, 600000);
+    service.calls.length = 0;
+    const wrong = await post('/config/sync-login', { passphrase: 'kenebec', url: SYNC });
+    check('v2: a wrong word is a 401 with the tries left', wrong.status === 401 && wrong.body.triesLeft === 4, JSON.stringify(wrong.body));
+    const right = await post('/config/sync-login', { passphrase: '  Kennebec ', url: SYNC });
+    check('v2: the right word signs in', right.status === 200 && right.body.ok === true, JSON.stringify(right.body));
+    const logins = service.calls.filter((c) => c.route === '/v1/login');
+    const last = logins.at(-1).body;
+    check('v2: it sent the authKey and the seed key, and no passphrase', Object.keys(last).sort().join() === 'authKey,seedKey', Object.keys(last).join());
+    check('v2: the passphrase is nowhere on the wire', !JSON.stringify(service.calls).includes('ennebec'));
+    check('v2: it asked for the params first', service.calls[0].route === '/v1/auth/params');
+    service.v2 = false;
+    service.calls.length = 0;
   }
 
   console.log('sync: every live frame also goes to the service, sealed, in order');

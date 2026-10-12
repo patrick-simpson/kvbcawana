@@ -666,6 +666,17 @@ said); "Owner" is what only the owner can do.
     leaders have `/checkin/ym`), friend rows via `POST /v1/history/rows` (the
     friend's name rides the sealed check-in row and the sealed job), and the
     leader tag and custom label of the phone's + menu.
+  - **Passphrase v2 built (2026-10-12):** the Worker (`GET /v1/auth/params`, `authKey`
+    login, the one upgrade login, the old login kept until `AUTH_LEGACY = "off"`, v2
+    change in one atomic put) and EVERY client: the lobby screens, projector and OBS
+    links, Settings' change, the desk and phone pages, Journey, the print server and
+    the Electron wizard sign in through `signInWithPassphrase`
+    (`lobby/shared/sync-protocol.js`) with `deriveAuthKey` (`cloud-crypto.js`). The desk
+    page seals the job as `{route: '/print', body, clubberId, source: 'desk'}` and rows
+    of kind checkin / visitor / undo / checkout. Open: watch `auth.legacyLastAt` in
+    `GET /v1/cloud/status`, then set `AUTH_LEGACY = "off"` and later delete the legacy
+    code (routes.md section 1). Not measured on a real Pi Zero: expect 1 to 3 s once
+    per sign-in.
 
 ## Online only
 

@@ -14,6 +14,7 @@ import {
   wirePayloads,
 } from './syncService.js';
 import { DISPLAY_KEY_STORAGE, loadDisplayKey } from './displayKey.js';
+import { deriveAuthKey } from '../../shared/cloud-crypto.js';
 import { sanitizeOverrides } from '../hooks/useConfig.js';
 import { parseUrlFlags } from './urlFlags.js';
 import { sanitizeSettings, sanitizeSlidesChunk } from './eventSanitizers.js';
@@ -79,37 +80,71 @@ describe('finding the service', () => {
   });
 });
 
-describe('signing in', () => {
-  it('saves the session and the display key, and returns the rest for the caller', async () => {
-    const fetchFn = answer(200, {
-      session: SESSION, displayKey: KEY,
-      state: { template: { savedAt: 'x', config: { audioMuted: true, pusherAppKey: 'no' } } },
-    });
-    const res = await syncLogin(BASE, 'kennebec', { fetchFn });
+/**
+ * A stand-in service: GET /v1/auth/params and POST /v1/login, recording every call.
+ * @param {{ params?: any, login: (body: any) => [number, any] }} svc
+ */
+function service(svc) {
+  const calls = [];
+  const fetchFn = vi.fn(async (url, init = {}) => {
+    const route = String(url).slice(BASE.length);
+    const body = init.body ? JSON.parse(init.body) : null;
+    calls.push({ route, body });
+    if (route === '/v1/auth/params') {
+      return svc.params ? new Response(JSON.stringify(svc.params), { status: 200 }) : new Response('{}', { status: 404 });
+    }
+    const [status, out] = svc.login(body);
+    return new Response(JSON.stringify(out), { status });
+  });
+  return { fetchFn, calls };
+}
+const PARAMS = { v: 2, salt: 'AAECAwQFBgcICQoLDA0ODw==', iter: 600000, legacy: true, upgrade: false };
+const OK = { session: SESSION, displayKey: KEY, state: { template: { savedAt: 'x', config: { audioMuted: true, pusherAppKey: 'no' } } } };
+
+describe('signing in (passphrase v2)', () => {
+  it('derives the authKey here and sends only that: the passphrase never leaves the screen', async () => {
+    const svc = service({ params: PARAMS, login: () => [200, OK] });
+    const res = await syncLogin(BASE, ' Kennebec ', { fetchFn: svc.fetchFn });
     expect(res).toMatchObject({ ok: true, template: { audioMuted: true } });
     expect(res).not.toHaveProperty('pusher');
     expect(loadSyncSession()).toBe(SESSION);
     expect(loadDisplayKey()).toBe(KEY);
     expect(localStorage.getItem(DISPLAY_KEY_STORAGE)).toBe(KEY);
-    const [url, init] = fetchFn.mock.calls[0];
-    expect(url).toBe(`${BASE}/v1/login`);
-    expect(JSON.parse(init.body)).toEqual({ passphrase: 'kennebec' });
+    expect(svc.calls.map((c) => c.route)).toEqual(['/v1/auth/params', '/v1/login']);
+    const sent = svc.calls[1].body;
+    expect(Object.keys(sent)).toEqual(['authKey']);
+    expect(sent.authKey).toBe(await deriveAuthKey('kennebec', PARAMS.salt, PARAMS.iter));
+    expect(JSON.stringify(svc.calls)).not.toContain('ennebec');
+  }, 30000);
+
+  it('the first sign-in after the deploy sends the passphrase once, with its authKey (the upgrade)', async () => {
+    const svc = service({ params: { ...PARAMS, upgrade: true }, login: () => [200, { ...OK, upgraded: true }] });
+    expect((await syncLogin(BASE, 'kennebec', { fetchFn: svc.fetchFn })).ok).toBe(true);
+    expect(svc.calls[1].body).toMatchObject({ passphrase: 'kennebec' });
+    expect(svc.calls[1].body.authKey).toBeTruthy();
+  }, 30000);
+
+  it('a service that has no v2 yet gets today\'s login', async () => {
+    const svc = service({ login: () => [200, OK] });
+    expect((await syncLogin(BASE, 'kennebec', { fetchFn: svc.fetchFn })).ok).toBe(true);
+    expect(svc.calls.map((c) => c.route)).toEqual(['/v1/auth/params', '/v1/login']);
+    expect(svc.calls[1].body).toEqual({ passphrase: 'kennebec' });
   });
 
   it('words each refusal by what to do', async () => {
-    expect(await syncLogin(BASE, 'x', { fetchFn: answer(401, { triesLeft: 3 }) })).toMatchObject({ ok: false, reason: 'wrong', triesLeft: 3 });
-    expect(await syncLogin(BASE, 'x', { fetchFn: answer(429, { retryAfterSec: 600 }) })).toMatchObject({ reason: 'locked', retryAfterSec: 600 });
+    expect(await syncLogin(BASE, 'x', { fetchFn: service({ params: PARAMS, login: () => [401, { triesLeft: 3, reason: 'wrong' }] }).fetchFn })).toMatchObject({ ok: false, reason: 'wrong', triesLeft: 3 });
+    expect(await syncLogin(BASE, 'x', { fetchFn: service({ params: PARAMS, login: () => [429, { retryAfterSec: 600 }] }).fetchFn })).toMatchObject({ reason: 'locked', retryAfterSec: 600 });
     expect(await syncLogin(BASE, 'x', { fetchFn: answer(503, {}) })).toMatchObject({ reason: 'not-set-up' });
     expect(await syncLogin(BASE, 'x', { fetchFn: vi.fn(async () => { throw new Error('down'); }) })).toMatchObject({ reason: 'unreachable' });
     expect(loadSyncSession()).toBe('');
-  });
+  }, 30000);
 
   it('refuses an answer without a usable key or session, and saves nothing', async () => {
-    const res = await syncLogin(BASE, 'kennebec', { fetchFn: answer(200, { session: SESSION, displayKey: 'short' }) });
+    const res = await syncLogin(BASE, 'kennebec', { fetchFn: service({ params: PARAMS, login: () => [200, { session: SESSION, displayKey: 'short' }] }).fetchFn });
     expect(res).toMatchObject({ ok: false, reason: 'rejected' });
     expect(loadSyncSession()).toBe('');
     expect(loadDisplayKey()).toBe('');
-  });
+  }, 30000);
 });
 
 describe('the template', () => {

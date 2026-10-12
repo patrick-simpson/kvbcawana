@@ -28,14 +28,14 @@ before(async () => {
 });
 
 /** A stand-in Worker: routes.md's shapes, in memory. */
-function worker({ stations = [], params = 'v2', history = 'login', legacy = false, check } = {}) {
+function worker({ stations = [], params = 'v2', history = 'login', legacy = false, upgrade = false, check } = {}) {
   const w = { calls: [], stations, historyKey: history === 'none' ? null : historyKey, busy: 0, expire: false, stationsChangedOnce: null, checkins: [], verifier: null };
   w.fetch = async (url, init = {}) => {
     const path = String(url).replace(/^\/api/, '');
     const body = init.body ? JSON.parse(init.body) : undefined;
     w.calls.push({ method: init.method || 'GET', path, body, auth: init.headers && init.headers.Authorization });
     const json = (status, b, headers = {}) => new Response(JSON.stringify(b), { status, headers: { 'Content-Type': 'application/json', ...headers } });
-    if (path === '/v1/auth/params') return params === 'v2' ? json(200, { v: 2, salt, iter: 600000, legacy }) : json(404, { error: 'Not found.' });
+    if (path === '/v1/auth/params') return params === 'v2' ? json(200, { v: 2, salt, iter: 600000, legacy, upgrade }) : json(404, { error: 'Not found.' });
     if (path === '/v1/login') {
       if (body.authKey) {
         const mine = await cc.deriveKeys(PASS, salt, 600000);
@@ -95,13 +95,21 @@ describe('sign-in, passphrase v2', () => {
     const orig = w.fetch;
     w.fetch = async (url, init) => {   // no v2 verifier yet: a bare authKey is refused
       const body = init && init.body ? JSON.parse(init.body) : {};
-      if (String(url).endsWith('/v1/login') && body.authKey && !body.passphrase) { w.calls.push({ path: '/v1/login', body }); return new Response('{}', { status: 401 }); }
+      if (String(url).endsWith('/v1/login') && body.authKey && !body.passphrase) { w.calls.push({ path: '/v1/login', body }); return new Response(JSON.stringify({ reason: 'upgrade-needed' }), { status: 401 }); }
       return orig(url, init);
     };
     await make(w).desk.signIn(PASS);
     const logins = w.calls.filter((c) => c.path === '/v1/login');
     assert.equal(logins.length, 2);
     assert.deepEqual(Object.keys(logins[1].body).sort(), ['authKey', 'passphrase']);
+  });
+
+  it('when the Worker says an upgrade is due, the first sign-in is ONE login with the passphrase and its authKey', async () => {
+    const w = worker({ legacy: true, upgrade: true });
+    await make(w).desk.signIn(PASS);
+    const logins = w.calls.filter((c) => c.path === '/v1/login');
+    assert.equal(logins.length, 1);
+    assert.deepEqual(Object.keys(logins[0].body).sort(), ['authKey', 'passphrase']);
   });
 
   it('a Worker without v2 yet gets today\'s login', async () => {
@@ -154,7 +162,8 @@ describe('checking in', () => {
     assert.equal(post.night, NIGHT);
     assert.equal(post.clubberId, '662');
     assert.deepEqual(post.items, { Bible: true, Friend: true });
-    const wire = JSON.stringify(post);
+    const { job: _job, historyRow: _row, ...plainPost } = post;   // the sealed parts are random base64
+    const wire = JSON.stringify(plainPost);
     assert.ok(!/Kit|Tester|Sam/.test(wire), 'no name or friend in clear');
     assert.equal(post.job.kind, 'print-job');
     assert.equal(post.job.night, NIGHT);
@@ -272,7 +281,7 @@ describe('undo, check out and the one-off tag', () => {
     assert.equal(bodies[0][1].club, 'Sparks');
     assert.equal(bodies[1][1].club, 'Sparks');
     assert.deepEqual(bodies[2][1].visitor, { first: 'Mia', last: 'Jones', club: 'Cubbies' });
-    assert.ok(!/Lu|Tester/.test(JSON.stringify(bodies[1][1])));
+    { const { historyRow, ...plain } = bodies[1][1]; assert.ok(!/Lu|Tester/.test(JSON.stringify(plain)), 'no name in the clear (the sealed row is random base64)'); }
   });
 
   it('a one-off tag is a reprint job sealed to the stations, never a check-in', async () => {

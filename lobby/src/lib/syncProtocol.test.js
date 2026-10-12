@@ -1,6 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { createRequire } from 'node:module';
 import {
+  AUTH_PARAMS_PATH,
   SYNC_URL_MAX,
   UNREACHABLE,
   buildLoginBody,
@@ -9,6 +10,7 @@ import {
   isValidSession,
   isValidSyncUrl,
   normalizeSyncPassphrase,
+  parseAuthParams,
   parseLoginResponse,
   parseSessionCheck,
   parseSyncIndex,
@@ -16,6 +18,7 @@ import {
   readResponse,
   screenNamePath,
   screenSettingsPath,
+  signInWithPassphrase,
   SCREEN_HELLO_PATH,
 } from '../../shared/sync-protocol.js';
 
@@ -128,6 +131,7 @@ describe('the CommonJS copy the print server and the Electron app load', () => {
   it('exports the same functions, and they agree', () => {
     const cjs = createRequire(import.meta.url)('../../../printer/print-server/sync-protocol.js');
     expect(Object.keys(cjs).sort()).toEqual(Object.keys({
+      AUTH_PARAMS_PATH, parseAuthParams, signInWithPassphrase,
       SYNC_URL_MAX, UNREACHABLE, buildLoginBody, buildRequest, isPlausibleDisplayKey, isValidSession, isValidSyncUrl,
       normalizeSyncPassphrase, parseLoginResponse, parseSessionCheck, parseSyncIndex, publishRequest, readResponse,
       screenNamePath, screenSettingsPath, SCREEN_HELLO_PATH,
@@ -136,5 +140,97 @@ describe('the CommonJS copy the print server and the Electron app load', () => {
     expect(cjs.SYNC_URL_MAX).toBe(SYNC_URL_MAX);
     expect(cjs.isValidSyncUrl('https://awana.kvbchurch.org/api')).toBe(true);
     expect(cjs.parseLoginResponse({ ok: false, status: 401, body: { triesLeft: 2 } })).toEqual(parseLoginResponse({ ok: false, status: 401, body: { triesLeft: 2 } }));
+  });
+});
+
+describe('passphrase v2 sign-in (one driver for every client)', () => {
+  const P = { v: 2, salt: 'c2FsdHNhbHRzYWx0c2FsdA==', iter: 600000, legacy: true, upgrade: false };
+  const ok = (body) => ({ ok: true, status: 200, body });
+  const derive = async (pass, salt, iter) => `key:${pass}:${salt}:${iter}`;
+  /** A request stub that answers by route and records the calls. */
+  const rig = (routes) => {
+    const calls = [];
+    const request = async (path, o = {}) => { calls.push({ path, body: o.body }); return routes[path](o.body); };
+    return { calls, request };
+  };
+
+  it('reads the params, and only a well-formed v2 answer', () => {
+    expect(AUTH_PARAMS_PATH).toBe('/v1/auth/params');
+    expect(parseAuthParams(ok(P))).toEqual({ salt: P.salt, iter: 600000, legacy: true, upgrade: false });
+    expect(parseAuthParams(ok({ ...P, upgrade: true })).upgrade).toBe(true);
+    for (const bad of [ok({ ...P, v: 1 }), ok({ ...P, salt: '' }), ok({ ...P, iter: 'x' }), { ok: false, status: 404, body: null }, ok(null)]) {
+      expect(parseAuthParams(bad)).toBeNull();
+    }
+  });
+
+  it('sends the authKey alone, normalizing the passphrase before it derives', async () => {
+    const r = rig({ '/v1/auth/params': () => ok(P), '/v1/login': () => ok({ session: SESSION }) });
+    const out = await signInWithPassphrase({ request: r.request, derive, passphrase: '  KenneBec ' });
+    expect(r.calls[1].body).toEqual({ authKey: `key:kennebec:${P.salt}:600000` });
+    expect(out.derived).toEqual({ salt: P.salt, iter: 600000, authKey: `key:kennebec:${P.salt}:600000` });
+  });
+
+  it('the seed key rides along on every shape of login', async () => {
+    const r = rig({ '/v1/auth/params': () => ok({ ...P, upgrade: true }), '/v1/login': () => ok({}) });
+    await signInWithPassphrase({ request: r.request, derive, passphrase: 'kennebec', seedKey: ` ${KEY} ` });
+    expect(r.calls[1].body).toEqual({ passphrase: 'kennebec', authKey: `key:kennebec:${P.salt}:600000`, seedKey: KEY });
+  });
+
+  it('upgrade-needed (the store was upgraded by nobody yet) is answered with the passphrase once', async () => {
+    const r = rig({
+      '/v1/auth/params': () => ok(P),
+      '/v1/login': (b) => (b.passphrase ? ok({ session: SESSION, upgraded: true }) : { ok: false, status: 401, body: { reason: 'upgrade-needed' } }),
+    });
+    const out = await signInWithPassphrase({ request: r.request, derive, passphrase: 'kennebec' });
+    expect(out.res.ok).toBe(true);
+    expect(r.calls.map((c) => Object.keys(c.body || {}).join('+'))).toEqual(['', 'authKey', 'passphrase+authKey']);
+  });
+
+  it('falls back to today\'s login only for a service with no v2 (404); other failures are reported as they are', async () => {
+    const old = rig({ '/v1/auth/params': () => ({ ok: false, status: 404, body: null }), '/v1/login': () => ok({ session: SESSION }) });
+    const a = await signInWithPassphrase({ request: old.request, derive, passphrase: 'Kennebec' });
+    expect(old.calls[1].body).toEqual({ passphrase: 'kennebec' });
+    expect(a.derived).toBeNull();
+    for (const status of [0, 503, 500]) {
+      const r = rig({ '/v1/auth/params': () => ({ ok: false, status, body: null }), '/v1/login': () => ok({}) });
+      const out = await signInWithPassphrase({ request: r.request, derive, passphrase: 'kennebec' });
+      expect(out.res.status).toBe(status);
+      expect(r.calls).toHaveLength(1);
+    }
+  });
+
+  it('a held derived key signs in again with ONE request and no derivation; a stale one starts over', async () => {
+    const held = { salt: P.salt, iter: 600000, authKey: 'held-key' };
+    const spy = vi.fn(derive);
+    const good = rig({ '/v1/login': () => ok({ session: SESSION }) });
+    const again = await signInWithPassphrase({ request: good.request, derive: spy, derived: held });
+    expect(again.derived).toBe(held);
+    expect(good.calls).toHaveLength(1);
+    expect(spy).not.toHaveBeenCalled();
+
+    const stale = rig({
+      '/v1/login': (b) => (b.authKey === 'held-key' ? { ok: false, status: 401, body: { reason: 'wrong' } } : ok({ session: SESSION })),
+      '/v1/auth/params': () => ok(P),
+    });
+    const fresh = await signInWithPassphrase({ request: stale.request, derive: spy, derived: held, passphrase: 'new word' });
+    expect(fresh.res.ok).toBe(true);
+    expect(fresh.derived.authKey).toBe(`key:new word:${P.salt}:600000`);
+    // with no passphrase to start over with, the 401 is the answer and the key is dropped
+    const none = await signInWithPassphrase({ request: stale.request, derive: spy, derived: held });
+    expect(none.res.status).toBe(401);
+    expect(none.derived).toBeNull();
+  });
+
+  it('a derivation that throws is a refusal, not a crash', async () => {
+    const r = rig({ '/v1/auth/params': () => ok(P), '/v1/login': () => ok({}) });
+    const out = await signInWithPassphrase({ request: r.request, derive: async () => { throw new RangeError('x'); }, passphrase: 'kennebec' });
+    expect(out.res.ok).toBe(false);
+    expect(r.calls).toHaveLength(1);
+  });
+
+  it('parseLoginResponse passes the history key through', () => {
+    const res = parseLoginResponse({ ok: true, status: 200, body: { session: SESSION, displayKey: KEY, history: { pub: 'p', kid: 'k', wrapped: {} } } });
+    expect(res).toMatchObject({ ok: true, history: { pub: 'p' } });
+    expect(parseLoginResponse({ ok: true, status: 200, body: { session: SESSION, displayKey: KEY } })).not.toHaveProperty('history');
   });
 });

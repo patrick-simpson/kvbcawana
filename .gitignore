@@ -8,5 +8,6 @@ site/lib/large-files.generated.js
 # own full local copy at build time. Never edit or commit these.
 journey/public/brand/
 journey/public/family.css
+journey/public/src/shared/
 printer/print-server/public/brand/
 lobby/public/family.css

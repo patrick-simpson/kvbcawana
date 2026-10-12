@@ -16,7 +16,15 @@
      ten minutes and on reconnect, and one PUT a second after a room setting
      changes here. No socket of its own.
    - Until the display site's shared/sync.json names a service, the Settings
-     section stays hidden and nothing here runs. */
+     section stays hidden and nothing here runs.
+   - Sign-in is passphrase v2 (lobby/worker/src/routes.md section 1): the
+     passphrase is turned into an authKey HERE and only that is sent. The
+     protocol dance is the family's one copy, lobby/shared/sync-protocol.js, and
+     the derivation lobby/shared/cloud-crypto.js: both are loaded as ES modules
+     at sign-in from src/shared/ (copied by scripts/family-assets.mjs, never
+     edited). The derivation is 600000 PBKDF2 rounds, a few seconds ONCE on a Pi
+     Zero, off the page's thread; nothing re-derives afterwards (every later
+     request rides the session). */
 
 (function () {
   'use strict';
@@ -30,6 +38,9 @@
   var REQUEST_TIMEOUT_MS = 8000;   // one answer or none: a hung request must not hold a pull or a push forever
   var PUSH_DELAY_MS = 1000;
   var SESSION_RE = /^v1\.\d+\.\d+\.[A-Za-z0-9_-]{20,}$/;
+  // Where the two shared ES modules are (next to this script). A test seam may
+  // hand them over directly: window.journeyAuthModules = { sp, cc }.
+  var SHARED_BASE = new URL('shared/', (document.currentScript && document.currentScript.src) || new URL('src/sync.js', window.location.href)).href;
 
   // The room keys, in Journey's own storage formats (schedule.js owns them).
   var KEYS = {
@@ -105,6 +116,16 @@
       if (typeof window.applyCaptionDisplayPrefs === 'function') window.applyCaptionDisplayPrefs();
       if (typeof window.syncSlidesPrefInputs === 'function') window.syncSlidesPrefInputs();
     } catch (e) { /* the stored values still apply on the next load */ }
+  }
+
+  /* The passphrase v2 modules, loaded once, on the first sign-in. */
+  var authModules = null;
+  function loadAuth() {
+    if (window.journeyAuthModules) return Promise.resolve(window.journeyAuthModules);
+    if (authModules) return authModules;
+    authModules = Promise.all([import(SHARED_BASE + 'sync-protocol.js'), import(SHARED_BASE + 'cloud-crypto.js')])
+      .then(function (m) { return { sp: m[0], cc: m[1] }; }, function () { authModules = null; return null; });
+    return authModules;
   }
 
   function request(path, opts) {
@@ -190,8 +211,13 @@
     var input = document.getElementById('sync-passphrase');
     var passphrase = normalize(input.value);
     if (!passphrase) { note('Type the passphrase first.', 'bad'); return; }
-    note('Signing in…');
-    request('/v1/login', { method: 'POST', body: { passphrase: passphrase } }).then(function (res) {
+    note('Signing in… (the first time takes a few seconds)');
+    loadAuth().then(function (m) {
+      // The modules did not load (offline file, old browser): today's login, which a service that still has the old hash accepts.
+      if (!m) return request('/v1/login', { method: 'POST', body: { passphrase: passphrase } });
+      return m.sp.signInWithPassphrase({ request: request, derive: m.cc.deriveAuthKey, passphrase: passphrase })
+        .then(function (out) { return out.res; });
+    }).then(function (res) {
       var b = res.body || {};
       if (res.status === 401) {
         note('That is not the passphrase.' + (typeof b.triesLeft === 'number' ? ' ' + b.triesLeft + ' tries left before a 15-minute wait.' : ''), 'bad');

@@ -170,9 +170,9 @@ export function createDesk({ cc, fetch: fetchFn, store, base = DESK_API, now = D
     if (params.status === 200 && params.body && params.body.v === 2) {
       const { authKey } = await cc.deriveKeys(passphrase, params.body.salt, params.body.iter);
       const key = cc.bytesToBase64(authKey);
-      login = await request('POST', '/v1/login', { authKey: key }, { auth: false });
-      // The first v2 client after the deploy upgrades the store: the passphrase once, with its authKey.
-      if (login.status === 401 && params.body.legacy) login = await request('POST', '/v1/login', { passphrase: typed, authKey: key }, { auth: false });
+      // While the Worker stores no v2 verifier (`upgrade`), the first client sends the passphrase once, with its authKey.
+      login = await request('POST', '/v1/login', params.body.upgrade ? { passphrase: typed, authKey: key } : { authKey: key }, { auth: false });
+      if (login.status === 401 && login.body && login.body.reason === 'upgrade-needed') login = await request('POST', '/v1/login', { passphrase: typed, authKey: key }, { auth: false });
     } else {
       // A Worker without v2 yet (or a failed params call): today's login.
       login = await request('POST', '/v1/login', { passphrase: typed }, { auth: false });
