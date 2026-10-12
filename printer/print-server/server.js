@@ -25,6 +25,9 @@ const { createCanvas, loadImage } = require('@napi-rs/canvas');
 const brand = require('./brand');
 const syncClient = require('./sync-client');
 const phoneRelay = require('./phone-relay');
+const cloudRequest = require('./cloud-request');
+const jobPuller = require('./job-puller');
+const historySync = require('./history-sync');
 const pickup = require('./pickup');
 const { CLUB_TABLE, clubKeyByLabel } = require('./clubTable');
 const { cleanText } = require('./textClean');
@@ -184,6 +187,9 @@ function writeConfigFile(next) {
 }
 
 let config = loadConfigFile();
+// Online check-in, P2 (see configureCloud() below): set once the app has made
+// this computer a registered print station. null = the old paths only.
+let cloudStation = null;
 
 // Install the display key into the publisher. The three name-bearing events
 // (checkin, recap, birthdays) are sealed with it so the live channel
@@ -7370,6 +7376,9 @@ app.post('/reset-tonight', (req, res) => {
 // a channel outage can never disturb printing.
 
 function publishTally() {
+  // Online check-in (P2): with this computer a registered station, the Worker
+  // publishes the tally and the pickup list; ours stays quiet.
+  if (cloudStation) return;
   try {
     const st = computeTonightStats();
     // Unified theming (#18): every tally carries the Screen season (already
@@ -7416,6 +7425,7 @@ function stillHereInWindow() {
 
 /** Publish the list now (the minute timer's job, and a change's). */
 function publishStillHere() {
+  if (cloudStation) return;   // the Worker publishes the pickup list in cloud mode
   try {
     const entries = stillHereEntries();
     const payload = events.buildCheckout(entries, distinctChildrenPrintedToday());
@@ -7426,7 +7436,7 @@ function publishStillHere() {
 
 /** Something that may change the list happened: publish soon if it did. */
 function stillHereChanged() {
-  if (stillHereTimer) return;
+  if (cloudStation || stillHereTimer) return;
   stillHereTimer = setTimeout(() => {
     stillHereTimer = null;
     try {
@@ -7900,6 +7910,157 @@ app.post('/config/sync-logout', (req, res) => {
   }
   syncStatus = { state: 'none', checkedAt: null, error: null };
   return res.json({ ok: true });
+});
+
+// ── Online check-in, P2: this computer as a print STATION ───────────────────
+// The app (electron-app/main.js) makes the station key, registers it and calls
+// configureCloud() once safeStorage holds it; from then on this print server
+//   * takes ALL its print jobs from the Worker (job-puller.js) and runs them
+//     through the print routes above, from loopback, at most once each;
+//   * pulls the sealed roster and completed books (update-csv and
+//     /feed/completed-books are the paths it feeds);
+//   * reads the season's attendance from the sealed history (history-sync.js)
+//     into the ledger above, and seals a history row for a job that came from a
+//     TwoTimTwo-page check-in;
+//   * stops publishing the tally and the pickup list itself (cloudStation set:
+//     publishTally / publishStillHere are inert, the Worker publishes).
+// Every old path (the extension, the phone relay's job route) keeps working.
+const CLOUD_ATTENDANCE_MS = 30 * 60 * 1000;
+let cloudStop = null;
+let cloudImporting = false;
+
+/** Add nights from sealed history to the attendance ledger (additive, like the audit's apply). */
+function mergeAttendance(entries) {
+  const today = localDayISO();
+  const ledger = loadAttendance();
+  let changed = 0;
+  for (const e of Array.isArray(entries) ? entries : []) {
+    const dates = (e && Array.isArray(e.dates) ? e.dates : []).filter((d) => typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d) && d <= today);
+    if (!dates.length) continue;
+    const idKey = e.clubberId != null && String(e.clubberId).trim() ? `id:${String(e.clubberId).trim().toLowerCase()}` : '';
+    const nameKey = String(e.name || '').toLowerCase().trim();
+    const key = idKey || nameKey;
+    if (!key) continue;
+    if (idKey && nameKey && ledger[nameKey] && Array.isArray(ledger[nameKey].dates)) {
+      // The legacy name key moves to the id key, as recordAttendance does.
+      if (!ledger[idKey] || !Array.isArray(ledger[idKey].dates)) ledger[idKey] = ledger[nameKey];
+      else for (const d of ledger[nameKey].dates) if (!ledger[idKey].dates.includes(d)) ledger[idKey].dates.push(d);
+      delete ledger[nameKey];
+    }
+    const entry = ledger[key] && Array.isArray(ledger[key].dates) ? ledger[key] : { name: String(e.name || '').trim(), dates: [] };
+    let added = false;
+    for (const d of dates) if (!entry.dates.includes(d)) { entry.dates.push(d); added = true; }
+    if (added) { entry.dates.sort(); ledger[key] = entry; changed++; }
+  }
+  if (changed) saveAttendance(ledger);
+  return changed;
+}
+
+function stopCloud() {
+  if (cloudStop) { try { cloudStop(); } catch { /* best effort */ } }
+  cloudStop = null;
+  cloudStation = null;
+}
+
+/**
+ * @param {{
+ *   stationId: string, ring: () => Promise<any>, historyRing?: () => Promise<any>, historyPub?: () => (string|null),
+ *   request?: Function, fetchFn?: typeof fetch, localBase?: string, journalFile?: string|null,
+ *   now?: () => number, start?: boolean, heartbeatMs?: number,
+ * }} opts
+ */
+function configureCloud(opts) {
+  stopCloud();
+  if (!opts || typeof opts.ring !== 'function' || typeof opts.stationId !== 'string' || !opts.stationId) {
+    return { ok: false, error: 'a station needs its id and its key ring' };
+  }
+  const log = (m) => console.log(m);
+  const signedIn = () => (signedInToSync() ? { base: config.syncUrl, session: config.syncSession } : null);
+  const request = opts.request || cloudRequest.cloudRequest;
+  const stationId = () => opts.stationId;
+  const localBase = opts.localBase || `http://127.0.0.1:${PORT}`;
+  const journal = jobPuller.createJournal(opts.journalFile === undefined ? path.join(DATA_DIR, 'print-journal.json') : opts.journalFile, opts.now);
+  const writer = historySync.createHistoryWriter({ pub: opts.historyPub || (() => null), signedIn, request, stationId, log, now: opts.now });
+  const puller = jobPuller.createJobPuller({
+    signedIn, stationId, ring: opts.ring, localBase, request, journal, fetchFn: opts.fetchFn, now: opts.now, log, heartbeatMs: opts.heartbeatMs,
+    // A check-in made on TwoTimTwo's own page: the Worker cannot seal a history
+    // row for it, so the station that prints it does.
+    onPrinted: async ({ record, night }) => {
+      if (record.source !== 'ttt-page') return;
+      const b = record.body || {};
+      const who = b.firstName !== undefined ? { firstName: b.firstName, lastName: b.lastName || '' } : splitFullName(b.name);
+      await writer.record('checkin', {
+        ts: new Date().toISOString(), first: who.firstName, last: who.lastName, club: String(b.clubName || ''),
+        ...(b.clubberId ? { clubberId: String(b.clubberId) } : {}), ...(b.visitor ? { visitor: true } : {}),
+        ...(b.friend === true ? { friend: true } : {}), source: 'ttt-page',
+      }, night);
+    },
+  });
+  const bundles = jobPuller.createBundleSync({ signedIn, stationId, ring: opts.ring, localBase, request, fetchFn: opts.fetchFn, now: opts.now, log });
+  const attendance = historySync.createAttendanceReader({
+    historyRing: opts.historyRing || (async () => null), signedIn, request, stationId, merge: mergeAttendance, log, now: opts.now,
+  });
+  cloudStation = { stationId: opts.stationId, puller, bundles, writer, attendance, journal, opts, signedIn, request, stationIdFn: stationId };
+  if (opts.start !== false) {
+    const unref = (fn, ms) => { const t = setTimeout(fn, ms); if (t.unref) t.unref(); return t; };
+    const stopPull = jobPuller.startJobPuller({ puller, bundles, log, setTimeoutFn: unref });
+    const readAttendance = () => attendance.syncOnce().catch(() => {});
+    const first = setTimeout(readAttendance, 20 * 1000);
+    const every = setInterval(() => { readAttendance(); writer.flush().catch(() => {}); }, CLOUD_ATTENDANCE_MS);
+    if (first.unref) first.unref();
+    if (every.unref) every.unref();
+    cloudStop = () => { stopPull(); clearTimeout(first); clearInterval(every); };
+  }
+  console.log(`[station] This computer is print station ${opts.stationId}: print jobs come from the service; the tally and pickup list are the service's to publish.`);
+  return { ok: true };
+}
+
+/** "I looked at the printer": clears the CHECK THE PRINTER warning. */
+function clearCheckThePrinter() {
+  if (cloudStation) cloudStation.puller.clearChecks();
+}
+
+function cloudStatus() {
+  if (!cloudStation) return { station: false };
+  return {
+    station: true, stationId: cloudStation.stationId,
+    jobs: cloudStation.puller.status(), history: cloudStation.writer.status(),
+    attendance: cloudStation.attendance.status(), bundles: cloudStation.bundles.status(),
+  };
+}
+
+/** The one-time "Import laptop history" action (tray item and the settings page). */
+async function importLaptopHistory() {
+  if (!cloudStation) return { ok: false, reason: 'not-a-station', error: 'This computer is not a print station yet.' };
+  if (cloudImporting) return { ok: false, reason: 'busy', error: 'An import is already running.' };
+  cloudImporting = true;
+  try {
+    const o = cloudStation.opts;
+    return await historySync.importLaptopHistory({
+      pub: o.historyPub || (() => null), signedIn: cloudStation.signedIn, request: cloudStation.request, stationId: cloudStation.stationIdFn,
+      readHistory: () => loadHistory(), readLedger: () => loadAttendance(), log: (m) => console.log(m),
+    });
+  } catch (e) {
+    return { ok: false, reason: 'error', error: e && e.message };
+  } finally { cloudImporting = false; }
+}
+
+app.get('/cloud/print-status', (req, res) => {
+  if (!isTrustedOrSettingsPage(req)) return res.status(403).json({ error: 'The check-in laptop only' });
+  res.json(cloudStatus());
+});
+
+// "I looked at the printer": clears the CHECK THE PRINTER warning.
+app.post('/cloud/print-status/clear', (req, res) => {
+  if (!isTrustedOrSettingsPage(req)) return res.status(403).json({ error: 'The check-in laptop only' });
+  clearCheckThePrinter();
+  res.json(cloudStatus());
+});
+
+app.post('/cloud/import-history', async (req, res) => {
+  if (!isTrustedOrSettingsPage(req)) return res.status(403).json({ error: 'The check-in laptop only' });
+  const r = await importLaptopHistory();
+  res.status(r.ok ? 200 : (r.reason === 'signed-out' ? 401 : 409)).json(r);
 });
 
 function startClubNightTimers() {
@@ -9784,6 +9945,7 @@ function startListening(attempt = 1) {
 }
 
 module.exports = {
+  configureCloud, stopCloud, cloudStatus, clearCheckThePrinter, importLaptopHistory, mergeAttendance,
   app, startListening, stopListening, isBusy, resetRelayForTest, setUpdateHandler, setLatestVersion, setExtensionInfo, setOpsAlertHandler,
   // For the Electron shell: this module is require-cached across settings
   // saves, so the shell pushes the freshly merged config.json and printer

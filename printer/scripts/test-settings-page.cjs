@@ -99,6 +99,9 @@ async function main() {
       ['/reprint-range', 'POST'], ['/attendance-audit', 'GET'], ['/attendance-audit/apply', 'POST'], ['/rehearsal', 'POST'],
       ['/config/sync-login', 'POST'],
     ].every(([p, m]) => r(PAGE, p, m) && !r(PAGE, p, 'DELETE') && !r(PAGE, p, m === 'GET' ? 'POST' : 'GET') && !r(PAGE, p, m).open));
+    check('the print station\'s status, its clear and the history import are rows of their own', [
+      ['/cloud/print-status', 'GET'], ['/cloud/print-status/clear', 'POST'], ['/cloud/import-history', 'POST'],
+    ].every(([p, m]) => r(PAGE, p, m) && !r(PAGE, p, 'DELETE') && !r(PAGE, p, m === 'GET' ? 'POST' : 'GET') && !r(PAGE, p, m).open));
     check('...and none of them is open (each needs the sign-in)', Object.keys(security.SETTINGS_PAGE_ROUTES).filter((p) => security.SETTINGS_PAGE_ROUTES[p].open).join() === '/health');
     check('...a secret-minting or secret-reading route is never in the table', !['/config/display-key/generate', '/config/slides-token/generate', '/config/display-login/generate', '/config/sync-logout', '/api/lobby-slides', '/api/display-settings']
       .some((p) => Object.prototype.hasOwnProperty.call(security.SETTINGS_PAGE_ROUTES, p)));

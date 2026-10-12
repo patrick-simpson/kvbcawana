@@ -26,6 +26,7 @@ const { createDisplay } = require('./src/display/display');
 const { createSetupWizard } = require('./src/setup-wizard');
 const { createSyncSession } = require('./src/sync-session');
 const { createDeviceSync } = require('./src/device-sync');
+const stationFace = require('./src/station');
 const { findDisplay } = require('./src/display/displays');
 const { SCREENS } = require('./src/display/screens');
 
@@ -107,6 +108,13 @@ let wizard = null;        // src/setup-wizard.js
 let syncSession = null;   // src/sync-session.js
 let syncClient = null;    // print-server/sync-client.js (loaded in app.whenReady)
 let deviceSync = null;    // src/device-sync.js: this computer's row on /settings
+let stationKeys = null;   // print-server/station-keys.js: the station key and the history key (safeStorage only)
+// Online check-in P2: this computer as a print station. 'off' | 'refused' (safeStorage
+// cannot keep the key: the station role is refused, fail closed) | 'signed-out' | 'waiting' | 'ready'.
+let stationState = { state: 'off', error: '' };
+let historyNone = false;   // the church has no history key yet
+let stationLoop = null;
+let stationChecked = 0;    // CHECK THE PRINTER count last announced
 let setupWindow = null;   // the print server's status window (renderer/), print role only
 let pdfWindow = null;  // hidden window used for printer enumeration
 let serverInstance = null;
@@ -431,6 +439,11 @@ function buildTray(config) {
       ? { label: '⚠ Print server NOT RUNNING — open its status', click: () => createSetupWindow() }
       : { label: `Printer: ${config.printerName || '(system default)'}`, enabled: false });
     template.push({ label: `Print server: http://localhost:${PORT}`, enabled: false });
+    for (const item of stationFace.stationMenuItems(stationView())) {
+      template.push(item.action
+        ? { label: item.label, enabled: item.enabled !== false, click: () => stationClick(item.action) }
+        : { label: item.label, enabled: false });
+    }
     template.push({
       // The easy button. When the server is down this (re)starts it in one
       // click; when it's up, it's a harmless restart for "when in doubt".
@@ -922,6 +935,7 @@ async function startPrintRole({ fromWizard = false } = {}) {
   // chosen one.
   startServer(config);
   buildTray(config);
+  startStationLoop();
 
   // A new version landed this launch (the app wrote a newer extension to its
   // folder): restart Chrome so it loads it, on the check-in page only, at any
@@ -1073,11 +1087,120 @@ async function finishSetup(choices) {
     return { ok: false, error: `It could not be saved: ${e && e.message ? e.message : e}` };
   }
   if (roles.print && printerChanged) startServer(currentConfig);
-  if (roles.print && pendingPassphrase) signPrintServerIn(pendingPassphrase);
+  if (roles.print && pendingPassphrase) {
+    signPrintServerIn(pendingPassphrase);
+    // The history key is opened with the passphrase now, once, and kept in safeStorage.
+    unlockHistoryKey(pendingPassphrase).then(() => { if (roles.print) { startStationLoop(); return ensureStation(); } }).catch(() => {});
+  }
   pendingPassphrase = null;
   // A new sign-in, or a first setup: on /settings now, not in two minutes.
   if (deviceSync) deviceSync.start();
   return { ok: true, roles };
+}
+
+// ─── Online check-in P2: this computer as a print station ────────────────────
+// The key pair is made once and kept only through safeStorage (print-server/
+// station-keys.js); where safeStorage cannot encrypt the station role is
+// REFUSED (fail closed: no key, no registration, the old paths carry on). The
+// public key is registered with the Worker (no pairing step); only then does
+// the print server switch to cloud mode (configureCloud: it takes its jobs from
+// the Worker and the Worker publishes the tally), so a Worker that does not
+// know stations yet changes nothing.
+
+function stationView() {
+  const check = serverModule && serverModule.cloudStatus ? ((serverModule.cloudStatus().jobs || {}).checkThePrinter || []).length : 0;
+  const keys = stationKeys ? stationKeys.status() : { history: 'locked' };
+  return { station: stationState.state, error: stationState.error, history: historyNone && keys.history !== 'ready' ? 'none' : keys.history, check };
+}
+
+function setStation(next) {
+  const changed = next.state !== stationState.state || (next.error || '') !== stationState.error;
+  stationState = { state: next.state, error: next.error || '' };
+  if (changed) { console.log('[station]', stationState.state, stationState.error); refreshTray(); }
+}
+
+/** Make the key, register it, and put the print server in cloud mode. Never throws. */
+async function ensureStation() {
+  if (!roles.print || !stationKeys || ensureStation.running) return;
+  ensureStation.running = true;
+  try {
+    const k = await stationKeys.ensure();
+    if (!k.ok) { setStation({ state: 'refused', error: k.error }); return; }
+    const s = deviceSession();
+    if (!s) { setStation({ state: 'signed-out' }); return; }
+    roles = rolesStore.ensureDeviceId(app.getPath('userData'), roles);
+    const r = await stationKeys.register({ base: s.url, session: s.session, stationId: roles.deviceId, name: roles.name || os.hostname() });
+    if (!r.ok) { setStation({ state: r.reason === 'signed-out' ? 'signed-out' : 'waiting', error: r.reason }); return; }
+    if (serverModule && serverModule.configureCloud && !ensureStation.configured) {
+      const c = serverModule.configureCloud({
+        stationId: roles.deviceId,
+        ring: () => stationKeys.ring(),
+        historyRing: () => stationKeys.historyRing(),
+        historyPub: () => stationKeys.historyPub(),
+      });
+      ensureStation.configured = c && c.ok === true;
+    }
+    setStation({ state: ensureStation.configured ? 'ready' : 'waiting', error: ensureStation.configured ? '' : 'the print server is not running' });
+  } catch (e) {
+    console.warn('[station]', e && e.message);
+    setStation({ state: 'waiting', error: e && e.message });
+  } finally { ensureStation.running = false; }
+}
+
+/** The passphrase is at hand (the wizard): open the history key with it and keep it. Never throws. */
+async function unlockHistoryKey(passphrase) {
+  if (!roles.print || !stationKeys) return;
+  try {
+    const s = deviceSession();
+    if (!s) return;
+    roles = rolesStore.ensureDeviceId(app.getPath('userData'), roles);
+    const r = await stationKeys.unlockHistory({ base: s.url, session: s.session, stationId: roles.deviceId, passphrase });
+    historyNone = !r.ok && r.reason === 'no-history-key';
+    if (!r.ok && !historyNone) console.warn('[station] history key:', r.reason);
+    refreshTray();
+  } catch (e) { console.warn('[station] history key:', e && e.message); }
+}
+
+function startStationLoop() {
+  if (stationLoop) return;
+  ensureStation().catch(() => {});
+  let rounds = 0;
+  stationLoop = setInterval(() => {
+    rounds++;
+    // Until it works, and then every ten minutes (a repeat register is harmless and keeps the Worker's row fresh).
+    if (stationState.state !== 'ready' || rounds % 20 === 0) ensureStation().catch(() => {});
+    const check = stationView().check;
+    if (check !== stationChecked) {
+      if (check > stationChecked) {
+        try {
+          if (Notification.isSupported()) new Notification({ title: APP_NAME, body: 'Check the printer: a label may not have come out.' }).show();
+        } catch { /* best effort */ }
+      }
+      stationChecked = check;
+      refreshTray();
+    }
+  }, 30 * 1000);
+  if (stationLoop.unref) stationLoop.unref();
+}
+
+async function stationClick(action) {
+  if (action === 'wizard') { openWizard(); return; }
+  if (action === 'clear-check') {
+    if (serverModule && serverModule.clearCheckThePrinter) serverModule.clearCheckThePrinter();
+    stationChecked = 0;
+    refreshTray();
+    return;
+  }
+  if (action === 'import-history') {
+    const { response } = await dialog.showMessageBox({
+      type: 'question', title: APP_NAME, buttons: ['Import', 'Cancel'], defaultId: 1, cancelId: 1,
+      message: 'Import this laptop\'s history into the church\'s sealed history?',
+      detail: 'Print history and attendance on this computer are sealed with the church\'s history key and sent to the sync service. Nothing is removed here, and running it again stores nothing twice.',
+    });
+    if (response !== 0) return;
+    const r = serverModule && serverModule.importLaptopHistory ? await serverModule.importLaptopHistory() : { ok: false, error: 'The print server is not running.' };
+    dialog.showMessageBox({ type: r.ok ? 'info' : 'warning', title: APP_NAME, message: stationFace.importResultText(r) }).catch(() => {});
+  }
 }
 
 function openWizard() {
@@ -1228,6 +1351,10 @@ app.whenReady().then(async () => {
   });
   syncClient = require(path.join(printServerDir(), 'sync-client.js'));
   syncSession = createSyncSession({ userData, safeStorage, syncClient });
+  stationKeys = require(path.join(printServerDir(), 'station-keys.js')).createStationKeys({
+    dir: userData, safeStorage, request: require(path.join(printServerDir(), 'cloud-request.js')).cloudRequest,
+    log: (...a) => console.log(...a),
+  });
   deviceSync = createDeviceSync({
     userData,
     deviceId: () => {

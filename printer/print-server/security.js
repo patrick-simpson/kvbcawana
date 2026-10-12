@@ -214,6 +214,13 @@ const SETTINGS_PAGE_ROUTES = {
   '/attendance-audit/apply': { methods: ['POST'] },
   '/rehearsal': { methods: ['POST'] },
   '/config/sync-login': { methods: ['POST'] },
+  // Online check-in, P2: this computer as a print station. The status shows
+  // the print jobs' outcome (and CHECK THE PRINTER); clear says the printer
+  // was looked at; the import seals this laptop's history once and posts it.
+  // None of them returns or takes a key.
+  '/cloud/print-status': { methods: ['GET'] },
+  '/cloud/print-status/clear': { methods: ['POST'] },
+  '/cloud/import-history': { methods: ['POST'] },
 };
 
 const SETTINGS_PAGE_CONFIG_KEYS = [

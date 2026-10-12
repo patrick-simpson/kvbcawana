@@ -566,6 +566,56 @@ relay reaches the `/phone/*` routes from this computer (loopback, no
 credential). With no internet the desk still prints (extension to localhost);
 there are no phones and no settings changes until it is back.
 
+**The print role is an online check-in STATION (P2, ROADMAP.md#online-check-in,
+built 2026-10-12).** Route contract: `lobby/worker/src/routes.md`. The extension
+and every old print path still work (P7 removes the extension); this adds the
+Worker as the one source of jobs.
+- **Keys** (`print-server/station-keys.js`, Electron-free, `safeStorage`
+  injected): an ECDH P-256 station key made once, its private JWK kept ONLY
+  through safeStorage (`station-key.bin`); where safeStorage cannot encrypt it
+  returns `REFUSED` and writes nothing (fail closed, the tray says "cannot be a
+  print station"). The public key is registered with `POST /v1/station/register`
+  under `roles.json`'s `deviceId`, no pairing step. The history private key is
+  opened with the passphrase once, at the wizard (`unlockHistory`, same
+  construction as `unwrapPrivateKey` but the JWK is kept, again in safeStorage,
+  `history-key.bin`); the passphrase is never kept. `main.js`: `ensureStation()`
+  makes the key, registers it, and only THEN calls the server's `configureCloud()`;
+  `electron-app/src/station.js` is the tray text. Station requests carry
+  `X-Station` (`print-server/cloud-request.js`).
+- **Jobs** (`print-server/job-puller.js`, modelled on `phone-relay.js`):
+  `POST /v1/print/lease {max:1}`, open the bundle with `openAsStation`, run it
+  through a route in `JOB_PULL_ROUTES` (`/print /reprint /print-barf-bags
+  /print-custom /print-oneoff /print-leader /print-award`) on loopback, ack
+  AFTER the print returns, `POST /v1/print/hello` every 30 s and as a heartbeat
+  while a job prints. A job record is `{route, body, clubberId?, gen?, source?}`;
+  a `raw` job (a TwoTimTwo-page check-in, opened by the Worker over TLS) becomes
+  `/print {cloud: true}`. **At most once (owner):** every jobId is journalled in
+  `print-journal.json` as `spooling` BEFORE the route is called, `printed` after.
+  A journalled job is never printed again: acked `printed` when it came out,
+  `already-spooled` when it was mid-print or its outcome is unknown, and those
+  raise CHECK THE PRINTER (`GET /cloud/print-status`, the tray, a notification,
+  cleared by `POST /cloud/print-status/clear`); a print that gets no answer is
+  unknown the same way; only a definite HTTP refusal is acked `failed` and may
+  run again. A second jobId for the same `night:clubberId:gen` is one tag; a
+  duplicate jobId in flight is dropped; `printedTonightFor()` still backstops.
+  An ack that fails is retried each round (never a reprint); 404/409/410 means
+  the Worker dropped the job (an undo) and ends it. `scripts/test-job-puller.cjs`.
+- **Rosters and books** arrive sealed (`createBundleSync`: `GET
+  /v1/station/roster|books?night=`, record `{csv}` / `{entries}`) and are fed to
+  the existing `/update-csv` and `/feed/completed-books`.
+- **History** (`print-server/history-sync.js`; every route tolerated missing): a
+  job from a TwoTimTwo-page check-in gets a `checkin` row sealed with `sealRow`
+  and posted to `POST /v1/history/rows` (queued while the route is down); the
+  history key reads the season's rows back into the attendance ledger
+  (`mergeAttendance`, additive) every 30 minutes for the milestone, first-time,
+  twin and "Go to" fields; **Import laptop history** (tray item and `POST
+  /cloud/import-history`, in `SETTINGS_PAGE_ROUTES`) seals `print-history.json`
+  and `attendance.json` (content-derived row ids, so a second run stores
+  nothing twice) and posts them to `POST /v1/history/import`.
+- **Publisher gate:** with `configureCloud()` active `publishTally`,
+  `publishStillHere` and `stillHereChanged` return at once (the Worker
+  publishes); `stopCloud()` restores them.
+
 **Every dashboard tool is on awana.kvbchurch.org/settings, Laptop section**
 (`lobby/src/components/settings/laptop.jsx` and `laptop-tools.jsx`,
 `lib/printServer.js`; the notes are in `lobby/CLAUDE.md`). The page reaches this
