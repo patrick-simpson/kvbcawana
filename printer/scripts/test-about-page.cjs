@@ -161,11 +161,11 @@ test('the trademark line is in the disclaimer bar, the footer and both meta desc
 // ── The reel ─────────────────────────────────────────────────────────────────
 test('the reel plays /reel/ muted and inline, ends on its poster, waits under reduced motion, and has a stand-in', () => {
   const reel = live(read('components/home/Reel.tsx'));
-  assert.match(reel, /wide: '\/reel\/reel-1080\.mp4'/);
-  assert.match(reel, /narrow: '\/reel\/reel-720\.mp4'/);
+  assert.match(reel, /FILM = '\/reel\/reel\.mp4'/);
+  assert.doesNotMatch(reel, /reel-1080|reel-720/, 'one film, no size choice');
   assert.match(reel, /POSTER = '\/reel\/poster\.jpg'/);
-  for (const f of ['reel-1080.mp4', 'reel-720.mp4', 'poster.jpg']) assert.ok(require('fs').existsSync(require('path').join(__dirname, '..', 'public', 'reel', f)), `public/reel/${f} is committed, so the page never shows Coming soon`);
-  assert.match(reel, /matchMedia\('\(max-width: 720px\)'\)/);
+  for (const f of ['reel.mp4', 'poster.jpg']) assert.ok(require('fs').existsSync(require('path').join(__dirname, '..', 'public', 'reel', f)), `public/reel/${f} is committed, so the page never shows Coming soon`);
+  assert.ok(require('fs').statSync(require('path').join(__dirname, '..', 'public', 'reel', 'reel.mp4')).size <= 1.6 * 1000 * 1000, 'the film stays about 1.5 MB');
   assert.match(reel, /<video[\s\S]*playsInline[\s\S]*muted[\s\S]*\/>/);
   assert.match(reel, /prefers-reduced-motion: reduce/);
   assert.match(reel, /onEnded=\{\(e\) => \{ setMode\('ended'\); e\.currentTarget\.load\(\);/);

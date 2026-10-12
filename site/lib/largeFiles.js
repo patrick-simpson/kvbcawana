@@ -28,7 +28,7 @@ export function mustStream(sitePath, size) {
 /**
  * The repo path a streamed site path is served from, or null when it may not
  * be streamed (outside the folders above, or not a plain path).
- * @param {string} sitePath  e.g. /reel/reel-1080.mp4
+ * @param {string} sitePath  e.g. /reel/reel.mp4
  */
 export function repoPathFor(sitePath) {
   for (const [prefix, folder] of Object.entries(REPO_FOLDERS)) {

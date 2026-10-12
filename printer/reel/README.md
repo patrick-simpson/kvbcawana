@@ -11,7 +11,7 @@ npm run reel          # in printer/: labels, footage, film, edit (about 20 minut
 It needs the built site (`SITE_ORIGIN=https://awana.kvbchurch.org node site/build.mjs`
 at the repo root; `npm run reel` builds it when `site/dist` is missing),
 Chromium (`PLAYWRIGHT_CHROMIUM`, else `/opt/pw-browsers/chromium`) and ffmpeg.
-It writes `printer/public/reel/reel-1080.mp4`, `reel-720.mp4` and `poster.jpg`,
+It writes `printer/public/reel/reel.mp4` (one 960x540 file, about 1.5 MB) and `poster.jpg`,
 which the page plays; everything in between goes to `reel/.work/` (ignored).
 
 ## How it is made
