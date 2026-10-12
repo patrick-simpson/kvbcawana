@@ -1,6 +1,6 @@
 /* ── The kit, as this page uses it ─────────────────────────────────────
-   The Awana 2026-27 catalog's brand kit is mirrored byte for byte in
-   public/brand/ (see CLAUDE.md, "Brand kit"): brand/tokens.css defines the
+   The Awana 2026-27 catalog's brand kit is copied byte for byte into
+   public/brand/ (generated from lobby/shared/brand/) (see CLAUDE.md, "Brand kit"): brand/tokens.css defines the
    --brand-* properties and brand/fonts.css the three self-hosted families,
    both linked from index.html ahead of this sheet. Everything below reads
    the kit through these aliases. Each one carries the kit's own value as its

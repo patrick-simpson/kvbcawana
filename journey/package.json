@@ -12,6 +12,8 @@
     "build-leader-prep": "node scripts/build-leader-prep.mjs",
     "build-prep-transcripts": "node scripts/build-prep-transcripts.mjs",
     "build": "node scripts/build-schedule.mjs",
+    "assets": "node ../scripts/family-assets.mjs journey",
+    "pretest": "node ../scripts/family-assets.mjs journey",
     "test": "node --test"
   },
   "devDependencies": {

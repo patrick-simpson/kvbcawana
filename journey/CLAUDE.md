@@ -57,7 +57,7 @@ minutes, with no SSH and no keyboard.
   be added to `STAMPED_ASSETS` too. It also rewrites the deployed
   `brand/fonts.css` so each font URL carries `?v=<first 12 hex of that
   font's sha256>` (see "Brand kit" below). The committed page keeps
-  `content="dev"` and plain asset paths (a test pins that), the committed
+  `content="dev"` and plain asset paths (a test pins that), the generated
   `brand/` stays byte-identical to the kit, and `version.json` is
   gitignored, so a checkout and the jsdom harness see the page exactly as
   before. The script is idempotent and throws if the meta is missing, if
@@ -117,7 +117,7 @@ server is at fault.
 - Only `public/` is deployed, under `/journey/` of the one site (by
   `site/build.mjs`) — repo docs, workflow files, etc.
   never end up served on the live site. (The one README that is served is
-  `public/brand/README.md`, because the kit mirror is the whole kit, byte
+  `public/brand/README.md`, because the generated copy is the whole kit, byte
   for byte; see "Brand kit" below.)
 - `public/index.html` is the only page. It mounts two full-viewport
   layers and toggles a `hidden` class between them rather than
@@ -214,16 +214,19 @@ Read Prep, captions).
   `font-variant-numeric: tabular-nums` is set; nothing on this kiosk sets a
   number in the shout face.
 
-- **`public/brand/` is a byte-identical mirror of the whole kit**, whose
-  canonical copy is `lobby/shared/brand/` (read its
-  README). Never edit it here. `node scripts/sync-brand-kit.mjs
-  <signage-checkout>` re-copies it and rewrites
-  `data/brand-kit-manifest.json` (a sha256 per file plus the signage commit
-  that last touched the kit); `--check` compares without writing and exits 1
-  on drift. `test/brand-kit.test.mjs` fails if the mirror and the manifest
-  disagree in any file, so a hand edit, a half copy or a dropped file is
-  caught here even though the canonical repo is not. Commit the mirror and
-  the manifest together.
+- **`public/brand/` is a generated, ignored, byte-identical copy of the
+  whole kit** (so is `public/family.css`, below). The one canonical kit is
+  `lobby/shared/brand/` (read its README); never edit the copy. `npm run
+  assets` (`node ../scripts/family-assets.mjs journey`) makes both, `npm test`
+  runs it first (`pretest`) and `site/build.mjs` runs it before it copies
+  `public/` into `/journey/` and hashes it for the build id (so a kit change
+  reloads the kiosks). **The Pi serves nothing from this repo**: its Chromium
+  loads the deployed `awana.kvbchurch.org/journey/` (`pi/journey-kiosk.sh`),
+  so the built site is where the kit and `family.css` live at runtime, from
+  the same origin as the page and never from another app's address. Opening
+  `public/` straight from a checkout (a dev server, a file) needs `npm run
+  assets` first. `test/brand-kit.test.mjs` fails if the copy is missing or
+  differs from the kit in any file.
 - **Self-hosted, never the network.** `index.html` links
   `brand/tokens.css` and `brand/fonts.css` ahead of `src/style.css`; no
   font, stylesheet or image comes from anywhere else (a test pins the only
@@ -282,10 +285,9 @@ styles inline in a `<style>` block. There is no `about.css`.
   weight to the Pi's page. `scripts/stamp-build.mjs` stamps `index.html`
   only, so `about.html` needs no build meta and is left untouched by the
   deploy (checked by running the stamp over a scratch copy of `public/`).
-- **`family.css` is byte-identical across the three repos.** The canonical
-  copy is `printer/styles/family.css` and its spec is
-  `printer/docs/FAMILY-DESIGN.md`; change it there and copy
-  the file byte-for-byte to all three, never edit this copy on its own.
+- **`public/family.css` is a generated, ignored copy** (`npm run assets`).
+  The one committed copy is `printer/styles/family.css` and its spec is
+  `printer/docs/FAMILY-DESIGN.md`; change it there, never edit this copy.
   Anything page-specific goes in `about.html`'s inline `<style>` with the
   `jd-` prefix, built on the family tokens.
 - **Bump the `?v=` token on BOTH about pages whenever `family.css` changes**

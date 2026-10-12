@@ -85,7 +85,7 @@ build notes). The electron-app is one app with two roles:
   plain file; the passphrase is held in memory until the wizard closes, to
   sign the print server in too via its loopback `/config/sync-login`), a
   name, the printer, the screen + monitor + hours. Tray: "Set up this
-  computer...". It styles itself from the print server's brand-kit mirror,
+  computer...". It styles itself from the print server's brand-kit copy,
   two folders up from `static/` both unpackaged and packaged.
 - **The sound room hand-off**: `src/handoff.js` reads
   `%APPDATA%\awana-label-printer\handoff.json` (written by
@@ -141,12 +141,14 @@ sit lower down, and the `#install`, `#simulator`, `#faq`, `#features` and
 pages with the Check-in Display's and Journey Display's `about.html`.
 
 - **This repo holds the family design system.** `styles/family.css` is the
-  canonical stylesheet and `docs/FAMILY-DESIGN.md` its spec
-  (`docs/family-reference.html` renders every component). Byte-identical
-  copies live at `lobby/public/family.css` and `journey/public/family.css`
-  (`scripts/check-mirrors.mjs` fails CI if they drift): change the canonical
-  file, copy it over both, and bump the `family.css?v=N` token on both about
-  pages.
+  one committed stylesheet and `docs/FAMILY-DESIGN.md` its spec
+  (`docs/family-reference.html` renders every component). The lobby's and
+  Journey's about pages get generated, ignored copies at
+  `lobby/public/family.css` and `journey/public/family.css`
+  (`node scripts/family-assets.mjs` at the repo root, run by their dev,
+  build and test scripts and `site/build.mjs`; `scripts/check-mirrors.mjs`
+  fails CI if one is missing, differs or is committed): change the canonical
+  file and bump the `family.css?v=N` token on both about pages.
   Page-only styling goes in `styles/page.css` (`lbl-` prefix).
 - **Tailwind v4 is compiled** (`@tailwindcss/vite`, `styles/site.css` with
   `source(none)` + explicit `@source` lines limited to the site's own files).
@@ -232,12 +234,19 @@ checked in at the desk or on TwoTimTwo. The report pass matches a row WITH an
 id on its id only, and a name-only row on the report entry's name too.
 
 **The brand kit (6.17.0, shout face Paytone One since 6.18.0).**
-`print-server/public/brand/` is a byte-identical
-mirror of the canonical kit in `lobby/shared/brand/`, pinned
-by `scripts/brand-kit.sha256` and checked by `scripts/test-brand-kit.cjs` (in
-`npm test`); take a new kit with `node scripts/gen-brand-manifest.cjs --from
-<canonical>`, never by hand (the text files are LF only; `.gitattributes`
-keeps them so). `print-server/brand.js` registers Paytone One / Londrina Solid /
+`print-server/public/brand/` is NOT committed: it is a generated, byte-identical
+copy of the one canonical kit in `lobby/shared/brand/`, made by
+`node ../scripts/family-assets.mjs printer` before anything reads it
+(`npm test`'s `pretest`, print-server's `prestart`, electron-app's `predev` /
+`pretest` / `prebuild:renderer` so `npm run dist` packages it, and
+`release-app.yml` before the render smoke test), so the server, the tests and
+the installer all hold a full local copy and nothing fetches it at runtime.
+`scripts/test-brand-kit.cjs` (in `npm test`) fails if the copy is missing or
+differs from the canonical kit, if any build script loses its copy step, or if
+a text file has a CR (the text files are LF only; `lobby/.gitattributes`
+keeps them so). Change the kit in `lobby/shared/brand/`, never the copy; a
+bare `node server.js` or an individual `npm run test:*` needs `npm run assets`
+once first. Golden label baselines show what a changed font or mark draws. `print-server/brand.js` registers Paytone One / Londrina Solid /
 Figtree with the canvas and loads the official one-colour club marks, and
 EVERYTHING in it fails open: a missing or damaged font, or a letter the font
 lacks, prints that word in the old Windows face; a missing mark falls back to

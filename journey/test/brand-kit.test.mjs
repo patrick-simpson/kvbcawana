@@ -1,25 +1,25 @@
 // The brand kit mirror and the page's use of it.
 //
-// public/brand/ is a byte-identical copy of the signage repo's shared/brand/
-// (the canonical kit), so the kiosk never depends on another site or the
-// network for its own fonts and colours. These tests are the drift check: the
-// mirror must match data/brand-kit-manifest.json file for file, the page must
+// public/brand/ is a generated, gitignored copy of lobby/shared/brand/ (the
+// canonical kit; scripts/family-assets.mjs makes it, `npm test` runs that
+// first), so the kiosk never depends on another site or the network for its
+// own fonts and colours. These tests are the drift check: the copy must match
+// the kit file for file, the page must
 // load only self-hosted brand assets, style.css's fallbacks and baked art must
 // agree with the kit, and the Pi Zero's paint budget (flat, one keyframe, no
 // blur) is pinned rather than remembered.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { cpSync, existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
-import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { diffTrees, hashTree, MANIFEST_PATH, MIRROR_DIR, syncBrandKit } from '../scripts/sync-brand-kit.mjs';
+import { checkAssets, KIT, listFiles, ROOT } from '../../scripts/family-assets.mjs';
 
 const REPO = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const PUBLIC = path.join(REPO, 'public');
 const read = (rel) => readFileSync(path.join(PUBLIC, rel), 'utf8');
-const manifest = JSON.parse(readFileSync(MANIFEST_PATH, 'utf8'));
+const kitFiles = listFiles(path.join(ROOT, KIT));
 const html = read('index.html');
 const styleCss = read('src/style.css');
 
@@ -50,15 +50,12 @@ function splitTop(value, sep = ',') {
   return parts;
 }
 
-test('public/brand/ is exactly the manifest, file for file', () => {
-  const drift = diffTrees(manifest.files, hashTree(MIRROR_DIR));
+test('public/brand/ and public/family.css are exactly the canonical files, file for file', () => {
   assert.deepEqual(
-    drift,
+    checkAssets(['journey']),
     [],
-    'public/brand/ must be a byte-identical copy of the kit: re-run ' +
-      'node scripts/sync-brand-kit.mjs <Awana-Check-in-Display checkout> rather than editing it by hand'
+    'they are generated copies: run `npm run assets` (npm test does) rather than editing them by hand'
   );
-  assert.equal(manifest.source, 'Awana-Check-in-Display/shared/brand/');
 });
 
 test('the mirror carries everything this page loads, fonts with their licences', () => {
@@ -76,7 +73,7 @@ test('the mirror carries everything this page loads, fonts with their licences',
     'fonts/OFL-LondrinaSolid.txt',
     'fonts/OFL-Figtree.txt',
   ]) {
-    assert.ok(rel in manifest.files, `${rel} is in the mirror`);
+    assert.ok(kitFiles.includes(rel), `${rel} is in the kit`);
   }
   // Every font the kit's sheet names is really there.
   for (const m of read('brand/fonts.css').matchAll(/url\((['"]?)([^'")?]+)\1\)/g)) {
@@ -108,7 +105,7 @@ const unitsPerEm = (ttf) => {
 test('the shout is Paytone One, whole, and Galindo is gone from everything the page reaches', () => {
   // Owner decision 2026-09-29: Galindo "looks too much like SpongeBob".
   assert.deepEqual(
-    Object.keys(manifest.files).filter((rel) => /galindo/i.test(rel)),
+    kitFiles.filter((rel) => /galindo/i.test(rel)),
     [],
     'no Galindo file in the mirror'
   );
@@ -131,7 +128,7 @@ test('the shout is Paytone One, whole, and Galindo is gone from everything the p
 test('the shout font is the unmodified whole font, in the TTF and in the WOFF2', () => {
   // The OFL reserves the name "Paytone One", so a subset or a re-encode under
   // that name is a licence problem, and a hand-edited mirror would hide it.
-  // The manifest already pins these files to the kit; this pins what the kit
+  // The copy is checked against the kit above; this pins what the kit
   // must have put there (the canonical repo's own test decodes the WOFF2 table
   // by table). Both files are read whole, never trimmed to latin.
   const dir = path.join(PUBLIC, 'brand', 'fonts');
@@ -193,38 +190,6 @@ test('the headlines stacked over other lines sit on the cap line the design was 
   }
 });
 
-test('the drift check notices a changed, a missing and an extra file', () => {
-  const dir = mkdtempSync(path.join(os.tmpdir(), 'journey-brand-'));
-  cpSync(MIRROR_DIR, dir, { recursive: true });
-  assert.deepEqual(diffTrees(manifest.files, hashTree(dir)), []);
-
-  writeFileSync(path.join(dir, 'tokens.css'), `${read('brand/tokens.css')}\n/* hand edit */\n`);
-  rmSync(path.join(dir, 'logos', 'journey-white.svg'));
-  writeFileSync(path.join(dir, 'stray.css'), 'body{}');
-  assert.deepEqual(diffTrees(manifest.files, hashTree(dir)).sort(), [
-    'changed: tokens.css',
-    'extra: stray.css',
-    'missing: logos/journey-white.svg',
-  ]);
-  rmSync(dir, { recursive: true, force: true });
-});
-
-test('--check against a signage checkout compares without writing anything', () => {
-  // A fake signage checkout whose kit is this mirror: no drift, and the
-  // mirror and the manifest are left exactly as they were.
-  const checkout = mkdtempSync(path.join(os.tmpdir(), 'journey-signage-'));
-  cpSync(MIRROR_DIR, path.join(checkout, 'shared', 'brand'), { recursive: true });
-  const before = readFileSync(MANIFEST_PATH, 'utf8');
-  const { drift } = syncBrandKit(checkout, { check: true });
-  assert.deepEqual(drift, []);
-  assert.equal(readFileSync(MANIFEST_PATH, 'utf8'), before);
-
-  writeFileSync(path.join(checkout, 'shared', 'brand', 'tokens.css'), ':root{}');
-  assert.deepEqual(syncBrandKit(checkout, { check: true }).drift, ['changed: tokens.css']);
-  assert.throws(() => syncBrandKit(os.tmpdir(), { check: true }), /not the brand kit/);
-  rmSync(checkout, { recursive: true, force: true });
-});
-
 test('the page links the kit and loads nothing from the network', () => {
   const links = [...html.matchAll(/<link\b[^>]*href="([^"]+)"/g)].map((m) => m[1]);
   assert.deepEqual(links, ['brand/tokens.css', 'brand/fonts.css', 'src/style.css']);
@@ -262,7 +227,7 @@ test("every kit fallback in style.css is the kit's own value", () => {
 
 test("the baked art is the kit's own shapes, path for path", () => {
   const kitPaths = new Set();
-  for (const rel of Object.keys(manifest.files)) {
+  for (const rel of kitFiles) {
     if (!/^(shapes|doodles)\/.*\.svg$/.test(rel)) continue;
     for (const m of read(`brand/${rel}`).matchAll(/\sd="([^"]+)"/g)) kitPaths.add(m[1]);
   }

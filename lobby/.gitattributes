@@ -1,0 +1,14 @@
+# The brand kit's text files are LF only, in every checkout. The kit is copied
+# byte for byte into journey/public/brand/ and printer/print-server/public/brand/
+# (scripts/family-assets.mjs), and Git for Windows checks text out as CRLF by
+# default (the release workflow builds the installer on a Windows runner), which
+# would ship CRLF copies. The fonts are binary and never converted.
+# (printer/scripts/test-brand-kit.cjs refuses any CR outright.)
+shared/brand/** text=auto eol=lf
+shared/brand/**/*.svg text eol=lf
+shared/brand/**/*.css text eol=lf
+shared/brand/**/*.json text eol=lf
+shared/brand/**/*.md text eol=lf
+shared/brand/**/*.txt text eol=lf
+shared/brand/**/*.ttf binary
+shared/brand/**/*.woff2 binary

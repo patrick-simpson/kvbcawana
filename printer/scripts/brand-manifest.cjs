@@ -1,7 +1,6 @@
-// Shared by gen-brand-manifest.cjs (writes the pin) and test-brand-kit.cjs
-// (checks it). The manifest is `sha256sum` format — "<hex>  <path>" per line,
-// paths relative to the mirror, sorted — so `sha256sum -c` can read it too
-// (from inside print-server/public/brand/).
+// Helpers for test-brand-kit.cjs: the print server's generated copy of the brand
+// kit (print-server/public/brand/, made by ../../scripts/family-assets.mjs from
+// the canonical lobby/shared/brand/) and the canonical kit it must equal.
 
 'use strict';
 
@@ -11,7 +10,7 @@ const crypto = require('crypto');
 
 const REPO = path.join(__dirname, '..');
 const MIRROR_DIR = path.join(REPO, 'print-server', 'public', 'brand');
-const MANIFEST_FILE = path.join(__dirname, 'brand-kit.sha256');
+const KIT_DIR = path.join(REPO, '..', 'lobby', 'shared', 'brand');
 
 // Every regular file under `dir`, as [{ file, sha256 }] with forward-slash
 // relative paths, sorted. Symlinks are listed (and so fail the check) rather
@@ -33,14 +32,12 @@ function hashTree(dir) {
 }
 
 // The kit's text files (SVG, CSS, JSON, Markdown, the licence texts) are LF
-// only, in the canonical repo and here. A CR in one means a line-ending
-// conversion got to it: Git for Windows' default (core.autocrlf=true) checks
-// the canonical kit out as CRLF, and copying that checkout in would pin CRLF
-// hashes that agree with the copy and with nothing upstream, silently ending
-// "byte-identical". So any file under `dir` that is not a font or an image and
-// holds a '\r' is listed here, and both the regenerate script and the test
-// refuse them. (.gitattributes also keeps these types LF on checkout and
-// normalises them on commit.)
+// only. A CR in one means a line-ending conversion got to it: Git for Windows'
+// default (core.autocrlf=true) checks text out as CRLF, and the installer is
+// built on a Windows runner. Any file under `dir` that is not a font or an
+// image and holds a '\r' is listed here, and the test refuses them.
+// (lobby/.gitattributes keeps these types LF on checkout and normalises them
+// on commit.)
 const BINARY_EXTENSIONS = new Set(['.ttf', '.otf', '.woff', '.woff2', '.png', '.jpg', '.jpeg', '.gif', '.webp', '.ico', '.pdf']);
 function filesWithCarriageReturns(dir) {
   const out = [];
@@ -58,17 +55,4 @@ function filesWithCarriageReturns(dir) {
   return out;
 }
 
-function formatManifest(entries) {
-  return entries.map((e) => `${e.sha256}  ${e.file}`).join('\n') + '\n';
-}
-
-function parseManifest(text) {
-  const map = new Map();
-  for (const line of String(text).split(/\r?\n/)) {
-    const m = line.match(/^([0-9a-f]{64}) {2}(.+)$/);
-    if (m) map.set(m[2], m[1]);
-  }
-  return map;
-}
-
-module.exports = { REPO, MIRROR_DIR, MANIFEST_FILE, hashTree, formatManifest, parseManifest, filesWithCarriageReturns };
+module.exports = { REPO, MIRROR_DIR, KIT_DIR, hashTree, filesWithCarriageReturns };

@@ -9,5 +9,9 @@
   },
   "engines": {
     "node": ">=22"
+  },
+  "scripts": {
+    "prestart": "node ../../scripts/family-assets.mjs printer",
+    "start": "node server.js"
   }
 }

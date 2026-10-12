@@ -55,6 +55,12 @@ const run = (cmd, cwd, env = {}) => {
 rmSync(OUT, { recursive: true, force: true });
 mkdirSync(OUT, { recursive: true });
 
+// The brand kit and family.css have one canonical copy each; the apps get theirs
+// here (Journey's public/brand and family.css, the print server's public/brand for
+// /checkin, the lobby's about page stylesheet) before anything below reads them.
+// Journey's build id (hashTree below) covers them, so a kit change reloads the kiosks.
+run('node scripts/family-assets.mjs all', ROOT);
+
 // The printer's public site at the root.
 run('npm run build', path.join(ROOT, 'printer'), { SITE_BASE: '/' });
 cpSync(path.join(ROOT, 'printer', 'dist'), OUT, { recursive: true });
