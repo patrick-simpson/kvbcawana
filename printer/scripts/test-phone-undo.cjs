@@ -5,7 +5,7 @@
 // What it guards:
 // * The queue. POST /phone/undo with inTwoTimTwo queues an `undo` action for
 //   the extension and changes NOTHING here: a child with no TwoTimTwo id is
-//   refused (Remove is the only way for them), the "Allow driven check-ins"
+//   refused (Remove is the only way for them), the enableDrivenCheckin
 //   switch refuses it the way it refuses a phone check-in, a double-tap is one
 //   action, and an extension older than 7.14 (no ?accept=undo) is never handed
 //   one: it would take it for a check-in and answer "Already checked in".
@@ -270,7 +270,7 @@ async function serverSuite() {
       const cfg = (body) => fetch(BASE + '/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       check('(switched off on this computer)', (await cfg({ enableDrivenCheckin: false })).ok);
       const r = await post('/phone/undo', { firstName: 'Mia', lastName: 'Reed', clubberId: '77', inTwoTimTwo: true });
-      check('an undo is refused at once, saying why', r.status === 409 && /Allow driven check-ins/.test(r.body.error), JSON.stringify(r.body));
+      check('an undo is refused at once, saying why', r.status === 409 && /Printing → Labels/.test(r.body.error), JSON.stringify(r.body));
       check('and nothing is queued', !(await pendingNow('undo')).some((a) => a.type === 'undo' && a.status === 'pending'));
       check('Remove still works with it off (local only)', (await post('/phone/undo', { firstName: 'Zed', lastName: 'Walker' })).status === 200);
       check('(switched back on)', (await cfg({ enableDrivenCheckin: true })).ok);

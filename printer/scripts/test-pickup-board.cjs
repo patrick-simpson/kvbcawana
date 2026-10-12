@@ -396,7 +396,7 @@ async function serverSuite() {
       const cfg = (body) => fetch(BASE + '/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       await cfg({ enableDrivenCheckin: false });
       r = await post('/phone/undo', { firstName: 'Ava', lastName: 'Stone', clubberId: '4821', checkout: true });
-      check('driven check-ins off: refused at once, saying why', r.status === 409 && /Allow driven check-ins/.test(r.body.error));
+      check('driven check-ins off: refused at once, saying why', r.status === 409 && /Printing → Labels/.test(r.body.error));
       await cfg({ enableDrivenCheckin: true });
       const src = require('./server-source.cjs')();
       check('one nobody picks up fails with the reason, like an undo', /a\.detail = co \? CHECKOUT_NOT_PICKED_UP : UNDO_NOT_PICKED_UP;/.test(src) && /older than 7\.16/.test(src));
