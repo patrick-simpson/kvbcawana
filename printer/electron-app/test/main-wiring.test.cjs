@@ -83,3 +83,12 @@ describe('the hidden printer window', () => {
     assert.doesNotMatch(main, /[^t]pdfWindow\.webContents\.getPrintersAsync/);
   });
 });
+
+describe('the display role saves its state durably', () => {
+  it('flushes the temp file to disk before renaming it into place', () => {
+    const i = display.indexOf('function writeJson');
+    const body = display.slice(i, display.indexOf('let state =', i));
+    assert.match(body, /fs\.fsyncSync\(fd\)/);
+    assert.ok(body.indexOf('fsyncSync') < body.indexOf('renameSync'));
+  });
+});
