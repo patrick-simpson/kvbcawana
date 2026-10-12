@@ -8,6 +8,8 @@ import { isScreenId } from '../../src/lib/syncSpecs.js';
 
 /** A live socket opened by a registered screen carries this tag (screens.js). */
 const SCREEN_TAG = 'screen:';
+/** Live sockets kept open at once (the church has a few dozen screens at most). */
+const MAX_SOCKETS = 200;
 
 /** The pages that may call this service from a browser. */
 const ALLOWED_ORIGINS = [
@@ -98,6 +100,12 @@ export class SyncStore {
     // A registered screen names itself (?screen=<id>), so /settings can say it
     // is online. Only a well-formed id is kept; anything else is a plain socket.
     const screen = url.searchParams.get('screen');
+    // A bound on sockets: the oldest go first (a dead peer's, usually), so one
+    // misbehaving page reconnecting in a loop cannot grow the set without end.
+    const open = this.state.getWebSockets();
+    for (const old of open.slice(0, Math.max(0, open.length - (MAX_SOCKETS - 1)))) {
+      try { old.close(1013, 'busy'); } catch { /* already closed */ }
+    }
     this.state.acceptWebSocket(server, isScreenId(screen) ? [`${SCREEN_TAG}${screen}`] : []);
     // Catch it up: the last tally, recap, birthdays and the rest, and the
     // newest deck's chunks, as the printer's rebroadcasts would within minutes.
@@ -126,7 +134,10 @@ export class SyncStore {
     try { ws.close(code === 1005 ? 1000 : code, 'bye'); } catch { /* already closed */ }
   }
 
-  webSocketError() {}
+  /** A socket that errored is closed, so it stops counting against the bound. */
+  webSocketError(ws) {
+    try { ws.close(1011, 'error'); } catch { /* already closed */ }
+  }
 }
 
 /** @param {Record<string, any>} env */
