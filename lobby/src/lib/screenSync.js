@@ -180,3 +180,8 @@ let liveId = null;
 /** @param {string | null} id */
 export function setLiveScreenId(id) { liveId = isScreenId(id) ? id : null; }
 export function liveScreenId() { return liveId; }
+/** The name this screen goes by (for the change log's X-Device-Name). */
+let liveName = '';
+/** @param {string} name */
+export function setLiveScreenName(name) { liveName = String(name || ''); }
+export function liveScreenName() { return liveName; }
