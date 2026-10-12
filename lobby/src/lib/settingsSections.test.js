@@ -95,3 +95,13 @@ describe('the classic rail (?rail=classic)', () => {
     try { expect(railMode('')).toBe('new'); } finally { Storage.prototype.getItem = real; }
   });
 });
+
+describe('the preview focus', () => {
+  it('keeps the same state object when the focus did not change, so a pointer move re-renders nothing', async () => {
+    const { nextFocusState } = await import('./settingsSections.js');
+    const prev = { section: 'look', focus: 'slide' };
+    expect(nextFocusState(prev, 'look', 'slide')).toBe(prev);
+    expect(nextFocusState(prev, 'look', 'name')).toEqual({ section: 'look', focus: 'name' });
+    expect(nextFocusState(prev, 'show', 'slide')).toEqual({ section: 'show', focus: 'slide' });
+  });
+});

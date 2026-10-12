@@ -198,3 +198,15 @@ export function phaseWords(phase) {
   if (!phase) return '';
   return /** @type {Record<string, string>} */ (PHASE_WORDS)[phase] ?? phase;
 }
+
+/**
+ * The TV preview's focus after the pointer or keyboard moved into a card:
+ * the SAME object when nothing changed, so React skips the render (a pointer
+ * moving inside one card fires this on every move).
+ * @param {{ section: string, focus: string }} prev
+ * @param {string} section
+ * @param {string} focus
+ */
+export function nextFocusState(prev, section, focus) {
+  return prev.section === section && prev.focus === focus ? prev : { section, focus };
+}

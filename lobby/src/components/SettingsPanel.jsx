@@ -10,7 +10,7 @@ import { useDisplayLogin } from '../hooks/useDisplayLogin.js';
 import { useSync } from '../hooks/useSync.js';
 import { pageBuild } from '../lib/buildReload.js';
 import {
-  classicOpeningSection, classicSectionsFor, openingSection, railMode, resolveClassicSection, resolveSection, sectionsFor,
+  classicOpeningSection, classicSectionsFor, nextFocusState, openingSection, railMode, resolveClassicSection, resolveSection, sectionsFor,
 } from '../lib/settingsSections.js';
 import { initialMission } from '../lib/missionControl.js';
 import { isSharedKey, pickShared } from '../lib/sharedSettings.js';
@@ -527,7 +527,7 @@ export default function SettingsPanel({
   // The focus is the card the pointer or keyboard focus is in (data-preview on PanelCard).
   const trackFocus = (e) => {
     const card = e.target?.closest?.('[data-preview]');
-    if (card?.dataset.preview) setFocusState({ section, focus: card.dataset.preview });
+    if (card?.dataset.preview) setFocusState((prev) => nextFocusState(prev, section, card.dataset.preview));
   };
 
   // The settings page is not a screen: what matters there is the sign-in.
