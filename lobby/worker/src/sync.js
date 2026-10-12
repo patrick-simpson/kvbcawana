@@ -45,6 +45,16 @@ import { Watcher } from './watcher.js';
 import { CloudPhone } from './phone.js';
 import { Friends } from './friends.js';
 import { Screens } from './screens.js';
+import { BadRequest, fail, json } from './http.js';
+import { Registry } from './registry.js';
+import { Ledger, Tags } from './ledger.js';
+import { PrintQueue } from './printq.js';
+import { Stations } from './stations.js';
+import { Adopter } from './adopt.js';
+import { Desk } from './desk.js';
+import { mountCheckin } from './checkinRoutes.js';
+
+export { json };
 
 export const IP_MAX_FAILS = 5;
 export const IP_LOCK_MS = 15 * 60 * 1000;
@@ -56,25 +66,14 @@ export const SETTINGS_JSON_MAX = 3800;
 /** The slide chunker's budget and count (print-server/events.js). */
 export const SLIDES_CHUNK_JSON_BUDGET = 3900;
 export const SLIDES_TOTAL_MAX = 12;
+/** The events the laptop may not publish while the Worker is the one publisher (live.js names them). */
+export const SINGLE_PUBLISHER_DROPS = Object.freeze(['tally', 'checkout']);
 export const BODY_MAX = 128 * 1024;   // bytes; the entry point refuses a longer Content-Length before reading
 
 
 /**
  * @typedef {{ get(key: string): Promise<any>, put(key: string, value: any): Promise<void>, delete(key: string): Promise<any> }} Store
  */
-
-/** @param {unknown} body @param {number} [status] @param {Record<string, string>} [headers] */
-export function json(body, status = 200, headers = {}) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', ...headers },
-  });
-}
-
-/** @param {string} message @param {number} status @param {Record<string, unknown>} [extra] */
-function fail(message, status, extra = {}) {
-  return json({ error: message, ...extra }, status);
-}
 
 /**
  * The published deck: text slides only, in the wire's shape (what the print
@@ -147,6 +146,23 @@ export class SyncCore {
     // ...and who brought a friend tonight (BARF Night's email; friends.js).
     this.friends = new Friends({ storage: this.storage, watcher: this.watcher, now: this.now });
     this.phone = new CloudPhone({ watcher: this.watcher, relay: this.relayQueue, storage: this.storage, now: this.now, friends: this.friends });
+    // Online check-in (ROADMAP.md#online-check-in): the night's claims, the print
+    // lease queue, the registered stations, what the watcher does with the
+    // report (P4) and the desk's check-in claim logic. Every module that owns
+    // routes adds them to the registry with ONE line below.
+    this.registry = new Registry();
+    this.tags = new Tags(() => this.watcher.creds()?.password);
+    this.ledger = new Ledger({ storage: this.storage, now: this.now });
+    this.printq = new PrintQueue({ storage: this.storage, now: this.now });
+    this.stations = new Stations({ storage: this.storage, now: this.now });
+    this.adopt = new Adopter({
+      ledger: this.ledger, printq: this.printq, stations: this.stations, tags: this.tags,
+      secret: () => this.watcher.creds()?.password, env: this.env, now: this.now, storage: this.storage,
+    });
+    this.watcher.adopt = this.adopt;
+    this.desk = new Desk({ watcher: this.watcher, ledger: this.ledger, printq: this.printq, stations: this.stations, tags: this.tags, now: this.now });
+    mountCheckin(this.registry, this);   // stations, print lease, desk (routes.md 4, 5, 6)
+    // mountHistory(this.registry, this);   // P6: history rows, summary, key (one line each)
     // The screen registry (ROADMAP.md#settings-page, phase 2): its doorbells ride the live
     // channel only, for the one screen they name.
     this.screens = new Screens({
@@ -358,6 +374,8 @@ export class SyncCore {
           break;
       }
       if (url.pathname === '/v1/screens' || url.pathname.startsWith('/v1/screens/')) return await this.screenRoute(request, url);
+      const hit = this.registry.match(request.method, url.pathname);
+      if (hit) return await this.runRoute(hit, request, url, ip);
       const known = new Set([
         'GET /v1/state', 'PUT /v1/settings', 'PUT /v1/slides', 'PUT /v1/template',
         'PUT /v1/journey', 'POST /v1/calendar/refresh', 'POST /v1/passphrase', 'POST /v1/publish',
@@ -435,6 +453,28 @@ export class SyncCore {
       console.error('[sync] unexpected error', err);
       return fail('Something went wrong on the sync service.', 500);
     }
+  }
+
+  /**
+   * A registry route (registry.js): check its auth level, then run it.
+   * `station` is a session plus X-Station naming a registered station (no
+   * pairing step: any computer with the passphrase may register one).
+   * @param {{ route: import('./registry.js').Registry['routes'][number], params: Record<string, string> }} hit
+   * @param {Request} request @param {URL} url @param {string} ip
+   */
+  async runRoute(hit, request, url, ip) {
+    const { route, params } = hit;
+    if (route.auth !== 'public' && !(await this.authorized(request))) {
+      return fail('This screen is signed out. Type the passphrase again.', 401, { reason: 'signed-out' });
+    }
+    let stationId = null;
+    if (route.auth === 'station') {
+      stationId = request.headers.get('X-Station') || '';
+      await this.stations.load();
+      if (!this.stations.get(stationId)) return fail('That station is not registered.', 403, { reason: 'unknown-station' });
+      await this.stations.touch(stationId);
+    }
+    return route.handler({ core: this, request, url, params, ip, stationId, body: () => this.body(request) });
   }
 
   /**
@@ -644,6 +684,12 @@ export class SyncCore {
   async livePublish(request) {
     const res = checkPublish(await this.body(request));
     if (!res.ok) return fail(res.error, res.status);
+    // ONE publisher (ROADMAP.md#online-check-in): in cloud mode the Worker
+    // publishes the tally and the still-here list itself, so the laptop's are
+    // dropped, answered 200 so the print server does not owe a resend.
+    if (this.singlePublisher && SINGLE_PUBLISHER_DROPS.includes(res.event)) {
+      return json({ ok: true, screens: 0, dropped: true, reason: 'single-publisher' });
+    }
     const screens = await this.relay(res.event, res.payload);
     return json({ ok: true, screens });
   }
@@ -661,4 +707,3 @@ export class SyncCore {
   }
 }
 
-class BadRequest extends Error {}

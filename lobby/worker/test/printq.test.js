@@ -170,7 +170,7 @@ describe('done and failed', () => {
     const { q, lookup, checkIn } = setup();
     const j = await checkIn('662');
     await q.lease('a', 1, lookup);
-    expect(await q.done(j.jobId)).toEqual({ ok: true, already: false, known: true, tag: j.tag, gen: 1 });
+    expect(await q.done(j.jobId)).toEqual({ ok: true, already: false, known: true, tag: j.tag, gen: 1, night: NIGHT });
     expect(await q.done(j.jobId)).toEqual({ ok: true, already: true, known: true });
     expect(await q.heartbeat(j.jobId, 'a', lookup)).toEqual({ ok: false, reason: 'done' });
     expect(await q.lease('b', 1, lookup)).toEqual([]);

@@ -193,7 +193,7 @@ export class PrintQueue {
    * (undone, purged), answers ok. `already-spooled` raises "check the printer".
    * Returns the job's claim (tag, gen) so the caller can mark it printed.
    * @param {string} jobId @param {'printed'|'already-spooled'} [result]
-   * @returns {Promise<{ ok: true, already: boolean, known: boolean, tag?: string|null, gen?: number|null }>}
+   * @returns {Promise<{ ok: true, already: boolean, known: boolean, tag?: string|null, gen?: number|null, night?: string }>}
    */
   async done(jobId, result = 'printed') {
     await this.load();
@@ -207,7 +207,7 @@ export class PrintQueue {
     job.bundle = null;
     job.raw = null;
     await this.doc.save();
-    return { ok: true, already: false, known: true, tag: job.tag, gen: job.gen };
+    return { ok: true, already: false, known: true, tag: job.tag, gen: job.gen, night: job.night };
   }
 
   /**
@@ -229,6 +229,16 @@ export class PrintQueue {
     return { ok: true, known: true, state: job.state };
   }
 
+  /** Drop one job that was never leased to anyone useful (its check-in failed). @param {string} jobId */
+  async dropJob(jobId) {
+    await this.load();
+    const job = this.jobs()[jobId];
+    if (!job || job.state === 'done') return false;
+    delete this.jobs()[jobId];
+    await this.doc.save();
+    return true;
+  }
+
   /** An undo: drop every job of this claim that has not been printed. @param {string} tag */
   async dropForTag(tag) {
     await this.load();
@@ -238,6 +248,20 @@ export class PrintQueue {
     }
     if (n) await this.doc.save();
     return n;
+  }
+
+  /**
+   * The stations' bundle for a job that was waiting for one (its raw body goes).
+   * @param {string} jobId @param {any} bundle
+   */
+  async attach(jobId, bundle) {
+    await this.load();
+    const job = this.jobs()[jobId];
+    if (!job || job.bundle || !bundle) return false;
+    job.bundle = bundle;
+    job.raw = null;
+    await this.doc.save();
+    return true;
   }
 
   /** Jobs still waiting for their stations' bundle (adopt.js seals them). */

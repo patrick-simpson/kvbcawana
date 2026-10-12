@@ -131,7 +131,7 @@ export class Ledger {
    *             TwoTimTwo already has it), with the `gen` to settle or release by
    *   already   someone holds it: its state (and job id) to answer with
    * @param {string} night @param {string} tag
-   * @param {{ source?: string, initial?: 'checking'|'queued' }} [opts]
+   * @param {{ source?: string, initial?: 'checking'|'queued', jobId?: string }} [opts]
    * @returns {Promise<{ ok: true, gen: number, regen: boolean } | { ok: false, already: true, state: string, gen: number, jobId?: string }>}
    */
   async claim(night, tag, opts = {}) {
@@ -141,14 +141,15 @@ export class Ledger {
     return r;
   }
 
-  /** The synchronous half of claim(): no await anywhere in it. @param {string} night @param {string} tag @param {{ source?: string, initial?: 'checking'|'queued' }} opts */
+  /** The synchronous half of claim(): no await anywhere in it. @param {string} night @param {string} tag @param {{ source?: string, initial?: 'checking'|'queued', jobId?: string }} opts */
   claimNow(night, tag, opts = {}) {
     const claims = this.claims(night);
     const t = this.now();
     const c = claims[tag];
     const initial = opts.initial === 'queued' ? 'queued' : 'checking';
     const fresh = (/** @type {number} */ gen) => ({
-      state: initial, gen, source: opts.source || 'desk', at: t, ...(initial === 'checking' ? { until: t + CHECKING_TTL_MS } : {}),
+      state: initial, gen, source: opts.source || 'desk', at: t,
+      ...(initial === 'checking' ? { until: t + CHECKING_TTL_MS } : {}), ...(opts.jobId ? { jobId: opts.jobId } : {}),
     });
     if (!c) {
       if (Object.keys(claims).length >= CLAIMS_MAX) return /** @type {const} */ ({ ok: false, already: true, state: 'full', gen: 0 });
