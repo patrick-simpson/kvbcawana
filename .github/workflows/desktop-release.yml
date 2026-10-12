@@ -23,7 +23,7 @@ name: Release Awana Lobby Display (sound room app)
 # lobby.yml to point at them by absolute URL, commits it to
 # site/updates/lobby/ and dispatches ci.yml so the site redeploys
 # with it. Never tag by hand; a stray release goes with
-# desktop-delete-release.yml (and a revert of the feed commit).
+# delete-release.yml (app desktop) and a revert of the feed commit.
 
 on:
   workflow_dispatch:

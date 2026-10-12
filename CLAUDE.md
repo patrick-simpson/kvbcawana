@@ -48,7 +48,7 @@ commits or files.
   the version and `ref: main`). Each runs the tests first, creates the tag
   (`printer-v*` / `desktop-v*`), builds and smoke-tests on Windows, publishes
   with `make_latest: false`, and commits the app's update feed into
-  `site/updates/`, which only ever moves forward. The delete workflows undo a
+  `site/updates/`, which only ever moves forward. `delete-release.yml` (pick the app) undoes a
   bad release. **Update feeds are ours, not GitHub's "Latest"**: both Electron
   apps use electron-updater's generic provider on
   `awana.kvbchurch.org/updates/printer/` and `/updates/lobby/` (channel

@@ -119,7 +119,7 @@ Instead, once steps 1–5 are on `main`, dispatch **`.github/workflows/printer-r
 
 The workflow runs the test suites FIRST, then creates the tag (so a failing test never leaves a tag behind), builds the `.exe` on Windows, smoke-tests it (silent install, `/health`, `/preview`), publishes the GitHub Release with `make_latest: false`, and commits the update feed to `site/updates/printer/` (which `ci.yml` then publishes). **The feed is ours, not GitHub's "Latest"**: the app updates from awana.kvbchurch.org/updates/printer/, and the workflow refuses a version that would move the feed backwards. Watch it through with `mcp__github__actions_get`; a release is done when the run is green, the release has its assets, and the feed names the new version.
 
-**Made a mistake?** Dispatch **`.github/workflows/printer-delete-release.yml`** with the exact stray tag; it removes the release and its tag with its own token (and revert the feed commit if one was made).
+**Made a mistake?** Dispatch **`.github/workflows/delete-release.yml`** with `app` = printer and the exact stray tag; it removes the release and its tag with its own token (and revert the feed commit if one was made).
 
 ## Commands
 

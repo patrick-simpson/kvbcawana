@@ -826,7 +826,7 @@ printer feed names): new displays get KVBC Awana, never this app. The owner's ca
   Windows build, silent install and a `--smoke-test` launch that must load
   the live page with the right version, then the release with the `.exe`,
   its blockmap and `lobby.yml`, and a check that `releases/latest` is the new
-  tag. Never tag by hand; a stray release goes with the root `desktop-delete-release.yml`.
+  tag. Never tag by hand; a stray release goes with the root `delete-release.yml` (`app` = desktop).
 - **One of three screens** (owner, 2026-10-07; `src/screens.js`, pure): the
   lobby (`/lobby/index.html`), the projector (`/lobby/countdown.html`) or
   Journey (`/journey/`), one at a time, in the same `persist:lobby` profile (one

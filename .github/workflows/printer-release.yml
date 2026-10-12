@@ -25,7 +25,7 @@ name: Release KVBC Awana
 # release assets; the last job rewrites latest.yml to point at them by
 # absolute URL, commits it to site/updates/printer/ and dispatches ci.yml so
 # the site redeploys with it. Releases are therefore published with
-# make_latest: false. To undo a bad release, run printer-delete-release.yml
+# make_latest: false. To undo a bad release, run delete-release.yml (app printer)
 # AND revert site/updates/printer/latest.yml.
 
 on:
