@@ -3521,8 +3521,11 @@
       debounceTimer = setTimeout(checkForChange, DEBOUNCE_MS);
     });
 
-    const watchTarget = document.querySelector('#lastCheckin') || document.body;
-    observer.observe(watchTarget, {
+    // The body, not #lastCheckin itself: if the page replaces that element, an
+    // observer bound to the old node would watch a detached tree for good.
+    // checkForChange re-queries the element each time, so the extra mutations
+    // cost one cheap lookup per debounce.
+    observer.observe(document.body, {
       childList: true,
       subtree: true,
       characterData: true

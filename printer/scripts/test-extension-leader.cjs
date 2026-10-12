@@ -274,6 +274,12 @@ const pruneSharedDedup = new Function('SHARED_DEDUP_PREFIX', extractFunction('pr
     check('a child not printed yet still prints', printed.join() === 'Eli Stone');
   }
 
+  console.log('\nthe #lastCheckin watcher');
+  {
+    check('it observes the body, so a replaced #lastCheckin cannot leave it watching a detached node',
+      /observer\.observe\(document\.body, \{/.test(extractFunction('watchCheckins')) && !/observe\(watchTarget/.test(SRC));
+  }
+
   console.log('\nstore night detection');
   {
     const rx = SRC.match(/return scanCalendarFor\((\/\\bstore\\b\/i)\);/);
