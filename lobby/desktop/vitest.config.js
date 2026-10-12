@@ -1,5 +1,5 @@
 // The desktop app's own unit tests: pure Node, no jsdom. They run in the
-// desktop release pipeline (build-desktop.yml), not in the website's deploy
+// desktop release pipeline (desktop-release.yml), not in the website's deploy
 // gate, so a desktop test can never block an urgent site redeploy (the
 // root `eslint .` does still lint desktop/).
 import { defineConfig } from 'vitest/config';

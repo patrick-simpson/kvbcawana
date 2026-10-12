@@ -59,8 +59,10 @@ commits or files.
   workflow artifacts older than a day: the account has 0.5 GB of Actions
   storage, and the release workflows keep their installer artifacts only a
   day (`retention-days: 1`); the Releases are what people download. The
-  apps' own workflows under `lobby/.github/`, `journey/.github/`,
-  `printer/.github/` are dormant.
+  per-app `.github/` folders are gone (their workflows were dormant and are
+  deleted; the one manual workflow they held that still matters is
+  `lobby-update-snapshots.yml`, which regenerates the lobby's visual
+  baselines and is dispatched by hand).
 - Realtime: since 2026-10-03 every screen listens to the Worker's live channel
   (sign-in with the church passphrase; names stay sealed end to end; the same
   events and sanitizers as the Pusher design). The Pusher keys are cleared and

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // ─────────────────────────────────────────────────────────────
 // Nightly calendar-feed builder (run by .github/workflows/
-// update-calendar.yml, or by hand):
+// lobby-update-calendar.yml, or by hand):
 //
 //   node scripts/fetch-calendar.mjs                    # live fetch
 //   node scripts/fetch-calendar.mjs --from-file page.html

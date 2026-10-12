@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // ─────────────────────────────────────────────────────────────
-// Nightly video transcode (run by .github/workflows/update-lesson.yml,
+// Nightly video transcode (run by .github/workflows/journey-update-lesson.yml,
 // after scripts/fetch-current-lesson.mjs, or by hand):
 //
 //   node scripts/transcode-lesson-video.mjs

@@ -245,7 +245,7 @@ whenever no reading is available. Set your
 town in Settings → Screen & corner → **Weather** with the **Look up** button.
 
 **How the data flows:** the calendar site doesn't allow direct browser
-fetches, so a nightly GitHub Action (`.github/workflows/update-calendar.yml`
+fetches, so a nightly GitHub Action (`.github/workflows/lobby-update-calendar.yml`
 → `scripts/fetch-calendar.mjs`) scrapes the calendar page into
 `public/calendar-feed.json` and redeploys when it changes. The display reads
 that file same-origin. If the file ever goes stale (>3 weeks), the display

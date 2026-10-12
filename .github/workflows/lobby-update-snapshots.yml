@@ -1,8 +1,9 @@
-name: Update visual-regression baselines
+name: Update lobby visual-regression baselines
 
-# Manual-only: regenerate the e2e screenshot baselines on the same
-# Ubuntu runner CI uses, and commit them back. Run this after an
-# intentional visual change makes the `visual` project fail in CI.
+# Manual-only: regenerate the lobby's e2e screenshot baselines
+# (lobby/e2e/__screenshots__) on the same Ubuntu runner CI uses, and commit
+# them back. Run this after an intentional visual change makes the lobby's
+# `visual` project fail in CI.
 on:
   workflow_dispatch:
 
@@ -19,26 +20,31 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
+          cache-dependency-path: lobby/package-lock.json
 
       - name: Install dependencies
+        working-directory: lobby
         run: npm ci
 
       - name: Build
+        working-directory: lobby
         run: npm run build
 
       - name: Install Playwright Chromium
+        working-directory: lobby
         run: npx playwright install --with-deps chromium
 
       - name: Regenerate baselines
+        working-directory: lobby
         run: npm run e2e:update
 
       - name: Commit updated baselines
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add e2e/__screenshots__
+          git add lobby/e2e/__screenshots__
           git diff --cached --quiet && echo "No baseline changes." && exit 0
           git commit -m "chore: regenerate visual-regression baselines"
           git push

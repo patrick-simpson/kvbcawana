@@ -391,7 +391,7 @@ awana.kvbchurch.org/journey/videos/ since 2026-10-03, streamed from that
 release by the site's function with Range passed through, because Pages'
 static files ignore Range and a video must seek) by
 `scripts/transcode-all-lessons.mjs` / the on-demand
-`transcode-all-lessons.yml` workflow. The manual video-picker plays
+`journey-transcode-all-lessons.yml` workflow. The manual video-picker plays
 these (originals were undecodable on the Pi Zero — reported broken from
 the live kiosk), falling back to the original URL if an asset is
 missing. A Release rather than `public/` keeps ~1.1GB out of the repo,

@@ -145,7 +145,7 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     // Playwright specs live in e2e/ and must never run under vitest. The
-    // desktop app's tests run in its own pipeline (build-desktop.yml), so a
+    // desktop app's tests run in its own pipeline (desktop-release.yml), so a
     // desktop TEST can never block a site redeploy (the root lint still
     // covers desktop/).
     exclude: [...configDefaults.exclude, 'e2e/**', 'desktop/**', 'worker/**'],
@@ -161,7 +161,7 @@ export default defineConfig({
         'src/main.jsx',
         'src/presentation/main.jsx',
         'src/sw.js', // service worker — never runs under jsdom
-        'desktop/**', // the sound room app: tested in build-desktop.yml
+        'desktop/**', // the sound room app: tested in desktop-release.yml
       ],
       // Ratchet DELIBERATELY (no autoUpdate): measured 2026-07 baseline
       // (stmts 44 / branches 47 / funcs 37 / lines 46) minus ~5 points
