@@ -3,7 +3,7 @@ name: CI
 # One test run for the whole family. Each app keeps exactly the checks its
 # old repo ran; the copies the three used to compare over the network
 # (contract and envelope vectors) are compared here directly; the brand kit
-# and family.css are kept once and copied into each app at build time. Nothing deploys from this repo yet: the apps' own
+# is kept once and copied into each app at build time. Nothing deploys from this repo yet: the apps' own
 # workflows sit dormant under their folders (GitHub reads only the root's) until the
 # one-site move at awana.kvbchurch.org replaces them.
 
@@ -43,7 +43,6 @@ jobs:
   # base to compare with, or a change to this file. The fast jobs always run.
   #   lobby   reads only lobby/ (its vitest excludes worker/ and desktop/,
   #           whose lint moved into their own jobs below), plus
-  #           printer/styles/family.css (its build copies it into public/)
   #           journey/public/src/schedule.js
   #           site/desk/ and printer/print-server/public/phone.html (e2e/desk.spec.js
   #           serves the desk page, with the phone page's touch core, from a stub origin)
@@ -118,7 +117,6 @@ jobs:
               if [[ "$f" != */* && "$f" == *.md ]]; then continue; fi
               case "$f" in
                 journey/public/src/schedule.js) lobby=true ;;  # screenSpecs.test.js reads it
-                printer/styles/family.css) lobby=true ;;  # the lobby's build copies it into public/
                 site/desk/*|printer/print-server/public/phone.html) lobby=true ;;  # e2e/desk.spec.js serves the desk page (site/desk/desk-page.mjs injects the touch core)
                 lobby/worker/*|lobby/desktop/*|printer/*|journey/*|site/*|.github/workflows/*) ;;
                 *) lobby=true ;;
@@ -144,7 +142,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      # The brand kit and family.css have one canonical file each; the apps'
+      # The brand kit and the sync modules have one canonical file each; the apps'
       # copies are generated (and gitignored), so make them, then check them.
       - run: node scripts/family-assets.mjs
       - run: node scripts/check-mirrors.mjs

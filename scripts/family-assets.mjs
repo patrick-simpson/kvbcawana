@@ -3,37 +3,36 @@
 //
 //   the brand kit   canonical lobby/shared/brand/       -> journey/public/brand/,
 //                                                          printer/print-server/public/brand/
-//   family.css      canonical printer/styles/family.css -> lobby/public/family.css,
-//                                                          journey/public/family.css
 //   sync modules    canonical lobby/shared/sync-protocol.js and cloud-crypto.js
 //                                                       -> journey/public/src/shared/ (the kiosk's
 //                                                          passphrase v2 sign-in imports them, byte for byte)
+//
+// (family.css is no longer copied: the site bundles printer/styles/family.css
+// itself, and no lobby or Journey file loads it.)
 //
 // The copies are build output: gitignored, never edited, never committed. Each
 // screen still holds a FULL local copy at runtime (Journey's Pi kiosk, the print
 // server and the Windows installer work offline; nothing fetches another app's
 // files), because every build that serves or packages an app runs this first:
 //
-//   node scripts/family-assets.mjs <journey|printer|lobby|all>   copy (writes only what differs)
-//   node scripts/family-assets.mjs --check [app ...]             verify the copies exist and match
+//   node scripts/family-assets.mjs <journey|printer|all>   copy (writes only what differs)
+//   node scripts/family-assets.mjs --check [app ...]       verify the copies exist and match
 //
-// wired into each app's npm scripts (pretest, prebuild, predev, prestart), into
-// site/build.mjs and into release-app.yml. Canonical files change in place;
-// the copies follow on the next run.
+// wired into each app's npm scripts (pretest, prestart), into site/build.mjs and
+// into release-app.yml. Canonical files change in place; the copies follow on
+// the next run.
 import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 export const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 export const KIT = 'lobby/shared/brand';
-export const FAMILY_CSS = 'printer/styles/family.css';
 // ES modules the Journey kiosk loads at sign-in (public/src/sync.js).
 export const JOURNEY_MODULES = ['sync-protocol.js', 'cloud-crypto.js'];
 // What each app holds a copy of. Paths are repo-relative.
 export const COPIES = {
-  journey: { kit: 'journey/public/brand', css: 'journey/public/family.css', modules: 'journey/public/src/shared' },
+  journey: { kit: 'journey/public/brand', modules: 'journey/public/src/shared' },
   printer: { kit: 'printer/print-server/public/brand' },
-  lobby: { css: 'lobby/public/family.css' },
 };
 
 const abs = (p) => path.join(ROOT, p);
@@ -77,7 +76,6 @@ function pairs(apps) {
     const c = COPIES[app];
     if (!c) throw new Error(`family-assets: unknown app "${app}" (journey, printer, lobby or all)`);
     if (c.kit) out.push({ kind: 'dir', from: KIT, to: c.kit });
-    if (c.css) out.push({ kind: 'file', from: FAMILY_CSS, to: c.css });
     if (c.modules) for (const name of JOURNEY_MODULES) out.push({ kind: 'file', from: `lobby/shared/${name}`, to: `${c.modules}/${name}` });
   }
   return out;
@@ -133,7 +131,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
         console.error(`✗ ${problems.length} problem(s) with the generated copies:\n  ${problems.join('\n  ')}`);
         process.exit(1);
       }
-      console.log(`✓ the brand kit, family.css and shared module copies exist and match their canonical files (${apps.join(', ')})`);
+      console.log(`✓ the brand kit and shared module copies exist and match their canonical files (${apps.join(', ')})`);
     } else {
       const n = copyAssets(apps);
       if (n) console.log(`family-assets: ${n} file(s) updated for ${apps.join(', ')}`);

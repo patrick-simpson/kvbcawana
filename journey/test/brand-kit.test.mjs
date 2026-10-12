@@ -50,7 +50,7 @@ function splitTop(value, sep = ',') {
   return parts;
 }
 
-test('public/brand/ and public/family.css are exactly the canonical files, file for file', () => {
+test('public/brand/ and public/src/shared/ are exactly the canonical files, file for file', () => {
   assert.deepEqual(
     checkAssets(['journey']),
     [],

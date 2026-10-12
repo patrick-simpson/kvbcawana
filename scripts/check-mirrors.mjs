@@ -17,7 +17,6 @@
 //                                 printer's test reads it in place.
 //
 //   the brand kit                 canonical lobby/shared/brand/
-//   family.css                    canonical printer/styles/family.css
 //                                 NOT mirrored in git any more: each app gets its own copy at
 //                                 build time (scripts/family-assets.mjs), so every screen still
 //                                 holds a full local copy at runtime. Here: the copies exist and
@@ -57,13 +56,12 @@ problems.push(...checkAssets(Object.keys(COPIES)));
 
 // ...are ignored, and git tracks none of them.
 const git = (...args) => execFileSync('git', args, { cwd: ROOT, encoding: 'utf8' }).trim();
-for (const { kit, css } of Object.values(COPIES)) {
-  for (const p of [kit, css].filter(Boolean)) {
-    const tracked = git('ls-files', '--', p);
-    if (tracked) problems.push(`${p} is generated, but git tracks ${tracked.split('\n').length} file(s) in it (git rm --cached; it is in .gitignore)`);
-    try { git('check-ignore', '-q', p.endsWith('.css') ? p : `${p}/tokens.css`); }
-    catch { problems.push(`${p} is not gitignored`); }
-  }
+for (const { kit } of Object.values(COPIES)) {
+  if (!kit) continue;
+  const tracked = git('ls-files', '--', kit);
+  if (tracked) problems.push(`${kit} is generated, but git tracks ${tracked.split('\n').length} file(s) in it (git rm --cached; it is in .gitignore)`);
+  try { git('check-ignore', '-q', `${kit}/tokens.css`); }
+  catch { problems.push(`${kit} is not gitignored`); }
 }
 
 // ...and every consumer's build makes them first.
@@ -75,8 +73,6 @@ const textStep = (file, re, what) => {
   if (!re.test(readFileSync(path.join(ROOT, file), 'utf8'))) problems.push(`${file} no longer ${what}`);
 };
 pkgStep('journey/package.json', 'pretest', 'journey');
-pkgStep('lobby/package.json', 'prebuild', 'lobby');
-pkgStep('lobby/package.json', 'predev', 'lobby');
 pkgStep('printer/package.json', 'pretest', 'printer');
 pkgStep('printer/electron-app/package.json', 'prebuild:renderer', 'printer');
 pkgStep('printer/electron-app/package.json', 'predev', 'printer');
@@ -99,8 +95,8 @@ for (const d of sharedDrift()) problems.push(`${d.dest} differs from what ${d.sr
 if (problems.length) {
   console.error(`✗ ${problems.length} problem(s):\n  ${problems.join('\n  ')}`);
   console.error('Vectors: change the canonical file, then copy it over the other (never the other way round).');
-  console.error('Brand kit and family.css: change the canonical file, then run node scripts/family-assets.mjs; the sync protocol copy: node scripts/gen-sync-protocol.mjs.');
+  console.error('Brand kit: change the canonical file, then run node scripts/family-assets.mjs; the sync protocol copy: node scripts/gen-sync-protocol.mjs.');
   console.error('Cloud crypto: change lobby/shared/cloud-crypto.js, then run node scripts/gen-cloud-crypto.mjs.');
   process.exit(1);
 }
-console.log('✓ contract and envelope vectors match; the cloud crypto copy is current; the brand kit and family.css copies are generated, ignored and match their canonical files; the generated shared-module copies match lobby/shared, and so does the sync protocol copy');
+console.log('✓ contract and envelope vectors match; the cloud crypto copy is current; the brand kit copies are generated, ignored and match their canonical files; the generated shared-module copies match lobby/shared, and so does the sync protocol copy');

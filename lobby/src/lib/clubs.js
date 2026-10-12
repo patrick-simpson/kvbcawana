@@ -6,8 +6,9 @@
 // the orange its catalog page uses. These baked values are what a screen
 // shows before shared/theme.json loads (and if it never does); theme.json
 // carries the same catalog values and wins field by field once fetched.
-// The Cubbies/Sparks/Puggles/T&T mascot stickers are club-supplied art
-// (scripts/extract-club-art.py, scripts/prepare-club-gfx.py). Lookup is
+// The Cubbies/Sparks/Puggles/T&T mascot stickers are club-supplied art (the
+// PNGs in src/assets/clubs/, no script makes them); the white marks come from
+// the catalog via scripts/brand/extract-catalog-brand.py. Lookup is
 // case-insensitive and alias-aware; unknown or missing clubs fall back to
 // the warm Awana-orange default so a typo in the check-in system still
 // produces a joyful banner. Trek and Journey have no mascot characters
