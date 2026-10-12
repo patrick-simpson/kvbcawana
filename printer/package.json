@@ -8,6 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "assets": "node ../scripts/family-assets.mjs printer",
+    "reel": "node ../scripts/family-assets.mjs printer && node reel/make.mjs",
     "test:contracts": "node scripts/test-contracts.cjs",
     "test:replay": "node scripts/test-replay-night.cjs",
     "test:server": "node scripts/test-server-helpers.cjs",

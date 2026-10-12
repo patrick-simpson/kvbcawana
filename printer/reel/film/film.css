@@ -1,0 +1,80 @@
+/* The film: one 1920x1080 stage, every part absolutely placed and moved only
+   by transform and opacity from film.js. The three voices are the kit's:
+   Paytone One shouts, Londrina Solid labels, Figtree is read. Depth is a hard
+   offset, never a blur (the catalog's rule). */
+/* The kit's faces, declared as the lobby declares them (lobby/src/styles/app.css):
+   Paytone One with the screens' ascent/descent overrides, so every caps line,
+   chip and plate here sits exactly as it does on the lobby TV. Full fonts,
+   never a subset (their licences reserve the names). */
+@font-face { font-family: 'Paytone One'; font-style: normal; font-weight: 100 900; font-display: block;
+  ascent-override: 96%; descent-override: 43.6%; line-gap-override: 0%;
+  src: url('/shared/brand/fonts/paytone-one-full-400-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Londrina Solid'; font-style: normal; font-weight: 400; font-display: block;
+  src: url('/shared/brand/fonts/londrina-solid-full-400-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Figtree'; font-style: normal; font-weight: 300 900; font-display: block;
+  src: url('/shared/brand/fonts/figtree-latin-wght-normal.woff2') format('woff2-variations'); }
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 1920px; height: 1080px; overflow: hidden; background: #000; }
+body { -webkit-font-smoothing: antialiased; text-rendering: geometricPrecision; }
+#stage { position: relative; width: 1920px; height: 1080px; overflow: hidden; background: #fff; }
+
+.scene { position: absolute; inset: 0; overflow: hidden; display: none; }
+.layer { position: absolute; inset: 0; }
+.abs { position: absolute; left: 0; top: 0; transform-origin: 50% 50%; will-change: transform, opacity; }
+.art { display: block; overflow: visible; }
+img.mark { display: block; }
+
+.shout { font-family: 'Paytone One', 'Arial Rounded MT Bold', sans-serif; font-weight: 400; text-transform: uppercase; line-height: 0.93; letter-spacing: 0.005em; font-synthesis: none; }
+.label { font-family: 'Londrina Solid', 'Arial Narrow', sans-serif; font-weight: 400; text-transform: uppercase; letter-spacing: 0.04em; line-height: 1; }
+.read { font-family: 'Figtree', 'Segoe UI', sans-serif; font-weight: 500; line-height: 1.32; }
+
+.words { white-space: nowrap; }
+.words__row { display: block; }
+.words__word { display: inline-block; white-space: nowrap; }
+.words__piece { display: inline-block; transform-origin: 50% 88%; will-change: transform, opacity; }
+.words__gap { display: inline-block; width: 0.26em; }
+
+.chip { position: absolute; left: 0; top: 0; }
+.chip svg { display: block; overflow: visible; }
+
+/* A name tag: the club colour, white shout, the deep shade as a hard offset. */
+.tag { position: absolute; left: 0; top: 0; padding: 0.16em 0.5em 0.2em; border-radius: 999px; color: #fff; white-space: nowrap; }
+
+/* A photo or a screen on the catalog's plate: rounded, with a coloured
+   outline printed out of register (p.72). */
+.plate { position: absolute; left: 0; top: 0; }
+.plate__outline { position: absolute; inset: 0; border: 6px solid currentColor; border-radius: 30px; transform: translate(18px, 18px); }
+.plate__face { position: absolute; inset: 0; border-radius: 26px; overflow: hidden; background: #000; }
+.plate__face img.screen { position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: block; }
+
+/* The phone: a slab of glass in a dark body. */
+.phone { position: absolute; left: 0; top: 0; background: #14161b; border-radius: 68px; box-shadow: 0 0 0 3px #2a2e36 inset; }
+.phone__screen { position: absolute; left: 16px; top: 16px; right: 16px; bottom: 16px; border-radius: 54px; overflow: hidden; background: #EAF4FB; }
+.phone__bar { position: absolute; left: 0; top: 0; right: 0; height: 50px; background: #4C72B8; color: #fff; display: flex; align-items: center; justify-content: space-between; padding: 6px 34px 0 40px; font: 700 19px/1 'Figtree', sans-serif; }
+.phone__icons { display: flex; gap: 6px; align-items: center; }
+.phone__icons i { width: 18px; height: 11px; border-radius: 2px; background: #fff; opacity: 0.9; }
+.phone__icons b { width: 26px; height: 13px; border-radius: 4px; border: 2px solid #fff; background: linear-gradient(90deg, #fff 70%, transparent 70%); }
+.phone__view { position: absolute; left: 0; top: 50px; right: 0; bottom: 0; overflow: hidden; }
+.phone__view img.screen { width: 100%; height: 100%; display: block; }
+.phone__hole { position: absolute; left: 50%; top: 30px; width: 22px; height: 22px; margin-left: -11px; border-radius: 50%; background: #05060a; }
+.tap { position: absolute; left: 0; top: 0; width: 96px; height: 96px; margin: -48px 0 0 -48px; border-radius: 50%; background: rgba(255,255,255,0.55); border: 4px solid rgba(255,255,255,0.95); box-shadow: 0 0 0 3px rgba(35,31,32,0.25); }
+
+/* A browser window, for the settings page. */
+.browser { position: absolute; left: 0; top: 0; border-radius: 22px; overflow: hidden; background: #fff; }
+.browser__bar { position: absolute; left: 0; top: 0; right: 0; height: 64px; background: #E8ECF2; display: flex; align-items: center; gap: 12px; padding: 0 22px; }
+.browser__dot { width: 16px; height: 16px; border-radius: 50%; }
+.browser__url { margin-left: 18px; flex: 1; height: 40px; border-radius: 20px; background: #fff; display: flex; align-items: center; padding: 0 22px; font: 600 22px/1 'Figtree', sans-serif; color: #4A5160; }
+.browser__view { position: absolute; left: 0; top: 64px; right: 0; bottom: 0; overflow: hidden; }
+.browser__view img.screen { width: 100%; height: 100%; display: block; }
+
+/* The label printer: a flat drawing in the kit's manner. */
+.printer { position: absolute; left: 0; top: 0; }
+.label-img { position: absolute; left: 0; top: 0; width: 600px; height: 300px; border-radius: 14px; box-shadow: 0 10px 0 rgba(35,31,32,0.16); background: #fff; }
+
+.button-kit { position: absolute; left: 0; top: 0; padding: 0.42em 1.1em 0.38em; border-radius: 999px; color: #fff; white-space: nowrap; }
+.cursor { position: absolute; left: 0; top: 0; width: 46px; height: 60px; }
+
+.band { position: absolute; left: -80px; width: 2080px; display: flex; align-items: center; padding-left: 230px; color: #fff; }
+.callout { position: absolute; left: 0; top: 0; white-space: nowrap; }
+.fade { position: absolute; inset: 0; pointer-events: none; }
