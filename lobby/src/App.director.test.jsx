@@ -52,15 +52,11 @@ vi.mock('./hooks/useBuildReload.js', () => ({
 
 import { STINGER_SEC } from './lib/lobbyMotion.js';
 import { SETUP_CARD_QUIET_MS } from './lib/constants.js';
+import { todayKey } from './test/appHarness.js';
 
 const App = (await import('./App.jsx')).default;
 const cfg = await import('./hooks/useConfig.js');
 const { FLAGSHIP_DURATION_SEC } = await import('./lib/flagship.js');
-
-function todayKey(now = new Date()) {
-  const pad = (n) => String(n).padStart(2, '0');
-  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
-}
 
 const A = { id: 's_a', text: 'Slide A', durationSec: 5 };
 const H = { id: 's_h', text: 'Held poster', durationSec: 10, holdCheckIns: true };

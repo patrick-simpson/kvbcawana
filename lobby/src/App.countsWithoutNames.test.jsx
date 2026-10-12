@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, cleanup, act } from '@testing-library/react';
+import { night, setup } from './test/appHarness.js';
 
 // "COUNTS RISING, NO NAMES — CHECK THE PRINTER", end to end (owner report,
 // 2026-10-11: it was up on a Sunday). The sync Worker replays the last
@@ -12,19 +13,8 @@ const live = fakeLive();
 const bound = live.bound;
 
 const App = (await import('./App.jsx')).default;
-const cfg = await import('./hooks/useConfig.js');
-
-function setup() {
-  localStorage.setItem('awanaConfig.v1', JSON.stringify({ confettiLevel: 'off', firstArrivalMoment: false,
-    sharedScheduleUrl: '', backgroundSource: 'manual', calendarEnabled: false, seasonPromos: false,
-    manualSlides: [{ id: 's_1', type: 'text', eyebrow: 'This week', text: 'Bring your handbook', theme: 'sky' }],
-    reduceMotion: true,
-  }));
-  cfg._resetForTest();
-}
 
 const MIN = 60 * 1000;
-const frame = (checkedIn, at = Date.now()) => ({ checkedIn, booksCompleted: 0, awardsEarned: 0, friendsBrought: 0, at });
 const alarmUp = (c) => c.textContent.includes('COUNTS RISING, NO NAMES');
 
 beforeEach(() => {
@@ -52,7 +42,7 @@ describe('counts rising, no names', () => {
   it('stays down on a Sunday when the Worker replays last Wednesday\'s count', async () => {
     const c = await mount();
     const wednesday = new Date(2026, 9, 7, 20, 15).getTime();
-    await act(async () => { bound.tonight(frame(118, wednesday)); });
+    await act(async () => { bound.tonight(night(118, wednesday)); });
     await act(async () => { vi.advanceTimersByTime(20 * MIN); });
     expect(alarmUp(c)).toBe(false);
   });
@@ -60,7 +50,7 @@ describe('counts rising, no names', () => {
   it('stays down on a screen opened mid-evening, after the names went by', async () => {
     const c = await mount();
     for (let i = 0; i < 6; i += 1) {
-      await act(async () => { bound.tonight(frame(63)); });
+      await act(async () => { bound.tonight(night(63)); });
       await act(async () => { vi.advanceTimersByTime(2 * MIN); });
     }
     expect(alarmUp(c)).toBe(false);
@@ -68,12 +58,12 @@ describe('counts rising, no names', () => {
 
   it('comes up when the count rises while the screen watches and no name follows', async () => {
     const c = await mount();
-    await act(async () => { bound.tonight(frame(40)); });
+    await act(async () => { bound.tonight(night(40)); });
     await act(async () => { vi.advanceTimersByTime(MIN); });
-    await act(async () => { bound.tonight(frame(44)); });
+    await act(async () => { bound.tonight(night(44)); });
     for (let i = 0; i < 4; i += 1) {
       await act(async () => { vi.advanceTimersByTime(2 * MIN); });
-      await act(async () => { bound.tonight(frame(44)); });
+      await act(async () => { bound.tonight(night(44)); });
     }
     await act(async () => { vi.advanceTimersByTime(30 * 1000); });
     expect(alarmUp(c)).toBe(true);

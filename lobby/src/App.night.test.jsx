@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, cleanup, act } from '@testing-library/react';
+import { night, setup } from './test/appHarness.js';
 
 // A NEW NIGHT ON A SCREEN THAT STAYS UP. The once-per-night ledgers (the
 // 25/50/100 crossings and friends) and tonight's count lived as long as the
@@ -13,18 +14,7 @@ const live = fakeLive();
 const bound = live.bound;
 
 const App = (await import('./App.jsx')).default;
-const cfg = await import('./hooks/useConfig.js');
 
-function setup() {
-  localStorage.setItem('awanaConfig.v1', JSON.stringify({ confettiLevel: 'off', firstArrivalMoment: false,
-    sharedScheduleUrl: '', backgroundSource: 'manual', calendarEnabled: false, seasonPromos: false,
-    manualSlides: [{ id: 's_1', type: 'text', eyebrow: 'This week', text: 'Bring your handbook', theme: 'sky' }],
-    reduceMotion: true,
-  }));
-  cfg._resetForTest();
-}
-
-const night = (checkedIn) => ({ checkedIn, booksCompleted: 0, awardsEarned: 0, friendsBrought: 0, at: Date.now() });
 const toast = (c) => c.querySelector('.milestone-toast');
 
 beforeEach(() => {

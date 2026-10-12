@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, cleanup, act, waitFor } from '@testing-library/react';
 import { NOTICE_MAX_AGE_MS } from './lib/constants.js';
+import { kids, setup } from './test/appHarness.js';
 
 // WHO HOLDS WHICH PART OF THE ROOM (rebrand stage 4b-2): whole-App tests of
 // the rules src/lib/overlayFit.js lobbyRoom decides and App wires up: the
@@ -25,28 +26,11 @@ const live = fakeLive();
 const bound = live.bound;
 
 const App = (await import('./App.jsx')).default;
-const cfg = await import('./hooks/useConfig.js');
 
 // The pickup features come on by themselves from 7:30 pm (2026-10-08): the
 // clock at 7:45 pm (or 6:00 pm, before), on a Tuesday, still running.
 function clockAt(h, m, extra = []) {
   vi.useFakeTimers({ toFake: ['Date', ...extra], now: new Date(2026, 9, 6, h, m), shouldAdvanceTime: true });
-}
-
-function setup(config = {}) {
-  localStorage.setItem('awanaConfig.v1', JSON.stringify({
-    confettiLevel: 'off',
-    firstArrivalMoment: false,
-    sharedScheduleUrl: '',
-    backgroundSource: 'manual',
-    calendarEnabled: false,
-    seasonPromos: false,
-    manualSlides: [{ id: 's_1', type: 'text', eyebrow: 'This week', text: 'Bring your handbook', theme: 'sky' }],
-    // Zero animation: what is on screen is the resting state, at once.
-    reduceMotion: true,
-    ...config,
-  }));
-  cfg._resetForTest();
 }
 
 async function mount() {
@@ -58,7 +42,6 @@ async function mount() {
 
 const stage = (c) => c.querySelector('.stage');
 const has = (c, cls) => stage(c).classList.contains(cls);
-const kids = (n) => Array.from({ length: n }, (_, i) => ({ firstName: `Kid${i}`, club: ['Sparks', 'T&T', 'Cubbies'][i % 3] }));
 
 beforeEach(() => {
   live.reset();

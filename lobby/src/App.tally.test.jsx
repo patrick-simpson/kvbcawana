@@ -14,16 +14,12 @@ import { render, screen, cleanup, act, waitFor } from '@testing-library/react';
 // not depend on which widget mode the display happens to be in.
 
 import { fakeLive } from './lib/__fixtures__/fakeLive.js';
+import { todayKey } from './test/appHarness.js';
 const live = fakeLive();
 const bound = live.bound;
 
 const App = (await import('./App.jsx')).default;
 const cfg = await import('./hooks/useConfig.js');
-
-function todayKey(now = new Date()) {
-  const pad = (n) => String(n).padStart(2, '0');
-  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
-}
 
 function storedCount() {
   const raw = localStorage.getItem('awanaTally.v1');
