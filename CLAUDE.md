@@ -45,7 +45,8 @@ commits or files.
   Journey is stamped with a hash of its own files, so only a Journey change
   reloads the kiosks.
 - Releases: `printer-release.yml` and `desktop-release.yml` (dispatch with
-  the version and `ref: main`). Each runs the tests first, creates the tag
+  the version and `ref: main`; both are thin callers of the reusable
+  `release-app.yml`, where the pipeline lives). Each runs the tests first, creates the tag
   (`printer-v*` / `desktop-v*`), builds and smoke-tests on Windows, publishes
   with `make_latest: false`, and commits the app's update feed into
   `site/updates/`, which only ever moves forward. `delete-release.yml` (pick the app) undoes a
