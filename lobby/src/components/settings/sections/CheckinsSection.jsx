@@ -16,10 +16,9 @@ function SecondsField({ id, label, hint, ms, min, max, onChange }) {
   );
 }
 
-export function CheckinsSection({ form, set, update, onPreview }) {
+export function WelcomeBannersCard({ form, update, onPreview }) {
   return (
-    <>
-      <PanelCard title="Welcome banners" scope="shared">
+      <PanelCard title="Welcome banners" scope="shared" preview="welcome">
         <SecondsField
           id="std" label="How long each name stays up (seconds)" min="2" max="20"
           ms={form.standardDisplayMs}
@@ -39,8 +38,12 @@ export function CheckinsSection({ form, set, update, onPreview }) {
           </button>
         )}
       </PanelCard>
+  );
+}
 
-      <PanelCard title="Extras" tab="var(--brand-journey)" scope="shared">
+export function WelcomeExtrasCard({ form, set }) {
+  return (
+      <PanelCard title="Welcome extras" tab="var(--brand-journey)" scope="shared" preview="welcome">
         <Toggle
           checked={form.firstArrivalMoment}
           onChange={set('firstArrivalMoment')}
@@ -66,8 +69,12 @@ export function CheckinsSection({ form, set, update, onPreview }) {
           hint="While a name is up the scene briefly breathes that club's color. Off by default because it competes with a night skin you chose on purpose."
         />
       </PanelCard>
+  );
+}
 
-      <PanelCard title="Club lines" tab="var(--brand-trek)" scope="shared">
+export function ClubLinesCard({ form, update }) {
+  return (
+      <PanelCard title="Club lines" tab="var(--brand-trek)" scope="shared" preview="welcome">
         <span className="hint panel-intro">
           A short line under the child’s name on their welcome, one per club. Leave a club blank for no line. Up to
           80 characters.
@@ -97,6 +104,16 @@ export function CheckinsSection({ form, set, update, onPreview }) {
           })}
         </div>
       </PanelCard>
+  );
+}
+
+// The classic rail's Check-ins section (?rail=classic).
+export function CheckinsSection({ form, set, update, onPreview }) {
+  return (
+    <>
+      <WelcomeBannersCard form={form} update={update} onPreview={onPreview} />
+      <WelcomeExtrasCard form={form} set={set} />
+      <ClubLinesCard form={form} update={update} />
     </>
   );
 }

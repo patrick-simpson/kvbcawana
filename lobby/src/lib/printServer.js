@@ -42,7 +42,7 @@ async function timed(url, init, timeoutMs, fetchFn) {
 }
 
 /**
- * Is there a Club Label Printer server on this computer? Only /health, which
+ * Is there a KVBC Awana print service on this computer? Only /health, which
  * answers without the token. A server that is not ours (some other app on
  * port 3456) is told apart by the shape of what it says.
  * @param {{ fetchFn?: typeof fetch, timeoutMs?: number }} [opts]
@@ -66,9 +66,12 @@ export async function probePrintServer(opts) {
   }
 }
 
+/** What a church-wide setting written at the laptop gets while the laptop follows the church settings. */
+export const CHURCH_MANAGED_WORDS = 'This is a church-wide setting now: change it in Printing (it works from any phone or computer).';
+
 /**
  * @typedef {{ ok: true, data: any }
- *   | { ok: false, reason: 'no-token' | 'no-token-on-server' | 'wrong-token' | 'sign-in-refused' | 'refused' | 'unreachable' | 'rejected', status: number, error: string }} Reply
+ *   | { ok: false, reason: 'no-token' | 'no-token-on-server' | 'wrong-token' | 'sign-in-refused' | 'refused' | 'unreachable' | 'rejected' | 'church-managed', status: number, error: string }} Reply
  */
 
 /**
@@ -82,7 +85,7 @@ export async function probePrintServer(opts) {
 export async function callPrintServer(path, opts) {
   const token = String(opts.token || '').trim();
   const session = String(opts.session || '').trim();
-  if (!token && !session) return { ok: false, reason: 'no-token', status: 0, error: 'Sign in under Setup first.' };
+  if (!token && !session) return { ok: false, reason: 'no-token', status: 0, error: 'Sign in under Account & app first.' };
   const fetchFn = opts.fetchFn || fetch;
   const post = opts.method === 'POST';
   /** @type {Record<string, string>} */
@@ -96,7 +99,7 @@ export async function callPrintServer(path, opts) {
       body: post ? JSON.stringify(opts.body ?? {}) : undefined,
     }, opts.timeoutMs ?? CALL_TIMEOUT_MS, fetchFn);
   } catch {
-    return { ok: false, reason: 'unreachable', status: 0, error: 'The print server did not answer.' };
+    return { ok: false, reason: 'unreachable', status: 0, error: 'The check-in laptop did not answer.' };
   }
   if (res.ok) {
     if (opts.raw) return { ok: true, data: await res.blob() };
@@ -110,6 +113,9 @@ export async function callPrintServer(path, opts) {
   if (res.status === 403 && /Wrong publish token/i.test(error)) return { ok: false, reason: 'wrong-token', status: 403, error };
   if (res.status === 403 && !token && /sync service|sign in/i.test(error)) return { ok: false, reason: 'sign-in-refused', status: 403, error };
   if (res.status === 403) return { ok: false, reason: 'refused', status: 403, error };
+  // A church-wide key while the laptop follows the Worker's church settings
+  // (routes.md 10.3): the page's Printing cards are where it changes now.
+  if (res.status === 409 && body && body.reason === 'church-managed') return { ok: false, reason: 'church-managed', status: 409, error: CHURCH_MANAGED_WORDS };
   return { ok: false, reason: 'rejected', status: res.status, error };
 }
 

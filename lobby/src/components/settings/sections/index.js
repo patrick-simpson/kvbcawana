@@ -6,3 +6,7 @@ export * from './CelebrationsSection.jsx';
 export * from './PickupSection.jsx';
 export * from './LookSection.jsx';
 export * from './SetupSection.jsx';
+export * from './TonightSection.jsx';
+export * from './ShowSection.jsx';
+export * from './PrintingSection.jsx';
+export * from './AccountSection.jsx';

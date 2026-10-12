@@ -67,6 +67,12 @@ describe('callPrintServer', () => {
     expect((await callPrintServer('/x', { token: 't', fetchFn: async () => { throw new Error('x'); } })).reason).toBe('unreachable');
   });
 
+  it('names a church-wide key the laptop now takes from the church settings (409 church-managed)', async () => {
+    const r = await callPrintServer('/config', { token: 't', method: 'POST', body: { labelFooter: 'x' }, fetchFn: async () => json({ reason: 'church-managed', error: 'This is a church-wide setting now: change it under Printing.' }, 409) });
+    expect(r).toMatchObject({ ok: false, reason: 'church-managed', status: 409 });
+    expect(r.ok === false && r.error).toMatch(/in Printing/);
+  });
+
   it('returns a blob for a preview', async () => {
     const r = await callPrintServer('/preview', { token: 't', raw: true, fetchFn: async () => json({}) });
     expect(r.ok && r.data instanceof Blob).toBe(true);

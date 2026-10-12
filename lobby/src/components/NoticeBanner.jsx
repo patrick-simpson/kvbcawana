@@ -4,7 +4,7 @@ import { M } from '../lib/motion.jsx';
 import { DUR, EASE } from '../lib/brand.js';
 import { holdThenLand } from '../lib/lobbyMotion.js';
 import { squishLand, withSquish } from '../lib/squish.js';
-import { isFresh, stampOf } from '../lib/freshness.js';
+import { CLOCK_SKEW_TOLERANCE_MS, isFresh, stampOf } from '../lib/freshness.js';
 import { NOTICE_MAX_AGE_MS } from '../lib/constants.js';
 import { OVERLAY, bandRoom, fitParagraph, plateChrome } from '../lib/overlayFit.js';
 import { useFontsReady } from '../hooks/useFontsReady.js';
@@ -37,7 +37,21 @@ const PLATE_SPILL = 0.3;
  * @param {number} now
  */
 export function noticeShowing(notice, now) {
-  return Boolean(notice?.message) && isFresh(stampOf(notice), NOTICE_MAX_AGE_MS, now);
+  if (!notice?.message) return false;
+  const d = notice.durationSec;
+  if (typeof d !== 'number') return isFresh(stampOf(notice), NOTICE_MAX_AGE_MS, now);
+  // The owner's notice composer (routes.md 10.4): `durationSec` after RECEIPT,
+  // never past this screen's own ceiling; 0 is "take it down now". Aged from
+  // the receive stamp alone: the Worker rewrites it to the time left on a
+  // replay, so the printer's older `at` must not shorten it.
+  if (d <= 0) return false;
+  // A stale `at` drops it too: every live owner notice was sent at most 4 h
+  // before it arrives (durationMin <= 240; a replay keeps its `at`), while the
+  // Worker's take-down is stamped 7 h back (TAKEDOWN_AGE_MS). Judged against
+  // the arrival, with the usual clock-skew tolerance: 6 h.
+  const from = typeof notice.receivedAt === 'number' ? notice.receivedAt : stampOf(notice);
+  if (typeof notice.at === 'number' && typeof from === 'number' && from - notice.at > NOTICE_MAX_AGE_MS + CLOCK_SKEW_TOLERANCE_MS) return false;
+  return isFresh(from, Math.min(d * 1000, NOTICE_MAX_AGE_MS), now);
 }
 
 /**

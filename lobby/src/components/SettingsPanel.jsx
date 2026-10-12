@@ -9,13 +9,18 @@ import { useDisplayKey } from '../hooks/useDisplayKey.js';
 import { useDisplayLogin } from '../hooks/useDisplayLogin.js';
 import { useSync } from '../hooks/useSync.js';
 import { pageBuild } from '../lib/buildReload.js';
-import { openingSection, sectionsFor } from '../lib/settingsSections.js';
+import {
+  classicOpeningSection, classicSectionsFor, openingSection, railMode, resolveClassicSection, resolveSection, sectionsFor,
+} from '../lib/settingsSections.js';
+import { initialMission } from '../lib/missionControl.js';
 import { isSharedKey, pickShared } from '../lib/sharedSettings.js';
 import { ZeroAnimationContext } from '../lib/motion.jsx';
 import {
-  CelebrationsSection, CheckinsSection, LookSection, PickupSection, ScreenSection, SetupSection,
-  SlidesSection, StatusSection, statusProblems,
+  AccountSection, CelebrationsSection, CheckinsSection, ClassicLookSection, LookSection, PickupSection, PrintingSection,
+  ScreenSection, SetupSection, SharedSettingsCard, ShowSection, SlidesSection, StatusSection, TonightSection, statusProblems,
 } from './settings/sections/index.js';
+import TvPreview, { previewEnabled } from './settings/TvPreview.jsx';
+import { EMPTY_NOTICE } from './settings/NoticeCard.jsx';
 import { FollowingContext, RemoteScreenContext, SettingsPageContext } from './settings/fields.jsx';
 import { ScreenOverviewSection, ScreensSection } from './settings/screens.jsx';
 import LaptopSection from './settings/laptop.jsx';
@@ -136,6 +141,8 @@ export default function SettingsPanel({
   // one from the list; `screen` is set when this panel IS that screen's
   // (RemoteScreenPanel), with its note, actions, rename and forget.
   onOpenScreen = null, screen = null, screenNote = null, onScreenAction, onScreenRenamed, onScreenForgotten,
+  // Mission control's memory-only feed of recent first names (App, settings page only), and the rail.
+  mission = null, rail: railProp = null, tonightTitle = null,
 }) {
   const stored = savedConfig ?? config;
   const [initial] = useState(() => seedForm(stored));
@@ -161,12 +168,29 @@ export default function SettingsPanel({
   const problems = statusProblems({ opsFailures, layerFaults, remoteConfigError, wakeLockStatus, demoActive, status });
 
   const { signedIn } = useSync();
-  const sections = sectionsFor(page, { remote: Boolean(screen) });
+  // The new seven-section rail, or today's (?rail=classic: deleted the release after the overhaul).
+  const [rail] = useState(() => railProp ?? railMode());
+  const classic = rail === 'classic';
+  const sections = classic ? classicSectionsFor(page, { remote: Boolean(screen) }) : sectionsFor(page, { remote: Boolean(screen) });
   // The settings page opens on signing in until it is signed in: nothing
   // there reaches a screen without it.
-  const [section, setSectionState] = useState(() => (page && !signedIn && !initialTab ? 'setup' : openingSection(initialTab, {
-    status, keyed, problems: problems.length,
-  })));
+  const [section, setSectionState] = useState(() => (classic
+    ? (page && !signedIn && !initialTab ? 'setup' : classicOpeningSection(initialTab, { status, keyed, problems: problems.length }))
+    : openingSection(initialTab, { status, keyed, problems: problems.length, page, signedIn })));
+  // The live TV preview (settings page only): what the draft would look like.
+  // The focus belongs to the section it was set in: a new section starts on the slide.
+  const [focusState, setFocusState] = useState({ section: '', focus: 'slide' });
+  const [previewOn, setPreviewOn] = useState(false);
+  const [noticeDraft, setNoticeDraft] = useState(EMPTY_NOTICE);
+  const [wide, setWide] = useState(() => (typeof window !== 'undefined' && window.matchMedia ? window.matchMedia('(min-width: 1200px)').matches : false));
+  useEffect(() => {
+    if (!window.matchMedia) return undefined;
+    const q = window.matchMedia('(min-width: 1200px)');
+    const on = () => setWide(q.matches);
+    q.addEventListener?.('change', on);
+    return () => q.removeEventListener?.('change', on);
+  }, []);
+  const [previewKilled, setPreviewKilled] = useState(false);
   // Phones show the list, then one section full screen; an explicit request
   // (the first-run card) goes straight to its section.
   const [view, setView] = useState(() => (initialTab ? 'section' : 'list'));
@@ -243,21 +267,22 @@ export default function SettingsPanel({
     setGeneration((g) => g + 1);
   };
 
-  const goTo = (id) => {
+  const goTo = (asked) => {
+    const id = (classic ? resolveClassicSection(asked) : resolveSection(asked)) ?? asked;
     setSectionState(id);
     setView('section');
     onTabChange?.(id);
   };
 
   const reset = () => {
-    if (window.confirm('Reset this screen? Every setting goes back to its default, and the typed slides saved on this device are deleted. The login, keys, uploaded files and the published deck stay.')) {
+    if (window.confirm('Reset this screen? Every setting goes back to its default, and the typed slides saved on this device are deleted. The sign-in, keys, uploaded files and the published deck stay.')) {
       onReset();
       onClose();
     }
   };
 
   const resetTally = () => {
-    if (window.confirm("Reset tonight's counter to zero? It re-syncs from the print server's next count, and the “Doors are open” moment can play again tonight.")) onResetTally();
+    if (window.confirm("Reset tonight's counter to zero? It re-syncs from the next count, and the “Doors are open” moment can play again tonight.")) onResetTally();
   };
 
   // #35: move a display's whole setup between machines as a JSON file.
@@ -266,7 +291,7 @@ export default function SettingsPanel({
   // even when it was configured centrally and `overrides` is empty. Never
   // URL flags, never the panic mask, and structurally never the display key,
   // publish token or login key: sanitizeOverrides is VALIDATORS-bound and
-  // none of the three is a config key (see src/lib/displayKey.js).
+  // neither is a config key (see src/lib/displayKey.js).
   const exportSettings = () => {
     flush();
     const baseline = { ...defaults, audioMuted: !defaults.audioEnabledByDefault };
@@ -389,20 +414,60 @@ export default function SettingsPanel({
   const lowPowerForced = config?.reduceMotion === true && (savedConfig ?? config)?.reduceMotion !== true;
   const props = { form, set, update };
 
+  const today = localDateStr();
+  const slidesProps = {
+    slideCount: (savedConfig ?? config).manualSlides?.length || 0,
+    onEditSlides: () => { flush(); onOpenSlideEditor(); },
+    syncedDeck,
+    today,
+    tonightTitle,
+    onPreviewPromo: onPreviewPromo ? (key) => { flush(); onPreviewPromo(key); } : null,
+    onForgetSyncedDeck,
+  };
+  const accountProps = {
+    secure,
+    build,
+    shared,
+    shareStatus,
+    onOpenDebug: onOpenDebug ? () => { flush(); onOpenDebug(); } : null,
+    onExport: exportSettings,
+    onImport: () => importRef.current?.click(),
+    onResetTally: onResetTally ? resetTally : null,
+    onReset: reset,
+    onShareNow: onShare ? () => { flush(); onShare(pickShared(normalize(formRef.current))); } : null,
+  };
+
   let body;
   if (section === 'screens' && onOpenScreen) {
     body = <ScreensSection onOpen={onOpenScreen} goTo={goTo} />;
-  } else if (section === 'status' && screen) {
+  } else if ((section === 'status' || section === 'tonight') && screen) {
     body = (
-      <ScreenOverviewSection
-        screen={screen} following={form.followSharedSettings !== false} goTo={goTo}
-        onAction={(a) => { flush(); onScreenAction?.(a); }} onRenamed={onScreenRenamed} onForgotten={onScreenForgotten}
+      <>
+        <ScreenOverviewSection
+          screen={screen} following={form.followSharedSettings !== false} goTo={goTo}
+          onAction={(a) => { flush(); onScreenAction?.(a); }} onRenamed={onScreenRenamed} onForgotten={onScreenForgotten}
+        />
+        {/* The new rail has no Account section on a screen opened from the page: its follow switch lives here. */}
+        {!classic && <SharedSettingsCard form={form} set={set} shared={shared} shareStatus={shareStatus} onShareNow={null} />}
+      </>
+    );
+  } else if (section === 'tonight') {
+    body = (
+      <TonightSection
+        status={status} nameStatus={nameStatus} keyed={keyed} displayKey={displayKey}
+        lastEventAt={lastEventAt} openedAt={openedAt} phase={phase} scheduleSource={scheduleSource}
+        calendar={calendar} calendarEnabled={form.calendarEnabled} opsFailures={opsFailures}
+        layerFaults={layerFaults} remoteConfigError={remoteConfigError} wakeLockStatus={wakeLockStatus}
+        demoActive={demoActive} syncedDeck={syncedDeck} slidesStatus={slidesStatus}
+        following={form.followPublishedSlides !== false} build={build} goTo={goTo}
+        onReload={() => window.location.reload()}
+        mission={mission ?? initialMission()} noticeDraft={noticeDraft} onNoticeDraft={setNoticeDraft}
       />
     );
   } else if (section === 'status') {
     body = (
       <StatusSection
-        status={status} nameStatus={nameStatus} keyed={keyed} displayKey={displayKey} login={login}
+        status={status} nameStatus={nameStatus} keyed={keyed} displayKey={displayKey}
         lastEventAt={lastEventAt} openedAt={openedAt} phase={phase} scheduleSource={scheduleSource}
         calendar={calendar} calendarEnabled={form.calendarEnabled} opsFailures={opsFailures}
         layerFaults={layerFaults} remoteConfigError={remoteConfigError} wakeLockStatus={wakeLockStatus}
@@ -411,19 +476,23 @@ export default function SettingsPanel({
         onReload={() => window.location.reload()}
       />
     );
+  } else if (section === 'show') {
+    body = (
+      <ShowSection
+        {...props} onPreview={onTest ? preview : null} onBoardDemo={onBoardDemo ? () => { flush(); onBoardDemo(); } : null}
+        panicMode={panicMode} onPanic={onPanic} wakeLockStatus={wakeLockStatus} lowPowerForced={lowPowerForced} goTo={goTo}
+      />
+    );
+  } else if (section === 'look' && !classic) {
+    body = <LookSection {...props} {...slidesProps} />;
+  } else if (section === 'printing') {
+    body = <PrintingSection />;
+  } else if (section === 'account') {
+    body = <AccountSection {...props} {...accountProps} />;
   } else if (section === 'checkins') {
     body = <CheckinsSection {...props} onPreview={onTest ? preview : null} />;
   } else if (section === 'slides') {
-    body = (
-      <SlidesSection
-        {...props}
-        slideCount={(savedConfig ?? config).manualSlides?.length || 0}
-        onEditSlides={() => { flush(); onOpenSlideEditor(); }}
-        syncedDeck={syncedDeck}
-        today={localDateStr()}
-        onPreviewPromo={onPreviewPromo ? (key) => { flush(); onPreviewPromo(key); } : null}
-      />
-    );
+    body = <SlidesSection {...props} {...slidesProps} />;
   } else if (section === 'screen') {
     body = <ScreenSection {...props} panicMode={panicMode} onPanic={onPanic} wakeLockStatus={wakeLockStatus} lowPowerForced={lowPowerForced} />;
   } else if (section === 'celebrations') {
@@ -435,28 +504,35 @@ export default function SettingsPanel({
   } else if (section === 'history') {
     body = <HistorySection />;
   } else if (section === 'look') {
-    body = <LookSection {...props} />;
+    body = <ClassicLookSection {...props} />;
   } else {
-    body = (
-      <SetupSection
-        {...props}
-        status={status} secure={secure} login={login}
-        syncedDeck={syncedDeck} onForgetSyncedDeck={onForgetSyncedDeck}
-        onOpenDebug={onOpenDebug ? () => { flush(); onOpenDebug(); } : null}
-        onExport={exportSettings}
-        onImport={() => importRef.current?.click()}
-        onResetTally={onResetTally ? resetTally : null}
-        onReset={reset}
-        shared={shared}
-        shareStatus={shareStatus}
-        onShareNow={onShare ? () => { flush(); onShare(pickShared(normalize(formRef.current))); } : null}
-      />
-    );
+    body = <SetupSection {...props} {...accountProps} />;
   }
+
+  // The live TV preview (docs/SETTINGS-OVERHAUL.md section 6): the settings
+  // page only, on Tonight / What screens show / Slides & look. Wide screens get
+  // a sticky column; narrower ones a toggle strip on show / look.
+  const previewAllowed = !classic && page && !screen && !previewKilled && previewEnabled();
+  const previewOnSection = previewAllowed && ['tonight', 'show', 'look'].includes(section);
+  const showColumn = previewOnSection && wide;
+  const showStrip = previewAllowed && !wide && ['show', 'look'].includes(section);
+  const publishedSlide = syncedDeck?.slides?.find?.((sl) => sl && sl.type !== 'video' && !sl.videoId) ?? null;
+  const previewFocus = focusState.section === section ? focusState.focus : 'slide';
+  const tvPreview = (
+    <TvPreview
+      form={form} focus={previewFocus} noticeDraft={noticeDraft}
+      publishedSlide={publishedSlide} today={today} tonightTitle={tonightTitle} onHide={() => setPreviewKilled(true)}
+    />
+  );
+  // The focus is the card the pointer or keyboard focus is in (data-preview on PanelCard).
+  const trackFocus = (e) => {
+    const card = e.target?.closest?.('[data-preview]');
+    if (card?.dataset.preview) setFocusState({ section, focus: card.dataset.preview });
+  };
 
   // The settings page is not a screen: what matters there is the sign-in.
   const pill = screen ? (screen.online ? 'On now' : 'Off') : page ? (signedIn ? 'Signed in' : 'Not signed in') : {
-    connected: keyed ? 'Connected' : 'Connected · not logged in',
+    connected: keyed ? 'Connected' : 'Connected · not signed in',
     connecting: 'Connecting…',
     disconnected: 'Disconnected',
     off: 'Not set up',
@@ -466,7 +542,7 @@ export default function SettingsPanel({
     <div className="panel-backdrop" onClick={done}>
       <div
         ref={dialogRef}
-        className="panel panel--tabbed panel--settings"
+        className={`panel panel--tabbed panel--settings${showColumn ? ' has-preview' : ''}`}
         role="dialog"
         aria-modal="true"
         aria-label="Settings"
@@ -492,8 +568,9 @@ export default function SettingsPanel({
           <nav className="settings-nav" aria-label="Settings sections">
             <div role="tablist" aria-orientation="vertical" aria-label="Settings sections" onKeyDown={onNavKeyDown}>
               {sections.map((s) => {
-                const badge = screen ? null : s.id === 'status' && problems.length ? problems.length
-                  : s.id === 'setup' && (status === 'off' || !keyed) ? '!' : null;
+                const badge = screen ? null
+                  : (s.id === 'status' || s.id === 'tonight') && problems.length ? problems.length
+                    : (s.id === 'setup' || s.id === 'account') && (page ? !signedIn : (status === 'off' || !keyed)) ? '!' : null;
                 return (
                   <button
                     key={s.id}
@@ -510,7 +587,7 @@ export default function SettingsPanel({
                     onClick={() => onNavClick(s.id)}
                   >
                     <span className="settings-nav__label" id={`tab-${s.id}-label`}>{s.label}</span>
-                    <span className="settings-nav__blurb" id={`tab-${s.id}-blurb`}>{screen && s.id === 'status' ? 'On or off, its name, its buttons' : s.blurb}</span>
+                    <span className="settings-nav__blurb" id={`tab-${s.id}-blurb`}>{screen && (s.id === 'status' || s.id === 'tonight') ? 'On or off, its name, its buttons' : s.blurb}</span>
                     {badge != null && <span className="settings-nav__badge" aria-label={`${badge} to check`}>{badge}</span>}
                   </button>
                 );
@@ -531,10 +608,25 @@ export default function SettingsPanel({
               </button>
               <h3 className="settings-pane__title" key={section}>{current.label}</h3>
             </div>
-            <div className="panel-body" key={`${section}-${generation}`} onBlur={onPaneBlur} onKeyDown={onPaneKeyDown}>
+            {showStrip && (
+              <>
+                <div className="tv-preview-strip">
+                  <button type="button" className="ghost small" aria-pressed={previewOn} onClick={() => setPreviewOn((v) => !v)}>
+                    {previewOn ? 'Hide the preview' : 'Preview'}
+                  </button>
+                  <span className="hint">What a TV would show with these settings.</span>
+                </div>
+                {previewOn && tvPreview}
+              </>
+            )}
+            <div
+              className="panel-body" key={`${section}-${generation}`} onBlur={onPaneBlur} onKeyDown={onPaneKeyDown}
+              onFocusCapture={previewOnSection ? trackFocus : undefined} onPointerOverCapture={previewOnSection ? trackFocus : undefined}
+            >
               {body}
             </div>
           </section>
+          {showColumn && <aside className="settings-preview-col" aria-label="TV preview">{tvPreview}</aside>}
         </div>
 
         </FollowingContext.Provider>
@@ -546,14 +638,14 @@ export default function SettingsPanel({
             {screen && screenNote ? screenNote.text
               : shareStatus?.state === 'sending' ? 'Sending to every screen…'
               : shareStatus?.state === 'sent' ? 'Sent to every screen.'
-                : shareStatus?.state === 'failed' ? 'This screen only (see Setup → Shared settings).'
+                : shareStatus?.state === 'failed' ? `This screen only (see ${classic ? 'Setup' : 'Account & app'} → Church-wide settings).`
                   : screen ? `Changes reach ${screen.name} as you make them.`
-                  : page ? (signedIn ? 'Changes reach every screen as you make them.' : 'Sign in under Setup to change every screen.')
+                  : page ? (signedIn ? 'Changes reach every screen as you make them.' : (classic ? 'Sign in under Setup to change every screen.' : 'Sign in under Account & app to change every screen.'))
                     : configure ? 'Changes go live on the screen as you make them.'
                     : changed ? 'Changes are live on this screen.' : 'Changes apply as you make them.'}
           </span>
           <button type="button" className="ghost" onClick={undo} disabled={!changed}
-            title="Put every setting back the way it was when you opened Settings (not the login, keys or uploaded files)">
+            title="Put every setting back the way it was when you opened Settings (not the sign-in, keys or uploaded files)">
             Undo changes
           </button>
           {/* Configure mode (the sound room app's Settings window) has no

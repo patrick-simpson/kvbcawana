@@ -75,9 +75,9 @@ test('a keyboard move leaves a visible focus ring on the slide index line', asyn
 test('under ?lowPower=1 no panel pseudo-element animates, and a checkbox ticks with no transition', async ({ page }) => {
   await boot(page, '?lowPower=1');
   await expect(page.locator('html.zero-animation-mode')).toHaveCount(1);
-  const dialog = await openSettingsTab(page, 'Status');
+  const dialog = await openSettingsTab(page, 'Tonight');
 
-  for (const name of ['Status', 'Check-ins', 'Slides', 'Screen & corner', 'Celebrations', 'Pickup board', 'Look & season', 'Setup']) {
+  for (const name of ['Tonight', 'What screens show', 'Slides & look', 'Account & app']) {
     await dialog.getByRole('tab', { name }).click();
     const moving = await dialog.evaluate((root) => {
       const out = [];
@@ -96,7 +96,7 @@ test('under ?lowPower=1 no panel pseudo-element animates, and a checkbox ticks w
     expect(moving, name).toEqual([]);
   }
 
-  await dialog.getByRole('tab', { name: 'Check-ins' }).click();
+  await dialog.getByRole('tab', { name: 'What screens show' }).click();
   const box = dialog.locator('input[type="checkbox"]:visible').first();
   await expect(box).toBeVisible();
   await box.click();
@@ -116,7 +116,7 @@ test('under ?lowPower=1 no panel pseudo-element animates, and a checkbox ticks w
  * live (Done is Jelly UI's canvas button wherever motion is allowed).
  */
 async function openWithUndo(page) {
-  const dialog = await openSettingsTab(page, 'Check-ins');
+  const dialog = await openSettingsTab(page, 'What screens show');
   await dialog.getByRole('checkbox', { name: 'First arrival of the night' }).click();
   // Let the panel's own entrance finish first, so the button holds still.
   await expect.poll(() => dialog.evaluate((el) => el.getAnimations().filter((a) => a.playState === 'running').length), { timeout: 3000 }).toBe(0);

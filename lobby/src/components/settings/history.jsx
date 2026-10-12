@@ -6,6 +6,7 @@ import {
   fetchNightRows, fetchNights, fetchSummary, historyUnlocked, lockHistory, unlockHistory,
 } from '../../lib/historyCrypto.js';
 import { buildTrends, checkoutRate, nightCsv, nightWords, rowLines, seasonAverages } from '../../lib/historyTrends.js';
+import { callPrintServer, probePrintServer } from '../../lib/printServer.js';
 import { PanelCard } from './fields.jsx';
 import { BarChart, LineChart } from './historyCharts.jsx';
 import '../../styles/history.css';
@@ -145,6 +146,39 @@ function NightRows({ night, session, url }) {
   );
 }
 
+/**
+ * Import laptop history (docs/SETTINGS-OVERHAUL.md 2.6): the laptop seals its own
+ * old history once and posts it (POST /cloud/import-history on localhost, the
+ * settings page's route). Press-driven: it looks for the laptop only when the
+ * button is pressed (never on load, so Chrome has no reason to ask).
+ */
+export function ImportLaptopHistoryCard() {
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState(/** @type {{ text: string, bad?: boolean } | null} */ (null));
+  const run = async () => {
+    setBusy(true);
+    setNote(null);
+    const probe = await probePrintServer();
+    if (!probe.found) {
+      setBusy(false);
+      setNote({ bad: true, text: 'Open this page on the check-in laptop to import its history.' });
+      return;
+    }
+    if (!window.confirm('Import this laptop’s saved history into the church history?\n\nIt is sealed on the laptop first, so the service never sees a name. Running it twice adds nothing new.')) { setBusy(false); return; }
+    const r = await callPrintServer('/cloud/import-history', { session: loadSyncSession(), method: 'POST', body: {}, timeoutMs: 120000 });
+    setBusy(false);
+    if (r.ok && r.data?.ok) setNote({ text: `Imported: ${r.data.rows ?? 0} entries read, ${r.data.stored ?? 0} new, ${r.data.duplicates ?? 0} already there.` });
+    else setNote({ bad: true, text: r.data?.error || r.error || 'The import did not finish.' });
+  };
+  return (
+    <PanelCard title="Import laptop history" tab={TAB}>
+      <p className="hint">One time: bring the check-in laptop’s own saved history (past check-ins and attendance) into the church history above. Only on the check-in laptop.</p>
+      <button type="button" className="ghost section-jump" disabled={busy} onClick={run}>{busy ? 'Importing…' : 'Import laptop history'}</button>
+      {note && <p className={`hint${note.bad ? ' hint--warn' : ''}`} role="status">{note.text}</p>}
+    </PanelCard>
+  );
+}
+
 export default function HistorySection() {
   const { signedIn, url } = useSync();
   const session = loadSyncSession();
@@ -167,7 +201,7 @@ export default function HistorySection() {
   }, [signedIn, url, session]);
 
   if (!signedIn || !url) {
-    return <PanelCard title="History" tab={TAB}><Hint>Sign in to the sync service under Setup to see past nights.</Hint></PanelCard>;
+    return <PanelCard title="History" tab={TAB}><Hint>Sign in under Account & app to see past nights.</Hint></PanelCard>;
   }
   return (
     <>
@@ -191,6 +225,7 @@ export default function HistorySection() {
           </ul>
         ) : <Hint>Nothing to list yet.</Hint>}
       </PanelCard>
+      <ImportLaptopHistoryCard />
     </>
   );
 }

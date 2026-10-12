@@ -21,6 +21,7 @@ import {
   screenPartChanged,
   screenSettingsFrom,
   setLiveScreenId,
+  setLiveScreenName,
   withScreenPart,
 } from '../lib/screenSync.js';
 import { SCREEN_DEFAULT_NAMES, cleanScreenName, sanitizeScreenAction, sanitizeScreenSettings } from '../lib/syncSpecs.js';
@@ -63,6 +64,7 @@ export async function renameThisScreen(name) {
   const res = await renameScreen(id, name);
   if (res.ok) {
     saveScreenSlot(kind, { name: res.name });
+    setLiveScreenName(res.name || '');
     setThisScreen({ name: res.name });
   }
   return res;
@@ -157,6 +159,7 @@ export function useScreenSync({ kind, enabled, overrides, replaceConfig, onActio
     setLiveScreenId(id);
     const have = loadScreenSlot(kind);
     setThisScreen({ id, kind, name: have?.name || defaultName || SCREEN_DEFAULT_NAMES[kind], registered: false });
+    setLiveScreenName(have?.name || defaultName || SCREEN_DEFAULT_NAMES[kind]);
     let stopped = false;
     let gone = false; // a Worker without the registry (404): stop asking
 
@@ -186,6 +189,7 @@ export function useScreenSync({ kind, enabled, overrides, replaceConfig, onActio
       const name = typeof body?.screen?.name === 'string' ? body.screen.name : null;
       if (name) {
         saveScreenSlot(kind, { name });
+        setLiveScreenName(name);
         setThisScreen({ name });
       }
       setThisScreen({ registered: true });

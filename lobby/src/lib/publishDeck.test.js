@@ -23,7 +23,7 @@ describe('publishDeck', () => {
     const result = await publishDeck([{ text: 'x' }], '', { fetchFn: () => { throw new Error('must not fetch'); } });
     expect(result.ok).toBe(false);
     expect(result.reason).toBe('no-token');
-    expect(result.message).toMatch(/Connect this screen/);
+    expect(result.message).toMatch(/Account & app/);
   });
 
   it('POSTs the sanitized text-only deck with the bearer token', async () => {

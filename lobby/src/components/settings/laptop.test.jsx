@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, configure, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import LaptopSection from './laptop.jsx';
-import { savePublishToken } from '../../lib/publishToken.js';
 
 // The section draws a dozen cards that each ask the stand-in server for something; on a busy CI
 // runner (or the full suite with coverage) the default 1 s is not always enough.
@@ -15,9 +14,11 @@ const HEALTH = {
 const CONFIG = { printerName: 'Dock', backupPrinterName: '', labelFooter: 'KVBC', pickupClubs: ['Sparks'], lateGraceMin: 10, seasonTheme: 'auto' };
 
 const SESSION = 'v1.1.1700000000000.settingspagesettingspagesettings';
+/** The page's sign-in is the only proof: no token anywhere. */
+const signIn = () => localStorage.setItem('awanaSyncSession.v1', SESSION);
 
 /** A stand-in print server: routes by method and path, remembers what it was sent. */
-function server({ token = 'tok', online = true, health = HEALTH, audit } = {}) {
+function server({ online = true, health = HEALTH, audit } = {}) {
   const calls = [];
   let rehearsal = Boolean(health.rehearsal);
   const fn = vi.fn(async (url, init = {}) => {
@@ -29,7 +30,7 @@ function server({ token = 'tok', online = true, health = HEALTH, audit } = {}) {
     if (path === '/health') return res({ ...health, rehearsal });
     const auth = (init.headers || {}).Authorization;
     if (auth === 'Sync v1.1.1700000000000.notthesessionnotthesessionnot') return res({ error: 'Sign in to the settings page again: the sync service did not accept its sign-in.' }, 403);
-    if (auth !== `Bearer ${token}` && auth !== `Sync ${SESSION}`) return res({ error: 'Wrong publish token.' }, 403);
+    if (auth !== `Sync ${SESSION}`) return res({ error: 'Sign in to the settings page with the church passphrase first.' }, 403);
     if (path === '/config' && method === 'GET') return res(CONFIG);
     if (path === '/config' && method === 'POST') return res({ ok: true });
     if (path === '/printers') return res({ printers: [{ name: 'Dock' }, { name: 'Spare' }] });
@@ -88,13 +89,15 @@ describe('Laptop section', () => {
     await waitFor(() => expect(s.calls.filter((c) => c.path === '/health')).toHaveLength(2));
   });
 
-  it('found without a token: shows the status and asks for the token, and calls nothing else', async () => {
+  it('found without a sign-in: shows the status and says to sign in under Account & app, and calls nothing else', async () => {
     const s = server();
     vi.stubGlobal('fetch', s.fn);
     render(<LaptopSection />);
     expect(await screen.findByText('The printer is out of labels')).toBeTruthy();
     expect(screen.getByText('Connect to the printer')).toBeTruthy();
+    expect(screen.getByText(/Sign in under Account & app/)).toBeTruthy();
     expect(screen.queryByLabelText('Name tag printer')).toBeNull();
+    expect(screen.queryByText(/publish token/i)).toBeNull();
     expect(s.calls.map((c) => c.path)).toEqual(['/health']);
   });
 
@@ -107,18 +110,18 @@ describe('Laptop section', () => {
     expect(s.calls.find((c) => c.path === '/config').headers.Authorization).toBe(`Sync ${SESSION}`);
   });
 
-  it('a session the printer refuses says to sign in again, and offers the token', async () => {
+  it('a session the printer refuses says to sign in again, and offers no token', async () => {
     localStorage.setItem('awanaSyncSession.v1', 'v1.1.1700000000000.notthesessionnotthesessionnot');
     const s = server();
     vi.stubGlobal('fetch', s.fn);
     render(<LaptopSection />);
     expect(await screen.findByText(/Sign in to the settings page again/)).toBeTruthy();
-    expect(screen.getByText(/Or paste a publish token/)).toBeTruthy();
+    expect(screen.queryByText(/publish token/i)).toBeNull();
     expect(screen.queryByLabelText('Name tag printer')).toBeNull();
   });
 
-  it('found with a token: the printer, labels, pickup list, schedule and tonight', async () => {
-    savePublishToken('tok');
+  it('signed in: the printer, labels, pickup list, schedule and tonight', async () => {
+    signIn();
     const s = server();
     vi.stubGlobal('fetch', s.fn);
     render(<LaptopSection />);
@@ -129,12 +132,14 @@ describe('Laptop section', () => {
     expect(screen.getByRole('checkbox', { name: 'Cubbies' }).checked).toBe(false);
     expect(await screen.findByLabelText('Row 1 club')).toBeTruthy();
     expect(await screen.findByText('Maya R')).toBeTruthy();
-    // Every call after the probe carries the token.
-    for (const c of s.calls.filter((x) => x.path !== '/health')) expect(c.headers.Authorization).toBe('Bearer tok');
+    // Every call after the probe carries the page's sign-in, never a token.
+    for (const c of s.calls.filter((x) => x.path !== '/health')) expect(c.headers.Authorization).toBe(`Sync ${SESSION}`);
+    // One Season control: the laptop's own copy is gone.
+    expect(screen.queryByLabelText('Screen season')).toBeNull();
   });
 
   it('saves the printer pick with POST /config, and only that key', async () => {
-    savePublishToken('tok');
+    signIn();
     const s = server();
     vi.stubGlobal('fetch', s.fn);
     render(<LaptopSection />);
@@ -146,7 +151,7 @@ describe('Laptop section', () => {
   });
 
   it('saves pickup clubs as the ticked list', async () => {
-    savePublishToken('tok');
+    signIn();
     const s = server();
     vi.stubGlobal('fetch', s.fn);
     render(<LaptopSection />);
@@ -156,7 +161,7 @@ describe('Laptop section', () => {
   });
 
   it('saves the schedule with the late grace', async () => {
-    savePublishToken('tok');
+    signIn();
     const s = server();
     vi.stubGlobal('fetch', s.fn);
     render(<LaptopSection />);
@@ -168,7 +173,7 @@ describe('Laptop section', () => {
   });
 
   it('refuses a start time that is not a time, without calling the printer', async () => {
-    savePublishToken('tok');
+    signIn();
     const s = server();
     vi.stubGlobal('fetch', s.fn);
     render(<LaptopSection />);
@@ -179,7 +184,7 @@ describe('Laptop section', () => {
   });
 
   it('reprints after a confirm', async () => {
-    savePublishToken('tok');
+    signIn();
     const s = server();
     vi.stubGlobal('fetch', s.fn);
     vi.stubGlobal('confirm', vi.fn(() => true));
@@ -191,7 +196,7 @@ describe('Laptop section', () => {
   });
 
   it('runs the diagnostics and lists each check as passed or failed', async () => {
-    savePublishToken('tok');
+    signIn();
     const s = server();
     vi.stubGlobal('fetch', s.fn);
     render(<LaptopSection />);
@@ -202,17 +207,8 @@ describe('Laptop section', () => {
     expect(within(list).getByText('passed')).toBeTruthy();
   });
 
-  it('asks for the token again when the printer says it is wrong', async () => {
-    savePublishToken('stale');
-    const s = server({ token: 'fresh' });
-    vi.stubGlobal('fetch', s.fn);
-    render(<LaptopSection />);
-    expect(await screen.findByText('The printer did not accept that token.')).toBeTruthy();
-    expect(screen.queryByLabelText('Name tag printer')).toBeNull();
-  });
-
   it('has no dashboard, no PIN and no keys: the page is the only place', async () => {
-    savePublishToken('tok');
+    signIn();
     vi.stubGlobal('fetch', server().fn);
     render(<LaptopSection />);
     await screen.findByLabelText('Name tag printer');
@@ -222,10 +218,11 @@ describe('Laptop section', () => {
     expect(screen.queryByLabelText(/PIN/i)).toBeNull();
     expect(screen.queryByText(/Wi-?Fi access/i)).toBeNull();
     expect(screen.queryByText(/display key/i)).toBeNull();
+    expect(screen.queryByText(/publish token/i)).toBeNull();
   });
 
   it('prints a leader tag, lists the remembered ones, and forgets one after a confirm', async () => {
-    savePublishToken('tok');
+    signIn();
     const s = server();
     vi.stubGlobal('fetch', s.fn);
     vi.stubGlobal('confirm', vi.fn(() => true));
@@ -243,7 +240,7 @@ describe('Laptop section', () => {
   });
 
   it('prints a one-off tag only with a name and a club, and a custom label with its text', async () => {
-    savePublishToken('tok');
+    signIn();
     const s = server();
     vi.stubGlobal('fetch', s.fn);
     render(<LaptopSection />);
@@ -262,7 +259,7 @@ describe('Laptop section', () => {
   });
 
   it('reprints a stretch in two steps: the server counts first, and only a confirm prints', async () => {
-    savePublishToken('tok');
+    signIn();
     const s = server();
     vi.stubGlobal('fetch', s.fn);
     render(<LaptopSection />);
@@ -279,7 +276,7 @@ describe('Laptop section', () => {
   });
 
   it('refuses a stretch with no times, without calling the printer', async () => {
-    savePublishToken('tok');
+    signIn();
     const s = server();
     vi.stubGlobal('fetch', s.fn);
     render(<LaptopSection />);
@@ -289,7 +286,7 @@ describe('Laptop section', () => {
   });
 
   it('shows the attendance audit and applies the missing dates only after a confirm', async () => {
-    savePublishToken('tok');
+    signIn();
     const audit = {
       known: true, matches: false, ageMs: 86400000, scopeDates: 5, totals: { missing: 2, ledgerOnly: 0 },
       rows: [{ key: 'id:1', name: 'Maya R', club: 'Sparks', missingHere: ['2026-10-07'], ledgerOnly: [] }],
@@ -310,7 +307,7 @@ describe('Laptop section', () => {
   });
 
   it('says so plainly when the audit has no grid yet, and offers nothing to apply', async () => {
-    savePublishToken('tok');
+    signIn();
     vi.stubGlobal('fetch', server().fn);
     render(<LaptopSection />);
     expect(await screen.findByText(/no attendance grid has been read yet/)).toBeTruthy();
@@ -318,7 +315,7 @@ describe('Laptop section', () => {
   });
 
   it('arms rehearsal mode only after a confirm, and turns it off without one', async () => {
-    savePublishToken('tok');
+    signIn();
     const s = server();
     vi.stubGlobal('fetch', s.fn);
     const ask = vi.fn(() => false);
@@ -338,14 +335,14 @@ describe('Laptop section', () => {
     expect(ask).toHaveBeenCalledTimes(2);
   });
 
-  it('saves the three switches that moved here, one key each', async () => {
-    savePublishToken('tok');
+  it('saves the three switches that live here, one key each', async () => {
+    signIn();
     const s = server();
     vi.stubGlobal('fetch', s.fn);
     render(<LaptopSection />);
     fireEvent.click(await screen.findByRole('checkbox', { name: /Musical printer/ }));
     fireEvent.click(screen.getByRole('checkbox', { name: /Update health beacon/ }));
-    fireEvent.click(screen.getByRole('checkbox', { name: /Allow driven check-ins/ }));
+    fireEvent.click(screen.getByRole('checkbox', { name: /Chrome extension check children in on TwoTimTwo directly/ }));
     await waitFor(() => expect(s.calls.filter((c) => c.path === '/config' && c.method === 'POST')).toHaveLength(3));
     expect(s.calls.filter((c) => c.path === '/config' && c.method === 'POST').map((c) => c.body)).toEqual([
       { musicalPrinter: true }, { updateBeacon: true }, { enableDrivenCheckin: false },
@@ -353,7 +350,7 @@ describe('Laptop section', () => {
   });
 
   it('lists tonight\'s print failures when the server counts some', async () => {
-    savePublishToken('tok');
+    signIn();
     vi.stubGlobal('fetch', server({ health: { ...HEALTH, printFailures: 1 } }).fn);
     render(<LaptopSection />);
     const list = await screen.findByRole('list', { name: 'Print failures tonight' });
@@ -361,11 +358,11 @@ describe('Laptop section', () => {
   });
 
   it('signs the laptop back in to the sync service with the passphrase, and says nothing of keys', async () => {
-    savePublishToken('tok');
+    signIn();
     const s = server({ health: { ...HEALTH, sync: { signedIn: false, state: 'signed-out', error: 'The passphrase was changed on another screen.' } } });
     vi.stubGlobal('fetch', s.fn);
     render(<LaptopSection />);
-    expect(await screen.findByText('This laptop was signed out of the sync service.')).toBeTruthy();
+    expect(await screen.findByText('This laptop was signed out of the church’s sign-in.')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Sign this laptop in' }));
     expect(await screen.findByText('Type the church passphrase first.')).toBeTruthy();
     expect(s.calls.some((c) => c.path === '/config/sync-login')).toBe(false);
@@ -378,11 +375,12 @@ describe('Laptop section', () => {
     await waitFor(() => expect(s.calls.filter((c) => c.path === '/health')).toHaveLength(2));
   });
 
-  it('when the laptop is signed in it asks for no passphrase', async () => {
-    savePublishToken('tok');
+  it('when the laptop is signed in the sign-in card is not shown at all, and nothing asks for a passphrase', async () => {
+    signIn();
     vi.stubGlobal('fetch', server().fn);
     render(<LaptopSection />);
-    expect(await screen.findByText('This laptop is signed in to the sync service.')).toBeTruthy();
+    await screen.findByLabelText('Name tag printer');
+    expect(screen.queryByText('This laptop’s sign-in')).toBeNull();
     expect(screen.queryByLabelText('Church passphrase')).toBeNull();
   });
 });

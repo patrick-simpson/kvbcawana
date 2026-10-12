@@ -67,6 +67,16 @@ describe('the room rules, wired up', () => {
     expect(has(container, 'notice-takeover')).toBe(false);
   });
 
+  it('a notice with durationSec 0 takes the notice down at once (the owner\'s Take it down)', async () => {
+    setup();
+    const { container } = await mount();
+    await act(async () => { bound.notice({ level: 'critical', message: 'CLUB CANCELLED TONIGHT', at: Date.now(), durationSec: 900 }); });
+    expect(has(container, 'notice-takeover')).toBe(true);
+    await act(async () => { bound.notice({ level: 'critical', message: 'CLUB CANCELLED TONIGHT', at: Date.now() + 1, durationSec: 0 }); });
+    expect(has(container, 'notice-takeover')).toBe(false);
+    expect(container.querySelector('.notice-banner--critical')).toBeNull();
+  });
+
   it('from 7:30 pm the list takes the foot by itself and the slides carry on above it; before, nothing shows', async () => {
     clockAt(19, 45);
     setup();

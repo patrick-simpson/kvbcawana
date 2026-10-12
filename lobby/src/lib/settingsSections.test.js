@@ -1,36 +1,55 @@
-import { describe, expect, it } from 'vitest';
-import { LAPTOP_SECTION, LEGACY_TABS, SCREENS_SECTION, SECTIONS, openingSection, phaseWords, resolveSection, sectionsFor } from './settingsSections.js';
+import { beforeEach, describe, expect, it } from 'vitest';
+import {
+  CLASSIC_SECTIONS, LEGACY_TABS, RAIL_STORAGE, SECTIONS, classicOpeningSection, classicSectionsFor, openingSection, phaseWords, railMode,
+  resolveClassicSection, resolveSection, sectionsFor,
+} from './settingsSections.js';
 
-describe('settings sections', () => {
-  it('lists eight sections, everyday ones first and Setup last', () => {
-    expect(SECTIONS.map((s) => s.id)).toEqual(['status', 'checkins', 'slides', 'screen', 'celebrations', 'pickup', 'look', 'setup']);
+describe('the new rail (docs/SETTINGS-OVERHAUL.md section 1)', () => {
+  it('is seven sections, in the order Tonight … Account & app', () => {
+    expect(SECTIONS.map((s) => s.id)).toEqual(['tonight', 'screens', 'show', 'look', 'printing', 'history', 'account']);
+    expect(SECTIONS.map((s) => s.label)).toEqual(['Tonight', 'Screens', 'What screens show', 'Slides & look', 'Printing', 'History', 'Account & app']);
     for (const s of SECTIONS) expect(s.blurb.length).toBeGreaterThan(0);
   });
 
-  it('lists the Laptop section on the settings page only, just before Setup', () => {
-    expect(sectionsFor(false)).toBe(SECTIONS);
-    const ids = sectionsFor(true).map((s) => s.id);
-    expect(ids).toEqual(['status', 'screens', 'checkins', 'slides', 'screen', 'celebrations', 'pickup', 'look', 'laptop', 'history', 'setup']);
-    expect(LAPTOP_SECTION.blurb.length).toBeGreaterThan(0);
-    expect(resolveSection('laptop')).toBe('laptop');
-    expect(resolveSection('history')).toBe('history');
+  it('shows the page all seven, a TV four, and a screen opened from the page three', () => {
+    expect(sectionsFor(true).map((s) => s.id)).toEqual(['tonight', 'screens', 'show', 'look', 'printing', 'history', 'account']);
+    expect(sectionsFor(false).map((s) => s.id)).toEqual(['tonight', 'show', 'look', 'account']);
+    expect(sectionsFor(true, { remote: true }).map((s) => s.id)).toEqual(['tonight', 'show', 'look']);
+    expect(sectionsFor(false, { remote: true }).map((s) => s.id)).toEqual(['tonight', 'show', 'look']);
   });
 
-  it('maps every old tab id to the section that now holds its controls', () => {
+  it('keeps the page-only sections off a TV', () => {
+    for (const remote of [false, true]) {
+      const ids = sectionsFor(false, { remote }).map((s) => s.id);
+      for (const only of ['screens', 'printing', 'history']) expect(ids).not.toContain(only);
+    }
+  });
+
+  it('resolves every old id to the section that holds its controls', () => {
+    expect(LEGACY_TABS).toEqual({
+      status: 'tonight', checkins: 'show', slides: 'look', screen: 'show', celebrations: 'show', pickup: 'show',
+      setup: 'account', laptop: 'printing', connection: 'account', background: 'look', banners: 'show', display: 'show', calendar: 'look',
+    });
     for (const [old, now] of Object.entries(LEGACY_TABS)) expect(resolveSection(old)).toBe(now);
-    expect(resolveSection('pickup')).toBe('pickup');
+    for (const s of SECTIONS) expect(resolveSection(s.id)).toBe(s.id);
     expect(resolveSection('nope')).toBeNull();
     expect(resolveSection(null)).toBeNull();
   });
 
-  it('opens where the volunteer needs to be', () => {
-    expect(openingSection('connection', { status: 'connected', keyed: true })).toBe('setup');
-    expect(openingSection(null, { status: 'off' })).toBe('setup');
-    expect(openingSection(null, { status: 'connected', keyed: false })).toBe('setup');
-    expect(openingSection(null, { status: 'disconnected', keyed: true })).toBe('status');
-    expect(openingSection(null, { status: 'connected', keyed: true, problems: 2 })).toBe('status');
-    expect(openingSection(null, { status: 'connected', keyed: true })).toBe('checkins');
-    expect(openingSection(null, { status: 'connecting', keyed: true })).toBe('checkins');
+  it('opens where the owner needs to be', () => {
+    // the page: Account & app until signed in, else Tonight
+    expect(openingSection(null, { page: true, signedIn: false })).toBe('account');
+    expect(openingSection(null, { page: true, signedIn: true })).toBe('tonight');
+    // a TV: account when it cannot work, tonight when anything is wrong, else show
+    expect(openingSection(null, { status: 'off' })).toBe('account');
+    expect(openingSection(null, { status: 'connected', keyed: false })).toBe('account');
+    expect(openingSection(null, { status: 'disconnected', keyed: true })).toBe('tonight');
+    expect(openingSection(null, { status: 'connected', keyed: true, problems: 2 })).toBe('tonight');
+    expect(openingSection(null, { status: 'connected', keyed: true })).toBe('show');
+    expect(openingSection(null, { status: 'connecting', keyed: true })).toBe('show');
+    // an explicit request wins, old ids included
+    expect(openingSection('setup', { status: 'connected', keyed: true })).toBe('account');
+    expect(openingSection('slides', { page: true, signedIn: false })).toBe('look');
   });
 
   it('says the program phase in plain words', () => {
@@ -41,12 +60,38 @@ describe('settings sections', () => {
   });
 });
 
-describe('the settings page\'s own sections', () => {
-  it('Screens comes after Status on the page only, never on a screen or a screen opened from the page', () => {
-    expect(sectionsFor(true).map((s) => s.id).slice(0, 2)).toEqual(['status', 'screens']);
-    expect(sectionsFor(false, { remote: false })).toBe(SECTIONS);
-    expect(sectionsFor(true, { remote: true })).toBe(SECTIONS);
-    expect(SCREENS_SECTION.blurb.length).toBeGreaterThan(0);
-    expect(resolveSection('screens')).toBe('screens');
+describe('the classic rail (?rail=classic)', () => {
+  beforeEach(() => localStorage.clear());
+
+  it('is today\'s eight, and the page adds Screens, Laptop and History', () => {
+    expect(classicSectionsFor(false)).toBe(CLASSIC_SECTIONS);
+    expect(classicSectionsFor(true).map((s) => s.id)).toEqual(['status', 'screens', 'checkins', 'slides', 'screen', 'celebrations', 'pickup', 'look', 'laptop', 'history', 'setup']);
+    expect(classicSectionsFor(true, { remote: true })).toBe(CLASSIC_SECTIONS);
+    expect(resolveClassicSection('connection')).toBe('setup');
+    expect(resolveClassicSection('laptop')).toBe('laptop');
+    expect(resolveClassicSection('tonight')).toBe('status');
+    expect(resolveClassicSection('account')).toBe('setup');
+    expect(resolveClassicSection('nope')).toBeNull();
+  });
+
+  it('opens as it always did', () => {
+    expect(classicOpeningSection(null, { status: 'off' })).toBe('setup');
+    expect(classicOpeningSection(null, { status: 'disconnected', keyed: true })).toBe('status');
+    expect(classicOpeningSection(null, { status: 'connected', keyed: true })).toBe('checkins');
+  });
+
+  it('is chosen by ?rail=classic, remembered, and left with ?rail=new', () => {
+    expect(railMode('')).toBe('new');
+    expect(railMode('?rail=classic')).toBe('classic');
+    expect(localStorage.getItem(RAIL_STORAGE)).toBe('classic');
+    expect(railMode('')).toBe('classic');
+    expect(railMode('?rail=new')).toBe('new');
+    expect(railMode('')).toBe('new');
+  });
+
+  it('falls back to the new rail when storage throws', () => {
+    const real = Storage.prototype.getItem;
+    Storage.prototype.getItem = () => { throw new Error('blocked'); };
+    try { expect(railMode('')).toBe('new'); } finally { Storage.prototype.getItem = real; }
   });
 });

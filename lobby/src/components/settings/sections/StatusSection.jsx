@@ -3,20 +3,18 @@ import { useSync } from '../../../hooks/useSync.js';
 import {
   deriveClubInfo, formatShortDate, isStoreNight, localDateStr, splitTitle,
 } from '../../../lib/calendarLogic.js';
-import { maskDisplayKey } from '../../../lib/displayKey.js';
-import { JOURNEY_URL, PROJECTOR_GAME_TIME_URL } from '../../../lib/constants.js';
 import { phaseWords } from '../../../lib/settingsSections.js';
 import { PanelCard } from '../fields.jsx';
 
 /** The one-line status the header and the Status section both lead with. */
-export function statusSentence(status, keyed) {
+export function statusSentence(status, keyed, where = 'Account & app → Sign in') {
   return {
     connected: keyed
       ? 'Connected — check-ins will appear instantly'
-      : 'Connected — not logged in yet (Setup → Connect this screen)',
+      : `Connected — not signed in yet (${where})`,
     connecting: 'Connecting…',
     disconnected: 'Disconnected — check the network',
-    off: 'Not set up yet — sign in under Setup → Connect this screen',
+    off: `Not set up yet — sign in under ${where.split(' → ')[0]}`,
   }[status] || status;
 }
 
@@ -77,7 +75,7 @@ export function statusProblems({ opsFailures, layerFaults, remoteConfigError, wa
   return out;
 }
 
-function slideSyncLines({ syncedDeck, slidesStatus, following, hasKey, nowAt }) {
+export function slideSyncLines({ syncedDeck, slidesStatus, following, hasKey, nowAt, where = 'Account & app' }) {
   let statusLine;
   if (syncedDeck) {
     const when = new Date(syncedDeck.publishedAt);
@@ -91,13 +89,13 @@ function slideSyncLines({ syncedDeck, slidesStatus, following, hasKey, nowAt }) 
   // leading with the login (pasting the key by hand is the fallback).
   let hintLine = null;
   if (following && !hasKey) {
-    hintLine = 'This screen is not logged in, so it cannot read published decks — type the church’s display passphrase under Setup → Connect this screen (or paste the display key by hand under Setup → Advanced).';
+    hintLine = `This screen is not signed in, so it cannot read published decks — type the church passphrase under ${where}.`;
   } else if (slidesStatus === 'bad-key') {
-    hintLine = 'Published decks are arriving but will not open with this screen’s key — log in again under Setup → Connect this screen to pick up the current key (or re-paste it under Advanced).';
+    hintLine = `Published decks are arriving but will not open with this screen’s key — sign in again under ${where} to pick up the current key.`;
   } else if (slidesStatus === 'no-key') {
-    hintLine = 'Published decks are arriving but this screen has no usable key — log in under Setup → Connect this screen.';
+    hintLine = `Published decks are arriving but this screen has no usable key — sign in under ${where}.`;
   } else if (slidesStatus === 'refused-plaintext') {
-    hintLine = 'The print server is publishing slides UNENCRYPTED (no display key set there); this keyed screen refuses them. Set the display key on the print server.';
+    hintLine = 'The check-in laptop is publishing slides UNENCRYPTED; this keyed screen refuses them. Sign the laptop in again under Printing → At the laptop.';
   }
   return { statusLine, hintLine };
 }
@@ -108,7 +106,7 @@ function slideSyncLines({ syncedDeck, slidesStatus, following, hasKey, nowAt }) 
  * otherwise it can only re-read the copies this screen reaches (the site's
  * nightly feed), and says so instead of looking like it did nothing.
  */
-function CalendarRefresh({ calendar }) {
+export function CalendarRefresh({ calendar }) {
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState(/** @type {{text: string, warn?: boolean} | null} */ (null));
   const run = async () => {
@@ -120,7 +118,7 @@ function CalendarRefresh({ calendar }) {
     if (res.viaSync) {
       setNote({ text: res.changed ? 'Read the church calendar: it changed, and every screen is updating now.' : 'Read the church calendar: nothing has changed.' });
     } else {
-      setNote({ text: 'Checked again for the newest copy this screen can reach. Sign this screen in with the passphrase (Setup) to read the church calendar right now.' });
+      setNote({ text: 'Checked again for the newest copy this screen can reach. Sign this screen in with the passphrase (Account & app) to read the church calendar right now.' });
     }
   };
   return (
@@ -133,47 +131,20 @@ function CalendarRefresh({ calendar }) {
   );
 }
 
-export function StatusSection({
-  status, nameStatus, keyed, displayKey, login, lastEventAt, openedAt, phase, scheduleSource,
-  calendar, calendarEnabled, opsFailures, layerFaults, remoteConfigError, wakeLockStatus, demoActive,
-  syncedDeck, slidesStatus, following, build, goTo, onReload,
-}) {
-  const syncState = useSync();
-  const realtime = {
-    connected: 'connected',
-    connecting: 'connecting…',
-    disconnected: 'disconnected',
-    off: 'not set up — not signed in',
-  }[status] || status;
-  const lastSeen = lastEventAt
-    ? `${new Date(lastEventAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} (${Math.max(0, Math.round((openedAt - lastEventAt) / 60000))} min ago)`
-    : 'none yet this session';
 
-  let loginLine;
-  if (login.loginStatus === 'logged-in') {
-    loginLine = `logged in${login.kid ? ` (key ${login.kid})` : ''} — display key and publish token filled in automatically`;
-  } else if (login.loginStatus === 'stale') {
-    loginLine = 'passphrase changed on the print server — log in again under Setup (names keep working meanwhile)';
-  } else if (login.loginStatus === 'busy') {
-    loginLine = 'checking…';
-  } else if (displayKey) {
-    loginLine = `not logged in — display key pasted by hand (${maskDisplayKey(displayKey)})`;
-  } else {
-    loginLine = 'not logged in — no display key on this screen, so names will not appear';
-  }
-
-  const namesLine = {
-    'no-key': 'encrypted names are arriving but this screen has no key — log in under Setup',
-    'bad-key': 'encrypted names are arriving but will not open with this screen’s key — log in again, or paste the current key under Setup → Advanced',
-    downgraded: 'the print server is sending names unencrypted and this keyed screen refuses them — set the display key on the print server',
+/** The names line: can this screen read the encrypted names, and if not, the fix. */
+export function namesLineFor(nameStatus, displayKey) {
+  return {
+    'no-key': 'encrypted names are arriving but this screen has no key — sign in under Account & app',
+    'bad-key': 'encrypted names are arriving but will not open with this screen’s key — sign in again under Account & app',
+    downgraded: 'the check-in laptop is sending names unencrypted and this keyed screen refuses them — sign the laptop in again under Printing → At the laptop',
   }[nameStatus] ?? (displayKey
     ? 'this screen can read encrypted names'
-    : 'no key yet — encrypted names will not open here until you log in');
+    : 'no key yet — encrypted names will not open here until you sign in');
+}
 
-  const needsSetup = status === 'off' || !keyed;
-  const preview = calendarEnabled ? calendarPreview(calendar) : null;
-  const sync = slideSyncLines({ syncedDeck, slidesStatus, following, hasKey: keyed, nowAt: openedAt });
-
+/** Everything the panel knows is wrong on THIS screen, as the alert boxes. */
+export function StatusAlerts({ opsFailures, layerFaults, remoteConfigError, wakeLockStatus, demoActive, onReload }) {
   const alerts = [];
   if (opsFailures?.length) {
     const latest = opsFailures[0];
@@ -181,7 +152,7 @@ export function StatusSection({
       <div className="status-alert" key="printer">
         <strong>The printer reported {opsFailures.length} problem{opsFailures.length > 1 ? 's' : ''} tonight</strong>
         {latest?.at ? <> (latest{latest.club ? `: ${latest.club}` : ''} at {new Date(latest.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })})</> : null}
-        {' '}— see Laptop on awana.kvbchurch.org/settings.
+        {' '}— see Printing → At the laptop on awana.kvbchurch.org/settings.
       </div>,
     );
   }
@@ -197,8 +168,8 @@ export function StatusSection({
     alerts.push(
       <div className="status-alert" key="remote">
         <strong>The central config for this screen could not be applied</strong> ({remoteConfigError}) — from this
-        page&rsquo;s <code>?config=</code> URL, or the address the display login handed it. This display is running
-        on its built-in defaults and its own settings instead.
+        page&rsquo;s <code>?config=</code> URL. This display is running on its built-in defaults and its own settings
+        instead.
       </div>,
     );
   }
@@ -220,67 +191,111 @@ export function StatusSection({
       </div>,
     );
   }
+  return alerts.length > 0 ? <div className="status-alerts" role="status">{alerts}</div> : null;
+}
 
+/** "Connection": the sentence, realtime, the church's sign-in, names. @param {{ goTo: (id: string) => void, accountId?: string }} props */
+export function ConnectionCard({ status, keyed, displayKey, nameStatus, lastEventAt, openedAt, goTo, accountId = 'setup' }) {
+  const syncState = useSync();
+  const realtime = {
+    connected: 'connected',
+    connecting: 'connecting…',
+    disconnected: 'disconnected',
+    off: 'not set up — not signed in',
+  }[status] || status;
+  const lastSeen = lastEventAt
+    ? `${new Date(lastEventAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} (${Math.max(0, Math.round((openedAt - lastEventAt) / 60000))} min ago)`
+    : 'none yet this session';
+  const needsSetup = status === 'off' || !keyed;
+  const where = accountId === 'account' ? 'Account & app' : 'Setup';
   return (
-    <>
-      {alerts.length > 0 && <div className="status-alerts" role="status">{alerts}</div>}
+    <PanelCard title="Sign-in & connection">
+      <p className={`status-sentence ${status}`}><span className="dot" />{statusSentence(status, keyed, accountId === 'account' ? 'Account & app → Sign in' : 'Setup → Connect this screen')}</p>
+      <div className="hint conn-summary">
+        <div><strong>Realtime:</strong> {realtime} · last check-in {lastSeen}</div>
+        <div><strong>Church sign-in:</strong> {syncState.signedIn ? `signed in${syncState.lastSyncAt ? `, synced ${new Date(syncState.lastSyncAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` : ''}` : (syncState.phase === 'expired' ? `signed out: the passphrase was changed, type the new one under ${where}` : `not signed in: type the passphrase under ${where}`)}</div>
+        {status !== 'off' && <div><strong>Names:</strong> {namesLineFor(nameStatus, displayKey)}</div>}
+      </div>
+      {needsSetup && (
+        <button type="button" className="secondary section-jump" onClick={() => goTo(accountId)}>
+          Set up this screen →
+        </button>
+      )}
+    </PanelCard>
+  );
+}
 
-      <PanelCard title="Connection">
-        <p className={`status-sentence ${status}`}><span className="dot" />{statusSentence(status, keyed)}</p>
-        <div className="hint conn-summary">
-          <div><strong>Realtime:</strong> {realtime} · last check-in {lastSeen}</div>
-          {syncState.url
-            ? <div><strong>Sync service:</strong> {syncState.signedIn ? `signed in${syncState.lastSyncAt ? `, synced ${new Date(syncState.lastSyncAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` : ''}` : (syncState.phase === 'expired' ? 'signed out: the passphrase was changed, type the new one under Setup' : 'not signed in: type the passphrase under Setup')}</div>
-            : <div><strong>Display login:</strong> {loginLine}</div>}
-          {status !== 'off' && <div><strong>Names:</strong> {namesLine}</div>}
-        </div>
-        {needsSetup && (
-          <button type="button" className="secondary section-jump" onClick={() => goTo('setup')}>
-            Set up this screen →
-          </button>
-        )}
-      </PanelCard>
+/** Right now (the phase), the calendar, the published slides, Refresh calendar now. */
+export function CalendarPhaseCard({
+  phase, scheduleSource, calendar, calendarEnabled, syncedDeck, slidesStatus, following, keyed, openedAt, slidesWhere = 'Slides & look',
+  accountWhere = 'Account & app',
+}) {
+  const preview = calendarEnabled ? calendarPreview(calendar) : null;
+  const sync = slideSyncLines({ syncedDeck, slidesStatus, following, hasKey: keyed, nowAt: openedAt, where: accountWhere });
+  return (
+    <PanelCard title="Calendar & phase" tab="var(--brand-journey)">
+      <div className="hint conn-summary">
+        <div><strong>Right now:</strong> {phaseWords(phase) || 'unknown'}{scheduleSource ? ` (schedule: ${scheduleSource})` : ''}</div>
+        {calendarEnabled
+          ? <div><strong>Calendar:</strong> {preview || 'no calendar data loaded yet'}{calendar?.source && calendar.source !== 'none' ? ` · source: ${calendar.source}` : ''}</div>
+          : <div><strong>Calendar:</strong> calendar slides are off ({slidesWhere})</div>}
+        <div><strong>Published slides:</strong> {sync.statusLine}</div>
+        {sync.hintLine && <div><strong>{sync.hintLine}</strong></div>}
+      </div>
+      {calendarEnabled && calendar?.refresh ? <CalendarRefresh calendar={calendar} /> : null}
+    </PanelCard>
+  );
+}
 
-      <PanelCard title="Tonight" tab="var(--brand-journey)">
-        <div className="hint conn-summary">
-          <div><strong>Right now:</strong> {phaseWords(phase) || 'unknown'}{scheduleSource ? ` (schedule: ${scheduleSource})` : ''}</div>
-          {calendarEnabled
-            ? <div><strong>Calendar:</strong> {preview || 'no calendar data loaded yet'}{calendar?.source && calendar.source !== 'none' ? ` · source: ${calendar.source}` : ''}</div>
-            : <div><strong>Calendar:</strong> calendar slides are off (Slides)</div>}
-          <div><strong>Published slides:</strong> {sync.statusLine}</div>
-          {sync.hintLine && <div><strong>{sync.hintLine}</strong></div>}
-        </div>
-        {calendarEnabled && calendar?.refresh ? (
-          <CalendarRefresh calendar={calendar} />
-        ) : null}
-      </PanelCard>
-
-      <PanelCard title="Other screens" tab="var(--brand-blue)">
-        <div className="panel-links">
-          <a className="panel-button secondary" href={PROJECTOR_GAME_TIME_URL} target="_blank" rel="noopener noreferrer">
-            Projector: game time
-          </a>
-          <a className="panel-button secondary" href={JOURNEY_URL} target="_blank" rel="noopener noreferrer">
-            Journey
-          </a>
-        </div>
-        <p className="hint">
-          Each opens in a new tab. The projector starts on game time and goes back to its own schedule after
-          15 minutes or at the evening&rsquo;s next change.
-        </p>
-      </PanelCard>
-
-      <PanelCard title="About" tab="var(--brand-trek)">
+/**
+ * About. `part` 'screen': this screen's build and self-update line (a TV's
+ * Tonight); 'legal': the trademark line (Account & app, everywhere); 'all':
+ * both, as the classic Status section has them.
+ * @param {{ build?: string | null, part?: 'screen' | 'legal' | 'all' }} props
+ */
+export function AboutCard({ build, part = 'all' }) {
+  return (
+    <PanelCard title={part === 'screen' ? 'About this screen' : 'About'} tab="var(--brand-trek)">
+      {part !== 'legal' && (
         <p className="hint">
           {build ? <>This screen is running build <code>{build}</code>. </> : null}
           It updates itself within a few minutes of a new release, whenever nothing is on screen.
         </p>
+      )}
+      {part !== 'screen' && (
         <p className="hint panel-legal">
           Awana® and the Awana club names are trademarks of Awana Clubs International.
           This display is an independent church project — NOT AFFILIATED OR ENDORSED BY
           AWANA CLUBS INTERNATIONAL.
         </p>
-      </PanelCard>
+      )}
+    </PanelCard>
+  );
+}
+
+// The classic rail's Status section (?rail=classic): minus the display login,
+// the key paste hints and the "Other screens" links (docs/SETTINGS-OVERHAUL.md section 3).
+export function StatusSection({
+  status, nameStatus, keyed, displayKey, lastEventAt, openedAt, phase, scheduleSource,
+  calendar, calendarEnabled, opsFailures, layerFaults, remoteConfigError, wakeLockStatus, demoActive,
+  syncedDeck, slidesStatus, following, build, goTo, onReload,
+}) {
+  return (
+    <>
+      <StatusAlerts
+        opsFailures={opsFailures} layerFaults={layerFaults} remoteConfigError={remoteConfigError}
+        wakeLockStatus={wakeLockStatus} demoActive={demoActive} onReload={onReload}
+      />
+      <ConnectionCard
+        status={status} keyed={keyed} displayKey={displayKey} nameStatus={nameStatus}
+        lastEventAt={lastEventAt} openedAt={openedAt} goTo={goTo}
+      />
+      <CalendarPhaseCard
+        phase={phase} scheduleSource={scheduleSource} calendar={calendar} calendarEnabled={calendarEnabled}
+        syncedDeck={syncedDeck} slidesStatus={slidesStatus} following={following} keyed={keyed} openedAt={openedAt}
+        slidesWhere="Slides" accountWhere="Setup"
+      />
+      <AboutCard build={build} />
     </>
   );
 }

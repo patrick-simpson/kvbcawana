@@ -31,20 +31,21 @@ for (const [width, height] of [[1920, 1080], [1280, 720], [1024, 768]]) {
       const pane = await dialog.locator('.settings-pane').boundingBox();
       expect(nav.width).toBeGreaterThan(150);
       expect(pane.x).toBeGreaterThanOrEqual(nav.x + nav.width - 1);
-      // Every section is one click away: all eight rail items are visible.
+      // Every section is one click away: all four rail items are visible.
       for (const item of await dialog.getByRole('tab').all()) {
         expect(inside(await item.boundingBox(), { width, height })).toBe(true);
       }
       const done = dialog.locator('.actions button.primary', { hasText: /^done$/i });
       expect(inside(await done.boundingBox(), { width, height })).toBe(true);
-      // An unconfigured screen opens on Setup, where the fix is.
-      await expect(dialog.getByRole('tab', { name: 'Setup' })).toHaveAttribute('aria-selected', 'true');
-      await expect(dialog.getByLabel('Display key')).toBeVisible();
+      // An unconfigured screen opens on Account & app, where the fix is.
+      await expect(dialog.getByRole('tab', { name: 'Account & app' })).toHaveAttribute('aria-selected', 'true');
+      await expect(dialog.getByLabel('Passphrase', { exact: true }).first()).toBeVisible();
+      await expect(dialog.getByLabel('Display key')).toHaveCount(0);
     });
 
     test('a change applies at once and Undo puts it back', async ({ page }) => {
       const dialog = await open(page, '?lowPower=1');
-      await dialog.getByRole('tab', { name: 'Screen & corner' }).click();
+      await dialog.getByRole('tab', { name: 'What screens show' }).click();
       await dialog.getByRole('checkbox', { name: 'Wall clock' }).click();
       const saved = () => page.evaluate(() => JSON.parse(localStorage.getItem('awanaConfig.v1') || '{}'));
       expect((await saved()).showClock).toBe(false);
@@ -62,14 +63,14 @@ test.describe('on a phone (390x844)', () => {
     const dialog = await open(page, '?lowPower=1');
     await expect(dialog.locator('.settings-pane')).toBeHidden();
     const tabs = dialog.getByRole('tab');
-    await expect(tabs).toHaveCount(8);
+    await expect(tabs).toHaveCount(4);
     for (const item of await tabs.all()) {
       const box = await item.boundingBox();
       // A thumb-sized target, inside the screen.
       expect(box.height).toBeGreaterThanOrEqual(44);
       expect(inside(box, { width: 390, height: 844 })).toBe(true);
     }
-    await dialog.getByRole('tab', { name: 'Celebrations' }).click();
+    await dialog.getByRole('tab', { name: 'What screens show' }).click();
     await expect(dialog.locator('.settings-nav')).toBeHidden();
     const pane = await dialog.locator('.settings-pane').boundingBox();
     const panel = await dialog.boundingBox();
@@ -91,7 +92,7 @@ test.describe('on a phone (390x844)', () => {
 
 test('Escape closes, and focus goes back to where it was', async ({ page }) => {
   const dialog = await open(page, '?lowPower=1');
-  await expect(dialog.getByRole('tab', { name: 'Setup' })).toBeFocused();
+  await expect(dialog.getByRole('tab', { name: 'Account & app' })).toBeFocused();
   await page.keyboard.press('Escape');
   await expect(dialog).toBeHidden();
 });

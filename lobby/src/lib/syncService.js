@@ -32,6 +32,7 @@ import { deriveAuthKey } from '../../shared/cloud-crypto.js';
 import { saveDisplayKey } from './displayKey.js';
 import { sanitizeTemplate } from './syncSpecs.js';
 import { timedFetch } from './timedFetch.js';
+import { deviceHeaders } from './deviceId.js';
 
 export const SYNC_SESSION_STORAGE = 'awanaSyncSession.v1';
 /** The last address shared/sync.json gave (not a secret), for offline boots. */
@@ -121,8 +122,11 @@ export async function resolveSyncUrl(opts = {}) {
 export async function syncRequest(base, path, opts = {}) {
   const fetchFn = opts.fetchFn || timedFetch;
   const req = buildRequest(base, path, opts);
+  // Who is asking, for the change log (routes.md 10.1). Only a signed-in call
+  // carries it: a sign-in has no session, so no device either.
+  const headers = opts.session ? { ...req.init.headers, ...deviceHeaders() } : req.init.headers;
   try {
-    return await readResponse(await fetchFn(req.url, { ...req.init, cache: 'no-store' }));
+    return await readResponse(await fetchFn(req.url, { ...req.init, headers, cache: 'no-store' }));
   } catch {
     return { ...UNREACHABLE };
   }

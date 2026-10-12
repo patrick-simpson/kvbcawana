@@ -97,7 +97,7 @@ describe('shared settings, wired up', () => {
     await act(async () => { utils = render(<App />); });
     const { container, getByLabelText, getByRole, findByText } = utils;
     await act(async () => { getByLabelText('Open settings').click(); });
-    await act(async () => { getByRole('tab', { name: 'Celebrations' }).click(); });
+    await act(async () => { getByRole('tab', { name: 'What screens show' }).click(); });
     const input = getByLabelText('Room milestone (every N check-ins)');
     await act(async () => {
       input.focus();

@@ -2,7 +2,7 @@ import { MilestoneListField, PanelCard } from '../fields.jsx';
 
 export function CelebrationsSection({ form, set, update }) {
   return (
-    <PanelCard title="Celebrations" tab="var(--brand-journey)" scope="shared">
+    <PanelCard title="Celebrations" tab="var(--brand-journey)" scope="shared" preview="welcome">
       <div className="field">
         <label htmlFor="milestone">Room milestone (every N check-ins)</label>
         <input

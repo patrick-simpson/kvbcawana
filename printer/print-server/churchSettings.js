@@ -73,16 +73,19 @@ const CHURCH_KEYS = Object.freeze(Object.keys(CHURCH_SPEC));
 
 const DROP = Symbol('drop');
 
+/** @param {unknown} v @returns {boolean} */
 function isPlainObject(v) {
   return !!v && typeof v === 'object' && !Array.isArray(v);
 }
 
 // One printable line: control characters become spaces, whitespace collapses
 // (the print server's printableConfigLine).
+/** @param {string} value @param {number} max */
 function oneLine(value, max) {
   return stripControlChars(value).replace(/\s+/g, ' ').trim().slice(0, max);
 }
 
+/** @param {any} raw @param {any} rule */
 function cleanTemplate(raw, rule) {
   if (!isPlainObject(raw)) return null;
   /** @type {Record<string, any>} */
@@ -95,16 +98,17 @@ function cleanTemplate(raw, rule) {
   return Object.keys(out).length > 1 ? out : null;
 }
 
+/** @param {any} r @param {any} rule */
 function cleanRow(r, rule) {
   if (!isPlainObject(r)) return null;
-  const text = (v, max) => (typeof v === 'string' || typeof v === 'number' ? stripControlChars(String(v)).trim().slice(0, max) : '');
+  const text = (/** @type {unknown} */ v, /** @type {number} */ max) => (typeof v === 'string' || typeof v === 'number' ? stripControlChars(String(v)).trim().slice(0, max) : '');
   const club = text(r.club, rule.club);
   if (!club) return null;
   const start = typeof r.startTime === 'string' && /^\d{1,2}:\d{2}$/.test(r.startTime) ? r.startTime : '';
   return { club, startTime: start, location: text(r.location, rule.location), room: text(r.room, rule.room) };
 }
 
-/** One value by its rule; DROP when it is not one this key may hold. */
+/** One value by its rule; DROP when it is not one this key may hold. @param {string} key @param {any} value */
 function cleanValue(key, value) {
   const rule = /** @type {any} */ (CHURCH_SPEC)[key];
   switch (rule.type) {
