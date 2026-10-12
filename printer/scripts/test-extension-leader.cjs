@@ -235,6 +235,22 @@ const pruneSharedDedup = new Function('SHARED_DEDUP_PREFIX', extractFunction('pr
     check('the print server unreachable: driven anyway, as before', down.driven.join() === 'd4');
   }
 
+  console.log('\nphone actions: an answered action leaves the in-flight set');
+  {
+    const timers = [];
+    const inFlight = new Set(['z9']);
+    new Function('env', `
+      const PRINT_SERVER = 'x'; const phoneActionsInFlight = env.inFlight;
+      const fetch = () => Promise.resolve({});
+      const setTimeout = (fn, ms) => env.timers.push({ fn, ms });
+      ${extractFunction('reportPhoneAction')}
+      reportPhoneAction('z9', true, '');
+    `)({ inFlight, timers });
+    check('the id is forgotten 30 s after its result is sent, not before', inFlight.has('z9') && timers.length === 1 && timers[0].ms === 30000);
+    timers[0].fn();
+    check('...so the set empties and the reload is no longer held', inFlight.size === 0);
+  }
+
   console.log('\nyouth check-out: a refused child is tried three times a night, not every 30 s');
   {
     const ymStillToTry = new Function('YM_MAX_FAILS', extractFunction('ymStillToTry') + '; return ymStillToTry;')(3);

@@ -4391,6 +4391,10 @@
       body: JSON.stringify({ ok: ok, detail: detail || '' }),
       signal: AbortSignal.timeout(4000)
     }).catch(function() {});
+    // Answered: forget it after the server has had time to stop offering it, so
+    // the set neither grows all night nor holds the peak-window reload (which
+    // waits while size > 0) once the check-in is done.
+    setTimeout(function() { phoneActionsInFlight.delete(id); }, 30000);
   }
 
   // Does TwoTimTwo's own check-in report list this child tonight? The only
