@@ -103,6 +103,6 @@ commits or files.
 4. Every installed app repointed (printer and sound room update feeds, the Pi
    kiosk, Journey's embed, cross-links), one last release from each old repo
    (done by 2026-10-03).
-5. A full rehearsal, then ONE switch day (`SWITCH.md` is the runbook) the owner
+5. A full rehearsal, then ONE switch day (done; `SWITCH.md` is the cleanup checklist that follows) the owner
    picks (never a Wednesday). OBS / ProPresenter feeds carry the passphrase in
    their link (owner's choice). No forwarding from the old github.io addresses.
