@@ -163,6 +163,31 @@ describe('the desk check-in', () => {
     expect((await st.call('GET', '/v1/print/next')).body.jobs).toHaveLength(1);
   });
 
+  it('the report promotes the claim while the post is slow, then the post fails or is refused: the job stays and prints', async () => {
+    for (const fault of ['timeout', 'refuse']) {
+      const t = await rig();
+      const st = await t.station();
+      const heard = [];
+      t.core.desk.hooks.afterCheckin.push((e) => { heard.push([e.gen, e.club, e.jobId]); });
+      t.faults.checkin = fault;
+      const realPost = t.core.desk.post.bind(t.core.desk);
+      t.core.desk.post = async (...args) => {
+        // TwoTimTwo recorded it; the watcher's read saw the child before our answer came back.
+        await t.core.ledger.promote(NIGHT, await t.core.tags.identity(NIGHT, '662'));
+        return realPost(...args);
+      };
+      const body = await t.deskBody([st]);
+      const res = await t.call('POST', '/v1/desk/checkin', body);
+      expect(res).toMatchObject({ status: 200, body: { ok: true, already: false, jobId: body.job.id, gen: 1 } });
+      expect(heard).toEqual([[1, 'Sparks', body.job.id]]);
+      const jobs = (await st.call('GET', '/v1/print/next')).body.jobs;
+      expect(jobs.map((j) => j.jobId)).toEqual([body.job.id]);
+      expect((await t.call('GET', '/v1/print/status')).body.claims).toMatchObject({ queued: 1, undone: 0 });
+      // a retry finds it, and nothing is posted or printed twice
+      expect((await t.call('POST', '/v1/desk/checkin', await t.deskBody([st]))).body).toMatchObject({ ok: true, already: true, state: 'queued' });
+    }
+  });
+
   it('a refusal from TwoTimTwo releases the claim and answers why', async () => {
     const t = await rig();
     const st = await t.station();

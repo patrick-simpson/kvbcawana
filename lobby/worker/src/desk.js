@@ -223,9 +223,19 @@ export class Desk {
     const claim = await this.ledger.claim(night, tag, { source: 'desk' });
     if (!claim.ok) return json({ ok: true, already: true, state: claim.state, jobId: claim.jobId ?? null });
     const jobId = job ? String(job.id) : null;
+    // The watcher may have promoted our claim (checking -> queued) while the post
+    // was out: TwoTimTwo has the child after all, and the job stored with the claim
+    // is the one that prints. Then neither give up nor settle may touch it.
+    const ours = () => {
+      const c = this.ledger.peek(night, tag);
+      return !!c && c.gen === claim.gen && (c.state === 'queued' || c.state === 'printed');
+    };
+    /** @returns {Promise<boolean>} true when the claim was promoted meanwhile (keep the job, carry on) */
     const giveUp = async () => {
-      await this.ledger.release(night, tag, claim.gen);
+      const released = await this.ledger.release(night, tag, claim.gen);
+      if (!released.ok && ours()) return true;
       if (jobId) await this.printq.dropJob(jobId);
+      return false;
     };
     // 3. The job rides the claim: not leasable until it is queued.
     if (job) {
@@ -241,17 +251,22 @@ export class Desk {
     if ('clubberId' in who) {
       const posted = await this.post(who.clubberId, body.items);
       if (!posted.ok) {
-        await giveUp();
-        return posted.response;
+        if (!(await giveUp())) return posted.response;
+        // Promoted while the post was slow, failed or refused: the report shows the
+        // child checked in, so this is a check-in like any other (the same as the
+        // settle below), named from the check-in page already read.
+        const kid = (this.cache?.page.roster || []).find((/** @type {any} */ k) => k.clubberId === who.clubberId);
+        club = kid?.club || '';
+        name = kid?.name || '';
+      } else {
+        club = posted.club;
+        name = posted.name;
       }
-      club = posted.club;
-      name = posted.name;
     }
     const settled = await this.ledger.settle(night, tag, claim.gen, jobId ?? undefined);
     if (!settled.ok) {
       // The report may have promoted it first (our answer was slow): fine.
-      const now = this.ledger.peek(night, tag);
-      if (!now || now.state !== 'queued' || now.gen !== claim.gen) {
+      if (!ours()) {
         if (jobId) await this.printq.dropJob(jobId);
         return refuse(409, { reason: 'superseded' });
       }

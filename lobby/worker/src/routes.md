@@ -278,7 +278,10 @@ network call):
    `{reason}`. A timeout or network error is AMBIGUOUS (TwoTimTwo may have it):
    the claim is released, the job dropped, 504 `{reason: 'unsure', retry: true}`;
    if TwoTimTwo did record it, the watcher finds the child on the report and
-   claims and prints it itself.
+   claims and prints it itself. If the watcher already PROMOTED this claim to
+   `queued` while the post was out (slow, failed or refused alike), TwoTimTwo
+   has the child: the job is kept, the hooks fire and the answer is the
+   ordinary success, the same as a promoted claim at the settle.
 5. **Hooks.** `desk.hooks.afterCheckin / afterUndo / afterCheckout` are arrays
    of functions the history (P6, registered) and the count (P5, `publisher.js`,
    registered) modules push to; each gets
