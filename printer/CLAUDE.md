@@ -628,9 +628,21 @@ Worker as the one source of jobs.
   /cloud/import-history`, in `SETTINGS_PAGE_ROUTES`) seals `print-history.json`
   and `attendance.json` (content-derived row ids, so a second run stores
   nothing twice) and posts them to `POST /v1/history/import`.
-- **Publisher gate:** with `configureCloud()` active `publishTally`,
-  `publishStillHere` and `stillHereChanged` return at once (the Worker
-  publishes); `stopCloud()` restores them.
+- **Publisher gate and the greeting** (P5, `lobby/worker/src/routes.md` section 8):
+  with `configureCloud()` active `publishTally`, `publishStillHere` and
+  `stillHereChanged` publish nothing (the Worker makes the tally, the ticker and the
+  still-here list); `stopCloud()` restores them. Instead the station keeps the Worker's
+  copy of what only this computer knows current: `sendStationExtras()` posts the Screen
+  season, the rehearsal flag and the pickup clubs to `POST /v1/station/extras` (on a
+  change, at least once a minute, `stillHereChanged` is its trigger). The **greeting** is
+  the station's: the job puller adds `cloudJob: <jobId>` to a `/print` body, and
+  `performCheckinPrint` hands its `checkin` (birthday, first-timer, welcome back,
+  milestone: only this computer has the roster and the history) to the relay with
+  `{job}` meta; the relay sends it as the station (`X-Station`) with `X-Job` to
+  `POST /v1/publish` (`sendGreeting`: a 4xx or a dropped answer is final, an unreachable
+  Worker is tried three times). The Worker lets exactly one greeting per job through and
+  drops every other `checkin`. A `/print` with no job (the extension's own path) greets
+  through the laptop's relay queue as before. `scripts/test-station-greeting.cjs`.
 
 **Every dashboard tool is on awana.kvbchurch.org/settings, Laptop section**
 (`lobby/src/components/settings/laptop.jsx` and `laptop-tools.jsx`,

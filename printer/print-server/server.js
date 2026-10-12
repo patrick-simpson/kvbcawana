@@ -4225,7 +4225,8 @@ async function performCheckinPrint(input) {
     cloudCheckin  = false,
     regen         = false,
     broughtFriend = false,
-    friendName    = ''
+    friendName    = '',
+    greetJob      = null
   } = input || {};
 
   // ── Demo / training mode ────────────────────────────────────────────────────
@@ -4559,7 +4560,10 @@ async function performCheckinPrint(input) {
         firstName, club: effectiveClubName, isBirthday: !!birthday, isFirstTimer: isFirstTimerTonight,
         welcomeBack, milestone: milestoneCount,
       });
-      events.publish(EVENT_CHANNEL, 'checkin', checkinEvent);
+      // A station's job: the greeting (birthday, first-timer, milestone: only this computer
+      // has the roster and the history) is the ONE the single publisher lets through,
+      // named by the job it is for (lobby/worker/src/routes.md section 8).
+      events.publish(EVENT_CHANNEL, 'checkin', checkinEvent, greetJob && cloudStation ? { job: greetJob } : undefined);
       pushEventToBuffer(checkinEvent);
 
       // Log to print history. trophyBook is the once-per-night marker for
@@ -4640,6 +4644,7 @@ app.post('/print', async (req, res) => {
     cloudCheckin: body.cloud === true,
     regen: body.regen === true,
     broughtFriend: body.friend === true, friendName: cleanFriendName(body.friendName),
+    greetJob: typeof body.cloudJob === 'string' && /^[A-Za-z0-9_-]{22}$/.test(body.cloudJob) ? body.cloudJob : null,
   });
   res.status(out.status).json(out.body);
 });
@@ -7592,8 +7597,30 @@ async function drainRelay() {
   }
 }
 
-events.setRelay((channel, event, body) => {
+// A station's greeting for the print job it just ran, to the Worker with that job's id (the
+// single publisher lets one per job through and drops any other `checkin`). A refusal is an
+// answer (a duplicate or a dropped job is not retried); only an unreachable service is.
+const GREETING_TRIES = 3;
+async function sendGreeting(body, jobId) {
+  for (let attempt = 0; attempt < GREETING_TRIES; attempt++) {
+    const station = cloudStation;
+    const where = station && station.signedIn();
+    if (!where) return false;
+    const r = await station.request(where.base, '/v1/publish', {
+      method: 'POST', body: { event: 'checkin', payload: body }, session: where.session,
+      station: station.stationIdFn(), headers: { 'X-Job': jobId },
+    });
+    if (r.status === 401) checkSyncSignIn().catch(() => {});
+    if (r.ok) return true;
+    if (r.status >= 400 && r.status < 500) return false;
+    await new Promise((resolve) => { const t = setTimeout(resolve, 1500); if (t.unref) t.unref(); });
+  }
+  return false;
+}
+
+events.setRelay((channel, event, body, meta) => {
   if (channel !== EVENT_CHANNEL || !signedInToSync()) return false;
+  if (event === 'checkin' && meta && meta.job && cloudStation) return sendGreeting(body, meta.job);
   if (Date.now() < relayBrokenUntil) { oweRelay(event, body); return false; }
   return enqueueRelay(event, body);
 });
@@ -9788,7 +9815,7 @@ module.exports = {
   // Tonight's count. authoritativeTonight() is THE definition every surface
   // reads; the setter exists so a test can put the server in report mode (and
   // in stale-report mode) without a scrape, a socket or a wall-clock wait.
-  printedTonightFor, authoritativeTonight, tonightHereNow, stillHereEntries, publishStillHere, sendStationExtras, REPORT_FRESH_MS, TALLY_GRACE_MIN, TALLY_LEAD_MIN,
+  printedTonightFor, authoritativeTonight, tonightHereNow, stillHereEntries, publishStillHere, sendStationExtras, sendGreeting, REPORT_FRESH_MS, TALLY_GRACE_MIN, TALLY_LEAD_MIN,
   _setLastCheckinReportForTests(report) { lastCheckinReport = report; },
   _setStillHereWindowForTests(fn) { stillHereWindowForTests = fn; },
   _setCheckedOutForTests(date, ids, names) { checkedOutTonight = { date, ids: new Set(ids), names: new Set((names || []).map(normalizedName)) }; },

@@ -904,7 +904,8 @@ function setRelay(fn) {
   publishState.configured = !!relay;
 }
 
-function publish(channel, event, payload) {
+// `meta` rides to the relay untouched (a station's greeting names the print job it is for).
+function publish(channel, event, payload, meta) {
   publishState.configured = !!relay;
   if (!relay || !payload) return Promise.resolve(false);
 
@@ -938,7 +939,7 @@ function publish(channel, event, payload) {
   // Handed over synchronously (the frame is on its way before publish() returns);
   // a throwing or rejecting relay is just a failed publish.
   let handed;
-  try { handed = Promise.resolve(relay(channel, event, body)); } catch (e) { handed = Promise.resolve(false); }
+  try { handed = Promise.resolve(relay(channel, event, body, meta)); } catch (e) { handed = Promise.resolve(false); }
   return handed.then((ok) => ok === true, () => false).then((ok) => {
     publishState.lastPublishOk = ok;
     publishState.lastPublishAt = nowIso();

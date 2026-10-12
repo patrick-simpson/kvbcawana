@@ -353,9 +353,11 @@ for a check-in only. A job is the same station-pad sealed bundle everywhere.
 **What the print role does with a job** (`job-puller.js`): opens the bundle with
 its station key, takes the record `{route, body, clubberId?, gen?, source?}`,
 refuses a route outside the print routes, and runs it on its own print server
-from loopback, so every old rule applies. For `/print` it sets `cloud: true` and,
-when the lease's `gen` is above 1 (an undo and a new check-in), `regen: true`,
-which tells the print server's own duplicate rules that this is a NEW tag.
+from loopback, so every old rule applies. For `/print` it sets `cloud: true`,
+`cloudJob: <jobId>` (the greeting the print makes goes to the Worker with the job,
+section 8) and, when the lease's `gen` is above 1 (an undo and a new check-in),
+`regen: true`, which tells the print server's own duplicate rules that this is a
+NEW tag.
 
 **GEN SEMANTICS (one place).** A claim's `gen` starts at 1 and only goes up: an
 undo (or the child vanishing from TwoTimTwo's report) makes it `undone` at
