@@ -2485,8 +2485,8 @@ html.cursor-hidden #slide-controls {
    disabled button keeps its own opacity). Nothing here waits for anything:
    the element is on screen and clickable from its first frame. Never over a
    playing video (the control bar, captions and loading overlay have no
-   motion), and Awana's deck is never animated (the slide sweep is a band
-   of its own passing over the stage). Timing is the kit's: a 100 ms beat,
+   motion), and Awana's deck is never restyled (the slide change carries a
+   copy of the old slide off on a band of its own). Timing is the kit's: a 100 ms beat,
    its four curves (brand/tokens.css). */
 @media (prefers-reduced-motion: no-preference) {
   html.motion-full {
@@ -2496,6 +2496,12 @@ html.cursor-hidden #slide-controls {
     /* Added to the splash's delays while the view-flip stinger covers the
        screen, so the splash lands as the stinger leaves (24-motion.js). */
     --jm-lead: 0ms;
+    /* The carry (view flip, slide change): band width, stripe slant,
+       length, and ONE ease-in-out curve shared by everything it moves. */
+    --jm-band-w: 46vw;
+    --jm-slant: 16vh;
+    --jm-carry-ms: 1000ms;
+    --jm-carry: cubic-bezier(0.5, 0, 0.2, 1);
   }
 
   /* The splash ("Large Group Time"): tab drops in, wordmark slams, the
@@ -2659,11 +2665,34 @@ html.cursor-hidden #slide-controls {
     animation: jm-rise 420ms var(--jm-settle) 120ms backwards;
   }
 
-  /* Teaching slides: the bar rides up under the deck; every slide change
-     sends a sweep across (24-motion.js adds .jm-slide-sweep, a band of its
-     own: Awana's slide is already there underneath, untouched). */
+  /* Teaching slides: the bar rides up under the deck. Every slide change is
+     the carry below: 24-motion.js puts a copy of the old slide
+     (.jm-slide-ghost, Awana's stage cloned whole, so the deck's own rules
+     draw it) over the new one and a band (.jm-slide-sweep) beside it; the
+     copy rides off on the band's leading edge and the new slide, already in
+     place, is uncovered behind it. Awana's slide itself is never restyled. */
   html.motion-full #slide-controls {
     animation: jm-bar-up 420ms var(--jm-settle) 160ms backwards;
+  }
+  html.motion-full .jm-slide-ghost,
+  html.motion-full .jm-slide-sweep {
+    --jm-band-w: 30vw;
+    --jm-slant: 12vh;
+    --jm-carry-ms: 720ms;
+  }
+  html.motion-full .jm-slide-ghost {
+    position: absolute;
+    inset: 0;
+    z-index: 7;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #000000;
+    pointer-events: none;
+    animation: jm-carry var(--jm-carry-ms) var(--jm-carry) both;
+  }
+  html.motion-full .jm-slide-ghost.is-back {
+    animation-name: jm-carry-back;
   }
   html.motion-full .jm-slide-sweep {
     position: absolute;
@@ -2672,40 +2701,69 @@ html.cursor-hidden #slide-controls {
     overflow: hidden;
     pointer-events: none;
   }
-  html.motion-full .jm-slide-sweep > span {
-    position: absolute;
-    top: -10%;
-    bottom: -10%;
-    left: 0;
-    width: 34%;
-    background: var(--jr-purple);
-    transform: translateX(150vw);
-    animation: jm-band-across 460ms var(--jm-wipe) both;
-  }
-  html.motion-full .jm-slide-sweep > span + span {
-    width: 6%;
-    background: var(--jr-hot);
-    animation-delay: 60ms;
-  }
-  html.motion-full .jm-slide-sweep.is-back > span {
-    animation-name: jm-band-back;
-  }
   /* The template slide's heading, split into its words for the word-by-word
-     slam (24-motion.js); a word must be a box to scale. */
+     settle (24-motion.js); a word must be a box to move. */
   html.motion-full .jm-word {
     display: inline-block;
   }
 
-  /* The view flip (Check-in Display <-> Journey, both ways): four skewed
-     bars (hot, ink, deep, club purple) slam across in a stack, the
-     destination's name slams onto the purple, then the bars peel away in
-     reverse order. Into Journey it runs left to right, back to the
-     Check-in Display right to left (.is-checkin mirrors the whole thing,
-     and the word back). About a second; the view underneath has already
-     changed (instant acknowledgement), this only plays over it and never
-     takes a click (pointer-events: none). Each bar has an in and an out
-     animation: the out fills forwards only, so until it starts the in's
-     end state holds. */
+  /* The carry (both the view flip and the slide change): one band of four
+     stripes (hot, ink, deep, club purple, trailing to leading) the width of
+     --jm-band-w, starting just off one edge. The band and the old picture
+     run the SAME keyframes with the same length and curve, so the old
+     picture stays hung on the band's square leading edge the whole way; the
+     slanted stripes behind it uncover the new picture, which never moves.
+     Forward runs left to right; .is-back (a step back, the way back to the
+     Check-in Display) right to left, stripes mirrored. */
+  html.motion-full .jm-carry-band {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    right: 100%;
+    width: var(--jm-band-w);
+    animation: jm-carry var(--jm-carry-ms) var(--jm-carry) both;
+  }
+  html.motion-full .is-back > .jm-carry-band {
+    right: auto;
+    left: 100%;
+    animation-name: jm-carry-back;
+  }
+  html.motion-full .jm-carry-stripes {
+    position: absolute;
+    inset: 0;
+  }
+  html.motion-full .is-back .jm-carry-stripes {
+    transform: scaleX(-1);
+  }
+  /* Each stripe runs from its slanted trailing edge to the band's square
+     leading edge; the next one up covers it from further on, so no seam
+     ever opens between them. */
+  html.motion-full .jm-carry-stripe {
+    position: absolute;
+    inset: 0;
+    background: var(--jr-hot);
+    clip-path: polygon(var(--jm-slant) 0, 100% 0, 100% 100%, 0 100%);
+  }
+  html.motion-full .jm-carry-stripe:nth-child(2) {
+    background: var(--jr-ink);
+    clip-path: polygon(calc(var(--jm-slant) + 5%) 0, 100% 0, 100% 100%, 5% 100%);
+  }
+  html.motion-full .jm-carry-stripe:nth-child(3) {
+    background: var(--jr-deep);
+    clip-path: polygon(calc(var(--jm-slant) + 13%) 0, 100% 0, 100% 100%, 13% 100%);
+  }
+  html.motion-full .jm-carry-stripe:nth-child(4) {
+    background: var(--jr-purple);
+    clip-path: polygon(calc(var(--jm-slant) + 24%) 0, 100% 0, 100% 100%, 24% 100%);
+  }
+
+  /* The view flip (Check-in Display <-> Journey, both ways): the band layer
+     over everything (click-through), and the OUTGOING layer shown again for
+     the length of the carry (.jm-carry-out beats .hidden; its class stays,
+     so the code still reads it as hidden; the check-in frame is only
+     restyled, never moved in the page or reloaded) above the incoming one,
+     riding off on the band. About a second; the view underneath has
+     already changed (instant acknowledgement). */
   html.motion-full .jm-stinger {
     position: fixed;
     inset: 0;
@@ -2713,75 +2771,35 @@ html.cursor-hidden #slide-controls {
     overflow: hidden;
     pointer-events: none;
   }
-  html.motion-full .jm-stinger.is-checkin,
-  html.motion-full .jm-stinger.is-checkin .jm-stinger-word {
-    transform: scaleX(-1);
+  html.motion-full .jm-carry-out {
+    display: block !important;
+    z-index: 8;
+    pointer-events: none;
+    animation: jm-carry var(--jm-carry-ms) var(--jm-carry) both;
   }
-  html.motion-full .jm-stinger-bar {
-    position: absolute;
-    top: -5%;
-    bottom: -5%;
-    left: -25%;
-    width: 150%;
-    transform: translateX(-160%) skewX(-14deg);
-    animation:
-      jm-bar-in 280ms var(--jm-settle) 0ms both,
-      jm-bar-out 280ms var(--jm-wipe) 740ms forwards;
+  html.motion-full .jm-carry-out.is-back {
+    animation-name: jm-carry-back;
   }
-  html.motion-full .jm-stinger-bar:nth-child(1) { background: var(--jr-hot); }
-  html.motion-full .jm-stinger-bar:nth-child(2) {
-    background: var(--jr-ink);
-    animation-delay: 40ms, 700ms;
+  /* Leaving Journey: what it was showing (splash, placeholder, slides; all
+     three flex boxes) rides off as it stood, entrances held at rest. */
+  html.motion-full .jm-carry-keep {
+    display: flex !important;
   }
-  html.motion-full .jm-stinger-bar:nth-child(3) {
-    background: var(--jr-deep);
-    animation-delay: 80ms, 660ms;
+  html.motion-full .jm-carry-keep,
+  html.motion-full .jm-carry-keep *,
+  html.motion-full .jm-carry-keep::before,
+  html.motion-full .jm-carry-keep::after {
+    animation-delay: -60s !important;
   }
-  html.motion-full .jm-stinger-bar:nth-child(4) {
-    background: var(--jr-purple);
-    animation-delay: 120ms, 620ms;
-  }
-  html.motion-full .jm-stinger-word {
+  html.motion-full .jm-slide-still {
     position: absolute;
     inset: 0;
+    z-index: 7;
     display: flex;
-    flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: clamp(0.4rem, 1.2 * var(--u), 1.4rem);
-    color: #ffffff;
-    animation:
-      jm-fade 1ms linear 260ms backwards,
-      jm-word-out 280ms var(--jm-wipe) 620ms forwards;
-  }
-  html.motion-full .jm-stinger.is-checkin .jm-stinger-word {
-    animation-name: jm-fade, jm-word-out-mirrored;
-  }
-  html.motion-full .jm-stinger-word img {
-    display: block;
-    width: clamp(12rem, 44 * var(--u), 50rem);
-    height: auto;
-    animation: jm-slam-hard 420ms var(--jm-settle) 260ms backwards;
-  }
-  html.motion-full .jm-stinger-shout {
-    position: relative;
-    top: var(--jr-shout-lift);
-    font-family: var(--jr-font-shout);
-    font-size: calc(clamp(2.4rem, 9 * var(--u), 11rem) * var(--jr-shout-fit));
-    line-height: 1;
-    text-transform: uppercase;
-    text-shadow: 0.06em 0.06em 0 var(--jr-hot);
-    animation: jm-slam-hard 420ms var(--jm-settle) 260ms backwards;
-  }
-  html.motion-full .jm-stinger-kicker {
-    font-family: var(--jr-font-label);
-    font-size: clamp(1rem, 2.6 * var(--u), 3.2rem);
-    line-height: 1;
-    letter-spacing: 0.3em;
-    padding-left: 0.3em;
-    text-transform: uppercase;
-    color: var(--jr-tint);
-    animation: jm-wipe-center 300ms var(--jm-settle) 400ms backwards;
+    background: #000000;
+    pointer-events: none;
   }
 
   @keyframes jm-slam {
@@ -2834,28 +2852,12 @@ html.cursor-hidden #slide-controls {
   @keyframes jm-bar-up {
     from { transform: translateY(calc(100% + max(3vh, 24px) + 12px)); }
   }
-  @keyframes jm-band-across {
-    from { transform: translateX(-50vw) skewX(-16deg); }
-    to { transform: translateX(150vw) skewX(-16deg); }
+  @keyframes jm-carry {
+    from { transform: translateX(0); }
+    to { transform: translateX(calc(100vw + var(--jm-band-w))); }
   }
-  @keyframes jm-band-back {
-    from { transform: translateX(150vw) skewX(16deg); }
-    to { transform: translateX(-50vw) skewX(16deg); }
-  }
-  @keyframes jm-bar-in {
-    from { transform: translateX(-160%) skewX(-14deg); }
-    to { transform: translateX(0) skewX(-14deg); }
-  }
-  @keyframes jm-bar-out {
-    from { transform: translateX(0) skewX(-14deg); }
-    to { transform: translateX(160%) skewX(-14deg); }
-  }
-  @keyframes jm-word-out {
-    from { transform: none; }
-    to { transform: translateX(120vw); }
-  }
-  @keyframes jm-word-out-mirrored {
-    from { transform: scaleX(-1); }
-    to { transform: translateX(120vw) scaleX(-1); }
+  @keyframes jm-carry-back {
+    from { transform: translateX(0); }
+    to { transform: translateX(calc(-100vw - var(--jm-band-w))); }
   }
 }

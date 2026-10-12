@@ -53,57 +53,124 @@ test('the Pi never gets the motion: no class, no stinger, no sweep, no inline st
   }
 });
 
-test('a desktop gets the motion; the view has flipped before the stinger is even built', async () => {
+// The carry's moving parts: the band, and the outgoing picture hung on it.
+const band = (root) => root.querySelector(':scope > .jm-carry-band');
+const outgoing = (k) => [...k.document.querySelectorAll('.jm-carry-out')];
+
+test('a desktop gets the motion; the band carries the old view off, the new one is already there', async () => {
   const k = bootKiosk(ROUTES, ANSWERED, DESKTOP, reduce(false));
   try {
     await ticks();
     assert.equal(hasMotion(k), true);
     assert.equal(stinger(k), null, 'nothing plays for the view the page opened on');
+    const journeyView = k.document.getElementById('journey-view');
+    const checkinView = k.document.getElementById('checkin-view');
+    const splash = k.document.getElementById('journey-splash');
     k.document.getElementById('toggle-btn').click();
     // Synchronously after the click: the Journey view is already up.
-    assert.equal(k.document.getElementById('journey-view').classList.contains('hidden'), false);
+    assert.equal(journeyView.classList.contains('hidden'), false);
     await ticks(1);
     const s = stinger(k);
-    assert.ok(s, 'the flip stinger plays over the new view');
+    assert.ok(s, 'the flip plays over the new view');
     assert.equal(s.getAttribute('aria-hidden'), 'true');
-    assert.equal(s.querySelectorAll('.jm-stinger-bar').length, 4);
-    assert.ok(s.querySelector('.jm-stinger-word img'), 'into Journey: the Journey wordmark');
+    assert.equal(s.classList.contains('is-back'), false, 'into Journey: left to right');
+    assert.equal(band(s).querySelectorAll('.jm-carry-stripe').length, 4, 'one band, four stripes');
+    // The old view is the one the band carries: still `hidden` to the code,
+    // shown again by the carry only, and never moved in the page (the
+    // check-in frame is the same element, still in its layer).
+    assert.deepEqual(outgoing(k), [checkinView]);
+    assert.equal(checkinView.classList.contains('hidden'), true);
+    assert.equal(k.document.getElementById('checkin-frame').parentElement, checkinView);
+    assert.equal(splash.classList.contains('hidden'), false, 'the new view is in place under it');
+
+    // And back: the other way, the Journey view (with the splash it was
+    // showing, though the code has put it away) carried off.
     k.document.getElementById('toggle-btn').click();
     await ticks(1);
-    assert.match(stinger(k).textContent, /Check-in/, 'and back: the Check-in name, one stinger at a time');
-    assert.equal(k.document.querySelectorAll('.jm-stinger').length, 1);
-    // A video that starts playing takes it down at once.
+    assert.equal(k.document.querySelectorAll('.jm-stinger').length, 1, 'one carry at a time');
+    assert.equal(stinger(k).classList.contains('is-back'), true);
+    assert.deepEqual(outgoing(k), [journeyView]);
+    assert.equal(journeyView.classList.contains('is-back'), true);
+    assert.equal(checkinView.classList.contains('jm-carry-out'), false, 'the first carry let go');
+    assert.equal(splash.classList.contains('hidden'), true, 'the code put the splash away');
+    assert.equal(splash.classList.contains('jm-carry-keep'), true, '...and the carry shows it riding off');
+
+    // The carry ends: everything it touched is back as the code left it.
+    band(stinger(k)).dispatchEvent(new k.window.Event('animationend'));
+    assert.equal(stinger(k), null);
+    assert.deepEqual(outgoing(k), []);
+    assert.equal(k.document.querySelector('.jm-carry-keep'), null);
+    assert.equal(journeyView.classList.contains('is-back'), false);
+
+    // A video that starts playing takes a carry down at once.
+    k.document.getElementById('toggle-btn').click();
+    await ticks(1);
+    assert.ok(stinger(k));
     k.video.dispatchEvent(new k.window.Event('playing'));
     assert.equal(stinger(k), null);
+    assert.deepEqual(outgoing(k), []);
   } finally {
     k.close();
   }
 });
 
-test('desktop slides: each step sends a sweep over the stage, a step back sweeps the other way', async () => {
+test('desktop slides: the old slide rides off on the band, a step back runs the other way', async () => {
   const k = bootKiosk(ROUTES, ANSWERED, DESKTOP, reduce(false));
   try {
     await ticks();
     k.window.startSlidesPreview(6);
     await ticks(1);
-    // The flip into the slides has its own stinger (covering slide 1); let it end.
-    const bars = k.document.querySelectorAll('.jm-stinger .jm-stinger-bar');
-    assert.equal(bars.length, 4);
-    bars[0].dispatchEvent(new k.window.Event('animationend'));
+    // The flip into the slides carries the Check-in Display off (slide 1 is
+    // what it uncovers); let it end.
+    band(stinger(k)).dispatchEvent(new k.window.Event('animationend'));
     assert.equal(stinger(k), null);
+    await ticks(2);
+    const realImage = k.document.getElementById('slide-image');
+    const firstSrc = realImage.getAttribute('src');
+    assert.ok(firstSrc, 'slide 1 landed');
     k.window.nextSlide();
     await ticks(1);
-    const sweep = k.document.querySelector('#slides-view > .jm-slide-sweep');
-    assert.ok(sweep);
+    const view = k.document.getElementById('slides-view');
+    const sweep = view.querySelector(':scope > .jm-slide-sweep');
+    const ghost = view.querySelector(':scope > .jm-slide-ghost');
+    assert.ok(sweep && ghost, 'a band and the old slide beside it');
     assert.equal(sweep.classList.contains('is-back'), false);
+    assert.equal(ghost.getAttribute('aria-hidden'), 'true');
+    assert.equal(band(sweep).querySelectorAll('.jm-carry-stripe').length, 4);
+    // The old picture is slide 1 (a copy of the stage), the real stage
+    // already shows slide 2, and every lookup still finds the real one.
+    assert.equal(ghost.querySelector('img').getAttribute('src'), firstSrc);
+    assert.equal(k.document.getElementById('slide-image'), realImage);
+    assert.equal(k.document.getElementById('slide-counter').textContent, 'Slide 2 of 7');
+    assert.ok(ghost.compareDocumentPosition(realImage) & k.window.Node.DOCUMENT_POSITION_PRECEDING, 'the copy comes after the real stage');
+    await ticks(2);
+    const secondSrc = realImage.getAttribute('src');
+    assert.notEqual(secondSrc, firstSrc);
     k.window.prevSlide();
     await ticks(1);
-    assert.equal(k.document.querySelectorAll('.jm-slide-sweep').length, 1, 'one sweep at a time');
+    assert.equal(k.document.querySelectorAll('.jm-slide-sweep').length, 1, 'one band at a time');
+    assert.equal(k.document.querySelectorAll('.jm-slide-ghost').length, 1, 'one old slide at a time');
     assert.equal(k.document.querySelector('.jm-slide-sweep').classList.contains('is-back'), true);
+    assert.equal(k.document.querySelector('.jm-slide-ghost').classList.contains('is-back'), true);
+    assert.equal(k.document.querySelector('.jm-slide-ghost img').getAttribute('src'), secondSrc, 'slide 2 rides off');
+    band(k.document.querySelector('.jm-slide-sweep')).dispatchEvent(new k.window.Event('animationend'));
+    assert.equal(k.document.querySelector('.jm-slide-ghost, .jm-slide-sweep'), null, 'gone when the band is');
+
+    // Leaving the slides for the Check-in Display: the last slide rides off
+    // as a still copy (the code has already emptied the stage).
+    await ticks(2);
+    k.document.getElementById('toggle-btn').click();
+    await ticks(1);
+    assert.ok(stinger(k));
+    assert.equal(view.classList.contains('jm-carry-keep'), true);
+    assert.equal(view.querySelector('.jm-slide-still img').getAttribute('src'), firstSrc);
+    band(stinger(k)).dispatchEvent(new k.window.Event('animationend'));
+    assert.equal(view.querySelector('.jm-slide-still'), null);
   } finally {
     k.close();
   }
 });
+
 
 test('reduced motion, configure mode and the Low power choice all switch it off; Full switches it on', async () => {
   const reduced = bootKiosk(ROUTES, ANSWERED, DESKTOP, reduce(true));
@@ -229,7 +296,7 @@ async function stepSlides(page) {
       text,
       words: [...heading.querySelectorAll('.jm-word')].map((w) => w.textContent),
       templateAnims: running(template),
-      bulletAnims: [...document.querySelectorAll('#slide-template-bullets li')].map(running),
+      bulletAnims: [...document.getElementById('slide-template-bullets').children].map(running),
       counter: counter.textContent,
     };
     nextSlide(); // pressed again mid-animation: the next slide, at once
@@ -287,7 +354,7 @@ test('in Chromium: the Pi profile runs only the splash pulse; a desktop runs the
     const full = await openPage(browser, DESKTOP);
     const fullRun = await walkAndCollect(full.page);
     assert.match(fullRun.cls, /\bmotion-full\b/);
-    for (const name of ['jm-bar-in', 'jm-slam', 'jm-slam-hard', 'jm-card-in', 'jm-fly-in', 'jm-slam-soft']) {
+    for (const name of ['jm-carry', 'jm-slam', 'jm-slam-hard', 'jm-card-in', 'jm-fly-in', 'jm-slam-soft']) {
       assert.ok(fullRun.names.includes(name), `${name} runs on a desktop (ran: ${fullRun.names.join(', ')})`);
     }
     await full.context.close();
@@ -307,3 +374,60 @@ test('in Chromium: the Pi profile runs only the splash pulse; a desktop runs the
     await browser.close();
   }
 });
+
+// Freezes every running animation at `t` ms and reports where the band's
+// leading edge and the old picture's edge are (both in viewport px).
+async function carryEdges(page, t, bandSel, oldSel) {
+  return page.evaluate(
+    ({ t, bandSel, oldSel }) => {
+      for (const a of document.getAnimations()) {
+        a.pause();
+        a.currentTime = t;
+      }
+      const band = document.querySelector(bandSel).getBoundingClientRect();
+      const old = document.querySelector(oldSel).getBoundingClientRect();
+      const back = !!document.querySelector(bandSel).closest('.is-back');
+      return { lead: back ? band.left : band.right, edge: back ? old.right : old.left, width: innerWidth };
+    },
+    { t, bandSel, oldSel }
+  );
+}
+
+test('in Chromium: the old picture is hung on the band the whole way (flip both ways, slide steps)', { skip }, async () => {
+  const { chromium } = await import('playwright-core');
+  const browser = await chromium.launch({ executablePath: CHROMIUM });
+  try {
+    const { page, context } = await openPage(browser, DESKTOP);
+    const sample = async (bandSel, oldSel) => {
+      const seen = [];
+      for (const t of [0, 150, 300, 450, 600, 900]) {
+        const { lead, edge, width } = await carryEdges(page, t, bandSel, oldSel);
+        assert.ok(Math.abs(lead - edge) < 1, `at ${t}ms the band's leading edge (${lead}) holds the old picture's edge (${edge})`);
+        seen.push(edge);
+      }
+      assert.ok(Math.abs(seen[0] - (seen[0] < 1 ? 0 : 1280)) < 1, 'it starts exactly where the old picture stood');
+      assert.ok(seen.some((x) => x > 100 && x < 1180), 'and crosses the screen');
+      await page.evaluate(() => document.getAnimations().forEach((a) => (a.effect.getComputedTiming().endTime === Infinity ? a.play() : a.finish())));
+      await page.waitForTimeout(50);
+    };
+    // Into Journey, left to right: the Check-in Display rides off.
+    await page.click('#toggle-btn');
+    await sample('.jm-stinger > .jm-carry-band', '#checkin-view');
+    assert.equal(await page.evaluate(() => getComputedStyle(document.getElementById('checkin-view')).display), 'none');
+    // And back, right to left: the splash rides off.
+    await page.click('#toggle-btn');
+    await sample('.jm-stinger > .jm-carry-band', '#journey-view');
+    // A slide step: the copy of the old slide rides off.
+    await page.evaluate(() => startSlidesPreview(6));
+    await page.waitForTimeout(1500);
+    await page.evaluate(() => nextSlide());
+    await sample('.jm-slide-sweep > .jm-carry-band', '.jm-slide-ghost');
+    await page.waitForTimeout(300);
+    await page.evaluate(() => prevSlide());
+    await sample('.jm-slide-sweep > .jm-carry-band', '.jm-slide-ghost');
+    await context.close();
+  } finally {
+    await browser.close();
+  }
+});
+
