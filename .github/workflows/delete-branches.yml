@@ -1,0 +1,44 @@
+# Deletes the named remote branches (by hand). For stale session branches a
+# Claude session cannot delete itself (its git access covers its own branch
+# only). Refuses main and any branch with commits main does not contain,
+# unless `force` is set; the deleted tips are printed so a branch can be
+# recreated from its SHA.
+name: Delete branches
+
+on:
+  workflow_dispatch:
+    inputs:
+      branches:
+        description: 'Branch names, space separated'
+        required: true
+      force:
+        description: 'Also delete branches whose commits are not on main (history differs)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  delete:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Delete
+        env:
+          BRANCHES: ${{ inputs.branches }}
+          FORCE: ${{ inputs.force }}
+        run: |
+          set -u
+          for b in $BRANCHES; do
+            if [ "$b" = main ]; then echo "::error::refusing to delete main"; exit 1; fi
+            if ! git rev-parse -q --verify "origin/$b" >/dev/null; then echo "$b: not found"; continue; fi
+            tip=$(git rev-parse "origin/$b")
+            if [ "$FORCE" != true ] && ! git merge-base --is-ancestor "$tip" origin/main; then
+              echo "::warning::$b ($tip) has commits main does not contain; skipped (set force)"; continue
+            fi
+            git push origin --delete "$b"
+            echo "deleted $b (was $tip)" | tee -a "$GITHUB_STEP_SUMMARY"
+          done
