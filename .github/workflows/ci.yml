@@ -146,13 +146,22 @@ jobs:
       - run: npm run test:coverage
 
   lobby-e2e:
-    name: Lobby + projector (build, browser smoke)
+    # The smoke suite (237 tests, 4 minutes on one runner) in 4 shards. The
+    # shards split by test (--fully-parallel): touch.spec.js alone holds 88
+    # of them, and by file the shards would be 74 / 75 / 88 / 0. Every shard
+    # builds and installs on its own; the deploy job needs the job, so it
+    # waits for all four.
+    name: Lobby + projector (browser smoke ${{ matrix.shard }}/4)
     needs: changes
     if: needs.changes.outputs.lobby == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     concurrency:
-      group: lobby-e2e-${{ github.ref }}
+      group: lobby-e2e-${{ matrix.shard }}-${{ github.ref }}
       cancel-in-progress: true
     defaults:
       run:
@@ -184,12 +193,12 @@ jobs:
         if: steps.pwcache.outputs.cache-hit == 'true'
         run: npx playwright install-deps chromium
       - name: E2E smoke
-        run: npm run e2e
+        run: npm run e2e -- --fully-parallel --shard=${{ matrix.shard }}/4
       - name: Upload Playwright report
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: lobby-playwright-report
+          name: lobby-playwright-report-${{ matrix.shard }}
           path: lobby/playwright-report
           retention-days: 7
 
