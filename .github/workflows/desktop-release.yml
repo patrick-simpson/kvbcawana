@@ -319,19 +319,16 @@ jobs:
             curl -fsSIL -o /dev/null "$u" || { echo "::error::feed points at a missing asset: $u"; exit 1; }
           done
 
-      - name: Commit the feed and redeploy the site
+      - name: Commit the feed
+        uses: ./.github/actions/push-main
+        with:
+          bot-name: sync-bot
+          paths: site/updates/lobby/lobby.yml
+          message: "chore: sound room app ${{ inputs.version }} update feed"
+
+      - name: Redeploy the site
         run: |
           set -euo pipefail
-          git config user.name 'sync-bot'
-          git config user.email 'github-actions[bot]@users.noreply.github.com'
-          git add site/updates/lobby/lobby.yml
-          git commit -m "chore: sound room app ${VERSION} update feed"
-          # main can move while the Windows build runs; rebase and retry.
-          for i in 1 2 3 4; do
-            if git push origin HEAD:main; then break
-            elif [ "$i" = 4 ]; then echo '::error::git push failed after retries'; exit 1
-            else git fetch origin main; git rebase origin/main; sleep $((i * 3)); fi
-          done
           # A push made with GITHUB_TOKEN fires no push trigger, so ask for
           # the CI run (and its deploy job) explicitly.
           gh workflow run ci.yml --repo "${GITHUB_REPOSITORY}" --ref main
