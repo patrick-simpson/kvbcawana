@@ -11,7 +11,18 @@ the Chromium layout tests) on every push and then publishes the one site, so
 each green push redeploys https://awana.kvbchurch.org/journey/ (the only
 correct kiosk address). This folder's own `.github/` workflows are dormant.
 
-Concretely, after editing any file: run `npm test` and `node --check
+**`public/src/schedule.js` is a build output.** Edit the section files in
+`src/schedule/` (`00-core.js`, `01-device-profile.js` ... `23-self-update.js`,
+one per banner section, in load order), then run `npm run build` and commit
+both. The build is a plain byte-for-byte concatenation in filename order: no
+wrapper, no renaming, no minifying, so the Pi still loads ONE classic script
+whose top-level state is shared exactly as before (a new section is a new
+numbered file; a cut may fall anywhere between top-level statements).
+`test/schedule-build.test.mjs` and CI fail if the committed output is stale,
+and the tests, the stamp, `site/build.mjs` and the lobby's `screenSpecs.test.js`
+keep reading the committed `public/src/schedule.js`, so nothing else changed.
+
+Concretely, after editing any file: run `npm run build`, `npm test` and `node --check
 public/src/schedule.js`, `git add`, `git commit` with a clear message, and
 `git push origin HEAD:main` (no PR, no other branch).
 
@@ -98,8 +109,9 @@ server is at fault.
 
 ## Tech stack snapshot
 
-- Plain static HTML/CSS/JS — **deliberately no framework or build
-  step**. This runs on a Raspberry Pi Zero from 2017 (single-core
+- Plain static HTML/CSS/JS — **deliberately no framework and no bundler**
+  (the one build step is the concatenation of `src/schedule/` above, committed
+  output, nothing to run at deploy). This runs on a Raspberry Pi Zero from 2017 (single-core
   ARMv6, 512MB RAM), so keeping the page as light as possible for the
   Chromium kiosk browser matters more than developer convenience.
 - Only `public/` is deployed, under `/journey/` of the one site (by

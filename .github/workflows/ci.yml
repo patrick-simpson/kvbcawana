@@ -231,7 +231,7 @@ jobs:
           cache: npm
           cache-dependency-path: journey/package-lock.json
       - run: npm ci
-      - run: node --check public/src/schedule.js && node --check public/src/sync.js
+      - run: node scripts/build-schedule.mjs --check && node --check public/src/schedule.js && node --check public/src/sync.js
       - run: npm test
 
   printer:

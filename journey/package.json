@@ -11,6 +11,7 @@
     "render-handouts": "node scripts/render-leader-handouts.mjs",
     "build-leader-prep": "node scripts/build-leader-prep.mjs",
     "build-prep-transcripts": "node scripts/build-prep-transcripts.mjs",
+    "build": "node scripts/build-schedule.mjs",
     "test": "node --test"
   },
   "devDependencies": {
