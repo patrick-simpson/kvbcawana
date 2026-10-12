@@ -27,7 +27,8 @@ const PRINTER_STATES = ['ok', 'busy', 'offline', 'error', 'paper', 'unknown'];
 
 /**
  * @typedef {{ stationId: string, name: string, pub: string, kid: string, registeredAt: string,
- *   lastSeenAt: string|null, printer: { state: string, detail?: string }|null }} Station
+ *   lastSeenAt: string|null, printer: { state: string, detail?: string }|null,
+ *   version?: string, churchRev?: number }} Station
  */
 
 /** An AES-GCM ciphertext's size on the pad ladder: the rung plus the 16-byte tag. */
@@ -45,6 +46,16 @@ export function cleanPrinter(p) {
   const state = PRINTER_STATES.includes(p.state) ? p.state : 'unknown';
   const detail = typeof p.detail === 'string' ? p.detail.replace(/[^\x20-\x7e]/g, ' ').trim().slice(0, 80) : '';
   return detail ? { state, detail } : { state };
+}
+
+/** An app version a heartbeat reports, 'X.Y.Z', or null. @param {unknown} v */
+export function cleanVersion(v) {
+  return typeof v === 'string' && /^\d{1,4}\.\d{1,5}\.\d{1,6}$/.test(v) ? v : null;
+}
+
+/** The church-settings rev a station applied, or null. @param {unknown} v */
+export function cleanRev(v) {
+  return Number.isInteger(v) && /** @type {number} */ (v) >= 0 && /** @type {number} */ (v) <= 1e9 ? /** @type {number} */ (v) : null;
 }
 
 export class Stations {
@@ -93,6 +104,8 @@ export class Stations {
     const t = new Date(this.now()).toISOString();
     /** @type {Station} */
     const station = { stationId, name, pub: body.pub, kid, registeredAt: mine ? mine.registeredAt : t, lastSeenAt: mine ? mine.lastSeenAt : null, printer: mine ? mine.printer : null };
+    if (mine && mine.version) station.version = mine.version;
+    if (mine && mine.churchRev !== undefined) station.churchRev = mine.churchRev;
     if (mine) list[list.indexOf(mine)] = station; else list.push(station);
     this.doc.data.rev += 1;
     await this.doc.save();
@@ -118,17 +131,22 @@ export class Stations {
   }
 
   /**
-   * A station's call came in: note when, and its printer (heartbeat). Written
-   * through at most every SEEN_WRITE_MS unless the printer's state changed.
-   * @param {string} id @param {any} [printer]
+   * A station's call came in: note when, and its printer (heartbeat), its app
+   * version and the church-settings rev it applied (routes.md 10.3). Written
+   * through at most every SEEN_WRITE_MS unless one of those changed.
+   * @param {string} id @param {any} [printer] @param {{ version?: unknown, churchRev?: unknown }} [report]
    */
-  async touch(id, printer) {
+  async touch(id, printer, report = {}) {
     await this.load();
     const s = this.get(id);
     if (!s) return false;
     const t = this.now();
     const clean = printer === undefined ? undefined : cleanPrinter(printer);
-    const changed = clean !== undefined && JSON.stringify(clean) !== JSON.stringify(s.printer);
+    let changed = clean !== undefined && JSON.stringify(clean) !== JSON.stringify(s.printer);
+    const version = cleanVersion(report.version);
+    if (version !== null && version !== s.version) { s.version = version; changed = true; }
+    const churchRev = cleanRev(report.churchRev);
+    if (churchRev !== null && churchRev !== s.churchRev) { s.churchRev = churchRev; changed = true; }
     const stale = !s.lastSeenAt || t - Date.parse(s.lastSeenAt) >= SEEN_WRITE_MS;
     s.lastSeenAt = new Date(t).toISOString();
     if (clean !== undefined) s.printer = clean;

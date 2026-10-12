@@ -26,15 +26,19 @@ export function mountCheckin(registry, core) {
 
   // ── stations (routes.md 4) ─────────────────────────────────────────────────
 
-  registry.add('POST', '/v1/station/register', 'session', async ({ body }) => {
+  registry.add('POST', '/v1/station/register', 'session', async ({ body, request }) => {
     const r = await core.stations.register(await body());
+    if (r.ok) await core.logChange(request, {}, { what: 'station', target: r.station.stationId, keys: ['register'], after: { name: r.station.name }, undoable: false });
     return r.ok ? json({ ok: true, station: r.station, stations: await core.stations.list() }) : fail(r.error, r.status);
   });
 
   registry.add('GET', '/v1/stations', 'session', async () => json(await core.stations.list()));
 
-  registry.add('DELETE', '/v1/stations/:id', 'session', async ({ params }) => {
+  registry.add('DELETE', '/v1/stations/:id', 'session', async ({ params, request }) => {
+    await core.stations.load();
+    const name = core.stations.get(params.id)?.name || '';
     const r = await core.stations.revoke(params.id);
+    if (r.ok) await core.logChange(request, {}, { what: 'station', target: params.id, keys: ['remove'], before: { name }, undoable: false });
     return r.ok ? json({ ok: true, stations: r.stations }) : fail('No such station.', 404);
   });
 
@@ -46,7 +50,9 @@ export function mountCheckin(registry, core) {
     await core.adopt.load();
     if (core.adopt.pending() > 0) await core.adopt.drain(1);
     const jobs = await core.printq.lease(stationId, Math.min(LEASE_MAX, Number(max) || 1), lookup);
-    return json({ jobs, leaseMs: LEASE_MS });
+    // routes.md 10.3: how a station learns of a church-settings or switch change (within one poll).
+    await core.church.load();
+    return json({ jobs, leaseMs: LEASE_MS, church: { rev: core.church.rev, switchesRev: core.switches.rev } });
   };
   registry.add('GET', '/v1/print/next', 'station', ({ url, stationId }) => next(/** @type {string} */ (stationId), url.searchParams.get('max')));
 
@@ -73,7 +79,7 @@ export function mountCheckin(registry, core) {
   /** Every 30 s (and during a print, every few seconds with the job id): the lease stays alive and the printer's state is noted. */
   const heartbeat = async (/** @type {string} */ stationId, /** @type {any} */ b) => {
     await loadAll();
-    await core.stations.touch(stationId, b.printer);
+    await core.stations.touch(stationId, b.printer, { version: b.version, churchRev: b.churchRev });
     if (b.jobId === undefined) return json({ ok: true });
     if (!validJobId(b.jobId)) return fail('That is not a job id.', 400);
     const r = await core.printq.heartbeat(b.jobId, stationId, lookup);

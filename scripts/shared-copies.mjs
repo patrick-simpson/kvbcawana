@@ -29,6 +29,7 @@ export const COPIES = [
   ['lobby/shared/text.js', 'printer/print-server/textClean.js', 'cjs'],
   ['lobby/shared/tonight.js', 'printer/print-server/tonight.js', 'cjs'],
   ['lobby/shared/pickup.js', 'printer/print-server/pickup.js', 'cjs'],
+  ['lobby/shared/churchSettings.js', 'printer/print-server/churchSettings.js', 'cjs'],
 ];
 
 export function render(source, format, src) {

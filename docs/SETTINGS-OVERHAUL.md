@@ -111,8 +111,8 @@ derived from S `nightTheme` alone.
 | Pickup list | six club boxes | Laptop → Pickup list (`laptop.jsx:402-413`) | C `pickupClubs` | |
 | BARF Night | nights (date list add/remove), Show tonight's list, Print BARF Bag labels | Setup → Cloud check-in → BARF Night (`SetupSection.jsx:128-130`); `church-config.json` `barfNights` (no UI before) | C `barfNights`; W `GET /v1/cloud/friends`, `POST /v1/cloud/barf-bags` (unchanged) | |
 | Tonight's prints | tonight's history rows (unlock with the passphrase, as History does), Reprint per row | Laptop → Tonight's prints (`laptop.jsx:456-500`) | W `GET /v1/history/rows?night=` (sealed, opened in the browser) + `POST /v1/print/reprint` (bundle sealed in the browser to every station, record `{route: '/reprint', body: {name, clubberId}, source: 'settings'}` + a `reprint` history row via `POST /v1/history/rows`) | lists what reached D1 (desk, station-printed TwoTimTwo-page and phone jobs); an extension-only print is not there: "At the laptop" still has the laptop's own list |
-| Name tags | leader tag (typed name + club), one-off tag, custom label | Laptop → Name tags (`laptop-tools.jsx:221-235`) | W `POST /v1/print/reprint` with a tool record `{route: '/print-leader' \| '/print-oneoff' \| '/print-custom', body}` (sealed in the browser; `JOB_PULL_ROUTES` already allow them; job id `reprint:<uuid>`) | remembered leaders list + Forget stay at the laptop (`GET /leaders` is the laptop's file) |
-| At the laptop | collapsed until opened (probes `http://localhost:3456/health` on open only, as today); then: This laptop (status, warnings, Print a test label, Run diagnostics, Clear print queue, Rehearsal mode, Play test tune, print failures), CHECK THE PRINTER clear, Printers (tag + backup, musical printer, update beacon), label preview, Reprint a stretch, remembered leaders, Attendance audit, This laptop's sign-in (only when the print server is signed out) | Laptop (`laptop.jsx:96-228`, `502-579`; `laptop-tools.jsx:237-410`) | L | not found: one line "Open this page on the check-in laptop for the printer itself" |
+| Name tags | leader tag (typed name + club), one-off tag, custom label | Laptop → Name tags (`laptop-tools.jsx:221-235`) | W `POST /v1/print/reprint` with a tool record `{route: '/print-leader' \| '/print-oneoff' \| '/print-custom', body}` (sealed in the browser; `JOB_PULL_ROUTES` already allow them; job id `reprint:<uuid>`) | remembered leaders list + Forget from anywhere: C `leaders` (section 4; moved from the laptop's `leaders.json`, owner 2026-10-12) |
+| At the laptop | collapsed until opened (probes `http://localhost:3456/health` on open only, as today); then: This laptop (status, warnings, Print a test label, Run diagnostics, Clear print queue, Rehearsal mode, Play test tune, print failures), CHECK THE PRINTER clear, Printers (tag + backup, musical printer, update beacon), label preview, Reprint a stretch, Attendance audit, This laptop's sign-in (only when the print server is signed out) | Laptop (`laptop.jsx:96-228`, `502-579`; `laptop-tools.jsx:237-410`) | L | not found: one line "Open this page on the check-in laptop for the printer itself" |
 
 Before the seed (`GET /v1/church/settings` `rev: 0`): the C cards are read-only with "Waiting
 for the check-in laptop to send its settings (KVBC Awana 9.3.0)" and one button "Start from
@@ -179,7 +179,13 @@ A vitest (`settingsCopy.test.js`, Track C) fails on `/dashboard|Club Label Print
 Keys moving (exact list = routes.md 10.3 `CHURCH_SPEC`): `labelFooter`, `firstTimerInverted`,
 `trophyBand`, `connectCard`, `connectCardAutoFirstTimer`, `connectCardGreeting`,
 `enableDrivenCheckin`, `labelTemplates`, `schedule`, `lateGraceMin`, `pickupClubs`,
-`seasonTheme`, `barfNights`.
+`seasonTheme`, `barfNights`, `leaders` (owner 2026-10-12: the remembered leaders, today
+the print server's `leaders.json` behind `/leaders` + `/leaders/forget`, move here so
+`/checkin`'s leader-tag chips work from any phone; rows `{firstName, lastName, clubName,
+lastPrintedAt, printCount}`, adult volunteers' names only, at most 80, one per
+name; the station seeds it from `leaders.json` and, on apply, writes `leaders.json` (its
+`rememberLeader` / `forgetLeader` then edit the Worker copy with `baseRev`); a remember or
+forget from a phone is a church edit of the whole `leaders` list, logged like any other).
 Staying per laptop (config.json only, At the laptop): `printerName`, `backupPrinterName`,
 `cupsMedia`, `musicalPrinter` (TSPL hardware), `updateBeacon`, `worksheetPrinter`; never on
 the page: `checkinUrl`, `historyRetentionDays`, `fleetConfigUrl`, `SECRET_CONFIG_KEYS`.
