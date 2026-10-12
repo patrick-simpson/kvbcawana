@@ -79,6 +79,7 @@ const SUITES = [
   ['test-history-icons', 10],
   ['test-stores-cache', 10],
   ['test-label-golden', 13],
+  ['test-label-marks', 5],
   ['test-about-page', 5],
 ];
 const tasks = [

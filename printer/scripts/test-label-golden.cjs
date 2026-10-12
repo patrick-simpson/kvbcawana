@@ -299,16 +299,18 @@ const CASES = [
   // go dark (name + allergy safety icons survive — those are not templatable).
   { name: 'template-no-icon', model: { firstName: 'Testkid', lastName: 'Sample', clubName: 'Sparks', template: { showIconPanel: false } } },
   { name: 'template-minimal', model: { firstName: 'Testkid', lastName: 'Sample', clubName: 'Sparks', handbookGroup: 'Flight 3:16', allergyTokens: ['NUTS'], footerText: 'KVBC Awana · Wednesdays 6:15–8:00pm', template: { showIconPanel: false, showLastName: false, showClubLine: false, showGroupLine: false, showFooter: false, nameMaxPt: 30 } } },
-  // The thermal-logo pipeline. light-cyan is the real Puggles incident; padded
+  // The thermal-logo pipeline. Known clubs always print the official kit mark
+  // now, so these use an UNKNOWN club ('Rookies'): the only case where the
+  // downloaded TwoTimTwo image is drawn. light-cyan is the real Puggles incident; padded
   // proves the ink crop; ghost and white-on-dark pin the fallback boundaries.
-  { name: 'logo-light-cyan',   model: { firstName: 'Testkid', lastName: 'Sample', clubName: 'Puggles', clubImageBuffer: lightCyanLogo() } },
-  { name: 'logo-padded',       model: { firstName: 'Testkid', lastName: 'Sample', clubName: 'Sparks', clubImageBuffer: paddedLogo() } },
-  { name: 'logo-ghost',        model: { firstName: 'Testkid', lastName: 'Sample', clubName: 'Sparks', clubImageBuffer: ghostLogo() } },
-  { name: 'logo-white-on-dark', model: { firstName: 'Testkid', lastName: 'Sample', clubName: 'Trek', clubImageBuffer: whiteOnDarkLogo() } },
+  { name: 'logo-light-cyan',   model: { firstName: 'Testkid', lastName: 'Sample', clubName: 'Rookies', clubImageBuffer: lightCyanLogo() } },
+  { name: 'logo-padded',       model: { firstName: 'Testkid', lastName: 'Sample', clubName: 'Rookies', clubImageBuffer: paddedLogo() } },
+  { name: 'logo-ghost',        model: { firstName: 'Testkid', lastName: 'Sample', clubName: 'Rookies', clubImageBuffer: ghostLogo() } },
+  { name: 'logo-white-on-dark', model: { firstName: 'Testkid', lastName: 'Sample', clubName: 'Rookies', clubImageBuffer: whiteOnDarkLogo() } },
   // Inverted (first-timer / award) labels print the icon panel near-black, so
   // the logo must flip to WHITE ink or it vanishes into its own background —
   // found by review, black-on-#1f2937, invisible on paper.
-  { name: 'logo-inverted-visitor', model: { firstName: 'Testkid', lastName: 'Sample', clubName: 'Puggles', clubImageBuffer: lightCyanLogo(), isVisitor: true, extras: { inverted: true } } },
+  { name: 'logo-inverted-visitor', model: { firstName: 'Testkid', lastName: 'Sample', clubName: 'Rookies', clubImageBuffer: lightCyanLogo(), isVisitor: true, extras: { inverted: true } } },
   // Trophy band (#293): the inverse chip that names a finished handbook. The
   // second case is the one that earns its keep — it proves the footer yields
   // its slot so the bottom-left stack stays at three lines, and that the band

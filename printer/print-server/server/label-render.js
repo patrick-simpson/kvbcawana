@@ -403,10 +403,10 @@ async function generateLabel(input) {
   // On step-up labels, drop the club icon entirely — the kid is leaving
   // that club, and the wider text area makes the message more obvious.
   // Otherwise the icon panel exists for any recognized club: it shows the
-  // real TwoTimTwo club logo when the client supplied one, the official
-  // one-colour club mark from the brand kit when it did not (or the logo was
-  // unusable), and the letter monogram as the last resort, so the icon zone
-  // never silently disappears.
+  // official one-colour club mark from the brand kit for the six known clubs;
+  // TwoTimTwo's downloaded club image only when the club has no kit mark (an
+  // unknown club) or the mark failed to load; and the letter monogram as the
+  // last resort, so the icon zone never silently disappears.
   const hasLogo     = !stepUp && !!clubImageBuffer && tplOn('showIconPanel');
   const hasEmblem   = !stepUp && !hasLogo && !!$images.CLUB_MONOGRAM[$eligibility.clubKey(clubName)] && tplOn('showIconPanel');
   const hasIcon     = hasLogo || hasEmblem;
@@ -479,10 +479,27 @@ async function generateLabel(input) {
       const dy = iconY + (iconSize - drawH) / 2;
       ctx.drawImage(art.canvas, dx, dy, drawW, drawH);
     };
-    if (hasLogo) {
-      // Crop to the artwork and binarize for thermal — see
-      // prepareLogoForThermal. A null result (undecodable, or no ink at all)
-      // falls through to the official mark below.
+    {
+      // FIRST CHOICE for every club the kit knows: the official one-colour
+      // club mark (brand kit, logos/*-black.svg). Vector, so it rasterises
+      // crisply at icon size, and put through the same thermal converter as a
+      // downloaded logo (cropped to its ink, one solid ink colour, re-inked
+      // white on an inverted label). TwoTimTwo's small colour pictures come out
+      // distorted and dark in 1 bit, so the supplied image is NOT preferred.
+      // Fails open: an unknown club or a missing/undecodable mark falls
+      // through to the supplied image, then the monogram.
+      const key = $eligibility.clubKey(clubName);
+      const mark = await thermalClubMark(key, inkWhite);
+      if (mark) {
+        drawArt(mark);
+        markDrawn = true;
+      }
+    }
+    if (hasLogo && !markDrawn) {
+      // Only for a club with no kit mark (or one that would not draw): crop
+      // to the artwork and binarize for thermal, see prepareLogoForThermal. A
+      // null result (undecodable, or no ink at all) falls through to the
+      // monogram below.
       const logo = await prepareLogoForThermal(clubImageBuffer, { ink });
       if (logo) {
         // The icon zone is 76pt ≈ 317 device px at 300 DPI. A logo whose
@@ -492,28 +509,15 @@ async function generateLabel(input) {
         // upscaled 4–5×, and the thermal printer then dithers the blurry
         // antialiased edges into speckle — the printed result is
         // recognisably worse than no logo at all. Below half the target
-        // resolution, the vector mark (or the solid-ink monogram) is the
-        // better label: skip the image and fall through to it.
+        // resolution, the solid-ink monogram is the better
+        // label: skip the image and fall through to it.
         const targetPx = iconSize * SCALE;
         if (Math.max(logo.sourceWidth, logo.sourceHeight) >= targetPx / 2) {
           drawArt(logo);
           logoDrawn = true;
         } else {
-          console.log(`[icon] Club artwork is ${logo.sourceWidth}x${logo.sourceHeight}px after cropping — too small for a ${Math.round(targetPx)}px icon zone, using the club mark instead`);
+          console.log(`[icon] Club artwork is ${logo.sourceWidth}x${logo.sourceHeight}px after cropping — too small for a ${Math.round(targetPx)}px icon zone, using the monogram instead`);
         }
-      }
-    }
-    if (!logoDrawn) {
-      // The official one-colour club mark (brand kit, logos/*-black.svg):
-      // vector, so it rasterises crisply at icon size, and put through the
-      // SAME thermal converter as a downloaded logo (cropped to its ink, one
-      // solid ink colour, re-inked white on an inverted label). Fails open: a
-      // missing or undecodable mark falls through to the monogram.
-      const key = $eligibility.clubKey(clubName);
-      const mark = await thermalClubMark(key, inkWhite);
-      if (mark) {
-        drawArt(mark);
-        markDrawn = true;
       }
     }
     if (!logoDrawn && !markDrawn) {
