@@ -19,7 +19,7 @@ const skip = existsSync(CHROMIUM) ? false : `no Chromium at ${CHROMIUM}`;
 const TYPES = { '.html': 'text/html', '.css': 'text/css', '.svg': 'image/svg+xml', '.woff2': 'font/woff2' };
 const PILLS = ['back15-btn', 'pause-btn', 'fwd15-btn', 'unmute-btn', 'cc-btn'];
 
-// The Pi's safe-mode screen with and without overscan, then the other
+// A small 4:3 screen with and without overscan, then the other
 // screens under the breakpoint, a phone held sideways among them.
 const VIEWPORTS = [
   [592, 432],

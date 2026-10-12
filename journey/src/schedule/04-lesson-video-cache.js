@@ -35,17 +35,8 @@ function sameLesson(a, b) {
   return !!a && !!b && a.week === b.week && a.downloadUrl === b.downloadUrl;
 }
 
-/* The nightly transcode reuses ONE filename (current-lesson-video.mp4), so
-   when the lesson changes, this week's bytes and last week's live at the same
-   URL — and a kiosk refreshing hourly essentially never witnesses the brief
-   pre-transcode state (downloadUrl = the per-week CloudFront original) whose
-   URL change used to be what flushed the cache. Keying the cached video by
-   transcodedAt (which uniquely identifies each transcode run) instead of by
-   URL alone is what keeps a cached lesson from surviving its own replacement.
-   The fetch itself still goes to the real URL — only the cache key carries
-   the version. */
-/* Awana's own full-size file for this lesson, which is what a full-quality
-   device plays. current-lesson.json's sourceUrl is the CORS-friendly CDN URL
+/* Awana's own full-size file for this lesson, which is what the kiosk
+   plays. current-lesson.json's sourceUrl is the CORS-friendly CDN URL
    the nightly script already resolved (see CLAUDE.md), so it is both
    playable and fetchable into the Cache API; lessons.json's downloadUrl for
    the same week is the fallback when a lesson file predates that field.
@@ -61,26 +52,18 @@ function originalVideoUrl(lesson) {
   return typeof lesson.downloadUrl === 'string' ? lesson.downloadUrl : null;
 }
 
-/* The two qualities are stored under keys that can never collide, so a device
-   that switches profiles can never be served the other quality's bytes:
-
-   low   the historical key exactly: downloadUrl, plus the transcode's own
-         version once there is one. A Pi that already has this week stored
-         keeps it.
-   full  the original's URL plus a quality marker.
+/* The cached original is stored under its URL plus a quality marker, so
+   it can never be mistaken for a 480p copy stored under the bare URL by an
+   older version of this page (store-before-evict drops that one on the next
+   full round).
 
    The marker is a query parameter rather than a '#1080' fragment because the
    Cache API ignores fragments when it matches a request, so a fragment would
    silently be the same key as the plain URL. */
-function videoCacheKey(lesson, profile = effectiveProfile()) {
-  if (profile === 'full') {
-    const url = originalVideoUrl(lesson);
-    if (!url) return null;
-    return `${url}${url.includes('?') ? '&' : '?'}q=1080`;
-  }
-  if (!lesson.transcodedAt) return lesson.downloadUrl;
-  const sep = lesson.downloadUrl.includes('?') ? '&' : '?';
-  return `${lesson.downloadUrl}${sep}v=${encodeURIComponent(lesson.transcodedAt)}`;
+function videoCacheKey(lesson) {
+  const url = originalVideoUrl(lesson);
+  if (!url) return null;
+  return `${url}${url.includes('?') ? '&' : '?'}q=1080`;
 }
 
 /* Pre-download everything the current week's show and picker can need — the
@@ -91,32 +74,20 @@ function videoCacheKey(lesson, profile = effectiveProfile()) {
    piece of the new one is safely stored — a mid-download failure can never
    leave the cache emptier than it started (the invariant the old
    cacheLessonVideo() kept for the video alone, extended to the bundle). */
-/* Which video file the bundle should pre-download for this device, if any.
-
-   low   Only the transcoded file is worth caching. Before the nightly
-         transcode lands, downloadUrl is still the 1080p original: bytes this
-         device cannot play, which would eat the bundle's budget and then be
-         served straight back by resolveVideoSrc.
-   full  Awana's original, under the quality-marked key, so the 480p entry is
-         never mistaken for it. Marked optional: the original is a cross-origin
-         fetch, and if it is ever served without CORS headers there is nothing
-         this page can do about it. That must cost the lesson's video and
-         nothing else, not hold up the eviction of last week's bundle. */
+/* The video file the bundle pre-downloads: Awana's original, under the
+   quality-marked key. Marked optional: the original is a cross-origin fetch,
+   and if it is ever served without CORS headers there is nothing this page
+   can do about it. That must cost the lesson's video and nothing else, not
+   hold up the eviction of last week's bundle. */
 function lessonVideoCandidates(lesson) {
-  if (effectiveProfile() === 'full') {
-    const url = originalVideoUrl(lesson);
-    const cacheKey = videoCacheKey(lesson, 'full');
-    return url && cacheKey ? [{ fetchUrl: url, cacheKey, optional: true }] : [];
-  }
-  return lesson.transcodedAt
-    ? [{ fetchUrl: lesson.downloadUrl, cacheKey: videoCacheKey(lesson, 'low') }]
-    : [];
+  const url = originalVideoUrl(lesson);
+  const cacheKey = videoCacheKey(lesson);
+  return url && cacheKey ? [{ fetchUrl: url, cacheKey, optional: true }] : [];
 }
 
 let bundleInFlight = false;
 let bundleInFlightSince = 0;
-// A file of the bundle (the video is the big one, up to 25 MiB on a slow
-// connection) must finish within this, headers AND body, or it is given up
+// A file of the bundle (the video is the big one) must finish within this, headers AND body, or it is given up
 // for this round and tried again on the next refresh.
 const BUNDLE_FILE_MS = 3 * 60 * 1000;
 // The latch itself is never trusted past this: a round that somehow never
@@ -127,7 +98,7 @@ async function cacheLessonBundle(lesson) {
   if (!('caches' in window)) return;
   // Startup, the hourly timer, and the 'online' listener can all fire close
   // together — without this, each would re-download the same multi-MB video
-  // in parallel on a single-core Pi. Whatever a skipped call would have
+  // in parallel. Whatever a skipped call would have
   // stored, the next refresh's call picks up (skip-if-cached is per item).
   if (bundleInFlight && Date.now() - bundleInFlightSince < BUNDLE_LATCH_MAX_MS) return;
   if (bundleInFlight) console.warn('Journey: a lesson bundle download has been stuck for 15 minutes; starting over');

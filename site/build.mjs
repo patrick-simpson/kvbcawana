@@ -239,8 +239,8 @@ for (const file of walk(OUT)) {
 // (functions/journey, functions/api) unless _routes.json says otherwise, so
 // without it every static Journey request (the page, its scripts, the brand
 // kit, schedule.json) went through the Function and fell through to the file:
-// an invocation counted against the daily quota and a hop added to a kiosk on
-// a Pi, for nothing. Only the paths a Function actually answers are routed to
+// an invocation counted against the daily quota and a hop added to every
+// kiosk request, for nothing. Only the paths a Function actually answers are routed to
 // one: the sync Worker under /api, the lesson videos, and the large files
 // streamed from the repo. Everything else is a plain static file.
 writeFileSync(path.join(OUT, '_routes.json'), `${JSON.stringify({

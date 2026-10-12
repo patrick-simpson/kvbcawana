@@ -18,7 +18,7 @@ import { JSDOM } from 'jsdom';
 const REPO = path.dirname(new URL(import.meta.url).pathname).replace(/\/test$/, '');
 const PUBLIC = path.join(REPO, 'public');
 
-// The page's schedule is the Pi's LOCAL time of day (Journey 18:30-19:15), so a
+// The page's schedule is the kiosk's LOCAL time of day (Journey 18:30-19:15), so a
 // test that reads the real clock behaves differently inside that window than
 // outside it (the suite hung every evening in it). Every boot therefore pins
 // the page's Date to a fixed local time OUTSIDE the window; the clock still
@@ -43,34 +43,33 @@ export function pinClock(window, nowMs = DEFAULT_NOW) {
 
 export const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
 
-// The kiosk this harness boots is the real one: a Raspberry Pi Zero, which
-// detectDeviceProfile() reads as the low-power profile. A test that wants the
-// page as a Mac or a laptop sees it passes `device` (see below).
-export const PI_ZERO = {
+// The kiosk this harness boots is the real one: a Windows PC running the KVBC
+// Awana app. The page plays and moves the same on every device, so the user
+// agent only matters to a test that wants to show exactly that (pass
+// `device`, e.g. DESKTOP for a Mac).
+export const KIOSK_PC = {
   userAgent:
-    'Mozilla/5.0 (X11; Linux armv6l) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36',
-  hardwareConcurrency: 1,
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
 };
 
 export const DESKTOP = {
   userAgent:
     'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
-  hardwareConcurrency: 8,
 };
 
 /**
  * @param routes  url substring -> { json } | { status } | { text }
  * @param prefs   localStorage entries seeded BEFORE schedule.js runs, the way
  *                a kiosk that has been used before comes up
- * @param device  { userAgent, hardwareConcurrency } the machine this page is
- *                running on, defaulting to the kiosk's own Pi Zero
+ * @param device  { userAgent } the machine this page is running on,
+ *                defaulting to the kiosk PC
  * @param setup   optional (window) => void, run just before schedule.js, for a
  *                browser capability jsdom lacks that the page reads at startup
  * @param pageUrl the address the page is opened at (a query string such as
  *                ?configure=1 is read by the page itself)
  * @returns { dom, window, document, fetchLog, seeks, video, close }
  */
-export function bootKiosk(routes = {}, prefs = {}, device = PI_ZERO, setup = null, pageUrl = 'https://example.test/') {
+export function bootKiosk(routes = {}, prefs = {}, device = KIOSK_PC, setup = null, pageUrl = 'https://example.test/') {
   const html = readFileSync(path.join(PUBLIC, 'index.html'), 'utf8').replace(
     '<script src="src/schedule.js"></script>',
     ''
@@ -82,12 +81,6 @@ export function bootKiosk(routes = {}, prefs = {}, device = PI_ZERO, setup = nul
     userAgent: device.userAgent,
   });
   const { window } = dom;
-  // jsdom reports 4 cores whatever it is pretending to be, and the page reads
-  // this to tell a Pi from a laptop.
-  Object.defineProperty(window.navigator, 'hardwareConcurrency', {
-    get: () => device.hardwareConcurrency,
-    configurable: true,
-  });
 
   const fetchLog = [];
   window.fetch = (url, options = {}) => {

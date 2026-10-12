@@ -4,7 +4,7 @@
 // runs in and what it must never touch on the way.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { bootKiosk, tick, PI_ZERO, DEFAULT_NOW } from './kiosk-dom.mjs';
+import { bootKiosk, tick, KIOSK_PC, DEFAULT_NOW } from './kiosk-dom.mjs';
 
 const LESSONS = {
   version: 1,
@@ -51,7 +51,7 @@ const ticks = async (n = 4) => {
 };
 
 async function bootAtTheSplash(prefs = ANSWERED) {
-  const kiosk = bootKiosk(ROUTES, prefs, PI_ZERO);
+  const kiosk = bootKiosk(ROUTES, prefs, KIOSK_PC);
   await ticks();
   kiosk.window.setView('journey');
   assert.equal(
@@ -105,7 +105,7 @@ test('Shift+ArrowRight skips, plain ArrowRight still begins the video', async ()
   pressArrowRight(plain.window);
   await ticks(6);
   assert.equal(slidesShowing(plain), false, 'the lesson is what a bare arrow means');
-  assert.equal(plain.video.getAttribute('src'), 'current-lesson-video.mp4');
+  assert.equal(plain.video.getAttribute('src'), 'https://cdn.awana.example/student-1-original.mp4', "Awana's original");
   plain.close();
 });
 
@@ -175,7 +175,7 @@ test('the skipped show finishes back at the Check-in Display, like any lesson', 
 });
 
 test('the picker offers teaching slides for every week, week 27 included', async () => {
-  const kiosk = bootKiosk(ROUTES, ANSWERED, PI_ZERO);
+  const kiosk = bootKiosk(ROUTES, ANSWERED, KIOSK_PC);
   await ticks();
   const { document, window } = kiosk;
   document.getElementById('settings-btn').click();
@@ -208,7 +208,7 @@ test('the picker offers teaching slides for every week, week 27 included', async
 });
 
 test('the toggle button tears a slides preview down, same as a video one', async () => {
-  const kiosk = bootKiosk(ROUTES, ANSWERED, PI_ZERO);
+  const kiosk = bootKiosk(ROUTES, ANSWERED, KIOSK_PC);
   await ticks();
   const { document } = kiosk;
   document.getElementById('settings-btn').click();

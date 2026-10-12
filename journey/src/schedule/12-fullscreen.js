@@ -192,7 +192,7 @@ document.addEventListener('keydown', (e) => {
      panel or the handout overlay open, never while typing. ArrowLeft is
      deliberately left alone — it means "previous slide" once the teaching
      slides are up — and ArrowRight stays the handoff to those slides.
-     Repeats are ignored: a held key would queue seeks faster than the Pi's
+     Repeats are ignored: a held key would queue seeks faster than the
      decoder can serve them. */
   if (e.code === 'Comma' || e.code === 'Period' || e.code === 'BracketLeft' || e.code === 'BracketRight') {
     if (

@@ -4,7 +4,7 @@
 // settings panel, a reading overlay) are page states, not flags.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { bootKiosk, tick, PI_ZERO } from './kiosk-dom.mjs';
+import { bootKiosk, tick, KIOSK_PC } from './kiosk-dom.mjs';
 
 const CURRENT = {
   version: 2,
@@ -36,7 +36,7 @@ function bootDeployed({ deployed = OLD_BUILD, served = OLD_BUILD, version } = {}
     'index.html': { text: page(served) },
   };
   if (version !== null) routes['version.json'] = { json: version || { build: deployed } };
-  const kiosk = bootKiosk(routes, ANSWERED, PI_ZERO);
+  const kiosk = bootKiosk(routes, ANSWERED, KIOSK_PC);
   kiosk.document
     .querySelector('meta[name="journey-build"]')
     .setAttribute('content', OLD_BUILD);

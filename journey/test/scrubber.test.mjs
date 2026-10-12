@@ -1,4 +1,4 @@
-// The control bar's scrubber on a Pi: one seek when the finger lifts (not one
+// The control bar's scrubber: one seek when the finger lifts (not one
 // per drag event), and no DOM writes while the bar is faded out.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

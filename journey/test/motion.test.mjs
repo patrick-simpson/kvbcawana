@@ -1,15 +1,15 @@
-// The full profile's motion (24-motion.js + style.css's motion block), and
-// the Pi's lack of it. jsdom checks who gets html.motion-full and the two
+// Journey's motion (24-motion.js + style.css's motion block), and its absence
+// under reduced motion. jsdom checks who gets html.motion-full and the two
 // JS-driven pieces (the view-flip stinger, the slide sweep); real Chromium
-// checks what the stylesheet then does: a low page runs no animation but
-// the splash's pulse, a full page runs the kit-timed entrances, reduced
-// motion runs none of them even if the class were there.
+// checks what the stylesheet then does: a page with motion runs the
+// kit-timed entrances, a reduced-motion page runs no animation but the
+// splash's pulse, even if the class were there.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { bootKiosk, tick, PI_ZERO, DESKTOP } from './kiosk-dom.mjs';
+import { bootKiosk, tick, KIOSK_PC, DESKTOP } from './kiosk-dom.mjs';
 
 const PUBLIC = path.join(path.dirname(path.dirname(fileURLToPath(import.meta.url))), 'public');
 const json = (rel) => JSON.parse(readFileSync(path.join(PUBLIC, rel), 'utf8'));
@@ -33,8 +33,8 @@ const reduce = (matches) => (window) => {
 const hasMotion = (k) => k.document.documentElement.classList.contains('motion-full');
 const stinger = (k) => k.document.querySelector('.jm-stinger');
 
-test('the Pi never gets the motion: no class, no stinger, no sweep, no inline style', async () => {
-  const k = bootKiosk(ROUTES, ANSWERED, PI_ZERO);
+test('reduced motion never gets the motion: no class, no stinger, no sweep, no inline style', async () => {
+  const k = bootKiosk(ROUTES, ANSWERED, KIOSK_PC, reduce(true));
   try {
     await ticks();
     assert.equal(hasMotion(k), false);
@@ -57,8 +57,8 @@ test('the Pi never gets the motion: no class, no stinger, no sweep, no inline st
 const band = (root) => root.querySelector(':scope > .jm-carry-band');
 const outgoing = (k) => [...k.document.querySelectorAll('.jm-carry-out')];
 
-test('a desktop gets the motion; the band carries the old view off, the new one is already there', async () => {
-  const k = bootKiosk(ROUTES, ANSWERED, DESKTOP, reduce(false));
+test('the kiosk gets the motion; the band carries the old view off, the new one is already there', async () => {
+  const k = bootKiosk(ROUTES, ANSWERED, KIOSK_PC, reduce(false));
   try {
     await ticks();
     assert.equal(hasMotion(k), true);
@@ -114,8 +114,8 @@ test('a desktop gets the motion; the band carries the old view off, the new one 
   }
 });
 
-test('desktop slides: the old slide rides off on the band, a step back runs the other way', async () => {
-  const k = bootKiosk(ROUTES, ANSWERED, DESKTOP, reduce(false));
+test('kiosk slides: the old slide rides off on the band, a step back runs the other way', async () => {
+  const k = bootKiosk(ROUTES, ANSWERED, KIOSK_PC, reduce(false));
   try {
     await ticks();
     k.window.startSlidesPreview(6);
@@ -172,8 +172,8 @@ test('desktop slides: the old slide rides off on the band, a step back runs the 
 });
 
 
-test('reduced motion, configure mode and the Low power choice all switch it off; Full switches it on', async () => {
-  const reduced = bootKiosk(ROUTES, ANSWERED, DESKTOP, reduce(true));
+test('reduced motion and configure mode switch it off; every device without them gets it', async () => {
+  const reduced = bootKiosk(ROUTES, ANSWERED, KIOSK_PC, reduce(true));
   try {
     await ticks();
     assert.equal(hasMotion(reduced), false, 'the OS asked for reduced motion');
@@ -183,27 +183,22 @@ test('reduced motion, configure mode and the Low power choice all switch it off;
   } finally {
     reduced.close();
   }
-  const configure = bootKiosk(ROUTES, ANSWERED, DESKTOP, reduce(false), 'https://example.test/?configure=1');
+  const configure = bootKiosk(ROUTES, ANSWERED, KIOSK_PC, reduce(false), 'https://example.test/?configure=1');
   try {
     assert.equal(hasMotion(configure), false, 'the configure window is a tool, not the show');
   } finally {
     configure.close();
   }
-  const desk = bootKiosk(ROUTES, ANSWERED, DESKTOP, reduce(false));
-  try {
-    desk.document.getElementById('pi-mode-switch').click();
-    assert.equal(hasMotion(desk), false, 'Low power on a laptop is the Pi, motion included');
-    desk.document.getElementById('quality-auto').click();
-    assert.equal(hasMotion(desk), true);
-  } finally {
-    desk.close();
-  }
-  const pi = bootKiosk(ROUTES, ANSWERED, PI_ZERO, reduce(false));
-  try {
-    pi.document.getElementById('pi-mode-switch').click();
-    assert.equal(hasMotion(pi), true, 'Full quality chosen by hand is the full profile');
-  } finally {
-    pi.close();
+  // The page no longer asks what it runs on: a Mac and a phone get it too,
+  // and an old saved "low" choice from the removed Pi mode is ignored.
+  const phone = { userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148' };
+  for (const device of [DESKTOP, phone]) {
+    const k = bootKiosk(ROUTES, { ...ANSWERED, 'journey.playback.quality': 'low' }, device, reduce(false));
+    try {
+      assert.equal(hasMotion(k), true);
+    } finally {
+      k.close();
+    }
   }
 });
 
@@ -228,8 +223,7 @@ async function openPage(browser, device, reducedMotion = 'no-preference') {
   });
   const page = await context.newPage();
   // Noon, outside the 6:30 window (the page reads the local clock).
-  await page.addInitScript((cores) => {
-    Object.defineProperty(navigator, 'hardwareConcurrency', { get: () => cores });
+  await page.addInitScript(() => {
     const RealDate = Date;
     const noon = new RealDate(2026, 9, 7, 12, 0, 0).getTime();
     const offset = noon - RealDate.now();
@@ -244,7 +238,7 @@ async function openPage(browser, device, reducedMotion = 'no-preference') {
       }
     };
     localStorage.setItem('journey.captions', 'off');
-  }, device.hardwareConcurrency);
+  });
   await page.route('**/*', (route) => {
     const url = new URL(route.request().url());
     if (url.host !== 'journey.test') return route.abort();
@@ -306,11 +300,11 @@ async function stepSlides(page) {
   });
 }
 
-test('in Chromium: slide changes animate the layers on a desktop, never on the Pi, and never hold a press', { skip }, async () => {
+test('in Chromium: slide changes animate the layers, never under reduced motion, and never hold a press', { skip }, async () => {
   const { chromium } = await import('playwright-core');
   const browser = await chromium.launch({ executablePath: CHROMIUM });
   try {
-    const full = await openPage(browser, DESKTOP);
+    const full = await openPage(browser, KIOSK_PC);
     const { first, second } = await stepSlides(full.page);
     assert.ok(first.words.length >= 2, 'the heading is split into its words');
     assert.equal(first.words.join(' '), first.text.trim().split(/\s+/).join(' '), 'the same words in the same order');
@@ -320,49 +314,41 @@ test('in Chromium: slide changes animate the layers on a desktop, never on the P
     assert.equal(second.templateAnims, 1, 'the old transition is cancelled, the new one runs');
     await full.context.close();
 
-    for (const [device, reducedMotion] of [[PI_ZERO, 'no-preference'], [DESKTOP, 'reduce']]) {
-      const quiet = await openPage(browser, device, reducedMotion);
-      const run = await stepSlides(quiet.page);
-      assert.deepEqual(run.first.words, [], 'the heading stays one text node');
-      assert.equal(run.first.templateAnims, 0);
-      assert.deepEqual(run.first.bulletAnims, [0, 0, 0]);
-      await quiet.context.close();
-    }
+    const quiet = await openPage(browser, KIOSK_PC, 'reduce');
+    const run = await stepSlides(quiet.page);
+    assert.deepEqual(run.first.words, [], 'the heading stays one text node');
+    assert.equal(run.first.templateAnims, 0);
+    assert.deepEqual(run.first.bulletAnims, [0, 0, 0]);
+    await quiet.context.close();
   } finally {
     await browser.close();
   }
 });
 
-test('in Chromium: the Pi profile runs only the splash pulse; a desktop runs the entrances', { skip }, async () => {
+test('in Chromium: reduced motion runs only the splash pulse; the kiosk runs the entrances', { skip }, async () => {
   const { chromium } = await import('playwright-core');
   const browser = await chromium.launch({ executablePath: CHROMIUM });
   try {
-    const low = await openPage(browser, PI_ZERO);
-    const lowRun = await walkAndCollect(low.page);
-    assert.equal(lowRun.cls.includes('motion-full'), false);
-    assert.deepEqual(lowRun.names.filter((n) => n !== 'journey-splash-pulse'), [], 'nothing moves on the Pi but the pulse');
+    const full = await openPage(browser, KIOSK_PC);
+    const fullRun = await walkAndCollect(full.page);
+    assert.match(fullRun.cls, /\bmotion-full\b/);
+    for (const name of ['jm-carry', 'jm-slam', 'jm-slam-hard', 'jm-card-in', 'jm-fly-in', 'jm-slam-soft']) {
+      assert.ok(fullRun.names.includes(name), `${name} runs on the kiosk (ran: ${fullRun.names.join(', ')})`);
+    }
+    await full.context.close();
+
+    const reduced = await openPage(browser, KIOSK_PC, 'reduce');
+    const reducedRun = await walkAndCollect(reduced.page);
+    assert.equal(reducedRun.cls.includes('motion-full'), false);
+    assert.deepEqual(reducedRun.names.filter((n) => n !== 'journey-splash-pulse'), [], 'nothing moves but the pulse');
     // Every element's computed animation, everywhere on the page.
-    const stray = await low.page.evaluate(() =>
+    const stray = await reduced.page.evaluate(() =>
       [...document.querySelectorAll('*')]
         .flatMap((el) => [el, '::before', '::after'].map((p) => (p === el ? getComputedStyle(el) : getComputedStyle(el, p))))
         .map((cs) => cs.animationName)
         .filter((n) => n !== 'none' && n !== 'journey-splash-pulse')
     );
     assert.deepEqual(stray, []);
-    await low.context.close();
-
-    const full = await openPage(browser, DESKTOP);
-    const fullRun = await walkAndCollect(full.page);
-    assert.match(fullRun.cls, /\bmotion-full\b/);
-    for (const name of ['jm-carry', 'jm-slam', 'jm-slam-hard', 'jm-card-in', 'jm-fly-in', 'jm-slam-soft']) {
-      assert.ok(fullRun.names.includes(name), `${name} runs on a desktop (ran: ${fullRun.names.join(', ')})`);
-    }
-    await full.context.close();
-
-    const reduced = await openPage(browser, DESKTOP, 'reduce');
-    const reducedRun = await walkAndCollect(reduced.page);
-    assert.equal(reducedRun.cls.includes('motion-full'), false);
-    assert.deepEqual(reducedRun.names.filter((n) => n !== 'journey-splash-pulse'), []);
     // And the stylesheet's own gate holds even if the class were there.
     const forced = await reduced.page.evaluate(() => {
       document.documentElement.classList.add('motion-full');
@@ -397,7 +383,7 @@ test('in Chromium: the old picture is hung on the band the whole way (flip both 
   const { chromium } = await import('playwright-core');
   const browser = await chromium.launch({ executablePath: CHROMIUM });
   try {
-    const { page, context } = await openPage(browser, DESKTOP);
+    const { page, context } = await openPage(browser, KIOSK_PC);
     const sample = async (bandSel, oldSel) => {
       const seen = [];
       for (const t of [0, 150, 300, 450, 600, 900]) {

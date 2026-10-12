@@ -12,15 +12,16 @@
    deep shade and a lavender tint. The one hot red-orange marks the one thing
    to press. Paytone One shouts, Londrina Solid labels, Figtree is read.
 
-   Built for a 2017 Pi Zero: flat fills and hard offsets only (no blur, no
-   filters, no gradients), and no new animation. The splash's single opacity
-   pulse (journey-splash-pulse, below) is still the only keyframe on the page.
+   The kit's flat look: flat fills and hard offsets only (no blur, no
+   filters, no gradients). Outside the motion block at the end of this sheet
+   the splash's single opacity pulse (journey-splash-pulse, below) is the
+   only keyframe on the page.
 
    --u is one hundredth of the width of the largest 16:9 box that fits the
    screen, which is the unit the approved mockup was drawn in, so a 1080p TV
    gets the mockup exactly. On a squarer screen it may grow by up to a
-   quarter into the spare height: the kiosk's HDMI safe mode is 640x480 (see
-   PI_SETUP.md), where the 16:9 box alone would leave the splash small in a
+   quarter into the spare height: on a 640x480 screen (an older TV in HDMI
+   safe mode) the 16:9 box alone would leave the splash small in a
    field of empty purple. Every size built on it has a rem floor, because the
    page is also opened on phones. */
 :root {
@@ -160,8 +161,7 @@ html.cursor-hidden * {
    instead of autoplaying; playback only starts once an operator presses
    the button, Space, or → (see schedule.js's isAwaitingPlay()). Flat
    colors, no blur/gradients/shadows beyond the button's, and the only
-   animation is a cheap opacity pulse — this still has to render smoothly
-   on a Raspberry Pi Zero. */
+   animation outside the motion block is a cheap opacity pulse. */
 #journey-splash {
   position: relative;
   width: 100%;
@@ -294,7 +294,7 @@ html.cursor-hidden * {
 /* The lesson's name, shouted: Paytone One in caps with the deep shade as a hard
    offset shadow (a flat second fill, painted once; never a blur). Capped at
    7vw so the longest name in the course (RESURRECTION, week 18) stays clear
-   of the left doodle cluster on the Pi's 4:3 screen; a 16:9 TV never
+   of the left doodle cluster on a 4:3 screen; a 16:9 TV never
    reaches the cap. The fit and the lift (see the top of this sheet) keep the
    caps as tall, and the gap under the kicker as tight, as the design was
    drawn with Galindo. */
@@ -468,23 +468,6 @@ html.cursor-hidden * {
   }
 }
 
-/* A note on the splash, where the operator is already looking at 6:30: the
-   lesson's video has not been converted for this kiosk yet, so it will be
-   streamed instead. Amber, because it is worth knowing and nothing is
-   broken. */
-#journey-splash-quality {
-  margin-top: 2vh;
-  max-width: min(52ch, 88vw);
-  padding: 0.6rem 0.9rem;
-  border-radius: 10px;
-  border-left: 4px solid var(--jr-sun);
-  background: var(--jr-deep);
-  color: #ffffff;
-  font-size: clamp(0.9rem, 1.5vw, 1.2rem);
-  line-height: 1.4;
-  text-align: left;
-}
-
 /* ── "Trek · Small Group Time" — club nights, 7:00-7:30 PM (25-trek.js).
    The splash's craft in Trek's colours: the club's deep teal field, its wave
    along the bottom, its corner tab (the splash's tab, in Trek's teal) naming
@@ -492,9 +475,8 @@ html.cursor-hidden * {
    when the church calendar names one. Top right, the kit's stepped chip in
    the club teal counts the Trek kids checked in tonight (hidden when no
    count is known). The corner buttons keep to their bottom-right column
-   (below), so the chip has the top-right to itself. Static on the Pi: flat
-   fills, hard offsets, no animation (the full profile's entrance is in the
-   motion block). No countdown, by the owner's brief. */
+   (below), so the chip has the top-right to itself. Flat fills, hard
+   offsets, no animation here (its entrance is in the motion block). No countdown, by the owner's brief. */
 #trek-view {
   background: #000000;
 }
@@ -686,7 +668,7 @@ html.cursor-hidden * {
   right: calc(max(3vw, 24px) + 48px + 16px);
   z-index: 9;
   /* A size smaller than Trek's: it shares the top edge with the splash's
-     wordmark, which it must clear on the Pi's 640x480. */
+     wordmark, which it must clear at 640x480. */
   font-size: clamp(0.8rem, 1.7 * var(--u), 2.2rem);
   background: var(--jr-art-chip-journey) left top / 100% 100% no-repeat;
 }
@@ -698,8 +680,8 @@ html.cursor-hidden * {
 /* Loading indicator — shown while a lesson video is fetching/buffering, so a
    slow start (especially a manual preview streaming a full-size original)
    reads as "working on it" rather than a dead black screen. Same cheap
-   opacity-pulse-only animation budget as the splash — no spinners with
-   transforms, this renders on a Pi Zero. */
+   opacity-pulse-only animation as the splash — no spinners with
+   transforms. */
 /* Deep ink, still see-through: when a video stalls mid-lesson its frozen
    frame stays faintly visible under the words, as it always did. */
 #journey-loading {
@@ -737,8 +719,8 @@ html.cursor-hidden * {
 
 /* Both floating controls sit at least one safe-area inset in from the true
    edge — consumer TVs fed over HDMI commonly crop several percent of each
-   edge ("overscan"), and PI_SETUP.md/README.md instruct enabling "HDMI Safe
-   Mode", which crops further still. A control flush against the literal
+   edge ("overscan"), and "HDMI Safe Mode" on an older TV crops further
+   still. A control flush against the literal
    edge can be cropped off-screen entirely. */
 /* Playback control bar: pause/play, sound, scrubber, elapsed time. Fades
    out together with the idle cursor (the same cursor-hidden class drives
@@ -921,14 +903,14 @@ html.cursor-hidden #video-controls:not(.force-visible) {
      frame the white text can lose contrast against it — the shadow keeps
      the letterforms readable without making the band opaque. A hard offset
      (the kit's only kind of shadow), not a blur: a cue changes every few
-     seconds, and a blurred shadow is the costliest text a Pi Zero paints. */
+     seconds, and a blurred shadow is the costliest text to paint. */
   text-shadow: 0.05em 0.05em 0 rgba(35, 31, 32, 0.85);
 }
 
 /* Settings → Captions → "Dark backdrop": a solid band instead of the
    translucent one, for a lesson whose frames are bright enough that even
    the shadowed white text loses contrast. Flat colour only — no blur or
-   gradient — like everything else on the Pi's paint budget. The deep ink
+   gradient — like everything else in the flat look. The deep ink
    holds white text at about 10:1. */
 #caption-overlay.caption-backdrop #caption-text {
   background-color: var(--jr-ink);
@@ -1106,7 +1088,7 @@ html.cursor-hidden #video-controls:not(.force-visible) {
 
 #unmute-btn::after {
   /* A text label survives a missing emoji font (not guaranteed present on
-     every Raspberry Pi OS image) where the glyph alone would render as a
+     every computer) where the glyph alone would render as a
      blank "tofu" box. */
   content: 'Sound off';
 }
@@ -1777,8 +1759,8 @@ html.configure-mode #settings-card {
    before its handler has done any work at all. On the kiosk's flaky
    connection some actions used to start with a (now-bounded) network wait,
    and a press that changes nothing for even half a second reads as "the
-   button is broken". Flat background swaps only, no transforms — Pi Zero
-   animation budget. `transition: none` makes the pressed state land on the
+   button is broken". Flat background swaps only, no transforms.
+   `transition: none` makes the pressed state land on the
    very next paint instead of easing in; the release still eases out via
    each control's own base transition. These sit at the end of the sheet so
    they win the cascade over the hover/focus rules above. */
@@ -1862,8 +1844,8 @@ html.configure-mode #settings-card {
    Journey, Advocates, the lesson's name, Large Group Time, one at a time
    over the video while it buffers (src/schedule/06-lesson-intro.js). Each
    card is a full-bleed flat field in the club's colours, opaque, so the one
-   on top is all that shows; the swap is instant. This is the Pi's version
-   too: no animation here (the full profile's entrances live in the motion
+   on top is all that shows; the swap is instant. This is the reduced-motion
+   version too: no animation here (the entrances live in the motion
    block), no blur, no gradients, hard offsets only. Over everything in the
    Journey layer (video, bar, captions, loading), under the corner buttons
    and Settings. A tap on it skips to the video. */
@@ -2150,8 +2132,7 @@ html.cursor-hidden #slide-controls {
 /* Settings → teaching-slide preferences (10-foot sized like the rest). */
 #settings-slides,
 #settings-captions,
-#settings-sync,
-#settings-quality {
+#settings-sync {
   margin-top: 1.5rem;
   padding-top: 1.25rem;
   border-top: 1px solid rgba(222, 213, 234, 0.25);
@@ -2163,8 +2144,7 @@ html.cursor-hidden #slide-controls {
 /* Section heads are Londrina kickers, as on the splash. */
 #settings-slides h3,
 #settings-captions h3,
-#settings-sync h3,
-#settings-quality h3 {
+#settings-sync h3 {
   font-family: var(--jr-font-label);
   font-size: 1.7rem;
   font-weight: 400;
@@ -2172,85 +2152,6 @@ html.cursor-hidden #slide-controls {
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--jr-tint);
-}
-
-/* Settings -> Pi mode: one switch row. Flat colours only, no transitions, no
-   keyframes: the low profile paints this panel too. */
-#pi-mode-switch {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  width: 100%;
-  min-height: 72px;
-  padding: 0.6rem 1rem;
-  border: 2px solid rgba(222, 213, 234, 0.5);
-  border-radius: 16px;
-  background: none;
-  color: #ffffff;
-  text-align: left;
-  cursor: pointer;
-}
-
-.pi-mode-track {
-  flex: none;
-  position: relative;
-  width: 76px;
-  height: 40px;
-  border: 2px solid rgba(222, 213, 234, 0.6);
-  border-radius: 999px;
-}
-
-.pi-mode-knob {
-  position: absolute;
-  top: 4px;
-  left: 4px;
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  background: #ffffff;
-}
-
-#pi-mode-switch[aria-checked='true'] .pi-mode-track {
-  background: var(--jr-tint);
-  border-color: var(--jr-tint);
-}
-
-#pi-mode-switch[aria-checked='true'] .pi-mode-knob {
-  left: 40px;
-  background: var(--jr-ink);
-}
-
-.pi-mode-label {
-  display: block;
-  font-family: var(--jr-font-label);
-  font-size: 1.5rem;
-  letter-spacing: 0.04em;
-}
-
-.pi-mode-sub {
-  display: block;
-  font-size: 1.05rem;
-  opacity: 0.85;
-}
-
-#pi-mode-switch:hover,
-#pi-mode-switch:focus-visible {
-  border-color: #ffffff;
-}
-
-#pi-mode-switch:active {
-  opacity: 0.8;
-}
-
-#quality-auto {
-  min-height: 44px;
-  padding: 0.2em 0.4em;
-  border: 0;
-  background: none;
-  color: var(--jr-tint);
-  font: inherit;
-  text-decoration: underline;
-  cursor: pointer;
 }
 
 /* Pill buttons (Settings -> Sync sign in/out), sized for the same
@@ -2279,7 +2180,6 @@ html.cursor-hidden #slide-controls {
   opacity: 0.8;
 }
 
-#quality-status:empty,
 #sync-status:empty {
   display: none;
 }
@@ -2569,16 +2469,14 @@ html.cursor-hidden #slide-controls {
   }
 }
 
-/* ── Motion: full profile only (owner 2026-10-12) ─────────────────────
-   Bold motion graphics for a Mac, a PC or a phone opened on the page:
-   punchy wipes, type that slams in, colour sweeps in the club purple. The
-   Pi ('low' profile) never sees any of it: every rule below is scoped to
-   html.motion-full, which schedule.js (24-motion.js) sets ONLY on the full
-   profile, outside configure mode, and when the OS does not ask for reduced
-   motion; the whole block also sits inside a no-preference media query.
-   So a low-profile page matches none of these rules and keeps its one
-   keyframe (journey-splash-pulse) and its paint budget (test-pinned:
-   brand-kit.test.mjs, motion.test.mjs).
+/* ── Motion (owner 2026-10-12) ─────────────────────────────────────────
+   Bold motion graphics: punchy wipes, type that slams in, colour sweeps in
+   the club purple. Every rule below is scoped to html.motion-full, which
+   schedule.js (24-motion.js) sets outside configure mode when the OS does
+   not ask for reduced motion; the whole block also sits inside a
+   no-preference media query. So a reduced-motion page matches none of
+   these rules and keeps its one keyframe (journey-splash-pulse) and the
+   flat look (test-pinned: brand-kit.test.mjs, motion.test.mjs).
    Rules of the block: only transform, opacity and clip-path move; entrances
    only (closing is instant); keyframes give only the FROM side (and any
    overshoot), so the last frame is always the element's own resting style

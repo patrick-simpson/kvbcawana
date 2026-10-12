@@ -18,10 +18,10 @@
    it (cancelLessonIntro()). Space, →, Enter or a tap on it skips to the
    video.
 
-   The same cards on every device. Full profile: bold entrances and a band
+   The same cards on every device. With motion: bold entrances and a band
    that carries the last card off into the video (style.css motion block,
-   24-motion.js carryIntroOff()). Low profile (the Pi) and reduced motion:
-   instant swaps, nothing animated, the paint budget untouched. While it is
+   24-motion.js carryIntroOff()). Reduced motion: instant swaps, nothing
+   animated. While it is
    up the video element is shown (under the cards), so the count chip, the
    reload check and the Trek poll all read it as the lesson it is.
 
@@ -29,7 +29,7 @@
    window.journeyIntroTiming (read at each start). */
 const LESSON_INTRO = {
   cardsAt: [0, 1100, 2200, 3600], // Journey, Advocates, lesson, Large Group Time
-  minMs: 4600, // the last card's earliest end (the full profile's carry adds ~0.8s)
+  minMs: 4600, // the last card's earliest end (the motion's carry adds ~0.8s)
   holdMaxMs: 15000, // then the video starts whether it is ready or not
   pollMs: 250,
   aheadS: 8, // seconds buffered past the playhead that count as "ready"
@@ -77,7 +77,7 @@ function lessonIntroVideoReady(aheadS = lessonIntroTiming().aheadS) {
 
 function showLessonIntroCard(index) {
   // The new card on top, the one before it left under it (its entrance wipes
-  // over it on the full profile); anything older goes.
+  // over it with motion on); anything older goes.
   lessonIntroCards.forEach((card, i) => card.classList.toggle('hidden', i > index || i < index - 1));
   if (lessonIntro) lessonIntro.card = index;
 }
@@ -176,7 +176,7 @@ function lessonIntroStep(intro) {
   intro.timers.push(setTimeout(() => lessonIntroCheck(intro), intro.timing.pollMs));
 }
 
-// The cards go and the video starts: on the full profile the last card is
+// The cards go and the video starts: with motion on, the last card is
 // carried off first (the video, still paused, is what the band uncovers;
 // motion is never laid over a playing video).
 function finishLessonIntro(intro, { instant = false } = {}) {

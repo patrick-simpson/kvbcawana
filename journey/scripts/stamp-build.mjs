@@ -17,7 +17,7 @@
  * Point 3 is what makes a reload actually pick up new code: GitHub Pages
  * serves every asset with max-age=600, and Chromium will happily reuse a
  * still-fresh subresource from disk across a reload (this is the ten-minute
- * trap PI_SETUP.md warns about). A changed query string is a different URL,
+ * trap). A changed query string is a different URL,
  * so the new page pulls new assets immediately.
  *
  * Point 4 is the same promise one level down. The fonts are not named in
@@ -25,7 +25,7 @@
  * would leave a new @font-face rule free to pair with an old font still fresh
  * in the disk cache. Each font URL is versioned by its OWN content hash, not
  * the build id, so a deploy that did not touch the fonts does not make a
- * 512MB Pi fetch them again, and one that did can never render with the old
+ * kiosk fetch them again, and one that did can never render with the old
  * bytes.
  *
  * The committed files keep plain paths and content="dev": only the deployed

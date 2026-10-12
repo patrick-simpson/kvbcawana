@@ -5,14 +5,14 @@
    Display repo's worker/). This kiosk signs in to it with the church
    passphrase from Settings, and then its ROOM settings follow every other
    Journey screen: captions on/off, caption size and backdrop, the teaching
-   slides' auto-advance and extras, and tonight's edited bullets. Video
-   quality and the leader prep transcript choice stay on this device, because
-   they depend on the device and on the leader.
+   slides' auto-advance and extras, and tonight's edited bullets. The leader
+   prep transcript choice stays on this device, because it depends on the
+   leader.
 
    - The sign-in lives in the SAME localStorage slots the lobby signage uses
      (this page and the embedded Check-in Display share an origin), so signing
      in here also sets the embedded lobby screen up, and the other way round.
-   - Light on purpose (the kiosk is a Pi Zero): one fetch at start, one every
+   - Light on purpose: one fetch at start, one every
      ten minutes and on reconnect, and one PUT a second after a room setting
      changes here. No socket of its own.
    - Until the display site's shared/sync.json names a service, the Settings
@@ -22,8 +22,8 @@
      protocol dance is the family's one copy, lobby/shared/sync-protocol.js, and
      the derivation lobby/shared/cloud-crypto.js: both are loaded as ES modules
      at sign-in from src/shared/ (copied by scripts/family-assets.mjs, never
-     edited). The derivation is 600000 PBKDF2 rounds, a few seconds ONCE on a Pi
-     Zero, off the page's thread; nothing re-derives afterwards (every later
+     edited). The derivation is 600000 PBKDF2 rounds, about a second ONCE, off
+     the page's thread; nothing re-derives afterwards (every later
      request rides the session). */
 
 (function () {

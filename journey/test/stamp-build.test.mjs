@@ -113,7 +113,7 @@ test('every font URL carries the hash of the very bytes it names', () => {
     assert.equal(query, `v=${shortHash(file)}`, `${rel} is versioned by its own content`);
   }
   // The build id is not what versions a font: a deploy that leaves the fonts
-  // alone must not make the Pi fetch them again.
+  // alone must not make the kiosk fetch them again.
   assert.equal(fontsCss.includes('ccc333'), false);
   rmSync(dir, { recursive: true, force: true });
 });

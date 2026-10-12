@@ -64,7 +64,6 @@ const journeySplashResumeBtn = document.getElementById('journey-splash-resume-bt
 const journeySplashResumeLabel = document.getElementById('journey-splash-resume-label');
 const journeySplashStartOverBtn = document.getElementById('journey-splash-startover-btn');
 const journeySplashSlidesBtn = document.getElementById('journey-splash-slides-btn');
-const journeySplashQuality = document.getElementById('journey-splash-quality');
 const journeyVideo = document.getElementById('journey-video');
 const journeyLoading = document.getElementById('journey-loading');
 const journeyLoadingNote = document.getElementById('journey-loading-note');
@@ -137,10 +136,6 @@ const notesEditGroups = document.getElementById('notes-edit-groups');
 const notesEditStatus = document.getElementById('notes-edit-status');
 const notesEditedBadge = document.getElementById('notes-edited-badge');
 const notesResetBtn = document.getElementById('notes-reset-btn');
-const piModeSwitch = document.getElementById('pi-mode-switch');
-const qualityAutoNote = document.getElementById('quality-auto-note');
-const qualityAutoBtn = document.getElementById('quality-auto');
-const qualityStatus = document.getElementById('quality-status');
 const trekView = document.getElementById('trek-view');
 const trekChip = document.getElementById('trek-chip');
 const trekChipCount = document.getElementById('trek-chip-count');
@@ -155,107 +150,12 @@ const journeyChipCount = document.getElementById('journey-chip-count');
 // club-night rule itself has loaded: until then no night is a club night.
 const trekNight = { ready: false, rule: null, schedule: null, feed: null };
 
-/* ── Device profile: what this particular screen can cope with ────────
-   This page runs in two very different places. The kiosk is a 2017
-   Raspberry Pi Zero (single-core ARMv6) that cannot decode Awana's 1080p
-   originals at a watchable frame rate, and wants the embedded Check-in
-   Display's animations turned down. The same URL is also opened on a Mac,
-   a laptop or a phone, where the converted 480p copies are a needless
-   downgrade of a lesson projected to a room.
-
-   So the page asks what it is running on, once, and everything quality
-   related reads the answer: the iframe's ?lowPower=1 flag, which file the
-   scheduled show and the picker play, and which bytes cacheLessonBundle()
-   pre-downloads.
-
-   'low' is the historical behavior, unchanged in every detail: a device
-   that detects low, or is set to Low power by hand, does exactly what the
-   kiosk did before this existed.
-
-   detectDeviceProfile() is pure (it takes the two navigator readings) so
-   the UA table below can be tested without a browser:
-   - Linux on ARM is a Raspberry Pi, every model this could run on.
-   - Phones and tablets stream on cell data onto a small screen, where the
-     480p copy is the right trade rather than a compromise.
-   - Two cores or fewer is a weak machine whatever it calls itself. */
-const PLAYBACK_QUALITY_KEY = 'journey.playback.quality';
-const PLAYBACK_QUALITY_CHOICES = ['auto', 'full', 'low'];
-
-function detectDeviceProfile(userAgent, hardwareConcurrency) {
-  const ua = String(userAgent || '');
-  if (/\b(armv6l|armv7l|aarch64)\b/.test(ua)) return 'low';
-  if (/Android|Mobile|iPhone|iPad/.test(ua)) return 'low';
-  const cores = Number(hardwareConcurrency);
-  if (Number.isFinite(cores) && cores > 0 && cores <= 2) return 'low';
-  return 'full';
-}
-
-// The one place navigator is read.
-const detectedProfile = detectDeviceProfile(
-  navigator.userAgent,
-  navigator.hardwareConcurrency
-);
-
-// Per-device override, wrapped like every other preference here: kiosk
-// Chromium can throw on localStorage rather than returning null.
-function storedPlaybackQuality() {
-  try {
-    const v = localStorage.getItem(PLAYBACK_QUALITY_KEY);
-    return PLAYBACK_QUALITY_CHOICES.includes(v) ? v : 'auto';
-  } catch {
-    return 'auto';
-  }
-}
-
-// Returns whether the choice was actually stored, because a write that failed has
-// to be said out loud rather than reported as saved, like the bullet editor.
-function storePlaybackQuality(choice) {
-  try {
-    localStorage.setItem(PLAYBACK_QUALITY_KEY, choice);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-// Cached for the page's lifetime: this is read on every video pick and a
-// localStorage hit per pick is pointless. chooseQuality() clears it, which
-// is the only way the answer can change without a reload.
-let profileCache = null;
-
-function effectiveProfile() {
-  if (profileCache) return profileCache;
-  const choice = storedPlaybackQuality();
-  profileCache = choice === 'auto' ? detectedProfile : choice;
-  return profileCache;
-}
-
 /* ── The embedded Check-in Display ────────────────────────────────────
-   ?lowPower=1 is that app's own flag for "this screen is weak": it forces
-   confetti off and zero animation for THIS embed only, without touching
-   what its other, standalone signage devices default to. So the flag is
-   the low profile's, and a full-quality device gets the plain URL.
-   index.html ships the low-power URL as the static src, so a browser with
-   JavaScript disabled still shows something. */
-// The one site (awana.kvbchurch.org) serves both, so the display is this
-// page's own origin, at /lobby/.
+   index.html loads it at ../lobby/ (plain URL, full motion: the lobby's own
+   ?lowPower=1 flag is not used here). The one site (awana.kvbchurch.org)
+   serves both, so the display is this page's own origin. */
 const CHECKIN_DISPLAY_ORIGIN = window.location.origin;
 const CHECKIN_DISPLAY_URL = new URL('../lobby/', window.location.href).href;
-
-function checkinDisplayUrl(profile) {
-  return profile === 'low' ? `${CHECKIN_DISPLAY_URL}?lowPower=1` : CHECKIN_DISPLAY_URL;
-}
-
-// Only written when it differs: assigning the same src still reloads the
-// iframe in Chromium, which would drop the display's live check-in socket
-// for no reason at all.
-function applyCheckinDisplayUrl() {
-  if (!checkinFrame || CONFIGURE_MODE) return;
-  const wanted = checkinDisplayUrl(effectiveProfile());
-  if (checkinFrame.getAttribute('src') !== wanted) checkinFrame.src = wanted;
-}
-
-applyCheckinDisplayUrl();
 
 let currentLesson = null;
 // public/lessons.json's whole lesson list, once loaded (see loadAllLessons at
@@ -401,17 +301,8 @@ function sameLesson(a, b) {
   return !!a && !!b && a.week === b.week && a.downloadUrl === b.downloadUrl;
 }
 
-/* The nightly transcode reuses ONE filename (current-lesson-video.mp4), so
-   when the lesson changes, this week's bytes and last week's live at the same
-   URL — and a kiosk refreshing hourly essentially never witnesses the brief
-   pre-transcode state (downloadUrl = the per-week CloudFront original) whose
-   URL change used to be what flushed the cache. Keying the cached video by
-   transcodedAt (which uniquely identifies each transcode run) instead of by
-   URL alone is what keeps a cached lesson from surviving its own replacement.
-   The fetch itself still goes to the real URL — only the cache key carries
-   the version. */
-/* Awana's own full-size file for this lesson, which is what a full-quality
-   device plays. current-lesson.json's sourceUrl is the CORS-friendly CDN URL
+/* Awana's own full-size file for this lesson, which is what the kiosk
+   plays. current-lesson.json's sourceUrl is the CORS-friendly CDN URL
    the nightly script already resolved (see CLAUDE.md), so it is both
    playable and fetchable into the Cache API; lessons.json's downloadUrl for
    the same week is the fallback when a lesson file predates that field.
@@ -427,26 +318,18 @@ function originalVideoUrl(lesson) {
   return typeof lesson.downloadUrl === 'string' ? lesson.downloadUrl : null;
 }
 
-/* The two qualities are stored under keys that can never collide, so a device
-   that switches profiles can never be served the other quality's bytes:
-
-   low   the historical key exactly: downloadUrl, plus the transcode's own
-         version once there is one. A Pi that already has this week stored
-         keeps it.
-   full  the original's URL plus a quality marker.
+/* The cached original is stored under its URL plus a quality marker, so
+   it can never be mistaken for a 480p copy stored under the bare URL by an
+   older version of this page (store-before-evict drops that one on the next
+   full round).
 
    The marker is a query parameter rather than a '#1080' fragment because the
    Cache API ignores fragments when it matches a request, so a fragment would
    silently be the same key as the plain URL. */
-function videoCacheKey(lesson, profile = effectiveProfile()) {
-  if (profile === 'full') {
-    const url = originalVideoUrl(lesson);
-    if (!url) return null;
-    return `${url}${url.includes('?') ? '&' : '?'}q=1080`;
-  }
-  if (!lesson.transcodedAt) return lesson.downloadUrl;
-  const sep = lesson.downloadUrl.includes('?') ? '&' : '?';
-  return `${lesson.downloadUrl}${sep}v=${encodeURIComponent(lesson.transcodedAt)}`;
+function videoCacheKey(lesson) {
+  const url = originalVideoUrl(lesson);
+  if (!url) return null;
+  return `${url}${url.includes('?') ? '&' : '?'}q=1080`;
 }
 
 /* Pre-download everything the current week's show and picker can need — the
@@ -457,32 +340,20 @@ function videoCacheKey(lesson, profile = effectiveProfile()) {
    piece of the new one is safely stored — a mid-download failure can never
    leave the cache emptier than it started (the invariant the old
    cacheLessonVideo() kept for the video alone, extended to the bundle). */
-/* Which video file the bundle should pre-download for this device, if any.
-
-   low   Only the transcoded file is worth caching. Before the nightly
-         transcode lands, downloadUrl is still the 1080p original: bytes this
-         device cannot play, which would eat the bundle's budget and then be
-         served straight back by resolveVideoSrc.
-   full  Awana's original, under the quality-marked key, so the 480p entry is
-         never mistaken for it. Marked optional: the original is a cross-origin
-         fetch, and if it is ever served without CORS headers there is nothing
-         this page can do about it. That must cost the lesson's video and
-         nothing else, not hold up the eviction of last week's bundle. */
+/* The video file the bundle pre-downloads: Awana's original, under the
+   quality-marked key. Marked optional: the original is a cross-origin fetch,
+   and if it is ever served without CORS headers there is nothing this page
+   can do about it. That must cost the lesson's video and nothing else, not
+   hold up the eviction of last week's bundle. */
 function lessonVideoCandidates(lesson) {
-  if (effectiveProfile() === 'full') {
-    const url = originalVideoUrl(lesson);
-    const cacheKey = videoCacheKey(lesson, 'full');
-    return url && cacheKey ? [{ fetchUrl: url, cacheKey, optional: true }] : [];
-  }
-  return lesson.transcodedAt
-    ? [{ fetchUrl: lesson.downloadUrl, cacheKey: videoCacheKey(lesson, 'low') }]
-    : [];
+  const url = originalVideoUrl(lesson);
+  const cacheKey = videoCacheKey(lesson);
+  return url && cacheKey ? [{ fetchUrl: url, cacheKey, optional: true }] : [];
 }
 
 let bundleInFlight = false;
 let bundleInFlightSince = 0;
-// A file of the bundle (the video is the big one, up to 25 MiB on a slow
-// connection) must finish within this, headers AND body, or it is given up
+// A file of the bundle (the video is the big one) must finish within this, headers AND body, or it is given up
 // for this round and tried again on the next refresh.
 const BUNDLE_FILE_MS = 3 * 60 * 1000;
 // The latch itself is never trusted past this: a round that somehow never
@@ -493,7 +364,7 @@ async function cacheLessonBundle(lesson) {
   if (!('caches' in window)) return;
   // Startup, the hourly timer, and the 'online' listener can all fire close
   // together — without this, each would re-download the same multi-MB video
-  // in parallel on a single-core Pi. Whatever a skipped call would have
+  // in parallel. Whatever a skipped call would have
   // stored, the next refresh's call picks up (skip-if-cached is per item).
   if (bundleInFlight && Date.now() - bundleInFlightSince < BUNDLE_LATCH_MAX_MS) return;
   if (bundleInFlight) console.warn('Journey: a lesson bundle download has been stuck for 15 minutes; starting over');
@@ -567,12 +438,11 @@ async function cacheLessonBundle(lesson) {
 }
 
 /* ── Stream first, play the cached copy only when streaming cannot ────
-   The Pi plays a picker video streamed over plain HTTP smoothly, and
-   stutters badly on the SAME encode served to the <video> element as a blob
-   URL out of the Cache API (owner report, 2026-09-16, from the live kiosk;
-   both files verified as identical encodes, 854x480 Baseline 3.1, 23.976
-   fps, same frame count). The blob path is the only variable, so a device
-   with a working connection now streams, exactly the way the picker always
+   The old kiosk computer played a picker video streamed over plain HTTP
+   smoothly, and stuttered badly on the SAME encode served to the <video>
+   element as a blob URL out of the Cache API (owner report, 2026-09-16, from
+   the live kiosk; both files verified as identical encodes). The blob path
+   was the only variable, so a device with a working connection streams, exactly the way the picker always
    has, and the cache goes back to being what it is good at: the safety net
    for an evening with no internet.
 
@@ -624,32 +494,15 @@ async function blobUrlFromCacheHit(cached, token) {
    has bumped the token while the probe or the cache read was in flight, this
    returns null WITHOUT committing anything, so a stale resolve can neither
    clobber currentObjectUrl nor strand a multi-megabyte blob URL that nothing
-   will ever revoke (on a 512MB Pi that leak would sit resident until the
-   next show). Callers must bail on null. */
+   will ever revoke (that leak would sit resident until the next show). Callers must bail on null. */
 async function resolveVideoSrc(lesson, token) {
-  // Which quality this device plays, decided once here so the cache lookup
-  // and the live URL can never disagree about it.
-  const profile = effectiveProfile();
-  const liveUrl = profile === 'full' ? originalVideoUrl(lesson) : lesson.downloadUrl;
-  const cacheKey = videoCacheKey(lesson, profile);
+  const liveUrl = originalVideoUrl(lesson);
+  const key = videoCacheKey(lesson);
   streamSwapCandidate = null;
   if ('caches' in window) {
     try {
       const cache = await caches.open(VIDEO_CACHE_NAME);
-      // Migration fallback: kiosks that cached this week's video before the
-      // key was versioned hold it under the bare downloadUrl. That copy can
-      // only be a same-URL fetch (at worst exactly the staleness the old code
-      // always had), so it is strictly better than falling through to the
-      // network on a dead evening connection. The bundle prefetch stores
-      // under the versioned key and then evicts the legacy entry, so this
-      // heals itself after one online refresh. Low profile only: on full that
-      // bare key holds the 480p copy, which is the other quality's bytes.
-      let key = cacheKey;
-      let cached = cacheKey ? await cache.match(cacheKey) : null;
-      if (!cached && profile === 'low') {
-        key = lesson.downloadUrl;
-        cached = await cache.match(key);
-      }
+      const cached = key ? await cache.match(key) : null;
       if (cached) {
         // There are bytes on disk, so this is the one decision worth a probe:
         // stream them from the server if it can answer, and keep the disk
@@ -738,10 +591,10 @@ async function swapToCachedCopy() {
    it (cancelLessonIntro()). Space, →, Enter or a tap on it skips to the
    video.
 
-   The same cards on every device. Full profile: bold entrances and a band
+   The same cards on every device. With motion: bold entrances and a band
    that carries the last card off into the video (style.css motion block,
-   24-motion.js carryIntroOff()). Low profile (the Pi) and reduced motion:
-   instant swaps, nothing animated, the paint budget untouched. While it is
+   24-motion.js carryIntroOff()). Reduced motion: instant swaps, nothing
+   animated. While it is
    up the video element is shown (under the cards), so the count chip, the
    reload check and the Trek poll all read it as the lesson it is.
 
@@ -749,7 +602,7 @@ async function swapToCachedCopy() {
    window.journeyIntroTiming (read at each start). */
 const LESSON_INTRO = {
   cardsAt: [0, 1100, 2200, 3600], // Journey, Advocates, lesson, Large Group Time
-  minMs: 4600, // the last card's earliest end (the full profile's carry adds ~0.8s)
+  minMs: 4600, // the last card's earliest end (the motion's carry adds ~0.8s)
   holdMaxMs: 15000, // then the video starts whether it is ready or not
   pollMs: 250,
   aheadS: 8, // seconds buffered past the playhead that count as "ready"
@@ -797,7 +650,7 @@ function lessonIntroVideoReady(aheadS = lessonIntroTiming().aheadS) {
 
 function showLessonIntroCard(index) {
   // The new card on top, the one before it left under it (its entrance wipes
-  // over it on the full profile); anything older goes.
+  // over it with motion on); anything older goes.
   lessonIntroCards.forEach((card, i) => card.classList.toggle('hidden', i > index || i < index - 1));
   if (lessonIntro) lessonIntro.card = index;
 }
@@ -896,7 +749,7 @@ function lessonIntroStep(intro) {
   intro.timers.push(setTimeout(() => lessonIntroCheck(intro), intro.timing.pollMs));
 }
 
-// The cards go and the video starts: on the full profile the last card is
+// The cards go and the video starts: with motion on, the last card is
 // carried off first (the video, still paused, is what the band uncovers;
 // motion is never laid over a playing video).
 function finishLessonIntro(intro, { instant = false } = {}) {
@@ -964,7 +817,7 @@ if (lessonIntroEl) {
   });
 }
 /* ── Resume an interrupted lesson ─────────────────────────────────────
-   A Pi brownout, an accidental hard refresh, or a stray press of the ⇄
+   A power cut, an accidental hard refresh, or a stray press of the ⇄
    button used to cost the room the whole lesson so far: playCurrentLesson()
    always attaches a fresh src and never seeks, and stopJourneyContent()
    detaches it, so every restart began again at 0:00. The scheduled show now
@@ -1157,7 +1010,6 @@ async function showJourneyContent() {
   // Every real lesson name is one word of at most 12 letters; anything longer
   // is a fallback title and gets the smaller size (see style.css).
   journeySplashTitle.classList.toggle('is-long', splashText.headline.length > 14);
-  showQualityNote(currentLesson);
   // Decided from localStorage alone — no fetch stands between the splash
   // appearing and the operator seeing which buttons it offers.
   offerResume(currentLesson);
@@ -1167,49 +1019,6 @@ async function showJourneyContent() {
 // Actually starts the queued lesson playing — called only from a genuine
 // user action (keypress or the on-screen button), which is also what makes
 // unmuted autoplay reliable (see audioUnlocked below).
-// Which file the SCHEDULED 6:30 show should play.
-//
-// `downloadUrl` is the transcoded, same-origin 480p file ONLY once the nightly
-// transcode has succeeded; fetch-current-lesson.mjs resets it back to the
-// 1080p `sourceUrl` (and transcodedAt to null) every time the lesson genuinely
-// changes. The Pi Zero provably cannot decode that original at a watchable
-// frame rate, and transcode-lesson-video.mjs is deliberately built to never
-// fail the nightly job — so a silent transcode failure used to leave the room
-// watching a slideshow of stutters with nothing on screen to explain it.
-//
-// So the scheduled show never plays the original. When there is no transcode
-// yet it uses that week's batch-transcoded Release asset instead, which is the
-// same 854x480 Baseline encode the picker already relies on. That streams
-// rather than playing from the cache (the Release's redirect hop sends no CORS
-// header, so its bytes can never be stored — see CLAUDE.md), which is a real
-// cost on a flaky evening, but a streamed 480p file is watchable and a cached
-// 1080p one is not.
-//
-// All of that is a LOW-profile rule, and so is the splash note below it: a
-// full-quality device plays Awana's original whether or not the kiosk's
-// nightly transcode has run, so there is nothing degraded to warn about.
-function scheduledVideoPlan(lesson) {
-  if (!lesson) return null;
-  if (effectiveProfile() === 'full') return { mode: 'original' };
-  if (lesson.transcodedAt) return { mode: 'transcoded' };
-  return { mode: 'release', url: transcodedPreviewUrl(lesson.week, 'student') };
-}
-
-// The splash says so BEFORE anyone presses play, because the operator can act
-// on it (pick the week by hand, or accept a stream) only if they know. Only
-// ever shown on the low profile, where a missing transcode really does mean a
-// streamed, lower-quality copy.
-function showQualityNote(lesson) {
-  const plan = scheduledVideoPlan(lesson);
-  const degraded = !!plan && plan.mode === 'release';
-  if (degraded) {
-    journeySplashQuality.textContent =
-      "This week's video has not been converted for the kiosk yet, so it will stream the " +
-      'standard-quality copy instead. It needs the internet to play, and may pause to buffer.';
-  }
-  journeySplashQuality.classList.toggle('hidden', !degraded);
-}
-
 // `withIntro`: the splash's plain Begin (beginScheduledPlay); the lesson intro
 // (06-lesson-intro.js) covers the first seconds while the video, attached at
 // once, buffers underneath, and starts it when it is ready.
@@ -1229,11 +1038,8 @@ async function playCurrentLesson(resumeAt = 0, withIntro = false) {
   }
   journeyVideo.loop = false; // plays once; falls back to Check-in Display on 'ended' below
   setMuted(!audioUnlocked);
-  const plan = scheduledVideoPlan(currentLesson);
-  const src =
-    plan && plan.mode === 'release'
-      ? plan.url // no transcode yet: the Release copy, never the 1080p original
-      : await resolveVideoSrc(currentLesson, token); // this device's quality, cache first
+  // Awana's original: streamed when the network answers, else the cached copy.
+  const src = await resolveVideoSrc(currentLesson, token);
   if (!src || token !== journeyRequestToken) {
     // Nothing to play after all: what the room would have seen without the
     // intro (the loading overlay and its stall note).
@@ -1387,7 +1193,7 @@ async function captionsAvailable(url) {
    stale caller can simply discard (revoke) the result; requestPlayback()
    commits the blob URL to captionObjectUrl only after confirming it is still
    the current request. VTTs are ~10-20KB, so none of this holds meaningful
-   memory on the Pi. */
+   memory. */
 let captionObjectUrl = null;
 async function cachedCaptionBlobUrl(url) {
   if (!('caches' in window)) return null;
@@ -1538,53 +1344,6 @@ syncCaptionPrefInputs();
 applyCaptionDisplayPrefs();
 captionsSizeSelect.addEventListener('change', storeCaptionDisplayPrefs);
 captionsBackdropInput.addEventListener('change', storeCaptionDisplayPrefs);
-
-/* ── Settings: Pi mode ────────────────────────────────────────────────
-   One switch. On = the low profile (what the kiosk Raspberry Pi needs),
-   off = the full profile. With nothing saved the switch shows what detection
-   picked and a line says so; flipping it saves an explicit 'low'/'full', and
-   a "Use automatic" button (only shown while a choice is saved) writes
-   'auto' again. A change applies at once: the embedded display's flag is
-   swapped now, and the next video pick reads the new profile.
-
-   Like the caption size, the change is applied in memory whether or not the
-   write succeeded, and a failed write says so instead of claiming it saved:
-   nothing else on the page would tell the operator that the choice will be
-   gone after a reload. */
-function qualityWords(profile) {
-  return profile === 'full' ? 'full quality' : 'low power';
-}
-
-function syncQualityButtons() {
-  const choice = storedPlaybackQuality();
-  piModeSwitch.setAttribute('aria-checked', String(effectiveProfile() === 'low'));
-  qualityAutoNote.textContent =
-    choice === 'auto'
-      ? `Automatic: this computer looks like ${detectedProfile === 'low' ? 'a Pi' : 'a regular computer'}.`
-      : 'Chosen by hand on this computer.';
-  qualityAutoBtn.classList.toggle('hidden', choice === 'auto');
-}
-
-function chooseQuality(choice) {
-  if (!PLAYBACK_QUALITY_CHOICES.includes(choice)) return;
-  const stored = storePlaybackQuality(choice);
-  // Applied from the choice itself, not read back from storage, so the
-  // switch still does something on a device where the write just failed.
-  profileCache = choice === 'auto' ? detectedProfile : choice;
-  applyCheckinDisplayUrl();
-  applyMotionProfile();
-  syncQualityButtons();
-  qualityStatus.textContent = stored
-    ? `Using ${qualityWords(effectiveProfile())} on this device.`
-    : `Using ${qualityWords(effectiveProfile())} now, but this kiosk’s browser won’t ` +
-      'store settings, so it goes back to Automatic when the page reloads.';
-}
-
-syncQualityButtons();
-piModeSwitch.addEventListener('click', () => {
-  chooseQuality(piModeSwitch.getAttribute('aria-checked') === 'true' ? 'full' : 'low');
-});
-qualityAutoBtn.addEventListener('click', () => chooseQuality('auto'));
 
 function applyCaptions() {
   removeCaptionTracks();
@@ -1826,7 +1585,7 @@ function togglePause() {
    otherwise left dragging a finger-sized scrubber on a projected screen and
    overshooting; a fixed jump is the control that actually gets used mid-
    teaching. Purely local seeking on an already-attached source — no fetch,
-   nothing to await — so it costs the Pi one decoder re-seek and nothing else.
+   nothing to await — so it costs one decoder re-seek and nothing else.
    Clamped a quarter-second shy of the end so "skip" can never trip the
    'ended' handoff by accident: → is the deliberate way on to the slides. */
 const SEEK_STEP_S = 15;
@@ -1859,7 +1618,7 @@ journeyVideo.addEventListener('click', togglePause);
 pauseBtn.addEventListener('click', togglePause);
 
 /* Dragging only moves the readout; the one seek happens on release. Seeking on
-   every input event made the Pi's decoder re-seek dozens of times a second. */
+   every input event made the decoder re-seek dozens of times a second. */
 videoScrubber.addEventListener('input', () => {
   scrubbing = true;
   const t = Number(videoScrubber.value);
@@ -1885,8 +1644,8 @@ function stopJourneyContent() {
   stopTeachingSlides();
   journeyVideo.pause();
   // Release the cached video's blob URL and detach the element while the
-  // Journey view isn't showing — on a 512MB Pi Zero, a ~100-200MB decoded
-  // blob has no business staying resident for the other 23 hours of the day.
+  // Journey view isn't showing — a ~100-200MB decoded blob has no business
+  // staying resident for the other 23 hours of the day.
   // It costs one cheap Cache API read to reconstruct at the next 6:30 PM.
   journeyVideo.removeAttribute('src');
   journeyVideo.load();
@@ -2202,7 +1961,7 @@ document.addEventListener('keydown', (e) => {
      panel or the handout overlay open, never while typing. ArrowLeft is
      deliberately left alone — it means "previous slide" once the teaching
      slides are up — and ArrowRight stays the handoff to those slides.
-     Repeats are ignored: a held key would queue seeks faster than the Pi's
+     Repeats are ignored: a held key would queue seeks faster than the
      decoder can serve them. */
   if (e.code === 'Comma' || e.code === 'Period' || e.code === 'BracketLeft' || e.code === 'BracketRight') {
     if (
@@ -2286,15 +2045,15 @@ document.addEventListener('keydown', (e) => {
 });
 
 /* ── Keep the kiosk screen awake ─────────────────────────────────────
-   Raspberry Pi OS ships with screen blanking enabled by default; with no
+   Operating systems blank the screen by default; with no
    keyboard/mouse activity for hours, the display can go to sleep long
    before 6:30 PM arrives. The Wake Lock API only prevents the screen from
    blanking — it doesn't dismiss a blank that already happened — so this
    also re-acquires on visibilitychange (e.g. after the tab/monitor was
    backgrounded and the lock was released) rather than only once on load.
    Requires HTTPS, which GitHub Pages provides. Not fatal if unsupported
-   (older Chromium builds) — disabling blanking at the OS level (see
-   PI_SETUP.md) is the belt-and-braces fallback either way. */
+   (older Chromium builds) — turning screen sleep off in the kiosk
+   computer's own power settings is the belt-and-braces fallback either way. */
 let wakeLock = null;
 async function requestWakeLock() {
   if (!('wakeLock' in navigator)) return;
@@ -2380,14 +2139,14 @@ journeyVideo.addEventListener('error', () => {
   console.warn('Journey: video failed to load/play', journeyVideo.error);
   hideVideoLoading();
   if (previewMode) {
-    // A preview tries the transcoded release asset first; if that errored
-    // (asset missing, release renamed), retry once with the lesson's
-    // original URL before giving up. Cleared immediately so a failure of
-    // the fallback itself lands in endPreview() below, not a loop.
+    // A preview tries Awana's original first; if that errored, retry once
+    // with the lesson's 480p release copy before giving up. Cleared
+    // immediately so a failure of the fallback itself lands in endPreview()
+    // below, not a loop.
     if (previewFallbackUrl) {
       const fallback = previewFallbackUrl;
       previewFallbackUrl = null;
-      console.warn('Journey: transcoded preview failed, retrying with the original —', fallback);
+      console.warn('Journey: preview failed, retrying with the fallback copy —', fallback);
       showVideoLoading();
       journeyVideo.src = fallback;
       applyCaptions(); // keep captions across the one-time fallback swap
@@ -2472,7 +2231,7 @@ if (CONFIGURE_MODE) {
   // retry than waiting out the hourly timer — flaky church WiFi is the normal
   // operating condition here. ('online' can fire in bursts on a flapping
   // connection; the bundleInFlight guard in cacheLessonBundle() is what keeps
-  // that from stacking duplicate multi-MB downloads on the single-core Pi.)
+  // that from stacking duplicate multi-MB downloads.)
   window.addEventListener('online', () => refreshLesson());
 }
 
@@ -2480,31 +2239,26 @@ if (CONFIGURE_MODE) {
    Lets an operator browse every lesson in public/lessons.json and play
    any one of them right now — always a one-off: it never changes what
    the schedule above will automatically show at the next 6:30 PM, and
-   never touches current-lesson.json. Plays the lesson's pre-transcoded
-   480p copy from videos/ on this site (see transcodedPreviewUrl above),
-   falling back to the original URL only if that asset is missing — an
-   earlier version played the originals directly, which the Pi Zero
-   cannot decode at a watchable frame rate, so "only the current week
-   plays properly" was reported broken from the live kiosk. Still skips
-   the Cache API: an occasional manual action doesn't need the nightly
+   never touches current-lesson.json. Plays Awana's original, falling
+   back once to the lesson's 480p copy from videos/ on this site (see
+   transcodedPreviewUrl below) if the original errors. Skips the Cache
+   API: an occasional manual action doesn't need the nightly
    lesson's pre-caching machinery, it just needs a decodable file. Picking
    a lesson ALWAYS asks Leader or Student Video first (lessons with no
    Leader Video — week 27 — have that choice disabled); see the comment in
    onLessonPicked() for why this is deliberately unconditional. */
 
 let pendingPreviewLesson = null;
-// Set alongside each preview: the lesson's original URL, tried once if the
-// transcoded release asset errors (missing, or the release was renamed).
+// Set alongside each preview: the lesson's 480p copy, tried once if the
+// original errors.
 let previewFallbackUrl = null;
 // The week of the lesson being previewed — the teaching slides shown after
 // a preview video are that lesson's, not the scheduled one's.
 let previewWeek = null;
 
-// Every lesson (Student and Leader) has a Pi-playable 480p re-encode
-// uploaded as a GitHub Release asset by scripts/transcode-all-lessons.mjs —
-// the Pi Zero can't decode Awana's 1080p originals at a watchable frame
-// rate, so previews play these first and only fall back to the original if
-// the asset is missing. (Release asset URLs 302-redirect, which <video>
+// Every lesson (Student and Leader) has a 480p re-encode uploaded as a
+// GitHub Release asset by scripts/transcode-all-lessons.mjs, the one-shot
+// fallback when a picked original will not play. (Release asset URLs 302-redirect, which <video>
 // follows fine; no crossorigin attribute means CORS never applies.)
 // Since 2026-10-03 they are served from this site itself, under videos/ (the
 // kvbcawana `journey-videos-v2` release, every file under 25 MiB, streamed by
@@ -2687,7 +2441,7 @@ function openHandout(lesson) {
 function closeHandout() {
   ++handoutRequestId; // abandon any still-resolving open
   handoutView.classList.add('hidden');
-  // Drop the PDF viewer's memory the moment it's closed — same 512MB-Pi
+  // Drop the PDF viewer's memory the moment it's closed — same memory
   // hygiene as detaching the <video> element's src.
   handoutFrame.removeAttribute('src');
   if (handoutObjectUrl) {
@@ -3177,10 +2931,6 @@ function openSettingsPanel() {
   notesEditBody.classList.add('hidden');
   notesEditToggle.setAttribute('aria-expanded', 'false');
   updateNotesEditedBadge();
-  // Both read only memory and localStorage, so the panel still opens in the
-  // same frame the gear was pressed.
-  syncQualityButtons();
-  qualityStatus.textContent = '';
   settingsPanel.classList.remove('hidden');
   if (allLessons) {
     renderLessonList(allLessons);
@@ -3313,28 +3063,23 @@ function armPreviewSeek(seconds) {
 }
 
 /* Which file a picked video plays, and what it falls back to once if that
-   errors. The two profiles are exact inverses of each other: a weak device
-   wants the 480p Release copy and treats Awana's original as the emergency
-   spare, a capable one wants the original and treats the Release copy as the
-   spare. Neither is cached: a Release asset's redirect hop carries no CORS
+   errors: Awana's original, with the 480p Release copy as the spare (the
+   Release copy alone when there is no original). Neither is cached: a Release asset's redirect hop carries no CORS
    header, and an occasional manual pick does not need the nightly bundle's
    machinery, it just needs a file that plays. */
 function previewSources(week, variant, originalUrl) {
   const release = transcodedPreviewUrl(week, variant);
-  return effectiveProfile() === 'full' && originalUrl
+  return originalUrl
     ? { url: originalUrl, fallback: release }
-    : { url: release, fallback: originalUrl };
+    : { url: release, fallback: null };
 }
 
 async function playStudentPreview(lesson, seekTo = 0) {
   // The current week's Student Video is the one already pre-downloaded for
   // the 6:30 show, so play the local copy instead of re-streaming it: a
-  // same-week preview works with the network dead. resolveVideoSrc() serves
-  // this device's own quality, so there is no risk of handing the Pi the
-  // 1080p bytes; on the low profile the shortcut still needs transcodedAt,
-  // because without it downloadUrl is that original.
+  // same-week preview works with the network dead.
   const sameWeek = !!currentLesson && currentLesson.week === lesson.week;
-  if (sameWeek && (effectiveProfile() === 'full' || currentLesson.transcodedAt)) {
+  if (sameWeek) {
     const token = journeyRequestToken;
     const src = await resolveVideoSrc(currentLesson, token);
     if (!src || token !== journeyRequestToken) return; // torn down while reading the cache
@@ -3906,7 +3651,7 @@ function saveNotesEditor() {
 }
 
 // Typing writes through a short debounce rather than on every keystroke —
-// this is a single-core Pi, and JSON.stringify per character is silly.
+// JSON.stringify per character is silly.
 function scheduleNotesSave() {
   clearTimeout(notesEditSaveTimer);
   notesEditSaveTimer = setTimeout(saveNotesEditor, 500);
@@ -4172,7 +3917,7 @@ if (!CONFIGURE_MODE) loadLeaderPrep();
    the function its own control uses, so the kiosk ends up exactly where it
    would be had the change been made on it. The embedded Check-in Display
    writes this storage too (its own awana* keys), so anything not listed
-   costs one lookup and nothing else: this is a Pi Zero. The sync session
+   costs one lookup and nothing else. The sync session
    (awanaSyncSession.v1) is sync.js's to watch. */
 const LIVE_STORAGE_KEYS = {
   [CAPTION_PREF_KEY]: () => {
@@ -4186,12 +3931,6 @@ const LIVE_STORAGE_KEYS = {
   [CAPTION_SIZE_KEY]: () => {
     syncCaptionPrefInputs();
     applyCaptionDisplayPrefs();
-  },
-  [PLAYBACK_QUALITY_KEY]: () => {
-    profileCache = null; // the cached answer is the old choice's
-    applyCheckinDisplayUrl();
-    applyMotionProfile();
-    syncQualityButtons();
   },
   [SLIDES_AUTO_KEY]: () => syncSlidesPrefInputs(),
   [SLIDE_NOTES_OVERRIDE_KEY]: () => {
@@ -4261,7 +4000,7 @@ function warmBrandFonts() {
 warmBrandFonts();
 
 /* ── Self-updating kiosk ──────────────────────────────────────────────
-   The Pi is wall-mounted and nobody wants to SSH in or find a keyboard to
+   The kiosk is wall-mounted and nobody wants to find a keyboard to
    press F5 after a deploy. So the page notices a new build and reloads
    itself, with two hard rules: never onto the old page, and never while a
    room is watching something.
@@ -4406,18 +4145,18 @@ if (!CONFIGURE_MODE) {
     checkForNewBuild();
   });
 }
-/* ── Motion: the full profile's motion graphics (owner 2026-10-12) ─────
-   On a Mac, a PC or a phone (effectiveProfile() 'full') Journey moves like a
-   sports broadcast: the splash, every menu, Read Prep, the handout, the
-   slides and the flip between the Check-in Display and Journey. The Pi
-   ('low') stays exactly as it was: no class, no observer, no element, no
-   inline style (only the reduced-motion query is listened to), and every
-   rule in style.css's motion block is scoped to html.motion-full (see that
-   block for its rules).
+/* ── Motion: Journey's motion graphics (owner 2026-10-12) ─────────────
+   Journey moves like a sports broadcast: the splash, every menu, Read Prep,
+   the handout, the slides and the flip between the Check-in Display and
+   Journey. A page without motion (configure mode, or the OS asking for
+   reduced motion) gets no class, no observer, no element, no inline style
+   (only the reduced-motion query is listened to), and every rule in
+   style.css's motion block is scoped to html.motion-full (see that block
+   for its rules).
 
-   html.motion-full is set when ALL hold: full profile, not configure mode,
-   and the OS does not ask for reduced motion (the stylesheet checks that
-   too). It follows the Pi mode switch and the OS setting live.
+   html.motion-full is set when BOTH hold: not configure mode, and the OS
+   does not ask for reduced motion (the stylesheet checks that too). It
+   follows the OS setting live.
 
    Most motion is plain CSS that runs when an element is shown. Two pieces
    need a hand from here, and both are driven by watching the DOM rather
@@ -4459,7 +4198,7 @@ let shownLayer = null;
 let lastSlideNumber = 0;
 
 function motionWanted() {
-  if (CONFIGURE_MODE || effectiveProfile() !== 'full') return false;
+  if (CONFIGURE_MODE) return false;
   return !(reducedMotionQuery && reducedMotionQuery.matches);
 }
 
@@ -4467,14 +4206,14 @@ function motionOn() {
   return document.documentElement.classList.contains(MOTION_CLASS);
 }
 
-function applyMotionProfile() {
+function applyMotion() {
   const root = document.documentElement;
   if (motionWanted()) {
     root.classList.add(MOTION_CLASS);
     startMotionWatchers();
     return;
   }
-  if (!root.classList.contains(MOTION_CLASS)) return; // never touch the low page
+  if (!root.classList.contains(MOTION_CLASS)) return; // never touch a still page
   root.classList.remove(MOTION_CLASS);
   stopMotionWatchers();
   clearStinger();
@@ -4641,7 +4380,7 @@ function playViewFlip(from, to, keep = []) {
    carry, the card hung on the band, the video (attached, still paused) what
    it uncovers. The one place motion is waited on, because the intro is a
    timed sequence of its own: `done` (which starts the video) runs when the
-   band has passed, at once without the full profile. */
+   band has passed, at once without motion. */
 const CARRY_INTRO_MS = 820;
 let introCarry = null; // { el, sweep }
 
@@ -4838,12 +4577,12 @@ function animateSlideLayers(back, lead) {
 
 if (reducedMotionQuery) {
   if (typeof reducedMotionQuery.addEventListener === 'function') {
-    reducedMotionQuery.addEventListener('change', applyMotionProfile);
+    reducedMotionQuery.addEventListener('change', applyMotion);
   } else if (typeof reducedMotionQuery.addListener === 'function') {
-    reducedMotionQuery.addListener(applyMotionProfile);
+    reducedMotionQuery.addListener(applyMotion);
   }
 }
-applyMotionProfile();
+applyMotion();
 /* ── Trek: small group time (owner 2026-10-12) ─────────────────────────
    On a CLUB NIGHT, 7:00-7:30 PM, the screen is Trek's title card ("TREK ·
    SMALL GROUP TIME", #trek-view) instead of the Check-in Display. Three
@@ -4878,7 +4617,7 @@ applyMotionProfile();
 const CLUB_COUNTS_KEY = 'awanaClubCounts.v1';
 // A tally older than this (or from another day) is not tonight's count.
 const TREK_COUNT_MAX_AGE_MS = 12 * 60 * 60 * 1000;
-// The printer's clock may run a little ahead of the Pi's.
+// The printer's clock may run a little ahead of the kiosk's.
 const TREK_COUNT_SKEW_MS = 60 * 60 * 1000;
 const TREK_NIGHT_REFRESH_MS = 6 * 60 * 60 * 1000;
 const TREK_SCHEDULE_URL = new URL('shared/schedule.json', CHECKIN_DISPLAY_URL).href;
@@ -4906,14 +4645,14 @@ function trekSmallGroupTime(now) {
   }
 }
 
-/** Tonight's date key in the church's zone (the calendar's dates), else the Pi's own. */
+/** Tonight's date key in the church's zone (the calendar's dates), else the kiosk's own. */
 function trekDateKey(now) {
   if (trekNight.rule && typeof trekNight.rule.zonedParts === 'function') {
     const zone = trekNight.schedule && typeof trekNight.schedule.timezone === 'string' ? trekNight.schedule.timezone : undefined;
     try {
       return trekNight.rule.zonedParts(now, zone).dateKey;
     } catch {
-      /* the Pi's own date below */
+      /* the kiosk's own date below */
     }
   }
   const pad = (n) => String(n).padStart(2, '0');

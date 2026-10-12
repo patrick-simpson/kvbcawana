@@ -111,7 +111,7 @@ async function captionsAvailable(url) {
    stale caller can simply discard (revoke) the result; requestPlayback()
    commits the blob URL to captionObjectUrl only after confirming it is still
    the current request. VTTs are ~10-20KB, so none of this holds meaningful
-   memory on the Pi. */
+   memory. */
 let captionObjectUrl = null;
 async function cachedCaptionBlobUrl(url) {
   if (!('caches' in window)) return null;

@@ -251,7 +251,7 @@ test('pressing a timestamp closes prep and seeks that video there', async () => 
   await tick();
   await tick();
 
-  assert.match(video.getAttribute('src'), /week-01-leader\.mp4$/);
+  assert.equal(video.getAttribute('src'), 'https://clubs.awana.org/leader-1.mp4');
   assert.deepEqual(seeks, [], 'nothing may be seeked before the media reports its duration');
   video.dispatchEvent(new kiosk.window.Event('loadedmetadata'));
   assert.deepEqual(seeks, [252]);
@@ -270,7 +270,7 @@ test('a seek armed by a superseded request never lands on the newer video', asyn
   document.querySelectorAll('.prep-time')[1].click();
   await tick();
   await tick();
-  assert.match(video.getAttribute('src'), /week-01-student\.mp4$/);
+  assert.equal(video.getAttribute('src'), 'https://clubs.awana.org/student-1.mp4');
 
   // Whatever supersedes it (the view-toggle button, the 7:15 boundary, a
   // newer pick) bumps journeyRequestToken through stopJourneyContent().
@@ -299,7 +299,7 @@ test('the Student path asks video or prep, and Back returns to the roles', async
   document.getElementById('settings-student-video').click();
   await tick();
   await tick();
-  assert.match(kiosk.video.getAttribute('src'), /week-01-student\.mp4$/);
+  assert.equal(kiosk.video.getAttribute('src'), 'https://clubs.awana.org/student-1.mp4');
   assert.deepEqual(kiosk.seeks, [], 'a plain Watch Video starts at the top');
   kiosk.video.dispatchEvent(new kiosk.window.Event('loadedmetadata'));
   assert.deepEqual(kiosk.seeks, []);

@@ -1,5 +1,5 @@
 # kvbc-awana — agent rules (root)
-One repo (merged 2026-10-01 with full history of three old repos): `lobby/` (signage, projector, sync Worker, sound-room app; was Awana-Check-in-Display), `journey/` (Pi kiosk; was Journey-Display), `printer/` (Club Label Printer; was Print-TwoTimTwo-Labels). Each folder's `CLAUDE.md` is authoritative for its app: read before changing anything inside. Why/history: `lobby/docs/DECISIONS.md`, `journey/docs/DECISIONS.md`. Plans: `ROADMAP.md` (anchors below).
+One repo (merged 2026-10-01 with full history of three old repos): `lobby/` (signage, projector, sync Worker, sound-room app; was Awana-Check-in-Display), `journey/` (Journey room kiosk, a PC in the KVBC Awana app since 2026-10-12; was Journey-Display), `printer/` (Club Label Printer; was Print-TwoTimTwo-Labels). Each folder's `CLAUDE.md` is authoritative for its app: read before changing anything inside. Why/history: `lobby/docs/DECISIONS.md`, `journey/docs/DECISIONS.md`. Plans: `ROADMAP.md` (anchors below).
 
 ## Git
 - Push directly to `main` (owner's standing rule, all apps; printer used PRs before). No branches/PRs unless asked. Run the app's own checks first (named in its CLAUDE.md). One finding per commit. NO model names in commits or files.

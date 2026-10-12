@@ -56,7 +56,7 @@ function togglePause() {
    otherwise left dragging a finger-sized scrubber on a projected screen and
    overshooting; a fixed jump is the control that actually gets used mid-
    teaching. Purely local seeking on an already-attached source — no fetch,
-   nothing to await — so it costs the Pi one decoder re-seek and nothing else.
+   nothing to await — so it costs one decoder re-seek and nothing else.
    Clamped a quarter-second shy of the end so "skip" can never trip the
    'ended' handoff by accident: → is the deliberate way on to the slides. */
 const SEEK_STEP_S = 15;
@@ -89,7 +89,7 @@ journeyVideo.addEventListener('click', togglePause);
 pauseBtn.addEventListener('click', togglePause);
 
 /* Dragging only moves the readout; the one seek happens on release. Seeking on
-   every input event made the Pi's decoder re-seek dozens of times a second. */
+   every input event made the decoder re-seek dozens of times a second. */
 videoScrubber.addEventListener('input', () => {
   scrubbing = true;
   const t = Number(videoScrubber.value);
@@ -115,8 +115,8 @@ function stopJourneyContent() {
   stopTeachingSlides();
   journeyVideo.pause();
   // Release the cached video's blob URL and detach the element while the
-  // Journey view isn't showing — on a 512MB Pi Zero, a ~100-200MB decoded
-  // blob has no business staying resident for the other 23 hours of the day.
+  // Journey view isn't showing — a ~100-200MB decoded blob has no business
+  // staying resident for the other 23 hours of the day.
   // It costs one cheap Cache API read to reconstruct at the next 6:30 PM.
   journeyVideo.removeAttribute('src');
   journeyVideo.load();

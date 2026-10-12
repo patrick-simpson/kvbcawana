@@ -32,7 +32,7 @@
 const CLUB_COUNTS_KEY = 'awanaClubCounts.v1';
 // A tally older than this (or from another day) is not tonight's count.
 const TREK_COUNT_MAX_AGE_MS = 12 * 60 * 60 * 1000;
-// The printer's clock may run a little ahead of the Pi's.
+// The printer's clock may run a little ahead of the kiosk's.
 const TREK_COUNT_SKEW_MS = 60 * 60 * 1000;
 const TREK_NIGHT_REFRESH_MS = 6 * 60 * 60 * 1000;
 const TREK_SCHEDULE_URL = new URL('shared/schedule.json', CHECKIN_DISPLAY_URL).href;
@@ -60,14 +60,14 @@ function trekSmallGroupTime(now) {
   }
 }
 
-/** Tonight's date key in the church's zone (the calendar's dates), else the Pi's own. */
+/** Tonight's date key in the church's zone (the calendar's dates), else the kiosk's own. */
 function trekDateKey(now) {
   if (trekNight.rule && typeof trekNight.rule.zonedParts === 'function') {
     const zone = trekNight.schedule && typeof trekNight.schedule.timezone === 'string' ? trekNight.schedule.timezone : undefined;
     try {
       return trekNight.rule.zonedParts(now, zone).dateKey;
     } catch {
-      /* the Pi's own date below */
+      /* the kiosk's own date below */
     }
   }
   const pad = (n) => String(n).padStart(2, '0');

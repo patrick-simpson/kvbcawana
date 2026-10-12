@@ -153,12 +153,13 @@ Full contract: `lobby/worker/src/routes.md` section 8.
     follow by its hello alone. In `journey/public/src/sync.js`: keep the id in
     the same `awanaScreens.v1` slot under `journey` (one origin, the lobby's
     format), POST `/v1/screens/hello {id, kind: 'journey'}` every 2 minutes
-    while signed in and not in configure mode, reconcile `playbackQuality`
-    with `journey.playback.quality` against `synced` exactly as
-    `reconcileScreen` does, and apply through the same function
-    `LIVE_STORAGE_KEYS[PLAYBACK_QUALITY_KEY]` runs (a same-window write fires
-    no `storage` event); add a case to `test/sync.test.mjs`. /settings
-    already lists and edits a Journey kiosk in its row.
+    while signed in and not in configure mode; add a case to
+    `test/sync.test.mjs`. 2026-10-12: Journey's one per-screen setting
+    (`playbackQuality`, the Pi mode switch) went with the Pi, so a kiosk row
+    would have nothing to edit; `SCREEN_SPECS.journey` in
+    `lobby/src/lib/syncSpecs.js` (and its `screenSpecs.test.js` case, which
+    reads `PLAYBACK_QUALITY_CHOICES` from Journey's schedule.js) still names
+    it until a lobby change drops it.
   - **For the owner**: a forgotten screen that is still running comes back at
     its next hello (by design); and a change made on /settings while the TV
     has an unsent change of its own wins over it.
@@ -724,8 +725,7 @@ said); "Owner" is what only the owner can do.
     page seals the job as `{route: '/print', body, clubberId, source: 'desk'}` and rows
     of kind checkin / visitor / undo / checkout. Open: watch `auth.legacyLastAt` in
     `GET /v1/cloud/status`, then set `AUTH_LEGACY = "off"` and later delete the legacy
-    code (routes.md section 1). Not measured on a real Pi Zero: expect 1 to 3 s once
-    per sign-in.
+    code (routes.md section 1).
   - **P5 built (2026-10-12, not released).** One count: `lobby/shared/tonight.js`
     (generated copy `printer/print-server/tonight.js`) is the printer's AND the
     Worker's `authoritativeTonight()` / `tonightHereNow()`, with the partial-report and

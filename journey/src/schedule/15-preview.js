@@ -2,31 +2,26 @@
    Lets an operator browse every lesson in public/lessons.json and play
    any one of them right now — always a one-off: it never changes what
    the schedule above will automatically show at the next 6:30 PM, and
-   never touches current-lesson.json. Plays the lesson's pre-transcoded
-   480p copy from videos/ on this site (see transcodedPreviewUrl above),
-   falling back to the original URL only if that asset is missing — an
-   earlier version played the originals directly, which the Pi Zero
-   cannot decode at a watchable frame rate, so "only the current week
-   plays properly" was reported broken from the live kiosk. Still skips
-   the Cache API: an occasional manual action doesn't need the nightly
+   never touches current-lesson.json. Plays Awana's original, falling
+   back once to the lesson's 480p copy from videos/ on this site (see
+   transcodedPreviewUrl below) if the original errors. Skips the Cache
+   API: an occasional manual action doesn't need the nightly
    lesson's pre-caching machinery, it just needs a decodable file. Picking
    a lesson ALWAYS asks Leader or Student Video first (lessons with no
    Leader Video — week 27 — have that choice disabled); see the comment in
    onLessonPicked() for why this is deliberately unconditional. */
 
 let pendingPreviewLesson = null;
-// Set alongside each preview: the lesson's original URL, tried once if the
-// transcoded release asset errors (missing, or the release was renamed).
+// Set alongside each preview: the lesson's 480p copy, tried once if the
+// original errors.
 let previewFallbackUrl = null;
 // The week of the lesson being previewed — the teaching slides shown after
 // a preview video are that lesson's, not the scheduled one's.
 let previewWeek = null;
 
-// Every lesson (Student and Leader) has a Pi-playable 480p re-encode
-// uploaded as a GitHub Release asset by scripts/transcode-all-lessons.mjs —
-// the Pi Zero can't decode Awana's 1080p originals at a watchable frame
-// rate, so previews play these first and only fall back to the original if
-// the asset is missing. (Release asset URLs 302-redirect, which <video>
+// Every lesson (Student and Leader) has a 480p re-encode uploaded as a
+// GitHub Release asset by scripts/transcode-all-lessons.mjs, the one-shot
+// fallback when a picked original will not play. (Release asset URLs 302-redirect, which <video>
 // follows fine; no crossorigin attribute means CORS never applies.)
 // Since 2026-10-03 they are served from this site itself, under videos/ (the
 // kvbcawana `journey-videos-v2` release, every file under 25 MiB, streamed by

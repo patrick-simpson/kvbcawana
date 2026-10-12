@@ -3,7 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { bootKiosk, tick, PI_ZERO } from './kiosk-dom.mjs';
+import { bootKiosk, tick, KIOSK_PC } from './kiosk-dom.mjs';
 
 const ROUTES = {
   'current-lesson.json': {
@@ -208,7 +208,7 @@ test('every lesson in the course splits into a short one-word name', () => {
 
 test('the brand fonts are asked for at startup, and nothing waits on them', async () => {
   const asked = [];
-  const kiosk = bootKiosk(ROUTES, {}, PI_ZERO, (window) => {
+  const kiosk = bootKiosk(ROUTES, {}, KIOSK_PC, (window) => {
     // A font load that never settles: the flaky evening this exists for.
     window.document.fonts = { load: (face) => (asked.push(face), new Promise(() => {})) };
   });
@@ -224,7 +224,7 @@ test('the brand fonts are asked for at startup, and nothing waits on them', asyn
 
   // A browser that throws on the request, or has no font API at all, still
   // boots: the fallback faces are the only cost.
-  const throwing = bootKiosk(ROUTES, {}, PI_ZERO, (window) => {
+  const throwing = bootKiosk(ROUTES, {}, KIOSK_PC, (window) => {
     window.document.fonts = {
       load: () => {
         throw new window.DOMException('bad font shorthand', 'SyntaxError');

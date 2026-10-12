@@ -6,8 +6,8 @@
 // own fonts and colours. These tests are the drift check: the copy must match
 // the kit file for file, the page must
 // load only self-hosted brand assets, style.css's fallbacks and baked art must
-// agree with the kit, and the Pi Zero's paint budget (flat, one keyframe, no
-// blur) is pinned rather than remembered.
+// agree with the kit, and the flat look outside the motion block (one
+// keyframe, no blur) is pinned rather than remembered.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
@@ -202,7 +202,7 @@ test('the page links the kit and loads nothing from the network', () => {
   // Display beside this page, at ../lobby/.
   const external = [...html.matchAll(/(?:src|href)="(https?:[^"]+)"/g)].map((m) => m[1]);
   assert.deepEqual(external, []);
-  assert.match(html, /<iframe\b[^>]*src="\.\.\/lobby\/\?lowPower=1"/);
+  assert.match(html, /<iframe\b[^>]*src="\.\.\/lobby\/"/);
 
   for (const [name, css] of [
     ['style.css', styleCss],
@@ -341,10 +341,10 @@ test("Awana's deck keeps its own look, the template slide's type included", () =
   for (const { selector, body } of deck) {
     assert.deepEqual(declarations(body), AWANA_DECK[selector], `${selector} is exactly as Awana's deck has it`);
   }
-  // The full profile's slide transitions (24-motion.js) animate the deck's
-  // layers from script and leave every declaration above alone; the one
-  // stylesheet rule they add is the heading's words as boxes, on the full
-  // profile only, changing nothing else about the type.
+  // The slide transitions (24-motion.js) animate the deck's layers from
+  // script and leave every declaration above alone; the one stylesheet rule
+  // they add is the heading's words as boxes, with motion on only, changing
+  // nothing else about the type.
   const words = rules(styleCss).filter((r) => /\.jm-word/.test(r.selector));
   assert.deepEqual(
     words.map((r) => [r.selector, declarations(r.body)]),
@@ -352,10 +352,10 @@ test("Awana's deck keeps its own look, the template slide's type included", () =
   );
 });
 
-/* style.css split where a low-profile page stops matching: the one motion
+/* style.css split where a reduced-motion page stops matching: the one motion
    block (`@media (prefers-reduced-motion: no-preference) { html.motion-full
-   ... }`, whose class 24-motion.js sets only on the full profile) and
-   everything else. Found by brace matching, so nothing hides in it unseen. */
+   ... }`, whose class 24-motion.js sets outside configure mode and reduced
+   motion) and everything else. Found by brace matching, so nothing hides in it unseen. */
 const MOTION_OPEN = '@media (prefers-reduced-motion: no-preference) {';
 function splitMotionBlock(css) {
   const start = css.indexOf(MOTION_OPEN);
@@ -368,20 +368,20 @@ function splitMotionBlock(css) {
     if (css[end] === '}') depth -= 1;
     if (depth === 0) break;
   }
-  return { low: css.slice(0, start) + css.slice(end + 1), motion: css.slice(start + MOTION_OPEN.length, end) };
+  return { still: css.slice(0, start) + css.slice(end + 1), motion: css.slice(start + MOTION_OPEN.length, end) };
 }
 
-test('the Pi Zero paint budget: one keyframe, no filters, no gradients, no blur', () => {
+test('the flat look: one keyframe outside the motion block, no filters, no gradients, no blur', () => {
   const css = stripComments(styleCss);
-  // What a low-profile page can match is everything outside the motion
-  // block: there the splash's opacity pulse is still the only keyframe and
-  // the only animation, as before the full profile got its motion.
-  const { low } = splitMotionBlock(css);
-  assert.deepEqual([...low.matchAll(/@keyframes\s+([\w-]+)/g)].map((m) => m[1]), ['journey-splash-pulse']);
-  for (const m of low.matchAll(/animation(?:-name)?\s*:\s*([^;]+);/g)) {
+  // What a reduced-motion page can match is everything outside the motion
+  // block: there the splash's opacity pulse is the only keyframe and the
+  // only animation.
+  const { still } = splitMotionBlock(css);
+  assert.deepEqual([...still.matchAll(/@keyframes\s+([\w-]+)/g)].map((m) => m[1]), ['journey-splash-pulse']);
+  for (const m of still.matchAll(/animation(?:-name)?\s*:\s*([^;]+);/g)) {
     assert.match(m[1], /^journey-splash-pulse\b/, 'the pulse is the only animation');
   }
-  assert.doesNotMatch(low, /motion-full|\bjm-/, 'nothing outside the block names the motion');
+  assert.doesNotMatch(still, /motion-full|\bjm-/, 'nothing outside the block names the motion');
   // The property itself, prefixed or not (Chromium still honours
   // -webkit-filter), in any case: CSS property names ignore it.
   assert.doesNotMatch(css, /(^|[\s;{])(-[a-z]+-)?filter\s*:/i, 'no filters');
@@ -403,16 +403,16 @@ test('the Pi Zero paint budget: one keyframe, no filters, no gradients, no blur'
   }
 });
 
-test("the full profile's motion is fenced: html.motion-full only, cheap properties only", () => {
+test("the motion is fenced: html.motion-full only, cheap properties only", () => {
   const { motion } = splitMotionBlock(stripComments(styleCss));
   // Every rule in the block (keyframe steps aside) needs html.motion-full, so
-  // a page without the class (the Pi, configure mode, reduced motion)
-  // matches none of them.
+  // a page without the class (configure mode, reduced motion) matches none
+  // of them.
   const step = /^(from|to|\d+(\.\d+)?%)(\s*,\s*(from|to|\d+(\.\d+)?%))*$/;
   const selectors = rules(motion).map((r) => r.selector).filter((sel) => !step.test(sel));
   assert.ok(selectors.length > 20);
   for (const sel of selectors) {
-    for (const one of splitTop(sel)) assert.match(one, /^html\.motion-full\b/, `${one} is scoped to the full profile`);
+    for (const one of splitTop(sel)) assert.match(one, /^html\.motion-full\b/, `${one} is scoped to html.motion-full`);
   }
   // Its keyframes are its own (jm-) and move only transform, opacity and
   // clip-path; its animations name only them; no transitions.

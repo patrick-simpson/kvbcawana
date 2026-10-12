@@ -2,14 +2,15 @@
 // over the video while it buffers, only when the splash's Begin starts the
 // lesson from the top (any time of day); held for the video at most holdMaxMs; never in
 // the way of playback (errors, ⇄, skips). jsdom drives the logic with the
-// timing shrunk through window.journeyIntroTiming; real Chromium checks the
-// Pi's cards never animate and the full profile's do.
+// timing shrunk through window.journeyIntroTiming (under reduced motion, so
+// the cards just swap, unless a test asks for motion); real Chromium checks
+// the reduced-motion cards never animate and the kiosk's do.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { bootKiosk, tick, pinClock, PI_ZERO, DESKTOP } from './kiosk-dom.mjs';
+import { bootKiosk, tick, pinClock } from './kiosk-dom.mjs';
 
 const PUBLIC = path.join(path.dirname(path.dirname(fileURLToPath(import.meta.url))), 'public');
 const json = (rel) => JSON.parse(readFileSync(path.join(PUBLIC, rel), 'utf8'));
@@ -32,13 +33,19 @@ const ticks = async (n = 4) => {
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /* Boots the kiosk at `now`, the video reporting `media.readyState` (0 until
-   a test says otherwise), counting play() calls. */
-async function boot({ now = SHOW_TIME, device = PI_ZERO, prefs = ANSWERED, timing = TIMING } = {}) {
+   a test says otherwise), counting play() calls. The OS asks for reduced
+   motion unless `motion` is set, so the timing tests see instant swaps. */
+async function boot({ now = SHOW_TIME, motion = false, prefs = ANSWERED, timing = TIMING } = {}) {
   const media = { readyState: 0, plays: 0 };
-  const k = bootKiosk(ROUTES, prefs, device, (window) => {
+  const k = bootKiosk(ROUTES, prefs, undefined, (window) => {
     pinClock(window, now);
     window.journeyIntroTiming = timing;
-    window.matchMedia = (query) => ({ matches: false, media: query, addEventListener() {}, removeEventListener() {} });
+    window.matchMedia = (query) => ({
+      matches: !motion && /prefers-reduced-motion:\s*reduce/.test(query),
+      media: query,
+      addEventListener() {},
+      removeEventListener() {},
+    });
     window.HTMLMediaElement.prototype.play = function play() {
       media.plays += 1;
       return Promise.resolve();
@@ -92,7 +99,7 @@ test('the 6:30 Begin runs the four cards in order over the buffering video, then
     assert.equal(media.plays, 1, 'and the video started, once');
     assert.ok(shown($('video-controls')));
     assert.equal(shown($('journey-intro-wait')), false, 'it never had to hold');
-    // The Pi: the cards just swap. No motion class, no band, no inline style.
+    // Reduced motion: the cards just swap. No motion class, no band, no inline style.
     assert.equal(k.document.documentElement.classList.contains('motion-full'), false);
     assert.equal(k.document.querySelector('.jm-intro-sweep, .jm-intro-out'), null);
     for (const el of [$('journey-intro'), ...CARD_IDS.map($)]) assert.equal(el.getAttribute('style'), null);
@@ -226,8 +233,8 @@ test('Space skips to the video; ⇄ takes the screen; a video error plays as tod
   }
 });
 
-test('a desktop: the last card rides off on the band, then the video starts', async () => {
-  const { k, media, $ } = await boot({ device: DESKTOP });
+test('with motion: the last card rides off on the band, then the video starts', async () => {
+  const { k, media, $ } = await boot({ motion: true });
   try {
     assert.ok(k.document.documentElement.classList.contains('motion-full'));
     media.readyState = 4;
@@ -247,16 +254,15 @@ test('a desktop: the last card rides off on the band, then the video starts', as
   }
 });
 
-/* ── Real Chromium: the Pi's cards never animate; the full profile's do ── */
+/* ── Real Chromium: reduced-motion cards never animate; the kiosk's do ─── */
 const CHROMIUM = process.env.PLAYWRIGHT_CHROMIUM || '/opt/pw-browsers/chromium';
 const skip = existsSync(CHROMIUM) ? false : `no Chromium at ${CHROMIUM}`;
 const TYPES = { '.html': 'text/html', '.css': 'text/css', '.js': 'text/javascript', '.json': 'application/json', '.svg': 'image/svg+xml', '.woff2': 'font/woff2', '.jpg': 'image/jpeg' };
 
-async function introAnimations(browser, device) {
-  const context = await browser.newContext({ viewport: { width: 1280, height: 720 }, userAgent: device.userAgent, reducedMotion: 'no-preference' });
+async function introAnimations(browser, reducedMotion) {
+  const context = await browser.newContext({ viewport: { width: 1280, height: 720 }, reducedMotion });
   const page = await context.newPage();
-  await page.addInitScript((cores) => {
-    Object.defineProperty(navigator, 'hardwareConcurrency', { get: () => cores });
+  await page.addInitScript(() => {
     const RealDate = Date;
     const offset = new RealDate(2026, 9, 7, 18, 35, 0).getTime() - RealDate.now();
     // eslint-disable-next-line no-global-assign
@@ -271,7 +277,7 @@ async function introAnimations(browser, device) {
     };
     localStorage.setItem('journey.captions', 'off');
     window.journeyIntroTiming = { cardsAt: [0, 250, 500, 750], minMs: 60000 };
-  }, device.hardwareConcurrency);
+  });
   // The video never answers: the cards hold, nothing errors.
   await page.route('**/*.mp4', () => {});
   await page.route('**/*', (route) => {
@@ -304,14 +310,14 @@ async function introAnimations(browser, device) {
   return run;
 }
 
-test('in Chromium: the Pi intro is instant swaps (no animation at all); a desktop animates it', { skip }, async () => {
+test('in Chromium: the reduced-motion intro is instant swaps (no animation at all); the kiosk animates it', { skip }, async () => {
   const { chromium } = await import('playwright-core');
   const browser = await chromium.launch({ executablePath: CHROMIUM });
   try {
-    const pi = await introAnimations(browser, PI_ZERO);
-    assert.deepEqual(pi.tops, CARD_IDS, 'the same four cards, in order');
-    assert.deepEqual(pi.names, [], 'nothing on the Pi intro animates');
-    const full = await introAnimations(browser, DESKTOP);
+    const still = await introAnimations(browser, 'reduce');
+    assert.deepEqual(still.tops, CARD_IDS, 'the same four cards, in order');
+    assert.deepEqual(still.names, [], 'nothing on the reduced-motion intro animates');
+    const full = await introAnimations(browser, 'no-preference');
     assert.deepEqual(full.tops, CARD_IDS);
     for (const name of ['jm-intro-wipe', 'jm-slam-hard']) assert.ok(full.names.includes(name), `${name} (ran: ${full.names})`);
   } finally {

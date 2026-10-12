@@ -215,7 +215,7 @@ function saveNotesEditor() {
 }
 
 // Typing writes through a short debounce rather than on every keystroke —
-// this is a single-core Pi, and JSON.stringify per character is silly.
+// JSON.stringify per character is silly.
 function scheduleNotesSave() {
   clearTimeout(notesEditSaveTimer);
   notesEditSaveTimer = setTimeout(saveNotesEditor, 500);

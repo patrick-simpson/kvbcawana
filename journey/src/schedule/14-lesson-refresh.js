@@ -62,7 +62,7 @@ if (CONFIGURE_MODE) {
   // retry than waiting out the hourly timer — flaky church WiFi is the normal
   // operating condition here. ('online' can fire in bursts on a flapping
   // connection; the bundleInFlight guard in cacheLessonBundle() is what keeps
-  // that from stacking duplicate multi-MB downloads on the single-core Pi.)
+  // that from stacking duplicate multi-MB downloads.)
   window.addEventListener('online', () => refreshLesson());
 }
 

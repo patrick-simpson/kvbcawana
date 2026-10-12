@@ -395,10 +395,6 @@ function openSettingsPanel() {
   notesEditBody.classList.add('hidden');
   notesEditToggle.setAttribute('aria-expanded', 'false');
   updateNotesEditedBadge();
-  // Both read only memory and localStorage, so the panel still opens in the
-  // same frame the gear was pressed.
-  syncQualityButtons();
-  qualityStatus.textContent = '';
   settingsPanel.classList.remove('hidden');
   if (allLessons) {
     renderLessonList(allLessons);
@@ -531,28 +527,23 @@ function armPreviewSeek(seconds) {
 }
 
 /* Which file a picked video plays, and what it falls back to once if that
-   errors. The two profiles are exact inverses of each other: a weak device
-   wants the 480p Release copy and treats Awana's original as the emergency
-   spare, a capable one wants the original and treats the Release copy as the
-   spare. Neither is cached: a Release asset's redirect hop carries no CORS
+   errors: Awana's original, with the 480p Release copy as the spare (the
+   Release copy alone when there is no original). Neither is cached: a Release asset's redirect hop carries no CORS
    header, and an occasional manual pick does not need the nightly bundle's
    machinery, it just needs a file that plays. */
 function previewSources(week, variant, originalUrl) {
   const release = transcodedPreviewUrl(week, variant);
-  return effectiveProfile() === 'full' && originalUrl
+  return originalUrl
     ? { url: originalUrl, fallback: release }
-    : { url: release, fallback: originalUrl };
+    : { url: release, fallback: null };
 }
 
 async function playStudentPreview(lesson, seekTo = 0) {
   // The current week's Student Video is the one already pre-downloaded for
   // the 6:30 show, so play the local copy instead of re-streaming it: a
-  // same-week preview works with the network dead. resolveVideoSrc() serves
-  // this device's own quality, so there is no risk of handing the Pi the
-  // 1080p bytes; on the low profile the shortcut still needs transcodedAt,
-  // because without it downloadUrl is that original.
+  // same-week preview works with the network dead.
   const sameWeek = !!currentLesson && currentLesson.week === lesson.week;
-  if (sameWeek && (effectiveProfile() === 'full' || currentLesson.transcodedAt)) {
+  if (sameWeek) {
     const token = journeyRequestToken;
     const src = await resolveVideoSrc(currentLesson, token);
     if (!src || token !== journeyRequestToken) return; // torn down while reading the cache

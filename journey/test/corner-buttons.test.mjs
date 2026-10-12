@@ -28,7 +28,7 @@ const CHROMIUM = process.env.PLAYWRIGHT_CHROMIUM || '/opt/pw-browsers/chromium';
 const skip = existsSync(CHROMIUM) ? false : `no Chromium at ${CHROMIUM}`;
 const TYPES = { '.html': 'text/html', '.css': 'text/css', '.svg': 'image/svg+xml', '.woff2': 'font/woff2' };
 
-// The Pi's safe-mode screen with and without overscan, then 720p and 1080p.
+// A small 4:3 screen with and without overscan, then 720p and 1080p.
 const VIEWPORTS = [
   [592, 432],
   [640, 480],

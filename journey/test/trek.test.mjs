@@ -11,7 +11,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { bootKiosk, tick, pinClock, PI_ZERO, DESKTOP } from './kiosk-dom.mjs';
+import { bootKiosk, tick, pinClock } from './kiosk-dom.mjs';
 
 const clubNight = await import('../../lobby/shared/clubNight.js');
 
@@ -60,7 +60,9 @@ function feed(extra = [], { cancelled = false } = {}) {
 
 const ANSWERED = { 'journey.captions': 'off' };
 
-function boot(nowMs, { calendar = feed(), schedule = SCHEDULE, prefs = {}, device = PI_ZERO, rule = clubNight, extraRoutes = {} } = {}) {
+// The OS asks for reduced motion unless `motion` is set (the card is then
+// still, and no view-flip carry runs under the assertions).
+function boot(nowMs, { calendar = feed(), schedule = SCHEDULE, prefs = {}, motion = false, rule = clubNight, extraRoutes = {} } = {}) {
   const routes = {
     ...extraRoutes,
     'current-lesson.json': { json: CURRENT },
@@ -68,10 +70,15 @@ function boot(nowMs, { calendar = feed(), schedule = SCHEDULE, prefs = {}, devic
     'calendar-feed.json': calendar ? { json: calendar } : { status: 404 },
     'shared/schedule.json': schedule ? { json: schedule } : { status: 404 },
   };
-  return bootKiosk(routes, { ...ANSWERED, ...prefs }, device, (window) => {
+  return bootKiosk(routes, { ...ANSWERED, ...prefs }, undefined, (window) => {
     pinClock(window, nowMs);
     if (rule) window.journeyClubNightModule = rule;
-    window.matchMedia = (query) => ({ matches: false, media: query, addEventListener() {}, removeEventListener() {} });
+    window.matchMedia = (query) => ({
+      matches: !motion && /prefers-reduced-motion:\s*reduce/.test(query),
+      media: query,
+      addEventListener() {},
+      removeEventListener() {},
+    });
   });
 }
 
@@ -341,17 +348,17 @@ test('the toggle and Settings still work over the card', async () => {
   }
 });
 
-test('the Pi gets a still card; a desktop gets no Check-in stinger over it', async () => {
-  const pi = boot(at(19, 5));
+test('reduced motion gets a still card; with motion, no Check-in stinger over it', async () => {
+  const still = boot(at(19, 5));
   try {
     await ticks();
-    assert.equal(view(pi), 'trek');
-    assert.equal(pi.document.documentElement.classList.contains('motion-full'), false);
-    assert.equal(pi.document.querySelector('.jm-stinger'), null);
+    assert.equal(view(still), 'trek');
+    assert.equal(still.document.documentElement.classList.contains('motion-full'), false);
+    assert.equal(still.document.querySelector('.jm-stinger'), null);
   } finally {
-    pi.close();
+    still.close();
   }
-  const mac = boot(at(18, 59), { device: DESKTOP });
+  const mac = boot(at(18, 59), { motion: true });
   try {
     await ticks();
     assert.equal(mac.document.documentElement.classList.contains('motion-full'), true);

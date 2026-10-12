@@ -3,9 +3,9 @@
 // The lesson's name is set in Paytone One at a size tuned for the face that
 // came before it (see --jr-shout-fit in style.css), and jsdom has no layout.
 // So this boots the real page in Chromium (the same binary the handout
-// renderer uses; set PLAYWRIGHT_CHROMIUM if yours lives elsewhere), as the Pi
-// Zero kiosk (its user agent), and checks, for every lesson in the course on
-// the Pi's safe-mode screen and on a 1080p TV: the shout face really is the
+// renderer uses; set PLAYWRIGHT_CHROMIUM if yours lives elsewhere), and
+// checks, for every lesson in the course on a small 4:3 screen and on a
+// 1080p TV: the shout face really is the
 // one drawn, the name is one line, clear of the doodle cluster beside it and
 // of the buttons under it, and an accented capital (Paytone One's reach past
 // its own ascent) has nothing to be clipped by. Skipped, and says so, on a
@@ -22,10 +22,7 @@ const PUBLIC = path.join(path.dirname(path.dirname(fileURLToPath(import.meta.url
 const CHROMIUM = process.env.PLAYWRIGHT_CHROMIUM || '/opt/pw-browsers/chromium';
 const skip = existsSync(CHROMIUM) ? false : `no Chromium at ${CHROMIUM}`;
 const TYPES = { '.html': 'text/html', '.css': 'text/css', '.svg': 'image/svg+xml', '.woff2': 'font/woff2', '.ttf': 'font/ttf' };
-const PI_ZERO_UA =
-  'Mozilla/5.0 (X11; Linux armv6l) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36';
-
-// The Pi's safe-mode screen with and without overscan, a 720p TV and a 1080p one.
+// A small 4:3 screen with and without overscan, a 720p TV and a 1080p one.
 const VIEWPORTS = [
   [592, 432],
   [640, 480],
@@ -42,7 +39,7 @@ test('every lesson name fits the splash in the shout face, on the kiosk and on a
   const browser = await chromium.launch({ executablePath: CHROMIUM });
   try {
     for (const [width, height] of VIEWPORTS) {
-      const page = await browser.newPage({ viewport: { width, height }, userAgent: PI_ZERO_UA });
+      const page = await browser.newPage({ viewport: { width, height } });
       await page.route('**/*', (route) => {
         const url = new URL(route.request().url());
         const rel = decodeURIComponent(url.pathname).replace(/^\/+/, '');

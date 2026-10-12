@@ -18,12 +18,9 @@
 </head>
 <body>
   <div id="checkin-view" class="view">
-    <!-- The src here is the low-power one, so a browser with JavaScript off
-         still shows the display. schedule.js rewrites it at startup from the
-         device profile (see checkinDisplayUrl in src/schedule.js). -->
     <iframe
       id="checkin-frame"
-      src="../lobby/?lowPower=1"
+      src="../lobby/"
       title="Awana Check-in Display"
       allow="fullscreen"
     ></iframe>
@@ -77,7 +74,6 @@
         <button id="journey-splash-slides-btn" type="button">Skip to slides</button>
       </div>
       <p id="journey-splash-prompt">or press <kbd>Space</kbd> / <kbd>→</kbd> begin &middot; <kbd>Shift</kbd>+<kbd>→</kbd> slides &middot; <kbd>S</kbd> settings</p>
-      <p id="journey-splash-quality" class="hidden" role="status"></p>
     </div>
     <video id="journey-video" class="hidden" muted playsinline></video>
     <div id="caption-prompt" class="hidden" role="dialog" aria-modal="true" aria-labelledby="caption-prompt-q">
@@ -220,7 +216,7 @@
         <p class="settings-hint">
           Sign this screen in with the church passphrase. Captions, the teaching
           slides&rsquo; settings and tonight&rsquo;s edited bullets then follow every
-          Journey screen; video quality stays on this one. It sets up the lobby
+          Journey screen. It sets up the lobby
           check-in screen here too.
         </p>
         <div id="sync-signin" class="sync-row">
@@ -232,21 +228,6 @@
           <button id="sync-signout-btn" type="button" class="quality-btn">Sign out</button>
         </div>
         <p id="sync-status" class="settings-hint" role="status"></p>
-      </div>
-      <div id="settings-quality">
-        <h3>Pi mode</h3>
-        <button id="pi-mode-switch" type="button" role="switch" aria-checked="false" aria-describedby="quality-auto-note">
-          <span class="pi-mode-track" aria-hidden="true"><span class="pi-mode-knob"></span></span>
-          <span class="pi-mode-text">
-            <span class="pi-mode-label">Pi mode</span>
-            <span class="pi-mode-sub">No animations, smaller video &mdash; for slow computers</span>
-          </span>
-        </button>
-        <p class="settings-hint">
-          <span id="quality-auto-note"></span>
-          <button id="quality-auto" type="button" class="hidden">Use automatic</button>
-        </p>
-        <p id="quality-status" class="settings-hint" role="status"></p>
       </div>
       <div id="settings-slides">
         <h3>After the video: teaching slides</h3>

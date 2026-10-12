@@ -5,7 +5,7 @@
    the function its own control uses, so the kiosk ends up exactly where it
    would be had the change been made on it. The embedded Check-in Display
    writes this storage too (its own awana* keys), so anything not listed
-   costs one lookup and nothing else: this is a Pi Zero. The sync session
+   costs one lookup and nothing else. The sync session
    (awanaSyncSession.v1) is sync.js's to watch. */
 const LIVE_STORAGE_KEYS = {
   [CAPTION_PREF_KEY]: () => {
@@ -19,12 +19,6 @@ const LIVE_STORAGE_KEYS = {
   [CAPTION_SIZE_KEY]: () => {
     syncCaptionPrefInputs();
     applyCaptionDisplayPrefs();
-  },
-  [PLAYBACK_QUALITY_KEY]: () => {
-    profileCache = null; // the cached answer is the old choice's
-    applyCheckinDisplayUrl();
-    applyMotionProfile();
-    syncQualityButtons();
   },
   [SLIDES_AUTO_KEY]: () => syncSlidesPrefInputs(),
   [SLIDE_NOTES_OVERRIDE_KEY]: () => {

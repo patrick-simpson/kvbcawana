@@ -1,13 +1,13 @@
 /* ── Keep the kiosk screen awake ─────────────────────────────────────
-   Raspberry Pi OS ships with screen blanking enabled by default; with no
+   Operating systems blank the screen by default; with no
    keyboard/mouse activity for hours, the display can go to sleep long
    before 6:30 PM arrives. The Wake Lock API only prevents the screen from
    blanking — it doesn't dismiss a blank that already happened — so this
    also re-acquires on visibilitychange (e.g. after the tab/monitor was
    backgrounded and the lock was released) rather than only once on load.
    Requires HTTPS, which GitHub Pages provides. Not fatal if unsupported
-   (older Chromium builds) — disabling blanking at the OS level (see
-   PI_SETUP.md) is the belt-and-braces fallback either way. */
+   (older Chromium builds) — turning screen sleep off in the kiosk
+   computer's own power settings is the belt-and-braces fallback either way. */
 let wakeLock = null;
 async function requestWakeLock() {
   if (!('wakeLock' in navigator)) return;
@@ -93,14 +93,14 @@ journeyVideo.addEventListener('error', () => {
   console.warn('Journey: video failed to load/play', journeyVideo.error);
   hideVideoLoading();
   if (previewMode) {
-    // A preview tries the transcoded release asset first; if that errored
-    // (asset missing, release renamed), retry once with the lesson's
-    // original URL before giving up. Cleared immediately so a failure of
-    // the fallback itself lands in endPreview() below, not a loop.
+    // A preview tries Awana's original first; if that errored, retry once
+    // with the lesson's 480p release copy before giving up. Cleared
+    // immediately so a failure of the fallback itself lands in endPreview()
+    // below, not a loop.
     if (previewFallbackUrl) {
       const fallback = previewFallbackUrl;
       previewFallbackUrl = null;
-      console.warn('Journey: transcoded preview failed, retrying with the original —', fallback);
+      console.warn('Journey: preview failed, retrying with the fallback copy —', fallback);
       showVideoLoading();
       journeyVideo.src = fallback;
       applyCaptions(); // keep captions across the one-time fallback swap

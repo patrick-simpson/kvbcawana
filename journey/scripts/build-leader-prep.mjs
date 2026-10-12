@@ -77,7 +77,7 @@ export function buildLeaderPrep() {
   };
 }
 
-/** One line per week: the file is warmed at startup on a Pi Zero, so no
+/** One line per week: the file is warmed at every kiosk startup, so no
  *  indentation, but a change to one week still diffs as one line. */
 export function serializeLeaderPrep(data) {
   const weeks = Object.entries(data.weeks).map(([k, v]) => `    ${JSON.stringify(k)}: ${JSON.stringify(v)}`);

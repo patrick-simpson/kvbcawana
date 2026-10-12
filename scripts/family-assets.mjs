@@ -13,7 +13,7 @@
 // itself, and no lobby or Journey file loads it.)
 //
 // The copies are build output: gitignored, never edited, never committed. Each
-// screen still holds a FULL local copy at runtime (Journey's Pi kiosk, the print
+// screen still holds a FULL local copy at runtime (the Journey kiosk, the print
 // server and the Windows installer work offline; nothing fetches another app's
 // files), because every build that serves or packages an app runs this first:
 //

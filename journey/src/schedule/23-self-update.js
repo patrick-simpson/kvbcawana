@@ -1,5 +1,5 @@
 /* ── Self-updating kiosk ──────────────────────────────────────────────
-   The Pi is wall-mounted and nobody wants to SSH in or find a keyboard to
+   The kiosk is wall-mounted and nobody wants to find a keyboard to
    press F5 after a deploy. So the page notices a new build and reloads
    itself, with two hard rules: never onto the old page, and never while a
    room is watching something.

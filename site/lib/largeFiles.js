@@ -23,11 +23,11 @@ export const REPO_FOLDERS = {
 
 export const VIDEO_RELEASE_TAG = 'journey-videos-v2';
 
-// This week's lesson, re-encoded for the Pi by the nightly bot
+// This week's lesson, re-encoded to 480p by the nightly bot
 // (.github/workflows/journey-update-lesson.yml), which replaces the asset in
 // place under this one name and commits journey/public/current-lesson-video.json
-// (its sha256) beside current-lesson.json. The Pi asks for the same URL it
-// always did.
+// (its sha256) beside current-lesson.json. Served at the same URL it always
+// was (since 2026-10-12 the Journey page itself plays Awana's original).
 export const RELEASE_FILES = {
   '/journey/current-lesson-video.mp4': 'current-lesson-video.mp4',
 };

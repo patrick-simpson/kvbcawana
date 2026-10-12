@@ -1,15 +1,15 @@
-/* ── Motion: the full profile's motion graphics (owner 2026-10-12) ─────
-   On a Mac, a PC or a phone (effectiveProfile() 'full') Journey moves like a
-   sports broadcast: the splash, every menu, Read Prep, the handout, the
-   slides and the flip between the Check-in Display and Journey. The Pi
-   ('low') stays exactly as it was: no class, no observer, no element, no
-   inline style (only the reduced-motion query is listened to), and every
-   rule in style.css's motion block is scoped to html.motion-full (see that
-   block for its rules).
+/* ── Motion: Journey's motion graphics (owner 2026-10-12) ─────────────
+   Journey moves like a sports broadcast: the splash, every menu, Read Prep,
+   the handout, the slides and the flip between the Check-in Display and
+   Journey. A page without motion (configure mode, or the OS asking for
+   reduced motion) gets no class, no observer, no element, no inline style
+   (only the reduced-motion query is listened to), and every rule in
+   style.css's motion block is scoped to html.motion-full (see that block
+   for its rules).
 
-   html.motion-full is set when ALL hold: full profile, not configure mode,
-   and the OS does not ask for reduced motion (the stylesheet checks that
-   too). It follows the Pi mode switch and the OS setting live.
+   html.motion-full is set when BOTH hold: not configure mode, and the OS
+   does not ask for reduced motion (the stylesheet checks that too). It
+   follows the OS setting live.
 
    Most motion is plain CSS that runs when an element is shown. Two pieces
    need a hand from here, and both are driven by watching the DOM rather
@@ -51,7 +51,7 @@ let shownLayer = null;
 let lastSlideNumber = 0;
 
 function motionWanted() {
-  if (CONFIGURE_MODE || effectiveProfile() !== 'full') return false;
+  if (CONFIGURE_MODE) return false;
   return !(reducedMotionQuery && reducedMotionQuery.matches);
 }
 
@@ -59,14 +59,14 @@ function motionOn() {
   return document.documentElement.classList.contains(MOTION_CLASS);
 }
 
-function applyMotionProfile() {
+function applyMotion() {
   const root = document.documentElement;
   if (motionWanted()) {
     root.classList.add(MOTION_CLASS);
     startMotionWatchers();
     return;
   }
-  if (!root.classList.contains(MOTION_CLASS)) return; // never touch the low page
+  if (!root.classList.contains(MOTION_CLASS)) return; // never touch a still page
   root.classList.remove(MOTION_CLASS);
   stopMotionWatchers();
   clearStinger();
@@ -233,7 +233,7 @@ function playViewFlip(from, to, keep = []) {
    carry, the card hung on the band, the video (attached, still paused) what
    it uncovers. The one place motion is waited on, because the intro is a
    timed sequence of its own: `done` (which starts the video) runs when the
-   band has passed, at once without the full profile. */
+   band has passed, at once without motion. */
 const CARRY_INTRO_MS = 820;
 let introCarry = null; // { el, sweep }
 
@@ -430,9 +430,9 @@ function animateSlideLayers(back, lead) {
 
 if (reducedMotionQuery) {
   if (typeof reducedMotionQuery.addEventListener === 'function') {
-    reducedMotionQuery.addEventListener('change', applyMotionProfile);
+    reducedMotionQuery.addEventListener('change', applyMotion);
   } else if (typeof reducedMotionQuery.addListener === 'function') {
-    reducedMotionQuery.addListener(applyMotionProfile);
+    reducedMotionQuery.addListener(applyMotion);
   }
 }
-applyMotionProfile();
+applyMotion();

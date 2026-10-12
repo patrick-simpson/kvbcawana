@@ -1,5 +1,5 @@
 /* ── Resume an interrupted lesson ─────────────────────────────────────
-   A Pi brownout, an accidental hard refresh, or a stray press of the ⇄
+   A power cut, an accidental hard refresh, or a stray press of the ⇄
    button used to cost the room the whole lesson so far: playCurrentLesson()
    always attaches a fresh src and never seeks, and stopJourneyContent()
    detaches it, so every restart began again at 0:00. The scheduled show now
@@ -192,7 +192,6 @@ async function showJourneyContent() {
   // Every real lesson name is one word of at most 12 letters; anything longer
   // is a fallback title and gets the smaller size (see style.css).
   journeySplashTitle.classList.toggle('is-long', splashText.headline.length > 14);
-  showQualityNote(currentLesson);
   // Decided from localStorage alone — no fetch stands between the splash
   // appearing and the operator seeing which buttons it offers.
   offerResume(currentLesson);
@@ -202,49 +201,6 @@ async function showJourneyContent() {
 // Actually starts the queued lesson playing — called only from a genuine
 // user action (keypress or the on-screen button), which is also what makes
 // unmuted autoplay reliable (see audioUnlocked below).
-// Which file the SCHEDULED 6:30 show should play.
-//
-// `downloadUrl` is the transcoded, same-origin 480p file ONLY once the nightly
-// transcode has succeeded; fetch-current-lesson.mjs resets it back to the
-// 1080p `sourceUrl` (and transcodedAt to null) every time the lesson genuinely
-// changes. The Pi Zero provably cannot decode that original at a watchable
-// frame rate, and transcode-lesson-video.mjs is deliberately built to never
-// fail the nightly job — so a silent transcode failure used to leave the room
-// watching a slideshow of stutters with nothing on screen to explain it.
-//
-// So the scheduled show never plays the original. When there is no transcode
-// yet it uses that week's batch-transcoded Release asset instead, which is the
-// same 854x480 Baseline encode the picker already relies on. That streams
-// rather than playing from the cache (the Release's redirect hop sends no CORS
-// header, so its bytes can never be stored — see CLAUDE.md), which is a real
-// cost on a flaky evening, but a streamed 480p file is watchable and a cached
-// 1080p one is not.
-//
-// All of that is a LOW-profile rule, and so is the splash note below it: a
-// full-quality device plays Awana's original whether or not the kiosk's
-// nightly transcode has run, so there is nothing degraded to warn about.
-function scheduledVideoPlan(lesson) {
-  if (!lesson) return null;
-  if (effectiveProfile() === 'full') return { mode: 'original' };
-  if (lesson.transcodedAt) return { mode: 'transcoded' };
-  return { mode: 'release', url: transcodedPreviewUrl(lesson.week, 'student') };
-}
-
-// The splash says so BEFORE anyone presses play, because the operator can act
-// on it (pick the week by hand, or accept a stream) only if they know. Only
-// ever shown on the low profile, where a missing transcode really does mean a
-// streamed, lower-quality copy.
-function showQualityNote(lesson) {
-  const plan = scheduledVideoPlan(lesson);
-  const degraded = !!plan && plan.mode === 'release';
-  if (degraded) {
-    journeySplashQuality.textContent =
-      "This week's video has not been converted for the kiosk yet, so it will stream the " +
-      'standard-quality copy instead. It needs the internet to play, and may pause to buffer.';
-  }
-  journeySplashQuality.classList.toggle('hidden', !degraded);
-}
-
 // `withIntro`: the splash's plain Begin (beginScheduledPlay); the lesson intro
 // (06-lesson-intro.js) covers the first seconds while the video, attached at
 // once, buffers underneath, and starts it when it is ready.
@@ -264,11 +220,8 @@ async function playCurrentLesson(resumeAt = 0, withIntro = false) {
   }
   journeyVideo.loop = false; // plays once; falls back to Check-in Display on 'ended' below
   setMuted(!audioUnlocked);
-  const plan = scheduledVideoPlan(currentLesson);
-  const src =
-    plan && plan.mode === 'release'
-      ? plan.url // no transcode yet: the Release copy, never the 1080p original
-      : await resolveVideoSrc(currentLesson, token); // this device's quality, cache first
+  // Awana's original: streamed when the network answers, else the cached copy.
+  const src = await resolveVideoSrc(currentLesson, token);
   if (!src || token !== journeyRequestToken) {
     // Nothing to play after all: what the room would have seen without the
     // intro (the loading overlay and its stall note).

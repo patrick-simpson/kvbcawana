@@ -7,7 +7,7 @@
 // another window through its storage listener.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { bootKiosk, tick, PI_ZERO } from './kiosk-dom.mjs';
+import { bootKiosk, tick, KIOSK_PC } from './kiosk-dom.mjs';
 
 const LESSONS = {
   version: 1,
@@ -83,13 +83,13 @@ function fakeChannels(window) {
 
 function bootConfigure() {
   let channels;
-  const kiosk = bootKiosk(ROUTES, ANSWERED, PI_ZERO, (w) => { channels = fakeChannels(w); }, CONFIGURE_URL);
+  const kiosk = bootKiosk(ROUTES, ANSWERED, KIOSK_PC, (w) => { channels = fakeChannels(w); }, CONFIGURE_URL);
   return { ...kiosk, channels };
 }
 
 function bootLive(prefs = ANSWERED) {
   let channels;
-  const kiosk = bootKiosk(ROUTES, prefs, PI_ZERO, (w) => { channels = fakeChannels(w); });
+  const kiosk = bootKiosk(ROUTES, prefs, KIOSK_PC, (w) => { channels = fakeChannels(w); });
   return { ...kiosk, channels };
 }
 
@@ -207,13 +207,13 @@ test('the live kiosk plays a relayed pick only for a lesson it knows', async () 
     await ticks();
     assert.equal(hidden(doc, 'settings-panel'), true, 'the kiosk\'s own panel closes, as the button does');
     assert.equal(hidden(doc, 'journey-view'), false);
-    assert.match(k.video.getAttribute('src') || '', /videos\/week-03-student\.mp4$/);
+    assert.equal(k.video.getAttribute('src'), 'https://clubs.awana.org/student-3.mp4', "Awana's original");
   } finally {
     k.close();
   }
 });
 
-test('the live kiosk takes caption and quality settings saved by another window, live', async () => {
+test('the live kiosk takes caption and slide settings saved by another window, live', async () => {
   const k = bootLive();
   try {
     await ticks();
@@ -227,14 +227,6 @@ test('the live kiosk takes caption and quality settings saved by another window,
     assert.ok(doc.getElementById('caption-overlay').classList.contains('caption-backdrop'));
     assert.equal(doc.getElementById('captions-size').value, '1.6');
     assert.equal(doc.getElementById('captions-backdrop').checked, true);
-
-    // The quality choice is cached per page load: the event must drop it.
-    const frame = doc.getElementById('checkin-frame');
-    assert.match(frame.getAttribute('src'), /lowPower=1/);
-    window.localStorage.setItem('journey.playback.quality', 'full');
-    window.dispatchEvent(new window.StorageEvent('storage', { key: 'journey.playback.quality' }));
-    assert.doesNotMatch(frame.getAttribute('src'), /lowPower/);
-    assert.equal(doc.getElementById('pi-mode-switch').getAttribute('aria-checked'), 'false');
 
     // Slides preferences re-sync their inputs.
     window.localStorage.setItem('journey.slides.autoAdvanceSec', '30');

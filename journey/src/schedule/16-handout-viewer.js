@@ -59,7 +59,7 @@ function openHandout(lesson) {
 function closeHandout() {
   ++handoutRequestId; // abandon any still-resolving open
   handoutView.classList.add('hidden');
-  // Drop the PDF viewer's memory the moment it's closed — same 512MB-Pi
+  // Drop the PDF viewer's memory the moment it's closed — same memory
   // hygiene as detaching the <video> element's src.
   handoutFrame.removeAttribute('src');
   if (handoutObjectUrl) {

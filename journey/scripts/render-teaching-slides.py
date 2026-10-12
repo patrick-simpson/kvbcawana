@@ -5,7 +5,7 @@ kiosk-ready images under public/slides/week-NN/.
 Per week this writes:
   slide-1.jpg .. slide-4.jpg  Awana's own four teaching slides (title, core
                               verse, misconception, illumination), 1280x960
-                              JPEG q85 — the Pi Zero decodes JPEG cheaply and
+                              JPEG q85 — JPEG decodes cheaply and
                               the source art is photographic texture anyway.
   template.jpg                the bare background of the deck's fifth slide
                               (Awana's blank "TEMPLATE" — heading + three

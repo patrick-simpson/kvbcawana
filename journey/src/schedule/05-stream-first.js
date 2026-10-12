@@ -1,10 +1,9 @@
 /* ── Stream first, play the cached copy only when streaming cannot ────
-   The Pi plays a picker video streamed over plain HTTP smoothly, and
-   stutters badly on the SAME encode served to the <video> element as a blob
-   URL out of the Cache API (owner report, 2026-09-16, from the live kiosk;
-   both files verified as identical encodes, 854x480 Baseline 3.1, 23.976
-   fps, same frame count). The blob path is the only variable, so a device
-   with a working connection now streams, exactly the way the picker always
+   The old kiosk computer played a picker video streamed over plain HTTP
+   smoothly, and stuttered badly on the SAME encode served to the <video>
+   element as a blob URL out of the Cache API (owner report, 2026-09-16, from
+   the live kiosk; both files verified as identical encodes). The blob path
+   was the only variable, so a device with a working connection streams, exactly the way the picker always
    has, and the cache goes back to being what it is good at: the safety net
    for an evening with no internet.
 
@@ -56,32 +55,15 @@ async function blobUrlFromCacheHit(cached, token) {
    has bumped the token while the probe or the cache read was in flight, this
    returns null WITHOUT committing anything, so a stale resolve can neither
    clobber currentObjectUrl nor strand a multi-megabyte blob URL that nothing
-   will ever revoke (on a 512MB Pi that leak would sit resident until the
-   next show). Callers must bail on null. */
+   will ever revoke (that leak would sit resident until the next show). Callers must bail on null. */
 async function resolveVideoSrc(lesson, token) {
-  // Which quality this device plays, decided once here so the cache lookup
-  // and the live URL can never disagree about it.
-  const profile = effectiveProfile();
-  const liveUrl = profile === 'full' ? originalVideoUrl(lesson) : lesson.downloadUrl;
-  const cacheKey = videoCacheKey(lesson, profile);
+  const liveUrl = originalVideoUrl(lesson);
+  const key = videoCacheKey(lesson);
   streamSwapCandidate = null;
   if ('caches' in window) {
     try {
       const cache = await caches.open(VIDEO_CACHE_NAME);
-      // Migration fallback: kiosks that cached this week's video before the
-      // key was versioned hold it under the bare downloadUrl. That copy can
-      // only be a same-URL fetch (at worst exactly the staleness the old code
-      // always had), so it is strictly better than falling through to the
-      // network on a dead evening connection. The bundle prefetch stores
-      // under the versioned key and then evicts the legacy entry, so this
-      // heals itself after one online refresh. Low profile only: on full that
-      // bare key holds the 480p copy, which is the other quality's bytes.
-      let key = cacheKey;
-      let cached = cacheKey ? await cache.match(cacheKey) : null;
-      if (!cached && profile === 'low') {
-        key = lesson.downloadUrl;
-        cached = await cache.match(key);
-      }
+      const cached = key ? await cache.match(key) : null;
       if (cached) {
         // There are bytes on disk, so this is the one decision worth a probe:
         // stream them from the server if it can answer, and keep the disk

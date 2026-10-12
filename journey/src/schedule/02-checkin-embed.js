@@ -1,29 +1,9 @@
 /* ── The embedded Check-in Display ────────────────────────────────────
-   ?lowPower=1 is that app's own flag for "this screen is weak": it forces
-   confetti off and zero animation for THIS embed only, without touching
-   what its other, standalone signage devices default to. So the flag is
-   the low profile's, and a full-quality device gets the plain URL.
-   index.html ships the low-power URL as the static src, so a browser with
-   JavaScript disabled still shows something. */
-// The one site (awana.kvbchurch.org) serves both, so the display is this
-// page's own origin, at /lobby/.
+   index.html loads it at ../lobby/ (plain URL, full motion: the lobby's own
+   ?lowPower=1 flag is not used here). The one site (awana.kvbchurch.org)
+   serves both, so the display is this page's own origin. */
 const CHECKIN_DISPLAY_ORIGIN = window.location.origin;
 const CHECKIN_DISPLAY_URL = new URL('../lobby/', window.location.href).href;
-
-function checkinDisplayUrl(profile) {
-  return profile === 'low' ? `${CHECKIN_DISPLAY_URL}?lowPower=1` : CHECKIN_DISPLAY_URL;
-}
-
-// Only written when it differs: assigning the same src still reloads the
-// iframe in Chromium, which would drop the display's live check-in socket
-// for no reason at all.
-function applyCheckinDisplayUrl() {
-  if (!checkinFrame || CONFIGURE_MODE) return;
-  const wanted = checkinDisplayUrl(effectiveProfile());
-  if (checkinFrame.getAttribute('src') !== wanted) checkinFrame.src = wanted;
-}
-
-applyCheckinDisplayUrl();
 
 let currentLesson = null;
 // public/lessons.json's whole lesson list, once loaded (see loadAllLessons at

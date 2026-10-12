@@ -1,11 +1,11 @@
 // Where the scheduled show's bytes come from: the network first, the cached
-// copy as the safety net. The Pi plays a streamed file smoothly and stutters
-// on the same encode served as a blob URL (owner report 2026-09-16), so this
-// is a playback-quality property, not a plumbing detail, and it is driven
+// copy as the safety net. The old kiosk played a streamed file smoothly and
+// stuttered on the same encode served as a blob URL (owner report 2026-09-16),
+// so this is a playback-quality property, not a plumbing detail, and it is driven
 // through the real splash button rather than by calling resolveVideoSrc.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { bootKiosk, installCaches, tick, PI_ZERO } from './kiosk-dom.mjs';
+import { bootKiosk, installCaches, tick, KIOSK_PC } from './kiosk-dom.mjs';
 
 const CURRENT = {
   version: 2,
@@ -17,12 +17,13 @@ const CURRENT = {
   resolvedAt: '2026-09-15T03:00:00Z',
 };
 
-const VIDEO_KEY = `current-lesson-video.mp4?v=${encodeURIComponent(CURRENT.transcodedAt)}`;
+// Awana's original is what plays, cached under its quality-marked key.
+const VIDEO_KEY = `${CURRENT.sourceUrl}?q=1080`;
 
 // The video URL answers a HEAD, which is what "the network is up" means here.
 const ROUTES = {
   'current-lesson.json': { json: CURRENT },
-  'current-lesson-video.mp4': { text: 'streamable bytes' },
+  'student-1-original.mp4': { text: 'streamable bytes' },
 };
 
 // The caption prompt asks once per device and would otherwise sit in front of
@@ -45,7 +46,7 @@ function countObjectUrls(window) {
 }
 
 async function bootWithCachedVideo(prefs = ANSWERED, routes = ROUTES) {
-  const kiosk = bootKiosk(routes, prefs, PI_ZERO);
+  const kiosk = bootKiosk(routes, prefs, KIOSK_PC);
   await ticks();
   const caches = installCaches(kiosk.window);
   const cache = await kiosk.window.caches.open('journey-videos-v1');
@@ -87,10 +88,10 @@ test('a reachable video streams, and no blob is made for it', async () => {
   const objectUrls = countObjectUrls(kiosk.window);
   await beginTheLesson(kiosk);
 
-  assert.equal(kiosk.video.getAttribute('src'), 'current-lesson-video.mp4');
+  assert.equal(kiosk.video.getAttribute('src'), CURRENT.sourceUrl);
   assert.equal(objectUrls.length, 0, 'the cached copy is the safety net, not the default');
   assert.equal(
-    kiosk.fetchLog.some((r) => r.method === 'HEAD' && r.url.includes('current-lesson-video.mp4')),
+    kiosk.fetchLog.some((r) => r.method === 'HEAD' && r.url.includes('student-1-original.mp4')),
     true,
     'one bounded HEAD is what decides it'
   );
@@ -98,7 +99,7 @@ test('a reachable video streams, and no blob is made for it', async () => {
 });
 
 test('a video the server will not answer for falls back to the cached copy', async () => {
-  // No route for the .mp4, so the HEAD comes back 404: the file is cached but
+  // No route for the original, so the HEAD comes back 404: the file is cached but
   // the network cannot serve it right now.
   const kiosk = await bootWithCachedVideo(ANSWERED, { 'current-lesson.json': { json: CURRENT } });
   const objectUrls = countObjectUrls(kiosk.window);
@@ -122,7 +123,7 @@ test('an offline kiosk plays the cached copy without probing at all', async () =
   assert.equal(
     kiosk.fetchLog
       .slice(before)
-      .some((r) => r.method === 'HEAD' && r.url.includes('current-lesson-video.mp4')),
+      .some((r) => r.method === 'HEAD' && r.url.includes('student-1-original.mp4')),
     false,
     'navigator.onLine already answered the question'
   );
@@ -132,7 +133,7 @@ test('an offline kiosk plays the cached copy without probing at all', async () =
 test('a streamed video that stalls swaps to the cached copy, once, where it was', async () => {
   const kiosk = await bootWithCachedVideo();
   await beginTheLesson(kiosk);
-  assert.equal(kiosk.video.getAttribute('src'), 'current-lesson-video.mp4');
+  assert.equal(kiosk.video.getAttribute('src'), CURRENT.sourceUrl);
 
   kiosk.video.currentTime = 120;
   const timers = captureTimers(kiosk.window, () =>
@@ -161,10 +162,10 @@ test('a streamed video that stalls swaps to the cached copy, once, where it was'
 test('a stall with nothing cached is left to the existing stall handling', async () => {
   // No cache at all: the picker's videos and any evening the bundle never
   // landed. There is nothing to swap to, so nothing is armed.
-  const kiosk = bootKiosk(ROUTES, ANSWERED, PI_ZERO);
+  const kiosk = bootKiosk(ROUTES, ANSWERED, KIOSK_PC);
   await ticks();
   await beginTheLesson(kiosk);
-  assert.equal(kiosk.video.getAttribute('src'), 'current-lesson-video.mp4');
+  assert.equal(kiosk.video.getAttribute('src'), CURRENT.sourceUrl);
 
   const timers = captureTimers(kiosk.window, () =>
     kiosk.video.dispatchEvent(new kiosk.window.Event('waiting'))
@@ -185,6 +186,6 @@ test('a stall on the last seconds hands over to the slides instead of swapping',
   timerAt(timers, 8000).cb();
   await ticks(6);
 
-  assert.equal(kiosk.video.getAttribute('src'), 'current-lesson-video.mp4', 'no swap this close to the end');
+  assert.equal(kiosk.video.getAttribute('src'), CURRENT.sourceUrl, 'no swap this close to the end');
   kiosk.close();
 });

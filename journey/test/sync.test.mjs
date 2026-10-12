@@ -138,7 +138,7 @@ test('a pull never overwrites a change made here that has not gone up yet', asyn
   k.close();
 });
 
-test('a change here goes to every Journey screen, and video quality never does', async () => {
+test('a change here goes to every Journey screen, and a leftover quality choice never does', async () => {
   const k = boot({ journey: ROOM, prefs: { 'awanaSyncSession.v1': SESSION, 'journey.playback.quality': 'low' } });
   await settle();
   const size = k.document.getElementById('captions-size');
