@@ -121,6 +121,23 @@ test('a signed-in screen pulls the room\'s settings at start', async () => {
   k.close();
 });
 
+test('a pull never overwrites a change made here that has not gone up yet', async () => {
+  const journey = structuredClone(ROOM);
+  const k = boot({ journey, prefs: { 'awanaSyncSession.v1': SESSION } });
+  await settle();
+  // An edit made here, its push not yet sent...
+  k.window.localStorage.setItem('journey.captions.size', '0.8');
+  // ...while the room has moved on.
+  journey.savedAt = '2026-10-02T18:00:00.000Z';
+  journey.settings = { ...journey.settings, captionSize: '1.6' };
+  await k.window.journeySync.pull();
+  await settle();
+  assert.equal(k.window.localStorage.getItem('journey.captions.size'), '0.8', 'the local edit survives the pull');
+  const put = k.calls.filter((c) => c.route === '/v1/journey' && c.method === 'PUT').at(-1);
+  assert.ok(put && put.body.settings.captionSize === '0.8', 'and it is sent up');
+  k.close();
+});
+
 test('a change here goes to every Journey screen, and video quality never does', async () => {
   const k = boot({ journey: ROOM, prefs: { 'awanaSyncSession.v1': SESSION, 'journey.playback.quality': 'low' } });
   await settle();
