@@ -1,12 +1,28 @@
+// GENERATED from lobby/shared/clubNight.js by scripts/shared-copies.mjs: do not edit; edit the source and run
+// `node scripts/shared-copies.mjs`. scripts/check-mirrors.mjs fails when this copy drifts.
 // @ts-check
-// When the lobby display should be on screen: club nights, 5:00 to 8:00 pm,
-// in the church's own time zone. Pure (no Electron, no clock of its own), so
-// the rules are unit-tested; main.js hands it the time and the two files.
+// THE club-night rule: when a Wednesday club night is on, and when a screen
+// shows for it. Pure (no Electron, no clock of its own, no DOM), so one copy
+// serves every reader and the rules are unit-tested once
+// (lobby/shared/clubNight.test.js).
+//
+// Who reads it, and how (see lobby/shared/README.md):
+//   - lobby/src (the signage, the projector) imports this file through Vite;
+//   - lobby/desktop (the sound room bridge) and printer/electron-app (the
+//     one KVBC Awana app) ship in installers that cannot reach outside their
+//     own folder, so each carries a GENERATED copy
+//     (lobby/desktop/src/clubNight.js, printer/electron-app/src/display/clubNight.js)
+//     made by `node scripts/shared-copies.mjs`; scripts/check-mirrors.mjs
+//     fails CI when either has drifted. Edit this file, then regenerate.
+//
+// The window is the computer's own hours (the printer app's settings.hours,
+// owner 2026-10-11: "hours per computer"); without hours it is the church's
+// 5:00 to 8:00 pm, exactly what the sound room bridge always used.
 //
 // A club night is decided the same way the signage decides one
-// (src/lib/calendarLogic.js clubNights() / deriveClubInfo()):
+// (lobby/src/lib/calendarLogic.js clubNights() / deriveClubInfo()):
 //   1. shared/schedule.json's specialDates marks a date `noClub: true`:
-//      never a club night, whatever else says so;
+//      never a club night, whatever else says so (isNoClubDate);
 //   2. a specialDates entry with its own `windows` table is a special meeting
 //      (the projector runs one even on a non-Wednesday): a club night;
 //   3. with a calendar feed (calendar-feed.json, built nightly from TwoTimTwo,
@@ -21,14 +37,37 @@
 
 /** @typedef {{ meeting?: { day?: number }, timezone?: string, specialDates?: Record<string, { noClub?: boolean, windows?: unknown[] }> }} Schedule */
 /** @typedef {{ generatedAt?: string, events?: Array<{ date?: string, kind?: string, isCancelled?: boolean }> }} Feed */
+/** @typedef {{ openMin: number, closeMin: number }} Hours */
 
 export const DEFAULT_TIMEZONE = 'America/New_York';
 export const DEFAULT_MEETING_DAY = 3; // Wednesday
 export const OPEN_AT_MIN = 17 * 60; // 5:00 pm
 export const CLOSE_AT_MIN = 20 * 60; // 8:00 pm
+/** @type {Hours} */
+export const DEFAULT_HOURS = Object.freeze({ openMin: OPEN_AT_MIN, closeMin: CLOSE_AT_MIN });
 
 const DATE_KEY = /^\d{4}-\d{2}-\d{2}$/;
 const WEEKDAYS = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+
+/**
+ * Is `dateKey` marked no-club by the schedule's specialDates table?
+ *
+ * @param {Record<string, { noClub?: boolean }> | null | undefined} specialDates
+ * @param {string} dateKey  YYYY-MM-DD
+ * @returns {boolean}
+ */
+export function isNoClubDate(specialDates, dateKey) {
+  return specialDates?.[dateKey]?.noClub === true;
+}
+
+/** Good hours, or the default: an open before its close, inside one day. */
+export function hoursOrDefault(/** @type {any} */ hours) {
+  if (hours && Number.isInteger(hours.openMin) && Number.isInteger(hours.closeMin)
+    && hours.openMin >= 0 && hours.closeMin <= 24 * 60 && hours.openMin < hours.closeMin) {
+    return /** @type {Hours} */ ({ openMin: hours.openMin, closeMin: hours.closeMin });
+  }
+  return DEFAULT_HOURS;
+}
 
 /**
  * The wall-clock date, weekday and minute of the day at `now` in `timeZone`.
@@ -69,7 +108,7 @@ export function zonedParts(now, timeZone = DEFAULT_TIMEZONE) {
  */
 export function isClubNight(dateKey, weekday, { schedule = null, feed = null, timeZone = DEFAULT_TIMEZONE } = {}) {
   const special = schedule?.specialDates && typeof schedule.specialDates === 'object' ? schedule.specialDates : {};
-  if (special[dateKey]?.noClub === true) return false;
+  if (isNoClubDate(special, dateKey)) return false;
   if (Array.isArray(special[dateKey]?.windows) && special[dateKey].windows.length > 0) return true;
 
   const events = Array.isArray(feed?.events)
@@ -77,7 +116,7 @@ export function isClubNight(dateKey, weekday, { schedule = null, feed = null, ti
     : [];
   const generated = feed?.generatedAt ? new Date(feed.generatedAt) : null;
   const generatedKey = generated && !Number.isNaN(generated.getTime()) ? zonedParts(generated, timeZone).dateKey : null;
-  const lastKey = events.reduce((max, e) => (e.date > max ? e.date : max), '');
+  const lastKey = events.reduce((max, e) => { const d = /** @type {string} */ (e.date); return d > max ? d : max; }, '');
   if (events.length && dateKey > lastKey) return false; // past the season
   const covered = events.length > 0 && generatedKey != null && generatedKey <= dateKey;
   if (covered) {
@@ -88,6 +127,8 @@ export function isClubNight(dateKey, weekday, { schedule = null, feed = null, ti
   return weekday === day;
 }
 
+const zoneOf = (/** @type {Schedule | null} */ schedule) => (typeof schedule?.timezone === 'string' && schedule.timezone ? schedule.timezone : DEFAULT_TIMEZONE);
+
 /**
  * Whether `now` is inside tonight's display window, and the key of that
  * window (its date), which the "Hide until the next club night" override is
@@ -95,12 +136,14 @@ export function isClubNight(dateKey, weekday, { schedule = null, feed = null, ti
  *
  * @param {Date} now
  * @param {{ schedule?: Schedule | null, feed?: Feed | null }} sources
+ * @param {Hours} [hours]  this computer's hours (default 5:00 to 8:00 pm)
  * @returns {{ inWindow: boolean, windowKey: string | null, dateKey: string, minutes: number }}
  */
-export function displayWindow(now, { schedule = null, feed = null } = {}) {
-  const timeZone = typeof schedule?.timezone === 'string' && schedule.timezone ? schedule.timezone : DEFAULT_TIMEZONE;
+export function displayWindow(now, { schedule = null, feed = null } = {}, hours) {
+  const { openMin, closeMin } = hoursOrDefault(hours);
+  const timeZone = zoneOf(schedule);
   const { dateKey, weekday, minutes } = zonedParts(now, timeZone);
-  const inHours = minutes >= OPEN_AT_MIN && minutes < CLOSE_AT_MIN;
+  const inHours = minutes >= openMin && minutes < closeMin;
   const inWindow = inHours && isClubNight(dateKey, weekday, { schedule, feed, timeZone });
   return { inWindow, windowKey: inWindow ? dateKey : null, dateKey, minutes };
 }
@@ -112,10 +155,12 @@ export function displayWindow(now, { schedule = null, feed = null } = {}) {
  * @param {Date} now
  * @param {{ schedule?: Schedule | null, feed?: Feed | null }} sources
  * @param {number} [days]
+ * @param {Hours} [hours]
  * @returns {string | null}
  */
-export function nextClubNight(now, { schedule = null, feed = null } = {}, days = 60) {
-  const timeZone = typeof schedule?.timezone === 'string' && schedule.timezone ? schedule.timezone : DEFAULT_TIMEZONE;
+export function nextClubNight(now, { schedule = null, feed = null } = {}, days = 60, hours) {
+  const { closeMin } = hoursOrDefault(hours);
+  const timeZone = zoneOf(schedule);
   const today = zonedParts(now, timeZone);
   for (let i = 0; i <= days; i++) {
     // Noon UTC steps a whole day at a time with no DST edge to trip on.
@@ -123,7 +168,7 @@ export function nextClubNight(now, { schedule = null, feed = null } = {}, days =
     const probe = new Date(Date.UTC(y, m - 1, d + i, 12));
     const key = probe.toISOString().slice(0, 10);
     const weekday = probe.getUTCDay();
-    if (i === 0 && today.minutes >= CLOSE_AT_MIN) continue;
+    if (i === 0 && today.minutes >= closeMin) continue;
     if (isClubNight(key, weekday, { schedule, feed, timeZone })) return key;
   }
   return null;
@@ -131,14 +176,15 @@ export function nextClubNight(now, { schedule = null, feed = null } = {}, days =
 
 /**
  * Whether today (in the church's zone) is a club night, at any hour: the
- * optional shutdown asks after the 8:00 pm close, which nextClubNight() has
- * already moved past.
+ * optional shutdown asks after the close, which nextClubNight() has already
+ * moved past.
  *
  * @param {Date} now
  * @param {{ schedule?: Schedule | null, feed?: Feed | null }} sources
  */
 export function clubNightToday(now, { schedule = null, feed = null } = {}) {
-  const timeZone = typeof schedule?.timezone === 'string' && schedule.timezone ? schedule.timezone : DEFAULT_TIMEZONE;
+  const timeZone = zoneOf(schedule);
   const { dateKey, weekday } = zonedParts(now, timeZone);
   return isClubNight(dateKey, weekday, { schedule, feed, timeZone });
 }
+

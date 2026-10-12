@@ -15,6 +15,7 @@
 // ─────────────────────────────────────────────────────────────
 
 import { SLIDE_THEMES, TEXT_SIZES } from './slides.js';
+import { isNoClubDate } from '../../shared/clubNight.js';
 
 // Local-time YYYY-MM-DD key (same recipe as useTally's todayKey).
 export function localDateStr(d = new Date()) {
@@ -106,8 +107,8 @@ function dayOfWeek(dateStr) {
 export function clubNights(events, specialDates = null) {
   const special = (specialDates && typeof specialDates === 'object') ? specialDates : {};
   return (Array.isArray(events) ? events : []).filter((e) => e?.kind === 'club').map((e) => {
+    if (!isNoClubDate(special, e.date)) return e;
     const entry = special[e.date];
-    if (!entry || entry.noClub !== true) return e;
     // The calendar's own title still stands as the title (it may be a real
     // event name); the shared file's label is carried separately, because it is
     // the church's words for WHY there is no club, which is what the heads-up

@@ -1,18 +1,29 @@
+// GENERATED from lobby/shared/clubNight.js by scripts/shared-copies.mjs: do not edit; edit the source and run
+// `node scripts/shared-copies.mjs`. scripts/check-mirrors.mjs fails when this copy drifts.
+'use strict';
 // @ts-check
-// When the display should be on screen: club nights, within this computer's
-// display hours (default 5:00 to 8:00 pm), in the church's own time zone.
-// Pure (no Electron, no clock of its own), so the rules are unit-tested;
-// display.js hands it the time, the two files and the hours.
+// THE club-night rule: when a Wednesday club night is on, and when a screen
+// shows for it. Pure (no Electron, no clock of its own, no DOM), so one copy
+// serves every reader and the rules are unit-tested once
+// (lobby/shared/clubNight.test.js).
 //
-// Moved here from lobby/desktop/src/clubNight.js (the sound room app, KVBC
-// Awana v9, ROADMAP.md#kvbc-awana-one-app). The one change: the window is this computer's
-// hours (settings.hours, owner 2026-10-11: "hours per computer"), not a fixed
-// 5:00 to 8:00 pm. Without hours it is exactly the old window.
+// Who reads it, and how (see lobby/shared/README.md):
+//   - lobby/src (the signage, the projector) imports this file through Vite;
+//   - lobby/desktop (the sound room bridge) and printer/electron-app (the
+//     one KVBC Awana app) ship in installers that cannot reach outside their
+//     own folder, so each carries a GENERATED copy
+//     (lobby/desktop/src/clubNight.js, printer/electron-app/src/display/clubNight.js)
+//     made by `node scripts/shared-copies.mjs`; scripts/check-mirrors.mjs
+//     fails CI when either has drifted. Edit this file, then regenerate.
+//
+// The window is the computer's own hours (the printer app's settings.hours,
+// owner 2026-10-11: "hours per computer"); without hours it is the church's
+// 5:00 to 8:00 pm, exactly what the sound room bridge always used.
 //
 // A club night is decided the same way the signage decides one
 // (lobby/src/lib/calendarLogic.js clubNights() / deriveClubInfo()):
 //   1. shared/schedule.json's specialDates marks a date `noClub: true`:
-//      never a club night, whatever else says so;
+//      never a club night, whatever else says so (isNoClubDate);
 //   2. a specialDates entry with its own `windows` table is a special meeting
 //      (the projector runs one even on a non-Wednesday): a club night;
 //   3. with a calendar feed (calendar-feed.json, built nightly from TwoTimTwo,
@@ -24,7 +35,6 @@
 //      schedule's meeting day (Wednesday).
 // Rule 3's "season over" keeps the TV dark all summer; the tray's Show now is
 // the way to put it up for a summer event.
-'use strict';
 
 /** @typedef {{ meeting?: { day?: number }, timezone?: string, specialDates?: Record<string, { noClub?: boolean, windows?: unknown[] }> }} Schedule */
 /** @typedef {{ generatedAt?: string, events?: Array<{ date?: string, kind?: string, isCancelled?: boolean }> }} Feed */
@@ -39,6 +49,17 @@ const DEFAULT_HOURS = Object.freeze({ openMin: OPEN_AT_MIN, closeMin: CLOSE_AT_M
 
 const DATE_KEY = /^\d{4}-\d{2}-\d{2}$/;
 const WEEKDAYS = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+
+/**
+ * Is `dateKey` marked no-club by the schedule's specialDates table?
+ *
+ * @param {Record<string, { noClub?: boolean }> | null | undefined} specialDates
+ * @param {string} dateKey  YYYY-MM-DD
+ * @returns {boolean}
+ */
+function isNoClubDate(specialDates, dateKey) {
+  return specialDates?.[dateKey]?.noClub === true;
+}
 
 /** Good hours, or the default: an open before its close, inside one day. */
 function hoursOrDefault(/** @type {any} */ hours) {
@@ -88,7 +109,7 @@ function zonedParts(now, timeZone = DEFAULT_TIMEZONE) {
  */
 function isClubNight(dateKey, weekday, { schedule = null, feed = null, timeZone = DEFAULT_TIMEZONE } = {}) {
   const special = schedule?.specialDates && typeof schedule.specialDates === 'object' ? schedule.specialDates : {};
-  if (special[dateKey]?.noClub === true) return false;
+  if (isNoClubDate(special, dateKey)) return false;
   if (Array.isArray(special[dateKey]?.windows) && special[dateKey].windows.length > 0) return true;
 
   const events = Array.isArray(feed?.events)
@@ -96,7 +117,7 @@ function isClubNight(dateKey, weekday, { schedule = null, feed = null, timeZone 
     : [];
   const generated = feed?.generatedAt ? new Date(feed.generatedAt) : null;
   const generatedKey = generated && !Number.isNaN(generated.getTime()) ? zonedParts(generated, timeZone).dateKey : null;
-  const lastKey = events.reduce((max, e) => (e.date > max ? e.date : max), '');
+  const lastKey = events.reduce((max, e) => { const d = /** @type {string} */ (e.date); return d > max ? d : max; }, '');
   if (events.length && dateKey > lastKey) return false; // past the season
   const covered = events.length > 0 && generatedKey != null && generatedKey <= dateKey;
   if (covered) {
@@ -169,6 +190,16 @@ function clubNightToday(now, { schedule = null, feed = null } = {}) {
 }
 
 module.exports = {
-  DEFAULT_TIMEZONE, DEFAULT_MEETING_DAY, OPEN_AT_MIN, CLOSE_AT_MIN, DEFAULT_HOURS,
-  hoursOrDefault, zonedParts, isClubNight, displayWindow, nextClubNight, clubNightToday,
+  DEFAULT_TIMEZONE,
+  DEFAULT_MEETING_DAY,
+  OPEN_AT_MIN,
+  CLOSE_AT_MIN,
+  DEFAULT_HOURS,
+  isNoClubDate,
+  hoursOrDefault,
+  zonedParts,
+  isClubNight,
+  displayWindow,
+  nextClubNight,
+  clubNightToday,
 };

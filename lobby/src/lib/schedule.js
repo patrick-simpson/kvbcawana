@@ -8,7 +8,9 @@
 // styling and the chime ducks, so a straggler's arrival doesn't blast
 // over the pledges happening in the next room.
 
-export const PHASES = ['off', 'countdown', 'ceremony', 'game-time', 'closing', 'shutdown'];
+import { DEFAULT_MEETING_DAY, isNoClubDate as isNoClubIn } from '../../shared/clubNight.js';
+
+export const PHASES =['off', 'countdown', 'ceremony', 'game-time', 'closing', 'shutdown'];
 
 // shared/schedule.json window `kind` → display phase.
 const KIND_TO_PHASE = {
@@ -20,7 +22,7 @@ const KIND_TO_PHASE = {
 // Baked KVBC fallback — mirrors shared/schedule.json in the countdown
 // repo, already reduced to phases.
 export const DEFAULT_SCHEDULE = {
-  meetingDay: 3, // Wednesday
+  meetingDay: DEFAULT_MEETING_DAY, // Wednesday
   specialDates: {},
   windows: [
     { start: '18:00', end: '18:05', phase: 'ceremony' },
@@ -120,7 +122,7 @@ export function sanitizeSpecialDates(raw) {
  * @returns {boolean}
  */
 export function isNoClubDate(schedule, dateStr) {
-  return schedule?.specialDates?.[dateStr]?.noClub === true;
+  return isNoClubIn(schedule?.specialDates, dateStr);
 }
 
 /**

@@ -52,7 +52,9 @@ function sharedDir() {
       });
     },
     closeBundle() {
-      cpSync(SHARED_DIR, resolve(__dirname, 'dist/shared'), { recursive: true });
+      // Data and art only: the shared modules (shared/*.js) and their tests
+      // are source for the builds, not something the site serves.
+      cpSync(SHARED_DIR, resolve(__dirname, 'dist/shared'), { recursive: true, filter: (src) => !/\.js$/.test(src) });
     },
   };
 }

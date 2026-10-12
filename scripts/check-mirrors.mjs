@@ -8,12 +8,15 @@
 //   the brand kit                 lobby/shared/brand/  ->  journey/public/brand/,
 //                                                          printer/print-server/public/brand/
 //   family.css                    printer/styles/  ->  lobby/public/, journey/public/
+//   shared modules                lobby/shared/*.js  ->  generated copies for the packaged
+//                                 apps (scripts/shared-copies.mjs lists them)
 //
 // Until the one-site build serves a single copy of each (step 2), the copies
 // stay, and this keeps them honest.
 import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { drift as sharedDrift } from './shared-copies.mjs';
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const rel = (p) => path.relative(ROOT, p);
@@ -51,9 +54,11 @@ sameTree('lobby/shared/brand', 'printer/print-server/public/brand');
 same('printer/styles/family.css', 'lobby/public/family.css');
 same('printer/styles/family.css', 'journey/public/family.css');
 
+for (const d of sharedDrift()) problems.push(`${d.dest} differs from what ${d.src} generates (run node scripts/shared-copies.mjs)`);
+
 if (problems.length) {
   console.error(`✗ ${problems.length} copy problem(s):\n  ${problems.join('\n  ')}`);
   console.error('Change the canonical file, then copy it over the others (never the other way round).');
   process.exit(1);
 }
-console.log('✓ contract vectors, envelope vectors, the brand kit and family.css match across the three apps');
+console.log('✓ contract vectors, envelope vectors, the brand kit, family.css and the generated shared modules match across the apps');
