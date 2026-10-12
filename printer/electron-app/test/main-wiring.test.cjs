@@ -75,3 +75,11 @@ describe('the repair installer download', () => {
     assert.match(body, /fs\.unlinkSync\(dest\)/);
   });
 });
+
+describe('the hidden printer window', () => {
+  it('is made again after a crash, and every use goes through getPdfWindow', () => {
+    assert.match(main, /function getPdfWindow\(\) \{\n  if \(!pdfWindow \|\| pdfWindow\.isDestroyed\(\)\) createPdfWindow\(\);/);
+    assert.match(main, /render-process-gone/);
+    assert.doesNotMatch(main, /[^t]pdfWindow\.webContents\.getPrintersAsync/);
+  });
+});

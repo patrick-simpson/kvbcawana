@@ -354,6 +354,17 @@ function createPdfWindow() {
     webPreferences: { nodeIntegration: false, contextIsolation: true }
   });
   pdfWindow.loadURL('about:blank');
+  // A renderer crash leaves a dead window; forget it so the next use makes a new one.
+  pdfWindow.webContents.on('render-process-gone', () => {
+    try { if (pdfWindow && !pdfWindow.isDestroyed()) pdfWindow.destroy(); } catch { /* gone */ }
+    pdfWindow = null;
+  });
+}
+
+/** The hidden printer-enumeration window, made again if a crash took it. */
+function getPdfWindow() {
+  if (!pdfWindow || pdfWindow.isDestroyed()) createPdfWindow();
+  return pdfWindow;
 }
 
 function createSetupWindow() {
@@ -819,7 +830,7 @@ async function ensureServerRunning(context) {
 ipcMain.handle('get-printers', async () => {
   try {
     // Use Electron's built-in printer enumeration — no subprocess, always works
-    const printers = await pdfWindow.webContents.getPrintersAsync();
+    const printers = await getPdfWindow().webContents.getPrintersAsync();
     return printers.map(p => ({ name: p.name, isDefault: p.isDefault }));
   } catch {
     return [];
@@ -1416,7 +1427,7 @@ app.whenReady().then(async () => {
     },
     printers: async () => {
       try {
-        const list = await pdfWindow.webContents.getPrintersAsync();
+        const list = await getPdfWindow().webContents.getPrintersAsync();
         return list.map((p) => ({ name: p.name, isDefault: p.isDefault }));
       } catch { return []; }
     },
