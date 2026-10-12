@@ -640,8 +640,12 @@ Worker as the one source of jobs.
   `{job}` meta; the relay sends it as the station (`X-Station`) with `X-Job` to
   `POST /v1/publish` (`sendGreeting`: a 4xx or a dropped answer is final, an unreachable
   Worker is tried three times). The Worker lets exactly one greeting per job through and
-  drops every other `checkin`. A `/print` with no job (the extension's own path) greets
-  through the laptop's relay queue as before. `scripts/test-station-greeting.cjs`.
+  drops every other `checkin`. On a station a `/print` with no job (the phone page's relay
+  job, the extension) greets as the station naming the child (`greet: {clubberId}` or a
+  visitor's name and club), and a cloud job that meets a label already printed greets
+  LATE with that label's own event (`late: true`): the Worker greets each child once a
+  night (routes.md section 8). Without the station role it greets through the laptop's
+  relay queue as before. `scripts/test-station-greeting.cjs`.
 
 **Every dashboard tool is on awana.kvbchurch.org/settings, Laptop section**
 (`lobby/src/components/settings/laptop.jsx` and `laptop-tools.jsx`,

@@ -25,12 +25,20 @@
 //
 // And the gate (`gate()`, called by POST /v1/publish): while the Worker is the
 // publisher the laptop's `tally`, `tonight` and `checkout` frames are DROPPED
-// (200 {dropped: true}, so the print server owes no resend) and so is every
-// `checkin` greeting but ONE per print job from a registered station: the
-// greeting only the station can make (birthday, first-timer, milestone: it
-// holds the roster and the history key), sent with the job it printed
-// (`X-Job`) and let through once (printq.greet). A dropped `tally` or
-// `tonight` frame is plaintext numbers, so its season / rehearsal flag and the
+// (200 {dropped: true}, so the print server owes no resend), and a `checkin`
+// greeting goes through only from a registered station (`X-Station`) and only
+// ONCE PER CHILD PER NIGHT: the greeting only the station can make (birthday,
+// first-timer, milestone: it holds the roster and the history key), named
+// either by the job it printed (`X-Job`, printq.greet) or, for a label it printed
+// with no job (the phone page's relay job, the extension, a phone visitor), by
+// the child in the body (`greet: {clubberId}` or `greet: {name, club}`), which the
+// Worker turns into the claim's own tag in memory (never stored). So whichever
+// door a child came through, and whichever path then printed (a TwoTimTwo-page
+// job that met a label already printed greets LATE, `late: true`, with its job),
+// the screens hear them once. A late greeting is dropped while the laptop is
+// still the publisher (it greeted the first time). The greeted tags are kept for
+// the night only (`publisher:greeted`), purged with the claims. A dropped `tally`
+// or `tonight` frame is plaintext numbers, so its season / rehearsal flag and the
 // books and awards counts are remembered for the frames the Worker makes.
 //
 // Free plan: a publish is a few microseconds of counting plus at most one AES
@@ -57,12 +65,15 @@ export class Publisher {
    * @param {{ storage: { get(k: string): Promise<any>, put(k: string, v: any): Promise<void>, delete(k: string): Promise<any> },
    *   book: import('./tonight.js').TonightBook, stations: import('./stations.js').Stations,
    *   printq: import('./printq.js').PrintQueue, ledger: import('./ledger.js').Ledger,
-   *   now: () => number, enabled: () => boolean,
+   *   tags?: import('./ledger.js').Tags, now: () => number, enabled: () => boolean,
    *   publish: (event: string, payload: unknown, sealed: boolean) => Promise<unknown>,
    *   log?: (line: string) => void }} deps
    */
-  constructor({ storage, book, stations, printq, ledger, now, enabled, publish, log }) {
+  constructor({ storage, book, stations, printq, ledger, tags, now, enabled, publish, log }) {
     this.book = book;
+    this.tags = tags || null;
+    /** Who has been greeted tonight: claim tags (HMACs), never an id or a name. */
+    this.greetedDoc = new Doc(storage, 'publisher:greeted', () => ({ night: null, tags: {} }));
     this.stations = stations;
     this.printq = printq;
     this.ledger = ledger;
@@ -202,6 +213,8 @@ export class Publisher {
   /** The window has closed: names and the night's counters go; the next night starts clean. */
   async endOfNight() {
     const n = await this.book.endOfNight();
+    await this.greetedDoc.load();
+    await this.greetedDoc.drop();
     this.last = { tally: { sig: null, at: 0 }, tonight: { sig: null, at: 0 }, checkout: { sig: null, at: 0 } };
     return n;
   }
@@ -212,11 +225,17 @@ export class Publisher {
    * What to do with a frame a client posts to /v1/publish. null = relay it as
    * given; otherwise the answer to send instead (the frame is dropped).
    * @param {Request} request @param {string} event @param {any} payload
+   * @param {{ greet?: any, late?: boolean }} [meta] what a station's greeting says about itself
    * @returns {Promise<Record<string, any>|null>}
    */
-  async gate(request, event, payload) {
-    if (!this.enabled()) return null;
-    if (event === 'checkin') return this.gateGreeting(request);
+  async gate(request, event, payload, meta = {}) {
+    if (!this.enabled()) {
+      // The laptop is the publisher and greeted the child when it printed the first
+      // label: a late greeting (a TwoTimTwo-page job that met that label) would be a second.
+      if (event === 'checkin' && meta.late === true) { this.published.dropped += 1; return { ok: true, screens: 0, dropped: true, reason: 'late' }; }
+      return null;
+    }
+    if (event === 'checkin') return this.gateGreeting(request, meta);
     if (!SINGLE_PUBLISHER_DROPS.includes(event)) return null;
     // Plaintext numbers the Worker's own frames need: remember, then drop.
     if (event === 'tally' && payload && typeof payload === 'object') {
@@ -228,18 +247,59 @@ export class Publisher {
     return { ok: true, screens: 0, dropped: true, reason: 'single-publisher' };
   }
 
-  /** One greeting per check-in job, and only the registered station's. @param {Request} request */
-  async gateGreeting(request) {
+  /**
+   * One greeting per child per night, and only a registered station's: named by
+   * its print job, or by the child it printed with no job.
+   * @param {Request} request @param {{ greet?: any, late?: boolean }} meta
+   */
+  async gateGreeting(request, meta = {}) {
     const drop = (/** @type {string} */ why) => { this.published.dropped += 1; return { ok: true, screens: 0, dropped: true, reason: why }; };
     const stationId = request.headers.get('X-Station') || '';
     const jobId = request.headers.get('X-Job') || '';
-    if (!stationId || !jobId) return drop('single-publisher');
+    if (!stationId || (!jobId && !meta.greet)) return drop('single-publisher');
     await this.stations.load();
     if (!this.stations.get(stationId)) return drop('unknown-station');
-    const r = await this.printq.greet(jobId, localTime(this.now()).date);
-    if (!r.ok) return drop(r.reason);
+    const night = localTime(this.now()).date;
+    await this.greetedDoc.load();
+    if (jobId) {
+      const r = await this.printq.greet(jobId, night, (tag) => this.takeChild(night, tag));
+      if (!r.ok) return drop(r.reason);
+    } else {
+      const tag = await this.childTag(night, meta.greet);
+      if (!tag) return drop('no-child');
+      if (!this.takeChild(night, tag)) return drop('already-greeted');
+    }
+    await this.greetedDoc.save();
     this.published.greetings += 1;
     return null;
+  }
+
+  /**
+   * Mark a child greeted tonight. One synchronous step (after greetedDoc.load()):
+   * false when they already were. A job with no tag (none) is its own child.
+   * @param {string} night @param {string|null} tag
+   */
+  takeChild(night, tag) {
+    const d = this.greetedDoc.data;
+    if (d.night !== night) { d.night = night; d.tags = {}; }
+    if (!tag) return true;
+    if (d.tags[tag]) return false;
+    d.tags[tag] = 1;
+    return true;
+  }
+
+  /**
+   * The claim tag of the child a job-less greeting names: `{clubberId}` or a
+   * visitor's `{name, club}`. In memory only; null when it names nobody.
+   * @param {string} night @param {any} g
+   */
+  async childTag(night, g) {
+    if (!this.tags || !g || typeof g !== 'object') return null;
+    const id = typeof g.clubberId === 'string' || typeof g.clubberId === 'number' ? String(g.clubberId).trim() : '';
+    if (id) return /^\d{1,12}$/.test(id) ? this.tags.identity(night, id) : null;
+    const name = typeof g.name === 'string' ? g.name.replace(/\s+/g, ' ').trim().slice(0, 80) : '';
+    const club = typeof g.club === 'string' ? g.club.replace(/\s+/g, ' ').trim().slice(0, 40) : '';
+    return name ? this.tags.visitor(night, name, club) : null;
   }
 
   // ── status ─────────────────────────────────────────────────────────────────

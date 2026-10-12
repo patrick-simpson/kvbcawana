@@ -234,15 +234,18 @@ export class PrintQueue {
    * printed it may greet the child once. One synchronous step; a job that is
    * gone (undone, purged), another night's, a reprint's or already greeted
    * is refused with its reason.
-   * @param {string} jobId @param {string} night
+   * `takeChild(tag)` (the publisher's once-per-child-per-night check) runs in the
+   * same synchronous step: false means this child was already greeted tonight.
+   * @param {string} jobId @param {string} night @param {(tag: string|null) => boolean} [takeChild]
    * @returns {Promise<{ ok: true } | { ok: false, reason: 'unknown-job'|'already-greeted'|'not-a-checkin' }>}
    */
-  async greet(jobId, night) {
+  async greet(jobId, night, takeChild) {
     await this.load();
     const job = validJobId(jobId) ? this.jobs()[jobId] : undefined;
     if (!job || job.night !== night || job.state === 'dead') return { ok: false, reason: 'unknown-job' };
     if (job.kind !== 'checkin') return { ok: false, reason: 'not-a-checkin' };
     if (job.greeted) return { ok: false, reason: 'already-greeted' };
+    if (takeChild && !takeChild(job.tag)) return { ok: false, reason: 'already-greeted' };
     job.greeted = true;
     await this.doc.save();
     return { ok: true };

@@ -8,6 +8,7 @@ import { REPORT_FRESH_MS } from '../../shared/tonight.js';
 import { seal } from '../src/crypto.js';
 import { MINUTE_MS, STILL_GAP_MS } from '../src/publisher.js';
 import { SyncCore } from '../src/sync.js';
+import { SPILL_MS, WATCH_INTERVAL_MS } from '../src/watcher.js';
 import { fakeClock, everything, memoryStore, sealJob } from './helpers.js';
 import { ENV, NIGHT, kid, rig, row } from './rig.js';
 
@@ -80,6 +81,63 @@ describe('the single publisher gate', () => {
     const reprintId = 'reprint:11111111-2222-3333-4444-555555555555';
     expect((await t.call('POST', '/v1/print/reprint', { jobId: reprintId, bundle: rp.bundle })).body.ok).toBe(true);
     expect((await sealed({ 'X-Station': st.body.stationId, 'X-Job': reprintId })).body).toMatchObject({ dropped: true });
+  });
+
+  it('greets each child ONCE a night whichever path printed them: a job-less station greeting names the child, a late job greeting fills in a dropped one', async () => {
+    const t = await rig({ env: ON, kids: [] });
+    await t.core.watcher.tick();   // the baseline read: nobody is here
+    const st = await t.station();
+    const S = { 'X-Station': st.body.stationId };
+    const greeting = async (extra = {}, headers = {}) => (await t.call('POST', '/v1/publish', {
+      event: 'checkin', payload: await seal(await t.core.displayKey(), 'checkin', { firstName: 'Kit', club: 'Sparks' }), ...extra,
+    }, headers)).body;
+    const count = () => t.sent.filter((f) => f.e === 'checkin').length;
+
+    // the phone page's relay job (or the extension) printed on the station: it names the child
+    expect(await greeting({ greet: { clubberId: '662' } })).toMatchObject({ dropped: true, reason: 'single-publisher' });   // no station: dropped
+    expect(await greeting({ greet: { clubberId: '662' } }, S)).toEqual({ ok: true, screens: 1 });
+    expect(await greeting({ greet: { clubberId: '662' } }, S)).toMatchObject({ dropped: true, reason: 'already-greeted' });
+    expect(await greeting({ greet: { clubberId: 'not-an-id' } }, S)).toMatchObject({ dropped: true, reason: 'no-child' });
+    // then the watcher saw them on the report (CLOUD_PRINT): a job, which met the label already printed
+    t.night.kids.push(kid('662', 'Sparks', 'Kit Tester'));
+    t.clock.tick(WATCH_INTERVAL_MS); await t.core.watcher.tick();
+    t.clock.tick(SPILL_MS); await t.core.watcher.tick();
+    const jobs = (await st.call('GET', '/v1/print/next')).body.jobs;
+    expect(jobs).toHaveLength(1);
+    expect(await greeting({ late: true }, { ...S, 'X-Job': jobs[0].jobId })).toMatchObject({ dropped: true, reason: 'already-greeted' });
+    expect(count()).toBe(1);
+
+    // a child whose first greeting the gate dropped (the laptop's relay, no station): the late one greets them, once
+    t.night.kids.push(kid('663', 'Cubbies', 'Ottoline Tester'));
+    expect(await greeting()).toMatchObject({ dropped: true });
+    t.clock.tick(WATCH_INTERVAL_MS); await t.core.watcher.tick();
+    t.clock.tick(SPILL_MS); await t.core.watcher.tick();
+    const late = (await st.call('GET', '/v1/print/next')).body.jobs;
+    expect(late).toHaveLength(1);
+    expect(await greeting({ late: true }, { ...S, 'X-Job': late[0].jobId })).toEqual({ ok: true, screens: 1 });
+    expect(await greeting({ greet: { clubberId: '663' } }, S)).toMatchObject({ dropped: true, reason: 'already-greeted' });
+    expect(count()).toBe(2);
+
+    // a phone visitor (no clubber id) is named by name and club; the desk's spelling is the same child
+    expect(await greeting({ greet: { name: 'Zed Visitor', club: 'Sparks' } }, S)).toEqual({ ok: true, screens: 1 });
+    expect(await greeting({ greet: { name: ' zed  VISITOR', club: 'sparks' } }, S)).toMatchObject({ dropped: true, reason: 'already-greeted' });
+    expect(count()).toBe(3);
+    // storage holds keyed hashes only, never the id or the name it was given
+    expect(everything(t.storage)).not.toMatch(/"662"|"663"|Zed|Visitor/i);
+    // the next night starts clean
+    await t.core.publisher.endOfNight();
+    expect((await t.storage.get('publisher:greeted'))).toBeUndefined();
+  });
+
+  it('with SINGLE_PUBLISHER off a late greeting is dropped (the laptop greeted already) and every other greeting flows as before', async () => {
+    const t = await rig({ kids: [kid('662', 'Sparks', 'Kit Tester')] });
+    const st = await t.station();
+    const body = async (extra) => ({ event: 'checkin', payload: await seal(await t.core.displayKey(), 'checkin', { firstName: 'Kit', club: 'Sparks' }), ...extra });
+    const S = { 'X-Station': st.body.stationId };
+    expect((await t.call('POST', '/v1/publish', await body({}))).body).toEqual({ ok: true, screens: 1 });
+    expect((await t.call('POST', '/v1/publish', await body({ greet: { clubberId: '662' } }), S)).body).toEqual({ ok: true, screens: 1 });
+    expect((await t.call('POST', '/v1/publish', await body({ late: true }), { ...S, 'X-Job': 'A'.repeat(22) })).body).toMatchObject({ dropped: true, reason: 'late' });
+    expect(t.sent.filter((f) => f.e === 'checkin')).toHaveLength(2);
   });
 
   it('while the laptop is still the publisher (SINGLE_PUBLISHER off) the Worker publishes nothing and drops nothing', async () => {

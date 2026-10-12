@@ -56,7 +56,9 @@ export function checkPublish(body) {
   if (new TextEncoder().encode(text).length > LIVE_MAX_BYTES) {
     return { ok: false, status: 413, error: 'That frame is too big for the live channel.' };
   }
-  return { ok: true, event, payload: b.payload, text };
+  // A station's greeting may say who it is for (`greet`) and that it is a late one
+  // (`late`): the publisher's gate reads them; they never reach a screen.
+  return { ok: true, event, payload: b.payload, text, meta: { greet: b.greet && typeof b.greet === 'object' ? b.greet : null, late: b.late === true } };
 }
 
 /** The wire form a screen receives: one JSON object per message. */

@@ -18,7 +18,9 @@
 // P5 (the last section): the Worker as the ONE publisher, with the REAL print server behind
 // the puller. A desk check-in and a TwoTimTwo-page check-in each print once and are greeted
 // ONCE (the station's sealed `checkin`, sent with its job, birthday and all; the laptop's own
-// greeting is dropped, and a replay of a greeting is dropped), the Worker's tally counts them,
+// greeting is dropped, and a replay of a greeting is dropped); a phone page check-in (a relay job)
+// and an extension check-in are greeted once too, when the watcher's job meets their label
+// (no second label, a LATE greeting only if none got through), the Worker's tally counts them,
 // its sealed still-here list names them, and the station's season / pickup clubs reach it.
 //
 // The Worker is ESM and this is CommonJS, so it is loaded with import(). Its
@@ -319,17 +321,53 @@ const fakeSafe = {
     await settle();
     check('an idle tick greets nobody again', frames('checkin').length === 2);
 
+    // the phone page: the Worker checks the child in on TwoTimTwo and hands the station a relay
+    // job (no print-queue job), the station prints and greets naming the child; then the
+    // watcher (CLOUD_PRINT) finds the child on the report and makes a job, which meets the label
+    const labels = () => fs.readFileSync(jobLog, 'utf8').trim().split('\n').length;
+    const local = (p, body) => real(`http://127.0.0.1:34590${p}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then((r) => r.json());
+    const beforePhone = labels();
+    const phonePrint = await local('/print', { name: 'Pip Phonely', clubName: 'Sparks', clubberId: '703', cloud: true });
+    await settle();
+    check('a phone page check-in (the relay job, no print job) prints once and is greeted once', phonePrint.success === true && labels() === beforePhone + 1 && frames('checkin').length === 3, `${JSON.stringify(phonePrint)} ${frames('checkin').length}`);
+    check('and that greeting names them', (await open('checkin', frames('checkin')[2])).firstName === 'Pip');
+    t2.night.kids.push({ id: '703', club: 'Sparks', name: 'Pip Phonely' });
+    t2.clock.tick(WATCH_INTERVAL_MS); await t2.core.watcher.tick();
+    t2.clock.tick(SPILL_MS); await t2.core.watcher.tick();
+    const r3 = await puller2.tick();
+    await settle();
+    check('the watcher\'s job for that child prints no second label and greets nobody twice', r3.handled === 1 && labels() === beforePhone + 1 && frames('checkin').length === 3, `${JSON.stringify(r3)} ${labels()} ${frames('checkin').length}`);
+
+    // the extension (the fallback): its greeting never reached the screens (here: printed while
+    // this computer was not yet the station, its plain relay unreachable); then the watcher's job
+    // meets the label and greets LATE, once, with the printer's own event
+    server.stopCloud();
+    const extPrint = await local('/print', { name: 'Rue Extensia', clubName: 'Cubbies', clubberId: '704' });
+    await settle();
+    server.configureCloud({ stationId: STATION, ring: async () => st.ring, request: request2, start: false, journalFile: null });
+    check('an extension check-in prints, and no greeting reached the screens yet', extPrint.success === true && labels() === beforePhone + 2 && frames('checkin').length === 3, `${JSON.stringify(extPrint)} ${frames('checkin').length}`);
+    t2.night.kids.push({ id: '704', club: 'Cubbies', name: 'Rue Extensia' });
+    t2.clock.tick(WATCH_INTERVAL_MS); await t2.core.watcher.tick();
+    t2.clock.tick(SPILL_MS); await t2.core.watcher.tick();
+    const r4 = await puller2.tick();
+    await settle();
+    check('the watcher\'s job prints no second label but greets the child, once', r4.handled === 1 && labels() === beforePhone + 2 && frames('checkin').length === 4, `${JSON.stringify(r4)} ${labels()} ${frames('checkin').length}`);
+    check('with the greeting the printer made for that label', (await open('checkin', frames('checkin')[3])).firstName === 'Rue');
+    await puller2.tick();
+    await settle();
+    check('an idle tick greets nobody again', frames('checkin').length === 4);
+
     // the Worker's own tally, ticker and still-here list
     t2.clock.tick(WATCH_INTERVAL_MS);
     await t2.core.watcher.tick();
     const tally = frames('tally').at(-1).d;
-    check('the tally counts both children, by club, in the printer\'s shape', tally.total === 2 && tally.counts.Sparks === 1 && tally.counts.Cubbies === 1 && typeof tally.at === 'string', JSON.stringify(tally));
-    check('the ticker says two checked in', frames('tonight').at(-1).d.checkedIn === 2);
+    check('the tally counts every child, by club, in the printer\'s shape', tally.total === 4 && tally.counts.Sparks === 2 && tally.counts.Cubbies === 2 && typeof tally.at === 'string', JSON.stringify(tally));
+    check('the ticker says four checked in', frames('tonight').at(-1).d.checkedIn === 4);
     const still = await open('checkout', frames('checkout').at(-1));
-    check('the sealed still-here list names them: first name and club', still.entries.map((e) => `${e.firstName}/${e.club}`).sort().join() === 'Kit/Sparks,Ottoline/Cubbies', JSON.stringify(still));
-    check('the count is the shared module\'s (GET /v1/desk/tonight)', (await t2.call('GET', '/v1/desk/tonight')).body.checkedIn === 2);
+    check('the sealed still-here list names them: first name and club', still.entries.map((e) => `${e.firstName}/${e.club}`).sort().join() === 'Kit/Sparks,Ottoline/Cubbies,Pip/Sparks,Rue/Cubbies', JSON.stringify(still));
+    check('the count is the shared module\'s (GET /v1/desk/tonight)', (await t2.call('GET', '/v1/desk/tonight')).body.checkedIn === 4);
     const plainFrames = JSON.stringify(t2.sent.filter((f) => f.e === 'tally' || f.e === 'tonight'));
-    check('and no name or id of a child is readable in the Worker\'s storage, and none is on a plaintext frame', !/Tester|Quillfeather|Ottoline|"662"|"702"/.test(everything(t2.storage)) && !/Tester|Quillfeather|Ottoline|Kit/.test(plainFrames));
+    check('and no name or id of a child is readable in the Worker\'s storage, and none is on a plaintext frame', !/Tester|Quillfeather|Ottoline|Phonely|Extensia|"662"|"702"|"703"|"704"/.test(everything(t2.storage)) && !/Tester|Quillfeather|Ottoline|Kit|Pip|Rue/.test(plainFrames));
     check('the Worker\'s tally and the printer\'s builder agree on the shape', JSON.stringify(Object.keys(tally).sort()) === JSON.stringify(Object.keys(events.buildTally({ Sparks: 1, Cubbies: 1 }, 2, { season: server.currentScreenSeason() })).sort()));
     check('and so do the ticker\'s and the list\'s', JSON.stringify(Object.keys(frames('tonight').at(-1).d).sort()) === JSON.stringify(Object.keys(events.buildTonight({ checkedIn: 2 })).sort())
       && JSON.stringify(Object.keys(still).sort()) === JSON.stringify(Object.keys(events.buildCheckout([{ firstName: 'Kit', club: 'Sparks' }], 2)).sort()));

@@ -8,8 +8,11 @@
 // request; what it must do:
 //   * a job's /print (cloud: true, cloudJob: <jobId>) greets through the job route,
 //     sealed (the name is not in the frame), with the printer's own flags;
-//   * a /print with no job (the laptop's own path) never uses it;
-//   * a retried job's second /print prints nothing and greets nobody;
+//   * a /print with no job (the phone page's relay job, the extension) greets as the
+//     station too, naming the child (`greet: {clubberId}` or a visitor's name and club)
+//     so the Worker can greet each child once;
+//   * a job that meets a label already printed prints nothing and greets LATE with the
+//     same event (same id) and its job: the Worker drops it if the child was greeted;
 //   * a refusal (4xx: the Worker already greeted this job) is not retried, an
 //     unreachable Worker is, three times;
 //   * the station tells the Worker its season, rehearsal flag and pickup clubs.
@@ -73,6 +76,7 @@ const JOB_C = 'C'.repeat(22);
   const cfg = server.configureCloud({ stationId: 'station-aaaaaaaa', ring: async () => null, request, start: false, journalFile: null });
   check('this computer is a station', cfg.ok === true, JSON.stringify(cfg));
   const fresh = () => { calls.length = 0; };
+  const greetingsSeen = {};
   const greetings = () => calls.filter((c) => c.p === '/v1/publish');
 
   {
@@ -85,6 +89,7 @@ const JOB_C = 'C'.repeat(22);
     const frame = greetings()[0] && greetings()[0].body;
     check('a sealed checkin (no name in it)', frame && frame.event === 'checkin' && env.isEnvelope(frame.payload) && !JSON.stringify(frame).includes('Ava'), JSON.stringify(frame).slice(0, 200));
     const opened = await env.openEnvelope(await env.importDisplayKey(key), 'checkin', frame.payload);
+    greetingsSeen.A = opened.payload;
     check('it opens with the display key: first name, club, the birthday this week', opened.ok && opened.payload.firstName === 'Ava' && opened.payload.club === 'Sparks' && opened.payload.isBirthday === true && opened.payload.isFirstTimer === false, JSON.stringify(opened));
     check('and it is not sent through the laptop\'s own relay queue', plain.length === 0, JSON.stringify(plain));
   }
@@ -98,20 +103,35 @@ const JOB_C = 'C'.repeat(22);
     check('the greeting says first-timer (the laptop\'s own rule, on the station)', opened.ok && opened.payload.isFirstTimer === true && opened.payload.firstName === 'Zoe', JSON.stringify(opened));
   }
 
-  console.log('\na retried job greets nobody twice; the laptop\'s own print never uses the job route');
+  console.log('\na job that meets a label already printed greets late, with the same event; a job-less print names its child');
   {
+    const k = await env.importDisplayKey(key);
     fresh();
+    const first = greetingsSeen.A;
     const again = await post('/print', { name: 'Ava Stone', clubName: 'Sparks', clubberId: '1', cloud: true, cloudJob: JOB_A });
     check('the duplicate prints nothing', again.body.duplicate === true, JSON.stringify(again));
     await new Promise((resolve) => setTimeout(resolve, 50));
-    check('and sends nothing', greetings().length === 0);
+    const late = greetings()[0];
+    const lateOpened = late && await env.openEnvelope(k, 'checkin', late.body.payload);
+    check('and sends ONE late greeting as the station, with its job, the SAME event (a screen that showed it drops it)', greetings().length === 1
+      && late.body.late === true && late.headers['X-Job'] === JOB_A && late.station === 'station-aaaaaaaa'
+      && lateOpened.ok && lateOpened.payload.id === first.id && lateOpened.payload.isBirthday === true, JSON.stringify({ calls, first, lateOpened }));
+    fresh();
     const own = await post('/print', { name: 'Mia Lee', clubName: 'T&T', clubberId: '3' });
     check('a /print with no job prints as ever', own.body.success === true);
     await new Promise((resolve) => setTimeout(resolve, 100));
-    check('and its greeting goes the laptop\'s way, not the job route (the single publisher would drop it)', greetings().length === 0 && plain.includes('checkin'), JSON.stringify({ calls, plain }));
+    check('and the station greets naming the child (no job), never through the laptop\'s plain relay', greetings().length === 1 && !greetings()[0].headers
+      && JSON.stringify(greetings()[0].body.greet) === JSON.stringify({ clubberId: '3' }) && !greetings()[0].body.late && !plain.includes('checkin'), JSON.stringify({ calls, plain }));
+    fresh();
+    await post('/print', { name: 'Kay Visitor', clubName: 'Sparks', visitor: true });
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    const v = greetings().find((c) => c.body.greet && c.body.greet.name === 'Kay Visitor');
+    check('a visitor with no clubber id is named by name and club', v && v.body.greet.club === 'Sparks' && !JSON.stringify(v.body.payload).includes('Kay'), JSON.stringify(calls.map((c) => c.body && c.body.greet)));
+    fresh();
     const bad = await post('/print', { name: 'Eli Stone', clubName: 'Cubbies', clubberId: '2', cloud: true, cloudJob: 'not a job id' });
     await new Promise((resolve) => setTimeout(resolve, 50));
-    check('a job id that is not a job id is ignored', bad.body.success === true && greetings().length === 0, JSON.stringify(calls));
+    check('a job id that is not a job id is ignored (the child is named instead)', bad.body.success === true && greetings().length === 1 && !greetings()[0].headers
+      && greetings()[0].body.greet.clubberId === '2', JSON.stringify(calls));
   }
 
   console.log('\nretries: a refusal is an answer, an unreachable Worker is tried again');

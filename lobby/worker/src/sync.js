@@ -177,7 +177,7 @@ export class SyncCore {
     // and the /v1/publish gate. The watcher feeds it each applied report, the desk its hooks.
     this.book = new TonightBook({ storage: this.storage, secret: () => this.watcher.creds()?.password, now: this.now, names: () => this.singlePublisher });
     this.publisher = new Publisher({
-      storage: this.storage, book: this.book, stations: this.stations, printq: this.printq, ledger: this.ledger,
+      storage: this.storage, book: this.book, stations: this.stations, printq: this.printq, ledger: this.ledger, tags: this.tags,
       now: this.now, enabled: () => this.singlePublisher,
       publish: (event, payload, sealed) => (sealed ? this.publishSealed(event, payload) : this.relay(event, payload)),
     });
@@ -839,7 +839,7 @@ export class SyncCore {
     // Worker publishes the tally, the ticker and the still-here list itself, so the
     // laptop's are dropped (answered 200 so the print server owes no resend), and so
     // is every greeting but the one a registered station sends with its print job.
-    const dropped = await this.publisher.gate(request, res.event, res.payload);
+    const dropped = await this.publisher.gate(request, res.event, res.payload, res.meta);
     if (dropped) return json(dropped);
     const screens = await this.relay(res.event, res.payload);
     return json({ ok: true, screens });

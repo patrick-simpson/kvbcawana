@@ -307,6 +307,45 @@ function pruneEventBuffer() {
   if (kept.length !== eventBuffer.length) eventBuffer = kept;
 }
 
+// Tonight's greetings by child (memory only, today's only): a TwoTimTwo-page job that
+// meets a label already printed greets LATE with the very same event (the same id, so a
+// screen that already showed it drops it), because the single publisher may have dropped
+// the first one (lobby/worker/src/routes.md section 8).
+let greetingsTonight = { day: null, byKey: new Map() };
+function greetingKeys(firstName, lastName, clubberId) {
+  const keys = [];
+  if (clubberId !== null && clubberId !== undefined && String(clubberId).trim()) keys.push(`id:${String(clubberId).trim()}`);
+  const name = `${firstName || ''} ${lastName || ''}`.replace(/\s+/g, ' ').trim().toLowerCase();
+  if (name) keys.push(`name:${name}`);
+  return keys;
+}
+function rememberGreeting(firstName, lastName, clubberId, checkinEvent) {
+  const day = localDayISO();
+  if (greetingsTonight.day !== day) greetingsTonight = { day, byKey: new Map() };
+  for (const k of greetingKeys(firstName, lastName, clubberId)) greetingsTonight.byKey.set(k, checkinEvent);
+}
+function greetingFor(firstName, lastName, clubberId) {
+  if (greetingsTonight.day !== localDayISO()) return null;
+  for (const k of greetingKeys(firstName, lastName, clubberId)) if (greetingsTonight.byKey.has(k)) return greetingsTonight.byKey.get(k);
+  return null;
+}
+// Who a job-less greeting is for, so the single publisher can greet each child once
+// whichever path printed them: the clubber id, else a visitor's name and club. It rides
+// the publish body to the Worker (never a screen), which keeps only a keyed hash of it.
+function greetingChild(firstName, lastName, clubberId, clubName) {
+  const id = clubberId !== null && clubberId !== undefined ? String(clubberId).trim() : '';
+  if (/^\d{1,12}$/.test(id)) return { clubberId: id };
+  const name = `${firstName || ''} ${lastName || ''}`.replace(/\s+/g, ' ').trim();
+  return name ? { name, club: String(clubName || '').trim() } : null;
+}
+// A cloud job that found this child's label already printed tonight: no second label, but
+// the child is greeted if no greeting reached the screens yet (the Worker decides, by child).
+function greetLate(firstName, lastName, clubberId, clubName, greetJob) {
+  if (!greetJob || !cloudStation) return;
+  const ev = greetingFor(firstName, lastName, clubberId) || events.buildCheckin({ firstName, club: clubName });
+  events.publish(EVENT_CHANNEL, 'checkin', ev, { job: greetJob, late: true });
+}
+
 function pushEventToBuffer(checkinEvent) {
   pruneEventBuffer();
   eventBuffer.push(checkinEvent);
@@ -4268,12 +4307,14 @@ async function performCheckinPrint(input) {
   // one label to a generation.
   if (!isDemo && !regen && printedTonightFor(firstName, lastName, clubberId, cloudCheckin)) {
     console.log(`[print] '${firstName} ${lastName}' already has tonight's tag (${cloudCheckin ? 'cloud job' : 'printed for a cloud check-in'}) — duplicate suppressed`);
+    greetLate(firstName, lastName, clubberId, clubName, greetJob);
     return { status: 200, body: { success: true, duplicate: true } };
   }
   // Demo mode skips the duplicate window: a trainer demonstrating the same
   // child twice in a row is the normal case, not a double-tap to suppress.
   if (!isDemo && !regen && isDuplicatePrint(dupKey)) {
     console.log(`[print] '${firstName} ${lastName}' already printed within ${DUPLICATE_WINDOW_MS / 1000}s — duplicate suppressed`);
+    greetLate(firstName, lastName, clubberId, clubName, greetJob);
     return { status: 200, body: { success: true, duplicate: true } };
   }
   if (!isDemo) claimPrint(dupKey);
@@ -4563,7 +4604,13 @@ async function performCheckinPrint(input) {
       // A station's job: the greeting (birthday, first-timer, milestone: only this computer
       // has the roster and the history) is the ONE the single publisher lets through,
       // named by the job it is for (lobby/worker/src/routes.md section 8).
-      events.publish(EVENT_CHANNEL, 'checkin', checkinEvent, greetJob && cloudStation ? { job: greetJob } : undefined);
+      // With no job (the phone page's relay job, the extension, a phone visitor) a station
+      // names the child instead, so the single publisher can still greet them once.
+      // (An id-less print the roster knows is named by the roster's id: the same child.)
+      const knownId = clubberId || (record && String(record.ClubberID || '').trim()) || null;
+      const greetChild = !greetJob && cloudStation ? greetingChild(firstName, lastName, knownId, effectiveClubName) : null;
+      events.publish(EVENT_CHANNEL, 'checkin', checkinEvent, greetJob && cloudStation ? { job: greetJob } : (greetChild ? { child: greetChild } : undefined));
+      rememberGreeting(firstName, lastName, knownId, checkinEvent);
       pushEventToBuffer(checkinEvent);
 
       // Log to print history. trophyBook is the once-per-night marker for
@@ -7597,18 +7644,22 @@ async function drainRelay() {
   }
 }
 
-// A station's greeting for the print job it just ran, to the Worker with that job's id (the
-// single publisher lets one per job through and drops any other `checkin`). A refusal is an
-// answer (a duplicate or a dropped job is not retried); only an unreachable service is.
+// A station's greeting, to the Worker as the station: with the id of the print job it just
+// ran (`X-Job`), or with the child it printed a job-less label for (`greet` in the body), and
+// `late` when a job met a label already printed. The single publisher lets one greeting per
+// child per night through and drops any other `checkin`. A refusal is an answer (a duplicate
+// or a dropped job is not retried); only an unreachable service is. `meta` may be a job id.
 const GREETING_TRIES = 3;
-async function sendGreeting(body, jobId) {
+async function sendGreeting(body, meta) {
+  const m = typeof meta === 'string' ? { job: meta } : (meta || {});
+  const publishBody = { event: 'checkin', payload: body, ...(m.child ? { greet: m.child } : {}), ...(m.late ? { late: true } : {}) };
   for (let attempt = 0; attempt < GREETING_TRIES; attempt++) {
     const station = cloudStation;
     const where = station && station.signedIn();
     if (!where) return false;
     const r = await station.request(where.base, '/v1/publish', {
-      method: 'POST', body: { event: 'checkin', payload: body }, session: where.session,
-      station: station.stationIdFn(), headers: { 'X-Job': jobId },
+      method: 'POST', body: publishBody, session: where.session,
+      station: station.stationIdFn(), ...(m.job ? { headers: { 'X-Job': m.job } } : {}),
     });
     if (r.status === 401) checkSyncSignIn().catch(() => {});
     if (r.ok) return true;
@@ -7620,7 +7671,7 @@ async function sendGreeting(body, jobId) {
 
 events.setRelay((channel, event, body, meta) => {
   if (channel !== EVENT_CHANNEL || !signedInToSync()) return false;
-  if (event === 'checkin' && meta && meta.job && cloudStation) return sendGreeting(body, meta.job);
+  if (event === 'checkin' && meta && (meta.job || meta.child) && cloudStation) return sendGreeting(body, meta);
   if (Date.now() < relayBrokenUntil) { oweRelay(event, body); return false; }
   return enqueueRelay(event, body);
 });

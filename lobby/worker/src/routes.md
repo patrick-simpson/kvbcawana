@@ -494,6 +494,24 @@ names. Chosen:
   `{dropped: true, reason}`. So a child is greeted exactly once with everything
   the printer used to say, whether the desk page or TwoTimTwo's own page checked
   them in, and the Worker never opens or seals a name for a greeting.
+- **Once per CHILD per night, whichever path printed** (review fix, 2026-10-12).
+  A label the station prints with NO print job (the phone page's relay job, the
+  extension, a phone visitor) greets as the station too, naming the child in the
+  publish body: `POST /v1/publish {event: 'checkin', payload, greet: {clubberId}}`
+  (or a visitor's `greet: {name, club}`; the id the roster knows wins). The gate
+  turns it into the claim's own tag (`identityTag` / `visitorTag`) in memory and
+  lets it through once. Every greeting, by job or by child, takes the child's tag
+  in `publisher:greeted` (`{night, tags}`: HMACs only, never an id or a name; a new
+  night or the end of the window clears it), so a second greeting for the same
+  child is `{dropped: true, reason: 'already-greeted'}`. A cloud job that meets a
+  label already printed tonight (`printedTonightFor` or the 45 s window) prints
+  nothing and greets LATE: the same event the first label made (same `id`, so a
+  screen that showed it drops it; a fresh welcome if this computer has none) with
+  its `X-Job` and `late: true`. That is how a child whose first greeting the gate
+  dropped (an extension print relayed without a station) is still greeted once.
+  With `SINGLE_PUBLISHER` off the gate passes every greeting as before and drops
+  only a `late` one (`reason: 'late'`: the laptop already greeted the child).
+  Undo then a new check-in is the same child: not greeted again.
 - Not carried (known, owner's call at P7): the extension's youth check-out sweep
   posts check-outs to the laptop only; a Trek / Journey child checked out that
   way stays on the count here until the extension is retired. The desk's
