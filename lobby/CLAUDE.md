@@ -1668,7 +1668,18 @@ setup guide and the API. The owner's calls:
   applies the migrations before every Worker deploy), the print lease is
   `GET /v1/print/next` + `POST /v1/print/done|failed|heartbeat` only, and with
   `SINGLE_PUBLISHER` on the relay also drops the laptop's `checkin` greeting while
-  the Worker greets once. `printer/scripts/test-cloud-e2e.cjs` runs the Worker, the
+  the Worker greets once. **P5, the one publisher (2026-10-12):** with the switch on the
+  Worker publishes `tally`, `tonight` and the sealed still-here `checkout` from its own
+  state (`worker/src/publisher.js`, `tonight.js`, `frames.js`), counting with
+  `shared/tonight.js` (the SAME `authoritativeTonight()` the print server runs, through
+  `printer/print-server/tonight.js`; the still-here list is `shared/pickup.js`), drops
+  the laptop's `tally` / `tonight` / `checkout` / `checkin` frames, and lets one
+  station-made greeting per print job through (`X-Station` + `X-Job`; the station has the
+  roster and the history key for birthdays and milestones, so the Worker no longer greets).
+  The Worker keeps tonight's FIRST names and clubs, sealed under the state key and purged
+  when the watch window closes (`tonight:book`), only while the switch is on: the one new
+  place a name rests, read as the second exception after the friend list. Design and
+  timing: `worker/src/routes.md` section 8. `printer/scripts/test-cloud-e2e.cjs` runs the Worker, the
   station keys, the job puller and the history writer end to end.
 - **Gates:** the Worker's tests run in `ci.yml`'s `worker` job
   (`npx vitest run --config worker/vitest.config.js`), not this app's vitest

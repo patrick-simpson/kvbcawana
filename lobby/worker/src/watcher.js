@@ -27,6 +27,7 @@
 import { TwoTimTwoClient, credentialsFrom, itemsToSend, reportColumns, rowShape } from './twotimtwo.js';
 import { fromBase64, toBase64 } from './crypto.js';
 import { INTERACTIVE_WAIT_MS, READ_INTERVAL_MS, ReadBudget } from './readbudget.js';
+import { massUndoRefused, reportIsPartial } from '../../shared/tonight.js';
 
 export { READ_INTERVAL_MS };
 /**
@@ -194,14 +195,16 @@ function clubsOf(ids, kids) {
  */
 export function compareReport(prev, report) {
   const kids = childrenOf(report.entries);
-  if (report.declared !== null && report.entries.length < report.declared) {
+  // The SHARED rules (lobby/shared/tonight.js, the print server's too): a report
+  // that parsed fewer children than its own Count: footers is partial, and a read
+  // that drops more than half the room at once is refused.
+  if (reportIsPartial(report)) {
     return { verdict: 'partial', kids, added: [], gone: [] };
   }
   if (!prev) return { verdict: 'baseline', kids, added: [], gone: [] };
   const added = Object.keys(kids).filter((id) => !(id in prev));
   const gone = Object.keys(prev).filter((id) => !(id in kids));
-  const before = Object.keys(prev).length;
-  if (before > 0 && gone.length > before / 2) return { verdict: 'mass-undo', kids, added: [], gone: [] };
+  if (massUndoRefused(gone.length, Object.keys(prev).length)) return { verdict: 'mass-undo', kids, added: [], gone: [] };
   return { verdict: 'applied', kids, added, gone };
 }
 
@@ -227,6 +230,8 @@ export class Watcher {
     this.budget = budget || new ReadBudget({ now: this.now, sleep, storage });
     /** Print-job adoption (adopt.js): set by SyncCore; the watcher only calls it. @type {import('./adopt.js').Adopter|null} */
     this.adopt = null;
+    /** The one publisher (publisher.js): set by SyncCore; the watcher feeds it each applied report and its tick. @type {import('./publisher.js').Publisher|null} */
+    this.publisher = null;
     this.alarms = alarms || { set() {}, get: () => null };
     // warn, not log: the lint allows warn and error only, and `wrangler tail` shows both.
     this.log = log || ((line) => console.warn(line));
@@ -315,6 +320,7 @@ export class Watcher {
       next = Math.min(w.untilMs, IDLE_MAX_MS);
       // The window has closed: tonight's claims and jobs are forgotten.
       try { await this.adopt?.endOfNight(); } catch (err) { console.error('[cloud] end-of-night purge failed', err); }
+      try { await this.publisher?.endOfNight(); } catch (err) { console.error('[cloud] end-of-night purge of the names failed', err); }
     } else {
       await this.budget.load();
       await this.adopt?.load();
@@ -324,8 +330,13 @@ export class Watcher {
         try { await this.read(); } catch (err) { console.error('[cloud] watcher read failed', err); }
       } else if (this.budget.peek() === 0 && this.checkinPageDue(before)) {
         try { await this.probeCheckinPage(); } catch (err) { console.error('[cloud] check-in page probe failed', err); }
-      } else if (this.adopt) {
+      } else if (this.adopt && this.adopt.pending() > 0) {
         try { await this.adopt.drain(SEAL_PER_TICK); } catch (err) { console.error('[cloud] sealing a job failed', err); }
+      } else if (this.publisher) {
+        // The minute's tally / ticker / still-here list, and anything a change left
+        // waiting. (A tick that read the report published from onReport already; one
+        // job per invocation keeps each inside the free plan's CPU.)
+        await this.publisher.tick();
       }
       const s = await this.loadStatus();
       next = Math.max(this.lastWatcherRead(s) + WATCH_INTERVAL_MS - this.now(), this.budget.peek(), 1000);
@@ -525,6 +536,10 @@ export class Watcher {
         this.log(`[cloud] shadow: would publish tally ${JSON.stringify(wouldPublishTally(kids, now))}`);
       }
       await this.storage.put('cloud:snap', await sealState(creds.password, { date, kids }));
+      // The count's own state (tonight.js): what an applied report says, first names and clubs only.
+      if (this.publisher) {
+        try { await this.publisher.onReport({ night: date, at: now, entries: res.report.entries }); } catch (err) { console.error('[cloud] publishing the count failed', err); }
+      }
       // The claims and print jobs follow what the report says (adopt.js; the
       // children's names stay in this call's memory and are sealed there).
       if (this.adopt && verdict === 'applied') {

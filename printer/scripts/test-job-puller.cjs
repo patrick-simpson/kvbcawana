@@ -312,7 +312,7 @@ const PORT = 34610;
     const b4 = jobs();
     const r = await puller.handle(ttt);
     check('a TwoTimTwo-page job prints through /print as a cloud check-in', r === 'printed' && jobs() >= b4 + 1 && printed.length === 1
-      && printed[0].record.source === 'ttt' && printed[0].record.body.cloud === true && printed[0].record.body.clubName === 'Sparks' && printed[0].record.body.friend === true && !printed[0].record.body.regen, JSON.stringify(printed));
+      && printed[0].record.source === 'ttt' && printed[0].record.body.cloud === true && printed[0].record.body.clubName === 'Sparks' && printed[0].record.body.friend === true && !printed[0].record.body.regen && printed[0].record.body.cloudJob === ttt.jobId, JSON.stringify(printed));
     check('a job with no bundle fails (the Worker never leases one)', await puller.handle({ jobId: cc.newRowId() }) === 'failed');
     check('and a raw payload is no longer a thing', await puller.handle({ jobId: cc.newRowId(), raw: { firstName: 'Tia' } }) === 'failed');
   }

@@ -90,14 +90,19 @@ const squash = (text) => String(text || '').trim().replace(/\s+/g, ' ');
  * has none.
  *
  * @param {string} html
- * @returns {{ entries: {clubberId: string, name: string, club: string}[], declared: number|null } | null}
+ * A child whose row says YES under a "Brought a friend" column (any club table
+ * that has one; the extension's friendsBrought rule) carries `friend: true`:
+ * what a BARF Night tag for a check-in made on TwoTimTwo's own page is printed
+ * from (adopt.js; the box has no name field, so no friend's name).
+ *
+ * @returns {{ entries: {clubberId: string, name: string, club: string, friend?: boolean}[], declared: number|null } | null}
  */
 export function parseCheckinReport(html) {
   if (!html || isLoginPage(html)) return null;
   const doc = documentOf(html);
   const tables = [...doc.querySelectorAll('table')];
   if (!tables.length) return null;
-  /** @type {{clubberId: string, name: string, club: string}[]} */
+  /** @type {{clubberId: string, name: string, club: string, friend?: boolean}[]} */
   const entries = [];
   let declared = 0;
   let declaredAll = true;
@@ -111,6 +116,14 @@ export function parseCheckinReport(html) {
     const totals = table.querySelector('tfoot tr.totals');
     const m = totals ? /Count:\s*(\d+)/i.exec(totals.textContent || '') : null;
     if (m) declared += parseInt(m[1], 10); else declaredAll = false;
+    // The Brought a friend column, if this club has one: EVERY header row is searched
+    // (the crest sits in a header row of its own ahead of the real headings).
+    let friendIdx = -1;
+    for (const hr of table.querySelectorAll('thead tr')) {
+      if (friendIdx >= 0) break;
+      const cells = [...hr.querySelectorAll('th')];
+      friendIdx = cells.findIndex((th) => FRIEND_RE.test(squash(th.textContent)));
+    }
     for (const row of table.querySelectorAll('tbody tr')) {
       // Only this table's own rows, should another table ever sit inside it.
       if (row.closest('table') !== table) continue;
@@ -136,7 +149,8 @@ export function parseCheckinReport(html) {
         name = next ? squash(next.textContent) : '';
       }
       if (name && SUMMARY_CELL_RE.test(name)) name = '';
-      entries.push({ clubberId: idm[1], name, club });
+      const friend = friendIdx >= 0 && tds.length > friendIdx && /^yes$/i.test(squash(tds[friendIdx].textContent));
+      entries.push({ clubberId: idm[1], name, club, ...(friend ? { friend: true } : {}) });
     }
   }
   if (!readAnyClub) return null;

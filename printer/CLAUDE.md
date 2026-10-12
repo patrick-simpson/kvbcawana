@@ -244,8 +244,13 @@ the extra icon sprite they use (never a symbol id the family sprite already has)
   in as `input.template` — the renderer never reads config (golden-suite
   purity). Fail open: any broken template renders the stock label. Safety
   content (allergy icons, no-photo camera, birthday) is not templatable.
-- **Three modules are GENERATED copies of `lobby/shared/`** (the installer
-  holds only this folder): `print-server/clubTable.js` (the club table and the
+- **Four modules are GENERATED copies of `lobby/shared/`** (the installer
+  holds only this folder): `print-server/tonight.js` (THE count, P5: the pure
+  rules of `tonightHereNow()` / `authoritativeTonight()`, the identity keys,
+  `reportIsPartial` and the mass-undo guard `massUndoRefused`, which the sync
+  Worker imports from the same source; `server.js` only supplies its own rows,
+  report, check-outs and clock; `scripts/test-tonight-shared.cjs`),
+  `print-server/clubTable.js` (the club table and the
   two matchers; `clubKey()` is the substring one on purpose, `brand.js`'s
   `MARK_FILES` / `MARK_NAMES` and `CLUB_MONOGRAM` come from the same rows),
   `print-server/textClean.js` (`cleanName`, `stripControlChars`,
@@ -270,7 +275,8 @@ DYMO 30256, `w167h288`). The Windows path is untouched.
 truth when it is fresh (received within `REPORT_FRESH_MS`, 12 minutes); the
 printer's own history is the fallback, and `/health` raises a
 `{type:'tally-source'}` warning whenever it is the one being used.
-`authoritativeTonight()` in `print-server/server.js` is **the one function** —
+`authoritativeTonight()` (its rules are `lobby/shared/tonight.js`, a generated copy
+in `print-server/tonight.js`; `server.js` holds a thin wrapper) is **the one function** —
 `publishTally()`, `computeTonightStats()` (so `/stats/tonight`),
 `/phone/tonight` and `/health` all read it, and none of them
 computes a count of its own. Rules: only a report the reconcile pass actually
@@ -622,9 +628,21 @@ Worker as the one source of jobs.
   /cloud/import-history`, in `SETTINGS_PAGE_ROUTES`) seals `print-history.json`
   and `attendance.json` (content-derived row ids, so a second run stores
   nothing twice) and posts them to `POST /v1/history/import`.
-- **Publisher gate:** with `configureCloud()` active `publishTally`,
-  `publishStillHere` and `stillHereChanged` return at once (the Worker
-  publishes); `stopCloud()` restores them.
+- **Publisher gate and the greeting** (P5, `lobby/worker/src/routes.md` section 8):
+  with `configureCloud()` active `publishTally`, `publishStillHere` and
+  `stillHereChanged` publish nothing (the Worker makes the tally, the ticker and the
+  still-here list); `stopCloud()` restores them. Instead the station keeps the Worker's
+  copy of what only this computer knows current: `sendStationExtras()` posts the Screen
+  season, the rehearsal flag and the pickup clubs to `POST /v1/station/extras` (on a
+  change, at least once a minute, `stillHereChanged` is its trigger). The **greeting** is
+  the station's: the job puller adds `cloudJob: <jobId>` to a `/print` body, and
+  `performCheckinPrint` hands its `checkin` (birthday, first-timer, welcome back,
+  milestone: only this computer has the roster and the history) to the relay with
+  `{job}` meta; the relay sends it as the station (`X-Station`) with `X-Job` to
+  `POST /v1/publish` (`sendGreeting`: a 4xx or a dropped answer is final, an unreachable
+  Worker is tried three times). The Worker lets exactly one greeting per job through and
+  drops every other `checkin`. A `/print` with no job (the extension's own path) greets
+  through the laptop's relay queue as before. `scripts/test-station-greeting.cjs`.
 
 **Every dashboard tool is on awana.kvbchurch.org/settings, Laptop section**
 (`lobby/src/components/settings/laptop.jsx` and `laptop-tools.jsx`,

@@ -47,7 +47,7 @@ export function validJobId(id) {
  * @typedef {{ jobId: string, kind: 'checkin'|'reprint', night: string, tag: string|null, gen: number|null,
  *   bundle: any|null, raw: any|null, state: 'queued'|'leased'|'done'|'dead', leaseUntil: number,
  *   station: string|null, leases: number, fails: number, createdAt: number, doneAt?: number,
- *   result?: string, lastError?: string, checkPrinter?: boolean }} Job
+ *   result?: string, lastError?: string, checkPrinter?: boolean, greeted?: boolean }} Job
  */
 
 /** @typedef {(night: string, tag: string) => { state: string, gen: number }|undefined} ClaimLookup */
@@ -227,6 +227,25 @@ export class PrintQueue {
     job.state = job.fails >= MAX_FAILS ? 'dead' : 'queued';
     await this.doc.save();
     return { ok: true, known: true, state: job.state };
+  }
+
+  /**
+   * ONE greeting per check-in job (P5, publisher.js gate): the station that
+   * printed it may greet the child once. One synchronous step; a job that is
+   * gone (undone, purged), another night's, a reprint's or already greeted
+   * is refused with its reason.
+   * @param {string} jobId @param {string} night
+   * @returns {Promise<{ ok: true } | { ok: false, reason: 'unknown-job'|'already-greeted'|'not-a-checkin' }>}
+   */
+  async greet(jobId, night) {
+    await this.load();
+    const job = validJobId(jobId) ? this.jobs()[jobId] : undefined;
+    if (!job || job.night !== night || job.state === 'dead') return { ok: false, reason: 'unknown-job' };
+    if (job.kind !== 'checkin') return { ok: false, reason: 'not-a-checkin' };
+    if (job.greeted) return { ok: false, reason: 'already-greeted' };
+    job.greeted = true;
+    await this.doc.save();
+    return { ok: true };
   }
 
   /** Drop one job that was never leased to anyone useful (its check-in failed). @param {string} jobId */

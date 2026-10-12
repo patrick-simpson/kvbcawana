@@ -92,6 +92,12 @@ const today = (() => { const d = new Date(); return `${d.getFullYear()}-${String
     r = await post('/print', { name: 'Mia Lee', clubName: 'T&T', clubberId: '3', cloud: true, friend: true, friendName: 'Jo' });
     await settle();
     check('a cloud check-in prints both, and is not reported again (the service recorded it)', jobs() === 7 && reports.length === 2, `${jobs()} ${reports.length}`);
+    // P5: a check-in made on TwoTimTwo's own page. The Worker's watcher reads Brought a friend off the
+    // report and its job carries friend: true and NO friend's name (TwoTimTwo's box has no name field).
+    r = await post('/print', { name: 'Kai Ford', clubName: 'Sparks', clubberId: '9', cloud: true, friend: true, cloudJob: 'K'.repeat(22) });
+    await settle();
+    check('a TwoTimTwo-page child the report marks Brought a friend gets the BARFED tag too, with no friend\'s name, and is not reported again',
+      r.body.success === true && jobs() === 9 && reports.length === 2, `${jobs()} ${reports.length}`);
   }
 
   console.log('\nBARF Night: the BARF Bag labels, one job');

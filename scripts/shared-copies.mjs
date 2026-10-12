@@ -10,9 +10,11 @@
 //   node scripts/shared-copies.mjs --check  fail when any copy has drifted
 //                                           (scripts/check-mirrors.mjs runs this)
 //
-// A shared module must be self-contained (no imports) and declare its
-// exports as `export const NAME` / `export function NAME` only, so the
-// CommonJS form is a mechanical rewrite.
+// A shared module declares its exports as `export const NAME` /
+// `export function NAME` only, and may import only another shared module of
+// this table by a relative `import { a, b } from './x.js';` (nothing else), so
+// the CommonJS form is a mechanical rewrite: that import becomes a
+// `require()` of the other module's generated copy in the same folder.
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -25,16 +27,26 @@ export const COPIES = [
   ['lobby/shared/clubNight.js', 'printer/electron-app/src/display/clubNight.js', 'cjs'],
   ['lobby/shared/clubs.js', 'printer/print-server/clubTable.js', 'cjs'],
   ['lobby/shared/text.js', 'printer/print-server/textClean.js', 'cjs'],
+  ['lobby/shared/tonight.js', 'printer/print-server/tonight.js', 'cjs'],
+  ['lobby/shared/pickup.js', 'printer/print-server/pickup.js', 'cjs'],
 ];
 
 export function render(source, format, src) {
   const note = `// GENERATED from ${src} by scripts/shared-copies.mjs: do not edit; edit the source and run\n// \`node scripts/shared-copies.mjs\`. scripts/check-mirrors.mjs fails when this copy drifts.\n`;
   if (format === 'esm') return note + source;
-  if (/^\s*import\s/m.test(source) || /^export\s+(default|\{|\*)/m.test(source)) {
-    throw new Error(`${src}: a shared module may only use export const / export function and no imports`);
+  if (/^export\s+(default|\{|\*)/m.test(source)) {
+    throw new Error(`${src}: a shared module may only use export const / export function`);
   }
+  // `import { a, b } from './x.js';` of another module in this table -> its generated copy.
+  const importRe = /^import\s+\{([^}]*)\}\s+from\s+'\.\/([A-Za-z0-9_-]+\.js)';[ \t]*$/gm;
+  let body = source.replace(importRe, (_m, imported, file) => {
+    const hit = COPIES.find(([from, , fmt]) => fmt === 'cjs' && path.basename(from) === file);
+    if (!hit) throw new Error(`${src}: imports ./${file}, which is not a generated shared module`);
+    return `const {${imported}} = require('./${path.basename(hit[1], '.js')}');`;
+  });
+  if (/^\s*import\s/m.test(body)) throw new Error(`${src}: a shared module may import only another shared module by a relative named import`);
   const names = [];
-  const body = source.replace(/^export (const|function) ([A-Za-z0-9_$]+)/gm, (_m, kind, name) => { names.push(name); return `${kind} ${name}`; });
+  body = body.replace(/^export (const|function) ([A-Za-z0-9_$]+)/gm, (_m, kind, name) => { names.push(name); return `${kind} ${name}`; });
   return `${note}'use strict';\n${body.replace(/\n*$/, '\n')}\nmodule.exports = {\n  ${names.join(',\n  ')},\n};\n`;
 }
 

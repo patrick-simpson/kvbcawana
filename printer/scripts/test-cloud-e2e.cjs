@@ -15,6 +15,12 @@
 // journal, across an app restart and a lease that expired), the history stored
 // is ciphertext only, and the lease routes the puller calls are the Worker's.
 //
+// P5 (the last section): the Worker as the ONE publisher, with the REAL print server behind
+// the puller. A desk check-in and a TwoTimTwo-page check-in each print once and are greeted
+// ONCE (the station's sealed `checkin`, sent with its job, birthday and all; the laptop's own
+// greeting is dropped, and a replay of a greeting is dropped), the Worker's tally counts them,
+// its sealed still-here list names them, and the station's season / pickup clubs reach it.
+//
 // The Worker is ESM and this is CommonJS, so it is loaded with import(). Its
 // two runtime packages (linkedom, parse5) come from lobby/worker/node_modules
 // (CI: `npm ci --omit=dev --prefix lobby/worker` before the printer's tests).
@@ -217,6 +223,119 @@ const fakeSafe = {
   const byId = Object.fromEntries(merged.map((e) => [e.key, e]));
   check('the reader opened the night; the child checked in, undone and checked in again counts once; the TwoTimTwo-page child counts',
     out.ok && byId['id:662'] && byId['id:662'].dates.join() === NIGHT && byId['id:700'] && byId['id:700'].dates.join() === NIGHT, JSON.stringify({ out, merged }));
+
+  // ── P5: the Worker is the one publisher; the real print server is the station ──
+  console.log('\nthe one publisher: one greeting per check-in, the Worker\'s tally and still-here list');
+  {
+    const env = await import(pathToFileURL(path.join(root, '..', 'lobby', 'src', 'lib', 'envelope.js')).href);
+    const { makeStation, sealJob } = await load('test', 'helpers.js');
+    const { row: stubRow } = await load('test', 'rig.js');
+    const storage2 = memoryStore();
+    const t2 = await rig({ storage: storage2, env: { SINGLE_PUBLISHER: 'on', HISTORY_DB: d1Stub() }, kids: [] });
+    {   // a real history key, as the first client makes it (the rig's stand-in is replaced before anything is sealed)
+      const hk = await cc.createHistoryKey(PASS);
+      await storage2.delete('history:pub'); await storage2.delete('history:wrapped');
+      await t2.call('PUT', '/v1/history/key', { pub: hk.pub, kid: hk.kid, wrapped: hk.wrapped });
+    }
+    const st = await t2.station(STATION, 'Check-in laptop');
+    await t2.core.watcher.tick();   // the baseline read: nobody is here
+
+    // The real print server, with a stub powershell: the puller's /print goes to it over loopback.
+    const bin = fs.mkdtempSync(path.join(os.tmpdir(), 'kvbc-e2e-bin-'));
+    const jobLog = path.join(bin, 'jobs.log');
+    fs.writeFileSync(path.join(bin, 'powershell'), `#!/bin/sh\necho job >> ${jobLog}\nexit 0\n`, { mode: 0o755 });
+    process.env.PATH = `${bin}:${process.env.PATH}`;
+    const data = fs.mkdtempSync(path.join(os.tmpdir(), 'kvbc-e2e-data-'));
+    const today = new Date();
+    fs.writeFileSync(path.join(data, 'config.json'), JSON.stringify({
+      printerName: 'Fake', lateGraceMin: 24 * 60, syncUrl: BASE, syncSession: t2.session,
+    }));
+    fs.writeFileSync(path.join(data, 'clubbers.csv'), `Clubber ID,First Name,Last Name,Club,Birthdate\n662,Kit,Tester,Sparks,${today.getMonth() + 1}/${today.getDate()}/2016\n702,Ottoline,Quillfeather,Cubbies,3/3/2016\n`);
+    Object.assign(process.env, { AWANA_DATA_DIR: data, AWANA_PORT: '34590', AWANA_BIND_HOST: '127.0.0.1', PRINTER_NAME: 'Fake' });
+    const server = require(path.join(root, 'print-server', 'server.js'));
+    const events = require(path.join(root, 'print-server', 'events.js'));
+    const displayKey = await t2.core.displayKey();
+    events.setDisplayKey(displayKey);
+    const listener = server.startListening();
+    await listener.ready;
+    const real = globalThis.fetch;
+
+    const request2 = async (base, p, { method = 'GET', body, session, station, headers: extra = {} } = {}) => {
+      const headers = { 'Content-Type': 'application/json', ...(session ? { Authorization: `Bearer ${session}` } : {}), ...(station ? { 'X-Station': station } : {}), ...extra };
+      const res = await t2.core.handle(new Request(`${base}${p}`, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) }));
+      let parsed = null;
+      try { parsed = await res.json(); } catch { /* not JSON */ }
+      return { ok: res.ok, status: res.status, body: parsed };
+    };
+    check('this computer is the print station', server.configureCloud({ stationId: STATION, ring: async () => st.ring, request: request2, start: false, journalFile: null }).ok === true);
+    check('the station tells the Worker its season, rehearsal flag and pickup clubs', (await server.sendStationExtras(true)) === true
+      && (await t2.call('GET', '/v1/publisher/status')).body.pickupClubs.join() === 'Puggles,Cubbies,Sparks,T&T');
+
+    const puller2 = jp.createJobPuller({
+      signedIn: () => ({ base: BASE, session: t2.session }), stationId: () => STATION, ring: async () => st.ring, localBase: 'http://127.0.0.1:34590',
+      request: request2, journal: jp.createJournal(null, t2.clock.now), fetchFn: real, now: t2.clock.now, log: () => {},
+    });
+    const frames = (event) => t2.sent.filter((f) => f.e === event);
+    const imported = await env.importDisplayKey(displayKey);
+    const open = async (event, f) => (await env.openEnvelope(imported, event, f.d)).payload;
+    const settle = () => new Promise((resolve) => setTimeout(resolve, 150));
+
+    // a desk check-in: the REAL desk page transport, signed in by passphrase v2 against this Worker
+    const deskFetch2 = async (url, init = {}) => t2.core.handle(new Request(`${BASE}${String(url).replace(/^\/api/, '')}`, init));
+    const desk2 = createDesk({ cc: esmCc, fetch: deskFetch2, now: t2.clock.now });
+    await desk2.signIn(PASS);
+    check('the desk page signs in by v2 on the single-publisher Worker', desk2.signedIn === true);
+    t2.night.kids.push({ id: '662', club: 'Sparks', name: 'Kit Tester' });
+    const deskOut = await desk2.checkIn({ clubberId: '662', name: 'Kit Tester', club: 'Sparks' }, {});
+    const jobId = deskOut.jobId;
+    check('the desk check-in is accepted', deskOut.already === false && typeof jobId === 'string' && jobId.length > 0, JSON.stringify(deskOut));
+    check('the Worker\'s tally already counts the child (the desk ticks it before the next read)', frames('tally').at(-1).d.total === 1);
+    check('and greets nobody itself', frames('checkin').length === 0);
+    const r1 = await puller2.tick();
+    await settle();
+    check('the real print server printed one label for the job', r1.handled === 1 && fs.readFileSync(jobLog, 'utf8').trim().split('\n').length === 1, JSON.stringify(r1));
+    check('and exactly ONE greeting reached the screens, sealed (no name on the wire)', frames('checkin').length === 1 && env.isEnvelope(frames('checkin')[0].d) && !('firstName' in frames('checkin')[0].d), String(frames('checkin').length));
+    const g1 = await open('checkin', frames('checkin')[0]);
+    check('with what only the station knows: the child, the club and the birthday week', g1.firstName === 'Kit' && g1.club === 'Sparks' && g1.isBirthday === true && g1.isFirstTimer === false && typeof g1.id === 'string', JSON.stringify(g1));
+
+    // a replay: the same greeting again (a retry, a second station) is dropped by the Worker
+    const { seal } = await load('src', 'crypto.js');
+    const replay = await server.sendGreeting(await seal(displayKey, 'checkin', events.buildCheckin({ firstName: 'Kit', club: 'Sparks' })), jobId);
+    await settle();
+    check('a second greeting for the same job is answered dropped and reaches nobody', replay === true && frames('checkin').length === 1, `${replay} ${frames('checkin').length}`);
+
+    // a check-in made on TwoTimTwo's own page
+    t2.night.kids.push({ id: '702', club: 'Cubbies', name: 'Ottoline Quillfeather' });
+    t2.clock.tick(WATCH_INTERVAL_MS);
+    await t2.core.watcher.tick();
+    t2.clock.tick(SPILL_MS);
+    await t2.core.watcher.tick();
+    const r2 = await puller2.tick();
+    await settle();
+    check('the TwoTimTwo-page child is printed once, and greeted once more (two check-ins, two greetings)', r2.handled === 1 && frames('checkin').length === 2, `${JSON.stringify(r2)} ${frames('checkin').length}`);
+    const g2 = await open('checkin', frames('checkin')[1]);
+    check('and that greeting names them', g2.firstName === 'Ottoline' && g2.club === 'Cubbies', JSON.stringify(g2));
+    await puller2.tick();
+    await settle();
+    check('an idle tick greets nobody again', frames('checkin').length === 2);
+
+    // the Worker's own tally, ticker and still-here list
+    t2.clock.tick(WATCH_INTERVAL_MS);
+    await t2.core.watcher.tick();
+    const tally = frames('tally').at(-1).d;
+    check('the tally counts both children, by club, in the printer\'s shape', tally.total === 2 && tally.counts.Sparks === 1 && tally.counts.Cubbies === 1 && typeof tally.at === 'string', JSON.stringify(tally));
+    check('the ticker says two checked in', frames('tonight').at(-1).d.checkedIn === 2);
+    const still = await open('checkout', frames('checkout').at(-1));
+    check('the sealed still-here list names them: first name and club', still.entries.map((e) => `${e.firstName}/${e.club}`).sort().join() === 'Kit/Sparks,Ottoline/Cubbies', JSON.stringify(still));
+    check('the count is the shared module\'s (GET /v1/desk/tonight)', (await t2.call('GET', '/v1/desk/tonight')).body.checkedIn === 2);
+    const plainFrames = JSON.stringify(t2.sent.filter((f) => f.e === 'tally' || f.e === 'tonight'));
+    check('and no name or id of a child is readable in the Worker\'s storage, and none is on a plaintext frame', !/Tester|Quillfeather|Ottoline|"662"|"702"/.test(everything(t2.storage)) && !/Tester|Quillfeather|Ottoline|Kit/.test(plainFrames));
+    check('the Worker\'s tally and the printer\'s builder agree on the shape', JSON.stringify(Object.keys(tally).sort()) === JSON.stringify(Object.keys(events.buildTally({ Sparks: 1, Cubbies: 1 }, 2, { season: server.currentScreenSeason() })).sort()));
+    check('and so do the ticker\'s and the list\'s', JSON.stringify(Object.keys(frames('tonight').at(-1).d).sort()) === JSON.stringify(Object.keys(events.buildTonight({ checkedIn: 2 })).sort())
+      && JSON.stringify(Object.keys(still).sort()) === JSON.stringify(Object.keys(events.buildCheckout([{ firstName: 'Kit', club: 'Sparks' }], 2)).sort()));
+    server.stopCloud();
+    listener.close();
+  }
 
   console.log(`\n${passed} passed, ${failed} failed`);
   fs.rmSync(dir, { recursive: true, force: true });

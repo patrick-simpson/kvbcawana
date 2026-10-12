@@ -256,7 +256,7 @@ export class Desk {
         return refuse(409, { reason: 'superseded' });
       }
     }
-    await this.fire('afterCheckin', { night, tag, gen: claim.gen, jobId, club, name, visitor: 'visitor' in who, historyRow: body.historyRow, source: 'desk' });
+    await this.fire('afterCheckin', { friend: Array.isArray(body.items) ? body.items.map(String).includes('Friend') : !!(body.items && body.items.Friend === true), night, tag, clubberId: 'clubberId' in who ? who.clubberId : undefined, gen: claim.gen, jobId, club, name, visitor: 'visitor' in who, historyRow: body.historyRow, source: 'desk' });
     return json({ ok: true, already: false, jobId, gen: claim.gen, history: this.hooks.afterCheckin.length ? 'hooked' : 'off' });
   }
 
@@ -321,7 +321,7 @@ export class Desk {
     // The claim goes, and so does a job that has not printed (the child is not here).
     await this.ledger.undo(night, tag);
     const dropped = await this.printq.dropForTag(tag);
-    await this.fire('afterUndo', { night, tag, club: clean(body.club, 24), historyRow: body.historyRow, source: 'desk', visitor: 'visitor' in who });
+    await this.fire('afterUndo', { night, tag, clubberId: 'clubberId' in who ? who.clubberId : undefined, club: clean(body.club, 24), historyRow: body.historyRow, source: 'desk', visitor: 'visitor' in who });
     return json({ ok: true, droppedJobs: dropped });
   }
 
@@ -336,7 +336,8 @@ export class Desk {
       const sent = await this.postMeeting(who.clubberId, 'checkout');
       if (!sent.ok) return sent.response;
     }
-    await this.fire('afterCheckout', { night, club: clean(body.club, 24), historyRow: body.historyRow, source: 'desk', visitor: 'visitor' in who });
+    const tag = await this.tagFor(who, night);
+    await this.fire('afterCheckout', { night, tag, clubberId: 'clubberId' in who ? who.clubberId : undefined, club: clean(body.club, 24), historyRow: body.historyRow, source: 'desk', visitor: 'visitor' in who });
     return json({ ok: true });
   }
 

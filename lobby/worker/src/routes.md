@@ -48,15 +48,15 @@ here and keep its shape; a change of shape is a change to this file first.
   ready answers from the last read with its `readAt`, or 429 `{retryAfterMs}`
   when it has none. Posts (check in, undo, check out) are writes, not reads.
 - **Single publisher** (`SINGLE_PUBLISHER = "on"` with cloud check-in
-  running). The Worker publishes `tally`, `tonight`, the pickup list and the
-  greetings in cloud mode; `POST /v1/publish` drops the laptop's `tally`,
-  `checkout` (the still-here list) and `checkin` (greeting) frames with 200
-  `{dropped: true}` so the print server owes no resend, and keeps every other
-  event. The Worker greets a cloud check-in ONCE itself (`SyncCore.greet`, a
-  sealed `checkin` {firstName, club, id, at}: a desk check-in after the claim
-  settles, a TwoTimTwo-page child when the watcher adopts it; the name is in
-  memory for that call only). It does not know birthdays, first-timers or
-  milestones yet (the print server's greeting did): open, with P5.
+  running; section 8 has the design). The Worker publishes `tally`, `tonight`
+  and the still-here list (`checkout`) from its own state with the shared
+  count (`lobby/shared/tonight.js`), and `POST /v1/publish` drops the laptop's
+  `tally`, `tonight`, `checkout` and `checkin` frames with 200
+  `{dropped: true}` so the print server owes no resend, keeping every other
+  event. The ONE exception is a `checkin` greeting sent by a registered
+  station with the print job it printed (`X-Station`, `X-Job`): it goes
+  through once per job, because only the station can make it (birthday,
+  first-timer, milestone). The Worker no longer greets anyone itself.
 
 ## Wire shapes (all from `cloud-crypto.js`)
 
@@ -258,7 +258,7 @@ behaviour is `desk.js`, which the page calls through these routes.
 | `POST /v1/desk/checkin` **BUILT** | session | `{night, clubberId \| visitor: {first, last, club}, items, historyRow: Row, job: Bundle \| null}`; `night` is the church's local date (else 400 `wrong-night`); `items` is `{Bible?, Friend?}` or `['Bible', 'Friend']`; `job.id` is the jobId, `job.kind` is `print-job`, `job.night` is `night`; `job` may be null only while no station is registered | see below |
 | `POST /v1/desk/undo` **BUILT** | session | `{night, clubberId \| visitor, historyRow}` | TwoTimTwo's undo (`checkinclubberundo`, accepted on "(checkin undone)"), then the claim goes `undone` (gen + 1) and every unprinted job of that child is dropped: `{ok, droppedJobs}`. A refusal is 409 `{reason}`, a timeout 504 `{reason: 'unsure'}`: nothing is changed here, and the watcher settles what TwoTimTwo has |
 | `POST /v1/desk/checkout` **BUILT** | session | `{night, clubberId \| visitor, historyRow}` | TwoTimTwo check-out (accepted only on "OK"): `{ok}`. The claim is left as it is |
-| `GET /v1/desk/tonight` | session | | `authoritativeTonight()` counts (the shared module, not a port; P5) |
+| `GET /v1/desk/tonight` **BUILT (P5)** | session | | `{night, source: 'report' \| 'history', checkedIn, checkedOut, byClub, reportAgeMs, enabled}`: `authoritativeTonight()` from the Worker's own state (the shared module, not a port; section 8). Answers in shadow mode too, so the owner can compare it with the laptop's count |
 
 **`POST /v1/desk/checkin`, in order** (nothing is checked-and-set across the
 network call):
@@ -280,11 +280,11 @@ network call):
    if TwoTimTwo did record it, the watcher finds the child on the report and
    claims and prints it itself.
 5. **Hooks.** `desk.hooks.afterCheckin / afterUndo / afterCheckout` are arrays
-   of functions the history (P6, registered), the greeting (`SyncCore.greet`,
-   registered) and the tally (P5) modules push to; each gets
-   `{night, tag, gen, jobId, club, name, visitor, historyRow, source}` (`name`
-   is in memory for the call, never stored). A hook that throws never fails the
-   check-in. The answer is `{ok, already: false, jobId, gen, history: 'hooked'}`:
+   of functions the history (P6, registered) and the count (P5, `publisher.js`,
+   registered) modules push to; each gets
+   `{night, tag, clubberId?, gen, jobId, club, name, visitor, historyRow, source}` (`name`
+   is in memory for the call; the count keeps only the FIRST name, sealed: section 8). A hook
+   that throws never fails the check-in. The answer is `{ok, already: false, jobId, gen, history: 'hooked'}`:
    the sealed row is stored (section 3), counted in `night_summary`, and
    ciphertext only. The `historyRow` is **sealed by the desk page, never the
    Worker**; `desk.checkRow` (history.js) accepts only a row of the Row shape for
@@ -340,7 +340,9 @@ alarm tick or per `GET /v1/print/next`** (`SEAL_PER_TICK = 1`), and while any
 wait the watcher asks for another tick `SPILL_MS` (1 s) later. With no station
 registered the job waits as a `raw` body (sealed under the state key; the Worker's
 own, never leased and never shown to a station) and `drain()` seals it to the
-stations once one registers. Brought a friend (BARFED, no friend's name) is P5's.
+stations once one registers. Brought a friend: a child the report marks Brought a friend gets `friend: true` in the
+job body, so the station also prints the BARFED tag on a BARF night (section 8, "BARF on
+the TwoTimTwo-page fallback").
 
 ## 6. Print (BUILT)
 
@@ -366,9 +368,11 @@ for a check-in only. A job is the same station-pad sealed bundle everywhere.
 **What the print role does with a job** (`job-puller.js`): opens the bundle with
 its station key, takes the record `{route, body, clubberId?, gen?, source?}`,
 refuses a route outside the print routes, and runs it on its own print server
-from loopback, so every old rule applies. For `/print` it sets `cloud: true` and,
-when the lease's `gen` is above 1 (an undo and a new check-in), `regen: true`,
-which tells the print server's own duplicate rules that this is a NEW tag.
+from loopback, so every old rule applies. For `/print` it sets `cloud: true`,
+`cloudJob: <jobId>` (the greeting the print makes goes to the Worker with the job,
+section 8) and, when the lease's `gen` is above 1 (an undo and a new check-in),
+`regen: true`, which tells the print server's own duplicate rules that this is a
+NEW tag.
 
 **GEN SEMANTICS (one place).** A claim's `gen` starts at 1 and only goes up: an
 undo (or the child vanishing from TwoTimTwo's report) makes it `undone` at
@@ -416,7 +420,92 @@ undo): the station ends it quietly.
   writes and take no slot.
 - **Switches** (`wrangler.toml [vars]`, both `"off"` until the shadow night):
   `CLOUD_PRINT` (jobs for TwoTimTwo-page check-ins) and `SINGLE_PUBLISHER`
-  (in cloud mode `POST /v1/publish` drops the laptop's `tally`, `checkout` and
-  `checkin` frames with 200 `{dropped: true}`, so the print server owes no
-  resend and a child is greeted once, by the Worker; turn it on only when the
-  Worker also publishes the tally and the still-here list itself, P5).
+  (in cloud mode the Worker publishes `tally`, `tonight` and the still-here
+  list itself, and `POST /v1/publish` drops the laptop's `tally`, `tonight`,
+  `checkout` and `checkin` frames with 200 `{dropped: true}`, except the one
+  greeting per print job a station sends; section 8).
+
+## 8. The one publisher (P5: BUILT)
+
+`src/tonight.js` (the book), `src/publisher.js` (frames, timing, the gate and
+three routes), `src/frames.js` (the printer's frame shapes), and the shared
+rules `lobby/shared/tonight.js` + `lobby/shared/pickup.js` (the print server runs
+the same source through generated copies, `scripts/shared-copies.mjs`:
+`authoritativeTonight`, `tonightHereNow`, the identity keys, `reportIsPartial`,
+`massUndoRefused`, the pickup list). With `SINGLE_PUBLISHER = "off"` the Worker
+still counts (the shadow night's comparison) but publishes nothing and keeps no
+first name.
+
+**What is published, and when** (the printer's own rules):
+
+| Frame | Shape | Sealed | When |
+| --- | --- | --- | --- |
+| `tally` | `{counts, total, at, season?, rehearsal?}` | plaintext numbers | on a change (an applied report, a desk check-in, undo, check-out) and every minute while the watch window is open |
+| `tonight` | `{checkedIn, booksCompleted, awardsEarned, friendsBrought, at}` | plaintext numbers | with the tally |
+| `checkout` | `{entries: [{firstName, club}], at, printed}` (the still-here list, at most 60, filtered by `pickupClubs`: default every club but Trek and Journey) | **sealed** with the display key, padded on the printer's ladder | inside the window only (60 minutes before the club window to 60 after, `watchWindow`, pinned to the printer's `TALLY_LEAD_MIN` / `TALLY_GRACE_MIN`), on a change (never two within 2 s) and every minute |
+| `checkin` | the printer's greeting (birthday, first-timer, milestone, welcome back) | sealed, padded to 512 | by the STATION, once per print job (below) |
+
+**Where the Worker gets each number.** The count comes from its own state, the
+applied report (never a partial one or one the mass-undo guard refused: the same
+`reportIsPartial` / `massUndoRefused` as the printer's reconcile) plus the desk's
+marks (a desk undo beats a report that still lists the child; a check-out takes
+the child off; a desk check-in ticks the count before the next read), run through
+the shared `authoritativeTonight()`: report when fresh (12 minutes) else the
+night's own rows, unregistered visitors only while no report is fresh. What the
+Worker cannot know is the print server's: the Screen season and rehearsal flag
+that ride the tally, and the pickup list's clubs. The station tells it, plaintext
+and non-personal: `POST /v1/station/extras` (station) `{season?, rehearsal?,
+pickupClubs?}`, sent every minute and on a change; the books and awards counts
+come from the laptop's `tonight` frame the gate drops (it remembers those two
+numbers). `GET /v1/publisher/status` (session) is counts and times only.
+
+**Names in the still-here list and the greeting: the design.** The Worker cannot
+read names from history (sealed to the history key, which it never holds), and
+the pickup board names first names, so something has to know tonight's first
+names. Chosen:
+
+- **Still-here: the Worker keeps tonight's FIRST names and clubs, sealed, for
+  the night only.** `tonight:book` is one AES-GCM blob under the state key (HKDF
+  from the TwoTimTwo password secret, as the watcher's snapshot and the claims'
+  tags): a copy of the storage alone opens nothing. It holds the applied
+  report's entries (clubber id, FIRST name, club) and the desk's rows (first
+  name, club, a visitor's HMAC tag in place of a surname): never a last name,
+  birthday, allergy or note. Purged with the claims when the watch window closes.
+  It is written only when it changes and only while `SINGLE_PUBLISHER` is on
+  (in shadow mode first names are not kept at all: ids and clubs are enough to
+  count). Why this and not the station: the Worker already sees these names in
+  memory for every check-in it prints or greets and for every report it reads;
+  the book adds an at-rest, sealed, one-night copy, not a new reader. The
+  station can restart, sleep or be unplugged mid-night, and the pickup list must
+  not go quiet or stale with it; a still-here list built from the station's jobs
+  would also miss every child already on the report when it started. This is the
+  second sealed-names exception after the friend list (`friends.js`, 3 days),
+  and the owner should read it as such (SECURITY.md says so).
+- **Greeting: the station.** It opens the job, holds the roster and the history
+  key, so only it can say birthday / first-timer / milestone. It publishes the
+  sealed `checkin` through `POST /v1/publish` with `X-Station` and `X-Job: <jobId>`
+  (the job it just printed); the gate lets it through if the station is registered
+  and the job is tonight's check-in (not a reprint) and not yet greeted
+  (`printq.greet`, one synchronous step, `greeted` on the job), and drops any
+  other `checkin` (the laptop's, a retry, a second station's) with 200
+  `{dropped: true, reason}`. So a child is greeted exactly once with everything
+  the printer used to say, whether the desk page or TwoTimTwo's own page checked
+  them in, and the Worker never opens or seals a name for a greeting.
+- Not carried (known, owner's call at P7): the extension's youth check-out sweep
+  posts check-outs to the laptop only; a Trek / Journey child checked out that
+  way stays on the count here until the extension is retired. The desk's
+  check-out and TwoTimTwo's own report are honoured.
+
+**BARF on the TwoTimTwo-page fallback.** The parsed report marks a child
+`friend: true` when their row says YES under a Brought a friend column (the
+extension's `friendsBrought` rule: the header is searched in every header row, the
+cell must read YES). The job the watcher seals for such a child carries `friend: true` in
+its `/print` body (`adopt.js printRecord`), so the station prints the BARFED tag after
+the child's own on a BARF night (`isBarfNight()`, the church's `barfNights`, which the
+print server keeps: the same place that already decides it for the desk and the phone)
+and on no other night, with NO friend's name (TwoTimTwo's box has no name field; the tag
+is the child's first name alone, as on the desk path). The Worker also records the child
+for the 6:30 pm email (`friends.record`, friend's name empty), because a cloud job tells
+the station not to report it again; a desk check-in with the Friend item ticked is
+recorded the same way (the desk page's sealed job carries the friend's name to the
+tag). The same flag counts in the `tonight` frame's `friendsBrought`.

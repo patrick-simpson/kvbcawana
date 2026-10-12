@@ -26,7 +26,7 @@ export async function rig({ env = {}, kids = [], households = null, start = WED_
     const clubs = [...new Set(night.kids.map((k) => k.club))];
     return page(...clubs.map((club) => {
       const these = night.kids.filter((k) => k.club === club);
-      return table(`${club} `, these.map((k) => ({ id: k.id, name: k.name })), { count: night.count ?? these.length });
+      return table(`${club} `, these.map((k) => ({ id: k.id, name: k.name, friend: k.friend })), { count: night.count ?? these.length });
     }), clubs.length ? '' : table('Sparks ', []));
   };
   const tt = fakeTwoTimTwo({ report: render, checkin: () => CHECKIN_PAGE, households });

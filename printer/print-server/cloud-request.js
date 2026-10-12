@@ -10,12 +10,14 @@ const protocol = require('./sync-protocol');
 /**
  * @param {string} base the Worker's address
  * @param {string} path e.g. '/v1/print/lease'
- * @param {{ method?: string, body?: any, session?: string, station?: string, fetchFn?: typeof fetch }} [opts]
+ * @param {{ method?: string, body?: any, session?: string, station?: string, headers?: Record<string, string>, fetchFn?: typeof fetch }} [opts]
  * @returns {Promise<{ ok: boolean, status: number, body: any }>}
  */
-async function cloudRequest(base, path, { method, body, session, station, fetchFn } = {}) {
+async function cloudRequest(base, path, { method, body, session, station, headers, fetchFn } = {}) {
   const req = protocol.buildRequest(base, path, { method, body, session });
   if (station) req.init.headers['X-Station'] = station;
+  // Extra headers a route names (the greeting's `X-Job`); never a credential.
+  if (headers) for (const [k, v] of Object.entries(headers)) req.init.headers[k] = String(v);
   try {
     const f = fetchFn || globalThis.fetch;
     const res = await f(req.url, { ...req.init, signal: AbortSignal.timeout(protocol.SYNC_TIMEOUT_MS) });

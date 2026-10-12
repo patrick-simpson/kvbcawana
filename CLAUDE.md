@@ -37,7 +37,7 @@ commits or files.
   smoke; Chromium cached by the `@playwright/test` version in
   `lobby/package-lock.json`). Every `setup-node` caches npm. The printer's
   48 test scripts stay serial on purpose: many bind fixed ports that
-  collide across scripts (34573, 34575, 34581, 34583, 34586, 34597).
+  collide across scripts (34573, 34575, 34581, 34583, 34586, 34588, 34597).
 - `ci.yml`'s deploy job, on `main` only and once everything is green: takes
   the site the `site` job built (it does not rebuild; the `SITE_ORIGIN`
   repository variable is required, and the site job builds with that same

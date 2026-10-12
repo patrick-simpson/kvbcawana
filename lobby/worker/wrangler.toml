@@ -19,11 +19,13 @@ CLOUD_CHECKIN = "shadow"
 #                    in on TwoTimTwo's own page) gets a print job, sealed to the
 #                    stations in the Worker. Stations lease it, so turn it on only
 #                    when the extension no longer prints the same child.
-#   SINGLE_PUBLISHER "on": the Worker drops the laptop's tally, still-here and
-#                    check-in greeting frames (POST /v1/publish answers dropped)
-#                    and greets a cloud check-in itself (name only, no birthday or
-#                    milestone yet). Turn it on only with P5, when the Worker
-#                    publishes the tally and the still-here list itself.
+#   SINGLE_PUBLISHER "on": the Worker is the one publisher: it publishes the tally,
+#                    the ticker and the still-here list from its own state (the shared
+#                    count), drops the laptop's frames (POST /v1/publish answers dropped)
+#                    and lets only a station's greeting for a print job through (one per
+#                    job). It then keeps tonight's first names + clubs, sealed, until the
+#                    window closes (routes.md section 8). Turn it on only on the shadow
+#                    night, with the station running.
 CLOUD_PRINT = "off"
 SINGLE_PUBLISHER = "off"
 # Passphrase v2 migration (src/routes.md section 1). "on": clients that still send

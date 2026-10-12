@@ -281,7 +281,9 @@ function createJobPuller(o) {
     // is a NEW tag: the Worker's gen and the journal below are what stop a
     // second label of one generation, so the server's own rule steps aside.
     if (rec.route === '/print') {
-      rec.body = { ...rec.body, cloud: true };
+      // `cloudJob` names this job to the print route, so the greeting it makes goes to the
+      // Worker with the job (the one greeting per check-in the single publisher lets through).
+      rec.body = { ...rec.body, cloud: true, cloudJob: id };
       if (Number.isInteger(rec.gen) && rec.gen > 1) rec.body.regen = true;
     }
 
