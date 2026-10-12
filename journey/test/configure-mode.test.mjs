@@ -234,7 +234,7 @@ test('the live kiosk takes caption and quality settings saved by another window,
     window.localStorage.setItem('journey.playback.quality', 'full');
     window.dispatchEvent(new window.StorageEvent('storage', { key: 'journey.playback.quality' }));
     assert.doesNotMatch(frame.getAttribute('src'), /lowPower/);
-    assert.equal(doc.getElementById('quality-full').getAttribute('aria-pressed'), 'true');
+    assert.equal(doc.getElementById('pi-mode-switch').getAttribute('aria-checked'), 'false');
 
     // Slides preferences re-sync their inputs.
     window.localStorage.setItem('journey.slides.autoAdvanceSec', '30');

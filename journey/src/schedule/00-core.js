@@ -137,11 +137,9 @@ const notesEditGroups = document.getElementById('notes-edit-groups');
 const notesEditStatus = document.getElementById('notes-edit-status');
 const notesEditedBadge = document.getElementById('notes-edited-badge');
 const notesResetBtn = document.getElementById('notes-reset-btn');
-const qualityButtons = {
-  auto: document.getElementById('quality-auto'),
-  full: document.getElementById('quality-full'),
-  low: document.getElementById('quality-low'),
-};
+const piModeSwitch = document.getElementById('pi-mode-switch');
+const qualityAutoNote = document.getElementById('quality-auto-note');
+const qualityAutoBtn = document.getElementById('quality-auto');
 const qualityStatus = document.getElementById('quality-status');
 const trekView = document.getElementById('trek-view');
 const trekChip = document.getElementById('trek-chip');

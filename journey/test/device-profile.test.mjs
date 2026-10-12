@@ -146,7 +146,7 @@ test('the iframe is only rewritten when the URL actually changes', () => {
   kiosk.window.applyCheckinDisplayUrl();
   assert.equal(writes, 0);
 
-  kiosk.document.getElementById('quality-full').click();
+  kiosk.document.getElementById('pi-mode-switch').click();
   assert.equal(writes, 1);
   assert.equal(frame.getAttribute('src'), FULL_URL);
 
@@ -155,29 +155,52 @@ test('the iframe is only rewritten when the URL actually changes', () => {
   kiosk.close();
 });
 
-test('the Settings buttons set, show and persist the choice', () => {
+test('the Pi mode switch shows detection, saves a choice, and Use automatic clears it', () => {
   const kiosk = bootKiosk(ROUTES, ANSWERED, PI_ZERO);
   const { document, window } = kiosk;
   document.getElementById('settings-btn').click();
+  const sw = document.getElementById('pi-mode-switch');
+  const auto = document.getElementById('quality-auto');
+  const key = () => window.localStorage.getItem('journey.playback.quality');
 
-  const pressed = () =>
-    ['auto', 'full', 'low']
-      .filter((k) => document.getElementById(`quality-${k}`).getAttribute('aria-pressed') === 'true');
-  assert.deepEqual(pressed(), ['auto']);
-  // Auto has to say what it detected, or it is a promise nobody can check.
-  assert.equal(document.getElementById('quality-auto').textContent, 'Auto (detected: low power)');
+  assert.equal(sw.getAttribute('role'), 'switch');
+  // Nothing saved: the switch shows what detection picked and says so.
+  assert.equal(sw.getAttribute('aria-checked'), 'true');
+  assert.match(document.getElementById('quality-auto-note').textContent, /Automatic: this computer looks like a Pi/);
+  assert.ok(auto.classList.contains('hidden'), 'no saved choice, nothing to clear');
 
-  document.getElementById('quality-full').click();
-  assert.deepEqual(pressed(), ['full']);
-  assert.equal(window.localStorage.getItem('journey.playback.quality'), 'full');
+  sw.click(); // off -> full
+  assert.equal(sw.getAttribute('aria-checked'), 'false');
+  assert.equal(key(), 'full');
   assert.equal(window.effectiveProfile(), 'full');
   assert.match(document.getElementById('quality-status').textContent, /full quality/);
+  assert.ok(!auto.classList.contains('hidden'));
 
-  document.getElementById('quality-auto').click();
-  assert.deepEqual(pressed(), ['auto']);
-  assert.equal(window.localStorage.getItem('journey.playback.quality'), 'auto');
+  sw.click(); // on -> low
+  assert.equal(sw.getAttribute('aria-checked'), 'true');
+  assert.equal(key(), 'low');
   assert.equal(window.effectiveProfile(), 'low');
+
+  sw.click();
+  auto.click();
+  assert.equal(key(), 'auto');
+  assert.equal(window.effectiveProfile(), 'low');
+  assert.equal(sw.getAttribute('aria-checked'), 'true');
+  assert.ok(auto.classList.contains('hidden'));
   assert.equal(document.getElementById('checkin-frame').getAttribute('src'), LOW_POWER_URL);
+  kiosk.close();
+});
+
+test('on a regular computer the switch starts off and says so', () => {
+  const kiosk = bootKiosk(ROUTES, ANSWERED, DESKTOP);
+  const { document, window } = kiosk;
+  document.getElementById('settings-btn').click();
+  const sw = document.getElementById('pi-mode-switch');
+  assert.equal(sw.getAttribute('aria-checked'), 'false');
+  assert.match(document.getElementById('quality-auto-note').textContent, /a regular computer/);
+  sw.click();
+  assert.equal(window.localStorage.getItem('journey.playback.quality'), 'low');
+  assert.equal(window.effectiveProfile(), 'low');
   kiosk.close();
 });
 
@@ -191,8 +214,8 @@ test('a choice that cannot be stored applies now and says it will not last', () 
   window.Storage.prototype.setItem = () => {
     throw new Error('storage blocked');
   };
-  document.getElementById('quality-full').click();
-  assert.equal(window.effectiveProfile(), 'full', 'the button still has to do something');
+  document.getElementById('pi-mode-switch').click();
+  assert.equal(window.effectiveProfile(), 'full', 'the switch still has to do something');
   assert.equal(document.getElementById('checkin-frame').getAttribute('src'), FULL_URL);
   assert.match(document.getElementById('quality-status').textContent, /won’t[\s\S]*store settings/);
   window.Storage.prototype.setItem = realSetItem;

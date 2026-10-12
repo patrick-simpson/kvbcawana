@@ -2073,15 +2073,87 @@ html.cursor-hidden #slide-controls {
   color: var(--jr-tint);
 }
 
-/* Settings -> Playback quality: Auto / Full quality / Low power, one pressed
-   at a time. Pill buttons like the Read Prep version switch, sized for the
-   same across-the-room read as the rest of this panel. */
-#quality-buttons {
+/* Settings -> Pi mode: one switch row. Flat colours only, no transitions, no
+   keyframes: the low profile paints this panel too. */
+#pi-mode-switch {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
+  align-items: center;
+  gap: 1rem;
+  width: 100%;
+  min-height: 72px;
+  padding: 0.6rem 1rem;
+  border: 2px solid rgba(222, 213, 234, 0.5);
+  border-radius: 16px;
+  background: none;
+  color: #ffffff;
+  text-align: left;
+  cursor: pointer;
 }
 
+.pi-mode-track {
+  flex: none;
+  position: relative;
+  width: 76px;
+  height: 40px;
+  border: 2px solid rgba(222, 213, 234, 0.6);
+  border-radius: 999px;
+}
+
+.pi-mode-knob {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #ffffff;
+}
+
+#pi-mode-switch[aria-checked='true'] .pi-mode-track {
+  background: var(--jr-tint);
+  border-color: var(--jr-tint);
+}
+
+#pi-mode-switch[aria-checked='true'] .pi-mode-knob {
+  left: 40px;
+  background: var(--jr-ink);
+}
+
+.pi-mode-label {
+  display: block;
+  font-family: var(--jr-font-label);
+  font-size: 1.5rem;
+  letter-spacing: 0.04em;
+}
+
+.pi-mode-sub {
+  display: block;
+  font-size: 1.05rem;
+  opacity: 0.85;
+}
+
+#pi-mode-switch:hover,
+#pi-mode-switch:focus-visible {
+  border-color: #ffffff;
+}
+
+#pi-mode-switch:active {
+  opacity: 0.8;
+}
+
+#quality-auto {
+  min-height: 44px;
+  padding: 0.2em 0.4em;
+  border: 0;
+  background: none;
+  color: var(--jr-tint);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* Pill buttons (Settings -> Sync sign in/out), sized for the same
+   across-the-room read as the rest of this panel. */
 .quality-btn {
   min-height: 56px;
   padding: 0.5em 1.4em;
@@ -2094,12 +2166,6 @@ html.cursor-hidden #slide-controls {
   font-weight: 400;
   letter-spacing: 0.04em;
   cursor: pointer;
-}
-
-.quality-btn[aria-pressed='true'] {
-  background: var(--jr-tint);
-  border-color: var(--jr-tint);
-  color: var(--jr-ink);
 }
 
 .quality-btn:hover,
@@ -2383,12 +2449,6 @@ html.cursor-hidden #slide-controls {
   #settings-variant-buttons,
   #settings-student-buttons,
   #settings-leader-buttons {
-    flex-direction: column;
-  }
-
-  /* The Auto button carries what was detected, so it is the widest of the
-     three and cannot share a phone row with them. */
-  #quality-buttons {
     flex-direction: column;
   }
 

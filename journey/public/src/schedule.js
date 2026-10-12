@@ -137,11 +137,9 @@ const notesEditGroups = document.getElementById('notes-edit-groups');
 const notesEditStatus = document.getElementById('notes-edit-status');
 const notesEditedBadge = document.getElementById('notes-edited-badge');
 const notesResetBtn = document.getElementById('notes-reset-btn');
-const qualityButtons = {
-  auto: document.getElementById('quality-auto'),
-  full: document.getElementById('quality-full'),
-  low: document.getElementById('quality-low'),
-};
+const piModeSwitch = document.getElementById('pi-mode-switch');
+const qualityAutoNote = document.getElementById('quality-auto-note');
+const qualityAutoBtn = document.getElementById('quality-auto');
 const qualityStatus = document.getElementById('quality-status');
 const trekView = document.getElementById('trek-view');
 const trekChip = document.getElementById('trek-chip');
@@ -1266,11 +1264,13 @@ applyCaptionDisplayPrefs();
 captionsSizeSelect.addEventListener('change', storeCaptionDisplayPrefs);
 captionsBackdropInput.addEventListener('change', storeCaptionDisplayPrefs);
 
-/* ── Settings: Playback quality ───────────────────────────────────────
-   Three buttons, Auto / Full quality / Low power, with Auto naming what was
-   detected so an operator can see what it would do before trusting it. A
-   change applies at once: the embedded display's flag is swapped now, and
-   the next video pick reads the new profile.
+/* ── Settings: Pi mode ────────────────────────────────────────────────
+   One switch. On = the low profile (what the kiosk Raspberry Pi needs),
+   off = the full profile. With nothing saved the switch shows what detection
+   picked and a line says so; flipping it saves an explicit 'low'/'full', and
+   a "Use automatic" button (only shown while a choice is saved) writes
+   'auto' again. A change applies at once: the embedded display's flag is
+   swapped now, and the next video pick reads the new profile.
 
    Like the caption size, the change is applied in memory whether or not the
    write succeeded, and a failed write says so instead of claiming it saved:
@@ -1281,18 +1281,20 @@ function qualityWords(profile) {
 }
 
 function syncQualityButtons() {
-  qualityButtons.auto.textContent = `Auto (detected: ${qualityWords(detectedProfile)})`;
   const choice = storedPlaybackQuality();
-  for (const key of PLAYBACK_QUALITY_CHOICES) {
-    qualityButtons[key].setAttribute('aria-pressed', String(key === choice));
-  }
+  piModeSwitch.setAttribute('aria-checked', String(effectiveProfile() === 'low'));
+  qualityAutoNote.textContent =
+    choice === 'auto'
+      ? `Automatic: this computer looks like ${detectedProfile === 'low' ? 'a Pi' : 'a regular computer'}.`
+      : 'Chosen by hand on this computer.';
+  qualityAutoBtn.classList.toggle('hidden', choice === 'auto');
 }
 
 function chooseQuality(choice) {
   if (!PLAYBACK_QUALITY_CHOICES.includes(choice)) return;
   const stored = storePlaybackQuality(choice);
   // Applied from the choice itself, not read back from storage, so the
-  // buttons still do something on a device where the write just failed.
+  // switch still does something on a device where the write just failed.
   profileCache = choice === 'auto' ? detectedProfile : choice;
   applyCheckinDisplayUrl();
   applyMotionProfile();
@@ -1300,13 +1302,14 @@ function chooseQuality(choice) {
   qualityStatus.textContent = stored
     ? `Using ${qualityWords(effectiveProfile())} on this device.`
     : `Using ${qualityWords(effectiveProfile())} now, but this kiosk’s browser won’t ` +
-      'store settings, so it goes back to Auto when the page reloads.';
+      'store settings, so it goes back to Automatic when the page reloads.';
 }
 
 syncQualityButtons();
-for (const key of PLAYBACK_QUALITY_CHOICES) {
-  qualityButtons[key].addEventListener('click', () => chooseQuality(key));
-}
+piModeSwitch.addEventListener('click', () => {
+  chooseQuality(piModeSwitch.getAttribute('aria-checked') === 'true' ? 'full' : 'low');
+});
+qualityAutoBtn.addEventListener('click', () => chooseQuality('auto'));
 
 function applyCaptions() {
   removeCaptionTracks();

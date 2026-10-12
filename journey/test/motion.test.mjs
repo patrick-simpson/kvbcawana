@@ -124,7 +124,7 @@ test('reduced motion, configure mode and the Low power choice all switch it off;
   }
   const desk = bootKiosk(ROUTES, ANSWERED, DESKTOP, reduce(false));
   try {
-    desk.document.getElementById('quality-low').click();
+    desk.document.getElementById('pi-mode-switch').click();
     assert.equal(hasMotion(desk), false, 'Low power on a laptop is the Pi, motion included');
     desk.document.getElementById('quality-auto').click();
     assert.equal(hasMotion(desk), true);
@@ -133,7 +133,7 @@ test('reduced motion, configure mode and the Low power choice all switch it off;
   }
   const pi = bootKiosk(ROUTES, ANSWERED, PI_ZERO, reduce(false));
   try {
-    pi.document.getElementById('quality-full').click();
+    pi.document.getElementById('pi-mode-switch').click();
     assert.equal(hasMotion(pi), true, 'Full quality chosen by hand is the full profile');
   } finally {
     pi.close();
