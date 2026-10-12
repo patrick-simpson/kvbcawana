@@ -35,11 +35,14 @@ export async function rig({ env = {}, kids = [], households = null, start = WED_
   const faults = { checkin: null, undo: null, checkout: null, checkoutReply: null };
   /** When each data page was read: the clock's invariant. */
   const reads = [];
+  /** Every request that takes a slot on the read clock (each GET, sign-in hops included, and the sign-in post). */
+  const slots = [];
   const posts = { undo: [], checkout: [], /** when each check-out post was made */ checkoutAt: [] };
   const fetchFn = async (url, init = {}) => {
     const u = new URL(url);
     const method = init.method || 'GET';
     if (method === 'GET' && !u.pathname.startsWith('/site/')) reads.push({ at: clock.t, path: u.pathname });
+    if (method === 'GET' || u.pathname === '/site/login') slots.push({ at: clock.t, path: u.pathname, method });
     const fault = (u.pathname === '/clubber/checkinclubber' && faults.checkin)
       || (u.pathname === '/clubber/checkinclubberundo' && faults.undo)
       || (u.pathname === '/clubber/checkout' && method === 'POST' && faults.checkout);
@@ -66,7 +69,7 @@ export async function rig({ env = {}, kids = [], households = null, start = WED_
     broadcast: (text) => { sent.push(JSON.parse(text)); return 1; },
   });
   const r = {
-    clock, storage, tt, night, faults, reads, posts, alarm, sent, core: make(), session: '',
+    clock, storage, tt, night, faults, reads, slots, posts, alarm, sent, core: make(), session: '',
     /** A new object over the same storage: a Durable Object restart. */
     restart() { r.core = make(); r.wire(); return r.core; },
     wire() { r.watcher = r.core.watcher; },
