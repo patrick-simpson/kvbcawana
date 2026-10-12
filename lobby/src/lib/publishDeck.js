@@ -35,7 +35,7 @@ export async function publishDeck(slides, token, opts) {
     return {
       ok: false,
       reason: 'no-token',
-      message: 'No publish token on this machine. Log in under Settings → Setup → Connect this screen (the church passphrase), or publish from awana.kvbchurch.org/settings.',
+      message: 'This machine is not signed in. Type the church passphrase under Settings → Account & app, or publish from awana.kvbchurch.org/settings.',
     };
   }
   const textSlides = sanitizeSlides(slides).filter((s) => !isVideoSlide(s));

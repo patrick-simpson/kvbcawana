@@ -173,8 +173,8 @@ describe('feedback', () => {
     publish.publishDeck.mockResolvedValue({ ok: false, reason: 'auth', message: 'Publish token rejected.' });
     render(<SlideEditorPanel {...baseProps()} />);
     fireEvent.click(screen.getByRole('button', { name: 'Publish to all displays' }));
-    await waitFor(() => expect(screen.getByRole('status').textContent).toMatch(/no valid publish token — log in under Settings/));
-    expect(screen.getByRole('status').textContent).toMatch(/Publishing slides/);
+    await waitFor(() => expect(screen.getByRole('status').textContent).toMatch(/not signed in — type the church passphrase under Settings → Account & app/));
+    expect(screen.getByRole('status').textContent).not.toMatch(/Publishing slides|paste a token/);
     // The print dashboard is retired: nothing sends a person there any more.
     expect(screen.getByRole('status').textContent).not.toMatch(/dashboard/i);
   });

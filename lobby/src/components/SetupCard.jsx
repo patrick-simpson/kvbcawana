@@ -77,12 +77,11 @@ export default function SetupCard({ card, onOpenSettings }) {
       </div>
       <ol>
         <li className={connected ? 'done' : ''}>
-          Sign in with the church&rsquo;s passphrase — Settings → Setup → <strong>Sign in</strong>.
+          Sign in with the church&rsquo;s passphrase — Settings → Account &amp; app → <strong>Sign in</strong>.
           That connects this screen to the live channel.
         </li>
         <li className={keyed ? 'done' : ''}>
-          Names need the display key. Signing in fills it in; to paste one by hand, use{' '}
-          Settings → Setup → <strong>Advanced</strong>.
+          Names need the church&rsquo;s encryption key. Signing in fills it in.
         </li>
       </ol>
       <div className="actions">

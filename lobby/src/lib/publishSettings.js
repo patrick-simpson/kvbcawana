@@ -30,7 +30,7 @@ export async function publishSettings(config, token, opts) {
     return {
       ok: false,
       reason: 'no-token',
-      message: 'This screen has no publish token, so it cannot send settings to the other screens. Log it in (Settings → Setup → Connect this screen).',
+      message: 'This screen is not signed in, so it cannot send settings to the other screens. Sign it in (Settings → Account & app).',
     };
   }
   let res;

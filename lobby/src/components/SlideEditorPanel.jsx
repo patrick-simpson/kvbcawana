@@ -264,7 +264,7 @@ export default function SlideEditorPanel({ config, syncedDeck, onChange, onClose
       // anywhere, so say nothing extra there — the server's message already
       // says what to shorten.
       const fallback = result.reason === 'auth' && !viaSync
-        ? ' This machine has no valid publish token — log in under Settings → Setup → Connect this screen, or paste a token under Settings → Setup → Publishing slides.'
+        ? ' This machine is not signed in — type the church passphrase under Settings → Account & app, or publish from awana.kvbchurch.org/settings.'
         : '';
       setPublishState({ phase: 'err', message: `${result.message}${fallback}`, deckRev: null });
     }
@@ -623,8 +623,8 @@ export default function SlideEditorPanel({ config, syncedDeck, onChange, onClose
             onClick={publishAll}
             disabled={publishState.phase === 'busy'}
             title={hasToken
-              ? 'Send this deck to every display, via the print server'
-              : 'Needs a publish token — log in under Settings → Setup → Connect this screen, or paste one under Settings → Setup → Publishing slides'}
+              ? 'Send this deck to every display'
+              : 'Needs a sign-in — type the church passphrase under Settings → Account & app'}
           >
             {publishState.phase === 'busy' ? 'Publishing…' : 'Publish to all displays'}
           </button>

@@ -68,9 +68,10 @@ describe('SetupCard (signage first-run)', () => {
     render(<Screen status="off" hasDisplayKey={false} />);
     const card = screen.getByRole('region', { name: 'Display setup' });
     // The two steps say where to go: the passphrase signs in, and brings the key.
-    expect(card.textContent).toMatch(/Settings → Setup → Sign in/);
+    expect(card.textContent).toMatch(/Settings → Account & app → Sign in/);
     expect(card.textContent).toMatch(/church.s passphrase/);
-    expect(card.textContent).toMatch(/Settings → Setup → Advanced/);
+    expect(card.textContent).toMatch(/encryption key/);
+    expect(card.textContent).not.toMatch(/Advanced|by hand/);
     expect(card.textContent).not.toMatch(/Pusher/);
     expect(card.textContent).toMatch(/sync themselves/);
     // The gear stands beside the card now; the shortcut rides the button.
