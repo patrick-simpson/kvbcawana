@@ -2351,8 +2351,8 @@ handoutCloseBtn.addEventListener('click', closeHandout);
    phone — a Letter-sized PDF page in Chromium's viewer, pinch-zoomed, is
    the worst reading experience a leader preparing on the way to church
    could be handed. "Read Prep" renders the same page-1 content (Big Idea,
-   Key Points, Scripture, Discussion Questions) as plain text this page
-   lays out itself, so it reflows on any screen.
+   Key Points, Scripture, the "For you" and "Ask your group" questions) as
+   plain text this page lays out itself, so it reflows on any screen.
 
    public/leader-prep.json is GENERATED from data/leader-handout-summaries
    .json by scripts/build-leader-prep.mjs (which render-leader-handouts.mjs
@@ -2695,6 +2695,18 @@ function prepSection(heading, build) {
   prepBody.appendChild(section);
 }
 
+// leader-prep.json v2 carries two question sets: the leader's own reflection
+// ("For you") and what the leader asks the students ("Ask your group", may be
+// empty). A v1 copy still sitting in the asset cache has one plain list,
+// which was always the leader's own questions: read it as "For you" until
+// the quiet revalidate replaces it.
+function prepQuestionSets(questions) {
+  const clean = (list) => (Array.isArray(list) ? list.filter((q) => typeof q === 'string' && q.trim()) : []);
+  if (Array.isArray(questions)) return { forYou: clean(questions), forGroup: [] };
+  if (!questions || typeof questions !== 'object') return { forYou: [], forGroup: [] };
+  return { forYou: clean(questions.forYou), forGroup: clean(questions.forGroup) };
+}
+
 function renderPrep(lesson, role = 'leader') {
   // The Student Prep has no summary to show: the Big Idea / Key Points /
   // Scripture / Questions are written from the LEADER Video, so putting them
@@ -2741,10 +2753,15 @@ function renderPrep(lesson, role = 'leader') {
       return p;
     });
   }
-  if (Array.isArray(entry.questions) && entry.questions.length) {
-    prepSection('Discussion Questions', () => {
+  const sets = prepQuestionSets(entry.questions);
+  for (const [heading, questions] of [
+    ['For you', sets.forYou],
+    ['Ask your group', sets.forGroup],
+  ]) {
+    if (!questions.length) continue;
+    prepSection(heading, () => {
       const ol = document.createElement('ol');
-      for (const question of entry.questions) {
+      for (const question of questions) {
         const li = document.createElement('li');
         li.textContent = question;
         ol.appendChild(li);

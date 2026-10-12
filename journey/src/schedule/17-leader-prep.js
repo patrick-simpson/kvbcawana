@@ -3,8 +3,8 @@
    phone — a Letter-sized PDF page in Chromium's viewer, pinch-zoomed, is
    the worst reading experience a leader preparing on the way to church
    could be handed. "Read Prep" renders the same page-1 content (Big Idea,
-   Key Points, Scripture, Discussion Questions) as plain text this page
-   lays out itself, so it reflows on any screen.
+   Key Points, Scripture, the "For you" and "Ask your group" questions) as
+   plain text this page lays out itself, so it reflows on any screen.
 
    public/leader-prep.json is GENERATED from data/leader-handout-summaries
    .json by scripts/build-leader-prep.mjs (which render-leader-handouts.mjs
