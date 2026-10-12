@@ -117,7 +117,9 @@ export class Switches {
   effectiveEnv() {
     const env = Object.create(this.rawEnv);
     for (const name of SWITCH_NAMES) {
-      Object.defineProperty(env, name, { get: () => this.value(name), enumerable: true });
+      // An assignment (a test, or code that set env.X before switches existed) sets the
+      // DEFAULT, as editing wrangler.toml would; a stored value still wins over it.
+      Object.defineProperty(env, name, { get: () => this.value(name), set: (v) => { this.rawEnv[name] = v; }, enumerable: true });
     }
     return env;
   }

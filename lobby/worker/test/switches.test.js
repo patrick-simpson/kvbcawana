@@ -31,6 +31,15 @@ describe('defaults', () => {
     expect(r.core.ym.enabled).toBe(true);
   });
 
+  it('assigning env.X sets the default (as editing wrangler.toml would); a stored value still wins', async () => {
+    const r = await rig({ env: { YM_CHECKOUT: 'off' }, start: SUNDAY });
+    r.core.env.YM_CHECKOUT = 'on';
+    expect(r.core.switches.view('YM_CHECKOUT')).toMatchObject({ value: 'on', default: 'on', source: 'default' });
+    await r.call('PUT', '/v1/switches', { name: 'YM_CHECKOUT', value: 'off' });
+    r.core.env.YM_CHECKOUT = 'on';
+    expect(r.core.ym.enabled).toBe(false);
+  });
+
   it('an unset online var is off, an odd value is its fallback, a set safety var is honoured', async () => {
     const r = await rig({ env: { CLOUD_PRINT: undefined, SINGLE_PUBLISHER: 'shadow', NOTICES: 'off' }, start: SUNDAY });
     const b = (await r.call('GET', '/v1/switches')).body;
