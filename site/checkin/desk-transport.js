@@ -1,10 +1,11 @@
-// The desk page's transport: everything that talks to the sync Worker, and
-// everything that seals, in ONE small module (ROADMAP.md#online-check-in P3).
-// No DOM and no globals: the page hands it `fetch`, a storage object and the
-// cloud-crypto module (lobby/shared/cloud-crypto.js, the canonical copy), so
-// Node tests run it as it is. The routes are lobby/worker/src/routes.md; when
-// the Worker's contract moves (the print role's is being reconciled), this is
-// the only file that follows.
+// The check-in page's transport (awana.kvbchurch.org/checkin, the page is
+// printer/print-server/public/phone.html): everything that talks to the sync
+// Worker's desk routes, and everything that seals, in ONE small module
+// (ROADMAP.md#online-check-in; it was the /desk page's). No DOM and no globals:
+// the page hands it `fetch`, a storage object and the cloud-crypto module
+// (lobby/shared/cloud-crypto.js, the canonical copy), so Node tests run it as it
+// is. The routes are lobby/worker/src/routes.md; when the Worker's contract
+// moves, this is the only file that follows.
 //
 // THE RULES it keeps (routes.md "Rules every route keeps"):
 //   - Free-CPU. Every key derivation and every seal is HERE, in the browser:
@@ -13,8 +14,10 @@
 //     registered stations (sealForStations) and the history row to the history
 //     key (sealRow) before anything is posted. The Worker validates and stores.
 //   - Names go to the Worker in clear only inside the check-in the Worker must
-//     post to TwoTimTwo (the clubber id; a visitor's name, which it hashes).
-//     The sealed job and the sealed row carry the rest.
+//     post to TwoTimTwo (the clubber id; a visitor's name, which it hashes), and
+//     a Brought-a-friend friend's FIRST name for the 6:30 BARF list (friends.js,
+//     what the phone path always sent). The sealed job and the sealed row carry
+//     the rest.
 //   - Fail closed. No history key, or a seal that cannot be made, posts NOTHING.
 //   - The 5 s read budget. A 429 is a DeskError 'busy' with `retryAfterMs`; the
 //     page shows "busy, try again in Ns" and does not hammer.
@@ -375,7 +378,7 @@ export function createDesk({ cc, fetch: fetchFn, store, base = DESK_API, now = D
       ...(choice.friend ? { friend: true, ...(friendName ? { friendName } : {}) } : {}),
     };
     const out = await sealedPost('/v1/desk/checkin', async (list) => ({
-      night: n, ...who(child), items,
+      night: n, ...who(child), items, ...(choice.friend && friendName ? { friendName } : {}),
       historyRow: await sealHistory(n, isVisitor ? 'visitor' : 'checkin', historyRecord(child, { friend: choice.friend, friendName })),
       job: await sealJob(list, n, { route: '/print', body: printBody, clubberId, source: 'desk' }),
     }));
@@ -395,26 +398,56 @@ export function createDesk({ cc, fetch: fetchFn, store, base = DESK_API, now = D
   const checkout = (/** @type {any} */ child) => undoOrCheckout('checkout', child);
 
   /**
-   * A one-off name tag: a label and no check-in (never counted, nothing sent
-   * to TwoTimTwo), a `reprint:` job sealed to every station.
-   * @param {{ name: string, club: string }} tag
+   * A label that is not a check-in: a `reprint:` job sealed to every station
+   * (never counted, nothing sent to TwoTimTwo). The record is exactly what the
+   * print role runs: one of the print server's own routes and its own body.
+   * @param {string} route @param {Record<string, any>} body
    */
-  async function oneOffTag(tag) {
+  async function reprintJob(route, body) {
     const n = night();
-    const first = String(tag.name || '').replace(/\s+/g, ' ').trim().slice(0, 40);
-    if (!first) throw new DeskError('refused', 'Type the child’s first name.', { reason: 'no-name' });
-    const club = String(tag.club || '').trim();
-    if (!club) throw new DeskError('refused', 'Pick the child’s club.', { reason: 'no-club' });
     const jobId = `reprint:${crypto.randomUUID()}`;
-    // The record the print role runs: the print server's own POST /print-oneoff and its body.
     await sealedPost('/v1/print/reprint', async (list) => ({
-      jobId, bundle: await sealJob(list, n, { route: '/print-oneoff', body: { firstName: first, clubName: club }, source: 'desk', at: new Date(now()).toISOString() }),
+      jobId, bundle: await sealJob(list, n, { route, body, source: 'desk', at: new Date(now()).toISOString() }),
     }), { needJob: true });
     return { jobId };
   }
+  const oneLine = (/** @type {unknown} */ v, /** @type {number} */ max) => String(v || '').replace(/\s+/g, ' ').trim().slice(0, max);
+
+  /**
+   * A one-off name tag: a typed first name and a club, no roster lookup (the
+   * print server's POST /print-oneoff). The screens welcome the child; the count never moves.
+   * @param {{ name: string, club: string }} tag
+   */
+  async function oneOffTag(tag) {
+    const first = oneLine(tag.name, 40);
+    if (!first) throw new DeskError('refused', 'Type the child’s first name.', { reason: 'no-name' });
+    const club = String(tag.club || '').trim();
+    if (!club) throw new DeskError('refused', 'Pick the child’s club.', { reason: 'no-club' });
+    return reprintJob('/print-oneoff', { firstName: first, clubName: club });
+  }
+
+  /**
+   * A leader tag (the print server's POST /print-leader, filed under isLeader there, never a check-in).
+   * @param {{ name: string, club?: string }} tag
+   */
+  async function leaderTag(tag) {
+    const name = oneLine(tag.name, 80);
+    if (!name) throw new DeskError('refused', 'Type the leader’s name.', { reason: 'no-name' });
+    return reprintJob('/print-leader', { name, clubName: String(tag.club || '').trim() });
+  }
+
+  /**
+   * A custom label: one line of free text on a blank label (POST /print-custom), which records nothing.
+   * @param {{ text: string }} label
+   */
+  async function customLabel(label) {
+    const text = oneLine(label.text, 60);
+    if (!text) throw new DeskError('refused', 'Type the label text.', { reason: 'no-text' });
+    return reprintJob('/print-custom', { text });
+  }
 
   return {
-    signIn, restore, signOut, roster, families, printStatus, tonight, loadStations, checkIn, undo, checkout, oneOffTag,
+    signIn, restore, signOut, roster, families, printStatus, tonight, loadStations, checkIn, undo, checkout, oneOffTag, leaderTag, customLabel,
     get signedIn() { return !!session; },
     get hasHistory() { return !!history; },
     get night() { return night(); },

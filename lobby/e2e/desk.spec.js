@@ -73,7 +73,7 @@ async function stubSite(page) {
     if (u.pathname.startsWith('/api/')) return api(route, req);
     if (u.pathname === '/desk/' || u.pathname === '/desk') return route.fulfill({ status: 200, contentType: 'text/html', body: buildDeskPage() });
     if (u.pathname === '/desk/cloud-crypto.js') return route.fulfill({ status: 200, contentType: MIME['.js'], body: readFileSync(path.join(SHARED, 'cloud-crypto.js')) });
-    if (u.pathname.startsWith('/desk/')) return route.fulfill({ status: 200, contentType: MIME['.js'], body: readFileSync(path.join(DESK, path.basename(u.pathname))) });
+    if (u.pathname.startsWith('/desk/')) return route.fulfill({ status: 200, contentType: MIME['.js'], body: readFileSync(path.join(path.basename(u.pathname) === 'desk-transport.js' ? path.join(DESK, '..', 'checkin') : DESK, path.basename(u.pathname))) });
     if (u.pathname.startsWith('/lobby/shared/')) {
       const file = path.join(SHARED, u.pathname.slice('/lobby/shared/'.length));
       return route.fulfill({ status: 200, contentType: MIME[path.extname(file)] || 'application/octet-stream', body: readFileSync(file) });
@@ -128,7 +128,7 @@ test('sign in, search, check two siblings in together, undo one, check one out',
   expect(sent['11'].items).toEqual({ Bible: true });
   expect(sent['12'].items).toEqual({ Bible: true, Friend: true });
   for (const post of world.posts) {
-    const { job: _job, historyRow: _row, ...plain } = post.body;   // the sealed parts are random base64
+    const { job: _job, historyRow: _row, friendName: _friend, ...plain } = post.body;   // the sealed parts are random base64; the friend's first name goes to the BARF list
     expect(JSON.stringify(plain)).not.toMatch(/Ada|Ben|Tester|Sam/);
     expect(post.body.night).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     expect(post.body.job.kind).toBe('print-job');

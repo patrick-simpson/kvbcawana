@@ -29,8 +29,8 @@ describe('the desk page', () => {
     assert.deepEqual(imports.sort(), ['./cloud-crypto.js', './desk-transport.js']);
     const build = read('site', 'build.mjs');
     assert.match(build, /cloud-crypto\.js/);
-    assert.match(build, /'desk\.js', 'desk-transport\.js'/);
-    assert.match(read('site', 'desk', 'desk-transport.js'), /^(?![\s\S]*\bimport\b[^\n]*from)/, 'the transport takes the crypto module from its caller');
+    assert.match(build, /'checkin', 'desk-transport\.js'/);
+    assert.match(read('site', 'checkin', 'desk-transport.js'), /^(?![\s\S]*\bimport\b[^\n]*from)/, 'the transport takes the crypto module from its caller');
   });
 
   it('draws with the brand kit\'s faces and nothing from another host', () => {
@@ -51,7 +51,7 @@ describe('the desk page', () => {
   });
 
   it('never stores the passphrase and names no medical field', () => {
-    const js = read('site', 'desk', 'desk.js') + read('site', 'desk', 'desk-transport.js');
+    const js = read('site', 'desk', 'desk.js') + read('site', 'checkin', 'desk-transport.js');
     assert.ok(!/localStorage\.setItem\([^)]*pass/i.test(js));
     assert.ok(!/allerg|medical/i.test(js));
   });

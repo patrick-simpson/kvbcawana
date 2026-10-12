@@ -146,7 +146,8 @@ run(`node scripts/stamp-build.mjs ${journeyBuild} ${JSON.stringify(journeyOut)}`
   const deskOut = path.join(OUT, 'desk');
   mkdirSync(deskOut, { recursive: true });
   writeFileSync(path.join(deskOut, 'index.html'), buildDeskPage());
-  for (const f of ['desk.js', 'desk-transport.js']) cpSync(path.join(ROOT, 'site', 'desk', f), path.join(deskOut, f));
+  cpSync(path.join(ROOT, 'site', 'desk', 'desk.js'), path.join(deskOut, 'desk.js'));
+  cpSync(path.join(ROOT, 'site', 'checkin', 'desk-transport.js'), path.join(deskOut, 'desk-transport.js'));
   cpSync(path.join(ROOT, 'lobby', 'shared', 'cloud-crypto.js'), path.join(deskOut, 'cloud-crypto.js'));
   if (!existsSync(path.join(OUT, 'lobby', 'shared', 'brand', 'fonts.css'))) throw new Error('site/build.mjs: /desk reads the lobby brand kit, which is missing');
 }

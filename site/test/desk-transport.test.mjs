@@ -1,11 +1,11 @@
-// The desk page's transport and sealing (site/desk/desk-transport.js) against a
+// The check-in page's transport and sealing (site/checkin/desk-transport.js) against a
 // stand-in Worker that speaks routes.md and, like the real one, only checks
 // shapes: every seal is the browser's, and the tests open them with the
 // station's and the history key's own private keys to prove what is inside.
 import assert from 'node:assert/strict';
 import { describe, it, before } from 'node:test';
 import * as cc from '../../lobby/shared/cloud-crypto.js';
-import { createDesk, DeskError, HISTORY_PIN_STORAGE, printLabel, SESSION_STORAGE } from '../desk/desk-transport.js';
+import { createDesk, DeskError, HISTORY_PIN_STORAGE, printLabel, SESSION_STORAGE } from '../checkin/desk-transport.js';
 
 const PASS = 'kennebec';
 const SESSION = 'v1.1.1760000000.abcdefghijklmnopqrstuvwxyz0123';
@@ -162,9 +162,10 @@ describe('checking in', () => {
     assert.equal(post.night, NIGHT);
     assert.equal(post.clubberId, '662');
     assert.deepEqual(post.items, { Bible: true, Friend: true });
-    const { job: _job, historyRow: _row, ...plainPost } = post;   // the sealed parts are random base64
+    const { job: _job, historyRow: _row, friendName, ...plainPost } = post;   // the sealed parts are random base64
     const wire = JSON.stringify(plainPost);
-    assert.ok(!/Kit|Tester|Sam/.test(wire), 'no name or friend in clear');
+    assert.ok(!/Kit|Tester|Sam/.test(wire), 'no child\'s name in clear');
+    assert.equal(friendName, 'Sam', 'the friend\'s first name alone, for the 6:30 BARF list (as the phone path sent it)');
     assert.equal(post.job.kind, 'print-job');
     assert.equal(post.job.night, NIGHT);
     assert.equal(post.job.to.length, 2);
@@ -302,6 +303,33 @@ describe('undo, check out and the one-off tag', () => {
     const d2 = make(none).desk;
     await d2.signIn(PASS);
     await assert.rejects(d2.oneOffTag({ name: 'Ava', club: 'Puggles' }), { code: 'no-station' });
+  });
+
+  it('a leader tag and a custom label are reprint jobs on the print server\'s own routes, never a check-in', async () => {
+    const a = await station('station-aaaaaaaa');
+    const w = worker({ stations: [a] });
+    const { desk } = make(w);
+    await desk.signIn(PASS);
+    await desk.leaderTag({ name: '  Pat   Leader ', club: 'Sparks' });
+    await desk.customLabel({ text: ' KITCHEN ' + 'x'.repeat(80) });
+    const [lead, custom] = w.calls.filter((c) => c.path === '/v1/print/reprint');
+    assert.match(lead.body.jobId, /^reprint:/);
+    assert.deepEqual(await cc.openAsStation(a.ring, lead.body.bundle), { route: '/print-leader', body: { name: 'Pat Leader', clubName: 'Sparks' }, source: 'desk', at: '2026-10-14T22:00:00.000Z' });
+    const label = await cc.openAsStation(a.ring, custom.body.bundle);
+    assert.equal(label.route, '/print-custom');
+    assert.equal(label.body.text, `KITCHEN ${'x'.repeat(52)}`);
+    await assert.rejects(desk.leaderTag({ name: ' ' }), { reason: 'no-name' });
+    await assert.rejects(desk.customLabel({ text: '' }), { reason: 'no-text' });
+    assert.equal(w.calls.filter((c) => c.path === '/v1/desk/checkin').length, 0);
+    assert.ok(!JSON.stringify(lead.body).includes('Pat'), 'the leader\'s name rides only the sealed job');
+  });
+
+  it('without Brought a friend no friend\'s name is sent', async () => {
+    const w = worker({ stations: [] });
+    const { desk } = make(w);
+    await desk.signIn(PASS);
+    await desk.checkIn(kid, { bible: true, friend: false, friendName: 'Sam' });
+    assert.ok(!('friendName' in w.checkins[0]));
   });
 });
 
