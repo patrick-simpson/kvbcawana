@@ -1,8 +1,13 @@
-// A stand-in for the check-in laptop behind awana.kvbchurch.org/checkin: the
-// page relays every call through /api/v1/relay and collects the answer from
-// /api/v1/relay/result (printer/print-server/public/phone.html, relayCall),
-// so these answer the way the laptop's print server would, from a made-up
-// roster. A check-in is "done" on its first status poll.
+// A stand-in for the check-in service behind awana.kvbchurch.org/checkin: the
+// page (printer/print-server/public/phone.html) checks children in through the
+// sync Worker's desk routes (site/checkin/desk-transport.js), so these answer
+// the way the Worker would, from a made-up roster. The page starts signed in
+// (a session and a pinned history key in this browser, as a phone that has
+// signed in once has), and the history key is a real one made here, so the page
+// seals its rows exactly as it would on a club night. No print station is
+// registered, so a check-in carries no label job.
+import { generateKeyPair } from '../../../lobby/shared/cloud-crypto.js';
+
 const KIDS = [
   ['Ava Linden', 'Puggles', true], ['Mia Rourke', 'Puggles'], ['Ella Marchetti', 'Puggles'],
   ['Leo Castellan', 'Cubbies', true], ['Ezra Holloway', 'Cubbies'], ['Ruby Ashford', 'Cubbies'],
@@ -10,51 +15,38 @@ const KIDS = [
   ['Noah Fairbanks', 'T&T', true], ['Lucy Ambrose', 'T&T'], ['Eli Thornbury', 'T&T'], ['Nora Whitcombe', 'T&T'],
   ['Sophia Hartwell', 'Trek'], ['Caleb Moreland', 'Trek'],
 ];
+const SESSION = 'v1.1.1760000000.reelreelreelreelreelreel01';
 
 export async function phoneApi(page, { checkedIn = 41 } = {}) {
-  const kids = KIDS.map(([name, club, done]) => ({ name, club, checkedIn: !!done }));
+  const kids = KIDS.map(([name, club, done], i) => {
+    const [first, ...rest] = name.split(' ');
+    return { clubberId: String(100 + i), first, last: rest.join(' '), club, clubId: '', checkedIn: !!done };
+  });
   let count = checkedIn;
-  const queue = new Map();
-  let next = 1;
+  const history = await generateKeyPair();
   const answer = (path, body) => {
-    if (path === '/phone/roster') {
-      return { kids, households: [], items: { bible: ['Puggles', 'Cubbies', 'Sparks', 'T&T'], friend: ['Puggles', 'Cubbies', 'Sparks', 'T&T', 'Trek', 'Journey'] }, recent: { ready: false } };
+    if (path === '/v1/desk/roster') {
+      return { readAt: new Date().toISOString(), kids, items: { bible: ['Puggles', 'Cubbies', 'Sparks', 'T&T'], friend: ['Puggles', 'Cubbies', 'Sparks', 'T&T', 'Trek', 'Journey'] } };
     }
-    if (path === '/phone/tonight') {
-      return { checkedIn: count, visitors: 2, byClub: { Puggles: 6, Cubbies: 9, Sparks: 12, 'T&T': 14 }, entries: [], features: ['checkout'] };
-    }
-    if (path === '/clubs') return { clubs: ['Puggles', 'Cubbies', 'Sparks', 'T&T', 'Trek', 'Journey'] };
-    if (path === '/leaders') return { leaders: [], hidden: 0 };
-    if (path === '/reconcile') return {};
-    if (path === '/phone/checkin') {
-      const kid = kids.find((k) => k.name === body.name);
-      return { ok: true, id: `job-${body.name}`, kid };
-    }
-    if (path.startsWith('/phone/status/')) {
-      const name = decodeURIComponent(path.slice('/phone/status/job-'.length));
-      const kid = kids.find((k) => k.name === name);
+    if (path === '/v1/desk/families') return { households: [] };
+    if (path === '/v1/desk/tonight') return { checkedIn: count, checkedOut: 0, byClub: { Puggles: 6, Cubbies: 9, Sparks: 12, 'T&T': 14 } };
+    if (path === '/v1/stations') return [];
+    if (path === '/v1/print/status') return { queued: 0, leased: 0, done: count, dead: 0, checkThePrinter: [], pendingToSeal: 0, claims: { printed: count }, stations: [{ stationId: 'reel', name: 'Check-in laptop', lastSeenAt: new Date().toISOString(), printer: { state: 'ok' } }] };
+    if (path === '/v1/desk/checkin') {
+      const kid = kids.find((k) => k.clubberId === body.clubberId);
       if (kid && !kid.checkedIn) { kid.checkedIn = true; count += 1; }
-      return { status: 'done' };
+      return { ok: true, already: false, jobId: null, gen: 1, history: 'hooked' };
     }
-    return {};
+    return null;
   };
-  await page.addInitScript(() => { try { sessionStorage.setItem('awanaCheckinSession', 'reel-session'); } catch { /* */ } });
+  await page.addInitScript(([session, pin]) => {
+    try { localStorage.setItem('awanaSyncSession.v1', session); localStorage.setItem('awanaDeskHistoryKey.v1', pin); } catch { /* */ }
+  }, [SESSION, JSON.stringify({ pub: history.publicKey, kid: history.kid })]);
   await page.route(/\/api\/v1\//, async (route) => {
     const req = route.request();
     const url = new URL(req.url());
-    let out = {};
-    if (url.pathname.endsWith('/v1/relay')) {
-      const { method, path, body } = req.postDataJSON();
-      const id = `q${next++}`;
-      queue.set(id, answer(path, body || {}, method));
-      out = { id };
-    } else if (url.pathname.endsWith('/v1/relay/result')) {
-      const id = url.searchParams.get('id');
-      out = { done: true, status: 200, body: queue.get(id) || {} };
-      queue.delete(id);
-    } else if (url.pathname.endsWith('/v1/login')) {
-      out = { session: 'reel-session' };
-    }
-    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(out) });
+    const body = req.method() === 'POST' ? req.postDataJSON() : null;
+    const out = answer(url.pathname.replace(/^\/api/, ''), body);
+    await route.fulfill({ status: out ? 200 : 404, contentType: 'application/json', body: JSON.stringify(out || { error: 'Not found.' }) });
   });
 }
