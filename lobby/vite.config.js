@@ -94,7 +94,7 @@ function serviceWorker() {
         const files = Object.keys(bundle).sort().filter((f) => !f.endsWith('.html'));
         const hash = createHash('sha256').update(files.join('\n')).digest('hex').slice(0, 12);
         const precache = files
-          .filter((f) => /\.(js|css|woff2?)$/.test(f) && !f.startsWith('powerpoint-addon/'))
+          .filter((f) => /\.(js|css|woff2?)$/.test(f))
           .map((f) => `./${f}`);
         const source = readFileSync(resolve(__dirname, 'src/sw.js'), 'utf8')
           .replace('__BUILD_HASH__', hash)
@@ -139,9 +139,6 @@ export default defineConfig({
       },
     },
   },
-  // The default public/ dir holds the favicon plus the PowerPoint add-in
-  // under public/powerpoint-addon/, matching the /powerpoint-addon/…
-  // URLs in the add-in manifest.
   test: {
     environment: 'jsdom',
     // Playwright specs live in e2e/ and must never run under vitest. The
