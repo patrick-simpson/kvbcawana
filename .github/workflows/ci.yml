@@ -47,7 +47,14 @@ jobs:
   #           journey/public/src/schedule.js and printer/components/Lobby.tsx
   #           (the home page's stepped chips, aboutChips.test.js)
   #   printer reads printer/, plus lobby/worker/src/relay.js
-  #           (test-phone-relay), site/build.mjs (test-phone-touch),
+  #           (test-phone-relay) and, since the online check-in end-to-end test
+  #           (printer/scripts/test-cloud-e2e.cjs) runs the Worker in process,
+  #           ALL of lobby/worker/src, lobby/worker/migrations, the four test
+  #           helpers it reuses (rig, helpers, fixtures, d1stub), the Worker's
+  #           package files (its two runtime packages are installed for it) and
+  #           the lobby/src/lib and lobby/shared files the Worker imports
+  #           (calendarParse, envelope, settingRules, sharedSettings, slides,
+  #           syncSpecs; text.js), site/build.mjs (test-phone-touch),
   #           lobby/src/lib/syncSpecs.js and the lobby/shared/sync-protocol.js it
   #           re-exports (electron-app's device-sync test), and lobby/shared/brand/
   #           (the print server's brand kit is a copy of it, made before the tests
@@ -114,7 +121,7 @@ jobs:
                 *) lobby=true ;;
               esac
               case "$f" in
-                lobby/worker/src/relay.js|lobby/src/lib/syncSpecs.js|lobby/shared/sync-protocol.js|lobby/shared/brand/*|lobby/shared/cloud-crypto.js|lobby/shared/cloud-vectors.json|lobby/src/lib/printServer.js|lobby/src/components/settings/laptop*.jsx|site/build.mjs) printer=true ;;
+                lobby/worker/src/*|lobby/worker/migrations/*|lobby/worker/test/rig.js|lobby/worker/test/helpers.js|lobby/worker/test/fixtures.js|lobby/worker/test/d1stub.js|lobby/worker/package.json|lobby/worker/package-lock.json|lobby/src/lib/calendarParse.js|lobby/src/lib/envelope.js|lobby/src/lib/settingRules.js|lobby/src/lib/sharedSettings.js|lobby/src/lib/slides.js|lobby/src/lib/syncSpecs.js|lobby/shared/text.js|lobby/shared/sync-protocol.js|lobby/shared/brand/*|lobby/shared/cloud-crypto.js|lobby/shared/cloud-vectors.json|lobby/src/lib/printServer.js|lobby/src/components/settings/laptop*.jsx|site/build.mjs) printer=true ;;
                 lobby/*|journey/*|site/updates/*|.github/workflows/*) ;;
                 *) printer=true ;;
               esac
@@ -296,6 +303,9 @@ jobs:
           working-directory: printer
       - run: npm ci
         working-directory: printer/print-server
+      # test-cloud-e2e.cjs runs the sync Worker in process: its two runtime
+      # packages (linkedom, parse5), not wrangler.
+      - run: npm ci --omit=dev --prefix ../lobby/worker
       - run: npm test
       - run: npm run build
 
@@ -447,13 +457,21 @@ jobs:
           if [ -z "$BASE" ]; then
             echo "No base commit to compare against; deploying the Worker."
             echo "changed=true" >> "$GITHUB_OUTPUT"
-          elif git diff --quiet "$BASE" HEAD -- lobby/worker lobby/src/lib lobby/shared/text.js lobby/shared/sync-protocol.js .github/workflows/ci.yml; then
+          elif git diff --quiet "$BASE" HEAD -- lobby/worker lobby/worker/migrations lobby/src/lib lobby/shared/text.js lobby/shared/sync-protocol.js lobby/shared/cloud-crypto.js .github/workflows/ci.yml; then
             echo "Nothing the Worker is built from changed since $BASE; its deploy is skipped."
             echo "changed=false" >> "$GITHUB_OUTPUT"
           else
             echo "The Worker's sources changed since $BASE; deploying it."
             echo "changed=true" >> "$GITHUB_OUTPUT"
           fi
+      - name: Apply the history database's migrations
+        # Before the Worker that needs them. Idempotent (wrangler remembers what
+        # it applied), so it runs on every Worker deploy rather than guessing
+        # whether lobby/worker/migrations changed (a change there changes the
+        # Worker's own folder, so it deploys too).
+        if: steps.ready.outputs.ready == 'true' && steps.worker.outputs.changed == 'true'
+        working-directory: lobby/worker
+        run: npx wrangler d1 migrations apply awana-history --remote
       - name: Deploy the sync Worker
         if: steps.ready.outputs.ready == 'true' && steps.worker.outputs.changed == 'true'
         working-directory: lobby/worker

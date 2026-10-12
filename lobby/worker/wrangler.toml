@@ -19,9 +19,11 @@ CLOUD_CHECKIN = "shadow"
 #                    in on TwoTimTwo's own page) gets a print job, sealed to the
 #                    stations in the Worker. Stations lease it, so turn it on only
 #                    when the extension no longer prints the same child.
-#   SINGLE_PUBLISHER "on": the Worker drops the laptop's tally and still-here
-#                    frames (POST /v1/publish answers dropped). Turn it on only
-#                    with P5, when the Worker publishes those two itself.
+#   SINGLE_PUBLISHER "on": the Worker drops the laptop's tally, still-here and
+#                    check-in greeting frames (POST /v1/publish answers dropped)
+#                    and greets a cloud check-in itself (name only, no birthday or
+#                    milestone yet). Turn it on only with P5, when the Worker
+#                    publishes the tally and the still-here list itself.
 CLOUD_PRINT = "off"
 SINGLE_PUBLISHER = "off"
 
@@ -35,18 +37,16 @@ new_sqlite_classes = ["SyncStore"]
 
 # Online check-in history (ROADMAP.md#online-check-in): a FREE Cloudflare D1
 # database, binding HISTORY_DB, holding only sealed rows and plaintext counts
-# (migrations/0001_history.sql). Left commented until the database exists, so a
-# deploy never needs one. To set it up (the owner, once):
-#   cd lobby/worker
-#   npx wrangler d1 create awana-history        # prints a database_id
-#   (paste it below and uncomment the block)
-#   npx wrangler d1 migrations apply awana-history --remote
-# Code must treat a missing env.HISTORY_DB as "history is off", never an error.
-# [[d1_databases]]
-# binding = "HISTORY_DB"
-# database_name = "awana-history"
-# database_id = "<from wrangler d1 create>"
-# migrations_dir = "migrations"
+# (migrations/). Created by the owner on 2026-10-12 (`wrangler d1 create
+# awana-history`; the id is not a secret). ci.yml's deploy job applies the
+# migrations before every Worker deploy (`wrangler d1 migrations apply
+# awana-history --remote`, idempotent). Code still treats a missing
+# env.HISTORY_DB as "history is off", never an error.
+[[d1_databases]]
+binding = "HISTORY_DB"
+database_name = "awana-history"
+database_id = "893de8eb-13cf-4187-8ea2-eab652735acf"
+migrations_dir = "migrations"
 
 # Read the church calendar every six hours (UTC), so it is fresh without
 # anyone pressing Refresh.
