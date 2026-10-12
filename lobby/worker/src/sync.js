@@ -130,9 +130,9 @@ export class SyncCore {
    * @param {{ storage: Store, env: Record<string, any>, fetchFn?: typeof fetch, now?: () => number,
    *   broadcast?: (text: string) => number, closeAll?: (code: number, reason: string) => void,
    *   alarms?: { set(atMs: number): Promise<void>|void, get(): Promise<number|null>|number|null },
-   *   liveScreens?: () => Set<string> }} deps
+   *   liveScreens?: () => Set<string>, sleep?: (ms: number) => Promise<void> }} deps
    */
-  constructor({ storage, env, fetchFn, now, broadcast, closeAll, alarms, liveScreens }) {
+  constructor({ storage, env, fetchFn, now, broadcast, closeAll, alarms, liveScreens, sleep }) {
     this.storage = storage;
     this.env = env || {};
     this.fetchFn = fetchFn || ((...args) => fetch(...args));
@@ -142,7 +142,7 @@ export class SyncCore {
     this.closeAll = closeAll || (() => {});
     this.relayQueue = new Relay(this.storage, this.now);
     // Cloud check-in (ROADMAP.md#cloud-check-in), phase 1: the read-only report watcher.
-    this.watcher = new Watcher({ storage: this.storage, env: this.env, fetchFn: this.fetchFn, now: this.now, alarms });
+    this.watcher = new Watcher({ storage: this.storage, env: this.env, fetchFn: this.fetchFn, now: this.now, alarms, sleep });
     // ...and the phone page's check-ins, answered here instead of by the laptop.
     // ...and who brought a friend tonight (BARF Night's email; friends.js).
     this.friends = new Friends({ storage: this.storage, watcher: this.watcher, now: this.now });

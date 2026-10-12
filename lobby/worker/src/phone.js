@@ -15,6 +15,13 @@
 
 import { localTime } from './watcher.js';
 import { BIBLE_RE, FRIEND_RE } from './twotimtwo.js';
+import { INTERACTIVE_WAIT_MS } from './readbudget.js';
+
+/** A page read made for a phone: it may queue for a slot on the ONE 5 s read clock (readbudget.js). */
+const WAIT = (/** @type {string} */ kind) => ({ waitMs: INTERACTIVE_WAIT_MS, kind });
+/** When the read clock is booked past what a phone will wait: tell the page to ask again. @param {{error?: string, retryAfterMs?: number}} r */
+const busy = (r) => (r.error === 'read-busy'
+  ? { status: 429, body: { error: 'TwoTimTwo was just read. Try again in a few seconds.', retryAfterMs: r.retryAfterMs || 5000 } } : null);
 
 /** TwoTimTwo's club ids (printer/docs/TWOTIMTWO.md §2.1). */
 export const CLUB_BY_ID = Object.freeze({ 1: 'Cubbies', 2: 'Sparks', 3: 'T&T', 4: 'Puggles', 6: 'Trek', 7: 'Journey' });
@@ -65,16 +72,18 @@ export class CloudPhone {
     if (c && t - c.at < (c.familiesError ? FAMILIES_RETRY_MS : FAMILIES_TTL_MS)) return c;
     const client = this.watcher.clientFor();
     if (!client) return { households: [], items: { bible: [], friend: [] }, at: t };
-    const hh = await client.households();
+    const hh = await client.households(WAIT('phone-families'));
     let events = page ? page.events : null;
     if (!events) {
-      const p = await client.checkinPage();
+      const p = await client.checkinPage(WAIT('phone-families'));
       events = p.ok ? p.page.events : [];
     }
     // Why there are no families, as a fixed code (never page text), so a roster
     // without them can be told apart from a household export that failed.
     const out = { households: hh.ok ? hh.households : [], items: itemClubs(events), at: t, ...(hh.ok ? {} : { familiesError: hh.error }) };
-    // A good read is kept half an hour, a failure five minutes.
+    // A good read is kept half an hour, a failure five minutes; a read that
+    // was only turned away by the 5 s clock is no failure and is not kept.
+    if (!hh.ok && hh.error === 'read-busy') return out;
     this.familiesCache = out;
     return out;
   }
@@ -180,9 +189,9 @@ export class CloudPhone {
   async roster() {
     const client = this.watcher.clientFor();
     if (!client) return { status: 503, body: { error: 'Cloud check-in is not set up.' } };
-    const page = await client.checkinPage();
-    if (!page.ok) return { status: 502, body: { error: 'TwoTimTwo did not answer. Try again in a moment.' } };
-    const report = await client.report(localTime(this.now()).date);
+    const page = await client.checkinPage(WAIT('phone-roster'));
+    if (!page.ok) return busy(page) || { status: 502, body: { error: 'TwoTimTwo did not answer. Try again in a moment.' } };
+    const report = await client.report(localTime(this.now()).date, WAIT('phone-roster'));
     const kids = page.page.roster.map((r) => ({
       name: r.name, club: r.club || CLUB_BY_ID[/** @type {keyof typeof CLUB_BY_ID} */ (Number(r.clubId))] || '',
       checkedIn: r.checkedIn, removedHere: false, inactive: false,
@@ -202,8 +211,8 @@ export class CloudPhone {
     const client = this.watcher.clientFor();
     if (!client) return { status: 503, body: { error: 'Cloud check-in is not set up.' } };
     const date = localTime(this.now()).date;
-    const report = await client.report(date);
-    if (!report.ok) return { status: 502, body: { error: 'TwoTimTwo did not answer. Try again in a moment.' } };
+    const report = await client.report(date, WAIT('phone-tonight'));
+    if (!report.ok) return busy(report) || { status: 502, body: { error: 'TwoTimTwo did not answer. Try again in a moment.' } };
     const seen = new Set();
     const entries = [];
     /** @type {Record<string, number>} */
