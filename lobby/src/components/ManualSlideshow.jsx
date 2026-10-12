@@ -192,7 +192,8 @@ export default function ManualSlideshow({ slides, slideshowDelaySec, clubTint = 
   const zero = useContext(ZeroAnimationContext);
 
   // The hold timer, pausable: time already spent on this slide survives a
-  // pause, so names on screen stop the clock instead of resetting it.
+  // pause, so names on screen stop the clock instead of resetting it. Timed on
+  // the monotonic clock: a wall-clock step (NTP) must not bend the hold.
   const timing = useRef({ key: '', spent: 0, startedAt: 0 });
   useEffect(() => {
     const t = timing.current;
@@ -311,6 +312,8 @@ export default function ManualSlideshow({ slides, slideshowDelaySec, clubTint = 
   );
 }
 
+const playMuted = (el) => { el?.play?.()?.catch?.(() => {}); };
+
 function VideoSlide({ slide, loop, onFinished }) {
   const [src, setSrc] = useState(null);
   const [failed, setFailed] = useState(false);
@@ -358,7 +361,9 @@ function VideoSlide({ slide, loop, onFinished }) {
           onError={() => setFailed(true)}
           // Autoplay is allowed because the video is muted, but a
           // rejected play() promise must never surface as an error.
-          ref={(el) => { el?.play?.()?.catch?.(() => {}); }}
+          // The callback is stable: a fresh one each render makes React call
+          // it again, and play() on an ended video restarts it.
+          ref={playMuted}
         />
       ) : (
         <span className="manual-slide-video-missing">
