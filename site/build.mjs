@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // Builds the one site into site/dist:
 //
-//   /            the Club Label Printer's public site (printer/, built at base /)
+//   /            the family's one public page (printer/, built at base /): the
+//                label printer, the lobby signage (#lobby) and the Journey kiosk (#journey)
 //   /lobby/      the lobby signage (lobby/ build; countdown.html is the projector)
 //   /settings    a redirect to /lobby/settings.html, one settings page (ROADMAP.md#settings-page)
 //   /journey/    the Journey kiosk (journey/public, build-stamped)
@@ -21,6 +22,7 @@ import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { downloadRedirects } from './lib/downloads.js';
+import { pageRedirects } from './lib/redirects.js';
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const OUT = path.join(ROOT, 'site', 'dist');
@@ -125,6 +127,8 @@ const readFeed = (feed) => {
 };
 writeFileSync(path.join(OUT, '_redirects'), [
   ...downloadRedirects(readFeed, RELEASES),
+  // The lobby's and Journey's about pages are sections of the home page now.
+  ...pageRedirects(),
   // Pages serves foo.html at /foo (and 308s the .html form there).
   // The one settings page for every screen (ROADMAP.md#settings-page).
   '/settings /lobby/settings 302',
