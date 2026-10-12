@@ -32,7 +32,7 @@ test('the configure page is Settings alone, with no Done and no gear', async ({ 
   await page.keyboard.press('Escape');
   await page.mouse.click(5, 5);
   await expect(dialog).toBeVisible();
-  await dialog.getByRole('tab', { name: 'Setup' }).click();
+  await dialog.getByRole('tab', { name: 'Account & app' }).click();
   await expect(dialog.getByRole('button', { name: 'Debug panel' })).toHaveCount(0);
 });
 
@@ -42,7 +42,7 @@ test('a setting changed there goes live on the screen, which never reloads', asy
   await live.evaluate(() => { window.__sameLoad = true; });
   const cfg = await boot(context, '?configure=1&lowPower=1');
   const dialog = cfg.getByRole('dialog', { name: 'Settings' });
-  await dialog.getByRole('tab', { name: 'Screen & corner' }).click();
+  await dialog.getByRole('tab', { name: 'What screens show' }).click();
   await dialog.getByRole('checkbox', { name: 'Strip the screen to the basics' }).check();
   await expect(live.locator('.panic-pill')).toBeVisible();
   await dialog.getByRole('checkbox', { name: 'Strip the screen to the basics' }).uncheck();
@@ -57,7 +57,7 @@ test('Preview a check-in plays on the live screen, not in the configure page', a
   await expect(live.locator('.stage')).toBeVisible();
   const cfg = await boot(context, '?configure=1&lowPower=1');
   const dialog = cfg.getByRole('dialog', { name: 'Settings' });
-  await dialog.getByRole('tab', { name: 'Check-ins' }).click();
+  await dialog.getByRole('tab', { name: 'What screens show' }).click();
   await dialog.getByRole('button', { name: 'Preview a check-in' }).click();
   await expect(live.locator('.checkin')).toBeVisible();
   await expect(live.locator('.demo-pill')).toBeVisible();

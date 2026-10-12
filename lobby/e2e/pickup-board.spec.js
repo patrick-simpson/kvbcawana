@@ -24,7 +24,7 @@ async function open(page, query = '?lowPower=1') {
 async function startDemo(page) {
   await page.keyboard.press('Control+Shift+S');
   const dialog = page.getByRole('dialog', { name: 'Settings' });
-  await dialog.getByRole('tab', { name: 'Pickup board' }).click();
+  await dialog.getByRole('tab', { name: 'What screens show' }).click();
   await dialog.getByRole('button', { name: /Show a demo on this TV/ }).click();
   await expect(dialog).toBeHidden();
   const board = page.locator('.stage .checkout-board.names');
@@ -139,7 +139,7 @@ test('Settings previews the board on sample names, and the guard empties it', as
   await open(page);
   await page.keyboard.press('Control+Shift+S');
   const dialog = page.getByRole('dialog', { name: 'Settings' });
-  await dialog.getByRole('tab', { name: 'Pickup board' }).click();
+  await dialog.getByRole('tab', { name: 'What screens show' }).click();
   const preview = dialog.getByRole('img', { name: /preview of the pickup board/ });
   await expect(preview.locator('.checkout-plate')).toHaveCount(6);
   const frame = await preview.boundingBox();
