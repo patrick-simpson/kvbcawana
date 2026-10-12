@@ -1,4 +1,5 @@
 import { useEffect, useId, useState } from 'react';
+import { onSettingsChanged } from '../../lib/settingsBus.js';
 import { PanelCard } from './fields.jsx';
 import { untilWords } from '../../lib/missionControl.js';
 import {
@@ -29,6 +30,10 @@ export default function NoticeCard({ draft, onDraft, overviewNotice }) {
     getNotice().then((a) => { if (live) setCurrent(a.ok ? a.body?.notice ?? null : null); });
     return () => { live = false; };
   }, []);
+  // An Undo in the change log may have sent or taken down the notice.
+  useEffect(() => onSettingsChanged((what) => {
+    if (what === 'notice') getNotice().then((a) => setCurrent(a.ok ? a.body?.notice ?? null : null));
+  }), []);
   // The 10 s poll sees a notice come and go (this page's, or another device's):
   // adopted while rendering, when the overview's own value changes.
   const [seenOverview, setSeenOverview] = useState(overviewNotice);

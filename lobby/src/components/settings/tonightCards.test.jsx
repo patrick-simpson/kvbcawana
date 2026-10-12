@@ -227,6 +227,7 @@ describe('the change log', () => {
   });
 
   it('Undo calls the Worker and reloads; "changed since" is said in words', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
     world.answer = changes();
     render(<ChangeLogCard />);
     fireEvent.click(await screen.findByRole('button', { name: /^Undo:/ }));
@@ -238,6 +239,38 @@ describe('the change log', () => {
     render(<ChangeLogCard />);
     fireEvent.click(await screen.findByRole('button', { name: /^Undo:/ }));
     expect(await screen.findByText('Changed again since; nothing undone.')).toBeTruthy();
+  });
+
+  it('Undo asks first, naming what changes back; declining posts nothing', async () => {
+    const ask = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    world.answer = changes();
+    render(<ChangeLogCard />);
+    fireEvent.click(await screen.findByRole('button', { name: /^Undo:/ }));
+    await waitFor(() => expect(ask).toHaveBeenCalledTimes(1));
+    expect(ask.mock.calls[0][0]).toMatch(/Chrome on Android.*church-wide screen settings.*standard display ms/s);
+    expect(calls.some((c) => c.path.includes('/undo'))).toBe(false);
+  });
+
+  it('Undo of a switch asks the dry run first and lists its warnings, then the switches card reloads', async () => {
+    const ask = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    let flipped = false;
+    const sw = { seq: 7, at: new Date().toISOString(), device: { name: 'Pixel' }, what: 'switch', target: 'SINGLE_PUBLISHER', keys: ['SINGLE_PUBLISHER'], before: { SINGLE_PUBLISHER: 'on' }, after: { SINGLE_PUBLISHER: 'off' }, undoable: true };
+    world.answer = (p, o) => {
+      if (p === '/v1/switches' && (o.method || 'GET') === 'GET') return SWITCHES({ switches: [{ name: 'SINGLE_PUBLISHER', value: flipped ? 'on' : 'off', default: 'on', source: 'worker' }] });
+      if (p === '/v1/switches' && o.method === 'PUT') return ok({ ok: true, warnings: ['no-station'], oldStations: [] });
+      if (p === '/v1/changes/7/undo') { flipped = true; return ok({ ok: true, seq: 8 }); }
+      if (p.startsWith('/v1/changes')) return ok({ entries: [sw], next: null, head: 7, off: false });
+      return bad(404);
+    };
+    render(<><SwitchesCard overview={{ window: { open: false } }} /><ChangeLogCard /></>);
+    const name = 'The service runs the screens’ count and pickup list';
+    expect((await screen.findByRole('checkbox', { name })).checked).toBe(false);
+    fireEvent.click(await screen.findByRole('button', { name: /^Undo:/ }));
+    await waitFor(() => expect(calls.some((c) => c.path === '/v1/changes/7/undo')).toBe(true));
+    const dry = calls.find((c) => c.path === '/v1/switches' && c.method === 'PUT');
+    expect(dry.body).toMatchObject({ name: 'SINGLE_PUBLISHER', value: 'on', dryRun: true });
+    expect(ask.mock.calls[0][0]).toMatch(/The service warns/);
+    await waitFor(() => expect(screen.getByRole('checkbox', { name }).checked).toBe(true));
   });
 
   it('filters by kind and pages with Older', async () => {

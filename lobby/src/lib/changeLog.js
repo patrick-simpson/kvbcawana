@@ -91,3 +91,26 @@ export function filterChanges(entries, kind) {
 export function canUndo(e) {
   return e.undoable === true && e.undoneBy == null && e.undoOf == null;
 }
+
+/**
+ * The confirm text before an Undo: what will change back (and, for a switch,
+ * what the Worker's dry run says the flip would warn about).
+ * @param {Entry} e
+ * @param {{ warnings?: string[], old?: string } | null} [dry] the switches dryRun's answer, when it was asked
+ */
+export function undoConfirmText(e, dry = null) {
+  const d = describeChange(e);
+  let text = `Undo ${d.who}’s change to ${d.what}${d.detail ? ` (${d.detail})` : ''}?\n\nIt puts ${e.what === 'switch' ? 'the switch' : 'it'} back to what it was before.`;
+  if (e.what === 'switch' && dry) {
+    const lines = (dry.warnings || []).map((w) => `• ${w}`);
+    if (lines.length) text += `\n\nThe service warns:\n${lines.join('\n')}`;
+    if (dry.old) text += `\n${dry.old}`;
+  }
+  return text;
+}
+
+/** The value an undo of a switch entry puts back: its `before`, or the default. @param {Entry} e @returns {'on' | 'off' | 'default'} */
+export function switchUndoValue(e) {
+  const v = e.before && typeof e.before === 'object' && e.target ? e.before[e.target] : null;
+  return v === 'on' || v === 'off' ? v : 'default';
+}

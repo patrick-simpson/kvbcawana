@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { CloudCheckinTestField, PanelCard, Toggle } from './fields.jsx';
+import { onSettingsChanged } from '../../lib/settingsBus.js';
 import { agoWords } from '../../lib/missionControl.js';
 import { getSwitches, oldStationWords, predictWarnings, putSwitch, warningWords } from '../../lib/workerClient.js';
 
@@ -41,6 +42,9 @@ export default function SwitchesCard({ overview }) {
     });
     return () => { live = false; };
   }, [round]);
+
+  // An Undo in the change log may have flipped a switch: read them again.
+  useEffect(() => onSettingsChanged((what) => { if (what === 'switch') load(); }), [load]);
 
   const rowOf = (name) => (data?.switches || []).find((s) => s.name === name);
 

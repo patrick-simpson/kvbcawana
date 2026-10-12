@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { PanelCard } from './fields.jsx';
-import { CHANGE_KINDS, canUndo, describeChange, filterChanges, whenWords } from '../../lib/changeLog.js';
-import { getChanges, undoChange, undoFailure } from '../../lib/workerClient.js';
+import { CHANGE_KINDS, canUndo, describeChange, filterChanges, switchUndoValue, undoConfirmText, whenWords } from '../../lib/changeLog.js';
+import { getChanges, oldStationWords, putSwitch, undoChange, undoFailure, warningWords } from '../../lib/workerClient.js';
+import { emitSettingsChanged } from '../../lib/settingsBus.js';
 
 // The change log (docs/SETTINGS-OVERHAUL.md 2.1 / 2.7 and 7, routes.md 10.5):
 // who changed what, when, with Undo where the Worker can do it. Account & app
@@ -64,9 +65,16 @@ function useChanges(limit) {
   const undo = async (entry) => {
     setBusy(true);
     setNote(null);
+    // A switch asks the Worker what putting it back would warn about first.
+    let dry = null;
+    if (entry.what === 'switch' && entry.target) {
+      const r = await putSwitch({ name: entry.target, value: switchUndoValue(entry), dryRun: true });
+      if (r.ok) dry = { warnings: Array.isArray(r.body?.warnings) ? r.body.warnings.map((c) => warningWords(c)) : [], old: oldStationWords(r.body?.oldStations) };
+    }
+    if (!window.confirm(undoConfirmText(entry, dry))) { setBusy(false); return; }
     const a = await undoChange(entry.seq);
     setBusy(false);
-    if (a.ok) { setNote({ text: 'Undone.' }); load(); } else setNote({ warn: true, text: undoFailure(a) });
+    if (a.ok) { setNote({ text: 'Undone.' }); load(); emitSettingsChanged(entry.what); } else setNote({ warn: true, text: undoFailure(a) });
   };
 
   return { entries, next, off, problem, note, busy, undo, older, load };

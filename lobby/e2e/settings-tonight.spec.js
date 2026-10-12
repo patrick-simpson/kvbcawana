@@ -178,7 +178,12 @@ test('Recent changes: Undo puts a setting back; a change made again since says s
   const dialog = page.getByRole('dialog', { name: 'Settings' });
   const card = dialog.locator('.panel-card', { has: page.getByRole('heading', { name: 'Recent changes' }) });
   await expect(card).toContainText('Chrome on Android');
+  // Every Undo asks first, naming what changes back.
+  const asked = [];
+  page.on('dialog', (d) => { asked.push(d.message()); d.accept(); });
   await card.getByRole('button', { name: /^Undo: Chrome on Android/ }).click();
+  await expect.poll(() => asked.length).toBe(1);
+  expect(asked[0]).toMatch(/Chrome on Android/);
   await expect(card.getByText('Undone.')).toBeVisible();
   expect(page.w.calls.some((c) => c.method === 'POST' && c.path === '/v1/changes/3/undo')).toBe(true);
   page.w.undo = { status: 409, body: { reason: 'changed-since', keys: ['CLOUD_PRINT'] } };

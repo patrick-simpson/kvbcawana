@@ -6,6 +6,7 @@
 
 import { useCallback, useEffect, useSyncExternalStore } from 'react';
 import { churchState, fetchChurch, saveChurch, startFromDefaults } from '../lib/churchClient.js';
+import { onSettingsChanged } from '../lib/settingsBus.js';
 import { useSync } from './useSync.js';
 
 /** @typedef {import('../lib/churchClient.js').ChurchDoc} ChurchDoc */
@@ -23,6 +24,9 @@ export async function reloadChurch() {
   if (r.ok) set({ doc: r.doc, loading: false, error: '' });
   else set({ loading: false, error: r.message });
 }
+
+// An Undo in the change log of a printing setting, or of a switch the cards read: read the document again.
+onSettingsChanged((what) => { if ((what === 'church' || what === 'switch') && snapshot.doc) reloadChurch(); });
 
 /** Put a newer document in for every card (a stale 409 handed it back). @param {ChurchDoc} doc */
 export function adoptChurch(doc) { set({ doc, error: '' }); }
