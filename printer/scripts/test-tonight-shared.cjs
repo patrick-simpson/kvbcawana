@@ -25,7 +25,7 @@ process.env.AWANA_BIND_HOST = '127.0.0.1';
 
 const rules = require(path.join(root, 'print-server', 'tonight.js'));
 const server = require(path.join(root, 'print-server', 'server.js'));
-const src = fs.readFileSync(path.join(root, 'print-server', 'server.js'), 'utf8');
+const src = require('./server-source.cjs')();
 
 console.log('\nthe printer holds no second copy of the rules');
 check('server.js requires the generated shared module', /require\('\.\/tonight'\)/.test(src));

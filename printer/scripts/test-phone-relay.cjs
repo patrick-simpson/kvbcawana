@@ -97,7 +97,7 @@ const PORT = 34575;
     r = await fetch(`${localBase}/pending-actions/${ava.id}/result`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ok: true }) });
     st = await (await fetch(`${localBase}/phone/status/${ava.id}`)).json();
     check('and the result lands as before', r.status === 200 && st.status === 'done');
-    const src = fs.readFileSync(path.join(root, 'print-server', 'server.js'), 'utf8');
+    const src = require('./server-source.cjs')();
     check('a claim never answered goes back to pending after 90 s', /PENDING_CLAIM_MS = 90 \* 1000/.test(src) && /a\.status === 'claimed' && now - a\.claimedAt > PENDING_CLAIM_MS[\s\S]{0,80}a\.status = 'pending'/.test(src));
   }
 
@@ -160,7 +160,7 @@ const PORT = 34575;
   {
     const r = await relay.relayOnce({ base: 'x', session: 'v1.1.1.nope', localBase, syncRequest });
     check('signed out: nothing runs', !r.ok && r.status === 401 && r.handled === 0, JSON.stringify(r));
-    const src = fs.readFileSync(path.join(root, 'print-server', 'server.js'), 'utf8');
+    const src = require('./server-source.cjs')();
     check('the print server runs the loop only while signed in to the sync service',
       /phoneRelay\.startPhoneRelay\(\{\s*signedIn: \(\) => \(signedInToSync\(\) \? \{ base: config\.syncUrl, session: config\.syncSession \} : null\)/.test(src));
     check('it asks every second while phones are busy, every 20 s otherwise', relay.RELAY_BUSY_MS === 1000 && relay.RELAY_IDLE_MS === 20000);

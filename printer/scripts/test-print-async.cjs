@@ -20,7 +20,7 @@ const root = path.join(__dirname, '..');
 const PORT = 34584;
 
 (async () => {
-  const SRC = fs.readFileSync(path.join(root, 'print-server', 'server.js'), 'utf8');
+  const SRC = require('./server-source.cjs')();
   console.log('\nprint path: nothing synchronous is left');
   check('no execSync in the print server', !/\bexecSync\(/.test(SRC));
   check('the only Atomics.wait left is the config rename retry (a rare error path)', (SRC.match(/Atomics\.wait\(/g) || []).length === 1 && /renameWithRetrySync[\s\S]{0,400}Atomics\.wait/.test(SRC));
@@ -110,7 +110,7 @@ const PORT = 34584;
     const r = await fetch(`${base}/__test-reject`, { signal: AbortSignal.timeout(5000) }).then(async (x) => ({ status: x.status, body: await x.json().catch(() => null) })).catch((e) => ({ status: 0, body: String(e) }));
     check('the client hears 500 as JSON', r.status === 500 && r.body && r.body.error === 'Internal server error', JSON.stringify(r));
     check('within the moment, not after a timeout', Date.now() - t0 < 2000, `${Date.now() - t0} ms`);
-    const src = fs.readFileSync(path.join(__dirname, '..', 'print-server', 'server.js'), 'utf8');
+    const src = require('./server-source.cjs')();
     check('every async route is wrapped at registration', /h\.constructor\.name === 'AsyncFunction'\s*\?\s*\(req, res, next\) => h\(req, res, next\)\.catch\(next\)/.test(src));
     check('label enrichment fails open to a basic label', /Enrichment failed for '\$\{firstName\} \$\{lastName\}'/.test(src) && /Step-up check failed/.test(src) && /Late routing failed/.test(src));
   }

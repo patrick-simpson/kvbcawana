@@ -67,7 +67,7 @@ const BASE = `http://127.0.0.1:${PORT}`;
     check('the phone’s roster carries the families, the Bible/Friend clubs and the last two nights',
       r.status === 200 && JSON.stringify(r.body.households) === JSON.stringify([['ava stone', 'eli stone']])
       && r.body.items.bible[0] === 'Sparks' && r.body.recent && r.body.recent.ready === false && r.body.kids.length === 3, JSON.stringify(r.body).slice(0, 300));
-    const src = fs.readFileSync(path.join(root, 'print-server', 'server.js'), 'utf8');
+    const src = require('./server-source.cjs')();
     check('only the check-in laptop itself may set them', /app\.post\('\/touch\/context'[\s\S]{0,120}isLoopbackRequest\(req\)\) return res\.status\(403\)/.test(src));
   }
 

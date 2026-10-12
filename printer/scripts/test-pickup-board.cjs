@@ -293,7 +293,7 @@ async function serverSuite() {
       const f = lastFrame();
       check('the existing event, its shape unchanged: entries + at + printed', f && Object.keys(f.payload).sort().join() === 'at,entries,printed' && Number.isInteger(f.payload.printed), f && JSON.stringify(f.payload));
       check('entries are first name + club only', f && f.payload.entries.every((e) => Object.keys(e).join() === 'firstName,club') && !JSON.stringify(f.payload).match(/Stone|Walker|4821/));
-      const src = fs.readFileSync(path.join(root, 'print-server', 'server.js'), 'utf8');
+      const src = require('./server-source.cjs')();
       const events = require(path.join(root, 'print-server', 'events.js'));
       check('it is sealed like every name-bearing frame', events.ENCRYPTED_EVENTS.has('checkout'));
       check('every minute inside the tally window', /setInterval\(onTallyWindow\(publishStillHere\), 60 \* 1000\);/.test(src));
@@ -398,7 +398,7 @@ async function serverSuite() {
       r = await post('/phone/undo', { firstName: 'Ava', lastName: 'Stone', clubberId: '4821', checkout: true });
       check('driven check-ins off: refused at once, saying why', r.status === 409 && /Allow driven check-ins/.test(r.body.error));
       await cfg({ enableDrivenCheckin: true });
-      const src = fs.readFileSync(path.join(root, 'print-server', 'server.js'), 'utf8');
+      const src = require('./server-source.cjs')();
       check('one nobody picks up fails with the reason, like an undo', /a\.detail = co \? CHECKOUT_NOT_PICKED_UP : UNDO_NOT_PICKED_UP;/.test(src) && /older than 7\.16/.test(src));
     }
 

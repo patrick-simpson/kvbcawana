@@ -657,7 +657,7 @@ console.log('recapEntriesForTonight — the recap is tonight, never last week');
   check('an entry with no readable time is dropped, not replayed forever', !tonight.some((e) => e.id === 'd'));
   check('a buffer that is all tonight is untouched', recapEntriesForTonight(buffer.slice(0, 1), '2026-10-07').length === 1);
   check('the day defaults to today', Array.isArray(recapEntriesForTonight([])));
-  const src = fs.readFileSync(path.join(__dirname, '..', 'print-server', 'server.js'), 'utf8');
+  const src = require('./server-source.cjs')();
   check('publishRecap prunes before it publishes, and so does every push', /function publishRecap\(\) \{\s*try \{[\s\S]*?pruneEventBuffer\(\);[\s\S]*?buildRecap\(eventBuffer\)/.test(src) && /function pushEventToBuffer\(checkinEvent\) \{\s*pruneEventBuffer\(\);/.test(src));
 }
 
@@ -678,7 +678,7 @@ console.log('calendarDaysBetween — the new-kid window counts calendar days, no
     process.stdout.write(String((now - first) / 86400000));
   `], { env: { ...process.env, TZ: 'America/New_York' }, encoding: 'utf8' });
   check('(the old formula really did come up short across spring-forward)', Number(out) < 14, out);
-  const src = fs.readFileSync(path.join(__dirname, '..', 'print-server', 'server.js'), 'utf8');
+  const src = require('./server-source.cjs')();
   check('recordAttendance judges the window with it', /isNewKid = calendarDaysBetween\(firstNight, today\) < 14;/.test(src));
 }
 
@@ -691,7 +691,7 @@ console.log('isNewerVersion — an update is newer, never merely different');
   check('the same version is not', !isNewerVersion('7.11.0', '7.11.0'));
   check('an older version in the feed is not an update (a pulled release, a stale mirror)', !isNewerVersion('7.10.9', '7.11.0'));
   check('garbage is never newer', !isNewerVersion('latest', '7.11.0') && !isNewerVersion(null, '7.11.0') && !isNewerVersion('7.11.0', ''));
-  const src = fs.readFileSync(path.join(__dirname, '..', 'print-server', 'server.js'), 'utf8');
+  const src = require('./server-source.cjs')();
   check('the VERSION poll, the shell\'s report and /update-now all judge by it',
     /if \(isNewerVersion\(ver, SERVER_VERSION\)\) \{\s*latestVersion = ver;/.test(src)
     && /function setLatestVersion\(ver\) \{\s*if \(isNewerVersion\(ver, SERVER_VERSION\)\)/.test(src)
@@ -810,7 +810,7 @@ console.log('printPdf — a worksheet never leaves the Windows default printer s
   // REGRESSION GUARD: the worksheet print made its printer the Windows default
   // and never put it back, so on an install whose label printer is "the system
   // default" every label after a mid-club worksheet went to the letter printer.
-  const src = require('fs').readFileSync(path.join(__dirname, '..', 'print-server', 'server.js'), 'utf8');
+  const src = require('./server-source.cjs')();
   const printPdf = src.slice(src.indexOf('async function printPdfNow('), src.indexOf('async function runPdfPrintScript('));
   check('the previous default is read before the print', /const previous = printerName && process\.platform === 'win32' \? await currentDefaultPrinter\(\) : '';/.test(printPdf));
   check('and put back in a finally, whatever happened to the print', /finally \{\s*if \(previous && previous !== printerName\) await restoreDefaultPrinter\(previous\);/.test(printPdf));
@@ -842,7 +842,22 @@ console.log('packaging — every print-server module must ship inside the Window
   const required = new Set();
   for (const f of jsFiles) {
     const src = fs.readFileSync(path.join(serverDir, f), 'utf8');
-    for (const m of src.matchAll(/require\('\.\/([^']+)'\)/g)) required.add(m[1]);
+    for (const m of src.matchAll(/require\('\.\/([^']+)'\)/g)) if (!m[1].startsWith('server/')) required.add(m[1]);
+  }
+  // server.js is split into print-server/server/*.js: they require each other as
+  // './x' (inside server/) and the top-level modules as '../x'.
+  const subDir = path.join(serverDir, 'server');
+  const subFiles = fs.readdirSync(subDir).filter(f => f.endsWith('.js'));
+  check('server.js is split into modules under print-server/server/', subFiles.length > 10);
+  const coversSubDir = filter.includes('server/**') || filter.includes('server/*.js') || filter.includes('server/**/*.js');
+  check('the packaged app ships print-server/server/ (the split server modules)', coversSubDir,
+    'add "server/**" to electron-app package.json build.extraResources filter');
+  for (const f of subFiles) {
+    const src = fs.readFileSync(path.join(subDir, f), 'utf8');
+    for (const m of src.matchAll(/require\('\.\.\/([^']+)'\)/g)) required.add(m[1]);
+    for (const m of src.matchAll(/(?:require|lazy)\('\.\/([^']+)'\)/g)) {
+      check(`server/${f} requires './${m[1]}', which exists in server/`, fs.existsSync(path.join(subDir, m[1] + '.js')));
+    }
   }
   check('found the local requires to verify', required.size > 0);
 
@@ -1060,8 +1075,7 @@ console.log('effectiveHandbookGroup — no line unless it routes somewhere');
   // pattern was the same two lines pasted four times, and a fifth paste is
   // exactly how a future call site would miss the policy.
   const fs = require('fs');
-  const serverSrc = fs.readFileSync(
-    path.join(__dirname, '..', 'print-server', 'server.js'), 'utf8');
+  const serverSrc = require('./server-source.cjs')();
   const calls = (serverSrc.match(/handbookGroup = effectiveHandbookGroup\(/g) || []).length;
   check('all four enrichment sites route through the helper', calls === 4, `found ${calls}`);
   check("the old inline 'all' check is gone from every call site",
@@ -1121,7 +1135,7 @@ console.log('half-birthday cake (#8) — June–August birthdays, label only');
   // event and publishBirthdays/birthday-roster sites keep isBirthdayWeek;
   // the five label-render sites use isCakeWeek.
   const fs2 = require('fs');
-  const src = fs2.readFileSync(path.join(__dirname, '..', 'print-server', 'server.js'), 'utf8');
+  const src = require('./server-source.cjs')();
   const cakeCalls = (src.match(/= isCakeWeek\(record\.Birthdate\)/g) || []).length;
   const realCalls = (src.match(/isBirthdayWeek\(record\.Birthdate\)/g) || []).length;
   check('five label sites key the cake on isCakeWeek', cakeCalls === 5, `found ${cakeCalls}`);
@@ -1212,8 +1226,7 @@ console.log('birthday age line (#291) — real birthday weeks only');
   // Wiring, mirroring the isCakeWeek scan above: the same five label-render
   // sites derive the age, so a reprint/preview/award label can't silently
   // differ from the label that first printed.
-  const ageSrc = require('fs').readFileSync(
-    path.join(__dirname, '..', 'print-server', 'server.js'), 'utf8');
+  const ageSrc = require('./server-source.cjs')();
   const ageCalls = (ageSrc.match(/birthdayAgeThisWeek\(record\.Birthdate\)/g) || []).length;
   // Re-assert the isCakeWeek/isBirthdayWeek counts the block above pins, so
   // the birthdayWeekYear refactor is PROVEN not to have disturbed them.
@@ -1475,8 +1488,7 @@ console.log('spooler backlog (#256) — a jam must not look healthy');
 
   // Wiring: the probe must never be reachable from the print path, and the
   // dashboard must not swallow the dynamic backlog message.
-  const spoolSrc = require('fs').readFileSync(
-    path.join(__dirname, '..', 'print-server', 'server.js'), 'utf8');
+  const spoolSrc = require('./server-source.cjs')();
   check('checkPrinterWarnings still has exactly one caller (GET /health)',
     (spoolSrc.match(/await checkPrinterWarnings\(\)/g) || []).length === 1,
     'a second caller would put a PowerShell probe on the print path');
@@ -1632,8 +1644,7 @@ console.log('range reprint (#257) — which of tonight’s rows come back out');
   }
 
   // Wiring: the range must reuse the single-row path, not grow a second one.
-  const rangeSrc = require('fs').readFileSync(
-    path.join(__dirname, '..', 'print-server', 'server.js'), 'utf8');
+  const rangeSrc = require('./server-source.cjs')();
   check('/reprint and /reprint-range both go through reprintRow()',
     (rangeSrc.match(/await reprintRow\(/g) || []).length === 2, 'a second render path would drift');
   check('the receipt-printer trial is gone (no receipt module, no jam reprint)',
@@ -1740,8 +1751,7 @@ console.log('\ntrophy band (#293): band text + completed-books window');
 
   // Wiring: this feed must never reach the public channel, and the band must
   // never sit in front of a print.
-  const trophySrc = require('fs').readFileSync(
-    path.join(__dirname, '..', 'print-server', 'server.js'), 'utf8');
+  const trophySrc = require('./server-source.cjs')();
   check('/feed/completed-books is not registered as a publishing feed',
     /app\.post\('\/feed\/completed-books', \(req, res\) => \{/.test(trophySrc)
     && !/app\.post\('\/feed\/completed-books',\s*makeFeedRoute/.test(trophySrc)

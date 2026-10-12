@@ -59,6 +59,7 @@
         "to": "print-server",
         "filter": [
           "*.js",
+          "server/**",
           "church-config.json",
           "package.json",
           "public/**"

@@ -242,6 +242,25 @@ page was 38,648). Two pages, one stylesheet:
 
 ## Architecture
 
+**The print server is split into modules (`print-server/server/`).** `server.js`
+is the entry: it loads `server/*.js` in the order the old single file ran (so
+middleware and routes register in the same order), exports every name the tests
+and the Electron shell import, and holds the standalone start-up. Each module is
+one section of the old file (`config`, `clubbers`, `label-render`, `printing`,
+`http` (the Express app, CORS, the loopback gate), `checkin-print`, `history`,
+`tonight-count`, `reprint`, `leaders`, `feed-routes`, `publishers`, `relay`,
+`station`, `config-routes`, `phone-routes`, `lifecycle`, ...). A name from
+another module is reached as `$module.name` (`$config.config`,
+`$printing.printLabel(...)`); each module's `exports` are live getters (setters
+for the state other modules assign), and `server/lazy.js` requires the other
+module on first use, so the load order stays server.js's and cycles are safe.
+New code goes in the module of its section; a new module needs a line in
+`server.js` in the position its routes should register. The packaged app ships
+the folder through `electron-app/package.json` `build.extraResources`
+(`"server/**"`; `scripts/test-server-helpers.cjs` fails if it is dropped). Suites
+that pin code by its shape read `scripts/server-source.cjs`, the whole server as
+one string with the `$module.` prefixes removed.
+
 **Label Generation:**
 - ONE renderer: `generateLabel()` in `print-server/server.js` draws a
   1200×600 canvas PNG (4x2 @ 300dpi), printed via PowerShell

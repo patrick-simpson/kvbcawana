@@ -278,7 +278,7 @@ async function serverSuite() {
 
     console.log('\nphone undo: never left waiting');
     {
-      const src = fs.readFileSync(path.join(root, 'print-server', 'server.js'), 'utf8');
+      const src = require('./server-source.cjs')();
       check('an undo nobody picks up in a minute fails, with the reason',
         /const UNDO_PICKUP_MS = 60 \* 1000;/.test(src)
         && /a\.status === 'pending' && now - new Date\(a\.at\)\.getTime\(\) > UNDO_PICKUP_MS\) \{\n\s+a\.status = 'failed';\n\s+a\.detail = co \? CHECKOUT_NOT_PICKED_UP : UNDO_NOT_PICKED_UP;/.test(src));

@@ -172,7 +172,7 @@ exit 0
     check('it is drawn on the 4x2 label page', img.width === 1200 && img.height === 600, `${img.width}x${img.height}`);
     fs.unlinkSync(png.pngPath);
 
-    const src = fs.readFileSync(path.join(__dirname, '..', 'print-server', 'server.js'), 'utf8');
+    const src = require('./server-source.cjs')();
     const dropSrc = src.slice(src.indexOf('async function generateDropOffTag'), src.indexOf('// Operator-configured footer', src.indexOf('async function generateDropOffTag')));
     check('the drop-off card says GO TO and never "late" (nothing singles a child out)',
       /'GO TO'/.test(dropSrc) && !/['"`][^'"`]*\blate\b[^'"`]*['"`]/i.test(dropSrc));

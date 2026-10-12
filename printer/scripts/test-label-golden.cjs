@@ -1384,7 +1384,7 @@ async function main() {
     check('the same logo bytes are prepared once and the result reused', again === padded);
     const paddedWhite = await prepareLogoForThermal(paddedLogo(), { ink: [255, 255, 255] });
     check('a different ink is its own preparation', paddedWhite !== null && paddedWhite !== padded);
-    check('the cache is bounded', /LOGO_PREP_MAX = 24/.test(require('fs').readFileSync(require('path').join(__dirname, '..', 'print-server', 'server.js'), 'utf8')));
+    check('the cache is bounded', /LOGO_PREP_MAX = 24/.test(require('./server-source.cjs')()));
 
     // A pale-gray card must read as PAPER: at the old threshold of 40 the
     // whole card became a featureless black slab and the artwork inside it

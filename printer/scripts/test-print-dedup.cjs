@@ -97,7 +97,7 @@ const PORT = 34581;
     check('the endless stream was cut off at the 2 MB cap, not buffered', mem < 400 * 1024 * 1024, `${Math.round(mem / 1048576)} MB heap`);
     await new Promise((r) => setTimeout(r, 200));
     check('every upstream connection was drained or destroyed', open === 0, `${open} still open`);
-    const src = fs.readFileSync(path.join(root, 'print-server', 'server.js'), 'utf8');
+    const src = require('./server-source.cjs')();
     check('non-200 answers close the socket, not leave it to the agent', /res\.statusCode !== 200\) \{[\s\S]{0,200}?req\.destroy\(\);/.test(src));
     check('a label prints without its icon rather than fail (the icon is decoration)', /console\.log\(`\[icon\] Could not load club image: \$\{e\.message\}`\);\s*\}\s*return null;/.test(src));
     odd.close();
@@ -105,7 +105,7 @@ const PORT = 34581;
 
   console.log('\nduplicate guard: every guarded print claims and releases its key');
   {
-    const src = fs.readFileSync(path.join(root, 'print-server', 'server.js'), 'utf8');
+    const src = require('./server-source.cjs')();
     const claims = (src.match(/claimPrint\(dupKey\)/g) || []).length;
     const releases = (src.match(/releasePrint\(dupKey\)/g) || []).length;
     check('five guarded prints (check-in, award, leader, custom, one-off), each claiming', claims === 5, String(claims));
@@ -114,7 +114,7 @@ const PORT = 34581;
   }
 
   console.log('\nduplicate guard: a stale claim expires');
-  check('a claim is never honoured past two minutes', /IN_FLIGHT_MAX_MS = 2 \* 60 \* 1000/.test(fs.readFileSync(path.join(root, 'print-server', 'server.js'), 'utf8')));
+  check('a claim is never honoured past two minutes', /IN_FLIGHT_MAX_MS = 2 \* 60 \* 1000/.test(require('./server-source.cjs')()));
 
   console.log(`\n${passed} passed, ${failed} failed`);
   process.exit(failed ? 1 : 0);

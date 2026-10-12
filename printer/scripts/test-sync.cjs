@@ -211,7 +211,7 @@ async function main() {
     await settle(5600);
     check('an owed tally a newer one overtook is not resent', !service.calls.slice(before).some((c) => c.route === '/v1/publish' && c.body.event === 'tally'));
     server.resetRelayForTest();
-    const src = fs.readFileSync(path.join(__dirname, '..', 'print-server', 'server.js'), 'utf8');
+    const src = require('./server-source.cjs')();
     check('the queue is bounded and old check-ins are left to the recap', /RELAY_QUEUE_MAX = 50/.test(src) && /RELAY_CHECKIN_MAX_AGE_MS = 2 \* 60 \* 1000/.test(src) && /RELAY_BREAK_MS = 30 \* 1000/.test(src));
     check('one sign-in check at a time', /if \(signInCheck\) return signInCheck;/.test(src));
   }

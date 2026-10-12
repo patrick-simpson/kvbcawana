@@ -318,7 +318,7 @@ console.log('─'.repeat(60));
   check('main.js hands the result to the print server',
     /setExtensionInfo\(extensionState\)/.test(mainSrc));
 
-  const serverSrc = fs.readFileSync(path.join(repo, 'print-server', 'server.js'), 'utf8');
+  const serverSrc = require('./server-source.cjs')();
   check('the server exports setExtensionInfo', /setExtensionInfo,/.test(serverSrc));
   // /health is CORS-reachable from the check-in site, and the folder path
   // contains the operator's Windows username.

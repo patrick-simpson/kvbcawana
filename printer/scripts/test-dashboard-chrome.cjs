@@ -319,7 +319,7 @@ console.log('\nsurfaces chrome: the phone page loads only the kit under /brand/'
     JSON.stringify(local.filter((r) => !r.startsWith('/brand/'))));
   const exists = local.map((r) => r.split('#')[0]).filter((r) => !fs.existsSync(path.join(root, 'print-server', 'public', r)));
   check('every one of them is in the mirror', exists.length === 0, exists.join(', '));
-  const server = read('print-server', 'server.js');
+  const server = require('./server-source.cjs')();
   check('the print server still mounts the kit, to loopback only, after the loopback gate',
     server.indexOf("app.use('/brand'") > server.indexOf('security.isLoopbackRequest(req)') && server.indexOf('security.isLoopbackRequest(req)') > 0);
   check('the brand mount serves only css, fonts and svg with plain paths',

@@ -370,7 +370,7 @@ async function main() {
   // ── 5. Nothing here touches the wire or the print path ───────────────────
   console.log('audit: it stays operator-local');
   {
-    const src = fs.readFileSync(path.join(__dirname, '..', 'print-server', 'server.js'), 'utf8');
+    const src = require('./server-source.cjs')();
     const feedsSrc = fs.readFileSync(path.join(__dirname, '..', 'print-server', 'feeds.js'), 'utf8');
     check('the grid feed is not a publishing feed',
       !/FEED_NAMES = \[[^\]]*attendance/.test(feedsSrc)

@@ -147,9 +147,11 @@ or a prerequisite is missing):
   `journey/public/current-lesson-video.mp4` into history each change (about
   20 MB). Moving it to the `journey-videos-v2` release changes where the Pi's
   bundle comes from, so it waits for the owner.
-- **Split the big files.** `printer/print-server/server.js` (about 9,300
-  lines) and `printer/chrome-extension/content.js` (about 5,200), plus a jsdom
-  harness for the extension. Some logic is already lifted out for tests.
+- **Split the big files.** `printer/chrome-extension/content.js` (about 5,200
+  lines), plus a jsdom harness for the extension. Some logic is already lifted
+  out for tests. (`printer/print-server/server.js` is done: it is the entry and
+  the exports, with the code in `printer/print-server/server/`, see
+  `printer/CLAUDE.md`.)
 - **Lobby code splitting.** `React.lazy` for the panels and the PowerPoint
   parser on demand. The App suites open panels synchronously and
   `pptxModel.js` imports the parser statically, so those suites need reworking first.
