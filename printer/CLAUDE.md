@@ -130,43 +130,96 @@ The workflow runs the test suites FIRST, then creates the tag (so a failing test
 | Print Server | `PRINTER_NAME="Printer" node server.js` (port 3456) |
 | Checks (root) | `npm test` runs every suite in `scripts/` (what `ci.yml` and the release run); extension logic is tested by lifting functions out of `content.js` (see `scripts/test-extension-*.cjs`) |
 
-## Public website (root React app → the home page of awana.kvbchurch.org)
+## Public website (root React app → the ONE family page, the home of awana.kvbchurch.org)
 
 Built by `site/build.mjs` (`npm run build` here with `SITE_BASE=/`) and served
 at the one site's root; the lobby lives under `/lobby`, Journey under
-`/journey`, the phone page under `/checkin`. The home page is a capability showcase written for church leadership first
-(then other churches and volunteers: the Simulator, Install Guide and FAQ
-sit lower down, and the `#install`, `#simulator`, `#faq`, `#features` and
-`#how-it-works` anchors must keep resolving). It is one of three "family"
-pages with the Check-in Display's and Journey Display's `about.html`.
+`/journey`, the phone page under `/checkin`. **This is the family's one
+about page** (owner, 2026-10-12: the lobby's `about.html` and Journey's were
+merged into it; `/lobby/about.html` and `/journey/about.html` 301 to `/#lobby`
+and `/#journey`, `site/lib/redirects.js`, tested in `site/test/redirects.test.mjs`).
+The page is a capability showcase written for church leadership first (then
+other churches and volunteers). Its order: the label printer / KVBC Awana app
+(hero, stats, `#features`, the whole club night `#family`, `#how-it-works`,
+the Simulator `#simulator`, the Install Guide `#install`, the FAQ `#faq`),
+then **`#lobby`** (the lobby signage and the projector,
+`components/Lobby.tsx`, styles `styles/lobby.css`, classes `cid-`) and
+**`#journey`** (the Journey kiosk, `components/Journey.tsx`,
+`styles/journey.css`, classes `jd-`). The `#install`, `#simulator`, `#faq`,
+`#features` and `#how-it-works` anchors must keep resolving
+(`scripts/test-about-page.cjs` fails if one goes). The two product sections
+wear their own accent (`data-accent="checkin"` / `"journey"`), keep their own
+Fig. numbers, and carry their own hero; each was generated once from the old
+static page and is edited here now. `components/family/ScreenIcons.tsx` is
+the extra icon sprite they use (never a symbol id the family sprite already has).
 
 - **This repo holds the family design system.** `styles/family.css` is the
   one committed stylesheet and `docs/FAMILY-DESIGN.md` its spec
-  (`docs/family-reference.html` renders every component). The lobby's and
-  Journey's about pages get generated, ignored copies at
-  `lobby/public/family.css` and `journey/public/family.css`
-  (`node scripts/family-assets.mjs` at the repo root, run by their dev,
-  build and test scripts and `site/build.mjs`; `scripts/check-mirrors.mjs`
-  fails CI if one is missing, differs or is committed): change the canonical
-  file and bump the `family.css?v=N` token on both about pages.
-  Page-only styling goes in `styles/page.css` (`lbl-` prefix).
+  (`docs/family-reference.html` renders every component). The site bundles
+  it through `styles/site.css`. `node scripts/family-assets.mjs` (repo root)
+  still writes ignored copies to `lobby/public/family.css` and
+  `journey/public/family.css`, which nothing links now that the static about
+  pages are gone (to be dropped). Page-only styling goes in `styles/page.css`
+  (`lbl-` prefix), `styles/lobby.css` (`cid-`) and `styles/journey.css` (`jd-`).
 - **Tailwind v4 is compiled** (`@tailwindcss/vite`, `styles/site.css` with
   `source(none)` + explicit `@source` lines limited to the site's own files).
-  No runtime CDN, no import map; icons are the inline SVG sprite in
-  `components/family/Icons.tsx`.
+  No runtime CDN, no import map; icons are the inline SVG sprites in
+  `components/family/Icons.tsx` and `ScreenIcons.tsx`.
 - **The Simulator's DOM is a contract.** `#lastCheckin`, `.clubber`,
   `.name` and `.club img` (see `src/constants.ts` DOM_SELECTORS) mirror
   TwoTimTwo's real page, so keep that structure whenever it is restyled.
   Its roster (`data.ts`) is obviously fictional full names on purpose.
 - **Claims track the code.** Every sentence must be true of the current
   release; a feature change that the page describes updates the page in the
-  same PR. Opt-in features carry a `.fam-card__tag`, the phone's "Not here"
-  list is always shown with its safeguards, and the label mocks follow
-  `generateLabel()`. Screens are CSS recreations with generic first names
-  and no Awana logos or club art; the disclaimer bar, meta description and
-  footer carry the not-affiliated line. Links out go only to the two sibling
-  about pages, the three repos and this app's own downloads, never to the
-  live signage or kiosk roots.
+  same commit. Opt-in features carry a `.fam-card__tag` (and that tag is used
+  for nothing else: "set up once" notes are a plain `.cid-setup` line), the
+  phone's "Not here" list is always shown with its safeguards, and the label
+  mocks follow `generateLabel()`. The lobby's pick-up board is always shown
+  with its four safeguards, worded as `decideBoard()` behaves; when the
+  signage's look changes, rebuild its recreations in the same commit.
+- **No Awana art, generic names.** Screens are CSS/SVG recreations of the
+  CURRENT looks, drawn fresh: no logos, club wordmarks, mascots or curriculum
+  clipart (the owner uses the official branding on the church's OWN screens,
+  TRADEMARKS.md, and by his choice not on this public page), and no shape
+  copied from the kit. Each is `role="img"` with a full `aria-label`, captioned
+  "Recreated for illustration", with generic first names only; club names are
+  plain text where the real screen shows a mark. The disclaimer bar, the meta
+  description and the footer legal paragraph carry the not-affiliated line, and
+  the first visible "Awana" carries the ®. Two deliberate AA departures,
+  commented in `lobby.css` / `journey.css`: the check-in kicker is white on the
+  club's deep wave, and the hot sticker / Begin button is `#CF4518`, not the
+  kit's `#F15A28`. The lobby's chips (`.cid-step`) are generated by its own
+  `chipGeometry()` around Paytone One's measured widths: regenerate them, never
+  hand-edit (`lobby/src/lib/aboutChips.test.js` fails on drift). Doodles are
+  placed for the headline that was there; the old browser test that measured
+  every recreation for text touching a doodle (`e2e/about.visual.spec.js`)
+  went with the static page, so check a changed recreation by eye at phone,
+  tablet and desktop width.
+- **Faces: the kit's own, never Google's** (owner, 2026-09-29: Galindo "looks
+  too much like SpongeBob"; the projector's Lilita One went with it). Paytone
+  One shouts, Londrina Solid labels, Figtree is read, from the lobby kit's
+  `fonts.css` (`index.html` links `/lobby/shared/brand/fonts.css`, served by the
+  one site; the full, unmodified files: their licenses reserve the names, so
+  never a Google or `@fontsource` subset). Google is asked only for the
+  editorial faces (Fraunces, Source Sans 3, IBM Plex Mono), in the ONE
+  stylesheet each page links, and nothing else comes from another host: a v1
+  `css?family=Paytone+One` link, a mirror, a preload, an `@import`, a
+  page-local `@font-face` or a `url()` to another host all fail
+  `scripts/test-about-page.cjs` (part of `npm test`), which also pins the
+  lobby's three voices, the Journey start screen's palette to the kit's
+  `tokens.css`, the no-image / no-kit-art rule, the not-affiliated line, the
+  anchors and the links below. (A standalone `npm run dev` here has no
+  `/lobby/shared/`, so it falls back to system faces.)
+- **Journey's licensing wording is strict** (journey/CLAUDE.md, "Licensing
+  boundary"): the `#journey` section says the kiosk plays curriculum the church
+  already licenses through its own Awana Ministry Membership, used only within
+  the church's own program, and never links to, names or advertises a lesson
+  video, transcoded copy, release asset, transcript, handout or slide image
+  (no "re-host", "mirror", "download" near the videos). Its room is students,
+  never children.
+- **Links out go only** to the three repos, this app's own downloads and the
+  page's own sections (`/#lobby`, `/#journey`), never to the live signage
+  (`/lobby/`, `/lobby/countdown`) or the kiosk root (`/journey/`).
 
 ## Architecture
 

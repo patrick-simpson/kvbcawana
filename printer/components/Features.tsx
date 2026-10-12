@@ -1,10 +1,9 @@
 import React from 'react';
 import { Icon, IconName } from './family/Icons';
-import { URLS } from './family/Family';
 
 /* ── The whole club night: the family band (FAMILY.md §4.8) ─────────────── */
 export const FamilyBand: React.FC = () => (
-  <section className="fam-band" aria-labelledby="band-title">
+  <section className="fam-band" id="family" aria-labelledby="band-title">
     <div className="fam-wrap">
       <div className="fam-band__head">
         <p className="fam-kicker">A family of three</p>
@@ -40,7 +39,7 @@ export const FamilyBand: React.FC = () => (
           <div className="fam-product__body">
             <p>The lobby TV welcomes each child by first name, and the projector keeps the evening on schedule.</p>
             <ul className="fam-product__points"><li>Birthdays and celebrations</li><li>A countdown and game timers</li></ul>
-            <a className="fam-product__link" href={URLS.checkin}><span>About Check-in Display</span><Icon name="arrow" /></a>
+            <a className="fam-product__link" href="#lobby"><span>The lobby signage, below</span><Icon name="arrow" /></a>
           </div>
         </li>
         <li className="fam-product" data-accent="journey">
@@ -51,7 +50,7 @@ export const FamilyBand: React.FC = () => (
           <div className="fam-product__body">
             <p>A small kiosk shows the Check-in Display by day and, at 6:30, has tonight’s lesson ready for a leader to start, with captions and teaching slides.</p>
             <ul className="fam-product__points"><li>Runs on a tiny, older computer</li><li>Tonight’s lesson is saved ahead of time</li></ul>
-            <a className="fam-product__link" href={URLS.journey}><span>About Journey Display</span><Icon name="arrow" /></a>
+            <a className="fam-product__link" href="#journey"><span>The Journey kiosk, below</span><Icon name="arrow" /></a>
           </div>
         </li>
       </ul>

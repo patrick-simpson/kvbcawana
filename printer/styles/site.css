@@ -14,6 +14,8 @@
 @import "tailwindcss" source(none);
 @import "./family.css" layer(components);
 @import "./page.css" layer(components);
+@import "./lobby.css" layer(components);
+@import "./journey.css" layer(components);
 
 @source "../App.tsx";
 @source "../index.tsx";
