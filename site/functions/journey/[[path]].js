@@ -1,7 +1,9 @@
 // /journey/* is the kiosk's static files; its videos (which must seek, and
 // Pages' static files ignore Range) and anything too big for Pages are served
 // by proxyLarge (site/lib/proxyLarge.js) from the map site/build.mjs writes for
-// each build. Anything else falls through to the static file.
+// each build: the lesson videos, this week's current-lesson-video.mp4 included,
+// from the journey-videos-v2 release. Anything else falls through to the static
+// file.
 import { proxyLarge } from '../../lib/proxyLarge.js';
 import { LARGE_FILES, LARGE_PREFIXES } from '../../lib/large-files.generated.js';
 

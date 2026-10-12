@@ -1,9 +1,11 @@
 // Videos, and any file too big for Cloudflare Pages (25 MiB a file), are left
 // out of the upload by site/build.mjs and served from here instead, because
 // Pages' static files ignore Range and a <video> must be able to seek. Each is
-// streamed from GitHub (the Journey lesson videos from their release; this
-// week's lesson from the repo at the SAME commit the site was built from, so
-// it always matches the JSON deployed beside it), with Range passed through,
+// streamed from GitHub (the Journey lesson videos, this week's included, from
+// their release; the home page's film from the repo at the SAME commit the site
+// was built from, so it always matches the files deployed beside it), with
+// Range passed through (GitHub answers a release download with a redirect to
+// its storage, which fetch follows, Range and all),
 // on the site's own origin, so a page's Cache API fetch and its <video> work
 // exactly as they did when the file was a static asset.
 
