@@ -91,17 +91,22 @@ const BASE = `http://127.0.0.1:${PORT}`;
 
   console.log('\nthe youth leaders’ page and the 7:15 check-out (7.10.0)');
   {
-    const res = await fetch(BASE + '/phone/ym');
-    const html = await res.text();
-    check('/phone/ym serves the phone page marked Trek and Journey only, check-in only',
-      res.status === 200 && html.indexOf("window.AWANA_ONLY_CLUBS = ['trek', 'journey']; window.AWANA_SIMPLE = true;") !== -1
-      && html.indexOf('AWANA_SIMPLE') < html.indexOf("var RELAY = window.AWANA_RELAY"));
+    // Online only (2026-10-12): the print server no longer serves the phone page on the LAN
+    // (/phone, /phone/ym, /phone.html); the Wi-Fi page is gone and phones use /checkin.
+    for (const p of ['/phone', '/phone/ym', '/phone.html', '/index.html', '/']) {
+      const res = await fetch(BASE + p);
+      const html = await res.text();
+      check(`GET ${p} does not serve the phone page or a dashboard`,
+        !/awana-phone|AWANA_RELAY|id="pin-screen"/.test(html) && !/<title>[^<]*Dashboard/i.test(html), String(res.status));
+    }
+    const root_ = await (await fetch(BASE + '/')).text();
+    check('GET / says where the settings went', /awana\.kvbchurch\.org\/settings/.test(root_));
     const phone = fs.readFileSync(path.join(root, 'print-server', 'public', 'phone.html'), 'utf8');
     check('the page keeps only those clubs’ children', /return !ONLY \|\| ONLY\.indexOf\(clubKit\(sk\.club\)\) !== -1;/.test(phone));
     check('the simple page hides Tonight and the + menu, and never asks for leaders or jams',
       /\$\('count-pill'\)\.hidden = SIMPLE;/.test(phone) && /\$\('menu-btn'\)\.hidden = SIMPLE;/.test(phone) && /if \(SIMPLE\) return;[^\n]*\n  refreshLeaders\(\);/.test(phone));
     const build = fs.readFileSync(path.join(root, '..', 'site', 'build.mjs'), 'utf8');
-    check('the website builds /checkin/ym too', /path\.join\(checkinOut, 'ym', 'index\.html'\)/.test(build) && /AWANA_ONLY_CLUBS = \['trek', 'journey'\]/.test(build));
+    check('the website builds /checkin/ym too (the one source is phone.html)', /path\.join\(checkinOut, 'ym', 'index\.html'\)/.test(build) && /AWANA_ONLY_CLUBS = \['trek', 'journey'\]/.test(build));
 
     const ext = fs.readFileSync(path.join(root, 'chrome-extension', 'content.js'), 'utf8');
     const grab = (name) => { const i = ext.indexOf('function ' + name + '('); let d = 0, j = ext.indexOf('{', i); for (; j < ext.length; j++) { if (ext[j] === '{') d++; else if (ext[j] === '}' && --d === 0) break; } return ext.slice(i, j + 1); };

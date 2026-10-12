@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-// Integration tests for the print server's trust model (v5.3.0).
+// Integration tests for the print server's trust model (v5.3.0; Online only,
+// 2026-10-12: the LAN, the Wi-Fi phone page and the PIN are gone).
 //
 // These assert the properties that keep children's names and allergy data off
 // the network. They are integration tests rather than unit tests on purpose:
@@ -7,10 +8,9 @@
 // route that forgot its auth check, a bind call missing its host argument —
 // and none of those are visible from a pure function test.
 //
-// A real non-loopback request is needed to exercise the LAN path, so the suite
-// binds 0.0.0.0 and connects to a non-loopback local IPv4 address. If the host
-// has no such address the LAN cases are skipped (loudly) rather than passing
-// vacuously.
+// A real non-loopback request is needed to exercise the gate, so the suite
+// connects to a non-loopback local IPv4 address. If the host has no such
+// address the LAN cases fail (loudly) rather than passing vacuously.
 //
 // Run: npm run test:security
 
@@ -62,12 +62,12 @@ function lanAddress() {
 }
 
 function request(opts) {
-  const { host, method = 'GET', pathname, headers = {}, body } = opts;
+  const { host, port = PORT, method = 'GET', pathname, headers = {}, body } = opts;
   return new Promise((resolve, reject) => {
     const payload = body === undefined ? null : (typeof body === 'string' ? body : JSON.stringify(body));
     const req = http.request({
       host,
-      port: PORT,
+      port,
       method,
       path: pathname,
       headers: {
@@ -99,7 +99,7 @@ async function main() {
   fs.writeFileSync(path.join(dataDir, 'config.json'), JSON.stringify({
     printerName: '',
     checkinUrl: 'https://example.twotimtwo.com/clubber/checkin',
-    phonePin: PIN,
+    phonePin: PIN,                 // an old install's PIN: nothing reads it any more
     lanAccess: true,
     pusherSecret: 'SECRET-MUST-NOT-LEAK',
     pusherKey: 'key-abc',
@@ -127,7 +127,7 @@ async function main() {
 
   process.env.AWANA_DATA_DIR = dataDir;
   process.env.AWANA_PORT = String(PORT);     // don't collide with a real install on 3456
-  process.env.AWANA_BIND_HOST = '0.0.0.0';   // so the LAN cases can connect at all
+  process.env.AWANA_BIND_HOST = '0.0.0.0';   // asking for the LAN must change nothing (checked below)
 
   // require() the server AFTER the env is set — DATA_DIR is read at module load.
   const server = require(path.join(__dirname, '..', 'print-server', 'server.js'));
@@ -142,275 +142,81 @@ async function main() {
     const res = await request({ host: '127.0.0.1', pathname: '/stats/tonight' });
     check('loopback GET /stats/tonight is allowed', res.status === 200, `status ${res.status}`);
     const body = json(res) || {};
-    check('loopback /stats/tonight still returns the data the dashboard needs',
+    check('loopback /stats/tonight still returns the data the settings page and the extension need',
       Array.isArray(body.allergyKids), 'allergyKids missing');
   }
   {
     const res = await request({ host: '127.0.0.1', pathname: '/config' });
     const cfg = json(res) || {};
-    check('loopback GET /config exposes secrets to the dashboard',
+    check('loopback GET /config (no Origin: the app on this computer) still carries the secrets',
       cfg.pusherSecret === 'SECRET-MUST-NOT-LEAK' && cfg.phonePin === PIN && cfg.displayLoginPassphrase === 'PASSPHRASE-MUST-NOT-LEAK',
-      'the dashboard could not read its own settings');
+      'the app could not read its own settings');
   }
 
-  // ── The LAN is not trusted ──────────────────────────────────────────────────
+  // ── The LAN is not served (Online only, 2026-10-12) ────────────────────────
+  // The server binds 127.0.0.1 and refuses any non-loopback socket at the gate,
+  // so there is no PIN, no Wi-Fi phone page and no dashboard. Two properties:
+  //  1. WIRING: even if something put this app on a LAN socket (a second
+  //     listener on 0.0.0.0 here), every request from a non-loopback address is
+  //     refused, with or without an old PIN, and leaks nothing.
+  //  2. BIND: a child process with the default config, and even with
+  //     AWANA_BIND_HOST asking for 0.0.0.0, is unreachable on the LAN address.
   if (!lan) {
     console.warn('  ! No non-loopback IPv4 address on this host — LAN cases SKIPPED');
     check('LAN cases were exercised', false, 'no non-loopback address available');
   } else {
-    // The phone page itself must load — it is the PIN entry form.
-    {
-      const res = await request({ host: lan, pathname: '/phone' });
-      check('LAN GET /phone serves the PIN form', res.status === 200, `status ${res.status}`);
-      check('LAN GET /phone carries no roster data', !res.body.includes('Leakcanary'));
-    }
-    // ...and so must its brand kit: the fonts, tokens, corner-tab shape and
-    // the Awana Clubs mark it draws the PIN screen with. They are served
-    // BEFORE the gate (no PIN exists yet on that screen, and a stylesheet's
-    // url() could never send one), so they never touch the rate limiter —
-    // which is why these run before the happy path. The paths that must stay
-    // gated are checked after the refusal sweep, below.
-    {
-      const phone = await request({ host: lan, pathname: '/phone' });
-      // Markup attributes, CSS url()s (quoted either way, or bare), AND the
-      // URLs its scripts assign (the tab-shape probe is `probe.src =
-      // '/brand/…'`): a script-set path outside /brand/ 403s on the Wi-Fi
-      // exactly like a tag's. Same collector as test-dashboard-chrome.cjs.
-      const ASSET_REF = new RegExp([
-        /(?:src|href)="(?<attr>\/[^"]*)"/.source,
-        /url\('(?<q1>\/[^']*)'\)/.source,
-        /url\("(?<q2>\/[^"]*)"\)/.source,
-        /url\((?<bare>\/[^'")\s]*)\)/.source,
-        /\.(?:src|href)\s*=\s*(?<sq>['"])(?<prop>\/[^'"]*)\k<sq>/.source,
-        /setAttribute\(\s*['"](?:src|href)['"]\s*,\s*(?<aq>['"])(?<set>\/[^'"]*)\k<aq>/.source,
-      ].join('|'), 'g');
-      const refs = [...phone.body.matchAll(ASSET_REF)].map(({ groups: g }) => ({
-        url: (g.attr || g.q1 || g.q2 || g.bare || g.prop || g.set).split('#')[0], script: !!(g.prop || g.set),
-      }));
-      const assets = refs.map((r) => r.url);
-      check('the phone page’s Awana Clubs mark is collected too', assets.includes('/brand/logos/awana-clubs-white.svg'), JSON.stringify(refs));
-      check('the phone page loads brand assets at all', assets.length >= 3, JSON.stringify(assets));
-      check('every asset the phone page loads is under /brand/ (anything else would 403 on the Wi-Fi)',
-        assets.every((a) => a.startsWith('/brand/')), JSON.stringify(assets));
-      for (const a of new Set(assets)) {
-        const res = await request({ host: lan, pathname: a });
-        check(`LAN GET ${a} loads without a PIN`, res.status === 200, `status ${res.status}`);
-      }
-      const font = await request({ host: lan, pathname: '/brand/fonts/paytone-one-full-400-normal.woff2' });
-      check('LAN GET a brand WOFF2 font loads without a PIN', font.status === 200, `status ${font.status}`);
-      const ttf = await request({ host: lan, pathname: '/brand/fonts/PaytoneOne-Regular.ttf' });
-      check('...and so does the TTF the stylesheet falls back to', ttf.status === 200, `status ${ttf.status}`);
-      const css = await request({ host: lan, pathname: '/brand/fonts.css' });
-      check('the brand stylesheet is the kit, not the dashboard', /@font-face/.test(css.body) && !css.body.includes('Leakcanary'));
-    }
+    const lanPort = PORT + 2;
+    const lanListener = http.createServer(server.app);
+    await new Promise((resolve) => lanListener.listen(lanPort, '0.0.0.0', resolve));
+    const lanReq = (o) => request({ ...o, host: lan, port: lanPort });
 
-    // ── Happy path first ──────────────────────────────────────────────────────
-    // Ordered before the refusal sweep on purpose: a correct PIN clears the
-    // limiter, and the sweep below deliberately trips it.
-    {
-      const res = await request({
-        host: lan, method: 'POST', pathname: '/phone/roster', body: { pin: PIN },
-      });
-      check('LAN POST /phone/roster succeeds with the right PIN', res.status === 200, `status ${res.status}`);
-      const body = json(res) || {};
-      check('LAN phone roster returns kids', Array.isArray(body.kids) && body.kids.length === 1,
-        JSON.stringify(body).slice(0, 120));
-    }
-    {
-      const res = await request({
-        host: lan, pathname: '/stats/tonight', headers: { 'X-Awana-Pin': PIN },
-      });
-      check('LAN GET /stats/tonight succeeds with the PIN header', res.status === 200, `status ${res.status}`);
-    }
-    // The phone's Tonight tab and its actions: through the gate with the PIN,
-    // then refused by validation with no side effect where the body is empty.
-    {
-      const res = await request({ host: lan, method: 'POST', pathname: '/phone/tonight', body: { pin: PIN } });
-      const body = json(res) || {};
-      check('LAN POST /phone/tonight succeeds with the right PIN', res.status === 200, `status ${res.status}`);
-      check('LAN /phone/tonight lists the checked-in kid (so there IS something to leak)',
-        Array.isArray(body.entries) && body.entries.length === 1 && body.entries[0].lastName === 'Leakcanary',
-        JSON.stringify(body).slice(0, 160));
-      check('LAN /phone/tonight entries carry no allergy or image data',
-        !res.body.includes('peanut') && !res.body.includes('clubImageData'));
-    }
-    {
-      const undo = await request({ host: lan, method: 'POST', pathname: '/phone/undo', body: { pin: PIN } });
-      check('LAN POST /phone/undo with no identity is a 400 (through the gate, refused by validation)', undo.status === 400, `status ${undo.status}`);
-      const restore = await request({ host: lan, method: 'POST', pathname: '/phone/restore', body: { pin: PIN } });
-      check('LAN POST /phone/restore with no identity is a 400', restore.status === 400, `status ${restore.status}`);
-      const visitor = await request({ host: lan, method: 'POST', pathname: '/phone/visitor', body: { pin: PIN } });
-      check('LAN POST /phone/visitor with no name is a 400', visitor.status === 400, `status ${visitor.status}`);
-      const leader = await request({ host: lan, method: 'POST', pathname: '/print-leader', body: { pin: PIN, name: 'Lan Leader', clubName: 'Sparks' } });
-      check('LAN POST /print-leader succeeds with the right PIN', leader.status === 200, `status ${leader.status} ${leader.body.slice(0, 120)}`);
-      const stats = json(await request({ host: '127.0.0.1', pathname: '/stats/tonight' })) || {};
-      check('a leader tag from the LAN moved nothing that counts children', stats.checkedIn === 1, JSON.stringify(stats));
-
-      // The remembered-leader chips and the club list, both reachable with the
-      // PIN. The chips carry volunteers' names, so they are gated like the
-      // roster; the club list is not personal data but rides the same gate.
-      const clubs = await request({ host: lan, method: 'POST', pathname: '/clubs', body: { pin: PIN } });
-      check('LAN POST /clubs succeeds with the right PIN', clubs.status === 200, `status ${clubs.status}`);
-      check('LAN /clubs offers Journey', /Journey/.test(clubs.body), clubs.body.slice(0, 120));
-      const leaders = await request({ host: lan, method: 'POST', pathname: '/leaders', body: { pin: PIN } });
-      check('LAN POST /leaders succeeds with the right PIN', leaders.status === 200, `status ${leaders.status}`);
-      check('LAN /leaders remembers the leader just printed', /Lan Leader|Lan/.test(leaders.body),
-        leaders.body.slice(0, 160));
-      const forgetBad = await request({ host: lan, method: 'POST', pathname: '/leaders/forget', body: { pin: PIN } });
-      check('LAN POST /leaders/forget with no key is a 400 (through the gate, refused by validation)',
-        forgetBad.status === 400, `status ${forgetBad.status}`);
-
-      // Clearing the print queue (#256) BINS labels that are about to print,
-      // so it is gated on isTrustedConfigOrigin like /play-tune and
-      // /rehearsal — deliberately stricter than the PIN, which is LAN trust
-      // and not authorization to throw away a child's label. Checked HERE,
-      // before the refusal sweep below trips the rate limiter.
-      const queue = await request({
-        host: lan, method: 'POST', pathname: '/printer/clear-queue',
-        headers: { 'X-Awana-Pin': PIN }, body: { confirm: true },
-      });
-      check('LAN POST /printer/clear-queue is refused even WITH a valid PIN',
-        queue.status === 403, `status ${queue.status}`);
-    }
-
-    // Secrets stay on the machine even for an authenticated LAN caller.
-    {
-      const res = await request({ host: lan, pathname: '/config', headers: { 'X-Awana-Pin': PIN } });
-      check('LAN GET /config is allowed with the PIN', res.status === 200, `status ${res.status}`);
-      check('LAN GET /config withholds the Pusher secret', !res.body.includes('SECRET-MUST-NOT-LEAK'));
-      check('LAN GET /config withholds the PIN itself', !res.body.includes(PIN));
-      check('LAN GET /config withholds the display passphrase', !res.body.includes('PASSPHRASE-MUST-NOT-LEAK'));
-    }
-    // ...and a LAN caller cannot WRITE them either.
-    {
-      const res = await request({
-        host: lan, method: 'POST', pathname: '/config',
-        headers: { 'X-Awana-Pin': PIN }, body: { pin: PIN, pusherSecret: 'attacker' },
-      });
-      check('LAN POST /config refuses to set the Pusher secret', res.status === 403, `status ${res.status}`);
-      const pp = await request({
-        host: lan, method: 'POST', pathname: '/config',
-        headers: { 'X-Awana-Pin': PIN }, body: { pin: PIN, displayLoginPassphrase: 'attacker-chosen-passphrase' },
-      });
-      check('LAN POST /config refuses to set the display passphrase', pp.status === 403, `status ${pp.status}`);
-    }
-
-    // ── Refusal sweep ─────────────────────────────────────────────────────────
-    // Every endpoint that can return roster data, plus the dashboard itself.
-    // A missing PIN counts toward the rate limiter, so later paths in this list
-    // legitimately answer 429 instead of 403 — both mean "refused, no data",
-    // which is the property under test.
-    const PII_PATHS = [
-      '/stats/tonight',
-      '/history',
-      '/history/today',
-      '/checkin-csv-export',
-      '/roster-status',
-      '/failures',
-      '/diagnostics',
-      '/config',
-      // Aggregate counts, but they are still tonight's operational picture —
-      // and /reconcile is a read of the roster's shape, so it is gated like
-      // every other one.
-      '/reconcile',
-      '/',                       // the dashboard itself
+    const GET_PATHS = [
+      '/', '/phone', '/phone/ym', '/phone.html', '/index.html', '/step-chip.js',
+      '/health', '/stats/tonight', '/history', '/history/today', '/checkin-csv-export', '/roster-status',
+      '/failures', '/diagnostics', '/config', '/reconcile', '/clubs', '/leaders', '/attendance-audit',
       '/preview?name=Testkid%20Leakcanary',
+      '/brand/fonts.css', '/brand/fonts/PaytoneOne-Regular.ttf', '/brand/tokens.css',
+      '/brand/../index.html', '/brand/%2e%2e/index.html', '/brand/README.md', '/brand/',
     ];
-    for (const p of PII_PATHS) {
-      const res = await request({ host: lan, pathname: p });
-      check(`LAN GET ${p} is refused without a PIN`,
-        res.status === 403 || res.status === 429, `status ${res.status}`);
-      check(`LAN GET ${p} leaks no roster name`, !res.body.includes('Leakcanary'),
-        'response contained a child name');
+    for (const p of GET_PATHS) {
+      for (const headers of [{}, { 'X-Awana-Pin': PIN }]) {
+        const res = await lanReq({ pathname: p, headers });
+        check(`LAN GET ${p} is refused${headers['X-Awana-Pin'] ? ' even with the old PIN' : ''}`, res.status === 403, `status ${res.status}`);
+        check(`LAN GET ${p} leaks no roster name`, !res.body.includes('Leakcanary') && !res.body.includes('peanut'),
+          'response contained a child name');
+      }
     }
-    const PII_POST_PATHS = [
-      ['/phone/roster', {}],
-      ['/phone/tonight', {}],
-      ['/phone/undo', { firstName: 'Testkid', lastName: 'Leakcanary' }],
-      ['/phone/restore', { firstName: 'Testkid', lastName: 'Leakcanary' }],
-      ['/phone/visitor', { name: 'Stranger Danger' }],
-      ['/print-leader', { name: 'Stranger Leader' }],
-      // Volunteers' names are personal data too: the chips are gated like the
-      // roster, and forgetting is a write no unauthenticated caller may make.
-      ['/leaders', {}],
-      ['/leaders/forget', { key: 'lan leader' }],
-      ['/clubs', {}],
-      ['/reconcile', {}],
-      // TwoTimTwo's own count is only ever posted by the extension on the
-      // check-in machine. An unauthenticated caller must not be able to plant
-      // a second opinion that makes a real shortfall look like agreement.
+    const POST_PATHS = [
+      ['/phone/roster', {}], ['/phone/tonight', {}], ['/phone/undo', { firstName: 'Testkid', lastName: 'Leakcanary' }],
+      ['/phone/restore', { firstName: 'Testkid', lastName: 'Leakcanary' }], ['/phone/visitor', { name: 'Stranger Danger' }],
+      ['/phone/checkin', { name: 'Testkid Leakcanary' }],
+      ['/print-leader', { name: 'Stranger Leader' }], ['/print-custom', { text: 'Stranger' }], ['/print-oneoff', { firstName: 'Stranger', clubName: 'Sparks' }],
+      ['/leaders', {}], ['/leaders/forget', { key: 'lan leader' }], ['/clubs', {}], ['/reconcile', {}],
       ['/feed/source-count', { date: '2026-09-02', checkedIn: 999 }],
-      // The completed-books feed carries children's FULL names (it decides
-      // whose next label gets a trophy band), so it is gated like the roster.
       ['/feed/completed-books', { entries: [{ name: 'Stranger Leakcanary', book: 'Wingrunner', date: '2026-09-02' }] }],
-      // The attendance grid carries full names too, and its apply route writes
-      // into the season ledger — neither may be reachable without a PIN.
       ['/feed/attendance-grid', { meetingDates: ['2026-09-02'], clubsRead: ['Sparks'], rows: [{ name: 'Stranger Leakcanary', club: 'Sparks', dates: ['2026-09-02'] }] }],
-      ['/attendance-audit/apply', { confirm: true }],
+      ['/attendance-audit/apply', { confirm: true }], ['/printer/clear-queue', { confirm: true }], ['/rehearsal', { on: true }],
+      ['/config', { pusherSecret: 'attacker' }], ['/config', { printerName: 'Evil' }], ['/config/sync-login', { passphrase: 'x', url: 'https://evil.example' }],
+      ['/config/display-key/generate', {}], ['/pending-actions/x/claim', {}],
     ];
-    for (const [p, body] of PII_POST_PATHS) {
-      const res = await request({ host: lan, method: 'POST', pathname: p, body });
-      check(`LAN POST ${p} is refused without a PIN`,
-        res.status === 403 || res.status === 429, `status ${res.status}`);
+    for (const [p, body] of POST_PATHS) {
+      const res = await lanReq({ method: 'POST', pathname: p, body: { pin: PIN, ...body }, headers: { 'X-Awana-Pin': PIN } });
+      check(`LAN POST ${p} is refused even with the old PIN`, res.status === 403, `status ${res.status}`);
       check(`LAN POST ${p} leaks no roster name`, !res.body.includes('Leakcanary'));
     }
     {
       // None of those refused writes may have touched anything.
       const stats = json(await request({ host: '127.0.0.1', pathname: '/stats/tonight' })) || {};
-      check('an unauthenticated undo/visitor/leader attempt mutated nothing', stats.checkedIn === 1, JSON.stringify(stats));
+      check('the refused writes mutated nothing', stats.checkedIn === 1, JSON.stringify(stats));
       const hist = json(await request({ host: '127.0.0.1', pathname: '/history' })) || [];
       check('no history row was added by the refused writes',
         Array.isArray(hist) && !hist.some((r) => /Stranger/.test(r.firstName || '')), JSON.stringify(hist.map((r) => r.firstName)));
       const rec = json(await request({ host: '127.0.0.1', pathname: '/reconcile' })) || {};
-      check('a refused source-count post planted no second opinion',
-        rec.known === false || rec.theirs !== 999, JSON.stringify(rec));
-      const kept = json(await request({ host: '127.0.0.1', pathname: '/leaders' })) || {};
-      check('the refused forget did not remove a remembered leader',
-        Array.isArray(kept.leaders) && kept.leaders.some((l) => /Lan/.test(l.firstName || '')),
-        JSON.stringify(kept.leaders));
+      check('a refused source-count post planted no second opinion', rec.known === false || rec.theirs !== 999, JSON.stringify(rec));
+      const cfg = JSON.parse(fs.readFileSync(path.join(dataDir, 'config.json'), 'utf8'));
+      check('a refused config write changed nothing', cfg.printerName === '' && cfg.pusherSecret === 'SECRET-MUST-NOT-LEAK', JSON.stringify(Object.keys(cfg)));
     }
-
-    // ── The brand mount opens the kit and nothing else ────────────────────────
-    // Only stylesheets, fonts and SVGs with a plain path are served ahead of
-    // the gate. A climb out of the kit, an encoded one, another file type in
-    // the kit, and the dashboard's own chip script all still need the PIN.
-    // After the sweep on purpose: each refusal counts toward the limiter.
-    for (const p of [
-      '/brand/../index.html',
-      '/brand/%2e%2e/index.html',
-      '/brand/..%2findex.html',
-      '/brand/README.md',
-      '/brand/tokens.json',
-      '/brand/',
-      '/step-chip.js',
-    ]) {
-      const res = await request({ host: lan, pathname: p });
-      check(`LAN GET ${p} is still refused without a PIN`,
-        res.status === 403 || res.status === 429, `status ${res.status}`);
-      check(`LAN GET ${p} does not serve the dashboard`, !res.body.includes('id="print-count"'));
-    }
-
-    // ── Brute force ───────────────────────────────────────────────────────────
-    // Runs last: it leaves the address locked out.
-    {
-      let sawLockout = false;
-      let lastStatus = 0;
-      for (let i = 0; i < 12; i++) {
-        const res = await request({
-          host: lan, pathname: '/stats/tonight', headers: { 'X-Awana-Pin': 'wrong-' + i },
-        });
-        lastStatus = res.status;
-        if (res.status === 429) { sawLockout = true; break; }
-      }
-      check('repeated wrong PINs trigger a lockout', sawLockout, `last status ${lastStatus}`);
-      // The lockout must apply to a correct PIN too, or it is trivially bypassed
-      // by interleaving one guess with one known-good request.
-      const after = await request({
-        host: lan, pathname: '/stats/tonight', headers: { 'X-Awana-Pin': PIN },
-      });
-      check('lockout also blocks the correct PIN while active', after.status === 429,
-        `status ${after.status}`);
-    }
+    await new Promise((resolve) => lanListener.close(resolve));
   }
 
   // ── The managed extension folder is loopback-only ───────────────────────────
@@ -554,115 +360,100 @@ async function main() {
     check('POST /config still accepts a normal https check-in URL', res.status === 200, `status ${res.status}`);
   }
 
-  // ── PIN policy on write ─────────────────────────────────────────────────────
+  // ── The PIN, LAN access and the CORS list are retired keys ──────────────────
+  // POST /config accepts the call (an old page may still send one) and changes
+  // nothing: nothing reads them, so a poisoned config cannot widen the server.
   {
-    const res = await request({
-      host: '127.0.0.1', method: 'POST', pathname: '/config', body: { phonePin: '12' },
-    });
-    check('POST /config rejects a too-short PIN', res.status === 400, `status ${res.status}`);
-  }
-  {
+    const before = JSON.parse(fs.readFileSync(path.join(dataDir, 'config.json'), 'utf8'));
     const res = await request({
       host: '127.0.0.1', method: 'POST', pathname: '/config',
-      body: { allowedOrigins: ['*', 'https://ok.example', 'not a url'] },
+      body: { phonePin: 'brand-new-pin', lanAccess: false, allowedOrigins: ['https://ok.example'] },
     });
-    check('POST /config accepts allowedOrigins', res.status === 200, `status ${res.status}`);
+    check('POST /config still answers an old page that sends them', res.status === 200, `status ${res.status}`);
     const saved = JSON.parse(fs.readFileSync(path.join(dataDir, 'config.json'), 'utf8'));
-    check('allowedOrigins drops a wildcard entry',
-      Array.isArray(saved.allowedOrigins) && !saved.allowedOrigins.includes('*'),
-      JSON.stringify(saved.allowedOrigins));
-    check('allowedOrigins keeps the valid entry',
-      saved.allowedOrigins.includes('https://ok.example'),
-      JSON.stringify(saved.allowedOrigins));
+    check('...but the PIN is not changed', saved.phonePin === before.phonePin, JSON.stringify(saved.phonePin));
+    check('...and LAN access is not changed', saved.lanAccess === before.lanAccess, JSON.stringify(saved.lanAccess));
+    check('...and no allowed origin is added', saved.allowedOrigins === undefined, JSON.stringify(saved.allowedOrigins));
+    // Even a config.json that still lists an origin does not widen CORS.
+    server.applySavedConfig({ ...saved, allowedOrigins: ['https://ok.example'] });
+    const cors = await request({ host: '127.0.0.1', pathname: '/stats/tonight', headers: { Origin: 'https://ok.example' } });
+    check('an allowedOrigins entry left in an old config.json grants nothing', !cors.headers['access-control-allow-origin'],
+      `got ${cors.headers['access-control-allow-origin']}`);
+    server.applySavedConfig(saved);
+  }
+  {
+    const res = await request({ host: '127.0.0.1', pathname: '/stats/tonight', headers: { Origin: 'http://192.168.1.20:' + PORT } });
+    check('a LAN machine\'s page on our port is not "our own page"', !res.headers['access-control-allow-origin'],
+      `got ${res.headers['access-control-allow-origin']}`);
+    const own = await request({ host: '127.0.0.1', pathname: '/stats/tonight', headers: { Origin: 'http://localhost:' + PORT } });
+    check('a loopback page on our port is', own.headers['access-control-allow-origin'] === 'http://localhost:' + PORT);
   }
 
   listener.close();
   // The server sets interval timers for club-night publishing; unref the loop.
   await new Promise((r) => setTimeout(r, 50));
 
-  // ── The default bind is loopback-only ───────────────────────────────────────
+  // ── The bind is loopback-only, whatever is asked ────────────────────────────
   // The most important property in this file, and it cannot be tested in-process
   // because the bind happens once at listen() time. A child process with a
-  // default config (no lanAccess, no AWANA_BIND_HOST) must be UNREACHABLE on the
-  // LAN address — not merely PIN-protected there.
+  // default config, and one that ASKS for the LAN (AWANA_BIND_HOST=0.0.0.0, an
+  // old lanAccess:true with a PIN), must be UNREACHABLE on the LAN address.
   if (lan) {
-    const defaultDir = fs.mkdtempSync(path.join(os.tmpdir(), 'awana-sec-default-'));
-    fs.writeFileSync(path.join(defaultDir, 'config.json'), JSON.stringify({
-      printerName: '', checkinUrl: 'https://example.twotimtwo.com/clubber/checkin',
-    }, null, 2));
-    const childPort = PORT + 1;
-    const child = require('child_process').spawn(
-      process.execPath,
-      [path.join(__dirname, '..', 'print-server', 'server.js')],
-      {
-        env: {
-          ...process.env,
-          AWANA_DATA_DIR: defaultDir,
-          AWANA_PORT: String(childPort),
-          AWANA_BIND_HOST: '',           // exercise the real default
-        },
-        stdio: 'ignore',
-      }
-    );
-    // Give it a moment to bind.
-    await new Promise((r) => setTimeout(r, 1500));
+    for (const [label, envHost, cfgExtra] of [
+      ['default install', '', {}],
+      ['AWANA_BIND_HOST=0.0.0.0', '0.0.0.0', {}],
+      ['an old config with lanAccess and a PIN', '', { lanAccess: true, phonePin: PIN }],
+    ]) {
+      const defaultDir = fs.mkdtempSync(path.join(os.tmpdir(), 'awana-sec-default-'));
+      fs.writeFileSync(path.join(defaultDir, 'config.json'), JSON.stringify({
+        printerName: '', checkinUrl: 'https://example.twotimtwo.com/clubber/checkin', ...cfgExtra,
+      }, null, 2));
+      const childPort = PORT + 1;
+      const child = require('child_process').spawn(
+        process.execPath,
+        [path.join(__dirname, '..', 'print-server', 'server.js')],
+        {
+          env: { ...process.env, AWANA_DATA_DIR: defaultDir, AWANA_PORT: String(childPort), AWANA_BIND_HOST: envHost },
+          stdio: 'ignore',
+        }
+      );
+      // Give it a moment to bind.
+      await new Promise((r) => setTimeout(r, 1500));
 
-    const reach = (host) => new Promise((resolve) => {
-      const req = http.request({ host, port: childPort, path: '/stats/tonight', timeout: 3000 },
-        (res) => { res.resume(); resolve({ ok: true, status: res.statusCode }); });
-      req.on('error', (e) => resolve({ ok: false, code: e.code }));
-      req.on('timeout', () => { req.destroy(); resolve({ ok: false, code: 'timeout' }); });
-      req.end();
-    });
+      const reach = (host) => new Promise((resolve) => {
+        const req = http.request({ host, port: childPort, path: '/health', timeout: 3000 },
+          (res) => { res.resume(); resolve({ ok: true, status: res.statusCode }); });
+        req.on('error', (e) => resolve({ ok: false, code: e.code }));
+        req.on('timeout', () => { req.destroy(); resolve({ ok: false, code: 'timeout' }); });
+        req.end();
+      });
 
-    const viaLoopback = await reach('127.0.0.1');
-    check('default install still serves the dashboard over loopback',
-      viaLoopback.ok && viaLoopback.status === 200, JSON.stringify(viaLoopback));
+      const viaLoopback = await reach('127.0.0.1');
+      check(`${label}: still answers over loopback`, viaLoopback.ok && viaLoopback.status === 200, JSON.stringify(viaLoopback));
+      const viaLan = await reach(lan);
+      check(`${label}: is NOT reachable on the LAN address at all`, !viaLan.ok, `reachable with status ${viaLan.status}`);
 
-    const viaLan = await reach(lan);
-    check('default install is NOT reachable on the LAN address at all',
-      !viaLan.ok, `reachable with status ${viaLan.status}`);
-
-    child.kill('SIGKILL');
-    try { fs.rmSync(defaultDir, { recursive: true, force: true }); } catch { /* best effort */ }
+      child.kill('SIGKILL');
+      try { fs.rmSync(defaultDir, { recursive: true, force: true }); } catch { /* best effort */ }
+    }
   }
 
   try { fs.rmSync(dataDir, { recursive: true, force: true }); } catch { /* best effort */ }
   try { fs.rmSync(binDir, { recursive: true, force: true }); } catch { /* best effort */ }
 
-  // ── Static check: the dashboard escapes untrusted values ────────────────────
+  // ── Static check: no dashboard is served, and the page that replaced it escapes ─
   // The stored-XSS chain ran through print-history.json into the dashboard's
-  // innerHTML, and the dashboard is served from the one origin allowed to read
-  // the Pusher secret and the PIN. These are the fields an attacker controls (or
-  // that carry a child's name); each must be wrapped in esc() at every
-  // interpolation site.
+  // innerHTML. The dashboard is gone; its replacement is React text (never inner
+  // HTML) on awana.kvbchurch.org, and the print server serves one tiny static
+  // page that carries no child's name.
   {
-    const dash = fs.readFileSync(
-      path.join(__dirname, '..', 'print-server', 'public', 'index.html'), 'utf8');
-    check('dashboard defines esc()', /function esc\(/.test(dash));
-
-    const MUST_ESCAPE = [
-      'e.firstName', 'e.lastName', 'e.clubName', 'e.printer',
-      'k.name', 'f.name', 'f.club', 'f.error',
-      'r.test', 'r.detail', 's.stage', 's.detail',
-      'row.club', 'row.startTime', 'row.location', 'row.room',
-    ];
-    const lines = dash.split('\n');
-    for (const field of MUST_ESCAPE) {
-      const escaped = field.replace('.', '\\.');
-      // A concatenation of this field into a string: "+ field" or "+ (field".
-      const concatenated = new RegExp('\\+\\s*\\(?\\s*' + escaped + '\\b');
-      // The same, but safely wrapped: "esc(field" or "esc((field".
-      const wrapped = new RegExp('esc\\(\\s*\\(?\\s*' + escaped + '\\b');
-      const offending = [];
-      lines.forEach((line, i) => {
-        if (!concatenated.test(line)) return;
-        if (line.includes('textContent')) return;      // not an HTML sink
-        if (wrapped.test(line)) return;                // already escaped
-        offending.push(i + 1);
-      });
-      check(`dashboard escapes ${field}`, offending.length === 0,
-        offending.length ? `unescaped at line(s) ${offending.join(', ')}` : '');
+    check('the dashboard page is gone from the print server', !fs.existsSync(path.join(__dirname, '..', 'print-server', 'public', 'index.html')));
+    const settingsDir = path.join(__dirname, '..', '..', 'lobby', 'src', 'components', 'settings');
+    const sources = fs.readdirSync(settingsDir).filter((f) => /^laptop.*\.jsx$/.test(f) && !/test/.test(f));
+    check('the settings page\'s laptop cards were found', sources.length >= 2, sources.join());
+    for (const f of sources) {
+      const src = fs.readFileSync(path.join(settingsDir, f), 'utf8');
+      check(`${f} renders children\'s names as React text, never inner HTML`, !/dangerouslySetInnerHTML|\.innerHTML\s*=/.test(src));
     }
   }
 

@@ -259,27 +259,29 @@ async function main() {
   }
 
   // ── 7. The three surfaces ─────────────────────────────────────────────────
-  // Source-level, like the club-list checks in test-leaders.cjs: the dashboard
+  // Source-level, like the club-list checks in test-leaders.cjs: the settings-page
   // card, the phone section and the widget checkbox are plain DOM with no way
   // to be exercised headlessly, but "it never marks a name printed and never
   // registers anyone" is exactly the kind of claim that quietly stops being
   // true, so it is pinned against the shipped source.
-  console.log('\ncustom label: the dashboard, the phone and the widget');
+  console.log('\ncustom label: the settings page, the phone and the widget');
   {
     const read = (...p) => fs.readFileSync(path.join(__dirname, '..', ...p), 'utf8');
-    const dash = read('print-server', 'public', 'index.html');
+    // The dashboard is retired: its Custom Label card is the settings page's (CustomLabel in laptop-tools.jsx).
+    const tools = read('..', 'lobby', 'src', 'components', 'settings', 'laptop-tools.jsx');
+    const custom = tools.slice(tools.indexOf('function CustomLabel('), tools.indexOf('/** Leader tags, one-off name tags'));
     const phone = read('print-server', 'public', 'phone.html');
     const ext = read('chrome-extension', 'content.js');
 
-    check('the dashboard has a Custom Label card after the leader card',
-      dash.indexOf('id="custom-card"') > dash.indexOf('id="leader-card"'));
-    check('its input is capped at 60 characters, like the server',
-      /id="custom-text" maxlength="60"/.test(dash));
+    check('the settings page has a Custom label card after the leader and one-off tags',
+      tools.indexOf('<CustomLabel api={api} />') > tools.indexOf('<LeaderTags api={api} clubs={clubs} />')
+      && tools.indexOf('<CustomLabel api={api} />') > tools.indexOf('<OneOffTag api={api} clubs={clubs} />'));
+    check('its input is capped at 60 characters, like the server', /maxLength=\{60\}/.test(custom));
     check('it says out loud that nothing is counted or recorded',
-      /not counted, not recorded/i.test(dash));
-    check('Enter submits it', /getElementById\('custom-text'\)\.addEventListener\('keydown'/.test(dash));
-    check('and it never reloads history afterwards (there is no row to reload)',
-      !/printCustomLabel[\s\S]{0,900}loadHistory\(\)/.test(dash));
+      /nothing is counted, no history row is written/i.test(custom));
+    check('Enter submits it', /e\.key === 'Enter' && print\(\)/.test(custom));
+    check('it posts to /print-custom and never reloads the history afterwards (there is no row to reload)',
+      /'\/print-custom'/.test(custom) && !/\/history|load\(\)/.test(custom));
 
     check('the phone page has a Custom label panel after the leader panel',
       phone.indexOf('id="custom-panel"') > phone.indexOf('id="leader-panel"')

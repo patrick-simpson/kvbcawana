@@ -23,7 +23,7 @@ describe('publishDeck', () => {
     const result = await publishDeck([{ text: 'x' }], '', { fetchFn: () => { throw new Error('must not fetch'); } });
     expect(result.ok).toBe(false);
     expect(result.reason).toBe('no-token');
-    expect(result.message).toMatch(/Lobby Slides/);
+    expect(result.message).toMatch(/Connect this screen/);
   });
 
   it('POSTs the sanitized text-only deck with the bearer token', async () => {
@@ -55,12 +55,12 @@ describe('publishDeck', () => {
     });
     expect(result.ok).toBe(false);
     expect(result.reason).toBe('unreachable');
-    expect(result.message).toMatch(/Export/);
+    expect(result.message).toMatch(/awana\.kvbchurch\.org\/settings/);
   });
 
   it('maps 403 to "auth" and relays the server\'s own words', async () => {
     const result = await publishDeck([{ text: 'x' }], TOKEN, {
-      fetchFn: () => Promise.resolve(errResponse(403, { error: 'Wrong publish token. Compare it with the print server dashboard → Lobby slides.' })),
+      fetchFn: () => Promise.resolve(errResponse(403, { error: 'Wrong publish token. Sign in to the settings page with the church passphrase instead.' })),
     });
     expect(result.ok).toBe(false);
     expect(result.reason).toBe('auth');

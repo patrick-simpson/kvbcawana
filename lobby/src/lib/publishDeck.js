@@ -5,8 +5,8 @@
 // This only works from a browser on the check-in machine itself —
 // http://localhost is exempt from mixed-content blocking, and the print
 // server's CORS carve-out plus the bearer token do the authenticating. From
-// anywhere else the fetch fails fast and the editor shows the paste-into-
-// dashboard fallback instead, which is the primary documented path.
+// anywhere else the fetch fails fast and the editor says to publish from
+// awana.kvbchurch.org/settings instead (the print dashboard is retired).
 
 import { isVideoSlide, sanitizeSlides } from './slides.js';
 
@@ -23,7 +23,7 @@ export const PRINT_SERVER_SLIDES_URL = 'http://localhost:3456/api/lobby-slides';
  * device — the caller confirms that with the operator before calling).
  *
  * @param {Array<object>} slides The deck as edited (may include video slides).
- * @param {string} token The publish token from the printer dashboard.
+ * @param {string} token The publish token held on this machine.
  * @param {{url?: string, fetchFn?: typeof fetch}} [opts] Test seams.
  * @returns {Promise<PublishOk | PublishErr>} Never throws.
  */
@@ -35,7 +35,7 @@ export async function publishDeck(slides, token, opts) {
     return {
       ok: false,
       reason: 'no-token',
-      message: 'No publish token on this machine. Get one from the print server dashboard → Lobby Slides → Generate, and paste it below.',
+      message: 'No publish token on this machine. Log in under Settings → Setup → Connect this screen (the church passphrase), or publish from awana.kvbchurch.org/settings.',
     };
   }
   const textSlides = sanitizeSlides(slides).filter((s) => !isVideoSlide(s));
@@ -54,7 +54,7 @@ export async function publishDeck(slides, token, opts) {
     return {
       ok: false,
       reason: 'unreachable',
-      message: 'Could not reach the print server. One-click publish only works in a browser on the check-in computer while the printer app is running — from anywhere else, use Export and paste the file into the printer dashboard → Lobby Slides.',
+      message: 'Could not reach the print server. One-click publish only works in a browser on the check-in computer while the KVBC Awana app is running — from anywhere else, publish the deck from awana.kvbchurch.org/settings.',
     };
   }
 

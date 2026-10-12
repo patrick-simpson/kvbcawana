@@ -29,7 +29,7 @@
   const STORE_KEY      = 'awana_storeMode';  // 'auto' | 'on' | 'off'
 
   let selectedMode        = localStorage.getItem(STORAGE_KEY) || 'auto';
-  // The printer is chosen in ONE place, the settings page (the print dashboard until 8.3.0): every
+  // The printer is chosen in ONE place, the settings page: every
   // print goes to the printer the server is set to, so this is always empty
   // and a choice this browser saved before is forgotten (just below).
   const selectedPrinterName = '';
@@ -4528,7 +4528,7 @@
   // the login form or the bare "Login Required". Each reason a phone can be
   // told is one sentence here (the server keeps 200 characters of it).
   var UNDO_SAY = {
-    off: 'Phone check-ins and undos are switched off on the check-in laptop (printer dashboard, Settings, "Allow driven check-ins").',
+    off: 'Phone check-ins and undos are switched off on the check-in laptop (awana.kvbchurch.org/settings, Laptop, "Allow driven check-ins from phones").',
     'no-id': 'The check-in laptop has no TwoTimTwo id for this child. Use Remove, and undo at the desk.',
     'no-form': 'The printing TwoTimTwo tab on the laptop is not the check-in page. Open the check-in page there and try again.',
     'signed-out': 'The check-in laptop is signed out of TwoTimTwo. Sign in there and try again.',
@@ -4622,7 +4622,7 @@
   // record. On OK the id joins tonight's checked-out list, posted to the print
   // server with the youth sweep's (so a restarted print server catches up).
   var CHECKOUT_SAY = {
-    off: 'Phone check-ins and check-outs are switched off on the check-in laptop (printer dashboard, Settings, "Allow driven check-ins").',
+    off: 'Phone check-ins and check-outs are switched off on the check-in laptop (awana.kvbchurch.org/settings, Laptop, "Allow driven check-ins from phones").',
     'no-id': 'The check-in laptop has no TwoTimTwo id for this child, so it cannot check them out there.',
     'signed-out': 'The check-in laptop could not open TwoTimTwo\'s Checkout page (signed out?). Sign in there and try again.',
     'no-meeting': 'TwoTimTwo\'s Checkout page shows no meeting tonight. Check at the desk.',
@@ -4942,7 +4942,7 @@
         selectorBannerShown = true;
         var banner = document.createElement('div');
         banner.id = 'awana-selector-banner';
-        banner.textContent = '⚠ CLUB PRINTER: the check-in page layout has changed — automatic label printing may be broken. Use the widget search or walk-in printing, and check the dashboard.';
+        banner.textContent = '⚠ CLUB PRINTER: the check-in page layout has changed — automatic label printing may be broken. Use the widget search or walk-in printing, and check awana.kvbchurch.org/settings.';
         Object.assign(banner.style, {
           position: 'fixed', top: '0', left: '0', right: '0', zIndex: '2147483647',
           background: '#dc2626', color: '#fff', fontWeight: '700',

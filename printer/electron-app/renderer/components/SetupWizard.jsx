@@ -119,8 +119,8 @@ export default function SetupWizard({ onSaved }) {
         </div>
 
         <p className="footer-note">
-          If Windows asks about network access after saving, click <b>Allow</b> —
-          that's what lets phones on your Wi-Fi use phone check-in.
+          Everything else (name tags, the schedule, diagnostics) is on
+          awana.kvbchurch.org/settings. Phones check in at awana.kvbchurch.org/checkin.
         </p>
       </main>
     </div>

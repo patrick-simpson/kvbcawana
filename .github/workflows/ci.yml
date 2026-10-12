@@ -52,6 +52,11 @@ jobs:
   #           re-exports (electron-app's device-sync test), and lobby/shared/brand/
   #           (the print server's brand kit is a copy of it, made before the tests
   #           by scripts/family-assets.mjs)
+  #           and the settings page's laptop cards, which replaced the
+  #           print dashboard (lobby/src/lib/printServer.js and
+  #           lobby/src/components/settings/laptop*.jsx: test-leaders,
+  #           test-custom-label, test-pickup-board, test-attendance-audit,
+  #           test-server-security, test-server-helpers)
   changes:
     name: What changed
     runs-on: ubuntu-latest
@@ -106,7 +111,7 @@ jobs:
                 *) lobby=true ;;
               esac
               case "$f" in
-                lobby/worker/src/relay.js|lobby/src/lib/syncSpecs.js|lobby/shared/sync-protocol.js|lobby/shared/brand/*|site/build.mjs) printer=true ;;
+                lobby/worker/src/relay.js|lobby/src/lib/syncSpecs.js|lobby/shared/sync-protocol.js|lobby/shared/brand/*|lobby/src/lib/printServer.js|lobby/src/components/settings/laptop*.jsx|site/build.mjs) printer=true ;;
                 lobby/*|journey/*|site/updates/*|.github/workflows/*) ;;
                 *) printer=true ;;
               esac

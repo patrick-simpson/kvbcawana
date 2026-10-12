@@ -11,13 +11,11 @@ paid certificate. Click **More info**, then **Run anyway** (the install steps ar
 
 After that the app updates itself, including mid-club-night (how it does so is in [SETUP.md §1](docs/SETUP.md#1-first-start-and-updates)). If you'd rather it not surprise you, watch the tray icon — it shows "Updating to vX… restarting" for the few seconds before it happens.
 
-### Phones can't reach the phone page
+### Phones can't open the check-in page
 
-Phone check-in is off unless you turn it on, and the server listens only on the laptop until you do. The settings are in [SETUP.md §4](docs/SETUP.md#4-phone-check-in-optional-off-by-default). Check them first:
+Phones use **awana.kvbchurch.org/checkin** on any network. There is no address to find on the laptop, no PIN and no Wi-Fi setting any more: the print server listens only on the laptop itself (owner, 2026-10-11: online only), so an old bookmark to `http://<laptop-ip>:3456/phone` will not load. Send the phone to awana.kvbchurch.org/checkin instead. If that page itself will not load, the phone has no internet; check it is on the church Wi-Fi or mobile data.
 
-1. **Settings → Check-in Features:** a **Phone check-in PIN** is set (at least 4 characters), and **"Let phones on this Wi-Fi reach this PC"** is checked. Then **restart the app** — the listening socket is bound at startup. A missing PIN makes the checkbox do nothing: the server refuses to expose the roster without one, says so at startup, and shows a warning on the dashboard.
-2. **Firewall:** the first time the server starts, Windows shows an **Allow access** prompt — click **Allow** (make sure "Private networks" is checked). Missed it? Open the app's **Settings** (tray icon → Settings) and click **Enable Phone Check-in (firewall)**, then approve the administrator prompt.
-3. **Wi-Fi:** both devices must be on the same network. Use the laptop's IPv4 from `ipconfig` (Wireless LAN), e.g. `http://192.168.1.20:3456/phone`.
+**With no internet at the church** there are no phones and no settings changes, but the check-in desk still prints: check-in and the extension talk to the laptop only.
 
 ### "Port 3456 is in use" dialog at startup
 
@@ -38,30 +36,23 @@ install folder. (That folder is still named after the app's pre-v5.9.0 name,
 
 ## Phone check-in problems
 
-**Phone can't open the page** — see [Phones can't reach the phone page](#phones-cant-reach-the-phone-page) above.
+**Phone can't open the page** — see [Phones can't open the check-in page](#phones-cant-open-the-check-in-page) above.
 
 **Phone says "No answer"** — the check-in page must be open on the
-main laptop with the extension loaded; that's what performs the real
-check-in. Also check Settings → "Allow driven check-ins" is on.
+main laptop with the extension loaded for the undo and check-out the laptop
+drives. Also check awana.kvbchurch.org/settings → Laptop → "Allow driven
+check-ins from phones" is on (open it in Chrome on the laptop).
 
 **Phone shows a kid as not checked in when they are (or vice versa)** —
 since 5.7.0 the phone re-fetches the roster every ~12 seconds, so
 check-ins made on other devices (and undos made on TwoTimTwo) appear on
-their own. If a phone seems frozen anyway, its Wi-Fi likely dropped —
+their own. If a phone seems frozen anyway, its connection likely dropped —
 the page backs off polling while unreachable and catches up as soon as
 the server answers again.
 
-**Wrong PIN** — the PIN is set on the dashboard (Settings → Check-in
-Features), and must be at least 4 characters. A blank PIN no longer means
-"no PIN required": it means phones cannot connect at all, because the server
-will not expose the roster without one.
-
-**"Too many wrong PINs"** — after 8 *different* wrong attempts that phone is
-locked out for a minute; the page shows a live countdown and lets you back in
-when it hits zero. Retyping the same wrong PIN (or mashing the button while it
-sends) no longer digs the hole deeper — only distinct guesses count. (The
-lockout itself is deliberate: without it a 4-digit PIN could be guessed in
-seconds.)
+**Asked to sign in** — the phone page signs in with the church passphrase (the
+same word every screen types), not a PIN. "That is not the passphrase" means a
+typo or an old one; too many wrong tries locks that phone out for a few minutes.
 
 ---
 
@@ -72,7 +63,7 @@ seconds.)
 The extension's selector self-test failed — TwoTimTwo shipped new
 page markup and automatic detection may be blind. Check kids in
 normally; print labels via widget search or Walk-in Guest. Then check
-the dashboard's Night Status card for which selector broke, and file
+awana.kvbchurch.org/settings → Laptop → *Run diagnostics* for which selector broke, and file
 an issue / update the extension.
 
 ### Labels print but look wrong
@@ -145,7 +136,7 @@ an issue / update the extension.
 
 ### How to check server logs
 
-The print server's own status window (tray icon → the print server's status) and the dashboard's Diagnostics tab show what it is doing. Look for:
+The app's status window (tray icon → *Print server status...*) and awana.kvbchurch.org/settings → Laptop → *Run diagnostics* show what it is doing. Look for:
 - `Printer: DYMO LabelWriter 450` → Printer is configured
 - `POST /print` → Someone just tried to print
 - `Error: ...` → Something went wrong
@@ -177,7 +168,7 @@ If none of these solutions work:
 
 1. **Collect information:**
    - Screenshot of the error message
-   - The dashboard's Diagnostics tab
+   - The settings page's Laptop → *Run diagnostics* list
    - Browser console errors (F12 → Console tab)
    - Windows printer name (Settings → Printers & scanners)
 

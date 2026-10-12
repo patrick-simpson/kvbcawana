@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-// The one copy of the kit's stepped-chip geometry, shared with the dashboard
-// (it sets window.StepChip; see the file's header).
+// The one copy of the kit's stepped-chip geometry (print-server/public/step-chip.js;
+// it sets window.StepChip, see the file's header).
 import '../../../print-server/public/step-chip.js';
 
 // The catalog's stepped chip, "PRINTER / ONLINE": a small label tier over a

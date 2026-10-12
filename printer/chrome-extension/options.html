@@ -16,11 +16,11 @@
   </style>
 </head>
 <body>
-  <!-- Every setting lives on the one settings page (8.3.0): the printer, the
-       backup printer, labels, the schedule, diagnostics. options.js sends the
-       tab there when this computer is online; this card is what shows when it
-       is not, or for a moment before it goes. The print dashboard on this
-       computer stays as the fallback for a night with no internet. -->
+  <!-- Every setting lives on the one settings page: the printer, the backup
+       printer, labels, the schedule, diagnostics, the name-tag tools. options.js
+       sends the tab there when this computer is online; this card is what shows
+       when it is not, or for a moment before it goes. With no internet the desk
+       still prints; the settings wait until it is back. -->
   <div class="card">
     <h2>KVBC Check-in</h2>
     <p>
@@ -31,8 +31,7 @@
     </p>
     <a class="btn" id="open-settings" href="https://awana.kvbchurch.org/settings" target="_blank" rel="noopener">Open settings</a>
     <p class="quiet">
-      No internet tonight? <a href="http://localhost:3456/#settings" target="_blank" rel="noopener">Open the print dashboard</a>
-      on this computer instead.
+      No internet tonight? Check-in still prints at the desk. The settings wait until the internet is back.
     </p>
   </div>
   <script src="options.js"></script>

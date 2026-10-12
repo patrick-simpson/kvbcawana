@@ -15,9 +15,8 @@ future app updates refresh the extension for you. A copy unzipped somewhere else
 never updates and will quietly drift behind the print server.
 
 1. Find the managed folder. Either:
-   - **Tray icon → Open Chrome extension folder**, or
-   - the dashboard at `http://localhost:3456` → **Diagnostics** → *Chrome
-     extension folder* → **Copy folder path**.
+   - **Tray icon → Open Chrome extension folder** (it opens in Explorer: drag
+     the folder onto Chrome's dialog, or copy the path from the title bar).
 
    It is `%APPDATA%\awana-label-printer\chrome-extension` (the folder is
    still named after the app's pre-v5.9.0 name, "Awana Label Printer" —
@@ -34,8 +33,8 @@ The KVBC widget will now automatically appear on the check-in page!
 
 > Running from a source checkout instead of the installer? Load
 > `chrome-extension/` from the repo. There is no managed folder in that case,
-> and the dashboard hides the Diagnostics block rather than pointing you at a
-> path that does not exist.
+> and the tray has no *Open Chrome extension folder* item rather than pointing
+> you at a path that does not exist.
 
 ## Keeping the extension up to date
 

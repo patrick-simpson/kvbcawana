@@ -85,11 +85,14 @@ function settingSuite() {
   check('a club we do not know is refused, by name', !n.ok && /Rangers/.test(n.reason));
   check('not a list is refused', !pickup.normalizePickupClubs('Sparks').ok && !pickup.normalizePickupClubs([7]).ok);
   check('null means back to the default', pickup.normalizePickupClubs(null).ok && pickup.normalizePickupClubs(null).value === null);
-  const dash = fs.readFileSync(path.join(root, 'print-server', 'public', 'index.html'), 'utf8');
-  check('the dashboard offers the same clubs and the same default',
-    dash.includes(`var PICKUP_CLUBS = ${JSON.stringify(pickup.PICKUP_CLUBS).replace(/"/g, "'").replace(/,/g, ', ')};`)
-    && dash.includes(`var PICKUP_DEFAULT = ${JSON.stringify(pickup.PICKUP_DEFAULT).replace(/"/g, "'").replace(/,/g, ', ')};`));
-  check('and saves it with the other settings', /pickupClubs: readPickupClubs\(\),/.test(dash) && /renderPickupClubs\(config\.pickupClubs\);/.test(dash));
+  // The settings page (lobby/src/lib/printServer.js, laptop.jsx) is where the clubs are ticked now.
+  const page = fs.readFileSync(path.join(root, '..', 'lobby', 'src', 'lib', 'printServer.js'), 'utf8');
+  const laptop = fs.readFileSync(path.join(root, '..', 'lobby', 'src', 'components', 'settings', 'laptop.jsx'), 'utf8');
+  const asJs = (list) => JSON.stringify(list).replace(/"/g, "'").replace(/,/g, ', ');
+  check('the settings page offers the same clubs and the same default',
+    page.includes(`export const PICKUP_CLUBS = ${asJs(pickup.PICKUP_CLUBS)};`)
+    && page.includes(`export const PICKUP_DEFAULT = ${asJs(pickup.PICKUP_DEFAULT)};`));
+  check('and saves it as a pickupClubs list through POST /config', /save\(\{ pickupClubs: next \}\)/.test(laptop));
 
   console.log('\npickup list: composition');
   const kids = [

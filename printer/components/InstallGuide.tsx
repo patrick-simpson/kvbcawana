@@ -83,8 +83,10 @@ export const InstallGuide: React.FC = () => {
               <strong>Start print server</strong> button in the tray menu and in the print server window.
             </p>
             <p className="lbl-small">
-              If Windows asks about network access after setup, click <strong>Allow</strong>. That’s what lets
-              phones on your Wi-Fi use phone check-in, once you turn it on and set a PIN.
+              Settings live at <strong>awana.kvbchurch.org/settings</strong> (the tray’s <strong>Settings</strong>
+              opens it): open it in Chrome on this computer and it finds the printer by itself. The print server
+              answers only this computer, so Windows has nothing to ask about the network, and phones check in at
+              awana.kvbchurch.org/checkin.
             </p>
           </Step>
 
@@ -101,8 +103,8 @@ export const InstallGuide: React.FC = () => {
                 <li>Click <strong>Load unpacked</strong> and pick <Code>%APPDATA%\awana-label-printer\chrome-extension</Code></li>
               </ol>
               <p className="lbl-small">
-                Can’t find it? The tray menu has <strong>Open Chrome extension folder</strong>, and the
-                dashboard’s <strong>Diagnostics</strong> tab has a <strong>Copy folder path</strong> button.
+                Can’t find it? The tray menu has <strong>Open Chrome extension folder</strong>, which opens it
+                in Explorer so you can drag it onto the dialog.
               </p>
             </div>
             <div className="lbl-note lbl-note--block lbl-note--accent">
@@ -159,7 +161,7 @@ export const InstallGuide: React.FC = () => {
             </div>
             <p className="lbl-small">
               Then open your church’s TwoTimTwo check-in page in Chrome and check a child in. A real label
-              should print. (The dashboard’s test label works too.)
+              should print. (The settings page’s test label works too.)
             </p>
           </Step>
         </ol>

@@ -56,6 +56,9 @@ welcome. This is the plan; its status is at the end of this track.
   Opened anywhere else, those parts say "open this on the check-in laptop".
   The laptop's own dashboard and the extension's options point to /settings;
   the dashboard stays as a plain fallback for a night with no internet.
+  (Superseded 2026-10-12, [Online only](#online-only): the dashboard is gone,
+  every one of its tools is in the Laptop section, and with no internet the
+  desk still prints and nothing else changes.)
 - **Privacy and safety stay as they are**: the display key and sessions never
   in config, the shared settings through their allowlist, a screen's settings
   through VALIDATORS, the print server's PIN gate for anything off the laptop.
@@ -141,6 +144,10 @@ welcome. This is the plan; its status is at the end of this track.
 
 #### Inventory: every setting and tool, and where it lives now
 
+*As of phase 3 (2026-10-11). The "dashboard only" rows are historical: the
+dashboard was retired on 2026-10-12 and each of them was moved or removed, see
+the [Online only](#online-only) inventory.*
+
 The print dashboard (`printer/print-server/public/index.html`, localhost:3456)
 and the Chrome extension (`chrome-extension/`). The extension's options page
 and popup held no settings of their own (6.26.0 moved the printer pick to the
@@ -192,7 +199,7 @@ on the check-in laptop to set the printer" and lists what it would show.
 
 - **The token** (decided 2026-10-11): signed in to /settings with the
   passphrase is enough; the publish token stays as a fallback, folded away.
-- **Phone PIN and the keys stay on the dashboard.** The PIN protects the
+- **(Superseded 2026-10-12, see [Online only](#online-only).) Phone PIN and the keys stay on the dashboard.** The PIN protects the
   roster on the Wi-Fi and the token's blast radius was chosen small (slides
   and settings); letting a page set the PIN or the display key would widen it.
   Say so if you want them on /settings anyway (it would need a separate
@@ -507,9 +514,9 @@ Read this first if you are picking the work up in a new session.
 
 ## Online only
 
-Owner decision, 2026-10-11. **Status: decided, not built.**
+Owner decision, 2026-10-11. **Status: built 2026-10-12 (not released: no version bump, no `changes.md` entry, no dispatch).**
 
-The laptop keeps its own check-in and its own label path. What moves is the laptop's web surface: its print dashboard (`localhost:3456`) and its Wi-Fi phone page (`http://<laptop-ip>:3456/phone`).
+The laptop keeps its own check-in and its own label path. What moved is the laptop's web surface: its print dashboard (`localhost:3456`) and its Wi-Fi phone page (`http://<laptop-ip>:3456/phone`) are gone. Its tools are on awana.kvbchurch.org/settings (Laptop section), its phones use awana.kvbchurch.org/checkin, and the print server answers only the computer it runs on.
 
 ### The owner's decisions (2026-10-11)
 
@@ -519,22 +526,61 @@ The laptop keeps its own check-in and its own label path. What moves is the lapt
 | The laptop's Wi-Fi phone page (`http://<laptop-ip>:3456/phone`) | **Retired.** Phones use awana.kvbchurch.org/checkin. |
 | No internet | Check-in still prints at the desk. No phones and no settings changes until the internet is back. |
 
-### What this changes in the other tracks
+### What this changed in the other tracks
 
-- The Settings track says the dashboard "stays as a plain fallback for a night with no internet". This track supersedes that line: with no internet the desk still prints, and nothing is changed from a phone or a settings page.
-- The Settings track leaves the phone PIN, the display key and the sync sign-in on the dashboard. Retiring the dashboard needs a new home for them; that is not decided (see below).
-- The Wi-Fi phone page cannot be retired while phones still depend on the laptop. Today its Undo check-in, Check out, visitors and custom labels go to the laptop. [Cloud check-in](#cloud-check-in) phase 4 moves check-in, undo, check-out and visitors to the Worker; custom labels are not in any phase yet.
+- The Settings track said the dashboard "stays as a plain fallback for a night with no internet". This track superseded that line: with no internet the desk still prints, and nothing is changed from a phone or a settings page. The extension's options card now says so instead of linking to a dashboard.
+- The Settings track left the phone PIN, the display key and the sync sign-in on the dashboard. The PIN is gone with the Wi-Fi phone page (nothing to protect), the display key is installed by the sync sign-in (the manual generate, copy and clear buttons went with the Pusher design), and the sync sign-in moved to the Laptop section with the model below.
+- The Wi-Fi phone page was turned off without waiting for a Worker phase: phones already reach custom labels, one-off tags, leader tags, undo and check-out through the Worker's relay (`phone-relay.js`, the phone page's own calls) while the laptop is on, and check-in itself is the Worker's ([Cloud check-in](#cloud-check-in) phase 4).
 
 ### Status
 
-- 2026-10-11: decided by the owner. Not built.
+- 2026-10-11: decided by the owner.
+- 2026-10-12: **built.** In order, one commit each.
+  1. The inventory (below).
+  2. The tools moved into `lobby/src/components/settings/laptop-tools.jsx` and `laptop.jsx`, each through a new row in `SETTINGS_PAGE_ROUTES` with its check in `printer/scripts/test-settings-page.cjs` written first: leader tags (`/print-leader`, `/leaders`, `/leaders/forget`), one-off tags (`/print-oneoff`), custom labels (`/print-custom`), a stretch reprint (`/reprint-range`, a dry run and then a confirm), the attendance audit (`/attendance-audit`, apply needs `confirm`), rehearsal mode (`/rehearsal`, with a confirm), print failures, the switches `updateBeacon`, `enableDrivenCheckin` and `musicalPrinter`, and this computer's sync sign-in (`/config/sync-login`).
+  3. The dashboard and the LAN phone page retired: `print-server/public/index.html` deleted; `/phone` and `/phone/ym` removed; the server binds 127.0.0.1 only and a loopback gate refuses any other socket (the PIN gate, rate limiter, `resolveBindHost`, `lanAccess`, `AWANA_BIND_HOST` and the config's `allowedOrigins` are gone; "our own page" in the CORS rule is a loopback host); `GET /` answers a tiny page that links to /settings; the app's firewall button, "Phones" address and LAN IPC are gone and its tray and status window open /settings; the extension's popup and options point only there. `phone.html` and its `site/build.mjs` step (`/checkin`) are untouched.
+  4. Tests, `printer/CLAUDE.md`, the printer docs, `lobby/CLAUDE.md`, the public site's claims and this file.
+- **Secrets.** The display key, the publish token and the display login are never read, minted or set from the page (their routes are not in the table; POST /config refuses their keys from it). The sync sign-in keeps the model the page already used: the page's sync session, confirmed by the print server with the sync service it is already configured for (`config.syncUrl`, which a dropped sign-in keeps, so a computer signed out by a passphrase change can be signed back in from the page's own fresh session). The page then sends only the passphrase, and the print server signs in to `config.syncUrl`, never an address the page names. A computer with no service on record is signed in by the app's setup wizard ("Set up this computer...", the same route with no Origin). Sign-out is removed.
+- **Not moved, on purpose.** The check-in URL stays in the app's setup wizard (it is handed to the Windows shell). The extension folder stays in the tray ("Open Chrome extension folder"; the path holds the Windows user name). Tonight at a glance, the roster count, the welcome-screen privacy card, the count check card, the update banner and "Update now", and the what's-new card were read-only monitoring or duplicated elsewhere (the screens show the count, `/health`'s warnings carry every fault, the app updates itself every 10 minutes, the release notes are a /settings card): they went with the page.
+
+### Inventory (2026-10-12): every dashboard feature, and where it goes
+
+Read off `printer/print-server/public/index.html` (every `fetch` it makes) against `security.js` (`SETTINGS_PAGE_ROUTES`, `SETTINGS_PAGE_CONFIG_KEYS`). The page may use a route only if the table lists it; a route that should take the page next to the dashboard calls `isTrustedOrSettingsPage`, one that holds a secret or opens the network keeps `isTrustedConfigOrigin` alone.
+
+| Dashboard feature | Routes it calls | Today | Decision |
+| --- | --- | --- | --- |
+| Name tag printer, backup printer | GET /printers, GET and POST /config | in /settings | kept there |
+| Label footer, visitor palette, trophy band, connect card, greeting | POST /config | in /settings | kept there |
+| Per-club label layout and preview | GET and POST /config/label-templates, GET /preview | in /settings | kept there |
+| Pickup clubs, schedule, late grace, screen season | POST /config, GET and POST /config/schedule | in /settings | kept there |
+| Print history, single reprint | GET /history/today, POST /reprint | in /settings | kept there |
+| Diagnostics, status and warnings, test label, clear queue, test tune | GET /diagnostics, GET /health, POST /canary, POST /printer/clear-queue, POST /play-tune | in /settings | kept there |
+| Leader tags (print, remembered leaders, forget) | POST /print-leader, GET /leaders, POST /leaders/forget, GET /clubs | dashboard only | **move** (new routes) |
+| One-off name tag | POST /print-oneoff | dashboard only | **move** (new route) |
+| Custom label | POST /print-custom | dashboard only | **move** (new route) |
+| Reprint a stretch | POST /reprint-range | dashboard only | **move** (new route) |
+| Attendance audit | GET /attendance-audit, POST /attendance-audit/apply | dashboard only | **move** (new routes) |
+| Rehearsal mode | POST /rehearsal | dashboard only (`isTrustedConfigOrigin`) | **move**, with a confirm; the page's sync sign-in is the proof |
+| Print failures tonight | GET /failures | route allowed, not drawn | **move** (drawn in the status card) |
+| Musical printer, update beacon, driven check-ins | POST /config `musicalPrinter`, `updateBeacon`, `enableDrivenCheckin` | musical key allowed, no switch; the others dashboard only | **move** (two new keys, three switches) |
+| Sync sign-in (this computer's own) | POST /config/sync-login, /config/sync-logout | dashboard only | **move sign-in** (the page's confirmed session; the address is fixed to the one this computer already uses, never one the page names); sign-out is **removed** (a laptop leaves the service by turning its print role off) |
+| Phone check-in PIN | POST /config `phonePin` | dashboard only | **removed** (no LAN phone page) |
+| Wi-Fi access for phones, LAN bind, PIN gate, firewall button, "Phones" address | POST /config `lanAccess`, `resolveBindHost`, the auth gate, the app's `enable-phone-checkin` | dashboard, app, server | **removed** (the server listens on loopback only) |
+| Allowed origins | POST /config `allowedOrigins` | no control on the dashboard | **removed** from the page's reach (it existed for the LAN phone page) |
+| Display key (generate, copy, clear) | POST /config `displayKey`, /config/display-key/generate | dashboard only | **removed**: the sync sign-in installs the service's key and is the only pipe; the warnings now say "sign this computer in" |
+| Publish token, lobby slides paste-and-publish | POST /config/slides-token/generate, GET and POST /api/lobby-slides | dashboard only | **removed**: the slide editor on /settings publishes through the sync service; a token already on the laptop still works as the page's fallback proof |
+| Check-in URL | POST /config `checkinUrl` | dashboard only | **kept in the app's setup wizard** ("Set up this computer..."), not on /settings: it is handed to the Windows shell |
+| Extension folder path | GET /health `extension.folder` (loopback only) | dashboard only | **kept in the tray** ("Open Chrome extension folder"); the path holds the Windows user name and is never sent to a web page |
+| History retention, fleet config URL | POST /config | no control on the dashboard | unchanged (config only) |
+| Tonight at a glance, roster count, welcome-screen privacy card, count check, update banner and "Update now", what's new | GET /stats/tonight, /roster-status, /reconcile, /whats-new, POST /update-now | dashboard only | **removed** (read-only monitoring: the screens show the count, /health's warnings carry every fault, the app updates itself every 10 minutes, release notes are a /settings card) |
+| Extension popup, options page, "Printing to Change" link | GET /health | open /settings | the offline "dashboard" fallback link goes |
 
 ### Still to do
 
-1. Move the dashboard-only tools (the [Settings track](#settings-page) inventory) to awana.kvbchurch.org/settings, through the same localhost route the Laptop section already uses.
-2. Decide where the phone PIN, the display key and the sync sign-in are set once the dashboard is gone. Not decided. The Settings track kept the PIN on the dashboard for a reason that still holds: a page that could set the PIN or the display key would widen the token's blast radius, which was kept small on purpose, unless it had a separate confirmation credential.
-3. Give custom labels a phase, then turn off the laptop's Wi-Fi phone page (phones on the church network, the PIN and the phone routes) only after every phone tool has moved.
-4. Confirm on the laptop, with the internet off, that check-in still prints at the desk.
+1. **Confirm on the laptop, with the internet off, that check-in still prints at the desk** (not seen here; the suites run the server and the extension's logic against stand-ins).
+2. **Real Chrome.** The Laptop section's calls to `http://localhost:3456` are pinned with headers in tests and stubbed in `e2e/settings-laptop.spec.js`; open /settings on the laptop and allow Chrome's local-network prompt once. Every settings tool now depends on it.
+3. **Release.** Nothing is released: the version, `changes.md` and the dispatch are the owner's. The first release that carries this removes the dashboard and the LAN page from every laptop at once, so tell the volunteers the phone address changed to awana.kvbchurch.org/checkin.
+4. Left alone because another change owns it: the display-login screens in the lobby still tell a person to read the passphrase "on the print-server dashboard" (`SetupChecklist.jsx`, `QuickNav.jsx`, `settings/fields.jsx`); that flow is the retired Pusher design.
 
 ## KVBC Awana one app
 

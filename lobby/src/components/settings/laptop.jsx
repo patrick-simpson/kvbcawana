@@ -3,21 +3,23 @@ import { PUBLISH_TOKEN_CHANGE_EVENT, loadPublishToken } from '../../lib/publishT
 import { loadSyncSession } from '../../lib/syncService.js';
 import { useSync } from '../../hooks/useSync.js';
 import {
-  PICKUP_CLUBS, PRINT_DASHBOARD_URL, callPrintServer, canReprint, cleanScheduleRows, formToTemplate, healthSummary,
+  PICKUP_CLUBS, callPrintServer, canReprint, cleanScheduleRows, formToTemplate, healthSummary,
   historyTags, NAME_SIZE_MAX, NAME_SIZE_MIN, pickupTicked, printerOptions, probePrintServer, TEMPLATE_FIELDS,
   templateClubLabel, templateToForm, validStartTime, withTemplate,
 } from '../../lib/printServer.js';
 import { PanelCard, PublishTokenField, Toggle } from './fields.jsx';
+import { AttendanceAuditCard, NameTagsCard, ReprintStretch, SyncSignInCard, useClubs } from './laptop-tools.jsx';
 import '../../styles/laptop.css';
 
-// The Laptop section (ROADMAP.md#settings-page phase 3): the check-in laptop's own settings,
-// the print dashboard's parts, on the one settings page. It looks for the print
-// server on http://localhost:3456 only when the section is opened (a browser
-// may ask the person before an https page talks to their own computer, so it
-// must not do that on load). Found: the printer's parts, through the same
-// routes the dashboard uses. Not found: one calm card that says where to open
-// this page. What the page may change is the server's call (printer's own keys
-// only; the PIN and the keys stay on the dashboard), see lib/printServer.js.
+// The Laptop section (ROADMAP.md#settings-page phase 3, and #online-only): the check-in
+// laptop's own settings and tools. The print dashboard is retired, so this is
+// where all of them live. It looks for the print server on
+// http://localhost:3456 only when the section is opened (a browser may ask the
+// person before an https page talks to their own computer, so it must not do
+// that on load). Found: the printer's parts and tools. Not found: one calm
+// card that says where to open this page. What the page may do is the
+// server's call (security.js SETTINGS_PAGE_ROUTES; POST /config takes the
+// printer's own keys only, never a key or a token), see lib/printServer.js.
 
 const SEASONS = [
   ['auto', 'Auto (follow the calendar)'], ['off', 'Off: each screen uses its own skin'], ['back-to-school', 'Back to school'],
@@ -28,9 +30,10 @@ const SEASONS = [
 const WOULD_SHOW = [
   ['The printer', 'which printer prints the name tags, and the backup'],
   ['Labels', 'the footer, the visitor and connect-card options, each club’s layout with a preview'],
+  ['Name tags', 'leader tags, one-off tags and custom labels'],
   ['Pickup list and schedule', 'which clubs are on the pickup list, the club schedule, the late grace'],
-  ['Tonight’s prints', 'the list, with a Reprint on each'],
-  ['Checks', 'diagnostics, a test label, clear the print queue'],
+  ['Tonight’s prints', 'the list, with a Reprint on each, or a whole stretch at once'],
+  ['Checks', 'diagnostics, a test label, clear the print queue, rehearsal mode, the attendance audit'],
 ];
 
 /** One line of feedback under a control, announced politely. */
@@ -45,8 +48,9 @@ function NotFound({ onLookAgain, checking }) {
       <div className="laptop-away">
         <p className="laptop-away__lead">Open this page on the check-in laptop to set the printer.</p>
         <p className="hint">
-          The printer’s settings live on the laptop that runs the Club Label Printer app, and this page can only
+          The printer’s settings live on the laptop that runs the KVBC Awana app, and this page can only
           reach them from that computer, in Chrome, with the app running. Everything else here works from any device.
+          With no internet the desk still prints; the settings wait until it is back.
         </p>
         <h4 className="settings-subhead">What shows up there</h4>
         <ul className="laptop-would">
@@ -59,7 +63,7 @@ function NotFound({ onLookAgain, checking }) {
             {checking ? 'Looking…' : 'Look again'}
           </button>
           <span className="hint">
-            On the laptop and still here? Check the Club Label Printer app is running (its tray icon), then look again.
+            On the laptop and still here? Check the KVBC Awana app is running (its tray icon), then look again.
             Chrome may also ask to let this site connect to devices on your computer: allow it.
           </span>
         </div>
@@ -70,28 +74,21 @@ function NotFound({ onLookAgain, checking }) {
 
 /**
  * How the page proves itself to the printer: signing in under Setup (the
- * print server asks the sync service), or, as a fallback, its publish token.
+ * print server asks the sync service), or, as a fallback, a publish token the
+ * laptop already has.
  */
-function ConnectCard({ health, problem, signedIn }) {
-  const serverHasNone = health.lobbySlides?.tokenConfigured === false || problem?.reason === 'no-token-on-server';
+function ConnectCard({ problem, signedIn }) {
   const lead = problem?.reason === 'wrong-token' ? 'The printer did not accept that token.'
-    : problem?.reason === 'sign-in-refused' ? problem.error
+    : problem?.reason === 'sign-in-refused' || problem?.reason === 'no-token-on-server' ? problem.error
       : signedIn ? 'The printer is here.' : 'The printer is here. Sign in under Setup with the church passphrase to change its settings.';
   return (
     <PanelCard title="Connect to the printer" tab="var(--brand-sun)">
       <p className="laptop-away__lead">{lead}</p>
       <details className="advanced-fields">
-        <summary>Or paste the printer&rsquo;s publish token</summary>
-      <p className="hint">
-        {serverHasNone
-          ? 'The printer has no token yet. On the laptop open the print dashboard → Lobby slides → Generate publish token, then paste it here.'
-          : 'On the laptop, the print dashboard → Lobby slides shows the token (Copy). It stays in this browser, never in a settings export or a link.'}
-      </p>
-      <PublishTokenField />
+        <summary>Or paste a publish token this laptop already has</summary>
+        <p className="hint">It stays in this browser, never in a settings export or a link. Most people never need one: the passphrase sign-in is enough.</p>
+        <PublishTokenField />
       </details>
-      <div className="field">
-        <a className="hint" href={PRINT_DASHBOARD_URL} target="_blank" rel="noopener noreferrer">Open the print dashboard on this computer</a>
-      </div>
     </PanelCard>
   );
 }
@@ -129,6 +126,21 @@ function StatusCard({ health, api, onRefresh }) {
     const r = await api('/play-tune', { method: 'POST', body: {} });
     setNote(r.ok ? { text: 'Playing the test tune.' } : { bad: true, text: r.error });
   });
+  const rehearsal = () => run('rehearsal', async () => {
+    const arming = !health.rehearsal;
+    if (arming && !window.confirm('Turn rehearsal mode on?\n\nEvery label prints with a TEST band, nothing is recorded, and every screen shows a TEST watermark, until you turn it off (it turns itself off after 2 hours).')) return;
+    const r = await api('/rehearsal', { method: 'POST', body: { on: arming } });
+    if (!r.ok) return setNote({ bad: true, text: r.error });
+    setNote({ text: arming ? 'Rehearsal mode is on. Turn it off before real check-ins.' : 'Rehearsal mode is off.' });
+    onRefresh();
+  });
+  const [failures, setFailures] = useState([]);
+  useEffect(() => {
+    if (!(health.printFailures > 0)) return undefined;
+    let alive = true;
+    api('/failures').then((r) => { if (alive && r.ok && Array.isArray(r.data)) setFailures(r.data); });
+    return () => { alive = false; };
+  }, [health.printFailures, api]);
 
   return (
     <PanelCard title="This laptop" tab="var(--brand-blue)">
@@ -137,7 +149,7 @@ function StatusCard({ health, api, onRefresh }) {
         <div>
           <strong>{summary.headline}</strong>
           <span className="hint">
-            Club Label Printer {health.version}, printing to {health.printer}.
+            KVBC Awana {health.version}, printing to {health.printer}.
           </span>
         </div>
         <button type="button" className="ghost" onClick={onRefresh}>Refresh</button>
@@ -151,9 +163,21 @@ function StatusCard({ health, api, onRefresh }) {
         <button type="button" className="ghost" onClick={testPrint} disabled={busy !== ''}>Print a test label</button>
         <button type="button" className="ghost" onClick={diagnostics} disabled={busy !== ''}>Run diagnostics</button>
         <button type="button" className="ghost" onClick={clearQueue} disabled={busy !== ''}>Clear print queue</button>
+        <button type="button" className="ghost" onClick={rehearsal} disabled={busy !== ''} aria-pressed={Boolean(health.rehearsal)}>
+          {health.rehearsal ? 'Turn rehearsal mode off' : 'Rehearsal mode'}
+        </button>
         {health.musicalTune?.enabled ? <button type="button" className="ghost" onClick={tune} disabled={busy !== ''}>Play test tune</button> : null}
       </div>
       <Note note={note} />
+      {health.printFailures > 0 && failures.length > 0 && (
+        <ul className="laptop-warnings" aria-label="Print failures tonight">
+          {failures.map((f, i) => (
+            <li key={`${f.at}-${i}`}>
+              <strong>{f.name}</strong> ({f.club || 'no club'}) at {new Date(f.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}: {f.error}
+            </li>
+          ))}
+        </ul>
+      )}
       {rows && (
         <ul className="laptop-diag" aria-label="Diagnostics">
           {rows.map((r) => (
@@ -318,6 +342,12 @@ function LabelsCard({ cfg, save, api }) {
         checked={!!cfg.connectCard} onChange={(e) => apply({ connectCard: e.target.checked })} />
       <Toggle title="Print it automatically on a first-ever check-in" checked={!!cfg.connectCardAutoFirstTimer}
         onChange={(e) => apply({ connectCardAutoFirstTimer: e.target.checked })} />
+      <Toggle title="Allow driven check-ins from phones" hint="Lets the phone page and the touch screen drive TwoTimTwo through the extension."
+        checked={cfg.enableDrivenCheckin !== false} onChange={(e) => apply({ enableDrivenCheckin: e.target.checked })} />
+      <Toggle title="Musical printer" hint="A tune with every label, Happy Birthday for birthday kids (TSPL printers such as the D450). If the label creeps forward instead of returning, turn it off."
+        checked={cfg.musicalPrinter === true} onChange={(e) => apply({ musicalPrinter: e.target.checked })} />
+      <Toggle title="Update health beacon" hint="After an update, announce that the new version came back cleanly (the version number only)."
+        checked={cfg.updateBeacon === true} onChange={(e) => apply({ updateBeacon: e.target.checked })} />
       <div className="field">
         <label htmlFor={`${id}-greeting`}>Connect card greeting</label>
         <input id={`${id}-greeting`} type="text" maxLength={60} value={greeting} placeholder="We’re so glad you’re here!"
@@ -424,6 +454,7 @@ function NightCard({ cfg, save, api }) {
 }
 
 function TonightCard({ api }) {
+  const clubs = useClubs(api);
   const [rows, setRows] = useState(null);
   const [note, setNote] = useState(null);
   const [nonce, setNonce] = useState(0);
@@ -447,6 +478,7 @@ function TonightCard({ api }) {
   return (
     <PanelCard title="Tonight’s prints" tab="var(--brand-sun)">
       <div className="laptop-actions"><button type="button" className="ghost" onClick={load}>Refresh</button></div>
+      <ReprintStretch api={api} clubs={clubs} onDone={load} />
       <Note note={note} />
       {rows && rows.length === 0 && <p className="hint">Nothing has printed today.</p>}
       {rows && rows.length > 0 && (
@@ -463,18 +495,6 @@ function TonightCard({ api }) {
           ))}
         </ul>
       )}
-    </PanelCard>
-  );
-}
-
-function DashboardOnlyCard() {
-  return (
-    <PanelCard title="PIN and keys" tab="var(--brand-blue)">
-      <p className="hint">
-        The phone PIN, the display key and login passphrase and Wi-Fi access for phones are set on the
-        print dashboard on this computer only. They never pass through a web page.
-      </p>
-      <a className="hint" href={PRINT_DASHBOARD_URL} target="_blank" rel="noopener noreferrer">Open the print dashboard</a>
     </PanelCard>
   );
 }
@@ -526,17 +546,19 @@ function Found({ health, onRefresh }) {
   return (
     <>
       <StatusCard health={health} api={api} onRefresh={onRefresh} />
-      {!connected && <ConnectCard health={health} problem={problem} signedIn={signedIn} />}
+      {!connected && <ConnectCard problem={problem} signedIn={signedIn} />}
+      {connected && <SyncSignInCard health={health} api={api} onRefresh={onRefresh} />}
       {connected && cfg && (
         <Fragment key={proof}>
           <PrintersCard cfg={cfg} printers={printers} save={save} />
           <LabelsCard cfg={cfg} save={save} api={api} />
           <NightCard cfg={cfg} save={save} api={api} />
           <TonightCard api={api} />
+          <NameTagsCard api={api} />
+          <AttendanceAuditCard api={api} />
         </Fragment>
       )}
       {connected && !cfg && <PanelCard><p className="hint">Reading the printer’s settings…</p></PanelCard>}
-      <DashboardOnlyCard />
     </>
   );
 }

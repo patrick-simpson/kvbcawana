@@ -1,8 +1,8 @@
 // The laptop's half of the phone check-in relay (7.9.0). The phone page at
 // awana.kvbchurch.org/checkin cannot reach this laptop, so it leaves its
 // requests with the sync service; this loop collects them, runs each one
-// against this print server's own phone API (the same calls a phone on the
-// church Wi-Fi makes, from loopback, so the PIN gate is not in the way), and
+// against this print server's own phone API (the phone page's calls, from
+// loopback: the server answers nothing else, and needs no PIN), and
 // hands each answer back. See lobby/worker/src/relay.js for the other half.
 //
 // Only while this print server is signed in to the sync service. It asks every

@@ -114,7 +114,7 @@ export const PhoneTonight: React.FC = () => (
   </div>
 );
 
-/* ── Dashboard windows (the print server's own dashboard, recreated) ───── */
+/* ── Settings-page windows (the Laptop section's cards, recreated) ───── */
 export const DashWindow: React.FC<{ title: string; label: string; children: React.ReactNode; className?: string }> = ({ title, label, children, className }) => (
   <div className={`lbl-window${className ? ' ' + className : ''}`} role="img" aria-label={label}>
     <div className="lbl-window__bar"><span></span><span></span><span></span><b>{title}</b></div>
@@ -123,31 +123,31 @@ export const DashWindow: React.FC<{ title: string; label: string; children: Reac
 );
 
 export const JamAlarm: React.FC = () => (
-  <DashWindow title="Dashboard"
-    label="Recreation of the dashboard during a paper jam: a red status light reading Problem Detected, check the warnings below for details. Below it, a warning: 4 print jobs are waiting on Label Printer, oldest 3 minutes 12 seconds, status PaperOut. Labels are not coming out; check paper and power, then clear the queue on the Diagnostics tab. Beside it, the Clear print queue button from the Diagnostics tab.">
+  <DashWindow title="Settings · Laptop"
+    label="Recreation of the settings page’s laptop card during a paper jam: a red status light reading Problem Detected, check the warnings below for details. Below it, a warning: 4 print jobs are waiting on Label Printer, oldest 3 minutes 12 seconds, status PaperOut. Labels are not coming out; check paper and power, then clear the queue from this card. Beside it, the Clear print queue button.">
     <div className="lbl-status lbl-status--red">
       <span className="lbl-dot" />
       <div><b>Problem Detected</b><span>Check the warnings below for details.</span></div>
     </div>
     <div className="lbl-warnbox">
       <p className="lbl-warnbox__head">Warnings</p>
-      <p>4 print jobs are waiting on “Label Printer” (oldest 3m 12s, status: PaperOut). Labels are NOT coming out — check paper and power, then clear the queue on the Diagnostics tab.</p>
+      <p>4 print jobs are waiting on “Label Printer” (oldest 3m 12s, status: PaperOut). Labels are NOT coming out — check paper and power, then clear the queue from this card.</p>
     </div>
-    <div className="lbl-window__actions"><span className="lbl-uibtn lbl-uibtn--secondary">Clear print queue</span><span className="lbl-window__where">on the Diagnostics tab</span></div>
+    <div className="lbl-window__actions"><span className="lbl-uibtn lbl-uibtn--secondary">Clear print queue</span><span className="lbl-window__where">on the same card</span></div>
   </DashWindow>
 );
 
 export const CountCheck: React.FC = () => (
   <div className="lbl-countcheck lbl-stage">
-    <DashWindow title="Dashboard · Tonight at a Glance"
-      label="Recreation of the dashboard’s Tonight at a Glance card when the counts agree: 31 checked in, 31 labels printed, from TwoTimTwo’s report; club chips for Cubbies 8, Sparks 12 and T and T 11; and a green line: Matches TwoTimTwo, 31 checked in.">
+    <DashWindow title="Tonight · count check"
+      label="Recreation of the Tonight count check when the counts agree: 31 checked in, 31 labels printed, from TwoTimTwo’s report; club chips for Cubbies 8, Sparks 12 and T and T 11; and a green line: Matches TwoTimTwo, 31 checked in.">
       <div className="lbl-tonight"><span className="lbl-tonight__num">31</span><span className="lbl-tonight__lab">checked in tonight</span></div>
       <p className="lbl-window__note">31 labels printed · from TwoTimTwo’s report</p>
       <ClubChips />
       <p className="lbl-verdict lbl-verdict--ok"><Icon name="check" /><span>Matches TwoTimTwo (31 checked in)</span></p>
     </DashWindow>
-    <DashWindow title="Dashboard · Tonight at a Glance"
-      label="Recreation of the same card when one child has no label: still 31 checked in, from TwoTimTwo’s report, with 30 labels printed; and a red line reading TwoTimTwo 31, printed 30, 1 with no label printed, with Sparks minus 1 on the line below.">
+    <DashWindow title="Tonight · count check"
+      label="Recreation of the same check when one child has no label: still 31 checked in, from TwoTimTwo’s report, with 30 labels printed; and a red line reading TwoTimTwo 31, printed 30, 1 with no label printed, with Sparks minus 1 on the line below.">
       <div className="lbl-tonight"><span className="lbl-tonight__num">31</span><span className="lbl-tonight__lab">checked in tonight</span></div>
       <p className="lbl-window__note">30 labels printed · from TwoTimTwo’s report</p>
       <ClubChips />
@@ -164,8 +164,7 @@ const ClubChips: React.FC = () => (
    The left window is Check-in Display's own slide editor (Settings → Edit
    slides), open in a browser on the check-in laptop: its "Publish to all
    displays" button posts the deck to the print server there, which seals
-   it and sends it to every screen (the printer dashboard's Lobby Slides
-   card is the paste-a-file route to the same pipe). The TV is a typed slide
+   it and sends it to every screen. The TV is a typed slide
    in the display's 2026-27 look: the "night" catalog scene, a Londrina
    Solid eyebrow, a Paytone One headline and the house wave (CatalogScene.jsx,
    app.css .manual-slide-*). No logo, no club art. */

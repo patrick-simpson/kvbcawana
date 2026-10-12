@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
-  PICKUP_DEFAULT, PRINT_SERVER, callPrintServer, canReprint, cleanScheduleRows, formToTemplate, healthSummary, pickupTicked,
-  printerOptions, probePrintServer, templateToForm, validStartTime, withTemplate,
+  PICKUP_DEFAULT, PRINT_SERVER, auditDays, auditSummary, callPrintServer, canReprint, cleanScheduleRows, formToTemplate, healthSummary,
+  pickupTicked, printerOptions, probePrintServer, templateToForm, timeToday, validStartTime, withTemplate,
 } from './printServer.js';
 
 const json = (body, status = 200) => ({ ok: status < 400, status, json: async () => body, blob: async () => new Blob(['png']) });
@@ -59,8 +59,9 @@ describe('callPrintServer', () => {
   it('tells the token problems from other refusals', async () => {
     const say = (error, status = 403) => callPrintServer('/config', { token: 't', fetchFn: async () => json({ error }, status) });
     expect((await say('No publish token is set on the print server.')).reason).toBe('no-token-on-server');
+    expect((await say('Sign in to the settings page with the church passphrase first (Setup), then try again.')).reason).toBe('no-token-on-server');
     expect((await say('Wrong publish token.')).reason).toBe('wrong-token');
-    expect((await say('phonePin can be changed from the dashboard')).reason).toBe('refused');
+    expect((await say('phonePin cannot be changed from a web page')).reason).toBe('refused');
     const bad = await say('nope', 400);
     expect(bad).toMatchObject({ reason: 'rejected', status: 400, error: 'nope' });
     expect((await callPrintServer('/x', { token: 't', fetchFn: async () => { throw new Error('x'); } })).reason).toBe('unreachable');
@@ -117,5 +118,36 @@ describe('the pure helpers', () => {
     expect(canReprint({ firstName: 'Maya', isAward: true })).toBe(false);
     expect(canReprint({ firstName: 'Maya', isLeader: true })).toBe(false);
     expect(canReprint({ firstName: 'Maya', oneOff: true })).toBe(false);
+  });
+});
+
+describe('the moved tools\' helpers', () => {
+  it('turns a typed time into today\'s instant, a whole minute either way', () => {
+    const now = new Date(2026, 9, 14, 12, 0, 0);
+    const from = new Date(timeToday('6:30', false, now));
+    const to = new Date(timeToday('6:45', true, now));
+    expect([from.getFullYear(), from.getMonth(), from.getDate(), from.getHours(), from.getMinutes(), from.getSeconds()]).toEqual([2026, 9, 14, 6, 30, 0]);
+    expect([to.getHours(), to.getMinutes(), to.getSeconds(), to.getMilliseconds()]).toEqual([6, 45, 59, 999]);
+    expect(timeToday('25:00', false, now)).toBeNull();
+    expect(timeToday('6:7', false, now)).toBeNull();
+    expect(timeToday('soon', true, now)).toBeNull();
+    expect(timeToday('', true, now)).toBeNull();
+  });
+
+  it('counts the grid\'s age in whole days', () => {
+    expect(auditDays(0)).toBe(0);
+    expect(auditDays(86400000 * 2 + 5)).toBe(2);
+    expect(auditDays(undefined)).toBe(0);
+  });
+
+  it('words the attendance audit from the server\'s own answer', () => {
+    expect(auditSummary(null).tone).toBe('none');
+    expect(auditSummary({ known: false }).text).toMatch(/no attendance grid/);
+    expect(auditSummary({ known: false, reason: 'stale', ageMs: 86400000 * 9 }).text).toMatch(/9 day\(s\) old/);
+    expect(auditSummary({ known: false, reason: 'no-meetings' }).text).toMatch(/no past meeting dates/);
+    expect(auditSummary({ known: true, matches: true, scopeDates: 7 })).toEqual({ tone: 'ok', text: 'Agrees with TwoTimTwo across 7 meeting(s).' });
+    const warn = auditSummary({ known: true, matches: false, totals: { missing: 3, ledgerOnly: 1 } });
+    expect(warn.tone).toBe('warn');
+    expect(warn.text).toMatch(/3 night\(s\) TwoTimTwo has/);
   });
 });

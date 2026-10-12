@@ -68,7 +68,7 @@ function openExternalSafely(value, context) {
     dialog.showErrorBox(
       `${APP_NAME}: blocked link`,
       'The configured check-in address is not a valid web address, so it was not opened.\n\n'
-      + 'Open Settings and set the check-in page URL (it should start with https://).'
+      + 'Open "Set up this computer..." from the tray icon and set the check-in page URL (it should start with https://).'
     );
     return false;
   }
@@ -92,13 +92,11 @@ const CONFIG_PATH = path.join(app.getPath('userData'), 'config.json');
 const PORT = 3456;
 const isDev = process.env.NODE_ENV === 'development';
 const isAutoStart = process.argv.includes('--auto-start');
-// Renamed from 'Awana Print Server (TCP 3456)' in v5.9.0 (trademark
-// compliance rebrand). The rule-add below is idempotent on this new name, so
-// an already-updated machine simply gets a second, harmlessly redundant
-// allow rule under the old name rather than losing connectivity — removing
-// it would need an elevated prompt on every launch, which isn't worth it for
-// a leftover firewall rule nobody sees day to day.
-const FIREWALL_RULE = 'Club Print Server (TCP 3456)';
+// Where every setting and tool lives now that the print dashboard (and the
+// Wi-Fi phone page, and the firewall rule it needed) is retired: the one
+// settings page, opened in Chrome on this computer, which finds the print
+// server on localhost by itself.
+const SETTINGS_URL = 'https://awana.kvbchurch.org/settings';
 
 let tray = null;
 // What this computer is (src/roles.js). Read before anything starts, in
@@ -446,6 +444,11 @@ function buildTray(config) {
       });
     }
     template.push({
+      // Printer, labels, name tags, schedule, diagnostics: all on the one page.
+      label: 'Settings (awana.kvbchurch.org/settings)',
+      click: () => openExternalSafely(SETTINGS_URL, 'tray menu')
+    });
+    template.push({
       label: config.printerName ? 'Print server status...' : 'Finish print server setup…',
       click: () => createSetupWindow()
     });
@@ -628,7 +631,7 @@ function startServer(config) {
     serverModule.setUpdateHandler(() => installUpdateNow());
     // Operator alerts (#3 contract drift, etc.): the server decides WHEN,
     // this shell decides HOW — a system notification, so it lands even when
-    // no dashboard tab is open. Guarded: notifications are best-effort.
+    // no settings tab is open. Guarded: notifications are best-effort.
     if (serverModule.setOpsAlertHandler) {
       serverModule.setOpsAlertHandler(({ title, body }) => {
         try {
@@ -829,30 +832,8 @@ ipcMain.handle('get-server-state', () => ({
   update: updateState,
 }));
 
-ipcMain.handle('get-lan-address', () => {
-  for (const addrs of Object.values(os.networkInterfaces())) {
-    for (const a of addrs || []) {
-      if (a.family === 'IPv4' && !a.internal) return a.address;
-    }
-  }
-  return null;
-});
-
-// Phone check-in needs inbound TCP 3456 open. The per-user installer can't
-// add a firewall rule silently; this runs the (idempotent) rule add with a
-// UAC prompt when the user asks for it from Settings.
-ipcMain.handle('enable-phone-checkin', async () => {
-  if (process.platform !== 'win32') return { ok: false, error: 'Windows only' };
-  const cmd = `if (-not (Get-NetFirewallRule -DisplayName '${FIREWALL_RULE}' -ErrorAction SilentlyContinue)) { New-NetFirewallRule -DisplayName '${FIREWALL_RULE}' -Direction Inbound -Protocol TCP -LocalPort ${PORT} -Action Allow -Profile Private,Domain | Out-Null }`;
-  try {
-    execFileSync('powershell', ['-NoProfile', '-Command',
-      `Start-Process powershell -Verb RunAs -Wait -WindowStyle Hidden -ArgumentList '-NoProfile','-Command',"${cmd.replace(/"/g, '\\"')}"`
-    ], { timeout: 60000, windowsHide: true });
-    return { ok: true };
-  } catch (e) {
-    return { ok: false, error: 'Firewall rule was not added (administrator approval declined?)' };
-  }
-});
+// The status window's Settings button (and the tray's): the one settings page.
+ipcMain.handle('open-settings', () => openExternalSafely(SETTINGS_URL, 'status window'));
 
 ipcMain.handle('install-update', () => { installUpdateNow(); return { ok: true }; });
 
@@ -909,7 +890,7 @@ const printServerDir = () => (app.isPackaged
 // The passphrase typed in the wizard, held in memory only from a good
 // sign-in until the wizard closes, so finishing it can sign the print server
 // in too (its own /config/sync-login, which keeps its session in config.json
-// as the dashboard's sign-in always has). Never written anywhere by this app.
+// as every sign-in of its has). Never written anywhere by this app.
 let pendingPassphrase = null;
 let printRoleStarted = false;
 
@@ -1016,7 +997,7 @@ function signPrintServerIn(passphrase) {
     .catch((e) => {
       console.warn('[setup] The print server could not sign in:', e && e.message);
       try {
-        if (Notification.isSupported()) new Notification({ title: APP_NAME, body: 'The print server could not sign in to the sync service. Sign it in from its dashboard (Settings, Sync service).' }).show();
+        if (Notification.isSupported()) new Notification({ title: APP_NAME, body: 'The print server could not sign in to the sync service. Open "Set up this computer..." from the tray icon and sign in again.' }).show();
       } catch { /* best effort */ }
     });
 }
