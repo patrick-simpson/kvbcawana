@@ -14,7 +14,8 @@ Usage:
 Output: src/assets/clubs/{puggles,cubbies,sparks,tnt}.png
 
 Trek and Journey have no logo art in this catalog; their wordmarks are
-custom catalog-style builds instead (see render-club-wordmarks.mjs).
+custom catalog-style builds instead (their art boards and render script
+were removed; git history has them).
 Mascot sticker art comes from extract-club-art.py.
 """
 
