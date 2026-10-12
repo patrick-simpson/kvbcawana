@@ -3,6 +3,8 @@
 //
 //   /            the family's one public page (printer/, built at base /): the
 //                label printer, the lobby signage (#lobby) and the Journey kiosk (#journey)
+//   /reel/       that page's film (printer/public/reel; its videos are streamed
+//                by site/functions/reel, see "Videos" below)
 //   /lobby/      the lobby signage (lobby/ build; countdown.html is the projector)
 //   /settings    a redirect to /lobby/settings.html, one settings page (ROADMAP.md#settings-page)
 //   /journey/    the Journey kiosk (journey/public, build-stamped)
@@ -22,6 +24,7 @@ import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { downloadRedirects } from './lib/downloads.js';
+import { REPO_FOLDERS, mustStream, repoPathFor } from './lib/largeFiles.js';
 import { pageRedirects } from './lib/redirects.js';
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
@@ -171,28 +174,29 @@ writeFileSync(path.join(OUT, '_headers'), [
 
 // Videos are never uploaded to Pages, whose static files ignore Range requests
 // (measured 2026-10-03: every request answered 200 with the whole file), so a
-// <video> could not seek or resume mid-lesson. site/functions/journey/[[path]].js
-// streams them instead, on this origin, with Range passed through:
+// <video> could not seek or resume mid-lesson (and Safari will not play one at
+// all). Functions stream them instead, on this origin, with Range passed through
+// (site/lib/largeFiles.js says which, site/lib/proxyLarge.js how):
 //   /journey/videos/<file>.mp4  the picker's lesson videos, from the
 //                               journey-videos-v2 release (pi-encode.mjs keeps
-//                               every one under 25 MiB);
-//   any other journey/public .mp4, and any file over Pages' 25 MiB limit,
-//                               from GitHub's copy of THIS commit, so it always
-//                               matches the files deployed beside it.
-// Only files committed under journey/public can be served that way; anything
+//                               every one under 25 MiB; functions/journey);
+//   any other journey/public video, the home page's film under /reel/
+//   (printer/public/reel, functions/reel), and any file over Pages' 25 MiB
+//   limit, from GitHub's copy of THIS commit, so it always matches the files
+//   deployed beside it.
+// Only files committed under those folders can be served that way; anything
 // else that big is a build output, and fails the build rather than the deploy.
 const REPO = process.env.GITHUB_REPOSITORY || 'patrick-simpson/kvbcawana';
 const VIDEO_PREFIXES = { '/journey/videos/': `https://github.com/${REPO}/releases/download/journey-videos-v2/` };
-const PAGES_FILE_MAX = 25 * 1024 * 1024;
 const largeFiles = {};
 const walk = (dir) => readdirSync(dir, { withFileTypes: true }).flatMap((d) =>
   d.isDirectory() ? walk(path.join(dir, d.name)) : [path.join(dir, d.name)]);
 for (const file of walk(OUT)) {
-  if (statSync(file).size < PAGES_FILE_MAX && !file.endsWith('.mp4')) continue;
   const sitePath = '/' + path.relative(OUT, file).split(path.sep).join('/');
-  if (!sitePath.startsWith('/journey/')) throw new Error(`${sitePath} is over 25 MiB, and only journey/public files can be served from the repo`);
-  const repoPath = `journey/public/${sitePath.slice('/journey/'.length)}`;
-  if (!existsSync(path.join(ROOT, repoPath))) throw new Error(`${sitePath} is over 25 MiB and is not a file in the repo`);
+  if (!mustStream(sitePath, statSync(file).size)) continue;
+  const repoPath = repoPathFor(sitePath);
+  if (!repoPath) throw new Error(`${sitePath} is a video or over 25 MiB, and only files committed under ${Object.values(REPO_FOLDERS).join(' or ')} can be served from the repo`);
+  if (!existsSync(path.join(ROOT, repoPath))) throw new Error(`${sitePath} is a video or over 25 MiB and is not a file in the repo (${repoPath})`);
   largeFiles[sitePath] = `https://raw.githubusercontent.com/${REPO}/${BUILD_ID}/${repoPath}`;
   rmSync(file);
   console.log(`  ${sitePath} (${(statSync(path.join(ROOT, repoPath)).size / 1048576).toFixed(1)} MiB): streamed from the repo, not uploaded`);
