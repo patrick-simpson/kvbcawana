@@ -29,8 +29,11 @@
 // READS. Who is in comes from the watcher's report (handed over in memory after
 // each applied read; no report read of its own). The Checkout page is read only
 // for the meeting's calendar_id and date (and its rows), at most every
-// YM_PAGE_MS (30 s), only while due, through the one read clock with waitMs 0
-// (it skips its turn when the clock is booked). Posts are writes.
+// YM_PAGE_MS (60 s), only while due, through the one read clock with waitMs 0
+// (it skips its turn when the clock is booked, and keeps clear of the report's
+// reserved slot: readbudget.js). It needs the page for the meeting's id and the
+// rare row the report does not list, so once a minute is plenty, and it leaves
+// the roster its share of the 4 reads a minute. Posts are writes.
 //
 // STORAGE. `ym:state` (the night, the meeting, the page's rows, the done list
 // and the tries) is ONE blob sealed under the state key (sealState, as the
@@ -44,8 +47,8 @@ export const YM_AT = '19:15';
 export const YM_CLUBS = Object.freeze(['trek', 'journey']);
 /** Tries per child per night (the extension's YM_MAX_FAILS). */
 export const YM_MAX_FAILS = 3;
-/** The Checkout page is read at most this often (the extension's YM_SWEEP_MS). */
-export const YM_PAGE_MS = 30 * 1000;
+/** The Checkout page is read at most this often (the extension sweeps every 30 s; the Worker's 4 reads a minute are shared, owner 2026-10-12). */
+export const YM_PAGE_MS = 60 * 1000;
 /** At most one check-out post this often (owner, 2026-10-12). */
 export const YM_CHECKOUT_GAP_MS = 15 * 1000;
 /** More than this many children in a night's lists is a bug. */
@@ -153,6 +156,11 @@ export class YmCheckout {
     await this.storage.put('ym:status', this.status);
   }
 
+  /** Is a Checkout page read due (the sweep due, YM_PAGE_MS since the last)? */
+  pageDue() {
+    return this.due() && this.now() - (this.status.night === localTime(this.now()).date ? this.status.lastPageAt : 0) >= YM_PAGE_MS;
+  }
+
   /** Due now, and on? */
   due() {
     return this.enabled && ymDue(this.now());
@@ -171,7 +179,7 @@ export class YmCheckout {
       const now = this.now();
       const night = localTime(now).date;
       this.roll(night);
-      if (now - this.status.lastPageAt >= YM_PAGE_MS && this.watcher.budget.peek() === 0) {
+      if (now - this.status.lastPageAt >= YM_PAGE_MS && this.watcher.budget.peek(false) === 0) {
         if (await this.readPage()) return true;
       }
       return await this.postOne(night);
@@ -251,7 +259,7 @@ export class YmCheckout {
     if (!this.due()) return null;
     const now = this.now();
     const night = localTime(now).date;
-    const page = Math.max(this.status.night === night ? this.status.lastPageAt + YM_PAGE_MS - now : 0, this.watcher.budget.peek());
+    const page = Math.max(this.status.night === night ? this.status.lastPageAt + YM_PAGE_MS - now : 0, this.watcher.budget.peek(false));
     const post = this.st.cal && this.st.night === night && this.pending(night).length ? Math.max(this.status.nextPostAt - now, 0) : Infinity;
     return Math.min(page, post);
   }
@@ -268,6 +276,7 @@ export class YmCheckout {
       at: YM_AT,
       clubs: [...YM_CLUBS],
       gapSec: YM_CHECKOUT_GAP_MS / 1000,
+      pageSec: YM_PAGE_MS / 1000,
       maxTries: YM_MAX_FAILS,
       night: tonight ? night : null,
       checkedOut: tonight ? this.status.checkedOut : 0,

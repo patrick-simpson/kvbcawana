@@ -295,7 +295,7 @@ const childrenWords = (n) => `${n} child${n === 1 ? '' : 'ren'} checked in`;
  * @returns {{ok: boolean, text: string}}
  */
 function describeClubNightTest(test, throttled, st) {
-  const lead = throttled ? 'Read a moment ago (TwoTimTwo allows one read every 5 s): ' : '';
+  const lead = throttled ? 'Read a moment ago (the check-in service reads TwoTimTwo at most once every 15 s): ' : '';
   const day = clubNightWords(test.date);
   if (!test.ok) {
     const shape = test.shape && typeof test.shape === 'object' ? test.shape : null;
@@ -339,9 +339,9 @@ export function describeCloudTest(res) {
     return { ok: false, text: 'The sync service has no TwoTimTwo user yet. Add the TWOTIMTWO_USERNAME and TWOTIMTWO_PASSWORD secrets in GitHub, then run CI with "Redeploy the sync Worker" ticked.' };
   }
   if (body.test && typeof body.test === 'object') return describeClubNightTest(body.test, Boolean(body.throttled), st);
-  // A read in the last 5 s (TwoTimTwo's limit, all reads combined) is not repeated: report that one.
+  // A read in the last 15 s (the Worker's read clock, all reads combined) is not repeated: report that one.
   const error = body.throttled ? st.lastError : body.error;
-  const lead = body.throttled ? 'Read a moment ago (TwoTimTwo allows one read every 5 s): ' : '';
+  const lead = body.throttled ? 'Read a moment ago (the check-in service reads TwoTimTwo at most once every 15 s): ' : '';
   if (error) return { ok: false, text: lead + cloudErrorWords(error, st) };
   const n = Number.isInteger(st.checkedIn) ? st.checkedIn : null;
   const count = n === null ? 'the report was only partly readable, so no count yet' : `${childrenWords(n)} today`;

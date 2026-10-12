@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { openAsStation } from '../../shared/cloud-crypto.js';
 import { Registry } from '../src/registry.js';
 import { LEASE_MS } from '../src/printq.js';
+import { READ_INTERVAL_MS } from '../src/readbudget.js';
 import { everything, plainWords } from './helpers.js';
 import { HOUSEHOLD_CSV } from './fixtures.js';
 import { NIGHT, kid, rig, row } from './rig.js';
@@ -425,15 +426,15 @@ describe('a restart (a new object over the same storage)', () => {
     expect((await st.call('GET', '/v1/print/next')).body.jobs).toEqual([]);
     expect((await st.call('POST', '/v1/print/heartbeat', { jobId: body.job.id })).body).toMatchObject({ ok: true });
     // and the read clock: the first check-in read the page; a read right after the
-    // restart (a fresh object has no cached page) waits out the rest of the 5 s
+    // restart (a fresh object has no cached page) waits out the rest of the 15 s
     const before = t.reads.at(-1).at;
     await t.call('GET', '/v1/desk/roster');
-    expect(t.reads.at(-1).at - before).toBeGreaterThanOrEqual(5000);
-    expect(minGap(t.reads)).toBeGreaterThanOrEqual(5000);
+    expect(t.reads.at(-1).at - before).toBeGreaterThanOrEqual(READ_INTERVAL_MS);
+    expect(minGap(t.reads)).toBeGreaterThanOrEqual(READ_INTERVAL_MS);
   });
 });
 
-describe('every TwoTimTwo read, of every kind, keeps the 5 s clock', () => {
+describe('every TwoTimTwo read, of every kind, keeps the 15 s clock', () => {
   it('desk check-ins, the roster, undo, the watcher and a phone roster interleaved', async () => {
     const t = await rig({ kids: [kid(1), kid(2)] });
     const st = await t.station();
@@ -450,7 +451,7 @@ describe('every TwoTimTwo read, of every kind, keeps the 5 s clock', () => {
     t.clock.tick(10000);
     await t.core.watcher.tick();
     expect(t.reads.length).toBeGreaterThanOrEqual(4);
-    expect(minGap(t.reads)).toBeGreaterThanOrEqual(5000);
+    expect(minGap(t.reads)).toBeGreaterThanOrEqual(READ_INTERVAL_MS);
     expect(t.core.watcher.budget.stats().taken).toMatchObject({ watcher: expect.any(Number), desk: expect.any(Number) });
   });
 
@@ -462,7 +463,7 @@ describe('every TwoTimTwo read, of every kind, keeps the 5 s clock', () => {
       { clubberId: '663', first: 'Lu', last: 'Tester', club: '', clubId: '3', checkedIn: true },
     ]);
     expect(first.body.readAt).toBe(new Date(t.clock.t).toISOString());
-    const second = await t.call('GET', '/v1/desk/roster');   // within 5 s: the same read, no new page
+    const second = await t.call('GET', '/v1/desk/roster');   // within 30 s: the same read, no new page
     expect(second.body.readAt).toBe(first.body.readAt);
     expect(t.reads.filter((r) => r.path === '/clubber/checkin')).toHaveLength(1);
     // the clock booked solid (a long queue): 429 with when to ask again
@@ -486,14 +487,14 @@ describe('the desk page\'s items and families', () => {
     const t = await rig({ households: () => HOUSEHOLD_CSV });
     const a = await t.call('GET', '/v1/desk/families');
     expect(a.status).toBe(200);
-    expect(a.body).toEqual({ households: [['Sophie Tester', 'Cal Tester'], ['Ann Smith', 'Ben Smith', 'Cy Smith']] });
+    expect(a.body).toEqual({ households: [['Sophie Tester', 'Cal Tester'], ['Ann Smith', 'Ben Smith', 'Cy Smith']], familiesAt: new Date(t.clock.t).toISOString() });
     expect(JSON.stringify(a.body)).not.toMatch(/Elm St|555-/);
     await t.call('GET', '/v1/desk/families');
     expect(t.reads.filter((r) => r.path === '/household/csv')).toHaveLength(1);
     t.clock.tick(31 * 60 * 1000);
     await t.call('GET', '/v1/desk/families');
     expect(t.reads.filter((r) => r.path === '/household/csv')).toHaveLength(2);
-    expect(minGap(t.reads)).toBeGreaterThanOrEqual(5000);
+    expect(minGap(t.reads)).toBeGreaterThanOrEqual(READ_INTERVAL_MS);
   });
 
   it('an unreadable export is an empty list with a fixed code, kept five minutes; a busy clock is a 429 and not kept', async () => {

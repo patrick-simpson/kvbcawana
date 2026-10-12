@@ -280,7 +280,7 @@ describe('the TwoTimTwo client', () => {
     expect(c.loginBlockedUntil).toBe(0);
   });
 
-  it('every request of a sign-in (the form, the post, the redirect) and the page after it takes a slot on the one 5 s clock', async () => {
+  it('every request of a sign-in (the form, the post, the redirect) and the page after it takes a slot on the one read clock', async () => {
     let t = Date.parse('2026-10-14T22:00:00Z');
     const tt = fakeTwoTimTwo();
     const at = [];

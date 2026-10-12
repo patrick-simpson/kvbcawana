@@ -178,8 +178,8 @@ describe('the Worker publishes the tally, the ticker and the still-here list', (
     await t.core.watcher.tick();
     const count = (e) => t.sent.filter((f) => f.e === e).length;
     expect([count('tally'), count('tonight'), count('checkout')]).toEqual([1, 1, 1]);
-    // two more reads of the same report inside the minute: nothing new
-    for (let i = 0; i < 3; i++) { t.clock.tick(WATCH_INTERVAL_MS); await t.core.watcher.tick(); }
+    // another read of the same report inside the minute: nothing new
+    t.clock.tick(WATCH_INTERVAL_MS); await t.core.watcher.tick();
     expect([count('tally'), count('tonight'), count('checkout')]).toEqual([1, 1, 1]);
     // a minute on: the heartbeat
     t.clock.tick(MINUTE_MS);

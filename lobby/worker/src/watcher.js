@@ -1,10 +1,11 @@
 // The report watcher (ROADMAP.md#cloud-check-in, piece 2, phase 1: READ-ONLY SHADOW).
 //
 // During the club window a Durable Object alarm reads TwoTimTwo's check-in
-// report every 5 seconds (TwoTimTwo's terms: ONE read every 5 s, every read
-// combined, never faster: a manual "read now" shares the same clock, and the
-// alarm skips its turn when any other read, a phone's roster say, was made in
-// the last 5 s) and compares it with the last read:
+// report every 30 seconds (WATCH_INTERVAL_MS) on the ONE read clock
+// (readbudget.js: one read every 15 s, every Worker read combined, while the
+// laptop's extension tab still reads; a manual "read now" shares the same
+// clock, and the alarm skips its turn when another read holds the slot) and
+// compares it with the last read:
 //   - a child new on the report is a check-in made on TwoTimTwo (nothing
 //     checks in through Cloudflare yet), which phase 2 will print a label for;
 //   - a child gone from it was undone on TwoTimTwo.
@@ -31,16 +32,19 @@ import { massUndoRefused, reportIsPartial } from '../../shared/tonight.js';
 
 export { READ_INTERVAL_MS };
 /**
- * TwoTimTwo's terms (owner, 2026-10-11, superseding the first 15 s): one read
- * every 5 seconds, ALL reads combined. Every read, the watcher's own included,
- * takes a slot from the one clock in readbudget.js (the client does it before
- * each page GET). The watcher's report is read about every WATCH_INTERVAL_MS,
- * which leaves the slots in between to the desk, the phone page and the
- * check-in and checkout pages. 15 s (owner, 2026-10-12): while the laptop's
- * extension tab still reads TwoTimTwo beside the Worker (about 5 reads a
- * minute), the two together stay under TwoTimTwo's one read every 5 s.
+ * The report is read every WATCH_INTERVAL_MS: every other slot of the read
+ * clock (readbudget.js READ_INTERVAL_MS, 15 s while the laptop's extension tab
+ * still reads, owner 2026-10-12). The watcher RESERVES the next report's
+ * moment, so the slot between is everyone else's (the roster's check-in page,
+ * the Checkout page, a households catch-up) and the report never starves: a
+ * waiting request may push it one slot, once (45 s at worst). The alarm is
+ * also the scheduler of the Worker's own other reads, one per free slot, in
+ * this order: the night's check-in page (warms the desk), a households
+ * catch-up (families.js), the youth check-out's Checkout page (once a minute
+ * after 7:15 pm), then the roster's check-in page read ahead while pages poll
+ * it (desk.js), so a poll is answered from a page at most 30 s old.
  */
-export const WATCH_INTERVAL_MS = 15 * 1000;
+export const WATCH_INTERVAL_MS = 30 * 1000;
 /**
  * Work per alarm invocation. Sealing a print job to the stations is ECDH per
  * station (measured ~4.2 ms for 3 stations under Node), and the free plan
@@ -236,6 +240,8 @@ export class Watcher {
     this.publisher = null;
     /** The youth check-out (ymcheckout.js): set by SyncCore; the watcher hands it each applied report and a turn of its alarm. @type {import('./ymcheckout.js').YmCheckout|null} */
     this.ym = null;
+    /** The desk (desk.js): set by SyncCore; the watcher warms its check-in page and catches its families up. @type {import('./desk.js').Desk|null} */
+    this.desk = null;
     this.alarms = alarms || { set() {}, get: () => null };
     // warn, not log: the lint allows warn and error only, and `wrangler tail` shows both.
     this.log = log || ((line) => console.warn(line));
@@ -293,6 +299,7 @@ export class Watcher {
       readIntervalSec: READ_INTERVAL_MS / 1000,
       watchIntervalSec: WATCH_INTERVAL_MS / 1000,
       budget: this.budget.stats(),
+      ...(this.desk ? { deskPage: { held: this.desk.hasNightPage(), readAt: this.desk.cache ? new Date(this.desk.cache.at).toISOString() : null }, families: this.desk.familiesSource.stats() } : {}),
       signedIn: !!(this.client && this.client.cookies.size),
       loginBlockedForSec: this.client && this.client.loginBlockedUntil > this.now()
         ? Math.ceil((this.client.loginBlockedUntil - this.now()) / 1000) : 0,
@@ -336,11 +343,24 @@ export class Watcher {
       await this.budget.load();
       await this.adopt?.load();
       const before = await this.loadStatus();
-      const due = this.lastWatcherRead(before) + WATCH_INTERVAL_MS <= this.now();
+      const reportAt = this.lastWatcherRead(before) + WATCH_INTERVAL_MS;
+      // The next report's slot is the watcher's: other reads keep clear of it.
+      this.budget.reserve(reportAt);
+      const due = reportAt <= this.now();
+      const families = this.desk ? this.desk.familiesSource : null;
       if (due && this.budget.peek() === 0) {
         try { await this.read(); } catch (err) { console.error('[cloud] watcher read failed', err); }
-      } else if (this.budget.peek() === 0 && this.checkinPageDue(before)) {
+      } else if (this.budget.peek(false) === 0 && this.checkinPageDue(before)) {
         try { await this.probeCheckinPage(); } catch (err) { console.error('[cloud] check-in page probe failed', err); }
+      } else if (this.budget.peek(false) === 0 && families && families.wanted()
+        && await families.refresh().catch((err) => { console.error('[cloud] households catch-up failed', err); return false; })) {
+        // One households re-read: a child the export did not list (families.js).
+      } else if (this.budget.peek(false) === 0 && this.ym && this.ym.pageDue()
+        && await this.ym.step().catch((err) => { console.error('[cloud] youth check-out failed', err); return false; })) {
+        // The Checkout page, once a minute after 7:15 pm (ymcheckout.js).
+      } else if (this.budget.peek(false) === 0 && this.desk && this.desk.rosterRefreshInMs() === 0
+        && await this.desk.refreshRoster().catch((err) => { console.error('[cloud] roster read ahead failed', err); return false; })) {
+        // The roster's page read ahead, so the pages' next poll is answered at once.
       } else if (this.adopt && this.adopt.pending() > 0) {
         try { await this.adopt.drain(SEAL_PER_TICK); } catch (err) { console.error('[cloud] sealing a job failed', err); }
       } else if (this.ym && this.ym.due() && await this.ym.step().catch((err) => { console.error('[cloud] youth check-out failed', err); return false; })) {
@@ -352,11 +372,16 @@ export class Watcher {
         await this.publisher.tick();
       }
       const s = await this.loadStatus();
-      next = Math.max(this.lastWatcherRead(s) + WATCH_INTERVAL_MS - this.now(), this.budget.peek(), 1000);
+      this.budget.reserve(this.lastWatcherRead(s) + WATCH_INTERVAL_MS);
+      const reportIn = Math.max((this.budget.reserved ? this.budget.reserved.at : 0) - this.now(), this.budget.peek(), 1000);
+      next = reportIn;
+      // The free slot between reports, for the watcher's other reads.
+      const other = this.otherWakeInMs(s);
+      if (other !== null) next = Math.min(next, Math.max(other, this.budget.peek(false), 1000));
       // Jobs still waiting to be sealed: the next tick (not the next read) seals one.
       if (this.adopt && this.adopt.pending() > 0) next = Math.min(next, SPILL_MS);
       next = this.ymWake(next);
-      // A sign-in that is backing off waits it out instead of waking every 5 s.
+      // A sign-in that is backing off waits it out instead of waking every few seconds.
       if (this.client && this.client.loginBlockedUntil > this.now()) {
         next = Math.max(next, this.client.loginBlockedUntil - this.now());
       }
@@ -383,13 +408,26 @@ export class Watcher {
     return n;
   }
 
+  /**
+   * When the watcher's other reads next want a slot (ms), or null: the night's
+   * check-in page, a households catch-up, the roster read ahead. (The youth
+   * check-out's own wake is ymWake.)
+   * @param {any} status
+   */
+  otherWakeInMs(status) {
+    if (this.checkinPageDue(status)) return 0;
+    const waits = [this.desk ? this.desk.familiesSource.wakeInMs() : null, this.desk ? this.desk.rosterRefreshInMs() : null];
+    const due = waits.filter((w) => w !== null);
+    return due.length ? Math.min(...due) : null;
+  }
+
   /** When the watcher last read the report (ms; 0 never). @param {{ lastReadAt?: string|null }} status */
   lastWatcherRead(status) {
     const own = status.lastReadAt ? Date.parse(status.lastReadAt) : 0;
     return Number.isFinite(own) ? own : 0;
   }
 
-  /** The owner's "read now" (a rehearsal on any day): the same 5 s clock. */
+  /** The owner's "read now" (a rehearsal on any day): the one read clock. */
   async readNow() {
     if (this.mode === 'off') return { ok: false, error: 'off', status: await this.status() };
     if (!this.creds()) return { ok: false, error: 'not-configured', status: await this.status() };
@@ -415,7 +453,7 @@ export class Watcher {
     const wantId = /^\d{1,20}$/.test(String(body.clubberId ?? '')) ? String(body.clubberId) : '';
     const wantName = String(body.name ?? '').trim().toLowerCase().replace(/\s+/g, ' ').slice(0, 80);
     if (!wantId && !wantName) return { ok: false, error: 'no-child' };
-    const page = await client.checkinPage({ waitMs: INTERACTIVE_WAIT_MS, kind: 'desk-checkin' });
+    const page = await client.checkinPage({ waitMs: INTERACTIVE_WAIT_MS, kind: 'desk-checkin', urgent: true });
     if (!page.ok) return { ok: false, error: page.error, ...('retryAfterMs' in page ? { retryAfterMs: page.retryAfterMs } : {}) };
     const found = page.page.roster.filter((r) => (wantId ? r.clubberId === wantId : r.name.toLowerCase() === wantName));
     if (!found.length) return { ok: false, error: 'not-found' };
@@ -432,7 +470,7 @@ export class Watcher {
     if (child.checkedIn) return { ok: false, error: 'already-checked-in', ...preview };
     if (!hasAttendance) return { ok: false, error: 'no-attendance-item', ...preview };
     if (body.confirm !== true) return { ok: true, preview: true, ...preview };
-    const res = await client.checkIn({ clubberId: child.clubberId, calendarId: page.page.calendarId, events, name: child.name });
+    const res = await client.checkIn({ clubberId: child.clubberId, calendarId: page.page.calendarId, events, name: child.name }, { desk: true });
     const status = await this.loadStatus();
     this.note(status, 'cloud-check-in', { ok: res.ok, club: child.club });
     await this.storage.put('cloud:status', status);
@@ -442,7 +480,7 @@ export class Watcher {
   /**
    * The Settings button's test: sign in and read the most recent club night's
    * report (today on a Wednesday), so it means something on any day. It
-   * changes nothing the watcher keeps but the shared 5 s clock; the answer is
+   * changes nothing the watcher keeps but the shared read clock; the answer is
    * counts only, and on an unreadable page its shape (title, table counts).
    */
   async testRead() {
@@ -517,8 +555,9 @@ export class Watcher {
     if (!snap || snap.date !== date) snap = null;
 
     const loginsBefore = client.logins;
-    // waitMs 0: the watcher never queues for a slot, it skips its turn.
-    const res = await client.report(date, { waitMs: 0, kind: 'watcher' });
+    // waitMs 0: the watcher never queues for a slot, it skips its turn. priority:
+    // the slot it reserved is its own.
+    const res = await client.report(date, { waitMs: 0, kind: 'watcher', priority: true });
     if (!res.ok && res.error === 'read-busy') return { ok: true, throttled: true, retryAfterMs: res.retryAfterMs };
     status.reads += 1;
     // When the report was read: after a sign-in (its own slots on the clock) that is later than `now`.
@@ -571,6 +610,8 @@ export class Watcher {
       await this.storage.put('cloud:snap', await sealState(creds.password, { date, kids }));
       // Who is in, for the youth check-out (in memory; it reads no report of its own).
       this.ym?.onReport({ date, kids });
+      // A child the households export does not list: a family to catch up (families.js).
+      this.desk?.familiesSource.noteChildren(date, res.report.entries.map((e) => e.name));
       // The count's own state (tonight.js): what an applied report says, first names and clubs only.
       if (this.publisher) {
         try { await this.publisher.onReport({ night: date, at: now, entries: res.report.entries }); } catch (err) { console.error('[cloud] publishing the count failed', err); }
@@ -596,13 +637,17 @@ export class Watcher {
 
   /**
    * Once a night, the check-in page: proves tonight's meeting and its check-in
-   * items can be read (the desk posts with them). Ids and counts only. It takes
+   * items can be read (the desk posts with them), and warms the desk's copy, so
+   * a check-in reads nothing (owner 2026-10-12). Ids and counts only. It takes
    * its own slot on the read clock, so it runs on a tick the report did not
    * (tick() asks `checkinPageDue()` first). A failed read is tried again after
    * CHECKIN_PAGE_RETRY_MS, never every tick.
    */
   checkinPageDue(status) {
     const last = status.checkinPage;
+    // The desk holds none for tonight (a restarted object): read it again, so a
+    // check-in never has to.
+    if (this.desk && !this.desk.hasNightPage() && last && last.ok) return true;
     return !last || (!last.ok && this.now() - Date.parse(last.at) >= CHECKIN_PAGE_RETRY_MS);
   }
 
@@ -612,6 +657,8 @@ export class Watcher {
     const status = await this.loadStatus();
     const page = await client.checkinPage({ waitMs: 0, kind: 'watcher' });
     if (!page.ok && page.error === 'read-busy') return;
+    // The desk keeps it for the night: a check-in then reads nothing.
+    if (page.ok) this.desk?.warm(page.page, this.now());
     const at = new Date(this.now()).toISOString();
     status.checkinPage = page.ok
       ? { ok: true, at, calendarId: page.page.calendarId, events: page.page.events.length,

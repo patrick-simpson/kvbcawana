@@ -145,21 +145,24 @@ describe('the watcher', () => {
     expect(near.alarm.at - near.now()).toBe(10 * 60 * 1000);
   });
 
-  it('reads the report about every 15 s, and every read of every kind shares one 5 s clock', async () => {
-    expect(READ_INTERVAL_MS).toBe(5000);
-    expect(WATCH_INTERVAL_MS).toBe(15000);
+  it('reads the report every 30 s, and every read of every kind shares one 15 s clock', async () => {
+    expect(READ_INTERVAL_MS).toBe(15000);
+    expect(WATCH_INTERVAL_MS).toBe(30000);
     expect(SEAL_PER_TICK).toBe(1);
     const s = setup({ kids: [kid(1)] });
     await s.w.tick();
     expect(reportReads(s)).toBe(1);
-    expect(s.alarm.at - s.now()).toBe(WATCH_INTERVAL_MS);
+    // the free slot between two reports: the night's check-in page
+    expect(s.alarm.at - s.now()).toBe(READ_INTERVAL_MS);
     s.tick(2000);
-    // read-now is a read like any other: 3 s of the 5 s clock are left
+    // read-now is a read like any other: 13 s of the 15 s clock are left
     expect((await s.w.readNow()).throttled).toBe(true);
+    s.tick(READ_INTERVAL_MS - 2000);
     await s.w.tick();
     expect(reportReads(s)).toBe(1);
-    expect(s.alarm.at - s.now()).toBe(WATCH_INTERVAL_MS - 2000);
-    s.tick(WATCH_INTERVAL_MS - 2000);
+    expect(s.tt.calls.filter((c) => c.path === '/clubber/checkin')).toHaveLength(1);
+    expect(s.alarm.at - s.now()).toBe(WATCH_INTERVAL_MS - READ_INTERVAL_MS);
+    s.tick(WATCH_INTERVAL_MS - READ_INTERVAL_MS);
     await s.w.tick();
     expect(reportReads(s)).toBe(2);
   });
@@ -169,7 +172,7 @@ describe('the watcher', () => {
     await s.w.tick();
     s.tick(WATCH_INTERVAL_MS);
     const client = /** @type {any} */ (s.w.clientFor());
-    await client.checkinPage({ waitMs: 12000, kind: 'phone-roster' });   // takes the slot now
+    await client.checkinPage({ waitMs: 20000, kind: 'phone-roster', priority: true });   // takes the slot now
     await s.w.tick();                                                    // the report is due, the clock is not
     expect(reportReads(s)).toBe(1);
     expect(s.alarm.at - s.now()).toBe(READ_INTERVAL_MS);

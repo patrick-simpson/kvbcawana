@@ -19,8 +19,14 @@
 //     what the phone path always sent). The sealed job and the sealed row carry
 //     the rest.
 //   - Fail closed. No history key, or a seal that cannot be made, posts NOTHING.
-//   - The 5 s read budget. A 429 is a DeskError 'busy' with `retryAfterMs`; the
-//     page shows "busy, try again in Ns" and does not hammer.
+//   - The Worker's read clock (one TwoTimTwo read every 15 s, every reader
+//     combined, while the laptop's extension tab still reads; a roster request
+//     queues up to 20 s for its turn, and a check-in, undo or check-out reads
+//     nothing once the Worker holds tonight's check-in page). A 429 is a
+//     DeskError 'busy' with `retryAfterMs`; the page shows "busy, try again in
+//     Ns" and does not hammer. The roster and families answers carry
+//     `familiesAt` (when the Worker's household list was read): a page that
+//     sees it move asks for the families again.
 //   - A stations-changed 409 (a station registered or left while we sealed) is
 //     answered by resealing to the list the Worker sends back, up to RESEAL_MAX.
 
@@ -157,7 +163,7 @@ export function createDesk({ cc, fetch: fetchFn, store, base = DESK_API, now = D
     }
     if (res.status === 429 && opts.auth !== false) {
       const header = Number(res.headers && res.headers.get && res.headers.get('Retry-After'));
-      const retryAfterMs = Number(data && data.retryAfterMs) || (Number.isFinite(header) && header > 0 ? header * 1000 : 5000);
+      const retryAfterMs = Number(data && data.retryAfterMs) || (Number.isFinite(header) && header > 0 ? header * 1000 : 15000);
       throw new DeskError('busy', `TwoTimTwo was just read. Try again in ${Math.max(1, Math.ceil(retryAfterMs / 1000))}s.`, { retryAfterMs });
     }
     return { status: res.status, body: data };

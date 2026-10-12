@@ -6,7 +6,9 @@
 // TwoTimTwo agreed (Devin, 2026-10-11) to an automated check-in user on the
 // church's site, reading as often as ONE read every 5 seconds (all reads
 // combined; the first word was 15 s), everything encrypted, and with no
-// technical support from them if it breaks. So:
+// technical support from them if it breaks. While the laptop's extension tab
+// still reads beside it, the Worker keeps to one read every 15 s (owner
+// 2026-10-12, readbudget.js READ_INTERVAL_MS). So:
 //   - every request is https to ONE host (TWOTIMTWO_HOST, a *.twotimtwo.com
 //     name), and a redirect anywhere else is refused, so the session cookie
 //     and the password can never be sent to another site;
@@ -14,7 +16,7 @@
 //     only: neither is ever stored, logged or returned;
 //   - a refused sign-in backs off (5, 15, then 60 minutes), so a wrong password
 //     never hammers their login or locks the account;
-//   - EVERY request that reads takes a slot from the one 5 s clock
+//   - EVERY request that reads takes a slot from the one read clock
 //     (readbudget.js): a page, each hop of the sign-in (the form, the post, a
 //     redirect) and every redirect hop. Only the check-in, undo and check-out
 //     posts themselves are writes and take none;
@@ -28,6 +30,7 @@
 
 import { parseHTML } from 'linkedom';
 import { parse, serialize } from 'parse5';
+import { INTERACTIVE_WAIT_MS, READ_INTERVAL_MS } from './readbudget.js';
 
 export const DEFAULT_HOST = 'kvbchurch.twotimtwo.com';
 const HOST_RE = /^[a-z0-9][a-z0-9-]{0,62}\.twotimtwo\.com$/;
@@ -39,8 +42,15 @@ export const PAGE_MAX = 4 * 1024 * 1024;
 export const LOGIN_BACKOFF_MS = [5 * 60 * 1000, 15 * 60 * 1000, 60 * 60 * 1000];
 /** Sign-in back-off after each try in a row that met TwoTimTwo down (5xx) or no network. */
 export const DOWN_BACKOFF_MS = [30 * 1000, 60 * 1000, 2 * 60 * 1000, 5 * 60 * 1000];
-/** How long a request already under way (a sign-in's next hop, a redirect, the page after a sign-in) queues for its slot. */
-export const FOLLOW_WAIT_MS = 12 * 1000;
+/**
+ * How long a request already under way (a sign-in's next hop, a redirect, the
+ * page after a sign-in) queues for its slot: behind what an interactive request
+ * may have booked, plus one slot. Such a hop is a `priority` read (it never
+ * yields to the report's reservation), so a sign-in is never left half done.
+ */
+export const FOLLOW_WAIT_MS = INTERACTIVE_WAIT_MS + READ_INTERVAL_MS;
+/** A desk check-in, undo or check-out's read: the head of the read queue (readbudget.js). */
+export const URGENT = Object.freeze({ urgent: true });
 const USER_AGENT = 'KVBC-Awana-CloudCheckin/1 (+https://awana.kvbchurch.org)';
 
 const LOGIN_FORM_RE = /name\s*=\s*["']LoginForm\[password\]["']/i;
@@ -381,6 +391,18 @@ export function itemsToSend(events, clubId, options = {}) {
  * @returns {string[][] | null}
  */
 export function parseHouseholdCsv(text) {
+  const all = householdLists(text);
+  return all ? all.filter((kids) => kids.length >= 2) : null;
+}
+
+/**
+ * Every household's active children by name, one-child households included
+ * (so a child the export does not list at all can be told from one with no
+ * brothers or sisters: families.js). Same columns, same rules.
+ * @param {string} text
+ * @returns {string[][] | null}
+ */
+export function householdLists(text) {
   const t = String(text || '').replace(/^\uFEFF/, '');
   if (!t || isLoginPage(t) || /^\s*</.test(t)) return null;
   /** @type {string[][]} */
@@ -409,7 +431,7 @@ export function parseHouseholdCsv(text) {
   for (const r of rows.slice(1)) {
     if (!String(r[idCol] || '').trim()) continue;
     const kids = String(r[kidsCol] || '').split(',').map((k) => squash(k).slice(0, 80)).filter(Boolean);
-    if (kids.length >= 2) out.push(kids);
+    if (kids.length) out.push(kids);
   }
   return out;
 }
@@ -452,7 +474,7 @@ export class TwoTimTwoClient {
     this.password = creds.password;
     this.fetchFn = opts.fetchFn || ((...args) => fetch(...args));
     this.now = opts.now || (() => Date.now());
-    /** The one 5 s read clock (readbudget.js): every page GET takes a slot. None: no limit (the unit tests). */
+    /** The one read clock (readbudget.js): every page GET takes a slot. None: no limit (the unit tests). */
     this.budget = opts.budget || null;
     /** @type {Map<string, string>} */
     this.cookies = new Map();
@@ -464,6 +486,10 @@ export class TwoTimTwoClient {
     this.logins = 0;
     /** When this session last asked for a signed-in page (ms; 0 never): the watcher's read clock reads it. */
     this.lastReadMs = 0;
+    /** Desk writes that met a lapsed session and signed in again (write()). */
+    this.relogins = 0;
+    /** The sign-in under way, shared (signIn()). @type {Promise<any>|null} */
+    this.signingIn = null;
   }
 
   get origin() { return `https://${this.host}`; }
@@ -488,11 +514,14 @@ export class TwoTimTwoClient {
 
   /**
    * A slot from the one clock, or a thrown `ReadBusy` (with retryAfterMs).
-   * No clock (the unit tests): nothing to wait for. @param {number} waitMs @param {string} kind
+   * No clock (the unit tests): nothing to wait for. `priority` (readbudget.js):
+   * true for the watcher's report or a hop of a request already under way,
+   * URGENT for a desk action's read.
+   * @param {number} waitMs @param {string} kind @param {boolean | { urgent: boolean }} [priority]
    */
-  async slot(waitMs, kind) {
+  async slot(waitMs, kind, priority = false) {
     if (!this.budget) { this.lastReadMs = this.now(); return; }
-    const s = await this.budget.take(waitMs, kind);
+    const s = await this.budget.take(waitMs, kind, priority);
     if (!s.ok) throw Object.assign(new Error('read-busy'), { name: 'ReadBusy', retryAfterMs: s.retryAfterMs });
     this.lastReadMs = this.now();
   }
@@ -502,7 +531,7 @@ export class TwoTimTwoClient {
    * and no hop may leave the TwoTimTwo host. `slot` makes the first hop take a
    * slot from the clock (queueing up to its waitMs); every redirect hop takes one
    * too (FOLLOW_WAIT_MS), a write's included.
-   * @param {string} path @param {{method?: string, form?: URLSearchParams, slot?: { waitMs: number, kind: string }}} [opts]
+   * @param {string} path @param {{method?: string, form?: URLSearchParams, slot?: { waitMs: number, kind: string, priority?: boolean | { urgent: boolean } }, urgent?: boolean}} [opts]
    * @returns {Promise<{status: number, path: string, html: string}>}
    */
   async request(path, opts = {}) {
@@ -512,8 +541,8 @@ export class TwoTimTwoClient {
     const kind = opts.slot ? opts.slot.kind : 'redirect';
     for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
       if (url.protocol !== 'https:' || url.host !== this.host) throw new Error('off-site-redirect');
-      if (hop > 0) await this.slot(FOLLOW_WAIT_MS, kind);
-      else if (opts.slot) await this.slot(opts.slot.waitMs, kind);
+      if (hop > 0) await this.slot(FOLLOW_WAIT_MS, kind, opts.urgent || (opts.slot && opts.slot.priority === URGENT) ? URGENT : true);
+      else if (opts.slot) await this.slot(opts.slot.waitMs, kind, opts.slot.priority || false);
       /** @type {Record<string, string>} */
       const headers = { 'User-Agent': USER_AGENT, Accept: 'text/html,*/*' };
       const jar = this.cookieHeader();
@@ -538,7 +567,7 @@ export class TwoTimTwoClient {
   /**
    * Sign in: the form, the post and any redirect, each on the one clock (the
    * first queues up to `waitMs`, the rest up to FOLLOW_WAIT_MS).
-   * @param {{ waitMs?: number, kind?: string }} [opts]
+   * @param {{ waitMs?: number, kind?: string, priority?: boolean, urgent?: boolean }} [opts]
    * @returns {Promise<{ok: true} | {ok: false, error: string, retryAfterMs?: number}>}
    */
   async login(opts = {}) {
@@ -548,7 +577,7 @@ export class TwoTimTwoClient {
     this.cookies.clear();
     let res;
     try {
-      const form = await this.request('/site/login', { slot: { waitMs: opts.waitMs ?? 0, kind: 'login' } });
+      const form = await this.request('/site/login', { slot: { waitMs: opts.waitMs ?? 0, kind: 'login', priority: opts.urgent ? URGENT : !!opts.priority } });
       this.logins += 1;
       // TwoTimTwo down already on the form: no post into it.
       if (form.status >= 500) {
@@ -562,7 +591,7 @@ export class TwoTimTwoClient {
       params.set('LoginForm[username]', this.username);
       params.set('LoginForm[password]', this.password);
       params.set('Login', '1');
-      res = await this.request('/site/login', { method: 'POST', form: params, slot: { waitMs: FOLLOW_WAIT_MS, kind: 'login' } });
+      res = await this.request('/site/login', { method: 'POST', form: params, slot: { waitMs: FOLLOW_WAIT_MS, kind: 'login', priority: opts.urgent ? URGENT : true } });
     } catch (err) {
       this.cookies.clear();
       const code = errorCode(err);
@@ -591,6 +620,16 @@ export class TwoTimTwoClient {
     return { ok: false, error: 'login-refused' };
   }
 
+  /**
+   * One sign-in at a time: callers that find one under way share it (two at
+   * once would each clear the other's cookie). @param {{ waitMs?: number, priority?: boolean, urgent?: boolean }} opts
+   * @returns {Promise<{ok: true} | {ok: false, error: string, retryAfterMs?: number}>}
+   */
+  signIn(opts) {
+    if (!this.signingIn) this.signingIn = this.login(opts).finally(() => { this.signingIn = null; });
+    return this.signingIn;
+  }
+
   /** TwoTimTwo down or no network at a sign-in: wait 30 s, 1, 2, then 5 minutes before the next. */
   noteDown() {
     this.downUntil = this.now() + DOWN_BACKOFF_MS[Math.min(this.downFails, DOWN_BACKOFF_MS.length - 1)];
@@ -602,29 +641,37 @@ export class TwoTimTwoClient {
    * when the page comes back as the login form (the session expired).
    * Every GET takes a slot from the read clock first: `waitMs` is how long
    * this caller will queue for one (0: the watcher, which skips its turn),
-   * and a refusal is `{error: 'read-busy', retryAfterMs}`.
+   * and a refusal is `{error: 'read-busy', retryAfterMs}`. `priority`: the
+   * watcher's report (it may take the slot it reserved); `urgent`: a desk
+   * check-in, undo or check-out with nothing cached, the head of the queue
+   * (readbudget.js).
    * @param {string} path
-   * @param {{ waitMs?: number, kind?: string }} [opts]
+   * @param {{ waitMs?: number, kind?: string, priority?: boolean, urgent?: boolean }} [opts]
    * @returns {Promise<{ok: true, html: string} | {ok: false, error: string, retryAfterMs?: number}>}
    */
   async page(path, opts = {}) {
     // The caller's wait is for the first request; once one is made the rest queue
     // behind it (FOLLOW_WAIT_MS): a sign-in is never left half done.
     let waitMs = opts.waitMs ?? 0;
+    const urgent = !!opts.urgent;
+    /** @type {boolean | { urgent: boolean }} */
+    let priority = urgent ? URGENT : !!opts.priority;
     for (let attempt = 0; attempt < 2; attempt++) {
       if (!this.cookies.size || attempt > 0) {
-        const signedIn = await this.login({ waitMs });
+        const signedIn = await this.signIn({ waitMs, priority: priority === true, urgent });
         if (!signedIn.ok) return signedIn;
         waitMs = FOLLOW_WAIT_MS;
+        priority = urgent ? URGENT : true;
       }
       let res;
       try {
-        res = await this.request(path, { slot: { waitMs, kind: opts.kind || 'page' } });
+        res = await this.request(path, { slot: { waitMs, kind: opts.kind || 'page', priority } });
       } catch (err) {
         const code = errorCode(err);
         return code === 'read-busy' ? { ok: false, error: code, retryAfterMs: /** @type {any} */ (err).retryAfterMs } : { ok: false, error: code };
       }
       waitMs = FOLLOW_WAIT_MS;
+      priority = urgent ? URGENT : true;
       if (isLoginPage(res.html) || /\/site\/login/i.test(res.path)) continue;
       // A refusal is answered with one fresh sign-in: TwoTimTwo applies a
       // permission granted to the user at its next sign-in, not to a session
@@ -647,53 +694,80 @@ export class TwoTimTwoClient {
   }
 
   /**
+   * A write for a desk action (`desk: true`): never left waiting on a lapsed
+   * session. Its redirect hops are URGENT reads, and when TwoTimTwo answers
+   * with the login form (signed out) it signs in again at the head of the
+   * read queue and makes the write ONCE more. Without `desk` (the youth
+   * check-out sweep) a signed-out answer is just that.
+   * @template {{ok: boolean, error?: string}} R
+   * @param {(urgent: boolean) => Promise<R>} send @param {{ desk?: boolean }} opts
+   * @returns {Promise<R>}
+   */
+  async write(send, opts) {
+    const desk = !!(opts && opts.desk);
+    const first = await send(desk);
+    if (first.ok || first.error !== 'signed-out' || !desk) return first;
+    const signedIn = await this.signIn({ waitMs: INTERACTIVE_WAIT_MS, urgent: true });
+    if (!signedIn.ok) return first;
+    this.relogins += 1;
+    return send(true);
+  }
+
+  /**
    * Check one child in: TwoTimTwo's own POST, as the check-in page makes it.
    * @param {{clubberId: string, calendarId: string, events: string[], name: string}} c
+   * @param {{ desk?: boolean }} [opts] a desk action: signs in again and retries once (write())
    * @returns {Promise<{ok: true} | {ok: false, error: string}>}
    */
-  async checkIn(c) {
-    const form = new URLSearchParams();
-    form.set('clubber_id', c.clubberId);
-    form.set('calendar_id', c.calendarId);
-    for (const id of c.events) form.append('events[]', id);
-    let res;
-    try {
-      res = await this.request('/clubber/checkinclubber', { method: 'POST', form });
-    } catch (err) {
-      return { ok: false, error: errorCode(err) };
-    }
-    if (isLoginPage(res.html) || /\/site\/login/i.test(res.path)) return { ok: false, error: 'signed-out' };
-    if (res.status !== 200) return { ok: false, error: res.status >= 500 ? 'twotimtwo-down' : `http-${res.status}` };
-    return checkinReplyOk(res.html, c.name) ? { ok: true } : { ok: false, error: 'checkin-refused' };
+  async checkIn(c, opts = {}) {
+    return this.write(async (urgent) => {
+      const form = new URLSearchParams();
+      form.set('clubber_id', c.clubberId);
+      form.set('calendar_id', c.calendarId);
+      for (const id of c.events) form.append('events[]', id);
+      let res;
+      try {
+        res = await this.request('/clubber/checkinclubber', { method: 'POST', form, urgent });
+      } catch (err) {
+        return { ok: /** @type {const} */ (false), error: errorCode(err) };
+      }
+      if (isLoginPage(res.html) || /\/site\/login/i.test(res.path)) return { ok: /** @type {const} */ (false), error: 'signed-out' };
+      if (res.status !== 200) return { ok: /** @type {const} */ (false), error: res.status >= 500 ? 'twotimtwo-down' : `http-${res.status}` };
+      return checkinReplyOk(res.html, c.name) ? { ok: /** @type {const} */ (true) } : { ok: /** @type {const} */ (false), error: 'checkin-refused' };
+    }, opts);
   }
 
   /**
    * Undo one check-in: TwoTimTwo's own POST (docs: `checkinclubberundo`),
    * counted only on its short "(checkin undone)" answer. A write: no read slot.
-   * @param {{clubberId: string, calendarId: string}} c
+   * @param {{clubberId: string, calendarId: string}} c @param {{ desk?: boolean }} [opts]
    * @returns {Promise<{ok: true} | {ok: false, error: string}>}
    */
-  async undoCheckIn(c) {
-    return this.postOk('/clubber/checkinclubberundo', c, (t) => /\(checkin undone\)/i.test(t));
+  async undoCheckIn(c, opts = {}) {
+    return this.write((urgent) => this.postOk('/clubber/checkinclubberundo', c, (t) => /\(checkin undone\)/i.test(t), urgent), opts);
   }
 
   /**
    * Check one child out: POST /clubber/checkout, accepted only on an exact "OK".
-   * @param {{clubberId: string, calendarId: string}} c
+   * @param {{clubberId: string, calendarId: string}} c @param {{ desk?: boolean }} [opts]
    * @returns {Promise<{ok: true} | {ok: false, error: string}>}
    */
-  async checkOut(c) {
-    return this.postOk('/clubber/checkout', c, (t) => t.trim() === 'OK');
+  async checkOut(c, opts = {}) {
+    return this.write((urgent) => this.postOk('/clubber/checkout', c, (t) => t.trim() === 'OK', urgent), opts);
   }
 
-  /** @param {string} path @param {{clubberId: string, calendarId: string}} c @param {(text: string) => boolean} accept */
-  async postOk(path, c, accept) {
+  /**
+   * @param {string} path @param {{clubberId: string, calendarId: string}} c @param {(text: string) => boolean} accept
+   * @param {boolean} [urgent] a desk action's: its redirect hops are urgent reads
+   * @returns {Promise<{ok: true} | {ok: false, error: string}>}
+   */
+  async postOk(path, c, accept, urgent = false) {
     const form = new URLSearchParams();
     form.set('calendar_id', c.calendarId);
     form.set('clubber_id', c.clubberId);
     let res;
     try {
-      res = await this.request(path, { method: 'POST', form });
+      res = await this.request(path, { method: 'POST', form, urgent });
     } catch (err) {
       return { ok: false, error: errorCode(err) };
     }
@@ -706,8 +780,10 @@ export class TwoTimTwoClient {
   async households(opts = {}) {
     const page = await this.page('/household/csv', { kind: 'households', ...opts });
     if (!page.ok) return page;
-    const list = parseHouseholdCsv(page.html);
-    return list ? { ok: /** @type {const} */ (true), households: list } : { ok: /** @type {const} */ (false), error: 'households-unreadable' };
+    const all = householdLists(page.html);
+    return all
+      ? { ok: /** @type {const} */ (true), households: all.filter((kids) => kids.length >= 2), names: all.flat() }
+      : { ok: /** @type {const} */ (false), error: 'households-unreadable' };
   }
 
   /**

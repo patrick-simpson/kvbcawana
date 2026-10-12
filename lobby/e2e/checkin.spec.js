@@ -130,7 +130,7 @@ test('sign in, search, check two siblings in with Bible and a friend, undo one, 
   const { world, historyRing, stationRing } = await stubSite(page);
   await signIn(page);
 
-  // The 5 s read budget: the first roster read is a 429, and the page says so and waits.
+  // The Worker's read clock: the first roster read is a 429, and the page says so and waits.
   await expect(page.locator('#busy')).toContainText(/busy: try again in \d+s/);
   await expect(page.locator('#list')).toContainText('families still to come', { timeout: 10_000 });
   await expect(page.locator('#print-led')).toHaveText('Printer ready');

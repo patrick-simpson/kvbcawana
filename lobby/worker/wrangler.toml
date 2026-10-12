@@ -9,7 +9,9 @@ compatibility_flags = ["nodejs_compat"]
 workers_dev = true
 
 # Cloud check-in (ROADMAP.md#cloud-check-in). "shadow" is phase 1: the report watcher
-# reads TwoTimTwo every 5 s on club nights and publishes nothing; it stays
+# reads TwoTimTwo's report every 30 s on club nights (all the Worker's reads share one
+# 15 s clock while the laptop's extension tab still reads, src/readbudget.js) and
+# publishes nothing; it stays
 # idle until the TWOTIMTWO_* secrets exist. "off" stops it.
 [vars]
 CLOUD_CHECKIN = "shadow"
