@@ -42,6 +42,14 @@
     </script>
   </div>
 
+  <!-- Tonight's Journey count (club purple), over the Journey view except
+       while a lesson video plays (src/schedule/25-trek.js); hidden with no
+       count. Before #journey-view so its CSS can step the splash doodles out. -->
+  <div id="journey-chip" class="jr-chip hidden" role="status">
+    <span class="jr-chip-label">Checked in</span>
+    <span class="jr-chip-block"><span id="journey-chip-count" class="jr-chip-count"></span></span>
+  </div>
+
   <div id="journey-view" class="view hidden">
     <div id="journey-placeholder">
       <span><img src="brand/logos/journey-white.svg" alt="Journey" draggable="false" /></span>
@@ -106,6 +114,25 @@
         <button id="slide-prev-btn" type="button">&larr; Back</button>
         <span id="slide-counter" aria-live="polite"></span>
         <button id="slide-next-btn" type="button">Next &rarr;</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Trek's small group time: club nights, 7:00-7:30 PM (src/schedule/25-trek.js).
+       The chip is tonight's Trek count from the lobby's tally (hidden when
+       none is known); the lesson line only when the church calendar names
+       tonight's Trek lesson. -->
+  <div id="trek-view" class="view hidden">
+    <div id="trek-card">
+      <div id="trek-tab">Small Group Time</div>
+      <div id="trek-chip" class="jr-chip hidden" role="status">
+        <span id="trek-chip-label" class="jr-chip-label">Checked in</span>
+        <span id="trek-chip-block" class="jr-chip-block"><span id="trek-chip-count" class="jr-chip-count"></span></span>
+      </div>
+      <div id="trek-wordmark"><img src="brand/logos/trek-white.svg" alt="Trek" draggable="false" /></div>
+      <div id="trek-lesson" class="hidden">
+        <span id="trek-lesson-kicker">Tonight&rsquo;s lesson</span>
+        <span id="trek-lesson-title"></span>
       </div>
     </div>
   </div>

@@ -53,6 +53,7 @@ export const STAMPED_ASSETS = [
   'brand/tokens.css',
   'brand/fonts.css',
   'brand/logos/journey-white.svg',
+  'brand/logos/trek-white.svg',
 ];
 
 // The brand kit's @font-face sheet, whose url()s are relative to itself.

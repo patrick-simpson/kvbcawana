@@ -61,6 +61,12 @@ if (!CONFIGURE_MODE) {
 function scheduledPhase() {
   const now = new Date();
   const minutes = now.getHours() * 60 + now.getMinutes();
+  // Trek's small group time comes first: on a club night it takes 7:00-7:30,
+  // the Journey window's last quarter hour included (trekSmallGroupTime() in
+  // 25-trek.js; a lesson still running holds it off, see pollSchedule()).
+  if (minutes >= TREK_START_MINUTES && minutes < TREK_END_MINUTES && trekSmallGroupTime(now)) {
+    return 'trek';
+  }
   return minutes >= JOURNEY_START_MINUTES && minutes < JOURNEY_END_MINUTES
     ? 'journey'
     : 'checkin';

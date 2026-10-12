@@ -95,6 +95,43 @@ test('over the Check-in Display both corner buttons keep to the one bottom-right
           assert.ok(near(away[id][side], want.journey[id][side]), `${width}x${height}, Journey view: #${id} ${side} is ${away[id][side]}, want ${want.journey[id][side]}`);
         }
       }
+
+      // Journey's count chip sits just left of the gear in the top-right,
+      // top-aligned with it and clearly apart, never under it.
+      await page.evaluate(() => {
+        document.getElementById('journey-chip-count').textContent = '128';
+        document.getElementById('journey-chip').classList.remove('hidden');
+      });
+      const jchip = await page.evaluate(() => {
+        const r = document.getElementById('journey-chip').getBoundingClientRect();
+        return { left: r.left, top: r.top, right: r.right, bottom: r.bottom };
+      });
+      const gear = (await measure())['settings-btn'];
+      assert.ok(near(jchip.top, gear.top), `${width}x${height}: the Journey chip is top-aligned with the gear`);
+      assert.ok(jchip.right <= gear.left - 12, `${width}x${height}: the Journey chip ends ${gear.left - jchip.right}px left of the gear`);
+      assert.ok(jchip.left >= 0, `${width}x${height}: the Journey chip is on screen`);
+      await page.evaluate(() => document.getElementById('journey-chip').classList.add('hidden'));
+
+      // Trek's small group card (club nights 7:00-7:30) keeps the column too:
+      // its top-right is the Trek count chip, which must stay clear of the gear.
+      await page.evaluate(() => {
+        document.getElementById('journey-view').classList.add('hidden');
+        document.getElementById('trek-view').classList.remove('hidden');
+        document.getElementById('trek-chip').classList.remove('hidden');
+        document.getElementById('trek-chip-count').textContent = '128';
+      });
+      const trek = await measure();
+      for (const id of ['toggle-btn', 'settings-btn']) {
+        for (const side of ['left', 'top', 'right', 'bottom']) {
+          assert.ok(near(trek[id][side], want.checkin[id][side]), `${width}x${height}, Trek card: #${id} ${side} is ${trek[id][side]}, want ${want.checkin[id][side]}`);
+        }
+      }
+      const chip = await page.evaluate(() => {
+        const r = document.getElementById('trek-chip').getBoundingClientRect();
+        return { top: r.top, bottom: r.bottom, right: r.right };
+      });
+      assert.ok(chip.right <= width && chip.top >= 0, `${width}x${height}: the Trek chip is on screen`);
+      assert.ok(chip.bottom < trek['settings-btn'].top, `${width}x${height}: the Trek chip is clear of the gear`);
       await page.close();
     }
   } finally {

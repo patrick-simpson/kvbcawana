@@ -27,6 +27,7 @@ function chooseQuality(choice) {
   // buttons still do something on a device where the write just failed.
   profileCache = choice === 'auto' ? detectedProfile : choice;
   applyCheckinDisplayUrl();
+  applyMotionProfile();
   syncQualityButtons();
   qualityStatus.textContent = stored
     ? `Using ${qualityWords(effectiveProfile())} on this device.`
@@ -113,6 +114,7 @@ async function requestPlayback(captionUrl, proceed) {
   stopTeachingSlides(); // a slideshow left from the previous video must not sit over this one
   journeyView.classList.remove('hidden');
   checkinView.classList.add('hidden');
+  trekView.classList.add('hidden'); // a lesson or preview over Trek's card takes the screen
   journeyPlaceholder.classList.add('hidden');
   journeySplash.classList.add('hidden');
   showVideoLoading();

@@ -58,7 +58,7 @@ function endOfLessonHandoff() {
       endPreview();
       return;
     }
-    setView('checkin');
+    setView(lessonDoneView());
   };
   const week = previewMode ? previewWeek : currentLesson && currentLesson.week;
   if (startTeachingSlides(week, finish)) return true;
@@ -114,7 +114,7 @@ journeyVideo.addEventListener('error', () => {
     // The lesson can't play, but this week's teaching slides are already on
     // this device — far better on the wall than a dead placeholder. Only a
     // week with no slides falls through to it.
-    if (startTeachingSlides(currentLesson && currentLesson.week, () => setView('checkin'))) return;
+    if (startTeachingSlides(currentLesson && currentLesson.week, () => setView(lessonDoneView()))) return;
     journeyVideo.classList.add('hidden');
     videoControls.classList.add('hidden');
     journeyPlaceholder.classList.remove('hidden');

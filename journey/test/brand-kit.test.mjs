@@ -64,6 +64,7 @@ test('the mirror carries everything this page loads, fonts with their licences',
     'tokens.json',
     'fonts.css',
     'logos/journey-white.svg',
+    'logos/trek-white.svg',
     'fonts/paytone-one-full-400-normal.woff2',
     'fonts/PaytoneOne-Regular.ttf',
     'fonts/londrina-solid-full-400-normal.woff2',
@@ -234,8 +235,16 @@ test("the baked art is the kit's own shapes, path for path", () => {
   const baked = [...styleCss.matchAll(/\sd='([^']+)'/g)].map((m) => m[1]);
   assert.ok(baked.length >= 8, 'the wave, the tab and the doodles are all baked in');
   for (const d of baked) assert.ok(kitPaths.has(d), `baked path ${d.slice(0, 24)}… is in the kit`);
-  // Journey's own wave and tab, not another club's.
-  for (const rel of ['shapes/wave-journey.svg', 'shapes/tab-c-journey.svg']) {
+  // Journey's own wave and tab, not another club's; and on Trek's small
+  // group card, Trek's wave and tab and the kit's stepped chip.
+  for (const rel of [
+    'shapes/wave-journey.svg',
+    'shapes/tab-c-journey.svg',
+    'shapes/wave-trek.svg',
+    'shapes/tab-c-trek.svg',
+    'shapes/chip-plate.svg',
+    'shapes/chip-keyline.svg',
+  ]) {
     const d = read(`brand/${rel}`).match(/\sd="([^"]+)"/)[1];
     assert.ok(baked.includes(d), `${rel} is on the page`);
   }
@@ -332,14 +341,47 @@ test("Awana's deck keeps its own look, the template slide's type included", () =
   for (const { selector, body } of deck) {
     assert.deepEqual(declarations(body), AWANA_DECK[selector], `${selector} is exactly as Awana's deck has it`);
   }
+  // The full profile's slide transitions (24-motion.js) animate the deck's
+  // layers from script and leave every declaration above alone; the one
+  // stylesheet rule they add is the heading's words as boxes, on the full
+  // profile only, changing nothing else about the type.
+  const words = rules(styleCss).filter((r) => /\.jm-word/.test(r.selector));
+  assert.deepEqual(
+    words.map((r) => [r.selector, declarations(r.body)]),
+    [['html.motion-full .jm-word', ['display: inline-block']]]
+  );
 });
+
+/* style.css split where a low-profile page stops matching: the one motion
+   block (`@media (prefers-reduced-motion: no-preference) { html.motion-full
+   ... }`, whose class 24-motion.js sets only on the full profile) and
+   everything else. Found by brace matching, so nothing hides in it unseen. */
+const MOTION_OPEN = '@media (prefers-reduced-motion: no-preference) {';
+function splitMotionBlock(css) {
+  const start = css.indexOf(MOTION_OPEN);
+  assert.notEqual(start, -1, 'the motion block exists');
+  assert.equal(css.indexOf(MOTION_OPEN, start + 1), -1, 'one motion block');
+  let depth = 0;
+  let end = start + MOTION_OPEN.length - 1;
+  for (; end < css.length; end += 1) {
+    if (css[end] === '{') depth += 1;
+    if (css[end] === '}') depth -= 1;
+    if (depth === 0) break;
+  }
+  return { low: css.slice(0, start) + css.slice(end + 1), motion: css.slice(start + MOTION_OPEN.length, end) };
+}
 
 test('the Pi Zero paint budget: one keyframe, no filters, no gradients, no blur', () => {
   const css = stripComments(styleCss);
-  assert.deepEqual([...css.matchAll(/@keyframes\s+([\w-]+)/g)].map((m) => m[1]), ['journey-splash-pulse']);
-  for (const m of css.matchAll(/animation(?:-name)?\s*:\s*([^;]+);/g)) {
+  // What a low-profile page can match is everything outside the motion
+  // block: there the splash's opacity pulse is still the only keyframe and
+  // the only animation, as before the full profile got its motion.
+  const { low } = splitMotionBlock(css);
+  assert.deepEqual([...low.matchAll(/@keyframes\s+([\w-]+)/g)].map((m) => m[1]), ['journey-splash-pulse']);
+  for (const m of low.matchAll(/animation(?:-name)?\s*:\s*([^;]+);/g)) {
     assert.match(m[1], /^journey-splash-pulse\b/, 'the pulse is the only animation');
   }
+  assert.doesNotMatch(low, /motion-full|\bjm-/, 'nothing outside the block names the motion');
   // The property itself, prefixed or not (Chromium still honours
   // -webkit-filter), in any case: CSS property names ignore it.
   assert.doesNotMatch(css, /(^|[\s;{])(-[a-z]+-)?filter\s*:/i, 'no filters');
@@ -359,4 +401,34 @@ test('the Pi Zero paint budget: one keyframe, no filters, no gradients, no blur'
       }
     }
   }
+});
+
+test("the full profile's motion is fenced: html.motion-full only, cheap properties only", () => {
+  const { motion } = splitMotionBlock(stripComments(styleCss));
+  // Every rule in the block (keyframe steps aside) needs html.motion-full, so
+  // a page without the class (the Pi, configure mode, reduced motion)
+  // matches none of them.
+  const step = /^(from|to|\d+(\.\d+)?%)(\s*,\s*(from|to|\d+(\.\d+)?%))*$/;
+  const selectors = rules(motion).map((r) => r.selector).filter((sel) => !step.test(sel));
+  assert.ok(selectors.length > 20);
+  for (const sel of selectors) {
+    for (const one of splitTop(sel)) assert.match(one, /^html\.motion-full\b/, `${one} is scoped to the full profile`);
+  }
+  // Its keyframes are its own (jm-) and move only transform, opacity and
+  // clip-path; its animations name only them; no transitions.
+  const names = [...motion.matchAll(/@keyframes\s+([\w-]+)/g)].map((m) => m[1]);
+  assert.ok(names.length > 5);
+  for (const name of names) assert.match(name, /^jm-/);
+  for (const block of motion.matchAll(/@keyframes\s+[\w-]+\s*\{((?:[^{}]*\{[^{}]*\})*)\s*\}/g)) {
+    for (const frame of block[1].matchAll(/\{([^{}]*)\}/g)) {
+      for (const decl of frame[1].split(';').map((d) => d.trim()).filter(Boolean)) {
+        assert.match(decl, /^(transform|opacity|clip-path|animation-timing-function)\s*:/, `keyframes move only cheap properties: ${decl}`);
+      }
+    }
+  }
+  for (const m of motion.matchAll(/animation(?:-name)?\s*:\s*([^;]+);/g)) {
+    const name = m[1].trim().match(/^[\w-]+/)[0];
+    assert.ok(names.includes(name), `${m[1]} names one of the block's own keyframes`);
+  }
+  assert.doesNotMatch(motion, /transition\s*:/, 'entrances are keyframes, never transitions');
 });

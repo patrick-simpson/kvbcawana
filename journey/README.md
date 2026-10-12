@@ -7,6 +7,7 @@ A simple kiosk website that displays the **Journey: Advocates** video lesson on 
 **About page (what it does, in plain words):** https://awana.kvbchurch.org/#journey
 
 - **6:30 PM – 7:15 PM:** Shows the current week's Journey lesson video
+- **Club nights, 7:00 PM – 7:30 PM:** Shows Trek's "Small Group Time" card (tonight's Trek count, and Trek's lesson when the church calendar names it); a Journey lesson still running at 7:00 finishes first
 - **All other times:** Shows the Awana Check-in Display
 - **Runs on:** Raspberry Pi (any model, including Pi Zero)
 - **No setup complexity:** Plain HTML/CSS/JavaScript—no build step, no databases
@@ -278,7 +279,8 @@ The video lessons come from the **Journey: Advocates** curriculum hosted by Awan
 A small gear (⚙) button opens a list of every lesson in the course. While
 the Check-in Display is showing (all day, except 6:30–7:15 PM) the gear sits
 in the bottom-right corner, just above the switch-display (⇄) button; over
-the lesson, the splash and the slides it is in the top-right corner. Tap a
+the lesson, the splash and the slides it is in the top-right corner. (Over
+Trek's small group card it stays in the bottom-right corner too.) Tap a
 week to play it right now — this is just a one-time preview and never
 changes what plays automatically at 6:30 PM.
 
