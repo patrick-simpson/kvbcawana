@@ -128,7 +128,8 @@ test('sign in, search, check two siblings in together, undo one, check one out',
   expect(sent['11'].items).toEqual({ Bible: true });
   expect(sent['12'].items).toEqual({ Bible: true, Friend: true });
   for (const post of world.posts) {
-    expect(JSON.stringify(post.body)).not.toMatch(/Ada|Ben|Tester|Sam/);
+    const { job: _job, historyRow: _row, ...plain } = post.body;   // the sealed parts are random base64
+    expect(JSON.stringify(plain)).not.toMatch(/Ada|Ben|Tester|Sam/);
     expect(post.body.night).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     expect(post.body.job.kind).toBe('print-job');
     expect(post.body.historyRow.kind).toBe('checkin');
