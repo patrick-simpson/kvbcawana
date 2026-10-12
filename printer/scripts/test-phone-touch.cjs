@@ -26,10 +26,11 @@ const BASE = `http://127.0.0.1:${PORT}`;
     const a = block(touch), b = block(phone);
     check('the phone carries touch.js’s search, households and tile fit verbatim (run scripts/sync-touch-core.cjs)',
       a === b && /function searchPeople/.test(b) && /function groupFamilies/.test(b) && /function fitTiles/.test(b));
-    // The page is on the Worker's desk path since 2026-10-12 (one /checkin): "Not here the
-    // last two club nights" read the laptop's attendance, which the Worker does not have.
-    check('the phone shows families first when typing, then the children, then "did you mean"',
-      (() => { const r = phone.slice(phone.indexOf('function renderSearch')); const x = r.indexOf("'Families'"), y = r.indexOf("'Children'"), z = r.indexOf("'Did you mean'"); return x > 0 && x < y && y < z; })());
+    check('the phone shows families first when typing, away families last',
+      (() => { const r = phone.slice(phone.indexOf('function renderSearch')); const x = r.indexOf("'Families'"), y = r.indexOf("'Children'"), z = r.indexOf("'Not here the last two club nights'"); return x > 0 && x < y && y < z; })());
+    // Since 2026-10-12 "Not here" is read from the sealed history in the browser (memory only).
+    check('who was here lately comes from the history, opened in the page, never stored',
+      /desk\.recentAttendance\(2\)/.test(phone) && !/(?:localStorage|sessionStorage)\.setItem\([^)]*RECENT/.test(phone));
     check('Bible starts ticked on the phone’s card and family page',
       /var choice = \{ bible: items\.bible, friend: false \};/.test(phone) && /openFamily\(null, f\.kids, \{ bible: true, friend: false \}, f\.name\)/.test(phone));
     check('a phone check-in sends Bible / Friend with it (the Worker\'s desk check-in, site/checkin/desk-transport.js)',

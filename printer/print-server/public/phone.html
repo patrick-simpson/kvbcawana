@@ -334,7 +334,10 @@
       <select id="leader-club" aria-label="Leader's club"><option value="">No club</option></select>
       <button class="btn hot" id="leader-print" type="button">Print leader tag</button>
     </div>
-    <p class="quiet">Remembered leaders and Print selected are on the settings page (Laptop).</p>
+    <div id="leader-chips-wrap" hidden>
+      <div class="acts" style="margin-top:12px"><button class="btn ghost" id="leader-print-selected" type="button">Print selected</button></div>
+      <div id="leader-chips" class="chips"></div>
+    </div>
     <p class="err" id="leader-status"></p>
   </div>
   <div class="menu-sec" id="custom-panel">
@@ -587,6 +590,13 @@ var SERVER_TONIGHT = null;     // GET /v1/desk/tonight: the Worker's own count, 
 var UNDOING = {};              // row key -> true while TwoTimTwo's undo (or a visitor's Remove) is under way
 var CHECKING_OUT = {};         // row key -> true while a check-out is under way
 var LOCAL = { night: '', visitors: [], out: [], at: {} };   // what only this page knows tonight
+// Who was here the last two club nights: { names: {normName: true}, ids: {clubberId: true} }
+// or null. Built in THIS page's memory from the sealed history (desk.recentAttendance(),
+// opened with the history key the passphrase sign-in unwrapped), never stored; null
+// (nobody shown as away) until it is ready, and for good when it cannot be read.
+var RECENT = null;
+var recentAskedAt = 0;
+var RECENT_RETRY_MS = 5 * 60 * 1000;
 var rosterLoaded = false;
 var unlockedState = false;
 var unlockInFlight = false;
@@ -744,6 +754,9 @@ function signOut(message) {
   KIDS = [];
   HOUSEHOLDS = null; familiesAt = 0;
   SERVER_TONIGHT = null;
+  RECENT = null; recentAskedAt = 0;
+  leaderSelection = {};
+  renderLeaderChips([]);
   rosterLoaded = false;
   clearPinCountdown();
   showPinScreen(message);
@@ -765,6 +778,8 @@ function startSession() {
   fillClubSelects();
   render();
   startRosterPoll();
+  if (SIMPLE) return;   // the youth page: check-in only
+  refreshLeaders();
 }
 function unlock() {
   if (unlockInFlight) return;
@@ -845,6 +860,25 @@ function waitingPeople() {
 function itemsFor(club) {
   var has = function(list) { return (list || []).some(function(c) { return clubKit(c) && clubKit(c) === clubKit(club); }); };
   return { bible: has(ITEMS.bible), friend: has(ITEMS.friend) };
+}
+function isAway(f) {
+  if (!RECENT) return false;
+  return f.kids.every(function(k) { return !RECENT.names[norm(k.name)] && !(k.kid && RECENT.ids[k.kid.clubberId]); });
+}
+// After the roster is on screen, never in the way of a check-in: the history's
+// last two club nights, read once (again after a while if it could not be).
+function loadRecent() {
+  if (RECENT || SIMPLE || !desk || !desk.canReadHistory) return;
+  if (recentAskedAt && Date.now() - recentAskedAt < RECENT_RETRY_MS) return;
+  recentAskedAt = Date.now();
+  desk.recentAttendance(2).then(function(r) {
+    if (!r || !unlockedState) return;
+    var names = {}, ids = {};
+    r.names.forEach(function(n) { names[norm(n)] = true; });
+    r.ids.forEach(function(id) { ids[id] = true; });
+    RECENT = { names: names, ids: ids };
+    if (!$('fampage').classList.contains('on') && openSheet !== 'kid-sheet') render();
+  });
 }
 
 // ── Smooth redraws (the touch check-in's): keyed tiles, FLIP, pop-outs ─────
@@ -954,6 +988,18 @@ function famCard(f, hits) {
   b.onclick = function() { famClick(f); };
   return b;
 }
+function awayButton(f, prefix) {
+  var b = keyed('button', 'famsm', prefix + f.key);
+  b.dataset.names = names(f);
+  var dots = el('span', 'dots');
+  f.kids.forEach(function(c) { var d = el('span', 'dot'); d.style.setProperty('--c', clubOf(c.clubName).color); dots.appendChild(d); });
+  b.appendChild(dots);
+  b.appendChild(el('span', 'nm', f.kids.length === 1 ? f.kids[0].name : f.name));
+  if (f.kids.length > 1) b.appendChild(el('span', 'n', String(f.kids.length)));
+  b.setAttribute('aria-label', famLabel(f));
+  b.onclick = function() { famClick(f); };
+  return b;
+}
 function kidCard(p) {
   var club = clubOf(p.clubName);
   var b = keyed('button', 'card' + (p.checkedIn ? ' in' : ''), 'c:' + p.recid);
@@ -984,10 +1030,13 @@ function render() {
   renderCount();
 }
 
-// Families still to come (the search box is empty).
+// Families still to come (the search box is empty): the "Not here" list too.
 function renderFamilies(list) {
-  var main = groupFamilies(waitingPeople(), HOUSEHOLDS);
-  if (!main.length) { list.appendChild(el('div', 'cheer', 'Everyone’s checked in!')); return; }
+  var all = groupFamilies(waitingPeople(), HOUSEHOLDS);
+  if (!all.length) { list.appendChild(el('div', 'cheer', 'Everyone’s checked in!')); return; }
+  var main = all.filter(function(f) { return !isAway(f); });
+  var away = all.filter(isAway);
+  if (!main.length) { main = away; away = []; }
   list.appendChild(el('div', 'lead', main.length + (main.length === 1 ? ' family' : ' families') + ' still to come'));
   var W = list.clientWidth - 24;
   var H = window.innerHeight - list.getBoundingClientRect().top - 60;
@@ -1002,10 +1051,18 @@ function renderFamilies(list) {
   grid.style.gridAutoRows = Math.floor(h) + 'px';
   main.forEach(function(f) { grid.appendChild(famTile(f, { w: w, h: h })); });
   list.appendChild(grid);
+  if (away.length) {
+    var box = el('div', 'away');
+    box.appendChild(el('div', 'lead', 'Not here the last two club nights · ' + away.length));
+    var row = el('div', 'awayrow');
+    away.forEach(function(f) { row.appendChild(awayButton(f, 'a:')); });
+    box.appendChild(row);
+    list.appendChild(box);
+  }
 }
 
-// Typing: households first, then the children on their own panel, then "Did
-// you mean" families.
+// Typing: households first, then the children on their own panel, "Did you
+// mean" families, and families not here lately only at the bottom.
 function renderSearch(list, q) {
   var everyone = KIDS.map(person);
   var r = searchPeople(everyone, q);
@@ -1025,15 +1082,26 @@ function renderSearch(list, q) {
   }
   var exact = famsFor(r.matches);
   var near = norm(q).length >= 3 ? famsFor(r.close) : [];
+  var away = exact.concat(near).filter(isAway);
+  exact = exact.filter(function(f) { return !isAway(f); });
+  near = near.filter(function(f) { return !isAway(f); });
+  var awayKid = {};
+  away.forEach(function(f) { f.kids.forEach(function(k) { awayKid[k.recid] = true; }); });
   // A child who is a family of one is already their family card; the panel
   // lists the brothers and sisters the cards hold, and anyone already in.
-  var kids = r.matches.filter(function(p) { return p.checkedIn || (famOf[p.recid] && famOf[p.recid].kids.length > 1); });
+  var kids = r.matches.filter(function(p) { return !awayKid[p.recid] && (p.checkedIn || (famOf[p.recid] && famOf[p.recid].kids.length > 1)); });
 
   if (exact.length) {
     list.appendChild(el('div', 'sec', exact.length === 1 ? 'Family' : 'Families'));
     var g = el('div', 'rfams');
     exact.forEach(function(f) { g.appendChild(famCard(f, hits)); });
     list.appendChild(g);
+  }
+  if (near.length) {
+    list.appendChild(el('div', 'sec', exact.length ? 'Or did you mean' : 'Did you mean'));
+    var g2 = el('div', 'rfams');
+    near.forEach(function(f) { g2.appendChild(famCard(f, hits)); });
+    list.appendChild(g2);
   }
   if (kids.length) {
     var panel = el('div', 'panel');
@@ -1043,13 +1111,15 @@ function renderSearch(list, q) {
     panel.appendChild(g3);
     list.appendChild(panel);
   }
-  if (near.length) {
-    list.appendChild(el('div', 'sec', exact.length ? 'Or did you mean' : 'Did you mean'));
-    var g2 = el('div', 'rfams');
-    near.forEach(function(f) { g2.appendChild(famCard(f, hits)); });
-    list.appendChild(g2);
+  if (away.length) {
+    var box = el('div', 'away');
+    box.appendChild(el('div', 'lead', 'Not here the last two club nights'));
+    var row = el('div', 'awayrow');
+    away.forEach(function(f) { row.appendChild(awayButton(f, 's:')); });
+    box.appendChild(row);
+    list.appendChild(box);
   }
-  if (!exact.length && !near.length && !kids.length) {
+  if (!exact.length && !near.length && !kids.length && !away.length) {
     list.appendChild(el('div', 'note', 'No child matches “' + q.trim() + '”. A visitor? Tap + for a visitor.'));
   }
 }
@@ -1128,6 +1198,7 @@ function openKid(p) {
   s.appendChild(el('div', 'bar'));
   s.appendChild(el('div', 'nm', p.name));
   s.appendChild(el('div', 'cl', p.clubName || ''));
+  if (isAway({ kids: [p] })) s.appendChild(el('div', 'sub', 'Not here the last two club nights'));
   if (items.bible || items.friend) {
     var opts = el('div', 'opts');
     if (items.bible) opts.appendChild(optButton('Bible', choice.bible, function(v) { choice.bible = v; }));
@@ -1340,6 +1411,7 @@ function refreshAll() {
       if (!$('fampage').classList.contains('on') && openSheet !== 'kid-sheet') render(); else renderCount();
       if (openSheet === 'tonight-sheet') renderTonight();
       scheduleRosterPoll();
+      setTimeout(loadRecent, 0);
     });
   }).catch(function(e) {
     rosterFetchInFlight = false;
@@ -1543,7 +1615,7 @@ function checkoutEntry(entry) {
 // Every print here is a job sealed in this page to the print stations (a
 // reprint job, never a check-in, nothing sent to TwoTimTwo); a visitor is a
 // check-in like any other, named only inside the seals.
-$('menu-btn').addEventListener('click', function() { fillClubSelects(); showSheet('menu-sheet'); });
+$('menu-btn').addEventListener('click', function() { refreshLeaders(); fillClubSelects(); showSheet('menu-sheet'); });
 $('menu-close').addEventListener('click', hideSheet);
 // A label's failure, in its own panel when it is not one every action words alike.
 function printFailed(e, status) {
@@ -1561,15 +1633,84 @@ function printLeaderTag() {
   status.textContent = '';
   var btn = $('leader-print');
   btn.disabled = true;
-  desk.leaderTag({ name: name, club: $('leader-club').value }).then(function() {
+  var club = $('leader-club').value;
+  desk.leaderTag({ name: name, club: club }).then(function() {
     leaderInFlight = false; btn.disabled = false;
     toast('Leader tag for ' + name + ' sent to the printer.', 4000, null, null, 'good');
     $('leader-name').value = '';
     setTimeout(refreshStatus, 800);
+    // A new name joins the church's remembered leaders (never in the way of the print).
+    desk.rememberLeader({ name: name, club: club }).then(function(r) { if (r) renderLeaderChips(r.leaders); });
   }).catch(function(e) { leaderInFlight = false; btn.disabled = false; printFailed(e, status); });
 }
 $('leader-print').addEventListener('click', printLeaderTag);
 $('leader-name').addEventListener('keydown', function(e) { if (e.key === 'Enter') printLeaderTag(); });
+
+// Remembered leaders: the church settings' `leaders` (routes.md 10.3), the same
+// list on every device. Tick a few and Print selected tags a whole team. No
+// list (the Worker has no church settings yet, or no connection) = no chips.
+var leaderSelection = {};
+var leaderCache = [];
+function renderLeaderChips(leaders) {
+  leaderCache = (leaders || []).slice();
+  var wrap = $('leader-chips-wrap'), list = $('leader-chips');
+  list.textContent = '';
+  if (!leaderCache.length) { wrap.hidden = true; return; }
+  wrap.hidden = false;
+  leaderCache.forEach(function(l) {
+    var key = l.name.toLowerCase();
+    var chip = el('span', 'leader-chip');
+    var pick = el('label');
+    pick.style.cssText = 'display:inline-flex;align-items:center;gap:6px';
+    var cb = el('input'); cb.type = 'checkbox'; cb.checked = !!leaderSelection[key];
+    cb.addEventListener('change', function() { if (cb.checked) leaderSelection[key] = true; else delete leaderSelection[key]; });
+    pick.appendChild(cb);
+    pick.appendChild(document.createTextNode(l.name + (l.club ? ' · ' + l.club : '')));
+    var one = el('button', null, 'Print'); one.type = 'button';
+    one.addEventListener('click', function() { printLeaders([l]); });
+    var x = el('button', 'x', '×'); x.type = 'button';
+    x.setAttribute('aria-label', 'Forget ' + l.name);
+    x.addEventListener('click', function() { forgetLeader(l.name); });
+    chip.appendChild(pick); chip.appendChild(one); chip.appendChild(x);
+    list.appendChild(chip);
+  });
+}
+function refreshLeaders() {
+  if (!unlockedState || SIMPLE) return;
+  desk.churchLeaders().then(function(d) { renderLeaderChips(d ? d.leaders : []); });
+}
+// One sealed leader-tag job per leader, in order (the printer is one serial device).
+function printLeaders(leaders) {
+  var status = $('leader-status');
+  if (!leaders || !leaders.length) { status.textContent = 'Tick a leader first.'; return; }
+  if (leaderInFlight) return;
+  leaderInFlight = true;
+  status.textContent = '';
+  var sent = 0, failedNames = [];
+  var chain = Promise.resolve();
+  leaders.forEach(function(l) {
+    chain = chain.then(function() {
+      return desk.leaderTag({ name: l.name, club: l.club }).then(function() { sent++; }, function(e) { failedNames.push(l.name); if (e && e.code === 'signed-out') throw e; });
+    });
+  });
+  chain.then(function() {
+    leaderInFlight = false;
+    if (failedNames.length) status.textContent = 'Sent ' + sent + '; not sent: ' + failedNames.join(', ');
+    else { toast(sent + ' leader tag' + (sent === 1 ? '' : 's') + ' sent to the printer.', 4000, null, null, 'good'); leaderSelection = {}; renderLeaderChips(leaderCache); }
+    setTimeout(refreshStatus, 800);
+  }, function(e) { leaderInFlight = false; commonError(e, 'Could not print: '); });
+}
+function forgetLeader(name) {
+  if (!confirm('Forget ' + name + '? Their tag can still be printed by typing the name.')) return;
+  delete leaderSelection[name.toLowerCase()];
+  desk.forgetLeader(name).then(function(r) {
+    if (r) renderLeaderChips(r.leaders);
+    else $('leader-status').textContent = 'Could not update the remembered leaders. Try again.';
+  });
+}
+$('leader-print-selected').addEventListener('click', function() {
+  printLeaders(leaderCache.filter(function(l) { return leaderSelection[l.name.toLowerCase()]; }));
+});
 
 // Custom label: one line of free text. Records nothing at all.
 var customInFlight = false;

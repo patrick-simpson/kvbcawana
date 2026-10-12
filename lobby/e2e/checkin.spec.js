@@ -40,6 +40,7 @@ async function stubSite(page, { kids } = {}) {
       { clubberId: '14', first: 'Tia', last: 'Youth', club: 'Trek', clubId: '6', checkedIn: false },
     ],
     posts: [], tags: [], logins: [], rosterCalls: 0, busyFirst: true, queued: 0, printed: 0, refuse: null, signedOut: false,
+    history: null, historyCalls: [], church: null, churchPuts: [],
   };
   const api = async (route, req) => {
     const u = new URL(req.url());
@@ -62,6 +63,23 @@ async function stubSite(page, { kids } = {}) {
     if (p === '/v1/stations') return route.fulfill(json(200, [station]));
     if (p === '/v1/print/status') {
       return route.fulfill(json(200, { queued: world.queued, leased: 0, done: world.printed, dead: 0, waitingToSeal: 0, checkThePrinter: [], pendingToSeal: 0, claims: { printed: world.printed }, stations: [station] }));
+    }
+    if (p === '/v1/history/nights') {
+      world.historyCalls.push(p);
+      return route.fulfill(world.history ? json(200, Object.keys(world.history).map((night) => ({ night, rows: world.history[night].length }))) : json(503, { reason: 'history-off' }));
+    }
+    if (p === '/v1/history/rows') {
+      world.historyCalls.push(`${p}?${u.searchParams}`);
+      return route.fulfill(json(200, { rows: (world.history && world.history[u.searchParams.get('night')]) || [], next: null }));
+    }
+    if (p === '/v1/church/settings') {
+      if (!world.church) return route.fulfill(json(404, { error: 'Not found.' }));
+      if (method === 'PUT') {
+        world.churchPuts.push(body);
+        world.church = { rev: world.church.rev + 1, settings: { ...world.church.settings, ...body.settings } };
+        return route.fulfill(json(200, { ok: true, rev: world.church.rev, settings: world.church.settings }));
+      }
+      return route.fulfill(json(200, { rev: world.church.rev, settings: world.church.settings, switches: {} }));
     }
     if (p === '/v1/print/reprint') { world.tags.push(body); return route.fulfill(json(200, { ok: true, jobId: body.jobId, existing: false })); }
     if (p === '/v1/desk/checkin' || p === '/v1/desk/undo' || p === '/v1/desk/checkout') {
@@ -303,4 +321,88 @@ test('a wrong passphrase stays on the sign-in, and a signed-out session returns 
   await page.locator('#kid-sheet').getByRole('button', { name: 'Check in' }).click();
   await expect(page.locator('#pin-screen')).toBeVisible();
   await expect(page.locator('#pin-err')).toContainText('Signed out');
+});
+
+/** A history row sealed to the history key, as the desk or the laptop's import wrote it. */
+async function sealedRow(history, night, kind, record) {
+  const id = cc.newRowId();
+  return { id, night, kind, ...(await cc.sealRow(history.pub, { id, night, kind, record })) };
+}
+
+test('"Not here the last two club nights" is rebuilt in the page from the sealed history, memory only', async ({ page }) => {
+  test.setTimeout(60_000);
+  const { world, history } = await stubSite(page);
+  world.busyFirst = false;
+  // Ada was here last week; Cy two weeks ago; Ben checked in and was undone; Tia never came.
+  world.history = {
+    '2026-01-14': [
+      await sealedRow(history, '2026-01-14', 'checkin', { ts: 1, first: 'Ada', last: 'Tester', club: 'Cubbies', clubberId: '11', source: 'desk' }),
+      await sealedRow(history, '2026-01-14', 'checkin', { ts: 2, first: 'Ben', last: 'Tester', club: 'Sparks', clubberId: '12', source: 'desk' }),
+      await sealedRow(history, '2026-01-14', 'undo', { ts: 3, first: 'Ben', last: 'Tester', club: 'Sparks', clubberId: '12', source: 'desk' }),
+    ],
+    '2026-01-07': [await sealedRow(history, '2026-01-07', 'checkin', { ts: 1, first: 'Cy', last: 'Other', club: 'T&T', clubberId: '13', source: 'ttt' })],
+  };
+  await signIn(page);
+  const away = page.locator('.away', { hasText: 'Not here the last two club nights · 1' });
+  await expect(away).toBeVisible({ timeout: 10_000 });
+  await expect(away.locator('.famsm')).toHaveText(/Tia Youth/);
+  await expect(page.locator('.fam', { hasText: 'Tester' })).toHaveCount(1);   // Ada was here: the family is not away
+  await expect(page.locator('.fam', { hasText: 'Cy Other' })).toHaveCount(1);
+  // Typing finds her at the bottom, and her card says so; she checks in like anyone else.
+  await search(page).fill('Tia');
+  await expect(page.locator('.away .lead')).toHaveText('Not here the last two club nights');
+  await page.locator('.away .famsm').click();
+  await expect(page.locator('#kid-sheet .sub')).toHaveText('Not here the last two club nights');
+  await page.locator('#kid-sheet').getByRole('button', { name: 'Check in' }).click();
+  await expect(page.locator('#toast')).toContainText('Tia Youth is checked in');
+  // Worker (D1) reads only: one nights list and each night's rows, once; nothing kept in storage.
+  expect(world.historyCalls.filter((c) => c === '/v1/history/nights')).toHaveLength(1);
+  expect(world.historyCalls.filter((c) => c.startsWith('/v1/history/rows'))).toHaveLength(2);
+  const stored = await page.evaluate(() => JSON.stringify({ ...localStorage, ...sessionStorage }));
+  expect(stored).not.toMatch(/Tia|Cy Other|Ada|privateKey|d":/);
+  // A reload takes up the session without the passphrase: no key, so nobody is shown away.
+  await page.reload();
+  await expect(page.locator('#list')).toContainText('families still to come', { timeout: 10_000 });
+  await page.waitForTimeout(500);
+  await expect(page.locator('.away')).toHaveCount(0);
+});
+
+test('remembered leaders come from the church settings; a new leader tag adds one; no route, no chips', async ({ page }) => {
+  test.setTimeout(60_000);
+  const { world, stationRing } = await stubSite(page);
+  world.busyFirst = false;
+  world.church = { rev: 3, settings: { labelFooter: 'Welcome', leaders: [{ name: 'Ann Lead', club: 'Cubbies' }] } };
+  await signIn(page);
+  await expect(page.locator('#list')).toContainText('families still to come', { timeout: 10_000 });
+  await page.locator('#menu-btn').click();
+  await expect(page.locator('#leader-chips .leader-chip')).toHaveText([/Ann Lead · Cubbies/]);
+  await page.locator('.leader-chip', { hasText: 'Ann Lead' }).getByRole('button', { name: 'Print', exact: true }).click();
+  await expect(page.locator('#toast')).toContainText('1 leader tag sent');
+  expect(await cc.openAsStation(stationRing, world.tags[0].bundle)).toMatchObject({ route: '/print-leader', body: { name: 'Ann Lead', clubName: 'Cubbies' } });
+  // A typed leader's tag prints, then the name joins the list (only the leaders key is written, on the current rev).
+  await page.getByLabel('Leader\'s name').fill('Pat Leader');
+  await page.locator('#leader-club').selectOption('Sparks');
+  await page.locator('#leader-print').click();
+  await expect(page.locator('#leader-chips .leader-chip')).toHaveCount(2);
+  expect(world.churchPuts).toEqual([{ baseRev: 3, settings: { leaders: [{ name: 'Ann Lead', club: 'Cubbies' }, { name: 'Pat Leader', club: 'Sparks' }] } }]);
+  expect(world.church.settings.labelFooter).toBe('Welcome');
+  // Tick both and Print selected: one sealed leader job each.
+  for (const chip of await page.locator('.leader-chip input[type=checkbox]').all()) await chip.check();
+  await page.locator('#leader-print-selected').click();
+  await expect(page.locator('#toast')).toContainText('2 leader tags sent');
+  expect(world.tags).toHaveLength(4);
+  // Forget one.
+  page.once('dialog', (d) => d.accept());
+  await page.locator('.leader-chip', { hasText: 'Ann Lead' }).getByRole('button', { name: 'Forget Ann Lead' }).click();
+  await expect(page.locator('#leader-chips .leader-chip')).toHaveText([/Pat Leader · Sparks/]);
+
+  // The Worker has no church settings yet (404): no chips, and the print still works.
+  world.church = null;
+  await page.locator('#menu-close').click();
+  await page.locator('#menu-btn').click();
+  await expect(page.locator('#leader-chips-wrap')).toBeHidden();
+  await page.getByLabel('Leader\'s name').fill('Quinn New');
+  await page.locator('#leader-print').click();
+  await expect(page.locator('#toast')).toContainText('Leader tag for Quinn New');
+  expect(world.churchPuts).toHaveLength(2);   // the add and the forget above; nothing for Quinn
 });

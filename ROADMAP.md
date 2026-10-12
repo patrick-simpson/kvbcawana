@@ -741,9 +741,13 @@ said); "Owner" is what only the owner can do.
     friend's first name also rides the check-in to the 6:30 BARF list (`friendName`,
     routes.md section 5), as the phone path sent it. `/checkin/ym` is the same page
     for Trek and Journey (check-in only). `/desk` 301s to `/checkin/`; `site/desk/` is
-    gone (its transport moved to `site/checkin/`). Left with the laptop (they read its
-    data): Remove/Add back of a TwoTimTwo child, "Not here the last two club nights",
-    remembered leader chips (on /settings), the laptop's count check. Visitors and
+    gone (its transport moved to `site/checkin/`). Back by the owner's call (same day): "Not here the last two club nights",
+    rebuilt in the browser from the sealed history (the last two earlier nights, opened
+    with the history key held NON-extractable in memory after a passphrase sign-in;
+    D1 reads only, lazy, silent without a key), and the remembered leader chips, read
+    from and added to the church settings `leaders` (routes.md 10.3; chips appear once
+    that route and key land). Left with the laptop (they read its data): Remove/Add back
+    of a TwoTimTwo child, the laptop's count check. Visitors and
     who this page checked out are kept per tab for the night, as the desk did.
     `lobby/e2e/checkin.spec.js`, `site/test/checkin-page.test.mjs`.
   - **`/checkin/classic`: DELETE after Wednesday 2026-10-14.** The relayed phone
