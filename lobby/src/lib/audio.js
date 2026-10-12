@@ -14,7 +14,12 @@ function getContext() {
     if (!Ctx) return null;
     audioCtx = new Ctx();
   }
-  if (audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
+  if (audioCtx.state === 'suspended') {
+    // Try to wake it for the NEXT chime, but skip this one: notes scheduled on
+    // a frozen clock would all sound at once when a tap finally resumes it.
+    audioCtx.resume().catch(() => {});
+    return null;
+  }
   return audioCtx;
 }
 
