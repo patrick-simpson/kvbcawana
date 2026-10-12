@@ -53,6 +53,33 @@ test('the Pi never gets the motion: no class, no stinger, no sweep, no inline st
   }
 });
 
+test('a desktop gets the motion; the view has flipped before the stinger is even built', async () => {
+  const k = bootKiosk(ROUTES, ANSWERED, DESKTOP, reduce(false));
+  try {
+    await ticks();
+    assert.equal(hasMotion(k), true);
+    assert.equal(stinger(k), null, 'nothing plays for the view the page opened on');
+    k.document.getElementById('toggle-btn').click();
+    // Synchronously after the click: the Journey view is already up.
+    assert.equal(k.document.getElementById('journey-view').classList.contains('hidden'), false);
+    await ticks(1);
+    const s = stinger(k);
+    assert.ok(s, 'the flip stinger plays over the new view');
+    assert.equal(s.getAttribute('aria-hidden'), 'true');
+    assert.equal(s.querySelectorAll('.jm-stinger-bar').length, 4);
+    assert.ok(s.querySelector('.jm-stinger-word img'), 'into Journey: the Journey wordmark');
+    k.document.getElementById('toggle-btn').click();
+    await ticks(1);
+    assert.match(stinger(k).textContent, /Check-in/, 'and back: the Check-in name, one stinger at a time');
+    assert.equal(k.document.querySelectorAll('.jm-stinger').length, 1);
+    // A video that starts playing takes it down at once.
+    k.video.dispatchEvent(new k.window.Event('playing'));
+    assert.equal(stinger(k), null);
+  } finally {
+    k.close();
+  }
+});
+
 test('reduced motion, configure mode and the Low power choice all switch it off; Full switches it on', async () => {
   const reduced = bootKiosk(ROUTES, ANSWERED, DESKTOP, reduce(true));
   try {
@@ -181,7 +208,7 @@ test('in Chromium: the Pi profile runs only the splash pulse; a desktop runs the
     const full = await openPage(browser, DESKTOP);
     const fullRun = await walkAndCollect(full.page);
     assert.match(fullRun.cls, /\bmotion-full\b/);
-    for (const name of ['jm-slam', 'jm-slam-hard', 'jm-card-in', 'jm-fly-in', 'jm-slam-soft']) {
+    for (const name of ['jm-bar-in', 'jm-slam', 'jm-slam-hard', 'jm-card-in', 'jm-fly-in', 'jm-slam-soft']) {
       assert.ok(fullRun.names.includes(name), `${name} runs on a desktop (ran: ${fullRun.names.join(', ')})`);
     }
     await full.context.close();

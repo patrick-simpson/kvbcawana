@@ -2339,6 +2339,94 @@ html.cursor-hidden #slide-controls {
     animation: jm-rise 420ms var(--jm-settle) 120ms backwards;
   }
 
+  /* The view flip (Check-in Display <-> Journey, both ways): four skewed
+     bars (hot, ink, deep, club purple) slam across in a stack, the
+     destination's name slams onto the purple, then the bars peel away in
+     reverse order. Into Journey it runs left to right, back to the
+     Check-in Display right to left (.is-checkin mirrors the whole thing,
+     and the word back). About a second; the view underneath has already
+     changed (instant acknowledgement), this only plays over it and never
+     takes a click (pointer-events: none). Each bar has an in and an out
+     animation: the out fills forwards only, so until it starts the in's
+     end state holds. */
+  html.motion-full .jm-stinger {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    overflow: hidden;
+    pointer-events: none;
+  }
+  html.motion-full .jm-stinger.is-checkin,
+  html.motion-full .jm-stinger.is-checkin .jm-stinger-word {
+    transform: scaleX(-1);
+  }
+  html.motion-full .jm-stinger-bar {
+    position: absolute;
+    top: -5%;
+    bottom: -5%;
+    left: -25%;
+    width: 150%;
+    transform: translateX(-160%) skewX(-14deg);
+    animation:
+      jm-bar-in 280ms var(--jm-settle) 0ms both,
+      jm-bar-out 280ms var(--jm-wipe) 740ms forwards;
+  }
+  html.motion-full .jm-stinger-bar:nth-child(1) { background: var(--jr-hot); }
+  html.motion-full .jm-stinger-bar:nth-child(2) {
+    background: var(--jr-ink);
+    animation-delay: 40ms, 700ms;
+  }
+  html.motion-full .jm-stinger-bar:nth-child(3) {
+    background: var(--jr-deep);
+    animation-delay: 80ms, 660ms;
+  }
+  html.motion-full .jm-stinger-bar:nth-child(4) {
+    background: var(--jr-purple);
+    animation-delay: 120ms, 620ms;
+  }
+  html.motion-full .jm-stinger-word {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: clamp(0.4rem, 1.2 * var(--u), 1.4rem);
+    color: #ffffff;
+    animation:
+      jm-fade 1ms linear 260ms backwards,
+      jm-word-out 280ms var(--jm-wipe) 620ms forwards;
+  }
+  html.motion-full .jm-stinger.is-checkin .jm-stinger-word {
+    animation-name: jm-fade, jm-word-out-mirrored;
+  }
+  html.motion-full .jm-stinger-word img {
+    display: block;
+    width: clamp(12rem, 44 * var(--u), 50rem);
+    height: auto;
+    animation: jm-slam-hard 420ms var(--jm-settle) 260ms backwards;
+  }
+  html.motion-full .jm-stinger-shout {
+    position: relative;
+    top: var(--jr-shout-lift);
+    font-family: var(--jr-font-shout);
+    font-size: calc(clamp(2.4rem, 9 * var(--u), 11rem) * var(--jr-shout-fit));
+    line-height: 1;
+    text-transform: uppercase;
+    text-shadow: 0.06em 0.06em 0 var(--jr-hot);
+    animation: jm-slam-hard 420ms var(--jm-settle) 260ms backwards;
+  }
+  html.motion-full .jm-stinger-kicker {
+    font-family: var(--jr-font-label);
+    font-size: clamp(1rem, 2.6 * var(--u), 3.2rem);
+    line-height: 1;
+    letter-spacing: 0.3em;
+    padding-left: 0.3em;
+    text-transform: uppercase;
+    color: var(--jr-tint);
+    animation: jm-wipe-center 300ms var(--jm-settle) 400ms backwards;
+  }
+
   @keyframes jm-slam {
     from { opacity: 0; transform: scale(1.6); }
     60% { opacity: 1; transform: scale(0.97); }
@@ -2385,5 +2473,21 @@ html.cursor-hidden #slide-controls {
   }
   @keyframes jm-rise {
     from { opacity: 0; transform: translateY(2.4rem); }
+  }
+  @keyframes jm-bar-in {
+    from { transform: translateX(-160%) skewX(-14deg); }
+    to { transform: translateX(0) skewX(-14deg); }
+  }
+  @keyframes jm-bar-out {
+    from { transform: translateX(0) skewX(-14deg); }
+    to { transform: translateX(160%) skewX(-14deg); }
+  }
+  @keyframes jm-word-out {
+    from { transform: none; }
+    to { transform: translateX(120vw); }
+  }
+  @keyframes jm-word-out-mirrored {
+    from { transform: scaleX(-1); }
+    to { transform: translateX(120vw) scaleX(-1); }
   }
 }
