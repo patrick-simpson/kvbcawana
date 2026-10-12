@@ -135,6 +135,39 @@ describe('Printing: the church cards', () => {
     expect(puts()[1].body.settings.labelTemplates).toBeNull();
   });
 
+  it('two devices: a stale 409 on the layouts keeps the other device\'s club and sends only mine on top', async () => {
+    const theirs = { trek: { version: 1, showLastName: false } };
+    state.put = () => {
+      state.church = { ...state.church, rev: 5, settings: { ...state.church.settings, labelTemplates: theirs } };
+      return { ok: false, status: 409, body: { reason: 'stale', rev: 5, settings: state.church.settings } };
+    };
+    mount();
+    fireEvent.change(await screen.findByLabelText('Club'), { target: { value: 'spark' } });
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Last name' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save label layouts' }));
+    expect(await screen.findByText('Someone else changed this a moment ago; check and save again.')).toBeTruthy();
+    state.put = (body) => ({ ok: true, status: 200, body: { ok: true, rev: 6, settings: { ...state.church.settings, ...body.settings }, savedAt: 'x' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save label layouts' }));
+    await waitFor(() => expect(puts()).toHaveLength(2));
+    expect(puts()[1].body.baseRev).toBe(5);
+    expect(puts()[1].body.settings.labelTemplates).toEqual({ ...theirs, spark: { version: 1, showLastName: false } });
+  });
+
+  it('two devices: a stale 409 on the schedule shows the other device\'s rows and does not resend mine', async () => {
+    const theirs = [{ club: 'Cubbies', startTime: '6:15', location: 'Story', room: 'Room 2' }];
+    state.put = () => {
+      state.church = { ...state.church, rev: 5, settings: { ...state.church.settings, schedule: theirs } };
+      return { ok: false, status: 409, body: { reason: 'stale', rev: 5, settings: state.church.settings } };
+    };
+    mount();
+    fireEvent.change(await screen.findByLabelText('Row 1 starts'), { target: { value: '6:45' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save schedule' }));
+    expect(await screen.findByText(/Reloaded.*Apply your change again/)).toBeTruthy();
+    expect(screen.getByLabelText('Row 1 club').value).toBe('Cubbies');
+    expect(screen.getByLabelText('Row 1 starts').value).toBe('6:15');
+    expect(screen.getByRole('button', { name: 'Save schedule' }).disabled).toBe(true);   // nothing of mine left to clobber with
+  });
+
   it('before the seed everything is read-only, with one button that starts from defaults after a confirm', async () => {
     state.church = doc({ rev: 0, settings: null });
     state.put = (body) => {

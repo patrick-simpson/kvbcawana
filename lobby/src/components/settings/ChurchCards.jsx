@@ -1,4 +1,4 @@
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { useSync } from '../../hooks/useSync.js';
 import { loadSyncSession } from '../../lib/syncService.js';
 import { CHURCH_SPEC, churchValue, PAUSED_WORDS, UNSEEDED_WORDS } from '../../lib/churchClient.js';
@@ -61,12 +61,13 @@ function Note({ note }) {
   return <span className={`hint laptop-note${note.bad ? ' hint--warn' : ''}`} role="status">{note.text}</span>;
 }
 
-/** Saves a set of keys and words the answer. @returns {(changes: Record<string, any>) => Promise<{text: string, bad?: boolean}>} */
+/** Saves a set of keys and words the answer. @returns {(changes: Record<string, any>) => Promise<{text: string, bad?: boolean, stale?: any}>} */
 function useSaver(church) {
   return async (changes) => {
     const r = await church.save(changes);
     if (r.ok) return { text: 'Saved.' };
-    return { bad: true, text: r.message };
+    // `stale`: the newer document, for a card whose draft is a whole list that must be rebuilt over it.
+    return { bad: true, text: r.message, ...(r.kind === 'stale' ? { stale: r.doc } : {}) };
   };
 }
 
@@ -172,6 +173,8 @@ export function ClubLabelCard({ church }) {
   const draft = useDraft(docTemplates);
   const [club, setClub] = useState('default');
   const [note, setNote] = useState(/** @type {any} */ (null));
+  // The clubs this card's draft changed: after a stale 409 only these are laid over the newer document.
+  const changedClubs = useRef(/** @type {Set<string>} */ (new Set()));
   const [preview, setPreview] = useState(/** @type {{ url?: string, text?: string } | null} */ (null));
   const all = draft.value;
   const form = templateToForm(all[club]);
@@ -179,13 +182,20 @@ export function ClubLabelCard({ church }) {
   const edit = (patch) => {
     const t = formToTemplate({ ...form, ...patch });
     draft.set(withTemplate(all, club, Object.keys(t).length ? { version: 1, ...t } : {}));
+    changedClubs.current.add(club);
     setNote(null);
   };
   const saveAll = async () => {
     const hasAny = Object.keys(all).length > 0;
     const r = await save({ labelTemplates: hasAny ? all : null });
     setNote(r);
-    if (!r.bad) draft.clear();
+    if (!r.bad) { draft.clear(); changedClubs.current.clear(); }
+    else if (r.stale) {
+      // Someone else's layouts are in the newer document: keep THEIRS, with only the clubs edited here on top.
+      let merged = churchValue(r.stale, 'labelTemplates') || {};
+      for (const k of changedClubs.current) merged = withTemplate(merged, k, all[k] || {});
+      draft.set(merged);
+    }
   };
   const showPreview = async () => {
     setPreview({ text: 'Looking for the check-in laptop…' });
@@ -247,6 +257,11 @@ export function ClubNightCard({ church }) {
     const r = await save({ schedule: clean, lateGraceMin: grace });
     setNote(r.bad ? r : { text: 'Schedule saved.' });
     if (!r.bad) { rows.clear(); late.clear(); }
+    else if (r.stale) {
+      // The rows are one list: resaving ours would overwrite the other device's edit. Show theirs and ask again.
+      rows.clear(); late.clear();
+      setNote({ bad: true, text: 'Reloaded — someone else changed the schedule. Apply your change again.' });
+    }
   };
   return (
     <PanelCard title="Club night" tab="var(--brand-journey)">
