@@ -1,9 +1,10 @@
 # Online check-in: the Worker's new routes (P0 contract)
 
 The route table the P1–P7 builders work against (root
-`ROADMAP.md#online-check-in`). **Nothing here is built yet** except the
-crypto module (`lobby/shared/cloud-crypto.js`) and the D1 schema
-(`../migrations/0001_history.sql`). When a route lands, mark it built here and
+`ROADMAP.md#online-check-in`). **Built so far:** the
+crypto module (`lobby/shared/cloud-crypto.js`), the D1 schema
+(`../migrations/0001_history.sql`, `0002_applied_batches.sql`) and sections 2
+and 3 (P6, `history.js`, below). Nothing else is built yet. When a route lands, mark it built here and
 keep its shape; a change of shape is a change to this file first.
 
 ## Rules every route keeps
@@ -121,6 +122,57 @@ The friend list (BARF, `friends.js`) moves here: each friend brought is a
 `kind: 'friend'` row sealed to the history key. The 6:30 pm emailed report
 then needs a reader that can unwrap the key (see the roadmap's open
 questions); the read-only link cannot open rows by itself.
+
+### Built (P6): `history.js`, sections 2 and 3
+
+`history.js` exports `History` (`new History({ storage, env, now })`), which
+answers `GET /v1/history/key`, `PUT /v1/history/key`, `POST /v1/history/rows`,
+`POST /v1/history/import`, `GET /v1/history/rows`, `/nights`, `/summary`, and
+one more, `GET /v1/history/status` (`{db, pending}`: is `HISTORY_DB` bound, and
+how many outbox entries wait). Differences from the table above:
+
+- **Outbox.** A POST is validated, written to the Durable Object's storage
+  (`hout:<batchId>`, at most 40 rows each; 400 entries at most, then 503
+  `history-backlog`), then copied to D1 in ONE atomic `db.batch` per entry
+  (4 s limit). D1 down or slow: the answer is **202** `{stored, duplicates,
+  pending}` and the entry waits; `flush()` retries on the next history request.
+  `batchId` is a SHA-256 of the row ids and summary, inserted into
+  `applied_batches` inside the same batch, so a retried POST or a lost outbox
+  delete never counts `night_summary` twice.
+- **No `HISTORY_DB`** (not created yet): POSTs are accepted into the outbox
+  and answer **202** `{reason: 'history-off', queued, message: 'History
+  storage is not set up yet...'}`; every GET answers 503
+  `{reason: 'history-off'}`. This replaces the 503 in the table, so a desk's
+  check-ins are never lost before D1 exists.
+- **Body limits.** `POST /v1/history/rows` 256 KB (100 sealed rows are about
+  170 KB, more than `BODY_MAX`), `import` 1 MB, `PUT key` 16 KB. A row with
+  any field off its shape, a `kid` that is not the stored key's, or a missing
+  history key (409 `no-key`) refuses the WHOLE batch (400 `unsealed`): nothing
+  is stored. Fields outside `{id, night, kind, v, kid, epk, iv, ct}` are dropped.
+- **Passphrase change.** `PUT /v1/history/key` is first-writer-wins only. The
+  re-wrap rides the passphrase change, which `sync.js` owns:
+  `History.rewrapWrites(body.wrapped)` returns `{writes}` (the new
+  `history:wrapped` and `history:wrapped:prev` = `{wrapped, until: now + 7
+  days}`) or `{error}` (a ready 400 `wrap-missing` when a history key exists
+  and the body has no valid `wrapped`: the change then writes NOTHING).
+
+#### Registering `history.js` (the integrator's three small edits)
+
+1. `sync.js` constructor, beside `this.friends`:
+   `this.history = new History({ storage: this.storage, env, now: this.now });`
+   (`import { History } from './history.js';`)
+2. `sync.js` `handle()`, in the authorized switch's `known` set, one line:
+   `if (History.handles(request.method, url.pathname)) { if (!(await this.authorized(request))) return fail('This screen is signed out. Type the passphrase again.', 401, { reason: 'signed-out' }); return await this.history.handle(request, url); }`
+   placed just before `const known = new Set([...])` (the routes need no
+   other table entry; CORS `Allow-Methods` already lists PUT).
+3. `changePassphrase` (v1 today, v2 in P1): after the current passphrase is
+   checked, `const h = await this.history.rewrapWrites(body.wrapped); if (h.error) return h.error;`
+   and add `...h.writes` to the SAME `storage.put({...})` object that stores
+   the new `auth`.
+
+Optional: call `await this.history.flush()` from `cron()` and `alarm()` so an
+outbox drains with nobody asking. Free plan, one D1 database: see
+`wrangler.toml` (the commented `HISTORY_DB` block) and `../migrations/`.
 
 ## 4. Stations (P3)
 
