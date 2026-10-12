@@ -44,14 +44,14 @@ jobs:
   #   lobby   reads only lobby/ (its vitest excludes worker/ and desktop/,
   #           whose lint moved into their own jobs below), plus
   #           printer/styles/family.css (its build copies it into public/)
-  #           journey/public/src/schedule.js and printer/components/Lobby.tsx
-  #           (the home page's stepped chips, aboutChips.test.js)
+  #           and journey/public/src/schedule.js
   #   printer reads printer/, plus lobby/worker/src/relay.js
   #           (test-phone-relay), site/build.mjs (test-phone-touch),
   #           lobby/src/lib/syncSpecs.js and the lobby/shared/sync-protocol.js it
   #           re-exports (electron-app's device-sync test), and lobby/shared/brand/
   #           (the print server's brand kit is a copy of it, made before the tests
-  #           by scripts/family-assets.mjs)
+  #           by scripts/family-assets.mjs; the home page imports its shapes,
+  #           doodles and club marks, and test-about-page reads them)
   #           and the settings page's laptop cards, which replaced the
   #           print dashboard (lobby/src/lib/printServer.js and
   #           lobby/src/components/settings/laptop*.jsx: test-leaders,
@@ -109,7 +109,6 @@ jobs:
               case "$f" in
                 journey/public/src/schedule.js) lobby=true ;;  # screenSpecs.test.js reads it
                 printer/styles/family.css) lobby=true ;;  # the lobby's build copies it into public/
-                printer/components/Lobby.tsx) lobby=true ;;  # aboutChips.test.js reads the home page's chips
                 lobby/worker/*|lobby/desktop/*|printer/*|journey/*|site/*|.github/workflows/*) ;;
                 *) lobby=true ;;
               esac

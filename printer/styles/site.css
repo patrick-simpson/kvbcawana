@@ -1,5 +1,6 @@
 /* ==========================================================================
-   Club Label Printer website stylesheet (index.html + capabilities.html).
+   The capabilities reference's stylesheet (capabilities.html). The home page
+   and /help have their own (home.css).
 
    Compiled Tailwind v4 replaces the old runtime cdn.tailwindcss.com script.
    Scanning is pinned to the site's own source files: the print server, the
@@ -14,11 +15,7 @@
 @import "tailwindcss" source(none);
 @import "./family.css" layer(components);
 @import "./page.css" layer(components);
-@import "./lobby.css" layer(components);
-@import "./journey.css" layer(components);
 
-@source "../App.tsx";
-@source "../index.tsx";
 @source "../capabilities.tsx";
 @source "../components";
 @source "../src";
