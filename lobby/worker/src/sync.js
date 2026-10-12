@@ -68,6 +68,7 @@ import { UNKNOWN_DEVICE, deviceOf } from './device.js';
 import { Changes, changedSince, changedSinceRefusal, diffKeys, mountChanges } from './changes.js';
 import { Switches, mountSwitches } from './switches.js';
 import { Church, mountChurch } from './church.js';
+import { Notices, mountNotice } from './notice.js';
 
 export { json };
 
@@ -225,6 +226,8 @@ export class SyncCore {
     mountSwitches(this.registry, this);   // /v1/switches (routes.md 10.2)
     this.church = new Church({ storage: this.storage, now: this.now });
     mountChurch(this.registry, this);   // /v1/church/settings (routes.md 10.3)
+    this.notices = new Notices({ storage: this.storage, now: this.now });
+    mountNotice(this.registry, this);   // /v1/notice (routes.md 10.4)
   }
 
   /**
@@ -286,7 +289,9 @@ export class SyncCore {
   async replayFrames() {
     const out = [];
     for (const event of REPLAYED) {
-      const text = await this.storage.get(replayKey(event));
+      let text = await this.storage.get(replayKey(event));
+      // The owner's notice (notice.js) with the seconds it has left; never an expired one.
+      if (event === 'notice') text = await this.notices.replay(text);
       if (typeof text === 'string') out.push(text);
     }
     const slides = await this.storage.get('live:slides');
@@ -984,6 +989,9 @@ export class SyncCore {
     // Worker publishes the tally, the ticker and the still-here list itself, so the
     // laptop's are dropped (answered 200 so the print server owes no resend), and so
     // is every greeting but the one a registered station sends with its print job.
+    // The owner's notice (notice.js) is never overwritten by the laptop's /msg/admin mirror.
+    const ownerNotice = await this.notices.gate(res.event);
+    if (ownerNotice) return json(ownerNotice);
     const dropped = await this.publisher.gate(request, res.event, res.payload, res.meta);
     if (dropped) return json(dropped);
     const screens = await this.relay(res.event, res.payload);
