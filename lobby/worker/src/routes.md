@@ -1,10 +1,12 @@
 # Online check-in: the Worker's new routes (P0 contract)
 
 The route table the P1–P7 builders work against (root
-`ROADMAP.md#online-check-in`). **Nothing here is built yet** except the
-crypto module (`lobby/shared/cloud-crypto.js`) and the D1 schema
-(`../migrations/0001_history.sql`). When a route lands, mark it built here and
-keep its shape; a change of shape is a change to this file first.
+`ROADMAP.md#online-check-in`). Built so far: the crypto module
+(`lobby/shared/cloud-crypto.js`), the D1 schema (`../migrations/0001_history.sql`)
+and, in the Worker core, **the routes marked BUILT below** (stations, the print
+lease, the desk's claim API, the one read clock; section 7 says how a module
+adds its own). When a route lands, mark it built here and keep its shape; a
+change of shape is a change to this file first.
 
 ## Rules every route keeps
 
@@ -122,49 +124,148 @@ The friend list (BARF, `friends.js`) moves here: each friend brought is a
 then needs a reader that can unwrap the key (see the roadmap's open
 questions); the read-only link cannot open rows by itself.
 
-## 4. Stations (P3)
+## 4. Stations (BUILT: register, list, revoke; the rest is the station role's)
 
 | Route | Auth | Request | Answer |
 | --- | --- | --- | --- |
-| `POST /v1/station/register` | session | `{stationId, name, pub, kid}`; `stationId` is the KVBC Awana app's `roles.json` `deviceId`; the private key is in Electron safeStorage (the app refuses the station role when safeStorage is unavailable) | stores `station:<id>`; the same `stationId` may replace its own key. `{stations}` |
-| `GET /v1/stations` | session | | `[{stationId, name, pub, kid, registeredAt, lastSeenAt, printer}]` (what a client seals bundles to) |
-| `DELETE /v1/stations/<stationId>` | session | | removes a dead computer's key; bundles already sealed to it stay unreadable to it only |
+| `POST /v1/station/register` **BUILT** | session | `{stationId, name, pub, kid}`; `stationId` is the KVBC Awana app's `roles.json` `deviceId` (8 to 64 of `A-Za-z0-9._-`); `pub` is the 65-byte raw P-256 key in base64, `kid` must be its `kidOf` (the Worker checks it, a hash); the private key is in Electron safeStorage (the app refuses the station role when safeStorage is unavailable) | stores it in the `stations` document; the same `stationId` may replace its own key (keeps `registeredAt`). `{ok, station, stations: [...list]}`. 409: another station already uses that key, or ten stations are registered (`STATIONS_MAX`) |
+| `GET /v1/stations` **BUILT** | session | | `[{stationId, name, pub, kid, registeredAt, lastSeenAt, printer}]` (what a client seals bundles to) |
+| `DELETE /v1/stations/<stationId>` **BUILT** | session | | removes a dead computer's key; `{ok, stations}`, 404 when unknown. Bundles already sealed to it stay unreadable to it only. Its calls answer 403 from then on |
 | `GET /v1/station/roster-source?night=` | station | | TwoTimTwo's roster CSV, read through the Worker (counts against the 5 s budget), passed through in memory and never stored. The station seals it to every station. |
 | `PUT /v1/station/roster` | station | `{night, bundle}` (`kind: 'roster'`, allergies inside) | stores `roster:<night>` (the latest wins); `{ok}` |
 | `GET /v1/station/roster?night=` | station | | `{bundle}` or 404 |
 | `PUT /v1/station/books` / `GET /v1/station/books?night=` | station | `{night, bundle}` (`kind: 'books'`, completed books) | as the roster |
 
-Medical notes are sealed ONLY to station keys, never to the history key
-(`sealRow` refuses a record with a medical key).
+A job's bundle must be sealed to **every** registered station and nobody else
+(`Stations.checkBundle`): a missing station answers 409
+`{reason: 'stations-changed', stations}` and the client reseals, so a job is
+never unreadable to a station about to lease it. Medical notes are sealed ONLY
+to station keys, never to the history key (`sealRow` refuses a record with a
+medical key).
 
-## 5. The desk page (P2)
+## 5. The desk page (the Worker's claim API is BUILT; the page is P3's)
 
 Our desk page (a browser at the desk, signed in) and the TwoTimTwo page
 fallback. The desk page derives keys at sign-in, fetches `/v1/stations` and
-`/v1/history/key`, and seals before it posts.
+`/v1/history/key`, and seals before it posts. The handlers are thin: the
+behaviour is `desk.js`, which the page calls through these routes.
 
 | Route | Auth | Request | Answer |
 | --- | --- | --- | --- |
-| `GET /v1/desk/roster` | session | | tonight's check-in page roster `{readAt, kids: [{clubberId, first, last, club}]}` (no medical data; plaintext over TLS, from the last read, never stored readable) |
-| `POST /v1/desk/checkin` | session | `{night, clubberId \| visitor: {first, last, club}, items, friendFirst?, historyRow: Row, job: Bundle \| null}`; `job.id` is the jobId | claim = `identityTag`/`visitorTag`; an existing claim answers `{already: true, jobId}` (nothing posted twice). Else posts to TwoTimTwo; on success stores the job (`job:<tag>` = `{jobId, bundle, state: 'queued'}`), inserts the history row, bumps `night_summary`, publishes the greeting and tally. `{ok, jobId}`. On a TwoTimTwo refusal nothing is stored. |
-| `POST /v1/desk/undo` | session | `{night, clubberId, historyRow}` | TwoTimTwo undo; the claim and an unprinted job are dropped |
-| `POST /v1/desk/checkout` | session | `{night, clubberId, historyRow}` | TwoTimTwo check-out |
-| `GET /v1/desk/tonight` | session | | `authoritativeTonight()` counts (the shared module, not a port) |
+| `GET /v1/desk/roster` **BUILT** | session | | tonight's check-in page roster `{readAt, stale?, kids: [{clubberId, first, last, club, clubId, checkedIn}]}` (no medical data; plaintext over TLS, from the last read, held in memory, never stored). Read through the 5 s clock: a read within 5 s is the last one; a clock booked past 12 s answers the last read marked `stale`, or 429 `{reason: 'read-busy', retryAfterMs}` with none |
+| `POST /v1/desk/checkin` **BUILT** | session | `{night, clubberId \| visitor: {first, last, club}, items, historyRow: Row, job: Bundle \| null}`; `night` is the church's local date (else 400 `wrong-night`); `items` is `{Bible?, Friend?}` or `['Bible', 'Friend']`; `job.id` is the jobId, `job.kind` is `print-job`, `job.night` is `night`; `job` may be null only while no station is registered | see below |
+| `POST /v1/desk/undo` **BUILT** | session | `{night, clubberId \| visitor, historyRow}` | TwoTimTwo's undo (`checkinclubberundo`, accepted on "(checkin undone)"), then the claim goes `undone` (gen + 1) and every unprinted job of that child is dropped: `{ok, droppedJobs}`. A refusal is 409 `{reason}`, a timeout 504 `{reason: 'unsure'}`: nothing is changed here, and the watcher settles what TwoTimTwo has |
+| `POST /v1/desk/checkout` **BUILT** | session | `{night, clubberId \| visitor, historyRow}` | TwoTimTwo check-out (accepted only on "OK"): `{ok}`. The claim is left as it is |
+| `GET /v1/desk/tonight` | session | | `authoritativeTonight()` counts (the shared module, not a port; P5) |
 
-**The TwoTimTwo page fallback.** A check-in made on TwoTimTwo's own page is
-seen by the watcher (in the Worker, which holds the name in memory only). It
-cannot seal a station bundle or a history row (no ECDH in the Worker), so its
-job is stored as `{jobId, raw: sealState(...), state: 'queued'}` under the
-Worker's symmetric state key (as `cloud:snap` is today) and leased to a
-station, which seals the history row and resolves allergies from its own
-roster. Brought a friend on that path prints a BARFED tag WITHOUT the
-friend's name (the report has only the box).
+**`POST /v1/desk/checkin`, in order** (nothing is checked-and-set across the
+network call):
 
-## 6. Print (P4)
+1. **Fail closed.** No `historyRow` of the Row shape for tonight, or (with
+   stations registered) no `job` sealed to exactly the registered stations:
+   nothing is written, 400 `{reason: 'unsealed', what}`, or 409
+   `{reason: 'stations-changed', stations}`.
+2. **Claim** the child: `identityTag` for a clubber id, `visitorTag` for a
+   visitor. A child already claimed answers 200 `{ok: true, already: true,
+   state, jobId}` and nothing is posted twice, from this desk or a second one.
+3. The `job` is stored **with** the claim (not leasable while the claim is
+   `checking`).
+4. **Post to TwoTimTwo** (a visitor is not on TwoTimTwo: no post). Success, or
+   TwoTimTwo already having the child ("already checked in"), settles the claim
+   `queued`. A definite refusal releases the claim and drops the job: 409
+   `{reason}`. A timeout or network error is AMBIGUOUS (TwoTimTwo may have it):
+   the claim is released, the job dropped, 504 `{reason: 'unsure', retry: true}`;
+   if TwoTimTwo did record it, the watcher finds the child on the report and
+   claims and prints it itself.
+5. **Hooks.** `desk.hooks.afterCheckin / afterUndo / afterCheckout` are arrays
+   of functions the history (P6) and tally (P5) modules push to; each gets
+   `{night, tag, gen, jobId, club, visitor, historyRow, source}`. A hook that
+   throws never fails the check-in. The answer is `{ok, already: false, jobId,
+   gen, history: 'hooked' | 'off'}`: **until a history module registers its
+   hook the sealed row is validated and not stored** (`history: 'off'`). P6 may
+   also replace `desk.checkRow` with a check that knows the current `kid`.
+
+Read failures on the way answer 429 `{reason: 'read-busy', retryAfterMs}`,
+502 `{reason: 'twotimtwo-unreadable'}` or 503 `{reason: 'not-configured'}`.
+
+**The claim ledger** (`ledger.js`): `checking` (60 s, `CHECKING_TTL_MS`) ->
+`queued` -> `printed`, or `undone`. `gen` only goes up: undo (or the child
+vanishing from the report) bumps it, and so does checking the child in again;
+a ttl-expired `checking` is taken over at gen + 1, so the old attempt cannot
+settle. A claim a failed post releases goes `undone` at the same gen (never
+deleted, so a gen is never reused). Every check-and-set is one synchronous step
+in memory with a write-through to Durable Object storage, loaded once after a
+restart. Claims are purged when the watch window closes (`adopt.endOfNight`).
+
+**The TwoTimTwo page fallback** (BUILT in the watcher, `adopt.js`, switched by
+`CLOUD_PRINT = "on"`). A check-in made on TwoTimTwo's own page is seen by the
+watcher as a child newly on the report:
+
+- no claim (or an undone one): claim `source: 'ttt'` (gen + 1 over an undone
+  one) and a job **sealed to the stations in the Worker** with
+  `sealForStations` (`{clubberId, name, club, source: 'ttt'}`; the owner's
+  2026-10-12 decision, which supersedes the earlier `raw`-leased design);
+- a `checking` claim (the desk's post went through, its answer was lost):
+  promoted to `queued`, its stored job prints;
+- a claim already `queued` / `printed`: nothing;
+- gone from the report (an applied read only): `queued` / `printed` -> `undone`,
+  gen + 1, the unprinted job dropped.
+
+**CPU on the free plan (10 ms per invocation).** One seal is ~2.6 to 4.2 ms for
+3 stations (Node; `test/adopt.test.js` measures it). The report read only does
+the cheap part (an HMAC per child) and puts the child on a backlog sealed under
+the Worker's state key (it holds the name); **at most one job is sealed per
+alarm tick or per `GET /v1/print/next`** (`SEAL_PER_TICK = 1`), and while any
+wait the watcher asks for another tick `SPILL_MS` (1 s) later. With no station
+registered the job waits as a `raw` body (also sealed under the state key) and
+is sealed once one registers. Brought a friend (BARFED, no friend's name) is P5's.
+
+## 6. Print (BUILT)
+
+A station (`X-Station`) leases a job for 90 s (`LEASE_MS`), prints it and says
+done. **Canonical routes** (the first draft below called them lease / ack /
+hello; those answer too, as aliases):
 
 | Route | Auth | Request | Answer |
 | --- | --- | --- | --- |
-| `POST /v1/print/lease` | station | `{max: 1..10}` | `{jobs: [{jobId, bundle \| raw, leaseUntil}]}`; a lease lasts 60 s, then the job is free again |
-| `POST /v1/print/ack` | station | `{jobId, result: 'printed' \| 'already-spooled' \| 'failed', error?}` | `printed` and `already-spooled` complete the job. At most once: the station journals every jobId it spooled, so a retried job it already sent to the printer acks `already-spooled` without printing, and the Worker raises "check the printer" on the status (it may not have come out). `failed` frees the job for another lease. |
-| `POST /v1/print/hello` | station | `{printer: {state, detail?}}` every 30 s | `lastSeenAt`, printer state for the status sticker and the desk page |
-| `GET /v1/print/status` | session | | `{queued, leased, done, checkThePrinter: [jobId], stations: [{stationId, name, lastSeenAt, printer}]}` |
+| `GET /v1/print/next?max=1..10` (alias `POST /v1/print/lease {max}`) | station | | `{jobs: [{jobId, kind: 'checkin' \| 'reprint', night, gen, bundle, leaseUntil, attempt}], leaseMs}`. Sweeps expired leases back into the queue first; **drops** (never leases) a job whose claim is undone, on another `gen`, already printed, or older than two hours; skips a job whose claim is still `checking`, and one with no bundle yet; oldest first. Seals at most one waiting TwoTimTwo-page job first |
+| `POST /v1/print/done` (alias `POST /v1/print/ack`) | station | `{jobId, result?: 'printed' \| 'already-spooled'}` | `{ok, already}`. Idempotent: a job already done, or gone (undone, purged) answers ok. `printed` marks the claim `printed` if the job's gen is still the claim's. `already-spooled` (the station journalled the jobId and did not print again) completes the job and raises `checkThePrinter` |
+| `POST /v1/print/failed` (ack with `result: 'failed'`) | station | `{jobId, error?: <short code>}` | `{ok, state}`: the job is free for another lease at once; after five failures it is `dead` and shows on the status |
+| `POST /v1/print/heartbeat` (alias `POST /v1/print/hello`) | station | `{jobId?, printer?: {state, detail?}}` every 30 s, and every few seconds while a job prints | with `jobId`: `{ok: true, leaseUntil}` renews the lease, or `{ok: false, reason}` where `unknown` (dropped: stop), `done`, `stale`, `other` (another station holds it). The printer state (`ok busy offline error paper unknown`) and `lastSeenAt` are noted for the status |
+| `GET /v1/print/status` | session | | `{queued, leased, done, dead, waitingToSeal, checkThePrinter: [jobId], dropped: {stale, expired}, claims: {checking, queued, printed, undone}, pendingToSeal, cloudPrint, stations: [{stationId, name, lastSeenAt, printer}]}`. Counts and random ids only |
+| `POST /v1/print/reprint` | session | `{jobId: 'reprint:<uuid>', bundle}` sealed to every station, `kind` `print-job`, `night` tonight | a reprint job: bypasses the claims entirely. `{ok, jobId, existing}` |
+
+Job ids: a check-in job's id is its bundle's `id` (22 base64url characters); a
+reprint's `jobId` is `reprint:<uuid>` while its bundle keeps a 22-character id
+(the AAD format). A job is the same station-pad sealed bundle everywhere.
+At most once: the station journals every jobId it spooled, so a retried job it
+already spooled acks `already-spooled` without printing, and the Worker raises
+"check the printer" (the label may not have come out). A lease that is never
+renewed or finished goes back to the queue, so a second station can print it;
+the journal cannot stop that across stations, which is why a job is leased to
+one at a time.
+
+## 7. Adding routes, the read clock, the switches (BUILT)
+
+- **The registry** (`registry.js`): a module adds its routes with
+  `registry.add(method, '/v1/path/:param', 'public'|'session'|'station', handler)`
+  and ONE line in SyncCore's constructor (`mountCheckin(this.registry, this)`;
+  P6 adds `mountHistory(...)` beside it). `sync.js` checks the auth level
+  (`runRoute`), so a handler only sees a valid session, or a valid session plus
+  a registered station (`ctx.stationId`); a handler gets `{core, request, url,
+  params, ip, stationId, body}` and returns `json(...)` / `fail(...)` from
+  `http.js`. A method + pattern registers once: a second add throws.
+- **The read clock** (`readbudget.js`): every TwoTimTwo page GET (the watcher's
+  report, the desk, the phone page, the check-in and check-out pages) takes a
+  slot through `TwoTimTwoClient.page(path, {waitMs, kind})`. One read every 5 s
+  in all; a caller says how long it will queue (`waitMs`): 0 for the watcher
+  (it skips its turn), `INTERACTIVE_WAIT_MS` (12 s) for a desk or phone request,
+  and a refusal is `{error: 'read-busy', retryAfterMs}`. The watcher's report is
+  read about every 10 s (`WATCH_INTERVAL_MS`), the rest of the slots are the
+  others'. The clock survives a restart (`read:next` in storage). Posts are
+  writes and take no slot.
+- **Switches** (`wrangler.toml [vars]`, both `"off"` until the shadow night):
+  `CLOUD_PRINT` (jobs for TwoTimTwo-page check-ins) and `SINGLE_PUBLISHER`
+  (in cloud mode `POST /v1/publish` drops the laptop's `tally` and `checkout`
+  frames with 200 `{dropped: true}`, so the print server owes no resend; turn
+  it on only when the Worker publishes those itself, P5).

@@ -676,6 +676,11 @@ export class SyncCore {
     });
   }
 
+  /** SINGLE_PUBLISHER = "on" and cloud check-in is running: the Worker is the only publisher of the tally and the pickup list. */
+  get singlePublisher() {
+    return String(this.env.SINGLE_PUBLISHER || '').trim().toLowerCase() === 'on' && this.watcher.mode !== 'off' && !!this.watcher.creds();
+  }
+
   /**
    * The check-in laptop's events (and anything else a signed-in device sends),
    * relayed to every live screen exactly as given: sealed frames stay sealed.

@@ -13,6 +13,17 @@ workers_dev = true
 # idle until the TWOTIMTWO_* secrets exist. "off" stops it.
 [vars]
 CLOUD_CHECKIN = "shadow"
+# Online check-in (ROADMAP.md#online-check-in). Both stay "off" until the owner's
+# shadow night, so a deploy changes nothing at church:
+#   CLOUD_PRINT      "on": a child the watcher finds on TwoTimTwo's report (checked
+#                    in on TwoTimTwo's own page) gets a print job, sealed to the
+#                    stations in the Worker. Stations lease it, so turn it on only
+#                    when the extension no longer prints the same child.
+#   SINGLE_PUBLISHER "on": the Worker drops the laptop's tally and still-here
+#                    frames (POST /v1/publish answers dropped). Turn it on only
+#                    with P5, when the Worker publishes those two itself.
+CLOUD_PRINT = "off"
+SINGLE_PUBLISHER = "off"
 
 [[durable_objects.bindings]]
 name = "SYNC"

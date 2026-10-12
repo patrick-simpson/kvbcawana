@@ -1615,6 +1615,25 @@ setup guide and the API. The owner's calls:
   route), and answers /phone/roster and /phone/tonight from TwoTimTwo while
   the laptop is off. `CLOUD_CHECKIN = "off"` sends everything to the laptop
   again.
+- **Online check-in, the Worker core** (`ROADMAP.md#online-check-in`, 2026-10-12;
+  the routes are `worker/src/routes.md`): `readbudget.js` is the ONE TwoTimTwo
+  read clock (every page GET takes a slot, 5 s apart, kept in storage; the
+  watcher reads its report about every 10 s); `ledger.js` the night's claims
+  (keyed by `identityTag` / `visitorTag`, `checking|queued|printed|undone`, a
+  `gen` that only goes up), `printq.js` the 90 s print leases (a job whose gen
+  is not the claim's, or whose claim is undone, is never leased),
+  `stations.js` the registered station keys (no pairing step), `adopt.js` the
+  watcher's rules (a child newly on the report is claimed and its job sealed to
+  the stations IN the Worker, at most ONE seal per alarm tick or request for the
+  free plan's 10 ms of CPU; gone from the report is undone), `desk.js` the desk's
+  check-in / undo / check-out order (fail closed, claim, post, settle or
+  release; an ambiguous timeout releases the claim, "already checked in" is
+  success). Every check-and-set is one synchronous step in memory with a
+  write-through (`doc.js`): no `await` (and no fetch) between the check and the
+  write. New routes join through `registry.js` with one mount line in
+  `SyncCore`. The Worker never derives a key or opens a bundle; storage holds no
+  clubber id or name (`sealState` for the one body that must wait). `CLOUD_PRINT`
+  and `SINGLE_PUBLISHER` in `wrangler.toml` are `"off"` until the shadow night.
 - **Gates:** the Worker's tests run in `ci.yml`'s `worker` job
   (`npx vitest run --config worker/vitest.config.js`), not this app's vitest
   (the root vitest excludes `worker/**`; the root lint covers it). Its relay

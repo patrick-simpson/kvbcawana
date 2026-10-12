@@ -21,11 +21,13 @@ export const row = (kind = 'checkin', night = NIGHT) => ({
 });
 
 export async function rig({ env = {}, kids = [], start = WED_6PM, storage = memoryStore(), clock = fakeClock(start) } = {}) {
-  const night = { kids: [...kids] };
+  const night = { kids: [...kids], count: null };
   const render = () => {
     const clubs = [...new Set(night.kids.map((k) => k.club))];
-    return page(...clubs.map((club) => table(`${club} `, night.kids.filter((k) => k.club === club).map((k) => ({ id: k.id, name: k.name }))
-    )), clubs.length ? '' : table('Sparks ', []));
+    return page(...clubs.map((club) => {
+      const these = night.kids.filter((k) => k.club === club);
+      return table(`${club} `, these.map((k) => ({ id: k.id, name: k.name })), { count: night.count ?? these.length });
+    }), clubs.length ? '' : table('Sparks ', []));
   };
   const tt = fakeTwoTimTwo({ report: render, checkin: () => CHECKIN_PAGE });
   tt.checkinName = 'Kit Tester';
