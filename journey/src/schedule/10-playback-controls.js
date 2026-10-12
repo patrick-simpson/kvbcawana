@@ -80,15 +80,20 @@ journeyVideo.addEventListener('durationchange', syncScrubber);
 journeyVideo.addEventListener('click', togglePause);
 pauseBtn.addEventListener('click', togglePause);
 
+/* Dragging only moves the readout; the one seek happens on release. Seeking on
+   every input event made the Pi's decoder re-seek dozens of times a second. */
 videoScrubber.addEventListener('input', () => {
   scrubbing = true;
   const t = Number(videoScrubber.value);
   if (Number.isFinite(t)) {
-    journeyVideo.currentTime = t;
     videoTime.textContent = `${formatTime(t)} / ${formatTime(journeyVideo.duration)}`;
   }
 });
 videoScrubber.addEventListener('change', () => {
+  const t = Number(videoScrubber.value);
+  if (scrubbing && Number.isFinite(t)) {
+    try { journeyVideo.currentTime = t; } catch { /* not seekable yet */ }
+  }
   scrubbing = false;
 });
 
