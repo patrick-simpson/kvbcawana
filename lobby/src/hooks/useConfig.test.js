@@ -291,6 +291,12 @@ describe('the shared settings layer (contract v6)', () => {
     expect(result.current.config.milestoneEvery).toBe(12);
   });
 
+  it('a stamp with an empty publishedAt is applied without throwing', () => {
+    const { result } = renderHook(() => useConfig());
+    expect(() => act(() => setSharedLocally({ milestoneEvery: 21 }, { rev: 2, publishedAt: '' }))).not.toThrow();
+    expect(result.current.config.milestoneEvery).toBe(21);
+  });
+
   it('survives a reload, and a value this build does not know is dropped', () => {
     receiveSharedSettings({ ...at('2026-10-01T23:35:00.000Z'), settings: { nightTheme: 'not-a-skin-we-ship', milestoneEvery: 40 } });
     _resetForTest();
