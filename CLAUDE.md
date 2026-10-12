@@ -108,6 +108,18 @@ commits or files.
 - The stability and performance audit of 2026-10-04 is fixed except for the
   items under "Deferred work" below (its file was removed; the repo history has it).
 
+## Everything free, forever (owner, 2026-10-11)
+
+A project-wide rule: every piece runs on a free plan, now and later
+(Cloudflare Workers FREE with its 10 ms of CPU per request, Durable Objects
+and D1 on their free allowances, GitHub Actions' free minutes and 0.5 GB of
+storage). So key derivation, encryption and decryption run in CLIENTS (the
+browser pages, the KVBC Awana app), never in the Worker, which routes, stores
+ciphertext and keyed-hash identifiers, and hashes. A change that needs a paid
+plan is the wrong change. `ROADMAP.md#online-check-in` is the track built on
+it (it supersedes the cloud check-in phases 2+ and "no internet still prints":
+with no internet the desk uses the paper sheet).
+
 ## The move in progress (owner's plan, 2026-10-01)
 
 1. This repo, with history (done).
