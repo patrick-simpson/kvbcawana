@@ -7,7 +7,7 @@
 //   4. the film        (render.mjs: film/ at 1920x1080, 60 fps)
 //   5. the edit        (edit.mjs: soundtrack, encodes, poster)
 //
-// Writes printer/public/reel/{reel-1080.mp4, reel-720.mp4, poster.jpg}.
+// Writes printer/public/reel/{reel.mp4, poster.jpg}.
 // --draft stops after a quick 720p/30 fps cut (reel/.work/draft.mp4).
 import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';

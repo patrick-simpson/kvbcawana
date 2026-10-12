@@ -14,7 +14,7 @@ const SITE = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const ROOT = path.dirname(SITE);
 
 test('every video is streamed, and any other file only when it is too big for Pages', () => {
-  assert.equal(mustStream('/reel/reel-1080.mp4', 1000), true);
+  assert.equal(mustStream('/reel/reel.mp4', 1000), true);
   assert.equal(mustStream('/reel/reel.webm', 1000), true);
   assert.equal(mustStream('/journey/current-lesson-video.mp4', 22 * 1024 * 1024), true);
   assert.equal(mustStream('/reel/poster.jpg', 300 * 1024), false);
@@ -23,8 +23,7 @@ test('every video is streamed, and any other file only when it is too big for Pa
 });
 
 test('a streamed path comes from Journey\'s public files or the film\'s folder, and nowhere else', () => {
-  assert.equal(repoPathFor('/reel/reel-1080.mp4'), 'printer/public/reel/reel-1080.mp4');
-  assert.equal(repoPathFor('/reel/reel-720.mp4'), 'printer/public/reel/reel-720.mp4');
+  assert.equal(repoPathFor('/reel/reel.mp4'), 'printer/public/reel/reel.mp4');
   assert.equal(repoPathFor('/journey/current-lesson-video.mp4'), 'journey/public/current-lesson-video.mp4');
   assert.equal(repoPathFor('/assets/clip.mp4'), null);
   assert.equal(repoPathFor('/reel/../printer/secret.mp4'), null);
@@ -34,21 +33,21 @@ test('a streamed path comes from Journey\'s public files or the film\'s folder, 
 });
 
 test('the film the home page plays is committed, small enough for one request, and streamed with Range', async () => {
-  for (const file of ['reel-1080.mp4', 'reel-720.mp4', 'poster.jpg']) {
+  for (const file of ['reel.mp4', 'poster.jpg']) {
     assert.ok(existsSync(path.join(ROOT, 'printer/public/reel', file)), `printer/public/reel/${file} is committed`);
   }
-  // The owner's limit: the 1080p film under 20 MB.
-  assert.ok(statSync(path.join(ROOT, 'printer/public/reel/reel-1080.mp4')).size <= 20 * 1000 * 1000);
+  // The owner's limit (2026-10-12): one 540p film of about 1.5 MB.
+  assert.ok(statSync(path.join(ROOT, 'printer/public/reel/reel.mp4')).size <= 1.6 * 1000 * 1000);
   // Its Function is the large-file proxy, like Journey's.
   const fn = readFileSync(path.join(SITE, 'functions/reel/[[path]].js'), 'utf8');
   assert.match(fn, /proxyLarge\(context\.request, LARGE_FILES, fetch\)\) \|\| context\.next\(\)/);
-  const files = { '/reel/reel-1080.mp4': 'https://raw.example/repo/printer/public/reel/reel-1080.mp4' };
+  const files = { '/reel/reel.mp4': 'https://raw.example/repo/printer/public/reel/reel.mp4' };
   let asked;
-  const res = await proxyLarge(new Request('https://awana.kvbchurch.org/reel/reel-1080.mp4', { headers: { Range: 'bytes=0-1' } }), files,
+  const res = await proxyLarge(new Request('https://awana.kvbchurch.org/reel/reel.mp4', { headers: { Range: 'bytes=0-1' } }), files,
     async (url, init) => { asked = { url, range: init.headers.get('Range') }; return new Response('ab', { status: 206, headers: { 'Content-Range': 'bytes 0-1/9' } }); });
   assert.equal(res.status, 206);
   assert.equal(res.headers.get('Content-Type'), 'video/mp4');
-  assert.deepEqual(asked, { url: files['/reel/reel-1080.mp4'], range: 'bytes=0-1' });
+  assert.deepEqual(asked, { url: files['/reel/reel.mp4'], range: 'bytes=0-1' });
 });
 
 test('site/build.mjs streams by this rule and routes what it streams to a Function', () => {
@@ -59,6 +58,6 @@ test('site/build.mjs streams by this rule and routes what it streams to a Functi
   const routes = path.join(SITE, 'dist', '_routes.json');
   if (!existsSync(routes)) return; // a built site is checked too, when there is one
   const include = JSON.parse(readFileSync(routes, 'utf8')).include;
-  for (const p of ['/reel/reel-1080.mp4', '/reel/reel-720.mp4']) assert.ok(include.includes(p), `${p} goes to its Function`);
-  assert.equal(existsSync(path.join(SITE, 'dist', 'reel', 'reel-1080.mp4')), false, 'and is not uploaded');
+  assert.ok(include.includes('/reel/reel.mp4'), '/reel/reel.mp4 goes to its Function');
+  assert.equal(existsSync(path.join(SITE, 'dist', 'reel', 'reel.mp4')), false, 'and is not uploaded');
 });

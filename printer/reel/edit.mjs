@@ -7,9 +7,9 @@
 // every picture cut in film.js lands on the music's grid. A 20 ms crossfade
 // at the splice, a short fade in, and a 2.4 s fade out at the end.
 //
-// Writes printer/public/reel/reel-1080.mp4 (H.264, 1920x1080, 60 fps, under
-// 20 MB), reel-720.mp4 (1280x720 for phones) and poster.jpg (a still of the
-// closing title), from reel/.work/film.mp4 (render.mjs).
+// Writes printer/public/reel/reel.mp4 (ONE file: H.264 High, 960x540, 30 fps,
+// AAC mono 64 kbps, about 1.5 MB) and poster.jpg (a still of the closing
+// title, 1280x720), from reel/.work/film.mp4 (render.mjs).
 //
 //   node reel/edit.mjs            all of it
 //   node reel/edit.mjs --draft    a quick 720p cut into reel/.work/draft.mp4
@@ -54,11 +54,11 @@ export function soundtrack(duration, out = path.join(WORK, 'soundtrack.wav')) {
 function twoPass(input, audio, out, { width, height, fps, kbps, audioKbps = 128 }) {
   const log = path.join(WORK, `x264-${width}`);
   const vf = `scale=${width}:${height}:flags=lanczos,fps=${fps},format=yuv420p`;
-  const common = ['-c:v', 'libx264', '-preset', 'slow', '-tune', 'animation', '-profile:v', 'high', '-level', fps > 30 ? '4.2' : '4.0',
-    '-b:v', `${kbps}k`, '-maxrate', `${Math.round(kbps * 2.2)}k`, '-bufsize', `${kbps * 4}k`, '-g', String(fps * 2), '-passlogfile', log];
+  const common = ['-c:v', 'libx264', '-preset', 'veryslow', '-tune', 'animation', '-profile:v', 'high', '-level', '3.1',
+    '-b:v', `${kbps}k`, '-maxrate', `${kbps * 2}k`, '-bufsize', `${kbps * 4}k`, '-g', String(fps * 2), '-passlogfile', log];
   ff(['-i', input, '-vf', vf, ...common, '-pass', '1', '-an', '-f', 'mp4', '/dev/null']);
   ff(['-i', input, '-i', audio, '-map', '0:v', '-map', '1:a', '-vf', vf, ...common, '-pass', '2',
-    '-c:a', 'aac', '-b:a', `${audioKbps}k`, '-shortest', '-movflags', '+faststart', out]);
+    '-c:a', 'aac', '-b:a', `${audioKbps}k`, '-ac', '1', '-shortest', '-movflags', '+faststart', out]);
 }
 
 export function edit({ draft = false } = {}) {
@@ -74,15 +74,14 @@ export function edit({ draft = false } = {}) {
     return;
   }
   mkdirSync(OUT, { recursive: true });
-  // Under 20 MB (decimal) with the audio: 1080p60 at about 1.8 Mbps; the
-  // phones' 720p at 30 fps and under 9 MB. kbit/s for a size in MB:
+  // The owner's limit (2026-10-12): about 1.5 MB (decimal) in all, audio
+  // included: 540p at 30 fps, video near 86 kbit/s, music at 64 kbit/s mono.
   const budget = (mb, audioKbps) => Math.floor((mb * 8000) / duration - audioKbps);
-  twoPass(film, audio, path.join(OUT, 'reel-1080.mp4'), { width: 1920, height: 1080, fps: 60, kbps: budget(18.8, 128), audioKbps: 128 });
-  twoPass(film, audio, path.join(OUT, 'reel-720.mp4'), { width: 1280, height: 720, fps: 30, kbps: budget(8.6, 112), audioKbps: 112 });
+  twoPass(film, audio, path.join(OUT, 'reel.mp4'), { width: 960, height: 540, fps: 30, kbps: budget(1.5, 64) - 3, audioKbps: 64 });
   // The poster: the closing title, settled (film.js POSTER_AT).
   const posterAt = Number(process.env.REEL_POSTER_AT || 73.2);
-  ff(['-ss', String(posterAt), '-i', film, '-frames:v', '1', '-q:v', '3', path.join(OUT, 'poster.jpg')]);
-  for (const f of ['reel-1080.mp4', 'reel-720.mp4', 'poster.jpg']) {
+  ff(['-ss', String(posterAt), '-i', film, '-frames:v', '1', '-vf', 'scale=1280:720:flags=lanczos', '-q:v', '4', path.join(OUT, 'poster.jpg')]);
+  for (const f of ['reel.mp4', 'poster.jpg']) {
     console.log(`  ${f}: ${(statSync(path.join(OUT, f)).size / 1048576).toFixed(2)} MB`);
   }
 }

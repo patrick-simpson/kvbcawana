@@ -3,9 +3,8 @@ import { Ico } from './Icons';
 import { AWANA_WHITE, Doodle, Shape } from './Kit';
 
 /*
- * The demo reel at the top of the home page. The films are
- * /reel/reel-1080.mp4 (wider screens) and /reel/reel-720.mp4 (720 px and
- * narrower), with /reel/poster.jpg as the poster: printer/public/reel/,
+ * The demo reel at the top of the home page. The film is ONE small file,
+ * /reel/reel.mp4 (960x540, about 1.5 MB), with /reel/poster.jpg as the poster: printer/public/reel/,
  * which the site build streams like Journey's big files (site/build.mjs).
  *
  * - It starts by itself, muted and inline, with a Tap for sound button and a
@@ -13,16 +12,15 @@ import { AWANA_WHITE, Doodle, Shape } from './Kit';
  * - When it ends it goes back to the poster, with a Watch again button.
  * - With reduced motion it never starts by itself: the poster and a play
  *   button wait, and that button plays it with sound.
- * - Until the films are there (or if one fails) the frame shows the on-brand
+ * - Until the film is there (or if one fails) the frame shows the on-brand
  *   stand-in, which also sits behind the poster while it loads.
  */
-const FILMS = { wide: '/reel/reel-1080.mp4', narrow: '/reel/reel-720.mp4' };
+const FILM = '/reel/reel.mp4';
 export const POSTER = '/reel/poster.jpg';
 
 type Mode = 'waiting' | 'playing' | 'paused' | 'ended' | 'missing';
 
 const reducedMotion = () => typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-const pickFilm = () => (typeof window.matchMedia === 'function' && window.matchMedia('(max-width: 720px)').matches ? FILMS.narrow : FILMS.wide);
 
 /** The stand-in: the catalog's cover, drawn in the kit (the six club waves, the Awana Clubs mark). */
 const StandIn: React.FC<{ missing: boolean }> = ({ missing }) => (
@@ -52,8 +50,8 @@ export const Reel: React.FC = () => {
   const [mode, setMode] = useState<Mode>('waiting');
   const [muted, setMuted] = useState(true);
 
-  // The film is chosen once, for the screen it opens on.
-  useEffect(() => { setFilm(pickFilm()); }, []);
+  // The film mounts after the first render (the prerendered page has none).
+  useEffect(() => { setFilm(FILM); }, []);
 
   useEffect(() => {
     const v = video.current;
