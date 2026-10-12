@@ -26,6 +26,7 @@ const brand = require('./brand');
 const syncClient = require('./sync-client');
 const phoneRelay = require('./phone-relay');
 const pickup = require('./pickup');
+const { CLUB_TABLE, clubKeyByLabel } = require('./clubTable');
 const { execFile } = require('child_process');
 const cups = require('./cups');
 // The Raspberry Pi print station (ROADMAP.md#cloud-check-in) prints through CUPS. It is
@@ -769,16 +770,10 @@ const STEP_UP_NEXT_CLUB = {
   journey: 'Graduates'
 };
 
+// Substring matching on purpose (label text is free-form); the table and the
+// matcher are lobby/shared/clubs.js, through the generated ./clubTable.js.
 function clubKey(clubName) {
-  const n = String(clubName || '').trim().toLowerCase();
-  if (!n) return null;
-  if (n.includes('puggle'))  return 'puggle';
-  if (n.includes('cubbie'))  return 'cubbie';
-  if (n.includes('spark'))   return 'spark';
-  if (n.includes('trek'))    return 'trek';
-  if (n.includes('journey')) return 'journey';
-  if (n.includes('t&t') || n.includes('t & t') || n === 'tnt' || n === 't t') return 't&t';
-  return null;
+  return clubKeyByLabel(clubName);
 }
 
 function nextClubFor(clubName) {
@@ -1408,14 +1403,7 @@ async function resolveImageBuffer(clubImageData) {
 // official club mark from the brand kit, and only when that is missing too
 // does the label fall back to a solid badge with the club's monogram. TR (not
 // T) for Trek so it can't be confused with T&T.
-const CLUB_MONOGRAM = {
-  puggle:  'P',
-  cubbie:  'C',
-  spark:   'S',
-  't&t':   'T&T',
-  trek:    'TR',
-  journey: 'J',
-};
+const CLUB_MONOGRAM = Object.fromEntries(CLUB_TABLE.map((c) => [c.key, c.monogram]));
 
 // ── The one club list every dropdown reads ────────────────────────────────────
 // Display names for the clubs above, in club order, served by GET /clubs and
@@ -1427,14 +1415,7 @@ const CLUB_MONOGRAM = {
 // the wrong club or none. Keys are clubKey() values, so anything the label
 // renderer can style (monogram + font) is offerable and nothing else is —
 // test-server-helpers.cjs asserts these two tables stay in step.
-const CLUB_DISPLAY_NAMES = {
-  puggle:  'Puggles',
-  cubbie:  'Cubbies',
-  spark:   'Sparks',
-  't&t':   'T&T',
-  trek:    'Trek',
-  journey: 'Journey',
-};
+const CLUB_DISPLAY_NAMES = Object.fromEntries(CLUB_TABLE.map((c) => [c.key, c.name]));
 const CLUB_LIST = Object.keys(CLUB_MONOGRAM).map((k) => CLUB_DISPLAY_NAMES[k]);
 
 // ── The fonts labels printed in before the brand kit ─────────────────────────

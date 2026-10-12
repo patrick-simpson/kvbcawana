@@ -15,6 +15,8 @@
 
 'use strict';
 
+const { clubKeyByLabel } = require('./clubTable');
+
 // Every club the setting can name, in the order the dashboard shows them.
 const PICKUP_CLUBS = Object.freeze(['Puggles', 'Cubbies', 'Sparks', 'T&T', 'Trek', 'Journey']);
 // Trek and Journey leave on their own at 7:15 (the extension's youth
@@ -25,14 +27,7 @@ const PICKUP_DEFAULT = Object.freeze(['Puggles', 'Cubbies', 'Sparks', 'T&T']);
 // schedule row or a history row's clubName all land on one key.
 function pickupClubKey(name) {
   const n = String(name == null ? '' : name).replace(/&amp;/gi, '&').trim().toLowerCase();
-  if (!n) return null;
-  if (n.includes('puggle')) return 'puggle';
-  if (n.includes('cubbie')) return 'cubbie';
-  if (n.includes('spark')) return 'spark';
-  if (n.includes('trek')) return 'trek';
-  if (n.includes('journey')) return 'journey';
-  if (n.includes('t&t') || n.includes('t & t') || n === 'tnt' || n === 't t') return 't&t';
-  return null;
+  return clubKeyByLabel(n);
 }
 
 const CANONICAL_BY_KEY = new Map(PICKUP_CLUBS.map((c) => [pickupClubKey(c), c]));
