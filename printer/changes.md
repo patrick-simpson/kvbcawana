@@ -1,4 +1,13 @@
-﻿## [9.2.1] - 2026-10-12
+﻿## [9.3.0] - 2026-10-13
+The new settings page: printing settings from anywhere.
+
+**Printing settings live on awana.kvbchurch.org.** Label options and layouts, the club-night schedule and late grace, the pickup-list clubs, the season, BARF nights and the remembered leaders are edited in Settings, Printing, from any phone or computer. This computer takes them from the sync service and writes them to its own files, so it still prints with no internet. The first print station sends its current settings and leaders when it starts.
+
+**The station follows the settings page's switches.** Printing check-ins from TwoTimTwo's own page, the screens' count and pickup list, and the automatic Trek and Journey check-out can each be switched on or off from Settings, Tonight, and this computer follows within seconds.
+
+**One check-in page.** awana.kvbchurch.org/checkin now uses online check-in underneath (a child is never printed twice, and history is saved); /desk goes there too.
+
+## [9.2.1] - 2026-10-12
 The automatic Trek and Journey check-out moves to the sync service.
 
 **The sync service checks Trek and Journey out.** On club nights from 7:15 pm to midnight it checks out every Trek and Journey child still checked in on TwoTimTwo, the same rule as before, one child every 15 seconds so TwoTimTwo never sees a burst. Tonight's count on every screen drops as they go. On a computer that is the print station, the Chrome extension's own check-out sweep now stays off (it starts again if the station role stops), so the two never both check a child out.
