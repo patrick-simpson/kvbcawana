@@ -69,7 +69,7 @@ describe('the sweep', () => {
 
   it('at 7:15 checks out each Trek and Journey child, ONE post every 15 s, with the page\'s meeting', async () => {
     const t = await rig({ env: ON, kids: [...YOUNGER, ...TREK], start: AT('19:15') });
-    await drive(t, 2 * 60 * 1000);
+    await drive(t, 3 * 60 * 1000);   // a sign-in first: three slots of the 15 s clock
     expect(posted(t)).toEqual(['7001', '7002', '7003']);
     const at = t.posts.checkoutAt;
     expect(at[1] - at[0]).toBe(YM_CHECKOUT_GAP_MS);
@@ -119,15 +119,15 @@ describe('the sweep', () => {
 
   it('a late arrival is checked out once the watcher\'s report lists them, and a Checkout-page row counts too', async () => {
     const t = await rig({ env: ON, kids: [TREK[0]], start: AT('19:15') });
-    await drive(t, 60 * 1000);
+    await drive(t, 2 * 60 * 1000);
     expect(posted(t)).toEqual(['7001']);
     t.night.kids.push(kid('7009', 'Journey', 'Late Comer'));
     t.night.out = [{ id: '7010', name: 'Page Only', club: 'Trek' }, { id: '7011', name: 'Small One', club: 'Sparks' }];
-    await drive(t, 60 * 1000);
+    await drive(t, 2 * 60 * 1000);   // the next report (30 s) and the next Checkout page (60 s)
     expect(posted(t)).toEqual(['7001', '7009', '7010']);
   });
 
-  it('reads no report of its own: the Checkout page at most every 30 s, all reads 5 s apart', async () => {
+  it('reads no report of its own: the Checkout page at most every 60 s, all reads 15 s apart', async () => {
     const run = async (env) => {
       const t = await rig({ env, kids: [...YOUNGER, ...TREK], start: AT('19:15') });
       await drive(t, 3 * 60 * 1000);
@@ -160,7 +160,7 @@ describe('the sweep', () => {
   it('keeps no name and no clubber id in plain storage', async () => {
     const t = await rig({ env: ON, kids: TREK, start: AT('19:15') });
     t.night.out = [{ id: '7010', name: 'Page Only', club: 'Trek' }];
-    await drive(t, 2 * 60 * 1000);
+    await drive(t, 3 * 60 * 1000);
     expect(posted(t)).toContain('7010');
     const all = everything(t.storage);
     for (const s of ['7001', '7002', '7003', '7010', 'Ann', 'Trekker', 'Page Only']) expect(all).not.toContain(s);

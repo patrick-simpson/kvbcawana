@@ -24,7 +24,7 @@ describe('GET /v1/tonight/overview', () => {
     expect(o).toMatchObject({ at: new Date(r.clock.t).toISOString(), night: '2026-10-14', clubNight: true, window: { open: true, opensInMin: 0, closesInMin: 180 } });
     expect(o.count).toMatchObject({ checkedIn: 3, checkedOut: 0, byClub: { Sparks: 1, Trek: 1, Cubbies: 1 }, enabled: true });
     expect(Object.keys(o.count)).toEqual(['source', 'checkedIn', 'checkedOut', 'byClub', 'reportAgeMs', 'enabled']);
-    expect(o.read).toMatchObject({ mode: 'shadow', configured: true, lastError: null, watchIntervalSec: 15 });
+    expect(o.read).toMatchObject({ mode: 'shadow', configured: true, lastError: null, watchIntervalSec: 30 });
     expect(Object.keys(o.read)).toEqual(['mode', 'configured', 'signedIn', 'lastReadAt', 'lastOkAt', 'lastError', 'loginBlockedForSec', 'watchIntervalSec']);
     expect(o.print).toMatchObject({ checkThePrinter: 0, stations: [{ stationId: 'station-aaaaaaaa', name: 'Desk laptop', printer: { state: 'ok' }, version: '9.3.0', churchRev: 0 }] });
     expect(o.print.claims).toEqual(expect.objectContaining({ queued: expect.any(Number) }));

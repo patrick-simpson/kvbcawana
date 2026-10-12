@@ -27,24 +27,30 @@
 //
 // A visitor with no clubber id is not on TwoTimTwo: claim, job, hooks, no post.
 //
-// READS. The check-in page behind a check-in (who, which items, the meeting)
-// is read through the ONE 5 s clock (readbudget.js) and kept for
-// CHECKIN_PAGE_TTL_MS, so a rush of check-ins is not a read each.
+// READS (owner 2026-10-12: a check-in is "instantaneous as much as possible,
+// never a wait"). What a check-in, undo or check-out needs from the check-in
+// page (the meeting's calendar_id, the items and their clubs, each child's
+// club) does not change within a meeting: the page is kept for the whole club
+// night, warmed by the watcher when the watch window opens (`warm`) and
+// refreshed by the roster's reads (at most every CHECKIN_PAGE_TTL_MS, on the
+// ONE read clock, readbudget.js). A desk action uses it and reads nothing; only
+// with nothing held for tonight (a restart before the watcher warmed it), or a
+// child the held page does not list, does it read, and then URGENT: the head
+// of the read queue. Its writes sign in again once when the session lapsed.
 
 import { churchNight } from '../../shared/cloud-crypto.js';
 import { json } from './http.js';
 import { INTERACTIVE_WAIT_MS, READ_INTERVAL_MS } from './readbudget.js';
 import { itemsToSend } from './twotimtwo.js';
+import { Families } from './families.js';
 import { PRINT_JOB_KIND } from './adopt.js';
 import { itemClubs } from './phone.js';
 
-/** How long a read of the check-in page serves check-ins (who, items, meeting). */
-export const CHECKIN_PAGE_TTL_MS = 2 * 60 * 1000;
-/** The households (families) change rarely: one read of the export serves the desk this long (a failure, FAMILIES_RETRY_MS). */
-export const FAMILIES_TTL_MS = 30 * 60 * 1000;
-export const FAMILIES_RETRY_MS = 5 * 60 * 1000;
-/** The meeting's id does not change in a night: undo and check-out reuse it this long. */
-export const CALENDAR_TTL_MS = 10 * 60 * 1000;
+/** The roster's check-in page is re-read at most this often (pages poll every 15 s; 2 of the 4 reads a minute). */
+export const CHECKIN_PAGE_TTL_MS = 30 * 1000;
+export { FAMILIES_TTL_MS, FAMILIES_RETRY_MS } from './families.js';
+/** Pages asked for the roster this recently: the watcher reads it ahead in a free slot. */
+export const ROSTER_ACTIVE_MS = 45 * 1000;
 const ID_RE = /^\d{1,12}$/;
 const AMBIGUOUS = new Set(['timeout', 'network']);
 
@@ -93,12 +99,59 @@ export class Desk {
     };
     /** May be async: history.js replaces it with a check that knows the current kid. @type {(row: any, night: string) => boolean|Promise<boolean>} */
     this.checkRow = defaultRowCheck;
-    /** @type {{ at: number, page: any }|null} */
+    /** The check-in page, kept for the club night it was read on. @type {{ at: number, page: any, night: string }|null} */
     this.cache = null;
     /** @type {Promise<any>|null} */
     this.inflight = null;
-    /** @type {{ at: number, households: string[][], error?: string }|null} */
-    this.familiesCache = null;
+    /** A desk action's own (urgent) read, never queued behind the roster's. @type {Promise<any>|null} */
+    this.inflightUrgent = null;
+    /** When a page last asked for the roster (ms). */
+    this.rosterAskedAt = 0;
+    /** TwoTimTwo's households (families.js); the watcher's alarm catches it up. */
+    this.familiesSource = new Families({ watcher, now });
+  }
+
+  /**
+   * Is a roster refresh worth a free slot of the watcher's alarm: a page asked
+   * for the roster lately (they poll every 15 s) and the page held is a slot
+   * old? Then the alarm reads it ahead (`refreshRoster`) and the next poll is
+   * answered at once. @returns {number|null} ms until due, or null
+   */
+  rosterRefreshInMs() {
+    if (!this.rosterAskedAt || this.now() - this.rosterAskedAt > ROSTER_ACTIVE_MS || this.inflight) return null;
+    const c = this.cache;
+    if (!c || c.night !== churchNight(this.now())) return 0;
+    return Math.max(0, c.at + READ_INTERVAL_MS - this.now());
+  }
+
+  /** The watcher's read ahead of the roster (waitMs 0). true when it read. */
+  async refreshRoster() {
+    const client = this.watcher.clientFor();
+    if (!client || this.inflight) return false;
+    const r = await client.checkinPage({ waitMs: 0, kind: 'roster-ahead' });
+    if (!r.ok) return r.error !== 'read-busy';
+    this.warm(r.page, this.now());
+    return true;
+  }
+
+  /** Is tonight's check-in page held (what every desk action needs)? */
+  hasNightPage() {
+    return !!this.cache && this.cache.night === churchNight(this.now());
+  }
+
+  /**
+   * A check-in page someone else read (the watcher at the window's opening):
+   * held for the night like the desk's own. @param {any} page @param {number} at
+   */
+  warm(page, at) {
+    if (!page || (this.cache && this.cache.at >= at)) return;
+    this.cache = { at, page, night: churchNight(at) };
+    this.noteRoster(page);
+  }
+
+  /** Children the page lists, for the families' catch-up (families.js). @param {any} page */
+  noteRoster(page) {
+    this.familiesSource.noteChildren(churchNight(this.now()), (page.roster || []).map((/** @type {any} */ k) => k.name));
   }
 
   /** @param {'afterCheckin'|'afterUndo'|'afterCheckout'} name @param {Record<string, any>} event */
@@ -111,28 +164,33 @@ export class Desk {
   // ── the check-in page ──────────────────────────────────────────────────────
 
   /**
-   * The check-in page, from this object's last read when it is young enough,
-   * else read through the shared clock. A failed read with an older copy in
-   * hand gives that copy (`stale`), never nothing.
-   * @param {number} maxAgeMs @param {boolean} [force]
+   * The check-in page, from this object's last read when it is young enough
+   * (`maxAgeMs`; Infinity: any read from tonight), else read through the
+   * shared clock. A failed read with an older copy in hand gives that copy
+   * (`stale`), never nothing. `urgent`: a desk action's read, the head of the
+   * read queue (readbudget.js), never queued behind the roster's.
+   * @param {number} maxAgeMs @param {boolean} [force] @param {boolean} [urgent]
    * @returns {Promise<{ ok: true, page: any, readAt: number, stale?: boolean } | { ok: false, error: string, retryAfterMs?: number }>}
    */
-  async page(maxAgeMs, force = false) {
+  async page(maxAgeMs, force = false, urgent = false) {
     const c = this.cache;
-    if (!force && c && this.now() - c.at < maxAgeMs) return { ok: true, page: c.page, readAt: c.at };
-    if (this.inflight) return this.inflight;
-    this.inflight = (async () => {
+    if (!force && c && c.night === churchNight(this.now()) && this.now() - c.at <= maxAgeMs) return { ok: true, page: c.page, readAt: c.at };
+    const slot = urgent ? 'inflightUrgent' : 'inflight';
+    if (this[slot]) return this[slot];
+    this[slot] = (async () => {
       const client = this.watcher.clientFor();
       if (!client || this.watcher.mode === 'off') return { ok: /** @type {const} */ (false), error: 'not-configured' };
-      const r = await client.checkinPage({ waitMs: INTERACTIVE_WAIT_MS, kind: 'desk' });
+      const r = await client.checkinPage({ waitMs: INTERACTIVE_WAIT_MS, kind: urgent ? 'desk-action' : 'desk', urgent });
       if (r.ok) {
-        this.cache = { at: this.now(), page: r.page };
-        return { ok: /** @type {const} */ (true), page: r.page, readAt: this.cache.at };
+        const at = this.now();
+        if (!this.cache || this.cache.at <= at) this.cache = { at, page: r.page, night: churchNight(at) };
+        this.noteRoster(r.page);
+        return { ok: /** @type {const} */ (true), page: r.page, readAt: at };
       }
       if (this.cache) return { ok: /** @type {const} */ (true), page: this.cache.page, readAt: this.cache.at, stale: true };
       return { ok: /** @type {const} */ (false), error: r.error, ...('retryAfterMs' in r ? { retryAfterMs: r.retryAfterMs } : {}) };
-    })().finally(() => { this.inflight = null; });
-    return this.inflight;
+    })().finally(() => { this[slot] = null; });
+    return this[slot];
   }
 
   /** @param {{ ok: false, error: string, retryAfterMs?: number }} r */
@@ -142,38 +200,34 @@ export class Desk {
     return refuse(502, { reason: 'twotimtwo-unreadable', error: r.error });
   }
 
-  /** GET /v1/desk/roster: tonight's check-in page, no medical data. */
+  /** GET /v1/desk/roster: tonight's check-in page (at most CHECKIN_PAGE_TTL_MS old), no medical data. */
   async roster() {
-    const r = await this.page(READ_INTERVAL_MS);
+    this.rosterAskedAt = this.now();
+    const r = await this.page(CHECKIN_PAGE_TTL_MS);
     if (!r.ok) return this.pageFailure(r);
     const kids = r.page.roster.map((/** @type {any} */ k) => {
       const parts = String(k.name || '').trim().split(/\s+/);
       return { clubberId: k.clubberId, first: parts[0] || '', last: parts.slice(1).join(' '), club: k.club, clubId: k.clubId, checkedIn: !!k.checkedIn };
     });
     // Which clubs offer Bible / Brought a friend: from the page already read, no extra read.
-    return json({ readAt: new Date(r.readAt).toISOString(), ...(r.stale ? { stale: true } : {}), kids, items: itemClubs(r.page.events || []) });
+    // familiesAt: when the households held were read, so a page sees a catch-up re-read and asks again.
+    const familiesAt = this.familiesSource.readAt();
+    return json({ readAt: new Date(r.readAt).toISOString(), ...(r.stale ? { stale: true } : {}), kids, items: itemClubs(r.page.events || []), ...(familiesAt ? { familiesAt } : {}) });
   }
 
   /**
    * GET /v1/desk/families: TwoTimTwo's households (names only, two or more
    * active children each), for the page's families-first search and its
-   * brothers and sisters. One read of the export per FAMILIES_TTL_MS through
-   * the shared clock, held in memory, never stored. A failed read is an empty
-   * list with a fixed `familiesError` code (the page then shows children one
-   * by one), kept FAMILIES_RETRY_MS; one only turned away by the clock is not
-   * kept and answers 429.
+   * brothers and sisters (families.js: one read of the export per half hour,
+   * caught up when a child it does not list appears; memory only). A failed
+   * read is an empty list with a fixed `familiesError` code (the page then
+   * shows children one by one); one only turned away by the clock answers 429.
    */
   async families() {
-    const c = this.familiesCache;
-    if (c && this.now() - c.at < (c.error ? FAMILIES_RETRY_MS : FAMILIES_TTL_MS)) {
-      return json({ households: c.households, ...(c.error ? { familiesError: c.error } : {}) });
-    }
-    const client = this.watcher.clientFor();
-    if (!client || this.watcher.mode === 'off') return refuse(503, { reason: 'not-configured' });
-    const r = await client.households({ waitMs: INTERACTIVE_WAIT_MS, kind: 'desk-families' });
-    if (!r.ok && r.error === 'read-busy') return this.pageFailure({ ok: false, error: 'read-busy', retryAfterMs: r.retryAfterMs });
-    this.familiesCache = r.ok ? { at: this.now(), households: r.households } : { at: this.now(), households: [], error: r.error };
-    return json({ households: this.familiesCache.households, ...(this.familiesCache.error ? { familiesError: this.familiesCache.error } : {}) });
+    const f = await this.familiesSource.get();
+    if ('notConfigured' in f) return refuse(503, { reason: 'not-configured' });
+    if ('busy' in f) return this.pageFailure({ ok: false, error: 'read-busy', retryAfterMs: f.busy });
+    return json({ households: f.households, ...(f.at ? { familiesAt: new Date(f.at).toISOString() } : {}), ...(f.error ? { familiesError: f.error } : {}) });
   }
 
   // ── check in ───────────────────────────────────────────────────────────────
@@ -303,7 +357,7 @@ export class Desk {
     const events = itemsToSend(page.events, child.clubId, { Bible: flag('Bible'), Friend: flag('Friend') });
     const hasAttendance = page.events.some((/** @type {any} */ e) => e.automatic && (!e.clubs.length || e.clubs.includes(child.clubId)));
     if (!hasAttendance) return { ok: false, response: refuse(409, { reason: 'no-attendance-item' }) };
-    const res = await client.checkIn({ clubberId, calendarId: page.calendarId, events, name: child.name });
+    const res = await client.checkIn({ clubberId, calendarId: page.calendarId, events, name: child.name }, { desk: true });
     if (res.ok) {
       child.checkedIn = true;
       return { ok: true, club: child.club, name: child.name };
@@ -315,9 +369,12 @@ export class Desk {
     return { ok: false, response: refuse(409, { reason: res.error }) };
   }
 
-  /** @param {string} clubberId @param {boolean} force */
+  /**
+   * The child on tonight's check-in page: the page held for the night (no
+   * read), else an urgent read. @param {string} clubberId @param {boolean} force
+   */
   async find(clubberId, force) {
-    const r = await this.page(CHECKIN_PAGE_TTL_MS, force);
+    const r = await this.page(Infinity, force, true);
     if (!r.ok) return r;
     const child = r.page.roster.find((/** @type {any} */ k) => k.clubberId === clubberId);
     return child ? { ok: /** @type {const} */ (true), child, page: r.page } : { ok: /** @type {const} */ (false), error: 'not-found' };
@@ -375,11 +432,11 @@ export class Desk {
   async postMeeting(clubberId, what) {
     const client = this.watcher.clientFor();
     if (!client || this.watcher.mode === 'off') return { ok: false, response: refuse(503, { reason: 'not-configured' }) };
-    const r = await this.page(CALENDAR_TTL_MS);
+    const r = await this.page(Infinity, false, true);
     if (!r.ok) return { ok: false, response: this.pageFailure(r) };
     const res = what === 'undo'
-      ? await client.undoCheckIn({ clubberId, calendarId: r.page.calendarId })
-      : await client.checkOut({ clubberId, calendarId: r.page.calendarId });
+      ? await client.undoCheckIn({ clubberId, calendarId: r.page.calendarId }, { desk: true })
+      : await client.checkOut({ clubberId, calendarId: r.page.calendarId }, { desk: true });
     if (res.ok) return { ok: true };
     if (AMBIGUOUS.has(res.error)) return { ok: false, response: refuse(504, { reason: 'unsure', retry: true }) };
     return { ok: false, response: refuse(409, { reason: res.error }) };
