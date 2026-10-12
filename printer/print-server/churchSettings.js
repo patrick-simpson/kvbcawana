@@ -20,8 +20,12 @@ const { normalizePickupClubs } = require('./pickup');
 const { clubKeyByLabel } = require('./clubTable');
 const { stripControlChars } = require('./textClean');
 
-/** The largest settings object (JSON bytes) the Worker stores. */
-const CHURCH_JSON_MAX = 24576;
+/**
+ * The largest settings object (JSON bytes) the Worker stores: 64 KB, so 80
+ * leaders at the longest names fit beside a full schedule and every template
+ * (about 33 KB at worst); a Durable Object value holds 128 KB.
+ */
+const CHURCH_JSON_MAX = 65536;
 
 /** The Screen season choices (`auto` and `off` plus the print server's SEASON_KEYS). */
 const CHURCH_SEASONS = Object.freeze([

@@ -9,7 +9,7 @@ describe('the church settings allowlist (routes.md 10.3)', () => {
       'pickupClubs', 'seasonTheme', 'barfNights', 'leaders',
     ]);
     expect(Object.keys(CHURCH_SPEC)).toEqual(CHURCH_KEYS);
-    expect(CHURCH_JSON_MAX).toBe(24576);
+    expect(CHURCH_JSON_MAX).toBe(65536);
   });
 
   it('never keeps a per-laptop key or a secret', () => {

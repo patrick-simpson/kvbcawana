@@ -655,15 +655,17 @@ none) is the switch's own fallback. `SWITCHES_STORED` unset counts as `on`.
 One allowlist, `lobby/shared/churchSettings.js` (pure; generated CommonJS copy
 `printer/print-server/churchSettings.js` via `scripts/shared-copies.mjs`,
 checked by `check-mirrors.mjs`): `CHURCH_SPEC`, `CHURCH_KEYS`,
-`sanitizeChurch(raw) -> {settings, dropped: [key]}` (a `null` value is neither
-kept nor dropped: it means the default), `mergeChurch(prev, patch) -> settings`
-(a new object: a key sent as `null` is deleted, a value its rule refuses leaves
-the old one), `cleanChurchValue(key, v) -> {ok, value?}` (one key's rule),
-`CHURCH_SEASONS`, `LEADERS_MAX` = 200, `CHURCH_JSON_MAX` = 65536 bytes (raised
-from 24576 for the leader list: 200 rows at the longest names plus a full schedule
-stay under it; a Durable Object value holds 128 KB) (BUILT, with
-`churchSettings.test.js`; the `shared-copies.mjs` / `check-mirrors.mjs` lines
-are Track B's). It imports
+`sanitizeChurch(raw, {patch?}) -> {settings, dropped: [key]}` (a `null` value is
+kept only with `{patch: true}`, an edit's "delete this key", and for
+`pickupClubs`, where it is the default list; otherwise dropped),
+`mergeChurch(prev, patch) -> settings` (a new object; a key sent as `null` is
+deleted; it does NOT clean, so the Worker sanitizes the patch first),
+`CHURCH_SEASONS`, `CHURCH_TEMPLATE_SWITCHES`, `CHURCH_JSON_MAX` = 65536 bytes
+(raised from 24576 for the leader list: 80 rows at the longest names beside a
+full schedule and every template reach about 33 KB; a Durable Object value holds
+128 KB) (BUILT: ONE file, written by Track B, commits `adab0cd` / `438b794`,
+taken into Track A unchanged but for `CHURCH_JSON_MAX`; its test; the
+`shared-copies.mjs` line). It imports
 only `./pickup.js`, `./clubs.js` and `./text.js` (each already in `COPIES`, so
 `shared-copies.mjs` rewrites the imports to `./pickup`, `./clubTable`, `./textClean`)
 and uses only `export const` / `export function`.
@@ -674,11 +676,11 @@ and uses only `export const` / `export function`.
 | `firstTimerInverted`, `trophyBand`, `connectCard`, `connectCardAutoFirstTimer`, `enableDrivenCheckin` | bool |
 | `labelTemplates` | object, at most 12 keys (`default` or a `shared/clubs.js` club key), each `{version: 1, showIconPanel?, showLastName?, showClubLine?, showGroupLine?, showVisitorPill?, showFooter?: false, nameMaxPt?: int 18..47}` (the print server's `sanitizeLabelTemplates` shape; a template with no override is dropped) |
 | `schedule` | array of at most 60 rows `{club: 1..30 chars, startTime: /^\d{1,2}:\d{2}$/ or '', location: ..40, room: ..40}` |
-| `lateGraceMin` | int 0..120 |
+| `lateGraceMin` | int 0..120 (a number or a digit string, rounded and clamped; anything else dropped) |
 | `pickupClubs` | `pickup.js normalizePickupClubs` (`null` = the default list) |
 | `seasonTheme` | `auto` \| `off` \| `back-to-school` \| `fall` \| `thanksgiving` \| `christmas` \| `winter` \| `spring` \| `easter` \| `vbs-summer` |
-| `barfNights` | array of at most 20 unique sorted `YYYY-MM-DD` (more than 20 valid dates: the key is dropped) |
-| `leaders` | the remembered leaders (owner 2026-10-12, moved from the print server's `leaders.json`): array of rows `{firstName: ..40, lastName: ..40, clubName: ..40, lastPrintedAt: ms (0 when unknown), printCount: int >= 1}` (one line each, no `<` `>`), one row per name (first + last, case-folded; the first wins), sorted newest `lastPrintedAt` first, at most `LEADERS_MAX` (200: the newest kept). Anything else on a row (`key`, a phone number, a birthdate) is never kept. ADULT volunteers' names only |
+| `barfNights` | array of at most 20 unique sorted `YYYY-MM-DD` (the first 20 kept) |
+| `leaders` | the remembered leaders (owner 2026-10-12, moved from the print server's `leaders.json`): array of rows `{firstName: ..80, lastName: ..80, clubName: ..40, lastPrintedAt: ms (0 when unknown), printCount: int >= 1}` (one line each), one row per name (first + last, case-folded; the first wins), in the order sent, at most 80 (the print server's `LEADERS_MAX`). Anything else on a row (`key`, a phone number, a birthdate) is never kept. ADULT volunteers' names only |
 
 Never here: printers, `cupsMedia`, `musicalPrinter`, `updateBeacon`,
 `worksheetPrinter`, `checkinUrl`, `historyRetentionDays`, `fleetConfigUrl`, any

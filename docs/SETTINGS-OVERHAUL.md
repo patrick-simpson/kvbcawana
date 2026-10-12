@@ -182,7 +182,7 @@ Keys moving (exact list = routes.md 10.3 `CHURCH_SPEC`): `labelFooter`, `firstTi
 `seasonTheme`, `barfNights`, `leaders` (owner 2026-10-12: the remembered leaders, today
 the print server's `leaders.json` behind `/leaders` + `/leaders/forget`, move here so
 `/checkin`'s leader-tag chips work from any phone; rows `{firstName, lastName, clubName,
-lastPrintedAt, printCount}`, adult volunteers' names only, at most 200, newest first, one per
+lastPrintedAt, printCount}`, adult volunteers' names only, at most 80, one per
 name; the station seeds it from `leaders.json` and, on apply, writes `leaders.json` (its
 `rememberLeader` / `forgetLeader` then edit the Worker copy with `baseRev`); a remember or
 forget from a phone is a church edit of the whole `leaders` list, logged like any other).

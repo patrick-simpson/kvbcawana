@@ -110,7 +110,7 @@ describe('editing', () => {
 
   it('400 when every key was dropped, 400 without baseRev, dropped named when some were', async () => {
     const { r } = await seeded();
-    expect(await r.call('PUT', '/v1/church/settings', { baseRev: 1, settings: { printerName: 'x', lateGraceMin: 500 } })).toMatchObject({ status: 400, body: { reason: 'bad-settings', dropped: ['printerName', 'lateGraceMin'] } });
+    expect(await r.call('PUT', '/v1/church/settings', { baseRev: 1, settings: { printerName: 'x', lateGraceMin: 'ten' } })).toMatchObject({ status: 400, body: { reason: 'bad-settings', dropped: ['printerName', 'lateGraceMin'] } });
     expect(await r.call('PUT', '/v1/church/settings', { settings: { trophyBand: true } })).toMatchObject({ status: 400, body: { reason: 'bad-rev' } });
     expect(await r.call('PUT', '/v1/church/settings', { baseRev: 1, settings: [] })).toMatchObject({ status: 400 });
     const some = await r.call('PUT', '/v1/church/settings', { baseRev: 1, settings: { trophyBand: false, cupsMedia: 'w' } });
@@ -173,9 +173,9 @@ describe('the remembered leaders (church key `leaders`)', () => {
     expect(r.storage.map.get('church').settings.leaders.map((l) => l.firstName)).toEqual(['Bo', 'Ann']);
   });
 
-  it('a full list of 200 leaders fits, and its change log entry stays under 2 KB (before in logv)', async () => {
+  it('a full list of 80 leaders (the cap) fits, and its change log entry stays under 2 KB (before in logv)', async () => {
     const { r } = await seeded();
-    const leaders = Array.from({ length: 200 }, (_, i) => ({ firstName: `Leader${i}`, lastName: 'Volunteer', clubName: 'T&T', lastPrintedAt: 1760000000000 + i, printCount: 2 }));
+    const leaders = Array.from({ length: 80 }, (_, i) => ({ firstName: `Leader${i}`, lastName: 'Volunteer', clubName: 'T&T', lastPrintedAt: 1760000000000 + i, printCount: 2 }));
     expect((await r.call('PUT', '/v1/church/settings', { baseRev: 1, settings: { leaders } })).status).toBe(200);
     expect((await r.call('PUT', '/v1/church/settings', { baseRev: 2, settings: { leaders: leaders.slice(1) } })).status).toBe(200);
     const e = (await r.call('GET', '/v1/changes?limit=1')).body.entries[0];
@@ -183,7 +183,7 @@ describe('the remembered leaders (church key `leaders`)', () => {
     expect(e.after).toBeNull();
     expect(new TextEncoder().encode(JSON.stringify(e)).length).toBeLessThanOrEqual(2048);
     expect((await r.call('POST', `/v1/changes/${e.seq}/undo`)).status).toBe(200);
-    expect(r.storage.map.get('church').settings.leaders).toHaveLength(200);
+    expect(r.storage.map.get('church').settings.leaders).toHaveLength(80);
   });
 });
 

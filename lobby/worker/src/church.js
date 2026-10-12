@@ -15,7 +15,7 @@
 // check-and-set is one synchronous step on the in-memory document (doc.js),
 // written through before the answer.
 
-import { CHURCH_JSON_MAX, CHURCH_KEYS, cleanChurchValue, mergeChurch, sanitizeChurch } from '../../shared/churchSettings.js';
+import { CHURCH_JSON_MAX, mergeChurch, sanitizeChurch } from '../../shared/churchSettings.js';
 import { Doc } from './doc.js';
 import { fail, json } from './http.js';
 import { DOORBELL_EVENT, frameText } from './live.js';
@@ -127,15 +127,8 @@ export function mountChurch(registry, core) {
     if (!Number.isInteger(b.baseRev)) return fail('Send baseRev, the rev you edited.', 400, { reason: 'bad-rev' });
     const raw = b.settings;
     if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return fail('No settings.', 400, { reason: 'bad-settings', dropped: [] });
-    /** @type {Record<string, unknown>} */
-    const patch = {};
-    /** @type {string[]} */
-    const dropped = [];
-    for (const key of Object.keys(raw)) {
-      const v = raw[key];
-      if (CHURCH_KEYS.includes(key) && (v === null || cleanChurchValue(key, v).ok)) patch[key] = v;
-      else if (dropped.length < 40) dropped.push(key.slice(0, 40));
-    }
+    // Cleaned by the one allowlist; a null stays (it deletes the key).
+    const { settings: patch, dropped } = sanitizeChurch(raw, { patch: true });
     if (!Object.keys(patch).length && !(b.fromDefaults === true && !dropped.length)) {
       return fail('None of those settings could be kept.', 400, { reason: 'bad-settings', dropped });
     }
