@@ -4,6 +4,12 @@
 //   contract / envelope vectors   printer/  ->  lobby/src/lib/__fixtures__/
 //                                 still committed, byte-identical mirrors (canonical first)
 //
+//   online check-in's crypto      lobby/shared/cloud-crypto.js  ->  a GENERATED CommonJS copy,
+//                                 printer/print-server/cloud-crypto.js (scripts/gen-cloud-crypto.mjs;
+//                                 the packaged Windows app cannot import the ES module). Its
+//                                 vectors, lobby/shared/cloud-vectors.json, have ONE copy: the
+//                                 printer's test reads it in place.
+//
 //   the brand kit                 canonical lobby/shared/brand/
 //   family.css                    canonical printer/styles/family.css
 //                                 NOT mirrored in git any more: each app gets its own copy at
@@ -18,6 +24,7 @@ import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { checkAssets, COPIES } from './family-assets.mjs';
+import { SOURCE as CLOUD_CRYPTO_SOURCE, TARGET as CLOUD_CRYPTO_COPY, expectedCopy as cloudCryptoCopy } from './gen-cloud-crypto.mjs';
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 
@@ -31,6 +38,11 @@ function same(canonical, copy) {
 
 same('printer/contract-vectors.json', 'lobby/src/lib/__fixtures__/contract-vectors.json');
 same('printer/envelope-vectors.json', 'lobby/src/lib/__fixtures__/envelope-vectors.json');
+
+// The cloud crypto's CommonJS copy is generated, so it is compared with what
+// the generator would write now, not byte for byte with the source.
+if (!existsSync(path.join(ROOT, CLOUD_CRYPTO_COPY))) problems.push(`${CLOUD_CRYPTO_COPY} is missing (generate it from ${CLOUD_CRYPTO_SOURCE}: node scripts/gen-cloud-crypto.mjs)`);
+else if (readFileSync(path.join(ROOT, CLOUD_CRYPTO_COPY), 'utf8') !== cloudCryptoCopy()) problems.push(`${CLOUD_CRYPTO_COPY} is stale (run: node scripts/gen-cloud-crypto.mjs)`);
 
 // The generated copies exist and match the canonical files.
 problems.push(...checkAssets(Object.keys(COPIES)));
@@ -70,6 +82,7 @@ if (problems.length) {
   console.error(`✗ ${problems.length} problem(s):\n  ${problems.join('\n  ')}`);
   console.error('Vectors: change the canonical file, then copy it over the other (never the other way round).');
   console.error('Brand kit and family.css: change the canonical file, then run node scripts/family-assets.mjs.');
+  console.error('Cloud crypto: change lobby/shared/cloud-crypto.js, then run node scripts/gen-cloud-crypto.mjs.');
   process.exit(1);
 }
-console.log('✓ contract and envelope vectors match; the brand kit and family.css copies are generated, ignored and match their canonical files');
+console.log('✓ contract and envelope vectors match; the cloud crypto copy is current; the brand kit and family.css copies are generated, ignored and match their canonical files');

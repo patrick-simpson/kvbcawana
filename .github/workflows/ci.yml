@@ -51,6 +51,9 @@ jobs:
   #           lobby/src/lib/syncSpecs.js (electron-app's device-sync test)
   #           and lobby/shared/brand/ (the print server's brand kit is a
   #           copy of it, made before the tests by scripts/family-assets.mjs)
+  #           and lobby/shared/cloud-vectors.json (test-cloud-crypto reads it;
+  #           its print-server/cloud-crypto.js is generated from
+  #           lobby/shared/cloud-crypto.js, which the copies job checks)
   changes:
     name: What changed
     runs-on: ubuntu-latest
@@ -105,7 +108,7 @@ jobs:
                 *) lobby=true ;;
               esac
               case "$f" in
-                lobby/worker/src/relay.js|lobby/src/lib/syncSpecs.js|lobby/shared/brand/*|site/build.mjs) printer=true ;;
+                lobby/worker/src/relay.js|lobby/src/lib/syncSpecs.js|lobby/shared/brand/*|lobby/shared/cloud-crypto.js|lobby/shared/cloud-vectors.json|site/build.mjs) printer=true ;;
                 lobby/*|journey/*|site/updates/*|.github/workflows/*) ;;
                 *) printer=true ;;
               esac

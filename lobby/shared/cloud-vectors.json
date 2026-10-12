@@ -1,0 +1,720 @@
+{
+  "version": 1,
+  "about": "Deterministic vectors for lobby/shared/cloud-crypto.js (scripts/gen-cloud-vectors.mjs). Every name is made up. Never regenerate to make a test pass.",
+  "params": {
+    "PBKDF2_ITER": 600000,
+    "PBKDF2_ITER_MIN": 600000,
+    "PBKDF2_ITER_MAX": 2000000,
+    "INFO_AUTH": "kvbc-auth-v1",
+    "INFO_WRAP": "kvbc-history-wrap-v1",
+    "INFO_HIST": "kvbc-hist-v1",
+    "INFO_STATION": "kvbc-station-v1",
+    "AAD_WRAP": "wrap1:",
+    "AAD_HIST": "hist1:",
+    "AAD_STATION": "stn1:",
+    "ROW_PAD": 1024,
+    "STATION_PAD_LADDER": [
+      1024,
+      4096,
+      16384,
+      65536,
+      262144,
+      1048576
+    ]
+  },
+  "keys": {
+    "history": {
+      "jwk": {
+        "kty": "EC",
+        "crv": "P-256",
+        "x": "VyW0WujGn8KoLE-eQKJCwHBCTRCfqXTj1DyzUVrR9VE",
+        "y": "dIq4Fi6pHxvdHiV40zbQEl0eSWbYOmLtEL3_A36aMr0",
+        "d": "HtYmT4qjPJcXVtM05hzfRXVe7l4xrKBtHfQb4KZtO0I"
+      },
+      "pub": "BFcltFroxp/CqCxPnkCiQsBwQk0Qn6l049Q8s1Fa0fVRdIq4Fi6pHxvdHiV40zbQEl0eSWbYOmLtEL3/A36aMr0=",
+      "kid": "d2449e61adc0bd31"
+    },
+    "stationA": {
+      "jwk": {
+        "kty": "EC",
+        "crv": "P-256",
+        "x": "F-T6BQyfIG-kVb864_zdezTsTQbJSb2TCpNshFfGXhM",
+        "y": "KWm_YnS9PdUcuStRihM6ZbbkVex2NTLuI3yLShCbKdY",
+        "d": "E25zrX0gsntDC0WfTxiCrwDsupaF_sT3DUE0VoauFUc"
+      },
+      "pub": "BBfk+gUMnyBvpFW/OuP83Xs07E0GyUm9kwqTbIRXxl4TKWm/YnS9PdUcuStRihM6ZbbkVex2NTLuI3yLShCbKdY=",
+      "kid": "a24c7c6d617839b8"
+    },
+    "stationB": {
+      "jwk": {
+        "kty": "EC",
+        "crv": "P-256",
+        "x": "P5nu4xleFxoz5LbUM1_hn5VddBx-tcoNWwdy9emNE0A",
+        "y": "nl_8Jl61H27rXUl4gJjl3uoAQ2cOP11s9T4Omu1Dqx8",
+        "d": "Y_IHsG8rGFyNkJ8AGZATokLlRURnEYI98_YmBAdpMo4"
+      },
+      "pub": "BD+Z7uMZXhcaM+S21DNf4Z+VXXQcfrXKDVsHcvXpjRNAnl/8Jl61H27rXUl4gJjl3uoAQ2cOP11s9T4Omu1Dqx8=",
+      "kid": "df24fa8bf08f973e"
+    },
+    "eph1": {
+      "jwk": {
+        "kty": "EC",
+        "crv": "P-256",
+        "x": "_D_PB_XMHUDrU95IUm_GR6VBDxhPHAeDlxJW7LIr2w8",
+        "y": "UzuFFC0e_Pe6t8j15qD7sy5lvkdV_CZP8q4DDzsXL00",
+        "d": "qbQ9v7wyqS9wFDLFz38JmQeQfaSYUTVZaWxIY262Vkk"
+      },
+      "pub": "BPw/zwf1zB1A61PeSFJvxkelQQ8YTxwHg5cSVuyyK9sPUzuFFC0e/Pe6t8j15qD7sy5lvkdV/CZP8q4DDzsXL00=",
+      "kid": "a7a00a8479fbb539"
+    },
+    "eph2": {
+      "jwk": {
+        "kty": "EC",
+        "crv": "P-256",
+        "x": "lP54rNsBrNM4N1GRlEKdlEC4zT2l8Hxuoq2VaVewC5M",
+        "y": "eMaeTqNH9dLz2XNvoYq9PNJsjtUciqiutD3hubhs0go",
+        "d": "yGCc_nko2lQHo6Q1YPsbyAmgH3ZcIcyj3zyufpiAy-I"
+      },
+      "pub": "BJT+eKzbAazTODdRkZRCnZRAuM09pfB8bqKtlWlXsAuTeMaeTqNH9dLz2XNvoYq9PNJsjtUciqiutD3hubhs0go=",
+      "kid": "b4356712ea0cc234"
+    },
+    "eph3": {
+      "jwk": {
+        "kty": "EC",
+        "crv": "P-256",
+        "x": "EONSKiWH1uHXrQovwfOUOHpHPyvxeN9OBGgLoC5jOHs",
+        "y": "kBI_gtPFobwO5cNrXNZVaw0cvbEOSN4tn_G_cCG35V4",
+        "d": "-hgr3hYHC0EhskwFM50wDvfdsJAdC_2zhlAb1bPjhvg"
+      },
+      "pub": "BBDjUiolh9bh160KL8HzlDh6Rz8r8XjfTgRoC6AuYzh7kBI/gtPFobwO5cNrXNZVaw0cvbEOSN4tn/G/cCG35V4=",
+      "kid": "1c30d40794b9f4e7"
+    },
+    "eph4": {
+      "jwk": {
+        "kty": "EC",
+        "crv": "P-256",
+        "x": "UqeZzbzZEX6rumgw148DkNyzmHMbPFc33tqJPAMbFVE",
+        "y": "stC1rZxtumrMwa6oxmyaeXucPGhjrRE6v-J8qDPCeC8",
+        "d": "0pTKaaoLJJmjT5vhV7lbbbo0QqpPQvHk4-FAiP51SW0"
+      },
+      "pub": "BFKnmc282RF+q7poMNePA5Dcs5hzGzxXN97aiTwDGxVRstC1rZxtumrMwa6oxmyaeXucPGhjrRE6v+J8qDPCeC8=",
+      "kid": "1caf0c5f2ffaaaa7"
+    },
+    "eph5": {
+      "jwk": {
+        "kty": "EC",
+        "crv": "P-256",
+        "x": "mZXuBgHPEExpw5EcX_T3769S-eK4MeR7hULzU79Mj8I",
+        "y": "7nT5gdHnxDqwi87vS-_2asiV2yWvkEZRC_481aMs714",
+        "d": "AAruzZIl46vhcDgxsJikVEzOqfE1to_W5bWox8lTi1Y"
+      },
+      "pub": "BJmV7gYBzxBMacORHF/09++vUvniuDHke4VC81O/TI/C7nT5gdHnxDqwi87vS+/2asiV2yWvkEZRC/481aMs714=",
+      "kid": "3b6dc8a6026ac207"
+    }
+  },
+  "derive": [
+    {
+      "passphrase": "Kennebec",
+      "salt": "HyYtNDtCSVBXXmVsc3qBiA==",
+      "iter": 600000,
+      "authKey": "swRNoIPwYpNhYb8JudDp6p465JtZSVXWLw8hTjJEmFo=",
+      "authVerifier": "u87Cw8+WjkLh0PIk2E8W0rHH0VE4a/MoNIH2Zi1ntYk="
+    },
+    {
+      "passphrase": "  KENNEBEC  ",
+      "salt": "HyYtNDtCSVBXXmVsc3qBiA==",
+      "iter": 600000,
+      "authKey": "swRNoIPwYpNhYb8JudDp6p465JtZSVXWLw8hTjJEmFo=",
+      "authVerifier": "u87Cw8+WjkLh0PIk2E8W0rHH0VE4a/MoNIH2Zi1ntYk="
+    },
+    {
+      "passphrase": "awana rocks 2026",
+      "salt": "PkVMU1phaG92fYSLkpmgpw==",
+      "iter": 600001,
+      "authKey": "pjYl9X8e7V+GUWq6EnV8lPwkJd2l635ieZbfsq33ba8=",
+      "authVerifier": "NXqHWvcmIisvyZBbruhjfz0swZw/fJdW3Qbos1KGVbU="
+    }
+  ],
+  "wrap": {
+    "passphrase": "Kennebec",
+    "iter": 600000,
+    "salt": "XWRrcnmAh46VnKOqsbi/xg==",
+    "iv": "fIOKkZifpq20u8LJ",
+    "wrapped": {
+      "v": 1,
+      "salt": "XWRrcnmAh46VnKOqsbi/xg==",
+      "iter": 600000,
+      "iv": "fIOKkZifpq20u8LJ",
+      "ct": "SJmq67VcgUD69qzsMmeAy76Fm4AkQ5R1ibeYpb81c7nIg/1XdSPOwSJ1hw450l6yvZ06Lr2C7/rB5i60K2kotChRr6ha0bgpk0zjnseYleWL4KChcO8Ga7oR8pKsAlECdhPO4QofAei+H/s768R/l+BilsEFC8oI0NQ3pbmCX0xgbVvoyZFUr14cuEWZEqw7GbH/GyXY4diWzE9TwUpaYiEQ8JI8j9vQ5EAiEm82FDHN03Rf9+VAzafZ4Si4fz9s"
+    }
+  },
+  "rewrap": {
+    "oldPassphrase": "Kennebec",
+    "newPassphrase": "new word 2027",
+    "iter": 600000,
+    "salt": "m6KpsLe+xczT2uHo7/b9BA==",
+    "iv": "usHIz9bd5Ovy+QAH",
+    "wrapped": {
+      "v": 1,
+      "salt": "m6KpsLe+xczT2uHo7/b9BA==",
+      "iter": 600000,
+      "iv": "usHIz9bd5Ovy+QAH",
+      "ct": "3pagXzCA+t2kbuj4b3vliVvSTg8Yqz6nColeMtvXtA9kf4ridFmDliYWdtLKAJWZARPKuAEwtU6a4gCxLtX6DS0JPu3Dsx7QTc7HrG0/IrQuGfPi7Cbq09atkZH4O0SRL+NJWzNAssXwUau3+9j6rZa65nPKxR5ebiSjINK6H4lO9XOXlw8KdfuZvKIyYcwchgk665OB9ZJbU9cpaflw0FyJiOgRRw3ghOAPK/R0EuT0fH4rMxkfZcfpySTXYwAI"
+    }
+  },
+  "rows": [
+    {
+      "id": "AAAAAAAAAAAAAAAAAAAAAA",
+      "night": "2026-10-14",
+      "kind": "checkin",
+      "record": {
+        "ts": "2026-10-14T22:31:05.000Z",
+        "clubberId": "100234",
+        "first": "Ava",
+        "last": "Example",
+        "club": "Sparks",
+        "items": [
+          "Attendance",
+          "Bible"
+        ],
+        "via": "desk"
+      },
+      "ephemeral": "eph1",
+      "iv": "2eDn7vX8AwoRGB8m",
+      "wire": {
+        "v": 1,
+        "kid": "d2449e61adc0bd31",
+        "epk": "BPw/zwf1zB1A61PeSFJvxkelQQ8YTxwHg5cSVuyyK9sPUzuFFC0e/Pe6t8j15qD7sy5lvkdV/CZP8q4DDzsXL00=",
+        "iv": "2eDn7vX8AwoRGB8m",
+        "ct": "mjGPn6mSC2Y8eOL69GrUCxdqqeMHmpFvJSDninxqOvo4RbNk5ZSp5fYji2fAqdMSw+CK/UL+ditlknRXZXXCtPG1Wp1a3xSGiiayuiShEbrzyf49XRaatRZzZ1/W9eyeHfoPQoWYzo553r0RD8wplHvg3+uIeRFMYhwVp6lwSvOhyLqj8bw8qP6vDroR9v2ZBZ+5COQnUIIWWVrpZ8MBAZwfwNxpjeCk/kBrf5qu1ss0ZmNIM3+E37zRJdw6PqgfxoIQHpM3xsPO907WPj+znhdhZ11j5SB+0mS8rj6C7QUa+BHDTVEdvRmywPep4fd/OO6y/UnTwZKSFnFgLA6TDMCP6XXS16wJKHVVGyQJ5f0u7oYR+0OD/q78vnLlHblZ4x0RCp42rcbWrN6anlAp5OJsx80MinEfSSuIVAKVTDmmrYNTsf9uqaDrgXeNaWV3FBI2R+Y+DkUC5hUn8Eeg23NvtPBKs+w4BzmrUmhQ+AtcBVyjvhB1312Vkr6mC/jiekLkqWYLxa6S/bY7lmI+n2YbbXJb5Z3IncOiAdGcvLebweAaNdULQmvMMxDluG6lgBiAKdZqlCk1JJymJvQ2xCEfVFSVU3TC4epr0djf479ruaYvSDQ+qBundwzjUFjludRI6m7eL2n8iBgi32O1KJJtpukJTfH/7vo8hrgPCoZ1kH6lA/c3zkIfCUsNNgiGZ6ONdW/He+W+riVkvhVN0ml0n8qEyaCS3A+zoakJKKnkq8TszVLwGBpWGBktg7BBdO9q6l8cerABQmF20TzP5Tm9KbPBv+FQ8NA8zDgsHSJJw99tYrV94jHJxSVaZBx17vARUXn8e4gPu5X7I8KgiC+uEvTm0JxcWvpbTpOfgb3UjFZlwQ5mwhP29oQ28hiVM0tXcgyDNXWB1ZTWOhXw6isuLrgpHasUjyFaLAH7pt9Y7edfBDVm8Mmz4dJtB+nFErga0Jn3OMJl+23FrSMjREd4CqomUYt173dB6VK5wSPCIZAsT9j+a6yhT6azIyVNYKWL26QW3kRXxCnQExCafMJpW+OHN8wnglC/qJiWbu03L75GDkoeuho0/xnYYUZ8RdmE20YZU9cFezoFe6Rh3s+pE7UFSUC5zB0/eGSNgj9FvNf2384e/R7o5FrirMcxILfzlWYgH0QM4Ub03r5y9upPuT/YyHEtLvCJX8rnTSl2bopj8GOf2LjeDThVTrhlzriw7my0Qf2v/IJGZ+DgJ4FGHeE7rCcjOMj0v5Cym6yoKmtcm5DAMM+63R+SKZNFJWRXFIIv7GaokNEg67H2TFA7Al1Ky4t1w+GEI2pJmBTvDhEyfZmIVLxbT+ptkTLCjKbIMUD29jWGjkz93dYlqcB9fvGez352vNo6XkJUTHs="
+      }
+    },
+    {
+      "id": "BBBBBBBBBBBBBBBBBBBBBB",
+      "night": "2026-10-14",
+      "kind": "friend",
+      "record": {
+        "ts": "2026-10-14T22:40:00.000Z",
+        "clubberId": "100777",
+        "first": "Zoë",
+        "last": "Sample",
+        "club": "T&T",
+        "friendFirst": "Mateo"
+      },
+      "ephemeral": "eph2",
+      "iv": "+P8GDRQbIikwNz5F",
+      "wire": {
+        "v": 1,
+        "kid": "d2449e61adc0bd31",
+        "epk": "BJT+eKzbAazTODdRkZRCnZRAuM09pfB8bqKtlWlXsAuTeMaeTqNH9dLz2XNvoYq9PNJsjtUciqiutD3hubhs0go=",
+        "iv": "+P8GDRQbIikwNz5F",
+        "ct": "8MelAkPdUgXqa6IAKtiZ8oRVgXL8eZ2MYVZsysYvf4K2U6PmdmVsFuXbw2iZtqDQlbBup2HXiJkqwxA5ZTICwGbO7z4vvqUTeznuiy6Wok3K4emwxN41ACpknn+vEr294ni72YdYkqTKA6VnItmTbeZYmHEjrGOHCYv3oZ4b57Dqds8v14DHoN2RYv3/NKR1YWu8zncVQyAoGA47pSlFLKV7nHYQz8GNBWt3Hio2jtWR+59ZJeBJLwa7V7xt5PXKZ8CFOuYz/6am2sP0cYPETNz0JSz2jIi73tf+YYn5nR7nmeyxlQT/6dMsiqxId+uGj/pL2OrEbWj6ekcvYdM9jNomhZkO5M++XwLEKIEBIOvRZNosLSSuDV/q5DrNosN+PKj8BY7i+8TGNWVN7E2kKXTgV9eoJb7wnP/elUzwzqXeTvpOoeJfCAK6opAPLibsI+gymt65Z0XXFuTVbWhhJn6bb+mzObbNCDaT9jkQ7wCXGIIUGDSd8XHtWHwS+n1GYU1KLiymzdyE3wyPtFeLKBfucjlzEQDoDDW5cDiFKKH/C4dVN9BTIAgoadPmAna6gw73IkETa2SPQrWF3UqPlGOrqqE0EwsJWH91NsLSgSMsutXr+sNuoZjVREgsxJtgBBCkQ8rmomaISFWYmzLIfstLM7v75jQXdvApGhY+GiXCXyDD4uxtu04gvKAKZBzRD9qxcOziK9r2EHcb0/mBWiS815wojKYOYGvZZ+yquhyJJEx1gv2JZVqhXiYC/ePzT7mSFyxms7QSDM14Qxt00HQrIKPevGTaujhI+OYZtCYFlzY5F1yfS20Mxf2F0aIDW3ytd9IMABohk/2Ttmp+A5KkFwjzz+aBrqcQzis8ind3p6alvY2R6X/0soPzjRBWVI2zvujpBzYU9W0crP1RqANggHrjtPm6yZnOmpZAIK1htxl0mYfuOBF5EzAe6dYdzulNUr+qWI6hqTnUVKss0jI7VoeN5Jjc7b3vb5Ove/PCbR2sQJDMOtLGjB6nbfrH4ZQO9gD7zDPdcfN04SO+7pp0sfIhkuf2vOyBzGDbCry0+OgbbsvQqd6GijNsKU/5Ce6jpOgWFszX8VjMFrdgCYv8VkPtPAlDDwmaJG4D0l503jP3Dz2hWXCTou/oeMaizf+B1HHiF+FzMthVuaJHRanKWftXFZCUbRNXAWkATol6YhibbfslGmlBjLB0fHj+S4KpRSEHLgMfjmcOi0cvwatqz7avxu4eeQ8fx0XDE7DXfD+bWLM/Tf78FUEVA7T49EE9ChN5TiwdO4jLOgHSIcw+XA7VymLGXXIs/GlhDmM85FhqNzkiwGNsoFSBEW4OncKHixRcS+VGZOedTDyLOTxuphVub7uCOebKx+BBQ8g="
+      }
+    },
+    {
+      "id": "CCCCCCCCCCCCCCCCCCCCCC",
+      "night": "2026-10-14",
+      "kind": "undo",
+      "record": {
+        "ts": "2026-10-14T22:45:12.000Z",
+        "clubberId": "100234",
+        "club": "Sparks"
+      },
+      "ephemeral": "eph3",
+      "iv": "Fx4lLDM6QUhPVl1k",
+      "wire": {
+        "v": 1,
+        "kid": "d2449e61adc0bd31",
+        "epk": "BBDjUiolh9bh160KL8HzlDh6Rz8r8XjfTgRoC6AuYzh7kBI/gtPFobwO5cNrXNZVaw0cvbEOSN4tn/G/cCG35V4=",
+        "iv": "Fx4lLDM6QUhPVl1k",
+        "ct": "Ii2SCy/Lw6AyxnQisyBS3wHAKlbYvnooRbHvQNeJBBy6fqi53yNBXjdB/ierhseatAB4XWyf0xnXoBejl6MlHmyyZGkYC071YIoZNYQ3otb6CpIuq5DSKVwhyT7W9YoslxqjMfkao0z8/KAdZFPu5xml4CiTvBhNcjJoddff41mgnq6G1BGuh+JctBtJn9ebe1HyGfZSphW39LF+1cnKMzFlmfoCHVzHh234kyJjDrDtQwhA754/qpX5jNz0O3xhTPSzPPnKSqZ2OMiSS8OTvGOizxnUFA+SjnaZVrndyjfOYtkiC6H9pF73n2fm4XQ6efA6K9t1KSMm8GCvOq1TPPUw1W3OoP8nkZ3CVQvqNePNbLjYBDmgL66Dz9giw4qs3aM0Qf/uH0VdCleklGckdr840bUZoJb82JzO5vl8ebBXPrTuwN7CEXwj6HaEbpp5ceC6u1HOQ0ceoXITQoyeH2WBAnaVJ2wu7tCYySgJ84QBUbUNnaqnrpS0WNaGsDDPIDuZKh4OHfLZuz+ao3LskRaEP5bveV0YFCZYO6gdj9vIlHDZKCMMfzQL31CihNTeqy/Lcp4bT8jj81pBJbloRjdKGK0rCrDI5aUJX60wUyDzimvf0X64UaaY7k1CiKvlXredsaowHD5R+ywVhSk1Aq/oK+cGM75HYYCi0JW2o53V1Ba2W9bHojPoUAvYcRzmKeAVHHsrntED+6KXMrVxM/wErF67BJdvufjTVpFshn13PiVYs6RRURVY5ba8YYDEJ881lX9Bj1MBTNEIlMYPFazwi36Tsk2IkRvjCsyCmfjXoTWYRo45GW8CILn3LgO0T00Nb4BRK6p/rn5DvTJH/sUJP+uwTG6rTm30RawqAeku1hmDL+bt2/f4MmpFAD1FtNuIipw62E3D7PyoYHTti/VwOAkCqJxC57CuhlMt80+nxTNPF9dUt6owfcRqoOuey3GHPWouHSMv1a7NM4QnYDGsKGT/Lq30RGHhcCk0USqQ0MF0S7ivf0EYxj6L8FMYp1JUF8TTB9djQNwQMch0w4PSkSZx+XUXVytoUwplH6klNiEKdkwkdFEX+fjYABivI+ZD+knIpjp1WqAxRrUPSuo/1mN5BuDi7TN9FuFj9RneQ6Gd4MhU6HND6C9rHNaIg9xhhRK89BN9Tv/MWGkJhjHDxmJrXViMzAOyeSEx175ZehdeBk+I/SvihkNWx75KSyCMYB5NDWtgtEIa2GAI0imc352tFu8exwNkoD8gzpN4hs6N2lZ77fMQvmAJLabraawt6RIB2zlo4k9HBjYzeo3Hh1I4s9444TNXHsJ9Dn5fbgYoczsdUYlrdy8m4C/GxI7UwOIG4LbH0FS4OZEskCPmH7cGp4bMOvcIjGbda7M="
+      }
+    }
+  ],
+  "stations": [
+    {
+      "id": "DDDDDDDDDDDDDDDDDDDDDD",
+      "night": "2026-10-14",
+      "kind": "job",
+      "record": {
+        "ts": "2026-10-14T22:31:05.000Z",
+        "jobId": "DDDDDDDDDDDDDDDDDDDDDD",
+        "first": "Ava",
+        "last": "Example",
+        "club": "Sparks",
+        "allergies": "Peanuts (made up)",
+        "items": [
+          "Attendance",
+          "Bible"
+        ]
+      },
+      "recipients": [
+        "stationA",
+        "stationB"
+      ],
+      "ephemeral": [
+        "eph4",
+        "eph5"
+      ],
+      "iv": [
+        "Nj1ES1JZYGdudXyD",
+        "VVxjanF4f4aNlJui"
+      ],
+      "bundle": {
+        "v": 1,
+        "id": "DDDDDDDDDDDDDDDDDDDDDD",
+        "night": "2026-10-14",
+        "kind": "job",
+        "to": [
+          {
+            "v": 1,
+            "kid": "a24c7c6d617839b8",
+            "epk": "BFKnmc282RF+q7poMNePA5Dcs5hzGzxXN97aiTwDGxVRstC1rZxtumrMwa6oxmyaeXucPGhjrRE6v+J8qDPCeC8=",
+            "iv": "Nj1ES1JZYGdudXyD",
+            "ct": "enVEkYYE6YVHbzZKan59olhAHo/BAbaGIwAMnqM/clOJ7L19SoejZkq2L/72P0bwPXGhmPC5M/pmZFdt112w4GH9ILVg1UxbyHIQz7bpNThjpGsA1Sr8yN+2DGhO5Ko4p47eJOBDkbpDLcBqBKdlpTXeJ2/riB5If2NBL87KpYv3KFOZR/aml81b+S/EPIikQqCsatqhZqZRljSrqsobtrT/q530Mfat1KikU5pIijW1frqOltvwRBa31Qnw3BcaHqNW8guP8U9IC1WYn66w470nwAkxGkZOHKhOVLw7nkJ21b0/tFKAVDKiBR6XPdFBLhMvMS47U2sswoLd3jwuoAQ05m7LKNkNdv5oTSEIU2OqS32UR99/679XMiFmGGGjM78ul4bWCdRyxcNOAEjlrlzANZaLYa8Ow0EmiDzpGwn47Arm2Sf3VBnCd2JLAy/NtDVoLJTXDh5Ic3qqMwmVmcU4iDnlZx6681JH9folxqxRrywk/hZk+8eIMM/RFAvRQ6Kyf6elemKLy0066/4Wm1k5WmaCDHdu7U2kOYi7cIAtto6shoufVUvu3a7iic5WJZ2+e5yaaSVEUeYnnOArXE1G+FjglA08QLJ3ZMSuWfPvfh7aTcKSuGe1bvXbWxZhAfxWDboc5eD1mrl5oJfEJ562DNv+YwkSb4bxcFvGisFgrV6QF+3xlAZJEmD5cg+2d+Bzfy5IndpQa6NUwbdV2RgV6FpR+Vv/+kshDfX3lbYzA5FkyWhiepHX+KMR9Lpl7HPYLUeee/iywObn6T/XIyBoi7LSu8WTmL8BizYbKsAFpGyvKShJTPEBwIHFTwH32mAvQsJV7D603lGTvhDV3fPhKh1f37xxZLPwVWMLs/7+5v8t6LjucJKgB3PMWle+841H4wwvKELxon/rzBj8Bl97ZiFZEvKS3XExLDbFL+rFDAlgABDQ8k6cw73iXwtFO2iEbTOcbZcw7ghAcDf//DwyXKzS0I2A/WKiePgTtcEkrdtepuopBBk6C4jeaFcio2A/+b7ss5g5hLOJN+QXwjvD+39XoSxreTkyLSyCFd0faEQgO8Bx2lSazBDQunt4GiiPXJTgOwJ9Bl4UKfNmXV3b403ibsJUAracSs2euADTq5vPU9fcVi5nc2jiOzjSdBpsTh4s7D7EesD0H1x1CaGThHIt8b/V0uZO8MLgubSTSy71drWl2MARwminFVrf/yLcsh/wg+YPrmZpUojRKcEah3nDYubMv5CQwJp68WaJjU0I9kxrsPt9koCi95A8nnitDQcbwIATj0HPKZ/gyQYagBLGu9wING7ambrftY0CpXkCP4LVRJ617WowitoeFTvbetpRj7y4boEWzEwT9z0bt6RTn5z8FGvp6Uijkjg="
+          },
+          {
+            "v": 1,
+            "kid": "df24fa8bf08f973e",
+            "epk": "BJmV7gYBzxBMacORHF/09++vUvniuDHke4VC81O/TI/C7nT5gdHnxDqwi87vS+/2asiV2yWvkEZRC/481aMs714=",
+            "iv": "VVxjanF4f4aNlJui",
+            "ct": "pbmFu8gUdyCgSA+vTdaZqWsDyoeznqMhxNzNm1HytyJUljBiH5NPUtk3Rw/V7PjODzrSRi70bOs8y9Y5YTjxjZcdv9WM34tytCdigEM13LtyuELTvyvhns3KQHKckTS8UgLR0gUo4+bE+ZRy64xZf8T/sC8bR+gzhG29k8pL9JbJPZJ13DZpQbi0zZa+0x48XkEWwpngpwMtMnGwsY/S1Im5KsfoQLb/rMhTtO050JvQwOCcmJe8QMXNL6j86SpK4sXoDY1g1Wbm9YR4WrTrjsi/CSi44yF4972QImrbfmaQDPZs9OzG0eFnI1OsXgdC/C/5Q6cR18253I8T/ppC7Oh4WfF1lAmQFQhEP2zamk/z5sqMe+0bK1OjAaAJ/q4EYYXV0IPBlv591Zbi5NM/45TbyJWscXuzQXR9+qp2ZE5TetCjIqLsRuLH7Eb2Epid0oZX+OUF6S8gpXZZ15IPp3IU95vddWlY6jp6xlcCZRp7ue10UXOgc7d9opisLIpvBFrxhJ7fncGHx2ZULX9tsyUqTdBj7+RLQrDzdRANPKolygIXnXU9696jxuFKtCHAfLYKSJlj9avp+5T/qRdoamjnZQvIdnxnr79zwGgmOsayj8oizhvU3qyJ2aDOKDUTgzJav3/CBGcWz7/FozL+aqGfw9VMQmmYLEyuO1D3MrluboY1xumw0Yn3Pe3ChqUviFxEfnKuAB9D/jeA46IEld0jvm8rKU4RrqjSu0MNZNPnvkS5G3O734Rk7ggX1BO5VRIpXniWG+yq2tiFPSizV0BWHAxI/ALlesPatoMJAzCr6TvtC7luJlyXEhF4OIibxxIIyLLAUAcqDTJ2iafUi7xWBTRANNBAEcgvp9uMZ8V9G7zZuKlRZ82syl2C9xy8GAUM+GTxfrvHwXwD2Q6MW3DUvMRDv5dmcgkxkWUBjM3QOjRIoYM+wrP9g/9y7EVBPxTGltMWvmYSghSZOtB1+VTv+C44oQ6GsuFD94Pixg/91gW7o6A3/M9EXOEwt64hbKFf+/LNoFCLqKtanDPFPAi0YOItm+qmMMsDlMsWEt1M6cNwfYbMQIC//y/pZY157c9RT6Su8xqQQGf1x+DEyVukK0jVYPbC+hrbbqbAyHgl65z78DJPjVhq8zlxsrw6sH4PBqoF/tJor2HzmpNt65a6DuD6dGKG1ZyvWc9wRk9nc2CEKGx+I2DvnJiH4EeGS3qYiSJuF8dTo1Mhf7T3wR9n7yf/wyf2oEqMzD7tZW7YC3kyfOJ9llhGscn41uN3hNHVElD96PryY+sNHu35eLpSwAQoYMkGYW/eh32EuvibH8BnMFOTqusGVEu+ikrC9J0r3480uaILo2cr7ZcKqyRkSwVH45mk5oiTQ32gbdI="
+          }
+        ]
+      }
+    },
+    {
+      "id": "EEEEEEEEEEEEEEEEEEEEEE",
+      "night": "2026-10-14",
+      "kind": "roster",
+      "record": {
+        "ts": "2026-10-14T21:00:00.000Z",
+        "kids": [
+          {
+            "id": "100000",
+            "first": "Kid0",
+            "last": "Sample",
+            "club": "Puggles",
+            "allergies": "Made-up allergy"
+          },
+          {
+            "id": "100001",
+            "first": "Kid1",
+            "last": "Sample",
+            "club": "Cubbies",
+            "allergies": ""
+          },
+          {
+            "id": "100002",
+            "first": "Kid2",
+            "last": "Sample",
+            "club": "Sparks",
+            "allergies": ""
+          },
+          {
+            "id": "100003",
+            "first": "Kid3",
+            "last": "Sample",
+            "club": "T&T",
+            "allergies": ""
+          },
+          {
+            "id": "100004",
+            "first": "Kid4",
+            "last": "Sample",
+            "club": "Trek",
+            "allergies": ""
+          },
+          {
+            "id": "100005",
+            "first": "Kid5",
+            "last": "Sample",
+            "club": "Journey",
+            "allergies": ""
+          },
+          {
+            "id": "100006",
+            "first": "Kid6",
+            "last": "Sample",
+            "club": "Puggles",
+            "allergies": ""
+          },
+          {
+            "id": "100007",
+            "first": "Kid7",
+            "last": "Sample",
+            "club": "Cubbies",
+            "allergies": "Made-up allergy"
+          },
+          {
+            "id": "100008",
+            "first": "Kid8",
+            "last": "Sample",
+            "club": "Sparks",
+            "allergies": ""
+          },
+          {
+            "id": "100009",
+            "first": "Kid9",
+            "last": "Sample",
+            "club": "T&T",
+            "allergies": ""
+          },
+          {
+            "id": "100010",
+            "first": "Kid10",
+            "last": "Sample",
+            "club": "Trek",
+            "allergies": ""
+          },
+          {
+            "id": "100011",
+            "first": "Kid11",
+            "last": "Sample",
+            "club": "Journey",
+            "allergies": ""
+          },
+          {
+            "id": "100012",
+            "first": "Kid12",
+            "last": "Sample",
+            "club": "Puggles",
+            "allergies": ""
+          },
+          {
+            "id": "100013",
+            "first": "Kid13",
+            "last": "Sample",
+            "club": "Cubbies",
+            "allergies": ""
+          },
+          {
+            "id": "100014",
+            "first": "Kid14",
+            "last": "Sample",
+            "club": "Sparks",
+            "allergies": "Made-up allergy"
+          },
+          {
+            "id": "100015",
+            "first": "Kid15",
+            "last": "Sample",
+            "club": "T&T",
+            "allergies": ""
+          },
+          {
+            "id": "100016",
+            "first": "Kid16",
+            "last": "Sample",
+            "club": "Trek",
+            "allergies": ""
+          },
+          {
+            "id": "100017",
+            "first": "Kid17",
+            "last": "Sample",
+            "club": "Journey",
+            "allergies": ""
+          },
+          {
+            "id": "100018",
+            "first": "Kid18",
+            "last": "Sample",
+            "club": "Puggles",
+            "allergies": ""
+          },
+          {
+            "id": "100019",
+            "first": "Kid19",
+            "last": "Sample",
+            "club": "Cubbies",
+            "allergies": ""
+          },
+          {
+            "id": "100020",
+            "first": "Kid20",
+            "last": "Sample",
+            "club": "Sparks",
+            "allergies": ""
+          },
+          {
+            "id": "100021",
+            "first": "Kid21",
+            "last": "Sample",
+            "club": "T&T",
+            "allergies": "Made-up allergy"
+          },
+          {
+            "id": "100022",
+            "first": "Kid22",
+            "last": "Sample",
+            "club": "Trek",
+            "allergies": ""
+          },
+          {
+            "id": "100023",
+            "first": "Kid23",
+            "last": "Sample",
+            "club": "Journey",
+            "allergies": ""
+          },
+          {
+            "id": "100024",
+            "first": "Kid24",
+            "last": "Sample",
+            "club": "Puggles",
+            "allergies": ""
+          },
+          {
+            "id": "100025",
+            "first": "Kid25",
+            "last": "Sample",
+            "club": "Cubbies",
+            "allergies": ""
+          },
+          {
+            "id": "100026",
+            "first": "Kid26",
+            "last": "Sample",
+            "club": "Sparks",
+            "allergies": ""
+          },
+          {
+            "id": "100027",
+            "first": "Kid27",
+            "last": "Sample",
+            "club": "T&T",
+            "allergies": ""
+          },
+          {
+            "id": "100028",
+            "first": "Kid28",
+            "last": "Sample",
+            "club": "Trek",
+            "allergies": "Made-up allergy"
+          },
+          {
+            "id": "100029",
+            "first": "Kid29",
+            "last": "Sample",
+            "club": "Journey",
+            "allergies": ""
+          },
+          {
+            "id": "100030",
+            "first": "Kid30",
+            "last": "Sample",
+            "club": "Puggles",
+            "allergies": ""
+          },
+          {
+            "id": "100031",
+            "first": "Kid31",
+            "last": "Sample",
+            "club": "Cubbies",
+            "allergies": ""
+          },
+          {
+            "id": "100032",
+            "first": "Kid32",
+            "last": "Sample",
+            "club": "Sparks",
+            "allergies": ""
+          },
+          {
+            "id": "100033",
+            "first": "Kid33",
+            "last": "Sample",
+            "club": "T&T",
+            "allergies": ""
+          },
+          {
+            "id": "100034",
+            "first": "Kid34",
+            "last": "Sample",
+            "club": "Trek",
+            "allergies": ""
+          },
+          {
+            "id": "100035",
+            "first": "Kid35",
+            "last": "Sample",
+            "club": "Journey",
+            "allergies": "Made-up allergy"
+          },
+          {
+            "id": "100036",
+            "first": "Kid36",
+            "last": "Sample",
+            "club": "Puggles",
+            "allergies": ""
+          },
+          {
+            "id": "100037",
+            "first": "Kid37",
+            "last": "Sample",
+            "club": "Cubbies",
+            "allergies": ""
+          },
+          {
+            "id": "100038",
+            "first": "Kid38",
+            "last": "Sample",
+            "club": "Sparks",
+            "allergies": ""
+          },
+          {
+            "id": "100039",
+            "first": "Kid39",
+            "last": "Sample",
+            "club": "T&T",
+            "allergies": ""
+          }
+        ]
+      },
+      "recipients": [
+        "stationA",
+        "stationB"
+      ],
+      "ephemeral": [
+        "eph5",
+        "eph4"
+      ],
+      "iv": [
+        "dHuCiZCXnqWss7rB",
+        "k5qhqK+2vcTL0tng"
+      ],
+      "bundle": {
+        "v": 1,
+        "id": "EEEEEEEEEEEEEEEEEEEEEE",
+        "night": "2026-10-14",
+        "kind": "roster",
+        "to": [
+          {
+            "v": 1,
+            "kid": "a24c7c6d617839b8",
+            "epk": "BJmV7gYBzxBMacORHF/09++vUvniuDHke4VC81O/TI/C7nT5gdHnxDqwi87vS+/2asiV2yWvkEZRC/481aMs714=",
+            "iv": "dHuCiZCXnqWss7rB",
+            "ct": "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"
+          },
+          {
+            "v": 1,
+            "kid": "df24fa8bf08f973e",
+            "epk": "BFKnmc282RF+q7poMNePA5Dcs5hzGzxXN97aiTwDGxVRstC1rZxtumrMwa6oxmyaeXucPGhjrRE6v+J8qDPCeC8=",
+            "iv": "k5qhqK+2vcTL0tng",
+            "ct": "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"
+          }
+        ]
+      }
+    }
+  ],
+  "tags": {
+    "stateKey": "srnAx87V3OPq8fj/Bg0UGyIpMDc+RUxTWmFob3Z9hIs=",
+    "cases": [
+      {
+        "night": "2026-10-14",
+        "clubberId": "100234",
+        "tag": "VGd9mkoAFqd0UunhBxq1ZYajK1Qbp6xfun1pCKZcqC8"
+      },
+      {
+        "night": "2026-10-21",
+        "clubberId": "100234",
+        "tag": "tvu2cr243V-SyN2CToeD2cWFgP3pNYY4sS0K9s8MQZw"
+      },
+      {
+        "night": "2026-10-14",
+        "name": "  Mateo   GARCÍA ",
+        "club": "Sparks",
+        "tag": "P0i8iQXsSukLa9QGMf5mrkWi-cgCrLZlYEWMQOINMJo"
+      },
+      {
+        "night": "2026-10-14",
+        "name": "mateo garcía",
+        "club": "sparks",
+        "tag": "P0i8iQXsSukLa9QGMf5mrkWi-cgCrLZlYEWMQOINMJo"
+      }
+    ]
+  },
+  "nights": [
+    {
+      "ms": 1792036740000,
+      "night": "2026-10-14",
+      "note": "11:59 pm Wednesday Eastern (EDT) is still Wednesday"
+    },
+    {
+      "ms": 1792036800000,
+      "night": "2026-10-15",
+      "note": "midnight Eastern (EDT)"
+    },
+    {
+      "ms": 1796272200000,
+      "night": "2026-12-02",
+      "note": "11:30 pm Wednesday Eastern (EST), already Thursday in UTC"
+    },
+    {
+      "ms": 1793511000000,
+      "night": "2026-11-01",
+      "note": "the morning the clocks go back"
+    }
+  ],
+  "refuse": [
+    {
+      "why": "a medical key in a history row",
+      "id": "FFFFFFFFFFFFFFFFFFFFFF",
+      "night": "2026-10-14",
+      "kind": "checkin",
+      "record": {
+        "first": "Ava",
+        "allergies": "made up"
+      }
+    },
+    {
+      "why": "nested medical key",
+      "id": "FFFFFFFFFFFFFFFFFFFFFF",
+      "night": "2026-10-14",
+      "kind": "checkin",
+      "record": {
+        "kid": {
+          "first": "Ava",
+          "medicalNotes": "made up"
+        }
+      }
+    },
+    {
+      "why": "too big for ROW_PAD",
+      "id": "FFFFFFFFFFFFFFFFFFFFFF",
+      "night": "2026-10-14",
+      "kind": "checkin",
+      "record": {
+        "first": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+      }
+    },
+    {
+      "why": "a UTC-looking night",
+      "id": "FFFFFFFFFFFFFFFFFFFFFF",
+      "night": "2026-10-15T02:00",
+      "kind": "checkin",
+      "record": {
+        "first": "Ava"
+      }
+    },
+    {
+      "why": "a row id that is not 22 base64url characters",
+      "id": "short",
+      "night": "2026-10-14",
+      "kind": "checkin",
+      "record": {
+        "first": "Ava"
+      }
+    },
+    {
+      "why": "a kind with a capital",
+      "id": "FFFFFFFFFFFFFFFFFFFFFF",
+      "night": "2026-10-14",
+      "kind": "Checkin",
+      "record": {
+        "first": "Ava"
+      }
+    }
+  ]
+}
