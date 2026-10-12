@@ -1,8 +1,7 @@
 # Spare club art
 
-Official Awana art supplied by the club, processed by
-`scripts/prepare-club-gfx.py` (trimmed, downscaled, quantized) and
-committed here for future slides/features. Vite only bundles assets
+Official Awana art supplied by the club, processed once (trimmed,
+downscaled, quantized) and committed here for future slides/features. Vite only bundles assets
 that `src/` code imports, so nothing in this folder adds to `dist/`
 until it's actually used.
 
