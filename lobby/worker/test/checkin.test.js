@@ -5,6 +5,7 @@ import { openAsStation } from '../../shared/cloud-crypto.js';
 import { Registry } from '../src/registry.js';
 import { LEASE_MS } from '../src/printq.js';
 import { everything } from './helpers.js';
+import { HOUSEHOLD_CSV } from './fixtures.js';
 import { NIGHT, kid, rig, row } from './rig.js';
 
 const minGap = (reads) => reads.slice(1).reduce((m, r, i) => Math.min(m, r.at - reads[i].at), Infinity);
@@ -416,5 +417,49 @@ describe('every TwoTimTwo read, of every kind, keeps the 5 s clock', () => {
     const busy = await t2.call('GET', '/v1/desk/roster');
     expect(busy.status).toBe(429);
     expect(busy.body.retryAfterMs).toBeGreaterThan(0);
+  });
+});
+
+describe('the desk page\'s items and families', () => {
+  it('the roster says which clubs offer Bible and Brought a friend, from the page it already read', async () => {
+    const t = await rig();
+    const got = await t.call('GET', '/v1/desk/roster');
+    expect(got.body.items).toEqual({ bible: expect.arrayContaining(['Sparks', 'T&T', 'Trek']), friend: [] });
+    expect(t.reads.filter((r) => r.path === '/household/csv')).toHaveLength(0);
+  });
+
+  it('families are the household export, names only, read once per half hour through the clock', async () => {
+    const t = await rig({ households: () => HOUSEHOLD_CSV });
+    const a = await t.call('GET', '/v1/desk/families');
+    expect(a.status).toBe(200);
+    expect(a.body).toEqual({ households: [['Sophie Tester', 'Cal Tester'], ['Ann Smith', 'Ben Smith', 'Cy Smith']] });
+    expect(JSON.stringify(a.body)).not.toMatch(/Elm St|555-/);
+    await t.call('GET', '/v1/desk/families');
+    expect(t.reads.filter((r) => r.path === '/household/csv')).toHaveLength(1);
+    t.clock.tick(31 * 60 * 1000);
+    await t.call('GET', '/v1/desk/families');
+    expect(t.reads.filter((r) => r.path === '/household/csv')).toHaveLength(2);
+    expect(minGap(t.reads)).toBeGreaterThanOrEqual(5000);
+  });
+
+  it('an unreadable export is an empty list with a fixed code, kept five minutes; a busy clock is a 429 and not kept', async () => {
+    const t = await rig();   // the stand-in has no household export
+    const a = await t.call('GET', '/v1/desk/families');
+    expect(a.status).toBe(200);
+    expect(a.body.households).toEqual([]);
+    expect(a.body.familiesError).toEqual(expect.any(String));
+    const before = t.reads.length;
+    await t.call('GET', '/v1/desk/families');
+    expect(t.reads.length).toBe(before);
+    const t2 = await rig({ households: () => HOUSEHOLD_CSV });
+    for (let i = 0; i < 4; i++) t2.core.watcher.budget.claim(60000);
+    const busy = await t2.call('GET', '/v1/desk/families');
+    expect(busy.status).toBe(429);
+    expect(busy.body.reason).toBe('read-busy');
+  });
+
+  it('families need a session', async () => {
+    const t = await rig();
+    expect((await t.core.handle(new Request('https://sync.test/v1/desk/families'))).status).toBe(401);
   });
 });

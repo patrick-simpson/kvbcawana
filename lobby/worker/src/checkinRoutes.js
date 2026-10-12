@@ -115,6 +115,7 @@ export function mountCheckin(registry, core) {
   // ── the desk's claim API (routes.md 5): thin; the logic is desk.js ──────────
 
   registry.add('GET', '/v1/desk/roster', 'session', () => core.desk.roster());
+  registry.add('GET', '/v1/desk/families', 'session', () => core.desk.families());
   registry.add('POST', '/v1/desk/checkin', 'session', async ({ body }) => core.desk.checkIn(await body()));
   registry.add('POST', '/v1/desk/undo', 'session', async ({ body }) => core.desk.undo(await body()));
   registry.add('POST', '/v1/desk/checkout', 'session', async ({ body }) => core.desk.checkout(await body()));

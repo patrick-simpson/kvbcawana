@@ -36,9 +36,13 @@ import { json } from './http.js';
 import { INTERACTIVE_WAIT_MS, READ_INTERVAL_MS } from './readbudget.js';
 import { itemsToSend } from './twotimtwo.js';
 import { PRINT_JOB_KIND } from './adopt.js';
+import { itemClubs } from './phone.js';
 
 /** How long a read of the check-in page serves check-ins (who, items, meeting). */
 export const CHECKIN_PAGE_TTL_MS = 2 * 60 * 1000;
+/** The households (families) change rarely: one read of the export serves the desk this long (a failure, FAMILIES_RETRY_MS). */
+export const FAMILIES_TTL_MS = 30 * 60 * 1000;
+export const FAMILIES_RETRY_MS = 5 * 60 * 1000;
 /** The meeting's id does not change in a night: undo and check-out reuse it this long. */
 export const CALENDAR_TTL_MS = 10 * 60 * 1000;
 const ID_RE = /^\d{1,12}$/;
@@ -89,6 +93,8 @@ export class Desk {
     this.cache = null;
     /** @type {Promise<any>|null} */
     this.inflight = null;
+    /** @type {{ at: number, households: string[][], error?: string }|null} */
+    this.familiesCache = null;
   }
 
   /** @param {'afterCheckin'|'afterUndo'|'afterCheckout'} name @param {Record<string, any>} event */
@@ -140,7 +146,30 @@ export class Desk {
       const parts = String(k.name || '').trim().split(/\s+/);
       return { clubberId: k.clubberId, first: parts[0] || '', last: parts.slice(1).join(' '), club: k.club, clubId: k.clubId, checkedIn: !!k.checkedIn };
     });
-    return json({ readAt: new Date(r.readAt).toISOString(), ...(r.stale ? { stale: true } : {}), kids });
+    // Which clubs offer Bible / Brought a friend: from the page already read, no extra read.
+    return json({ readAt: new Date(r.readAt).toISOString(), ...(r.stale ? { stale: true } : {}), kids, items: itemClubs(r.page.events || []) });
+  }
+
+  /**
+   * GET /v1/desk/families: TwoTimTwo's households (names only, two or more
+   * active children each), for the page's families-first search and its
+   * brothers and sisters. One read of the export per FAMILIES_TTL_MS through
+   * the shared clock, held in memory, never stored. A failed read is an empty
+   * list with a fixed `familiesError` code (the page then shows children one
+   * by one), kept FAMILIES_RETRY_MS; one only turned away by the clock is not
+   * kept and answers 429.
+   */
+  async families() {
+    const c = this.familiesCache;
+    if (c && this.now() - c.at < (c.error ? FAMILIES_RETRY_MS : FAMILIES_TTL_MS)) {
+      return json({ households: c.households, ...(c.error ? { familiesError: c.error } : {}) });
+    }
+    const client = this.watcher.clientFor();
+    if (!client || this.watcher.mode === 'off') return refuse(503, { reason: 'not-configured' });
+    const r = await client.households({ waitMs: INTERACTIVE_WAIT_MS, kind: 'desk-families' });
+    if (!r.ok && r.error === 'read-busy') return this.pageFailure({ ok: false, error: 'read-busy', retryAfterMs: r.retryAfterMs });
+    this.familiesCache = r.ok ? { at: this.now(), households: r.households } : { at: this.now(), households: [], error: r.error };
+    return json({ households: this.familiesCache.households, ...(this.familiesCache.error ? { familiesError: this.familiesCache.error } : {}) });
   }
 
   // ── check in ───────────────────────────────────────────────────────────────
