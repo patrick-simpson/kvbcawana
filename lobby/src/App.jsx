@@ -44,6 +44,7 @@ import { BOARD_HIDDEN, decideBoard, demoCheckout, pickupNow } from './lib/checko
 import { SAMPLE_BOARD_NAMES, SAMPLE_NAMES, pick } from './lib/demoNames.js';
 import { useScreenSync } from './hooks/useScreenSync.js';
 import { getAllClubs } from './lib/clubs.js';
+import { saveClubCounts } from './lib/clubCountsStore.js';
 import { OVERLAY, setupUp } from './lib/overlayFit.js';
 import {
   autoSlideDeck, calendarSlidesFor, effectiveManualSlides, isSlideDriven, promoSlotFor, promosAreOn,
@@ -393,6 +394,9 @@ export default function App() {
     // The latest per-club counts, as they are, for the per-screen club count
     // in the top-right corner (config.cornerClub).
     setTallyCounts(tally.counts);
+    // And for the Journey kiosk next door (same origin), whose Trek small
+    // group card counts Trek's children: numbers only (clubCountsStore.js).
+    saveClubCounts(tally.counts, tally.at);
 
     // Reconcile the corner "Tonight" counter to this broadcast's total —
     // the fix for both an operator UNDO on the print server (total drops)
