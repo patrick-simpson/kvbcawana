@@ -167,6 +167,69 @@ function makeWorker() {
     await sleep(10);
     check('...and the next lease tries again', broken.appliedRev() === 2 && broken.warnings().length === 0);
 
+    // The doc went BACK (lost, or "Start from defaults" made rev 1 {}): never a deletion.
+    for (const asStation of [false, true]) {
+      const who = asStation ? 'station' : 'not a station';
+      const w5 = makeWorker();
+      w5.rev = 5; w5.doc = { labelFooter: 'Owner', lateGraceMin: 20, connectCardGreeting: 'Hi' };
+      const p5 = [];
+      const back = createChurchSync({
+        signedIn: () => ({ base: SYNC, session: SESSION }), request: async (b, p, o) => w5.answer(o.method, o.body, o.station),
+        isStation: () => asStation, stationId: () => (asStation ? 'station-eeeeeeee' : null),
+        readConfig: () => ({ labelFooter: 'Owner', lateGraceMin: 20, connectCardGreeting: 'Hi', printerName: 'X' }),
+        applyPatch: (patch, deletes) => { p5.push({ patch, deletes }); return { errors: [], changed: Object.keys(patch), pickupChanged: false, seasonChanged: false }; },
+      });
+      await back.syncNow();
+      check(`(${who}) rev 5 applied`, back.appliedRev() === 5);
+      w5.rev = 1; w5.doc = {};
+      const out = await back.syncNow();
+      check(`(${who}) a reset doc (rev 1, {}) below the applied rev deletes NOTHING from config.json`, JSON.stringify(p5.at(-1)) === JSON.stringify({ patch: {}, deletes: [] }), JSON.stringify(p5.at(-1)));
+      if (asStation) {
+        const put = w5.calls.filter((c) => c.method === 'PUT').at(-1);
+        check('(station) and sends config.json\'s church part back on the edit route (first writer wins: only the keys the doc lacks)', out === 'reseeded' && put && put.body.baseRev === 1
+          && JSON.stringify(put.body.settings) === JSON.stringify({ labelFooter: 'Owner', connectCardGreeting: 'Hi', lateGraceMin: 20 }) && w5.rev === 2 && back.appliedRev() === 2, `${out} ${JSON.stringify(put)}`);
+      } else {
+        check('(not a station) and sends nothing', out === 'reseated' && !w5.calls.some((c) => c.method === 'PUT') && back.appliedRev() === 1);
+        // The owner edits the made-again doc: a later rev deletes only keys THAT doc dropped.
+        w5.rev = 2; w5.doc = { labelFooter: 'New' };
+        await back.syncNow();
+        check('(not a station) a later rev of the made-again doc never deletes the keys config.json kept', JSON.stringify(p5.at(-1)) === JSON.stringify({ patch: { labelFooter: 'New' }, deletes: [] }), JSON.stringify(p5.at(-1)));
+      }
+    }
+    {
+      // A doc made again holding a key of its own: the doc's value wins, the rest is sent back.
+      const w6 = makeWorker();
+      w6.rev = 4; w6.doc = { labelFooter: 'Old' };
+      const p6 = [];
+      const s6 = createChurchSync({
+        signedIn: () => ({ base: SYNC, session: SESSION }), request: async (b, p, o) => w6.answer(o.method, o.body, o.station),
+        isStation: () => true, stationId: () => 'station-ffffffff', readConfig: () => ({ labelFooter: 'Old', lateGraceMin: 30 }),
+        applyPatch: (patch, deletes) => { p6.push({ patch, deletes }); return { errors: [], changed: [], pickupChanged: false, seasonChanged: false }; },
+      });
+      await s6.syncNow();
+      w6.rev = 1; w6.doc = { labelFooter: 'Fresh' };
+      await s6.syncNow();
+      check('a made-again doc\'s own key wins; only the keys it lacks go back', p6.at(-1).patch.labelFooter === 'Fresh' && p6.at(-1).deletes.length === 0
+        && w6.doc.labelFooter === 'Fresh' && w6.doc.lateGraceMin === 30, JSON.stringify(w6.doc));
+      // Unreachable while sending back: asked again on the next lease.
+      w6.rev = 1; w6.doc = { labelFooter: 'Fresh' };
+      const s7 = createChurchSync({
+        signedIn: () => ({ base: SYNC, session: SESSION }), request: async (b, p, o) => (o.method === 'PUT' && w6.down ? { ok: false, status: 0, body: null } : w6.answer(o.method, o.body, o.station)),
+        isStation: () => true, stationId: () => 'station-ffffffff', readConfig: () => ({ labelFooter: 'Old', lateGraceMin: 30 }),
+        applyPatch: () => ({ errors: [], changed: [], pickupChanged: false, seasonChanged: false }),
+        loadApplied: () => ({ rev: 4, keys: ['labelFooter', 'lateGraceMin'] }),
+      });
+      w6.down = false;
+      const realAnswer = w6.answer;
+      let putDown = true;
+      w6.answer = (m, b, st) => (m === 'PUT' && putDown ? { ok: false, status: 0, body: null } : realAnswer(m, b, st));
+      check('sending back while unreachable fails softly', (await s7.syncNow()) === 'reseed-failed' && s7.appliedRev() === 4);
+      putDown = false;
+      s7.onChurch(1, 1);
+      await sleep(10);
+      check('...and the next lease sends them', w6.rev === 2 && w6.doc.lateGraceMin === 30 && s7.appliedRev() === 2, JSON.stringify(w6.doc));
+    }
+
     // A first fetch before the station role (configureCloud) found the doc empty: it is
     // seeded once the role is active, and on every lease while the doc stays empty.
     for (const via of ['stationActive', 'lease']) {

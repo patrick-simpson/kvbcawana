@@ -220,7 +220,12 @@ relay's sync sign-in, for every signed-in print server, station or not):
    settings}` with config.json's church part (`schedule` = `ledger.scheduleRows()` only if
    config.json has its own rows; `barfNights` = config.json's else `church-config.json`'s);
    201 → applied rev 1 (no file write needed: same values); 200 `already` → fetch and
-   apply. Only a station seeds (route auth `station`).
+   apply. Only a station seeds (route auth `station`). A station whose first fetch came
+   before it was a station seeds when `configureCloud()` runs and on every lease while the
+   doc is still empty. A rev BELOW the applied one (the doc lost, or "Start from defaults"
+   after a loss) never deletes a config.json key: its keys apply with no deletion, and a
+   station sends the keys the doc lacks back on the edit route (`baseRev`; the doc's own
+   keys still win), logged.
 6. **One writer.** While church sync is active (signed in, not paused, applied rev ≥ 1), a
    SETTINGS-PAGE request (`req.settingsPage`) to POST /config, `/config/schedule` or
    `/config/label-templates` that touches a church key answers 409 `{reason:

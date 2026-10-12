@@ -25,6 +25,9 @@
 //               ever awaited by a print, and nothing throws into one.
 //   first run   the doc is empty (rev 0): a STATION seeds it with its config.json
 //               church part (first writer wins); any other computer waits.
+//   went back   a rev BELOW the applied one (the doc lost, or "Start from
+//               defaults" after a loss): its keys apply, NOTHING is deleted, and a
+//               station sends back the keys the doc lacks (the doc's still win).
 //   switches    the effective Worker switches ride every answer; kept in memory
 //               only (never fetched = unknown = the behaviour before 9.3.0).
 //   off         not signed in, Worker unreachable, `paused` (CHURCH_SETTINGS
@@ -151,15 +154,20 @@ function createChurchSync(o) {
     }
   }
 
-  function apply(doc, rev) {
+  /**
+   * @param {any} doc @param {number} rev
+   * @param {boolean} [keepLocal] a doc that went BACK (lost, or made again): its
+   *   keys win, but nothing is deleted from config.json
+   */
+  function apply(doc, rev, keepLocal = false) {
     const { settings, dropped } = church.sanitizeChurch(doc.settings);
     const patch = {};
     const deletes = [];
     for (const key of church.CHURCH_KEYS) {
       if (Object.prototype.hasOwnProperty.call(settings, key)) {
-        if (settings[key] === null) { if (!NOT_IN_CONFIG.includes(key)) deletes.push(key); }
+        if (settings[key] === null) { if (!NOT_IN_CONFIG.includes(key) && !keepLocal) deletes.push(key); }
         else patch[key] = settings[key];
-      } else if (applied.keys.includes(key) && !dropped.includes(key) && !NOT_IN_CONFIG.includes(key)) {
+      } else if (!keepLocal && applied.keys.includes(key) && !dropped.includes(key) && !NOT_IN_CONFIG.includes(key)) {
         deletes.push(key);   // the doc held it at the last apply and no longer does: back to the default
       }
     }
@@ -179,7 +187,9 @@ function createChurchSync(o) {
       message: `${refused.length === 1 ? 'A church setting' : `${refused.length} church settings`} from awana.kvbchurch.org could not be used on this computer (${refused.map((r) => `${r.key}: ${r.error}`).join('; ').slice(0, 300)}); it keeps its own value${refused.length === 1 ? '' : 's'}. Change ${refused.length === 1 ? 'it' : 'them'} under Printing.`,
     }] : [];
     const keys = Object.keys(settings).filter((k) => settings[k] !== null);
-    for (const k of dropped) if (applied.keys.includes(k) && church.CHURCH_KEYS.includes(k) && !keys.includes(k)) keys.push(k);
+    // A key the doc refused stays this computer's to delete later, unless the doc went back
+    // (then only the keys it holds are the Worker's: what config.json kept is never wiped).
+    if (!keepLocal) for (const k of dropped) if (applied.keys.includes(k) && church.CHURCH_KEYS.includes(k) && !keys.includes(k)) keys.push(k);
     applied = { rev, switchesRev, appliedAt: new Date(now()).toISOString(), keys };
     save();
     log(`[church] Applied the church settings (rev ${rev}${result.changed.length ? `: ${result.changed.join(', ')}` : ', nothing changed'})`);
@@ -207,6 +217,43 @@ function createChurchSync(o) {
     return 'seed-failed';
   }
 
+  /**
+   * The Worker's doc rev went BELOW the applied one: the doc was lost, or made
+   * again ("Start from defaults" after a loss). An empty or reset doc never
+   * wipes config.json: its keys are applied with no deletion, and a station
+   * sends the keys it lacks from this computer's config.json (the doc's own keys
+   * still win: first writer wins), as the seed would have.
+   * @param {any} doc @param {number} rev
+   */
+  async function reseat(doc, rev) {
+    const prev = applied.rev;
+    log(`[church] The church settings on awana.kvbchurch.org went back to rev ${rev} (this computer had rev ${prev}): nothing is removed here; ${o.isStation() ? "this station sends the settings the service no longer holds" : 'keeping this computer\'s own values for the rest'}`);
+    const out = apply(doc, rev, true);
+    if (out !== 'applied' || !o.isStation()) return out === 'applied' ? 'reseated' : out;
+    const held = church.sanitizeChurch(doc.settings).settings;
+    const local = seedFrom(o.readConfig(), o.churchConfig ? o.churchConfig() : null, o.seedExtras ? o.seedExtras() : null);
+    const missing = {};
+    for (const k of Object.keys(local)) if (!Object.prototype.hasOwnProperty.call(held, k)) missing[k] = local[k];
+    if (!Object.keys(missing).length) return 'reseated';
+    const r = await call('PUT', { baseRev: rev, settings: missing });
+    if (r.ok && r.body) {
+      const next = revOf(r.body.rev);
+      const merged = r.body.settings && typeof r.body.settings === 'object' ? r.body.settings : church.mergeChurch(doc.settings, missing);
+      lastDoc = { rev: next, settings: merged };
+      seenRev = next;
+      applied = { ...applied, rev: next, appliedAt: new Date(now()).toISOString(), keys: [...new Set([...applied.keys, ...Object.keys(missing)])] };
+      save();
+      log(`[church] Sent this computer's ${Object.keys(missing).join(', ')} back to awana.kvbchurch.org (rev ${next})`);
+      return 'reseeded';
+    }
+    lastError = r.status ? `the settings could not be sent back (HTTP ${r.status})` : 'the service is unreachable';
+    log(`[church] ${lastError}`);
+    // Unreachable or a stale base: ask again on the next lease (nothing is lost meanwhile,
+    // config.json keeps them). A definite refusal is not retried every 5 s.
+    if (!r.status || r.status === 409) { applied = { ...applied, rev: prev }; save(); seenRev = -1; }
+    return 'reseed-failed';
+  }
+
   async function fetchOnce(depth = 0) {
     if (!o.signedIn()) return 'signed-out';
     const r = await call('GET');
@@ -232,8 +279,9 @@ function createChurchSync(o) {
       return 'not-seeded';
     }
     unseeded = false;
-    // A rev other than the applied one (a lower one: the doc was made again).
     if (rev === applied.rev) return 'current';
+    // A lower rev: the doc was lost or made again. Never a deletion from it.
+    if (rev < applied.rev) return reseat(doc, rev);
     return apply(doc, rev);
   }
 
