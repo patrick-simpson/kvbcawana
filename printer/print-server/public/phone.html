@@ -626,6 +626,8 @@ var FAMILIES_EVERY_MS = 30 * 60 * 1000;
 var rosterPollMs = ROSTER_POLL_BASE_MS;
 var rosterPollTimer = null;
 var rosterFetchInFlight = false;
+var rosterTries = 0;            // roster reads that failed before the first one worked
+var lastRosterAt = 0;          // when the last roster answer arrived
 var rosterEpoch = 0;           // bumped by every confirmed check-in: an older roster answer is stale
 var rosterMisses = 0;          // ticks in a row that could not reach the service
 var pollActive = false;
@@ -776,7 +778,7 @@ function signOut(message) {
   RECENT = null; recentAskedAt = 0;
   leaderSelection = {};
   renderLeaderChips([]);
-  rosterLoaded = false;
+  rosterLoaded = false; rosterTries = 0; lastRosterAt = 0;
   clearPinCountdown();
   showPinScreen(message);
 }
@@ -1060,7 +1062,7 @@ function render() {
   var list = $('list');
   beginKeyed(list);
   while (list.firstChild) list.removeChild(list.firstChild);
-  if (!rosterLoaded) list.appendChild(el('div', 'note', 'Reading the roster…'));
+  if (!rosterLoaded) list.appendChild(el('div', 'note', rosterTries ? 'Still counting crayons… trying again.' : 'Reading the roster…'));
   else if (!KIDS.length) list.appendChild(el('div', 'note', 'TwoTimTwo has nobody on tonight’s check-in page yet. Is the meeting set up?'));
   else if (!q.trim()) renderFamilies(list);
   else renderSearch(list, q);
@@ -1562,6 +1564,23 @@ function stopRosterPoll() {
   clearTimeout(rosterPollTimer); rosterPollTimer = null;
 }
 function startRosterPoll() { pollActive = true; rosterPollMs = ROSTER_POLL_BASE_MS; refreshAll(); }
+// Draw what is known now (the list, or just the count while a sheet is open).
+function paint() {
+  if (!unlockedState) return;
+  if (!$('fampage').classList.contains('on') && openSheet !== 'kid-sheet') render(); else renderCount();
+  if (openSheet === 'tonight-sheet') renderTonight();
+}
+// A phone that slept, lost its signal or was tapped after a stall asks again at
+// once (the Worker's own read clock still answers "busy" if that is too soon).
+function nudgeRoster() {
+  if (!pollActive || !unlockedState || rosterFetchInFlight || document.hidden) return;
+  if (rosterLoaded && Date.now() - lastRosterAt < ROSTER_POLL_BASE_MS) return;
+  scheduleRosterPoll(0);
+}
+window.addEventListener('online', nudgeRoster);
+window.addEventListener('focus', nudgeRoster);
+window.addEventListener('pageshow', nudgeRoster);
+document.addEventListener('pointerdown', function() { if (!rosterLoaded) nudgeRoster(); }, true);
 // One tick: the roster (one TwoTimTwo read on the Worker's clock, or its last
 // read), the families every half hour, the Worker's count and the printer.
 function refreshAll() {
@@ -1577,19 +1596,20 @@ function refreshAll() {
     // the list. Ask again instead.
     if (epoch !== rosterEpoch) { rosterFetchInFlight = false; scheduleRosterPoll(0); return null; }
     applyRoster(data);
-    var more = [desk.tonight().then(function(t) { SERVER_TONIGHT = t; }, function() { /* the roster's own count stands */ }), refreshBarf()];
+    lastRosterAt = Date.now();
+    paint();   // the list shows now; the households and the count join it as they arrive
+    var more = [desk.tonight().then(function(t) { SERVER_TONIGHT = t; paint(); }, function() { /* the roster's own count stands */ }), refreshBarf()];
     // The Worker read the households again (a newly registered child joins their family):
     // its roster answer says so with a new `familiesAt` (absent: the half-hour rule alone).
     var newFamilies = data.familiesAt !== undefined && data.familiesAt !== familiesStamp;
     if (newFamilies || Date.now() - familiesAt > FAMILIES_EVERY_MS) {
       var stamp = data.familiesAt;
-      more.push(desk.families().then(function(d) { applyFamilies(d); if (stamp !== undefined) familiesStamp = stamp; },
+      more.push(desk.families().then(function(d) { applyFamilies(d); if (stamp !== undefined) familiesStamp = stamp; paint(); },
         function(e) { if (e && e.code === 'busy') familiesAt = Date.now() - FAMILIES_EVERY_MS + 20000; }));
     }
     return Promise.all(more).then(function() {
       rosterFetchInFlight = false;
-      if (!$('fampage').classList.contains('on') && openSheet !== 'kid-sheet') render(); else renderCount();
-      if (openSheet === 'tonight-sheet') renderTonight();
+      paint();
       scheduleRosterPoll();
       setTimeout(loadRecent, 0);
     });
@@ -1600,7 +1620,7 @@ function refreshAll() {
     if (e && e.code === 'unreachable') showOffline(true);
     else if (!rosterLoaded) toast(e && e.message ? e.message : 'The roster could not be read.', 6000, null, null, 'bad');
     else $('down-note').hidden = false;
-    if (!rosterLoaded) render();
+    if (!rosterLoaded) { rosterTries += 1; render(); }
     rosterPollMs = Math.min(rosterPollMs * 2, ROSTER_POLL_MAX_MS);
     scheduleRosterPoll();
   });
