@@ -2236,8 +2236,3 @@ Major release adding dashboard, sibling batch check-in, offline queue, and opera
 - **Extension Auto-Update:** Checks `/health` endpoint for version mismatches, displays "Update available" notice.
 - **Server Health Endpoint:** `/health` now returns `version` alongside `status` and `printer`.
 - **Version Sync:** `bump-version.cjs` updates chrome-extension files automatically.
-
----
-
-**Older releases:** See [CHANGELOG_ARCHIVE.md](CHANGELOG_ARCHIVE.md)
-
