@@ -1,0 +1,306 @@
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { expect, test } from '@playwright/test';
+import { buildCheckinPages, CHECKIN_MODULES } from '../../site/checkin/checkin-page.mjs';
+import * as cc from '../shared/cloud-crypto.js';
+
+// The one check-in page (awana.kvbchurch.org/checkin: the print app's phone page on
+// the desk's online path, ROADMAP.md#online-check-in) in a real browser against a
+// stand-in Worker: sign in (passphrase v2), a busy 429, families-first search,
+// two siblings checked in together with Bible and Brought a friend, undo, check
+// out, a visitor, the one-off, leader and custom labels, the youth page, and the
+// error states (a refusal, already checked in, no internet, signed out). Every
+// seal is the page's: the stand-in opens what it was sent with the station's and
+// the history key's private keys, and checks that no child's name travelled in
+// clear. The page is served from a made-up https origin by page.route, exactly as
+// site/build.mjs builds it, so no port or build is needed.
+
+const HERE = path.dirname(fileURLToPath(import.meta.url));
+const SHARED = path.join(HERE, '..', 'shared');
+const ORIGIN = 'https://checkin.test';
+const PASS = 'kennebec';
+const MIME = { '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.woff2': 'font/woff2', '.ttf': 'font/ttf', '.json': 'application/json' };
+const SESSION = 'v1.1.1760000000.abcdefghijklmnopqrstuvwxyz0123';
+const json = (status, body) => ({ status, contentType: 'application/json', body: JSON.stringify(body) });
+const PAGES = buildCheckinPages();
+
+async function stubSite(page, { kids } = {}) {
+  const history = await cc.createHistoryKey(PASS);
+  const historyRing = await cc.keyRing(await cc.unwrapPrivateKey(history.wrapped, PASS, history.pub), history.pub);
+  const kp = await cc.generateKeyPair();
+  const station = { stationId: 'station-aaaaaaaa', name: 'Desk laptop', pub: kp.publicKey, kid: kp.kid, registeredAt: 1, lastSeenAt: new Date().toISOString(), printer: { state: 'ok' } };
+  const stationRing = await cc.keyRing(await cc.importPrivateKey(kp.privateJwk), kp.publicKey);
+  const salt = cc.bytesToBase64(cc.randomBytes(16));
+  const world = {
+    kids: kids || [
+      { clubberId: '11', first: 'Ada', last: 'Tester', club: 'Cubbies', clubId: '1', checkedIn: false },
+      { clubberId: '12', first: 'Ben', last: 'Tester', club: 'Sparks', clubId: '2', checkedIn: false },
+      { clubberId: '13', first: 'Cy', last: 'Other', club: 'T&T', clubId: '3', checkedIn: false },
+      { clubberId: '14', first: 'Tia', last: 'Youth', club: 'Trek', clubId: '6', checkedIn: false },
+    ],
+    posts: [], tags: [], logins: [], rosterCalls: 0, busyFirst: true, queued: 0, printed: 0, refuse: null, signedOut: false,
+  };
+  const api = async (route, req) => {
+    const u = new URL(req.url());
+    const p = u.pathname.replace(/^\/api/, '');
+    const method = req.method();
+    const body = method === 'POST' || method === 'PUT' ? req.postDataJSON() : null;
+    if (p === '/v1/auth/params') return route.fulfill(json(200, { v: 2, salt, iter: 600000, legacy: false }));
+    if (p === '/v1/login') {
+      world.logins.push(body);
+      return route.fulfill(json(200, { session: SESSION, displayKey: `${'k'.repeat(43)}=`, state: {}, history: { pub: history.pub, kid: history.kid, wrapped: history.wrapped } }));
+    }
+    if (world.signedOut || req.headers().authorization !== `Bearer ${SESSION}`) return route.fulfill(json(401, { error: 'signed out' }));
+    if (p === '/v1/desk/roster') {
+      world.rosterCalls += 1;
+      if (world.busyFirst) { world.busyFirst = false; return route.fulfill(json(429, { ok: false, reason: 'read-busy', retryAfterMs: 1500 })); }
+      return route.fulfill(json(200, { readAt: new Date().toISOString(), kids: world.kids, items: { bible: ['Cubbies', 'Sparks'], friend: ['Sparks'] } }));
+    }
+    if (p === '/v1/desk/families') return route.fulfill(json(200, { households: [['Ada Tester', 'Ben Tester']] }));
+    if (p === '/v1/desk/tonight') return route.fulfill(json(404, { error: 'Not found.' }));
+    if (p === '/v1/stations') return route.fulfill(json(200, [station]));
+    if (p === '/v1/print/status') {
+      return route.fulfill(json(200, { queued: world.queued, leased: 0, done: world.printed, dead: 0, waitingToSeal: 0, checkThePrinter: [], pendingToSeal: 0, claims: { printed: world.printed }, stations: [station] }));
+    }
+    if (p === '/v1/print/reprint') { world.tags.push(body); return route.fulfill(json(200, { ok: true, jobId: body.jobId, existing: false })); }
+    if (p === '/v1/desk/checkin' || p === '/v1/desk/undo' || p === '/v1/desk/checkout') {
+      world.posts.push({ path: p, body });
+      if (world.refuse) return route.fulfill(world.refuse);
+      const kid = world.kids.find((k) => k.clubberId === body.clubberId);
+      if (p === '/v1/desk/checkin') {
+        if (kid && kid.checkedIn) return route.fulfill(json(200, { ok: true, already: true, state: 'queued', jobId: null }));
+        if (kid) kid.checkedIn = true;
+        world.queued += 1;
+        return route.fulfill(json(200, { ok: true, already: false, jobId: body.job.id, gen: 1, history: 'hooked' }));
+      }
+      if (p === '/v1/desk/undo') { if (kid) kid.checkedIn = false; return route.fulfill(json(200, { ok: true, droppedJobs: 1 })); }
+      return route.fulfill(json(200, { ok: true }));
+    }
+    return route.fulfill(json(404, { error: 'Not found.' }));
+  };
+  await page.route(`${ORIGIN}/**`, async (route) => {
+    const req = route.request();
+    const u = new URL(req.url());
+    if (u.pathname.startsWith('/api/')) return api(route, req);
+    if (u.pathname === '/checkin/') return route.fulfill({ status: 200, contentType: 'text/html', body: PAGES.index });
+    if (u.pathname === '/checkin/ym/') return route.fulfill({ status: 200, contentType: 'text/html', body: PAGES.ym });
+    const mod = CHECKIN_MODULES[u.pathname.slice('/checkin/'.length)];
+    if (mod) return route.fulfill({ status: 200, contentType: MIME['.js'], body: readFileSync(mod) });
+    if (u.pathname.startsWith('/checkin/brand/')) {
+      // site/build.mjs serves the print server's copy of the kit; the kit's one committed copy is lobby/shared/brand.
+      const file = path.join(SHARED, 'brand', u.pathname.slice('/checkin/brand/'.length));
+      return route.fulfill({ status: 200, contentType: MIME[path.extname(file)] || 'application/octet-stream', body: readFileSync(file) });
+    }
+    return route.fulfill({ status: 404, body: 'no' });
+  });
+  return { world, historyRing, stationRing, history };
+}
+
+async function signIn(page, where = '/checkin/') {
+  await page.goto(`${ORIGIN}${where}`);
+  await page.getByLabel('Passphrase').fill(PASS);
+  await page.getByRole('button', { name: 'Unlock' }).click();
+}
+const search = (page) => page.getByLabel('Search by first or last name');
+
+test.use({ viewport: { width: 390, height: 844 } });
+
+test('sign in, search, check two siblings in with Bible and a friend, undo one, check one out', async ({ page }) => {
+  test.setTimeout(60_000);
+  const { world, historyRing, stationRing } = await stubSite(page);
+  await signIn(page);
+
+  // The 5 s read budget: the first roster read is a 429, and the page says so and waits.
+  await expect(page.locator('#busy')).toContainText(/busy: try again in \d+s/);
+  await expect(page.locator('#list')).toContainText('families still to come', { timeout: 10_000 });
+  await expect(page.locator('#print-led')).toHaveText('Printer ready');
+  expect(world.logins).toHaveLength(1);
+  expect(Object.keys(world.logins[0])).toEqual(['authKey']);
+  expect(JSON.stringify(world.logins)).not.toContain(PASS);
+  expect(await page.evaluate(() => JSON.stringify({ ...localStorage, ...sessionStorage }))).not.toContain(PASS);
+  // Brothers and sisters are one family tile.
+  await expect(page.locator('.fam', { hasText: 'Tester' })).toHaveCount(1);
+
+  // Families-first search, with "did you mean" for a near spelling.
+  await search(page).fill('teste');
+  await expect(page.locator('.fcard')).toHaveCount(1);
+  await expect(page.locator('.fcard .fn')).toHaveText('Tester');
+  await search(page).fill('Tesler');
+  await expect(page.getByText('Did you mean')).toBeVisible();
+  await search(page).fill('tester');
+  await page.locator('.fcard').click();
+
+  // The family page: both tiles, Bible ticked, Brought a friend (Sparks) with the friend's first name.
+  await expect(page.locator('#fampage .tile')).toHaveCount(2);
+  const ben = page.locator('.tile', { hasText: 'Ben Tester' });
+  await ben.getByRole('button', { name: 'Brought a friend' }).click();
+  await ben.getByLabel('Friend’s first name').fill('Sam');
+  await page.getByRole('button', { name: 'Both of them' }).click();
+  await expect(page.locator('#toast')).toContainText('Tester: 2 checked in');
+  expect(world.posts.map((p) => p.path)).toEqual(['/v1/desk/checkin', '/v1/desk/checkin']);
+
+  // What was sent: the clubber id, the items, the friend's first name for the BARF list, and no child's name in clear.
+  const sent = Object.fromEntries(world.posts.map((p) => [p.body.clubberId, p.body]));
+  expect(sent['11'].items).toEqual({ Bible: true });
+  expect(sent['12'].items).toEqual({ Bible: true, Friend: true });
+  expect(sent['12'].friendName).toBe('Sam');
+  expect(sent['11'].friendName).toBeUndefined();
+  for (const post of world.posts) {
+    const { job: _job, historyRow: _row, friendName: _friend, ...plain } = post.body;   // the sealed parts are random base64
+    expect(JSON.stringify(plain)).not.toMatch(/Ada|Ben|Tester|Sam/);
+    expect(post.body.night).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(post.body.job.kind).toBe('print-job');
+    expect(post.body.historyRow.kind).toBe('checkin');
+  }
+  // exactly the print server's /print body, sealed to the station (routes.md section 5)
+  expect(await cc.openAsStation(stationRing, sent['12'].job)).toEqual({ route: '/print', body: { name: 'Ben Tester', clubName: 'Sparks', clubberId: '12', friend: true, friendName: 'Sam' }, clubberId: '12', source: 'desk' });
+  const row = await cc.openRow(historyRing, sent['11'].historyRow);
+  expect(row).toMatchObject({ first: 'Ada', last: 'Tester', club: 'Cubbies', clubberId: '11', source: 'desk' });
+  expect(typeof row.ts).toBe('number');
+  await expect(page.locator('#print-led')).toHaveText('2 labels queued', { timeout: 15_000 });
+  await expect(page.locator('#count-pill')).toHaveText('2 in');
+  await expect(page.locator('.fam', { hasText: 'Tester' })).toHaveCount(0);
+
+  // A second tap on a child another phone already checked in: "already", no second label.
+  world.kids[2].checkedIn = true;   // Cy, checked in at the desk meanwhile; this page has not re-read yet
+  await search(page).fill('Cy');
+  await page.locator('.fcard').click();
+  await page.locator('#kid-sheet').getByRole('button', { name: 'Check in' }).click();
+  await expect(page.locator('#toast')).toContainText('Already checked in');
+
+  // Tonight: undo Ben (TwoTimTwo's undo), then check Ada out.
+  await page.locator('#count-pill').click();
+  await expect(page.locator('#tonight-list .row')).toHaveCount(3);
+  await page.locator('.row', { hasText: 'Ben Tester' }).getByRole('button', { name: 'Undo check-in' }).click();
+  await expect(page.locator('#confirm-title')).toHaveText('Undo Ben Tester’s check-in on TwoTimTwo?');
+  await page.locator('#confirm-ok').click();
+  await expect(page.locator('#toast')).toContainText('Ben Tester’s check-in is undone');
+  const undo = world.posts.find((p) => p.path === '/v1/desk/undo');
+  expect(undo.body.clubberId).toBe('12');
+  expect(undo.body.club).toBe('Sparks');
+  expect(undo.body.historyRow.kind).toBe('undo');
+  expect(await cc.openRow(historyRing, undo.body.historyRow)).toMatchObject({ first: 'Ben', last: 'Tester', club: 'Sparks' });
+  await expect(page.locator('#tonight-list .row')).toHaveCount(2);
+  await page.locator('.row', { hasText: 'Ada Tester' }).getByRole('button', { name: 'Check out' }).click();
+  await page.locator('#confirm-ok').click();
+  await expect(page.locator('#toast')).toContainText('Ada Tester is checked out');
+  expect(world.posts.at(-1).path).toBe('/v1/desk/checkout');
+  expect(world.posts.at(-1).body.historyRow.kind).toBe('checkout');
+  expect(world.posts.at(-1).body.club).toBe('Cubbies');
+  expect(await cc.openRow(historyRing, world.posts.at(-1).body.historyRow)).toMatchObject({ first: 'Ada', last: 'Tester' });
+  await expect(page.locator('.row', { hasText: 'Ada Tester' })).toContainText('Checked out');
+  await expect(page.locator('#count-pill')).toHaveText('1 in');
+});
+
+test('a visitor is checked in by name; one-off, leader and custom labels print without a check-in', async ({ page }) => {
+  test.setTimeout(60_000);
+  const { world, stationRing } = await stubSite(page);
+  world.busyFirst = false;
+  await signIn(page);
+  await expect(page.locator('#list')).toContainText('families still to come', { timeout: 10_000 });
+
+  await page.locator('#menu-btn').click();
+  await page.getByLabel('Visitor\'s full name').fill('Mia Jones');
+  await page.locator('#visitor-club').selectOption('Cubbies');
+  await page.locator('#visitor-print').click();
+  await expect(page.locator('#toast')).toContainText('Mia is checked in (visitor)');
+  expect(world.posts[0].body.visitor).toEqual({ first: 'Mia', last: 'Jones', club: 'Cubbies' });
+  expect(world.posts[0].body.clubberId).toBeUndefined();
+  expect(world.posts[0].body.historyRow.kind).toBe('visitor');
+
+  await page.locator('#menu-btn').click();
+  await page.getByLabel('Child’s first name').fill('Ava');
+  await page.locator('#oneoff-clubs').getByRole('radio', { name: 'Puggles' }).click();
+  await page.locator('#oneoff-print').click();
+  await expect(page.locator('#toast')).toContainText('Printing Ava’s tag');
+  await page.getByLabel('Leader\'s name').fill('Pat Leader');
+  await page.locator('#leader-club').selectOption('Sparks');
+  await page.locator('#leader-print').click();
+  await expect(page.locator('#toast')).toContainText('Leader tag for Pat Leader');
+  await page.getByLabel('Custom label text').fill('KITCHEN');
+  await page.locator('#custom-print').click();
+  await expect(page.locator('#toast')).toContainText('Custom label sent');
+  expect(world.tags.map((t) => t.jobId)).toEqual([expect.stringMatching(/^reprint:/), expect.stringMatching(/^reprint:/), expect.stringMatching(/^reprint:/)]);
+  // the print server's own routes and bodies: what the station's puller runs
+  const opened = await Promise.all(world.tags.map((t) => cc.openAsStation(stationRing, t.bundle)));
+  expect(opened.map((o) => [o.route, o.body])).toEqual([
+    ['/print-oneoff', { firstName: 'Ava', clubName: 'Puggles' }],
+    ['/print-leader', { name: 'Pat Leader', clubName: 'Sparks' }],
+    ['/print-custom', { text: 'KITCHEN' }],
+  ]);
+  for (const t of world.tags) expect(JSON.stringify(t)).not.toMatch(/Ava|Pat|KITCHEN/);
+  expect(world.posts.filter((p) => p.path === '/v1/desk/checkin')).toHaveLength(1);   // only the visitor
+
+  await page.locator('#menu-close').click();
+  await page.locator('#count-pill').click();
+  await expect(page.locator('#tonight-list .row', { hasText: 'Mia Jones' })).toContainText('Visitor');
+  await page.locator('.row', { hasText: 'Mia Jones' }).getByRole('button', { name: 'Remove' }).click();
+  await page.locator('#confirm-ok').click();
+  await expect(page.locator('#toast')).toContainText('Mia Jones removed from tonight');
+  expect(world.posts.at(-1)).toMatchObject({ path: '/v1/desk/undo', body: { visitor: { first: 'Mia', last: 'Jones', club: 'Cubbies' } } });
+});
+
+test('error states: a refusal puts the child back, no internet points to the paper sheet', async ({ page }) => {
+  test.setTimeout(60_000);
+  const { world } = await stubSite(page);
+  world.busyFirst = false;
+  await signIn(page);
+  await expect(page.locator('#list')).toContainText('families still to come', { timeout: 10_000 });
+  world.refuse = json(409, { ok: false, reason: 'no-attendance-item' });
+  await search(page).fill('Cy');
+  await page.locator('.fcard').click();
+  await page.locator('#kid-sheet').getByRole('button', { name: 'Check in' }).click();
+  await expect(page.locator('#toast')).toContainText('Couldn’t check in Cy Other: TwoTimTwo has no attendance item for that club tonight.');
+  await search(page).fill('');
+  await expect(page.locator('.fam', { hasText: 'Cy Other' })).toHaveCount(1);
+  await expect(page.locator('#count-pill')).toHaveText('0 in');
+
+  // No internet: the next call cannot reach the service.
+  await page.route(`${ORIGIN}/api/v1/desk/checkin`, (route) => route.abort());
+  world.refuse = null;
+  await page.locator('.fam', { hasText: 'Cy Other' }).click();
+  await page.locator('#kid-sheet').getByRole('button', { name: 'Check in' }).click();
+  await expect(page.locator('#toast')).toContainText('paper sheet');
+  await expect(page.locator('#offline-note')).toBeVisible();
+  await expect(page.locator('#offline-note')).toContainText('paper sheet at the desk');
+  await expect(page.locator('.fam', { hasText: 'Cy Other' })).toHaveCount(1);
+});
+
+test('the youth leaders\' page shows Trek and Journey only, check-in only, on the same path', async ({ page }) => {
+  const { world } = await stubSite(page);
+  world.busyFirst = false;
+  await signIn(page, '/checkin/ym/');
+  await expect(page.locator('h1')).toHaveText('Trek & Journey');
+  await expect(page.locator('#list')).toContainText('1 family still to come', { timeout: 10_000 });
+  await expect(page.locator('.fam')).toHaveText(/Tia Youth/);
+  await expect(page.locator('#count-pill')).toBeHidden();
+  await expect(page.locator('#menu-btn')).toBeHidden();
+  await page.locator('.fam').click();
+  await page.locator('#kid-sheet').getByRole('button', { name: 'Check in' }).click();
+  await expect(page.locator('#toast')).toContainText('Tia Youth is checked in');
+  expect(world.posts.map((p) => [p.path, p.body.clubberId])).toEqual([['/v1/desk/checkin', '14']]);
+});
+
+test('a wrong passphrase stays on the sign-in, and a signed-out session returns to it', async ({ page }) => {
+  const { world } = await stubSite(page);
+  world.busyFirst = false;
+  await page.route(`${ORIGIN}/api/v1/login`, (route) => route.fulfill(json(401, { error: 'no' })), { times: 1 });
+  await signIn(page);
+  await expect(page.locator('#pin-err')).toHaveText('That is not the passphrase.');
+  await expect(page.locator('#main-screen')).toBeHidden();
+  await page.getByLabel('Passphrase').fill(PASS);
+  await page.getByRole('button', { name: 'Unlock' }).click();
+  await expect(page.locator('#list')).toContainText('families still to come', { timeout: 10_000 });
+  // A reload takes up the session (this device has checked the history key once).
+  await page.reload();
+  await expect(page.locator('#list')).toContainText('families still to come', { timeout: 10_000 });
+  expect(world.logins).toHaveLength(1);
+  // The passphrase changed: the next call is a 401 and the page asks again.
+  world.signedOut = true;
+  await search(page).fill('Cy');
+  await page.locator('.fcard').click();
+  await page.locator('#kid-sheet').getByRole('button', { name: 'Check in' }).click();
+  await expect(page.locator('#pin-screen')).toBeVisible();
+  await expect(page.locator('#pin-err')).toContainText('Signed out');
+});

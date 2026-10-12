@@ -141,7 +141,7 @@ const today = (() => { const d = new Date(); return `${d.getFullYear()}-${String
       && /closest\('#checkin'\)[\s\S]{0,120}friendBoxTicked\(\)/.test(content));
     check('the touch screen and the phone page ask for the friend\'s first name',
       /friendInput\(/.test(touch) && /options\.FriendName = friendName/.test(touch)
-      && /friendInput\(/.test(phone) && /options\.FriendName = friendName/.test(phone));
+      && /friendInput\(/.test(phone) && /friend: items\.friend && !!e\.choice\.friend, friendName: friendName \}/.test(phone));
     check('a brother or sister never gets the first child\'s friend name',
       /openFamily\(p, sibs, \{ bible: choice\.bible, friend: choice\.friend \}\)/.test(phone)
       && /var choice = \{ bible: state\.choice\.bible, friend: state\.choice\.friend, friendName: state\.choice\.friendName \|\| '' \};/.test(touch)

@@ -314,7 +314,8 @@ async function main() {
 
     check('the check-in widget fetches /clubs', /\/clubs'/.test(ext) || ext.includes("+ '/clubs'"));
     check('the settings page fetches /clubs', dash.includes("'/clubs'"));
-    check('the phone page fetches /clubs', phone.includes("'/clubs'"));
+    // The phone page is on the Worker's path (no laptop to ask): it reads the one club table.
+    check('the phone page reads the one club table (lobby/shared/clubs.js)', phone.includes("import('/checkin/clubs.js')") && /CLUBS = table\.map\(function\(r\) \{ return r\.name; \}\)/.test(phone));
 
     // The regression: a second hardcoded club list living in a dropdown. The
     // widget keeps ONE baked list as an offline fallback (named so it is

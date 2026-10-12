@@ -286,11 +286,11 @@ async function serverSuite() {
         /a\.status === 'claimed' && now - a\.claimedAt > PENDING_CLAIM_MS\) \{\n\s+a\.status = 'failed';\n\s+a\.detail = co \? CHECKOUT_NO_ANSWER : UNDO_NO_ANSWER;/.test(src));
       check('the phone\'s status read is where that is noticed', /app\.get\('\/phone\/status\/:id', \(req, res\) => \{\n  prunePendingActions\(\);/.test(src));
       const phone = fs.readFileSync(path.join(root, 'print-server', 'public', 'phone.html'), 'utf8');
-      check('the phone asks the laptop through /phone/undo (the relay\'s allowlisted route) with inTwoTimTwo',
-        /postJson\('\/phone\/undo', \{ pin: PIN, firstName: ident\.firstName, lastName: ident\.lastName, clubberId: ident\.clubberId, inTwoTimTwo: true \}\)/.test(phone));
-      check('an older laptop that only Removed is told apart (no id in its answer)', /if \(data && data\.id\) \{ pollUndo\(/.test(phone) && /was only removed from tonight’s count/.test(phone));
-      check('a failure offers Remove, and only on a tap', /undoFailed[\s\S]{0,200}'Remove', function\(\) \{ askRemove\(entry\); \}/.test(phone));
-      check('Undo check-in is offered only on a row with a TwoTimTwo id', /if \(e\.clubberId && !e\.visitor\) \{/.test(phone));
+      // Since 2026-10-12 /checkin undoes through the Worker's desk route (TwoTimTwo's own
+      // undo, a sealed history row); /phone/undo stays for the laptop's touch screen.
+      check('the phone page undoes through the Worker\'s desk route (TwoTimTwo\'s own undo)', /desk\.undo\(childOf\(entry\)\)/.test(phone));
+      check('a failure says why and changes nothing', /'Not undone in TwoTimTwo: '/.test(phone) && /delete UNDOING\[entry\.key\];\n\s+renderTonight\(\);/.test(phone));
+      check('Undo check-in is offered only on a child on TwoTimTwo; a visitor gets Remove', /e\.visitor \? 'Remove' : 'Undo check-in'/.test(phone));
       const relay = require(path.join(root, 'print-server', 'phone-relay.js'));
       check('the website\'s relay already carries both calls', relay.relayAllowed('POST', '/phone/undo') && relay.relayAllowed('GET', '/phone/status/0f8c1a2b-3c4d-4e5f-8a9b-0c1d2e3f4a5b'));
     }

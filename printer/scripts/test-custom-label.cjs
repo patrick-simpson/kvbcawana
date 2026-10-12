@@ -286,8 +286,9 @@ async function main() {
     check('the phone page has a Custom label panel after the leader panel',
       phone.indexOf('id="custom-panel"') > phone.indexOf('id="leader-panel"')
       && phone.indexOf('id="custom-panel"') < phone.indexOf('id="visitor-form"'));
-    check('it posts through the PIN-carrying helper',
-      /postJson\('\/print-custom', \{ pin: PIN, text: text \}\)/.test(phone));
+    check('it prints through the Worker as a sealed job on /print-custom (site/checkin/desk-transport.js)',
+      /desk\.customLabel\(\{ text: text \}\)/.test(phone)
+      && /reprintJob\('\/print-custom', \{ text \}\)/.test(read('..', 'site', 'checkin', 'desk-transport.js')));
 
     check('the widget has a Custom checkbox beside Leader',
       /createTextNode\('Custom'\)/.test(ext) && /walkInClubRow\.append\(clubSelect, visitorCheck, leaderCheck, customCheck\)/.test(ext));
