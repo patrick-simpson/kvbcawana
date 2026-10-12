@@ -1,4 +1,13 @@
-﻿## [9.0.1] - 2026-10-11
+﻿## [9.0.2] - 2026-10-11
+A cleanup release: what nothing uses any more is gone.
+
+**Pusher is gone for good.** Every screen has listened to the sync service's live channel since October 3, so the print server's Pusher publisher, its settings on the dashboard and the app's Pusher release ping are removed. Check-ins, counts and names reach the screens exactly as before (sealed end to end), and updates are still checked every ten minutes.
+
+**The old script installer is gone** (install-and-run.ps1, install.bat, launch-awana.bat and the awana.kvbchurch.org/install.ps1 one-liner), with the app's import from the old C:\output folder. The app still offers to remove shortcuts with its old name.
+
+**Also removed:** the bookmarklet pages (the Chrome extension replaced them long ago), the leftovers of the receipt-printer trial, and old files nothing read.
+
+## [9.0.1] - 2026-10-11
 Fixes from the 9.0.0 review.
 
 **Startup never waits on a question.** The offers to remove old-named shortcuts no longer hold up the display, the setup or the computer's row on /settings: on a start nobody is watching (an update's restart, Windows' sign-in) those used to wait until someone clicked.
