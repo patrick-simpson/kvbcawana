@@ -98,6 +98,26 @@ describe('staying in sync', () => {
     expect(state.init.headers.Authorization).toBe(`Bearer ${SESSION}`);
   });
 
+  it('asks again for the service address when sync.json was unreachable at boot', async () => {
+    saveSyncSession(SESSION);
+    _resetSyncForTest();
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      let up = false;
+      const calls = fakeService({ 'shared/sync.json': () => (up ? [200, { url: BASE }] : [500, {}]) });
+      await act(async () => { await syncNow(); });
+      expect(calls.some((c) => c.url.endsWith('/v1/state'))).toBe(false);
+      up = true;
+      await act(async () => { await syncNow(); });
+      expect(calls.some((c) => c.url.endsWith('/v1/state'))).toBe(false); // too soon to ask again
+      vi.setSystemTime(Date.now() + 61000);
+      await act(async () => { await syncNow(); });
+      expect(calls.some((c) => c.url.endsWith('/v1/state'))).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('a 401 means the passphrase changed: the session goes and the screen says so', async () => {
     saveSyncSession(SESSION);
     _resetSyncForTest();
