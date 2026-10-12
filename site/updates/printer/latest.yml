@@ -1,8 +1,8 @@
-version: 9.2.1
+version: 9.3.0
 files:
-  - url: https://github.com/patrick-simpson/kvbcawana/releases/download/printer-v9.2.1/KVBC-Awana-Setup.exe
-    sha512: rhmUT6/87UqVfp5EKV+pVEYrs/MOtuo+cQ/X4dOBZlg4JlK20maG7Ppdae/PsnfJJVzFjV3KXJx3vBP/YSIZ6g==
-    size: 244554888
-path: https://github.com/patrick-simpson/kvbcawana/releases/download/printer-v9.2.1/KVBC-Awana-Setup.exe
-sha512: rhmUT6/87UqVfp5EKV+pVEYrs/MOtuo+cQ/X4dOBZlg4JlK20maG7Ppdae/PsnfJJVzFjV3KXJx3vBP/YSIZ6g==
-releaseDate: '2026-10-12T09:17:53.935Z'
+  - url: https://github.com/patrick-simpson/kvbcawana/releases/download/printer-v9.3.0/KVBC-Awana-Setup.exe
+    sha512: UDNgo6RTTB6ado+zBe3Wu6qIomohwTZRbq95ig9Cbk74DoNPXBaKd2et/ITfrdux9mfq8UizreOG5UtossG/sg==
+    size: 244569256
+path: https://github.com/patrick-simpson/kvbcawana/releases/download/printer-v9.3.0/KVBC-Awana-Setup.exe
+sha512: UDNgo6RTTB6ado+zBe3Wu6qIomohwTZRbq95ig9Cbk74DoNPXBaKd2et/ITfrdux9mfq8UizreOG5UtossG/sg==
+releaseDate: '2026-10-12T11:32:04.486Z'
