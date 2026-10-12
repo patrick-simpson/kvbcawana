@@ -1,158 +1,32 @@
-# kvbc-awana — conventions for Claude
+# kvbc-awana — agent rules (root)
+One repo (merged 2026-10-01 with full history of three old repos): `lobby/` (signage, projector, sync Worker, sound-room app; was Awana-Check-in-Display), `journey/` (Pi kiosk; was Journey-Display), `printer/` (Club Label Printer; was Print-TwoTimTwo-Labels). Each folder's `CLAUDE.md` is authoritative for its app: read before changing anything inside. Why/history: `lobby/docs/DECISIONS.md`, `journey/docs/DECISIONS.md`. Plans: `ROADMAP.md` (anchors below).
 
-One repo for KVBC's Awana screens, merged 2026-10-01 with the full history of
-the three old repos: the lobby signage and projector (`lobby/`, was
-Awana-Check-in-Display), the Journey kiosk (`journey/`, was Journey-Display)
-and the Club Label Printer (`printer/`, was Print-TwoTimTwo-Labels). **Each
-folder's own `CLAUDE.md` holds that app's rules and is authoritative for it**;
-read it before changing anything inside.
+## Git
+- Push directly to `main` (owner's standing rule, all apps; printer used PRs before). No branches/PRs unless asked. Run the app's own checks first (named in its CLAUDE.md). One finding per commit. NO model names in commits or files.
+- NEVER work in the archived repos Print-TwoTimTwo-Labels, Awana-Check-in-Display, Journey-Display (archived 2026-10-11; all work lands here; their github.io sites still serve the last build, nothing reads them, no forwarding).
 
-## Git workflow
+## CI / deploy (`.github/workflows/ci.yml`, every push and PR; Node 22)
+- Jobs: each app's checks as its old repo ran them; `scripts/check-mirrors.mjs` (contract and envelope vectors byte-identical across apps, printer's first; brand kit + `printer/styles/family.css` have ONE committed copy each (lobby `shared/brand/`, `printer/styles/family.css`) copied by `scripts/family-assets.mjs` into Journey `public/`, print server `public/brand/`, lobby `public/` at build time; copies ignored; each app's `pretest`/`prebuild`/`prestart`, `site/build.mjs`, `release-app.yml` make them); `site` job builds the one site once per run (uploads `site/dist` + `site/lib/large-files.generated.js` as one-day `site-dist` artifact) and tests its Pages Function; lobby = parallel `lobby-checks` (lint, typecheck, vitest) + `lobby-e2e` (build, browser smoke; Chromium cached by `@playwright/test` version in `lobby/package-lock.json`); `setup-node` caches npm.
+- "What changed" job skips lobby's 7.5-min suite and printer's 3-min one only when every changed file is one that suite never reads. Keep its lists in step when a suite starts reading another folder.
+- Printer's 48 test scripts stay SERIAL on purpose (fixed ports collide: 34573, 34575, 34581, 34583, 34586, 34597).
+- Deploy job (`main` only, after all green): takes the site the `site` job built (no rebuild; repo variable `SITE_ORIGIN` required, site job uses the same), installs only the Worker's packages (wrangler), deploys the sync Worker ONLY when its sources changed (every Worker deploy restarts the Durable Object and drops every screen's socket), publishes to Cloudflare Pages at awana.kvbchurch.org: `/` (printer's React site: public page; lobby `#lobby`, projector `#projector`, Journey `#journey`; old `/lobby/about.html`, `/journey/about.html` 301 there), `/lobby`, `/lobby/countdown` (projector), `/journey`, `/checkin` (phone page), `/settings` (`ROADMAP.md#settings-page`), `/api` (Worker), `/updates` (update feeds). Journey stamped with a hash of its own files: only a Journey change reloads kiosks.
+- Releases: `printer-release.yml`, `desktop-release.yml` (dispatch with version, `ref: main`; thin callers of reusable `release-app.yml`): run tests, create tag (`printer-v*`/`desktop-v*`), build + smoke-test on Windows, publish `make_latest: false`, commit the app's update feed into `site/updates/` (only moves forward). `delete-release.yml` (pick app) undoes a bad release. Update feeds are OURS not GitHub "Latest": electron-updater generic provider at `awana.kvbchurch.org/updates/printer/` and `/updates/lobby/` (channel lobby), absolute URLs to this repo's release assets (Pages can't host the 170 MB installers). Release workflows keep installer artifacts 1 day (`retention-days: 1`).
+- `brand-catalog-release.yml` (by hand): downloads the Awana Clubs 2026-27 catalog PDF (~50 MB, brand kit source) and uploads it to release `brand-catalog-2026-27`; NEVER in the tree.
+- Bots (commit to `main` with rebase-and-retry, dispatch `ci.yml`): `lobby-update-calendar.yml`, `journey-update-lesson.yml` nightly. `clean-artifacts.yml` weekly/by hand deletes workflow artifacts older than a day (0.5 GB Actions storage). Per-app `.github/` folders are gone; the one manual workflow that still matters is `lobby-update-snapshots.yml` (regenerates lobby visual baselines; dispatch by hand).
 
-Push directly to `main` (the owner's standing rule for every app here; the
-printer repo used PRs). Before a push, run that app's own checks (each
-`CLAUDE.md` names them) and keep one finding per commit. No model names in
-commits or files.
+## Everything free, forever (owner 2026-10-11)
+Every piece runs on a free plan, now and later (Cloudflare Workers FREE with 10 ms CPU per request, Durable Objects and D1 free allowances, GitHub Actions free minutes and 0.5 GB). Key derivation, encryption and decryption run in CLIENTS (browser pages, KVBC Awana app), NEVER in the Worker, which routes, stores ciphertext and keyed-hash ids, and hashes. A change needing a paid plan is the wrong change. Track: `ROADMAP.md#online-check-in` (supersedes cloud check-in phases 2+ and "no internet still prints": no internet = paper sheet).
 
-## What runs today
+## State of the world (2026-10-12)
+- Realtime: every screen listens to the Worker's live channel (since 2026-10-03; church passphrase sign-in; names sealed end to end; same events and sanitizers as the old Pusher design). Pusher keys cleared; printer relays every frame to the Worker; printer's Pusher publisher, electron Pusher client, Worker `pusher.js`, ci `PUSHER_*` block and legacy `provision` login removed (2026-10-12). Owner's manual step left: delete `PUSHER_*` GitHub secrets and the Pusher app.
+- Switch day done (`ROADMAP.md#switch-day-cleanup` = cleanup checklist). Every screen runs on awana.kvbchurch.org; installed apps update from its feeds (bridge releases printer 6.22.0, sound room 1.1.0, out 2026-10-01). OBS/ProPresenter feeds carry the passphrase in their link (owner's choice).
+- `ROADMAP.md#cloud-check-in`: owner plan (2026-10-11) to retire the check-in laptop (Worker talks to TwoTimTwo, Raspberry Pi prints labels). Phased, shadow-tested beside the laptop; read before touching check-in, the relay or the print path. TwoTimTwo (Devin) allowed 2026-10-11: everything encrypted, ONE read per 5 s all reads combined, no vendor support. Phase 1 (read-only report watcher `lobby/worker/src/twotimtwo.js`, `lobby/worker/src/watcher.js`) built, idle until `TWOTIMTWO_*` secrets set.
+- `ROADMAP.md#kvbc-awana-one-app` (owner 2026-10-11): ONE Windows app KVBC Awana (printer 9.0.0, `printer/electron-app/`), print server and/or display per computer via first-run wizard. Sound-room app (`lobby/desktop/`) ends at 2.1.0 (hand-off). Built on branch `kvbc-awana-v9`, unreleased; its "Still to do" lists what the release workflows must change for the rename.
+- 2026-10-04 stability/performance audit fixed except "Deferred work"; its file was removed (history has it).
 
-- `.github/workflows/ci.yml` runs on every push and PR: each app's checks as
-  its old repo ran them (all on Node 22; its "What changed" job skips the
-  lobby's 7.5-minute suite and the printer's 3-minute one only when every
-  changed file is one that suite never reads, so a Worker-only change
-  deploys in about 2 minutes; keep that job's lists in step when a suite
-  starts reading another folder), `scripts/check-mirrors.mjs` (the
-  contract and envelope vectors, byte-identical across the apps, the printer's
-  first; and that the brand kit copies exist and match: the kit has ONE
-  committed copy, the lobby's `shared/brand/`, and `scripts/family-assets.mjs`
-  copies it into Journey's `public/` and the print server's `public/brand/` at
-  build time (and the sync modules into Journey's `public/src/shared/`), so
-  every screen still holds a full local copy; the copies are ignored, and
-  Journey's `pretest`, the printer's `pretest` / `prestart`, `site/build.mjs`
-  and `release-app.yml` make them; `printer/styles/family.css` is bundled by
-  the site alone and copied nowhere), and a `site` job
-  that builds the one site (once per run: it uploads `site/dist` and
-  `site/lib/large-files.generated.js` as a one-day `site-dist` artifact) and
-  tests its Pages Function. The lobby runs as two parallel jobs,
-  `lobby-checks` (lint, typecheck, vitest) and `lobby-e2e` (build, browser
-  smoke; Chromium cached by the `@playwright/test` version in
-  `lobby/package-lock.json`). Every `setup-node` caches npm. The printer's
-  48 test scripts stay serial on purpose: many bind fixed ports that
-  collide across scripts (34573, 34575, 34581, 34583, 34586, 34588, 34597).
-- `ci.yml`'s deploy job, on `main` only and once everything is green: takes
-  the site the `site` job built (it does not rebuild; the `SITE_ORIGIN`
-  repository variable is required, and the site job builds with that same
-  variable, so they agree), installs only the Worker's packages (wrangler),
-  deploys the sync Worker only when its sources changed (every Worker deploy restarts its
-  Durable Object and drops every screen's socket), then publishes the site to
-  Cloudflare Pages at **awana.kvbchurch.org**: `/` the family's one public page
-  (the printer's React site, with the lobby signage at `#lobby` and the Journey
-  kiosk at `#journey`; the old `/lobby/about.html` and `/journey/about.html`
-  301 to those sections),
-  `/lobby`, `/lobby/countdown` (the projector), `/journey`, `/checkin` (the
-  phone page), `/desk` (the desk check-in, `site/desk/`: every seal is made in the
-  browser, `ROADMAP.md#online-check-in`), `/settings` (one settings page for every screen, `ROADMAP.md#settings-page`), `/api` (the Worker), `/updates` (the apps' update feeds).
-  Journey is stamped with a hash of its own files, so only a Journey change
-  reloads the kiosks.
-- Releases: `printer-release.yml` and `desktop-release.yml` (dispatch with
-  the version and `ref: main`; both are thin callers of the reusable
-  `release-app.yml`, where the pipeline lives). Each runs the tests first, creates the tag
-  (`printer-v*` / `desktop-v*`), builds and smoke-tests on Windows, publishes
-  with `make_latest: false`, and commits the app's update feed into
-  `site/updates/`, which only ever moves forward. `delete-release.yml` (pick the app) undoes a
-  bad release. **Update feeds are ours, not GitHub's "Latest"**: both Electron
-  apps use electron-updater's generic provider on
-  `awana.kvbchurch.org/updates/printer/` and `/updates/lobby/` (channel
-  lobby), with absolute URLs to this repo's release assets (Pages cannot host
-  the 170 MB installers).
-- The Awana Clubs 2026-27 catalog PDF (the brand kit's source, ~50 MB) is a
-  graphical reference on the `brand-catalog-2026-27` release, never in the
-  tree: `brand-catalog-release.yml` (by hand) downloads it and uploads it.
-- Bots: `lobby-update-calendar.yml` and `journey-update-lesson.yml` run
-  nightly, commit to `main` (rebase-and-retry) and dispatch `ci.yml`. `clean-artifacts.yml` runs weekly (and by hand) and deletes
-  workflow artifacts older than a day: the account has 0.5 GB of Actions
-  storage, and the release workflows keep their installer artifacts only a
-  day (`retention-days: 1`); the Releases are what people download. The
-  per-app `.github/` folders are gone (their workflows were dormant and are
-  deleted; the one manual workflow they held that still matters is
-  `lobby-update-snapshots.yml`, which regenerates the lobby's visual
-  baselines and is dispatched by hand).
-- Realtime: since 2026-10-03 every screen listens to the Worker's live channel
-  (sign-in with the church passphrase; names stay sealed end to end; the same
-  events and sanitizers as the Pusher design). The Pusher keys are cleared and
-  the printer relays every frame to the Worker. The printer's Pusher publisher
-  and the electron app's Pusher client are removed (2026-10-12), and so are the
-  Worker's `pusher.js`, `ci.yml`'s `PUSHER_*` block and the legacy `provision`
-  display login. Only the owner's manual step remains: delete the `PUSHER_*`
-  GitHub secrets and the Pusher app.
-- **The three old repos are archived** (2026-10-11, after switch day): every
-  screen runs on awana.kvbchurch.org and both installed apps update from its
-  feeds (their bridge releases, printer 6.22.0 and sound room 1.1.0, went out
-  on 2026-10-01). Never work in Print-TwoTimTwo-Labels, Awana-Check-in-Display
-  or Journey-Display: all work lands in this repo's folders (a session that
-  started in the old lobby repo on 2026-10-11 had to be ported here). Their
-  github.io sites still serve the last build, and nothing reads from them (the
-  lesson videos come from this repo's own `journey-videos-v2` release).
-- `ROADMAP.md#cloud-check-in` is the plan (owner, 2026-10-11) to retire the check-in
-  laptop: the sync Worker talks to TwoTimTwo itself, a Raspberry Pi at church
-  prints the labels. Phased, shadow-tested beside the laptop; read it before
-  touching check-in, the relay or the print path. TwoTimTwo (Devin) allowed
-  it on 2026-10-11: everything encrypted, ONE read every 5 s with all reads
-  combined (it was 15 s at first), no
-  vendor support. Phase 1 (the Worker's read-only report watcher,
-  `lobby/worker/src/twotimtwo.js` / `watcher.js`) is built and idle until the
-  `TWOTIMTWO_*` secrets are set.
-- `ROADMAP.md#kvbc-awana-one-app` (owner, 2026-10-11): ONE Windows app, **KVBC Awana**
-  (printer 9.0.0, `printer/electron-app/`), a print server, a display or
-  both per computer, set by a first-run wizard. The sound room app
-  (`lobby/desktop/`) ends at 2.1.0, which hands the sound room PC over to it.
-  Built on branch `kvbc-awana-v9`, not yet released; its "Still to do" lists
-  what the release workflows must change for the rename.
-- The stability and performance audit of 2026-10-04 is fixed except for the
-  items under "Deferred work" below (its file was removed; the repo history has it).
-
-## Everything free, forever (owner, 2026-10-11)
-
-A project-wide rule: every piece runs on a free plan, now and later
-(Cloudflare Workers FREE with its 10 ms of CPU per request, Durable Objects
-and D1 on their free allowances, GitHub Actions' free minutes and 0.5 GB of
-storage). So key derivation, encryption and decryption run in CLIENTS (the
-browser pages, the KVBC Awana app), never in the Worker, which routes, stores
-ciphertext and keyed-hash identifiers, and hashes. A change that needs a paid
-plan is the wrong change. `ROADMAP.md#online-check-in` is the track built on
-it (it supersedes the cloud check-in phases 2+ and "no internet still prints":
-with no internet the desk uses the paper sheet).
-
-## The move in progress (owner's plan, 2026-10-01)
-
-1. This repo, with history (done).
-2. One Cloudflare Pages site at **awana.kvbchurch.org** (done; the printer's
-   public site, now also the one About page for all three apps (`/#lobby`,
-   `/#journey`), at `/`, `/lobby`, `/lobby/countdown`,
-   `/journey`, `/api`).
-3. Pusher replaced by the Worker's own live channel (done 2026-10-03).
-4. Every installed app repointed (printer and sound room update feeds, the Pi
-   kiosk, Journey's embed, cross-links), one last release from each old repo
-   (done by 2026-10-03).
-5. A full rehearsal, then ONE switch day (done; `ROADMAP.md#switch-day-cleanup` is the cleanup checklist that follows) the owner
-   picks (never a Wednesday). OBS / ProPresenter feeds carry the passphrase in
-   their link (owner's choice). No forwarding from the old github.io addresses.
-
-## Deferred work
-
-Still open from the 2026-10-04 audit, deferred on purpose (the owner's call
-or a prerequisite is missing):
-
-- **Nightly lesson video in the repo.** `journey-update-lesson.yml` commits
-  `journey/public/current-lesson-video.mp4` into history each change (about
-  20 MB). Moving it to the `journey-videos-v2` release changes where the Pi's
-  bundle comes from, so it waits for the owner.
-- **Split the big files.** `printer/print-server/server.js` (about 9,300
-  lines) and `printer/chrome-extension/content.js` (about 5,200), plus a jsdom
-  harness for the extension. Some logic is already lifted out for tests.
-- **Lobby code splitting.** `React.lazy` for the panels and the PowerPoint
-  parser on demand. The App suites open panels synchronously and
-  `pptxModel.js` imports the parser statically, so those suites need reworking first.
-- **Pusher removal from the print server.** See `ROADMAP.md#switch-day-cleanup`.
-- **Remaining Low findings** from the audit's per-area lists. They are not
-  carried one by one here; the repo history has the original file.
+## Deferred work (owner's call or prerequisite missing; do not start unasked)
+- Nightly lesson video in repo: `journey-update-lesson.yml` commits `journey/public/current-lesson-video.mp4` (~20 MB per change) into history; moving it to release `journey-videos-v2` changes where the Pi's bundle comes from: waits for owner.
+- Split big files: `printer/print-server/server.js` (~9,300 lines), `printer/chrome-extension/content.js` (~5,200), plus a jsdom harness for the extension.
+- Lobby code splitting: `React.lazy` panels and PowerPoint parser on demand; App suites open panels synchronously and `pptxModel.js` imports the parser statically, so rework those suites first.
+- Pusher removal from the print server: see `ROADMAP.md#switch-day-cleanup`.
+- Remaining Low findings of the audit: not carried here (history).
