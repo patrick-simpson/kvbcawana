@@ -83,4 +83,28 @@ describe('the overview poll (routes.md 10.6)', () => {
     await act(async () => { await vi.advanceTimersByTimeAsync(OVERVIEW_POLL_MS * 3); });
     expect(getOverview).toHaveBeenCalledTimes(1);
   });
+
+  it('visibility toggles never start a second chain or shorten the interval', async () => {
+    let release;
+    getOverview.mockImplementationOnce(() => new Promise((r) => { release = () => r(good(1)); }));
+    getOverview.mockImplementation(async () => good(2));
+    renderHook(() => useOverview({ enabled: true }));
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+    expect(getOverview).toHaveBeenCalledTimes(1);   // the first read is still out
+    // hide / show while it is in flight: no second read
+    for (let i = 0; i < 3; i += 1) { setVisible('hidden'); document.dispatchEvent(new Event('visibilitychange')); setVisible('visible'); document.dispatchEvent(new Event('visibilitychange')); }
+    expect(getOverview).toHaveBeenCalledTimes(1);
+    await act(async () => { release(); await vi.advanceTimersByTimeAsync(0); });
+    // toggling soon after a read does not read again before the normal interval
+    await act(async () => { await vi.advanceTimersByTimeAsync(3000); });
+    setVisible('hidden'); document.dispatchEvent(new Event('visibilitychange'));
+    setVisible('visible'); document.dispatchEvent(new Event('visibilitychange'));
+    await act(async () => { await vi.advanceTimersByTimeAsync(OVERVIEW_POLL_MS - 3000 - 1); });
+    expect(getOverview).toHaveBeenCalledTimes(1);
+    await act(async () => { await vi.advanceTimersByTimeAsync(1); });
+    expect(getOverview).toHaveBeenCalledTimes(2);
+    // and exactly one chain keeps going: one read per interval
+    await act(async () => { await vi.advanceTimersByTimeAsync(OVERVIEW_POLL_MS * 3); });
+    expect(getOverview).toHaveBeenCalledTimes(5);
+  });
 });

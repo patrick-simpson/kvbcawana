@@ -23,13 +23,22 @@ export function useOverview({ enabled }) {
   useEffect(() => {
     if (!enabled) return undefined;
     let live = true;
+    // ONE chain: a single scheduled handle and an in-flight guard, so a tab coming
+    // back to the front while a read is out can never start a second chain.
     /** @type {ReturnType<typeof setTimeout> | undefined} */
     let timer;
+    let inFlight = false;
+    let lastStart = -Infinity;
     const visible = () => (typeof document === 'undefined' ? true : document.visibilityState !== 'hidden');
+    /** @param {number} ms */
+    const schedule = (ms) => { clearTimeout(timer); timer = setTimeout(tick, ms); };
     const tick = async () => {
-      if (!live) return;
+      if (!live || inFlight) return;
+      inFlight = true;
+      lastStart = Date.now();
       setLoading(true);
       const a = await getOverview();
+      inFlight = false;
       if (!live) return;
       setLoading(false);
       if (a.ok && a.body && typeof a.body === 'object') {
@@ -41,10 +50,15 @@ export function useOverview({ enabled }) {
         setError(a.message);
         if (failuresRef.current >= OVERVIEW_MAX_FAILURES) { setStopped(true); return; }
       }
-      timer = setTimeout(tick, visible() ? OVERVIEW_POLL_MS : OVERVIEW_SLOW_POLL_MS);
+      schedule(visible() ? OVERVIEW_POLL_MS : OVERVIEW_SLOW_POLL_MS);
     };
-    // A tab coming back to the front reads at once, rather than waiting out a slow beat.
-    const onVisible = () => { if (visible() && failuresRef.current < OVERVIEW_MAX_FAILURES) { clearTimeout(timer); tick(); } };
+    // A tab coming back to the front reads at once, rather than waiting out a slow
+    // beat, but never sooner than one normal interval after the last read began.
+    const onVisible = () => {
+      if (!visible() || inFlight || failuresRef.current >= OVERVIEW_MAX_FAILURES) return;
+      const wait = OVERVIEW_POLL_MS - (Date.now() - lastStart);
+      if (wait <= 0) { clearTimeout(timer); tick(); } else schedule(wait);
+    };
     document.addEventListener('visibilitychange', onVisible);
     tick();
     return () => { live = false; clearTimeout(timer); document.removeEventListener('visibilitychange', onVisible); };
