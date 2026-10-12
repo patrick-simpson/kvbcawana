@@ -10,7 +10,7 @@ label printer's dashboard and labels. This folder is the ONE copy
 | `tokens.json` | Club colors (primary, deep, tint), house colors, the three font families and the motion timing table, for code (JS, canvas). |
 | `tokens.css` | The same values as `--brand-*` custom properties, for plain CSS. |
 | `fonts.css` | `@font-face` rules for pages with no bundler (paths relative to this file). |
-| `fonts/` | Paytone One and Londrina Solid, each as the FULL font (an unmodified TTF and a lossless WOFF2), and Figtree (variable): a latin WOFF2 for the web and the full TTF for the printer's canvas, with each font's SIL Open Font License. See "The three voices" and "Reserved Font Names and the OFL" below. |
+| `fonts/` | Paytone One and Londrina Solid, each as the FULL font (an unmodified TTF and a lossless WOFF2), and Figtree (variable): a latin WOFF2 for the web and the full TTF for the printer's canvas, with each font's SIL Open Font License. Plus two faces for the printed labels only: Comic Neue (Regular, Bold) and Playfair Display (variable), full unmodified TTFs. See "The three voices", "The club faces (labels only)" and "Reserved Font Names and the OFL" below. |
 | `logos/` | Every club mark as vector SVG: `-white` (knockout for club-color and dark fields), `-color` (full color, for light fields), `-black` (one color, for the thermal label printer). Plus the Awana Clubs mark, white and black. |
 | `shapes/` | The catalog's club wave per club, the corner tabs, the stepped chip's plate and keyline, the starburst and the tip blob. Single-color shapes paint in `currentColor`. |
 | `doodles/` | The catalog's doodle set (sparkles, dots, rings, squiggles, zigzags, loops and more), in `currentColor`. |
@@ -98,6 +98,50 @@ Measured from the font file (1000 units per em):
   `overflow: hidden` sized to ascent and descent will clip them. Descenders
   are shallow (-.195 em; Ç and Ą reach -.248 em).
 
+## The club faces (labels only)
+
+Owner decision 2026-10-12, from label previews he approved: four clubs' name
+tags are set, every text line of them, in a face of their own instead of the
+three voices. Puggles and Cubbies print in **Comic Neue** (Bold for the first
+name and the bold lines: club line, handbook group, "Go to", pills, chips;
+Regular for the last name and the other small lines); Trek and Journey in
+**Playfair Display** (weight 800 for the first name, 700 for the bold lines,
+400 for the rest). Sparks and T&T keep Paytone One, Londrina Solid and
+Figtree. The allergy, birthday and no-photo icons are unchanged.
+
+Only the label printer's canvas uses them (`printer/print-server/brand.js`
+`CLUB_FACES`; rules in `printer/CLAUDE.md` "Labels"). No screen loads them, so
+`fonts.css` and the tokens do not name them, and there is no WOFF2 of either.
+They ride along in every copy of this folder like any other file.
+
+| File | Bytes | sha256 | Source |
+| --- | --- | --- | --- |
+| `ComicNeue-Regular.ttf` | 57,248 | `a0ee5a37c8b27c4db0700137d928598b1e23b0089e1546a8961909176b779360` | `google/fonts` `ofl/comicneue/`, Version 2.003 |
+| `ComicNeue-Bold.ttf` | 55,716 | `3e7e5fccfd7e0788f317b43312151c1bd5cf058c9697a8d83eac3939050bd61e` | the same |
+| `PlayfairDisplay-Variable.ttf` | 300,724 | `c40f2293766a503bc70cce9e512ef844a4ccb7cbcde792fe2ea31d191917d8d6` | `google/fonts` `ofl/playfairdisplay/PlayfairDisplay[wght].ttf`, Version 1.203, `wght` 400 to 900 |
+
+Each is the upstream file byte for byte (the Playfair file is renamed on disk
+only, because brackets do not belong in a URL path; its name table is
+untouched). `fonts/OFL-ComicNeue.txt` and `fonts/OFL-PlayfairDisplay.txt` are
+the upstream `OFL.txt` files verbatim. Comic Neue declares no Reserved Font
+Name ("Copyright 2014 The Comic Neue Project Authors"). Playfair Display
+declares one ("Copyright 2017 The Playfair Display Project Authors ... with
+Reserved Font Name "Playfair Display""), so it is held to the same rule as
+Paytone One and Londrina Solid: the whole, unmodified font, never a subset;
+`src/lib/brandKit.test.js` pins all three files and reads the reserved name
+from the license, and the printer's `scripts/test-brand-kit.cjs` pins them in
+its copy.
+
+Coverage, from the files' character maps (the label falls back word by word
+to the stock voice, then to the old Windows face, for what a face lacks):
+
+- **Comic Neue** (both cuts): Basic Latin, Latin-1, most of Latin
+  Extended-A (Polish, Czech: Ł Ž ř) and Ț; **no** Ș, Ğ, İ, Ĳ, precomposed
+  Vietnamese, Cyrillic, Greek or CJK.
+- **Playfair Display**: Latin-1, Latin Extended-A, Ș Ț, precomposed
+  Vietnamese and Cyrillic; **no** Greek or CJK.
+- Neither has the Ewe ɔ or any emoji.
+
 ## Regenerating from a new catalog
 
 `scripts/brand/extract-catalog-brand.py` rebuilds every mark and shape
@@ -128,7 +172,8 @@ and the apps' own tests fail if a copy is missing, differs, or is committed.
 Two of the kit's three families declare a Reserved Font Name in their license:
 Paytone One ("Paytone" and "Paytone One") and Londrina Solid ("Londrina
 Solid"). Figtree declares none, which is why its file is allowed to be a latin
-subset. **The Reserved Font Name is why the kit ships the whole font and never
+subset. (The label-only Playfair Display declares one too and ships whole, as a
+TTF only: see "The club faces (labels only)" above.) **The Reserved Font Name is why the kit ships the whole font and never
 a subset** of Paytone One or Londrina Solid. OFL clause 3: "No Modified Version
 of the Font Software may use the Reserved Font Name(s) unless explicit written
 permission is granted", and the license defines a Modified Version as any
