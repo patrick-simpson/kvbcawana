@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { CLUBS } from '../config.js';
 import { THEME, artUrl } from '../lib/shared-config.js';
-import { ScreenFrame } from '../components/ScreenFrame.jsx';
+import { ScreenFrame } from '../components/small.jsx';
 import { ParticleField } from '../components/ParticleField.jsx';
 import { SparkleDoodles } from '../components/SparkleDoodles.jsx';
 import { ClubWave } from '../components/ClubWave.jsx';
@@ -19,10 +19,8 @@ import {
   warningFor,
 } from '../lib/gameWarning.js';
 import { playStinger } from '../lib/stingers.js';
-import { birthdaysThisWeek, listNames } from '../lib/birthdays.js';
-import { countForClub } from '../lib/tally.js';
-import { mulberry32 } from '../lib/color.js';
-import { FAR_WAVE_KEEP, HOUSE, WARNING_TONES, shade } from '../lib/kit.js';
+import { birthdaysThisWeek, listNames, normalizeClub } from '../lib/birthdays.js';
+import { FAR_WAVE_KEEP, HOUSE, WARNING_TONES, mulberry32, shade } from '../lib/kit.js';
 import { chipGeometry, inkEm, measureEm } from '../lib/chip.js';
 import { DUR, EASE } from '../lib/motion-tokens.js';
 import { holdThen, partVariants } from '../lib/landing.js';
@@ -63,6 +61,23 @@ const LAND_HOLD = 0.25;
  * sanctioned sanitized socket) instead of the original repo's own
  * useTally hook — the view itself is unchanged.
  */
+/**
+ * Live check-in tally — pure parsing/lookup for the `tally` events the
+ * print server publishes on the shared Pusher channel:
+ *   { counts: { "<club display name>": n, ... }, total: n, at: ISO }
+ * Counts are keyed by club name as the check-in system reports it, so
+ * lookups go through the same club-name normalizer the birthday CSV uses.
+ */
+
+/** Tonight's count for one club id, or null when the tally doesn't cover it. */
+export function countForClub(tally, clubId) {
+  let found = null;
+  for (const [name, n] of Object.entries(tally.counts)) {
+    if (normalizeClub(name) === clubId) found = (found ?? 0) + n;
+  }
+  return found;
+}
+
 export const GameTimeView = ({ now, window: gameWindow, endsAt, tally }) => {
   // Held still under ?vr=1 / OS reduced-motion, where every ambient layer stops.
   const lowPower = useLowPower();

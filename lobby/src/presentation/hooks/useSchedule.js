@@ -3,7 +3,7 @@ import { AppMode } from '../types.js';
 import { CHURCH } from '../church.config.js';
 import { evaluateOverride } from '../lib/watchdog.js';
 import { advisedNextMeeting, applyScheduleAdvisory } from '../lib/scheduleAdvisory.js';
-import { useEffectiveSchedule } from './useEffectiveSchedule.js';
+import { useEffectiveSchedule } from './index.js';
 import {
   getNextMeeting,
   resolveState,

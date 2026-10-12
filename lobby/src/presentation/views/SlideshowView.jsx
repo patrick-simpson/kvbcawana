@@ -6,7 +6,7 @@ import { useCalendarEvents } from '../hooks/useCalendarEvents.js';
 import { DUR, EASE } from '../lib/motion-tokens.js';
 import { LEAVE_TOTAL, holdThen } from '../lib/landing.js';
 import { HOUSE } from '../lib/kit.js';
-import { useKeydown } from '../hooks/useKeydown.js';
+import { useKeydown } from '../hooks/index.js';
 import { slideGesture, useTouch } from '../lib/touch.js';
 import { ColorSweep } from '../components/ColorSweep.jsx';
 import { StepChip } from '../components/StepChip.jsx';

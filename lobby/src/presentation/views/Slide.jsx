@@ -1,12 +1,11 @@
 import React, { useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { ScreenFrame } from '../components/ScreenFrame.jsx';
+import { BodyText, ScreenFrame } from '../components/small.jsx';
 import { ParticleField } from '../components/ParticleField.jsx';
 import { SparkleDoodles } from '../components/SparkleDoodles.jsx';
 import { ConfettiBurst } from '../components/ConfettiBurst.jsx';
 import { HEADLINE_LINE_HEIGHT, Headline, fittedU, headlineBox } from '../components/Headline.jsx';
 import { Kicker } from '../components/Kicker.jsx';
-import { BodyText } from '../components/BodyText.jsx';
 import { StepChip } from '../components/StepChip.jsx';
 import { wordCount } from '../components/Words.jsx';
 import { HOUSE } from '../lib/kit.js';

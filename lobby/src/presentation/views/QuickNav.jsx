@@ -5,14 +5,13 @@ import { localDateKey } from '../lib/shared-config.js';
 import { addSkipDate, overlayEntries, removeSkipDate, subscribeOverlay } from '../lib/scheduleOverlay.js';
 import { setStingersEnabled, stingersEnabled, subscribeStingers, unlockStingers } from '../lib/stingers.js';
 import { clearBirthdays, useBirthdays } from '../hooks/useBirthdays.js';
-import { useEffectiveSchedule } from '../hooks/useEffectiveSchedule.js';
+import { useEffectiveSchedule } from '../hooks/index.js';
 import { lowPowerPreference, setLowPowerPreference, useLowPower } from '../hooks/useLowPower.js';
 import { useClockDrift } from '../hooks/useClockDrift.js';
 import { useDisplayLogin } from '../../hooks/useDisplayLogin.js';
 import { useDisplayKey } from '../../hooks/useDisplayKey.js';
 import { maskDisplayKey } from '../../lib/displayKey.js';
 import { isPlausibleKey } from '../../lib/envelope.js';
-import { GlassPanel } from '../components/GlassPanel.jsx';
 import { FLAGS } from '../lib/flags.js';
 
 /**
@@ -28,6 +27,17 @@ import { FLAGS } from '../lib/flags.js';
  * `touch`); nothing of this hover panel is on a touch page at all, so its
  * invisible buttons can never catch a tap meant for the wall.
  */
+/**
+ * The one solid surface for floating operator controls (the menu, the
+ * setup note): the kit's ink with a white keyline and a hard offset shadow
+ * (flat, never a blur), legible over any view. See `.pj-panel` in index.css.
+ */
+const GlassPanel = ({ className = '', children }) => (
+  <div className={`pj-panel ${className}`.trim()}>
+    {children}
+  </div>
+);
+
 export const QuickNav = ({ now, state, isOverride, onSelect, onResume, socketStatus }) => {
   const skewMs = useClockDrift();
 
