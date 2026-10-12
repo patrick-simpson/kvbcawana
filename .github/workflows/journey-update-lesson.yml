@@ -41,15 +41,11 @@ jobs:
       - name: Check out the code
         uses: actions/checkout@v4
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      - name: Set up Node.js and install dependencies
+        uses: ./.github/actions/setup-app
         with:
-          node-version: '22'
-          cache: 'npm'
-          cache-dependency-path: journey/package-lock.json
-
-      - name: Install dependencies
-        run: npm ci
+          lockfile: journey/package-lock.json
+          working-directory: journey
 
       - name: Install ffmpeg
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg

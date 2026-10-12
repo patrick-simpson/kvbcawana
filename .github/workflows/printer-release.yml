@@ -62,16 +62,13 @@ jobs:
           ref: ${{ inputs.ref }}
       - id: sha
         run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-      - uses: actions/setup-node@v4
+      - name: Set up Node.js and install root dependencies
+        uses: ./.github/actions/setup-app
         with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: |
+          lockfile: |
             printer/package-lock.json
             printer/print-server/package-lock.json
-      - name: Install root dependencies
-        run: npm ci
-        working-directory: printer
+          working-directory: printer
       - name: Install print-server dependencies
         run: npm ci
         working-directory: printer/print-server
@@ -140,11 +137,9 @@ jobs:
         with:
           ref: ${{ needs.tag.outputs.sha }}
 
-      - uses: actions/setup-node@v4
+      - uses: ./.github/actions/setup-app
         with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: printer/electron-app/package-lock.json
+          lockfile: printer/electron-app/package-lock.json
 
       # The full print server ships inside the installer via extraResources,
       # INCLUDING its node_modules — without this install step the packaged

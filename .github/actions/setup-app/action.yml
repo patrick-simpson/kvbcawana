@@ -1,0 +1,35 @@
+name: Set up an app
+description: >
+  Node 22 with the npm cache keyed on the given lockfile(s), then `npm ci` in
+  the given directory. The caller checks out first. Leave working-directory
+  empty to set up Node and the cache only (the caller installs later).
+
+inputs:
+  lockfile:
+    description: Lockfile path(s) the npm cache is keyed on (one per line for several).
+    required: true
+  working-directory:
+    description: Where to run `npm ci`, relative to the workspace. Empty skips the install.
+    required: false
+    default: ''
+  args:
+    description: Extra arguments for `npm ci` (for example --ignore-scripts).
+    required: false
+    default: ''
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v4
+      with:
+        node-version: '22'
+        cache: npm
+        cache-dependency-path: ${{ inputs.lockfile }}
+    - name: Install dependencies
+      if: inputs.working-directory != ''
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        NPM_CI_ARGS: ${{ inputs.args }}
+      # Unquoted on purpose: the args are a word list.
+      run: npm ci $NPM_CI_ARGS

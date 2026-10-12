@@ -33,15 +33,11 @@ jobs:
       - name: Check out the code
         uses: actions/checkout@v4
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      - name: Set up Node.js and install dependencies
+        uses: ./.github/actions/setup-app
         with:
-          node-version: '22'
-          cache: 'npm'
-          cache-dependency-path: lobby/package-lock.json
-
-      - name: Install dependencies
-        run: npm ci
+          lockfile: lobby/package-lock.json
+          working-directory: lobby
 
       - name: Fetch and parse the calendar
         # Exits 1 (failing the run, which emails the repo owner) if the

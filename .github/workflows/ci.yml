@@ -118,12 +118,10 @@ jobs:
         working-directory: lobby
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: ./.github/actions/setup-app
         with:
-          node-version: '22'
-          cache: npm
-          cache-dependency-path: lobby/package-lock.json
-      - run: npm ci
+          lockfile: lobby/package-lock.json
+          working-directory: lobby
       - run: npm run lint
       - run: npm run typecheck
       - run: npm run test:coverage
@@ -139,12 +137,10 @@ jobs:
         working-directory: lobby
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: ./.github/actions/setup-app
         with:
-          node-version: '22'
-          cache: npm
-          cache-dependency-path: lobby/package-lock.json
-      - run: npm ci
+          lockfile: lobby/package-lock.json
+          working-directory: lobby
       - name: Build
         run: npm run build
       # Chromium is cached by the version of @playwright/test the lockfile
@@ -184,14 +180,12 @@ jobs:
         working-directory: lobby
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: ./.github/actions/setup-app
         with:
-          node-version: '22'
-          cache: npm
-          cache-dependency-path: |
+          lockfile: |
             lobby/package-lock.json
             lobby/worker/package-lock.json
-      - run: npm ci
+          working-directory: lobby
       - run: npm ci --prefix worker
       # The lobby-checks job's \`eslint .\` covers worker/ too, but it may be skipped.
       - run: npx eslint worker
@@ -206,12 +200,10 @@ jobs:
         working-directory: lobby
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: ./.github/actions/setup-app
         with:
-          node-version: '22'
-          cache: npm
-          cache-dependency-path: lobby/package-lock.json
-      - run: npm ci
+          lockfile: lobby/package-lock.json
+          working-directory: lobby
       # The lobby-checks job's \`eslint .\` covers desktop/ too, but it may be skipped.
       - run: npx eslint desktop
       - run: npx vitest run --config desktop/vitest.config.js
@@ -225,12 +217,10 @@ jobs:
         working-directory: journey
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: ./.github/actions/setup-app
         with:
-          node-version: '22'
-          cache: npm
-          cache-dependency-path: journey/package-lock.json
-      - run: npm ci
+          lockfile: journey/package-lock.json
+          working-directory: journey
       - run: node --check public/src/schedule.js && node --check public/src/sync.js
       - run: npm test
 
@@ -245,14 +235,12 @@ jobs:
         working-directory: printer
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: ./.github/actions/setup-app
         with:
-          node-version: '22'
-          cache: npm
-          cache-dependency-path: |
+          lockfile: |
             printer/package-lock.json
             printer/print-server/package-lock.json
-      - run: npm ci
+          working-directory: printer
       - run: npm ci
         working-directory: printer/print-server
       - run: npm test
