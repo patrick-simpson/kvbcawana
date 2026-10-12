@@ -8,7 +8,6 @@ import { clearBirthdays, useBirthdays } from '../hooks/useBirthdays.js';
 import { useEffectiveSchedule } from '../hooks/useEffectiveSchedule.js';
 import { lowPowerPreference, setLowPowerPreference, useLowPower } from '../hooks/useLowPower.js';
 import { useClockDrift } from '../hooks/useClockDrift.js';
-import { useConfig } from '../../hooks/useConfig.js';
 import { useDisplayLogin } from '../../hooks/useDisplayLogin.js';
 import { useDisplayKey } from '../../hooks/useDisplayKey.js';
 import { maskDisplayKey } from '../../lib/displayKey.js';
@@ -493,22 +492,17 @@ const BirthdayStatus = ({ touch = false }) => {
 };
 
 /**
- * Display settings (#42): the live-data connection, editable on the
- * display machine itself instead of via URL flags. The Pusher key is
- * the PUBLIC subscribe-only key (the print server holds the secret).
- * Credentials live in the display's shared device config
- * (`awanaConfig.v1` via useConfig) — the same store the signage page's
- * Settings panel writes — and the sanctioned socket picks changes up
- * immediately (no reload needed).
+ * Display settings (#42): the live-data connection, set up on the display
+ * machine itself instead of via URL flags: the church passphrase (signs in to
+ * the sync service's live channel) and, by hand, the display key. Both live in
+ * their own storage slots, the same ones the signage page's Settings panel
+ * writes, and the sanctioned socket picks changes up immediately (no reload
+ * needed).
  */
 const DisplaySettings = ({ socketStatus, touch = false, initialOpen = false }) => {
-  const { config, updateConfig } = useConfig();
   const [open, setOpen] = useState(initialOpen);
-  // The by-hand fold opens itself when it IS the fix: no Pusher key yet.
+  // The by-hand fold opens itself when it IS the fix: not connected yet.
   const [advanced, setAdvanced] = useState(() => socketStatus === 'off');
-  const [key, setKey] = useState(config.pusherAppKey || '');
-  const [cluster, setCluster] = useState(config.pusherCluster || 'us2');
-  const [saved, setSaved] = useState(false);
   // Display login: one passphrase provisions the display key + publish token
   // (the sealed birthday list needs the key). Same store the signage page's
   // Settings uses — src/lib/displayLogin.js.
@@ -523,12 +517,6 @@ const DisplaySettings = ({ socketStatus, touch = false, initialOpen = false }) =
   const [editingKey, setEditingKey] = useState(false);
   const [keyDraft, setKeyDraft] = useState('');
   const [keyNote, setKeyNote] = useState('');
-
-  const save = () => {
-    updateConfig({ pusherAppKey: key.trim(), pusherCluster: cluster.trim() });
-    setSaved(true);
-    setTimeout(() => setSaved(false), 4000);
-  };
 
   const busy = loginStatus === 'busy';
   const canLogin = secure && !busy && passphrase.trim().length > 0;
@@ -560,8 +548,8 @@ const DisplaySettings = ({ socketStatus, touch = false, initialOpen = false }) =
   else if (loginStatus === 'stale') { loginLine = 'Passphrase changed — log in again'; lineTone = 'bad'; }
   else if (busy) loginLine = 'Checking…';
   else if (viaSync) loginLine = 'Type the church passphrase to set this screen up';
-  else if (socketStatus === 'off') { loginLine = 'Not connected — add the live data key under Advanced first'; lineTone = 'bad'; }
-  else if (socketStatus === 'disconnected') { loginLine = 'Not connected — check the network, then the key under Advanced'; lineTone = 'bad'; }
+  else if (socketStatus === 'off') { loginLine = 'Not connected — sign in with the passphrase'; lineTone = 'bad'; }
+  else if (socketStatus === 'disconnected') { loginLine = 'Not connected — check the network'; lineTone = 'bad'; }
   else if (socketStatus === 'connecting') loginLine = 'Connecting…';
   else if (loginStatus === 'wrong') { loginLine = 'Wrong passphrase'; lineTone = 'bad'; }
   else if (pendingLogin) loginLine = 'Will log in when the print server is heard';
@@ -640,40 +628,6 @@ const DisplaySettings = ({ socketStatus, touch = false, initialOpen = false }) =
             </button>
             {advanced && (
               <>
-                <form
-                  className="pj-sheet__fields"
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    save();
-                  }}
-                >
-                  <h4 className="pj-sheet__label">Live data key (Pusher, public)</h4>
-                  <input
-                    className="pj-sheet__input"
-                    value={key}
-                    onChange={(e) => setKey(e.target.value)}
-                    placeholder="public key — blank = off"
-                    enterKeyHint="next"
-                    aria-label="Pusher app key"
-                    {...typed}
-                  />
-                  <input
-                    className="pj-sheet__input"
-                    value={cluster}
-                    onChange={(e) => setCluster(e.target.value)}
-                    placeholder="cluster (us2)"
-                    enterKeyHint="done"
-                    aria-label="Pusher cluster"
-                    {...typed}
-                  />
-                  <button type="submit" className="pj-sheet__pill pj-sheet__pill--go">
-                    Save
-                  </button>
-                  <p className="pj-sheet__hint">
-                    {saved ? 'Saved — applies immediately' : 'Powers live counts + birthday sync'}
-                  </p>
-                </form>
-
                 <h4 className="pj-sheet__label">Display key (names + birthdays)</h4>
                 {!secure ? (
                   <p className="pj-sheet__note is-bad">
@@ -800,36 +754,6 @@ const DisplaySettings = ({ socketStatus, touch = false, initialOpen = false }) =
           </button>
           {advanced && (
             <>
-              <label className="text-[0.6rem] uppercase text-white/45" style={{ fontWeight: 700 }}>
-                Live data key (Pusher, public)
-              </label>
-              <input
-                className={inputStyle}
-                value={key}
-                onChange={(e) => setKey(e.target.value)}
-                placeholder="public key — blank = off"
-                spellCheck={false}
-                aria-label="Pusher app key"
-              />
-              <input
-                className={inputStyle}
-                value={cluster}
-                onChange={(e) => setCluster(e.target.value)}
-                placeholder="cluster (us2)"
-                spellCheck={false}
-                aria-label="Pusher cluster"
-              />
-              <button
-                onClick={save}
-                className="px-3 py-1 text-xs uppercase text-[var(--brand-tnt)] hover:bg-[var(--brand-tnt)]/15 rounded-lg transition-all border border-[var(--brand-tnt)]/40"
-                style={{ fontWeight: 800 }}
-              >
-                Save
-              </button>
-              <p className="pj-panel-note text-[0.7rem] text-white/50 text-right">
-                {saved ? 'Saved — applies immediately' : 'Powers live counts + birthday sync'}
-              </p>
-
               <label className="text-[0.6rem] uppercase text-white/45 mt-1" style={{ fontWeight: 700 }}>
                 Display key (names + birthdays)
               </label>

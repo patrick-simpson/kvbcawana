@@ -2,8 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 // Bundled fonts (no CDN) so the display looks right even on a church
 // network that blocks or throttles font hosts. The three brand voices
-// (shared/brand/README.md): Paytone One shouts (--font-shout, and
-// --font-display at the old footprint) and Londrina Solid labels
+// (shared/brand/README.md): Paytone One shouts (--font-shout) and Londrina Solid labels
 // (--font-condensed; the 400 cut only, which is already bold, so no CSS
 // weight can reach for the much fatter 900). Both are @font-face rules in
 // app.css on the kit's own full font files, never an @fontsource subset,

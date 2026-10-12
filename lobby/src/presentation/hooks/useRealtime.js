@@ -1,6 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useSocket } from '../../hooks/useSocket.js';
-import { useConfig } from '../../hooks/useConfig.js';
 import { normalizeClub } from '../lib/birthdays.js';
 import { saveLiveBirthdays } from './useBirthdays.js';
 
@@ -8,7 +7,7 @@ import { saveLiveBirthdays } from './useBirthdays.js';
  * The presentation page's ONLY socket-adjacent code. All realtime data
  * arrives through the display's sanctioned privacy boundary —
  * src/hooks/useSocket.js binding the strict allowlist sanitizers in
- * src/lib/eventSanitizers.js — never through a second Pusher stack.
+ * src/lib/eventSanitizers.js — never through a second socket stack.
  * (This replaces the original repo's pusher.ts/useTally/useBirthdaySync.)
  *
  * - `tally` events → { counts, total, at: Date } for GameTimeView's
@@ -24,25 +23,14 @@ import { saveLiveBirthdays } from './useBirthdays.js';
  *   ADVISORY layer (lib/scheduleAdvisory.js), never a replacement for
  *   shared/schedule.json or the device skip-weeks overlay.
  *
- * Pusher credentials come from the display's shared device config
- * (`awanaConfig.v1`): set once in the signage Settings panel or QuickNav,
- * or passed as `?key=...&cluster=...` — adopted below into the persisted
- * overrides so a one-time provisioning URL survives reloads (the same
- * semantics the original app's ?pusherKey= flag had).
+ * The screen listens on the sync service's live channel once it is signed in
+ * (the church passphrase: QuickNav, or `?passphrase=` on a feed's link, which
+ * useSync reads). An old link that still carries Pusher's `?key=&cluster=`
+ * is simply ignored.
  */
 export function useRealtime() {
-  const { config, updateConfig } = useConfig();
   const [tally, setTally] = useState(null);
   const [schedule, setSchedule] = useState(null);
-
-  // One-time startup chore: persist ?key=/&cluster= provisioning.
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const key = (params.get('key') || '').trim();
-    const cluster = (params.get('cluster') || '').trim();
-    if (!key) return;
-    updateConfig(cluster ? { pusherAppKey: key, pusherCluster: cluster } : { pusherAppKey: key });
-  }, [updateConfig]); // updateConfig is a stable useCallback — this runs once at mount
 
   const onTally = useCallback((safe) => {
     setTally({ counts: safe.counts, total: safe.total, at: new Date(safe.at) });
@@ -66,7 +54,6 @@ export function useRealtime() {
     tally,
     schedule,
     socketStatus: status,
-    pusherConfigured: Boolean(config.pusherAppKey),
   };
 }
 

@@ -178,7 +178,7 @@ export default function DebugPanel({
         <img className="panel-mark" src={awanaClubsMark} alt="" draggable="false" />
         <h3>Debug · Simulate check-ins</h3>
         <div className="debug-stats">
-          <span>pusher: {status ?? 'unknown'}</span>
+          <span>live: {status ?? 'unknown'}</span>
           <span>
             last event: {lastEventAt
               ? new Date(lastEventAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' })

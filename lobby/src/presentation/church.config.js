@@ -8,11 +8,9 @@
  * src/presentation/lib/shared-config.js) so the sibling display/printer
  * apps read the same source of truth.
  *
- * Pusher credentials intentionally do NOT live here either (unlike the
- * original KVBC-Awana-Countdown repo): the presentation page shares
- * this display's device config (`awanaConfig.v1` via useConfig), so the
- * key/cluster entered once in the signage Settings panel — or passed as
- * `?key=...&cluster=...` — cover both pages.
+ * Realtime credentials do NOT live here either (unlike the original
+ * KVBC-Awana-Countdown repo): the screen signs in to the sync service's live
+ * channel with the church passphrase, kept in its own storage slot.
  */
 
 export const CHURCH = {

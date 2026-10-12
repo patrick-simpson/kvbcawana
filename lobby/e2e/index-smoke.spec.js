@@ -1,12 +1,12 @@
 import { test as plain } from '@playwright/test';
 import { advanceUntilVisible, expect, test } from './pastFlagship.js';
+import { liveChannel } from './liveChannel.js';
 
-// A deployed build may carry a baked Pusher key (repository variables), so
-// tests that need a screen with NO key seed an empty override rather than
-// assuming one. Overrides win over the baked default; '' is a valid value.
-const NO_KEY = () => localStorage.setItem('awanaConfig.v1', JSON.stringify({ pusherAppKey: '' }));
+// A screen that has not signed in to the sync service: no saved overrides, so
+// its socket status is 'off'.
+const NO_KEY = () => localStorage.setItem('awanaConfig.v1', JSON.stringify({}));
 
-// The signage page must boot cleanly with no Pusher key (socket status
+// The signage page must boot cleanly when it is not signed in (socket status
 // 'off' by design) and no network beyond its own origin. Cross-origin
 // fetches (weather, calendar scrape) are aborted so the test is
 // hermetic — the app is built to treat those as ordinary offline.
@@ -23,7 +23,7 @@ plain('signage stage boots with no errors and no external network', async ({ pag
       consoleErrors.push(msg.text());
     }
   });
-  await page.route(/open-meteo|pusher|twotimtwo/, (route) => route.abort());
+  await page.route(/open-meteo|twotimtwo/, (route) => route.abort());
   await page.addInitScript(NO_KEY);
 
   await page.goto('/index.html');
@@ -40,7 +40,7 @@ plain('signage stage boots with no errors and no external network', async ({ pag
 });
 
 test('overlay mode renders a transparent stage', async ({ page }) => {
-  await page.route(/open-meteo|pusher|twotimtwo/, (route) => route.abort());
+  await page.route(/open-meteo|twotimtwo/, (route) => route.abort());
   await page.goto('/index.html?overlay=1');
   await expect(page.locator('.stage.overlay')).toBeVisible();
   // Operator chrome never reaches an OBS/ProPresenter feed.
@@ -51,7 +51,7 @@ test('overlay mode renders a transparent stage', async ({ page }) => {
 // deck renders THAT deck after a reboot — no network, no local slides. This
 // is the boot path every display takes at 5pm on club night.
 test('a cached synced deck renders in place of local slides', async ({ page }) => {
-  await page.route(/open-meteo|pusher|twotimtwo/, (route) => route.abort());
+  await page.route(/open-meteo|twotimtwo/, (route) => route.abort());
   await page.addInitScript(() => {
     localStorage.setItem('awanaConfig.v1', JSON.stringify({ backgroundSource: 'manual' }));
     localStorage.setItem('awanaSyncedSlides.v1', JSON.stringify({
@@ -73,7 +73,7 @@ test('a cached synced deck renders in place of local slides', async ({ page }) =
 // with NO background setting saved shows the deck the check-in machine
 // published, not the welcome placeholder.
 test('a published deck shows on a screen with no background setting saved', async ({ page }) => {
-  await page.route(/open-meteo|pusher|twotimtwo/, (route) => route.abort());
+  await page.route(/open-meteo|twotimtwo/, (route) => route.abort());
   await page.addInitScript(() => {
     localStorage.setItem('awanaSyncedSlides.v1', JSON.stringify({
       deckRev: 8,
@@ -89,36 +89,28 @@ test('a published deck shows on a screen with no background setting saved', asyn
   await expect(page.getByText('Published with nothing else set')).toBeVisible();
 });
 
-// ?key= must reach the socket (an OBS/ProPresenter embed has no localStorage).
-// Pusher itself is aborted, so the dot leaves "not set up" for connecting or
-// disconnected — either proves the flag reached `new Pusher(...)`.
-test('the ?key= URL flag reaches the socket', async ({ page }) => {
-  await page.route(/open-meteo|pusher|twotimtwo/, (route) => route.abort());
+// An OBS / ProPresenter link written before Pusher was retired still carries
+// ?key= and ?cluster=. They are ignored: the page boots, and (signed in to
+// nothing) the dot still says "not set up", exactly as without them.
+test('an old link\'s Pusher ?key= and ?cluster= are ignored', async ({ page }) => {
+  await page.route(/open-meteo|twotimtwo/, (route) => route.abort());
   await page.addInitScript(() => {
-    localStorage.setItem('awanaConfig.v1', JSON.stringify({ showConnectionStatus: true, pusherAppKey: '' }));
+    localStorage.setItem('awanaConfig.v1', JSON.stringify({ showConnectionStatus: true }));
   });
-  await page.goto('/index.html');
-  await expect(page.locator('.status-dot')).toContainText('not set up');
   await page.goto('/index.html?key=abc123&cluster=us2');
-  await expect(page.locator('.status-dot')).not.toContainText('not set up');
+  await expect(page.locator('.stage')).toBeVisible();
+  await expect(page.locator('.status-dot')).toContainText('not set up');
 });
 
-// Saving the Pusher key in Settings connects the socket in the SAME tab —
-// no reload. This is the first thing a volunteer does on a new screen.
-test('saving the Pusher key in Settings connects without a reload', async ({ page }) => {
-  await page.route(/open-meteo|pusher|twotimtwo/, (route) => route.abort());
-  // Keep the sticker visible once the screen leaves 'off' (it auto-shows
-  // only for 'off' and for long drops).
+// A signed-in screen listens on the sync service's live channel: the dot
+// leaves "not set up" and reads connected once the socket opens.
+test('a signed-in screen connects to the live channel', async ({ page }) => {
+  await page.route(/open-meteo|twotimtwo/, (route) => route.abort());
+  await liveChannel(page);
   await page.addInitScript(() => {
-    localStorage.setItem('awanaConfig.v1', JSON.stringify({ showConnectionStatus: true, pusherAppKey: '' }));
+    localStorage.setItem('awanaConfig.v1', JSON.stringify({ showConnectionStatus: true }));
   });
   await page.goto('/index.html');
-  await expect(page.locator('.status-dot')).toContainText('not set up');
-  await page.keyboard.press('Control+Shift+S');
-  // With no key Settings opens on Setup, its Advanced fold already open.
-  await page.getByLabel('Pusher App Key').fill('abc123');
-  await page.getByLabel('Pusher Cluster').fill('us2');
-  // Typed fields apply as they are left; Done applies the last one and closes.
-  await page.locator('jelly-button:has-text("Done")').click();
+  await expect(page.locator('.status-dot')).toContainText('connected');
   await expect(page.locator('.status-dot')).not.toContainText('not set up');
 });

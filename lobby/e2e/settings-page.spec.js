@@ -6,7 +6,7 @@ import { expect, test } from '@playwright/test';
 // and no button that acts on a screen (those reach a chosen screen later).
 
 test.beforeEach(async ({ page }) => {
-  await page.route(/open-meteo|pusher|twotimtwo|kvbchurch\.org/, (route) => route.abort());
+  await page.route(/open-meteo|twotimtwo|kvbchurch\.org/, (route) => route.abort());
   await page.goto('/settings.html?lowPower=1');
 });
 

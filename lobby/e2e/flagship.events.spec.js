@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { fakePusher } from './fakePusher.js';
+import { liveChannel } from './liveChannel.js';
 
 // The flagship slide against what happens over and around it, in a real
 // browser with the real clock: check-ins play OVER it and it steps back for
@@ -7,8 +7,6 @@ import { fakePusher } from './fakePusher.js';
 // In the events project: multi-second and timing-sensitive, so ci.yml only.
 
 const CONFIG = {
-  pusherAppKey: 'e2e-key',
-  pusherCluster: 'us2',
   backgroundSource: 'manual',
   calendarEnabled: false,
   seasonPromos: false,
@@ -26,7 +24,7 @@ const CONFIG = {
 };
 
 async function boot(page, query = '') {
-  const send = await fakePusher(page);
+  const send = await liveChannel(page);
   await page.addInitScript((c) => {
     localStorage.setItem('awanaConfig.v1', JSON.stringify(c));
     localStorage.setItem('awanaSetupCardDismissed.v1', '1');

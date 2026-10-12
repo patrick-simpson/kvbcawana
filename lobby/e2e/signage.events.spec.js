@@ -1,10 +1,10 @@
 import { expect, test } from '@playwright/test';
-import { fakePusher } from './fakePusher.js';
+import { liveChannel } from './liveChannel.js';
 
 // End-to-end coverage of the signage page's EVENT rendering.
 //
 // Until demo mode existed there was no way to get an event into this page from
-// a test: the only seam was the live Pusher socket, which index-smoke.spec.js
+// a test: the only seam was the live socket, which index-smoke.spec.js
 // deliberately aborts to stay hermetic. So the signage app — the thing families
 // actually look at — had exactly two e2e assertions: it boots, and overlay mode
 // works. Nothing checked that a check-in produces a banner.
@@ -22,7 +22,7 @@ import { fakePusher } from './fakePusher.js';
 
 /** Abort every cross-origin fetch so the run is hermetic and offline-safe. */
 async function goSignage(page, query = '') {
-  await page.route(/open-meteo|pusher|twotimtwo/, (route) => route.abort());
+  await page.route(/open-meteo|twotimtwo/, (route) => route.abort());
   await page.goto(`/index.html${query}`);
   await expect(page.locator('.stage')).toBeVisible();
 }
@@ -453,20 +453,18 @@ test('a T&T check-in keeps its square mark inside its slot, on screen', async ({
 // tilde went through its pill's, ȘTEFAN's comma shadow sat on its bottom one,
 // and a pickup-board chip's mark ran off its pill onto the white card. A real
 // first name only reaches either over the socket, so these tests stand in for
-// Pusher (page.routeWebSocket) and publish plaintext, as a printer with no
+// the live channel (page.routeWebSocket) and publish plaintext, as a printer with no
 // display key does, under ?lowPower=1 so every frame is the resting one.
 // MilestoneToast.test.jsx and overlayFit.test.js pin the arithmetic; this
 // pins what Chromium actually paints.
 
 /** Boot the lobby on a typed slide, with a key for the stand-in socket. */
 async function goLobby(page, extra = {}) {
-  const send = await fakePusher(page);
+  const send = await liveChannel(page);
   await page.addInitScript((config) => {
     localStorage.setItem('awanaSetupCardDismissed.v1', '1');
     localStorage.setItem('awanaConfig.v1', JSON.stringify(config));
   }, {
-    pusherAppKey: 'e2e-key',
-    pusherCluster: 'us2',
     backgroundSource: 'manual',
     calendarEnabled: false,
     seasonPromos: false,

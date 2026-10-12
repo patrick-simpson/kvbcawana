@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { test as pastFlagship } from './pastFlagship.js';
-import { fakePusher } from './fakePusher.js';
+import { liveChannel } from './liveChannel.js';
 
 // The pickup board in the foot (owner, 2026-10-07: "The still remaining kids
 // list should just take the bottom of the screen. It shouldn't take over all
@@ -12,9 +12,9 @@ import { fakePusher } from './fakePusher.js';
 // critical notice still in the middle, and the demo gone after its 20 seconds.
 
 async function open(page, query = '?lowPower=1') {
-  await page.route(/open-meteo|pusher|twotimtwo/, (route) => route.abort());
+  await page.route(/open-meteo|twotimtwo/, (route) => route.abort());
   await page.addInitScript(() => localStorage.setItem('awanaConfig.v1', JSON.stringify({
-    pusherAppKey: '', seasonPromos: false, calendarEnabled: false,
+    seasonPromos: false, calendarEnabled: false,
   })));
   await page.clock.install();
   await page.goto(`/index.html${query}`);
@@ -162,13 +162,13 @@ const SIXTY = CLUBS.flatMap((club) => NAMES.map((firstName) => ({ firstName, clu
 const PICKUP_TIME = new Date('2026-10-06T19:45:00-04:00');
 
 async function lobbyAtPickup(page, extra = {}) {
-  const send = await fakePusher(page);
+  const send = await liveChannel(page);
   await page.clock.setSystemTime(PICKUP_TIME);
   await page.addInitScript((cfg) => {
     localStorage.setItem('awanaSetupCardDismissed.v1', '1');
     localStorage.setItem('awanaConfig.v1', JSON.stringify(cfg));
   }, {
-    pusherAppKey: 'e2e-key', pusherCluster: 'us2', backgroundSource: 'manual', calendarEnabled: false, seasonPromos: false,
+    backgroundSource: 'manual', calendarEnabled: false, seasonPromos: false,
     manualSlides: [{ id: 's_1', type: 'text', eyebrow: 'This week', text: 'Bring your handbook and a friend to Awana', theme: 'sky' }],
     particleEffect: 'off', firstArrivalMoment: false, sharedScheduleUrl: '',
     ...extra,

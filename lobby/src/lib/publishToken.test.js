@@ -91,10 +91,10 @@ describe('leak path 2: the settings export cannot contain the token', () => {
 describe('leak path 3: the token never travels in a URL', () => {
   it('parseUrlFlags never returns a publish token', () => {
     const flags = parseUrlFlags(
-      '?key=abc123&cluster=us2&slidesPublishToken=' + encodeURIComponent(TOKEN)
+      '?overlay=1&key=abc123&cluster=us2&slidesPublishToken=' + encodeURIComponent(TOKEN)
       + '&publishToken=' + encodeURIComponent(TOKEN));
     expect(JSON.stringify(flags)).not.toContain(TOKEN);
-    expect(flags.pusherAppKey ?? flags.key).toBeTruthy();
+    expect(flags.overlay).toBe(true);   // the parser ran
   });
 });
 

@@ -4,7 +4,6 @@ import { sanitizeOverrides } from './useConfig.js';
 describe('sanitizeOverrides', () => {
   it('keeps valid overrides', () => {
     const overrides = {
-      pusherAppKey: 'abc123',
       standardDisplayMs: 7000,
       audioMuted: false,
       useLocalSlideshow: true,
@@ -22,7 +21,6 @@ describe('sanitizeOverrides', () => {
       specialDisplayMs: NaN,
       gapBetweenBannersMs: null,
       audioMuted: 'true',
-      pusherAppKey: 42,
     })).toEqual({});
   });
 
@@ -154,32 +152,21 @@ describe('useConfig store', () => {
     expect(JSON.parse(localStorage.getItem('awanaConfig.v1'))).toEqual({ audioMuted: false });
   });
 
-  it('layers defaults < ?config= remote < device overrides < ?key=/?cluster=', () => {
-    localStorage.setItem('awanaConfig.v1', JSON.stringify({ pusherAppKey: 'device', pusherCluster: 'us2' }));
+  it('layers defaults < ?config= remote < device overrides, and an old ?key=/?cluster= link is ignored', () => {
+    localStorage.setItem('awanaConfig.v1', JSON.stringify({ showClock: false, pusherAppKey: 'old' }));
     atUrl('?key=url&cluster=eu');
     _resetForTest();
     const { result } = renderHook(() => useConfig());
-    act(() => setRemoteDefaults({ pusherAppKey: 'remote', nightTheme: 'christmas', bogus: 1 }));
+    act(() => setRemoteDefaults({ showClock: true, nightTheme: 'christmas', bogus: 1 }));
     const { config, storedConfig } = result.current;
-    expect(config.pusherAppKey).toBe('url');
-    expect(config.pusherCluster).toBe('eu');
+    expect(config.showClock).toBe(false);             // device wins over remote
     expect(config.nightTheme).toBe('christmas');      // remote reached the effective config
-    expect(storedConfig.pusherAppKey).toBe('device'); // device wins over remote…
-    expect(storedConfig.pusherCluster).toBe('us2');   // …and flags never appear in the stored layer
     expect(storedConfig.nightTheme).toBe('christmas');
     expect('bogus' in config).toBe(false);
-  });
-
-  it('?cluster= is ignored without ?key=, and ?key= alone keeps the saved cluster', () => {
-    localStorage.setItem('awanaConfig.v1', JSON.stringify({ pusherAppKey: 'device', pusherCluster: 'ap1' }));
-    atUrl('?cluster=eu');
-    _resetForTest();
-    expect(renderHook(() => useConfig()).result.current.config.pusherCluster).toBe('ap1');
-    atUrl('?key=abc');
-    _resetForTest();
-    const { config } = renderHook(() => useConfig()).result.current;
-    expect(config.pusherAppKey).toBe('abc');
-    expect(config.pusherCluster).toBe('ap1');
+    for (const k of ['pusherAppKey', 'pusherCluster']) {
+      expect(k in config).toBe(false);
+      expect(k in storedConfig).toBe(false);
+    }
   });
 
   it('?lowPower=1 forces the two motion keys down in config only — the defaults stay full', () => {

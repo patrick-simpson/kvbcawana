@@ -9,14 +9,14 @@ import { expect, test } from '@playwright/test';
 
 async function boot(context, query) {
   const page = await context.newPage();
-  await page.route(/open-meteo|pusher|twotimtwo/, (route) => route.abort());
+  await page.route(/open-meteo|twotimtwo/, (route) => route.abort());
   await page.goto(`/index.html${query}`);
   return page;
 }
 
 test.beforeEach(async ({ context }) => {
   await context.addInitScript(() => {
-    if (!localStorage.getItem('awanaConfig.v1')) localStorage.setItem('awanaConfig.v1', JSON.stringify({ pusherAppKey: '' }));
+    if (!localStorage.getItem('awanaConfig.v1')) localStorage.setItem('awanaConfig.v1', JSON.stringify({}));
   });
 });
 

@@ -7,7 +7,7 @@ import { expect, test } from '@playwright/test';
 // row the page draws is a row the fit counted.
 
 test.beforeEach(async ({ page }) => {
-  await page.route(/open-meteo|pusher|twotimtwo/, (route) => route.abort());
+  await page.route(/open-meteo|twotimtwo/, (route) => route.abort());
   await page.addInitScript(() => localStorage.setItem('awanaPresentationSetupDismissed.v1', '1'));
 });
 

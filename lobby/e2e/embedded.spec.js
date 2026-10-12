@@ -1,5 +1,6 @@
 import { expect, test } from './pastFlagship.js';
 import { boxes, embed, expectClear } from './embedHost.js';
+import { liveChannel } from './liveChannel.js';
 
 // Embedded in the Journey kiosk (Journey-Display's public/index.html shows
 // this page full-screen in an iframe), Journey floats its own always-visible
@@ -35,8 +36,9 @@ const FULL_SLIDE = {
 };
 
 /** The same screen opened directly, for comparison. */
-async function standalone(page, { config = {}, weather = null } = {}) {
-  await page.route(/pusher|twotimtwo|sockjs/, (route) => route.abort());
+async function standalone(page, { config = {}, weather = null, signedIn = true } = {}) {
+  if (signedIn) await liveChannel(page);
+  await page.route(/twotimtwo|sockjs/, (route) => route.abort());
   await page.route(/open-meteo/, (route) => (weather == null ? route.abort() : route.fulfill({
     body: JSON.stringify({ current: { temperature_2m: 56, apparent_temperature: 54, weather_code: weather, is_day: 1 } }),
     contentType: 'application/json',
@@ -45,7 +47,7 @@ async function standalone(page, { config = {}, weather = null } = {}) {
   await page.addInitScript((cfg) => {
     localStorage.setItem('awanaSetupCardDismissed.v1', '1');
     localStorage.setItem('awanaConfig.v1', JSON.stringify(cfg));
-  }, { pusherAppKey: 'e2e-key', pusherCluster: 'us2', ...config });
+  }, { ...config });
   await page.goto('/index.html?lowPower=1');
   await expect(page.locator('.stage')).toBeVisible();
   await page.evaluate(() => document.fonts.ready);
@@ -71,7 +73,7 @@ for (const [width, height] of [[640, 480], [1280, 720], [1920, 1080]]) {
     // it alone and it stays exactly where it stands standalone: the widest
     // sky ("Thunderstorm with hail") under a problem sticker.
     test('the top-right stack keeps its own place', async ({ page, context }) => {
-      const config = { pusherAppKey: '', showConnectionStatus: true, showClock: false, showTally: false };
+      const config = { showConnectionStatus: true, showClock: false, showTally: false };
       // At 640x480 the "not set up" sticker's px floors make it stand tall,
       // so the weather sits out there, framed or not; elsewhere it sits under
       // the sticker. Wait for that whole stack on both screens.
@@ -84,9 +86,9 @@ for (const [width, height] of [[640, 480], [1280, 720], [1920, 1080]]) {
         expect(list).toHaveLength(items);
         return list;
       };
-      const framed = await settled(await embed(page, { config, weather: 96 }));
+      const framed = await settled(await embed(page, { config, weather: 96, signedIn: false }));
       expectClear(framed, { width, height });
-      const alone = await settled(await standalone(await context.newPage(), { config, weather: 96 }));
+      const alone = await settled(await standalone(await context.newPage(), { config, weather: 96, signedIn: false }));
       expect(rounded(framed)).toEqual(rounded(alone));
     });
 
@@ -178,7 +180,8 @@ test.describe('embedded on a portrait phone (390x844)', () => {
   // Journey is opened on a phone now and then; the first-run card is 90vw
   // there and ran under the host's gear.
   test('the first-run card ends short of the host\'s column', async ({ page }) => {
-    const frame = await embed(page, { setupCard: true });
+    // The first-run card is for a screen that has not signed in yet.
+    const frame = await embed(page, { setupCard: true, signedIn: false });
     await expect(frame.locator('.setup-card')).toBeVisible();
     expectClear(await boxes(frame, '.setup-card'), { width: 390, height: 844 });
   });
@@ -190,7 +193,7 @@ test.describe('standalone at 1280x720', () => {
   // The same screen as the first embedded case, opened directly: no class,
   // and the corners keep their own insets, exactly as before.
   test('nothing moves: the corners keep their own insets', async ({ page }) => {
-    const frame = await standalone(page, { config: { pusherAppKey: '', showConnectionStatus: true, showTally: false } });
+    const frame = await standalone(page, { config: { showConnectionStatus: true, showTally: false }, signedIn: false });
     await expect(frame.locator('html')).not.toHaveClass(/\bembedded\b/);
     const chip = page.locator('.corner-bottom .corner-chip--clock');
     await expect(chip).toBeVisible({ timeout: 12_000 });

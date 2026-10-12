@@ -7,7 +7,7 @@ trusting it.**
 
 ## The privacy invariant
 
-Every payload arriving on the Pusher channel is reduced to an explicit
+Every payload arriving on the live channel (Pusher until 2026-10-11) is reduced to an explicit
 allowlist of fields before anything else in the app sees it. The sanitizers live
 in [`src/lib/eventSanitizers.js`](src/lib/eventSanitizers.js) and are bound
 per-event in [`src/hooks/useSocket.js`](src/hooks/useSocket.js) — one sanitizer
@@ -31,14 +31,21 @@ Two supporting rules:
   design — but it is length-bounded and forced to plain text, and rendered as an
   ordinary React text child. Nothing in this app uses
   `dangerouslySetInnerHTML`.
-- **One Pusher stack.** `src/presentation/` may not open a second connection;
+- **One realtime stack.** `src/presentation/` may not open a second connection;
   its realtime data must flow through the same sanitized socket. Otherwise a
   second, unsanitized path could appear without anyone noticing.
 
 If you change the socket layer, the sanitizers, or a banner component, preserve
 this invariant. It is the only thing standing between a roster and a projector.
 
-## The channel is public, so the names are encrypted
+## The channel was public, so the names are encrypted
+
+> **Update 2026-10-11:** Pusher is retired. Screens now listen on the sync
+> service's live channel, which only a signed-in screen (the church passphrase)
+> can open, so arrival timing and headcounts are no longer public either. The
+> names are still sealed end to end, on purpose: the service relays ciphertext
+> it cannot read. The rest of this section describes the public-channel design
+> the sealing was built for; read "Pusher" as "the relay".
 
 This section used to explain, at length, that anyone who viewed the page source
 could take the Pusher App Key, subscribe to `awana-channel` from anywhere in the
@@ -136,7 +143,7 @@ service** instead of opening the print server's `provision` frame:
   where the old frame needed 12+ characters. The service keeps only a salted
   HMAC of it.
 - A sign-in returns a session (its own storage slot, `awanaSyncSession.v1`,
-  never config, never an export or a URL), the display key and the Pusher key.
+  never config, never an export or a URL) and the display key.
   **Anyone with the word can read names and change every screen** (the owner's
   choice): treat it like the WiFi password, and change it from Settings →
   Setup → **Change the passphrase** if it gets out. A change signs every screen
@@ -146,7 +153,7 @@ service** instead of opening the print server's `provision` frame:
   sees a check-in: names still go from the check-in laptop straight to the
   screens, sealed.
 - What it hands back is not trusted as-is: shared settings and the deck pass
-  the same allowlist sanitizers as a Pusher frame (`dispatchEvent`), the
+  the same allowlist sanitizers as a live frame (`dispatchEvent`), the
   template its own allowlist, the calendar `sanitizeFeed`.
 - Its doorbell (`changed` `{what}` on `awana-sync`) is plaintext and carries no
   content; a screen that hears it fetches from the service.
@@ -276,9 +283,11 @@ three leak paths at once, each of which is a documented, encouraged workflow:
    table, so anything in `VALIDATORS` is settable from a file at a public URL.
 2. Settings → Export serialises the overrides to a JSON file that gets emailed
    and dropped in shared drives.
-3. `?key=` already carries the Pusher App Key on the query string, so a URL is an
-   established place for credentials here — and URLs land in browser history,
-   screenshots, and the kiosk shortcut taped to the wall.
+3. The URL: OBS / ProPresenter links carry the passphrase (`?passphrase=`, the
+   owner's choice; it is stripped from the address bar once read) and used to
+   carry Pusher's public `?key=`, now ignored. URLs land in browser history,
+   screenshots, and the kiosk shortcut taped to the wall, so the display key
+   itself never travels in one.
 
 Three deny-lists would each have been one forgotten line away from publishing the
 key. A separate storage entry means there is no list to forget.
@@ -318,12 +327,11 @@ own OIDC token.
 
 ## Forking this repo
 
-1. **Replace `pusherAppKey` in `src/config.js` with your own church's key**, or
-   clear it and use the Settings panel. If you fork a deployed instance and
-   leave the key in place, you will subscribe to that church's channel and show
-   their children's first names on your screen.
-2. **Never add the Pusher `secret` or `app_id`** to this repo. The display only
-   ever needs the key and the cluster. The secret belongs on the print server.
+1. **Point `shared/sync.json` at your own sync service** (or clear it). If you
+   fork a deployed instance and leave it, your screens sign in to that church's
+   service.
+2. **Never add the sync service's secrets** (`INITIAL_PASSPHRASE`, the
+   TwoTimTwo credentials) to this repo. They live in the Worker's own secrets.
 3. **Set your own church identity** — `src/presentation/church.config.js` and
    the files under `shared/` carry church-specific names, schedule and slide
    copy.

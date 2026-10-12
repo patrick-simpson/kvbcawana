@@ -174,8 +174,7 @@ export function useSyncDriver({ handlers, dispatch, store }) {
 }
 
 /**
- * Sign in with the passphrase. On success applies the Pusher keys (only if
- * they differ from what this screen has), the template (only keys this screen
+ * Sign in with the passphrase. On success applies the template (only keys this screen
  * has not set itself) and the state.
  * @param {string} passphrase
  * @param {{ config: Record<string, unknown>, overrides: Record<string, unknown>, updateConfig: (patch: Record<string, unknown>) => void, template?: boolean }} store
@@ -187,8 +186,6 @@ export async function signIn(passphrase, store) {
   if (!res.ok) return res;
   /** @type {Record<string, unknown>} */
   const patch = store.template === false ? {} : templatePatch(res.template, store.overrides);
-  if (res.pusher.key && res.pusher.key !== store.config.pusherAppKey) patch.pusherAppKey = res.pusher.key;
-  if (res.pusher.cluster && res.pusher.cluster !== store.config.pusherCluster) patch.pusherCluster = res.pusher.cluster;
   if (Object.keys(patch).length) store.updateConfig(patch);
   if (res.state) applier?.(res.state);
   update({ signedIn: true, phase: 'ok', lastSyncAt: Date.now(), kid: res.state?.kid ?? null });

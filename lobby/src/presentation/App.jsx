@@ -39,10 +39,10 @@ const isTarget = (t) => Boolean(t) && typeof t === 'object'
 export const App = () => {
   const now = useClock();
 
-  // All realtime data (live tally + birthday sync + schedule advisory +
-  // ?key= adoption) flows through the display's sanctioned sanitized
+  // All realtime data (live tally + birthday sync + schedule advisory)
+  // flows through the display's sanctioned sanitized
   // socket — see hooks/useRealtime.js. This replaces the original
-  // repo's adoptPusherUrlFlags/useBirthdaySync startup chores. Read
+  // repo's useBirthdaySync startup chore. Read
   // before useSchedule() so the `schedule` broadcast can be folded in
   // as an advisory layer over shared/schedule.json (never a
   // replacement — see lib/scheduleAdvisory.js).

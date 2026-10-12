@@ -15,7 +15,7 @@ const HYPHENS = `https://kvbc.example.org/${Array.from({ length: 14 }, (_, i) =>
 const URL90 = 'https://kvbc.example.org/awana/fall-2026/registration-form-for-families?ref=lobby-signage';
 
 async function showSlide(page, { eyebrow = '', text, textSize = 'auto', config = {}, weather = null }) {
-  await page.route(/pusher|twotimtwo|sockjs/, (route) => route.abort());
+  await page.route(/twotimtwo|sockjs/, (route) => route.abort());
   if (weather) {
     await page.route(/open-meteo/, (route) => route.fulfill({
       body: JSON.stringify({ current: { temperature_2m: 72, apparent_temperature: 70, weather_code: weather, is_day: 1 } }),
@@ -29,7 +29,6 @@ async function showSlide(page, { eyebrow = '', text, textSize = 'auto', config =
     localStorage.setItem('awanaSetupCardDismissed.v1', '1');
     localStorage.setItem('awanaConfig.v1', JSON.stringify(cfg));
   }, {
-    pusherAppKey: '',
     backgroundSource: 'manual',
     calendarEnabled: false,
     seasonPromos: false,

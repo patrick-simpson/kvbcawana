@@ -95,9 +95,9 @@ describe('promo font isolation (app.css + styles/promos/)', () => {
   });
 
   it('the lobby speaks the three brand voices', () => {
-    const root = ALL.find((r) => r.selector === ':root' && /--font-display/.test(r.body));
+    const root = ALL.find((r) => r.selector === ':root' && /--font-shout/.test(r.body));
     expect(root?.body).toMatch(/--font-shout:\s*'Paytone One', 'Baloo 2 Variable'/);
-    expect(root?.body).toMatch(/--font-display:\s*'Shout Fit', 'Baloo 2 Variable'/);
+    expect(root?.body).not.toMatch(/--font-display:/);
     expect(root?.body).toMatch(/--font-body:\s*'Figtree Variable'/);
     expect(root?.body).toMatch(/--font-condensed:\s*'Londrina Solid'/);
     // Galindo is gone from every rule (the comments may still tell its story).
@@ -120,11 +120,10 @@ function fontFaces(text) {
 describe('the shout face (app.css)', () => {
   const faces = fontFaces(css);
   const shout = faces.find((f) => f.family === 'Paytone One');
-  const fit = faces.find((f) => f.family === 'Shout Fit');
   const main = readFileSync(resolve(__dirname, '../main.jsx'), 'utf8');
 
   it('is Paytone One from the kit\'s own full files: never a subset under its reserved name', () => {
-    for (const face of [shout, fit]) {
+    for (const face of [shout]) {
       expect(face.d.src).toBe(
         "url('../../shared/brand/fonts/paytone-one-full-400-normal.woff2') format('woff2'), url('../../shared/brand/fonts/PaytoneOne-Regular.ttf') format('truetype')",
       );
@@ -136,14 +135,14 @@ describe('the shout face (app.css)', () => {
     expect(css).not.toMatch(/@fontsource\/(galindo|paytone)/);
   });
 
-  it('the old-footprint alias is the same face at 88%, and only the alias is scaled', () => {
-    expect(fit.d['size-adjust']).toBe('88%');
+  it('is declared at true size: no size-adjust scaling', () => {
     expect(shout.d['size-adjust']).toBeUndefined();
+    expect(faces.some((f) => f.family === 'Shout Fit')).toBe(false);
   });
 
-  it('both seat the caps where the fits\' line-box arithmetic assumes (SHOUT_BOX)', async () => {
+  it('seats the caps where the fits\' line-box arithmetic assumes (SHOUT_BOX)', async () => {
     const { SHOUT_BOX } = await import('./brand.js');
-    for (const face of [shout, fit]) {
+    for (const face of [shout]) {
       expect(parseFloat(face.d['ascent-override']) / 100).toBeCloseTo(SHOUT_BOX.ascent, 6);
       expect(parseFloat(face.d['descent-override']) / 100).toBeCloseTo(SHOUT_BOX.descent, 6);
       expect(face.d['line-gap-override']).toBe('0%');
@@ -175,6 +174,6 @@ describe('the label face (app.css)', () => {
     expect(label[0].d['font-style']).toBe('normal');
     expect(css).not.toMatch(/londrina-solid-full-900|LondrinaSolid-Black/);
     // ...and no synthesized bold is smeared over the 400 cut when a rule asks for one.
-    expect(ALL.find((r) => r.selector === ':root' && /--font-display/.test(r.body))?.body).toMatch(/font-synthesis-weight:\s*none/);
+    expect(ALL.find((r) => r.selector === ':root' && /--font-shout/.test(r.body))?.body).toMatch(/font-synthesis-weight:\s*none/);
   });
 });

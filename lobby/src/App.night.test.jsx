@@ -8,25 +8,15 @@ import { render, cleanup, act } from '@testing-library/react';
 // Events go in through the real socket seam, as in App.overlays.test.jsx; the
 // clock is faked so the minute tick that notices the date can be driven.
 
-let bound = {};
-vi.mock('pusher-js', () => ({
-  default: class FakePusher {
-    constructor() {
-      this.connection = { state: 'connected', bind: () => {}, unbind: () => {} };
-    }
-    subscribe() { return { bind: (evt, fn) => { bound[evt] = fn; }, unbind_all: () => {} }; }
-    unsubscribe() {}
-    disconnect() {}
-    connect() {}
-  },
-}));
+import { fakeLive } from './lib/__fixtures__/fakeLive.js';
+const live = fakeLive();
+const bound = live.bound;
 
 const App = (await import('./App.jsx')).default;
 const cfg = await import('./hooks/useConfig.js');
 
 function setup() {
-  localStorage.setItem('awanaConfig.v1', JSON.stringify({
-    pusherAppKey: 'k', pusherCluster: 'us2', confettiLevel: 'off', firstArrivalMoment: false,
+  localStorage.setItem('awanaConfig.v1', JSON.stringify({ confettiLevel: 'off', firstArrivalMoment: false,
     sharedScheduleUrl: '', backgroundSource: 'manual', calendarEnabled: false, seasonPromos: false,
     manualSlides: [{ id: 's_1', type: 'text', eyebrow: 'This week', text: 'Bring your handbook', theme: 'sky' }],
     reduceMotion: true,
@@ -38,8 +28,9 @@ const night = (checkedIn) => ({ checkedIn, booksCompleted: 0, awardsEarned: 0, f
 const toast = (c) => c.querySelector('.milestone-toast');
 
 beforeEach(() => {
-  bound = {};
+  live.reset();
   localStorage.clear();
+  live.signIn();
   sessionStorage.clear();
   vi.useFakeTimers({ toFake: ['setTimeout', 'setInterval', 'clearTimeout', 'clearInterval', 'Date'] });
   vi.setSystemTime(new Date(2026, 9, 7, 23, 58, 0));   // Wednesday, two minutes to midnight
@@ -72,6 +63,10 @@ describe('a new night', () => {
     // Midnight passes; the minute tick notices the new date.
     vi.setSystemTime(new Date(2026, 9, 8, 0, 0, 30));
     await act(async () => { vi.advanceTimersByTime(60000); });
+    // The jump in the clock made the live socket look silent, so it was dropped
+    // and reopened after its one-second backoff: wait for the new one.
+    await act(async () => { vi.advanceTimersByTime(1500); });
+    await vi.waitFor(() => expect(bound.tonight).toBeTypeOf('function'));
 
     // Next week (the page is still up): 48 is a baseline again, never a replay...
     await act(async () => { bound.tonight(night(48)); });

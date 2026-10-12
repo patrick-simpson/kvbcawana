@@ -86,7 +86,8 @@ describe('signing in', () => {
       state: { template: { savedAt: 'x', config: { audioMuted: true, pusherAppKey: 'no' } } },
     });
     const res = await syncLogin(BASE, 'kennebec', { fetchFn });
-    expect(res).toMatchObject({ ok: true, pusher: { key: 'pk', cluster: 'us2' }, template: { audioMuted: true } });
+    expect(res).toMatchObject({ ok: true, template: { audioMuted: true } });
+    expect(res).not.toHaveProperty('pusher');
     expect(loadSyncSession()).toBe(SESSION);
     expect(loadDisplayKey()).toBe(KEY);
     expect(localStorage.getItem(DISPLAY_KEY_STORAGE)).toBe(KEY);

@@ -21,8 +21,6 @@ const isString = (v) => typeof v === 'string';
 const numberBetween = (min, max) => (v) => typeof v === 'number' && Number.isFinite(v) && v >= min && v <= max;
 
 const VALIDATORS = {
-  pusherAppKey: isString,
-  pusherCluster: isString,
   backgroundSource: (v) => ['powerpoint', 'manual', 'pptx', 'video'].includes(v),
   manualSlides: Array.isArray,
   powerpointEmbedUrl: isString,
@@ -169,7 +167,7 @@ function saveOverrides(overrides) {
 // ── One store for the whole page ─────────────────────────────────────────────
 // Every useConfig() call used to own its own useState(loadOverrides) slot and
 // only heard about changes through the cross-tab `storage` event — which never
-// fires in the tab that made the change. So saving the Pusher key in Settings
+// fires in the tab that made the change. So saving a setting
 // did not reach the socket's copy until someone reloaded, and the ?config= layer
 // (fetched in App) never reached the socket at all. A single module-level store
 // read through useSyncExternalStore gives every hook the same snapshot the
@@ -177,13 +175,13 @@ function saveOverrides(overrides) {
 // working when localStorage is blocked because the overrides live in memory.
 //
 // Layers, lowest to highest:
-//   1. src/config.js baked defaults (incl. VITE_PUSHER_* from the build)
+//   1. src/config.js baked defaults
 //   2. ?config=<url> remote JSON — App fetches it and calls setRemoteDefaults()
 //   3. this device's saved overrides (awanaConfig.v1)
 //   3b. the SHARED settings from the check-in computer (awanaSharedSettings.v1,
 //      contract v6), for the shared keys only, while followSharedSettings
 //      ⇒ storedConfig: what Settings edits and Export writes
-//   4. URL flags — ?key=/&cluster= and ?lowPower=1 (src/lib/urlFlags.js) — in
+//   4. URL flag — ?lowPower=1 (src/lib/urlFlags.js) — in
 //      memory only: never saved, never shown as a saved setting, never exported
 //      ⇒ config: what the socket and the stage consume
 // The panic mask (src/lib/panic.js) is applied by App on top of `config` and
@@ -231,15 +229,11 @@ export function resolveStoredConfig(remote, device, shared = null) {
   return stored;
 }
 
-// Layer 4: URL flags. ?cluster= is honoured only alongside ?key= (an embed
-// URL names a whole Pusher app or nothing); ?lowPower=1 forces the two
+// Layer 4: URL flags. ?lowPower=1 forces the two
 // motion keys down for THIS embed only — confettiLevel/reduceMotion's own
 // defaults stay full-strength for every other device (see CLAUDE.md).
 function applyFlags(stored, f) {
   let out = stored;
-  if (f.pusherAppKey) {
-    out = { ...out, pusherAppKey: f.pusherAppKey, pusherCluster: f.pusherCluster || out.pusherCluster };
-  }
   if (f.lowPower) out = { ...out, confettiLevel: 'off', reduceMotion: true };
   return out;
 }

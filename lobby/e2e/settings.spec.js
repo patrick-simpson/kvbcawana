@@ -5,10 +5,10 @@ import { expect, test } from '@playwright/test';
 // always on screen. Changes apply as they are made, so closing is never a
 // question.
 
-const NO_KEY = () => localStorage.setItem('awanaConfig.v1', JSON.stringify({ pusherAppKey: '' }));
+const NO_KEY = () => localStorage.setItem('awanaConfig.v1', JSON.stringify({}));
 
 async function open(page, query = '') {
-  await page.route(/open-meteo|pusher|twotimtwo/, (route) => route.abort());
+  await page.route(/open-meteo|twotimtwo/, (route) => route.abort());
   await page.addInitScript(NO_KEY);
   await page.goto(`/index.html${query}`);
   await expect(page.locator('.stage')).toBeVisible();
@@ -39,7 +39,7 @@ for (const [width, height] of [[1920, 1080], [1280, 720], [1024, 768]]) {
       expect(inside(await done.boundingBox(), { width, height })).toBe(true);
       // An unconfigured screen opens on Setup, where the fix is.
       await expect(dialog.getByRole('tab', { name: 'Setup' })).toHaveAttribute('aria-selected', 'true');
-      await expect(dialog.getByLabel('Pusher App Key')).toBeVisible();
+      await expect(dialog.getByLabel('Display key')).toBeVisible();
     });
 
     test('a change applies at once and Undo puts it back', async ({ page }) => {
@@ -49,7 +49,7 @@ for (const [width, height] of [[1920, 1080], [1280, 720], [1024, 768]]) {
       const saved = () => page.evaluate(() => JSON.parse(localStorage.getItem('awanaConfig.v1') || '{}'));
       expect((await saved()).showClock).toBe(false);
       await dialog.getByRole('button', { name: 'Undo changes' }).click();
-      expect(await saved()).toEqual({ pusherAppKey: '' });
+      expect(await saved()).toEqual({});
       await expect(dialog.getByRole('checkbox', { name: 'Wall clock' })).toBeChecked();
     });
   });

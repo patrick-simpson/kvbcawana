@@ -67,7 +67,7 @@ export function resolveSection(id) {
 /**
  * Which section the panel opens on.
  *  - an explicit request (the first-run card, the slide editor's return) wins;
- *  - a screen that cannot work yet (no Pusher app, or no key for the names)
+ *  - a screen that cannot work yet (not signed in, or no key for the names)
  *    opens on Setup, where the fix is;
  *  - anything else wrong opens on Status, where the problem is explained;
  *  - otherwise Check-ins, the section changed most often.

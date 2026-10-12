@@ -13,18 +13,9 @@ import { render, screen, cleanup, act, waitFor } from '@testing-library/react';
 // rendered chip: that is the same number a reload comes back to, and it does
 // not depend on which widget mode the display happens to be in.
 
-let bound = {};
-vi.mock('pusher-js', () => ({
-  default: class FakePusher {
-    constructor() {
-      this.connection = { state: 'connected', bind: () => {}, unbind: () => {} };
-    }
-    subscribe() { return { bind: (evt, fn) => { bound[evt] = fn; }, unbind_all: () => {} }; }
-    unsubscribe() {}
-    disconnect() {}
-    connect() {}
-  },
-}));
+import { fakeLive } from './lib/__fixtures__/fakeLive.js';
+const live = fakeLive();
+const bound = live.bound;
 
 const App = (await import('./App.jsx')).default;
 const cfg = await import('./hooks/useConfig.js');
@@ -49,12 +40,11 @@ const kid = (over = {}) => ({
 });
 
 beforeEach(() => {
-  bound = {};
+  live.reset();
   localStorage.clear();
+  live.signIn();
   sessionStorage.clear();
   localStorage.setItem('awanaConfig.v1', JSON.stringify({
-    pusherAppKey: 'k',
-    pusherCluster: 'us2',
     // Confetti draws to a real canvas, which jsdom has no 2d context for, and
     // the first-arrival flourish would fire one on the very first check-in.
     confettiLevel: 'off',

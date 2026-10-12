@@ -40,7 +40,7 @@ async function boot(page, { setupCard = false } = {}) {
       if (!setupCard) localStorage.setItem('awanaSetupCardDismissed.v1', '1');
     } catch { /* storage blocked: the card simply shows */ }
   }, { setupCard });
-  await page.route(/open-meteo|pusher|twotimtwo/, (route) => route.abort());
+  await page.route(/open-meteo|twotimtwo/, (route) => route.abort());
   await page.route('**/calendar-feed.json', (route) =>
     route.fulfill({ path: 'e2e/fixtures/calendar-feed.json', contentType: 'application/json' })
   );

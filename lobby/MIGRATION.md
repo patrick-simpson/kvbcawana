@@ -30,7 +30,7 @@ two can run side by side for as long as needed.
 3. **Operator cutover:** switch the projector machine's kiosk
    bookmark/autostart from `…/KVBC-Awana-Countdown/` to
    `…/Awana-Check-in-Display/countdown.html`. localStorage does not
-   cross origins, so on the new page re-enter the Pusher key once
+   cross origins, so on the new page sign in with the church passphrase once
    (QuickNav → Display Settings, or `?key=…&cluster=…` on first
    load); birthdays sync themselves from the print server's broadcast.
    *Tooling shipped 2026-07-18:* the presentation page detects a
@@ -56,4 +56,4 @@ two can run side by side for as long as needed.
 - ~~Retire the signage corner `CountdownTimer.jsx` chip~~ — **done
   2026-07-18**: removed from the DataCycle rotation and sticker layout;
   the presentation tool owns countdown duty. The component file and its
-  `resolveTarget` tests remain one release for easy revert.
+  `resolveTarget` tests were deleted later (2026-10-12).

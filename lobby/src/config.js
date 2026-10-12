@@ -22,21 +22,6 @@ const fromSiteRoot = (path) => {
 };
 
 const config = {
-  // Pusher credentials. Sign up free at https://pusher.com, create a
-  // Channels app, and copy these two values from its "App Keys" page.
-  //
-  // A fleet can bake them into the build so a brand-new screen connects
-  // with nothing typed: set the GitHub repository VARIABLES
-  // PUSHER_APP_KEY and PUSHER_CLUSTER (Settings → Secrets and variables →
-  // Actions → Variables) and deploy.yml passes them in as VITE_PUSHER_*.
-  // The app key is Pusher's PUBLIC subscribe key — it ships in every
-  // display's bundle regardless — so a variable, not a secret, is the
-  // right home; a fork that sets neither starts blank, exactly as before.
-  // Per-device Settings, a ?config= file and ?key= still override these —
-  // all of that layering happens in src/hooks/useConfig.js.
-  pusherAppKey: import.meta.env.VITE_PUSHER_APP_KEY || '',
-  pusherCluster: import.meta.env.VITE_PUSHER_CLUSTER || 'us2',
-
   // What plays behind the check-in banners:
   //   'manual'     — the typed/published slide deck plus the calendar
   //                  slides. THE DEFAULT: a freshly logged-in screen shows
@@ -370,8 +355,8 @@ const config = {
 
   // Self-heal watchdog: reload the page automatically after this many
   // minutes of continuously-lost realtime connection (never more than
-  // twice an hour). 0 disables. Only fires when Pusher is configured —
-  // a display that was never set up is left alone.
+  // twice an hour). 0 disables. Only fires when the screen is signed in to
+  // the live channel — a display that was never set up is left alone.
   watchdogReloadMin: 30,
 };
 

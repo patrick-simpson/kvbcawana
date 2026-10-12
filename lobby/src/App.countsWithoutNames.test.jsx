@@ -7,25 +7,15 @@ import { render, cleanup, act } from '@testing-library/react';
 // count above zero with no name for six minutes as the fault. It must fire
 // only on a rise this screen sees, with no name following.
 
-let bound = {};
-vi.mock('pusher-js', () => ({
-  default: class FakePusher {
-    constructor() {
-      this.connection = { state: 'connected', bind: () => {}, unbind: () => {} };
-    }
-    subscribe() { return { bind: (evt, fn) => { bound[evt] = fn; }, unbind_all: () => {} }; }
-    unsubscribe() {}
-    disconnect() {}
-    connect() {}
-  },
-}));
+import { fakeLive } from './lib/__fixtures__/fakeLive.js';
+const live = fakeLive();
+const bound = live.bound;
 
 const App = (await import('./App.jsx')).default;
 const cfg = await import('./hooks/useConfig.js');
 
 function setup() {
-  localStorage.setItem('awanaConfig.v1', JSON.stringify({
-    pusherAppKey: 'k', pusherCluster: 'us2', confettiLevel: 'off', firstArrivalMoment: false,
+  localStorage.setItem('awanaConfig.v1', JSON.stringify({ confettiLevel: 'off', firstArrivalMoment: false,
     sharedScheduleUrl: '', backgroundSource: 'manual', calendarEnabled: false, seasonPromos: false,
     manualSlides: [{ id: 's_1', type: 'text', eyebrow: 'This week', text: 'Bring your handbook', theme: 'sky' }],
     reduceMotion: true,
@@ -38,8 +28,9 @@ const frame = (checkedIn, at = Date.now()) => ({ checkedIn, booksCompleted: 0, a
 const alarmUp = (c) => c.textContent.includes('COUNTS RISING, NO NAMES');
 
 beforeEach(() => {
-  bound = {};
+  live.reset();
   localStorage.clear();
+  live.signIn();
   sessionStorage.clear();
   vi.useFakeTimers({ toFake: ['setTimeout', 'setInterval', 'clearTimeout', 'clearInterval', 'Date'] });
   vi.setSystemTime(new Date(2026, 9, 11, 12, 30, 0));   // a Sunday afternoon

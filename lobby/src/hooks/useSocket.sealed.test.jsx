@@ -8,7 +8,7 @@ import { renderHook, waitFor, act, cleanup } from '@testing-library/react';
 //   1. ANTI-DOWNGRADE. If a screen holds a key, a PLAINTEXT name event must be
 //      refused. Without this the encryption is decorative — anyone able to
 //      publish just sends unsealed frames and the screen renders them.
-//   2. ORDER. crypto.subtle.decrypt is async inside what Pusher calls as a
+//   2. ORDER. crypto.subtle.decrypt is async inside what the socket calls as a
 //      synchronous handler, so two check-ins milliseconds apart could resolve
 //      out of order and greet the second child first. The REAL guard for that is
 //      useSocket.order.test.jsx, which injects decrypt latency — against actual
@@ -19,30 +19,11 @@ import { renderHook, waitFor, act, cleanup } from '@testing-library/react';
 //      beside it, so an opened payload is still reduced to its allowlisted
 //      fields. A sealed frame is authenticated, not trusted.
 
-/** The one fake channel every test drives. */
-let bound = {};
-let connectionHandlers = {};
+import { fakeLive } from '../lib/__fixtures__/fakeLive.js';
 
-vi.mock('pusher-js', () => ({
-  default: class FakePusher {
-    constructor() {
-      this.connection = {
-        state: 'connected',
-        bind: (evt, fn) => { connectionHandlers[evt] = fn; },
-        unbind: () => {},
-      };
-    }
-    subscribe() {
-      return {
-        bind: (evt, fn) => { bound[evt] = fn; },
-        unbind_all: () => {},
-      };
-    }
-    unsubscribe() {}
-    disconnect() {}
-    connect() {}
-  },
-}));
+/** The one fake live channel every test drives. */
+const live = fakeLive();
+const bound = live.bound;
 
 const { useSocket } = await import('./useSocket.js');
 const cfg = await import('./useConfig.js');
@@ -56,19 +37,16 @@ const KEY = fixture.testKey;
 const AT = '2026-08-01T23:30:00.000Z';
 const keyBytes = () => fromBase64(KEY);
 
-/** Emit a frame on the fake channel exactly as pusher-js would. */
+/** Emit a frame on the fake live channel. */
 const emit = (event, payload) => act(() => { bound[event]?.(payload); });
 
 function setup(handlers) {
-  localStorage.setItem('awanaConfig.v1', JSON.stringify({
-    pusherAppKey: 'testkey', pusherCluster: 'us2',
-  }));
+  live.signIn();
   return renderHook(() => useSocket(handlers));
 }
 
 beforeEach(() => {
-  bound = {};
-  connectionHandlers = {};
+  live.reset();
   localStorage.clear();
   cfg._resetForTest(); // one config store per page — start each case clean
   vi.spyOn(console, 'error').mockImplementation(() => {});

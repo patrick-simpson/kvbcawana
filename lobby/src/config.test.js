@@ -1,37 +1,17 @@
-import { describe, it, expect, afterEach, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { sanitizeOverrides } from './hooks/useConfig.js';
+import config from './config.js';
 
-// The Pusher subscribe key can be baked into the build from repository
-// variables (deploy.yml → VITE_PUSHER_*). Blank when unset, so a fork that has
-// not set them starts exactly where it always did; per-device overrides still
-// win, so a screen can point elsewhere without a redeploy.
-
-afterEach(() => {
-  vi.unstubAllEnvs();
-  vi.resetModules();
-});
-
-describe('baked Pusher defaults', () => {
-  it('reads VITE_PUSHER_APP_KEY / VITE_PUSHER_CLUSTER when set', async () => {
-    vi.stubEnv('VITE_PUSHER_APP_KEY', 'baked-key');
-    vi.stubEnv('VITE_PUSHER_CLUSTER', 'eu');
-    vi.resetModules();
-    const { default: config } = await import('./config.js');
-    expect(config.pusherAppKey).toBe('baked-key');
-    expect(config.pusherCluster).toBe('eu');
+// Pusher is retired (2026-10-11): a screen saved before that may still carry
+// the old key and cluster in its overrides, and they are dropped on load.
+describe('retired Pusher settings', () => {
+  it('are no longer a config default', () => {
+    expect('pusherAppKey' in config).toBe(false);
+    expect('pusherCluster' in config).toBe(false);
   });
 
-  it('is blank / us2 when the variables are unset', async () => {
-    vi.stubEnv('VITE_PUSHER_APP_KEY', '');
-    vi.stubEnv('VITE_PUSHER_CLUSTER', '');
-    vi.resetModules();
-    const { default: config } = await import('./config.js');
-    expect(config.pusherAppKey).toBe('');
-    expect(config.pusherCluster).toBe('us2');
-  });
-
-  it('a per-device override still passes the validator (device beats baked)', () => {
-    expect(sanitizeOverrides({ pusherAppKey: 'device-key', pusherCluster: 'ap1' }))
-      .toEqual({ pusherAppKey: 'device-key', pusherCluster: 'ap1' });
+  it('a saved override that still carries them is dropped, the rest kept', () => {
+    expect(sanitizeOverrides({ pusherAppKey: 'device-key', pusherCluster: 'ap1', showClock: true }))
+      .toEqual({ showClock: true });
   });
 });

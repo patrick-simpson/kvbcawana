@@ -471,7 +471,7 @@ function DashboardOnlyCard() {
   return (
     <PanelCard title="PIN and keys" tab="var(--brand-blue)">
       <p className="hint">
-        The phone PIN, the display key and login passphrase, the Pusher keys and Wi-Fi access for phones are set on the
+        The phone PIN, the display key and login passphrase and Wi-Fi access for phones are set on the
         print dashboard on this computer only. They never pass through a web page.
       </p>
       <a className="hint" href={PRINT_DASHBOARD_URL} target="_blank" rel="noopener noreferrer">Open the print dashboard</a>

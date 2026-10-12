@@ -11,18 +11,9 @@ import { NOTICE_MAX_AGE_MS } from './lib/constants.js';
 // and the banner judge a notice on one clock. Events go in through the real
 // socket seam (sanitizers and all), as in App.tally.test.jsx.
 
-let bound = {};
-vi.mock('pusher-js', () => ({
-  default: class FakePusher {
-    constructor() {
-      this.connection = { state: 'connected', bind: () => {}, unbind: () => {} };
-    }
-    subscribe() { return { bind: (evt, fn) => { bound[evt] = fn; }, unbind_all: () => {} }; }
-    unsubscribe() {}
-    disconnect() {}
-    connect() {}
-  },
-}));
+import { fakeLive } from './lib/__fixtures__/fakeLive.js';
+const live = fakeLive();
+const bound = live.bound;
 
 const App = (await import('./App.jsx')).default;
 const cfg = await import('./hooks/useConfig.js');
@@ -33,8 +24,6 @@ const pickupTime = () => vi.useFakeTimers({ toFake: ['Date'], now: new Date(2026
 
 function setup(config = {}) {
   localStorage.setItem('awanaConfig.v1', JSON.stringify({
-    pusherAppKey: 'k',
-    pusherCluster: 'us2',
     confettiLevel: 'off',
     firstArrivalMoment: false,
     sharedScheduleUrl: '',
@@ -64,8 +53,9 @@ const kids = (n) => Array.from({ length: n }, (_, i) => ({ firstName: `Kid${i}`,
 // goes to the print server on this computer, with the publish token.
 
 beforeEach(() => {
-  bound = {};
+  live.reset();
   localStorage.clear();
+  live.signIn();
   sessionStorage.clear();
   vi.spyOn(console, 'warn').mockImplementation(() => {});
 });
@@ -115,8 +105,13 @@ describe('shared settings, wired up', () => {
     });
     vi.stubGlobal('fetch', fetchFn);
     setup();
+    // Not signed in to the sync service: the settings go to the print server on
+    // this computer, with the token (signed in, they go through the Worker).
+    live.signOut();
     localStorage.setItem('awanaPublishToken.v1', 'tok_AbCdEfGhIjKlMnOpQrStUvWx');
-    const { container, getByLabelText, getByRole, findByText } = await mount();
+    let utils;
+    await act(async () => { utils = render(<App />); });
+    const { container, getByLabelText, getByRole, findByText } = utils;
     await act(async () => { getByLabelText('Open settings').click(); });
     await act(async () => { getByRole('tab', { name: 'Celebrations' }).click(); });
     const input = getByLabelText('Room milestone (every N check-ins)');

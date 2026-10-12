@@ -28,7 +28,7 @@ function standIn() {
 test.beforeEach(async ({ page }) => {
   const w = standIn();
   page.w = w;
-  await page.route(/open-meteo|pusher|twotimtwo|kvbchurch\.org/, (route) => route.abort());
+  await page.route(/open-meteo|twotimtwo|kvbchurch\.org/, (route) => route.abort());
   await page.route('**/shared/sync.json', (route) => route.fulfill({ json: { url: SYNC } }));
   await page.routeWebSocket(/sync\.test/, () => {});
   await page.route(`${SYNC}/**`, async (route) => {

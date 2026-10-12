@@ -28,7 +28,7 @@ describe('SetupCard (signage first-run)', () => {
     expect(document.querySelectorAll('li.done')).toHaveLength(0);
   });
 
-  it('shows one step, with the connection ticked, once Pusher is set up', () => {
+  it('shows one step, with the connection ticked, once the screen is signed in', () => {
     render(<Screen status="connected" hasDisplayKey={false} />);
     expect(screen.getByText(/One quick setup step/)).toBeTruthy();
     expect(document.querySelectorAll('li.done')).toHaveLength(1);
@@ -67,12 +67,11 @@ describe('SetupCard (signage first-run)', () => {
   it('still offers both steps\' words and the keyboard way in, in the strip\'s shorter copy', () => {
     render(<Screen status="off" hasDisplayKey={false} />);
     const card = screen.getByRole('region', { name: 'Display setup' });
-    // The two steps say where to go and where the secret is kept.
+    // The two steps say where to go: the passphrase signs in, and brings the key.
+    expect(card.textContent).toMatch(/Settings → Setup → Sign in/);
+    expect(card.textContent).toMatch(/church.s passphrase/);
     expect(card.textContent).toMatch(/Settings → Setup → Advanced/);
-    expect(card.textContent).toMatch(/App Key and Cluster/);
-    expect(card.textContent).toMatch(/Settings → Pusher Integration/);
-    expect(card.textContent).toMatch(/Settings → Setup → Display login/);
-    expect(card.textContent).toMatch(/Settings → Display login/);
+    expect(card.textContent).not.toMatch(/Pusher/);
     expect(card.textContent).toMatch(/sync themselves/);
     // The gear stands beside the card now; the shortcut rides the button.
     expect(screen.getByRole('button', { name: 'Open Settings' }).title).toMatch(/Ctrl\+Shift\+S/);

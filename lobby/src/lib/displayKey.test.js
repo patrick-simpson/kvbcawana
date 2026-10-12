@@ -129,13 +129,14 @@ describe('leak path 2: the settings export cannot contain the key', () => {
 describe('leak path 3: the key never travels in a URL', () => {
   it('parseUrlFlags never returns a display key', () => {
     const flags = parseUrlFlags(
-      '?key=abc123&cluster=us2&displayKey=' + encodeURIComponent(REAL_KEY)
+      '?overlay=1&key=abc123&cluster=us2&displayKey=' + encodeURIComponent(REAL_KEY)
       + '&display_key=' + encodeURIComponent(REAL_KEY));
     expect(JSON.stringify(flags)).not.toContain(REAL_KEY);
     expect(flags).not.toHaveProperty('displayKey');
-    // The Pusher app key IS accepted from the URL — that is deliberate, it is
-    // public — so this assertion proves the parser ran rather than no-oped.
-    expect(flags.pusherAppKey ?? flags.key).toBeTruthy();
+    // ?key= was Pusher's public app key and is ignored now. ?overlay=1 proves
+    // the parser ran rather than no-oped.
+    expect(flags.overlay).toBe(true);
+    expect(flags).not.toHaveProperty('key');
   });
 });
 

@@ -108,7 +108,9 @@ describe('SettingsPanel: the two-pane shell', () => {
     const { container } = render(<SettingsPanel {...baseProps()} />);
     expect(screen.getByRole('tab', { name: 'Setup' }).getAttribute('aria-selected')).toBe('true');
     expect(container.querySelector('details.advanced-fields').open).toBe(true);
-    expect(screen.getByLabelText('Pusher App Key')).toBeTruthy();
+    // Pusher's key and cluster are retired: nothing to type but the display key.
+    expect(screen.queryByLabelText('Pusher App Key')).toBeNull();
+    expect(screen.getByLabelText('Display key')).toBeTruthy();
   });
 
   it('a working screen with a problem opens on Status and counts it on the rail', () => {
@@ -194,10 +196,11 @@ describe('SettingsPanel: live apply, Undo and Done', () => {
   it('Enter in a typed field applies it too', () => {
     const props = baseProps();
     render(<SettingsPanel {...props} />);
-    const key = screen.getByLabelText('Pusher App Key');
-    fireEvent.change(key, { target: { value: 'key123' } });
-    fireEvent.keyDown(key, { key: 'Enter' });
-    expect(props.onChange).toHaveBeenCalledWith({ pusherAppKey: 'key123' });
+    section('Check-ins');
+    const std = screen.getByLabelText('How long each name stays up (seconds)');
+    fireEvent.change(std, { target: { value: '7' } });
+    fireEvent.keyDown(std, { key: 'Enter' });
+    expect(props.onChange).toHaveBeenCalledWith({ standardDisplayMs: 7000 });
   });
 
   it('durations are typed in seconds and stored in milliseconds, clamped', () => {
@@ -214,15 +217,16 @@ describe('SettingsPanel: live apply, Undo and Done', () => {
   it('Done applies a field still being typed in, then closes', () => {
     const props = baseProps();
     render(<SettingsPanel {...props} />);
-    fireEvent.change(screen.getByLabelText('Pusher App Key'), { target: { value: 'key123' } });
+    section('Check-ins');
+    fireEvent.change(screen.getByLabelText('How long each name stays up (seconds)'), { target: { value: '7' } });
     clickDone();
-    expect(props.onChange).toHaveBeenCalledWith({ pusherAppKey: 'key123' });
+    expect(props.onChange).toHaveBeenCalledWith({ standardDisplayMs: 7000 });
     expect(props.onClose).toHaveBeenCalled();
   });
 
   it('an untouched panel writes nothing — a baked key or fleet value is never pinned', () => {
     const props = baseProps();
-    props.config = { ...defaults, pusherAppKey: 'baked-from-build', audioMuted: true };
+    props.config = { ...defaults, standardDisplayMs: 9000, audioMuted: true };
     render(<SettingsPanel {...props} />);
     for (const name of SECTION_NAMES) section(name);
     clickDone();
@@ -285,13 +289,13 @@ describe('SettingsPanel: live apply, Undo and Done', () => {
     for (const [label, cb, where] of [['Preview a check-in', 'onTest', 'Check-ins'], ['Debug panel', 'onOpenDebug', 'Setup'], [/Edit slides/, 'onOpenSlideEditor', 'Slides']]) {
       const props = happyProps();
       render(<SettingsPanel {...props} />);
-      section('Setup');
-      fireEvent.change(screen.getByLabelText('Pusher App Key'), { target: { value: 'key123' } });
+      section('Celebrations');
+      fireEvent.change(screen.getByLabelText('Room milestone (every N check-ins)'), { target: { value: '40' } });
       section(where);
-      // Leaving Setup unmounts the field without a blur: the pending value
-      // is still applied before the action runs.
+      // Leaving Celebrations unmounts the field without a blur: the pending
+      // value is still applied before the action runs.
       fireEvent.click(screen.getByRole('button', { name: label }));
-      expect(props.onChange).toHaveBeenCalledWith({ pusherAppKey: 'key123' });
+      expect(props.onChange).toHaveBeenCalledWith({ milestoneEvery: 40 });
       expect(props[cb]).toHaveBeenCalled();
       expect(props.onChange.mock.invocationCallOrder[0]).toBeLessThan(props[cb].mock.invocationCallOrder[0]);
       cleanup();
@@ -376,9 +380,9 @@ describe('Status', () => {
 });
 
 describe('Setup: connecting this screen', () => {
-  it('with no Pusher key the login field points at Advanced', () => {
+  it('a screen that is not connected says so in the login field', () => {
     render(<SettingsPanel {...baseProps()} />);
-    expect(screen.getByText(/not connected to Pusher yet/)).toBeTruthy();
+    expect(screen.getByText(/This screen is not connected yet/)).toBeTruthy();
   });
 
   it('the passphrase box is typeable before any frame arrives and Log in enables on text', async () => {
@@ -635,7 +639,7 @@ describe('Setup: tools', () => {
     vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
     const props = happyProps();
     props.savedConfig = { ...defaults, audioMuted: true, nightTheme: 'christmas', weatherLat: 10 };
-    props.config = { ...props.savedConfig, pusherAppKey: 'from-url-flag' };
+    props.config = { ...props.savedConfig, reduceMotion: true };   // what a URL flag (?lowPower=1) layers on
     render(<SettingsPanel {...props} />);
     fireEvent.click(screen.getByRole('checkbox', { name: 'First arrival of the night' }));
     section('Setup');
@@ -647,7 +651,7 @@ describe('Setup: tools', () => {
     });
     expect(JSON.parse(text)).toEqual({ nightTheme: 'christmas', weatherLat: 10, firstArrivalMoment: false });
     expect(text).not.toContain(FAKE_KEY);
-    expect(text).not.toContain('from-url-flag');
+    expect(text).not.toContain('reduceMotion');
   });
 
   it('both resets ask first and say what they do', () => {

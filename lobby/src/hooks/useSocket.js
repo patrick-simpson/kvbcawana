@@ -1,6 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import Pusher from 'pusher-js';
-import { useConfig } from './useConfig.js';
 import { useDisplayKey } from './useDisplayKey.js';
 import {
   ENCRYPTED_EVENTS,
@@ -8,13 +6,7 @@ import {
   isEnvelope,
   openEnvelope,
 } from '../lib/envelope.js';
-import {
-  PROVISION_CHANNEL,
-  PROVISION_EVENT,
-  noteCacheMiss,
-  receiveProvisionFrame,
-} from '../lib/displayLogin.js';
-import { SYNC_CHANNEL, SYNC_EVENT, loadSyncSession } from '../lib/syncService.js';
+import { SYNC_EVENT, loadSyncSession } from '../lib/syncService.js';
 import { ringSyncDoorbell, syncNow, useSync } from './useSync.js';
 import { liveScreenId } from '../lib/screenSync.js';
 import {
@@ -73,8 +65,7 @@ const LIVE_BACKOFF_SEC = [1, 2, 5, 10, 30];
  * is dead whatever its readyState says: after a Wi-Fi roam, a router reboot or
  * a NAT drop the TCP side can stay half-open for many minutes, with every ping
  * sent into a buffer and the screen reading "connected" while check-ins go
- * missing. Pusher-js carried its own activity timeout; this is the live
- * channel's. Two ping periods plus a margin, so one lost pong is forgiven.
+ * missing. This is the live channel's activity timeout. Two ping periods plus a margin, so one lost pong is forgiven.
  * And a socket that has not opened within LIVE_CONNECT_MS is dropped the same
  * way, rather than sitting in CONNECTING for the browser's own long timeout.
  */
@@ -102,7 +93,7 @@ const HANDLER_NAMES = {
 };
 
 /**
- * Subscribes to `awana-channel` and forwards each event type to its
+ * Listens on the sync Worker's live channel and forwards each event type to its
  * handler after sanitizing:
  *
  *   useSocket({ onCheckin, onRecap, onTally, onBirthdays, onOps, onCanary,
@@ -110,25 +101,18 @@ const HANDLER_NAMES = {
  *
  * A bare function is accepted as shorthand for `{ onCheckin }`.
  * Returns { status, lastEventAt, lastCheckinAt, retry }.
- * `retry` is { attempts, delaySec } while the pipe is down (pusher-js
- * announces each backoff via its 'connecting_in' event), null otherwise
+ * `retry` is { attempts, delaySec } while the pipe is down, null otherwise
  * — so the Signal sticker can say "retrying in ~Ns" instead of a bare
  * "disconnected".
  */
 export function useSocket(handlers) {
-  const { config } = useConfig();
-  const { pusherAppKey, pusherCluster } = config;
   const { displayKey } = useDisplayKey();
-  const enabled = Boolean(pusherAppKey && pusherCluster);
-  // Signed in to the sync service, the screen listens on ITS live channel
-  // instead of Pusher (the one-site move, step 3): only signed-in screens can
-  // listen there, so arrival timing and headcount stop being public.
+  // The screen listens on the sync service's live channel, signed in with the
+  // church passphrase: only signed-in screens can listen there, so arrival
+  // timing and headcount are not public. Not signed in, the status is 'off'.
   const sync = useSync();
   const live = Boolean(sync.url && sync.signedIn);
-  // A signed-in screen waits the moment it takes to read shared/sync.json
-  // rather than open Pusher only to drop it.
-  const resolving = sync.signedIn && sync.url === null;
-  const active = enabled || live;
+  const active = live;
   const [socketStatus, setSocketStatus] = useState('connecting');
   const [lastEventAt, setLastEventAt] = useState(null);
   const [lastCheckinAt, setLastCheckinAt] = useState(null);
@@ -159,7 +143,7 @@ export function useSocket(handlers) {
   const keyRef = useRef(null);
   const failuresRef = useRef(0);
   // One promise chain per sealed event. crypto.subtle.decrypt is async inside
-  // what Pusher calls as a synchronous handler, so without this two check-ins
+  // what the socket calls as a synchronous handler, so without this two check-ins
   // arriving milliseconds apart could resolve out of order and greet the second
   // child first. Chaining costs nothing at this volume and removes the whole
   // class of bug.
@@ -194,7 +178,7 @@ export function useSocket(handlers) {
   }, [displayKey]);
 
   // One handler per contract event, the same whichever transport carries it
-  // (Pusher, or the sync Worker's live channel): decryption sits in front of
+  // (the sync Worker's live channel): decryption sits in front of
   // dispatchEvent, never beside it. Everything it touches is a ref or a state
   // setter, so it is built once.
   const bindEvents = useCallback((/** @type {(event: string, fn: (frame: any) => void) => void} */ bind) => {
@@ -218,9 +202,9 @@ export function useSocket(handlers) {
         // ANTI-DOWNGRADE. Once this screen holds a key, a PLAINTEXT payload on a
         // name-bearing event is refused. Without this the encryption would be
         // decorative: anyone able to publish could simply send unsealed frames
-        // and the screen would render them. (Publishing needs the Pusher app
-        // SECRET, not the public app key, so this is defence in depth rather
-        // than the only lock — but it is the lock that belongs on the consumer.)
+        // and the screen would render them. (Publishing needs the passphrase, so
+        // this is defence in depth rather than the only lock — but it is the
+        // lock that belongs on the consumer.)
         if (keyRef.current && !isEnvelope(frame)) {
           console.error(
             `[socket] REFUSED a plaintext '${event}' — this screen has a display key, so sealed events must arrive sealed`);
@@ -283,88 +267,9 @@ export function useSocket(handlers) {
     }
   }, []);
 
-  useEffect(() => {
-    if (!enabled || live || resolving) return undefined;
-    const pusher = new Pusher(pusherAppKey, { cluster: pusherCluster });
-    const map = { initialized: 'connecting', connecting: 'connecting', connected: 'connected', unavailable: 'disconnected', failed: 'disconnected', disconnected: 'disconnected' };
-    const onStateChange = ({ current }) => {
-      setSocketStatus(map[current] || 'disconnected');
-      if (current === 'connected') setRetry(null);
-    };
-    const onConnectingIn = (delaySec) => {
-      setRetry((prev) => ({
-        attempts: (prev?.attempts ?? 0) + 1,
-        delaySec: Number.isFinite(delaySec) ? Math.round(delaySec) : null,
-      }));
-    };
-    pusher.connection.bind('state_change', onStateChange);
-    pusher.connection.bind('connecting_in', onConnectingIn);
-    const channel = pusher.subscribe('awana-channel');
-    channel.bind('pusher:subscription_error', (err) => {
-      console.error('Pusher subscription failed:', err);
-      setSocketStatus('disconnected');
-    });
-
-    // DEVICE PROVISIONING, NOT DISPLAY DATA. The print server publishes the
-    // display key + publish token, sealed under a passphrase-derived key, on a
-    // separate CACHE channel (a new subscriber gets the last frame at once).
-    // Frames go to src/lib/displayLogin.js, which validates them strictly and
-    // writes only into the displayKey/publishToken storage slots. Nothing from
-    // this channel is ever sanitized-and-rendered, and it never reaches
-    // dispatchEvent — it is not one of the contract events above. This is the
-    // one file allowed to import pusher-js, which is why the subscription
-    // lives here rather than in displayLogin.js.
-    const provision = pusher.subscribe(PROVISION_CHANNEL);
-    provision.bind(PROVISION_EVENT, (frame) => receiveProvisionFrame(frame));
-    provision.bind('pusher:cache_miss', () => noteCacheMiss());
-
-    // THE SYNC SERVICE'S DOORBELL, NOT DISPLAY DATA. The Worker (worker/)
-    // rings `changed` {what} on its own channel when the calendar, the screen
-    // template or Journey's settings change. It carries no content; the screen
-    // fetches the change from the Worker, where it passes the same sanitizers.
-    // Like `provision`, it never reaches dispatchEvent.
-    const sync = pusher.subscribe(SYNC_CHANNEL);
-    sync.bind(SYNC_EVENT, (payload) => ringSyncDoorbell(payload));
-
-    bindEvents((event, fn) => channel.bind(event, fn));
-
-    // When the TV wakes from sleep or the network returns, pusher-js can
-    // take minutes to notice its socket is dead (activity-timeout + pong
-    // cycle). Nudge it to reconnect immediately so the first kid through
-    // the door still gets a banner.
-    const nudge = () => {
-      const state = pusher.connection.state;
-      if (state === 'disconnected' || state === 'unavailable' || state === 'failed') {
-        pusher.connect();
-      }
-    };
-    const onVisible = () => { if (!document.hidden) nudge(); };
-    document.addEventListener('visibilitychange', onVisible);
-    window.addEventListener('online', nudge);
-    window.addEventListener('focus', nudge);
-
-    return () => {
-      document.removeEventListener('visibilitychange', onVisible);
-      window.removeEventListener('online', nudge);
-      window.removeEventListener('focus', nudge);
-      // Unbind before disconnecting so the dying connection's final
-      // state events can't clobber the status of a replacement socket.
-      pusher.connection.unbind('state_change', onStateChange);
-      pusher.connection.unbind('connecting_in', onConnectingIn);
-      channel.unbind_all();
-      pusher.unsubscribe('awana-channel');
-      provision.unbind_all();
-      pusher.unsubscribe(PROVISION_CHANNEL);
-      sync.unbind_all();
-      pusher.unsubscribe(SYNC_CHANNEL);
-      pusher.disconnect();
-    };
-  }, [enabled, live, resolving, pusherAppKey, pusherCluster, bindEvents]);
-
   // The sync Worker's live channel: one WebSocket, frames as {e, d}. A
   // keep-alive "ping" every LIVE_PING_MS (answered at the edge without waking
-  // the Worker), and a backoff reconnect announced through `retry` exactly
-  // as pusher-js's connecting_in was. A socket that never opens, or one closed
+  // the Worker), and a backoff reconnect announced through `retry`. A socket that never opens, or one closed
   // with 4001 (the passphrase was changed), asks the service whether this
   // sign-in still counts; if not, useSync drops it and this falls back.
   useEffect(() => {
@@ -476,8 +381,8 @@ export function useSocket(handlers) {
     // Slide-sync readability, kept apart from nameStatus on purpose (see the
     // state's comment). Only Settings renders this.
     slidesStatus: active ? slidesStatus : 'idle',
-    // Which pipe this screen listens on: 'live' (the sync Worker) or 'pusher'.
-    transport: live ? 'live' : 'pusher',
+    // Which pipe this screen listens on: 'live' (the sync Worker), or 'off'.
+    transport: live ? 'live' : 'off',
     hasDisplayKey: Boolean(displayKey),
   };
 }
@@ -490,7 +395,7 @@ export { sanitizeCheckin as sanitize };
 /**
  * Sanitize one wire payload and hand it to its bound handler.
  *
- * PRIVACY INVARIANT — this is the ONE dispatch path. The live Pusher binding
+ * PRIVACY INVARIANT — this is the ONE dispatch path. The live-channel binding
  * above calls it, and so does `simulateEvent()` below, so a simulated event is
  * filtered by exactly the same allowlist sanitizer as a real one. Before this
  * was factored out, the debug panel called the render handlers directly and
@@ -500,7 +405,7 @@ export { sanitizeCheckin as sanitize };
  * Returns the sanitized payload, or null when the sanitizer rejected it.
  *
  * `meta` is IN-PROCESS ONLY and is never part of the wire payload. The live
- * Pusher binding above never passes it, so a handler can only ever see it from
+ * binding above never passes it, so a handler can only ever see it from
  * a locally injected event. That is how Settings' "Preview a check-in" shows a
  * rehearsal banner without moving the public count: the fact that the event is
  * a rehearsal travels beside the payload, not inside it, where a producer (or

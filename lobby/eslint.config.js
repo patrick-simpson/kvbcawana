@@ -19,9 +19,10 @@ export default [
       'no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^[A-Z_]' }],
       'no-console': ['warn', { allow: ['warn', 'error'] }],
       // PRIVACY INVARIANT (see CLAUDE.md): all realtime data must flow
-      // through the sanitized socket in src/hooks/useSocket.js. A second
-      // Pusher stack anywhere else would bypass the per-event allowlist
-      // sanitizers, so importing pusher-js is mechanically forbidden.
+      // through the sanitized socket in src/hooks/useSocket.js. Pusher is
+      // retired (2026-10-11) and pusher-js is no longer a dependency; a
+      // second realtime stack anywhere would bypass the per-event allowlist
+      // sanitizers, so importing it again is mechanically forbidden.
       'no-restricted-imports': ['error', {
         paths: [{
           name: 'pusher-js',
@@ -29,11 +30,6 @@ export default [
         }],
       }],
     },
-  },
-  {
-    // The one sanctioned pusher-js import site.
-    files: ['src/hooks/useSocket.js'],
-    rules: { 'no-restricted-imports': 'off' },
   },
   {
     // CLI scripts (the nightly calendar-feed builder) report via stdout.

@@ -55,7 +55,7 @@ function Driver({ onSlides }) {
 }
 
 describe('signing in with the passphrase', () => {
-  it('"kennebec" applies the Pusher keys, the template and the shared settings', async () => {
+  it('"kennebec" applies the template and the shared settings, and ignores the Pusher keys the service still sends', async () => {
     fakeService();
     const onSlides = vi.fn();
     render(<Driver onSlides={onSlides} />);
@@ -66,9 +66,9 @@ describe('signing in with the passphrase', () => {
     });
     expect(res).toMatchObject({ ok: true });
     expect(loadSyncSession()).toBe(SESSION);
-    expect(result.current.config.pusherAppKey).toBe('pk');
+    expect('pusherAppKey' in result.current.config).toBe(false);
     expect(result.current.config.audioMuted).toBe(true);
-    // Through the same sanitizers a Pusher frame takes.
+    // Through the same sanitizers a live frame takes.
     expect(result.current.shared).toMatchObject({ rev: 7, settings: { checkoutBoardNamesAbove: 7 } });
     expect(result.current.config.checkoutBoardNamesAbove).toBe(7);
     expect(onSlides).toHaveBeenCalledWith(expect.objectContaining({ deckRev: 3, slides: [expect.objectContaining({ text: 'Store next week' })] }), undefined);

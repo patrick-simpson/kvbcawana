@@ -29,7 +29,7 @@ const at = (now, extra = '') => `/countdown.html?now=${now}&freeze=1${extra}`;
 const TUESDAY = '2026-09-15T18:30:00';
 
 test.beforeEach(async ({ page }) => {
-  await page.route(/open-meteo|pusher|twotimtwo/, (route) => route.abort());
+  await page.route(/open-meteo|twotimtwo/, (route) => route.abort());
   // The first-run note is its own subject below; everywhere else it is dismissed.
   await page.addInitScript(() => localStorage.setItem('awanaSetupChecklistDismissed.v1', '1'));
 });
@@ -314,7 +314,7 @@ for (const [name, use] of DEVICES) {
 
 /** A new screen: no live-data key and the note not dismissed (on the first load only, so a dismissal holds). */
 const NO_KEY = () => {
-  localStorage.setItem('awanaConfig.v1', JSON.stringify({ pusherAppKey: '' }));
+  localStorage.setItem('awanaConfig.v1', JSON.stringify({}));
   if (!sessionStorage.getItem('pj-seeded')) {
     sessionStorage.setItem('pj-seeded', '1');
     localStorage.removeItem('awanaSetupChecklistDismissed.v1');

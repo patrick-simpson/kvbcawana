@@ -188,11 +188,11 @@ export function DisplayLoginField({ status, secure, login }) {
   } else if (busy) {
     statusCopy = <>Checking… (this takes a few seconds on a small TV stick — it only happens once)</>;
   } else if (status === 'off') {
-    statusCopy = <><strong>This screen is not connected to Pusher yet.</strong> Open <em>Advanced</em> below and add the App Key and Cluster from the print-server dashboard (Settings → Pusher Integration). The screen connects as soon as you leave the field; then log in here.</>;
+    statusCopy = <><strong>This screen is not connected yet.</strong> It has no sync service to sign in to, so it cannot reach the live channel.</>;
   } else if (status === 'disconnected') {
-    statusCopy = <><strong>Not connected to Pusher</strong> — check the network, then the App Key and Cluster under <em>Advanced</em>. The print server is probably fine.</>;
+    statusCopy = <><strong>Not connected</strong> — check the network. The print server is probably fine.</>;
   } else if (status === 'connecting') {
-    statusCopy = <>Connecting to Pusher… the login frame arrives as soon as the connection is up.</>;
+    statusCopy = <>Connecting… the login frame arrives as soon as the connection is up.</>;
   } else if (loginStatus === 'wrong') {
     statusCopy = <><strong>That passphrase does not match the print server’s.</strong> Check the dashboard → Settings → Display login and try again.</>;
   } else if (pendingLogin) {
@@ -200,7 +200,7 @@ export function DisplayLoginField({ status, secure, login }) {
   } else if (frameStatus === 'waiting') {
     statusCopy = <>Connected — waiting for the print server’s login frame. It must be running, with a display key <em>and</em> a display passphrase set (dashboard → Settings → Display login). You can type the passphrase now; it is tried as soon as the frame lands.</>;
   } else if (frameStatus === 'miss') {
-    statusCopy = <><strong>The print server has not published a login frame in the last 30 minutes.</strong> Start it (or check its Pusher settings), then try again.</>;
+    statusCopy = <><strong>The print server has not published a login frame in the last 30 minutes.</strong> Start it then try again.</>;
   } else {
     statusCopy = <>Type the church’s display passphrase from the print-server dashboard (Settings → Display login). This screen then receives the display key and publish token by itself.</>;
   }
@@ -276,8 +276,8 @@ function whenWords(at) {
 
 /**
  * Sign this screen in to the sync service with the church passphrase
- * (worker/). One word sets it up completely: the display key, the Pusher
- * keys, the shared settings, the slides and, for a new screen, the template.
+ * (worker/). One word sets it up completely: the display key, the live
+ * channel, the shared settings, the slides and, for a new screen, the template.
  * Shown instead of the print server's display login once shared/sync.json
  * names a sync service.
  */
