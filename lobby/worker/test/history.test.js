@@ -183,7 +183,7 @@ describe('reading back, and the client opens it', () => {
       { night: NIGHT, club: 'Sparks', checkedIn: 5, checkedOut: 4, undone: 0, prints: 5 },
       { night: '2026-10-07', club: 'Sparks', checkedIn: 1, checkedOut: 1, undone: 0, prints: 1 },
     ] });
-    expect((await call('GET', '/v1/history/nights')).body).toEqual([{ night: NIGHT, rows: 5 }, { night: '2026-10-07', rows: 1 }]);
+    expect((await call('GET', '/v1/history/nights')).body).toEqual([{ night: NIGHT, rows: 5, kinds: { checkin: 5 } }, { night: '2026-10-07', rows: 1, kinds: { checkin: 1 } }]);
     const sum = (await call('GET', `/v1/history/summary?from=${NIGHT}&to=${NIGHT}`)).body;
     expect(sum).toEqual([{ night: NIGHT, club: 'Sparks', checkedIn: 5, checkedOut: 4, undone: 0, prints: 5 }]);
 

@@ -131,6 +131,8 @@ answers `GET /v1/history/key`, `PUT /v1/history/key`, `POST /v1/history/rows`,
 one more, `GET /v1/history/status` (`{db, pending}`: is `HISTORY_DB` bound, and
 how many outbox entries wait). Differences from the table above:
 
+- **Nights** answer `[{night, rows, kinds: {checkin: n, visitor: n, ...}}]`
+  (`kinds` is a COUNT by the plaintext kind; the trends read visitors from it).
 - **Outbox.** A POST is validated, written to the Durable Object's storage
   (`hout:<batchId>`, at most 40 rows each; 400 entries at most, then 503
   `history-backlog`), then copied to D1 in ONE atomic `db.batch` per entry

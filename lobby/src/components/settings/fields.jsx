@@ -398,7 +398,7 @@ export function ChangePassphraseField() {
     setBusy(false);
     if (res.ok) {
       setCurrent(''); setNext(''); setAgain('');
-      setNote({ text: 'Changed. Type the new passphrase on every other screen, and sign the check-in laptop in first so check-ins keep showing.' });
+      setNote({ text: 'Changed. Type the new passphrase on every other screen, and sign the check-in laptop in first so check-ins keep showing.' + (res.historyNote ? ` ${res.historyNote}` : ''), warn: Boolean(res.historyNote) });
     } else {
       setNote({ warn: true, text: res.message });
     }

@@ -1,0 +1,16 @@
+/* The History section (settings page only): plain-SVG charts and tables. */
+.panel .hist-chart { margin: 0 0 1.2rem; }
+.panel .hist-chart figcaption { font-weight: 700; margin-bottom: 0.3rem; color: var(--panel-ink); }
+.panel .hist-svg { width: 100%; height: auto; display: block; }
+.panel .hist-grid { stroke: currentColor; stroke-opacity: 0.18; stroke-width: 1; }
+.panel .hist-axis { fill: var(--panel-ink); font-size: 11px; opacity: 0.75; }
+.panel .hist-legend { display: flex; flex-wrap: wrap; gap: 0.3rem 1rem; list-style: none; margin: 0.3rem 0; padding: 0; font-size: 0.9rem; }
+.panel .hist-swatch { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 0.35rem; vertical-align: -1px; }
+.panel .hist-numbers summary { cursor: pointer; font-size: 0.9rem; }
+.panel .hist-table-wrap { overflow-x: auto; max-width: 100%; }
+.panel .hist-table { border-collapse: collapse; font-size: 0.9rem; min-width: 100%; }
+.panel .hist-table caption { text-align: left; font-weight: 700; padding: 0.3rem 0; }
+.panel .hist-table th, .panel .hist-table td { text-align: left; padding: 0.3rem 0.6rem; border-bottom: 1px solid rgba(0, 0, 0, 0.12); white-space: nowrap; }
+.panel .hist-nights { list-style: none; margin: 0; padding: 0; }
+.panel .hist-night-btn { width: 100%; text-align: left; min-height: 44px; display: flex; gap: 0.8rem; align-items: baseline; }
+.panel .hist-actions { display: flex; gap: 0.6rem; flex-wrap: wrap; margin: 0.5rem 0; }

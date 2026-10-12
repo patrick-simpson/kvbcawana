@@ -399,9 +399,17 @@ export class History {
     if (!r) return fail('from and to are YYYY-MM-DD.', 400, { reason: 'bad-range' });
     const db = await this.readyDb();
     if (!db) return this.off();
-    const res = await db.prepare('SELECT night, COUNT(*) AS rows FROM history_rows WHERE night BETWEEN ?1 AND ?2 GROUP BY night ORDER BY night DESC LIMIT ?3')
-      .bind(r.from, r.to, NIGHTS_MAX).all();
-    return out(res.results || []);
+    const res = await db.prepare('SELECT night, kind, COUNT(*) AS n FROM history_rows WHERE night BETWEEN ?1 AND ?2 GROUP BY night, kind ORDER BY night DESC LIMIT ?3')
+      .bind(r.from, r.to, NIGHTS_MAX * 12).all();
+    /** @type {Map<string, { night: string, rows: number, kinds: Record<string, number> }>} */
+    const byNight = new Map();
+    for (const line of res.results || []) {
+      const n = byNight.get(line.night) || { night: line.night, rows: 0, kinds: {} };
+      n.rows += line.n;
+      n.kinds[line.kind] = line.n;
+      byNight.set(line.night, n);
+    }
+    return out([...byNight.values()].slice(0, NIGHTS_MAX));
   }
 
   /** @param {URL} url */

@@ -895,6 +895,22 @@ through `simulateEvent`'s sanitizers).
   `laptop.test.jsx`, `e2e/settings-laptop.spec.js` (stubs localhost). The
   printer's suites read `lib/printServer.js` and `settings/laptop*.jsx` too
   (ci.yml's "What changed" lists them), so a change there runs both suites.
+- **The History section** (Online check-in P6; `settings/history.jsx`,
+  `settings/historyCharts.jsx`, `lib/historyCrypto.js`, `lib/historyTrends.js`;
+  settings page only, after Laptop). Trends (attendance per club by night and
+  season, visitors, check-out share, season averages) come from the Worker's
+  PLAINTEXT `night_summary` and the nights' `kinds` counts, as plain SVG with a
+  legend, an aria-label and a "Show the numbers" table each. A night's rows are
+  sealed: the page opens them in the browser with the passphrase, used once to
+  unwrap the history key into a NON-extractable key held in module memory only
+  (never localStorage; `signOut` and "Lock the names" forget it; a wrong word
+  opens nothing). CSV is built client-side, and a typed name that starts `=`
+  `+` `-` `@` is defused. **Changing the passphrase re-wraps the history key
+  first** (`rewrapHistoryKey`, proved before anything is sent) and sends the
+  new wrap in the same `POST /v1/passphrase`; if it cannot, the passphrase is
+  NOT changed. Worker half: `worker/src/routes.md` ("Built (P6)").
+  `historyCrypto.test.js`, `historyTrends.test.js`, `history.test.jsx`,
+  `e2e/settings-history.spec.js`.
 - **Screens, managed from /settings** (ROADMAP.md#settings-page phase 2): a lobby TV and
   the projector register with the sync Worker (`useScreenSync`,
   `lib/screenSync.js`, `worker/src/screens.js`) and follow their own settings

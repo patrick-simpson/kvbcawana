@@ -6,7 +6,7 @@
 // Everyday sections first (what a volunteer reaches for on a club night),
 // then the ones set once, then setup and tools.
 
-/** @typedef {'status' | 'checkins' | 'slides' | 'screen' | 'celebrations' | 'pickup' | 'look' | 'setup' | 'laptop' | 'screens'} SectionId */
+/** @typedef {'status' | 'checkins' | 'slides' | 'screen' | 'celebrations' | 'pickup' | 'look' | 'setup' | 'laptop' | 'screens' | 'history'} SectionId */
 
 /** @type {{ id: SectionId, label: string, blurb: string }[]} */
 export const SECTIONS = [
@@ -29,6 +29,10 @@ export const SCREENS_SECTION = { id: 'screens', label: 'Screens', blurb: 'Every 
 // schedule and diagnostics, reached through localhost, just before Setup.
 /** @type {{ id: SectionId, label: string, blurb: string }} */
 export const LAPTOP_SECTION = { id: 'laptop', label: 'Laptop', blurb: 'Printer, labels, schedule, diagnostics' };
+// History (ROADMAP.md#online-check-in, P6): past nights, trends, sealed rows
+// opened in the browser. Settings page only, right after Laptop.
+/** @type {{ id: SectionId, label: string, blurb: string }} */
+export const HISTORY_SECTION = { id: 'history', label: 'History', blurb: 'Past nights, trends, export' };
 
 /**
  * The sections a surface lists.
@@ -37,10 +41,10 @@ export const LAPTOP_SECTION = { id: 'laptop', label: 'Laptop', blurb: 'Printer, 
  */
 export function sectionsFor(page, { remote = false } = {}) {
   if (!page || remote) return SECTIONS;
-  return [SECTIONS[0], SCREENS_SECTION, ...SECTIONS.slice(1, -1), LAPTOP_SECTION, SECTIONS[SECTIONS.length - 1]];
+  return [SECTIONS[0], SCREENS_SECTION, ...SECTIONS.slice(1, -1), LAPTOP_SECTION, HISTORY_SECTION, SECTIONS[SECTIONS.length - 1]];
 }
 
-const IDS = new Set([...SECTIONS, SCREENS_SECTION, LAPTOP_SECTION].map((s) => s.id));
+const IDS = new Set([...SECTIONS, SCREENS_SECTION, LAPTOP_SECTION, HISTORY_SECTION].map((s) => s.id));
 
 // The old tab ids, from before the two-pane redesign: a caller (or a link in
 // old copy) asking for one lands on the section that now holds its controls.
