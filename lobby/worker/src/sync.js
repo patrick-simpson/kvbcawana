@@ -69,6 +69,7 @@ import { Changes, changedSince, changedSinceRefusal, diffKeys, mountChanges } fr
 import { Switches, mountSwitches } from './switches.js';
 import { Church, mountChurch } from './church.js';
 import { Notices, mountNotice } from './notice.js';
+import { mountOverview } from './overview.js';
 
 export { json };
 
@@ -228,6 +229,7 @@ export class SyncCore {
     mountChurch(this.registry, this);   // /v1/church/settings (routes.md 10.3)
     this.notices = new Notices({ storage: this.storage, now: this.now });
     mountNotice(this.registry, this);   // /v1/notice (routes.md 10.4)
+    mountOverview(this.registry, this);   // /v1/tonight/overview (routes.md 10.6)
   }
 
   /**
