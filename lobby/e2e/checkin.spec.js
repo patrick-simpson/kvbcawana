@@ -25,6 +25,9 @@ const MIME = { '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+
 const SESSION = 'v1.1.1760000000.abcdefghijklmnopqrstuvwxyz0123';
 const json = (status, body) => ({ status, contentType: 'application/json', body: JSON.stringify(body) });
 const PAGES = buildCheckinPages();
+// Screenshots of the flows at 390x844 (CHECKIN_SHOTS names a folder; else the test's own output folder).
+const SHOTS = process.env.CHECKIN_SHOTS || '';
+const shot = (name) => (SHOTS ? path.join(SHOTS, name) : test.info().outputPath(name));
 
 async function stubSite(page, { kids } = {}) {
   const history = await cc.createHistoryKey(PASS);
@@ -42,6 +45,8 @@ async function stubSite(page, { kids } = {}) {
     ],
     posts: [], tags: [], logins: [], rosterCalls: 0, busyFirst: true, queued: 0, printed: 0, refuse: null, signedOut: false,
     history: null, historyCalls: [], church: null, churchPuts: [],
+    /** A promise the desk routes wait on (a slow TwoTimTwo), per-child 429s, per-child refusals. */
+    gate: null, busyFor: {}, refuseFor: {},
   };
   const api = async (route, req) => {
     const u = new URL(req.url());
@@ -85,6 +90,10 @@ async function stubSite(page, { kids } = {}) {
     if (p === '/v1/print/reprint') { world.tags.push(body); return route.fulfill(json(200, { ok: true, jobId: body.jobId, existing: false })); }
     if (p === '/v1/desk/checkin' || p === '/v1/desk/undo' || p === '/v1/desk/checkout') {
       world.posts.push({ path: p, body });
+      if (world.gate) await world.gate;
+      const busyKey = `${p}:${body.clubberId}`;
+      if (world.busyFor[busyKey] > 0) { world.busyFor[busyKey] -= 1; return route.fulfill(json(429, { ok: false, reason: 'read-busy', retryAfterMs: 1500 })); }
+      if (world.refuseFor[body.clubberId]) return route.fulfill(json(409, { ok: false, reason: world.refuseFor[body.clubberId] }));
       if (world.refuse) return route.fulfill(world.refuse);
       const kid = world.kids.find((k) => k.clubberId === body.clubberId);
       if (p === '/v1/desk/checkin') {
@@ -131,7 +140,7 @@ test('sign in, search, check two siblings in with Bible and a friend, undo one, 
   await signIn(page);
 
   // The 5 s read budget: the first roster read is a 429, and the page says so and waits.
-  await expect(page.locator('#busy')).toContainText(/busy: try again in \d+s/);
+  await expect(page.locator('#busy')).toContainText(/Waiting for TwoTimTwo… \d+s/);
   await expect(page.locator('#list')).toContainText('families still to come', { timeout: 10_000 });
   await expect(page.locator('#print-led')).toHaveText('Printer ready');
   expect(world.logins).toHaveLength(1);
@@ -293,7 +302,7 @@ test('the youth leaders\' page shows Trek and Journey only, check-in only, on th
   await expect(page.locator('h1')).toHaveText('Trek & Journey');
   await expect(page.locator('#list')).toContainText('1 family still to come', { timeout: 10_000 });
   await expect(page.locator('.fam')).toHaveText(/Tia Youth/);
-  await expect(page.locator('#count-pill')).toBeHidden();
+  await expect(page.locator('#count-pill')).toBeVisible();   // its own Tonight, with Undo check-in
   await expect(page.locator('#menu-btn')).toBeHidden();
   await page.locator('.fam').click();
   await page.locator('#kid-sheet').getByRole('button', { name: 'Check in' }).click();
@@ -410,3 +419,75 @@ test('remembered leaders come from the church settings; a new leader tag adds on
   await expect(page.locator('#toast')).toContainText('Leader tag for Quinn New');
   expect(world.churchPuts).toHaveLength(2);   // the add and the forget above; nothing for Quinn
 });
+
+/** The child's own line on its tile in the list (data-state while the queue holds them). */
+const kidState = (page, name) => page.locator(`#list .kid[data-name="${name}"]`);
+
+for (const where of ['/checkin/', '/checkin/ym/']) {
+  const ym = where === '/checkin/ym/';
+  test(`the queue on ${where}: taps at once, each pending until TwoTimTwo confirms; a refusal reverts one; busy retries by itself`, async ({ page }) => {
+    test.setTimeout(60_000);
+    const kids = ym ? [
+      { clubberId: '21', first: 'Tia', last: 'Youth', club: 'Trek', clubId: '6', checkedIn: false },
+      { clubberId: '22', first: 'Jo', last: 'Journey', club: 'Journey', clubId: '7', checkedIn: false },
+      { clubberId: '23', first: 'Max', last: 'Trekker', club: 'Trek', clubId: '6', checkedIn: false },
+    ] : undefined;
+    const { world } = await stubSite(page, { kids });
+    world.busyFirst = false;
+    await signIn(page, where);
+    await expect(page.locator('#list')).toContainText('still to come', { timeout: 10_000 });
+    let release;
+    world.gate = new Promise((r) => { release = r; });
+    const [refused, busy, third] = ym ? [['21', 'Tia Youth'], ['22', 'Jo Journey'], ['23', 'Max Trekker']] : [['13', 'Cy Other'], ['14', 'Tia Youth'], ['11', 'Ada Tester']];
+    world.refuseFor[refused[0]] = 'no-attendance-item';
+    world.busyFor[`/v1/desk/checkin:${busy[0]}`] = 1;
+
+    // Three children, one after the other: the volunteer never waits.
+    for (const [, name] of [refused, busy]) {
+      await page.locator('.fam', { hasText: name }).click();
+      await page.locator('#kid-sheet').getByRole('button', { name: 'Check in' }).click();
+    }
+    if (ym) {
+      await page.locator('.fam', { hasText: third[1] }).click();
+      await page.locator('#kid-sheet').getByRole('button', { name: 'Check in' }).click();
+    } else {
+      await page.locator('.fam', { hasText: 'Tester' }).click();
+      await page.getByRole('button', { name: 'Both of them' }).click();
+    }
+    // Every tapped child shows "Checking in…"; none says checked in before TwoTimTwo does.
+    for (const name of [refused[1], busy[1], third[1]]) await expect(kidState(page, name)).toHaveAttribute('data-state', 'pending');
+    await expect(kidState(page, refused[1])).toHaveText('Checking in…');
+    await expect(page.locator('#list')).not.toContainText('Checked in ✓');
+    await expect(page.locator('#count-pill')).toHaveText('0 in');
+    await page.screenshot({ path: shot(`${ym ? 'ym-' : ''}queue-pending.png`) });
+    // At most two at the Worker at once, in tap order.
+    expect(world.posts.map((p) => p.body.clubberId)).toEqual([refused[0], busy[0]]);
+
+    release();
+    world.gate = null;
+    // The refused child alone reverts, with the reason.
+    await expect(kidState(page, refused[1])).toHaveAttribute('data-state', 'failed');
+    await expect(kidState(page, refused[1])).toHaveText('Not checked in: TwoTimTwo has no attendance item for that club tonight.');
+    await expect(page.locator('#toast')).toContainText(`Couldn’t check in ${refused[1]}: TwoTimTwo has no attendance item for that club tonight.`);
+    // The busy one: a calm countdown, then the page tries again by itself.
+    await expect(kidState(page, busy[1])).toContainText(/Waiting for TwoTimTwo… \d+s/);
+    await page.screenshot({ path: shot(`${ym ? 'ym-' : ''}queue-waiting.png`) });
+    await expect(kidState(page, busy[1])).toHaveText('Checked in ✓', { timeout: 8000 });
+    await expect(page.locator('#count-pill')).toHaveText(ym ? '2 in' : '3 in', { timeout: 8000 });
+    const order = world.posts.filter((p) => p.path === '/v1/desk/checkin').map((p) => p.body.clubberId);
+    expect(order.slice(0, 3)).toEqual([refused[0], busy[0], third[0]]);
+    expect(order.filter((id) => id === busy[0])).toHaveLength(2);   // the automatic retry, once
+    await expect(page.locator('.fam', { hasText: refused[1] })).toHaveCount(1);
+
+    // Undo through the same queue: busy, a countdown, then done by itself.
+    world.busyFor[`/v1/desk/undo:${third[0]}`] = 1;
+    await page.locator('#count-pill').click();
+    const row = page.locator('.row', { hasText: third[1] });
+    if (ym) await expect(row.getByRole('button', { name: 'Check out' })).toHaveCount(0);   // the Worker checks Trek and Journey out
+    await row.getByRole('button', { name: 'Undo check-in' }).click();
+    await page.locator('#confirm-ok').click();
+    await expect(row).toContainText(/Waiting for TwoTimTwo… \d+s/);
+    await expect(page.locator('#toast')).toContainText(`${third[1]}’s check-in is undone`, { timeout: 8000 });
+    expect(world.posts.filter((p) => p.path === '/v1/desk/undo')).toHaveLength(2);
+  });
+}

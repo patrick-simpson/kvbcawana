@@ -124,6 +124,12 @@
   .card .cl { font-family: var(--f-label); font-size: 15px; letter-spacing: .05em; text-transform: uppercase; color: var(--deep); }
   .card.in { background: #F1F5F9; box-shadow: none; cursor: default; }
   .card.in .nm, .card.in .cl { color: #94a3b8; }
+  /* A tapped child: pending until TwoTimTwo confirms (owner 2026-10-12: "Checked in ✓" only then). */
+  .kid.s-pending, .kid.s-waiting { color: var(--c-blue-deep); }
+  .kid.s-done { color: var(--good); }
+  .kid.s-failed { color: var(--bad); }
+  .fam.has-pending { background: #F8FAFC; }
+  .kid .st { font-weight: 700; }
   .card .tag { margin-left: auto; font-family: var(--f-label); font-size: 14px; letter-spacing: .05em; text-transform: uppercase; padding: 3px 9px; border-radius: 999px; background: #E2E8F0; color: #475569; white-space: nowrap; }
   .away { margin-top: 18px; }
   .away .lead { color: var(--ink-faint); }
@@ -585,10 +591,9 @@ var HOUSEHOLDS = null;         // householdIndex()-shaped, from GET /v1/desk/fam
 var familiesAt = 0;
 var ITEMS = { bible: [], friend: [] };
 var CLUBS = ['Puggles', 'Cubbies', 'Sparks', 'T&T', 'Trek', 'Journey'];   // replaced by clubs.js's table when it loads
-var STATE = {};                // child key -> { status: 'sending' } while this page checks them in
+var STATE = {};                // child key -> { status: 'pending'|'waiting'|'done'|'failed', left?, msg? } (the check-in queue)
 var SERVER_TONIGHT = null;     // GET /v1/desk/tonight: the Worker's own count, when it answers
-var UNDOING = {};              // row key -> true while TwoTimTwo's undo (or a visitor's Remove) is under way
-var CHECKING_OUT = {};         // row key -> true while a check-out is under way
+var OPS = {};                  // Tonight row key -> { kind: 'undo'|'checkout', status: 'pending'|'waiting', left? } (the same queue)
 var LOCAL = { night: '', visitors: [], out: [], at: {} };   // what only this page knows tonight
 // Who was here the last two club nights: { names: {normName: true}, ids: {clubberId: true} }
 // or null. Built in THIS page's memory from the sealed history (desk.recentAttendance(),
@@ -646,8 +651,10 @@ function $(id) { return document.getElementById(id); }
 
 // ── Toast ──────────────────────────────────────────────────────────────────
 var toastTimer = null;
+var badUntil = 0;
 function toast(msg, ms, actionLabel, onAction, kind) {
   var t = $('toast');
+  badUntil = kind === 'bad' ? Date.now() + Math.min(ms || 3000, 6000) : 0;
   t.textContent = msg;
   t.className = 'toast' + (kind ? ' ' + kind : '');
   if (actionLabel && onAction) {
@@ -731,7 +738,8 @@ function startPinCountdown(seconds) {
 function showMainScreen() {
   $('pin-screen').hidden = true;
   $('main-screen').hidden = false;
-  $('count-pill').hidden = SIMPLE;
+  // The youth page too (owner 2026-10-12): its Tonight lists its own clubs, with Undo check-in.
+  $('count-pill').hidden = false;
   $('menu-btn').hidden = SIMPLE;
 }
 function showPinScreen(message) {
@@ -750,7 +758,8 @@ function signOut(message) {
   stopRosterPoll();
   unlockedState = false;
   if (desk) desk.signOut();
-  STATE = {}; UNDOING = {}; CHECKING_OUT = {};
+  stopQueue();
+  STATE = {}; OPS = {};
   KIDS = [];
   HOUSEHOLDS = null; familiesAt = 0;
   SERVER_TONIGHT = null;
@@ -765,7 +774,7 @@ function signOut(message) {
 function commonError(e, prefix) {
   if (!e || !e.code) return false;
   if (e.code === 'signed-out') { signOut(e.message); return true; }
-  if (e.code === 'busy') { setBusy(e.retryAfterMs); toast((prefix || '') + e.message, 5000, null, null, 'bad'); return true; }
+  if (e.code === 'busy') { setBusy(e.retryAfterMs); toast((prefix || '') + 'TwoTimTwo is busy for a moment. Try again shortly.', 5000, null, null, 'bad'); return true; }
   if (e.code === 'unreachable') { showOffline(true); toast((prefix || '') + 'no internet connection. Use the paper sheet at the desk.', 6000, null, null, 'bad'); return true; }
   return false;
 }
@@ -853,10 +862,21 @@ function person(k) {
   return { name: k.name, recid: kidKey(k), clubId: k.clubId, clubName: k.club || '', kid: k,
     checkedIn: !!k.checkedIn && !STATE[kidKey(k)] };
 }
-// Still to come: not checked in, nothing in flight on this page.
+// Still to come: not checked in, plus every child this page's queue holds (their
+// tile stays, showing "Checking in…", until TwoTimTwo confirms and a moment after).
 function waitingPeople() {
-  return KIDS.filter(function(k) { return !k.checkedIn && !STATE[kidKey(k)]; }).map(person);
+  return KIDS.filter(function(k) { return !k.checkedIn || STATE[kidKey(k)]; }).map(person);
 }
+// What a tapped child's tile says while the queue has them.
+function stateText(st) {
+  if (!st) return '';
+  if (st.status === 'waiting') return 'Waiting for TwoTimTwo… ' + st.left + 's';
+  if (st.status === 'done') return 'Checked in ✓';
+  if (st.status === 'failed') return 'Not checked in' + (st.msg ? ': ' + st.msg : '');
+  return 'Checking in…';
+}
+// A child the volunteer may tap: not in the queue (or their last try failed).
+function tappable(c) { var st = STATE[c.recid]; return !st || st.status === 'failed'; }
 function itemsFor(club) {
   var has = function(list) { return (list || []).some(function(c) { return clubKit(c) && clubKit(c) === clubKit(club); }); };
   return { bible: has(ITEMS.bible), friend: has(ITEMS.friend) };
@@ -949,7 +969,8 @@ function stripe(f) {
 function famLabel(f) { return f.kids.length === 1 ? f.kids[0].name : f.name + ': ' + f.kids.map(function(c) { return c.name.split(' ')[0]; }).join(', '); }
 function names(f) { return f.kids.map(function(c) { return c.name.toLowerCase(); }).join('|'); }
 function famTile(f, fit) {
-  var b = keyed('button', 'fam', 'f:' + f.key);
+  var busy = f.kids.some(function(c) { return STATE[c.recid]; });
+  var b = keyed('button', 'fam' + (busy ? ' has-pending' : ''), 'f:' + f.key);
   b.dataset.names = names(f);
   b.style.setProperty('--stripe', stripe(f));
   var single = f.kids.length === 1;
@@ -958,14 +979,17 @@ function famTile(f, fit) {
   var fn = el('div', 'fn', title); fn.style.fontSize = Math.round(fs) + 'px';
   var line = el('div', 'kids');
   f.kids.forEach(function(c) {
-    var k = el('span', 'kid'), d = el('span', 'dot');
+    var st = STATE[c.recid];
+    var k = el('span', 'kid' + (st ? ' s-' + st.status : '')), d = el('span', 'dot');
     d.style.setProperty('--c', clubOf(c.clubName).color);
     k.appendChild(d);
-    k.appendChild(document.createTextNode(single ? (c.clubName || '') : c.name.split(' ')[0]));
+    if (st) { k.dataset.state = st.status; k.dataset.name = c.name; }
+    k.appendChild(document.createTextNode(single ? (st ? stateText(st) : (c.clubName || '')) : c.name.split(' ')[0] + (st ? ' · ' + stateText(st) : '')));
     line.appendChild(k);
   });
+  if (busy) line.style.maxHeight = 'none';
   b.appendChild(fn); b.appendChild(line);
-  b.setAttribute('aria-label', famLabel(f));
+  b.setAttribute('aria-label', famLabel(f) + (busy ? ': ' + f.kids.filter(function(c) { return STATE[c.recid]; }).map(function(c) { return c.name.split(' ')[0] + ' ' + stateText(STATE[c.recid]); }).join(', ') : ''));
   b.onclick = function() { famClick(f); };
   return b;
 }
@@ -977,10 +1001,12 @@ function famCard(f, hits) {
   b.appendChild(el('div', 'fn', single ? f.kids[0].name : f.name));
   var line = el('div', 'kids');
   f.kids.forEach(function(c) {
-    var k = el('span', 'kid' + (hits[c.recid] ? ' hit' : ''));
+    var st = STATE[c.recid];
+    var k = el('span', 'kid' + (hits[c.recid] ? ' hit' : '') + (st ? ' s-' + st.status : ''));
     k.style.setProperty('--c', clubOf(c.clubName).color);
     k.appendChild(el('span', 'dot'));
-    k.appendChild(document.createTextNode(single ? (c.clubName || '') : c.name.split(' ')[0]));
+    if (st) { k.dataset.state = st.status; k.dataset.name = c.name; }
+    k.appendChild(document.createTextNode(single ? (st ? stateText(st) : (c.clubName || '')) : c.name.split(' ')[0] + (st ? ' · ' + stateText(st) : '')));
     line.appendChild(k);
   });
   b.appendChild(line);
@@ -1237,8 +1263,15 @@ function siblingsOf(p) {
 }
 
 function famClick(f) {
-  if (f.kids.length === 1) openKid(f.kids[0]);
-  else openFamily(null, f.kids, { bible: true, friend: false }, f.name);
+  var ready = f.kids.filter(tappable);
+  if (!ready.length) {
+    // Everyone here is in the queue: a child waiting on TwoTimTwo may be stopped.
+    var waiting = f.kids.filter(function(c) { var st = STATE[c.recid]; return st && st.status === 'waiting'; });
+    if (waiting.length) askStop(waiting[0]);
+    return;
+  }
+  if (ready.length === 1) openKid(ready[0]);
+  else openFamily(null, ready, { bible: true, friend: false }, f.name);
 }
 
 // The family page: after a child's check-in (first) it offers the brothers
@@ -1250,7 +1283,11 @@ function openFamily(first, kids, choice, title) {
   var head = el('div', 'head');
   if (first) {
     var last = first.name.split(' ').slice(1).join(' ');
-    head.appendChild(el('div', 'done-l', '✓ ' + first.name + ' is checked in'));
+    var firstLine = el('div', 'done-l', 'Checking in ' + first.name + '…');
+    firstLine.id = 'fam-first';
+    firstLine.dataset.key = first.recid;
+    firstLine.dataset.name = first.name;
+    head.appendChild(firstLine);
     head.appendChild(el('h2', null, (last ? last + ': also' : 'Also') + ' here tonight?'));
   } else head.appendChild(el('h2', null, title || 'This family'));
   var tiles = el('div', 'tiles');
@@ -1277,8 +1314,8 @@ function openFamily(first, kids, choice, title) {
     go.addEventListener('click', function() {
       if (entry.state !== 'ready') return;
       entry.state = 'done';
-      t.classList.add('done');
-      go.textContent = '✓ Checked in';
+      t.classList.add('busy');
+      go.textContent = 'Checking in…';
       checkInMany([entry], null);
       if (famEntries.every(function(x) { return x.state === 'done'; })) closeFamily();
     });
@@ -1310,50 +1347,176 @@ function closeFamily() {
   render();
 }
 
-// ── Check-in: back to the list at once, the Worker does the rest ───────────
-// Each child leaves the list from the tap (STATE). One at a time, in order, the
-// transport seals the label and the history row and the Worker claims the child,
-// posts to TwoTimTwo and settles: a child already claimed (another phone, the
-// desk, TwoTimTwo's own page) answers "already", never a second label. A failure
-// puts the child back with the reason; busy, signed out or no internet stops the
-// rest (they go back on the list too).
-var checkinChain = Promise.resolve();
-function checkInMany(entries, family) {
-  var ok = 0, already = 0, failed = [], stop = null;
-  entries.forEach(function(e) {
-    var k = e.p.kid;
-    joy[k.name.toLowerCase()] = true;
-    STATE[kidKey(k)] = { status: 'sending' };
-  });
+// ── The queue: tap, tap, tap; each child settles on its own ─────────────────
+// Owner, 2026-10-12: check-ins feel instant and never ask for a second tap. A tap
+// puts the child in this page's queue and their tile says "Checking in…" at once;
+// "Checked in ✓" only when the Worker answers that TwoTimTwo took it (the label
+// prints only then). The volunteer keeps tapping other children meanwhile: the
+// queue runs them in tap order, at most MAX_RUNNING at a time. A busy Worker (the
+// 5 s read clock) is not a failure: the tile says "Waiting for TwoTimTwo… Ns" and
+// the queue tries again by itself when the count ends (safe: the Worker's claim
+// makes a retry "already", never a second label); tapping a waiting tile stops it.
+// A refusal reverts that child's tile alone, with its reason. Undo and check-out
+// ride the same queue. Leaving the page with work in it asks first.
+var MAX_RUNNING = 2;
+var DONE_SHOW_MS = 2500;
+var FAILED_SHOW_MS = 9000;
+var QUEUE = [];               // jobs waiting their turn, in tap order
+var RUNNING = 0;
+var WAITING = {};             // job id -> job, counting down to its automatic retry
+var queueEpoch = 0;           // a sign-out ends every job of the session before it
+function queueBusy() { return QUEUE.length + RUNNING + Object.keys(WAITING).length > 0; }
+function enqueue(job) {
+  job.epoch = queueEpoch;
+  QUEUE.push(job);
+  job.onState('pending');
+  pump();
+}
+function pump() { while (RUNNING < MAX_RUNNING && QUEUE.length) runJob(QUEUE.shift()); }
+function runJob(job) {
+  RUNNING += 1;
+  job.onState('pending');
+  var settle = function(fn) {
+    return function(x) {
+      if (job.epoch !== queueEpoch) return;   // signed out meanwhile: the queue was emptied
+      RUNNING -= 1;
+      fn(x);
+      pump();
+    };
+  };
+  job.go().then(settle(function(r) { job.onDone(r); }), settle(function(e) {
+    if (e && e.code === 'busy' && !job.cancelled) { waitJob(job, e.retryAfterMs); return; }
+    if (e && e.code === 'signed-out') { signOut(e.message); return; }
+    job.onFail(e);
+  }));
+}
+function waitJob(job, ms) {
+  var until = Date.now() + Math.max(1000, ms || 5000);
+  WAITING[job.id] = job;
+  function tick() {
+    if (job.cancelled || job.epoch !== queueEpoch) { clearInterval(job.timer); delete WAITING[job.id]; return; }
+    var left = Math.ceil((until - Date.now()) / 1000);
+    if (left <= 0) {
+      clearInterval(job.timer);
+      delete WAITING[job.id];
+      QUEUE.unshift(job);   // its turn again, ahead of later taps
+      pump();
+      return;
+    }
+    job.onState('waiting', left);
+  }
+  tick();
+  job.timer = setInterval(tick, 500);
+}
+function stopJob(job) {
+  job.cancelled = true;
+  clearInterval(job.timer);
+  delete WAITING[job.id];
+  QUEUE = QUEUE.filter(function(x) { return x !== job; });
+  job.onCancel();
+}
+function stopQueue() {
+  queueEpoch += 1;
+  Object.keys(WAITING).forEach(function(id) { clearInterval(WAITING[id].timer); });
+  WAITING = {}; QUEUE = []; RUNNING = 0;
+}
+function jobFor(id) {
+  if (WAITING[id]) return WAITING[id];
+  return QUEUE.filter(function(j) { return j.id === id; })[0] || null;
+}
+window.addEventListener('beforeunload', function(e) {
+  if (!queueBusy()) return;
+  e.preventDefault();
+  e.returnValue = '';
+});
+// Everything that shows the queue, redrawn.
+function paint() {
   render();
+  paintFamily();
+  if (openSheet === 'tonight-sheet') renderTonight();
+}
+// The family page's tiles follow their children's state.
+function paintFamily() {
+  var head = $('fampage').querySelector('#fam-first');
+  if (head) {
+    var hs = STATE[head.dataset.key], hk = KIDS.filter(function(k) { return kidKey(k) === head.dataset.key; })[0];
+    head.textContent = hs && hs.status === 'failed' ? head.dataset.name + ' is not checked in'
+      : (hs && hs.status !== 'done') ? (hs.status === 'waiting' ? 'Waiting for TwoTimTwo… ' + hs.left + 's' : 'Checking in ' + head.dataset.name + '…')
+        : (hk && hk.checkedIn ? '✓ ' + head.dataset.name + ' is checked in' : head.textContent);
+  }
+  famEntries.forEach(function(x) {
+    if (x.state !== 'done') return;
+    var st = STATE[kidKey(x.p.kid)];
+    if (st && st.status === 'failed') { x.state = 'ready'; x.t.classList.remove('busy', 'done'); x.go.textContent = 'Check in'; return; }
+    if ((st && st.status === 'done') || (!st && x.p.kid.checkedIn)) { x.t.classList.remove('busy'); x.t.classList.add('done'); x.go.textContent = '✓ Checked in'; return; }
+    if (st) x.go.textContent = stateText(st);
+  });
+}
+// A child waiting on TwoTimTwo: stop trying?
+function askStop(c) {
+  var job = jobFor('c:' + c.recid);
+  if (!job) return;
+  pendingConfirm = { mode: 'stop', job: job, back: null };
+  $('confirm-title').textContent = 'Stop checking in ' + c.name + '?';
+  $('confirm-body').textContent = 'TwoTimTwo is busy for a moment, so this page is waiting to try again by itself. Stop, and ' + c.name.split(' ')[0] + ' goes back on the list, not checked in.';
+  $('confirm-ok').textContent = 'Stop trying';
+  showSheet('confirm-sheet');
+}
+
+// ── Check-in: each child a job in the queue ─────────────────────────────────
+// The transport seals the label and the history row and the Worker claims the
+// child, posts to TwoTimTwo and settles: a child already claimed (another phone,
+// the desk, TwoTimTwo's own page) answers "already", never a second label.
+var groupSeq = 0;
+function checkInMany(entries, family) {
+  var group = { id: ++groupSeq, left: 0, ok: 0, already: 0, failed: [], family: family, single: entries.length === 1 ? entries[0].p.name : null };
   entries.forEach(function(e) {
-    checkinChain = checkinChain.then(function() {
-      var k = e.p.kid, key = kidKey(k);
-      if (stop) { delete STATE[key]; return; }
-      var items = itemsFor(k.club);
-      var friendName = String(e.choice.friendName || '').replace(/\s+/g, ' ').trim().slice(0, 24);
-      return desk.checkIn({ clubberId: k.clubberId, name: k.name, club: k.club },
-        { bible: items.bible && !!e.choice.bible, friend: items.friend && !!e.choice.friend, friendName: friendName }).then(function(r) {
+    var k = e.p.kid, key = kidKey(k);
+    if (STATE[key] && STATE[key].status !== 'failed') return;
+    var items = itemsFor(k.club);
+    var friendName = String(e.choice.friendName || '').replace(/\s+/g, ' ').trim().slice(0, 24);
+    var choice = { bible: items.bible && !!e.choice.bible, friend: items.friend && !!e.choice.friend, friendName: friendName };
+    group.left += 1;
+    var finish = function() {
+      group.left -= 1;
+      if (group.left > 0) return;
+      group.failed.forEach(function(f) { toast('Couldn’t check in ' + f.name + ': ' + (f.why || 'try again'), 7000, null, null, 'bad'); });
+      // A problem stays readable: the queue settling behind it never covers it with good news
+      // (the tile already says "Checked in ✓").
+      if (Date.now() < badUntil && !group.failed.length) { setTimeout(refreshStatus, 800); scheduleRosterPoll(6000); return; }
+      if (!group.failed.length && group.ok) {
+        toast(group.single && group.ok + group.already === 1 ? group.single + ' is checked in' : (group.family ? group.family + ': ' : '') + group.ok + ' checked in', 3000, null, null, 'good');
+      } else if (!group.failed.length && group.already) toast('Already checked in (another phone or the desk got there first).', 4500);
+      setTimeout(refreshStatus, 800);
+      scheduleRosterPoll(6000);
+    };
+    enqueue({
+      id: 'c:' + key,
+      go: function() { return desk.checkIn({ clubberId: k.clubberId, name: k.name, club: k.club }, choice); },
+      onState: function(status, left) { STATE[key] = { status: status, left: left }; paint(); },
+      onDone: function(r) {
         k.checkedIn = true;
         LOCAL.at[key] = Date.now();
         rosterEpoch += 1;
-        if (r.already) already++; else ok++;
-      }, function(err) {
-        if (err && (err.code === 'busy' || err.code === 'signed-out' || err.code === 'unreachable')) stop = err;
-        else failed.push({ k: k, why: err && err.message });
-      }).then(function() { delete STATE[key]; });
+        saveLocal();
+        joy[k.name.toLowerCase()] = true;
+        if (r.already) group.already++; else group.ok++;
+        STATE[key] = { status: 'done' };
+        paint();
+        setTimeout(function() { if (STATE[key] && STATE[key].status === 'done') { delete STATE[key]; paint(); } }, DONE_SHOW_MS);
+        finish();
+      },
+      onFail: function(err) {
+        if (err && err.code === 'unreachable') showOffline(true);
+        var why = err && err.code === 'unreachable' ? 'no internet connection. Use the paper sheet at the desk.' : (err && err.message);
+        group.failed.push({ name: k.name, why: why });
+        STATE[key] = { status: 'failed', msg: why };
+        paint();
+        setTimeout(function() { if (STATE[key] && STATE[key].status === 'failed') { delete STATE[key]; paint(); } }, FAILED_SHOW_MS);
+        finish();
+      },
+      onCancel: function() { delete STATE[key]; paint(); finish(); },
     });
-  });
-  checkinChain = checkinChain.then(function() {
-    saveLocal();
-    render();
-    if (stop) { commonError(stop, 'Not checked in: '); return; }
-    failed.forEach(function(f) { toast('Couldn’t check in ' + f.k.name + ': ' + (f.why || 'try again'), 7000, null, null, 'bad'); });
-    if (!failed.length && ok) {
-      toast(entries.length === 1 ? entries[0].p.name + ' is checked in' : (family ? family + ': ' : '') + ok + ' checked in', 3000, null, null, 'good');
-    } else if (!failed.length && already) toast('Already checked in (another phone or the desk got there first).', 4500);
-    setTimeout(refreshStatus, 800);
-    scheduleRosterPoll(6000);
   });
 }
 
@@ -1368,7 +1531,7 @@ function setBusy(retryAfterMs) {
     var b = $('busy');
     if (left <= 0) { clearInterval(busyTimer); busyTimer = null; b.hidden = true; return; }
     b.hidden = false;
-    b.textContent = 'TwoTimTwo is busy: try again in ' + left + 's.';
+    b.textContent = 'Waiting for TwoTimTwo… ' + left + 's';
   }
   tick();
   busyTimer = setInterval(tick, 500);
@@ -1449,7 +1612,7 @@ document.addEventListener('visibilitychange', function() {
 // checked in; the count is the Worker's own (GET /v1/desk/tonight) when it
 // answers, else this list's.
 function tonightRows() {
-  var rows = KIDS.filter(function(k) { return k.checkedIn && !STATE[kidKey(k)]; }).map(function(k) {
+  var rows = KIDS.filter(function(k) { return k.checkedIn; }).map(function(k) {
     var parts = k.name.split(' ');
     return { key: kidKey(k), firstName: parts[0] || '', lastName: parts.slice(1).join(' '), clubName: k.club || '', clubberId: k.clubberId,
       visitor: false, checkedOut: LOCAL.out.indexOf(kidKey(k)) !== -1, at: LOCAL.at[kidKey(k)] || null, kid: k };
@@ -1465,7 +1628,8 @@ function tonightCounts() {
   var rows = tonightRows(), here = rows.filter(function(r) { return !r.checkedOut; });
   var byClub = {};
   here.forEach(function(r) { var c = r.clubName || 'No club'; byClub[c] = (byClub[c] || 0) + 1; });
-  var s = SERVER_TONIGHT;
+  // The Worker's count is the whole church's: the youth page counts its own clubs.
+  var s = ONLY ? null : SERVER_TONIGHT;
   if (s && isFinite(s.checkedIn)) {
     return { checkedIn: Number(s.checkedIn), checkedOut: Number(s.checkedOut) || 0, byClub: s.byClub || byClub, server: true };
   }
@@ -1514,16 +1678,26 @@ function renderTonight() {
       var d = e.at ? new Date(e.at) : null;
       who.appendChild(el('span', null, d && !isNaN(d.getTime()) ? d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : ''));
       var acts = el('div', 'rowacts');
-      var busy = UNDOING[e.key] || CHECKING_OUT[e.key];
+      var op = OPS[e.key];
       // Check out: on TwoTimTwo for a child with a TwoTimTwo id; a visitor is
-      // marked here (and off the service's count). Never twice.
+      // marked here (and off the service's count). Never twice. While either is
+      // in the queue its button says so; a waiting one is stopped by a tap.
       if (!e.checkedOut) {
-        var cb = el('button', 'tt', CHECKING_OUT[e.key] ? 'Checking out…' : 'Check out'); cb.type = 'button';
-        if (busy) cb.disabled = true; else cb.addEventListener('click', function() { askCheckout(e); });
-        acts.appendChild(cb);
+        var opText = function(kind, idle, going) {
+          if (!op || op.kind !== kind) return idle;
+          return op.status === 'waiting' ? 'Waiting for TwoTimTwo… ' + op.left + 's' : going;
+        };
+        // The youth page has no Check out: the Worker checks Trek and Journey out by itself (YM_CHECKOUT).
+        if (!SIMPLE) {
+          var cb = el('button', 'tt', opText('checkout', 'Check out', 'Checking out…')); cb.type = 'button';
+          if (op) { cb.disabled = !(op.kind === 'checkout' && op.status === 'waiting'); cb.addEventListener('click', function() { var j = jobFor('o:' + e.key); if (j) stopJob(j); }); }
+          else cb.addEventListener('click', function() { askCheckout(e); });
+          acts.appendChild(cb);
+        }
         // Undo check-in (TwoTimTwo's own undo) for a child on TwoTimTwo; Remove for a visitor.
-        var ub = el('button', e.visitor ? null : 'tt', UNDOING[e.key] ? (e.visitor ? 'Removing…' : 'Undoing…') : (e.visitor ? 'Remove' : 'Undo check-in')); ub.type = 'button';
-        if (busy) ub.disabled = true; else ub.addEventListener('click', function() { askUndo(e); });
+        var ub = el('button', e.visitor ? null : 'tt', opText('undo', e.visitor ? 'Remove' : 'Undo check-in', e.visitor ? 'Removing…' : 'Undoing…')); ub.type = 'button';
+        if (op) { ub.disabled = !(op.kind === 'undo' && op.status === 'waiting'); ub.addEventListener('click', function() { var j = jobFor('o:' + e.key); if (j) stopJob(j); }); }
+        else ub.addEventListener('click', function() { askUndo(e); });
         acts.appendChild(ub);
       }
       row.appendChild(who); row.appendChild(acts);
@@ -1563,21 +1737,40 @@ function askCheckout(entry) {
   $('confirm-ok').textContent = 'Check out';
   showSheet('confirm-sheet');
 }
-$('confirm-cancel').addEventListener('click', function() { pendingConfirm = null; renderTonight(); showSheet('tonight-sheet'); });
+$('confirm-cancel').addEventListener('click', function() {
+  var c = pendingConfirm;
+  pendingConfirm = null;
+  if (c && c.mode === 'stop') { hideSheet(); return; }
+  renderTonight(); showSheet('tonight-sheet');
+});
 $('confirm-ok').addEventListener('click', function() {
   var c = pendingConfirm;
   pendingConfirm = null;
+  if (c && c.mode === 'stop') { hideSheet(); stopJob(c.job); return; }
   renderTonight();
   showSheet('tonight-sheet');
   if (c && c.mode === 'checkout') checkoutEntry(c.entry);
   else if (c) undoEntry(c.entry);
 });
+// Undo and check-out: a job each in the same queue (auto-retry when busy).
+function rowJob(entry, kind, go, done, failWords) {
+  enqueue({
+    id: 'o:' + entry.key,
+    go: go,
+    onState: function(status, left) { OPS[entry.key] = { kind: kind, status: status, left: left }; if (openSheet === 'tonight-sheet') renderTonight(); },
+    onDone: function() { delete OPS[entry.key]; done(); },
+    onFail: function(e) {
+      delete OPS[entry.key];
+      renderTonight();
+      if (commonError(e, failWords)) return;
+      toast(failWords + (e && e.message ? e.message : 'try again.'), 10000, null, null, 'bad');
+    },
+    onCancel: function() { delete OPS[entry.key]; renderTonight(); },
+  });
+}
 function undoEntry(entry) {
   var name = displayName(entry);
-  UNDOING[entry.key] = true;
-  renderTonight();
-  desk.undo(childOf(entry)).then(function() {
-    delete UNDOING[entry.key];
+  rowJob(entry, 'undo', function() { return desk.undo(childOf(entry)); }, function() {
     if (entry.visitor) LOCAL.visitors = LOCAL.visitors.filter(function(v) { return v.key !== entry.key; });
     else if (entry.kid) { entry.kid.checkedIn = false; rosterEpoch += 1; }
     saveLocal();
@@ -1585,30 +1778,17 @@ function undoEntry(entry) {
     render(); renderTonight();
     setTimeout(refreshStatus, 800);
     scheduleRosterPoll(6000);
-  }).catch(function(e) {
-    delete UNDOING[entry.key];
-    renderTonight();
-    if (commonError(e, 'Not undone: ')) return;
-    toast((entry.visitor ? 'Not removed: ' : 'Not undone in TwoTimTwo: ') + (e && e.message ? e.message : 'try again.'), 10000, null, null, 'bad');
-  });
+  }, entry.visitor ? 'Not removed: ' : 'Not undone in TwoTimTwo: ');
 }
 function checkoutEntry(entry) {
   var name = displayName(entry);
-  CHECKING_OUT[entry.key] = true;
-  renderTonight();
-  desk.checkout(childOf(entry)).then(function() {
-    delete CHECKING_OUT[entry.key];
+  rowJob(entry, 'checkout', function() { return desk.checkout(childOf(entry)); }, function() {
     LOCAL.out.push(entry.key);
     saveLocal();
     toast(name + ' is checked out.', 4000, null, null, 'good');
     render(); renderTonight();
     scheduleRosterPoll(6000);
-  }).catch(function(e) {
-    delete CHECKING_OUT[entry.key];
-    renderTonight();
-    if (commonError(e, 'Not checked out: ')) return;
-    toast('Not checked out: ' + (e && e.message ? e.message : 'try again.'), 10000, null, null, 'bad');
-  });
+  }, 'Not checked out: ');
 }
 
 // ── The + menu: one-off name tag, leader tag, custom label, visitor ──────────
