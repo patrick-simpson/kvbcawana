@@ -74,7 +74,7 @@ describe('the single publisher gate', () => {
     expect((await sealed({ 'X-Station': st.body.stationId, 'X-Job': jobId })).body).toMatchObject({ dropped: true, reason: 'already-greeted' });
     const greetings = t.sent.filter((f) => f.e === 'checkin');
     expect(greetings).toHaveLength(1);
-    expect(JSON.stringify(greetings[0])).not.toMatch(/Kit/);   // sealed
+    expect(Object.keys(greetings[0].d).sort()).toEqual(['ct', 'iv', 'kid', 'v']);   // sealed
     // a reprint is not a check-in: no greeting
     const rp = await sealJob([st], { route: '/reprint', body: {} }, { id: 'A'.repeat(22) });
     const reprintId = 'reprint:11111111-2222-3333-4444-555555555555';
@@ -110,7 +110,7 @@ describe('the Worker publishes the tally, the ticker and the still-here list', (
     expect(Object.keys(checkout.entries[0]).sort()).toEqual(['club', 'firstName']);
     // the still-here list is SEALED, the others are plaintext numbers
     const raw = t.sent.find((f) => f.e === 'checkout').d;
-    expect(JSON.stringify(raw)).not.toMatch(/Ada|Sparks/);
+    expect(Object.keys(raw).sort()).toEqual(['ct', 'iv', 'kid', 'v']);   // an envelope: no `entries`, no names (not a regexp over ciphertext, which could hold "Ada" by chance)
     expect(raw).toMatchObject({ v: 1 });
     expect(JSON.stringify(t.sent.filter((f) => f.e === 'tally' || f.e === 'tonight'))).not.toMatch(/Ada|Bo|Cy|Dee/);
   });
@@ -215,7 +215,7 @@ describe('the Worker publishes the tally, the ticker and the still-here list', (
     await t.core.watcher.tick();
     expect((await t.call('GET', '/v1/desk/tonight')).body).toMatchObject({ night: NIGHT, source: 'report', checkedIn: 4, byClub: { Sparks: 2, Trek: 1, 'T&T': 1 }, enabled: false });
     expect(t.sent.filter((f) => ['tally', 'tonight', 'checkout'].includes(f.e))).toEqual([]);
-    expect(everything(t.storage)).not.toMatch(/Ada|Bo Tester|Cy/);
+    expect(everything(t.storage)).not.toMatch(/"(Ada|Bo|Cy|Dee)"|Bo Tester|Cy Tester/);   // quoted: a name as a JSON value, never a run of random base64
     // the sealed book holds ids and clubs but, while the laptop publishes, no first names: open it and see
     const { openState } = await import('../src/watcher.js');
     const book = await openState(ENV.TWOTIMTWO_PASSWORD, t.storage.map.get('tonight:book').sealed);
@@ -232,7 +232,7 @@ describe('what the Worker keeps of tonight\'s children', () => {
     await t.call('POST', '/v1/desk/checkin', await t.deskBody([st]));
     const stored = everything(t.storage);
     // no plaintext name or id anywhere in storage
-    for (const needle of ['Ada', 'Lovelace', 'Bo Tester', 'Kit', '"662"', 'clubberId']) expect(stored, needle).not.toContain(needle);
+    for (const needle of ['"Ada"', '"Bo"', '"Kit"', 'Lovelace', 'Bo Tester', 'Kit Tester', '"662"', 'clubberId']) expect(stored, needle).not.toContain(needle);
     // opened with the state key: a first name, a club, an id; never a last name
     const { openState } = await import('../src/watcher.js');
     const book = await openState(ENV.TWOTIMTWO_PASSWORD, t.storage.map.get('tonight:book').sealed);

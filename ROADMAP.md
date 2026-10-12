@@ -660,7 +660,7 @@ said); "Owner" is what only the owner can do.
     claim ledger, the desk claim API and the watcher's claim rules are in
     `lobby/worker/src` (routes.md sections 4 to 7, marked BUILT). Still open for
     the owner: `CLOUD_PRINT` and `SINGLE_PUBLISHER` stay `"off"` in
-    `wrangler.toml` until the shadow night (P5 publishes the tally itself), and
+    `wrangler.toml` until the shadow night (P5 publishes the tally itself, built), and
     the desk's sealed history row is validated but stored only once the history
     module (P6) registers its hook.
   - **P1 + P4 + P6 + P2 merged and reconciled (2026-10-12).** One print lease
@@ -672,10 +672,24 @@ said); "Owner" is what only the owner can do.
     relay drops the laptop's greeting under `SINGLE_PUBLISHER` and the Worker greets
     once. `printer/scripts/test-cloud-e2e.cjs` proves one label per check-in, no
     duplicate, a re-print after undo, no reprint after a lost ack, ciphertext only.
-    **Still open before the switch:** the desk page (P3); the Worker's greeting has
-    no birthday / first-timer / milestone; P5's single publisher of the tally,
-    `tonight` and the pickup list; the release of the print role (version bump and
-    changes.md); BARFED tags for the TwoTimTwo-page fallback.
+    **Still open before the switch:** the desk page (P3); the release of the print
+    role (version bump and changes.md: server.js, job-puller.js and events.js changed
+    in P5); the shadow night with `SINGLE_PUBLISHER = "on"`.
+  - **P5 built (2026-10-12, not released).** One count: `lobby/shared/tonight.js`
+    (generated copy `printer/print-server/tonight.js`) is the printer's AND the
+    Worker's `authoritativeTonight()` / `tonightHereNow()`, with the partial-report and
+    mass-undo rules; `lobby/shared/pickup.js` the still-here list. With
+    `SINGLE_PUBLISHER` on the Worker publishes `tally`, `tonight` and the sealed
+    still-here list from its own state (it keeps tonight's first names + clubs sealed
+    for the night: see "P5: how the Worker names children" above), the relay drops the
+    laptop's frames and lets one station greeting per print job through (birthday,
+    first-timer and milestone are back), and a TwoTimTwo-page child the report marks
+    Brought a friend gets the BARFED tag (station-side `isBarfNight()`, no friend's
+    name). Tests: `lobby/shared/tonight.test.js`, Worker `publisher.test.js`,
+    `adopt.test.js`, `twotimtwo.test.js`, printer `test-tonight-shared.cjs`,
+    `test-station-greeting.cjs`, `test-barf.cjs`, and `test-cloud-e2e.cjs` (the real
+    print server behind the puller: one greeting per check-in, the tally, the list).
+    Known gap for P7: the extension's youth check-out sweep posts to the laptop only.
 
 ## Online only
 
