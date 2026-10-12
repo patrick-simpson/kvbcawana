@@ -33,8 +33,9 @@ export function defaultDeviceName(ua = typeof navigator !== 'undefined' ? naviga
 /** @param {unknown} name */
 export function cleanDeviceName(name) {
   // \s covers tabs and newlines; any other control character is dropped.
-  return [...String(name ?? '')].map((c) => (c.charCodeAt(0) < 32 || c.charCodeAt(0) === 127 ? ' ' : c)).join('')
-    .replace(/\s+/g, ' ').trim().slice(0, DEVICE_NAME_MAX);
+  // Cut by code points, never between the halves of a surrogate pair (an emoji).
+  return [...[...String(name ?? '')].map((c) => (c.charCodeAt(0) < 32 || c.charCodeAt(0) === 127 ? ' ' : c)).join('')
+    .replace(/\s+/g, ' ').trim()].slice(0, DEVICE_NAME_MAX).join('').trim();
 }
 
 /** @returns {{id: string, name: string} | null} */
@@ -89,6 +90,7 @@ export function deviceHeaders() {
   const who = screenId ? { id: screenId, name: cleanDeviceName(liveScreenName()) } : loadDevice();
   /** @type {Record<string, string>} */
   const headers = { 'X-Device': who.id };
-  if (who.name) headers['X-Device-Name'] = encodeURIComponent(who.name);
+  // A name that cannot be encoded (a lone surrogate) is left off: the id still goes.
+  try { if (who.name) headers['X-Device-Name'] = encodeURIComponent(who.name); } catch { /* X-Device only */ }
   return headers;
 }

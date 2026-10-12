@@ -124,7 +124,11 @@ export async function syncRequest(base, path, opts = {}) {
   const req = buildRequest(base, path, opts);
   // Who is asking, for the change log (routes.md 10.1). Only a signed-in call
   // carries it: a sign-in has no session, so no device either.
-  const headers = opts.session ? { ...req.init.headers, ...deviceHeaders() } : req.init.headers;
+  let who = {};
+  if (opts.session) {
+    try { who = deviceHeaders(); } catch { /* the call goes without the log's who */ }
+  }
+  const headers = { ...req.init.headers, ...who };
   try {
     return await readResponse(await fetchFn(req.url, { ...req.init, headers, cache: 'no-store' }));
   } catch {

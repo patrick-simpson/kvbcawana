@@ -92,5 +92,10 @@ describe('ids and names', () => {
     expect(cleanScreenName('  Gym\n\tprojector   ')).toBe('Gym projector');
     expect(cleanScreenName('x'.repeat(50))).toHaveLength(40);
     expect(cleanScreenName(7)).toBe('');
+    // an emoji at the cut is kept whole or dropped whole, never split into a lone surrogate
+    const cut = cleanScreenName(`${'x'.repeat(39)}😀tail`);
+    expect(cut).toBe(`${'x'.repeat(39)}😀`);
+    expect(() => encodeURIComponent(cut)).not.toThrow();
+    expect([...cleanScreenName('😀'.repeat(50))]).toHaveLength(40);
   });
 });

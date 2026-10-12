@@ -161,8 +161,9 @@ export function isScreenId(id) {
  */
 export function cleanScreenName(raw) {
   if (typeof raw !== 'string') return '';
+  // Cut by code points, never between the halves of a surrogate pair (an emoji).
   // eslint-disable-next-line no-control-regex
-  return raw.replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, SCREEN_NAME_MAX).trim();
+  return [...raw.replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/g, ' ').replace(/\s+/g, ' ').trim()].slice(0, SCREEN_NAME_MAX).join('').trim();
 }
 
 /**

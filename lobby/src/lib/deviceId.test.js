@@ -32,6 +32,26 @@ describe('the change log device (routes.md 10.1)', () => {
     expect(saveDeviceName('   ').name).toBe(defaultDeviceName());
   });
 
+  it('cuts a name by code points: an emoji at the cut never splits, and the header still encodes', () => {
+    const name = cleanDeviceName(`${'x'.repeat(39)}😀tail`);
+    expect(name).toBe(`${'x'.repeat(39)}😀`);
+    expect([...cleanDeviceName('😀'.repeat(60))]).toHaveLength(40);
+    saveDeviceName(`${'y'.repeat(39)}🎉more`);
+    const h = deviceHeaders();
+    expect(h['X-Device-Name']).toBeTruthy();
+    expect(decodeURIComponent(h['X-Device-Name'])).toBe(`${'y'.repeat(39)}🎉`);
+  });
+
+  it('falls back to X-Device alone when the name cannot be encoded', () => {
+    saveDeviceName('Pat');
+    const real = globalThis.encodeURIComponent;
+    globalThis.encodeURIComponent = () => { throw new URIError('malformed'); };
+    try {
+      const h = deviceHeaders();
+      expect(Object.keys(h)).toEqual(['X-Device']);
+    } finally { globalThis.encodeURIComponent = real; }
+  });
+
   it('works with storage blocked (memory only)', () => {
     const real = Storage.prototype.setItem;
     Storage.prototype.setItem = () => { throw new Error('blocked'); };
