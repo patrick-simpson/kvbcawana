@@ -110,3 +110,26 @@ safeStorage, config.json) and offline cache.
   `node scripts/check-mirrors.mjs` fails CI when the copy is stale.
 - Journey's `public/src/sync.js` is a browser script with its own copy of the
   session pattern; it is not on this module yet.
+
+## `cloud-crypto.js` (online check-in's client cryptography)
+
+Root `ROADMAP.md#online-check-in`. Dependency-free WebCrypto (no imports, DOM,
+Node or storage) for the browser, Node 22 and the Worker: the passphrase
+derivation (`deriveKeys`, PBKDF2 600000+ then HKDF into `authKey` and
+`wrapKey`), the wrapped history key (`wrapPrivateKey`, `unwrapPrivateKey`,
+`rewrapPrivateKey`, `createHistoryKey`), history rows (`sealRow`, `openRow`),
+station bundles (`sealForStations`, `openAsStation`), padding, the AAD
+builders, `kidOf` / `fingerprint`, the Durable Object's identifier tags
+(`identityTag`, `visitorTag`) and the church's night key (`churchNight`).
+Every derivation, seal and open runs in a client; the Worker only uses the
+verifier hash and the tags (free plan, 10 ms of CPU).
+
+- **Vectors:** `cloud-vectors.json` (fixed keys, salts, IVs and ephemeral
+  keys; one copy). `src/lib/cloudCrypto.test.js` (vitest),
+  `worker/test/cloudCrypto.test.js` and `printer/scripts/test-cloud-crypto.cjs`
+  reproduce them. Regenerate (`node scripts/gen-cloud-vectors.mjs` at the repo
+  root) only for a deliberate format change, never to make a test pass.
+- **The printer's copy is generated**: `printer/print-server/cloud-crypto.js`
+  (CommonJS, for the print server and the KVBC Awana app). After editing this
+  file run `node scripts/gen-cloud-crypto.mjs`; `node scripts/check-mirrors.mjs`
+  fails CI when the copy is stale.

@@ -501,8 +501,8 @@ export function TemplateField() {
  * in to TwoTimTwo as the church's check-in user and read the most recent club
  * night's report once (today's has no club tables on any other day),
  * so the owner can prove the secrets work before a club night. Read-only, and
- * the answer is counts only; TwoTimTwo allows one read every 15 seconds, so a
- * second press inside that reports the last read instead.
+ * the answer is counts only; TwoTimTwo allows one read every 5 seconds (all
+ * reads combined), so a second press inside that reports the last read instead.
  */
 export function CloudCheckinTestField() {
   const sync = useSync();

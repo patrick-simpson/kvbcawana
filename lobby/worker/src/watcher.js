@@ -1,8 +1,10 @@
 // The report watcher (ROADMAP.md#cloud-check-in, piece 2, phase 1: READ-ONLY SHADOW).
 //
 // During the club window a Durable Object alarm reads TwoTimTwo's check-in
-// report every 15 seconds (TwoTimTwo's agreed limit, never faster: a manual
-// "read now" shares the same clock) and compares it with the last read:
+// report every 5 seconds (TwoTimTwo's terms: ONE read every 5 s, every read
+// combined, never faster: a manual "read now" shares the same clock, and the
+// alarm skips its turn when any other read, a phone's roster say, was made in
+// the last 5 s) and compares it with the last read:
 //   - a child new on the report is a check-in made on TwoTimTwo (nothing
 //     checks in through Cloudflare yet), which phase 2 will print a label for;
 //   - a child gone from it was undone on TwoTimTwo.
@@ -25,8 +27,13 @@
 import { TwoTimTwoClient, credentialsFrom, itemsToSend, reportColumns, rowShape } from './twotimtwo.js';
 import { fromBase64, toBase64 } from './crypto.js';
 
-/** TwoTimTwo's agreed limit (2026-10-11): one report read per 15 seconds. */
-export const READ_INTERVAL_MS = 15 * 1000;
+/**
+ * TwoTimTwo's terms (owner, 2026-10-11, superseding the first 15 s): one read
+ * every 5 seconds, all reads combined. The watcher's reads keep to it and wait
+ * out any other read the client made (`lastReadMs`); routing every read
+ * through one clock is ROADMAP.md#online-check-in P1.
+ */
+export const READ_INTERVAL_MS = 5 * 1000;
 /** The longest an idle alarm sleeps before it looks at the clock again. */
 export const IDLE_MAX_MS = 6 * 60 * 60 * 1000;
 /**
@@ -284,9 +291,10 @@ export class Watcher {
     } else {
       try { await this.read(); } catch (err) { console.error('[cloud] watcher read failed', err); }
       const s = await this.loadStatus();
-      const since = s.lastReadAt ? this.now() - Date.parse(s.lastReadAt) : READ_INTERVAL_MS;
+      const last = this.lastAnyRead(s);
+      const since = last ? this.now() - last : READ_INTERVAL_MS;
       next = Math.max(READ_INTERVAL_MS - since, 1000);
-      // A sign-in that is backing off waits it out instead of waking every 15 s.
+      // A sign-in that is backing off waits it out instead of waking every 5 s.
       if (this.client && this.client.loginBlockedUntil > this.now()) {
         next = Math.max(next, this.client.loginBlockedUntil - this.now());
       }
@@ -295,7 +303,17 @@ export class Watcher {
     return { next };
   }
 
-  /** The owner's "read now" (a rehearsal on any day): the same 15 s clock. */
+  /**
+   * The last read of any kind, in ms: the watcher's own (stored) or any other
+   * this object's client made (memory: the phone's roster, tonight, families).
+   * @param {{ lastReadAt?: string|null }} status
+   */
+  lastAnyRead(status) {
+    const own = status.lastReadAt ? Date.parse(status.lastReadAt) : 0;
+    return Math.max(Number.isFinite(own) ? own : 0, this.client ? this.client.lastReadMs : 0);
+  }
+
+  /** The owner's "read now" (a rehearsal on any day): the same 5 s clock. */
   async readNow() {
     if (this.mode === 'off') return { ok: false, error: 'off', status: await this.status() };
     if (!this.creds()) return { ok: false, error: 'not-configured', status: await this.status() };
@@ -348,7 +366,7 @@ export class Watcher {
   /**
    * The Settings button's test: sign in and read the most recent club night's
    * report (today on a Wednesday), so it means something on any day. It
-   * changes nothing the watcher keeps but the shared 15 s clock; the answer is
+   * changes nothing the watcher keeps but the shared 5 s clock; the answer is
    * counts only, and on an unreadable page its shape (title, table counts).
    */
   async testRead() {
@@ -358,7 +376,7 @@ export class Watcher {
     if (this.inFlight) await this.inFlight.catch(() => {});
     const status = await this.loadStatus();
     const now = this.now();
-    if (status.lastReadAt && now - Date.parse(status.lastReadAt) < READ_INTERVAL_MS) {
+    if (now - this.lastAnyRead(status) < READ_INTERVAL_MS) {
       return { ok: !!status.lastTest?.ok, throttled: true, test: status.lastTest || null, status: await this.status() };
     }
     status.reads += 1;
@@ -403,7 +421,7 @@ export class Watcher {
   async readOnce() {
     const status = await this.loadStatus();
     const now = this.now();
-    if (status.lastReadAt && now - Date.parse(status.lastReadAt) < READ_INTERVAL_MS) {
+    if (now - this.lastAnyRead(status) < READ_INTERVAL_MS) {
       return { ok: true, throttled: true };
     }
     const client = this.clientFor();

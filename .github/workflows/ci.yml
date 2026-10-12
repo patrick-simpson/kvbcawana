@@ -57,6 +57,9 @@ jobs:
   #           lobby/src/components/settings/laptop*.jsx: test-leaders,
   #           test-custom-label, test-pickup-board, test-attendance-audit,
   #           test-server-security, test-server-helpers)
+  #           and lobby/shared/cloud-vectors.json (test-cloud-crypto reads it;
+  #           its print-server/cloud-crypto.js is generated from
+  #           lobby/shared/cloud-crypto.js, which the copies job checks)
   changes:
     name: What changed
     runs-on: ubuntu-latest
@@ -111,7 +114,7 @@ jobs:
                 *) lobby=true ;;
               esac
               case "$f" in
-                lobby/worker/src/relay.js|lobby/src/lib/syncSpecs.js|lobby/shared/sync-protocol.js|lobby/shared/brand/*|lobby/src/lib/printServer.js|lobby/src/components/settings/laptop*.jsx|site/build.mjs) printer=true ;;
+                lobby/worker/src/relay.js|lobby/src/lib/syncSpecs.js|lobby/shared/sync-protocol.js|lobby/shared/brand/*|lobby/shared/cloud-crypto.js|lobby/shared/cloud-vectors.json|lobby/src/lib/printServer.js|lobby/src/components/settings/laptop*.jsx|site/build.mjs) printer=true ;;
                 lobby/*|journey/*|site/updates/*|.github/workflows/*) ;;
                 *) printer=true ;;
               esac

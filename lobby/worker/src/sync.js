@@ -157,7 +157,7 @@ export class SyncCore {
     });
   }
 
-  /** The Durable Object's alarm: the watcher's 15 s read (it sets the next one). */
+  /** The Durable Object's alarm: the watcher's 5 s read (it sets the next one). */
   async alarm() {
     return this.watcher.tick();
   }

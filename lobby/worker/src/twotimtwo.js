@@ -4,8 +4,9 @@
 // an undo or a check-out.
 //
 // TwoTimTwo agreed (Devin, 2026-10-11) to an automated check-in user on the
-// church's site, reading as often as every 15 seconds, everything encrypted,
-// and with no technical support from them if it breaks. So:
+// church's site, reading as often as ONE read every 5 seconds (all reads
+// combined; the first word was 15 s), everything encrypted, and with no
+// technical support from them if it breaks. So:
 //   - every request is https to ONE host (TWOTIMTWO_HOST, a *.twotimtwo.com
 //     name), and a redirect anywhere else is refused, so the session cookie
 //     and the password can never be sent to another site;
@@ -402,6 +403,8 @@ export class TwoTimTwoClient {
     this.loginFails = 0;
     this.loginBlockedUntil = 0;
     this.logins = 0;
+    /** When this session last asked for a signed-in page (ms; 0 never): the watcher's read clock reads it. */
+    this.lastReadMs = 0;
   }
 
   get origin() { return `https://${this.host}`; }
@@ -504,6 +507,7 @@ export class TwoTimTwoClient {
         if (!signedIn.ok) return signedIn;
       }
       let res;
+      this.lastReadMs = this.now();
       try {
         res = await this.request(path);
       } catch (err) {

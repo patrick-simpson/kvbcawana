@@ -95,7 +95,8 @@ commits or files.
   laptop: the sync Worker talks to TwoTimTwo itself, a Raspberry Pi at church
   prints the labels. Phased, shadow-tested beside the laptop; read it before
   touching check-in, the relay or the print path. TwoTimTwo (Devin) allowed
-  it on 2026-10-11: everything encrypted, reads no faster than every 15 s, no
+  it on 2026-10-11: everything encrypted, ONE read every 5 s with all reads
+  combined (it was 15 s at first), no
   vendor support. Phase 1 (the Worker's read-only report watcher,
   `lobby/worker/src/twotimtwo.js` / `watcher.js`) is built and idle until the
   `TWOTIMTWO_*` secrets are set.
@@ -107,6 +108,18 @@ commits or files.
   what the release workflows must change for the rename.
 - The stability and performance audit of 2026-10-04 is fixed except for the
   items under "Deferred work" below (its file was removed; the repo history has it).
+
+## Everything free, forever (owner, 2026-10-11)
+
+A project-wide rule: every piece runs on a free plan, now and later
+(Cloudflare Workers FREE with its 10 ms of CPU per request, Durable Objects
+and D1 on their free allowances, GitHub Actions' free minutes and 0.5 GB of
+storage). So key derivation, encryption and decryption run in CLIENTS (the
+browser pages, the KVBC Awana app), never in the Worker, which routes, stores
+ciphertext and keyed-hash identifiers, and hashes. A change that needs a paid
+plan is the wrong change. `ROADMAP.md#online-check-in` is the track built on
+it (it supersedes the cloud check-in phases 2+ and "no internet still prints":
+with no internet the desk uses the paper sheet).
 
 ## The move in progress (owner's plan, 2026-10-01)
 
