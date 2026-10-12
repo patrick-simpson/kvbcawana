@@ -548,7 +548,9 @@ const PORT = Number(process.env.AWANA_TEST_PORT || require('./free-port.cjs')())
     check('a check-in carries who, where and when (sealed)', ava && ava.last === 'Stone' && ava.club === 'Sparks' && ava.clubberId === '1' && ava.ts === Date.parse('2026-09-23T22:10:00.000Z'));
     const att = opened.filter((x) => x.k === 'id:1').flatMap((x) => x.dates);
     check('a kid\'s whole ledger comes across', att.length === 120 && new Set(att).size === 120);
-    check('no plaintext name in any wire row', !JSON.stringify(imported).includes('Stone') && !JSON.stringify(imported).includes('Ava'));
+    // plain() masks the base64 ciphertext first: ~10 KB of random base64 holds
+    // "Ava" by chance about one run in 25 (the CI flake of 2026-10-12).
+    check('no plaintext name in any wire row', !plain(imported).includes('Stone') && !plain(imported).includes('Ava'));
     check('the nights are the church\'s local dates', imported.find((x) => x.kind === 'import-checkin').night === '2026-09-23');
     const firstIds = imported.map((x) => x.id).sort();
     imported.length = 0;
