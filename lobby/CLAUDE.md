@@ -1401,8 +1401,8 @@ as they are. The projector is a later, separate change.
 
 Owner request 2026-10-01: Settings "looks bad on desktop and mobile"; rebuilt
 for usability. `src/components/SettingsPanel.jsx` is the shell (the form,
-live apply, the rail, Undo / Done); `src/components/settings/sections.jsx`
-holds the eight sections and `settings/fields.jsx` the rows, cards and the
+live apply, the rail, Undo / Done); `src/components/settings/sections/`
+(one file per section, `index.js` re-exports) holds the eight sections and `settings/fields.jsx` the rows, cards and the
 fields with their own storage (login, display key, publish token, uploads);
 `src/lib/settingsSections.js` is the pure half (the section table, the old
 tab ids, which section it opens on, the phase in plain words).

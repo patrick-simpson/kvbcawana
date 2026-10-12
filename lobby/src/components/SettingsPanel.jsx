@@ -15,7 +15,7 @@ import { ZeroAnimationContext } from '../lib/motion.jsx';
 import {
   CelebrationsSection, CheckinsSection, LookSection, PickupSection, ScreenSection, SetupSection,
   SlidesSection, StatusSection, statusProblems,
-} from './settings/sections.jsx';
+} from './settings/sections/index.js';
 import { FollowingContext, RemoteScreenContext, SettingsPageContext } from './settings/fields.jsx';
 import { ScreenOverviewSection, ScreensSection } from './settings/screens.jsx';
 import LaptopSection from './settings/laptop.jsx';
