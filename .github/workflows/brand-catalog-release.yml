@@ -1,0 +1,38 @@
+# The Awana Clubs product catalog, kept as a graphical reference (owner,
+# 2026-10-11): the brand kit (lobby/shared/brand/) was drawn from it, and
+# lobby/scripts/brand/extract-catalog-brand.py reads it. It is the flipbook's
+# Download PDF (about 50 MB), so it lives as a release asset, never in the
+# tree. Run by hand; a second run replaces the file. Next season: change the
+# URL, TAG and NAME below and run it again.
+name: Brand catalog (reference PDF)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write # create the release / upload the asset
+
+env:
+  URL: https://awana-catalog.s3.us-east-2.amazonaws.com/flipbooks/awana-product-guide-26-27/inc/pdf/ox6kwtbhhd.pdf
+  TAG: brand-catalog-2026-27
+  NAME: awana-product-guide-2026-27.pdf
+
+jobs:
+  upload:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download the catalog
+        run: |
+          curl -fSL --retry 3 -o "$NAME" "$URL"
+          head -c 5 "$NAME" | grep -q '%PDF-' || { echo "::error::not a PDF"; exit 1; }
+          ls -l "$NAME"
+      - name: Publish it as a release asset (never Latest)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            gh release create "$TAG" --latest=false --title "Awana Clubs catalog 2026-27 (brand reference)" \
+              --notes "The Awana Clubs 2026-27 product guide, the source of the brand kit in lobby/shared/brand/. Reference only. Source: the Download button of https://awana-catalog.s3.us-east-2.amazonaws.com/flipbooks/awana-product-guide-26-27/index.html"
+          fi
+          gh release upload "$TAG" "$NAME" --clobber

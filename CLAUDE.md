@@ -54,6 +54,9 @@ commits or files.
   `awana.kvbchurch.org/updates/printer/` and `/updates/lobby/` (channel
   lobby), with absolute URLs to this repo's release assets (Pages cannot host
   the 170 MB installers).
+- The Awana Clubs 2026-27 catalog PDF (the brand kit's source, ~50 MB) is a
+  graphical reference on the `brand-catalog-2026-27` release, never in the
+  tree: `brand-catalog-release.yml` (by hand) downloads it and uploads it.
 - Bots: `lobby-update-calendar.yml` and `journey-update-lesson.yml` run
   nightly, commit to `main` (rebase-and-retry) and dispatch `ci.yml`. `clean-artifacts.yml` runs weekly (and by hand) and deletes
   workflow artifacts older than a day: the account has 0.5 GB of Actions
