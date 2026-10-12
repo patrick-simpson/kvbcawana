@@ -485,11 +485,6 @@ sup { font-size: .55em; line-height: 0; vertical-align: .9em; }
 .kv-kiosk__begin .kv-ico { width: 2.8cqw; height: 2.8cqw; }
 .kv-kiosk__skip { color: #fff; box-shadow: inset 0 0 0 .35cqw rgba(255, 255, 255, .7); }
 .kv-kiosk__foot { position: absolute; left: 42%; right: 42%; bottom: 0; height: 4.4cqw; background: linear-gradient(#2a272c, #151316); clip-path: polygon(20% 0, 80% 0, 100% 100%, 0 100%); }
-.kv-kiosk__pi { position: absolute; z-index: 2; right: 3cqw; bottom: 0; width: 17cqw; height: 10cqw; background: #127a3f; border-radius: 1.2cqw; box-shadow: inset 0 0 0 .5cqw #0d5e30, .8cqw .8cqw 0 rgba(35, 31, 32, .22); transform: rotate(-5deg); }
-.kv-kiosk__pi span { position: absolute; background: #222; border-radius: .4cqw; }
-.kv-kiosk__pi span:nth-child(1) { left: 2.4cqw; top: 3.2cqw; width: 4.4cqw; height: 4.4cqw; }
-.kv-kiosk__pi span:nth-child(2) { left: 8.6cqw; top: 3.6cqw; width: 3.4cqw; height: 3.4cqw; background: #c9ccd1; }
-.kv-kiosk__pi span:nth-child(3) { left: 1.6cqw; right: 1.6cqw; top: 1cqw; height: 1.2cqw; background: repeating-linear-gradient(90deg, #e3b341 0 .7cqw, transparent .7cqw 1.4cqw); }
 
 /* The phone page */
 .kv-phone { display: flex; justify-content: center; height: 100%; }

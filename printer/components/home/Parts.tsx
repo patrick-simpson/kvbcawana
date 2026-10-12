@@ -59,7 +59,7 @@ const PARTS: Part[] = [
     id: 'journey', club: 'journey', num: '04', kicker: 'In the youth room', icon: 'kiosk',
     title: 'The lesson, ready when the room is',
     body: <>A little kiosk shows the lobby welcome most of the evening. At 6:30 it turns to the week’s Journey lesson and waits for a leader to press Begin, with captions and teaching slides ready for the students.</>,
-    facts: ['Built for a Raspberry Pi Zero', 'Curriculum the church already licenses through its own Awana Ministry Membership'],
+    facts: ['Runs on a PC in the youth room', 'Curriculum the church already licenses through its own Awana Ministry Membership'],
     art: () => <KioskArt />,
     doodles: ['squiggle-wave', 'sparkle-4pt-x', 'ring'],
   },

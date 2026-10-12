@@ -177,8 +177,7 @@ export const ProjectorArt: React.FC<{ on: boolean }> = ({ on }) => {
 /* ── The Journey kiosk ────────────────────────────────────────────────────── */
 
 export const KioskArt: React.FC = () => (
-  <div className="kv-scr kv-kiosk" role="img" aria-label="Recreation of the Journey kiosk's start screen at 6:30: a deep indigo field with a purple corner tab reading Large Group Time, the Journey wordmark, the week and lesson as placeholders, and an orange Begin Video button waiting for a leader. A small Raspberry Pi sits behind the screen.">
-    <div className="kv-kiosk__pi" aria-hidden="true"><span /><span /><span /></div>
+  <div className="kv-scr kv-kiosk" role="img" aria-label="Recreation of the Journey kiosk's start screen at 6:30: a deep indigo field with a purple corner tab reading Large Group Time, the Journey wordmark, the week and lesson as placeholders, and an orange Begin Video button waiting for a leader.">
     <div className="kv-kiosk__bezel">
       <div className="kv-kiosk__screen">
         <Shape name="tab-b-sparks" className="kv-kiosk__tab" />
