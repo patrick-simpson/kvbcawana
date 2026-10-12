@@ -23,6 +23,7 @@ const LIVE_STORAGE_KEYS = {
   [PLAYBACK_QUALITY_KEY]: () => {
     profileCache = null; // the cached answer is the old choice's
     applyCheckinDisplayUrl();
+    applyMotionProfile();
     syncQualityButtons();
   },
   [SLIDES_AUTO_KEY]: () => syncSlidesPrefInputs(),

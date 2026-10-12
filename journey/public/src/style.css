@@ -2181,3 +2181,209 @@ html.cursor-hidden #slide-controls {
     font-size: 1.05rem;
   }
 }
+
+/* ── Motion: full profile only (owner 2026-10-12) ─────────────────────
+   Bold motion graphics for a Mac, a PC or a phone opened on the page:
+   punchy wipes, type that slams in, colour sweeps in the club purple. The
+   Pi ('low' profile) never sees any of it: every rule below is scoped to
+   html.motion-full, which schedule.js (24-motion.js) sets ONLY on the full
+   profile, outside configure mode, and when the OS does not ask for reduced
+   motion; the whole block also sits inside a no-preference media query.
+   So a low-profile page matches none of these rules and keeps its one
+   keyframe (journey-splash-pulse) and its paint budget (test-pinned:
+   brand-kit.test.mjs, motion.test.mjs).
+   Rules of the block: only transform, opacity and clip-path move; entrances
+   only (closing is instant); keyframes give only the FROM side (and any
+   overshoot), so the last frame is always the element's own resting style
+   and `backwards` fill hands back to the normal cascade when they end (a
+   disabled button keeps its own opacity). Nothing here waits for anything:
+   the element is on screen and clickable from its first frame. Never over a
+   playing video (the control bar, captions and loading overlay have no
+   motion), and Awana's deck is never animated (the slide sweep is a band
+   of its own passing over the stage). Timing is the kit's: a 100 ms beat,
+   its four curves (brand/tokens.css). */
+@media (prefers-reduced-motion: no-preference) {
+  html.motion-full {
+    --jm-wipe: var(--brand-ease-wipe, cubic-bezier(0.76, 0, 0.24, 1));
+    --jm-settle: var(--brand-ease-settle, cubic-bezier(0.16, 1, 0.3, 1));
+    --jm-pop: var(--brand-ease-pop, cubic-bezier(0.34, 1.56, 0.64, 1));
+    /* Added to the splash's delays while the view-flip stinger covers the
+       screen, so the splash lands as the stinger leaves (24-motion.js). */
+    --jm-lead: 0ms;
+  }
+
+  /* The splash ("Large Group Time"): tab drops in, wordmark slams, the
+     kicker wipes on, the lesson name slams down hard, buttons pop up. */
+  html.motion-full #journey-splash-banner {
+    animation: jm-drop-tab 460ms var(--jm-pop) calc(var(--jm-lead) + 100ms) backwards;
+  }
+  html.motion-full #journey-splash-journey {
+    animation: jm-slam 520ms var(--jm-settle) var(--jm-lead) backwards;
+  }
+  html.motion-full #journey-splash-advocates {
+    animation: jm-wipe-center 420ms var(--jm-settle) calc(var(--jm-lead) + 220ms) backwards;
+  }
+  html.motion-full #journey-splash-week {
+    animation: jm-wipe-right 360ms var(--jm-settle) calc(var(--jm-lead) + 320ms) backwards;
+  }
+  html.motion-full #journey-splash-title {
+    animation: jm-slam-hard 520ms var(--jm-settle) calc(var(--jm-lead) + 400ms) backwards;
+  }
+  html.motion-full #journey-splash-actions > * {
+    animation: jm-pop-up 460ms var(--jm-pop) calc(var(--jm-lead) + 560ms) backwards;
+  }
+  html.motion-full #journey-splash-actions > :nth-child(2) {
+    animation-delay: calc(var(--jm-lead) + 620ms);
+  }
+  html.motion-full #journey-splash-actions > :nth-child(3) {
+    animation-delay: calc(var(--jm-lead) + 680ms);
+  }
+  html.motion-full #journey-splash-actions > :nth-child(4) {
+    animation-delay: calc(var(--jm-lead) + 740ms);
+  }
+  html.motion-full #journey-splash::before {
+    animation: jm-spin-in 460ms var(--jm-pop) calc(var(--jm-lead) + 640ms) backwards;
+  }
+  html.motion-full #journey-splash::after {
+    animation: jm-spin-in 460ms var(--jm-pop) calc(var(--jm-lead) + 720ms) backwards;
+  }
+
+  /* No lesson yet: the wordmark alone, slammed in. */
+  html.motion-full #journey-placeholder img {
+    animation: jm-slam 520ms var(--jm-settle) var(--jm-lead) backwards;
+  }
+
+  /* "Show captions?" comes up before the video starts, never over it. */
+  html.motion-full #caption-prompt-q {
+    animation: jm-slam-hard 460ms var(--jm-settle) backwards;
+  }
+  html.motion-full #caption-prompt-buttons button {
+    animation: jm-pop-up 420ms var(--jm-pop) 160ms backwards;
+  }
+  html.motion-full #caption-prompt-buttons button + button {
+    animation-delay: 220ms;
+  }
+  html.motion-full #caption-prompt-note {
+    animation: jm-fade 300ms linear 300ms backwards;
+  }
+
+  /* Settings: the scrim is up at once (it is the acknowledgement), the
+     card punches up into place, the title wipes on, the lesson rows and
+     every menu's buttons fly in from the right in quick succession. */
+  html.motion-full #settings-backdrop {
+    animation: jm-fade-from-half 200ms linear backwards;
+  }
+  html.motion-full #settings-card {
+    animation: jm-card-in 360ms var(--jm-settle) backwards;
+  }
+  html.motion-full #settings-header h2 {
+    animation: jm-wipe-right 360ms var(--jm-settle) 80ms backwards;
+  }
+  html.motion-full .settings-lesson-row {
+    animation: jm-fly-in 320ms var(--jm-settle) 360ms backwards;
+  }
+  html.motion-full .settings-lesson-row:nth-child(1) { animation-delay: 60ms; }
+  html.motion-full .settings-lesson-row:nth-child(2) { animation-delay: 90ms; }
+  html.motion-full .settings-lesson-row:nth-child(3) { animation-delay: 120ms; }
+  html.motion-full .settings-lesson-row:nth-child(4) { animation-delay: 150ms; }
+  html.motion-full .settings-lesson-row:nth-child(5) { animation-delay: 180ms; }
+  html.motion-full .settings-lesson-row:nth-child(6) { animation-delay: 210ms; }
+  html.motion-full .settings-lesson-row:nth-child(7) { animation-delay: 240ms; }
+  html.motion-full .settings-lesson-row:nth-child(8) { animation-delay: 270ms; }
+  html.motion-full .settings-lesson-row:nth-child(9) { animation-delay: 300ms; }
+  html.motion-full .settings-lesson-row:nth-child(10) { animation-delay: 330ms; }
+
+  html.motion-full #settings-variant-prompt,
+  html.motion-full #settings-student-prompt,
+  html.motion-full #settings-leader-prompt {
+    transform-origin: left center;
+    animation: jm-slam-soft 360ms var(--jm-settle) backwards;
+  }
+  html.motion-full #settings-variant-buttons button,
+  html.motion-full #settings-student-buttons button,
+  html.motion-full #settings-leader-buttons button {
+    animation: jm-fly-in 360ms var(--jm-settle) 60ms backwards;
+  }
+  html.motion-full #settings-variant-buttons button:nth-child(2),
+  html.motion-full #settings-student-buttons button:nth-child(2),
+  html.motion-full #settings-leader-buttons button:nth-child(2) {
+    animation-delay: 120ms;
+  }
+  html.motion-full #settings-variant-buttons button:nth-child(3),
+  html.motion-full #settings-leader-buttons button:nth-child(3) {
+    animation-delay: 180ms;
+  }
+  html.motion-full #settings-variant-back,
+  html.motion-full #settings-student-back,
+  html.motion-full #settings-leader-back {
+    animation: jm-fade 200ms linear 200ms backwards;
+  }
+
+  /* Read Prep and the handout: the header bar sweeps across in the deep
+     shade, its title skids in, the page under it rises. */
+  html.motion-full #prep-header,
+  html.motion-full #handout-header {
+    animation: jm-wipe-right 320ms var(--jm-settle) backwards;
+  }
+  html.motion-full #prep-title,
+  html.motion-full #handout-title {
+    animation: jm-skid-in 360ms var(--jm-settle) 80ms backwards;
+  }
+  html.motion-full #prep-body > * {
+    animation: jm-rise 420ms var(--jm-settle) 120ms backwards;
+  }
+  html.motion-full #prep-body > :nth-child(2) { animation-delay: 170ms; }
+  html.motion-full #prep-body > :nth-child(3) { animation-delay: 220ms; }
+  html.motion-full #prep-body > :nth-child(n + 4) { animation-delay: 270ms; }
+  html.motion-full #handout-frame {
+    animation: jm-rise 420ms var(--jm-settle) 120ms backwards;
+  }
+
+  @keyframes jm-slam {
+    from { opacity: 0; transform: scale(1.6); }
+    60% { opacity: 1; transform: scale(0.97); }
+  }
+  @keyframes jm-slam-hard {
+    from { opacity: 0; transform: scale(2.4) rotate(-4deg); }
+    55% { opacity: 1; transform: scale(0.94) rotate(0deg); }
+    75% { transform: scale(1.03); }
+  }
+  @keyframes jm-slam-soft {
+    from { opacity: 0; transform: scale(1.25); }
+  }
+  @keyframes jm-wipe-right {
+    from { clip-path: inset(0 100% 0 0); }
+  }
+  @keyframes jm-wipe-center {
+    from { clip-path: inset(0 50% 0 50%); }
+  }
+  @keyframes jm-drop-tab {
+    from { transform: translate(-60%, -70%) rotate(-8deg); }
+  }
+  @keyframes jm-pop-up {
+    from { opacity: 0; transform: translateY(1.2em) scale(0.6); }
+  }
+  @keyframes jm-spin-in {
+    from { opacity: 0; transform: scale(0.2) rotate(-120deg); }
+  }
+  @keyframes jm-fade {
+    from { opacity: 0; }
+  }
+  @keyframes jm-fade-from-half {
+    from { opacity: 0.5; }
+  }
+  @keyframes jm-card-in {
+    from { opacity: 0.4; transform: translateY(8vh) scale(0.92) rotate(-1.5deg); }
+    70% { opacity: 1; transform: translateY(-0.6vh) scale(1.01) rotate(0deg); }
+  }
+  @keyframes jm-fly-in {
+    from { opacity: 0; transform: translateX(14vw) skewX(-14deg); }
+    70% { opacity: 1; transform: translateX(-0.6vw) skewX(2deg); }
+  }
+  @keyframes jm-skid-in {
+    from { opacity: 0; transform: translateX(-3em) skewX(-16deg); }
+  }
+  @keyframes jm-rise {
+    from { opacity: 0; transform: translateY(2.4rem); }
+  }
+}

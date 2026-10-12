@@ -27,6 +27,7 @@ function chooseQuality(choice) {
   // buttons still do something on a device where the write just failed.
   profileCache = choice === 'auto' ? detectedProfile : choice;
   applyCheckinDisplayUrl();
+  applyMotionProfile();
   syncQualityButtons();
   qualityStatus.textContent = stored
     ? `Using ${qualityWords(effectiveProfile())} on this device.`
