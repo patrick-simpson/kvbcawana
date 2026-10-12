@@ -197,8 +197,8 @@ truth when it is fresh (received within `REPORT_FRESH_MS`, 12 minutes); the
 printer's own history is the fallback, and `/health` raises a
 `{type:'tally-source'}` warning whenever it is the one being used.
 `authoritativeTonight()` in `print-server/server.js` is **the one function** —
-`publishTally()`, `computeTonightStats()` (so `/stats/tonight` and the
-dashboard), `/phone/tonight` and `/health` all read it, and none of them
+`publishTally()`, `computeTonightStats()` (so `/stats/tonight`),
+`/phone/tonight` and `/health` all read it, and none of them
 computes a count of its own. Rules: only a report the reconcile pass actually
 APPLIED is kept (one the mass-undo guard refused would zero a night); a row
 marked `undoneBy` — the phone's Remove or Undo check-in, or `/reset-tonight` — beats the report,
@@ -244,9 +244,11 @@ lacks, prints that word in the old Windows face; a missing mark falls back to
 the letter monogram; with the whole kit gone the label is the pre-rebrand one.
 `/health` reports `fonts` / `clubMarks` and raises `brandFonts` / `brandMarks`
 `{type, message}` warnings (reasons are fixed strings, never paths). The kit
-folder is the ONE path served before the PIN gate (`/brand/`, only `.css`,
-`.woff2`, `.ttf`, `.svg` with plain paths), because the phone page is the PIN
-screen; keep it to public brand files only.
+folder is the ONE static path the server serves (`/brand/`, to loopback only,
+only `.css`, `.woff2`, `.ttf`, `.svg` with plain paths); keep it to public
+brand files only. (It used to sit before the PIN gate for the Wi-Fi phone
+page's PIN screen; both are gone, and `site/build.mjs` copies the kit into
+`/checkin/brand/` for the online phone page.)
 
 **The shout is Paytone One (6.18.0), not Galindo.** Owner decision 2026-09-29:
 Galindo "looks too much like SpongeBob", so the first name, the monogram, a
@@ -296,9 +298,10 @@ web copies were Latin subsets until the 6.18.0 kit). What that means here:
   `inkReach(..., 'alphabetic')`.
 - **One name in three places.** The family string is `FONT_FILES[0]` in
   `brand.js`, `--brand-font-display` / `fonts.css` in the kit, and each
-  surface's `--f-shout` fallback (dashboard, phone, the status
+  surface's `--f-shout` fallback (the phone page and the status
   window) plus `step-chip.js`'s measuring family; `test-brand-kit.cjs` and
-  `test-dashboard-chrome.cjs` fail if they drift. The installer's `/health`
+  `test-dashboard-chrome.cjs` (kept under its old name; the dashboard it was
+  written for is retired) fail if they drift. The installer's `/health`
   smoke check still needs 4 loaded fonts (Paytone One, Londrina Solid, Londrina
   Solid Black, Figtree): the number is unchanged.
 
@@ -312,7 +315,7 @@ config.json are never read. A late child (`lateGoToLine` answers) gets a plain n
 the household ONE drop-off label (`dropOffTagFor` / `generateDropOffTag`, once
 per family per night) on the label printer. The card's band says GO TO and the time, never "late", and the child's own tag is identical to everyone's (owner: nothing singles a child out). `printerSetupWarnings()` (pure)
 judges the setup: `printerUnset`, `printerNotFound`, `printerOffline`
-(Get-Printer PrinterStatus); the dashboard and the
+(Get-Printer PrinterStatus); the settings page and the
 status window read offline as PROBLEM.
 `scripts/test-label-printer.cjs`.
 
@@ -325,7 +328,7 @@ publishes a sealed `checkin` with `oneOff: true` (contract optional field):
 the screens welcome the child and never count them. Never into the recap
 buffer, no `publishTally()`. A reprint of a one-off (`reprintRow`) stays a
 one-off and greets nobody. The touch check-in, the phone's + menu (relayed:
-both allowlists carry it) and the dashboard all call the same route.
+both allowlists carry it) and the settings page's name-tag card all call the same route.
 The touch check-in's **Undo check-in** (7.18.0, it replaced Printer jammed)
 lists `/phone/tonight` and undoes through `/phone/undo` exactly like the
 phone; a successful TwoTimTwo undo also `unmarkPrinted()`s the child, or a
@@ -342,13 +345,13 @@ print server's `events.publish()` seals a frame and hands it to the relay
 and an OWED resend of state frames; `/health` warns while the breaker is open),
 which only works while this computer is signed in to the sync service. The
 Pusher publisher, its npm package and the cache-channel `provision` frame are
-gone (2026-10-12), and so are the dashboard's Pusher fields; the electron app's
+gone (2026-10-12), and so are the old dashboard's Pusher fields; the electron app's
 Pusher release-ping client went with them (updates poll the feed every 10
 minutes). Old config.json files may still hold `pusher*` keys: they are never
 read, and `pusherSecret` stays redacted from GET /config. The display-login
 state and `buildProvisionFrame` stay in `events.js` (the KDF is pinned by
 `envelope-vectors.json`, mirrored with the lobby) and POST /config still takes
-the passphrase, but nothing publishes the frame and the dashboard has no
+the passphrase, but nothing publishes the frame and no page has a
 Display login section. `/health` reports the
 channel as `live` (`configured` means signed in), and the church-config key
 `pusherChannel` keeps its old name because it is the relay's channel name.
@@ -384,15 +387,16 @@ loopback-only in `/health` — it contains the operator's Windows username and
 `/health` is CORS-readable from the check-in site. The version is not gated;
 the extension needs it for the update banner.
 
-**`/health` warnings must be `{type, message}` objects.** The dashboard renders
-`w.message`, so a bare string painted an EMPTY yellow box — the privacy and
-phone-PIN warnings were invisible for exactly this reason. `warningTexts()` in
+**`/health` warnings must be `{type, message}` objects.** The settings page's
+status card and the app's status window render `w.message`, so a bare string
+painted an EMPTY yellow box — the privacy warnings were invisible for exactly
+this reason. `warningTexts()` in
 `test-server-realtime.cjs` fails by name if strings come back.
 
 **Config writes:** `config.json` has several writers with different views of it.
 Use `applySavedConfig()` for the live sync — plain `Object.assign` cannot DELETE,
-which is why clearing the phone PIN used to leave the old one accepted until a
-restart. The Electron app must merge via `electron-app/src/config-store.js`,
+which is why clearing a key (the old phone PIN, once) used to leave the old one
+accepted until a restart. The Electron app must merge via `electron-app/src/config-store.js`,
 never write the file whole. Every write of config.json (both sides) is
 tmp + fsync + rename with a `.bak` of the file it replaces; a damaged file is
 restored from the backup or moved aside, never written over, and `/health`
@@ -463,21 +467,54 @@ Brought a friend (`friendInput`); a sibling's card never copies the name.
 `lp` with every file under CUPS, never retried. It is a Worker JOB route
 (`JOB_ROUTES`), sent from the lobby's Settings. `scripts/test-barf.cjs`.
 
-**The settings page reaches this server (8.3.0, owner 2026-10-11).**
-awana.kvbchurch.org/settings (its Laptop section) calls this server on
-localhost. `security.SETTINGS_PAGE_ORIGIN` is the one exact origin (never
-`displayOrigins`), `SETTINGS_PAGE_ROUTES` the whole list of paths and methods,
-`SETTINGS_PAGE_CONFIG_KEYS` the only keys POST /config takes from it; every
-route but /health needs a loopback socket and either the page's sync session
-(`Authorization: Sync`, confirmed with the sync service by
-`settingsPageSessionOk`, only while this server is signed in to it) or the
-publish token (`corsPolicy`
-sets `req.settingsPage`), and the preflight answers Private Network Access
-for those routes only. A route that should accept the page next to the
-dashboard uses `isTrustedOrSettingsPage`; anything holding a secret or opening
-the network keeps `isTrustedConfigOrigin` alone. The extension's options,
-popup and "Printing to Change" link open the settings page; the dashboard is
-the offline fallback. `scripts/test-settings-page.cjs`.
+**Online only: the print server has no page of its own (owner 2026-10-11,
+built 2026-10-12).** The print dashboard (`public/index.html`, localhost:3456)
+and the Wi-Fi phone page (GET `/phone`, `/phone/ym`, the phone PIN, `lanAccess`,
+the app's Windows firewall rule and "Phones" address, `AWANA_BIND_HOST`) are
+gone. `startListening()` binds 127.0.0.1 and nothing else, and an app-level gate
+refuses a non-loopback socket on every route (`test-server-security.cjs` proves
+both with a real LAN address, and that asking for `0.0.0.0` or an old
+`lanAccess` changes nothing); `GET /` answers a tiny page that links to
+awana.kvbchurch.org/settings; the only static folder is `/brand/`, to loopback.
+Old config.json keys `phonePin`, `lanAccess` and `allowedOrigins` are never read
+(`phonePin` stays redacted from GET /config), `isAllowedOrigin`'s "our own page"
+is a loopback host on our port (a LAN address on 3456 is somebody else's
+server), and POST /config ignores the three. `public/phone.html` STAYS:
+`site/build.mjs` makes awana.kvbchurch.org/checkin from it, and the Worker's
+relay reaches the `/phone/*` routes from this computer (loopback, no
+credential). With no internet the desk still prints (extension to localhost);
+there are no phones and no settings changes until it is back.
+
+**Every dashboard tool is on awana.kvbchurch.org/settings, Laptop section**
+(`lobby/src/components/settings/laptop.jsx` and `laptop-tools.jsx`,
+`lib/printServer.js`; the notes are in `lobby/CLAUDE.md`). The page reaches this
+server on localhost: `security.SETTINGS_PAGE_ORIGIN` is the one exact origin
+(never `displayOrigins`), `SETTINGS_PAGE_ROUTES` the whole list of paths and
+methods, `SETTINGS_PAGE_CONFIG_KEYS` the only keys POST /config takes from it;
+every route but /health needs a loopback socket and either the page's sync
+session (`Authorization: Sync`, confirmed with the sync service by
+`settingsPageSessionOk` against `config.syncUrl`, which a dropped sign-in keeps)
+or a publish token already on the laptop (`corsPolicy` sets `req.settingsPage`),
+and the preflight answers Private Network Access for those routes only. A route
+that should accept the page next to this computer's own app uses
+`isTrustedOrSettingsPage`; anything holding a secret keeps
+`isTrustedConfigOrigin` alone. **A new route needs a row in the table and a
+check in `scripts/test-settings-page.cjs` FIRST.** What moved: leader tags
+(`/print-leader`, `/leaders`, `/leaders/forget`), one-off and custom labels,
+a stretch reprint (`/reprint-range`, dry run then confirm), the attendance audit
+(`/attendance-audit`, apply needs `confirm`), rehearsal mode (`/rehearsal`),
+three more switches (`updateBeacon`, `enableDrivenCheckin`, `musicalPrinter`)
+and this computer's own sync sign-in. **Secrets never go through the page:** the
+display key, publish token and display-login mint/read routes, `sync-logout`
+and `/api/lobby-slides` are not in the table, POST /config refuses every
+`SECRET_CONFIG_KEYS` key from it, and `/config/sync-login` from the page takes
+only the passphrase and signs in to `config.syncUrl` (never an address the page
+names; a computer with none on record is signed in by the app's setup wizard,
+"Set up this computer...", through the same route with no Origin). Left in the
+app on purpose: the check-in URL (the wizard; it reaches the Windows shell) and
+the extension folder (tray, "Open Chrome extension folder"; the path holds the
+Windows user name). The extension's options, popup and "Printing to Change" link
+open the settings page. `scripts/test-settings-page.cjs`.
 
 **The still-here list and the phone's Check out (7.16.0, owner 2026-10-08).**
 The lobby's pickup list (shown from 7:30) is built HERE, not scraped:
@@ -485,7 +522,7 @@ TwoTimTwo's Checkout page lists nobody at KVBC. `tonightHereNow()` is the
 "who" behind `authoritativeTonight()` (one child per identity, same rules,
 visitors only when history-built), and `publishStillHere()` filters it by
 config `pickupClubs` (`print-server/pickup.js`; default every club but Trek
-and Journey; the dashboard's "Clubs on the pickup list") and publishes the
+and Journey; the settings page's "Pickup list") and publishes the
 existing sealed `checkout` event through `events.buildCheckout` (shape
 unchanged and mirrored with the lobby: entries {firstName, club} plus
 `printed`). Every minute in the tally window and, debounced, on any change

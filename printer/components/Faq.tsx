@@ -8,11 +8,11 @@ const QA: { q: string; a: React.ReactNode }[] = [
   },
   {
     q: 'Can it print the same child twice by accident?',
-    a: 'No. The print server holds back a repeat print of the same child within a 45-second window, so retries, double-taps and overlapping detection paths produce exactly one label. Deliberate reprints from the widget or the dashboard always work.',
+    a: 'No. The print server holds back a repeat print of the same child within a 45-second window, so retries, double-taps and overlapping detection paths produce exactly one label. Deliberate reprints from the widget or the settings page always work.',
   },
   {
     q: 'What happens if the Wi-Fi goes down mid-event?',
-    a: 'Labels keep printing. The roster is kept on the laptop and in the extension, prints wait in line while the server is briefly out of reach, and the widget search works from the saved roster, so you can keep printing labels and finish the TwoTimTwo check-ins when the connection returns.',
+    a: 'Labels keep printing. The roster is kept on the laptop and in the extension, prints wait in line while the server is briefly out of reach, and the widget search works from the saved roster, so you can keep printing labels and finish the TwoTimTwo check-ins when the connection returns. Phones and the settings page need the internet, so they wait until it is back; the check-in desk does not.',
   },
   {
     q: 'How do updates work?',
@@ -28,7 +28,7 @@ const QA: { q: string; a: React.ReactNode }[] = [
   },
   {
     q: 'Something isn’t printing. Help?',
-    a: <>Click <strong>Help — Not Working?</strong> in the widget for automatic diagnostics, or open the dashboard at <code className="lbl-code">http://localhost:3456</code> for a traffic-light health check, plain-language warnings and a test label preview.</>,
+    a: <>Click <strong>Help — Not Working?</strong> in the widget for automatic diagnostics, or open <code className="lbl-code">awana.kvbchurch.org/settings</code> in Chrome on the laptop for a health check, plain-language warnings, diagnostics and a test label.</>,
   },
 ];
 

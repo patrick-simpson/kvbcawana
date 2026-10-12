@@ -62,7 +62,7 @@ system reports them; each consumer normalizes through its own alias map.
 | `counts` | object `{ "<club name>": int ≥ 0 }` (≤30 clubs) |
 | `total` | int ≥ 0 |
 | `at` | string (ISO 8601) |
-| `season` | OPTIONAL string, lowercase slug (e.g. `christmas`) — the printer's unified-theming broadcast (#18), set by the dashboard's **Screen season** setting (config key `seasonTheme`); absent when that setting is Off. Labels no longer print seasonal art (2026-27 rebrand); this field is now only for the screens. Zero PII. |
+| `season` | OPTIONAL string, lowercase slug (e.g. `christmas`) — the printer's unified-theming broadcast (#18), set by the settings page's **Screen season** setting (config key `seasonTheme`); absent when that setting is Off. Labels no longer print seasonal art (2026-27 rebrand); this field is now only for the screens. Zero PII. |
 | `rehearsal` | OPTIONAL literal `true` — present only while rehearsal mode (#19) is armed, so displays watermark themselves. Absent otherwise. |
 
 Both optional fields stay optional forever: consumers drop unknown fields, so
@@ -97,7 +97,7 @@ First names only, ever. `month`/`day` are the birthday's calendar month/day
 ### `slides` — the operator's typed lobby slide deck (v5, sealed, chunked)
 
 Published by the print server when the operator publishes the typed slide
-deck (dashboard "Lobby slides" card, or the display app's slide editor
+deck (the settings page's Typed & published slides, or the display app's slide editor
 POSTing to `/api/lobby-slides`), then rebroadcast whole every ~5 minutes
 while the server runs so a rebooted screen converges without a handshake.
 

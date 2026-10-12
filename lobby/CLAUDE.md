@@ -902,15 +902,32 @@ through `simulateEvent`'s sanitizers).
   `SettingsPageContext` leaves out every `scope="screen"` card not marked
   `keep`. A new "This screen" card is hidden there by itself; mark it `keep`
   only if it means something on a phone. `e2e/settings-page.spec.js`.
-- **The Laptop section** (phase 3, `settings/laptop.jsx`, `lib/printServer.js`,
-  `sectionsFor(page)`: listed on the settings page only) probes
-  `http://localhost:3456/health` when it is opened, never on load, and then
-  talks to the print server's own routes with its sync sign-in (the print
-  server confirms it with the sync service), or a pasted publish token. What the page
-  may do is the server's rule (`printer/print-server/security.js`,
-  `SETTINGS_PAGE_ROUTES`); a new call needs a row there and a test in
-  `printer/scripts/test-settings-page.cjs` first. The phone PIN and the keys
-  are not here on purpose. `e2e/settings-laptop.spec.js` stubs localhost.
+- **The Laptop section** (phase 3, and Online only 2026-10-12: the print
+  dashboard is retired, so this is where every tool of the check-in laptop
+  lives; `settings/laptop.jsx` and `settings/laptop-tools.jsx`,
+  `lib/printServer.js`, `sectionsFor(page)`: listed on the settings page only)
+  probes `http://localhost:3456/health` when it is opened, never on load, and
+  then talks to the print server's own routes with its sync sign-in (the print
+  server confirms it with the sync service), or a pasted publish token
+  already on the laptop. Cards: This laptop (status, test label, diagnostics,
+  clear queue, test tune, rehearsal mode with a confirm, tonight's print
+  failures), Sync service (this computer's own sign-in: it sends only the
+  passphrase, the print server signs in to the service it already uses), Printers,
+  Labels (footer, palettes, connect card, templates with preview, and the
+  switches driven check-ins, musical printer, update beacon), Pickup list,
+  Club night, Tonight's prints (reprint one, or a stretch: a dry run, then a
+  confirm), Name tags and labels (leader tags, one-off tags, custom labels) and
+  the Attendance audit. What the page may do is the server's rule
+  (`printer/print-server/security.js`, `SETTINGS_PAGE_ROUTES`); a new call needs
+  a row there and a check in `printer/scripts/test-settings-page.cjs` first.
+  **No key or token is ever shown, minted or set here** (the display key,
+  publish token and display login routes are not in the table), and there is
+  no phone PIN or Wi-Fi switch: the print server listens on the laptop only
+  and phones use /checkin. Not here on purpose: the check-in URL (the app's
+  setup wizard) and the extension folder (the tray). `printServer.test.js`,
+  `laptop.test.jsx`, `e2e/settings-laptop.spec.js` (stubs localhost). The
+  printer's suites read `lib/printServer.js` and `settings/laptop*.jsx` too
+  (ci.yml's "What changed" lists them), so a change there runs both suites.
 - **Screens, managed from /settings** (ROADMAP.md#settings-page phase 2): a lobby TV and
   the projector register with the sync Worker (`useScreenSync`,
   `lib/screenSync.js`, `worker/src/screens.js`) and follow their own settings

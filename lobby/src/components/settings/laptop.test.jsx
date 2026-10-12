@@ -1,7 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, configure, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import LaptopSection from './laptop.jsx';
 import { savePublishToken } from '../../lib/publishToken.js';
+
+// The section draws a dozen cards that each ask the stand-in server for something; on a busy CI
+// runner (or the full suite with coverage) the default 1 s is not always enough.
+configure({ asyncUtilTimeout: 5000 });
 
 const res = (body, status = 200) => ({ ok: status < 400, status, json: async () => body, blob: async () => new Blob(['png']) });
 const HEALTH = {
@@ -341,7 +345,7 @@ describe('Laptop section', () => {
     render(<LaptopSection />);
     fireEvent.click(await screen.findByRole('checkbox', { name: /Musical printer/ }));
     fireEvent.click(screen.getByRole('checkbox', { name: /Update health beacon/ }));
-    fireEvent.click(screen.getByRole('checkbox', { name: /Allow check-in, undo and check-out/ }));
+    fireEvent.click(screen.getByRole('checkbox', { name: /Allow driven check-ins/ }));
     await waitFor(() => expect(s.calls.filter((c) => c.path === '/config' && c.method === 'POST')).toHaveLength(3));
     expect(s.calls.filter((c) => c.path === '/config' && c.method === 'POST').map((c) => c.body)).toEqual([
       { musicalPrinter: true }, { updateBeacon: true }, { enableDrivenCheckin: false },

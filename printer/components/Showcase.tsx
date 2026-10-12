@@ -66,7 +66,7 @@ const RunsTheRoom: React.FC = () => (
         </CapabilityCard>
         <CapabilityCard icon="flask" title="Rehearse the whole room" tag="Off until armed"
           safeguard="It switches itself off after two hours, so a forgotten practice can’t spill into a real club night."
-          hood={<>Rehearsal prints skip print history, the season attendance record and the tally. Every tally sent while it is armed carries a <code>rehearsal: true</code> flag that the lobby screens recognize, and the dashboard’s health check warns for as long as it is on.</>}>
+          hood={<>Rehearsal prints skip print history, the season attendance record and the tally. Every tally sent while it is armed carries a <code>rehearsal: true</code> flag that the lobby screens recognize, and the settings page’s health check warns for as long as it is on.</>}>
           Before opening night a leader can run a full practice: real labels print with a bold TEST
           band, the lobby screens show a rehearsal notice, and nothing is counted or remembered.
         </CapabilityCard>
@@ -80,9 +80,9 @@ const RunsTheRoom: React.FC = () => (
 
       <Also items={[
         { b: 'A slide can hold the check-ins.', rest: 'While a slide marked “Hold check-ins” is up, arriving names wait instead of covering it, then each plays in full on the next slide.' },
-        { b: "A “what’s new” card", rest: 'on the dashboard shows the release notes for the version that just arrived.' },
+        { b: "A “what’s new” card", rest: 'on the settings page shows the release notes for the version that just arrived.' },
         { b: 'A broken update is easy to fix:', rest: 'an interrupted install offers a one-click Repair instead of a cryptic error.' },
-        { b: 'The dashboard notices', rest: 'when Chrome is still running an older extension than the one the app installed.' },
+        { b: 'The settings page notices', rest: 'when Chrome is still running an older extension than the one the app installed.' },
         { b: 'The lobby screens can wear the season', rest: 'the labels are wearing (with a screen’s theme set to Auto), and always show when a rehearsal is running.' },
         { b: 'An optional update beacon', rest: 'confirms a clean install with nothing more than a version number, only if a church turns it on.' },
         { b: 'Warnings in plain words:', rest: 'a missing consent column or a stuck queue is spelled out, never a silent yellow box.' },
@@ -107,8 +107,8 @@ const Accuracy: React.FC = () => (
       <ul className="fam-cards">
         <CapabilityCard icon="chart" title="Tonight’s count comes from TwoTimTwo"
           safeguard="A child a volunteer removed on the phone, or a night an operator reset, stays removed even while TwoTimTwo keeps listing them."
-          hood={<>A check-in report counts when it arrived within the last 12 minutes, plus anyone checked in since. With no fresh report, the count falls back to the printer’s own history, and the dashboard’s health check names the fallback, so a weaker number never looks like the stronger one.</>}>
-          The number on the lobby screen and the dashboard follows TwoTimTwo’s own check-in report, so a
+          hood={<>A check-in report counts when it arrived within the last 12 minutes, plus anyone checked in since. With no fresh report, the count falls back to the printer’s own history, and the settings page’s health check names the fallback, so a weaker number never looks like the stronger one.</>}>
+          The number on the lobby screen follows TwoTimTwo’s own check-in report, so a
           child checked in while the laptop was asleep is still counted.
         </CapabilityCard>
         <CapabilityCard icon="check" title="A count check that names the gap"
@@ -124,11 +124,11 @@ const Accuracy: React.FC = () => (
           to add what’s missing.
         </CapabilityCard>
         <CapabilityCard icon="nocam" title="No-photo wishes are never silent"
-          safeguard="The dashboard’s consent summary shows the answers it found, never children’s names."
+          safeguard="The consent check reports the answers it found, never children’s names."
           hood={<><code>parseNoPhoto()</code> reads both the photo-release and the medical-release columns and flags any answer that starts with a negative word (“No”, “Declined”) or carries a negative phrase (“Not signed”, “No photos”). Blank, “N/A” and “pending” mean not answered, and never print the camera.</>}>
           If a family has said no to photos, in either consent column and in any of the ways a church
           might write it, the crossed-out camera prints, and a solid bar runs down the label’s right edge
-          so whoever holds the camera sees it at a glance. If the column can’t be read, the dashboard says so.
+          so whoever holds the camera sees it at a glance. If the column can’t be read, the settings page says so.
         </CapabilityCard>
         <CapabilityCard icon="id" title="Twin-safe labels"
           hood={<>Identity is anchored to TwoTimTwo’s own clubber id first, with the name as a fallback, through printing, duplicate checks and reprints. An ambiguous name is refused rather than guessed.</>}>
@@ -136,7 +136,7 @@ const Accuracy: React.FC = () => (
           names match exactly, their labels add a middle initial or a small birth-month note.
         </CapabilityCard>
         <CapabilityCard icon="lock" title="Names travel sealed" tag="With a display key"
-          safeguard="Until a church sets its key, the dashboard says plainly that names are traveling unsealed."
+          safeguard="Until the laptop is signed in and holds the church’s key, the settings page says plainly that names are traveling unsealed."
           hood={<><code>AES-256-GCM</code>, padded so a message’s length gives nothing away about a name. A screen that holds a key drops any unsealed name message, so the protection can’t be quietly switched off.</>}>
           The lobby screens receive names over a public realtime channel, so each first name and club is
           encrypted before it leaves the laptop. Anyone who found the channel could not read a single child’s name.
@@ -150,7 +150,7 @@ const Accuracy: React.FC = () => (
         { b: 'A daily read-only check', rest: "that TwoTimTwo’s pages still work the way the extension expects, caught before club night." },
         { b: '“Tonight” means tonight:', rest: 'streaks, exports and counts agree on the local evening, even late at night.' },
         { b: 'Reset tonight', rest: 'zeroes a practice night on every screen at once, without deleting a single history row.' },
-        { b: 'Who is still here at pickup:', rest: 'the laptop keeps the lobby screens’ still-here list itself, sealed like every name, for the clubs a leader ticks on the dashboard (Trek and Journey start unticked: they leave on their own).' },
+        { b: 'Who is still here at pickup:', rest: 'the laptop keeps the lobby screens’ still-here list itself, sealed like every name, for the clubs a leader ticks on the settings page (Trek and Journey start unticked: they leave on their own).' },
       ]} />
     </div>
   </section>
@@ -173,21 +173,21 @@ const NightOf: React.FC = () => (
         </figure>
         <figure className="fam-frame lbl-figure">
           <div className="lbl-stage"><JamAlarm /></div>
-          <Caption fig="Fig. 5">A jam turns the dashboard red and says what is stuck, and where the fix is.</Caption>
+          <Caption fig="Fig. 5">A jam turns the settings page’s status card red and says what is stuck, and where the fix is.</Caption>
         </figure>
       </div>
 
       <ul className="fam-cards">
-        <CapabilityCard icon="phone" title="A phone becomes a check-in station" tag="Off by default"
-          safeguard="The laptop only answers phones after a church sets a PIN and turns on phone access."
+        <CapabilityCard icon="phone" title="A phone becomes a check-in station" tag="Church passphrase"
+          safeguard="The laptop never listens on the network: phones go through the church’s sync service and sign in with the passphrase."
           hood={<>The Tonight tab mirrors the same list the lobby tally is built from, with Remove and Add back for local corrections. Remove fixes the count here; it never undoes the check-in on TwoTimTwo. Undo check-in does: the laptop undoes it on TwoTimTwo, and the count changes only once TwoTimTwo confirms. Check out works the same way: the laptop checks the child out on TwoTimTwo, and only once TwoTimTwo answers OK does the child come off the count and the lobby’s still-here list. Online at awana.kvbchurch.org/checkin, signed in with the church passphrase, the check-in itself goes through the church’s cloud service straight to TwoTimTwo, with the laptop on or off, and the laptop prints the tag the moment it hears.</>}>
-          A volunteer’s phone on the church Wi-Fi can check a child in, print a leader’s name tag, and see
+          A volunteer’s phone, on any network, can check a child in, print a leader’s name tag, and see
           exactly who is being counted tonight.
         </CapabilityCard>
-        <CapabilityCard icon="alarm" title="The dashboard turns red on a jam"
+        <CapabilityCard icon="alarm" title="The status card turns red on a jam"
           safeguard="Clearing the queue asks first, and only works at the laptop itself, never from a phone."
           hood={<><code>checkPrinterWarnings()</code> reads the Windows print queue and warns at three or more waiting jobs, an oldest job past 90 seconds, or any error status such as PaperOut. If the queue can’t be read, it says unknown, never zero.</>}>
-          A paper jam or an empty roll used to sit behind a green dashboard while labels quietly failed.
+          A paper jam or an empty roll used to sit behind a green status light while labels quietly failed.
           Now a backlog turns the light red, names the real numbers, and points to Clear print queue.
         </CapabilityCard>
         <CapabilityCard icon="reprint" title="Reprint a whole stretch after a jam"
@@ -198,7 +198,7 @@ const NightOf: React.FC = () => (
         <CapabilityCard icon="badge" title="Leader name tags, remembered"
           safeguard="A leader tag never counts as a child’s check-in, anywhere."
           hood={<>Remembered leaders live in their own names-only list and are offered for 270 days, a full club year, then quietly step aside. One tap forgets a name.</>}>
-          A volunteer’s tag prints from the widget, the phone or the dashboard. After the first time, their
+          A volunteer’s tag prints from the widget, the phone or the settings page. After the first time, their
           name comes back as a one-tap chip for the rest of the season.
         </CapabilityCard>
         <CapabilityCard icon="tag" title="A label that just says VOLUNTEER"
@@ -223,7 +223,7 @@ const NightOf: React.FC = () => (
           </CapabilityCard>
         </ul>
         <Safeguard id="sg-not-here" title="How the “Not here” list is kept safe" items={[
-          { promise: 'Off until a church turns on phone check-in', detail: 'It lives on the PIN-protected phone page, which the laptop only serves once a PIN and phone access are set.' },
+          { promise: 'Behind the church passphrase', detail: 'It lives on the phone page at awana.kvbchurch.org/checkin, which opens only for someone who knows the passphrase.' },
           { promise: "It stays on the leader’s phone", detail: 'The list is never sent to the lobby screens or over the realtime channel.' },
           { promise: '“Not checked in yet,” never “missing”', detail: 'It only knows who has had a label printed tonight, and the page says so. It is not a headcount.' },
           { promise: 'Blank until it truly knows', detail: 'The count stays empty until the roster has actually loaded, so it can never show a confident zero.' },
@@ -237,7 +237,7 @@ const NightOf: React.FC = () => (
         { b: 'Leader worksheets', rest: 'can print themselves when the meeting starts, also off until chosen.' },
         { b: 'One-tap reprints', rest: "of any single label from tonight’s list in the widget." },
         { b: "Keeps printing when the Wi-Fi doesn’t:", rest: 'the widget searches the roster saved on the laptop, so labels still print and the TwoTimTwo check-ins can be finished later.' },
-        { b: '“Help, not working?”', rest: 'in the widget runs its own checks, and the dashboard has a traffic-light health view and a test label preview.' },
+        { b: '“Help, not working?”', rest: 'in the widget runs its own checks, and the settings page has a health view, diagnostics and a test label.' },
       ]} />
     </div>
   </section>
