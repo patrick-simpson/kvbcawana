@@ -42,6 +42,24 @@ const Module = require('module');
 const os = require('os');
 const path = require('path');
 
+// ── Pin the wall clock ────────────────────────────────────────────────────────
+// The server keys "today" and "tonight" on the LOCAL date (localDayISO, read
+// from the global Date when called), and so does this file's own checks. A run
+// that crosses midnight therefore splits one night's rows across two days: a
+// row written at 23:59:59 reads back as yesterday's at 00:00:01, and about
+// twenty "tonight" checks fail. So the clock starts at a Wednesday, 7 pm local,
+// and runs on from there: timers and elapsed-time checks still advance, and no
+// run gets near midnight. Installed before the server loads, so every `new Date()`
+// the server makes after that point reads the pinned clock.
+const RealDate = Date;
+const PINNED_AT = new RealDate(2026, 9, 7, 19, 0, 0).getTime();
+const clockShift = PINNED_AT - RealDate.now();
+class PinnedDate extends RealDate {
+  constructor(...args) { if (args.length === 0) super(PinnedDate.now()); else super(...args); }
+  static now() { return RealDate.now() + clockShift; }
+}
+global.Date = PinnedDate;
+
 const PORT = Number(process.env.AWANA_TEST_PORT || 34573);
 const BASE = `http://127.0.0.1:${PORT}`;
 

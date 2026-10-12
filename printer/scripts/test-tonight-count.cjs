@@ -21,6 +21,21 @@
 
 'use strict';
 
+// ── Pin the wall clock ────────────────────────────────────────────────────────
+// Every synthetic row is stamped relative to "now" and must fall on TODAY, which
+// the server reads from the local date. Run across midnight (8 pm Eastern on a
+// UTC runner) the rows land on yesterday and every "tonight" count comes up
+// empty. So the clock starts at a Wednesday, 7 pm local, and runs on from there
+// (timers still advance). Installed before the server loads.
+const RealDate = Date;
+const PINNED_AT = new RealDate(2026, 9, 7, 19, 0, 0).getTime();
+const clockShift = PINNED_AT - RealDate.now();
+class PinnedDate extends RealDate {
+  constructor(...args) { if (args.length === 0) super(PinnedDate.now()); else super(...args); }
+  static now() { return RealDate.now() + clockShift; }
+}
+global.Date = PinnedDate;
+
 let __suiteFinished = false;
 process.on('exit', (code) => {
   if (code === 0 && !__suiteFinished) {

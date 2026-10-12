@@ -297,8 +297,11 @@ describe('useTally', () => {
     });
 
     it('counts an UNSTAMPED check-in once the grace window has passed', () => {
-      vi.useFakeTimers();
+      // Pin the wall clock mid-evening: unpinned, a run that crosses midnight
+      // rolls the day key and load() re-reads zero, so the bump counts 1, not 8.
+      vi.useFakeTimers({ toFake: ['Date'] });
       try {
+        vi.setSystemTime(new Date(2026, 9, 7, 19, 0));   // a Wednesday, 7 pm
         const { api } = setup();
         act(() => { api.current.sync(7, Date.now()); });
         act(() => { vi.advanceTimersByTime(TALLY_BUMP_GRACE_MS + 1); });

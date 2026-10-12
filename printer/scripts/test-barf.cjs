@@ -4,6 +4,21 @@
 // tells the sync service who brought whom for the night's email. A stub
 // printer counts the tags; a stand-in sync service catches the reports.
 'use strict';
+
+// ── Pin the wall clock ────────────────────────────────────────────────────────
+// `today` below is computed up front and handed to the server as tonight's
+// BARF Night, while the server asks the global Date for the local day on every
+// print. A run that crosses midnight (8 pm Eastern on a UTC runner) would lose
+// its BARF Night mid-test. So the clock starts at a Wednesday, 7 pm local, and
+// runs on from there (timers still advance). Installed before the server loads.
+const RealDate = Date;
+const PINNED_AT = new RealDate(2026, 9, 7, 19, 0, 0).getTime();
+const clockShift = PINNED_AT - RealDate.now();
+class PinnedDate extends RealDate {
+  constructor(...args) { if (args.length === 0) super(PinnedDate.now()); else super(...args); }
+  static now() { return RealDate.now() + clockShift; }
+}
+global.Date = PinnedDate;
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
