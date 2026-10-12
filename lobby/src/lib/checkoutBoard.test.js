@@ -106,6 +106,12 @@ describe('going quiet shows as age, not as a frozen list', () => {
     expect(d.ageMin).toBe(0);
   });
 
+  it('a list from an earlier night is hidden, not warned about', () => {
+    const d = decideBoard({ ...base, checkout: payload(10, 7207) });
+    expect(d.state).toBe(BOARD_HIDDEN);
+    expect(d.reason).toMatch(/earlier night/);
+  });
+
   it('staleness wins over name suppression', () => {
     // A stale short list must not render as the anonymous message, which would
     // imply live knowledge that almost everyone had gone.
@@ -251,7 +257,8 @@ describe('decideBoard ages the data by this screen\'s clock when App stamped it'
       checkout: { entries: [{ firstName: 'Ava', club: 'Sparks' }], printed: 10, at: now - 26 * 60 * 60 * 1000, receivedAt: now - 1000 },
       namesAbove: 0, staleMin: 15, now,
     });
-    expect(d.state).toBe(BOARD_STALE);
+    // Never shown as fresh; 26 h is an earlier night, so the board stays away.
+    expect(d.state).toBe(BOARD_HIDDEN);
   });
   it('an unstamped payload is aged by its own at, as before', () => {
     const now = new Date(2026, 9, 7, 20, 0).getTime();

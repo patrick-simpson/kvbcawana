@@ -65,6 +65,14 @@ export const PICKUP_START = '19:30';
 export const EMPTY_HOLD_MS = 60_000;
 
 /**
+ * A list older than this cannot be tonight's (club nights run a few hours), so
+ * it is from an earlier night and the board stays away instead of warning that
+ * "this list stopped updating" about a list nobody is expected to send (a
+ * Monday evening showed "7207 min ago", owner 2026-10-12).
+ */
+export const OLD_LIST_MIN = 12 * 60;
+
+/**
  * "HH:MM" (24-hour) to minutes after midnight, or null when it is not one.
  * @param {unknown} hhmm
  * @returns {number | null}
@@ -120,6 +128,9 @@ export function decideBoard({ checkout, namesAbove, staleMin, now, emptySince = 
   // rather than as "fresh forever" — a skewed producer clock must not be able to
   // pin the board open indefinitely.
   const age = ageMin < 0 ? 0 : ageMin;
+  if (!demo && age > OLD_LIST_MIN) {
+    return { state: BOARD_HIDDEN, ageMin: Math.round(age), reason: 'the last list is from an earlier night' };
+  }
   if (age > staleMin) {
     return { state: BOARD_STALE, ageMin: Math.round(age), reason: 'the checkout tab is probably closed' };
   }
