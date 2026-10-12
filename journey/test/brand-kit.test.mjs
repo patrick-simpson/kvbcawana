@@ -332,6 +332,15 @@ test("Awana's deck keeps its own look, the template slide's type included", () =
   for (const { selector, body } of deck) {
     assert.deepEqual(declarations(body), AWANA_DECK[selector], `${selector} is exactly as Awana's deck has it`);
   }
+  // The full profile's slide transitions (24-motion.js) animate the deck's
+  // layers from script and leave every declaration above alone; the one
+  // stylesheet rule they add is the heading's words as boxes, on the full
+  // profile only, changing nothing else about the type.
+  const words = rules(styleCss).filter((r) => /\.jm-word/.test(r.selector));
+  assert.deepEqual(
+    words.map((r) => [r.selector, declarations(r.body)]),
+    [['html.motion-full .jm-word', ['display: inline-block']]]
+  );
 });
 
 /* style.css split where a low-profile page stops matching: the one motion

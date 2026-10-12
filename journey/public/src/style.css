@@ -2339,6 +2339,43 @@ html.cursor-hidden #slide-controls {
     animation: jm-rise 420ms var(--jm-settle) 120ms backwards;
   }
 
+  /* Teaching slides: the bar rides up under the deck; every slide change
+     sends a sweep across (24-motion.js adds .jm-slide-sweep, a band of its
+     own: Awana's slide is already there underneath, untouched). */
+  html.motion-full #slide-controls {
+    animation: jm-bar-up 420ms var(--jm-settle) 160ms backwards;
+  }
+  html.motion-full .jm-slide-sweep {
+    position: absolute;
+    inset: 0;
+    z-index: 9;
+    overflow: hidden;
+    pointer-events: none;
+  }
+  html.motion-full .jm-slide-sweep > span {
+    position: absolute;
+    top: -10%;
+    bottom: -10%;
+    left: 0;
+    width: 34%;
+    background: var(--jr-purple);
+    transform: translateX(150vw);
+    animation: jm-band-across 460ms var(--jm-wipe) both;
+  }
+  html.motion-full .jm-slide-sweep > span + span {
+    width: 6%;
+    background: var(--jr-hot);
+    animation-delay: 60ms;
+  }
+  html.motion-full .jm-slide-sweep.is-back > span {
+    animation-name: jm-band-back;
+  }
+  /* The template slide's heading, split into its words for the word-by-word
+     slam (24-motion.js); a word must be a box to scale. */
+  html.motion-full .jm-word {
+    display: inline-block;
+  }
+
   /* The view flip (Check-in Display <-> Journey, both ways): four skewed
      bars (hot, ink, deep, club purple) slam across in a stack, the
      destination's name slams onto the purple, then the bars peel away in
@@ -2473,6 +2510,17 @@ html.cursor-hidden #slide-controls {
   }
   @keyframes jm-rise {
     from { opacity: 0; transform: translateY(2.4rem); }
+  }
+  @keyframes jm-bar-up {
+    from { transform: translateY(calc(100% + max(3vh, 24px) + 12px)); }
+  }
+  @keyframes jm-band-across {
+    from { transform: translateX(-50vw) skewX(-16deg); }
+    to { transform: translateX(150vw) skewX(-16deg); }
+  }
+  @keyframes jm-band-back {
+    from { transform: translateX(150vw) skewX(16deg); }
+    to { transform: translateX(-50vw) skewX(16deg); }
   }
   @keyframes jm-bar-in {
     from { transform: translateX(-160%) skewX(-14deg); }

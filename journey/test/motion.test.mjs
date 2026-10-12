@@ -80,6 +80,31 @@ test('a desktop gets the motion; the view has flipped before the stinger is even
   }
 });
 
+test('desktop slides: each step sends a sweep over the stage, a step back sweeps the other way', async () => {
+  const k = bootKiosk(ROUTES, ANSWERED, DESKTOP, reduce(false));
+  try {
+    await ticks();
+    k.window.startSlidesPreview(6);
+    await ticks(1);
+    // The flip into the slides has its own stinger (covering slide 1); let it end.
+    const bars = k.document.querySelectorAll('.jm-stinger .jm-stinger-bar');
+    assert.equal(bars.length, 4);
+    bars[0].dispatchEvent(new k.window.Event('animationend'));
+    assert.equal(stinger(k), null);
+    k.window.nextSlide();
+    await ticks(1);
+    const sweep = k.document.querySelector('#slides-view > .jm-slide-sweep');
+    assert.ok(sweep);
+    assert.equal(sweep.classList.contains('is-back'), false);
+    k.window.prevSlide();
+    await ticks(1);
+    assert.equal(k.document.querySelectorAll('.jm-slide-sweep').length, 1, 'one sweep at a time');
+    assert.equal(k.document.querySelector('.jm-slide-sweep').classList.contains('is-back'), true);
+  } finally {
+    k.close();
+  }
+});
+
 test('reduced motion, configure mode and the Low power choice all switch it off; Full switches it on', async () => {
   const reduced = bootKiosk(ROUTES, ANSWERED, DESKTOP, reduce(true));
   try {
@@ -186,6 +211,60 @@ async function walkAndCollect(page) {
     return { names: [...names].sort(), cls: document.documentElement.className };
   });
 }
+
+// Steps a week-6 slideshow onto its first generated (template) slide, then
+// one more, and reports what moved and what the heading says.
+async function stepSlides(page) {
+  return page.evaluate(async () => {
+    startSlidesPreview(6);
+    const counter = document.getElementById('slide-counter');
+    const heading = document.getElementById('slide-template-heading');
+    const template = document.getElementById('slide-template');
+    // Image slides first; step until the template slide shows.
+    for (let i = 0; i < 8 && template.classList.contains('hidden'); i += 1) nextSlide();
+    await Promise.resolve();
+    const text = heading.textContent;
+    const running = (el) => el.getAnimations().length;
+    const first = {
+      text,
+      words: [...heading.querySelectorAll('.jm-word')].map((w) => w.textContent),
+      templateAnims: running(template),
+      bulletAnims: [...document.querySelectorAll('#slide-template-bullets li')].map(running),
+      counter: counter.textContent,
+    };
+    nextSlide(); // pressed again mid-animation: the next slide, at once
+    await Promise.resolve();
+    const second = { counter: counter.textContent, text: heading.textContent, templateAnims: running(template) };
+    return { first, second };
+  });
+}
+
+test('in Chromium: slide changes animate the layers on a desktop, never on the Pi, and never hold a press', { skip }, async () => {
+  const { chromium } = await import('playwright-core');
+  const browser = await chromium.launch({ executablePath: CHROMIUM });
+  try {
+    const full = await openPage(browser, DESKTOP);
+    const { first, second } = await stepSlides(full.page);
+    assert.ok(first.words.length >= 2, 'the heading is split into its words');
+    assert.equal(first.words.join(' '), first.text.trim().split(/\s+/).join(' '), 'the same words in the same order');
+    assert.equal(first.templateAnims, 1, 'the background wipes in');
+    assert.ok(first.bulletAnims.length === 3 && first.bulletAnims.every((n) => n === 1), 'each bullet cascades in');
+    assert.notEqual(second.counter, first.counter, 'a press mid-transition steps on at once');
+    assert.equal(second.templateAnims, 1, 'the old transition is cancelled, the new one runs');
+    await full.context.close();
+
+    for (const [device, reducedMotion] of [[PI_ZERO, 'no-preference'], [DESKTOP, 'reduce']]) {
+      const quiet = await openPage(browser, device, reducedMotion);
+      const run = await stepSlides(quiet.page);
+      assert.deepEqual(run.first.words, [], 'the heading stays one text node');
+      assert.equal(run.first.templateAnims, 0);
+      assert.deepEqual(run.first.bulletAnims, [0, 0, 0]);
+      await quiet.context.close();
+    }
+  } finally {
+    await browser.close();
+  }
+});
 
 test('in Chromium: the Pi profile runs only the splash pulse; a desktop runs the entrances', { skip }, async () => {
   const { chromium } = await import('playwright-core');
