@@ -1266,7 +1266,7 @@ html, body, #root {
    that mounts a name. Its buttons still take the press. */
 
 /* ── Tabbed panels: Settings and the slide editor ────────────────────────
-   A fixed-height column: the header band and the tab rail pinned on top,
+   A fixed-height column: the header band pinned on top,
    the cards scrolling on the pale field, the actions always visible at the
    bottom (crucial when driving a TV from a couch). */
 .panel--tabbed {
@@ -1318,62 +1318,6 @@ html, body, #root {
   max-width: 24rem;
   margin: 0;
 }
-/* Something is wrong (printer failures, a crashed layer, the central config,
-   the wake lock, demo mode): a white note across the band, keyed in the
-   Sparks red, or sunflower for the softer ones. */
-.panel .panel-header .hint.panel-alert {
-  grid-column: 1 / -1;
-  margin-top: 0.45rem;
-  padding: 0.6rem 0.95rem;
-  border-radius: 12px;
-  border-left: 6px solid var(--brand-sparks-deep);
-  background: #ffffff;
-  color: var(--panel-ink);
-  font-size: 0.92rem;
-}
-.panel .panel-header .hint.panel-alert--warn { border-left-color: var(--brand-sun); }
-.panel .panel-header .hint.panel-alert code { color: var(--panel-ink); }
-
-/* The tab rail: Londrina tracked caps; the open tab is the blue chip. */
-.panel-tabs {
-  display: flex;
-  gap: 0.35rem;
-  padding: 0.7rem var(--panel-pad) 0.75rem;
-  background: #ffffff;
-  border-bottom: 2px solid var(--panel-card-line);
-  overflow-x: auto;
-  scrollbar-width: none;
-  flex-shrink: 0;
-}
-.panel-tabs::-webkit-scrollbar { display: none; }
-.panel button.panel-tab {
-  /* Overrides the generic .panel button look: a tab is type, not a key. */
-  appearance: none;
-  min-height: 44px;
-  padding: 0.55rem 1.05rem 0.5rem;
-  border: 0;
-  border-radius: 999px;
-  background: transparent;
-  box-shadow: none;
-  font-size: 1.08rem;
-  letter-spacing: 0.07em;
-  color: var(--panel-muted);
-  white-space: nowrap;
-}
-.panel button.panel-tab:hover { color: var(--panel-ink); background: var(--brand-cloud); }
-/* A tab is type, not a key: a softer squish about its middle, and no sink. */
-.panel button.panel-tab {
-  --squish-x: var(--squish-tab-x);
-  --squish-y: var(--squish-tab-y);
-  --squish-sink: 0 0;
-  transform-origin: 50% 50%;
-}
-.panel button.panel-tab[aria-selected='true'] {
-  color: #ffffff;
-  background: var(--brand-blue);
-  box-shadow: 0 3px 0 var(--brand-blue-deep);
-}
-
 /* The body: cards on the pale field. */
 .panel-body {
   flex: 1;
@@ -1495,8 +1439,6 @@ html, body, #root {
 
 /* A readout: the chip's plate and keyline on a light surface. The keyline
    is the box; the plate is printed a little out of register behind it. */
-.panel .tab-intro,
-.panel .calendar-preview,
 .panel .notice-warn,
 .panel .panel-note {
   position: relative;
@@ -1509,8 +1451,6 @@ html, body, #root {
   color: var(--panel-ink);
   font-size: 0.95rem;
 }
-.panel .tab-intro::before,
-.panel .calendar-preview::before,
 .panel .notice-warn::before,
 .panel .panel-note::before {
   content: '';
@@ -1524,15 +1464,6 @@ html, body, #root {
 /* A published deck is being ignored: sunflower, not red; nothing is broken. */
 .panel .notice-warn { border-color: var(--brand-orange-deep); }
 .panel .notice-warn::before { background: var(--brand-cream); }
-.panel .calendar-preview {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-  flex-wrap: wrap;
-  margin: 0.25rem 0 1.2rem;
-  font-weight: 700;
-}
 /* Connection tab summary: three short lines, one fact each. */
 .panel .conn-summary > div + div { margin-top: 0.3rem; }
 .panel .panel-intro { display: block; margin-bottom: 1.1rem; }
@@ -2008,15 +1939,11 @@ html, body, #root {
   .panel--tabbed .panel-header h2 { font-size: 1.8rem; }
   .panel--tabbed .panel-header .hint.panel-sub { font-size: 0.85rem; line-height: 1.35; }
   .panel--tabbed .panel-header .status-line { padding: 0.4rem 0.8rem; font-size: 0.85rem; }
-  .panel-tabs { padding-block: 0.45rem 0.5rem; }
-  .panel button.panel-tab { min-height: 40px; padding-block: 0.45rem 0.4rem; }
   .panel-body { padding-top: 1rem; }
   .panel--tabbed .actions { padding-top: 0.6rem; gap: 0.45rem; }
   .panel--tabbed .actions button { min-height: 40px; padding-block: 0.4rem 0.35rem; }
   .panel--tabbed jelly-button { --jelly-button-height: 2.75rem; }
   .panel .hint.panel-legal { margin-top: 0.4rem; font-size: 0.72rem; }
-  .panel .panel-header .hint.panel-alert { margin-top: 0.3rem; padding: 0.35rem 0.8rem; font-size: 0.85rem; line-height: 1.35; }
-  .panel .panel-header .panel-alert button.small { min-height: 30px; padding-block: 0.2rem 0.15rem; font-size: 0.88rem; }
 }
 .panel .hint.panel-legal {
   margin: 0.55rem 0 0;
@@ -2566,9 +2493,6 @@ input:focus-visible {
 /* ── Narrow screens: compact chrome, wrappable banner ────── */
 @media (max-width: 700px) {
   .corner-stack { gap: 0.85rem; }
-  .first-time-burst { width: clamp(72px, 20vw, 110px); top: -22%; }
-  .welcome-back-seal { width: clamp(72px, 20vw, 110px); top: -22%; }
-  .first-time-burst span { font-size: clamp(0.7rem, 2.6vw, 0.95rem); }
 
   /* The lobby's u makes the overlays tiny on a phone; give the ones a
      leader reads there a floor, and let the band use the width. */
@@ -2611,13 +2535,6 @@ input:focus-visible {
     margin-top: 0.35rem;
     padding: 0.3rem 0.7rem;
     font-size: 0.78rem;
-  }
-  .panel-tabs { padding: 0.45rem var(--panel-pad); gap: 0.15rem; }
-  .panel button.panel-tab {
-    min-height: 40px;
-    padding: 0.45rem 0.65rem 0.4rem;
-    font-size: 0.9rem;
-    letter-spacing: 0.05em;
   }
   .panel-body { padding: 0.9rem var(--panel-pad) 0.4rem; }
   .panel-card { padding: 0.9rem 1rem 0.2rem; }
@@ -4070,10 +3987,8 @@ details.advanced-fields > .hint { display: block; margin-bottom: 0.9rem; }
   .panel--settings .actions > * { flex: 1 1 0; }
 }
 
-/* Settings → Pickup board: two times side by side, and the live preview, a
-   16:9 frame whose --u is 1% of its own width, so the board inside draws at
+/* Settings → Pickup board: the live preview, a 16:9 frame whose --u is 1% of its own width, so the board inside draws at
    exactly its TV proportions. */
-.panel .field-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.9rem; }
 .board-preview {
   position: relative;
   container-type: inline-size;
