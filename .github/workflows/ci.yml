@@ -318,10 +318,11 @@ jobs:
     # expects, a file over Pages' 25 MiB that is not in the repo, a missing
     # must-have) and the Pages Function has tests. Both used to run only
     # inside the main-only deploy job, after the Worker had already shipped,
-    # so a PR never saw them. Here they run on every push and PR, and this is
-    # the ONE build: the deploy job publishes the dist this job uploads (with
-    # the same SITE_ORIGIN: the repository variable, which the deploy used,
-    # else the production address) instead of rebuilding it.
+    # so a PR never saw them. Here they run on every push and PR. The deploy
+    # job builds the same commit again itself rather than taking this job's
+    # dist as a run file: run files count against the account's 0.5 GB of
+    # Actions storage, and with the owner's $0 Actions budget a full storage
+    # would block the upload and stop every deploy (owner, 2026-10-12).
     name: The one site
     runs-on: ubuntu-latest
     timeout-minutes: 25
@@ -344,21 +345,6 @@ jobs:
         run: node site/build.mjs
       - name: Test the Pages Function
         run: node --test site/test/*.test.mjs
-      # What the deploy job publishes: dist, and the generated list of files
-      # too big for Pages (site/functions/journey imports it; it is not
-      # committed). Hidden files are included so nothing in dist is dropped.
-      - name: Keep the built site for the deploy job
-        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
-        uses: actions/upload-artifact@v4
-        with:
-          name: site-dist
-          path: |
-            site/dist
-            site/lib/large-files.generated.js
-          include-hidden-files: true
-          if-no-files-found: error
-          retention-days: 1
-          compression-level: 1   # the deploy job waits on this upload and download
 
   deploy:
     # The site is built first (its failures are the cheap ones), then the
@@ -390,7 +376,10 @@ jobs:
         with:
           node-version: '22'
           cache: npm
-          cache-dependency-path: lobby/worker/package-lock.json
+          cache-dependency-path: |
+            lobby/worker/package-lock.json
+            lobby/package-lock.json
+            printer/package-lock.json
       - name: Check the Cloudflare secrets
         id: ready
         run: |
@@ -403,15 +392,20 @@ jobs:
       - name: Install the Worker's packages (wrangler)
         if: steps.ready.outputs.ready == 'true'
         run: npm ci --prefix lobby/worker
-      - name: Fetch the site the site job built
-        # Built once, by the site job of this same run, with the same
-        # SITE_ORIGIN and commit. dist, plus site/lib/large-files.generated.js
-        # (the Pages Function imports it), land back where they were built.
+      - name: Build the site
+        # Same commit and SITE_ORIGIN as the site job's checked build (no run
+        # file hand-off: see the site job). dist, plus
+        # site/lib/large-files.generated.js (the Pages Function imports it).
         if: steps.ready.outputs.ready == 'true'
-        uses: actions/download-artifact@v4
-        with:
-          name: site-dist
-          path: site
+        env:
+          SITE_ORIGIN: ${{ vars.SITE_ORIGIN }}
+        run: |
+          if [ -z "$SITE_ORIGIN" ]; then
+            echo "::error::Set the repository variable SITE_ORIGIN (https://awana.kvbchurch.org) before deploying."; exit 1
+          fi
+          npm ci --prefix lobby
+          npm ci --prefix printer
+          node site/build.mjs
       - name: Check the site's origin
         if: steps.ready.outputs.ready == 'true'
         env:
@@ -511,28 +505,3 @@ jobs:
           $WRANGLER pages project create kvbcawana --production-branch main 2>/dev/null || true
           $WRANGLER pages deploy dist --project-name kvbcawana --branch main --commit-dirty=true
 
-  cleanup:
-    # site-dist (~50 MB) is only a hand-off from the site job to the deploy
-    # job; left for its one-day retention, a busy day of pushes filled the
-    # account's 0.5 GB of Actions storage (owner, 2026-10-12). Deleted as soon
-    # as the deploy is done or skipped. A FAILED deploy keeps it for its day,
-    # so "Re-run failed jobs" still finds it.
-    name: Delete the hand-off files
-    needs: [site, deploy]
-    if: ${{ always() && needs.deploy.result != 'failure' && github.event_name != 'pull_request' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    permissions:
-      actions: write
-    steps:
-      - name: Delete this run's site-dist
-        env:
-          GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.repository }}
-          RUN_ID: ${{ github.run_id }}
-        run: |
-          gh api "repos/$REPO/actions/runs/$RUN_ID/artifacts" --jq '.artifacts[] | select(.name == "site-dist") | .id' |
-            while read -r id; do
-              gh api -X DELETE "repos/$REPO/actions/artifacts/$id" >/dev/null && echo "Deleted site-dist ($id)" ||
-                echo "::warning::Could not delete site-dist ($id); it expires in a day"
-            done
