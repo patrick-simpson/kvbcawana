@@ -82,6 +82,51 @@ export function warningWords(code) {
   })[code] || code;
 }
 
+/** A station seen this recently counts as on (routes.md 10.2). */
+export const STATION_RECENT_MS = 2 * 60 * 1000;
+/** The first KVBC Awana that follows a runtime SINGLE_PUBLISHER / YM_CHECKOUT change. */
+export const STATION_MIN_VERSION = '9.3.0';
+
+/** @param {unknown} v @returns {number[]} */
+function versionParts(v) {
+  return String(v ?? '').split('.').map((n) => Number.parseInt(n, 10) || 0);
+}
+/** @param {unknown} a @param {unknown} b @returns {boolean} a < b */
+export function versionBelow(a, b) {
+  const x = versionParts(a);
+  const y = versionParts(b);
+  for (let i = 0; i < 3; i += 1) {
+    if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) < (y[i] || 0);
+  }
+  return false;
+}
+
+/**
+ * What the Worker is likely to warn about, worked out here from what the page
+ * already holds (the switches' station list and the overview's watch window),
+ * so the confirm can say it BEFORE the press. The Worker's own answer to the PUT
+ * is the authority and replaces this on the card afterwards (routes.md 10.2).
+ * @param {{ stations?: any[] } | null} switches the GET /v1/switches answer
+ * @param {any} overview
+ * @param {string} name @param {'on' | 'off' | 'default'} value @param {number} [now]
+ * @returns {string[]} warning codes
+ */
+export function predictWarnings(switches, overview, name, value, now = Date.now()) {
+  /** @type {string[]} */
+  const out = [];
+  const stations = Array.isArray(switches?.stations) ? switches.stations : [];
+  const recent = stations.filter((s) => {
+    const t = typeof s.lastSeenAt === 'number' ? s.lastSeenAt : Date.parse(s.lastSeenAt);
+    return Number.isFinite(t) && now - t <= STATION_RECENT_MS;
+  });
+  if (name === 'CHURCH_SETTINGS' || name === 'NOTICES' || name === 'CHANGE_LOG') return out;
+  if (!recent.length) out.push('no-station');
+  if (recent.some((s) => !s.version || versionBelow(s.version, STATION_MIN_VERSION))) out.push('station-old');
+  if (overview?.window?.open) out.push('window-open');
+  if (name === 'YM_CHECKOUT' && value === 'off' && recent.length) out.push('ym-tab-reload');
+  return out;
+}
+
 /** The sentence a notice send/undo/take-down failure gets. @param {Answer} a */
 export function noticeFailure(a) {
   if (a.status === 503 && a.body?.reason === 'notices-off') return 'Notices are switched off (Online check-in switches, Advanced).';

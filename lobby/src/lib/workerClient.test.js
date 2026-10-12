@@ -49,3 +49,28 @@ describe('the overhaul routes (routes.md section 10)', () => {
     expect(w.undoFailure({ status: 410, body: {}, message: '' })).toMatch(/too old/);
   });
 });
+
+describe('predicting the warnings for the confirm (routes.md 10.2)', () => {
+  const now = Date.parse('2026-10-14T23:00:00Z');
+  const seen = (secAgo, version = '9.3.0') => ({ stationId: 's', name: 'Laptop', lastSeenAt: new Date(now - secAgo * 1000).toISOString(), version });
+  it('compares versions', () => {
+    expect(w.versionBelow('9.2.1', '9.3.0')).toBe(true);
+    expect(w.versionBelow('9.3.0', '9.3.0')).toBe(false);
+    expect(w.versionBelow('10.0.0', '9.3.0')).toBe(false);
+    expect(w.versionBelow(null, '9.3.0')).toBe(true);
+  });
+  it('no station seen in 2 minutes', () => {
+    expect(w.predictWarnings({ stations: [seen(300)] }, null, 'CLOUD_PRINT', 'on', now)).toContain('no-station');
+    expect(w.predictWarnings({ stations: [] }, null, 'CLOUD_PRINT', 'on', now)).toContain('no-station');
+    expect(w.predictWarnings({ stations: [seen(30)] }, null, 'CLOUD_PRINT', 'on', now)).toEqual([]);
+  });
+  it('an old station, an open watch window, a youth check-out turned off', () => {
+    expect(w.predictWarnings({ stations: [seen(30, '9.2.1')] }, null, 'SINGLE_PUBLISHER', 'off', now)).toContain('station-old');
+    expect(w.predictWarnings({ stations: [seen(30)] }, { window: { open: true } }, 'CLOUD_PRINT', 'on', now)).toContain('window-open');
+    expect(w.predictWarnings({ stations: [seen(30)] }, null, 'YM_CHECKOUT', 'off', now)).toContain('ym-tab-reload');
+    expect(w.predictWarnings({ stations: [seen(30)] }, null, 'YM_CHECKOUT', 'on', now)).not.toContain('ym-tab-reload');
+  });
+  it('the safety switches warn of nothing', () => {
+    expect(w.predictWarnings({ stations: [] }, { window: { open: true } }, 'NOTICES', 'off', now)).toEqual([]);
+  });
+});

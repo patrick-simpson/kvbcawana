@@ -155,6 +155,18 @@ export function agoWords(at, now = Date.now()) {
   return `${Math.round(h / 24)} days ago`;
 }
 
+/** "in 12 min" style time left until a moment. @param {unknown} at @param {number} [now] */
+export function untilWords(at, now = Date.now()) {
+  const t = atMs(at);
+  if (t === null) return 'later';
+  const min = Math.round((t - now) / 60000);
+  if (min <= 0) return 'now';
+  if (min < 60) return `in ${min} min`;
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  return `in ${h} h${m ? ` ${m} min` : ''}`;
+}
+
 /** The TwoTimTwo read as one word and a line. @param {any} read */
 export function readWords(read) {
   if (!read || !read.configured) return { tone: 'warn', text: 'Not set up: the service has no TwoTimTwo user yet.' };
