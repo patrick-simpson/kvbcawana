@@ -455,6 +455,25 @@ export class SyncCore {
     return Math.max(0, IP_MAX_FAILS - mine.count);
   }
 
+  /**
+   * Forget guess counters whose window and lock are long over, so a scan from
+   * many addresses cannot leave a key behind for each one for ever. Run by the
+   * scheduled run; a Store without list() (tests) has nothing to prune.
+   */
+  async pruneFails() {
+    if (!this.storage.list) return 0;
+    const t = this.now();
+    const keep = Math.max(IP_LOCK_MS, GLOBAL_WINDOW_MS, GLOBAL_LOCK_MS);
+    let dropped = 0;
+    for (const [key, v] of await this.storage.list({ prefix: 'fails:', limit: 1000 })) {
+      if (v && v.until > t) continue;
+      if (v && typeof v.first === 'number' && t - v.first <= keep) continue;
+      await this.storage.delete(key);
+      dropped += 1;
+    }
+    return dropped;
+  }
+
   /** @param {string} ip */
   async lockout(ip) {
     const ms = await this.lockedFor(ip);
@@ -1015,6 +1034,7 @@ export class SyncCore {
   async cron() {
     await this.switches.load();
     await this.relayQueue.purge();
+    await this.pruneFails();
     // Keeps the watcher's alarm set (it sets its own after each run; this is
     // the safety net if one was ever lost).
     await this.watcher.arm();

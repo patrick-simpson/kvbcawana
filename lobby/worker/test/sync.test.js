@@ -253,6 +253,21 @@ describe('template and Journey settings', () => {
   });
 });
 
+describe('guess counters', () => {
+  it('the scheduled run forgets counters whose window is long over, and keeps live ones', async () => {
+    const s = setup();
+    s.storage.list = async ({ prefix }) => new Map([...s.storage.map].filter(([k]) => k.startsWith(prefix)).map(([k, v]) => [k, structuredClone(v)]));
+    const t0 = s.now();
+    await s.storage.put('fails:1.2.3.4', { count: 2, first: t0 - 3 * 3600000, until: 0 });
+    await s.storage.put('fails:5.6.7.8', { count: 2, first: t0 - 60000, until: 0 });
+    await s.storage.put('fails:9.9.9.9', { count: 5, first: t0 - 3 * 3600000, until: t0 + 60000 });
+    expect(await s.core.pruneFails()).toBe(1);
+    expect(s.storage.map.has('fails:1.2.3.4')).toBe(false);
+    expect(s.storage.map.has('fails:5.6.7.8')).toBe(true);
+    expect(s.storage.map.has('fails:9.9.9.9')).toBe(true);
+  });
+});
+
 describe('the calendar', () => {
   it('Refresh reads the church page now, keeps it, and rings every screen', async () => {
     const s = setup();
