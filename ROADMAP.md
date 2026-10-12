@@ -656,7 +656,7 @@ said); "Owner" is what only the owner can do.
     sealed to.
   - **Worker core built (2026-10-12):** the phone page's reads, the desk's and the
     watcher's now all take a slot on the one 5 s clock (`readbudget.js`); the
-    watcher reads its report about every 10 s. Stations, the print lease, the
+    watcher reads its report about every 15 s. Stations, the print lease, the
     claim ledger, the desk claim API and the watcher's claim rules are in
     `lobby/worker/src` (routes.md sections 4 to 7, marked BUILT). Still open for
     the owner: `CLOUD_PRINT` and `SINGLE_PUBLISHER` stay `"off"` in

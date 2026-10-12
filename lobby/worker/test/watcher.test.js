@@ -145,9 +145,9 @@ describe('the watcher', () => {
     expect(near.alarm.at - near.now()).toBe(10 * 60 * 1000);
   });
 
-  it('reads the report about every 10 s, and every read of every kind shares one 5 s clock', async () => {
+  it('reads the report about every 15 s, and every read of every kind shares one 5 s clock', async () => {
     expect(READ_INTERVAL_MS).toBe(5000);
-    expect(WATCH_INTERVAL_MS).toBe(10000);
+    expect(WATCH_INTERVAL_MS).toBe(15000);
     expect(SEAL_PER_TICK).toBe(1);
     const s = setup({ kids: [kid(1)] });
     await s.w.tick();

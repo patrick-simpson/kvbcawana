@@ -418,7 +418,7 @@ undo): the station ends it quietly.
   in all; a caller says how long it will queue (`waitMs`): 0 for the watcher
   (it skips its turn), `INTERACTIVE_WAIT_MS` (12 s) for a desk or phone request,
   and a refusal is `{error: 'read-busy', retryAfterMs}`. The watcher's report is
-  read about every 10 s (`WATCH_INTERVAL_MS`), the rest of the slots are the
+  read about every 15 s (`WATCH_INTERVAL_MS`), the rest of the slots are the
   others'. The clock survives a restart (`read:next` in storage). The sign-in
   takes slots too, one per request (the form, the login post, its redirect),
   and so does every redirect hop: the first request of a call queues for the

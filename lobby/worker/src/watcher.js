@@ -36,9 +36,11 @@ export { READ_INTERVAL_MS };
  * takes a slot from the one clock in readbudget.js (the client does it before
  * each page GET). The watcher's report is read about every WATCH_INTERVAL_MS,
  * which leaves the slots in between to the desk, the phone page and the
- * check-in and checkout pages.
+ * check-in and checkout pages. 15 s (owner, 2026-10-12): while the laptop's
+ * extension tab still reads TwoTimTwo beside the Worker (about 5 reads a
+ * minute), the two together stay under TwoTimTwo's one read every 5 s.
  */
-export const WATCH_INTERVAL_MS = 10 * 1000;
+export const WATCH_INTERVAL_MS = 15 * 1000;
 /**
  * Work per alarm invocation. Sealing a print job to the stations is ECDH per
  * station (measured ~4.2 ms for 3 stations under Node), and the free plan

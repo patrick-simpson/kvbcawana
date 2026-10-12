@@ -179,7 +179,7 @@ describe('the Worker publishes the tally, the ticker and the still-here list', (
     const count = (e) => t.sent.filter((f) => f.e === e).length;
     expect([count('tally'), count('tonight'), count('checkout')]).toEqual([1, 1, 1]);
     // two more reads of the same report inside the minute: nothing new
-    for (let i = 0; i < 3; i++) { t.clock.tick(10000); await t.core.watcher.tick(); }
+    for (let i = 0; i < 3; i++) { t.clock.tick(WATCH_INTERVAL_MS); await t.core.watcher.tick(); }
     expect([count('tally'), count('tonight'), count('checkout')]).toEqual([1, 1, 1]);
     // a minute on: the heartbeat
     t.clock.tick(MINUTE_MS);
@@ -187,7 +187,7 @@ describe('the Worker publishes the tally, the ticker and the still-here list', (
     expect([count('tally'), count('tonight'), count('checkout')]).toEqual([2, 2, 2]);
     // a child checked in on TwoTimTwo's own page: a change, at once
     t.night.kids.push(kid('5', 'Cubbies', 'Eve Tester'));
-    t.clock.tick(10000);
+    t.clock.tick(WATCH_INTERVAL_MS);
     await t.core.watcher.tick();
     expect((await frames(t, 'tally')).at(-1)).toMatchObject({ total: 5, counts: { Cubbies: 1 } });
     expect((await frames(t, 'checkout')).at(-1).entries.map((e) => e.firstName)).toEqual(['Ada', 'Bo', 'Dee', 'Eve']);
