@@ -117,6 +117,26 @@ const today = (() => { const d = new Date(); return `${d.getFullYear()}-${String
     check('the sync service may send it as a job; a phone page may not', relay.jobAllowed('POST', '/print-barf-bags') && !relay.relayAllowed('POST', '/print-barf-bags'));
   }
 
+  console.log('\nA late BARF friend: the tag alone (9.3.1, a station job)');
+  {
+    const before = jobs();
+    const historyFile = path.join(dataDir, 'print-history.json');
+    const readHistory = () => (fs.existsSync(historyFile) ? fs.readFileSync(historyFile, 'utf8') : '');
+    const historyBefore = readHistory();
+    const reportsBefore = reports.length;
+    let r = await post('/print-barf-tag', { firstName: '  Ava  ' });
+    await settle();
+    check('it prints ONE label, the BARFED tag', r.status === 200 && r.body.ok === true && jobs() === before + 1, `${JSON.stringify(r)} ${jobs() - before}`);
+    check('and records nothing: no report to the service, no history row',
+      reports.length === reportsBefore && readHistory() === historyBefore);
+    r = await post('/print-barf-tag', { firstName: ' <> ' });
+    check('no first name is a clear refusal, nothing printed', r.status === 400 && jobs() === before + 1, JSON.stringify(r));
+    const puller = require(path.join(root, 'print-server', 'job-puller.js'));
+    check('the station runs it as a job', puller.jobPullAllowed('POST', '/print-barf-tag'));
+    const relay = require(path.join(root, 'print-server', 'phone-relay.js'));
+    check('the laptop relay never runs it (station jobs only)', !relay.jobAllowed('POST', '/print-barf-tag') && !relay.relayAllowed('POST', '/print-barf-tag'));
+  }
+
   console.log('\nBARF Night: the phone\'s card');
   {
     const q = await post('/phone/checkin', { name: 'Ava Stone', options: { Bible: true, Friend: true, FriendName: ' Maya<b> ' } });

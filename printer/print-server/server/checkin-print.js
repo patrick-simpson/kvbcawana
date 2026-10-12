@@ -551,6 +551,29 @@ app.post('/print-barf-bags', async (req, res) => {
   }
 });
 
+// A late BARF friend's tag (9.3.1, owner 2026-10-12): the child is already
+// checked in and has their name tag; the sync Worker redid the check-in with
+// Brought a friend and sends ONLY this (a job from awana.kvbchurch.org/checkin's
+// BARF button, lobby/worker/src/routes.md 5.1). generateBarfTag(): slime band,
+// BARFED!, the first name alone. No history row, no count, no greeting: the
+// station's journal keeps it to one label; the Worker decided it is a BARF night.
+app.post('/print-barf-tag', async (req, res) => {
+  const firstName = $tags.cleanFriendName(req.body && req.body.firstName);
+  if (!firstName) return res.status(400).json({ error: 'firstName is required' });
+  let pngPath = null;
+  try {
+    pngPath = (await $tags.generateBarfTag({ firstName })).pngPath;
+    await $printing.printLabel(pngPath, $config.PRINTER_NAME);
+    console.log('[print] a late BARF tag');
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('[print] a late BARF tag failed:', e.message);
+    res.status(500).json({ error: 'The BARF tag did not print. Check the label printer.' });
+  } finally {
+    if (pngPath) fs.unlink(pngPath, () => {});
+  }
+});
+
 app.post('/print', async (req, res) => {
   const body = req.body || {};
   let firstName, lastName;
