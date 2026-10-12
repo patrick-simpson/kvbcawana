@@ -468,16 +468,29 @@ async function generateLabel(input) {
     // Preserve aspect ratio within the 76pt square. Post-crop this is the
     // aspect of the ARTWORK — a wordmark on a padded square canvas used to fit
     // by its padding and shrink the art; now it fits by the art itself.
-    const drawArt = (art) => {
+    // `rotate` turns the art 90 degrees counter-clockwise (reads bottom to
+    // top) BEFORE fitting, so it fills the square by its sideways shape.
+    const drawArt = (art, rotate = false) => {
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = 'high';
-      const aspect = art.width / art.height;
+      const artW = rotate ? art.height : art.width;
+      const artH = rotate ? art.width : art.height;
+      const aspect = artW / artH;
       let drawW = iconSize, drawH = iconSize;
       if (aspect > 1) { drawH = iconSize / aspect; }
       else { drawW = iconSize * aspect; }
-      const dx = iconX + (iconSize - drawW) / 2;
-      const dy = iconY + (iconSize - drawH) / 2;
-      ctx.drawImage(art.canvas, dx, dy, drawW, drawH);
+      const cx = iconX + iconSize / 2;
+      const cy = iconY + iconSize / 2;
+      if (!rotate) {
+        ctx.drawImage(art.canvas, cx - drawW / 2, cy - drawH / 2, drawW, drawH);
+        return;
+      }
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(-Math.PI / 2);
+      // Drawn in the turned frame: its width is the fitted HEIGHT.
+      ctx.drawImage(art.canvas, -drawH / 2, -drawW / 2, drawH, drawW);
+      ctx.restore();
     };
     {
       // FIRST CHOICE for every club the kit knows: the official one-colour
@@ -491,7 +504,7 @@ async function generateLabel(input) {
       const key = $eligibility.clubKey(clubName);
       const mark = await thermalClubMark(key, inkWhite);
       if (mark) {
-        drawArt(mark);
+        drawArt(mark, !!brand.MARK_ROTATE[key]);
         markDrawn = true;
       }
     }

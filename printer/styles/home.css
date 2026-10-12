@@ -562,6 +562,7 @@ sup { font-size: .55em; line-height: 0; vertical-align: .9em; }
 .kv-label { position: relative; display: flex; width: 100%; aspect-ratio: 2 / 1; background: #fff; border-radius: 1.6cqw; box-shadow: 0 0 0 .3cqw rgba(35, 31, 32, .12), .8cqw .8cqw 0 rgba(35, 31, 32, .12); overflow: hidden; color: #111; }
 .kv-label__art { flex: none; width: 24%; display: grid; place-items: center; background: #e9e8e5; padding: 2cqw; }
 .kv-label__art img { width: 100%; height: auto; max-height: 26cqw; object-fit: contain; }
+.kv-label__art--turn img { flex: none; width: 44cqw; max-width: none; height: 20cqw; max-height: none; transform: rotate(-90deg); }
 .kv-label__main { position: relative; flex: 1; display: flex; flex-direction: column; justify-content: center; padding: 2.4cqw 4cqw 2.4cqw 4.4cqw; }
 .kv-label--nophoto .kv-label__main { margin-right: 3.4cqw; }
 .kv-label--nophoto::after { content: ""; position: absolute; right: 0; top: 0; bottom: 0; width: 3.4cqw; background: #111; }

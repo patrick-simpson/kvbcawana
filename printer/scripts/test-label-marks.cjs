@@ -4,7 +4,10 @@
 //     kit's official one-colour mark, even when TwoTimTwo's club image is
 //     supplied (its small colour pictures print distorted and dark in 1 bit);
 //   unknown club -> the supplied image;
-//   kit mark missing -> the supplied image, else the letter monogram.
+//   kit mark missing -> the supplied image, else the letter monogram;
+//   orientation (owner 2026-10-12): the mark prints SIDEWAYS (brand.MARK_ROTATE)
+//     for Puggles, Cubbies, Sparks, Trek, Journey, upright for T&T; image and
+//     monogram fallbacks always upright.
 // Rendering is byte-deterministic, so "which art was drawn" is a byte compare
 // against the same label rendered with only that art available.
 const fs = require('fs');
@@ -18,7 +21,7 @@ process.env.AWANA_DATA_DIR = dataDir;
 
 const server = require(path.join(__dirname, '..', 'print-server', 'server.js'));
 const brand = require(path.join(__dirname, '..', 'print-server', 'brand.js'));
-const { createCanvas } = require(path.join(__dirname, '..', 'print-server', 'node_modules', '@napi-rs', 'canvas'));
+const { createCanvas, loadImage } = require(path.join(__dirname, '..', 'print-server', 'node_modules', '@napi-rs', 'canvas'));
 
 let passed = 0;
 const failures = [];
@@ -40,6 +43,25 @@ fs.cpSync(path.join(KIT_DIR, 'fonts'), path.join(noMarksKit, 'fonts'), { recursi
 
 const render = async (clubName, clubImageBuffer, more = {}) =>
   (await server.generateLabel({ firstName: 'Testkid', lastName: 'Sample', clubName, clubImageBuffer, ...more })).buffer;
+// Ink bounding box inside the icon panel (left 340 px, clear of the wave line).
+const inkBox = async (buf) => {
+  const img = await loadImage(buf);
+  const c = createCanvas(340, img.height), x = c.getContext('2d');
+  x.drawImage(img, 0, 0);
+  const d = x.getImageData(0, 0, 340, img.height).data;
+  let x0 = 1e9, y0 = 1e9, x1 = -1, y1 = -1;
+  for (let py = 0; py < img.height; py++) for (let px = 0; px < 340; px++) {
+    const i = (py * 340 + px) * 4;
+    if (d[i] < 80 && d[i + 1] < 80 && d[i + 2] < 80) { if (px < x0) x0 = px; if (px > x1) x1 = px; if (py < y0) y0 = py; if (py > y1) y1 = py; }
+  }
+  return { w: x1 - x0 + 1, h: y1 - y0 + 1 };
+};
+const wideSolid = (() => {
+  const c = createCanvas(400, 200);
+  const x = c.getContext('2d');
+  x.fillStyle = '#000000'; x.fillRect(0, 0, 400, 200);
+  return c.toBuffer('image/png');
+})();
 const same = (a, b) => Buffer.compare(a, b) === 0;
 
 (async () => {
@@ -54,6 +76,22 @@ const same = (a, b) => Buffer.compare(a, b) === 0;
     check(`${club}: kit mark missing -> the supplied image is drawn`, !same(pictureOnly, withPic) && !same(pictureOnly, monogram));
     check(`${club}: kit mark missing, no image -> the monogram, not the mark`, !same(monogram, without));
   }
+
+  for (const club of ['Puggles', 'Cubbies', 'Sparks', 'Trek', 'Journey']) {
+    const b = await inkBox(await render(club));
+    check(`${club}: mark is sideways, taller than wide (${b.w}x${b.h})`, b.h > b.w);
+    check(`${club}: sideways mark fills the panel height (${b.h}px)`, b.h >= 200);
+  }
+  const tnt = await inkBox(await render('T&T'));
+  check(`T&T: mark stays upright, wider than tall (${tnt.w}x${tnt.h})`, tnt.w >= tnt.h);
+  check('MARK_ROTATE is a per-club table: T&T off, the other five on',
+    !brand.MARK_ROTATE['t&t'] && ['puggle', 'cubbie', 'spark', 'trek', 'journey'].every((k) => brand.MARK_ROTATE[k] === true));
+  brand.loadBrandKit(noMarksKit);
+  const fbWide = await inkBox(await render('Puggles', wideSolid));
+  const fbUnknown = await inkBox(await render('Rookies', wideSolid));
+  brand.loadBrandKit(KIT_DIR);
+  check(`fallback supplied image stays upright for a rotating club (${fbWide.w}x${fbWide.h})`, fbWide.w > fbWide.h);
+  check(`unknown club image stays upright (${fbUnknown.w}x${fbUnknown.h})`, fbUnknown.w > fbUnknown.h);
 
   const unknownPic = await render('Rookies', picture);
   const unknownNone = await render('Rookies');

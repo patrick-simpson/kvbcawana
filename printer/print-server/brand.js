@@ -67,6 +67,13 @@ const FONT_FILES = Object.freeze([
 // label.
 const MARK_FILES = Object.freeze(Object.fromEntries(CLUB_TABLE.map((c) => [c.key, `${c.mark}-black.svg`])));
 
+// Clubs whose mark prints SIDEWAYS on the label: rotated 90 degrees
+// counter-clockwise (reads bottom to top) so a wide wordmark fills the tall
+// icon panel instead of shrinking to a thin strip. Owner's choice 2026-10-12;
+// T&T stays upright. Only the kit mark turns: the supplied image and the
+// monogram fallbacks stay upright.
+const MARK_ROTATE = Object.freeze({ puggle: true, cubbie: true, spark: true, trek: true, journey: true });
+
 // How the warnings name them to an operator.
 const MARK_NAMES = Object.freeze(Object.fromEntries(CLUB_TABLE.map((c) => [c.key, c.name])));
 
@@ -512,7 +519,7 @@ function warnings() {
 }
 
 module.exports = {
-  DEFAULT_BRAND_DIR, FONT_FILES, MARK_FILES, MARK_RASTER_LONG_SIDE,
+  DEFAULT_BRAND_DIR, FONT_FILES, MARK_FILES, MARK_ROTATE, MARK_RASTER_LONG_SIDE,
   loadBrandKit, status, warnings,
   fontReady, fontCovers, splitRuns, clubMarkSvg, markFailed, kitGeneration,
   // Pure helpers, exported for unit tests.
