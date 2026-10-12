@@ -45,6 +45,7 @@
     "test:reconcile": "node scripts/test-reconcile.cjs",
     "test:audit": "node scripts/test-attendance-audit.cjs",
     "test:brand": "node scripts/test-brand-kit.cjs",
+    "test:club-fonts": "node scripts/test-club-fonts.cjs",
     "test:about": "node scripts/test-about-page.cjs",
     "test:dashboard": "node scripts/test-dashboard-chrome.cjs",
     "test:app": "node --test \"electron-app/test/*.test.cjs\""

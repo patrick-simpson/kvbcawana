@@ -85,24 +85,45 @@ function getClubFontFamily(clubName) {
 // `wght` is Figtree's weight axis. Figtree ships as one variable font and the
 // canvas ignores a CSS weight for it (it draws the default Light instance and
 // fakes anything heavier), so the weight goes through fontVariationSettings.
+//
+// CLUB FACES (owner 2026-10-12). Puggles and Cubbies set EVERY line in Comic
+// Neue, Trek and Journey in Playfair Display (brand.CLUB_FACES, keyed by club
+// key; Sparks, T&T, no club and an unknown club keep the voices above). Each
+// role's `tier` says which of the club set's three weights it takes: `shout`
+// the first name and the monogram, `bold` the club line, group, "Go to",
+// pills, chips and bands, `regular` the rest, as in the approved previews.
+// The club face goes IN FRONT of the role's voice, so a label falls back in
+// steps: a word the club face cannot draw (Comic Neue has no Vietnamese or
+// Ș, Playfair no Greek) goes to the stock voice, and only a word that cannot
+// draw either goes to the old Windows face; a `whole` role makes the same
+// choice for the whole string. A club whose face did not load (brand.clubFaces
+// is then null) prints exactly the stock label. A label with no club of its
+// own (custom, BARF, drop-off) passes '' and is stock.
 const LEGACY_SANS = 'Helvetica, Arial, sans-serif';
 const LABEL_VOICES = Object.freeze({
-  name:      { family: 'Paytone One',          legacy: 'bold', whole: true },
-  monogram:  { family: 'Paytone One',          legacy: 'bold', whole: true },
-  custom:    { family: 'Paytone One',          legacy: 'bold', legacyFamily: LEGACY_SANS, whole: true },
-  last:      { family: 'Figtree', wght: 500,   legacy: '',     whole: true },
-  hint:      { family: 'Figtree', wght: 500,   legacy: 'italic' },
-  group:     { family: 'Figtree', wght: 600,   legacy: 'italic' },
-  goTo:      { family: 'Figtree', wght: 700,   legacy: 'bold' },
-  milestone: { family: 'Figtree', wght: 500,   legacy: '' },
-  footer:    { family: 'Figtree', wght: 400,   legacy: 'italic' },
-  age:       { family: 'Figtree', wght: 600,   legacy: '' },
-  club:      { family: 'Londrina Solid',       legacy: 'italic bold' },
-  stepUp:    { family: 'Londrina Solid Black', legacy: 'bold' },
-  pill:      { family: 'Londrina Solid Black', legacy: 'bold' },
-  band:      { family: 'Londrina Solid Black', legacy: 'bold' },
-  test:      { family: 'Londrina Solid Black', legacy: 'bold', legacyFamily: LEGACY_SANS },
+  name:      { family: 'Paytone One',          legacy: 'bold', whole: true, tier: 'shout' },
+  monogram:  { family: 'Paytone One',          legacy: 'bold', whole: true, tier: 'shout' },
+  custom:    { family: 'Paytone One',          legacy: 'bold', legacyFamily: LEGACY_SANS, whole: true, tier: 'shout' },
+  last:      { family: 'Figtree', wght: 500,   legacy: '',     whole: true, tier: 'regular' },
+  hint:      { family: 'Figtree', wght: 500,   legacy: 'italic', tier: 'regular' },
+  group:     { family: 'Figtree', wght: 600,   legacy: 'italic', tier: 'bold' },
+  goTo:      { family: 'Figtree', wght: 700,   legacy: 'bold', tier: 'bold' },
+  milestone: { family: 'Figtree', wght: 500,   legacy: '', tier: 'regular' },
+  footer:    { family: 'Figtree', wght: 400,   legacy: 'italic', tier: 'regular' },
+  age:       { family: 'Figtree', wght: 600,   legacy: '', tier: 'regular' },
+  club:      { family: 'Londrina Solid',       legacy: 'italic bold', tier: 'bold' },
+  stepUp:    { family: 'Londrina Solid Black', legacy: 'bold', tier: 'bold' },
+  pill:      { family: 'Londrina Solid Black', legacy: 'bold', tier: 'bold' },
+  band:      { family: 'Londrina Solid Black', legacy: 'bold', tier: 'bold' },
+  test:      { family: 'Londrina Solid Black', legacy: 'bold', legacyFamily: LEGACY_SANS, tier: 'bold' },
 });
+
+// The first name's line box per club face, measured once at a 'top' baseline
+// (label-layout.js NAME_CAP_TOP, NAME_BOX_AIR): keyed by family and weight;
+// null when the face measured nonsense (then the stock constants are used).
+const nameBoxes = new Map();
+// Room, in em, a club face's ink is given past its measured bounds (inkReach).
+const CLUB_INK_PAD = 0.045;
 
 // The type helpers for one label, bound to its club's old family. Every helper
 // takes (ctx, role, size, text): measure, fill (honouring ctx.textAlign and
@@ -119,53 +140,70 @@ const LABEL_VOICES = Object.freeze({
 // the kit's face and the other in Helvetica.
 function labelType(clubName, pinned = {}) {
   const clubFamily = getClubFontFamily(clubName);
-  const voice = (role) => LABEL_VOICES[role] || LABEL_VOICES.last;
+  const clubSet = brand.clubFaces(clubKeyByLabel(clubName));
+  const stock = (role) => LABEL_VOICES[role] || LABEL_VOICES.last;
+  // The faces a role may be set in, best first, each a whole voice (family,
+  // weight, and the role's legacy style behind it): the club's face, then the
+  // stock voice. Only faces that loaded are listed.
+  const faces = (role) => {
+    const v = stock(role);
+    const out = [];
+    const c = clubSet && clubSet[v.tier];
+    if (c) out.push({ ...v, family: c.family, wght: c.wght });
+    if (brand.fontReady(v.family)) out.push(v);
+    return out;
+  };
+  // The first face that draws every character of `s`, else null (old face).
+  const wholeFace = (role, s) => faces(role).find((f) => brand.fontCovers(f.family, s)) || null;
   const pinnedFace = new Map();
   for (const [role, whole] of Object.entries(pinned || {})) {
-    const v = voice(role);
-    pinnedFace.set(role, brand.fontReady(v.family) && brand.fontCovers(v.family, whole));
+    pinnedFace.set(role, wholeFace(role, whole));
   }
+  // Runs of `text`, each with the face it prints in (`face`, null for the old
+  // Windows face).
   const runsOf = (role, text) => {
-    const v = voice(role);
+    const v = stock(role);
     const s = String(text == null ? '' : text);
-    if (pinnedFace.has(role)) return [{ text: s, brand: pinnedFace.get(role) }];
-    if (!brand.fontReady(v.family)) return [{ text: s, brand: false }];
-    if (v.whole) return [{ text: s, brand: brand.fontCovers(v.family, s) }];
-    return brand.splitRuns(v.family, s);
+    if (pinnedFace.has(role)) return [{ text: s, face: pinnedFace.get(role) }];
+    const list = faces(role);
+    if (!list.length) return [{ text: s, face: null }];
+    if (v.whole) return [{ text: s, face: wholeFace(role, s) }];
+    return brand.splitRuns(list.map((f) => f.family), s)
+      .map((r) => ({ text: r.text, face: list.find((f) => f.family === r.family) || null }));
   };
-  const use = (ctx, role, size, inBrand) => {
-    const v = voice(role);
+  const use = (ctx, role, size, face) => {
+    const v = stock(role);
     const fallback = v.legacyFamily || clubFamily;
-    ctx.font = inBrand
-      ? `${size}px "${v.family}", ${fallback}`
+    ctx.font = face
+      ? `${size}px "${face.family}", ${fallback}`
       : `${v.legacy ? v.legacy + ' ' : ''}${size}px ${fallback}`;
     // Always set, so no weight leaks from one run into the next face.
-    ctx.fontVariationSettings = inBrand && v.wght ? `"wght" ${v.wght}` : 'normal';
+    ctx.fontVariationSettings = face && face.wght ? `"wght" ${face.wght}` : 'normal';
   };
   const measure = (ctx, role, size, text) => {
     let w = 0;
-    for (const r of runsOf(role, text)) { use(ctx, role, size, r.brand); w += ctx.measureText(r.text).width; }
+    for (const r of runsOf(role, text)) { use(ctx, role, size, r.face); w += ctx.measureText(r.text).width; }
     return w;
   };
   const fill = (ctx, role, size, text, x, y) => {
     const runs = runsOf(role, text);
     if (runs.length === 1) {
-      use(ctx, role, size, runs[0].brand);
+      use(ctx, role, size, runs[0].face);
       ctx.fillText(runs[0].text, x, y);
       return;
     }
     // Mixed faces: lay the runs out left to right on ONE alphabetic baseline,
-    // the one the brand face would sit on at (x, y) — each face's own 'top' or
-    // 'middle' sits at a different height, so anchoring runs separately would
-    // step the line.
+    // the one the lead (first kit) face would sit on at (x, y) — each face's
+    // own 'top' or 'middle' sits at a different height, so anchoring runs
+    // separately would step the line.
     const align = ctx.textAlign;
     const baseline = ctx.textBaseline;
-    const widths = runs.map((r) => { use(ctx, role, size, r.brand); return ctx.measureText(r.text).width; });
+    const widths = runs.map((r) => { use(ctx, role, size, r.face); return ctx.measureText(r.text).width; });
     const total = widths.reduce((a, b) => a + b, 0);
     let left = align === 'center' ? x - total / 2
       : (align === 'right' || align === 'end') ? x - total : x;
-    const lead = runs.find((r) => r.brand) || runs[0];
-    use(ctx, role, size, lead.brand);
+    const lead = runs.find((r) => r.face) || runs[0];
+    use(ctx, role, size, lead.face);
     let yAlpha = y;
     if (baseline !== 'alphabetic') {
       const below = ctx.measureText(lead.text).actualBoundingBoxDescent;
@@ -175,7 +213,7 @@ function labelType(clubName, pinned = {}) {
     ctx.textBaseline = 'alphabetic';
     ctx.textAlign = 'left';
     runs.forEach((r, i) => {
-      use(ctx, role, size, r.brand);
+      use(ctx, role, size, r.face);
       ctx.fillText(r.text, left, yAlpha);
       left += widths[i];
     });
@@ -196,49 +234,91 @@ function labelType(clubName, pinned = {}) {
     }
     return minSize;
   };
-  // True when this text would print in the kit face (for layout decisions
-  // that depend on the face's shape, like the name's descender room).
-  const inBrand = (role, text) => runsOf(role, text).some((r) => r.brand);
+  // True when this text would print in a kit face, the stock voice's or the
+  // club's (for layout decisions that depend on the face's shape, like the
+  // name's descender room).
+  const inBrand = (role, text) => runsOf(role, text).some((r) => r.face);
   // How far the ink of `text` reaches above and below the origin of a line
   // drawn with a 'top' baseline (or the given one; 'alphabetic' is the line's
   // baseline itself), as a multiple of the size ({ above, below }, `above`
   // positive UP, so an accented capital that rises past the top of the em box
   // is positive and an ordinary word is negative). null unless the whole text
-  // prints in the kit face: the old Windows faces keep their ink inside the box
+  // prints in ONE kit face: the old Windows faces keep their ink inside the box
   // and were laid out without this. Measured off the canvas at 100 px and
-  // scaled (outlines scale exactly), so it is the shipped font's own answer,
-  // glyph by glyph: a plain name reaches 0.20 down from the origin, "Émile" is
-  // 0.09 above it, "Ștefan" hangs 1.31 below it.
+  // scaled (outlines scale exactly), in the face the text prints in, so it is
+  // the shipped font's own answer, glyph by glyph: in Paytone One a plain name
+  // reaches 0.20 down from the origin, "Émile" is 0.09 above it, "Ștefan"
+  // hangs 1.31 below it.
   const inkReach = (ctx, role, text, at = 'top') => {
     const runs = runsOf(role, text);
-    if (runs.length !== 1 || !runs[0].brand || !runs[0].text) return null;
+    if (runs.length !== 1 || !runs[0].face || !runs[0].text) return null;
     const baseline = ctx.textBaseline;
     ctx.textBaseline = at;
-    use(ctx, role, 100, true);
+    use(ctx, role, 100, runs[0].face);
     const m = ctx.measureText(runs[0].text);
     ctx.textBaseline = baseline;
-    const above = m.actualBoundingBoxAscent / 100;
-    const below = m.actualBoundingBoxDescent / 100;
+    // A club face is unhinted (the rasteriser autohints it), and at label
+    // sizes its marks print up to 0.045 em past the outline's bounds (measured
+    // at 16 to 46 pt, 1-bit), so it is given that room on both sides; the
+    // stock shout's numbers are its own, as they always were.
+    const pad = runs[0].face.family === stock(role).family ? 0 : CLUB_INK_PAD;
+    const above = m.actualBoundingBoxAscent / 100 + pad;
+    const below = m.actualBoundingBoxDescent / 100 + pad;
     return Number.isFinite(above) && Number.isFinite(below) ? { above, below } : null;
   };
   // How far to move a line drawn with a 'middle' baseline so that the CAPITAL
   // block sits on the line's centre, as a multiple of the size; 0 unless the
-  // text prints in the kit face. The canvas puts 'middle' at the centre of the
+  // text prints in a kit face. The canvas puts 'middle' at the centre of the
   // em box, and a face's capitals are not centred in that: Galindo's stood
   // 0.09 above it, Paytone One's 0.06 below. Capitals, not the string's own
-  // ink, so two lines of one label keep one baseline whatever they contain.
+  // ink, so two lines of one label keep one baseline whatever they contain;
+  // the lead face's capitals, so each club face is centred on its own.
   const capCentre = (ctx, role, text) => {
-    const runs = runsOf(role, text);
-    if (!runs.some((r) => r.brand)) return 0;
+    const lead = runsOf(role, text).find((r) => r.face);
+    if (!lead) return 0;
     const baseline = ctx.textBaseline;
     ctx.textBaseline = 'middle';
-    use(ctx, role, 100, true);
-    const m = ctx.measureText('H');
+    use(ctx, role, 100, lead.face);
+    // A monogram is a few letters alone in a disc, and a club face's capitals
+    // are not all capital-sized (Playfair Display's J hangs below the line),
+    // so in a club face it centres on its own ink. The stock shout keeps the
+    // capitals it was laid out on.
+    const own = role === 'monogram' && lead.face.family !== stock(role).family;
+    const m = ctx.measureText(own ? lead.text : 'H');
     ctx.textBaseline = baseline;
     const shift = (m.actualBoundingBoxAscent - m.actualBoundingBoxDescent) / 200;
     return Number.isFinite(shift) ? shift : 0;
   };
-  return { measure, fill, truncate, fit, inBrand, inkReach, capCentre };
+  // The first name's line box in the face `text` prints in: { lift, lineH }
+  // as multiples of the size (label-layout.js NAME_LIFT_BRAND), or null when
+  // it prints in the old faces or mixes faces (the box is then the size
+  // itself, as it always was). The stock shout keeps the constants; a club
+  // face is measured once (see nameBoxes).
+  const nameBox = (ctx, role, text) => {
+    const runs = runsOf(role, text);
+    if (runs.length !== 1 || !runs[0].face) return null;
+    const face = runs[0].face;
+    if (face.family === stock(role).family) {
+      return { lift: $labelLayout.NAME_LIFT_BRAND, lineH: $labelLayout.NAME_LINE_H_BRAND };
+    }
+    const key = `${face.family}|${face.wght || ''}`;
+    if (!nameBoxes.has(key)) {
+      const baseline = ctx.textBaseline;
+      ctx.textBaseline = 'top';
+      use(ctx, role, 100, face);
+      const capTop = -ctx.measureText('H').actualBoundingBoxAscent / 100;
+      const bottom = ctx.measureText('gjpqy').actualBoundingBoxDescent / 100;
+      ctx.textBaseline = baseline;
+      let box = null;
+      if (Number.isFinite(capTop) && Number.isFinite(bottom) && bottom > capTop) {
+        const lift = capTop - $labelLayout.NAME_CAP_TOP;
+        box = { lift, lineH: bottom - lift + $labelLayout.NAME_BOX_AIR };
+      }
+      nameBoxes.set(key, box);
+    }
+    return nameBoxes.get(key) || { lift: $labelLayout.NAME_LIFT_BRAND, lineH: $labelLayout.NAME_LINE_H_BRAND };
+  };
+  return { measure, fill, truncate, fit, inBrand, inkReach, capCentre, nameBox };
 }
 
 // ── Free-text label sizing (POST /print-custom) ──────────────────────────────

@@ -80,6 +80,7 @@ const SUITES = [
   ['test-stores-cache', 10],
   ['test-label-golden', 13],
   ['test-label-marks', 5],
+  ['test-club-fonts', 4],
   ['test-about-page', 5],
 ];
 const tasks = [

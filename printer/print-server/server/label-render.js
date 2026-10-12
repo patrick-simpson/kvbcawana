@@ -635,9 +635,12 @@ async function generateLabel(input) {
   // the top, and the comma of Ș and Ț, or a cedilla or ogonek, hangs past the
   // bottom. An ordinary name reaches neither, so those two are 0 and the
   // layout is the same for every plain name.
+  // A club's own face (Comic Neue, Playfair Display) sits differently in its
+  // box from the stock shout, so the box is the face's own (labelType nameBox).
   const nameBrand = type.inBrand('name', displayFirst);
-  const nameLineH = nameBrand ? $labelLayout.NAME_LINE_H_BRAND : 1;
-  const nameLift = nameBrand ? $labelLayout.NAME_LIFT_BRAND : 0;
+  const box = nameBrand ? type.nameBox(ctx, 'name', displayFirst) : null;
+  const nameLineH = box ? box.lineH : 1;
+  const nameLift = box ? box.lift : 0;
   const reach = nameBrand ? type.inkReach(ctx, 'name', displayFirst) : null;
   const nameRoomAbove = reach ? Math.max(0, nameLift + reach.above) : 0;
   const nameRoomBelow = reach ? Math.max(0, reach.below - nameLift - nameLineH) : 0;

@@ -14,6 +14,8 @@ Object.defineProperties(exports, {
   DIVIDER_X: { enumerable: true, get: () => DIVIDER_X },
   ICON_COL_W: { enumerable: true, get: () => ICON_COL_W },
   ICON_WAVE_MAX_DX: { enumerable: true, get: () => ICON_WAVE_MAX_DX },
+  NAME_BOX_AIR: { enumerable: true, get: () => NAME_BOX_AIR },
+  NAME_CAP_TOP: { enumerable: true, get: () => NAME_CAP_TOP },
   NAME_INK_TOP: { enumerable: true, get: () => NAME_INK_TOP },
   NAME_LIFT_BRAND: { enumerable: true, get: () => NAME_LIFT_BRAND },
   NAME_LINE_H_BRAND: { enumerable: true, get: () => NAME_LINE_H_BRAND },
@@ -69,6 +71,15 @@ const NO_PHOTO_CUT     = (BX + BW) - (PAGE_W - NO_PHOTO_BAR_W - NO_PHOTO_BAR_GAP
 // draw where they always did.
 const NAME_LINE_H_BRAND = 1.06;
 const NAME_LIFT_BRAND = 0.15;
+// The rule those two numbers follow, for a club's own face (Comic Neue,
+// Playfair Display; labelType().nameBox measures each once): lift the name so
+// its capitals stand NAME_CAP_TOP below the top of its box, and end the box
+// NAME_BOX_AIR past the deepest ordinary descender. Paytone One by this rule
+// measures 0.153 and 1.063; it keeps the rounded constants above.
+//   Comic Neue Bold         capitals 0.095, g j p q y to 0.965 -> lift -0.015, box 1.03
+//   Playfair Display 800    capitals 0.262, g j p q y to 1.152 -> lift  0.152, box 1.05
+const NAME_CAP_TOP = 0.11;
+const NAME_BOX_AIR = 0.05;
 // How close to the paper's top edge the first name's ink may rise, in pt. A
 // mark that stands above the capitals (É, Ấ) needs room above the name; the
 // block only pays for the part of that room the paper above it cannot give

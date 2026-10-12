@@ -775,7 +775,7 @@ async function main() {
       const calls = [];
       const orig = ctxProto.fillText;
       ctxProto.fillText = function recordFont(text, ...rest) {
-        calls.push({ text: String(text), font: this.font });
+        calls.push({ text: String(text), font: this.font, wght: this.fontVariationSettings });
         return orig.call(this, text, ...rest);
       };
       try { await render(model, kit); } finally { ctxProto.fillText = orig; }
@@ -787,7 +787,6 @@ async function main() {
     // of the draws of this text in that face?".
     const fontsOf = (calls, text) => calls.filter((k) => k.text === text).map((k) => k.font);
     const anyAsks = (calls, text, style, family) => fontsOf(calls, text).some((f) => asks(f, style, family));
-    const anyInKit = (calls, text, kitFamily, family) => fontsOf(calls, text).some((f) => inKit(f, kitFamily, family));
     // `<style> <size>px <family>`, the shape every pre-kit font string had.
     const asks = (font, style, family) => typeof font === 'string'
       && new RegExp(`^${style ? esc(style) + ' ' : ''}[0-9.]+px ${esc(family)}$`).test(font);
@@ -806,6 +805,21 @@ async function main() {
       ['',        OLD_SANS],
       ['Choir',   OLD_SANS],
     ];
+    // [family, wght] each line asks for with the kit whole. The stock voices,
+    // and the four clubs set in a face of their own (owner 2026-10-12, as
+    // previewed): Comic Neue Bold for the name and the bold lines, Regular for
+    // the rest; Playfair Display 800 / 700 / 400.
+    const STOCK_FACE = {
+      shout: ['Paytone One'], last: ['Figtree', 500], hint: ['Figtree', 500], group: ['Figtree', 600],
+      footer: ['Figtree', 400], milestone: ['Figtree', 500], goTo: ['Figtree', 700],
+      pill: ['Londrina Solid Black'], club: ['Londrina Solid'],
+    };
+    const clubFace = (shout, bold, regular) => ({
+      shout, last: regular, hint: regular, group: bold, footer: regular, milestone: regular, goTo: bold, pill: bold, club: bold,
+    });
+    const COMIC = clubFace(['Comic Neue Bold'], ['Comic Neue Bold'], ['Comic Neue']);
+    const PLAYFAIR = clubFace(['Playfair Display', 800], ['Playfair Display', 700], ['Playfair Display', 400]);
+    const CLUB_FACE = { Puggles: COMIC, Cubbies: COMIC, Trek: PLAYFAIR, Journey: PLAYFAIR };
     const everyLine = (clubName) => ({
       firstName: 'Testkid', lastName: 'Sample', clubName, handbookGroup: 'Flight 3:16', nameHint: 'b. Mar',
       isVisitor: true, footerText: 'Wednesdays', extras: { goToLine: 'Go to: Rm 4', milestoneLine: '10th club night tonight!' },
@@ -847,24 +861,29 @@ async function main() {
       check(`no kit, ${who}: the TEST band asks for bold ${OLD_SANS}, as it always did`,
         asks(fontOf(b, 'TEST — NOT A CHECK-IN'), 'bold', OLD_SANS), fontOf(b, 'TEST — NOT A CHECK-IN'));
 
-      // The kit whole: the voices, each with the club's old face behind it.
+      // The kit whole: the voices (or the club's own face, owner 2026-10-12),
+      // each with the club's old face behind it, at the weight it was
+      // approved at.
+      const want = CLUB_FACE[clubName] || STOCK_FACE;
       const k = await fontsDrawn(everyLine(clubName));
-      check(`kit, ${who}: the first name asks for Paytone One over ${family}`,
-        inKit(fontOf(k, 'Testkid'), 'Paytone One', family), fontOf(k, 'Testkid'));
-      for (const text of ['Sample', 'b. Mar', 'Flight 3:16', 'Wednesdays', '10th club night tonight!', 'Go to: Rm 4']) {
-        check(`kit, ${who}: "${text}" asks for Figtree over ${family}`,
-          inKit(fontOf(k, text), 'Figtree', family), fontOf(k, text));
+      const sets = (call, face) => !!call && inKit(call.font, face[0], family)
+        && call.wght === (face[1] ? `"wght" ${face[1]}` : 'normal');
+      const callOf = (calls, text) => calls.find((c) => c.text === text);
+      const show = (call) => call && `${call.font} / ${call.wght}`;
+      const lines = [['Testkid', 'shout'], ['Sample', 'last'], ['b. Mar', 'hint'], ['Flight 3:16', 'group'],
+        ['Wednesdays', 'footer'], ['10th club night tonight!', 'milestone'], ['Go to: Rm 4', 'goTo'], ['VISITOR', 'pill']];
+      for (const [text, role] of lines) {
+        check(`kit, ${who}: "${text}" asks for ${want[role].join(' ')} over ${family}`,
+          sets(callOf(k, text), want[role]), show(callOf(k, text)));
       }
-      check(`kit, ${who}: the pill asks for Londrina Solid Black over ${family}`,
-        inKit(fontOf(k, 'VISITOR'), 'Londrina Solid Black', family), fontOf(k, 'VISITOR'));
       if (clubName && letter) {
         // Marks gone, fonts whole: the monogram and the club line come back,
-        // in the kit's voices.
+        // in the kit's voices (or the club's face).
         const n = await fontsDrawn(everyLine(clubName), 'no-marks');
-        check(`kit without marks, ${who}: the club line asks for Londrina Solid over ${family}`,
-          anyInKit(n, clubName, 'Londrina Solid', family), JSON.stringify(fontsOf(n, clubName)));
-        check(`kit without marks, ${who}: the monogram asks for Paytone One over ${family}`,
-          anyInKit(n, letter, 'Paytone One', family), JSON.stringify(fontsOf(n, letter)));
+        check(`kit without marks, ${who}: the club line asks for ${want.club.join(' ')} over ${family}`,
+          n.some((c) => c.text === clubName && sets(c, want.club)), JSON.stringify(fontsOf(n, clubName)));
+        check(`kit without marks, ${who}: the monogram asks for ${want.shout.join(' ')} over ${family}`,
+          n.some((c) => c.text === letter && sets(c, want.shout)), JSON.stringify(fontsOf(n, letter)));
       }
     }
     check('the font recorder saw the renderer draw (it hooks the right prototype)', spied > 50, `${spied} calls`);
@@ -1050,16 +1069,22 @@ async function main() {
     };
     const NAMES = ['Testkid', 'Ivy', 'Gypsy', 'Jorge', 'Émile', 'Ángel', 'Ömer', 'Åsa', 'Ñandú', 'Çelik', 'Ąga',
       'Ștefan', 'Țara', 'Thảo', 'Ấn', 'Ễ', 'Ẳ', 'Nguyễn'];
-    for (const name of NAMES) {
-      const bands = await inkBands(await render({ firstName: name, lastName: 'Sample', clubName: 'Sparks' }));
-      check(`"${name}": the last name is a band of its own, not run together with the first name's ink`,
-        bands.length >= 2, JSON.stringify(bands));
-      if (bands.length < 2) continue;
-      check(`"${name}": the first name's ink starts below the badge's top edge`,
-        bands[0][0] >= BADGE_TOP_PX, `starts at row ${bands[0][0]}, the badge at ${BADGE_TOP_PX}`);
-      const gap = bands[bands.length - 1][0] - bands[bands.length - 2][1] - 1;
-      check(`"${name}": at least 2 pt of clear paper between the first name and the last name`,
-        gap >= Math.ceil(2 * S), `${gap} px (${(gap / S).toFixed(1)} pt)`);
+    // In the stock shout (Sparks) and in each club face (Puggles: Comic Neue,
+    // Trek: Playfair Display; each measured with its own ink, and a name the
+    // club face lacks a letter of falls back to the stock shout on that label).
+    for (const club of ['Sparks', 'Puggles', 'Trek']) {
+      for (const name of NAMES) {
+        const who = club === 'Sparks' ? `"${name}"` : `${club} "${name}"`;
+        const bands = await inkBands(await render({ firstName: name, lastName: 'Sample', clubName: club }));
+        check(`${who}: the last name is a band of its own, not run together with the first name's ink`,
+          bands.length >= 2, JSON.stringify(bands));
+        if (bands.length < 2) continue;
+        check(`${who}: the first name's ink starts below the badge's top edge`,
+          bands[0][0] >= BADGE_TOP_PX, `starts at row ${bands[0][0]}, the badge at ${BADGE_TOP_PX}`);
+        const gap = bands[bands.length - 1][0] - bands[bands.length - 2][1] - 1;
+        check(`${who}: at least 2 pt of clear paper between the first name and the last name`,
+          gap >= Math.ceil(2 * S), `${gap} px (${(gap / S).toFixed(1)} pt)`);
+      }
     }
     // ...and the same on a label crowded to the top: the accent's room is part
     // of the block, so the block is squeezed by shrinking the name, and the
@@ -1070,11 +1095,14 @@ async function main() {
     // nearer than the layout aims (the canvas reports integer-pixel bounds at
     // 100 px, and a 1-bit row is a quarter of a point), so this allows 0.5 pt.
     const PAPER_EDGE_PX = Math.round((4 - 0.5) * S);
-    for (const name of ['Ấn', 'Ẳ', 'Émile', 'Ângelo', 'Ömer', 'Ñandú']) {
-      const crowded = CASES.find((c) => c.name === 'name-tall-accent-crowded').model;
-      const bands = await inkBands(await render({ ...crowded, firstName: name }), crowded.noPhoto ? X1_NO_PHOTO : X1);
-      check(`"${name}" on a crowded label: the first name's ink stays 3.5 pt or more off the paper's top edge`,
-        bands.length > 0 && bands[0][0] >= PAPER_EDGE_PX, `${JSON.stringify(bands[0])} vs ${PAPER_EDGE_PX}`);
+    for (const club of [null, 'Puggles', 'Trek']) {
+      for (const name of ['Ấn', 'Ẳ', 'Émile', 'Ângelo', 'Ömer', 'Ñandú']) {
+        const crowded = CASES.find((c) => c.name === 'name-tall-accent-crowded').model;
+        const model = club ? { ...crowded, clubName: club, firstName: name } : { ...crowded, firstName: name };
+        const bands = await inkBands(await render(model), crowded.noPhoto ? X1_NO_PHOTO : X1);
+        check(`${club ? club + ' ' : ''}"${name}" on a crowded label: the first name's ink stays 3.5 pt or more off the paper's top edge`,
+          bands.length > 0 && bands[0][0] >= PAPER_EDGE_PX, `${JSON.stringify(bands[0])} vs ${PAPER_EDGE_PX}`);
+      }
     }
   }
 
