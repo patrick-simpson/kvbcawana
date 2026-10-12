@@ -471,7 +471,8 @@ export default function App() {
 
   // Church-authored announcements (#onNotice): the state lives above, beside
   // the room rules it feeds.
-  const handleNotice = useCallback((payload) => setNotice(stampReceived(payload)), []);
+  // durationSec 0 is the owner's "Take it down" (routes.md 10.4): clear now.
+  const handleNotice = useCallback((payload) => setNotice(payload?.durationSec === 0 ? null : stampReceived(payload)), []);
   const clearNotice = useCallback(() => setNotice(null), []);
 
   // Every live check-in — real or simulated — plays a banner and bumps

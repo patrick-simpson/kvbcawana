@@ -48,7 +48,7 @@ const ALLOWED_KEYS = {
   tonight: ['checkedIn', 'booksCompleted', 'awardsEarned', 'friendsBrought', 'at'],
   points: ['groups', 'at', 'club'],
   schedule: ['at', 'nextMeetingDate', 'title', 'noClubThisWeek'],
-  notice: ['level', 'message', 'at'],
+  notice: ['level', 'message', 'at', ...vectors.events.notice.optionalFields],
   slides: ['deckRev', 'publishedAt', 'seq', 'total', 'slides'],
   settings: ['rev', 'publishedAt', 'settings'],
 };
@@ -326,5 +326,24 @@ describe('slides: holdCheckIns (stage 4)', () => {
     const out = SANITIZERS.slides(chunk);
     expect(out.slides).toHaveLength(5);
     for (const e of out.slides) expect('holdCheckIns' in e).toBe(false);
+  });
+});
+
+describe('notice durationSec (routes.md 10.4)', () => {
+  const base = { level: 'info', message: 'Hello', at: '2026-09-16T21:00:00.000Z' };
+  it('keeps a whole number of seconds from 0 to 14400', () => {
+    expect(sanitizeNotice({ ...base, durationSec: 900 }).durationSec).toBe(900);
+    expect(sanitizeNotice({ ...base, durationSec: 0 }).durationSec).toBe(0);
+    expect(sanitizeNotice({ ...base, durationSec: 14400 }).durationSec).toBe(14400);
+  });
+  it('drops anything else, keeping the notice', () => {
+    for (const bad of [-5, 14401, 1.5, '60', null, NaN, Infinity, {}, []]) {
+      const out = sanitizeNotice({ ...base, durationSec: bad });
+      expect(out).not.toBeNull();
+      expect('durationSec' in out).toBe(false);
+    }
+  });
+  it('is absent when the producer sent none', () => {
+    expect('durationSec' in sanitizeNotice(base)).toBe(false);
   });
 });

@@ -37,7 +37,16 @@ const PLATE_SPILL = 0.3;
  * @param {number} now
  */
 export function noticeShowing(notice, now) {
-  return Boolean(notice?.message) && isFresh(stampOf(notice), NOTICE_MAX_AGE_MS, now);
+  if (!notice?.message) return false;
+  const d = notice.durationSec;
+  if (typeof d !== 'number') return isFresh(stampOf(notice), NOTICE_MAX_AGE_MS, now);
+  // The owner's notice composer (routes.md 10.4): `durationSec` after RECEIPT,
+  // never past this screen's own ceiling; 0 is "take it down now". Aged from
+  // the receive stamp alone: the Worker rewrites it to the time left on a
+  // replay, so the printer's older `at` must not shorten it.
+  if (d <= 0) return false;
+  const from = typeof notice.receivedAt === 'number' ? notice.receivedAt : stampOf(notice);
+  return isFresh(from, Math.min(d * 1000, NOTICE_MAX_AGE_MS), now);
 }
 
 /**

@@ -163,3 +163,28 @@ describe('one clock', () => {
     expect(container.querySelector('.notice-banner--critical')).toBeNull();
   });
 });
+
+describe('durationSec (routes.md 10.4)', () => {
+  const at = 1_000_000;
+  const n = (extra) => ({ level: 'info', message: 'x', at, receivedAt: at, ...extra });
+  it('hides a notice durationSec after it was received', () => {
+    expect(noticeShowing(n({ durationSec: 900 }), at + 900_000)).toBe(true);
+    expect(noticeShowing(n({ durationSec: 900 }), at + 900_001)).toBe(false);
+  });
+  it('never outlives the screen\'s own ceiling', () => {
+    expect(noticeShowing(n({ durationSec: 14400 }), at + NOTICE_MAX_AGE_MS)).toBe(true);
+    expect(noticeShowing(n({ durationSec: 14400 }), at + NOTICE_MAX_AGE_MS + 1)).toBe(false);
+  });
+  it('0 takes it down now', () => {
+    expect(noticeShowing(n({ durationSec: 0 }), at)).toBe(false);
+  });
+  it('ages a replay from its receipt, not from the older printer stamp', () => {
+    // sent 3 h ago, replayed with 2 h left: still showing
+    const replay = { level: 'info', message: 'x', at: at - 3 * 3600_000, receivedAt: at, durationSec: 7200 };
+    expect(noticeShowing(replay, at + 3600_000)).toBe(true);
+    expect(noticeShowing(replay, at + 7200_001)).toBe(false);
+  });
+  it('a notice without one keeps the old rule', () => {
+    expect(noticeShowing({ level: 'info', message: 'x', at }, at + NOTICE_MAX_AGE_MS)).toBe(true);
+  });
+});

@@ -111,6 +111,8 @@
  * @property {'info'|'warn'|'critical'} level
  * @property {string} message
  * @property {number} at Epoch ms.
+ * @property {number} [durationSec] Whole seconds 0..NOTICE_DURATION_MAX_SEC: how long this
+ *   screen keeps it after RECEIVING it; 0 takes it down now. Absent: the screen's own ceiling.
  */
 
 import { cleanText, plainText } from '../../shared/text.js';
@@ -133,6 +135,8 @@ const CHECKOUT_MAX = 60;
 const TALLY_CLUBS_MAX = 30;
 const POINTS_GROUPS_MAX = 20;
 const NOTICE_MAX = 200;
+/** The longest a notice may ask to stay up: the Worker's 240 minutes. */
+export const NOTICE_DURATION_MAX_SEC = 14400;
 const TITLE_MAX = 60;
 
 /** @type {ReadonlyArray<OpsEvent['type']>} */
@@ -587,6 +591,11 @@ export function sanitizeNotice(payload) {
   const message = plainText(raw.message, NOTICE_MAX);
   if (!message) return null;
   const level = NOTICE_LEVELS.find((l) => l === raw.level) || 'info';
+  const d = raw.durationSec;
+  // A whole number of seconds in range, or dropped (never coerced, never clamped).
+  if (typeof d === 'number' && Number.isInteger(d) && d >= 0 && d <= NOTICE_DURATION_MAX_SEC) {
+    return { level, message, at, durationSec: d };
+  }
   return { level, message, at };
 }
 
