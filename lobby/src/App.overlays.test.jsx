@@ -108,9 +108,18 @@ describe('the room rules, wired up', () => {
     clockAt(19, 45);
     setup();
     const { container } = await mount();
-    await act(async () => { bound.checkout({ entries: kids(9), printed: 40, at: Date.now() - 26 * 3600 * 1000 }); });
+    // Tonight's list that went quiet three hours ago: the warning.
+    await act(async () => { bound.checkout({ entries: kids(9), printed: 40, at: Date.now() - 3 * 3600 * 1000 }); });
     expect(container.querySelector('.checkout-board.stale.checkout-board--line')).not.toBeNull();
     expect(has(container, 'board-up')).toBe(false);
+  });
+
+  it('a list from an earlier night (a Monday after Wednesday) is no board at all, not a warning', async () => {
+    clockAt(19, 45);
+    setup();
+    const { container } = await mount();
+    await act(async () => { bound.checkout({ entries: kids(9), printed: 40, at: Date.now() - 26 * 3600 * 1000 }); });
+    expect(container.querySelector('.checkout-board')).toBeNull();
   });
 
   it('over the pickup list a critical notice still takes the middle, and both stay whole', async () => {
