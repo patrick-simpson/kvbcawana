@@ -104,6 +104,19 @@ describe('the desk check-in', () => {
     expect(t.tt.checkins[0].getAll('events[]')).toEqual(expect.arrayContaining(['40', '707']));
   });
 
+  it('the friend\'s first name rides Brought a friend to the 6:30 BARF list, and only with it', async () => {
+    const t = await rig();
+    const st = await t.station();
+    await t.call('POST', '/v1/desk/checkin', await t.deskBody([st], { items: { Friend: true }, friendName: '  Sam\n ' + 'x'.repeat(30) }));
+    const list = (await t.call('GET', '/v1/cloud/friends')).body;
+    expect(list.total).toBe(1);
+    expect(list.clubs[0].kids[0].friend).toBe(`Sam ${'x'.repeat(20)}`);
+    const u = await rig();
+    const st2 = await u.station();
+    await u.call('POST', '/v1/desk/checkin', await u.deskBody([st2], { items: {}, friendName: 'Sam' }));
+    expect((await u.call('GET', '/v1/cloud/friends')).body.total).toBe(0);
+  });
+
   it('fails closed: no sealed history row writes nothing at all', async () => {
     const t = await rig();
     const st = await t.station();

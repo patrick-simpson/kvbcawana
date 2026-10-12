@@ -199,7 +199,7 @@ export class Desk {
   }
 
   /**
-   * POST /v1/desk/checkin {night, clubberId | visitor, items, historyRow, job}.
+   * POST /v1/desk/checkin {night, clubberId | visitor, items, friendName?, historyRow, job}.
    * @param {any} body
    */
   async checkIn(body) {
@@ -274,7 +274,11 @@ export class Desk {
         return refuse(409, { reason: 'superseded' });
       }
     }
-    await this.fire('afterCheckin', { friend: Array.isArray(body.items) ? body.items.map(String).includes('Friend') : !!(body.items && body.items.Friend === true), night, tag, clubberId: 'clubberId' in who ? who.clubberId : undefined, gen: claim.gen, jobId, club, name, visitor: 'visitor' in who, historyRow: body.historyRow, source: 'desk' });
+    const friend = Array.isArray(body.items) ? body.items.map(String).includes('Friend') : !!(body.items && body.items.Friend === true);
+    // The friend's first name, only with Brought a friend: for the 6:30 BARF email and the
+    // BARF bags (friends.js, sealed under the Worker's key, as the phone path always sent it).
+    const friendName = friend ? clean(body.friendName, 24) : '';
+    await this.fire('afterCheckin', { friend, friendName, night, tag, clubberId: 'clubberId' in who ? who.clubberId : undefined, gen: claim.gen, jobId, club, name, visitor: 'visitor' in who, historyRow: body.historyRow, source: 'desk' });
     return json({ ok: true, already: false, jobId, gen: claim.gen, history: this.hooks.afterCheckin.length ? 'hooked' : 'off' });
   }
 
