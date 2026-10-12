@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { AnimatePresence, MotionConfig } from 'framer-motion';
 import { M, ZeroAnimationContext } from './lib/motion.jsx';
 import BackgroundIframe from './components/BackgroundIframe.jsx';
@@ -74,6 +74,7 @@ import {
 import { receiveSharedSettings, setRemoteDefaults, setSharedLocally } from './hooks/useConfig.js';
 import { publishSettings } from './lib/publishSettings.js';
 import { publishViaSync, useSync, useSyncDriver } from './hooks/useSync.js';
+import { MISSION_HIDDEN_CLEAR_MS, initialMission, reduceMission } from './lib/missionControl.js';
 import { loadPublishToken } from './lib/publishToken.js';
 import { FLEET_CONFIG_URL_CHANGE_EVENT, loadFleetConfigUrl, resolveRemoteConfigUrl } from './lib/fleetConfigUrl.js';
 import { getClubPalette } from './lib/clubs.js';
@@ -618,15 +619,42 @@ export default function App() {
 
   // In configure mode the socket only feeds Settings' status: no child's
   // name, recap, pickup or notice is ever shown in the booth's Settings window.
-  const liveHandlers = useMemo(() => (CONFIGURE
-    ? { ...socketHandlers, onCheckin: noop, onRecap: noop, onCheckout: noop, onNotice: noop }
-    : socketHandlers), [socketHandlers]);
+  // The settings page's one exception (docs/SETTINGS-OVERHAUL.md section 5): mission
+  // control's FIRST NAMES, five at most, newest first, from the same sanitized
+  // frames this socket already decrypts. They go to React state here and nowhere
+  // else (never storage, never the network), and are cleared on sign-out and
+  // when the page has been hidden for MISSION_HIDDEN_CLEAR_MS. The stage itself
+  // still shows nothing in configure mode: the handlers below stay no-ops for it.
+  const [mission, missionDispatch] = useReducer(reduceMission, undefined, initialMission);
+  const liveHandlers = useMemo(() => {
+    if (!CONFIGURE) return socketHandlers;
+    const quiet = { ...socketHandlers, onCheckin: noop, onRecap: noop, onCheckout: noop, onNotice: noop };
+    if (!SETTINGS_PAGE) return quiet;
+    return {
+      ...quiet,
+      onCheckin: (payload) => missionDispatch({ type: 'checkin', payload }),
+      onRecap: (payload) => missionDispatch({ type: 'recap', payload }),
+      onTally: (payload, meta) => { socketHandlers.onTally?.(payload, meta); missionDispatch({ type: 'tally', payload }); },
+    };
+  }, [socketHandlers]);
   const { status, lastEventAt, lastCheckinAt, retry, nameStatus, slidesStatus, hasDisplayKey } = useSocket(liveHandlers);
   // A reconnect (any change of the socket's state) forgets the last list: the
   // next one is a baseline, never a room full of "has checked out".
   useEffect(() => { leaveBaselineRef.current = null; }, [status]);
   // The sync service's state (shared settings, the published deck) enters
   // through the same sanitizing dispatch path as a live frame.
+  useEffect(() => { if (SETTINGS_PAGE && !sync.signedIn) missionDispatch({ type: 'clear' }); }, [sync.signedIn]);
+  useEffect(() => {
+    if (!SETTINGS_PAGE) return undefined;
+    /** @type {ReturnType<typeof setTimeout> | undefined} */
+    let timer;
+    const onVisibility = () => {
+      clearTimeout(timer);
+      if (document.visibilityState === 'hidden') timer = setTimeout(() => missionDispatch({ type: 'clear' }), MISSION_HIDDEN_CLEAR_MS);
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => { clearTimeout(timer); document.removeEventListener('visibilitychange', onVisibility); };
+  }, []);
   const syncStore = useMemo(() => ({ config: effectiveConfig, overrides, updateConfig }), [effectiveConfig, overrides, updateConfig]);
   useSyncDriver({ handlers: liveHandlers, dispatch: dispatchEvent, store: syncStore });
 
@@ -1690,6 +1718,8 @@ export default function App() {
         <ErrorBoundary label="settings-panel" onError={() => setSettingsOpen(false)}>
           <SettingsPanel
             onOpenScreen={SETTINGS_PAGE ? setManagedScreen : null}
+            mission={SETTINGS_PAGE ? mission : null}
+            tonightTitle={tonightTitle}
             config={config}
             savedConfig={storedConfig}
             overrides={overrides}

@@ -73,6 +73,9 @@ const baseProps = () => ({
   onResetTally: vi.fn(),
   onOpenSlideEditor: vi.fn(),
   onOpenDebug: vi.fn(),
+  // The classic rail (?rail=classic): this suite keeps it compiling and honest.
+  // The new rail has its own suite (SettingsPanel.rail.test.jsx).
+  rail: 'classic',
 });
 /** A screen that works: connected and keyed, so it opens on Check-ins. */
 const happyProps = () => {
@@ -102,13 +105,16 @@ describe('SettingsPanel: the two-pane shell', () => {
     expect(screen.getByLabelText('How long each name stays up (seconds)')).toBeTruthy();
   });
 
-  it('an unconfigured screen opens on Setup, with the by-hand fold open', () => {
+  it('an unconfigured screen opens on Setup, with the passphrase to type and no key or token to paste', () => {
     const { container } = render(<SettingsPanel {...baseProps()} />);
     expect(screen.getByRole('tab', { name: 'Setup' }).getAttribute('aria-selected')).toBe('true');
-    expect(container.querySelector('details.advanced-fields').open).toBe(true);
-    // Pusher's key and cluster are retired: nothing to type but the display key.
+    expect(container.querySelector('details.advanced-fields summary')?.textContent).not.toMatch(/paste keys by hand/);
+    // Pusher is gone, and so are the display login, the display key and the publish token.
     expect(screen.queryByLabelText('Pusher App Key')).toBeNull();
-    expect(screen.getByLabelText('Display key')).toBeTruthy();
+    expect(screen.queryByLabelText('Display key')).toBeNull();
+    expect(screen.queryByLabelText('Display login')).toBeNull();
+    expect(screen.queryByText(/Publish token/i)).toBeNull();
+    expect(screen.getByLabelText('Passphrase')).toBeTruthy();
   });
 
   it('a working screen with a problem opens on Status and counts it on the rail', () => {
@@ -322,16 +328,17 @@ describe('SettingsPanel: live apply, Undo and Done', () => {
 });
 
 describe('Status', () => {
-  it('names the login state (key pasted by hand) and what the screen can read', () => {
+  it('names the church sign-in and what the screen can read', () => {
     render(<SettingsPanel {...{ ...happyProps(), initialTab: 'status' }} />);
     expect(screen.getByText('Connected — check-ins will appear instantly')).toBeTruthy();
-    expect(screen.getByText(/display key pasted by hand/)).toBeTruthy();
+    expect(screen.getByText(/Church sign-in:/)).toBeTruthy();
+    expect(screen.queryByText(/Display login|display key pasted by hand/)).toBeNull();
     expect(screen.getByText(/this screen can read encrypted names/)).toBeTruthy();
   });
 
-  it('a connected but unkeyed screen is told to log in, with a jump to Setup', () => {
+  it('a connected but unkeyed screen is told to sign in, with a jump to Setup', () => {
     render(<SettingsPanel {...{ ...baseProps(), status: 'connected', nameStatus: 'no-key', initialTab: 'status' }} />);
-    expect(screen.getByText('Connected — not logged in yet (Setup → Connect this screen)')).toBeTruthy();
+    expect(screen.getByText('Connected — not signed in yet (Setup → Connect this screen)')).toBeTruthy();
     expect(screen.getByText(/encrypted names are arriving but this screen has no key/)).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: /Set up this screen/ }));
     expect(screen.getByRole('tab', { name: 'Setup' }).getAttribute('aria-selected')).toBe('true');
@@ -378,31 +385,27 @@ describe('Status', () => {
 });
 
 describe('Setup: connecting this screen', () => {
-  it('a screen that is not connected says so in the login field', () => {
+  it('a screen that is not connected is told to sign in with the passphrase', () => {
     render(<SettingsPanel {...baseProps()} />);
-    expect(screen.getByText(/This screen is not connected yet/)).toBeTruthy();
+    expect(screen.getByText(/Type the church.s passphrase/)).toBeTruthy();
   });
 
-  it('the passphrase box is typeable before any frame arrives and Log in enables on text', async () => {
+  it('the passphrase box is typeable before any frame arrives and Sign in enables on text', () => {
     const props = { ...baseProps(), status: 'connected' };
-    const { container } = render(<SettingsPanel {...props} />);
-    // Connected: the by-hand fold stays closed — login leads.
-    expect(container.querySelector('details.advanced-fields').open).toBe(false);
-    const input = screen.getByLabelText('Display login');
+    render(<SettingsPanel {...props} />);
+    const input = screen.getByLabelText('Passphrase');
     expect(input.disabled).toBe(false);
-    const button = screen.getByRole('button', { name: 'Log in' });
+    const button = screen.getByRole('button', { name: 'Sign in' });
     expect(button.disabled).toBe(true);
     fireEvent.change(input, { target: { value: 'abcd-efgh-ijkm-npqr' } });
     expect(button.disabled).toBe(false);
-    fireEvent.click(button);
-    await waitFor(() => expect(loginState.login).toHaveBeenCalledWith('abcd-efgh-ijkm-npqr'));
     // The passphrase is never config.
     expect(props.onChange).not.toHaveBeenCalled();
   });
 
   it('Show reveals the passphrase', () => {
     render(<SettingsPanel {...{ ...baseProps(), status: 'connected' }} />);
-    const input = screen.getByLabelText('Display login');
+    const input = screen.getByLabelText('Passphrase');
     expect(input.type).toBe('password');
     fireEvent.click(screen.getByRole('button', { name: 'Show passphrase' }));
     expect(input.type).toBe('text');
@@ -410,31 +413,24 @@ describe('Setup: connecting this screen', () => {
     expect(input.type).toBe('password');
   });
 
-  it('a wrong passphrase is called out and the box stays usable', () => {
-    Object.assign(loginState, { loginStatus: 'wrong' });
-    render(<SettingsPanel {...{ ...baseProps(), status: 'connected' }} />);
-    expect(screen.getByText(/does not match the print server/)).toBeTruthy();
-    expect(screen.getByLabelText('Display login').disabled).toBe(false);
-  });
-
-  it('a logged-in screen shows its kid and offers Log out behind a confirm', () => {
-    Object.assign(loginState, { loginStatus: 'logged-in', kid: '2c366156' });
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
-    render(<SettingsPanel {...{ ...baseProps(), status: 'connected', initialTab: 'setup' }} />);
-    expect(screen.getByText('logged in · key 2c366156')).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: 'Log out' }));
-    expect(loginState.logout).toHaveBeenCalled();
-  });
-
   it('without secure crypto nothing pretends a pasted key would help', () => {
     vi.stubGlobal('crypto', {});
-    const { container } = render(<SettingsPanel {...{ ...baseProps(), status: 'connected' }} />);
+    render(<SettingsPanel {...{ ...baseProps(), status: 'connected' }} />);
     expect(screen.getByRole('tab', { name: 'Setup' }).getAttribute('aria-selected')).toBe('true');
     expect(screen.getAllByText(/not in a secure context/).length).toBeGreaterThan(0);
     expect(screen.queryByRole('button', { name: 'Paste key' })).toBeNull();
-    expect(screen.getByLabelText('Display login').disabled).toBe(true);
-    expect(container.querySelector('details.advanced-fields').open).toBe(true);
+    expect(screen.getByLabelText('Passphrase').disabled).toBe(true);
     vi.unstubAllGlobals();
+  });
+
+  it('the removed controls are gone: no display login, key fold, publish token, cloud card or Club Label Printer', () => {
+    render(<SettingsPanel {...{ ...baseProps(), status: 'connected', initialTab: 'setup' }} />);
+    for (const gone of [/Display login/, /Display key/, /Publish token/, /Paste key/, /Club Label Printer/, /Being built to replace the check-in laptop/]) {
+      expect(screen.queryByText(gone)).toBeNull();
+      expect(screen.queryByLabelText(gone)).toBeNull();
+    }
+    expect(screen.queryByRole('heading', { name: /Publishing slides|Cloud check-in/ })).toBeNull();
+    expect(screen.getByRole('heading', { name: 'KVBC Awana release notes' })).toBeTruthy();
   });
 });
 
@@ -521,9 +517,10 @@ describe('Slides', () => {
     vi.useRealTimers();
   });
 
-  it('published-slide hints on Status lead with logging in', () => {
+  it('published-slide hints on Status lead with signing in', () => {
     render(<SettingsPanel {...{ ...baseProps(), status: 'connected', initialTab: 'status' }} />);
-    expect(screen.getByText(/type the church’s display passphrase under Setup → Connect this screen/)).toBeTruthy();
+    expect(screen.getByText(/type the church passphrase under Setup/)).toBeTruthy();
+    expect(screen.queryByText(/Advanced|display key by hand/)).toBeNull();
   });
 });
 
@@ -587,7 +584,8 @@ describe('Check-ins, Screen & corner, Celebrations, Pickup board, Look & season'
     expect(screen.queryByLabelText("Who's still here board")).toBeNull();
     expect(screen.queryByLabelText('Show from')).toBeNull();
     expect(screen.queryByLabelText('Hide after')).toBeNull();
-    expect(screen.getByText("Shows by itself from 7:30 pm on club nights. Which clubs are on the list is set on the check-in laptop's dashboard.")).toBeTruthy();
+    expect(screen.getByText(/Shows by itself from 7:30 pm on club nights\. Which clubs are on the list is set under Printing → Pickup list\./)).toBeTruthy();
+    expect(screen.queryByText(/dashboard/i)).toBeNull();
     expect(screen.getByLabelText('Stop showing names at or below')).toBeTruthy();
     expect(screen.getByText(/This is the setting that matters/)).toBeTruthy();
   });
@@ -654,7 +652,7 @@ describe('Setup: tools', () => {
     expect(confirm).toHaveBeenLastCalledWith(expect.stringMatching(/Doors are open/));
     expect(props.onResetTally).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: 'Reset this screen' }));
-    expect(confirm).toHaveBeenLastCalledWith(expect.stringMatching(/typed slides.*login, keys/s));
+    expect(confirm).toHaveBeenLastCalledWith(expect.stringMatching(/typed slides.*sign-in, keys/s));
     expect(props.onReset).not.toHaveBeenCalled();
     confirm.mockReturnValue(true);
     fireEvent.click(screen.getByRole('button', { name: 'Reset this screen' }));
@@ -674,17 +672,12 @@ describe('Setup: tools', () => {
   });
 });
 
-describe('Status: other screens', () => {
-  it('links the projector on game time and Journey, each in a new tab', () => {
+describe('Status: the Other screens links are gone', () => {
+  it('shows no projector or Journey links (the Screens section and the website own them)', () => {
     render(<SettingsPanel {...{ ...happyProps(), initialTab: 'status' }} />);
-    const projector = screen.getByRole('link', { name: 'Projector: game time' });
-    expect(projector.getAttribute('href')).toBe('https://awana.kvbchurch.org/lobby/countdown?view=game');
-    const journey = screen.getByRole('link', { name: 'Journey' });
-    expect(journey.getAttribute('href')).toBe('https://awana.kvbchurch.org/journey/');
-    for (const a of [projector, journey]) {
-      expect(a.getAttribute('target')).toBe('_blank');
-      expect(a.getAttribute('rel')).toContain('noopener');
-    }
+    expect(screen.queryByRole('link', { name: 'Projector: game time' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Journey' })).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'Other screens' })).toBeNull();
   });
 });
 
@@ -823,14 +816,14 @@ describe('shared settings (contract v6)', () => {
     const props = open({
       initialTab: 'setup',
       shared: { rev: 4, publishedAt: '2026-10-01T23:35:00.000Z', settings: {} },
-      shareStatus: { state: 'failed', message: 'Could not reach the print server from this screen' },
+      shareStatus: { state: 'failed', message: 'Could not reach the check-in laptop from this screen' },
     });
     expect(screen.getByText(/Following update 4/)).toBeTruthy();
-    expect(screen.getAllByText(/Could not reach the print server from this screen/).length).toBeGreaterThan(0);
-    expect(screen.getByText(/This screen only \(see Setup → Shared settings\)/)).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: /Send this screen’s shared settings to every screen/ }));
+    expect(screen.getAllByText(/Could not reach the check-in laptop from this screen/).length).toBeGreaterThan(0);
+    expect(screen.getByText(/This screen only \(see Setup → Church-wide settings\)/)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /Send this screen’s church-wide settings to every screen/ }));
     expect(props.onShare).toHaveBeenCalledTimes(1);
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Follow the shared settings' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Follow the church-wide settings' }));
     expect(props.onChange).toHaveBeenCalledWith({ followSharedSettings: false });
   });
 

@@ -182,7 +182,7 @@ describe("tonight's counter never runs above the printer's total", () => {
     expect(storedCount()).toBe(1);
 
     await act(async () => { screen.getByLabelText('Open settings').click(); });
-    await act(async () => { screen.getByRole('tab', { name: 'Check-ins' }).click(); });
+    await act(async () => { screen.getByRole('tab', { name: 'What screens show' }).click(); });
     await act(async () => { screen.getByText('Preview a check-in').click(); });
 
     // The rehearsal really happened...

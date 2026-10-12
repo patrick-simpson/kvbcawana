@@ -5,30 +5,20 @@ import { decideBoard, demoCheckout } from '../../../lib/checkoutBoard.js';
 import CheckoutBoard from '../../CheckoutBoard.jsx';
 import { PanelCard, Toggle } from '../fields.jsx';
 
-export function PickupSection({ form, set, onBoardDemo }) {
-  const [sample] = useState(() => demoCheckout(getAllClubs(), SAMPLE_BOARD_NAMES, Date.now()));
-  // The preview follows the form: the same rules the TV applies, on sample
-  // names, so turning the naming guard up shows what the room would see.
-  const previewDecision = decideBoard({
-    checkout: sample,
-    namesAbove: Number(form.checkoutBoardNamesAbove) || 0,
-    staleMin: 120,
-    now: sample.at,
-    demo: true,
-  });
+export function PickupBoardCard({ form, set, goTo, title = <>Who&apos;s still here</> }) {
   return (
-    <>
-      <PanelCard title={<>Who&apos;s still here</>} tab="var(--brand-puggles-deep)" scope="shared">
+      <PanelCard title={title} tab="var(--brand-puggles-deep)" scope="shared" preview="pickup">
         {/* No switch and no times since 2026-10-08 (owner): the pickup
             features come on by themselves at 7:30 pm (checkoutBoard.js
             PICKUP_START), and the printer only sends a list on club nights. */}
         <p className="hint panel-intro">
-          Shows by itself from 7:30 pm on club nights. Which clubs are on the list is set on the check-in laptop&apos;s dashboard.
+          Shows by itself from 7:30 pm on club nights. Which clubs are on the list is set under Printing → Pickup list.
+          {goTo && <>{' '}<button type="button" className="ghost small" onClick={() => goTo('printing')}>Which clubs →</button></>}
         </p>
         <span className="hint">
           Lists children who have <strong>not been checked out yet</strong> in the check-in system along the bottom of
           the screen, under the slides, each club&apos;s names after its plate, and says &ldquo;<em>name</em> has checked
-          out&rdquo; there as each one leaves the list. Needs the print server and a volunteer with the check-in page
+          out&rdquo; there as each one leaves the list. Needs the check-in laptop and a volunteer with the check-in page
           open — when that tab closes, the board shows its age instead of freezing.
           {' '}<strong>It is not a verified headcount:</strong> it reflects whether checkout was actually recorded,
           which during a busy pickup often lags. Treat it as a prompt to go look, never as proof the building is clear.
@@ -64,8 +54,23 @@ export function PickupSection({ form, set, onBoardDemo }) {
           <span className="hint">After this long with no update the board says so, rather than showing a frozen list that still looks live.</span>
         </div>
       </PanelCard>
+  );
+}
 
-      <PanelCard title="Preview" tab="var(--brand-journey)">
+/** The board drawn on sample names, following the form (a TV's own panel; the page has the live TV preview). */
+export function PickupPreviewCard({ form, onBoardDemo }) {
+  const [sample] = useState(() => demoCheckout(getAllClubs(), SAMPLE_BOARD_NAMES, Date.now()));
+  // The preview follows the form: the same rules the TV applies, on sample
+  // names, so turning the naming guard up shows what the room would see.
+  const previewDecision = decideBoard({
+    checkout: sample,
+    namesAbove: Number(form.checkoutBoardNamesAbove) || 0,
+    staleMin: 120,
+    now: sample.at,
+    demo: true,
+  });
+  return (
+      <PanelCard title="Preview" tab="var(--brand-journey)" preview="pickup">
         <div className="board-preview" role="img" aria-label="A preview of the pickup board with sample names along the bottom of the screen, each club's names after its plate">
           <CheckoutBoard decision={previewDecision} checkout={sample} calm preview demo />
         </div>
@@ -79,6 +84,15 @@ export function PickupSection({ form, set, onBoardDemo }) {
           </button>
         )}
       </PanelCard>
+  );
+}
+
+// The classic rail's Pickup board section (?rail=classic).
+export function PickupSection({ form, set, onBoardDemo }) {
+  return (
+    <>
+      <PickupBoardCard form={form} set={set} />
+      <PickupPreviewCard form={form} onBoardDemo={onBoardDemo} />
     </>
   );
 }

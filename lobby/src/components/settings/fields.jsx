@@ -4,11 +4,8 @@ import { deleteDeck, getDeck, putDeck } from '../../lib/pptxStore.js';
 import { BACKGROUND_VIDEO_ID, deleteVideo, getVideo, putVideo } from '../../lib/videoStore.js';
 import { BACKGROUND_VIDEO_CHANGED_EVENT } from '../VideoBackground.jsx';
 import { parseAndCacheDeck } from '../../lib/pptxModel.js';
-import { useDisplayKey } from '../../hooks/useDisplayKey.js';
-import { maskDisplayKey } from '../../lib/displayKey.js';
-import { isPlausibleKey } from '../../lib/envelope.js';
-import { loadPublishToken, maskPublishToken, savePublishToken } from '../../lib/publishToken.js';
 import CornerTab from '../brand/CornerTab.jsx';
+import { getAuthStatus } from '../../lib/workerClient.js';
 import { changePassphrase, loadFriendsReport, printBarfBags, saveTemplate, signIn, signOut, testCloudCheckin, useSync } from '../../hooks/useSync.js';
 import { RELEASE_NOTES_URL, parseReleaseNotes } from '../../lib/releaseNotes.js';
 import { useConfig } from '../../hooks/useConfig.js';
@@ -16,8 +13,8 @@ import { PASSPHRASE_MIN, TEMPLATE_KEYS } from '../../lib/syncSpecs.js';
 import { renameThisScreen, useThisScreen } from '../../hooks/useScreenSync.js';
 
 // The Settings panel's building blocks: rows, cards, and the fields that keep
-// their own storage (the three secrets, the uploaded files) and so are never
-// part of the panel's config form.
+// their own storage (the sign-in, the uploaded files) and so are never part of
+// the panel's config form.
 
 export const INSECURE_CONTEXT_COPY = (
   <>
@@ -83,7 +80,7 @@ export function Toggle({ checked, onChange, title, hint, disabled }) {
   );
 }
 
-// Whether this screen follows the shared settings (contract v6): the card tags
+// Whether this screen follows the church-wide settings (contract v6): the card tags
 // say "Every screen" only while it does.
 export const FollowingContext = createContext(true);
 // True on awana.kvbchurch.org/settings (ROADMAP.md#settings-page): the device is not a
@@ -110,19 +107,18 @@ function ScopeTag({ scope }) {
   return (
     <span className={`scope-tag scope-tag--${shared ? 'shared' : 'screen'}`}
       title={shared
-        ? 'Shared: a change here reaches every screen (made on the check-in computer).'
-        : scope === 'shared' ? 'This screen is not following the shared settings, so these stay on this screen.'
+        ? 'Church-wide: a change here reaches every screen.'
+        : scope === 'shared' ? 'This screen is not following the church-wide settings, so these stay on this screen.'
           : remote ? `${remote.name} only.` : 'This screen only.'}>
       {shared ? 'Every screen' : remote ? `${remote.name} only` : 'This screen'}
     </span>
   );
 }
 
-// One white card on the panel's pale field, like the printer dashboard's
-// cards. A titled card names its section with the kit's corner tab (the
+// One white card on the panel's pale field. A titled card names its section with the kit's corner tab (the
 // colour only tells the sections apart); the heading inside it is the same
 // <h3 className="section"> the tab always had.
-export function PanelCard({ title, tab = 'var(--brand-blue)', scope, keep = false, local = false, children }) {
+export function PanelCard({ title, tab = 'var(--brand-blue)', scope, keep = false, local = false, preview, children }) {
   const page = useContext(SettingsPageContext);
   const remote = useContext(RemoteScreenContext);
   const following = useContext(FollowingContext);
@@ -132,7 +128,7 @@ export function PanelCard({ title, tab = 'var(--brand-blue)', scope, keep = fals
     if (local || (scope === 'shared' && !following)) return null;
   } else if (page && scope === 'screen' && !keep) return null;
   return (
-    <div className="panel-card">
+    <div className="panel-card" data-preview={preview || undefined}>
       {title ? (
         <div className="panel-card__head">
           <CornerTab color={tab} className="panel-card__tab">
@@ -142,117 +138,6 @@ export function PanelCard({ title, tab = 'var(--brand-blue)', scope, keep = fals
         </div>
       ) : null}
       {children}
-    </div>
-  );
-}
-
-/**
- * Display login — the one thing a volunteer types on a new screen. The print
- * server publishes the display key + publish token sealed under a
- * passphrase-derived key; typing the passphrase here opens that frame and
- * fills both secrets in. Like the key and token fields below it, this is
- * deliberately NOT part of `form`/`set`: the derived login key lives in its
- * own storage slot (src/lib/displayLogin.js) so it never rides the settings
- * export, a `?config=` file, or a URL.
- */
-export function DisplayLoginField({ status, secure, login }) {
-  const { loginStatus, kid } = login;
-  const [draft, setDraft] = useState('');
-  const [reveal, setReveal] = useState(false);
-  const [note, setNote] = useState('');
-
-  const busy = loginStatus === 'busy';
-  const canSubmit = secure && !busy && draft.trim().length > 0;
-
-  const submit = async () => {
-    const p = draft.trim();
-    if (!p || !canSubmit) return;
-    setNote('');
-    const result = await login.login(p);
-    if (result === 'logged-in') { setDraft(''); setNote('Logged in. Names and published slides now work on this screen.'); }
-    else if (result === 'storage') setNote('This screen cannot save the keys — browser storage is blocked.');
-    // 'wrong', 'locked' and 'unsupported' are described by the status line below.
-  };
-
-  // In the order a volunteer needs them: the one thing nothing here can fix,
-  // then the settled states, then whatever is standing between them and
-  // logging in — starting with the socket, because the print server is
-  // usually fine and the screen simply is not connected yet.
-  let statusCopy;
-  if (!secure || loginStatus === 'unsupported') {
-    statusCopy = INSECURE_CONTEXT_COPY;
-  } else if (loginStatus === 'logged-in') {
-    statusCopy = <><strong>Logged in</strong>{kid ? <> · key <code>{kid}</code></> : null} — the display key and publish token were filled in automatically and will follow rotations on the print server.</>;
-  } else if (loginStatus === 'stale') {
-    statusCopy = <><strong>The display passphrase was changed on the print server.</strong> Names keep working with the key this screen already holds until you log in again.</>;
-  } else if (busy) {
-    statusCopy = <>Checking… (this takes a few seconds on a small TV stick — it only happens once)</>;
-  } else if (status === 'off') {
-    statusCopy = <><strong>This screen is not connected yet.</strong> It has no sync service to sign in to, so it cannot reach the live channel.</>;
-  } else if (status === 'disconnected') {
-    statusCopy = <><strong>Not connected</strong> — check the network. The print server is probably fine.</>;
-  } else if (status === 'connecting') {
-    statusCopy = <>Connecting… the login frame arrives as soon as the connection is up.</>;
-  } else if (loginStatus === 'wrong') {
-    statusCopy = <><strong>That passphrase does not match the print server’s.</strong> Check the dashboard → Settings → Display login and try again.</>;
-  } else {
-    statusCopy = <>Type the church’s display passphrase from the print-server dashboard (Settings → Display login). This screen then receives the display key and publish token by itself.</>;
-  }
-
-  const loggedIn = loginStatus === 'logged-in';
-  return (
-    <div className="field">
-      {!loggedIn ? (
-        <>
-          <label htmlFor="dlogin">Display login</label>
-          <div className="display-key-row">
-            <input
-              id="dlogin"
-              type={reveal ? 'text' : 'password'}
-              autoComplete="off"
-              spellCheck={false}
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter' && canSubmit) submit(); }}
-              placeholder="display passphrase"
-              disabled={!secure || busy}
-            />
-            <button
-              type="button"
-              className="ghost"
-              aria-pressed={reveal}
-              aria-label={reveal ? 'Hide passphrase' : 'Show passphrase'}
-              onClick={() => setReveal((v) => !v)}
-            >
-              {reveal ? 'Hide' : 'Show'}
-            </button>
-            <button type="button" className="ghost" disabled={!canSubmit} onClick={submit}>Log in</button>
-          </div>
-        </>
-      ) : (
-        <>
-          <span className="field-label" id="dlogin-label">Display login</span>
-          <div className="display-key-row" role="group" aria-labelledby="dlogin-label">
-            <code className="display-key-value">logged in{kid ? ` · key ${kid}` : ''}</code>
-            <button
-              type="button"
-              className="ghost"
-              onClick={() => {
-                if (window.confirm('Log this screen out? It forgets the login key, the display key and the publish token — names and published slides stop here until someone logs in again.')) {
-                  login.logout();
-                  setNote('');
-                }
-              }}
-            >
-              Log out
-            </button>
-          </div>
-        </>
-      )}
-      <span className="hint">
-        {note && <><strong>{note}</strong> </>}
-        {statusCopy}
-      </span>
     </div>
   );
 }
@@ -269,11 +154,9 @@ function whenWords(at) {
 }
 
 /**
- * Sign this screen in to the sync service with the church passphrase
- * (worker/). One word sets it up completely: the display key, the live
- * channel, the shared settings, the slides and, for a new screen, the template.
- * Shown instead of the print server's display login once shared/sync.json
- * names a sync service.
+ * Sign this screen in with the church passphrase (the sync Worker, worker/).
+ * One word sets it up completely: the encryption key, the live channel, the
+ * church-wide settings, the slides and, for a new screen, the template.
  */
 export function SyncSignInField({ secure }) {
   const sync = useSync();
@@ -344,7 +227,7 @@ export function SyncSignInField({ secure }) {
             ? INSECURE_CONTEXT_COPY
             : sync.phase === 'expired'
               ? <><strong>The passphrase was changed.</strong> Type the new one to sign this screen in again. Names keep working meanwhile.</>
-              : <>Type the church&rsquo;s passphrase. This screen then gets the encryption key, the shared settings, the slides and the calendar by itself.</>}
+              : <>Type the church&rsquo;s passphrase. This screen then gets the encryption key, the church-wide settings, the slides and the calendar by itself.</>}
         </span>
       </div>
     );
@@ -359,7 +242,7 @@ export function SyncSignInField({ secure }) {
           type="button"
           className="ghost"
           onClick={() => {
-            if (window.confirm('Sign this screen out of the sync service? It keeps its key and settings, but stops receiving changes until someone types the passphrase again.')) {
+            if (window.confirm('Sign this screen out? It keeps its key and settings, but stops receiving changes until someone types the passphrase again.')) {
               signOut();
               setNote(null);
             }
@@ -371,11 +254,32 @@ export function SyncSignInField({ secure }) {
       <span className="hint" role="status">
         {note && <><strong>{note.text}</strong> </>}
         {sync.phase === 'offline'
-          ? <><strong>Cannot reach the sync service right now.</strong> This screen keeps what it has and tries again.</>
+          ? <><strong>Cannot reach the church’s sign-in right now.</strong> This screen keeps what it has and tries again.</>
           : <>Synced{sync.lastSyncAt ? ` at ${whenWords(sync.lastSyncAt)}` : ''}. Changes made on any signed-in screen reach this one within seconds.</>}
       </span>
     </div>
   );
+}
+
+/**
+ * The sign-in security line (GET /v1/cloud/status `auth`, routes.md section 1):
+ * the new sign-in is on, and when the last old sign-in was seen. Read once.
+ */
+export function AuthSecurityLine() {
+  const sync = useSync();
+  const [auth, setAuth] = useState(/** @type {any} */ (undefined));
+  useEffect(() => {
+    if (!sync.signedIn) return undefined;
+    let live = true;
+    getAuthStatus().then((a) => { if (live) setAuth(a.ok && a.body?.auth ? a.body.auth : null); });
+    return () => { live = false; };
+  }, [sync.signedIn]);
+  if (!auth) return null;
+  const when = auth.legacyLastAt ? whenWords(auth.legacyLastAt) : '';
+  const old = auth.legacy
+    ? `old sign-ins: ${when ? `last seen ${when}, ` : 'none seen yet, '}${auth.legacyOn === false ? 'off' : 'still allowed'}`
+    : 'old sign-ins: off';
+  return <p className="hint auth-security" role="status">{`New sign-in (v2) ${auth.v2 === false ? 'off' : 'on'}; ${old}.`}</p>;
 }
 
 /** Change the church passphrase for every screen (needs the current one). */
@@ -404,6 +308,8 @@ export function ChangePassphraseField() {
     }
   };
   return (
+    <>
+    <AuthSecurityLine />
     <details className="advanced-fields">
       <summary>Change the passphrase</summary>
       <div className="field">
@@ -428,6 +334,7 @@ export function ChangePassphraseField() {
           : 'Do this if the word got out. It signs every screen out and replaces the encryption key.'}
       </span>
     </details>
+    </>
   );
 }
 
@@ -523,7 +430,7 @@ export function CloudCheckinTestField() {
       </button>
       <span className="hint" role="status">
         {note ? <strong className={note.ok ? undefined : 'hint--warn'}>{note.text}</strong> : null}{' '}
-        The sync service signs in as the church&rsquo;s check-in user and reads the last club night&rsquo;s
+        The service signs in as the church&rsquo;s check-in user and reads the last club night&rsquo;s
         check-in report once. It changes nothing on TwoTimTwo and shows only a count.
       </span>
     </div>
@@ -608,7 +515,7 @@ export function ReleaseNotesField() {
   };
   return (
     <details className="advanced-fields release-notes" onToggle={(e) => { if (e.currentTarget.open) load(); }}>
-      <summary>Club Label Printer release notes</summary>
+      <summary>KVBC Awana release notes</summary>
       {notes === null && <p className="hint">Loading…</p>}
       {notes === 'error' && <p className="hint hint--warn">The release notes could not be loaded. Check this screen&rsquo;s internet connection.</p>}
       {Array.isArray(notes) && notes.map((sec) => (
@@ -620,177 +527,6 @@ export function ReleaseNotesField() {
         </section>
       ))}
     </details>
-  );
-}
-
-/**
- * The display key — the secret that lets this screen read children's names.
- *
- * Deliberately NOT part of `form`/`set` like every other field on this panel.
- * `form` is the config overrides object, and that object is what
- * `exportSettings()` writes to a downloadable JSON file and what a
- * `?config=<url>` file can populate. Routing the key through it would publish
- * it through two workflows the docs actively recommend. See the long comment in
- * src/lib/displayKey.js; src/lib/displayKey.test.js asserts both stay closed.
- */
-export function DisplayKeyField({ secure }) {
-  const { displayKey, setDisplayKey } = useDisplayKey();
-  const [draft, setDraft] = useState('');
-  const [editing, setEditing] = useState(false);
-  const [saved, setSaved] = useState(false);
-
-  const configured = Boolean(displayKey);
-  const valid = isPlausibleKey(draft.trim());
-
-  const commit = () => {
-    const next = draft.trim();
-    if (next && !isPlausibleKey(next)) return;
-    const ok = setDisplayKey(next);
-    setSaved(ok);
-    setEditing(false);
-    setDraft('');
-    if (!ok) window.alert('This screen cannot save the key — browser storage is blocked, so names will not appear.');
-  };
-
-  return (
-    <div className="field">
-      {editing ? (
-        <>
-          <label htmlFor="dkey">Display key</label>
-          <div className="display-key-row">
-            <input
-              id="dkey"
-              type="password"
-              autoComplete="off"
-              spellCheck={false}
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter' && (valid || !draft.trim())) commit(); }}
-              placeholder="paste the 44-character key"
-            />
-            <button type="button" className="ghost" disabled={!valid} onClick={commit}>Save</button>
-            <button type="button" className="ghost" onClick={() => { setEditing(false); setDraft(''); }}>Cancel</button>
-          </div>
-        </>
-      ) : (
-        <>
-          <span className="field-label" id="dkey-label">Display key</span>
-          <div className="display-key-row" role="group" aria-labelledby="dkey-label">
-            <code className="display-key-value">
-              {configured ? maskDisplayKey(displayKey) : (secure ? 'not set — names will not appear' : 'not set')}
-            </code>
-            {secure && (
-              <button type="button" className="ghost" onClick={() => { setEditing(true); setSaved(false); }}>
-                {configured ? 'Replace' : 'Paste key'}
-              </button>
-            )}
-            {configured && (
-              <button
-                type="button"
-                className="ghost"
-                onClick={() => {
-                  if (window.confirm('Remove the display key from THIS screen? Names will stop appearing here until you paste it again.')) {
-                    setDisplayKey('');
-                  }
-                }}
-              >
-                Remove
-              </button>
-            )}
-          </div>
-        </>
-      )}
-      <span className="hint">
-        {!secure && <>{INSECURE_CONTEXT_COPY} </>}
-        {editing && draft.trim() && !valid && (
-          <><strong>That does not look like a display key.</strong> It should be 44 characters ending in <code>=</code>. </>
-        )}
-        {saved && <><strong>Saved.</strong> Press <em>Night Test</em> on the print-server dashboard to confirm. </>}
-        Children&apos;s names travel <strong>encrypted</strong>, because the realtime channel itself is public.
-        Normally filled in by Display login above. To do it by hand: generate the key once on the print-server
-        dashboard (its front page says whether names are encrypted; the button there opens
-        <code>Settings → Realtime privacy</code>) and paste the same value into every screen. Without it the
-        clock, weather, counts and slides all still work — only the welcome banners stop.
-        {' '}<strong>Never</strong> email it, put it in a URL, or include it in a settings export — it is the one
-        secret here that is worth something.
-      </span>
-    </div>
-  );
-}
-
-/**
- * The publish token — the credential the print server requires before THIS
- * machine's slide editor may publish to every screen. Deliberately NOT part of
- * `form`/`set`, for exactly the reasons the display key is not: `form` backs
- * the settings export and the ?config= merge, and a credential must ride
- * neither. See src/lib/publishToken.js; publishToken.test.js pins the paths.
- */
-export function PublishTokenField() {
-  const [token, setToken] = useState(loadPublishToken);
-  const [draft, setDraft] = useState('');
-  const [editing, setEditing] = useState(false);
-
-  const commit = () => {
-    const next = draft.trim();
-    const ok = savePublishToken(next);
-    if (ok) setToken(next);
-    else window.alert('This machine cannot save the token — browser storage is blocked.');
-    setEditing(false);
-    setDraft('');
-  };
-
-  return (
-    <div className="field" style={{ marginTop: '0.5rem' }}>
-      {editing ? (
-        <>
-          <label htmlFor="ptoken">Publish token</label>
-          <div className="display-key-row">
-            <input
-              id="ptoken"
-              type="password"
-              autoComplete="off"
-              spellCheck={false}
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') commit(); }}
-              placeholder="paste a publish token"
-            />
-            <button type="button" className="ghost" disabled={!draft.trim()} onClick={commit}>Save</button>
-            <button type="button" className="ghost" onClick={() => { setEditing(false); setDraft(''); }}>Cancel</button>
-          </div>
-        </>
-      ) : (
-        <>
-          <span className="field-label" id="ptoken-label">Publish token</span>
-          <div className="display-key-row" role="group" aria-labelledby="ptoken-label">
-            <code className="display-key-value">
-              {token ? maskPublishToken(token) : 'not set — the Publish button will explain how to get one'}
-            </code>
-            <button type="button" className="ghost" onClick={() => setEditing(true)}>
-              {token ? 'Replace' : 'Paste token'}
-            </button>
-            {token && (
-              <button
-                type="button"
-                className="ghost"
-                onClick={() => {
-                  if (window.confirm('Remove the publish token from this machine? Its Publish button will stop working; other screens are unaffected.')) {
-                    savePublishToken('');
-                    setToken('');
-                  }
-                }}
-              >
-                Remove
-              </button>
-            )}
-          </div>
-        </>
-      )}
-      <span className="hint">
-        Only needed on the machine that edits slides, and filled in automatically on a logged-in screen.
-        It stays on this machine — never in a settings export, a <code>?config=</code> file, or a URL.
-      </span>
-    </div>
   );
 }
 

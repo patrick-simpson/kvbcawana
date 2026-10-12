@@ -42,7 +42,7 @@ export default function RemoteScreenPanel({ screen, shared, shareStatus, onShare
       savedConfig={savedConfig}
       overrides={remote.settings}
       status="connected"
-      initialTab="status"
+      initialTab="tonight"
       page
       configure
       screen={info}
