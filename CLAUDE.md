@@ -22,9 +22,14 @@ commits or files.
   changed file is one that suite never reads, so a Worker-only change
   deploys in about 2 minutes; keep that job's lists in step when a suite
   starts reading another folder), `scripts/check-mirrors.mjs` (the
-  contract and envelope vectors, the brand kit and `family.css`, which must be
-  byte-identical across the apps; canonical first: the printer's vectors and
-  `printer/styles/family.css`, the lobby's `shared/brand/`), and a `site` job
+  contract and envelope vectors, byte-identical across the apps, the printer's
+  first; and that the brand kit and `family.css` copies exist and match: those
+  two have ONE committed copy each, the lobby's `shared/brand/` and
+  `printer/styles/family.css`, and `scripts/family-assets.mjs` copies them
+  into Journey's `public/`, the print server's `public/brand/` and the
+  lobby's `public/` at build time, so every screen still holds a full local
+  copy; the copies are ignored, and each app's `pretest` / `prebuild` /
+  `prestart`, `site/build.mjs` and `release-app.yml` make them), and a `site` job
   that builds the one site (once per run: it uploads `site/dist` and
   `site/lib/large-files.generated.js` as a one-day `site-dist` artifact) and
   tests its Pages Function. The lobby runs as two parallel jobs,

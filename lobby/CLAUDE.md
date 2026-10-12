@@ -288,10 +288,16 @@ and `doodles/`. Read its README before changing it.
   `art.logo` (full color, for light fields) on banners, which sit on the
   club's own color. `clubs.js` carries the same catalog values as the
   pre-load fallback.
-- **Mirrors.** Journey (`journey/public/brand/`) and the printer
-  (`print-server/public/brand/`) carry byte-identical copies with drift
-  checks, so neither depends on the network at showtime. Change the kit
-  here first, then re-copy it into both.
+- **One copy, copied at build time.** This folder is the only committed
+  copy of the kit (and its README the only README). Journey
+  (`journey/public/brand/`) and the printer (`printer/print-server/public/brand/`)
+  get a full local copy from `node scripts/family-assets.mjs` (repo root),
+  which their tests, dev starts, builds, `site/build.mjs` and the printer
+  release run first; the copies are ignored by version control and never
+  edited, so neither app depends on the network at showtime. Change the kit
+  here, in place. `scripts/check-mirrors.mjs` fails CI if a copy is missing,
+  differs or is committed. `lobby/.gitattributes` keeps the kit's text files
+  LF in every checkout (the Windows release runner copies from it).
 - `scripts/brand/extract-catalog-brand.py` regenerates the marks and shapes
   from a catalog PDF (not committed), for next season.
 - **Two sizes of one shout.** `--font-shout` is Paytone One at true size, for
@@ -369,7 +375,7 @@ one of three "family" pages (with the Club Label Printer home and Journey
 Display's `about.html`) that share one design system. Rules:
 
 - **Static, outside the Vite graph.** `public/about.html` and
-  `public/family.css` are copied into `dist/` as-is; the page's own styling
+  `public/family.css` (a generated copy, see below) are copied into `dist/` as-is; the page's own styling
   lives in an inline `<style>` block in `about.html` (there is no
   `about.css`). The page is not a Vite entry and must never import React,
   Tailwind, `app.css`, the signage bundle or any service-worker
@@ -385,11 +391,11 @@ Display's `about.html`) that share one design system. Rules:
   never changes. A new query string is a new cache key, so the bump is what
   gets a restyled `family.css` to a signage device. Page-only styling needs
   no bump: it is inline, so it travels with the network-first HTML.
-- **`family.css` is byte-identical across the three apps** (`lobby/`,
-  `journey/`, `printer/`; `scripts/check-mirrors.mjs` fails CI on drift). The
-  canonical copy is `printer/styles/family.css` and its spec is
-  `printer/docs/FAMILY-DESIGN.md`; never edit this copy, only replace it
-  with the canonical file. Page-only styling goes in
+- **`family.css` has one committed copy**, `printer/styles/family.css`, and
+  its spec is `printer/docs/FAMILY-DESIGN.md`. `public/family.css` here (and
+  Journey's) is a generated, ignored copy that `npm run dev` / `npm run
+  build` (and `site/build.mjs`) make with `node ../scripts/family-assets.mjs
+  lobby`; never edit it, change the canonical file. Page-only styling goes in
   `about.html`'s `<style>` block, every class prefixed `cid-`.
 - **No Awana art on this page.** The owner uses the official Awana branding
   (club marks, the Awana Clubs mark, the catalog's design language) on the

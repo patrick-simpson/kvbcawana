@@ -2,8 +2,8 @@
 
 One kit for every screen in the Awana app family: the lobby signage
 (`index.html`), the projector (`countdown.html`), the Journey kiosk and the
-label printer's dashboard and labels. This folder is the canonical copy;
-the other repos carry byte-identical mirrors.
+label printer's dashboard and labels. This folder is the ONE copy
+(and this the one README): nothing else in the repo duplicates it.
 
 | File | What it is |
 | --- | --- |
@@ -109,14 +109,19 @@ pieces listed above into this folder by hand and update the colors in
 `tokens.css` and `fonts.css`, and if the Paytone One or Londrina Solid files
 stop being the unmodified font (see "Reserved Font Names and the OFL").
 
-## Mirrors
+## Build-time copies
 
-`journey-display/public/brand/` and
-`Print-TwoTimTwo-Labels/print-server/public/brand/` are byte-identical
-copies of this folder, checked by a drift test in each repo, so neither
-depends on the network at showtime. Change the kit here first, then
-re-copy it into both. The Paytone One and Londrina Solid files must stay whole
-in the mirrors too (the same OFL reasoning applies to a copy).
+Journey (`journey/public/brand/`) and the print server
+(`printer/print-server/public/brand/`) each hold a full local copy of this
+folder, so neither depends on the network at showtime (the Pi kiosk, the
+print server and the Windows app work offline). The copies are generated, not
+committed: `node scripts/family-assets.mjs` (repo root) makes them, and every
+test run, dev start, site build and installer build runs it first (each app's
+`pretest` / `prebuild` / `prestart`, `site/build.mjs`, `release-app.yml`).
+Change the kit here, in place; never edit a copy. The Paytone One and
+Londrina Solid files stay whole in every copy (the same OFL reasoning applies
+to a copy), which a byte-for-byte copy guarantees; `scripts/check-mirrors.mjs`
+and the apps' own tests fail if a copy is missing, differs, or is committed.
 
 ## Reserved Font Names and the OFL
 
