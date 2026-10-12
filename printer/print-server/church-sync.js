@@ -119,6 +119,7 @@ function createChurchSync(o) {
   let lastOk = false;
   let lastDoc = null;   // {rev, settings}: the Worker's doc as last seen (for this computer's own edits)
   let seenRev = -1;
+  let unseeded = false;   // the last answer was an empty doc (rev 0) this computer did not seed
   let busy = null;
   let again = false;
   let lastFetchAt = 0;
@@ -226,8 +227,11 @@ function createChurchSync(o) {
     const rev = revOf(doc.rev);
     if (doc.settings && typeof doc.settings === 'object' && rev > 0) lastDoc = { rev, settings: doc.settings };
     if (rev === 0 || !doc.settings || typeof doc.settings !== 'object') {
-      return o.isStation() ? seed(depth) : 'not-seeded';
+      if (o.isStation()) { unseeded = false; return seed(depth); }
+      unseeded = true;   // asked again once this computer is a station (stationActive, the lease)
+      return 'not-seeded';
     }
+    unseeded = false;
     // A rev other than the applied one (a lower one: the doc was made again).
     if (rev === applied.rev) return 'current';
     return apply(doc, rev);
@@ -285,10 +289,22 @@ function createChurchSync(o) {
   function onChurch(rev, sRev) {
     const r = revOf(rev);
     const s = revOf(sRev);
-    if (lastOk && r === seenRev && s === switchesRev) return;
+    // An empty doc this computer saw before it was a station: every lease asks
+    // again (and seeds) until the doc holds settings.
+    if (lastOk && r === seenRev && s === switchesRev && !(unseeded && r === 0)) return;
     // A failed fetch is not tried again on every lease (one every 5 s): at most every 30 s.
     if (!lastOk && lastFetchAt && now() - lastFetchAt < RETRY_MS) return;
     syncNow().catch(() => {});
+  }
+
+  /**
+   * The station role just became active (configureCloud). A first fetch made
+   * before it left an empty doc unseeded, and a station does not poll: ask
+   * again now, so it seeds. Never throws.
+   */
+  function stationActive() {
+    if (!unseeded || !o.signedIn() || !o.isStation()) return null;
+    return syncNow().catch(() => {});
   }
 
   /** The loop's step (every 5 s): the first fetch after sign-in, the non-station poll. */
@@ -321,7 +337,7 @@ function createChurchSync(o) {
   }
 
   return {
-    syncNow, onChurch, tick, start, managed, status, edit,
+    syncNow, onChurch, stationActive, tick, start, managed, status, edit,
     appliedRev: () => applied.rev,
     switches: () => (switches ? { ...switches } : null),
     warnings: () => warnings.slice(),

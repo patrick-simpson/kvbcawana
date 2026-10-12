@@ -166,6 +166,28 @@ function makeWorker() {
     broken.onChurch(2, 1);
     await sleep(10);
     check('...and the next lease tries again', broken.appliedRev() === 2 && broken.warnings().length === 0);
+
+    // A first fetch before the station role (configureCloud) found the doc empty: it is
+    // seeded once the role is active, and on every lease while the doc stays empty.
+    for (const via of ['stationActive', 'lease']) {
+      const w4 = makeWorker();
+      let st = false;
+      const late = createChurchSync({
+        signedIn: () => ({ base: SYNC, session: SESSION }), request: async (b, p, o) => w4.answer(o.method, o.body, o.station),
+        isStation: () => st, stationId: () => (st ? 'station-dddddddd' : null), readConfig: () => ({ labelFooter: 'Late' }),
+        applyPatch: () => ({ errors: [], changed: [], pickupChanged: false, seasonChanged: false }),
+      });
+      check(`(${via}) the first fetch, not yet a station: not seeded`, (await late.syncNow()) === 'not-seeded' && w4.rev === 0);
+      check(`(${via}) stationActive while still not a station asks nothing`, late.stationActive() === null);
+      st = true;
+      if (via === 'stationActive') await late.stationActive();
+      else { late.onChurch(0, 1); await sleep(10); }
+      check(`(${via}) the station role seeds the empty doc`, w4.rev === 1 && w4.doc.labelFooter === 'Late' && late.appliedRev() === 1, JSON.stringify(w4.doc));
+      const c = w4.calls.length;
+      late.onChurch(1, 1);
+      await sleep(10);
+      check(`(${via}) once seeded, a lease naming the rev asks nothing`, w4.calls.length === c);
+    }
   }
 
   // ── the real print server ─────────────────────────────────────────────────
@@ -231,7 +253,9 @@ function makeWorker() {
   check('this computer is a station', reconfigure().ok === true);
   {
     const mtime = fs.statSync(configFile).mtimeMs;
-    check('a station seeds the empty doc', (await sync.syncNow()) === 'seeded' && w.rev === 1);
+    // The doc was found empty before this computer was a station: becoming one seeds it at once.
+    for (let i = 0; i < 100 && w.rev === 0; i++) await sleep(10);
+    check('a station seeds the empty doc (configureCloud asks again: it was found empty before)', w.rev === 1 && w.calls.filter((c) => c.method === 'PUT').length === 1 && (await sync.syncNow()) === 'current');
     const put = w.calls.find((c) => c.method === 'PUT');
     check('as the station, with seed: true', put && put.station === 'station-aaaaaaaa' && put.body.seed === true);
     check('with config.json\'s church part: its schedule, footer, greeting, pickup list, late grace, BARF nights from church-config.json',

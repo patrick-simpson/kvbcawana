@@ -162,6 +162,8 @@ function configureCloud(opts) {
     historyRing: opts.historyRing || (async () => null), signedIn, request, stationId, merge: mergeAttendance, log, now: opts.now,
   });
   $config.cloudStation = { stationId: opts.stationId, puller, bundles, writer, attendance, journal, opts, signedIn, request, stationIdFn: stationId };
+  // A church doc this computer found empty before it was a station is seeded now.
+  churchSyncInstance().stationActive();
   if (opts.start !== false) {
     const unref = (fn, ms) => { const t = setTimeout(fn, ms); if (t.unref) t.unref(); return t; };
     const stopPull = jobPuller.startJobPuller({ puller, bundles, log, setTimeoutFn: unref });
