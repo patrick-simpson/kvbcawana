@@ -8,6 +8,7 @@ const printerCleanName = (s, max) => String(s == null ? '' : s).trim().slice(0, 
 const printerStored = (value, max) => stripControlChars(value, ' ').trim().slice(0, Number.isFinite(max) ? max : 80);
 const printerFriend = (raw) => {
   if (typeof raw !== 'string') return '';
+  // eslint-disable-next-line no-control-regex -- the old spelling, kept verbatim as the reference
   return raw.replace(/[\u0000-\u001f\u007f<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, 24);
 };
 const oldPlain = (s, max) => String(s == null ? '' : s).replace(/<[^>]*>/g, ' ').replace(/[<>]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, max);
