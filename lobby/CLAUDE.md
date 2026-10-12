@@ -92,7 +92,7 @@ mechanisms, because framer-motion and CSS need different enforcement:
   to remember. The pseudo-elements are named because `*` never matches
   one and neither property is inherited: the kit checkbox's `::before`
   check pop still played under `?lowPower=1` until they were.
-  `src/lib/zeroAnimationCss.test.js` pins the rule and fails any
+  `src/lib/sourceScans.test.js` pins the rule and fails any
   pseudo-element animation it would not reach.
 - Verified live (not just unit-tested): a real animated element sampled
   every 250ms genuinely oscillates opacity standalone but is perfectly
@@ -313,7 +313,7 @@ and `doodles/`. Read its README before changing it.
   one static primitive, StepPlate, only draws a measured outline
   (one 100 ms beat, the wipe / settle / pop / exit curves).
   `zeroAnimation.test.jsx` renders each through the real framer-motion under
-  zero-animation mode, and `src/lib/motionImports.test.js` fails any signage
+  zero-animation mode, and `src/lib/sourceScans.test.js` fails any signage
   file that imports an animating framer-motion export instead of `M`.
 - **The lobby has its own visual suite**, `e2e/signage.visual.spec.js`: a
   paused Playwright clock (install() alone lets time run), Math.random
@@ -1395,7 +1395,7 @@ as they are. The projector is a later, separate change.
   with a `cubic-bezier` (the kit's pop) in its place: behind `var()`, an
   easing a browser cannot read leaves the property unset instead of falling
   back. Softer or firmer amounts per control (the gear, a tab, a debug tile,
-  the checkbox) are `--squish-*` tokens on `:root`; `squishCss.test.js` pins
+  the checkbox) are `--squish-*` tokens on `:root`; `sourceScans.test.js` pins
   every token and every `linear()` string to `PRESS` / `releaseEasing()`. The
   kit checkbox's check springs in and goes out on the exit curve: any
   overshoot past 0 is a negative scale, a mirrored check.
@@ -1425,7 +1425,7 @@ as they are. The projector is a later, separate change.
   twin prefixed `.zero-animation-mode` (one class deeper, so it always wins),
   and another in the `prefers-reduced-motion` block written with the press's
   own selector (the `:not(:disabled)` included, or it loses on specificity).
-  `zeroAnimationCss.test.js` fails a press without both, and any rule that
+  `sourceScans.test.js` fails a press without both, and any rule that
   moves the turned surfaces' `transform-origin`; `e2e/panels.spec.js` holds a
   real button in each mode.
 - **Jelly UI's Save button** gates its canvas physics on the OS's reduced

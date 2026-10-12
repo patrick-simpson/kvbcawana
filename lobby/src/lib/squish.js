@@ -96,7 +96,7 @@ const POP_SEC = 0.46;
  * `releaseMs` on releaseEasing(). The pill's amount is DEPTH.press /
  * BULGE.press; a control that needs a softer (or, small and round, a
  * firmer) squash has its own. app.css carries every number as a `--squish-*`
- * property on :root, and squishCss.test.js pins the two equal.
+ * property on :root, and sourceScans.test.js pins the two equal.
  */
 export const PRESS = Object.freeze({
   ms: 100,
@@ -279,7 +279,7 @@ export function withSquish(beat, squish) {
  * steps over `ms`, to three places, ending on exactly 1. It does not depend
  * on how deep the press went, so one easing serves both axes. app.css writes
  * this string out literally (a `linear()` behind var() could not fall back),
- * and squishCss.test.js pins the two equal.
+ * and sourceScans.test.js pins the two equal.
  * @param {number} [stops]
  * @param {number} [ms]
  */

@@ -1772,7 +1772,7 @@ html, body, #root {
 
 /* ── The soft squish: operator presses ───────────────────────────────────
    Jelly UI's feel on the kit's own controls (src/lib/squish.js has the one
-   physics; squishCss.test.js pins every number here to it). A press squashes
+   physics; sourceScans.test.js pins every number here to it). A press squashes
    the control onto its ledge in --squish-press and sinks it 2px, as it
    always sank; on release it springs back through a stretch and a smaller
    squash to rest, over --squish-release, on the spring written as linear().
@@ -2451,7 +2451,7 @@ input:focus-visible {
    by ZeroAnimationContext in src/lib/motion.jsx, since CSS can't reach
    those. `*` never matches a pseudo-element and neither property is
    inherited, so ::before / ::after are named too (the panels' checkbox
-   pops its check on a ::before; src/lib/zeroAnimationCss.test.js fails
+   pops its check on a ::before; src/lib/sourceScans.test.js fails
    any pseudo-element that animates without being named here). */
 .zero-animation-mode,
 .zero-animation-mode *,
@@ -2463,7 +2463,7 @@ input:focus-visible {
 /* The blanket rule stops the spring; this stops the squash, so a press on the
    Pi is the flat, instant 2px sink it always was (the soft squish's presses,
    above). Every press rule is named, one prefix deeper so it always wins;
-   squishCss.test.js fails a new press rule that is not. */
+   sourceScans.test.js fails a new press rule that is not. */
 .zero-animation-mode .settings-gear:active,
 .zero-animation-mode .panel button:not(:disabled):active,
 .zero-animation-mode .panel .actions label:active,

@@ -38,7 +38,7 @@ describe('FlagshipSlide', () => {
   });
 
   it('uses only M elements for motion: nothing here can animate under ?lowPower=1', async () => {
-    // src/lib/motionImports.test.js pins the import; this pins the rendered
+    // src/lib/sourceScans.test.js pins the import; this pins the rendered
     // result: under zero animation every letter is already at rest, its
     // squish included (no scale left over, so no transform at all).
     const { container } = still(<FlagshipSlide />);
