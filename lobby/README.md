@@ -37,7 +37,7 @@ pledges), per-club game-time screens with live check-in counts and
 birthday shout-outs, a closing slide, and a shutdown view — all driven
 by a pure, tested schedule engine over `shared/schedule.json`.
 
-- **URL:** `https://awana.kvbchurch.org/lobby/countdown` (also `/projector`)
+- **URL:** `https://awana.kvbchurch.org/lobby/countdown`
 - **Source:** `src/presentation/` (fully isolated from the signage app;
   it shares only the sanitized Pusher socket and the device config store)
 - **Time-travel QA:** append `?now=2026-09-16T18:04:00` (any ISO

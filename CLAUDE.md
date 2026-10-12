@@ -97,7 +97,7 @@ commits or files.
 
 1. This repo, with history (done).
 2. One Cloudflare Pages site at **awana.kvbchurch.org** (done; the printer's
-   public site and one About page at `/`, `/lobby`, `/projector` → `/lobby/countdown`,
+   public site and one About page at `/`, `/lobby`, `/lobby/countdown`,
    `/journey`, `/api`).
 3. Pusher replaced by the Worker's own live channel (done 2026-10-03).
 4. Every installed app repointed (printer and sound room update feeds, the Pi
