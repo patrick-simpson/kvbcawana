@@ -3,10 +3,10 @@
 // shapes: every seal is the browser's, and the tests open them with the
 // station's and the history key's own private keys to prove what is inside.
 import assert from 'node:assert/strict';
-import { describe, it, before } from 'node:test';
+import { describe, it, before, mock } from 'node:test';
 import * as cc from '../../lobby/shared/cloud-crypto.js';
 import { mergeChurch, sanitizeChurch } from '../../lobby/shared/churchSettings.js';
-import { createDesk, DeskError, HISTORY_PIN_STORAGE, printLabel, SESSION_STORAGE } from '../checkin/desk-transport.js';
+import { createDesk, DeskError, HISTORY_PIN_STORAGE, READ_TIMEOUT_MS, printLabel, SESSION_STORAGE } from '../checkin/desk-transport.js';
 
 const PASS = 'kennebec';
 const SESSION = 'v1.1.1760000000.abcdefghijklmnopqrstuvwxyz0123';
@@ -533,5 +533,22 @@ describe('remembered leaders (the church settings `leaders`)', () => {
     await desk.signIn(PASS);
     await desk.rememberLeader({ name: 'One More' });
     assert.equal(w.churchPuts.length, 0);
+  });
+});
+
+describe('a read that never answers', () => {
+  it('gives up after READ_TIMEOUT_MS as "unreachable", so the page asks again instead of waiting forever', async () => {
+    mock.timers.enable({ apis: ['setTimeout'] });
+    try {
+      const hung = (url, init) => new Promise((_, reject) => init.signal.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError'))));
+      const d = createDesk({ cc, fetch: hung, store: memoryStore(), now: () => NOW });
+      const asked = d.roster();
+      const outcome = asked.then(() => null, (e) => e);
+      mock.timers.tick(READ_TIMEOUT_MS);
+      const err = await outcome;
+      assert.ok(err instanceof DeskError);
+      assert.equal(err.code, 'unreachable');
+      assert.match(err.message, /did not answer in time/);
+    } finally { mock.timers.reset(); }
   });
 });

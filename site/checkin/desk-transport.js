@@ -40,6 +40,8 @@ export const HISTORY_PIN_STORAGE = 'awanaDeskHistoryKey.v1';
 export const RESEAL_MAX = 3;
 /** The most remembered leaders (church settings `leaders`, lobby/shared/churchSettings.js). */
 export const LEADERS_MAX = 80;
+/** A read waits this long (the Worker queues a roster request up to 20 s for its turn) before the page asks again. */
+export const READ_TIMEOUT_MS = 30 * 1000;
 /** A station not heard from for this long means "check the printer". */
 export const STATION_QUIET_MS = 2 * 60 * 1000;
 
@@ -146,7 +148,7 @@ export function createDesk({ cc, fetch: fetchFn, store, base = DESK_API, now = D
   /**
    * One request. Returns {status, body}; throws only DeskError for the failures
    * every call words the same way (unreachable, signed out, busy).
-   * @param {string} method @param {string} path @param {unknown} [body] @param {{ auth?: boolean }} [opts]
+   * @param {string} method @param {string} path @param {unknown} [body] @param {{ auth?: boolean, timeoutMs?: number }} [opts]
    * @returns {Promise<{ status: number, body: any }>}
    */
   async function request(method, path, body, opts = {}) {
@@ -155,10 +157,17 @@ export function createDesk({ cc, fetch: fetchFn, store, base = DESK_API, now = D
     if (body !== undefined) headers['Content-Type'] = 'application/json';
     if (opts.auth !== false && session) headers.Authorization = `Bearer ${session}`;
     let res;
+    // A read that never answers (a phone's connection can stall without failing)
+    // gives up after READ_TIMEOUT_MS so the page asks again. Only reads: a
+    // check-in that was sent must never be reported as lost on a timer.
+    const timer = opts.timeoutMs && typeof AbortController === 'function' ? new AbortController() : null;
+    const timeout = timer ? setTimeout(() => timer.abort(), opts.timeoutMs) : null;
     try {
-      res = await fetchFn(`${base}${path}`, { method, headers, body: body === undefined ? undefined : JSON.stringify(body), cache: 'no-store' });
+      res = await fetchFn(`${base}${path}`, { method, headers, body: body === undefined ? undefined : JSON.stringify(body), cache: 'no-store', ...(timer ? { signal: timer.signal } : {}) });
     } catch {
-      throw new DeskError('unreachable', 'No internet connection to the check-in service.');
+      throw new DeskError('unreachable', timer && timer.signal.aborted ? 'The check-in service did not answer in time.' : 'No internet connection to the check-in service.');
+    } finally {
+      if (timeout) clearTimeout(timeout);
     }
     /** @type {any} */
     let data = null;
@@ -274,7 +283,7 @@ export function createDesk({ cc, fetch: fetchFn, store, base = DESK_API, now = D
   }
   /** @param {string} path */
   async function get(path) {
-    const r = await request('GET', path);
+    const r = await request('GET', path, undefined, { timeoutMs: READ_TIMEOUT_MS });
     if (r.status === 200) return r.body;
     throw httpError(r);
   }
@@ -284,7 +293,7 @@ export function createDesk({ cc, fetch: fetchFn, store, base = DESK_API, now = D
   const printStatus = () => get('/v1/print/status');
   /** The Worker's own tonight count (routes.md `GET /v1/desk/tonight`, P5): null until that route exists. */
   async function tonight() {
-    const r = await request('GET', '/v1/desk/tonight');
+    const r = await request('GET', '/v1/desk/tonight', undefined, { timeoutMs: READ_TIMEOUT_MS });
     return r.status === 200 ? r.body : null;
   }
 
