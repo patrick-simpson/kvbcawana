@@ -39,7 +39,10 @@ commits or files.
   variable, so they agree), installs only the Worker's packages (wrangler),
   deploys the sync Worker only when its sources changed (every Worker deploy restarts its
   Durable Object and drops every screen's socket), then publishes the site to
-  Cloudflare Pages at **awana.kvbchurch.org**: `/` the printer's public site,
+  Cloudflare Pages at **awana.kvbchurch.org**: `/` the family's one public page
+  (the printer's React site, with the lobby signage at `#lobby` and the Journey
+  kiosk at `#journey`; the old `/lobby/about.html` and `/journey/about.html`
+  301 to those sections),
   `/lobby`, `/lobby/countdown` (the projector), `/journey`, `/checkin` (the
   phone page), `/settings` (one settings page for every screen, `ROADMAP.md#settings-page`), `/api` (the Worker), `/updates` (the apps' update feeds).
   Journey is stamped with a hash of its own files, so only a Journey change
@@ -103,7 +106,8 @@ commits or files.
 
 1. This repo, with history (done).
 2. One Cloudflare Pages site at **awana.kvbchurch.org** (done; the printer's
-   public site and one About page at `/`, `/lobby`, `/lobby/countdown`,
+   public site, now also the one About page for all three apps (`/#lobby`,
+   `/#journey`), at `/`, `/lobby`, `/lobby/countdown`,
    `/journey`, `/api`).
 3. Pusher replaced by the Worker's own live channel (done 2026-10-03).
 4. Every installed app repointed (printer and sound room update feeds, the Pi

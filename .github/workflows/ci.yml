@@ -43,7 +43,9 @@ jobs:
   # Anything unknown runs everything: a manual run or a bot's dispatch, no
   # base to compare with, or a change to this file. The fast jobs always run.
   #   lobby   reads only lobby/ (its vitest excludes worker/ and desktop/,
-  #           whose lint moved into their own jobs below)
+  #           whose lint moved into their own jobs below), plus
+  #           journey/public/src/schedule.js and printer/components/Lobby.tsx
+  #           (the home page's stepped chips, aboutChips.test.js)
   #   printer reads printer/, plus lobby/worker/src/relay.js
   #           (test-phone-relay), site/build.mjs (test-phone-touch) and
   #           lobby/src/lib/syncSpecs.js (electron-app's device-sync test)
@@ -79,6 +81,7 @@ jobs:
               if [[ "$f" != */* && "$f" == *.md ]]; then continue; fi
               case "$f" in
                 journey/public/src/schedule.js) lobby=true ;;  # screenSpecs.test.js reads it
+                printer/components/Lobby.tsx) lobby=true ;;  # aboutChips.test.js reads the home page's chips
                 lobby/worker/*|lobby/desktop/*|printer/*|journey/*|site/*|.github/workflows/*) ;;
                 *) lobby=true ;;
               esac

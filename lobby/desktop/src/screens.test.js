@@ -26,7 +26,7 @@ describe('screens', () => {
     const journey = screenUrls(SITE, 'journey').base;
     expect(isScreenPage('https://awana.kvbchurch.org/lobby/countdown.html', lobby)).toBe(true);
     expect(isScreenPage('https://awana.kvbchurch.org/journey/', lobby)).toBe(false);
-    expect(isScreenPage('https://awana.kvbchurch.org/journey/about.html', journey)).toBe(true);
+    expect(isScreenPage('https://awana.kvbchurch.org/journey/index.html', journey)).toBe(true);
     expect(isScreenPage('https://awana.kvbchurch.org/', journey)).toBe(false);
     expect(isScreenPage('https://evil.example/journey/', journey)).toBe(false);
     expect(isScreenPage('not a url', journey)).toBe(false);

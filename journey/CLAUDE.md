@@ -269,75 +269,56 @@ Read Prep, captions).
   `#slide-template*`) declaration for declaration, and fails if any other
   rule names those elements.
 
-## About page (`public/about.html`)
+## About page: now the `#journey` section of the home page
 
-A static showcase page for church leadership, one of three sibling pages
-(Club Label Printer's home page, the Check-in Display's `about.html`, and
-this). It is one plain HTML file with no script at all: the shared
-`public/family.css` beside it (linked as `family.css?v=N`), and its own page
-styles inline in a `<style>` block. There is no `about.css`.
+The static `public/about.html` and `test/about-page.test.mjs` are gone: on
+2026-10-12 the three family about pages became ONE page, the printer's React
+site at awana.kvbchurch.org/ (printer/CLAUDE.md, "Public website"), and
+Journey's part of it is its `#journey` section: `printer/components/Journey.tsx`
+with `printer/styles/journey.css` (classes `jd-`). `/journey/about.html` 301s
+to `/#journey` (`site/lib/redirects.js`). The kiosk never loaded the page and
+still loads nothing of it (`index.html` does not link `family.css`;
+`public/family.css` stays only as a byte-identical mirror that
+`scripts/check-mirrors.mjs` compares). The rules that came with the page live
+on, checked by `printer/scripts/test-about-page.cjs` (printer `npm test`):
 
-- **The kiosk never loads it.** `index.html` does not link it, and it must
-  never load `schedule.js` or `style.css`; nothing here should ever add
-  weight to the Pi's page. `scripts/stamp-build.mjs` stamps `index.html`
-  only, so `about.html` needs no build meta and is left untouched by the
-  deploy (checked by running the stamp over a scratch copy of `public/`).
-- **`family.css` is byte-identical across the three repos.** The canonical
-  copy is `printer/styles/family.css` and its spec is
-  `printer/docs/FAMILY-DESIGN.md`; change it there and copy
-  the file byte-for-byte to all three, never edit this copy on its own.
-  Anything page-specific goes in `about.html`'s inline `<style>` with the
-  `jd-` prefix, built on the family tokens.
-- **Bump the `?v=` token on BOTH about pages whenever `family.css` changes**
-  (this one and the Check-in Display's `public/about.html`). Pages serves the
-  stylesheet with `max-age=600`, and the Check-in Display's service worker
-  serves same-origin stylesheets cache-first under its build's cache name,
-  so a deploy that changes only the CSS under an unchanged URL may never
-  reach a screen that already has the old copy. HTML is fetched fresh, so a
-  new query string on the link is what carries the change.
-- **The 6:30 start screen (Fig. 1 and the resume card) is drawn in the kit,
-  with the kit's own faces.** The page links `brand/fonts.css` (the same
-  self-hosted mirror the kiosk loads, full unmodified fonts) beside its
-  Google link, which asks for the editorial faces only (Fraunces, Source Sans
-  3, IBM Plex Mono): never Galindo (owner, 2026-09-29), never a Google or
-  subset copy of a brand face. The recreation follows `public/src/style.css`'s
-  splash: the deep ink field, the club purple corner tab and waves, Paytone
-  One for the shout (with `1.05` fit and the `-.15em` lift), Londrina Solid
-  for labels and buttons, Figtree for the hint. Its art is drawn fresh for the
-  page (no kit file, no `<img>`), and "Journey" is set as plain text, not the
-  wordmark: no Awana logo on this page. One deliberate departure, as on the
-  Check-in Display's page: the Begin Video orange is `#CF4518`, not the kit's
-  `#F15A28`, so its white label passes AA at mock size.
-  `test/about-page.test.mjs` pins the palette to `brand/tokens.css`, the
-  loaded faces, the departure and the no-image rule, and that nothing is
-  fetched from another host but the ONE Google stylesheet for the editorial
-  faces and its two preconnects (a v1 `css?family=Paytone+One` link, a mirror,
-  a preload, an `@import`, a page-local `@font-face` or a `url()` to another
-  host all fail it). The playback, slide-bar
-  and Read Prep recreations below it are still the pre-kit black / red /
-  system-ui drawings; redraw them the same way when they are next touched.
-- **Licensing wording is strict** (see "Licensing boundary" above): the page
-  says the kiosk plays curriculum the church already licenses through its
-  own Awana Ministry Membership, used only within the church's own program
-  (its kiosk and its leaders) and never shared or offered anywhere else, and
-  that each lesson is prepared so even the little Pi plays it smoothly. It
-  never says the kiosk plays "a copy", a "smaller copy", or anything
-  "re-encoded" or "transcoded", and never implies the Pi plays full
-  quality. It must never link to, name the URL or filename of, or advertise
-  any lesson video, transcoded copy, Release asset, transcript, handout or
-  slide image, and never say "re-host", "mirror", or "download" anywhere
-  near the videos (the phrase is "saved ahead on the kiosk itself"). Screen
-  mocks are CSS recreations with placeholder text: no video frames, no
-  slide artwork, no curriculum text or imagery, no Awana logos.
-- **The room is students.** Journey is the high-school ministry, so the page
+- **The 6:30 start screen (Fig. 1 and the resume card) is drawn in the kit, with
+  the kit's own faces**, loaded from the kit's `fonts.css` (the home page links
+  `/lobby/shared/brand/fonts.css`; full, unmodified fonts) beside Google's
+  stylesheet for the editorial faces only (Fraunces, Source Sans 3, IBM Plex
+  Mono): never Galindo (owner, 2026-09-29), never a Google or subset copy of a
+  brand face, nothing else from another host. The recreation follows
+  `public/src/style.css`'s splash: the deep ink field, the club purple corner tab
+  and waves, Paytone One for the shout (with `1.05` fit and the `-.15em` lift),
+  Londrina Solid for labels and buttons, Figtree for the hint. The test pins
+  its palette to the kit's `tokens.css`, the loaded faces, the one deliberate
+  departure (the Begin Video orange is `#CF4518`, not the kit's `#F15A28`, so its
+  white label passes AA at mock size) and the no-image rule. Its art is drawn
+  fresh (no kit file, no `<img>`), and "Journey" is set as plain text, not the
+  wordmark: no Awana logo on the page. The playback, slide-bar and Read Prep
+  recreations are still the pre-kit black / red / system-ui drawings; redraw
+  them the same way when they are next touched.
+- **Licensing wording is strict** (see "Licensing boundary" above): the section
+  says the kiosk plays curriculum the church already licenses through its own
+  Awana Ministry Membership, used only within the church's own program (its
+  kiosk and its leaders) and never shared or offered anywhere else, and that
+  each lesson is prepared so even the little Pi plays it smoothly. It never says
+  the kiosk plays "a copy", a "smaller copy", or anything "re-encoded" or
+  "transcoded", and never implies the Pi plays full quality. It must never link
+  to, name the URL or filename of, or advertise any lesson video, transcoded
+  copy, Release asset, transcript, handout or slide image, and never say
+  "re-host", "mirror", or "download" anywhere near the videos (the phrase is
+  "saved ahead on the kiosk itself"). Screen mocks are CSS recreations with
+  placeholder text: no video frames, no slide artwork, no curriculum text or
+  imagery, no Awana logos.
+- **The room is students.** Journey is the high-school ministry, so the section
   says "students", never "children", about the people watching the lesson.
-- **Never link to the live kiosk.** Links out go to the two sibling pages
-  (the labels home page and the Check-in Display's `about.html`) and the
-  three GitHub repos only, never to this site's root or `index.html`, and
-  never to the Check-in Display's root or `countdown.html`.
-- Trademark: the "Not affiliated with or endorsed by Awana® Clubs
-  International" line sits at the top, in the meta description and in the
-  footer's full disclaimer.
+- **Never link to the live kiosk.** Links out go to the three GitHub repos, the
+  app's downloads and the page's own sections, never to `/journey/` or
+  `index.html`, and never to the lobby's root or `countdown.html`.
+- Trademark: the "Not affiliated with or endorsed by Awana® Clubs International"
+  line sits in the disclaimer bar, the meta description and the footer's full
+  disclaimer.
 
 ## Daily schedule
 

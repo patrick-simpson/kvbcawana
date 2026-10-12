@@ -115,7 +115,7 @@ test('the shout is Paytone One, whole, and Galindo is gone from everything the p
   assert.deepEqual(readdirSync(path.join(PUBLIC, 'brand', 'fonts')).filter((f) => /galindo/i.test(f)), []);
   // (style.css's comments say why the sizes are fitted, and so name it; what
   // may not is a rule, a font load or a page.)
-  for (const rel of ['index.html', 'about.html', 'src/style.css', 'src/schedule.js', 'brand/fonts.css', 'brand/tokens.css']) {
+  for (const rel of ['index.html', 'src/style.css', 'src/schedule.js', 'brand/fonts.css', 'brand/tokens.css']) {
     const text = rel.endsWith('.css') ? stripComments(read(rel)) : read(rel);
     assert.doesNotMatch(text, /galindo/i, `${rel} does not name Galindo`);
   }

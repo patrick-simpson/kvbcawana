@@ -4,14 +4,14 @@ import { Icon, IconName } from './Icons';
 /**
  * Thin JSX wrappers that emit exactly the family design system's markup
  * (FAMILY.md §4). Class names are the family's own `fam-*` classes; nothing
- * here re-expresses them as utilities, so this site cannot drift from the two
- * static about pages that share family.css.
+ * here re-expresses them as utilities, so this site cannot drift from the family
+ * design system.
  */
 
 export const URLS = {
   labels: 'https://awana.kvbchurch.org/',
-  checkin: 'https://awana.kvbchurch.org/lobby/about.html',
-  journey: 'https://awana.kvbchurch.org/journey/about.html',
+  checkin: 'https://awana.kvbchurch.org/#lobby',
+  journey: 'https://awana.kvbchurch.org/#journey',
   srcLabels: 'https://github.com/patrick-simpson/kvbcawana/tree/main/printer',
   srcCheckin: 'https://github.com/patrick-simpson/kvbcawana/tree/main/lobby',
   srcJourney: 'https://github.com/patrick-simpson/kvbcawana/tree/main/journey',

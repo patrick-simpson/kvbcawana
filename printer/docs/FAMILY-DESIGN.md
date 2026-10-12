@@ -1,12 +1,12 @@
 # Club Night Tools: family design system (v1.1, 2026-09-28)
 
-This is the shared design system for the three showcase pages:
+This is the shared design system for the three showcase pages. Since 2026-10-12 they are ONE page, the home page of awana.kvbchurch.org (`printer/`), with one section per product (the old per-app `about.html` files are gone and redirect to `/#lobby` and `/#journey`); the "about.html" link and file rules further down describe the three-page era:
 
 | Product | Page | `data-accent` | Accent |
 | --- | --- | --- | --- |
 | Club Label Printer | labels site home (`Print-TwoTimTwo-Labels`, React + Vite) | `labels` | green |
-| Check-in Display | `about.html` on `Awana-Check-in-Display` | `checkin` | warm orange |
-| Journey Display | `about.html` on `Journey-Display` (static, no build) | `journey` | deep indigo |
+| Check-in Display | the `#lobby` section of the home page (was `about.html`) | `checkin` | warm orange |
+| Journey Display | the `#journey` section of the home page (was `about.html`) | `journey` | deep indigo |
 
 - **Canonical CSS:** [`styles/family.css`](../styles/family.css) in this repo. It is self-contained and needs no build step.
 - **Copies:** byte-identical at `Awana-Check-in-Display/public/family.css` and `Journey-Display/public/family.css`. Never edit a copy: change the canonical file, copy it over both, and bump the `family.css?v=N` token on both static about pages (the Check-in signage service worker serves CSS cache-first, so a new URL is what gets a changed stylesheet onto a signage device).
