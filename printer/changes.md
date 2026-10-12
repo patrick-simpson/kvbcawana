@@ -1,4 +1,11 @@
-﻿## [9.3.1] - 2026-10-12
+﻿## [9.4.0] - 2026-10-12
+You can see an update downloading, and the Journey PC saves its lessons ahead of time.
+
+**Update progress.** While the app downloads a new version, the tray menu and its tooltip say "Downloading update 42% (71 of 170 MB)", and the status window adds the time left. When it is done it says "Update ready, restarting...". If the download fails, a plain line says it will try again soon. When an update installs has not changed.
+
+**The Journey screen is a PC now.** Opened in this app, the Journey page saves every lesson's full-quality video on the computer by itself (outside 5:30 to 8 pm, never while a lesson is on screen), and plays saved lessons from the disk, so a slow internet connection never interrupts one. Progress shows in Journey's Settings and on the settings page's Journey kiosk row.
+
+## [9.3.1] - 2026-10-12
 Labels wear the official club logos and their clubs' own lettering, and a friend who came late gets a BARFED tag.
 
 **Official club logos.** Every Puggles, Cubbies, Sparks, T&T, Trek and Journey label now prints the club's official one-colour logo instead of TwoTimTwo's small colour picture (which came out dark and blurry on the thermal printer). Five clubs (Puggles, Cubbies, Sparks, Trek and Journey) print their logo sideways, reading bottom to top, so it fills the tall panel; T&T stays upright. On a crowded label the logo shrinks to stay above the group line.
