@@ -1180,6 +1180,10 @@
         "critical"
       ],
       "maxMessage": 200,
+      "optionalFields": [
+        "durationSec"
+      ],
+      "durationSecNote": "Optional whole seconds 0..14400: the screen hides the notice that long after it RECEIVED it (never longer than its own 4 hour ceiling); 0 takes it down now. Added with the settings page's notice composer; an older screen ignores it and keeps the 4 hour ceiling. Out of range or not a whole number: dropped, never coerced.",
       "note": "`message` is the ONLY free-text field on the channel. It is church-authored copy written for public display (TwoTimTwo /msg/admin), shown verbatim by design — but bounded to 200 chars and forced to plain text so it cannot inject markup or break the layout. It is never derived from roster data.",
       "valid": [
         {
@@ -1191,6 +1195,12 @@
           "level": "info",
           "message": "Bring your Bible next week!",
           "at": "2026-09-16T21:00:00.000Z"
+        },
+        {
+          "level": "warn",
+          "message": "Club is ending early tonight",
+          "at": "2026-09-16T21:00:00.000Z",
+          "durationSec": 1800
         }
       ],
       "dirty": [
@@ -1215,6 +1225,18 @@
           },
           "mustNotContain": [
             "emergency-broadcast"
+          ]
+        },
+        {
+          "reason": "a negative duration is dropped, the notice itself stays",
+          "payload": {
+            "level": "info",
+            "message": "Bring your Bible next week!",
+            "at": "2026-09-16T21:00:00.000Z",
+            "durationSec": -5
+          },
+          "mustNotContain": [
+            "durationSec"
           ]
         }
       ],
