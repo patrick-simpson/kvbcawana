@@ -148,6 +148,7 @@ vocabulary for the desk page, the print role and the history views:
 | --- | --- | --- |
 | `checkin` | the desk page (`source: 'desk'`) with `POST /v1/desk/checkin`; the print role for a TwoTimTwo-page check-in once it prints (`source: 'ttt'`, `history-sync.js rowForPrinted`), posted with its own `summary` line `{checkedIn: 1}` for its club in a post holding only that row, so a retry is the same batch and counts once (a phone page check-in is counted here too: the watcher's job meets its label) | `{ts, first, last, club, clubberId?, friend?, friendFirst?, source}`, `ts` epoch MILLISECONDS |
 | `visitor` | the desk page, a visitor with no clubber id | as `checkin`, no `clubberId` (the trends count visitors from this kind) |
+| `barf-friend` | the desk page with `POST /v1/desk/barf-late` (5.1): a late Brought a friend; no count line | `{ts, first, last, club, clubberId, friendFirst, source}` |
 | `undo` | the desk page with `POST /v1/desk/undo` | `{ts, first, last, club, clubberId?, source}`: the child is NOT here after it |
 | `checkout` | the desk page with `POST /v1/desk/checkout` | as `undo` |
 | `reprint` | the desk page, posted with `POST /v1/history/rows` beside `POST /v1/print/reprint` | `{ts, first, last, club, source}` |
@@ -301,8 +302,8 @@ network call):
 exactly what the print role runs:
 `{route: '/print', body: {name, clubName, clubberId?, visitor?, friend?, friendName?}, clubberId, source: 'desk'}` (`body` is the print server's own `POST /print` body: `name` is split there, a visitor has no `clubberId` and `visitor: true`; Bible is an `items` flag for TwoTimTwo and is not a print field).
 `route` is one of the print server's own print routes (`/print`, `/reprint`,
-`/print-barf-bags`, `/print-custom`, `/print-oneoff`, `/print-leader`,
-`/print-award`), `body` that route's own JSON. The page does NOT know the claim's
+`/print-barf-bags`, `/print-barf-tag` (9.3.1+, 5.1), `/print-custom`, `/print-oneoff`,
+`/print-leader`, `/print-award`), `body` that route's own JSON. The page does NOT know the claim's
 `gen` (the Worker assigns it): the lease carries it, plaintext (section 6), and
 the print role uses that over any `gen` in the record. The Worker adds
 `cloud: true` / `regen` itself on the print server side; the page never sends
@@ -349,6 +350,38 @@ own, never leased and never shown to a station) and `drain()` seals it to the
 stations once one registers. Brought a friend: a child the report marks Brought a friend gets `friend: true` in the
 job body, so the station also prints the BARFED tag on a BARF night (section 8, "BARF on
 the TwoTimTwo-page fallback").
+
+### 5.1 A late BARF friend (BUILT, `barf.js`; owner 2026-10-12)
+
+A child already checked in tonight brought a friend after all. The page's green
+BARF button (shown only on a BARF night) picks the child and the friend's first
+name; ONE Worker operation does the rest, so nothing prints, greets or counts twice.
+
+| Route | Auth | Request | Answer |
+| --- | --- | --- | --- |
+| `GET /v1/desk/barf` | session | | `{night, barfNight: true \| false \| null, friends: [clubberId], tagRoute, stations}`. `barfNight` = the church settings' `barfNights` (10.3) holds tonight, the station's own rule; `null` (the page hides the button) with no church settings or `CHURCH_SETTINGS` off. `friends`: children who already brought one tonight (the friends list and the applied report's YES). `tagRoute`: `/print-barf-tag` when EVERY registered station reports 9.3.1 or later, else `/print-custom` (what 9.3.0 runs: a job route it would refuse is never sent). No TwoTimTwo read |
+| `POST /v1/desk/barf-late` | session | `{night, clubberId, friendName, historyRow: Row (kind 'barf-friend'), tagJob: {jobId: 'reprint:<uuid>', bundle} \| null}`; `tagJob` sealed to every station (record `{route: tagRoute, body: {firstName, clubName}}` or `{route: '/print-custom', body: {text: 'BARFED! <first>'}}`), null only with no station | `{ok, checkedIn, items: {Bible, Friend: true}, jobId, history, reason?, tries?}` (below). 400 `wrong-night` / `no-child` / `no-friend-name` / `unsealed` (`what`); 409 `not-barf-night`, `already-friend`, `busy` (another operation, or a desk check-in being posted), `not-on-report`, `not-found`, `no-friend-item`, `no-attendance-item`, `stations-changed`; 429 / 502 / 503 as 5 |
+| `POST /v1/desk/barf-late` (recheck) | session | `{night, clubberId, recheck: true, items}` (the `items` the failed answer gave) | the redo alone: `{ok, checkedIn, items, reason?}`. No label, no list, no row |
+
+In order: refuse early (above; the friend check and the mark are one synchronous
+step per child); ONE report read on the 5 s clock (the child must be on it; YES
+under Bible is `items.Bible`); **hold** the child on the report
+(`watcher.hold`: every read until the hold ends lists them, memory only); TwoTimTwo's
+undo (an ambiguous one is checked on the check-in page: still checked in = 504
+`unsure`, nothing changed), then its check-in with the same items plus Brought a
+friend, up to 3 tries (writes, no read slot). So a watcher read in the gap sees no
+child leave and none arrive: no claim undone (same gen, same state), no job
+dropped, no TwoTimTwo-page check-in adopted, no greeting, the count unchanged.
+Then, whatever the redo did: the BARF tag job is queued as a `reprint:` job
+(no claim; the station journals it, at most once; nothing greets), the friend goes
+on the friends list (`friends.record`: the 6:30 email and `bagNames`, the BARF
+bags), the sealed row is kept (no `night_summary` line). A redo that took keeps
+the hold 30 s more; one that never took lets it go at once (the next read sees
+the truth: the claim undone, the count down) and answers `checkedIn: false` with
+`reason`; the page shows "<Child> is NOT checked in on TwoTimTwo" and a one-tap
+recheck, which makes the claim live (queued, no job) and holds the child BEFORE
+its post, so the watcher never adopts them as new; a failed recheck undoes that
+claim again. The child's name tag is never reprinted.
 
 ## 6. Print (BUILT)
 

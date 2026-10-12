@@ -20,22 +20,24 @@ export const row = (kind = 'checkin', night = NIGHT) => ({
   id: newRowId(), night, kind, v: 1, kid: '0123456789abcdef', epk: `BA${'A'.repeat(85)}=`, iv: 'A'.repeat(16), ct: 'A'.repeat(1388),
 });
 
-export async function rig({ env = {}, kids = [], households = null, start = WED_6PM, storage = memoryStore(), clock = fakeClock(start) } = {}) {
+export async function rig({ env = {}, kids = [], households = null, start = WED_6PM, storage = memoryStore(), clock = fakeClock(start), checkinPage = () => CHECKIN_PAGE } = {}) {
   const night = { kids: [...kids], count: null, /** rows the Checkout page lists */ out: [] };
   const render = () => {
     const clubs = [...new Set(night.kids.map((k) => k.club))];
     return page(...clubs.map((club) => {
       const these = night.kids.filter((k) => k.club === club);
-      return table(`${club} `, these.map((k) => ({ id: k.id, name: k.name, friend: k.friend })), { count: night.count ?? these.length });
+      return table(`${club} `, these.map((k) => ({ id: k.id, name: k.name, friend: k.friend, bible: k.bible })), { count: night.count ?? these.length });
     }), clubs.length ? '' : table('Sparks ', []));
   };
-  const tt = fakeTwoTimTwo({ report: render, checkin: () => CHECKIN_PAGE, checkout: () => checkoutPage({ rows: night.out }), households });
+  const tt = fakeTwoTimTwo({ report: render, checkin: checkinPage, checkout: () => checkoutPage({ rows: night.out }), households });
   tt.checkinName = 'Kit Tester';
   /** checkoutReply: what TwoTimTwo answers a check-out post instead of "OK". */
   const faults = { checkin: null, undo: null, checkout: null, checkoutReply: null };
   /** When each data page was read: the clock's invariant. */
   const reads = [];
   const posts = { undo: [], checkout: [], /** when each check-out post was made */ checkoutAt: [] };
+  /** Called as TwoTimTwo takes an undo / a check-in post (before it answers): a test moves the report, or reads it, there. */
+  const on = { undo: null, checkin: null };
   const fetchFn = async (url, init = {}) => {
     const u = new URL(url);
     const method = init.method || 'GET';
@@ -46,6 +48,7 @@ export async function rig({ env = {}, kids = [], households = null, start = WED_
     if (fault === 'timeout') throw Object.assign(new Error('timed out'), { name: 'TimeoutError' });
     if (u.pathname === '/clubber/checkinclubberundo' && method === 'POST') {
       posts.undo.push(new URLSearchParams(init.body));
+      if (on.undo && !fault) await on.undo(new URLSearchParams(init.body));
       return new Response(fault === 'refuse' ? '<b>not checked in</b>' : '<b>(checkin undone)</b>', { status: 200 });
     }
     if (u.pathname === '/clubber/checkout' && method === 'POST') {
@@ -53,6 +56,10 @@ export async function rig({ env = {}, kids = [], households = null, start = WED_
       posts.checkoutAt.push(clock.t);
       if (faults.checkoutReply != null && !fault) return new Response(faults.checkoutReply, { status: 200 });
       return new Response(fault === 'refuse' ? 'no' : 'OK', { status: 200 });
+    }
+    if (u.pathname === '/clubber/checkinclubber' && method === 'POST' && on.checkin) {
+      const verdict = await on.checkin(new URLSearchParams(init.body));
+      if (verdict === 'refuse') return new Response('<html><body>Something went wrong</body></html>', { status: 200 });
     }
     if (fault === 'refuse') return new Response('<html><body>Something went wrong</body></html>', { status: 200 });
     return tt.fetchFn(url, init);
@@ -66,7 +73,7 @@ export async function rig({ env = {}, kids = [], households = null, start = WED_
     broadcast: (text) => { sent.push(JSON.parse(text)); return 1; },
   });
   const r = {
-    clock, storage, tt, night, faults, reads, posts, alarm, sent, core: make(), session: '',
+    clock, storage, tt, night, faults, on, reads, posts, alarm, sent, core: make(), session: '',
     /** A new object over the same storage: a Durable Object restart. */
     restart() { r.core = make(); r.wire(); return r.core; },
     wire() { r.watcher = r.core.watcher; },
