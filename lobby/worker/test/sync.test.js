@@ -283,6 +283,19 @@ describe('the calendar', () => {
     expect(s.sent.length).toBe(rings);
   });
 
+  it('a second Refresh within 30 s is answered without reading the page again', async () => {
+    const s = setup();
+    const { body: login } = await s.login();
+    await s.call('POST', '/v1/calendar/refresh', {}, login.session);
+    s.tick(5000);
+    const again = await (await s.call('POST', '/v1/calendar/refresh', {}, login.session)).json();
+    expect(again).toMatchObject({ changed: false, throttled: true });
+    expect(s.fetched.length).toBe(1);
+    s.tick(30000);
+    await s.call('POST', '/v1/calendar/refresh', {}, login.session);
+    expect(s.fetched.length).toBe(2);
+  });
+
   it('a page that stops parsing keeps the last good calendar and says why', async () => {
     const s = setup();
     const { body: login } = await s.login();
@@ -293,6 +306,7 @@ describe('the calendar', () => {
       get: s.storage.get, put: s.storage.put, delete: s.storage.delete,
     });
     broken.core.storage = s.storage;
+    broken.tick(60000);
     const res = await broken.call('POST', '/v1/calendar/refresh', {}, login.session);
     expect(res.status).toBe(502);
     expect((await res.json()).error).toMatch(/club nights/);
@@ -303,6 +317,7 @@ describe('the calendar', () => {
     const s = setup();
     const { body: login } = await s.login();
     await s.call('POST', '/v1/calendar/refresh', {}, login.session);
+    s.tick(60000);
     s.core.fetchFn = async () => {
       // A concurrent refresh lands a newer calendar while this read is in flight.
       const cur = await s.storage.get('calendar');
