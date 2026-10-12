@@ -116,6 +116,25 @@ run(`node scripts/stamp-build.mjs ${journeyBuild} ${JSON.stringify(journeyOut)}`
   writeFileSync(path.join(checkinOut, 'ym', 'index.html'), ym);
 }
 
+// /checkin/classic (and /checkin/classic/ym): the relayed phone page exactly as it
+// was on 2026-10-12, a frozen copy (site/checkin/classic.html, byte for byte that
+// day's printer/print-server/public/phone.html) made into a page the same way
+// /checkin was. A fallback for Wednesday 2026-10-14 ONLY: DELETE after 10/14
+// (this block, site/checkin/classic.html and its test; ROADMAP.md#online-check-in).
+{
+  const classicOut = path.join(OUT, 'checkin', 'classic');
+  const page = readFileSync(path.join(ROOT, 'site', 'checkin', 'classic.html'), 'utf8');
+  const online = page
+    .replaceAll('"/brand/', '"/checkin/brand/')
+    .replace('<script>\n// ── The touch check-in', `<script>window.AWANA_RELAY = '/api';</script>\n<script>\n// ── The touch check-in`);
+  const ym = online.replace("<script>window.AWANA_RELAY = '/api';</script>\n",
+    "<script>window.AWANA_RELAY = '/api';</script>\n<script>window.AWANA_ONLY_CLUBS = ['trek', 'journey']; window.AWANA_SIMPLE = true;</script>\n");
+  if (online === page || ym === online || online.includes('"/brand/')) throw new Error('site/build.mjs: site/checkin/classic.html lost its shape');
+  mkdirSync(path.join(classicOut, 'ym'), { recursive: true });
+  writeFileSync(path.join(classicOut, 'index.html'), online);
+  writeFileSync(path.join(classicOut, 'ym', 'index.html'), ym);
+}
+
 // The desk check-in (ROADMAP.md#online-check-in P3): site/desk/ is the page and its
 // transport, the touch check-in's search and family grouping come from the print
 // app's phone page (desk-page.mjs), and the cloud crypto is the canonical
@@ -241,7 +260,7 @@ writeFileSync(path.join(OUT, '_routes.json'), `${JSON.stringify({
 writeFileSync(path.join(ROOT, 'site', 'lib', 'large-files.generated.js'),
   `// Written by site/build.mjs for build ${BUILD_ID}; not committed.\nexport const LARGE_FILES = ${JSON.stringify(largeFiles, null, 2)};\nexport const LARGE_PREFIXES = ${JSON.stringify(VIDEO_PREFIXES, null, 2)};\n`);
 
-for (const must of ['index.html', 'lobby/index.html', 'lobby/countdown.html', 'lobby/settings.html', 'journey/index.html', 'lobby/shared/sync.json', 'desk/index.html', 'desk/desk.js', 'desk/desk-transport.js', 'desk/cloud-crypto.js', 'checkin/sync-protocol.js', 'checkin/cloud-crypto.js']) {
+for (const must of ['index.html', 'lobby/index.html', 'lobby/countdown.html', 'lobby/settings.html', 'journey/index.html', 'lobby/shared/sync.json', 'desk/index.html', 'desk/desk.js', 'desk/desk-transport.js', 'desk/cloud-crypto.js', 'checkin/sync-protocol.js', 'checkin/cloud-crypto.js', 'checkin/classic/index.html', 'checkin/classic/ym/index.html']) {
   if (!existsSync(path.join(OUT, must))) throw new Error(`site build is missing ${must}`);
 }
 console.log(`\n✓ site/dist built for ${ORIGIN} (build ${BUILD_ID.slice(0, 7)})`);

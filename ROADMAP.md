@@ -729,6 +729,12 @@ said); "Owner" is what only the owner can do.
     station's `/config/church` turns the extension's sweep off; `stopCloud` hands it
     back. Owner: set `YM_CHECKOUT = "on"` before (or with) the station role, and
     release the print server change. routes.md section 9.
+  - **`/checkin/classic`: DELETE after Wednesday 2026-10-14.** The relayed phone
+    page exactly as /checkin served it on 2026-10-12 (`site/checkin/classic.html`,
+    a frozen copy, pinned by its SHA-256 in `site/test/checkin-classic.test.mjs`),
+    with `/checkin/classic/ym`, kept as the one-night fallback while /checkin moves
+    to the desk's online path. After 10/14 delete the file, its block in
+    `site/build.mjs` (and its two `must` entries) and the test.
 
 ## Online only
 

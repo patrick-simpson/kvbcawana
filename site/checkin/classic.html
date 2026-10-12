@@ -1,0 +1,2005 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#4C72B8">
+<title>Club Phone Check-in</title>
+<!-- The phone check-in (7.7.0): the touch check-in on a phone. Families still
+     to come, families-first search, the child's card with Bible ticked, the
+     brothers and sisters' page, the same jelly. Tonight and the other prints
+     sit behind the count pill and the + button.
+     The brand kit mirror (public/brand/), served to the Wi-Fi without a PIN
+     because this page is the PIN screen; see BRAND_PUBLIC_PATH in server.js.
+     The hex after each var() is the kit's own value, a fallback pinned to
+     tokens.css by scripts/test-dashboard-chrome.cjs. -->
+<link rel="stylesheet" href="/brand/fonts.css">
+<link rel="stylesheet" href="/brand/tokens.css">
+<style>
+  :root {
+    --c-blue: var(--brand-blue, #4C72B8);
+    --c-blue-deep: var(--brand-blue-deep, #34569A);
+    --c-ink: var(--brand-ink, #231F20);
+    --c-hot: var(--brand-hot, #F15A28);
+    --c-hot-deep: var(--brand-hot-deep, #9E3512);
+    --c-sun: var(--brand-sun, #FCB614);
+    --c-orange: var(--brand-orange, #FAA41D);
+    --c-cream: var(--brand-cream, #FFE8C2);
+    --c-cloud: var(--brand-cloud, #D6EFF8);
+    --c-puggles: var(--brand-puggles, #1DB6D9);
+    --c-puggles-deep: var(--brand-puggles-deep, #1A627C);
+    --c-cubbies: var(--brand-cubbies, #4C72B8);
+    --c-cubbies-deep: var(--brand-cubbies-deep, #2F4F8A);
+    --c-sparks: var(--brand-sparks, #F04A4B);
+    --c-sparks-deep: var(--brand-sparks-deep, #B82B32);
+    --c-tnt: var(--brand-tnt, #58BD79);
+    --c-tnt-deep: var(--brand-tnt-deep, #2F8A4E);
+    --c-trek: var(--brand-trek, #047E71);
+    --c-trek-deep: var(--brand-trek-deep, #02554C);
+    --c-journey: var(--brand-journey, #8A649D);
+    --c-journey-deep: var(--brand-journey-deep, #56467F);
+    --bad: var(--c-sparks-deep);
+    --good: var(--c-tnt-deep);
+    --page: #EAF4FB;
+    --line: #E1E7EF;
+    --ink-soft: #4A5160;
+    --ink-faint: #64748B;
+    --f-shout: var(--brand-font-display, 'Paytone One', 'Arial Rounded MT Bold', 'Trebuchet MS', sans-serif);
+    --f-label: var(--brand-font-label, 'Londrina Solid', 'Arial Narrow', 'Helvetica Neue', sans-serif);
+    --f-read: var(--brand-font-body, 'Figtree', 'Segoe UI', system-ui, sans-serif);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; }
+  body { font-family: var(--f-read); background: var(--page); color: var(--c-ink); overscroll-behavior: none; }
+  button { font: inherit; color: inherit; }
+  :focus-visible { outline: 3px solid var(--c-ink); outline-offset: 2px; }
+  [hidden] { display: none !important; }
+
+  /* ── Header ── */
+  .top { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: 10px;
+    padding: calc(10px + env(safe-area-inset-top)) 14px 10px; background: var(--c-blue); color: #fff; }
+  .brand-mark { height: 30px; width: auto; flex: none; }
+  .top h1 { flex: 1; font-family: var(--f-shout); font-weight: 400; font-size: 22px; line-height: 1; }
+  .pill { border: none; cursor: pointer; height: 40px; padding: 0 14px; border-radius: 20px; background: #fff; color: var(--c-blue-deep);
+    font-family: var(--f-label); font-size: 18px; letter-spacing: 0.05em; text-transform: uppercase; white-space: nowrap; }
+  .round { border: none; cursor: pointer; width: 44px; height: 44px; border-radius: 50%; background: rgba(255,255,255,.18); color: #fff;
+    font-size: 28px; line-height: 1; display: grid; place-items: center; }
+
+  /* ── PIN ── */
+  .pin { max-width: 380px; margin: 48px auto; padding: 0 16px; }
+  .pin .card { background: #fff; border-radius: 24px; padding: 26px 22px; box-shadow: 0 4px 18px rgba(15,23,42,.1); display: flex; flex-direction: column; gap: 14px; }
+  .pin h2 { font-family: var(--f-shout); font-weight: 400; font-size: 26px; color: var(--c-blue-deep); }
+  .pin input { height: 60px; border-radius: 16px; border: 3px solid var(--line); padding: 0 16px; font: 700 26px var(--f-read); letter-spacing: .3em; text-align: center; }
+  .pin input:focus { border-color: var(--c-blue); outline: none; }
+  .pin .btn { flex: none; width: 100%; }
+  .err { color: var(--bad); font-weight: 700; font-size: 15px; min-height: 1.2em; }
+
+  /* ── Search + list ── */
+  .search { position: sticky; top: calc(60px + env(safe-area-inset-top)); z-index: 5; padding: 10px 12px 8px; background: var(--page); }
+  .search .box { position: relative; }
+  .down-note { margin: 8px 2px 0; padding: 8px 12px; border-radius: 12px; background: var(--c-cream); color: var(--c-hot-deep); font-size: 14px; font-weight: 600; line-height: 1.35; }
+  .down-note[hidden] { display: none; }
+  .search input { width: 100%; height: 56px; border-radius: 18px; border: 3px solid #fff; background: #fff; padding: 0 48px 0 46px;
+    font: 600 20px var(--f-read); color: var(--c-ink); box-shadow: 0 3px 12px rgba(47,79,138,.12); -webkit-appearance: none; appearance: none; }
+  .search input:focus { border-color: var(--c-blue); outline: none; }
+  .search input::-webkit-search-cancel-button, .search input::-webkit-search-decoration { -webkit-appearance: none; appearance: none; }
+  .search .mag { position: absolute; left: 16px; top: 50%; transform: translateY(-50%); opacity: .5; font-size: 18px; pointer-events: none; }
+  .search .clear { position: absolute; right: 6px; top: 50%; translate: 0 -50%; border: none; background: none; width: 44px; height: 44px; border-radius: 50%; font-size: 18px; color: var(--ink-faint); cursor: pointer; }
+  .list { padding: 0 12px calc(24px + env(safe-area-inset-bottom)); }
+  .lead, .sec { font-family: var(--f-label); font-size: 17px; letter-spacing: .06em; text-transform: uppercase; color: var(--c-blue); margin: 6px 4px 8px; }
+  .note { color: var(--ink-faint); font-size: 16px; padding: 28px 8px; text-align: center; line-height: 1.4; }
+  .cheer { text-align: center; padding: 60px 10px; font-family: var(--f-shout); font-size: 30px; color: var(--good); }
+
+  .fams { display: grid; gap: 8px; }
+  .fam, .fcard, .card, .famsm { border: none; cursor: pointer; text-align: left; background: #fff; position: relative; overflow: hidden; min-width: 0;
+    box-shadow: 0 2px 10px rgba(15,23,42,.08); }
+  .fam { display: flex; flex-direction: column; justify-content: center; gap: 4px; padding: 6px 10px 6px 16px; border-radius: 16px; }
+  .fam::before, .fcard::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 7px; background: linear-gradient(var(--stripe)); }
+  .fam .fn { font-family: var(--f-shout); font-size: 20px; line-height: 1.05; color: var(--c-blue-deep); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .fam .kids, .fcard .kids { display: flex; flex-wrap: wrap; gap: 2px 8px; font-weight: 700; font-size: 14px; color: #334155; }
+  .fam .kids { max-height: 2.6em; overflow: hidden; }
+  .kid { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--c); flex: none; }
+  .rfams { display: grid; gap: 10px; }
+  .fcard { display: flex; flex-direction: column; gap: 8px; padding: 12px 14px 12px 20px; border-radius: 18px; }
+  .fcard .fn { font-family: var(--f-shout); font-size: 26px; line-height: 1.05; color: var(--c-blue-deep); }
+  .fcard .kid { padding: 3px 10px 3px 7px; border-radius: 999px; background: #F1F5F9; font-size: 16px; }
+  .fcard .kid.hit { background: color-mix(in srgb, var(--c) 20%, #fff); color: var(--c-ink); }
+  .panel { margin-top: 16px; padding: 10px 10px 12px; background: rgba(255,255,255,.6); border-radius: 20px; }
+  .grid { display: grid; gap: 8px; }
+  .card { display: flex; align-items: center; gap: 10px; min-height: 64px; padding: 10px 14px 10px 20px; border-radius: 16px; }
+  .card::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 8px; background: var(--club); }
+  .card .nm { font-family: var(--f-shout); font-size: 20px; line-height: 1.1; }
+  .card .cl { font-family: var(--f-label); font-size: 15px; letter-spacing: .05em; text-transform: uppercase; color: var(--deep); }
+  .card.in { background: #F1F5F9; box-shadow: none; cursor: default; }
+  .card.in .nm, .card.in .cl { color: #94a3b8; }
+  .card .tag { margin-left: auto; font-family: var(--f-label); font-size: 14px; letter-spacing: .05em; text-transform: uppercase; padding: 3px 9px; border-radius: 999px; background: #E2E8F0; color: #475569; white-space: nowrap; }
+  .away { margin-top: 18px; }
+  .away .lead { color: var(--ink-faint); }
+  .awayrow { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; }
+  .famsm { display: flex; align-items: center; gap: 7px; height: 44px; padding: 0 10px; border-radius: 12px; box-shadow: 0 1px 4px rgba(15,23,42,.08); }
+  .famsm .dots { display: flex; gap: 3px; flex: none; }
+  .famsm .nm { font-family: var(--f-shout); font-size: 16px; color: #334155; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; }
+  .famsm .n { font-weight: 700; font-size: 13px; color: var(--ink-faint); background: #F1F5F9; border-radius: 999px; padding: 1px 7px; }
+
+  /* ── Sheets ── */
+  .scrim { position: fixed; inset: 0; background: rgba(15,23,42,.36); opacity: 0; pointer-events: none; transition: opacity .2s ease; z-index: 20; }
+  .scrim.on { opacity: 1; pointer-events: auto; }
+  .sheet { position: fixed; left: 0; right: 0; bottom: 0; z-index: 21; max-height: 92vh; overflow-y: auto; overscroll-behavior: contain;
+    background: #fff; border-radius: 26px 26px 0 0; padding: 22px 18px calc(22px + env(safe-area-inset-bottom));
+    box-shadow: 0 -8px 32px rgba(15,23,42,.18); transform: translateY(105%); visibility: hidden;
+    transition: transform .24s ease, visibility 0s .24s; }
+  .sheet.on { transform: none; visibility: visible; transition: none; animation: sheetin 460ms cubic-bezier(.3,.7,.4,1) both; }
+  @keyframes sheetin { 0% { transform: translateY(105%); } 60% { transform: translateY(-3%) scale(1.02, .98); } 80% { transform: translateY(1%) scale(.99, 1.01); } 100% { transform: none; } }
+  .sheet .grab { width: 44px; height: 5px; border-radius: 3px; background: #CBD5E1; margin: -8px auto 14px; }
+  .sheet h2 { font-family: var(--f-shout); font-weight: 400; font-size: 26px; line-height: 1.1; color: var(--c-blue-deep); }
+  .sheet h3 { font-family: var(--f-label); font-weight: 400; font-size: 17px; letter-spacing: .06em; text-transform: uppercase; color: var(--c-blue); margin: 18px 0 8px; }
+  .kidcard .bar { height: 9px; border-radius: 999px; background: var(--club); margin: -4px 0 16px; }
+  .kidcard .nm { font-family: var(--f-shout); font-size: 34px; line-height: 1.05; overflow-wrap: anywhere; }
+  .kidcard .cl { font-family: var(--f-label); font-size: 18px; letter-spacing: .05em; text-transform: uppercase; color: var(--deep); margin-top: 4px; }
+  .kidcard .sub { color: var(--ink-soft); font-size: 15px; margin-top: 6px; }
+  .opts { display: flex; gap: 8px; flex-wrap: wrap; margin: 16px 0 2px; }
+  .opt { border: 3px solid #E2E8F0; background: #fff; cursor: pointer; display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 0 16px;
+    border-radius: 14px; font-weight: 700; font-size: 18px; color: #334155; transition: border-color .12s ease, background .12s ease; }
+  .opt .box { width: 26px; height: 26px; border-radius: 8px; border: 3px solid #94a3b8; display: grid; place-items: center; color: #fff; font-size: 16px; }
+  .opt.on { border-color: var(--club, var(--c-blue)); background: color-mix(in srgb, var(--club, #4C72B8) 10%, #fff); }
+  .opt.on .box { background: var(--club, var(--c-blue)); border-color: var(--club, var(--c-blue)); animation: boxpop 360ms cubic-bezier(.3,.7,.4,1) both; }
+  @keyframes boxpop { 0% { scale: .3; rotate: -20deg; } 55% { scale: 1.25; rotate: 6deg; } 100% { scale: 1; rotate: 0deg; } }
+  .acts { display: flex; gap: 10px; margin-top: 18px; }
+  .btn { border: none; cursor: pointer; flex: 1; display: grid; place-items: center; min-height: 58px; border-radius: 18px; padding: 0 14px;
+    font-family: var(--f-shout); font-size: 22px; background: var(--c-blue); color: #fff; }
+  .btn.go { flex: 2; background: var(--club, var(--c-blue)); }
+  .btn.no { background: #F1F5F9; color: #334155; }
+  .btn.ghost { background: #F1F5F9; color: var(--c-blue-deep); font-size: 18px; min-height: 48px; }
+  .btn.hot { background: var(--c-hot); }
+  .btn.danger { background: var(--bad); }
+  .btn[disabled] { filter: grayscale(.6) opacity(.6); cursor: default; }
+  .field { display: flex; flex-direction: column; gap: 8px; }
+  .field input, .field select { height: 52px; border-radius: 14px; border: 3px solid var(--line); padding: 0 14px; font: 600 18px var(--f-read); background: #fff; color: var(--c-ink); }
+  .field input:focus, .field select:focus { border-color: var(--c-blue); outline: none; }
+  .menu-sec { padding: 4px 0 6px; border-top: 1px solid var(--line); }
+  .grab + .menu-sec, .grab + [hidden] + .menu-sec { border-top: none; }
+  /* One-off name tag (7.18.0): the clubs as club-coloured chips, youngest first. */
+  .cpick { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+  .cpick button { position: relative; border: 3px solid transparent; cursor: pointer; min-height: 46px; padding: 0 6px; border-radius: 14px;
+    background: color-mix(in srgb, var(--c) 14%, #fff); color: var(--d);
+    font-family: var(--f-label); font-size: 17px; letter-spacing: .05em; text-transform: uppercase; }
+  .cpick button[aria-checked="true"] { background: var(--c); border-color: var(--d); color: #fff; text-shadow: .07em .07em 0 var(--d); }
+  #oneoff-panel .btn.go { flex: none; }
+  .quiet { color: var(--ink-faint); font-size: 14px; line-height: 1.4; margin: 8px 2px 0; }
+  .quiet + .err { margin-top: 6px; }
+
+  /* ── The family page ── */
+  .fampage { position: fixed; inset: 0; z-index: 15; background: var(--page); display: flex; flex-direction: column;
+    transform: translateX(100%); visibility: hidden; transition: transform .24s ease, visibility 0s .24s; }
+  .fampage.on { transform: none; visibility: visible; transition: transform 520ms linear(0, 0.213, 0.605, 0.93, 1.103, 1.142, 1.106, 1.05, 1.006, 0.984, 0.98, 0.986, 0.994, 1, 1.002, 1.003, 1); }
+  .fampage .head { padding: calc(16px + env(safe-area-inset-top)) 16px 6px; }
+  .fampage .done-l { font-family: var(--f-label); font-size: 17px; letter-spacing: .05em; text-transform: uppercase; color: var(--good); }
+  .fampage h2 { font-family: var(--f-shout); font-weight: 400; font-size: 26px; color: var(--c-blue-deep); margin-top: 2px; }
+  .fampage .tiles { flex: 1; overflow-y: auto; padding: 12px 12px; display: grid; gap: 10px; align-content: start; }
+  .tile { background: #fff; border-radius: 18px; padding: 14px 14px 12px 20px; position: relative; overflow: hidden; box-shadow: 0 2px 10px rgba(15,23,42,.08); }
+  .tile::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 8px; background: var(--club); }
+  .tile .nm { font-family: var(--f-shout); font-size: 22px; line-height: 1.1; }
+  .tile .cl { font-family: var(--f-label); font-size: 15px; letter-spacing: .05em; text-transform: uppercase; color: var(--deep); }
+  .tile .opts { margin: 10px 0 0; }
+  .tile .opt { min-height: 46px; font-size: 16px; padding: 0 12px; }
+  /* BARF Night (8.1.0): the friend's first name, under Brought a friend. 16px: iOS zooms smaller inputs. */
+  .fname { display: block; box-sizing: border-box; width: 100%; min-height: 50px; margin: 10px 0 0; padding: 0 14px;
+    border: 3px solid var(--club, #4C72B8); border-radius: 12px; background: #fff; color: #16243F; font-weight: 600; font-size: 18px; line-height: 1.2; font-family: inherit; }
+  .fname[hidden] { display: none; }
+  .tile .fname { min-height: 44px; font-size: 16px; }
+  .tile .go1 { border: none; cursor: pointer; width: 100%; display: grid; place-items: center; margin-top: 10px; min-height: 52px; border-radius: 14px;
+    background: var(--club); color: #fff; font-family: var(--f-shout); font-size: 20px; }
+  .tile.done .go1 { background: #E8F5E9; color: var(--good); cursor: default; }
+  .tile.busy .go1 { opacity: .7; }
+  .fampage .foot { display: flex; gap: 10px; padding: 10px 12px calc(14px + env(safe-area-inset-bottom)); }
+
+  /* ── Tonight ── */
+  .total { font-family: var(--f-shout); font-size: 30px; color: var(--c-blue-deep); }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px; border-radius: 999px; background: #F1F5F9; font-weight: 700; font-size: 15px; }
+  .check { font-size: 14px; line-height: 1.45; margin: 10px 0 0; font-weight: 600; }
+  .row { display: flex; align-items: center; gap: 10px; padding: 10px 4px; border-bottom: 1px solid var(--line); }
+  .row .who { flex: 1; min-width: 0; }
+  .row .who b { display: block; font-size: 17px; }
+  .row .who span { font-size: 13px; color: var(--ink-faint); }
+  .row button { border: 2px solid var(--line); background: #fff; color: var(--bad); font-weight: 700; font-size: 14px; padding: 8px 12px; border-radius: 12px; cursor: pointer; }
+  .row .who small { display: block; font-size: 12px; color: var(--ink-faint); }
+  .row .rowacts { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+  .row button.tt { color: var(--c-blue-deep); }
+  .row .vtag { font-family: var(--f-label); font-size: 13px; letter-spacing: .05em; text-transform: uppercase; color: var(--c-hot-deep); margin-left: 6px; }
+  .leader-chip { display: inline-flex; align-items: center; gap: 6px; padding: 6px 8px 6px 12px; border-radius: 999px; background: var(--c-cream); font-weight: 700; font-size: 15px; }
+  .leader-chip button { border: none; background: #fff; border-radius: 999px; padding: 4px 10px; font-weight: 700; font-size: 13px; cursor: pointer; color: var(--c-blue-deep); }
+  .leader-chip .x { background: none; color: var(--ink-faint); font-size: 18px; padding: 0 6px; }
+
+  /* ── Toast ── */
+  .toast { position: fixed; left: 50%; top: calc(12px + env(safe-area-inset-top)); z-index: 30; display: flex; align-items: center; gap: 10px;
+    max-width: calc(100vw - 24px); padding: 12px 18px; border-radius: 999px; background: var(--c-ink); color: #fff; font-weight: 700; font-size: 16px;
+    box-shadow: 0 8px 24px rgba(15,23,42,.25); transform: translate(-50%, -180%); visibility: hidden; transition: transform .22s ease, visibility 0s .22s; }
+  .toast.on { visibility: visible; transition: none; animation: toastin 440ms cubic-bezier(.3,.7,.4,1) both; }
+  @keyframes toastin { 0% { transform: translate(-50%, -180%) scale(.8); } 55% { transform: translate(-50%, 8%) scale(1.06, .94); } 78% { transform: translate(-50%, -2%) scale(.98, 1.02); } 100% { transform: translate(-50%, 0); } }
+  .toast.good { background: var(--good); }
+  .toast.bad { background: var(--bad); }
+  .toast button { background: none; border: none; color: var(--c-sun); font-family: var(--f-label); font-size: 16px; letter-spacing: 0.06em; text-transform: uppercase; text-decoration: underline; cursor: pointer; }
+  .toast :focus-visible { outline-color: var(--c-sun); }
+
+  /* ── Jelly: the touch check-in's, the lobby's spring ── */
+  .fam, .fcard, .card, .famsm, .btn, .go1, .opt, .pill, .round, .row button, .cpick button { transform-origin: 50% 100%;
+    transition-property: scale, translate, border-color, background; transition-duration: 520ms;
+    transition-timing-function: cubic-bezier(.34,1.56,.64,1);
+    transition-timing-function: linear(0, 0.213, 0.605, 0.93, 1.103, 1.142, 1.106, 1.05, 1.006, 0.984, 0.98, 0.986, 0.994, 1, 1.002, 1.003, 1); }
+  .fam:active, .fcard:active, .card:active, .famsm:active, .go1:active { scale: 1.03 .92; translate: 0 3px; transition-duration: 80ms; transition-timing-function: ease-out; }
+  .btn:active, .opt:active, .pill:active, .round:active, .row button:active, .cpick button:active { scale: 1.06 .9; translate: 0 3px; transition-duration: 80ms; transition-timing-function: ease-out; }
+  .card.in:active { scale: none; translate: none; }
+  @keyframes land { 0% { opacity: 0; translate: 0 16px; scale: .84 1.16; } 45% { opacity: 1; translate: 0 -3px; scale: 1.07 .93; } 70% { translate: 0 0; scale: .98 1.02; } 100% { opacity: 1; translate: 0 0; scale: 1 1; } }
+  .fam, .fcard, .card, .famsm, .tile { animation: land 480ms cubic-bezier(.3,.7,.4,1) both; }
+  .stay { animation: none !important; }
+  .ghosts { position: fixed; inset: 0; pointer-events: none; z-index: 4; overflow: hidden; }
+  .ghosts > * { position: fixed; display: block !important; margin: 0 !important; }
+  .ghosts > * > * { width: 100%; height: 100%; animation: none !important; }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+  }
+</style>
+</head>
+<body>
+<header class="top">
+  <img class="brand-mark" src="/brand/logos/awana-clubs-white.svg" alt="Awana Clubs">
+  <h1>Check in</h1>
+  <button class="pill" id="count-pill" type="button" hidden>0 in</button>
+  <button class="round" id="menu-btn" type="button" aria-label="More: one-off name tag, leader tag, custom label, visitor" hidden>+</button>
+</header>
+
+<div class="pin" id="pin-screen">
+  <div class="card">
+    <h2>Phone check-in</h2>
+    <p>Type the PIN from the check-in desk.</p>
+    <input type="password" id="pin" inputmode="numeric" autocomplete="off" placeholder="PIN" aria-label="PIN">
+    <div class="err" id="pin-err"></div>
+    <button class="btn" id="pin-btn" type="button">Unlock</button>
+  </div>
+</div>
+
+<main id="main-screen" hidden>
+  <div class="search">
+    <div class="box">
+      <span class="mag" aria-hidden="true">🔍</span>
+      <input type="search" id="search" placeholder="Type a first or last name" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="search" aria-label="Search by first or last name">
+      <button class="clear" id="search-clear" type="button" aria-label="Clear" hidden>✕</button>
+    </div>
+    <p class="down-note" id="down-note" role="status" hidden>Not hearing from the check-in laptop. This list may be out of date; trying again.</p>
+  </div>
+  <div class="list" id="list" aria-live="polite"></div>
+</main>
+
+<div class="ghosts" id="ghosts"></div>
+
+<div class="fampage" id="fampage" role="dialog" aria-modal="true"></div>
+
+<div class="scrim" id="scrim"></div>
+
+<div class="sheet kidcard" id="kid-sheet" role="dialog" aria-modal="true"></div>
+
+<div class="sheet" id="tonight-sheet" role="dialog" aria-modal="true" aria-labelledby="tonight-total">
+  <div class="grab"></div>
+  <div class="total" id="tonight-total"></div>
+  <div class="chips" id="tonight-chips"></div>
+  <div class="check" id="tonight-check" hidden></div>
+  <div id="tonight-list"></div>
+  <div class="acts"><button class="btn ghost" id="tonight-close" type="button">Close</button></div>
+</div>
+
+<div class="sheet" id="menu-sheet" role="dialog" aria-modal="true">
+  <div class="grab"></div>
+  <div class="menu-sec" id="oneoff-panel">
+    <h3 id="oneoff-h">One-off name tag</h3>
+    <div class="field">
+      <input type="text" id="oneoff-name" maxlength="40" placeholder="Child’s first name" autocomplete="off" autocorrect="off" autocapitalize="words" spellcheck="false" enterkeyhint="go" aria-label="Child’s first name">
+      <div class="cpick" id="oneoff-clubs" role="radiogroup" aria-label="Child’s club"></div>
+      <button class="btn go" id="oneoff-print" type="button" disabled>Print tag</button>
+    </div>
+    <p class="quiet">Prints a name tag and welcomes them on the screens. It doesn’t count toward tonight.</p>
+    <p class="err" id="oneoff-status" role="alert"></p>
+  </div>
+  <div class="menu-sec" id="leader-panel">
+    <h3>Leader tag</h3>
+    <div class="field">
+      <input type="text" id="leader-name" maxlength="80" placeholder="Leader's name" autocomplete="off">
+      <select id="leader-club" aria-label="Leader's club"><option value="">No club</option></select>
+      <button class="btn hot" id="leader-print" type="button">Print leader tag</button>
+    </div>
+    <div id="leader-chips-wrap" hidden>
+      <div class="acts" style="margin-top:12px"><button class="btn ghost" id="leader-print-selected" type="button">Print selected</button></div>
+      <div id="leader-chips" class="chips"></div>
+      <div class="check" id="leader-chips-note"></div>
+    </div>
+    <p class="err" id="leader-status"></p>
+  </div>
+  <div class="menu-sec" id="custom-panel">
+    <h3>Custom label</h3>
+    <div class="field">
+      <input type="text" id="custom-text" maxlength="60" placeholder="VOLUNTEER, KITCHEN, Room 4 Helper…" autocomplete="off">
+      <button class="btn" id="custom-print" type="button">Print custom label</button>
+    </div>
+    <p class="err" id="custom-status"></p>
+  </div>
+  <div class="menu-sec" id="visitor-form">
+    <h3>Visitor not on the list</h3>
+    <div class="field">
+      <input type="text" id="visitor-name" maxlength="80" placeholder="Visitor's full name" autocomplete="off">
+      <select id="visitor-club" aria-label="Visitor's club"></select>
+      <button class="btn" id="visitor-print" type="button">Print visitor label</button>
+    </div>
+    <p class="err" id="visitor-status"></p>
+  </div>
+  <div class="acts"><button class="btn ghost" id="menu-close" type="button">Close</button></div>
+</div>
+
+<div class="sheet" id="confirm-sheet" role="dialog" aria-modal="true">
+  <h2 id="confirm-title"></h2>
+  <p class="check" id="confirm-body"></p>
+  <div class="acts">
+    <button class="btn ghost" id="confirm-cancel" type="button">Cancel</button>
+    <button class="btn danger" id="confirm-ok" type="button">Remove from count</button>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+// ── The touch check-in's own search, households and tile fit, verbatim ─────
+  // touch-core:begin (this block is copied verbatim into print-server/public/phone.html by scripts/sync-touch-core.cjs; test-touch-search.cjs pins the two equal)
+  // ── Search (pure; the tests load this half in Node) ──────────────────────
+  function norm(s) {
+    return String(s == null ? '' : s)
+      .normalize('NFD').replace(/[̀-ͯ]/g, '')
+      .toLowerCase()
+      .replace(/['’-]/g, '')
+      .replace(/[^a-z ]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  // A light sound-alike key, so "Jaxon" meets "Jackson" and "Kaitlyn" meets
+  // "Caitlin": the spellings parents pick between, not a general phonetics.
+  function sound(s) {
+    return s
+      .replace(/ph/g, 'f').replace(/ck/g, 'k').replace(/x/g, 'ks').replace(/q/g, 'k')
+      .replace(/c(?=[eiy])/g, 's').replace(/c/g, 'k').replace(/gh/g, 'g')
+      .replace(/y/g, 'i').replace(/z/g, 's').replace(/ie$/, 'i').replace(/ee/g, 'i')
+      .replace(/(.)\1+/g, '$1').replace(/h$/, '');
+  }
+
+  // Optimal string alignment distance (Damerau-Levenshtein without repeated
+  // edits of one substring): a swapped pair of letters costs one.
+  function editDistance(a, b) {
+    if (a === b) return 0;
+    var m = a.length, n = b.length;
+    if (!m) return n;
+    if (!n) return m;
+    var prev2 = null, prev = new Array(n + 1), cur = new Array(n + 1);
+    for (var j = 0; j <= n; j++) prev[j] = j;
+    for (var i = 1; i <= m; i++) {
+      cur[0] = i;
+      for (var k = 1; k <= n; k++) {
+        var cost = a[i - 1] === b[k - 1] ? 0 : 1;
+        var v = Math.min(prev[k] + 1, cur[k - 1] + 1, prev[k - 1] + cost);
+        if (prev2 && i > 1 && k > 1 && a[i - 1] === b[k - 2] && a[i - 2] === b[k - 1]) v = Math.min(v, prev2[k - 2] + 1);
+        cur[k] = v;
+      }
+      var t = prev2 || new Array(n + 1);
+      prev2 = prev; prev = cur; cur = t;
+    }
+    return prev[n];
+  }
+
+  // How far a typed word may be from a name and still be offered: none for
+  // one or two letters (those are only ever a prefix), one for up to four,
+  // two after that.
+  function allowedEdits(len) { return len <= 2 ? 0 : len <= 4 ? 1 : 2; }
+
+  // How well one typed word matches one name word: { d, prefix }.
+  function wordMatch(q, t) {
+    if (t.indexOf(q) === 0) return { d: 0, prefix: true };
+    var d = Math.min(editDistance(q, t), editDistance(q, t.slice(0, q.length)));
+    var sq = sound(q), st = sound(t);
+    d = Math.min(d, editDistance(sq, st), editDistance(sq, st.slice(0, sq.length)));
+    return { d: d, prefix: false };
+  }
+
+  /**
+   * @param {{name: string}[]} people
+   * @param {string} query
+   * @returns {{matches: object[], close: object[]}} matches: every typed word
+   *   starts a word of the name; close: within a few letters ("Did you mean").
+   */
+  function searchPeople(people, query, limits) {
+    var lim = limits || { matches: 40, close: 8 };
+    var q = norm(query).split(' ').filter(Boolean);
+    if (!q.length) return { matches: [], close: [] };
+    var matches = [], close = [];
+    for (var i = 0; i < people.length; i++) {
+      var p = people[i];
+      var words = p._words || (p._words = norm(p.name).split(' ').filter(Boolean));
+      if (!words.length) continue;
+      var all = true, ok = true, total = 0, firstHit = false;
+      for (var a = 0; a < q.length && ok; a++) {
+        var best = null;
+        for (var b = 0; b < words.length; b++) {
+          var m = wordMatch(q[a], words[b]);
+          if (!best || m.d < best.d || (m.d === best.d && m.prefix && !best.prefix)) { best = m; if (a === 0) firstHit = b === 0; }
+        }
+        if (best.d > allowedEdits(q[a].length)) ok = false;
+        else { total += best.d; if (!best.prefix) all = false; }
+      }
+      if (!ok) continue;
+      if (all) matches.push({ p: p, firstHit: firstHit });
+      else close.push({ p: p, d: total });
+    }
+    matches.sort(function (x, y) {
+      if (x.firstHit !== y.firstHit) return x.firstHit ? -1 : 1;
+      if (!!x.p.checkedIn !== !!y.p.checkedIn) return x.p.checkedIn ? 1 : -1;
+      return x.p.name.localeCompare(y.p.name);
+    });
+    close.sort(function (x, y) { return x.d - y.d || x.p.name.localeCompare(y.p.name); });
+    return {
+      matches: matches.slice(0, lim.matches).map(function (m) { return m.p; }),
+      close: close.slice(0, lim.close).map(function (m) { return m.p; }),
+    };
+  }
+
+  // TwoTimTwo's /household/csv → { nameKey: householdId } and
+  // { householdId: [nameKey...] }. Only those two things survive the parse.
+  function parseCsv(text) {
+    var rows = [], row = [], field = '', q = false;
+    for (var i = 0; i < text.length; i++) {
+      var c = text[i];
+      if (q) {
+        if (c === '"') { if (text[i + 1] === '"') { field += '"'; i++; } else q = false; }
+        else field += c;
+      } else if (c === '"') q = true;
+      else if (c === ',') { row.push(field); field = ''; }
+      else if (c === '\n' || c === '\r') {
+        if (c === '\r' && text[i + 1] === '\n') i++;
+        row.push(field); field = ''; rows.push(row); row = [];
+      } else field += c;
+    }
+    if (field || row.length) { row.push(field); rows.push(row); }
+    return rows;
+  }
+
+  function householdIndex(csvText) {
+    var rows = parseCsv(String(csvText || ''));
+    var byName = {}, members = {};
+    if (!rows.length) return { byName: byName, members: members };
+    var head = rows[0].map(function (h) { return norm(h); });
+    var idCol = head.indexOf('household id');
+    var kidsCol = head.indexOf('active clubbers');
+    if (idCol < 0 || kidsCol < 0) return { byName: byName, members: members };
+    for (var r = 1; r < rows.length; r++) {
+      var id = (rows[r][idCol] || '').trim();
+      var kids = (rows[r][kidsCol] || '').split(',').map(norm).filter(Boolean);
+      if (!id || kids.length < 2) continue;
+      members[id] = kids;
+      kids.forEach(function (k) { byName[k] = id; });
+    }
+    return { byName: byName, members: members };
+  }
+
+  // The children still to come, as families: grouped by TwoTimTwo household
+  // (never guessed; a child the household list doesn't place, or every child
+  // before it has loaded, is a family of one), named by the children's last
+  // name, in alphabetical order.
+  function groupFamilies(children, households) {
+    var groups = {}, order = [];
+    children.forEach(function (c) {
+      var hh = households && households.byName[norm(c.name)];
+      var key = hh ? 'hh:' + hh : 'kid:' + (c.recid || c.name);
+      if (!groups[key]) { groups[key] = { key: key, kids: [] }; order.push(key); }
+      groups[key].kids.push(c);
+    });
+    return order.map(function (k) {
+      var g = groups[k];
+      var counts = {}, lasts = [];
+      g.kids.forEach(function (c) {
+        var last = c.name.split(' ').slice(1).join(' ') || c.name;
+        if (!counts[last]) { counts[last] = 0; lasts.push(last); }
+        counts[last]++;
+      });
+      lasts.sort(function (a, b) { return counts[b] - counts[a] || a.localeCompare(b); });
+      g.name = lasts.slice(0, 2).join(' & ');
+      g.kids.sort(function (a, b) { return a.name.localeCompare(b.name); });
+      return g;
+    }).sort(function (a, b) { return a.name.localeCompare(b.name) || a.kids[0].name.localeCompare(b.kids[0].name); });
+  }
+
+  // The biggest equal tiles that fit `n` into a W x H box without scrolling:
+  // try every column count and keep the one whose tiles stand tallest, a tile
+  // never narrower than `minAspect` times its height (names need the width).
+  // Below `minH` tall they no longer fit, so the grid scrolls at minH instead.
+  // As children arrive n falls, and a tile only ever grows.
+  function fitTiles(n, W, H, gap, minAspect, minH) {
+    if (n <= 0 || W <= 0 || H <= 0) return { cols: 1, w: W, h: minH, scroll: false };
+    var best = null;
+    for (var cols = 1; cols <= n; cols++) {
+      var rows = Math.ceil(n / cols);
+      var w = (W - gap * (cols - 1)) / cols;
+      var h = Math.min((H - gap * (rows - 1)) / rows, w / minAspect);
+      if (w > 0 && h > 0 && (!best || h > best.h)) best = { cols: cols, w: w, h: h };
+    }
+    if (!best || best.h < minH) {
+      var cols2 = Math.max(1, Math.floor((W + gap) / (minH * minAspect + gap)));
+      return { cols: cols2, w: (W - gap * (cols2 - 1)) / cols2, h: minH, scroll: true };
+    }
+    return { cols: best.cols, w: best.w, h: best.h, scroll: false };
+  }
+
+  // touch-core:end
+
+// ── Online or on the Wi-Fi ─────────────────────────────────────────────────
+// On the church Wi-Fi this page is served by the laptop's print app and talks
+// to it directly, unlocked with the PIN. At awana.kvbchurch.org/checkin
+// (7.9.0; the site build sets AWANA_RELAY to its /api) it signs in with the
+// sync passphrase and every call travels through the sync service's relay:
+// the laptop collects it, runs it exactly as below, and the answer comes back.
+var RELAY = window.AWANA_RELAY || '';
+// The youth page (7.10.0: /checkin/ym online, /phone/ym on the Wi-Fi): only
+// the clubs in AWANA_ONLY_CLUBS (brand-kit keys, e.g. trek and journey), and
+// check-in only (AWANA_SIMPLE): no Tonight pill, no + menu.
+var ONLY = Array.isArray(window.AWANA_ONLY_CLUBS) ? window.AWANA_ONLY_CLUBS : null;
+var SIMPLE = !!window.AWANA_SIMPLE;
+var PIN_KEY = RELAY ? 'awanaCheckinSession' : 'awanaPhonePin';
+
+// ── State ──────────────────────────────────────────────────────────────────
+var PIN = sessionStorage.getItem(PIN_KEY) || '';
+var KIDS = [];                 // the roster: { name, club, checkedIn, removedHere, inactive }
+var HOUSEHOLDS = null;         // householdIndex()-shaped, from the laptop via /phone/roster
+var ITEMS = { bible: [], friend: [] };
+var RECENT = null;             // { names: {} } of the last two club nights, or null
+var CLUBS = ['Puggles', 'Cubbies', 'Sparks', 'T&T', 'Trek', 'Journey'];
+var STATE = {};                // name key -> { status: 'sending'|'pending'|'restoring', id, tries }
+var TONIGHT = { checkedIn: 0, visitors: 0, byClub: {}, entries: [] };
+var REMOVING = {};
+var UNDOING = {};              // entry key -> true while TwoTimTwo's undo is under way
+var CHECKING_OUT = {};         // entry key -> true while a check-out is under way (7.16.0)
+var rosterLoaded = false;
+var unlockedState = false;
+var unlockInFlight = false;
+var pinCountdownTimer = null;
+var ROSTER_POLL_BASE_MS = 12000;
+var ROSTER_POLL_MAX_MS = 60000;
+var rosterPollMs = ROSTER_POLL_BASE_MS;
+var rosterPollTimer = null;
+var rosterPollResumeTimer = null;
+var rosterFetchInFlight = false;
+var rosterEpoch = 0;           // bumped by every confirmed check-in: an older roster answer is stale
+var rosterMisses = 0;          // roster polls in a row that got no answer
+var pollActive = false;
+
+var KIT = {
+  puggles: { color: '#1DB6D9', deep: '#1A627C' }, cubbies: { color: '#4C72B8', deep: '#2F4F8A' },
+  sparks: { color: '#F04A4B', deep: '#B82B32' }, tnt: { color: '#58BD79', deep: '#2F8A4E' },
+  trek: { color: '#047E71', deep: '#02554C' }, journey: { color: '#8A649D', deep: '#56467F' },
+};
+// A club name to the brand kit's club key, the same rules as clubKey() in server.js.
+function clubKit(name) {
+  var n = String(name || '').trim().toLowerCase();
+  if (!n) return '';
+  if (n.indexOf('puggle') !== -1) return 'puggles';
+  if (n.indexOf('cubbie') !== -1) return 'cubbies';
+  if (n.indexOf('spark') !== -1) return 'sparks';
+  if (n.indexOf('trek') !== -1) return 'trek';
+  if (n.indexOf('journey') !== -1) return 'journey';
+  if (n.indexOf('t&t') !== -1 || n.indexOf('t & t') !== -1 || n === 'tnt' || n === 't t') return 'tnt';
+  return '';
+}
+function clubOf(name) { return KIT[clubKit(name)] || { color: '#64748B', deep: '#334155' }; }
+
+function el(tag, cls, text) {
+  var e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (text != null) e.textContent = text;
+  return e;
+}
+function $(id) { return document.getElementById(id); }
+
+// ── Toast ──────────────────────────────────────────────────────────────────
+var toastTimer = null;
+function toast(msg, ms, actionLabel, onAction, kind) {
+  var t = $('toast');
+  t.textContent = msg;
+  t.className = 'toast' + (kind ? ' ' + kind : '');
+  if (actionLabel && onAction) {
+    var b = el('button', null, actionLabel);
+    b.type = 'button';
+    b.addEventListener('click', function() { t.classList.remove('on'); onAction(); });
+    t.appendChild(b);
+  }
+  void t.offsetWidth;
+  t.classList.add('on');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(function() { t.classList.remove('on'); }, ms || 3000);
+}
+
+// ── Talking to the print server ────────────────────────────────────────────
+// Throws an Error with a `.code` of 'pin' | 'locked' | 'network' | 'http'.
+function call(method, path, body) {
+  if (RELAY) return relayCall(method, path, body);
+  if (method === 'GET') {
+    return fetch(path, { headers: { 'X-Awana-Pin': PIN } }).then(function(r) {
+      if (r.status === 403) { var e = new Error('pin'); e.code = 'pin'; throw e; }
+      return r.json();
+    });
+  }
+  return postJson(path, body);
+}
+var LAPTOP_DOWN = 'The check-in laptop is not answering. Is it on, with the TwoTimTwo check-in page open?';
+function relayErr(code, message, status) { var e = new Error(message || code); e.code = code; if (status) e.status = status; return e; }
+// One relayed call: hand it over, then collect the answer (the laptop asks
+// every second while phones are busy, so this is usually a second or two).
+function relayCall(method, path, body) {
+  var auth = { 'Content-Type': 'application/json', Authorization: 'Bearer ' + PIN };
+  return fetch(RELAY + '/v1/relay', { method: 'POST', headers: auth, body: JSON.stringify({ method: method, path: path, body: body || {} }) })
+    .catch(function() { throw relayErr('network', 'No internet connection.'); })
+    .then(function(r) {
+      if (r.status === 401) throw relayErr('pin');
+      return r.json().catch(function() { return {}; }).then(function(d) {
+        if (!r.ok || !d.id) throw relayErr('http', d.error || 'The sync service refused that.', r.status);
+        return d.id;
+      });
+    })
+    .then(function(id) {
+      var started = Date.now();
+      return new Promise(function(resolve, reject) {
+        (function poll() {
+          fetch(RELAY + '/v1/relay/result?id=' + id, { headers: auth }).then(function(r) {
+            if (r.status === 401) throw relayErr('pin');
+            return r.json();
+          }).then(function(d) {
+            if (!d.done) {
+              if (Date.now() - started > 60000) { reject(relayErr('network', LAPTOP_DOWN)); return; }
+              setTimeout(poll, 500);
+              return;
+            }
+            if (d.status >= 200 && d.status < 300) { resolve(d.body); return; }
+            if (d.status === 504) { reject(relayErr('network', LAPTOP_DOWN, 504)); return; }
+            var b = d.body || {};
+            reject(relayErr(d.status >= 500 || !b.error ? 'network' : 'http', b.error || LAPTOP_DOWN, d.status));
+          }).catch(function(e) {
+            if (e && e.code) { reject(e); return; }
+            if (Date.now() - started > 60000) { reject(relayErr('network', 'No internet connection.')); return; }
+            setTimeout(poll, 1000);
+          });
+        })();
+      });
+    });
+}
+function postJson(path, body) {
+  if (RELAY) return relayCall('POST', path, body);
+  return fetch(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body || {})
+  }).then(function(r) {
+    if (r.status === 403) { var pinErr = new Error('pin'); pinErr.code = 'pin'; throw pinErr; }
+    if (r.status === 429) {
+      var retryAfter = parseInt(r.headers.get('Retry-After'), 10);
+      var lockedErr = new Error('locked');
+      lockedErr.code = 'locked';
+      lockedErr.retryAfter = (isFinite(retryAfter) && retryAfter > 0) ? retryAfter : 60;
+      throw lockedErr;
+    }
+    if (!r.ok) {
+      return r.json().catch(function() { return null; }).then(function(data) {
+        var httpErr = new Error((data && data.error) || 'network');
+        httpErr.code = r.status >= 500 || !data ? 'network' : 'http';
+        httpErr.status = r.status;
+        throw httpErr;
+      });
+    }
+    return r.json();
+  });
+}
+function fetchRoster(pin) { return postJson('/phone/roster', { pin: pin }); }
+function fetchTonight(pin) { return postJson('/phone/tonight', { pin: pin }); }
+
+// The one club list, from the server (GET /clubs), so every surface agrees.
+function loadClubs() {
+  postJson('/clubs', { pin: PIN }).then(function(d) {
+    if (d && Array.isArray(d.clubs) && d.clubs.length) CLUBS = d.clubs;
+    fillClubSelects();
+  }).catch(function() { fillClubSelects(); });
+}
+function fillClubSelects() {
+  var lead = $('leader-club'), vis = $('visitor-club');
+  var keepL = lead.value, keepV = vis.value;
+  lead.textContent = ''; vis.textContent = '';
+  var none = el('option', null, 'No club'); none.value = ''; lead.appendChild(none);
+  var seen = {}, clubs = [];
+  CLUBS.forEach(function(c) { seen[c] = true; clubs.push(c); });
+  KIDS.forEach(function(k) { var c = (k.club || '').trim(); if (c && !seen[c]) { seen[c] = true; clubs.push(c); } });
+  CLUBS.forEach(function(c) { var o = el('option', null, c); o.value = c; lead.appendChild(o); });
+  clubs.forEach(function(c) { var o = el('option', null, c); o.value = c; vis.appendChild(o); });
+  var none2 = el('option', null, 'No club'); none2.value = ''; vis.appendChild(none2);
+  if (keepL) lead.value = keepL;
+  if (keepV) vis.value = keepV;
+  renderOneOffClubs();
+}
+
+// ── PIN ────────────────────────────────────────────────────────────────────
+function clearPinCountdown() { clearInterval(pinCountdownTimer); pinCountdownTimer = null; }
+function startPinCountdown(seconds) {
+  clearPinCountdown();
+  var remaining = seconds, btn = $('pin-btn'), err = $('pin-err');
+  btn.disabled = true;
+  function tick() {
+    if (remaining <= 0) { clearPinCountdown(); err.textContent = ''; btn.disabled = false; return; }
+    err.textContent = 'Too many wrong PINs — try again in ' + remaining + 's';
+    remaining -= 1;
+  }
+  tick();
+  pinCountdownTimer = setInterval(tick, 1000);
+}
+function showMainScreen() {
+  $('pin-screen').hidden = true;
+  $('main-screen').hidden = false;
+  $('count-pill').hidden = SIMPLE;
+  $('menu-btn').hidden = SIMPLE;
+}
+function showPinScreen(message) {
+  closeAll();
+  $('main-screen').hidden = true;
+  $('pin-screen').hidden = false;
+  $('count-pill').hidden = true;
+  $('menu-btn').hidden = true;
+  $('pin').value = '';
+  $('pin-err').textContent = message || '';
+}
+// A 403 mid-poll: the desk changed the PIN. Stop everything, forget it all.
+function handlePinInvalidated() {
+  stopRosterPoll();
+  unlockedState = false;
+  sessionStorage.removeItem(PIN_KEY);
+  PIN = '';
+  STATE = {};
+  REMOVING = {};
+  KIDS = [];
+  HOUSEHOLDS = null;
+  RECENT = null;
+  rosterLoaded = false;
+  TONIGHT = { checkedIn: 0, visitors: 0, byClub: {}, entries: [] };
+  leaderSelection = {};
+  renderLeaderChips([], 0);
+  renderCountCheck(null);
+  clearPinCountdown();
+  showPinScreen(RELAY ? 'Signed out (the passphrase changed?). Type it again.' : 'PIN changed — ask the check-in desk for the new PIN.');
+}
+// A 429 mid-poll: rate-limited. Stop polling and resume when the lockout clears.
+function handleLockoutDuringPoll(retryAfterSeconds) {
+  var secs = (isFinite(retryAfterSeconds) && retryAfterSeconds > 0) ? retryAfterSeconds : 60;
+  pollActive = false;
+  clearTimeout(rosterPollTimer);
+  rosterPollTimer = null;
+  toast('Too many requests — pausing live updates for ' + secs + 's.', 6000);
+  clearTimeout(rosterPollResumeTimer);
+  rosterPollResumeTimer = setTimeout(function() { startRosterPoll(); }, (secs + 1) * 1000);
+}
+function handleActionError(e, prefix) {
+  if (e.code === 'pin') { handlePinInvalidated(); return; }
+  if (e.code === 'locked') { handleLockoutDuringPoll(e.retryAfter); return; }
+  toast(prefix + (e.code === 'network' ? (RELAY ? e.message : 'cannot reach the print server. Same Wi-Fi?') : e.message), 5000, null, null, 'bad');
+  refreshAll();
+}
+function startSession(data) {
+  applyRoster(data);
+  STATE = {};
+  unlockedState = true;
+  showMainScreen();
+  render();
+  startRosterPoll();
+  refreshTonight();
+  loadClubs();
+  if (SIMPLE) return;   // the youth page: check-in only
+  refreshLeaders();
+}
+function unlock() {
+  if (unlockInFlight) return;
+  var pinVal = $('pin').value.trim();
+  if (!pinVal) return;
+  unlockInFlight = true;
+  var btn = $('pin-btn');
+  btn.disabled = true;
+  (RELAY ? relayLogin(pinVal) : Promise.resolve(pinVal)).then(function(key) {
+    if (RELAY) PIN = key;
+    return fetchRoster(key).then(function(data) { return { key: key, data: data }; });
+  }).then(function(got) {
+    var data = got.data;
+    PIN = got.key;
+    sessionStorage.setItem(PIN_KEY, PIN);
+    unlockInFlight = false;
+    btn.disabled = false;
+    startSession(data);
+  }).catch(function(e) {
+    unlockInFlight = false;
+    if (e.code === 'locked') { startPinCountdown(e.retryAfter); return; }
+    btn.disabled = false;
+    if (RELAY) { PIN = ''; $('pin-err').textContent = e.code === 'wrong' || e.code === 'pin' ? 'That is not the passphrase.' : (e.message || LAPTOP_DOWN); return; }
+    $('pin-err').textContent = e.code === 'pin' ? 'Wrong PIN — ask the check-in desk.' : 'Cannot reach the print server. Same Wi-Fi?';
+  });
+}
+// Online: the sync passphrase gets a session, which every relayed call carries.
+// Passphrase v2 (lobby/worker/src/routes.md section 1): the passphrase is turned into
+// an authKey HERE (the family's one sign-in, lobby/shared/sync-protocol.js, and the
+// derivation, lobby/shared/cloud-crypto.js; site/build.mjs serves both at /checkin/)
+// and only the authKey is sent. A phone takes about a second for the 600000 rounds.
+var relayModules = null;
+function loadRelayModules() {
+  if (!relayModules) {
+    relayModules = Promise.all([import('/checkin/sync-protocol.js'), import('/checkin/cloud-crypto.js')])
+      .then(function(m) { return { sp: m[0], cc: m[1] }; }, function() { relayModules = null; return null; });
+  }
+  return relayModules;
+}
+function relayRequest(path, o) {
+  o = o || {};
+  return fetch(RELAY + path, { method: o.method || 'GET', headers: o.body === undefined ? {} : { 'Content-Type': 'application/json' }, body: o.body === undefined ? undefined : JSON.stringify(o.body) })
+    .then(function(r) { return r.json().catch(function() { return {}; }).then(function(d) { return { ok: r.ok, status: r.status, body: d }; }); },
+      function() { return { ok: false, status: 0, body: null }; });
+}
+function relayLogin(passphrase) {
+  return loadRelayModules().then(function(m) {
+    // The modules did not load (an old phone, a cached page): today's login, which a service that still has the old hash accepts.
+    if (!m) return relayRequest('/v1/login', { method: 'POST', body: { passphrase: passphrase } });
+    return m.sp.signInWithPassphrase({ request: relayRequest, derive: m.cc.deriveAuthKey, passphrase: passphrase }).then(function(out) { return out.res; });
+  }).then(function(r) {
+    var d = r.body || {};
+    if (r.status === 0) throw relayErr('network', 'No internet connection.');
+    if (r.status === 429) { var e = relayErr('locked'); e.retryAfter = d.retryAfterSec || 60; throw e; }
+    if (r.status === 401) throw relayErr('wrong');
+    if (!r.ok || !d.session) throw relayErr('network', d.error || 'The sync service did not answer.');
+    return d.session;
+  });
+}
+if (RELAY) {
+  $('pin').type = 'password';
+  $('pin').setAttribute('inputmode', 'text');
+  $('pin').setAttribute('placeholder', 'Passphrase');
+  $('pin').setAttribute('aria-label', 'Passphrase');
+  $('pin').style.letterSpacing = 'normal';
+  document.querySelector('#pin-screen p').textContent = 'Type the check-in passphrase (the one the lobby screens use).';
+}
+if (ONLY) {
+  var ymTitle = window.AWANA_TITLE || 'Trek & Journey';
+  document.querySelector('.top h1').textContent = ymTitle;
+  document.title = ymTitle + ' check-in';
+}
+$('pin-btn').addEventListener('click', unlock);
+$('pin').addEventListener('keydown', function(e) { if (e.key === 'Enter') unlock(); });
+
+// ── Roster ─────────────────────────────────────────────────────────────────
+// A kid this phone has a check-in in flight for keeps its object, so a
+// refresh never clobbers the optimistic state.
+function applyRoster(data) {
+  rosterLoaded = true;
+  var oldByName = {};
+  KIDS.forEach(function(k) { oldByName[k.name.toLowerCase()] = k; });
+  KIDS = (data.kids || []).filter(function(sk) {
+    return !ONLY || ONLY.indexOf(clubKit(sk.club)) !== -1;
+  }).map(function(sk) {
+    var key = sk.name.toLowerCase();
+    if (Object.prototype.hasOwnProperty.call(STATE, key) && oldByName[key]) return oldByName[key];
+    return sk;
+  });
+  // The laptop's households (names only) in householdIndex()'s shape.
+  var byName = {}, members = {};
+  (data.households || []).forEach(function(h, i) {
+    var names = (h || []).map(norm).filter(Boolean);
+    if (names.length < 2) return;
+    members['h' + i] = names;
+    names.forEach(function(n) { byName[n] = 'h' + i; });
+  });
+  HOUSEHOLDS = Object.keys(members).length ? { byName: byName, members: members } : null;
+  ITEMS = data.items || { bible: [], friend: [] };
+  var r = data.recent;
+  if (r && r.ready) {
+    var names = {};
+    (r.names || []).forEach(function(n) { names[norm(n)] = true; });
+    RECENT = { names: names };
+  } else RECENT = null;
+  fillClubSelects();
+}
+
+// One person in the shape the touch core works with.
+function person(k) {
+  return { name: k.name, recid: 'n:' + norm(k.name), clubId: '', clubName: k.club || '', kid: k,
+    checkedIn: !!k.checkedIn && !STATE[k.name.toLowerCase()] };
+}
+// Still to come: active, not checked in, nothing in flight on this phone.
+function waitingPeople() {
+  return KIDS.filter(function(k) {
+    var st = STATE[k.name.toLowerCase()];
+    return !k.checkedIn && !k.inactive && !(st && st.status !== 'restoring');
+  }).map(person);
+}
+function itemsFor(club) {
+  var has = function(list) { return (list || []).some(function(c) { return clubKit(c) && clubKit(c) === clubKit(club); }); };
+  return { bible: has(ITEMS.bible), friend: has(ITEMS.friend) };
+}
+function isAway(f) {
+  if (!RECENT) return false;
+  return f.kids.every(function(k) { return !RECENT.names[norm(k.name)]; });
+}
+
+// ── Smooth redraws (the touch check-in's): keyed tiles, FLIP, pop-outs ─────
+var SPRING = 'linear(0, 0.213, 0.605, 0.93, 1.103, 1.142, 1.106, 1.05, 1.006, 0.984, 0.98, 0.986, 0.994, 1, 1.002, 1.003, 1)';
+var kd = { prev: {}, next: {}, fresh: 0 };
+var joy = {};
+function calm() { return window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches; }
+function beginKeyed(list) {
+  var prev = {};
+  list.querySelectorAll('[data-k]').forEach(function(e) {
+    prev[e.dataset.k] = { el: e, r: e.getBoundingClientRect(), pc: e.parentNode ? e.parentNode.className : '' };
+  });
+  kd = { prev: prev, next: {}, fresh: 0 };
+}
+function keyed(tag, cls, k) {
+  var o = kd.prev[k], e;
+  if (o && o.el.tagName === tag.toUpperCase() && !kd.next[k]) {
+    e = o.el;
+    e.className = cls + ' stay';
+    e.removeAttribute('style');
+    while (e.firstChild) e.removeChild(e.firstChild);
+    e.onclick = null;
+  } else {
+    e = el(tag, cls);
+    e.style.animationDelay = Math.min(kd.fresh++, 12) * 18 + 'ms';
+  }
+  e.type = 'button';
+  e.dataset.k = k;
+  kd.next[k] = e;
+  return e;
+}
+function endKeyed() {
+  if (calm()) return;
+  Object.keys(kd.next).forEach(function(k) {
+    var o = kd.prev[k], e = kd.next[k];
+    if (!o || o.el !== e || !e.animate || !e.isConnected) return;
+    var r = e.getBoundingClientRect();
+    if (!r.width || !o.r.width) return;
+    var dx = o.r.left - r.left, dy = o.r.top - r.top, sx = o.r.width / r.width, sy = o.r.height / r.height;
+    if (Math.abs(dx) < 1 && Math.abs(dy) < 1 && Math.abs(sx - 1) < 0.01 && Math.abs(sy - 1) < 0.01) return;
+    e.animate([{ transformOrigin: '0 0', transform: 'translate(' + dx + 'px,' + dy + 'px) scale(' + sx + ',' + sy + ')' },
+      { transformOrigin: '0 0', transform: 'none' }], { duration: 520, easing: SPRING });
+  });
+  Object.keys(kd.prev).forEach(function(k) {
+    if (kd.next[k]) return;
+    var o = kd.prev[k];
+    if (!o.r.width || o.r.bottom < 0 || o.r.top > window.innerHeight) return;
+    var holder = el('div', o.pc);
+    holder.style.cssText = 'left:' + o.r.left + 'px;top:' + o.r.top + 'px;width:' + o.r.width + 'px;height:' + o.r.height + 'px';
+    o.el.classList.add('stay');
+    holder.appendChild(o.el);
+    $('ghosts').appendChild(holder);
+    var happy = (o.el.dataset.names || '').split('|').some(function(n) { return n && joy[n]; });
+    var a = holder.animate(happy
+      ? [{ transform: 'none', opacity: 1 }, { transform: 'translateY(-8px) scale(1.12,.9)', opacity: 1, offset: 0.35 },
+         { transform: 'translateY(-22px) scale(.4)', opacity: 0 }]
+      : [{ transform: 'none', opacity: 1 }, { transform: 'scale(.85)', opacity: 0 }],
+      { duration: happy ? 460 : 160, easing: happy ? 'cubic-bezier(.3,.7,.4,1)' : 'ease-in', fill: 'forwards' });
+    a.onfinish = function() { holder.remove(); };
+  });
+}
+
+// ── Drawing ────────────────────────────────────────────────────────────────
+function stripe(f) {
+  var stops = f.kids.map(function(c) { return clubOf(c.clubName).color; });
+  return stops.length > 1 ? stops.join(',') : stops[0] + ',' + stops[0];
+}
+function famLabel(f) { return f.kids.length === 1 ? f.kids[0].name : f.name + ': ' + f.kids.map(function(c) { return c.name.split(' ')[0]; }).join(', '); }
+function names(f) { return f.kids.map(function(c) { return c.name.toLowerCase(); }).join('|'); }
+function famTile(f, fit) {
+  var b = keyed('button', 'fam', 'f:' + f.key);
+  b.dataset.names = names(f);
+  b.style.setProperty('--stripe', stripe(f));
+  var single = f.kids.length === 1;
+  var title = single ? f.kids[0].name : f.name;
+  var fs = Math.max(15, Math.min(24, fit.h * 0.3, (fit.w - 30) / (title.length * 0.6 + 0.4)));
+  var fn = el('div', 'fn', title); fn.style.fontSize = Math.round(fs) + 'px';
+  var line = el('div', 'kids');
+  f.kids.forEach(function(c) {
+    var k = el('span', 'kid'), d = el('span', 'dot');
+    d.style.setProperty('--c', clubOf(c.clubName).color);
+    k.appendChild(d);
+    k.appendChild(document.createTextNode(single ? (c.clubName || '') : c.name.split(' ')[0]));
+    line.appendChild(k);
+  });
+  b.appendChild(fn); b.appendChild(line);
+  b.setAttribute('aria-label', famLabel(f));
+  b.onclick = function() { famClick(f); };
+  return b;
+}
+function famCard(f, hits) {
+  var b = keyed('button', 'fcard', 'r:' + f.key);
+  b.dataset.names = names(f);
+  b.style.setProperty('--stripe', stripe(f));
+  var single = f.kids.length === 1;
+  b.appendChild(el('div', 'fn', single ? f.kids[0].name : f.name));
+  var line = el('div', 'kids');
+  f.kids.forEach(function(c) {
+    var k = el('span', 'kid' + (hits[c.recid] ? ' hit' : ''));
+    k.style.setProperty('--c', clubOf(c.clubName).color);
+    k.appendChild(el('span', 'dot'));
+    k.appendChild(document.createTextNode(single ? (c.clubName || '') : c.name.split(' ')[0]));
+    line.appendChild(k);
+  });
+  b.appendChild(line);
+  b.setAttribute('aria-label', famLabel(f));
+  b.onclick = function() { famClick(f); };
+  return b;
+}
+function awayButton(f, prefix) {
+  var b = keyed('button', 'famsm', prefix + f.key);
+  b.dataset.names = names(f);
+  var dots = el('span', 'dots');
+  f.kids.forEach(function(c) { var d = el('span', 'dot'); d.style.setProperty('--c', clubOf(c.clubName).color); dots.appendChild(d); });
+  b.appendChild(dots);
+  b.appendChild(el('span', 'nm', f.kids.length === 1 ? f.kids[0].name : f.name));
+  if (f.kids.length > 1) b.appendChild(el('span', 'n', String(f.kids.length)));
+  b.setAttribute('aria-label', famLabel(f));
+  b.onclick = function() { famClick(f); };
+  return b;
+}
+function kidCard(p) {
+  var club = clubOf(p.clubName);
+  var b = keyed('button', 'card' + (p.checkedIn ? ' in' : ''), 'c:' + p.recid);
+  b.dataset.names = p.name.toLowerCase();
+  b.style.setProperty('--club', p.checkedIn ? '#CBD5E1' : club.color);
+  b.style.setProperty('--deep', club.deep);
+  var txt = el('div'); txt.style.cssText = 'flex:1;min-width:0';
+  txt.appendChild(el('div', 'nm', p.name));
+  txt.appendChild(el('div', 'cl', p.clubName || ''));
+  b.appendChild(txt);
+  if (p.checkedIn) { b.appendChild(el('span', 'tag', 'Checked in')); b.setAttribute('aria-disabled', 'true'); }
+  else b.onclick = function() { openKid(p); };
+  return b;
+}
+
+function render() {
+  if (!unlockedState) return;
+  var q = $('search').value;
+  $('search-clear').hidden = !q;
+  var list = $('list');
+  beginKeyed(list);
+  while (list.firstChild) list.removeChild(list.firstChild);
+  if (!rosterLoaded) list.appendChild(el('div', 'note', 'Reading the roster…'));
+  else if (!KIDS.length) list.appendChild(el('div', 'note', 'The roster is empty — sync the CSV on the check-in laptop.'));
+  else if (!q.trim()) renderFamilies(list);
+  else renderSearch(list, q);
+  endKeyed();
+  renderCount();
+}
+
+// Families still to come (the search box is empty): the "Not here" list too.
+function renderFamilies(list) {
+  var all = groupFamilies(waitingPeople(), HOUSEHOLDS);
+  if (!all.length) { list.appendChild(el('div', 'cheer', 'Everyone’s checked in!')); return; }
+  var main = all.filter(function(f) { return !isAway(f); });
+  var away = all.filter(isAway);
+  if (!main.length) { main = away; away = []; }
+  list.appendChild(el('div', 'lead', main.length + (main.length === 1 ? ' family' : ' families') + ' still to come'));
+  var W = list.clientWidth - 24;
+  var H = window.innerHeight - list.getBoundingClientRect().top - 60;
+  // Two columns on a phone (three or more on a tablet), tall enough for the
+  // name and a row of children; a long list scrolls.
+  var cols = Math.max(2, Math.floor((W + 8) / (180 + 8)));
+  var w = (W - 8 * (cols - 1)) / cols;
+  var rows = Math.ceil(main.length / cols);
+  var h = Math.max(78, Math.min(120, (Math.max(200, H) - 8 * (rows - 1)) / rows));
+  var grid = el('div', 'fams');
+  grid.style.gridTemplateColumns = 'repeat(' + cols + ', minmax(0, 1fr))';
+  grid.style.gridAutoRows = Math.floor(h) + 'px';
+  main.forEach(function(f) { grid.appendChild(famTile(f, { w: w, h: h })); });
+  list.appendChild(grid);
+  if (away.length) {
+    var box = el('div', 'away');
+    box.appendChild(el('div', 'lead', 'Not here the last two club nights · ' + away.length));
+    var row = el('div', 'awayrow');
+    away.forEach(function(f) { row.appendChild(awayButton(f, 'a:')); });
+    box.appendChild(row);
+    list.appendChild(box);
+  }
+}
+
+// Typing: households first, then the children on their own panel, "Did you
+// mean" families, and families not here lately only at the bottom.
+function renderSearch(list, q) {
+  var everyone = KIDS.filter(function(k) { return !k.inactive; }).map(person);
+  var r = searchPeople(everyone, q);
+  var fams = groupFamilies(waitingPeople(), HOUSEHOLDS);
+  var famOf = {};
+  fams.forEach(function(f) { f.kids.forEach(function(k) { famOf[k.recid] = f; }); });
+  var hits = {}, seen = {};
+  function famsFor(people) {
+    var out = [];
+    people.forEach(function(p) {
+      if (p.checkedIn) return;
+      hits[p.recid] = true;
+      var f = famOf[p.recid];
+      if (f && !seen[f.key]) { seen[f.key] = true; out.push(f); }
+    });
+    return out;
+  }
+  var exact = famsFor(r.matches);
+  var near = norm(q).length >= 3 ? famsFor(r.close) : [];
+  var away = exact.concat(near).filter(isAway);
+  exact = exact.filter(function(f) { return !isAway(f); });
+  near = near.filter(function(f) { return !isAway(f); });
+  var awayKid = {};
+  away.forEach(function(f) { f.kids.forEach(function(k) { awayKid[k.recid] = true; }); });
+  // A child who is a family of one is already their family card; the panel
+  // lists the brothers and sisters the cards hold, and anyone already in.
+  var kids = r.matches.filter(function(p) { return !awayKid[p.recid] && (p.checkedIn || (famOf[p.recid] && famOf[p.recid].kids.length > 1)); });
+
+  if (exact.length) {
+    list.appendChild(el('div', 'sec', exact.length === 1 ? 'Family' : 'Families'));
+    var g = el('div', 'rfams');
+    exact.forEach(function(f) { g.appendChild(famCard(f, hits)); });
+    list.appendChild(g);
+  }
+  if (near.length) {
+    list.appendChild(el('div', 'sec', exact.length ? 'Or did you mean' : 'Did you mean'));
+    var g2 = el('div', 'rfams');
+    near.forEach(function(f) { g2.appendChild(famCard(f, hits)); });
+    list.appendChild(g2);
+  }
+  if (kids.length) {
+    var panel = el('div', 'panel');
+    panel.appendChild(el('div', 'sec', 'Children'));
+    var g3 = el('div', 'grid');
+    kids.forEach(function(p) { g3.appendChild(kidCard(p)); });
+    panel.appendChild(g3);
+    list.appendChild(panel);
+  }
+  if (away.length) {
+    var box = el('div', 'away');
+    box.appendChild(el('div', 'lead', 'Not here the last two club nights'));
+    var row = el('div', 'awayrow');
+    away.forEach(function(f) { row.appendChild(awayButton(f, 's:')); });
+    box.appendChild(row);
+    list.appendChild(box);
+  }
+  if (!exact.length && !near.length && !kids.length && !away.length) {
+    list.appendChild(el('div', 'note', 'No child matches “' + q.trim() + '”. A visitor? Tap + for a visitor label.'));
+  }
+}
+
+function renderCount() {
+  $('count-pill').textContent = (TONIGHT.checkedIn || 0) + ' in';
+  $('count-pill').setAttribute('aria-label', (TONIGHT.checkedIn || 0) + ' here now. Show who.');
+}
+
+$('search').addEventListener('input', render);
+$('search-clear').addEventListener('click', function() { $('search').value = ''; render(); $('search').focus(); });
+window.addEventListener('resize', function() { if (!$('search').value.trim()) render(); });
+
+// ── Sheets ─────────────────────────────────────────────────────────────────
+var openSheet = null;
+function showSheet(id) {
+  if (openSheet && openSheet !== id) $(openSheet).classList.remove('on');
+  openSheet = id;
+  $('scrim').classList.add('on');
+  $(id).classList.add('on');
+}
+function hideSheet() {
+  if (openSheet) $(openSheet).classList.remove('on');
+  openSheet = null;
+  $('scrim').classList.remove('on');
+}
+function closeAll() { hideSheet(); closeFamily(); }
+$('scrim').addEventListener('click', hideSheet);
+document.addEventListener('keydown', function(e) {
+  if (e.key !== 'Escape') return;
+  if (openSheet) hideSheet(); else if ($('fampage').classList.contains('on')) closeFamily();
+});
+
+// BARF Night (8.1.0, owner): "Friend's first name", shown while Brought a
+// friend is on. The name belongs to this child only (never copied to a sibling).
+function friendInput(holder) {
+  var inp = el('input', 'fname');
+  inp.type = 'text';
+  inp.maxLength = 24;
+  inp.placeholder = 'Friend’s first name';
+  inp.setAttribute('aria-label', 'Friend’s first name');
+  inp.autocomplete = 'off';
+  inp.setAttribute('autocapitalize', 'words');
+  inp.setAttribute('enterkeyhint', 'done');
+  inp.hidden = !holder.friend;
+  inp.addEventListener('input', function() { holder.friendName = inp.value; });
+  return inp;
+}
+
+function optButton(label, on, onChange) {
+  var b = el('button', 'opt' + (on ? ' on' : ''));
+  b.type = 'button';
+  var box = el('span', 'box', on ? '✓' : '');
+  b.appendChild(box); b.appendChild(document.createTextNode(label));
+  b.setAttribute('aria-pressed', on ? 'true' : 'false');
+  b.addEventListener('click', function() {
+    var now = !b.classList.contains('on');
+    b.classList.toggle('on', now);
+    box.textContent = now ? '✓' : '';
+    b.setAttribute('aria-pressed', now ? 'true' : 'false');
+    onChange(now);
+  });
+  return b;
+}
+
+// The child's card: Bible ticked where the club has it, then Check in, and
+// straight back to the list (the check-in finishes in the background). A
+// child a phone took out of tonight's count gets Add back instead.
+function openKid(p) {
+  var k = p.kid, club = clubOf(p.clubName), items = itemsFor(p.clubName);
+  var choice = { bible: items.bible, friend: false };
+  var s = $('kid-sheet');
+  s.textContent = '';
+  s.style.setProperty('--club', club.color);
+  s.style.setProperty('--deep', club.deep);
+  s.appendChild(el('div', 'grab'));
+  s.appendChild(el('div', 'bar'));
+  s.appendChild(el('div', 'nm', p.name));
+  s.appendChild(el('div', 'cl', p.clubName || ''));
+  if (k.removedHere) s.appendChild(el('div', 'sub', 'Taken out of tonight’s count on a phone. Add them back to count them again.'));
+  else if (items.bible || items.friend) {
+    var opts = el('div', 'opts');
+    if (items.bible) opts.appendChild(optButton('Bible', choice.bible, function(v) { choice.bible = v; }));
+    var fname = items.friend ? friendInput(choice) : null;
+    if (items.friend) opts.appendChild(optButton('Brought a friend', false, function(v) {
+      choice.friend = v;
+      fname.hidden = !v;
+      if (v) setTimeout(function() { try { fname.focus(); } catch (e) { /* ignore */ } }, 30);
+    }));
+    s.appendChild(opts);
+    if (fname) s.appendChild(fname);
+  }
+  var acts = el('div', 'acts');
+  var no = el('button', 'btn no', 'Cancel'); no.type = 'button';
+  no.addEventListener('click', hideSheet);
+  var go = el('button', 'btn go', k.removedHere ? 'Add back' : 'Check in'); go.type = 'button';
+  go.addEventListener('click', function() {
+    hideSheet();
+    if (k.removedHere) { restore({ name: k.name }); return; }
+    var sibs = siblingsOf(p);
+    checkInMany([{ p: p, choice: choice }], null);
+    // Brothers and sisters start from this child's Bible / friend ticks, never their friend's name.
+    if (sibs.length) openFamily(p, sibs, { bible: choice.bible, friend: choice.friend }); else { $('search').value = ''; render(); }
+  });
+  acts.appendChild(no); acts.appendChild(go);
+  s.appendChild(acts);
+  showSheet('kid-sheet');
+}
+
+function siblingsOf(p) {
+  if (!HOUSEHOLDS) return [];
+  var id = HOUSEHOLDS.byName[norm(p.name)];
+  if (!id) return [];
+  var wanted = {};
+  HOUSEHOLDS.members[id].forEach(function(n) { if (n !== norm(p.name)) wanted[n] = true; });
+  return waitingPeople().filter(function(c) { return wanted[norm(c.name)]; });
+}
+
+function famClick(f) {
+  if (f.kids.length === 1) openKid(f.kids[0]);
+  else openFamily(null, f.kids, { bible: true, friend: false }, f.name);
+}
+
+// The family page: after a child's check-in (first) it offers the brothers
+// and sisters; from a family tile (first = null) it is the family.
+var famEntries = [];
+function openFamily(first, kids, choice, title) {
+  var page = $('fampage');
+  page.textContent = '';
+  var head = el('div', 'head');
+  if (first) {
+    var last = first.name.split(' ').slice(1).join(' ');
+    head.appendChild(el('div', 'done-l', '✓ ' + first.name + ' is checked in'));
+    head.appendChild(el('h2', null, (last ? last + ': also' : 'Also') + ' here tonight?'));
+  } else head.appendChild(el('h2', null, title || 'This family'));
+  var tiles = el('div', 'tiles');
+  famEntries = [];
+  kids.forEach(function(c, i) {
+    var club = clubOf(c.clubName), items = itemsFor(c.clubName);
+    var mine = { bible: items.bible && !!choice.bible, friend: items.friend && !!choice.friend };
+    var t = el('div', 'tile');
+    t.style.setProperty('--club', club.color);
+    t.style.setProperty('--deep', club.deep);
+    t.style.animationDelay = 60 + i * 40 + 'ms';
+    t.appendChild(el('div', 'nm', c.name));
+    t.appendChild(el('div', 'cl', c.clubName || ''));
+    if (items.bible || items.friend) {
+      var o = el('div', 'opts');
+      if (items.bible) o.appendChild(optButton('Bible', mine.bible, function(v) { mine.bible = v; }));
+      var fn = items.friend ? friendInput(mine) : null;
+      if (items.friend) o.appendChild(optButton('Brought a friend', mine.friend, function(v) { mine.friend = v; fn.hidden = !v; }));
+      t.appendChild(o);
+      if (fn) t.appendChild(fn);
+    }
+    var go = el('button', 'go1', 'Check in'); go.type = 'button';
+    var entry = { p: c, choice: mine, t: t, go: go, state: 'ready' };
+    go.addEventListener('click', function() {
+      if (entry.state !== 'ready') return;
+      entry.state = 'done';
+      t.classList.add('done');
+      go.textContent = '✓ Checked in';
+      checkInMany([entry], null);
+      if (famEntries.every(function(x) { return x.state === 'done'; })) closeFamily();
+    });
+    t.appendChild(go);
+    tiles.appendChild(t);
+    famEntries.push(entry);
+  });
+  var foot = el('div', 'foot');
+  var done = el('button', 'btn no', 'Done'); done.type = 'button';
+  done.addEventListener('click', closeFamily);
+  var all = el('button', 'btn go', kids.length === 2 ? 'Both of them' : 'All of them'); all.type = 'button';
+  all.addEventListener('click', function() {
+    var left = famEntries.filter(function(x) { return x.state === 'ready'; });
+    left.forEach(function(x) { x.state = 'done'; });
+    var fam = first ? first.name.split(' ').slice(1).join(' ') : (title || '');
+    checkInMany(left, fam);
+    closeFamily();
+  });
+  foot.appendChild(done); foot.appendChild(all);
+  page.appendChild(head); page.appendChild(tiles); page.appendChild(foot);
+  page.classList.add('on');
+}
+function closeFamily() {
+  var page = $('fampage');
+  if (!page.classList.contains('on')) return;
+  page.classList.remove('on');
+  famEntries = [];
+  $('search').value = '';
+  render();
+}
+
+// ── Check-in: queued for the laptop, back to the list at once ──────────────
+// Each child leaves the list from the tap (STATE), the laptop does the work
+// (/phone/checkin, picked up by the check-in page's extension), and one line
+// says when they are all in. A failure puts the child back, in red.
+function checkInMany(entries, family) {
+  var left = entries.length, ok = 0, failed = [];
+  entries.forEach(function(e) {
+    var k = e.p.kid;
+    var key = k.name.toLowerCase();
+    joy[key] = true;
+    STATE[key] = { status: 'sending', tries: 0 };
+  });
+  render();
+  entries.forEach(function(e) {
+    var k = e.p.kid, key = k.name.toLowerCase();
+    var options = {};
+    var items = itemsFor(k.club);
+    if (items.bible) options.Bible = !!e.choice.bible;
+    if (items.friend) options.Friend = !!e.choice.friend;
+    var friendName = String(e.choice.friendName || '').replace(/\s+/g, ' ').trim().slice(0, 24);
+    if (options.Friend && friendName) options.FriendName = friendName;
+    postJson('/phone/checkin', { pin: PIN, name: k.name, options: options }).then(function(data) {
+      if (!data || !data.id) throw new Error((data && data.error) || 'failed');
+      STATE[key] = { status: 'pending', id: data.id, tries: 0 };
+      pollStatus(key, k, settle);
+    }).catch(function(err) {
+      // The child goes back on the list: left 'sending', they were hidden for
+      // the rest of the session.
+      delete STATE[key];
+      render();
+      if (err.code === 'pin' || err.code === 'locked') { handleActionError(err, ''); return; }
+      settle(false, k, err.message);
+    });
+  });
+  function settle(good, k, why) {
+    if (good) ok++; else failed.push({ k: k, why: why });
+    if (--left) return;
+    failed.forEach(function(f) { toast('Couldn’t check in ' + f.k.name + ': ' + (f.why || 'see the check-in laptop'), 6000, null, null, 'bad'); });
+    if (ok && !failed.length) {
+      toast(entries.length === 1 ? entries[0].p.name + ' is checked in' : (family ? family + ': ' : '') + ok + ' checked in', 3000, null, null, 'good');
+    }
+    refreshAll();
+  }
+}
+function pollStatus(key, kid, settle) {
+  var st = STATE[key];
+  if (!st || st.status !== 'pending') return;
+  if (st.tries > 45) {   // ~90 s: the laptop may be closed
+    delete STATE[key];
+    render();
+    settle(false, kid, 'the check-in laptop is not answering. Check in there instead.');
+    return;
+  }
+  setTimeout(function() {
+    var cur = STATE[key];
+    if (!cur || cur.status !== 'pending') return;
+    call('GET', '/phone/status/' + cur.id).then(function(s) {
+      if (s.status === 'done') {
+        kid.checkedIn = true;
+        rosterEpoch += 1;
+        delete STATE[key];
+        settle(true, kid);
+      } else if (s.status === 'failed') {
+        delete STATE[key];
+        render();
+        settle(false, kid, s.detail);
+      } else { cur.tries += 1; pollStatus(key, kid, settle); }
+    }).catch(function() { cur.tries += 1; pollStatus(key, kid, settle); });
+  }, 1500);
+}
+
+// ── Polling ────────────────────────────────────────────────────────────────
+function scheduleRosterPoll(delay) {
+  clearTimeout(rosterPollTimer);
+  if (!pollActive) return;
+  rosterPollTimer = setTimeout(refreshAll, delay == null ? rosterPollMs : delay);
+}
+function stopRosterPoll() {
+  pollActive = false;
+  clearTimeout(rosterPollTimer); rosterPollTimer = null;
+  clearTimeout(rosterPollResumeTimer); rosterPollResumeTimer = null;
+}
+function startRosterPoll() { pollActive = true; rosterPollMs = ROSTER_POLL_BASE_MS; scheduleRosterPoll(); }
+// One tick refreshes the roster and tonight together, so they never drift.
+function refreshAll() {
+  if (!pollActive || rosterFetchInFlight) return;
+  if (document.hidden) { scheduleRosterPoll(); return; }
+  rosterFetchInFlight = true;
+  var epoch = rosterEpoch;
+  Promise.all([fetchRoster(PIN), fetchTonight(PIN)]).then(function(results) {
+    rosterFetchInFlight = false;
+    rosterPollMs = ROSTER_POLL_BASE_MS;
+    showLaptopDown(false);
+    // Asked before a check-in was confirmed: it would put that child back on
+    // the list. Ask again instead.
+    if (epoch !== rosterEpoch) { scheduleRosterPoll(0); return; }
+    applyRoster(results[0]);
+    applyTonight(results[1]);
+    if (!$('fampage').classList.contains('on') && openSheet !== 'kid-sheet') render(); else renderCount();
+    if (openSheet === 'tonight-sheet') renderTonight();
+    scheduleRosterPoll();
+  }).catch(function(e) {
+    rosterFetchInFlight = false;
+    if (e.code === 'pin') { handlePinInvalidated(); return; }
+    if (e.code === 'locked') { handleLockoutDuringPoll(e.retryAfter); return; }
+    showLaptopDown(true);
+    rosterPollMs = Math.min(rosterPollMs * 2, ROSTER_POLL_MAX_MS);
+    scheduleRosterPoll();
+  });
+}
+// Two polls in a row with no answer: say so, because the list is now only as
+// fresh as the last answer, and a child checked in at the desk since then
+// still shows here.
+function showLaptopDown(down) {
+  rosterMisses = down ? rosterMisses + 1 : 0;
+  $('down-note').hidden = rosterMisses < 2;
+}
+document.addEventListener('visibilitychange', function() {
+  if (document.hidden || !unlockedState || !pollActive) return;
+  refreshAll();
+});
+
+// ── Tonight (the count pill) ───────────────────────────────────────────────
+function applyTonight(data) {
+  if (!data || typeof data !== 'object') return;
+  TONIGHT = {
+    checkedIn: Number(data.checkedIn) || 0,
+    checkedOut: Number(data.checkedOut) || 0,
+    visitors: Number(data.visitors) || 0,
+    byClub: data.byClub || {},
+    // Check out (7.16.0) only when the laptop's print server says it can:
+    // the website's copy of this page may be newer than the laptop's app.
+    canCheckout: Array.isArray(data.features) && data.features.indexOf('checkout') !== -1,
+    entries: (data.entries || []).filter(function(e) { return !REMOVING[e.key]; })
+  };
+}
+function refreshTonight() {
+  if (!unlockedState) return;
+  refreshCountCheck();
+  fetchTonight(PIN).then(function(data) { applyTonight(data); renderCount(); if (openSheet === 'tonight-sheet') renderTonight(); })
+    .catch(function(e) {
+      if (e.code === 'pin') { handlePinInvalidated(); return; }
+      if (e.code === 'locked') { handleLockoutDuringPoll(e.retryAfter); }
+    });
+}
+function renderTonight() {
+  // "Here now" (7.15.0): children checked out tonight are off the count.
+  $('tonight-total').textContent = (TONIGHT.checkedIn || 0) + ' here now' +
+    (TONIGHT.checkedOut ? ' · ' + TONIGHT.checkedOut + ' checked out' : '') +
+    (TONIGHT.visitors ? ' · ' + TONIGHT.visitors + ' visitor' + (TONIGHT.visitors === 1 ? '' : 's') : '');
+  var chips = $('tonight-chips');
+  chips.textContent = '';
+  Object.keys(TONIGHT.byClub || {}).sort().forEach(function(club) {
+    var c = el('span', 'chip'), d = el('span', 'dot');
+    d.style.setProperty('--c', clubOf(club).color);
+    c.appendChild(d); c.appendChild(document.createTextNode(club + ' ' + TONIGHT.byClub[club]));
+    chips.appendChild(c);
+  });
+  var list = $('tonight-list');
+  list.textContent = '';
+  var entries = TONIGHT.entries || [];
+  if (!entries.length) { list.appendChild(el('div', 'note', 'No one is counted yet tonight.')); return; }
+  var groups = {};
+  entries.forEach(function(e) { var g = e.clubName || 'No club'; (groups[g] = groups[g] || []).push(e); });
+  Object.keys(groups).sort().forEach(function(g) {
+    var h = el('h3', null, g + ' · ' + groups[g].length);
+    list.appendChild(h);
+    groups[g].sort(function(a, b) { return String(b.at).localeCompare(String(a.at)); }).forEach(function(e) {
+      var row = el('div', 'row'), who = el('div', 'who');
+      var b = el('b', null, (e.firstName + ' ' + e.lastName).trim());
+      if (e.visitor) b.appendChild(el('span', 'vtag', 'Visitor'));
+      if (e.checkedOut) b.appendChild(el('span', 'vtag', 'Checked out'));
+      var d = new Date(e.at);
+      who.appendChild(b);
+      who.appendChild(el('span', null, isNaN(d.getTime()) ? '' : d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })));
+      // Undo check-in (7.14.0) needs the child's TwoTimTwo id; without one
+      // (a visitor, a label printed before the roster knew them) only the
+      // local Remove is possible, and the row says so.
+      var acts = el('div', 'rowacts');
+      var busy = REMOVING[e.key] || UNDOING[e.key] || CHECKING_OUT[e.key];
+      // Check out (7.16.0): on TwoTimTwo through the laptop for a row with a
+      // TwoTimTwo id; "Mark checked out" (here only) for one without. Never
+      // on a child already checked out.
+      if (TONIGHT.canCheckout && !e.checkedOut) {
+        var hasId = e.clubberId && !e.visitor;
+        var cb = el('button', 'tt', CHECKING_OUT[e.key] ? 'Checking out…' : (hasId ? 'Check out' : 'Mark checked out')); cb.type = 'button';
+        if (busy) cb.disabled = true; else cb.addEventListener('click', function() { askCheckout(e); });
+        acts.appendChild(cb);
+      }
+      if (e.clubberId && !e.visitor) {
+        var ub = el('button', 'tt', UNDOING[e.key] ? 'Undoing…' : 'Undo check-in'); ub.type = 'button';
+        if (busy) ub.disabled = true; else ub.addEventListener('click', function() { askUndo(e); });
+        acts.appendChild(ub);
+      } else {
+        who.appendChild(el('small', null, e.visitor ? 'Not on TwoTimTwo: Remove only' : 'No TwoTimTwo id here: Remove only'));
+      }
+      var btn = el('button', null, REMOVING[e.key] ? 'Removing…' : 'Remove'); btn.type = 'button';
+      if (busy) btn.disabled = true; else btn.addEventListener('click', function() { askRemove(e); });
+      acts.appendChild(btn);
+      row.appendChild(who); row.appendChild(acts);
+      list.appendChild(row);
+    });
+  });
+}
+// The print server's count against TwoTimTwo's own.
+function renderCountCheck(v) {
+  var c = $('tonight-check');
+  if (!v || !v.known) { c.hidden = true; return; }
+  c.hidden = false;
+  if (v.matches) { c.style.color = '#15803d'; c.textContent = '✓ Matches TwoTimTwo (' + (v.theirs || 0) + ')'; return; }
+  var short = v.unexplained < 0;
+  var clubs = (v.byClub || []).filter(function(x) { return x.unexplained !== 0; })
+    .map(function(x) { return x.club + ' ' + (x.unexplained < 0 ? '−' : '+') + Math.abs(x.unexplained); }).join(', ');
+  c.style.color = short ? '#b91c1c' : '#b45309';
+  c.textContent = '⚠ TwoTimTwo ' + v.theirs + ' · printed ' + v.ours + ' — ' + Math.abs(v.unexplained) +
+    (short ? ' with no label' : ' extra') + (clubs ? ' (' + clubs + ')' : '');
+}
+function refreshCountCheck() {
+  if (!unlockedState) return;
+  postJson('/reconcile', { pin: PIN }).then(renderCountCheck).catch(function() {});
+}
+$('count-pill').addEventListener('click', function() { renderTonight(); showSheet('tonight-sheet'); refreshTonight(); });
+$('tonight-close').addEventListener('click', hideSheet);
+
+// ── Tonight: remove / add back ─────────────────────────────────────────────
+function identityOf(x) {
+  if (x.firstName !== undefined) return { firstName: x.firstName, lastName: x.lastName, clubberId: x.clubberId || null };
+  var parts = String(x.name || '').trim().split(/\s+/);
+  return { firstName: parts[0] || '', lastName: parts.slice(1).join(' '), clubberId: null };
+}
+function displayName(ident) { return (ident.firstName + ' ' + ident.lastName).trim(); }
+var pendingConfirm = null;     // { entry, mode: 'remove' | 'undo' }
+function askRemove(entry) {
+  var name = (entry.firstName + ' ' + entry.lastName).trim();
+  pendingConfirm = { entry: entry, mode: 'remove' };
+  $('confirm-title').textContent = 'Remove ' + name + ' from tonight’s count?';
+  $('confirm-body').textContent = 'This only changes the count on the lobby screens and this list. It does NOT undo the check-in on TwoTimTwo. If ' +
+    entry.firstName + ' really left, also undo them on the check-in laptop.';
+  $('confirm-ok').textContent = 'Remove from count';
+  showSheet('confirm-sheet');
+}
+function askUndo(entry) {
+  var name = (entry.firstName + ' ' + entry.lastName).trim();
+  pendingConfirm = { entry: entry, mode: 'undo' };
+  $('confirm-title').textContent = 'Undo ' + name + '’s check-in on TwoTimTwo?';
+  $('confirm-body').textContent = 'The check-in laptop undoes it on TwoTimTwo, and then ' + entry.firstName +
+    ' comes off tonight’s count and the lobby screens. If TwoTimTwo does not confirm it, nothing changes and this page says why.';
+  $('confirm-ok').textContent = 'Undo check-in';
+  showSheet('confirm-sheet');
+}
+function askCheckout(entry) {
+  var name = (entry.firstName + ' ' + entry.lastName).trim();
+  var hasId = entry.clubberId && !entry.visitor;
+  pendingConfirm = { entry: entry, mode: 'checkout' };
+  $('confirm-title').textContent = (hasId ? 'Check out ' : 'Mark ') + name + (hasId ? '?' : ' checked out?');
+  $('confirm-body').textContent = hasId
+    ? 'The check-in laptop checks ' + entry.firstName + ' out on TwoTimTwo, and then they come off tonight’s count and the lobby’s still-here list. If TwoTimTwo does not answer OK, nothing changes and this page says why.'
+    : entry.firstName + ' has no TwoTimTwo record on the check-in laptop, so this only takes them off tonight’s count and the lobby’s still-here list. Nothing is sent to TwoTimTwo.';
+  $('confirm-ok').textContent = hasId ? 'Check out' : 'Mark checked out';
+  showSheet('confirm-sheet');
+}
+$('confirm-cancel').addEventListener('click', function() { pendingConfirm = null; renderTonight(); showSheet('tonight-sheet'); });
+$('confirm-ok').addEventListener('click', function() {
+  var c = pendingConfirm;
+  pendingConfirm = null;
+  renderTonight();
+  showSheet('tonight-sheet');
+  if (c && c.mode === 'checkout') checkoutEntry(c.entry);
+  else if (c && c.mode === 'undo') undoEntry(c.entry);
+  else if (c) removeEntry(c.entry);
+});
+
+// ── Tonight: undo on TwoTimTwo (7.14.0) ────────────────────────────────────
+// Queued for the check-in laptop like a phone check-in (/phone/undo with
+// inTwoTimTwo, the same route Remove uses, so the website's relay carries it),
+// then followed on /phone/status. The count changes only when the laptop's
+// extension reports TwoTimTwo's own "(checkin undone)"; any failure says
+// exactly why and offers Remove, which stays the volunteer's choice.
+var UNDO_GIVE_UP_MS = 3 * 60 * 1000;   // the server answers by then (a minute to pick up, 90 s to report)
+function undoEntry(entry) {
+  var ident = identityOf(entry), name = displayName(ident);
+  UNDOING[entry.key] = true;
+  renderTonight();
+  postJson('/phone/undo', { pin: PIN, firstName: ident.firstName, lastName: ident.lastName, clubberId: ident.clubberId, inTwoTimTwo: true }).then(function(data) {
+    if (data && data.id) { pollUndo(entry, data.id, Date.now()); return; }
+    // An older print app on the laptop does not know the undo and Removed
+    // the child from the count instead. Say exactly that.
+    delete UNDOING[entry.key];
+    toast(name + ' was only removed from tonight’s count: the check-in laptop’s app is older and cannot undo on TwoTimTwo. Undo there too.', 9000, null, null, 'bad');
+    refreshAll();
+  }).catch(function(e) {
+    delete UNDOING[entry.key];
+    renderTonight();
+    if (e.code === 'pin' || e.code === 'locked') { handleActionError(e, ''); return; }
+    undoFailed(entry, e.message);
+  });
+}
+// Follows a queued undo or check-out on /phone/status until the laptop says
+// done or failed (`kind` 'undo' | 'checkout').
+function pollUndo(entry, id, started, kind) {
+  var co = kind === 'checkout';
+  var busy = co ? CHECKING_OUT : UNDOING;
+  var failed = co ? checkoutFailed : undoFailed;
+  setTimeout(function() {
+    if (!busy[entry.key]) return;
+    call('GET', '/phone/status/' + id).then(function(s) {
+      if (s && s.status === 'done') {
+        delete busy[entry.key];
+        toast(displayName(identityOf(entry)) + (co ? ': checked out in TwoTimTwo.' : ': undone in TwoTimTwo.'), 4000, null, null, 'good');
+        refreshAll();
+        return;
+      }
+      if (s && s.status === 'failed') { delete busy[entry.key]; renderTonight(); failed(entry, s.detail); return; }
+      if (s && s.error && !s.status) { lost(); return; }   // on the Wi-Fi a 404 arrives as a body
+      next();
+    }).catch(function(e) {
+      if (e && e.code === 'http' && e.status === 404) { lost(); return; }
+      next();
+    });
+  }, 1500);
+  function lost() {
+    delete busy[entry.key];
+    renderTonight();
+    failed(entry, 'The check-in laptop lost track of it (restarted?). Check TwoTimTwo before trying again.');
+  }
+  function next() {
+    if (Date.now() - started > UNDO_GIVE_UP_MS) {
+      delete busy[entry.key];
+      renderTonight();
+      failed(entry, 'The check-in laptop has not answered. Check TwoTimTwo before trying again.');
+      return;
+    }
+    pollUndo(entry, id, started, kind);
+  }
+}
+function undoFailed(entry, why) {
+  toast('Not undone in TwoTimTwo: ' + (why || 'see the check-in laptop.'), 10000, 'Remove', function() { askRemove(entry); }, 'bad');
+}
+
+// ── Tonight: check out (7.16.0) ────────────────────────────────────────────
+// Rides /phone/undo with `checkout: true` (the relay already carries it), the
+// same queue-and-follow as Undo check-in: the child comes off the count and
+// the lobby's still-here list only when TwoTimTwo answers OK. A row with no
+// TwoTimTwo id is marked here at once (local: true in the answer).
+function checkoutEntry(entry) {
+  var ident = identityOf(entry), name = displayName(ident);
+  CHECKING_OUT[entry.key] = true;
+  renderTonight();
+  postJson('/phone/undo', { pin: PIN, firstName: ident.firstName, lastName: ident.lastName, clubberId: entry.visitor ? null : ident.clubberId, checkout: true }).then(function(data) {
+    if (data && data.id) { pollUndo(entry, data.id, Date.now(), 'checkout'); return; }
+    delete CHECKING_OUT[entry.key];
+    if (data && data.local) toast(name + ' marked checked out (on this laptop only).', 5000, null, null, 'good');
+    // An older print app that ignored the flag Removed the child instead.
+    else toast(name + ' was only removed from tonight’s count: the check-in laptop’s app is older and cannot check out. Check out at the desk.', 9000, null, null, 'bad');
+    refreshAll();
+  }).catch(function(e) {
+    delete CHECKING_OUT[entry.key];
+    renderTonight();
+    if (e.code === 'pin' || e.code === 'locked') { handleActionError(e, ''); return; }
+    checkoutFailed(entry, e.message);
+  });
+}
+function checkoutFailed(entry, why) {
+  toast('Not checked out: ' + (why || 'see the check-in laptop.'), 10000, null, null, 'bad');
+}
+function removeEntry(entry) {
+  var ident = identityOf(entry), name = displayName(ident);
+  REMOVING[entry.key] = true;
+  TONIGHT.entries = (TONIGHT.entries || []).filter(function(e) { return e.key !== entry.key; });
+  TONIGHT.checkedIn = Math.max(0, (TONIGHT.checkedIn || 0) - 1);
+  var g = entry.clubName || 'No club';
+  if (TONIGHT.byClub && TONIGHT.byClub[g]) { TONIGHT.byClub[g] -= 1; if (!TONIGHT.byClub[g]) delete TONIGHT.byClub[g]; }
+  if (entry.visitor && TONIGHT.visitors) TONIGHT.visitors -= 1;
+  renderTonight(); renderCount();
+  postJson('/phone/undo', { pin: PIN, firstName: ident.firstName, lastName: ident.lastName, clubberId: ident.clubberId }).then(function() {
+    delete REMOVING[entry.key];
+    toast(name + ' removed from tonight’s count.', 6000, 'Undo', function() { restore(entry); });
+    refreshAll();
+  }).catch(function(e) {
+    delete REMOVING[entry.key];
+    if (e.code === 'http' && e.status === 404) { toast('Already removed — refreshing.'); refreshAll(); return; }
+    handleActionError(e, 'Could not remove: ');
+  });
+}
+function restore(x) {
+  var ident = identityOf(x), name = displayName(ident), key = name.toLowerCase();
+  STATE[key] = { status: 'restoring' };
+  render();
+  postJson('/phone/restore', { pin: PIN, firstName: ident.firstName, lastName: ident.lastName, clubberId: ident.clubberId }).then(function() {
+    delete STATE[key];
+    toast(name + ' is back in tonight’s count.', 3000, null, null, 'good');
+    refreshAll();
+  }).catch(function(e) {
+    delete STATE[key];
+    render();
+    if (e.code === 'http' && e.status === 404) { toast('Nothing to add back for ' + name + ' — use Check in.', 5000); refreshAll(); return; }
+    handleActionError(e, 'Could not add back: ');
+  });
+}
+
+// ── The + menu: one-off name tag, leader tag, custom label, visitor ──────────
+$('menu-btn').addEventListener('click', function() { refreshLeaders(); fillClubSelects(); showSheet('menu-sheet'); });
+$('menu-close').addEventListener('click', hideSheet);
+
+// A leader tag is not a check-in: the server files it under isLeader.
+var leaderInFlight = false;
+function printLeaderTag() {
+  if (leaderInFlight) return;
+  var name = $('leader-name').value.trim(), status = $('leader-status');
+  if (!name) { status.textContent = 'Type the leader’s name.'; return; }
+  leaderInFlight = true;
+  status.textContent = '';
+  var btn = $('leader-print');
+  btn.disabled = true;
+  postJson('/print-leader', { pin: PIN, name: name, clubName: $('leader-club').value }).then(function(data) {
+    leaderInFlight = false; btn.disabled = false;
+    if (data && data.duplicate) { toast('Already printed a moment ago.'); return; }
+    toast('Leader tag for ' + name + ' printing at the door.', 4000, null, null, 'good');
+    $('leader-name').value = '';
+    refreshLeaders();
+  }).catch(function(e) {
+    leaderInFlight = false; btn.disabled = false;
+    if (e.code === 'network' && e.status >= 500) { status.textContent = 'Printer problem — see the check-in laptop.'; return; }
+    if (e.code === 'http') { status.textContent = e.message; return; }
+    handleActionError(e, 'Could not print: ');
+  });
+}
+$('leader-print').addEventListener('click', printLeaderTag);
+$('leader-name').addEventListener('keydown', function(e) { if (e.key === 'Enter') printLeaderTag(); });
+
+// Remembered leaders: tick a few and Print selected tags a whole team.
+var leaderSelection = {};
+var leaderCache = [];
+function renderLeaderChips(leaders, hidden) {
+  leaderCache = (leaders || []).slice();
+  var wrap = $('leader-chips-wrap'), list = $('leader-chips'), note = $('leader-chips-note');
+  list.textContent = '';
+  if (!leaderCache.length) { wrap.hidden = true; return; }
+  wrap.hidden = false;
+  leaderCache.forEach(function(l) {
+    var name = ((l.firstName || '') + ' ' + (l.lastName || '')).trim();
+    var chip = el('span', 'leader-chip');
+    var pick = el('label');
+    pick.style.cssText = 'display:inline-flex;align-items:center;gap:6px';
+    var cb = el('input'); cb.type = 'checkbox'; cb.checked = !!leaderSelection[l.key];
+    cb.addEventListener('change', function() { if (cb.checked) leaderSelection[l.key] = true; else delete leaderSelection[l.key]; });
+    pick.appendChild(cb);
+    pick.appendChild(document.createTextNode(name + (l.clubName ? ' · ' + l.clubName : '')));
+    var one = el('button', null, 'Print'); one.type = 'button';
+    one.addEventListener('click', function() { printLeaders([l]); });
+    var x = el('button', 'x', '×'); x.type = 'button';
+    x.setAttribute('aria-label', 'Forget ' + name);
+    x.addEventListener('click', function() { forgetLeader(l.key, name); });
+    chip.appendChild(pick); chip.appendChild(one); chip.appendChild(x);
+    list.appendChild(chip);
+  });
+  note.textContent = hidden ? hidden + ' not printed this season (hidden)' : '';
+}
+function refreshLeaders() {
+  if (!unlockedState) return;
+  postJson('/leaders', { pin: PIN }).then(function(d) { if (d) renderLeaderChips(d.leaders, d.hidden); }).catch(function() {});
+}
+function printLeaders(leaders) {
+  var status = $('leader-status');
+  if (!leaders || !leaders.length) { status.textContent = 'Tick a leader first.'; return; }
+  if (leaderInFlight) return;
+  leaderInFlight = true;
+  status.textContent = '';
+  postJson('/print-leader', {
+    pin: PIN,
+    leaders: leaders.map(function(l) { return { firstName: l.firstName, lastName: l.lastName, clubName: l.clubName || '' }; })
+  }).then(function(d) {
+    leaderInFlight = false;
+    d = d || {};
+    if (d.failed) {
+      var bad = (d.results || []).filter(function(x) { return !x.success; }).map(function(x) { return x.name; }).join(', ');
+      status.textContent = 'Printed ' + d.printed + '; failed: ' + bad;
+    } else {
+      toast('Printing ' + d.printed + ' leader tag' + (d.printed === 1 ? '' : 's') + ' at the door.', 4000, null, null, 'good');
+      leaderSelection = {};
+    }
+    refreshLeaders();
+  }).catch(function(e) {
+    leaderInFlight = false;
+    if (e.code === 'network' && e.status >= 500) { status.textContent = 'Printer problem — see the check-in laptop.'; return; }
+    handleActionError(e, 'Could not print: ');
+  });
+}
+function forgetLeader(key, name) {
+  if (!confirm('Forget ' + name + '? Their tag can still be printed by typing the name.')) return;
+  delete leaderSelection[key];
+  postJson('/leaders/forget', { pin: PIN, key: key }).then(function(d) { if (d) renderLeaderChips(d.leaders, d.hidden); })
+    .catch(function(e) { handleActionError(e, 'Could not update: '); });
+}
+$('leader-print-selected').addEventListener('click', function() {
+  printLeaders(leaderCache.filter(function(l) { return leaderSelection[l.key]; }));
+});
+
+// Custom label: one line of free text. Records nothing at all.
+var customInFlight = false;
+function printCustomLabel() {
+  if (customInFlight) return;
+  var input = $('custom-text'), status = $('custom-status');
+  var text = input.value.trim();
+  if (!text) { status.textContent = 'Type the label text.'; return; }
+  customInFlight = true;
+  status.textContent = '';
+  var btn = $('custom-print');
+  btn.disabled = true;
+  postJson('/print-custom', { pin: PIN, text: text }).then(function(data) {
+    customInFlight = false; btn.disabled = false;
+    if (data && data.duplicate) { toast('Already printed a moment ago.'); return; }
+    toast('Custom label printing at the door.', 4000, null, null, 'good');
+    input.value = '';
+  }).catch(function(e) {
+    customInFlight = false; btn.disabled = false;
+    if (e.code === 'network' && e.status >= 500) { status.textContent = 'Printer problem — see the check-in laptop.'; return; }
+    if (e.code === 'http') { status.textContent = e.message; return; }
+    handleActionError(e, 'Could not print: ');
+  });
+}
+$('custom-print').addEventListener('click', printCustomLabel);
+$('custom-text').addEventListener('keydown', function(e) { if (e.key === 'Enter') printCustomLabel(); });
+
+// One-off name tag (7.18.0): a typed first name and a club, no roster lookup.
+// The screens welcome the child; the count never moves. After a print the
+// name clears and the club stays, so a run of tags is name, Print, name, Print.
+var oneOffClub = '';
+var oneOffInFlight = false;
+var oneOffClubsFor = '';
+// Rebuilt only when the club list changes (the roster poll calls this every
+// few seconds, and a chip swapped out under a finger would lose the tap).
+function renderOneOffClubs() {
+  var box = $('oneoff-clubs');
+  if (oneOffClub && CLUBS.indexOf(oneOffClub) === -1) oneOffClub = '';
+  if (oneOffClubsFor === CLUBS.join('|')) {
+    Array.prototype.forEach.call(box.children, function(b) { b.setAttribute('aria-checked', b.textContent === oneOffClub ? 'true' : 'false'); });
+    syncOneOff();
+    return;
+  }
+  oneOffClubsFor = CLUBS.join('|');
+  box.textContent = '';
+  CLUBS.forEach(function(c) {
+    var kit = clubOf(c);
+    var b = el('button', null, c);
+    b.type = 'button';
+    b.setAttribute('role', 'radio');
+    b.setAttribute('aria-checked', c === oneOffClub ? 'true' : 'false');
+    b.style.setProperty('--c', kit.color);
+    b.style.setProperty('--d', kit.deep);
+    b.addEventListener('click', function() {
+      oneOffClub = c;
+      $('oneoff-status').textContent = '';
+      renderOneOffClubs();
+      if (!$('oneoff-name').value.trim()) $('oneoff-name').focus();
+    });
+    box.appendChild(b);
+  });
+  syncOneOff();
+}
+// The button wakes only with a name and a club, and wears the club's colour.
+function syncOneOff() {
+  var btn = $('oneoff-print');
+  $('oneoff-panel').style.setProperty('--club', oneOffClub ? clubOf(oneOffClub).color : '');
+  btn.disabled = oneOffInFlight || !oneOffClub || !$('oneoff-name').value.trim();
+  btn.textContent = oneOffInFlight ? 'Printing…' : 'Print tag';
+}
+function printOneOff() {
+  if (oneOffInFlight) return;
+  var input = $('oneoff-name'), status = $('oneoff-status');
+  var firstName = input.value.replace(/\s+/g, ' ').trim();
+  if (!firstName) { status.textContent = 'Type the child’s first name.'; return; }
+  if (!oneOffClub) { status.textContent = 'Pick the child’s club.'; return; }
+  oneOffInFlight = true;
+  status.textContent = '';
+  syncOneOff();
+  postJson('/print-oneoff', { pin: PIN, firstName: firstName, clubName: oneOffClub }).then(function(data) {
+    oneOffInFlight = false;
+    data = data || {};
+    var who = data.firstName || firstName;
+    if (data.duplicate) toast('Already printing ' + who + '’s tag.');
+    else if (data.demo) toast('Test tag printed (rehearsal mode).', 4000, null, null, 'good');
+    else toast('Printing ' + who + '’s tag.', 4000, null, null, 'good');
+    input.value = '';
+    syncOneOff();
+    input.focus();
+  }).catch(function(e) {
+    oneOffInFlight = false;
+    syncOneOff();
+    if (e.code === 'network' && e.status >= 500) { status.textContent = 'Printer problem — see the check-in laptop.'; return; }
+    if (e.code === 'http') { status.textContent = e.message; return; }
+    handleActionError(e, 'Could not print: ');
+  });
+}
+$('oneoff-print').addEventListener('click', printOneOff);
+$('oneoff-name').addEventListener('input', function() { $('oneoff-status').textContent = ''; syncOneOff(); });
+$('oneoff-name').addEventListener('keydown', function(e) { if (e.key === 'Enter') printOneOff(); });
+
+// A visitor not on the roster: a visitor label, counted tonight.
+var visitorInFlight = false;
+function printVisitor() {
+  if (visitorInFlight) return;
+  var name = $('visitor-name').value.trim(), status = $('visitor-status');
+  if (!name || name.split(/\s+/).length < 2) { status.textContent = 'Type the visitor’s first and last name.'; return; }
+  visitorInFlight = true;
+  status.textContent = '';
+  var btn = $('visitor-print');
+  btn.disabled = true;
+  postJson('/phone/visitor', { pin: PIN, name: name, clubName: $('visitor-club').value }).then(function(data) {
+    visitorInFlight = false; btn.disabled = false;
+    if (data && data.duplicate) { toast('Already printed a moment ago.'); return; }
+    toast('Visitor label for ' + name.split(/\s+/)[0] + ' printing at the door.', 4000, null, null, 'good');
+    $('visitor-name').value = '';
+    hideSheet();
+    refreshAll();
+  }).catch(function(e) {
+    visitorInFlight = false; btn.disabled = false;
+    if (e.code === 'http' && e.status === 409) {
+      toast(e.message, 6000);
+      hideSheet();
+      $('search').value = name;
+      render();
+      return;
+    }
+    if (e.code === 'network' && e.status >= 500) { status.textContent = 'Printer problem — see the check-in laptop.'; return; }
+    handleActionError(e, 'Could not print: ');
+  });
+}
+$('visitor-print').addEventListener('click', printVisitor);
+$('visitor-name').addEventListener('keydown', function(e) { if (e.key === 'Enter') printVisitor(); });
+
+// Auto-unlock with the PIN this tab already used.
+if (PIN) {
+  fetchRoster(PIN).then(startSession).catch(function(e) {
+    sessionStorage.removeItem(PIN_KEY);
+    PIN = '';
+    if (e.code === 'locked') startPinCountdown(e.retryAfter);
+  });
+}
+</script>
+</body>
+</html>
