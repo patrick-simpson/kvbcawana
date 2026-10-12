@@ -17,6 +17,21 @@
 
 'use strict';
 
+// ── Pin the wall clock ────────────────────────────────────────────────────────
+// `today` (the trophy feed's date) is taken up front and compared with the
+// server's local day later on. Run across midnight (8 pm Eastern on a UTC
+// runner) the two disagree and the once-a-night trophy check fails. So the
+// clock starts at a Wednesday, 7 pm local, and runs on from there (timers still
+// advance). Installed before the server loads.
+const RealDate = Date;
+const PINNED_AT = new RealDate(2026, 9, 7, 19, 0, 0).getTime();
+const clockShift = PINNED_AT - RealDate.now();
+class PinnedDate extends RealDate {
+  constructor(...args) { if (args.length === 0) super(PinnedDate.now()); else super(...args); }
+  static now() { return RealDate.now() + clockShift; }
+}
+global.Date = PinnedDate;
+
 // A crashed suite must FAIL, not pass: server.js's uncaughtException handler
 // (a production never-crash feature) can swallow a test-time crash, letting
 // the event loop drain and the process exit 0 without a summary ever printing.
