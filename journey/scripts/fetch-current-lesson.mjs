@@ -107,6 +107,7 @@
 
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { JSDOM } from 'jsdom';
+import { keepResolvedUrl } from './lesson-url.mjs';
 
 const DEFAULT_URL = 'https://kvbchurch.twotimtwo.com/calendar/index?current_only=Y';
 const DEFAULT_LESSONS = 'public/lessons.json';
@@ -341,7 +342,7 @@ if (normalizeLabel(sectionText).startsWith(ENTRANCE_GATE_LABEL)) {
     process.exit(1);
   }
   const existing = readExisting(out);
-  const sourceUrl = await resolveCorsFriendlyVideoUrl(firstLesson.downloadUrl);
+  const sourceUrl = keepResolvedUrl(existing, firstLesson, await resolveCorsFriendlyVideoUrl(firstLesson.downloadUrl));
   const candidate = { week: firstLesson.week, title: firstLesson.title, sourceUrl };
   if (sameLesson(existing, candidate) && !heartbeatDue(existing)) {
     console.log(`Still in the entrance gate ("${sectionText}") — ${out} untouched (week 1 default).`);
@@ -364,7 +365,7 @@ if (!lesson) {
 }
 
 const existing = readExisting(out);
-const sourceUrl = await resolveCorsFriendlyVideoUrl(lesson.downloadUrl);
+const sourceUrl = keepResolvedUrl(existing, lesson, await resolveCorsFriendlyVideoUrl(lesson.downloadUrl));
 const candidate = { week: lesson.week, title: lesson.title, sourceUrl };
 if (sameLesson(existing, candidate) && !heartbeatDue(existing)) {
   console.log(`No change (still week ${lesson.week}) — ${out} untouched.`);
