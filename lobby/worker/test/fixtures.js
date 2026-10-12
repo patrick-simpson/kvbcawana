@@ -37,10 +37,25 @@ export const CHECKIN_PAGE = '<html><body><div class="clubbers">' +
   '</form></body></html>';
 
 /**
+ * TwoTimTwo's Checkout page (printer/docs/TWOTIMTWO.md §2.1): the notices table first,
+ * the meeting's date select, a row per child it lists, and the meeting id in its script.
+ * @param {{ calendarId?: string, date?: string, rows?: {id: string, name: string, club: string}[], title?: string }} [o]
+ */
+export function checkoutPage({ calendarId = '368', date = '2026-10-14', rows = [], title = 'KVBC Awana - Checkout Clubber' } = {}) {
+  const trs = rows.map((r) => `<tr class="clubber-row"><td><a href="#" class="checkout" clubber_id="${r.id}">Check out</a></td>` +
+    `<td class="clubber name M">${r.name}</td><td class="center"><img class="club-icon-20" src="/images/clubs/x.png" alt="${r.club} "></td><td></td><td></td><td></td></tr>`).join('');
+  return `<html><head><title>${title}</title></head><body><table class="items table"><tr><th>Title</th></tr></table>` +
+    `<form><select id="date" name="date"><option value="2026-10-07">Oct 7</option><option value="${date}" selected>Tonight</option></select></form>` +
+    `<table class="table"><thead><tr><th></th><th>Clubber</th><th></th><th>Parent/Guardian</th><th>Other</th></tr></thead><tbody>` +
+    `${trs || '<tr><td class="empty"><span class="empty">No results found.</span></td></tr>'}</tbody></table>` +
+    `<script>$('a.checkout').click(function(){ $.post('/clubber/checkout', { calendar_id: ${calendarId}, clubber_id: $(this).attr('clubber_id') }); });</script></body></html>`;
+}
+
+/**
  * A stand-in TwoTimTwo: /site/login with a CSRF token and a session cookie,
  * a signed-in report, and the login form for anything without the cookie.
  */
-export function fakeTwoTimTwo({ password = 'right-pass', report = () => page(table('Sparks ', [{ id: 1, name: 'Ada Tester' }])), checkin = () => CHECKIN_PAGE, households = null } = {}) {
+export function fakeTwoTimTwo({ password = 'right-pass', report = () => page(table('Sparks ', [{ id: 1, name: 'Ada Tester' }])), checkin = () => CHECKIN_PAGE, checkout = () => checkoutPage(), households = null } = {}) {
   const calls = [];
   let session = 0;
   const live = new Set();
@@ -65,6 +80,7 @@ export function fakeTwoTimTwo({ password = 'right-pass', report = () => page(tab
     if (u.pathname === '/site/index') return new Response('<html><body>Welcome</body></html>', { status: 200 });
     if (u.pathname === '/clubber/checkin_report') return new Response(report(u.searchParams.get('date')), { status: 200 });
     if (u.pathname === '/clubber/checkin') return new Response(checkin(), { status: 200 });
+    if (u.pathname === '/clubber/checkout' && (init.method || 'GET') === 'GET') return new Response(checkout(), { status: 200 });
     if (u.pathname === '/household/csv' && households) {
       const h = households();
       if (h instanceof Response) return h;   // a refusal (403), as TwoTimTwo sends one

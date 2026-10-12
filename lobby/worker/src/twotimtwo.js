@@ -303,6 +303,36 @@ export function parseCheckinPage(html) {
 }
 
 /**
+ * The Checkout page (/clubber/checkout, printer/docs/TWOTIMTWO.md §2.1): the
+ * meeting its Check out button posts to (`calendar_id` in the page's own
+ * script), the meeting's date (the selected `select#date` option) and a row
+ * per child it still lists (`a.checkout[clubber_id]`, the club in the row's
+ * `img.club-icon-20` alt). The extension's readCheckoutPage, rule for rule.
+ * Ids and clubs only, never a name. null when it is not the Checkout page;
+ * `calendarId` '' when it names no meeting.
+ * @param {string} html
+ * @returns {{ calendarId: string, date: string, rows: {clubberId: string, club: string}[] } | null}
+ */
+export function parseCheckoutPage(html) {
+  if (!html || isLoginPage(html)) return null;
+  const doc = documentOf(html);
+  if (!/Checkout Clubber/.test(squash(doc.querySelector('title')?.textContent))) return null;
+  const cal = /calendar_id:\s*(\d{1,12})/.exec(html);
+  const opt = doc.querySelector('select#date option[selected]');
+  const date = opt ? String(opt.getAttribute('value') || '').trim() : '';
+  if (!cal || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return { calendarId: '', date: '', rows: [] };
+  /** @type {{clubberId: string, club: string}[]} */
+  const rows = [];
+  for (const a of doc.querySelectorAll('a.checkout[clubber_id]')) {
+    const id = String(a.getAttribute('clubber_id') || '').trim();
+    if (!/^\d{1,20}$/.test(id)) continue;
+    const img = a.closest('tr')?.querySelector('img.club-icon-20');
+    rows.push({ clubberId: id, club: img ? String(img.getAttribute('alt') || '').trim() : '' });
+  }
+  return { calendarId: cal[1], date, rows };
+}
+
+/**
  * Did TwoTimTwo record a check-in? Its answer to POST /clubber/checkinclubber
  * is the short #lastCheckin snippet naming the child: never a page, never the
  * login form, never "Login Required". The extension's checkinReplyOk, rule for
@@ -678,6 +708,19 @@ export class TwoTimTwoClient {
     if (!page.ok) return page;
     const list = parseHouseholdCsv(page.html);
     return list ? { ok: /** @type {const} */ (true), households: list } : { ok: /** @type {const} */ (false), error: 'households-unreadable' };
+  }
+
+  /**
+   * The Checkout page: its meeting and the rows it lists (parseCheckoutPage).
+   * @param {{ waitMs?: number, kind?: string }} [opts]
+   */
+  async checkoutPage(opts = {}) {
+    const page = await this.page('/clubber/checkout', { kind: 'checkout-page', ...opts });
+    if (!page.ok) return page;
+    const parsed = parseCheckoutPage(page.html);
+    if (!parsed) return { ok: /** @type {const} */ (false), error: 'checkout-page-unreadable' };
+    if (!parsed.calendarId) return { ok: /** @type {const} */ (false), error: 'no-meeting' };
+    return { ok: /** @type {const} */ (true), page: parsed };
   }
 
   /** @param {{ waitMs?: number, kind?: string }} [opts] */

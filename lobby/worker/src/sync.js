@@ -58,6 +58,7 @@ import { Ledger, Tags } from './ledger.js';
 import { PrintQueue } from './printq.js';
 import { Stations } from './stations.js';
 import { Adopter } from './adopt.js';
+import { YmCheckout } from './ymcheckout.js';
 import { Desk } from './desk.js';
 import { mountCheckin } from './checkinRoutes.js';
 import { History, mountHistory } from './history.js';
@@ -189,6 +190,10 @@ export class SyncCore {
     });
     this.desk.hooks.afterUndo.push((e) => this.publisher.deskUndo(e));
     this.desk.hooks.afterCheckout.push((e) => this.publisher.deskCheckout(e));
+    // The youth check-out (ymcheckout.js, YM_CHECKOUT): Trek and Journey checked out on
+    // TwoTimTwo from 7:15 pm, from the watcher's alarm; each one comes off tonight's count.
+    this.ym = new YmCheckout({ storage: this.storage, env: this.env, now: this.now, watcher: this.watcher, publisher: this.publisher });
+    this.watcher.ym = this.ym;
     mountPublisher(this.registry, this);   // /v1/desk/tonight, /v1/station/extras, /v1/publisher/status (routes.md 8)
     // The screen registry (ROADMAP.md#settings-page, phase 2): its doorbells ride the live
     // channel only, for the one screen they name.
@@ -498,7 +503,7 @@ export class SyncCore {
         // Cloud check-in, phase 1: counts and codes only, never a name or an id.
         case 'GET /v1/cloud/status':
           await this.watcher.arm();
-          return json({ ...(await this.watcher.status()), auth: await this.authStatus() });
+          return json({ ...(await this.watcher.status()), ymCheckout: await this.ym.statusView(), auth: await this.authStatus() });
         // Who brought a friend (friends.js): recorded by the laptop, read by a
         // signed-in screen, and one read-only link for the scheduled email.
         case 'POST /v1/cloud/friend': {
