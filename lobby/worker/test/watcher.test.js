@@ -6,6 +6,8 @@ import {
   GRACE_MIN,
   LEAD_MIN,
   READ_INTERVAL_MS,
+  SEAL_PER_TICK,
+  WATCH_INTERVAL_MS,
   Watcher,
   compareReport,
   lastClubNight,
@@ -46,7 +48,7 @@ function setup({ env = ENV, start = WED_6PM, kids = [] } = {}) {
   const alarm = { at: null };
   const lines = [];
   const w = new Watcher({
-    storage, env, fetchFn: tt.fetchFn, now: () => t,
+    storage, env, fetchFn: tt.fetchFn, now: () => t, sleep: async (ms) => { t += ms; },
     alarms: { set: (at) => { alarm.at = at; }, get: () => alarm.at },
     log: (line) => lines.push(line),
   });
@@ -143,33 +145,35 @@ describe('the watcher', () => {
     expect(near.alarm.at - near.now()).toBe(10 * 60 * 1000);
   });
 
-  it('reads every 5 seconds in the window and never faster, even with read-now', async () => {
+  it('reads the report about every 10 s, and every read of every kind shares one 5 s clock', async () => {
     expect(READ_INTERVAL_MS).toBe(5000);
+    expect(WATCH_INTERVAL_MS).toBe(10000);
+    expect(SEAL_PER_TICK).toBe(1);
     const s = setup({ kids: [kid(1)] });
     await s.w.tick();
     expect(reportReads(s)).toBe(1);
-    expect(s.alarm.at - s.now()).toBe(READ_INTERVAL_MS);
+    expect(s.alarm.at - s.now()).toBe(WATCH_INTERVAL_MS);
     s.tick(2000);
+    // read-now is a read like any other: 3 s of the 5 s clock are left
     expect((await s.w.readNow()).throttled).toBe(true);
     await s.w.tick();
     expect(reportReads(s)).toBe(1);
-    expect(s.alarm.at - s.now()).toBe(READ_INTERVAL_MS - 2000);
-    s.tick(3000);
+    expect(s.alarm.at - s.now()).toBe(WATCH_INTERVAL_MS - 2000);
+    s.tick(WATCH_INTERVAL_MS - 2000);
     await s.w.tick();
     expect(reportReads(s)).toBe(2);
   });
 
-  it('any other read on the session (a phone\'s roster) holds the watcher off for 5 s', async () => {
+  it('any other read on the session (a phone\'s roster) takes its slot: the watcher waits its turn, never doubles up', async () => {
     const s = setup({ kids: [kid(1)] });
     await s.w.tick();
-    s.tick(READ_INTERVAL_MS);
+    s.tick(WATCH_INTERVAL_MS);
     const client = /** @type {any} */ (s.w.clientFor());
-    await client.checkinPage();
-    s.tick(1000);
-    await s.w.tick();
+    await client.checkinPage({ waitMs: 12000, kind: 'phone-roster' });   // takes the slot now
+    await s.w.tick();                                                    // the report is due, the clock is not
     expect(reportReads(s)).toBe(1);
-    expect(s.alarm.at - s.now()).toBe(READ_INTERVAL_MS - 1000);
-    s.tick(READ_INTERVAL_MS - 1000);
+    expect(s.alarm.at - s.now()).toBe(READ_INTERVAL_MS);
+    s.tick(READ_INTERVAL_MS);
     await s.w.tick();
     expect(reportReads(s)).toBe(2);
   });
@@ -183,16 +187,18 @@ describe('the watcher', () => {
   it('a club night in shadow: baseline, check-ins and undos on TwoTimTwo, the tally it would publish', async () => {
     const s = setup({ kids: [kid(1), kid(2, 'Cubbies')] });
     await s.w.tick();
+    s.tick(READ_INTERVAL_MS);
+    await s.w.tick();   // no report due, the clock is free: the check-in page, once a night
     let st = await s.w.status();
     expect(st).toMatchObject({ mode: 'shadow', configured: true, windowOpen: true, checkedIn: 2, verdict: 'baseline' });
     expect(st.byClub).toEqual({ Sparks: 1, Cubbies: 1 });
     expect(st.checkinPage).toMatchObject({ ok: true, calendarId: '368', events: 2, attendanceItem: true, roster: 2 });
 
     s.night.kids.push(kid(3), kid(4, 'T&amp;T'));
-    s.tick(READ_INTERVAL_MS);
+    s.tick(WATCH_INTERVAL_MS);
     await s.w.tick();
     s.night.kids = s.night.kids.filter((k) => k.id !== 2);
-    s.tick(READ_INTERVAL_MS);
+    s.tick(WATCH_INTERVAL_MS);
     await s.w.tick();
     st = await s.w.status();
     expect(st.checkedIn).toBe(3);
@@ -207,7 +213,7 @@ describe('the watcher', () => {
 
   it('phase 1 publishes nothing and never posts to TwoTimTwo but its sign-in', async () => {
     const s = setup({ kids: [kid(1)] });
-    for (let i = 0; i < 4; i++) { await s.w.tick(); s.tick(READ_INTERVAL_MS); }
+    for (let i = 0; i < 4; i++) { await s.w.tick(); s.tick(WATCH_INTERVAL_MS); }
     expect(s.tt.calls.filter((c) => c.method === 'POST').every((c) => c.path === '/site/login')).toBe(true);
     const core = new SyncCore({ storage: memoryStore(), env: ENV, fetchFn: s.tt.fetchFn, now: s.now,
       publish: async () => { throw new Error('published'); }, broadcast: () => { throw new Error('broadcast'); } });
@@ -218,12 +224,12 @@ describe('the watcher', () => {
     const s = setup({ kids: [kid(1), kid(2), kid(3), kid(4)] });
     await s.w.tick();
     s.night.count = 9;
-    s.tick(READ_INTERVAL_MS);
+    s.tick(WATCH_INTERVAL_MS);
     await s.w.tick();
     expect(await s.w.status()).toMatchObject({ verdict: 'partial', checkedIn: 4 });
     s.night.count = null;
     s.night.kids = [kid(1)];
-    s.tick(READ_INTERVAL_MS);
+    s.tick(WATCH_INTERVAL_MS);
     await s.w.tick();
     const st = await s.w.status();
     expect(st).toMatchObject({ verdict: 'mass-undo', checkedIn: 4 });
@@ -245,7 +251,7 @@ describe('the watcher', () => {
     const s = setup({ kids: [kid(662, 'Sparks', 'Zed Uniquename'), kid(663, 'Cubbies', 'Yan Uniquename')] });
     await s.w.tick();
     s.night.kids.push(kid(664, 'Sparks', 'Xia Uniquename'));
-    s.tick(READ_INTERVAL_MS);
+    s.tick(WATCH_INTERVAL_MS);
     await s.w.tick();
     const everything = JSON.stringify([...s.storage.map.values()]) + JSON.stringify(await s.w.status()) + s.lines.join('\n');
     expect(everything).not.toMatch(/Uniquename|66[234]|right-pass|PHPSESSID|checkin@example\.org/);
@@ -313,7 +319,7 @@ describe('the Settings test read', () => {
     expect((await s.w.status()).checkedIn).toBeNull();
   });
 
-  it('shares the 15 second clock with the watcher', async () => {
+  it('shares the 5 second clock with the watcher', async () => {
     const s = setup({ start: SUNDAY, kids: [kid(1)] });
     await s.w.testRead();
     s.tick(3000);

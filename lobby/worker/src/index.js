@@ -145,7 +145,7 @@ export default {
         headers: origin ? {
           'Access-Control-Allow-Origin': origin,
           'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-          'Access-Control-Allow-Headers': 'Authorization, Content-Type',
+          'Access-Control-Allow-Headers': 'Authorization, Content-Type, X-Station',
           'Access-Control-Max-Age': '86400',
           Vary: 'Origin',
         } : {},

@@ -390,7 +390,7 @@ async function readCapped(res) {
 export class TwoTimTwoClient {
   /**
    * @param {{ host: string, username: string, password: string }} creds
-   * @param {{ fetchFn?: typeof fetch, now?: () => number }} [opts]
+   * @param {{ fetchFn?: typeof fetch, now?: () => number, budget?: import('./readbudget.js').ReadBudget }} [opts]
    */
   constructor(creds, opts = {}) {
     this.host = creds.host;
@@ -398,6 +398,8 @@ export class TwoTimTwoClient {
     this.password = creds.password;
     this.fetchFn = opts.fetchFn || ((...args) => fetch(...args));
     this.now = opts.now || (() => Date.now());
+    /** The one 5 s read clock (readbudget.js): every page GET takes a slot. None: no limit (the unit tests). */
+    this.budget = opts.budget || null;
     /** @type {Map<string, string>} */
     this.cookies = new Map();
     this.loginFails = 0;
@@ -497,16 +499,24 @@ export class TwoTimTwoClient {
   /**
    * A signed-in page: signs in first when there is no session, and once more
    * when the page comes back as the login form (the session expired).
+   * Every GET takes a slot from the read clock first: `waitMs` is how long
+   * this caller will queue for one (0: the watcher, which skips its turn),
+   * and a refusal is `{error: 'read-busy', retryAfterMs}`.
    * @param {string} path
-   * @returns {Promise<{ok: true, html: string} | {ok: false, error: string}>}
+   * @param {{ waitMs?: number, kind?: string }} [opts]
+   * @returns {Promise<{ok: true, html: string} | {ok: false, error: string, retryAfterMs?: number}>}
    */
-  async page(path) {
+  async page(path, opts = {}) {
     for (let attempt = 0; attempt < 2; attempt++) {
       if (!this.cookies.size || attempt > 0) {
         const signedIn = await this.login();
         if (!signedIn.ok) return signedIn;
       }
       let res;
+      if (this.budget) {
+        const slot = await this.budget.take(opts.waitMs ?? 0, opts.kind || 'page');
+        if (!slot.ok) return { ok: false, error: 'read-busy', retryAfterMs: slot.retryAfterMs };
+      }
       this.lastReadMs = this.now();
       try {
         res = await this.request(path);
@@ -524,9 +534,9 @@ export class TwoTimTwoClient {
     return { ok: false, error: 'signed-out' };
   }
 
-  /** @param {string} date YYYY-MM-DD */
-  async report(date) {
-    const page = await this.page(`/clubber/checkin_report?date=${encodeURIComponent(date)}`);
+  /** @param {string} date YYYY-MM-DD @param {{ waitMs?: number, kind?: string }} [opts] */
+  async report(date, opts = {}) {
+    const page = await this.page(`/clubber/checkin_report?date=${encodeURIComponent(date)}`, { kind: 'report', ...opts });
     if (!page.ok) return page;
     const report = parseCheckinReport(page.html);
     return report
@@ -555,16 +565,52 @@ export class TwoTimTwoClient {
     return checkinReplyOk(res.html, c.name) ? { ok: true } : { ok: false, error: 'checkin-refused' };
   }
 
+  /**
+   * Undo one check-in: TwoTimTwo's own POST (docs: `checkinclubberundo`),
+   * counted only on its short "(checkin undone)" answer. A write: no read slot.
+   * @param {{clubberId: string, calendarId: string}} c
+   * @returns {Promise<{ok: true} | {ok: false, error: string}>}
+   */
+  async undoCheckIn(c) {
+    return this.postOk('/clubber/checkinclubberundo', c, (t) => /\(checkin undone\)/i.test(t));
+  }
+
+  /**
+   * Check one child out: POST /clubber/checkout, accepted only on an exact "OK".
+   * @param {{clubberId: string, calendarId: string}} c
+   * @returns {Promise<{ok: true} | {ok: false, error: string}>}
+   */
+  async checkOut(c) {
+    return this.postOk('/clubber/checkout', c, (t) => t.trim() === 'OK');
+  }
+
+  /** @param {string} path @param {{clubberId: string, calendarId: string}} c @param {(text: string) => boolean} accept */
+  async postOk(path, c, accept) {
+    const form = new URLSearchParams();
+    form.set('calendar_id', c.calendarId);
+    form.set('clubber_id', c.clubberId);
+    let res;
+    try {
+      res = await this.request(path, { method: 'POST', form });
+    } catch (err) {
+      return { ok: false, error: errorCode(err) };
+    }
+    if (isLoginPage(res.html) || /\/site\/login/i.test(res.path)) return { ok: false, error: 'signed-out' };
+    if (res.status !== 200) return { ok: false, error: res.status >= 500 ? 'twotimtwo-down' : `http-${res.status}` };
+    return accept(res.html) ? { ok: true } : { ok: false, error: 'refused' };
+  }
+
   /** The families, from TwoTimTwo's household export (names only kept). */
-  async households() {
-    const page = await this.page('/household/csv');
+  async households(opts = {}) {
+    const page = await this.page('/household/csv', { kind: 'households', ...opts });
     if (!page.ok) return page;
     const list = parseHouseholdCsv(page.html);
     return list ? { ok: /** @type {const} */ (true), households: list } : { ok: /** @type {const} */ (false), error: 'households-unreadable' };
   }
 
-  async checkinPage() {
-    const page = await this.page('/clubber/checkin');
+  /** @param {{ waitMs?: number, kind?: string }} [opts] */
+  async checkinPage(opts = {}) {
+    const page = await this.page('/clubber/checkin', { kind: 'checkin-page', ...opts });
     if (!page.ok) return page;
     const parsed = parseCheckinPage(page.html);
     return parsed ? { ok: /** @type {const} */ (true), page: parsed } : { ok: /** @type {const} */ (false), error: 'checkin-page-unreadable' };

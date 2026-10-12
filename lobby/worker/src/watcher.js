@@ -26,14 +26,27 @@
 
 import { TwoTimTwoClient, credentialsFrom, itemsToSend, reportColumns, rowShape } from './twotimtwo.js';
 import { fromBase64, toBase64 } from './crypto.js';
+import { INTERACTIVE_WAIT_MS, READ_INTERVAL_MS, ReadBudget } from './readbudget.js';
 
+export { READ_INTERVAL_MS };
 /**
  * TwoTimTwo's terms (owner, 2026-10-11, superseding the first 15 s): one read
- * every 5 seconds, all reads combined. The watcher's reads keep to it and wait
- * out any other read the client made (`lastReadMs`); routing every read
- * through one clock is ROADMAP.md#online-check-in P1.
+ * every 5 seconds, ALL reads combined. Every read, the watcher's own included,
+ * takes a slot from the one clock in readbudget.js (the client does it before
+ * each page GET). The watcher's report is read about every WATCH_INTERVAL_MS,
+ * which leaves the slots in between to the desk, the phone page and the
+ * check-in and checkout pages.
  */
-export const READ_INTERVAL_MS = 5 * 1000;
+export const WATCH_INTERVAL_MS = 10 * 1000;
+/**
+ * Work per alarm invocation. Sealing a print job to the stations is ECDH per
+ * station (measured ~4.2 ms for 3 stations under Node), and the free plan
+ * allows 10 ms of CPU an invocation: ONE job per tick, the rest wait for the
+ * next (SPILL_MS later). test/adopt.test.js measures it.
+ */
+export const SEAL_PER_TICK = 1;
+export const SPILL_MS = 1000;
+
 /** The longest an idle alarm sleeps before it looks at the clock again. */
 export const IDLE_MAX_MS = 6 * 60 * 60 * 1000;
 /**
@@ -203,13 +216,17 @@ export class Watcher {
    * @param {{ storage: { get(k: string): Promise<any>, put(k: string, v: any): Promise<void>, delete(k: string): Promise<any> },
    *   env: Record<string, any>, fetchFn?: typeof fetch, now?: () => number,
    *   alarms?: { set(atMs: number): Promise<void>|void, get(): Promise<number|null>|number|null },
-   *   log?: (line: string) => void }} deps
+   *   log?: (line: string) => void, sleep?: (ms: number) => Promise<void>, budget?: ReadBudget }} deps
    */
-  constructor({ storage, env, fetchFn, now, alarms, log }) {
+  constructor({ storage, env, fetchFn, now, alarms, log, sleep, budget }) {
     this.storage = storage;
     this.env = env || {};
     this.fetchFn = fetchFn;
     this.now = now || (() => Date.now());
+    /** The ONE TwoTimTwo read clock: this watcher's client and every other read through it share it. */
+    this.budget = budget || new ReadBudget({ now: this.now, sleep, storage });
+    /** Print-job adoption (adopt.js): set by SyncCore; the watcher only calls it. @type {import('./adopt.js').Adopter|null} */
+    this.adopt = null;
     this.alarms = alarms || { set() {}, get: () => null };
     // warn, not log: the lint allows warn and error only, and `wrangler tail` shows both.
     this.log = log || ((line) => console.warn(line));
@@ -233,7 +250,7 @@ export class Watcher {
     if (!creds) return null;
     const key = `${creds.host}\n${creds.username}\n${creds.password}`;
     if (!this.client || this.clientKey !== key) {
-      this.client = new TwoTimTwoClient(creds, { fetchFn: this.fetchFn, now: this.now });
+      this.client = new TwoTimTwoClient(creds, { fetchFn: this.fetchFn, now: this.now, budget: this.budget });
       this.clientKey = key;
     }
     return this.client;
@@ -265,6 +282,8 @@ export class Watcher {
       windowOpen: w.open,
       nextWindowInMin: w.open ? 0 : Math.round(w.untilMs / 60000),
       readIntervalSec: READ_INTERVAL_MS / 1000,
+      watchIntervalSec: WATCH_INTERVAL_MS / 1000,
+      budget: this.budget.stats(),
       signedIn: !!(this.client && this.client.cookies.size),
       loginBlockedForSec: this.client && this.client.loginBlockedUntil > this.now()
         ? Math.ceil((this.client.loginBlockedUntil - this.now()) / 1000) : 0,
@@ -281,19 +300,37 @@ export class Watcher {
     return true;
   }
 
-  /** The alarm: read when the window is open, then set the next one. Never throws. */
+  /**
+   * The alarm. Window closed: forget the night and sleep to the next one.
+   * Window open: ONE of two jobs per invocation, to stay inside the free
+   * plan's CPU: the report read when it is due (about every WATCH_INTERVAL_MS,
+   * and only when the shared read clock has a slot), otherwise seal at most
+   * SEAL_PER_TICK waiting print jobs. Then set the next alarm. Never throws.
+   */
   async tick() {
     if (this.mode === 'off' || !this.creds()) return { next: null };
     const w = watchWindow(this.now());
     let next;
     if (!w.open) {
       next = Math.min(w.untilMs, IDLE_MAX_MS);
+      // The window has closed: tonight's claims and jobs are forgotten.
+      try { await this.adopt?.endOfNight(); } catch (err) { console.error('[cloud] end-of-night purge failed', err); }
     } else {
-      try { await this.read(); } catch (err) { console.error('[cloud] watcher read failed', err); }
+      await this.budget.load();
+      await this.adopt?.load();
+      const before = await this.loadStatus();
+      const due = this.lastWatcherRead(before) + WATCH_INTERVAL_MS <= this.now();
+      if (due && this.budget.peek() === 0) {
+        try { await this.read(); } catch (err) { console.error('[cloud] watcher read failed', err); }
+      } else if (this.budget.peek() === 0 && this.checkinPageDue(before)) {
+        try { await this.probeCheckinPage(); } catch (err) { console.error('[cloud] check-in page probe failed', err); }
+      } else if (this.adopt) {
+        try { await this.adopt.drain(SEAL_PER_TICK); } catch (err) { console.error('[cloud] sealing a job failed', err); }
+      }
       const s = await this.loadStatus();
-      const last = this.lastAnyRead(s);
-      const since = last ? this.now() - last : READ_INTERVAL_MS;
-      next = Math.max(READ_INTERVAL_MS - since, 1000);
+      next = Math.max(this.lastWatcherRead(s) + WATCH_INTERVAL_MS - this.now(), this.budget.peek(), 1000);
+      // Jobs still waiting to be sealed: the next tick (not the next read) seals one.
+      if (this.adopt && this.adopt.pending() > 0) next = Math.min(next, SPILL_MS);
       // A sign-in that is backing off waits it out instead of waking every 5 s.
       if (this.client && this.client.loginBlockedUntil > this.now()) {
         next = Math.max(next, this.client.loginBlockedUntil - this.now());
@@ -303,14 +340,10 @@ export class Watcher {
     return { next };
   }
 
-  /**
-   * The last read of any kind, in ms: the watcher's own (stored) or any other
-   * this object's client made (memory: the phone's roster, tonight, families).
-   * @param {{ lastReadAt?: string|null }} status
-   */
-  lastAnyRead(status) {
+  /** When the watcher last read the report (ms; 0 never). @param {{ lastReadAt?: string|null }} status */
+  lastWatcherRead(status) {
     const own = status.lastReadAt ? Date.parse(status.lastReadAt) : 0;
-    return Math.max(Number.isFinite(own) ? own : 0, this.client ? this.client.lastReadMs : 0);
+    return Number.isFinite(own) ? own : 0;
   }
 
   /** The owner's "read now" (a rehearsal on any day): the same 5 s clock. */
@@ -339,8 +372,8 @@ export class Watcher {
     const wantId = /^\d{1,20}$/.test(String(body.clubberId ?? '')) ? String(body.clubberId) : '';
     const wantName = String(body.name ?? '').trim().toLowerCase().replace(/\s+/g, ' ').slice(0, 80);
     if (!wantId && !wantName) return { ok: false, error: 'no-child' };
-    const page = await client.checkinPage();
-    if (!page.ok) return { ok: false, error: page.error };
+    const page = await client.checkinPage({ waitMs: INTERACTIVE_WAIT_MS, kind: 'desk-checkin' });
+    if (!page.ok) return { ok: false, error: page.error, ...('retryAfterMs' in page ? { retryAfterMs: page.retryAfterMs } : {}) };
     const found = page.page.roster.filter((r) => (wantId ? r.clubberId === wantId : r.name.toLowerCase() === wantName));
     if (!found.length) return { ok: false, error: 'not-found' };
     if (found.length > 1) return { ok: false, error: 'ambiguous', matches: found.length };
@@ -376,13 +409,14 @@ export class Watcher {
     if (this.inFlight) await this.inFlight.catch(() => {});
     const status = await this.loadStatus();
     const now = this.now();
-    if (now - this.lastAnyRead(status) < READ_INTERVAL_MS) {
-      return { ok: !!status.lastTest?.ok, throttled: true, test: status.lastTest || null, status: await this.status() };
-    }
+    await this.budget.load();
+    const throttled = async () => ({ ok: !!status.lastTest?.ok, throttled: true, test: status.lastTest || null, status: await this.status() });
+    if (this.budget.peek() > 0) return throttled();
+    const date = lastClubNight(now);
+    const res = await client.report(date, { waitMs: 0, kind: 'settings-test' });
+    if (!res.ok && res.error === 'read-busy') return throttled();
     status.reads += 1;
     status.lastReadAt = new Date(now).toISOString();
-    const date = lastClubNight(now);
-    const res = await client.report(date);
     /** @type {Record<string, any>} */
     let test;
     if (res.ok) {
@@ -393,7 +427,7 @@ export class Watcher {
       };
       if (test.partial) test.rowShape = rowShape(res.html);
       test.columns = reportColumns(res.html);
-      const page = await client.checkinPage();
+      const page = await client.checkinPage({ waitMs: INTERACTIVE_WAIT_MS, kind: 'settings-test' });
       test.checkinPage = page.ok
         ? { ok: true, calendarId: page.page.calendarId, events: page.page.events.length }
         : { ok: false, error: page.error };
@@ -421,9 +455,8 @@ export class Watcher {
   async readOnce() {
     const status = await this.loadStatus();
     const now = this.now();
-    if (now - this.lastAnyRead(status) < READ_INTERVAL_MS) {
-      return { ok: true, throttled: true };
-    }
+    await this.budget.load();
+    if (this.budget.peek() > 0) return { ok: true, throttled: true, retryAfterMs: this.budget.peek() };
     const client = this.clientFor();
     if (!client) return { ok: false, error: 'not-configured' };
     const date = localTime(now).date;
@@ -441,9 +474,11 @@ export class Watcher {
     if (!snap || snap.date !== date) snap = null;
 
     const loginsBefore = client.logins;
+    // waitMs 0: the watcher never queues for a slot, it skips its turn.
+    const res = await client.report(date, { waitMs: 0, kind: 'watcher' });
+    if (!res.ok && res.error === 'read-busy') return { ok: true, throttled: true, retryAfterMs: res.retryAfterMs };
     status.reads += 1;
     status.lastReadAt = new Date(now).toISOString();
-    const res = await client.report(date);
     if (client.logins > loginsBefore) this.note(status, 'sign-in', { ok: res.ok || res.error !== 'login-refused' });
     if (!res.ok) {
       status.lastError = res.error;
@@ -490,24 +525,50 @@ export class Watcher {
         this.log(`[cloud] shadow: would publish tally ${JSON.stringify(wouldPublishTally(kids, now))}`);
       }
       await this.storage.put('cloud:snap', await sealState(creds.password, { date, kids }));
-    }
-
-    // Once a night, the check-in page: proves tonight's meeting and its
-    // check-in items can be read (phase 4 posts with them). Ids and counts only.
-    // A failed read is tried again after CHECKIN_PAGE_RETRY_MS, never every tick.
-    const lastPage = status.checkinPage;
-    if (!lastPage || (!lastPage.ok && now - Date.parse(lastPage.at) >= CHECKIN_PAGE_RETRY_MS)) {
-      const page = await client.checkinPage();
-      const at = new Date(now).toISOString();
-      status.checkinPage = page.ok
-        ? { ok: true, at, calendarId: page.page.calendarId, events: page.page.events.length,
-          attendanceItem: page.page.events.some((e) => e.automatic), roster: page.page.roster.length }
-        : { ok: false, at, error: page.error };
-      this.note(status, 'checkin-page', { ok: page.ok });
-      if (!page.ok) this.log(`[cloud] shadow: check-in page unreadable (${page.error})`);
+      // The claims and print jobs follow what the report says (adopt.js; the
+      // children's names stay in this call's memory and are sealed there).
+      if (this.adopt && verdict === 'applied') {
+        const first = new Map();
+        for (const e of res.report.entries) if (!first.has(e.clubberId)) first.set(e.clubberId, e);
+        try {
+          await this.adopt.onReport({
+            night: date,
+            added: added.map((id) => first.get(id)).filter((e) => !!e),
+            gone,
+          });
+        } catch (err) { console.error('[cloud] adopting the report failed', err); }
+      }
     }
 
     await this.storage.put('cloud:status', status);
     return { ok: true, verdict };
+  }
+
+  /**
+   * Once a night, the check-in page: proves tonight's meeting and its check-in
+   * items can be read (the desk posts with them). Ids and counts only. It takes
+   * its own slot on the read clock, so it runs on a tick the report did not
+   * (tick() asks `checkinPageDue()` first). A failed read is tried again after
+   * CHECKIN_PAGE_RETRY_MS, never every tick.
+   */
+  checkinPageDue(status) {
+    const last = status.checkinPage;
+    return !last || (!last.ok && this.now() - Date.parse(last.at) >= CHECKIN_PAGE_RETRY_MS);
+  }
+
+  async probeCheckinPage() {
+    const client = this.clientFor();
+    if (!client) return;
+    const status = await this.loadStatus();
+    const page = await client.checkinPage({ waitMs: 0, kind: 'watcher' });
+    if (!page.ok && page.error === 'read-busy') return;
+    const at = new Date(this.now()).toISOString();
+    status.checkinPage = page.ok
+      ? { ok: true, at, calendarId: page.page.calendarId, events: page.page.events.length,
+        attendanceItem: page.page.events.some((e) => e.automatic), roster: page.page.roster.length }
+      : { ok: false, at, error: page.error };
+    this.note(status, 'checkin-page', { ok: page.ok });
+    if (!page.ok) this.log(`[cloud] shadow: check-in page unreadable (${page.error})`);
+    await this.storage.put('cloud:status', status);
   }
 }
