@@ -510,3 +510,29 @@ jobs:
           WRANGLER=../lobby/worker/node_modules/.bin/wrangler
           $WRANGLER pages project create kvbcawana --production-branch main 2>/dev/null || true
           $WRANGLER pages deploy dist --project-name kvbcawana --branch main --commit-dirty=true
+
+  cleanup:
+    # site-dist (~50 MB) is only a hand-off from the site job to the deploy
+    # job; left for its one-day retention, a busy day of pushes filled the
+    # account's 0.5 GB of Actions storage (owner, 2026-10-12). Deleted as soon
+    # as the deploy is done or skipped. A FAILED deploy keeps it for its day,
+    # so "Re-run failed jobs" still finds it.
+    name: Delete the hand-off files
+    needs: [site, deploy]
+    if: ${{ always() && needs.deploy.result != 'failure' && github.event_name != 'pull_request' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: write
+    steps:
+      - name: Delete this run's site-dist
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          gh api "repos/$REPO/actions/runs/$RUN_ID/artifacts" --jq '.artifacts[] | select(.name == "site-dist") | .id' |
+            while read -r id; do
+              gh api -X DELETE "repos/$REPO/actions/artifacts/$id" >/dev/null && echo "Deleted site-dist ($id)" ||
+                echo "::warning::Could not delete site-dist ($id); it expires in a day"
+            done

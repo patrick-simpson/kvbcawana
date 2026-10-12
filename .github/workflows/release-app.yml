@@ -724,3 +724,26 @@ jobs:
           else
             echo "Released ${TAG_PREFIX}${VERSION}; feed committed and ci.yml dispatched"
           fi
+
+  cleanup:
+    # The installer hand-offs (170-650 MB each) live on the release once it
+    # is published; kept for their day they filled the account's 0.5 GB of
+    # Actions storage (owner, 2026-10-12). Deleted once the release is done
+    # or skipped; a FAILED release keeps them for their day, so "Re-run
+    # failed jobs" still finds them.
+    needs: [release]
+    if: ${{ always() && needs.release.result != 'failure' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Delete this run's installer files
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          gh api --paginate "repos/$REPO/actions/runs/$RUN_ID/artifacts" --jq '.artifacts[] | "\(.id) \(.name)"' |
+            while read -r id name; do
+              gh api -X DELETE "repos/$REPO/actions/artifacts/$id" >/dev/null && echo "Deleted $name" ||
+                echo "::warning::Could not delete $name; it expires in a day"
+            done
