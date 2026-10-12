@@ -506,7 +506,7 @@ const DisplaySettings = ({ socketStatus, touch = false, initialOpen = false }) =
   // Display login: one passphrase provisions the display key + publish token
   // (the sealed birthday list needs the key). Same store the signage page's
   // Settings uses — src/lib/displayLogin.js.
-  const { loginStatus, kid, login, logout } = useDisplayLogin();
+  const { loginStatus, kid, login, logout, viaSync } = useDisplayLogin();
   const [passphrase, setPassphrase] = useState('');
   const [reveal, setReveal] = useState(false);
   const [loginNote, setLoginNote] = useState('');
@@ -544,6 +544,11 @@ const DisplaySettings = ({ socketStatus, touch = false, initialOpen = false }) =
   else if (loginStatus === 'logged-in') { loginLine = `Logged in${kid ? ` · key ${kid}` : ''}`; lineTone = 'ok'; }
   else if (loginStatus === 'stale') { loginLine = 'Passphrase changed — log in again'; lineTone = 'bad'; }
   else if (busy) loginLine = 'Checking…';
+  else if (viaSync) loginLine = 'Type the church passphrase to set this screen up';
+  else if (socketStatus === 'off') { loginLine = 'Not connected — sign in with the passphrase'; lineTone = 'bad'; }
+  else if (socketStatus === 'disconnected') { loginLine = 'Not connected — check the network'; lineTone = 'bad'; }
+  else if (socketStatus === 'connecting') loginLine = 'Connecting…';
+  else if (loginStatus === 'wrong') { loginLine = 'Wrong passphrase'; lineTone = 'bad'; }
   else loginLine = 'Type the church passphrase to set this screen up';
   const tone = loginNote ? loginTone : lineTone;
   const toneClass = tone === 'ok' ? 'text-[var(--brand-tnt)]' : tone === 'bad' ? 'text-[var(--brand-hot)]' : 'text-white/60';

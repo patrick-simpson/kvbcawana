@@ -45,6 +45,7 @@ export function useDisplayLogin() {
     loginStatus,
     kid: sync.kid,
     hasLoginKey: sync.signedIn,
+    viaSync: Boolean(sync.url),
     syncProblem: syncResult,
     login,
     logout: doLogout,
