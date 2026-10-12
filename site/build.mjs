@@ -7,6 +7,9 @@
 //   /settings    a redirect to /lobby/settings.html, one settings page (ROADMAP.md#settings-page)
 //   /journey/    the Journey kiosk (journey/public, build-stamped)
 //   /checkin     the phone check-in, online (the print app's phone page, relayed)
+//   /desk        the desk check-in (site/desk/; ROADMAP.md#online-check-in P3): its own
+//                page and transport, the touch check-in's search injected, every seal
+//                made in the browser (lobby/shared/cloud-crypto.js is copied beside it)
 //   /api/*       the sync Worker, through site/functions (not built here)
 //
 // Each app is built exactly as its own deploy built it, so nothing inside an
@@ -23,6 +26,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { downloadRedirects } from './lib/downloads.js';
 import { pageRedirects } from './lib/redirects.js';
+import { buildDeskPage } from './desk/desk-page.mjs';
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const OUT = path.join(ROOT, 'site', 'dist');
@@ -107,6 +111,22 @@ run(`node scripts/stamp-build.mjs ${journeyBuild} ${JSON.stringify(journeyOut)}`
   writeFileSync(path.join(checkinOut, 'ym', 'index.html'), ym);
 }
 
+// The desk check-in (ROADMAP.md#online-check-in P3): site/desk/ is the page and its
+// transport, the touch check-in's search and family grouping come from the print
+// app's phone page (desk-page.mjs), and the cloud crypto is the canonical
+// lobby/shared/cloud-crypto.js, copied beside it (the lobby build ships no .js from
+// shared/). The brand kit is the lobby's, already at /lobby/shared/brand. No /desk/ym:
+// the youth leaders check in on /checkin/ym, and a Trek/Journey-only desk would be
+// a filter on this page, not a second page, when it is wanted.
+{
+  const deskOut = path.join(OUT, 'desk');
+  mkdirSync(deskOut, { recursive: true });
+  writeFileSync(path.join(deskOut, 'index.html'), buildDeskPage());
+  for (const f of ['desk.js', 'desk-transport.js']) cpSync(path.join(ROOT, 'site', 'desk', f), path.join(deskOut, f));
+  cpSync(path.join(ROOT, 'lobby', 'shared', 'cloud-crypto.js'), path.join(deskOut, 'cloud-crypto.js'));
+  if (!existsSync(path.join(OUT, 'lobby', 'shared', 'brand', 'fonts.css'))) throw new Error('site/build.mjs: /desk reads the lobby brand kit, which is missing');
+}
+
 // The Electron apps' auto-update feeds (site/updates/printer/latest.yml and
 // site/updates/lobby/lobby.yml), written by the release workflows. Always
 // present, so a missing feed is a 404 rather than a build failure.
@@ -161,6 +181,8 @@ writeFileSync(path.join(OUT, '_headers'), [
   '  Cache-Control: no-cache',
   '/journey/',
   '  Cache-Control: no-cache',
+  '/desk/*',
+  '  Cache-Control: no-cache',
   '/updates/*',
   '  Cache-Control: no-cache',
   '/release-notes/*',
@@ -213,7 +235,7 @@ writeFileSync(path.join(OUT, '_routes.json'), `${JSON.stringify({
 writeFileSync(path.join(ROOT, 'site', 'lib', 'large-files.generated.js'),
   `// Written by site/build.mjs for build ${BUILD_ID}; not committed.\nexport const LARGE_FILES = ${JSON.stringify(largeFiles, null, 2)};\nexport const LARGE_PREFIXES = ${JSON.stringify(VIDEO_PREFIXES, null, 2)};\n`);
 
-for (const must of ['index.html', 'lobby/index.html', 'lobby/countdown.html', 'lobby/settings.html', 'journey/index.html', 'lobby/shared/sync.json']) {
+for (const must of ['index.html', 'lobby/index.html', 'lobby/countdown.html', 'lobby/settings.html', 'journey/index.html', 'lobby/shared/sync.json', 'desk/index.html', 'desk/desk.js', 'desk/desk-transport.js', 'desk/cloud-crypto.js']) {
   if (!existsSync(path.join(OUT, must))) throw new Error(`site build is missing ${must}`);
 }
 console.log(`\n✓ site/dist built for ${ORIGIN} (build ${BUILD_ID.slice(0, 7)})`);

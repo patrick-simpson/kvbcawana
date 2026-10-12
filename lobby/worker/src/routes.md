@@ -143,7 +143,7 @@ never unreadable to a station about to lease it. Medical notes are sealed ONLY
 to station keys, never to the history key (`sealRow` refuses a record with a
 medical key).
 
-## 5. The desk page (the Worker's claim API is BUILT; the page is P3's)
+## 5. The desk page (the Worker's claim API and the page, `site/desk/`, are BUILT)
 
 Our desk page (a browser at the desk, signed in) and the TwoTimTwo page
 fallback. The desk page derives keys at sign-in, fetches `/v1/stations` and
