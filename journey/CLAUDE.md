@@ -858,9 +858,10 @@ a reboot during a total outage has no app shell to load).
     worth keeping: the first Leader transcripts were whisper's own
     sentence segments, up to **202 characters** — fine to read, unusable
     as a caption (a wall of text on a TV, six wrapped lines on a phone) —
-    and `scripts/resegment-vtt.py` split them at sentence/clause/word
-    boundaries, apportioning duration by character count. That script is
-    no longer part of the pipeline; it stays only as a record.
+    and a resegmenting script split them at sentence/clause/word
+    boundaries, apportioning duration by character count. That script
+    and the other caption scripts were removed (git history has them;
+    see "How the captions were made" below).
   - **Size and backdrop are per-device settings** (Settings → Captions):
     a size choice (Small 0.8 / Normal 1 / Large 1.3 / Extra large 1.6,
     `journey.captions.size`) and a solid dark backdrop for bright frames
@@ -982,6 +983,20 @@ a reboot during a total outage has no app shell to load).
   it. Not fatal if unsupported — disabling blanking at the OS level
   (see `PI_SETUP.md`) is the belt-and-braces fallback either way.
 
+### How the captions were made (scripts removed)
+
+Both caption sets (the Student and Leader VTTs under `public/transcripts/`)
+came from one pipeline: faster-whisper large-v3 with word timestamps and a
+domain-vocabulary prompt, `condition_on_previous_text=False`,
+`hallucination_silence_threshold=2.0`, `repetition_penalty=1.1`; cues
+rebuilt from the word times to <=84 characters; a per-week review writing
+`corrections/week-NN.json` (a `"verified"` list for flags checked against
+audio); `validate-captions.py` as the publish gate; and an audio re-decode
+of every flagged cue. The Python scripts that drove those steps
+(transcribe, build, re-decode, resegment, remap) were removed from
+`journey/scripts/`; the repository history still has them. The gate
+`validate-captions.py` and `update-captions-manifest.mjs` remain in use.
+
 ### Leader transcripts and handouts (owner-requested 2026-08-22)
 
 Derived text content from the Leader Videos, same licensing character
@@ -993,14 +1008,8 @@ directly):
   each Leader Video (31 files; week 27 has none to transcribe). First
   generated with faster-whisper "small" (sentence segments); **redone
   2026-09-06 at large-v3** through the same pipeline as the Student
-  captions — `transcribe-student-captions.py leader` (word timestamps,
-  domain-vocabulary prompt, hallucination-hardened flags), a per-week
-  review pass writing `leader-corrections/week-NN.json` (mostly the
-  boundary-repeat words that `condition_on_previous_text=False`
-  produces, plus capitalisation and a handful of real mishearings), the
-  physics validator, an audio re-decode of every flagged cue, then
-  `build-student-captions.py leader`. Same-origin, so they work as
-  `<track>` captions without CORS issues. Regenerate only if Awana
+  captions (see "How the captions were made" below). Same-origin, so
+  they work as `<track>` captions without CORS issues. Regenerate only if Awana
   revises a video. Measured against the old pass: ~2.5% of words sat in
   a changed hunk; most hunks were filler, but the redo fixed real
   meaning errors ("except Christ" → "accept Christ", "relative to this
@@ -1010,8 +1019,9 @@ directly):
   **Re-transcribing renumbers every cue**, and `data/leader-transcript-
   prose.json` addresses cues by number — run
   `scripts/remap-transcript-prose-cues.py <dir-of-old-vtts>` before the
-  prose validator, which maps each paragraph boundary by time onto the
-  new numbering (keep a copy of the old VTTs for exactly this).
+  prose validator, which mapped each paragraph boundary by time onto the
+  new numbering (keep a copy of the old VTTs for exactly this; the remap
+  script was removed, its job is done).
   Two names both whisper passes garbled and the review pass now knows:
   the Awana Youth Ministries site is **AwanaYM.org**, and the author of
   *Questioning the Bible* is **Jonathan Morrow**.
@@ -1028,16 +1038,15 @@ directly):
     brisk human speech peaks near 20, and the worst offender was 106), a
     near-duplicate of its neighbour, or a sub-0.6s echo cue, and marks
     26-40 chars/sec as REVIEW (`REVIEW_RATE`: a careful read, not a
-    gate). `build-student-captions.py` repeats the rate and
-    near-duplicate detectors and refuses to write a week whose flagged
-    cues are neither corrected nor listed under `"verified"` in that
+    gate). The build step (since removed) repeated the rate and
+    near-duplicate detectors and refused to write a week whose flagged
+    cues were neither corrected nor listed under `"verified"` in that
     week's corrections file. Flags are not proof of a hallucination —
     they are a demand to check that cue against audio.
-  - `scripts/verify-caption-cue.py` re-decodes the window
-    around a cue independently (beam 10, no conditioning, so it cannot
-    inherit the original's invention) and prints it beside the current
-    text and neighbours. Note the only ffmpeg on the box is Playwright's
-    stripped build, which cannot demux mp4 — decode via
+  - The per-cue audio re-decode (beam 10, no conditioning, so it cannot
+    inherit the original's invention) was done by a since-removed
+    `verify-caption-cue.py`. Note the only ffmpeg on the box is
+    Playwright's stripped build, which cannot demux mp4: decode via
     `faster_whisper.audio.decode_audio` and slice the array instead.
   - Transcription now runs `condition_on_previous_text=False` plus
     `hallucination_silence_threshold=2.0` and `repetition_penalty=1.1`.
