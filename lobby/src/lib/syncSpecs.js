@@ -1,7 +1,7 @@
 // @ts-check
 // What the sync Worker (worker/) keeps besides the shared settings and the
-// slide deck, and the strict allowlists both sides apply to it. Pure and
-// import-free, so the Worker bundles this exact file and the signage reads the
+// slide deck, and the strict allowlists both sides apply to it. Pure (its one
+// import, settingRules.js, is pure too), so the Worker bundles this exact file and the signage reads the
 // same rules: a value one side accepts is a value the other side accepts.
 //
 // TEMPLATE_SPEC is the "new screen" template (owner, 2026-10-01): the
@@ -16,7 +16,10 @@
 // SCREEN_SPECS (below) is each registered screen's OWN settings, per kind,
 // which /settings edits through the Worker.
 
+import { cleanSpec } from './settingRules.js';
+
 /**
+ * The rule types these tables use: a subset of settingRules.js's.
  * @typedef {{ type: 'bool' }
  *   | { type: 'int', min: number, max: number }
  *   | { type: 'enum', values: string[] }
@@ -65,48 +68,12 @@ export function normalizeSyncPassphrase(p) {
 }
 
 /**
- * @param {SimpleRule} rule
- * @param {unknown} v
- */
-function cleanSimple(rule, v) {
-  switch (rule.type) {
-    case 'bool':
-      return typeof v === 'boolean' ? v : undefined;
-    case 'int':
-      if (typeof v !== 'number' || !Number.isFinite(v)) return undefined;
-      return Math.min(rule.max, Math.max(rule.min, Math.round(v)));
-    case 'enum':
-      return typeof v === 'string' && rule.values.includes(v) ? v : undefined;
-    case 'url': {
-      if (typeof v !== 'string') return undefined;
-      const s = v.trim();
-      if (!s) return '';
-      return s.length <= rule.max && /^https:\/\/[^\s<>"']+$/i.test(s) ? s : undefined;
-    }
-    case 'time':
-      // "HH:MM", 24-hour, as an <input type="time"> gives it.
-      return typeof v === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(v) ? v : undefined;
-    default:
-      return undefined;
-  }
-}
-
-/**
  * Exactly the template allowlist; anything else is dropped. {} for junk.
  * @param {unknown} raw
  * @returns {Record<string, unknown>}
  */
 export function sanitizeTemplate(raw) {
-  /** @type {Record<string, unknown>} */
-  const out = {};
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return out;
-  const src = /** @type {Record<string, unknown>} */ (raw);
-  for (const [key, rule] of Object.entries(TEMPLATE_SPEC)) {
-    if (!Object.prototype.hasOwnProperty.call(src, key)) continue;
-    const value = cleanSimple(rule, src[key]);
-    if (value !== undefined) out[key] = value;
-  }
-  return out;
+  return cleanSpec(TEMPLATE_SPEC, raw);
 }
 
 // ── Screens (ROADMAP.md#settings-page, phase 2) ─────────────────────────────────────────
@@ -211,16 +178,7 @@ export function cleanScreenName(raw) {
  * @returns {Record<string, unknown>}
  */
 export function sanitizeScreenSettings(kind, raw) {
-  /** @type {Record<string, unknown>} */
-  const out = {};
-  if (!isScreenKind(kind) || !raw || typeof raw !== 'object' || Array.isArray(raw)) return out;
-  const src = /** @type {Record<string, unknown>} */ (raw);
-  for (const [key, rule] of Object.entries(SCREEN_SPECS[kind])) {
-    if (!Object.prototype.hasOwnProperty.call(src, key)) continue;
-    const value = cleanSimple(rule, src[key]);
-    if (value !== undefined) out[key] = value;
-  }
-  return out;
+  return isScreenKind(kind) ? cleanSpec(SCREEN_SPECS[kind], raw) : {};
 }
 
 /**
