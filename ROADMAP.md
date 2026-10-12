@@ -1039,13 +1039,12 @@ owner's, by hand.
 
 ### Still to do
 
-- **Pusher secrets and variables.** Delete the `PUSHER_*` secrets and the
-  `PUSHER_APP_KEY` / `PUSHER_CLUSTER` variables in this repo. The deploy no
-  longer touches the Worker's own copies, so also delete `PUSHER_APP_ID`,
-  `PUSHER_KEY`, `PUSHER_SECRET` and `PUSHER_CLUSTER` from the Worker (the
-  Cloudflare dashboard, or `npx wrangler secret delete <name>` in
+- **Pusher secrets and variables.** Done 2026-10-12 (owner deleted the
+  `PUSHER_*` GitHub secrets). If still present, the Worker's own
+  `PUSHER_APP_ID`, `PUSHER_KEY`, `PUSHER_SECRET` and `PUSHER_CLUSTER` can go
+  too (Cloudflare dashboard, or `npx wrangler secret delete <name>` in
   `lobby/worker`); nothing reads them.
-- **Pusher app.** Delete the Pusher app itself.
+- **Pusher app.** Done 2026-10-12 (owner deleted it).
 - **Stray screens.** Find any screen still on the old github.io address
   (it stops getting check-ins once Pusher is off) and open
   awana.kvbchurch.org on it.
