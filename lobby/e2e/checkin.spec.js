@@ -10,7 +10,7 @@ import { mergeChurch, sanitizeChurch } from '../shared/churchSettings.js';
 // the desk's online path, ROADMAP.md#online-check-in) in a real browser against a
 // stand-in Worker: sign in (passphrase v2), a busy 429, families-first search,
 // two siblings checked in together with Bible and Brought a friend, undo, check
-// out, a visitor, the one-off, leader and custom labels, the youth page, and the
+// out, the walk-in, leader and custom labels, the queue, a late BARF friend, the youth page, and the
 // error states (a refusal, already checked in, no internet, signed out). Every
 // seal is the page's: the stand-in opens what it was sent with the station's and
 // the history key's private keys, and checks that no child's name travelled in
@@ -25,6 +25,14 @@ const MIME = { '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+
 const SESSION = 'v1.1.1760000000.abcdefghijklmnopqrstuvwxyz0123';
 const json = (status, body) => ({ status, contentType: 'application/json', body: JSON.stringify(body) });
 const PAGES = buildCheckinPages();
+// Screenshots of the flows at 390x844 (CHECKIN_SHOTS names a folder; else the test's own output folder).
+const SHOTS = process.env.CHECKIN_SHOTS || '';
+const shot = (name) => (SHOTS ? path.join(SHOTS, name) : test.info().outputPath(name));
+/** A screenshot once the sheets and pages have finished sliding. */
+async function snap(page, name) {
+  await page.waitForTimeout(700);
+  await page.screenshot({ path: shot(name) });
+}
 
 async function stubSite(page, { kids } = {}) {
   const history = await cc.createHistoryKey(PASS);
@@ -42,6 +50,12 @@ async function stubSite(page, { kids } = {}) {
     ],
     posts: [], tags: [], logins: [], rosterCalls: 0, busyFirst: true, queued: 0, printed: 0, refuse: null, signedOut: false,
     history: null, historyCalls: [], church: null, churchPuts: [],
+    /** A promise the desk routes wait on (a slow TwoTimTwo), per-child 429s, per-child refusals. */
+    gate: null, busyFor: {}, refuseFor: {},
+    /** GET /v1/desk/barf's answer (null: no route), and how the late-BARF redo goes ('ok' | 'fail'). */
+    barf: null, barfRedo: 'ok', barfPosts: [],
+    /** The households, and the Worker's optional `familiesAt` stamp (read-15s). */
+    households: [['Ada Tester', 'Ben Tester']], familiesAt: null, familiesCalls: 0,
   };
   const api = async (route, req) => {
     const u = new URL(req.url());
@@ -57,9 +71,12 @@ async function stubSite(page, { kids } = {}) {
     if (p === '/v1/desk/roster') {
       world.rosterCalls += 1;
       if (world.busyFirst) { world.busyFirst = false; return route.fulfill(json(429, { ok: false, reason: 'read-busy', retryAfterMs: 1500 })); }
-      return route.fulfill(json(200, { readAt: new Date().toISOString(), kids: world.kids, items: { bible: ['Cubbies', 'Sparks'], friend: ['Sparks'] } }));
+      return route.fulfill(json(200, { readAt: new Date().toISOString(), kids: world.kids, items: { bible: ['Cubbies', 'Sparks'], friend: ['Sparks'] }, ...(world.familiesAt ? { familiesAt: world.familiesAt } : {}) }));
     }
-    if (p === '/v1/desk/families') return route.fulfill(json(200, { households: [['Ada Tester', 'Ben Tester']] }));
+    if (p === '/v1/desk/families') {
+      world.familiesCalls += 1;
+      return route.fulfill(json(200, { households: world.households, ...(world.familiesAt ? { familiesAt: world.familiesAt } : {}) }));
+    }
     if (p === '/v1/desk/tonight') return route.fulfill(json(404, { error: 'Not found.' }));
     if (p === '/v1/stations') return route.fulfill(json(200, [station]));
     if (p === '/v1/print/status') {
@@ -82,9 +99,22 @@ async function stubSite(page, { kids } = {}) {
       }
       return route.fulfill(json(200, { rev: world.church.rev, settings: world.church.settings, switches: {} }));
     }
+    if (p === '/v1/desk/barf') return route.fulfill(world.barf ? json(200, world.barf) : json(404, { error: 'Not found.' }));
+    if (p === '/v1/desk/barf-late') {
+      world.barfPosts.push(body);
+      const items = { Bible: true, Friend: true };
+      if (body.recheck) { const k = world.kids.find((x) => x.clubberId === body.clubberId); if (k) k.checkedIn = true; return route.fulfill(json(200, { ok: true, checkedIn: true, items: body.items })); }
+      if (world.barf) world.barf.friends = [...world.barf.friends, body.clubberId];
+      if (world.barfRedo === 'fail') { const k = world.kids.find((x) => x.clubberId === body.clubberId); if (k) k.checkedIn = false; return route.fulfill(json(200, { ok: true, checkedIn: false, items, jobId: body.tagJob.jobId, reason: 'checkin-refused', tries: 3 })); }
+      return route.fulfill(json(200, { ok: true, checkedIn: true, items, jobId: body.tagJob.jobId, history: 'kept' }));
+    }
     if (p === '/v1/print/reprint') { world.tags.push(body); return route.fulfill(json(200, { ok: true, jobId: body.jobId, existing: false })); }
     if (p === '/v1/desk/checkin' || p === '/v1/desk/undo' || p === '/v1/desk/checkout') {
       world.posts.push({ path: p, body });
+      if (world.gate) await world.gate;
+      const busyKey = `${p}:${body.clubberId}`;
+      if (world.busyFor[busyKey] > 0) { world.busyFor[busyKey] -= 1; return route.fulfill(json(429, { ok: false, reason: 'read-busy', retryAfterMs: 1500 })); }
+      if (world.refuseFor[body.clubberId]) return route.fulfill(json(409, { ok: false, reason: world.refuseFor[body.clubberId] }));
       if (world.refuse) return route.fulfill(world.refuse);
       const kid = world.kids.find((k) => k.clubberId === body.clubberId);
       if (p === '/v1/desk/checkin') {
@@ -131,7 +161,7 @@ test('sign in, search, check two siblings in with Bible and a friend, undo one, 
   await signIn(page);
 
   // The Worker's read clock: the first roster read is a 429, and the page says so and waits.
-  await expect(page.locator('#busy')).toContainText(/busy: try again in \d+s/);
+  await expect(page.locator('#busy')).toContainText(/Waiting for TwoTimTwo… \d+s/);
   await expect(page.locator('#list')).toContainText('families still to come', { timeout: 10_000 });
   await expect(page.locator('#print-led')).toHaveText('Printer ready');
   expect(world.logins).toHaveLength(1);
@@ -212,25 +242,23 @@ test('sign in, search, check two siblings in with Bible and a friend, undo one, 
   await expect(page.locator('#count-pill')).toHaveText('1 in');
 });
 
-test('a visitor is checked in by name; one-off, leader and custom labels print without a check-in', async ({ page }) => {
+test('a walk-in name tag prints and is welcomed but never counted; leader and custom labels print without a check-in', async ({ page }) => {
   test.setTimeout(60_000);
   const { world, stationRing } = await stubSite(page);
   world.busyFirst = false;
   await signIn(page);
   await expect(page.locator('#list')).toContainText('families still to come', { timeout: 10_000 });
+  // Not on the list: the page points to the walk-in tag (no visitor check-in any more).
+  await search(page).fill('Zed');
+  await expect(page.locator('#list')).toContainText('Not on the list? Tap + for a walk-in name tag.');
+  await search(page).fill('');
 
   await page.locator('#menu-btn').click();
-  await page.getByLabel('Visitor\'s full name').fill('Mia Jones');
-  await page.locator('#visitor-club').selectOption('Cubbies');
-  await page.locator('#visitor-print').click();
-  await expect(page.locator('#toast')).toContainText('Mia is checked in (visitor)');
-  expect(world.posts[0].body.visitor).toEqual({ first: 'Mia', last: 'Jones', club: 'Cubbies' });
-  expect(world.posts[0].body.clubberId).toBeUndefined();
-  expect(world.posts[0].body.historyRow.kind).toBe('visitor');
-
-  await page.locator('#menu-btn').click();
+  await expect(page.locator('#oneoff-h')).toHaveText('Walk-in name tag');
+  await expect(page.locator('#visitor-form')).toHaveCount(0);
   await page.getByLabel('Child’s first name').fill('Ava');
   await page.locator('#oneoff-clubs').getByRole('radio', { name: 'Puggles' }).click();
+  await snap(page, 'walkin-menu.png');
   await page.locator('#oneoff-print').click();
   await expect(page.locator('#toast')).toContainText('Printing Ava’s tag');
   await page.getByLabel('Leader\'s name').fill('Pat Leader');
@@ -241,7 +269,7 @@ test('a visitor is checked in by name; one-off, leader and custom labels print w
   await page.locator('#custom-print').click();
   await expect(page.locator('#toast')).toContainText('Custom label sent');
   expect(world.tags.map((t) => t.jobId)).toEqual([expect.stringMatching(/^reprint:/), expect.stringMatching(/^reprint:/), expect.stringMatching(/^reprint:/)]);
-  // the print server's own routes and bodies: what the station's puller runs
+  // the print server's own routes and bodies: what the station's puller runs (a walk-in is the one-off route: greeted, never counted)
   const opened = await Promise.all(world.tags.map((t) => cc.openAsStation(stationRing, t.bundle)));
   expect(opened.map((o) => [o.route, o.body])).toEqual([
     ['/print-oneoff', { firstName: 'Ava', clubName: 'Puggles' }],
@@ -249,15 +277,40 @@ test('a visitor is checked in by name; one-off, leader and custom labels print w
     ['/print-custom', { text: 'KITCHEN' }],
   ]);
   for (const t of world.tags) expect(JSON.stringify(t)).not.toMatch(/Ava|Pat|KITCHEN/);
-  expect(world.posts.filter((p) => p.path === '/v1/desk/checkin')).toHaveLength(1);   // only the visitor
+  expect(world.posts).toHaveLength(0);   // nothing checked in, nothing counted
 
+  // Tonight lists the walk-in so the volunteers remember to register them; the count stays 0.
+  await page.locator('#menu-close').click();
+  await expect(page.locator('#count-pill')).toHaveText('0 in');
+  await page.locator('#count-pill').click();
+  const row = page.locator('#tonight-list .row', { hasText: 'Ava' });
+  await expect(row).toContainText('walk-in · not registered yet');
+  await expect(row.locator('button')).toHaveCount(0);
+  await expect(page.locator('#tonight-total')).toHaveText('0 here now · 1 walk-in');
+  await snap(page, 'walkin-tonight.png');
+});
+
+test('/checkin/ym: the + menu is the walk-in tag alone, for Trek and Journey', async ({ page }) => {
+  test.setTimeout(60_000);
+  const { world, stationRing } = await stubSite(page);
+  world.busyFirst = false;
+  await signIn(page, '/checkin/ym/');
+  await expect(page.locator('#list')).toContainText('still to come', { timeout: 10_000 });
+  await page.locator('#menu-btn').click();
+  await expect(page.locator('#oneoff-panel')).toBeVisible();
+  await expect(page.locator('#leader-panel')).toBeHidden();
+  await expect(page.locator('#custom-panel')).toBeHidden();
+  await expect(page.locator('#oneoff-clubs').getByRole('radio')).toHaveText(['Trek', 'Journey']);
+  await page.getByLabel('Child’s first name').fill('Rex');
+  await page.locator('#oneoff-clubs').getByRole('radio', { name: 'Journey' }).click();
+  await snap(page, 'ym-walkin-menu.png');
+  await page.locator('#oneoff-print').click();
+  await expect(page.locator('#toast')).toContainText('Printing Rex’s tag');
+  expect((await cc.openAsStation(stationRing, world.tags[0].bundle)).body).toEqual({ firstName: 'Rex', clubName: 'Journey' });
   await page.locator('#menu-close').click();
   await page.locator('#count-pill').click();
-  await expect(page.locator('#tonight-list .row', { hasText: 'Mia Jones' })).toContainText('Visitor');
-  await page.locator('.row', { hasText: 'Mia Jones' }).getByRole('button', { name: 'Remove' }).click();
-  await page.locator('#confirm-ok').click();
-  await expect(page.locator('#toast')).toContainText('Mia Jones removed from tonight');
-  expect(world.posts.at(-1)).toMatchObject({ path: '/v1/desk/undo', body: { visitor: { first: 'Mia', last: 'Jones', club: 'Cubbies' } } });
+  await expect(page.locator('#tonight-list .row', { hasText: 'Rex' })).toContainText('walk-in · not registered yet');
+  await expect(page.locator('#count-pill')).toHaveText('0 in');
 });
 
 test('error states: a refusal puts the child back, no internet points to the paper sheet', async ({ page }) => {
@@ -286,15 +339,15 @@ test('error states: a refusal puts the child back, no internet points to the pap
   await expect(page.locator('.fam', { hasText: 'Cy Other' })).toHaveCount(1);
 });
 
-test('the youth leaders\' page shows Trek and Journey only, check-in only, on the same path', async ({ page }) => {
+test('the youth leaders\' page shows Trek and Journey only, on the same path', async ({ page }) => {
   const { world } = await stubSite(page);
   world.busyFirst = false;
   await signIn(page, '/checkin/ym/');
   await expect(page.locator('h1')).toHaveText('Trek & Journey');
   await expect(page.locator('#list')).toContainText('1 family still to come', { timeout: 10_000 });
   await expect(page.locator('.fam')).toHaveText(/Tia Youth/);
-  await expect(page.locator('#count-pill')).toBeHidden();
-  await expect(page.locator('#menu-btn')).toBeHidden();
+  await expect(page.locator('#count-pill')).toBeVisible();   // its own Tonight, with Undo check-in
+  await expect(page.locator('#menu-btn')).toBeVisible();   // the walk-in tag alone
   await page.locator('.fam').click();
   await page.locator('#kid-sheet').getByRole('button', { name: 'Check in' }).click();
   await expect(page.locator('#toast')).toContainText('Tia Youth is checked in');
@@ -409,4 +462,188 @@ test('remembered leaders come from the church settings; a new leader tag adds on
   await page.locator('#leader-print').click();
   await expect(page.locator('#toast')).toContainText('Leader tag for Quinn New');
   expect(world.churchPuts).toHaveLength(2);   // the add and the forget above; nothing for Quinn
+});
+
+/** The child's own line on its tile in the list (data-state while the queue holds them). */
+const kidState = (page, name) => page.locator(`#list .kid[data-name="${name}"]`);
+
+for (const where of ['/checkin/', '/checkin/ym/']) {
+  const ym = where === '/checkin/ym/';
+  test(`the queue on ${where}: taps at once, each pending until TwoTimTwo confirms; a refusal reverts one; busy retries by itself`, async ({ page }) => {
+    test.setTimeout(60_000);
+    const kids = ym ? [
+      { clubberId: '21', first: 'Tia', last: 'Youth', club: 'Trek', clubId: '6', checkedIn: false },
+      { clubberId: '22', first: 'Jo', last: 'Journey', club: 'Journey', clubId: '7', checkedIn: false },
+      { clubberId: '23', first: 'Max', last: 'Trekker', club: 'Trek', clubId: '6', checkedIn: false },
+    ] : undefined;
+    const { world } = await stubSite(page, { kids });
+    world.busyFirst = false;
+    await signIn(page, where);
+    await expect(page.locator('#list')).toContainText('still to come', { timeout: 10_000 });
+    let release;
+    world.gate = new Promise((r) => { release = r; });
+    const [refused, busy, third] = ym ? [['21', 'Tia Youth'], ['22', 'Jo Journey'], ['23', 'Max Trekker']] : [['13', 'Cy Other'], ['14', 'Tia Youth'], ['11', 'Ada Tester']];
+    world.refuseFor[refused[0]] = 'no-attendance-item';
+    world.busyFor[`/v1/desk/checkin:${busy[0]}`] = 1;
+
+    // Three children, one after the other: the volunteer never waits.
+    for (const [, name] of [refused, busy]) {
+      await page.locator('.fam', { hasText: name }).click();
+      await page.locator('#kid-sheet').getByRole('button', { name: 'Check in' }).click();
+    }
+    if (ym) {
+      await page.locator('.fam', { hasText: third[1] }).click();
+      await page.locator('#kid-sheet').getByRole('button', { name: 'Check in' }).click();
+    } else {
+      await page.locator('.fam', { hasText: 'Tester' }).click();
+      await page.getByRole('button', { name: 'Both of them' }).click();
+    }
+    // Every tapped child shows "Checking in…"; none says checked in before TwoTimTwo does.
+    for (const name of [refused[1], busy[1], third[1]]) await expect(kidState(page, name)).toHaveAttribute('data-state', 'pending');
+    await expect(kidState(page, refused[1])).toHaveText('Checking in…');
+    await expect(page.locator('#list')).not.toContainText('Checked in ✓');
+    await expect(page.locator('#count-pill')).toHaveText('0 in');
+    await snap(page, `${ym ? 'ym-' : ''}queue-pending.png`);
+    // At most two at the Worker at once, in tap order.
+    expect(world.posts.map((p) => p.body.clubberId)).toEqual([refused[0], busy[0]]);
+
+    release();
+    world.gate = null;
+    // The refused child alone reverts, with the reason.
+    await expect(kidState(page, refused[1])).toHaveAttribute('data-state', 'failed');
+    await expect(kidState(page, refused[1])).toHaveText('Not checked in: TwoTimTwo has no attendance item for that club tonight.');
+    await expect(page.locator('#toast')).toContainText(`Couldn’t check in ${refused[1]}: TwoTimTwo has no attendance item for that club tonight.`);
+    // The busy one: a calm countdown, then the page tries again by itself.
+    await expect(kidState(page, busy[1])).toContainText(/Waiting for TwoTimTwo… \d+s/);
+    await snap(page, `${ym ? 'ym-' : ''}queue-waiting.png`);
+    await expect(kidState(page, busy[1])).toHaveText('Checked in ✓', { timeout: 8000 });
+    await expect(page.locator('#count-pill')).toHaveText(ym ? '2 in' : '3 in', { timeout: 8000 });
+    const order = world.posts.filter((p) => p.path === '/v1/desk/checkin').map((p) => p.body.clubberId);
+    expect(order.slice(0, 3)).toEqual([refused[0], busy[0], third[0]]);
+    expect(order.filter((id) => id === busy[0])).toHaveLength(2);   // the automatic retry, once
+    await expect(page.locator('.fam', { hasText: refused[1] })).toHaveCount(1);
+
+    // Undo through the same queue: busy, a countdown, then done by itself.
+    world.busyFor[`/v1/desk/undo:${third[0]}`] = 1;
+    await page.locator('#count-pill').click();
+    const row = page.locator('.row', { hasText: third[1] });
+    if (ym) await expect(row.getByRole('button', { name: 'Check out' })).toHaveCount(0);   // the Worker checks Trek and Journey out
+    await row.getByRole('button', { name: 'Undo check-in' }).click();
+    await page.locator('#confirm-ok').click();
+    await expect(row).toContainText(/Waiting for TwoTimTwo… \d+s/);
+    await expect(page.locator('#toast')).toContainText(`${third[1]}’s check-in is undone`, { timeout: 8000 });
+    expect(world.posts.filter((p) => p.path === '/v1/desk/undo')).toHaveLength(2);
+  });
+}
+
+for (const where of ['/checkin/', '/checkin/ym/']) {
+  const ym = where === '/checkin/ym/';
+  const tag = ym ? 'ym-' : '';
+  test(`BARF on ${where}: the green button only on a BARF night; a late friend redoes the check-in, prints the BARF tag, and a failed redo offers one tap`, async ({ page }) => {
+    test.setTimeout(90_000);
+    const kids = ym ? [
+      { clubberId: '21', first: 'Tia', last: 'Youth', club: 'Trek', clubId: '6', checkedIn: true },
+      { clubberId: '22', first: 'Jo', last: 'Journey', club: 'Journey', clubId: '7', checkedIn: true },
+      { clubberId: '23', first: 'Max', last: 'Trekker', club: 'Trek', clubId: '6', checkedIn: true },
+      { clubberId: '24', first: 'Una', last: 'Late', club: 'Journey', clubId: '7', checkedIn: false },
+    ] : [
+      { clubberId: '11', first: 'Ada', last: 'Tester', club: 'Cubbies', clubId: '1', checkedIn: true },
+      { clubberId: '12', first: 'Ben', last: 'Tester', club: 'Sparks', clubId: '2', checkedIn: true },
+      { clubberId: '13', first: 'Cy', last: 'Other', club: 'T&T', clubId: '3', checkedIn: true },
+      { clubberId: '14', first: 'Tia', last: 'Youth', club: 'Trek', clubId: '6', checkedIn: false },
+    ];
+    const [pick, hasFriend, failing] = ym ? [['21', 'Tia Youth', 'Tia', 'Trek'], ['22', 'Jo Journey'], ['23', 'Max Trekker']] : [['11', 'Ada Tester', 'Ada', 'Cubbies'], ['12', 'Ben Tester'], ['13', 'Cy Other']];
+    const { world, stationRing, historyRing } = await stubSite(page, { kids });
+    world.busyFirst = false;
+
+    // Not a BARF night, or the Worker cannot say: no button.
+    world.barf = { night: '2026-10-14', barfNight: false, friends: [], tagRoute: '/print-barf-tag', stations: 1 };
+    await signIn(page, where);
+    await expect(page.locator('#list')).toContainText(/still to come|Everyone/, { timeout: 10_000 });
+    await expect(page.locator('#barf-btn')).toBeHidden();
+    world.barf = null;
+    await page.reload();
+    await expect(page.locator('#list')).toContainText(/still to come|Everyone/, { timeout: 10_000 });
+    await expect(page.locator('#barf-btn')).toBeHidden();
+
+    // A BARF night: the green button at the top.
+    world.barf = { night: '2026-10-14', barfNight: true, friends: [hasFriend[0]], tagRoute: '/print-barf-tag', stations: 1 };
+    await page.reload();
+    await expect(page.locator('#barf-btn')).toBeVisible({ timeout: 10_000 });
+    await snap(page, `${tag}barf-button.png`);
+    await page.locator('#barf-btn').click();
+    await expect(page.locator('#barf-title')).toHaveText('Who brought the friend?');
+    // Tonight's checked-in children; one who already brought a friend is greyed out; nobody not checked in.
+    const kidsListed = page.locator('#barf-body .barf-kid');
+    await expect(kidsListed).toHaveCount(3);
+    await expect(page.locator('.barf-kid', { hasText: hasFriend[1] })).toBeDisabled();
+    await expect(page.locator('.barf-kid', { hasText: hasFriend[1] })).toContainText('Has a friend');
+    await snap(page, `${tag}barf-who.png`);
+    await page.locator('.barf-kid', { hasText: pick[1] }).click();
+    // The friend's first name is required.
+    await page.locator('#barf-body').getByRole('button', { name: 'Next' }).click();
+    await expect(page.locator('#barf-body .err')).toHaveText('Type the friend’s first name.');
+    await page.locator('#barf-body').getByLabel('Friend’s first name').fill('  Sam  ');
+    await snap(page, `${tag}barf-friend-name.png`);
+    await page.locator('#barf-body').getByRole('button', { name: 'Next' }).click();
+    await expect(page.locator('#barf-title')).toHaveText(`${pick[1]} brought Sam`);
+    await snap(page, `${tag}barf-confirm.png`);
+    await page.locator('#barf-body').getByRole('button', { name: 'Confirm' }).click();
+    await expect(page.locator('#toast')).toContainText(`${pick[2]}’s BARF tag is printing. Sam is on the BARF list.`);
+    await snap(page, `${tag}barf-done.png`);
+    // What was sent: the child's id, the friend's first name, the BARF tag sealed to the station, the row to the history key.
+    const sent = world.barfPosts[0];
+    expect(sent.clubberId).toBe(pick[0]);
+    expect(sent.friendName).toBe('Sam');
+    const { tagJob: _j, historyRow: _r, ...plain } = sent;
+    expect(JSON.stringify(plain)).not.toContain(pick[2]);
+    expect(sent.tagJob.jobId).toMatch(/^reprint:/);
+    const job = await cc.openAsStation(stationRing, sent.tagJob.bundle);
+    expect([job.route, job.body]).toEqual(['/print-barf-tag', { firstName: pick[2], clubName: pick[3] }]);
+    expect(sent.historyRow.kind).toBe('barf-friend');
+    expect(await cc.openRow(historyRing, sent.historyRow)).toMatchObject({ first: pick[2], clubberId: pick[0], friend: true, friendFirst: 'Sam' });
+    expect(world.posts).toHaveLength(0);   // no check-in of the friend, no second check-in of the child
+
+    // The redo does not take: a red line, and one tap checks them in again (no label).
+    world.barfRedo = 'fail';
+    await page.locator('#barf-btn').click();
+    await expect(page.locator('.barf-kid', { hasText: pick[1] })).toBeDisabled();   // a second friend: not offered
+    await page.locator('.barf-kid', { hasText: failing[1] }).click();
+    await page.locator('#barf-body').getByLabel('Friend’s first name').fill('Lu');
+    await page.locator('#barf-body').getByRole('button', { name: 'Next' }).click();
+    await page.locator('#barf-body').getByRole('button', { name: 'Confirm' }).click();
+    const red = page.locator('#barf-alert .ba.bad');
+    await expect(red).toContainText(`${failing[1]} is NOT checked in on TwoTimTwo — check them in again.`);
+    await snap(page, `${tag}barf-not-checked-in.png`);
+    await red.getByRole('button', { name: `Check ${failing[1].split(' ')[0]} in again` }).click();
+    await expect(page.locator('#toast')).toContainText(`${failing[1]} is checked in on TwoTimTwo again.`);
+    await expect(page.locator('#barf-alert')).toBeHidden();
+    expect(world.barfPosts.at(-1)).toMatchObject({ clubberId: failing[0], recheck: true, items: { Bible: true, Friend: true } });
+    expect(world.barfPosts.at(-1).tagJob).toBeUndefined();
+  });
+}
+
+test('a new familiesAt on the roster answer reads the families again, so a newly registered child joins their family', async ({ page }) => {
+  test.setTimeout(60_000);
+  const { world } = await stubSite(page);
+  world.busyFirst = false;
+  world.familiesAt = '2026-10-14T21:00:00.000Z';
+  await signIn(page);
+  await expect(page.locator('.fam', { hasText: 'Tester' })).toHaveCount(1, { timeout: 10_000 });
+  expect(world.familiesCalls).toBe(1);
+  // The same familiesAt on the next roster answer: no second read (the half-hour rule stands).
+  const before = world.rosterCalls;
+  await page.locator('.fam', { hasText: 'Cy Other' }).click();
+  await page.locator('#kid-sheet').getByRole('button', { name: 'Check in' }).click();   // the page re-reads the roster 6 s later
+  await expect.poll(() => world.rosterCalls, { timeout: 15_000 }).toBeGreaterThan(before);
+  expect(world.familiesCalls).toBe(1);
+  // Dee is registered on TwoTimTwo: the Worker's households change, and its roster says so.
+  world.kids.push({ clubberId: '15', first: 'Dee', last: 'Tester', club: 'Puggles', clubId: '4', checkedIn: false });
+  world.households = [['Ada Tester', 'Ben Tester', 'Dee Tester']];
+  world.familiesAt = '2026-10-14T22:05:00.000Z';
+  await page.locator('.fam', { hasText: 'Tia Youth' }).click();
+  await page.locator('#kid-sheet').getByRole('button', { name: 'Check in' }).click();
+  await expect.poll(() => world.familiesCalls, { timeout: 15_000 }).toBe(2);
+  await expect(page.locator('.fam', { hasText: 'Tester' })).toHaveCount(1);
+  await expect(page.locator('.fam', { hasText: 'Tester' })).toContainText('Dee');
 });

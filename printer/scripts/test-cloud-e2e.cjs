@@ -239,7 +239,10 @@ const fakeSafe = {
     const { makeStation, sealJob } = await load('test', 'helpers.js');
     const { row: stubRow } = await load('test', 'rig.js');
     const storage2 = memoryStore();
-    const t2 = await rig({ storage: storage2, env: { SINGLE_PUBLISHER: 'on', HISTORY_DB: d1Stub() }, kids: [] });
+    // The check-in page the stand-in TwoTimTwo serves: the rig's own until the late-BARF section swaps it.
+    let checkinPage2 = null;
+    const { CHECKIN_PAGE } = await load('test', 'fixtures.js');
+    const t2 = await rig({ storage: storage2, env: { SINGLE_PUBLISHER: 'on', HISTORY_DB: d1Stub() }, kids: [], checkinPage: () => (checkinPage2 ? checkinPage2() : CHECKIN_PAGE) });
     {   // a real history key, as the first client makes it (the rig's stand-in is replaced before anything is sealed)
       const hk = await cc.createHistoryKey(PASS);
       await storage2.delete('history:pub'); await storage2.delete('history:wrapped');
@@ -413,6 +416,53 @@ const fakeSafe = {
     const st9 = (await t2.call('GET', '/v1/print/status')).body;
     check('a leader tag and a custom label from the check-in page each print once and are done', r9.handled + r10.handled === 2 && labels() === l3 + 2 && st9.queued === 0 && st9.leased === 0 && st9.dead === 1,
       `${JSON.stringify([r9, r10])} ${labels()} ${JSON.stringify(st9)}`);
+
+    // a late BARF friend (routes.md 5.1): Kit, checked in and printed above, brought a friend.
+    // ONE Worker operation undoes and redoes Kit's TwoTimTwo check-in with Brought a friend
+    // while a watcher read lands in the gap; the station prints ONLY the BARF tag, once,
+    // greets nobody, and the count below still says five.
+    console.log('\na late BARF friend: the redo with Brought a friend, the BARF tag alone, once');
+    {
+      await t2.core.church.load();
+      t2.core.church.doc.data.settings = { ...(t2.core.church.doc.data.settings || {}), barfNights: [NIGHT] };
+      const onReport = () => t2.night.kids.some((k) => k.id === '662');
+      checkinPage2 = () => CHECKIN_PAGE.replace('checkin-box boy"', onReport() ? 'checkin-box boy checked-in"' : 'checkin-box boy"')
+        .replace('<label>Attendance</label>', '<label>Attendance</label><input class="event" name="events[]" value="808" clubs="2,3,6"><label>Brought a friend</label>');
+      t2.clock.tick(3 * 60 * 1000);   // the desk's cached check-in page is older than its two minutes
+      let gapRead = '';
+      t2.on.undo = async () => { t2.night.kids = t2.night.kids.filter((k) => k.id !== '662'); };
+      t2.on.checkin = async (form) => {
+        if (form.get('clubber_id') !== '662') return 'ok';
+        t2.clock.tick(WATCH_INTERVAL_MS); await t2.core.watcher.tick();
+        gapRead = t2.reads.at(-1)?.path || '';
+        t2.night.kids.push({ id: '662', club: 'Sparks', name: 'Kit Tester', friend: true });
+        return 'ok';
+      };
+      await st.call('POST', '/v1/print/heartbeat', { version: '9.3.1' });
+      const info = await desk2.barfInfo();
+      check('the page learns tonight is a BARF night and every station runs the tag route', info && info.barfNight === true && info.tagRoute === '/print-barf-tag' && info.friends.length === 0, JSON.stringify(info));
+      const bl = labels();
+      const bg = frames('checkin').length;
+      const out = await desk2.barfLate({ clubberId: '662', name: 'Kit Tester', club: 'Sparks' }, 'Sam', info.tagRoute);
+      check('the Worker undid and redid Kit\'s check-in with Brought a friend, a watcher read in the gap', out.checkedIn === true && t2.posts.undo.length === 1
+        && t2.tt.checkins.at(-1).getAll('events[]').includes('808') && gapRead === '/clubber/checkin_report', `${JSON.stringify(out)} ${gapRead}`);
+      t2.on.undo = null; t2.on.checkin = null;
+      const rb = await puller2.tick();
+      await settle();
+      check('the station prints ONE label (the BARF tag) and greets nobody', rb.handled === 1 && labels() === bl + 1 && frames('checkin').length === bg, `${JSON.stringify(rb)} ${labels()} ${frames('checkin').length}`);
+      t2.clock.tick(WATCH_INTERVAL_MS); await t2.core.watcher.tick();
+      t2.clock.tick(SPILL_MS); await t2.core.watcher.tick();
+      const rb2 = await puller2.tick();
+      await settle();
+      check('later reads adopt nothing: no second name tag, no second greeting', rb2.handled === 0 && labels() === bl + 1 && frames('checkin').length === bg, `${JSON.stringify(rb2)} ${labels()}`);
+      check('the friend is on the 6:30 list and the BARF bags', JSON.stringify((await t2.core.friends.bagNames(NIGHT)).names) === JSON.stringify(['Kit Tester', 'Sam']));
+      let refused = '';
+      try { await desk2.barfLate({ clubberId: '662', name: 'Kit Tester', club: 'Sparks' }, 'Max', info.tagRoute); } catch (e) { refused = e.reason || e.code; }
+      check('a second friend for Kit is refused', refused === 'already-friend', refused);
+      // A 9.3.0 station would refuse /print-barf-tag: the page is told to seal a custom label instead.
+      await st.call('POST', '/v1/print/heartbeat', { version: '9.3.0' });
+      check('with a 9.3.0 station the tag goes as a custom label it already runs', (await desk2.barfInfo()).tagRoute === '/print-custom');
+    }
 
     // the Worker's own tally, ticker and still-here list
     t2.clock.tick(WATCH_INTERVAL_MS);

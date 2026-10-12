@@ -7,17 +7,19 @@
 export function table(club, kids, { layout = 'live', count = kids.length, footer = true } = {}) {
   // A club with a Brought a friend column: its kids say `friend: true` (YES) or `false` (No).
   const withFriend = kids.some((k) => k.friend !== undefined);
-  const rows = kids.map(({ id, name, summary, friend }) => {
+  // ...and a Bible column the same way (`bible: true` YES, `false` No).
+  const withBible = kids.some((k) => k.bible !== undefined);
+  const rows = kids.map(({ id, name, summary, friend, bible }) => {
     const edit = `<a class='noprint' href='/meeting/clubberCheckin/${id}?CAL=368'><i class='fa fa-pencil'></i></a>`;
     const undo = `<a href='#' class='noprint pull-right' onclick='undoCheckin(${id})'></a>`;
-    const friendCell = withFriend ? `<td>${friend ? 'YES' : 'No'}</td>` : '';
+    const friendCell = (withBible ? `<td>${bible ? 'YES' : 'No'}</td>` : '') + (withFriend ? `<td>${friend ? 'YES' : 'No'}</td>` : '');
     return layout === 'live'
-      ? `<tbody><tr><td>${edit} ${name} ${undo}</td>${summary != null || withFriend ? `<td>${summary ?? ''}</td>` : ''}${friendCell}</tr>`
+      ? `<tbody><tr><td>${edit} ${name} ${undo}</td>${summary != null || withFriend || withBible ? `<td>${summary ?? ''}</td>` : ''}${friendCell}</tr>`
       : `<tbody><tr><td>${edit}${undo}</td><td>${name}</td>${friendCell}</tr>`;
   }).join('');
   return `<table class="table"><thead><tr><th colspan=4 class="title">` +
     `<img class="club-icon-30" src="/x.png" alt="${club}" /></th></tr>` +
-    `<tr><th>2026-10-07</th><th>Clubber</th>${withFriend ? '<th>Brought a friend</th>' : ''}</tr></thead>${rows}` +
+    `<tr><th>2026-10-07</th><th>Clubber</th>${withBible ? '<th>Bible</th>' : ''}${withFriend ? '<th>Brought a friend</th>' : ''}</tr></thead>${rows}` +
     (footer ? `<tfoot><tr class='totals'><td><i>Count: ${count}</i></td></tr></tfoot>` : '') + '</table>';
 }
 export const page = (...tables) =>

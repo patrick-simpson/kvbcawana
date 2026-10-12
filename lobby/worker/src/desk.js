@@ -207,7 +207,9 @@ export class Desk {
     if (!r.ok) return this.pageFailure(r);
     const kids = r.page.roster.map((/** @type {any} */ k) => {
       const parts = String(k.name || '').trim().split(/\s+/);
-      return { clubberId: k.clubberId, first: parts[0] || '', last: parts.slice(1).join(' '), club: k.club, clubId: k.clubId, checkedIn: !!k.checkedIn };
+      // A child a late BARF friend's undo and redo holds (barf.js) stays checked in here too.
+      const held = typeof this.watcher.held === 'function' && this.watcher.held(k.clubberId);
+      return { clubberId: k.clubberId, first: parts[0] || '', last: parts.slice(1).join(' '), club: k.club, clubId: k.clubId, checkedIn: !!k.checkedIn || held };
     });
     // Which clubs offer Bible / Brought a friend: from the page already read, no extra read.
     // familiesAt: when the households held were read, so a page sees a catch-up re-read and asks again.

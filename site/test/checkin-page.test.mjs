@@ -35,7 +35,8 @@ describe('the check-in page', () => {
   it('is on the desk\'s path: the transport for every call, no relay, no laptop PIN', () => {
     assert.ok(!/AWANA_RELAY|\/v1\/relay|\/phone\/|X-Awana-Pin|postJson\(/.test(src), 'nothing of the relayed page is left');
     for (const call of ['desk.signIn(', 'desk.restore()', 'desk.roster()', 'desk.families()', 'desk.tonight()', 'desk.printStatus()',
-      'desk.checkIn(', 'desk.undo(', 'desk.checkout(', 'desk.oneOffTag(', 'desk.leaderTag(', 'desk.customLabel(']) {
+      'desk.checkIn(', 'desk.undo(', 'desk.checkout(', 'desk.oneOffTag(', 'desk.leaderTag(', 'desk.customLabel(',
+      'desk.barfInfo()', 'desk.barfLate(', 'desk.barfRecheck(']) {
       assert.ok(src.includes(call), call);
     }
   });
@@ -46,7 +47,10 @@ describe('the check-in page', () => {
     assert.match(src, /if \(e && e\.code === 'busy'\) \{ setBusy\(e\.retryAfterMs\); scheduleRosterPoll\(\(e\.retryAfterMs \|\| 5000\) \+ 250\); return; \}/);
     assert.match(src, /var FAMILIES_EVERY_MS = 30 \* 60 \* 1000;/);
     // the roster is the one tick's only TwoTimTwo-backed call; nothing else polls on a timer
-    assert.equal((src.match(/setInterval\(/g) || []).length, 2, 'only the two countdowns tick');
+    assert.equal((src.match(/setInterval\(/g) || []).length, 3, 'only the three countdowns tick (the passphrase lockout, the roster\'s busy note, a queued job\'s automatic retry)');
+    // A busy Worker is a countdown and an automatic retry of that one job (owner 2026-10-12), never a hammer.
+    assert.match(src, /if \(e && e\.code === 'busy' && !job\.cancelled\) \{ waitJob\(job, e\.retryAfterMs\); return; \}/);
+    assert.match(src, /var until = Date\.now\(\) \+ Math\.max\(1000, ms \|\| 5000\);/);
   });
 
   it('draws with the brand kit under /checkin/brand/ and nothing from another host', () => {

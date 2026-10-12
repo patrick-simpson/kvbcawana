@@ -25,6 +25,9 @@ const clean = (raw, max) => (typeof raw === 'string'
     .replace(/\s+/g, ' ').trim().slice(0, max)
   : '');
 
+/** A friend's first name as every path keeps it (the print server's cleanFriendName: one line, 24). @param {unknown} raw */
+export const cleanFriendName = (raw) => clean(raw, 24);
+
 /** @param {string} date YYYY-MM-DD @param {number} days */
 function addDays(date, days) {
   const [y, m, d] = date.split('-').map(Number);

@@ -32,9 +32,10 @@ const BASE = `http://127.0.0.1:${PORT}`;
     check('who was here lately comes from the history, opened in the page, never stored',
       /desk\.recentAttendance\(2\)/.test(phone) && !/(?:localStorage|sessionStorage)\.setItem\([^)]*RECENT/.test(phone));
     check('Bible starts ticked on the phone’s card and family page',
-      /var choice = \{ bible: items\.bible, friend: false \};/.test(phone) && /openFamily\(null, f\.kids, \{ bible: true, friend: false \}, f\.name\)/.test(phone));
+      /var choice = \{ bible: items\.bible, friend: false \};/.test(phone) && /openFamily\(null, ready, \{ bible: true, friend: false \}, f\.name\)/.test(phone));
     check('a phone check-in sends Bible / Friend with it (the Worker\'s desk check-in, site/checkin/desk-transport.js)',
-      /desk\.checkIn\(\{ clubberId: k\.clubberId, name: k\.name, club: k\.club \},\n\s+\{ bible: items\.bible && !!e\.choice\.bible, friend: items\.friend && !!e\.choice\.friend, friendName: friendName \}\)/.test(phone));
+      /var choice = \{ bible: items\.bible && !!e\.choice\.bible, friend: items\.friend && !!e\.choice\.friend, friendName: friendName \};/.test(phone)
+      && /desk\.checkIn\(\{ clubberId: k\.clubberId, name: k\.name, club: k\.club \}, choice\)/.test(phone));
     check('the card goes back at once (the check-in runs in the background)',
       /hideSheet\(\);[\s\S]{0,200}checkInMany\(\[\{ p: p, choice: choice \}\], null\);/.test(phone));
   }
@@ -107,8 +108,9 @@ const BASE = `http://127.0.0.1:${PORT}`;
     check('GET / says where the settings went', /awana\.kvbchurch\.org\/settings/.test(root_));
     const phone = fs.readFileSync(path.join(root, 'print-server', 'public', 'phone.html'), 'utf8');
     check('the page keeps only those clubs’ children', /return !ONLY \|\| ONLY\.indexOf\(clubKit\(sk\.club\)\) !== -1;/.test(phone));
-    check('the simple page hides Tonight and the + menu',
-      /\$\('count-pill'\)\.hidden = SIMPLE;/.test(phone) && /\$\('menu-btn'\)\.hidden = SIMPLE;/.test(phone));
+    // Owner 2026-10-12: the youth page has its own Tonight too (Undo check-in, no Check out).
+    check('the simple page shows its own Tonight, with Undo check-in and no Check out',
+      /\$\('count-pill'\)\.hidden = false;/.test(phone) && /var s = ONLY \? null : SERVER_TONIGHT;/.test(phone) && /if \(!SIMPLE\) \{\n\s+var cb = el\('button', 'tt', opText\('checkout'/.test(phone));
     const build = fs.readFileSync(path.join(root, '..', 'site', 'build.mjs'), 'utf8');
     const pages = fs.readFileSync(path.join(root, '..', 'site', 'checkin', 'checkin-page.mjs'), 'utf8');
     check('the website builds /checkin/ym too (the one source is phone.html)', /path\.join\(checkinOut, 'ym', 'index\.html'\)/.test(build) && /AWANA_ONLY_CLUBS = \['trek', 'journey'\]/.test(pages));

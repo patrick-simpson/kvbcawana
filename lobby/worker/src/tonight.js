@@ -254,6 +254,12 @@ export class TonightBook {
     return r && now - r.at >= 0 && now - r.at <= REPORT_FRESH_MS ? r.entries.filter((e) => e.friend).length : 0;
   }
 
+  /** The clubber ids the applied report marks Brought a friend tonight (barf.js: who may not bring a second). (after load) @param {number} [now] */
+  friendIds(now = this.now()) {
+    const r = this.state(now).report;
+    return r ? r.entries.filter((e) => e.friend).map((e) => e.clubberId) : [];
+  }
+
   /** The end of the night: every name goes. */
   async endOfNight() {
     await this.load();

@@ -113,16 +113,17 @@ const squash = (text) => String(text || '').trim().replace(/\s+/g, ' ');
  * A child whose row says YES under a "Brought a friend" column (any club table
  * that has one; the extension's friendsBrought rule) carries `friend: true`:
  * what a BARF Night tag for a check-in made on TwoTimTwo's own page is printed
- * from (adopt.js; the box has no name field, so no friend's name).
+ * from (adopt.js; the box has no name field, so no friend's name). A YES under
+ * a Bible column is `bible: true` the same way.
  *
- * @returns {{ entries: {clubberId: string, name: string, club: string, friend?: boolean}[], declared: number|null } | null}
+ * @returns {{ entries: {clubberId: string, name: string, club: string, friend?: boolean, bible?: boolean}[], declared: number|null } | null}
  */
 export function parseCheckinReport(html) {
   if (!html || isLoginPage(html)) return null;
   const doc = documentOf(html);
   const tables = [...doc.querySelectorAll('table')];
   if (!tables.length) return null;
-  /** @type {{clubberId: string, name: string, club: string, friend?: boolean}[]} */
+  /** @type {{clubberId: string, name: string, club: string, friend?: boolean, bible?: boolean}[]} */
   const entries = [];
   let declared = 0;
   let declaredAll = true;
@@ -143,6 +144,14 @@ export function parseCheckinReport(html) {
       if (friendIdx >= 0) break;
       const cells = [...hr.querySelectorAll('th')];
       friendIdx = cells.findIndex((th) => FRIEND_RE.test(squash(th.textContent)));
+    }
+    // ...and the Bible column, by the same rule (a late BARF friend redoes the
+    // check-in with the items the child had: routes.md 5.1).
+    let bibleIdx = -1;
+    for (const hr of table.querySelectorAll('thead tr')) {
+      if (bibleIdx >= 0) break;
+      const cells = [...hr.querySelectorAll('th')];
+      bibleIdx = cells.findIndex((th) => BIBLE_RE.test(squash(th.textContent)));
     }
     for (const row of table.querySelectorAll('tbody tr')) {
       // Only this table's own rows, should another table ever sit inside it.
@@ -170,7 +179,8 @@ export function parseCheckinReport(html) {
       }
       if (name && SUMMARY_CELL_RE.test(name)) name = '';
       const friend = friendIdx >= 0 && tds.length > friendIdx && /^yes$/i.test(squash(tds[friendIdx].textContent));
-      entries.push({ clubberId: idm[1], name, club, ...(friend ? { friend: true } : {}) });
+      const bible = bibleIdx >= 0 && tds.length > bibleIdx && /^yes$/i.test(squash(tds[bibleIdx].textContent));
+      entries.push({ clubberId: idm[1], name, club, ...(friend ? { friend: true } : {}), ...(bible ? { bible: true } : {}) });
     }
   }
   if (!readAnyClub) return null;

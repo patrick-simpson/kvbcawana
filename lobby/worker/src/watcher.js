@@ -242,6 +242,8 @@ export class Watcher {
     this.ym = null;
     /** The desk (desk.js): set by SyncCore; the watcher warms its check-in page and catches its families up. @type {import('./desk.js').Desk|null} */
     this.desk = null;
+    /** Children held on the report by a desk operation (barf.js): clubber id -> {entry, until}. Memory only. @type {Map<string, { entry: any, until: number }>} */
+    this.holds = new Map();
     this.alarms = alarms || { set() {}, get: () => null };
     // warn, not log: the lint allows warn and error only, and `wrangler tail` shows both.
     this.log = log || ((line) => console.warn(line));
@@ -305,6 +307,47 @@ export class Watcher {
         ? Math.ceil((this.client.loginBlockedUntil - this.now()) / 1000) : 0,
       ...s,
     };
+  }
+
+  /**
+   * Hold a child on the report (barf.js): until `untilMs`, a read that does not list
+   * them is read as if it did, with `entry` (their report entry: clubber id, name,
+   * club, friend). In memory only, never stored (it holds a name); a restart ends
+   * every hold, and the truth (what TwoTimTwo lists) comes back with the next read.
+   * @param {{ clubberId: string, name: string, club: string, friend?: boolean }} entry @param {number} untilMs
+   */
+  hold(entry, untilMs) {
+    this.holds.set(entry.clubberId, { entry, until: untilMs });
+  }
+
+  /** Let go of a hold (now, or at `untilMs`). @param {string} clubberId @param {number} [untilMs] */
+  unhold(clubberId, untilMs) {
+    const h = this.holds.get(clubberId);
+    if (!h) return;
+    if (untilMs && untilMs > this.now()) h.until = untilMs;
+    else this.holds.delete(clubberId);
+  }
+
+  /** Is this child held right now? @param {string} clubberId */
+  held(clubberId) {
+    const h = this.holds.get(clubberId);
+    return !!h && h.until > this.now();
+  }
+
+  /**
+   * The report with every held child on it. Pure but for dropping expired holds.
+   * @template {{ entries: { clubberId: string }[] }} R @param {R} report @returns {R}
+   */
+  withHolds(report) {
+    if (!this.holds.size) return report;
+    const t = this.now();
+    const listed = new Set(report.entries.map((e) => e.clubberId));
+    const extra = [];
+    for (const [id, h] of this.holds) {
+      if (h.until <= t) { this.holds.delete(id); continue; }
+      if (!listed.has(id)) extra.push({ ...h.entry });
+    }
+    return extra.length ? { ...report, entries: [...report.entries, ...extra] } : report;
   }
 
   /** Make sure an alarm is set while the watcher is on (cron, and every status read). */
@@ -572,7 +615,10 @@ export class Watcher {
       return { ok: false, error: res.error };
     }
 
-    const { verdict, kids, added, gone } = compareReport(snap ? snap.kids : null, res.report);
+    // A child a desk operation holds (a late BARF friend's undo and redo, barf.js) is
+    // read as on the report while the hold lasts, so the brief gap is never seen.
+    const report = this.withHolds(res.report);
+    const { verdict, kids, added, gone } = compareReport(snap ? snap.kids : null, report);
     status.okReads += 1;
     status.lastOkAt = status.lastReadAt;
     status.lastError = null;
@@ -614,13 +660,13 @@ export class Watcher {
       this.desk?.familiesSource.noteChildren(date, res.report.entries.map((e) => e.name));
       // The count's own state (tonight.js): what an applied report says, first names and clubs only.
       if (this.publisher) {
-        try { await this.publisher.onReport({ night: date, at: now, entries: res.report.entries }); } catch (err) { console.error('[cloud] publishing the count failed', err); }
+        try { await this.publisher.onReport({ night: date, at: now, entries: report.entries }); } catch (err) { console.error('[cloud] publishing the count failed', err); }
       }
       // The claims and print jobs follow what the report says (adopt.js; the
       // children's names stay in this call's memory and are sealed there).
       if (this.adopt && verdict === 'applied') {
         const first = new Map();
-        for (const e of res.report.entries) if (!first.has(e.clubberId)) first.set(e.clubberId, e);
+        for (const e of report.entries) if (!first.has(e.clubberId)) first.set(e.clubberId, e);
         try {
           await this.adopt.onReport({
             night: date,

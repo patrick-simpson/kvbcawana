@@ -45,12 +45,13 @@ const fs = require('fs');
 const path = require('path');
 const cc = require('./cloud-crypto');
 
-// Every print route a job may run: check-in tags, a reprint, BARF bags, custom
+// Every print route a job may run: check-in tags, a reprint, BARF bags and tags, custom
 // and one-off labels, leader tags, award slips. Nothing that changes settings.
 const JOB_PULL_ROUTES = Object.freeze([
   ['POST', /^\/print$/],
   ['POST', /^\/reprint$/],
   ['POST', /^\/print-barf-bags$/],
+  ['POST', /^\/print-barf-tag$/],   // 9.3.1: a late BARF friend's tag (routes.md 5.1)
   ['POST', /^\/print-custom$/],
   ['POST', /^\/print-oneoff$/],
   ['POST', /^\/print-leader$/],

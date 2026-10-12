@@ -51,6 +51,7 @@ import { Relay } from './relay.js';
 import { Watcher } from './watcher.js';
 import { CloudPhone } from './phone.js';
 import { Friends } from './friends.js';
+import { mountBarf } from './barf.js';
 import { Screens } from './screens.js';
 import { BadRequest, fail, json } from './http.js';
 import { Registry } from './registry.js';
@@ -156,6 +157,8 @@ export class SyncCore {
     this.env = this.switches.effectiveEnv();
     this.fetchFn = fetchFn || ((...args) => fetch(...args));
     this.now = now || (() => Date.now());
+    /** A pause between tries (barf.js's redo); a test's clock moves time instead. */
+    this.sleep = sleep || ((/** @type {number} */ ms) => new Promise((r) => setTimeout(r, ms)));
     // The live channel: every screen's socket (index.js) carries everything.
     this.broadcast = broadcast || (() => 0);
     this.closeAll = closeAll || (() => {});
@@ -232,6 +235,7 @@ export class SyncCore {
     this.notices = new Notices({ storage: this.storage, now: this.now });
     mountNotice(this.registry, this);   // /v1/notice (routes.md 10.4)
     mountOverview(this.registry, this);   // /v1/tonight/overview (routes.md 10.6)
+    mountBarf(this.registry, this);   // /v1/desk/barf, /v1/desk/barf-late: a late BARF friend (routes.md 5.1)
   }
 
   /**
