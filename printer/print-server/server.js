@@ -31,6 +31,13 @@ const historySync = require('./history-sync');
 const pickup = require('./pickup');
 const { CLUB_TABLE, clubKeyByLabel } = require('./clubTable');
 const { cleanText } = require('./textClean');
+// THE count: the pure rules live in lobby/shared/tonight.js (generated copy); the sync Worker
+// imports the same source. This file only supplies its own state to them.
+const tonightRules = require('./tonight');
+const {
+  REPORT_FRESH_MS, normalizedName, displayClub, splitFullName, historyIdentityKey, reportEntryIdentityKey,
+  identityKeysOfRow, identityKeysOfReportEntry, distinctReportChildren, reportIsPartial, massUndoRefused,
+} = tonightRules;
 const { execFile } = require('child_process');
 const cups = require('./cups');
 // The Raspberry Pi print station (ROADMAP.md#cloud-check-in) prints through CUPS. It is
@@ -4197,13 +4204,6 @@ app.post('/label', async (req, res) => {
   }
 });
 
-// Splits a free-typed "First Last" into its parts; everything after the first
-// token is the last name (middle names, suffixes and hyphenated pairs stay put).
-function splitFullName(name) {
-  const parts = String(name == null ? '' : name).trim().split(/\s+/).filter(Boolean);
-  return { firstName: parts[0] || '', lastName: parts.slice(1).join(' ') || '' };
-}
-
 // The check-in print, factored out of POST /print so POST /phone/visitor can
 // run the exact same pipeline — dedup window, roster enrichment, season
 // ledger, checkin event, history row, tally — without looping an HTTP request
@@ -4754,29 +4754,6 @@ function historyRowMatches(row, firstName, lastName, clubberId) {
   return !!rowName && rowName === wantName;
 }
 
-// The dedup key for "one row per child" aggregations. Prefers the id so two
-// same-named children stay two children; falls back to the name for older rows.
-function historyIdentityKey(row) {
-  const id = row && row.clubberId != null ? String(row.clubberId).trim() : '';
-  if (id) return `id:${id}`;
-  return `name:${`${(row && row.firstName) || ''} ${(row && row.lastName) || ''}`.toLowerCase().trim()}`;
-}
-
-// Same identity key, computed from a checkin_report entry ({ clubberId, name,
-// club } — content.js's fetchCheckinReport() shape) instead of a history row,
-// so the two can be compared directly. Whitespace is collapsed (not just
-// trimmed): the report's name sits between two links in TwoTimTwo's own
-// markup and can come back with padding or a line break inside it, and a
-// history row never does, so leaving it uncollapsed would make an
-// already-checked-in child look "missing" from the report on a whitespace
-// technicality — exactly the false-undo this feature must not cause.
-function reportEntryIdentityKey(entry) {
-  const id = entry && entry.clubberId != null ? String(entry.clubberId).trim() : '';
-  if (id) return `id:${id}`;
-  const name = String((entry && entry.name) || '').toLowerCase().replace(/\s+/g, ' ').trim();
-  return `name:${name}`;
-}
-
 // R-1's /clubber/checkin_report is already the authoritative "who's checked in
 // tonight" list (content.js has polled it every ~60s since v5.2 to catch
 // missed check-ins). This is the other direction it never covered: an UNDO on
@@ -4863,7 +4840,7 @@ function reconcileHistoryWithReport(history, reportEntries, now = Date.now()) {
     else if (inReport && row.undone && !row.undoneBy) toClear.push(i);
   });
 
-  if (checkedInBefore > 0 && toUndo.length > checkedInBefore / 2) {
+  if (massUndoRefused(toUndo.length, checkedInBefore)) {
     return {
       history,
       changed: 0,
@@ -5137,48 +5114,7 @@ app.get('/history/today', (req, res) => {
 // Failed prints, award slips, connect cards and leader tags never count a kid
 // in (isNonCheckinRow), so they are out of both lists.
 function tonightCheckins(history = loadHistory(), today = localDayISO()) {
-  const entries = history.filter(e => e && isOnLocalDay(e.timestamp, today) && e.success !== false && !isNonCheckinRow(e));
-  const seen = new Set();
-  const active = [];
-  for (const e of entries) {
-    if (!`${e.firstName || ''} ${e.lastName || ''}`.trim()) continue;
-    // Keyed on the clubber id when the row has one, so two children who share a
-    // name count as two. Older rows without an id keep the name key.
-    const key = historyIdentityKey(e);
-    // The FIRST row seen per identity is the newest (history is newest-first) —
-    // the same row R-1 reconciliation and the phone's Remove are allowed to
-    // mark `undone`. Marking `seen` here, BEFORE the undone check, is what stops
-    // an older duplicate row (a same-night reprint, or a stale pre-undo print)
-    // from being read next and reviving a status the newest row has already
-    // settled — "latest record wins", deterministically.
-    if (seen.has(key)) continue;
-    seen.add(key);
-    // `undone` is set by R-1 reconciliation (TwoTimTwo's own report no longer
-    // lists the child) or by a volunteer's Remove on the phone page. Either way
-    // the next `tally` decrements instead of keeping the stale number all night.
-    if (e.undone) continue;
-    active.push(e);
-  }
-  // ── Two keys, one child ───────────────────────────────────────────────────
-  // The same kid can leave BOTH an `id:` row and a `name:` row on one night:
-  // a walk-in printed at the door before the roster knew them (no clubberId),
-  // then a driven check-in from the extension minutes later (clubberId), or
-  // the reverse. historyIdentityKey() cannot see that those are one person, so
-  // the night counted them twice and the lobby screen read one child high.
-  //
-  // Collapse them here, preferring the `id:` row: the id is TwoTimTwo's own
-  // identity for that child, and it is what /phone/undo, reconcile and the
-  // reprint lookup all key on. The name row is dropped, not merged, so
-  // nothing about the surviving row changes.
-  const fullNameOf = (e) => `${e.firstName || ''} ${e.lastName || ''}`.toLowerCase().replace(/\s+/g, ' ').trim();
-  const namesWithAnId = new Set();
-  for (const e of active) {
-    if (historyIdentityKey(e).startsWith('id:')) namesWithAnId.add(fullNameOf(e));
-  }
-  const deduped = namesWithAnId.size
-    ? active.filter((e) => historyIdentityKey(e).startsWith('id:') || !namesWithAnId.has(fullNameOf(e)))
-    : active;
-  return { date: today, entries, active: deduped };
+  return tonightRules.tonightRows(history, today, { onDay: isOnLocalDay, isNonCheckin: isNonCheckinRow });
 }
 
 // ── Tonight's count: one definition, one source of truth ─────────────────────
@@ -5231,188 +5167,34 @@ let lastPartialReport = null;   // { at, parsed, declared } — the last one we 
 // phone by name only (normalizedName keys); never sent to TwoTimTwo.
 let checkedOutTonight = { date: null, ids: new Set(), names: new Set() };
 
-// One child per clubber id, plus one per id-less name.
-function distinctReportChildren(entries) {
-  const keys = new Set();
-  (Array.isArray(entries) ? entries : []).forEach((e) => {
-    const id = e && e.clubberId != null ? String(e.clubberId).trim() : '';
-    const name = normalizedName(e && e.name);
-    if (id) keys.add(`id:${id}`); else if (name) keys.add(`name:${name}`);
-  });
-  return keys.size;
+/** The state the shared rules read: this printer's rows, its trusted report, its check-outs, its clock. */
+function tonightState(tonight, now) {
+  return { tonight, report: lastCheckinReport, checkedOut: checkedOutTonight, dayOf: (ms) => localDayISO(new Date(ms)) };
 }
-
-/** A report whose own footers list more children than the parse found. */
-function reportIsPartial(payload) {
-  return Boolean(payload) && Number.isInteger(payload.declared)
-    && distinctReportChildren(payload.entries) < payload.declared;
-}
-
-// Two 5-minute extension polls plus slack. Longer than one missed poll (so a
-// single hiccup does not flip the whole count back to history mode), shorter
-// than a club night (so a report from the start of the evening cannot still be
-// speaking for it at the end).
-const REPORT_FRESH_MS = 12 * 60 * 1000;
-
-const normalizedName = (name) => String(name || '').toLowerCase().replace(/\s+/g, ' ').trim();
-
-// EVERY key one identity could be filed under, id first. historyIdentityKey()
-// answers with the single canonical key; this answers with all of them, which
-// is what lets a report entry (always id-bearing) find a walk-in's name row.
-function identityKeysOfRow(row) {
-  const keys = [];
-  const id = row && row.clubberId != null ? String(row.clubberId).trim() : '';
-  if (id) keys.push(`id:${id}`);
-  const name = normalizedName(`${(row && row.firstName) || ''} ${(row && row.lastName) || ''}`);
-  if (name) keys.push(`name:${name}`);
-  return keys;
-}
-
-function identityKeysOfReportEntry(entry) {
-  const keys = [];
-  const id = entry && entry.clubberId != null ? String(entry.clubberId).trim() : '';
-  if (id) keys.push(`id:${id}`);
-  const name = normalizedName(entry && entry.name);
-  if (name) keys.push(`name:${name}`);
-  return keys;
-}
-
-// The club name as it should be displayed, from whichever side supplied it.
-// `&amp;` is decoded because the report's club comes out of a crest's alt
-// attribute and a raw entity would make T&T a club of its own.
-const displayClub = (raw) => String(raw == null ? '' : raw).replace(/&amp;/gi, '&').trim();
 
 /**
  * WHO is here now tonight: one entry per child, by the rules of the count
- * (below). authoritativeTonight() counts these; the lobby's still-here list
- * (7.16.0, publishStillHere) names them. Pure but for its reads of
- * lastCheckinReport and checkedOutTonight.
+ * (lobby/shared/tonight.js, the SAME code the sync Worker runs). The lobby's
+ * still-here list (7.16.0, publishStillHere) names them. Pure but for its
+ * reads of lastCheckinReport and checkedOutTonight.
  *
  * @returns {{source:'report'|'history', at:number|null, ageMs:number|null,
  *            children:Array<{keys:string[], club:string, firstName:string}>,
  *            checkedOut:number}}
  */
 function tonightHereNow(tonight = tonightCheckins(), now = Date.now()) {
-  // Checked out tonight: off every count, report or history (7.15.0). By
-  // clubber id; a child with no id here can be marked by name (7.16.0, the
-  // phone's local "Mark checked out").
-  const sameNight = checkedOutTonight.date === tonight.date;
-  const outIds = sameNight ? checkedOutTonight.ids : new Set();
-  const outNames = sameNight && checkedOutTonight.names ? checkedOutTonight.names : new Set();
-  const isOut = (keys) => keys.some((k) => (k.startsWith('id:') && outIds.has(k.slice(3)))
-    || (k.startsWith('name:') && outNames.has(k.slice(5))));
-  const fromHistory = () => {
-    const children = [];
-    let out = 0;
-    tonight.active.forEach((e) => {
-      const keys = identityKeysOfRow(e);
-      if (isOut(keys)) { out += 1; return; }
-      children.push({ keys, club: displayClub(e.clubName), firstName: String(e.firstName || '').trim() });
-    });
-    return { source: 'history', at: null, ageMs: null, children, checkedOut: out };
-  };
-
-  const rep = lastCheckinReport;
-  if (!rep) return fromHistory();
-  const ageMs = now - rep.at;
-  // A report from the future (a clock jump) is not fresh, it is broken.
-  if (ageMs < 0 || ageMs > REPORT_FRESH_MS) return fromHistory();
-  if (localDayISO(new Date(rep.at)) !== tonight.date) return fromHistory();
-
-  // Identities a PERSON took off tonight, and the club (and first name) each
-  // identity's rows were printed under. Both read the newest row per
-  // identity, the same row every other consumer treats as current.
-  const suppressed = new Set();
-  const clubByKey = new Map();
-  const firstByKey = new Map();
-  const seen = new Set();
-  for (const e of tonight.entries) {
-    if (!`${e.firstName || ''} ${e.lastName || ''}`.trim()) continue;
-    const canonical = historyIdentityKey(e);
-    if (seen.has(canonical)) continue;
-    seen.add(canonical);
-    const keys = identityKeysOfRow(e);
-    const club = displayClub(e.clubName);
-    const first = String(e.firstName || '').trim();
-    keys.forEach((k) => {
-      if (club && !clubByKey.has(k)) clubByKey.set(k, club);
-      if (first && !firstByKey.has(k)) firstByKey.set(k, first);
-      if (e.undone && e.undoneBy) suppressed.add(k);
-    });
-  }
-
-  const byKey = new Map();
-  const slots = [];
-  const left = new Set();
-  const add = (keys, club, firstName) => {
-    if (!keys.length) return;
-    if (keys.some((k) => suppressed.has(k))) return;
-    if (isOut(keys)) { left.add(keys.find((k) => k.startsWith('id:')) || keys[0]); return; }
-    // Two different TwoTimTwo ids are two different children, whatever their
-    // names say: a name match only joins an entry to a slot that has no id, or
-    // the same one. (A shared bogus "name" merged every child with the same
-    // report summary into one: 11 checked in read as 2, 2026-10-07.)
-    const id = keys.find((k) => k.startsWith('id:'));
-    let slot = null;
-    for (const k of keys) {
-      const hit = byKey.get(k);
-      if (!hit) continue;
-      const hitId = [...hit.keys].find((x) => x.startsWith('id:'));
-      if (id && hitId && hitId !== id) continue;
-      slot = hit;
-      break;
-    }
-    if (!slot) { slot = { keys: new Set(), club: '', firstName: '' }; slots.push(slot); }
-    if (!slot.club && club) slot.club = club;
-    if (!slot.firstName && firstName) slot.firstName = firstName;
-    keys.forEach((k) => { slot.keys.add(k); byKey.set(k, slot); });
-  };
-
-  // The report is the floor.
-  (Array.isArray(rep.entries) ? rep.entries : []).forEach((entry) => {
-    add(identityKeysOfReportEntry(entry), displayClub(entry && entry.club), splitFullName(entry && entry.name).firstName);
-  });
-  // Plus everyone who checked in since it was taken. Visitors excluded: they
-  // have no TwoTimTwo record, so the next report would silently drop them and
-  // the count would go backwards on screen.
-  tonight.active.forEach((row) => {
-    if (row.visitor) return;
-    const at = Date.parse(row.timestamp);
-    if (!Number.isFinite(at) || at <= rep.at) return;
-    add(identityKeysOfRow(row), displayClub(row.clubName), String(row.firstName || '').trim());
-  });
-
-  const children = slots.map((slot) => {
-    let club = slot.club;
-    let firstName = '';
-    for (const k of slot.keys) {
-      if (!club && clubByKey.has(k)) club = clubByKey.get(k);
-      // The name this printer printed beats the report's first word ("Mary
-      // Kate" prints as Mary Kate; the report's split would say Mary).
-      if (!firstName && firstByKey.has(k)) firstName = firstByKey.get(k);
-    }
-    return { keys: [...slot.keys], club: club || '', firstName: firstName || slot.firstName };
-  });
-
-  return { source: 'report', at: rep.at, ageMs, children, checkedOut: left.size };
+  return tonightRules.tonightHereNow(tonightState(tonight, now), now);
 }
 
 /**
- * THE one function every surface asks "how many children are here tonight".
- * Pure but for its read of lastCheckinReport, so both modes are unit-tested
- * without a socket, a scrape or a clock.
+ * THE one function every surface asks "how many children are here tonight"
+ * (lobby/shared/tonight.js).
  *
  * @returns {{source:'report'|'history', at:number|null, ageMs:number|null,
  *            checkedIn:number, byClub:Object}}
  */
 function authoritativeTonight(tonight = tonightCheckins(), now = Date.now()) {
-  const here = tonightHereNow(tonight, now);
-  const byClub = {};
-  here.children.forEach((c) => {
-    const name = c.club || 'No club';
-    byClub[name] = (byClub[name] || 0) + 1;
-  });
-  return { source: here.source, at: here.at, ageMs: here.ageMs, checkedIn: here.children.length, checkedOut: here.checkedOut, byClub };
+  return tonightRules.authoritativeTonight(tonightState(tonight, now), now);
 }
 
 // ── Tonight at a glance ───────────────────────────────────────────────────────

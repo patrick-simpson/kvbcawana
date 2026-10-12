@@ -244,8 +244,13 @@ the extra icon sprite they use (never a symbol id the family sprite already has)
   in as `input.template` — the renderer never reads config (golden-suite
   purity). Fail open: any broken template renders the stock label. Safety
   content (allergy icons, no-photo camera, birthday) is not templatable.
-- **Three modules are GENERATED copies of `lobby/shared/`** (the installer
-  holds only this folder): `print-server/clubTable.js` (the club table and the
+- **Four modules are GENERATED copies of `lobby/shared/`** (the installer
+  holds only this folder): `print-server/tonight.js` (THE count, P5: the pure
+  rules of `tonightHereNow()` / `authoritativeTonight()`, the identity keys,
+  `reportIsPartial` and the mass-undo guard `massUndoRefused`, which the sync
+  Worker imports from the same source; `server.js` only supplies its own rows,
+  report, check-outs and clock; `scripts/test-tonight-shared.cjs`),
+  `print-server/clubTable.js` (the club table and the
   two matchers; `clubKey()` is the substring one on purpose, `brand.js`'s
   `MARK_FILES` / `MARK_NAMES` and `CLUB_MONOGRAM` come from the same rows),
   `print-server/textClean.js` (`cleanName`, `stripControlChars`,
@@ -270,7 +275,8 @@ DYMO 30256, `w167h288`). The Windows path is untouched.
 truth when it is fresh (received within `REPORT_FRESH_MS`, 12 minutes); the
 printer's own history is the fallback, and `/health` raises a
 `{type:'tally-source'}` warning whenever it is the one being used.
-`authoritativeTonight()` in `print-server/server.js` is **the one function** —
+`authoritativeTonight()` (its rules are `lobby/shared/tonight.js`, a generated copy
+in `print-server/tonight.js`; `server.js` holds a thin wrapper) is **the one function** —
 `publishTally()`, `computeTonightStats()` (so `/stats/tonight`),
 `/phone/tonight` and `/health` all read it, and none of them
 computes a count of its own. Rules: only a report the reconcile pass actually
