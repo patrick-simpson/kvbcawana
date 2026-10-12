@@ -11,6 +11,8 @@ import { bootKiosk, tick } from './kiosk-dom.mjs';
 // modules from src/shared/ (family-assets copies); jsdom cannot import(), so the harness hands them over.
 import * as sp from '../../lobby/shared/sync-protocol.js';
 import * as cc from '../../lobby/shared/cloud-crypto.js';
+// The registry's own allowlist (the Worker applies exactly this to a hello's status).
+import { isScreenId, sanitizeScreenStatus } from '../../lobby/src/lib/syncSpecs.js';
 
 const REPO = path.dirname(new URL(import.meta.url).pathname).replace(/\/test$/, '');
 const SYNC_JS = readFileSync(path.join(REPO, 'public', 'src', 'sync.js'), 'utf8');
@@ -24,10 +26,11 @@ const V2_AUTHKEY = await cc.deriveAuthKey('kennebec', V2_PARAMS.salt, V2_PARAMS.
 const settle = async () => { for (let i = 0; i < 8; i++) await tick(); };
 
 /** Boot the kiosk, then sync.js against a stand-in service. */
-function boot({ url = SERVICE, journey = null, prefs = {}, stateStatus = 200, v2 = false, modules = true } = {}) {
-  const kiosk = bootKiosk({}, prefs);
+function boot({ url = SERVICE, journey = null, prefs = {}, stateStatus = 200, v2 = false, modules = true, pageUrl, screenName = '', tuning = null } = {}) {
+  const kiosk = bootKiosk({}, prefs, undefined, null, pageUrl);
   const { window } = kiosk;
   if (modules) window.journeyAuthModules = { sp, cc };
+  if (tuning) window.journeyScreenTuning = tuning;
   const calls = [];
   const inner = window.fetch;
   const reply = (status, body) => Promise.resolve({
@@ -54,6 +57,7 @@ function boot({ url = SERVICE, journey = null, prefs = {}, stateStatus = 200, v2
     }
     if (route === '/v1/state') return reply(stateStatus, { journey });
     if (route === '/v1/journey') return reply(200, { savedAt: '2026-10-01T19:00:00.000Z', settings: body.settings });
+    if (route === '/v1/screens/hello') return reply(200, { screen: { id: body.id, kind: body.kind, name: screenName || body.name }, settings: null });
     return reply(404, {});
   };
   const script = window.document.createElement('script');
@@ -221,5 +225,107 @@ test('if the shared modules cannot load, the kiosk still signs in the old way', 
   for (let i = 0; i < 40 && !k.window.localStorage.getItem('awanaSyncSession.v1'); i++) await new Promise((r) => setTimeout(r, 100));
   assert.equal(k.window.localStorage.getItem('awanaSyncSession.v1'), SESSION);
   assert.deepEqual(k.calls.find((c) => c.route === '/v1/login').body, { passphrase: 'kennebec' });
+  k.close();
+});
+
+// ── This kiosk on the settings page (the screen registry) ──
+
+const hellos = (k) => k.calls.filter((c) => c.route === '/v1/screens/hello');
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+const GIB = 1024 ** 3;
+/** What schedule.js's journeyDownloadStatus() answers, as it shapes it. */
+const DOWNLOADS = {
+  total: 63, saved: 24, bytesSaved: 11.2 * GIB, bytesTotal: 13.9 * GIB, downloading: true, waiting: null, paused: false,
+  percent: 42, currentWeek: 7, lastSavedAt: '2026-10-12T14:00:00.000Z', error: null, auto: true, supported: true, known: true,
+};
+
+test('signed in, the kiosk says hello as a Journey kiosk under an id it keeps in the lobby\'s slot', async () => {
+  const other = { id: 'tv_aaaaaaaaaaaaaaaaaaaa', synced: null };
+  const k = boot({ journey: ROOM, prefs: { 'awanaSyncSession.v1': SESSION, 'awanaScreens.v1': JSON.stringify({ lobby: other }) }, screenName: 'Journey room' });
+  await settle();
+  const [hi] = hellos(k);
+  assert.ok(hi, 'a hello went out at start');
+  assert.equal(hi.method, 'POST');
+  assert.equal(hi.auth, `Bearer ${SESSION}`);
+  assert.equal(hi.body.kind, 'journey');
+  assert.equal(hi.body.name, 'Journey kiosk');
+  assert.ok(isScreenId(hi.body.id), 'an id the Worker accepts');
+  assert.equal('status' in hi.body, false, 'no status until the kiosk knows what is saved (jsdom cannot save lessons)');
+  const slot = JSON.parse(k.window.localStorage.getItem('awanaScreens.v1'));
+  assert.deepEqual(slot.lobby, other, 'the lobby\'s own entry is left alone');
+  assert.equal(slot.journey.id, hi.body.id);
+  assert.equal(slot.journey.name, 'Journey room', 'the name /settings gave it is kept');
+  // The same id at the next hello, under the name it was given.
+  await k.window.journeySync.hello();
+  assert.equal(hellos(k).at(-1).body.id, hi.body.id);
+  assert.equal(hellos(k).at(-1).body.name, 'Journey room');
+  k.close();
+});
+
+test('its saved lessons ride the hello, trimmed to exactly what the registry keeps, never twice in a minute', async () => {
+  const k = boot({ journey: ROOM, prefs: { 'awanaSyncSession.v1': SESSION }, tuning: { minGapMs: 300, helloMs: 60_000 } });
+  let status = { ...DOWNLOADS, error: `Week 7 · Leader: ${'x'.repeat(400)}` };
+  k.window.journeyDownloadStatus = () => status;
+  await settle();
+  const first = hellos(k)[0];
+  assert.ok(first.body.status, 'the first hello carries it');
+  const sent = first.body.status;
+  assert.deepEqual(Object.keys(sent), ['lessons']);
+  assert.equal(JSON.stringify(sent).includes('supported'), false);
+  assert.ok(sent.lessons.error.length <= 120);
+  assert.deepEqual(sanitizeScreenStatus('journey', sent), sent, 'the Worker keeps every field the kiosk sends, unchanged');
+  assert.equal(sent.lessons.currentWeek, 7);
+
+  // Bytes arriving: one hello once the minute (here 300 ms) is up, not one per event.
+  for (let i = 1; i <= 5; i++) {
+    status = { ...status, bytesSaved: status.bytesSaved + i * 1e6 };
+    k.window.dispatchEvent(new k.window.CustomEvent('journey-download-status', { detail: status }));
+  }
+  await settle();
+  assert.equal(hellos(k).length, 1, 'not before the gap');
+  await wait(400);
+  await settle();
+  assert.equal(hellos(k).length, 2);
+  assert.equal(hellos(k)[1].body.status.lessons.bytesSaved, Math.floor(status.bytesSaved));
+  // Nothing changed: nothing sent.
+  k.window.dispatchEvent(new k.window.CustomEvent('journey-download-status', { detail: status }));
+  await wait(400);
+  await settle();
+  assert.equal(hellos(k).length, 2);
+  k.close();
+});
+
+test('a kiosk that does not know yet, or cannot save lessons, says hello without a status', async () => {
+  const k = boot({ journey: ROOM, prefs: { 'awanaSyncSession.v1': SESSION } });
+  k.window.journeyDownloadStatus = () => ({ ...DOWNLOADS, known: false });
+  await settle();
+  assert.equal('status' in hellos(k)[0].body, false);
+  k.window.journeyDownloadStatus = () => ({ ...DOWNLOADS, supported: false });
+  assert.equal(k.window.journeySync.lessonsStatus(), null);
+  k.close();
+});
+
+test('silent when signed out, and the configure window is never a second kiosk', async () => {
+  const out = boot({ journey: ROOM });
+  await settle();
+  await out.window.journeySync.hello();
+  assert.equal(hellos(out).length, 0);
+  out.close();
+  const cfg = boot({ journey: ROOM, prefs: { 'awanaSyncSession.v1': SESSION }, pageUrl: 'https://example.test/?configure=1' });
+  await settle();
+  await cfg.window.journeySync.hello();
+  assert.equal(hellos(cfg).length, 0);
+  assert.equal(cfg.window.localStorage.getItem('awanaScreens.v1'), null);
+  cfg.close();
+});
+
+test('signing in says hello at once', async () => {
+  const k = boot({ journey: ROOM });
+  await settle();
+  k.document.getElementById('sync-passphrase').value = 'kennebec';
+  k.document.getElementById('sync-signin-btn').click();
+  for (let i = 0; i < 40 && !hellos(k).length; i++) await wait(50);
+  assert.equal(hellos(k).length, 1);
+  assert.equal(hellos(k)[0].body.kind, 'journey');
   k.close();
 });

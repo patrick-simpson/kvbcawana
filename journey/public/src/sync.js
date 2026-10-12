@@ -24,7 +24,16 @@
      at sign-in from src/shared/ (copied by scripts/family-assets.mjs, never
      edited). The derivation is 600000 PBKDF2 rounds, about a second ONCE, off
      the page's thread; nothing re-derives afterwards (every later
-     request rides the session). */
+     request rides the session).
+   - Signed in, the kiosk also says hello to the screen registry
+     (POST /v1/screens/hello, kind 'journey', lobby/worker/src/routes.md 10.7)
+     so awana.kvbchurch.org/settings lists it, with how saving the lessons is
+     going (schedule.js's journeyDownloadStatus(), trimmed to numbers,
+     switches and one short reason). Its id is made once and kept in the
+     lobby's own slot, awanaScreens.v1, under 'journey'. A hello every two
+     minutes, and one when the status changes, never two within a minute.
+     Silent when signed out, unreachable, or in configure mode (the app's
+     Settings window is not a second kiosk). */
 
 (function () {
   'use strict';
@@ -53,9 +62,25 @@
   };
   var CAPTION_SIZES = ['0.8', '1', '1.3', '1.6'];
 
+  // The screen registry (the lobby's lib/screenSync.js format).
+  var SCREENS_KEY = 'awanaScreens.v1';
+  var SCREEN_KIND = 'journey';
+  var SCREEN_NAME = 'Journey kiosk';
+  var SCREEN_ID_RE = /^[A-Za-z0-9_-]{16,64}$/;
+  var SCREEN_TUNING = { helloMs: 2 * 60 * 1000, minGapMs: 60 * 1000 };
+  var STATUS_ERROR_MAX = 120;
+  var CONFIGURE = (function () {
+    try { return new URLSearchParams(window.location.search).get('configure') === '1'; } catch (e) { return false; }
+  })();
+
   var base = '';
   var pushTimer = null;
   var lastPushed = '';
+  var helloTimer = null;
+  var statusTimer = null;
+  var lastHelloAt = 0;
+  var lastStatusSent = '';
+  var screenGone = false; // a service without the registry (404): stop asking
 
   function get(key) {
     try { return localStorage.getItem(key); } catch (e) { return null; }
@@ -210,6 +235,118 @@
     pushTimer = setTimeout(push, PUSH_DELAY_MS);
   }
 
+  /* ── This kiosk on the settings page ── */
+
+  // A test may shorten the waits (read at each use).
+  function screenTuning() {
+    var t = window.journeyScreenTuning || {};
+    return {
+      helloMs: typeof t.helloMs === 'number' ? t.helloMs : SCREEN_TUNING.helloMs,
+      minGapMs: typeof t.minGapMs === 'number' ? t.minGapMs : SCREEN_TUNING.minGapMs,
+    };
+  }
+
+  function screensAll() {
+    var all = parse(get(SCREENS_KEY));
+    return all && typeof all === 'object' && !Array.isArray(all) ? all : {};
+  }
+  function screenSlot() {
+    var slot = screensAll()[SCREEN_KIND];
+    return slot && typeof slot === 'object' && SCREEN_ID_RE.test(slot.id) ? slot : null;
+  }
+  function saveScreenSlot(patch) {
+    var all = screensAll();
+    all[SCREEN_KIND] = Object.assign({}, all[SCREEN_KIND] || {}, patch);
+    return set(SCREENS_KEY, JSON.stringify(all));
+  }
+  /* This kiosk's id: 16 random bytes, url-safe, made once. '' when storage
+     is blocked (a kiosk that cannot keep an id would register anew at every
+     load, so it does not register). */
+  function screenId() {
+    var have = screenSlot();
+    if (have) return have.id;
+    var c = window.crypto;
+    if (!c || typeof c.getRandomValues !== 'function') return '';
+    var bytes = c.getRandomValues(new Uint8Array(16));
+    var id = btoa(String.fromCharCode.apply(null, bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    if (!saveScreenSlot({ id: id, synced: null })) return '';
+    var check = screenSlot();
+    return check && check.id === id ? id : '';
+  }
+
+  function count(v, max) {
+    return typeof v === 'number' && isFinite(v) ? Math.min(max, Math.max(0, Math.floor(v))) : 0;
+  }
+  /* The saved lessons, trimmed to what the registry keeps; null until the
+     kiosk knows (it reads its disk a few minutes after load) or where it
+     cannot save lessons at all. */
+  function lessonsStatus() {
+    var fn = window.journeyDownloadStatus;
+    if (typeof fn !== 'function') return null;
+    var s;
+    try { s = fn(); } catch (e) { return null; }
+    if (!s || !s.supported || !s.known || !(s.total > 0)) return null;
+    return {
+      saved: count(s.saved, 999),
+      total: count(s.total, 999),
+      bytesSaved: count(s.bytesSaved, 1e13),
+      bytesTotal: count(s.bytesTotal, 1e13),
+      downloading: s.downloading === true,
+      waiting: Boolean(s.waiting),
+      paused: s.paused === true,
+      percent: count(s.percent, 100),
+      currentWeek: typeof s.currentWeek === 'number' && s.currentWeek >= 1 ? count(s.currentWeek, 99) : null,
+      lastSavedAt: typeof s.lastSavedAt === 'string' ? s.lastSavedAt : null,
+      error: typeof s.error === 'string' && s.error ? s.error.slice(0, STATUS_ERROR_MAX) : null,
+      auto: s.auto === true,
+    };
+  }
+
+  function scheduleHello() {
+    clearTimeout(helloTimer);
+    helloTimer = setTimeout(hello, screenTuning().helloMs);
+  }
+
+  /* One hello: who this kiosk is, and its saved lessons when it knows them.
+     The next one is two minutes after the last, whatever started it. */
+  function hello() {
+    if (CONFIGURE || !base || screenGone) return Promise.resolve();
+    clearTimeout(statusTimer);
+    statusTimer = null;
+    scheduleHello();
+    var s = session();
+    if (!s) return Promise.resolve();
+    var id = screenId();
+    if (!id) return Promise.resolve();
+    var slot = screenSlot() || {};
+    var body = { id: id, kind: SCREEN_KIND, name: typeof slot.name === 'string' && slot.name ? slot.name : SCREEN_NAME };
+    var status = lessonsStatus();
+    var snapshot = status ? JSON.stringify(status) : '';
+    if (status) body.status = { lessons: status };
+    lastHelloAt = Date.now();
+    return request('/v1/screens/hello', { method: 'POST', body: body, session: s }).then(function (res) {
+      if (res.status === 404) { screenGone = true; clearTimeout(helloTimer); return; }
+      if (!res.ok || !res.body || !res.body.screen) return;
+      if (status) lastStatusSent = snapshot;
+      var name = res.body.screen.name;
+      if (typeof name === 'string' && name && name !== slot.name) saveScreenSlot({ name: name.slice(0, 40) });
+    });
+  }
+
+  /* The download status changed: a hello when it differs from the last one
+     sent, never sooner than a minute after the last hello. */
+  function statusChanged() {
+    if (CONFIGURE || !base || screenGone || !session() || statusTimer) return;
+    var status = lessonsStatus();
+    if (!status || JSON.stringify(status) === lastStatusSent) return;
+    var wait = Math.max(0, lastHelloAt + screenTuning().minGapMs - Date.now());
+    statusTimer = setTimeout(function () {
+      statusTimer = null;
+      var now = lessonsStatus();
+      if (now && JSON.stringify(now) !== lastStatusSent) hello();
+    }, wait);
+  }
+
   function signIn() {
     var input = document.getElementById('sync-passphrase');
     var passphrase = normalize(input.value);
@@ -244,6 +381,7 @@
       input.value = '';
       render();
       note('Signed in. Room settings now follow every Journey screen.', 'ok');
+      hello();
       var journey = b.state && b.state.journey;
       if (journey && typeof journey.savedAt === 'string') {
         applyRoom(journey.settings);
@@ -302,6 +440,11 @@
           pull();
           setInterval(pull, POLL_MS);
           window.addEventListener('online', pull);
+          hello();
+          window.addEventListener('online', function () {
+            if (Date.now() - lastHelloAt >= screenTuning().minGapMs) hello();
+          });
+          window.addEventListener('journey-download-status', statusChanged);
         }, function () {
           setTimeout(readIndex, indexRetryWait(attempt++));
         });
@@ -317,14 +460,17 @@
     window.addEventListener('storage', function (e) {
       if (e.key !== SESSION_KEY && e.key !== null) return;
       render();
-      if (session()) pull();
+      if (session()) { pull(); hello(); }
     });
   }
   // 15 s, 30 s, 60 s, then every five minutes.
   function indexRetryWait(n) { return Math.min(15000 * Math.pow(2, n), 5 * 60 * 1000); }
 
   // Test seam: the jsdom harness drives the same functions the page uses.
-  window.journeySync = { readRoom: readRoom, applyRoom: applyRoom, pull: pull, push: push, signIn: signIn, signOut: signOut, indexRetryWait: indexRetryWait };
+  window.journeySync = {
+    readRoom: readRoom, applyRoom: applyRoom, pull: pull, push: push, signIn: signIn, signOut: signOut, indexRetryWait: indexRetryWait,
+    hello: hello, lessonsStatus: lessonsStatus,
+  };
 
   start();
 })();
