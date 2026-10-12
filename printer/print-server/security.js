@@ -30,14 +30,14 @@
 // website open in the volunteer's browser.
 
 const crypto = require('crypto');
+// The text cleaner every trust-boundary caller shares (lobby/shared/text.js,
+// through its generated copy).
+const { isControlCharCode, stripControlChars, cleanText } = require('./textClean');
 
 // ── Control characters ────────────────────────────────────────────────────────
-// Expressed as char-code checks rather than regex escapes: this file is read
-// and edited often, and a mangled \x1f in a character class fails silently in
-// the direction of accepting too much.
-function isControlCharCode(code) {
-  return code < 0x20 || code === 0x7f;
-}
+// isControlCharCode and stripControlChars are textClean.js's (char-code checks
+// rather than regex escapes: a mangled \x1f in a character class fails
+// silently in the direction of accepting too much).
 
 function hasControlChars(value) {
   const s = String(value == null ? '' : value);
@@ -45,16 +45,6 @@ function hasControlChars(value) {
     if (isControlCharCode(s.charCodeAt(i))) return true;
   }
   return false;
-}
-
-function stripControlChars(value, replacement) {
-  const s = String(value == null ? '' : value);
-  const fill = replacement === undefined ? ' ' : replacement;
-  let out = '';
-  for (let i = 0; i < s.length; i++) {
-    out += isControlCharCode(s.charCodeAt(i)) ? fill : s[i];
-  }
-  return out;
 }
 
 // ── Loopback detection ────────────────────────────────────────────────────────
@@ -414,7 +404,7 @@ const STORED_NAME_MAX = 80;
 
 function sanitizeStoredText(value, max) {
   const limit = Number.isFinite(max) ? max : STORED_NAME_MAX;
-  return stripControlChars(value, ' ').trim().slice(0, limit);
+  return cleanText(value, limit, { coerce: true, control: ' ' });
 }
 
 // ── History retention ─────────────────────────────────────────────────────────

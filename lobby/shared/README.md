@@ -87,3 +87,4 @@ How each reader loads one:
 | --- | --- | --- |
 | `clubNight.js` | When a club night is on and when a screen shows for it (Eastern, Wednesday, 5-8 pm, `noClub`, special dates, past-season summer, per-computer hours) | `lobby/desktop/src/clubNight.js`, `printer/electron-app/src/display/clubNight.js` |
 | `clubs.js` | The club table (ids, names, aliases, colors, mark names, label monograms) and its two matchers: the lobby's exact alias lookup, the print server's substring match on label text | `printer/print-server/clubTable.js` |
+| `text.js` | The trust-boundary text cleaner (control characters, trim, per-caller limits, the notice's plain text) behind the lobby's `cleanString`/`plainText` and the print server's `cleanName`, `stripControlChars`, `sanitizeStoredText` and `cleanFriendName`; the Worker reaches it through `sharedSettings.js` | `printer/print-server/textClean.js` |

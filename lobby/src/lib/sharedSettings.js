@@ -1,7 +1,7 @@
 // @ts-check
 // The lobby screens' SHARED settings (contract v6): which settings follow the
 // check-in computer, and the strict allowlist sanitizer for the sealed
-// `settings` event that carries them. Pure and import-free, so the socket's
+// `settings` event that carries them. Pure (its one import is shared/text.js), so the socket's
 // sanitizer table and the config store can both use it.
 //
 // Owner, 2026-10-01: "settings changes should apply on all devices", except
@@ -13,6 +13,8 @@
 // SHARED_SPEC is the printer's SETTINGS_SPEC (print-server/events.js) and the
 // contract's `events.settings.keys`, rule for rule; sharedSettings.test.js
 // fails if this copy drifts from the contract vectors.
+
+import { plainText as sharedPlainText } from '../../shared/text.js';
 
 /**
  * @typedef {{ type: 'bool' }
@@ -84,17 +86,12 @@ const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 const SLUG_RE = /^[a-z0-9][a-z0-9-]*$/;
 
 /**
- * The printer's plainText(): no markup, one line, capped.
+ * The printer's plainText(): no markup, one line, capped (shared/text.js).
  * @param {unknown} s
  * @param {number} max
  */
 function plainText(s, max) {
-  return String(s == null ? '' : s)
-    .replace(/<[^>]*>/g, ' ')
-    .replace(/[<>]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, max);
+  return sharedPlainText(s, max, { coerce: true });
 }
 
 /**

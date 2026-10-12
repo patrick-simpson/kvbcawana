@@ -27,6 +27,7 @@ const syncClient = require('./sync-client');
 const phoneRelay = require('./phone-relay');
 const pickup = require('./pickup');
 const { CLUB_TABLE, clubKeyByLabel } = require('./clubTable');
+const { cleanText } = require('./textClean');
 const { execFile } = require('child_process');
 const cups = require('./cups');
 // The Raspberry Pi print station (ROADMAP.md#cloud-check-in) prints through CUPS. It is
@@ -3383,8 +3384,7 @@ function isBarfNight(now = new Date()) {
 // The friend's first name as a volunteer typed it: one line, no control
 // characters, at most 24 characters. '' for anything else.
 function cleanFriendName(raw) {
-  if (typeof raw !== 'string') return '';
-  return raw.replace(/[\u0000-\u001f\u007f<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, 24);
+  return cleanText(raw, 24, { control: '', angle: true, collapse: true });
 }
 
 // Tell the sync service who brought a friend tonight (BARF Night's 6:30 email,

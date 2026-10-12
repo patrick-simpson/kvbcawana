@@ -24,6 +24,7 @@ export const COPIES = [
   ['lobby/shared/clubNight.js', 'lobby/desktop/src/clubNight.js', 'esm'],
   ['lobby/shared/clubNight.js', 'printer/electron-app/src/display/clubNight.js', 'cjs'],
   ['lobby/shared/clubs.js', 'printer/print-server/clubTable.js', 'cjs'],
+  ['lobby/shared/text.js', 'printer/print-server/textClean.js', 'cjs'],
 ];
 
 export function render(source, format, src) {

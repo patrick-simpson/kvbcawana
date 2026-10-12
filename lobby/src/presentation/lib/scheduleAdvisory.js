@@ -3,7 +3,7 @@
  * a replacement for shared/schedule.json or the device-local "skip
  * weeks" overlay (scheduleOverlay.js). Sourced from the print server's
  * `schedule` event (contract v3, sanitized by
- * src/lib/eventSanitizers.js sanitizeSchedule): a bare calendar date,
+ * src/lib/eventSanitizers.js sanitizeScheduleEvent): a bare calendar date,
  * an optional public meeting theme, and an optional "no club this
  * week" flag — nothing that could ever hard-break the projector.
  *
