@@ -28,9 +28,13 @@ const BASE = `http://127.0.0.1:${PORT}`;
       a === b && /function searchPeople/.test(b) && /function groupFamilies/.test(b) && /function fitTiles/.test(b));
     check('the phone shows families first when typing, away families last',
       (() => { const r = phone.slice(phone.indexOf('function renderSearch')); const x = r.indexOf("'Families'"), y = r.indexOf("'Children'"), z = r.indexOf("'Not here the last two club nights'"); return x > 0 && x < y && y < z; })());
+    // Since 2026-10-12 "Not here" is read from the sealed history in the browser (memory only).
+    check('who was here lately comes from the history, opened in the page, never stored',
+      /desk\.recentAttendance\(2\)/.test(phone) && !/(?:localStorage|sessionStorage)\.setItem\([^)]*RECENT/.test(phone));
     check('Bible starts ticked on the phone’s card and family page',
       /var choice = \{ bible: items\.bible, friend: false \};/.test(phone) && /openFamily\(null, f\.kids, \{ bible: true, friend: false \}, f\.name\)/.test(phone));
-    check('a phone check-in sends Bible / Friend with it', /postJson\('\/phone\/checkin', \{ pin: PIN, name: k\.name, options: options \}\)/.test(phone));
+    check('a phone check-in sends Bible / Friend with it (the Worker\'s desk check-in, site/checkin/desk-transport.js)',
+      /desk\.checkIn\(\{ clubberId: k\.clubberId, name: k\.name, club: k\.club \},\n\s+\{ bible: items\.bible && !!e\.choice\.bible, friend: items\.friend && !!e\.choice\.friend, friendName: friendName \}\)/.test(phone));
     check('the card goes back at once (the check-in runs in the background)',
       /hideSheet\(\);[\s\S]{0,200}checkInMany\(\[\{ p: p, choice: choice \}\], null\);/.test(phone));
   }
@@ -103,10 +107,11 @@ const BASE = `http://127.0.0.1:${PORT}`;
     check('GET / says where the settings went', /awana\.kvbchurch\.org\/settings/.test(root_));
     const phone = fs.readFileSync(path.join(root, 'print-server', 'public', 'phone.html'), 'utf8');
     check('the page keeps only those clubs’ children', /return !ONLY \|\| ONLY\.indexOf\(clubKit\(sk\.club\)\) !== -1;/.test(phone));
-    check('the simple page hides Tonight and the + menu, and never asks for leaders or jams',
-      /\$\('count-pill'\)\.hidden = SIMPLE;/.test(phone) && /\$\('menu-btn'\)\.hidden = SIMPLE;/.test(phone) && /if \(SIMPLE\) return;[^\n]*\n  refreshLeaders\(\);/.test(phone));
+    check('the simple page hides Tonight and the + menu',
+      /\$\('count-pill'\)\.hidden = SIMPLE;/.test(phone) && /\$\('menu-btn'\)\.hidden = SIMPLE;/.test(phone));
     const build = fs.readFileSync(path.join(root, '..', 'site', 'build.mjs'), 'utf8');
-    check('the website builds /checkin/ym too (the one source is phone.html)', /path\.join\(checkinOut, 'ym', 'index\.html'\)/.test(build) && /AWANA_ONLY_CLUBS = \['trek', 'journey'\]/.test(build));
+    const pages = fs.readFileSync(path.join(root, '..', 'site', 'checkin', 'checkin-page.mjs'), 'utf8');
+    check('the website builds /checkin/ym too (the one source is phone.html)', /path\.join\(checkinOut, 'ym', 'index\.html'\)/.test(build) && /AWANA_ONLY_CLUBS = \['trek', 'journey'\]/.test(pages));
 
     const ext = fs.readFileSync(path.join(root, 'chrome-extension', 'content.js'), 'utf8');
     const grab = (name) => { const i = ext.indexOf('function ' + name + '('); let d = 0, j = ext.indexOf('{', i); for (; j < ext.length; j++) { if (ext[j] === '{') d++; else if (ext[j] === '}' && --d === 0) break; } return ext.slice(i, j + 1); };

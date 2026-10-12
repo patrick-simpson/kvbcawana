@@ -4,15 +4,26 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
 <meta name="theme-color" content="#4C72B8">
+<meta name="robots" content="noindex">
 <title>Club Phone Check-in</title>
-<!-- The phone check-in (7.7.0): the touch check-in on a phone. Families still
-     to come, families-first search, the child's card with Bible ticked, the
-     brothers and sisters' page, the same jelly. Tonight and the other prints
-     sit behind the count pill and the + button.
-     The brand kit mirror (public/brand/), served to the Wi-Fi without a PIN
-     because this page is the PIN screen; see BRAND_PUBLIC_PATH in server.js.
-     The hex after each var() is the kit's own value, a fallback pinned to
-     tokens.css by scripts/test-dashboard-chrome.cjs. -->
+<!-- The check-in page: awana.kvbchurch.org/checkin (and /checkin/ym), for phones,
+     tablets and the desk alike (owner, 2026-10-12: ONE check-in page; /desk
+     redirects here). The touch check-in on a phone: families still to come,
+     families-first search, the child's card with Bible ticked, the brothers and
+     sisters' page, the same jelly; Tonight and the other prints sit behind the
+     count pill and the + button.
+     Underneath it is the desk's online path (ROADMAP.md#online-check-in): signed
+     in with the church passphrase (passphrase v2, the key derived HERE), every
+     check-in a claim on the sync Worker, TwoTimTwo's own post and a settle, the
+     print job sealed in this page to the print stations (at most once) and the
+     history row sealed to the history key. site/checkin/desk-transport.js is
+     every Worker call and every seal; site/build.mjs serves it, cloud-crypto.js
+     and clubs.js beside this page.
+     This file stays in the print server's folder because its touch-core block
+     is the laptop touch screen's own (scripts/sync-touch-core.cjs); the print
+     server does not serve it. The brand kit mirror (public/brand/) is copied to
+     /checkin/brand/ by the site build. The hex after each var() is the kit's own
+     value, a fallback pinned to tokens.css by scripts/test-dashboard-chrome.cjs. -->
 <link rel="stylesheet" href="/brand/fonts.css">
 <link rel="stylesheet" href="/brand/tokens.css">
 <style>
@@ -240,6 +251,16 @@
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation: none !important; transition: none !important; }
   }
+
+  /* ── The service's state: busy, an old list, no internet, the printer ── */
+  .down-note.bad { background: #FDE2E2; color: #7A1F23; }
+  .statusline { display: flex; align-items: center; gap: 10px; margin: 8px 4px 0; font-size: 14px; }
+  .led { display: inline-flex; align-items: center; gap: 7px; font-weight: 700; color: var(--ink-soft); }
+  .led::before { content: ""; width: 10px; height: 10px; border-radius: 50%; background: #94A3B8; flex: none; }
+  .led.ok { color: var(--good); } .led.ok::before { background: var(--c-tnt); }
+  .led.queued { color: var(--c-blue-deep); } .led.queued::before { background: var(--c-sun); }
+  .led.check { color: var(--bad); } .led.check::before { background: var(--c-sparks); }
+  .pin .quiet { margin: 0; }
 </style>
 </head>
 <body>
@@ -251,13 +272,14 @@
 </header>
 
 <div class="pin" id="pin-screen">
-  <div class="card">
+  <form class="card" id="pin-form" autocomplete="off">
     <h2>Phone check-in</h2>
-    <p>Type the PIN from the check-in desk.</p>
-    <input type="password" id="pin" inputmode="numeric" autocomplete="off" placeholder="PIN" aria-label="PIN">
-    <div class="err" id="pin-err"></div>
-    <button class="btn" id="pin-btn" type="button">Unlock</button>
-  </div>
+    <p id="pin-intro">Type the check-in passphrase (the one the lobby screens use).</p>
+    <input type="password" id="pin" autocomplete="off" placeholder="Passphrase" aria-label="Passphrase" style="letter-spacing:normal">
+    <div class="err" id="pin-err" role="alert"></div>
+    <button class="btn" id="pin-btn" type="submit">Unlock</button>
+    <p class="quiet">The passphrase stays in this page: it makes a key here, and nothing that names a child leaves it unsealed.</p>
+  </form>
 </div>
 
 <main id="main-screen" hidden>
@@ -267,7 +289,11 @@
       <input type="search" id="search" placeholder="Type a first or last name" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="search" aria-label="Search by first or last name">
       <button class="clear" id="search-clear" type="button" aria-label="Clear" hidden>✕</button>
     </div>
-    <p class="down-note" id="down-note" role="status" hidden>Not hearing from the check-in laptop. This list may be out of date; trying again.</p>
+    <p class="down-note" id="busy" role="status" hidden></p>
+    <p class="down-note bad" id="offline-note" role="status" hidden>No internet connection to the check-in service. Check children in on the paper sheet at the desk; they are keyed into TwoTimTwo when the internet is back. Trying again.</p>
+    <p class="down-note" id="down-note" role="status" hidden>This list is from a little while ago (TwoTimTwo could not be read just now). Trying again.</p>
+    <p class="down-note bad" id="nohistory" role="status" hidden>Check-ins are paused: the service has no history key yet, so nothing could be recorded. Check children in on TwoTimTwo itself; the print station still prints them.</p>
+    <div class="statusline"><span class="led" id="print-led" role="status">Printer status unknown</span></div>
   </div>
   <div class="list" id="list" aria-live="polite"></div>
 </main>
@@ -286,7 +312,7 @@
   <div class="chips" id="tonight-chips"></div>
   <div class="check" id="tonight-check" hidden></div>
   <div id="tonight-list"></div>
-  <div class="acts"><button class="btn ghost" id="tonight-close" type="button">Close</button></div>
+  <div class="acts"><button class="btn ghost" id="signout" type="button">Sign out</button><button class="btn ghost" id="tonight-close" type="button">Close</button></div>
 </div>
 
 <div class="sheet" id="menu-sheet" role="dialog" aria-modal="true">
@@ -304,21 +330,20 @@
   <div class="menu-sec" id="leader-panel">
     <h3>Leader tag</h3>
     <div class="field">
-      <input type="text" id="leader-name" maxlength="80" placeholder="Leader's name" autocomplete="off">
+      <input type="text" id="leader-name" maxlength="80" placeholder="Leader's name" autocomplete="off" aria-label="Leader's name">
       <select id="leader-club" aria-label="Leader's club"><option value="">No club</option></select>
       <button class="btn hot" id="leader-print" type="button">Print leader tag</button>
     </div>
     <div id="leader-chips-wrap" hidden>
       <div class="acts" style="margin-top:12px"><button class="btn ghost" id="leader-print-selected" type="button">Print selected</button></div>
       <div id="leader-chips" class="chips"></div>
-      <div class="check" id="leader-chips-note"></div>
     </div>
     <p class="err" id="leader-status"></p>
   </div>
   <div class="menu-sec" id="custom-panel">
     <h3>Custom label</h3>
     <div class="field">
-      <input type="text" id="custom-text" maxlength="60" placeholder="VOLUNTEER, KITCHEN, Room 4 Helper…" autocomplete="off">
+      <input type="text" id="custom-text" maxlength="60" placeholder="VOLUNTEER, KITCHEN, Room 4 Helper…" autocomplete="off" aria-label="Custom label text">
       <button class="btn" id="custom-print" type="button">Print custom label</button>
     </div>
     <p class="err" id="custom-status"></p>
@@ -326,10 +351,11 @@
   <div class="menu-sec" id="visitor-form">
     <h3>Visitor not on the list</h3>
     <div class="field">
-      <input type="text" id="visitor-name" maxlength="80" placeholder="Visitor's full name" autocomplete="off">
+      <input type="text" id="visitor-name" maxlength="80" placeholder="Visitor's full name" autocomplete="off" aria-label="Visitor's full name">
       <select id="visitor-club" aria-label="Visitor's club"></select>
-      <button class="btn" id="visitor-print" type="button">Print visitor label</button>
+      <button class="btn" id="visitor-print" type="button">Check in visitor</button>
     </div>
+    <p class="quiet">Counted tonight and printed; a visitor is not on TwoTimTwo.</p>
     <p class="err" id="visitor-status"></p>
   </div>
   <div class="acts"><button class="btn ghost" id="menu-close" type="button">Close</button></div>
@@ -340,7 +366,7 @@
   <p class="check" id="confirm-body"></p>
   <div class="acts">
     <button class="btn ghost" id="confirm-cancel" type="button">Cancel</button>
-    <button class="btn danger" id="confirm-ok" type="button">Remove from count</button>
+    <button class="btn danger" id="confirm-ok" type="button">OK</button>
   </div>
 </div>
 
@@ -536,45 +562,60 @@
 
   // touch-core:end
 
-// ── Online or on the Wi-Fi ─────────────────────────────────────────────────
-// On the church Wi-Fi this page is served by the laptop's print app and talks
-// to it directly, unlocked with the PIN. At awana.kvbchurch.org/checkin
-// (7.9.0; the site build sets AWANA_RELAY to its /api) it signs in with the
-// sync passphrase and every call travels through the sync service's relay:
-// the laptop collects it, runs it exactly as below, and the answer comes back.
-var RELAY = window.AWANA_RELAY || '';
-// The youth page (7.10.0: /checkin/ym online, /phone/ym on the Wi-Fi): only
-// the clubs in AWANA_ONLY_CLUBS (brand-kit keys, e.g. trek and journey), and
-// check-in only (AWANA_SIMPLE): no Tonight pill, no + menu.
+// ── The check-in service (the desk's online path) ──────────────────────────
+// Every call is the sync Worker's desk routes through ONE module,
+// /checkin/desk-transport.js (site/checkin/), which also makes every seal: the
+// passphrase becomes an authKey here (never sent, never stored), each check-in
+// is a claim, TwoTimTwo's own post and a settle on the Worker, the print job is
+// sealed to the print stations (they print it at most once) and the history row
+// to the history key. A second phone or the desk tapping the same child gets
+// "already checked in", never a second label. The youth page (/checkin/ym):
+// only the clubs in AWANA_ONLY_CLUBS (brand-kit keys, e.g. trek and journey),
+// and check-in only (AWANA_SIMPLE): no Tonight pill, no + menu.
 var ONLY = Array.isArray(window.AWANA_ONLY_CLUBS) ? window.AWANA_ONLY_CLUBS : null;
 var SIMPLE = !!window.AWANA_SIMPLE;
-var PIN_KEY = RELAY ? 'awanaCheckinSession' : 'awanaPhonePin';
+var LOCAL_KEY = 'awanaCheckinLocal.v1';
 
 // ── State ──────────────────────────────────────────────────────────────────
-var PIN = sessionStorage.getItem(PIN_KEY) || '';
-var KIDS = [];                 // the roster: { name, club, checkedIn, removedHere, inactive }
-var HOUSEHOLDS = null;         // householdIndex()-shaped, from the laptop via /phone/roster
+var desk = null;               // createDesk() from desk-transport.js, once the modules load
+var printLabel = null;
+var newRowId = null;
+var KIDS = [];                 // the roster: { clubberId, name, club, clubId, checkedIn }
+var HOUSEHOLDS = null;         // householdIndex()-shaped, from GET /v1/desk/families
+var familiesAt = 0;
 var ITEMS = { bible: [], friend: [] };
-var RECENT = null;             // { names: {} } of the last two club nights, or null
-var CLUBS = ['Puggles', 'Cubbies', 'Sparks', 'T&T', 'Trek', 'Journey'];
-var STATE = {};                // name key -> { status: 'sending'|'pending'|'restoring', id, tries }
-var TONIGHT = { checkedIn: 0, visitors: 0, byClub: {}, entries: [] };
-var REMOVING = {};
-var UNDOING = {};              // entry key -> true while TwoTimTwo's undo is under way
-var CHECKING_OUT = {};         // entry key -> true while a check-out is under way (7.16.0)
+var CLUBS = ['Puggles', 'Cubbies', 'Sparks', 'T&T', 'Trek', 'Journey'];   // replaced by clubs.js's table when it loads
+var STATE = {};                // child key -> { status: 'sending' } while this page checks them in
+var SERVER_TONIGHT = null;     // GET /v1/desk/tonight: the Worker's own count, when it answers
+var UNDOING = {};              // row key -> true while TwoTimTwo's undo (or a visitor's Remove) is under way
+var CHECKING_OUT = {};         // row key -> true while a check-out is under way
+var LOCAL = { night: '', visitors: [], out: [], at: {} };   // what only this page knows tonight
+// Who was here the last two club nights: { names: {normName: true}, ids: {clubberId: true} }
+// or null. Built in THIS page's memory from the sealed history (desk.recentAttendance(),
+// opened with the history key the passphrase sign-in unwrapped), never stored; null
+// (nobody shown as away) until it is ready, and for good when it cannot be read.
+var RECENT = null;
+var recentAskedAt = 0;
+var RECENT_RETRY_MS = 5 * 60 * 1000;
 var rosterLoaded = false;
 var unlockedState = false;
 var unlockInFlight = false;
 var pinCountdownTimer = null;
-var ROSTER_POLL_BASE_MS = 12000;
+// TwoTimTwo is read at most once every 5 s, every reader combined (the Worker's
+// one clock): this page asks for the roster no faster than every 15 s (the
+// phone page asked every 12), backs off to a minute while the service does not
+// answer, and waits out the Worker's own retryAfterMs when it is busy.
+var ROSTER_POLL_BASE_MS = 15000;
 var ROSTER_POLL_MAX_MS = 60000;
+var FAMILIES_EVERY_MS = 30 * 60 * 1000;
 var rosterPollMs = ROSTER_POLL_BASE_MS;
 var rosterPollTimer = null;
-var rosterPollResumeTimer = null;
 var rosterFetchInFlight = false;
 var rosterEpoch = 0;           // bumped by every confirmed check-in: an older roster answer is stale
-var rosterMisses = 0;          // roster polls in a row that got no answer
+var rosterMisses = 0;          // ticks in a row that could not reach the service
 var pollActive = false;
+var busyUntil = 0;
+var busyTimer = null;
 
 var KIT = {
   puggles: { color: '#1DB6D9', deep: '#1A627C' }, cubbies: { color: '#4C72B8', deep: '#2F4F8A' },
@@ -621,95 +662,43 @@ function toast(msg, ms, actionLabel, onAction, kind) {
   toastTimer = setTimeout(function() { t.classList.remove('on'); }, ms || 3000);
 }
 
-// ── Talking to the print server ────────────────────────────────────────────
-// Throws an Error with a `.code` of 'pin' | 'locked' | 'network' | 'http'.
-function call(method, path, body) {
-  if (RELAY) return relayCall(method, path, body);
-  if (method === 'GET') {
-    return fetch(path, { headers: { 'X-Awana-Pin': PIN } }).then(function(r) {
-      if (r.status === 403) { var e = new Error('pin'); e.code = 'pin'; throw e; }
-      return r.json();
-    });
+// ── The modules: the transport, the crypto, the one club table ─────────────
+var modules = null;
+function loadModules() {
+  if (!modules) {
+    modules = Promise.all([import('/checkin/desk-transport.js'), import('/checkin/cloud-crypto.js'), import('/checkin/clubs.js')])
+      .then(function(m) {
+        printLabel = m[0].printLabel;
+        newRowId = m[1].newRowId;
+        var table = m[2].CLUB_TABLE;
+        if (table && table.length) CLUBS = table.map(function(r) { return r.name; });
+        desk = m[0].createDesk({
+          cc: m[1],
+          fetch: function(u, o) { return window.fetch(u, o); },
+          store: {
+            get: function(k) { return localStorage.getItem(k); },
+            set: function(k, v) { localStorage.setItem(k, v); },
+            remove: function(k) { localStorage.removeItem(k); }
+          }
+        });
+        return desk;
+      }, function(e) { modules = null; throw e; });
   }
-  return postJson(path, body);
+  return modules;
 }
-var LAPTOP_DOWN = 'The check-in laptop is not answering. Is it on, with the TwoTimTwo check-in page open?';
-function relayErr(code, message, status) { var e = new Error(message || code); e.code = code; if (status) e.status = status; return e; }
-// One relayed call: hand it over, then collect the answer (the laptop asks
-// every second while phones are busy, so this is usually a second or two).
-function relayCall(method, path, body) {
-  var auth = { 'Content-Type': 'application/json', Authorization: 'Bearer ' + PIN };
-  return fetch(RELAY + '/v1/relay', { method: 'POST', headers: auth, body: JSON.stringify({ method: method, path: path, body: body || {} }) })
-    .catch(function() { throw relayErr('network', 'No internet connection.'); })
-    .then(function(r) {
-      if (r.status === 401) throw relayErr('pin');
-      return r.json().catch(function() { return {}; }).then(function(d) {
-        if (!r.ok || !d.id) throw relayErr('http', d.error || 'The sync service refused that.', r.status);
-        return d.id;
-      });
-    })
-    .then(function(id) {
-      var started = Date.now();
-      return new Promise(function(resolve, reject) {
-        (function poll() {
-          fetch(RELAY + '/v1/relay/result?id=' + id, { headers: auth }).then(function(r) {
-            if (r.status === 401) throw relayErr('pin');
-            return r.json();
-          }).then(function(d) {
-            if (!d.done) {
-              if (Date.now() - started > 60000) { reject(relayErr('network', LAPTOP_DOWN)); return; }
-              setTimeout(poll, 500);
-              return;
-            }
-            if (d.status >= 200 && d.status < 300) { resolve(d.body); return; }
-            if (d.status === 504) { reject(relayErr('network', LAPTOP_DOWN, 504)); return; }
-            var b = d.body || {};
-            reject(relayErr(d.status >= 500 || !b.error ? 'network' : 'http', b.error || LAPTOP_DOWN, d.status));
-          }).catch(function(e) {
-            if (e && e.code) { reject(e); return; }
-            if (Date.now() - started > 60000) { reject(relayErr('network', 'No internet connection.')); return; }
-            setTimeout(poll, 1000);
-          });
-        })();
-      });
-    });
-}
-function postJson(path, body) {
-  if (RELAY) return relayCall('POST', path, body);
-  return fetch(path, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body || {})
-  }).then(function(r) {
-    if (r.status === 403) { var pinErr = new Error('pin'); pinErr.code = 'pin'; throw pinErr; }
-    if (r.status === 429) {
-      var retryAfter = parseInt(r.headers.get('Retry-After'), 10);
-      var lockedErr = new Error('locked');
-      lockedErr.code = 'locked';
-      lockedErr.retryAfter = (isFinite(retryAfter) && retryAfter > 0) ? retryAfter : 60;
-      throw lockedErr;
-    }
-    if (!r.ok) {
-      return r.json().catch(function() { return null; }).then(function(data) {
-        var httpErr = new Error((data && data.error) || 'network');
-        httpErr.code = r.status >= 500 || !data ? 'network' : 'http';
-        httpErr.status = r.status;
-        throw httpErr;
-      });
-    }
-    return r.json();
-  });
-}
-function fetchRoster(pin) { return postJson('/phone/roster', { pin: pin }); }
-function fetchTonight(pin) { return postJson('/phone/tonight', { pin: pin }); }
 
-// The one club list, from the server (GET /clubs), so every surface agrees.
-function loadClubs() {
-  postJson('/clubs', { pin: PIN }).then(function(d) {
-    if (d && Array.isArray(d.clubs) && d.clubs.length) CLUBS = d.clubs;
-    fillClubSelects();
-  }).catch(function() { fillClubSelects(); });
+// What this page did tonight and the roster cannot say: visitors, who it
+// checked out, and when. Per night, per tab (sessionStorage); a reload keeps it.
+function loadLocal() {
+  try {
+    var v = JSON.parse(sessionStorage.getItem(LOCAL_KEY) || 'null');
+    if (v && v.night === desk.night) return { night: v.night, visitors: v.visitors || [], out: v.out || [], at: v.at || {} };
+  } catch (e) { /* none */ }
+  return { night: desk.night, visitors: [], out: [], at: {} };
 }
+function saveLocal() { try { sessionStorage.setItem(LOCAL_KEY, JSON.stringify(LOCAL)); } catch (e) { /* the list lasts this load */ } }
+
+// The one club list (lobby/shared/clubs.js, served beside this page), plus any club the roster names.
 function fillClubSelects() {
   var lead = $('leader-club'), vis = $('visitor-club');
   var keepL = lead.value, keepV = vis.value;
@@ -720,13 +709,12 @@ function fillClubSelects() {
   KIDS.forEach(function(k) { var c = (k.club || '').trim(); if (c && !seen[c]) { seen[c] = true; clubs.push(c); } });
   CLUBS.forEach(function(c) { var o = el('option', null, c); o.value = c; lead.appendChild(o); });
   clubs.forEach(function(c) { var o = el('option', null, c); o.value = c; vis.appendChild(o); });
-  var none2 = el('option', null, 'No club'); none2.value = ''; vis.appendChild(none2);
   if (keepL) lead.value = keepL;
   if (keepV) vis.value = keepV;
   renderOneOffClubs();
 }
 
-// ── PIN ────────────────────────────────────────────────────────────────────
+// ── Sign-in ────────────────────────────────────────────────────────────────
 function clearPinCountdown() { clearInterval(pinCountdownTimer); pinCountdownTimer = null; }
 function startPinCountdown(seconds) {
   clearPinCountdown();
@@ -734,7 +722,7 @@ function startPinCountdown(seconds) {
   btn.disabled = true;
   function tick() {
     if (remaining <= 0) { clearPinCountdown(); err.textContent = ''; btn.disabled = false; return; }
-    err.textContent = 'Too many wrong PINs — try again in ' + remaining + 's';
+    err.textContent = 'Too many wrong tries — try again in ' + remaining + 's';
     remaining -= 1;
   }
   tick();
@@ -754,143 +742,101 @@ function showPinScreen(message) {
   $('menu-btn').hidden = true;
   $('pin').value = '';
   $('pin-err').textContent = message || '';
+  $('pin-btn').textContent = 'Unlock';
+  $('pin-btn').disabled = false;
 }
-// A 403 mid-poll: the desk changed the PIN. Stop everything, forget it all.
-function handlePinInvalidated() {
+// Signed out mid-night (the passphrase changed, or Sign out): stop everything, forget it all.
+function signOut(message) {
   stopRosterPoll();
   unlockedState = false;
-  sessionStorage.removeItem(PIN_KEY);
-  PIN = '';
-  STATE = {};
-  REMOVING = {};
+  if (desk) desk.signOut();
+  STATE = {}; UNDOING = {}; CHECKING_OUT = {};
   KIDS = [];
-  HOUSEHOLDS = null;
-  RECENT = null;
-  rosterLoaded = false;
-  TONIGHT = { checkedIn: 0, visitors: 0, byClub: {}, entries: [] };
+  HOUSEHOLDS = null; familiesAt = 0;
+  SERVER_TONIGHT = null;
+  RECENT = null; recentAskedAt = 0;
   leaderSelection = {};
-  renderLeaderChips([], 0);
-  renderCountCheck(null);
+  renderLeaderChips([]);
+  rosterLoaded = false;
   clearPinCountdown();
-  showPinScreen(RELAY ? 'Signed out (the passphrase changed?). Type it again.' : 'PIN changed — ask the check-in desk for the new PIN.');
+  showPinScreen(message);
 }
-// A 429 mid-poll: rate-limited. Stop polling and resume when the lockout clears.
-function handleLockoutDuringPoll(retryAfterSeconds) {
-  var secs = (isFinite(retryAfterSeconds) && retryAfterSeconds > 0) ? retryAfterSeconds : 60;
-  pollActive = false;
-  clearTimeout(rosterPollTimer);
-  rosterPollTimer = null;
-  toast('Too many requests — pausing live updates for ' + secs + 's.', 6000);
-  clearTimeout(rosterPollResumeTimer);
-  rosterPollResumeTimer = setTimeout(function() { startRosterPoll(); }, (secs + 1) * 1000);
+// The failures every action words alike. True when it was one of them.
+function commonError(e, prefix) {
+  if (!e || !e.code) return false;
+  if (e.code === 'signed-out') { signOut(e.message); return true; }
+  if (e.code === 'busy') { setBusy(e.retryAfterMs); toast((prefix || '') + e.message, 5000, null, null, 'bad'); return true; }
+  if (e.code === 'unreachable') { showOffline(true); toast((prefix || '') + 'no internet connection. Use the paper sheet at the desk.', 6000, null, null, 'bad'); return true; }
+  return false;
 }
-function handleActionError(e, prefix) {
-  if (e.code === 'pin') { handlePinInvalidated(); return; }
-  if (e.code === 'locked') { handleLockoutDuringPoll(e.retryAfter); return; }
-  toast(prefix + (e.code === 'network' ? (RELAY ? e.message : 'cannot reach the print server. Same Wi-Fi?') : e.message), 5000, null, null, 'bad');
-  refreshAll();
-}
-function startSession(data) {
-  applyRoster(data);
-  STATE = {};
+function startSession() {
+  LOCAL = loadLocal();
   unlockedState = true;
+  STATE = {};
   showMainScreen();
+  $('nohistory').hidden = desk.hasHistory;
+  fillClubSelects();
   render();
   startRosterPoll();
-  refreshTonight();
-  loadClubs();
   if (SIMPLE) return;   // the youth page: check-in only
   refreshLeaders();
 }
 function unlock() {
   if (unlockInFlight) return;
-  var pinVal = $('pin').value.trim();
-  if (!pinVal) return;
+  var word = $('pin').value;
+  if (!word.trim()) return;
   unlockInFlight = true;
   var btn = $('pin-btn');
   btn.disabled = true;
-  (RELAY ? relayLogin(pinVal) : Promise.resolve(pinVal)).then(function(key) {
-    if (RELAY) PIN = key;
-    return fetchRoster(key).then(function(data) { return { key: key, data: data }; });
-  }).then(function(got) {
-    var data = got.data;
-    PIN = got.key;
-    sessionStorage.setItem(PIN_KEY, PIN);
+  btn.textContent = 'Checking…';
+  $('pin-err').textContent = '';
+  // A phone takes a second or two for the key (600000 rounds, twice: the sign-in and the history key).
+  loadModules().then(function() { return desk.signIn(word); }).then(function() {
     unlockInFlight = false;
+    $('pin').value = '';
     btn.disabled = false;
-    startSession(data);
+    btn.textContent = 'Unlock';
+    startSession();
   }).catch(function(e) {
     unlockInFlight = false;
-    if (e.code === 'locked') { startPinCountdown(e.retryAfter); return; }
+    btn.textContent = 'Unlock';
+    if (e && e.code === 'locked') { startPinCountdown(e.retryAfterSec || 900); return; }
     btn.disabled = false;
-    if (RELAY) { PIN = ''; $('pin-err').textContent = e.code === 'wrong' || e.code === 'pin' ? 'That is not the passphrase.' : (e.message || LAPTOP_DOWN); return; }
-    $('pin-err').textContent = e.code === 'pin' ? 'Wrong PIN — ask the check-in desk.' : 'Cannot reach the print server. Same Wi-Fi?';
+    $('pin-err').textContent = !e || !e.code ? 'This page could not load its check-in code. Reload it.'
+      : e.code === 'unreachable' ? 'No internet connection. Check children in on the paper sheet at the desk.' : (e.message || 'Could not sign in.');
   });
-}
-// Online: the sync passphrase gets a session, which every relayed call carries.
-// Passphrase v2 (lobby/worker/src/routes.md section 1): the passphrase is turned into
-// an authKey HERE (the family's one sign-in, lobby/shared/sync-protocol.js, and the
-// derivation, lobby/shared/cloud-crypto.js; site/build.mjs serves both at /checkin/)
-// and only the authKey is sent. A phone takes about a second for the 600000 rounds.
-var relayModules = null;
-function loadRelayModules() {
-  if (!relayModules) {
-    relayModules = Promise.all([import('/checkin/sync-protocol.js'), import('/checkin/cloud-crypto.js')])
-      .then(function(m) { return { sp: m[0], cc: m[1] }; }, function() { relayModules = null; return null; });
-  }
-  return relayModules;
-}
-function relayRequest(path, o) {
-  o = o || {};
-  return fetch(RELAY + path, { method: o.method || 'GET', headers: o.body === undefined ? {} : { 'Content-Type': 'application/json' }, body: o.body === undefined ? undefined : JSON.stringify(o.body) })
-    .then(function(r) { return r.json().catch(function() { return {}; }).then(function(d) { return { ok: r.ok, status: r.status, body: d }; }); },
-      function() { return { ok: false, status: 0, body: null }; });
-}
-function relayLogin(passphrase) {
-  return loadRelayModules().then(function(m) {
-    // The modules did not load (an old phone, a cached page): today's login, which a service that still has the old hash accepts.
-    if (!m) return relayRequest('/v1/login', { method: 'POST', body: { passphrase: passphrase } });
-    return m.sp.signInWithPassphrase({ request: relayRequest, derive: m.cc.deriveAuthKey, passphrase: passphrase }).then(function(out) { return out.res; });
-  }).then(function(r) {
-    var d = r.body || {};
-    if (r.status === 0) throw relayErr('network', 'No internet connection.');
-    if (r.status === 429) { var e = relayErr('locked'); e.retryAfter = d.retryAfterSec || 60; throw e; }
-    if (r.status === 401) throw relayErr('wrong');
-    if (!r.ok || !d.session) throw relayErr('network', d.error || 'The sync service did not answer.');
-    return d.session;
-  });
-}
-if (RELAY) {
-  $('pin').type = 'password';
-  $('pin').setAttribute('inputmode', 'text');
-  $('pin').setAttribute('placeholder', 'Passphrase');
-  $('pin').setAttribute('aria-label', 'Passphrase');
-  $('pin').style.letterSpacing = 'normal';
-  document.querySelector('#pin-screen p').textContent = 'Type the check-in passphrase (the one the lobby screens use).';
 }
 if (ONLY) {
   var ymTitle = window.AWANA_TITLE || 'Trek & Journey';
   document.querySelector('.top h1').textContent = ymTitle;
   document.title = ymTitle + ' check-in';
 }
-$('pin-btn').addEventListener('click', unlock);
-$('pin').addEventListener('keydown', function(e) { if (e.key === 'Enter') unlock(); });
+$('pin-form').addEventListener('submit', function(e) { e.preventDefault(); unlock(); });
+$('signout').addEventListener('click', function() { signOut(''); });
 
 // ── Roster ─────────────────────────────────────────────────────────────────
-// A kid this phone has a check-in in flight for keeps its object, so a
-// refresh never clobbers the optimistic state.
+function kidKey(k) { return 'id:' + k.clubberId; }
+// A kid this page has a check-in in flight for keeps its object, so a refresh
+// never clobbers the optimistic state.
 function applyRoster(data) {
   rosterLoaded = true;
-  var oldByName = {};
-  KIDS.forEach(function(k) { oldByName[k.name.toLowerCase()] = k; });
-  KIDS = (data.kids || []).filter(function(sk) {
+  var old = {};
+  KIDS.forEach(function(k) { old[kidKey(k)] = k; });
+  KIDS = (data.kids || []).map(function(k) {
+    return { clubberId: String(k.clubberId), name: (String(k.first || '') + ' ' + String(k.last || '')).trim(), club: k.club || '', clubId: k.clubId || '', checkedIn: !!k.checkedIn };
+  }).filter(function(sk) {
     return !ONLY || ONLY.indexOf(clubKit(sk.club)) !== -1;
   }).map(function(sk) {
-    var key = sk.name.toLowerCase();
-    if (Object.prototype.hasOwnProperty.call(STATE, key) && oldByName[key]) return oldByName[key];
+    var key = kidKey(sk);
+    if (Object.prototype.hasOwnProperty.call(STATE, key) && old[key]) return old[key];
     return sk;
   });
-  // The laptop's households (names only) in householdIndex()'s shape.
+  ITEMS = data.items || { bible: [], friend: [] };
+  $('down-note').hidden = !data.stale;
+  fillClubSelects();
+}
+// TwoTimTwo's households (names only) in householdIndex()'s shape.
+function applyFamilies(data) {
   var byName = {}, members = {};
   (data.households || []).forEach(function(h, i) {
     var names = (h || []).map(norm).filter(Boolean);
@@ -899,27 +845,17 @@ function applyRoster(data) {
     names.forEach(function(n) { byName[n] = 'h' + i; });
   });
   HOUSEHOLDS = Object.keys(members).length ? { byName: byName, members: members } : null;
-  ITEMS = data.items || { bible: [], friend: [] };
-  var r = data.recent;
-  if (r && r.ready) {
-    var names = {};
-    (r.names || []).forEach(function(n) { names[norm(n)] = true; });
-    RECENT = { names: names };
-  } else RECENT = null;
-  fillClubSelects();
+  familiesAt = Date.now();
 }
 
 // One person in the shape the touch core works with.
 function person(k) {
-  return { name: k.name, recid: 'n:' + norm(k.name), clubId: '', clubName: k.club || '', kid: k,
-    checkedIn: !!k.checkedIn && !STATE[k.name.toLowerCase()] };
+  return { name: k.name, recid: kidKey(k), clubId: k.clubId, clubName: k.club || '', kid: k,
+    checkedIn: !!k.checkedIn && !STATE[kidKey(k)] };
 }
-// Still to come: active, not checked in, nothing in flight on this phone.
+// Still to come: not checked in, nothing in flight on this page.
 function waitingPeople() {
-  return KIDS.filter(function(k) {
-    var st = STATE[k.name.toLowerCase()];
-    return !k.checkedIn && !k.inactive && !(st && st.status !== 'restoring');
-  }).map(person);
+  return KIDS.filter(function(k) { return !k.checkedIn && !STATE[kidKey(k)]; }).map(person);
 }
 function itemsFor(club) {
   var has = function(list) { return (list || []).some(function(c) { return clubKit(c) && clubKit(c) === clubKit(club); }); };
@@ -927,7 +863,22 @@ function itemsFor(club) {
 }
 function isAway(f) {
   if (!RECENT) return false;
-  return f.kids.every(function(k) { return !RECENT.names[norm(k.name)]; });
+  return f.kids.every(function(k) { return !RECENT.names[norm(k.name)] && !(k.kid && RECENT.ids[k.kid.clubberId]); });
+}
+// After the roster is on screen, never in the way of a check-in: the history's
+// last two club nights, read once (again after a while if it could not be).
+function loadRecent() {
+  if (RECENT || SIMPLE || !desk || !desk.canReadHistory) return;
+  if (recentAskedAt && Date.now() - recentAskedAt < RECENT_RETRY_MS) return;
+  recentAskedAt = Date.now();
+  desk.recentAttendance(2).then(function(r) {
+    if (!r || !unlockedState) return;
+    var names = {}, ids = {};
+    r.names.forEach(function(n) { names[norm(n)] = true; });
+    r.ids.forEach(function(id) { ids[id] = true; });
+    RECENT = { names: names, ids: ids };
+    if (!$('fampage').classList.contains('on') && openSheet !== 'kid-sheet') render();
+  });
 }
 
 // ── Smooth redraws (the touch check-in's): keyed tiles, FLIP, pop-outs ─────
@@ -1072,7 +1023,7 @@ function render() {
   beginKeyed(list);
   while (list.firstChild) list.removeChild(list.firstChild);
   if (!rosterLoaded) list.appendChild(el('div', 'note', 'Reading the roster…'));
-  else if (!KIDS.length) list.appendChild(el('div', 'note', 'The roster is empty — sync the CSV on the check-in laptop.'));
+  else if (!KIDS.length) list.appendChild(el('div', 'note', 'TwoTimTwo has nobody on tonight’s check-in page yet. Is the meeting set up?'));
   else if (!q.trim()) renderFamilies(list);
   else renderSearch(list, q);
   endKeyed();
@@ -1089,8 +1040,8 @@ function renderFamilies(list) {
   list.appendChild(el('div', 'lead', main.length + (main.length === 1 ? ' family' : ' families') + ' still to come'));
   var W = list.clientWidth - 24;
   var H = window.innerHeight - list.getBoundingClientRect().top - 60;
-  // Two columns on a phone (three or more on a tablet), tall enough for the
-  // name and a row of children; a long list scrolls.
+  // Two columns on a phone (three or more on a tablet or the desk), tall
+  // enough for the name and a row of children; a long list scrolls.
   var cols = Math.max(2, Math.floor((W + 8) / (180 + 8)));
   var w = (W - 8 * (cols - 1)) / cols;
   var rows = Math.ceil(main.length / cols);
@@ -1113,7 +1064,7 @@ function renderFamilies(list) {
 // Typing: households first, then the children on their own panel, "Did you
 // mean" families, and families not here lately only at the bottom.
 function renderSearch(list, q) {
-  var everyone = KIDS.filter(function(k) { return !k.inactive; }).map(person);
+  var everyone = KIDS.map(person);
   var r = searchPeople(everyone, q);
   var fams = groupFamilies(waitingPeople(), HOUSEHOLDS);
   var famOf = {};
@@ -1169,16 +1120,16 @@ function renderSearch(list, q) {
     list.appendChild(box);
   }
   if (!exact.length && !near.length && !kids.length && !away.length) {
-    list.appendChild(el('div', 'note', 'No child matches “' + q.trim() + '”. A visitor? Tap + for a visitor label.'));
+    list.appendChild(el('div', 'note', 'No child matches “' + q.trim() + '”. A visitor? Tap + for a visitor.'));
   }
 }
 
-function renderCount() {
-  $('count-pill').textContent = (TONIGHT.checkedIn || 0) + ' in';
-  $('count-pill').setAttribute('aria-label', (TONIGHT.checkedIn || 0) + ' here now. Show who.');
-}
-
 $('search').addEventListener('input', render);
+$('search').addEventListener('keydown', function(e) {
+  if (e.key !== 'Enter') return;
+  var first = $('list').querySelector('.fcard, .fam');
+  if (first) first.click();
+});
 $('search-clear').addEventListener('click', function() { $('search').value = ''; render(); $('search').focus(); });
 window.addEventListener('resize', function() { if (!$('search').value.trim()) render(); });
 
@@ -1235,10 +1186,9 @@ function optButton(label, on, onChange) {
 }
 
 // The child's card: Bible ticked where the club has it, then Check in, and
-// straight back to the list (the check-in finishes in the background). A
-// child a phone took out of tonight's count gets Add back instead.
+// straight back to the list (the check-in finishes in the background).
 function openKid(p) {
-  var k = p.kid, club = clubOf(p.clubName), items = itemsFor(p.clubName);
+  var club = clubOf(p.clubName), items = itemsFor(p.clubName);
   var choice = { bible: items.bible, friend: false };
   var s = $('kid-sheet');
   s.textContent = '';
@@ -1248,8 +1198,8 @@ function openKid(p) {
   s.appendChild(el('div', 'bar'));
   s.appendChild(el('div', 'nm', p.name));
   s.appendChild(el('div', 'cl', p.clubName || ''));
-  if (k.removedHere) s.appendChild(el('div', 'sub', 'Taken out of tonight’s count on a phone. Add them back to count them again.'));
-  else if (items.bible || items.friend) {
+  if (isAway({ kids: [p] })) s.appendChild(el('div', 'sub', 'Not here the last two club nights'));
+  if (items.bible || items.friend) {
     var opts = el('div', 'opts');
     if (items.bible) opts.appendChild(optButton('Bible', choice.bible, function(v) { choice.bible = v; }));
     var fname = items.friend ? friendInput(choice) : null;
@@ -1264,10 +1214,9 @@ function openKid(p) {
   var acts = el('div', 'acts');
   var no = el('button', 'btn no', 'Cancel'); no.type = 'button';
   no.addEventListener('click', hideSheet);
-  var go = el('button', 'btn go', k.removedHere ? 'Add back' : 'Check in'); go.type = 'button';
+  var go = el('button', 'btn go', 'Check in'); go.type = 'button';
   go.addEventListener('click', function() {
     hideSheet();
-    if (k.removedHere) { restore({ name: k.name }); return; }
     var sibs = siblingsOf(p);
     checkInMany([{ p: p, choice: choice }], null);
     // Brothers and sisters start from this child's Bible / friend ticks, never their friend's name.
@@ -1361,78 +1310,73 @@ function closeFamily() {
   render();
 }
 
-// ── Check-in: queued for the laptop, back to the list at once ──────────────
-// Each child leaves the list from the tap (STATE), the laptop does the work
-// (/phone/checkin, picked up by the check-in page's extension), and one line
-// says when they are all in. A failure puts the child back, in red.
+// ── Check-in: back to the list at once, the Worker does the rest ───────────
+// Each child leaves the list from the tap (STATE). One at a time, in order, the
+// transport seals the label and the history row and the Worker claims the child,
+// posts to TwoTimTwo and settles: a child already claimed (another phone, the
+// desk, TwoTimTwo's own page) answers "already", never a second label. A failure
+// puts the child back with the reason; busy, signed out or no internet stops the
+// rest (they go back on the list too).
+var checkinChain = Promise.resolve();
 function checkInMany(entries, family) {
-  var left = entries.length, ok = 0, failed = [];
+  var ok = 0, already = 0, failed = [], stop = null;
   entries.forEach(function(e) {
     var k = e.p.kid;
-    var key = k.name.toLowerCase();
-    joy[key] = true;
-    STATE[key] = { status: 'sending', tries: 0 };
+    joy[k.name.toLowerCase()] = true;
+    STATE[kidKey(k)] = { status: 'sending' };
   });
   render();
   entries.forEach(function(e) {
-    var k = e.p.kid, key = k.name.toLowerCase();
-    var options = {};
-    var items = itemsFor(k.club);
-    if (items.bible) options.Bible = !!e.choice.bible;
-    if (items.friend) options.Friend = !!e.choice.friend;
-    var friendName = String(e.choice.friendName || '').replace(/\s+/g, ' ').trim().slice(0, 24);
-    if (options.Friend && friendName) options.FriendName = friendName;
-    postJson('/phone/checkin', { pin: PIN, name: k.name, options: options }).then(function(data) {
-      if (!data || !data.id) throw new Error((data && data.error) || 'failed');
-      STATE[key] = { status: 'pending', id: data.id, tries: 0 };
-      pollStatus(key, k, settle);
-    }).catch(function(err) {
-      // The child goes back on the list: left 'sending', they were hidden for
-      // the rest of the session.
-      delete STATE[key];
-      render();
-      if (err.code === 'pin' || err.code === 'locked') { handleActionError(err, ''); return; }
-      settle(false, k, err.message);
+    checkinChain = checkinChain.then(function() {
+      var k = e.p.kid, key = kidKey(k);
+      if (stop) { delete STATE[key]; return; }
+      var items = itemsFor(k.club);
+      var friendName = String(e.choice.friendName || '').replace(/\s+/g, ' ').trim().slice(0, 24);
+      return desk.checkIn({ clubberId: k.clubberId, name: k.name, club: k.club },
+        { bible: items.bible && !!e.choice.bible, friend: items.friend && !!e.choice.friend, friendName: friendName }).then(function(r) {
+        k.checkedIn = true;
+        LOCAL.at[key] = Date.now();
+        rosterEpoch += 1;
+        if (r.already) already++; else ok++;
+      }, function(err) {
+        if (err && (err.code === 'busy' || err.code === 'signed-out' || err.code === 'unreachable')) stop = err;
+        else failed.push({ k: k, why: err && err.message });
+      }).then(function() { delete STATE[key]; });
     });
   });
-  function settle(good, k, why) {
-    if (good) ok++; else failed.push({ k: k, why: why });
-    if (--left) return;
-    failed.forEach(function(f) { toast('Couldn’t check in ' + f.k.name + ': ' + (f.why || 'see the check-in laptop'), 6000, null, null, 'bad'); });
-    if (ok && !failed.length) {
-      toast(entries.length === 1 ? entries[0].p.name + ' is checked in' : (family ? family + ': ' : '') + ok + ' checked in', 3000, null, null, 'good');
-    }
-    refreshAll();
-  }
-}
-function pollStatus(key, kid, settle) {
-  var st = STATE[key];
-  if (!st || st.status !== 'pending') return;
-  if (st.tries > 45) {   // ~90 s: the laptop may be closed
-    delete STATE[key];
+  checkinChain = checkinChain.then(function() {
+    saveLocal();
     render();
-    settle(false, kid, 'the check-in laptop is not answering. Check in there instead.');
-    return;
-  }
-  setTimeout(function() {
-    var cur = STATE[key];
-    if (!cur || cur.status !== 'pending') return;
-    call('GET', '/phone/status/' + cur.id).then(function(s) {
-      if (s.status === 'done') {
-        kid.checkedIn = true;
-        rosterEpoch += 1;
-        delete STATE[key];
-        settle(true, kid);
-      } else if (s.status === 'failed') {
-        delete STATE[key];
-        render();
-        settle(false, kid, s.detail);
-      } else { cur.tries += 1; pollStatus(key, kid, settle); }
-    }).catch(function() { cur.tries += 1; pollStatus(key, kid, settle); });
-  }, 1500);
+    if (stop) { commonError(stop, 'Not checked in: '); return; }
+    failed.forEach(function(f) { toast('Couldn’t check in ' + f.k.name + ': ' + (f.why || 'try again'), 7000, null, null, 'bad'); });
+    if (!failed.length && ok) {
+      toast(entries.length === 1 ? entries[0].p.name + ' is checked in' : (family ? family + ': ' : '') + ok + ' checked in', 3000, null, null, 'good');
+    } else if (!failed.length && already) toast('Already checked in (another phone or the desk got there first).', 4500);
+    setTimeout(refreshStatus, 800);
+    scheduleRosterPoll(6000);
+  });
 }
 
 // ── Polling ────────────────────────────────────────────────────────────────
+// The 5 s read budget: a 429 says "busy, try again in Ns" and counts down; the
+// next roster read waits until then.
+function setBusy(retryAfterMs) {
+  busyUntil = Date.now() + (retryAfterMs || 5000);
+  clearInterval(busyTimer);
+  function tick() {
+    var left = Math.ceil((busyUntil - Date.now()) / 1000);
+    var b = $('busy');
+    if (left <= 0) { clearInterval(busyTimer); busyTimer = null; b.hidden = true; return; }
+    b.hidden = false;
+    b.textContent = 'TwoTimTwo is busy: try again in ' + left + 's.';
+  }
+  tick();
+  busyTimer = setInterval(tick, 500);
+}
+function showOffline(down) {
+  rosterMisses = down ? rosterMisses + 1 : 0;
+  $('offline-note').hidden = rosterMisses < 1;
+}
 function scheduleRosterPoll(delay) {
   clearTimeout(rosterPollTimer);
   if (!pollActive) return;
@@ -1441,185 +1385,182 @@ function scheduleRosterPoll(delay) {
 function stopRosterPoll() {
   pollActive = false;
   clearTimeout(rosterPollTimer); rosterPollTimer = null;
-  clearTimeout(rosterPollResumeTimer); rosterPollResumeTimer = null;
 }
-function startRosterPoll() { pollActive = true; rosterPollMs = ROSTER_POLL_BASE_MS; scheduleRosterPoll(); }
-// One tick refreshes the roster and tonight together, so they never drift.
+function startRosterPoll() { pollActive = true; rosterPollMs = ROSTER_POLL_BASE_MS; refreshAll(); }
+// One tick: the roster (one TwoTimTwo read on the Worker's clock, or its last
+// read), the families every half hour, the Worker's count and the printer.
 function refreshAll() {
   if (!pollActive || rosterFetchInFlight) return;
   if (document.hidden) { scheduleRosterPoll(); return; }
   rosterFetchInFlight = true;
   var epoch = rosterEpoch;
-  Promise.all([fetchRoster(PIN), fetchTonight(PIN)]).then(function(results) {
-    rosterFetchInFlight = false;
+  refreshStatus();
+  desk.roster().then(function(data) {
+    showOffline(false);
     rosterPollMs = ROSTER_POLL_BASE_MS;
-    showLaptopDown(false);
     // Asked before a check-in was confirmed: it would put that child back on
     // the list. Ask again instead.
-    if (epoch !== rosterEpoch) { scheduleRosterPoll(0); return; }
-    applyRoster(results[0]);
-    applyTonight(results[1]);
-    if (!$('fampage').classList.contains('on') && openSheet !== 'kid-sheet') render(); else renderCount();
-    if (openSheet === 'tonight-sheet') renderTonight();
-    scheduleRosterPoll();
+    if (epoch !== rosterEpoch) { rosterFetchInFlight = false; scheduleRosterPoll(0); return null; }
+    applyRoster(data);
+    var more = [desk.tonight().then(function(t) { SERVER_TONIGHT = t; }, function() { /* the roster's own count stands */ })];
+    if (Date.now() - familiesAt > FAMILIES_EVERY_MS) {
+      more.push(desk.families().then(applyFamilies, function(e) { if (e && e.code === 'busy') familiesAt = Date.now() - FAMILIES_EVERY_MS + 20000; }));
+    }
+    return Promise.all(more).then(function() {
+      rosterFetchInFlight = false;
+      if (!$('fampage').classList.contains('on') && openSheet !== 'kid-sheet') render(); else renderCount();
+      if (openSheet === 'tonight-sheet') renderTonight();
+      scheduleRosterPoll();
+      setTimeout(loadRecent, 0);
+    });
   }).catch(function(e) {
     rosterFetchInFlight = false;
-    if (e.code === 'pin') { handlePinInvalidated(); return; }
-    if (e.code === 'locked') { handleLockoutDuringPoll(e.retryAfter); return; }
-    showLaptopDown(true);
+    if (e && e.code === 'signed-out') { signOut(e.message); return; }
+    if (e && e.code === 'busy') { setBusy(e.retryAfterMs); scheduleRosterPoll((e.retryAfterMs || 5000) + 250); return; }
+    if (e && e.code === 'unreachable') showOffline(true);
+    else if (!rosterLoaded) toast(e && e.message ? e.message : 'The roster could not be read.', 6000, null, null, 'bad');
+    else $('down-note').hidden = false;
+    if (!rosterLoaded) render();
     rosterPollMs = Math.min(rosterPollMs * 2, ROSTER_POLL_MAX_MS);
     scheduleRosterPoll();
   });
 }
-// Two polls in a row with no answer: say so, because the list is now only as
-// fresh as the last answer, and a child checked in at the desk since then
-// still shows here.
-function showLaptopDown(down) {
-  rosterMisses = down ? rosterMisses + 1 : 0;
-  $('down-note').hidden = rosterMisses < 2;
+// The print station, in one line: printed, queued, or check the printer.
+function refreshStatus() {
+  if (!unlockedState) return;
+  var led = $('print-led');
+  desk.printStatus().then(function(s) {
+    var l = printLabel(s, Date.now());
+    led.className = 'led ' + l.kind;
+    led.textContent = l.text;
+  }, function(e) {
+    if (e && e.code === 'signed-out') return;
+    led.className = 'led check';
+    led.textContent = e && e.code === 'unreachable' ? 'No connection: check the internet' : 'Printer status unknown';
+  });
 }
 document.addEventListener('visibilitychange', function() {
   if (document.hidden || !unlockedState || !pollActive) return;
-  refreshAll();
+  scheduleRosterPoll(Math.max(0, busyUntil - Date.now()));
 });
 
 // ── Tonight (the count pill) ───────────────────────────────────────────────
-function applyTonight(data) {
-  if (!data || typeof data !== 'object') return;
-  TONIGHT = {
-    checkedIn: Number(data.checkedIn) || 0,
-    checkedOut: Number(data.checkedOut) || 0,
-    visitors: Number(data.visitors) || 0,
-    byClub: data.byClub || {},
-    // Check out (7.16.0) only when the laptop's print server says it can:
-    // the website's copy of this page may be newer than the laptop's app.
-    canCheckout: Array.isArray(data.features) && data.features.indexOf('checkout') !== -1,
-    entries: (data.entries || []).filter(function(e) { return !REMOVING[e.key]; })
-  };
+// Who is in: the roster's checked-in children and the visitors this page
+// checked in; the count is the Worker's own (GET /v1/desk/tonight) when it
+// answers, else this list's.
+function tonightRows() {
+  var rows = KIDS.filter(function(k) { return k.checkedIn && !STATE[kidKey(k)]; }).map(function(k) {
+    var parts = k.name.split(' ');
+    return { key: kidKey(k), firstName: parts[0] || '', lastName: parts.slice(1).join(' '), clubName: k.club || '', clubberId: k.clubberId,
+      visitor: false, checkedOut: LOCAL.out.indexOf(kidKey(k)) !== -1, at: LOCAL.at[kidKey(k)] || null, kid: k };
+  });
+  LOCAL.visitors.forEach(function(v) {
+    var parts = v.name.split(' ');
+    rows.push({ key: v.key, firstName: parts[0] || '', lastName: parts.slice(1).join(' '), clubName: v.club || '', clubberId: null,
+      visitor: true, checkedOut: LOCAL.out.indexOf(v.key) !== -1, at: v.at || null });
+  });
+  return rows;
 }
-function refreshTonight() {
-  if (!unlockedState) return;
-  refreshCountCheck();
-  fetchTonight(PIN).then(function(data) { applyTonight(data); renderCount(); if (openSheet === 'tonight-sheet') renderTonight(); })
-    .catch(function(e) {
-      if (e.code === 'pin') { handlePinInvalidated(); return; }
-      if (e.code === 'locked') { handleLockoutDuringPoll(e.retryAfter); }
-    });
+function tonightCounts() {
+  var rows = tonightRows(), here = rows.filter(function(r) { return !r.checkedOut; });
+  var byClub = {};
+  here.forEach(function(r) { var c = r.clubName || 'No club'; byClub[c] = (byClub[c] || 0) + 1; });
+  var s = SERVER_TONIGHT;
+  if (s && isFinite(s.checkedIn)) {
+    return { checkedIn: Number(s.checkedIn), checkedOut: Number(s.checkedOut) || 0, byClub: s.byClub || byClub, server: true };
+  }
+  return { checkedIn: here.length, checkedOut: rows.length - here.length, byClub: byClub, server: false };
+}
+function renderCount() {
+  var n = tonightCounts().checkedIn;
+  $('count-pill').textContent = n + ' in';
+  $('count-pill').setAttribute('aria-label', n + ' here now. Show who.');
 }
 function renderTonight() {
-  // "Here now" (7.15.0): children checked out tonight are off the count.
-  $('tonight-total').textContent = (TONIGHT.checkedIn || 0) + ' here now' +
-    (TONIGHT.checkedOut ? ' · ' + TONIGHT.checkedOut + ' checked out' : '') +
-    (TONIGHT.visitors ? ' · ' + TONIGHT.visitors + ' visitor' + (TONIGHT.visitors === 1 ? '' : 's') : '');
+  var t = tonightCounts();
+  var visitors = LOCAL.visitors.filter(function(v) { return LOCAL.out.indexOf(v.key) === -1; }).length;
+  // "Here now": children checked out tonight are off the count.
+  $('tonight-total').textContent = t.checkedIn + ' here now' +
+    (t.checkedOut ? ' · ' + t.checkedOut + ' checked out' : '') +
+    (visitors ? ' · ' + visitors + ' visitor' + (visitors === 1 ? '' : 's') : '');
   var chips = $('tonight-chips');
   chips.textContent = '';
-  Object.keys(TONIGHT.byClub || {}).sort().forEach(function(club) {
+  Object.keys(t.byClub || {}).sort().forEach(function(club) {
     var c = el('span', 'chip'), d = el('span', 'dot');
     d.style.setProperty('--c', clubOf(club).color);
-    c.appendChild(d); c.appendChild(document.createTextNode(club + ' ' + TONIGHT.byClub[club]));
+    c.appendChild(d); c.appendChild(document.createTextNode(club + ' ' + t.byClub[club]));
     chips.appendChild(c);
   });
+  var check = $('tonight-check');
+  check.hidden = false;
+  check.style.color = '';
+  check.textContent = t.server ? 'Counted by the check-in service, from TwoTimTwo.' : 'From TwoTimTwo’s check-in page, via the check-in service.';
   var list = $('tonight-list');
   list.textContent = '';
-  var entries = TONIGHT.entries || [];
-  if (!entries.length) { list.appendChild(el('div', 'note', 'No one is counted yet tonight.')); return; }
+  var entries = tonightRows();
+  if (!entries.length) { list.appendChild(el('div', 'note', 'No one is checked in yet tonight.')); return; }
   var groups = {};
   entries.forEach(function(e) { var g = e.clubName || 'No club'; (groups[g] = groups[g] || []).push(e); });
   Object.keys(groups).sort().forEach(function(g) {
     var h = el('h3', null, g + ' · ' + groups[g].length);
     list.appendChild(h);
-    groups[g].sort(function(a, b) { return String(b.at).localeCompare(String(a.at)); }).forEach(function(e) {
+    groups[g].sort(function(a, b) { return (a.firstName + ' ' + a.lastName).localeCompare(b.firstName + ' ' + b.lastName); }).forEach(function(e) {
       var row = el('div', 'row'), who = el('div', 'who');
+      row.dataset.name = (e.firstName + ' ' + e.lastName).trim();
       var b = el('b', null, (e.firstName + ' ' + e.lastName).trim());
       if (e.visitor) b.appendChild(el('span', 'vtag', 'Visitor'));
       if (e.checkedOut) b.appendChild(el('span', 'vtag', 'Checked out'));
-      var d = new Date(e.at);
       who.appendChild(b);
-      who.appendChild(el('span', null, isNaN(d.getTime()) ? '' : d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })));
-      // Undo check-in (7.14.0) needs the child's TwoTimTwo id; without one
-      // (a visitor, a label printed before the roster knew them) only the
-      // local Remove is possible, and the row says so.
+      var d = e.at ? new Date(e.at) : null;
+      who.appendChild(el('span', null, d && !isNaN(d.getTime()) ? d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : ''));
       var acts = el('div', 'rowacts');
-      var busy = REMOVING[e.key] || UNDOING[e.key] || CHECKING_OUT[e.key];
-      // Check out (7.16.0): on TwoTimTwo through the laptop for a row with a
-      // TwoTimTwo id; "Mark checked out" (here only) for one without. Never
-      // on a child already checked out.
-      if (TONIGHT.canCheckout && !e.checkedOut) {
-        var hasId = e.clubberId && !e.visitor;
-        var cb = el('button', 'tt', CHECKING_OUT[e.key] ? 'Checking out…' : (hasId ? 'Check out' : 'Mark checked out')); cb.type = 'button';
+      var busy = UNDOING[e.key] || CHECKING_OUT[e.key];
+      // Check out: on TwoTimTwo for a child with a TwoTimTwo id; a visitor is
+      // marked here (and off the service's count). Never twice.
+      if (!e.checkedOut) {
+        var cb = el('button', 'tt', CHECKING_OUT[e.key] ? 'Checking out…' : 'Check out'); cb.type = 'button';
         if (busy) cb.disabled = true; else cb.addEventListener('click', function() { askCheckout(e); });
         acts.appendChild(cb);
-      }
-      if (e.clubberId && !e.visitor) {
-        var ub = el('button', 'tt', UNDOING[e.key] ? 'Undoing…' : 'Undo check-in'); ub.type = 'button';
+        // Undo check-in (TwoTimTwo's own undo) for a child on TwoTimTwo; Remove for a visitor.
+        var ub = el('button', e.visitor ? null : 'tt', UNDOING[e.key] ? (e.visitor ? 'Removing…' : 'Undoing…') : (e.visitor ? 'Remove' : 'Undo check-in')); ub.type = 'button';
         if (busy) ub.disabled = true; else ub.addEventListener('click', function() { askUndo(e); });
         acts.appendChild(ub);
-      } else {
-        who.appendChild(el('small', null, e.visitor ? 'Not on TwoTimTwo: Remove only' : 'No TwoTimTwo id here: Remove only'));
       }
-      var btn = el('button', null, REMOVING[e.key] ? 'Removing…' : 'Remove'); btn.type = 'button';
-      if (busy) btn.disabled = true; else btn.addEventListener('click', function() { askRemove(e); });
-      acts.appendChild(btn);
       row.appendChild(who); row.appendChild(acts);
       list.appendChild(row);
     });
   });
 }
-// The print server's count against TwoTimTwo's own.
-function renderCountCheck(v) {
-  var c = $('tonight-check');
-  if (!v || !v.known) { c.hidden = true; return; }
-  c.hidden = false;
-  if (v.matches) { c.style.color = '#15803d'; c.textContent = '✓ Matches TwoTimTwo (' + (v.theirs || 0) + ')'; return; }
-  var short = v.unexplained < 0;
-  var clubs = (v.byClub || []).filter(function(x) { return x.unexplained !== 0; })
-    .map(function(x) { return x.club + ' ' + (x.unexplained < 0 ? '−' : '+') + Math.abs(x.unexplained); }).join(', ');
-  c.style.color = short ? '#b91c1c' : '#b45309';
-  c.textContent = '⚠ TwoTimTwo ' + v.theirs + ' · printed ' + v.ours + ' — ' + Math.abs(v.unexplained) +
-    (short ? ' with no label' : ' extra') + (clubs ? ' (' + clubs + ')' : '');
-}
-function refreshCountCheck() {
-  if (!unlockedState) return;
-  postJson('/reconcile', { pin: PIN }).then(renderCountCheck).catch(function() {});
-}
-$('count-pill').addEventListener('click', function() { renderTonight(); showSheet('tonight-sheet'); refreshTonight(); });
+$('count-pill').addEventListener('click', function() { renderTonight(); showSheet('tonight-sheet'); });
 $('tonight-close').addEventListener('click', hideSheet);
 
-// ── Tonight: remove / add back ─────────────────────────────────────────────
-function identityOf(x) {
-  if (x.firstName !== undefined) return { firstName: x.firstName, lastName: x.lastName, clubberId: x.clubberId || null };
-  var parts = String(x.name || '').trim().split(/\s+/);
-  return { firstName: parts[0] || '', lastName: parts.slice(1).join(' '), clubberId: null };
-}
-function displayName(ident) { return (ident.firstName + ' ' + ident.lastName).trim(); }
-var pendingConfirm = null;     // { entry, mode: 'remove' | 'undo' }
-function askRemove(entry) {
-  var name = (entry.firstName + ' ' + entry.lastName).trim();
-  pendingConfirm = { entry: entry, mode: 'remove' };
-  $('confirm-title').textContent = 'Remove ' + name + ' from tonight’s count?';
-  $('confirm-body').textContent = 'This only changes the count on the lobby screens and this list. It does NOT undo the check-in on TwoTimTwo. If ' +
-    entry.firstName + ' really left, also undo them on the check-in laptop.';
-  $('confirm-ok').textContent = 'Remove from count';
-  showSheet('confirm-sheet');
-}
+// ── Tonight: undo / remove / check out ─────────────────────────────────────
+function displayName(entry) { return (entry.firstName + ' ' + entry.lastName).trim(); }
+function childOf(entry) { return { clubberId: entry.clubberId, name: displayName(entry), club: entry.clubName, visitor: entry.visitor }; }
+var pendingConfirm = null;     // { entry, mode: 'undo' | 'checkout' }
 function askUndo(entry) {
-  var name = (entry.firstName + ' ' + entry.lastName).trim();
+  var name = displayName(entry);
   pendingConfirm = { entry: entry, mode: 'undo' };
-  $('confirm-title').textContent = 'Undo ' + name + '’s check-in on TwoTimTwo?';
-  $('confirm-body').textContent = 'The check-in laptop undoes it on TwoTimTwo, and then ' + entry.firstName +
-    ' comes off tonight’s count and the lobby screens. If TwoTimTwo does not confirm it, nothing changes and this page says why.';
-  $('confirm-ok').textContent = 'Undo check-in';
+  if (entry.visitor) {
+    $('confirm-title').textContent = 'Remove ' + name + ' from tonight?';
+    $('confirm-body').textContent = entry.firstName + ' is not on TwoTimTwo, so this only takes them off tonight’s count, and a label that has not printed yet is dropped.';
+    $('confirm-ok').textContent = 'Remove';
+  } else {
+    $('confirm-title').textContent = 'Undo ' + name + '’s check-in on TwoTimTwo?';
+    $('confirm-body').textContent = 'TwoTimTwo undoes it, and then ' + entry.firstName +
+      ' comes off tonight’s count and the lobby screens, and a label that has not printed yet is dropped. If TwoTimTwo does not confirm it, nothing changes and this page says why.';
+    $('confirm-ok').textContent = 'Undo check-in';
+  }
   showSheet('confirm-sheet');
 }
 function askCheckout(entry) {
-  var name = (entry.firstName + ' ' + entry.lastName).trim();
-  var hasId = entry.clubberId && !entry.visitor;
+  var name = displayName(entry);
   pendingConfirm = { entry: entry, mode: 'checkout' };
-  $('confirm-title').textContent = (hasId ? 'Check out ' : 'Mark ') + name + (hasId ? '?' : ' checked out?');
-  $('confirm-body').textContent = hasId
-    ? 'The check-in laptop checks ' + entry.firstName + ' out on TwoTimTwo, and then they come off tonight’s count and the lobby’s still-here list. If TwoTimTwo does not answer OK, nothing changes and this page says why.'
-    : entry.firstName + ' has no TwoTimTwo record on the check-in laptop, so this only takes them off tonight’s count and the lobby’s still-here list. Nothing is sent to TwoTimTwo.';
-  $('confirm-ok').textContent = hasId ? 'Check out' : 'Mark checked out';
+  $('confirm-title').textContent = 'Check out ' + name + '?';
+  $('confirm-body').textContent = entry.visitor
+    ? entry.firstName + ' is not on TwoTimTwo, so this only takes them off tonight’s count and the lobby’s still-here list.'
+    : 'TwoTimTwo checks ' + entry.firstName + ' out, and then they come off tonight’s count and the lobby’s still-here list. If TwoTimTwo does not answer OK, nothing changes and this page says why.';
+  $('confirm-ok').textContent = 'Check out';
   showSheet('confirm-sheet');
 }
 $('confirm-cancel').addEventListener('click', function() { pendingConfirm = null; renderTonight(); showSheet('tonight-sheet'); });
@@ -1629,143 +1570,60 @@ $('confirm-ok').addEventListener('click', function() {
   renderTonight();
   showSheet('tonight-sheet');
   if (c && c.mode === 'checkout') checkoutEntry(c.entry);
-  else if (c && c.mode === 'undo') undoEntry(c.entry);
-  else if (c) removeEntry(c.entry);
+  else if (c) undoEntry(c.entry);
 });
-
-// ── Tonight: undo on TwoTimTwo (7.14.0) ────────────────────────────────────
-// Queued for the check-in laptop like a phone check-in (/phone/undo with
-// inTwoTimTwo, the same route Remove uses, so the website's relay carries it),
-// then followed on /phone/status. The count changes only when the laptop's
-// extension reports TwoTimTwo's own "(checkin undone)"; any failure says
-// exactly why and offers Remove, which stays the volunteer's choice.
-var UNDO_GIVE_UP_MS = 3 * 60 * 1000;   // the server answers by then (a minute to pick up, 90 s to report)
 function undoEntry(entry) {
-  var ident = identityOf(entry), name = displayName(ident);
+  var name = displayName(entry);
   UNDOING[entry.key] = true;
   renderTonight();
-  postJson('/phone/undo', { pin: PIN, firstName: ident.firstName, lastName: ident.lastName, clubberId: ident.clubberId, inTwoTimTwo: true }).then(function(data) {
-    if (data && data.id) { pollUndo(entry, data.id, Date.now()); return; }
-    // An older print app on the laptop does not know the undo and Removed
-    // the child from the count instead. Say exactly that.
+  desk.undo(childOf(entry)).then(function() {
     delete UNDOING[entry.key];
-    toast(name + ' was only removed from tonight’s count: the check-in laptop’s app is older and cannot undo on TwoTimTwo. Undo there too.', 9000, null, null, 'bad');
-    refreshAll();
+    if (entry.visitor) LOCAL.visitors = LOCAL.visitors.filter(function(v) { return v.key !== entry.key; });
+    else if (entry.kid) { entry.kid.checkedIn = false; rosterEpoch += 1; }
+    saveLocal();
+    toast(entry.visitor ? name + ' removed from tonight.' : name + '’s check-in is undone.', 4000, null, null, 'good');
+    render(); renderTonight();
+    setTimeout(refreshStatus, 800);
+    scheduleRosterPoll(6000);
   }).catch(function(e) {
     delete UNDOING[entry.key];
     renderTonight();
-    if (e.code === 'pin' || e.code === 'locked') { handleActionError(e, ''); return; }
-    undoFailed(entry, e.message);
+    if (commonError(e, 'Not undone: ')) return;
+    toast((entry.visitor ? 'Not removed: ' : 'Not undone in TwoTimTwo: ') + (e && e.message ? e.message : 'try again.'), 10000, null, null, 'bad');
   });
 }
-// Follows a queued undo or check-out on /phone/status until the laptop says
-// done or failed (`kind` 'undo' | 'checkout').
-function pollUndo(entry, id, started, kind) {
-  var co = kind === 'checkout';
-  var busy = co ? CHECKING_OUT : UNDOING;
-  var failed = co ? checkoutFailed : undoFailed;
-  setTimeout(function() {
-    if (!busy[entry.key]) return;
-    call('GET', '/phone/status/' + id).then(function(s) {
-      if (s && s.status === 'done') {
-        delete busy[entry.key];
-        toast(displayName(identityOf(entry)) + (co ? ': checked out in TwoTimTwo.' : ': undone in TwoTimTwo.'), 4000, null, null, 'good');
-        refreshAll();
-        return;
-      }
-      if (s && s.status === 'failed') { delete busy[entry.key]; renderTonight(); failed(entry, s.detail); return; }
-      if (s && s.error && !s.status) { lost(); return; }   // on the Wi-Fi a 404 arrives as a body
-      next();
-    }).catch(function(e) {
-      if (e && e.code === 'http' && e.status === 404) { lost(); return; }
-      next();
-    });
-  }, 1500);
-  function lost() {
-    delete busy[entry.key];
-    renderTonight();
-    failed(entry, 'The check-in laptop lost track of it (restarted?). Check TwoTimTwo before trying again.');
-  }
-  function next() {
-    if (Date.now() - started > UNDO_GIVE_UP_MS) {
-      delete busy[entry.key];
-      renderTonight();
-      failed(entry, 'The check-in laptop has not answered. Check TwoTimTwo before trying again.');
-      return;
-    }
-    pollUndo(entry, id, started, kind);
-  }
-}
-function undoFailed(entry, why) {
-  toast('Not undone in TwoTimTwo: ' + (why || 'see the check-in laptop.'), 10000, 'Remove', function() { askRemove(entry); }, 'bad');
-}
-
-// ── Tonight: check out (7.16.0) ────────────────────────────────────────────
-// Rides /phone/undo with `checkout: true` (the relay already carries it), the
-// same queue-and-follow as Undo check-in: the child comes off the count and
-// the lobby's still-here list only when TwoTimTwo answers OK. A row with no
-// TwoTimTwo id is marked here at once (local: true in the answer).
 function checkoutEntry(entry) {
-  var ident = identityOf(entry), name = displayName(ident);
+  var name = displayName(entry);
   CHECKING_OUT[entry.key] = true;
   renderTonight();
-  postJson('/phone/undo', { pin: PIN, firstName: ident.firstName, lastName: ident.lastName, clubberId: entry.visitor ? null : ident.clubberId, checkout: true }).then(function(data) {
-    if (data && data.id) { pollUndo(entry, data.id, Date.now(), 'checkout'); return; }
+  desk.checkout(childOf(entry)).then(function() {
     delete CHECKING_OUT[entry.key];
-    if (data && data.local) toast(name + ' marked checked out (on this laptop only).', 5000, null, null, 'good');
-    // An older print app that ignored the flag Removed the child instead.
-    else toast(name + ' was only removed from tonight’s count: the check-in laptop’s app is older and cannot check out. Check out at the desk.', 9000, null, null, 'bad');
-    refreshAll();
+    LOCAL.out.push(entry.key);
+    saveLocal();
+    toast(name + ' is checked out.', 4000, null, null, 'good');
+    render(); renderTonight();
+    scheduleRosterPoll(6000);
   }).catch(function(e) {
     delete CHECKING_OUT[entry.key];
     renderTonight();
-    if (e.code === 'pin' || e.code === 'locked') { handleActionError(e, ''); return; }
-    checkoutFailed(entry, e.message);
-  });
-}
-function checkoutFailed(entry, why) {
-  toast('Not checked out: ' + (why || 'see the check-in laptop.'), 10000, null, null, 'bad');
-}
-function removeEntry(entry) {
-  var ident = identityOf(entry), name = displayName(ident);
-  REMOVING[entry.key] = true;
-  TONIGHT.entries = (TONIGHT.entries || []).filter(function(e) { return e.key !== entry.key; });
-  TONIGHT.checkedIn = Math.max(0, (TONIGHT.checkedIn || 0) - 1);
-  var g = entry.clubName || 'No club';
-  if (TONIGHT.byClub && TONIGHT.byClub[g]) { TONIGHT.byClub[g] -= 1; if (!TONIGHT.byClub[g]) delete TONIGHT.byClub[g]; }
-  if (entry.visitor && TONIGHT.visitors) TONIGHT.visitors -= 1;
-  renderTonight(); renderCount();
-  postJson('/phone/undo', { pin: PIN, firstName: ident.firstName, lastName: ident.lastName, clubberId: ident.clubberId }).then(function() {
-    delete REMOVING[entry.key];
-    toast(name + ' removed from tonight’s count.', 6000, 'Undo', function() { restore(entry); });
-    refreshAll();
-  }).catch(function(e) {
-    delete REMOVING[entry.key];
-    if (e.code === 'http' && e.status === 404) { toast('Already removed — refreshing.'); refreshAll(); return; }
-    handleActionError(e, 'Could not remove: ');
-  });
-}
-function restore(x) {
-  var ident = identityOf(x), name = displayName(ident), key = name.toLowerCase();
-  STATE[key] = { status: 'restoring' };
-  render();
-  postJson('/phone/restore', { pin: PIN, firstName: ident.firstName, lastName: ident.lastName, clubberId: ident.clubberId }).then(function() {
-    delete STATE[key];
-    toast(name + ' is back in tonight’s count.', 3000, null, null, 'good');
-    refreshAll();
-  }).catch(function(e) {
-    delete STATE[key];
-    render();
-    if (e.code === 'http' && e.status === 404) { toast('Nothing to add back for ' + name + ' — use Check in.', 5000); refreshAll(); return; }
-    handleActionError(e, 'Could not add back: ');
+    if (commonError(e, 'Not checked out: ')) return;
+    toast('Not checked out: ' + (e && e.message ? e.message : 'try again.'), 10000, null, null, 'bad');
   });
 }
 
 // ── The + menu: one-off name tag, leader tag, custom label, visitor ──────────
+// Every print here is a job sealed in this page to the print stations (a
+// reprint job, never a check-in, nothing sent to TwoTimTwo); a visitor is a
+// check-in like any other, named only inside the seals.
 $('menu-btn').addEventListener('click', function() { refreshLeaders(); fillClubSelects(); showSheet('menu-sheet'); });
 $('menu-close').addEventListener('click', hideSheet);
+// A label's failure, in its own panel when it is not one every action words alike.
+function printFailed(e, status) {
+  if (commonError(e, 'Could not print: ')) return;
+  status.textContent = e && e.message ? e.message : 'Could not print. Try again.';
+}
 
-// A leader tag is not a check-in: the server files it under isLeader.
+// A leader tag is not a check-in: the print server files it under isLeader.
 var leaderInFlight = false;
 function printLeaderTag() {
   if (leaderInFlight) return;
@@ -1775,88 +1633,86 @@ function printLeaderTag() {
   status.textContent = '';
   var btn = $('leader-print');
   btn.disabled = true;
-  postJson('/print-leader', { pin: PIN, name: name, clubName: $('leader-club').value }).then(function(data) {
+  var club = $('leader-club').value;
+  desk.leaderTag({ name: name, club: club }).then(function() {
     leaderInFlight = false; btn.disabled = false;
-    if (data && data.duplicate) { toast('Already printed a moment ago.'); return; }
-    toast('Leader tag for ' + name + ' printing at the door.', 4000, null, null, 'good');
+    toast('Leader tag for ' + name + ' sent to the printer.', 4000, null, null, 'good');
     $('leader-name').value = '';
-    refreshLeaders();
-  }).catch(function(e) {
-    leaderInFlight = false; btn.disabled = false;
-    if (e.code === 'network' && e.status >= 500) { status.textContent = 'Printer problem — see the check-in laptop.'; return; }
-    if (e.code === 'http') { status.textContent = e.message; return; }
-    handleActionError(e, 'Could not print: ');
-  });
+    setTimeout(refreshStatus, 800);
+    // A new name joins the church's remembered leaders (never in the way of the print).
+    desk.rememberLeader({ name: name, club: club }).then(function(r) { if (r) renderLeaderChips(r.leaders); });
+  }).catch(function(e) { leaderInFlight = false; btn.disabled = false; printFailed(e, status); });
 }
 $('leader-print').addEventListener('click', printLeaderTag);
 $('leader-name').addEventListener('keydown', function(e) { if (e.key === 'Enter') printLeaderTag(); });
 
-// Remembered leaders: tick a few and Print selected tags a whole team.
+// Remembered leaders: the church settings' `leaders` (routes.md 10.3), the same
+// list on every device. Tick a few and Print selected tags a whole team. No
+// list (the Worker has no church settings yet, or no connection) = no chips.
 var leaderSelection = {};
 var leaderCache = [];
-function renderLeaderChips(leaders, hidden) {
+function renderLeaderChips(leaders) {
   leaderCache = (leaders || []).slice();
-  var wrap = $('leader-chips-wrap'), list = $('leader-chips'), note = $('leader-chips-note');
+  var wrap = $('leader-chips-wrap'), list = $('leader-chips');
   list.textContent = '';
   if (!leaderCache.length) { wrap.hidden = true; return; }
   wrap.hidden = false;
   leaderCache.forEach(function(l) {
-    var name = ((l.firstName || '') + ' ' + (l.lastName || '')).trim();
+    var name = (l.firstName + ' ' + l.lastName).trim();
+    var key = name.toLowerCase();
     var chip = el('span', 'leader-chip');
     var pick = el('label');
     pick.style.cssText = 'display:inline-flex;align-items:center;gap:6px';
-    var cb = el('input'); cb.type = 'checkbox'; cb.checked = !!leaderSelection[l.key];
-    cb.addEventListener('change', function() { if (cb.checked) leaderSelection[l.key] = true; else delete leaderSelection[l.key]; });
+    var cb = el('input'); cb.type = 'checkbox'; cb.checked = !!leaderSelection[key];
+    cb.addEventListener('change', function() { if (cb.checked) leaderSelection[key] = true; else delete leaderSelection[key]; });
     pick.appendChild(cb);
     pick.appendChild(document.createTextNode(name + (l.clubName ? ' · ' + l.clubName : '')));
     var one = el('button', null, 'Print'); one.type = 'button';
     one.addEventListener('click', function() { printLeaders([l]); });
     var x = el('button', 'x', '×'); x.type = 'button';
     x.setAttribute('aria-label', 'Forget ' + name);
-    x.addEventListener('click', function() { forgetLeader(l.key, name); });
+    x.addEventListener('click', function() { forgetLeader(l); });
     chip.appendChild(pick); chip.appendChild(one); chip.appendChild(x);
     list.appendChild(chip);
   });
-  note.textContent = hidden ? hidden + ' not printed this season (hidden)' : '';
 }
 function refreshLeaders() {
-  if (!unlockedState) return;
-  postJson('/leaders', { pin: PIN }).then(function(d) { if (d) renderLeaderChips(d.leaders, d.hidden); }).catch(function() {});
+  if (!unlockedState || SIMPLE) return;
+  desk.churchLeaders().then(function(d) { renderLeaderChips(d ? d.leaders : []); });
 }
+// One sealed leader-tag job per leader, in order (the printer is one serial device).
 function printLeaders(leaders) {
   var status = $('leader-status');
   if (!leaders || !leaders.length) { status.textContent = 'Tick a leader first.'; return; }
   if (leaderInFlight) return;
   leaderInFlight = true;
   status.textContent = '';
-  postJson('/print-leader', {
-    pin: PIN,
-    leaders: leaders.map(function(l) { return { firstName: l.firstName, lastName: l.lastName, clubName: l.clubName || '' }; })
-  }).then(function(d) {
+  var sent = 0, failedNames = [];
+  var chain = Promise.resolve();
+  leaders.forEach(function(l) {
+    chain = chain.then(function() {
+      var name = (l.firstName + ' ' + l.lastName).trim();
+      return desk.leaderTag({ name: name, club: l.clubName }).then(function() { sent++; }, function(e) { failedNames.push(name); if (e && e.code === 'signed-out') throw e; });
+    });
+  });
+  chain.then(function() {
     leaderInFlight = false;
-    d = d || {};
-    if (d.failed) {
-      var bad = (d.results || []).filter(function(x) { return !x.success; }).map(function(x) { return x.name; }).join(', ');
-      status.textContent = 'Printed ' + d.printed + '; failed: ' + bad;
-    } else {
-      toast('Printing ' + d.printed + ' leader tag' + (d.printed === 1 ? '' : 's') + ' at the door.', 4000, null, null, 'good');
-      leaderSelection = {};
-    }
-    refreshLeaders();
-  }).catch(function(e) {
-    leaderInFlight = false;
-    if (e.code === 'network' && e.status >= 500) { status.textContent = 'Printer problem — see the check-in laptop.'; return; }
-    handleActionError(e, 'Could not print: ');
+    if (failedNames.length) status.textContent = 'Sent ' + sent + '; not sent: ' + failedNames.join(', ');
+    else { toast(sent + ' leader tag' + (sent === 1 ? '' : 's') + ' sent to the printer.', 4000, null, null, 'good'); leaderSelection = {}; renderLeaderChips(leaderCache); }
+    setTimeout(refreshStatus, 800);
+  }, function(e) { leaderInFlight = false; commonError(e, 'Could not print: '); });
+}
+function forgetLeader(l) {
+  var name = (l.firstName + ' ' + l.lastName).trim();
+  if (!confirm('Forget ' + name + '? Their tag can still be printed by typing the name.')) return;
+  delete leaderSelection[name.toLowerCase()];
+  desk.forgetLeader(l).then(function(r) {
+    if (r) renderLeaderChips(r.leaders);
+    else $('leader-status').textContent = 'Could not update the remembered leaders. Try again.';
   });
 }
-function forgetLeader(key, name) {
-  if (!confirm('Forget ' + name + '? Their tag can still be printed by typing the name.')) return;
-  delete leaderSelection[key];
-  postJson('/leaders/forget', { pin: PIN, key: key }).then(function(d) { if (d) renderLeaderChips(d.leaders, d.hidden); })
-    .catch(function(e) { handleActionError(e, 'Could not update: '); });
-}
 $('leader-print-selected').addEventListener('click', function() {
-  printLeaders(leaderCache.filter(function(l) { return leaderSelection[l.key]; }));
+  printLeaders(leaderCache.filter(function(l) { return leaderSelection[(l.firstName + ' ' + l.lastName).trim().toLowerCase()]; }));
 });
 
 // Custom label: one line of free text. Records nothing at all.
@@ -1870,17 +1726,12 @@ function printCustomLabel() {
   status.textContent = '';
   var btn = $('custom-print');
   btn.disabled = true;
-  postJson('/print-custom', { pin: PIN, text: text }).then(function(data) {
+  desk.customLabel({ text: text }).then(function() {
     customInFlight = false; btn.disabled = false;
-    if (data && data.duplicate) { toast('Already printed a moment ago.'); return; }
-    toast('Custom label printing at the door.', 4000, null, null, 'good');
+    toast('Custom label sent to the printer.', 4000, null, null, 'good');
     input.value = '';
-  }).catch(function(e) {
-    customInFlight = false; btn.disabled = false;
-    if (e.code === 'network' && e.status >= 500) { status.textContent = 'Printer problem — see the check-in laptop.'; return; }
-    if (e.code === 'http') { status.textContent = e.message; return; }
-    handleActionError(e, 'Could not print: ');
-  });
+    setTimeout(refreshStatus, 800);
+  }).catch(function(e) { customInFlight = false; btn.disabled = false; printFailed(e, status); });
 }
 $('custom-print').addEventListener('click', printCustomLabel);
 $('custom-text').addEventListener('keydown', function(e) { if (e.key === 'Enter') printCustomLabel(); });
@@ -1937,69 +1788,69 @@ function printOneOff() {
   oneOffInFlight = true;
   status.textContent = '';
   syncOneOff();
-  postJson('/print-oneoff', { pin: PIN, firstName: firstName, clubName: oneOffClub }).then(function(data) {
+  desk.oneOffTag({ name: firstName, club: oneOffClub }).then(function() {
     oneOffInFlight = false;
-    data = data || {};
-    var who = data.firstName || firstName;
-    if (data.duplicate) toast('Already printing ' + who + '’s tag.');
-    else if (data.demo) toast('Test tag printed (rehearsal mode).', 4000, null, null, 'good');
-    else toast('Printing ' + who + '’s tag.', 4000, null, null, 'good');
+    toast('Printing ' + firstName + '’s tag.', 4000, null, null, 'good');
     input.value = '';
     syncOneOff();
     input.focus();
-  }).catch(function(e) {
-    oneOffInFlight = false;
-    syncOneOff();
-    if (e.code === 'network' && e.status >= 500) { status.textContent = 'Printer problem — see the check-in laptop.'; return; }
-    if (e.code === 'http') { status.textContent = e.message; return; }
-    handleActionError(e, 'Could not print: ');
-  });
+    setTimeout(refreshStatus, 800);
+  }).catch(function(e) { oneOffInFlight = false; syncOneOff(); printFailed(e, status); });
 }
 $('oneoff-print').addEventListener('click', printOneOff);
 $('oneoff-name').addEventListener('input', function() { $('oneoff-status').textContent = ''; syncOneOff(); });
 $('oneoff-name').addEventListener('keydown', function(e) { if (e.key === 'Enter') printOneOff(); });
 
-// A visitor not on the roster: a visitor label, counted tonight.
+// A visitor not on the roster: checked in by name (the Worker hashes it) and
+// printed, counted tonight.
 var visitorInFlight = false;
 function printVisitor() {
   if (visitorInFlight) return;
-  var name = $('visitor-name').value.trim(), status = $('visitor-status');
-  if (!name || name.split(/\s+/).length < 2) { status.textContent = 'Type the visitor’s first and last name.'; return; }
+  var name = $('visitor-name').value.replace(/\s+/g, ' ').trim(), status = $('visitor-status');
+  if (!name || name.split(' ').length < 2) { status.textContent = 'Type the visitor’s first and last name.'; return; }
+  var club = $('visitor-club').value;
+  if (!club) { status.textContent = 'Pick the visitor’s club.'; return; }
+  var known = KIDS.filter(function(k) { return norm(k.name) === norm(name); })[0];
+  if (known) {
+    toast(known.name + ' is on TwoTimTwo’s list: check them in there.', 6000);
+    hideSheet();
+    $('search').value = name;
+    render();
+    return;
+  }
   visitorInFlight = true;
   status.textContent = '';
   var btn = $('visitor-print');
   btn.disabled = true;
-  postJson('/phone/visitor', { pin: PIN, name: name, clubName: $('visitor-club').value }).then(function(data) {
+  desk.checkIn({ name: name, club: club, visitor: true }, {}).then(function(r) {
     visitorInFlight = false; btn.disabled = false;
-    if (data && data.duplicate) { toast('Already printed a moment ago.'); return; }
-    toast('Visitor label for ' + name.split(/\s+/)[0] + ' printing at the door.', 4000, null, null, 'good');
+    if (r.already) { toast('Already checked in (another phone or the desk got there first).'); return; }
+    var key = 'v:' + newRowId();
+    LOCAL.visitors.push({ key: key, name: name, club: club, at: Date.now() });
+    saveLocal();
+    toast(name.split(' ')[0] + ' is checked in (visitor).', 4000, null, null, 'good');
     $('visitor-name').value = '';
     hideSheet();
-    refreshAll();
-  }).catch(function(e) {
-    visitorInFlight = false; btn.disabled = false;
-    if (e.code === 'http' && e.status === 409) {
-      toast(e.message, 6000);
-      hideSheet();
-      $('search').value = name;
-      render();
-      return;
-    }
-    if (e.code === 'network' && e.status >= 500) { status.textContent = 'Printer problem — see the check-in laptop.'; return; }
-    handleActionError(e, 'Could not print: ');
-  });
+    renderCount();
+    setTimeout(refreshStatus, 800);
+  }).catch(function(e) { visitorInFlight = false; btn.disabled = false; printFailed(e, status); });
 }
 $('visitor-print').addEventListener('click', printVisitor);
 $('visitor-name').addEventListener('keydown', function(e) { if (e.key === 'Enter') printVisitor(); });
 
-// Auto-unlock with the PIN this tab already used.
-if (PIN) {
-  fetchRoster(PIN).then(startSession).catch(function(e) {
-    sessionStorage.removeItem(PIN_KEY);
-    PIN = '';
-    if (e.code === 'locked') startPinCountdown(e.retryAfter);
-  });
-}
+// ── Start ──────────────────────────────────────────────────────────────────
+// A sign-in already in this browser (the screens', /settings', this page's) is
+// taken up when this device has checked the history key with the passphrase
+// once; otherwise the passphrase, once.
+loadModules().then(function() {
+  if (desk.restore() === 'ready') { startSession(); return; }
+  try {
+    if (localStorage.getItem('awanaSyncSession.v1')) $('pin-intro').textContent = 'This device is signed in, but check-in needs the passphrase once to check the history key.';
+  } catch (e) { /* no storage */ }
+  setTimeout(function() { try { $('pin').focus(); } catch (e) { /* ignore */ } }, 30);
+}, function() {
+  $('pin-err').textContent = 'This page could not load its check-in code. Reload it.';
+});
 </script>
 </body>
 </html>

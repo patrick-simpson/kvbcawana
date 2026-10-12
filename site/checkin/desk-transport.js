@@ -1,10 +1,11 @@
-// The desk page's transport: everything that talks to the sync Worker, and
-// everything that seals, in ONE small module (ROADMAP.md#online-check-in P3).
-// No DOM and no globals: the page hands it `fetch`, a storage object and the
-// cloud-crypto module (lobby/shared/cloud-crypto.js, the canonical copy), so
-// Node tests run it as it is. The routes are lobby/worker/src/routes.md; when
-// the Worker's contract moves (the print role's is being reconciled), this is
-// the only file that follows.
+// The check-in page's transport (awana.kvbchurch.org/checkin, the page is
+// printer/print-server/public/phone.html): everything that talks to the sync
+// Worker's desk routes, and everything that seals, in ONE small module
+// (ROADMAP.md#online-check-in; it was the /desk page's). No DOM and no globals:
+// the page hands it `fetch`, a storage object and the cloud-crypto module
+// (lobby/shared/cloud-crypto.js, the canonical copy), so Node tests run it as it
+// is. The routes are lobby/worker/src/routes.md; when the Worker's contract
+// moves, this is the only file that follows.
 //
 // THE RULES it keeps (routes.md "Rules every route keeps"):
 //   - Free-CPU. Every key derivation and every seal is HERE, in the browser:
@@ -13,8 +14,10 @@
 //     registered stations (sealForStations) and the history row to the history
 //     key (sealRow) before anything is posted. The Worker validates and stores.
 //   - Names go to the Worker in clear only inside the check-in the Worker must
-//     post to TwoTimTwo (the clubber id; a visitor's name, which it hashes).
-//     The sealed job and the sealed row carry the rest.
+//     post to TwoTimTwo (the clubber id; a visitor's name, which it hashes), and
+//     a Brought-a-friend friend's FIRST name for the 6:30 BARF list (friends.js,
+//     what the phone path always sent). The sealed job and the sealed row carry
+//     the rest.
 //   - Fail closed. No history key, or a seal that cannot be made, posts NOTHING.
 //   - The 5 s read budget. A 429 is a DeskError 'busy' with `retryAfterMs`; the
 //     page shows "busy, try again in Ns" and does not hammer.
@@ -29,6 +32,8 @@ export const SESSION_STORAGE = 'awanaSyncSession.v1';
 export const HISTORY_PIN_STORAGE = 'awanaDeskHistoryKey.v1';
 /** A stations-changed answer is resealed at most this many times. */
 export const RESEAL_MAX = 3;
+/** The most remembered leaders (church settings `leaders`, lobby/shared/churchSettings.js). */
+export const LEADERS_MAX = 80;
 /** A station not heard from for this long means "check the printer". */
 export const STATION_QUIET_MS = 2 * 60 * 1000;
 
@@ -110,6 +115,13 @@ export function createDesk({ cc, fetch: fetchFn, store, base = DESK_API, now = D
   let history = null;
   /** @type {{ stationId: string, name: string, kid: string, publicKey: string }[]|null} */
   let stations = null;
+  /**
+   * The history key's private half, opened at a passphrase sign-in: NON-extractable,
+   * held in this closure's memory only (never storage; a reload or sign-out forgets
+   * it). Only recentAttendance() reads with it. A restored session has none.
+   * @type {{ privateKey: CryptoKey, publicKey: string, kid: string }|null}
+   */
+  let ring = null;
 
   const pinned = () => {
     try {
@@ -215,6 +227,7 @@ export function createDesk({ cc, fetch: fetchFn, store, base = DESK_API, now = D
     const opened = await cc.unwrapPrivateKey(key.wrapped, passphrase, key.pub);
     if (!opened) throw new DeskError('history-mismatch', 'The history key does not open with this passphrase. Ask the owner before checking anyone in.');
     history = { pub: key.pub, kid: key.kid || (await cc.kidOf(key.pub)) };
+    ring = await cc.keyRing(opened, key.pub).catch(() => null);
     write(HISTORY_PIN_STORAGE, JSON.stringify(history));
   }
 
@@ -234,7 +247,7 @@ export function createDesk({ cc, fetch: fetchFn, store, base = DESK_API, now = D
     return 'ready';
   }
 
-  function signOut() { saveSession(''); history = null; stations = null; }
+  function signOut() { saveSession(''); history = null; stations = null; ring = null; }
 
   // ── reads ───────────────────────────────────────────────────────────────────
 
@@ -375,7 +388,7 @@ export function createDesk({ cc, fetch: fetchFn, store, base = DESK_API, now = D
       ...(choice.friend ? { friend: true, ...(friendName ? { friendName } : {}) } : {}),
     };
     const out = await sealedPost('/v1/desk/checkin', async (list) => ({
-      night: n, ...who(child), items,
+      night: n, ...who(child), items, ...(choice.friend && friendName ? { friendName } : {}),
       historyRow: await sealHistory(n, isVisitor ? 'visitor' : 'checkin', historyRecord(child, { friend: choice.friend, friendName })),
       job: await sealJob(list, n, { route: '/print', body: printBody, clubberId, source: 'desk' }),
     }));
@@ -395,28 +408,205 @@ export function createDesk({ cc, fetch: fetchFn, store, base = DESK_API, now = D
   const checkout = (/** @type {any} */ child) => undoOrCheckout('checkout', child);
 
   /**
-   * A one-off name tag: a label and no check-in (never counted, nothing sent
-   * to TwoTimTwo), a `reprint:` job sealed to every station.
-   * @param {{ name: string, club: string }} tag
+   * A label that is not a check-in: a `reprint:` job sealed to every station
+   * (never counted, nothing sent to TwoTimTwo). The record is exactly what the
+   * print role runs: one of the print server's own routes and its own body.
+   * @param {string} route @param {Record<string, any>} body
    */
-  async function oneOffTag(tag) {
+  async function reprintJob(route, body) {
     const n = night();
-    const first = String(tag.name || '').replace(/\s+/g, ' ').trim().slice(0, 40);
-    if (!first) throw new DeskError('refused', 'Type the child’s first name.', { reason: 'no-name' });
-    const club = String(tag.club || '').trim();
-    if (!club) throw new DeskError('refused', 'Pick the child’s club.', { reason: 'no-club' });
     const jobId = `reprint:${crypto.randomUUID()}`;
-    // The record the print role runs: the print server's own POST /print-oneoff and its body.
     await sealedPost('/v1/print/reprint', async (list) => ({
-      jobId, bundle: await sealJob(list, n, { route: '/print-oneoff', body: { firstName: first, clubName: club }, source: 'desk', at: new Date(now()).toISOString() }),
+      jobId, bundle: await sealJob(list, n, { route, body, source: 'desk', at: new Date(now()).toISOString() }),
     }), { needJob: true });
     return { jobId };
   }
+  const oneLine = (/** @type {unknown} */ v, /** @type {number} */ max) => String(v || '').replace(/\s+/g, ' ').trim().slice(0, max);
+
+  /**
+   * A one-off name tag: a typed first name and a club, no roster lookup (the
+   * print server's POST /print-oneoff). The screens welcome the child; the count never moves.
+   * @param {{ name: string, club: string }} tag
+   */
+  async function oneOffTag(tag) {
+    const first = oneLine(tag.name, 40);
+    if (!first) throw new DeskError('refused', 'Type the child’s first name.', { reason: 'no-name' });
+    const club = String(tag.club || '').trim();
+    if (!club) throw new DeskError('refused', 'Pick the child’s club.', { reason: 'no-club' });
+    return reprintJob('/print-oneoff', { firstName: first, clubName: club });
+  }
+
+  /**
+   * A leader tag (the print server's POST /print-leader, filed under isLeader there, never a check-in).
+   * @param {{ name: string, club?: string }} tag
+   */
+  async function leaderTag(tag) {
+    const name = oneLine(tag.name, 80);
+    if (!name) throw new DeskError('refused', 'Type the leader’s name.', { reason: 'no-name' });
+    return reprintJob('/print-leader', { name, clubName: String(tag.club || '').trim() });
+  }
+
+  /**
+   * A custom label: one line of free text on a blank label (POST /print-custom), which records nothing.
+   * @param {{ text: string }} label
+   */
+  async function customLabel(label) {
+    const text = oneLine(label.text, 60);
+    if (!text) throw new DeskError('refused', 'Type the label text.', { reason: 'no-text' });
+    return reprintJob('/print-custom', { text });
+  }
+
+  // ── who was here lately (the history, opened in the browser) ───────────────
+
+  /**
+   * Who was here on the last `count` club nights before tonight, from the sealed
+   * history rows (routes.md section 3), opened HERE with the history key this
+   * sign-in unwrapped. Worker (D1) reads only, never TwoTimTwo: one nights list,
+   * then each night's rows a page at a time. A child counts as here on a night
+   * when the LAST of their check-in and undo rows (by `ts`) is not an undo; the
+   * laptop's imported attendance ledger counts too. Fails SILENT: no key (a
+   * restored session), fewer than `count` earlier nights, history storage off,
+   * no connection or anything else answers null, and the page shows nobody as away.
+   * @param {number} [count]
+   * @returns {Promise<{ nights: string[], names: string[], ids: string[] }|null>}
+   */
+  async function recentAttendance(count = 2) {
+    if (!ring) return null;
+    const key = ring;
+    try {
+      const r = await request('GET', '/v1/history/nights');
+      if (r.status !== 200 || !Array.isArray(r.body)) return null;
+      const tonight = night();
+      const nights = [...new Set(r.body.map((/** @type {any} */ n) => n && n.night)
+        .filter((/** @type {any} */ n) => typeof n === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(n) && n < tonight))].sort().reverse().slice(0, count);
+      if (nights.length < count) return null;
+      /** @type {Set<string>} */ const names = new Set();
+      /** @type {Set<string>} */ const ids = new Set();
+      for (const n of nights) {
+        /** @type {Map<string, { ts: number, here: boolean, name: string, id: string }>} */
+        const last = new Map();
+        let after = '';
+        for (let page = 0; page < 20; page++) {
+          const q = await request('GET', `/v1/history/rows?night=${n}&limit=500${after ? `&after=${encodeURIComponent(after)}` : ''}`);
+          if (q.status !== 200 || !q.body) return null;
+          for (const row of q.body.rows || []) {
+            /** @type {any} */
+            const rec = await cc.openRow(key, row).catch(() => null);
+            if (!rec || typeof rec !== 'object') continue;
+            if (row.kind === 'import-attendance') {
+              if (Array.isArray(rec.dates) && rec.dates.includes(n) && rec.name) names.add(String(rec.name));
+              continue;
+            }
+            const arrive = row.kind === 'checkin' || row.kind === 'visitor' || (row.kind === 'import-checkin' && !rec.undone);
+            if (!arrive && row.kind !== 'undo') continue;
+            const name = `${rec.first || ''} ${rec.last || ''}`.replace(/\s+/g, ' ').trim();
+            const id = rec.clubberId ? String(rec.clubberId) : '';
+            const who = id ? `id:${id}` : `n:${cc.normalizeName(name)}`;
+            const ts = Number(rec.ts) || 0;
+            const was = last.get(who);
+            if (!was || ts >= was.ts) last.set(who, { ts, here: arrive, name: name || (was ? was.name : ''), id });
+          }
+          if (!q.body.next) break;
+          after = String(q.body.next);
+        }
+        for (const v of last.values()) {
+          if (!v.here) continue;
+          if (v.name) names.add(v.name);
+          if (v.id) ids.add(v.id);
+        }
+      }
+      return { nights, names: [...names], ids: [...ids] };
+    } catch { return null; }
+  }
+
+  // ── remembered leaders (the church settings, routes.md 10.3) ───────────────
+  // `leaders` in lobby/shared/churchSettings.js: at most LEADERS_MAX unique
+  // {firstName, lastName, clubName, lastPrintedAt, printCount}. The page writes
+  // only the names and the club of a NEW leader; lastPrintedAt and printCount are
+  // the station's / Worker's (the sanitizer fills their defaults), and a leader
+  // already on the list is sent back exactly as it was read.
+
+  /** @param {any} l */
+  const leaderKey = (l) => `${l.firstName} ${l.lastName}`.toLowerCase().replace(/\s+/g, ' ').trim();
+  /** @param {unknown} list @returns {{ firstName: string, lastName: string, clubName: string, lastPrintedAt?: number, printCount?: number }[]} */
+  function readLeaders(list) {
+    if (!Array.isArray(list)) return [];
+    /** @type {any[]} */
+    const out = [];
+    const seen = new Set();
+    for (const l of list) {
+      if (!l || typeof l !== 'object' || typeof l.firstName !== 'string') continue;
+      const row = { ...l, firstName: oneLine(l.firstName, 80), lastName: typeof l.lastName === 'string' ? oneLine(l.lastName, 80) : '', clubName: typeof l.clubName === 'string' ? oneLine(l.clubName, 40) : '' };
+      const k = leaderKey(row);
+      if (!k || seen.has(k)) continue;
+      seen.add(k);
+      out.push(row);
+      if (out.length >= LEADERS_MAX) break;
+    }
+    return out;
+  }
+  /** A typed name as the list keeps it: the first word, then the rest. @param {string} name */
+  function splitLeader(name) {
+    const parts = oneLine(name, 160).split(' ').filter(Boolean);
+    return { firstName: oneLine(parts[0] || '', 80), lastName: oneLine(parts.slice(1).join(' '), 80) };
+  }
+
+  /**
+   * The church's remembered leaders (`GET /v1/church/settings`, `settings.leaders`).
+   * Null when the route is not there yet (404), paused, or unreachable: the page
+   * then shows no chips.
+   */
+  async function churchLeaders() {
+    try {
+      const r = await request('GET', '/v1/church/settings');
+      if (r.status !== 200 || !r.body || typeof r.body !== 'object') return null;
+      return { rev: Number(r.body.rev) || 0, leaders: readLeaders(r.body.settings && r.body.settings.leaders) };
+    } catch { return null; }
+  }
+
+  /**
+   * Change the list through the church-settings edit (`PUT /v1/church/settings
+   * {baseRev, settings: {leaders}}`, only that key), once more on a stale rev.
+   * Never throws: null when it could not be written (route missing, not seeded,
+   * paused, offline).
+   * @param {(list: any[]) => any[]|null} change null = nothing to write
+   */
+  async function editLeaders(change) {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const cur = await churchLeaders();
+      if (!cur) return null;
+      const next = change(cur.leaders);
+      if (!next) return cur;
+      try {
+        const put = await request('PUT', '/v1/church/settings', { baseRev: cur.rev, settings: { leaders: next } });
+        if (put.status === 200 && put.body) {
+          const saved = put.body.settings && Array.isArray(put.body.settings.leaders) ? readLeaders(put.body.settings.leaders) : next;
+          return { rev: Number(put.body.rev) || cur.rev + 1, leaders: saved };
+        }
+        if (!(put.status === 409 && put.body && put.body.reason === 'stale')) return null;
+      } catch { return null; }
+    }
+    return null;
+  }
+  /** Remember a leader whose tag just printed (nothing when already on the list). @param {{ name: string, club?: string }} leader */
+  const rememberLeader = (leader) => {
+    const row = { ...splitLeader(leader.name), clubName: oneLine(leader.club, 40) };
+    if (!row.firstName) return Promise.resolve(null);
+    return editLeaders((list) => (list.some((l) => leaderKey(l) === leaderKey(row)) ? null
+      : (list.length >= LEADERS_MAX ? null : [...list, row])));
+  };
+  /** @param {{ firstName: string, lastName: string }} leader */
+  const forgetLeader = (leader) => editLeaders((list) => {
+    const next = list.filter((l) => leaderKey(l) !== leaderKey(leader));
+    return next.length === list.length ? null : next;
+  });
 
   return {
-    signIn, restore, signOut, roster, families, printStatus, tonight, loadStations, checkIn, undo, checkout, oneOffTag,
+    signIn, restore, signOut, roster, families, printStatus, tonight, loadStations, checkIn, undo, checkout, oneOffTag, leaderTag, customLabel,
+    recentAttendance, churchLeaders, rememberLeader, forgetLeader,
     get signedIn() { return !!session; },
     get hasHistory() { return !!history; },
+    get canReadHistory() { return !!ring; },
     get night() { return night(); },
   };
 }

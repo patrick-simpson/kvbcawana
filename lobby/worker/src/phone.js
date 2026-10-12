@@ -1,8 +1,10 @@
 // Cloud check-in for the phone page (awana.kvbchurch.org/checkin), owner's
 // choice 2026-10-11: the Worker checks a child in on TwoTimTwo itself, laptop
 // on or off, and then tells the laptop (when it is on) to print the tag at
-// once. The page is unchanged: it still sends every call through the relay,
-// and these are the calls the Worker answers itself (sync.js, POST /v1/relay):
+// once. Since 2026-10-12 /checkin is on the desk routes (desk.js); this serves
+// /checkin/classic, the old relayed page kept until 2026-10-14, which still
+// sends every call through the relay; these are the calls the Worker answers
+// itself (sync.js, POST /v1/relay):
 //
 //   POST /phone/checkin         always: TwoTimTwo's own check-in post
 //   GET  /phone/status/<id>     for a check-in made here

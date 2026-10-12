@@ -1,5 +1,6 @@
 // The merged about page: /lobby/about.html and /journey/about.html redirect
-// (301) to the lobby and Journey parts of the home page (#lobby, #journey).
+// (301) to the lobby and Journey parts of the home page (#lobby, #journey), and
+// the desk check-in (/desk) to the one check-in page (/checkin/).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
@@ -14,7 +15,17 @@ test('the two old about pages go permanently to their sections of the home page'
   for (const [from, to] of [['/lobby/about.html', '/#lobby'], ['/lobby/about', '/#lobby'], ['/journey/about.html', '/#journey'], ['/journey/about', '/#journey']]) {
     assert.deepEqual(rules.get(from), { to, code: '301' }, from);
   }
-  assert.equal(PAGE_REDIRECTS.length, 4);
+  assert.equal(PAGE_REDIRECTS.length, 7);
+});
+
+test('the desk check-in goes permanently to the one check-in page, and its source is gone', () => {
+  const rules = new Map(pageRedirects().map((l) => { const [from, to, code] = l.split(' '); return [from, { to, code }]; }));
+  for (const from of ['/desk', '/desk/', '/desk/index.html']) assert.deepEqual(rules.get(from), { to: '/checkin/', code: '301' }, from);
+  assert.equal(existsSync(path.join(SITE, 'desk')), false, 'site/desk/ is merged into /checkin');
+  const built = path.join(SITE, 'dist');
+  if (!existsSync(built)) return; // the CI site job builds first; a bare checkout has no dist
+  assert.equal(existsSync(path.join(built, 'desk')), false, 'nothing is built at /desk, so the redirect answers');
+  assert.ok(existsSync(path.join(built, 'checkin', 'index.html')));
 });
 
 test('the sections they land on exist on the home page, and the old files are gone', () => {

@@ -123,12 +123,12 @@ const fakeSafe = {
   const printedFor = (id) => prints.filter((b) => String(b.clubberId) === String(id)).length;
   const status = async () => (await t.call('GET', '/v1/print/status')).body;
 
-  // ── "the desk page": the REAL site/desk/desk-transport.js, signed in by passphrase v2 ──
+  // ── "the check-in page": the REAL site/checkin/desk-transport.js (/checkin's transport), signed in by passphrase v2 ──
   // It derives authKey, signs in (the one upgrade login the first time), proves the
   // history key, then seals the job and the row in "the browser" and posts.
   const esm = (...p) => import(pathToFileURL(path.join(root, '..', ...p)).href);
   const esmCc = await esm('lobby', 'shared', 'cloud-crypto.js');
-  const { createDesk } = await esm('site', 'desk', 'desk-transport.js');
+  const { createDesk } = await esm('site', 'checkin', 'desk-transport.js');
   const deskFetch = async (url, init = {}) => t.core.handle(new Request(`${BASE}${String(url).replace(/^\/api/, '')}`, init));
   const desk = createDesk({ cc: esmCc, fetch: deskFetch, now: t.clock.now });
   await desk.signIn(PASS);
@@ -401,6 +401,18 @@ const fakeSafe = {
     const st7 = (await t2.call('GET', '/v1/print/status')).body;
     check('a malformed job fails fast: dead on the Worker at once, and the tag behind it prints on the very next tick', st7.dead === 1 && labels() === l2 + 2 && r7.handled + r8.handled === 2, `${JSON.stringify(nextTag)} ${JSON.stringify([r7, r8])} ${JSON.stringify(st7)} ${labels()}`);
     await settle();
+
+    // a leader tag and a custom label from the check-in page (/checkin's + menu): sealed
+    // reprint jobs on the print server's own /print-leader and /print-custom, never counted
+    const l3 = labels();
+    await desk2.leaderTag({ name: 'Pat Leaderly', club: 'Sparks' });
+    await desk2.customLabel({ text: 'KITCHEN' });
+    const r9 = await puller2.tick();
+    const r10 = await puller2.tick();
+    await settle();
+    const st9 = (await t2.call('GET', '/v1/print/status')).body;
+    check('a leader tag and a custom label from the check-in page each print once and are done', r9.handled + r10.handled === 2 && labels() === l3 + 2 && st9.queued === 0 && st9.leased === 0 && st9.dead === 1,
+      `${JSON.stringify([r9, r10])} ${labels()} ${JSON.stringify(st9)}`);
 
     // the Worker's own tally, ticker and still-here list
     t2.clock.tick(WATCH_INTERVAL_MS);

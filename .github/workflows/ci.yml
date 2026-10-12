@@ -44,8 +44,9 @@ jobs:
   #   lobby   reads only lobby/ (its vitest excludes worker/ and desktop/,
   #           whose lint moved into their own jobs below), plus
   #           journey/public/src/schedule.js
-  #           site/desk/ and printer/print-server/public/phone.html (e2e/desk.spec.js
-  #           serves the desk page, with the phone page's touch core, from a stub origin)
+  #           site/checkin/ and printer/print-server/public/phone.html
+  #           (e2e/checkin.spec.js serves the one check-in page, built from the
+  #           phone page by site/checkin/checkin-page.mjs, from a stub origin)
   #   printer reads printer/, plus lobby/worker/src/relay.js
   #           (test-phone-relay) and, since the online check-in end-to-end test
   #           (printer/scripts/test-cloud-e2e.cjs) runs the Worker in process,
@@ -117,7 +118,7 @@ jobs:
               if [[ "$f" != */* && "$f" == *.md ]]; then continue; fi
               case "$f" in
                 journey/public/src/schedule.js) lobby=true ;;  # screenSpecs.test.js reads it
-                site/desk/*|printer/print-server/public/phone.html|printer/print-server/sync-protocol.js) lobby=true ;;  # e2e/desk.spec.js serves the desk page (site/desk/desk-page.mjs injects the touch core)
+                site/checkin/*|printer/print-server/public/phone.html|printer/print-server/sync-protocol.js) lobby=true ;;  # e2e/checkin.spec.js serves the check-in page (site/checkin/checkin-page.mjs builds it from phone.html)
                 lobby/worker/*|lobby/desktop/*|printer/*|journey/*|site/*|.github/workflows/*) ;;
                 *) lobby=true ;;
               esac

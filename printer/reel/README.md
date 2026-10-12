@@ -19,7 +19,7 @@ which the page plays; everything in between goes to `reel/.work/` (ignored).
 | Step | File | What it does |
 | --- | --- | --- |
 | Labels | `labels.cjs` | Real 4x2 labels from the print server's own renderer (`generateLabel()` through `/preview`), for a made-up roster. |
-| Footage | `record.mjs`, `shots.mjs`, `lib/vclock.mjs` | The real screens from `site/dist` (the lobby, the projector, Journey, `/checkin`, `/settings`), driven the way their own e2e suites drive them (the stand-in live channel, `lib/live.mjs`; a stand-in laptop behind the phone page, `lib/phone.mjs`), filmed frame by frame on a virtual clock at 60 fps. |
+| Footage | `record.mjs`, `shots.mjs`, `lib/vclock.mjs` | The real screens from `site/dist` (the lobby, the projector, Journey, `/checkin`, `/settings`), driven the way their own e2e suites drive them (the stand-in live channel, `lib/live.mjs`; a stand-in check-in service behind the phone page, `lib/phone.mjs`), filmed frame by frame on a virtual clock at 60 fps. |
 | Film | `film/` (`film.js`, `kit.js`, `lib.js`, `film.css`), `render.mjs` | The motion graphics and the edit in one page: the opener, the section cards, the closer, the footage on the catalog's plates. Every frame is a pure function of time, rendered by seeking and screenshotting. |
 | Edit | `edit.mjs` | Cuts the soundtrack to the film (bars 2-31, then the final phrase), mixes it, and encodes the deliverables. |
 

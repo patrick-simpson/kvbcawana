@@ -135,7 +135,7 @@ export const SHOTS = {
     warmup: async (shot) => { await shot.run(13.4, 100); },
   },
   // The phone page, awana.kvbchurch.org/checkin, on a phone: tap a child, keep
-  // Bible ticked, check in. The laptop behind it is a stand-in (lib/phone.mjs).
+  // Bible ticked, check in. The check-in service behind it is a stand-in (lib/phone.mjs).
   'phone': {
     url: '/checkin/', time: at('18:02:00'), seconds: 7,
     viewport: { width: 390, height: 844 }, dpr: 2, mobile: true,

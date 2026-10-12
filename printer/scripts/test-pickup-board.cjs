@@ -417,11 +417,11 @@ async function serverSuite() {
     console.log('\nthe phone page');
     {
       const phone = fs.readFileSync(path.join(root, 'print-server', 'public', 'phone.html'), 'utf8');
-      check('Check out rides /phone/undo with checkout:true (the relay\'s allowlisted route)',
-        /postJson\('\/phone\/undo', \{ pin: PIN, firstName: ident\.firstName, lastName: ident\.lastName, clubberId: entry\.visitor \? null : ident\.clubberId, checkout: true \}\)/.test(phone));
-      check('and is offered only when the laptop says it can, never on a child already checked out', /if \(TONIGHT\.canCheckout && !e\.checkedOut\) \{/.test(phone));
-      check('it asks first, naming the child', /function askCheckout\(entry\)/.test(phone) && /'Check out ' : 'Mark '\) \+ name/.test(phone));
-      check('and follows the queued action like an undo', /pollUndo\(entry, data\.id, Date\.now\(\), 'checkout'\)/.test(phone));
+      // Since 2026-10-12 /checkin checks out through the Worker's desk route (TwoTimTwo's own
+      // check-out, a sealed history row); /phone/undo checkout:true stays for the touch screen.
+      check('Check out goes through the Worker\'s desk route', /desk\.checkout\(childOf\(entry\)\)/.test(phone));
+      check('and is never offered on a child already checked out', /if \(!e\.checkedOut\) \{\n\s+var cb = el\('button', 'tt'/.test(phone));
+      check('it asks first, naming the child', /function askCheckout\(entry\)/.test(phone) && /'Check out ' \+ name \+ '\?'/.test(phone));
       const relay = require(path.join(root, 'print-server', 'phone-relay.js'));
       check('the website\'s relay already carries it', relay.relayAllowed('POST', '/phone/undo') && relay.relayAllowed('GET', '/phone/status/0f8c1a2b-3c4d-4e5f-8a9b-0c1d2e3f4a5b'));
     }
