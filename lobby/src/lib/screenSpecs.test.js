@@ -57,10 +57,8 @@ describe("the lobby's screen settings", () => {
 });
 
 describe('the other kinds', () => {
-  it("Journey's playback quality is its own page's three choices", () => {
-    const page = readFileSync(resolve(__dirname, '../../../journey/public/src/schedule.js'), 'utf8');
-    const m = /PLAYBACK_QUALITY_CHOICES = \[([^\]]+)\]/.exec(page);
-    expect(m && JSON.parse(`[${m[1].replaceAll("'", '"')}]`)).toEqual(SCREEN_SPECS.journey.playbackQuality.values);
+  it('Journey has no device setting of its own (the Pi mode is gone)', () => {
+    expect(SCREEN_SPECS.journey).toEqual({});
   });
 
   it("the projector's actions are the configure relay's, and a wall pick is checked like the projector checks it", () => {

@@ -152,7 +152,6 @@ export function ScreensSection({ onOpen, goTo }) {
 const FIELD_WORDS = {
   lowPower: { title: 'Low power', hint: 'No motion on the wall: for a weak projector PC.' },
   stingers: { title: 'Countdown chimes', hint: 'The chimes as the countdown runs out.' },
-  playbackQuality: { title: 'Playback quality', hint: 'Auto picks by the device; Low power plays the small files.', options: { auto: 'Auto', full: 'Full quality', low: 'Low power' } },
   printRole: { title: 'Prints labels', hint: 'Prints the check-in labels. Turned off mid-print, it waits for the last label, then restarts.', confirm: true },
   displayRole: { title: 'Display', hint: 'Shows a screen on its monitor on club nights.', confirm: true },
   displayFrom: { title: 'Display from', hint: 'Club nights only.' },

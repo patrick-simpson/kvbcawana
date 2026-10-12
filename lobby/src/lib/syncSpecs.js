@@ -108,11 +108,9 @@ export const SCREEN_SPECS = {
     lowPower: { type: 'bool' },
     stingers: { type: 'bool' },
   },
-  // Journey's one device setting the room does not share (schedule.js
-  // PLAYBACK_QUALITY_CHOICES).
-  journey: {
-    playbackQuality: { type: 'enum', values: ['auto', 'full', 'low'] },
-  },
+  // Journey has no device setting of its own since the Pi was removed (2026-10-12):
+  // one behaviour on every device.
+  journey: {},
   // The two role switches and the club-night display hours (default 5:00 to
   // 8:00 pm). Whether a role may change now (never a print server turned off
   // mid-print) is the app's to hold until it is idle (its hello then carries

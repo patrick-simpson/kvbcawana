@@ -194,7 +194,7 @@ describe('a screen\'s own settings', () => {
     expect((await s.call('PUT', `/v1/screens/${PJ}/settings`, { settings: { lowPower: true, stingers: 'yes', audioMuted: true } })).body.settings)
       .toEqual({ lowPower: true });
     expect((await s.call('PUT', `/v1/screens/${KIOSK}/settings`, { settings: { playbackQuality: 'low', captions: true } })).body.settings)
-      .toEqual({ playbackQuality: 'low' });
+      .toEqual({});
   });
 
   it('a KVBC Awana computer (v9) registers with its roles and display hours, and takes no actions', async () => {
