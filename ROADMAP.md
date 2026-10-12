@@ -115,7 +115,7 @@ welcome. This is the plan; its status is at the end of this track.
     Preview a check-in, pickup demo, Reset tonight's counter). A projector's,
     kiosk's or computer's switches are edited in its row.
     `e2e/settings-screens.spec.js`.
-  - **Projector** (`presentation/hooks/useProjectorScreen.js`): the same hook,
+  - **Projector** (`useProjectorScreen` in `presentation/App.jsx`): the same hook,
     Low power and the chimes as its layer, a wall pick or Resume obeyed;
     `useScreenSync.js` joined the isolation allowlist on purpose.
   - **TODO, Journey** (not built): Journey has no live socket, so it would

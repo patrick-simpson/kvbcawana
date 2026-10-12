@@ -1,17 +1,16 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { RotateCcw } from '../components/icons.jsx';
-import { ScreenFrame } from '../components/ScreenFrame.jsx';
+import { BodyText, ScreenFrame } from '../components/small.jsx';
 import { ParticleField } from '../components/ParticleField.jsx';
 import { SparkleDoodles } from '../components/SparkleDoodles.jsx';
 import { ClubWave } from '../components/ClubWave.jsx';
 import { Kicker } from '../components/Kicker.jsx';
 import { Headline } from '../components/Headline.jsx';
-import { BodyText } from '../components/BodyText.jsx';
 import { HOUSE } from '../lib/kit.js';
 import { FLAGS } from '../lib/flags.js';
 import { shouldBlackout } from '../lib/idleBlackout.js';
-import { useKeydown } from '../hooks/useKeydown.js';
+import { useKeydown } from '../hooks/index.js';
 import { usePortrait, useTouch } from '../lib/touch.js';
 
 const RESTART_KEYS = ['Space', 'Enter', 'ArrowRight', 'PageDown'];

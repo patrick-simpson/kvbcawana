@@ -1,6 +1,95 @@
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { join, relative, resolve } from 'node:path';
+import tokens from '../../shared/brand/tokens.json';
+import { PRESS, releaseEasing } from './squish.js';
+
+
+// ── app.css: the soft squish, spelled in CSS as squish.js spells it ──
+
+// The soft squish has one physics (src/lib/squish.js) and two spellings of it:
+// the keyframe lists the lobby's M elements land with, and app.css's operator
+// presses and panel entrances. This pins the CSS half to the JS half, the way
+// brandKit.test.js pins tokens.css to tokens.json: every --squish-* number on
+// :root, and every literal linear() easing, which must be the spring's own.
+
+const css = readFileSync(resolve(__dirname, '../styles/app.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+
+/** The kit's pop curve, as CSS: every spring's fallback. */
+const POP = `cubic-bezier(${tokens.motion.curves.pop.join(', ')})`;
+const KIT_CURVES = Object.values(tokens.motion.curves).map((c) => `cubic-bezier(${c.join(', ')})`);
+
+/** Every `--squish-*` custom property declared on a :root rule, name to value. */
+function rootSquish() {
+  const found = {};
+  for (const m of css.matchAll(/(^|\})\s*:root\s*\{([^}]*)\}/g)) {
+    for (const d of m[2].matchAll(/(--squish-[\w-]+)\s*:\s*([^;]+);/g)) found[d[1]] = d[2].trim();
+  }
+  return found;
+}
+
+/** Every rule body as its declarations, in order: [{ prop, value }]. */
+function declarationBlocks() {
+  return [...css.matchAll(/\{([^{}]*)\}/g)].map((m) => m[1].split(';')
+    .map((d) => d.trim()).filter(Boolean)
+    .map((d) => {
+      const at = d.indexOf(':');
+      return { prop: d.slice(0, at).trim(), value: d.slice(at + 1).trim() };
+    }));
+}
+
+describe('app.css spells the soft squish the way src/lib/squish.js does', () => {
+  it('its --squish-* numbers are PRESS\'s, and nothing else rides on :root', () => {
+    expect(rootSquish()).toEqual({
+      '--squish-press': `${PRESS.ms}ms`,
+      '--squish-release': `${PRESS.releaseMs}ms`,
+      '--squish-press-x': String(PRESS.scaleX),
+      '--squish-press-y': String(PRESS.scaleY),
+      '--squish-gear-x': String(PRESS.gear.scaleX),
+      '--squish-gear-y': String(PRESS.gear.scaleY),
+      '--squish-tab-x': String(PRESS.tab.scaleX),
+      '--squish-tab-y': String(PRESS.tab.scaleY),
+      '--squish-tile-x': String(PRESS.tile.scaleX),
+      '--squish-tile-y': String(PRESS.tile.scaleY),
+      '--squish-box': String(PRESS.box.scaleX),
+    });
+    // The checkbox squishes evenly: one number serves both axes.
+    expect(PRESS.box.scaleX).toBe(PRESS.box.scaleY);
+  });
+
+  it('every linear() easing is the spring\'s own release, character for character', () => {
+    const easings = [...css.matchAll(/linear\([^)]*\)/g)].map((m) => m[0]);
+    expect(easings.length).toBeGreaterThanOrEqual(4); // the presses, the gear, the check, the entrances
+    for (const e of easings) expect(e).toBe(releaseEasing());
+  });
+
+  it('each spring is written out literally, right after a cubic-bezier fallback of the same property', () => {
+    for (const block of declarationBlocks()) {
+      block.forEach(({ prop, value }, i) => {
+        if (!value.includes('linear(')) return;
+        // Behind var() an unreadable linear() would leave the property unset
+        // instead of falling back, so the declaration carries no var() at all.
+        expect(value, prop).not.toMatch(/var\(/);
+        const fallback = block[i - 1];
+        expect(fallback?.prop, `${prop}'s fallback`).toBe(prop);
+        expect(fallback.value).toBe(value.replaceAll(releaseEasing(), POP));
+        // Any other curve in the list is one of the kit's four, spelled out.
+        for (const curve of value.match(/cubic-bezier\([^)]*\)/g) ?? []) expect(KIT_CURVES).toContain(curve);
+      });
+    }
+  });
+
+  it('every spring runs for --squish-release, the release PRESS times', () => {
+    const springs = declarationBlocks().filter((block) => block.some(({ value }) => value.includes('linear(')));
+    expect(springs.length).toBeGreaterThanOrEqual(4);
+    for (const block of springs) {
+      const duration = block.find(({ prop }) => prop === 'transition-duration' || prop === 'animation');
+      expect(duration?.value, JSON.stringify(block)).toMatch(/var\(--squish-release\)/);
+    }
+  });
+});
+
+// ── app.css: zero animation reaches the pseudo-elements, and the presses stop ──
 
 // ?lowPower=1 means ZERO animation (CLAUDE.md). Plain CSS is stopped by one
 // blanket rule on `.zero-animation-mode`, deliberately a blanket rule so a
@@ -10,7 +99,6 @@ import { resolve } from 'node:path';
 // check on a ::before) kept playing on the Pi. This pins the blanket rule and
 // fails any rule that animates a pseudo-element the blanket rule does not name.
 
-const css = readFileSync(resolve(__dirname, '../styles/app.css'), 'utf8');
 
 /**
  * Flatten a stylesheet into { selector, body } rules, descending into
@@ -191,5 +279,76 @@ describe('the soft squish\'s presses stop in both kill switches (app.css)', () =
       expect(block, name).toBeDefined();
       expect(block).not.toMatch(/(^|[;{\s])transform\s*:/);
     }
+  });
+});
+
+// ── signage sources: animation goes through M, never framer-motion directly ──
+
+// CLAUDE.md, "Embedding on weaker hardware": every signage component must
+// animate through M (src/lib/motion.jsx), never framer-motion's `motion`
+// directly, or it silently keeps animating under ?lowPower=1 on the Pi Zero
+// embed. The rebrand adds a lot of new animated components; this makes the
+// rule a failing test instead of a line to remember.
+
+const SRC = resolve(__dirname, '..');
+
+/** @param {string} dir @returns {string[]} */
+function sourceFiles(dir) {
+  return readdirSync(dir).flatMap((name) => {
+    const path = join(dir, name);
+    if (statSync(path).isDirectory()) {
+      // The projector page has its own motion rules (CLAUDE.md, "The
+      // presentation page"), and fixtures are data.
+      return name === 'presentation' || name === '__fixtures__' ? [] : sourceFiles(path);
+    }
+    return /\.(jsx?|tsx?)$/.test(name) && !/\.test\.[jt]sx?$/.test(name) ? [path] : [];
+  });
+}
+
+/** Every named binding a file imports from framer-motion, plus namespace imports. */
+function framerImports(text) {
+  const found = [];
+  const re = /import\s+([^;]*?)\s+from\s+['"]framer-motion['"]/g;
+  for (const m of text.matchAll(re)) {
+    const clause = m[1];
+    if (/\*\s+as\s+/.test(clause)) found.push('*');
+    const named = clause.match(/\{([^}]*)\}/)?.[1] ?? '';
+    for (const part of named.split(',')) {
+      const imported = part.trim().split(/\s+as\s+/)[0];
+      if (imported) found.push(imported);
+    }
+    // A default import (`import fm from 'framer-motion'`) is the namespace too.
+    if (/^[A-Za-z_$][\w$]*\s*(,|$)/.test(clause.trim())) found.push('default');
+  }
+  return found;
+}
+
+// framer-motion exports that animate on their own and so would dodge the
+// zero-animation guarantee. AnimatePresence, MotionConfig and the hooks
+// only orchestrate what M elements do, which is why they stay allowed.
+const FORBIDDEN = new Set(['motion', 'm', 'animate', 'useAnimate', 'useAnimation', 'useAnimationControls', '*', 'default']);
+
+describe('signage animates only through M (src/lib/motion.jsx)', () => {
+  const files = sourceFiles(SRC);
+
+  it('finds the signage sources', () => {
+    expect(files.length).toBeGreaterThan(40);
+  });
+
+  it('no signage file but motion.jsx imports an animating framer-motion export', () => {
+    const offenders = files
+      .filter((f) => relative(SRC, f) !== join('lib', 'motion.jsx'))
+      .flatMap((f) => framerImports(readFileSync(f, 'utf8'))
+        .filter((name) => FORBIDDEN.has(name))
+        .map((name) => `${relative(SRC, f)}: ${name}`));
+    expect(offenders).toEqual([]);
+  });
+
+  it('the scanner itself recognises every import form it guards against', () => {
+    expect(framerImports("import { motion } from 'framer-motion';")).toEqual(['motion']);
+    expect(framerImports("import { AnimatePresence, motion as m2 } from \"framer-motion\";")).toEqual(['AnimatePresence', 'motion']);
+    expect(framerImports("import * as fm from 'framer-motion';")).toEqual(['*']);
+    expect(framerImports("import fm, { MotionConfig } from 'framer-motion';")).toEqual(['MotionConfig', 'default']);
+    expect(framerImports("import {\n  AnimatePresence,\n  useAnimate,\n} from 'framer-motion';")).toEqual(['AnimatePresence', 'useAnimate']);
   });
 });

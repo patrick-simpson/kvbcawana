@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { ScreenFrame } from '../components/ScreenFrame.jsx';
+import { ScreenFrame } from '../components/small.jsx';
 import { WeatherScene } from '../components/WeatherScene.jsx';
 import { ParticleField } from '../components/ParticleField.jsx';
 import { SparkleDoodles } from '../components/SparkleDoodles.jsx';
@@ -13,7 +13,7 @@ import { fitChipU } from '../lib/chip.js';
 import { useFontsReady } from '../hooks/useFontsReady.js';
 import { secondsUntil } from '../lib/schedule.js';
 import { playStinger } from '../lib/stingers.js';
-import { useKeydown } from '../hooks/useKeydown.js';
+import { useKeydown } from '../hooks/index.js';
 import { useWeather } from '../hooks/useWeather.js';
 import { useCalendarEvents } from '../hooks/useCalendarEvents.js';
 import { usePortrait, useTouch } from '../lib/touch.js';

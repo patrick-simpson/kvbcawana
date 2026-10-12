@@ -1,12 +1,12 @@
 import { act, cleanup, render, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { useProjectorScreen } from './useProjectorScreen.js';
-import { lowPowerPreference, setLowPowerPreference } from './useLowPower.js';
-import { setStingersEnabled, stingersEnabled } from '../lib/stingers.js';
-import { _resetThisScreenForTest } from '../../hooks/useScreenSync.js';
-import { _resetSyncForTest, ringSyncDoorbell } from '../../hooks/useSync.js';
-import { saveSyncSession } from '../../lib/syncService.js';
-import { loadScreenSlot } from '../../lib/screenSync.js';
+import { useProjectorScreen } from './App.jsx';
+import { lowPowerPreference, setLowPowerPreference } from './hooks/useLowPower.js';
+import { setStingersEnabled, stingersEnabled } from './lib/stingers.js';
+import { _resetThisScreenForTest } from '../hooks/useScreenSync.js';
+import { _resetSyncForTest, ringSyncDoorbell } from '../hooks/useSync.js';
+import { saveSyncSession } from '../lib/syncService.js';
+import { loadScreenSlot } from '../lib/screenSync.js';
 
 // The projector managed from /settings: its two switches are its layer, and
 // a wall pick or Resume from /settings reaches the same handlers as the menu.

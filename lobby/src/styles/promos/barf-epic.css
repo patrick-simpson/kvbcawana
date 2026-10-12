@@ -402,14 +402,6 @@
 .promo-slide--barf-epic .promo-epic-date--long {
   font-size: clamp(1.2rem, min(3.4vw, 5.6vh), 4.6rem);
 }
-.promo-epic-driprow {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 88%;
-  height: 0;
-  pointer-events: none;
-}
 .promo-epic-flare {
   position: absolute;
   left: 50%;

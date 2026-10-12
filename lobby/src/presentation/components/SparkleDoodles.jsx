@@ -1,8 +1,7 @@
 import React, { useMemo } from 'react';
-import { mulberry32 } from '../lib/color.js';
 import { useLowPower } from '../hooks/useLowPower.js';
 import { usePortrait } from '../lib/touch.js';
-import { CELEBRATION, HOUSE } from '../lib/kit.js';
+import { CELEBRATION, HOUSE, mulberry32 } from '../lib/kit.js';
 
 const KINDS = ['sparkle', 'sparkle', 'star', 'dot', 'ring', 'squiggle', 'zigzag'];
 

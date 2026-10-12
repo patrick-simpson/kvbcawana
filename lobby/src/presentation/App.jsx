@@ -1,9 +1,9 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { AnimatePresence, MotionConfig, motion } from 'framer-motion';
 import { AppMode } from './types.js';
 import { FLAGS } from './lib/flags.js';
 import { stateKey, windowsForDate } from './lib/schedule.js';
-import { useEffectiveSchedule } from './hooks/useEffectiveSchedule.js';
+import { useEffectiveSchedule } from './hooks/index.js';
 import { advisoryTitle } from './lib/scheduleAdvisory.js';
 import { DUR, EASE } from './lib/motion-tokens.js';
 import { useClock } from './hooks/useClock.js';
@@ -25,8 +25,9 @@ import { QuickNav } from './views/QuickNav.jsx';
 import { TouchMenu } from './views/TouchMenu.jsx';
 import { ConfigureView } from './views/ConfigureView.jsx';
 import { listenForRelay, relayToScreen } from '../lib/configureRelay.js';
-import { useProjectorScreen } from './hooks/useProjectorScreen.js';
-import { unlockStingers } from './lib/stingers.js';
+import { useScreenSync } from '../hooks/useScreenSync.js';
+import { lowPowerPreference, setLowPowerPreference, subscribeLowPower } from './hooks/useLowPower.js';
+import { setStingersEnabled, stingersEnabled, subscribeStingers, unlockStingers } from './lib/stingers.js';
 import { isTouch, usePortrait, useTouch } from './lib/touch.js';
 
 const OPENING_WINDOW_INDEX = 0;
@@ -35,6 +36,26 @@ const CONFIGURE = FLAGS.configure;
 /** A relayed wall pick, checked before the live projector obeys it. */
 const isTarget = (t) => Boolean(t) && typeof t === 'object'
   && (t.type === 'countdown' || (t.type === 'window' && Number.isInteger(t.index) && t.index >= 0 && t.index < 50));
+
+// The projector, managed from /settings (ROADMAP.md#settings-page, phase 2): it registers
+// with the sync Worker like a lobby TV, through the signage's own
+// useScreenSync (one copy of the rules, on the isolation allowlist), and its
+// two device switches are its layer: Low power and the countdown chimes, the
+// same stores the menu writes. A wall pick or Resume from /settings is obeyed
+// as the menu's own would be.
+
+/** @param {{ enabled: boolean, onAction: (action: string, data?: unknown) => void }} opts */
+export function useProjectorScreen({ enabled, onAction }) {
+  const lowPower = useSyncExternalStore(subscribeLowPower, lowPowerPreference, lowPowerPreference);
+  const stingers = useSyncExternalStore(subscribeStingers, stingersEnabled, stingersEnabled);
+  // Both always written out, so "off" is a value /settings can see.
+  const overrides = useMemo(() => ({ lowPower, stingers }), [lowPower, stingers]);
+  const replaceConfig = useCallback((next) => {
+    setLowPowerPreference(next.lowPower === true);
+    setStingersEnabled(next.stingers === true);
+  }, []);
+  useScreenSync({ kind: 'projector', enabled, overrides, replaceConfig, onAction, defaultName: 'Projector' });
+}
 
 export const App = () => {
   const now = useClock();
