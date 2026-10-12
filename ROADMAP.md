@@ -267,7 +267,9 @@ last one.
 **Superseded from phase 2 on by [Online check-in](#online-check-in) (owner,
 2026-10-11):** the print station is KVBC Awana's print role (no pairing step),
 history lives in D1 encrypted to the history key, and TwoTimTwo's read budget
-is one read every 5 s, all reads combined (not the 15 s below). Phase 1 and
+is one read every 5 s, all reads combined (not the 15 s below; the Worker keeps
+to one every 15 s while the laptop's extension tab still reads, owner
+2026-10-12: see the terms row under Online check-in). Phase 1 and
 the phone page's cloud check-in stand as built.
 
 ### The owner's decisions (2026-10-11)
@@ -604,7 +606,7 @@ hashing (SHA-256, HMAC). A design that needs a paid plan is not this design.
 | Stations | **No pairing step** (owner): any computer signed in with the passphrase may register a station key pair (ECDH P-256, private key in Electron safeStorage; the app refuses the station role when safeStorage is unavailable). Medical notes (allergies) are sealed **only** to station keys, never to the history key. Rosters, completed books and print jobs are sealed to every registered station (the same ECIES, info `kvbc-station-v1`, AAD prefix `stn1:`). |
 | Identifiers | The Durable Object never stores a plaintext clubber id: claims and job ids are keyed by HMAC(stateKey, night‖clubberId) (watcher.js's state-key approach); a visitor without an id by HMAC(stateKey, night‖normalized name‖club). The night is the church's LOCAL date (America/New_York, `localTime()` / TwoTimTwo's meeting date), never UTC. Claims are purged at the end of the night. |
 | BARF friend list | **Stays as is** (owner, 2026-10-12): sealed under the Worker-derived key (3-day retention), readable by the Worker only so it can send the 6:30 pm email. It does NOT move under the history key. |
-| TwoTimTwo's terms | Names may be stored, encrypted. Read budget: **one read every 5 seconds, all reads combined** (replaces the 15 s; `READ_INTERVAL_MS` is 5000). |
+| TwoTimTwo's terms | Names may be stored, encrypted. Read budget: **one read every 5 seconds, all reads combined** (replaces the 15 s). **Owner 2026-10-12: while the laptop's extension tab still reads TwoTimTwo (about 3 reads a minute), the Worker makes at most ONE read every 15 s, all its reads combined** (`READ_INTERVAL_MS` 15000 in `lobby/worker/src/readbudget.js`; back to 5000 when the tab is retired). The 4 slots a minute: the report every 30 s, the other slot to the roster's check-in page (30 s fresh), the Checkout page (once a minute after 7:15 pm) and a households catch-up when an unknown child appears (routes.md section 7). A desk check-in, undo or check-out reads nothing: the check-in page is kept for the night (routes.md section 5). |
 | No internet | **The paper sheet** (TwoTimTwo's `/clubber/checkin_form`), keyed in when the internet is back. This replaces Online only's "check-in still prints at the desk": with the extension retired, nothing at church checks in or prints offline. |
 | BARF on the TwoTimTwo-page fallback | When the report marks Brought a friend, the station prints a BARFED tag **without the friend's name** (TwoTimTwo's box has no name field). |
 | Printing | **At most once.** The station journals every jobId it spooled; a retried job it already spooled acks `already-spooled` without printing and the Worker flags "check the printer" (the label may not have come out). |
@@ -619,7 +621,7 @@ hashing (SHA-256, HMAC). A design that needs a paid plan is not this design.
                                  ▼   does key work
               ┌────────────────────────────────────┐
               │ sync Worker (free plan)            │  claims/jobs keyed by HMAC(stateKey, night|id)
-              │ · TwoTimTwo writes, 1 read / 5 s   │  history:pub, history:wrapped (DO)
+              │ · TwoTimTwo writes, 1 read / 15 s  │  history:pub, history:wrapped (DO)
               │ · print-job queue (leases)         │  history_rows, night_summary (D1, HISTORY_DB)
               │ · the ONE publisher to the screens │
               └───────────────┬────────────────────┘
@@ -673,8 +675,9 @@ said); "Owner" is what only the owner can do.
     the Worker's logs on the shadow night, and note the station count it was
     sealed to.
   - **Worker core built (2026-10-12):** the phone page's reads, the desk's and the
-    watcher's now all take a slot on the one 5 s clock (`readbudget.js`); the
-    watcher reads its report about every 15 s. Stations, the print lease, the
+    watcher's now all take a slot on the one read clock (`readbudget.js`; 15 s
+    while the extension tab still reads, owner 2026-10-12); the watcher reads its
+    report every 30 s and reserves its slot. Stations, the print lease, the
     claim ledger, the desk claim API and the watcher's claim rules are in
     `lobby/worker/src` (routes.md sections 4 to 7, marked BUILT). Still open for
     the owner: `CLOUD_PRINT` and `SINGLE_PUBLISHER` stay `"off"` in
@@ -743,7 +746,7 @@ said); "Owner" is what only the owner can do.
     `lobby/worker/src/ymcheckout.js` runs the extension's Trek/Journey sweep from the
     watcher's alarm with exactly its rules (club nights 7:15 pm to midnight, the
     Checkout page's own POST, exact "OK", 3 tries, a done list), from the watcher's
-    latest report (no report read of its own; the Checkout page at most every 30 s),
+    latest report (no report read of its own; the Checkout page at most every 60 s),
     at most ONE post every 15 s (owner), each child off the Worker's count. A print
     station's `/config/church` turns the extension's sweep off; `stopCloud` hands it
     back. Owner: set `YM_CHECKOUT = "on"` before (or with) the station role, and

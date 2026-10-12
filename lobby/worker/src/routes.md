@@ -41,12 +41,18 @@ here and keep its shape; a change of shape is a change to this file first.
 - **Fail closed.** A write that should carry a sealed form and does not
   (no `historyRow`, no station `bundle` when stations exist) writes NOTHING
   and answers 400 `{reason: 'unsealed'}`.
-- **TwoTimTwo read budget.** ONE read every 5 seconds, every read combined
-  (the watcher's report, the check-in page, the roster CSV, a desk roster
-  refresh, a manual read-now): one shared clock in the Durable Object
-  (`READ_INTERVAL_MS = 5000`). A route that needs a read when the clock is not
-  ready answers from the last read with its `readAt`, or 429 `{retryAfterMs}`
-  when it has none. Posts (check in, undo, check out) are writes, not reads.
+- **TwoTimTwo read budget.** TwoTimTwo allows ONE read every 5 seconds, every
+  read combined. While the laptop's extension tab still reads TwoTimTwo (about
+  3 reads a minute), the Worker makes at most ONE read every 15 seconds, all its
+  reads combined (owner 2026-10-12; `READ_INTERVAL_MS = 15000` in
+  `readbudget.js`, back to 5000 when the tab is retired): the watcher's report,
+  the check-in page, the Checkout page, the household export, the roster CSV,
+  every sign-in hop, a manual read-now. One shared clock in the Durable Object
+  (section 7 says how the 4 slots a minute are shared). A route that needs a
+  read waits its turn (up to `INTERACTIVE_WAIT_MS`, 20 s), then answers from the
+  last read with its `readAt`, or 429 `{retryAfterMs}` when it has none. Posts
+  (check in, undo, check out) are writes, not reads, and a desk check-in, undo
+  or check-out normally reads nothing at all (section 5).
 - **Single publisher** (`SINGLE_PUBLISHER = "on"` with cloud check-in
   running; section 8 has the design). The Worker publishes `tally`, `tonight`
   and the still-here list (`checkout`) from its own state with the shared
@@ -232,7 +238,7 @@ Worker deploy (idempotent).
 | `POST /v1/station/register` **BUILT** | session | `{stationId, name, pub, kid}`; `stationId` is the KVBC Awana app's `roles.json` `deviceId` (8 to 64 of `A-Za-z0-9._-`); `pub` is the 65-byte raw P-256 key in base64, `kid` must be its `kidOf` (the Worker checks it, a hash); the private key is in Electron safeStorage (the app refuses the station role when safeStorage is unavailable) | stores it in the `stations` document; the same `stationId` may replace its own key (keeps `registeredAt`). `{ok, station, stations: [...list]}`. 409: another station already uses that key, or ten stations are registered (`STATIONS_MAX`) |
 | `GET /v1/stations` **BUILT** | session | | `[{stationId, name, pub, kid, registeredAt, lastSeenAt, printer}]` (what a client seals bundles to) |
 | `DELETE /v1/stations/<stationId>` **BUILT** | session | | removes a dead computer's key; `{ok, stations}`, 404 when unknown. Bundles already sealed to it stay unreadable to it only. Its calls answer 403 from then on |
-| `GET /v1/station/roster-source?night=` | station | | TwoTimTwo's roster CSV, read through the Worker (counts against the 5 s budget), passed through in memory and never stored. The station seals it to every station. |
+| `GET /v1/station/roster-source?night=` | station | | TwoTimTwo's roster CSV, read through the Worker (counts against the read clock), passed through in memory and never stored. The station seals it to every station. |
 | `PUT /v1/station/roster` | station | `{night, bundle}` (`kind: 'roster'`, allergies inside) | stores `roster:<night>` (the latest wins); `{ok}` |
 | `GET /v1/station/roster?night=` | station | | `{bundle}` or 404 |
 | `PUT /v1/station/books` / `GET /v1/station/books?night=` | station | `{night, bundle}` (`kind: 'books'`, completed books) | as the roster |
@@ -256,8 +262,8 @@ behaviour is `desk.js`, which the page calls through these routes.
 
 | Route | Auth | Request | Answer |
 | --- | --- | --- | --- |
-| `GET /v1/desk/roster` **BUILT** | session | | tonight's check-in page roster `{readAt, stale?, kids: [{clubberId, first, last, club, clubId, checkedIn}]}` (no medical data; plaintext over TLS, from the last read, held in memory, never stored). Read through the 5 s clock: a read within 5 s is the last one; a clock booked past 12 s answers the last read marked `stale`, or 429 `{reason: 'read-busy', retryAfterMs}` with none |
-| `GET /v1/desk/families` **BUILT** | session | | `{households: string[][], familiesError?}`: TwoTimTwo's households (names only, two or more active children each), one read of the export per 30 minutes through the 5 s clock, kept in memory only; a failed read is `[]` plus a fixed `familiesError` code (kept five minutes), a clock turn-away is 429 `{reason: 'read-busy', retryAfterMs}` and not kept. The roster answer also carries `items: {bible: [club], friend: [club]}` (which clubs offer them, from the page it already read) |
+| `GET /v1/desk/roster` **BUILT** | session | | tonight's check-in page roster `{readAt, stale?, kids: [{clubberId, first, last, club, clubId, checkedIn}], familiesAt?}` (no medical data; plaintext over TLS, from the last read, held in memory, never stored). A page at most 30 s old (`CHECKIN_PAGE_TTL_MS`) is the answer; the watcher's alarm reads it ahead in a free slot while pages poll (pages poll every 15 s), else the request reads it through the read clock, waiting its turn up to 20 s; a clock booked past that answers the last read marked `stale`, or 429 `{reason: 'read-busy', retryAfterMs}` with none. `familiesAt`: when the Worker's household list was read (a page that sees it move asks `/v1/desk/families` again) |
+| `GET /v1/desk/families` **BUILT** | session | | `{households: string[][], familiesAt?, familiesError?}`: TwoTimTwo's households (names only, two or more active children each), one read of the export per 30 minutes through the read clock, kept in memory only (`families.js`). A child the roster or the report names that the export does not list at all (a family registered tonight) makes the watcher re-read it in a free slot: at most one such read every 15 s and at most once per unknown child per night; `familiesAt` then moves; a failed read is `[]` plus a fixed `familiesError` code (kept five minutes), a clock turn-away is 429 `{reason: 'read-busy', retryAfterMs}` and not kept. The roster answer also carries `items: {bible: [club], friend: [club]}` (which clubs offer them, from the page it already read) |
 | `POST /v1/desk/checkin` **BUILT** | session | `{night, clubberId \| visitor: {first, last, club}, items, friendName?, historyRow: Row, job: Bundle \| null}`; `friendName` (the friend's first name, cleaned to 24 characters) is kept only with `Friend` in `items` and goes ONLY to the 6:30 BARF list (`friends.js`, sealed under the Worker's key for 3 days, exactly what the phone path sent); `night` is the church's local date (else 400 `wrong-night`); `items` is `{Bible?, Friend?}` or `['Bible', 'Friend']`; `job.id` is the jobId, `job.kind` is `print-job`, `job.night` is `night`; `job` may be null only while no station is registered | see below |
 | `POST /v1/desk/undo` **BUILT** | session | `{night, clubberId \| visitor, historyRow}` | TwoTimTwo's undo (`checkinclubberundo`, accepted on "(checkin undone)"), then the claim goes `undone` (gen + 1), every unprinted job of that child is dropped, and a TwoTimTwo-page check-in of theirs still waiting on the watcher's backlog is forgotten (`adopt.forget`), so it is never adopted: `{ok, droppedJobs}`. A refusal is 409 `{reason}`, a timeout 504 `{reason: 'unsure'}`: nothing is changed here, and the watcher settles what TwoTimTwo has |
 | `POST /v1/desk/checkout` **BUILT** | session | `{night, clubberId \| visitor, historyRow}` | TwoTimTwo check-out (accepted only on "OK"): `{ok}`. The claim is left as it is |
@@ -307,6 +313,21 @@ exactly what the print role runs:
 the print role uses that over any `gen` in the record. The Worker adds
 `cloud: true` / `regen` itself on the print server side; the page never sends
 them.
+
+**A check-in never waits for a read** (owner 2026-10-12: "When someone is
+checking in a child it should be instantaneous as much as possible, never a
+wait"; TwoTimTwo still confirms before the label prints). What check-in, undo
+and check-out need from the check-in page (the meeting's `calendar_id`, the
+items and their clubs, each child's club) does not change within a meeting:
+the desk keeps the page for the whole club night (`hasNightPage`), warmed by
+the watcher when the watch window opens (and again after a restart) and
+refreshed by the roster's reads. A desk action uses it and reads nothing. Only
+with nothing held for tonight, or a child the held page does not list, does it
+read, and then URGENT: the head of the read queue, ahead of every queued
+roster, households, Checkout-page or report read, never inside 15 s of a read
+already started (`readbudget.js`). A post that meets a lapsed session (the
+login form) signs in again at the head of the queue and is made once more
+(`TwoTimTwoClient.write`, `{desk: true}`).
 
 Read failures on the way answer 429 `{reason: 'read-busy', retryAfterMs}`,
 502 `{reason: 'twotimtwo-unreadable'}` or 503 `{reason: 'not-configured'}`.
@@ -416,16 +437,32 @@ undo): the station ends it quietly.
   params, ip, stationId, body}` and returns `json(...)` / `fail(...)` from
   `http.js`. A method + pattern registers once: a second add throws.
 - **The read clock** (`readbudget.js`): every TwoTimTwo page GET (the watcher's
-  report, the desk, the phone page, the check-in and check-out pages) takes a
-  slot through `TwoTimTwoClient.page(path, {waitMs, kind})`. One read every 5 s
-  in all; a caller says how long it will queue (`waitMs`): 0 for the watcher
-  (it skips its turn), `INTERACTIVE_WAIT_MS` (12 s) for a desk or phone request,
-  and a refusal is `{error: 'read-busy', retryAfterMs}`. The watcher's report is
-  read about every 15 s (`WATCH_INTERVAL_MS`), the rest of the slots are the
-  others'. The clock survives a restart (`read:next` in storage). The sign-in
-  takes slots too, one per request (the form, the login post, its redirect),
-  and so does every redirect hop: the first request of a call queues for the
-  caller's `waitMs`, the rest behind it (`FOLLOW_WAIT_MS`, 12 s). A sign-in that
+  report, the desk, the phone page, the check-in, check-out and household
+  pages) takes a slot through `TwoTimTwoClient.page(path, {waitMs, kind})`. One
+  read every 15 s in all (owner 2026-10-12, while the laptop's extension tab
+  still reads; 5 s once it is retired), so 4 a minute. A caller says how long it
+  will queue (`waitMs`): 0 for the watcher's own reads (it skips its turn),
+  `INTERACTIVE_WAIT_MS` (20 s, more than one slot) for a desk or phone request,
+  and a refusal is `{error: 'read-busy', retryAfterMs}`. **How the 4 slots are
+  shared:** the watcher's report every 30 s (`WATCH_INTERVAL_MS`); the watcher
+  RESERVES its next report's moment, so every other read keeps a slot clear of
+  it and the slots go report, other, report, other. A waiting request that could
+  not otherwise be served may take the reserved slot once (the report then reads
+  15 s later: at worst 45 s apart, never starved). The watcher's alarm hands out
+  the other slot, in this order: tonight's check-in page once (warms the desk),
+  a households catch-up (an unknown child), the Checkout page (once a minute
+  after 7:15 pm, section 9), the roster's check-in page read ahead while pages
+  poll. Reads a minute: at 6:00 pm report 2 + roster page 2; at 7:30 pm report
+  2 + Checkout page 1 + roster page 1 (a poll that finds the page older than 30 s
+  reads it itself, waiting its turn). A desk action's read (only with nothing
+  held, section 5) is URGENT: the head of the queue (queued reads give way and
+  book again), never inside 15 s of a read already started. The clock survives
+  a restart (`read:next` in storage). The sign-in takes slots too, one per
+  request (the form, the login post, its redirect), and so does every redirect
+  hop: the first request of a call queues for the caller's `waitMs`, the rest
+  behind it (`FOLLOW_WAIT_MS`, 35 s, as `priority` reads that ignore the
+  reservation; a desk action's stay URGENT). Sign-ins are shared: a caller that
+  finds one under way waits for it. A sign-in that
   meets TwoTimTwo down (5xx) or no network backs off 30 s, 1, 2, then 5 minutes
   (`DOWN_BACKOFF_MS`; answered `twotimtwo-down` with `retryAfterMs` meanwhile; a
   refused password keeps its own 5 / 15 / 60 minutes). The check-in, undo and
@@ -560,15 +597,16 @@ out with the Checkout page's own `POST /clubber/checkout` (`calendar_id` +
   a restart never bursts. Forty children take about ten minutes.
 - **Reads.** The Checkout page (`GET /clubber/checkout`: `calendar_id` from its
   script, the date from `select#date`, rows `a.checkout[clubber_id]`) at most every
-  30 s (`YM_PAGE_MS`) and only while due, on the one read clock with `waitMs` 0.
-  With the watcher's report every 15 s that is 6 reads a minute of the 12 allowed.
+  60 s (`YM_PAGE_MS`) and only while due, on the one read clock with `waitMs` 0,
+  in the slot between two reports (section 7). With the report every 30 s and the
+  roster's page that is the 4 reads a minute the 15 s clock allows.
 - **Count.** Each check-out goes into tonight's book as a desk check-out does
   (`publisher.deskCheckout`), while the watch window is open (the book is purged
   when it closes): the tally and still-here list drop with `SINGLE_PUBLISHER` on.
 - **Storage.** `ym:state` (the night, meeting, page rows, done list, tries) is one
   blob sealed under the state key (`sealState`); `ym:status` counts and times only.
 - **Status.** `GET /v1/cloud/status` carries `ymCheckout: {enabled, due, at, clubs,
-  gapSec, maxTries, night, checkedOut, failed, gaveUp, pending, meeting, lastSweep,
+  gapSec, pageSec, maxTries, night, checkedOut, failed, gaveUp, pending, meeting, lastSweep,
   lastPageAt, lastError}`: no name, no id.
 - **Hand-off.** A computer that is the Worker's print station (`configureCloud`)
   answers `GET /config/church` with `ymCheckout.enabled: false`, so its extension
