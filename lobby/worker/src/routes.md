@@ -244,10 +244,13 @@ never unreadable to a station about to lease it. Medical notes are sealed ONLY
 to station keys, never to the history key (`sealRow` refuses a record with a
 medical key).
 
-## 5. The desk page (the Worker's claim API and the page, `site/desk/`, are BUILT)
+## 5. The desk page (the Worker's claim API and the page are BUILT)
 
-Our desk page (a browser at the desk, signed in) and the TwoTimTwo page
-fallback. The desk page derives keys at sign-in, fetches `/v1/stations` and
+Our check-in page, awana.kvbchurch.org/checkin (phones, tablets and the desk,
+one page since 2026-10-12; `/desk` 301s there; the page is
+`printer/print-server/public/phone.html`, its transport
+`site/checkin/desk-transport.js`), and the TwoTimTwo page fallback. "The desk
+page" below is that page. The desk page derives keys at sign-in, fetches `/v1/stations` and
 `/v1/history/key`, and seals before it posts. The handlers are thin: the
 behaviour is `desk.js`, which the page calls through these routes.
 

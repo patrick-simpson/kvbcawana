@@ -675,7 +675,8 @@ said); "Owner" is what only the owner can do.
     **Still open before the switch:** the release of the print role (version bump and
     changes.md: server.js, job-puller.js and events.js changed in P5); the shadow night
     with `SINGLE_PUBLISHER = "on"`.
-  - **Desk page built (2026-10-12, the desk-page task P3; ROADMAP's "P2 Desk page" row):**
+  - **Desk page built (2026-10-12, the desk-page task P3; ROADMAP's "P2 Desk page" row;
+    merged into /checkin the same day, see "ONE check-in page" below):**
     awana.kvbchurch.org/desk, `site/desk/` (`index.html`, `desk.js` the screen,
     `desk-transport.js` every Worker call and every seal, `desk-page.mjs` injects
     the touch check-in's own touch-core block from `phone.html` so search, "did you
@@ -729,6 +730,22 @@ said); "Owner" is what only the owner can do.
     station's `/config/church` turns the extension's sweep off; `stopCloud` hands it
     back. Owner: set `YM_CHECKOUT = "on"` before (or with) the station role, and
     release the print server change. routes.md section 9.
+  - **ONE check-in page (owner, 2026-10-12).** awana.kvbchurch.org/checkin is the phone
+    page (`printer/print-server/public/phone.html`: its look, search, families, Bible and
+    Brought a friend with the friend's first name, the + menu, Tonight) on the desk's
+    online path: passphrase v2, the Worker's desk routes (claim, TwoTimTwo's post,
+    settle: never printed twice), the label sealed to the stations and the history row
+    to the history key in the browser (`site/checkin/desk-transport.js`), the print
+    status line, the paper-sheet note when there is no internet. One-off, leader and
+    custom labels are sealed reprint jobs; a visitor is a desk visitor check-in. The
+    friend's first name also rides the check-in to the 6:30 BARF list (`friendName`,
+    routes.md section 5), as the phone path sent it. `/checkin/ym` is the same page
+    for Trek and Journey (check-in only). `/desk` 301s to `/checkin/`; `site/desk/` is
+    gone (its transport moved to `site/checkin/`). Left with the laptop (they read its
+    data): Remove/Add back of a TwoTimTwo child, "Not here the last two club nights",
+    remembered leader chips (on /settings), the laptop's count check. Visitors and
+    who this page checked out are kept per tab for the night, as the desk did.
+    `lobby/e2e/checkin.spec.js`, `site/test/checkin-page.test.mjs`.
   - **`/checkin/classic`: DELETE after Wednesday 2026-10-14.** The relayed phone
     page exactly as /checkin served it on 2026-10-12 (`site/checkin/classic.html`,
     a frozen copy, pinned by its SHA-256 in `site/test/checkin-classic.test.mjs`),
