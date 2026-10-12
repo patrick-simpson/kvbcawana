@@ -1,4 +1,17 @@
-﻿## [9.3.0] - 2026-10-13
+﻿## [9.3.1] - 2026-10-12
+Labels wear the official club logos and their clubs' own lettering, and a friend who came late gets a BARFED tag.
+
+**Official club logos.** Every Puggles, Cubbies, Sparks, T&T, Trek and Journey label now prints the club's official one-colour logo instead of TwoTimTwo's small colour picture (which came out dark and blurry on the thermal printer). Five clubs (Puggles, Cubbies, Sparks, Trek and Journey) print their logo sideways, reading bottom to top, so it fills the tall panel; T&T stays upright. On a crowded label the logo shrinks to stay above the group line.
+
+**Each club's own lettering.** Puggles and Cubbies labels print in Comic Neue, Trek and Journey labels in Playfair Display. Sparks, T&T, custom, BARF and drop-off labels look as before, and leader and one-off tags follow their club.
+
+**The BARFED tag for a late friend.** When a child already checked in turns out to have brought a friend, the BARF button on awana.kvbchurch.org/checkin prints just the BARFED tag with the child's first name at this computer (the child's name tag is not printed again), and the friend goes on the BARF list.
+
+**Chrome extension, sturdier.** It keeps seeing new check-ins when TwoTimTwo redraws its page, finds Store Night only as a whole word, never prints a child twice through its name fallback, gives up on a slow health or roster check instead of waiting forever, and forgets a phone action once it is answered.
+
+**App reliability.** The hidden printing window comes back by itself after a crash; a Chrome launch that fails is handled; a failed extension update is retried; the repair download refuses an incomplete file; the setup wizard saves only its own settings; the TV role saves its state safely; and a second start at sign-in no longer pops the window open.
+
+## [9.3.0] - 2026-10-13
 The new settings page: printing settings from anywhere.
 
 **Printing settings live on awana.kvbchurch.org.** Label options and layouts, the club-night schedule and late grace, the pickup-list clubs, the season, BARF nights and the remembered leaders are edited in Settings, Printing, from any phone or computer. This computer takes them from the sync service and writes them to its own files, so it still prints with no internet. The first print station sends its current settings and leaders when it starts.
