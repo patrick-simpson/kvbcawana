@@ -26,15 +26,19 @@ export function mountCheckin(registry, core) {
 
   // ── stations (routes.md 4) ─────────────────────────────────────────────────
 
-  registry.add('POST', '/v1/station/register', 'session', async ({ body }) => {
+  registry.add('POST', '/v1/station/register', 'session', async ({ body, request }) => {
     const r = await core.stations.register(await body());
+    if (r.ok) await core.logChange(request, {}, { what: 'station', target: r.station.stationId, keys: ['register'], after: { name: r.station.name }, undoable: false });
     return r.ok ? json({ ok: true, station: r.station, stations: await core.stations.list() }) : fail(r.error, r.status);
   });
 
   registry.add('GET', '/v1/stations', 'session', async () => json(await core.stations.list()));
 
-  registry.add('DELETE', '/v1/stations/:id', 'session', async ({ params }) => {
+  registry.add('DELETE', '/v1/stations/:id', 'session', async ({ params, request }) => {
+    await core.stations.load();
+    const name = core.stations.get(params.id)?.name || '';
     const r = await core.stations.revoke(params.id);
+    if (r.ok) await core.logChange(request, {}, { what: 'station', target: params.id, keys: ['remove'], before: { name }, undoable: false });
     return r.ok ? json({ ok: true, stations: r.stations }) : fail('No such station.', 404);
   });
 

@@ -64,6 +64,8 @@ import { mountCheckin } from './checkinRoutes.js';
 import { History, mountHistory } from './history.js';
 import { Publisher, mountPublisher } from './publisher.js';
 import { TonightBook } from './tonight.js';
+import { UNKNOWN_DEVICE, deviceOf } from './device.js';
+import { Changes, changedSince, changedSinceRefusal, diffKeys, mountChanges } from './changes.js';
 
 export { json };
 
@@ -203,6 +205,48 @@ export class SyncCore {
       liveScreens,
       ring: (payload) => { this.broadcast(frameText(DOORBELL_EVENT, payload)); },
     });
+    // The change log (changes.js, routes.md 10.5): every write path below logs who
+    // (device.js), when, which keys, before and after; a module that owns an
+    // undoable kind adds its undoer to `undoers`.
+    /** @type {Record<string, (u: { entry: any, before: any, device: any, undoOf: number }) => Promise<any>>} */
+    this.undoers = {};
+    this.changes = new Changes({ storage: this.storage, now: this.now, enabled: () => String(this.env.CHANGE_LOG || 'on').trim().toLowerCase() !== 'off' });
+    mountChanges(this.registry, this);   // /v1/changes, /v1/changes/:seq/undo (routes.md 10.5)
+    this.undoers.shared = (u) => this.undoShared(u);
+    this.undoers.screen = (u) => this.undoScreen(u);
+    this.undoers['screen-name'] = (u) => this.undoScreenName(u);
+  }
+
+  /**
+   * Who sent this request, for the change log (device.js). Never throws.
+   * @param {Request} request @returns {Promise<import('./device.js').Device>}
+   */
+  async deviceOf(request) {
+    try {
+      return await deviceOf(request, {
+        station: async (id) => { await this.stations.load(); return this.stations.get(id); },
+        screen: async (id) => Screens.pick(await this.screens.index(), id),
+      });
+    } catch (err) {
+      console.error('[changes] could not tell the device', err);
+      return { ...UNKNOWN_DEVICE };
+    }
+  }
+
+  /**
+   * Log a change made by this request (or by `by.device` for an undo). Never
+   * throws and never fails the write it describes.
+   * @param {Request|null} request @param {{ device?: any, undoOf?: number }} by @param {Record<string, any>} fields
+   * @returns {Promise<number|null>}
+   */
+  async logChange(request, by, fields) {
+    try {
+      const device = by.device || (request ? await this.deviceOf(request) : { ...UNKNOWN_DEVICE });
+      return await this.changes.log(/** @type {any} */ ({ ...fields, device, ...(by.undoOf ? { undoOf: by.undoOf } : {}) }));
+    } catch (err) {
+      console.error('[changes] could not log a change', err);
+      return null;
+    }
   }
 
   /** The Durable Object's alarm: the watcher's 5 s read (it sets the next one). */
@@ -586,12 +630,64 @@ export class SyncCore {
       case 'GET list': res = await this.screens.list(); break;
       case 'POST hello': res = await this.screens.hello(await this.body(request)); break;
       case 'GET settings': res = await this.screens.get(id); break;
-      case 'PUT settings': res = await this.screens.putSettings(id, await this.body(request)); break;
-      case 'PUT name': res = await this.screens.rename(id, await this.body(request)); break;
+      case 'PUT settings': res = await this.screenSettings(id, await this.body(request), request, {}); break;
+      case 'PUT name': res = await this.screenRename(id, await this.body(request), request, {}); break;
       case 'POST action': res = await this.screens.act(id, await this.body(request)); break;
-      default: res = await this.screens.forget(id);
+      default:
+        res = await this.screens.forget(id);
+        if (res.ok && /** @type {any} */ (res.body).forgotten) await this.logChange(request, {}, { what: 'screen-forget', target: id, keys: [], undoable: false });
     }
     return res.ok ? json(res.body) : fail(res.error, res.status);
+  }
+
+  /**
+   * A screen's own settings, logged (which keys, before and after; no change, no
+   * entry). The one path a PUT and an Undo take.
+   * @param {string} id @param {any} body @param {Request|null} request @param {{ device?: any, undoOf?: number }} by
+   * @returns {Promise<any>}
+   */
+  async screenSettings(id, body, request, by) {
+    const prev = await this.screens.settingsOf(id);
+    const res = await this.screens.putSettings(id, body);
+    if (!res.ok) return res;
+    const d = diffKeys(prev?.settings, /** @type {any} */ (res.body).settings);
+    const seq = d.keys.length ? await this.logChange(request, by, { what: 'screen', target: id, ...d }) : null;
+    return { ...res, seq };
+  }
+
+  /** A screen's name, logged. @param {string} id @param {any} body @param {Request|null} request @param {{ device?: any, undoOf?: number }} by @returns {Promise<any>} */
+  async screenRename(id, body, request, by) {
+    const was = Screens.pick(await this.screens.index(), id);
+    const res = await this.screens.rename(id, body);
+    if (!res.ok || !was) return res;
+    const name = /** @type {any} */ (res.body).screen.name;
+    const seq = name !== was.name ? await this.logChange(request, by, { what: 'screen-name', target: id, keys: ['name'], before: { name: was.name }, after: { name } }) : null;
+    return { ...res, seq };
+  }
+
+  /** @param {{ entry: any, before: any, device: any, undoOf: number }} u */
+  async undoScreen({ entry, before, device, undoOf }) {
+    const id = entry.target;
+    if (!Screens.pick(await this.screens.index(), id)) return { ok: false, status: 410, reason: 'gone', error: 'That screen has been forgotten.' };
+    const cur = (await this.screens.settingsOf(id))?.settings || {};
+    const keys = Object.keys(before);
+    const moved = changedSince(entry, Object.fromEntries(keys.map((k) => [k, cur[k] ?? null])));
+    if (moved.length) return changedSinceRefusal(moved);
+    const next = { ...cur };
+    for (const k of keys) { if (before[k] === null) delete next[k]; else next[k] = before[k]; }
+    const r = await this.screenSettings(id, { settings: next }, null, { device, undoOf });
+    return r.ok ? { ok: true, seq: r.seq } : { ok: false, status: r.status, reason: 'refused', error: r.error };
+  }
+
+  /** @param {{ entry: any, before: any, device: any, undoOf: number }} u */
+  async undoScreenName({ entry, before, device, undoOf }) {
+    const id = entry.target;
+    const r0 = Screens.pick(await this.screens.index(), id);
+    if (!r0) return { ok: false, status: 410, reason: 'gone', error: 'That screen has been forgotten.' };
+    const moved = changedSince(entry, { name: r0.name });
+    if (moved.length) return changedSinceRefusal(moved);
+    const r = await this.screenRename(id, { name: before.name }, null, { device, undoOf });
+    return r.ok ? { ok: true, seq: r.seq } : { ok: false, status: r.status, reason: 'refused', error: r.error };
   }
 
   /** @param {Request} request */
@@ -682,13 +778,38 @@ export class SyncCore {
   /** @param {Request} request */
   async putSettings(request) {
     const body = await this.body(request);
-    const settings = sanitizeSharedValues(body.settings);
-    if (byteLength(settings) > SETTINGS_JSON_MAX) return fail('Those settings are too long to share. Shorten the club lines or the welcome text.', 413);
+    const r = await this.writeShared(sanitizeSharedValues(body.settings), request, {});
+    return r.ok ? json(r.body) : fail(r.error, r.status);
+  }
+
+  /**
+   * Store, seal and publish the shared settings, and log which keys changed (no
+   * change, no entry). The one path a PUT and an Undo take.
+   * @param {Record<string, unknown>} settings already through sanitizeSharedValues
+   * @param {Request|null} request @param {{ device?: any, undoOf?: number }} by
+   * @returns {Promise<{ ok: true, seq: number|null, body: Record<string, unknown> } | { ok: false, status: number, error: string }>}
+   */
+  async writeShared(settings, request, by) {
+    if (byteLength(settings) > SETTINGS_JSON_MAX) return { ok: false, status: 413, error: 'Those settings are too long to share. Shorten the club lines or the welcome text.' };
     const prev = await this.storage.get('settings');
     const next = { rev: (prev?.rev || 0) + 1, publishedAt: this.stampAfter(prev?.publishedAt), settings };
     await this.storage.put('settings', next);
     const sent = await this.publishSealed('settings', next);
-    return json({ rev: next.rev, publishedAt: next.publishedAt, keyCount: Object.keys(settings).length, broadcast: sent.ok });
+    const d = diffKeys(prev?.settings, settings);
+    const seq = d.keys.length ? await this.logChange(request, by, { what: 'shared', ...d }) : null;
+    return { ok: true, seq, body: { rev: next.rev, publishedAt: next.publishedAt, keyCount: Object.keys(settings).length, broadcast: sent.ok } };
+  }
+
+  /** Undo a shared-settings change: its keys back to `before`, if they still hold `after`. @param {{ entry: any, before: any, device: any, undoOf: number }} u */
+  async undoShared({ entry, before, device, undoOf }) {
+    const cur = (await this.storage.get('settings'))?.settings || {};
+    const keys = Object.keys(before);
+    const moved = changedSince(entry, Object.fromEntries(keys.map((k) => [k, cur[k] ?? null])));
+    if (moved.length) return changedSinceRefusal(moved);
+    const next = { ...cur };
+    for (const k of keys) { if (before[k] === null) delete next[k]; else next[k] = before[k]; }
+    const r = await this.writeShared(sanitizeSharedValues(next), null, { device, undoOf });
+    return r.ok ? { ok: true, seq: r.seq } : { ok: false, status: r.status, reason: 'refused', error: r.error };
   }
 
   /** @param {Request} request */
@@ -704,15 +825,19 @@ export class SyncCore {
     await this.storage.put('slides', { deckRev, publishedAt, slides: deck });
     let broadcast = true;
     for (const chunk of chunks) broadcast = (await this.publishSealed('slides', chunk)).ok && broadcast;
+    await this.logChange(request, {}, { what: 'slides', keys: ['slides'], after: { slideCount: deck.length }, undoable: false });
     return json({ deckRev, publishedAt, slideCount: deck.length, droppedCount: raw.length - deck.length, broadcast });
   }
 
   /** @param {Request} request */
   async putTemplate(request) {
     const body = await this.body(request);
+    const prev = await this.storage.get('template');
     const next = { savedAt: new Date(this.now()).toISOString(), config: sanitizeTemplate(body.config) };
     await this.storage.put('template', next);
     await this.ring('template', next.savedAt);
+    const changed = diffKeys(prev?.config, next.config).keys;
+    if (changed.length) await this.logChange(request, {}, { what: 'template', keys: changed, undoable: false });
     return json(next);
   }
 
@@ -723,6 +848,8 @@ export class SyncCore {
     const next = { savedAt: this.stampAfter(prev?.savedAt), settings: sanitizeJourney(body.settings) };
     await this.storage.put('journey', next);
     await this.ring('journey', next.savedAt);
+    const changed = diffKeys(prev?.settings, next.settings).keys;
+    if (changed.length) await this.logChange(request, {}, { what: 'journey', keys: changed, undoable: false });
     return json(next);
   }
 
@@ -820,6 +947,7 @@ export class SyncCore {
     this.closeAll(4001, 'passphrase changed');
     for (const event of REPLAYED) await this.storage.delete(replayKey(event));
     await this.storage.delete('live:slides');
+    await this.logChange(request, {}, { what: 'passphrase', keys: [], undoable: false });
     return json({
       session: await this.mintSession(auth.epoch),
       displayKey: await this.displayKey(),
