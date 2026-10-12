@@ -1,5 +1,4 @@
 import { Fragment, useCallback, useEffect, useId, useState } from 'react';
-import { PUBLISH_TOKEN_CHANGE_EVENT, loadPublishToken } from '../../lib/publishToken.js';
 import { loadSyncSession } from '../../lib/syncService.js';
 import { useSync } from '../../hooks/useSync.js';
 import {
@@ -7,25 +6,19 @@ import {
   historyTags, NAME_SIZE_MAX, NAME_SIZE_MIN, pickupTicked, printerOptions, probePrintServer, TEMPLATE_FIELDS,
   templateClubLabel, templateToForm, validStartTime, withTemplate,
 } from '../../lib/printServer.js';
-import { PanelCard, PublishTokenField, Toggle } from './fields.jsx';
+import { PanelCard, Toggle } from './fields.jsx';
 import { AttendanceAuditCard, NameTagsCard, ReprintStretch, SyncSignInCard, useClubs } from './laptop-tools.jsx';
 import '../../styles/laptop.css';
 
-// The Laptop section (ROADMAP.md#settings-page phase 3, and #online-only): the check-in
-// laptop's own settings and tools. The print dashboard is retired, so this is
-// where all of them live. It looks for the print server on
+// The classic rail's Laptop section (?rail=classic) and the pieces the new rail's
+// Printing → At the laptop card reuses (AtTheLaptop.jsx): the check-in laptop's
+// own settings and tools. It looks for the print service on
 // http://localhost:3456 only when the section is opened (a browser may ask the
 // person before an https page talks to their own computer, so it must not do
 // that on load). Found: the printer's parts and tools. Not found: one calm
 // card that says where to open this page. What the page may do is the
 // server's call (security.js SETTINGS_PAGE_ROUTES; POST /config takes the
 // printer's own keys only, never a key or a token), see lib/printServer.js.
-
-const SEASONS = [
-  ['auto', 'Auto (follow the calendar)'], ['off', 'Off: each screen uses its own skin'], ['back-to-school', 'Back to school'],
-  ['fall', 'Fall'], ['thanksgiving', 'Thanksgiving'], ['christmas', 'Christmas'], ['winter', 'Winter'],
-  ['spring', 'Spring'], ['easter', 'Easter'], ['vbs-summer', 'VBS / Summer'],
-];
 
 const WOULD_SHOW = [
   ['The printer', 'which printer prints the name tags, and the backup'],
@@ -48,9 +41,9 @@ function NotFound({ onLookAgain, checking }) {
       <div className="laptop-away">
         <p className="laptop-away__lead">Open this page on the check-in laptop to set the printer.</p>
         <p className="hint">
-          The printer’s settings live on the laptop that runs the KVBC Awana app, and this page can only
-          reach them from that computer, in Chrome, with the app running. Everything else here works from any device.
-          With no internet the desk still prints; the settings wait until it is back.
+          The printer itself belongs to the laptop that runs the KVBC Awana app, and this page can only
+          reach it from that computer, in Chrome, with the app running. Everything else here works from any device.
+          With no internet the desk uses the paper sheet; the settings wait until it is back.
         </p>
         <h4 className="settings-subhead">What shows up there</h4>
         <ul className="laptop-would">
@@ -73,27 +66,20 @@ function NotFound({ onLookAgain, checking }) {
 }
 
 /**
- * How the page proves itself to the printer: signing in under Setup (the
- * print server asks the sync service), or, as a fallback, a publish token the
- * laptop already has.
+ * How the page proves itself to the printer: this page's own sign-in under
+ * Account & app (the laptop asks the church's sign-in to confirm it).
  */
-function ConnectCard({ problem, signedIn }) {
-  const lead = problem?.reason === 'wrong-token' ? 'The printer did not accept that token.'
-    : problem?.reason === 'sign-in-refused' || problem?.reason === 'no-token-on-server' ? problem.error
-      : signedIn ? 'The printer is here.' : 'The printer is here. Sign in under Setup with the church passphrase to change its settings.';
+export function ConnectCard({ problem, signedIn }) {
+  const lead = problem?.reason === 'sign-in-refused' || problem?.reason === 'no-token-on-server' ? problem.error
+    : signedIn ? 'The printer is here.' : 'The printer is here. Sign in under Account & app with the church passphrase to change its settings.';
   return (
     <PanelCard title="Connect to the printer" tab="var(--brand-sun)">
       <p className="laptop-away__lead">{lead}</p>
-      <details className="advanced-fields">
-        <summary>Or paste a publish token this laptop already has</summary>
-        <p className="hint">It stays in this browser, never in a settings export or a link. Most people never need one: the passphrase sign-in is enough.</p>
-        <PublishTokenField />
-      </details>
     </PanelCard>
   );
 }
 
-function StatusCard({ health, api, onRefresh }) {
+export function StatusCard({ health, api, onRefresh }) {
   const [note, setNote] = useState(null);
   const [rows, setRows] = useState(null);
   const [busy, setBusy] = useState('');
@@ -194,7 +180,7 @@ function StatusCard({ health, api, onRefresh }) {
   );
 }
 
-function PrintersCard({ cfg, printers, save }) {
+export function PrintersCard({ cfg, printers, save }) {
   const id = useId();
   const [note, setNote] = useState(null);
   const pick = (key) => async (e) => {
@@ -298,7 +284,7 @@ function TemplateEditor({ templates, knownClubs, save, loadPreview }) {
   );
 }
 
-function LabelsCard({ cfg, save, api }) {
+export function LabelsCard({ cfg, save, api }) {
   const id = useId();
   const [footer, setFooter] = useState(cfg.labelFooter || '');
   const [greeting, setGreeting] = useState(cfg.connectCardGreeting || '');
@@ -342,7 +328,7 @@ function LabelsCard({ cfg, save, api }) {
         checked={!!cfg.connectCard} onChange={(e) => apply({ connectCard: e.target.checked })} />
       <Toggle title="Print it automatically on a first-ever check-in" checked={!!cfg.connectCardAutoFirstTimer}
         onChange={(e) => apply({ connectCardAutoFirstTimer: e.target.checked })} />
-      <Toggle title="Allow driven check-ins from phones" hint="Lets the phone page and the touch screen drive TwoTimTwo through the extension."
+      <Toggle title="Let the check-in laptop's Chrome extension check children in on TwoTimTwo directly" hint="Desk clicks, phone Undo and Check out. Turn it off only if something is going wrong with the extension."
         checked={cfg.enableDrivenCheckin !== false} onChange={(e) => apply({ enableDrivenCheckin: e.target.checked })} />
       <Toggle title="Musical printer" hint="A tune with every label, Happy Birthday for birthday kids (TSPL printers such as the D450). If the label creeps forward instead of returning, turn it off."
         checked={cfg.musicalPrinter === true} onChange={(e) => apply({ musicalPrinter: e.target.checked })} />
@@ -360,7 +346,7 @@ function LabelsCard({ cfg, save, api }) {
   );
 }
 
-function NightCard({ cfg, save, api }) {
+export function NightCard({ cfg, save, api }) {
   const id = useId();
   const [rows, setRows] = useState(null);
   const [late, setLate] = useState(String(cfg.lateGraceMin ?? 10));
@@ -391,10 +377,6 @@ function NightCard({ cfg, save, api }) {
     if (clean.some((r) => !validStartTime(r.startTime))) return setNote({ bad: true, text: 'A start time reads like 6:30.' });
     const r = await api('/config/schedule', { method: 'POST', body: { schedule: clean, lateGraceMin: Number(late) || 0 } });
     if (r.ok) { setRows(clean); setNote({ text: 'Schedule saved.' }); } else setNote({ bad: true, text: r.error });
-  };
-  const season = async (e) => {
-    const r = await save({ seasonTheme: e.target.value });
-    setNote(r.ok ? { text: 'Saved. Screens take the new season in a moment.' } : { bad: true, text: r.error });
   };
 
   return (
@@ -439,13 +421,6 @@ function NightCard({ cfg, save, api }) {
         </div>
         <div className="laptop-actions">
           <button type="button" className="primary" onClick={saveSchedule} disabled={!rows}>Save schedule</button>
-        </div>
-        <div className="field">
-          <label htmlFor={`${id}-season`}>Screen season</label>
-          <select id={`${id}-season`} value={cfg.seasonTheme || 'auto'} onChange={season}>
-            {SEASONS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-          </select>
-          <span className="hint">Which seasonal skin the lobby screens wear. Auto follows the calendar.</span>
         </div>
         <Note note={note} />
       </PanelCard>
@@ -499,30 +474,31 @@ function TonightCard({ api }) {
   );
 }
 
-function Found({ health, onRefresh }) {
-  const [token, setToken] = useState(loadPublishToken);
-  // Signed in with the passphrase is enough: the print server confirms the
-  // session with the sync service. A pasted token still wins.
+/**
+ * Calls to the print service on this computer, proven by this page's sign-in
+ * (the laptop asks the church's sign-in to confirm it; no token anywhere).
+ * @returns {{ api: (path: string, opts?: any) => Promise<any>, signedIn: boolean, proof: string, problem: any }}
+ */
+export function useLaptopApi() {
   // (useSync re-renders this on signing in or out; the stored session is what
-  // is sent, and one the service no longer knows is refused, with a word.)
+  // is sent, and one the church's sign-in no longer knows is refused, with a word.)
   const { signedIn } = useSync();
   const session = loadSyncSession();
-  const proof = token || session;
-  const [problem, setProblem] = useState(null);
+  // A refusal belongs to the session that earned it: a new sign-in starts clean.
+  const [refused, setRefused] = useState({ session: '', problem: null });
+  const problem = refused.session === session ? refused.problem : null;
+  const api = useCallback(async (path, opts) => {
+    const r = await callPrintServer(path, { session, ...opts });
+    if (!r.ok && (r.reason === 'no-token-on-server' || r.reason === 'sign-in-refused')) setRefused({ session, problem: r });
+    return r;
+  }, [session]);
+  return { api, signedIn, proof: session, problem };
+}
+
+function Found({ health, onRefresh }) {
+  const { api, signedIn, proof, problem } = useLaptopApi();
   const [cfg, setCfg] = useState(null);
   const [printers, setPrinters] = useState(undefined);
-
-  useEffect(() => {
-    const sync = () => { setToken(loadPublishToken()); setProblem(null); };
-    window.addEventListener(PUBLISH_TOKEN_CHANGE_EVENT, sync);
-    return () => window.removeEventListener(PUBLISH_TOKEN_CHANGE_EVENT, sync);
-  }, []);
-
-  const api = useCallback(async (path, opts) => {
-    const r = await callPrintServer(path, { token, session, ...opts });
-    if (!r.ok && (r.reason === 'wrong-token' || r.reason === 'no-token-on-server' || r.reason === 'sign-in-refused')) setProblem(r);
-    return r;
-  }, [token, session]);
 
   useEffect(() => {
     if (!proof) return undefined;
@@ -547,7 +523,7 @@ function Found({ health, onRefresh }) {
     <>
       <StatusCard health={health} api={api} onRefresh={onRefresh} />
       {!connected && <ConnectCard problem={problem} signedIn={signedIn} />}
-      {connected && <SyncSignInCard health={health} api={api} onRefresh={onRefresh} />}
+      {connected && health.sync?.signedIn === false && <SyncSignInCard health={health} api={api} onRefresh={onRefresh} />}
       {connected && cfg && (
         <Fragment key={proof}>
           <PrintersCard cfg={cfg} printers={printers} save={save} />

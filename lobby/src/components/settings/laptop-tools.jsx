@@ -156,7 +156,7 @@ function OneOffTag({ api, clubs }) {
     setBusy(true); setNote({ text: 'Printing…' });
     const r = await api('/print-oneoff', { method: 'POST', body: { firstName, clubName: club } });
     setBusy(false);
-    if (!r.ok || r.data?.success !== true) return setNote({ bad: true, text: `Print failed: ${r.error || 'see the print server’s log'}` });
+    if (!r.ok || r.data?.success !== true) return setNote({ bad: true, text: `Print failed: ${r.error || 'see the laptop’s log'}` });
     const who = r.data.firstName || firstName;
     setNote({ text: r.data.duplicate ? `Already printing ${who}’s tag.`
       : r.data.demo ? 'Test tag printed (rehearsal mode): nothing recorded, nothing on the screens.'
@@ -383,14 +383,14 @@ export function SyncSignInCard({ health, api, onRefresh }) {
     onRefresh();
   };
   return (
-    <PanelCard title="Sync service" tab="var(--brand-journey)">
+    <PanelCard title="This laptop’s sign-in" tab="var(--brand-journey)">
       <p className="laptop-away__lead">
-        {out ? (sync.state === 'signed-out' ? 'This laptop was signed out of the sync service.' : 'This laptop is not signed in to the sync service.')
-          : 'This laptop is signed in to the sync service.'}
+        {out ? (sync.state === 'signed-out' ? 'This laptop was signed out of the church’s sign-in.' : 'This laptop is not signed in to the church’s sign-in.')
+          : 'This laptop is signed in to the church’s sign-in.'}
       </p>
       <p className="hint">
         {out
-          ? 'Without it the screens, the phone page and the count do not hear this laptop’s check-ins. Labels still print. Type the church passphrase to sign it in again.'
+          ? 'Without it the screens, phone check-in (awana.kvbchurch.org/checkin) and the count do not hear this laptop’s check-ins. Labels still print. Type the church passphrase to sign it in again.'
           : 'It seals each check-in with the key the screens share and relays it. If the passphrase is ever changed, sign this laptop in again here.'}
       </p>
       {sync.error ? <p className="hint hint--warn">{sync.error}</p> : null}
