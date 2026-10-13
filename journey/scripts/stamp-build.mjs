@@ -16,6 +16,10 @@
  *   5. public/index.html    each <link rel="preload"> of a kit font gets the
  *                           SAME ?v= as point 4 (a different URL would make
  *                           the preload a second, wasted download)
+ *   6. public/remote/index.html  the phone remote (owner 2026-10-13): the same
+ *                           meta and ?v=<sha> on every REMOTE_STAMPED_ASSETS
+ *                           path; its script carries that ?v= on to every
+ *                           module it loads (remote.js reads its own URL)
  *
  * Point 3 is what makes a reload actually pick up new code: GitHub Pages
  * serves every asset with max-age=600, and Chromium will happily reuse a
@@ -59,6 +63,17 @@ export const STAMPED_ASSETS = [
   'brand/logos/trek-white.svg',
 ];
 
+// The phone remote's page (journey/public/remote/, served at /journey/remote/)
+// and its assets, relative to it.
+export const REMOTE_PAGE = 'remote/index.html';
+export const REMOTE_STAMPED_ASSETS = [
+  '../brand/tokens.css',
+  '../brand/fonts.css',
+  '../brand/logos/journey-white.svg',
+  'remote.css',
+  'remote.js',
+];
+
 // The brand kit's @font-face sheet, whose url()s are relative to itself.
 export const FONTS_CSS = 'brand/fonts.css';
 
@@ -71,6 +86,11 @@ const escapeForRegExp = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
  * what the pattern consumes, so stamping twice is the same as stamping once
  * and re-stamping with a new id leaves no trace of the old one. */
 export function stampHtml(html, build) {
+  return stampPage(html, build, STAMPED_ASSETS, 'index.html');
+}
+
+/* The same for any page of this app, with its own asset list. */
+export function stampPage(html, build, assets, name) {
   const metaPattern = new RegExp(
     `(<meta\\s+[^>]*name=["']${BUILD_META_NAME}["'][^>]*content=["'])[^"']*(["'])`,
     'i'
@@ -83,10 +103,10 @@ export function stampHtml(html, build) {
     );
   }
   let out = html.replace(metaPattern, `$1${build}$2`);
-  for (const asset of STAMPED_ASSETS) {
+  for (const asset of assets) {
     const pattern = new RegExp(`((?:src|href)=["'])${escapeForRegExp(asset)}(?:\\?v=[^"']*)?(["'])`, 'g');
     if (!pattern.test(out)) {
-      throw new Error(`stamp-build: index.html does not reference ${asset}`);
+      throw new Error(`stamp-build: ${name} does not reference ${asset}`);
     }
     pattern.lastIndex = 0;
     out = out.replace(pattern, `$1${asset}?v=${build}$2`);
@@ -160,7 +180,14 @@ export function stampBuild(build, dir = path.join(REPO, 'public'), builtAt) {
   writeFileSync(htmlPath, html);
   writeFileSync(fontsPath, fontsCss);
   writeFileSync(path.join(dir, 'version.json'), version);
-  return { html, fontsCss, version };
+  // The phone remote, when the copy carries it (site/build.mjs fails a deploy without it).
+  const remotePath = path.join(dir, REMOTE_PAGE);
+  let remoteHtml = null;
+  if (existsSync(remotePath)) {
+    remoteHtml = stampPage(readFileSync(remotePath, 'utf8'), build, REMOTE_STAMPED_ASSETS, REMOTE_PAGE);
+    writeFileSync(remotePath, remoteHtml);
+  }
+  return { html, fontsCss, version, remoteHtml };
 }
 
 const invokedDirectly =

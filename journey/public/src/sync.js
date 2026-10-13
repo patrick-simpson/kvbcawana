@@ -49,7 +49,19 @@
      very iframe only): 'journey' pulls the room settings now, a 'screen' or
      'screen-action' for THIS kiosk's id says hello now (never twice in
      bellGapMs). Without it, the ten-minute pull and two-minute hello still
-     carry everything. */
+     carry everything.
+   - The phone remote (owner 2026-10-13, awana.kvbchurch.org/journey/remote/;
+     lobby/worker/src/routes.md 10.9): one press on a leader's phone goes to
+     every Journey kiosk. The Worker keeps it 20 seconds and rings this kiosk's
+     doorbell; the doorbell makes this page ask POST /v1/screens/now at once
+     (light: no storage on the service), which hands the presses over, each
+     ONCE (a press id is also never run twice here), and they run through
+     schedule.js's window.journeyRemote.command (the page's own functions).
+     While a phone is watching (the answer's `watch`, also in the hello's),
+     the same request carries what the screen shows (journeyRemote.now()):
+     on every change, never twice within nowGapMs (700 ms), and every
+     playingMs (10 s) (a playing video's position; a press whose doorbell was
+     missed). Nobody watching: nothing extra is sent at all. A service without the route (404) falls back to the hello. */
 
 (function () {
   'use strict';
@@ -83,13 +95,21 @@
   var SCREEN_KIND = 'journey';
   var SCREEN_NAME = 'Journey kiosk';
   var SCREEN_ID_RE = /^[A-Za-z0-9_-]{16,64}$/;
-  var SCREEN_TUNING = { helloMs: 2 * 60 * 1000, minGapMs: 60 * 1000, bellGapMs: 3000, ackMs: 4000, ackWindowMs: 30 * 1000, prefsDelayMs: 1000 };
+  var SCREEN_TUNING = {
+    helloMs: 2 * 60 * 1000, minGapMs: 60 * 1000, bellGapMs: 3000, ackMs: 4000, ackWindowMs: 30 * 1000, prefsDelayMs: 1000,
+    nowGapMs: 700, playingMs: 10 * 1000, pollGapMs: 250,
+  };
   // What the settings page may ask this kiosk to do: exactly the lobby's
   // SCREEN_ACTIONS.journey (lobby/src/lib/syncSpecs.js; its screenSpecs.test.js
   // reads this line and fails if the two lists differ).
   var REMOTE_ACTIONS = ['start-downloads', 'pause-downloads', 'resume-downloads', 'stop-downloads', 'delete-downloads'];
   var REMOTE_ACTIONS_MAX = 5;
   var DOORBELL_MESSAGE = 'awana-display:sync-doorbell';
+  // What the phone remote may ask: exactly lobby/shared/journeyRemote.js
+  // JOURNEY_REMOTE_ACTIONS (test/phone-remote.test.mjs reads this line).
+  var PHONE_ACTIONS = ['slide-next', 'slide-prev', 'slides-start', 'play', 'pause', 'toggle-pause', 'seek', 'mute', 'unmute', 'begin', 'pick'];
+  var PHONE_ACTIONS_MAX = 12;
+  var PHONE_SEEN_MAX = 64;
   var STATUS_ERROR_MAX = 120;
   var CONFIGURE = (function () {
     try { return new URLSearchParams(window.location.search).get('configure') === '1'; } catch (e) { return false; }
@@ -107,6 +127,15 @@
   var bellTimer = null;
   var pullTimer = null;
   var prefsTimer = null;
+  // The phone remote.
+  var watched = false; // a phone read the room's state lately (the service says so)
+  var nowGone = false; // a service without POST /v1/screens/now (404): the hello carries presses instead
+  var nowTimer = null;
+  var playingTimer = null;
+  var remoteBellTimer = null;
+  var lastNowAt = 0;
+  var lastNowSent = '';
+  var phoneSeen = []; // press ids already run (never twice)
 
   function get(key) {
     try { return localStorage.getItem(key); } catch (e) { return null; }
@@ -364,7 +393,115 @@
       if (typeof name === 'string' && name && name !== slot.name) saveScreenSlot({ name: name.slice(0, 40) });
       reconcilePrefs(res.body.settings);
       if (Array.isArray(res.body.actions)) runActions(res.body.actions);
+      if (Array.isArray(res.body.remote)) runPhone(res.body.remote);
+      if (typeof res.body.watch === 'boolean') setWatched(res.body.watch, true);
     });
+  }
+
+  /* ── The phone remote ── */
+
+  function phone() {
+    var r = window.journeyRemote;
+    return r && typeof r.command === 'function' && typeof r.now === 'function' ? r : null;
+  }
+
+  /* Each press in order, each id once, only the allowlisted actions. */
+  function runPhone(list) {
+    var r = phone();
+    if (!r || !Array.isArray(list)) return 0;
+    var ran = 0;
+    for (var i = 0; i < list.length && i < PHONE_ACTIONS_MAX; i++) {
+      var item = list[i];
+      if (!item || typeof item !== 'object' || PHONE_ACTIONS.indexOf(item.action) === -1) continue;
+      if (typeof item.id === 'string') {
+        if (phoneSeen.indexOf(item.id) !== -1) continue;
+        phoneSeen.push(item.id);
+        if (phoneSeen.length > PHONE_SEEN_MAX) phoneSeen.shift();
+      }
+      try { r.command({ id: item.id, action: item.action, data: item.data }); ran++; } catch (e) { /* reported as skipped by schedule.js */ }
+    }
+    return ran;
+  }
+
+  function currentNow() {
+    var r = phone();
+    if (!r) return null;
+    try { return r.now(); } catch (e) { return null; }
+  }
+
+  /* The report without the moving clock: a change worth sending at once. */
+  function nowKey(now) {
+    if (!now) return '';
+    var copy = {};
+    Object.keys(now).forEach(function (k) { if (k !== 'at') copy[k] = now[k]; });
+    if (copy.video) copy.video = { d: copy.video.d, paused: copy.video.paused, muted: copy.video.muted, t: copy.video.paused ? copy.video.t : null };
+    return JSON.stringify(copy);
+  }
+
+  function setWatched(on, sendNow) {
+    var was = watched;
+    watched = on === true;
+    if (!watched) {
+      clearTimeout(nowTimer); nowTimer = null;
+      clearTimeout(playingTimer); playingTimer = null;
+      return;
+    }
+    if (sendNow && !was) reportSoon(true);
+    armPlaying();
+  }
+
+  /* While a phone watches: one poll every playingMs (10 s), carrying the
+     video's position while one plays, and collecting any press whose
+     doorbell was missed (the embedded display reconnecting) well inside its
+     20 seconds. Nobody watching: no timer at all. */
+  function armPlaying() {
+    clearTimeout(playingTimer);
+    playingTimer = null;
+    if (!watched) return;
+    playingTimer = setTimeout(function () { playingTimer = null; reportSoon(true); }, screenTuning().playingMs);
+  }
+
+  /* One POST /v1/screens/now: collect presses, and say what the screen shows
+     when asked to (`withNow`). Resolves once the answer is handled. */
+  function phonePoll(withNow) {
+    var s = session();
+    var slot = screenSlot();
+    if (CONFIGURE || !base || screenGone || !s || !slot) return Promise.resolve();
+    if (nowGone) return hello();
+    var body = { id: slot.id };
+    var now = withNow ? currentNow() : null;
+    if (now) body.now = now;
+    lastNowAt = Date.now();
+    if (now) lastNowSent = nowKey(now);
+    return request('/v1/screens/now', { method: 'POST', body: body, session: s }).then(function (res) {
+      if (res.status === 404 && !(res.body && res.body.error && /Journey screen/.test(res.body.error))) {
+        // An older service: the hello carries what /settings asked, as before.
+        nowGone = true;
+        return hello();
+      }
+      if (res.status === 404) return hello(); // forgotten on /settings: the hello registers it again
+      if (res.status === 401) return;
+      if (!res.ok || !res.body) return;
+      if (Array.isArray(res.body.actions)) runPhone(res.body.actions);
+      if (res.body.hello === true) helloAfter(0);
+      setWatched(res.body.watch === true, false);
+    });
+  }
+
+  /* A change while a phone watches: sent, never twice within nowGapMs. */
+  function reportSoon(force) {
+    if (CONFIGURE || !base || screenGone || nowGone || !session() || !watched) return;
+    if (!force && nowKey(currentNow()) === lastNowSent) return;
+    if (nowTimer) return;
+    var wait = Math.max(0, lastNowAt + screenTuning().nowGapMs - Date.now());
+    nowTimer = setTimeout(function () {
+      nowTimer = null;
+      phonePoll(true).then(armPlaying, armPlaying);
+    }, wait);
+  }
+
+  function onScreenChanged() {
+    if (watched) reportSoon(false);
   }
 
   /* ── What the settings page asked (the hello's answer) ── */
@@ -482,7 +619,19 @@
     }
     if (d.what !== 'screen' && d.what !== 'screen-action') return;
     var slot = screenSlot();
-    if (!slot || d.id !== slot.id || bellTimer) return;
+    if (!slot || d.id !== slot.id) return;
+    if (d.what === 'screen-action' && !nowGone) {
+      // A press from the phone (or from /settings, which the answer says): the
+      // light poll, carrying what the screen shows, at once.
+      if (remoteBellTimer) return;
+      var soon = Math.max(0, lastNowAt + screenTuning().pollGapMs - Date.now());
+      remoteBellTimer = setTimeout(function () {
+        remoteBellTimer = null;
+        phonePoll(true).then(armPlaying, armPlaying);
+      }, soon);
+      return;
+    }
+    if (bellTimer) return;
     var wait = Math.max(0, lastHelloAt + screenTuning().bellGapMs - Date.now());
     bellTimer = setTimeout(function () { bellTimer = null; hello(); }, wait);
   }
@@ -604,6 +753,7 @@
             if (Date.now() - lastHelloAt >= screenTuning().minGapMs) hello();
           });
           window.addEventListener('journey-download-status', statusChanged);
+          window.addEventListener('journey-remote-change', onScreenChanged);
         }, function () {
           setTimeout(readIndex, indexRetryWait(attempt++));
         });
@@ -629,6 +779,7 @@
   window.journeySync = {
     readRoom: readRoom, applyRoom: applyRoom, pull: pull, push: push, signIn: signIn, signOut: signOut, indexRetryWait: indexRetryWait,
     hello: hello, lessonsStatus: lessonsStatus, runActions: runActions, reconcilePrefs: reconcilePrefs,
+    phonePoll: phonePoll, runPhone: runPhone, watching: function () { return watched; },
   };
 
   start();

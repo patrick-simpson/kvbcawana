@@ -5,7 +5,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -15,7 +15,10 @@ import {
   stampFontPreloads,
   stampFontsCss,
   stampHtml,
+  stampPage,
   STAMPED_ASSETS,
+  REMOTE_PAGE,
+  REMOTE_STAMPED_ASSETS,
 } from '../scripts/stamp-build.mjs';
 
 const REPO = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
@@ -238,4 +241,52 @@ test('a page with no build meta fails the deploy rather than shipping mute', () 
   // a kiosk that silently stops updating itself is the failure this exists to
   // prevent. Better a red workflow run.
   assert.throws(() => stampHtml('<html><head></head><body></body></html>', 'abc'), /journey-build/);
+});
+
+/* ── The phone remote (public/remote/index.html, owner 2026-10-13) ── */
+
+const REMOTE = path.join(REPO, 'public', REMOTE_PAGE);
+/* Every src/href naming a file of this site: the remote's own files and the
+   brand kit one folder up (../brand/), never another app (../../). */
+const remoteRefs = (page) =>
+  [...page.matchAll(/\s(?:src|href)=["']([^"']*)["']/g)]
+    .map((m) => m[1])
+    .filter((url) => url && !/^(?:[a-z][a-z\d+.-]*:|\/\/|#)/i.test(url) && !url.startsWith('../../'));
+
+test('the committed remote page keeps the placeholder and plain paths', () => {
+  const html = readFileSync(REMOTE, 'utf8');
+  assert.match(html, /<meta name="journey-build" content="dev" \/>/);
+  for (const asset of REMOTE_STAMPED_ASSETS) {
+    assert.equal(html.includes(`${asset}?v=`), false, `${asset} is unversioned in git`);
+    assert.equal(html.includes(asset), true, `${asset} is on the page`);
+  }
+});
+
+test('stamping the real remote page versions every local asset it names (the deploy copy of public/)', () => {
+  const dir = scratchPublic();
+  mkdirSync(path.join(dir, 'remote'), { recursive: true });
+  cpSync(REMOTE, path.join(dir, REMOTE_PAGE));
+  const sha = 'feedface0123456789abcdef0123456789abcdef';
+  const { remoteHtml } = stampBuild(sha, dir, '2026-10-13T18:00:00.000Z');
+  assert.equal(readFileSync(path.join(dir, REMOTE_PAGE), 'utf8'), remoteHtml);
+  assert.match(remoteHtml, new RegExp(`<meta name="journey-build" content="${sha}"`));
+  const plain = remoteRefs(readFileSync(REMOTE, 'utf8'));
+  assert.ok(plain.length >= REMOTE_STAMPED_ASSETS.length);
+  assert.deepEqual(remoteRefs(remoteHtml), plain.map((url) => `${url}?v=${sha}`), 'every local src/href carries the build id');
+  // Idempotent, like the kiosk's page.
+  assert.equal(stampPage(remoteHtml, sha, REMOTE_STAMPED_ASSETS, REMOTE_PAGE), remoteHtml);
+  rmSync(dir, { recursive: true, force: true });
+});
+
+test('a remote asset missing from the page fails the stamp loudly', () => {
+  const html = readFileSync(REMOTE, 'utf8').replace('remote.css', 'other.css');
+  assert.throws(() => stampPage(html, 'abc', REMOTE_STAMPED_ASSETS, REMOTE_PAGE), /remote\/index\.html does not reference remote\.css/);
+});
+
+test('the remote script carries its own ?v= on to every module it loads', () => {
+  const js = readFileSync(path.join(REPO, 'public', 'remote', 'remote.js'), 'utf8');
+  const imports = [...js.matchAll(/import\(`([^`]+)`\)/g)].map((m) => m[1]);
+  assert.ok(imports.length >= 4, 'logic, the remote rules and the two sign-in modules');
+  for (const spec of imports) assert.ok(spec.endsWith('${V}'), `${spec} is versioned`);
+  assert.equal(/^import\s/m.test(js), false, 'no static import (it could not carry the stamp)');
 });

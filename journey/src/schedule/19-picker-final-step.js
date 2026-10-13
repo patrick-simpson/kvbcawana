@@ -74,23 +74,35 @@ function relayToKiosk(action, data) {
    Returns whether it acted (the tests read that). */
 const RELAY_ACTIONS = ['pick'];
 
+/* A pick from outside this page (the configure relay, the phone remote in
+   28-phone-remote.js), checked as strictly as a click: a choice from
+   PICKER_CHOICES, a week this kiosk's own lessons.json knows, and a Leader
+   Video for the Leader side. { lesson, choice } or { reason } (the phone
+   remote's words for it); 'lessons-loading' only before the list is in. */
+function pickerTargetFor(data) {
+  if (!data || typeof data !== 'object' || !Number.isInteger(data.week)) return { reason: 'unknown-week' };
+  const choice = data.choice;
+  if (typeof choice !== 'string' || !Object.prototype.hasOwnProperty.call(PICKER_CHOICES, choice)) return { reason: 'unknown' };
+  if (!allLessons) return { reason: 'lessons-loading' };
+  const lesson = allLessons.find((l) => l && l.week === data.week);
+  if (!lesson) return { reason: 'unknown-week' };
+  if (PICKER_NEEDS_LEADER.includes(choice) && !lesson.leaderDownloadUrl) return { reason: 'no-leader' };
+  return { lesson, choice };
+}
+
 function handleConfigureRelay(message) {
   if (CONFIGURE_MODE) return false;
   if (!message || typeof message !== 'object' || message.screen !== 'journey') return false;
   if (!RELAY_ACTIONS.includes(message.action)) return false;
-  const data = message.data;
-  if (!data || typeof data !== 'object' || !Number.isInteger(data.week)) return false;
-  const choice = data.choice;
-  if (typeof choice !== 'string' || !Object.prototype.hasOwnProperty.call(PICKER_CHOICES, choice)) return false;
-  if (!allLessons) {
+  const target = pickerTargetFor(message.data);
+  if (target.reason === 'lessons-loading') {
     // Warmed at startup, so this is only a relay in the first seconds after a
     // boot: take it once the list is in.
     loadAllLessons().then((lessons) => { if (lessons) handleConfigureRelay(message); });
     return false;
   }
-  const lesson = allLessons.find((l) => l && l.week === data.week);
-  if (!lesson) return false;
-  if (PICKER_NEEDS_LEADER.includes(choice) && !lesson.leaderDownloadUrl) return false;
+  if (!target.lesson) return false;
+  const { lesson, choice } = target;
   // On the kiosk the picker cannot be reached under a reading overlay, so one
   // left open is closed first rather than covering what was asked for.
   if (readerOverlayOpen()) {

@@ -1,0 +1,645 @@
+{
+  "version": 1,
+  "weeks": {
+    "1": [
+      {
+        "q": "Why do you believe what you believe, and could you explain it to a friend?",
+        "answer": "One example: \"I trust Jesus, but honestly I'd struggle to explain why. This year I want a real reason I could share with a friend, with gentleness and respect.\"",
+        "scripture": "1 Peter 3:15",
+        "at": 258
+      },
+      {
+        "q": "Peter ran from the cross, then spoke boldly in Acts. What changed him?",
+        "answer": "He had seen and heard things he couldn't keep quiet about. In Acts 4:20 he says they can't stop speaking about what they saw and heard.",
+        "scripture": "Acts 4:20",
+        "at": 168
+      },
+      {
+        "q": "Is there a question about your faith you have never felt safe asking?",
+        "answer": "One example: \"How do we really know the Bible is true?\" It helps to hear that any question is welcome here, and that we can work out answers together.",
+        "scripture": null,
+        "at": 312
+      }
+    ],
+    "2": [
+      {
+        "q": "When has a friend earned your trust, and what did they do to earn it?",
+        "answer": "One example: \"A friend who kept my secret and showed up when they said they would.\" They kept giving me reasons, and the more I knew them, the more I trusted them.",
+        "scripture": null,
+        "at": 200
+      },
+      {
+        "q": "Is the faith you have really your own, or is it borrowed from your parents?",
+        "answer": "One honest answer: \"A lot of it is borrowed from my parents. I want to look at the evidence myself, like the signs John wrote down so we may believe.\"",
+        "scripture": "John 20:30-31",
+        "at": 484
+      },
+      {
+        "q": "Why do you think Jesus kept his wounds and showed them to Thomas?",
+        "answer": "Maybe to give Thomas one more reason to believe: proof that it was really him, and that he had done exactly what he said he would do.",
+        "scripture": null,
+        "at": 405
+      }
+    ],
+    "3": [
+      {
+        "q": "Where do you see feelings treated as more important than facts?",
+        "answer": "At school, with friends, and in movies, music and TV, how you feel about something often counts for more than what's actually real. That's the idea behind \"post-truth.\"",
+        "scripture": null,
+        "at": 72
+      },
+      {
+        "q": "Is your favorite ice cream flavor a subjective or an objective truth? Why?",
+        "answer": "Subjective. It's true because it's my taste, and your different favorite can be just as true. The color of a shirt is objective: it is what it is, whatever we think.",
+        "scripture": null,
+        "at": 446
+      },
+      {
+        "q": "Jesus said 'I am the way.' Can that be true for you but not for others?",
+        "answer": "No. Jesus made a claim about reality, so it's either true or false for everyone, no matter what any of us think about it. That's objective truth.",
+        "scripture": "John 14",
+        "at": 327
+      }
+    ],
+    "4": [
+      {
+        "q": "Should faith make sense? Why or why not?",
+        "answer": "Yes, even if not everything makes sense right away. God gave us minds and logic as tools for finding truth, and Jesus said to love God with all our mind.",
+        "scripture": null,
+        "at": 283
+      },
+      {
+        "q": "How do you use logic in your friendships to figure out what's true?",
+        "answer": "For example: if a friend's story doesn't add up, I think it through before I believe it. The lesson asks us to use that same careful thinking about Jesus.",
+        "scripture": null,
+        "at": 229
+      },
+      {
+        "q": "Which argument against Christianity sounds good until you think it through?",
+        "answer": "One example is \"all religions are true.\" It sounds kind, but religions contradict each other on big things, like who Jesus is, so they can't all be true.",
+        "scripture": null,
+        "at": 336
+      }
+    ],
+    "5": [
+      {
+        "q": "What lenses do you look through, and where did you first pick them up?",
+        "answer": "One example: \"A lot of how I see the world came from my family, but some probably came from friends and what I watch.\" It's worth asking where each piece came from.",
+        "scripture": null,
+        "at": 90
+      },
+      {
+        "q": "Where is your worldview a buffet, with pieces that don't fit together?",
+        "answer": "One honest example: \"I say I believe the Bible, but on big questions I often just go with the top answer online, even when the two don't fit together.\"",
+        "scripture": null,
+        "at": 302
+      },
+      {
+        "q": "How do movies and music you love show a worldview without ever saying so?",
+        "answer": "The people who make them see the world a certain way, and it comes through in how a story treats big questions like what's real, what's right, or what happens at death.",
+        "scripture": null,
+        "at": 204
+      }
+    ],
+    "6": [
+      {
+        "q": "What changes when you know God by name, not just as God Almighty?",
+        "answer": "God isn't just the most powerful being out there; he's personal. He told Moses his name, the Lord, and showed he remembers his covenant with his people.",
+        "scripture": "Exodus 6",
+        "at": 98
+      },
+      {
+        "q": "How would one personal God change what you believe about right and wrong?",
+        "answer": "Right and wrong wouldn't be something we make up. It would come from God himself, so we don't get to decide what's right, only whether we'll follow it.",
+        "scripture": null,
+        "at": 454
+      },
+      {
+        "q": "How would one caring, personal God change how you treat friends and family?",
+        "answer": "One example: since God keeps pursuing me even after I mess up, I could be quicker to forgive a friend or sibling and keep reaching out instead of giving up on them.",
+        "scripture": null,
+        "at": 458
+      }
+    ],
+    "7": [
+      {
+        "q": "How is God's Spirit living in you different from god being in everything?",
+        "answer": "The Holy Spirit lives in believers, but God is still distinct from us and holy. Pantheism says god is part of everything, even rocks and trees, with no line at all.",
+        "scripture": null,
+        "at": 103
+      },
+      {
+        "q": "Why does it matter that God is distinct from the world He made?",
+        "answer": "If God were part of everything, worshiping rocks or trees would be no different, which is idolatry. Because he's distinct and holy, we have a real standard for right and wrong.",
+        "scripture": null,
+        "at": 293
+      },
+      {
+        "q": "How can you talk about a friend's beliefs honestly and still show love?",
+        "answer": "For example: listen first and never mock what they believe, then gently share why I don't think it lines up with reality, remembering that changing how you see the world is hard.",
+        "scripture": null,
+        "at": 390
+      }
+    ],
+    "8": [
+      {
+        "q": "Where do you see naturalism showing up in your school or classes?",
+        "answer": "For example: in science, math and tech classes, where only what can be observed counts as real. It can go deeper too, like the idea that meaning only comes from science.",
+        "scripture": null,
+        "at": 85
+      },
+      {
+        "q": "If only what you can sense is real, where do justice and love come from?",
+        "answer": "Naturalism can't really say. You can't taste or touch justice or love, yet we know they're real, and that points beyond nature to a Creator God.",
+        "scripture": null,
+        "at": 304
+      },
+      {
+        "q": "Why would someone who rejects God still want to give kids clean water?",
+        "answer": "Because they still feel a real pull toward justice and love, even though naturalism can't explain it. The lesson says that pull points to a Creator beyond the natural world.",
+        "scripture": null,
+        "at": 469
+      }
+    ],
+    "9": [
+      {
+        "q": "Where have you been told that faith and science just don't mix?",
+        "answer": "Mostly in science class. It can feel like faith has to be checked at the door, as if anything about God is just religion and does not belong next to science.",
+        "scripture": null,
+        "at": 71
+      },
+      {
+        "q": "What are you learning in school right now that makes you think about God?",
+        "answer": "One example: in math, seeing how everything follows orderly rules reminds me that God is orderly and made us able to understand his world.",
+        "scripture": null,
+        "at": 321
+      },
+      {
+        "q": "Is your faith kept private, or does it show up at school and in public?",
+        "answer": "Honestly, I often keep Jesus \"upstairs\" in my private life and leave Him out of school. Faith and life were never meant to be separate, so I want Him in the public rooms too.",
+        "scripture": null,
+        "at": 425
+      }
+    ],
+    "10": [
+      {
+        "q": "If you had no Bible, what would nature alone tell you about God?",
+        "answer": "That someone designed it. The earth's atmosphere, rotation and distance from the sun are set just right for life, and that kind of fine-tuning points to a careful Designer.",
+        "scripture": null,
+        "at": 113
+      },
+      {
+        "q": "Is the universe random chance or a crafted design? Why do you think so?",
+        "answer": "Design, I think. Like the bottle flip, what looks like luck is really fine-tuning, and too many things are set just right for life to be random chance.",
+        "scripture": null,
+        "at": 149
+      },
+      {
+        "q": "What does a fine-tuned home for us reveal about God's heart?",
+        "answer": "That God cares about us. He didn't just make a planet where we could survive; He made us a home, with His heart and love in mind.",
+        "scripture": null,
+        "at": 279
+      }
+    ],
+    "11": [
+      {
+        "q": "Halfway through the science unit, what has truly made sense to you so far?",
+        "answer": "One example: DNA holds more information than anything people have made, and since information always traces back to a mind, it makes sense to me that DNA has an author.",
+        "scripture": null,
+        "at": 5
+      },
+      {
+        "q": "Do you ever nod along in a lesson while secretly thinking you don't get it?",
+        "answer": "Yeah, sometimes. It's okay to say so here; honest questions are welcome, and we can slow down and go over an idea again until it really makes sense.",
+        "scripture": null,
+        "at": 61
+      },
+      {
+        "q": "How does comparing DNA to a book help you picture what DNA really is?",
+        "answer": "A book is full of information, and every book has an author. DNA holds even more information than anything we've made, so it points to an author of life.",
+        "scripture": null,
+        "at": 155
+      }
+    ],
+    "12": [
+      {
+        "q": "Of fine-tuning, DNA, and design, which evidence spoke to you most, and why?",
+        "answer": "One example: design. Nobody thinks a city carved into a canyon wall came from wind and water, and DNA shows that same kind of design in nature.",
+        "scripture": null,
+        "at": 28
+      },
+      {
+        "q": "Was this enough evidence for you, or what questions do you still have?",
+        "answer": "Either answer is fine. One honest example: \"It mostly makes sense, but I'd like more on how design fits with what I hear about evolution.\"",
+        "scripture": null,
+        "at": 121
+      },
+      {
+        "q": "How can you challenge a teacher's view while still showing real respect?",
+        "answer": "Speak with truth and love: ask honest questions instead of trying to win, remember the teacher may know more than you, and stay humble and patient.",
+        "scripture": null,
+        "at": 93
+      }
+    ],
+    "13": [
+      {
+        "q": "Is it a fact that murder is wrong, or just an opinion? How do you know?",
+        "answer": "It's a fact. We can't measure right and wrong by ourselves, any more than Johnny could be \"one Johnny tall\"; we need a standard beyond us, and that points to God.",
+        "scripture": null,
+        "at": 305
+      },
+      {
+        "q": "Where do your ideas about right and wrong actually come from?",
+        "answer": "Probably home, school, friends and online. But the lesson says a sense of right and wrong is written on our hearts, which points to God as the real standard.",
+        "scripture": "Romans 2",
+        "at": 518
+      },
+      {
+        "q": "If copying homework isn't wrong just \"because we don't,\" is that a good reason?",
+        "answer": "No. \"Because we just don't\" isn't really a reason. If right and wrong are only opinion, nothing is truly wrong, so we need a standard outside ourselves.",
+        "scripture": null,
+        "at": 248
+      }
+    ],
+    "14": [
+      {
+        "q": "Where do you notice beauty in everyday life, and what might it point to?",
+        "answer": "One example: a sunset, crashing waves or a photo on my phone. Beauty like that points to a divine artist who made the world with purpose and order.",
+        "scripture": null,
+        "at": 47
+      },
+      {
+        "q": "Which question from this study is still unanswered for you right now?",
+        "answer": "Any honest answer is welcome. One example: \"If people disagree so much about what's beautiful, how can beauty be real?\" Naming it lets us work through it.",
+        "scripture": null,
+        "at": 193
+      },
+      {
+        "q": "How have your beliefs or questions changed since this study began?",
+        "answer": "Change can go either way. One example: \"At first I wasn't sure God fit with real life; now pointers like morality and beauty make sense, though I have new questions too.\"",
+        "scripture": null,
+        "at": 116
+      }
+    ],
+    "15": [
+      {
+        "q": "Why do so many questions about why things happen come down to human choices?",
+        "answer": "Choices shape so much of life, from quick decisions to hard ones. God gave people the real ability to choose, so a lot of what happens comes from what we decide.",
+        "scripture": null,
+        "at": 9
+      },
+      {
+        "q": "Why might the fact that you can choose at all point to a God who exists?",
+        "answer": "If we were only physical stuff, like water taking the shape of a glass, we couldn't truly choose. Real choices make sense if a personal God made us in His image.",
+        "scripture": null,
+        "at": 84
+      },
+      {
+        "q": "When is it hard to be honest in your group, and what would make it safer?",
+        "answer": "One example: \"It's hard when I disagree and worry how people will react. Knowing questions are welcome and no one will put me down would make it safer.\"",
+        "scripture": null,
+        "at": 276
+      }
+    ],
+    "16": [
+      {
+        "q": "Where do you see God's rescue or redemption in your own life story?",
+        "answer": "Every story has a problem and a fix. One example: \"A time I really messed up and was forgiven feels like my own small rescue story, and I see God in that.\"",
+        "scripture": null,
+        "at": 37
+      },
+      {
+        "q": "Why do you think people everywhere love telling and hearing stories?",
+        "answer": "Story comes from God, and we're made in His image, so we love stories. Our lives are part of a bigger, meaningful story He is writing.",
+        "scripture": null,
+        "at": 10
+      },
+      {
+        "q": "Which topic this year has been hardest for you to understand or accept?",
+        "answer": "Any honest answer is welcome. One example: \"Why morality and meaning need God is still hard for me, so I'd like to go back over it or try teaching it back.\"",
+        "scripture": null,
+        "at": 167
+      }
+    ],
+    "17": [
+      {
+        "q": "What is the most improbable event you can think of in human history?",
+        "answer": "Maybe getting struck by lightning the second you step outside. Very unlikely, but the lesson asks whether something just being unlikely is the same as a miracle.",
+        "scripture": null,
+        "at": 74
+      },
+      {
+        "q": "Is a good parking spot or a baby's birth a miracle like those in Scripture?",
+        "answer": "Probably not. Those are good things, but the miracles in Scripture, like the fire Elijah saw fall in 1 Kings 18, are God stepping in to do what nature can't, showing who He is.",
+        "scripture": "1 Kings 18",
+        "at": 114
+      },
+      {
+        "q": "If miracles still happen, why do you think you rarely see them near you?",
+        "answer": "They may just be rare where we live, and we're often taught to assume science explains everything. But we can't say they don't happen; God can still do them if He chooses.",
+        "scripture": null,
+        "at": 419
+      }
+    ],
+    "18": [
+      {
+        "q": "How would you respond to a friend who says the resurrection is just a myth?",
+        "answer": "I'd say it's treated as history: Jewish and Roman historians recorded that His followers said He rose, and Paul pointed to over 500 witnesses people could go ask.",
+        "scripture": "1 Corinthians 15",
+        "at": 418
+      },
+      {
+        "q": "How do you know Alexander the Great was real when you weren't there?",
+        "answer": "From history books and the evidence historians have. None of us were there for any of history, so we go with the best evidence, and the resurrection can be weighed that same way.",
+        "scripture": null,
+        "at": 326
+      },
+      {
+        "q": "Does the evidence convince you Jesus rose, or does something hold you back?",
+        "answer": "One honest answer: \"The evidence makes sense to me, but I hold back because believing it means something in my life would have to change.\"",
+        "scripture": null,
+        "at": 602
+      }
+    ],
+    "19": [
+      {
+        "q": "When Jesus asks 'Who do you say I am?', how would you answer him today?",
+        "answer": "One example: \"I believe you're God, not just a good teacher, so I need to actually follow you, not just admire what you taught.\"",
+        "scripture": "Matthew 16",
+        "at": 337
+      },
+      {
+        "q": "Why is it easier to call Jesus a good teacher than to call him God?",
+        "answer": "A good teacher's advice can be ignored when it's inconvenient, but if Jesus is God, I'm accountable to Him, and that asks a lot more of my life.",
+        "scripture": null,
+        "at": 277
+      },
+      {
+        "q": "What evidence backs up who you say you are, and what backs up who Jesus is?",
+        "answer": "For me it's what I actually do, like a player who scored 35 points. For Jesus: He claimed God's own name, \"I am,\" forgave sins, accepted worship and did miracles.",
+        "scripture": "John 8:58",
+        "at": 179
+      }
+    ],
+    "20": [
+      {
+        "q": "How would you describe the apostles' conviction, and do you agree with it?",
+        "answer": "They were so sure they'd seen Jesus alive that threats couldn't stop them; they couldn't stop telling what they'd seen and heard. I agree, because nobody dies for a lie.",
+        "scripture": "Acts 4:20",
+        "at": 105
+      },
+      {
+        "q": "If you knew something was true, how far would you go to make it known?",
+        "answer": "One honest answer: \"If I'd really seen it myself, I'd keep telling people even if it cost me friends, like the apostles kept talking after they were threatened.\"",
+        "scripture": null,
+        "at": 393
+      },
+      {
+        "q": "What does the apostles' fate mean for your own faith, here and now?",
+        "answer": "They saw Jesus with their own eyes and chose suffering over denying it, so I can trust their message. It pushes me to live my faith outside youth group too, not just at camp.",
+        "scripture": null,
+        "at": 467
+      }
+    ],
+    "21": [
+      {
+        "q": "Why does 'the Bible is true because it says so' just go in a circle?",
+        "answer": "It uses the Bible to prove the Bible, so it never gets outside the loop. We need reasons from outside it, like how many accurate ancient copies we have.",
+        "scripture": null,
+        "at": 84
+      },
+      {
+        "q": "How would you answer a friend who says we only have error-filled copies?",
+        "answer": "There are over 6,000 New Testament copies, and they agree more than 95 percent of the time. The differences are small, like spelling or little words, and none change what it teaches.",
+        "scripture": null,
+        "at": 478
+      },
+      {
+        "q": "If the Bible really is reliable, what should change in your life this week?",
+        "answer": "One example: \"I'll read something Paul wrote this week, trusting it's really what he wrote, and take it seriously instead of ignoring it.\"",
+        "scripture": null,
+        "at": 805
+      }
+    ],
+    "22": [
+      {
+        "q": "How does linking a story to a real object change how much you trust it?",
+        "answer": "It makes it easier to trust. An object shows the story wasn't just remembered wrong, like a family keepsake that backs up a parent's story from childhood.",
+        "scripture": null,
+        "at": 267
+      },
+      {
+        "q": "After two weeks of evidence, has the way you see the Bible changed at all?",
+        "answer": "One honest answer: \"I always believed it was God's Word, but I didn't know how much evidence shows it's real history, so I take it more seriously now.\"",
+        "scripture": null,
+        "at": 395
+      },
+      {
+        "q": "If a friend said the Bible is just old myths, how would you answer them?",
+        "answer": "I'd say archaeology keeps matching its details: coins point to King David, an inscription names Pontius Pilate, and the pool in John 5 was found just as John described.",
+        "scripture": "John 5",
+        "at": 338
+      }
+    ],
+    "23": [
+      {
+        "q": "Could Jesus fulfilling so many prophecies really be just coincidence?",
+        "answer": "It's hard to call it chance when there are about 300 of them, some very specific, like being born in Bethlehem. It's like being told someone's exact flight and shown their photo.",
+        "scripture": null,
+        "at": 40
+      },
+      {
+        "q": "What hard question about Jesus or the Bible have you been holding back?",
+        "answer": "One example: \"Weren't some prophecies taken out of context?\" Any honest question is welcome; we can write it down and research it together.",
+        "scripture": null,
+        "at": 105
+      },
+      {
+        "q": "Why was a spiritual kingdom so hard to accept for people expecting a ruler?",
+        "answer": "They expected a political and military ruler to end foreign rule and make Israel powerful again, so a Messiah with a spiritual kingdom turned their whole worldview upside down.",
+        "scripture": null,
+        "at": 219
+      }
+    ],
+    "24": [
+      {
+        "q": "If the Bible really is all we've said it is, what changes for you now?",
+        "answer": "One example: \"I should actually read it more and follow what it says, even the parts that aren't convenient, instead of just saying it's important.\"",
+        "scripture": null,
+        "at": 5
+      },
+      {
+        "q": "How would you answer \"men wrote the Bible, so how can it be God's word?\"",
+        "answer": "Jesus is fully man and fully God, so the Bible can be written by men and still come from God, who can make sure they recorded it accurately.",
+        "scripture": null,
+        "at": 287
+      },
+      {
+        "q": "What from the last four weeks most changed how you see the Bible, and why?",
+        "answer": "One example: \"Learning there are over 6,000 New Testament copies that agree so closely, because I had assumed it got changed a lot over time.\"",
+        "scripture": null,
+        "at": 400
+      }
+    ],
+    "25": [
+      {
+        "q": "When have you felt lost, and what finally helped you find your way?",
+        "answer": "One example: being lost somewhere new and only getting back once I figured out which way was north. The lesson says God is like that north: a fixed guide outside of us.",
+        "scripture": null,
+        "at": 320
+      },
+      {
+        "q": "Does calling evil the absence of good change how you see it? Why?",
+        "answer": "Yes. It means evil isn't something God made or a force equal to good. It's what's left when goodness is missing, the way darkness is just the absence of light.",
+        "scripture": null,
+        "at": 176
+      },
+      {
+        "q": "What question about suffering do you most wish you could ask God?",
+        "answer": "One honest example: \"Why do you let good people suffer?\" The lesson says questions like that are welcome, so it's worth writing yours down and bringing it back next week.",
+        "scripture": null,
+        "at": 441
+      }
+    ],
+    "26": [
+      {
+        "q": "If God is all-powerful, is there anything He still cannot do?",
+        "answer": "Yes. He can't lie or contradict Himself. That isn't weakness; it's because He is perfectly good and true. All-powerful means He can do everything that can be done.",
+        "scripture": null,
+        "at": 228
+      },
+      {
+        "q": "Why doesn't a God who can speak a universe into being just stop all evil?",
+        "answer": "The lesson says God gave us real free will, and He won't force us to choose good. He allows evil only for a time, for good reasons we only see in part right now.",
+        "scripture": null,
+        "at": 248
+      },
+      {
+        "q": "What good have you ever seen come out of something painful or hard?",
+        "answer": "One example: a parent's hard rule that felt awful at the time but turned out to protect me. The lesson says God can use even painful things for something good.",
+        "scripture": null,
+        "at": 313
+      }
+    ],
+    "27": [
+      {
+        "q": "When you are hurting, which of the video's questions do you ask God most?",
+        "answer": "One honest example: \"Am I alone in this?\" The video's answer is that God isn't distant; in Jesus He came down and suffered right alongside us.",
+        "scripture": null,
+        "at": 20
+      },
+      {
+        "q": "How did the lepers see Father Damien differently once he said \"we lepers\"?",
+        "answer": "They already knew he loved them, but now he was one of them. He understood their pain from the inside, and they saw how much he had given up for them.",
+        "scripture": null,
+        "at": 102
+      },
+      {
+        "q": "Does knowing Jesus felt betrayal and physical pain change how you pray?",
+        "answer": "It can. I can be honest with God about pain or being let down, because Jesus was betrayed by one of His closest disciples and suffered on the cross. He understands.",
+        "scripture": "Hebrews 4",
+        "at": 233
+      }
+    ],
+    "28": [
+      {
+        "q": "If your favorite place lost every good thing, what would be left?",
+        "answer": "Nothing worth wanting: no joy, no beauty, nothing refreshing. The lesson uses that picture to show what hell is like: life with every good gift of God taken away.",
+        "scripture": null,
+        "at": 139
+      },
+      {
+        "q": "If God is good and allows suffering, how can hell fit with that?",
+        "answer": "Hell isn't God enjoying punishment; it brings Him no pleasure. It's what's left when someone keeps rejecting Him, and a loving God invites us but won't force us.",
+        "scripture": "Ezekiel 18:23",
+        "at": 275
+      },
+      {
+        "q": "Why does it matter whether God sends people to hell or we send ourselves?",
+        "answer": "It shows God isn't cruel. He honors our choices, so people who keep refusing Him get what they chose. That makes His invitation right now really matter.",
+        "scripture": null,
+        "at": 244
+      }
+    ],
+    "29": [
+      {
+        "q": "When you think of a time you truly felt loved, what did it feel like?",
+        "answer": "One example: when a friend really listened on a hard day instead of trying to fix it. I felt seen and cared for, which is how the lesson says others should feel when we love them.",
+        "scripture": null,
+        "at": 147
+      },
+      {
+        "q": "When you share your faith, do you want to be right or to love?",
+        "answer": "Honestly, it's tempting to want to win. But the lesson says all our knowledge is worth nothing without love, so the goal is caring for the person, not beating their argument.",
+        "scripture": null,
+        "at": 95
+      },
+      {
+        "q": "How could you show someone Jesus by the way you listen to them?",
+        "answer": "One example: asking a friend about their story and really listening before sharing mine. The lesson says taking a real interest is being like Jesus; some may only see Him that way.",
+        "scripture": null,
+        "at": 130
+      }
+    ],
+    "30": [
+      {
+        "q": "What makes starting a spiritual conversation feel scary to you?",
+        "answer": "One honest answer: being asked something I can't answer. The lesson says that happens to everyone, and asking \"What do you mean by that?\" gives you a way forward.",
+        "scripture": null,
+        "at": 66
+      },
+      {
+        "q": "Why do we feel we need all the answers before sharing our faith?",
+        "answer": "We think having every answer is how we'll convince people. But everyone gets stumped, and it's okay to say \"I don't know\" and go find an answer for next time.",
+        "scripture": null,
+        "at": 81
+      },
+      {
+        "q": "Someone says there is too much evil for God to exist; what would you ask?",
+        "answer": "I'd ask, \"What do you mean by that?\" and then, \"How did you come to that conclusion?\", asked because I really want to understand, not to set up a comeback.",
+        "scripture": "Proverbs 18:13",
+        "at": 217
+      }
+    ],
+    "31": [
+      {
+        "q": "Have you ever been told to just believe when you wanted real answers?",
+        "answer": "One example: \"Yes, I asked a hard question once and was just told to have faith, and I felt brushed off.\" The lesson says unanswered doubts are one reason people walk away.",
+        "scripture": null,
+        "at": 56
+      },
+      {
+        "q": "Why might learning more about your faith lead to even more questions?",
+        "answer": "The more you learn, the more you notice what you still don't understand. The lesson says that's normal, and working through those questions can make faith stronger.",
+        "scripture": null,
+        "at": 126
+      },
+      {
+        "q": "Does hearing that others have doubts too make it easier to share yours?",
+        "answer": "Yes. Knowing I'm not the only one makes it less scary to speak up. The lesson even says some of Jesus' own apostles doubted after seeing Him risen.",
+        "scripture": "Matthew 28",
+        "at": 303
+      }
+    ],
+    "32": [
+      {
+        "q": "Look back at your notes from lesson one: how has your thinking changed?",
+        "answer": "One example: \"At the start I wasn't sure faith and reason fit together. Now I can give real reasons for what I believe, even though I still have questions.\"",
+        "scripture": null,
+        "at": 97
+      },
+      {
+        "q": "Which of your early questions about faith got answered, and which remain?",
+        "answer": "One example: \"I now see why evil doesn't disprove God, but I still wrestle with hell.\" The lesson says having more questions now is normal; keep seeking answers.",
+        "scripture": null,
+        "at": 106
+      },
+      {
+        "q": "What part could you play in helping a friend come to know Jesus?",
+        "answer": "One example: being the friend who listens, asks good questions and stays kind, even if someone else leads them to Jesus. Some plant, some water, but God gives the growth.",
+        "scripture": null,
+        "at": 204
+      }
+    ]
+  }
+}

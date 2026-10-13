@@ -104,9 +104,11 @@ function togglePause() {
    'ended' handoff by accident: → is the deliberate way on to the slides. */
 const SEEK_STEP_S = 15;
 
-function seekBy(delta) {
+// `gesture` false: asked from the phone remote (28-phone-remote.js), which is
+// not a press on this page, so it unlocks no sound.
+function seekBy(delta, gesture = true) {
   if (journeyVideo.classList.contains('hidden')) return;
-  audioUnlocked = true; // seeking is itself a genuine gesture
+  if (gesture) audioUnlocked = true; // seeking is itself a genuine gesture
   const from = journeyVideo.currentTime;
   if (!Number.isFinite(from)) return;
   const d = journeyVideo.duration;

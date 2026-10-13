@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="robots" content="noindex,nofollow" />
+  <meta name="journey-build" content="dev" />
+  <meta name="theme-color" content="#56467F" />
+  <title>Journey remote</title>
+  <link rel="stylesheet" href="../brand/tokens.css" />
+  <link rel="stylesheet" href="../brand/fonts.css" />
+  <link rel="stylesheet" href="remote.css" />
+</head>
+<body>
+  <header class="top">
+    <img class="top-mark" src="../brand/logos/journey-white.svg" alt="Journey" width="120" height="32" />
+    <span class="top-title">Phone remote</span>
+    <span id="conn" class="conn" data-state="off" role="status">Signed out</span>
+  </header>
+
+  <main class="page">
+    <noscript><p class="card">This remote needs JavaScript.</p></noscript>
+
+    <section id="signin" class="card signin" hidden>
+      <h1 class="shout">Sign in</h1>
+      <p>Type the church passphrase to run the Journey screens from this phone.</p>
+      <form id="signin-form" autocomplete="off">
+        <label for="passphrase" class="label">Passphrase</label>
+        <input id="passphrase" type="password" autocomplete="current-password" autocapitalize="none" spellcheck="false" enterkeyhint="go" />
+        <button id="signin-btn" type="submit" class="btn btn-hot">Sign in</button>
+      </form>
+      <p id="signin-note" class="note" role="status"></p>
+      <p class="fine">The passphrase is never saved on this phone; only the sign-in is.</p>
+    </section>
+
+    <section id="remote" class="remote" hidden>
+      <p id="reach" class="reach">Everything you press goes to every Journey screen (<b id="online">0</b> online)</p>
+      <p id="problem" class="problem" role="status" hidden></p>
+
+      <div class="cols">
+        <div class="col">
+          <section class="card now" aria-live="polite">
+            <p id="now-kicker" class="kicker">On the screen now</p>
+            <h1 id="now-main" class="shout">Asking the screen…</h1>
+            <p id="now-sub" class="now-sub"></p>
+            <p id="now-detail" class="now-detail"></p>
+            <ul id="now-lines" class="now-lines" hidden></ul>
+            <p id="now-wait" class="wait" hidden></p>
+            <p id="now-last" class="last" hidden></p>
+          </section>
+
+          <div id="slide-pad" class="slide-pad" role="group" aria-label="Teaching slides">
+            <button id="btn-prev" type="button" class="btn btn-big btn-back" data-action="slide-prev"><span aria-hidden="true">‹</span> Back</button>
+            <button id="btn-next" type="button" class="btn btn-big btn-next" data-action="slide-next"><span id="next-label">Next</span> <span aria-hidden="true">›</span></button>
+          </div>
+
+          <section id="answers" class="card answers" hidden>
+            <h2 class="label">Sample answers <span class="only">only on this phone</span></h2>
+            <p id="answers-edited" class="fine" hidden>These questions were edited on the screen, so sample answers are hidden.</p>
+            <ol id="answers-list" class="answers-list"></ol>
+          </section>
+
+          <button id="btn-slides" type="button" class="btn btn-wide" data-action="slides-start">Start teaching slides</button>
+        </div>
+
+        <div class="col">
+          <section class="card video" aria-labelledby="video-h">
+            <h2 id="video-h" class="label">Video</h2>
+            <div class="video-pad">
+              <button type="button" class="btn btn-mid" data-action="seek" data-by="-15">Back 15s</button>
+              <button id="btn-play" type="button" class="btn btn-mid btn-play" data-action="toggle-pause">Play / Pause</button>
+              <button type="button" class="btn btn-mid" data-action="seek" data-by="15">Skip 15s</button>
+            </div>
+            <div class="video-row">
+              <button id="btn-mute" type="button" class="btn btn-mid" data-action="mute">Mute</button>
+              <button id="btn-begin" type="button" class="btn btn-mid btn-begin" data-action="begin">Begin lesson</button>
+            </div>
+          </section>
+
+          <details id="picker" class="card picker">
+            <summary class="label">Choose a lesson</summary>
+            <label for="week" class="fine">Week</label>
+            <select id="week"></select>
+            <div id="choices" class="choices"></div>
+            <div id="confirm" class="confirm" hidden role="alertdialog" aria-labelledby="confirm-text">
+              <p id="confirm-text"></p>
+              <div class="confirm-row">
+                <button id="confirm-yes" type="button" class="btn btn-hot">Yes, replace it</button>
+                <button id="confirm-no" type="button" class="btn">Keep it</button>
+              </div>
+            </div>
+            <p id="picker-note" class="fine" role="status"></p>
+          </details>
+
+          <details id="screens" class="card screens" hidden>
+            <summary class="label">Screens (<span id="screens-count">0</span>)</summary>
+            <ul id="screens-list" class="screens-list"></ul>
+          </details>
+        </div>
+      </div>
+
+      <p class="foot"><button id="signout" type="button" class="link">Sign this phone out</button></p>
+    </section>
+  </main>
+
+  <script type="module" src="remote.js"></script>
+</body>
+</html>

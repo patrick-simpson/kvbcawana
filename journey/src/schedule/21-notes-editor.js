@@ -254,6 +254,7 @@ function buildSlideItems(week) {
     if (!extras[kind] || !notes || !Array.isArray(notes[kind]) || !notes[kind].length) continue;
     items.push({
       type: 'template',
+      kind, // which fill (the phone remote reports it: 28-phone-remote.js)
       heading: headings[kind],
       bullets: notes[kind].map(String),
       url: slideTemplateUrl(week),
