@@ -4,25 +4,27 @@
 // tested rather than eyeballed (settingsSections.test.js).
 //
 // Since 2026-10-12 (docs/SETTINGS-OVERHAUL.md section 1) the rail is seven
-// sections. The old eight-plus-three rail is still here, behind ?rail=classic
-// (or localStorage awanaSettingsRail.v1 = 'classic'), for the release after
-// the overhaul only; it is deleted the release after that.
-//
-// Everyday sections first (what an owner reaches for on a club night), then
-// the ones set once, then the account.
+// sections; since the reorganize (2026-10-13, docs/SETTINGS-OVERHAUL.md
+// "Reorganize") eight, with Journey, in the order a volunteer reaches for them
+// on a club night: what is happening tonight, the printing (reprints and name
+// tags first), the screens and what they show, then what is set once (Journey,
+// history) and the account. The old eight-plus-three rail is still here, behind
+// ?rail=classic (or localStorage awanaSettingsRail.v1 = 'classic'), for the
+// release after the overhaul only; it is deleted the release after that.
 
-/** @typedef {'tonight' | 'screens' | 'show' | 'look' | 'printing' | 'history' | 'account'} SectionId */
+/** @typedef {'tonight' | 'printing' | 'screens' | 'show' | 'look' | 'journey' | 'history' | 'account'} SectionId */
 /** @typedef {'status' | 'checkins' | 'slides' | 'screen' | 'celebrations' | 'pickup' | 'look' | 'setup' | 'laptop' | 'screens' | 'history'} ClassicSectionId */
 
 /** @type {{ id: SectionId, label: string, blurb: string }[]} */
 export const SECTIONS = [
-  { id: 'tonight', label: 'Tonight', blurb: 'Live count, printer, switches, notice' },
-  { id: 'screens', label: 'Screens', blurb: 'Every TV, projector, kiosk, computer' },
+  { id: 'tonight', label: 'Tonight', blurb: 'Live count, problems, notice to screens' },
+  { id: 'printing', label: 'Printing', blurb: 'Reprints, name tags, labels, schedule' },
+  { id: 'screens', label: 'Screens', blurb: 'Every TV, projector, kiosk and computer' },
   { id: 'show', label: 'What screens show', blurb: 'Welcomes, celebrations, pickup, corner' },
   { id: 'look', label: 'Slides & look', blurb: 'Slides, calendar, background, season' },
-  { id: 'printing', label: 'Printing', blurb: 'Labels, name tags, schedule, BARF Night' },
-  { id: 'history', label: 'History', blurb: 'Trends, nights, import' },
-  { id: 'account', label: 'Account & app', blurb: 'Sign-in, passphrase, KVBC Awana' },
+  { id: 'journey', label: 'Journey', blurb: 'Captions, teaching slides, saved lessons' },
+  { id: 'history', label: 'History', blurb: 'Trends, past nights, import' },
+  { id: 'account', label: 'Account & app', blurb: 'Sign-in, passphrase, the Windows app' },
 ];
 
 /** @type {Record<string, { id: SectionId, label: string, blurb: string }>} */

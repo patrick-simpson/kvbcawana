@@ -59,7 +59,7 @@ export function WelcomeExtrasCard({ form, set }) {
           title="Birthday-this-week ribbon"
           hint={<>
             When a child’s birthday falls later this week, their banner names the day (&ldquo;Birthday this
-            Friday!&rdquo;). Needs a display key — the birthday roster arrives encrypted.
+            Friday!&rdquo;). Needs the screen to be signed in: birthdays arrive encrypted.
           </>}
         />
         <Toggle

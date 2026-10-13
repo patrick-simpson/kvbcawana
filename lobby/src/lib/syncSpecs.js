@@ -110,9 +110,17 @@ export const SCREEN_SPECS = {
     lowPower: { type: 'bool' },
     stingers: { type: 'bool' },
   },
-  // Journey has no device setting of its own since the Pi was removed (2026-10-12):
-  // one behaviour on every device.
-  journey: {},
+  // Journey plays the same on every device since the Pi was removed (2026-10-12);
+  // its two own settings are about saving lessons on that computer
+  // (journey/src/schedule/26-lesson-downloads.js, owner 2026-10-12: edited from
+  // /settings → Journey → Lessons on the Journey PCs): "Download lessons
+  // automatically" (journey.downloads.auto) and "Include Leader Videos"
+  // (journey.downloads.leaders). The kiosk applies them, and sends up a change
+  // made on the kiosk itself (journey/public/src/sync.js).
+  journey: {
+    downloadsAuto: { type: 'bool' },
+    downloadsLeader: { type: 'bool' },
+  },
   // The two role switches and the club-night display hours (default 5:00 to
   // 8:00 pm). Whether a role may change now (never a print server turned off
   // mid-print) is the app's to hold until it is idle (its hello then carries
@@ -129,14 +137,27 @@ export const SCREEN_SPECS = {
  * What /settings may ask a screen to do (the configure relay's own actions,
  * configureRelay.js), delivered on the live channel. Each one is a request the
  * screen treats like a press of its own button.
+ *
+ * A Journey kiosk has no socket of its own (journey/CLAUDE.md "room sync"), so
+ * its actions are QUEUED by the Worker and handed over in its next hello's
+ * answer, each one once (SCREEN_ACTION_QUEUED_KINDS; worker/src/screens.js,
+ * worker/src/routes.md 10.8): the buttons of its own Settings → "Lessons on
+ * this computer", pressed from /settings → Journey.
  * @type {Record<ScreenKind, readonly string[]>}
  */
 export const SCREEN_ACTIONS = {
   lobby: Object.freeze(['preview-checkin', 'reset-tally', 'board-demo']),
   projector: Object.freeze(['select', 'resume']),
-  journey: Object.freeze([]),
+  journey: Object.freeze(['start-downloads', 'pause-downloads', 'resume-downloads', 'stop-downloads', 'delete-downloads']),
   computer: Object.freeze([]),
 };
+
+/** The kinds whose actions wait in the Worker for the screen's next hello (no live channel of their own). */
+export const SCREEN_ACTION_QUEUED_KINDS = Object.freeze(/** @type {readonly ScreenKind[]} */ (['journey']));
+/** How many actions may wait for one screen; one more is refused. */
+export const SCREEN_ACTION_QUEUE_MAX = 5;
+/** An action not collected within this long is dropped (a press an hour late is worse than none). */
+export const SCREEN_ACTION_TTL_MS = 10 * 60 * 1000;
 
 /** What a screen is called until someone names it. @type {Record<ScreenKind, string>} */
 export const SCREEN_DEFAULT_NAMES = { lobby: 'Lobby TV', projector: 'Projector', journey: 'Journey kiosk', computer: 'Computer' };
@@ -225,10 +246,12 @@ const BUILD_RE = /^[0-9a-f]{7,64}$/;
  * `known` false: the kiosk has not read its disk yet (a few minutes after
  * load); `supported` false: this browser cannot save lessons at all. Both are
  * true for a kiosk page older than them (it only reported once it knew).
+ * `leaders`: whether its "Include Leader Videos" is ticked (missing = true,
+ * the kiosk's own default).
  * @typedef {{ saved: number, total: number, bytesSaved: number, bytesTotal: number,
  *   downloading: boolean, waiting: boolean, paused: boolean, percent: number,
  *   currentWeek: number | null, lastSavedAt: string | null, error: string | null, auto: boolean,
- *   known: boolean, supported: boolean }} LessonsStatus
+ *   leaders: boolean, known: boolean, supported: boolean }} LessonsStatus
  * @typedef {{ version: string, update: { state: 'none' | 'downloading' | 'ready' | 'error', percent: number | null, at: string | null } }} AppStatus
  * @typedef {{ build: string | null }} PageStatus
  * @typedef {{ lessons: LessonsStatus } | { app: AppStatus } | { page: PageStatus }} ScreenStatus
@@ -276,6 +299,7 @@ function cleanLessons(l) {
     lastSavedAt: cleanStatusTime(l.lastSavedAt),
     error: cleanStatusText(l.error),
     auto: l.auto === true,
+    leaders: l.leaders !== false,
     known: l.known !== false,
     supported: l.supported !== false,
   };
@@ -332,7 +356,8 @@ export function sanitizeScreenStatus(kind, raw) {
  * once-a-minute one? (The free Durable Object allowance counts writes.) Both
  * sanitized for the same kind (or null).
  *   lessons  a lesson saved, the set changing, an error, pause, start, stop or
- *            wait, the automatic switch, knowing or not, or 10 points of progress
+ *            wait, the automatic switch, the Leader Videos tick, knowing or
+ *            not, or 10 points of progress
  *   app      a new version, the update's state, or 10 points of its download
  *   page     a new build
  * @param {ScreenStatus | null | undefined} a
@@ -345,7 +370,7 @@ export function screenStatusMoved(a, b) {
     const y = b.lessons;
     return x.saved !== y.saved || x.total !== y.total || x.error !== y.error || x.paused !== y.paused
       || x.downloading !== y.downloading || x.waiting !== y.waiting || x.auto !== y.auto
-      || x.known !== y.known || x.supported !== y.supported
+      || x.leaders !== y.leaders || x.known !== y.known || x.supported !== y.supported
       || Math.abs(x.percent - y.percent) >= 10;
   }
   if ('app' in a && 'app' in b) {

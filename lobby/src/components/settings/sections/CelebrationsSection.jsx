@@ -23,7 +23,7 @@ export function CelebrationsSection({ form, set, update }) {
           value={form.clubMilestoneEvery}
           onChange={set('clubMilestoneEvery')}
         />
-        <span className="hint">Uses the printer's live per-club counts — "Sparks 20 kids strong!". 0 turns it off.</span>
+        <span className="hint">Uses the check-in desk's live count for each club: "Sparks 20 kids strong!". 0 turns it off.</span>
       </div>
       <MilestoneListField
         id="bookMilestones"

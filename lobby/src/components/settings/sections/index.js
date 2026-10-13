@@ -10,3 +10,4 @@ export * from './TonightSection.jsx';
 export * from './ShowSection.jsx';
 export * from './PrintingSection.jsx';
 export * from './AccountSection.jsx';
+export * from './JourneySection.jsx';

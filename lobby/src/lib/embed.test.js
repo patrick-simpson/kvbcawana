@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { HOST_CONTROL, hostClearancePx, isEmbedded } from './embed.js';
+import { HOST_CONTROL, hostClearancePx, hostDoorbell, isEmbedded } from './embed.js';
+import { EMBED_DOORBELL_MESSAGE } from './constants.js';
 
 // Embedded in the Journey kiosk's iframe, Journey keeps its two buttons in one
 // column in the bottom-right corner, and the signage keeps what it draws
@@ -202,5 +203,27 @@ describe('app.css: the operator\'s panels and a wrapped ticker keep out of the c
     // ...and never wider than it is standalone.
     expect(max).toContain(decl(rule('.tonight-ticker', 'position').body, 'max-width').replace(/^calc\((.*)\)$/, '$1'));
     expect(decl(ticker.body, 'flex-wrap')).toBe('wrap');
+  });
+});
+
+describe('the sync doorbell, passed up to the Journey kiosk', () => {
+  const ID = 'jk_cccccccccccccccccccc';
+  it('only the room ring, and a screen ring with a well-formed id; only the word and the id', () => {
+    expect(hostDoorbell('journey', { what: 'journey', at: 'x' })).toEqual({ type: EMBED_DOORBELL_MESSAGE, what: 'journey' });
+    expect(hostDoorbell('screen-action', { what: 'screen-action', id: ID, action: 'delete-downloads', at: 'x' }))
+      .toEqual({ type: EMBED_DOORBELL_MESSAGE, what: 'screen-action', id: ID });
+    expect(hostDoorbell('screen', { id: ID })).toEqual({ type: EMBED_DOORBELL_MESSAGE, what: 'screen', id: ID });
+    for (const [what, payload] of [['calendar', {}], ['template', {}], ['screen', { id: 'short' }], ['screen-action', null], ['screen', { id: 42 }], [null, {}]]) {
+      expect(hostDoorbell(what, payload), String(what)).toBeNull();
+    }
+  });
+
+  it('the App posts it to its own origin only, embedded only, and Journey spells the message the same', () => {
+    const app = readFileSync(resolve(__dirname, '../App.jsx'), 'utf8');
+    expect(app).toMatch(/hostDoorbell\(what, payload\)[\s\S]{0,200}window\.parent\.postMessage\(message, window\.location\.origin\)/);
+    expect(app).toMatch(/if \(CONFIGURE \|\| !isEmbedded\(\)\) return undefined;\s*return onSyncDoorbell/);
+    const journey = readFileSync(resolve(__dirname, '../../../journey/public/src/sync.js'), 'utf8');
+    expect(journey).toContain(`var DOORBELL_MESSAGE = '${EMBED_DOORBELL_MESSAGE}';`);
+    expect(journey).toMatch(/event\.source !== frame\.contentWindow \|\| event\.origin !== window\.location\.origin/);
   });
 });

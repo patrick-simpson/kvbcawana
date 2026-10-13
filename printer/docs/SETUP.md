@@ -60,7 +60,7 @@ What Printing holds (the church-wide settings work from any device; *At the lapt
   check-out); **Each club’s label** — each club's layout. Church-wide: saved in
   the sync service and followed by the laptop. The musical printer and the
   update beacon stay with this laptop (At the laptop).
-- **Pickup list**, **Club night** (the schedule and the late grace; the
+- **Pickup list**, **Club night schedule** (the schedule and the late grace; the
   season is the one Season choice under Slides & look). The schedule has one row per slot of the night (club, from,
   activity, place), filled in with the church's 2026-27 schedule until you
   change it; a late check-in's label gets a "Go to:" line naming where the club

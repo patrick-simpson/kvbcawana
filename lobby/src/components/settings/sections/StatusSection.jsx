@@ -233,7 +233,7 @@ export function CalendarPhaseCard({
   const preview = calendarEnabled ? calendarPreview(calendar) : null;
   const sync = slideSyncLines({ syncedDeck, slidesStatus, following, hasKey: keyed, nowAt: openedAt, where: accountWhere });
   return (
-    <PanelCard title="Calendar & phase" tab="var(--brand-journey)">
+    <PanelCard title="Schedule and calendar" tab="var(--brand-journey)">
       <div className="hint conn-summary">
         <div><strong>Right now:</strong> {phaseWords(phase) || 'unknown'}{scheduleSource ? ` (schedule: ${scheduleSource})` : ''}</div>
         {calendarEnabled

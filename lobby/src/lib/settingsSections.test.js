@@ -5,14 +5,19 @@ import {
 } from './settingsSections.js';
 
 describe('the new rail (docs/SETTINGS-OVERHAUL.md section 1)', () => {
-  it('is seven sections, in the order Tonight … Account & app', () => {
-    expect(SECTIONS.map((s) => s.id)).toEqual(['tonight', 'screens', 'show', 'look', 'printing', 'history', 'account']);
-    expect(SECTIONS.map((s) => s.label)).toEqual(['Tonight', 'Screens', 'What screens show', 'Slides & look', 'Printing', 'History', 'Account & app']);
-    for (const s of SECTIONS) expect(s.blurb.length).toBeGreaterThan(0);
+  it('is eight sections since the reorganize, in club-night order: Tonight, Printing … Account & app', () => {
+    expect(SECTIONS.map((s) => s.id)).toEqual(['tonight', 'printing', 'screens', 'show', 'look', 'journey', 'history', 'account']);
+    expect(SECTIONS.map((s) => s.label)).toEqual(['Tonight', 'Printing', 'Screens', 'What screens show', 'Slides & look', 'Journey', 'History', 'Account & app']);
+    for (const s of SECTIONS) {
+      expect(s.blurb.length).toBeGreaterThan(0);
+      // Plain words: no jargon in a blurb, and no blurb longer than the rail can show.
+      expect(s.blurb, s.id).not.toMatch(/phase|sync|config|dashboard|print server|shared settings/i);
+      expect(s.blurb.length, s.id).toBeLessThanOrEqual(42);
+    }
   });
 
-  it('shows the page all seven, a TV four, and a screen opened from the page three', () => {
-    expect(sectionsFor(true).map((s) => s.id)).toEqual(['tonight', 'screens', 'show', 'look', 'printing', 'history', 'account']);
+  it('shows the page all eight, a TV four, and a screen opened from the page three', () => {
+    expect(sectionsFor(true).map((s) => s.id)).toEqual(['tonight', 'printing', 'screens', 'show', 'look', 'journey', 'history', 'account']);
     expect(sectionsFor(false).map((s) => s.id)).toEqual(['tonight', 'show', 'look', 'account']);
     expect(sectionsFor(true, { remote: true }).map((s) => s.id)).toEqual(['tonight', 'show', 'look']);
     expect(sectionsFor(false, { remote: true }).map((s) => s.id)).toEqual(['tonight', 'show', 'look']);
@@ -21,7 +26,7 @@ describe('the new rail (docs/SETTINGS-OVERHAUL.md section 1)', () => {
   it('keeps the page-only sections off a TV', () => {
     for (const remote of [false, true]) {
       const ids = sectionsFor(false, { remote }).map((s) => s.id);
-      for (const only of ['screens', 'printing', 'history']) expect(ids).not.toContain(only);
+      for (const only of ['screens', 'printing', 'journey', 'history']) expect(ids).not.toContain(only);
     }
   });
 
@@ -32,6 +37,7 @@ describe('the new rail (docs/SETTINGS-OVERHAUL.md section 1)', () => {
     });
     for (const [old, now] of Object.entries(LEGACY_TABS)) expect(resolveSection(old)).toBe(now);
     for (const s of SECTIONS) expect(resolveSection(s.id)).toBe(s.id);
+    expect(resolveSection('journey')).toBe('journey');
     expect(resolveSection('nope')).toBeNull();
     expect(resolveSection(null)).toBeNull();
   });

@@ -3,11 +3,12 @@ import { SYNC_BASE, installWorker, makeWorld } from './settingsStub.js';
 
 // The one settings page (awana.kvbchurch.org/settings → settings.html,
 // ROADMAP.md#settings-page, docs/SETTINGS-OVERHAUL.md section 1): configure mode on a
-// device that is not a screen. The seven-section rail (Tonight, Screens, What
-// screens show, Slides & look, Printing, History, Account & app), the old rail
-// behind ?rail=classic, every removed control gone, the TV preview column.
+// device that is not a screen. The eight-section rail since the 2026-10-13
+// reorganize (Tonight, Printing, Screens, What screens show, Slides & look,
+// Journey, History, Account & app), the old rail behind ?rail=classic, every
+// removed control gone, the TV preview column, the Journey section.
 
-const RAIL = ['Tonight', 'Screens', 'What screens show', 'Slides & look', 'Printing', 'History', 'Account & app'];
+const RAIL = ['Tonight', 'Printing', 'Screens', 'What screens show', 'Slides & look', 'Journey', 'History', 'Account & app'];
 
 test.describe('not signed in', () => {
   test.beforeEach(async ({ page }) => {
@@ -15,7 +16,7 @@ test.describe('not signed in', () => {
     await page.goto('/settings.html?lowPower=1');
   });
 
-  test('it is Settings alone: seven sections, opening on Account & app with the sign-in', async ({ page }) => {
+  test('it is Settings alone: eight sections, opening on Account & app with the sign-in', async ({ page }) => {
     const dialog = page.getByRole('dialog', { name: 'Settings' });
     await expect(dialog).toBeVisible();
     await expect(page).toHaveTitle('KVBC Awana Settings');
@@ -94,7 +95,8 @@ test.describe('signed in', () => {
     await page.goto('/settings.html?lowPower=1');
     const dialog = page.getByRole('dialog', { name: 'Settings' });
     await expect(dialog.getByRole('tab', { name: 'Tonight' })).toHaveAttribute('aria-selected', 'true');
-    await expect(dialog.getByText('Signed in: changes here reach every screen.')).toBeVisible();
+    await expect(dialog.getByRole('heading', { name: 'Sign in first' })).toHaveCount(0);
+    await expect(dialog.locator('.status-line')).toContainText('Signed in');
     await expect(dialog.getByTestId('mission-total')).toHaveText('42');
     await expect.poll(() => page.w.headers.length).toBeGreaterThan(2);
     // a signed-in call; the public calendar read carries neither a session nor a device
@@ -167,7 +169,7 @@ test.describe('signed in', () => {
     await page.goto('/settings.html?lowPower=1');
     const dialog = page.getByRole('dialog', { name: 'Settings' });
     await expect(dialog.locator('.settings-pane')).toBeHidden();
-    await expect(dialog.getByRole('tab')).toHaveCount(7);
+    await expect(dialog.getByRole('tab')).toHaveCount(8);
     for (const name of RAIL) {
       await dialog.getByRole('tab', { name, exact: true }).click();
       const overflow = await dialog.locator('.panel-body').evaluate((el) => el.scrollWidth - el.clientWidth);
@@ -186,6 +188,55 @@ test.describe('signed in', () => {
     const put = page.w.calls.find((c) => c.method === 'PUT' && c.path === '/v1/church/settings');
     expect(put.body.settings).toEqual({ seasonTheme: 'easter' });
     await expect(dialog.getByTestId('season-line')).toHaveText('Tonight: Easter (you picked it)');
+  });
+});
+
+test.describe('Journey (owner 2026-10-12)', () => {
+  const KIOSK = 'jk_cccccccccccccccccccc';
+  const kiosk = (lessons, online = true) => ({
+    id: KIOSK, kind: 'journey', name: 'Journey room', createdAt: new Date().toISOString(), lastSeen: new Date().toISOString(), online, live: false,
+    status: { lessons: { saved: 24, total: 63, bytesSaved: 12e9, bytesTotal: 14e9, downloading: false, waiting: false, paused: false, percent: 0, currentWeek: null, lastSavedAt: null, error: null, auto: true, leaders: true, known: true, supported: true, ...lessons } },
+  });
+
+  test.beforeEach(async ({ page }) => {
+    await page.route(/open-meteo|twotimtwo|kvbchurch\.org/, (route) => route.abort());
+    page.w = makeWorld({ journey: { savedAt: '2026-10-12T18:00:00.000Z', settings: { captions: true, slideNotes: { 5: { questions: ['Q'] } } } }, screens: [kiosk({ downloading: true, percent: 40, currentWeek: 7 })] });
+    await installWorker(page, page.w);
+    await page.goto('/settings.html?lowPower=1');
+  });
+
+  test('the room settings edit the one journey document; tonight\'s bullets ride along', async ({ page }) => {
+    const dialog = page.getByRole('dialog', { name: 'Settings' });
+    await dialog.getByRole('tab', { name: 'Journey', exact: true }).click();
+    for (const h of ['Captions', 'Teaching slides', 'Lessons on the Journey PCs']) await expect(dialog.getByRole('heading', { name: h }), h).toBeVisible();
+    await expect(dialog.getByRole('checkbox', { name: 'Show captions on the lesson videos' })).toBeChecked();
+    await dialog.getByLabel('Text size').selectOption('1.3');
+    await expect(dialog.getByText(/Saved\. Every Journey kiosk takes it/)).toBeVisible();
+    const put = page.w.calls.find((c) => c.method === 'PUT' && c.path === '/v1/journey');
+    expect(put.body.settings).toEqual({ captions: true, captionSize: '1.3', slideNotes: { 5: { questions: ['Q'] } } });
+  });
+
+  test('a kiosk\'s buttons send its commands; Delete asks first', async ({ page }) => {
+    const dialog = page.getByRole('dialog', { name: 'Settings' });
+    await dialog.getByRole('tab', { name: 'Journey', exact: true }).click();
+    const row = dialog.locator(`li[data-screen="${KIOSK}"]`);
+    await expect(row.getByTestId('kiosk-lessons-words')).toHaveText('Lessons: 24 of 63 saved · 11.2 GB · 40% · downloading Lesson 7');
+    await expect(row.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '85');
+    await row.getByRole('button', { name: 'Pause' }).click();
+    await expect(row.getByText(/Sent\. Journey room does it within a few seconds/)).toBeVisible();
+    page.once('dialog', (d) => d.accept());
+    await row.getByRole('button', { name: 'Delete downloaded lessons' }).click();
+    await expect.poll(() => page.w.calls.filter((c) => c.path.endsWith('/action')).map((c) => c.body.action)).toEqual(['pause-downloads', 'delete-downloads']);
+  });
+
+  test('a kiosk that is off: every button is disabled', async ({ page }) => {
+    page.w.screens = [kiosk({}, false)];
+    await page.reload();
+    const dialog = page.getByRole('dialog', { name: 'Settings' });
+    await dialog.getByRole('tab', { name: 'Journey', exact: true }).click();
+    const row = dialog.locator(`li[data-screen="${KIOSK}"]`);
+    await expect(row.getByText('It is off: these work when it is on.')).toBeVisible();
+    for (const b of await row.locator('.kiosk-lessons__buttons button').all()) await expect(b).toBeDisabled();
   });
 });
 

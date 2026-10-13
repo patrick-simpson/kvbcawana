@@ -126,7 +126,7 @@ export function noStatusWords(s) {
  * greyed while the screen is off (the last it said).
  * @param {{ screen: any }} props
  */
-function ScreenStatusLine({ screen }) {
+export function ScreenStatusLine({ screen }) {
   const cls = `screen-row__status${screen.online ? '' : ' screen-row__status--stale'}`;
   const st = screen.status;
   if (screen.kind === 'journey' && st?.lessons) {
@@ -161,7 +161,7 @@ function ScreenStatusLine({ screen }) {
 }
 
 /** A line drawing of the device, in the row's ink. @param {{kind: string}} props */
-function ScreenGlyph({ kind }) {
+export function ScreenGlyph({ kind }) {
   const common = { width: 28, height: 28, viewBox: '0 0 28 28', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': true };
   if (kind === 'projector') {
     return <svg {...common}><rect x="3" y="9" width="22" height="11" rx="3" /><circle cx="18" cy="14.5" r="3" /><path d="M7 20v2M21 20v2M7 13h4" /></svg>;
@@ -176,7 +176,7 @@ function ScreenGlyph({ kind }) {
 }
 
 /** On now / Off, as a dot and a word. @param {{online: boolean}} props */
-function ScreenState({ online }) {
+export function ScreenState({ online }) {
   return <span className={`screen-state screen-state--${online ? 'on' : 'off'}`}><span className="dot" />{online ? 'On now' : 'Off'}</span>;
 }
 
@@ -209,7 +209,7 @@ export function ScreensSection({ onOpen, goTo }) {
     return (
       <PanelCard title="Screens">
         <p className="hint panel-intro">Sign in with the church passphrase to see every screen and change any one of them from here.</p>
-        {goTo && <button type="button" className="secondary section-jump" onClick={() => goTo('setup')}>Sign in →</button>}
+        {goTo && <button type="button" className="secondary section-jump" onClick={() => goTo('account')}>Sign in →</button>}
       </PanelCard>
     );
   }
@@ -232,9 +232,9 @@ export function ScreensSection({ onOpen, goTo }) {
       {state.screens !== null && screens.length === 0 && (
         <PanelCard title="How a screen shows up">
           <p className="hint panel-intro">
-            Sign a TV, the projector or a Journey kiosk in with the passphrase (its Settings → Account & app) and it appears here
-            within a couple of minutes, named &ldquo;Lobby TV&rdquo;, &ldquo;Projector&rdquo; or &ldquo;Journey kiosk&rdquo;
-            until you rename it.
+            Sign a screen in with the passphrase (a TV&rsquo;s or the projector&rsquo;s Settings → Account & app, a Journey
+            kiosk&rsquo;s Settings → Sync) and it appears here within a couple of minutes, named &ldquo;Lobby TV&rdquo;,
+            &ldquo;Projector&rdquo; or &ldquo;Journey kiosk&rdquo; until you rename it.
           </p>
         </PanelCard>
       )}
@@ -263,7 +263,7 @@ export function ScreensSection({ onOpen, goTo }) {
                     </button>
                   )}
                 </div>
-                {open === s.id && <KindSettings screen={s} onChanged={refresh} onGone={() => { setOpen(null); refresh(); }} />}
+                {open === s.id && <KindSettings screen={s} goTo={goTo} onChanged={refresh} onGone={() => { setOpen(null); refresh(); }} />}
               </li>
             ))}
           </ul>
@@ -284,8 +284,15 @@ const FIELD_WORDS = {
   displayUntil: { title: 'Display until', hint: '' },
 };
 
-/** @param {{ screen: any, onChanged: () => void, onGone: () => void }} props */
-function KindSettings({ screen, onChanged, onGone }) {
+/**
+ * A Journey kiosk's own two settings (its lesson downloads) live with its
+ * download buttons under Journey → Lessons on the Journey PCs, so its row
+ * points there instead of repeating them.
+ */
+const ELSEWHERE = { journey: new Set(['downloadsAuto', 'downloadsLeader']) };
+
+/** @param {{ screen: any, onChanged: () => void, onGone: () => void, goTo?: (id: string) => void }} props */
+function KindSettings({ screen, onChanged, onGone, goTo }) {
   const [settings, setSettings] = useState(/** @type {Record<string, any> | null} */ (null));
   const [note, setNote] = useState(/** @type {{text: string, warn?: boolean} | null} */ (null));
   useEffect(() => {
@@ -324,10 +331,17 @@ function KindSettings({ screen, onChanged, onGone }) {
   };
 
   const spec = /** @type {Record<string, any>} */ (SCREEN_SPECS[/** @type {'projector'} */ (screen.kind)] || {});
+  const elsewhere = /** @type {Record<string, Set<string>>} */ (ELSEWHERE)[screen.kind];
   return (
     <div className="screen-row__body">
       {settings === null && !note && <p className="hint">Opening…</p>}
-      {settings !== null && Object.entries(spec).map(([key, rule]) => {
+      {screen.kind === 'journey' && (
+        <p className="hint">
+          Its saved lessons, the download buttons and its two download switches are under Journey.
+          {goTo && <>{' '}<button type="button" className="ghost small" onClick={() => goTo('journey')}>Lessons on the Journey PCs →</button></>}
+        </p>
+      )}
+      {settings !== null && Object.entries(spec).filter(([key]) => !elsewhere?.has(key)).map(([key, rule]) => {
         const words = /** @type {any} */ (FIELD_WORDS)[key] || { title: key, hint: '' };
         const id = `${screen.id}-${key}`;
         if (rule.type === 'bool') {
@@ -440,7 +454,7 @@ export function ScreenOverviewSection({ screen, following, onAction, onRenamed, 
             <span className="hint">Back to zero until the printer&rsquo;s next count; the &ldquo;Doors are open&rdquo; moment can play again.</span>
           </div>
         </div>
-        <button type="button" className="secondary section-jump" onClick={() => goTo('screen')}>Its corner, chime and motion →</button>
+        <button type="button" className="secondary section-jump" onClick={() => goTo('show')}>Its corner, chime and motion →</button>
       </PanelCard>
     </>
   );

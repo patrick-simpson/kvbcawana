@@ -73,7 +73,7 @@ test('a name never reaches the stage: the page shows no banner, and a one-off ta
 test('?mission=0 hides the card', async ({ page }) => {
   await page.goto('/settings.html?lowPower=1&mission=0');
   const dialog = page.getByRole('dialog', { name: 'Settings' });
-  await expect(dialog.getByRole('heading', { name: 'Calendar & phase' })).toBeVisible();
+  await expect(dialog.getByRole('heading', { name: 'Schedule and calendar' })).toBeVisible();
   await expect(dialog.getByRole('heading', { name: 'Tonight at a glance' })).toHaveCount(0);
 });
 

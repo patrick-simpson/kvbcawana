@@ -193,6 +193,17 @@ Full contract: `lobby/worker/src/routes.md` section 8.
   token, "Other screens", the duplicate season and sign-in, the stale cloud
   check-in card. Waiting on Track A (the Worker's routes) and Track B (KVBC
   Awana 9.3.0): until they land the cards say "arrives with its next update".
+- 2026-10-13: **Reorganize + Journey section** (owner 2026-10-12; outline in
+  `docs/SETTINGS-OVERHAUL.md` "Reorganize"). The rail is eight sections in
+  club-night order: Tonight, Printing, Screens, What screens show, Slides &
+  look, Journey, History, Account & app (section and card names that other
+  pages cite kept; old ids and `?rail=classic` still work). New Journey section:
+  Captions and Teaching slides edit the Worker's one journey document (new
+  `GET /v1/journey`), and "Lessons on the Journey PCs" lists every kiosk with
+  progress, Start / Pause / Resume / Stop / Delete (queued for the kiosk's next
+  hello, `lobby/worker/src/routes.md` 10.8; the embedded Check-in Display passes
+  the doorbell up so it lands in seconds) and its two download switches
+  (`SCREEN_SPECS.journey`). Needs one sync Worker deploy.
 
 #### Inventory: every setting and tool, and where it lives now
 

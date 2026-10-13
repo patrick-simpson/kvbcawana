@@ -23,6 +23,8 @@
 // Standalone (window.self === window.top) none of it applies, and the page
 // is laid out exactly as it always was.
 
+import { EMBED_DOORBELL_MESSAGE } from './constants.js';
+
 /**
  * Whether this page is inside another page's frame: the same test the
  * double-click fullscreen hand-off uses. Read at call time (not cached at
@@ -36,6 +38,23 @@ export function isEmbedded() {
   } catch {
     return true;
   }
+}
+
+/**
+ * What the Journey host is told when the sync service rings (constants.js
+ * EMBED_DOORBELL_MESSAGE): only a 'journey' ring, or a 'screen' /
+ * 'screen-action' ring naming a screen by a well-formed id, and only the
+ * word and the id (never an action or anything else the ring carried: the
+ * kiosk fetches what it needs itself). null for anything else.
+ * @param {unknown} what
+ * @param {unknown} payload
+ * @returns {{ type: string, what: string, id?: string } | null}
+ */
+export function hostDoorbell(what, payload) {
+  if (what === 'journey') return { type: EMBED_DOORBELL_MESSAGE, what };
+  if (what !== 'screen' && what !== 'screen-action') return null;
+  const id = payload && typeof payload === 'object' ? /** @type {any} */ (payload).id : null;
+  return typeof id === 'string' && /^[A-Za-z0-9_-]{16,64}$/.test(id) ? { type: EMBED_DOORBELL_MESSAGE, what, id } : null;
 }
 
 /**

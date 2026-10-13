@@ -8,7 +8,7 @@ import {
 } from './SlidesSection.jsx';
 
 /** Ambient particles and the weather mood. */
-export function WeatherEffectsCard({ form, set, where = 'What screens show' }) {
+export function WeatherEffectsCard({ form, set, where = 'What screens show → Corner' }) {
   return (
     <PanelCard title="Weather effects" tab="var(--brand-trek)" scope="shared" preview="slide">
       <div className="field">

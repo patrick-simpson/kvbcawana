@@ -43,7 +43,7 @@ jobs:
   # base to compare with, or a change to this file. The fast jobs always run.
   #   lobby   reads only lobby/ (its vitest excludes worker/ and desktop/,
   #           whose lint moved into their own jobs below), plus
-  #           journey/public/src/schedule.js
+  #           journey/public/src/schedule.js and journey/public/src/sync.js
   #           site/checkin/ and printer/print-server/public/phone.html
   #           (e2e/checkin.spec.js serves the one check-in page, built from the
   #           phone page by site/checkin/checkin-page.mjs, from a stub origin)
@@ -117,7 +117,7 @@ jobs:
               # suite. (In a case pattern * also matches "/", so this is a test.)
               if [[ "$f" != */* && "$f" == *.md ]]; then continue; fi
               case "$f" in
-                journey/public/src/schedule.js) lobby=true ;;  # screenSpecs.test.js reads it
+                journey/public/src/schedule.js|journey/public/src/sync.js) lobby=true ;;  # screenSpecs.test.js reads both, embed.test.js sync.js
                 site/checkin/*|printer/print-server/public/phone.html|printer/print-server/sync-protocol.js) lobby=true ;;  # e2e/checkin.spec.js serves the check-in page (site/checkin/checkin-page.mjs builds it from phone.html)
                 lobby/worker/*|lobby/desktop/*|printer/*|journey/*|site/*|.github/workflows/*) ;;
                 *) lobby=true ;;

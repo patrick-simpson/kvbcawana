@@ -41,8 +41,8 @@ export const PRINTING_FIELDS = Object.freeze({
   connectCardGreeting: 'Labels',
   enableDrivenCheckin: 'Labels',
   labelTemplates: 'Each club’s label',
-  schedule: 'Club night',
-  lateGraceMin: 'Club night',
+  schedule: 'Club night schedule',
+  lateGraceMin: 'Club night schedule',
   pickupClubs: 'Pickup list',
   barfNights: 'BARF Night',
   leaders: 'Name tags and labels',
@@ -264,7 +264,7 @@ export function ClubNightCard({ church }) {
     }
   };
   return (
-    <PanelCard title="Club night" tab="var(--brand-journey)">
+    <PanelCard title="Club night schedule" tab="var(--brand-journey)">
       <p className="hint">
         One row per slot of the night. A child who checks in late is sent to their club’s slot that started last:
         “Go to: Games, Fellowship Hall”. With no rows the church’s 2026-27 schedule is used.

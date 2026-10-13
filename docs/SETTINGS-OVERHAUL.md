@@ -442,3 +442,85 @@ deploy between 4:30 and 9:30 pm Wednesday.
 | New rail | owner cannot find a control | `?rail=classic`; `LEGACY_TABS` keep old deep links working |
 | Tool jobs from anywhere (name tags, reprint) | duplicate tags | at-most-once journal per jobId unchanged; each press mints ONE `reprint:<uuid>` (button disabled until answered); confirm before sending |
 | Removed publish-token fallback | the laptop page cannot prove itself without a sync session | sign in under Account (the page's sync session is the proof); the print server still accepts a stored token |
+
+## 11. Reorganize (2026-10-12/13, owner: "full reorganize, logical and easy to use"; plus the Journey section)
+
+Decided without a plan step (owner). What a volunteer needs on a club night
+comes first, what is set once comes later. Nothing changed what a setting does
+or its stored key / wire name; section ids, `LEGACY_TABS`, `?rail=`,
+`awanaSettingsRail.v1` and the classic rail are unchanged. Section and card
+names that other pages cite were kept (Printing → Labels, Printing → At the
+laptop, Printing → Pickup list, What screens show → Pickup board, Account &
+app → Sign in / Church-wide settings). Card order is pinned by
+`lobby/src/components/SettingsPanel.rail.test.jsx` ("the reorganized
+sections"); no card title is used twice on the page (same test).
+
+### 11.1 The rail (page: all eight; a TV: Tonight, What screens show, Slides & look, Account & app; a screen opened from Screens: Tonight, What screens show, Slides & look)
+
+| # | id | Label | Blurb | Moved |
+| --- | --- | --- | --- | --- |
+| 1 | `tonight` | Tonight | Live count, problems, notice to screens | |
+| 2 | `printing` | Printing | Reprints, name tags, labels, schedule | up from 5th: reprints and name tags are club-night tools |
+| 3 | `screens` | Screens | Every TV, projector, kiosk and computer | |
+| 4 | `show` | What screens show | Welcomes, celebrations, pickup, corner | |
+| 5 | `look` | Slides & look | Slides, calendar, background, season | |
+| 6 | `journey` | Journey | Captions, teaching slides, saved lessons | NEW (page only) |
+| 7 | `history` | History | Trends, past nights, import | |
+| 8 | `account` | Account & app | Sign-in, passphrase, the Windows app | |
+
+### 11.2 Section → cards (page; TV-only cards in brackets)
+
+- **Tonight**: [its alerts] · *Sign in first* (only while signed out; signed
+  in, the header pill already says so, so the old always-on "Sign-in &
+  connection" line left the page) · Needs a look (moved first: something to
+  act on) · Tonight at a glance · Notice to every screen (moved up: a club-night
+  action) · Schedule and calendar (was "Calendar & phase": "phase" is jargon) ·
+  Recent changes · Online check-in switches (moved last: set once, risky to
+  touch). [TV: its alerts · Sign-in & connection · Schedule and calendar · About
+  this screen.]
+- **Printing**: the church-document gate (only when it has something to say) ·
+  Tonight's prints · Name tags and labels (both moved to the top: used on club
+  nights) · BARF Night (a few nights a year) · Labels · Each club's label · Club
+  night schedule (was "Club night": it is the schedule and the late grace) ·
+  Pickup list · At the laptop (collapsed, needs this computer).
+- **Screens**: summary · one card per kind (Lobby TVs, Projectors, Journey
+  kiosks, Computers), each row with its status line and its own settings in
+  the row. A Journey kiosk's row no longer repeats its download switches: it
+  points at Journey → Lessons on the Journey PCs (one place per control).
+  "How a screen shows up" now says where each kind signs in (a Journey kiosk:
+  its Settings → Sync).
+- **What screens show**: [Simplified mode] · Welcome banners · Welcome extras ·
+  Club lines · Celebrations · Pickup board · [Preview] · Corner (weather
+  location and units in its fold) · [This TV]. Unchanged order; plain words:
+  "needs a display key" → "needs the screen to be signed in", "the printer's
+  live per-club counts" → "the check-in desk's live count for each club".
+- **Slides & look**: [Preview the promos] · [What plays behind the names] ·
+  Typed & published slides · Calendar slides · Season · Weather effects (its
+  hint now names where the weather location is: What screens show → Corner) ·
+  Just for fun. Unchanged order.
+- **Journey** (NEW, owner 2026-10-12: the kiosk's own Settings "really live in
+  the master settings page"): Captions (show captions, text size, dark
+  backdrop) · Teaching slides (auto-advance, the three extras; tonight's
+  bullets stay on the kiosk) · Lessons on the Journey PCs (every kiosk:
+  progress in words and as a bar, Start / Pause / Resume / Stop / Delete
+  downloaded lessons with a confirm, disabled while the kiosk is off, checking
+  or unable to save; "Download lessons automatically" and "Include Leader
+  Videos" per kiosk). Captions and Teaching slides carry an "Every Journey
+  kiosk" tag. Wire: `lobby/worker/src/routes.md` 10.8. The kiosk's own panel
+  keeps every control (the fallback at the PC); the lesson picker and the
+  bullet editor stay only there (owner's choice).
+- **History**: Trends · Nights · Import laptop history. Unchanged.
+- **Account & app**: Sign in · Passphrase · This device · Change log · KVBC
+  Awana for Windows · KVBC Awana release notes · About. [TV: Connect this
+  screen · Passphrase · Church-wide settings · KVBC Awana cards · This
+  screen's tools · About.] Unchanged.
+
+### 11.3 Left alone on purpose
+
+Section names (printer docs, print-server error strings and the extension cite
+"Printing → …"), every stored key and wire name, the classic rail (deleted the
+release after Wednesday as planned), the TV's own panel order (a TV opens on
+What screens show and its emergency switch, Simplified mode, stays first), the
+TV preview (Tonight, What screens show, Slides & look only), "Typed &
+published slides" (a radio label of the same words is test-pinned), and the
+online check-in switch titles (the owner's own words).

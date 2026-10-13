@@ -103,6 +103,10 @@ function ScopeTag({ scope }) {
   const page = useContext(SettingsPageContext);
   const remote = useContext(RemoteScreenContext);
   if (!scope || (page && scope === 'screen' && !remote)) return null;
+  // The Journey room settings: every Journey kiosk follows one document.
+  if (scope === 'journey') {
+    return <span className="scope-tag scope-tag--shared" title="A change here reaches every Journey kiosk.">Every Journey kiosk</span>;
+  }
   const shared = scope === 'shared' && following;
   return (
     <span className={`scope-tag scope-tag--${shared ? 'shared' : 'screen'}`}

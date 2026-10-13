@@ -4,7 +4,8 @@ import { ZeroAnimationContext } from '../lib/motion.jsx';
 import defaults from '../config.js';
 import { saveDisplayKey } from '../lib/displayKey.js';
 
-// The new seven-section rail (docs/SETTINGS-OVERHAUL.md sections 1-3), on the
+// The new rail (docs/SETTINGS-OVERHAUL.md sections 1-3, eight sections since the
+// 2026-10-13 "Reorganize"), on the
 // settings page (signed in and not), a TV's own panel and a screen opened
 // from the page. The sync store and the Worker are stand-ins.
 
@@ -49,6 +50,8 @@ const page = (extra) => baseProps({ page: true, configure: true, onOpenScreen: v
 const ZERO = ({ children }) => <ZeroAnimationContext.Provider value>{children}</ZeroAnimationContext.Provider>;
 const open = (props) => render(<ZERO><SettingsPanel {...props} /></ZERO>);
 const labels = () => screen.getAllByRole('tab').map((t) => t.querySelector('.settings-nav__label').textContent);
+/** The card titles of the open section, top to bottom. */
+const cardTitles = (container) => [...container.querySelectorAll('.settings-pane .panel-card h3.section')].map((h) => h.textContent);
 const tab = (name) => fireEvent.click(screen.getByRole('tab', { name }));
 
 beforeEach(() => {
@@ -62,9 +65,9 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 
 describe('the new rail on the settings page', () => {
-  it('lists the seven sections in order and opens on Tonight when signed in', () => {
+  it('lists the eight sections in club-night order and opens on Tonight when signed in', () => {
     open(page());
-    expect(labels()).toEqual(['Tonight', 'Screens', 'What screens show', 'Slides & look', 'Printing', 'History', 'Account & app']);
+    expect(labels()).toEqual(['Tonight', 'Printing', 'Screens', 'What screens show', 'Slides & look', 'Journey', 'History', 'Account & app']);
     expect(screen.getByRole('tab', { name: 'Tonight' }).getAttribute('aria-selected')).toBe('true');
   });
 
@@ -86,7 +89,7 @@ describe('the new rail on the settings page', () => {
 
   it('has none of the removed controls anywhere', () => {
     open(page());
-    for (const name of ['Tonight', 'Screens', 'What screens show', 'Slides & look', 'Printing', 'History', 'Account & app']) {
+    for (const name of ['Tonight', 'Printing', 'Screens', 'What screens show', 'Slides & look', 'Journey', 'History', 'Account & app']) {
       tab(name);
       expect(screen.queryByLabelText(/Display login|Display key|Publish token/i), name).toBeNull();
       expect(screen.queryByText(/paste keys by hand|Other screens|Allow driven check-ins from phones|Club Label Printer/i), name).toBeNull();
@@ -102,8 +105,9 @@ describe('the new rail on the settings page', () => {
       if (path.startsWith('/v1/changes')) return { ok: true, status: 200, body: { entries: [], next: null, head: 0 } };
       return { ok: false, status: 404, body: null };
     };
-    open(page());
-    expect(screen.getByText(/Signed in: changes here reach every screen/)).toBeTruthy();
+    const { container } = open(page());
+    // Signed in, the header says so: no sign-in card takes the top of the section.
+    expect(screen.queryByRole('heading', { name: 'Sign in first' })).toBeNull();
     await waitFor(() => expect(screen.getByTestId('mission-total').textContent).toBe('12'));
     expect(await screen.findByRole('checkbox', { name: 'Print TwoTimTwo-page check-ins' })).toBeTruthy();
     expect(screen.getByRole('checkbox', { name: 'The service runs the screens’ count and pickup list' })).toBeTruthy();
@@ -111,6 +115,17 @@ describe('the new rail on the settings page', () => {
     expect(screen.getByLabelText('Message')).toBeTruthy();
     expect(screen.getByRole('heading', { name: 'Recent changes' })).toBeTruthy();
     expect(calls).toContain('GET /v1/tonight/overview');
+    // Club-night order: at a glance, the notice, the schedule, recent changes, the switches last.
+    expect(cardTitles(container).filter((t) => t !== 'Needs a look'))
+      .toEqual(['Tonight at a glance', 'Notice to every screen', 'Schedule and calendar', 'Recent changes', 'Online check-in switches']);
+  });
+
+  it('signed out, Tonight starts with the way to sign in', () => {
+    sync.state = { ...sync.state, signedIn: false };
+    open(page({ initialTab: 'tonight' }));
+    expect(screen.getByRole('heading', { name: 'Sign in first' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Sign in →' }));
+    expect(screen.getByRole('tab', { name: 'Account & app' }).getAttribute('aria-selected')).toBe('true');
   });
 
   it('What screens show: the cards, and "Which clubs" points at Printing', () => {
@@ -160,6 +175,57 @@ describe('the new rail on the settings page', () => {
     open(page());
     tab('History');
     expect(screen.getByRole('heading', { name: 'Import laptop history' })).toBeTruthy();
+  });
+});
+
+describe('the reorganized sections (docs/SETTINGS-OVERHAUL.md "Reorganize", 2026-10-13)', () => {
+  const CHURCH = { rev: 3, savedAt: '2026-10-12T20:00:00Z', by: null, seeded: true, paused: false, switches: {}, switchesRev: 1, settings: { labelFooter: 'KVBC' } };
+
+  it('every section on the page lists its cards in the agreed order', () => {
+    answers.fn = (path) => (path === '/v1/church/settings' ? { ok: true, status: 200, body: CHURCH } : { ok: false, status: 404, body: null });
+    const { container } = open(page());
+    const expected = {
+      Printing: ['Tonight’s prints', 'Name tags and labels', 'BARF Night', 'Labels', 'Each club’s label', 'Club night schedule', 'Pickup list'],
+      'What screens show': ['Welcome banners', 'Welcome extras', 'Club lines', 'Celebrations', 'Pickup board', 'Corner'],
+      'Slides & look': ['Typed & published slides', 'Calendar slides', 'Season', 'Weather effects'],
+      Journey: ['Captions', 'Teaching slides', 'Lessons on the Journey PCs'],
+      History: ['Trends', 'Nights', 'Import laptop history'],
+      'Account & app': ['Sign in', 'Passphrase', 'This device', 'Change log', 'KVBC Awana for Windows', 'KVBC Awana release notes', 'About'],
+    };
+    for (const [name, cards] of Object.entries(expected)) {
+      tab(name);
+      const titles = cardTitles(container);
+      // (Printing's church cards wait for the document; its gate and At the laptop come and go with it.)
+      expect(titles.filter((t) => cards.includes(t)), name).toEqual(cards);
+    }
+  });
+
+  it('no card title is used twice on the page, and none says "&" where the rail spells out "and"', () => {
+    answers.fn = (path) => (path === '/v1/church/settings' ? { ok: true, status: 200, body: CHURCH } : { ok: false, status: 404, body: null });
+    const { container } = open(page());
+    const seen = new Map();
+    for (const name of labels()) {
+      tab(name);
+      for (const t of cardTitles(container)) {
+        expect(seen.has(t) ? `${t} in ${seen.get(t)} and ${name}` : '', t).toBe('');
+        seen.set(t, name);
+      }
+    }
+    expect(seen.size).toBeGreaterThan(25);
+  });
+
+  it('a TV\'s own panel has no Journey section, and its sections keep their cards', () => {
+    const { container } = open(baseProps({ initialTab: 'tonight' }));
+    expect(labels()).not.toContain('Journey');
+    expect(cardTitles(container)).toEqual(['Sign-in & connection', 'Schedule and calendar', 'About this screen']);
+    tab('What screens show');
+    expect(cardTitles(container)).toEqual(['Simplified mode', 'Welcome banners', 'Welcome extras', 'Club lines', 'Celebrations', 'Pickup board', 'Preview', 'Corner', 'This TV']);
+  });
+
+  it('the Journey section opens by id (a deep link), and Screens points a Journey kiosk at it', async () => {
+    open(page({ initialTab: 'journey' }));
+    expect(screen.getByRole('tab', { name: 'Journey' }).getAttribute('aria-selected')).toBe('true');
+    expect(screen.getByRole('heading', { name: 'Lessons on the Journey PCs' })).toBeTruthy();
   });
 });
 

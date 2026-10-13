@@ -29,11 +29,14 @@ function OverviewAlerts({ alerts }) {
 }
 
 /**
- * Tonight (docs/SETTINGS-OVERHAUL.md 2.1). The settings page: sign-in line,
- * mission control, calendar and phase, alerts, the online check-in switches,
- * the notice composer and recent changes. A TV's own panel: its connection,
- * tonight and its alerts only. `mission` is the page's memory-only feed of
- * recent first names (App); `noticeDraft` is lifted so the TV preview can show it.
+ * Tonight (docs/SETTINGS-OVERHAUL.md 2.1, reordered 2026-10-13 "Reorganize").
+ * The settings page, in club-night order: a sign-in pointer only while signed
+ * out (the header says when it is signed in), what needs a look, tonight at a
+ * glance, the notice to every screen, the schedule and calendar, recent
+ * changes, and last the online check-in switches (set once, rarely touched). A
+ * TV's own panel: its alerts, its connection, the schedule and calendar, and
+ * About this screen. `mission` is the page's memory-only feed of recent first
+ * names (App); `noticeDraft` is lifted so the TV preview can show it.
  */
 export function TonightSection({
   status, nameStatus, keyed, displayKey, lastEventAt, openedAt, phase, scheduleSource, calendar, calendarEnabled,
@@ -45,6 +48,12 @@ export function TonightSection({
   const live = page && sync.signedIn;
   const { overview, error, stopped, retry } = useOverview({ enabled: live });
   const alerts = alertsFrom(overview);
+  const calendarCard = (
+    <CalendarPhaseCard
+      phase={phase} scheduleSource={scheduleSource} calendar={calendar} calendarEnabled={calendarEnabled}
+      syncedDeck={syncedDeck} slidesStatus={slidesStatus} following={following} keyed={keyed} openedAt={openedAt}
+    />
+  );
 
   return (
     <>
@@ -53,15 +62,15 @@ export function TonightSection({
         wakeLockStatus={wakeLockStatus} demoActive={demoActive} onReload={onReload}
       />
       {page ? (
-        <PanelCard title="Sign-in & connection">
-          <p className={`status-sentence ${sync.signedIn ? 'connected' : 'off'}`}>
-            <span className="dot" />
-            {sync.signedIn ? 'Signed in: changes here reach every screen.' : 'Not signed in: nothing here reaches a screen yet.'}
-          </p>
-          {!sync.signedIn && (
+        !sync.signedIn && (
+          <PanelCard title="Sign in first">
+            <p className="status-sentence off">
+              <span className="dot" />
+              Not signed in: nothing here reaches a screen yet.
+            </p>
             <button type="button" className="secondary section-jump" onClick={() => goTo('account')}>Sign in →</button>
-          )}
-        </PanelCard>
+          </PanelCard>
+        )
       ) : (
         <ConnectionCard
           status={status} keyed={keyed} displayKey={displayKey} nameStatus={nameStatus}
@@ -69,19 +78,16 @@ export function TonightSection({
         />
       )}
 
+      {live && <OverviewAlerts alerts={alerts} />}
       {live && missionEnabled() && (
         <MissionControl overview={overview} mission={mission} error={error} stopped={stopped} onRetry={retry} />
       )}
-
-      <CalendarPhaseCard
-        phase={phase} scheduleSource={scheduleSource} calendar={calendar} calendarEnabled={calendarEnabled}
-        syncedDeck={syncedDeck} slidesStatus={slidesStatus} following={following} keyed={keyed} openedAt={openedAt}
-      />
-      {live && <OverviewAlerts alerts={alerts} />}
-
-      {live && <SwitchesCard overview={overview} />}
       {live && <NoticeCard draft={noticeDraft} onDraft={onNoticeDraft} overviewNotice={overview ? overview.notice ?? null : undefined} />}
+
+      {calendarCard}
+
       {live && <RecentChangesCard goTo={goTo} />}
+      {live && <SwitchesCard overview={overview} />}
 
       {!page && <AboutCard build={build} part="screen" />}
     </>

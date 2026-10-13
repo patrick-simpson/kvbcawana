@@ -60,6 +60,7 @@ export function makeWorld(over = {}) {
     stations: [{ stationId: 'st1', name: 'Check-in laptop', pub: 'AAAA', kid: 'k1', registeredAt: 1, lastSeenAt: now, printer: { state: 'ok' } }],
     auth: { v2: true, legacy: false, legacyOn: false, legacyLastAt: null },
     screens: [],
+    journey: null,
     nights: [],
     summary: [],
     ...over,
@@ -82,8 +83,16 @@ export async function installWorker(page, w) {
     w.calls.push({ method: req.method(), path, body });
     w.headers.push({ path, auth: Boolean(req.headers().authorization), device: req.headers()['x-device'], name: req.headers()['x-device-name'] });
     const m = req.method();
-    if (path === '/v1/state') return route.fulfill(json({ settings: null, slides: null, template: null, journey: null, calendar: null, kid: 'abcd1234' }));
+    if (path === '/v1/state') return route.fulfill(json({ settings: null, slides: null, template: null, journey: w.journey, calendar: null, kid: 'abcd1234' }));
     if (path === '/v1/screens') return route.fulfill(json({ screens: w.screens, max: 40 }));
+    // The Journey room document and a kiosk's queued download buttons (routes.md 10.8).
+    if (path === '/v1/journey' && m === 'GET') return route.fulfill(json({ journey: w.journey }));
+    if (path === '/v1/journey' && m === 'PUT') {
+      w.journey = { savedAt: new Date().toISOString(), settings: body.settings };
+      return route.fulfill(json(w.journey));
+    }
+    if (/^\/v1\/screens\/[^/]+\/action$/.test(path) && m === 'POST') return route.fulfill(json({ ok: true, delivered: false, queued: true }));
+    if (/^\/v1\/screens\/[^/]+\/settings$/.test(path) && m === 'PUT') return route.fulfill(json({ savedAt: new Date().toISOString(), settings: body.settings, dropped: [] }));
     if (path === '/v1/tonight/overview') return route.fulfill(json(w.overview));
     if (path === '/v1/switches' && m === 'GET') {
       return route.fulfill(json({ rev: w.switches.rev, updatedAt: w.switches.updatedAt, by: w.switches.by, stored: true, switches: w.switches.list, stations: w.switches.stations }));

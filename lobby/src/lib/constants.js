@@ -112,6 +112,15 @@ export const NOTICE_MAX_AGE_MS = 4 * 60 * 60 * 1000;
 // rather than inline at the one call site.
 export const EMBED_FULLSCREEN_MESSAGE = 'awana-display:toggle-fullscreen';
 
+// The sync service's doorbell, passed UP to the Journey kiosk (which has no
+// live channel of its own): {type, what, id?}, posted to the parent at THIS
+// page's own origin only (the kiosk is same-origin), and only 'journey' (the
+// room settings changed) and 'screen' / 'screen-action' with a screen id
+// (lib/embed.js hostDoorbell). Journey's public/src/sync.js listens, checks
+// event.source is its own iframe, and asks the service at once. Both sides
+// spell the string the same way (journey/CLAUDE.md "room sync").
+export const EMBED_DOORBELL_MESSAGE = 'awana-display:sync-doorbell';
+
 // Self-updating pages (see CLAUDE.md, "Self-updating pages"). A display that
 // has been running for days polls version.json this often, and again on the
 // browser's `online` event no more than once per BUILD_ONLINE_MIN_MS, because

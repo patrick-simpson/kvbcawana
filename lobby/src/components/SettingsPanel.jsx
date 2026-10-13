@@ -16,7 +16,7 @@ import { initialMission } from '../lib/missionControl.js';
 import { isSharedKey, pickShared } from '../lib/sharedSettings.js';
 import { ZeroAnimationContext } from '../lib/motion.jsx';
 import {
-  AccountSection, CelebrationsSection, CheckinsSection, ClassicLookSection, LookSection, PickupSection, PrintingSection,
+  AccountSection, CelebrationsSection, CheckinsSection, ClassicLookSection, JourneySection, LookSection, PickupSection, PrintingSection,
   ScreenSection, SetupSection, SharedSettingsCard, ShowSection, SlidesSection, StatusSection, TonightSection, statusProblems,
 } from './settings/sections/index.js';
 import TvPreview, { previewEnabled } from './settings/TvPreview.jsx';
@@ -168,7 +168,7 @@ export default function SettingsPanel({
   const problems = statusProblems({ opsFailures, layerFaults, remoteConfigError, wakeLockStatus, demoActive, status });
 
   const { signedIn } = useSync();
-  // The new seven-section rail, or today's (?rail=classic: deleted the release after the overhaul).
+  // The new rail (eight sections since the 2026-10-13 reorganize), or the old one (?rail=classic: deleted the release after the overhaul).
   const [rail] = useState(() => railProp ?? railMode());
   const classic = rail === 'classic';
   const sections = classic ? classicSectionsFor(page, { remote: Boolean(screen) }) : sectionsFor(page, { remote: Boolean(screen) });
@@ -486,7 +486,9 @@ export default function SettingsPanel({
   } else if (section === 'look' && !classic) {
     body = <LookSection {...props} {...slidesProps} />;
   } else if (section === 'printing') {
-    body = <PrintingSection />;
+    body = <PrintingSection goTo={goTo} />;
+  } else if (section === 'journey') {
+    body = <JourneySection goTo={goTo} />;
   } else if (section === 'account') {
     body = <AccountSection {...props} {...accountProps} />;
   } else if (section === 'checkins') {

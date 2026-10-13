@@ -77,7 +77,7 @@ import {
 } from './lib/milestones.js';
 import { receiveSharedSettings, setRemoteDefaults, setSharedLocally } from './hooks/useConfig.js';
 import { publishSettings } from './lib/publishSettings.js';
-import { publishViaSync, useSync, useSyncDriver } from './hooks/useSync.js';
+import { onSyncDoorbell, publishViaSync, useSync, useSyncDriver } from './hooks/useSync.js';
 import { MISSION_HIDDEN_CLEAR_MS, initialMission, reduceMission } from './lib/missionControl.js';
 import { loadPublishToken } from './lib/publishToken.js';
 import { FLEET_CONFIG_URL_CHANGE_EVENT, loadFleetConfigUrl, resolveRemoteConfigUrl } from './lib/fleetConfigUrl.js';
@@ -92,7 +92,7 @@ import {
 import { useWatchdogReload } from './hooks/useWatchdogReload.js';
 import { useBuildReload } from './hooks/useBuildReload.js';
 import { useTallerThan } from './hooks/useTallerThan.js';
-import { isEmbedded } from './lib/embed.js';
+import { hostDoorbell, isEmbedded } from './lib/embed.js';
 import { isConfigureMode, isSettingsPage, listenForRelay, relayToScreen } from './lib/configureRelay.js';
 import { BACKGROUND_VIDEO_CHANGED_EVENT } from './components/VideoBackground.jsx';
 import { BOARD_DEMO_MS, BUILD_QUIET_MS, SHARE_DEBOUNCE_MS, COUNTS_WITHOUT_NAMES_MS, TONIGHT_STALE_MS, DROPPED_GRACE_MS, EMBED_FULLSCREEN_MESSAGE, GEAR_IDLE_MS, LAYER_FAULT_SHOW_MS, MILESTONE_TOAST_MS, OPS_FAILURES_MAX, SETUP_CARD_QUIET_MS } from './lib/constants.js';
@@ -1291,6 +1291,20 @@ export default function App() {
       else if (action === 'media-changed') window.dispatchEvent(new Event(BACKGROUND_VIDEO_CHANGED_EVENT));
     });
   }, [previewCheckIn, resetTonight, startBoardDemo]);
+
+  // Journey's embedded copy passes the sync service's doorbell up to the
+  // kiosk page, which has no live channel of its own, so a change or a
+  // command from /settings → Journey reaches it in a second or two instead of
+  // at its next poll (lib/embed.js hostDoorbell: the word and a screen id,
+  // nothing else; this origin only).
+  useEffect(() => {
+    if (CONFIGURE || !isEmbedded()) return undefined;
+    return onSyncDoorbell((what, payload) => {
+      const message = hostDoorbell(what, payload);
+      if (!message) return;
+      try { window.parent.postMessage(message, window.location.origin); } catch { /* no parent to tell */ }
+    });
+  }, []);
 
   // Managed from /settings (ROADMAP.md#settings-page, phase 2): a real screen registers
   // with the sync Worker, follows its own settings there as its device layer,

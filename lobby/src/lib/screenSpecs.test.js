@@ -58,8 +58,19 @@ describe("the lobby's screen settings", () => {
 });
 
 describe('the other kinds', () => {
-  it('Journey has no device setting of its own (the Pi mode is gone)', () => {
-    expect(SCREEN_SPECS.journey).toEqual({});
+  it('Journey keeps only its two lesson-download switches (the Pi mode is gone)', () => {
+    expect(SCREEN_SPECS.journey).toEqual({ downloadsAuto: { type: 'bool' }, downloadsLeader: { type: 'bool' } });
+    expect(sanitizeScreenSettings('journey', { downloadsAuto: false, downloadsLeader: 'yes', playbackQuality: 'low' })).toEqual({ downloadsAuto: false });
+  });
+
+  it("Journey's actions are exactly its five download buttons, with no data, and the kiosk page knows the same five", () => {
+    expect(SCREEN_ACTIONS.journey).toEqual(['start-downloads', 'pause-downloads', 'resume-downloads', 'stop-downloads', 'delete-downloads']);
+    expect(sanitizeScreenAction('journey', 'delete-downloads', { all: true })).toEqual({ action: 'delete-downloads' });
+    expect(sanitizeScreenAction('journey', 'pick')).toBeNull();
+    expect(sanitizeScreenAction('lobby', 'start-downloads')).toBeNull();
+    const sync = readFileSync(resolve(__dirname, '../../../journey/public/src/sync.js'), 'utf8');
+    const listed = /var REMOTE_ACTIONS = \[([^\]]*)\]/.exec(sync)?.[1].match(/'[a-z-]+'/g)?.map((x) => x.slice(1, -1));
+    expect(listed).toEqual([...SCREEN_ACTIONS.journey]);
   });
 
   it("the projector's actions are the configure relay's, and a wall pick is checked like the projector checks it", () => {
@@ -86,7 +97,7 @@ describe("a Journey kiosk's status (its saved lessons)", () => {
 
   it('keeps exactly the fixed shape, nothing else', () => {
     expect(sanitizeScreenStatus('journey', { lessons: { ...good, url: 'https://x', names: ['Ada'] }, other: 1 }))
-      .toEqual({ lessons: { ...good, known: true, supported: true } });
+      .toEqual({ lessons: { ...good, leaders: true, known: true, supported: true } });
   });
 
   it('an older kiosk page (no known/supported) reads as knowing; a new one says when it does not', () => {
@@ -109,7 +120,7 @@ describe("a Journey kiosk's status (its saved lessons)", () => {
         percent: 250, currentWeek: 0, lastSavedAt: 'yesterday', auto: 'on' },
     })?.lessons;
     expect(out).toEqual({ saved: 63, total: 63, bytesSaved: 0, bytesTotal: 0, downloading: false, waiting: false, paused: true,
-      percent: 100, currentWeek: null, lastSavedAt: null, error: null, auto: false, known: true, supported: true });
+      percent: 100, currentWeek: null, lastSavedAt: null, error: null, auto: false, leaders: true, known: true, supported: true });
   });
 
   it('the error is one short line of plain words', () => {
@@ -124,6 +135,8 @@ describe("a Journey kiosk's status (its saved lessons)", () => {
     expect(screenStatusMoved(clean, sanitizeScreenStatus('journey', { lessons: { ...good, known: false } }))).toBe(true);
     expect(screenStatusMoved(clean, sanitizeScreenStatus('journey', { lessons: { ...good, supported: false } }))).toBe(true);
     expect(screenStatusMoved(clean, sanitizeScreenStatus('journey', { lessons: { ...good, percent: 51 } }))).toBe(false);
+    expect(screenStatusMoved(clean, sanitizeScreenStatus('journey', { lessons: { ...good, leaders: false } }))).toBe(true);
+    expect(sanitizeScreenStatus('journey', { lessons: { ...good, leaders: 'no' } })?.lessons.leaders).toBe(true);
     const a = { lessons: good };
     expect(screenStatusMoved(a, { lessons: { ...good, percent: 51, bytesSaved: 13e9 } })).toBe(false);
     expect(screenStatusMoved(a, { lessons: { ...good, percent: 52 } })).toBe(true);

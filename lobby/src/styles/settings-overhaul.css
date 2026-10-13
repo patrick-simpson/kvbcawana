@@ -165,3 +165,21 @@
   .panel .mission-count__total { font-size: 2.8rem; }
   .panel .change-row { flex-direction: column; }
 }
+
+/* ── Journey → Lessons on the Journey PCs ────────────────────────────────── */
+.panel .kiosk-lessons .screen-row__body { display: grid; gap: 0.5rem; }
+.panel .kiosk-lessons__progress { display: grid; gap: 0.3rem; }
+.panel .kiosk-lessons__bar {
+  position: relative;
+  height: 0.7rem;
+  border-radius: 999px;
+  background: var(--brand-cloud);
+  box-shadow: inset 0 0 0 1.5px var(--panel-keyline);
+  overflow: hidden;
+}
+.panel .kiosk-lessons__fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: var(--brand-journey);
+}
+.panel .kiosk-lessons__buttons { display: flex; flex-wrap: wrap; gap: 0.5rem; }
