@@ -18,6 +18,8 @@
 //
 // Every route here assumes the caller has ALREADY checked the session.
 
+import { TrendsImport } from './trendsimport.js';
+
 /** @typedef {{ get(k: string): Promise<any>, put(k: any, v?: any): Promise<void>, delete(k: any): Promise<any>, list?(o?: any): Promise<Map<string, any>> }} Storage */
 
 export const ROWS_BODY_MAX = 256 * 1024;
@@ -464,9 +466,30 @@ export class History {
     if (!r) return fail('from and to are YYYY-MM-DD.', 400, { reason: 'bad-range' });
     const db = await this.readyDb();
     if (!db) return this.off();
-    const res = await db.prepare('SELECT night, club, checked_in AS checkedIn, checked_out AS checkedOut, undone, prints FROM night_summary WHERE night BETWEEN ?1 AND ?2 ORDER BY night, club LIMIT ?3')
-      .bind(r.from, r.to, SUMMARY_MAX).all();
-    return out(res.results || []);
+    // The desk's live lines, plus the trends back-fill's imported counts
+    // (trendsimport.js, migration 0003) for every night and club that has NO
+    // live line: a night is never counted twice, and the live count wins. An
+    // imported line is `checkedIn` only, marked `imported: true`. Past
+    // SUMMARY_MAX the OLDEST lines are left out, never the newest.
+    const live = 'SELECT night, club, checked_in AS checkedIn, checked_out AS checkedOut, undone, prints, 0 AS imported FROM night_summary WHERE night BETWEEN ?1 AND ?2';
+    let res;
+    try {
+      res = await db.prepare(`SELECT night, club, checkedIn, checkedOut, undone, prints, imported FROM (${live} `
+        + 'UNION ALL SELECT i.night, i.club, i.attended, 0, 0, 0, 1 FROM night_summary_import i WHERE i.night BETWEEN ?1 AND ?2 '
+        + 'AND NOT EXISTS (SELECT 1 FROM night_summary s WHERE s.night = i.night AND s.club = i.club) '
+        + 'ORDER BY night DESC, club DESC LIMIT ?3) ORDER BY night, club')
+        .bind(r.from, r.to, SUMMARY_MAX).all();
+    } catch (err) {
+      // Migration 0003 not applied yet: the live lines alone, as before it.
+      if (!/no such table/i.test(String(err && /** @type {any} */ (err).message || err))) throw err;
+      res = await db.prepare(`SELECT * FROM (${live} ORDER BY night DESC, club DESC LIMIT ?3) ORDER BY night, club`).bind(r.from, r.to, SUMMARY_MAX).all();
+    }
+    const lines = res.results || [];
+    for (const l of lines) {
+      if (l.imported) l.imported = true;
+      else delete l.imported;
+    }
+    return out(lines);
   }
 
   off() {
@@ -486,6 +509,17 @@ export function mountHistory(registry, core) {
   for (const route of ROUTES) {
     const [method, pattern] = route.split(' ');
     registry.add(method, pattern, 'session', ({ request, url }) => core.history.handle(request, url));
+  }
+  // The trends back-fill (trendsimport.js, routes.md section 3): it runs from the
+  // watcher's alarm by itself; this is its status, and asking nudges the alarm
+  // when a season read is due (so a first deploy does not wait for the cron).
+  if (core.watcher) {
+    core.trends = new TrendsImport({ storage: core.storage, env: core.env, now: core.now, watcher: core.watcher });
+    core.watcher.trends = core.trends;
+    registry.add('GET', '/v1/history/import-status', 'session', async () => {
+      try { await core.trends.kick(); } catch (err) { console.error('[trends] could not set the alarm', err); }
+      return out(await core.trends.statusView());
+    });
   }
   const desk = core.desk;
   if (!desk) return;

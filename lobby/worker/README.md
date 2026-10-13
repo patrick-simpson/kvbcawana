@@ -113,7 +113,8 @@ schedule (`src/routes.md` sections 5 and 8): tonight's first names for the
 pickup list (`tonight:book`), who brought a friend (3 days), and, so a restart
 does not leave the check-in page waiting, tonight's check-in page roster
 (`desk:page`: clubber ids, full names, clubs, checked-in marks), deleted when
-the watch window closes.
+the watch window closes. The trends back-fill (below) keeps counts only: D1
+`night_summary_import` and `trends:import` (seasons, times, fixed codes).
 
 ## Developing
 
@@ -146,6 +147,7 @@ All JSON. Every route but the first three needs `Authorization: Bearer
 | `POST /v1/passphrase` `{current, next, rotateKey?}` | `{session, displayKey, rotatedKey}` |
 
 | `GET /v1/cloud/status` | the cloud check-in watcher: `{mode, configured, windowOpen, readIntervalSec, watchIntervalSec, budget: {intervalMs, interactiveWaitMs, readyInMs, reportReservedInMs, taken, refused, reportBumps, displaced}, deskPage: {held, readAt}, families: {held, readAt, waiting, lookedFor, catchUps}, checkedIn, byClub, tonight, lastError, checkinPage, log, ...}`, counts and fixed codes only |
+| `GET /v1/history/import-status` | the trends back-fill: `{state, seasons: [{season, nights, importedAt}], oldestSeason, lastRunAt, nextDueAt, lastError, ...}`, fixed codes only (`src/routes.md` section 3) |
 | `POST /v1/cloud/read-now` | one report read now, on any day (a rehearsal), never within 15 s of any read: `{ok, verdict?, error?, throttled?, status}` |
 
 Changes to the template, Journey's settings and the calendar ring a plaintext
@@ -231,3 +233,19 @@ Safety: a report with fewer children than its own `Count:` footers is partial
 and changes nothing; a read that would drop more than half the room is
 refused; a refused sign-in waits 5, then 15, then 60 minutes; every request is
 https to the one TwoTimTwo host and a redirect anywhere else is refused.
+
+## Trends back-fill (`src/trendsimport.js`, owner 2026-10-13)
+
+So the History section's trends reach back before the desk, the Worker reads
+TwoTimTwo's Attendance Summary (`/report/attendance_summary?year_start=<year>&output=csv`:
+a count per club per meeting, no names) by itself: the current season first,
+then one season further back per read until a season has no meetings (20 at
+most), and the current season once more after every club night's window
+closes (late paper sheets). It runs from the watcher's alarm only outside the
+watch window, at the lowest priority on the one read clock, and only with the
+`TWOTIMTWO_*` secrets, cloud check-in not off and `HISTORY_DB` bound. A report
+that does not read exactly as expected stores nothing (tried again daily, 3
+times). Counts go to D1 `night_summary_import` (migration 0003); the trends'
+summary answers the desk's live line where one exists, else the imported one,
+so nothing is counted twice. `GET /v1/history/import-status` says how far it
+got; `src/routes.md` section 3 has the details.

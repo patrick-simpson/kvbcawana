@@ -57,7 +57,7 @@ export function checkoutPage({ calendarId = '368', date = '2026-10-14', rows = [
  * A stand-in TwoTimTwo: /site/login with a CSRF token and a session cookie,
  * a signed-in report, and the login form for anything without the cookie.
  */
-export function fakeTwoTimTwo({ password = 'right-pass', report = () => page(table('Sparks ', [{ id: 1, name: 'Ada Tester' }])), checkin = () => CHECKIN_PAGE, checkout = () => checkoutPage(), households = null } = {}) {
+export function fakeTwoTimTwo({ password = 'right-pass', report = () => page(table('Sparks ', [{ id: 1, name: 'Ada Tester' }])), checkin = () => CHECKIN_PAGE, checkout = () => checkoutPage(), households = null, attendance = null } = {}) {
   const calls = [];
   let session = 0;
   const live = new Set();
@@ -87,6 +87,12 @@ export function fakeTwoTimTwo({ password = 'right-pass', report = () => page(tab
       const h = households();
       if (h instanceof Response) return h;   // a refusal (403), as TwoTimTwo sends one
       return new Response(h, { status: 200, headers: { 'Content-Type': 'application/csv' } });
+    }
+    // The Attendance Summary CSV (trendsimport.js): `attendance(yearStart)` answers a CSV, or a Response.
+    if (u.pathname === '/report/attendance_summary' && attendance) {
+      const a = attendance(u.searchParams.get('year_start'), u.searchParams.get('output'));
+      if (a instanceof Response) return a;
+      return new Response(a, { status: 200, headers: { 'Content-Type': 'application/csv' } });
     }
     if (u.pathname === '/clubber/checkinclubber' && init.method === 'POST') {
       state.checkins.push(body);

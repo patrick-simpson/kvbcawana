@@ -242,6 +242,8 @@ export class Watcher {
     this.ym = null;
     /** The desk (desk.js): set by SyncCore; the watcher warms its check-in page and catches its families up. @type {import('./desk.js').Desk|null} */
     this.desk = null;
+    /** The trends back-fill (trendsimport.js): set by mountHistory; the watcher only gives it a turn of the closed-window alarm. @type {import('./trendsimport.js').TrendsImport|null} */
+    this.trends = null;
     /** Children held on the report by a desk operation (barf.js): clubber id -> {entry, until}. Memory only. @type {Map<string, { entry: any, until: number }>} */
     this.holds = new Map();
     this.alarms = alarms || { set() {}, get: () => null };
@@ -389,6 +391,8 @@ export class Watcher {
         try { await this.ym.step(); } catch (err) { console.error('[cloud] youth check-out failed', err); }
         next = this.ymWake(next);
       }
+      // The trends back-fill (trendsimport.js): one season read at the lowest priority, never in the window.
+      if (this.trends) next = await this.trends.onAlarm(next);
     } else {
       await this.budget.load();
       await this.adopt?.load();
