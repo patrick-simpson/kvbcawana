@@ -455,6 +455,9 @@ sup { font-size: .55em; line-height: 0; vertical-align: .9em; }
 .kv-proj__digits b { font: 400 14cqw/1 var(--shout); color: #fff; font-variant-numeric: tabular-nums; }
 .kv-proj__digits i { font: 400 4.4cqw/1 var(--label); font-style: normal; color: var(--sun); margin-right: 1.6cqw; text-transform: uppercase; }
 .kv-proj__chip { font-size: 1.9cqw; margin-top: 4cqw; }
+.kv-proj__wx { position: absolute; z-index: 3; right: 3.4cqw; top: 6.6cqw; display: inline-flex; align-items: center; gap: .6cqw; padding: .55cqw 1.4cqw .5cqw .9cqw; font: 400 2.2cqw/1 var(--label); letter-spacing: .08em; text-transform: uppercase; white-space: nowrap; color: #fff; background: var(--brand-blue-deep); border-radius: 999px; box-shadow: .35cqw .35cqw 0 #1b2c4f; }
+.kv-proj__wx svg { flex: none; width: 2.8cqw; height: 2.8cqw; }
+.kv-proj__cloud { position: absolute; overflow: visible; z-index: -1; left: 0; top: 33cqw; width: 26cqw; height: auto; transform: translateX(30%); }
 .kv-proj__star { position: absolute; width: .9cqw; height: .9cqw; border-radius: 50%; background: #fff; }
 .kv-proj__star--a { left: 12cqw; top: 14cqw; } .kv-proj__star--b { right: 14cqw; top: 22cqw; } .kv-proj__star--c { left: 22cqw; bottom: 9cqw; }
 .kv-proj__game { --c: var(--brand-tnt); --c-deep: var(--brand-tnt-deep); }
@@ -812,6 +815,7 @@ sup { font-size: .55em; line-height: 0; vertical-align: .9em; }
   @keyframes kv-slam { 0% { opacity: 0; transform: scale(2.2) rotate(-4deg); } 55% { opacity: 1; transform: scale(.94); } 75% { transform: scale(1.03); } 100% { opacity: 1; transform: none; } }
   @keyframes kv-grow-x { 0% { transform: scaleX(0); } 100% { transform: none; } }
   @keyframes kv-pulse { 0%, 100% { opacity: .45; } 50% { opacity: .9; } }
+  @keyframes kv-cloud { 0% { transform: translateX(-110%); } 100% { transform: translateX(420%); } }
   @keyframes kv-twinkle { 0%, 100% { opacity: 1; } 50% { opacity: .2; } }
   @keyframes kv-led { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
   @keyframes kv-sticker { 0% { transform: rotate(12deg) scale(0); } 70% { transform: rotate(12deg) scale(1.08); } 100% { transform: rotate(12deg) scale(1); } }
@@ -847,6 +851,8 @@ sup { font-size: .55em; line-height: 0; vertical-align: .9em; }
   .kv-moment__d1 { animation: kv-pop .46s var(--pop) .8s both; } .kv-moment__d2 { animation: kv-pop .46s var(--pop) .9s both; } .kv-moment__d3 { animation: kv-pop .46s var(--pop) 1s both; }
   .kv-pickup { animation: kv-settle .52s var(--settle) both; }
   .kv-proj__view { animation: kv-fade .5s both; }
+  /* The cloud's resting place IS its still frame; the loop starts there (negative delay) and only moves it across, slowly. */
+  .kv-proj__cloud { animation: kv-cloud 80s linear -21.1s infinite; }
   .kv-proj__star { animation: kv-twinkle 2.4s ease-in-out infinite; }
   .kv-proj__star--b { animation-delay: -.8s; } .kv-proj__star--c { animation-delay: -1.6s; }
   .kv-proj__game .kv-proj__wave--bottom { animation: kv-rise .64s var(--wipe) both; }

@@ -212,6 +212,14 @@ export const LobbyArt: React.FC<{ on: boolean }> = ({ on }) => {
 
 /* ── The projector ────────────────────────────────────────────────────────── */
 
+/*
+ * The projector's weather (lobby WeatherScene.jsx: flat shapes, a hard offset
+ * shadow, a label chip top-right level with the mark). The cloud's path is the
+ * real one, in its 120 x 60 box: four bumps on a flat base. The chip is a
+ * sample reading, not real data.
+ */
+const WX_CLOUD = 'M14 56 A15 15 0 0 1 20 30 A19 19 0 0 1 52 14 A22 22 0 0 1 92 22 A19 19 0 0 1 106 56 Z';
+
 export const ProjectorArt: React.FC<{ on: boolean }> = ({ on }) => {
   const view = useCycle(2, 5200, on);
   const [secs, setSecs] = useState(107);
@@ -223,12 +231,22 @@ export const ProjectorArt: React.FC<{ on: boolean }> = ({ on }) => {
     return () => window.clearInterval(t);
   }, [on, view]);
   return (
-    <div className="kv-scr kv-proj" role="img" aria-label="Recreation of the main-room projector. All week it counts down to the next club night on black, Awana begins in 2 days 4 hours 12 minutes. On club night each club's game slot gets its own screen: GAME TIME for T&T in green, with a timer at 1:47 that has turned amber two minutes before the handoff.">
+    <div className="kv-scr kv-proj" role="img" aria-label="Recreation of the main-room projector. All week it counts down to the next club night on black, Awana begins in 2 days 4 hours 12 minutes. A small weather chip, Cloudy 54 degrees, sits top right, and one flat cartoon cloud drifts slowly behind the numbers. On club night each club's game slot gets its own screen: GAME TIME for T&T in green, with a timer at 1:47 that has turned amber two minutes before the handoff.">
       <span className="kv-proj__roller" />
       <div className="kv-proj__screen">
         {view === 0 ? (
           <div className="kv-proj__view kv-proj__count" key="count">
+            <svg className="kv-proj__cloud" viewBox="0 0 120 60" aria-hidden="true" focusable="false">
+              <g opacity=".7">
+                <path d={WX_CLOUD} transform="translate(4 5)" fill="var(--brand-blue-deep)" />
+                <path d={WX_CLOUD} fill="var(--sky)" />
+              </g>
+            </svg>
             <img className="kv-proj__mark" src={AWANA_WHITE} alt="" />
+            <span className="kv-proj__wx" aria-hidden="true">
+              <svg viewBox="0 0 24 24" focusable="false"><path d={WX_CLOUD} transform="translate(0 4) scale(.2)" fill="var(--cloud)" /></svg>
+              Cloudy · 54°F
+            </span>
             <span className="kv-proj__kicker">Awana begins in</span>
             <span className="kv-proj__digits"><b>2</b><i>d</i><b>04</b><i>h</i><b>12</b><i>m</i></span>
             <StepChip className="kv-proj__chip" label="Wednesday" value="6:00 pm" />
