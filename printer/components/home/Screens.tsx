@@ -333,15 +333,14 @@ const JourneyView: React.FC<{ step: JourneyStep; enter?: string }> = ({ step, en
             <span className="kv-jv__begin"><Ico name="play" />Begin Video</span>
             <span className="kv-jv__skip">Skip to slides</span>
           </span>
-          <span className="kv-jv__hint">or press Space / → begin · Shift+→ slides · S settings</span>
         </div>
       );
     case 'journey':
       return <div className={cls}><JourneyWave /><img className="kv-jv__bigmark" src={club('journey').white} alt="" /></div>;
     case 'advocates':
-      return <div className={cls}><span className="kv-jv__kicker">This year’s study</span><span className="kv-jv__shout">Advocates</span></div>;
+      return <div className={cls}><JourneyWave /><span className="kv-jv__kicker">This year’s study</span><span className="kv-jv__shout">Advocates</span></div>;
     case 'lesson':
-      return <div className={cls}><span className="kv-jv__kicker">Week 7</span><span className="kv-jv__shout">Lesson</span></div>;
+      return <div className={cls}><JourneyWave /><span className="kv-jv__kicker">Week 7</span><span className="kv-jv__shout">Lesson</span></div>;
     case 'lgt':
       return <div className={cls}><JourneyWave /><span className="kv-jv__shout kv-jv__shout--lgt">Large Group Time</span><span className="kv-jv__rule" /></div>;
     case 'play':
@@ -373,7 +372,7 @@ export const KioskArt: React.FC<{ on: boolean }> = ({ on }) => {
   const { step, via } = JOURNEY_STEPS[state.cur];
   const prev = state.prev >= 0 ? JOURNEY_STEPS[state.prev].step : null;
   return (
-    <div className="kv-scr kv-kiosk" role="img" aria-label="Recreation of the Journey screen on the youth room's PC. At 6:30 its start screen waits on a deep indigo field: a purple corner tab reading Large Group Time, the Journey wordmark over the word Advocates, the week and the lesson (placeholders here), an orange Begin Video button and Skip to slides. When a leader presses Begin, title cards follow one another, Journey, Advocates, the week's lesson and Large Group Time, then a striped band in Journey's colours sweeps across and carries the last card away to the lesson, which plays with a caption line and a control bar: back and skip 15 seconds, pause, sound, captions and a progress bar. The teaching slides follow on their own stage with Back and Next buttons. The lesson, its caption and the slides are left blank in this picture.">
+    <div className="kv-scr kv-kiosk" role="img" aria-label="Recreation of the Journey screen on the youth room's PC. At 6:30 its start screen waits on a deep indigo field: a purple corner tab reading Large Group Time, a small Journey wordmark over the word Advocates at the top, then the week and, largest of all, the lesson's name (placeholders here), an orange Begin Video button and Skip to slides. When a leader presses Begin, title cards follow one another, Journey, Advocates, the week's lesson and Large Group Time, then a striped band in Journey's colours sweeps across and carries the last card away to the lesson, which plays with a caption line and a control bar: back and skip 15 seconds, pause, sound, captions and a progress bar. The teaching slides follow on their own stage with Back and Next buttons. The lesson, its caption and the slides are left blank in this picture.">
       <div className="kv-kiosk__bezel">
         <div className="kv-kiosk__screen">
           {prev && via === 'wipe' && <JourneyView step={prev} key={`under-${state.n}`} />}
