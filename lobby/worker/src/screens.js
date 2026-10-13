@@ -21,6 +21,15 @@
 // is worse than none), and neither goes to Pusher. No child's name is ever in
 // any of it: a screen's settings are its chime, motion and the like.
 //
+// A Journey kiosk has no live channel of its own (journey/CLAUDE.md "room
+// sync"), so ITS actions (the lesson-download buttons, src/routes.md 10.8)
+// also wait here, in `screenq:<id>` {items: [{action, at}]}: at most
+// SCREEN_ACTION_QUEUE_MAX, each dropped after SCREEN_ACTION_TTL_MS, and handed
+// over in the kiosk's next hello's answer (`actions`), each one ONCE (the key
+// is deleted as it is read). The doorbell still rings, so the kiosk's embedded
+// Check-in Display (which does listen) can tell its host page to say hello at
+// once; with no doorbell the next two-minute hello carries it.
+//
 // A KVBC Awana computer (kind 'computer', ROADMAP.md#kvbc-awana-one-app) never turns its
 // print server off while a label is printing or waiting: it holds that change
 // and says so in each hello as `pendingRoleChange` (the settings it is
@@ -35,6 +44,9 @@
 // hello without one keeps the last.
 
 import {
+  SCREEN_ACTION_QUEUED_KINDS,
+  SCREEN_ACTION_QUEUE_MAX,
+  SCREEN_ACTION_TTL_MS,
   SCREEN_DEFAULT_NAMES,
   cleanScreenName,
   isScreenId,
@@ -59,6 +71,31 @@ export const STALE_MS = 30 * 24 * 60 * 60 * 1000;
 const INDEX = 'screens';
 /** @param {string} id */
 export const screenSettingsKey = (id) => `screen:${id}`;
+/** @param {string} id */
+export const screenQueueKey = (id) => `screenq:${id}`;
+
+/** @param {unknown} kind */
+const queuesActions = (kind) => /** @type {readonly unknown[]} */ (SCREEN_ACTION_QUEUED_KINDS).includes(kind);
+
+/**
+ * The actions still worth doing, in the order they were asked: each through
+ * the kind's allowlist again (a stored item is not trusted), none older than
+ * SCREEN_ACTION_TTL_MS, at most SCREEN_ACTION_QUEUE_MAX. Pure.
+ * @param {unknown} items @param {unknown} kind @param {number} now
+ * @returns {{action: string, at: string}[]}
+ */
+export function freshActions(items, kind, now) {
+  if (!Array.isArray(items)) return [];
+  /** @type {{action: string, at: string}[]} */
+  const out = [];
+  for (const item of items) {
+    const clean = sanitizeScreenAction(kind, item?.action);
+    const t = typeof item?.at === 'string' ? Date.parse(item.at) : NaN;
+    if (!clean || !Number.isFinite(t) || now - t > SCREEN_ACTION_TTL_MS || t - now > 60 * 1000) continue;
+    out.push({ action: clean.action, at: new Date(t).toISOString() });
+  }
+  return out.slice(-SCREEN_ACTION_QUEUE_MAX);
+}
 
 /**
  * @typedef {{id: string, kind: import('../../src/lib/syncSpecs.js').ScreenKind, name: string, createdAt: string, lastSeen: number,
@@ -181,7 +218,13 @@ export class Screens {
       await this.saveIndex(index);
     }
     if (status) this.fresh.set(id, status);
-    return { ok: true, body: { screen: this.view({ ...r, lastSeen: t }, this.liveScreens()), settings: await this.settingsOf(id) } };
+    const answer = { screen: this.view({ ...r, lastSeen: t }, this.liveScreens()), settings: await this.settingsOf(id) };
+    if (!queuesActions(kind)) return { ok: true, body: answer };
+    // What /settings asked of it since its last hello: handed over once.
+    const q = await this.storage.get(screenQueueKey(id));
+    if (q === undefined || q === null) return { ok: true, body: { ...answer, actions: [] } };
+    await this.storage.delete(screenQueueKey(id));
+    return { ok: true, body: { ...answer, actions: freshActions(q?.items, kind, t) } };
   }
 
   /**
@@ -195,6 +238,7 @@ export class Screens {
     delete index[oldest.id];
     this.fresh.delete(oldest.id);
     await this.storage.delete(screenSettingsKey(oldest.id));
+    await this.storage.delete(screenQueueKey(oldest.id));
     return true;
   }
 
@@ -259,13 +303,16 @@ export class Screens {
       await this.saveIndex(index);
     }
     await this.storage.delete(screenSettingsKey(id));
+    await this.storage.delete(screenQueueKey(id));
     return { ok: true, body: { forgotten: had } };
   }
 
   /**
    * POST /v1/screens/<id>/action {action, data?}: one of the kind's allowlisted
    * actions, rung on the live channel for that screen alone to act on.
-   * `delivered` says whether the screen was on the channel to hear it.
+   * `delivered` says whether the screen was on the channel to hear it. A kind
+   * without a live channel of its own (a Journey kiosk) gets it queued for its
+   * next hello instead (`queued: true`); a full queue is refused (429).
    * @param {string} id
    * @param {any} body
    * @returns {Promise<Result>}
@@ -275,7 +322,18 @@ export class Screens {
     if (!r) return refuse(404, 'There is no such screen. It may have been forgotten.');
     const clean = sanitizeScreenAction(r.kind, body?.action, body?.data);
     if (!clean) return refuse(400, 'That is not something this screen can be asked to do.');
-    this.ring({ what: 'screen-action', id, ...clean, at: new Date(this.now()).toISOString() });
+    const t = this.now();
+    const at = new Date(t).toISOString();
+    if (queuesActions(r.kind)) {
+      const waiting = freshActions((await this.storage.get(screenQueueKey(id)))?.items, r.kind, t);
+      if (waiting.length >= SCREEN_ACTION_QUEUE_MAX) {
+        return refuse(429, `${r.name} has not picked up the last ${SCREEN_ACTION_QUEUE_MAX} requests yet. Give it a minute, then try again.`);
+      }
+      await this.storage.put(screenQueueKey(id), { items: [...waiting, { action: clean.action, at }] });
+      this.ring({ what: 'screen-action', id, action: clean.action, at });
+      return { ok: true, body: { ok: true, delivered: false, queued: true } };
+    }
+    this.ring({ what: 'screen-action', id, ...clean, at });
     return { ok: true, body: { ok: true, delivered: this.liveScreens().has(id) } };
   }
 

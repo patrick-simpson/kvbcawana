@@ -551,7 +551,7 @@ export class SyncCore {
       if (hit) return await this.runRoute(hit, request, url, ip);
       const known = new Set([
         'GET /v1/state', 'PUT /v1/settings', 'PUT /v1/slides', 'PUT /v1/template',
-        'PUT /v1/journey', 'POST /v1/calendar/refresh', 'POST /v1/passphrase', 'POST /v1/publish',
+        'GET /v1/journey', 'PUT /v1/journey', 'POST /v1/calendar/refresh', 'POST /v1/passphrase', 'POST /v1/publish',
         'POST /v1/relay', 'GET /v1/relay/next', 'POST /v1/relay/answer', 'GET /v1/relay/result',
         'GET /v1/cloud/status', 'POST /v1/cloud/read-now', 'POST /v1/cloud/checkin',
         'POST /v1/cloud/friend', 'GET /v1/cloud/friends', 'POST /v1/cloud/friends-link', 'POST /v1/cloud/barf-bags',
@@ -565,6 +565,8 @@ export class SyncCore {
         case 'PUT /v1/settings': return await this.putSettings(request);
         case 'PUT /v1/slides': return await this.putSlides(request);
         case 'PUT /v1/template': return await this.putTemplate(request);
+        // The Journey room settings alone (/settings → Journey), without the deck /v1/state carries.
+        case 'GET /v1/journey': return json({ journey: (await this.storage.get('journey')) || null });
         case 'PUT /v1/journey': return await this.putJourney(request);
         case 'POST /v1/calendar/refresh': return await this.refreshCalendar({ minGapMs: CALENDAR_MANUAL_GAP_MS });
         case 'POST /v1/passphrase': return await this.changePassphrase(request, ip);

@@ -104,11 +104,16 @@ new one.
 The passphrase as a salted hash (never the word), the session-signing secret,
 the encryption key, the shared settings, the published slide deck, the screen
 template, Journey's room settings, and the church calendar. No names of
-children, ever: the laptop's check-in frames pass through sealed, and the
+children in the clear, ever: the laptop's check-in frames pass through sealed, and the
 cloud check-in watcher (below) reads TwoTimTwo's report in memory and keeps
 only counts, plus last read's clubber ids sealed under a key derived from the
 TwoTimTwo password secret. The TwoTimTwo password and its session cookie are
-never stored.
+never stored. Exceptions, each sealed under that same key and purged on
+schedule (`src/routes.md` sections 5 and 8): tonight's first names for the
+pickup list (`tonight:book`), who brought a friend (3 days), and, so a restart
+does not leave the check-in page waiting, tonight's check-in page roster
+(`desk:page`: clubber ids, full names, clubs, checked-in marks), deleted when
+the watch window closes.
 
 ## Developing
 
@@ -135,6 +140,7 @@ All JSON. Every route but the first three needs `Authorization: Bearer
 | `PUT /v1/settings` `{settings}` | `{rev, publishedAt, keyCount, broadcast}`; seals a `settings` frame (contract v6) |
 | `PUT /v1/slides` `{slides}` | `{deckRev, publishedAt, slideCount, droppedCount, broadcast}`; seals `slides` chunks (contract v5) |
 | `PUT /v1/template` `{config}` | `{savedAt, config}` |
+| `GET /v1/journey` | `{journey: {savedAt, settings} \| null}` (the room document alone; `src/routes.md` 10.8) |
 | `PUT /v1/journey` `{settings}` | `{savedAt, settings}` |
 | `POST /v1/calendar/refresh` | `{changed, generatedAt, checkedAt, clubCount, eventCount}`; 502 `{error}` keeps the last good copy |
 | `POST /v1/passphrase` `{current, next, rotateKey?}` | `{session, displayKey, rotatedKey}` |
@@ -163,7 +169,7 @@ one silent for a month.
 | `GET /v1/screens/<id>/settings` | `{screen, settings: {savedAt, settings} \| null}` |
 | `PUT /v1/screens/<id>/settings` `{settings}` | `{savedAt, settings, dropped}`; the whole layer, through the kind's allowlist |
 | `PUT /v1/screens/<id>/name` `{name}` | `{screen}` |
-| `POST /v1/screens/<id>/action` `{action, data?}` | `{ok, delivered}`; lobby: `preview-checkin`, `reset-tally`, `board-demo`; projector: `select`, `resume` |
+| `POST /v1/screens/<id>/action` `{action, data?}` | `{ok, delivered}`; lobby: `preview-checkin`, `reset-tally`, `board-demo`; projector: `select`, `resume`; journey: `start-downloads`, `pause-downloads`, `resume-downloads`, `stop-downloads`, `delete-downloads`, QUEUED (`{ok, delivered: false, queued: true}`, at most 5, 10 min) and handed over once in the kiosk's next hello answer (`actions`; `src/routes.md` 10.8) |
 | `DELETE /v1/screens/<id>` | `{forgotten}`; a screen still running comes back at its next hello |
 
 A settings change, a rename and an action ring the live channel only (never

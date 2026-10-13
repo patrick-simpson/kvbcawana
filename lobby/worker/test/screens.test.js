@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { SyncCore } from '../src/sync.js';
-import { ONLINE_MS, SCREENS_MAX, STALE_MS, screenSettingsKey } from '../src/screens.js';
+import { ONLINE_MS, SCREENS_MAX, STALE_MS, freshActions, screenQueueKey, screenSettingsKey } from '../src/screens.js';
 import { SHARED_KEYS } from '../../src/lib/sharedSettings.js';
-import { SCREEN_SPECS } from '../../src/lib/syncSpecs.js';
+import { SCREEN_ACTION_QUEUE_MAX, SCREEN_ACTION_TTL_MS, SCREEN_SPECS } from '../../src/lib/syncSpecs.js';
 
 // The screen registry (ROADMAP.md#settings-page, phase 2): screens say hello, /settings
 // lists them and edits each one's OWN settings through the kind's allowlist,
@@ -250,7 +250,7 @@ describe('a screen\'s own settings', () => {
       saved: 24, total: 63, bytesSaved: 9e9, bytesTotal: 9e9, downloading: false, waiting: true, paused: false,
       percent: 100, currentWeek: 7, lastSavedAt: '2026-10-11T16:00:00.000Z', auto: true,
     });
-    expect(Object.keys(lessons).sort()).toEqual(['auto', 'bytesSaved', 'bytesTotal', 'currentWeek', 'downloading', 'error', 'known', 'lastSavedAt',
+    expect(Object.keys(lessons).sort()).toEqual(['auto', 'bytesSaved', 'bytesTotal', 'currentWeek', 'downloading', 'error', 'known', 'lastSavedAt', 'leaders',
       'paused', 'percent', 'saved', 'supported', 'total', 'waiting']);
     expect(lessons).toMatchObject({ known: true, supported: true });
     expect(lessons.error.startsWith('Week 7 Leader Video: xxx')).toBe(true);
@@ -468,6 +468,104 @@ describe('actions', () => {
     await s.call('POST', '/v1/screens/hello', { id: TV, kind: 'lobby' });
     await s.call('POST', `/v1/screens/${TV}/action`, { action: 'reset-tally' });
     expect((await s.core.replayFrames()).some((f) => f.includes('screen-action'))).toBe(false);
+  });
+});
+
+describe("a Journey kiosk's actions wait for its next hello (routes.md 10.8)", () => {
+  const ACTIONS = ['start-downloads', 'pause-downloads', 'resume-downloads', 'stop-downloads', 'delete-downloads'];
+
+  it('only the five download buttons, queued (not delivered), and rung for the embedded display to pass on', async () => {
+    const s = setup();
+    await s.signIn();
+    await s.call('POST', '/v1/screens/hello', { id: KIOSK, kind: 'journey' });
+    for (const bad of ['pick', 'preview-checkin', 'reset-tally', 'select', 'delete-everything', '']) {
+      expect((await s.call('POST', `/v1/screens/${KIOSK}/action`, { action: bad })).status, bad).toBe(400);
+    }
+    expect(await s.storage.get(screenQueueKey(KIOSK))).toBeUndefined();
+    const res = await s.call('POST', `/v1/screens/${KIOSK}/action`, { action: 'start-downloads', data: { weeks: [1, 2] } });
+    expect(res.body).toEqual({ ok: true, delivered: false, queued: true });
+    expect(s.frames.map((f) => f.d)).toEqual([{ what: 'screen-action', id: KIOSK, action: 'start-downloads', at: expect.any(String) }]);
+    expect((await s.storage.get(screenQueueKey(KIOSK))).items).toEqual([{ action: 'start-downloads', at: expect.any(String) }]);
+  });
+
+  it('the next hello hands them over in order, ONCE; the hello after has none', async () => {
+    const s = setup();
+    await s.signIn();
+    await s.call('POST', '/v1/screens/hello', { id: KIOSK, kind: 'journey' });
+    await s.call('POST', `/v1/screens/${KIOSK}/action`, { action: 'pause-downloads' });
+    s.tick(1000);
+    await s.call('POST', `/v1/screens/${KIOSK}/action`, { action: 'delete-downloads' });
+    const first = await s.call('POST', '/v1/screens/hello', { id: KIOSK, kind: 'journey' });
+    expect(first.body.actions.map((a) => a.action)).toEqual(['pause-downloads', 'delete-downloads']);
+    expect(await s.storage.get(screenQueueKey(KIOSK))).toBeUndefined();
+    const second = await s.call('POST', '/v1/screens/hello', { id: KIOSK, kind: 'journey' });
+    expect(second.body.actions).toEqual([]);
+    // A TV's hello carries no actions field at all (its actions ride the live channel).
+    expect((await s.call('POST', '/v1/screens/hello', { id: TV, kind: 'lobby' })).body).not.toHaveProperty('actions');
+  });
+
+  it('bounded: at most five waiting, the sixth is refused (429) and nothing is lost', async () => {
+    const s = setup();
+    await s.signIn();
+    await s.call('POST', '/v1/screens/hello', { id: KIOSK, kind: 'journey', name: 'Room 4 kiosk' });
+    for (let i = 0; i < SCREEN_ACTION_QUEUE_MAX; i++) {
+      expect((await s.call('POST', `/v1/screens/${KIOSK}/action`, { action: ACTIONS[i % ACTIONS.length] })).status).toBe(200);
+    }
+    const full = await s.call('POST', `/v1/screens/${KIOSK}/action`, { action: 'stop-downloads' });
+    expect(full.status).toBe(429);
+    expect(full.body.error).toMatch(/Room 4 kiosk has not picked up/);
+    expect((await s.call('POST', '/v1/screens/hello', { id: KIOSK, kind: 'journey' })).body.actions).toHaveLength(SCREEN_ACTION_QUEUE_MAX);
+    expect((await s.call('POST', `/v1/screens/${KIOSK}/action`, { action: 'stop-downloads' })).status).toBe(200);
+  });
+
+  it('a press older than ten minutes is dropped, both when queuing and when handing over', async () => {
+    const s = setup();
+    await s.signIn();
+    await s.call('POST', '/v1/screens/hello', { id: KIOSK, kind: 'journey' });
+    await s.call('POST', `/v1/screens/${KIOSK}/action`, { action: 'start-downloads' });
+    s.tick(SCREEN_ACTION_TTL_MS + 1000);
+    expect((await s.call('POST', '/v1/screens/hello', { id: KIOSK, kind: 'journey' })).body.actions).toEqual([]);
+    expect(freshActions([{ action: 'stop-downloads', at: new Date(0).toISOString() }, { action: 'nope', at: new Date().toISOString() }, 'junk', null], 'journey', Date.now())).toEqual([]);
+    expect(freshActions({ not: 'a list' }, 'journey', Date.now())).toEqual([]);
+    // A stored item for another kind's action is not trusted either.
+    const now = Date.now();
+    expect(freshActions([{ action: 'reset-tally', at: new Date(now).toISOString() }], 'journey', now)).toEqual([]);
+    expect(freshActions([{ action: 'reset-tally', at: new Date(now).toISOString() }], 'lobby', now)).toEqual([{ action: 'reset-tally', at: new Date(now).toISOString() }]);
+  });
+
+  it('forgetting the kiosk forgets what was waiting for it; a lobby TV never queues', async () => {
+    const s = setup();
+    await s.signIn();
+    await s.call('POST', '/v1/screens/hello', { id: KIOSK, kind: 'journey' });
+    await s.call('POST', '/v1/screens/hello', { id: TV, kind: 'lobby' });
+    await s.call('POST', `/v1/screens/${KIOSK}/action`, { action: 'stop-downloads' });
+    await s.call('DELETE', `/v1/screens/${KIOSK}`);
+    expect(await s.storage.get(screenQueueKey(KIOSK))).toBeUndefined();
+    await s.call('POST', `/v1/screens/${TV}/action`, { action: 'reset-tally' });
+    expect(await s.storage.get(screenQueueKey(TV))).toBeUndefined();
+  });
+
+  it('its two own settings are the download switches, and the hello answer carries them', async () => {
+    const s = setup();
+    await s.signIn();
+    await s.call('POST', '/v1/screens/hello', { id: KIOSK, kind: 'journey' });
+    const put = await s.call('PUT', `/v1/screens/${KIOSK}/settings`, { settings: { downloadsAuto: false, downloadsLeader: 'yes', captions: true } });
+    expect(put.body.settings).toEqual({ downloadsAuto: false });
+    expect(put.body.dropped).toEqual(['downloadsLeader', 'captions']);
+    expect((await s.call('POST', '/v1/screens/hello', { id: KIOSK, kind: 'journey' })).body.settings.settings).toEqual({ downloadsAuto: false });
+  });
+});
+
+describe('the Journey room settings alone', () => {
+  it('GET /v1/journey answers the room document (or null) behind a session, without the deck', async () => {
+    const s = setup();
+    expect((await s.call('GET', '/v1/journey')).status).toBe(401);
+    await s.signIn();
+    expect((await s.call('GET', '/v1/journey')).body).toEqual({ journey: null });
+    const put = await s.call('PUT', '/v1/journey', { settings: { captions: true, captionSize: '1.3', slideExtras: { questions: false }, junk: 1 } });
+    const got = (await s.call('GET', '/v1/journey')).body;
+    expect(got).toEqual({ journey: { savedAt: put.body.savedAt, settings: { captions: true, captionSize: '1.3', slideExtras: { questions: false } } } });
+    expect(got).not.toHaveProperty('slides');
   });
 });
 

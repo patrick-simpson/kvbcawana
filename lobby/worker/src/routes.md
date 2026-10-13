@@ -966,6 +966,7 @@ journey    (journey/public/src/sync.js, from journeyDownloadStatus(): saving eve
 status: { lessons: { saved, total,            // videos, ints 0..999, saved <= total
                      bytesSaved, bytesTotal,  // ints 0..1e13, bytesSaved <= bytesTotal
                      downloading, waiting, paused, auto,   // true or false
+                     leaders,                 // "Include Leader Videos" ticked (missing = true; 10.8)
                      percent,                 // int 0..100
                      currentWeek,             // int 1..99 while downloading, else null
                      lastSavedAt,             // ISO time (normalized) or null
@@ -998,7 +999,7 @@ status: { page: { build } }                   // first 7 hex of the build hash (
 - Storage writes (free Durable Object allowance): the status rides the
   existing once-a-minute `lastSeen` write (`SEEN_WRITE_MS`); sooner only when
   it moved enough to matter (`screenStatusMoved`): lessons `saved`, `total`,
-  `error`, `paused`, `downloading`, `waiting`, `auto`, `known` or
+  `error`, `paused`, `downloading`, `waiting`, `auto`, `leaders`, `known` or
   `supported` changed, or `percent` moved 10 or more; app `version` or
   update `state` changed, or `percent` moved 10 or more; page `build`
   changed. The newest status is also held in memory (`Screens.fresh`), so
@@ -1010,3 +1011,42 @@ status: { page: { build } }                   // first 7 hex of the build hash (
   or its download moves 10 points, never twice within a minute. A TV or
   projector only at its usual hellos (its build changes only by reloading).
   No CPU-heavy work: clamps and short string clean-ups.
+
+### 10.8 A Journey kiosk's commands, and the room document alone (BUILT, owner 2026-10-12)
+
+/settings → Journey works every Journey kiosk's "Lessons on this computer"
+(`journey/src/schedule/26-lesson-downloads.js`) and edits the room settings.
+A kiosk has no live channel of its own, so its commands WAIT in the Worker
+for its next hello.
+
+| Route | Auth | Request | Answer |
+| --- | --- | --- | --- |
+| `POST /v1/screens/<id>/action` (a `journey` screen) | session | `{action}`: `start-downloads` \| `pause-downloads` \| `resume-downloads` \| `stop-downloads` \| `delete-downloads` (`SCREEN_ACTIONS.journey`; `data` dropped) | `{ok, delivered: false, queued: true}`; 400 for anything else; 429 when `SCREEN_ACTION_QUEUE_MAX` (5) already wait |
+| `POST /v1/screens/hello` (a `journey` screen) | session | as 10.7 | as 10.7 plus `actions: [{action, at}]`: everything queued since its last hello, in order, each ONCE (the queue key is deleted as it is read); `[]` when none. Other kinds' answers have no `actions` field |
+| `GET /v1/journey` | session | | `{journey: {savedAt, settings} \| null}` (the room document alone, without the deck `/v1/state` carries) |
+
+- Storage: `screenq:<id>` `{items: [{action, at}]}`, at most 5 items, one key
+  per kiosk, written by the action, deleted by the next hello (or when the
+  screen is forgotten / makes room). An item older than
+  `SCREEN_ACTION_TTL_MS` (10 min) is dropped, both when queuing and when
+  handing over (a delete an hour late is worse than none); a stored item is
+  re-checked against the kind's allowlist (`freshActions`). One storage get
+  per Journey hello, one put per press, one delete per collection: well
+  inside the free allowance.
+- The doorbell still rings `changed {what: 'screen-action', id, action, at}`
+  (not replayed). The kiosk's embedded Check-in Display (the lobby page in its
+  iframe, which listens) posts `{type: 'awana-display:sync-doorbell', what,
+  id}` to its parent at its own origin (`lobby/src/lib/embed.js`
+  `hostDoorbell`); the kiosk (`journey/public/src/sync.js`) checks the sender
+  is its own iframe and the id is its own, and says hello at once (never twice
+  in 3 s). A `journey` ring makes it pull the room document at once. Without
+  the doorbell, the two-minute hello and ten-minute pull carry everything.
+- The kiosk runs each command through its own buttons' functions
+  (`journey/src/schedule/27-settings-page.js`); its two switches are its
+  screen settings (`SCREEN_SPECS.journey`: `downloadsAuto`,
+  `downloadsLeader`), taken from the hello's `settings` when they changed
+  there, sent up (`PUT /v1/screens/<id>/settings`) when changed on the kiosk.
+  Its status gains `lessons.leaders` (10.7 shape; missing = true).
+- `PUT /v1/journey` replaces the whole document: /settings reads the newest
+  first and changes only its own keys (`lib/journeyClient.js` `mergeJourney`,
+  through `sanitizeJourney`), so tonight's edited bullets ride along.
