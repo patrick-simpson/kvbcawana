@@ -257,7 +257,7 @@ export const ProjectorArt: React.FC<{ on: boolean }> = ({ on }) => {
             <Shape name="wave-tnt" stretch className="kv-proj__wave kv-proj__wave--top" />
             <Shape name="wave-tnt" stretch className="kv-proj__wave kv-proj__wave--bottom" />
             <img className="kv-proj__club" src={club('tnt').white} alt="" />
-            <span className="kv-proj__game-title">Game time!</span>
+            <span className="kv-proj__game-title">Game time</span>
             <span className="kv-proj__timer">{Math.floor(secs / 60)}:{String(secs % 60).padStart(2, '0')}</span>
             <StepChip className="kv-proj__chip kv-proj__chip--amber" label="Handoff in" value="2 min" />
           </div>
