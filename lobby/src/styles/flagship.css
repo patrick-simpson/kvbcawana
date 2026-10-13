@@ -12,14 +12,18 @@
   overflow: hidden;
   background: var(--brand-sky);
   color: #fff;
+}
+/* A name is on screen: the headline steps aside the way typed copy does
+   (app.css, "One hero at a time"), all the way, never a see-through ghost
+   behind the name; the slide's own field, clouds and doodles stay. */
+.flagship-copy {
   transform-origin: 50% 40%;
   transition:
     opacity var(--brand-dur-settle) var(--brand-ease-settle),
     transform var(--brand-dur-settle) var(--brand-ease-settle);
 }
-/* A name is on screen: the slide steps back the way typed copy does. */
-.stage.checkin-active .flagship {
-  opacity: 0.28;
+.stage.checkin-active .flagship .flagship-copy {
+  opacity: 0;
   transform: scale(0.97);
 }
 
@@ -99,4 +103,8 @@
    after left/right/top it wiped them, stacking both clusters at the frame's
    top-left corner. */
 .flagship-doodle-slot--left .flagship-doodles { inset: auto; left: calc(5 * var(--u)); top: calc(15 * var(--u)); width: calc(20 * var(--u)); height: calc(18 * var(--u)); }
-.flagship-doodle-slot--right .flagship-doodles { inset: auto; right: calc(5 * var(--u)); top: calc(15 * var(--u)); width: calc(20 * var(--u)); height: calc(18 * var(--u)); }
+/* The right cluster sits LOWER than the left (design review 2026-10-13):
+   the same height either side of the headline read as a mirrored, evenly
+   placed frame; on a diagonal the two pull across the title instead. Its
+   box ends at 45u, the lobby's safe bottom, above the house waves. */
+.flagship-doodle-slot--right .flagship-doodles { inset: auto; right: calc(5 * var(--u)); top: calc(27 * var(--u)); width: calc(20 * var(--u)); height: calc(18 * var(--u)); }

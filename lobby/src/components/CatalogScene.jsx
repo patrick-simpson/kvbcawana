@@ -42,6 +42,11 @@ export const THEMES = LOBBY_THEMES;
 // The field's clouds and doodles, from the mockup's lobbyBack(), as % of the
 // screen (a 16:9 screen gives exactly the mockup's cqw) so the studio fills
 // any aspect ratio; doodle widths are in u so they keep their own shape.
+// The two clusters of three sit on a DIAGONAL, high left and low right
+// (design review 2026-10-13): mirrored at one height either side of the
+// headline they read as a symmetrical frame, the evenly placed look of a
+// template, and the right one sat under the top-right stack. The low one
+// stays above the house waves and left of the corner chip.
 const CLOUDS = [
   { left: -8, top: -10.7, width: 52, height: 64, rotate: -8, drift: 'a' },
   { left: 62, top: 32, width: 48, height: 60.4, rotate: 14, drift: 'b' },
@@ -50,9 +55,9 @@ const FIELD_DOODLES = [
   { kind: 'squiggle', left: 9, top: 26.7, size: 3.2, motion: 'float', delay: 0 },
   { kind: 'sparkle', left: 14, top: 20.4, size: 2.4, motion: 'twinkle', delay: -1.1 },
   { kind: 'dot', left: 18.5, top: 28.4, size: 1, motion: 'float', delay: -3.4 },
-  { kind: 'zigzag', left: 86, top: 35.6, size: 3.4, motion: 'float', delay: -2.2 },
-  { kind: 'sparkleX', left: 82, top: 26.7, size: 2, motion: 'twinkle', delay: -2.6 },
-  { kind: 'ring', left: 90, top: 26.3, size: 1.3, motion: 'float', delay: -5.1 },
+  { kind: 'zigzag', left: 83, top: 66, size: 3.4, motion: 'float', delay: -2.2 },
+  { kind: 'sparkleX', left: 88.5, top: 60.5, size: 2, motion: 'twinkle', delay: -2.6 },
+  { kind: 'ring', left: 93, top: 66.5, size: 1.3, motion: 'float', delay: -5.1 },
 ];
 
 // One clock for every field's ambient loops: each field sets its CSS

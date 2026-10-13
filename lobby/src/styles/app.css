@@ -983,9 +983,13 @@ html, body, #root {
   height: calc(29.25 * var(--u));
 }
 
-/* One hero at a time: while a child's name is up, the slide behind it
-   steps back instead of competing with it, and comes forward again when
-   the wave drops. Plain CSS transitions, so ?lowPower=1's blanket rule
+/* One hero at a time: while a child's name is up, the slide's copy steps
+   aside instead of competing with it, and comes back when the wave drops.
+   All the way (opacity 0), not a faded ghost: a headline left at a quarter
+   strength showed through the field as a see-through double of itself
+   (face and shadow overlapping) behind the name (design review
+   2026-10-13). The field, its clouds and doodles stay, so the room still
+   sees the lobby. Plain CSS transitions, so ?lowPower=1's blanket rule
    turns them into an instant switch. The posters are left alone: they are
    printed art, and stage 4 holds check-ins while one is up. */
 .background-placeholder .placeholder-copy,
@@ -999,10 +1003,10 @@ html, body, #root {
    .manual-slide-copy and must keep showing what the TV will show. */
 .stage.checkin-active .background-placeholder .placeholder-copy,
 .stage.checkin-active .manual-slideshow .manual-slide-copy {
-  opacity: 0.28;
+  opacity: 0;
   transform: scale(0.97);
 }
-/* The same step back, all the way, for the one thing that takes the middle
+/* The same step aside for the one thing that takes the middle
    of the room over (rebrand stage 4b-2): a critical notice
    (src/lib/overlayFit.js lobbyRoom). Its opaque plate sits on the copy's own
    box, so a faded headline would only show as a ghost round its edges; it

@@ -50,7 +50,8 @@ const LAND_HOLD = 0.25;
 /**
  * Per-club game-time screen, the approved mockup: the club's catalog waves
  * along the top and bottom edges (its deep shade behind its colour), the
- * club's white mark, GAME TIME! in the club's colour, a clock to the
+ * club's white mark, GAME TIME in the club's colour (no exclamation mark:
+ * the shout is already the shout; design review 2026-10-13), a clock to the
  * window's end with club-coloured colons, a stepped chip "GAME ENDS /
  * 6:30 PM", official character art standing on the bottom wave, and a
  * small live "CHECKED IN" chip per club (the print server's tally
@@ -157,7 +158,7 @@ export const GameTimeView = ({ now, window: gameWindow, endsAt, tally }) => {
           </motion.div>
 
           <Headline
-            text="GAME TIME!"
+            text="GAME TIME"
             color={primary.color}
             size="var(--text-game-headline)"
             parts={{ start: 1, hold: LAND_HOLD }}

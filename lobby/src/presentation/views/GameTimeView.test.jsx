@@ -52,7 +52,8 @@ describe('GameTimeView wrap-up warning', () => {
 
   it('keeps the rest of the screen intact while warning, the end time included', () => {
     const { container } = render(view(60));
-    expect(container.textContent).toMatch(/GAME TIME!/);
+    expect(container.textContent).toMatch(/GAME TIME/);
+    expect(container.textContent).not.toMatch(/GAME TIME!/);
     // The warning chip carries the end time on its label.
     expect(container.querySelector('[data-warning]').textContent).toMatch(/GAME ENDS 6:30 PM/);
   });

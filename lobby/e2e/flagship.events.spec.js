@@ -38,7 +38,7 @@ async function boot(page, query = '') {
 const child = (name, n) => ({ id: `${name}-${n}`, firstName: name, club: 'sparks', at: new Date().toISOString(), isBirthday: false, isFirstTimer: false });
 
 for (const query of ['', '?lowPower=1']) {
-  test(`a name plays over the flagship at once, the slide steps back for it, and comes forward again ${query || '(with motion)'}`, async ({ page }) => {
+  test(`a name plays over the flagship at once, the headline steps aside for it, and comes back again ${query || '(with motion)'}`, async ({ page }) => {
     test.setTimeout(45_000);
     const send = await boot(page, query);
     await send('checkin', child('Maya', 1));
@@ -46,10 +46,12 @@ for (const query of ['', '?lowPower=1']) {
     await expect(page.locator('.checkin')).toBeVisible({ timeout: 3000 });
     await expect(page.locator('.corner-chip--waiting')).toHaveCount(0);
     await expect(page.locator('.stage')).toHaveClass(/checkin-active/);
-    // The slide behind steps back (its own transition settles in ~0.6 s; instant under ?lowPower=1).
-    await expect.poll(async () => Number(await page.locator('.flagship').evaluate((e) => getComputedStyle(e).opacity)), { timeout: 3000 }).toBeLessThan(0.4);
+    // The slide's headline steps aside, all the way (its own transition settles in ~0.6 s;
+    // instant under ?lowPower=1); its field stays.
+    await expect.poll(async () => Number(await page.locator('.flagship-copy').evaluate((e) => getComputedStyle(e).opacity)), { timeout: 3000 }).toBe(0);
+    expect(Number(await page.locator('.flagship').evaluate((e) => getComputedStyle(e).opacity))).toBe(1);
     await expect(page.locator('.checkin')).toHaveCount(0, { timeout: 12_000 });
-    await expect.poll(async () => Number(await page.locator('.flagship').evaluate((e) => getComputedStyle(e).opacity)), { timeout: 3000 }).toBe(1);
+    await expect.poll(async () => Number(await page.locator('.flagship-copy').evaluate((e) => getComputedStyle(e).opacity)), { timeout: 3000 }).toBe(1);
   });
 }
 

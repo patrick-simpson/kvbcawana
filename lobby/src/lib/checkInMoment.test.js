@@ -33,14 +33,23 @@ describe('kickerFor', () => {
 });
 
 describe('sublineFor', () => {
-  it('a birthday-week ribbon replaces the day-claiming tagline', () => {
-    expect(sublineFor('birthday')).toMatch(/special day/);
+  it('no stock tagline: a birthday with no ribbon and no phrase has no line', () => {
+    expect(sublineFor('birthday')).toBeNull();
     expect(sublineFor('birthday', { ribbon: 'Birthday this Friday!' })).toBe('Birthday this Friday!');
   });
 
-  it('first-timers and returning kids get their own line, and ignore phrase and ribbon', () => {
-    expect(sublineFor('first', { phrase: 'Go Sparks!' })).toMatch(/very first time/);
-    expect(sublineFor('back', { ribbon: 'Birthday this Friday!' })).toMatch(/brand-new season/);
+  it('first-timers and returning kids read like every arrival: the ribbon and the club phrase, or nothing', () => {
+    expect(sublineFor('first')).toBeNull();
+    expect(sublineFor('back')).toBeNull();
+    expect(sublineFor('first', { phrase: 'Go Sparks!' })).toBe('Go Sparks!');
+    expect(sublineFor('back', { ribbon: 'Birthday this Friday!' })).toBe('Birthday this Friday!');
+  });
+
+  it('never a filler line, an em dash or the old taglines', () => {
+    for (const m of ['birthday', 'first', 'back', 'welcome']) {
+      const line = sublineFor(m, { ribbon: null, phrase: null });
+      expect(line).toBeNull();
+    }
   });
 
   it('a plain welcome carries the ribbon and the club phrase, or nothing', () => {
@@ -54,8 +63,9 @@ describe('sublineFor', () => {
 });
 
 describe('stickerFor', () => {
-  it('only birthdays and first-timers get the hot sticker', () => {
-    expect(stickerFor('birthday')).toEqual(['Happy', 'birthday!']);
+  it('only birthdays and first-timers get the hot sticker, never repeating the kicker', () => {
+    expect(stickerFor('birthday').join(' ').toLowerCase()).not.toBe(kickerFor({}, 'birthday').toLowerCase());
+    expect(stickerFor('birthday')).toEqual(['Birthday', 'week']);
     expect(stickerFor('first')).toEqual(['New!']);
     expect(stickerFor('back')).toBeNull();
     expect(stickerFor('welcome')).toBeNull();

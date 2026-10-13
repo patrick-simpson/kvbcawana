@@ -45,28 +45,24 @@ export function kickerFor(event, moment) {
   return KICKERS[moment];
 }
 
-const TAGLINES = {
-  birthday: 'Hip hip hooray — it’s your special day!',
-  first: 'We’re so glad you’re here for the very first time!',
-  back: 'Welcome back for a brand-new season!',
-};
-
 /**
- * The one line under the name, or null.
+ * The one line under the name, or null: the birthday-week ribbon from
+ * src/lib/birthdayWeek.js ("Birthday this Friday!") and the club's own
+ * phrase (Settings), joined, whichever are there.
  *
- * `ribbon` is the birthday-week label from src/lib/birthdayWeek.js ("Birthday
- * this Friday!"). The printer's isBirthday flag covers the whole ISO week, so
- * on a birthday moment the ribbon REPLACES the day-claiming tagline: "it's
- * your special day" is simply wrong on Wednesday for a Friday birthday. On a
- * plain welcome it rides along with the club's phrase, if there is one.
+ * Every kind of arrival reads the same way (owner design review
+ * 2026-10-13): the kicker and the sticker already say what is special, so
+ * there is no stock tagline under the name. The old ones ("Hip hip hooray,
+ * it's your special day!", "We're so glad you're here for the very first
+ * time!", "Welcome back for a brand-new season!") repeated the kicker or the
+ * sticker in filler words, and the birthday one was wrong on a Wednesday for
+ * a Friday birthday (the printer's isBirthday flag covers the whole week).
  *
- * @param {Moment} moment
+ * @param {Moment} _moment
  * @param {{ ribbon?: string | null, phrase?: string | null }} extras
  * @returns {string | null}
  */
-export function sublineFor(moment, { ribbon = null, phrase = null } = {}) {
-  if (moment === 'birthday') return ribbon || TAGLINES.birthday;
-  if (moment === 'first' || moment === 'back') return TAGLINES[moment];
+export function sublineFor(_moment, { ribbon = null, phrase = null } = {}) {
   const parts = [ribbon, phrase].filter((p) => typeof p === 'string' && p.trim() !== '');
   return parts.length ? parts.join(' · ') : null;
 }
@@ -74,12 +70,14 @@ export function sublineFor(moment, { ribbon = null, phrase = null } = {}) {
 /**
  * The hot sticker's lines, or null. Birthdays and first-timers only: the
  * catalog uses its one hot sticker for what is new or special, and a
- * sticker on every arrival would stop meaning anything.
+ * sticker on every arrival would stop meaning anything. The birthday
+ * sticker states the fact the printer sends (a birthday this week) instead
+ * of repeating the kicker's "Happy birthday" a second time.
  * @param {Moment} moment
  * @returns {string[] | null}
  */
 export function stickerFor(moment) {
-  if (moment === 'birthday') return ['Happy', 'birthday!'];
+  if (moment === 'birthday') return ['Birthday', 'week'];
   if (moment === 'first') return ['New!'];
   return null;
 }

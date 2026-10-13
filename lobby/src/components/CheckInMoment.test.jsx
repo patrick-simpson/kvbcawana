@@ -46,8 +46,8 @@ describe('CheckInMoment', () => {
   // box opens for a mark that would meet the kicker above it or the line
   // under it, and for nothing else.
   it('gives a tall mark under the kicker room above the name, and only a tall mark', () => {
-    const pad = (firstName, extra) => {
-      const { container, unmount } = render(still(<CheckInMoment event={kid({ firstName, ...extra })} />));
+    const pad = (firstName, extra, props = {}) => {
+      const { container, unmount } = render(still(<CheckInMoment event={kid({ firstName, ...extra })} {...props} />));
       const { paddingTop, paddingBottom } = container.querySelector('.checkin__name').style;
       unmount();
       return { top: parseFloat(paddingTop), bottom: parseFloat(paddingBottom), paddingTop, paddingBottom };
@@ -59,8 +59,9 @@ describe('CheckInMoment', () => {
     expect(accent.top).toBeGreaterThan(0.1);
     expect(accent.bottom).toBe(0);
     // A comma under a capital needs room above the line under the name.
-    expect(pad('Stefan', { welcomeBack: true }).paddingBottom).toBe('0em');
-    const comma = pad('Ștefan', { welcomeBack: true });
+    const lined = { ribbon: 'Birthday this Friday!' };
+    expect(pad('Stefan', {}, lined).paddingBottom).toBe('0em');
+    const comma = pad('Ștefan', {}, lined);
     expect(comma.paddingBottom).toMatch(/^[\d.]+em$/);
     expect(comma.bottom).toBeGreaterThan(0.1);
     expect(comma.top).toBe(0);
@@ -115,9 +116,9 @@ describe('CheckInMoment', () => {
 
   it.each([
     [{}, 'welcome', 'Welcome', null, null],
-    [{ welcomeBack: true }, 'welcome-back', 'Welcome back', /brand-new season/, null],
-    [{ isFirstTimer: true }, 'first-timer', 'Welcome to Awana Clubs', /very first time/, 'NEW!'],
-    [{ isBirthday: true }, 'birthday', 'Happy birthday', /special day/, 'HAPPYBIRTHDAY!'],
+    [{ welcomeBack: true }, 'welcome-back', 'Welcome back', null, null],
+    [{ isFirstTimer: true }, 'first-timer', 'Welcome to Awana Clubs', null, 'NEW!'],
+    [{ isBirthday: true }, 'birthday', 'Happy birthday', null, 'BIRTHDAYWEEK'],
   ])('%o reads as a %s moment', (flags, mode, kicker, line, sticker) => {
     const { container } = render(still(<CheckInMoment event={kid(flags)} />));
     expect(container.querySelector('.checkin').classList.contains(mode)).toBe(true);
@@ -130,7 +131,7 @@ describe('CheckInMoment', () => {
     else expect(st).toBeNull();
   });
 
-  it('a birthday-week ribbon replaces the day-claiming tagline', () => {
+  it('a birthday-week ribbon is the birthday\'s line', () => {
     const { container } = render(still(<CheckInMoment event={kid({ isBirthday: true })} ribbon="Birthday this Friday!" />));
     const line = container.querySelector('.checkin__line').textContent;
     expect(line).toBe('Birthday this Friday!');
