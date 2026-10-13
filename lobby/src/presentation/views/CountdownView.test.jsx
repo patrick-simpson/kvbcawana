@@ -7,7 +7,7 @@ import { CountdownView } from './CountdownView.jsx';
 // feature that QuickNav advertises as "Chimes at 1hr/30/10/5/1min" —
 // so these tests pin BOTH halves: no badge on screen, same audio.
 vi.mock('../lib/stingers.js', () => ({ playStinger: vi.fn() }));
-vi.mock('../hooks/useWeather.js', () => ({ useWeather: () => 'clear' }));
+vi.mock('../hooks/useWeather.js', () => ({ useWeather: () => 'clear', useWeatherReading: () => null }));
 vi.mock('../hooks/useCalendarEvents.js', () => ({ useCalendarEvents: () => [] }));
 
 import { playStinger } from '../lib/stingers.js';

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
-import { useWeather } from './useWeather.js';
+import { WEATHER_STALE_MS, useWeather, useWeatherReading } from './useWeather.js';
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -60,5 +60,46 @@ describe('useWeather network resilience', () => {
     await act(async () => {});
     expect(result.current).toBe('clear');
     unmount();
+  });
+});
+
+describe('useWeatherReading: what the scene and its chip are given', () => {
+  it('carries the type, the temperature in °F, day or night, and when it was read', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ current: { weather_code: 3, temperature_2m: 53.6, is_day: 0 } }) }));
+    const { result, unmount } = renderHook(() => useWeatherReading());
+    expect(result.current).toBeNull();
+    await act(async () => {});
+    expect(result.current).toMatchObject({ type: 'cloudy', temp: 54, isDay: false });
+    expect(typeof result.current.at).toBe('number');
+    // Fahrenheit, as the chip says: the shared fetcher's default unit.
+    expect(String(fetch.mock.calls[0][0])).toContain('temperature_unit=fahrenheit');
+    unmount();
+  });
+
+  it('is null (no chip, plain starfield) while nothing good has come back', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')));
+    const { result, unmount } = renderHook(() => useWeatherReading());
+    await act(async () => {});
+    expect(result.current).toBeNull();
+    unmount();
+  });
+
+  it('keeps the last good reading through a missed refresh, drops it once it is stale', async () => {
+    vi.useFakeTimers();
+    try {
+      const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ current: { weather_code: 61, temperature_2m: 50 } }) });
+      vi.stubGlobal('fetch', fetchMock);
+      const { result, unmount } = renderHook(() => useWeatherReading());
+      await act(async () => {});
+      expect(result.current?.type).toBe('rain');
+      fetchMock.mockRejectedValue(new Error('offline'));
+      await act(async () => { await vi.advanceTimersByTimeAsync(15 * 60 * 1000); });
+      expect(result.current?.type).toBe('rain');
+      await act(async () => { await vi.advanceTimersByTimeAsync(WEATHER_STALE_MS); });
+      expect(result.current).toBeNull();
+      unmount();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

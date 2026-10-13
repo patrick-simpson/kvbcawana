@@ -9,7 +9,7 @@ import { act, cleanup, fireEvent, render } from '@testing-library/react';
 const device = vi.hoisted(() => ({ touch: true }));
 vi.mock('../lib/touch.js', () => ({ useTouch: () => device.touch, usePortrait: () => false }));
 vi.mock('../lib/stingers.js', () => ({ playStinger: vi.fn() }));
-vi.mock('../hooks/useWeather.js', () => ({ useWeather: () => 'clear' }));
+vi.mock('../hooks/useWeather.js', () => ({ useWeather: () => 'clear', useWeatherReading: () => null }));
 vi.mock('../hooks/useCalendarEvents.js', () => ({ useCalendarEvents: () => [] }));
 
 const { CountdownView } = await import('./CountdownView.jsx');

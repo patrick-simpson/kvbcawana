@@ -100,73 +100,16 @@
     0%, 100% { opacity: 0.7; transform: scale(1); }
     50%       { opacity: 1;   transform: scale(1.04); }
   }
-  @keyframes rainFall {
-    0%   { transform: translateY(-100vh) rotate(20deg); opacity: 0; }
-    10%  { opacity: 0.6; }
-    90%  { opacity: 0.3; }
-    100% { transform: translateY(100vh) rotate(20deg); opacity: 0; }
-  }
-  @keyframes snowFall {
-    0%   { transform: translateY(-100vh) translateX(0); opacity: 0; }
-    5%   { opacity: 0.8; }
-    95%  { opacity: 0.4; }
-    100% { transform: translateY(100vh) translateX(50px); opacity: 0; }
-  }
-  @keyframes thunderFlash {
-    0%, 10%, 100% { opacity: 0; }
-    5%, 8% { opacity: 0.15; }
-  }
-  @keyframes cloudDrift {
-    0%   { transform: translateX(-150px); }
-    50%  { transform: translateX(150px); }
-    100% { transform: translateX(-150px); }
-  }
   @keyframes confettiExplode {
     0%   { transform: translate(-50%, -50%) scale(0) rotate(0deg); opacity: 1; }
     12%  { transform: translate(calc(-50% + var(--cx) * 0.5), calc(-50% + var(--cy) * 0.5)) scale(1) rotate(calc(var(--cr) * 0.3)); opacity: 1; }
     100% { transform: translate(calc(-50% + var(--cx)), calc(-50% + var(--cy) + 50vh)) scale(0.3) rotate(var(--cr)); opacity: 0; }
-  }
-  @keyframes twinkle {
-    0%, 100% { opacity: var(--star-min, 0.15); }
-    50%      { opacity: var(--star-max, 0.7); }
-  }
-  @keyframes shootingStar {
-    0%   { transform: translateX(0) translateY(0) scaleX(0); opacity: 0; }
-    3%   { opacity: 1; transform: translateX(0) translateY(0) scaleX(1); }
-    100% { transform: translateX(var(--shoot-x, 250px)) translateY(var(--shoot-y, 150px)) scaleX(1); opacity: 0; }
   }
   @keyframes auroraWave {
     0%   { transform: translateX(-30%) skewX(-5deg) scaleY(1); }
     33%  { transform: translateX(10%) skewX(3deg) scaleY(1.3); }
     66%  { transform: translateX(-10%) skewX(-3deg) scaleY(0.7); }
     100% { transform: translateX(-30%) skewX(-5deg) scaleY(1); }
-  }
-  @keyframes leafFall {
-    0%   { transform: translateY(-10vh) rotate(0deg) translateX(0); opacity: 0; }
-    10%  { opacity: 0.6; }
-    90%  { opacity: 0.2; }
-    100% { transform: translateY(110vh) rotate(360deg) translateX(80px); opacity: 0; }
-  }
-  @keyframes fireflyGlow {
-    0%, 100% { opacity: 0; }
-    20%  { opacity: 0; }
-    35%  { opacity: 0.8; }
-    50%  { opacity: 0.5; }
-    65%  { opacity: 0.9; }
-    80%  { opacity: 0; }
-  }
-  @keyframes fireflyDrift {
-    0%   { transform: translate(0, 0); }
-    25%  { transform: translate(var(--fly-x1, 30px), var(--fly-y1, -20px)); }
-    50%  { transform: translate(var(--fly-x2, -15px), var(--fly-y2, 15px)); }
-    75%  { transform: translate(var(--fly-x3, 25px), var(--fly-y3, -25px)); }
-    100% { transform: translate(0, 0); }
-  }
-  @keyframes blossomFall {
-    0%   { transform: translateY(-10vh) rotate(0deg) translateX(0); opacity: 0; }
-    10%  { opacity: 0.5; }
-    50%  { transform: translateY(50vh) rotate(180deg) translateX(-40px); opacity: 0.35; }
-    100% { transform: translateY(110vh) rotate(360deg) translateX(20px); opacity: 0; }
   }
   @keyframes colonPulse {
     0%, 100% { opacity: 1; }
@@ -653,6 +596,222 @@
   animation: screenShake 0.3s ease-in-out infinite;
 }
 
+/* ── The weather scene (components/WeatherScene.jsx) ─────────────────
+   The countdown's ambient weather in the catalog's flat language: flat
+   shapes with hard edges and hard offset shadows on pure black, never a
+   blur, a glow or a soft gradient (owner 2026-10-12: the old blurred white
+   ovals read as "a weird diagonal white blur").
+
+   Plain CSS on purpose, OUTSIDE @theme: Tailwind emits a @theme keyframe only
+   when a CSS rule names it, so the old weather keyframes (named only from
+   inline styles) never reached the build and the old weather never moved.
+   Every loop is transform or opacity only (the compositor's two), long and
+   calm; every piece's place with no animation IS its still frame, and each
+   loop starts from it (the components set the delays), so a paused tab,
+   reduced motion or `still` shows a finished, recognisable picture. The
+   positions and timings come from the component (custom properties). */
+.pj-wx {
+  /* The scene's own unit: the projector unit, scaled up in the portrait block
+     (a phone held upright is one tall column, and 1% of its width is tiny). */
+  --wx-u: var(--u);
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.pj-wx__layer {
+  position: absolute;
+  inset: 0;
+}
+.pj-wx svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.pj-wx__stars {
+  transition: opacity 2s ease;
+}
+.pj-wx-star {
+  position: absolute;
+  border-radius: 50%;
+  background: #FFFFFF;
+  opacity: var(--star-max);
+  animation: pjWxTwinkle var(--wx-dur) ease-in-out var(--wx-delay) infinite;
+}
+/* A flat streak (no gradient tail, no glow), invisible between passes. */
+.pj-wx-shoot {
+  position: absolute;
+  width: calc(4.5 * var(--wx-u));
+  height: max(2px, calc(0.16 * var(--wx-u)));
+  border-radius: 999px;
+  background: #FFFFFF;
+  opacity: 0;
+  transform-origin: 100% 50%;
+  animation: pjWxShoot var(--wx-dur) linear var(--wx-delay) infinite;
+}
+.pj-wx-cloud {
+  position: absolute;
+  left: var(--wx-x);
+  top: var(--wx-y);
+  width: var(--wx-w);
+  aspect-ratio: 2 / 1;
+  --wx-from: calc(-1 * var(--wx-x) - var(--wx-w) - 2vw);
+  --wx-to: calc(100vw - var(--wx-x) + 2vw);
+  animation: pjWxDrift var(--wx-dur) linear var(--wx-delay) infinite;
+}
+.pj-wx-bolt {
+  position: absolute;
+  top: 62%;
+  width: 17%;
+  aspect-ratio: 1 / 2;
+  opacity: var(--wx-o0);
+  animation: pjWxBolt var(--wx-dur) linear var(--wx-delay) infinite;
+}
+.pj-wx-fall {
+  position: absolute;
+  left: var(--wx-x);
+  top: var(--wx-y);
+  --wx-y0: calc(-1 * var(--wx-y) - 8vh);
+  --wx-y1: calc(104vh - var(--wx-y));
+  animation: pjWxFall var(--wx-dur) linear var(--wx-delay) infinite;
+}
+/* A rain streak, leaning with the way it falls (the Faller's 0.25 slant). */
+.pj-wx-drop {
+  width: max(2px, calc(0.3 * var(--wx-u)));
+  border-radius: 999px;
+  transform: rotate(-14deg);
+}
+.pj-wx-sway {
+  min-width: 5px;
+  min-height: 5px;
+  transform: rotate(var(--wx-tilt, 0deg));
+  animation: pjWxSway var(--wx-dur) ease-in-out var(--wx-delay) infinite alternate;
+}
+.pj-wx-splash {
+  position: absolute;
+  width: max(14px, calc(2.2 * var(--wx-u)));
+  aspect-ratio: 2 / 1;
+  transform-origin: 50% 100%;
+  animation: pjWxSplash var(--wx-dur) ease-out var(--wx-delay) infinite;
+}
+.pj-wx-band {
+  position: absolute;
+  left: -20vw;
+  width: 140vw;
+  animation: pjWxSlide var(--wx-dur) ease-in-out 0s infinite alternate;
+}
+.pj-wx-fly {
+  position: absolute;
+  width: max(6px, calc(0.9 * var(--wx-u)));
+  aspect-ratio: 1;
+  opacity: 0.85;
+  animation:
+    pjWxGlow var(--wx-dur) ease-in-out var(--wx-delay) infinite,
+    pjWxWander var(--wx-wander) ease-in-out 0s infinite alternate;
+}
+/* Reduced motion, `still`: the still frame, nothing moving. (Low power, the
+   OS setting among its three, already hides the whole layer: useLowPower.) */
+.pj-wx--still *,
+.pj-wx--still *::before,
+.pj-wx--still *::after {
+  animation: none !important;
+  transition: none !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  .pj-wx *,
+  .pj-wx *::before,
+  .pj-wx *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* The chip that says what the wall is drawing ("Cloudy · 54°F"): the label
+   voice on the house's deep blue, a hard offset shadow, top-right level with
+   the Awana mark (whose middle is 4.9u down), clear of every view's words.
+   .pj-wx makes no stacking context, so z-index 1 lifts the chip over the
+   doodles and particles drawn after the scene, still under the content
+   (ScreenFrame's z-10). The 52px floor keeps it under the PC's clock-drift pill on a small window.
+   The touch block moves it beside the menu button. */
+.pj-wx-chip {
+  position: absolute;
+  z-index: 1;
+  top: var(--pj-wx-chip-top, max(calc(4.9 * var(--u)), 52px));
+  right: var(--pj-wx-chip-right, calc(3.2 * var(--u)));
+  translate: 0 -50%;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+  padding: 0.34em 0.85em 0.3em 0.6em;
+  font-family: var(--font-condensed);
+  font-weight: 400;
+  font-size: var(--pj-wx-chip-size, max(12px, calc(1.45 * var(--u))));
+  line-height: 1;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: #FFFFFF;
+  background: var(--brand-blue-deep);
+  border-radius: 999px;
+  box-shadow: 0.16em 0.16em 0 #1B2C4F;
+  pointer-events: none;
+}
+.pj-wx-chip svg {
+  flex: none;
+  width: 1.3em;
+  height: 1.3em;
+}
+
+@keyframes pjWxTwinkle {
+  0%, 100% { opacity: var(--star-max); }
+  50%      { opacity: var(--star-min); }
+}
+@keyframes pjWxShoot {
+  0%, 94% { opacity: 0; transform: translate(0, 0) rotate(28deg); }
+  95%     { opacity: 0.9; }
+  100%    { opacity: 0; transform: translate(calc(14 * var(--wx-u)), calc(7.4 * var(--wx-u))) rotate(28deg); }
+}
+@keyframes pjWxDrift {
+  from { transform: translateX(var(--wx-from)); }
+  to   { transform: translateX(var(--wx-to)); }
+}
+@keyframes pjWxFall {
+  from { transform: translate(calc(var(--wx-y0) * var(--wx-slant, 0)), var(--wx-y0)); }
+  to   { transform: translate(calc(var(--wx-y1) * var(--wx-slant, 0)), var(--wx-y1)); }
+}
+@keyframes pjWxSway {
+  from { transform: translateX(calc(-1 * var(--wx-sway))) rotate(calc(var(--wx-tilt, 0deg) - var(--wx-turn, 0deg))); }
+  to   { transform: translateX(var(--wx-sway)) rotate(calc(var(--wx-tilt, 0deg) + var(--wx-turn, 0deg))); }
+}
+@keyframes pjWxSplash {
+  0%, 70% { opacity: 0; transform: scale(0.3); }
+  78%     { opacity: 0.85; transform: scale(1); }
+  100%    { opacity: 0; transform: scale(1.2); }
+}
+@keyframes pjWxSlide {
+  from { transform: translateX(0); }
+  to   { transform: translateX(var(--wx-shift)); }
+}
+/* Two 0.18 s flashes 0.3 s apart in a 12 s loop (a second bolt runs half a
+   loop behind): never more than two flashes in any second, a bolt never the
+   whole wall. Photosensitivity: keep it that way. */
+@keyframes pjWxBolt {
+  0%, 60%       { opacity: 0; }
+  60.1%, 61.5%  { opacity: 1; }
+  61.6%, 64%    { opacity: 0; }
+  64.1%, 65.5%  { opacity: 1; }
+  65.6%, 100%   { opacity: 0; }
+}
+@keyframes pjWxGlow {
+  0%, 100% { opacity: 0.85; }
+  50%      { opacity: 0.1; }
+}
+@keyframes pjWxWander {
+  from { transform: translate(0, 0); }
+  to   { transform: translate(var(--wx-dx), var(--wx-dy)); }
+}
+
 /* ── Test / kiosk determinism modes ─────────────────────────────
    [data-vr]          — ?vr=1 visual-regression mode: every animation
                         and transition frozen so two renders of one
@@ -978,6 +1137,15 @@
   /* The wall's own top-right corner pieces stop short of the button. */
   .pj-slide-clock { right: max(calc(3.4 * var(--u)), var(--pj-menu-room)); }
   .pj-game__tally { right: max(calc(3.2 * var(--u)), var(--pj-menu-room)); }
+  /* The weather chip stands left of the button, level with its middle, at a
+     size a phone can read; the clock-drift pill (left of the button too)
+     outranks it. */
+  .pj-wx-chip {
+    --pj-wx-chip-top: calc(max(10px, env(safe-area-inset-top)) + 22px);
+    --pj-wx-chip-right: calc(max(10px, env(safe-area-inset-right)) + 52px);
+    --pj-wx-chip-size: 13px;
+  }
+  :root:has(.pj-touch-drift) .pj-wx-chip { visibility: hidden; }
 
 
   /* ── The page as a thing held in the hand ── */
@@ -1211,4 +1379,7 @@
 
   /* ── The shutdown screen ── */
   .pj-shutdown { padding-bottom: calc(36 * var(--u)); }
+
+  /* ── The weather scene: its shapes twice the unit, so a cloud is a cloud ── */
+  .pj-wx { --wx-u: calc(2 * var(--u)); }
 }

@@ -14,7 +14,7 @@ import { useFontsReady } from '../hooks/useFontsReady.js';
 import { secondsUntil } from '../lib/schedule.js';
 import { playStinger } from '../lib/stingers.js';
 import { useKeydown } from '../hooks/index.js';
-import { useWeather } from '../hooks/useWeather.js';
+import { useWeatherReading } from '../hooks/useWeather.js';
 import { useCalendarEvents } from '../hooks/useCalendarEvents.js';
 import { usePortrait, useTouch } from '../lib/touch.js';
 import { DUR, EASE } from '../lib/motion-tokens.js';
@@ -43,7 +43,7 @@ const STINGER_TIMES = [3600, 1800, 600, 300, 60];
  */
 export const CountdownView = ({ now, target, theme, onSkip }) => {
   const seconds = secondsUntil(target, now);
-  const weather = useWeather();
+  const weather = useWeatherReading();
   const events = useCalendarEvents();
 
   const soundedStingers = useRef(new Set());
@@ -93,7 +93,7 @@ export const CountdownView = ({ now, target, theme, onSkip }) => {
       shake={isShaking}
       layers={
         <>
-          <WeatherScene weather={weather} />
+          <WeatherScene reading={weather} />
           <ParticleField />
           <SparkleDoodles seed={3} count={14} />
         </>
