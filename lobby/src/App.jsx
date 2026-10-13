@@ -1710,12 +1710,12 @@ export default function App() {
           )}
           {demoActive && (
             <div className="demo-pill" title="A simulated event has been fired on this screen. Reload to clear.">
-              demo mode — not real check-ins
+              demo mode · not real check-ins
             </div>
           )}
           {rehearsalActive && (
             <div className="rehearsal-pill" title="The print server is in rehearsal mode. Check-ins on this screen are practice, not real arrivals.">
-              rehearsal — practice run, not real check-ins
+              rehearsal · practice run, not real check-ins
             </div>
           )}
         </div>
