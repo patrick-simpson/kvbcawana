@@ -37,6 +37,20 @@
 // with nothing held for tonight (a restart before the watcher warmed it), or a
 // child the held page does not list, does it read, and then URGENT: the head
 // of the read queue. Its writes sign in again once when the session lapsed.
+//
+// KEPT ACROSS A RESTART (owner 2026-10-12, after /checkin sat on "Reading the
+// roster..." past a deploy): the page held is also written to Durable Object
+// storage as `desk:page`, ONE blob sealed under the Worker's state key
+// (watcher.js sealState, the same as `tonight:book` and `cloud:snap`): the
+// meeting's id, the check-in items, and per child the clubber id, full name,
+// club and checked-in mark. Written only while the watch window is open, at
+// most once a minute unless the list or who is checked in moved, never past
+// DESK_PAGE_MAX_BYTES; deleted when the window closes (`endOfNight`, from the
+// watcher's alarm). A new object reads it back once (`restore`) when it is
+// tonight's, opens, and is under DESK_PAGE_MAX_AGE_MS old; anything else is
+// deleted, never trusted. The roster answers a restored page at once
+// (`restored: true`) and the watcher's alarm reads a fresh one in its next
+// free slot.
 
 import { churchNight } from '../../shared/cloud-crypto.js';
 import { json } from './http.js';
@@ -45,9 +59,18 @@ import { itemsToSend } from './twotimtwo.js';
 import { Families } from './families.js';
 import { PRINT_JOB_KIND } from './adopt.js';
 import { itemClubs } from './phone.js';
+import { openState, sealState, watchWindow } from './watcher.js';
 
 /** The roster's check-in page is re-read at most this often (pages poll every 15 s; 2 of the 4 reads a minute). */
 export const CHECKIN_PAGE_TTL_MS = 30 * 1000;
+/** Where the held page is kept, sealed under the state key. */
+export const DESK_PAGE_KEY = 'desk:page';
+/** A held page whose children and checked-in marks did not move is written at most this often. */
+export const DESK_PAGE_PERSIST_MS = 60 * 1000;
+/** A stored page older than this is never restored (a club night's window is 4.5 hours). */
+export const DESK_PAGE_MAX_AGE_MS = 6 * 60 * 60 * 1000;
+/** The stored blob's limit (a Durable Object value holds 128 KiB): a bigger one is not written. */
+export const DESK_PAGE_MAX_BYTES = 120 * 1024;
 export { FAMILIES_TTL_MS, FAMILIES_RETRY_MS } from './families.js';
 /** Pages asked for the roster this recently: the watcher reads it ahead in a free slot. */
 export const ROSTER_ACTIVE_MS = 45 * 1000;
@@ -74,15 +97,43 @@ const refuse = (status, body) => json({ ok: false, ...body }, status);
 /** @param {any} v */
 const clean = (v, max = 40) => String(v ?? '').replace(/\s+/g, ' ').trim().slice(0, max);
 
+/**
+ * What the desk reads of a check-in page and nothing more (the stored form):
+ * the meeting's id (every post), the items with their clubs and labels
+ * (itemsToSend, itemClubs, the attendance check) and per child the clubber id,
+ * club id, name, club and checked-in mark (the roster answer, find, the
+ * check-in's name and club). Pure. @param {any} page
+ */
+export function compactPage(page) {
+  return {
+    calendarId: String(page?.calendarId ?? ''),
+    events: (Array.isArray(page?.events) ? page.events : []).map((/** @type {any} */ e) => ({
+      id: String(e.id ?? ''), clubs: (Array.isArray(e.clubs) ? e.clubs : []).map(String), automatic: !!e.automatic, label: String(e.label ?? '').slice(0, 60),
+    })),
+    roster: (Array.isArray(page?.roster) ? page.roster : []).map((/** @type {any} */ k) => ({
+      clubberId: String(k.clubberId ?? ''), clubId: String(k.clubId ?? ''), name: String(k.name ?? '').slice(0, 80), club: String(k.club ?? '').slice(0, 40), checkedIn: !!k.checkedIn,
+    })),
+  };
+}
+
+/** Did the list or who is checked in move? (memory only, never stored) @param {any} page */
+const pageSig = (page) => `${page.calendarId}|${(page.roster || []).map((/** @type {any} */ k) => `${k.clubberId}${k.checkedIn ? '+' : '-'}`).join(',')}`;
+
 export class Desk {
   /**
    * @param {{ watcher: import('./watcher.js').Watcher, ledger: import('./ledger.js').Ledger,
    *   printq: import('./printq.js').PrintQueue, stations: import('./stations.js').Stations,
    *   tags: import('./ledger.js').Tags, now: () => number, log?: (line: string) => void,
-   *   adopt?: import('./adopt.js').Adopter }} deps
+   *   adopt?: import('./adopt.js').Adopter,
+   *   storage?: { get(k: string): Promise<any>, put(k: string, v: any): Promise<void>, delete(k: string): Promise<any> },
+   *   secret?: () => string|null|undefined }} deps
    */
-  constructor({ watcher, ledger, printq, stations, tags, now, log, adopt }) {
+  constructor({ watcher, ledger, printq, stations, tags, now, log, adopt, storage, secret }) {
     this.watcher = watcher;
+    /** Where the held page is kept sealed (the watcher's storage, the one Durable Object's). */
+    this.storage = storage || watcher.storage || null;
+    /** The state key's secret, as every sealed blob of the Worker has it (the TwoTimTwo password secret). */
+    this.secret = secret || (() => watcher.creds()?.password);
     /** The watcher's backlog of TwoTimTwo-page check-ins: an undo takes the child off it. */
     this.adopt = adopt || null;
     this.ledger = ledger;
@@ -101,8 +152,20 @@ export class Desk {
     this.checkRow = defaultRowCheck;
     /** barf.js sets it: a tap on a child waiting to be checked in again after a late BARF friend. @type {((night: string, clubberId: string, wait: { bible: boolean }) => Promise<Response>)|null} */
     this.barfRecheck = null;
-    /** The check-in page, kept for the club night it was read on. @type {{ at: number, page: any, night: string }|null} */
+    /**
+     * The check-in page, kept for the club night it was read on. `restored`: read
+     * back from storage after a restart (not read by this object); `refreshFailed`:
+     * a read since then failed, so the roster goes back to reading (and `stale`).
+     * @type {{ at: number, page: any, night: string, restored?: boolean, refreshFailed?: boolean }|null}
+     */
     this.cache = null;
+    /** The one restore of a new object (single flight). @type {Promise<void>|null} */
+    this.restoring = null;
+    /** What was last written (memory only): the list's signature and when. */
+    this.savedSig = /** @type {string|null} */ (null);
+    this.savedAt = 0;
+    /** Storage may hold `desk:page` (unknown after a restart): the end of the night deletes it once. */
+    this.mayHoldStored = true;
     /** @type {Promise<any>|null} */
     this.inflight = null;
     /** A desk action's own (urgent) read, never queued behind the roster's. @type {Promise<any>|null} */
@@ -123,6 +186,8 @@ export class Desk {
     if (!this.rosterAskedAt || this.now() - this.rosterAskedAt > ROSTER_ACTIVE_MS || this.inflight) return null;
     const c = this.cache;
     if (!c || c.night !== churchNight(this.now())) return 0;
+    // A page read back after a restart: the very next free slot reads a fresh one.
+    if (c.restored) return 0;
     return Math.max(0, c.at + READ_INTERVAL_MS - this.now());
   }
 
@@ -131,8 +196,13 @@ export class Desk {
     const client = this.watcher.clientFor();
     if (!client || this.inflight) return false;
     const r = await client.checkinPage({ waitMs: 0, kind: 'roster-ahead' });
-    if (!r.ok) return r.error !== 'read-busy';
-    this.warm(r.page, this.now());
+    if (!r.ok) {
+      if (r.error === 'read-busy') return false;
+      // A restored page no read could replace: the roster reads (and says `stale`) as before.
+      if (this.cache && this.cache.restored) this.cache.refreshFailed = true;
+      return true;
+    }
+    await this.warm(r.page, this.now());
     return true;
   }
 
@@ -145,10 +215,94 @@ export class Desk {
    * A check-in page someone else read (the watcher at the window's opening):
    * held for the night like the desk's own. @param {any} page @param {number} at
    */
-  warm(page, at) {
+  async warm(page, at) {
     if (!page || (this.cache && this.cache.at >= at)) return;
     this.cache = { at, page, night: churchNight(at) };
     this.noteRoster(page);
+    await this.savePage(page, at);
+  }
+
+  // ── the held page in storage (sealed; see the top of this file) ──────────────
+
+  /**
+   * Write the page just read, sealed: only in the watch window, at most once per
+   * DESK_PAGE_PERSIST_MS unless the list or a checked-in mark moved, never past
+   * DESK_PAGE_MAX_BYTES. Never throws (a read never fails for it).
+   * @param {any} page @param {number} at
+   * @returns {Promise<'saved'|'skipped'|'throttled'|'too-big'|'failed'>}
+   */
+  async savePage(page, at) {
+    try {
+      const secret = this.secret();
+      if (!this.storage || !secret || !page || !Array.isArray(page.roster) || !watchWindow(at).open) return 'skipped';
+      const compact = compactPage(page);
+      const sig = pageSig(compact);
+      if (sig === this.savedSig && this.now() - this.savedAt < DESK_PAGE_PERSIST_MS) return 'throttled';
+      const sealed = await sealState(secret, { at, night: churchNight(at), page: compact });
+      if (JSON.stringify(sealed).length > DESK_PAGE_MAX_BYTES) {
+        // Never a cut-down list (a child missing from it would vanish from the page): none at all.
+        if (this.mayHoldStored) await this.storage.delete(DESK_PAGE_KEY);
+        this.mayHoldStored = false;
+        this.savedSig = null;
+        this.log('[desk] the check-in page is too big to keep across a restart; it is held in memory only');
+        return 'too-big';
+      }
+      await this.storage.put(DESK_PAGE_KEY, sealed);
+      this.mayHoldStored = true;
+      this.savedSig = sig;
+      this.savedAt = this.now();
+      return 'saved';
+    } catch (err) {
+      console.error('[desk] keeping the check-in page failed', err);
+      return 'failed';
+    }
+  }
+
+  /**
+   * A new object's one look at the stored page (single flight; every later call
+   * shares it). Held as `restored` only when nothing is held yet and it is
+   * tonight's, opens, and is under DESK_PAGE_MAX_AGE_MS old; anything else is
+   * deleted. Never throws.
+   */
+  restore() {
+    if (!this.restoring) {
+      this.restoring = this.restoreOnce().catch((err) => { console.error('[desk] reading back the check-in page failed', err); });
+    }
+    return this.restoring;
+  }
+
+  async restoreOnce() {
+    if (this.cache || !this.storage || this.watcher.mode === 'off') return;
+    const secret = this.secret();
+    if (!secret) return;
+    const sealed = await this.storage.get(DESK_PAGE_KEY);
+    if (!sealed) { this.mayHoldStored = false; return; }
+    const opened = await openState(secret, sealed);
+    const t = this.now();
+    const good = !!opened && typeof opened.at === 'number' && opened.night === churchNight(t)
+      && opened.at <= t + 60 * 1000 && t - opened.at <= DESK_PAGE_MAX_AGE_MS
+      && !!opened.page && Array.isArray(opened.page.roster) && Array.isArray(opened.page.events) && typeof opened.page.calendarId === 'string';
+    if (!good) {
+      // Another night's, too old, or sealed under another secret: gone, never trusted.
+      await this.storage.delete(DESK_PAGE_KEY);
+      this.mayHoldStored = false;
+      return;
+    }
+    if (this.cache) return;   // a read landed meanwhile: it is newer
+    const page = compactPage(opened.page);
+    this.cache = { at: opened.at, page, night: opened.night, restored: true };
+    this.savedSig = pageSig(page);
+    this.savedAt = t;
+  }
+
+  /** The watch window has closed: the stored page goes (the memory copy ends with the night). */
+  async endOfNight() {
+    this.savedSig = null;
+    this.savedAt = 0;
+    if (!this.storage || !this.mayHoldStored) return false;
+    await this.storage.delete(DESK_PAGE_KEY);
+    this.mayHoldStored = false;
+    return true;
   }
 
   /** Children the page lists, for the families' catch-up (families.js). @param {any} page */
@@ -172,11 +326,15 @@ export class Desk {
    * (`stale`), never nothing. `urgent`: a desk action's read, the head of the
    * read queue (readbudget.js), never queued behind the roster's.
    * @param {number} maxAgeMs @param {boolean} [force] @param {boolean} [urgent]
-   * @returns {Promise<{ ok: true, page: any, readAt: number, stale?: boolean } | { ok: false, error: string, retryAfterMs?: number }>}
+   * A page read back from storage after a restart counts as held (`restored`).
+   * @returns {Promise<{ ok: true, page: any, readAt: number, stale?: boolean, restored?: boolean } | { ok: false, error: string, retryAfterMs?: number }>}
    */
   async page(maxAgeMs, force = false, urgent = false) {
+    await this.restore();
     const c = this.cache;
-    if (!force && c && c.night === churchNight(this.now()) && this.now() - c.at <= maxAgeMs) return { ok: true, page: c.page, readAt: c.at };
+    if (!force && c && c.night === churchNight(this.now()) && this.now() - c.at <= maxAgeMs) {
+      return { ok: true, page: c.page, readAt: c.at, ...(c.restored ? { restored: true } : {}) };
+    }
     const slot = urgent ? 'inflightUrgent' : 'inflight';
     if (this[slot]) return this[slot];
     this[slot] = (async () => {
@@ -185,10 +343,14 @@ export class Desk {
       const r = await client.checkinPage({ waitMs: INTERACTIVE_WAIT_MS, kind: urgent ? 'desk-action' : 'desk', urgent });
       if (r.ok) {
         const at = this.now();
-        if (!this.cache || this.cache.at <= at) this.cache = { at, page: r.page, night: churchNight(at) };
+        const newest = !this.cache || this.cache.at <= at;
+        if (newest) this.cache = { at, page: r.page, night: churchNight(at) };
         this.noteRoster(r.page);
+        if (newest) await this.savePage(r.page, at);
         return { ok: /** @type {const} */ (true), page: r.page, readAt: at };
       }
+      // A restored page no read could replace: from now on the roster reads, as for any page.
+      if (this.cache && this.cache.restored) this.cache.refreshFailed = true;
       if (this.cache) return { ok: /** @type {const} */ (true), page: this.cache.page, readAt: this.cache.at, stale: true };
       return { ok: /** @type {const} */ (false), error: r.error, ...('retryAfterMs' in r ? { retryAfterMs: r.retryAfterMs } : {}) };
     })().finally(() => { this[slot] = null; });
@@ -202,10 +364,24 @@ export class Desk {
     return refuse(502, { reason: 'twotimtwo-unreadable', error: r.error });
   }
 
-  /** GET /v1/desk/roster: tonight's check-in page (at most CHECKIN_PAGE_TTL_MS old), no medical data. */
+  /**
+   * GET /v1/desk/roster: tonight's check-in page (at most CHECKIN_PAGE_TTL_MS
+   * old), no medical data. After a restart, a page read back from storage is
+   * the answer AT ONCE (`restored: true`, never a wait for the read clock)
+   * while the watch window is open: asking marks the roster wanted, so the
+   * watcher's alarm reads a fresh page in its next free slot and the next poll
+   * gets it. (No read is started from here: the alarm is what runs reliably.)
+   */
   async roster() {
-    this.rosterAskedAt = this.now();
-    const r = await this.page(CHECKIN_PAGE_TTL_MS);
+    const t = this.now();
+    this.rosterAskedAt = t;
+    await this.restore();
+    const c = this.cache;
+    const fromRestored = !!c && !!c.restored && !c.refreshFailed && c.night === churchNight(t)
+      && watchWindow(t).open && this.watcher.mode !== 'off';
+    const r = fromRestored && c
+      ? { ok: /** @type {const} */ (true), page: c.page, readAt: c.at, restored: true }
+      : await this.page(CHECKIN_PAGE_TTL_MS);
     if (!r.ok) return this.pageFailure(r);
     const kids = r.page.roster.map((/** @type {any} */ k) => {
       const parts = String(k.name || '').trim().split(/\s+/);
@@ -216,7 +392,9 @@ export class Desk {
     // Which clubs offer Bible / Brought a friend: from the page already read, no extra read.
     // familiesAt: when the households held were read, so a page sees a catch-up re-read and asks again.
     const familiesAt = this.familiesSource.readAt();
-    return json({ readAt: new Date(r.readAt).toISOString(), ...(r.stale ? { stale: true } : {}), kids, items: itemClubs(r.page.events || []), ...(familiesAt ? { familiesAt } : {}) });
+    // `restored` is not `stale`: the page's "TwoTimTwo is not answering" note is for a failed read only.
+    const flag = 'stale' in r && r.stale ? { stale: true } : 'restored' in r && r.restored ? { restored: true } : {};
+    return json({ readAt: new Date(r.readAt).toISOString(), ...flag, kids, items: itemClubs(r.page.events || []), ...(familiesAt ? { familiesAt } : {}) });
   }
 
   /**

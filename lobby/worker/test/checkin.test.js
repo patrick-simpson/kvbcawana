@@ -404,7 +404,8 @@ describe('what storage holds', () => {
     await t.call('POST', '/v1/desk/checkin', await t.deskBody([st]));
     await t.call('POST', '/v1/desk/checkin', await t.deskBody([st], { clubberId: undefined, visitor: { first: 'Zed', last: 'Uniquename', club: 'Sparks' } }));
     const all = everything(t.storage);
-    expect(all).not.toMatch(/Uniquename|Kit Tester|Kit|right-pass|checkin@example/);
+    // Whole words (plainWords): a random iv can spell a short name by chance.
+    expect(all).not.toMatch(plainWords(['Uniquename', 'Kit Tester', 'Kit', 'Tester', 'right-pass', 'checkin@example']));
     expect(all).not.toMatch(/"clubberId"|"662"/);
     expect(all).toContain('"ledger"');
   });
@@ -426,7 +427,9 @@ describe('a restart (a new object over the same storage)', () => {
     expect((await st.call('GET', '/v1/print/next')).body.jobs).toEqual([]);
     expect((await st.call('POST', '/v1/print/heartbeat', { jobId: body.job.id })).body).toMatchObject({ ok: true });
     // and the read clock: the first check-in read the page; a read right after the
-    // restart (a fresh object has no cached page) waits out the rest of the 15 s
+    // restart (a fresh object with no page held: the stored copy is taken away
+    // here, deskpage.test.js tests reading it back) waits out the rest of the 15 s
+    await t.storage.delete('desk:page');
     const before = t.reads.at(-1).at;
     await t.call('GET', '/v1/desk/roster');
     expect(t.reads.at(-1).at - before).toBeGreaterThanOrEqual(READ_INTERVAL_MS);

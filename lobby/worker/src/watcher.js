@@ -301,7 +301,7 @@ export class Watcher {
       readIntervalSec: READ_INTERVAL_MS / 1000,
       watchIntervalSec: WATCH_INTERVAL_MS / 1000,
       budget: this.budget.stats(),
-      ...(this.desk ? { deskPage: { held: this.desk.hasNightPage(), readAt: this.desk.cache ? new Date(this.desk.cache.at).toISOString() : null }, families: this.desk.familiesSource.stats() } : {}),
+      ...(this.desk ? { deskPage: { held: this.desk.hasNightPage(), readAt: this.desk.cache ? new Date(this.desk.cache.at).toISOString() : null, restored: !!this.desk.cache?.restored }, families: this.desk.familiesSource.stats() } : {}),
       signedIn: !!(this.client && this.client.cookies.size),
       loginBlockedForSec: this.client && this.client.loginBlockedUntil > this.now()
         ? Math.ceil((this.client.loginBlockedUntil - this.now()) / 1000) : 0,
@@ -352,6 +352,11 @@ export class Watcher {
 
   /** Make sure an alarm is set while the watcher is on (cron, and every status read). */
   async arm() {
+    // The desk's sealed check-in page never outlives the window, even with the
+    // watcher switched off (its alarm then never runs): the cron asks here too.
+    if (this.desk && !watchWindow(this.now()).open) {
+      try { await this.desk.endOfNight(); } catch (err) { console.error('[cloud] purge of the check-in page failed', err); }
+    }
     if (this.mode === 'off' || !this.creds()) return false;
     const at = await this.alarms.get();
     if (typeof at === 'number' && at > this.now()) return true;
@@ -375,6 +380,8 @@ export class Watcher {
       // The window has closed: tonight's claims and jobs are forgotten.
       try { await this.adopt?.endOfNight(); } catch (err) { console.error('[cloud] end-of-night purge failed', err); }
       try { await this.publisher?.endOfNight(); } catch (err) { console.error('[cloud] end-of-night purge of the names failed', err); }
+      // ...and the desk's sealed copy of tonight's check-in page (desk.js `desk:page`).
+      try { await this.desk?.endOfNight(); } catch (err) { console.error('[cloud] end-of-night purge of the check-in page failed', err); }
       // The youth check-out runs on to midnight (7:15 pm to midnight, past the
       // watch window): it sweeps from the last applied report and the Checkout page.
       if (this.ym && this.ym.due()) {
@@ -704,7 +711,7 @@ export class Watcher {
     const page = await client.checkinPage({ waitMs: 0, kind: 'watcher' });
     if (!page.ok && page.error === 'read-busy') return;
     // The desk keeps it for the night: a check-in then reads nothing.
-    if (page.ok) this.desk?.warm(page.page, this.now());
+    if (page.ok) await this.desk?.warm(page.page, this.now());
     const at = new Date(this.now()).toISOString();
     status.checkinPage = page.ok
       ? { ok: true, at, calendarId: page.page.calendarId, events: page.page.events.length,
