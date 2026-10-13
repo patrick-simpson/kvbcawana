@@ -19,9 +19,10 @@
      the screen once, and the phone's Unmute says why it could not.
    - Something only a person at the screen can clear (Settings open, a
      handout or Read Prep open, the "Show captions?" question) skips the
-     press, and the reason rides the next report: the phone shows it. A pick
-     never replaces a lesson already running unless the phone sent
-     `force: true` (only after its confirm tap).
+     press (a pick too, `force` or not), and the reason rides the next
+     report: the phone shows it. A pick never replaces a lesson already
+     running unless the phone sent `force: true` (only after its confirm
+     tap).
    - journeyRemote.now() is what the screen shows, in the shape the Worker
      keeps (lobby/shared/journeyRemote.js sanitizeJourneyNow): the view, the
      lesson's week and TITLE (never a file), the slide (number, kind, and the
@@ -160,7 +161,9 @@ function remoteStartSlides() {
 }
 
 /* A lesson from the phone's picker: the configure relay's checks, and never
-   over a running lesson (or an open handout / Read Prep) without `force`. */
+   over a running lesson without `force`. Settings, a handout / Read Prep or
+   the caption question has already skipped it (runRemoteCommand), as it
+   skips every press: only a person at the screen closes those. */
 function remotePick(data) {
   const target = pickerTargetFor(data);
   if (target.reason === 'lessons-loading') {
@@ -168,11 +171,7 @@ function remotePick(data) {
     return 'lessons-loading';
   }
   if (!target.lesson) return target.reason;
-  if (data.force !== true && (journeyLessonRunning() || readerOverlayOpen())) return 'lesson-running';
-  if (readerOverlayOpen()) {
-    closeHandout();
-    closePrep();
-  }
+  if (data.force !== true && journeyLessonRunning()) return 'lesson-running';
   if (remoteSoundAllowed()) audioUnlocked = true;
   PICKER_CHOICES[target.choice](target.lesson);
   return null;
@@ -181,10 +180,12 @@ function remotePick(data) {
 /* One press: null when it was done, else the reason it was skipped. */
 function runRemoteCommand(action, data) {
   if (CONFIGURE_MODE) return 'configure';
-  if (action === 'pick') return remotePick(data && typeof data === 'object' ? data : {});
+  // Every press, a pick too, waits for a person at the screen first.
   const blocked = remoteBlockedBy();
   if (blocked) return blocked;
   switch (action) {
+    case 'pick':
+      return remotePick(data && typeof data === 'object' ? data : {});
     case 'slide-next':
       if (!slideshowActive()) return 'no-slides';
       nextSlide();

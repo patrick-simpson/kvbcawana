@@ -63,6 +63,26 @@ function lessonFileSource(lesson, role) {
   return { url, bytes: Number.isFinite(bytes) && bytes > 0 ? bytes : null };
 }
 
+/* The current address and size of `week`'s `role` video from the loaded
+   lessons.json, or null when that is not known (the list not loaded, a week
+   it does not have, no downloadable address). */
+function currentLessonFileSource(week, role) {
+  const entry = Array.isArray(allLessons) ? allLessons.find((l) => l && l.week === week) : null;
+  return entry ? lessonFileSource(entry, role) : null;
+}
+
+/* Is the copy on disk (its info.json) still the file lessons.json names?
+   `source` is { url, bytes } (lessonFileSource(), or a download plan item).
+   A different address, or a different size when lessons.json gives one,
+   means Awana replaced the file: that copy is NOT saved (it does not play,
+   it is not counted) and the downloader starts it again (downloadOneLesson).
+   No source to compare with (null): the copy counts, so a kiosk that cannot
+   read lessons.json still plays what it saved. */
+function savedCopyMatches(info, source) {
+  if (!info || !source || !source.url) return true;
+  return info.url === source.url && !(source.bytes && info.bytes !== source.bytes);
+}
+
 /* Pure: how many bytes of a file of `total` bytes, cut into `chunk`-byte
    pieces, are safely on disk given the pieces' sizes in order. A piece counts
    only at its full expected size and only while every piece before it does
@@ -140,12 +160,17 @@ async function lessonChunkFiles(dir, info) {
 /* What is on disk for one video: { state, have, total, info }.
    state: 'none' (nothing), 'partial' (some pieces, resumable), 'saved' (every
    byte), 'damaged' (marked finished but pieces missing or the wrong size:
-   it is downloaded again, and plays from the internet meanwhile). */
-async function inspectLessonFile(id) {
+   it is downloaded again, and plays from the internet meanwhile). A copy of
+   a file lessons.json no longer names (`source`, savedCopyMatches()) is
+   'none' with `stale`: the downloader starts it from the beginning. Its
+   pieces stay on disk until then (only the downloader or Delete removes
+   anything). */
+async function inspectLessonFile(id, source) {
   const dir = await lessonFileDir(id, false);
   if (!dir) return { state: 'none', have: 0, total: 0, info: null };
   const info = await readLessonInfo(dir);
   if (!info) return { state: 'none', have: 0, total: 0, info: null };
+  if (!savedCopyMatches(info, source)) return { state: 'none', have: 0, total: (source && source.bytes) || 0, info: null, stale: true };
   const files = await lessonChunkFiles(dir, info);
   const have = committedLessonBytes(files.map((f) => f.size), info.bytes, info.chunk);
   let state = 'partial';
@@ -156,12 +181,15 @@ async function inspectLessonFile(id) {
 }
 
 /* The saved video as ONE disk-backed Blob of its pieces, or null when it is
-   not completely saved. Never reads the bytes themselves. */
-async function savedLessonBlob(id) {
+   not completely saved, or is a copy of a file lessons.json no longer names
+   (`source`: savedCopyMatches(); the caller then plays from the network, as
+   for a missing copy, and the downloader replaces it). Never reads the bytes
+   themselves, never deletes anything. */
+async function savedLessonBlob(id, source) {
   const dir = await lessonFileDir(id, false);
   if (!dir) return null;
   const info = await readLessonInfo(dir);
-  if (!info) return null;
+  if (!info || !savedCopyMatches(info, source)) return null;
   const files = await lessonChunkFiles(dir, info);
   if (committedLessonBytes(files.map((f) => f.size), info.bytes, info.chunk) !== info.bytes) return null;
   return new Blob(files, { type: 'video/mp4' });
@@ -176,7 +204,8 @@ let savedPlayback = null;
 const savedPlaybackFailures = new Set();
 
 /* A playable object URL for the saved copy of `week`'s `role` video, or null
-   (none, damaged, storage off, or a newer request has taken over: callers
+   (none, damaged, replaced by Awana since it was saved (checked against the
+   loaded lessons.json), storage off, or a newer request has taken over: callers
    re-check their own token). Follows the page's object-URL rule: the old
    currentObjectUrl is revoked only once the new one is in hand. */
 async function savedLessonObjectUrl(week, role, token, networkUrl) {
@@ -184,7 +213,7 @@ async function savedLessonObjectUrl(week, role, token, networkUrl) {
   const id = lessonFileId(week, role);
   let blob = null;
   try {
-    blob = await savedLessonBlob(id);
+    blob = await savedLessonBlob(id, currentLessonFileSource(week, role));
   } catch {
     blob = null;
   }
@@ -216,12 +245,13 @@ function fallBackFromSavedCopy() {
   return true;
 }
 
-/* Is the current week's Student Video saved? cacheLessonBundle() then skips
-   its own copy of it (no second ~150 MB in the Cache API). */
+/* Is the current week's Student Video saved (and still the file lessons.json
+   names)? cacheLessonBundle() then skips its own copy of it (no second
+   ~150 MB in the Cache API). */
 async function lessonSavedOnDisk(week, role) {
   if (!lessonStoreSupported()) return false;
   try {
-    return (await inspectLessonFile(lessonFileId(week, role))).state === 'saved';
+    return (await inspectLessonFile(lessonFileId(week, role), currentLessonFileSource(week, role))).state === 'saved';
   } catch {
     return false;
   }

@@ -237,8 +237,8 @@ test('Settings open, a handout open, or the caption question: the press waits fo
     assert.equal(now().wait, 'reader');
     assert.equal(press('slide-next'), false);
     assert.equal(now().last.reason, 'reader-open');
-    assert.equal(press('pick', { week: 3, choice: 'slides' }), false, 'a pick over it needs the confirm');
-    assert.equal(now().last.reason, 'lesson-running');
+    assert.equal(press('pick', { week: 3, choice: 'slides' }), false, 'a pick waits for it too');
+    assert.equal(now().last.reason, 'reader-open');
     $('handout-view').classList.add('hidden');
   } finally {
     await k.close();
@@ -253,6 +253,48 @@ test('Settings open, a handout open, or the caption question: the press waits fo
     assert.equal(fresh.now().wait, 'captions');
     assert.equal(fresh.press('play'), false);
     assert.equal(fresh.now().last.reason, 'captions-question');
+  } finally {
+    await fresh.k.close();
+  }
+});
+
+test('a pick waits for a person at the screen like every press: Settings, a handout, the caption question, confirmed or not', async () => {
+  const { k, $, press, now } = await boot();
+  try {
+    // Settings open over the Check-in Display: nothing running, and still skipped.
+    $('settings-btn').click();
+    assert.equal(press('pick', { week: 3, choice: 'slides' }), false);
+    assert.equal(now().last.reason, 'settings-open');
+    assert.equal(press('pick', { week: 3, choice: 'slides', force: true }), false, 'the confirm tap does not close Settings');
+    assert.equal(now().last.reason, 'settings-open');
+    assert.equal(shown($('settings-panel')), true, 'left for the person at the screen');
+    assert.equal(shown($('slides-view')), false);
+    k.window.closeSettingsPanel();
+    // A handout open over the room: skipped, confirmed or not, and left open.
+    $('handout-view').classList.remove('hidden');
+    assert.equal(press('pick', { week: 3, choice: 'slides', force: true }), false);
+    assert.equal(now().last.reason, 'reader-open');
+    assert.equal(shown($('handout-view')), true);
+    assert.equal(shown($('slides-view')), false);
+    $('handout-view').classList.add('hidden');
+    // Nothing in the way: the pick runs.
+    assert.equal(press('pick', { week: 3, choice: 'slides' }), true);
+    await ticks();
+    assert.equal(now().view, 'slides');
+  } finally {
+    await k.close();
+  }
+  // The caption question (a kiosk that never answered it).
+  const fresh = await boot({ prefs: {} });
+  try {
+    fresh.k.window.setView('journey');
+    await ticks();
+    fresh.press('begin');
+    await ticks(10);
+    assert.equal(fresh.now().wait, 'captions');
+    assert.equal(fresh.press('pick', { week: 4, choice: 'slides', force: true }), false);
+    assert.equal(fresh.now().last.reason, 'captions-question');
+    assert.equal(fresh.now().wait, 'captions', 'the question is still up');
   } finally {
     await fresh.k.close();
   }

@@ -144,9 +144,11 @@ export function lastWords(now) {
   return l.ok ? `${what}: done ✓` : `${what} skipped: ${REASON_WORDS[l.reason] || REASON_WORDS.unknown}`;
 }
 
-/* Does a pick need the confirm tap (a lesson, or a reading overlay, is up)? */
+/* Does a pick need the confirm tap (a lesson is up)? A screen waiting for a
+   person (Settings, a handout / Read Prep, the caption question) skips every
+   press, a confirmed pick too, so asking first there would only mislead. */
 export function needsConfirm(now) {
-  return Boolean(now && (RUNNING_VIEWS.includes(now.view) || now.wait === 'reader'));
+  return Boolean(now && RUNNING_VIEWS.includes(now.view));
 }
 
 /* The Begin button's words: what the splash's primary button would do. */

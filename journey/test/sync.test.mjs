@@ -26,7 +26,7 @@ const V2_AUTHKEY = await cc.deriveAuthKey('kennebec', V2_PARAMS.salt, V2_PARAMS.
 const settle = async () => { for (let i = 0; i < 8; i++) await tick(); };
 
 /** Boot the kiosk, then sync.js against a stand-in service. */
-function boot({ url = SERVICE, journey = null, prefs = {}, stateStatus = 200, v2 = false, modules = true, pageUrl, screenName = '', tuning = null, helloAnswer = null } = {}) {
+function boot({ url = SERVICE, journey = null, prefs = {}, stateStatus = 200, v2 = false, modules = true, pageUrl, screenName = '', tuning = null, helloAnswer = null, helloStatus = 200, nowAnswer = null } = {}) {
   const kiosk = bootKiosk({}, prefs, undefined, null, pageUrl);
   const { window } = kiosk;
   if (modules) window.journeyAuthModules = { sp, cc };
@@ -58,9 +58,12 @@ function boot({ url = SERVICE, journey = null, prefs = {}, stateStatus = 200, v2
     if (route === '/v1/state') return reply(stateStatus, { journey });
     if (route === '/v1/journey') return reply(200, { savedAt: '2026-10-01T19:00:00.000Z', settings: body.settings });
     if (route === '/v1/screens/hello') {
+      if (helloStatus !== 200) return reply(helloStatus, { error: 'unauthorized' });
       const extra = helloAnswer ? helloAnswer(body, calls) : { settings: null };
       return reply(200, { screen: { id: body.id, kind: body.kind, name: screenName || body.name }, ...extra });
     }
+    // The phone remote's poll (lobby/worker/src/routes.md 10.9): [status, body].
+    if (route === '/v1/screens/now' && nowAnswer) return reply(...nowAnswer(body, calls));
     if (/^\/v1\/screens\/[^/]+\/settings$/.test(route) && init.method === 'PUT') {
       return reply(200, { savedAt: `2026-10-12T20:00:0${calls.length % 10}.000Z`, settings: body.settings, dropped: [] });
     }
@@ -463,4 +466,84 @@ test('the embedded Check-in Display\'s doorbell: a hello now for this kiosk, a p
     assert.fail('the kiosk page has its Check-in Display iframe');
   }
   k.close();
+});
+
+/* ── A session the service refuses: signed out, and nothing keeps asking ── */
+
+const nows = (k) => k.calls.filter((c) => c.route === '/v1/screens/now');
+// Fast remote timers: a timed poll every 40 ms while a phone watches.
+const REMOTE_FAST = { helloMs: 60_000, nowGapMs: 10, playingMs: 40, pollGapMs: 10, bellGapMs: 30 };
+
+test('the phone remote\'s poll refused (401): signed out at once, and not one more poll until a new sign-in', async () => {
+  const answer = { now: [401, { error: 'unauthorized' }] };
+  const k = boot({
+    journey: ROOM,
+    prefs: { 'awanaSyncSession.v1': SESSION },
+    tuning: REMOTE_FAST,
+    helloAnswer: () => ({ settings: null, watch: true }), // a phone is watching
+    nowAnswer: () => answer.now,
+  });
+  try {
+    for (let i = 0; i < 40 && !nows(k).length; i++) await wait(10);
+    assert.equal(nows(k).length, 1, 'the report a watching phone asks for');
+    // Many timed polls' worth of time (in the field: 10 s each, about 360 an hour).
+    await wait(600);
+    await settle();
+    assert.equal(nows(k).length, 1, `no poll after the 401 (${nows(k).length} sent)`);
+    assert.equal(k.window.localStorage.getItem('awanaSyncSession.v1'), null, 'the session is dropped, as the pull drops it');
+    assert.match(k.document.getElementById('sync-status').textContent, /passphrase was changed/);
+    assert.ok(!k.document.getElementById('sync-signin').classList.contains('hidden'));
+    assert.equal(k.window.journeySync.watching(), false);
+    // Screen changes and the doorbell ask nothing while signed out.
+    k.window.dispatchEvent(new k.window.CustomEvent('journey-remote-change'));
+    await wait(100);
+    assert.equal(nows(k).length, 1);
+
+    // A new sign-in: the hello says a phone watches, and the polls resume.
+    answer.now = [200, { actions: [], watch: true, hello: false }];
+    k.document.getElementById('sync-passphrase').value = 'kennebec';
+    k.document.getElementById('sync-signin-btn').click();
+    for (let i = 0; i < 60 && nows(k).length < 3; i++) await wait(20);
+    assert.ok(nows(k).length >= 3, `polling again after the new sign-in (${nows(k).length})`);
+    assert.equal(nows(k).at(-1).auth, `Bearer ${SESSION}`);
+  } finally {
+    k.close();
+  }
+});
+
+test('a hello refused (401) signs this screen out the same way, without waiting for the ten-minute pull', async () => {
+  const k = boot({ journey: ROOM, prefs: { 'awanaSyncSession.v1': SESSION }, tuning: REMOTE_FAST, helloStatus: 401, nowAnswer: () => [200, { actions: [], watch: true }] });
+  try {
+    for (let i = 0; i < 40 && !hellos(k).length; i++) await wait(10);
+    await settle();
+    assert.equal(hellos(k).length, 1);
+    assert.equal(k.window.localStorage.getItem('awanaSyncSession.v1'), null);
+    assert.match(k.document.getElementById('sync-status').textContent, /passphrase was changed/);
+    await wait(200);
+    assert.equal(nows(k).length, 0);
+  } finally {
+    k.close();
+  }
+});
+
+test('signing out while a phone watches leaves no remote timer running', async () => {
+  const k = boot({
+    journey: ROOM,
+    prefs: { 'awanaSyncSession.v1': SESSION },
+    tuning: REMOTE_FAST,
+    helloAnswer: () => ({ settings: null, watch: true }),
+    nowAnswer: () => [200, { actions: [], watch: true, hello: false }],
+  });
+  try {
+    for (let i = 0; i < 40 && nows(k).length < 2; i++) await wait(10);
+    assert.ok(nows(k).length >= 2, 'timed polls while watched');
+    assert.equal(k.window.journeySync.watching(), true);
+    k.document.getElementById('sync-signout-btn').click();
+    assert.equal(k.window.journeySync.watching(), false, 'nobody watching as far as a signed-out kiosk knows');
+    const n = nows(k).length;
+    await wait(300);
+    assert.equal(nows(k).length, n);
+  } finally {
+    k.close();
+  }
 });

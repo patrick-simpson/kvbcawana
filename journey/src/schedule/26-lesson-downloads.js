@@ -360,7 +360,9 @@ async function inspectDownloads() {
       continue;
     }
     try {
-      const f = await inspectLessonFile(item.id);
+      // A copy of a file Awana has since replaced is not counted as saved, so
+      // the run below downloads it again (downloadOneLesson starts it over).
+      const f = await inspectLessonFile(item.id, item);
       files[item.id] = { state: f.state, have: f.have, total: f.total || item.bytes || 0 };
       const at = f.state === 'saved' && f.info && f.info.savedAt;
       if (at && (!dl.lastSavedAt || at > dl.lastSavedAt)) dl.lastSavedAt = at;
@@ -543,7 +545,7 @@ async function downloadOneLesson(item, restarts = 0) {
   const dir = await lessonFileDir(item.id, true);
   if (!dir) throw downloadError('this computer’s storage could not be opened');
   let info = await readLessonInfo(dir);
-  if (info && (info.url !== item.url || (item.bytes && info.bytes !== item.bytes))) {
+  if (info && !savedCopyMatches(info, item)) {
     // Awana moved or replaced the file: start that video again.
     await clearLessonDir(dir);
     info = null;
@@ -654,7 +656,7 @@ async function downloadWithRetries(item, runId) {
       dl.controller = null;
       if (runId !== dl.runId) return; // paused or stopped: not a failure
       try {
-        const f = await inspectLessonFile(item.id);
+        const f = await inspectLessonFile(item.id, item);
         dl.files[item.id] = { state: f.state, have: f.have, total: f.total || item.bytes || 0 };
       } catch { /* keep the last count */ }
       if (why === 'yield') continue; // a lesson started (or quiet hours): wait, then carry on

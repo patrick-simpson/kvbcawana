@@ -396,6 +396,52 @@ test('a damaged saved copy is passed over for the network', async () => {
   k.close();
 });
 
+test('a saved copy of a file Awana has since replaced (new address in lessons.json) plays from the network, is not counted, and the next run replaces it', async () => {
+  const k = boot({ routes: { 'student-2.mp4': { text: 'streamable' } } });
+  await ticks();
+  try {
+    // Saved from the OLD address; lessons.json now names student-2.mp4.
+    seedSaved(k.store, 'week-02-student', FILES[`${CDN}student-2.mp4`], { url: `${CDN}student-2-old.mp4` });
+    await k.window.loadAllLessons();
+    k.window.URL.createObjectURL = () => 'blob:saved';
+    await beginShow(k);
+    assert.equal(k.video.getAttribute('src'), CURRENT.sourceUrl, 'the old copy does not play');
+    assert.equal(saved(k.store, 'week-02-student'), true, 'pinned: playback never deletes it');
+    assert.equal(await k.window.lessonSavedOnDisk(2, 'student'), false, 'the bundle cache does not skip the video for it');
+    k.window.closeSettingsPanel?.();
+    k.window.setView('checkin');
+    await ticks();
+    k.$('downloads-leaders').click(); // Student Videos only for this one
+    await openSettings(k);
+    await wait(5);
+    const row = k.document.querySelector('.downloads-row[data-id="week-02-student"]');
+    assert.notEqual(row.dataset.state, 'saved', 'not shown as saved');
+    assert.equal(k.window.journeyDownloadStatus().saved, 0, 'not counted as saved');
+    k.$('downloads-start-btn').click();
+    await until(() => k.window.journeyDownloads.phase === 'idle', 4000, 'the run');
+    assert.ok(k.cdn.requests.some((r) => r.url === `${CDN}student-2.mp4` && r.range === null), 'downloaded again from the start');
+    assert.equal(JSON.parse(new TextDecoder().decode(k.store.read('journey-lessons-v1/week-02-student/info.json'))).url, `${CDN}student-2.mp4`);
+    assert.equal(k.window.journeyDownloadStatus().saved, 3);
+  } finally {
+    k.close();
+  }
+});
+
+test('a saved copy whose size no longer matches lessons.json plays from the network, and is kept', async () => {
+  const k = boot({ sizes: { ...SIZES, 2: SIZES[2] + 5 }, routes: { 'student-2.mp4': { text: 'streamable' } } });
+  await ticks();
+  try {
+    seedSaved(k.store, 'week-02-student', FILES[`${CDN}student-2.mp4`], { url: `${CDN}student-2.mp4` });
+    await k.window.loadAllLessons();
+    k.window.URL.createObjectURL = () => 'blob:saved';
+    await beginShow(k);
+    assert.equal(k.video.getAttribute('src'), CURRENT.sourceUrl);
+    assert.equal(saved(k.store, 'week-02-student'), true);
+  } finally {
+    k.close();
+  }
+});
+
 test('a saved copy that will not play goes over to the internet copy once, where the room got to', async () => {
   const k = boot();
   await ticks();

@@ -54,11 +54,11 @@ test('every skip reason the kiosk can give has words', () => {
   assert.deepEqual(CHOICES.map((c) => c.choice).sort(), [...JOURNEY_PICKER_CHOICES].sort());
 });
 
-test('a pick asks first only over a running lesson or an open handout', () => {
+test('a pick asks first only over a running lesson (a screen waiting for a person skips it anyway)', () => {
   assert.equal(needsConfirm({ view: 'video' }), true);
   assert.equal(needsConfirm({ view: 'slides' }), true);
   assert.equal(needsConfirm({ view: 'intro' }), true);
-  assert.equal(needsConfirm({ view: 'checkin', wait: 'reader' }), true);
+  assert.equal(needsConfirm({ view: 'checkin', wait: 'reader' }), false, 'the kiosk skips it as reader-open, confirmed or not');
   assert.equal(needsConfirm({ view: 'splash' }), false);
   assert.equal(needsConfirm({ view: 'checkin' }), false);
   assert.equal(needsConfirm(null), false);

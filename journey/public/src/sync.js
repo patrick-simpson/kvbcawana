@@ -61,7 +61,12 @@
      the same request carries what the screen shows (journeyRemote.now()):
      on every change, never twice within nowGapMs (700 ms), and every
      playingMs (10 s) (a playing video's position; a press whose doorbell was
-     missed). Nobody watching: nothing extra is sent at all. A service without the route (404) falls back to the hello. */
+     missed). Nobody watching: nothing extra is sent at all. A service without the route (404) falls back to the hello.
+   - A 401 on any request (the pull, a push, the hello, the phone remote's
+     poll, the switches) means the service no longer knows this session: it
+     is dropped as a sign-out drops it, and every remote poll and timer stops
+     until a new sign-in (never a request every few seconds that can only be
+     refused). */
 
 (function () {
   'use strict';
@@ -241,16 +246,25 @@
     document.getElementById('sync-signed-in').classList.toggle('hidden', !signedIn);
   }
 
+  /* The service refused this session (the passphrase was changed, or the
+     session was revoked): this screen is signed out, says why, and nothing
+     that rides the session keeps asking (the phone remote's polls and timers
+     stop; the hello and the pull stay quiet) until a new sign-in. Only the
+     session that was refused is dropped: a newer one signed in meanwhile is
+     kept. */
+  function sessionRefused(s) {
+    if (s && session() !== s) return;
+    set(SESSION_KEY, null);
+    stopPhone();
+    render();
+    note('The passphrase was changed. Type the new one to sign this screen in again.', 'bad');
+  }
+
   function pull() {
     var s = session();
     if (!base || !s) return Promise.resolve();
     return request('/v1/state', { session: s }).then(function (res) {
-      if (res.status === 401) {
-        set(SESSION_KEY, null);
-        render();
-        note('The passphrase was changed. Type the new one to sign this screen in again.', 'bad');
-        return;
-      }
+      if (res.status === 401) { sessionRefused(s); return; }
       if (!res.ok || !res.body) return;
       var journey = res.body.journey;
       if (!journey || typeof journey.savedAt !== 'string') return;
@@ -275,9 +289,7 @@
         set(APPLIED_KEY, res.body.savedAt);
         note('Saved for every Journey screen.', 'ok');
       } else if (res.status === 401) {
-        set(SESSION_KEY, null);
-        render();
-        note('The passphrase was changed. Type the new one to sign this screen in again.', 'bad');
+        sessionRefused(s);
       } else {
         note('Could not reach the sync service, so this change stayed on this screen.', 'bad');
       }
@@ -387,6 +399,7 @@
     lastHelloAt = Date.now();
     return request('/v1/screens/hello', { method: 'POST', body: body, session: s }).then(function (res) {
       if (res.status === 404) { screenGone = true; clearTimeout(helloTimer); return; }
+      if (res.status === 401) { sessionRefused(s); return; }
       if (!res.ok || !res.body || !res.body.screen) return;
       if (status) lastStatusSent = snapshot;
       var name = res.body.screen.name;
@@ -450,6 +463,16 @@
     armPlaying();
   }
 
+  /* Signed out (here, elsewhere, or refused by the service): no phone is
+     watching as far as this kiosk knows, and no remote timer is left to
+     fire. A new sign-in's hello says again whether one watches. */
+  function stopPhone() {
+    setWatched(false);
+    clearTimeout(remoteBellTimer);
+    remoteBellTimer = null;
+    lastNowSent = '';
+  }
+
   /* While a phone watches: one poll every playingMs (10 s), carrying the
      video's position while one plays, and collecting any press whose
      doorbell was missed (the embedded display reconnecting) well inside its
@@ -457,7 +480,7 @@
   function armPlaying() {
     clearTimeout(playingTimer);
     playingTimer = null;
-    if (!watched) return;
+    if (!watched || !session()) return;
     playingTimer = setTimeout(function () { playingTimer = null; reportSoon(true); }, screenTuning().playingMs);
   }
 
@@ -480,7 +503,7 @@
         return hello();
       }
       if (res.status === 404) return hello(); // forgotten on /settings: the hello registers it again
-      if (res.status === 401) return;
+      if (res.status === 401) { sessionRefused(s); return; }
       if (!res.ok || !res.body) return;
       if (Array.isArray(res.body.actions)) runPhone(res.body.actions);
       if (res.body.hello === true) helloAfter(0);
@@ -590,6 +613,8 @@
       .then(function (res) {
         if (res.ok && res.body && typeof res.body.savedAt === 'string') {
           saveScreenSlot({ synced: { savedAt: res.body.savedAt, settings: cleanPrefs(res.body.settings) } });
+        } else if (res.status === 401) {
+          sessionRefused(s);
         }
       });
   }
@@ -704,6 +729,7 @@
 
   function signOut() {
     set(SESSION_KEY, null);
+    stopPhone();
     render();
     note('Signed out. This screen keeps its settings.', 'muted');
   }
@@ -769,7 +795,7 @@
     window.addEventListener('storage', function (e) {
       if (e.key !== SESSION_KEY && e.key !== null) return;
       render();
-      if (session()) { pull(); hello(); }
+      if (session()) { pull(); hello(); } else stopPhone();
     });
   }
   // 15 s, 30 s, 60 s, then every five minutes.

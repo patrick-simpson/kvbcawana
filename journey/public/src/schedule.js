@@ -330,6 +330,26 @@ function lessonFileSource(lesson, role) {
   return { url, bytes: Number.isFinite(bytes) && bytes > 0 ? bytes : null };
 }
 
+/* The current address and size of `week`'s `role` video from the loaded
+   lessons.json, or null when that is not known (the list not loaded, a week
+   it does not have, no downloadable address). */
+function currentLessonFileSource(week, role) {
+  const entry = Array.isArray(allLessons) ? allLessons.find((l) => l && l.week === week) : null;
+  return entry ? lessonFileSource(entry, role) : null;
+}
+
+/* Is the copy on disk (its info.json) still the file lessons.json names?
+   `source` is { url, bytes } (lessonFileSource(), or a download plan item).
+   A different address, or a different size when lessons.json gives one,
+   means Awana replaced the file: that copy is NOT saved (it does not play,
+   it is not counted) and the downloader starts it again (downloadOneLesson).
+   No source to compare with (null): the copy counts, so a kiosk that cannot
+   read lessons.json still plays what it saved. */
+function savedCopyMatches(info, source) {
+  if (!info || !source || !source.url) return true;
+  return info.url === source.url && !(source.bytes && info.bytes !== source.bytes);
+}
+
 /* Pure: how many bytes of a file of `total` bytes, cut into `chunk`-byte
    pieces, are safely on disk given the pieces' sizes in order. A piece counts
    only at its full expected size and only while every piece before it does
@@ -407,12 +427,17 @@ async function lessonChunkFiles(dir, info) {
 /* What is on disk for one video: { state, have, total, info }.
    state: 'none' (nothing), 'partial' (some pieces, resumable), 'saved' (every
    byte), 'damaged' (marked finished but pieces missing or the wrong size:
-   it is downloaded again, and plays from the internet meanwhile). */
-async function inspectLessonFile(id) {
+   it is downloaded again, and plays from the internet meanwhile). A copy of
+   a file lessons.json no longer names (`source`, savedCopyMatches()) is
+   'none' with `stale`: the downloader starts it from the beginning. Its
+   pieces stay on disk until then (only the downloader or Delete removes
+   anything). */
+async function inspectLessonFile(id, source) {
   const dir = await lessonFileDir(id, false);
   if (!dir) return { state: 'none', have: 0, total: 0, info: null };
   const info = await readLessonInfo(dir);
   if (!info) return { state: 'none', have: 0, total: 0, info: null };
+  if (!savedCopyMatches(info, source)) return { state: 'none', have: 0, total: (source && source.bytes) || 0, info: null, stale: true };
   const files = await lessonChunkFiles(dir, info);
   const have = committedLessonBytes(files.map((f) => f.size), info.bytes, info.chunk);
   let state = 'partial';
@@ -423,12 +448,15 @@ async function inspectLessonFile(id) {
 }
 
 /* The saved video as ONE disk-backed Blob of its pieces, or null when it is
-   not completely saved. Never reads the bytes themselves. */
-async function savedLessonBlob(id) {
+   not completely saved, or is a copy of a file lessons.json no longer names
+   (`source`: savedCopyMatches(); the caller then plays from the network, as
+   for a missing copy, and the downloader replaces it). Never reads the bytes
+   themselves, never deletes anything. */
+async function savedLessonBlob(id, source) {
   const dir = await lessonFileDir(id, false);
   if (!dir) return null;
   const info = await readLessonInfo(dir);
-  if (!info) return null;
+  if (!info || !savedCopyMatches(info, source)) return null;
   const files = await lessonChunkFiles(dir, info);
   if (committedLessonBytes(files.map((f) => f.size), info.bytes, info.chunk) !== info.bytes) return null;
   return new Blob(files, { type: 'video/mp4' });
@@ -443,7 +471,8 @@ let savedPlayback = null;
 const savedPlaybackFailures = new Set();
 
 /* A playable object URL for the saved copy of `week`'s `role` video, or null
-   (none, damaged, storage off, or a newer request has taken over: callers
+   (none, damaged, replaced by Awana since it was saved (checked against the
+   loaded lessons.json), storage off, or a newer request has taken over: callers
    re-check their own token). Follows the page's object-URL rule: the old
    currentObjectUrl is revoked only once the new one is in hand. */
 async function savedLessonObjectUrl(week, role, token, networkUrl) {
@@ -451,7 +480,7 @@ async function savedLessonObjectUrl(week, role, token, networkUrl) {
   const id = lessonFileId(week, role);
   let blob = null;
   try {
-    blob = await savedLessonBlob(id);
+    blob = await savedLessonBlob(id, currentLessonFileSource(week, role));
   } catch {
     blob = null;
   }
@@ -483,12 +512,13 @@ function fallBackFromSavedCopy() {
   return true;
 }
 
-/* Is the current week's Student Video saved? cacheLessonBundle() then skips
-   its own copy of it (no second ~150 MB in the Cache API). */
+/* Is the current week's Student Video saved (and still the file lessons.json
+   names)? cacheLessonBundle() then skips its own copy of it (no second
+   ~150 MB in the Cache API). */
 async function lessonSavedOnDisk(week, role) {
   if (!lessonStoreSupported()) return false;
   try {
-    return (await inspectLessonFile(lessonFileId(week, role))).state === 'saved';
+    return (await inspectLessonFile(lessonFileId(week, role), currentLessonFileSource(week, role))).state === 'saved';
   } catch {
     return false;
   }
@@ -5664,7 +5694,9 @@ async function inspectDownloads() {
       continue;
     }
     try {
-      const f = await inspectLessonFile(item.id);
+      // A copy of a file Awana has since replaced is not counted as saved, so
+      // the run below downloads it again (downloadOneLesson starts it over).
+      const f = await inspectLessonFile(item.id, item);
       files[item.id] = { state: f.state, have: f.have, total: f.total || item.bytes || 0 };
       const at = f.state === 'saved' && f.info && f.info.savedAt;
       if (at && (!dl.lastSavedAt || at > dl.lastSavedAt)) dl.lastSavedAt = at;
@@ -5847,7 +5879,7 @@ async function downloadOneLesson(item, restarts = 0) {
   const dir = await lessonFileDir(item.id, true);
   if (!dir) throw downloadError('this computer’s storage could not be opened');
   let info = await readLessonInfo(dir);
-  if (info && (info.url !== item.url || (item.bytes && info.bytes !== item.bytes))) {
+  if (info && !savedCopyMatches(info, item)) {
     // Awana moved or replaced the file: start that video again.
     await clearLessonDir(dir);
     info = null;
@@ -5958,7 +5990,7 @@ async function downloadWithRetries(item, runId) {
       dl.controller = null;
       if (runId !== dl.runId) return; // paused or stopped: not a failure
       try {
-        const f = await inspectLessonFile(item.id);
+        const f = await inspectLessonFile(item.id, item);
         dl.files[item.id] = { state: f.state, have: f.have, total: f.total || item.bytes || 0 };
       } catch { /* keep the last count */ }
       if (why === 'yield') continue; // a lesson started (or quiet hours): wait, then carry on
@@ -6583,9 +6615,10 @@ window.journeySettingsPage = { command: settingsPageCommand, prefs: downloadPref
      the screen once, and the phone's Unmute says why it could not.
    - Something only a person at the screen can clear (Settings open, a
      handout or Read Prep open, the "Show captions?" question) skips the
-     press, and the reason rides the next report: the phone shows it. A pick
-     never replaces a lesson already running unless the phone sent
-     `force: true` (only after its confirm tap).
+     press (a pick too, `force` or not), and the reason rides the next
+     report: the phone shows it. A pick never replaces a lesson already
+     running unless the phone sent `force: true` (only after its confirm
+     tap).
    - journeyRemote.now() is what the screen shows, in the shape the Worker
      keeps (lobby/shared/journeyRemote.js sanitizeJourneyNow): the view, the
      lesson's week and TITLE (never a file), the slide (number, kind, and the
@@ -6724,7 +6757,9 @@ function remoteStartSlides() {
 }
 
 /* A lesson from the phone's picker: the configure relay's checks, and never
-   over a running lesson (or an open handout / Read Prep) without `force`. */
+   over a running lesson without `force`. Settings, a handout / Read Prep or
+   the caption question has already skipped it (runRemoteCommand), as it
+   skips every press: only a person at the screen closes those. */
 function remotePick(data) {
   const target = pickerTargetFor(data);
   if (target.reason === 'lessons-loading') {
@@ -6732,11 +6767,7 @@ function remotePick(data) {
     return 'lessons-loading';
   }
   if (!target.lesson) return target.reason;
-  if (data.force !== true && (journeyLessonRunning() || readerOverlayOpen())) return 'lesson-running';
-  if (readerOverlayOpen()) {
-    closeHandout();
-    closePrep();
-  }
+  if (data.force !== true && journeyLessonRunning()) return 'lesson-running';
   if (remoteSoundAllowed()) audioUnlocked = true;
   PICKER_CHOICES[target.choice](target.lesson);
   return null;
@@ -6745,10 +6776,12 @@ function remotePick(data) {
 /* One press: null when it was done, else the reason it was skipped. */
 function runRemoteCommand(action, data) {
   if (CONFIGURE_MODE) return 'configure';
-  if (action === 'pick') return remotePick(data && typeof data === 'object' ? data : {});
+  // Every press, a pick too, waits for a person at the screen first.
   const blocked = remoteBlockedBy();
   if (blocked) return blocked;
   switch (action) {
+    case 'pick':
+      return remotePick(data && typeof data === 'object' ? data : {});
     case 'slide-next':
       if (!slideshowActive()) return 'no-slides';
       nextSlide();
