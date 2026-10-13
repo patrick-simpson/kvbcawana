@@ -231,7 +231,7 @@ export const ProjectorArt: React.FC<{ on: boolean }> = ({ on }) => {
     return () => window.clearInterval(t);
   }, [on, view]);
   return (
-    <div className="kv-scr kv-proj" role="img" aria-label="Recreation of the main-room projector. All week it counts down to the next club night on black, Awana begins in 2 days 4 hours 12 minutes. A small weather chip, Cloudy 54 degrees, sits top right, and one flat cartoon cloud drifts slowly behind the numbers. On club night each club's game slot gets its own screen: GAME TIME for T&T in green, with a timer at 1:47 that has turned amber two minutes before the handoff.">
+    <div className="kv-scr kv-proj" role="img" aria-label="Recreation of the main-room projector. All week it counts down to the next club night on black, Awana begins in 2 days 4 hours 12 minutes. A small weather chip, Cloudy 54 degrees, sits top right, and one flat cartoon cloud drifts slowly behind the numbers. On club night each club's game slot gets its own screen: GAME TIME for T&T in green, with a timer at 1:47 that has turned amber two minutes before the handoff and a chip that says Wrap it up.">
       <span className="kv-proj__roller" />
       <div className="kv-proj__screen">
         {view === 0 ? (
@@ -254,12 +254,10 @@ export const ProjectorArt: React.FC<{ on: boolean }> = ({ on }) => {
           </div>
         ) : (
           <div className="kv-proj__view kv-proj__game" data-club="tnt" key="game">
-            <Shape name="wave-tnt" stretch className="kv-proj__wave kv-proj__wave--top" />
-            <Shape name="wave-tnt" stretch className="kv-proj__wave kv-proj__wave--bottom" />
             <img className="kv-proj__club" src={club('tnt').white} alt="" />
             <span className="kv-proj__game-title">Game time</span>
             <span className="kv-proj__timer">{Math.floor(secs / 60)}:{String(secs % 60).padStart(2, '0')}</span>
-            <StepChip className="kv-proj__chip kv-proj__chip--amber" label="Handoff in" value="2 min" />
+            <StepChip className="kv-proj__chip kv-proj__chip--amber" label="Game ends 6:30 pm" value="Wrap it up" />
           </div>
         )}
       </div>

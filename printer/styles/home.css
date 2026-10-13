@@ -461,9 +461,6 @@ sup { font-size: .55em; line-height: 0; vertical-align: .9em; }
 .kv-proj__star { position: absolute; width: .9cqw; height: .9cqw; border-radius: 50%; background: #fff; }
 .kv-proj__star--a { left: 12cqw; top: 14cqw; } .kv-proj__star--b { right: 14cqw; top: 22cqw; } .kv-proj__star--c { left: 22cqw; bottom: 9cqw; }
 .kv-proj__game { --c: var(--brand-tnt); --c-deep: var(--brand-tnt-deep); }
-.kv-proj__wave { position: absolute; left: -4%; width: 108%; height: 22%; color: var(--c); }
-.kv-proj__wave--top { top: -1px; transform: scale(-1, -1); }
-.kv-proj__wave--bottom { bottom: -1px; }
 .kv-proj__club { width: 9cqw; height: auto; margin-top: 3cqw; }
 .kv-proj__game-title { font: 400 9.6cqw/1 var(--shout); text-transform: uppercase; color: #fff; text-shadow: .7cqw .7cqw 0 var(--c-deep); margin-top: 1cqw; }
 .kv-proj__timer { font: 400 11cqw/1 var(--shout); color: var(--sun); font-variant-numeric: tabular-nums; margin-top: .6cqw; }
@@ -858,7 +855,6 @@ sup { font-size: .55em; line-height: 0; vertical-align: .9em; }
   .kv-proj__cloud { animation: kv-cloud 80s linear -21.1s infinite; }
   .kv-proj__star { animation: kv-twinkle 2.4s ease-in-out infinite; }
   .kv-proj__star--b { animation-delay: -.8s; } .kv-proj__star--c { animation-delay: -1.6s; }
-  .kv-proj__game .kv-proj__wave--bottom { animation: kv-rise .64s var(--wipe) both; }
   /* The Journey screen: the carry, the cards' slanted wipe and slams, the start screen's hint pulse. */
   .kv-kiosk__carry { animation: kv-carry .9s var(--wipe) both; }
   .kv-jv.is-wipe { animation: kv-slide-in .52s var(--wipe) both; }
