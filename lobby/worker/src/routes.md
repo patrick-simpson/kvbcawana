@@ -1193,3 +1193,25 @@ for its next hello.
 - `PUT /v1/journey` replaces the whole document: /settings reads the newest
   first and changes only its own keys (`lib/journeyClient.js` `mergeJourney`,
   through `sanitizeJourney`), so tonight's edited bullets ride along.
+
+### 10.9 The Journey phone remote (BUILT, owner 2026-10-13)
+
+"Build a way to advance slides for Journey on a phone ... Doing it on the
+phone should advance the slide for all." A leader's phone opens
+awana.kvbchurch.org/journey/remote/ (`journey/public/remote/`), signs in with
+the passphrase, and every press goes to EVERY Journey kiosk in the registry.
+Code: `journeyRemote.js`; rules (one copy, shared with the phone page):
+`../shared/journeyRemote.js`, re-exported by `src/lib/syncSpecs.js`.
+
+| Route | Auth | Request | Answer |
+| --- | --- | --- | --- |
+| `POST /v1/journey/remote` | session | `{action, data?}`: `slide-next` \| `slide-prev` \| `slides-start` \| `play` \| `pause` \| `toggle-pause` \| `seek` `{by}` (signed whole seconds, clamped to ±15, never 0) \| `mute` \| `unmute` \| `begin` \| `pick` `{week 1..99, choice in student/leader/slides/handout/student-prep/leader-prep, force?: true}`; other data dropped, never free text | `{ok, id, kiosks, online}`; 400 anything else; 409 `{reason: 'no-kiosks'}`; 429 `{retryAfterMs}` past 8 presses at once (4 a second after that) per sign-in |
+| `GET /v1/journey/remote/state` | session | | `{kiosks: [{id, name, online, now \| null}], online, serverNow, watchMs}` |
+| `POST /v1/screens/now` (a `journey` screen) | session | `{id, now?}` | `{actions: [{id, action, data?, at}], watch, hello}`; 404 for an id that is not a registered Journey kiosk |
+| `POST /v1/screens/hello` (a `journey` screen) | session | as 10.7 | as 10.8 plus `remote` (the same press list, handed over once) and `watch` |
+
+- `now` (the kiosk's report, `sanitizeJourneyNow`): `{view: splash|intro|video|slides|checkin|trek|idle, week, title (<= 80), preview, wait: captions|loading|settings|reader|null, slide?: {n, of, kind: title|verse|misconception|illumination|questions|template, heading, lines: [<= 3 x <= 80]}, video?: {t, d, paused, muted}, resume?, last: {id, action, ok, reason}|null, at}`. `at` is replaced by the Worker's receipt time. Lesson titles only, never a URL or a file name.
+- NOTHING is written to storage: presses live in memory per kiosk (at most 12, the oldest first out, each dropped after 20 s, each handed over ONCE: taken out as it is handed over, so a lost reply loses a press and never repeats it; the kiosk also never runs a press id twice); reports live in memory (newest per kiosk, a restart forgets them); "online" also counts a kiosk's recent poll (memory) without moving its stored `lastSeen`. The download commands of 10.8 stay as they are (stored, 10 min); `hello: true` tells a kiosk one waits (memory flag; after a restart the two-minute hello still collects it).
+- Doorbell: each press rings `changed {what: 'screen-action', id, action: 'remote'}` once per kiosk; the embedded Check-in Display passes it up (`lobby/src/lib/embed.js hostDoorbell`, unchanged), and the kiosk polls `POST /v1/screens/now` at once. The first state read after a quiet spell (no phone for 30 s) rings every kiosk the same way (`action: 'remote-watch'`) so they report straight away.
+- Watching: kiosks report only while a phone read the state within 30 s (`watch` in their answers): on each change (at most one every 700 ms) and one poll every 10 s (a playing video's position; and a press whose doorbell was missed is still collected inside its 20 s). Nobody watching = no extra request at all.
+- Free plan: no storage writes; CPU = clamps and Map lookups. Requests per hour with a phone open (one kiosk): ~2,400 state polls + ~400-500 kiosk polls (360 timed, plus one per change and per press) + presses; with the phone closed: nothing beyond the kiosks' usual hellos.

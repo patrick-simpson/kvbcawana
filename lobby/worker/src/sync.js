@@ -53,6 +53,7 @@ import { CloudPhone } from './phone.js';
 import { Friends } from './friends.js';
 import { mountBarf } from './barf.js';
 import { Screens } from './screens.js';
+import { JourneyRemote, mountJourneyRemote } from './journeyRemote.js';
 import { BadRequest, fail, json } from './http.js';
 import { Registry } from './registry.js';
 import { Ledger, Tags } from './ledger.js';
@@ -222,6 +223,14 @@ export class SyncCore {
       liveScreens,
       ring: (payload) => { this.broadcast(frameText(DOORBELL_EVENT, payload)); },
     });
+    // The Journey phone remote (journeyRemote.js, routes.md 10.9): one press to every
+    // Journey kiosk, and what each one shows while a phone watches. Memory only.
+    this.journeyRemote = new JourneyRemote({
+      screens: this.screens,
+      now: this.now,
+      ring: (payload) => { this.broadcast(frameText(DOORBELL_EVENT, payload)); },
+    });
+    mountJourneyRemote(this.registry, this);   // /v1/journey/remote, /v1/journey/remote/state (routes.md 10.9)
     // The change log (changes.js, routes.md 10.5): every write path below logs who
     // (device.js), when, which keys, before and after; a module that owns an
     // undoable kind adds its undoer to `undoers`.
@@ -656,6 +665,7 @@ export class SyncCore {
    * The screen registry's routes (screens.js), all behind a session:
    *   GET    /v1/screens                  every screen
    *   POST   /v1/screens/hello            {id, kind, name?, pendingRoleChange?, status?}
+   *   POST   /v1/screens/now              {id, now?}  a Journey kiosk's phone-remote poll (routes.md 10.9)
    *   GET    /v1/screens/<id>/settings    {screen, settings}
    *   PUT    /v1/screens/<id>/settings    {settings}
    *   PUT    /v1/screens/<id>/name        {name}
@@ -667,9 +677,9 @@ export class SyncCore {
     const m = /^\/v1\/screens(?:\/([^/]+)(?:\/(settings|name|action))?)?$/.exec(url.pathname);
     if (!m) return fail('Not found.', 404);
     const [, id = '', part = ''] = m;
-    // 'hello' is never an id (an id is 16 to 64 characters).
-    const route = !id ? `${request.method} list` : id === 'hello' && !part ? `${request.method} hello` : `${request.method} ${part}`;
-    const known = ['GET list', 'POST hello', 'GET settings', 'PUT settings', 'PUT name', 'POST action', 'DELETE '];
+    // 'hello' and 'now' are never ids (an id is 16 to 64 characters).
+    const route = !id ? `${request.method} list` : (id === 'hello' || id === 'now') && !part ? `${request.method} ${id}` : `${request.method} ${part}`;
+    const known = ['GET list', 'POST hello', 'POST now', 'GET settings', 'PUT settings', 'PUT name', 'POST action', 'DELETE '];
     if (!known.includes(route)) return fail('Not found.', 404);
     if (!(await this.authorized(request))) {
       return fail('This screen is signed out. Type the passphrase again.', 401, { reason: 'signed-out' });
@@ -677,13 +687,21 @@ export class SyncCore {
     let res;
     switch (route) {
       case 'GET list': res = await this.screens.list(); break;
-      case 'POST hello': res = await this.screens.hello(await this.body(request)); break;
+      case 'POST hello': {
+        const body = await this.body(request);
+        res = await this.screens.hello(body);
+        // A Journey kiosk's hello also hands over its phone-remote presses and whether a phone watches.
+        if (res.ok && body.kind === 'journey') res = { ok: true, body: { ...res.body, ...this.journeyRemote.helloExtras(body.id) } };
+        break;
+      }
+      case 'POST now': res = await this.journeyRemote.kioskPoll(await this.body(request)); break;
       case 'GET settings': res = await this.screens.get(id); break;
       case 'PUT settings': res = await this.screenSettings(id, await this.body(request), request, {}); break;
       case 'PUT name': res = await this.screenRename(id, await this.body(request), request, {}); break;
       case 'POST action': res = await this.screens.act(id, await this.body(request)); break;
       default:
         res = await this.screens.forget(id);
+        this.journeyRemote.forget(id);
         if (res.ok && /** @type {any} */ (res.body).forgotten) await this.logChange(request, {}, { what: 'screen-forget', target: id, keys: [], undoable: false });
     }
     return res.ok ? json(res.body) : fail(res.error, res.status);

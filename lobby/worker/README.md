@@ -168,6 +168,7 @@ one silent for a month.
 | --- | --- |
 | `POST /v1/screens/hello` `{id, kind, name?, pendingRoleChange?, status?}` | `{screen, settings}`; adds a new screen (a known one keeps its name), moves `lastSeen`; its `status` (a Journey kiosk's saved lessons, a computer's app version and update, a TV's or projector's page build; one shape per kind, `src/routes.md` 10.7) is kept and listed; a `computer` (KVBC Awana) holding a print-off until its last label prints sends `pendingRoleChange` (its allowlist), kept until a hello without one |
 | `GET /v1/screens` | `{screens: [{id, kind, name, createdAt, lastSeen, online, live, pendingRoleChange?, status?}], max}`; online = seen in the last 3 minutes or on the live channel |
+| `POST /v1/screens/now` `{id, now?}` | a Journey kiosk's phone-remote poll: `{actions, watch, hello}`; memory only, nothing stored (`src/routes.md` 10.9) |
 | `GET /v1/screens/<id>/settings` | `{screen, settings: {savedAt, settings} \| null}` |
 | `PUT /v1/screens/<id>/settings` `{settings}` | `{savedAt, settings, dropped}`; the whole layer, through the kind's allowlist |
 | `PUT /v1/screens/<id>/name` `{name}` | `{screen}` |
@@ -249,3 +250,7 @@ times). Counts go to D1 `night_summary_import` (migration 0003); the trends'
 summary answers the desk's live line where one exists, else the imported one,
 so nothing is counted twice. `GET /v1/history/import-status` says how far it
 got; `src/routes.md` section 3 has the details.
+
+### Journey phone remote (`src/journeyRemote.js`, `src/routes.md` 10.9)
+
+`POST /v1/journey/remote` `{action, data?}` sends one press to every Journey kiosk; `GET /v1/journey/remote/state` lists what each kiosk shows and how many are online. Both need a session. Held in memory only (presses 20 s, reports until replaced), never written to storage.

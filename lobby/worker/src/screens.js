@@ -122,6 +122,8 @@ export class Screens {
     this.ring = ring || (() => {});
     /** The newest status each screen reported, ahead of storage (at most one per known screen). @type {Map<string, NonNullable<ScreenRecord['status']>>} */
     this.fresh = new Map();
+    /** Journey kiosks with a download command waiting in storage (memory: a restart forgets, the two-minute hello still collects). @type {Set<string>} */
+    this.waiting = new Set();
   }
 
   /** @returns {Promise<Record<string, ScreenRecord>>} */
@@ -222,6 +224,7 @@ export class Screens {
     if (!queuesActions(kind)) return { ok: true, body: answer };
     // What /settings asked of it since its last hello: handed over once.
     const q = await this.storage.get(screenQueueKey(id));
+    this.waiting.delete(id);
     if (q === undefined || q === null) return { ok: true, body: { ...answer, actions: [] } };
     await this.storage.delete(screenQueueKey(id));
     return { ok: true, body: { ...answer, actions: freshActions(q?.items, kind, t) } };
@@ -237,6 +240,7 @@ export class Screens {
     if (!oldest || this.now() - oldest.lastSeen < STALE_MS) return false;
     delete index[oldest.id];
     this.fresh.delete(oldest.id);
+    this.waiting.delete(oldest.id);
     await this.storage.delete(screenSettingsKey(oldest.id));
     await this.storage.delete(screenQueueKey(oldest.id));
     return true;
@@ -298,6 +302,7 @@ export class Screens {
     const index = await this.index();
     const had = Boolean(Screens.pick(index, id));
     this.fresh.delete(id);
+    this.waiting.delete(id);
     if (had) {
       delete index[id];
       await this.saveIndex(index);
@@ -330,6 +335,7 @@ export class Screens {
         return refuse(429, `${r.name} has not picked up the last ${SCREEN_ACTION_QUEUE_MAX} requests yet. Give it a minute, then try again.`);
       }
       await this.storage.put(screenQueueKey(id), { items: [...waiting, { action: clean.action, at }] });
+      this.waiting.add(id);
       this.ring({ what: 'screen-action', id, action: clean.action, at });
       return { ok: true, body: { ok: true, delivered: false, queued: true } };
     }
