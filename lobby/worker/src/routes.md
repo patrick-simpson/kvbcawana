@@ -3,7 +3,7 @@
 The route table the P1–P7 builders work against (root
 `ROADMAP.md#online-check-in`). Built so far: the crypto module
 (`lobby/shared/cloud-crypto.js`), the D1 schema (`../migrations/0001_history.sql`,
-`0002_applied_batches.sql`), sections 2 and 3 (P6, `history.js`) and, in the
+`0002_applied_batches.sql`, `0003_trends_import.sql`), sections 2 and 3 (P6, `history.js`) and, in the
 Worker core, **the routes marked BUILT below** (stations, the print lease, the
 desk's claim API, the one read clock; section 7 says how a module adds its
 own). **This file is the single truth for the Worker, the print role
@@ -144,7 +144,8 @@ passphrase, lose the history (owner).
 | `POST /v1/history/rows` | session | `{rows: Row[] (at most 100), summary?: [{night, club, checkedIn, checkedOut, undone, prints}] (deltas)}` | `INSERT OR IGNORE` into `history_rows` (a retried batch is harmless), upsert-add into `night_summary`. `{stored, duplicates}`. 503 `{reason: 'history-off'}` without `HISTORY_DB`. |
 | `GET /v1/history/rows?night=YYYY-MM-DD&after=<id>&limit=<=500` | session | | `{rows: Row[], next: id \| null}` |
 | `GET /v1/history/nights?from=&to=` | session | | `[{night, rows}]` (a COUNT by night) |
-| `GET /v1/history/summary?from=&to=` | session | | `night_summary` lines, plaintext numbers |
+| `GET /v1/history/summary?from=&to=` | session | | `night_summary` lines, plaintext numbers, plus the trends back-fill's imported counts for every night and club with NO live line (`imported: true`; below) |
+| `GET /v1/history/import-status` **BUILT** | session | | the trends back-fill (below): `{state: 'idle'\|'running'\|'done'\|'unreadable'\|'not-configured', reason?, seasons: [{season, nights, importedAt}], oldestSeason, lastRunAt, nextDueAt, lastError, unreadableWhy, skipped, ended, currentSeasonLastAt}`, fixed codes and numbers only; asking also sets the alarm sooner when a season read is due |
 | `POST /v1/history/import` | session | `{rows: Row[] (at most 500), summary?}`, rows sealed by the KVBC Awana app from the laptop's own history (`kind` `import-checkin`, …) | as `POST /v1/history/rows`; `BODY_MAX` 1 MB for this route only |
 
 **Row kinds** (the plaintext `kind` of a row; the record inside is sealed). One
@@ -232,6 +233,65 @@ how many outbox entries wait). Differences from the table above:
 job runs `wrangler d1 migrations apply awana-history --remote` before every
 Worker deploy (idempotent).
 
+### The trends back-fill (BUILT, `trendsimport.js`; owner 2026-10-13)
+
+"For the trends page, can the worker grab the data off TwoTimTwo, then import it
+into the database in Cloudflare." Fully automatic, no button:
+
+- **Source.** `/report/attendance_summary?year_start=<season's first year>&output=csv`
+  (`printer/docs/TWOTIMTWO.md` sections 4, 5, 8.1): `"Meeting","Puggles","",...,"TOTAL",""`,
+  one row per meeting, newest first, a count per club. ONE read per season.
+  NOT verified against the live site: the `year_start` value (the start year,
+  `2025` for 2025-26, is assumed), the Meeting cell's date format (a few exact
+  shapes are read: `9/10/2025`, `9/10`, `2025-09-10`, `Sep10`, `September 10,
+  2025`, ...; a cell with no year takes it from the Aug-1 season boundary), and
+  what the blank-headed column beside each club holds (never read beyond being
+  number-like).
+- **Strict** (`parseAttendanceSummary`): the header must be `Meeting`, then each
+  club the app's club table knows (`lobby/shared/clubs.js`; stored under its
+  name, `T&T` etc.) with a blank partner, then `TOTAL`, `""`; every row the same
+  width; counts digits or blank; a row's clubs must add up to its TOTAL; a
+  Meeting cell is a date, a summary word (`Total`, `Average`) or blank with no
+  counts, else the season is refused; a dated row outside the season, or a night
+  listed twice, refuses it too. A refused season stores NOTHING (`lastError
+  'unreadable'`, `unreadableWhy` = `header`, `row-shape`, `bad-date`, `bad-count`,
+  `total-mismatch`, `duplicate-night`, `out-of-season`, `too-many-rows`, `not-csv`,
+  or `shrank`: a re-read with fewer nights than last time), is tried again after
+  24 h, 3 times, then skipped (`skipped`; the current season gets 3 fresh tries
+  after each club night). Nights after today (today only once its window has
+  closed) and nights with no attendance (the next, unheld meeting; TOTAL 0) are
+  skipped; counts are clamped 0..2000.
+- **When.** From the watcher's alarm (one hook line in `Watcher.tick`), only
+  while the watch window is CLOSED and the youth check-out is not due (so after
+  midnight on a club night when `YM_CHECKOUT` is on). Order: the current season
+  until first imported; then, after each club night's window closes, the current
+  season once more (late paper sheets); then the walk back, one season a read,
+  until a season has no meetings (`ended: 'empty'`) or 20 seasons (`'cap'`).
+  An older season is never read again once done. A season that comes back
+  identical to another (same body) or dated in another season means TwoTimTwo
+  ignored `year_start`: nothing is stored and the walk ends (`'year-ignored'`).
+- **The read clock.** One page on the shared clock with `waitMs` 0 and no
+  priority, the lowest of all: a booked clock is "next tick". A failed read backs
+  off 5 min, 15 min, 1 h (a refused sign-in at least the client's own back-off);
+  TwoTimTwo refusing the report (403, 404) waits a day. The whole back-fill is at
+  most 20 reads, once (plus a sign-in's hops); then one read a week.
+- **Storage.** D1 `night_summary_import (night, club, attended, imported_at)`
+  (`migrations/0003_trends_import.sql`), counts only. A season is ONE atomic
+  `db.batch`: a DELETE of its Aug 1..Jul 31 range, then upserts (`INSERT ... ON
+  CONFLICT DO UPDATE`) of 32 lines each (97 bound parameters; ~250 lines = 9
+  statements). DO storage `trends:import` (a small JSON: seasons with nights,
+  time and a body fingerprint, the walk's next season, refusals, times, fixed
+  error codes; no name). A restart resumes from it; the attempt is written
+  through before each read.
+- **Never double counted.** `GET /v1/history/summary` answers, per night and
+  club, the LIVE `night_summary` line when one exists, else the imported count
+  as `checkedIn` (`checkedOut`, `undone`, `prints` 0) with `imported: true`.
+  The live desk always wins. Past `SUMMARY_MAX` the oldest lines are left out.
+- **Not configured** (`state: 'not-configured'`, `reason`): `no-secrets` (no
+  `TWOTIMTWO_*`), `cloud-off` (`CLOUD_CHECKIN = "off"`: the alarm does not run),
+  `history-off` (no `HISTORY_DB`), `sign-in-refused`, `no-permission` (403 on the
+  report). It reads nothing and waits.
+
 ## 4. Stations (BUILT: register, list, revoke; the rest is the station role's)
 
 | Route | Auth | Request | Answer |
@@ -263,12 +323,42 @@ behaviour is `desk.js`, which the page calls through these routes.
 
 | Route | Auth | Request | Answer |
 | --- | --- | --- | --- |
-| `GET /v1/desk/roster` **BUILT** | session | | tonight's check-in page roster `{readAt, stale?, kids: [{clubberId, first, last, club, clubId, checkedIn}], familiesAt?}` (no medical data; plaintext over TLS, from the last read, held in memory, never stored). A page at most 30 s old (`CHECKIN_PAGE_TTL_MS`) is the answer; the watcher's alarm reads it ahead in a free slot while pages poll (pages poll every 15 s), else the request reads it through the read clock, waiting its turn up to 20 s; a clock booked past that answers the last read marked `stale`, or 429 `{reason: 'read-busy', retryAfterMs}` with none. `familiesAt`: when the Worker's household list was read (a page that sees it move asks `/v1/desk/families` again) |
+| `GET /v1/desk/roster` **BUILT** | session | | on a day with no club: `{noClub: true, today, next, readAt, kids: [], items: {bible: [], friend: []}}` at once, no TwoTimTwo read (see "No club tonight" below); otherwise tonight's check-in page roster `{readAt, stale?, restored?, kids: [{clubberId, first, last, club, clubId, checkedIn}], familiesAt?}` (no medical data; plaintext over TLS, from the last read, held in memory and kept SEALED in storage for the night, see "The held page across a restart" below). After a restart, a page read back from storage is the answer at once, `restored: true` (not `stale`: the page's "TwoTimTwo is not answering" note is for a failed read), and the watcher's alarm reads a fresh one in its next free slot. A page at most 30 s old (`CHECKIN_PAGE_TTL_MS`) is the answer; the watcher's alarm reads it ahead in a free slot while pages poll (pages poll every 15 s), else the request reads it through the read clock, waiting its turn up to 20 s; a clock booked past that answers the last read marked `stale`, or 429 `{reason: 'read-busy', retryAfterMs}` with none. `familiesAt`: when the Worker's household list was read (a page that sees it move asks `/v1/desk/families` again) |
 | `GET /v1/desk/families` **BUILT** | session | | `{households: string[][], familiesAt?, familiesError?}`: TwoTimTwo's households (names only, two or more active children each), one read of the export per 30 minutes through the read clock, kept in memory only (`families.js`). A child the roster or the report names that the export does not list at all (a family registered tonight) makes the watcher re-read it in a free slot: at most one such read every 15 s and at most once per unknown child per night; `familiesAt` then moves; a failed read is `[]` plus a fixed `familiesError` code (kept five minutes), a clock turn-away is 429 `{reason: 'read-busy', retryAfterMs}` and not kept. The roster answer also carries `items: {bible: [club], friend: [club]}` (which clubs offer them, from the page it already read) |
 | `POST /v1/desk/checkin` **BUILT** | session | `{night, clubberId \| visitor: {first, last, club}, items, friendName?, historyRow: Row, job: Bundle \| null}`; `friendName` (the friend's first name, cleaned to 24 characters) is kept only with `Friend` in `items` and goes ONLY to the 6:30 BARF list (`friends.js`, sealed under the Worker's key for 3 days, exactly what the phone path sent); `night` is the church's local date (else 400 `wrong-night`); `items` is `{Bible?, Friend?}` or `['Bible', 'Friend']`; `job.id` is the jobId, `job.kind` is `print-job`, `job.night` is `night`; `job` may be null only while no station is registered | see below |
 | `POST /v1/desk/undo` **BUILT** | session | `{night, clubberId \| visitor, historyRow}` | TwoTimTwo's undo (`checkinclubberundo`, accepted on "(checkin undone)"), then the claim goes `undone` (gen + 1), every unprinted job of that child is dropped, and a TwoTimTwo-page check-in of theirs still waiting on the watcher's backlog is forgotten (`adopt.forget`), so it is never adopted: `{ok, droppedJobs}`. A refusal is 409 `{reason}`, a timeout 504 `{reason: 'unsure'}`: nothing is changed here, and the watcher settles what TwoTimTwo has |
 | `POST /v1/desk/checkout` **BUILT** | session | `{night, clubberId \| visitor, historyRow}` | TwoTimTwo check-out (accepted only on "OK"): `{ok}`. The claim is left as it is |
 | `GET /v1/desk/tonight` **BUILT (P5)** | session | | `{night, source: 'report' \| 'history', checkedIn, checkedOut, byClub, reportAgeMs, enabled}`: `authoritativeTonight()` from the Worker's own state (the shared module, not a port; section 8). Answers in shadow mode too, so the owner can compare it with the laptop's count |
+
+**No club tonight** (BUILT, `desk.js` + `clubday.js`; owner 2026-10-13, after
+/checkin sat on "Reading the roster..." on a Monday evening while the Worker
+tried TwoTimTwo, whose check-in page on such a day shows some other meeting: a
+tap would check a child into it). A club day is decided by THE club-night rule,
+`lobby/shared/clubNight.js` `clubNightToday` (the one the TVs and the KVBC
+Awana app use), given `lobby/shared/schedule.json` (bundled at deploy: its time
+zone, meeting day and `specialDates`, so a `noClub` date is never a club day and
+a special meeting with its own `windows` is one) and the calendar the Worker
+keeps (storage `calendar`: an extra club night it lists is a club day, a
+cancelled one is not, a date past its last event is past the season). It is the
+WHOLE local day, midnight to midnight in the church's zone, not only the watch
+window (early arrivals, set-up). On any other day: `GET /v1/desk/roster` answers
+at once `{noClub: true, today, next, readAt, kids: [], items: {bible: [],
+friend: []}}` (`today` and `next` are YYYY-MM-DD in the church's zone; `next` is
+the next club day within 120 days, `null` when none is known, e.g. past the
+season), reads nothing and does not mark the roster wanted (so the alarm reads
+nothing ahead either); `POST /v1/desk/checkin|undo|checkout` and `POST
+/v1/desk/barf-late` (its recheck too) answer 409 `{ok: false, reason: 'no-club',
+today, next}` right after the `wrong-night` check (unchanged, first), before any
+read, claim, job or post. **Rehearsal** goes through as before: while the print
+station's rehearsal mode is on (armed on the laptop from /settings, Printing →
+At the laptop; the station sends `rehearsal` in `POST /v1/station/extras` on a
+change and every minute or two; `publisher.js rehearsing()`: heard within 5
+minutes, memory only, so a laptop gone away armed, or a restart, ends it until
+the next post) every route behaves as on a club day. The page shows one note,
+"No club tonight" and "Next club night: Wednesday, October 14", and asks again
+every 60 s (desk-transport.js maps `no-club` to `DeskError` `no-club`, "There is
+no club tonight."). `/checkin/classic` (`phone.js` `/phone/checkin`) has no such
+guard. `test/noclub.test.js`.
 
 Since 2026-10-12 (owner) the page sends no `visitor`: a child not on the list gets
 a walk-in name tag (a `reprint:` job on `/print-oneoff`, never counted). The
@@ -337,6 +427,40 @@ login form) signs in again at the head of the queue and is made once more
 Read failures on the way answer 429 `{reason: 'read-busy', retryAfterMs}`,
 502 `{reason: 'twotimtwo-unreadable'}` or 503 `{reason: 'not-configured'}`.
 
+**The held page across a restart** (BUILT, `desk.js`; owner 2026-10-12, after
+/checkin sat on "Reading the roster..." past a Worker deploy: every deploy
+empties the object's memory, and a cold read waits for the clock and a fresh
+TwoTimTwo sign-in, about a minute). After each read (the desk's, the roster's
+read ahead, the watcher's warm read) the page held is written to storage as
+`desk:page`: ONE blob sealed under the state key (`watcher.js sealState`, as
+`cloud:snap` and `tonight:book`), holding `{at, night, page}` where `page` is
+exactly what the desk reads (`compactPage`: `calendarId`, the items `{id,
+clubs, automatic, label}`, per child `{clubberId, clubId, name, club,
+checkedIn}`). Written only while the watch window is open, at most once a
+minute unless the list or a checked-in mark moved (bounded writes), never
+over 120 KB (300 children are about 52 KB; a bigger page is not written at
+all, never cut down). A new object reads it back once, lazily, on the first
+roster or desk call: only when it is tonight's (`churchNight`), opens, and is
+under 6 hours old; another night's, an older one, or one that will not open is
+deleted and the call goes on as before, never an error. A restored page counts
+as held (`hasNightPage`): desk actions read nothing, and `rosterRefreshInMs()`
+is 0, so the alarm's next free slot replaces it with a fresh read (no read is
+started from the request path). A failed read with a restored copy in hand is
+the ordinary `stale`. Deleted when the watch window closes (the watcher's
+end-of-night purge, with `tonight:book`; also `arm()` from the cron with the
+watcher switched off), so it never reaches the next night.
+
+**Privacy (owner may veto):** this puts a sealed copy of tonight's whole
+check-in page roster at rest in the Worker's storage until the window closes:
+every child the page lists (all active clubbers, not only those who came),
+with clubber id, FULL name, club and checked-in mark. It is the pattern of
+`cloud:snap` (ids and clubs) and `tonight:book` (first names), but it ALSO
+keeps LAST names at rest, sealed, for the whole roster, which nothing did
+before (the friends list keeps full names only of children who brought a
+friend, and the print backlog only for seconds). Storage alone opens nothing
+(the key comes from the TwoTimTwo password secret); no plaintext name or id is
+stored (`test/deskpage.test.js`).
+
 **The claim ledger** (`ledger.js`): `checking` (60 s, `CHECKING_TTL_MS`) ->
 `queued` -> `printed`, or `undone`. `gen` only goes up: undo (or the child
 vanishing from the report) bumps it, and so does checking the child in again;
@@ -385,7 +509,7 @@ name; ONE Worker operation does the rest, so nothing prints, greets or counts tw
 | Route | Auth | Request | Answer |
 | --- | --- | --- | --- |
 | `GET /v1/desk/barf` | session | | `{night, barfNight: true \| false \| null, friends: [clubberId], recheck: [{clubberId, items: {Bible, Friend: true}}], tagRoute, stations}`. `barfNight` = the church settings' `barfNights` (10.3) holds tonight, the station's own rule; `null` (the page hides the button) with no church settings or `CHURCH_SETTINGS` off. `friends`: children who already brought one tonight (the friends list and the applied report's YES). `tagRoute`: `/print-barf-tag` when EVERY registered station reports 9.3.1 or later, else `/print-custom` (what 9.3.0 runs: a job route it would refuse is never sent). `recheck`: children whose late-friend redo never took and who still wait to be checked in again (their claim is marked `recheck`), so a reloaded page shows the red line again. No TwoTimTwo read |
-| `POST /v1/desk/barf-late` | session | `{night, clubberId, friendName, historyRow: Row (kind 'barf-friend'), tagJob: {jobId: 'reprint:<uuid>', bundle} \| null}`; `tagJob` sealed to every station (record `{route: tagRoute, body: {firstName, clubName}}` or `{route: '/print-custom', body: {text: 'BARFED! <first>'}}`), null only with no station | `{ok, checkedIn, items: {Bible, Friend: true}, jobId, history, reason?, tries?}` (below). 400 `wrong-night` / `no-child` / `no-friend-name` / `unsealed` (`what`); 409 `not-barf-night`, `already-friend`, `busy` (another operation, or a desk check-in being posted), `not-on-report`, `not-found`, `no-friend-item`, `no-attendance-item`, `stations-changed`; 429 / 502 / 503 as 5 |
+| `POST /v1/desk/barf-late` | session | `{night, clubberId, friendName, historyRow: Row (kind 'barf-friend'), tagJob: {jobId: 'reprint:<uuid>', bundle} \| null}`; `tagJob` sealed to every station (record `{route: tagRoute, body: {firstName, clubName}}` or `{route: '/print-custom', body: {text: 'BARFED! <first>'}}`), null only with no station | `{ok, checkedIn, items: {Bible, Friend: true}, jobId, history, reason?, tries?}` (below). 400 `wrong-night` / `no-child` / `no-friend-name` / `unsealed` (`what`); 409 `no-club` (section 5, "No club tonight"), `not-barf-night`, `already-friend`, `busy` (another operation, or a desk check-in being posted), `not-on-report`, `not-found`, `no-friend-item`, `no-attendance-item`, `stations-changed`; 429 / 502 / 503 as 5 |
 | `POST /v1/desk/barf-late` (recheck) | session | `{night, clubberId, recheck: true, items}` (the `items` the failed answer gave) | the redo alone: `{ok, checkedIn, items, reason?}`. One urgent read of the check-in page first (never the page held for the night): a child TwoTimTwo already has is success with no post. No label, no list, no row |
 
 In order: refuse early (above; the friend check and the mark are one synchronous
@@ -498,9 +622,11 @@ undo): the station ends it quietly.
   the other slot, in this order: tonight's check-in page once (warms the desk),
   a households catch-up (an unknown child), the Checkout page (once a minute
   after 7:15 pm, section 9), the roster's check-in page read ahead while pages
-  poll. Reads a minute: at 6:00 pm report 2 + roster page 2; at 7:30 pm report
+  poll. Outside the window, and never ahead of any of these, the trends
+  back-fill (section 3) reads one season in a free slot. Reads a minute: at 6:00 pm report 2 + roster page 2; at 7:30 pm report
   2 + Checkout page 1 + roster page 1 (a poll that finds the page older than 30 s
-  reads it itself, waiting its turn). A desk action's read (only with nothing
+  reads it itself, waiting its turn). After a restart the page comes back sealed from storage (`desk:page`, section 5), so the
+  first roster poll is answered at once and the next free slot refreshes it. A desk action's read (only with nothing
   held, section 5) is URGENT: the head of the queue (queued reads give way and
   book again), never inside 15 s of a read already started. The clock survives
   a restart (`read:next` in storage). The sign-in takes slots too, one per
