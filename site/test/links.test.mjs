@@ -11,7 +11,7 @@ const page = readFileSync(path.join(SITE, 'links', 'index.html'), 'utf8');
 
 const ALLOWED = [
   '/checkin', '/checkin/ym',
-  '/lobby/', '/lobby/countdown', '/journey/',
+  '/lobby/', '/lobby/countdown', '/journey/', '/journey/remote/',
   '/settings',
   '/download/kvbc-awana', '/chrome-extension.zip', '/help', '/capabilities.html', '/release-notes/printer.md',
   '/',
@@ -34,7 +34,7 @@ test('every link is one of the listed pages: no extra links, no passphrase, quer
   }
 });
 
-test('each of the 12 listed pages is linked exactly once', () => {
+test('each of the 13 listed pages is linked exactly once', () => {
   assert.equal(hrefs.length, ALLOWED.length);
   assert.deepEqual([...hrefs].sort(), [...ALLOWED].sort());
 });

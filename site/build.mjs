@@ -199,6 +199,10 @@ writeFileSync(path.join(OUT, '_headers'), [
   '  Cache-Control: no-cache',
   '/journey/',
   '  Cache-Control: no-cache',
+  // The phone remote (journey/public/remote/, owner 2026-10-13): always the newest page, never in a search engine.
+  '/journey/remote/*',
+  '  Cache-Control: no-cache',
+  '  X-Robots-Tag: noindex, nofollow',
   '/checkin/*',
   '  Cache-Control: no-cache',
   '/links*',
@@ -262,7 +266,7 @@ writeFileSync(path.join(OUT, '_routes.json'), `${JSON.stringify({
 writeFileSync(path.join(ROOT, 'site', 'lib', 'large-files.generated.js'),
   `// Written by site/build.mjs for build ${BUILD_ID}; not committed.\nexport const LARGE_FILES = ${JSON.stringify(largeFiles, null, 2)};\nexport const LARGE_PREFIXES = ${JSON.stringify(VIDEO_PREFIXES, null, 2)};\n`);
 
-for (const must of ['index.html', 'lobby/index.html', 'lobby/countdown.html', 'lobby/settings.html', 'journey/index.html', 'lobby/shared/sync.json', 'checkin/index.html', 'checkin/ym/index.html', 'checkin/desk-transport.js', 'checkin/cloud-crypto.js', 'checkin/clubs.js', 'checkin/sync-protocol.js', 'checkin/brand/fonts.css', 'checkin/classic/index.html', 'checkin/classic/ym/index.html', 'links/index.html']) {
+for (const must of ['index.html', 'lobby/index.html', 'lobby/countdown.html', 'lobby/settings.html', 'journey/index.html', 'journey/remote/index.html', 'journey/remote/remote.js', 'journey/src/shared/journeyRemote.js', 'lobby/shared/sync.json', 'checkin/index.html', 'checkin/ym/index.html', 'checkin/desk-transport.js', 'checkin/cloud-crypto.js', 'checkin/clubs.js', 'checkin/sync-protocol.js', 'checkin/brand/fonts.css', 'checkin/classic/index.html', 'checkin/classic/ym/index.html', 'links/index.html']) {
   if (!existsSync(path.join(OUT, must))) throw new Error(`site build is missing ${must}`);
 }
 console.log(`\n✓ site/dist built for ${ORIGIN} (build ${BUILD_ID.slice(0, 7)})`);

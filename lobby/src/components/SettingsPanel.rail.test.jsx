@@ -188,7 +188,7 @@ describe('the reorganized sections (docs/SETTINGS-OVERHAUL.md "Reorganize", 2026
       Printing: ['Tonight’s prints', 'Name tags and labels', 'BARF Night', 'Labels', 'Each club’s label', 'Club night schedule', 'Pickup list'],
       'What screens show': ['Welcome banners', 'Welcome extras', 'Club lines', 'Celebrations', 'Pickup board', 'Corner'],
       'Slides & look': ['Typed & published slides', 'Calendar slides', 'Season', 'Weather effects'],
-      Journey: ['Captions', 'Teaching slides', 'Lessons on the Journey PCs'],
+      Journey: ['Phone remote', 'Captions', 'Teaching slides', 'Lessons on the Journey PCs'],
       History: ['Trends', 'Nights', 'Import laptop history'],
       'Account & app': ['Sign in', 'Passphrase', 'This device', 'Change log', 'KVBC Awana for Windows', 'KVBC Awana release notes', 'About'],
     };

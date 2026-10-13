@@ -281,6 +281,26 @@ export function JourneyLessonsCard({ goTo }) {
   );
 }
 
+/** The phone remote's address on this site (journey/public/remote/). */
+export const JOURNEY_REMOTE_URL = '/journey/remote/';
+
+/**
+ * The phone remote (owner 2026-10-13): a link to the page that runs the
+ * lesson on every Journey kiosk from a phone (Back/Next for the slides, the
+ * video's buttons, a lesson pick). Nothing to set here.
+ */
+export function JourneyRemoteCard() {
+  return (
+    <PanelCard title="Phone remote" tab="var(--brand-hot)">
+      <p className="hint panel-intro">
+        Run the lesson from your phone: Next and Back for the teaching slides, Play and Pause for the video, or pick a
+        lesson. Every press goes to every Journey kiosk.
+      </p>
+      <a className="secondary section-jump" href={JOURNEY_REMOTE_URL} target="_blank" rel="noopener">Open the phone remote →</a>
+    </PanelCard>
+  );
+}
+
 /**
  * Journey (owner 2026-10-12, the settings page only): captions and the
  * teaching slides for every Journey kiosk, and each kiosk's saved lessons.
@@ -298,6 +318,7 @@ export function JourneySection({ goTo }) {
   }
   return (
     <>
+      <JourneyRemoteCard />
       <JourneyCaptionsCard room={room} />
       <JourneySlidesCard room={room} />
       <JourneyLessonsCard goTo={goTo} />

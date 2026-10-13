@@ -159,6 +159,29 @@ export const SCREEN_ACTION_QUEUE_MAX = 5;
 /** An action not collected within this long is dropped (a press an hour late is worse than none). */
 export const SCREEN_ACTION_TTL_MS = 10 * 60 * 1000;
 
+// The Journey phone remote (owner 2026-10-13; awana.kvbchurch.org/journey/remote/):
+// one press goes to EVERY Journey kiosk, and each kiosk reports what its
+// screen shows while a phone is watching. Its rules live in
+// shared/journeyRemote.js, so the phone page (a plain static page under
+// /journey/, which gets a byte copy) applies exactly what the Worker does;
+// the Worker reaches them through this file like every other allowlist.
+export {
+  JOURNEY_NOW_SLIDE_KINDS,
+  JOURNEY_NOW_VIEWS,
+  JOURNEY_NOW_WAITS,
+  JOURNEY_PICKER_CHOICES,
+  JOURNEY_REMOTE_ACTIONS,
+  JOURNEY_REMOTE_BURST,
+  JOURNEY_REMOTE_QUEUE_MAX,
+  JOURNEY_REMOTE_REASONS,
+  JOURNEY_REMOTE_REFILL_PER_S,
+  JOURNEY_REMOTE_TTL_MS,
+  JOURNEY_REMOTE_WATCH_MS,
+  JOURNEY_SEEK_MAX_S,
+  sanitizeJourneyNow,
+  sanitizeJourneyRemote,
+} from '../../shared/journeyRemote.js';
+
 /** What a screen is called until someone names it. @type {Record<ScreenKind, string>} */
 export const SCREEN_DEFAULT_NAMES = { lobby: 'Lobby TV', projector: 'Projector', journey: 'Journey kiosk', computer: 'Computer' };
 

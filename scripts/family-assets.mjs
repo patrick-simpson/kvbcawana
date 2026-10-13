@@ -8,6 +8,8 @@
 //                                                          passphrase v2 sign-in imports them, byte for byte)
 //   club nights     canonical lobby/shared/clubNight.js -> journey/public/src/shared/ (the kiosk's
 //                                                          Trek small group card asks it, byte for byte)
+//   phone remote    canonical lobby/shared/journeyRemote.js -> journey/public/src/shared/ (the phone
+//                                                          remote page cleans the Worker's answers with it)
 //
 // (family.css is no longer copied: the site bundles printer/styles/family.css
 // itself, and no lobby or Journey file loads it.)
@@ -30,8 +32,9 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 export const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 export const KIT = 'lobby/shared/brand';
 // ES modules the Journey kiosk loads: at sign-in (public/src/sync.js), and the
-// club-night rule its Trek small group card follows (src/schedule/25-trek.js).
-export const JOURNEY_MODULES = ['sync-protocol.js', 'cloud-crypto.js', 'clubNight.js'];
+// club-night rule its Trek small group card follows (src/schedule/25-trek.js);
+// and the phone remote's rules (public/remote/, which also signs in with the first two).
+export const JOURNEY_MODULES = ['sync-protocol.js', 'cloud-crypto.js', 'clubNight.js', 'journeyRemote.js'];
 // What each app holds a copy of. Paths are repo-relative.
 export const COPIES = {
   journey: { kit: 'journey/public/brand', modules: 'journey/public/src/shared' },

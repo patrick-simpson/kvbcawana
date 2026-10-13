@@ -43,7 +43,8 @@ jobs:
   # base to compare with, or a change to this file. The fast jobs always run.
   #   lobby   reads only lobby/ (its vitest excludes worker/ and desktop/,
   #           whose lint moved into their own jobs below), plus
-  #           journey/public/src/schedule.js and journey/public/src/sync.js
+  #           journey/public/src/schedule.js, journey/public/src/sync.js and
+  #           journey/src/schedule/19-picker-final-step.js (the phone remote's picker choices)
   #           site/checkin/ and printer/print-server/public/phone.html
   #           (e2e/checkin.spec.js serves the one check-in page, built from the
   #           phone page by site/checkin/checkin-page.mjs, from a stub origin)
@@ -118,13 +119,13 @@ jobs:
               # suite. (In a case pattern * also matches "/", so this is a test.)
               if [[ "$f" != */* && "$f" == *.md ]]; then continue; fi
               case "$f" in
-                journey/public/src/schedule.js|journey/public/src/sync.js) lobby=true ;;  # screenSpecs.test.js reads both, embed.test.js sync.js
+                journey/public/src/schedule.js|journey/public/src/sync.js|journey/src/schedule/19-picker-final-step.js) lobby=true ;;  # screenSpecs.test.js reads both, embed.test.js sync.js, shared/journeyRemote.test.js the picker's choices
                 site/checkin/*|printer/print-server/public/phone.html|printer/print-server/sync-protocol.js) lobby=true ;;  # e2e/checkin.spec.js serves the check-in page (site/checkin/checkin-page.mjs builds it from phone.html)
                 lobby/worker/*|lobby/desktop/*|printer/*|journey/*|site/*|.github/workflows/*) ;;
                 *) lobby=true ;;
               esac
               case "$f" in
-                lobby/worker/src/*|lobby/worker/migrations/*|lobby/worker/test/rig.js|lobby/worker/test/helpers.js|lobby/worker/test/fixtures.js|lobby/worker/test/d1stub.js|lobby/worker/package.json|lobby/worker/package-lock.json|lobby/src/lib/calendarParse.js|lobby/src/lib/envelope.js|lobby/src/lib/settingRules.js|lobby/src/lib/sharedSettings.js|lobby/src/lib/slides.js|lobby/src/lib/syncSpecs.js|lobby/shared/text.js|lobby/shared/sync-protocol.js|lobby/shared/brand/*|lobby/shared/cloud-crypto.js|lobby/shared/cloud-vectors.json|lobby/shared/tonight.js|lobby/shared/pickup.js|lobby/shared/clubs.js|lobby/shared/clubNight.js|lobby/shared/schedule.json|lobby/shared/churchSettings.js|lobby/src/lib/printServer.js|lobby/src/components/settings/laptop*.jsx|site/build.mjs) printer=true ;;
+                lobby/worker/src/*|lobby/worker/migrations/*|lobby/worker/test/rig.js|lobby/worker/test/helpers.js|lobby/worker/test/fixtures.js|lobby/worker/test/d1stub.js|lobby/worker/package.json|lobby/worker/package-lock.json|lobby/src/lib/calendarParse.js|lobby/src/lib/envelope.js|lobby/src/lib/settingRules.js|lobby/src/lib/sharedSettings.js|lobby/src/lib/slides.js|lobby/src/lib/syncSpecs.js|lobby/shared/journeyRemote.js|lobby/shared/text.js|lobby/shared/sync-protocol.js|lobby/shared/brand/*|lobby/shared/cloud-crypto.js|lobby/shared/cloud-vectors.json|lobby/shared/tonight.js|lobby/shared/pickup.js|lobby/shared/clubs.js|lobby/shared/clubNight.js|lobby/shared/schedule.json|lobby/shared/churchSettings.js|lobby/src/lib/printServer.js|lobby/src/components/settings/laptop*.jsx|site/build.mjs) printer=true ;;
                 lobby/*|journey/*|site/updates/*|.github/workflows/*) ;;
                 *) printer=true ;;
               esac
@@ -456,7 +457,7 @@ jobs:
           if [ -z "$BASE" ]; then
             echo "No base commit to compare against; deploying the Worker."
             echo "changed=true" >> "$GITHUB_OUTPUT"
-          elif git diff --quiet "$BASE" HEAD -- lobby/worker lobby/worker/migrations lobby/src/lib lobby/shared/text.js lobby/shared/sync-protocol.js lobby/shared/cloud-crypto.js lobby/shared/tonight.js lobby/shared/pickup.js lobby/shared/clubs.js lobby/shared/churchSettings.js lobby/shared/clubNight.js lobby/shared/schedule.json .github/workflows/ci.yml; then
+          elif git diff --quiet "$BASE" HEAD -- lobby/worker lobby/worker/migrations lobby/src/lib lobby/shared/text.js lobby/shared/sync-protocol.js lobby/shared/cloud-crypto.js lobby/shared/tonight.js lobby/shared/pickup.js lobby/shared/clubs.js lobby/shared/churchSettings.js lobby/shared/clubNight.js lobby/shared/schedule.json lobby/shared/journeyRemote.js .github/workflows/ci.yml; then
             echo "Nothing the Worker is built from changed since $BASE; its deploy is skipped."
             echo "changed=false" >> "$GITHUB_OUTPUT"
           else

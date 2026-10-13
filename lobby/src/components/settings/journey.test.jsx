@@ -130,6 +130,26 @@ describe('the room settings (Captions, Teaching slides)', () => {
   });
 });
 
+describe('the phone remote', () => {
+  it('a card at the top links to the phone remote page, on this site, in a new tab', async () => {
+    mount();
+    const link = screen.getByRole('link', { name: /Open the phone remote/ });
+    expect(link.getAttribute('href')).toBe('/journey/remote/');
+    expect(link.getAttribute('target')).toBe('_blank');
+    expect(link.getAttribute('rel')).toContain('noopener');
+    const titles = [...document.querySelectorAll('.panel-card h3')].map((h) => h.textContent);
+    expect(titles[0]).toBe('Phone remote');
+    expect(screen.getByText(/Every press goes to every Journey kiosk/)).toBeTruthy();
+    await screen.findByText('Journey room');
+  });
+
+  it('signed out: no link (the one sign-in card only)', () => {
+    world.signedIn = false;
+    mount();
+    expect(screen.queryByRole('link', { name: /Open the phone remote/ })).toBeNull();
+  });
+});
+
 describe('Lessons on the Journey PCs', () => {
   const row = async () => {
     await screen.findByText('Journey room');
