@@ -26,6 +26,20 @@ import {
 } from '../lib/screenSync.js';
 import { SCREEN_DEFAULT_NAMES, cleanScreenName, sanitizeScreenAction, sanitizeScreenSettings } from '../lib/syncSpecs.js';
 import { onSyncDoorbell, syncAuthed, useSync } from './useSync.js';
+import { pageBuild } from '../lib/buildReload.js';
+
+/**
+ * What a TV or projector reports about itself in its hello (worker/src/routes.md
+ * 10.7): its page's own build, the first 7 hex of its awana-build meta, so
+ * /settings can say which version each screen is running. null (no stamp) on
+ * the dev server.
+ * @param {Document} [doc]
+ * @returns {{ page: { build: string | null } }}
+ */
+export function pageStatus(doc) {
+  const build = pageBuild(doc);
+  return { page: { build: build && /^[0-9a-f]{7,}$/i.test(build) ? build.slice(0, 7).toLowerCase() : null } };
+}
 
 /**
  * @typedef {import('../lib/syncSpecs.js').ScreenKind} ScreenKind
@@ -199,8 +213,9 @@ export function useScreenSync({ kind, enabled, overrides, replaceConfig, onActio
 
     const hello = async () => {
       if (stopped || gone) return;
+      const body = { id, kind, name: loadScreenSlot(kind)?.name || defaultName || SCREEN_DEFAULT_NAMES[kind] };
       const res = await syncAuthed('/v1/screens/hello', {
-        method: 'POST', body: { id, kind, name: loadScreenSlot(kind)?.name || defaultName || SCREEN_DEFAULT_NAMES[kind] },
+        method: 'POST', body: kind === 'lobby' || kind === 'projector' ? { ...body, status: pageStatus() } : body,
       });
       if (res.status === 404) { gone = true; return; }
       if (res.ok) await took(res.body);

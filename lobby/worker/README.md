@@ -158,7 +158,7 @@ one silent for a month.
 
 | Route | |
 | --- | --- |
-| `POST /v1/screens/hello` `{id, kind, name?, pendingRoleChange?, status?}` | `{screen, settings}`; adds a new screen (a known one keeps its name), moves `lastSeen`; a Journey kiosk's `status` (its saved lessons, `src/routes.md` 10.7) is kept and listed; a `computer` (KVBC Awana) holding a print-off until its last label prints sends `pendingRoleChange` (its allowlist), kept until a hello without one |
+| `POST /v1/screens/hello` `{id, kind, name?, pendingRoleChange?, status?}` | `{screen, settings}`; adds a new screen (a known one keeps its name), moves `lastSeen`; its `status` (a Journey kiosk's saved lessons, a computer's app version and update, a TV's or projector's page build; one shape per kind, `src/routes.md` 10.7) is kept and listed; a `computer` (KVBC Awana) holding a print-off until its last label prints sends `pendingRoleChange` (its allowlist), kept until a hello without one |
 | `GET /v1/screens` | `{screens: [{id, kind, name, createdAt, lastSeen, online, live, pendingRoleChange?, status?}], max}`; online = seen in the last 3 minutes or on the live channel |
 | `GET /v1/screens/<id>/settings` | `{screen, settings: {savedAt, settings} \| null}` |
 | `PUT /v1/screens/<id>/settings` `{settings}` | `{savedAt, settings, dropped}`; the whole layer, through the kind's allowlist |

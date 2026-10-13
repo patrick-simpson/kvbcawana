@@ -250,15 +250,16 @@ describe('a screen\'s own settings', () => {
       saved: 24, total: 63, bytesSaved: 9e9, bytesTotal: 9e9, downloading: false, waiting: true, paused: false,
       percent: 100, currentWeek: 7, lastSavedAt: '2026-10-11T16:00:00.000Z', auto: true,
     });
-    expect(Object.keys(lessons).sort()).toEqual(['auto', 'bytesSaved', 'bytesTotal', 'currentWeek', 'downloading', 'error', 'lastSavedAt',
-      'paused', 'percent', 'saved', 'total', 'waiting']);
+    expect(Object.keys(lessons).sort()).toEqual(['auto', 'bytesSaved', 'bytesTotal', 'currentWeek', 'downloading', 'error', 'known', 'lastSavedAt',
+      'paused', 'percent', 'saved', 'supported', 'total', 'waiting']);
+    expect(lessons).toMatchObject({ known: true, supported: true });
     expect(lessons.error.startsWith('Week 7 Leader Video: xxx')).toBe(true);
     expect(lessons.error.length).toBeLessThanOrEqual(120);
     expect(JSON.stringify(res.body)).not.toContain('cdn.example');
     expect((await s.call('GET', '/v1/screens')).body.screens[0].status).toEqual(res.body.screen.status);
   });
 
-  it('a status only from a Journey kiosk; junk is no status, and a hello without one keeps the last', async () => {
+  it('lessons only from a Journey kiosk; junk is no status, and a hello without one keeps the last', async () => {
     const s = setup();
     await s.signIn();
     const status = { lessons: { saved: 3, total: 63, bytesSaved: 1, bytesTotal: 2, percent: 4 } };
@@ -272,6 +273,69 @@ describe('a screen\'s own settings', () => {
     await s.call('POST', '/v1/screens/hello', { id: KIOSK, kind: 'journey' });
     list = (await s.call('GET', '/v1/screens')).body.screens;
     expect(list.find((x) => x.id === KIOSK).status.lessons).toMatchObject({ saved: 3, total: 63, error: null, currentWeek: null, lastSavedAt: null });
+  });
+
+  it('a kiosk that cannot save lessons, or has not looked yet, says so', async () => {
+    const s = setup();
+    await s.signIn();
+    const res = await s.call('POST', '/v1/screens/hello', {
+      id: KIOSK, kind: 'journey', status: { lessons: { saved: 0, total: 0, bytesSaved: 0, bytesTotal: 0, percent: 0, auto: false, known: false, supported: false } },
+    });
+    expect(res.body.screen.status.lessons).toMatchObject({ saved: 0, total: 0, known: false, supported: false, auto: false });
+  });
+
+  it('a computer reports its KVBC Awana version and update; a TV and a projector their page build', async () => {
+    const PC = 'pc_ffffffffffffffffffff';
+    const s = setup();
+    await s.signIn();
+    const PJ = 'pj_aaaaaaaaaaaaaaaaaaaa';
+    const pc = await s.call('POST', '/v1/screens/hello', {
+      id: PC, kind: 'computer',
+      status: { app: { version: '9.4.0', update: { state: 'downloading', percent: 42.9, at: '2026-10-12T15:00:00Z', url: 'https://x' }, path: 'C:\\Users' }, lessons: {} },
+    });
+    expect(pc.body.screen.status).toEqual({ app: { version: '9.4.0', update: { state: 'downloading', percent: 42, at: '2026-10-12T15:00:00.000Z' } } });
+    await s.call('POST', '/v1/screens/hello', { id: TV, kind: 'lobby', status: { page: { build: 'ABCDEF123456' } } });
+    await s.call('POST', '/v1/screens/hello', { id: PJ, kind: 'projector', status: { page: { build: null } } });
+    const list = (await s.call('GET', '/v1/screens')).body.screens;
+    expect(list.find((x) => x.id === TV).status).toEqual({ page: { build: 'abcdef1' } });
+    expect(list.find((x) => x.id === PJ).status).toEqual({ page: { build: null } });
+    expect(list.find((x) => x.id === PC).status.app.version).toBe('9.4.0');
+    // Another kind's shape, or junk, is ignored and the last one stays.
+    await s.call('POST', '/v1/screens/hello', { id: TV, kind: 'lobby', status: { lessons: { saved: 1, total: 2 } } });
+    await s.call('POST', '/v1/screens/hello', { id: PC, kind: 'computer', status: { app: { version: '9.4.0', update: { state: 'exploded' } } } });
+    await s.call('POST', '/v1/screens/hello', { id: PC, kind: 'computer', status: { page: { build: 'abcdef1' } } });
+    const again = (await s.call('GET', '/v1/screens')).body.screens;
+    expect(again.find((x) => x.id === TV).status).toEqual({ page: { build: 'abcdef1' } });
+    expect(again.find((x) => x.id === PC).status.app.update.state).toBe('downloading');
+    expect((await s.storage.get('screens'))[TV].status).toEqual({ page: { build: 'abcdef1' } });
+  });
+
+  it("a computer's update reaches storage at once on a new state or ten points, else with the once-a-minute write", async () => {
+    const PC = 'pc_gggggggggggggggggggg';
+    const s = setup();
+    await s.signIn();
+    const app = (state, percent) => ({ app: { version: '9.4.0', update: { state, percent, at: '2026-10-12T15:00:00Z' } } });
+    const stored = async () => (await s.storage.get('screens'))[PC].status?.app.update;
+    await s.call('POST', '/v1/screens/hello', { id: PC, kind: 'computer', status: app('downloading', 10) });
+    s.tick(10_000);
+    await s.call('POST', '/v1/screens/hello', { id: PC, kind: 'computer', status: app('downloading', 15) });
+    expect((await stored()).percent).toBe(10);
+    expect((await s.call('GET', '/v1/screens')).body.screens[0].status.app.update.percent).toBe(15);
+    s.tick(10_000);
+    await s.call('POST', '/v1/screens/hello', { id: PC, kind: 'computer', status: app('downloading', 20) });
+    expect((await stored()).percent).toBe(20);
+    s.tick(1_000);
+    await s.call('POST', '/v1/screens/hello', { id: PC, kind: 'computer', status: app('ready') });
+    expect(await stored()).toMatchObject({ state: 'ready', percent: null });
+    // A TV's build is the same at every hello: nothing written inside the minute.
+    await s.call('POST', '/v1/screens/hello', { id: TV, kind: 'lobby', status: { page: { build: 'abcdef1' } } });
+    const seen = (await s.storage.get('screens'))[TV].lastSeen;
+    s.tick(20_000);
+    await s.call('POST', '/v1/screens/hello', { id: TV, kind: 'lobby', status: { page: { build: 'abcdef1' } } });
+    expect((await s.storage.get('screens'))[TV].lastSeen).toBe(seen);
+    s.tick(1_000);
+    await s.call('POST', '/v1/screens/hello', { id: TV, kind: 'lobby', status: { page: { build: 'bcdef12' } } });
+    expect((await s.storage.get('screens'))[TV].status).toEqual({ page: { build: 'bcdef12' } });
   });
 
   it('a status reaches storage with the once-a-minute write, or at once when it moved enough to matter', async () => {

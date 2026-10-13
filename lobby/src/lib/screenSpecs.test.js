@@ -2,8 +2,8 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
-  SCREEN_ACTIONS, SCREEN_SPECS, SCREEN_STATUS_ERROR_MAX, TEMPLATE_KEYS, cleanScreenName, isScreenId, sanitizeScreenAction,
-  sanitizeScreenSettings, sanitizeScreenStatus, screenStatusMoved,
+  APP_UPDATE_STATES, SCREEN_ACTIONS, SCREEN_SPECS, SCREEN_STATUS_ERROR_MAX, SCREEN_STATUS_VERSION_MAX, TEMPLATE_KEYS, cleanScreenName,
+  isScreenId, sanitizeScreenAction, sanitizeScreenSettings, sanitizeScreenStatus, screenStatusMoved,
 } from './syncSpecs.js';
 import { sanitizeOverrides } from '../hooks/useConfig.js';
 import { SHARED_KEYS } from './sharedSettings.js';
@@ -85,10 +85,18 @@ describe("a Journey kiosk's status (its saved lessons)", () => {
   };
 
   it('keeps exactly the fixed shape, nothing else', () => {
-    expect(sanitizeScreenStatus('journey', { lessons: { ...good, url: 'https://x', names: ['Ada'] }, other: 1 })).toEqual({ lessons: good });
+    expect(sanitizeScreenStatus('journey', { lessons: { ...good, url: 'https://x', names: ['Ada'] }, other: 1 }))
+      .toEqual({ lessons: { ...good, known: true, supported: true } });
   });
 
-  it('only from a Journey kiosk, and junk is no status', () => {
+  it('an older kiosk page (no known/supported) reads as knowing; a new one says when it does not', () => {
+    expect(sanitizeScreenStatus('journey', { lessons: good })?.lessons).toMatchObject({ known: true, supported: true });
+    expect(sanitizeScreenStatus('journey', { lessons: { ...good, saved: 0, total: 0, known: false, supported: false } })?.lessons)
+      .toMatchObject({ saved: 0, total: 0, known: false, supported: false });
+    expect(sanitizeScreenStatus('journey', { lessons: { ...good, known: 'no', supported: 0 } })?.lessons).toMatchObject({ known: true, supported: true });
+  });
+
+  it('lessons only from a Journey kiosk, and junk is no status', () => {
     expect(sanitizeScreenStatus('lobby', { lessons: good })).toBeNull();
     expect(sanitizeScreenStatus('journey', null)).toBeNull();
     expect(sanitizeScreenStatus('journey', { lessons: [] })).toBeNull();
@@ -101,7 +109,7 @@ describe("a Journey kiosk's status (its saved lessons)", () => {
         percent: 250, currentWeek: 0, lastSavedAt: 'yesterday', auto: 'on' },
     })?.lessons;
     expect(out).toEqual({ saved: 63, total: 63, bytesSaved: 0, bytesTotal: 0, downloading: false, waiting: false, paused: true,
-      percent: 100, currentWeek: null, lastSavedAt: null, error: null, auto: false });
+      percent: 100, currentWeek: null, lastSavedAt: null, error: null, auto: false, known: true, supported: true });
   });
 
   it('the error is one short line of plain words', () => {
@@ -111,7 +119,11 @@ describe("a Journey kiosk's status (its saved lessons)", () => {
     expect(sanitizeScreenStatus('journey', { lessons: { ...good, error: '  \n ' } })?.lessons.error).toBeNull();
   });
 
-  it('moved enough to write at once: a lesson saved, an error, a pause, a start, or ten points', () => {
+  it('moved enough to write at once: a lesson saved, an error, a pause, a start, knowing, or ten points', () => {
+    const clean = sanitizeScreenStatus('journey', { lessons: good });
+    expect(screenStatusMoved(clean, sanitizeScreenStatus('journey', { lessons: { ...good, known: false } }))).toBe(true);
+    expect(screenStatusMoved(clean, sanitizeScreenStatus('journey', { lessons: { ...good, supported: false } }))).toBe(true);
+    expect(screenStatusMoved(clean, sanitizeScreenStatus('journey', { lessons: { ...good, percent: 51 } }))).toBe(false);
     const a = { lessons: good };
     expect(screenStatusMoved(a, { lessons: { ...good, percent: 51, bytesSaved: 13e9 } })).toBe(false);
     expect(screenStatusMoved(a, { lessons: { ...good, percent: 52 } })).toBe(true);
@@ -120,6 +132,60 @@ describe("a Journey kiosk's status (its saved lessons)", () => {
     expect(screenStatusMoved(a, { lessons: { ...good, paused: true } })).toBe(true);
     expect(screenStatusMoved(undefined, a)).toBe(true);
     expect(screenStatusMoved(undefined, null)).toBe(false);
+  });
+});
+
+describe("a computer's status (its KVBC Awana app and update)", () => {
+  const app = (update, version = '9.4.0') => ({ app: { version, update } });
+
+  it('keeps exactly the fixed shape; percent only while downloading', () => {
+    expect(sanitizeScreenStatus('computer', { ...app({ state: 'downloading', percent: 42.7, at: '2026-10-12T15:00:00Z', speed: 9 }), names: ['Ada'] }))
+      .toEqual(app({ state: 'downloading', percent: 42, at: '2026-10-12T15:00:00.000Z' }));
+    expect(sanitizeScreenStatus('computer', app({ state: 'ready', percent: 100, at: 'soon' })))
+      .toEqual(app({ state: 'ready', percent: null, at: null }));
+    expect(sanitizeScreenStatus('computer', app({ state: 'downloading', percent: 250 }))?.app.update.percent).toBe(100);
+    expect(sanitizeScreenStatus('computer', app({ state: 'downloading', percent: '42' }))?.app.update.percent).toBe(0);
+  });
+
+  it('the version is one short clean line', () => {
+    expect(sanitizeScreenStatus('computer', app({ state: 'none' }, '  9.4.0\u0000\n'))?.app.version).toBe('9.4.0');
+    expect([...(sanitizeScreenStatus('computer', app({ state: 'none' }, 'v'.repeat(300)))?.app.version || '')]).toHaveLength(SCREEN_STATUS_VERSION_MAX);
+  });
+
+  it('junk is no status: no version, an unknown state, no update, or another kind', () => {
+    expect(sanitizeScreenStatus('computer', app({ state: 'none' }, ''))).toBeNull();
+    expect(sanitizeScreenStatus('computer', app({ state: 'installing' }))).toBeNull();
+    expect(sanitizeScreenStatus('computer', { app: { version: '9.4.0' } })).toBeNull();
+    expect(sanitizeScreenStatus('lobby', app({ state: 'none' }))).toBeNull();
+    expect(sanitizeScreenStatus('computer', { lessons: { saved: 1, total: 2 } })).toBeNull();
+    expect(APP_UPDATE_STATES).toEqual(['none', 'downloading', 'ready', 'error']);
+  });
+
+  it('moved enough to write at once: a new version, a new state, or ten points', () => {
+    const at = (update, version) => sanitizeScreenStatus('computer', app(update, version));
+    const a = at({ state: 'downloading', percent: 40 });
+    expect(screenStatusMoved(a, at({ state: 'downloading', percent: 49 }))).toBe(false);
+    expect(screenStatusMoved(a, at({ state: 'downloading', percent: 50 }))).toBe(true);
+    expect(screenStatusMoved(a, at({ state: 'ready' }))).toBe(true);
+    expect(screenStatusMoved(at({ state: 'none' }), at({ state: 'none' }, '9.5.0'))).toBe(true);
+    expect(screenStatusMoved(at({ state: 'none', at: '2026-10-12T15:00:00Z' }), at({ state: 'none', at: '2026-10-12T16:00:00Z' }))).toBe(false);
+  });
+});
+
+describe("a TV's or projector's status (its page build)", () => {
+  it('the first 7 hex of its build, or null for no stamp; anything else is junk', () => {
+    expect(sanitizeScreenStatus('lobby', { page: { build: 'A1B2C3D4E5F6', url: 'x' }, other: 1 })).toEqual({ page: { build: 'a1b2c3d' } });
+    expect(sanitizeScreenStatus('projector', { page: { build: ' a1b2c3d ' } })).toEqual({ page: { build: 'a1b2c3d' } });
+    expect(sanitizeScreenStatus('projector', { page: { build: null } })).toEqual({ page: { build: null } });
+    expect(sanitizeScreenStatus('lobby', { page: { build: 'a1b2c3' } })).toBeNull();
+    expect(sanitizeScreenStatus('lobby', { page: { build: '<script>' } })).toBeNull();
+    expect(sanitizeScreenStatus('lobby', { page: {} })).toBeNull();
+    expect(sanitizeScreenStatus('journey', { page: { build: 'a1b2c3d' } })).toBeNull();
+  });
+
+  it('moved only with a new build', () => {
+    expect(screenStatusMoved({ page: { build: 'a1b2c3d' } }, { page: { build: 'a1b2c3d' } })).toBe(false);
+    expect(screenStatusMoved({ page: { build: 'a1b2c3d' } }, { page: { build: 'b2c3d4e' } })).toBe(true);
   });
 });
 

@@ -7,8 +7,8 @@
 //
 // WHAT IT HOLDS
 //   screens        one index, {[id]: {id, kind, name, createdAt, lastSeen,
-//                  pending?, status?}}, `pending` only for a computer and
-//                  `status` only for a Journey kiosk (below),
+//                  pending?, status?}}, `pending` only for a computer,
+//                  `status` in its kind's own shape (below),
 //                  at most SCREENS_MAX entries (one key, so no storage listing)
 //   screen:<id>    that screen's settings, {savedAt, settings}, through the
 //                  kind's allowlist (SCREEN_SPECS in src/lib/syncSpecs.js, the
@@ -26,12 +26,13 @@
 // and says so in each hello as `pendingRoleChange` (the settings it is
 // waiting to apply), which the list shows until a hello without one.
 //
-// A Journey kiosk's hello may carry `status` (src/routes.md 10.7): how saving
-// the full-quality lessons is going, through sanitizeScreenStatus's one fixed
-// shape (numbers, switches, one short reason). The newest is kept in memory
-// for the list; storage takes it with the once-a-minute lastSeen write, or at
-// once when it moved enough to matter (screenStatusMoved). A hello without
-// one keeps the last.
+// Every screen's hello may carry `status` (src/routes.md 10.7), through
+// sanitizeScreenStatus's one fixed shape for its kind: a Journey kiosk's saved
+// lessons, a computer's app version and update, a lobby TV's or projector's
+// page build. Another kind's status, or junk, is ignored. The newest is kept
+// in memory for the list; storage takes it with the once-a-minute lastSeen
+// write, or at once when it moved enough to matter (screenStatusMoved). A
+// hello without one keeps the last.
 
 import {
   SCREEN_DEFAULT_NAMES,
@@ -61,7 +62,7 @@ export const screenSettingsKey = (id) => `screen:${id}`;
 
 /**
  * @typedef {{id: string, kind: import('../../src/lib/syncSpecs.js').ScreenKind, name: string, createdAt: string, lastSeen: number,
- *   pending?: Record<string, unknown>, status?: {lessons: import('../../src/lib/syncSpecs.js').LessonsStatus}}} ScreenRecord
+ *   pending?: Record<string, unknown>, status?: import('../../src/lib/syncSpecs.js').ScreenStatus}} ScreenRecord
  * @typedef {{savedAt: string, settings: Record<string, unknown>}} ScreenSettings
  * @typedef {{ok: true, body: unknown} | {ok: false, status: number, error: string}} Result
  */
@@ -110,7 +111,7 @@ export class Screens {
   /** The record as /settings sees it. @param {ScreenRecord} r @param {Set<string>} live */
   view(r, live) {
     const onLive = live.has(r.id);
-    const status = r.kind === 'journey' ? this.fresh.get(r.id) || r.status : undefined;
+    const status = this.fresh.get(r.id) || r.status;
     return {
       id: r.id,
       kind: r.kind,
@@ -160,7 +161,7 @@ export class Screens {
     // A computer's held change, through its allowlist; nothing for any other kind.
     const held = kind === 'computer' ? sanitizeScreenSettings(kind, body.pendingRoleChange) : {};
     const pending = Object.keys(held).length ? held : undefined;
-    // A Journey kiosk's report; none (or junk) keeps the last one.
+    // Its report, in its kind's shape; none (or junk, or another kind's) keeps the last one.
     const status = sanitizeScreenStatus(kind, body.status);
     if (!r) {
       if (Object.keys(index).length >= SCREENS_MAX && !(await this.makeRoom(index))) {

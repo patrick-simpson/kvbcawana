@@ -952,42 +952,61 @@ No TwoTimTwo read, no seal: storage reads and in-memory state only. The page
 polls it every 10 s while Tonight is open and the tab visible, every 60 s
 otherwise, and stops after 3 failures in a row (a "Try again" button restarts it).
 
-### 10.7 A screen's status in its hello (BUILT: a Journey kiosk's saved lessons)
+### 10.7 A screen's status in its hello (BUILT: every kind)
 
 The screen registry (`screens.js`, `README.md` "Screens") takes one more
-optional field on `POST /v1/screens/hello`: `status`, for kind `journey`
-ONLY (any other kind's is ignored). The kiosk (`journey/public/src/sync.js`)
-sends it from `journeyDownloadStatus()`: how saving every lesson's
-full-quality video onto the kiosk is going. Numbers, switches and one short
-reason; never a name, a URL or a file path.
+optional field on `POST /v1/screens/hello`: `status`, one small report in
+its kind's own shape (another kind's shape is ignored: a lobby TV cannot
+report lessons). /settings words it under the row's On now / Off line.
+Numbers, switches, a version, a build and one short reason; never a name, a
+URL or a file path.
 
 ```
+journey    (journey/public/src/sync.js, from journeyDownloadStatus(): saving every lesson's full-quality video)
 status: { lessons: { saved, total,            // videos, ints 0..999, saved <= total
                      bytesSaved, bytesTotal,  // ints 0..1e13, bytesSaved <= bytesTotal
                      downloading, waiting, paused, auto,   // true or false
                      percent,                 // int 0..100
                      currentWeek,             // int 1..99 while downloading, else null
                      lastSavedAt,             // ISO time (normalized) or null
-                     error } }                // one line, control characters out, <= 120 characters, or null
+                     error,                   // one line, control characters out, <= 120 characters, or null
+                     known,                   // false until the kiosk has read its disk (missing = true: older kiosk pages)
+                     supported } }            // false where the browser cannot save lessons (missing = true)
+
+computer   (printer/electron-app: device-sync.js hello, update-progress.js appReport)
+status: { app: { version,                     // the running KVBC Awana version, one line, <= 40 characters (required)
+                 update: { state,             // 'none' | 'downloading' | 'ready' | 'error' (required)
+                           percent,           // int 0..100 while 'downloading', else null
+                           at } } }           // ISO time the state began, or null
+
+lobby, projector   (src/hooks/useScreenSync.js, the page's own <meta name="awana-build">)
+status: { page: { build } }                   // first 7 hex of the build hash (7..64 hex accepted, lowercased), or null (no stamp)
 ```
 
-- One allowlist, `sanitizeScreenStatus` in `src/lib/syncSpecs.js` (the file
-  the Worker bundles and /settings reads): anything else is dropped; a
-  status without numeric `saved` and `total` is junk and ignored.
-- A hello without `status` (or with junk) keeps the last one: a kiosk does
-  not know what is saved until it has read its disk a few minutes after
-  load, and its row must not blank on every reload.
+- One allowlist per kind, `sanitizeScreenStatus(kind, raw)` in
+  `src/lib/syncSpecs.js` (the file the Worker bundles and /settings reads):
+  unknown keys dropped, numbers clamped, strings trimmed with control
+  characters out. Junk is ignored: lessons without numeric `saved` and
+  `total`, an app without a version or a known update state, a page whose
+  build is not hex.
+- A hello without `status` (or with junk) keeps the last one, so a row never
+  blanks on a reload.
 - Kept on the screen's record in the `screens` index (bounded: one small
-  object per kiosk, at most `SCREENS_MAX` screens) and returned as
+  object per screen, at most `SCREENS_MAX` screens) and returned as
   `screen.status` in the hello's answer and in `GET /v1/screens`. Forgotten
   with the screen.
 - Storage writes (free Durable Object allowance): the status rides the
   existing once-a-minute `lastSeen` write (`SEEN_WRITE_MS`); sooner only when
-  it moved enough to matter (`screenStatusMoved`: `saved`, `total`, `error`,
-  `paused`, `downloading`, `waiting` or `auto` changed, or `percent` moved
-  10 or more). The newest status is also held in memory (`Screens.fresh`),
-  so the list shows it before storage does; a restart falls back to the
-  stored one.
-- The kiosk says hello every 2 minutes while signed in, and on a status
-  change, never twice within a minute; never in configure mode. No CPU-heavy
-  work: clamps and one string clean-up.
+  it moved enough to matter (`screenStatusMoved`): lessons `saved`, `total`,
+  `error`, `paused`, `downloading`, `waiting`, `auto`, `known` or
+  `supported` changed, or `percent` moved 10 or more; app `version` or
+  update `state` changed, or `percent` moved 10 or more; page `build`
+  changed. The newest status is also held in memory (`Screens.fresh`), so
+  the list shows it before storage does; a restart falls back to the stored
+  one.
+- Who says hello when: every screen every 2 minutes while signed in. The
+  Journey kiosk also on a status change, never twice within a minute, never
+  in configure mode. The KVBC Awana app also when its update state changes
+  or its download moves 10 points, never twice within a minute. A TV or
+  projector only at its usual hellos (its build changes only by reloading).
+  No CPU-heavy work: clamps and short string clean-ups.

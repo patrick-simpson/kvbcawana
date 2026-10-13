@@ -157,6 +157,14 @@ Full contract: `lobby/worker/src/routes.md` section 8.
     `SCREEN_SPECS.journey` is `{}` since the Pi mode switch went with the Pi;
     a future kiosk setting would be applied from the hello's answer (Journey
     has no live socket).
+  - **Every row's status line** (owner 2026-10-12, "it doesn't show the
+    progress of other synced devices"): each hello carries a small `status`
+    in its kind's shape (routes.md 10.7): a kiosk's lessons (also "checking
+    this computer…" and "can't be saved on this device"), a computer's
+    KVBC Awana version and update ("up to date", "downloading update 42%",
+    "update ready, installing when idle", "could not finish downloading"),
+    a TV's or projector's page version. A computer shows it only once it
+    runs an app release with it.
   - **For the owner**: a forgotten screen that is still running comes back at
     its next hello (by design); and a change made on /settings while the TV
     has an unsent change of its own wins over it.

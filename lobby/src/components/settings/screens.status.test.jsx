@@ -1,9 +1,11 @@
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-// A Journey kiosk's row on the settings page shows how saving the
-// full-quality lessons is going: the words (pure) and the row itself, against
-// a stand-in list (worker/test/screens.test.js pins what the Worker keeps).
+// Every row on the settings page's Screens has one status line under its
+// On now / Off line: a Journey kiosk's saved lessons, a computer's KVBC Awana
+// version and update, a TV's or projector's page version. The words (pure)
+// and the rows themselves, against a stand-in list (worker/test/screens.test.js
+// pins what the Worker keeps).
 
 const world = vi.hoisted(() => ({ screens: /** @type {any[]} */ ([]) }));
 vi.mock('../../hooks/useSync.js', () => ({ useSync: () => ({ signedIn: true, url: 'https://sync.test' }) }));
@@ -16,7 +18,7 @@ vi.mock('../../hooks/useScreenSync.js', () => ({
   sendScreenAction: async () => ({ ok: true }),
 }));
 
-const { ScreensSection, agoWords, lessonBytes, lessonStatusWords } = await import('./screens.jsx');
+const { ScreensSection, agoWords, appStatusWords, lessonBytes, lessonStatusWords, noStatusWords, pageStatusWords } = await import('./screens.jsx');
 
 afterEach(cleanup);
 
@@ -43,12 +45,12 @@ describe('the words', () => {
 
   it('saving, downloading, paused, waiting, off, a problem', () => {
     expect(lessonStatusWords(lessons(), NOW)).toEqual({
-      done: false, count: 'Lessons saved: 24 of 63 · 11.2 GB', state: '', error: '', saved: 'last saved 2 h ago',
+      done: false, phase: 'saving', count: 'Lessons: 24 of 63 saved · 11.2 GB', state: '', error: '', saved: 'last saved 2 h ago',
     });
     expect(lessonStatusWords(lessons({ downloading: true, currentWeek: 7 }), NOW)?.state).toBe('42% · downloading Lesson 7');
-    expect(lessonStatusWords(lessons({ paused: true }), NOW)?.state).toBe('Paused');
-    expect(lessonStatusWords(lessons({ waiting: true }), NOW)?.state).toMatch(/^Waiting/);
-    expect(lessonStatusWords(lessons({ auto: false }), NOW)?.state).toBe('Automatic download is off');
+    expect(lessonStatusWords(lessons({ paused: true }), NOW)?.state).toBe('paused');
+    expect(lessonStatusWords(lessons({ waiting: true }), NOW)?.state).toMatch(/^waiting/);
+    expect(lessonStatusWords(lessons({ auto: false }), NOW)?.state).toBe('automatic download is off here');
     expect(lessonStatusWords(lessons({ error: 'Week 8 · Leader: the internet connection dropped' }), NOW)?.error)
       .toBe('Problem: Week 8 · Leader: the internet connection dropped');
     expect(lessonStatusWords(lessons({ lastSavedAt: null }), NOW)?.saved).toBe('');
@@ -59,9 +61,41 @@ describe('the words', () => {
       .toMatchObject({ done: true, count: '63 of 63 · 13.9 GB', state: '' });
   });
 
-  it('nothing to say without a status or a lesson list', () => {
+  it('a browser with nothing saved and automatic download off says so plainly', () => {
+    const w = lessonStatusWords(lessons({ saved: 0, bytesSaved: 0, percent: 0, auto: false, lastSavedAt: null }), NOW);
+    expect(`${w?.count} · ${w?.state}`).toBe('Lessons: 0 of 63 saved · automatic download is off here');
+  });
+
+  it('not known yet, cannot save here, no lesson list: each said plainly, never nothing', () => {
+    expect(lessonStatusWords(lessons({ known: false, saved: 0, total: 0 }), NOW)).toMatchObject({ phase: 'checking', count: 'Lessons: checking this computer…', state: '' });
+    expect(lessonStatusWords(lessons({ supported: false, known: false, total: 0 }), NOW)).toMatchObject({ phase: 'unsupported', count: "Lessons can't be saved on this device" });
+    expect(lessonStatusWords(lessons({ total: 0, saved: 0 }), NOW)?.phase).toBe('no-list');
+    // An older kiosk page sends neither switch: it only ever reported once it knew.
+    expect(lessonStatusWords(lessons(), NOW)?.phase).toBe('saving');
     expect(lessonStatusWords(undefined, NOW)).toBeNull();
-    expect(lessonStatusWords(lessons({ total: 0, saved: 0 }), NOW)).toBeNull();
+  });
+
+  it('a computer: its KVBC Awana version and how its update is going', () => {
+    const app = (state, percent = null) => ({ version: '9.4.0', update: { state, percent, at: '2026-10-12T15:00:00.000Z' } });
+    const line = (a) => { const w = appStatusWords(a); return w && `${w.version} · ${w.update}`; };
+    expect(line(app('none'))).toBe('KVBC Awana 9.4.0 · up to date');
+    expect(line(app('downloading', 42))).toBe('KVBC Awana 9.4.0 · downloading update 42%');
+    expect(line(app('ready'))).toBe('KVBC Awana 9.4.0 · update ready, installing when idle');
+    expect(line(app('error'))).toBe('KVBC Awana 9.4.0 · update could not finish downloading');
+    expect(appStatusWords(app('error'))?.warn).toBe(true);
+    expect(appStatusWords(undefined)).toBeNull();
+  });
+
+  it('a TV or projector: its page version', () => {
+    expect(pageStatusWords({ build: 'a1b2c3d' })).toBe('Page version a1b2c3d');
+    expect(pageStatusWords({ build: null })).toBe('Page version unknown');
+    expect(pageStatusWords(undefined)).toBeNull();
+  });
+
+  it('before the first report: "Checking…" while on; a computer on an older app says why', () => {
+    expect(noStatusWords({ kind: 'lobby', online: true })).toBe('Checking…');
+    expect(noStatusWords({ kind: 'journey', online: false })).toBe('Nothing reported yet');
+    expect(noStatusWords({ kind: 'computer', online: true })).toMatch(/newest KVBC Awana app/);
   });
 });
 
@@ -82,7 +116,7 @@ describe('the Journey kiosks group', () => {
     const row = (id) => /** @type {HTMLElement} */ (container.querySelector(`[data-screen="${id}"]`));
 
     const busy = row('jk_aaaaaaaaaaaaaaaaaaaa');
-    expect(busy.textContent).toContain('Lessons saved: 24 of 63 · 11.2 GB · 42% · downloading Lesson 7 · last saved');
+    expect(busy.textContent).toContain('Lessons: 24 of 63 saved · 11.2 GB · 42% · downloading Lesson 7 · last saved');
     expect(busy.querySelector('.screen-row__status--stale')).toBeNull();
 
     const done = row('jk_bbbbbbbbbbbbbbbbbbbb');
@@ -90,7 +124,9 @@ describe('the Journey kiosks group', () => {
     expect(done.textContent).toContain('Off');
     expect(done.querySelector('.screen-row__status--stale')).toBeTruthy();
 
-    expect(row('jk_cccccccccccccccccccc').querySelector('.screen-row__status')).toBeNull();
+    const fresh = /** @type {HTMLElement} */ (row('jk_cccccccccccccccccccc').querySelector('.screen-row__status'));
+    expect(fresh.textContent).toBe('Checking…');
+    expect(fresh.dataset.status).toBe('none');
   });
 
   it('a problem gets its own line', async () => {
@@ -98,5 +134,53 @@ describe('the Journey kiosks group', () => {
     const { container } = render(<ScreensSection onOpen={() => {}} />);
     await screen.findByText('Journey kiosks');
     expect(container.querySelector('.screen-row__problem')?.textContent).toBe('Problem: not enough disk space (3.0 GB needed, 1.2 GB free)');
+  });
+});
+
+describe('every row has a status line', () => {
+  const row = (id, kind, name, online, status) => ({
+    id, kind, name, online, live: false, createdAt: '2026-10-01T00:00:00.000Z',
+    lastSeen: new Date(online ? Date.now() : Date.now() - 3 * 60 * 60 * 1000).toISOString(), ...(status ? { status } : {}),
+  });
+  const app = (state, percent = null) => ({ app: { version: '9.4.0', update: { state, percent, at: '2026-10-12T15:00:00.000Z' } } });
+
+  it('TVs, projectors, kiosks and computers, each in its own words, greyed when Off', async () => {
+    world.screens = [
+      row('tv_aaaaaaaaaaaaaaaaaaaa', 'lobby', 'Lobby TV', true, { page: { build: 'a1b2c3d' } }),
+      row('tv_bbbbbbbbbbbbbbbbbbbb', 'lobby', 'Old TV', true, null),
+      row('pj_aaaaaaaaaaaaaaaaaaaa', 'projector', 'Projector', false, { page: { build: '0f9e8d7' } }),
+      row('jk_aaaaaaaaaaaaaaaaaaaa', 'journey', 'Mac in the office', true, { lessons: lessons({ supported: false, known: false, saved: 0, total: 0 }) }),
+      row('jk_bbbbbbbbbbbbbbbbbbbb', 'journey', 'Journey room', true, { lessons: lessons({ known: false, saved: 0, total: 0 }) }),
+      row('pc_aaaaaaaaaaaaaaaaaaaa', 'computer', 'Check-in laptop', true, app('downloading', 42)),
+      row('pc_bbbbbbbbbbbbbbbbbbbb', 'computer', 'Sound room', true, app('error')),
+      row('pc_cccccccccccccccccccc', 'computer', 'Office PC', false, app('ready')),
+      row('pc_dddddddddddddddddddd', 'computer', 'Old app', true, null),
+    ];
+    const { container } = render(<ScreensSection onOpen={() => {}} />);
+    await screen.findByText('Computers');
+    const line = (id) => /** @type {HTMLElement} */ (container.querySelector(`[data-screen="${id}"] .screen-row__status`));
+
+    // Exactly one line in every row.
+    for (const s of world.screens) expect(container.querySelectorAll(`[data-screen="${s.id}"] .screen-row__status`)).toHaveLength(1);
+
+    expect(line('tv_aaaaaaaaaaaaaaaaaaaa').textContent).toBe('Page version a1b2c3d');
+    expect(line('tv_bbbbbbbbbbbbbbbbbbbb').textContent).toBe('Checking…');
+    expect(line('pj_aaaaaaaaaaaaaaaaaaaa').textContent).toBe('Page version 0f9e8d7');
+    expect(line('pj_aaaaaaaaaaaaaaaaaaaa').classList.contains('screen-row__status--stale')).toBe(true);
+    expect(line('jk_aaaaaaaaaaaaaaaaaaaa').textContent).toBe("Lessons can't be saved on this device");
+    expect(line('jk_bbbbbbbbbbbbbbbbbbbb').textContent).toBe('Lessons: checking this computer…');
+    expect(line('pc_aaaaaaaaaaaaaaaaaaaa').textContent).toBe('KVBC Awana 9.4.0 · downloading update 42%');
+    expect(line('pc_aaaaaaaaaaaaaaaaaaaa').classList.contains('screen-row__status--stale')).toBe(false);
+    expect(line('pc_bbbbbbbbbbbbbbbbbbbb').querySelector('.screen-row__warn')?.textContent).toBe('update could not finish downloading');
+    expect(line('pc_cccccccccccccccccccc').textContent).toBe('KVBC Awana 9.4.0 · update ready, installing when idle');
+    expect(line('pc_cccccccccccccccccccc').classList.contains('screen-row__status--stale')).toBe(true);
+    expect(line('pc_dddddddddddddddddddd').textContent).toMatch(/newest KVBC Awana app/);
+  });
+
+  it('another kind\'s status is never worded on the wrong row', async () => {
+    world.screens = [row('tv_aaaaaaaaaaaaaaaaaaaa', 'lobby', 'Lobby TV', true, app('none'))];
+    const { container } = render(<ScreensSection onOpen={() => {}} />);
+    await screen.findByText('Lobby TVs');
+    expect(container.querySelector('.screen-row__status')?.textContent).toBe('Checking…');
   });
 });

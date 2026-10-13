@@ -1,6 +1,6 @@
 import { act, cleanup, render, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { _resetThisScreenForTest, useScreenSync, useThisScreen, renameThisScreen } from './useScreenSync.js';
+import { _resetThisScreenForTest, pageStatus, useScreenSync, useThisScreen, renameThisScreen } from './useScreenSync.js';
 import { _resetSyncForTest, ringSyncDoorbell } from './useSync.js';
 import { _resetForTest as resetConfig, useConfig } from './useConfig.js';
 import { saveSyncSession } from '../lib/syncService.js';
@@ -59,12 +59,33 @@ const helloOf = (calls) => calls.filter((c) => c.url.endsWith('/v1/screens/hello
 const putsOf = (calls) => calls.filter((c) => c.method === 'PUT' && c.url.endsWith('/settings'));
 
 describe('a lobby TV managed from /settings', () => {
+  it('its hello reports the page build it is running (first 7 hex of its awana-build meta), clean enough for the Worker', async () => {
+    const meta = document.createElement('meta');
+    meta.name = 'awana-build';
+    meta.content = 'A1B2C3D4E5F6';
+    document.head.append(meta);
+    try {
+      expect(pageStatus()).toEqual({ page: { build: 'a1b2c3d' } });
+      const { sanitizeScreenStatus } = await import('../lib/syncSpecs.js');
+      expect(sanitizeScreenStatus('lobby', pageStatus())).toEqual(pageStatus());
+      const w = fakeWorker();
+      render(<Tv />);
+      await waitFor(() => expect(helloOf(w.calls)).toHaveLength(1));
+      expect(helloOf(w.calls)[0].body.status).toEqual({ page: { build: 'a1b2c3d' } });
+      meta.content = 'not-a-build';
+      expect(pageStatus()).toEqual({ page: { build: null } });
+    } finally {
+      meta.remove();
+    }
+  });
+
   it('says hello with a kept id and sends its own part up the first time', async () => {
     const w = fakeWorker();
     render(<Tv />);
     await waitFor(() => expect(putsOf(w.calls)).toHaveLength(1));
     const [hello] = helloOf(w.calls);
-    expect(hello.body).toEqual({ id: loadScreenSlot('lobby').id, kind: 'lobby', name: 'Lobby TV' });
+    // No build stamp here (as on the dev server): it says so rather than nothing.
+    expect(hello.body).toEqual({ id: loadScreenSlot('lobby').id, kind: 'lobby', name: 'Lobby TV', status: { page: { build: null } } });
     // Panic mode never leaves the TV.
     expect(putsOf(w.calls)[0].body).toEqual({ settings: { audioMuted: true } });
     expect(liveScreenId()).toBe(hello.body.id);

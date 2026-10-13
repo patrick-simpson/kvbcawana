@@ -15,7 +15,8 @@
 //
 // SCREEN_SPECS (below) is each registered screen's OWN settings, per kind,
 // which /settings edits through the Worker; sanitizeScreenStatus what a
-// screen reports about itself (a Journey kiosk's saved lessons).
+// screen reports about itself (a kiosk's saved lessons, a computer's app
+// version and update, a TV's or projector's page build).
 
 import { cleanSpec } from './settingRules.js';
 
@@ -197,33 +198,54 @@ export function sanitizeScreenAction(kind, action, data) {
 }
 
 // ── A screen's status (what it reports in its hello; never a setting) ───────
-// Only a Journey kiosk reports one: how saving every lesson's full-quality
-// video onto the kiosk is going (journey/src/schedule/26-lesson-downloads.js
-// journeyDownloadStatus(), trimmed by journey/public/src/sync.js). Numbers,
-// switches and one short plain-words reason: never a name, never a URL. The
-// Worker keeps exactly this shape on the screen's record; /settings reads it.
+// Every kind reports one small thing about itself, through ONE sanitizer per
+// kind (strict allowlist, numbers clamped, strings cleaned; never a name,
+// never a URL). The Worker keeps exactly this shape on the screen's record;
+// /settings words it under the row (settings/screens.jsx).
+//   journey    {lessons}  how saving every lesson's full-quality video onto
+//              the kiosk is going (journey/src/schedule/26-lesson-downloads.js
+//              journeyDownloadStatus(), trimmed by journey/public/src/sync.js)
+//   computer   {app}      the KVBC Awana app's version and its update
+//              (printer/electron-app/src/update-progress.js appReport)
+//   lobby,     {page}     the page's own build (its awana-build meta, 7 hex)
+//   projector
 
 /** The longest error line kept (characters). */
 export const SCREEN_STATUS_ERROR_MAX = 120;
+/** The longest app version kept (characters). */
+export const SCREEN_STATUS_VERSION_MAX = 40;
+/** What a computer's app update can be doing. */
+export const APP_UPDATE_STATES = Object.freeze(/** @type {const} */ (['none', 'downloading', 'ready', 'error']));
 const STATUS_COUNT_MAX = 999;
 const STATUS_BYTES_MAX = 1e13; // 10 TB: far past any kiosk's disk
 const STATUS_WEEK_MAX = 99;
+const BUILD_RE = /^[0-9a-f]{7,64}$/;
 
 /**
+ * `known` false: the kiosk has not read its disk yet (a few minutes after
+ * load); `supported` false: this browser cannot save lessons at all. Both are
+ * true for a kiosk page older than them (it only reported once it knew).
  * @typedef {{ saved: number, total: number, bytesSaved: number, bytesTotal: number,
  *   downloading: boolean, waiting: boolean, paused: boolean, percent: number,
- *   currentWeek: number | null, lastSavedAt: string | null, error: string | null, auto: boolean }} LessonsStatus
+ *   currentWeek: number | null, lastSavedAt: string | null, error: string | null, auto: boolean,
+ *   known: boolean, supported: boolean }} LessonsStatus
+ * @typedef {{ version: string, update: { state: 'none' | 'downloading' | 'ready' | 'error', percent: number | null, at: string | null } }} AppStatus
+ * @typedef {{ build: string | null }} PageStatus
+ * @typedef {{ lessons: LessonsStatus } | { app: AppStatus } | { page: PageStatus }} ScreenStatus
  */
 
 /** @param {unknown} v @param {number} max */
 const clampInt = (v, max) => (typeof v === 'number' && Number.isFinite(v) ? Math.min(max, Math.max(0, Math.floor(v))) : 0);
 
-/** One line of plain words, at most SCREEN_STATUS_ERROR_MAX characters; null when nothing is left. @param {unknown} raw */
-function cleanStatusText(raw) {
+/** @param {unknown} v @returns {v is Record<string, any>} */
+const isPlainObject = (v) => Boolean(v) && typeof v === 'object' && !Array.isArray(v);
+
+/** One line of plain words, at most `max` characters; null when nothing is left. @param {unknown} raw @param {number} [max] */
+function cleanStatusText(raw, max = SCREEN_STATUS_ERROR_MAX) {
   if (typeof raw !== 'string') return null;
   // eslint-disable-next-line no-control-regex
   const flat = raw.slice(0, 1000).replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/g, ' ').replace(/\s+/g, ' ').trim();
-  const out = [...flat].slice(0, SCREEN_STATUS_ERROR_MAX).join('').trim();
+  const out = [...flat].slice(0, max).join('').trim();
   return out || null;
 }
 
@@ -234,54 +256,106 @@ function cleanStatusTime(raw) {
   return Number.isFinite(t) && t > 0 ? new Date(t).toISOString() : null;
 }
 
-/**
- * A screen's reported status, in the one fixed shape, or null (junk, or a
- * kind that reports none). Every number clamped, every switch a real boolean.
- * @param {unknown} kind
- * @param {unknown} raw
- * @returns {{ lessons: LessonsStatus } | null}
- */
-export function sanitizeScreenStatus(kind, raw) {
-  if (kind !== 'journey' || !raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
-  const l = /** @type {any} */ (raw).lessons;
-  if (!l || typeof l !== 'object' || Array.isArray(l)) return null;
+/** @param {unknown} l @returns {LessonsStatus | null} */
+function cleanLessons(l) {
+  if (!isPlainObject(l)) return null;
   if (typeof l.total !== 'number' || typeof l.saved !== 'number') return null;
   const total = clampInt(l.total, STATUS_COUNT_MAX);
   const bytesTotal = clampInt(l.bytesTotal, STATUS_BYTES_MAX);
   const week = clampInt(l.currentWeek, STATUS_WEEK_MAX);
   return {
-    lessons: {
-      saved: Math.min(total, clampInt(l.saved, STATUS_COUNT_MAX)),
-      total,
-      bytesSaved: Math.min(bytesTotal, clampInt(l.bytesSaved, STATUS_BYTES_MAX)),
-      bytesTotal,
-      downloading: l.downloading === true,
-      waiting: l.waiting === true,
-      paused: l.paused === true,
-      percent: clampInt(l.percent, 100),
-      currentWeek: week >= 1 ? week : null,
-      lastSavedAt: cleanStatusTime(l.lastSavedAt),
-      error: cleanStatusText(l.error),
-      auto: l.auto === true,
-    },
+    saved: Math.min(total, clampInt(l.saved, STATUS_COUNT_MAX)),
+    total,
+    bytesSaved: Math.min(bytesTotal, clampInt(l.bytesSaved, STATUS_BYTES_MAX)),
+    bytesTotal,
+    downloading: l.downloading === true,
+    waiting: l.waiting === true,
+    paused: l.paused === true,
+    percent: clampInt(l.percent, 100),
+    currentWeek: week >= 1 ? week : null,
+    lastSavedAt: cleanStatusTime(l.lastSavedAt),
+    error: cleanStatusText(l.error),
+    auto: l.auto === true,
+    known: l.known !== false,
+    supported: l.supported !== false,
   };
+}
+
+/** @param {unknown} a @returns {AppStatus | null} */
+function cleanApp(a) {
+  if (!isPlainObject(a) || !isPlainObject(a.update)) return null;
+  const version = cleanStatusText(a.version, SCREEN_STATUS_VERSION_MAX);
+  const state = /** @type {readonly unknown[]} */ (APP_UPDATE_STATES).includes(a.update.state)
+    ? /** @type {AppStatus['update']['state']} */ (a.update.state) : null;
+  if (!version || !state) return null;
+  return {
+    version,
+    update: { state, percent: state === 'downloading' ? clampInt(a.update.percent, 100) : null, at: cleanStatusTime(a.update.at) },
+  };
+}
+
+/** @param {unknown} p @returns {PageStatus | null} */
+function cleanPage(p) {
+  if (!isPlainObject(p)) return null;
+  if (p.build === null) return { build: null };
+  const build = typeof p.build === 'string' ? p.build.trim().toLowerCase() : '';
+  return BUILD_RE.test(build) ? { build: build.slice(0, 7) } : null;
+}
+
+/**
+ * A screen's reported status, in its kind's one fixed shape, or null (junk,
+ * or another kind's status: a lobby TV cannot report lessons). Every number
+ * clamped, every switch a real boolean, every unknown key dropped.
+ * @param {unknown} kind
+ * @param {unknown} raw
+ * @returns {ScreenStatus | null}
+ */
+export function sanitizeScreenStatus(kind, raw) {
+  if (!isPlainObject(raw)) return null;
+  if (kind === 'journey') {
+    const lessons = cleanLessons(raw.lessons);
+    return lessons ? { lessons } : null;
+  }
+  if (kind === 'computer') {
+    const app = cleanApp(raw.app);
+    return app ? { app } : null;
+  }
+  if (kind === 'lobby' || kind === 'projector') {
+    const page = cleanPage(raw.page);
+    return page ? { page } : null;
+  }
+  return null;
 }
 
 /**
  * Has a status moved enough to be worth a storage write before the next
- * once-a-minute one? (The free Durable Object allowance counts writes.) A
- * lesson saved, the set changing, an error, pause, start, stop or wait, the
- * automatic switch, or 10 points of progress. Both sanitized (or null).
- * @param {{ lessons: LessonsStatus } | null | undefined} a
- * @param {{ lessons: LessonsStatus } | null | undefined} b
+ * once-a-minute one? (The free Durable Object allowance counts writes.) Both
+ * sanitized for the same kind (or null).
+ *   lessons  a lesson saved, the set changing, an error, pause, start, stop or
+ *            wait, the automatic switch, knowing or not, or 10 points of progress
+ *   app      a new version, the update's state, or 10 points of its download
+ *   page     a new build
+ * @param {ScreenStatus | null | undefined} a
+ * @param {ScreenStatus | null | undefined} b
  */
 export function screenStatusMoved(a, b) {
   if (!a || !b) return Boolean(a) !== Boolean(b);
-  const x = a.lessons;
-  const y = b.lessons;
-  return x.saved !== y.saved || x.total !== y.total || x.error !== y.error || x.paused !== y.paused
-    || x.downloading !== y.downloading || x.waiting !== y.waiting || x.auto !== y.auto
-    || Math.abs(x.percent - y.percent) >= 10;
+  if ('lessons' in a && 'lessons' in b) {
+    const x = a.lessons;
+    const y = b.lessons;
+    return x.saved !== y.saved || x.total !== y.total || x.error !== y.error || x.paused !== y.paused
+      || x.downloading !== y.downloading || x.waiting !== y.waiting || x.auto !== y.auto
+      || x.known !== y.known || x.supported !== y.supported
+      || Math.abs(x.percent - y.percent) >= 10;
+  }
+  if ('app' in a && 'app' in b) {
+    const x = a.app;
+    const y = b.app;
+    return x.version !== y.version || x.update.state !== y.update.state
+      || Math.abs((x.update.percent ?? 0) - (y.update.percent ?? 0)) >= 10;
+  }
+  if ('page' in a && 'page' in b) return a.page.build !== b.page.build;
+  return true;
 }
 
 /** @param {unknown} value */

@@ -56,25 +56,34 @@ export function lessonBytes(n) {
 
 /**
  * A Journey kiosk's saved lessons in plain words (its hello's `status.lessons`,
- * sanitized by the Worker). null when there is nothing to say.
+ * sanitized by the Worker). null without a status. `known`/`supported` missing
+ * (an older kiosk page) count as true.
  * @param {any} l
  * @param {number} [now]
- * @returns {{ done: boolean, count: string, state: string, error: string, saved: string } | null}
+ * @returns {{ done: boolean, phase: 'done' | 'saving' | 'checking' | 'unsupported' | 'no-list',
+ *   count: string, state: string, error: string, saved: string } | null}
  */
 export function lessonStatusWords(l, now = Date.now()) {
-  if (!l || typeof l !== 'object' || !(l.total > 0)) return null;
+  if (!l || typeof l !== 'object') return null;
+  /** @param {'checking' | 'unsupported' | 'no-list'} phase @param {string} count */
+  const only = (phase, count) => ({ done: false, phase, count, state: '', error: '', saved: '' });
+  if (l.supported === false) return only('unsupported', "Lessons can't be saved on this device");
+  if (l.known === false) return only('checking', 'Lessons: checking this computer…');
+  if (!(l.total > 0)) return only('no-list', 'Lessons: the lesson list has not loaded yet');
   const done = l.saved >= l.total;
-  const count = done ? `${l.total} of ${l.total} · ${lessonBytes(l.bytesTotal)}` : `Lessons saved: ${l.saved} of ${l.total} · ${lessonBytes(l.bytesSaved)}`;
+  const count = done ? `${l.total} of ${l.total} · ${lessonBytes(l.bytesTotal)}`
+    : `Lessons: ${l.saved} of ${l.total} saved${l.bytesSaved > 0 ? ` · ${lessonBytes(l.bytesSaved)}` : ''}`;
   let state = '';
   if (!done) {
     if (l.downloading) state = `${l.percent}% · downloading${l.currentWeek ? ` Lesson ${l.currentWeek}` : ''}`;
-    else if (l.paused) state = 'Paused';
-    else if (l.waiting) state = 'Waiting: carries on by itself after the lesson';
-    else if (!l.auto) state = 'Automatic download is off';
+    else if (l.paused) state = 'paused';
+    else if (l.waiting) state = 'waiting: carries on by itself after the lesson';
+    else if (!l.auto) state = 'automatic download is off here';
   }
   const ago = agoWords(l.lastSavedAt, now);
   return {
     done,
+    phase: done ? 'done' : 'saving',
     count,
     state,
     error: typeof l.error === 'string' && l.error ? `Problem: ${l.error}` : '',
@@ -82,19 +91,73 @@ export function lessonStatusWords(l, now = Date.now()) {
   };
 }
 
-/** The kiosk's saved lessons under its name; greyed while the kiosk is off (the last it said). @param {{lessons: any, stale: boolean}} props */
-function LessonStatus({ lessons, stale }) {
-  const w = lessonStatusWords(lessons);
-  if (!w) return null;
-  return (
-    <span className={`screen-row__status${stale ? ' screen-row__status--stale' : ''}`} data-lessons={w.done ? 'done' : 'saving'}>
-      {w.done && <><strong className="screen-row__done">All saved ✓</strong> · </>}
-      {w.count}
-      {w.state && <> · {w.state}</>}
-      {w.saved && <> · {w.saved}</>}
-      {w.error && <span className="screen-row__problem">{w.error}</span>}
-    </span>
-  );
+/**
+ * A computer's KVBC Awana app in plain words (its hello's `status.app`):
+ * "KVBC Awana 9.4.0 · up to date", "· downloading update 42%", "· update
+ * ready, installing when idle", "· update could not finish downloading".
+ * null without a status.
+ * @param {any} a
+ * @returns {{ version: string, update: string, warn: boolean } | null}
+ */
+export function appStatusWords(a) {
+  if (!a || typeof a !== 'object' || typeof a.version !== 'string' || !a.update) return null;
+  const state = a.update.state;
+  const update = state === 'downloading' ? `downloading update ${Number(a.update.percent) || 0}%`
+    : state === 'ready' ? 'update ready, installing when idle'
+      : state === 'error' ? 'update could not finish downloading'
+        : 'up to date';
+  return { version: `KVBC Awana ${a.version}`, update, warn: state === 'error' };
+}
+
+/** A TV's or projector's page build in plain words (its hello's `status.page`). @param {any} p */
+export function pageStatusWords(p) {
+  if (!p || typeof p !== 'object') return null;
+  return typeof p.build === 'string' && p.build ? `Page version ${p.build}` : 'Page version unknown';
+}
+
+/** What a row says before its screen has reported anything (an older page or app sends none). @param {{kind: string, online: boolean}} s */
+export function noStatusWords(s) {
+  if (s.kind === 'computer') return 'Version and updates show here once this computer has the newest KVBC Awana app';
+  return s.online ? 'Checking…' : 'Nothing reported yet';
+}
+
+/**
+ * The one status line under a row's On now / Off line, in its kind's words;
+ * greyed while the screen is off (the last it said).
+ * @param {{ screen: any }} props
+ */
+function ScreenStatusLine({ screen }) {
+  const cls = `screen-row__status${screen.online ? '' : ' screen-row__status--stale'}`;
+  const st = screen.status;
+  if (screen.kind === 'journey' && st?.lessons) {
+    const w = lessonStatusWords(st.lessons);
+    if (w) {
+      return (
+        <span className={cls} data-status="lessons" data-lessons={w.phase}>
+          {w.done && <><strong className="screen-row__done">All saved ✓</strong> · </>}
+          {w.count}
+          {w.state && <> · {w.state}</>}
+          {w.saved && <> · {w.saved}</>}
+          {w.error && <span className="screen-row__problem">{w.error}</span>}
+        </span>
+      );
+    }
+  }
+  if (screen.kind === 'computer' && st?.app) {
+    const w = appStatusWords(st.app);
+    if (w) {
+      return (
+        <span className={cls} data-status="app" data-update={st.app.update.state}>
+          {w.version} · {w.warn ? <span className="screen-row__warn">{w.update}</span> : w.update}
+        </span>
+      );
+    }
+  }
+  if ((screen.kind === 'lobby' || screen.kind === 'projector') && st?.page) {
+    const words = pageStatusWords(st.page);
+    if (words) return <span className={cls} data-status="page">{words}</span>;
+  }
+  return <span className={cls} data-status="none">{noStatusWords(screen)}</span>;
 }
 
 /** A line drawing of the device, in the row's ink. @param {{kind: string}} props */
@@ -187,7 +250,7 @@ export function ScreensSection({ onOpen, goTo }) {
                     <span className="screen-row__name">{s.name}</span>
                     <span className="screen-row__meta"><ScreenState online={s.online} /> · {s.online ? 'seen' : 'last seen'} {seenWords(s.lastSeen)}
                       {s.pendingRoleChange?.printRole === false && <> · <span className="hint--warn">prints no labels once the last one is out</span></>}</span>
-                    {s.kind === 'journey' && <LessonStatus lessons={s.status?.lessons} stale={!s.online} />}
+                    <ScreenStatusLine screen={s} />
                   </span>
                   {s.kind === 'lobby' ? (
                     <button type="button" className="secondary small" onClick={() => onOpen(s)} aria-label={`Open settings for ${s.name}`}>
