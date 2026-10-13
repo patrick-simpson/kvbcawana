@@ -240,8 +240,13 @@ function fingerprint(s) {
 }
 
 const COUNT_RE = /^\d{1,5}$/;
-/** The blank-headed partner column: its meaning is not documented, so it must only look like a number (a count or a percent). */
-const PARTNER_RE = /^[0-9][0-9.,]{0,9}\s?%?$|^\.[0-9]{1,6}\s?%?$/;
+/**
+ * The blank-headed partner column: its meaning is not documented, so it must only
+ * look like a number (a count or a percent) or a bracketed footnote mark: the
+ * live 2025-26 report carries "[1]" beside T&T and TOTAL on one night (owner's
+ * download, 2026-10-13), which refused the whole season.
+ */
+const PARTNER_RE = /^[0-9][0-9.,]{0,9}\s?%?$|^\.[0-9]{1,6}\s?%?$|^\[\d{1,3}\]$/;
 const SUMMARY_WORD_RE = /^(?:total|totals|grand total|average|averages|avg|mean|sum|count)\b/i;
 
 /**

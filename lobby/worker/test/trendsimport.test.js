@@ -126,6 +126,22 @@ describe('parseAttendanceSummary: strict', () => {
     expect(why('')).toBe('not-csv');
   });
 
+  it('reads the live report\'s footnote mark "[1]" beside a count (2025-26, owner 2026-10-13), and nothing else bracketed', () => {
+    const live = [
+      '"Meeting","Puggles","","Cubbies","","Sparks","","T&T","","Trek","","Journey","","TOTAL",""',
+      '"2025-11-19","3","","21","","28","","22","[1]","16","","","","90","[1]"',
+      '"2025-11-12","3","","20","","25","","24","","17","","","","89",""',
+      '',
+    ].join('\n');
+    const p = parseAttendanceSummary(live, 2025, '2026-10-13');
+    expect(p.ok && p.nights).toEqual([
+      { night: '2025-11-12', counts: { Puggles: 3, Cubbies: 20, Sparks: 25, 'T&T': 24, Trek: 17 } },
+      { night: '2025-11-19', counts: { Puggles: 3, Cubbies: 21, Sparks: 28, 'T&T': 22, Trek: 16 } },
+    ]);
+    const bad = parseAttendanceSummary(live.replace('"22","[1]"', '"22","[Ada]"'), 2025, '2026-10-13');
+    expect(bad.ok ? 'ok' : bad.why).toBe('bad-count');
+  });
+
   it('refuses a row whose clubs do not add up to its TOTAL, a bad count, a bad width, a twice-listed night', () => {
     const why = (text) => { const p = parseAttendanceSummary(text, 2026, '2026-10-11'); return p.ok ? 'ok' : p.why; };
     expect(why(SEASON_2026.replace('"94"', '"95"'))).toBe('total-mismatch');
