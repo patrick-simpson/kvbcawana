@@ -11,6 +11,11 @@ import { FLAGS } from '../lib/flags.js';
 //
 // Components call useLowPower() and return null when it's true; the
 // core content (timers, slides, tallies) is never affected.
+//
+// The weather scene asks the two halves apart (owner 2026-10-13): the
+// switch (?vr=1 or the QuickNav toggle, a weak-PC switch) hides it, the OS
+// setting (an accessibility one) shows its still frame instead, a finished
+// picture with nothing moving: useLowPowerSwitch() and useReducedMotion().
 
 const STORAGE_KEY = 'awanaPresentationLowPower.v1';
 
@@ -46,8 +51,18 @@ function notify() {
   for (const fn of listeners) fn();
 }
 
+/** The device's switch alone: ?vr=1 or the saved QuickNav toggle. */
+export function isLowPowerSwitch() {
+  return FLAGS.vr || stored;
+}
+
+/** The OS (or browser) reduced-motion setting alone. */
+export function isReducedMotion() {
+  return !!media?.matches;
+}
+
 export function isLowPower() {
-  return FLAGS.vr || stored || !!media?.matches;
+  return isLowPowerSwitch() || isReducedMotion();
 }
 
 export function setLowPowerPreference(on) {
@@ -76,4 +91,14 @@ export const subscribeLowPower = subscribe;
 
 export function useLowPower() {
   return useSyncExternalStore(subscribe, isLowPower, isLowPower);
+}
+
+/** Only the switch (?vr=1, the QuickNav toggle): the OS setting is not in it. */
+export function useLowPowerSwitch() {
+  return useSyncExternalStore(subscribe, isLowPowerSwitch, isLowPowerSwitch);
+}
+
+/** Only the OS reduced-motion setting, followed live. */
+export function useReducedMotion() {
+  return useSyncExternalStore(subscribe, isReducedMotion, isReducedMotion);
 }

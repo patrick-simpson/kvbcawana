@@ -352,3 +352,170 @@ describe('signage animates only through M (src/lib/motion.jsx)', () => {
     expect(framerImports("import {\n  AnimatePresence,\n  useAnimate,\n} from 'framer-motion';")).toEqual(['AnimatePresence', 'useAnimate']);
   });
 });
+
+
+// ── Every animation the code names, the build keeps ──
+
+// The build keeps a @theme keyframe (Tailwind, the projector's index.css)
+// only when an ordinary stylesheet rule names it. A keyframe named only from
+// component code (an inline `animation:` style) is dropped, and the piece
+// never moves: the projector's old weather loops and its confetti burst
+// (`confettiExplode`, ConfettiBurst.jsx) both shipped that way. So: every
+// animation name the code (signage AND src/presentation, and shared/) spells
+// must have its @keyframes in a stylesheet AND an ordinary rule naming it;
+// and no @theme keyframe may sit there unnamed (it is dropped from the build).
+
+const LOBBY = resolve(SRC, '..');
+
+/** Every file under `dir` matching `test`, skipping node_modules and fixtures. */
+function filesUnder(dir, test) {
+  return readdirSync(dir).flatMap((name) => {
+    const path = join(dir, name);
+    if (statSync(path).isDirectory()) return name === 'node_modules' || name === '__fixtures__' ? [] : filesUnder(path, test);
+    return test(name) ? [path] : [];
+  });
+}
+
+/** `body` split at top-level commas (not inside parentheses or `${…}`). */
+function splitTopLevel(body) {
+  const parts = [];
+  let depth = 0;
+  let start = 0;
+  for (let i = 0; i < body.length; i += 1) {
+    const c = body[i];
+    if (c === '(' || c === '{') depth += 1;
+    else if (c === ')' || c === '}') depth -= 1;
+    else if (c === ',' && depth === 0) { parts.push(body.slice(start, i)); start = i + 1; }
+  }
+  parts.push(body.slice(start));
+  return parts;
+}
+
+// Words an `animation` shorthand may hold that are not a keyframe's name.
+const NOT_A_NAME = new Set([
+  'none', 'infinite', 'normal', 'reverse', 'alternate', 'alternate-reverse', 'forwards', 'backwards', 'both',
+  'running', 'paused', 'linear', 'ease', 'ease-in', 'ease-out', 'ease-in-out', 'step-start', 'step-end',
+  'inherit', 'initial', 'unset', 'revert',
+]);
+
+/**
+ * The keyframe names in one `animation` / `animation-name` value. `${…}`
+ * pieces and functions (cubic-bezier, var, steps) are not names; a name
+ * built at run time (`${name} 2s`) is reported as `${…}`, which no
+ * stylesheet can be checked for.
+ */
+function animationNames(value) {
+  return splitTopLevel(value).flatMap((part) => {
+    const dynamic = /^\s*\$\{/.test(part);
+    const words = part
+      .replace(/\$\{[^}]*\}[\w%.]*/g, ' ')
+      .replace(/[\w-]+\([^)]*\)/g, ' ')
+      .split(/\s+/)
+      .filter((w) => /^-?[A-Za-z_][\w-]*$/.test(w) && !NOT_A_NAME.has(w));
+    return dynamic ? ['${…}', ...words] : words;
+  });
+}
+
+/** Every animation name a JS/JSX source spells: inline styles, DOM writes, Tailwind arbitrary classes. */
+function namesInCode(text) {
+  const code = text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+  const values = [
+    // style={{ animation: '…' }}, { animationName: `…` }, { 'animation': "…" }
+    ...[...code.matchAll(/['"]?\banimation(?:Name)?['"]?\s*:\s*(['"`])((?:\\.|(?!\1)[^\\])*)\1/g)].map((m) => m[2]),
+    // el.style.animation = '…'
+    ...[...code.matchAll(/\.style\.animation(?:Name)?\s*=\s*(['"`])((?:\\.|(?!\1)[^\\])*)\1/g)].map((m) => m[2]),
+    // el.style.setProperty('animation', '…')
+    ...[...code.matchAll(/setProperty\(\s*['"]animation(?:-name)?['"]\s*,\s*(['"`])((?:\\.|(?!\1)[^\\])*)\1/g)].map((m) => m[2]),
+  ];
+  const names = values.flatMap(animationNames);
+  // className="animate-[spin_2s_linear]": Tailwind writes the rule, the keyframe must exist.
+  for (const m of code.matchAll(/\banimate-\[([A-Za-z][A-Za-z0-9-]*)/g)) names.push(m[1]);
+  return names;
+}
+
+/** A stylesheet without comments, and the brace-matched blocks of an at-rule in it. */
+function blocksOf(css, at) {
+  const found = [];
+  const re = new RegExp(`@${at}\\b\\s*([\\w-]*)\\s*\\{`, 'g');
+  for (const m of css.matchAll(re)) {
+    let depth = 1;
+    let i = m.index + m[0].length;
+    for (; i < css.length && depth > 0; i += 1) {
+      if (css[i] === '{') depth += 1;
+      else if (css[i] === '}') depth -= 1;
+    }
+    found.push({ name: m[1], start: m.index, end: i, text: css.slice(m.index, i) });
+  }
+  return found;
+}
+
+/** The stylesheet graph's keyframes (and whether each sits in @theme) and the names ordinary rules use. */
+function stylesheetAnimations(sheets) {
+  const keyframes = new Map();
+  const ruled = new Set();
+  for (const { file, text } of sheets) {
+    const css = text.replace(/\/\*[\s\S]*?\*\//g, '');
+    const themes = blocksOf(css, 'theme');
+    const frames = blocksOf(css, 'keyframes');
+    for (const k of frames) {
+      const inTheme = themes.some((t) => k.start > t.start && k.end <= t.end);
+      keyframes.set(k.name, { file, inTheme });
+    }
+    // Ordinary rules: everything but the keyframe bodies themselves.
+    let rules = css;
+    for (const k of [...frames].reverse()) rules = rules.slice(0, k.start) + rules.slice(k.end);
+    for (const m of rules.matchAll(/(?:^|[;{\s])animation(?:-name)?\s*:\s*([^;}]+)/g)) {
+      for (const name of animationNames(m[1])) ruled.add(name);
+    }
+  }
+  return { keyframes, ruled };
+}
+
+describe('every animation the code names survives the build (lobby/src, shared/)', () => {
+  const code = [...filesUnder(SRC, (n) => /\.(jsx?|tsx?)$/.test(n) && !/\.test\.[jt]sx?$/.test(n)),
+    ...filesUnder(resolve(LOBBY, 'shared'), (n) => /\.(jsx?|tsx?)$/.test(n) && !/\.test\.[jt]sx?$/.test(n))];
+  const sheets = [...filesUnder(SRC, (n) => n.endsWith('.css')), ...filesUnder(resolve(LOBBY, 'shared'), (n) => n.endsWith('.css'))]
+    .map((file) => ({ file: relative(LOBBY, file), text: readFileSync(file, 'utf8') }));
+  const { keyframes, ruled } = stylesheetAnimations(sheets);
+
+  it('finds the sources, both stylesheets and their keyframes', () => {
+    expect(code.length).toBeGreaterThan(100);
+    expect(sheets.map((s) => s.file)).toEqual(expect.arrayContaining([join('src', 'styles', 'app.css'), join('src', 'presentation', 'index.css')]));
+    for (const name of ['pjWxFall', 'pjWxBolt', 'confettiExplode', 'panel-enter', 'sparkleSpin']) expect(keyframes.has(name), name).toBe(true);
+    expect(keyframes.get('sparkleSpin').inTheme).toBe(true);
+    expect(keyframes.get('confettiExplode').inTheme).toBe(false);
+  });
+
+  it('each name the code spells has its @keyframes and an ordinary rule naming it', () => {
+    const offenders = code.flatMap((file) => namesInCode(readFileSync(file, 'utf8'))
+      .filter((name) => !keyframes.has(name) || !ruled.has(name))
+      .map((name) => `${relative(LOBBY, file)}: ${name}${keyframes.has(name) ? ' (no stylesheet rule names it: the build drops it)' : ' (no @keyframes)'}`));
+    expect(offenders).toEqual([]);
+  });
+
+  it('no @theme keyframe goes unnamed (Tailwind would leave it out of the build)', () => {
+    const unnamed = [...keyframes].filter(([name, k]) => k.inTheme && !ruled.has(name)).map(([name, k]) => `${k.file}: ${name}`);
+    expect(unnamed).toEqual([]);
+  });
+
+  it('the scanners catch what they guard against', () => {
+    // The confetti burst as it shipped: an inline style naming a @theme keyframe.
+    expect(namesInCode("style={{ animation: `confettiExplode ${piece.duration}s cubic-bezier(0.25, 0.46, 0.45, 0.94) ${piece.delay}s forwards` }}"))
+      .toEqual(['confettiExplode']);
+    expect(namesInCode("el.style.animation = 'a 1s, b 2s ease-in-out infinite';")).toEqual(['a', 'b']);
+    expect(namesInCode("{ animationName: 'spinMe' }")).toEqual(['spinMe']);
+    expect(namesInCode("el.style.setProperty('animation-name', \"wob\")")).toEqual(['wob']);
+    expect(namesInCode('className="animate-[wiggle_1s_ease-in-out]"')).toEqual(['wiggle']);
+    expect(namesInCode('style={{ animation: `${name} 2s linear` }}')).toEqual(['${…}']);
+    expect(namesInCode("// animation: 'commented'\nconst a = { opacity: 1 };")).toEqual([]);
+    // Shorthand order and functions do not matter.
+    expect(animationNames('2s steps(4, end) var(--d) 0s infinite pjWxBolt')).toEqual(['pjWxBolt']);
+    // A @theme keyframe no rule names is caught; a rule naming it releases it.
+    const theme = '@theme {\n  @keyframes lost { to { opacity: 0; } }\n}\n';
+    expect(stylesheetAnimations([{ file: 'x.css', text: theme }]).keyframes.get('lost').inTheme).toBe(true);
+    expect(stylesheetAnimations([{ file: 'x.css', text: theme }]).ruled.has('lost')).toBe(false);
+    expect(stylesheetAnimations([{ file: 'x.css', text: `${theme}.a { animation: lost 1s both; }` }]).ruled.has('lost')).toBe(true);
+    // Words inside a keyframe body (`to`, `opacity`) are not rule names.
+    expect([...stylesheetAnimations([{ file: 'x.css', text: '@keyframes k { to { animation-timing-function: linear; } }' }]).ruled]).toEqual([]);
+  });
+});

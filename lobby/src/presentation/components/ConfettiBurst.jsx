@@ -22,6 +22,9 @@ const CONFETTI_PIECES = Array.from({ length: 100 }, (_, i) => {
   };
 });
 
+// The flight is plain CSS (index.css "The confetti burst": .pj-confetti-piece
+// and its confettiExplode keyframes), never an inline animation style: the
+// build keeps only keyframes a stylesheet rule names.
 export const ConfettiBurst = ({ onComplete }) => {
   const lowPower = useLowPower();
   useEffect(() => {
@@ -37,10 +40,8 @@ export const ConfettiBurst = ({ onComplete }) => {
       {CONFETTI_PIECES.map(piece => (
         <div
           key={piece.id}
+          className="pj-confetti-piece"
           style={{
-            position: 'absolute',
-            left: '50%',
-            top: '45%',
             width: piece.width,
             height: piece.height,
             borderRadius: piece.borderRadius,
@@ -48,7 +49,8 @@ export const ConfettiBurst = ({ onComplete }) => {
             ['--cx']: `${piece.cx}vw`,
             ['--cy']: `${piece.cy}vh`,
             ['--cr']: `${piece.rotation}deg`,
-            animation: `confettiExplode ${piece.duration}s cubic-bezier(0.25, 0.46, 0.45, 0.94) ${piece.delay}s forwards`,
+            ['--cf-dur']: `${piece.duration}s`,
+            ['--cf-delay']: `${piece.delay}s`,
           }}
         />
       ))}

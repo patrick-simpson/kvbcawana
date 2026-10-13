@@ -1,5 +1,5 @@
 import React from 'react';
-import { useLowPower } from '../hooks/useLowPower.js';
+import { useLowPowerSwitch, useReducedMotion } from '../hooks/useLowPower.js';
 import { autoSkin } from '../../lib/skins.js';
 import { HOUSE, KIT_CLUBS, mulberry32, shade } from '../lib/kit.js';
 import { weatherLabel } from '../lib/weatherLabel.js';
@@ -29,8 +29,12 @@ import { weatherLabel } from '../lib/weatherLabel.js';
 // (index.css, "The weather scene"): every animated piece's resting place IS
 // its still frame, and each loop starts from it, so with the animation off
 // (a paused tab, `prefers-reduced-motion`, `still`) the wall shows a finished,
-// recognisable picture. The low-power switch (useLowPower: ?vr=1, the OS
-// reduced-motion setting, the QuickNav toggle) still hides the whole layer.
+// recognisable picture. The OS (or browser) reduced-motion setting shows
+// exactly that still frame and the chip (owner 2026-10-13: an accessibility
+// setting asks for no motion, not for no weather; the thunder still frame is
+// one bolt lit and steady, never a flash). The low-power switch (?vr=1, the
+// QuickNav toggle: a weak-PC switch) still hides the whole layer, chip
+// included.
 
 /**
  * `n` deterministic places in the unit square, evenly spread with no rows,
@@ -503,18 +507,21 @@ const RainLayer = ({ drops }) => (
 /**
  * @param {{ reading?: { type: string, temp?: number, isDay?: boolean } | null, still?: boolean }} props
  *   `reading` from useWeatherReading (null = unknown: the plain starfield, no
- *   chip); `still` shows the finished still frame with no motion at all.
+ *   chip); `still` shows the finished still frame with no motion at all (as
+ *   the OS reduced-motion setting does by itself).
  */
 export const WeatherScene = ({ reading = null, still = false }) => {
-  const lowPower = useLowPower();
+  const switchedOff = useLowPowerSwitch();
+  const reducedMotion = useReducedMotion();
   // Computed per render (not at module load) so a projector left
   // running for months rolls into the new season's effects.
   const season = getSeason();
-  if (lowPower) return null;
+  if (switchedOff) return null;
+  const frozen = still || reducedMotion;
   const weather = reading?.type ?? 'clear';
   const stormy = weather === 'thunder';
   return (
-    <div className={`pj-wx${still ? ' pj-wx--still' : ''}`} data-weather={weather} data-season={season}>
+    <div className={`pj-wx${frozen ? ' pj-wx--still' : ''}`} data-weather={weather} data-season={season}>
       <div className="pj-wx__layer" aria-hidden="true">
 
         {/* ── Starfield (always there, dimmed under heavy weather) ── */}

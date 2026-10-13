@@ -11,7 +11,8 @@ import { setLowPowerPreference } from '../hooks/useLowPower.js';
 // The countdown's weather, redrawn flat (owner 2026-10-12: "What's the weird
 // diagonal white blur? Make it more obvious what it is"). Each weather mounts
 // the shapes that say it, nothing anywhere is a blur or a soft gradient, the
-// low-power switch still hides the whole layer, and the still frame (no
+// low-power switch still hides the whole layer, OS reduced motion shows the
+// still frame and the chip (owner 2026-10-13), and the still frame (no
 // animation at all) is a finished picture of the same weather.
 
 const css = readFileSync(resolve(__dirname, '../index.css'), 'utf8');
@@ -198,24 +199,79 @@ describe('WeatherScene: photosensitivity', () => {
 });
 
 describe('WeatherScene: low power and the still frame', () => {
-  it('low power still hides the whole layer, chip included', () => {
+  it('the low-power switch still hides the whole layer, chip included', () => {
     setLowPowerPreference(true);
     const { container } = renderOn(WINTER, { reading: reading('cloudy') });
     expect(container.innerHTML).toBe('');
   });
 
-  it('OS reduced motion is one of low power\'s three answers: the layer stays away', async () => {
+  /** A fresh WeatherScene module whose OS answers `reduce` (and, with `vr`, a ?vr=1 address). */
+  async function freshScene({ reduce = false, vr = false } = {}) {
     vi.resetModules();
-    const real = window.matchMedia;
-    window.matchMedia = (q) => ({ matches: q.includes('reduce'), media: q, addEventListener() {}, removeEventListener() {} });
-    try {
-      const mod = await import('./WeatherScene.jsx');
-      const { container } = render(<mod.WeatherScene reading={reading('rain')} />);
-      expect(container.innerHTML).toBe('');
-    } finally {
-      window.matchMedia = real;
+    const realMatch = window.matchMedia;
+    const realUrl = window.location.href;
+    window.matchMedia = (q) => ({ matches: reduce && q.includes('reduce'), media: q, addEventListener() {}, removeEventListener() {} });
+    if (vr) window.history.replaceState(null, '', '?vr=1');
+    const mod = await import('./WeatherScene.jsx');
+    const lowPower = await import('../hooks/useLowPower.js');
+    const restore = () => {
+      lowPower.setLowPowerPreference(false);
+      window.matchMedia = realMatch;
+      window.history.replaceState(null, '', realUrl);
       vi.resetModules();
+    };
+    return { WeatherScene: mod.WeatherScene, setLowPowerPreference: lowPower.setLowPowerPreference, restore };
+  }
+
+  it('OS reduced motion shows the still frame and the chip (an accessibility setting: no motion, not no weather)', async () => {
+    const { WeatherScene: Scene, restore } = await freshScene({ reduce: true });
+    try {
+      for (const type of ['clear', 'cloudy', 'fog', 'rain', 'snow', 'thunder']) {
+        const { container } = render(<Scene reading={reading(type)} />);
+        const scene = container.querySelector('.pj-wx');
+        expect(scene, type).not.toBeNull();
+        expect(scene.classList.contains('pj-wx--still'), type).toBe(true);
+        expect(scene.dataset.weather).toBe(type);
+        expect(container.querySelector('[data-weather-chip]'), type).not.toBeNull();
+        cleanup();
+      }
+      // Thunder's still frame: ONE bolt lit and steady (the kill rule stops pjWxBolt, so it never flashes).
+      const storm = render(<Scene reading={reading('thunder')} />).container;
+      const lit = [...storm.querySelectorAll('[data-wx="bolt"]')].filter((b) => b.style.getPropertyValue('--wx-o0') === '1');
+      expect(lit).toHaveLength(1);
+      expect(weatherCss).toMatch(/\.pj-wx-bolt \{[^}]*opacity: var\(--wx-o0\);/);
+      cleanup();
+      // The rain's splashes stand, the drops are on the wall.
+      const rain = render(<Scene reading={reading('rain')} />).container;
+      expect([...rain.querySelectorAll('[data-wx="splash"]')].filter((el) => Number(el.style.opacity) > 0).length).toBeGreaterThanOrEqual(3);
+      expect(rain.querySelector('[data-wx-layer="rain"]')).not.toBeNull();
+    } finally {
+      restore();
     }
+  });
+
+  it('the low-power switch beats reduced motion: switch on, nothing at all', async () => {
+    const { WeatherScene: Scene, setLowPowerPreference: setSwitch, restore } = await freshScene({ reduce: true });
+    try {
+      setSwitch(true);
+      expect(render(<Scene reading={reading('thunder')} />).container.innerHTML).toBe('');
+    } finally {
+      restore();
+    }
+  });
+
+  it('?vr=1 (screenshots, and the switch\'s address form) still hides the layer', async () => {
+    const { WeatherScene: Scene, restore } = await freshScene({ vr: true });
+    try {
+      expect(render(<Scene reading={reading('rain')} />).container.innerHTML).toBe('');
+    } finally {
+      restore();
+    }
+  });
+
+  it('with neither, the scene moves: no still class', () => {
+    const { container } = renderOn(WINTER, { reading: reading('rain') });
+    expect(container.querySelector('.pj-wx').classList.contains('pj-wx--still')).toBe(false);
   });
 
   it('`still` (and the reduced-motion rule) stops every animation in the scene', () => {
