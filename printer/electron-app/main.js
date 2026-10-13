@@ -19,6 +19,7 @@ const { removeShortcuts, findOldBrandShortcuts } = require('./src/shortcuts');
 const configStore = require('./src/config-store');
 const extensionSync = require('./src/extension-sync');
 const updateProgress = require('./src/update-progress');
+const { createUpdateState } = require('./src/update-state');
 const chromeRestart = require('./src/chrome-restart');
 const rolesStore = require('./src/roles');
 const handoff = require('./src/handoff');
@@ -129,15 +130,11 @@ let serverState = { status: 'starting', error: null };
 //   checking → available (downloading, percent) → downloaded (restart to apply)
 // upToDate is set by an explicit check that found nothing, so the UI can say
 // "✓ up to date" instead of silently doing nothing.
-let updateState = { checking: false, available: null, downloaded: null, percent: null, upToDate: false,
-  // Text for the tray and status window while a download runs (src/update-progress.js).
-  progressLine: null, progressDetail: null, error: null };
-const downloadProgress = updateProgress.createProgress();
-function syncProgressText() {
-  updateState.percent = downloadProgress.percent();
-  updateState.progressLine = downloadProgress.line();
-  updateState.progressDetail = downloadProgress.detail();
-}
+// The state lives in src/update-state.js: every electron-updater event goes
+// through its one state machine (a stale download error cannot outlive the
+// event that made it untrue); the object is updated in place.
+const updateMachine = createUpdateState();
+const updateState = updateMachine.state;
 // This computer's row on /settings shows the running version and how the
 // update is going (src/update-progress.js createAppReport, sent by
 // device-sync's hello); a hello comes sooner when that moved enough.
@@ -300,53 +297,38 @@ function setupAutoUpdater() {
   autoUpdater.disableWebInstaller = true;
 
   autoUpdater.on('checking-for-update', () => {
-    updateState.checking = true;
+    updateMachine.apply('checking');
     refreshTray();
   });
   autoUpdater.on('update-available', (info) => {
-    updateState.checking = false;
-    updateState.available = info.version;
-    updateState.upToDate = false;
-    updateState.error = null;
+    updateMachine.apply('available', info);
     if (serverModule && serverModule.setLatestVersion) serverModule.setLatestVersion(info.version);
     refreshTray();  // shows "Downloading update vX…"
     reportUpdate();
   });
   autoUpdater.on('update-not-available', () => {
-    updateState.checking = false;
-    updateState.available = null;
-    updateState.upToDate = true;
+    updateMachine.apply('not-available');
     refreshTray();  // shows "✓ Up to date"
     reportUpdate();
   });
   autoUpdater.on('download-progress', (p) => {
     // The status window polls get-server-state; the tray is repainted at most
     // about once a second (the module decides).
-    const repaint = downloadProgress.update(p);
-    syncProgressText();
+    const { repaint } = updateMachine.apply('progress', p);
     if (repaint) refreshTray();
     reportUpdate();
   });
   autoUpdater.on('update-downloaded', (info) => {
-    updateState.checking = false;
-    updateState.downloaded = info.version;
-    downloadProgress.reset();
-    syncProgressText();
+    updateMachine.apply('downloaded', info);
     refreshTray();  // shows "Updating to vX… restarting"
     reportUpdate();
     scheduleAutoInstall(info);
   });
   autoUpdater.on('error', (e) => {
-    updateState.checking = false;
     console.warn('[update] ', e && e.message);
     // Only a download that was under way is worth a message; a failed check
-    // while offline stays quiet, as before.
-    if (downloadProgress.active()) {
-      updateState.error = 'The update could not finish downloading. It will try again soon.';
-      updateState.available = null;
-    }
-    downloadProgress.reset();
-    syncProgressText();
+    // while offline stays quiet, as before (the machine tells them apart).
+    updateMachine.apply('error');
     refreshTray();
     reportUpdate();
   });
@@ -938,11 +920,11 @@ ipcMain.handle('check-for-updates', async () => {
   if (!autoUpdater || !app.isPackaged) {
     return { supported: false, ...updateState };
   }
-  updateState.upToDate = false;
+  updateMachine.apply('check-requested');
   try {
     await autoUpdater.checkForUpdates();
   } catch (e) {
-    updateState.checking = false;  // offline — leave upToDate false, no lie
+    updateMachine.apply('check-failed');  // offline — leave upToDate false, no lie
   }
   return { supported: true, ...updateState };
 });

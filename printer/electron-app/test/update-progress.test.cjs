@@ -99,7 +99,7 @@ describe('main.js wiring', () => {
     assert.match(main, /require\('\.\/src\/update-progress'\)/);
     assert.match(main, /autoUpdater\.on\('download-progress'/);
     assert.match(main, /Update ready, restarting\.\.\./);
-    assert.match(main, /updateState\.downloaded = info\.version;[\s\S]*?scheduleAutoInstall\(info\);/);
+    assert.match(main, /updateMachine\.apply\('downloaded', info\);[\s\S]*?scheduleAutoInstall\(info\);/);
   });
 });
 
