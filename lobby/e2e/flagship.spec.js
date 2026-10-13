@@ -68,9 +68,10 @@ test('a screen with no slides of its own opens on the finished flagship, at rest
   expect(clusters[1].l).toBeGreaterThan(clusters[1].vw * 0.6);
   expect(chrome.tab.l).toBeLessThanOrEqual(1);
   expect(chrome.tab.t).toBeLessThanOrEqual(1);
-  // Zero animation: nothing is moving, and the sheen has left.
+  // Zero animation: nothing is moving. The letters are flat white, with no
+  // sheen crossing them (the kit's flat-colour rule, design review 2026-10-13).
   expect(await page.evaluate(() => document.getAnimations().filter((a) => a.playState === 'running').length)).toBe(0);
-  expect(Number(await page.locator('.flagship-sheen').evaluate((e) => getComputedStyle(e).opacity))).toBe(0);
+  await expect(page.locator('.flagship-sheen')).toHaveCount(0);
 });
 
 test('the headline stays clear of the corner tab and the foot at every common size', async ({ page }) => {

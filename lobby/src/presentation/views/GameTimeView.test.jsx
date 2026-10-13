@@ -28,20 +28,20 @@ describe('GameTimeView wrap-up warning', () => {
 
   it('shows no warning badge with more than two minutes left', () => {
     const { container } = render(view(121));
-    expect(container.textContent).not.toMatch(/two minutes/i);
-    expect(container.textContent).not.toMatch(/30 seconds/i);
+    expect(container.textContent).not.toMatch(/wrap it up/i);
+    expect(container.textContent).not.toMatch(/line up now/i);
     expect(container.querySelector('[data-warning]')).toBeNull();
   });
 
-  it('shows TWO MINUTES at the two-minute mark', () => {
+  it('calls WRAP IT UP at the two-minute mark', () => {
     const { container } = render(view(120));
-    expect(container.textContent).toMatch(/TWO MINUTES/);
+    expect(container.textContent).toMatch(/WRAP IT UP/);
     expect(container.querySelector('[data-warning="two-minute"]')).not.toBeNull();
   });
 
-  it('shows LAST 30 SECONDS for the final call', () => {
+  it('calls LINE UP NOW for the final thirty seconds', () => {
     const { container } = render(view(30));
-    expect(container.textContent).toMatch(/LAST 30 SECONDS/);
+    expect(container.textContent).toMatch(/LINE UP NOW/);
     expect(container.querySelector('[data-warning="final-thirty"]')).not.toBeNull();
   });
 

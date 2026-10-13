@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import tokens from '../../../shared/brand/tokens.json';
-import { CELEBRATION, CLUB_ORDER, FAR_WAVE_KEEP, HOUSE, KIT_CLUBS, URGENT_COLOR, WARNING_TONES, shade } from './kit.js';
+import { CELEBRATION, CLUB_ORDER, HOUSE, KIT_CLUBS, URGENT_COLOR, WARNING_TONES, shade } from './kit.js';
 import { THEME } from './shared-config.js';
 
 // The projector reads the family kit (shared/brand/) directly, so these pin
@@ -39,8 +39,8 @@ describe('the projector kit', () => {
     for (const id of CLUB_ORDER) expect(URGENT_COLOR).not.toBe(KIT_CLUBS[id].primary);
   });
 
-  it('shade keeps a share of each channel (the far edge wave)', () => {
-    expect(shade('#2F8A4E', FAR_WAVE_KEEP)).toBe('#1F5A33');
+  it('shade keeps a share of each channel', () => {
+    expect(shade('#2F8A4E', 0.65)).toBe('#1F5A33');
     expect(shade('#FFFFFF', 0)).toBe('#000000');
     expect(shade('#123456', 1)).toBe('#123456');
     expect(shade('red', 0.5)).toBe('red');

@@ -25,7 +25,7 @@ describe('the setup note on touch', () => {
     const note = screen.getByRole('region', { name: 'Display setup' });
     expect(note.hasAttribute('data-setup-checklist')).toBe(true);
     expect(note.textContent).toMatch(/one quick setup step/i);
-    expect(note.textContent).toMatch(/Log in with the display passphrase/);
+    expect(note.textContent).toMatch(/Sign in with the church passphrase/);
     expect(container.textContent).not.toMatch(/[Hh]over/);
     fireEvent.click(within(note).getByRole('button', { name: 'Set up' }));
     expect(onSetUp).toHaveBeenCalledTimes(1);
@@ -36,7 +36,8 @@ describe('the setup note on touch', () => {
     const note = screen.getByRole('region', { name: 'Display setup' });
     expect(note.hasAttribute('data-setup-checklist')).toBe(false);
     expect(note.textContent).toMatch(/Display Settings, below/);
-    expect(note.textContent).toMatch(/Settings → Display login/);
+    expect(note.textContent).toMatch(/Same passphrase as awana\.kvbchurch\.org\/settings/);
+    expect(note.textContent).not.toMatch(/print-server|Display login/);
     expect(within(note).queryByRole('button', { name: 'Set up' })).toBeNull();
   });
 

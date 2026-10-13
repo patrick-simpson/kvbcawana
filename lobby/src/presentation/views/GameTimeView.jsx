@@ -5,7 +5,6 @@ import { THEME, artUrl } from '../lib/shared-config.js';
 import { ScreenFrame } from '../components/small.jsx';
 import { ParticleField } from '../components/ParticleField.jsx';
 import { SparkleDoodles } from '../components/SparkleDoodles.jsx';
-import { ClubWave } from '../components/ClubWave.jsx';
 import { ConfettiBurst } from '../components/ConfettiBurst.jsx';
 import { BigTimer } from '../components/BigTimer.jsx';
 import { Headline } from '../components/Headline.jsx';
@@ -20,7 +19,7 @@ import {
 } from '../lib/gameWarning.js';
 import { playStinger } from '../lib/stingers.js';
 import { birthdaysThisWeek, listNames, normalizeClub } from '../lib/birthdays.js';
-import { FAR_WAVE_KEEP, HOUSE, WARNING_TONES, mulberry32, shade } from '../lib/kit.js';
+import { HOUSE, WARNING_TONES, mulberry32 } from '../lib/kit.js';
 import { chipGeometry, inkEm, measureEm } from '../lib/chip.js';
 import { DUR, EASE } from '../lib/motion-tokens.js';
 import { holdThen, partVariants } from '../lib/landing.js';
@@ -48,15 +47,14 @@ const CHIP_SIZE = `calc(var(--pj-game-chip-u, ${CHIP_U}) * var(--u))`;
 const LAND_HOLD = 0.25;
 
 /**
- * Per-club game-time screen, the approved mockup: the club's catalog waves
- * along the top and bottom edges (its deep shade behind its colour), the
- * club's white mark, GAME TIME in the club's colour (no exclamation mark:
+ * Per-club game-time screen, the approved mockup: the club's white mark on
+ * black (no edge waves since owner 2026-10-13), GAME TIME in the club's colour (no exclamation mark:
  * the shout is already the shout; design review 2026-10-13), a clock to the
  * window's end with club-coloured colons, a stepped chip "GAME ENDS /
- * 6:30 PM", official character art standing on the bottom wave, and a
+ * 6:30 PM", official character art standing on the bottom edge, and a
  * small live "CHECKED IN" chip per club (the print server's tally
  * broadcast) in the top-right corner. Combined windows (Puggles & Cubbies)
- * get both marks, and the second club's colours on the top edge.
+ * get both marks.
  *
  * `tally` arrives as a prop (from useRealtime, via the display's
  * sanctioned sanitized socket) instead of the original repo's own
@@ -84,8 +82,6 @@ export const GameTimeView = ({ now, window: gameWindow, endsAt, tally }) => {
   const lowPower = useLowPower();
   const clubs = gameWindow.clubs.map((id) => CLUBS[id]);
   const primary = clubs[0];
-  const secondary = clubs[1];
-  const topClub = secondary ?? primary;
 
   // This week's (Sun–Sat) birthdays for the club(s) on screen.
   const roster = useBirthdays();
@@ -102,8 +98,9 @@ export const GameTimeView = ({ now, window: gameWindow, endsAt, tally }) => {
 
   // Wrap-up warning for the rotation boundary (lib/gameWarning.js). The
   // treatment is deliberately restrained: the figures recolour, and the
-  // one chip under the clock names the moment ("TWO MINUTES", "LAST 30
-  // SECONDS") while still carrying the end time on its label.
+  // one chip under the clock gives the call ("WRAP IT UP", "LINE UP NOW";
+  // never the time the clock already shows) while still carrying the end
+  // time on its label.
   const warning = warningFor(seconds);
   const tone = WARNING_TONES[warning];
 
@@ -130,19 +127,12 @@ export const GameTimeView = ({ now, window: gameWindow, endsAt, tally }) => {
     <ScreenFrame
       layers={
         <>
-          {/* The catalog's club waves along both edges: deep behind colour
-              along the top (the second club's, on a combined window), and
-              the club's own along the bottom, the far one slowly drifting. */}
-          <ClubWave color={shade(topClub.deep, FAR_WAVE_KEEP)} position="top" height={9} flip />
-          <ClubWave color={topClub.deep} position="top" height={6} delay={0.08} />
           <ParticleField />
           <SparkleDoodles
             seed={gameWindow.startMin}
             colors={[...clubs.map((c) => c.color), '#FFFFFF', HOUSE.sun]}
             count={16}
           />
-          <ClubWave color={primary.deep} position="bottom" height={15} flip drift={!lowPower} />
-          <ClubWave color={primary.color} position="bottom" height={11} delay={0.08} />
           <CharacterArt clubs={clubs} seed={gameWindow.startMin} />
         </>
       }
@@ -321,7 +311,7 @@ const ClubEmblem = ({ club }) => {
 /**
  * Official club character art in the lower corners — one per side,
  * seed-picked (stable per window) from the characters the theme ships,
- * standing on the bottom wave. Decorative layer only.
+ * standing on the bottom edge. Decorative layer only.
  */
 const CharacterArt = ({ clubs, seed }) => {
   const pool = clubs.flatMap(

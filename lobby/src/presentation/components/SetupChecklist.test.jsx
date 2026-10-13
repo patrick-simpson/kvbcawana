@@ -23,9 +23,13 @@ describe('the projector\'s first-run setup note', () => {
     render(<SetupChecklist />);
     expect(screen.getByText(/one quick setup step/i)).toBeTruthy();
     expect(screen.queryByText(/Live data key/)).toBeNull();
-    expect(screen.getByText(/Log in with the display passphrase/).textContent.startsWith('⬜')).toBe(true);
-    expect(screen.getByRole('region', { name: 'Display setup' }).textContent).toMatch(/Display Settings/);
-    expect(screen.getByRole('region', { name: 'Display setup' }).textContent).toMatch(/Settings → Display login/);
+    expect(screen.getByText(/Sign in with the church passphrase/).textContent.startsWith('⬜')).toBe(true);
+    const words = screen.getByRole('region', { name: 'Display setup' }).textContent;
+    expect(words).toMatch(/Hover top-right, then Display Settings/);
+    // The print server's display login is gone: the passphrase is the one the
+    // settings page signs in with (design review 2026-10-13).
+    expect(words).toMatch(/Same passphrase as awana\.kvbchurch\.org\/settings/);
+    expect(words).not.toMatch(/print-server|Display login|display passphrase|→|—/);
   });
 
   it('is gone once the screen is logged in, and never shows in screenshot mode', () => {
@@ -78,6 +82,21 @@ describe('where the note stands', () => {
     expect(reserve).toBeGreaterThanOrEqual(2 + 11.75);
     const nav = readFileSync(resolve(__dirname, '../views/SlideshowView.jsx'), 'utf8');
     expect(nav).toMatch(/fixed bottom-8 right-8/);
+  });
+
+  it('sets every word at one TV-legible size that two lines of still fit the band', () => {
+    // 1.15u (22px at 1080p) with a 12px floor; it was 1.05u with its second
+    // line at 0.85 of that, ~11px at 720p (design review 2026-10-13).
+    const rule = /\.pj-setup-note \{([^}]*)\}/.exec(css)?.[1] ?? '';
+    expect(rule).toMatch(/font-size: max\(12px, calc\(1\.15 \* var\(--u\)\)\)/);
+    for (const part of ['kicker', 'steps', 'where']) {
+      const body = new RegExp(`\\.pj-setup-note__${part} \\{([^}]*)\\}`).exec(css)?.[1] ?? '';
+      expect(body).toMatch(/font-size: 1em;/);
+      expect(body).toMatch(/line-height: 1\.2;/);
+    }
+    // Two lines and the padding inside the band under 51.75u (bottom 0.5u off the edge).
+    const lines = 2 * 1.2 + 0.32 + 0.36;
+    expect(lines * 1.15).toBeLessThanOrEqual(56.25 - SETUP_NOTE.top - 0.5);
   });
 
   it('is anchored to the window\'s bottom, so a 4:3 window has the black band under the frame too', () => {

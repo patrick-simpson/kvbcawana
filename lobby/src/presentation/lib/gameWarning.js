@@ -22,8 +22,8 @@ export const FINAL_THIRTY_SECONDS = 30;
  * The warning state for a game clock with `seconds` left.
  *
  * Zero (and anything past it) is deliberately `'none'`: the window is
- * over, the room is already changing hands, and a stale "LAST 30
- * SECONDS" badge over a 0:00 clock would be a lie. This matches
+ * over, the room is already changing hands, and a stale "LINE UP
+ * NOW" badge over a 0:00 clock would be a lie. This matches
  * BigTimer's own `seconds > 0` guard on its urgent treatment.
  *
  * @param {number} seconds
@@ -36,10 +36,16 @@ export function warningFor(seconds) {
   return 'none';
 }
 
-/** Badge copy per state. Said plainly — leaders read this across a gym. */
+/**
+ * Badge copy per state: the call to the referees, said plainly enough to
+ * read across a gym. It names what to DO, never the time left: the clock
+ * right above it already says that ("TWO MINUTES" under 1:45 and "LAST 30
+ * SECONDS" under 0:20 only repeated it; design review 2026-10-13). The
+ * state's colour (WARNING_TONES) carries the urgency.
+ */
 export const WARNING_LABELS = /** @type {Record<string, string>} */ ({
-  'two-minute': 'TWO MINUTES',
-  'final-thirty': 'LAST 30 SECONDS',
+  'two-minute': 'WRAP IT UP',
+  'final-thirty': 'LINE UP NOW',
 });
 
 /**

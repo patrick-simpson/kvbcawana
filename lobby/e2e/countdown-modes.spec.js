@@ -56,7 +56,7 @@ test('game time shows the two-minute wrap-up warning', async ({ page }) => {
   await page.goto('/countdown.html?now=2026-09-16T18:28:30');
   const view = page.locator('[data-mode="game-time"]');
   await expect(view).toBeVisible();
-  await expect(view.locator('[data-warning="two-minute"]')).toHaveText(/TWO MINUTES/);
+  await expect(view.locator('[data-warning="two-minute"]')).toHaveText(/WRAP IT UP/);
 });
 
 test('quick-nav hover affordance exists', async ({ page }) => {

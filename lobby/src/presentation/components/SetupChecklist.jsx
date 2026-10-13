@@ -10,6 +10,14 @@ import { useDisplayLogin } from '../../hooks/useDisplayLogin.js';
 const DISMISS_KEY = 'awanaSetupChecklistDismissed.v1';
 
 /**
+ * Where the passphrase comes from. No page shows it (the print server's
+ * display login is gone): it is the one word every screen and the settings
+ * page sign in with, and it is changed there. Short enough that the note's
+ * second line never wraps to a third at 720p.
+ */
+const SAME_PASSPHRASE = 'Same passphrase as awana.kvbchurch.org/settings.';
+
+/**
  * Where the note stands, in projector units down the 16:9 frame (index.css
  * `.pj-setup-note`): the bottom margin band. `top` is the first line below
  * anything a view draws: the Upcoming Awana Nights list stops at 51.75u
@@ -103,12 +111,11 @@ export const SetupChecklist = ({ touch = false, inSheet = false, onSetUp }) => {
             New display? One quick setup step
           </p>
           <ul className="pj-panel-note pj-setup-note__steps">
-            <li>{loggedIn ? '✅' : '⬜'} Log in with the display passphrase</li>
+            <li>{loggedIn ? '✅' : '⬜'} Sign in with the church passphrase</li>
           </ul>
           {inSheet && (
             <p className="pj-panel-note pj-setup-note__where">
-              It is in Display Settings, below. The passphrase is on the print-server dashboard
-              (Settings → Display login).
+              It is in Display Settings, below. {SAME_PASSPHRASE}
             </p>
           )}
         </div>
@@ -133,11 +140,10 @@ export const SetupChecklist = ({ touch = false, inSheet = false, onSetUp }) => {
           New display? One quick setup step
         </p>
         <ul className="pj-panel-note pj-setup-note__steps">
-          <li>{loggedIn ? '✅' : '⬜'} Log in with the display passphrase</li>
+          <li>{loggedIn ? '✅' : '⬜'} Sign in with the church passphrase</li>
         </ul>
         <p className="pj-panel-note pj-setup-note__where">
-          Hover the top-right corner → Display Settings. The passphrase is on the print-server dashboard
-          (Settings → Display login).
+          Hover top-right, then Display Settings. {SAME_PASSPHRASE}
         </p>
       </div>
       <button onClick={dismissSetup} className="pj-line-button pj-setup-note__dismiss">

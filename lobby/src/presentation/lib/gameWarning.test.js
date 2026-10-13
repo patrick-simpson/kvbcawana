@@ -44,8 +44,18 @@ describe('warning presentation tables', () => {
   it('labels and chime intensities cover exactly the two warning states', () => {
     expect(Object.keys(WARNING_LABELS).sort()).toEqual(['final-thirty', 'two-minute']);
     expect(Object.keys(WARNING_STINGER_INTENSITY).sort()).toEqual(['final-thirty', 'two-minute']);
-    expect(WARNING_LABELS['two-minute']).toMatch(/two minutes/i);
-    expect(WARNING_LABELS['final-thirty']).toMatch(/30 seconds/i);
+    expect(WARNING_LABELS['two-minute']).toBe('WRAP IT UP');
+    expect(WARNING_LABELS['final-thirty']).toBe('LINE UP NOW');
+  });
+
+  it('names the call, never the time the clock above it already shows', () => {
+    // "TWO MINUTES" under 1:45 and "LAST 30 SECONDS" under 0:20 repeated the
+    // clock (design review 2026-10-13). No figures, no time words, no shouting
+    // punctuation and no dashes.
+    for (const label of Object.values(WARNING_LABELS)) {
+      expect(label).not.toMatch(/\d|minute|second|[!—–-]/i);
+      expect(label).toBe(label.toUpperCase());
+    }
   });
 
   it('reserves the big three-note chime for the final call', () => {

@@ -26,8 +26,8 @@ export const CLUB_ORDER = ['puggles', 'cubbies', 'sparks', 'tnt', 'trek', 'journ
 const HEX = /^#([0-9a-f]{6})$/i;
 
 /**
- * Darken a colour by keeping `keep` (0..1) of each channel: the edge wave
- * behind a club's deep shade. Anything that is not a #rrggbb comes back as-is.
+ * Darken a colour by keeping `keep` (0..1) of each channel (the
+ * weather scene's leaf vein). Anything that is not a #rrggbb comes back as-is.
  * @param {string} hex
  * @param {number} keep
  */
@@ -39,9 +39,6 @@ export function shade(hex, keep) {
   const ch = (/** @type {number} */ v) => Math.round(v * k).toString(16).padStart(2, '0');
   return `#${ch((n >> 16) & 255)}${ch((n >> 8) & 255)}${ch(n & 255)}`.toUpperCase();
 }
-
-/** How much of a club's deep shade the far edge wave keeps (the mockup's T&T top wave). */
-export const FAR_WAVE_KEEP = 0.65;
 
 /** Every club colour plus the sun and white: confetti, particles, sparkles. */
 export const CELEBRATION = [

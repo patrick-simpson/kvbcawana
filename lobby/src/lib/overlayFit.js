@@ -444,13 +444,16 @@ export function nameChipSeat(ink) {
  * as a chip: `plate.pad` of padding in all, then the club's white mark (a box
  * at most `plate.mark` wide) or its name, `plate.gap`, and "N WAITING", both
  * in Londrina caps at `plate.label` with `plate.track` of tracking per letter.
- * A "+N more" chip is a name chip whose name is "+N more".
+ * A "+N more" chip is a name chip whose name is "+N more". The plate's words
+ * are the names' own size and a wordmark gets 3.2 x s: at 0.72 and 2.6 they
+ * were ~15px and ~55 x 15px at 1080p, too small to read across a lobby
+ * (design review 2026-10-13).
  */
 export const FOOT_CHIP = {
   row: 1.75,
   gap: 0.45,
   pad: 1.3,
-  plate: { pad: 1.1, mark: 2.6, gap: 0.35, label: 0.72, track: 0.06 },
+  plate: { pad: 1.1, mark: 3.2, gap: 0.35, label: 1, track: 0.06 },
 };
 
 /**

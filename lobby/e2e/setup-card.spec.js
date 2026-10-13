@@ -315,7 +315,9 @@ for (const [name, opts, sizes] of WALLS) {
       expect(m.note.left).toBeGreaterThanOrEqual(0);
       expect(m.note.right).toBeLessThanOrEqual(m.screen.width);
       expect(m.note.bottom).toBeLessThanOrEqual(m.screen.height);
-      expect(m.noteFont).toBeGreaterThanOrEqual(10.2);
+      // Every word at one size, 1.15u with a 12px floor (the dismiss button
+      // 0.9 of it): 22px at 1080p (design review 2026-10-13: ~11px at 720p).
+      expect(m.noteFont).toBeGreaterThanOrEqual(Math.max(12, 1.15 * m.u) * 0.9 - 0.05);
     });
   }
 }

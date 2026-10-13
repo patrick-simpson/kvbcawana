@@ -37,6 +37,15 @@ describe('FlagshipSlide', () => {
     expect(container.textContent).not.toMatch(/tonight/i);
   });
 
+  it('keeps the letters flat white: no sheen crosses them, no gradient anywhere', () => {
+    // The kit's flat-colour rule (design review 2026-10-13): a soft gradient
+    // swept the letters once a pass.
+    const { container } = still(<FlagshipSlide />);
+    expect(container.querySelector('.flagship-sheen')).toBeNull();
+    const css = readFileSync(resolve(__dirname, '../styles/flagship.css'), 'utf8');
+    expect(css).not.toMatch(/gradient\(|mix-blend-mode/);
+  });
+
   it('uses only M elements for motion: nothing here can animate under ?lowPower=1', async () => {
     // src/lib/sourceScans.test.js pins the import; this pins the rendered
     // result: under zero animation every letter is already at rest, its

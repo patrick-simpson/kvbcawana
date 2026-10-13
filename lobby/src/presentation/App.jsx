@@ -239,7 +239,7 @@ export const App = () => {
 
       {/* The Awana Clubs mark, like a broadcast logo: above every view, so no
           slide change or view crossfade ever moves it. */}
-      <AwanaMark placement={state.mode === AppMode.GAME_TIME ? 'game' : 'default'} hidden={bare} />
+      <AwanaMark hidden={bare} />
 
       {touch ? (
         <TouchMenu

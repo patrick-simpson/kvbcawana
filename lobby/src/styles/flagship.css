@@ -88,15 +88,6 @@
      FlagshipSlide.test.jsx. Well inside the mask's pads either way. */
   transform-origin: 50% 0.712em;
 }
-.flagship-sheen {
-  position: absolute;
-  inset: -4% -6%;
-  z-index: 1;
-  background: linear-gradient(100deg, rgba(255,255,255,0) 38%, rgba(255,255,255,0.55) 50%, rgba(255,255,255,0) 62%);
-  mix-blend-mode: soft-light;
-  pointer-events: none;
-}
-
 .flagship-doodle-slot { z-index: 3; }
 .flagship-doodles { position: absolute; }
 /* `inset: auto` comes FIRST in each rule below: it is a shorthand, and written

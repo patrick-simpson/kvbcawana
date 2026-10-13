@@ -1,6 +1,6 @@
 import { M } from '../lib/motion.jsx';
 import DoodleCluster from './brand/DoodleCluster.jsx';
-import { landsAt, keyframes, EASE_SLAM, EASE_OUT, EASE_INOUT } from './promos/kit.jsx';
+import { landsAt, EASE_SLAM, EASE_OUT } from './promos/kit.jsx';
 import { squishLand, withSquish } from '../lib/squish.js';
 
 // ─────────────────────────────────────────────────────────────
@@ -15,15 +15,15 @@ import { squishLand, withSquish } from '../lib/squish.js';
 //        below its mask with a little tilt, stretching as it rises and
 //        squashing onto its baseline as it drops back (the soft squish);
 //        2.1 TO AWANA! does the same, a beat behind.
-//   3.9  sparkles and dots land round the headline.
-//   6.4  a bright band sweeps once across both headline rows, and the frame
-//        holds.
+//   3.9  sparkles and dots land round the headline, and the frame holds.
+//        The letters stay flat white: no sheen crosses them (the kit's
+//        flat-colour rule; design review 2026-10-13).
 //
 // Rules (CLAUDE.md, "Season promo slides" and zero animation): every animated
 // element is M.*, every beat is a keyframe list that holds and then lands
 // (landsAt / keyframes from the promo kit), never `initial` plus a long
 // delay, and the LAST keyframe of everything is the finished slide, which is
-// what ?lowPower=1 freezes on. The sheen and the hops end invisible / at rest.
+// what ?lowPower=1 freezes on. The hops end at rest.
 // Check-ins play OVER this slide and it steps back for them (app.css).
 // ─────────────────────────────────────────────────────────────
 
@@ -71,24 +71,6 @@ function Row({ text, startAt, row }) {
   );
 }
 
-/** The bright band that crosses the headline once, ending off to the right, unseen. */
-function Sheen() {
-  return (
-    <M.div
-      className="flagship-sheen"
-      aria-hidden="true"
-      {...keyframes([
-        [0, { x: '-60%', opacity: 0 }],
-        [6.4, { x: '-60%', opacity: 0 }],
-        [6.5, { x: '-60%', opacity: 1 }],
-        [7.3, { x: '160%', opacity: 1 }],
-        [7.4, { x: '160%', opacity: 0 }],
-        [10, { x: '160%', opacity: 0 }],
-      ], EASE_INOUT)}
-    />
-  );
-}
-
 const DOODLES_LEFT = [
   { kind: 'sparkle', x: '4%', y: '10%', size: 'calc(3.6 * var(--u))', rotate: -8 },
   { kind: 'dot', x: '24%', y: '2%', size: 'calc(1.1 * var(--u))' },
@@ -115,7 +97,6 @@ export default function FlagshipSlide() {
         <div className="flagship-title">
           <Row text={ROWS[0]} startAt={1.3} row={0} />
           <Row text={ROWS[1]} startAt={2.1} row={1} />
-          <Sheen />
         </div>
       </div>
 

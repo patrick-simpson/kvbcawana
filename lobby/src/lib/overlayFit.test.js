@@ -459,6 +459,19 @@ describe('the pickup board in the foot (fitFoot)', () => {
     expect(wide).toEqual({ size: s, hidden: [0], fits: true });
   });
 
+  it('draws the plate the way it measures it, at a size a lobby can read', () => {
+    // Plate words at the names' size and wordmarks 3.2 chips wide: at 0.72 and
+    // 2.6 they were ~15px and ~55 x 15px at 1080p (design review 2026-10-13).
+    expect(FOOT_CHIP.plate.label).toBeGreaterThanOrEqual(1);
+    expect(FOOT_CHIP.plate.mark).toBeGreaterThanOrEqual(3.2);
+    const rule = (sel) => new RegExp(`${sel.replace(/[.]/g, '\\.')} \\{([^}]*)\\}`).exec(css)?.[1] ?? '';
+    expect(rule('.checkout-plate__name,\n.checkout-plate__count')).toMatch(new RegExp(`font-size: ${FOOT_CHIP.plate.label}em;`));
+    expect(rule('.checkout-plate__name,\n.checkout-plate__count')).toMatch(new RegExp(`letter-spacing: ${FOOT_CHIP.plate.track}em;`));
+    expect(rule('.checkout-plate__mark')).toMatch(new RegExp(`max-width: ${FOOT_CHIP.plate.mark}em;`));
+    // The board's heading: 1.35em of the strip's root, 25px at 1080p (was 16px).
+    expect(rule('.checkout-title')).toMatch(/font-size: 1\.35em;/);
+  });
+
   it('takes the largest size that fits, stepping down as the list grows', () => {
     // Two clubs of three: two rows at 1.8 (2 x 1.75 + 0.45, x 1.8 = 7.11).
     const box = { width: 60, height: 7.2, max: 1.8, min: 0.5, step: 0.05 };

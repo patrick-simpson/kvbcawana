@@ -2086,7 +2086,9 @@ html, body, #root {
 /* ── Connection status sticker (the SIGNAL chip) ─────────────
    The kit chip in the corner stack: SIGNAL on the pill, the pipe's state on
    the block with a flat status dot, the printer's count as a hot pill, and
-   any fault in words on its own sunflower strip. Sized in u with a pixel
+   any fault in words on its own sunflower strip. The state is a label, so it
+   wears the label face in caps at the pill's tracking ("NOT SET UP"), never
+   the read face in lowercase (design review 2026-10-13). Sized in u with a pixel
    floor, and capped at 19u wide so its longest wording wraps inside the
    stack instead of reaching into the top band. */
 .status-dot {
@@ -2103,9 +2105,12 @@ html, body, #root {
   flex-wrap: wrap;
   align-items: center;
   gap: 0.2em 0.5em;
+  font-family: var(--font-condensed);
   font-size: max(12px, calc(1.2 * var(--u)));
-  font-weight: 700;
+  font-weight: 400;
+  letter-spacing: 0.08em;
   line-height: 1.2;
+  text-transform: uppercase;
 }
 .status-dot .dot {
   flex: none;
@@ -3221,7 +3226,9 @@ input:focus-visible {
   margin: 0;
   font-family: var(--font-condensed);
   font-weight: 400;
-  font-size: 0.9em;
+  /* 25px at 1080p (it was 16px, design review 2026-10-13): the board's
+     heading, read from across the lobby. */
+  font-size: 1.35em;
   letter-spacing: 0.1em;
   line-height: 1.05;
   text-transform: uppercase;
@@ -3244,7 +3251,7 @@ input:focus-visible {
 }
 .checkout-board--line .checkout-line {
   margin: 0;
-  font-size: 1em;
+  font-size: 1.2em;
   font-weight: 700;
   line-height: 1.25;
 }
@@ -3270,7 +3277,7 @@ input:focus-visible {
   align-items: flex-start;
   justify-content: center;
   gap: 0.45em;
-  width: 8.6em;
+  width: 9.4em;
   margin: -0.45em 0;
   padding: 0.5em 1em 0.6em 0.9em;
   background: var(--brand-blue);
@@ -3314,15 +3321,15 @@ input:focus-visible {
 .checkout-plate__mark {
   display: block;
   width: auto;
-  height: 1.15em;
-  max-width: 2.6em;
+  height: 1.3em;
+  max-width: 3.2em;
   object-fit: contain;
   user-select: none;
 }
 .checkout-plate__name,
 .checkout-plate__count {
   font-family: var(--font-condensed);
-  font-size: 0.72em;
+  font-size: 1em;
   letter-spacing: 0.06em;
   line-height: 1;
   text-transform: uppercase;

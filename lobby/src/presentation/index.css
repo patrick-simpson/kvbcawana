@@ -411,9 +411,13 @@
   display: flex;
   gap: calc(1 * var(--u));
 }
+/* The characters stand on the bottom edge itself (they stood on the club's
+   bottom wave until the owner removed the edge waves, 2026-10-13). Upright on
+   a phone the portrait block keeps them 4u up, so the tilted art stays on
+   the screen (e2e/touch.spec.js). */
 .pj-game__character {
   position: absolute;
-  bottom: calc(2.4 * var(--u));
+  bottom: 0;
   height: calc(16 * var(--u));
   width: auto;
 }
@@ -479,8 +483,11 @@
    higher, so a note that stays below 51.75u can never cover a line of any of
    them, at any window size. Anchored to the window's bottom, on the slides'
    own left margin (8u), so on a 4:3 window it drops into the black band under
-   the frame and has more room. Two lines, sized in u with a 12px floor (it is
-   read at the keyboard, not off the wall); the button rides beside them.
+   the frame and has more room. Two lines, every word at one size (1.15u with a
+   12px floor: 22px at 1080p, read from across the room by whoever is setting
+   the wall up; design review 2026-10-13, it was ~11px at 720p), on a 1.2 line
+   height so both lines and the padding stay inside the 4u the band has; the
+   button rides beside them.
 
    It is as wide as its words, not the whole 84u: the bottom band is not
    empty of the wall's OWN overlays. The slideshow's Prev / Next pill stands
@@ -502,7 +509,7 @@
   gap: 1.4em;
   padding: 0.32em 1em 0.36em;
   border-width: 1.5px;
-  font-size: max(12px, calc(1.05 * var(--u)));
+  font-size: max(12px, calc(1.15 * var(--u)));
   border-radius: 0.9em;
   box-shadow: 0.25em 0.25em 0 rgb(3 4 4 / 0.9);
 }
@@ -521,7 +528,8 @@
 .pj-setup-note__kicker {
   grid-area: kicker;
   margin: 0;
-  font-size: 1.1em;
+  font-size: 1em;
+  line-height: 1.2;
   letter-spacing: 0.1em;
   margin-right: 0;
   color: var(--brand-orange);
@@ -535,21 +543,21 @@
   margin: 0;
   padding: 0;
   list-style: none;
-  font-size: 0.9em;
-  line-height: 1.3;
-  color: rgb(255 255 255 / 0.85);
+  font-size: 1em;
+  line-height: 1.2;
+  color: rgb(255 255 255 / 0.9);
 }
 .pj-setup-note__where {
   grid-area: where;
   margin: 0;
-  font-size: 0.85em;
-  line-height: 1.3;
-  color: rgb(255 255 255 / 0.6);
+  font-size: 1em;
+  line-height: 1.2;
+  color: rgb(255 255 255 / 0.75);
 }
 .pj-setup-note__dismiss {
   flex: none;
   padding: 0.35em 0.9em;
-  font-size: 0.85em;
+  font-size: 0.9em;
   white-space: nowrap;
 }
 /* The note gives way to the wall's own bottom-centre overlays (the slideshow's
