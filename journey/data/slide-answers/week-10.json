@@ -1,0 +1,23 @@
+{
+  "week": 10,
+  "questions": [
+    {
+      "q": "If you had no Bible, what would nature alone tell you about God?",
+      "answer": "That someone designed it. The earth's atmosphere, rotation and distance from the sun are set just right for life, and that kind of fine-tuning points to a careful Designer.",
+      "scripture": null,
+      "at": 113
+    },
+    {
+      "q": "Is the universe random chance or a crafted design? Why do you think so?",
+      "answer": "Design, I think. Like the bottle flip, what looks like luck is really fine-tuning, and too many things are set just right for life to be random chance.",
+      "scripture": null,
+      "at": 149
+    },
+    {
+      "q": "What does a fine-tuned home for us reveal about God's heart?",
+      "answer": "That God cares about us. He didn't just make a planet where we could survive; He made us a home, with His heart and love in mind.",
+      "scripture": null,
+      "at": 279
+    }
+  ]
+}

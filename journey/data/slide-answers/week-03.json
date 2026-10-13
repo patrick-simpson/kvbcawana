@@ -1,0 +1,23 @@
+{
+  "week": 3,
+  "questions": [
+    {
+      "q": "Where do you see feelings treated as more important than facts?",
+      "answer": "At school, with friends, and in movies, music and TV, how you feel about something often counts for more than what's actually real. That's the idea behind \"post-truth.\"",
+      "scripture": null,
+      "at": 72
+    },
+    {
+      "q": "Is your favorite ice cream flavor a subjective or an objective truth? Why?",
+      "answer": "Subjective. It's true because it's my taste, and your different favorite can be just as true. The color of a shirt is objective: it is what it is, whatever we think.",
+      "scripture": null,
+      "at": 446
+    },
+    {
+      "q": "Jesus said 'I am the way.' Can that be true for you but not for others?",
+      "answer": "No. Jesus made a claim about reality, so it's either true or false for everyone, no matter what any of us think about it. That's objective truth.",
+      "scripture": "John 14",
+      "at": 327
+    }
+  ]
+}

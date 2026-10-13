@@ -1,0 +1,23 @@
+{
+  "week": 11,
+  "questions": [
+    {
+      "q": "Halfway through the science unit, what has truly made sense to you so far?",
+      "answer": "One example: DNA holds more information than anything people have made, and since information always traces back to a mind, it makes sense to me that DNA has an author.",
+      "scripture": null,
+      "at": 5
+    },
+    {
+      "q": "Do you ever nod along in a lesson while secretly thinking you don't get it?",
+      "answer": "Yeah, sometimes. It's okay to say so here; honest questions are welcome, and we can slow down and go over an idea again until it really makes sense.",
+      "scripture": null,
+      "at": 61
+    },
+    {
+      "q": "How does comparing DNA to a book help you picture what DNA really is?",
+      "answer": "A book is full of information, and every book has an author. DNA holds even more information than anything we've made, so it points to an author of life.",
+      "scripture": null,
+      "at": 155
+    }
+  ]
+}

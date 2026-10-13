@@ -1,0 +1,23 @@
+{
+  "week": 22,
+  "questions": [
+    {
+      "q": "How does linking a story to a real object change how much you trust it?",
+      "answer": "It makes it easier to trust. An object shows the story wasn't just remembered wrong, like a family keepsake that backs up a parent's story from childhood.",
+      "scripture": null,
+      "at": 267
+    },
+    {
+      "q": "After two weeks of evidence, has the way you see the Bible changed at all?",
+      "answer": "One honest answer: \"I always believed it was God's Word, but I didn't know how much evidence shows it's real history, so I take it more seriously now.\"",
+      "scripture": null,
+      "at": 395
+    },
+    {
+      "q": "If a friend said the Bible is just old myths, how would you answer them?",
+      "answer": "I'd say archaeology keeps matching its details: coins point to King David, an inscription names Pontius Pilate, and the pool in John 5 was found just as John described.",
+      "scripture": "John 5",
+      "at": 338
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "week": 13,
+  "questions": [
+    {
+      "q": "Is it a fact that murder is wrong, or just an opinion? How do you know?",
+      "answer": "It's a fact. We can't measure right and wrong by ourselves, any more than Johnny could be \"one Johnny tall\"; we need a standard beyond us, and that points to God.",
+      "scripture": null,
+      "at": 305
+    },
+    {
+      "q": "Where do your ideas about right and wrong actually come from?",
+      "answer": "Probably home, school, friends and online. But the lesson says a sense of right and wrong is written on our hearts, which points to God as the real standard.",
+      "scripture": "Romans 2",
+      "at": 518
+    },
+    {
+      "q": "If copying homework isn't wrong just \"because we don't,\" is that a good reason?",
+      "answer": "No. \"Because we just don't\" isn't really a reason. If right and wrong are only opinion, nothing is truly wrong, so we need a standard outside ourselves.",
+      "scripture": null,
+      "at": 248
+    }
+  ]
+}
