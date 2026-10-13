@@ -368,7 +368,8 @@ describe('checking one child in (owner-only)', () => {
     expect(form.getAll('events[]')).toEqual(['40']);
     const stored = JSON.stringify([...s.storage.map.values()]);
     expect(stored).toContain('cloud-check-in');
-    expect(stored).not.toMatch(/Kit|Tester|662/);
+    // Whole words only: the bare 'Kit' or '662' also turn up by chance in random ciphertext and key ids.
+    expect(stored).not.toMatch(/Tester|Kit Tester|"662"/);
   });
 
   it('a reply that does not name the child is a refusal', async () => {

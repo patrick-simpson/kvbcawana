@@ -41,7 +41,9 @@ describe('the desk and history', () => {
     const stored = db.query('SELECT id, night, kind FROM history_rows');
     expect(stored).toEqual([{ id: row.id, night: NIGHT, kind: 'checkin' }]);
     expect(db.query('SELECT club, checked_in AS n FROM night_summary')).toEqual([{ club: 'Sparks', n: 1 }]);
-    expect(db.dump()).not.toMatch(/Kit|Tester|662/);
+    // A leaked row would carry its JSON field names and the surname; never match the bare
+    // 'Kit' or '662', which random base64 and hex (ciphertext, key ids) contain about 2% of runs.
+    expect(db.dump()).not.toMatch(/"first"|"last"|"clubberId"|Tester/);
     // a signed-in client reads it back and opens it with the history key
     const ring = await keyRing(await unwrapPrivateKey(key.wrapped, PASS, key.pub), key.pub);
     const got = (await t.call('GET', `/v1/history/rows?night=${NIGHT}`)).body.rows;
