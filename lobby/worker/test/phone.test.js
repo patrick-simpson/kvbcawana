@@ -6,6 +6,7 @@ import { itemsToSend } from '../src/twotimtwo.js';
 import { itemClubs } from '../src/phone.js';
 import { LAPTOP_ONLINE_MS } from '../src/relay.js';
 import { HOUSEHOLD_CSV, fakeTwoTimTwo, page, table } from './fixtures.js';
+import { leaks } from './noleak.js';
 
 const SUNDAY = Date.parse('2026-10-11T18:45:00Z');
 const ENV = { CLOUD_CHECKIN: 'shadow', TWOTIMTWO_USERNAME: 'checkin@example.org', TWOTIMTWO_PASSWORD: 'right-pass', INITIAL_PASSPHRASE: 'kennebec' };
@@ -131,7 +132,7 @@ describe('the phone page\'s check-in, answered by the Worker', () => {
     const s = await setup();
     const ans = await s.relay('POST', '/phone/checkin', { name: 'Sophie Tester' });
     await s.relay('GET', `/phone/status/${ans.body.id}`);
-    expect(JSON.stringify([...s.storage.map.values()])).not.toMatch(/Sophie|Tester/);
+    expect(leaks(JSON.stringify([...s.storage.map.values()]), ['Sophie', 'Tester'])).toEqual([]);
   });
 });
 
@@ -236,6 +237,6 @@ describe('families on the roster (owner, 2026-10-11)', () => {
     const s = await setup({ laptopOn: true });
     await laptopAnswers(s, LAPTOP_ROSTER);
     await s.relay('POST', '/phone/roster', {});
-    expect(JSON.stringify([...s.storage.map.values()])).not.toMatch(/Elm|555|Sophie|Smith|Pat Tester/);
+    expect(leaks(JSON.stringify([...s.storage.map.values()]), ['Elm', '555', 'Sophie', 'Smith', 'Pat Tester'])).toEqual([]);
   });
 });

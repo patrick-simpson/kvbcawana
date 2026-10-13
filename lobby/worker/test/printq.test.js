@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { JOB_TTL_MS, LEASE_MS, MAX_FAILS, PrintQueue, validJobId } from '../src/printq.js';
 import { Ledger, Tags } from '../src/ledger.js';
 import { fakeClock, memoryStore, everything } from './helpers.js';
+import { leaks } from './noleak.js';
 
 const NIGHT = '2026-10-14';
 const idOf = (n) => `job${String(n).padStart(19, 'A')}`;           // 22 characters
@@ -201,7 +202,7 @@ describe('done and failed', () => {
     expect(await q.failed(j.jobId, 'Printer says: "boom" (name Ava)')).toMatchObject({ state: 'dead' });
     expect(await q.lease('a', 1, lookup)).toEqual([]);
     expect(await q.status()).toMatchObject({ dead: 1 });
-    expect(everythingIn(q)).not.toContain('Ava');
+    expect(leaks(everythingIn(q), ['Ava'])).toEqual([]);
   });
 
   it('an undo drops an unprinted job but leaves a done one', async () => {
@@ -221,8 +222,8 @@ describe('storage and restarts', () => {
   it('holds ciphertext, ids and times only', async () => {
     const { storage, checkIn } = setup();
     await checkIn('662', 1);
-    expect(everything(storage)).not.toContain('662');
-    expect(everything(storage)).not.toMatch(/name|ava|right-pass/i);
+    expect(leaks(everything(storage), ['662'])).toEqual([]);
+    expect(leaks(everything(storage), ['name', 'ava', 'right-pass'], { ignoreCase: true })).toEqual([]);
   });
 
   it('a restarted object (new instance over the same storage) keeps a lease and a done', async () => {

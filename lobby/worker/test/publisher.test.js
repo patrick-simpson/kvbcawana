@@ -11,6 +11,7 @@ import { SyncCore } from '../src/sync.js';
 import { SPILL_MS, WATCH_INTERVAL_MS } from '../src/watcher.js';
 import { fakeClock, everything, memoryStore, sealJob } from './helpers.js';
 import { ENV, NIGHT, kid, rig, row } from './rig.js';
+import { leaks } from './noleak.js';
 
 const ON = { SINGLE_PUBLISHER: 'on' };
 
@@ -123,7 +124,7 @@ describe('the single publisher gate', () => {
     expect(await greeting({ greet: { name: ' zed  VISITOR', club: 'sparks' } }, S)).toMatchObject({ dropped: true, reason: 'already-greeted' });
     expect(count()).toBe(3);
     // storage holds keyed hashes only, never the id or the name it was given
-    expect(everything(t.storage)).not.toMatch(/"662"|"663"|Zed|Visitor/i);
+    expect(leaks(everything(t.storage), ['662', '663', 'Zed', 'Visitor'], { ignoreCase: true })).toEqual([]);
     // the next night starts clean
     await t.core.publisher.endOfNight();
     expect((await t.storage.get('publisher:greeted'))).toBeUndefined();

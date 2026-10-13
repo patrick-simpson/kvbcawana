@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { SyncCore } from '../src/sync.js';
 import { friendsReport, KEEP_DAYS } from '../src/friends.js';
 import { HOUSEHOLD_CSV, fakeTwoTimTwo, page, table } from './fixtures.js';
+import { leaks } from './noleak.js';
 
 const BARF_6PM = Date.parse('2026-10-14T22:00:00Z');   // Wednesday, 6:00 pm EDT
 const ENV = { CLOUD_CHECKIN: 'shadow', TWOTIMTWO_USERNAME: 'checkin@example.org', TWOTIMTWO_PASSWORD: 'right-pass', INITIAL_PASSPHRASE: 'kennebec' };
@@ -89,7 +90,7 @@ describe('recording who brought a friend', () => {
   it('names are sealed at rest: no child or friend readable in storage', async () => {
     const s = await setup();
     await s.call('POST', '/v1/cloud/friend', { name: 'Kit Uniquename', club: 'Sparks', friendName: 'Maya Otherone' });
-    expect(JSON.stringify([...s.storage.map.values()])).not.toMatch(/Uniquename|Otherone|Kit|Maya/);
+    expect(leaks(JSON.stringify([...s.storage.map.values()]), ['Uniquename', 'Otherone', 'Kit', 'Maya'])).toEqual([]);
   });
 
   it('a cloud check-in with Brought a friend records it, and the laptop\'s print job carries it', async () => {

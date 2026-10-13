@@ -8,6 +8,7 @@ import { SEAL_PER_TICK, SPILL_MS, WATCH_INTERVAL_MS } from '../src/watcher.js';
 import { everything } from './helpers.js';
 import { importDisplayKey, openEnvelope } from '../../src/lib/envelope.js';
 import { NIGHT, kid, rig, row } from './rig.js';
+import { leaks } from './noleak.js';
 
 /** Move the clock, then let the alarm run once. */
 const step = async (t, ms) => { t.clock.tick(ms); await t.core.watcher.tick(); };
@@ -229,7 +230,7 @@ describe('BARF on the TwoTimTwo-page fallback (the report marks Brought a friend
     expect(records.find((r) => r.clubberId === '3').body.friend).toBeUndefined();
     // who brought a friend, for the email (sealed, one night)
     expect((await t.call('GET', '/v1/cloud/friends')).body).toMatchObject({ total: 1, clubs: [{ club: 'Sparks', kids: [{ name: 'Zed Brought', friend: '' }] }] });
-    expect(everything(t.storage)).not.toContain('Zed');
+    expect(leaks(everything(t.storage), ['Zed'])).toEqual([]);
   });
 
   it('a desk check-in with the Friend item ticked is on the same list', async () => {

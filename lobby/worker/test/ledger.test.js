@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { CHECKING_TTL_MS, Ledger, Tags } from '../src/ledger.js';
 import { churchNight } from '../../shared/cloud-crypto.js';
 import { everything, fakeClock, memoryStore, plainWords } from './helpers.js';
+import { leaks } from './noleak.js';
 
 const NIGHT = '2026-10-14';
 
@@ -156,7 +157,7 @@ describe('storage', () => {
     await ledger.claim(NIGHT, tag);
     await ledger.claim(NIGHT, v, { source: 'desk' });
     const all = everything(storage);
-    expect(all).not.toContain('662');
+    expect(leaks(all, ['662'])).toEqual([]);
     expect(all).not.toMatch(plainWords(['zed', 'visitor', 'right-pass']));
     expect(all).toContain(tag);
   });
