@@ -1,4 +1,9 @@
-﻿## [9.4.0] - 2026-10-12
+﻿## [9.4.1] - 2026-10-13
+The settings page shows each computer's version and update progress.
+
+**Computers on the settings page.** Under Settings, Screens, every computer running KVBC Awana now shows its version and whether it is up to date, downloading an update (with the percent), or has one ready. The computer tells the sync service every two minutes, and sooner when an update starts or moves ten points. Nothing about how or when updates install has changed.
+
+## [9.4.0] - 2026-10-12
 You can see an update downloading, and the Journey PC saves its lessons ahead of time.
 
 **Update progress.** While the app downloads a new version, the tray menu and its tooltip say "Downloading update 42% (71 of 170 MB)", and the status window adds the time left. When it is done it says "Update ready, restarting...". If the download fails, a plain line says it will try again soon. When an update installs has not changed.
