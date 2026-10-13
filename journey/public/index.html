@@ -81,16 +81,18 @@
         <button id="journey-splash-startover-btn" class="hidden" type="button">Start over</button>
         <button id="journey-splash-slides-btn" type="button">Skip to slides</button>
       </div>
-      <p id="journey-splash-prompt">or press <kbd>Space</kbd> / <kbd>→</kbd> begin &middot; <kbd>Shift</kbd>+<kbd>→</kbd> slides &middot; <kbd>S</kbd> settings</p>
+      <!-- Operator keys: shown only while the mouse is moving (style.css), like
+           the video and slide bars; the room sees the splash alone. -->
+      <p id="journey-splash-prompt"><kbd>Space</kbd> or <kbd>→</kbd> begins &middot; <kbd>Shift</kbd>+<kbd>→</kbd> slides &middot; <kbd>S</kbd> settings</p>
     </div>
     <video id="journey-video" class="hidden" muted playsinline></video>
     <div id="caption-prompt" class="hidden" role="dialog" aria-modal="true" aria-labelledby="caption-prompt-q">
       <p id="caption-prompt-q">Show captions?</p>
       <div id="caption-prompt-buttons">
-        <button id="caption-yes" type="button">Yes <span class="key-hint">(Y)</span></button>
-        <button id="caption-no" type="button">No <span class="key-hint">(N)</span></button>
+        <button id="caption-yes" type="button">Yes</button>
+        <button id="caption-no" type="button">No</button>
       </div>
-      <p id="caption-prompt-note">You can change this later with the <strong>CC</strong> button on the video.</p>
+      <p id="caption-prompt-note">Change it any time with the <strong>CC</strong> button.</p>
     </div>
     <div id="journey-loading" class="hidden" role="status">
       <span id="journey-loading-text">Loading video&hellip;</span>
@@ -161,8 +163,12 @@
     </div>
   </div>
 
-  <button id="toggle-btn" type="button" aria-label="Switch display">⇄</button>
-  <button id="settings-btn" type="button" aria-label="Video settings">⚙</button>
+  <!-- The two corner buttons' icons: drawn on a 24px grid with one round
+       2.25 stroke in currentColor (the home page's icon family, the weight of
+       the kit's doodles at button size), so they never depend on a font
+       having the glyph. -->
+  <button id="toggle-btn" type="button" aria-label="Switch display"><svg class="corner-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 8.5h15M15 4.5l4 4-4 4M20 15.5H5M9 11.5l-4 4 4 4" /></svg></button>
+  <button id="settings-btn" type="button" aria-label="Video settings"><svg class="corner-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9.81 4.93L10.38 2.54L13.62 2.54L14.19 4.93A7.4 7.4 0 0 1 15.45 5.45L17.54 4.16L19.84 6.46L18.55 8.55A7.4 7.4 0 0 1 19.07 9.81L21.46 10.38L21.46 13.62L19.07 14.19A7.4 7.4 0 0 1 18.55 15.45L19.84 17.54L17.54 19.84L15.45 18.55A7.4 7.4 0 0 1 14.19 19.07L13.62 21.46L10.38 21.46L9.81 19.07A7.4 7.4 0 0 1 8.55 18.55L6.46 19.84L4.16 17.54L5.45 15.45A7.4 7.4 0 0 1 4.93 14.19L2.54 13.62L2.54 10.38L4.93 9.81A7.4 7.4 0 0 1 5.45 8.55L4.16 6.46L6.46 4.16L8.55 5.45A7.4 7.4 0 0 1 9.81 4.93Z" /><circle cx="12" cy="12" r="3" /></svg></button>
 
   <div id="settings-panel" class="hidden" role="dialog" aria-label="Journey video settings" aria-modal="true">
     <div id="settings-backdrop"></div>

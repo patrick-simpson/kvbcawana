@@ -385,6 +385,8 @@ test('the Journey chip: on the splash, gone while the video plays, back on the s
     assert.equal(shown(k, 'journey-splash'), true);
     assert.equal(chipUp(k), true, 'on the splash');
     assert.equal(chipText(k), '11');
+    const beside = () => k.document.getElementById('journey-chip').classList.contains('beside-slides');
+    assert.equal(beside(), false, 'beside the gear on the splash');
     k.document.getElementById('journey-splash-play-btn').click();
     await ticks();
     assert.ok(k.video.hasAttribute('src'));
@@ -392,7 +394,10 @@ test('the Journey chip: on the splash, gone while the video plays, back on the s
     k.video.dispatchEvent(new k.window.Event('ended'));
     await ticks(1);
     assert.equal(shown(k, 'slides-view'), true);
-    assert.equal(chipUp(k), true, 'back over the teaching slides');
+    assert.equal(chipUp(k), true, 'back with the teaching slides');
+    // In the pillarbox, off Awana's slide (design review 2026-10-13; where
+    // it lands is test/big-screen-layout.test.mjs).
+    assert.equal(beside(), true, 'moved beside the slide');
     // The lobby writes a new tally.
     k.window.localStorage.setItem('awanaClubCounts.v1', counts({ journey: 12 }, at(18, 41)));
     k.window.dispatchEvent(new k.window.StorageEvent('storage', { key: 'awanaClubCounts.v1' }));

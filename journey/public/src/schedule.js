@@ -5241,6 +5241,9 @@ function renderJourneyChip() {
   const text = count == null ? '' : String(count);
   if (journeyChipCount.textContent !== text) journeyChipCount.textContent = text;
   journeyChip.classList.toggle('hidden', count == null);
+  // Over the teaching slides it moves into the pillarbox bar, off Awana's
+  // slide (style.css, #journey-chip.beside-slides).
+  journeyChip.classList.toggle('beside-slides', count != null && !slidesView.classList.contains('hidden'));
 }
 
 const isPlainObject = (data) => !!data && typeof data === 'object' && !Array.isArray(data);
@@ -5327,7 +5330,7 @@ if (!CONFIGURE_MODE) {
   // `hidden` classes (no per-frame work), so no code that changes a view has
   // to remember it, and the chip is gone in the same task the video shows.
   const chipLayers = new MutationObserver(renderJourneyChip);
-  for (const el of [journeyView, trekView, journeyVideo, journeyLoading, prepView, handoutView]) {
+  for (const el of [journeyView, trekView, journeyVideo, journeyLoading, prepView, handoutView, slidesView]) {
     chipLayers.observe(el, { attributes: true, attributeFilter: ['class'] });
   }
   renderJourneyChip();

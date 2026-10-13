@@ -111,6 +111,8 @@ test('every lesson name fits the splash in the shout face, on the kiosk and on a
               title: box(title),
               week: box($('journey-splash-week')),
               actions: box($('journey-splash-actions')),
+              mark: box($('journey-splash-journey')),
+              kickerSize: parseFloat(getComputedStyle($('journey-splash-week')).fontSize),
               splash: box($('journey-splash')),
               size,
               lineHeight,
@@ -139,11 +141,39 @@ test('every lesson name fits the splash in the shout face, on the kiosk and on a
         const air = (m.capTop - m.kickerBase) / m.size;
         assert.ok(air > 0.08 && air < 0.26, `${at}: ${air.toFixed(2)} em between the kicker and the caps`);
         assert.ok(m.title.bottom <= m.actions.top, `${at}: above the buttons`);
+        // One hero (design review 2026-10-13): the name's caps stand well
+        // over the masthead wordmark and the week line above it.
+        assert.ok(m.size * 0.688 >= 1.5 * m.mark.height, `${at}: the name (caps ${(m.size * 0.688).toFixed(0)}px) outranks the wordmark (${m.mark.height.toFixed(0)}px)`);
+        assert.ok(m.size >= 2.5 * m.kickerSize, `${at}: and the week line`);
+        assert.ok(m.mark.bottom <= m.week.top, `${at}: the masthead sits above the lesson`);
       }
 
       // A title in a shape lessons.json does not use falls back to the whole
       // title at the smaller size: it may wrap, but never past the screen or
       // onto the buttons.
+      // The operator's key line is not part of the room's picture: invisible
+      // while the pointer is idle (html.cursor-hidden, which the page starts
+      // with), and when a moved mouse brings it up it sits clear of the
+      // buttons and of the toggle in the corner.
+      const hint = await page.evaluate(() => {
+        const el = document.getElementById('journey-splash-prompt');
+        const root = document.documentElement;
+        root.classList.add('cursor-hidden');
+        el.style.transition = 'none';
+        const idle = getComputedStyle(el).opacity;
+        root.classList.remove('cursor-hidden');
+        const moving = getComputedStyle(el).opacity;
+        const r = el.getBoundingClientRect();
+        const a = document.getElementById('journey-splash-actions').getBoundingClientRect();
+        const t = document.getElementById('toggle-btn').getBoundingClientRect();
+        el.style.transition = '';
+        return { idle, moving, top: r.top, right: r.right, bottom: r.bottom, actionsBottom: a.bottom, toggleLeft: t.left };
+      });
+      assert.equal(hint.idle, '0', `${at0}: the key line is hidden while the pointer is idle`);
+      assert.equal(hint.moving, '1', `${at0}: and shown when the mouse moves`);
+      assert.ok(hint.top >= hint.actionsBottom, `${at0}: below the buttons`);
+      assert.ok(hint.right <= hint.toggleLeft && hint.bottom <= height, `${at0}: clear of the toggle, on screen`);
+
       const long = await measure('Special Night: A Very Long Lesson Title That Will Not Split', true, 'Week 32');
       assert.ok(long.title.left >= 0 && long.title.right <= width, `${at0}: the fallback title is inside the screen`);
       assert.ok(long.title.bottom <= long.actions.top, `${at0}: the fallback title clears the buttons`);

@@ -47,6 +47,7 @@ async function measure(page, view) {
       show('caption-overlay', view === 'video');
       show('slides-view', view === 'slides');
       show('journey-chip', view === 'slides');
+      document.getElementById('journey-chip').classList.toggle('beside-slides', view === 'slides');
       document.getElementById('video-time').textContent = '12:45 / 15:02';
       document.getElementById('caption-text').textContent = 'And that is why it still matters today.';
       const chipCount = document.querySelector('#journey-chip .jr-chip-count');
@@ -63,6 +64,8 @@ async function measure(page, view) {
         toggle: box('toggle-btn'),
         gear: box('settings-btn'),
         chip: box('journey-chip'),
+        stage: box('slide-stage'),
+        chipFont: parseFloat(getComputedStyle(document.getElementById('journey-chip')).fontSize),
         next: box('slide-next-btn'),
         slideBar: box('slide-controls'),
         caption: parseFloat(getComputedStyle(document.getElementById('caption-text')).fontSize),
@@ -104,11 +107,25 @@ test('1080p is exactly as it was; 4K gets the same bar, buttons and captions twi
     }
     for (const [name, m, k] of [['1080p', hdSlides, 1], ['4K', uhdSlides, 2]]) {
       assert.ok(m.slideBar.right <= m.toggle.left - 16, `${name}: the slide bar stops short of the toggle`);
-      // The count chip sits left of the (grown) gear, as clear of it as at
-      // 1080p (test/corner-buttons.test.mjs: at least 12px there).
-      assert.ok(m.chip.right <= m.gear.left - 12 * k, `${name}: the Journey chip ends ${m.gear.left - m.chip.right}px left of the gear`);
-      assert.ok(Math.abs(m.chip.top - m.gear.top) < 1, `${name}: top-aligned with it`);
+      // Over the slides the count chip sits in the left pillarbox bar, never
+      // on Awana's slide (design review 2026-10-13), centred in the bar and
+      // top-aligned with the (grown) gear, which keeps the right bar.
+      assert.ok(m.chip.right <= m.stage.left - 12 * k, `${name}: the Journey chip ends ${m.stage.left - m.chip.right}px left of the slide`);
+      assert.ok(m.chip.left >= 12 * k, `${name}: and is on screen`);
+      assert.ok(Math.abs(m.chip.left - (m.stage.left - m.chip.right)) < 1, `${name}: centred in the bar`);
+      assert.ok(Math.abs(m.chip.top - m.gear.top) < 1, `${name}: top-aligned with the gear`);
     }
+
+    // A smaller 16:9 bar (1366x768, 171px) takes a smaller chip, still off
+    // the slide; a 4:3 screen has no bar, so the chip is its smallest in the
+    // top-left corner, away from the deck's centred titles and the gear.
+    const laptop = await measure(await openAt(browser, 1366, 768), 'slides');
+    assert.ok(laptop.chip.right <= laptop.stage.left - 12, `1366x768: off the slide (${laptop.chip.right} vs ${laptop.stage.left})`);
+    assert.ok(laptop.chip.left >= 12);
+    const square = await measure(await openAt(browser, 1024, 768), 'slides');
+    assert.ok(Math.abs(square.chipFont - 12.8) < 0.05, `4:3: the smallest chip (${square.chipFont}px)`);
+    assert.ok(square.chip.left <= 24 && square.chip.top <= 32, '4:3: in the top-left corner');
+    assert.ok(square.chip.right <= 1024 / 8, '4:3: an eighth of the width at most');
 
     // Over the Check-in Display the display's reserved column is 48px at
     // every size (the corner-button contract): there they never grow.

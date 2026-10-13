@@ -234,3 +234,31 @@ test('the brand fonts are asked for at startup, and nothing waits on them', asyn
   assert.equal(typeof throwing.window.splashLessonText, 'function', 'schedule.js ran to the end');
   throwing.close();
 });
+
+// Design review 2026-10-13: the room screen carries no keyboard hints. The
+// caption question's buttons say only Yes and No, its note is one short
+// line, and the keys still answer it; the corner buttons are drawn icons,
+// not font glyphs, and keep their spoken names.
+test('the caption question and the corner buttons carry no key or glyph text', () => {
+  const kiosk = bootKiosk(ROUTES);
+  const { document, window } = kiosk;
+  try {
+    assert.equal(document.getElementById('caption-yes').textContent.trim(), 'Yes');
+    assert.equal(document.getElementById('caption-no').textContent.trim(), 'No');
+    assert.equal(document.querySelector('.key-hint'), null);
+    const note = document.getElementById('caption-prompt-note').textContent.trim();
+    assert.ok(note.length <= 45 && /CC/.test(note), `one short line: "${note}"`);
+    window.showCaptionPrompt();
+    document.dispatchEvent(new window.KeyboardEvent('keydown', { code: 'KeyN', bubbles: true }));
+    assert.equal(window.isCaptionPromptOpen(), false, 'N still answers');
+    assert.equal(window.localStorage.getItem('journey.captions'), 'off');
+    for (const id of ['toggle-btn', 'settings-btn']) {
+      const button = document.getElementById(id);
+      assert.equal(button.textContent.trim(), '', `#${id} has no glyph text`);
+      assert.ok(button.querySelector('svg.corner-icon[aria-hidden="true"]'), `#${id} draws its icon`);
+      assert.ok(button.getAttribute('aria-label'), `#${id} keeps its name`);
+    }
+  } finally {
+    kiosk.close();
+  }
+});
