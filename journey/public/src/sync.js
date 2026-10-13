@@ -29,7 +29,8 @@
      (POST /v1/screens/hello, kind 'journey', lobby/worker/src/routes.md 10.7)
      so awana.kvbchurch.org/settings lists it, with how saving the lessons is
      going (schedule.js's journeyDownloadStatus(), trimmed to numbers,
-     switches and one short reason). Its id is made once and kept in the
+     switches and one short reason; also when it has not looked yet or
+     cannot save lessons here). Its id is made once and kept in the
      lobby's own slot, awanaScreens.v1, under 'journey'. A hello every two
      minutes, and one when the status changes, never two within a minute.
      Silent when signed out, unreachable, or in configure mode (the app's
@@ -277,15 +278,19 @@
   function count(v, max) {
     return typeof v === 'number' && isFinite(v) ? Math.min(max, Math.max(0, Math.floor(v))) : 0;
   }
-  /* The saved lessons, trimmed to what the registry keeps; null until the
-     kiosk knows (it reads its disk a few minutes after load) or where it
-     cannot save lessons at all. */
+  /* The saved lessons, trimmed to exactly what the registry keeps. Always an
+     answer once schedule.js has loaded, so /settings never shows nothing:
+     `known` is false until the kiosk has read its disk (a few minutes after
+     load), `supported` false where this browser cannot save lessons at all
+     (a Mac or a phone without the storage it needs). null only when there is
+     no schedule.js to ask. */
   function lessonsStatus() {
     var fn = window.journeyDownloadStatus;
     if (typeof fn !== 'function') return null;
     var s;
     try { s = fn(); } catch (e) { return null; }
-    if (!s || !s.supported || !s.known || !(s.total > 0)) return null;
+    if (!s || typeof s !== 'object') return null;
+    var supported = s.supported === true;
     return {
       saved: count(s.saved, 999),
       total: count(s.total, 999),
@@ -299,6 +304,8 @@
       lastSavedAt: typeof s.lastSavedAt === 'string' ? s.lastSavedAt : null,
       error: typeof s.error === 'string' && s.error ? s.error.slice(0, STATUS_ERROR_MAX) : null,
       auto: s.auto === true,
+      known: supported && s.known === true,
+      supported: supported,
     };
   }
 
@@ -307,7 +314,7 @@
     helloTimer = setTimeout(hello, screenTuning().helloMs);
   }
 
-  /* One hello: who this kiosk is, and its saved lessons when it knows them.
+  /* One hello: who this kiosk is, and how its saved lessons are going.
      The next one is two minutes after the last, whatever started it. */
   function hello() {
     if (CONFIGURE || !base || screenGone) return Promise.resolve();

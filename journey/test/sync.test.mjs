@@ -250,7 +250,10 @@ test('signed in, the kiosk says hello as a Journey kiosk under an id it keeps in
   assert.equal(hi.body.kind, 'journey');
   assert.equal(hi.body.name, 'Journey kiosk');
   assert.ok(isScreenId(hi.body.id), 'an id the Worker accepts');
-  assert.equal('status' in hi.body, false, 'no status until the kiosk knows what is saved (jsdom cannot save lessons)');
+  // jsdom cannot save lessons: the kiosk still reports, and says so.
+  assert.equal(hi.body.status.lessons.supported, false, 'a browser that cannot save lessons says so');
+  assert.equal(hi.body.status.lessons.known, false);
+  assert.deepEqual(sanitizeScreenStatus('journey', hi.body.status), hi.body.status);
   const slot = JSON.parse(k.window.localStorage.getItem('awanaScreens.v1'));
   assert.deepEqual(slot.lobby, other, 'the lobby\'s own entry is left alone');
   assert.equal(slot.journey.id, hi.body.id);
@@ -271,7 +274,8 @@ test('its saved lessons ride the hello, trimmed to exactly what the registry kee
   assert.ok(first.body.status, 'the first hello carries it');
   const sent = first.body.status;
   assert.deepEqual(Object.keys(sent), ['lessons']);
-  assert.equal(JSON.stringify(sent).includes('supported'), false);
+  assert.equal(sent.lessons.supported, true);
+  assert.equal(sent.lessons.known, true);
   assert.ok(sent.lessons.error.length <= 120);
   assert.deepEqual(sanitizeScreenStatus('journey', sent), sent, 'the Worker keeps every field the kiosk sends, unchanged');
   assert.equal(sent.lessons.currentWeek, 7);
@@ -295,12 +299,26 @@ test('its saved lessons ride the hello, trimmed to exactly what the registry kee
   k.close();
 });
 
-test('a kiosk that does not know yet, or cannot save lessons, says hello without a status', async () => {
+test('a kiosk that does not know yet, or cannot save lessons, still reports, and says which', async () => {
   const k = boot({ journey: ROOM, prefs: { 'awanaSyncSession.v1': SESSION } });
-  k.window.journeyDownloadStatus = () => ({ ...DOWNLOADS, known: false });
+  k.window.journeyDownloadStatus = () => ({ ...DOWNLOADS, known: false, total: 0, saved: 0 });
   await settle();
-  assert.equal('status' in hellos(k)[0].body, false);
-  k.window.journeyDownloadStatus = () => ({ ...DOWNLOADS, supported: false });
+  const checking = hellos(k)[0].body.status;
+  assert.equal(checking.lessons.known, false);
+  assert.equal(checking.lessons.supported, true);
+  assert.deepEqual(sanitizeScreenStatus('journey', checking), checking);
+  k.window.journeyDownloadStatus = () => ({ ...DOWNLOADS, supported: false, known: true });
+  assert.deepEqual(
+    [k.window.journeySync.lessonsStatus().supported, k.window.journeySync.lessonsStatus().known], [false, false],
+    'nothing is "known" where nothing can be saved',
+  );
+  // A browser (automatic download off), nothing saved yet: reported as it is.
+  k.window.journeyDownloadStatus = () => ({ ...DOWNLOADS, saved: 0, bytesSaved: 0, downloading: false, percent: 0, auto: false });
+  const browser = JSON.parse(JSON.stringify(k.window.journeySync.lessonsStatus()));
+  assert.deepEqual(sanitizeScreenStatus('journey', { lessons: browser }).lessons, browser);
+  assert.equal(k.window.journeySync.lessonsStatus().auto, false);
+  // No schedule.js to ask: no status (the Worker keeps the last).
+  k.window.journeyDownloadStatus = undefined;
   assert.equal(k.window.journeySync.lessonsStatus(), null);
   k.close();
 });
