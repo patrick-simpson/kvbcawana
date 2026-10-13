@@ -129,6 +129,18 @@ describe('mission control: words', () => {
     expect(readWords({ configured: true, signedIn: false }).text).toMatch(/Signed out/);
     expect(readWords({ configured: true, loginBlockedForSec: 60 }).text).toMatch(/Blocked/);
   });
+
+  it('a failed read says when, in plain words, and an earlier night\'s failure is history, not a problem now', () => {
+    const now = Date.parse('2026-10-13T22:15:00Z');
+    const recent = { configured: true, signedIn: true, lastError: 'report-unreadable', lastReadAt: new Date(now - 5 * 60000).toISOString() };
+    expect(readWords(recent, now)).toEqual({ tone: 'warn', text: 'The read 5 min ago failed: the report page did not look like the report.' });
+    const old = { ...recent, lastReadAt: new Date(now - 6 * 86400000).toISOString() };
+    expect(readWords(old, now)).toEqual({ tone: 'ok', text: 'No read since 6 days ago (that one failed: the report page did not look like the report). It reads again on the next club night.' });
+    expect(readWords({ ...recent, lastError: 'something-new' }, now).text).toMatch(/failed: something-new\.$/);
+    const base = { read: recent, print: {}, window: { open: false } };
+    expect(alertsFrom(base, now).map((a) => a.id)).toContain('ttt-error');
+    expect(alertsFrom({ ...base, read: old }, now).map((a) => a.id)).not.toContain('ttt-error');
+  });
   it('the check-out line', () => {
     expect(ymWords(null)).toBeNull();
     expect(ymWords({ enabled: false })).toMatch(/Off/);

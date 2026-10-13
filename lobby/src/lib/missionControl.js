@@ -128,7 +128,7 @@ export function alertsFrom(overview, now = Date.now()) {
   }
   const read = overview.read || {};
   if (read.loginBlockedForSec > 0) out.push({ id: 'ttt-blocked', tone: 'bad', text: `TwoTimTwo refused the sign-in, so the service is waiting ${Math.max(1, Math.ceil(read.loginBlockedForSec / 60))} min before it tries again.` });
-  else if (read.lastError) out.push({ id: 'ttt-error', tone: 'warn', text: `The last read of TwoTimTwo failed (${String(read.lastError).slice(0, 40)}).` });
+  else if (read.lastError && !oldReadError(read, now)) out.push({ id: 'ttt-error', tone: 'warn', text: `The last read of TwoTimTwo failed: ${readErrorWords(read.lastError)}.` });
   if (print.dead > 0) out.push({ id: 'dead-jobs', tone: 'bad', text: `${print.dead} label${print.dead === 1 ? '' : 's'} could not be printed after several tries.` });
   const ym = overview.ym;
   if (ym && (ym.failed > 0 || ym.gaveUp > 0)) out.push({ id: 'ym', tone: 'warn', text: `Trek and Journey check-out: ${(ym.failed || 0) + (ym.gaveUp || 0)} did not go through.` });
@@ -167,11 +167,39 @@ export function untilWords(at, now = Date.now()) {
   return `in ${h} h${m ? ` ${m} min` : ''}`;
 }
 
-/** The TwoTimTwo read as one word and a line. @param {any} read */
-export function readWords(read) {
+/** A failed read older than this is an earlier night's, told as history, never as a problem now. */
+export const READ_ERROR_OLD_MS = 12 * 60 * 60 * 1000;
+
+/** The Worker's read error codes in a few plain words (the full sentences: syncService.js). */
+const READ_ERROR_WORDS = {
+  'report-unreadable': 'the report page did not look like the report',
+  'signed-out': 'TwoTimTwo would not show the report',
+  'login-refused': 'TwoTimTwo refused the sign-in',
+  'twotimtwo-down': 'TwoTimTwo was not answering properly',
+  timeout: 'TwoTimTwo took too long to answer',
+  network: 'TwoTimTwo could not be reached',
+  'off-site-redirect': 'TwoTimTwo sent the service to another website',
+};
+
+/** @param {unknown} code */
+function readErrorWords(code) {
+  return READ_ERROR_WORDS[/** @type {keyof typeof READ_ERROR_WORDS} */ (String(code))] || String(code).slice(0, 40);
+}
+
+/** Is the last read's failure from an earlier night? @param {any} read @param {number} now */
+function oldReadError(read, now) {
+  const t = atMs(read.lastReadAt);
+  return t !== null && now - t > READ_ERROR_OLD_MS;
+}
+
+/** The TwoTimTwo read as one word and a line. @param {any} read @param {number} [now] */
+export function readWords(read, now = Date.now()) {
   if (!read || !read.configured) return { tone: 'warn', text: 'Not set up: the service has no TwoTimTwo user yet.' };
   if (read.loginBlockedForSec > 0) return { tone: 'bad', text: 'Blocked: TwoTimTwo refused the sign-in.' };
-  if (read.lastError) return { tone: 'warn', text: `Error: ${String(read.lastError).slice(0, 40)}` };
+  if (read.lastError && oldReadError(read, now)) {
+    return { tone: 'ok', text: `No read since ${agoWords(read.lastReadAt, now)} (that one failed: ${readErrorWords(read.lastError)}). It reads again on the next club night.` };
+  }
+  if (read.lastError) return { tone: 'warn', text: `The read ${agoWords(read.lastReadAt, now)} failed: ${readErrorWords(read.lastError)}.` };
   if (!read.signedIn) return { tone: 'warn', text: 'Signed out of TwoTimTwo.' };
   return { tone: 'ok', text: read.lastOkAt ? `OK, read ${agoWords(read.lastOkAt)}` : 'Signed in, no read yet.' };
 }

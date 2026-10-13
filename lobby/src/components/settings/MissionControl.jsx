@@ -57,7 +57,7 @@ export default function MissionControl({ overview, mission, error, stopped, onRe
   const print = overview?.print;
   const stations = Array.isArray(print?.stations) ? print.stations : [];
   const checks = Array.isArray(print?.checkThePrinter) ? print.checkThePrinter.length : Number(print?.checkThePrinter) || 0;
-  const read = overview?.read ? readWords(overview.read) : null;
+  const read = overview?.read ? readWords(overview.read, now) : null;
   const ym = overview ? ymWords(overview.ym) : null;
   const win = overview?.window;
 
