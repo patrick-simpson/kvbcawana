@@ -267,6 +267,10 @@ into the database in Cloudflare." Fully automatic, no button:
   until first imported; then, after each club night's window closes, the current
   season once more (late paper sheets); then the walk back, one season a read,
   until a season has no meetings (`ended: 'empty'`) or 20 seasons (`'cap'`).
+  The first of these that is DUE runs (`pick`): a current season refused and
+  waiting out its 24 h does not hold up the walk back meanwhile (status
+  `'unreadable'` with its `unreadableWhy` until it reads); with nothing due, the
+  alarm wakes for the soonest.
   An older season is never read again once done. A season that comes back
   identical to another (same body) or dated in another season means TwoTimTwo
   ignored `year_start`: nothing is stored and the walk ends (`'year-ignored'`).
@@ -374,8 +378,17 @@ minutes, memory only, so a laptop gone away armed, or a restart, ends it until
 the next post) every route behaves as on a club day. The page shows one note,
 "No club tonight" and "Next club night: Wednesday, October 14", and asks again
 every 60 s (desk-transport.js maps `no-club` to `DeskError` `no-club`, "There is
-no club tonight."). `/checkin/classic` (`phone.js` `/phone/checkin`) has no such
-guard. `test/noclub.test.js`.
+no club tonight."). The rule lives in ONE place, `watcher.js clubToday()` (the
+desk asks it), and covers every TwoTimTwo write: the older cloud check-in path
+too (code review 2026-10-13): `POST /v1/cloud/checkin`, preview or confirmed,
+answers `{ok: false, error: 'no-club', today, next}` (its own 200-with-`error`
+convention) and the relayed phone check-in of `/checkin/classic` (`phone.js`
+`/phone/checkin`, through `Watcher.checkIn`) is saved `failed` with "there is
+no club tonight. Check in at the desk on a club night.", both before the check-in
+page is read. Under every entry, the TwoTimTwo client's own check-in, undo and
+check-out posts ask again (`watcher.clientFor` gives it a `writeGuard`) and are
+refused `no-club` unsent, so a path added later cannot post into another
+meeting. `test/noclub.test.js`.
 
 Since 2026-10-12 (owner) the page sends no `visitor`: a child not on the list gets
 a walk-in name tag (a `reprint:` job on `/print-oneoff`, never counted). The
@@ -459,7 +472,10 @@ over 120 KB (300 children are about 52 KB; a bigger page is not written at
 all, never cut down). A new object reads it back once, lazily, on the first
 roster or desk call: only when it is tonight's (`churchNight`), opens, and is
 under 6 hours old; another night's, an older one, or one that will not open is
-deleted and the call goes on as before, never an error. A restored page counts
+deleted and the call goes on as before, never an error. A look that could not
+run yet (cloud check-in off, no TwoTimTwo secret, a storage error) is not the
+one look: it is tried again on a later call, at most once a minute, so a mode
+turned back on mid-evening still finds the page. A restored page counts
 as held (`hasNightPage`): desk actions read nothing, and `rosterRefreshInMs()`
 is 0, so the alarm's next free slot replaces it with a fresh read (no read is
 started from the request path). A failed read with a restored copy in hand is
@@ -1214,4 +1230,6 @@ Code: `journeyRemote.js`; rules (one copy, shared with the phone page):
 - NOTHING is written to storage: presses live in memory per kiosk (at most 12, the oldest first out, each dropped after 20 s, each handed over ONCE: taken out as it is handed over, so a lost reply loses a press and never repeats it; the kiosk also never runs a press id twice); reports live in memory (newest per kiosk, a restart forgets them); "online" also counts a kiosk's recent poll (memory) without moving its stored `lastSeen`. The download commands of 10.8 stay as they are (stored, 10 min); `hello: true` tells a kiosk one waits (memory flag; after a restart the two-minute hello still collects it).
 - Doorbell: each press rings `changed {what: 'screen-action', id, action: 'remote'}` once per kiosk; the embedded Check-in Display passes it up (`lobby/src/lib/embed.js hostDoorbell`, unchanged), and the kiosk polls `POST /v1/screens/now` at once. The first state read after a quiet spell (no phone for 30 s) rings every kiosk the same way (`action: 'remote-watch'`) so they report straight away.
 - Watching: kiosks report only while a phone read the state within 30 s (`watch` in their answers): on each change (at most one every 700 ms) and one poll every 10 s (a playing video's position; and a press whose doorbell was missed is still collected inside its 20 s). Nobody watching = no extra request at all.
+- The kiosk list: read from the `screens` index once per object, then kept in memory, refreshed by `screens.js onIndex` each time the registry writes its index (`saveIndex` is the only writer), so a state read or a kiosk poll reads NOTHING from storage (beyond the session check).
+- The press allowance is per sign-in, keyed by the session token's epoch, issue time and signature tail, read by the ONE token parser the sign-in check uses (`session.js parseSession`).
 - Free plan: no storage writes; CPU = clamps and Map lookups. Requests per hour with a phone open (one kiosk): ~2,400 state polls + ~400-500 kiosk polls (360 timed, plus one per change and per press) + presses; with the phone closed: nothing beyond the kiosks' usual hellos.

@@ -306,6 +306,50 @@ describe('the back-fill, from the alarm', () => {
     expect(s.seasons.map((x) => x.season)).toEqual(['2026-27', '2024-25']);
   });
 
+  it('an unreadable current season does not hold up the walk back: older seasons are read meanwhile, the current one again after a day', async () => {
+    const { r, db, asked, seasons } = await setup({ seasons: { ...SEASONS, 2026: CHANGED } });
+    await alarms(r);
+    // within minutes, not days: the walk went on while the current season waits out its day
+    expect(asked.map((a) => a.year)).toEqual([2026, 2025, 2024, 2023]);
+    expect(asked[asked.length - 1].at - asked[0].at).toBeLessThan(10 * 60 * 1000);
+    expect(imported(db)).toHaveLength(3 * 6 + 2 * 5);
+    let s = await status(r);
+    expect(s).toMatchObject({ state: 'unreadable', unreadableWhy: 'header', ended: 'empty', oldestSeason: '2024-25' });
+    expect(Date.parse(s.nextDueAt) - r.clock.t).toBeGreaterThan(UNREADABLE_RETRY_MS - 10 * 60 * 1000);
+    // nothing else is read while it waits: the alarm's next wake is the retry, a day after the refusal
+    r.clock.t += 2 * 3600 * 1000;
+    for (let i = 0; i < 5; i++) await r.core.alarm();
+    expect(asked).toHaveLength(4);
+    expect(r.core.trends.wakeInMs()).toBe(asked[0].at + UNREADABLE_RETRY_MS - r.clock.t);
+    // a day later the report reads again, and the current season is imported
+    seasons[2026] = SEASON_2026;
+    r.clock.t = asked[0].at + UNREADABLE_RETRY_MS;
+    await alarms(r);
+    expect(asked.map((a) => a.year)).toEqual([2026, 2025, 2024, 2023, 2026]);
+    s = await status(r);
+    expect(s).toMatchObject({ state: 'done', lastError: null, seasons: [{ season: '2026-27', nights: 5 }, { season: '2025-26', nights: 3 }, { season: '2024-25', nights: 2 }] });
+  });
+
+  it('pick() takes the next DUE job: a refused current season waiting out its day gives way to the walk; nothing due gives the soonest', async () => {
+    const { r } = await setup();
+    const ti = r.core.trends;
+    await ti.doc.load();
+    const now = r.clock.t;
+    ti.st.unreadable['2026'] = { tries: 1, nextAt: now + UNREADABLE_RETRY_MS, night: lastClosedClubNight(now), why: 'header' };
+    expect(ti.pick(now)).toEqual({ season: 2025, why: 'walk', notBefore: 0 });
+    // the walk's own season also waiting: the soonest of the two, the current one first on a tie
+    ti.st.unreadable['2025'] = { tries: 1, nextAt: now + 3600 * 1000, night: lastClosedClubNight(now), why: 'header' };
+    expect(ti.pick(now)).toEqual({ season: 2025, why: 'walk', notBefore: now + 3600 * 1000 });
+    ti.st.unreadable['2025'].nextAt = now + UNREADABLE_RETRY_MS;
+    expect(ti.pick(now)).toMatchObject({ season: 2026, why: 'current' });
+    // a due current season still comes first
+    ti.st.unreadable['2026'].nextAt = now - 1;
+    expect(ti.pick(now)).toMatchObject({ season: 2026, why: 'current' });
+    // a season out of tries is never picked
+    ti.st.unreadable['2026'].tries = UNREADABLE_TRIES;
+    expect(ti.pick(now)).toEqual({ season: 2025, why: 'walk', notBefore: now + UNREADABLE_RETRY_MS });
+  });
+
   it('TwoTimTwo answering the current season for an older one stops the walk and stores nothing', async () => {
     // The Meeting column without a year (as the grid's): only the fingerprint can tell.
     const noYear = SEASON_2026.replace(/"(\d{1,2})\/(\d{1,2})\/2026"/g, '"$1/$2"');

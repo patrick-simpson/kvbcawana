@@ -124,6 +124,18 @@ export class Screens {
     this.fresh = new Map();
     /** Journey kiosks with a download command waiting in storage (memory: a restart forgets, the two-minute hello still collects). @type {Set<string>} */
     this.waiting = new Set();
+    /** Told each index this object writes, after the write (journeyRemote.js keeps its kiosk list by it). @type {((index: Record<string, ScreenRecord>) => void)[]} */
+    this.indexWatchers = [];
+  }
+
+  /**
+   * Hear every index this object writes (saveIndex is the ONLY writer of the
+   * `screens` key), so a reader polled every second or two keeps what it needs
+   * in memory instead of reading the index each time.
+   * @param {(index: Record<string, ScreenRecord>) => void} fn
+   */
+  onIndex(fn) {
+    this.indexWatchers.push(fn);
   }
 
   /** @returns {Promise<Record<string, ScreenRecord>>} */
@@ -142,9 +154,12 @@ export class Screens {
     return isScreenId(id) && Object.prototype.hasOwnProperty.call(index, id) ? index[id] : null;
   }
 
-  /** @param {Record<string, ScreenRecord>} index */
+  /** The one writer of the index; its watchers hear it once stored. @param {Record<string, ScreenRecord>} index */
   async saveIndex(index) {
     await this.storage.put(INDEX, index);
+    for (const fn of this.indexWatchers) {
+      try { fn(index); } catch (err) { console.error('[screens] an index watcher failed', err); }
+    }
   }
 
   /** The record as /settings sees it. @param {ScreenRecord} r @param {Set<string>} live */

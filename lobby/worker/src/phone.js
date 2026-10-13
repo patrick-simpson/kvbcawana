@@ -164,6 +164,7 @@ export class CloudPhone {
       case 'not-found': return 'not on TwoTimTwo’s check-in list (already checked in, or not registered this year)';
       case 'ambiguous': return 'two children have that name on TwoTimTwo; check in at the desk';
       case 'already-checked-in': return 'already checked in';
+      case 'no-club': return 'there is no club tonight. Check in at the desk on a club night.';
       case 'checkin-refused': return 'TwoTimTwo did not record the check-in. Check in at the desk.';
       case 'no-attendance-item': return 'TwoTimTwo has no Attendance item for that club tonight';
       case 'login-refused': case 'login-backoff': return 'the cloud could not sign in to TwoTimTwo. Check in at the desk.';

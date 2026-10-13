@@ -29,6 +29,7 @@ import { TwoTimTwoClient, credentialsFrom, itemsToSend, reportColumns, rowShape 
 import { fromBase64, toBase64 } from './crypto.js';
 import { INTERACTIVE_WAIT_MS, READ_INTERVAL_MS, ReadBudget } from './readbudget.js';
 import { massUndoRefused, reportIsPartial } from '../../shared/tonight.js';
+import { SCHEDULE, clubDay } from './clubday.js';
 
 export { READ_INTERVAL_MS };
 /**
@@ -254,6 +255,8 @@ export class Watcher {
     this.clientKey = '';
     /** @type {Promise<any>|null} */
     this.inFlight = null;
+    /** The schedule the club-day rule reads (lobby/shared/schedule.json, bundled; tests swap it). */
+    this.schedule = SCHEDULE;
   }
 
   /** 'off' unless CLOUD_CHECKIN says shadow; phase 1 knows no other mode. */
@@ -263,16 +266,54 @@ export class Watcher {
 
   creds() { return credentialsFrom(this.env); }
 
-  /** One client per set of credentials (a changed secret starts a new session). */
+  /**
+   * One client per set of credentials (a changed secret starts a new session).
+   * Its check-in, undo and check-out posts are refused `no-club` on a day with
+   * no club (writeGuard): the backstop under every entry's own early refusal.
+   */
   clientFor() {
     const creds = this.creds();
     if (!creds) return null;
     const key = `${creds.host}\n${creds.username}\n${creds.password}`;
     if (!this.client || this.clientKey !== key) {
-      this.client = new TwoTimTwoClient(creds, { fetchFn: this.fetchFn, now: this.now, budget: this.budget });
+      this.client = new TwoTimTwoClient(creds, {
+        fetchFn: this.fetchFn, now: this.now, budget: this.budget,
+        writeGuard: async () => ((await this.clubToday()).club ? null : 'no-club'),
+      });
       this.clientKey = key;
     }
     return this.client;
+  }
+
+  // ── no club tonight (clubday.js; owner 2026-10-13) ─────────────────────────
+  // THE one place the rule is applied to TwoTimTwo writes: the desk's routes
+  // (desk.js, barf.js), the relayed phone check-in (phone.js) and POST
+  // /v1/cloud/checkin (checkIn below) all ask here BEFORE any read, claim or
+  // post, and the client's own posts ask again (clientFor's writeGuard), so a
+  // path added later cannot post a check-in into whatever meeting TwoTimTwo
+  // shows on a day with no club.
+
+  /**
+   * Is today a club day (the whole local day, the shared rule given the bundled
+   * schedule and the calendar in storage), or is the print station rehearsing
+   * (publisher.js `rehearsing`)? No TwoTimTwo read.
+   * @returns {Promise<{ club: boolean, today: string, next: string|null, rehearsal?: true }>}
+   */
+  async clubToday() {
+    /** @type {any} */
+    let feed;
+    try { feed = this.storage ? await this.storage.get('calendar') : null; } catch { feed = null; }
+    const day = clubDay(this.now(), feed, this.schedule);
+    if (day.club) return day;
+    const pub = this.publisher;
+    if (pub && typeof pub.rehearsing === 'function' && pub.rehearsing()) return { ...day, club: true, rehearsal: true };
+    return day;
+  }
+
+  /** null on a club day (or a rehearsal), else `{today, next}` for the refusal. @returns {Promise<{ today: string, next: string|null }|null>} */
+  async noClub() {
+    const day = await this.clubToday();
+    return day.club ? null : { today: day.today, next: day.next };
   }
 
   async loadStatus() {
@@ -497,13 +538,17 @@ export class Watcher {
    * would: Attendance (every automatic item), plus Bible and Brought a friend
    * when `options` ticks them, each only where it applies to the child's club.
    * The answer names the child (the caller asked for them by name); nothing
-   * stored or logged does.
+   * stored or logged does. On a day with no club (and no rehearsal) it is
+   * `{ok: false, error: 'no-club', today, next}` before any read (noClub).
    * @param {{name?: unknown, clubberId?: unknown, confirm?: unknown, options?: unknown}} body
    */
   async checkIn(body) {
     if (this.mode === 'off') return { ok: false, error: 'off' };
     const client = this.clientFor();
     if (!client) return { ok: false, error: 'not-configured' };
+    // No club today (and no rehearsal): refused before the page is read, preview or not.
+    const noClub = await this.noClub();
+    if (noClub) return { ok: false, error: 'no-club', ...noClub };
     const wantId = /^\d{1,20}$/.test(String(body.clubberId ?? '')) ? String(body.clubberId) : '';
     const wantName = String(body.name ?? '').trim().toLowerCase().replace(/\s+/g, ' ').slice(0, 80);
     if (!wantId && !wantName) return { ok: false, error: 'no-child' };

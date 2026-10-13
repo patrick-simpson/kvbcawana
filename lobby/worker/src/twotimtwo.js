@@ -500,6 +500,13 @@ export class TwoTimTwoClient {
     this.relogins = 0;
     /** The sign-in under way, shared (signIn()). @type {Promise<any>|null} */
     this.signingIn = null;
+    /**
+     * Asked before every check-in, undo or check-out post (write()): a fixed
+     * error code refuses it unsent (the watcher's `no-club`), null lets it go.
+     * None: every post goes (the unit tests).
+     * @type {(() => Promise<string|null>)|null}
+     */
+    this.writeGuard = opts.writeGuard || null;
   }
 
   get origin() { return `https://${this.host}`; }
@@ -714,6 +721,10 @@ export class TwoTimTwoClient {
    * @returns {Promise<R>}
    */
   async write(send, opts) {
+    if (this.writeGuard) {
+      const refused = await this.writeGuard();
+      if (refused) return { ok: /** @type {const} */ (false), error: refused };
+    }
     const desk = !!(opts && opts.desk);
     const first = await send(desk);
     if (first.ok || first.error !== 'signed-out' || !desk) return first;

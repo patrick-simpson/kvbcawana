@@ -22,6 +22,10 @@
 //             is under JOURNEY_REMOTE_WATCH_MS old (`watch` in their answers)
 //   buckets   presses per phone sign-in (a token bucket, keyed by the
 //             session's issue stamp and a 6-character tail of it; sessionKeyOf)
+//   kiosks    the registry's Journey kiosks: read from the `screens` index once,
+//             then kept by screens.js's onIndex (told every index it writes),
+//             so the phone's state read (every 1.5 s) and each kiosk's poll
+//             read nothing from storage
 //
 // A kiosk has no live channel of its own, so each press also rings the
 // doorbell `changed {what: 'screen-action', id, action: 'remote'}` once per
@@ -40,8 +44,9 @@ import {
   sanitizeJourneyNow,
   sanitizeJourneyRemote,
 } from '../../src/lib/syncSpecs.js';
-import { ONLINE_MS, Screens } from './screens.js';
+import { ONLINE_MS } from './screens.js';
 import { fail, json } from './http.js';
+import { parseSession } from './session.js';
 
 /** Sign-ins whose press counts are remembered (the oldest is forgotten past this). */
 export const REMOTE_BUCKETS_MAX = 64;
@@ -66,22 +71,21 @@ export function takeToken(bucket, now) {
 }
 
 /**
- * Which sign-in a request is, for counting presses: the session's
- * `epoch.issued` part plus the last 6 characters of its 43-character
- * signature (two phones signed in the same millisecond still count apart; 6
- * characters of an HMAC reveal nothing usable). Memory only, never stored or
- * logged. '' without one.
+ * Which sign-in a request is, for counting presses: the session's epoch and
+ * issue time plus the last 6 characters of its 43-character signature (6
+ * characters of an HMAC reveal nothing usable), read by the ONE token parser
+ * the sign-in check uses (session.js parseSession). Memory only, never stored
+ * or logged. '' without one.
  * @param {Request} request
  */
 export function sessionKeyOf(request) {
-  const header = request.headers.get('Authorization') || '';
-  const m = /^Bearer\s+v1\.(\d+)\.(\d+)\.([A-Za-z0-9_-]+)$/.exec(header.trim());
-  return m ? `${m[1]}.${m[2]}.${m[3].slice(-6)}` : '';
+  const s = parseSession(request);
+  return s ? `${s.epoch}.${s.issued}.${s.sig.slice(-6)}` : '';
 }
 
 export class JourneyRemote {
   /**
-   * @param {{ screens: Screens, now: () => number, ring: (payload: Record<string, unknown>) => void }} deps
+   * @param {{ screens: import('./screens.js').Screens, now: () => number, ring: (payload: Record<string, unknown>) => void }} deps
    */
   constructor({ screens, now, ring }) {
     this.screens = screens;
@@ -97,6 +101,30 @@ export class JourneyRemote {
     this.buckets = new Map();
     this.watchAt = 0;
     this.seq = 0;
+    /** The registry's Journey kiosks, by id (null until first needed). @type {Map<string, import('./screens.js').ScreenRecord>|null} */
+    this.kioskById = null;
+    /** The same, by name (state's and press's order). @type {import('./screens.js').ScreenRecord[]} */
+    this.kioskList = [];
+    if (typeof screens.onIndex === 'function') screens.onIndex((index) => this.keepKiosks(index));
+  }
+
+  /** The Journey kiosks of an index just read or written, kept in memory. @param {Record<string, import('./screens.js').ScreenRecord>} index */
+  keepKiosks(index) {
+    const list = Object.values(index || {})
+      .filter((r) => r && r.kind === 'journey' && isScreenId(r.id))
+      .map((r) => ({ ...r }))
+      .sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
+    this.kioskList = list;
+    this.kioskById = new Map(list.map((r) => [r.id, r]));
+  }
+
+  /** The kiosks by id: storage is read only the first time (a new object). */
+  async kioskMap() {
+    if (this.kioskById) return this.kioskById;
+    const index = await this.screens.index();
+    // An index written meanwhile was handed over by onIndex: it is newer.
+    if (!this.kioskById) this.keepKiosks(index);
+    return /** @type {Map<string, import('./screens.js').ScreenRecord>} */ (this.kioskById);
   }
 
   /** Is a phone watching (it read the state within JOURNEY_REMOTE_WATCH_MS)? */
@@ -104,11 +132,10 @@ export class JourneyRemote {
     return this.watchAt > 0 && this.now() - this.watchAt <= JOURNEY_REMOTE_WATCH_MS;
   }
 
-  /** Every Journey kiosk in the registry, by name. @returns {Promise<import('./screens.js').ScreenRecord[]>} */
+  /** Every Journey kiosk in the registry, by name (memory: kioskMap). @returns {Promise<import('./screens.js').ScreenRecord[]>} */
   async kiosks() {
-    return Object.values(await this.screens.index())
-      .filter((r) => r && r.kind === 'journey')
-      .sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
+    await this.kioskMap();
+    return this.kioskList;
   }
 
   /** Seen by a hello (stored lastSeen) or a remote poll (memory) within ONLINE_MS. @param {import('./screens.js').ScreenRecord} r @param {number} t */
@@ -180,7 +207,7 @@ export class JourneyRemote {
   async kioskPoll(body) {
     const id = body?.id;
     if (!isScreenId(id)) return { ok: false, status: 400, error: 'That screen id is not right.' };
-    const r = Screens.pick(await this.screens.index(), id);
+    const r = (await this.kioskMap()).get(id);
     if (!r || r.kind !== 'journey') return { ok: false, status: 404, error: 'There is no such Journey screen. It may have been forgotten.' };
     const t = this.now();
     this.seen.set(id, t);

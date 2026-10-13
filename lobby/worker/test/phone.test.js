@@ -8,7 +8,8 @@ import { LAPTOP_ONLINE_MS } from '../src/relay.js';
 import { HOUSEHOLD_CSV, fakeTwoTimTwo, page, table } from './fixtures.js';
 import { leaks } from './noleak.js';
 
-const SUNDAY = Date.parse('2026-10-11T18:45:00Z');
+// A club day, before the watch window opens (a check-in on a day with no club is refused: noclub.test.js).
+const WED_245PM = Date.parse('2026-10-14T18:45:00Z');
 const ENV = { CLOUD_CHECKIN: 'shadow', TWOTIMTWO_USERNAME: 'checkin@example.org', TWOTIMTWO_PASSWORD: 'right-pass', INITIAL_PASSPHRASE: 'kennebec' };
 
 // Tonight's items as KVBC has them: Attendance (every club, automatic), Bible
@@ -41,7 +42,7 @@ function memoryStore() {
 }
 
 async function setup({ laptopOn = false, env = ENV, report, households = () => HOUSEHOLD_CSV } = {}) {
-  let t = SUNDAY;
+  let t = WED_245PM;
   const tt = fakeTwoTimTwo({ checkin: () => CHECKIN, households, report: report || (() => page(table('Trek ', [{ id: 55, name: 'Tia Tester' }]))) });
   tt.checkinName = 'Sophie Tester';
   const storage = memoryStore();
@@ -153,7 +154,7 @@ describe('the roster and tonight with the laptop off', () => {
   it('tonight is today\'s report, in the laptop\'s shape', async () => {
     const s = await setup();
     const ans = await s.relay('POST', '/phone/tonight', {});
-    expect(ans.body).toMatchObject({ date: '2026-10-11', checkedIn: 1, byClub: { Trek: 1 }, countSource: 'twotimtwo',
+    expect(ans.body).toMatchObject({ date: '2026-10-14', checkedIn: 1, byClub: { Trek: 1 }, countSource: 'twotimtwo',
       entries: [{ key: 'id:55', firstName: 'Tia', lastName: 'Tester', clubName: 'Trek', clubberId: '55', checkedOut: false, visitor: false }] });
   });
 

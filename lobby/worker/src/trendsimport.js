@@ -439,8 +439,12 @@ export class TrendsImport {
 
   /**
    * The next season to read and when (`notBefore`), or null when nothing is
-   * left: the current season until it is first imported, then the refresh
-   * after a club night closes, then the walk back. Synchronous.
+   * left. In this order: the current season until it is first imported, then
+   * the refresh after a club night closes, then the walk back; the FIRST of
+   * them that is due now wins, so a current season refused for a day (waiting
+   * out UNREADABLE_RETRY_MS) never holds up the walk through older seasons
+   * meanwhile. With none due, the soonest (the earlier in that order on a tie).
+   * A season out of tries is never picked. Synchronous.
    * @param {number} now
    * @returns {{ season: number, why: 'current'|'refresh'|'walk', notBefore: number } | null}
    */
@@ -455,19 +459,18 @@ export class TrendsImport {
       if (r.tries >= UNREADABLE_TRIES) return null;
       return { season, why, notBefore: r.nextAt };
     };
-    if (!s.seasons[String(s0)]) {
-      const j = job(s0, 'current');
-      if (j) return j;
-    } else if (s.refreshedFor !== lastNight && lastNight >= `${s0}-08-01`) {
-      const j = job(s0, 'refresh');
-      if (j) return j;
-    }
+    /** @type {{ season: number, why: 'current'|'refresh'|'walk', notBefore: number }[]} */
+    const jobs = [];
+    /** @param {{ season: number, why: 'current'|'refresh'|'walk', notBefore: number } | null} j */
+    const add = (j) => { if (j) jobs.push(j); };
+    if (!s.seasons[String(s0)]) add(job(s0, 'current'));
+    else if (s.refreshedFor !== lastNight && lastNight >= `${s0}-08-01`) add(job(s0, 'refresh'));
     if (!s.walkDone) {
       const y = s.next ?? s0 - 1;
-      if (s0 - y >= SEASONS_MAX) return null;
-      return job(y, 'walk');
+      if (s0 - y < SEASONS_MAX) add(job(y, 'walk'));
     }
-    return null;
+    if (!jobs.length) return null;
+    return jobs.find((j) => j.notBefore <= now) || jobs.reduce((a, b) => (b.notBefore < a.notBefore ? b : a));
   }
 
   /** How long until a read is due (ms), or null when none may run. Needs the state loaded. */
@@ -704,10 +707,12 @@ export class TrendsImport {
     const done = Object.keys(s.seasons).map(Number).sort((a, b) => b - a);
     const withNights = done.filter((y) => s.seasons[String(y)].nights > 0);
     const j = this.pick(now);
+    // The current season refused and waiting out its day, while the walk went on meanwhile.
+    const current = s.seasons[String(currentSeason(now))] ? null : this.refusal(currentSeason(now), now);
     /** @type {'idle'|'running'|'done'|'unreadable'|'not-configured'} */
     let state;
     if (blocked) state = 'not-configured';
-    else if (s.lastError === 'unreadable') state = 'unreadable';
+    else if (s.lastError === 'unreadable' || current) state = 'unreadable';
     else if (!s.lastRunAt) state = 'idle';
     else if (!s.walkDone || !s.seasons[String(currentSeason(now))]) state = 'running';
     else state = 'done';
@@ -720,7 +725,7 @@ export class TrendsImport {
       lastRunAt: iso(s.lastRunAt),
       nextDueAt: !blocked && j ? iso(Math.max(now, j.notBefore, s.nextDueAt)) : null,
       lastError: s.lastError,
-      unreadableWhy: s.lastError === 'unreadable' ? s.unreadableWhy : null,
+      unreadableWhy: s.lastError === 'unreadable' ? s.unreadableWhy : current ? current.why : null,
       skipped: s.skipped.map(seasonLabel),
       ended: s.ended,
       currentSeasonLastAt: iso(s.currentSeasonLastAt),

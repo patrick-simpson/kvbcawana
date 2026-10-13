@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { SyncCore } from '../src/sync.js';
 import { REMOTE_BUCKETS_MAX, sessionKeyOf, takeToken } from '../src/journeyRemote.js';
+import { parseSession } from '../src/session.js';
 import {
   JOURNEY_REMOTE_BURST, JOURNEY_REMOTE_QUEUE_MAX, JOURNEY_REMOTE_TTL_MS, JOURNEY_REMOTE_WATCH_MS,
 } from '../../src/lib/syncSpecs.js';
@@ -219,6 +220,26 @@ describe('the press allowance (per phone sign-in)', () => {
     expect(sessionKeyOf(new Request('https://x/'))).toBe('');
   });
 
+  it('ONE parser reads the session token for the sign-in check and the press allowance: two sessions, two buckets', async () => {
+    const req = (h) => new Request('https://x/', { headers: h === undefined ? {} : { Authorization: h } });
+    expect(parseSession(req('Bearer v1.3.1790839331729.SECRETPART'))).toEqual({ epoch: 3, issued: 1790839331729, sig: 'SECRETPART', signed: 'v1.3.1790839331729' });
+    for (const bad of [undefined, '', 'Bearer', 'Basic v1.3.4.abc', 'Bearer v2.3.4.abc', 'Bearer v1.3.abc', 'Bearer v1.3.4.a+b']) expect(parseSession(req(bad))).toBeNull();
+    // the press allowance's key is made from that parse, never a second reading of the header
+    const s = await setup();
+    const other = (s.tick(1), await s.signIn());
+    for (const token of [s.phone, other]) {
+      const p = parseSession(req(`Bearer ${token}`));
+      expect(p).not.toBeNull();
+      expect(await s.core.authorized(req(`Bearer ${token}`))).toBe(true);
+      expect(sessionKeyOf(req(`Bearer ${token}`))).toBe(`${p.epoch}.${p.issued}.${p.sig.slice(-6)}`);
+    }
+    expect(sessionKeyOf(req(`Bearer ${s.phone}`))).not.toBe(sessionKeyOf(req(`Bearer ${other}`)));
+    for (let i = 0; i < JOURNEY_REMOTE_BURST; i += 1) expect((await s.press('slide-next')).status).toBe(200);
+    expect((await s.press('slide-next')).status).toBe(429);
+    expect((await s.press('slide-next', undefined, other)).status).toBe(200);
+    expect(s.core.journeyRemote.buckets.size).toBe(2);
+  });
+
   it('remembers a bounded number of phones', async () => {
     const s = await setup();
     for (let i = 0; i < REMOTE_BUCKETS_MAX + 10; i += 1) await s.core.journeyRemote.press(`1.${i}`, { action: 'slide-next' });
@@ -298,6 +319,40 @@ describe('what the screens show (memory only)', () => {
     await s.poll(K1);
     expect(s.storage.writes.slice(before)).toEqual([]);
     for (const key of s.storage.map.keys()) expect(key).not.toMatch(/remote|now/i);
+  });
+
+  it('state reads and kiosk polls read NOTHING from storage: the kiosk list is kept in memory, refreshed when the registry is written', async () => {
+    const s = await setup();
+    await s.state();   // the first read fills the list (one storage read at most)
+    const gets = [];
+    const realGet = s.storage.get;
+    s.storage.get = async (k) => { gets.push(k); return realGet(k); };
+    for (let i = 0; i < 20; i += 1) {
+      s.tick(1500);
+      await s.core.journeyRemote.state();
+      await s.core.journeyRemote.kioskPoll({ id: K1 });
+      await s.core.journeyRemote.kioskPoll({ id: K2, now: NOW_SLIDES });
+    }
+    expect(gets).toEqual([]);
+    // through the routes: the session check reads its own keys, the registry is never read
+    for (let i = 0; i < 10; i += 1) { await s.state(); await s.poll(K1); }
+    expect(gets.filter((k) => k === 'screens')).toEqual([]);
+    // a rename, a new kiosk, a forgotten one and a hello moving lastSeen show at once
+    await s.call('PUT', `/v1/screens/${K1}/name`, { name: 'Back room' }, s.phone);
+    const K3 = 'jk_dddddddddddddddddddd';
+    await s.call('POST', '/v1/screens/hello', { id: K3, kind: 'journey', name: 'Journey 3' }, s.kioskSession);
+    await s.call('DELETE', `/v1/screens/${K2}`, undefined, s.phone);
+    let st = (await s.state()).body;
+    expect(st.kiosks.map((k) => k.name)).toEqual(['Back room', 'Journey 3']);
+    expect((await s.poll(K3)).status).toBe(200);
+    expect((await s.poll(K2)).status).toBe(404);
+    s.tick(10 * 60 * 1000);
+    s.core.journeyRemote.seen.clear();
+    expect((await s.state()).body.online).toBe(0);
+    await s.call('POST', '/v1/screens/hello', { id: K3, kind: 'journey' }, s.kioskSession);
+    st = (await s.state()).body;
+    expect(st.kiosks.find((k) => k.id === K3).online).toBe(true);
+    expect(gets.filter((k) => k === 'screens').length).toBeLessThanOrEqual(5);   // only the registry's own writes read it
   });
 
   it('a download command queued from /settings tells the kiosk to say hello', async () => {

@@ -70,7 +70,6 @@ import { Families } from './families.js';
 import { PRINT_JOB_KIND } from './adopt.js';
 import { itemClubs } from './phone.js';
 import { openState, sealState, watchWindow } from './watcher.js';
-import { SCHEDULE, clubDay } from './clubday.js';
 
 /** The roster's check-in page is re-read at most this often (pages poll every 15 s; 2 of the 4 reads a minute). */
 export const CHECKIN_PAGE_TTL_MS = 30 * 1000;
@@ -82,6 +81,8 @@ export const DESK_PAGE_PERSIST_MS = 60 * 1000;
 export const DESK_PAGE_MAX_AGE_MS = 6 * 60 * 60 * 1000;
 /** The stored blob's limit (a Durable Object value holds 128 KiB): a bigger one is not written. */
 export const DESK_PAGE_MAX_BYTES = 120 * 1024;
+/** A restore that could not run yet (cloud check-in off, no secret, storage failed) is tried again at most this often. */
+export const DESK_RESTORE_RETRY_MS = 60 * 1000;
 export { FAMILIES_TTL_MS, FAMILIES_RETRY_MS } from './families.js';
 /** Pages asked for the roster this recently: the watcher reads it ahead in a free slot. */
 export const ROSTER_ACTIVE_MS = 45 * 1000;
@@ -170,8 +171,10 @@ export class Desk {
      * @type {{ at: number, page: any, night: string, restored?: boolean, refreshFailed?: boolean }|null}
      */
     this.cache = null;
-    /** The one restore of a new object (single flight). @type {Promise<void>|null} */
+    /** The one restore of a new object (single flight; kept once it ran to its end). @type {Promise<void>|null} */
     this.restoring = null;
+    /** A restore that could not run yet is not tried again before this (ms). */
+    this.restoreRetryAt = 0;
     /** What was last written (memory only): the list's signature and when. */
     this.savedSig = /** @type {string|null} */ (null);
     this.savedAt = 0;
@@ -185,9 +188,12 @@ export class Desk {
     this.rosterAskedAt = 0;
     /** TwoTimTwo's households (families.js); the watcher's alarm catches it up. */
     this.familiesSource = new Families({ watcher, now });
-    /** The schedule the club-day rule reads (lobby/shared/schedule.json, bundled; tests swap it). */
-    this.schedule = SCHEDULE;
   }
+
+  /** The schedule the club-day rule reads: the watcher's (one rule, one place; tests swap it). */
+  get schedule() { return this.watcher.schedule; }
+
+  set schedule(v) { this.watcher.schedule = v; }
 
   /**
    * Is a roster refresh worth a free slot of the watcher's alarm: a page asked
@@ -275,21 +281,31 @@ export class Desk {
    * A new object's one look at the stored page (single flight; every later call
    * shares it). Held as `restored` only when nothing is held yet and it is
    * tonight's, opens, and is under DESK_PAGE_MAX_AGE_MS old; anything else is
-   * deleted. Never throws.
+   * deleted. Only a look that ran to its end is kept for the object's life: one
+   * that could not run yet (cloud check-in off, no secret, a storage error) is
+   * tried again, at most once per DESK_RESTORE_RETRY_MS, so a mode turned back
+   * on mid-evening still finds the page. Never throws.
    */
   restore() {
-    if (!this.restoring) {
-      this.restoring = this.restoreOnce().catch((err) => { console.error('[desk] reading back the check-in page failed', err); });
-    }
-    return this.restoring;
+    if (this.restoring) return this.restoring;
+    if (this.now() < this.restoreRetryAt) return Promise.resolve();
+    const notYet = () => { this.restoring = null; this.restoreRetryAt = this.now() + DESK_RESTORE_RETRY_MS; };
+    const run = this.restoreOnce().then(
+      (done) => { if (!done) notYet(); },
+      (err) => { console.error('[desk] reading back the check-in page failed', err); notYet(); },
+    );
+    this.restoring = run;
+    return run;
   }
 
+  /** @returns {Promise<boolean>} true when it ran to its end (restored, nothing stored, or deleted), false when it could not run yet */
   async restoreOnce() {
-    if (this.cache || !this.storage || this.watcher.mode === 'off') return;
+    if (this.cache || !this.storage) return true;   // a page is held (newer), or nowhere to look: nothing to do, ever
+    if (this.watcher.mode === 'off') return false;
     const secret = this.secret();
-    if (!secret) return;
+    if (!secret) return false;
     const sealed = await this.storage.get(DESK_PAGE_KEY);
-    if (!sealed) { this.mayHoldStored = false; return; }
+    if (!sealed) { this.mayHoldStored = false; return true; }
     const opened = await openState(secret, sealed);
     const t = this.now();
     const good = !!opened && typeof opened.at === 'number' && opened.night === churchNight(t)
@@ -299,13 +315,14 @@ export class Desk {
       // Another night's, too old, or sealed under another secret: gone, never trusted.
       await this.storage.delete(DESK_PAGE_KEY);
       this.mayHoldStored = false;
-      return;
+      return true;
     }
-    if (this.cache) return;   // a read landed meanwhile: it is newer
+    if (this.cache) return true;   // a read landed meanwhile: it is newer
     const page = compactPage(opened.page);
     this.cache = { at: opened.at, page, night: opened.night, restored: true };
     this.savedSig = pageSig(page);
     this.savedAt = t;
+    return true;
   }
 
   /** The watch window has closed: the stored page goes (the memory copy ends with the night). */
@@ -374,18 +391,11 @@ export class Desk {
 
   /**
    * Is today a club day (the whole local day), or is the station rehearsing?
-   * No TwoTimTwo read: the bundled schedule and the calendar in storage.
+   * The watcher's rule (watcher.js clubToday), the one every TwoTimTwo write asks.
    * @returns {Promise<{ club: boolean, today: string, next: string|null, rehearsal?: true }>}
    */
-  async clubToday() {
-    /** @type {any} */
-    let feed;
-    try { feed = this.storage ? await this.storage.get('calendar') : null; } catch { feed = null; }
-    const day = clubDay(this.now(), feed, this.schedule);
-    if (day.club) return day;
-    const pub = this.watcher.publisher;
-    if (pub && typeof pub.rehearsing === 'function' && pub.rehearsing()) return { ...day, club: true, rehearsal: true };
-    return day;
+  clubToday() {
+    return this.watcher.clubToday();
   }
 
   /**

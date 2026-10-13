@@ -246,11 +246,11 @@ closes (late paper sheets). It runs from the watcher's alarm only outside the
 watch window, at the lowest priority on the one read clock, and only with the
 `TWOTIMTWO_*` secrets, cloud check-in not off and `HISTORY_DB` bound. A report
 that does not read exactly as expected stores nothing (tried again daily, 3
-times). Counts go to D1 `night_summary_import` (migration 0003); the trends'
+times; a refused current season does not hold up the walk back meanwhile). Counts go to D1 `night_summary_import` (migration 0003); the trends'
 summary answers the desk's live line where one exists, else the imported one,
 so nothing is counted twice. `GET /v1/history/import-status` says how far it
 got; `src/routes.md` section 3 has the details.
 
 ### Journey phone remote (`src/journeyRemote.js`, `src/routes.md` 10.9)
 
-`POST /v1/journey/remote` `{action, data?}` sends one press to every Journey kiosk; `GET /v1/journey/remote/state` lists what each kiosk shows and how many are online. Both need a session. Held in memory only (presses 20 s, reports until replaced), never written to storage.
+`POST /v1/journey/remote` `{action, data?}` sends one press to every Journey kiosk; `GET /v1/journey/remote/state` lists what each kiosk shows and how many are online. Both need a session. Held in memory only (presses 20 s, reports until replaced), never written to storage; the kiosk list is kept in memory too (refreshed when the screen registry is written), so the phone's 1.5 s polls read nothing from storage.

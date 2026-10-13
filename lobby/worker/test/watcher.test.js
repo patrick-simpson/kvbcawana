@@ -344,10 +344,11 @@ describe('the Settings test read', () => {
 });
 
 describe('checking one child in (owner-only)', () => {
-  const SUNDAY = Date.parse('2026-10-11T18:45:00Z');
+  // A club day, before the watch window opens (on a day with no club it is refused: noclub.test.js).
+  const WED_245PM = Date.parse('2026-10-14T18:45:00Z');
   /** The time a read waited for its slot on the one clock (a sign-in takes slots too). */
   const slept = { ms: 0 };
-  const make = (opts) => setup({ start: SUNDAY, ...opts });
+  const make = (opts) => setup({ start: WED_245PM, ...opts });
 
   it('previews first: who, their club and the meeting, and posts nothing', async () => {
     const s = make();
@@ -383,9 +384,9 @@ describe('checking one child in (owner-only)', () => {
     expect(await s.w.checkIn({ name: 'Nobody Here', confirm: true })).toEqual({ ok: false, error: 'not-found' });
     expect(await s.w.checkIn({ name: 'Lu Tester', confirm: true })).toMatchObject({ ok: false, error: 'already-checked-in' });
     expect(await s.w.checkIn({})).toEqual({ ok: false, error: 'no-child' });
-    const twins = setup({ start: SUNDAY });
+    const twins = setup({ start: WED_245PM });
     twins.tt.fetchFn = fakeTwoTimTwo({ checkin: () => CHECKIN_PAGE.replace('recid="663"', 'recid="664"').replace('Lu Tester', 'Kit Tester') }).fetchFn;
-    const w2 = new Watcher({ storage: memoryStore(), env: ENV, fetchFn: twins.tt.fetchFn, now: () => SUNDAY + slept.ms, sleep: async (ms) => { slept.ms += ms; }, log: () => {} });
+    const w2 = new Watcher({ storage: memoryStore(), env: ENV, fetchFn: twins.tt.fetchFn, now: () => WED_245PM + slept.ms, sleep: async (ms) => { slept.ms += ms; }, log: () => {} });
     expect(await w2.checkIn({ name: 'Kit Tester', confirm: true })).toEqual({ ok: false, error: 'ambiguous', matches: 2 });
     expect(s.tt.checkins).toHaveLength(0);
   });

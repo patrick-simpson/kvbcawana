@@ -153,6 +153,41 @@ describe('the size guard', () => {
 });
 
 describe('a restart reads the held page back', () => {
+  it('a restore that could not run yet (cloud check-in off, no secret) is tried again later, at most once a minute', async () => {
+    for (const block of ['off', 'no-secret']) {
+      const t = await deskRig();
+      await t.call('GET', '/v1/desk/roster');
+      expect(t.storage.map.has(DESK_PAGE_KEY)).toBe(true);
+      t.restart();
+      const env = t.core.rawEnv;
+      const saved = { ...env };
+      if (block === 'off') env.CLOUD_CHECKIN = 'off';
+      else delete env.TWOTIMTWO_PASSWORD;
+      const looks = [];
+      const realGet = t.storage.get;
+      t.storage.get = async (k) => { if (k === DESK_PAGE_KEY) looks.push(t.clock.t); return realGet(k); };
+      await t.core.desk.restore();
+      expect(t.core.desk.cache).toBeNull();
+      // turned back on mid-evening: within the minute it is not looked at again (cheap)...
+      Object.assign(env, saved);
+      t.clock.tick(30 * 1000);
+      await t.core.desk.restore();
+      expect(t.core.desk.cache).toBeNull();
+      // ...after it, the stored page is read back and the roster answers from it at once
+      t.clock.tick(31 * 1000);
+      const reads = t.pageReads();
+      const res = await t.call('GET', '/v1/desk/roster');
+      expect(res.status).toBe(200);
+      expect(res.body.restored).toBe(true);
+      expect(t.pageReads()).toBe(reads);
+      expect(looks).toHaveLength(1);
+      // a restore that ran to its end is never repeated
+      t.clock.tick(5 * 60 * 1000);
+      await t.core.desk.restore();
+      expect(looks).toHaveLength(1);
+    }
+  });
+
   it('the roster answers at once from it, `restored` (never `stale`), with no TwoTimTwo read at all', async () => {
     const t = await deskRig();
     const before = await t.call('GET', '/v1/desk/roster');

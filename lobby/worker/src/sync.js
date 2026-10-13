@@ -54,6 +54,7 @@ import { Friends } from './friends.js';
 import { mountBarf } from './barf.js';
 import { Screens } from './screens.js';
 import { JourneyRemote, mountJourneyRemote } from './journeyRemote.js';
+import { parseSession, sessionBody } from './session.js';
 import { BadRequest, fail, json } from './http.js';
 import { Registry } from './registry.js';
 import { Ledger, Tags } from './ledger.js';
@@ -426,20 +427,18 @@ export class SyncCore {
 
   /** @param {number} epoch */
   async mintSession(epoch) {
-    const body = `v1.${epoch}.${this.now()}`;
+    const body = sessionBody(epoch, this.now());
     return `${body}.${toBase64Url(await hmac(fromBase64(await this.secret()) || new Uint8Array(0), body))}`;
   }
 
-  /** @param {Request} request @returns {Promise<boolean>} */
+  /** The session token read by session.js parseSession (the one parser). @param {Request} request @returns {Promise<boolean>} */
   async authorized(request) {
-    const header = request.headers.get('Authorization') || '';
-    const token = header.startsWith('Bearer ') ? header.slice(7).trim() : '';
-    const m = /^v1\.(\d+)\.(\d+)\.([A-Za-z0-9_-]+)$/.exec(token);
-    if (!m) return false;
+    const session = parseSession(request);
+    if (!session) return false;
     const auth = await this.storage.get('auth');
-    if (!auth || Number(m[1]) !== auth.epoch) return false;
-    const expect = toBase64Url(await hmac(fromBase64(await this.secret()) || new Uint8Array(0), `v1.${m[1]}.${m[2]}`));
-    return safeEqual(expect, m[3]);
+    if (!auth || session.epoch !== auth.epoch) return false;
+    const expect = toBase64Url(await hmac(fromBase64(await this.secret()) || new Uint8Array(0), session.signed));
+    return safeEqual(expect, session.sig);
   }
 
   /** @param {string} ip @returns {Promise<number>} ms until this address may try again, 0 if now */
