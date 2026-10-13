@@ -511,8 +511,9 @@ export function mountHistory(registry, core) {
     registry.add(method, pattern, 'session', ({ request, url }) => core.history.handle(request, url));
   }
   // The trends back-fill (trendsimport.js, routes.md section 3): it runs from the
-  // watcher's alarm by itself; this is its status, and asking nudges the alarm
-  // when a season read is due (so a first deploy does not wait for the cron).
+  // watcher's alarm by itself; this is its status (with its desk self-check,
+  // `crosscheck`, computed after each import, never here), and asking nudges the
+  // alarm when a season read is due (so a first deploy does not wait for the cron).
   if (core.watcher) {
     core.trends = new TrendsImport({ storage: core.storage, env: core.env, now: core.now, watcher: core.watcher });
     core.watcher.trends = core.trends;

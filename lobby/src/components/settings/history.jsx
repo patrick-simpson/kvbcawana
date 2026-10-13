@@ -5,7 +5,9 @@ import { getClubPalette } from '../../lib/clubs.js';
 import {
   fetchNightRows, fetchNights, fetchSummary, historyUnlocked, lockHistory, unlockHistory,
 } from '../../lib/historyCrypto.js';
-import { buildTrends, checkoutRate, nightCsv, nightWords, rowLines, seasonAverages } from '../../lib/historyTrends.js';
+import { buildTrends, nightCheckoutRate, nightCsv, nightSourceNote, nightWords, rowLines, seasonAverages } from '../../lib/historyTrends.js';
+import { importStatusWords } from '../../lib/trendsClient.js';
+import { useImportStatus } from '../../hooks/useImportStatus.js';
 import { callPrintServer, probePrintServer } from '../../lib/printServer.js';
 import { PanelCard } from './fields.jsx';
 import { BarChart, LineChart } from './historyCharts.jsx';
@@ -15,7 +17,11 @@ import '../../styles/history.css';
 // only, like the Laptop section. Trends come from the Worker's plaintext
 // night_summary and need only the sync sign-in. A night's rows are sealed
 // (the Worker cannot read them); the page opens them with the passphrase, which
-// is used once to open the key and never kept (historyCrypto.js).
+// is used once to open the key and never kept (historyCrypto.js). Earlier
+// seasons come from TwoTimTwo's attendance report, brought in by the Worker by
+// itself (worker/src/trendsimport.js): the top of the Trends card says how far
+// back they go and how they compare with the desk (trendsClient.js); those
+// nights carry no check-out or visitor numbers, so those two charts leave them out.
 
 const TAB = 'var(--brand-blue)';
 
@@ -36,13 +42,33 @@ function downloadText(text, name) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+/** Where the trends' earlier seasons come from, and the desk self-check: two small lines. */
+function TrendsSource({ status }) {
+  const words = importStatusWords(status);
+  if (!words) return null;
+  return (
+    <div className="hist-source" role="status" aria-live="polite">
+      <p className={`hint${words.tone === 'warn' ? ' hint--warn' : ''}`}>{words.line}</p>
+      {words.check ? <p className={`hint hist-check${words.checkTone === 'warn' ? ' hint--warn' : ''}`}>{words.check}</p> : null}
+    </div>
+  );
+}
+
 function Trends({ trends }) {
   const [season, setSeason] = useState('all');
   const shown = useMemo(() => (season === 'all' ? trends.perNight : trends.perNight.filter((p) => p.season === season)), [trends, season]);
   const nights = shown.map((p) => p.night);
   const clubs = trends.clubs.filter((c) => shown.some((p) => p.byClub[c] > 0));
-  const series = clubs.map((c) => ({ label: c, color: getClubPalette(c).primary, values: shown.map((p) => p.byClub[c]) }));
+  const series = clubs.map((c) => ({
+    label: c, color: getClubPalette(c).primary, values: shown.map((p) => p.byClub[c]),
+    from: shown.map((p) => p.imported || p.importedClubs.includes(c)),
+  }));
   const total = shown.reduce((n, p) => n + p.checkedIn, 0);
+  const fromTtt = shown.filter((p) => p.imported).length;
+  // Visitors and check-outs: only nights the desk counted (TwoTimTwo's report has neither).
+  const desk = shown.filter((p) => !p.imported);
+  const deskNights = desk.map((p) => p.night);
+  const deskNotes = desk.map((p) => (p.importedClubs.length ? ' (desk clubs only)' : ''));
   const averages = seasonAverages(trends);
   return (
     <>
@@ -55,18 +81,25 @@ function Trends({ trends }) {
       </div>
       <LineChart
         title="Attendance by club"
-        summary={`Children checked in per club on each of ${nights.length} nights, ${total} check-ins in all.`}
-        nights={nights} series={series}
+        summary={`Children checked in per club on each of ${nights.length} nights, ${total} check-ins in all.${fromTtt ? ` ${fromTtt} of these nights are from TwoTimTwo's attendance report.` : ''}`}
+        nights={nights} series={series} nightNotes={shown.map(nightSourceNote)}
       />
+      {fromTtt ? (
+        <p className="hint">
+          {desk.length
+            ? `Visitors and check-outs leave out the ${fromTtt === 1 ? 'night' : `${fromTtt} nights`} from TwoTimTwo: its attendance report only says how many came.`
+            : 'No visitor or check-out numbers for these nights: TwoTimTwo’s attendance report only says how many came.'}
+        </p>
+      ) : null}
       <BarChart
         title="Visitors"
-        summary={`Visitors on each night: ${shown.map((p) => `${nightWords(p.night)} ${p.visitors}`).join(', ')}.`}
-        nights={nights} values={shown.map((p) => p.visitors)} color="var(--brand-sparks, #D9382C)"
+        summary={`Visitors on each night the desk counted: ${desk.map((p) => `${nightWords(p.night)} ${p.visitors}`).join(', ')}.`}
+        nights={deskNights} values={desk.map((p) => p.visitors)} color="var(--brand-sparks, #D9382C)" nightNotes={desk.map(nightSourceNote)}
       />
       <BarChart
         title="Checked out"
-        summary="The share of children checked in who were checked out, on each night."
-        nights={nights} values={shown.map((p) => checkoutRate(p.checkedOut, p.checkedIn))} color="var(--brand-blue, #1C5FAF)" unit="%" max={100}
+        summary="The share of children checked in at the desk who were checked out, on each night the desk counted."
+        nights={deskNights} values={desk.map(nightCheckoutRate)} color="var(--brand-blue, #1C5FAF)" unit="%" max={100} nightNotes={deskNotes}
       />
       <h4 className="settings-subhead">Average attendance per season</h4>
       <div className="hist-table-wrap">
@@ -185,6 +218,7 @@ export default function HistorySection() {
   const [data, setData] = useState(/** @type {any} */ (null));
   const [problem, setProblem] = useState('');
   const [open, setOpen] = useState('');
+  const importStatus = useImportStatus({ enabled: Boolean(signedIn && url) });
 
   useEffect(() => {
     if (!signedIn || !url) return undefined;
@@ -206,10 +240,11 @@ export default function HistorySection() {
   return (
     <>
       <PanelCard title="Trends" tab={TAB}>
+        <TrendsSource status={importStatus} />
         {problem ? <Hint>{problem}</Hint> : null}
         {!problem && !data ? <Hint>Loading…</Hint> : null}
-        {data && !data.nights.length ? <Hint>No nights saved yet. They appear here after the next club night.</Hint> : null}
-        {data && data.nights.length ? <Trends trends={data.trends} /> : null}
+        {data && !data.trends.perNight.length ? <Hint>No nights saved yet. They appear here after the next club night.</Hint> : null}
+        {data && data.trends.perNight.length ? <Trends trends={data.trends} /> : null}
       </PanelCard>
       <PanelCard title="Nights" tab={TAB}>
         {data && data.nights.length ? (

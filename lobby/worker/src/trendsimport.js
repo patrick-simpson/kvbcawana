@@ -47,8 +47,20 @@
 //   counted twice and the desk's own count always wins (history.js).
 //   DO storage `trends:import`: a small JSON of seasons, times and fixed codes.
 //
-// FREE PLAN: a season is one TwoTimTwo read, one D1 batch and one small storage
-// write; the whole back-fill is at most 20 reads, once; then one read a week.
+// THE SELF-CHECK (owner 2026-10-13: "after its first run, compare one imported
+// night with TwoTimTwo", automated): after every season it stores, ONE SELECT
+// puts each night and club that has BOTH a live desk line (night_summary,
+// checked_in > 0) and an imported count side by side: the desk's number
+// (checked_in less undone) against TwoTimTwo's. The tally, counted by NIGHT (a
+// night agrees when every club on it agrees), and up to 5 differing lines
+// (night, club, the two numbers) go into `trends:import` as `crosscheck`; no
+// name, nothing written to D1. A night the desk counted only some children
+// reads lower at the desk: that is expected, and the History section says so.
+// The check can only see nights the desk ran; before that, nothing compares.
+//
+// FREE PLAN: a season is one TwoTimTwo read, one D1 batch, one D1 SELECT (the
+// self-check) and one small storage write; the whole back-fill is at most 20
+// reads, once; then one read a week.
 
 import { clubIdByAlias, CLUB_TABLE } from '../../shared/clubs.js';
 import { Doc } from './doc.js';
@@ -68,6 +80,10 @@ export const BACKOFF_MS = Object.freeze([5 * 60 * 1000, 15 * 60 * 1000, 60 * 60 
 export const UNREADABLE_RETRY_MS = 24 * 60 * 60 * 1000;
 /** Tries per unreadable season, then it is skipped (the current season gets fresh tries after each club night). */
 export const UNREADABLE_TRIES = 3;
+/** Desk lines the self-check reads at most, newest first (the desk era is a few seasons of ~35 nights x 6 clubs). */
+export const CROSSCHECK_LINES_MAX = 2000;
+/** Differing lines kept as examples. */
+export const CROSSCHECK_EXAMPLES = 5;
 /** Rows per INSERT: 1 + 32 x 3 = 97 bound parameters (D1 allows 100). */
 const ROWS_PER_STATEMENT = 32;
 const D1_TIMEOUT_MS = 8000;
@@ -299,6 +315,55 @@ export function parseAttendanceSummary(text, season, cutoff) {
 }
 
 /**
+ * @typedef {{ night: string, club: string, desk: number, twotimtwo: number }} CrossLine
+ * @typedef {{ compared: number, matching: number, differing: number, deskHigher: number, examples: CrossLine[], at: number }} CrossCheck
+ */
+
+const NIGHT_RE = /^\d{4}-\d{2}-\d{2}$/;
+const CLUB_NAMES = new Set(CLUB_TABLE.map((c) => c.name));
+
+/**
+ * The self-check's tally, pure. `lines` are the desk's and TwoTimTwo's numbers
+ * for the same night and club, newest night first. Counted by night: a night
+ * agrees when every club on it agrees; `deskHigher` counts the differing nights
+ * where the desk counted MORE than TwoTimTwo in some club (the unexpected way:
+ * a desk that counted only some children reads lower). Only a real date, a
+ * club of the club table and two whole numbers are kept: a fixed shape.
+ * @param {any[]} lines @param {number} at
+ * @returns {CrossCheck}
+ */
+export function crossCheckOf(lines, at) {
+  /** @type {Map<string, { differs: boolean, higher: boolean }>} */
+  const nights = new Map();
+  /** @type {CrossLine[]} */
+  const examples = [];
+  for (const l of lines || []) {
+    const night = String(l?.night ?? '');
+    const club = String(l?.club ?? '');
+    const desk = Number(l?.desk);
+    const twotimtwo = Number(l?.twotimtwo);
+    if (!NIGHT_RE.test(night) || !CLUB_NAMES.has(club) || !Number.isInteger(desk) || !Number.isInteger(twotimtwo) || desk < 0 || twotimtwo < 0) continue;
+    const n = nights.get(night) || { differs: false, higher: false };
+    if (desk !== twotimtwo) {
+      n.differs = true;
+      if (desk > twotimtwo) n.higher = true;
+      if (examples.length < CROSSCHECK_EXAMPLES) examples.push({ night, club, desk, twotimtwo });
+    }
+    nights.set(night, n);
+  }
+  const all = [...nights.values()];
+  const differing = all.filter((n) => n.differs).length;
+  return {
+    compared: all.length,
+    matching: all.length - differing,
+    differing,
+    deskHigher: all.filter((n) => n.higher).length,
+    examples,
+    at,
+  };
+}
+
+/**
  * @typedef {{ tries: number, nextAt: number, night: string, why: string }} Refusal
  * @typedef {{
  *   v: 1, seasons: Record<string, { nights: number, importedAt: number, fp: string }>,
@@ -306,6 +371,7 @@ export function parseAttendanceSummary(text, season, cutoff) {
  *   unreadable: Record<string, Refusal>, skipped: number[],
  *   refreshedFor: string|null, lastRunAt: number, lastOkAt: number, currentSeasonLastAt: number,
  *   nextDueAt: number, lastError: string|null, unreadableWhy: string|null, errors: number,
+ *   crosscheck?: CrossCheck|null,
  * }} State
  */
 
@@ -313,7 +379,7 @@ export function parseAttendanceSummary(text, season, cutoff) {
 const freshState = () => ({
   v: 1, seasons: {}, next: null, walkDone: false, ended: null, unreadable: {}, skipped: [],
   refreshedFor: null, lastRunAt: 0, lastOkAt: 0, currentSeasonLastAt: 0, nextDueAt: 0,
-  lastError: null, unreadableWhy: null, errors: 0,
+  lastError: null, unreadableWhy: null, errors: 0, crosscheck: null,
 });
 
 /**
@@ -560,6 +626,7 @@ export class TrendsImport {
         return true;
       }
       s.seasons[String(season)] = { nights: parsed.nights.length, importedAt: at, fp: parsed.fp };
+      s.crosscheck = await this.crossCheck(at, s.crosscheck ?? null);
       delete s.unreadable[String(season)];
       s.skipped = s.skipped.filter((y) => y !== season);
       s.lastOkAt = at;
@@ -604,6 +671,28 @@ export class TrendsImport {
   }
 
   /**
+   * The self-check after a season is stored: ONE SELECT of every night and club
+   * with both a live desk line and an imported count, tallied by crossCheckOf.
+   * Reads only; never throws (a failed read keeps the last result).
+   * @param {number} at @param {CrossCheck|null} last
+   * @returns {Promise<CrossCheck|null>}
+   */
+  async crossCheck(at, last) {
+    const db = this.db;
+    if (!db) return last;
+    try {
+      const res = await withTimeout(db.prepare('SELECT s.night AS night, s.club AS club, MAX(s.checked_in - s.undone, 0) AS desk, i.attended AS twotimtwo '
+        + 'FROM night_summary s JOIN night_summary_import i ON i.night = s.night AND i.club = s.club '
+        + 'WHERE s.checked_in > 0 ORDER BY s.night DESC, s.club LIMIT ?1')
+        .bind(CROSSCHECK_LINES_MAX).all(), D1_TIMEOUT_MS);
+      return crossCheckOf(res.results || [], at);
+    } catch (err) {
+      console.error('[trends] the self-check could not read D1', err);
+      return last;
+    }
+  }
+
+  /**
    * GET /v1/history/import-status: what the back-fill has done, fixed codes and
    * numbers only (no text from TwoTimTwo, no name).
    */
@@ -635,6 +724,7 @@ export class TrendsImport {
       skipped: s.skipped.map(seasonLabel),
       ended: s.ended,
       currentSeasonLastAt: iso(s.currentSeasonLastAt),
+      crosscheck: s.crosscheck ? { ...s.crosscheck, examples: s.crosscheck.examples.map((e) => ({ ...e })), at: iso(s.crosscheck.at) } : null,
     };
   }
 }

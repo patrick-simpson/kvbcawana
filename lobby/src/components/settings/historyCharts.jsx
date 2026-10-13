@@ -5,6 +5,9 @@ import { nightWords } from '../../lib/historyTrends.js';
 // Built to read first and look second: thin marks, a quiet grid, the series
 // named in a legend beside swatches (never colour alone), a "show the
 // numbers" table under each, and an aria-label that says what the chart says.
+// A night counted from TwoTimTwo's attendance report (the trends back-fill) is
+// said so in its tooltip and its table row; on the line chart its dots are
+// hollow, named in the legend (never colour alone).
 
 const W = 640;
 const H = 220;
@@ -42,7 +45,7 @@ function XLabels({ nights }) {
   ) : null);
 }
 
-function Table({ caption, nights, columns }) {
+function Table({ caption, nights, columns, nightNotes }) {
   return (
     <details className="hist-numbers">
       <summary>Show the numbers</summary>
@@ -52,7 +55,7 @@ function Table({ caption, nights, columns }) {
           <thead><tr><th scope="col">Night</th>{columns.map((c) => <th scope="col" key={c.label}>{c.label}</th>)}</tr></thead>
           <tbody>
             {nights.map((n, i) => (
-              <tr key={n}><th scope="row">{nightWords(n)}</th>{columns.map((c) => <td key={c.label}>{c.values[i] ?? ''}{c.unit && c.values[i] != null ? c.unit : ''}</td>)}</tr>
+              <tr key={n}><th scope="row">{nightWords(n)}{nightNotes?.[i] || ''}</th>{columns.map((c) => <td key={c.label}>{c.values[i] ?? ''}{c.unit && c.values[i] != null ? c.unit : ''}</td>)}</tr>
             ))}
           </tbody>
         </table>
@@ -62,12 +65,16 @@ function Table({ caption, nights, columns }) {
 }
 
 /**
- * One line per series over the nights.
- * @param {{ title: string, summary: string, nights: string[], series: { label: string, color: string, values: number[] }[] }} p
+ * One line per series over the nights. `from[i]` marks a point counted from
+ * TwoTimTwo (drawn hollow, said in its tooltip); `nightNotes[i]` follows the
+ * night's name in the table.
+ * @param {{ title: string, summary: string, nights: string[], nightNotes?: string[],
+ *   series: { label: string, color: string, values: number[], from?: boolean[] }[] }} p
  */
-export function LineChart({ title, summary, nights, series }) {
+export function LineChart({ title, summary, nights, series, nightNotes }) {
   const id = useId();
   if (!nights.length) return null;
+  const anyFrom = series.some((s) => s.from?.some(Boolean));
   const top = niceMax(Math.max(1, ...series.flatMap((s) => s.values)));
   const y = (/** @type {number} */ v) => PAD.t + (1 - v / top) * (H - PAD.t - PAD.b);
   return (
@@ -81,25 +88,34 @@ export function LineChart({ title, summary, nights, series }) {
           <g key={s.label}>
             <polyline fill="none" stroke={s.color} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round"
               points={s.values.map((v, i) => `${xAt(i, nights.length)},${y(v)}`).join(' ')} />
-            {s.values.map((v, i) => (
-              <circle key={nights[i]} cx={xAt(i, nights.length)} cy={y(v)} r="4" fill={s.color} stroke="var(--panel-paper, #fff)" strokeWidth="2" />
-            ))}
+            {s.values.map((v, i) => {
+              const from = Boolean(s.from?.[i]);
+              return (
+                <circle key={nights[i]} cx={xAt(i, nights.length)} cy={y(v)} r={from ? 3.5 : 4}
+                  fill={from ? 'var(--panel-paper, #fff)' : s.color} stroke={from ? s.color : 'var(--panel-paper, #fff)'} strokeWidth="2"
+                  data-from={from ? 'twotimtwo' : undefined}>
+                  <title>{`${nightWords(nights[i])}, ${s.label}: ${v}${from ? ' (from TwoTimTwo)' : ''}`}</title>
+                </circle>
+              );
+            })}
           </g>
         ))}
       </svg>
       <ul className="hist-legend" aria-label="Clubs">
         {series.map((s) => <li key={s.label}><span className="hist-swatch" style={{ background: s.color }} aria-hidden="true" />{s.label}</li>)}
+        {anyFrom ? <li className="hist-legend-note"><span className="hist-swatch hist-swatch--hollow" aria-hidden="true" />Hollow dots: from TwoTimTwo</li> : null}
       </ul>
-      <Table caption={title} nights={nights} columns={series.map((s) => ({ label: s.label, values: s.values }))} />
+      <Table caption={title} nights={nights} nightNotes={nightNotes} columns={series.map((s) => ({ label: s.label, values: s.values }))} />
     </figure>
   );
 }
 
 /**
- * One bar per night, one measure.
- * @param {{ title: string, summary: string, nights: string[], values: (number|null)[], color: string, unit?: string, max?: number }} p
+ * One bar per night, one measure. A null value is no bar (and an empty cell),
+ * never a zero. `nightNotes[i]` follows the night's name in its tooltip and table.
+ * @param {{ title: string, summary: string, nights: string[], values: (number|null)[], color: string, unit?: string, max?: number, nightNotes?: string[] }} p
  */
-export function BarChart({ title, summary, nights, values, color, unit = '', max }) {
+export function BarChart({ title, summary, nights, values, color, unit = '', max, nightNotes }) {
   const id = useId();
   if (!nights.length) return null;
   const top = max ?? niceMax(Math.max(1, ...values.map((v) => v ?? 0)));
@@ -117,13 +133,17 @@ export function BarChart({ title, summary, nights, values, color, unit = '', max
           const h = v == null ? 0 : (v / top) * (H - PAD.t - PAD.b);
           return (
             <g key={n}>
-              {v != null && v > 0 ? <rect x={cx - bar / 2} y={H - PAD.b - h} width={bar} height={h} rx="3" fill={color} /> : null}
+              {v != null && v > 0 ? (
+                <rect x={cx - bar / 2} y={H - PAD.b - h} width={bar} height={h} rx="3" fill={color}>
+                  <title>{`${nightWords(n)}${nightNotes?.[i] || ''}: ${v}${unit}`}</title>
+                </rect>
+              ) : null}
               {nights.length <= 12 || i % Math.ceil(nights.length / 6) === 0 ? <text x={cx} y={H - 8} textAnchor="middle" className="hist-axis">{n.slice(5)}</text> : null}
             </g>
           );
         })}
       </svg>
-      <Table caption={title} nights={nights} columns={[{ label: title, values, unit }]} />
+      <Table caption={title} nights={nights} nightNotes={nightNotes} columns={[{ label: title, values, unit }]} />
     </figure>
   );
 }

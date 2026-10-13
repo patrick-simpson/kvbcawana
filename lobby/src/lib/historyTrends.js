@@ -14,23 +14,73 @@ export function seasonOf(night) {
 }
 
 /**
+ * @typedef {{ night: string, club: string, checkedIn: number, checkedOut: number, undone: number, prints: number, imported?: boolean }} SummaryLine
+ * @typedef {{
+ *   night: string, season: string, byClub: Record<string, number>, checkedIn: number,
+ *   deskCheckedIn: number, checkedOut: number|null, visitors: number|null,
+ *   imported: boolean, importedClubs: string[],
+ * }} NightTrend
+ */
+
+/**
  * Per-night numbers from the Worker's summary lines and nights list.
- * @param {{ night: string, club: string, checkedIn: number, checkedOut: number, undone: number, prints: number }[]} lines
+ *
+ * A line marked `imported: true` is a count from TwoTimTwo's attendance report
+ * (the trends back-fill, worker/src/trendsimport.js): how many came, nothing
+ * else. So a night whose EVERY line is imported (`imported`) has no check-out
+ * or visitor numbers at all: `checkedOut` and `visitors` are null, never 0. A
+ * mixed night (some clubs counted at the desk, some from TwoTimTwo) keeps the
+ * desk's clubs only for those two: `deskCheckedIn` is the check-ins they are a
+ * share of. `checkedIn` and `byClub` always count every club (attendance).
+ * @param {SummaryLine[]} lines
  * @param {{ night: string, kinds?: Record<string, number> }[]} nights
  */
 export function buildTrends(lines, nights) {
   const clubs = [...new Set(lines.map((l) => l.club))];
   const dates = [...new Set([...lines.map((l) => l.night), ...nights.map((n) => n.night)])].sort();
   const visitorsOn = new Map(nights.map((n) => [n.night, Number(n.kinds?.visitor) || 0]));
+  /** @type {Map<string, SummaryLine[]>} */
+  const byNight = new Map();
+  for (const l of lines) {
+    const list = byNight.get(l.night);
+    if (list) list.push(l); else byNight.set(l.night, [l]);
+  }
+  /** @type {NightTrend[]} */
   const perNight = dates.map((night) => {
-    const mine = lines.filter((l) => l.night === night);
+    const mine = byNight.get(night) || [];
+    const desk = mine.filter((l) => !l.imported);
+    const imported = mine.length > 0 && desk.length === 0;
     const byClub = Object.fromEntries(clubs.map((c) => [c, mine.find((l) => l.club === c)?.checkedIn ?? 0]));
     const checkedIn = mine.reduce((n, l) => n + l.checkedIn, 0);
-    const checkedOut = mine.reduce((n, l) => n + l.checkedOut, 0);
-    return { night, season: seasonOf(night), byClub, checkedIn, checkedOut, visitors: visitorsOn.get(night) || 0 };
+    const deskCheckedIn = desk.reduce((n, l) => n + l.checkedIn, 0);
+    const checkedOut = imported ? null : desk.reduce((n, l) => n + l.checkedOut, 0);
+    return {
+      night, season: seasonOf(night), byClub, checkedIn, deskCheckedIn, checkedOut,
+      visitors: imported ? null : visitorsOn.get(night) || 0,
+      imported, importedClubs: mine.filter((l) => l.imported).map((l) => l.club),
+    };
   });
   const seasons = [...new Set(perNight.map((p) => p.season))];
   return { clubs, perNight, seasons };
+}
+
+/**
+ * A night's check-out rate: the desk's clubs only, null for a night counted
+ * wholly from TwoTimTwo (it has no check-out numbers) or with no desk check-in.
+ * @param {NightTrend} p
+ */
+export function nightCheckoutRate(p) {
+  return p.imported || p.checkedOut === null ? null : checkoutRate(p.checkedOut, p.deskCheckedIn);
+}
+
+/**
+ * Where a night's numbers came from, for a chart's tooltip and table:
+ * '' (the desk), ' (from TwoTimTwo)' or ' (some clubs from TwoTimTwo)'.
+ * @param {NightTrend} p
+ */
+export function nightSourceNote(p) {
+  if (p.imported) return ' (from TwoTimTwo)';
+  return p.importedClubs.length ? ' (some clubs from TwoTimTwo)' : '';
 }
 
 /**

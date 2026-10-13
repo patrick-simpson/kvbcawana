@@ -14,3 +14,8 @@
 .panel .hist-nights { list-style: none; margin: 0; padding: 0; }
 .panel .hist-night-btn { width: 100%; text-align: left; min-height: 44px; display: flex; gap: 0.8rem; align-items: baseline; }
 .panel .hist-actions { display: flex; gap: 0.6rem; flex-wrap: wrap; margin: 0.5rem 0; }
+.panel .hist-swatch--hollow { background: transparent; border: 2px solid var(--panel-ink); opacity: 0.7; border-radius: 50%; width: 10px; height: 10px; }
+.panel .hist-legend-note { opacity: 0.85; }
+.panel .hist-source { margin: 0 0 0.8rem; }
+.panel .hist-source .hint { margin: 0 0 0.2rem; }
+.panel .hist-source .hist-check { font-size: 0.85rem; }

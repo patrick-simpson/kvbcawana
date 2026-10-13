@@ -78,3 +78,45 @@ for (const [size, viewport] of SIZES) {
     }
   });
 }
+
+// The Trends card's source line (the trends back-fill, routes.md section 3), in
+// each state the Worker answers, over a history with earlier seasons from
+// TwoTimTwo beside the desk's own nights: history-import-<state>-<size>.png.
+const OLD = ['2025-09-10', '2025-09-17', '2025-09-24', '2025-10-01', '2025-10-08'];
+const seasonsIn = [{ season: '2026-27', nights: 6, importedAt: new Date(now - 3 * 3600000).toISOString() }];
+for (let y = 2025; y >= 2016; y--) seasonsIn.push({ season: `${y}-${String((y + 1) % 100).padStart(2, '0')}`, nights: 30, importedAt: new Date(now - 3 * 3600000).toISOString() });
+const IMPORT_STATES = {
+  done: { state: 'done', seasons: seasonsIn, oldestSeason: '2016-17', nextDueAt: null, ended: 'empty', crosscheck: { compared: 4, matching: 4, differing: 0, deskHigher: 0, examples: [], at: new Date(now - 3 * 3600000).toISOString() } },
+  running: { state: 'running', seasons: seasonsIn.slice(0, 3), oldestSeason: '2024-25', nextDueAt: new Date(now + 15000).toISOString(), ended: null, crosscheck: { compared: 4, matching: 3, differing: 1, deskHigher: 0, examples: [{ night: '2026-09-23', club: 'Sparks', desk: 18, twotimtwo: 20 }], at: new Date(now).toISOString() } },
+  unreadable: { state: 'unreadable', seasons: [], oldestSeason: null, nextDueAt: new Date(now + 86400000).toISOString(), lastError: 'unreadable', unreadableWhy: 'header', ended: null, crosscheck: null },
+  'not-configured': { state: 'not-configured', reason: 'no-secrets', seasons: [], oldestSeason: null, nextDueAt: null, ended: null, crosscheck: null },
+};
+for (const [size, viewport] of SIZES) {
+  test.describe(`history import ${size}`, () => {
+    test.use({ viewport, hasTouch: size === '390x844' });
+    for (const [state, status] of Object.entries(IMPORT_STATES)) {
+      test(state, async ({ page }) => {
+        mkdirSync(OUT, { recursive: true });
+        await page.route(/open-meteo|twotimtwo|kvbchurch\.org/, (route) => route.abort());
+        const w = world();
+        w.importStatus = status;
+        if (state !== 'unreadable' && state !== 'not-configured') {
+          w.summary = [...OLD.flatMap((night, i) => ['Sparks', 'Cubbies', 'Puggles'].map((club, j) => ({ night, club, checkedIn: 12 + i + j * 3, checkedOut: 0, undone: 0, prints: 0, imported: true }))), ...w.summary];
+        }
+        await installWorker(page, w);
+        await page.goto('/settings.html?lowPower=1');
+        const dialog = page.getByRole('dialog', { name: 'Settings' });
+        await dialog.getByRole('tab', { name: 'History', exact: true }).click();
+        await expect(dialog.locator('.hist-source')).toBeVisible();
+        await expect(dialog.getByRole('img', { name: /Attendance by club/ })).toBeVisible();
+        await page.waitForTimeout(500);
+        await page.screenshot({ path: `${OUT}/history-import-${state}-${size}.png` });
+        if (state === 'done') {
+          await dialog.getByRole('img', { name: /Checked out/ }).scrollIntoViewIfNeeded();
+          await page.waitForTimeout(200);
+          await page.screenshot({ path: `${OUT}/history-import-${state}-${size}-charts.png` });
+        }
+      });
+    }
+  });
+}

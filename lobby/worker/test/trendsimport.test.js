@@ -9,8 +9,8 @@ import { describe, expect, it } from 'vitest';
 import { buildTrends } from '../../src/lib/historyTrends.js';
 import { READ_INTERVAL_MS } from '../src/readbudget.js';
 import {
-  BACKOFF_MS, COUNT_MAX, SEASONS_MAX, UNREADABLE_RETRY_MS, UNREADABLE_TRIES,
-  importCutoff, lastClosedClubNight, meetingDate, parseAttendanceSummary, seasonLabel,
+  BACKOFF_MS, COUNT_MAX, CROSSCHECK_EXAMPLES, SEASONS_MAX, UNREADABLE_RETRY_MS, UNREADABLE_TRIES,
+  crossCheckOf, importCutoff, lastClosedClubNight, meetingDate, parseAttendanceSummary, seasonLabel,
 } from '../src/trendsimport.js';
 import { d1Stub } from './d1stub.js';
 import { everything, plainWords } from './helpers.js';
@@ -446,8 +446,8 @@ describe('GET /v1/history/import-status', () => {
   it('answers a fixed shape: codes, seasons, times; idle before the first run', async () => {
     const { r } = await setup();
     const s = await status(r);
-    expect(Object.keys(s)).toEqual(['state', 'seasons', 'oldestSeason', 'lastRunAt', 'nextDueAt', 'lastError', 'unreadableWhy', 'skipped', 'ended', 'currentSeasonLastAt']);
-    expect(s).toMatchObject({ state: 'idle', seasons: [], oldestSeason: null, lastRunAt: null, lastError: null });
+    expect(Object.keys(s)).toEqual(['state', 'seasons', 'oldestSeason', 'lastRunAt', 'nextDueAt', 'lastError', 'unreadableWhy', 'skipped', 'ended', 'currentSeasonLastAt', 'crosscheck']);
+    expect(s).toMatchObject({ state: 'idle', seasons: [], oldestSeason: null, lastRunAt: null, lastError: null, crosscheck: null });
     await alarms(r);
     const done = await status(r);
     expect(done.seasons[0]).toEqual({ season: '2026-27', nights: 5, importedAt: expect.stringMatching(/^2026-10-11T/) });
@@ -476,7 +476,7 @@ describe('what is stored', () => {
     expect(JSON.stringify(await r.storage.get('trends:import'))).not.toMatch(words);
     expect(everything(r.storage)).not.toMatch(plainWords(['Zebedee', 'Quillfeather', 'Ottoline', 'Wrexham']));
     expect(Object.keys(await r.storage.get('trends:import')).sort()).toEqual([
-      'currentSeasonLastAt', 'ended', 'errors', 'lastError', 'lastOkAt', 'lastRunAt', 'next', 'nextDueAt',
+      'crosscheck', 'currentSeasonLastAt', 'ended', 'errors', 'lastError', 'lastOkAt', 'lastRunAt', 'next', 'nextDueAt',
       'refreshedFor', 'seasons', 'skipped', 'unreadable', 'unreadableWhy', 'v', 'walkDone',
     ]);
   });
@@ -487,5 +487,92 @@ describe('what is stored', () => {
     const sql = readFileSync(new URL('../migrations/0003_trends_import.sql', import.meta.url), 'utf8');
     expect(() => db.query(sql.replace(/--.*$/gm, '').trim())).not.toThrow();
     expect(() => db.query("INSERT INTO night_summary_import (night, club, attended, imported_at) VALUES ('2026-10-07', 'Sparks', 2001, 'x')")).toThrow();
+  });
+});
+
+describe('the self-check: the desk beside TwoTimTwo, by itself after each import', () => {
+  const desk = (db, night, club, checkedIn, undone = 0, checkedOut = 0) => db.query(
+    'INSERT INTO night_summary (night, club, checked_in, checked_out, undone, prints) VALUES (?, ?, ?, ?, ?, 0)', night, club, checkedIn, checkedOut, undone);
+
+  it('crossCheckOf counts by night: a night agrees only when every club on it agrees', () => {
+    const c = crossCheckOf([
+      { night: '2026-10-07', club: 'Sparks', desk: 22, twotimtwo: 22 },
+      { night: '2026-10-07', club: 'T&T', desk: 31, twotimtwo: 31 },
+      { night: '2026-09-30', club: 'Sparks', desk: 18, twotimtwo: 20 },
+      { night: '2026-09-30', club: 'T&T', desk: 29, twotimtwo: 29 },
+      { night: '2026-09-23', club: 'Trek', desk: 11, twotimtwo: 10 },
+    ], 1000);
+    expect(c).toEqual({
+      compared: 3, matching: 1, differing: 2, deskHigher: 1, at: 1000,
+      examples: [{ night: '2026-09-30', club: 'Sparks', desk: 18, twotimtwo: 20 }, { night: '2026-09-23', club: 'Trek', desk: 11, twotimtwo: 10 }],
+    });
+  });
+
+  it('crossCheckOf keeps a fixed shape: at most 5 examples, junk lines dropped, nothing else copied', () => {
+    const lines = [];
+    for (let d = 1; d <= 9; d++) lines.push({ night: `2026-09-0${d}`, club: 'Sparks', desk: d, twotimtwo: d + 1, name: 'Zebedee' });
+    lines.push({ night: 'Oct 7', club: 'Sparks', desk: 1, twotimtwo: 2 }, { night: '2026-10-07', club: 'Zebedee', desk: 1, twotimtwo: 2 },
+      { night: '2026-10-07', club: 'Sparks', desk: '1.5', twotimtwo: 2 }, { night: '2026-10-07', club: 'Sparks', desk: -1, twotimtwo: 2 }, null);
+    const c = crossCheckOf(lines, 5);
+    expect(c).toMatchObject({ compared: 9, matching: 0, differing: 9, deskHigher: 0 });
+    expect(c.examples).toHaveLength(CROSSCHECK_EXAMPLES);
+    expect(Object.keys(c.examples[0])).toEqual(['night', 'club', 'desk', 'twotimtwo']);
+    expect(JSON.stringify(c)).not.toMatch(/Zebedee|Oct 7/);
+    expect(crossCheckOf([], 5)).toEqual({ compared: 0, matching: 0, differing: 0, deskHigher: 0, examples: [], at: 5 });
+  });
+
+  it('after the import, compares every night and club the desk also counted, and shows it in import-status', async () => {
+    const { r, db } = await setup();
+    desk(db, '2026-10-07', 'Sparks', 22);                // agrees
+    desk(db, '2026-10-07', 'Cubbies', 15, 1);            // 15 check-ins, 1 undone: 14, agrees
+    desk(db, '2026-09-30', 'Sparks', 18);                // the desk counted only some: TwoTimTwo 20
+    desk(db, '2026-09-30', 'Trek', 0, 0, 3);             // check-outs only: not a desk count
+    desk(db, '2026-10-14', 'Sparks', 9);                 // not imported (tonight, not held yet): nothing to compare
+    const batches = db.batches;
+    await alarms(r);
+    // The self-check wrote nothing to D1: one batch per stored season, as before it.
+    expect(db.batches - batches).toBe(3);
+    const s = await status(r);
+    expect(s.crosscheck).toEqual({
+      compared: 2, matching: 1, differing: 1, deskHigher: 0,
+      examples: [{ night: '2026-09-30', club: 'Sparks', desk: 18, twotimtwo: 20 }],
+      at: expect.stringMatching(/^2026-10-11T/),
+    });
+    // The live line still wins in the trends: the summary answers the desk's 18.
+    const sum = (await r.call('GET', '/v1/history/summary?from=2026-09-30&to=2026-09-30')).body;
+    expect(sum.find((l) => l.club === 'Sparks')).toMatchObject({ checkedIn: 18 });
+  });
+
+  it('with no desk nights to set beside it: nothing compared, said as such', async () => {
+    const { r } = await setup();
+    await alarms(r);
+    expect((await status(r)).crosscheck).toMatchObject({ compared: 0, matching: 0, differing: 0, examples: [] });
+  });
+
+  it('runs again after the club-night refresh, and a failed read keeps the last result', async () => {
+    const { r, db, seasons } = await setup();
+    desk(db, '2026-10-07', 'Sparks', 22);
+    await alarms(r);
+    const first = (await status(r)).crosscheck;
+    expect(first).toMatchObject({ compared: 1, matching: 1 });
+    // Tonight the desk counts Sparks; TwoTimTwo has one more (a paper sheet).
+    seasons[2026] = SEASON_2026.replace('"10/14/2026","","","","","","","","","","","","","0",""', '"10/14/2026","6","","15","","23","","30","","12","","9","","95",""');
+    desk(db, '2026-10-14', 'Sparks', 22);
+    r.clock.t = WED_905PM;
+    await alarms(r);
+    const second = (await status(r)).crosscheck;
+    expect(second).toMatchObject({ compared: 2, matching: 1, differing: 1, examples: [{ night: '2026-10-14', club: 'Sparks', desk: 22, twotimtwo: 23 }] });
+    expect(second.at > first.at).toBe(true);
+    // D1 refusing the SELECT: the import still lands, the last self-check stays.
+    const prepare = db.prepare.bind(db);
+    db.prepare = (text) => {
+      if (/JOIN night_summary_import/.test(text)) throw new Error('D1 is busy');
+      return prepare(text);
+    };
+    seasons[2026] = seasons[2026].replace('"10/14/2026","6","","15","","23"', '"10/14/2026","6","","15","","24"').replace('"95",""', '"96",""');
+    r.clock.t = Date.parse('2026-10-22T01:05:00Z');
+    await alarms(r);
+    expect(db.query("SELECT attended FROM night_summary_import WHERE night = '2026-10-14' AND club = 'Sparks'")).toEqual([{ attended: 24 }]);
+    expect((await status(r)).crosscheck).toEqual(second);
   });
 });

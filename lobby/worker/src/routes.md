@@ -145,7 +145,7 @@ passphrase, lose the history (owner).
 | `GET /v1/history/rows?night=YYYY-MM-DD&after=<id>&limit=<=500` | session | | `{rows: Row[], next: id \| null}` |
 | `GET /v1/history/nights?from=&to=` | session | | `[{night, rows}]` (a COUNT by night) |
 | `GET /v1/history/summary?from=&to=` | session | | `night_summary` lines, plaintext numbers, plus the trends back-fill's imported counts for every night and club with NO live line (`imported: true`; below) |
-| `GET /v1/history/import-status` **BUILT** | session | | the trends back-fill (below): `{state: 'idle'\|'running'\|'done'\|'unreadable'\|'not-configured', reason?, seasons: [{season, nights, importedAt}], oldestSeason, lastRunAt, nextDueAt, lastError, unreadableWhy, skipped, ended, currentSeasonLastAt}`, fixed codes and numbers only; asking also sets the alarm sooner when a season read is due |
+| `GET /v1/history/import-status` **BUILT** | session | | the trends back-fill (below): `{state: 'idle'\|'running'\|'done'\|'unreadable'\|'not-configured', reason?, seasons: [{season, nights, importedAt}], oldestSeason, lastRunAt, nextDueAt, lastError, unreadableWhy, skipped, ended, currentSeasonLastAt, crosscheck}` (`crosscheck` = the self-check below, or null before the first import), fixed codes and numbers only; asking also sets the alarm sooner when a season read is due |
 | `POST /v1/history/import` | session | `{rows: Row[] (at most 500), summary?}`, rows sealed by the KVBC Awana app from the laptop's own history (`kind` `import-checkin`, …) | as `POST /v1/history/rows`; `BODY_MAX` 1 MB for this route only |
 
 **Row kinds** (the plaintext `kind` of a row; the record inside is sealed). One
@@ -287,6 +287,23 @@ into the database in Cloudflare." Fully automatic, no button:
   club, the LIVE `night_summary` line when one exists, else the imported count
   as `checkedIn` (`checkedOut`, `undone`, `prints` 0) with `imported: true`.
   The live desk always wins. Past `SUMMARY_MAX` the oldest lines are left out.
+- **Self-check** (owner 2026-10-13: "after its first run, compare one imported
+  night with TwoTimTwo", made automatic). After every season it stores, ONE
+  SELECT (a read; nothing more is written to D1) sets the desk beside
+  TwoTimTwo for every night and club with BOTH a live `night_summary` line
+  (`checked_in > 0`; the desk's number is `checked_in - undone`, never below 0)
+  and an imported count, newest first, 2000 lines at most. Kept in
+  `trends:import` and answered in `import-status` as `crosscheck: {compared,
+  matching, differing, deskHigher, examples: [{night, club, desk, twotimtwo}]
+  (5 at most, differing lines, newest first), at}`. Counted by NIGHT: a night
+  agrees only when every club on it agrees; `deskHigher` = the differing nights
+  where the desk counted MORE in some club (the unexpected way). Dates, club
+  table names and whole numbers only (`crossCheckOf` drops anything else). A
+  failed SELECT keeps the last result. Limits: it only sees nights the desk
+  ran (none before it existed: `compared` 0, "Nothing to compare with the desk
+  yet"); a night the desk counted only some children (the rest on paper or the
+  laptop) reads LOWER at the desk, which is expected and worded kindly in the
+  History section; the summary still answers the desk's live line for those.
 - **Not configured** (`state: 'not-configured'`, `reason`): `no-secrets` (no
   `TWOTIMTWO_*`), `cloud-off` (`CLOUD_CHECKIN = "off"`: the alarm does not run),
   `history-off` (no `HISTORY_DB`), `sign-in-refused`, `no-permission` (403 on the

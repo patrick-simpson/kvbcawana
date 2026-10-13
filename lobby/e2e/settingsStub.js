@@ -63,6 +63,8 @@ export function makeWorld(over = {}) {
     journey: null,
     nights: [],
     summary: [],
+    // GET /v1/history/import-status (routes.md 3, the trends back-fill); null answers 404 (an older Worker).
+    importStatus: null,
     ...over,
   };
 }
@@ -149,6 +151,7 @@ export async function installWorker(page, w) {
     if (path === '/v1/history/key') return route.fulfill(json({ pub: 'AAAA', kid: 'h1', wrapped: null, prev: null }));
     if (path === '/v1/history/nights') return route.fulfill(json(w.nights));
     if (path === '/v1/history/summary') return route.fulfill(json(w.summary));
+    if (path === '/v1/history/import-status') return route.fulfill(w.importStatus ? json(w.importStatus) : json({ error: 'Not found.' }, 404));
     if (path === '/v1/history/rows' && m === 'GET') return route.fulfill(json({ rows: [], next: null }));
     return route.fulfill(json({ error: 'Not found.' }, 404));
   });
