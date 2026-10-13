@@ -138,6 +138,13 @@ function syncProgressText() {
   updateState.progressLine = downloadProgress.line();
   updateState.progressDetail = downloadProgress.detail();
 }
+// This computer's row on /settings shows the running version and how the
+// update is going (src/update-progress.js createAppReport, sent by
+// device-sync's hello); a hello comes sooner when that moved enough.
+const appReport = updateProgress.createAppReport();
+function reportUpdate() {
+  if (deviceSync) deviceSync.reportSoon();
+}
 // The managed copy of the Chrome extension — see src/extension-sync.js. Filled
 // in once at startup and then reported verbatim to the tray, the settings
 // window and /health, so the folder the operator must load unpacked is never
@@ -303,12 +310,14 @@ function setupAutoUpdater() {
     updateState.error = null;
     if (serverModule && serverModule.setLatestVersion) serverModule.setLatestVersion(info.version);
     refreshTray();  // shows "Downloading update vX…"
+    reportUpdate();
   });
   autoUpdater.on('update-not-available', () => {
     updateState.checking = false;
     updateState.available = null;
     updateState.upToDate = true;
     refreshTray();  // shows "✓ Up to date"
+    reportUpdate();
   });
   autoUpdater.on('download-progress', (p) => {
     // The status window polls get-server-state; the tray is repainted at most
@@ -316,6 +325,7 @@ function setupAutoUpdater() {
     const repaint = downloadProgress.update(p);
     syncProgressText();
     if (repaint) refreshTray();
+    reportUpdate();
   });
   autoUpdater.on('update-downloaded', (info) => {
     updateState.checking = false;
@@ -323,6 +333,7 @@ function setupAutoUpdater() {
     downloadProgress.reset();
     syncProgressText();
     refreshTray();  // shows "Updating to vX… restarting"
+    reportUpdate();
     scheduleAutoInstall(info);
   });
   autoUpdater.on('error', (e) => {
@@ -337,6 +348,7 @@ function setupAutoUpdater() {
     downloadProgress.reset();
     syncProgressText();
     refreshTray();
+    reportUpdate();
   });
 
   const check = () => autoUpdater.checkForUpdates().catch(() => { /* offline is fine */ });
@@ -1425,6 +1437,7 @@ app.whenReady().then(async () => {
     local: deviceSettings,
     apply: applyDeviceSettings,
     busy: serverBusy,
+    report: () => appReport.read(app.getVersion(), updateState),
     onStatus: (st) => { console.log('[device]', st.state, st.pending ? `(held: ${JSON.stringify(st.pending)})` : ''); refreshTray(); },
     onSignedOut: (s) => {
       // The app's own sign-in is dropped, as a screen drops its session on a

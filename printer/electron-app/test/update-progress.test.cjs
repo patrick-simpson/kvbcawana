@@ -102,3 +102,47 @@ describe('main.js wiring', () => {
     assert.match(main, /updateState\.downloaded = info\.version;[\s\S]*?scheduleAutoInstall\(info\);/);
   });
 });
+
+describe("this computer's app on /settings", () => {
+  const { createAppReport, appReportMoved, updateStateName, UPDATE_STATES } = require('../src/update-progress');
+  const idle = { checking: false, available: null, downloaded: null, percent: null, error: null };
+
+  it('the update in one word, the states the Worker allows (lobby/src/lib/syncSpecs.js APP_UPDATE_STATES)', async () => {
+    assert.equal(updateStateName(idle), 'none');
+    assert.equal(updateStateName({ ...idle, available: '9.5.0', percent: 42 }), 'downloading');
+    assert.equal(updateStateName({ ...idle, available: '9.5.0', downloaded: '9.5.0' }), 'ready');
+    assert.equal(updateStateName({ ...idle, error: 'The update could not finish downloading. It will try again soon.' }), 'error');
+    assert.equal(updateStateName(null), 'none');
+    const { APP_UPDATE_STATES } = await import('../../../lobby/src/lib/syncSpecs.js');
+    assert.deepEqual([...UPDATE_STATES], [...APP_UPDATE_STATES]);
+  });
+
+  it('the running version, the state, the percent only while downloading, and when the state began', async () => {
+    let t = Date.parse('2026-10-12T15:00:00Z');
+    const r = createAppReport({ now: () => t });
+    assert.deepEqual(r.read('9.4.0', idle), { app: { version: '9.4.0', update: { state: 'none', percent: null, at: '2026-10-12T15:00:00.000Z' } } });
+    t += 60000;
+    const down = r.read('9.4.0', { ...idle, available: '9.5.0', percent: 42.6 });
+    assert.deepEqual(down.app.update, { state: 'downloading', percent: 43, at: '2026-10-12T15:01:00.000Z' });
+    t += 60000;
+    assert.equal(r.read('9.4.0', { ...idle, available: '9.5.0', percent: 60 }).app.update.at, '2026-10-12T15:01:00.000Z', 'same state, same start');
+    assert.equal(r.read('9.4.0', { ...idle, available: '9.5.0', percent: null }).app.update.percent, 0);
+    // Exactly what the Worker keeps.
+    const { sanitizeScreenStatus } = await import('../../../lobby/src/lib/syncSpecs.js');
+    assert.deepEqual(sanitizeScreenStatus('computer', down), down);
+    const ready = r.read('9.4.0', { ...idle, available: '9.5.0', downloaded: '9.5.0' });
+    assert.deepEqual(sanitizeScreenStatus('computer', ready), ready);
+  });
+
+  it('worth an early hello: a new state, a new version, or ten points; nothing sent yet counts', () => {
+    const at = (state, percent = null, version = '9.4.0') => ({ app: { version, update: { state, percent, at: null } } });
+    assert.equal(appReportMoved(null, at('none')), true);
+    assert.equal(appReportMoved(at('none'), at('none')), false);
+    assert.equal(appReportMoved(at('none'), at('downloading', 0)), true);
+    assert.equal(appReportMoved(at('downloading', 40), at('downloading', 49)), false);
+    assert.equal(appReportMoved(at('downloading', 40), at('downloading', 50)), true);
+    assert.equal(appReportMoved(at('downloading', 99), at('ready')), true);
+    assert.equal(appReportMoved(at('none'), at('none', null, '9.5.0')), true);
+    assert.equal(appReportMoved(at('none'), null), false);
+  });
+});

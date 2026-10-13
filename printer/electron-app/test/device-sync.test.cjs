@@ -27,6 +27,7 @@ function fakeWorker() {
       let r = w.screens[body.id];
       if (!r) r = w.screens[body.id] = { id: body.id, kind: body.kind, name: body.name };
       r.pendingRoleChange = body.pendingRoleChange || null;
+      if (body.status) r.status = body.status;
       return { ok: true, status: 200, body: { screen: { ...r }, settings: w.settings[body.id] || null } };
     }
     if (m && m[2] === 'settings' && method === 'GET') return { ok: true, status: 200, body: { screen: w.screens[m[1]], settings: w.settings[m[1]] || null } };
@@ -63,7 +64,7 @@ function fakeTimers() {
 }
 
 /** A computer: roles, hours, a print server that can be busy, main.js's apply. */
-function computer({ worker = fakeWorker(), print = true, display = false, name = 'Check-in laptop', signedIn = true } = {}) {
+function computer({ worker = fakeWorker(), print = true, display = false, name = 'Check-in laptop', signedIn = true, report } = {}) {
   const dir = tmp();
   const pc = {
     dir, worker, timers: fakeTimers(), busy: false, applied: [], statuses: [], signedOutWith: [],
@@ -97,7 +98,10 @@ function computer({ worker = fakeWorker(), print = true, display = false, name =
     onStatus: (st) => pc.statuses.push(st),
     onSignedOut: (s) => pc.signedOutWith.push(s.session),
     timers: pc.timers,
+    report,
+    now: () => pc.clock,
   });
+  pc.clock = Date.parse('2026-10-12T15:00:00Z');
   pc.id = () => pc.roles.deviceId;
   return pc;
 }
@@ -267,6 +271,78 @@ describe('the rounds', () => {
   });
 });
 
+describe("the app's version and update ride the hello", () => {
+  const { createAppReport } = require('../src/update-progress');
+  const idle = { checking: false, available: null, downloaded: null, percent: null, error: null };
+  const withApp = () => {
+    const u = { ...idle };
+    const rep = createAppReport({ now: () => Date.parse('2026-10-12T15:00:00Z') });
+    const pc = computer({ report: () => rep.read('9.4.0', u) });
+    return { pc, u };
+  };
+  const helloCalls = (pc) => pc.worker.calls.filter((c) => c.path === '/v1/screens/hello');
+
+  it('every hello carries it', async () => {
+    const { pc } = withApp();
+    await pc.sync.start();
+    assert.deepEqual(helloCalls(pc)[0].body.status, { app: { version: '9.4.0', update: { state: 'none', percent: null, at: '2026-10-12T15:00:00.000Z' } } });
+    pc.timers.run(ds.HELLO_MS);
+    await pc.sync.start();
+    assert.ok(helloCalls(pc).every((c) => c.body.status && c.body.status.app.version === '9.4.0'));
+  });
+
+  it('an update moving says hello sooner: on a new state or ten points, never within a minute of the last hello', async () => {
+    const { pc, u } = withApp();
+    await pc.sync.start();
+    const before = helloCalls(pc).length;
+    // Nothing moved: nothing extra.
+    pc.sync.reportSoon();
+    assert.equal(pc.timers.has(ds.REPORT_GAP_MS), false);
+    // Downloading starts right after a hello: it waits out the minute.
+    u.available = '9.5.0'; u.percent = 3;
+    pc.clock += 1000;
+    pc.sync.reportSoon();
+    assert.ok(pc.timers.has(ds.REPORT_GAP_MS - 1000), 'waits the rest of the minute');
+    pc.sync.reportSoon(); // a second move while waiting: still one hello
+    pc.timers.run(ds.REPORT_GAP_MS - 1000);
+    await pc.sync.start();
+    const sent = helloCalls(pc).slice(before);
+    assert.equal(sent.at(-1).body.status.app.update.state, 'downloading');
+    // A few points: the two-minute hello carries them.
+    u.percent = 9;
+    pc.clock += 2 * 60 * 1000;
+    pc.sync.reportSoon();
+    assert.equal(pc.timers.has(0), false);
+    // Ten points, a minute on: at once.
+    u.percent = 13;
+    pc.sync.reportSoon();
+    assert.ok(pc.timers.has(0));
+    pc.timers.run(0);
+    await pc.sync.start();
+    assert.equal(helloCalls(pc).at(-1).body.status.app.update.percent, 13);
+    // Ready: a new state.
+    u.downloaded = '9.5.0';
+    pc.clock += 2 * 60 * 1000;
+    pc.sync.reportSoon();
+    pc.timers.run(0);
+    await pc.sync.start();
+    assert.equal(pc.worker.screens[pc.id()].status.app.update.state, 'ready');
+  });
+
+  it('quiet when signed out or stopped, and a report that throws only leaves the status out', async () => {
+    const out = computer({ signedIn: false, report: () => ({ app: { version: '9.4.0', update: { state: 'none', percent: null, at: null } } }) });
+    await out.sync.start();
+    out.sync.reportSoon();
+    assert.equal(out.worker.calls.length, 0);
+    const pc = computer({ report: () => { throw new Error('no'); } });
+    await pc.sync.start();
+    assert.equal('status' in pc.worker.calls[0].body, false);
+    pc.sync.stop();
+    pc.sync.reportSoon();
+    assert.equal(pc.timers.has(0), false);
+  });
+});
+
 describe('roles.json keeps the id', () => {
   it('made once, kept through every change', () => {
     const dir = tmp();
@@ -292,6 +368,15 @@ describe('main.js wiring', () => {
   it('registers only once setup is done, and never with the session in a log or a file of its own', () => {
     assert.match(main, /function deviceSession\(\) \{\n  if \(!roles\.setupDone \|\| !syncSession\) return null;/);
     assert.doesNotMatch(main, /console\.[a-z]+\([^\n]*\.session\b/);
+  });
+  it("the app's version and update ride the hello, and every updater event may send it sooner", () => {
+    assert.match(main, /report: \(\) => appReport\.read\(app\.getVersion\(\), updateState\),/);
+    for (const ev of ['update-available', 'update-not-available', 'download-progress', 'update-downloaded', 'error']) {
+      const at = main.indexOf(`autoUpdater.on('${ev}'`);
+      assert.ok(at > 0, ev);
+      const body = main.slice(at, main.indexOf('\n  });', at));
+      assert.match(body, /reportUpdate\(\);/, ev);
+    }
   });
   it('a local change is sent up: applyRoles and the display\'s Settings window nudge it', () => {
     assert.match(main, /refreshTray\(\);\n  if \(deviceSync\) deviceSync\.nudge\(\);/);

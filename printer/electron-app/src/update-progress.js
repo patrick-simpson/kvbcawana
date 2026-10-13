@@ -1,5 +1,6 @@
 'use strict';
-// Update download progress, shown in the tray and the status window.
+// Update download progress, shown in the tray and the status window, and
+// this computer's app version and update for its /settings row (below).
 // Pure: no Electron, no timers. main.js feeds it electron-updater's
 // 'download-progress' payload ({percent, transferred, total, bytesPerSecond})
 // and asks it whether the tray is worth repainting yet (at most about once a
@@ -87,4 +88,57 @@ function createProgress({ now = Date.now, minRepaintMs = MIN_REPAINT_MS } = {}) 
   };
 }
 
-module.exports = { createProgress, formatProgress, formatSizes, formatTimeLeft, MIN_REPAINT_MS };
+// ── This computer's app on /settings (the row's status line) ──────────────
+// The hello device-sync.js sends carries {app: {version, update: {state,
+// percent, at}}} (lobby/worker/src/routes.md 10.7; the Worker's allowlist is
+// sanitizeScreenStatus in lobby/src/lib/syncSpecs.js). /settings says
+// "KVBC Awana 9.4.0 · up to date", "· downloading update 42%", "· update
+// ready, installing when idle" or "· update could not finish downloading".
+
+const UPDATE_STATES = Object.freeze(['none', 'downloading', 'ready', 'error']);
+const VERSION_MAX = 40;
+
+// main.js's updateState in one word.
+function updateStateName(u) {
+  if (!u) return 'none';
+  if (u.downloaded) return 'ready';
+  if (u.available) return 'downloading';
+  if (u.error) return 'error';
+  return 'none';
+}
+
+// Remembers when the update state last changed, for `at`. read() is cheap and
+// pure apart from that one stamp.
+function createAppReport({ now = Date.now } = {}) {
+  let state = null;
+  let since = null;
+  return {
+    read(version, u) {
+      const s = updateStateName(u);
+      if (s !== state) { state = s; since = new Date(now()).toISOString(); }
+      return {
+        app: {
+          version: String(version == null ? '' : version).trim().slice(0, VERSION_MAX),
+          update: { state: s, percent: s === 'downloading' ? clampPercent(u && u.percent) : null, at: since },
+        },
+      };
+    },
+  };
+}
+
+// Worth a hello before the next two-minute one? A new version, a new update
+// state, or ten points of download (the Worker writes on the same rule:
+// syncSpecs.js screenStatusMoved). Nothing sent yet counts as moved.
+function appReportMoved(a, b) {
+  if (!b || !b.app) return false;
+  if (!a || !a.app) return true;
+  const x = a.app;
+  const y = b.app;
+  return x.version !== y.version || x.update.state !== y.update.state
+    || Math.abs((x.update.percent || 0) - (y.update.percent || 0)) >= 10;
+}
+
+module.exports = {
+  createProgress, formatProgress, formatSizes, formatTimeLeft, MIN_REPAINT_MS,
+  UPDATE_STATES, updateStateName, createAppReport, appReportMoved,
+};

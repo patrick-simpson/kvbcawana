@@ -6,8 +6,10 @@
 //
 // WHAT IT DOES, at start and every HELLO_MS (the app has no live socket, so
 // the hello IS the doorbell):
-//   1. POST /v1/screens/hello {id, kind: 'computer', name, pendingRoleChange?}
-//      (the id is roles.json's deviceId, made once);
+//   1. POST /v1/screens/hello {id, kind: 'computer', name, pendingRoleChange?, status?}
+//      (the id is roles.json's deviceId, made once; `status` = this app's
+//      version and update, deps.report(), so /settings can show it: see
+//      update-progress.js createAppReport);
 //   2. GET /v1/screens/<id>/settings: the four keys SCREEN_SPECS.computer
 //      allows (printRole, displayRole, displayFrom, displayUntil);
 //   3. reconciles them against the last copy both sides agreed on (`synced`,
@@ -24,6 +26,11 @@
 // (the display, the hours) applies now, print stays on, the hello carries
 // `pendingRoleChange`, and the moment the server is idle the change applies.
 //
+// The app's version and update ride every hello; reportSoon() (main.js calls
+// it when the updater moves) says hello sooner when the update's state
+// changed or its download moved 10 points, never within REPORT_GAP_MS of the
+// last hello.
+//
 // 401 means signed out (the passphrase changed): it stops asking, says so
 // (status().state 'signed-out', the tray shows it), and starts again by
 // itself once there is a different session (the wizard signs in again).
@@ -31,6 +38,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { appReportMoved } = require('./update-progress');
 
 const KIND = 'computer';
 const FILE = 'device-sync.json';
@@ -40,6 +48,8 @@ const HELLO_MS = 2 * 60 * 1000;
 const PUSH_DEBOUNCE_MS = 1500;
 /** While a print-off is held, how often the print server is asked whether it is idle. */
 const IDLE_CHECK_MS = 3000;
+/** A hello for an update's progress never comes sooner than this after the last hello. */
+const REPORT_GAP_MS = 60 * 1000;
 /** The Worker's SCREEN_NAME_MAX. */
 const NAME_MAX = 40;
 
@@ -139,6 +149,8 @@ function writeStore(userData, store) {
  *   local: () => object,                        {printRole, displayRole, displayFrom, displayUntil} now
  *   apply: (settings: object) => Promise<{ok: boolean, error?: string}>,
  *   busy: () => boolean,                        the print server is printing or has a label waiting
+ *   report?: () => object | null,               this app's {app: {version, update}} for the hello (update-progress.js)
+ *   now?: () => number,
  *   onStatus?: (status: object) => void,
  *   onSignedOut?: (session: {url: string, session: string}) => void,
  *   log?: (...args: any[]) => void,
@@ -158,6 +170,10 @@ function createDeviceSync(deps) {
   let held = null;           // a print-off waiting for the print server to finish
   let failedToken = null;    // the session the Worker said 401 to
   let lastLocal = null;      // what nudge() compares against
+  let reportTimer = null;    // a hello for the app's update, waiting out REPORT_GAP_MS
+  let lastHelloAt = 0;       // when the last hello went out
+  let lastReport = null;     // the report the Worker last took
+  const clock = deps.now || Date.now;
   let status = { state: 'off', pending: null, error: null, at: null };
 
   const unref = (t) => { if (t && typeof t.unref === 'function') t.unref(); return t; };
@@ -227,10 +243,20 @@ function createDeviceSync(deps) {
     return true;
   }
 
-  function hello(s, id) {
+  function readReport() {
+    if (!deps.report) return null;
+    try { return deps.report() || null; } catch (e) { log('[device] report failed:', e && e.message); return null; }
+  }
+
+  async function hello(s, id) {
     const body = { id, kind: KIND, name: screenName(deps.name()) || 'Computer' };
     if (held) body.pendingRoleChange = held;
-    return deps.request(s.url, deps.protocol.SCREEN_HELLO_PATH, { method: 'POST', body, session: s.session });
+    const report = readReport();
+    if (report) body.status = report;
+    lastHelloAt = clock();
+    const res = await deps.request(s.url, deps.protocol.SCREEN_HELLO_PATH, { method: 'POST', body, session: s.session });
+    if (res && res.ok && report) lastReport = report;
+    return res;
   }
 
   async function put(s, id, settings) {
@@ -353,8 +379,20 @@ function createDeviceSync(deps) {
     },
     stop() {
       running = false;
-      for (const t of [loop, soon, idleTimer]) if (t) timers.clearTimeout(t);
-      loop = soon = idleTimer = null;
+      for (const t of [loop, soon, idleTimer, reportTimer]) if (t) timers.clearTimeout(t);
+      loop = soon = idleTimer = reportTimer = null;
+    },
+    /**
+     * The updater moved (main.js): a hello soon when the update's state
+     * changed or its download moved 10 points since the last one the Worker
+     * took; never within REPORT_GAP_MS of the last hello. Otherwise the
+     * two-minute hello carries it.
+     */
+    reportSoon() {
+      if (!running || reportTimer || status.state === 'signed-out' || status.state === 'off') return;
+      if (!appReportMoved(lastReport, readReport())) return;
+      const wait = Math.max(0, lastHelloAt + REPORT_GAP_MS - clock());
+      reportTimer = unref(timers.setTimeout(() => { reportTimer = null; tick(); }, wait));
     },
     /** Something here may have changed (the wizard, the Settings window, a tray refresh): sent up when it did. */
     nudge() {
@@ -372,6 +410,6 @@ function createDeviceSync(deps) {
 }
 
 module.exports = {
-  KIND, FILE, HELLO_MS, PUSH_DEBOUNCE_MS, IDLE_CHECK_MS, SPEC,
+  KIND, FILE, HELLO_MS, PUSH_DEBOUNCE_MS, IDLE_CHECK_MS, REPORT_GAP_MS, SPEC,
   cleanSettings, reconcileComputer, screenName, createDeviceSync,
 };
