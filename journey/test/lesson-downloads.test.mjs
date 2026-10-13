@@ -474,7 +474,8 @@ test('automatic mode: starts by itself after load with no press, saves everythin
   await until(() => saved(k.store, 'week-01-leader'), 4000, 'the automatic pass');
   await until(() => k.window.journeyDownloads.phase === 'idle', 2000, 'the end');
   const status = k.window.journeyDownloadStatus();
-  assert.deepEqual(Object.keys(status).sort(), ['auto', 'bytesSaved', 'bytesTotal', 'currentWeek', 'downloading', 'error', 'known', 'lastSavedAt', 'paused', 'percent', 'saved', 'supported', 'total', 'waiting']);
+  assert.deepEqual(Object.keys(status).sort(), ['auto', 'bytesSaved', 'bytesTotal', 'currentWeek', 'downloading', 'error', 'known', 'lastSavedAt', 'leaders', 'paused', 'percent', 'saved', 'supported', 'total', 'waiting']);
+  assert.equal(status.leaders, true);
   assert.equal(status.total, 5);
   assert.equal(status.saved, 5);
   assert.equal(status.bytesSaved, 50 + 37 + 64 + 20 + 21);
@@ -588,4 +589,66 @@ test('automatic mode is on by default only in the kiosk app: a Mac or phone open
   await openSettings(app);
   assert.equal(app.$('downloads-auto').checked, true, 'the kiosk app: on');
   app.close();
+});
+
+/* ── From the settings page (27-settings-page.js; public/src/sync.js hands the commands over) ── */
+
+test('each settings-page command presses the panel\'s own button: start, pause, resume, stop, delete', async () => {
+  // Week 2 hangs after 35 bytes until let go; week 3 always hangs (so the run is still going when Stop arrives).
+  let hang = true;
+  const k = boot({
+    cdn: { behave: (url) => (url.endsWith('student-3.mp4') ? { stallAfter: 20 } : hang && url.endsWith('student-2.mp4') ? { stallAfter: 35 } : null) },
+  });
+  const page = k.window.journeySettingsPage;
+  const asked = (week) => k.cdn.requests.filter((r) => r.url.endsWith(`student-${week}.mp4`));
+  assert.equal(page.command('pause-downloads'), false, 'nothing to pause yet');
+  assert.equal(page.command('stop-downloads'), false, 'nothing to stop yet');
+  assert.equal(page.command('format-the-disk'), false, 'an unknown command does nothing');
+  assert.equal(page.command('start-downloads'), true);
+  assert.equal(page.command('start-downloads'), false, 'already running');
+  await until(() => (k.window.journeyDownloads.files['week-02-student'] || {}).have === 35, 2000, 'bytes arriving');
+  assert.equal(page.command('pause-downloads'), true);
+  assert.equal(k.window.journeyDownloads.phase, 'paused');
+  assert.equal(k.window.localStorage.getItem('journey.downloads.run'), 'paused');
+  assert.equal(k.window.journeyDownloadStatus().paused, true);
+  await wait(20);
+  hang = false;
+  assert.equal(page.command('resume-downloads'), true);
+  await until(() => asked(3).length > 0, 4000, 'week 2 finished, week 3 begun');
+  assert.equal(asked(2).at(-1).range, 'bytes=32-', 'resumed from the next whole piece');
+  assert.deepEqual(joined(k.store, 'week-02-student'), FILES[`${CDN}student-2.mp4`]);
+  assert.equal(page.command('stop-downloads'), true);
+  assert.equal(k.window.journeyDownloads.phase, 'idle');
+  assert.equal(k.window.journeyDownloads.autoHeld, true, 'Stop rests automatic mode until the page loads again');
+  assert.ok(saved(k.store, 'week-02-student'), 'Stop keeps what is saved');
+  assert.equal(page.command('delete-downloads'), true);
+  await until(() => !k.store.exists('journey-lessons-v1'), 2000, 'the delete');
+  k.close();
+});
+
+test('the settings page sets the two switches as the tick boxes would, and reads them back', async () => {
+  const k = boot({ tuning: { autoStartMs: 1e9 } });
+  const page = k.window.journeySettingsPage;
+  const prefs = () => JSON.parse(JSON.stringify(page.prefs()));
+  assert.deepEqual(prefs(), { auto: true, leaders: true }, 'the kiosk app defaults: automatic on, Leader Videos on');
+  page.setPrefs({ auto: false, leaders: false });
+  assert.equal(k.window.localStorage.getItem('journey.downloads.auto'), '0');
+  assert.equal(k.window.localStorage.getItem('journey.downloads.leaders'), '0');
+  assert.deepEqual(prefs(), { auto: false, leaders: false });
+  assert.equal(k.window.journeyDownloadStatus().leaders, false, 'the status carries the Leader Videos tick');
+  await openSettings(k);
+  assert.equal(k.$('downloads-auto').checked, false);
+  assert.equal(k.$('downloads-leaders').checked, false);
+  assert.equal(k.window.journeyDownloads.items.some((i) => i.role === 'leader' || /leader/.test(i.id)), false, 'the plan follows the tick');
+  page.setPrefs({ leaders: true, junk: 1 });
+  await until(() => k.window.journeyDownloads.items.some((i) => /leader/.test(i.id)), 2000, 'the plan with Leader Videos');
+  await wait(100); // the panel's own disk read finishes
+  k.close();
+});
+
+test('configure mode and a browser that cannot save lessons ignore every command', async () => {
+  const cfg = boot({ pageUrl: 'https://example.test/journey/?configure=1' });
+  for (const a of ['start-downloads', 'delete-downloads']) assert.equal(cfg.window.journeySettingsPage.command(a), false, a);
+  assert.equal(cfg.cdn.requests.length, 0);
+  cfg.close();
 });

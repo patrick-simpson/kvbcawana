@@ -6302,6 +6302,41 @@ function refreshDownloadsSpace() {
   });
 }
 
+/* "Download lessons automatically", from its tick box here or from the
+   settings page (27-settings-page.js): stored, then a switch on looks for
+   work at once, and a switch off stops an automatic run (saved videos stay). */
+function setDownloadsAuto(on) {
+  try {
+    localStorage.setItem(DOWNLOADS_AUTO_KEY, on ? '1' : '0');
+  } catch {
+    setDownloadsNote('This choice could not be saved on this device.', 'bad');
+  }
+  if (on) {
+    dl.autoHeld = false;
+    dl.nextAutoAt = 0;
+    autoDownloadTick();
+  } else if (downloadsActive() && dl.auto) {
+    // Switched off: an automatic run stops (saved videos stay).
+    haltLessonDownloads('idle');
+    setDownloadsRunMark(null);
+    setDownloadsNote('Automatic downloading is off. Videos already saved stay saved.');
+  }
+  emitDownloadStatus(true);
+  renderDownloads();
+}
+
+/* "Include Leader Videos", from its tick box or from the settings page. A
+   run already going keeps its list; the next one (or Resume) reads this. */
+function setDownloadsLeaders(on) {
+  try {
+    localStorage.setItem(DOWNLOADS_LEADERS_KEY, on ? '1' : '0');
+  } catch {
+    setDownloadsNote('This choice could not be saved on this device.', 'bad');
+  }
+  if (!downloadsActive()) refreshDownloadsPanel();
+  emitDownloadStatus(true);
+}
+
 function hideDownloadsConfirm() {
   handFocus(downloadsConfirmNo, downloadsDeleteBtn);
   handFocus(downloadsConfirmYes, downloadsDeleteBtn);
@@ -6334,33 +6369,8 @@ if (downloadsSection) {
     renderDownloads();
     handFocus(downloadsStopBtn, downloadsStartBtn);
   });
-  downloadsAutoInput.addEventListener('change', () => {
-    try {
-      localStorage.setItem(DOWNLOADS_AUTO_KEY, downloadsAutoInput.checked ? '1' : '0');
-    } catch {
-      setDownloadsNote('This choice could not be saved on this device.', 'bad');
-    }
-    if (downloadsAutoInput.checked) {
-      dl.autoHeld = false;
-      dl.nextAutoAt = 0;
-      autoDownloadTick();
-    } else if (downloadsActive() && dl.auto) {
-      // Switched off: an automatic run stops (saved videos stay).
-      haltLessonDownloads('idle');
-      setDownloadsRunMark(null);
-      setDownloadsNote('Automatic downloading is off. Videos already saved stay saved.');
-    }
-    emitDownloadStatus(true);
-    renderDownloads();
-  });
-  downloadsLeadersInput.addEventListener('change', () => {
-    try {
-      localStorage.setItem(DOWNLOADS_LEADERS_KEY, downloadsLeadersInput.checked ? '1' : '0');
-    } catch {
-      setDownloadsNote('This choice could not be saved on this device.', 'bad');
-    }
-    if (!downloadsActive()) refreshDownloadsPanel();
-  });
+  downloadsAutoInput.addEventListener('change', () => setDownloadsAuto(downloadsAutoInput.checked));
+  downloadsLeadersInput.addEventListener('change', () => setDownloadsLeaders(downloadsLeadersInput.checked));
   downloadsDeleteBtn.addEventListener('click', () => {
     const saved = Object.values(dl.files).filter((f) => f.state === 'saved');
     const bytes = Object.values(dl.files).reduce((sum, f) => sum + (f.have || 0), 0);
@@ -6447,6 +6457,7 @@ function journeyDownloadStatus() {
     lastSavedAt: dl.lastSavedAt,
     error: dl.lastError,
     auto: downloadsAutoWanted(),
+    leaders: downloadsLeadersWanted(),
     supported: lessonStoreSupported() && !CONFIGURE_MODE,
     known: dl.inspected,
   };
@@ -6474,3 +6485,65 @@ function emitDownloadStatus(now) {
 
 window.journeyDownloads = dl; // tests read the state
 window.journeyDownloadStatus = journeyDownloadStatus;
+/* ── The owner's settings page (awana.kvbchurch.org/settings → Journey) ──
+   Owner 2026-10-12: "Lessons on this computer" can also be worked from the
+   settings page, for every Journey kiosk at once. This kiosk's Settings panel
+   keeps every control (it is the fallback at the PC); the settings page sends
+   the same presses here, and this file runs them through the panel's own
+   functions, so a press from there is exactly a press here.
+
+   - Commands (lobby/src/lib/syncSpecs.js SCREEN_ACTIONS.journey): start,
+     pause, resume, stop, delete. They reach this page in the answer to its
+     hello (public/src/sync.js, which checks each one against the same list)
+     a second or two after the press, or at the next two-minute hello.
+     Configure mode, or a browser that cannot save lessons, does nothing.
+   - The two switches ("Download lessons automatically", "Include Leader
+     Videos") are this kiosk's own settings on the sync service
+     (SCREEN_SPECS.journey downloadsAuto / downloadsLeader): sync.js hands
+     them to journeySettingsPage.setPrefs, and sends a change made on the
+     tick boxes here back up, so both places always show the same.
+   Nothing here touches the network. */
+
+/* The two switches as they are on this computer (the stored choice, else
+   the default: automatic only in the KVBC Awana app, Leader Videos on). */
+function downloadPrefs() {
+  return { auto: downloadsAutoWanted(), leaders: downloadsLeadersWanted() };
+}
+
+/* Set either switch, as its tick box would (only one that differs). */
+function setDownloadPrefs(patch) {
+  if (!patch || typeof patch !== 'object') return;
+  if (typeof patch.auto === 'boolean' && patch.auto !== downloadsAutoWanted()) setDownloadsAuto(patch.auto);
+  if (typeof patch.leaders === 'boolean' && patch.leaders !== downloadsLeadersWanted()) setDownloadsLeaders(patch.leaders);
+}
+
+/* One command from the settings page. true when it was run. */
+function settingsPageCommand(action) {
+  if (CONFIGURE_MODE || !lessonStoreSupported()) return false;
+  switch (action) {
+    case 'start-downloads':
+    case 'resume-downloads':
+      // Resume of a run that already ended starts one: both mean "carry on".
+      if (downloadsActive()) return false;
+      startLessonDownloads(false);
+      break;
+    case 'pause-downloads':
+      if (!downloadsActive()) return false;
+      pauseLessonDownloads();
+      break;
+    case 'stop-downloads':
+      if (!downloadsActive() && dl.phase !== 'paused') return false;
+      stopLessonDownloads();
+      break;
+    case 'delete-downloads':
+      setDownloadsNote('Deleting (asked from the settings page)…');
+      deleteDownloadedLessons();
+      break;
+    default:
+      return false;
+  }
+  renderDownloads();
+  return true;
+}
+
+window.journeySettingsPage = { command: settingsPageCommand, prefs: downloadPrefs, setPrefs: setDownloadPrefs };

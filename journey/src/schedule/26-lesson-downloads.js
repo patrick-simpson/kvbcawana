@@ -1013,6 +1013,41 @@ function refreshDownloadsSpace() {
   });
 }
 
+/* "Download lessons automatically", from its tick box here or from the
+   settings page (27-settings-page.js): stored, then a switch on looks for
+   work at once, and a switch off stops an automatic run (saved videos stay). */
+function setDownloadsAuto(on) {
+  try {
+    localStorage.setItem(DOWNLOADS_AUTO_KEY, on ? '1' : '0');
+  } catch {
+    setDownloadsNote('This choice could not be saved on this device.', 'bad');
+  }
+  if (on) {
+    dl.autoHeld = false;
+    dl.nextAutoAt = 0;
+    autoDownloadTick();
+  } else if (downloadsActive() && dl.auto) {
+    // Switched off: an automatic run stops (saved videos stay).
+    haltLessonDownloads('idle');
+    setDownloadsRunMark(null);
+    setDownloadsNote('Automatic downloading is off. Videos already saved stay saved.');
+  }
+  emitDownloadStatus(true);
+  renderDownloads();
+}
+
+/* "Include Leader Videos", from its tick box or from the settings page. A
+   run already going keeps its list; the next one (or Resume) reads this. */
+function setDownloadsLeaders(on) {
+  try {
+    localStorage.setItem(DOWNLOADS_LEADERS_KEY, on ? '1' : '0');
+  } catch {
+    setDownloadsNote('This choice could not be saved on this device.', 'bad');
+  }
+  if (!downloadsActive()) refreshDownloadsPanel();
+  emitDownloadStatus(true);
+}
+
 function hideDownloadsConfirm() {
   handFocus(downloadsConfirmNo, downloadsDeleteBtn);
   handFocus(downloadsConfirmYes, downloadsDeleteBtn);
@@ -1045,33 +1080,8 @@ if (downloadsSection) {
     renderDownloads();
     handFocus(downloadsStopBtn, downloadsStartBtn);
   });
-  downloadsAutoInput.addEventListener('change', () => {
-    try {
-      localStorage.setItem(DOWNLOADS_AUTO_KEY, downloadsAutoInput.checked ? '1' : '0');
-    } catch {
-      setDownloadsNote('This choice could not be saved on this device.', 'bad');
-    }
-    if (downloadsAutoInput.checked) {
-      dl.autoHeld = false;
-      dl.nextAutoAt = 0;
-      autoDownloadTick();
-    } else if (downloadsActive() && dl.auto) {
-      // Switched off: an automatic run stops (saved videos stay).
-      haltLessonDownloads('idle');
-      setDownloadsRunMark(null);
-      setDownloadsNote('Automatic downloading is off. Videos already saved stay saved.');
-    }
-    emitDownloadStatus(true);
-    renderDownloads();
-  });
-  downloadsLeadersInput.addEventListener('change', () => {
-    try {
-      localStorage.setItem(DOWNLOADS_LEADERS_KEY, downloadsLeadersInput.checked ? '1' : '0');
-    } catch {
-      setDownloadsNote('This choice could not be saved on this device.', 'bad');
-    }
-    if (!downloadsActive()) refreshDownloadsPanel();
-  });
+  downloadsAutoInput.addEventListener('change', () => setDownloadsAuto(downloadsAutoInput.checked));
+  downloadsLeadersInput.addEventListener('change', () => setDownloadsLeaders(downloadsLeadersInput.checked));
   downloadsDeleteBtn.addEventListener('click', () => {
     const saved = Object.values(dl.files).filter((f) => f.state === 'saved');
     const bytes = Object.values(dl.files).reduce((sum, f) => sum + (f.have || 0), 0);
@@ -1158,6 +1168,7 @@ function journeyDownloadStatus() {
     lastSavedAt: dl.lastSavedAt,
     error: dl.lastError,
     auto: downloadsAutoWanted(),
+    leaders: downloadsLeadersWanted(),
     supported: lessonStoreSupported() && !CONFIGURE_MODE,
     known: dl.inspected,
   };

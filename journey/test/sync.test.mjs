@@ -26,7 +26,7 @@ const V2_AUTHKEY = await cc.deriveAuthKey('kennebec', V2_PARAMS.salt, V2_PARAMS.
 const settle = async () => { for (let i = 0; i < 8; i++) await tick(); };
 
 /** Boot the kiosk, then sync.js against a stand-in service. */
-function boot({ url = SERVICE, journey = null, prefs = {}, stateStatus = 200, v2 = false, modules = true, pageUrl, screenName = '', tuning = null } = {}) {
+function boot({ url = SERVICE, journey = null, prefs = {}, stateStatus = 200, v2 = false, modules = true, pageUrl, screenName = '', tuning = null, helloAnswer = null } = {}) {
   const kiosk = bootKiosk({}, prefs, undefined, null, pageUrl);
   const { window } = kiosk;
   if (modules) window.journeyAuthModules = { sp, cc };
@@ -57,7 +57,13 @@ function boot({ url = SERVICE, journey = null, prefs = {}, stateStatus = 200, v2
     }
     if (route === '/v1/state') return reply(stateStatus, { journey });
     if (route === '/v1/journey') return reply(200, { savedAt: '2026-10-01T19:00:00.000Z', settings: body.settings });
-    if (route === '/v1/screens/hello') return reply(200, { screen: { id: body.id, kind: body.kind, name: screenName || body.name }, settings: null });
+    if (route === '/v1/screens/hello') {
+      const extra = helloAnswer ? helloAnswer(body, calls) : { settings: null };
+      return reply(200, { screen: { id: body.id, kind: body.kind, name: screenName || body.name }, ...extra });
+    }
+    if (/^\/v1\/screens\/[^/]+\/settings$/.test(route) && init.method === 'PUT') {
+      return reply(200, { savedAt: `2026-10-12T20:00:0${calls.length % 10}.000Z`, settings: body.settings, dropped: [] });
+    }
     return reply(404, {});
   };
   const script = window.document.createElement('script');
@@ -345,5 +351,116 @@ test('signing in says hello at once', async () => {
   for (let i = 0; i < 40 && !hellos(k).length; i++) await wait(50);
   assert.equal(hellos(k).length, 1);
   assert.equal(hellos(k)[0].body.kind, 'journey');
+  k.close();
+});
+
+/* ── The settings page (/settings → Journey): commands and the two switches ── */
+
+/** A stand-in for schedule.js's window.journeySettingsPage (27-settings-page.js; tested there for real). */
+function fakePage(k, prefs = { auto: true, leaders: true }) {
+  const ran = [];
+  const state = { ...prefs };
+  k.window.journeySettingsPage = {
+    command: (a) => { ran.push(a); return true; },
+    prefs: () => ({ ...state }),
+    setPrefs: (p) => { if (typeof p.auto === 'boolean') state.auto = p.auto; if (typeof p.leaders === 'boolean') state.leaders = p.leaders; },
+  };
+  return { ran, state };
+}
+const settingsPuts = (k) => k.calls.filter((c) => /\/v1\/screens\/[^/]+\/settings$/.test(c.route) && c.method === 'PUT');
+
+test('a hello\'s actions run once each, only the five allowlisted, then a quick hello reports the new state', async () => {
+  let queue = [
+    { action: 'pause-downloads', at: '2026-10-12T20:00:00Z' },
+    { action: 'format-disk', at: '2026-10-12T20:00:00Z' },
+    'junk',
+    { action: 'delete-downloads', at: '2026-10-12T20:00:01Z' },
+  ];
+  const k = boot({
+    journey: ROOM, prefs: { 'awanaSyncSession.v1': SESSION }, tuning: { helloMs: 60_000, ackMs: 50 },
+    // The service hands a queue over once (lobby/worker/src/screens.js).
+    helloAnswer: () => { const actions = queue; queue = []; return { settings: null, actions }; },
+  });
+  const page = fakePage(k);
+  await settle();
+  for (let i = 0; i < 40 && page.ran.length < 2; i++) await wait(10);
+  assert.deepEqual(page.ran, ['pause-downloads', 'delete-downloads'], 'in order, nothing off the list');
+  for (let i = 0; i < 40 && hellos(k).length < 2; i++) await wait(10);
+  assert.equal(hellos(k).length, 2, 'a hello soon after, so the page sees what happened');
+  await settle();
+  assert.deepEqual(page.ran, ['pause-downloads', 'delete-downloads'], 'never twice');
+  assert.equal(k.window.journeySync.runActions(new Array(9).fill({ action: 'stop-downloads' })), 5, 'at most five from one answer');
+  k.close();
+});
+
+test('the two switches: the service\'s newer copy is taken, a change made here goes up, a service with none gets this kiosk\'s', async () => {
+  let remote = null;
+  const k = boot({ journey: ROOM, prefs: { 'awanaSyncSession.v1': SESSION }, tuning: { helloMs: 60_000, prefsDelayMs: 20 }, helloAnswer: () => ({ settings: remote }) });
+  const page = fakePage(k, { auto: true, leaders: true });
+  await settle();
+  for (let i = 0; i < 40 && !settingsPuts(k).length; i++) await wait(10);
+  // No copy on the service yet: this kiosk's values go up.
+  assert.deepEqual(settingsPuts(k)[0].body, { settings: { downloadsAuto: true, downloadsLeader: true } });
+  const slot = () => JSON.parse(k.window.localStorage.getItem('awanaScreens.v1')).journey;
+  assert.equal(typeof slot().synced.savedAt, 'string');
+
+  // Changed on /settings: taken, and nothing sent back.
+  remote = { savedAt: '2026-10-12T21:00:00.000Z', settings: { downloadsAuto: false, downloadsLeader: false, captions: true } };
+  const before = settingsPuts(k).length;
+  await k.window.journeySync.hello();
+  await settle();
+  assert.deepEqual(page.state, { auto: false, leaders: false });
+  assert.equal(settingsPuts(k).length, before, 'agreed: nothing to send');
+  assert.deepEqual(slot().synced, { savedAt: remote.savedAt, settings: { downloadsAuto: false, downloadsLeader: false } });
+
+  // The same copy again: left alone (a press here since then is not undone).
+  page.state.auto = true;
+  await k.window.journeySync.hello();
+  await settle();
+  assert.equal(page.state.auto, true, 'an older copy never overwrites a change made here');
+  assert.deepEqual(settingsPuts(k).at(-1).body.settings, { downloadsAuto: true, downloadsLeader: false }, 'it goes up instead');
+
+  // A tick box here: up a moment later.
+  page.state.leaders = true;
+  const n = settingsPuts(k).length;
+  const box = k.document.getElementById('downloads-leaders');
+  box.dispatchEvent(new k.window.Event('change', { bubbles: true }));
+  for (let i = 0; i < 40 && settingsPuts(k).length === n; i++) await wait(10);
+  assert.deepEqual(settingsPuts(k).at(-1).body.settings, { downloadsAuto: true, downloadsLeader: true });
+  k.close();
+});
+
+test('the embedded Check-in Display\'s doorbell: a hello now for this kiosk, a pull for the room; anything else ignored', async () => {
+  const k = boot({ journey: ROOM, prefs: { 'awanaSyncSession.v1': SESSION }, tuning: { helloMs: 60_000, bellGapMs: 30 } });
+  fakePage(k);
+  await settle();
+  const id = JSON.parse(k.window.localStorage.getItem('awanaScreens.v1')).journey.id;
+  const frame = k.document.querySelector('#checkin-view iframe');
+  const ring = (data, { source = frame ? frame.contentWindow : null, origin = k.window.location.origin } = {}) =>
+    k.window.dispatchEvent(new k.window.MessageEvent('message', { data, source, origin }));
+  const pulls = () => k.calls.filter((c) => c.route === '/v1/state').length;
+  const h0 = hellos(k).length;
+  const p0 = pulls();
+  if (frame) {
+    ring({ type: 'awana-display:sync-doorbell', what: 'screen-action', id });
+    ring({ type: 'awana-display:sync-doorbell', what: 'screen-action', id }); // a burst is one hello
+    await wait(80);
+    await settle();
+    assert.equal(hellos(k).length, h0 + 1);
+    ring({ type: 'awana-display:sync-doorbell', what: 'journey' });
+    await wait(300);
+    await settle();
+    assert.equal(pulls(), p0 + 1);
+    // Another screen's id, another sender, another origin, or another message: nothing.
+    ring({ type: 'awana-display:sync-doorbell', what: 'screen-action', id: 'tv_aaaaaaaaaaaaaaaaaaaa' });
+    ring({ type: 'awana-display:sync-doorbell', what: 'screen-action', id }, { source: k.window });
+    ring({ type: 'awana-display:sync-doorbell', what: 'screen-action', id }, { origin: 'https://evil.example' });
+    ring({ type: 'awana-display:toggle-fullscreen', what: 'screen-action', id });
+    await wait(80);
+    await settle();
+    assert.equal(hellos(k).length, h0 + 1);
+  } else {
+    assert.fail('the kiosk page has its Check-in Display iframe');
+  }
   k.close();
 });

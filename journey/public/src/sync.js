@@ -34,7 +34,22 @@
      lobby's own slot, awanaScreens.v1, under 'journey'. A hello every two
      minutes, and one when the status changes, never two within a minute.
      Silent when signed out, unreachable, or in configure mode (the app's
-     Settings window is not a second kiosk). */
+     Settings window is not a second kiosk).
+   - The settings page can work this kiosk's "Lessons on this computer"
+     (owner 2026-10-12, /settings → Journey): the hello's answer carries what
+     it asked since the last hello (`actions`, each handed over once by the
+     service, lobby/worker/src/routes.md 10.8), checked against
+     REMOTE_ACTIONS and run through schedule.js's own buttons
+     (window.journeySettingsPage); and this kiosk's two switches (automatic
+     download, Leader Videos) are its own settings there, taken when the
+     page changed them and sent up when they were changed here.
+   - No socket of its own, so the embedded Check-in Display (which listens)
+     passes the service's doorbell up with postMessage
+     ({type: 'awana-display:sync-doorbell', what, id}, same origin, from that
+     very iframe only): 'journey' pulls the room settings now, a 'screen' or
+     'screen-action' for THIS kiosk's id says hello now (never twice in
+     bellGapMs). Without it, the ten-minute pull and two-minute hello still
+     carry everything. */
 
 (function () {
   'use strict';
@@ -68,7 +83,13 @@
   var SCREEN_KIND = 'journey';
   var SCREEN_NAME = 'Journey kiosk';
   var SCREEN_ID_RE = /^[A-Za-z0-9_-]{16,64}$/;
-  var SCREEN_TUNING = { helloMs: 2 * 60 * 1000, minGapMs: 60 * 1000 };
+  var SCREEN_TUNING = { helloMs: 2 * 60 * 1000, minGapMs: 60 * 1000, bellGapMs: 3000, ackMs: 4000, ackWindowMs: 30 * 1000, prefsDelayMs: 1000 };
+  // What the settings page may ask this kiosk to do: exactly the lobby's
+  // SCREEN_ACTIONS.journey (lobby/src/lib/syncSpecs.js; its screenSpecs.test.js
+  // reads this line and fails if the two lists differ).
+  var REMOTE_ACTIONS = ['start-downloads', 'pause-downloads', 'resume-downloads', 'stop-downloads', 'delete-downloads'];
+  var REMOTE_ACTIONS_MAX = 5;
+  var DOORBELL_MESSAGE = 'awana-display:sync-doorbell';
   var STATUS_ERROR_MAX = 120;
   var CONFIGURE = (function () {
     try { return new URLSearchParams(window.location.search).get('configure') === '1'; } catch (e) { return false; }
@@ -82,6 +103,10 @@
   var lastHelloAt = 0;
   var lastStatusSent = '';
   var screenGone = false; // a service without the registry (404): stop asking
+  var ackUntil = 0; // until then, a status change says hello after ackMs (a command was just run)
+  var bellTimer = null;
+  var pullTimer = null;
+  var prefsTimer = null;
 
   function get(key) {
     try { return localStorage.getItem(key); } catch (e) { return null; }
@@ -241,10 +266,9 @@
   // A test may shorten the waits (read at each use).
   function screenTuning() {
     var t = window.journeyScreenTuning || {};
-    return {
-      helloMs: typeof t.helloMs === 'number' ? t.helloMs : SCREEN_TUNING.helloMs,
-      minGapMs: typeof t.minGapMs === 'number' ? t.minGapMs : SCREEN_TUNING.minGapMs,
-    };
+    var out = {};
+    Object.keys(SCREEN_TUNING).forEach(function (k) { out[k] = typeof t[k] === 'number' ? t[k] : SCREEN_TUNING[k]; });
+    return out;
   }
 
   function screensAll() {
@@ -304,6 +328,7 @@
       lastSavedAt: typeof s.lastSavedAt === 'string' ? s.lastSavedAt : null,
       error: typeof s.error === 'string' && s.error ? s.error.slice(0, STATUS_ERROR_MAX) : null,
       auto: s.auto === true,
+      leaders: s.leaders !== false,
       known: supported && s.known === true,
       supported: supported,
     };
@@ -337,7 +362,129 @@
       if (status) lastStatusSent = snapshot;
       var name = res.body.screen.name;
       if (typeof name === 'string' && name && name !== slot.name) saveScreenSlot({ name: name.slice(0, 40) });
+      reconcilePrefs(res.body.settings);
+      if (Array.isArray(res.body.actions)) runActions(res.body.actions);
     });
+  }
+
+  /* ── What the settings page asked (the hello's answer) ── */
+
+  function remote() {
+    var r = window.journeySettingsPage;
+    return r && typeof r === 'object' ? r : null;
+  }
+
+  /* Each allowlisted command, in order, through schedule.js's own buttons;
+     then a hello a few seconds later so the page sees the new state. */
+  function runActions(list) {
+    var r = remote();
+    if (!r || typeof r.command !== 'function') return 0;
+    var ran = 0;
+    for (var i = 0; i < list.length && i < REMOTE_ACTIONS_MAX; i++) {
+      var action = list[i] && typeof list[i] === 'object' ? list[i].action : null;
+      if (REMOTE_ACTIONS.indexOf(action) === -1) continue;
+      try { if (r.command(action)) ran++; } catch (e) { /* the next press tries again */ }
+    }
+    if (ran) {
+      ackUntil = Date.now() + screenTuning().ackWindowMs;
+      helloAfter(screenTuning().ackMs);
+    }
+    return ran;
+  }
+
+  function helloAfter(ms) {
+    clearTimeout(statusTimer);
+    statusTimer = setTimeout(function () { statusTimer = null; hello(); }, ms);
+  }
+
+  /* The two switches, in the service's shape (only real booleans). */
+  function cleanPrefs(s) {
+    var out = {};
+    if (s && typeof s === 'object') {
+      if (typeof s.downloadsAuto === 'boolean') out.downloadsAuto = s.downloadsAuto;
+      if (typeof s.downloadsLeader === 'boolean') out.downloadsLeader = s.downloadsLeader;
+    }
+    return out;
+  }
+  function localPrefs() {
+    var r = remote();
+    if (!r || typeof r.prefs !== 'function') return null;
+    var p;
+    try { p = r.prefs(); } catch (e) { return null; }
+    return p && typeof p === 'object' ? { downloadsAuto: p.auto === true, downloadsLeader: p.leaders !== false } : null;
+  }
+  function samePrefs(a, b) {
+    return a.downloadsAuto === b.downloadsAuto && a.downloadsLeader === b.downloadsLeader;
+  }
+  function syncedPrefs() {
+    var slot = screenSlot();
+    var synced = slot && slot.synced;
+    return synced && typeof synced === 'object' && typeof synced.savedAt === 'string'
+      ? { savedAt: synced.savedAt, settings: cleanPrefs(synced.settings) } : null;
+  }
+
+  /* The service's copy of this kiosk's switches against this computer's:
+     changed there since they last agreed = take it; else a change made here
+     (or a service that has none yet) goes up. */
+  function reconcilePrefs(raw) {
+    var local = localPrefs();
+    if (!local) return;
+    var there = raw && typeof raw === 'object' && typeof raw.savedAt === 'string'
+      ? { savedAt: raw.savedAt, settings: cleanPrefs(raw.settings) } : null;
+    var agreed = syncedPrefs();
+    if (there && (!agreed || agreed.savedAt !== there.savedAt)) {
+      var patch = {};
+      if (typeof there.settings.downloadsAuto === 'boolean') patch.auto = there.settings.downloadsAuto;
+      if (typeof there.settings.downloadsLeader === 'boolean') patch.leaders = there.settings.downloadsLeader;
+      try { remote().setPrefs(patch); } catch (e) { /* the next hello tries again */ }
+      saveScreenSlot({ synced: there });
+      local = localPrefs() || local;
+      if (!samePrefs(local, there.settings)) pushPrefs(local); // a switch the service did not have yet
+      return;
+    }
+    if (!there || !agreed || !samePrefs(local, agreed.settings)) pushPrefs(local);
+  }
+
+  function pushPrefs(prefs) {
+    var s = session();
+    var slot = screenSlot();
+    if (CONFIGURE || !base || screenGone || !s || !slot) return Promise.resolve();
+    return request('/v1/screens/' + encodeURIComponent(slot.id) + '/settings', { method: 'PUT', body: { settings: prefs }, session: s })
+      .then(function (res) {
+        if (res.ok && res.body && typeof res.body.savedAt === 'string') {
+          saveScreenSlot({ synced: { savedAt: res.body.savedAt, settings: cleanPrefs(res.body.settings) } });
+        }
+      });
+  }
+
+  /* A tick box changed here: up a second later, if it differs from the service's. */
+  function schedulePrefsPush() {
+    if (CONFIGURE || !base || screenGone || !session()) return;
+    clearTimeout(prefsTimer);
+    prefsTimer = setTimeout(function () {
+      var local = localPrefs();
+      var agreed = syncedPrefs();
+      if (local && (!agreed || !samePrefs(local, agreed.settings))) pushPrefs(local);
+    }, screenTuning().prefsDelayMs);
+  }
+
+  /* The embedded Check-in Display rang: the service has something for this kiosk. */
+  function onDoorbell(event) {
+    var frame = document.querySelector('#checkin-view iframe');
+    if (!frame || event.source !== frame.contentWindow || event.origin !== window.location.origin) return;
+    var d = event.data;
+    if (!d || typeof d !== 'object' || d.type !== DOORBELL_MESSAGE) return;
+    if (CONFIGURE || !base || !session()) return;
+    if (d.what === 'journey') {
+      clearTimeout(pullTimer);
+      pullTimer = setTimeout(pull, 250);
+      return;
+    }
+    if (d.what !== 'screen' && d.what !== 'screen-action') return;
+    var slot = screenSlot();
+    if (!slot || d.id !== slot.id || bellTimer) return;
+    var wait = Math.max(0, lastHelloAt + screenTuning().bellGapMs - Date.now());
+    bellTimer = setTimeout(function () { bellTimer = null; hello(); }, wait);
   }
 
   /* The download status changed: a hello when it differs from the last one
@@ -346,7 +493,8 @@
     if (CONFIGURE || !base || screenGone || !session() || statusTimer) return;
     var status = lessonsStatus();
     if (!status || JSON.stringify(status) === lastStatusSent) return;
-    var wait = Math.max(0, lastHelloAt + screenTuning().minGapMs - Date.now());
+    var gap = Date.now() < ackUntil ? screenTuning().ackMs : screenTuning().minGapMs;
+    var wait = Math.max(0, lastHelloAt + gap - Date.now());
     statusTimer = setTimeout(function () {
       statusTimer = null;
       var now = lessonsStatus();
@@ -425,7 +573,11 @@
       card.addEventListener('change', schedulePush);
       card.addEventListener('input', schedulePush);
       card.addEventListener('click', schedulePush);
+      card.addEventListener('change', function (e) {
+        if (e.target && (e.target.id === 'downloads-auto' || e.target.id === 'downloads-leaders')) schedulePrefsPush();
+      });
     }
+    window.addEventListener('message', onDoorbell);
     document.addEventListener('click', function (e) {
       if (e.target && e.target.closest && e.target.closest('#cc-btn, .cc-btn, [data-captions-toggle]')) schedulePush();
     });
@@ -476,7 +628,7 @@
   // Test seam: the jsdom harness drives the same functions the page uses.
   window.journeySync = {
     readRoom: readRoom, applyRoom: applyRoom, pull: pull, push: push, signIn: signIn, signOut: signOut, indexRetryWait: indexRetryWait,
-    hello: hello, lessonsStatus: lessonsStatus,
+    hello: hello, lessonsStatus: lessonsStatus, runActions: runActions, reconcilePrefs: reconcilePrefs,
   };
 
   start();
