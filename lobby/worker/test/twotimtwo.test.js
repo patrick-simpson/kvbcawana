@@ -116,6 +116,14 @@ describe('the check-in report parser', () => {
     expect(parseCheckinReport(page())).toBeNull();
   });
 
+  it('before the first check-in the report has no club table: by its title an empty night, never otherwise', () => {
+    const bare = (title) => `<html><head><title>${title}</title></head><body><form><table><tr><td>Date</td></tr></table></form></body></html>`;
+    expect(parseCheckinReport(bare('KVBC - Checkin Report'))).toEqual({ entries: [], declared: 0 });
+    expect(parseCheckinReport(bare('KVBC - Check-in Report'))).toEqual({ entries: [], declared: 0 });
+    expect(parseCheckinReport(bare('KVBC - Clubbers'))).toBeNull();
+    expect(parseCheckinReport(`<html><head><title>KVBC - Checkin Report</title></head><body>${LOGIN_PAGE}</body></html>`)).toBeNull();
+  });
+
   // The extension runs as the volunteer, whose report has edit links; the
   // undo-only page is the check-in user's, which only this parser reads.
   it.each(Object.keys(SAMPLES).filter((k) => k !== 'undoOnly'))('agrees with the extension\'s own parser (%s)', async (name) => {

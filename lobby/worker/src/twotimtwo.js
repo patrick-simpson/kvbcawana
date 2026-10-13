@@ -103,6 +103,7 @@ const squash = (text) => String(text || '').trim().replace(/\s+/g, ' ');
  *
  * Rules, each from a bug (printer/docs/TWOTIMTWO.md "the markup, exactly"): one table
  * per club, named only by its crest's alt; tables without a crest are skipped;
+ * no club table at all is an empty night only on a page titled as the report;
  * a child is a row with an edit link or an undo control (the check-in user
  * gets only the undo); the name is the text of the cell holding it with every
  * link removed, the next cell only when that is empty; a summary cell is never a
@@ -122,7 +123,6 @@ export function parseCheckinReport(html) {
   if (!html || isLoginPage(html)) return null;
   const doc = documentOf(html);
   const tables = [...doc.querySelectorAll('table')];
-  if (!tables.length) return null;
   /** @type {{clubberId: string, name: string, club: string, friend?: boolean, bible?: boolean}[]} */
   const entries = [];
   let declared = 0;
@@ -183,8 +183,20 @@ export function parseCheckinReport(html) {
       entries.push({ clubberId: idm[1], name, club, ...(friend ? { friend: true } : {}), ...(bible ? { bible: true } : {}) });
     }
   }
-  if (!readAnyClub) return null;
+  // No club table: before the night's first check-in TwoTimTwo draws the report
+  // with none at all, so the report's own title says it is an empty night (as
+  // the laptop's extension reads it). Any other page is no report.
+  if (!readAnyClub) return isReportPage(doc) ? { entries: [], declared: 0 } : null;
   return { entries, declared: declaredAll ? declared : null };
+}
+
+/** The check-in report's own title ("KVBC - Checkin Report"). */
+const REPORT_TITLE_RE = /\bcheck-?\s*in report\b/i;
+
+/** Is this TwoTimTwo's check-in report, by its title? @param {Document} doc */
+function isReportPage(doc) {
+  const title = doc.querySelector('title');
+  return REPORT_TITLE_RE.test(squash(title ? title.textContent : ''));
 }
 
 /**

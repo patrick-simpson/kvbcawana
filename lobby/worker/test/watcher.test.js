@@ -334,11 +334,11 @@ describe('the Settings test read', () => {
   });
 
   it('an unreadable page is described by its shape, never its text', async () => {
-    const tt = fakeTwoTimTwo({ report: () => '<html><head><title>KVBC - Checkin Report</title></head><body><table><tr><td>Zed Uniquename</td></tr></table></body></html>' });
+    const tt = fakeTwoTimTwo({ report: () => '<html><head><title>KVBC - Maintenance</title></head><body><table><tr><td>Zed Uniquename</td></tr></table></body></html>' });
     const alarm = { at: null };
     const w = new Watcher({ storage: memoryStore(), env: ENV, fetchFn: tt.fetchFn, now: () => SUNDAY + slept.ms, sleep: async (ms) => { slept.ms += ms; }, alarms: { set: (a) => { alarm.at = a; }, get: () => alarm.at }, log: () => {} });
     const r = await w.testRead();
-    expect(r.test).toMatchObject({ ok: false, error: 'report-unreadable', shape: { title: 'KVBC - Checkin Report', tables: 1, clubTables: 0, loginForm: false } });
+    expect(r.test).toMatchObject({ ok: false, error: 'report-unreadable', shape: { title: 'KVBC - Maintenance', tables: 1, clubTables: 0, loginForm: false } });
     expect(JSON.stringify(r)).not.toContain('Uniquename');
   });
 });
