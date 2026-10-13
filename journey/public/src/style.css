@@ -249,15 +249,18 @@ html.cursor-hidden * {
 }
 
 /* Letter-spacing also trails the last letter, so the same amount on the left
-   keeps the word centred under the mark. */
+   keeps the word centred under the mark. Set like every other Londrina label
+   on the page (0.06em; design review 2026-10-13): tracked out to a third of
+   an em the condensed face read as a generic spaced-caps eyebrow, not the
+   catalog's tight labels. */
 #journey-splash-advocates {
-  padding-left: 0.34em;
+  padding-left: 0.06em;
   font-family: var(--jr-font-label);
   font-size: clamp(0.95rem, 2.4 * var(--u), 3rem);
   line-height: 1;
   color: var(--jr-tint);
   text-transform: uppercase;
-  letter-spacing: 0.34em;
+  letter-spacing: 0.06em;
 }
 
 /* "Large Group Time" is Journey's corner tab: the kit's wavy tab shape in the
@@ -298,7 +301,7 @@ html.cursor-hidden * {
   line-height: 1;
   color: var(--jr-tint);
   text-transform: uppercase;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.06em;
 }
 
 /* The lesson's name, shouted: Paytone One in caps with the deep shade as a hard
@@ -1910,13 +1913,14 @@ html.configure-mode #settings-card {
   height: auto;
 }
 
-/* Small tracked labels over the shouts, in Londrina, like the splash. */
+/* Small labels over the shouts, in Londrina, set like the splash's (0.06em,
+   the page's one label tracking; padding-left balances the trailing space). */
 .journey-intro-kicker {
-  padding-left: 0.3em;
+  padding-left: 0.06em;
   font-family: var(--jr-font-label);
   font-size: clamp(1rem, 2.6 * var(--u), 3.2rem);
   line-height: 1;
-  letter-spacing: 0.3em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--jr-tint);
 }
