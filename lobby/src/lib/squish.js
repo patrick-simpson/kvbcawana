@@ -94,8 +94,7 @@ const POP_SEC = 0.46;
 /**
  * An operator's press: squash in over `ms`, then spring back over
  * `releaseMs` on releaseEasing(). The pill's amount is DEPTH.press /
- * BULGE.press; a control that needs a softer (or, small and round, a
- * firmer) squash has its own. app.css carries every number as a `--squish-*`
+ * BULGE.press; a control that needs a softer squash has its own. app.css carries every number as a `--squish-*`
  * property on :root, and sourceScans.test.js pins the two equal.
  */
 export const PRESS = Object.freeze({
@@ -103,7 +102,6 @@ export const PRESS = Object.freeze({
   releaseMs: 750,
   scaleX: 1.04,
   scaleY: 0.92,
-  gear: Object.freeze({ scaleX: 1.1, scaleY: 0.88 }),
   tab: Object.freeze({ scaleX: 1.03, scaleY: 0.94 }),
   tile: Object.freeze({ scaleX: 1.02, scaleY: 0.94 }),
   box: Object.freeze({ scaleX: 0.88, scaleY: 0.88 }),

@@ -3,14 +3,14 @@ import { useDisplayLogin } from '../hooks/useDisplayLogin.js';
 
 // First-run helper for the SIGNAGE page. An unconfigured TV used to look
 // exactly like a healthy one — placeholder scene, no status sticker, the
-// gear faded out — so a volunteer had nothing to click and no idea why no
+// no way in drawn — so a volunteer had nothing to click and no idea why no
 // check-in ever appeared. Mirrors the countdown page's SetupChecklist
 // (which is Tailwind and must stay out of this CSS graph) with signage-
 // native markup: the card is a `.panel`, so it inherits the cream paper,
 // hint and button styles with one positioning rule.
 //
 // Where it stands is the lobby's business, not the card's: it sits in the
-// strip under the copy's lowest line, beside the gear (OVERLAY.setup in
+// strip under the copy's lowest line, clear of the left gutter (OVERLAY.setup in
 // src/lib/overlayFit.js), and App asks `setupUp()` there whether the room
 // has space for it right now (not over a name, a poster, the pickup board,
 // which shares its seat, the tonight strip...). Its own judgement is only "is this screen still

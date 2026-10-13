@@ -1024,12 +1024,6 @@ html, body, #root {
   opacity: 0 !important;
   transition: opacity var(--brand-dur-settle) var(--brand-ease-settle);
 }
-/* The idle gear would sit on the club's mark; it still comes back the
-   moment an operator moves the mouse. */
-.stage.checkin-active .settings-gear.idle {
-  opacity: 0;
-}
-
 /* Ambient particle layer (#26): snow / rain / sparkles behind the widgets.
    Pure CSS animation over a deterministic particle set — no JS per frame.
    z-index 1: above the background scene, below everything that talks. Flat,
@@ -1114,61 +1108,6 @@ html, body, #root {
   width: 100%;
   height: auto;
 }
-
-/* ── Settings gear button ──────────────────────────────────
-   A round kit chip: the chip charcoal printed a little out of register
-   behind a white keyline ring, the gear in white. */
-.settings-gear {
-  --gear-line: max(2px, calc(0.14 * var(--u)));
-  position: absolute;
-  left: var(--safe-inset);
-  bottom: var(--safe-inset);
-  width: max(46px, calc(2.9 * var(--u)));
-  height: max(46px, calc(2.9 * var(--u)));
-  border-radius: 50%;
-  background: transparent;
-  border: var(--gear-line) solid #fff;
-  color: #fff;
-  display: grid;
-  place-items: center;
-  cursor: pointer;
-  /* The idle fade, the hover spin, and the soft squish's spring back from a
-     press (see "The soft squish: operator presses" below for why each
-     timing list is written out literally, fallback first). */
-  transition-property: opacity, transform, scale;
-  transition-duration: var(--brand-dur-exit), var(--brand-dur-quick), var(--squish-release);
-  transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1), cubic-bezier(0.34, 1.56, 0.64, 1), cubic-bezier(0.34, 1.56, 0.64, 1);
-  transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1), cubic-bezier(0.34, 1.56, 0.64, 1), linear(0, 0.213, 0.605, 0.93, 1.103, 1.142, 1.106, 1.05, 1.006, 0.984, 0.98, 0.986, 0.994, 1, 1.002, 1.003, 1);
-  touch-action: manipulation;
-  -webkit-tap-highlight-color: transparent;
-  padding: 0;
-  z-index: 50;
-}
-.settings-gear::before {
-  content: '';
-  position: absolute;
-  inset: calc(-1 * var(--gear-line));
-  border-radius: 50%;
-  background: var(--brand-chip);
-  transform: translate(calc(0.22 * var(--u)), calc(0.13 * var(--u)));
-  z-index: -1;
-}
-.settings-gear svg {
-  width: 48%;
-  height: 48%;
-}
-.settings-gear:hover { transform: rotate(45deg) scale(1.05); }
-/* Its press: a firmer squish than a pill's (a small round key), on the
-   individual `scale`, which composes with the hover spin and April Fools'
-   transform instead of fighting them; its origin stays where the rotation
-   turns. */
-.settings-gear:active {
-  scale: var(--squish-gear-x) var(--squish-gear-y);
-  transition-duration: var(--brand-dur-exit), var(--brand-dur-quick), var(--squish-press);
-  transition-timing-function: var(--brand-ease-settle), var(--brand-ease-pop), var(--brand-ease-settle);
-}
-/* Faint, not gone: a volunteer at an unconfigured TV must be able to find the way in. */
-.settings-gear.idle { opacity: 0.12; pointer-events: auto; }
 
 /* ── Panels: the operator's kit card ─────────────────────────────────────
    Settings, the slide editor and the debug panel (and the first-run card,
@@ -1811,10 +1750,8 @@ html, body, #root {
   --squish-release: 750ms;
   --squish-press-x: 1.04;
   --squish-press-y: 0.92;
-  /* Per control: the gear is small and round (firmer), a tab is type and a
-     debug tile is wide (softer), a checkbox squishes evenly. */
-  --squish-gear-x: 1.1;
-  --squish-gear-y: 0.88;
+  /* Per control: a tab is type and a debug tile is wide (softer), a
+     checkbox squishes evenly. */
   --squish-tab-x: 1.03;
   --squish-tab-y: 0.94;
   --squish-tile-x: 1.02;
@@ -1858,7 +1795,7 @@ html, body, #root {
    up past where it has gone (12px of its own, 11 drawn): it belongs to the
    control, so up-in-place is a click on it. It only exists under :active,
    where `scale` has made the control a containing block for it, so no
-   `position` is set on the control itself (the gear is absolute already).
+   `position` is set on the control itself (the control is absolute already).
    The kill switches below hide it with the squash it compensates for. */
 .panel button:not(:disabled):active::after,
 .panel .actions label:active::after,
@@ -2193,13 +2130,14 @@ html, body, #root {
    - the tonight ticker, which moves left with it: a centred box moves by
      half its right inset, so twice the chip's shift keeps the gap the two
      have standalone. On a narrow screen that would run the widest night
-     (four stats, three-digit counts: ~58u) into the settings gear, because
-     the row is nearly full there (640x480: gear, ticker, chip and the
+     (four stats, three-digit counts: ~58u) into the bottom-left gutter (where the
+     settings gear stood until 2026-10-13), because
+     the row is nearly full there (640x480: gutter, ticker, chip and the
      host's toggle leave ~15px between them), so it never moves further than
-     centring it between the gear (its left inset plus 52px, or 2.9u on a
+     centring it between that gutter (its left inset plus 52px, or 2.9u on a
      big screen) and the widest corner chip (the clock, 15.3u).
      That centring is only a place, not a size: on a narrow screen (a
-     portrait phone) the room between the gear and the widest chip is
+     portrait phone) the room between the gutter and the widest chip is
      narrower than the widest night (174px for 226px at 390x844), so the
      ticker is capped to that room, less its own stat gap (0.8u) on each
      side, and wraps its stats into rows instead of running under the chip.
@@ -2250,8 +2188,8 @@ html.embedded .panel--tabbed {
 html.embedded .debug {
   max-width: calc(100% - 1.5rem - var(--host-clear-x));
 }
-/* The first-run card is a strip between the gear and the corner chip, or a
-   stacked card above the gear on a phone, centred by margin-inline: a
+/* The first-run card is a strip between the left gutter and the corner chip, or a
+   stacked card above the bottom-left corner on a phone, centred by margin-inline: a
    max-width here would only re-centre it, so its right EDGE keeps clear of
    the column (the phone card ran full width, under it). */
 html.embedded .panel.setup-card {
@@ -2431,7 +2369,6 @@ input:focus-visible {
   .debug {
     animation: none;
   }
-  .settings-gear,
   .panel button,
   .panel .actions label,
   .panel a.panel-button,
@@ -2444,7 +2381,6 @@ input:focus-visible {
   }
   /* No squash either: the press is the flat 2px sink, at once. Each selector
      is the press rule's own, so it matches its specificity and wins by order. */
-  .settings-gear:active,
   .panel button:not(:disabled):active,
   .panel .actions label:active,
   .panel a.panel-button:active,
@@ -2488,7 +2424,6 @@ input:focus-visible {
    Pi is the flat, instant 2px sink it always was (the soft squish's presses,
    above). Every press rule is named, one prefix deeper so it always wins;
    sourceScans.test.js fails a new press rule that is not. */
-.zero-animation-mode .settings-gear:active,
 .zero-animation-mode .panel button:not(:disabled):active,
 .zero-animation-mode .panel .actions label:active,
 .zero-animation-mode .panel a.panel-button:active,
@@ -2588,10 +2523,6 @@ input:focus-visible {
   .slide-card-preview { margin-bottom: 0.9rem; }
   .slide-card-fields { grid-column: 1; }
   .debug { top: 0.75rem; left: 0.75rem; width: calc(100% - 1.5rem); max-height: calc(100% - 1.5rem); }
-
-  /* Bigger touch target for the gear on phones. */
-  .settings-gear { width: 52px; height: 52px; }
-  .settings-gear.idle { opacity: 0.35; pointer-events: auto; }
 }
 
 /* ── Short screens (landscape phones): compact corner chrome. The lobby's
@@ -2669,8 +2600,8 @@ input:focus-visible {
 
 /* The live counter: "3 club nights left" / "Tonight!". Top-LEFT on
    purpose: the corner widget stack (clock, weather, tally) owns the
-   top right, and the settings gear owns the bottom left only as a
-   faded 44px target. The slot holds the position so the pill itself is
+   top right, and the bottom left is kept clear (the settings gear stood there
+   as a faded 44px target until 2026-10-13). The slot holds the position so the pill itself is
    free to pulse on the mid-hold beat. */
 .promo-chip-slot {
   position: absolute;
@@ -2933,8 +2864,8 @@ input:focus-visible {
 /* The kit's count chips (the printer dashboard's club chips: a pill, white
    Londrina caps, a Paytone One number) in the house blue, on the house waves
    bottom-centre. Its widest night (four stats, three-digit counts: 263 /
-   48 / 112 / 19) runs ~59.5u, inside the 60u between the settings gear
-   (ends ~4.3u) and the corner chip (from ~82u). Below the check-in wave's z-index as a belt-and-braces
+   48 / 112 / 19) runs ~59.5u, inside the 60u between the left gutter
+   (the old gear's seat, ends ~4.3u) and the corner chip (from ~82u). Below the check-in wave's z-index as a belt-and-braces
    (it also unmounts via `active` while a banner is up, see
    TonightTicker.jsx). Centred without translateX: framer-motion owns the
    transform. */
@@ -3038,7 +2969,7 @@ input:focus-visible {
 /* Critical: unmissable. The hot chip, big, centred on the copy's own box
    (12u to 46u of the 16:9 frame, which is centred on any screen), at the
    highest z-index on the stage (above the check-in moment's 10, the
-   toast's 40 and the gear's 50) so "CLUB CANCELLED TONIGHT" always wins.
+   toast's 40) so "CLUB CANCELLED TONIGHT" always wins.
    Still below the Settings / slide editor / debug panels (100+). */
 .notice-banner--critical {
   --plate-label: calc(2 * var(--u));
@@ -3161,8 +3092,8 @@ input:focus-visible {
    One. It always stands in the foot (src/lib/overlayFit.js OVERLAY.foot,
    the first-run card's seat): the strip under the copy's lowest line (45u
    down the 16:9 box, 16.875u under its middle) down to the corner chip's own
-   line 1.8u off the bottom, from a gap past the gear to a gap short of the
-   corner chip (82u), so it never covers slide copy, the gear or the chip, and
+   line 1.8u off the bottom, from a gap past the left gutter to a gap short of the
+   corner chip (82u), so it never covers slide copy or the chip, and
    the slides above it carry on as normal (owner, 2026-10-07: the list "should
    just take the bottom of the screen"). The strip's words are sized in em off
    one root here, in the lobby's u with an 11px floor, so the Pi's 640x480
@@ -3179,7 +3110,7 @@ input:focus-visible {
   left: calc(var(--safe-inset) + max(46px, calc(2.9 * var(--u))) + calc(1.2 * var(--u)));
   right: calc(19.2 * var(--u));
   /* On an ultrawide window the strip would run far past the 16:9 box: keep
-     it to the box's width, centred between the gear and the chip, as the
+     it to the box's width, centred between the gutter and the chip, as the
      first-run card does. */
   max-width: calc(80 * var(--u));
   margin-inline: auto;
@@ -3472,15 +3403,12 @@ input:focus-visible {
 /* ─── April Fools (#21) ─────────────────────────────────────────────────────
    config.aprilFools flips the whole stage upside down — but ONLY on April 1st
    (App.jsx gates on the date, so the toggle is inert the other 364 days).
-   Escape hatches are non-negotiable: the settings gear and the settings panel
-   counter-rotate so an operator can always find the off switch right-side up.
-   The gear ends up in the opposite corner while flipped — that's part of the
-   joke — but its icon reads upright and it still opens a normal panel. */
+   Escape hatch is non-negotiable: the settings panel counter-rotates so an
+   operator can always find the off switch right-side up (Ctrl+Shift+S, or
+   the settings page, opens it; neither is drawn on the stage). */
 .stage.april-fools { transform: rotate(180deg); }
-.stage.april-fools .settings-gear,
 .stage.april-fools .panel-backdrop,
 .stage.april-fools .debug { transform: rotate(180deg); }
-.stage.april-fools .settings-gear:hover { transform: rotate(225deg) scale(1.05); }
 
 /* ── First-run card (signage): a kit card in the foot of the lobby ───
    The printer dashboard's card: white, a hard offset in the house blue,
@@ -3489,9 +3417,9 @@ input:focus-visible {
    so it keeps the panel's hint and kbd styles.
 
    It stands in the strip UNDER the copy's lowest line (OVERLAY.setup in
-   src/lib/overlayFit.js: 45u down the 16:9 box), between the gear and the
+   src/lib/overlayFit.js: 45u down the 16:9 box), between the left gutter and the
    corner chip, because nothing the lobby draws on a slide comes below that
-   line. Parked above the gear it was 25u square and inside the copy's own
+   line. Parked above the bottom-left corner it was 25u square and inside the copy's own
    box at every size: it hid the start of a headline at 720p and the chip
    row at 1080p. The strip is ~11u tall, so the words lie in columns: the
    heading with the buttons beside it, the two steps side by side under
@@ -3506,7 +3434,7 @@ input:focus-visible {
   font-size: max(12px, calc(0.78 * var(--u)));
   width: auto;
   /* On an ultrawide window the strip would run far past the 16:9 box the
-     copy stands in: keep it to the box's width, centred between the gear
+     copy stands in: keep it to the box's width, centred between the gutter
      and the chip. */
   max-width: calc(80 * var(--u));
   margin-inline: auto;
@@ -3588,7 +3516,7 @@ input:focus-visible {
   border: 2px solid var(--brand-ink);
 }
 .panel.setup-card .actions button.ghost:hover { background: rgba(35, 31, 32, 0.06); }
-/* A window too narrow for a strip (a phone) stacks the card above the gear,
+/* A window too narrow for a strip (a phone) stacks the card above the bottom-left corner,
    the way it always stood. No lobby TV is this narrow: the strip holds down
    to 800x600. */
 @media (max-width: 639px) {
@@ -3653,8 +3581,7 @@ details.advanced-fields > .hint { display: block; margin-bottom: 0.9rem; }
    .zero-animation-mode). 1920-wide TVs — the design and Playwright
    baseline viewport — are untouched: 2400px only reaches 1440p boxes, and
    32px at 3840 reproduces the 1080p proportions exactly. The panels are
-   sized in rem above for the same reason; the gear (touch target) and the
-   slide-card thumbnail (locked to its 0.15 frame scale) stay in px. */
+   sized in rem above for the same reason; the slide-card thumbnail (locked to its 0.15 frame scale) stay in px. */
 @media (min-width: 2400px) {
   html { font-size: 21px; }
 }
@@ -4026,7 +3953,7 @@ details.advanced-fields > .hint { display: block; margin-bottom: 0.9rem; }
   background: var(--brand-cloud);
   border: 1.5px solid var(--panel-card-line);
 }
-/* The board in it stands where it does on a 1920x1080 TV: the gear's edge
+/* The board in it stands where it does on a 1920x1080 TV: the left gutter's edge
    there (5.5u), and the strip's words in the lobby's u alone, since the 11px
    floor is for a real screen, not a TV drawn this small. */
 .board-preview .checkout-region {

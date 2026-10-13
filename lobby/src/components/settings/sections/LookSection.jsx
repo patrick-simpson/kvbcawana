@@ -43,7 +43,7 @@ export function JustForFunFold({ form, set }) {
         checked={form.aprilFools === true}
         onChange={set('aprilFools')}
         title="April Fools: flip this screen upside down"
-        hint="Only does anything on April 1st. Labels and the printer stay serious, and this settings panel (plus its gear) stays right-side up so you can always turn it off."
+        hint="Only does anything on April 1st. Labels and the printer stay serious, and this settings panel stays right-side up so you can always turn it off."
       />
     </details>
   );

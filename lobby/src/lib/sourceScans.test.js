@@ -45,8 +45,6 @@ describe('app.css spells the soft squish the way src/lib/squish.js does', () => 
       '--squish-release': `${PRESS.releaseMs}ms`,
       '--squish-press-x': String(PRESS.scaleX),
       '--squish-press-y': String(PRESS.scaleY),
-      '--squish-gear-x': String(PRESS.gear.scaleX),
-      '--squish-gear-y': String(PRESS.gear.scaleY),
       '--squish-tab-x': String(PRESS.tab.scaleX),
       '--squish-tab-y': String(PRESS.tab.scaleY),
       '--squish-tile-x': String(PRESS.tile.scaleX),
@@ -59,7 +57,7 @@ describe('app.css spells the soft squish the way src/lib/squish.js does', () => 
 
   it('every linear() easing is the spring\'s own release, character for character', () => {
     const easings = [...css.matchAll(/linear\([^)]*\)/g)].map((m) => m[0]);
-    expect(easings.length).toBeGreaterThanOrEqual(4); // the presses, the gear, the check, the entrances
+    expect(easings.length).toBeGreaterThanOrEqual(4); // the presses, the check, the entrances
     for (const e of easings) expect(e).toBe(releaseEasing());
   });
 
@@ -237,11 +235,10 @@ describe('the soft squish\'s presses stop in both kill switches (app.css)', () =
   /** Does some rule (in `media`, or in none) give `sel` the declaration `scale: none`? */
   const stills = (sel, media) => all.some((r) => r.media === media && selectorsOf(r).includes(sel) && valueOf(r.body, 'scale') === 'none');
 
-  it('finds the presses: the pills, the debug tiles, the tabs\' own rail, the gear and the checkbox', () => {
+  it('finds the presses: the pills, the debug tiles, the tabs\' own rail and the checkbox', () => {
     expect(presses).toEqual(expect.arrayContaining([
       '.panel button:not(:disabled):active',
       '.debug button:not(:disabled):active',
-      '.settings-gear:active',
       ".panel input[type='checkbox']:not(:disabled):active",
     ]));
   });
@@ -264,12 +261,12 @@ describe('the soft squish\'s presses stop in both kill switches (app.css)', () =
     for (const r of all.filter((x) => selectorsOf(x).some((sel) => /:active$/.test(sel)))) expect(valueOf(r.body, 'transform')).toBeUndefined();
   });
 
-  // April Fools turns the gear, the backdrop, the debug panel and the first-run
+  // April Fools turns the backdrop, the debug panel and the first-run
   // card 180deg with `transform`, about their origin: a squish that moved the
   // origin would swing them off their place, and one on `transform` would
   // undo the joke's escape hatch.
   it('the surfaces April Fools turns keep their origin, and their entrances animate only translate, scale and opacity', () => {
-    const turned = /\.(settings-gear|panel-backdrop|debug|setup-card)(?![\w-])/;
+    const turned = /\.(panel-backdrop|debug|setup-card)(?![\w-])/;
     const subject = (sel) => sel.split(/\s+|>|\+|~/).filter(Boolean).at(-1) ?? '';
     const moved = all.filter((r) => valueOf(r.body, 'transform-origin') && selectorsOf(r).some((sel) => turned.test(subject(sel))));
     expect(moved.map((r) => r.selector)).toEqual([]);

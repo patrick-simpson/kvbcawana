@@ -9,8 +9,8 @@ import { useEffect, useState } from 'react';
 // lazyPanel(load) returns a component that renders the panel itself once its
 // chunk is in hand, and its `fallback` prop (the panel's own chrome with a
 // one-line "Opening…") until then:
-// - `preload()` starts the import early (the gear's hover/focus/press, a
-//   shortcut, Settings opening for the editor and debug panel, the settings
+// - `preload()` starts the import early (the keyboard shortcut,
+//   Settings opening for the editor and debug panel, the settings
 //   page at boot). A panel mounted after its chunk landed is the real panel
 //   from its first render: no loading card, and a test that awaited
 //   `preload()` mounts it in the same act() as before the split.

@@ -184,7 +184,7 @@ describe("tonight's counter never runs above the printer's total", () => {
     await act(async () => { bound.checkin(kid({ at: Date.now() })); });
     expect(storedCount()).toBe(1);
 
-    await act(async () => { screen.getByLabelText('Open settings').click(); });
+    await act(async () => { window.dispatchEvent(new KeyboardEvent('keydown', { key: 'S', ctrlKey: true, shiftKey: true })); });
     await act(async () => { screen.getByRole('tab', { name: 'What screens show' }).click(); });
     await act(async () => { screen.getByText('Preview a check-in').click(); });
 

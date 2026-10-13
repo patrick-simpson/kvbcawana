@@ -5,7 +5,7 @@ import { liveChannel } from './liveChannel.js';
 // The pickup board in the foot (owner, 2026-10-07: "The still remaining kids
 // list should just take the bottom of the screen. It shouldn't take over all
 // of the announcements."), and Settings' demo, in a real browser: the board
-// stands in the strip under the copy's lowest line, between the gear and the
+// stands in the strip under the copy's lowest line, between the left gutter and the
 // corner chip, every plate and chip inside its run and the card, the slide
 // copy above it untouched, the 60-entry cap held at every size (names behind
 // "+N more" where even the smallest readable chips cannot hold them), a
@@ -37,7 +37,7 @@ const within = (inner, outer, slack = 0.5) => inner.x >= outer.x - slack && inne
 
 /**
  * Where everything stands, in px: the strip and the card, every plate and
- * chip against the run, the gear, the corner chip, and each drawn row of the
+ * chip against the run, the left gutter, the corner chip, and each drawn row of the
  * slide copy (a Range's client rects, so a full-width block box never stands
  * in for its words).
  */
@@ -75,19 +75,25 @@ const layout = (page) => page.evaluate(() => {
     size: document.querySelector('.stage .checkout-board')
       ? parseFloat(getComputedStyle(document.querySelector('.stage .checkout-board')).getPropertyValue('--name-size'))
       : null,
-    gear: box(document.querySelector('.settings-gear')),
+    // The bottom-left gutter (the settings gear's old seat, removed 2026-10-13).
+    gutter: (() => {
+      const inset = Math.max(24, 0.025 * Math.min(innerWidth, innerHeight));
+      return { right: inset + Math.max(46, 2.9 * Math.min(innerWidth / 100, innerHeight / 56.25)) };
+    })(),
+    gearDrawn: document.querySelector('.settings-gear') !== null,
     corner: box(document.querySelector('.corner-bottom .corner-chip')),
     rows,
   };
 });
 
-/** The strip's own rules: under the copy's lowest line, clear of the gear and the corner chip. */
+/** The strip's own rules: under the copy's lowest line, clear of the left gutter and the corner chip. */
 function expectInTheFoot(l) {
   expect(l.region.top).toBeGreaterThanOrEqual(l.frameTop + 45 * l.u - 1);
   expect(l.region.bottom).toBeLessThanOrEqual(l.vh - 1.8 * l.u + 1);
   expect(within({ x: l.board.left, y: l.board.top, width: l.board.right - l.board.left, height: l.board.bottom - l.board.top },
     { x: l.region.left, y: l.region.top, width: l.region.right - l.region.left, height: l.region.bottom - l.region.top })).toBe(true);
-  expect(l.region.left).toBeGreaterThanOrEqual(l.gear.right);
+  expect(l.gearDrawn).toBe(false);
+  expect(l.region.left).toBeGreaterThanOrEqual(l.gutter.right);
   if (l.corner) expect(l.region.right).toBeLessThanOrEqual(l.corner.left);
   for (const row of l.rows) expect(row.bottom).toBeLessThanOrEqual(l.region.top);
 }
@@ -244,13 +250,13 @@ pastFlagship.describe('a child leaving the list', () => {
       const banner = page.locator('.stage .checkout-leave--name');
       await expect(banner).toHaveText('Sophia has checked out');
       await expect(page.locator('.stage .checkout-board')).toHaveCount(0);
-      // In the strip, clear of the copy, the gear and the corner chip.
+      // In the strip, clear of the copy, the left gutter and the corner chip.
       const l = await layout(page);
       const b = await banner.boundingBox();
       const strip = await page.locator('.stage .checkout-leaves').boundingBox();
       expect(within(b, strip)).toBe(true);
       expect(strip.y).toBeGreaterThanOrEqual(l.frameTop + 45 * l.u - 1);
-      expect(strip.x).toBeGreaterThanOrEqual(l.gear.right);
+      expect(strip.x).toBeGreaterThanOrEqual(l.gutter.right);
       if (l.corner) expect(strip.x + strip.width).toBeLessThanOrEqual(l.corner.left);
       for (const row of l.rows) expect(row.bottom).toBeLessThanOrEqual(strip.y);
       // A few seconds, and the list is back without her.

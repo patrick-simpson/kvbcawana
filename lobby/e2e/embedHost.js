@@ -25,6 +25,17 @@ export function hostSquares(vw, vh) {
   return { toggle, gear: { ...x, top: toggle.top - 8 - 48, bottom: toggle.top - 8 } };
 }
 
+/**
+ * The bottom-left corner the lobby keeps clear (the settings gear stood there
+ * until 2026-10-13): `--safe-inset` in from the left and bottom, the old
+ * gear's size square. Written out here, not read from the app's CSS.
+ */
+export function leftGutter(vw, vh) {
+  const inset = Math.max(24, 0.025 * Math.min(vw, vh));
+  const size = Math.max(46, 2.9 * Math.min(vw / 100, vh / 56.25));
+  return { left: inset, top: vh - inset - size, right: inset + size, bottom: vh - inset };
+}
+
 /** A stand-in for the Journey page: the iframe, and its two buttons drawn where Journey draws them. */
 export const hostPage = (src) => `<!doctype html><html><head><meta charset="utf-8"><style>
   html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: #000; }

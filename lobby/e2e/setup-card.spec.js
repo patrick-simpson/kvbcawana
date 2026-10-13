@@ -10,7 +10,7 @@ import { expect, test } from './pastFlagship.js';
 // free (it covered the left of the upcoming-nights list at 720p and the
 // coming-up chips at 1080p). Both are strips in the bottom band now, the zone
 // each page's layout keeps clear:
-//   lobby     the strip under the copy's lowest line (45u), between the gear
+//   lobby     the strip under the copy's lowest line (45u), between the left gutter
 //             and the corner chip (OVERLAY.setup, src/lib/overlayFit.js)
 //   projector the bottom margin band, below the coming-up list's 51.75u
 //             (SETUP_NOTE, src/presentation/components/SetupChecklist.jsx)
@@ -70,7 +70,12 @@ const lobbyBoxes = (page) => page.evaluate(() => {
   for (const k of document.querySelectorAll('.lobby-kicker')) add('kicker', textBoxes(k));
   for (const s of document.querySelectorAll('.lobby-sub')) add('sub line', textBoxes(s));
   for (const c of document.querySelectorAll('.lobby-chip')) add('date chip', [box(c.getBoundingClientRect())]);
-  for (const el of document.querySelectorAll('.settings-gear')) add('gear', [box(el.getBoundingClientRect())]);
+  {
+    // The bottom-left gutter (the settings gear's old seat): nothing stands in it.
+    const inset = Math.max(24, 0.025 * Math.min(innerWidth, innerHeight));
+    const size = Math.max(46, 2.9 * u);
+    add('left gutter', [{ left: inset, top: innerHeight - inset - size, right: inset + size, bottom: innerHeight - inset }]);
+  }
   for (const el of document.querySelectorAll('.corner-bottom .corner-chip')) add('corner chip', [box(el.getBoundingClientRect())]);
   for (const el of document.querySelectorAll('.corner-stack > *')) add('top-right stack', [box(el.getBoundingClientRect())]);
   for (const el of document.querySelectorAll('.tonight-ticker, .checkout-region')) add('ticker or board', [box(el.getBoundingClientRect())]);
@@ -148,10 +153,14 @@ test.describe('the lobby\'s first-run card, 1280x720', () => {
     await expect(page.locator('.debug')).toHaveCount(0);
     await expect(page.locator('.tonight-ticker')).toBeVisible();
     await expect(page.locator('.setup-card')).toHaveCount(0);
-    // The strip sits clear of the gear and the corner chip, as it always did.
+    // The strip sits clear of the left gutter and the corner chip, as it always did.
+    // No gear is drawn on the TV any more (owner 2026-10-13).
+    await expect(page.locator('.settings-gear')).toHaveCount(0);
     const strip = await page.locator('.tonight-ticker').boundingBox();
-    for (const sel of ['.settings-gear', '.corner-bottom .corner-chip']) {
-      const other = await page.locator(sel).first().boundingBox();
+    const inset = Math.max(24, 0.025 * Math.min(1280, 720));
+    const size = Math.max(46, 2.9 * Math.min(1280 / 100, 720 / 56.25));
+    const gutter = { x: inset, y: 720 - inset - size, width: size, height: size };
+    for (const [sel, other] of [['left gutter', gutter], ['.corner-bottom .corner-chip', await page.locator('.corner-bottom .corner-chip').first().boundingBox()]]) {
       expect(overlaps(
         { left: strip.x, top: strip.y, right: strip.x + strip.width, bottom: strip.y + strip.height },
         { left: other.x, top: other.y, right: other.x + other.width, bottom: other.y + other.height },

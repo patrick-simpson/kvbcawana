@@ -53,7 +53,7 @@ describe('the overlay bands', () => {
     expect(css).toMatch(new RegExp(`\\.top-flags \\{[^}]*max-width: calc\\(${OVERLAY.flags.width} \\* var\\(--u\\)\\)`));
   });
 
-  it('seat the pickup board in the first-run card\'s strip: under the copy\'s lowest line, between the gear and the corner chip', () => {
+  it('seat the pickup board in the first-run card\'s strip: under the copy\'s lowest line, between the left gutter and the corner chip', () => {
     // One seat, two tenants (owner, 2026-10-07: the list takes the bottom of
     // the screen, never the announcements above it).
     expect(OVERLAY.foot).toBe(OVERLAY.setup);
@@ -68,7 +68,7 @@ describe('the overlay bands', () => {
     // Its floor is the corner chip's own line, 1.8u off the bottom ...
     expect(rule).toMatch(new RegExp(`bottom: calc\\(${OVERLAY.foot.bottom} \\* var\\(--u\\)\\)`));
     expect(css).toMatch(new RegExp(`\\.corner-bottom \\{[^}]*bottom: calc\\(${OVERLAY.foot.bottom} \\* min\\(1vw, 1\\.7778vh\\)\\)`));
-    // ... and it runs from a gap past the gear to a gap short of the chip,
+    // ... and it runs from a gap past the gutter to a gap short of the chip,
     // exactly as the first-run card does.
     expect(rule).toMatch(new RegExp(`right: calc\\(${100 - OVERLAY.foot.chipLeft + OVERLAY.foot.gap} \\* var\\(--u\\)\\)`));
     expect(rule).toMatch(new RegExp(`left: calc\\(var\\(--safe-inset\\) \\+ max\\(46px, calc\\(2\\.9 \\* var\\(--u\\)\\)\\) \\+ calc\\(${OVERLAY.foot.gap} \\* var\\(--u\\)\\)\\)`));
@@ -89,7 +89,7 @@ describe('the overlay bands', () => {
     expect(mid + 22 / 2).toBeLessThan(OVERLAY.foot.top);
   });
 
-  it('keep the first-run card\'s seat under the copy\'s lowest line, between the gear and the corner chip', () => {
+  it('keep the first-run card\'s seat under the copy\'s lowest line, between the left gutter and the corner chip', () => {
     // Nothing the slide copy draws comes below LAYOUT.safeBottom, so a card
     // that stays under it can never cover a headline, whatever the size.
     expect(OVERLAY.setup.top).toBeGreaterThanOrEqual(LAYOUT.safeBottom);
@@ -99,7 +99,7 @@ describe('the overlay bands', () => {
     // Its right edge stops a gap short of the corner chip (which starts at
     // chipLeft, the number the ticker's room is measured to) ...
     expect(rule).toMatch(new RegExp(`right: calc\\(${100 - OVERLAY.setup.chipLeft + OVERLAY.setup.gap} \\* var\\(--u\\)\\)`));
-    // ... its left edge a gap past the gear's ...
+    // ... its left edge a gap past the gutter's ...
     expect(rule).toMatch(new RegExp(`left: calc\\(var\\(--safe-inset\\) \\+ max\\(46px, calc\\(2\\.9 \\* var\\(--u\\)\\)\\) \\+ calc\\(${OVERLAY.setup.gap} \\* var\\(--u\\)\\)\\)`));
     // ... and it rides the chip's own line, 1.8u off the bottom.
     expect(rule).toMatch(/bottom: calc\(1\.8 \* var\(--u\)\)/);

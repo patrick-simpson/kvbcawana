@@ -1,5 +1,5 @@
 import { expect, test } from './pastFlagship.js';
-import { boxes, embed, expectClear, hits, hostSquares } from './embedHost.js';
+import { boxes, embed, expectClear, hits, hostSquares, leftGutter } from './embedHost.js';
 import { liveChannel } from './liveChannel.js';
 
 // Embedded in the Journey kiosk, the corners that only events bring up
@@ -102,13 +102,13 @@ for (const [width, height] of [[640, 480], [1280, 720], [390, 844]]) {
     test.use({ viewport: { width, height } });
 
     // Four stats with three-digit counts beside the widest corner chip (the
-    // clock): at 640x480 the gear, the ticker, the chip and the host's toggle
-    // fill the row but for ~15px, so the ticker must neither run into the gear
+    // clock): at 640x480 the left gutter, the ticker, the chip and the host's toggle
+    // fill the row but for ~15px, so the ticker must neither run into the gutter
     // nor the chip, and the chip must stay out from under the toggle. On a
     // portrait phone that room is narrower than the night (174px for 226px at
     // 390x844, where it ran 26px under the clock), so it wraps into it,
     // keeping its own stat gap from both.
-    test('the widest night\'s ticker keeps clear of the gear and the corner chip, and the chip of the toggle', async ({ page }) => {
+    test('the widest night\'s ticker keeps clear of the left gutter and the corner chip, and the chip of the toggle', async ({ page }) => {
       const frame = await embed(page, { config: { showTally: false } });
       await expect(frame.locator('.corner-bottom .corner-chip--clock')).toBeVisible({ timeout: 12_000 });
       await simulate(page, frame, /Show tonight ticker/, 13);
@@ -117,11 +117,12 @@ for (const [width, height] of [[640, 480], [1280, 720], [390, 844]]) {
       await page.waitForTimeout(300);
       const [ticker] = await boxes(frame, '.tonight-ticker');
       const stats = await boxes(frame, '.tonight-ticker-stat');
-      const [gear] = await boxes(frame, '.settings-gear');
+      await expect(frame.locator('.settings-gear')).toHaveCount(0);
+      const gutter = leftGutter(width, height);
       const chips = await boxes(frame, '.corner-bottom .corner-chip');
       expectClear([ticker, ...stats, ...chips], { width, height });
       for (const box of [ticker, ...stats]) {
-        expect(hits(box, gear), `${box.what} over the settings gear`).toBe(false);
+        expect(hits(box, gutter), `${box.what} over the bottom-left gutter`).toBe(false);
         for (const chip of chips) expect(hits(box, chip), `${box.what} over the corner chip`).toBe(false);
       }
     });

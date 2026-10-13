@@ -29,7 +29,8 @@ import { BOARD_ANONYMOUS, BOARD_EMPTY, BOARD_NAMES, BOARD_STALE } from './checko
  *    LAYOUT.safeTop), and ends by 45u;
  *  - the house waves' crests sit at ~46.5-48u; the tonight ticker's chips
  *    ride the waves up to ~5u off the bottom; the corner chip bottom-right
- *    starts at ~80u; the gear bottom-left ends at ~4u;
+ *    starts at ~80u; the bottom-left gutter (the settings gear's seat until 2026-10-13, kept
+ *    so nothing moved) ends at ~4u;
  *  - the check-in wave is the bottom 29.25u (52% of the 16:9 box).
  *
  * `band`: the top-centre strip between the corner tab and the top-right
@@ -49,7 +50,7 @@ import { BOARD_ANONYMOUS, BOARD_EMPTY, BOARD_NAMES, BOARD_STALE } from './checko
  *
  * `foot`: the strip under the copy's lowest line (`top`: LAYOUT.safeBottom, 45u
  * down the 16:9 box, down to the corner chip's own line, `bottom` 1.8u off the
- * bottom edge), from a `gap` past the gear's right edge to a `gap` short of
+ * bottom edge), from a `gap` past the gutter's right edge to a `gap` short of
  * the corner chip's left edge (`chipLeft`, ~82u, the number the ticker's room
  * is measured to). Nothing the lobby draws on a slide comes below `top`, so
  * whatever stays in the strip can never cover copy. Two things take turns in
@@ -61,7 +62,7 @@ import { BOARD_ANONYMOUS, BOARD_EMPTY, BOARD_NAMES, BOARD_STALE } from './checko
  *    strip, its names wrapping across it (fitFoot), and otherwise a one-line
  *    card on the strip's floor; the slides above carry on as normal;
  *  - the first-run card (`setup`, the same seat), which yields to the board.
- *    It used to stand above the gear, 25u wide and 25u tall, which is inside
+ *    It used to stand above the bottom-left corner, 25u wide and 25u tall, which is inside
  *    the copy's own box at every size: it hid the start of a headline at 720p
  *    and the chip row at 1080p. It lays its words out in columns to fit the
  *    ~11u the strip leaves.

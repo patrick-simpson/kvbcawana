@@ -14,9 +14,6 @@ export const LAYER_FAULT_SHOW_MS = 10 * 60 * 1000;
 // Milestone / club-milestone toast hold time.
 export const MILESTONE_TOAST_MS = 6000;
 
-// Settings gear fades after this much mouse stillness.
-export const GEAR_IDLE_MS = 3000;
-
 // The first-run setup card waits this long after the lobby's last name has
 // gone before it comes back. On a screen that is not keyed yet the card is
 // always due, and check-ins a few seconds apart would otherwise have it pop

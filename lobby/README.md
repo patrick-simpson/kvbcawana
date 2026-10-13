@@ -111,10 +111,10 @@ Keeps what you set in the browser's local storage on that device, so it never
 enters your repository and is not inherited by anyone who forks it.
 
 1. Open your deployed app (see step 6). A brand-new screen shows a slim
-   **New display?** card along the bottom, beside the gear, with these same
+   **New display?** card along the bottom with these same
    steps and an **Open Settings** button.
-2. Or click the gear icon in the bottom-left corner (it stays faintly visible),
-   or press <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd>.
+2. Or press <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd> (the TV draws no settings
+   button; everything else is done from awana.kvbchurch.org/settings → Screens).
 3. A new screen opens Settings on **Setup** → **Sign in** → type the church
    passphrase → **Sign in**. That connects the screen to the live channel and
    fills in the display key by itself (every change in Settings applies as you
@@ -151,7 +151,7 @@ Settings < `?lowPower=1`).
 
 ### Signing a screen in (names, slides, publishing)
 
-One word does it. Gear → Settings → Setup → **Sign in** → type the church
+One word does it. <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd> → Setup → **Sign in** → type the church
 passphrase. The screen receives the display key (children's names, published
 slides), applies the shared settings and the "new screen" template, and keeps
 following rotations made on the sync service. Pasting the display key by hand

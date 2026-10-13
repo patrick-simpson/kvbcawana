@@ -74,7 +74,7 @@ describe('SetupCard (signage first-run)', () => {
     expect(card.textContent).not.toMatch(/Advanced|by hand/);
     expect(card.textContent).not.toMatch(/Pusher/);
     expect(card.textContent).toMatch(/sync themselves/);
-    // The gear stands beside the card now; the shortcut rides the button.
+    // The card's button is the TV's one drawn way in; the shortcut rides it.
     expect(screen.getByRole('button', { name: 'Open Settings' }).title).toMatch(/Ctrl\+Shift\+S/);
   });
 

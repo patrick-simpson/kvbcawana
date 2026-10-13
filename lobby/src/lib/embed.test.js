@@ -157,8 +157,8 @@ describe('app.css: the operator\'s panels and a wrapped ticker keep out of the c
   });
 
   it('the first-run card ends short of the column (90vw of a phone ran under it)', () => {
-    // Both of its layouts: the strip (right of the gear, short of the corner
-    // chip) and, under 640px, the card stacked above the gear.
+    // Both of its layouts: the strip (right of the left gutter, short of the corner
+    // chip) and, under 640px, the card stacked above the bottom-left corner.
     const own = ALL.filter((r) => r.selector === '.panel.setup-card' && decl(r.body, 'right')).map((r) => decl(r.body, 'right'));
     expect(own).toEqual(['calc(19.2 * var(--u))', 'var(--safe-inset)']);
     const embedded = ALL.filter((r) => r.selector === 'html.embedded .panel.setup-card');
@@ -184,11 +184,11 @@ describe('app.css: the operator\'s panels and a wrapped ticker keep out of the c
     expect(decl(rule('html.embedded .board-preview .checkout-region').body, 'right')).toBe(own);
   });
 
-  // Centred between the gear and the widest chip, the widest night is still
+  // Centred between the left gutter and the widest chip, the widest night is still
   // wider than that room on a portrait phone (390x844: 226px in 174px), and it
   // ran 26px under the shifted clock chip. It is capped to exactly the room
   // its centring counts, and wraps into rows instead.
-  it('the ticker is capped to the room between the gear and the widest corner chip, and wraps into it', () => {
+  it('the ticker is capped to the room between the left gutter and the widest corner chip, and wraps into it', () => {
     const ticker = rule('html.embedded .tonight-ticker');
     const max = decl(ticker.body, 'max-width');
     const right = decl(ticker.body, 'right');

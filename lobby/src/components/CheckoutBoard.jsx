@@ -33,7 +33,7 @@ import {
 // white card with a hard offset shadow and a house-blue tab carrying its title
 // (the kit's wavy tab on the one-line card), the count in Paytone One. WHERE it goes is always the foot (src/lib/overlayFit.js
 // OVERLAY.foot, boardPlacement): the strip under the copy's lowest line, from
-// the gear to the corner chip, the first-run card's seat. The slides above it
+// the left gutter to the corner chip, the first-run card's seat. The slides above it
 // carry on as normal (owner, 2026-10-07: "The still remaining kids list should
 // just take the bottom of the screen. It shouldn't take over all of the
 // announcements."; until then a live list at pickup time took the middle and

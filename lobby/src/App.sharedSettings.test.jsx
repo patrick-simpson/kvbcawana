@@ -99,7 +99,7 @@ describe('shared settings, wired up', () => {
     let utils;
     await act(async () => { utils = render(<App />); });
     const { container, getByLabelText, getByRole, findByText } = utils;
-    await act(async () => { getByLabelText('Open settings').click(); });
+    await act(async () => { window.dispatchEvent(new KeyboardEvent('keydown', { key: 'S', ctrlKey: true, shiftKey: true })); });
     await act(async () => { getByRole('tab', { name: 'What screens show' }).click(); });
     const input = getByLabelText('Room milestone (every N check-ins)');
     await act(async () => {

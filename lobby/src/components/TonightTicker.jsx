@@ -93,7 +93,7 @@ export function tickerRows(tonight, now) {
  *
  * Drawn as the kit's count chips (the printer dashboard's club chips: a
  * pill, white Londrina caps, a Paytone One number), sitting on the house waves
- * bottom-centre between the settings gear and the corner chip. These four
+ * bottom-centre between the left gutter and the corner chip. These four
  * counts are the whole room's, not one club's, so they wear the house blue:
  * club colour on this screen always means that club.
  *

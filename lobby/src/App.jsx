@@ -95,7 +95,7 @@ import { useTallerThan } from './hooks/useTallerThan.js';
 import { hostDoorbell, isEmbedded } from './lib/embed.js';
 import { isConfigureMode, isSettingsPage, listenForRelay, relayToScreen } from './lib/configureRelay.js';
 import { BACKGROUND_VIDEO_CHANGED_EVENT } from './components/VideoBackground.jsx';
-import { BOARD_DEMO_MS, BUILD_QUIET_MS, SHARE_DEBOUNCE_MS, COUNTS_WITHOUT_NAMES_MS, TONIGHT_STALE_MS, DROPPED_GRACE_MS, EMBED_FULLSCREEN_MESSAGE, GEAR_IDLE_MS, LAYER_FAULT_SHOW_MS, MILESTONE_TOAST_MS, OPS_FAILURES_MAX, SETUP_CARD_QUIET_MS } from './lib/constants.js';
+import { BOARD_DEMO_MS, BUILD_QUIET_MS, SHARE_DEBOUNCE_MS, COUNTS_WITHOUT_NAMES_MS, TONIGHT_STALE_MS, DROPPED_GRACE_MS, EMBED_FULLSCREEN_MESSAGE, LAYER_FAULT_SHOW_MS, MILESTONE_TOAST_MS, OPS_FAILURES_MAX, SETUP_CARD_QUIET_MS } from './lib/constants.js';
 
 // Read once — the URL can't change without a full page load.
 const FLAGS = parseUrlFlags();
@@ -113,7 +113,7 @@ const noop = () => {};
 // Configure mode and the settings page open Settings on the first render, so
 // its chunk is asked for now, beside the main one, not after it has run.
 // A screen asks for nothing here: its panels load when a volunteer reaches
-// for them (the gear's hover, focus or press, a shortcut, the first-run card).
+// for them (the keyboard shortcut, the first-run card).
 if (CONFIGURE) {
   SettingsPanel.preload();
   if (SETTINGS_PAGE) RemoteScreenPanel.preload();
@@ -893,7 +893,6 @@ export default function App() {
   const backToScreens = () => { setSettingsTab('screens'); setManagedScreen(null); };
   const [editorFromSettings, setEditorFromSettings] = useState(false);
   const [debugOpen, setDebugOpen] = useState(false);
-  const [gearIdle, setGearIdle] = useState(true);
   // The slide editor goes back where it came from: Settings → Slides & look,
   // or the stage when the keyboard opened it.
   const closeSlideEditor = () => {
@@ -1155,8 +1154,8 @@ export default function App() {
     [calendar.events, todayStr, specialDates],
   );
   // April Fools (#21): screens only, and only does anything on April 1st —
-  // a toggle left on all year is inert 364 days. The settings panel and gear
-  // counter-rotate in CSS so the operator can always find the exit.
+  // a toggle left on all year is inert 364 days. The settings panel
+  // counter-rotates in CSS so the operator can always find the exit.
   const aprilFools = isAprilFools(config.aprilFools === true, todayStr);
 
   const skin = resolveSkin(
@@ -1184,24 +1183,6 @@ export default function App() {
     () => (weatherTheme ? weatherMood(weather) : { cozy: false, dim: 1, reason: 'off' }),
     [weatherTheme, weather],
   );
-
-  // Reveal the gear on any mouse movement, fade it after 3 seconds of stillness.
-  useEffect(() => {
-    let timer;
-    const wake = () => {
-      setGearIdle(false);
-      clearTimeout(timer);
-      timer = setTimeout(() => setGearIdle(true), GEAR_IDLE_MS);
-    };
-    window.addEventListener('mousemove', wake);
-    window.addEventListener('touchstart', wake);
-    wake();
-    return () => {
-      window.removeEventListener('mousemove', wake);
-      window.removeEventListener('touchstart', wake);
-      clearTimeout(timer);
-    };
-  }, []);
 
   // Keyboard shortcuts for the hidden panels. Ctrl+Shift+X is the panic
   // switch — S/E/D were taken. Settings and the slide editor are OPEN-only:
@@ -1723,7 +1704,7 @@ export default function App() {
 
       {/* First-run card: an unconfigured TV must offer a volunteer a way in.
           It stands in the strip under the copy's lowest line, beside the
-          gear (OVERLAY.setup), so it never covers a headline; setupUp() says
+          left gutter (OVERLAY.setup), so it never covers a headline; setupUp() says
           when the room has space for it (never on an OBS/ProPresenter feed,
           over a panel, a name, a poster or the pickup board), and it hides
           itself once the screen is connected and keyed. */}
@@ -1732,22 +1713,6 @@ export default function App() {
           card={setupCard}
           onOpenSettings={() => { SettingsPanel.preload(); setSettingsTab('setup'); setSettingsOpen(true); }}
         />
-      )}
-
-      {!overlay && !CONFIGURE && (
-        <button
-          className={`settings-gear ${gearIdle ? 'idle' : ''}`}
-          onClick={() => { SettingsPanel.preload(); setSettingsTab(null); setSettingsOpen(true); }}
-          // Reaching for the gear starts loading Settings, so it is usually
-          // in hand by the click and opens with no "Opening…" card at all.
-          onPointerEnter={SettingsPanel.preload}
-          onFocus={SettingsPanel.preload}
-          onPointerDown={SettingsPanel.preload}
-          title="Settings (Ctrl+Shift+S)"
-          aria-label="Open settings"
-        >
-          <Gear />
-        </button>
       )}
 
       {settingsOpen && SETTINGS_PAGE && managedScreen && (
@@ -1874,14 +1839,5 @@ export default function App() {
     </MotionConfig>
     </LobbyLiveContext.Provider>
     </ZeroAnimationContext.Provider>
-  );
-}
-
-function Gear() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="12" r="3" />
-      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-    </svg>
   );
 }

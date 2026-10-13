@@ -2,8 +2,8 @@
 // EDIT-ME CONFIG
 //
 // This is the file most users will change. Anything here can ALSO be
-// overridden at runtime via the on-screen Settings panel (gear icon,
-// bottom-left), which stores your overrides in the browser's
+// overridden at runtime via the on-screen Settings panel (Ctrl+Shift+S, or the settings
+// page at awana.kvbchurch.org/settings), which stores your overrides in the browser's
 // localStorage so you can tweak without committing new code.
 //
 // All keys are optional — leave one blank and the app falls back to

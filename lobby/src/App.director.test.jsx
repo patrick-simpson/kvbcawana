@@ -237,7 +237,7 @@ describe('the lobby director, end to end', { timeout: 20_000 }, () => {
     configure();
     await mountPastFlagship();
     const preview = () => document.querySelector('[data-testid="promo-preview"]');
-    await act(async () => { document.querySelector('[aria-label="Open settings"]').click(); });
+    await act(async () => { window.dispatchEvent(new KeyboardEvent('keydown', { key: 'S', ctrlKey: true, shiftKey: true })); });
     await act(async () => {
       [...document.querySelectorAll('[role="tab"]')].find((t) => t.textContent.includes('Slides')).click();
     });
@@ -261,7 +261,7 @@ describe('the lobby director, end to end', { timeout: 20_000 }, () => {
   it('a promo preview ends by itself when the promo does', async () => {
     configure();
     await mountPastFlagship();
-    await act(async () => { document.querySelector('[aria-label="Open settings"]').click(); });
+    await act(async () => { window.dispatchEvent(new KeyboardEvent('keydown', { key: 'S', ctrlKey: true, shiftKey: true })); });
     await act(async () => {
       [...document.querySelectorAll('[role="tab"]')].find((t) => t.textContent.includes('Slides')).click();
     });
