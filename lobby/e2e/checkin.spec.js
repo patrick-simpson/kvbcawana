@@ -56,6 +56,8 @@ async function stubSite(page, { kids } = {}) {
     barf: null, barfRedo: 'ok', barfPosts: [],
     /** The households, and the Worker's optional `familiesAt` stamp (read-15s). */
     households: [['Ada Tester', 'Ben Tester']], familiesAt: null, familiesCalls: 0,
+    /** A day with no club: the roster's `{noClub: true, today, next}` (routes.md 5); null = a club day. */
+    noClub: null, tonightCalls: 0,
   };
   const api = async (route, req) => {
     const u = new URL(req.url());
@@ -71,13 +73,14 @@ async function stubSite(page, { kids } = {}) {
     if (p === '/v1/desk/roster') {
       world.rosterCalls += 1;
       if (world.busyFirst) { world.busyFirst = false; return route.fulfill(json(429, { ok: false, reason: 'read-busy', retryAfterMs: 1500 })); }
+      if (world.noClub) return route.fulfill(json(200, { noClub: true, ...world.noClub, readAt: new Date().toISOString(), kids: [], items: { bible: [], friend: [] } }));
       return route.fulfill(json(200, { readAt: new Date().toISOString(), kids: world.kids, items: { bible: ['Cubbies', 'Sparks'], friend: ['Sparks'] }, ...(world.familiesAt ? { familiesAt: world.familiesAt } : {}) }));
     }
     if (p === '/v1/desk/families') {
       world.familiesCalls += 1;
       return route.fulfill(json(200, { households: world.households, ...(world.familiesAt ? { familiesAt: world.familiesAt } : {}) }));
     }
-    if (p === '/v1/desk/tonight') return route.fulfill(json(404, { error: 'Not found.' }));
+    if (p === '/v1/desk/tonight') { world.tonightCalls += 1; return route.fulfill(json(404, { error: 'Not found.' })); }
     if (p === '/v1/stations') return route.fulfill(json(200, [station]));
     if (p === '/v1/print/status') {
       return route.fulfill(json(200, { queued: world.queued, leased: 0, done: world.printed, dead: 0, waitingToSeal: 0, checkThePrinter: [], pendingToSeal: 0, claims: { printed: world.printed }, stations: [station] }));
@@ -346,6 +349,77 @@ test('error states: a refusal puts the child back, no internet points to the pap
   await expect(page.locator('#offline-note')).toBeVisible();
   await expect(page.locator('#offline-note')).toContainText('paper sheet at the desk');
   await expect(page.locator('.fam', { hasText: 'Cy Other' })).toHaveCount(1);
+});
+
+// No club tonight (owner 2026-10-13: a Monday evening sat on "Reading the roster..."):
+// the Worker answers the roster at once with `noClub`, and the page shows one note.
+test('no club tonight: one friendly note, no search, no error, asked again every minute, and the list comes by itself on the club day', async ({ page }) => {
+  test.setTimeout(60_000);
+  const { world } = await stubSite(page);
+  world.busyFirst = false;
+  world.noClub = { today: '2026-10-12', next: '2026-10-14' };
+  await page.clock.install();
+  await signIn(page);
+  const note = page.locator('#list .noclub');
+  await expect(note).toBeVisible({ timeout: 10_000 });
+  await expect(note.locator('.noclub-title')).toHaveText('No club tonight');
+  await expect(note.locator('.noclub-next')).toHaveText('Next club night: Wednesday, October 14');
+  await expect(note.locator('.noclub-quip')).toHaveText(/\S/);
+  await snap(page, 'checkin-no-club.png');
+  await expect(page.locator('#list')).not.toContainText('Reading the roster');
+  await expect(search(page)).toBeHidden();
+  await expect(page.locator('#print-led')).toBeHidden();
+  await expect(page.locator('#toast.on')).toHaveCount(0);
+  await expect(page.locator('#count-pill')).toHaveText('0 in');
+  // the families and the Worker's count are not asked for on a day with no club
+  expect(world.familiesCalls).toBe(0);
+  expect(world.tonightCalls).toBe(0);
+  // Tonight and the + menu still open: leader and custom labels print, the walk-in tag waits for a club night
+  await page.locator('#count-pill').click();
+  await expect(page.locator('#tonight-check')).toHaveText('No club tonight.');
+  await page.locator('#tonight-close').click();
+  await page.locator('#menu-btn').click();
+  await expect(page.locator('#leader-panel')).toBeVisible();
+  await expect(page.locator('#custom-panel')).toBeVisible();
+  await expect(page.locator('#oneoff-panel')).toBeHidden();
+  await page.locator('#menu-close').click();
+
+  // Asked again once a minute, not every 15 s.
+  const asked = world.rosterCalls;
+  await page.clock.fastForward(30_000);
+  await page.waitForTimeout(300);
+  expect(world.rosterCalls).toBe(asked);
+  // The club day: the Worker answers the roster, and within the minute the list is back.
+  world.noClub = null;
+  await page.clock.fastForward(31_000);
+  await expect(page.locator('#list')).toContainText('families still to come', { timeout: 10_000 });
+  await expect(note).toHaveCount(0);
+  await expect(search(page)).toBeVisible();
+  await page.locator('#menu-btn').click();
+  await expect(page.locator('#oneoff-panel')).toBeVisible();
+});
+
+test('no club tonight: a tap the Worker refuses no-club puts the child back and shows the note at once; the youth page hides its + menu', async ({ page }) => {
+  test.setTimeout(60_000);
+  const { world } = await stubSite(page);
+  world.busyFirst = false;
+  await signIn(page);
+  await expect(page.locator('#list')).toContainText('families still to come', { timeout: 10_000 });
+  // Past midnight on a cancelled night: the list on screen is stale, and the Worker refuses the tap.
+  world.refuse = json(409, { ok: false, reason: 'no-club', today: '2026-10-14', next: '2026-10-21' });
+  world.noClub = { today: '2026-10-14', next: '2026-10-21' };
+  await search(page).fill('Cy');
+  await page.locator('.fcard').click();
+  await page.locator('#kid-sheet').getByRole('button', { name: 'Check in' }).click();
+  await expect(page.locator('#toast')).toContainText('Couldn’t check in Cy Other: There is no club tonight.');
+  await expect(page.locator('#list .noclub-next')).toHaveText('Next club night: Wednesday, October 21', { timeout: 5_000 });
+  await expect(page.locator('#count-pill')).toHaveText('0 in');
+
+  // The youth page (this device is signed in, so it opens straight on the list's place).
+  await page.goto(`${ORIGIN}/checkin/ym/`);
+  await expect(page.locator('#list .noclub')).toBeVisible({ timeout: 10_000 });
+  await expect(page.locator('#menu-btn')).toBeHidden();   // its + is the walk-in tag alone
+  await expect(page.locator('#count-pill')).toBeVisible();
 });
 
 test('the youth leaders\' page shows Trek and Journey only, on the same path', async ({ page }) => {

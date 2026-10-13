@@ -100,6 +100,13 @@
   .lead, .sec { font-family: var(--f-label); font-size: 17px; letter-spacing: .06em; text-transform: uppercase; color: var(--c-blue); margin: 6px 4px 8px; }
   .note { color: var(--ink-faint); font-size: 16px; padding: 28px 8px; text-align: center; line-height: 1.4; }
   .cheer { text-align: center; padding: 60px 10px; font-family: var(--f-shout); font-size: 30px; color: var(--good); }
+  /* No club tonight (owner 2026-10-13): one friendly note in the list's place, no search box, no printer line. */
+  .noclub { display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center; padding: 16vh 16px 40px; }
+  .noclub-title { font-family: var(--f-shout); font-weight: 400; font-size: clamp(36px, 10vw, 56px); line-height: 1.05; color: var(--c-blue-deep); }
+  .noclub-next { font-family: var(--f-label); font-size: clamp(20px, 5.5vw, 28px); letter-spacing: .04em; line-height: 1.2; color: var(--c-ink); text-wrap: balance; }
+  .noclub-quip { max-width: 30ch; color: var(--ink-faint); font-size: 15px; line-height: 1.4; text-wrap: balance; }
+  #main-screen.no-club .search .box, #main-screen.no-club .barf-btn, #main-screen.no-club .barf-alert, #main-screen.no-club #busy,
+  #main-screen.no-club #down-note, #main-screen.no-club #nohistory, #main-screen.no-club .statusline { display: none !important; }
 
   .fams { display: grid; gap: 8px; }
   .fam, .fcard, .card, .famsm { border: none; cursor: pointer; text-align: left; background: #fff; position: relative; overflow: hidden; min-width: 0;
@@ -260,7 +267,7 @@
   .btn:active, .opt:active, .pill:active, .round:active, .row button:active, .cpick button:active { scale: 1.06 .9; translate: 0 3px; transition-duration: 80ms; transition-timing-function: ease-out; }
   .card.in:active { scale: none; translate: none; }
   @keyframes land { 0% { opacity: 0; translate: 0 16px; scale: .84 1.16; } 45% { opacity: 1; translate: 0 -3px; scale: 1.07 .93; } 70% { translate: 0 0; scale: .98 1.02; } 100% { opacity: 1; translate: 0 0; scale: 1 1; } }
-  .fam, .fcard, .card, .famsm, .tile { animation: land 480ms cubic-bezier(.3,.7,.4,1) both; }
+  .fam, .fcard, .card, .famsm, .tile, .noclub { animation: land 480ms cubic-bezier(.3,.7,.4,1) both; }
   .stay { animation: none !important; }
   .ghosts { position: fixed; inset: 0; pointer-events: none; z-index: 4; overflow: hidden; }
   .ghosts > * { position: fixed; display: block !important; margin: 0 !important; }
@@ -633,6 +640,14 @@ var rosterMisses = 0;          // ticks in a row that could not reach the servic
 var pollActive = false;
 var busyUntil = 0;
 var busyTimer = null;
+// No club tonight (owner 2026-10-13): on a day that is not a club day the Worker's
+// roster answers at once `{noClub: true, today, next}` and reads nothing from
+// TwoTimTwo (lobby/worker/src/routes.md 5). The page shows one friendly note in
+// the list's place, hides the search box, and asks again once a minute, so on the
+// club day it switches to the list by itself within a minute of the Worker saying so.
+var NO_CLUB = null;            // { today, next } while the Worker says there is no club today
+var NO_CLUB_POLL_MS = 60 * 1000;
+var noClubWords = null;        // desk-transport.js's words for the note
 
 var KIT = {
   puggles: { color: '#1DB6D9', deep: '#1A627C' }, cubbies: { color: '#4C72B8', deep: '#2F4F8A' },
@@ -688,6 +703,7 @@ function loadModules() {
     modules = Promise.all([import('/checkin/desk-transport.js'), import('/checkin/cloud-crypto.js'), import('/checkin/clubs.js')])
       .then(function(m) {
         printLabel = m[0].printLabel;
+        noClubWords = m[0].noClubWords;
         newRowId = m[1].newRowId;
         var table = m[2].CLUB_TABLE;
         if (table && table.length) CLUBS = table.map(function(r) { return r.name; });
@@ -779,6 +795,7 @@ function signOut(message) {
   leaderSelection = {};
   renderLeaderChips([]);
   rosterLoaded = false; rosterTries = 0; lastRosterAt = 0;
+  setNoClub(null);
   clearPinCountdown();
   showPinScreen(message);
 }
@@ -856,6 +873,31 @@ function applyRoster(data) {
   ITEMS = data.items || { bible: [], friend: [] };
   $('down-note').hidden = !data.stale;
   fillClubSelects();
+}
+// A day with no club (the Worker's `noClub` answer): nobody to list or count, no
+// search, no walk-in tag (leader and custom labels still print); null = a club day.
+function setNoClub(data) {
+  var was = !!NO_CLUB;
+  NO_CLUB = data ? { today: String(data.today || ''), next: data.next || null } : null;
+  $('main-screen').classList.toggle('no-club', !!NO_CLUB);
+  $('oneoff-panel').hidden = !!NO_CLUB;
+  if (unlockedState) $('menu-btn').hidden = SIMPLE && !!NO_CLUB;   // the youth page's + is the walk-in tag alone
+  if (!NO_CLUB) return;
+  rosterLoaded = true;
+  KIDS = [];
+  ITEMS = { bible: [], friend: [] };
+  SERVER_TONIGHT = null;
+  $('down-note').hidden = true;
+  if (!was) { $('search').value = ''; closeFamily(); }
+}
+function noClubNote() {
+  var w = noClubWords ? noClubWords(NO_CLUB) : { title: 'No club tonight', next: '', quip: '' };
+  var box = el('div', 'noclub');
+  box.setAttribute('role', 'status');
+  box.appendChild(el('div', 'noclub-title', w.title));
+  if (w.next) box.appendChild(el('div', 'noclub-next', w.next));
+  if (w.quip) box.appendChild(el('div', 'noclub-quip', w.quip));
+  return box;
 }
 // TwoTimTwo's households (names only) in householdIndex()'s shape.
 function applyFamilies(data) {
@@ -1062,7 +1104,8 @@ function render() {
   var list = $('list');
   beginKeyed(list);
   while (list.firstChild) list.removeChild(list.firstChild);
-  if (!rosterLoaded) list.appendChild(el('div', 'note', rosterTries ? 'Still counting crayons… trying again.' : 'Reading the roster…'));
+  if (NO_CLUB) list.appendChild(noClubNote());
+  else if (!rosterLoaded) list.appendChild(el('div', 'note', rosterTries ? 'Still counting crayons… trying again.' : 'Reading the roster…'));
   else if (!KIDS.length) list.appendChild(el('div', 'note', 'TwoTimTwo has nobody on tonight’s check-in page yet. Is the meeting set up?'));
   else if (!q.trim()) renderFamilies(list);
   else renderSearch(list, q);
@@ -1402,6 +1445,7 @@ function runJob(job) {
     if (e && e.code === 'busy' && !job.cancelled) { waitJob(job, e.retryAfterMs); return; }
     if (e && e.code === 'signed-out') { signOut(e.message); return; }
     job.onFail(e);
+    if (e && e.code === 'no-club') scheduleRosterPoll(0);   // no club today: the roster says so, and the note replaces the list
   }));
 }
 function waitJob(job, ms) {
@@ -1591,6 +1635,17 @@ function refreshAll() {
   refreshStatus();
   desk.roster().then(function(data) {
     showOffline(false);
+    // No club today (a restored or stale list never says so): the note, and the next ask in a minute.
+    if (data && data.noClub === true && !data.stale && !data.restored) {
+      rosterFetchInFlight = false;
+      setNoClub(data);
+      lastRosterAt = Date.now();
+      rosterPollMs = NO_CLUB_POLL_MS;
+      paint();
+      scheduleRosterPoll();
+      return null;
+    }
+    if (NO_CLUB) setNoClub(null);
     rosterPollMs = ROSTER_POLL_BASE_MS;
     // Asked before a check-in was confirmed: it would put that child back on
     // the list. Ask again instead.
@@ -1695,7 +1750,7 @@ function renderTonight() {
   var check = $('tonight-check');
   check.hidden = false;
   check.style.color = '';
-  check.textContent = t.server ? 'Counted by the check-in service, from TwoTimTwo.' : 'From TwoTimTwo’s check-in page, via the check-in service.';
+  check.textContent = NO_CLUB ? 'No club tonight.' : t.server ? 'Counted by the check-in service, from TwoTimTwo.' : 'From TwoTimTwo’s check-in page, via the check-in service.';
   var list = $('tonight-list');
   list.textContent = '';
   var entries = tonightRows();

@@ -40,8 +40,13 @@ export const HISTORY_PIN_STORAGE = 'awanaDeskHistoryKey.v1';
 export const RESEAL_MAX = 3;
 /** The most remembered leaders (church settings `leaders`, lobby/shared/churchSettings.js). */
 export const LEADERS_MAX = 80;
-/** A read waits this long (the Worker queues a roster request up to 20 s for its turn) before the page asks again. */
-export const READ_TIMEOUT_MS = 30 * 1000;
+/**
+ * A read waits this long before the page gives up and asks again. The Worker
+ * queues a roster request up to 20 s for its turn, and after a Worker restart
+ * its first read is a fresh TwoTimTwo sign-in, about 45 s of spaced reads on
+ * the one read clock: 30 s abandoned it every time (owner 2026-10-13).
+ */
+export const READ_TIMEOUT_MS = 60 * 1000;
 /** A station not heard from for this long means "check the printer". */
 export const STATION_QUIET_MS = 2 * 60 * 1000;
 
@@ -50,7 +55,7 @@ const SESSION_RE = /^v1\.\d+\.\d+\.[A-Za-z0-9_-]{20,}$/;
 /**
  * Every failure the page words, as one error with a fixed `code`:
  * 'wrong' 'locked' 'unreachable' 'signed-out' 'busy' 'no-history' 'history-mismatch'
- * 'unsealed' 'no-station' 'wrong-night' 'unsure' 'refused' 'http'.
+ * 'unsealed' 'no-station' 'wrong-night' 'no-club' 'unsure' 'refused' 'http'.
  */
 export class DeskError extends Error {
   /** @param {string} code @param {string} message @param {Record<string, any>} [extra] */
@@ -77,6 +82,7 @@ export function refusalWords(reason) {
     case 'no-friend-item': return 'TwoTimTwo has no Brought a friend item for that club tonight.';
     case 'busy': return 'That child is being checked in right now. Try again in a moment.';
     case 'not-checked-in-again': return 'TwoTimTwo did not take the check-in again (after their BARF friend). Try again, or check them in on TwoTimTwo itself.';
+    case 'no-club': return 'There is no club tonight.';
     default: return `TwoTimTwo or the service refused it (${reason}).`;
   }
 }
@@ -105,6 +111,45 @@ export function printLabel(status, nowMs) {
   if (waiting) return { kind: 'queued', text: `${waiting} label${waiting === 1 ? '' : 's'} queued` };
   const printed = status.claims && Number.isFinite(status.claims.printed) ? status.claims.printed : status.done || 0;
   return { kind: 'ok', text: printed ? `Printed ${printed}` : 'Printer ready' };
+}
+
+/** The small line under "No club tonight": kind and tiny, one per day (the owner likes a little humour). */
+export const NO_CLUB_QUIPS = Object.freeze([
+  'The name tags are taking a well-earned nap.',
+  'The game cones are resting up for the next one.',
+  'Even the label printer gets a night off.',
+  'The crayons are catching up on their sleep.',
+  'The check-in desk is putting its feet up.',
+]);
+
+/**
+ * A church date (YYYY-MM-DD, already the church's own day) in American words:
+ * "Wednesday, October 14", with the year only when it is not `thisYear`'s. ''
+ * for anything that is not a real date. Pure.
+ * @param {unknown} key @param {string} [thisYear] YYYY
+ */
+export function dayWords(key, thisYear) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(key || ''));
+  if (!m) return '';
+  // Noon UTC of that date reads as that same date: the key is already the church's day.
+  const d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 12));
+  if (Number.isNaN(d.getTime()) || d.toISOString().slice(0, 10) !== key) return '';
+  return d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', ...(thisYear && thisYear !== m[1] ? { year: 'numeric' } : {}), timeZone: 'UTC' });
+}
+
+/**
+ * What the page shows on a day with no club (the roster's `{noClub: true, today,
+ * next}` answer, routes.md 5): a title, the next club night when the Worker knows
+ * one ('' otherwise), and the day's small line. Pure.
+ * @param {{ today?: unknown, next?: unknown }|null} answer
+ * @returns {{ title: string, next: string, quip: string }}
+ */
+export function noClubWords(answer) {
+  const a = answer || {};
+  const today = /^\d{4}-\d{2}-\d{2}$/.test(String(a.today || '')) ? String(a.today) : '';
+  const next = dayWords(a.next, today.slice(0, 4) || undefined);
+  const seed = today.split('').reduce((n, c) => n + (Number(c) || 0), 0);
+  return { title: 'No club tonight', next: next ? `Next club night: ${next}` : '', quip: NO_CLUB_QUIPS[seed % NO_CLUB_QUIPS.length] };
 }
 
 /**
@@ -277,6 +322,8 @@ export function createDesk({ cc, fetch: fetchFn, store, base = DESK_API, now = D
     const reason = r.body && typeof r.body.reason === 'string' ? r.body.reason : '';
     if (r.status === 504 || reason === 'unsure') return new DeskError('unsure', 'TwoTimTwo did not answer in time. Check TwoTimTwo before trying again.');
     if (reason === 'wrong-night') return new DeskError('wrong-night', 'The service says it is a different club night than this computer thinks.', { night: r.body.night });
+    // A day with no club (routes.md 5, "No club tonight"): nothing was read, claimed or posted.
+    if (reason === 'no-club') return new DeskError('no-club', refusalWords('no-club'), { today: r.body.today ?? null, next: r.body.next ?? null });
     if (reason === 'unsealed') return new DeskError('unsealed', refusalWords('unsealed'), { what: r.body.what });
     if (r.status === 409 || r.status === 502 || r.status === 503) return new DeskError('refused', refusalWords(reason || 'refused'), { reason });
     return new DeskError('http', (r.body && (r.body.error || r.body.reason)) || `The check-in service answered HTTP ${r.status}.`, { status: r.status });

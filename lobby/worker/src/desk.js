@@ -51,6 +51,16 @@
 // deleted, never trusted. The roster answers a restored page at once
 // (`restored: true`) and the watcher's alarm reads a fresh one in its next
 // free slot.
+//
+// NO CLUB TONIGHT (owner 2026-10-13, after /checkin sat on "Reading the
+// roster..." on a Monday evening): on a day that is not a club day
+// (clubday.js: the shared club-night rule, the schedule and the Worker's
+// calendar, the whole local day) the roster answers AT ONCE `{noClub: true,
+// today, next, kids: [], items}` and TwoTimTwo is not touched: what its
+// check-in page shows on such a day is some other meeting, whose list a tap
+// would check a child into. A check-in, undo, check-out or late BARF friend is
+// refused 409 `no-club` before any read, claim or post. The print station's
+// rehearsal mode (publisher.js `rehearsing`) lets a rehearsal through as before.
 
 import { churchNight } from '../../shared/cloud-crypto.js';
 import { json } from './http.js';
@@ -60,6 +70,7 @@ import { Families } from './families.js';
 import { PRINT_JOB_KIND } from './adopt.js';
 import { itemClubs } from './phone.js';
 import { openState, sealState, watchWindow } from './watcher.js';
+import { SCHEDULE, clubDay } from './clubday.js';
 
 /** The roster's check-in page is re-read at most this often (pages poll every 15 s; 2 of the 4 reads a minute). */
 export const CHECKIN_PAGE_TTL_MS = 30 * 1000;
@@ -174,6 +185,8 @@ export class Desk {
     this.rosterAskedAt = 0;
     /** TwoTimTwo's households (families.js); the watcher's alarm catches it up. */
     this.familiesSource = new Families({ watcher, now });
+    /** The schedule the club-day rule reads (lobby/shared/schedule.json, bundled; tests swap it). */
+    this.schedule = SCHEDULE;
   }
 
   /**
@@ -357,6 +370,34 @@ export class Desk {
     return this[slot];
   }
 
+  // ── no club tonight (see the top of this file) ─────────────────────────────
+
+  /**
+   * Is today a club day (the whole local day), or is the station rehearsing?
+   * No TwoTimTwo read: the bundled schedule and the calendar in storage.
+   * @returns {Promise<{ club: boolean, today: string, next: string|null, rehearsal?: true }>}
+   */
+  async clubToday() {
+    /** @type {any} */
+    let feed;
+    try { feed = this.storage ? await this.storage.get('calendar') : null; } catch { feed = null; }
+    const day = clubDay(this.now(), feed, this.schedule);
+    if (day.club) return day;
+    const pub = this.watcher.publisher;
+    if (pub && typeof pub.rehearsing === 'function' && pub.rehearsing()) return { ...day, club: true, rehearsal: true };
+    return day;
+  }
+
+  /**
+   * A desk write on a day with no club: 409 `no-club` (with today and the next
+   * club day), before any read, claim or post; null on a club day.
+   * @returns {Promise<Response|null>}
+   */
+  async noClubRefusal() {
+    const day = await this.clubToday();
+    return day.club ? null : refuse(409, { reason: 'no-club', today: day.today, next: day.next });
+  }
+
   /** @param {{ ok: false, error: string, retryAfterMs?: number }} r */
   pageFailure(r) {
     if (r.error === 'read-busy') return refuse(429, { reason: 'read-busy', retryAfterMs: r.retryAfterMs ?? READ_INTERVAL_MS });
@@ -371,9 +412,15 @@ export class Desk {
    * while the watch window is open: asking marks the roster wanted, so the
    * watcher's alarm reads a fresh page in its next free slot and the next poll
    * gets it. (No read is started from here: the alarm is what runs reliably.)
+   * On a day with no club (and no rehearsal): `{noClub: true, today, next}` at
+   * once with no children, no read, and the roster not marked wanted.
    */
   async roster() {
     const t = this.now();
+    const day = await this.clubToday();
+    if (!day.club) {
+      return json({ noClub: true, today: day.today, next: day.next, readAt: new Date(t).toISOString(), kids: [], items: { bible: [], friend: [] } });
+    }
     this.rosterAskedAt = t;
     await this.restore();
     const c = this.cache;
@@ -441,6 +488,8 @@ export class Desk {
   async checkIn(body) {
     const night = churchNight(this.now());
     if (body.night !== night) return refuse(400, { reason: 'wrong-night', night });
+    const noClub = await this.noClubRefusal();
+    if (noClub) return noClub;
     const who = this.who(body);
     if (!who) return refuse(400, { reason: 'no-child' });
     if (!(await this.checkRow(body.historyRow, night))) return refuse(400, { reason: 'unsealed', what: 'historyRow' });
@@ -574,6 +623,8 @@ export class Desk {
   async undo(body) {
     const night = churchNight(this.now());
     if (body.night !== night) return refuse(400, { reason: 'wrong-night', night });
+    const noClub = await this.noClubRefusal();
+    if (noClub) return noClub;
     const who = this.who(body);
     if (!who) return refuse(400, { reason: 'no-child' });
     if (!(await this.checkRow(body.historyRow, night))) return refuse(400, { reason: 'unsealed', what: 'historyRow' });
@@ -598,6 +649,8 @@ export class Desk {
   async checkout(body) {
     const night = churchNight(this.now());
     if (body.night !== night) return refuse(400, { reason: 'wrong-night', night });
+    const noClub = await this.noClubRefusal();
+    if (noClub) return noClub;
     const who = this.who(body);
     if (!who) return refuse(400, { reason: 'no-child' });
     if (!(await this.checkRow(body.historyRow, night))) return refuse(400, { reason: 'unsealed', what: 'historyRow' });

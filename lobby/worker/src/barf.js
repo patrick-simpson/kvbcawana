@@ -158,6 +158,9 @@ export class BarfLate {
     const core = this.core;
     const night = churchNight(core.now());
     if (body.night !== night) return refuse(400, { reason: 'wrong-night', night });
+    // No club today (and no rehearsal): refused before any read or post (desk.js).
+    const noClub = await core.desk.noClubRefusal();
+    if (noClub) return noClub;
     const clubberId = ID_RE.test(String(body.clubberId ?? '')) ? String(body.clubberId) : '';
     if (!clubberId) return refuse(400, { reason: 'no-child' });
     if (body.recheck === true) return this.guard(clubberId, () => this.recheck(night, clubberId, body));

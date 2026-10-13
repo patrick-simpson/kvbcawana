@@ -53,6 +53,12 @@ import { localTime, watchWindow } from './watcher.js';
 export const MINUTE_MS = 60 * 1000;
 /** At least this long between two still-here lists (the printer's debounce). */
 export const STILL_GAP_MS = 2000;
+/**
+ * Rehearsal mode counts only while the station keeps saying so: it posts its
+ * extras on a change and at least every minute or two (POST /v1/station/extras),
+ * so a laptop that went away armed never leaves the Worker rehearsing.
+ */
+export const REHEARSAL_FRESH_MS = 5 * 60 * 1000;
 /** What the gate drops while the Worker is the publisher. `checkin` has its own rule. */
 export const SINGLE_PUBLISHER_DROPS = Object.freeze(['tally', 'checkout', 'tonight']);
 const COUNT_MAX = 9999;
@@ -88,6 +94,19 @@ export class Publisher {
     /** What was published since this object started: counts, for the status. */
     this.published = { tally: 0, tonight: 0, checkout: 0, greetings: 0, dropped: 0 };
     this.busy = /** @type {Promise<any>|null} */ (null);
+    /** When the station (or a dropped tally) last said rehearsal mode is ON (ms; memory only, 0 = not lately). */
+    this.rehearsalHeardAt = 0;
+  }
+
+  /**
+   * Is the print station's rehearsal mode on right now (armed on the laptop, from
+   * /settings Printing → At the laptop; it disarms itself after 2 hours)? Heard
+   * within REHEARSAL_FRESH_MS, in this object's memory: after a restart it is off
+   * until the station's next post. The desk's club-day guard lets a rehearsal
+   * through on a day with no club (desk.js `clubToday`).
+   */
+  rehearsing() {
+    return this.rehearsalHeardAt > 0 && this.now() - this.rehearsalHeardAt <= REHEARSAL_FRESH_MS;
   }
 
   // ── extras ─────────────────────────────────────────────────────────────────
@@ -103,6 +122,7 @@ export class Publisher {
     let changed = false;
     if (typeof b.season === 'string' && (b.season === '' || /^[a-z][a-z-]{1,19}$/.test(b.season)) && d.season !== b.season) { d.season = b.season; changed = true; }
     if (typeof b.rehearsal === 'boolean' && d.rehearsal !== b.rehearsal) { d.rehearsal = b.rehearsal; changed = true; }
+    if (typeof b.rehearsal === 'boolean') this.rehearsalHeardAt = b.rehearsal ? this.now() : 0;
     if (Array.isArray(b.pickupClubs)) {
       const n = normalizePickupClubs(b.pickupClubs);
       if (n.ok && JSON.stringify(n.value) !== JSON.stringify(d.pickupClubs)) { d.pickupClubs = n.value; changed = true; }

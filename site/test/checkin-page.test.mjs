@@ -53,6 +53,19 @@ describe('the check-in page', () => {
     assert.match(src, /var until = Date\.now\(\) \+ Math\.max\(1000, ms \|\| 5000\);/);
   });
 
+  it('on a day with no club (the roster\'s noClub answer, owner 2026-10-13): the note in the list\'s place, asked again once a minute', () => {
+    assert.match(src, /var NO_CLUB_POLL_MS = 60 \* 1000;/);
+    // a restored or stale list is never read as "no club"
+    assert.match(src, /if \(data && data\.noClub === true && !data\.stale && !data\.restored\) \{[\s\S]{0,200}setNoClub\(data\);[\s\S]{0,120}rosterPollMs = NO_CLUB_POLL_MS;[\s\S]{0,60}scheduleRosterPoll\(\);/);
+    // the note replaces "Reading the roster…" and the list; its words are the transport's (site/test/desk-transport.test.mjs)
+    assert.match(src, /if \(NO_CLUB\) list\.appendChild\(noClubNote\(\)\);\n\s+else if \(!rosterLoaded\)/);
+    assert.match(src, /noClubWords = m\[0\]\.noClubWords;/);
+    // no search box, no printer line, no busy or stale note while it shows
+    assert.match(src, /#main-screen\.no-club \.search \.box,[^{]*#main-screen\.no-club \.statusline \{ display: none !important; \}/);
+    // a write the Worker refuses no-club asks the roster again at once, so the note replaces the list
+    assert.match(src, /job\.onFail\(e\);\n\s+if \(e && e\.code === 'no-club'\) scheduleRosterPoll\(0\);/);
+  });
+
   it('draws with the brand kit under /checkin/brand/ and nothing from another host', () => {
     assert.match(index, /href="\/checkin\/brand\/fonts\.css"/);
     assert.match(index, /src="\/checkin\/brand\/logos\/awana-clubs-white\.svg"/);

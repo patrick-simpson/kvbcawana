@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { describe, it, before, mock } from 'node:test';
 import * as cc from '../../lobby/shared/cloud-crypto.js';
 import { mergeChurch, sanitizeChurch } from '../../lobby/shared/churchSettings.js';
-import { createDesk, DeskError, HISTORY_PIN_STORAGE, READ_TIMEOUT_MS, printLabel, SESSION_STORAGE } from '../checkin/desk-transport.js';
+import { createDesk, dayWords, DeskError, HISTORY_PIN_STORAGE, NO_CLUB_QUIPS, noClubWords, READ_TIMEOUT_MS, printLabel, SESSION_STORAGE } from '../checkin/desk-transport.js';
 
 const PASS = 'kennebec';
 const SESSION = 'v1.1.1760000000.abcdefghijklmnopqrstuvwxyz0123';
@@ -538,17 +538,69 @@ describe('remembered leaders (the church settings `leaders`)', () => {
 
 describe('a read that never answers', () => {
   it('gives up after READ_TIMEOUT_MS as "unreachable", so the page asks again instead of waiting forever', async () => {
+    // 60 s (owner 2026-10-13): after a Worker restart the roster's first read is a fresh
+    // TwoTimTwo sign-in, about 45 s of spaced reads; 30 s abandoned it every time.
+    assert.equal(READ_TIMEOUT_MS, 60 * 1000);
     mock.timers.enable({ apis: ['setTimeout'] });
     try {
       const hung = (url, init) => new Promise((_, reject) => init.signal.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError'))));
       const d = createDesk({ cc, fetch: hung, store: memoryStore(), now: () => NOW });
       const asked = d.roster();
-      const outcome = asked.then(() => null, (e) => e);
-      mock.timers.tick(READ_TIMEOUT_MS);
+      let settled = false;
+      const outcome = asked.then(() => null, (e) => e).finally(() => { settled = true; });
+      mock.timers.tick(45 * 1000);   // a cold sign-in is still being waited for
+      await new Promise((resolve) => setImmediate(resolve));
+      assert.equal(settled, false);
+      mock.timers.tick(READ_TIMEOUT_MS - 45 * 1000);
       const err = await outcome;
       assert.ok(err instanceof DeskError);
       assert.equal(err.code, 'unreachable');
       assert.match(err.message, /did not answer in time/);
     } finally { mock.timers.reset(); }
+  });
+});
+
+describe('no club tonight (routes.md 5: the roster\'s noClub answer, the writes\' 409 no-club)', () => {
+  it('the roster answer passes through as it came: noClub, today, next, no children', async () => {
+    const w = worker();
+    const inner = w.fetch;
+    w.fetch = async (url, init) => (String(url).endsWith('/v1/desk/roster')
+      ? new Response(JSON.stringify({ noClub: true, today: '2026-10-12', next: NIGHT, readAt: '2026-10-13T00:36:00.000Z', kids: [], items: { bible: [], friend: [] } }), { status: 200 })
+      : inner(url, init));
+    const { desk } = make(w);
+    await desk.signIn(PASS);
+    const r = await desk.roster();
+    assert.equal(r.noClub, true);
+    assert.equal(r.next, NIGHT);
+    assert.deepEqual(r.kids, []);
+  });
+
+  it('a check-in, undo, check-out or late BARF friend refused no-club is a DeskError \'no-club\' in plain words, with the next club night', async () => {
+    const refusal = { ok: false, reason: 'no-club', today: '2026-10-12', next: NIGHT };
+    const w = worker({ stations: [await station('st-1')], check: () => new Response(JSON.stringify(refusal), { status: 409 }) });
+    const { desk } = make(w);
+    await desk.signIn(PASS);
+    for (const go of [() => desk.checkIn(kid, { bible: true }), () => desk.undo(kid), () => desk.checkout(kid), () => desk.barfLate(kid, 'Sam', '/print-barf-tag')]) {
+      await assert.rejects(go(), (e) => e instanceof DeskError && e.code === 'no-club' && e.message === 'There is no club tonight.' && e.next === NIGHT && e.today === '2026-10-12');
+    }
+  });
+
+  it('the note: "No club tonight", the next club night in American words, and a small line that stays put all day', () => {
+    assert.deepEqual(noClubWords({ today: '2026-10-12', next: '2026-10-14' }), { title: 'No club tonight', next: 'Next club night: Wednesday, October 14', quip: noClubWords({ today: '2026-10-12' }).quip });
+    assert.equal(noClubWords({ today: '2026-10-12', next: null }).next, '');
+    assert.equal(noClubWords(null).title, 'No club tonight');
+    assert.ok(NO_CLUB_QUIPS.includes(noClubWords({ today: '2026-10-12' }).quip));
+    for (const q of NO_CLUB_QUIPS) assert.ok(q.length <= 60 && !/[\u{1F300}-\u{1FAFF}\u2600-\u27BF]/u.test(q), q);
+    // the line changes from day to day, never between two polls of one day
+    assert.equal(noClubWords({ today: '2026-10-12' }).quip, noClubWords({ today: '2026-10-12', next: '2026-10-14' }).quip);
+    assert.ok(new Set(['2026-10-12', '2026-10-13', '2026-10-15', '2026-10-16', '2026-10-17'].map((d) => noClubWords({ today: d }).quip)).size > 1);
+  });
+
+  it('dates read as the church\'s own day, with the year only across New Year', () => {
+    assert.equal(dayWords('2026-10-14'), 'Wednesday, October 14');
+    assert.equal(dayWords('2027-01-06', '2026'), 'Wednesday, January 6, 2027');
+    assert.equal(dayWords('2026-12-30', '2026'), 'Wednesday, December 30');
+    assert.equal(noClubWords({ today: '2026-12-21', next: '2027-01-06' }).next, 'Next club night: Wednesday, January 6, 2027');
+    for (const bad of ['', null, '2026-02-30', '14/10/2026', '2026-10-14T00:00']) assert.equal(dayWords(bad), '', String(bad));
   });
 });

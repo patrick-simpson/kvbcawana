@@ -79,10 +79,17 @@ describe('the held check-in page is written sealed after a read', () => {
     for (let i = 0; i < 6 && !t.core.desk.hasNightPage(); i++) { await t.core.alarm(); t.clock.t = t.alarm.at; }
     expect(t.core.desk.hasNightPage()).toBe(true);
     expect(t.puts).toHaveLength(1);
-    // a Monday evening (no club, the window shut): a read is held in memory only
+    // a Monday evening (no club, the window shut): the roster reads nothing at all (noclub.test.js)...
     const monday = await deskRig({ start: Date.parse('2026-10-13T00:36:00Z') });   // Mon 2026-10-12 8:36 pm Eastern
+    expect((await monday.call('GET', '/v1/desk/roster')).body.noClub).toBe(true);
+    expect(monday.pageReads()).toBe(0);
+    // ...and a rehearsal's read, outside the window, is held in memory only
+    const st = await monday.station();
+    await st.call('POST', '/v1/station/extras', { rehearsal: true });
     const res = await monday.call('GET', '/v1/desk/roster');
     expect(res.status).toBe(200);
+    expect(res.body.noClub).toBeUndefined();
+    expect(monday.pageReads()).toBe(1);
     expect(monday.puts).toHaveLength(0);
     expect(monday.storage.map.has(DESK_PAGE_KEY)).toBe(false);
   });
