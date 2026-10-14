@@ -194,6 +194,12 @@ describe('reading back, and the client opens it', () => {
     expect(rest.rows).toHaveLength(2);
     expect(rest.next).toBeNull();
 
+    const multi = (await call('GET', `/v1/history/rows?night=${NIGHT},2026-10-07`)).body;
+    expect(multi.rows).toHaveLength(6);
+    expect(multi.next).toBeNull();
+    const sortedIds = multi.rows.map((r) => r.id).sort();
+    expect(multi.rows.map((r) => r.id)).toEqual(sortedIds);
+
     const pair = await unwrapPrivateKey(key.wrapped, PASS, key.pub);
     const ring = await keyRing(pair, key.pub);
     const opened = await Promise.all([...first.rows, ...rest.rows].map((r) => openRow(ring, r)));
