@@ -59,7 +59,7 @@ const counter = (len, max) => (
  *
  * `config` is the STORED config (never the panic mask or URL flags).
  */
-function SlideCard({ slide, i, slidesLength, today, cardRef, patch, moveAndFocus, duplicate, remove }) {
+function SlideCard({ slide, i, slidesLength, today, cardRef, patch, moveAndFocus, duplicate, remove, counter }) {
   return (
     <div className="slide-card" ref={cardRef}>
       {/* The index line names the card with the kit's corner tab, as
@@ -570,6 +570,7 @@ export default function SlideEditorPanel({ config, syncedDeck, onChange, onClose
               moveAndFocus={moveAndFocus}
               duplicate={duplicate}
               remove={remove}
+              counter={counter}
             />
           ))}
 
