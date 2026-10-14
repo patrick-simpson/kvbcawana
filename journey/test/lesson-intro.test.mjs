@@ -14,7 +14,10 @@ import { bootKiosk, tick, pinClock } from './kiosk-dom.mjs';
 
 const PUBLIC = path.join(path.dirname(path.dirname(fileURLToPath(import.meta.url))), 'public');
 const json = (rel) => JSON.parse(readFileSync(path.join(PUBLIC, rel), 'utf8'));
-const CURRENT = json('current-lesson.json');
+// A fixed lesson (week 6), not the live data file: the nightly job and a
+// by-hand change both rewrite that file, and this test is about the cards.
+const WEEK_6 = json('lessons.json').lessons.find((l) => l.week === 6);
+const CURRENT = { version: 2, week: 6, title: WEEK_6.title, sourceUrl: WEEK_6.downloadUrl, downloadUrl: WEEK_6.downloadUrl, transcodedAt: null, resolvedAt: '2026-10-08T15:43:56.061Z' };
 const ROUTES = {
   'current-lesson.json': { json: CURRENT },
   'lessons.json': { json: json('lessons.json') },
