@@ -648,6 +648,46 @@
   // the phone the child was in (green) while TwoTimTwo had nothing. So: a
   // snippet, never a page, never the login form or the bare "Login Required"
   // the AJAX endpoints answer with when signed out, and it names the child.
+  function sanitizeCheckinReply(html) {
+    if (!html) return '';
+    var doc = new DOMParser().parseFromString(html, 'text/html');
+    var out = document.createElement('div');
+    var safeTags = { 'a': true, 'small': true, 'b': true, 'i': true, 'strong': true, 'em': true, 'span': true };
+    function walk(node, parent) {
+      if (node.nodeType === 3) {
+        parent.appendChild(document.createTextNode(node.nodeValue));
+      } else if (node.nodeType === 1) {
+        var tag = node.tagName.toLowerCase();
+        if (tag === 'script' || tag === 'style' || tag === 'iframe' || tag === 'object') return;
+        if (safeTags[tag]) {
+          var el = document.createElement(tag);
+          if (tag === 'a') {
+            var href = node.getAttribute('href');
+            if (href && /^(\/|#)/.test(href) && href.toLowerCase().indexOf('javascript:') !== 0) {
+              el.setAttribute('href', href);
+            }
+            var onclick = node.getAttribute('onclick');
+            if (onclick && /^undoCheckin\(\d+\)$/.test(onclick.replace(/\s+/g, ''))) {
+              el.setAttribute('onclick', onclick);
+            }
+          }
+          for (var i = 0; i < node.childNodes.length; i++) {
+            walk(node.childNodes[i], el);
+          }
+          parent.appendChild(el);
+        } else {
+          for (var j = 0; j < node.childNodes.length; j++) {
+            walk(node.childNodes[j], parent);
+          }
+        }
+      }
+    }
+    for (var i = 0; i < doc.body.childNodes.length; i++) {
+      walk(doc.body.childNodes[i], out);
+    }
+    return out.innerHTML;
+  }
+
   function checkinReplyOk(text, childName) {
     var CHECKIN_REPLY_MAX = 4000;   // a snippet; the check-in page itself is far larger
     var t = typeof text === 'string' ? text.trim() : '';
@@ -5221,7 +5261,7 @@
         var row = rowByRecid(recid);
         if (row) { row.classList.add('checked-in'); row.style.display = 'none'; }
         var last = document.querySelector('#lastCheckin div');
-        if (last) last.innerHTML = text;   // what TwoTimTwo's own success handler does
+        if (last) last.innerHTML = sanitizeCheckinReply(text);   // what TwoTimTwo's own success handler does
         return 'ok';
       });
     }).catch(function() { return 'network'; });
