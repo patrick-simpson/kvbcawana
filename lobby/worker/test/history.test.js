@@ -7,7 +7,6 @@ import {
   createHistoryKey, keyRing, newRowId, openRow, rewrapPrivateKey, sealRow, unwrapPrivateKey,
 } from '../../shared/cloud-crypto.js';
 import { d1Stub } from './d1stub.js';
-import { row } from './rig.js';
 
 const NIGHT = '2026-10-14';
 const PASS = 'kennebec river';
@@ -243,8 +242,6 @@ describe('a passphrase change re-wraps the key and old rows stay readable', () =
 
   it('fetches rows by an array of nights', async () => {
     const { history } = await setup();
-    const storage = history.storage;
-    const db = history.db;
     const call = (method, path, body = undefined) => history.handle(
       new Request(`http://localhost${path}`, { method, body: body ? JSON.stringify(body) : undefined }),
       new URL(`http://localhost${path}`),

@@ -426,15 +426,18 @@ export class History {
 
   /** @param {URL} url */
   async getRows(url) {
-    let nights = [];
     const nightsParam = url.searchParams.get('nights');
+    const nightsArr = [];
     if (nightsParam) {
-      try { nights = JSON.parse(nightsParam); } catch { return fail('nights must be a JSON array.', 400, { reason: 'bad-nights' }); }
-      if (!Array.isArray(nights) || !nights.every(validNight)) return fail('nights must be a JSON array of YYYY-MM-DD.', 400, { reason: 'bad-nights' });
+      try {
+        const parsed = JSON.parse(nightsParam);
+        if (!Array.isArray(parsed) || !parsed.every(validNight)) return fail('nights must be a JSON array of YYYY-MM-DD.', 400, { reason: 'bad-nights' });
+        nightsArr.push(...parsed);
+      } catch { return fail('nights must be a JSON array.', 400, { reason: 'bad-nights' }); }
     } else {
       const night = url.searchParams.get('night') || '';
       if (!validNight(night)) return fail('Say which night: ?night=YYYY-MM-DD.', 400, { reason: 'bad-night' });
-      nights = [night];
+      nightsArr.push(night);
     }
     const after = url.searchParams.get('after') || '';
     if (after && !ID_RE.test(after)) return fail('That "after" is not a row id.', 400, { reason: 'bad-after' });
@@ -443,12 +446,12 @@ export class History {
     if (!db) return this.off();
 
     let res;
-    if (nights.length === 1) {
+    if (nightsArr.length === 1) {
       res = await db.prepare('SELECT id, night, kind, v, kid, epk, iv, ct FROM history_rows WHERE night = ?1 AND id > ?2 ORDER BY id LIMIT ?3')
-        .bind(nights[0], after, limit + 1).all();
+        .bind(nightsArr[0], after, limit + 1).all();
     } else {
       res = await db.prepare('SELECT id, night, kind, v, kid, epk, iv, ct FROM history_rows WHERE night IN (SELECT value FROM json_each(?1)) AND id > ?2 ORDER BY id LIMIT ?3')
-        .bind(JSON.stringify(nights), after, limit + 1).all();
+        .bind(JSON.stringify(nightsArr), after, limit + 1).all();
     }
     const rows = res.results || [];
     const more = rows.length > limit;
