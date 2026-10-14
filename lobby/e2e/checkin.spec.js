@@ -294,7 +294,8 @@ test('a walk-in name tag prints and is welcomed but never counted; leader and cu
     ['/print-leader', { name: 'Pat Leader', clubName: 'Sparks' }],
     ['/print-custom', { text: 'KITCHEN' }],
   ]);
-  for (const t of world.tags) expect(JSON.stringify(t)).not.toMatch(/Ava|Pat|KITCHEN/);
+  // Whole words only: the sealed bundle is random base64, which spells "Pat" now and then.
+  for (const t of world.tags) expect(JSON.stringify(t)).not.toMatch(/(?<![A-Za-z0-9+/])(?:Ava|Pat|KITCHEN)(?![A-Za-z0-9+/])/);
   expect(world.posts).toHaveLength(0);   // nothing checked in, nothing counted
 
   // Tonight lists the walk-in so the volunteers remember to register them; the count stays 0.
