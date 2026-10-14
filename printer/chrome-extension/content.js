@@ -654,15 +654,32 @@
     var out = document.createElement('div');
     var safeTags = { 'a': true, 'small': true, 'b': true, 'i': true, 'strong': true, 'em': true, 'span': true };
 
-    // Protect against DOM clobbering by using unforgeable getters
-    // Window.Node and Window.Element might not be in scope depending on execution environment (e.g. extension context or tests without it)
-    var TheNode = typeof Node !== 'undefined' ? Node : doc.defaultView.Node;
-    var TheElement = typeof Element !== 'undefined' ? Element : doc.defaultView.Element;
-    var getNodeType = Object.getOwnPropertyDescriptor(TheNode.prototype, 'nodeType').get;
-    var getLocalName = Object.getOwnPropertyDescriptor(TheElement.prototype, 'localName').get;
-    var getChildNodes = Object.getOwnPropertyDescriptor(TheNode.prototype, 'childNodes').get;
-    var getAttribute = TheElement.prototype.getAttribute;
-    var nodeValueGet = Object.getOwnPropertyDescriptor(TheNode.prototype, 'nodeValue').get;
+    // Protect against DOM clobbering by using unforgeable getters from prototypes
+    function getGetter(obj, prop) {
+      var proto = Object.getPrototypeOf(obj);
+      while (proto) {
+        var desc = Object.getOwnPropertyDescriptor(proto, prop);
+        if (desc && desc.get) return desc.get;
+        proto = Object.getPrototypeOf(proto);
+      }
+      return null;
+    }
+    function getMethod(obj, prop) {
+      var proto = Object.getPrototypeOf(obj);
+      while (proto) {
+        var desc = Object.getOwnPropertyDescriptor(proto, prop);
+        if (desc && desc.value) return desc.value;
+        proto = Object.getPrototypeOf(proto);
+      }
+      return null;
+    }
+    var _text = document.createTextNode('');
+    var getNodeType = getGetter(_text, 'nodeType');
+    var getChildNodes = getGetter(_text, 'childNodes');
+    var nodeValueGet = getGetter(_text, 'nodeValue');
+    var _div = document.createElement('div');
+    var getLocalName = getGetter(_div, 'localName');
+    var getAttribute = getMethod(_div, 'getAttribute');
 
     function walk(node, parent) {
       var type = getNodeType.call(node);
