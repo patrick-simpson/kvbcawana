@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { ASPECT, LOGO_ARRIVAL, MIN_WIDTH_PX, logoFor, parseChurchLogo } from './churchLogo.js';
+import { ASPECT, LOGO_ARRIVAL, MIN_WIDTH_PX, logoFor, logoLetters, parseChurchLogo } from './churchLogo.js';
 
 // The church's logo (owner 2026-10-13): the kit's files are what every screen
 // draws, so the parse and the size rules are pinned against them.
@@ -54,5 +54,32 @@ describe('the church logo', () => {
   it('refuses a file that is not the kit\'s shape', () => {
     expect(() => parseChurchLogo('<svg viewBox="0 0 1 1"><path d="M0 0"/></svg>')).toThrow();
     expect(() => parseChurchLogo('<svg><path class="kvbc-church" d="M0 0"/><path class="kvbc-awana" d="M0 0"/></svg>')).toThrow();
+  });
+
+  it('splits Awana Clubs into its ten letters, each with its counters, left to right', () => {
+    // The flagship's bouncy letters (owner 2026-10-13) cut the traced line
+    // up in code; the kit's file stays the one drawing.
+    for (const name of ['kvbc-awana-full.svg', 'kvbc-awana-two-line.svg']) {
+      const awana = parseChurchLogo(kit(name)).parts.find((p) => p.part === 'awana');
+      const letters = logoLetters(awana.d);
+      expect(letters).toHaveLength('AwanaClubs'.length);
+      for (let i = 1; i < letters.length; i += 1) expect(letters[i].x0).toBeGreaterThan(letters[i - 1].x1);
+      // Every sub-path of the line lands in exactly one letter: A, a, a and b keep their holes.
+      const subpaths = (d) => (d.match(/[Mm]/g) || []).length;
+      expect(letters.reduce((n, l) => n + subpaths(l.d), 0)).toBe(subpaths(awana.d));
+      expect(letters.map((l) => subpaths(l.d))).toEqual([2, 1, 2, 1, 2, 1, 1, 1, 2, 1]);
+      // Each letter starts with an absolute moveto, so it draws in place on its own.
+      for (const l of letters) expect(l.d).toMatch(/^M[\d.]+ [\d.]+/);
+    }
+  });
+
+  it('keeps a split path drawing exactly where the whole one did', () => {
+    // Relative moves after a close are relative to the sub-path's start.
+    const letters = logoLetters('m10 10h5v5h-5zm20 0h5v5h-5zm2 1h1v1h-1z');
+    expect(letters).toEqual([
+      { d: 'M10 10h5v5h-5z', x0: 10, x1: 15 },
+      { d: 'M30 10h5v5h-5zM32 11h1v1h-1z', x0: 30, x1: 35 },
+    ]);
+    expect(() => logoLetters('l1 2')).toThrow();
   });
 });

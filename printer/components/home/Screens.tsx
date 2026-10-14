@@ -6,7 +6,7 @@ import { CLUBS, LOGO, Club, Doodle, Shape, StepChip } from './Kit';
  * Small recreations of the real screens, drawn in HTML and CSS (styles/home.css,
  * `kv-scr-*`), each sized in container units so it scales as one picture. Each
  * is role="img" with a full description. They follow the CURRENT looks (the
- * lobby's check-in moment and pick-up board, the projector, the Journey start
+ * lobby's flagship welcome, check-in moment and pick-up board, the projector, the Journey start
  * screen, the phone page, the label generateLabel() draws, the KVBC Awana
  * setup wizard), with generic first names only. When a screen's look changes,
  * redraw its recreation in the same commit.
@@ -164,15 +164,32 @@ export const Moment: React.FC<{ name: string; club: Club; kicker?: string; run?:
   </div>
 );
 
-/** The lobby's idle scene: the slide behind every welcome. */
-const LobbyScene: React.FC<{ title: string; dim?: boolean }> = ({ title, dim }) => (
-  <div className={`kv-scene${dim ? ' is-dim' : ''}`}>
+/**
+ * The lobby's scene: the flagship welcome (lobby FlagshipSlide.jsx: the
+ * church's logo, huge and in ink on the sky, "We're so glad you're here!"
+ * under it), or a typed slide. `dim` = a name is up, and the slide's words
+ * step aside. The real TV draws the full logo (520px and up); a miniature is
+ * too small for it, so it draws the two-line (260px and up) and, on a
+ * narrower card, the stacked one (home.css), never a version under its floor.
+ */
+const LobbyScene: React.FC<{ title?: string; dim?: boolean }> = ({ title, dim }) => (
+  <div className={`kv-scene${dim ? ' is-dim' : ''}${title ? '' : ' kv-scene--flagship'}`}>
     <span className="kv-scene__blob kv-scene__blob--a" />
     <span className="kv-scene__blob kv-scene__blob--b" />
-    <Doodle name="smile-arc" className="kv-scene__d1" />
-    <Doodle name="zigzag" className="kv-scene__d2" />
-    <span className="kv-scene__kicker">Tonight</span>
-    <span className="kv-scene__title">{title}</span>
+    {title ? (
+      <>
+        <Doodle name="smile-arc" className="kv-scene__d1" />
+        <Doodle name="zigzag" className="kv-scene__d2" />
+        <span className="kv-scene__kicker">Tonight</span>
+        <span className="kv-scene__title">{title}</span>
+      </>
+    ) : (
+      <>
+        <img className="kv-scene__logo kv-scene__logo--two-line" src={LOGO.twoLineInk} alt="" />
+        <img className="kv-scene__logo kv-scene__logo--stacked" src={LOGO.stackedInk} alt="" />
+        <span className="kv-scene__glad">We’re so glad you’re here!</span>
+      </>
+    )}
   </div>
 );
 
@@ -196,15 +213,16 @@ export const Tv: React.FC<{ children: React.ReactNode; label: string; className?
   </div>
 );
 
-/** The lobby TV for the showcase: a welcome, then (in turn) the pick-up board. */
+/** The lobby TV for the showcase: the welcome, two names over it, then (in turn) the pick-up board. */
 export const LobbyArt: React.FC<{ on: boolean }> = ({ on }) => {
-  const step = useCycle(3, 3600, on);
+  const step = useCycle(4, 3600, on);
   const names = [{ n: 'Ava', c: club('sparks') }, { n: 'Mateo', c: club('tnt') }];
+  const moment = step === 1 || step === 2 ? names[step - 1] : null;
   return (
-    <Tv label="Recreation of the lobby TV. A child's club wave rises from the bottom of the screen and carries their first name, AVA, under the word Welcome, with the Sparks mark on the wave. In turn the same screen shows the pick-up board along its foot: the first names of children not checked out yet, grouped by club.">
-      <LobbyScene title={step === 2 ? 'See you next week!' : 'Welcome to Awana!'} dim={step < 2} />
-      {step < 2 && <Moment name={names[step].n} club={names[step].c} kicker={step ? 'Welcome back' : 'Welcome'} run={step} />}
-      {step === 2 && <Pickup />}
+    <Tv label="Recreation of the lobby TV. It opens on the church's own logo, huge in the middle of the screen, with We're so glad you're here! under it. Then a child's club wave rises from the bottom of the screen and carries their first name, AVA, under the word Welcome, with the Sparks mark on the wave. In turn the same screen shows the pick-up board along its foot: the first names of children not checked out yet, grouped by club.">
+      <LobbyScene title={step === 3 ? 'See you next week!' : undefined} dim={moment != null} />
+      {moment && <Moment name={moment.n} club={moment.c} kicker={step === 2 ? 'Welcome back' : 'Welcome'} run={step} />}
+      {step === 3 && <Pickup />}
       <StepChip className="kv-tv__chip" label="Clear" value="58°" />
     </Tv>
   );

@@ -155,7 +155,7 @@ function Field({ theme, wipe, animated }) {
 // The logo lands a beat after the scene appears, with the first slide's copy.
 const LOGO_HOLD = 0.3;
 
-function Chrome({ away, via, swell, still }) {
+function Chrome({ away, via, swell, still, logoAway = false }) {
   // Where the chrome is and how it got there, captured once per change of
   // spot (derived state), so a later change of `via` alone never replays it.
   const [state, setState] = useState(() => ({ spot: chromeSpot('home', away, via), from: null, via }));
@@ -172,7 +172,7 @@ function Chrome({ away, via, swell, still }) {
   // so dropping them while the chrome was away swelled it again on return.
   const swelling = !still && swell > 0 ? swellKeyframes('-16%') : null;
   return (
-    <div className={`lobby-chrome lobby-chrome--${current.spot}${away ? ' lobby-chrome--away' : ''}`} aria-hidden="true">
+    <div className={`lobby-chrome lobby-chrome--${current.spot}${away ? ' lobby-chrome--away' : ''}${logoAway ? ' lobby-chrome--logo-away' : ''}`} aria-hidden="true">
       <M.div className="lobby-waves" initial={false} animate={waves.animate} transition={waves.transition}>
         <Wave className="lobby-wave lobby-wave--sun lobby-ambient lobby-ambient--roll" color="var(--brand-sun)" />
         {/* Remounted per hand-off, so each count plays its swell once. */}
@@ -217,6 +217,7 @@ function Chrome({ away, via, swell, still }) {
  *   wipe?: boolean,
  *   chromeAway?: boolean,
  *   chromeVia?: string,
+ *   logoAway?: boolean,
  *   swell?: number,
  *   children?: import('react').ReactNode,
  * }} props
@@ -229,6 +230,9 @@ export default function CatalogScene({
   // How the current theme arrived (true: under the stinger), how the chrome
   // should move, and the hand-off count that swells the house wave.
   wipe = false, chromeAway = false, chromeVia = 'handoff', swell = 0,
+  // The flagship's big logo is up: the tab's small one steps aside (one logo
+  // on screen at a time, never two of the same mark; app.css).
+  logoAway = false,
   children,
 }) {
   const key = lobbyTheme(theme);
@@ -266,7 +270,7 @@ export default function CatalogScene({
 
       <div className="lobby-content">{children}</div>
 
-      <Chrome away={chromeAway} via={chromeVia} swell={swell} still={still} />
+      <Chrome away={chromeAway} via={chromeVia} swell={swell} still={still} logoAway={logoAway} />
     </div>
   );
 }

@@ -1,6 +1,7 @@
 // @ts-check
-// The flagship slide: one permanent, built-in "Welcome to Awana!" piece of
-// motion design that leads every pass through the typed slideshow.
+// The flagship slide: one permanent, built-in welcome, the church's own logo
+// huge in the middle of the screen (owner 2026-10-13: "a super fun, joyful
+// animation of the logo"), that leads every pass through the typed slideshow.
 //
 // It is not stored, published or editable, and has no setting; only the
 // clock (flagshipOnAir) takes it off, during Wednesday club: like the calendar slides and the
@@ -56,4 +57,94 @@ export function flagshipOnAir(now = new Date()) {
 export function withFlagship(deck, onAir = true) {
   const rest = (deck || []).filter((s) => !isFlagshipSlide(s));
   return onAir ? [FLAGSHIP_SLIDE, ...rest] : rest;
+}
+
+/**
+ * The three ways the logo arrives (owner 2026-10-13: "one of each on each
+ * load, mix it up"), in the order a screen plays them:
+ *   bounce  Awana Clubs bounces in letter by letter, club-colour doodles pop;
+ *   pop     the whole logo pops up from small, with a confetti burst;
+ *   parade  the six club colours march up behind it, back to the sky.
+ */
+export const FLAGSHIP_STYLES = Object.freeze(['bounce', 'pop', 'parade']);
+
+/**
+ * The two wordings (owner 2026-10-13): `glad` is the logo with "We're so glad
+ * you're here!" under it; `welcome` is "Welcome to" over the logo, nothing
+ * under it. Both use the full logo, tagline and all.
+ */
+export const FLAGSHIP_VERSIONS = Object.freeze(['glad', 'welcome']);
+
+/** The one line each wording adds, exactly as the owner wrote it. */
+export const FLAGSHIP_LINES = Object.freeze({
+  glad: 'We\u2019re so glad you\u2019re here!',
+  welcome: 'Welcome to',
+});
+
+const LOGO_NAME = 'Kennebec Valley Baptist Church Awana Clubs. Strengthening the next generation of lifelong disciples for Christ';
+
+/**
+ * The slide's one spoken label (it is role="img"): the logo's own words, and
+ * the line the wording adds, in reading order.
+ * @param {'glad' | 'welcome'} version
+ */
+export function flagshipLabel(version) {
+  return version === 'welcome'
+    ? `${FLAGSHIP_LINES.welcome} ${LOGO_NAME}`
+    : `${LOGO_NAME}. ${FLAGSHIP_LINES.glad}`;
+}
+
+/**
+ * The style and wording for the n-th showing on a screen: the styles take
+ * turns and so do the wordings, so neither repeats back to back, and six
+ * showings in a row play every pairing once.
+ * @param {number} n
+ * @returns {{ style: 'bounce' | 'pop' | 'parade', version: 'glad' | 'welcome' }}
+ */
+export function flagshipPick(n) {
+  const i = Number.isFinite(n) && n >= 0 ? Math.floor(n) : 0;
+  return {
+    style: /** @type {'bounce' | 'pop' | 'parade'} */ (FLAGSHIP_STYLES[i % FLAGSHIP_STYLES.length]),
+    version: /** @type {'glad' | 'welcome'} */ (FLAGSHIP_VERSIONS[i % FLAGSHIP_VERSIONS.length]),
+  };
+}
+
+/** Where a screen keeps its place in the rotation (this screen only, never shared). */
+export const FLAGSHIP_TURN_KEY = 'awanaFlagshipTurn.v1';
+
+/** The turn in memory, for a browser whose storage throws or forgets. */
+let memoryTurn = 0;
+
+/**
+ * The pick for the showing about to start, and the screen moves on one: its
+ * place is kept in localStorage (so a reload carries on with the next one),
+ * in memory when storage is not there. Never throws.
+ * @param {{ getItem(k: string): string | null, setItem(k: string, v: string): void } | null} [store]
+ */
+export function nextFlagshipPick(store = defaultStore()) {
+  let n = memoryTurn;
+  try {
+    const saved = Number.parseInt(store?.getItem(FLAGSHIP_TURN_KEY) ?? '', 10);
+    if (Number.isFinite(saved) && saved >= 0) n = saved;
+  } catch { /* storage refused: the memory turn carries on */ }
+  // Six showings play every pairing; wrap there so the number stays small.
+  const next = (n + 1) % (FLAGSHIP_STYLES.length * FLAGSHIP_VERSIONS.length);
+  memoryTurn = next;
+  try {
+    store?.setItem(FLAGSHIP_TURN_KEY, String(next));
+  } catch { /* storage refused: the memory turn carries on */ }
+  return flagshipPick(n);
+}
+
+function defaultStore() {
+  try {
+    return typeof localStorage === 'undefined' ? null : localStorage;
+  } catch {
+    return null;
+  }
+}
+
+/** Test seam: forget the memory turn. */
+export function resetFlagshipTurn() {
+  memoryTurn = 0;
 }

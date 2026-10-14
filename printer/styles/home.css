@@ -426,6 +426,20 @@ sup { font-size: .55em; line-height: 0; vertical-align: .9em; }
 .kv-scene__d2 { position: absolute; width: 4cqw; right: 22cqw; top: 6cqw; color: #fff; }
 .kv-scene__kicker { position: relative; font: 400 3.2cqw/1 var(--label); letter-spacing: .12em; text-transform: uppercase; color: var(--navy); }
 .kv-scene__title { position: relative; font: 400 7.6cqw/1 var(--shout); color: var(--navy); margin-top: 1.2cqw; text-align: center; }
+/* The flagship welcome: the church's logo, ink on the sky (one colour, no
+   shadow), the glad line well under it; the welcome's words step aside for a
+   name like the slide's do. Two-line at 72% of the TV where that is 260px or
+   more (a TV 361px wide), stacked below that (130px and up). */
+.kv-scene--flagship { padding-bottom: 0; }
+.kv-scene__logo { position: relative; height: auto; }
+.kv-scene__logo--two-line { width: 72cqw; }
+.kv-scene__logo--stacked { display: none; width: max(130px, 34cqw); }
+@container (max-width: 360.98px) {
+  .kv-scene__logo--two-line { display: none; }
+  .kv-scene__logo--stacked { display: block; }
+}
+.kv-scene__glad { position: relative; font: 400 4.4cqw/1 var(--shout); color: var(--ink); margin-top: 3cqw; white-space: nowrap; }
+.kv-scene.is-dim .kv-scene__logo, .kv-scene.is-dim .kv-scene__glad { opacity: 0; transform: scale(.97); }
 
 .kv-moment { position: absolute; inset: 0; z-index: 2; }
 .kv-moment__wave { position: absolute; left: -3%; width: 106%; bottom: 22%; height: 52%; color: var(--c); transform: scaleX(-1); }
@@ -805,6 +819,8 @@ sup { font-size: .55em; line-height: 0; vertical-align: .9em; }
 
 /* ── Motion (never under reduced motion; resting styles are final) ──────── */
 @media (prefers-reduced-motion: no-preference) {
+  /* The lobby miniature's welcome steps aside for a name. */
+  .kv-scene__logo, .kv-scene__glad { transition: opacity .4s, transform .5s var(--settle); }
   @keyframes kv-float { 0%, 100% { transform: translateY(0) rotate(0); } 50% { transform: translateY(-10px) rotate(6deg); } }
   @keyframes kv-drift { 0%, 100% { transform: scaleX(-1) translateX(0); } 50% { transform: scaleX(-1) translateX(1.6%); } }
   @keyframes kv-pop { 0% { transform: scale(0) rotate(-30deg); opacity: 0; } 100% { opacity: 1; } }

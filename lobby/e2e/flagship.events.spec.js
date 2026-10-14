@@ -23,12 +23,18 @@ const CONFIG = {
   standardDisplayMs: 2000,
 };
 
-async function boot(page, query = '') {
+async function boot(page, query = '', turn = 0) {
   const send = await liveChannel(page);
-  await page.addInitScript((c) => {
+  await page.addInitScript(({ c, turn }) => {
     localStorage.setItem('awanaConfig.v1', JSON.stringify(c));
     localStorage.setItem('awanaSetupCardDismissed.v1', '1');
-  }, CONFIG);
+    // Which welcome plays is this screen's turn (src/lib/flagship.js), set
+    // once per tab so a reload carries on with the next one.
+    if (!sessionStorage.getItem('flagshipTurnSet')) {
+      localStorage.setItem('awanaFlagshipTurn.v1', String(turn));
+      sessionStorage.setItem('flagshipTurnSet', '1');
+    }
+  }, { c: CONFIG, turn });
   await page.goto(`/index.html${query}`);
   await expect(page.locator('.flagship')).toBeVisible();
   await page.evaluate(() => document.fonts.ready);
@@ -38,7 +44,7 @@ async function boot(page, query = '') {
 const child = (name, n) => ({ id: `${name}-${n}`, firstName: name, club: 'sparks', at: new Date().toISOString(), isBirthday: false, isFirstTimer: false });
 
 for (const query of ['', '?lowPower=1']) {
-  test(`a name plays over the flagship at once, the headline steps aside for it, and comes back again ${query || '(with motion)'}`, async ({ page }) => {
+  test(`a name plays over the flagship at once, the logo steps aside for it, and comes back again ${query || '(with motion)'}`, async ({ page }) => {
     test.setTimeout(45_000);
     const send = await boot(page, query);
     await send('checkin', child('Maya', 1));
@@ -46,7 +52,7 @@ for (const query of ['', '?lowPower=1']) {
     await expect(page.locator('.checkin')).toBeVisible({ timeout: 3000 });
     await expect(page.locator('.corner-chip--waiting')).toHaveCount(0);
     await expect(page.locator('.stage')).toHaveClass(/checkin-active/);
-    // The slide's headline steps aside, all the way (its own transition settles in ~0.6 s;
+    // The slide's logo and its line step aside, all the way (its own transition settles in ~0.6 s;
     // instant under ?lowPower=1); its field stays.
     await expect.poll(async () => Number(await page.locator('.flagship-copy').evaluate((e) => getComputedStyle(e).opacity)), { timeout: 3000 }).toBe(0);
     expect(Number(await page.locator('.flagship').evaluate((e) => getComputedStyle(e).opacity))).toBe(1);
@@ -70,4 +76,33 @@ test('the flagship leads every pass: flagship, then the operator\'s slides, then
   }
   // 10 s flagship + 3 s + 3 s = 16 s a pass, so 22 s sees the flagship come round again.
   expect(seen.slice(0, 4)).toEqual(['FLAGSHIP', 'SLIDE ALPHA', 'SLIDE BRAVO', 'FLAGSHIP']);
+});
+
+test('with motion, each load plays the next style, and every one comes to rest on the same finished frame', async ({ page }) => {
+  test.setTimeout(60_000);
+  // The flagship's motion happens in real time, so this watches it with the real clock.
+  await boot(page, '', 0);
+  const seen = [];
+  for (let i = 0; i < 3; i += 1) {
+    if (i) await page.reload();
+    await expect(page.locator('.flagship')).toBeVisible();
+    seen.push(await page.locator('.flagship').getAttribute('data-style'));
+    // The longest moment (the parade) is still by 6.5 s of real time.
+    await page.waitForTimeout(7_000);
+    const rest = await page.evaluate(() => {
+      const ink = document.querySelector('.flagship-ink');
+      const strip = document.querySelector('.flagship-parade__strip');
+      return {
+        color: getComputedStyle(ink).color,
+        // Nothing in the lockup is left moved, scaled or tilted (a doodle rests at its own tilt).
+        moving: [...document.querySelectorAll('.flagship-ink *:not(.flagship-doodle)')]
+          .filter((e) => !['none', 'matrix(1, 0, 0, 1, 0, 0)'].includes(getComputedStyle(e).transform)).length,
+        stripGone: !strip || strip.getBoundingClientRect().bottom <= 0,
+      };
+    });
+    expect(rest.color, seen.at(-1)).toBe('rgb(35, 31, 32)');
+    expect(rest.moving, seen.at(-1)).toBe(0);
+    expect(rest.stripGone, seen.at(-1)).toBe(true);
+  }
+  expect(seen).toEqual(['bounce', 'pop', 'parade']);
 });

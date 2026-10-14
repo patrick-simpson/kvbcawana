@@ -349,6 +349,14 @@ html, body, #root {
   display: block;
   color: #fff;
   overflow: visible;
+  transition: opacity var(--brand-dur-settle) var(--brand-ease-settle);
+}
+/* The flagship's big logo is up (FlagshipSlide.jsx): the tab's small one
+   steps aside, so the room never sees the same mark twice at once (owner
+   2026-10-13), and comes back with the next slide. Opacity only; the tab
+   itself stays, the catalog's corner. */
+.lobby-chrome--logo-away .lobby-tab__logo {
+  opacity: 0;
 }
 .lobby-tab__logo--two-line {
   width: calc(15 * var(--u));

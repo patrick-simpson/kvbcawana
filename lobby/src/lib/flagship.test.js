@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import {
   FLAGSHIP_DURATION_SEC, flagshipOnAir, FLAGSHIP_ID, FLAGSHIP_SLIDE, isFlagshipSlide, withFlagship,
+  FLAGSHIP_LINES, FLAGSHIP_STYLES, FLAGSHIP_TURN_KEY, FLAGSHIP_VERSIONS, flagshipLabel, flagshipPick,
+  nextFlagshipPick, resetFlagshipTurn,
 } from './flagship.js';
 import { holdsCheckIns, slideDurationMs } from './slides.js';
 import { sanitizeSlides } from './slides.js';
@@ -49,4 +51,50 @@ describe('the flagship slide', () => {
     expect(withFlagship([{ id: 'a' }], false).map((s) => s.id)).toEqual(['a']);
   });
 
+});
+
+describe('which welcome plays (owner 2026-10-13: "one of each on each load, mix it up")', () => {
+  it('takes the next style and the next wording each showing, never the same twice in a row', () => {
+    const six = [0, 1, 2, 3, 4, 5].map(flagshipPick);
+    expect(FLAGSHIP_STYLES).toEqual(['bounce', 'pop', 'parade']);
+    expect(FLAGSHIP_VERSIONS).toEqual(['glad', 'welcome']);
+    for (let i = 1; i < six.length; i += 1) {
+      expect(six[i].style).not.toBe(six[i - 1].style);
+      expect(six[i].version).not.toBe(six[i - 1].version);
+    }
+    // Six showings play every pairing once.
+    expect(new Set(six.map((p) => `${p.style}/${p.version}`)).size).toBe(6);
+    expect(flagshipPick(6)).toEqual(flagshipPick(0));
+    expect(flagshipPick(-3)).toEqual(flagshipPick(0));
+  });
+
+  it('keeps this screen\'s place in its own storage, carrying on after a reload', () => {
+    const data = new Map();
+    const store = { getItem: (k) => data.get(k) ?? null, setItem: (k, v) => { data.set(k, v); } };
+    expect(nextFlagshipPick(store)).toEqual(flagshipPick(0));
+    expect(data.get(FLAGSHIP_TURN_KEY)).toBe('1');
+    expect(nextFlagshipPick(store)).toEqual(flagshipPick(1));
+    data.set(FLAGSHIP_TURN_KEY, '5');
+    expect(nextFlagshipPick(store)).toEqual(flagshipPick(5));
+    expect(data.get(FLAGSHIP_TURN_KEY)).toBe('0');
+    data.set(FLAGSHIP_TURN_KEY, 'garbage');
+    expect(nextFlagshipPick(store)).toEqual(flagshipPick(0));
+  });
+
+  it('carries on in memory when storage throws, and never throws itself', () => {
+    resetFlagshipTurn();
+    const broken = { getItem: () => { throw new Error('denied'); }, setItem: () => { throw new Error('denied'); } };
+    expect(nextFlagshipPick(broken)).toEqual(flagshipPick(0));
+    expect(nextFlagshipPick(broken)).toEqual(flagshipPick(1));
+    expect(nextFlagshipPick(null)).toEqual(flagshipPick(2));
+    resetFlagshipTurn();
+  });
+
+  it('says the owner\'s own words, and the logo\'s with them, as one label', () => {
+    expect(FLAGSHIP_LINES.glad).toBe('We\u2019re so glad you\u2019re here!');
+    expect(FLAGSHIP_LINES.welcome).toBe('Welcome to');
+    expect(flagshipLabel('glad')).toBe('Kennebec Valley Baptist Church Awana Clubs. Strengthening the next generation of lifelong disciples for Christ. We\u2019re so glad you\u2019re here!');
+    expect(flagshipLabel('welcome')).toBe('Welcome to Kennebec Valley Baptist Church Awana Clubs. Strengthening the next generation of lifelong disciples for Christ');
+    for (const v of FLAGSHIP_VERSIONS) expect(flagshipLabel(v)).not.toMatch(/\u2014/);
+  });
 });

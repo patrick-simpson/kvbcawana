@@ -1,23 +1,23 @@
 /* ── The flagship slide (FlagshipSlide.jsx) ───────────────────
-   The catalog's welcome page as a title sequence, first in every pass.
+   The church's logo, huge in the middle, first in every pass.
    FlagshipSlide.jsx owns the timing; this file owns the look. It stands in
    the same 100u x 56.25u frame as the lobby copy (u = 1% of a 16:9 stage),
-   full-bleed field behind it. Layers, lowest first: clouds 0,
-   headline 2, doodles 3. The corner tab and the house waves are the
-   scene's own chrome (CatalogScene), over this slide like every other. */
+   full-bleed field behind it. Layers, lowest first: clouds 0, the club
+   parade 1, the logo and its line 2. The corner tab and the house waves are
+   the scene's own chrome (CatalogScene), over this slide like every other;
+   the tab's own small logo steps aside while this one is up (app.css). */
 
 .flagship {
   position: absolute;
   inset: 0;
   overflow: hidden;
   background: var(--brand-sky);
-  color: #fff;
 }
-/* A name is on screen: the headline steps aside the way typed copy does
-   (app.css, "One hero at a time"), all the way, never a see-through ghost
-   behind the name; the slide's own field, clouds and doodles stay. */
+/* A name is on screen: the logo and its line step aside the way typed copy
+   does (app.css, "One hero at a time"), all the way, never a see-through
+   ghost behind the name; the slide's own field and clouds stay. */
 .flagship-copy {
-  transform-origin: 50% 40%;
+  transform-origin: 50% 50%;
   transition:
     opacity var(--brand-dur-settle) var(--brand-ease-settle),
     transform var(--brand-dur-settle) var(--brand-ease-settle);
@@ -28,17 +28,15 @@
 }
 
 /* Everything below is laid out in the 16:9 frame, centred in the screen. */
-.flagship-clouds,
-.flagship-copy,
-.flagship-doodle-slot {
+.flagship-clouds {
   position: absolute;
   inset: 0;
   margin: auto;
   width: calc(100 * var(--u));
   height: calc(56.25 * var(--u));
   pointer-events: none;
+  z-index: 0;
 }
-.flagship-clouds { z-index: 0; }
 
 .flagship-cloud {
   position: absolute;
@@ -49,53 +47,136 @@
 .flagship-cloud--a { left: -8%; top: 18%; width: 46%; height: 52%; }
 .flagship-cloud--b { right: -10%; top: 4%; width: 52%; height: 62%; }
 
+/* The headline box: 19u down to 45u, clear of the corner tab (15.5u), the
+   top-right stack, the house waves (45.5u) and the corner chip. The logo
+   and its line stand centred in it; on a screen taller than 16:9 (4:3) the
+   frame has room above and below, so a lockup a little taller than the box
+   still clears the tab and the waves. */
 .flagship-copy {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(50% - 28.125 * var(--u) + 19 * var(--u));
+  height: calc(26 * var(--u));
+  margin: 0 auto;
+  width: calc(100 * var(--u));
   z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+/* The ONE colour of the logo and its line: ink on the sky (the parade turns
+   it white while a club colour is behind it, FlagshipSlide.jsx). */
+.flagship-ink {
   display: flex;
   flex-direction: column;
   align-items: center;
-  /* Above the waves, clear of the tab and the top-right stack. */
-  padding-top: calc(19 * var(--u));
-  box-sizing: border-box;
+  color: #231f20;
 }
-.flagship-title { position: relative; }
-.flagship-row {
-  display: flex;
-  justify-content: center;
-  gap: 0.28em;
+
+/* The logo: as wide as the box allows. The full logo needs 520px for its
+   thin church line and tagline (shared/churchLogo.js MIN_WIDTH_PX); 72u is
+   that on a 722px-wide frame. A 4:3 screen narrower than that has the
+   height to spare, so it takes 520px (up to 84u, 8u clear each side). */
+.flagship-mark {
+  position: relative;
+  --logo-w: max(calc(72 * var(--u)), min(520px, calc(84 * var(--u))));
+}
+.flagship--welcome .flagship-mark {
+  --logo-w: max(calc(75 * var(--u)), min(520px, calc(84 * var(--u))));
+}
+.flagship-pop { transform-origin: 50% 50%; }
+.flagship-logo {
+  display: block;
+  overflow: visible;
+  height: auto;
+  width: var(--logo-w);
+}
+.flagship-logo--full { aspect-ratio: 1910 / 487; }
+.flagship-logo--two-line { display: none; aspect-ratio: 1910 / 403; }
+/* Too small for the full logo at 520px inside the box (a 16:9 frame under
+   722px wide, or one under 619px wide on any screen): the two-line logo,
+   80u wide (512px on a 640x360 screen, over its 260px floor). */
+@container lobby-scene (max-width: 618.98px) or ((max-width: 721.98px) and (min-aspect-ratio: 3 / 2)) or (max-height: 405.98px) {
+  .flagship-logo--full { display: none; }
+  .flagship-logo--two-line { display: block; }
+  .flagship-mark { --logo-w: calc(80 * var(--u)); }
+  .flagship--welcome .flagship-mark { --logo-w: calc(80 * var(--u)); }
+}
+
+/* The wording's line: the shout face, much bigger and heavier than the
+   tagline and set well apart from it, so the two never read as one
+   paragraph. Flat, one colour, no shadow (it sits with the logo). */
+.flagship-line {
   font-family: var(--font-shout);
-  font-size: calc(11.6 * var(--u));
-  line-height: 0.9;
-  text-transform: uppercase;
-  color: #fff;
-}
-.flagship-row--1 { font-size: calc(10.2 * var(--u)); }
-.flagship-word { display: flex; }
-/* The mask each letter rises from; padded so the hard shadow and the tall
-   accents are never cut by it. */
-.flagship-mask {
-  display: block;
-  overflow: hidden;
-  padding: 0.12em 0.14em 0.22em 0.02em;
-  margin: -0.12em -0.14em -0.22em -0.02em;
-}
-.flagship-letter {
-  display: block;
-  text-shadow: 0.05em 0.06em 0 var(--brand-blue);
+  line-height: 1;
+  white-space: nowrap;
+  transform-origin: 50% 100%;
   will-change: transform;
-  /* Its soft squish sits it down onto its baseline: (SHOUT_BOX's ascent less
-     its descent, plus the row's 0.9 line height) / 2, pinned by
-     FlagshipSlide.test.jsx. Well inside the mask's pads either way. */
-  transform-origin: 50% 0.712em;
 }
-.flagship-doodle-slot { z-index: 3; }
-.flagship-doodles { position: absolute; }
-/* `inset: auto` comes FIRST in each rule below: it is a shorthand, and written
-   after left/right/top it wiped them, stacking both clusters at the frame's
-   top-left corner. */
-.flagship-doodle-slot--left .flagship-doodles { inset: auto; left: calc(5 * var(--u)); top: calc(15 * var(--u)); width: calc(20 * var(--u)); height: calc(18 * var(--u)); }
-/* The right cluster sits LOWER than the left (design review 2026-10-13):
-   the same height either side of the headline read as a mirrored, evenly
-   placed frame; on a diagonal the two pull across the title instead. Its
-   box ends at 45u, the lobby's safe bottom, above the house waves. */
-.flagship-doodle-slot--right .flagship-doodles { inset: auto; right: calc(5 * var(--u)); top: calc(27 * var(--u)); width: calc(20 * var(--u)); height: calc(18 * var(--u)); }
+.flagship-line--glad {
+  font-size: calc(4.4 * var(--u));
+  margin-top: calc(3 * var(--u));
+}
+.flagship-line--welcome {
+  font-size: calc(5.2 * var(--u));
+  margin-bottom: calc(1.4 * var(--u));
+}
+
+/* The bouncy letters' doodles: shares of the logo's box, outside its ink. */
+.flagship-doodles {
+  position: absolute;
+  inset: 0;
+}
+.flagship-doodle {
+  position: absolute;
+  display: block;
+  translate: -50% -50%;
+}
+.flagship-doodle > svg { display: block; width: 100%; height: 100%; overflow: visible; }
+
+/* The club parade: six bands a screen and a crest tall, stacked, marching up
+   from below the screen and off the top (FlagshipSlide.jsx paradeBeat). The
+   strip rests off the frame. */
+.flagship-parade {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  z-index: 1;
+  pointer-events: none;
+}
+.flagship-parade__strip {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  /* six bands of (1 + crest) screens, plus the last one's tail */
+  height: calc(100% * (6 * 1.12 + 0.12));
+  will-change: transform;
+}
+.flagship-band {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% * var(--k) * 1.12 / 6.84);
+  height: calc(100% * 1.12 / 6.84);
+  background: var(--band);
+}
+.flagship-band__crest {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  /* a pixel into the band below it, so no seam of sky shows between */
+  bottom: calc(100% - 1px);
+  height: calc(100% * 0.12 / 1.12 + 1px);
+  display: block;
+}
+.flagship-band__tail {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  top: calc(100% * 6.72 / 6.84 - 1px);
+  height: calc(100% * 0.12 / 6.84 + 1px);
+  display: block;
+}

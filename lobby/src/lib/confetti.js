@@ -251,3 +251,35 @@ export function fireMilestone(opts) {
     }, 700);
   }
 }
+
+// The six clubs, youngest first (shared/brand/tokens.json `clubs`, primary):
+// Puggles, Cubbies, Sparks, T&T, Trek, Journey.
+export const CLUB_CONFETTI_COLORS = ['#1DB6D9', '#4C72B8', '#F04A4B', '#58BD79', '#047E71', '#8A649D'];
+
+/**
+ * The flagship's "big pop" (owner 2026-10-13): the church's logo pops up huge
+ * and a burst of sparkles and dots in the six club colours flies out from
+ * behind it, then two low cannons answer from the corners. Same rules as
+ * every burst: the confetti level (off skips it, reduced halves it), the
+ * rush throttle and reduced motion all win; the slide never calls it under
+ * zero animation. Always the clubs' colours, whatever the season: it is the
+ * clubs' welcome.
+ * @param {{ x: number, y: number }} [origin]  the logo's centre, 0..1 of the viewport
+ */
+export function fireWelcome(origin) {
+  if (off()) return;
+  const from = origin && unit(origin.x) && unit(origin.y) ? { x: origin.x, y: origin.y } : { x: 0.5, y: 0.5 };
+  const colors = CLUB_CONFETTI_COLORS;
+  const shapes = brandShapes();
+  confetti({
+    ...BASE,
+    particleCount: scaled(190), spread: 360, startVelocity: 52, decay: 0.9, ticks: 260,
+    gravity: 0.8, origin: from, colors, shapes, scalar: 2.1,
+  });
+  setTimeout(() => {
+    if (off()) return;
+    const cannons = { ...BASE, spread: 60, startVelocity: 62, ticks: 240, gravity: 1, colors, shapes, scalar: 1.7 };
+    confetti({ ...cannons, particleCount: scaled(70), angle: 62, origin: { x: 0, y: 0.95 } });
+    confetti({ ...cannons, particleCount: scaled(70), angle: 118, origin: { x: 1, y: 0.95 } });
+  }, 220);
+}

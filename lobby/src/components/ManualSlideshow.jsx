@@ -252,6 +252,9 @@ export default function ManualSlideshow({ slides, slideshowDelaySec, clubTint = 
         // The flagship keeps the scene's own chrome (the orange tab and house
         // waves every other slide has); only a video or a poster covers it.
         chromeAway={kind === 'video' || kind === 'promo'}
+        // ...but its small logo steps aside while the flagship's big one is
+        // up: the same mark twice on one screen reads as a doubling.
+        logoAway={kind === 'flagship'}
         chromeVia={transition.via}
         swell={transition.swells}
         clubTint={clubTint}

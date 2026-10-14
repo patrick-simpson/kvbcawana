@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { useLayoutEffect } from 'react';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
@@ -450,6 +452,20 @@ describe('ManualSlideshow on the lobby scene (rebrand stage 4b)', () => {
     expect(chrome().className).toContain('lobby-chrome--home');
     act(() => vi.advanceTimersByTime(5000)); // → the poster
     expect(chrome().className).toContain('lobby-chrome--away');
+  });
+
+  it('steps the tab\'s small logo aside while the flagship\'s big one is up, and brings it back after', () => {
+    // One logo on screen at a time (owner 2026-10-13: the same mark twice
+    // reads as a doubling); the tab itself stays home.
+    const flagship = { id: 'flagship_welcome', type: 'flagship', durationSec: 5 };
+    const { container } = render(<ManualSlideshow slides={[flagship, sky[0]]} slideshowDelaySec={5} />);
+    const chrome = () => container.querySelector('.lobby-chrome');
+    expect(chrome().className).toContain('lobby-chrome--logo-away');
+    expect(chrome().className).toContain('lobby-chrome--home');
+    act(() => vi.advanceTimersByTime(5000));
+    expect(chrome().className).not.toContain('lobby-chrome--logo-away');
+    const appCss = readFileSync(resolve(__dirname, '../styles/app.css'), 'utf8');
+    expect(appCss).toMatch(/\.lobby-chrome--logo-away \.lobby-tab__logo \{\s*opacity: 0;\s*\}/);
   });
 
   // Where the chrome goes for a poster and for a video, and when, is pinned

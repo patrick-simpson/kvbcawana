@@ -136,7 +136,7 @@ test('every shape, doodle and club mark is the kit\'s own file, imported from lo
     for (const [tag] of live(read(rel)).matchAll(/<img\b[^>]*>/g)) {
       const src = attr(tag, 'src');
       if (!src && /\bhidden\b/.test(tag)) continue; // the replica's empty club image (the extension reads its alt)
-      assert.match(src, /^\{(?:LOGO\.(?:twoLineInk|twoLineWhite|fullWhite)|c\.(?:color|white)|spec\.club\.black|club\('[a-z]+'\)\.white)\}$/, `${rel}: ${tag}`);
+      assert.match(src, /^\{(?:LOGO\.(?:twoLineInk|twoLineWhite|fullWhite|stackedInk)|c\.(?:color|white)|spec\.club\.black|club\('[a-z]+'\)\.white)\}$/, `${rel}: ${tag}`);
       assert.ok(/\balt=/.test(tag), `${rel}: ${tag} has alt`);
     }
   }

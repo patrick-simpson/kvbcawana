@@ -85,3 +85,94 @@ export function parseChurchLogo(svg) {
   parts.sort((a, b) => LOGO_PARTS.indexOf(a.part) - LOGO_PARTS.indexOf(b.part));
   return { viewBox, label, parts };
 }
+
+/** How many numbers each SVG path command takes. */
+const PATH_ARGS = Object.freeze({ m: 2, l: 2, h: 1, v: 1, c: 6, s: 4, q: 4, t: 2, a: 7, z: 0 });
+
+/**
+ * One line of the logo split into its letters (the flagship's bouncy letters,
+ * owner 2026-10-13): each closed sub-path of the traced line, its counters
+ * (the hole of an "a" or a "b", a sub-path that sits inside another's x-range)
+ * kept with the letter they belong to, left to right. Each letter's `d`
+ * starts with an absolute moveto, so it draws in place on its own, and with
+ * the line's even-odd fill its holes stay holes. `x0`/`x1` are its left and
+ * right edges in the logo's own units. Pure: the kit's file stays the one
+ * drawing; this only cuts it up.
+ * @param {string} d one path's data
+ * @returns {Array<{ d: string, x0: number, x1: number }>}
+ */
+export function logoLetters(d) {
+  const toks = d.match(/[A-Za-z]|[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?/g) || [];
+  /** @type {Array<{ out: string[], x0: number, x1: number }>} */
+  const subs = [];
+  /** @type {{ out: string[], x0: number, x1: number } | null} */
+  let cur = null;
+  let i = 0;
+  let cx = 0;
+  let cy = 0;
+  let sx = 0;
+  let sy = 0;
+  let cmd = '';
+  const isCmd = (/** @type {string} */ t) => /^[A-Za-z]$/.test(t);
+  /** @param {number} x */
+  const see = (x) => {
+    if (!cur) throw new Error('logoLetters: a path must start with a moveto');
+    cur.x0 = Math.min(cur.x0, x);
+    cur.x1 = Math.max(cur.x1, x);
+  };
+  while (i < toks.length) {
+    if (isCmd(toks[i])) cmd = toks[i++];
+    const lc = cmd.toLowerCase();
+    const rel = cmd !== cmd.toUpperCase();
+    if (!(lc in PATH_ARGS)) throw new Error(`logoLetters: unknown path command ${cmd}`);
+    if (lc === 'z') {
+      if (!cur) throw new Error('logoLetters: a path must start with a moveto');
+      cur.out.push('z');
+      cx = sx;
+      cy = sy;
+      continue;
+    }
+    const a = [];
+    for (let k = 0; k < PATH_ARGS[/** @type {keyof typeof PATH_ARGS} */ (lc)]; k += 1) a.push(Number(toks[i++]));
+    if (a.some((n) => !Number.isFinite(n))) throw new Error('logoLetters: a path command is short of numbers');
+    if (lc === 'm') {
+      const x = (rel ? cx : 0) + a[0];
+      const y = (rel ? cy : 0) + a[1];
+      cur = { out: [`M${Math.round(x * 1000) / 1000} ${Math.round(y * 1000) / 1000}`], x0: x, x1: x };
+      subs.push(cur);
+      cx = x; cy = y; sx = x; sy = y;
+      // Numbers after a moveto are line-tos, in the moveto's own sense.
+      cmd = rel ? 'l' : 'L';
+      continue;
+    }
+    if (!cur) throw new Error('logoLetters: a path must start with a moveto');
+    cur.out.push(cmd + a.join(' '));
+    if (lc === 'h') { cx = (rel ? cx : 0) + a[0]; see(cx); } else if (lc === 'v') {
+      cy = (rel ? cy : 0) + a[0];
+    } else if (lc === 'a') {
+      cx = (rel ? cx : 0) + a[5]; cy = (rel ? cy : 0) + a[6]; see(cx);
+    } else {
+      // Control points and the end point: a curve never strays outside them.
+      let ex = cx;
+      let ey = cy;
+      for (let k = 0; k < a.length; k += 2) {
+        ex = (rel ? cx : 0) + a[k];
+        ey = (rel ? cy : 0) + a[k + 1];
+        see(ex);
+      }
+      cx = ex; cy = ey;
+    }
+  }
+  // Widest first, so a counter always finds the letter it sits in.
+  const byWidth = [...subs].sort((p, q) => (q.x1 - q.x0) - (p.x1 - p.x0));
+  /** @type {Array<{ parts: string[], x0: number, x1: number }>} */
+  const letters = [];
+  for (const s of byWidth) {
+    const home = letters.find((l) => s.x0 >= l.x0 - 0.5 && s.x1 <= l.x1 + 0.5);
+    if (home) home.parts.push(s.out.join(''));
+    else letters.push({ parts: [s.out.join('')], x0: s.x0, x1: s.x1 });
+  }
+  return letters
+    .sort((p, q) => p.x0 - q.x0)
+    .map((l) => ({ d: l.parts.join(''), x0: Math.round(l.x0 * 10) / 10, x1: Math.round(l.x1 * 10) / 10 }));
+}

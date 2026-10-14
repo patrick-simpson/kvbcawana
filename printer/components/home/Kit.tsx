@@ -15,6 +15,7 @@ import React from 'react';
 import logoTwoLineInk from '../../../lobby/shared/brand/logos/kvbc-awana-two-line-ink.svg';
 import logoTwoLineWhite from '../../../lobby/shared/brand/logos/kvbc-awana-two-line-white.svg';
 import logoFullWhite from '../../../lobby/shared/brand/logos/kvbc-awana-full-white.svg';
+import logoStackedInk from '../../../lobby/shared/brand/logos/kvbc-awana-stacked-ink.svg';
 import pugglesColor from '../../../lobby/shared/brand/logos/puggles-color.svg';
 import cubbiesColor from '../../../lobby/shared/brand/logos/cubbies-color.svg';
 import sparksColor from '../../../lobby/shared/brand/logos/sparks-color.svg';
@@ -128,5 +129,6 @@ export const LOGO = {
   twoLineInk: logoTwoLineInk,
   twoLineWhite: logoTwoLineWhite,
   fullWhite: logoFullWhite,
+  stackedInk: logoStackedInk,
   alt: 'Kennebec Valley Baptist Church Awana Clubs',
 } as const;
