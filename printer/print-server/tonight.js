@@ -270,8 +270,16 @@ function tonightHereNow(state, now) {
     for (const k of keys) {
       const hit = byKey.get(k);
       if (!hit) continue;
-      const hitId = [...hit.keys].find((x) => x.startsWith('id:'));
-      if (id && hitId && hitId !== id) continue;
+      if (id) {
+        let hitId;
+        for (const x of hit.keys) {
+          if (x.startsWith('id:')) {
+            hitId = x;
+            break;
+          }
+        }
+        if (hitId && hitId !== id) continue;
+      }
       slot = hit;
       break;
     }
