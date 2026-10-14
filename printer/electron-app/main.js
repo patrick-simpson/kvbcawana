@@ -1402,7 +1402,7 @@ app.whenReady().then(async () => {
     dir: userData, safeStorage, request: require(path.join(printServerDir(), 'cloud-request.js')).cloudRequest,
     log: (...a) => console.log(...a),
   });
-  deviceSync = createDeviceSync({
+  deviceSync = await createDeviceSync({
     userData,
     deviceId: () => {
       roles = rolesStore.ensureDeviceId(userData, roles);

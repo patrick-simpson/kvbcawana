@@ -114,9 +114,9 @@ function reconcileComputer({ remote, synced, local }) {
 /** Does going from `local` to `wanted` turn the print server off? */
 const turnsPrintOff = (local, wanted) => local.printRole === true && wanted.printRole === false;
 
-function readStore(userData) {
+async function readStore(userData) {
   try {
-    const raw = JSON.parse(fs.readFileSync(path.join(userData, FILE), 'utf8'));
+    const raw = JSON.parse(await fs.promises.readFile(path.join(userData, FILE), 'utf8'));
     return {
       synced: cleanRecord(raw && raw.synced),
       name: raw && typeof raw.name === 'string' ? raw.name : null,
@@ -157,10 +157,10 @@ function writeStore(userData, store) {
  *   timers?: { setTimeout: Function, clearTimeout: Function },
  * }} deps
  */
-function createDeviceSync(deps) {
+async function createDeviceSync(deps) {
   const log = deps.log || (() => {});
   const timers = deps.timers || { setTimeout, clearTimeout };
-  const store = readStore(deps.userData);
+  const store = await readStore(deps.userData);
   let running = false;
   let loop = null;
   let soon = null;
