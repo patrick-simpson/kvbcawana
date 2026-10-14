@@ -42,5 +42,12 @@ describe('demoNames', () => {
       const result = pick(SAMPLE_BOARD_NAMES);
       expect(SAMPLE_BOARD_NAMES).toContain(result);
     });
+
+    it('never returns an out-of-bounds element', () => {
+      const list = ['A', 'B', 'C'];
+      for (let i = 0; i < 100; i++) {
+        expect(list).toContain(pick(list));
+      }
+    });
   });
 });
