@@ -145,7 +145,11 @@ export async function installWorker(page, w) {
       return route.fulfill(json({ ok: true, rev: w.church.rev, savedAt: w.church.savedAt, settings: next }));
     }
     if (path === '/v1/stations') return route.fulfill(json(w.stations));
-    if (path === '/v1/print/reprint' && m === 'POST') return route.fulfill(json({ ok: true, jobId: body.jobId, existing: false }));
+    if (path === '/v1/print/reprint' && m === 'POST') { (w.reprints ||= []).push(body); return route.fulfill(json({ ok: true, jobId: body.jobId, existing: false })); }
+    if (path === '/v1/cloud/barf-bags' && m === 'POST') {
+      (w.barfAsks ||= []).push(body);
+      return route.fulfill(json({ ok: true, listed: true, names: ['Dot Tester', 'Ed'], bags: [{ name: 'Dot Tester', club: 'Cubbies' }, { name: 'Ed', club: 'Sparks', friendOf: 'Dot Tester' }], labels: 2, kids: 1, friends: 1, unnamed: 0, date: '2026-10-14' }));
+    }
     if (path === '/v1/history/rows' && m === 'POST') return route.fulfill(json({ stored: body.rows.length, duplicates: 0 }));
     if (path === '/v1/cloud/status') return route.fulfill(json({ auth: w.auth }));
     if (path === '/v1/history/key') return route.fulfill(json({ pub: 'AAAA', kid: 'h1', wrapped: null, prev: null }));

@@ -88,6 +88,14 @@ test('BARF Night: the nights are a list', async ({ page }) => {
   expect(puts(page)[0].body.settings.barfNights).toEqual(['2026-10-28', '2026-11-04']);
   await expect(dialog.getByRole('button', { name: 'Show tonight’s list' })).toBeVisible();
   await expect(dialog.getByRole('button', { name: 'Print BARF Bag labels' })).toBeVisible();
+  // The labels go sealed to the print stations as one job (owner 2026-10-14: the relayed job never printed).
+  page.once('dialog', (d) => d.accept());
+  await dialog.getByRole('button', { name: 'Print BARF Bag labels' }).click();
+  await expect(dialog.getByText('Sent 2 BARF Bag labels to the label printer as one job: 1 child and 1 friend.')).toBeVisible();
+  expect(page.w.barfAsks).toEqual([{ list: true }]);
+  expect(page.w.reprints).toHaveLength(1);
+  expect(page.w.reprints[0].jobId).toMatch(/^reprint:/);
+  expect(JSON.stringify(page.w.reprints[0])).not.toMatch(/(?<![A-Za-z0-9+/])(?:Dot|Tester|Ed)(?![A-Za-z0-9+/])/);
 });
 
 test('before the laptop has sent its settings the cards are read-only, with one way forward', async ({ page }) => {

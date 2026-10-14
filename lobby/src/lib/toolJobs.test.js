@@ -39,7 +39,7 @@ describe('tool job records', () => {
   });
 
   it('refuse a route no settings page may start', () => {
-    expect(TOOL_ROUTES).toEqual(['/reprint', '/print-leader', '/print-oneoff', '/print-custom']);
+    expect(TOOL_ROUTES).toEqual(['/reprint', '/print-leader', '/print-oneoff', '/print-custom', '/print-barf-bags']);
     expect(() => toolRecord('/print', {})).toThrow();
   });
 

@@ -20,7 +20,7 @@ import { call } from './workerClient.js';
 export const RESEAL_MAX = 3;
 
 /** The print routes a settings-page job may name (the station's JOB_PULL_ROUTES allow them). */
-export const TOOL_ROUTES = Object.freeze(['/reprint', '/print-leader', '/print-oneoff', '/print-custom']);
+export const TOOL_ROUTES = Object.freeze(['/reprint', '/print-leader', '/print-oneoff', '/print-custom', '/print-barf-bags']);
 
 /**
  * @param {string} route @param {Record<string, unknown>} body @param {number} [now]
@@ -39,6 +39,8 @@ export const leaderRecord = (/** @type {{ name: string, clubName: string }} */ t
 export const oneOffRecord = (/** @type {{ firstName: string, clubName: string }} */ tag, /** @type {number} */ now = Date.now()) => toolRecord('/print-oneoff', { firstName: tag.firstName, clubName: tag.clubName }, now);
 /** @param {string} text */
 export const customRecord = (/** @type {string} */ text, /** @type {number} */ now = Date.now()) => toolRecord('/print-custom', { text }, now);
+/** Tonight's BARF Bag labels, one job (the station's /print-barf-bags). @param {string[]} names @param {any[]} bags */
+export const barfBagsRecord = (/** @type {string[]} */ names, /** @type {any[]} */ bags, /** @type {number} */ now = Date.now()) => toolRecord('/print-barf-bags', { names, bags }, now);
 
 /** @param {any[]} list */
 export function asStations(list) {

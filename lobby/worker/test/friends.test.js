@@ -160,6 +160,16 @@ describe('BARF Bag labels', () => {
     ]);
   });
 
+  it('{list: true}: the names to the signed-in page (it seals them to the print stations), nothing queued, laptop on or off', async () => {
+    const s = await setup();
+    await s.call('POST', '/v1/cloud/friend', { name: 'Dot Tester', club: 'Cubbies', friendName: 'Ed', friendClub: 'Sparks' });
+    expect((await s.call('POST', '/v1/cloud/barf-bags', { list: true }, false)).status).toBe(401);
+    const r = (await s.call('POST', '/v1/cloud/barf-bags', { list: true })).body;
+    expect(r).toEqual({ ok: true, listed: true, names: ['Dot Tester', 'Ed'], bags: [{ name: 'Dot Tester', club: 'Cubbies' }, { name: 'Ed', club: 'Sparks', friendOf: 'Dot Tester' }],
+      labels: 2, kids: 1, friends: 1, unnamed: 0, date: '2026-10-14' });
+    expect(s.storage.map.get('relay:queue') || []).toEqual([]);
+  });
+
   it('says why when it cannot: nobody tonight, or the laptop is off', async () => {
     const s = await setup({ laptopOn: true });
     expect((await s.call('POST', '/v1/cloud/barf-bags', {})).body).toMatchObject({ ok: false, reason: 'none' });

@@ -25,6 +25,7 @@ import { saveDisplayKey } from '../lib/displayKey.js';
 import { AUTH_PARAMS_PATH, parseAuthParams } from '../../shared/sync-protocol.js';
 import { PBKDF2_ITER, authVerifier, bytesToBase64, deriveAuthKey, randomBytes } from '../../shared/cloud-crypto.js';
 import { historyWrapLanded, lockHistory, rewrapHistoryKey } from '../lib/historyCrypto.js';
+import { barfBagsRecord, sendToolJob } from '../lib/toolJobs.js';
 
 /**
  * @typedef {{
@@ -253,13 +254,25 @@ export async function testCloudCheckin() {
 }
 
 /**
- * "Print BARF Bag labels": the Worker sends tonight's names (each child who
- * brought a friend, and each named friend) to the laptop, printed as one job.
+ * "Print BARF Bag labels": tonight's names (each child who brought a friend,
+ * and each named friend), printed as one job. Owner 2026-10-14: the job the
+ * Worker queued for the laptop's relay never printed, so the page asks for the
+ * list and seals it to the print stations itself, the way every name tag
+ * travels (toolJobs.js). A service with no list, or no print station, falls
+ * back to the relay as before.
  * @returns {Promise<{ok: boolean, text: string}>}
  */
 export async function printBarfBags() {
   const url = await ensureUrl();
   if (!url || !loadSyncSession()) return { ok: false, text: 'Sign this screen in with the passphrase first.' };
+  const listed = await syncRequest(url, '/v1/cloud/barf-bags', { method: 'POST', body: { list: true }, session: loadSyncSession() });
+  const b = listed.body && typeof listed.body === 'object' ? listed.body : {};
+  // An older service ignored `list` and already queued the relay job: say what it said.
+  if (!listed.ok || b.listed !== true) return describeBarfBags(listed);
+  const job = await sendToolJob(barfBagsRecord(b.names, b.bags));
+  const summary = { ...b, names: undefined, bags: undefined, listed: undefined };
+  if (job.ok) return describeBarfBags({ ok: true, status: 200, body: summary });
+  if (job.reason !== 'no-station') return { ok: false, text: job.message };
   return describeBarfBags(await syncRequest(url, '/v1/cloud/barf-bags', { method: 'POST', body: {}, session: loadSyncSession() }));
 }
 

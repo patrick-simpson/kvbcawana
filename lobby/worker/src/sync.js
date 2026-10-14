@@ -616,8 +616,13 @@ export class SyncCore {
         // BARF Bag labels: tonight's names to the laptop, printed as one job
         // (printer 8.2.0's /print-barf-bags, a job no page can send itself).
         case 'POST /v1/cloud/barf-bags': {
-          const bags = await this.friends.bagNames((await this.body(request)).date);
+          const asked = await this.body(request);
+          const bags = await this.friends.bagNames(asked.date);
           if (!bags.names.length) return json({ ok: false, reason: 'none', ...bags, names: undefined, bags: undefined });
+          // {list: true} (owner 2026-10-14, the relayed job never printed): the names to this
+          // signed-in page, which seals them to the print stations itself (lobby toolJobs.js),
+          // the same path as every name tag. Nothing is queued here.
+          if (asked.list === true) return json({ ok: true, listed: true, names: bags.names, bags: bags.bags, labels: bags.names.length, kids: bags.kids, friends: bags.friends, unnamed: bags.unnamed, date: bags.date });
           if (!(await this.relayQueue.laptopOnline())) return json({ ok: false, reason: 'laptop-off', ...bags, names: undefined, bags: undefined });
           const job = await this.relayQueue.enqueueJob('/print-barf-bags', { names: bags.names, bags: bags.bags });
           return json({ ok: job.ok, reason: job.ok ? undefined : 'busy', labels: bags.names.length, kids: bags.kids, friends: bags.friends, unnamed: bags.unnamed, date: bags.date });
