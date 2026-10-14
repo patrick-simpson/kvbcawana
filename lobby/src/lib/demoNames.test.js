@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { pick, SAMPLE_NAMES, SAMPLE_BOARD_NAMES } from './demoNames.js';
 
 describe('demoNames', () => {
@@ -19,6 +19,10 @@ describe('demoNames', () => {
   });
 
   describe('pick', () => {
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
     it('returns undefined for an empty list', () => {
       expect(pick([])).toBeUndefined();
     });
@@ -41,6 +45,24 @@ describe('demoNames', () => {
     it('returns an element from SAMPLE_BOARD_NAMES', () => {
       const result = pick(SAMPLE_BOARD_NAMES);
       expect(SAMPLE_BOARD_NAMES).toContain(result);
+    });
+
+    describe('deterministic picking based on Math.random', () => {
+      it('picks the first element when Math.random() is 0', () => {
+        vi.spyOn(Math, 'random').mockReturnValue(0);
+        expect(pick(['A', 'B', 'C'])).toBe('A');
+      });
+
+      it('picks the middle element when Math.random() is 0.5', () => {
+        vi.spyOn(Math, 'random').mockReturnValue(0.5);
+        // length 4 * 0.5 = 2. Index 2 is 'C'
+        expect(pick(['A', 'B', 'C', 'D'])).toBe('C');
+      });
+
+      it('picks the last element when Math.random() is very close to 1', () => {
+        vi.spyOn(Math, 'random').mockReturnValue(0.9999999999);
+        expect(pick(['A', 'B', 'C'])).toBe('C');
+      });
     });
   });
 });
