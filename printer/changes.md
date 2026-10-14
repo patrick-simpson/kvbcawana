@@ -1,4 +1,9 @@
-﻿## [9.4.5] - 2026-10-14
+﻿## [9.4.6] - 2026-10-14
+BARF Bag labels print.
+
+**BARF Bag labels.** The bag labels now print one at a time, the same way every name tag and BARF tag prints (with its retry and the backup printer), instead of as one job of several pages, which did not come out on BARF night. They still print in order, children then their friends.
+
+## [9.4.5] - 2026-10-14
 BARF Bag labels for friends say the friend's club.
 
 **Friend's club.** The check-in page now asks "Friend's club" next to the friend's first name (Puggles, Cubbies, Sparks, T&T, Trek, Journey, or Not sure). A friend's bag prints it ("SPARKS FRIEND"); without an answer it still says "FRIEND OF <child>". This needs the sync service updated too (it deploys with the website). The touch screen at the laptop does not ask it yet.

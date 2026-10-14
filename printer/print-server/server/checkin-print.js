@@ -553,8 +553,11 @@ app.post('/print-barf-bags', async (req, res) => {
   const paths = [];
   try {
     for (const b of bags) paths.push((await $tags.generateBarfBag(b.name, { club: b.club, friendOf: b.friendOf })).pngPath);
-    await $printing.printImages(paths, $config.PRINTER_NAME);
-    console.log(`[print] ${bags.length} BARF Bag label(s), one job`);
+    // 9.4.6 (owner 2026-10-14, BARF night: the bags never came out): one label at a
+    // time through printLabel(), the path every name tag and BARF tag prints on
+    // (retry, backup printer), in order, instead of the one multi-page job.
+    for (const p of paths) await $printing.printLabel(p, $config.PRINTER_NAME);
+    console.log(`[print] ${bags.length} BARF Bag label(s)`);
     res.json({ ok: true, printed: bags.length });
   } catch (e) {
     console.error('[print] BARF Bag labels failed:', e.message);

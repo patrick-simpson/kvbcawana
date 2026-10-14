@@ -100,7 +100,7 @@ const today = (() => { const d = new Date(); return `${d.getFullYear()}-${String
       r.body.success === true && jobs() === 9 && reports.length === 2, `${jobs()} ${reports.length}`);
   }
 
-  console.log('\nBARF Night: the BARF Bag labels, one job');
+  console.log('\nBARF Night: the BARF Bag labels, one label at a time');
   {
     const bag = await server.generateBarfBag('Maya');
     const png = fs.readFileSync(bag.pngPath);
@@ -108,7 +108,7 @@ const today = (() => { const d = new Date(); return `${d.getFullYear()}-${String
     fs.unlinkSync(bag.pngPath);
     const before = jobs();
     let r = await post('/print-barf-bags', { names: ['Sophia Simpson', 'Maya', 'James'] });
-    check('three labels go to the printer as ONE job', r.status === 200 && r.body.printed === 3 && jobs() === before + 1, `${JSON.stringify(r)} ${jobs() - before}`);
+    check('three labels go to the printer one at a time (9.4.6)', r.status === 200 && r.body.printed === 3 && jobs() === before + 3, `${JSON.stringify(r)} ${jobs() - before}`);
     // 9.4.4: a bag also says what it needs (a child's club; a friend's host). The
     // sync service sends `bags`; a label with a club or a host differs from the bare name.
     const bare = await server.generateBarfBag('Maya');
@@ -123,9 +123,9 @@ const today = (() => { const d = new Date(); return `${d.getFullYear()}-${String
     for (const l of [bare, withClub, friend, bareEd, clubFriend]) fs.unlinkSync(l.pngPath);
     const beforeBags = jobs();
     r = await post('/print-barf-bags', { names: ['Dot Tester', 'Ed'], bags: [{ name: 'Dot Tester', club: 'Cubbies' }, { name: 'Ed', club: '', friendOf: 'Dot Tester' }, { name: 'Zoe', club: 'Sparks' }] });
-    check('the new list of bags prints as ONE job, one label each', r.status === 200 && r.body.printed === 3 && jobs() === beforeBags + 1, `${JSON.stringify(r)} ${jobs() - beforeBags}`);
+    check('the new list of bags prints one label each, on the name tag path (9.4.6)', r.status === 200 && r.body.printed === 3 && jobs() === beforeBags + 3, `${JSON.stringify(r)} ${jobs() - beforeBags}`);
     r = await post('/print-barf-bags', { names: [' ', 7] });
-    check('nothing to print is a clear refusal', r.status === 400 && jobs() === beforeBags + 1, JSON.stringify(r));
+    check('nothing to print is a clear refusal', r.status === 400 && jobs() === beforeBags + 3, JSON.stringify(r));
     r = await post('/print-barf-bags', {});
     check('and so is no list', r.status === 400);
     const relay = require(path.join(root, 'print-server', 'phone-relay.js'));
