@@ -62,4 +62,17 @@ describe('settings joy', () => {
     expect(document.querySelector('.joy-burst')).toBeNull();
     vi.unstubAllGlobals();
   });
+
+  it('fails open (allows joy) if the media query throws an error', () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('matchMedia', () => {
+      throw new Error('Not implemented in this environment');
+    });
+    document.body.innerHTML = '<input type="checkbox" checked>';
+    const box = document.querySelector('input');
+    fire(box);
+    expect(box.classList.contains('joy-pop')).toBe(true);
+    expect(document.querySelector('.joy-burst')).not.toBeNull();
+    vi.unstubAllGlobals();
+  });
 });
