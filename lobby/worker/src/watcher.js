@@ -721,12 +721,16 @@ export class Watcher {
       // The claims and print jobs follow what the report says (adopt.js; the
       // children's names stay in this call's memory and are sealed there).
       if (this.adopt && verdict === 'applied') {
-        const first = new Map();
-        for (const e of report.entries) if (!first.has(e.clubberId)) first.set(e.clubberId, e);
         try {
+          let mappedAdded = [];
+          if (added.length > 0) {
+            const first = new Map();
+            for (const e of report.entries) if (!first.has(e.clubberId)) first.set(e.clubberId, e);
+            mappedAdded = added.map((id) => first.get(id)).filter((e) => !!e);
+          }
           await this.adopt.onReport({
             night: date,
-            added: added.map((id) => first.get(id)).filter((e) => !!e),
+            added: mappedAdded,
             gone,
           });
         } catch (err) { console.error('[cloud] adopting the report failed', err); }
