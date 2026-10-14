@@ -1,4 +1,9 @@
-﻿## [9.4.2] - 2026-10-13
+﻿## [9.4.3] - 2026-10-13
+The church's own logo.
+
+**KVBC Awana logo.** The status window's header and the side of the setup window now show the Kennebec Valley Baptist Church Awana Clubs logo instead of the Awana Clubs mark, in white, as on the screens and the website. Nothing about printing, updates or settings has changed.
+
+## [9.4.2] - 2026-10-13
 Update status that tells the truth.
 
 **No stuck update error.** If an update download failed once, the tray, the status window and the settings page could keep saying the update could not finish downloading, even after the app was up to date. Every update step now goes through one set of rules, so the message clears as soon as the next check, download or ready update comes along.
