@@ -74,6 +74,8 @@ import { friendClubOf } from './friends.js';
 
 /** The roster's check-in page is re-read at most this often (pages poll every 15 s; 2 of the 4 reads a minute). */
 export const CHECKIN_PAGE_TTL_MS = 30 * 1000;
+/** TwoTimTwo's club ids (printer/docs/TWOTIMTWO.md 2.1), when the page names no child of that club. */
+const KNOWN_CLUB_IDS = /** @type {Record<string, string>} */ ({ cubbies: '1', sparks: '2', 't&t': '3', puggles: '4', trek: '6', journey: '7' });
 /** Where the held page is kept, sealed under the state key. */
 export const DESK_PAGE_KEY = 'desk:page';
 /** A held page whose children and checked-in marks did not move is written at most this often. */
@@ -172,6 +174,8 @@ export class Desk {
      * @type {{ at: number, page: any, night: string, restored?: boolean, refreshFailed?: boolean }|null}
      */
     this.cache = null;
+    /** Tonight's checked-in children from the watcher's latest applied report (memory only; ids, names, clubs). @type {{ night: string, kids: { clubberId: string, name: string, club: string }[] }} */
+    this.reportKids = { night: '', kids: [] };
     /** Children this desk checked in tonight (memory only): a page read that began before a check-in landed must not un-check them. @type {{ night: string, ids: Set<string> }} */
     this.deskChecked = { night: '', ids: new Set() };
     /** The one restore of a new object (single flight; kept once it ran to its end). @type {Promise<void>|null} */
@@ -226,6 +230,39 @@ export class Desk {
     }
     await this.warm(r.page, this.now());
     return true;
+  }
+
+  /**
+   * The watcher's applied report (watcher.js): who TwoTimTwo has checked in.
+   * TwoTimTwo's check-in page REMOVES a checked-in child's row (printer/docs/
+   * TWOTIMTWO.md 2.1), so the page alone never lists them; the roster adds them
+   * from here, checked in (owner 2026-10-14: the BARF list showed nobody).
+   * @param {string} night @param {any[]} entries
+   */
+  onReport(night, entries) {
+    const kids = [];
+    for (const e of Array.isArray(entries) ? entries : []) {
+      const clubberId = String(e?.clubberId ?? '').trim();
+      if (!/^\d{1,20}$/.test(clubberId)) continue;
+      kids.push({ clubberId, name: String(e.name ?? '').replace(/\s+/g, ' ').trim().slice(0, 80), club: String(e.club ?? '').trim().slice(0, 40) });
+    }
+    this.reportKids = { night, kids };
+  }
+
+  /**
+   * TwoTimTwo's club id for a club name: from the page's own rows first, else
+   * the ids TWOTIMTWO.md 2.1 lists. '' when unknown. @param {string} club @param {any} page
+   */
+  clubIdFor(club, page) {
+    const want = String(club || '').trim().toLowerCase();
+    if (!want) return '';
+    for (const k of page?.roster || []) if (String(k.club || '').trim().toLowerCase() === want && k.clubId) return String(k.clubId);
+    return KNOWN_CLUB_IDS[want] || '';
+  }
+
+  /** Tonight's report children (empty for another night). */
+  reportedTonight() {
+    return this.reportKids.night === churchNight(this.now()) ? this.reportKids.kids : [];
   }
 
   /** Remember (or forget) a child this desk checked in tonight. @param {string} clubberId @param {boolean} on */
@@ -461,6 +498,14 @@ export class Desk {
       const held = typeof this.watcher.held === 'function' && this.watcher.held(k.clubberId);
       return { clubberId: k.clubberId, first: parts[0] || '', last: parts.slice(1).join(' '), club: k.club, clubId: k.clubId, checkedIn: !!k.checkedIn || held || this.deskChecked_(k.clubberId) };
     });
+    // Checked in on TwoTimTwo: the page dropped their row, the report lists them.
+    const listed = new Map(kids.map((/** @type {any} */ k) => [k.clubberId, k]));
+    for (const e of this.reportedTonight()) {
+      const k = listed.get(e.clubberId);
+      if (k) { k.checkedIn = true; continue; }
+      const parts = e.name.split(' ');
+      kids.push({ clubberId: e.clubberId, first: parts[0] || '', last: parts.slice(1).join(' '), club: e.club, clubId: this.clubIdFor(e.club, r.page), checkedIn: true });
+    }
     // Which clubs offer Bible / Brought a friend: from the page already read, no extra read.
     // familiesAt: when the households held were read, so a page sees a catch-up re-read and asks again.
     const familiesAt = this.familiesSource.readAt();

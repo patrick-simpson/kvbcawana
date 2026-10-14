@@ -15,6 +15,8 @@ import { NIGHT, kid, rig, row } from './rig.js';
 const PAGE = CHECKIN_PAGE.replace('checkin-box boy"', 'checkin-box boy checked-in"')
   .replace('<label>Attendance</label>', '<label>Attendance</label><input class="event" name="events[]" value="808" clubs="2,3,6"><label>Brought a friend</label>');
 const PAGE_OUT = PAGE.replace('checkin-box boy checked-in"', 'checkin-box boy"');
+// TwoTimTwo's real page (printer/docs/TWOTIMTWO.md 2.1): a checked-in child's row is REMOVED, not marked.
+const PAGE_ROW_GONE = PAGE.replace(/<div class="clubber checkin-box boy checked-in" recid="662"[\s\S]*?<\/div><\/div>/, '');
 const KIT = { id: '662', name: 'Kit Tester', club: 'Sparks', bible: true, friend: false };
 
 const step = async (t, ms) => { t.clock.tick(ms); await t.core.watcher.tick(); };
@@ -23,10 +25,10 @@ const leased = async (st) => (await st.call('GET', '/v1/print/next?max=10')).bod
 const uuid = () => crypto.randomUUID();
 
 /** A BARF night with Kit checked in on TwoTimTwo's page, adopted and printed (claim printed, gen 1). */
-async function barfNight({ barf = true, env = {} } = {}) {
+async function barfNight({ barf = true, env = {}, rowGoes = false } = {}) {
   /** @type {any} */ let ref = null;
   // The check-in page marks Kit checked in exactly while the report lists Kit.
-  const t = await rig({ kids: [kid(1)], checkinPage: () => (ref && !ref.night.kids.some((k) => k.id === '662') ? PAGE_OUT : PAGE), env: { SINGLE_PUBLISHER: 'on', ...env } });
+  const t = await rig({ kids: [kid(1)], checkinPage: () => (ref && !ref.night.kids.some((k) => k.id === '662') ? PAGE_OUT : rowGoes ? PAGE_ROW_GONE : PAGE), env: { SINGLE_PUBLISHER: 'on', ...env } });
   ref = t;
   await t.core.church.load();
   t.core.church.doc.data.settings = barf === null ? null : { barfNights: barf ? [NIGHT] : ['2026-10-21'] };
@@ -304,5 +306,32 @@ describe('POST /v1/desk/barf-late', () => {
     expect(t.tt.checkins).toHaveLength(0);
     expect(t.core.watcher.held('662')).toBe(false);
     expect((await t.core.friends.bagNames(NIGHT)).names).toEqual([]);
+  });
+});
+
+describe('TwoTimTwo drops a checked-in child\'s row from its check-in page (owner 2026-10-14: the BARF list showed nobody)', () => {
+  it('the fixture really drops the row', () => {
+    expect(PAGE_ROW_GONE).not.toContain('recid="662"');
+    expect(PAGE_ROW_GONE).toContain('recid="663"');
+  });
+
+  it('the roster lists the child from the report, checked in, with the club\'s id', async () => {
+    const { t } = await barfNight({ rowGoes: true });
+    t.clock.tick(READ_INTERVAL_MS * 3);
+    const kids = (await t.call('GET', '/v1/desk/roster')).body.kids;
+    expect(kids.find((k) => k.clubberId === '662')).toMatchObject({ first: 'Kit', last: 'Tester', club: 'Sparks', clubId: '2', checkedIn: true });
+  });
+
+  it('a late friend still undoes and redoes the check-in, on the page\'s meeting and items', async () => {
+    const { t, st } = await barfNight({ rowGoes: true });
+    followPosts(t);
+    const b = await body(st);
+    const res = await t.call('POST', '/v1/desk/barf-late', b);
+    expect(res.body).toMatchObject({ ok: true, checkedIn: true, items: { Bible: true, Friend: true } });
+    expect(t.posts.undo).toHaveLength(1);
+    const redo = t.tt.checkins.at(-1);
+    expect(redo.get('clubber_id')).toBe('662');
+    expect(redo.get('calendar_id')).toBe('368');
+    expect(redo.getAll('events[]').sort()).toEqual(['40', '707', '808']);
   });
 });

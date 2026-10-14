@@ -241,7 +241,14 @@ export class BarfLate {
       if (!p.events.some((/** @type {any} */ e) => !e.automatic && FRIEND_RE.test(e.label || '') && !BIBLE_RE.test(e.label || '') && applies(e))) return 'no-friend-item';
       return '';
     };
-    const found = await this.child(clubberId, (f) => !lacks(f));
+    let found = await this.child(clubberId, (f) => !lacks(f));
+    if (!found.ok && found.error === 'not-found') {
+      // TwoTimTwo's check-in page drops a checked-in child's row: the report's entry
+      // stands in, on the page's own meeting and items (owner 2026-10-14).
+      const held = await desk.page(Infinity, false, true);
+      const clubId = held.ok ? desk.clubIdFor(entry.club, held.page) : '';
+      if (held.ok && clubId) found = { ok: /** @type {const} */ (true), child: { clubberId, name: entry.name, club: entry.club, clubId, checkedIn: true }, page: held.page };
+    }
     if (!found.ok) return found.error === 'not-found' ? refuse(409, { reason: 'not-found' }) : desk.pageFailure(found);
     const { child, page } = found;
     const missing = lacks(found);

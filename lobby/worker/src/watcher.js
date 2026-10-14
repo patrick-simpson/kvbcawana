@@ -714,6 +714,8 @@ export class Watcher {
       this.ym?.onReport({ date, kids });
       // A child the households export does not list: a family to catch up (families.js).
       this.desk?.familiesSource.noteChildren(date, res.report.entries.map((e) => e.name));
+      // Who is checked in, for the desk's roster (the check-in page drops their rows; desk.js onReport).
+      this.desk?.onReport(date, res.report.entries);
       // The count's own state (tonight.js): what an applied report says, first names and clubs only.
       if (this.publisher) {
         try { await this.publisher.onReport({ night: date, at: now, entries: report.entries }); } catch (err) { console.error('[cloud] publishing the count failed', err); }
