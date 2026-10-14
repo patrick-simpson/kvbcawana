@@ -126,14 +126,25 @@ export class Friends {
   async bagNames(date) {
     const report = await this.report(date);
     const names = [];
+    // The same labels with what each bag needs besides the name (owner
+    // 2026-10-14: "I need to know on the barf bag tags what club a child is
+    // in"): a child's own club; a friend has none in TwoTimTwo, so the label
+    // says whose friend they are. `names` stays for a laptop that has not
+    // updated yet.
+    /** @type {{ name: string, club: string, friendOf?: string }[]} */
+    const bags = [];
     let unnamed = 0;
     for (const club of report.clubs) {
       for (const kid of club.kids) {
         names.push(kid.name);
-        if (kid.friend) names.push(kid.friend); else unnamed += 1;
+        bags.push({ name: kid.name, club: club.club === 'No club' ? '' : club.club });
+        if (kid.friend) {
+          names.push(kid.friend);
+          bags.push({ name: kid.friend, club: '', friendOf: kid.name });
+        } else unnamed += 1;
       }
     }
-    return { date: report.date, names, kids: report.total, friends: report.total - unnamed, unnamed };
+    return { date: report.date, names, bags, kids: report.total, friends: report.total - unnamed, unnamed };
   }
 
   /**

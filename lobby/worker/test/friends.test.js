@@ -150,6 +150,14 @@ describe('BARF Bag labels', () => {
     expect(r.body).toEqual({ ok: true, labels: 5, kids: 3, friends: 2, unnamed: 1, date: '2026-10-14' });
     const job = (await s.call('GET', '/v1/relay/next')).body.requests[0];
     expect(job).toMatchObject({ path: '/print-barf-bags', job: true, body: { names: ['Dot Tester', 'Ed', 'Zoe Tester', 'Ana', 'Al Tester'] } });
+    // Each bag also says what the label must show: a child's club, whose friend a friend is.
+    expect(job.body.bags).toEqual([
+      { name: 'Dot Tester', club: 'Cubbies' },
+      { name: 'Ed', club: '', friendOf: 'Dot Tester' },
+      { name: 'Zoe Tester', club: 'Sparks' },
+      { name: 'Ana', club: '', friendOf: 'Zoe Tester' },
+      { name: 'Al Tester', club: 'Trek' },
+    ]);
   });
 
   it('says why when it cannot: nobody tonight, or the laptop is off', async () => {

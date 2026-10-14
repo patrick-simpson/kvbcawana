@@ -617,9 +617,9 @@ export class SyncCore {
         // (printer 8.2.0's /print-barf-bags, a job no page can send itself).
         case 'POST /v1/cloud/barf-bags': {
           const bags = await this.friends.bagNames((await this.body(request)).date);
-          if (!bags.names.length) return json({ ok: false, reason: 'none', ...bags, names: undefined });
-          if (!(await this.relayQueue.laptopOnline())) return json({ ok: false, reason: 'laptop-off', ...bags, names: undefined });
-          const job = await this.relayQueue.enqueueJob('/print-barf-bags', { names: bags.names });
+          if (!bags.names.length) return json({ ok: false, reason: 'none', ...bags, names: undefined, bags: undefined });
+          if (!(await this.relayQueue.laptopOnline())) return json({ ok: false, reason: 'laptop-off', ...bags, names: undefined, bags: undefined });
+          const job = await this.relayQueue.enqueueJob('/print-barf-bags', { names: bags.names, bags: bags.bags });
           return json({ ok: job.ok, reason: job.ok ? undefined : 'busy', labels: bags.names.length, kids: bags.kids, friends: bags.friends, unnamed: bags.unnamed, date: bags.date });
         }
         // Check one child in on TwoTimTwo; a preview unless {confirm: true}.
