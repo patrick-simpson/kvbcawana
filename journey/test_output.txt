@@ -1,0 +1,3252 @@
+
+> journey-display@1.0.0 pretest
+> node ../scripts/family-assets.mjs journey
+
+
+> journey-display@1.0.0 test
+> node --test
+
+TAP version 13
+# Subtest: 1080p is exactly as it was; 4K gets the same bar, buttons and captions twice as big
+ok 1 - 1080p is exactly as it was; 4K gets the same bar, buttons and captions twice as big # SKIP no Chromium at /opt/pw-browsers/chromium
+  ---
+  duration_ms: 0.912838
+  type: 'test'
+  ...
+# Subtest: public/brand/ and public/src/shared/ are exactly the canonical files, file for file
+ok 2 - public/brand/ and public/src/shared/ are exactly the canonical files, file for file
+  ---
+  duration_ms: 11.737614
+  type: 'test'
+  ...
+# Subtest: the mirror carries everything this page loads, fonts with their licences
+ok 3 - the mirror carries everything this page loads, fonts with their licences
+  ---
+  duration_ms: 0.552991
+  type: 'test'
+  ...
+# Subtest: the shout is Paytone One, whole, and Galindo is gone from everything the page reaches
+ok 4 - the shout is Paytone One, whole, and Galindo is gone from everything the page reaches
+  ---
+  duration_ms: 4.397834
+  type: 'test'
+  ...
+# Subtest: the shout font is the unmodified whole font, in the TTF and in the WOFF2
+ok 5 - the shout font is the unmodified whole font, in the TTF and in the WOFF2
+  ---
+  duration_ms: 1.474749
+  type: 'test'
+  ...
+# Subtest: every shout size keeps the caps as tall as the Galindo it was tuned on
+ok 6 - every shout size keeps the caps as tall as the Galindo it was tuned on
+  ---
+  duration_ms: 1.701314
+  type: 'test'
+  ...
+# Subtest: the headlines stacked over other lines sit on the cap line the design was drawn with
+ok 7 - the headlines stacked over other lines sit on the cap line the design was drawn with
+  ---
+  duration_ms: 2.388886
+  type: 'test'
+  ...
+# Subtest: the page links the kit and loads nothing from the network
+ok 8 - the page links the kit and loads nothing from the network
+  ---
+  duration_ms: 1.715869
+  type: 'test'
+  ...
+# Subtest: every kit fallback in style.css is the kit's own value
+ok 9 - every kit fallback in style.css is the kit's own value
+  ---
+  duration_ms: 1.275832
+  type: 'test'
+  ...
+# Subtest: the baked art is the kit's own shapes, path for path
+ok 10 - the baked art is the kit's own shapes, path for path
+  ---
+  duration_ms: 2.072319
+  type: 'test'
+  ...
+# Subtest: the colours that were never Journey's are gone
+ok 11 - the colours that were never Journey's are gone
+  ---
+  duration_ms: 6.212153
+  type: 'test'
+  ...
+# Subtest: Awana's deck keeps its own look, the template slide's type included
+ok 12 - Awana's deck keeps its own look, the template slide's type included
+  ---
+  duration_ms: 2.215355
+  type: 'test'
+  ...
+# Subtest: the flat look: one keyframe outside the motion block, no filters, no gradients, no blur
+ok 13 - the flat look: one keyframe outside the motion block, no filters, no gradients, no blur
+  ---
+  duration_ms: 4.951546
+  type: 'test'
+  ...
+# Subtest: the motion is fenced: html.motion-full only, cheap properties only
+ok 14 - the motion is fenced: html.motion-full only, cheap properties only
+  ---
+  duration_ms: 3.939399
+  type: 'test'
+  ...
+# Subtest: parseCues maps every numbered cue to its start second and text
+ok 15 - parseCues maps every numbered cue to its start second and text
+  ---
+  duration_ms: 1.604034
+  type: 'test'
+  ...
+# Subtest: exactText joins the cue range verbatim, boundary repeats and all
+ok 16 - exactText joins the cue range verbatim, boundary repeats and all
+  ---
+  duration_ms: 1.884028
+  type: 'test'
+  ...
+# Subtest: buildPrepTranscript takes t from the paragraph first cue and keeps both versions
+ok 17 - buildPrepTranscript takes t from the paragraph first cue and keeps both versions
+  ---
+  duration_ms: 1.334508
+  type: 'test'
+  ...
+# Subtest: a paragraph pointing at a cue the VTT does not have is refused
+ok 18 - a paragraph pointing at a cue the VTT does not have is refused
+  ---
+  duration_ms: 0.74667
+  type: 'test'
+  ...
+# Subtest: the committed week 1 leader file matches what the pipeline builds today
+ok 19 - the committed week 1 leader file matches what the pipeline builds today
+  ---
+  duration_ms: 6.127946
+  type: 'test'
+  ...
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/?configure=1:3757:22)
+#     at async loadTeachingSlides (https://example.test/?configure=1:3787:25)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/?configure=1:3757:22)
+#     at async loadTeachingSlides (https://example.test/?configure=1:3787:25)
+# Subtest: configure mode is the Settings panel alone, open from load, and nothing of the kiosk runs
+ok 20 - configure mode is the Settings panel alone, open from load, and nothing of the kiosk runs
+  ---
+  duration_ms: 450.125994
+  type: 'test'
+  ...
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/?configure=1:3757:22)
+#     at async loadTeachingSlides (https://example.test/?configure=1:3787:25)
+# Subtest: configure mode: the panel cannot be closed, by button, backdrop, Escape or the idle timer
+ok 21 - configure mode: the panel cannot be closed, by button, backdrop, Escape or the idle timer
+  ---
+  duration_ms: 140.463597
+  type: 'test'
+  ...
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: configure mode: a pick is relayed to the live kiosk, never played here
+ok 22 - configure mode: a pick is relayed to the live kiosk, never played here
+  ---
+  duration_ms: 130.043192
+  type: 'test'
+  ...
+# Journey: previewing "Unit 1, Lesson 3: Truth (Student Video)"
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: the live kiosk plays a relayed pick only for a lesson it knows
+ok 23 - the live kiosk plays a relayed pick only for a lesson it knows
+  ---
+  duration_ms: 136.655948
+  type: 'test'
+  ...
+# Subtest: the live kiosk takes caption and slide settings saved by another window, live
+ok 24 - the live kiosk takes caption and slide settings saved by another window, live
+  ---
+  duration_ms: 144.158804
+  type: 'test'
+  ...
+# Subtest: below 1100px the pills never join the scrubber row, whatever the readout says
+ok 25 - below 1100px the pills never join the scrubber row, whatever the readout says # SKIP no Chromium at /opt/pw-browsers/chromium
+  ---
+  duration_ms: 0.938205
+  type: 'test'
+  ...
+# Subtest: over the Check-in Display both corner buttons keep to the one bottom-right column it leaves them
+ok 26 - over the Check-in Display both corner buttons keep to the one bottom-right column it leaves them # SKIP no Chromium at /opt/pw-browsers/chromium
+  ---
+  duration_ms: 1.111944
+  type: 'test'
+  ...
+# Subtest: README.md tells the operator where the gear is over the Check-in Display and over everything else
+ok 27 - README.md tells the operator where the gear is over the Check-in Display and over everything else
+  ---
+  duration_ms: 0.853257
+  type: 'test'
+  ...
+# Subtest: test/fake-opfs.mjs
+ok 7 - test/fake-opfs.mjs
+  ---
+  duration_ms: 36.483071
+  type: 'test'
+  ...
+# Subtest: the summaries file is v2 and every week has both question sets
+ok 29 - the summaries file is v2 and every week has both question sets
+  ---
+  duration_ms: 1.329426
+  type: 'test'
+  ...
+# Subtest: every week in the data passes the same checks drafted text must
+ok 30 - every week in the data passes the same checks drafted text must
+  ---
+  duration_ms: 122.939209
+  type: 'test'
+  ...
+# Subtest: the validator refuses what page 1 cannot hold or the video never said
+ok 31 - the validator refuses what page 1 cannot hold or the video never said
+  ---
+  duration_ms: 28.64745
+  type: 'test'
+  ...
+# Subtest: Scripture may be a book, a chapter, a chapter range or verses, if the video names the book
+ok 32 - Scripture may be a book, a chapter, a chapter range or verses, if the video names the book
+  ---
+  duration_ms: 25.536202
+  type: 'test'
+  ...
+# Subtest: page 1 holds a week at every limit (render --fit-check)
+ok 33 - page 1 holds a week at every limit (render --fit-check) # SKIP no Chromium at /opt/pw-browsers/chromium
+  ---
+  duration_ms: 0.273492
+  type: 'test'
+  ...
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: the Settings panel was left open; closing it
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: the Settings panel left open closes after 15 quiet minutes, and activity resets the clock
+ok 34 - the Settings panel left open closes after 15 quiet minutes, and activity resets the clock
+  ---
+  duration_ms: 494.305069
+  type: 'test'
+  ...
+# Not implemented: HTMLMediaElement's load() method
+# Not implemented: HTMLMediaElement's load() method
+# Journey: previewing "Lesson 3"
+# Journey: a paused preview was left for 21 minutes; handing the room back
+# Subtest: a PAUSED preview left for 20 minutes hands the room back; a playing one is never cut
+ok 35 - a PAUSED preview left for 20 minutes hands the room back; a playing one is never cut
+  ---
+  duration_ms: 140.479832
+  type: 'test'
+  ...
+# Subtest: the wake lock asks again when released, and every five minutes while there is none
+ok 36 - the wake lock asks again when released, and every five minutes while there is none
+  ---
+  duration_ms: 0.39609
+  type: 'test'
+  ...
+# Subtest: sync: the index is retried with backoff until read, and every request has a timeout
+ok 37 - sync: the index is retried with backoff until read, and every request has a timeout
+  ---
+  duration_ms: 2.150753
+  type: 'test'
+  ...
+# Subtest: test/kiosk-dom.mjs
+ok 10 - test/kiosk-dom.mjs
+  ---
+  duration_ms: 917.417633
+  type: 'test'
+  ...
+# Subtest: real OPFS: download, a Range resume with no preflight, and a disk-backed saved copy
+ok 39 - real OPFS: download, a Range resume with no preflight, and a disk-backed saved copy # SKIP no Chromium at /opt/pw-browsers/chromium
+  ---
+  duration_ms: 2.349046
+  type: 'test'
+  ...
+# Subtest: the downloads panel fits the TV and small 4:3 screens, mid-download with a failure
+ok 40 - the downloads panel fits the TV and small 4:3 screens, mid-download with a failure # SKIP no Chromium at /opt/pw-browsers/chromium
+  ---
+  duration_ms: 0.219256
+  type: 'test'
+  ...
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: progress: real bytes, floored percent, 100% only when every video is saved
+ok 41 - progress: real bytes, floored percent, 100% only when every video is saved
+  ---
+  duration_ms: 481.00828
+  type: 'test'
+  ...
+# Subtest: rate, Content-Range and the committed-bytes rule
+ok 42 - rate, Content-Range and the committed-bytes rule
+  ---
+  duration_ms: 134.851725
+  type: 'test'
+  ...
+# Subtest: the plan: Student Videos from this week on, then Leaders; only lessons.json video files
+ok 43 - the plan: Student Videos from this week on, then Leaders; only lessons.json video files
+  ---
+  duration_ms: 102.051563
+  type: 'test'
+  ...
+# Subtest: the real lessons.json: every original has a browser-downloadable address and a size
+ok 44 - the real lessons.json: every original has a browser-downloadable address and a size
+  ---
+  duration_ms: 1.692965
+  type: 'test'
+  ...
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: Download all lessons saves every video, one at a time, fetching nothing else
+ok 45 - Download all lessons saves every video, one at a time, fetching nothing else
+  ---
+  duration_ms: 177.185562
+  type: 'test'
+  ...
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at runNextTicks (node:internal/process/task_queues:64:5)
+#     at process.processTimers (node:internal/timers:518:9)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at runNextTicks (node:internal/process/task_queues:64:5)
+#     at process.processTimers (node:internal/timers:518:9)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at runNextTicks (node:internal/process/task_queues:64:5)
+#     at process.processTimers (node:internal/timers:518:9)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: saved videos are skipped and a part-saved one resumes with a Range request
+ok 46 - saved videos are skipped and a part-saved one resumes with a Range request
+  ---
+  duration_ms: 132.611856
+  type: 'test'
+  ...
+# Journey: could not download week-03-student Error: Awana’s server answered with an error (503)
+#     at downloadError (https://example.test/:5599:15)
+#     at downloadOneLesson (https://example.test/:5939:11)
+#     at async downloadWithRetries (https://example.test/:5986:7)
+#     at async runDownloadLoop (https://example.test/:6046:7)
+#     at async run (https://example.test/:6096:7) {
+#   plain: 'Awana’s server answered with an error (503)'
+# }
+# Journey: could not download week-03-student Error: Awana’s server answered with an error (503)
+#     at downloadError (https://example.test/:5599:15)
+#     at downloadOneLesson (https://example.test/:5939:11)
+#     at async downloadWithRetries (https://example.test/:5986:7)
+#     at async runDownloadLoop (https://example.test/:6046:7)
+#     at async run (https://example.test/:6096:7) {
+#   plain: 'Awana’s server answered with an error (503)'
+# }
+# Journey: could not download week-03-student Error: Awana’s server answered with an error (503)
+#     at downloadError (https://example.test/:5599:15)
+#     at downloadOneLesson (https://example.test/:5939:11)
+#     at async downloadWithRetries (https://example.test/:5986:7)
+#     at async runDownloadLoop (https://example.test/:6046:7)
+#     at async run (https://example.test/:6096:7) {
+#   plain: 'Awana’s server answered with an error (503)'
+# }
+# Journey: could not download week-03-student Error: Awana’s server answered with an error (503)
+#     at downloadError (https://example.test/:5599:15)
+#     at downloadOneLesson (https://example.test/:5939:11)
+#     at runNextTicks (node:internal/process/task_queues:64:5)
+#     at listOnTimeout (node:internal/timers:547:9)
+#     at process.processTimers (node:internal/timers:521:7)
+#     at async downloadWithRetries (https://example.test/:5986:7)
+#     at async runDownloadLoop (https://example.test/:6046:7)
+#     at async run (https://example.test/:6096:7) {
+#   plain: 'Awana’s server answered with an error (503)'
+# }
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: one video failing does not stop the rest; it is named plainly and retried next time
+ok 47 - one video failing does not stop the rest; it is named plainly and retried next time
+  ---
+  duration_ms: 165.726211
+  type: 'test'
+  ...
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: pause keeps every finished piece; resume carries on from the next one
+ok 48 - pause keeps every finished piece; resume carries on from the next one
+  ---
+  duration_ms: 173.364927
+  type: 'test'
+  ...
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: a run interrupted by a reload carries on by itself; a paused one waits
+ok 49 - a run interrupted by a reload carries on by itself; a paused one waits
+  ---
+  duration_ms: 242.566277
+  type: 'test'
+  ...
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: the download gives way while a lesson video plays from the internet
+ok 50 - the download gives way while a lesson video plays from the internet
+  ---
+  duration_ms: 143.072252
+  type: 'test'
+  ...
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: not enough disk space: says so plainly and does not start
+ok 51 - not enough disk space: says so plainly and does not start
+  ---
+  duration_ms: 103.472847
+  type: 'test'
+  ...
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: Delete asks first (focus on "keep"), and is the only thing that removes saved lessons
+ok 52 - Delete asks first (focus on "keep"), and is the only thing that removes saved lessons
+  ---
+  duration_ms: 118.109621
+  type: 'test'
+  ...
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: a saved lesson plays from this computer even with the internet up: no probe, no stream
+ok 53 - a saved lesson plays from this computer even with the internet up: no probe, no stream
+  ---
+  duration_ms: 94.108316
+  type: 'test'
+  ...
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: a damaged saved copy is passed over for the network
+ok 54 - a damaged saved copy is passed over for the network
+  ---
+  duration_ms: 92.618606
+  type: 'test'
+  ...
+# Not implemented: HTMLMediaElement's load() method
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: a saved copy of a file Awana has since replaced (new address in lessons.json) plays from the network, is not counted, and the next run replaces it
+ok 55 - a saved copy of a file Awana has since replaced (new address in lessons.json) plays from the network, is not counted, and the next run replaces it
+  ---
+  duration_ms: 130.42567
+  type: 'test'
+  ...
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: a saved copy whose size no longer matches lessons.json plays from the network, and is kept
+ok 56 - a saved copy whose size no longer matches lessons.json plays from the network, and is kept
+  ---
+  duration_ms: 92.503226
+  type: 'test'
+  ...
+# Journey: video failed to load/play undefined
+# Journey: the saved copy would not play; using the internet copy — week-02-student
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: a saved copy that will not play goes over to the internet copy once, where the room got to
+ok 57 - a saved copy that will not play goes over to the internet copy once, where the room got to
+  ---
+  duration_ms: 141.40846
+  type: 'test'
+  ...
+# Journey: previewing "Unit 1, Lesson 1: Name1 (Leader Video)"
+# Journey: video failed to load/play undefined
+# Journey: the saved copy would not play; using the internet copy — week-01-leader
+# Journey: video failed to load/play undefined
+# Journey: preview failed, retrying with the fallback copy — videos/week-01-leader.mp4
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/?configure=1:3757:22)
+#     at async loadTeachingSlides (https://example.test/?configure=1:3787:25)
+# Subtest: the picker plays a saved copy of any week, with the original then the 480p copy behind it
+ok 58 - the picker plays a saved copy of any week, with the original then the 480p copy behind it
+  ---
+  duration_ms: 74.258416
+  type: 'test'
+  ...
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: configure mode never downloads: it points at the kiosk
+ok 59 - configure mode never downloads: it points at the kiosk
+  ---
+  duration_ms: 115.517283
+  type: 'test'
+  ...
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: a browser without OPFS says so, and nothing else changes
+ok 60 - a browser without OPFS says so, and nothing else changes
+  ---
+  duration_ms: 84.921248
+  type: 'test'
+  ...
+# Subtest: quiet hours come from the schedule: 5:30-8 PM, and an automatic run holds for the lesson
+ok 61 - quiet hours come from the schedule: 5:30-8 PM, and an automatic run holds for the lesson
+  ---
+  duration_ms: 68.165588
+  type: 'test'
+  ...
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at runNextTicks (node:internal/process/task_queues:64:5)
+#     at process.processTimers (node:internal/timers:518:9)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at runNextTicks (node:internal/process/task_queues:64:5)
+#     at process.processTimers (node:internal/timers:518:9)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at runNextTicks (node:internal/process/task_queues:64:5)
+#     at process.processTimers (node:internal/timers:518:9)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: automatic mode: starts by itself after load with no press, saves everything, reports status
+ok 62 - automatic mode: starts by itself after load with no press, saves everything, reports status
+  ---
+  duration_ms: 104.818058
+  type: 'test'
+  ...
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: automatic mode never starts in the quiet hours, with the switch off, or with a lesson on screen
+ok 63 - automatic mode never starts in the quiet hours, with the switch off, or with a lesson on screen
+  ---
+  duration_ms: 489.61545
+  type: 'test'
+  ...
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: the switch: off stops an automatic run (saved videos stay), on starts one
+ok 64 - the switch: off stops an automatic run (saved videos stay), on starts one
+  ---
+  duration_ms: 109.698462
+  type: 'test'
+  ...
+# Journey: could not download week-02-student DOMException {}
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: an automatic run reaching the quiet hours waits, and carries on after 8 PM
+ok 65 - an automatic run reaching the quiet hours waits, and carries on after 8 PM
+  ---
+  duration_ms: 1150.896052
+  type: 'test'
+  ...
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: a newly published lesson is picked up on a later automatic pass
+ok 66 - a newly published lesson is picked up on a later automatic pass
+  ---
+  duration_ms: 137.131
+  type: 'test'
+  ...
+# Journey: could not download week-02-student Error: Awana’s server answered with an error (500)
+#     at downloadError (https://example.test/:5599:15)
+#     at downloadOneLesson (https://example.test/:5939:11)
+#     at async downloadWithRetries (https://example.test/:5986:7)
+#     at async runDownloadLoop (https://example.test/:6046:7)
+#     at async run (https://example.test/:6096:7) {
+#   plain: 'Awana’s server answered with an error (500)'
+# }
+# Journey: could not download week-02-student Error: Awana’s server answered with an error (500)
+#     at downloadError (https://example.test/:5599:15)
+#     at downloadOneLesson (https://example.test/:5939:11)
+#     at runNextTicks (node:internal/process/task_queues:64:5)
+#     at listOnTimeout (node:internal/timers:547:9)
+#     at process.processTimers (node:internal/timers:521:7)
+#     at async downloadWithRetries (https://example.test/:5986:7)
+#     at async runDownloadLoop (https://example.test/:6046:7)
+#     at async run (https://example.test/:6096:7) {
+#   plain: 'Awana’s server answered with an error (500)'
+# }
+# Journey: could not download week-02-student Error: Awana’s server answered with an error (500)
+#     at downloadError (https://example.test/:5599:15)
+#     at downloadOneLesson (https://example.test/:5939:11)
+#     at runNextTicks (node:internal/process/task_queues:64:5)
+#     at listOnTimeout (node:internal/timers:547:9)
+#     at process.processTimers (node:internal/timers:521:7)
+#     at async downloadWithRetries (https://example.test/:5986:7)
+#     at async runDownloadLoop (https://example.test/:6046:7)
+#     at async run (https://example.test/:6096:7) {
+#   plain: 'Awana’s server answered with an error (500)'
+# }
+# Journey: could not download week-02-student Error: Awana’s server answered with an error (500)
+#     at downloadError (https://example.test/:5599:15)
+#     at downloadOneLesson (https://example.test/:5939:11)
+#     at runNextTicks (node:internal/process/task_queues:64:5)
+#     at listOnTimeout (node:internal/timers:547:9)
+#     at process.processTimers (node:internal/timers:521:7)
+#     at async downloadWithRetries (https://example.test/:5986:7)
+#     at async runDownloadLoop (https://example.test/:6046:7)
+#     at async run (https://example.test/:6096:7) {
+#   plain: 'Awana’s server answered with an error (500)'
+# }
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: an error reaches the status at once
+ok 67 - an error reaches the status at once
+  ---
+  duration_ms: 116.813155
+  type: 'test'
+  ...
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: automatic mode is on by default only in the kiosk app: a Mac or phone opening the page never starts by itself
+ok 68 - automatic mode is on by default only in the kiosk app: a Mac or phone opening the page never starts by itself
+  ---
+  duration_ms: 242.647688
+  type: 'test'
+  ...
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: each settings-page command presses the panel's own button: start, pause, resume, stop, delete
+ok 69 - each settings-page command presses the panel's own button: start, pause, resume, stop, delete
+  ---
+  duration_ms: 127.150567
+  type: 'test'
+  ...
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/journey/?configure=1:3757:22)
+#     at async loadTeachingSlides (https://example.test/journey/?configure=1:3787:25)
+# Subtest: the settings page sets the two switches as the tick boxes would, and reads them back
+ok 70 - the settings page sets the two switches as the tick boxes would, and reads them back
+  ---
+  duration_ms: 200.118193
+  type: 'test'
+  ...
+# Subtest: configure mode and a browser that cannot save lessons ignore every command
+ok 71 - configure mode and a browser that cannot save lessons ignore every command
+  ---
+  duration_ms: 69.588265
+  type: 'test'
+  ...
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Subtest: the 6:30 Begin runs the four cards in order over the buffering video, then plays it
+ok 72 - the 6:30 Begin runs the four cards in order over the buffering video, then plays it
+  ---
+  duration_ms: 690.905333
+  type: 'test'
+  ...
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Subtest: not ready at the end: the last card holds, says so, and goes the moment the video is
+ok 73 - not ready at the end: the last card holds, says so, and goes the moment the video is
+  ---
+  duration_ms: 400.723414
+  type: 'test'
+  ...
+# Not implemented: HTMLMediaElement's load() method
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Subtest: never ready: the hold is capped, then the video starts anyway with the loading overlay
+ok 74 - never ready: the hold is capped, then the video starts anyway with the loading overlay
+  ---
+  duration_ms: 824.877283
+  type: 'test'
+  ...
+# Subtest: the default hold is capped at 15 seconds after a ~5 second sequence
+ok 75 - the default hold is capped at 15 seconds after a ~5 second sequence
+  ---
+  duration_ms: 2.145355
+  type: 'test'
+  ...
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: previewing "Week 6"
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Subtest: the splash Begin from the top at any time (noon too), not a resume, not Start over
+ok 76 - the splash Begin from the top at any time (noon too), not a resume, not Start over
+  ---
+  duration_ms: 491.068908
+  type: 'test'
+  ...
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Not implemented: HTMLMediaElement's load() method
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: video failed to load/play undefined
+# Not implemented: HTMLMediaElement's load() method
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Subtest: Space skips to the video; ⇄ takes the screen; a video error plays as today
+ok 77 - Space skips to the video; ⇄ takes the screen; a video error plays as today
+  ---
+  duration_ms: 386.91123
+  type: 'test'
+  ...
+# Subtest: with motion: the last card rides off on the band, then the video starts
+ok 78 - with motion: the last card rides off on the band, then the video starts
+  ---
+  duration_ms: 330.719559
+  type: 'test'
+  ...
+# Subtest: in Chromium: the reduced-motion intro is instant swaps (no animation at all); the kiosk animates it
+ok 79 - in Chromium: the reduced-motion intro is instant swaps (no animation at all); the kiosk animates it # SKIP no Chromium at /opt/pw-browsers/chromium
+  ---
+  duration_ms: 0.321893
+  type: 'test'
+  ...
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: the lesson is retried soon, not in an hour: 15 s, 30 s, 60 s, then every five minutes
+ok 80 - the lesson is retried soon, not in an hour: 15 s, 30 s, 60 s, then every five minutes
+  ---
+  duration_ms: 442.263715
+  type: 'test'
+  ...
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: a lesson once read is remembered, and stands in when the next boot cannot read one
+ok 81 - a lesson once read is remembered, and stands in when the next boot cannot read one
+  ---
+  duration_ms: 285.577529
+  type: 'test'
+  ...
+# Journey: a lesson bundle download has been stuck for 15 minutes; starting over
+# Subtest: a bundle download that stalls does not hold the latch for the life of the page
+ok 82 - a bundle download that stalls does not hold the latch for the life of the page
+  ---
+  duration_ms: 175.828027
+  type: 'test'
+  ...
+# Subtest: a failed HEAD keeps the address already resolved for the same lesson
+ok 83 - a failed HEAD keeps the address already resolved for the same lesson
+  ---
+  duration_ms: 1.078539
+  type: 'test'
+  ...
+# Subtest: a resolved address is used as is
+ok 84 - a resolved address is used as is
+  ---
+  duration_ms: 0.251743
+  type: 'test'
+  ...
+# Subtest: a different week or title takes the fallback: it is a new lesson
+ok 85 - a different week or title takes the fallback: it is a new lesson
+  ---
+  duration_ms: 0.178809
+  type: 'test'
+  ...
+# Subtest: no feed yet, or one with no address: the fallback stands
+ok 86 - no feed yet, or one with no address: the fallback stands
+  ---
+  duration_ms: 0.179869
+  type: 'test'
+  ...
+# Subtest: the pointer records the transcode it stands for
+ok 87 - the pointer records the transcode it stands for
+  ---
+  duration_ms: 1.820426
+  type: 'test'
+  ...
+# Subtest: a lesson is re-encoded unless the pointer and the release both hold its transcode
+ok 88 - a lesson is re-encoded unless the pointer and the release both hold its transcode
+  ---
+  duration_ms: 0.51317
+  type: 'test'
+  ...
+# Subtest: the committed pointer matches current-lesson.json
+ok 89 - the committed pointer matches current-lesson.json
+  ---
+  duration_ms: 0.391798
+  type: 'test'
+  ...
+# Subtest: the video itself is not in the tree, and is ignored
+ok 90 - the video itself is not in the tree, and is ignored
+  ---
+  duration_ms: 14.572498
+  type: 'test'
+  ...
+# Subtest: the nightly workflow uploads to the release before it commits the pointer, never the video
+ok 91 - the nightly workflow uploads to the release before it commits the pointer, never the video
+  ---
+  duration_ms: 1.894624
+  type: 'test'
+  ...
+# Not implemented: HTMLMediaElement's load() method
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Not implemented: HTMLMediaElement's load() method
+# Journey: previewing week 6 teaching slides
+# Not implemented: HTMLMediaElement's load() method
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Subtest: reduced motion never gets the motion: no class, no stinger, no sweep, no inline style
+ok 92 - reduced motion never gets the motion: no class, no stinger, no sweep, no inline style
+  ---
+  duration_ms: 467.418269
+  type: 'test'
+  ...
+# Not implemented: HTMLMediaElement's load() method
+# Not implemented: HTMLMediaElement's load() method
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Subtest: the kiosk gets the motion; the band carries the old view off, the new one is already there
+ok 93 - the kiosk gets the motion; the band carries the old view off, the new one is already there
+  ---
+  duration_ms: 168.356992
+  type: 'test'
+  ...
+# Not implemented: HTMLMediaElement's load() method
+# Journey: previewing week 6 teaching slides
+# Not implemented: HTMLMediaElement's load() method
+# Not implemented: HTMLMediaElement's load() method
+# Not implemented: HTMLMediaElement's load() method
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Subtest: kiosk slides: the old slide rides off on the band, a step back runs the other way
+ok 94 - kiosk slides: the old slide rides off on the band, a step back runs the other way
+  ---
+  duration_ms: 155.061416
+  type: 'test'
+  ...
+# Not implemented: HTMLMediaElement's load() method
+# Journey: previewing week 6 teaching slides
+# Not implemented: HTMLMediaElement's load() method
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Subtest: kiosk slides: the carry is held at its first frame until the new picture is decoded
+ok 95 - kiosk slides: the carry is held at its first frame until the new picture is decoded
+  ---
+  duration_ms: 142.348001
+  type: 'test'
+  ...
+# Not implemented: HTMLMediaElement's load() method
+# Journey: previewing week 6 teaching slides
+# Not implemented: HTMLMediaElement's load() method
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Subtest: kiosk slides: a picture that never decodes holds the carry 400ms at most, and still goes on screen
+ok 96 - kiosk slides: a picture that never decodes holds the carry 400ms at most, and still goes on screen
+  ---
+  duration_ms: 556.59368
+  type: 'test'
+  ...
+# Not implemented: HTMLMediaElement's load() method
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Not implemented: HTMLMediaElement's load() method
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Not implemented: HTMLMediaElement's load() method
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Subtest: startup: the entrances wait for the fonts, and only with motion
+ok 97 - startup: the entrances wait for the fonts, and only with motion
+  ---
+  duration_ms: 1550.788905
+  type: 'test'
+  ...
+# Not implemented: HTMLMediaElement's load() method
+# Not implemented: HTMLMediaElement's load() method
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Subtest: reduced motion and configure mode switch it off; every device without them gets it
+ok 98 - reduced motion and configure mode switch it off; every device without them gets it
+  ---
+  duration_ms: 386.73261
+  type: 'test'
+  ...
+# Subtest: in Chromium: slide changes animate the layers, never under reduced motion, and never hold a press
+ok 99 - in Chromium: slide changes animate the layers, never under reduced motion, and never hold a press # SKIP no Chromium at /opt/pw-browsers/chromium
+  ---
+  duration_ms: 2.633208
+  type: 'test'
+  ...
+# Subtest: in Chromium: reduced motion runs only the splash pulse; the kiosk runs the entrances
+ok 100 - in Chromium: reduced motion runs only the splash pulse; the kiosk runs the entrances # SKIP no Chromium at /opt/pw-browsers/chromium
+  ---
+  duration_ms: 0.801971
+  type: 'test'
+  ...
+# Subtest: in Chromium: the old picture is hung on the band the whole way (flip both ways, slide steps)
+ok 101 - in Chromium: the old picture is hung on the band the whole way (flip both ways, slide steps) # SKIP no Chromium at /opt/pw-browsers/chromium
+  ---
+  duration_ms: 0.549307
+  type: 'test'
+  ...
+# Subtest: in Chromium: the slide stage clips the drift, so a step never slides over the pillarbox
+ok 102 - in Chromium: the slide stage clips the drift, so a step never slides over the pillarbox # SKIP no Chromium at /opt/pw-browsers/chromium
+  ---
+  duration_ms: 0.184126
+  type: 'test'
+  ...
+# Subtest: in Chromium: while the fonts load the splash entrance waits at its first frame, then plays
+ok 103 - in Chromium: while the fonts load the splash entrance waits at its first frame, then plays # SKIP no Chromium at /opt/pw-browsers/chromium
+  ---
+  duration_ms: 0.094596
+  type: 'test'
+  ...
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: the embedded display is the plain lobby URL, never ?lowPower=1, and is not rewritten
+ok 104 - the embedded display is the plain lobby URL, never ?lowPower=1, and is not rewritten
+  ---
+  duration_ms: 411.550887
+  type: 'test'
+  ...
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: Settings has no playback-quality switch, and an old saved choice is ignored
+ok 105 - Settings has no playback-quality switch, and an old saved choice is ignored
+  ---
+  duration_ms: 122.440059
+  type: 'test'
+  ...
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: the scheduled show plays the original on the kiosk PC
+ok 106 - the scheduled show plays the original on the kiosk PC
+  ---
+  duration_ms: 109.441206
+  type: 'test'
+  ...
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: the scheduled show plays the original on a Mac
+ok 107 - the scheduled show plays the original on a Mac
+  ---
+  duration_ms: 85.084543
+  type: 'test'
+  ...
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: the scheduled show plays the original on a phone
+ok 108 - the scheduled show plays the original on a phone
+  ---
+  duration_ms: 81.328457
+  type: 'test'
+  ...
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: a lesson with no transcode yet still plays the original
+ok 109 - a lesson with no transcode yet still plays the original
+  ---
+  duration_ms: 77.499103
+  type: 'test'
+  ...
+# Journey: previewing "Unit 1, Lesson 1: Apologetics (Leader Video)"
+# Journey: video failed to load/play undefined
+# Journey: preview failed, retrying with the fallback copy — videos/week-01-leader.mp4
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: could not cache https://cdn.awana.example/student-1-original.mp4 TypeError: Failed to fetch
+#     at window.fetch (file:///app/journey/test/original-video.test.mjs:166:66)
+#     at cacheLessonBundle (https://example.test/:677:32)
+#     at async TestContext.<anonymous> (file:///app/journey/test/original-video.test.mjs:172:3)
+#     at async Test.run (node:internal/test_runner/test:1054:7)
+#     at async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: the picker plays the original, with the Release copy as its one fallback
+ok 110 - the picker plays the original, with the Release copy as its one fallback
+  ---
+  duration_ms: 115.789267
+  type: 'test'
+  ...
+# Subtest: the original is cached under a quality-marked query key
+ok 111 - the original is cached under a quality-marked query key
+  ---
+  duration_ms: 62.63914
+  type: 'test'
+  ...
+# Subtest: the bundle stores the original, never the 480p copy
+ok 112 - the bundle stores the original, never the 480p copy
+  ---
+  duration_ms: 78.336084
+  type: 'test'
+  ...
+# Subtest: an original that will not download costs the video and nothing else
+ok 113 - an original that will not download costs the video and nothing else
+  ---
+  duration_ms: 72.140349
+  type: 'test'
+  ...
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Not implemented: HTMLMediaElement's load() method
+# TypeError: Cannot read properties of undefined (reading 'documentElement')
+#     at motionOn (https://example.test/:4632:19)
+#     at playViewFlip (https://example.test/:4798:8)
+#     at MutationObserver.<anonymous> (https://example.test/:4705:5)
+#     at MutationObserver.invokeTheCallbackFunction (/app/journey/node_modules/jsdom/lib/generated/idl/MutationCallback.js:19:26)
+#     at notifyMutationObservers (/app/journey/node_modules/jsdom/lib/jsdom/living/helpers/mutation-observers.js:160:22)
+#     at /app/journey/node_modules/jsdom/lib/jsdom/living/helpers/mutation-observers.js:133:5
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: the clock-drift note is gone, page and script
+ok 114 - the clock-drift note is gone, page and script
+  ---
+  duration_ms: 446.523082
+  type: 'test'
+  ...
+# Subtest: the embedded display can ask for the whole page to go fullscreen
+ok 115 - the embedded display can ask for the whole page to go fullscreen
+  ---
+  duration_ms: 117.08705
+  type: 'test'
+  ...
+# Subtest: a message from anywhere else, or about anything else, is ignored
+ok 116 - a message from anywhere else, or about anything else, is ignored
+  ---
+  duration_ms: 102.503308
+  type: 'test'
+  ...
+# Subtest: a double-click on the Journey layer toggles the page, a control does not
+ok 117 - a double-click on the Journey layer toggles the page, a control does not
+  ---
+  duration_ms: 98.977759
+  type: 'test'
+  ...
+# Subtest: the splash names the lesson as a kicker over its one-word name
+ok 118 - the splash names the lesson as a kicker over its one-word name
+  ---
+  duration_ms: 112.993797
+  type: 'test'
+  ...
+# TypeError: Cannot read properties of undefined (reading 'documentElement')
+#     at motionOn (https://example.test/:4632:19)
+#     at playViewFlip (https://example.test/:4798:8)
+#     at MutationObserver.<anonymous> (https://example.test/:4705:5)
+#     at MutationObserver.invokeTheCallbackFunction (/app/journey/node_modules/jsdom/lib/generated/idl/MutationCallback.js:19:26)
+#     at notifyMutationObservers (/app/journey/node_modules/jsdom/lib/jsdom/living/helpers/mutation-observers.js:160:22)
+#     at /app/journey/node_modules/jsdom/lib/jsdom/living/helpers/mutation-observers.js:133:5
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: the splash and the placeholder carry the Journey wordmark and this week
+ok 119 - the splash and the placeholder carry the Journey wordmark and this week
+  ---
+  duration_ms: 84.020673
+  type: 'test'
+  ...
+# TypeError: Cannot read properties of undefined (reading 'documentElement')
+#     at motionOn (https://example.test/:4632:19)
+#     at playViewFlip (https://example.test/:4798:8)
+#     at MutationObserver.<anonymous> (https://example.test/:4705:5)
+#     at MutationObserver.invokeTheCallbackFunction (/app/journey/node_modules/jsdom/lib/generated/idl/MutationCallback.js:19:26)
+#     at notifyMutationObservers (/app/journey/node_modules/jsdom/lib/jsdom/living/helpers/mutation-observers.js:160:22)
+#     at /app/journey/node_modules/jsdom/lib/jsdom/living/helpers/mutation-observers.js:133:5
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: a title that does not split is shown whole, at the smaller size
+ok 120 - a title that does not split is shown whole, at the smaller size
+  ---
+  duration_ms: 125.13467
+  type: 'test'
+  ...
+# Subtest: every lesson in the course splits into a short one-word name
+ok 121 - every lesson in the course splits into a short one-word name
+  ---
+  duration_ms: 138.95238
+  type: 'test'
+  ...
+# Not implemented: HTMLMediaElement's load() method
+# TypeError: Cannot read properties of undefined (reading 'documentElement')
+#     at motionOn (https://example.test/:4632:19)
+#     at playViewFlip (https://example.test/:4798:8)
+#     at MutationObserver.<anonymous> (https://example.test/:4705:5)
+#     at MutationObserver.invokeTheCallbackFunction (/app/journey/node_modules/jsdom/lib/generated/idl/MutationCallback.js:19:26)
+#     at notifyMutationObservers (/app/journey/node_modules/jsdom/lib/jsdom/living/helpers/mutation-observers.js:160:22)
+#     at /app/journey/node_modules/jsdom/lib/jsdom/living/helpers/mutation-observers.js:133:5
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: the brand fonts are asked for at startup, and nothing waits on them
+ok 122 - the brand fonts are asked for at startup, and nothing waits on them
+  ---
+  duration_ms: 168.292712
+  type: 'test'
+  ...
+# Subtest: the caption question and the corner buttons carry no key or glyph text
+ok 123 - the caption question and the corner buttons carry no key or glyph text
+  ---
+  duration_ms: 91.162593
+  type: 'test'
+  ...
+# Not implemented: HTMLMediaElement's load() method
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Subtest: the kiosk takes exactly the phone's eleven actions, in both of its files
+ok 124 - the kiosk takes exactly the phone's eleven actions, in both of its files
+  ---
+  duration_ms: 2.545206
+  type: 'test'
+  ...
+# Not implemented: HTMLMediaElement's load() method
+# Not implemented: HTMLMediaElement's load() method
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Subtest: Next and Back step the slides through the page's own functions, and the report follows
+ok 125 - Next and Back step the slides through the page's own functions, and the report follows
+  ---
+  duration_ms: 538.01511
+  type: 'test'
+  ...
+# Not implemented: HTMLMediaElement's load() method
+# Not implemented: HTMLMediaElement's load() method
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Subtest: an edited bullet on this kiosk is what the report carries (the phone then hides its sample answers)
+ok 126 - an edited bullet on this kiosk is what the report carries (the phone then hides its sample answers)
+  ---
+  duration_ms: 216.365656
+  type: 'test'
+  ...
+# Not implemented: HTMLMediaElement's load() method
+# Not implemented: HTMLMediaElement's load() method
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Subtest: Begin on the splash, then Play/Pause, ±15 s and Mute act on the video; the report says where it is
+ok 127 - Begin on the splash, then Play/Pause, ±15 s and Mute act on the video; the report says where it is
+  ---
+  duration_ms: 223.335434
+  type: 'test'
+  ...
+# Not implemented: HTMLMediaElement's load() method
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Subtest: a plain browser: a phone press is not a tap, so the video stays muted and Unmute says why
+ok 128 - a plain browser: a phone press is not a tap, so the video stays muted and Unmute says why
+  ---
+  duration_ms: 218.063076
+  type: 'test'
+  ...
+# Not implemented: HTMLMediaElement's load() method
+# Journey: previewing week 3 teaching slides
+# Not implemented: HTMLMediaElement's load() method
+# Journey: previewing week 4 teaching slides
+# Not implemented: HTMLMediaElement's load() method
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Subtest: a pick: checked like the configure relay, and never over a running lesson without force
+ok 129 - a pick: checked like the configure relay, and never over a running lesson without force
+  ---
+  duration_ms: 181.563763
+  type: 'test'
+  ...
+# Not implemented: HTMLMediaElement's load() method
+# Not implemented: HTMLMediaElement's load() method
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Not implemented: HTMLMediaElement's load() method
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Subtest: Settings open, a handout open, or the caption question: the press waits for a person at the screen
+ok 130 - Settings open, a handout open, or the caption question: the press waits for a person at the screen
+  ---
+  duration_ms: 416.790202
+  type: 'test'
+  ...
+# Not implemented: HTMLMediaElement's load() method
+# Journey: previewing week 3 teaching slides
+# Not implemented: HTMLMediaElement's load() method
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Subtest: a pick waits for a person at the screen like every press: Settings, a handout, the caption question, confirmed or not
+ok 131 - a pick waits for a person at the screen like every press: Settings, a handout, the caption question, confirmed or not
+  ---
+  duration_ms: 346.04357
+  type: 'test'
+  ...
+# Not implemented: HTMLMediaElement's load() method
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Subtest: configure mode never runs a press
+ok 132 - configure mode never runs a press
+  ---
+  duration_ms: 129.736953
+  type: 'test'
+  ...
+# Not implemented: HTMLMediaElement's load() method
+# Not implemented: HTMLMediaElement's load() method
+# Not implemented: HTMLMediaElement's load() method
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Subtest: nobody watching: the screen changing sends nothing at all
+ok 133 - nobody watching: the screen changing sends nothing at all
+  ---
+  duration_ms: 442.978047
+  type: 'test'
+  ...
+# Not implemented: HTMLMediaElement's load() method
+# Journey: previewing "Week 6"
+# Not implemented: HTMLMediaElement's load() method
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Subtest: a phone watching: the report goes at once, then on each change (never twice within the gap), and one timed poll every few seconds
+ok 134 - a phone watching: the report goes at once, then on each change (never twice within the gap), and one timed poll every few seconds
+  ---
+  duration_ms: 2995.147194
+  type: 'test'
+  ...
+# Not implemented: HTMLMediaElement's load() method
+# Subtest: the doorbell collects the phone's presses at once; each press id runs once; only the allowlisted
+ok 135 - the doorbell collects the phone's presses at once; each press id runs once; only the allowlisted
+  ---
+  duration_ms: 274.871038
+  type: 'test'
+  ...
+# Subtest: a finished encode replaces the live file and leaves no partial
+ok 136 - a finished encode replaces the live file and leaves no partial # SKIP
+  ---
+  duration_ms: 1.147307
+  type: 'test'
+  ...
+# Subtest: an encode that cannot fit the cap keeps the old file and cleans up
+ok 137 - an encode that cannot fit the cap keeps the old file and cleans up # SKIP
+  ---
+  duration_ms: 0.178988
+  type: 'test'
+  ...
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: formatTime renders the m:ss a timestamp button shows
+ok 138 - formatTime renders the m:ss a timestamp button shows
+  ---
+  duration_ms: 455.240006
+  type: 'test'
+  ...
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: a leader Read Prep shows the summary with the transcript collapsed
+ok 139 - a leader Read Prep shows the summary with the transcript collapsed
+  ---
+  duration_ms: 146.359158
+  type: 'test'
+  ...
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: a leader Read Prep shows both question sets, each labelled
+ok 140 - a leader Read Prep shows both question sets, each labelled
+  ---
+  duration_ms: 150.084875
+  type: 'test'
+  ...
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: an empty "Ask your group" set leaves that section off
+ok 141 - an empty "Ask your group" set leaves that section off
+  ---
+  duration_ms: 109.484023
+  type: 'test'
+  ...
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: a cached v1 leader-prep.json (one plain list) still reads, as "For you"
+ok 142 - a cached v1 leader-prep.json (one plain list) still reads, as "For you"
+  ---
+  duration_ms: 115.800343
+  type: 'test'
+  ...
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: expanding shows the edited paragraphs, and Exact words swaps them with no fetch
+ok 143 - expanding shows the edited paragraphs, and Exact words swaps them with no fetch
+  ---
+  duration_ms: 125.29187
+  type: 'test'
+  ...
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: the stored version preference is what a later open starts in
+ok 144 - the stored version preference is what a later open starts in
+  ---
+  duration_ms: 150.515409
+  type: 'test'
+  ...
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: a Student Read Prep has no summary and opens expanded
+ok 145 - a Student Read Prep has no summary and opens expanded
+  ---
+  duration_ms: 84.981447
+  type: 'test'
+  ...
+# Journey: transcript unavailable prep-transcripts/week-01-leader.json Error: prep-transcripts/week-01-leader.json 404
+#     at loadPrepTranscript (https://example.test/:2988:24)
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: a transcript that will not download says so in place
+ok 146 - a transcript that will not download says so in place
+  ---
+  duration_ms: 102.952029
+  type: 'test'
+  ...
+# Journey: previewing "Unit 1, Lesson 1: Apologetics (Leader Video)"
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: pressing a timestamp closes prep and seeks that video there
+ok 147 - pressing a timestamp closes prep and seeks that video there
+  ---
+  duration_ms: 95.581461
+  type: 'test'
+  ...
+# Journey: previewing "Unit 1, Lesson 1: Apologetics (Student Video)"
+# Not implemented: HTMLMediaElement's load() method
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: a seek armed by a superseded request never lands on the newer video
+ok 148 - a seek armed by a superseded request never lands on the newer video
+  ---
+  duration_ms: 113.466399
+  type: 'test'
+  ...
+# Journey: previewing "Unit 1, Lesson 1: Apologetics (Student Video)"
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: the Student path asks video or prep, and Back returns to the roles
+ok 149 - the Student path asks video or prep, and Back returns to the roles
+  ---
+  duration_ms: 88.325203
+  type: 'test'
+  ...
+# Subtest: the current week bundle asks for both roles transcripts
+ok 150 - the current week bundle asks for both roles transcripts
+  ---
+  duration_ms: 65.215437
+  type: 'test'
+  ...
+# Subtest: test/remote-harness.mjs
+ok 23 - test/remote-harness.mjs
+  ---
+  duration_ms: 89.823756
+  type: 'test'
+  ...
+# Subtest: which screen the readout follows
+ok 152 - which screen the readout follows
+  ---
+  duration_ms: 1.336236
+  type: 'test'
+  ...
+# Subtest: the readout in plain words
+ok 153 - the readout in plain words
+  ---
+  duration_ms: 2.387808
+  type: 'test'
+  ...
+# Subtest: a report is never run on for long, nor past the end
+ok 154 - a report is never run on for long, nor past the end
+  ---
+  duration_ms: 0.249336
+  type: 'test'
+  ...
+# Subtest: every skip reason the kiosk can give has words
+ok 155 - every skip reason the kiosk can give has words
+  ---
+  duration_ms: 1.310814
+  type: 'test'
+  ...
+# Subtest: a pick asks first only over a running lesson (a screen waiting for a person skips it anyway)
+ok 156 - a pick asks first only over a running lesson (a screen waiting for a person skips it anyway)
+  ---
+  duration_ms: 0.33532
+  type: 'test'
+  ...
+# Subtest: sample answers match the wall by exact text; an edit hides them; no file, no section
+ok 157 - sample answers match the wall by exact text; an edit hides them; no file, no section
+  ---
+  duration_ms: 0.756246
+  type: 'test'
+  ...
+# Subtest: signed out: the passphrase card; signing in sends only the derived key, keeps only the session
+ok 158 - signed out: the passphrase card; signing in sends only the derived key, keeps only the session # SKIP no Chromium at /opt/pw-browsers/chromium
+  ---
+  duration_ms: 1.428435
+  type: 'test'
+  ...
+# Subtest: a session the service no longer takes goes back to the sign-in card, in plain words
+ok 159 - a session the service no longer takes goes back to the sign-in card, in plain words # SKIP no Chromium at /opt/pw-browsers/chromium
+  ---
+  duration_ms: 0.297802
+  type: 'test'
+  ...
+# Subtest: layout at 390x844: no sideways scroll, Back and Next thumb-sized, every control reachable
+ok 160 - layout at 390x844: no sideways scroll, Back and Next thumb-sized, every control reachable # SKIP no Chromium at /opt/pw-browsers/chromium
+  ---
+  duration_ms: 0.139034
+  type: 'test'
+  ...
+# Subtest: layout at 360x740: no sideways scroll, Back and Next thumb-sized, every control reachable
+ok 161 - layout at 360x740: no sideways scroll, Back and Next thumb-sized, every control reachable # SKIP no Chromium at /opt/pw-browsers/chromium
+  ---
+  duration_ms: 0.124808
+  type: 'test'
+  ...
+# Subtest: layout at 1024x768: no sideways scroll, Back and Next thumb-sized, every control reachable
+ok 162 - layout at 1024x768: no sideways scroll, Back and Next thumb-sized, every control reachable # SKIP no Chromium at /opt/pw-browsers/chromium
+  ---
+  duration_ms: 0.129394
+  type: 'test'
+  ...
+# Subtest: presses: one request each, the right action; the readout follows the screen
+ok 163 - presses: one request each, the right action; the readout follows the screen # SKIP no Chromium at /opt/pw-browsers/chromium
+  ---
+  duration_ms: 0.135435
+  type: 'test'
+  ...
+# Subtest: picking a lesson over a running one asks first, then sends force; over nothing it just goes
+ok 164 - picking a lesson over a running one asks first, then sends force; over nothing it just goes # SKIP no Chromium at /opt/pw-browsers/chromium
+  ---
+  duration_ms: 0.139448
+  type: 'test'
+  ...
+# Subtest: sample answers: shown for the questions on the wall, on this phone only
+ok 165 - sample answers: shown for the questions on the wall, on this phone only # SKIP no Chromium at /opt/pw-browsers/chromium
+  ---
+  duration_ms: 0.114711
+  type: 'test'
+  ...
+# Subtest: no answers file yet: the answers section is simply absent
+ok 166 - no answers file yet: the answers section is simply absent # SKIP no Chromium at /opt/pw-browsers/chromium
+  ---
+  duration_ms: 0.397994
+  type: 'test'
+  ...
+# Subtest: the service unreachable: "Reconnecting…" in plain words, and it recovers by itself
+ok 167 - the service unreachable: "Reconnecting…" in plain words, and it recovers by itself # SKIP no Chromium at /opt/pw-browsers/chromium
+  ---
+  duration_ms: 0.45982
+  type: 'test'
+  ...
+# Subtest: stops asking while the page is hidden
+ok 168 - stops asking while the page is hidden # SKIP no Chromium at /opt/pw-browsers/chromium
+  ---
+  duration_ms: 0.178958
+  type: 'test'
+  ...
+# Subtest: public/src/schedule.js is up to date with src/schedule/
+ok 169 - public/src/schedule.js is up to date with src/schedule/
+  ---
+  duration_ms: 13.272779
+  type: 'test'
+  ...
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: dragging moves the readout only; the seek happens once, on release
+ok 170 - dragging moves the readout only; the seek happens once, on release
+  ---
+  duration_ms: 422.735692
+  type: 'test'
+  ...
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: while the bar is faded out (cursor hidden, not paused) the scrubber is not written
+ok 171 - while the bar is faded out (cursor hidden, not paused) the scrubber is not written
+  ---
+  duration_ms: 110.555735
+  type: 'test'
+  ...
+# Subtest: playing with the bar showing: the scrubber glides every frame, and stops when nobody can see it
+ok 172 - playing with the bar showing: the scrubber glides every frame, and stops when nobody can see it
+  ---
+  duration_ms: 214.467761
+  type: 'test'
+  ...
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: the same build is not news: no index fetch, no reload
+ok 173 - the same build is not news: no index fetch, no reload
+  ---
+  duration_ms: 427.809611
+  type: 'test'
+  ...
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: a newer build is deployed (bbbbbbb); this page is aaaaaaa
+# Subtest: no version.json at all leaves the poller inert
+ok 174 - no version.json at all leaves the poller inert
+  ---
+  duration_ms: 111.187405
+  type: 'test'
+  ...
+# Journey: reloading for build bbbbbbb
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: a new build waits for the CDN to serve the new page, then reloads once
+ok 175 - a new build waits for the CDN to serve the new page, then reloads once
+  ---
+  duration_ms: 108.987598
+  type: 'test'
+  ...
+# Journey: a newer build is deployed (bbbbbbb); this page is aaaaaaa
+# Not implemented: HTMLMediaElement's load() method
+# Journey: reloading for build bbbbbbb
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: a lesson on screen blocks the reload, and it tries again later
+ok 176 - a lesson on screen blocks the reload, and it tries again later
+  ---
+  duration_ms: 117.265704
+  type: 'test'
+  ...
+# Journey: a newer build is deployed (bbbbbbb); this page is aaaaaaa
+# Not implemented: HTMLMediaElement's load() method
+# Journey: reloading for build bbbbbbb
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: the settings panel, a reading overlay and the splash all hold it off
+ok 177 - the settings panel, a reading overlay and the splash all hold it off
+  ---
+  duration_ms: 111.345801
+  type: 'test'
+  ...
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: the 'online' burst is rate limited to one check a minute
+ok 178 - the 'online' burst is rate limited to one check a minute
+  ---
+  duration_ms: 86.086845
+  type: 'test'
+  ...
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Not implemented: HTMLMediaElement's load() method
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: the splash button shows the slides without ever attaching a video
+ok 179 - the splash button shows the slides without ever attaching a video
+  ---
+  duration_ms: 442.387848
+  type: 'test'
+  ...
+# Not implemented: HTMLMediaElement's load() method
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: Shift+ArrowRight skips, plain ArrowRight still begins the video
+ok 180 - Shift+ArrowRight skips, plain ArrowRight still begins the video
+  ---
+  duration_ms: 241.681083
+  type: 'test'
+  ...
+# Not implemented: HTMLMediaElement's load() method
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: skipping clears the resume mark: the lesson is being called done
+ok 181 - skipping clears the resume mark: the lesson is being called done
+  ---
+  duration_ms: 95.054359
+  type: 'test'
+  ...
+# Not implemented: HTMLMediaElement's load() method
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: the settings panel and a text field hold the shortcut off
+ok 182 - the settings panel and a text field hold the shortcut off
+  ---
+  duration_ms: 109.227179
+  type: 'test'
+  ...
+# Not implemented: HTMLMediaElement's load() method
+# Not implemented: HTMLMediaElement's load() method
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: the skipped show finishes back at the Check-in Display, like any lesson
+ok 183 - the skipped show finishes back at the Check-in Display, like any lesson
+  ---
+  duration_ms: 101.145472
+  type: 'test'
+  ...
+# Not implemented: HTMLMediaElement's load() method
+# Journey: previewing week 27 teaching slides
+# Not implemented: HTMLMediaElement's load() method
+# Not implemented: HTMLMediaElement's load() method
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: the picker offers teaching slides for every week, week 27 included
+ok 184 - the picker offers teaching slides for every week, week 27 included
+  ---
+  duration_ms: 130.475875
+  type: 'test'
+  ...
+# Not implemented: HTMLMediaElement's load() method
+# Journey: previewing week 1 teaching slides
+# Not implemented: HTMLMediaElement's load() method
+# Not implemented: HTMLMediaElement's load() method
+# Subtest: the toggle button tears a slides preview down, same as a video one
+ok 185 - the toggle button tears a slides preview down, same as a video one
+  ---
+  duration_ms: 132.126164
+  type: 'test'
+  ...
+# Subtest: a complete set builds one stable file, weeks in order, in the phone's shape
+ok 186 - a complete set builds one stable file, weeks in order, in the phone's shape
+  ---
+  duration_ms: 14.781865
+  type: 'test'
+  ...
+# Subtest: refuses a half set: any missing week means nothing is written
+ok 187 - refuses a half set: any missing week means nothing is written
+  ---
+  duration_ms: 53.672309
+  type: 'test'
+  ...
+# Subtest: every rule is checked, and each problem is named
+ok 188 - every rule is checked, and each problem is named
+  ---
+  duration_ms: 63.050477
+  type: 'test'
+  ...
+# Subtest: the command: builds, then --check says up to date; stale or missing exits 2; an incomplete set with nothing published passes
+ok 189 - the command: builds, then --check says up to date; stale or missing exits 2; an incomplete set with nothing published passes
+  ---
+  duration_ms: 300.996669
+  type: 'test'
+  ...
+# Subtest: the committed public/slide-answers.json is what the committed data builds (or neither is complete yet)
+ok 190 - the committed public/slide-answers.json is what the committed data builds (or neither is complete yet)
+  ---
+  duration_ms: 1.954662
+  type: 'test'
+  ...
+# Subtest: every lesson name fits the splash in the shout face, on the kiosk and on a TV
+ok 191 - every lesson name fits the splash in the shout face, on the kiosk and on a TV # SKIP no Chromium at /opt/pw-browsers/chromium
+  ---
+  duration_ms: 1.016259
+  type: 'test'
+  ...
+# Subtest: the committed page carries the placeholder the workflow replaces
+ok 192 - the committed page carries the placeholder the workflow replaces
+  ---
+  duration_ms: 2.171881
+  type: 'test'
+  ...
+# Subtest: the brand stylesheets and the wordmark are among the versioned assets
+ok 193 - the brand stylesheets and the wordmark are among the versioned assets
+  ---
+  duration_ms: 0.360091
+  type: 'test'
+  ...
+# Subtest: stamping writes the build id into the meta and onto the assets
+ok 194 - stamping writes the build id into the meta and onto the assets
+  ---
+  duration_ms: 18.352405
+  type: 'test'
+  ...
+# Subtest: every font URL carries the hash of the very bytes it names
+ok 195 - every font URL carries the hash of the very bytes it names
+  ---
+  duration_ms: 13.306179
+  type: 'test'
+  ...
+# Subtest: every font URL in the sheet is versioned exactly once, the shout included
+ok 196 - every font URL in the sheet is versioned exactly once, the shout included
+  ---
+  duration_ms: 7.622764
+  type: 'test'
+  ...
+# Subtest: a changed font gets a new URL, an unchanged one keeps its old one
+ok 197 - a changed font gets a new URL, an unchanged one keeps its old one
+  ---
+  duration_ms: 11.61915
+  type: 'test'
+  ...
+# Subtest: a font sheet naming a missing font, or no fonts at all, fails the deploy
+ok 198 - a font sheet naming a missing font, or no fonts at all, fails the deploy
+  ---
+  duration_ms: 4.930053
+  type: 'test'
+  ...
+# Subtest: stamping is idempotent, and a new build leaves no trace of the old one
+ok 199 - stamping is idempotent, and a new build leaves no trace of the old one
+  ---
+  duration_ms: 18.970872
+  type: 'test'
+  ...
+# Subtest: the page preloads the fonts it draws, on the very URLs the font sheet asks for
+ok 200 - the page preloads the fonts it draws, on the very URLs the font sheet asks for
+  ---
+  duration_ms: 11.482025
+  type: 'test'
+  ...
+# Subtest: a preload of a font the sheet does not name, or the deploy lacks, fails the deploy
+ok 201 - a preload of a font the sheet does not name, or the deploy lacks, fails the deploy
+  ---
+  duration_ms: 5.733757
+  type: 'test'
+  ...
+# Subtest: a page with no build meta fails the deploy rather than shipping mute
+ok 202 - a page with no build meta fails the deploy rather than shipping mute
+  ---
+  duration_ms: 0.363973
+  type: 'test'
+  ...
+# Subtest: the committed remote page keeps the placeholder and plain paths
+ok 203 - the committed remote page keeps the placeholder and plain paths
+  ---
+  duration_ms: 0.298018
+  type: 'test'
+  ...
+# Subtest: stamping the real remote page versions every local asset it names (the deploy copy of public/)
+ok 204 - stamping the real remote page versions every local asset it names (the deploy copy of public/)
+  ---
+  duration_ms: 7.952448
+  type: 'test'
+  ...
+# Subtest: a remote asset missing from the page fails the stamp loudly
+ok 205 - a remote asset missing from the page fails the stamp loudly
+  ---
+  duration_ms: 0.931225
+  type: 'test'
+  ...
+# Subtest: the remote script carries its own ?v= on to every module it loads
+ok 206 - the remote script carries its own ?v= on to every module it loads
+  ---
+  duration_ms: 0.446911
+  type: 'test'
+  ...
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: hidden, and silent, until the display site names a service
+ok 207 - hidden, and silent, until the display site names a service
+  ---
+  duration_ms: 476.768377
+  type: 'test'
+  ...
+# Not implemented: navigation to another Document
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: "kennebec" signs in into the slots the lobby screen shares, and takes the room's settings
+ok 208 - "kennebec" signs in into the slots the lobby screen shares, and takes the room's settings
+  ---
+  duration_ms: 190.880616
+  type: 'test'
+  ...
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: a signed-in screen pulls the room's settings at start
+ok 209 - a signed-in screen pulls the room's settings at start
+  ---
+  duration_ms: 129.380284
+  type: 'test'
+  ...
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: a pull never overwrites a change made here that has not gone up yet
+ok 210 - a pull never overwrites a change made here that has not gone up yet
+  ---
+  duration_ms: 124.965104
+  type: 'test'
+  ...
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: a change here goes to every Journey screen, and a leftover quality choice never does
+ok 211 - a change here goes to every Journey screen, and a leftover quality choice never does
+  ---
+  duration_ms: 1332.597683
+  type: 'test'
+  ...
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: a passphrase change elsewhere signs this screen out and says so
+ok 212 - a passphrase change elsewhere signs this screen out and says so
+  ---
+  duration_ms: 100.198062
+  type: 'test'
+  ...
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: a sign-in made in another window (the configure page) signs this screen in, without a reload
+ok 213 - a sign-in made in another window (the configure page) signs this screen in, without a reload
+  ---
+  duration_ms: 93.296599
+  type: 'test'
+  ...
+# Not implemented: navigation to another Document
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: passphrase v2: the kiosk derives the authKey itself and sends only that
+ok 214 - passphrase v2: the kiosk derives the authKey itself and sends only that
+  ---
+  duration_ms: 501.396379
+  type: 'test'
+  ...
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: passphrase v2: a wrong word is refused and counted, and the session stays empty
+ok 215 - passphrase v2: a wrong word is refused and counted, and the session stays empty
+  ---
+  duration_ms: 481.753006
+  type: 'test'
+  ...
+# Not implemented: navigation to another Document
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: if the shared modules cannot load, the kiosk still signs in the old way
+ok 216 - if the shared modules cannot load, the kiosk still signs in the old way
+  ---
+  duration_ms: 185.406277
+  type: 'test'
+  ...
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: signed in, the kiosk says hello as a Journey kiosk under an id it keeps in the lobby's slot
+ok 217 - signed in, the kiosk says hello as a Journey kiosk under an id it keeps in the lobby's slot
+  ---
+  duration_ms: 79.371946
+  type: 'test'
+  ...
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: its saved lessons ride the hello, trimmed to exactly what the registry keeps, never twice in a minute
+ok 218 - its saved lessons ride the hello, trimmed to exactly what the registry keeps, never twice in a minute
+  ---
+  duration_ms: 909.390224
+  type: 'test'
+  ...
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: a kiosk that does not know yet, or cannot save lessons, still reports, and says which
+ok 219 - a kiosk that does not know yet, or cannot save lessons, still reports, and says which
+  ---
+  duration_ms: 79.740479
+  type: 'test'
+  ...
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/?configure=1:3757:22)
+#     at async loadTeachingSlides (https://example.test/?configure=1:3787:25)
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: silent when signed out, and the configure window is never a second kiosk
+ok 220 - silent when signed out, and the configure window is never a second kiosk
+  ---
+  duration_ms: 162.444946
+  type: 'test'
+  ...
+# Not implemented: navigation to another Document
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: signing in says hello at once
+ok 221 - signing in says hello at once
+  ---
+  duration_ms: 131.006992
+  type: 'test'
+  ...
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: a hello's actions run once each, only the five allowlisted, then a quick hello reports the new state
+ok 222 - a hello's actions run once each, only the five allowlisted, then a quick hello reports the new state
+  ---
+  duration_ms: 127.326852
+  type: 'test'
+  ...
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: the two switches: the service's newer copy is taken, a change made here goes up, a service with none gets this kiosk's
+ok 223 - the two switches: the service's newer copy is taken, a change made here goes up, a service with none gets this kiosk's
+  ---
+  duration_ms: 115.420353
+  type: 'test'
+  ...
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: the embedded Check-in Display's doorbell: a hello now for this kiosk, a pull for the room; anything else ignored
+ok 224 - the embedded Check-in Display's doorbell: a hello now for this kiosk, a pull for the room; anything else ignored
+  ---
+  duration_ms: 572.747989
+  type: 'test'
+  ...
+# Not implemented: navigation to another Document
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: the phone remote's poll refused (401): signed out at once, and not one more poll until a new sign-in
+ok 225 - the phone remote's poll refused (401): signed out at once, and not one more poll until a new sign-in
+  ---
+  duration_ms: 847.016803
+  type: 'test'
+  ...
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: a hello refused (401) signs this screen out the same way, without waiting for the ten-minute pull
+ok 226 - a hello refused (401) signs this screen out the same way, without waiting for the ten-minute pull
+  ---
+  duration_ms: 283.974904
+  type: 'test'
+  ...
+# Subtest: signing out while a phone watches leaves no remote timer running
+ok 227 - signing out while a phone watches leaves no remote timer running
+  ---
+  duration_ms: 417.984484
+  type: 'test'
+  ...
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: club night: Journey until 7:00, Trek from 7:00 to 7:30, then the Check-in Display
+ok 228 - club night: Journey until 7:00, Trek from 7:00 to 7:30, then the Check-in Display
+  ---
+  duration_ms: 483.303497
+  type: 'test'
+  ...
+# Not implemented: HTMLMediaElement's load() method
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: the poll flips 18:59 -> 19:00 -> 19:30: splash, then the card, then the Check-in Display
+ok 229 - the poll flips 18:59 -> 19:00 -> 19:30: splash, then the card, then the Check-in Display
+  ---
+  duration_ms: 139.892276
+  type: 'test'
+  ...
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: a kiosk switched on mid-window shows the card as soon as it knows the night
+ok 230 - a kiosk switched on mid-window shows the card as soon as it knows the night
+  ---
+  duration_ms: 121.562993
+  type: 'test'
+  ...
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: not on a non-club night: a cancelled night, a noClub date, another weekday
+ok 231 - not on a non-club night: a cancelled night, a noClub date, another weekday
+  ---
+  duration_ms: 323.142855
+  type: 'test'
+  ...
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: until the club-night rule has loaded, no night is a club night
+ok 232 - until the club-night rule has loaded, no night is a club night
+  ---
+  duration_ms: 90.514368
+  type: 'test'
+  ...
+# Not implemented: HTMLMediaElement's load() method
+# Not implemented: HTMLMediaElement's load() method
+# Not implemented: HTMLMediaElement's load() method
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Subtest: a lesson still running at 7:00 is waited for; its end brings the card; 7:30 ends it
+ok 233 - a lesson still running at 7:00 is waited for; its end brings the card; 7:30 ends it
+  ---
+  duration_ms: 102.369397
+  type: 'test'
+  ...
+# Not implemented: HTMLMediaElement's load() method
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: teaching slides still up at 7:00 are waited for too; Finish brings the card
+ok 234 - teaching slides still up at 7:00 are waited for too; Finish brings the card
+  ---
+  duration_ms: 82.918418
+  type: 'test'
+  ...
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: the chip shows tonight’s Trek count, follows the lobby’s writes, and hides with none
+ok 235 - the chip shows tonight’s Trek count, follows the lobby’s writes, and hides with none
+  ---
+  duration_ms: 242.641657
+  type: 'test'
+  ...
+# Subtest: trekCountFrom: only a well-formed entry from today
+ok 236 - trekCountFrom: only a well-formed entry from today
+  ---
+  duration_ms: 68.33722
+  type: 'test'
+  ...
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: the calendar names tonight’s Trek lesson: shown; anything less: no title
+ok 237 - the calendar names tonight’s Trek lesson: shown; anything less: no title
+  ---
+  duration_ms: 212.784223
+  type: 'test'
+  ...
+# Not implemented: HTMLMediaElement's load() method
+# Not implemented: HTMLMediaElement's load() method
+# Not implemented: HTMLMediaElement's load() method
+# Journey: previewing week 1 teaching slides
+# Not implemented: HTMLMediaElement's load() method
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: the toggle and Settings still work over the card
+ok 238 - the toggle and Settings still work over the card
+  ---
+  duration_ms: 82.10598
+  type: 'test'
+  ...
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: reduced motion gets a still card; with motion, no Check-in stinger over it
+ok 239 - reduced motion gets a still card; with motion, no Check-in stinger over it
+  ---
+  duration_ms: 202.825572
+  type: 'test'
+  ...
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: the Journey chip: on the splash, gone while the video plays, back on the slides
+ok 240 - the Journey chip: on the splash, gone while the video plays, back on the slides
+  ---
+  duration_ms: 82.578421
+  type: 'test'
+  ...
+# Not implemented: HTMLMediaElement's load() method
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: the Journey chip stays away from reading overlays, the Trek card, the Check-in Display, and with no count
+ok 241 - the Journey chip stays away from reading overlays, the Trek card, the Check-in Display, and with no count
+  ---
+  duration_ms: 150.563896
+  type: 'test'
+  ...
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: a reachable video streams, and no blob is made for it
+ok 242 - a reachable video streams, and no blob is made for it
+  ---
+  duration_ms: 509.564347
+  type: 'test'
+  ...
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: a video the server will not answer for falls back to the cached copy
+ok 243 - a video the server will not answer for falls back to the cached copy
+  ---
+  duration_ms: 129.945467
+  type: 'test'
+  ...
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: an offline kiosk plays the cached copy without probing at all
+ok 244 - an offline kiosk plays the cached copy without probing at all
+  ---
+  duration_ms: 124.790507
+  type: 'test'
+  ...
+# Journey: the streamed video stalled, switching to the cached copy
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: a streamed video that stalls swaps to the cached copy, once, where it was
+ok 245 - a streamed video that stalls swaps to the cached copy, once, where it was
+  ---
+  duration_ms: 112.652989
+  type: 'test'
+  ...
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: a stall with nothing cached is left to the existing stall handling
+ok 246 - a stall with nothing cached is left to the existing stall handling
+  ---
+  duration_ms: 97.835385
+  type: 'test'
+  ...
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: a stall on the last seconds hands over to the slides instead of swapping
+ok 247 - a stall on the last seconds hands over to the slides instead of swapping
+  ---
+  duration_ms: 99.464197
+  type: 'test'
+  ...
+# Not implemented: HTMLMediaElement's load() method
+# Not implemented: HTMLMediaElement's load() method
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Journey: leader-prep.json unavailable — Error: leader-prep.json 404
+#     at fetchLeaderPrepJson (https://example.test/:2862:22)
+#     at async loadLeaderPrep (https://example.test/:2894:21)
+# Journey: teaching-slides.json unavailable — Error: teaching-slides.json 404
+#     at fetchTeachingSlidesJson (https://example.test/:3757:22)
+#     at async loadTeachingSlides (https://example.test/:3787:25)
+# Subtest: a short wait after a seek never flashes the loading overlay; a real stall shows it after 500ms
+ok 248 - a short wait after a seek never flashes the loading overlay; a real stall shows it after 500ms
+  ---
+  duration_ms: 1942.863016
+  type: 'test'
+  ...
+# Subtest: the stall clock still starts at the waiting itself, not at the reveal
+ok 249 - the stall clock still starts at the waiting itself, not at the reveal
+  ---
+  duration_ms: 81.848589
+  type: 'test'
+  ...
+1..249
+# tests 249
+# suites 0
+# pass 223
+# fail 0
+# cancelled 0
+# skipped 26
+# todo 0
+# duration_ms 22901.940899

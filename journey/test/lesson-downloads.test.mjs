@@ -542,7 +542,7 @@ test('automatic mode never starts in the quiet hours, with the switch off, or wi
   const quiet = boot({ now: at(18, 0), tuning: { autoStartMs: 10, autoTickMs: 10 } });
   await wait(80);
   assert.equal(quiet.cdn.requests.length, 0, '6 PM: nothing');
-  assert.equal(quiet.window.autoDownloadTick(), false);
+  assert.equal(await quiet.window.autoDownloadTick(), false);
   quiet.close();
 
   const off = boot({ prefs: { 'journey.downloads.auto': '0' }, tuning: { autoStartMs: 10, autoTickMs: 10 } });

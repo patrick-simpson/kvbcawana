@@ -1113,7 +1113,14 @@ if (downloadsSection) {
         if (dl.phase === 'idle') startLessonDownloads(false, true);
       }, downloadTuning().resumeAfterLoadMs);
     }
-    setInterval(autoDownloadTick, downloadTuning().autoTickMs);
+    const runAutoDownloadTick = async () => {
+      try {
+        await autoDownloadTick();
+      } finally {
+        setTimeout(runAutoDownloadTick, downloadTuning().autoTickMs);
+      }
+    };
+    setTimeout(runAutoDownloadTick, downloadTuning().autoTickMs);
     window.addEventListener('online', () => autoDownloadTick());
     setTimeout(async () => {
       await prepareDownloadStatus();
@@ -1140,7 +1147,7 @@ async function prepareDownloadStatus() {
    into the lesson or the quiet hours); the run itself waits if one begins.
    A finished pass looks again after autoRecheckMs, re-reading lessons.json,
    which is how a newly published lesson is picked up. */
-function autoDownloadTick(now = Date.now()) {
+async function autoDownloadTick(now = Date.now()) {
   if (CONFIGURE_MODE || !lessonStoreSupported() || !downloadsAutoWanted()) return false;
   if (dl.autoHeld || dl.phase !== 'idle') return false;
   const tuning = downloadTuning();
@@ -1148,7 +1155,7 @@ function autoDownloadTick(now = Date.now()) {
   if (now < dl.nextAutoAt) return false;
   if (navigator.onLine === false) return false;
   if (currentHoldReason(true)) return false;
-  startLessonDownloads(true);
+  await startLessonDownloads(true);
   return true;
 }
 
