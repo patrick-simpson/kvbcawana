@@ -1,4 +1,11 @@
-﻿## [9.4.3] - 2026-10-13
+﻿## [9.4.4] - 2026-10-14
+BARF Bag labels say what club a child is in.
+
+**Club on the bag.** Under a child's name, a BARF Bag label now prints their club (CUBBIES, SPARKS, T&T...). A friend's bag says whose friend they are ("FRIEND OF DOT"), because a friend has no club on TwoTimTwo. The sync service sends the clubs along with the names, so this needs the sync service updated too (it deploys with the website). Nothing else about printing has changed.
+
+**Safer check-in reply.** The text TwoTimTwo sends back after the Chrome extension checks a child in is cleaned to plain text, links and the undo control before it is shown, so nothing odd in a reply can run inside TwoTimTwo's page.
+
+## [9.4.3] - 2026-10-13
 The church's own logo.
 
 **KVBC Awana logo.** The status window's header and the side of the setup window now show the Kennebec Valley Baptist Church Awana Clubs logo instead of the Awana Clubs mark, in white, as on the screens and the website. Nothing about printing, updates or settings has changed.

@@ -208,7 +208,10 @@ function barfBagOwner(name) {
   return /S$/.test(first) ? `${first}’` : `${first}’S`;
 }
 
-async function generateBarfBag(name) {
+// `info`: {club} for a child (their club under the name), {friendOf} for a
+// friend ("FRIEND OF SOPHIA": a friend has no club in TwoTimTwo), neither for
+// a label with the name alone.
+async function generateBarfBag(name, info = {}) {
   const cvs = createCanvas($labelRender.PX_W, $labelRender.PX_H);
   const ctx = cvs.getContext('2d');
   ctx.scale($labelRender.SCALE, $labelRender.SCALE);
@@ -245,9 +248,18 @@ async function generateBarfBag(name) {
   type.fill(ctx, 'name', bs, bag, $labelLayout.PAGE_W / 2, top + BARF_BAND / 2 + 1 + type.capCentre(ctx, 'name', bag) * bs);
 
   const owner = barfBagOwner(name) || 'MY';
+  // Between the name and the slime: the child's club, or whose friend this is.
+  // With that line the name rides higher and smaller, so both sit above the drips.
+  const club = String((info && info.club) || '').trim();
+  const friendOf = String((info && info.friendOf) || '').trim().split(/\s+/)[0];
+  const sub = club ? club.toLocaleUpperCase('en-US') : friendOf ? `FRIEND OF ${friendOf.toLocaleUpperCase('en-US')}` : '';
   ctx.fillStyle = ink;
-  const os2 = type.fit(ctx, 'name', owner, $labelLayout.PAGE_W - 36, 44, 14);
-  type.fill(ctx, 'name', os2, owner, $labelLayout.PAGE_W / 2, 42 + type.capCentre(ctx, 'name', owner) * os2);
+  const os2 = type.fit(ctx, 'name', owner, $labelLayout.PAGE_W - 36, sub ? 34 : 44, 14);
+  type.fill(ctx, 'name', os2, owner, $labelLayout.PAGE_W / 2, (sub ? 30 : 42) + type.capCentre(ctx, 'name', owner) * os2);
+  if (sub) {
+    const ss = type.fit(ctx, 'name', sub, $labelLayout.PAGE_W - 36, 20, 10);
+    type.fill(ctx, 'name', ss, sub, $labelLayout.PAGE_W / 2, 64 + type.capCentre(ctx, 'name', sub) * ss);
+  }
 
   const pngPath = $images.tmpFilePath('awana-barfbag', 'png');
   fs.writeFileSync(pngPath, cvs.toBuffer('image/png'));

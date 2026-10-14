@@ -1,6 +1,6 @@
 {
   "name": "awana-label-printer",
-  "version": "9.4.3",
+  "version": "9.4.4",
   "description": "KVBC Awana: the print server and the screens, one app for every KVBC Awana computer",
   "main": "main.js",
   "scripts": {

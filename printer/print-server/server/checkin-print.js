@@ -532,17 +532,30 @@ async function performCheckinPrint(input) {
 // lobby Settings: every child who brought a friend tonight, and each friend
 // who was named), or from this laptop. Names in, labels out; nothing kept.
 const BARF_BAGS_MAX = 120;
+// 9.4.4 (owner 2026-10-14: "I need to know on the barf bag tags what club a
+// child is in"): the Worker also sends `bags` [{name, club, friendOf?}]; a
+// child's label carries their club, a friend's says whose friend they are. A
+// Worker that only sends `names` still prints (name alone, as before).
 app.post('/print-barf-bags', async (req, res) => {
-  const raw = req.body && Array.isArray(req.body.names) ? req.body.names : null;
+  const body = req.body || {};
+  const fromBags = Array.isArray(body.bags) ? body.bags : null;
+  const raw = fromBags || (Array.isArray(body.names) ? body.names.map((n) => ({ name: n })) : null);
   if (!raw) return res.status(400).json({ error: 'names must be a list' });
-  const names = raw.map((n) => $tags.cleanFriendName(n)).filter((n) => $tags.barfBagOwner(n)).slice(0, BARF_BAGS_MAX);
-  if (!names.length) return res.status(400).json({ error: 'No names to print.' });
+  const bags = raw
+    .map((b) => ({
+      name: $tags.cleanFriendName(b && b.name),
+      club: $tags.cleanFriendName(b && b.club),
+      friendOf: $tags.cleanFriendName(b && b.friendOf),
+    }))
+    .filter((b) => $tags.barfBagOwner(b.name))
+    .slice(0, BARF_BAGS_MAX);
+  if (!bags.length) return res.status(400).json({ error: 'No names to print.' });
   const paths = [];
   try {
-    for (const n of names) paths.push((await $tags.generateBarfBag(n)).pngPath);
+    for (const b of bags) paths.push((await $tags.generateBarfBag(b.name, { club: b.club, friendOf: b.friendOf })).pngPath);
     await $printing.printImages(paths, $config.PRINTER_NAME);
-    console.log(`[print] ${names.length} BARF Bag label(s), one job`);
-    res.json({ ok: true, printed: names.length });
+    console.log(`[print] ${bags.length} BARF Bag label(s), one job`);
+    res.json({ ok: true, printed: bags.length });
   } catch (e) {
     console.error('[print] BARF Bag labels failed:', e.message);
     res.status(500).json({ error: 'The BARF Bag labels did not print. Check the label printer, then try again.' });
