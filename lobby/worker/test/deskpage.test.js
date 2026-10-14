@@ -252,6 +252,23 @@ describe('a restart reads the held page back', () => {
     expect(t.pageReads()).toBe(reads);
   });
 
+  it('a child this desk checked in stays checked in on the roster even when a later read of TwoTimTwo\'s page does not mark them (BARF who-list, owner 2026-10-14)', async () => {
+    const t = await deskRig();
+    await t.call('GET', '/v1/desk/roster');
+    const st = await t.station();
+    const done = await t.call('POST', '/v1/desk/checkin', await t.deskBody([st]));
+    expect(done.body).toMatchObject({ ok: true });
+    // a read of the page that began before the check-in landed: nobody marked
+    t.clock.tick(CHECKIN_PAGE_TTL_MS + 1000);
+    const again = (await t.call('GET', '/v1/desk/roster')).body;
+    expect(again.kids.find((k) => k.clubberId === '662').checkedIn).toBe(true);
+    expect(again.kids.find((k) => k.clubberId === '98765').checkedIn).toBe(false);
+    // an undo takes the memory back too
+    expect((await t.call('POST', '/v1/desk/undo', { night: NIGHT, clubberId: '662', historyRow: row('undo') })).body).toMatchObject({ ok: true });
+    t.clock.tick(CHECKIN_PAGE_TTL_MS + 1000);
+    expect((await t.call('GET', '/v1/desk/roster')).body.kids.find((k) => k.clubberId === '662').checkedIn).toBe(false);
+  });
+
   it('after a failed read the restored copy is `stale`, as any held page', async () => {
     const t = await deskRig();
     await t.call('GET', '/v1/desk/roster');

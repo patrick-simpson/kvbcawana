@@ -172,6 +172,8 @@ export class Desk {
      * @type {{ at: number, page: any, night: string, restored?: boolean, refreshFailed?: boolean }|null}
      */
     this.cache = null;
+    /** Children this desk checked in tonight (memory only): a page read that began before a check-in landed must not un-check them. @type {{ night: string, ids: Set<string> }} */
+    this.deskChecked = { night: '', ids: new Set() };
     /** The one restore of a new object (single flight; kept once it ran to its end). @type {Promise<void>|null} */
     this.restoring = null;
     /** A restore that could not run yet is not tried again before this (ms). */
@@ -224,6 +226,18 @@ export class Desk {
     }
     await this.warm(r.page, this.now());
     return true;
+  }
+
+  /** Remember (or forget) a child this desk checked in tonight. @param {string} clubberId @param {boolean} on */
+  noteDeskChecked(clubberId, on) {
+    const night = churchNight(this.now());
+    if (this.deskChecked.night !== night) this.deskChecked = { night, ids: new Set() };
+    if (on) this.deskChecked.ids.add(clubberId); else this.deskChecked.ids.delete(clubberId);
+  }
+
+  /** @param {string} clubberId */
+  deskChecked_(clubberId) {
+    return this.deskChecked.night === churchNight(this.now()) && this.deskChecked.ids.has(clubberId);
   }
 
   /** Is tonight's check-in page held (what every desk action needs)? */
@@ -445,7 +459,7 @@ export class Desk {
       const parts = String(k.name || '').trim().split(/\s+/);
       // A child a late BARF friend's undo and redo holds (barf.js) stays checked in here too.
       const held = typeof this.watcher.held === 'function' && this.watcher.held(k.clubberId);
-      return { clubberId: k.clubberId, first: parts[0] || '', last: parts.slice(1).join(' '), club: k.club, clubId: k.clubId, checkedIn: !!k.checkedIn || held };
+      return { clubberId: k.clubberId, first: parts[0] || '', last: parts.slice(1).join(' '), club: k.club, clubId: k.clubId, checkedIn: !!k.checkedIn || held || this.deskChecked_(k.clubberId) };
     });
     // Which clubs offer Bible / Brought a friend: from the page already read, no extra read.
     // familiesAt: when the households held were read, so a page sees a catch-up re-read and asks again.
@@ -609,6 +623,7 @@ export class Desk {
     const res = await client.checkIn({ clubberId, calendarId: page.calendarId, events, name: child.name }, { desk: true });
     if (res.ok) {
       child.checkedIn = true;
+      this.noteDeskChecked(clubberId, true);
       return { ok: true, club: child.club, name: child.name };
     }
     if (AMBIGUOUS.has(res.error)) {
@@ -644,6 +659,7 @@ export class Desk {
       const sent = await this.postMeeting(who.clubberId, 'undo');
       if (!sent.ok) return sent.response;
       for (const k of this.cache?.page.roster || []) if (k.clubberId === who.clubberId) k.checkedIn = false;
+      this.noteDeskChecked(who.clubberId, false);
     }
     const tag = await this.tagFor(who, night);
     if (!tag) return refuse(503, { reason: 'not-configured' });
