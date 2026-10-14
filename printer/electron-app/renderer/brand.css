@@ -55,11 +55,11 @@ body { font-family: var(--f-read); font-size: 13px; line-height: 1.4; color: var
 
 .app { min-height: 100vh; display: flex; flex-direction: column; }
 
-/* ── Header: the Awana Clubs mark, the product name, the stepped chip ── */
-.app-header { background: var(--c-blue); color: #fff; padding: 12px 18px; display: flex; align-items: center; gap: 12px; }
-.app-header .brand-mark { display: block; height: 38px; width: auto; flex: none; }
-.app-header .titles { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1; }
-.app-header h1 { margin: 0; font-family: var(--f-shout); font-weight: 400; font-size: 22px; line-height: 1.05; }
+/* ── Header: the church's logo over the status line, the stepped chip ── */
+.app-header { background: var(--c-blue); color: #fff; padding: 14px 18px 12px; display: flex; align-items: center; gap: 12px; }
+.app-header .brand-logo { display: block; width: 260px; height: auto; aspect-ratio: 1910 / 403; flex: none; }
+.app-header .titles { display: flex; flex-direction: column; gap: 6px; min-width: 0; flex: 1; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 .app-header .sub { font-family: var(--f-label); font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--c-cloud); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .app-header .sub.bad { color: #fff; }
 .step-chip { display: inline-block; flex: none; line-height: 0; font-size: 19px; }

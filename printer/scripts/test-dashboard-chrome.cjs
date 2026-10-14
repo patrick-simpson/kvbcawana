@@ -313,7 +313,7 @@ console.log('\nsurfaces chrome: the phone page loads only the kit under /brand/'
   // (site/build.mjs rewrites only "/brand/ to "/checkin/brand/).
   const refs = pageAssetRefs(SURFACES.phone).filter((r) => !/^(https?:|data:|javascript:)/.test(r.url));
   const local = refs.map((r) => r.url);
-  check('the phone page draws the Awana Clubs mark from the kit', local.includes('/brand/logos/awana-clubs-white.svg'), JSON.stringify(local));
+  check('the phone page draws the church\'s logo (two-line, white) from the kit', local.includes('/brand/logos/kvbc-awana-two-line-white.svg') && !local.some((r) => r.includes('awana-clubs')), JSON.stringify(local));
   check('the phone page loads the kit', local.length >= 3, JSON.stringify(local));
   check('every same-origin asset the phone page loads is under /brand/', local.every((r) => r.startsWith('/brand/')),
     JSON.stringify(local.filter((r) => !r.startsWith('/brand/'))));

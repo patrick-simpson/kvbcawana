@@ -13,8 +13,10 @@
 <link rel="stylesheet" href="../../print-server/public/brand/tokens.css">
 <style>
   /* The wizard in the brand kit: Paytone One shouts the step, Londrina Solid
-     labels, Figtree is read. One blue rail with the Awana Clubs mark and the
-     steps; one paper panel with the question. The hex after each var() is the
+     labels, Figtree is read. One blue rail with the church's own logo (owner
+     2026-10-13: stacked, white, still, never under 130px wide, the size its
+     thin church line needs; the rail is too narrow for the two-line one) and
+     the steps; one paper panel with the question. The hex after each var() is the
      kit's own value (tokens.css), for a stripped build. */
   :root {
     --blue: var(--brand-blue, #4C72B8);
@@ -49,9 +51,9 @@
 
   /* ── The rail ── */
   .rail { background: var(--blue); color: #fff; padding: 22px 20px 18px; display: flex; flex-direction: column; gap: 22px; }
-  .rail img { width: 104px; height: auto; display: block; }
-  .rail h1 { margin: 0; font: 400 26px/1.02 var(--f-shout); }
-  .rail h1 small { display: block; margin-top: 6px; font: 400 13px/1.2 var(--f-label); letter-spacing: .08em; text-transform: uppercase; color: var(--cloud); }
+  .rail img { width: 160px; height: auto; display: block; }
+  .rail h1 { margin: -4px 0 0; font: 400 15px/1.2 var(--f-label); letter-spacing: .08em; text-transform: uppercase; color: var(--cloud); }
+  .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
   .steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; counter-reset: step; }
   .steps li { counter-increment: step; display: flex; align-items: center; gap: 10px; padding: 6px 8px; border-radius: 10px;
     font: 400 15px/1.1 var(--f-label); letter-spacing: .06em; text-transform: uppercase; color: var(--cloud); }
@@ -135,8 +137,8 @@
 </head>
 <body>
   <aside class="rail">
-    <img src="../../print-server/public/brand/logos/awana-clubs-white.svg" alt="Awana Clubs" width="104" height="44">
-    <h1>KVBC Awana<small>Set up this computer</small></h1>
+    <img src="../../print-server/public/brand/logos/kvbc-awana-stacked-white.svg" alt="Kennebec Valley Baptist Church Awana Clubs" width="160" height="125">
+    <h1><span class="sr-only">KVBC Awana: </span>Set up this computer</h1>
     <ol class="steps" id="steps"></ol>
     <div class="foot" id="version"></div>
   </aside>
