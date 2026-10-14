@@ -247,36 +247,104 @@ function createAttendanceReader(o) {
     /** @type {{ key: string, id: string|null, name: string, night: string, present: boolean, at: number }[]} */
     const events = [];
     let readNights = 0;
-    for (const n of nights.body) {
-      if (!n || !ISO_DAY.test(n.night)) continue;
-      if (n.night !== today && seen.get(n.night) === n.rows) continue;
-      let after = '';
-      let count = 0;
-      for (let page = 0; page < 40; page++) {
-        const q = `/v1/history/rows?night=${n.night}&limit=500${after ? `&after=${encodeURIComponent(after)}` : ''}`;
-        const r = await o.request(s.base, q, { session: s.session, station: o.stationId() });
-        if (!r.ok || !r.body || !Array.isArray(r.body.rows)) { count = -1; break; }
-        for (const row of r.body.rows) {
-          count++;
-          const rec = await cc.openRow(ring, row);
-          if (!rec) { stats.unreadable++; continue; }
-          if (rec.undone === true) continue;
-          if (PRESENT_KINDS.has(row.kind) || row.kind === 'undo') {
-            // A desk undo takes the child back out: the LAST of a child's check-in / undo rows (by time) decides.
-            const nm = rec.name || `${rec.first || ''} ${rec.last || ''}`;
-            const id = rec.clubberId != null && String(rec.clubberId).trim() ? String(rec.clubberId).trim() : null;
-            const key = id ? `id:${id.toLowerCase()}` : String(nm).trim().toLowerCase();
-            if (key) events.push({ key, id, name: nm, night: row.night, present: row.kind !== 'undo', at: tsOf(rec.ts) });
-          } else if (row.kind === 'import-attendance' && Array.isArray(rec.dates)) {
-            const m = /^id:(.+)$/.exec(String(rec.k || ''));
-            add(m ? m[1] : null, rec.name, rec.dates);
+
+    // Check if we need to fall back to the old per-night loop or use the new range based query
+    // The new range based query can efficiently load all rows in one request
+    const nightsToLoad = nights.body.filter(n => n && ISO_DAY.test(n.night) && (n.night === today || seen.get(n.night) !== n.rows));
+
+    if (nightsToLoad.length > 0) {
+        // We will fetch the data via range query
+        // The first unread night
+        const firstNight = nightsToLoad[0].night;
+        const lastNight = nightsToLoad[nightsToLoad.length - 1].night;
+
+        // Find the full range
+        const sorted = nightsToLoad.map(n => n.night).sort();
+        const from = sorted[0];
+        const to = sorted[sorted.length - 1];
+
+        let after = '';
+        let success = true;
+        let count = 0;
+
+        for (let page = 0; page < 400; page++) {
+          const q = `/v1/history/rows?from=${from}&to=${to}&limit=2000${after ? `&after=${encodeURIComponent(after)}` : ''}`;
+          const r = await o.request(s.base, q, { session: s.session, station: o.stationId() });
+
+          if (r.status === 400 && r.body && r.body.reason === 'bad-night') {
+            // The worker hasn't been upgraded to support range queries, fall back to per-night
+            success = false;
+            break;
+          }
+
+          if (!r.ok || !r.body || !Array.isArray(r.body.rows)) {
+            success = false;
+            break;
+          }
+
+          for (const row of r.body.rows) {
+            count++;
+            const rec = await cc.openRow(ring, row);
+            if (!rec) { stats.unreadable++; continue; }
+            if (rec.undone === true) continue;
+            if (PRESENT_KINDS.has(row.kind) || row.kind === 'undo') {
+              // A desk undo takes the child back out: the LAST of a child's check-in / undo rows (by time) decides.
+              const nm = rec.name || `${rec.first || ''} ${rec.last || ''}`;
+              const id = rec.clubberId != null && String(rec.clubberId).trim() ? String(rec.clubberId).trim() : null;
+              const key = id ? `id:${id.toLowerCase()}` : String(nm).trim().toLowerCase();
+              if (key) events.push({ key, id, name: nm, night: row.night, present: row.kind !== 'undo', at: tsOf(rec.ts) });
+            } else if (row.kind === 'import-attendance' && Array.isArray(rec.dates)) {
+              const m = /^id:(.+)$/.exec(String(rec.k || ''));
+              add(m ? m[1] : null, rec.name, rec.dates);
+            }
+          }
+
+          if (!r.body.next) break;
+          after = r.body.next;
+        }
+
+        if (success) {
+          // Record that we saw these nights
+          for (const n of nightsToLoad) {
+            seen.set(n.night, n.rows);
+            readNights++;
+          }
+        } else {
+          // Fall back to old method
+          readNights = 0;
+          for (const n of nights.body) {
+            if (!n || !ISO_DAY.test(n.night)) continue;
+            if (n.night !== today && seen.get(n.night) === n.rows) continue;
+            let after = '';
+            let count = 0;
+            for (let page = 0; page < 40; page++) {
+              const q = `/v1/history/rows?night=${n.night}&limit=500${after ? `&after=${encodeURIComponent(after)}` : ''}`;
+              const r = await o.request(s.base, q, { session: s.session, station: o.stationId() });
+              if (!r.ok || !r.body || !Array.isArray(r.body.rows)) { count = -1; break; }
+              for (const row of r.body.rows) {
+                count++;
+                const rec = await cc.openRow(ring, row);
+                if (!rec) { stats.unreadable++; continue; }
+                if (rec.undone === true) continue;
+                if (PRESENT_KINDS.has(row.kind) || row.kind === 'undo') {
+                  // A desk undo takes the child back out: the LAST of a child's check-in / undo rows (by time) decides.
+                  const nm = rec.name || `${rec.first || ''} ${rec.last || ''}`;
+                  const id = rec.clubberId != null && String(rec.clubberId).trim() ? String(rec.clubberId).trim() : null;
+                  const key = id ? `id:${id.toLowerCase()}` : String(nm).trim().toLowerCase();
+                  if (key) events.push({ key, id, name: nm, night: row.night, present: row.kind !== 'undo', at: tsOf(rec.ts) });
+                } else if (row.kind === 'import-attendance' && Array.isArray(rec.dates)) {
+                  const m = /^id:(.+)$/.exec(String(rec.k || ''));
+                  add(m ? m[1] : null, rec.name, rec.dates);
+                }
+              }
+              if (!r.body.next) break;
+              after = r.body.next;
+            }
+            if (count >= 0) { seen.set(n.night, n.rows); readNights++; }
           }
         }
-        if (!r.body.next) break;
-        after = r.body.next;
-      }
-      if (count >= 0) { seen.set(n.night, n.rows); readNights++; }
     }
+
     // Resolve check-ins against undos, per child per night, in the order they happened.
     const last = new Map();
     for (const e of events.sort((a, b) => a.at - b.at)) last.set(`${e.night}|${e.key}`, e);

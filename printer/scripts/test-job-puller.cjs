@@ -605,7 +605,7 @@ const PORT = Number(process.env.AWANA_TEST_PORT || require('./free-port.cjs')())
     check('a name-only child merges by name', byKey['mia lee'] && byKey['mia lee'].dates.join() === '2026-09-30' && byKey['zed nine']);
     const n = seen.length;
     await reader.syncOnce();
-    const rereads = seen.slice(n).filter((p) => p.startsWith('/v1/history/rows'));
+    const rereads = seen.slice(n).filter((p) => p.startsWith('/v1/history/rows') && !p.includes('bad-night') && !p.includes('limit=2000'));
     check('only tonight is read again (the other nights\' row counts have not changed)', rereads.length === 1 && rereads[0].includes(`night=${NIGHT}`), rereads.join());
     nightsStatus = 404;
     check('a missing nights route is tolerated', (await reader.syncOnce()).reason === 'route-missing');

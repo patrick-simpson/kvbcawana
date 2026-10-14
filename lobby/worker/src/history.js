@@ -427,14 +427,23 @@ export class History {
   /** @param {URL} url */
   async getRows(url) {
     const night = url.searchParams.get('night') || '';
-    if (!validNight(night)) return fail('Say which night: ?night=YYYY-MM-DD.', 400, { reason: 'bad-night' });
+    const r = this.range(url);
+    const hasRange = url.searchParams.has('from') && url.searchParams.has('to');
+    if (!validNight(night) && !hasRange) return fail('Say which night: ?night=YYYY-MM-DD.', 400, { reason: 'bad-night' });
+    if (hasRange && !r) return fail('from and to are YYYY-MM-DD.', 400, { reason: 'bad-range' });
     const after = url.searchParams.get('after') || '';
     if (after && !ID_RE.test(after)) return fail('That "after" is not a row id.', 400, { reason: 'bad-after' });
-    const limit = Math.min(500, Math.max(1, Number.parseInt(url.searchParams.get('limit') || '200', 10) || 200));
+    const limit = Math.min(2500, Math.max(1, Number.parseInt(url.searchParams.get('limit') || '200', 10) || 200));
     const db = await this.readyDb();
     if (!db) return this.off();
-    const res = await db.prepare('SELECT id, night, kind, v, kid, epk, iv, ct FROM history_rows WHERE night = ?1 AND id > ?2 ORDER BY id LIMIT ?3')
-      .bind(night, after, limit + 1).all();
+    let res;
+    if (validNight(night)) {
+      res = await db.prepare('SELECT id, night, kind, v, kid, epk, iv, ct FROM history_rows WHERE night = ?1 AND id > ?2 ORDER BY id LIMIT ?3')
+        .bind(night, after, limit + 1).all();
+    } else {
+      res = await db.prepare('SELECT id, night, kind, v, kid, epk, iv, ct FROM history_rows WHERE night BETWEEN ?1 AND ?2 AND id > ?3 ORDER BY id LIMIT ?4')
+        .bind(r.from, r.to, after, limit + 1).all();
+    }
     const rows = res.results || [];
     const more = rows.length > limit;
     const page = more ? rows.slice(0, limit) : rows;
