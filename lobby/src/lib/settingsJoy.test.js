@@ -75,4 +75,46 @@ describe('settings joy', () => {
     expect(document.querySelector('.joy-burst')).not.toBeNull();
     vi.unstubAllGlobals();
   });
+
+  it('fails open in joyAllowed if the matchMedia dependency throws an error natively', async () => {
+    const { joyAllowed } = await import('./settingsJoy.js');
+    const mockWin = {
+      document: {
+        documentElement: {
+          classList: {
+            contains: () => false
+          }
+        }
+      },
+      matchMedia: () => {
+        throw new Error('Native error');
+      }
+    };
+    expect(joyAllowed(mockWin)).toBe(true);
+  });
+
+  it('celebrates a select change correctly', () => {
+    vi.useFakeTimers();
+    document.body.innerHTML = '<select><option value="1">1</option></select>';
+    const select = document.querySelector('select');
+    select.getBoundingClientRect = () => ({
+      left: 10,
+      right: 110,
+      top: 20,
+      bottom: 40,
+      width: 100,
+      height: 20
+    });
+    fire(select);
+    expect(select.classList.contains('joy-pop')).toBe(true);
+    const burst = document.querySelector('.joy-burst');
+    expect(burst).not.toBeNull();
+  });
+
+  it('returns null for a radio input with no radio-option parent', async () => {
+    const { joyTarget } = await import('./settingsJoy.js');
+    document.body.innerHTML = '<input type="radio" />';
+    const radio = document.querySelector('input');
+    expect(joyTarget(radio)).toBeNull();
+  });
 });
