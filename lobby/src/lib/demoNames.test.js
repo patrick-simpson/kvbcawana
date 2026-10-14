@@ -42,5 +42,12 @@ describe('demoNames', () => {
       const result = pick(SAMPLE_BOARD_NAMES);
       expect(SAMPLE_BOARD_NAMES).toContain(result);
     });
+
+    it('does not mutate the input array', () => {
+      const list = ['A', 'B', 'C'];
+      const original = [...list];
+      pick(list);
+      expect(list).toEqual(original);
+    });
   });
 });
