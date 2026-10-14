@@ -1113,11 +1113,15 @@ if (downloadsSection) {
         if (dl.phase === 'idle') startLessonDownloads(false, true);
       }, downloadTuning().resumeAfterLoadMs);
     }
-    setInterval(() => {
-      if (!downloadsActive() && !dl.autoHeld) {
-        autoDownloadTick();
-      }
-    }, downloadTuning().autoTickMs);
+    const scheduleNextTick = () => {
+      setTimeout(() => {
+        if (!downloadsActive() && !dl.autoHeld) {
+          autoDownloadTick();
+        }
+        scheduleNextTick();
+      }, downloadTuning().autoTickMs);
+    };
+    scheduleNextTick();
     window.addEventListener('online', () => autoDownloadTick());
     setTimeout(async () => {
       await prepareDownloadStatus();
