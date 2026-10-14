@@ -201,7 +201,7 @@ test('kiosk slides: the carry is held at its first frame until the new picture i
     for (const d of decodes.splice(0)) d.resolve();
     await ticks(2);
     const firstSrc = realImage.getAttribute('src');
-    assert.match(firstSrc, /slide-1\.jpg$/);
+    assert.match(firstSrc, /slide-1\.jpg(\?r=\d+)?$/);
     // The next slide was decoded ahead already (asked for, at least).
     await ticks(2);
     for (const d of decodes.splice(0)) d.resolve();
@@ -215,26 +215,26 @@ test('kiosk slides: the carry is held at its first frame until the new picture i
     // Slide 2 was decoded ahead, so the carry runs at once.
     await ticks(2);
     assert.equal(ghost.classList.contains('jm-hold'), false, 'a picture decoded ahead never holds the carry');
-    assert.match(realImage.getAttribute('src'), /slide-2\.jpg$/);
+    assert.match(realImage.getAttribute('src'), /slide-2\.jpg(\?r=\d+)?$/);
 
     // Slide 3: its decode is still pending (asked for ahead, not done).
     band(sweep).dispatchEvent(new k.window.Event('animationend'));
     await ticks(2);
-    const pendingThird = decodes.filter((d) => /slide-3\.jpg$/.test(d.src));
+    const pendingThird = decodes.filter((d) => /slide-3\.jpg(\?r=\d+)?$/.test(d.src));
     assert.equal(pendingThird.length, 1, 'slide 3 is being decoded ahead');
     k.window.nextSlide();
     await ticks(2);
     const held = k.document.querySelector('.jm-slide-ghost');
     assert.equal(held.classList.contains('jm-hold'), true, 'the old slide holds, still covering the stage');
     assert.equal(k.document.querySelector('.jm-slide-sweep').classList.contains('jm-hold'), true, 'the band waits off screen');
-    assert.match(held.querySelector('img').getAttribute('src'), /slide-2\.jpg$/, 'what covers the stage is the old slide');
-    assert.match(realImage.getAttribute('src'), /slide-2\.jpg$/, 'the new picture is not on the stage half-decoded');
+    assert.match(held.querySelector('img').getAttribute('src'), /slide-2\.jpg(\?r=\d+)?$/, 'what covers the stage is the old slide');
+    assert.match(realImage.getAttribute('src'), /slide-2\.jpg(\?r=\d+)?$/, 'the new picture is not on the stage half-decoded');
     assert.equal(k.document.getElementById('slide-counter').textContent, 'Slide 3 of 7', 'the press is acknowledged at once');
     pendingThird[0].resolve();
     await ticks(2);
     assert.equal(held.classList.contains('jm-hold'), false, 'decoded: the carry goes');
     assert.equal(k.document.querySelector('.jm-slide-sweep').classList.contains('jm-hold'), false);
-    assert.match(realImage.getAttribute('src'), /slide-3\.jpg$/);
+    assert.match(realImage.getAttribute('src'), /slide-3\.jpg(\?r=\d+)?$/);
   } finally {
     k.close();
   }

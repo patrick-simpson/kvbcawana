@@ -3726,12 +3726,22 @@ function weekTag(week) {
   return `week-${String(week).padStart(2, '0')}`;
 }
 
+// Awana's own decks for lessons 2-2 (Monotheism) and 2-4 (Naturalism) were
+// published swapped; weeks 6 and 8 hold the right pictures since 2026-10-14.
+// A kiosk keys saved pictures by address and never re-fetches one it has, so
+// these two weeks carry a revision in the address: an old copy is never reused.
+const SLIDE_REVISIONS = { 6: 2, 8: 2 };
+
+function slideRevision(week) {
+  return SLIDE_REVISIONS[week] ? `?r=${SLIDE_REVISIONS[week]}` : '';
+}
+
 function slideImageUrl(week, n) {
-  return `slides/${weekTag(week)}/slide-${n}.jpg`;
+  return `slides/${weekTag(week)}/slide-${n}.jpg${slideRevision(week)}`;
 }
 
 function slideTemplateUrl(week) {
-  return `slides/${weekTag(week)}/template.jpg`;
+  return `slides/${weekTag(week)}/template.jpg${slideRevision(week)}`;
 }
 
 function teachingSlidesFor(week) {
