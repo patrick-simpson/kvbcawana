@@ -73,17 +73,13 @@ describe('FlagshipSlide: the church logo, huge (owner 2026-10-13)', () => {
     expect(css()).toMatch(/\.flagship-ink \{[^}]*color: #231f20;/);
   });
 
-  it('never draws the full logo under 520px: the two-line stands in where the box is too small', () => {
+  it('draws the full logo, tagline and all, on every screen: squeezed where the box is small (owner 2026-10-13)', () => {
     const sheet = css();
-    // 72u is 520px on a 722px frame; a 4:3 screen narrower than that takes 520px, up to 84u.
+    // 72u (75u under "Welcome to"); a 4:3 screen takes up to 520px, at most 84u.
     expect(sheet).toMatch(/--logo-w: max\(calc\(72 \* var\(--u\)\), min\(520px, calc\(84 \* var\(--u\)\)\)\)/);
-    const query = sheet.match(/@container lobby-scene ([^{]+)\{([^}]+\}[^}]+\}[^}]+\}[^}]+\})/);
-    expect(query[1]).toContain('(max-width: 618.98px)');
-    expect(query[1]).toContain('(max-width: 721.98px) and (min-aspect-ratio: 3 / 2)');
-    expect(query[2]).toMatch(/\.flagship-logo--full \{ display: none; \}/);
-    expect(query[2]).toMatch(/\.flagship-logo--two-line \{ display: block; \}/);
-    // 80u of the smallest 16:9 frame that falls back (640px) is 512px, over the two-line's 260px.
-    expect(query[2]).toContain('calc(80 * var(--u))');
+    // No size swaps the full logo for the two-line one.
+    expect(sheet).not.toMatch(/\.flagship-logo--full \{ display: none; \}/);
+    expect(sheet).not.toMatch(/\.flagship-logo--two-line \{ display: block; \}/);
   });
 
   it('bounce: Awana Clubs comes apart into its ten letters, and six doodles, one per club colour, pop round it', () => {

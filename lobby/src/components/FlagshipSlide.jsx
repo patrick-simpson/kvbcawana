@@ -20,8 +20,8 @@ import twoLineSvg from '../../shared/brand/logos/kvbc-awana-two-line.svg?raw';
 // The logo is the FULL version (church line, Awana Clubs, tagline), ONE
 // solid colour: ink on the sky, white while a club colour is behind it
 // (never two colours, an outline, a shadow or a stretch; shared/churchLogo.js).
-// Where the full logo cannot be 520px wide inside the slide's box (a 16:9
-// screen under 722px wide) the two-line logo stands in (flagship.css).
+// On every screen, however small (owner 2026-10-13: squeezed, never swapped
+// for the two-line logo; flagship.css).
 //
 // Each showing takes the next STYLE and the next WORDING (src/lib/flagship.js
 // nextFlagshipPick; tests pass `pick`):

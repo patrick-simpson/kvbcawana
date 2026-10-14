@@ -75,10 +75,9 @@
   color: #231f20;
 }
 
-/* The logo: as wide as the box allows. The full logo needs 520px for its
-   thin church line and tagline (shared/churchLogo.js MIN_WIDTH_PX); 72u is
-   that on a 722px-wide frame. A 4:3 screen narrower than that has the
-   height to spare, so it takes 520px (up to 84u, 8u clear each side). */
+/* The logo: as wide as the box allows, 72u (75u under "Welcome to"). A 4:3
+   screen has the height to spare, so it takes up to 520px (at most 84u,
+   8u clear each side). Below that it is simply smaller (owner 2026-10-13). */
 .flagship-mark {
   position: relative;
   --logo-w: max(calc(72 * var(--u)), min(520px, calc(84 * var(--u))));
@@ -95,14 +94,13 @@
 }
 .flagship-logo--full { aspect-ratio: 1910 / 487; }
 .flagship-logo--two-line { display: none; aspect-ratio: 1910 / 403; }
-/* Too small for the full logo at 520px inside the box (a 16:9 frame under
-   722px wide, or one under 619px wide on any screen): the two-line logo,
-   80u wide (512px on a 640x360 screen, over its 260px floor). */
-@container lobby-scene (max-width: 618.98px) or ((max-width: 721.98px) and (min-aspect-ratio: 3 / 2)) or (max-height: 405.98px) {
-  .flagship-logo--full { display: none; }
-  .flagship-logo--two-line { display: block; }
-  .flagship-mark { --logo-w: calc(80 * var(--u)); }
-  .flagship--welcome .flagship-mark { --logo-w: calc(80 * var(--u)); }
+/* Owner 2026-10-13: the full logo (tagline too) on every screen, squeezed
+   where the box is small rather than swapped for the two-line one. A short
+   16:9 frame (under 722px wide) takes 64u so the line under it stays clear
+   of the house waves. */
+@container lobby-scene ((max-width: 721.98px) and (min-aspect-ratio: 3 / 2)) or (max-height: 405.98px) {
+  .flagship-mark,
+  .flagship--welcome .flagship-mark { --logo-w: calc(64 * var(--u)); }
 }
 
 /* The wording's line: the shout face, much bigger and heavier than the
