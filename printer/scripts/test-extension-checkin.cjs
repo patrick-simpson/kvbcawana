@@ -165,6 +165,8 @@ console.log('\nextension check-in sanitizer: strips XSS and unsafe URLs');
   const dom = new (require('jsdom').JSDOM)();
   global.document = dom.window.document;
   global.DOMParser = dom.window.DOMParser;
+  global.Node = dom.window.Node;
+  global.Element = dom.window.Element;
   const sanitizeCheckinReply = new Function(extractFunction('sanitizeCheckinReply') + '; return sanitizeCheckinReply;')();
 
   const origSnippet = '<a href="/clubber/update/4821">Ava Stone</a> <small>(<a href="#" onclick="undoCheckin(4821)">undo</a>)</small>';

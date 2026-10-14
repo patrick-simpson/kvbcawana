@@ -653,37 +653,52 @@
     var doc = new DOMParser().parseFromString(html, 'text/html');
     var out = document.createElement('div');
     var safeTags = { 'a': true, 'small': true, 'b': true, 'i': true, 'strong': true, 'em': true, 'span': true };
+
+    // Protect against DOM clobbering by using unforgeable getters
+    // Window.Node and Window.Element might not be in scope depending on execution environment (e.g. extension context or tests without it)
+    var TheNode = typeof Node !== 'undefined' ? Node : doc.defaultView.Node;
+    var TheElement = typeof Element !== 'undefined' ? Element : doc.defaultView.Element;
+    var getNodeType = Object.getOwnPropertyDescriptor(TheNode.prototype, 'nodeType').get;
+    var getLocalName = Object.getOwnPropertyDescriptor(TheElement.prototype, 'localName').get;
+    var getChildNodes = Object.getOwnPropertyDescriptor(TheNode.prototype, 'childNodes').get;
+    var getAttribute = TheElement.prototype.getAttribute;
+    var nodeValueGet = Object.getOwnPropertyDescriptor(TheNode.prototype, 'nodeValue').get;
+
     function walk(node, parent) {
-      if (node.nodeType === 3) {
-        parent.appendChild(document.createTextNode(node.nodeValue));
-      } else if (node.nodeType === 1) {
-        var tag = node.tagName.toLowerCase();
+      var type = getNodeType.call(node);
+      if (type === 3) { // TEXT_NODE
+        parent.appendChild(document.createTextNode(nodeValueGet.call(node)));
+      } else if (type === 1) { // ELEMENT_NODE
+        var tag = (getLocalName.call(node) || '').toLowerCase();
         if (tag === 'script' || tag === 'style' || tag === 'iframe' || tag === 'object') return;
         if (safeTags[tag]) {
           var el = document.createElement(tag);
           if (tag === 'a') {
-            var href = node.getAttribute('href');
-            if (href && /^(\/|#)/.test(href) && href.toLowerCase().indexOf('javascript:') !== 0) {
+            var href = getAttribute.call(node, 'href');
+            if (href && typeof href === 'string' && /^(\/|#)/.test(href) && href.toLowerCase().indexOf('javascript:') !== 0) {
               el.setAttribute('href', href);
             }
-            var onclick = node.getAttribute('onclick');
-            if (onclick && /^undoCheckin\(\d+\)$/.test(onclick.replace(/\s+/g, ''))) {
+            var onclick = getAttribute.call(node, 'onclick');
+            if (onclick && typeof onclick === 'string' && /^undoCheckin\(\d+\)$/.test(onclick.replace(/\s+/g, ''))) {
               el.setAttribute('onclick', onclick);
             }
           }
-          for (var i = 0; i < node.childNodes.length; i++) {
-            walk(node.childNodes[i], el);
+          var children = getChildNodes.call(node);
+          for (var i = 0; i < children.length; i++) {
+            walk(children[i], el);
           }
           parent.appendChild(el);
         } else {
-          for (var j = 0; j < node.childNodes.length; j++) {
-            walk(node.childNodes[j], parent);
+          var children = getChildNodes.call(node);
+          for (var j = 0; j < children.length; j++) {
+            walk(children[j], parent);
           }
         }
       }
     }
-    for (var i = 0; i < doc.body.childNodes.length; i++) {
-      walk(doc.body.childNodes[i], out);
+    var rootChildren = getChildNodes.call(doc.body);
+    for (var i = 0; i < rootChildren.length; i++) {
+      walk(rootChildren[i], out);
     }
     return out.innerHTML;
   }
