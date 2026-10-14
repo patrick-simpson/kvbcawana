@@ -678,7 +678,7 @@ for (const where of ['/checkin/', '/checkin/ym/']) {
     await snap(page, `${tag}barf-button.png`);
     await page.locator('#barf-btn').click();
     await expect(page.locator('#barf-title')).toHaveText('Who brought the friend?');
-    // Tonight's checked-in children; one who already brought a friend is greyed out; nobody not checked in.
+    // Tonight's checked-in children; one who already brought a friend is greyed out; the others wait behind the search box.
     const kidsListed = page.locator('#barf-body .barf-kid');
     await expect(kidsListed).toHaveCount(3);
     await expect(page.locator('.barf-kid', { hasText: hasFriend[1] })).toBeDisabled();
@@ -732,6 +732,35 @@ for (const where of ['/checkin/', '/checkin/ym/']) {
     expect(world.barfPosts.at(-1).tagJob).toBeUndefined();
   });
 }
+
+test('BARF: a child who is not checked in yet is found by typing a name, and confirming checks them in with Brought a friend and the friend\'s club', async ({ page }) => {
+  test.setTimeout(60_000);
+  const kids = [
+    { clubberId: '11', first: 'Ada', last: 'Tester', club: 'Cubbies', clubId: '1', checkedIn: true },
+    { clubberId: '12', first: 'Ben', last: 'Tester', club: 'Sparks', clubId: '2', checkedIn: false },
+  ];
+  const { world } = await stubSite(page, { kids });
+  world.busyFirst = false;
+  world.barf = { night: '2026-10-14', barfNight: true, friends: [], tagRoute: '/print-barf-tag', stations: 1 };
+  await signIn(page, '/checkin/');
+  await expect(page.locator('#barf-btn')).toBeVisible({ timeout: 10_000 });
+  await page.locator('#barf-btn').click();
+  // Only the checked-in child until a name is typed.
+  await expect(page.locator('#barf-body .barf-kid')).toHaveCount(1);
+  await page.locator('#barf-body').getByLabel('Find a child').fill('ben');
+  const ben = page.locator('.barf-kid', { hasText: 'Ben Tester' });
+  await expect(ben).toContainText('not checked in yet');
+  await ben.click();
+  await page.locator('#barf-body').getByLabel('Friend’s first name').fill('Sam');
+  await page.locator('#barf-body').getByLabel('Friend’s club').selectOption('Cubbies');
+  await page.locator('#barf-body').getByRole('button', { name: 'Next' }).click();
+  await expect(page.locator('#barf-body')).toContainText('is not checked in yet');
+  await page.locator('#barf-body').getByRole('button', { name: 'Confirm' }).click();
+  await expect.poll(() => world.posts.length).toBe(1);
+  expect(world.posts[0].path).toBe('/v1/desk/checkin');
+  expect(world.posts[0].body).toMatchObject({ clubberId: '12', items: { Bible: true, Friend: true }, friendName: 'Sam', friendClub: 'Cubbies' });
+  expect(world.barfPosts).toHaveLength(0);   // an ordinary check-in, not the late-friend redo
+});
 
 test('a new familiesAt on the roster answer reads the families again, so a newly registered child joins their family', async ({ page }) => {
   test.setTimeout(60_000);

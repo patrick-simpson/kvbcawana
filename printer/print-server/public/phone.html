@@ -2181,12 +2181,21 @@ function barfStep(build) {
 }
 function openBarf() {
   refreshBarf();
-  var kids = KIDS.filter(function(k) { return k.checkedIn; }).slice().sort(function(a, b) { return a.name.localeCompare(b.name); });
+  var byName = function(x, y) { return x.name.localeCompare(y.name); };
+  var here = KIDS.filter(function(k) { return k.checkedIn; }).slice().sort(byName);
+  var notYet = KIDS.filter(function(k) { return !k.checkedIn; }).slice().sort(byName);
   $('barf-title').textContent = 'Who brought the friend?';
   barfStep(function(body) {
-    if (!kids.length) body.appendChild(el('div', 'note', 'No one is checked in yet tonight.'));
+    // Owner 2026-10-14: the list also holds children who are not checked in yet;
+    // picking one checks them in with Brought a friend. Type a name to find them.
+    var find = el('input', 'fname');
+    find.type = 'search'; find.placeholder = 'Type a name to find a child';
+    find.setAttribute('aria-label', 'Find a child'); find.autocomplete = 'off';
+    find.style.marginTop = '0';
+    body.appendChild(find);
     var list = el('div', 'grid');
-    kids.forEach(function(k) {
+    var hint = el('div', 'note');
+    var card = function(k, notIn) {
       var club = clubOf(k.club), had = !!BARF.friends[k.clubberId] || !!BARF_LINES[k.clubberId];
       var b = el('button', 'card barf-kid' + (had ? ' in' : ''));
       b.type = 'button';
@@ -2194,13 +2203,27 @@ function openBarf() {
       b.style.setProperty('--deep', club.deep);
       var txt = el('div'); txt.style.cssText = 'flex:1;min-width:0';
       txt.appendChild(el('div', 'nm', k.name));
-      txt.appendChild(el('div', 'cl', k.club || ''));
+      txt.appendChild(el('div', 'cl', (k.club || '') + (notIn ? ' · not checked in yet' : '')));
       b.appendChild(txt);
       if (had) { b.appendChild(el('span', 'tag', 'Has a friend')); b.disabled = true; b.setAttribute('aria-disabled', 'true'); }
       else b.addEventListener('click', function() { barfName(k); });
-      list.appendChild(b);
-    });
+      return b;
+    };
+    var draw = function() {
+      var q = find.value.trim().toLowerCase();
+      list.textContent = '';
+      here.filter(function(k) { return !q || k.name.toLowerCase().indexOf(q) !== -1; }).forEach(function(k) { list.appendChild(card(k, false)); });
+      var more = q ? notYet.filter(function(k) { return k.name.toLowerCase().indexOf(q) !== -1; }) : [];
+      more.slice(0, 30).forEach(function(k) { list.appendChild(card(k, true)); });
+      var shown = list.children.length;
+      hint.textContent = !q ? (here.length ? 'Not here yet? Type their name above.' : 'No one is checked in yet tonight. Type a name above to find a child.')
+        : (shown ? '' : 'No one by that name.');
+      hint.hidden = !hint.textContent;
+    };
+    find.addEventListener('input', draw);
+    body.appendChild(hint);
     body.appendChild(list);
+    draw();
     var acts = el('div', 'acts');
     var no = el('button', 'btn ghost', 'Cancel'); no.type = 'button';
     no.addEventListener('click', hideSheet);
@@ -2242,13 +2265,23 @@ function barfConfirm(k, friend, club) {
   var first = k.name.split(' ')[0];
   $('barf-title').textContent = k.name + ' brought ' + friend;
   barfStep(function(body) {
-    body.appendChild(el('p', 'check', 'TwoTimTwo’s check-in for ' + first + ' gets Brought a friend, ' + first + '’s BARF tag prints, and ' + friend +
-      ' goes on tonight’s BARF list. ' + first + '’s name tag does not print again. ' + friend + ' is not checked in.'));
+    body.appendChild(el('p', 'check', k.checkedIn
+      ? 'TwoTimTwo’s check-in for ' + first + ' gets Brought a friend, ' + first + '’s BARF tag prints, and ' + friend +
+        ' goes on tonight’s BARF list. ' + first + '’s name tag does not print again. ' + friend + ' is not checked in.'
+      : first + ' is not checked in yet. Confirming checks ' + first + ' in with Brought a friend: ' + first + '’s name tag and BARF tag print, and ' + friend +
+        ' goes on tonight’s BARF list. ' + friend + ' is not checked in.'));
     var acts = el('div', 'acts');
     var back = el('button', 'btn ghost', 'Back'); back.type = 'button';
     back.addEventListener('click', function() { barfName(k, { name: friend, club: club }); });
     var ok = el('button', 'btn go barf-go', 'Confirm'); ok.type = 'button';
-    ok.addEventListener('click', function() { hideSheet(); barfLate(k, friend, club); });
+    ok.addEventListener('click', function() {
+      hideSheet();
+      if (k.checkedIn) { barfLate(k, friend, club); return; }
+      // Not checked in yet: an ordinary check-in with Brought a friend (the BARF tag prints after the name tag).
+      if (!itemsFor(k.club).friend) { toast(first + '’s club has no Brought a friend box on TwoTimTwo, so check ' + first + ' in on TwoTimTwo.', 7000, null, null, 'bad'); return; }
+      var items = itemsFor(k.club);
+      checkInMany([{ p: person(k), choice: { bible: items.bible, friend: true, friendName: friend, friendClub: club || '' } }], null);
+    });
     acts.appendChild(back); acts.appendChild(ok);
     body.appendChild(acts);
   });
