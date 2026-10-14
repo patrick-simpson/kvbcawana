@@ -71,6 +71,7 @@ describe('parseVersion', () => {
 
   it('treats anything unexpected as no news', () => {
     expect(parseVersion('')).toBeNull();
+    expect(parseVersion('{invalid}')).toBeNull();
     expect(parseVersion('not json')).toBeNull();
     expect(parseVersion('null')).toBeNull();
     expect(parseVersion('[1,2,3]')).toBeNull();
@@ -105,6 +106,14 @@ describe('fetchProbe', () => {
 
   it('returns null when the network throws', async () => {
     const fetchImpl = vi.fn().mockRejectedValue(new Error('offline'));
+    await expect(fetchProbe('version.json', { fetchImpl })).resolves.toBeNull();
+  });
+
+  it('returns null when reading the body throws', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({
+      ok: true,
+      text: vi.fn().mockRejectedValue(new Error('stream interrupted')),
+    });
     await expect(fetchProbe('version.json', { fetchImpl })).resolves.toBeNull();
   });
 
