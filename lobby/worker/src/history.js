@@ -426,15 +426,30 @@ export class History {
 
   /** @param {URL} url */
   async getRows(url) {
-    const night = url.searchParams.get('night') || '';
-    if (!validNight(night)) return fail('Say which night: ?night=YYYY-MM-DD.', 400, { reason: 'bad-night' });
+    let nights = [];
+    const nightsParam = url.searchParams.get('nights');
+    if (nightsParam) {
+      try { nights = JSON.parse(nightsParam); } catch { return fail('nights must be a JSON array.', 400, { reason: 'bad-nights' }); }
+      if (!Array.isArray(nights) || !nights.every(validNight)) return fail('nights must be a JSON array of YYYY-MM-DD.', 400, { reason: 'bad-nights' });
+    } else {
+      const night = url.searchParams.get('night') || '';
+      if (!validNight(night)) return fail('Say which night: ?night=YYYY-MM-DD.', 400, { reason: 'bad-night' });
+      nights = [night];
+    }
     const after = url.searchParams.get('after') || '';
     if (after && !ID_RE.test(after)) return fail('That "after" is not a row id.', 400, { reason: 'bad-after' });
     const limit = Math.min(500, Math.max(1, Number.parseInt(url.searchParams.get('limit') || '200', 10) || 200));
     const db = await this.readyDb();
     if (!db) return this.off();
-    const res = await db.prepare('SELECT id, night, kind, v, kid, epk, iv, ct FROM history_rows WHERE night = ?1 AND id > ?2 ORDER BY id LIMIT ?3')
-      .bind(night, after, limit + 1).all();
+
+    let res;
+    if (nights.length === 1) {
+      res = await db.prepare('SELECT id, night, kind, v, kid, epk, iv, ct FROM history_rows WHERE night = ?1 AND id > ?2 ORDER BY id LIMIT ?3')
+        .bind(nights[0], after, limit + 1).all();
+    } else {
+      res = await db.prepare('SELECT id, night, kind, v, kid, epk, iv, ct FROM history_rows WHERE night IN (SELECT value FROM json_each(?1)) AND id > ?2 ORDER BY id LIMIT ?3')
+        .bind(JSON.stringify(nights), after, limit + 1).all();
+    }
     const rows = res.results || [];
     const more = rows.length > limit;
     const page = more ? rows.slice(0, limit) : rows;

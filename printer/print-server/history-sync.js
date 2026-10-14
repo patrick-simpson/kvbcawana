@@ -247,17 +247,25 @@ function createAttendanceReader(o) {
     /** @type {{ key: string, id: string|null, name: string, night: string, present: boolean, at: number }[]} */
     const events = [];
     let readNights = 0;
+
+    const nightsToRead = [];
     for (const n of nights.body) {
       if (!n || !ISO_DAY.test(n.night)) continue;
       if (n.night !== today && seen.get(n.night) === n.rows) continue;
+      nightsToRead.push(n);
+    }
+
+    for (let i = 0; i < nightsToRead.length; i += 40) {
+      const batchNights = nightsToRead.slice(i, i + 40);
+      const batchNightStrings = batchNights.map(n => n.night);
+
       let after = '';
-      let count = 0;
-      for (let page = 0; page < 40; page++) {
-        const q = `/v1/history/rows?night=${n.night}&limit=500${after ? `&after=${encodeURIComponent(after)}` : ''}`;
+      let ok = true;
+      for (let page = 0; page < 400; page++) {
+        const q = `/v1/history/rows?nights=${encodeURIComponent(JSON.stringify(batchNightStrings))}&limit=500${after ? `&after=${encodeURIComponent(after)}` : ''}`;
         const r = await o.request(s.base, q, { session: s.session, station: o.stationId() });
-        if (!r.ok || !r.body || !Array.isArray(r.body.rows)) { count = -1; break; }
+        if (!r.ok || !r.body || !Array.isArray(r.body.rows)) { ok = false; break; }
         for (const row of r.body.rows) {
-          count++;
           const rec = await cc.openRow(ring, row);
           if (!rec) { stats.unreadable++; continue; }
           if (rec.undone === true) continue;
@@ -275,7 +283,13 @@ function createAttendanceReader(o) {
         if (!r.body.next) break;
         after = r.body.next;
       }
-      if (count >= 0) { seen.set(n.night, n.rows); readNights++; }
+
+      if (ok) {
+        for (const n of batchNights) {
+           seen.set(n.night, n.rows);
+           readNights++;
+        }
+      }
     }
     // Resolve check-ins against undos, per child per night, in the order they happened.
     const last = new Map();

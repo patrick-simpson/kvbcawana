@@ -7,6 +7,7 @@ import {
   createHistoryKey, keyRing, newRowId, openRow, rewrapPrivateKey, sealRow, unwrapPrivateKey,
 } from '../../shared/cloud-crypto.js';
 import { d1Stub } from './d1stub.js';
+import { row } from './rig.js';
 
 const NIGHT = '2026-10-14';
 const PASS = 'kennebec river';
@@ -238,6 +239,51 @@ describe('a passphrase change re-wraps the key and old rows stay readable', () =
     // after 7 days the previous wrap is no longer offered
     const later = new History({ storage, env: { HISTORY_DB: db }, now: () => Date.parse('2026-10-22T00:00:00Z') });
     expect((await (await later.getKey()).json()).prev).toBeNull();
+  });
+
+  it('fetches rows by an array of nights', async () => {
+    const { history } = await setup();
+    const storage = history.storage;
+    const db = history.db;
+    const call = (method, path, body = undefined) => history.handle(
+      new Request(`http://localhost${path}`, { method, body: body ? JSON.stringify(body) : undefined }),
+      new URL(`http://localhost${path}`),
+    );
+
+    // Write a row on one night
+    const row1 = await sealed({ first: 'One', ts: 1 }, { night: '2023-01-01' });
+    row1.id = '1111111111111111111111';
+    await call('POST', '/v1/history/rows', { rows: [row1] });
+
+    // Write a row on a different night
+    const row2 = await sealed({ first: 'Two', ts: 2 }, { night: '2023-01-02' });
+    row2.id = '2222222222222222222222';
+    await call('POST', '/v1/history/rows', { rows: [row2] });
+
+    await history.flush();
+
+    // Fetch both
+    let get = await call('GET', `/v1/history/rows?nights=${encodeURIComponent(JSON.stringify(['2023-01-01', '2023-01-02']))}`);
+    expect(get.status).toBe(200);
+    const body = await get.json();
+    expect(body.rows.length).toBe(2);
+    expect(body.rows[0].id).toBe('1111111111111111111111');
+    expect(body.rows[1].id).toBe('2222222222222222222222');
+
+    // Fetch one via nights array
+    get = await call('GET', `/v1/history/rows?nights=${encodeURIComponent(JSON.stringify(['2023-01-02']))}`);
+    expect(get.status).toBe(200);
+    const body2 = await get.json();
+    expect(body2.rows.length).toBe(1);
+    expect(body2.rows[0].id).toBe('2222222222222222222222');
+
+    // Reject bad JSON
+    get = await call('GET', `/v1/history/rows?nights=bad`);
+    expect(get.status).toBe(400);
+
+    // Reject bad night format
+    get = await call('GET', `/v1/history/rows?nights=${encodeURIComponent(JSON.stringify(['bad-date']))}`);
+    expect(get.status).toBe(400);
   });
 
   it('with no history key yet, a passphrase change needs no wrap', async () => {
