@@ -64,7 +64,7 @@ function fakeTimers() {
 }
 
 /** A computer: roles, hours, a print server that can be busy, main.js's apply. */
-function computer({ worker = fakeWorker(), print = true, display = false, name = 'Check-in laptop', signedIn = true, report } = {}) {
+async function computer({ worker = fakeWorker(), print = true, display = false, name = 'Check-in laptop', signedIn = true, report } = {}) {
   const dir = tmp();
   const pc = {
     dir, worker, timers: fakeTimers(), busy: false, applied: [], statuses: [], signedOutWith: [],
@@ -74,7 +74,7 @@ function computer({ worker = fakeWorker(), print = true, display = false, name =
     syncedAtApply: [],
   };
   pc.local = () => ({ printRole: pc.roles.print, displayRole: pc.roles.display, displayFrom: pc.hours.start, displayUntil: pc.hours.end });
-  pc.sync = ds.createDeviceSync({
+  pc.sync = await ds.createDeviceSync({
     userData: dir,
     deviceId: () => { pc.roles = rolesStore.ensureDeviceId(dir, pc.roles); return pc.roles.deviceId; },
     session: () => pc.session,
@@ -139,7 +139,7 @@ describe('reconcileComputer', () => {
 
 describe('the rounds', () => {
   it('first start: hello as a computer under an id kept in roles.json, then its settings go up', async () => {
-    const pc = computer();
+    const pc = await computer();
     await pc.sync.start();
     assert.ok(rolesStore.isDeviceId(pc.id()));
     assert.equal(rolesStore.readRoles(pc.dir).deviceId, pc.id());
@@ -157,7 +157,7 @@ describe('the rounds', () => {
   });
 
   it('a change on /settings is applied, saved as agreed BEFORE it is applied (print off restarts the app)', async () => {
-    const pc = computer({ print: true, display: false });
+    const pc = await computer({ print: true, display: false });
     await pc.sync.start();
     pc.worker.edit(pc.id(), { printRole: true, displayRole: true, displayFrom: '16:30', displayUntil: '20:30' });
     await pc.sync.start();
@@ -171,7 +171,7 @@ describe('the rounds', () => {
   });
 
   it('a change made here (the wizard, the Settings window) goes up after a nudge', async () => {
-    const pc = computer();
+    const pc = await computer();
     await pc.sync.start();
     pc.worker.calls.length = 0;
     pc.sync.nudge();
@@ -186,7 +186,7 @@ describe('the rounds', () => {
   });
 
   it('never turns the print server off mid-print: the rest applies, print-off waits for idle and says so in its hello', async () => {
-    const pc = computer({ print: true, display: false });
+    const pc = await computer({ print: true, display: false });
     await pc.sync.start();
     pc.busy = true;
     pc.worker.edit(pc.id(), { printRole: false, displayRole: true, displayFrom: '17:00', displayUntil: '20:00' });
@@ -209,7 +209,7 @@ describe('the rounds', () => {
   });
 
   it('a label that starts between the look and the change: held, never reverted on the Worker', async () => {
-    const pc = computer({ print: true, display: true });
+    const pc = await computer({ print: true, display: true });
     await pc.sync.start();
     pc.busyOnApply = true;
     pc.worker.edit(pc.id(), { printRole: false, displayRole: true, displayFrom: '17:00', displayUntil: '20:00' });
@@ -225,7 +225,7 @@ describe('the rounds', () => {
   });
 
   it('a change this computer refuses (no role left) puts its own settings back', async () => {
-    const pc = computer({ print: false, display: true });
+    const pc = await computer({ print: false, display: true });
     await pc.sync.start();
     pc.worker.edit(pc.id(), { printRole: false, displayRole: false, displayFrom: '17:00', displayUntil: '20:00' });
     await pc.sync.start();
@@ -234,7 +234,7 @@ describe('the rounds', () => {
   });
 
   it('401 is signed out: it says so, stops asking, and starts again on a new sign-in', async () => {
-    const pc = computer();
+    const pc = await computer();
     pc.worker.token = 'v1.1760000000.2.zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz';
     await pc.sync.start();
     assert.equal(pc.sync.status().state, 'signed-out');
@@ -251,14 +251,14 @@ describe('the rounds', () => {
   });
 
   it('not signed in, or not set up: nothing is sent', async () => {
-    const pc = computer({ signedIn: false });
+    const pc = await computer({ signedIn: false });
     await pc.sync.start();
     assert.deepEqual(pc.worker.calls, []);
     assert.equal(pc.sync.status().state, 'off');
   });
 
   it('names: a rename on /settings is taken here, a rename here goes up', async () => {
-    const pc = computer({ name: 'Desk' });
+    const pc = await computer({ name: 'Desk' });
     await pc.sync.start();
     pc.worker.screens[pc.id()].name = 'Welcome desk';
     await pc.sync.start();
@@ -274,16 +274,16 @@ describe('the rounds', () => {
 describe("the app's version and update ride the hello", () => {
   const { createAppReport } = require('../src/update-progress');
   const idle = { checking: false, available: null, downloaded: null, percent: null, error: null };
-  const withApp = () => {
+  const withApp = async () => {
     const u = { ...idle };
     const rep = createAppReport({ now: () => Date.parse('2026-10-12T15:00:00Z') });
-    const pc = computer({ report: () => rep.read('9.4.0', u) });
+    const pc = await computer({ report: () => rep.read('9.4.0', u) });
     return { pc, u };
   };
   const helloCalls = (pc) => pc.worker.calls.filter((c) => c.path === '/v1/screens/hello');
 
   it('every hello carries it', async () => {
-    const { pc } = withApp();
+    const { pc } = await withApp();
     await pc.sync.start();
     assert.deepEqual(helloCalls(pc)[0].body.status, { app: { version: '9.4.0', update: { state: 'none', percent: null, at: '2026-10-12T15:00:00.000Z' } } });
     pc.timers.run(ds.HELLO_MS);
@@ -292,7 +292,7 @@ describe("the app's version and update ride the hello", () => {
   });
 
   it('an update moving says hello sooner: on a new state or ten points, never within a minute of the last hello', async () => {
-    const { pc, u } = withApp();
+    const { pc, u } = await withApp();
     await pc.sync.start();
     const before = helloCalls(pc).length;
     // Nothing moved: nothing extra.
@@ -330,11 +330,11 @@ describe("the app's version and update ride the hello", () => {
   });
 
   it('quiet when signed out or stopped, and a report that throws only leaves the status out', async () => {
-    const out = computer({ signedIn: false, report: () => ({ app: { version: '9.4.0', update: { state: 'none', percent: null, at: null } } }) });
+    const out = await computer({ signedIn: false, report: () => ({ app: { version: '9.4.0', update: { state: 'none', percent: null, at: null } } }) });
     await out.sync.start();
     out.sync.reportSoon();
     assert.equal(out.worker.calls.length, 0);
-    const pc = computer({ report: () => { throw new Error('no'); } });
+    const pc = await computer({ report: () => { throw new Error('no'); } });
     await pc.sync.start();
     assert.equal('status' in pc.worker.calls[0].body, false);
     pc.sync.stop();

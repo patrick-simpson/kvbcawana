@@ -58,6 +58,8 @@ async function stubSite(page, { kids } = {}) {
     households: [['Ada Tester', 'Ben Tester']], familiesAt: null, familiesCalls: 0,
     /** A day with no club: the roster's `{noClub: true, today, next}` (routes.md 5); null = a club day. */
     noClub: null, tonightCalls: 0,
+    /** A promise the roster answer waits on (a cold Worker signing in to TwoTimTwo). */
+    rosterGate: null,
   };
   const api = async (route, req) => {
     const u = new URL(req.url());
@@ -72,6 +74,7 @@ async function stubSite(page, { kids } = {}) {
     if (world.signedOut || req.headers().authorization !== `Bearer ${SESSION}`) return route.fulfill(json(401, { error: 'signed out' }));
     if (p === '/v1/desk/roster') {
       world.rosterCalls += 1;
+      if (world.rosterGate) await world.rosterGate;
       if (world.busyFirst) { world.busyFirst = false; return route.fulfill(json(429, { ok: false, reason: 'read-busy', retryAfterMs: 1500 })); }
       if (world.noClub) return route.fulfill(json(200, { noClub: true, ...world.noClub, readAt: new Date().toISOString(), kids: [], items: { bible: [], friend: [] } }));
       return route.fulfill(json(200, { readAt: new Date().toISOString(), kids: world.kids, items: { bible: ['Cubbies', 'Sparks'], friend: ['Sparks'] }, ...(world.familiesAt ? { familiesAt: world.familiesAt } : {}) }));
@@ -353,6 +356,22 @@ test('error states: a refusal puts the child back, no internet points to the pap
 
 // No club tonight (owner 2026-10-13: a Monday evening sat on "Reading the roster..."):
 // the Worker answers the roster at once with `noClub`, and the page shows one note.
+test('a slow first roster read (a cold sign-in to TwoTimTwo) says so after a few seconds, then the list comes', async ({ page }) => {
+  test.setTimeout(60_000);
+  const { world } = await stubSite(page);
+  world.busyFirst = false;
+  let open;
+  world.rosterGate = new Promise((resolve) => { open = resolve; });
+  await signIn(page);
+  const list = page.locator('#list');
+  await expect(list).toContainText('Reading the roster', { timeout: 10_000 });
+  await expect(list).toContainText('Signing in to TwoTimTwo… this can take up to a minute.', { timeout: 10_000 });
+  open();
+  await search(page).fill('Ada');
+  await expect(list).toContainText('Ada', { timeout: 10_000 });
+  await expect(list).not.toContainText('Signing in to TwoTimTwo');
+});
+
 test('no club tonight: one friendly note, no search, no error, asked again every minute, and the list comes by itself on the club day', async ({ page }) => {
   test.setTimeout(60_000);
   const { world } = await stubSite(page);

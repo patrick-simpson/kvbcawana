@@ -641,6 +641,9 @@ var rosterPollMs = ROSTER_POLL_BASE_MS;
 var rosterPollTimer = null;
 var rosterFetchInFlight = false;
 var rosterTries = 0;            // roster reads that failed before the first one worked
+var rosterSlow = false;         // the first roster read has taken over ROSTER_SLOW_MS (a cold TwoTimTwo sign-in)
+var ROSTER_SLOW_MS = 5000;
+var rosterSlowTimer = null;
 var lastRosterAt = 0;          // when the last roster answer arrived
 var rosterEpoch = 0;           // bumped by every confirmed check-in: an older roster answer is stale
 var rosterMisses = 0;          // ticks in a row that could not reach the service
@@ -801,7 +804,8 @@ function signOut(message) {
   RECENT = null; recentAskedAt = 0;
   leaderSelection = {};
   renderLeaderChips([]);
-  rosterLoaded = false; rosterTries = 0; lastRosterAt = 0;
+  rosterLoaded = false; rosterTries = 0; lastRosterAt = 0; rosterSlow = false;
+  if (rosterSlowTimer) { clearTimeout(rosterSlowTimer); rosterSlowTimer = null; }
   setNoClub(null);
   clearPinCountdown();
   showPinScreen(message);
@@ -1111,8 +1115,11 @@ function render() {
   var list = $('list');
   beginKeyed(list);
   while (list.firstChild) list.removeChild(list.firstChild);
+  // A cold start (the Worker just restarted) signs in to TwoTimTwo first: about 45 s on its
+  // one-read-per-15-s clock. Past ROSTER_SLOW_MS the page says so (owner 2026-10-14).
   if (NO_CLUB) list.appendChild(noClubNote());
-  else if (!rosterLoaded) list.appendChild(el('div', 'note', rosterTries ? 'Still counting crayons… trying again.' : 'Reading the roster…'));
+  else if (!rosterLoaded) list.appendChild(el('div', 'note', rosterTries ? 'Still counting crayons… trying again.'
+    : rosterSlow ? 'Signing in to TwoTimTwo… this can take up to a minute.' : 'Reading the roster…'));
   else if (!KIDS.length) list.appendChild(el('div', 'note', 'TwoTimTwo has nobody on tonight’s check-in page yet. Is the meeting set up?'));
   else if (!q.trim()) renderFamilies(list);
   else renderSearch(list, q);
@@ -1639,6 +1646,9 @@ function refreshAll() {
   if (document.hidden) { scheduleRosterPoll(); return; }
   rosterFetchInFlight = true;
   var epoch = rosterEpoch;
+  if (!rosterLoaded && !rosterSlowTimer && !rosterSlow) {
+    rosterSlowTimer = setTimeout(function() { rosterSlowTimer = null; if (!rosterLoaded) { rosterSlow = true; render(); } }, ROSTER_SLOW_MS);
+  }
   refreshStatus();
   desk.roster().then(function(data) {
     showOffline(false);

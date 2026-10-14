@@ -1113,7 +1113,11 @@ if (downloadsSection) {
         if (dl.phase === 'idle') startLessonDownloads(false, true);
       }, downloadTuning().resumeAfterLoadMs);
     }
-    setInterval(autoDownloadTick, downloadTuning().autoTickMs);
+    setInterval(() => {
+      if (!downloadsActive() && !dl.autoHeld) {
+        autoDownloadTick();
+      }
+    }, downloadTuning().autoTickMs);
     window.addEventListener('online', () => autoDownloadTick());
     setTimeout(async () => {
       await prepareDownloadStatus();
