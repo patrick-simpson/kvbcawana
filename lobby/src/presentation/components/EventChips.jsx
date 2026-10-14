@@ -17,8 +17,17 @@ function formatDays(days) {
  * or emoji, matching the countdown's flattened-to-type treatment: the
  * night's name in white, when it is in Awana orange.
  */
-export const EventChips = ({ events }) => {
-  const special = events.filter((e) => e.isSpecial).slice(0, 4);
+/**
+ * Days left in this week (Sunday to Saturday, the birthdays' week), counting
+ * today: a night this week is already the THIS WEEK chip above, so it is not
+ * listed again below it (owner 2026-10-14).
+ * @param {Date} now
+ */
+export const daysLeftThisWeek = (now) => 6 - now.getDay();
+
+export const EventChips = ({ events, thisWeekShown = false, now = new Date() }) => {
+  const lastDay = daysLeftThisWeek(now);
+  const special = events.filter((e) => e.isSpecial && !(thisWeekShown && e.daysUntil <= lastDay)).slice(0, 4);
   if (special.length === 0) return null;
 
   return (

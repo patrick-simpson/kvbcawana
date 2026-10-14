@@ -4,6 +4,18 @@ import { CHURCH } from '../church.config.js';
 const REFRESH_MS = 30 * 60 * 1000;
 const MAX_EVENTS = 6;
 
+/**
+ * Whole calendar days from `today` (local midnight) to the day `date` falls on.
+ * Both sides are taken at local midnight, so a night TODAY is 0 (an event dated
+ * at noon used to round up to "tomorrow") and a clock change cannot shift it.
+ * @param {Date} date @param {Date} today
+ */
+export function calendarDaysUntil(date, today) {
+  const day = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const start = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  return Math.round((day.getTime() - start.getTime()) / 86400000);
+}
+
 /* ── Primary source: the JSON feed the sibling display repo's nightly
       GitHub Action publishes (validated defensively — any surprise in
       shape falls through to the direct scrape). ─────────────────────── */
@@ -24,7 +36,7 @@ function parseFeed(data) {
     if (e.isCancelled === true) continue; // parity with the scraper's "skipped" rule
     const date = new Date(`${e.date}T12:00:00`);
     if (Number.isNaN(date.getTime()) || date < today) continue;
-    const daysUntil = Math.round((date.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+    const daysUntil = calendarDaysUntil(date, today);
     const isSpecial =
       typeof e.isSpecial === 'boolean'
         ? e.isSpecial
@@ -80,7 +92,7 @@ function parseCalendarHTML(html) {
         }
       }
 
-      const daysUntil = Math.round((date.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+      const daysUntil = calendarDaysUntil(date, today);
       const isSpecial = !title.toLowerCase().includes('awana meeting');
       events.push({ date, title, isSpecial, daysUntil });
     });

@@ -120,7 +120,7 @@ export const CountdownView = ({ now, target, theme, onSkip }) => {
           </div>
         )}
 
-        <EventChips events={events} />
+        <EventChips events={events} thisWeekShown={!!theme} now={now} />
       </div>
 
       {/* Touch: the skip's question. data-pj-bottom-overlay: it stands on the
