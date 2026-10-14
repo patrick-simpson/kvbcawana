@@ -68,7 +68,7 @@ describe('the check-in page', () => {
 
   it('draws with the brand kit under /checkin/brand/ and nothing from another host', () => {
     assert.match(index, /href="\/checkin\/brand\/fonts\.css"/);
-    assert.match(index, /src="\/checkin\/brand\/logos\/awana-clubs-white\.svg"/);
+    assert.match(index, /src="\/checkin\/brand\/logos\/kvbc-awana-two-line-white\.svg"/);
     assert.deepEqual([...index.matchAll(/(?:href|src)="(https?:)?\/\/[^"]+"/g)], []);
     assert.ok(!/fonts\.googleapis|@import|@font-face/.test(index));
   });

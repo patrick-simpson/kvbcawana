@@ -66,10 +66,18 @@
   :focus-visible { outline: 3px solid var(--c-ink); outline-offset: 2px; }
   [hidden] { display: none !important; }
 
-  /* ── Header ── */
-  .top { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: 10px;
-    padding: calc(10px + env(safe-area-inset-top)) 14px 10px; background: var(--c-blue); color: #fff; }
-  .brand-mark { height: 30px; width: auto; flex: none; }
+  /* ── Header ──
+     The church's logo (owner 2026-10-13: two-line, white, still) heads the
+     page in a blue band that scrolls away; the bar under it (title, count,
+     menu) sticks. The logo never goes under 260px wide, where its thin church
+     line stops reading, which is why it is not squeezed into the bar beside
+     the controls. The status-bar strip keeps the blue behind a notch once the
+     band has scrolled off. */
+  .masthead { padding: calc(14px + env(safe-area-inset-top)) 14px 6px; background: var(--c-blue); color: #fff; }
+  .brand-logo { display: block; width: 260px; height: auto; aspect-ratio: 1910 / 403; }
+  body::before { content: ''; position: fixed; top: 0; left: 0; right: 0; height: env(safe-area-inset-top); background: var(--c-blue); z-index: 11; }
+  .top { position: sticky; top: env(safe-area-inset-top); z-index: 10; display: flex; align-items: center; gap: 10px;
+    min-height: 60px; padding: 10px 14px; background: var(--c-blue); color: #fff; }
   .top h1 { flex: 1; font-family: var(--f-shout); font-weight: 400; font-size: 22px; line-height: 1; }
   .pill { border: none; cursor: pointer; height: 40px; padding: 0 14px; border-radius: 20px; background: #fff; color: var(--c-blue-deep);
     font-family: var(--f-label); font-size: 18px; letter-spacing: 0.05em; text-transform: uppercase; white-space: nowrap; }
@@ -288,8 +296,10 @@
 </style>
 </head>
 <body>
+<div class="masthead">
+  <img class="brand-logo" src="/brand/logos/kvbc-awana-two-line-white.svg" alt="Kennebec Valley Baptist Church Awana Clubs" width="260" height="55">
+</div>
 <header class="top">
-  <img class="brand-mark" src="/brand/logos/awana-clubs-white.svg" alt="Awana Clubs">
   <h1>Check in</h1>
   <button class="pill" id="count-pill" type="button" hidden>0 in</button>
   <button class="round" id="menu-btn" type="button" aria-label="More: walk-in name tag, leader tag, custom label" hidden>+</button>
