@@ -114,10 +114,10 @@ describe('guards against losing work', () => {
     render(<SlideEditorPanel {...baseProps()} />);
     fireEvent.click(screen.getByRole('button', { name: '+ Add slide' }));
     expect(screen.getByText('Slide 4 of 4')).toBeTruthy();
-    fireEvent.click(screen.getAllByRole('button', { name: 'Delete' })[3]);
+    fireEvent.click(screen.getByRole('button', { name: 'Delete slide 4' }));
     expect(confirm).not.toHaveBeenCalled();
     expect(screen.queryByText('Slide 4 of 4')).toBeNull();
-    fireEvent.click(screen.getAllByRole('button', { name: 'Delete' })[0]);
+    fireEvent.click(screen.getByRole('button', { name: 'Delete slide 1' }));
     expect(confirm).toHaveBeenCalledWith('Delete this slide?');
     expect(screen.getByText('Slide 1 of 3')).toBeTruthy();
   });

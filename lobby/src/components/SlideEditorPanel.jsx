@@ -548,8 +548,8 @@ export default function SlideEditorPanel({ config, syncedDeck, onChange, onClose
                   <button className="ghost" data-move="up" onClick={() => moveAndFocus(i, i - 1, slide.id, 'up')} disabled={i === 0} aria-label={`Move slide ${i + 1} up`}>↑</button>
                   <button className="ghost" data-move="down" onClick={() => moveAndFocus(i, i + 1, slide.id, 'down')} disabled={i === slides.length - 1} aria-label={`Move slide ${i + 1} down`}>↓</button>
                   <button className="ghost" data-move="bottom" onClick={() => moveAndFocus(i, slides.length - 1, slide.id, 'bottom')} disabled={i === slides.length - 1} aria-label={`Move slide ${i + 1} to the bottom`}>Bottom</button>
-                  <button className="ghost" onClick={() => duplicate(i)} disabled={slides.length >= MAX_SLIDES}>Duplicate</button>
-                  <button className="danger" onClick={() => remove(slide.id)}>Delete</button>
+                  <button className="ghost" onClick={() => duplicate(i)} disabled={slides.length >= MAX_SLIDES} aria-label={`Duplicate slide ${i + 1}`}>Duplicate</button>
+                  <button className="danger" onClick={() => remove(slide.id)} aria-label={`Delete slide ${i + 1}`}>Delete</button>
                 </div>
               </div>
             </div>
