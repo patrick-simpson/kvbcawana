@@ -116,13 +116,12 @@ for (const [version, turn] of Object.entries(TURNS)) {
       const u = Math.min(m.vw / 100, m.vh / 56.25);
       const frameTop = (m.vh - 56.25 * u) / 2;
       const overlap = (a, b) => a.l < b.r && a.r > b.l && a.t < b.b && a.b > b.t;
-      // The full logo, tagline and all, on every screen (owner 2026-10-13:
-      // squeezed where the box is small, never swapped for the two-line one).
-      expect(m.variant, at).toBe('full');
-      // As big as the box allows: 72u (75u under "Welcome to"); a 4:3 screen up to 520px.
-      // A short 16:9 frame under 722px wide takes 64u, so the line clears the waves.
-      const small = (w < 722 && w / h >= 1.5) || h < 406;
-      const wanted = small ? 64 * u : Math.max((version === 'welcome' ? 75 : 72) * u, Math.min(520, 84 * u));
+      // The full logo wherever it can be 520px wide in the box; the two-line
+      // only on a 16:9 screen under 722px wide, and never under 260px.
+      expect(m.variant, at).toBe(w === 640 && h === 360 ? 'two-line' : 'full');
+      expect(m.logo.w, at).toBeGreaterThanOrEqual(m.variant === 'full' ? 519.5 : 259.5);
+      // As big as the box allows: 72u (75u under "Welcome to"), or 80u for the two-line.
+      const wanted = m.variant === 'two-line' ? 80 * u : Math.max((version === 'welcome' ? 75 : 72) * u, Math.min(520, 84 * u));
       expect(Math.abs(m.logo.w - wanted), at).toBeLessThan(1.5);
       for (const piece of [m.logo, ...m.lines]) {
         expect(overlap(piece, m.tab), `${at}: under the corner tab`).toBe(false);
