@@ -262,7 +262,17 @@ pastFlagship.describe('a child leaving the list', () => {
       // A few seconds, and the list is back without her.
       await page.clock.runFor(3500);
       await expect(page.locator('.stage .checkout-leave')).toHaveCount(0);
-      await expect(page.locator('.stage .checkout-name__chip')).toHaveCount(23);
+      // Shown and behind "+N more", every child still on the list is counted
+      // (at 640x480 the bigger plate words send a few behind it, more where a
+      // browser measures the face a hair wider, as CI's does).
+      const board = page.locator('.stage .checkout-board--list');
+      await expect(board).toBeVisible();
+      await expect.poll(async () => {
+        const shown = await board.locator('.checkout-name__chip').count();
+        const more = (await board.locator('.checkout-more').allTextContents()).map((t) => Number(/\d+/.exec(t)[0]));
+        return shown + more.reduce((a, n) => a + n, 0);
+      }).toBe(23);
+      if (width >= 1920) await expect(page.locator('.stage .checkout-name__chip')).toHaveCount(23);
     });
   }
 });
