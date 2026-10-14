@@ -34,7 +34,7 @@ const STINGER_TIMES = [3600, 1800, 600, 300, 60];
  * with Awana-orange colons, and under them only what the week needs (the
  * next meeting's day while it is still a day or more out, the church's
  * theme for it as a stepped chip, special nights as plain lines). The
- * Awana Clubs mark rides above every view (App.jsx). Time flows in via the
+ * church's logo rides above every view (App.jsx). Time flows in via the
  * single app clock — this view owns no timers of its own.
  * `onSkip` is the operator skip (Space / click) — jumps to the opening
  * ceremony. `theme` is the church-authored meeting theme from a fresh

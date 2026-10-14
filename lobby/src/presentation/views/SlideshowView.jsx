@@ -30,7 +30,7 @@ const CHANGE_HOLD = LEAVE_TOTAL + 0.02;
  * Slide deck. A change is the approved mockup's, in place of the old 3D
  * flip: the outgoing lines leave upward one after another, the six club
  * colours sweep once along the bottom edge and are gone, and the next title
- * and text land. The Awana Clubs mark (App.jsx) and the pledge slides' clock
+ * and text land. The church's logo (App.jsx) and the pledge slides' clock
  * stay put through it, like a broadcast logo. No setTimeout state machine,
  * and keypresses are never dropped mid-transition: every press moves the
  * index and starts a sweep of its own, while a sweep a quicker press caught

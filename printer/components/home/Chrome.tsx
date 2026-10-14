@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Ico } from './Icons';
-import { Shape } from './Kit';
+import { LOGO, Shape } from './Kit';
 
 export const LINKS = {
   repo: 'https://github.com/patrick-simpson/kvbcawana',
@@ -34,18 +34,22 @@ const NAV: Record<Page, { href: string; label: string }[]> = {
   ],
 };
 
-/** The wordmark: the app's own name, set in the kit's voices. */
+/**
+ * The church's own logo (owner 2026-10-13), in one colour: ink two-line in
+ * the header, white in the footer (the full logo, tagline and all, where the
+ * column is 520px or wider; two-line where it is not).
+ */
 export const Wordmark: React.FC<{ inverse?: boolean }> = ({ inverse }) => (
-  <span className={`kv-mark${inverse ? ' kv-mark--inverse' : ''}`}>
-    <span className="kv-mark__badge" aria-hidden="true">
-      <Shape name="starburst" className="kv-mark__burst" />
-      <Ico name="label" className="kv-mark__glyph" />
+  inverse ? (
+    <span className="kv-logo kv-logo--footer">
+      <img className="kv-logo__full" src={LOGO.fullWhite} alt={LOGO.alt} width="520" height="133" />
+      <img className="kv-logo__narrow" src={LOGO.twoLineWhite} alt={LOGO.alt} width="260" height="55" />
     </span>
-    <span className="kv-mark__words">
-      <span className="kv-mark__name">KVBC Awana</span>
-      <span className="kv-mark__sub">Club night tools</span>
+  ) : (
+    <span className="kv-logo">
+      <img className="kv-logo__head" src={LOGO.twoLineInk} alt={LOGO.alt} width="260" height="55" />
     </span>
-  </span>
+  )
 );
 
 export const Header: React.FC<{ page: Page }> = ({ page }) => {
@@ -75,7 +79,7 @@ export const Header: React.FC<{ page: Page }> = ({ page }) => {
             </ul>
           </nav>
           <a className="kv-btn kv-btn--hot kv-header__cta" href={LINKS.download}>
-            <Ico name="download" />Download<span className="kv-sr"> KVBC Awana for Windows</span>
+            <Ico name="download" /><span className="kv-header__cta-word">Download</span><span className="kv-sr"> KVBC Awana for Windows</span>
           </a>
         </div>
       </header>

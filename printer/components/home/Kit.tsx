@@ -6,12 +6,15 @@ import React from 'react';
  * its one copy, so nothing here is redrawn or copied and a kit change reaches
  * the page by itself. Each paints in currentColor.
  *
- * The club marks are imported as URLs (Vite fingerprints them into /assets/).
+ * The club marks and the church's own logo are imported as URLs (Vite
+ * fingerprints them into /assets/).
  * Awana® and the club marks are trademarks of Awana Clubs International, used
  * by a member church with the disclaimer in the header, the footer and the
  * meta description (owner, 2026-10-11).
  */
-import awanaWhite from '../../../lobby/shared/brand/logos/awana-clubs-white.svg';
+import logoTwoLineInk from '../../../lobby/shared/brand/logos/kvbc-awana-two-line-ink.svg';
+import logoTwoLineWhite from '../../../lobby/shared/brand/logos/kvbc-awana-two-line-white.svg';
+import logoFullWhite from '../../../lobby/shared/brand/logos/kvbc-awana-full-white.svg';
 import pugglesColor from '../../../lobby/shared/brand/logos/puggles-color.svg';
 import cubbiesColor from '../../../lobby/shared/brand/logos/cubbies-color.svg';
 import sparksColor from '../../../lobby/shared/brand/logos/sparks-color.svg';
@@ -114,4 +117,16 @@ export const CLUBS: Club[] = [
 export const clubByName = (name: string): Club =>
   CLUBS.find((c) => c.name.toLowerCase() === name.trim().toLowerCase()) || CLUBS[2];
 
-export const AWANA_WHITE = awanaWhite;
+/**
+ * The church's own logo (owner 2026-10-13; it replaced the Awana Clubs mark
+ * on every screen and on these pages): always ONE colour, ink on a light
+ * field and white on a dark or strong one; two-line no narrower than 260px,
+ * full (with the tagline) no narrower than 520px. Rules and the sheet:
+ * lobby/shared/churchLogo.js and awana.kvbchurch.org/logo/.
+ */
+export const LOGO = {
+  twoLineInk: logoTwoLineInk,
+  twoLineWhite: logoTwoLineWhite,
+  fullWhite: logoFullWhite,
+  alt: 'Kennebec Valley Baptist Church Awana Clubs',
+} as const;

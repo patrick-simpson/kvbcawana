@@ -14,7 +14,7 @@ import { useBuildReload } from '../hooks/useBuildReload.js';
 import { selfReload } from '../lib/reloadLedger.js';
 import { projectorIdle } from '../lib/buildReload.js';
 import { ViewErrorBoundary, ErrorScreen } from './components/ViewErrorBoundary.jsx';
-import { AwanaMark } from './components/AwanaMark.jsx';
+import { ChurchMark } from './components/ChurchMark.jsx';
 import { ResumePill } from './components/ResumePill.jsx';
 import { SetupChecklist } from './components/SetupChecklist.jsx';
 import { CountdownView } from './views/CountdownView.jsx';
@@ -152,7 +152,7 @@ export const App = () => {
   useBuildReload(buildReloadBusy);
 
   // A deliberately bare wall (the opening's closing blackout, the shutdown
-  // screen's idle blackout) takes the Awana Clubs mark with it. The views
+  // screen's idle blackout) takes the church's logo with it. The views
   // report it; a view that goes away reports false on its way out.
   const [bare, setBare] = useState(false);
 
@@ -237,9 +237,10 @@ export const App = () => {
         </motion.div>
       </AnimatePresence>
 
-      {/* The Awana Clubs mark, like a broadcast logo: above every view, so no
-          slide change or view crossfade ever moves it. */}
-      <AwanaMark hidden={bare} />
+      {/* The church's logo, like a broadcast logo: above every view, so no
+          slide change or view crossfade ever moves it. The shutdown screen
+          signs the night off with the full logo, tagline and all. */}
+      <ChurchMark hidden={bare} full={state.mode === AppMode.SHUTDOWN} />
 
       {touch ? (
         <TouchMenu

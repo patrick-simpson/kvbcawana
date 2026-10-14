@@ -6,6 +6,9 @@ Terse, dated. Rules live in `../CLAUDE.md`; this is the why. Tests cited pin the
 - `name`/`appId` kept at `awana-label-printer`: electron-builder derives install dir and `userData` from `name` (confirmed in `build-electron.yml`'s CI comment); renaming would orphan every install's data and break the NSIS upgrade-in-place lookup for no user-visible gain. The title-cased `Club Label Printer` data folder in older docs was a doc bug (corrected in the 5.9.0 pass); it never existed.
 - Channel `awana-channel`, `AWANA_*`, `X-Awana-Pin`, `window.awana`, `pusherChannel`: internal, not branding, so they never move with a rename.
 
+## The church's logo (owner 2026-10-13)
+- Approved logo sheet: the church's own KVBC Awana logo replaces the Awana Clubs mark on the home page (header two-line ink, footer full white), the reel stand-in, the projector miniature (top left, as on the wall), /checkin, and the Windows app (status header, wizard rail). Always one colour by field; minimum widths (full 520, two-line 260, stacked 130 px) because "BAPTIST CHURCH" is a thin weight, so a narrow place takes another version instead of a smaller one: the phone header could not hold 260px beside the count and menu (hence the scrolling band), the wizard's 236px rail takes the stacked one, and the first page had 512px for the full one (needs 520), so it has none. Trademark line word for word, favicons, the app icon, labels and club marks unchanged. The reel film still shows the old mark until `npm run reel` is rerun.
+
 ## Releases
 - Manual tagging failed repeatedly: sessions' git access is commonly branch-scoped (tag pushes rejected), plus silent footguns (tag name case, a republished release reusing its old tag ref). Hence dispatch-only releases.
 - The printer repo used PRs; the owner's rule for this repo is push to `main`. A pushed branch nobody merges is work stranded where the operator cannot see it.

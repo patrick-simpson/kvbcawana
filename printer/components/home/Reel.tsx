@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Ico } from './Icons';
-import { AWANA_WHITE, Doodle, Shape } from './Kit';
+import { Doodle, LOGO, Shape } from './Kit';
 
 /*
  * The demo reel at the top of the home page. The film is ONE small file,
@@ -22,7 +22,7 @@ type Mode = 'waiting' | 'playing' | 'paused' | 'ended' | 'missing';
 
 const reducedMotion = () => typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-/** The stand-in: the catalog's cover, drawn in the kit (the six club waves, the Awana Clubs mark). */
+/** The stand-in: the catalog's cover, drawn in the kit (the six club waves, the church's logo in white). */
 const StandIn: React.FC<{ missing: boolean }> = ({ missing }) => (
   <div className={`kv-standin${missing ? ' is-missing' : ''}`} aria-hidden={!missing}>
     <div className="kv-standin__waves" aria-hidden="true">
@@ -33,7 +33,7 @@ const StandIn: React.FC<{ missing: boolean }> = ({ missing }) => (
     <Doodle name="sparkle-4pt" className="kv-standin__d1" />
     <Doodle name="ring" className="kv-standin__d2" />
     <Doodle name="loop" className="kv-standin__d3" />
-    <img className="kv-standin__awana" src={AWANA_WHITE} alt="" width="220" height="110" />
+    <img className="kv-standin__awana" src={LOGO.twoLineWhite} alt="" width="260" height="55" />
     {missing && (
       <div className="kv-standin__copy">
         <p className="kv-standin__kicker">Demo reel</p>

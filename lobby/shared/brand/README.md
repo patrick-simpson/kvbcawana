@@ -284,8 +284,22 @@ already bold, and no CSS weight may reach for the much fatter Black), each in
 one `@font-face` in `src/styles/app.css` and `src/presentation/index.css`;
 the 900 files are for the pages that load `fonts.css`.
 
+## The church's logo (owner 2026-10-13)
+
+Since 2026-10-13 the church's own logo (`logos/kvbc-awana-*`) is the logo every
+screen and page shows; the Awana Clubs mark files stay in the kit (the frozen
+`/checkin/classic` page still draws the white one) but nothing new uses them.
+The rules, in one place in code (`../churchLogo.js`): ONE colour chosen by the
+field (white on colour or dark, ink `#231F20` on light), never two colours, an
+outline, a shadow, a gradient or a stretch; full only where it can be 520px
+wide, two-line 260px, stacked 130px ("BAPTIST CHURCH" is a thin weight), and a
+smaller space takes the next version down or no logo at all; it arrives once,
+church line then Awana Clubs then tagline, then never moves (the check-in
+moment and the promos never animate it). Where each screen puts it:
+`lobby/CLAUDE.md` ("Brand kit") and `printer/CLAUDE.md`.
+
 ## Trademarks
 
 The club marks and the Awana Clubs mark are trademarks of Awana Clubs
 International, used here by the owner's decision for the church's own
-club screens and labels. See `TRADEMARKS.md` at the repo root.
+club screens and labels. The KVBC Awana logo is the church's own. See `TRADEMARKS.md` at the repo root.

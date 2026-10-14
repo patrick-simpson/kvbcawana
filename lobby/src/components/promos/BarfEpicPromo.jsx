@@ -857,7 +857,7 @@ export default function BarfEpicPromo({ promo, lines }) {
         <M.div className="promo-epic-flash" aria-hidden="true" {...FLASH} />
       </M.div>
 
-      <Wordmark at={T_MARK} />
+      <Wordmark at={T_MARK} tone="ink" />
       <CountdownChip label={promo.countdown} at={T_CHIP} pulses={[11.8, 13.8]} />
     </div>
   );

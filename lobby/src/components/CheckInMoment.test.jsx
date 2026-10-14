@@ -108,9 +108,12 @@ describe('CheckInMoment', () => {
     expect(container.querySelector('.checkin__mark').getAttribute('alt')).toBe('T&T logo');
   });
 
-  it('an unknown club gets the Awana Clubs mark and the house colours, never a blank', () => {
+  it('an unknown club gets the church\'s own logo (two-line, white) and the house colours, never a blank', () => {
     const { container } = render(still(<CheckInMoment event={kid({ club: 'Leaders Kids' })} />));
-    expect(container.querySelector('.checkin__mark').getAttribute('alt')).toBe('Awana Clubs');
+    const mark = container.querySelector('.checkin__mark');
+    expect(mark.getAttribute('alt')).toBe('Kennebec Valley Baptist Church Awana Clubs');
+    expect(mark.getAttribute('src')).toMatch(/kvbc-awana-two-line-white/);
+    expect(container.querySelector('.checkin__mark-slot--church')).not.toBeNull();
     expect(container.querySelector('.checkin').style.getPropertyValue('--club-primary')).toBe('#FAA41D');
   });
 

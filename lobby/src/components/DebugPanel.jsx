@@ -1,7 +1,7 @@
 import { useRef } from 'react';
 import { getAllClubs } from '../lib/clubs.js';
 import { SAMPLE_NAMES, pick } from '../lib/demoNames.js';
-import awanaClubsMark from '../../shared/brand/logos/awana-clubs-white.svg';
+import churchLogo from '../../shared/brand/logos/kvbc-awana-two-line-white.svg';
 
 export default function DebugPanel({
   onSimulate, onSimulateRecap, onSimulateOps, onSimulateTonight, onSimulateNotice, onClearNotice,
@@ -175,7 +175,7 @@ export default function DebugPanel({
           readouts as keyline chips. The simulators scroll under it; Close
           stays pinned at the foot, so a 720p screen can always get out. */}
       <div className="debug-header">
-        <img className="panel-mark" src={awanaClubsMark} alt="" draggable="false" />
+        <img className="panel-mark" src={churchLogo} alt="" draggable="false" />
         <h3>Debug · Simulate check-ins</h3>
         <div className="debug-stats">
           <span>live: {status ?? 'unknown'}</span>

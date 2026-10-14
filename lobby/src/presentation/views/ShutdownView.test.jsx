@@ -95,7 +95,7 @@ describe('ShutdownView idle blackout', () => {
     expect(container.textContent).toMatch(/SEE YOU NEXT WEEK/i);
   });
 
-  it('reports the blackout as a bare wall (App takes the Awana Clubs mark with it)', () => {
+  it('reports the blackout as a bare wall (App takes the church logo with it)', () => {
     const onBareChange = vi.fn();
     const { rerender, unmount } = render(<ShutdownView now={START} onRestart={() => {}} onBareChange={onBareChange} />);
     expect(onBareChange).toHaveBeenLastCalledWith(false);

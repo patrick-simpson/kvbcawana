@@ -338,10 +338,40 @@ html, body, #root {
 .lobby-tab .brand-tab__content {
   padding: calc(2.2 * var(--u)) 0 0 calc(2.6 * var(--u));
 }
-.lobby-tab__mark {
+/* The church's logo on the tab (owner 2026-10-13): white, one colour, never
+   an outline or a shadow. Two-line where it can be at least 260px wide (the
+   thin "BAPTIST CHURCH" line's floor, shared/churchLogo.js MIN_WIDTH_PX),
+   stacked below that (a 720p or 4:3 screen); the scene's own size decides. */
+.catalog-scene {
+  container: lobby-scene / size;
+}
+.lobby-tab__logo {
   display: block;
-  width: calc(13 * var(--u));
+  color: #fff;
+  overflow: visible;
+}
+.lobby-tab__logo--two-line {
+  width: calc(15 * var(--u));
   height: auto;
+  aspect-ratio: 1910 / 403;
+  /* Down into the tab's fat end, clear of its curve by the church line's
+     height (the logo's own clear space). */
+  margin-top: calc(0.8 * var(--u));
+}
+.lobby-tab__logo--stacked {
+  display: none;
+  width: calc(10.5 * var(--u));
+  height: auto;
+  aspect-ratio: 1034 / 805;
+}
+/* 15u reaches 260px at u = 17.33px: a 1733x975 scene. The slide editor's
+   thumbnails and the Settings preview (1600x900 frames standing for a 1080p
+   TV) keep the two-line. */
+@container lobby-scene ((max-width: 1732.98px) or (max-height: 974.98px)) {
+  .lobby-tab__logo--two-line { display: none; }
+  .lobby-tab__logo--stacked { display: block; }
+  :is(.slide-card-frame, .tv-preview__stage) .lobby-tab__logo--two-line { display: block; }
+  :is(.slide-card-frame, .tv-preview__stage) .lobby-tab__logo--stacked { display: none; }
 }
 
 /* The copy frame. Sizes, gaps and line breaks come from the fit in
@@ -1237,10 +1267,14 @@ html, body, #root {
   color: #ffffff;
   flex-shrink: 0;
 }
+/* The church's logo in a panel's blue band (owner 2026-10-13): two-line,
+   white, still, and never under 260px wide (16.25rem), where its thin church
+   line stops reading; a band too small for that shows no logo at all. */
 .panel-mark {
   display: block;
-  width: 7rem;
+  width: 16.25rem;
   height: auto;
+  aspect-ratio: 1910 / 403;
   user-select: none;
 }
 .panel--tabbed .panel-header .panel-mark { grid-column: 1; grid-row: 1 / span 2; }
@@ -1891,7 +1925,6 @@ html, body, #root {
 @media (max-height: 820px) {
   .panel--tabbed { height: 94vh; max-height: 94vh; padding-bottom: 0.6rem; }
   .panel--tabbed .panel-header { padding-block: 0.7rem 0.75rem; row-gap: 0.15rem; }
-  .panel--tabbed .panel-header .panel-mark { width: 5.6rem; }
   .panel--tabbed .panel-header h2 { font-size: 1.8rem; }
   .panel--tabbed .panel-header .hint.panel-sub { font-size: 0.85rem; line-height: 1.35; }
   .panel--tabbed .panel-header .status-line { padding: 0.4rem 0.8rem; font-size: 0.85rem; }
@@ -1936,7 +1969,7 @@ html, body, #root {
   color: #ffffff;
   flex-shrink: 0;
 }
-.debug-header .panel-mark { width: 5.6rem; grid-row: 1 / span 2; }
+.debug-header .panel-mark { grid-row: 1 / span 2; }
 .debug h3 {
   margin: 0;
   font-family: var(--font-condensed);
@@ -2483,7 +2516,7 @@ input:focus-visible {
     padding: 0 0 0.6rem;
   }
   .panel--tabbed .panel-header { padding: 0.6rem var(--panel-pad) 0.65rem; column-gap: 0.75rem; }
-  .panel--tabbed .panel-header .panel-mark { width: 4.5rem; }
+  .panel--tabbed .panel-header .panel-mark { display: none; }
   .panel--tabbed .panel-header h2 { font-size: 1.45rem; }
   .panel--tabbed .panel-header .hint.panel-sub { font-size: 0.78rem; }
   /* The status readout drops under the title instead of squeezing it. */
@@ -2580,9 +2613,12 @@ input:focus-visible {
   background: radial-gradient(ellipse at 50% 44%, rgba(0, 0, 0, 0) 52%, rgba(0, 0, 0, 0.38) 100%);
 }
 
-/* The Awana Clubs wordmark, small and centred at the top of every
-   promo. Its own slot does the centring so framer-motion owns the
-   element's transform outright. */
+/* The church's logo, centred at the top of every promo (owner 2026-10-13):
+   two-line, never under 260px wide (its thin church line's floor). The
+   posters were laid out round a small wordmark, so on a screen under
+   1600x900 a legible logo would crowd each headline: there it stays off and
+   the poster carries on without it (the corner chip still dates it). Its own
+   slot does the centring so framer-motion owns the element outright. */
 .promo-wordmark-slot {
   position: absolute;
   z-index: 4;
@@ -2594,8 +2630,12 @@ input:focus-visible {
   pointer-events: none;
 }
 .promo-wordmark {
-  height: clamp(22px, min(2.6vw, 4.6vh), 52px);
-  width: auto;
+  width: clamp(260px, min(13.5vw, 24vh), 600px);
+  height: auto;
+  aspect-ratio: 1910 / 403;
+}
+@media (max-width: 1599.98px), (max-height: 899.98px) {
+  .promo-wordmark-slot { display: none; }
 }
 
 /* The live counter: "3 club nights left" / "Tonight!". Top-LEFT on
@@ -3626,7 +3666,7 @@ details.advanced-fields > .hint { display: block; margin-bottom: 0.9rem; }
   left: 0;
   top: 0;
 }
-.brand-tab svg {
+.brand-tab > svg {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -3764,7 +3804,7 @@ details.advanced-fields > .hint { display: block; margin-bottom: 0.9rem; }
   grid-template-columns: auto minmax(0, 1fr) auto;
   padding-block: 0.75rem 0.8rem;
 }
-.panel--settings .panel-header .panel-mark { grid-row: 1; width: 5.4rem; }
+.panel--settings .panel-header .panel-mark { grid-row: 1; }
 .panel--settings .panel-header h2 { grid-row: 1; align-self: center; font-size: 1.9rem; }
 .panel--settings .panel-header .status-line { grid-row: 1; margin: 0; }
 .settings-main {

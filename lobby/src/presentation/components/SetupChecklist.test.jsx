@@ -122,7 +122,7 @@ describe('the note gives way to the wall\'s own bottom overlays', () => {
     expect(read('../components/ResumePill.jsx')).toMatch(/data-resume-pill[\s\S]{0,200}data-pj-bottom-overlay/);
     // A marker on an always-mounted element would hide the note for good.
     const attribute = /\sdata-pj-bottom-overlay(?=[\s=>/])/;   // as a JSX attribute, not as a word in a comment
-    const marked = ['../App.jsx', '../components/AwanaMark.jsx', '../components/SetupChecklist.jsx', '../views/QuickNav.jsx']
+    const marked = ['../App.jsx', '../components/ChurchMark.jsx', '../components/SetupChecklist.jsx', '../views/QuickNav.jsx']
       .filter((rel) => attribute.test(read(rel)));
     expect(marked).toEqual([]);
   });

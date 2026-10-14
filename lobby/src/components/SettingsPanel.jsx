@@ -27,7 +27,7 @@ import LaptopSection from './settings/laptop.jsx';
 import HistorySection from './settings/history.jsx';
 import { CORNER_CLUB_IDS } from '../lib/clubs.js';
 import { celebrateChange } from '../lib/settingsJoy.js';
-import awanaClubsMark from '../../shared/brand/logos/awana-clubs-white.svg';
+import churchLogo from '../../shared/brand/logos/kvbc-awana-two-line-white.svg';
 
 const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
 
@@ -552,7 +552,7 @@ export default function SettingsPanel({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="panel-header">
-          <img className="panel-mark" src={awanaClubsMark} alt="" draggable="false" />
+          <img className="panel-mark" src={churchLogo} alt="" draggable="false" />
           <h2>{screen ? screen.name : page ? 'KVBC Awana Settings' : 'Settings'}</h2>
           <div className={`status-line ${screen ? (screen.online ? 'connected' : 'off') : page ? (signedIn ? 'connected' : 'off') : status}`} role="status">
             <span className="dot" />

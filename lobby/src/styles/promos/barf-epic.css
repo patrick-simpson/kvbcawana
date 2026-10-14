@@ -579,13 +579,13 @@
   pointer-events: none;
 }
 
-/* The chip and the wordmark sit ON the goo wall, so both are inverted
-   against it: a lime chip on lime is no chip at all. */
+/* The chip and the logo sit ON the goo wall, so both are inverted against
+   it: a lime chip on lime is no chip at all, and the logo is ink there
+   (BarfEpicPromo passes tone="ink"; one colour, never a shadow). */
 .promo-slide--barf-epic .promo-chip-slot { z-index: 5; top: 2.2%; }
 .promo-slide--barf-epic .promo-chip {
   background: #3b1a63;
   color: #c7f26a;
   box-shadow: 0 0 0 0.14em #c7f26a, 0 10px 28px rgba(26, 6, 46, 0.45);
 }
-.promo-slide--barf-epic .promo-wordmark-slot { z-index: 5; top: 1.2%; }
-.promo-slide--barf-epic .promo-wordmark { filter: drop-shadow(0 0.25vh 0.5vh rgba(26, 6, 46, 0.55)); }
+.promo-slide--barf-epic .promo-wordmark-slot { z-index: 5; top: 0.55%; }

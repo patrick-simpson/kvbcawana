@@ -163,7 +163,7 @@ describe('PromoSlide', () => {
     });
   });
 
-  describe('the Awana Clubs wordmark', () => {
+  describe('the church logo at the top', () => {
     it('is on every promo', () => {
       for (const kind of ['contest', 'friend', 'barfEpic', 'parents']) {
         const { container } = render(<PromoSlide promo={promo(kind)} />);

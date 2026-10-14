@@ -2,6 +2,8 @@ import { useContext, useEffect, useState } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import { M, ZeroAnimationContext } from '../../lib/motion.jsx';
 import { PROMO_DURATION_SEC } from '../../lib/promos.js';
+import LOGO_WHITE from '../../../shared/brand/logos/kvbc-awana-two-line-white.svg';
+import LOGO_INK from '../../../shared/brand/logos/kvbc-awana-two-line-ink.svg';
 
 // ─────────────────────────────────────────────────────────────
 // The promo kit: what every fall showreel poster is built from.
@@ -9,7 +11,7 @@ import { PROMO_DURATION_SEC } from '../../lib/promos.js';
 // Each poster (ContestPromo, FriendPromo, BarfEpicPromo, ParentsPromo in
 // this folder) is a 15 second piece of motion design that ends on its own
 // finished printed poster. The pieces below are the parts they share: the
-// timing helpers, the Awana wordmark, the countdown chip, the one rotating
+// timing helpers, the church's logo, the countdown chip, the one rotating
 // detail line and the depth layers.
 //
 // Rules every poster keeps (CLAUDE.md, "Season promo slides"):
@@ -177,33 +179,26 @@ export function splatPath(seed, arms = 7) {
   return `${d}z`;
 }
 
-// Same recipe as config.js's fromSiteRoot: a fork or mirror serves its
-// own copy of shared/, and a non-browser context (tests) must not throw.
-function siteRootUrl(path) {
-  try {
-    return new URL(path, window.location.href).href;
-  } catch {
-    return '';
-  }
-}
-
-const LOGO_URL = siteRootUrl('shared/art/awana-clubs-logo.png');
-
 /**
- * The Awana Clubs wordmark, which simply is not there if the art 404s.
- * `at` is when it lands (seconds); it rests fully lit.
+ * The church's own logo at the top of every poster (owner 2026-10-13; it
+ * replaced the Awana Clubs wordmark): two-line, ONE colour picked by the
+ * poster's field (`tone`: white on a dark or strong one, ink on a light one),
+ * never a shadow or an outline. It does not move: at `at` (seconds) it simply
+ * fades up, and it rests fully lit. If the art fails to load it is not there.
+ * @param {{ at?: number, className?: string, tone?: 'white' | 'ink' }} props
  */
-export function Wordmark({ at = 0, className = '' }) {
+export function Wordmark({ at = 0, className = '', tone = 'white' }) {
   const [broken, setBroken] = useState(false);
-  if (broken || !LOGO_URL) return null;
+  if (broken) return null;
   return (
     <div className={`promo-wordmark-slot ${className}`}>
       <M.img
-        className="promo-wordmark"
-        src={LOGO_URL}
-        alt="Awana Clubs"
+        className={`promo-wordmark promo-wordmark--${tone}`}
+        src={tone === 'ink' ? LOGO_INK : LOGO_WHITE}
+        alt="Kennebec Valley Baptist Church Awana Clubs"
+        draggable="false"
         onError={() => setBroken(true)}
-        {...landsAt(at, 0.55, { opacity: [0, 1], y: [-20, 0] }, EASE_OUT)}
+        {...landsAt(at, 0.45, { opacity: [0, 1] }, EASE_OUT)}
       />
     </div>
   );

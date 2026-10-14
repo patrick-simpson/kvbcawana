@@ -6,6 +6,7 @@ import Wave from './Wave.jsx';
 import CornerTab from './CornerTab.jsx';
 import Sticker from './Sticker.jsx';
 import DoodleCluster from './DoodleCluster.jsx';
+import ChurchLogo from './ChurchLogo.jsx';
 import { holdThenLand } from '../../lib/lobbyMotion.js';
 import { squishLand, withSquish } from '../../lib/squish.js';
 
@@ -59,6 +60,15 @@ describe('brand primitives under zero-animation mode', () => {
     const { container } = zero(<Sticker {...ENTRANCES.sticker}>NEW!</Sticker>);
     const el = container.querySelector('.brand-sticker');
     await waitFor(() => expect(atRest(el)).toBe(true), INSTANT);
+  });
+
+  it('the church logo arriving line by line is already whole and still', async () => {
+    const { container } = zero(<ChurchLogo variant="full" arrive hold={0.3} />);
+    const lines = [...container.querySelectorAll('path')];
+    expect(lines.map((l) => l.getAttribute('class'))).toEqual(['kvbc-church', 'kvbc-awana', 'kvbc-tagline']);
+    await waitFor(() => {
+      for (const el of lines) expect(atRest(el)).toBe(true);
+    }, INSTANT);
   });
 
   it('every doodle has landed, and the twinkle rests at full size', async () => {

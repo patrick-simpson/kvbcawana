@@ -183,24 +183,25 @@ sup { font-size: .55em; line-height: 0; vertical-align: .9em; }
 .kv-nav__link:hover { background: rgba(255, 255, 255, .6); }
 .kv-header__cta { min-height: 44px; font-size: 1.08rem; }
 
-.kv-mark { display: inline-flex; align-items: center; gap: 10px; color: var(--navy); }
-.kv-mark__badge { position: relative; width: 50px; height: 50px; display: grid; place-items: center; color: var(--hot-btn); flex: none; }
-.kv-mark__burst { position: absolute; inset: 0; width: 100%; height: 100%; transition: transform .6s var(--pop); }
-.kv-header__home:hover .kv-mark__burst { transform: rotate(30deg) scale(1.06); }
-.kv-mark__glyph { position: relative; width: 24px; height: 24px; color: #fff; }
-.kv-mark__words { display: flex; flex-direction: column; }
-.kv-mark__name { font: 400 1.45rem/1 var(--shout); letter-spacing: -.01em; }
-.kv-mark__sub { font: 400 .86rem/1.2 var(--label); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-2); margin-top: 3px; }
-.kv-mark--inverse { color: #fff; }
-.kv-mark--inverse .kv-mark__sub { color: rgba(255, 255, 255, .85); }
+.kv-logo { display: block; line-height: 0; }
+.kv-logo img { display: block; height: auto; }
+.kv-logo__head { width: 260px; }
+/* The footer's full logo needs its 520px (its tagline's floor); a narrower
+   column gets the two-line one. */
+.kv-footer__lead { container-type: inline-size; }
+.kv-logo__full { width: 520px; }
+.kv-logo__narrow { display: none !important; width: 260px; }
+@container (max-width: 519.98px) {
+  .kv-logo__full { display: none !important; }
+  .kv-logo__narrow { display: block !important; }
+}
 
 @media (max-width: 1000px) { .kv-nav { display: none; } }
 @media (max-width: 480px) {
   .kv-header__inner { min-height: 64px; gap: 12px; }
-  .kv-mark__badge { width: 42px; height: 42px; }
-  .kv-mark__name { font-size: 1.2rem; }
-  .kv-mark__sub { font-size: .74rem; }
-  .kv-header__cta { padding: .5em .9em; font-size: 1rem; min-height: 44px; }
+  /* The logo keeps its 260px; the button gives up its word (still read out). */
+  .kv-header__cta { padding: .5em .8em; font-size: 1rem; min-height: 44px; min-width: 44px; justify-content: center; }
+  .kv-header__cta-word { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 }
 
 /* ── Hero: the reel, framed ─────────────────────────────────────────────── */
@@ -325,8 +326,11 @@ sup { font-size: .55em; line-height: 0; vertical-align: .9em; }
 .kv-standin__wave--sparks { height: 38%; color: var(--brand-sparks); transform: scaleX(-1); }
 .kv-standin__wave--cubbies { height: 30%; color: var(--brand-cubbies); }
 .kv-standin__wave--puggles { height: 22%; color: var(--brand-puggles); transform: scaleX(-1); }
-.kv-standin__awana { position: absolute; left: 50%; top: 18%; width: 24%; height: auto; transform: translateX(-50%); }
-.kv-standin.is-missing .kv-standin__awana { left: 6%; top: 8%; width: 16%; transform: none; }
+.kv-standin__awana { position: absolute; left: 50%; top: 18%; width: max(24%, 260px); height: auto; transform: translateX(-50%); }
+.kv-standin.is-missing .kv-standin__awana { left: 6%; top: 8%; width: 260px; transform: none; }
+/* Under 260px wide its church line stops reading, and a narrow frame has no
+   room for it beside the copy: there the waves carry the stand-in alone. */
+@media (max-width: 760px) { .kv-standin__awana { display: none; } }
 .kv-standin__d1 { position: absolute; width: 4%; right: 12%; top: 14%; color: var(--sun); }
 .kv-standin__d2 { position: absolute; width: 2.4%; right: 8%; top: 34%; color: #fff; }
 .kv-standin__d3 { position: absolute; width: 9%; left: 6%; top: 40%; color: #fff; }
@@ -449,13 +453,13 @@ sup { font-size: .55em; line-height: 0; vertical-align: .9em; }
 .kv-proj__roller { position: absolute; z-index: 2; left: -2%; right: -2%; top: 0; height: 3.4cqw; border-radius: 2cqw; background: linear-gradient(#f3f1ec, #bdb9b0); box-shadow: 0 .6cqw 0 rgba(35, 31, 32, .2); }
 .kv-proj__screen { position: relative; margin-top: 1.4cqw; aspect-ratio: 16 / 9; background: #000; overflow: hidden; isolation: isolate; box-shadow: 1.6cqw 1.6cqw 0 rgba(35, 31, 32, .22); border-radius: 0 0 .8cqw .8cqw; }
 .kv-proj__view { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-.kv-proj__mark { position: absolute; z-index: 3; left: 50%; top: 6cqw; width: 13cqw; transform: translateX(-50%); }
+.kv-proj__mark { position: absolute; z-index: 3; left: 3.2cqw; top: 2.6cqw; width: 15cqw; height: auto; }
 .kv-proj__kicker { font: 400 3.6cqw/1 var(--label); letter-spacing: .14em; text-transform: uppercase; color: #fff; margin-top: 6cqw; }
 .kv-proj__digits { display: flex; align-items: baseline; gap: .6cqw; margin-top: 1.4cqw; }
 .kv-proj__digits b { font: 400 14cqw/1 var(--shout); color: #fff; font-variant-numeric: tabular-nums; }
 .kv-proj__digits i { font: 400 4.4cqw/1 var(--label); font-style: normal; color: var(--sun); margin-right: 1.6cqw; text-transform: uppercase; }
 .kv-proj__chip { font-size: 1.9cqw; margin-top: 4cqw; }
-.kv-proj__wx { position: absolute; z-index: 3; right: 3.4cqw; top: 6.6cqw; display: inline-flex; align-items: center; gap: .6cqw; padding: .55cqw 1.4cqw .5cqw .9cqw; font: 400 2.2cqw/1 var(--label); letter-spacing: .08em; text-transform: uppercase; white-space: nowrap; color: #fff; background: var(--brand-blue-deep); border-radius: 999px; box-shadow: .35cqw .35cqw 0 #1b2c4f; }
+.kv-proj__wx { position: absolute; z-index: 3; right: 3.4cqw; top: 3.4cqw; display: inline-flex; align-items: center; gap: .6cqw; padding: .55cqw 1.4cqw .5cqw .9cqw; font: 400 2.2cqw/1 var(--label); letter-spacing: .08em; text-transform: uppercase; white-space: nowrap; color: #fff; background: var(--brand-blue-deep); border-radius: 999px; box-shadow: .35cqw .35cqw 0 #1b2c4f; }
 .kv-proj__wx svg { flex: none; width: 2.8cqw; height: 2.8cqw; }
 .kv-proj__cloud { position: absolute; overflow: visible; z-index: -1; left: 0; top: 33cqw; width: 26cqw; height: auto; transform: translateX(30%); }
 .kv-proj__star { position: absolute; width: .9cqw; height: .9cqw; border-radius: 50%; background: #fff; }

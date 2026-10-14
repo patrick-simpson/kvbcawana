@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Ico, IcoName } from './Icons';
-import { AWANA_WHITE, CLUBS, Club, Doodle, Shape, StepChip } from './Kit';
+import { CLUBS, LOGO, Club, Doodle, Shape, StepChip } from './Kit';
 
 /*
  * Small recreations of the real screens, drawn in HTML and CSS (styles/home.css,
@@ -234,6 +234,8 @@ export const ProjectorArt: React.FC<{ on: boolean }> = ({ on }) => {
     <div className="kv-scr kv-proj" role="img" aria-label="Recreation of the main-room projector. All week it counts down to the next club night on black, Awana begins in 2 days 4 hours 12 minutes. A small weather chip, Cloudy 54 degrees, sits top right, and one flat cartoon cloud drifts slowly behind the numbers. On club night each club's game slot gets its own screen: GAME TIME for T&T in green, with a timer at 1:47 that has turned amber two minutes before the handoff and a chip that says Wrap it up.">
       <span className="kv-proj__roller" />
       <div className="kv-proj__screen">
+        {/* The church's logo, top left over every view, as on the wall. */}
+        <img className="kv-proj__mark" src={LOGO.twoLineWhite} alt="" />
         {view === 0 ? (
           <div className="kv-proj__view kv-proj__count" key="count">
             <svg className="kv-proj__cloud" viewBox="0 0 120 60" aria-hidden="true" focusable="false">
@@ -242,7 +244,6 @@ export const ProjectorArt: React.FC<{ on: boolean }> = ({ on }) => {
                 <path d={WX_CLOUD} fill="var(--sky)" />
               </g>
             </svg>
-            <img className="kv-proj__mark" src={AWANA_WHITE} alt="" />
             <span className="kv-proj__wx" aria-hidden="true">
               <svg viewBox="0 0 24 24" focusable="false"><path d={WX_CLOUD} transform="translate(0 4) scale(.2)" fill="var(--cloud)" /></svg>
               Cloudy · 54°F

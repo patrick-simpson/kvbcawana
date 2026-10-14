@@ -448,7 +448,7 @@
 }
 
 /* ── Wordmark, chip, detail ───────────────────────────────── */
-.promo-slide--friend .promo-wordmark-slot { top: 3%; }
+.promo-slide--friend .promo-wordmark-slot { top: 2.2%; }
 .promo-slide--friend .promo-chip-slot { top: 4%; left: 3.4%; }
 .promo-slide--friend .promo-chip {
   background: #7ed321;

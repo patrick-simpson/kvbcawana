@@ -8,7 +8,7 @@ import {
 import { LOBBY_THEMES, lobbyTheme } from '../lib/lobbyFrame.js';
 import CornerTab from './brand/CornerTab.jsx';
 import Wave from './brand/Wave.jsx';
-import awanaClubsMark from '../../shared/brand/logos/awana-clubs-white.svg';
+import ChurchLogo from './brand/ChurchLogo.jsx';
 
 // The lobby (rebrand stage 4b): the approved mockup's studio, behind every
 // typed slide, calendar slide and the idle placeholder. Three layers, and
@@ -19,9 +19,12 @@ import awanaClubsMark from '../../shared/brand/logos/awana-clubs-white.svg';
 //               (CSS keyframes, transform only, compositor-driven);
 //   the COPY    whatever the caller renders as children (SlideCopy, a video,
 //               a poster), on a 16:9 box centred on the screen;
-//   the CHROME  the orange corner tab carrying the Awana Clubs mark, and the
-//               house waves low along the bottom: sunflower behind (slowly
-//               rolling), Awana orange in front.
+//   the CHROME  the orange corner tab carrying the church's logo (owner
+//               2026-10-13: white, two-line on a big enough screen, stacked
+//               on a smaller one, arriving once line by line with the first
+//               slide and then never moving), and the house waves low along
+//               the bottom: sunflower behind (slowly rolling), Awana orange
+//               in front.
 //
 // The scene is ONE persistent layer: a slide change swaps the copy, never the
 // studio. When two slides want different themes the field crossfades under
@@ -149,6 +152,9 @@ function Field({ theme, wipe, animated }) {
  * by opacity). `swell` counts hand-offs: each new count swells the orange
  * wave once, and nothing else ever replays it.
  */
+// The logo lands a beat after the scene appears, with the first slide's copy.
+const LOGO_HOLD = 0.3;
+
 function Chrome({ away, via, swell, still }) {
   // Where the chrome is and how it got there, captured once per change of
   // spot (derived state), so a later change of `via` alone never replays it.
@@ -184,7 +190,10 @@ function Chrome({ away, via, swell, still }) {
         animate={tab.animate}
         transition={tab.transition}
       >
-        <img className="lobby-tab__mark" src={awanaClubsMark} alt="" draggable="false" />
+        {/* Both versions are drawn; the scene's size picks one (app.css, a
+            container query: two-line only where it is 260px or wider). */}
+        <ChurchLogo variant="two-line" className="lobby-tab__logo lobby-tab__logo--two-line" arrive={!still} hold={LOGO_HOLD} decorative />
+        <ChurchLogo variant="stacked" className="lobby-tab__logo lobby-tab__logo--stacked" arrive={!still} hold={LOGO_HOLD} decorative />
       </CornerTab>
     </div>
   );

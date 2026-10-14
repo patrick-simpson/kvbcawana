@@ -19,7 +19,7 @@ import { useFontsReady } from '../hooks/useFontsReady.js';
 import Wave from './brand/Wave.jsx';
 import Sticker from './brand/Sticker.jsx';
 import DoodleCluster from './brand/DoodleCluster.jsx';
-import awanaClubsMark from '../../shared/brand/logos/awana-clubs-white.svg';
+import churchLogo from '../../shared/brand/logos/kvbc-awana-two-line-white.svg';
 
 /**
  * The check-in moment: the catalog's club opener page (p.63), played live.
@@ -256,8 +256,11 @@ export default function CheckInMoment({ event, step = 0, audioEnabled, clubPhras
   useFontsReady();
   const club = getClubPalette(event.club);
   const clubKey = club.name || 'awana';
-  const mark = club.logo || awanaClubsMark;
-  const markAlt = club.name ? `${club.name} logo` : 'Awana Clubs';
+  // An unknown club gets the church's own logo (owner 2026-10-13: two-line,
+  // white on the house colours), which never moves: the name is the moment.
+  const mark = club.logo || churchLogo;
+  const markAlt = club.name ? `${club.name} logo` : 'Kennebec Valley Baptist Church Awana Clubs';
+  const churchMark = !club.logo;
   const moment = momentFor(event);
   const first = step === 0;
   const changed = useFlipTracking(event, clubKey);
@@ -367,10 +370,10 @@ export default function CheckInMoment({ event, step = 0, audioEnabled, clubPhras
       </M.div>
 
       <M.div
-        className="checkin__mark-slot"
-        initial={{ opacity: 0, x: '-24%' }}
+        className={`checkin__mark-slot${churchMark ? ' checkin__mark-slot--church' : ''}`}
+        initial={{ opacity: 0, x: churchMark ? 0 : '-24%' }}
         animate={{ opacity: 1, x: 0 }}
-        exit={{ opacity: 0, y: '-30%', transition: LEAVE }}
+        exit={{ opacity: 0, y: churchMark ? 0 : '-30%', transition: LEAVE }}
         transition={{ duration: 0.42, delay: ENTRANCE.mark, ease: EASE.settle }}
       >
         <AnimatePresence initial={false}>
@@ -379,7 +382,7 @@ export default function CheckInMoment({ event, step = 0, audioEnabled, clubPhras
             className="checkin__mark"
             src={mark}
             alt={markAlt}
-            initial={{ opacity: 0, x: '-18%' }}
+            initial={{ opacity: 0, x: churchMark ? 0 : '-18%' }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, transition: { duration: 0.18, ease: EASE.exit } }}
             transition={{ duration: 0.38, delay: t.mark, ease: EASE.settle }}

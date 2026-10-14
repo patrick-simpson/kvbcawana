@@ -217,13 +217,19 @@
   text-wrap: balance;
 }
 
-/* ── The Awana Clubs mark (a broadcast logo, above every view) ── */
+/* ── The church's logo (a broadcast logo, above every view; ChurchMark.jsx) ── */
 .pj-mark {
   position: absolute;
   z-index: 30;
-  height: auto;
+  color: #ffffff;
   pointer-events: none;
   user-select: none;
+}
+.pj-mark__logo {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
 }
 
 /* ── The stepped chip (StepChip.jsx) ────────────────────────────── */

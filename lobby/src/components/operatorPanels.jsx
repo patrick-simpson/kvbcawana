@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { lazyPanel } from '../lib/lazyPanel.jsx';
-import awanaClubsMark from '../../shared/brand/logos/awana-clubs-white.svg';
+import churchLogo from '../../shared/brand/logos/kvbc-awana-two-line-white.svg';
 
 // The operator panels, each in its own chunk (src/lib/lazyPanel.jsx; App hands
 // each its `fallback`). Nothing a TV shows on its own lives here: the check-in
@@ -46,7 +46,7 @@ export function DebugOpening() {
   return (
     <div className="debug debug--opening" aria-busy="true">
       <div className="debug-header">
-        <img className="panel-mark" src={awanaClubsMark} alt="" draggable="false" />
+        <img className="panel-mark" src={churchLogo} alt="" draggable="false" />
         <h3>Debug · Simulate check-ins</h3>
         <div className="debug-stats" role="status"><span>Opening…</span></div>
       </div>

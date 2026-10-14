@@ -64,14 +64,30 @@ describe('CatalogScene club tint (#349)', () => {
 describe('CatalogScene as the lobby (rebrand stage 4b)', () => {
   afterEach(cleanup);
 
-  it('is the approved studio: a field, the corner tab with the Awana Clubs mark, two house waves', () => {
+  it('is the approved studio: a field, the corner tab with the church logo, two house waves', () => {
     const { container } = render(<CatalogScene theme="sky" still />);
     expect(container.querySelector('.lobby-field--sky')).not.toBeNull();
     expect(container.querySelectorAll('.lobby-cloud')).toHaveLength(2);
     expect(container.querySelectorAll('.lobby-doodle').length).toBeGreaterThanOrEqual(6);
-    expect(container.querySelector('.lobby-tab img').getAttribute('src')).toMatch(/awana-clubs-white/);
+    // Owner 2026-10-13: the church's own logo, both versions drawn (the
+    // scene's size picks one in app.css), one colour (currentColor, white
+    // from CSS), no Awana Clubs mark left.
+    const logos = [...container.querySelectorAll('.lobby-tab svg.church-logo')];
+    expect(logos.map((l) => [...l.classList].find((c) => c.startsWith('church-logo--')))).toEqual(['church-logo--two-line', 'church-logo--stacked']);
+    for (const logo of logos) {
+      expect(logo.querySelector('g').getAttribute('fill')).toBe('currentColor');
+      expect([...logo.querySelectorAll('path')].map((p) => p.getAttribute('class'))).toEqual(['kvbc-church', 'kvbc-awana']);
+    }
+    expect(container.querySelector('.lobby-tab img')).toBeNull();
     expect(container.querySelector('.lobby-wave--sun')).not.toBeNull();
     expect(container.querySelector('.lobby-wave--house')).not.toBeNull();
+    // A still scene (thumbnails, weak hardware) draws it; a live one lets it arrive once.
+    for (const logo of logos) expect(logo.dataset.arrive).toBe('no');
+    cleanup();
+    const live = render(<CatalogScene theme="sky" />).container;
+    const arriving = live.querySelectorAll('.lobby-tab svg.church-logo');
+    expect(arriving).toHaveLength(2);
+    for (const logo of arriving) expect(logo.dataset.arrive).toBe('once');
   });
 
   it('paints the copy between the field and the chrome', () => {

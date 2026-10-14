@@ -53,7 +53,7 @@ export const ShutdownView = ({ now, onRestart, onBareChange }) => {
     blackedRef.current = blackout;
   }, [blackout]);
 
-  // The idle blackout is a bare wall: App takes the Awana Clubs mark away
+  // The idle blackout is a bare wall: App takes the church's logo away
   // with it, and gives it back on wake (or when this view goes).
   useEffect(() => {
     onBareChange?.(blackout);

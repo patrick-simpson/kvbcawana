@@ -24,7 +24,7 @@ import { publishDeck } from '../lib/publishDeck.js';
 import { loadPublishToken } from '../lib/publishToken.js';
 import { publishViaSync, useSync } from '../hooks/useSync.js';
 import CornerTab from './brand/CornerTab.jsx';
-import awanaClubsMark from '../../shared/brand/logos/awana-clubs-white.svg';
+import churchLogo from '../../shared/brand/logos/kvbc-awana-two-line-white.svg';
 
 const THEME_OPTIONS = [
   { value: 'auto', label: 'Auto (rotate)' },
@@ -337,7 +337,7 @@ export default function SlideEditorPanel({ config, syncedDeck, onChange, onClose
     <div className="panel-backdrop" onClick={requestClose}>
       <div className="panel panel--tabbed panel--slides" role="dialog" aria-label="Typed slides" onClick={(e) => e.stopPropagation()}>
         <div className="panel-header">
-          <img className="panel-mark" src={awanaClubsMark} alt="" draggable="false" />
+          <img className="panel-mark" src={churchLogo} alt="" draggable="false" />
           <h2>Typed Slides</h2>
           <div className="hint panel-sub">
             {slides.length} of {MAX_SLIDES} slides
