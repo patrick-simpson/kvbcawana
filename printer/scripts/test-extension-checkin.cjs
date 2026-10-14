@@ -158,3 +158,22 @@ console.log('\nextension check-in tokens: a fresh meeting id before every direct
     process.exit(failed ? 1 : 0);
   })();
 }
+
+
+console.log('\nextension check-in sanitizer: strips XSS and unsafe URLs');
+{
+  const dom = new (require('jsdom').JSDOM)();
+  global.document = dom.window.document;
+  global.DOMParser = dom.window.DOMParser;
+  const sanitizeCheckinReply = new Function(extractFunction('sanitizeCheckinReply') + '; return sanitizeCheckinReply;')();
+
+  const origSnippet = '<a href="/clubber/update/4821">Ava Stone</a> <small>(<a href="#" onclick="undoCheckin(4821)">undo</a>)</small>';
+  const evilSnippet = '<a href="/clubber/update/4821">Ava Stone</a> <small>(<a href="#" onclick="undoCheckin(4821)">undo</a>)</small><script>alert(1)</script><img src=x onerror=alert(2)><a href="javascript:alert(3)">evil</a>';
+
+  const s1 = sanitizeCheckinReply(origSnippet);
+  check('preserves the original snippet unmodified', s1 === origSnippet, s1);
+
+  const s2 = sanitizeCheckinReply(evilSnippet);
+  check('strips dangerous tags like script and img', s2.indexOf('script') === -1 && s2.indexOf('img') === -1);
+  check('strips dangerous javascript: href attributes', s2.indexOf('alert(3)') === -1);
+}
