@@ -26,6 +26,12 @@ afterEach(() => {
 });
 
 describe('pageBuild', () => {
+  it('handles missing global document', () => {
+    vi.stubGlobal('document', undefined);
+    expect(pageBuild()).toBeNull();
+    vi.unstubAllGlobals();
+  });
+
   it('reads the hash this page was stamped with', () => {
     document.head.innerHTML = `<meta name="${BUILD_META_NAME}" content="abc123def456">`;
     expect(pageBuild()).toBe('abc123def456');
@@ -61,6 +67,10 @@ describe('buildFromHtml', () => {
   // no stamp, so it can never be mistaken for the new build.
   it('is null for an unrelated page', () => {
     expect(buildFromHtml('<html><head><title>Sign in to WiFi</title></head></html>')).toBeNull();
+  });
+
+  it('is null when content is empty', () => {
+    expect(buildFromHtml('<meta name="' + BUILD_META_NAME + '" content="">')).toBeNull();
   });
 });
 
@@ -115,6 +125,31 @@ describe('fetchProbe', () => {
       text: vi.fn().mockRejectedValue(new Error('stream interrupted')),
     });
     await expect(fetchProbe('version.json', { fetchImpl })).resolves.toBeNull();
+  });
+
+  it('uses global fetch if fetchImpl is not provided', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(textResponse('{"build":"global"}')));
+    await expect(fetchProbe('version.json')).resolves.toBe('{"build":"global"}');
+    vi.unstubAllGlobals();
+  });
+
+  it('returns null when the global fetch network throws', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')));
+    await expect(fetchProbe('version.json')).resolves.toBeNull();
+    vi.unstubAllGlobals();
+  });
+
+  it('returns null when there is no fetchImpl and no global fetch', async () => {
+    vi.stubGlobal('fetch', undefined);
+    await expect(fetchProbe('version.json')).resolves.toBeNull();
+    vi.unstubAllGlobals();
+  });
+
+  it('works when AbortController is not available', async () => {
+    vi.stubGlobal('AbortController', undefined);
+    const fetchImpl = vi.fn().mockResolvedValue(textResponse('{"build":"no-abort"}'));
+    await expect(fetchProbe('version.json', { fetchImpl })).resolves.toBe('{"build":"no-abort"}');
+    vi.unstubAllGlobals();
   });
 
   it('gives up after the timeout instead of hanging forever', async () => {
@@ -172,9 +207,30 @@ describe('isTyping', () => {
     expect(isTyping()).toBe(true);
   });
 
+  it('is false when activeElement is null', () => {
+    const doc = { get activeElement() { return null; } };
+    expect(isTyping(doc)).toBe(false);
+  });
+
+  it('is true when activeElement.isContentEditable is true', () => {
+    const doc = { activeElement: { isContentEditable: true } };
+    expect(isTyping(doc)).toBe(true);
+  });
+
   it('is true inside a contenteditable region', () => {
     document.body.innerHTML = '<div id="f" contenteditable="true" tabindex="0"></div>';
     document.getElementById('f').focus();
     expect(isTyping()).toBe(true);
+  });
+});
+
+import { reloadPage } from './buildReload.js';
+
+describe('reloadPage', () => {
+  it('calls window.location.reload', () => {
+    vi.stubGlobal('location', { reload: vi.fn() });
+    reloadPage();
+    expect(window.location.reload).toHaveBeenCalled();
+    vi.unstubAllGlobals();
   });
 });
