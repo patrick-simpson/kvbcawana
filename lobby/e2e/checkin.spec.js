@@ -200,6 +200,7 @@ test('sign in, search, check two siblings in with Bible and a friend, undo one, 
   const ben = page.locator('.tile', { hasText: 'Ben Tester' });
   await ben.getByRole('button', { name: 'Brought a friend' }).click();
   await ben.getByLabel('Friend’s first name').fill('Sam');
+  await ben.getByLabel('Friend’s club').selectOption('Cubbies');
   await page.getByRole('button', { name: 'Both of them' }).click();
   await expect(page.locator('#toast')).toContainText('Tester: 2 checked in');
   expect(world.posts.map((p) => p.path)).toEqual(['/v1/desk/checkin', '/v1/desk/checkin']);
@@ -209,6 +210,8 @@ test('sign in, search, check two siblings in with Bible and a friend, undo one, 
   expect(sent['11'].items).toEqual({ Bible: true });
   expect(sent['12'].items).toEqual({ Bible: true, Friend: true });
   expect(sent['12'].friendName).toBe('Sam');
+  expect(sent['12'].friendClub).toBe('Cubbies');
+  expect(sent['11'].friendClub).toBeUndefined();
   expect(sent['11'].friendName).toBeUndefined();
   for (const post of world.posts) {
     const { job: _job, historyRow: _row, friendName: _friend, ...plain } = post.body;   // the sealed parts are random base64
@@ -686,6 +689,7 @@ for (const where of ['/checkin/', '/checkin/ym/']) {
     await page.locator('#barf-body').getByRole('button', { name: 'Next' }).click();
     await expect(page.locator('#barf-body .err')).toHaveText('Type the friend’s first name.');
     await page.locator('#barf-body').getByLabel('Friend’s first name').fill('  Sam  ');
+    await page.locator('#barf-body').getByLabel('Friend’s club').selectOption('Sparks');
     await snap(page, `${tag}barf-friend-name.png`);
     await page.locator('#barf-body').getByRole('button', { name: 'Next' }).click();
     await expect(page.locator('#barf-title')).toHaveText(`${pick[1]} brought Sam`);
@@ -697,6 +701,7 @@ for (const where of ['/checkin/', '/checkin/ym/']) {
     const sent = world.barfPosts[0];
     expect(sent.clubberId).toBe(pick[0]);
     expect(sent.friendName).toBe('Sam');
+    expect(sent.friendClub).toBe('Sparks');
     const { tagJob: _j, historyRow: _r, ...plain } = sent;
     expect(JSON.stringify(plain)).not.toContain(pick[2]);
     expect(sent.tagJob.jobId).toMatch(/^reprint:/);

@@ -14,6 +14,7 @@
 
 import { localTime, openState, sealState } from './watcher.js';
 import { toBase64Url } from './crypto.js';
+import { CLUB_TABLE, clubIdByAlias } from '../../shared/clubs.js';
 
 export const KEEP_DAYS = 3;
 export const CLUB_ORDER = Object.freeze(['Puggles', 'Cubbies', 'Sparks', 'T&T', 'Trek', 'Journey']);
@@ -24,6 +25,17 @@ const clean = (raw, max) => (typeof raw === 'string'
   ? Array.from(raw).filter((c) => c.charCodeAt(0) >= 32 && c.charCodeAt(0) !== 127 && c !== '<' && c !== '>').join('')
     .replace(/\s+/g, ' ').trim().slice(0, max)
   : '');
+
+/**
+ * A club the page offered ("Puggles", "T&T"...) as the table's own name, or ''
+ * for anything else: the friend's club on a bag is never free text.
+ * @param {unknown} raw
+ */
+export function friendClubOf(raw) {
+  const id = typeof raw === 'string' && raw.trim() ? clubIdByAlias(raw.trim()) : '';
+  const club = id ? CLUB_TABLE.find((c) => c.id === id) : null;
+  return club ? club.name : '';
+}
 
 /** A friend's first name as every path keeps it (the print server's cleanFriendName: one line, 24). @param {unknown} raw */
 export const cleanFriendName = (raw) => clean(raw, 24);
@@ -42,7 +54,7 @@ async function sha256(text) {
 /**
  * The report: clubs in club order, children by name, each with their friend
  * ('' when none was typed). Pure.
- * @param {{name: string, club: string, friendName: string}[]} rows @param {string} date
+ * @param {{name: string, club: string, friendName: string, friendClub?: string}[]} rows @param {string} date
  */
 export function friendsReport(rows, date) {
   /** @type {Map<string, {name: string, friend: string}[]>} */
@@ -50,7 +62,7 @@ export function friendsReport(rows, date) {
   for (const r of rows) {
     const club = r.club || 'No club';
     if (!byClub.has(club)) byClub.set(club, []);
-    /** @type {{name: string, friend: string}[]} */ (byClub.get(club)).push({ name: r.name, friend: r.friendName || '' });
+    /** @type {{name: string, friend: string, friendClub?: string}[]} */ (byClub.get(club)).push({ name: r.name, friend: r.friendName || '', ...(r.friendClub ? { friendClub: r.friendClub } : {}) });
   }
   const rank = (c) => { const i = CLUB_ORDER.indexOf(c); return i < 0 ? CLUB_ORDER.length : i; };
   const clubs = [...byClub.keys()].sort((a, b) => rank(a) - rank(b) || a.localeCompare(b))
@@ -83,7 +95,7 @@ export class Friends {
    * One child who brought a friend tonight. A second record for the same
    * child (by clubber id, else by name) fills in a friend's name the first
    * lacked, and otherwise changes nothing.
-   * @param {any} body {name, club, clubberId?, friendName?}
+   * @param {any} body {name, club, clubberId?, friendName?, friendClub?}
    */
   async record(body) {
     const k = this.key();
@@ -91,12 +103,14 @@ export class Friends {
     const name = clean(body && body.name, 80);
     if (!name) return { ok: false, status: 400, error: 'name is required' };
     const clubberId = /^\d{1,20}$/.test(String(body.clubberId ?? '')) ? String(body.clubberId) : '';
-    const row = { name, club: clean(body.club, 40), clubberId, friendName: clean(body.friendName, 24), at: new Date(this.now()).toISOString() };
+    const friendClub = friendClubOf(body.friendClub);
+    const row = { name, club: clean(body.club, 40), clubberId, friendName: clean(body.friendName, 24), ...(friendClub ? { friendClub } : {}), at: new Date(this.now()).toISOString() };
     const date = localTime(this.now()).date;
     const rows = await this.rows(date);
     const same = rows.find((r) => (clubberId && r.clubberId ? r.clubberId === clubberId : r.name.toLowerCase() === name.toLowerCase()));
     if (same) {
       if (!same.friendName && row.friendName) same.friendName = row.friendName;
+      if (!same.friendClub && friendClub) same.friendClub = friendClub;
       if (!same.clubberId && clubberId) same.clubberId = clubberId;
       if (!same.club && row.club) same.club = row.club;
     } else {
@@ -129,8 +143,9 @@ export class Friends {
     // The same labels with what each bag needs besides the name (owner
     // 2026-10-14: "I need to know on the barf bag tags what club a child is
     // in"): a child's own club; a friend has none in TwoTimTwo, so the label
-    // says whose friend they are. `names` stays for a laptop that has not
-    // updated yet.
+    // says whose friend they are, and their club when the page asked it
+    // (owner 2026-10-14: "ask what club a friend is in when we ask for their
+    // name"). `names` stays for a laptop that has not updated yet.
     /** @type {{ name: string, club: string, friendOf?: string }[]} */
     const bags = [];
     let unnamed = 0;
@@ -140,7 +155,7 @@ export class Friends {
         bags.push({ name: kid.name, club: club.club === 'No club' ? '' : club.club });
         if (kid.friend) {
           names.push(kid.friend);
-          bags.push({ name: kid.friend, club: '', friendOf: kid.name });
+          bags.push({ name: kid.friend, club: kid.friendClub || '', friendOf: kid.name });
         } else unnamed += 1;
       }
     }

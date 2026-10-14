@@ -252,7 +252,7 @@ async function generateBarfBag(name, info = {}) {
   // With that line the name rides higher and smaller, so both sit above the drips.
   const club = String((info && info.club) || '').trim();
   const friendOf = String((info && info.friendOf) || '').trim().split(/\s+/)[0];
-  const sub = club ? club.toLocaleUpperCase('en-US') : friendOf ? `FRIEND OF ${friendOf.toLocaleUpperCase('en-US')}` : '';
+  const sub = club ? club.toLocaleUpperCase('en-US') + (friendOf ? ' FRIEND' : '') : friendOf ? `FRIEND OF ${friendOf.toLocaleUpperCase('en-US')}` : '';
   ctx.fillStyle = ink;
   const os2 = type.fit(ctx, 'name', owner, $labelLayout.PAGE_W - 36, sub ? 34 : 44, 14);
   type.fill(ctx, 'name', os2, owner, $labelLayout.PAGE_W / 2, (sub ? 30 : 42) + type.capCentre(ctx, 'name', owner) * os2);

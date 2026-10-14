@@ -1,4 +1,9 @@
-﻿## [9.4.4] - 2026-10-14
+﻿## [9.4.5] - 2026-10-14
+BARF Bag labels for friends say the friend's club.
+
+**Friend's club.** The check-in page now asks "Friend's club" next to the friend's first name (Puggles, Cubbies, Sparks, T&T, Trek, Journey, or Not sure). A friend's bag prints it ("SPARKS FRIEND"); without an answer it still says "FRIEND OF <child>". This needs the sync service updated too (it deploys with the website). The touch screen at the laptop does not ask it yet.
+
+## [9.4.4] - 2026-10-14
 BARF Bag labels say what club a child is in.
 
 **Club on the bag.** Under a child's name, a BARF Bag label now prints their club (CUBBIES, SPARKS, T&T...). A friend's bag says whose friend they are ("FRIEND OF DOT"), because a friend has no club on TwoTimTwo. The sync service sends the clubs along with the names, so this needs the sync service updated too (it deploys with the website). Nothing else about printing has changed.

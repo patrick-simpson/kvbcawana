@@ -207,7 +207,7 @@ export class SyncCore {
     this.desk.hooks.afterCheckin.push((e) => this.publisher.deskCheckin(e));
     // A desk check-in with Brought a friend ticked: who, for the 6:30 BARF email (friends.js).
     this.desk.hooks.afterCheckin.push(async (e) => {
-      if (e.friend && e.name) await this.friends.record({ name: e.name, club: e.club, clubberId: e.clubberId, friendName: e.friendName || '' });
+      if (e.friend && e.name) await this.friends.record({ name: e.name, club: e.club, clubberId: e.clubberId, friendName: e.friendName || '', friendClub: e.friendClub || '' });
     });
     this.desk.hooks.afterUndo.push((e) => this.publisher.deskUndo(e));
     this.desk.hooks.afterCheckout.push((e) => this.publisher.deskCheckout(e));

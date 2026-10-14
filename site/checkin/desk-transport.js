@@ -440,7 +440,7 @@ export function createDesk({ cc, fetch: fetchFn, store, base = DESK_API, now = D
    * `{route: '/print', body: <the print server's /print body>, clubberId, source: 'desk'}`.
    * The page does not know the claim's gen: the lease carries it.
    * @param {{ clubberId?: string|null, name: string, club?: string, visitor?: boolean }} child
-   * @param {{ bible?: boolean, friend?: boolean, friendName?: string }} [choice]
+   * @param {{ bible?: boolean, friend?: boolean, friendName?: string, friendClub?: string }} [choice]
    * @returns {Promise<{ already: boolean, jobId: string|null, gen?: number, history: string }>}
    */
   async function checkIn(child, choice = {}) {
@@ -455,8 +455,9 @@ export function createDesk({ cc, fetch: fetchFn, store, base = DESK_API, now = D
       ...(isVisitor ? { visitor: true } : {}),
       ...(choice.friend ? { friend: true, ...(friendName ? { friendName } : {}) } : {}),
     };
+    const friendClub = friendName ? String(choice.friendClub || '').slice(0, 20) : '';
     const out = await sealedPost('/v1/desk/checkin', async (list) => ({
-      night: n, ...who(child), items, ...(choice.friend && friendName ? { friendName } : {}),
+      night: n, ...who(child), items, ...(choice.friend && friendName ? { friendName, ...(friendClub ? { friendClub } : {}) } : {}),
       historyRow: await sealHistory(n, isVisitor ? 'visitor' : 'checkin', historyRecord(child, { friend: choice.friend, friendName })),
       job: await sealJob(list, n, { route: '/print', body: printBody, clubberId, source: 'desk' }),
     }));
@@ -562,10 +563,10 @@ export function createDesk({ cc, fetch: fetchFn, store, base = DESK_API, now = D
    * here to every station: the tag's own route, or a "BARFED! <first>" custom label
    * for a station older than 9.3.1), and records the friend. `checkedIn: false` in
    * the answer = TwoTimTwo did not take the redo: offer barfRecheck(child, items).
-   * @param {{ clubberId: string, name: string, club?: string }} child @param {string} friendName @param {string} [tagRoute]
+   * @param {{ clubberId: string, name: string, club?: string }} child @param {string} friendName @param {string} [tagRoute] @param {string} [friendClub]
    * @returns {Promise<{ checkedIn: boolean, items: { Bible: boolean, Friend: boolean }, jobId: string|null, reason?: string }>}
    */
-  async function barfLate(child, friendName, tagRoute) {
+  async function barfLate(child, friendName, tagRoute, friendClub) {
     const friend = friendFirst(friendName);
     if (!friend) throw new DeskError('refused', 'Type the friend’s first name.', { reason: 'no-friend-name' });
     if (!child || !child.clubberId) throw new DeskError('refused', 'Pick the child who brought the friend.', { reason: 'no-child' });
@@ -574,7 +575,7 @@ export function createDesk({ cc, fetch: fetchFn, store, base = DESK_API, now = D
     const route = tagRoute === '/print-barf-tag' ? '/print-barf-tag' : '/print-custom';
     const body = route === '/print-barf-tag' ? { firstName: first, clubName: child.club || '' } : { text: `BARFED! ${first}` };
     const out = await sealedPost('/v1/desk/barf-late', async (list) => ({
-      night: n, clubberId: String(child.clubberId), friendName: friend,
+      night: n, clubberId: String(child.clubberId), friendName: friend, ...(friendClub ? { friendClub: String(friendClub).slice(0, 20) } : {}),
       historyRow: await sealHistory(n, 'barf-friend', historyRecord(child, { friend: true, friendName: friend })),
       tagJob: list.length ? { jobId: `reprint:${crypto.randomUUID()}`, bundle: await sealJob(list, n, { route, body, source: 'desk', at: new Date(now()).toISOString() }) } : null,
     }));

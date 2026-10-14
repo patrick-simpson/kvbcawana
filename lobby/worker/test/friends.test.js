@@ -3,7 +3,7 @@
 // the scheduled 6:30 pm email through a one-night link.
 import { describe, expect, it } from 'vitest';
 import { SyncCore } from '../src/sync.js';
-import { friendsReport, KEEP_DAYS } from '../src/friends.js';
+import { friendsReport, friendClubOf, KEEP_DAYS } from '../src/friends.js';
 import { HOUSEHOLD_CSV, fakeTwoTimTwo, page, table } from './fixtures.js';
 import { leaks } from './noleak.js';
 
@@ -167,5 +167,22 @@ describe('BARF Bag labels', () => {
     await off.call('POST', '/v1/cloud/friend', { name: 'Zoe Tester', club: 'Sparks', friendName: 'Ana' });
     expect((await off.call('POST', '/v1/cloud/barf-bags', {})).body).toMatchObject({ ok: false, reason: 'laptop-off', kids: 1 });
     expect(off.storage.map.get('relay:queue') || []).toEqual([]);
+  });
+});
+
+describe('the friend\'s club', () => {
+  it('keeps only a club the page offers, under its table name', () => {
+    expect(friendClubOf('cubbie')).toBe('Cubbies');
+    expect(friendClubOf(' T&T ')).toBe('T&T');
+    expect(friendClubOf('Sparks')).toBe('Sparks');
+    expect(friendClubOf('<b>Hax</b>')).toBe('');
+    expect(friendClubOf('')).toBe('');
+    expect(friendClubOf(7)).toBe('');
+  });
+  it('goes on the report and on the friend\'s bag', async () => {
+    const s = await setup();
+    await s.call('POST', '/v1/cloud/friend', { name: 'Kit Tester', club: 'Sparks', clubberId: '662', friendName: 'Maya', friendClub: 'Cubbies' });
+    const r = await s.call('GET', '/v1/cloud/friends');
+    expect(r.body.clubs[0].kids[0]).toEqual({ name: 'Kit Tester', friend: 'Maya', friendClub: 'Cubbies' });
   });
 });

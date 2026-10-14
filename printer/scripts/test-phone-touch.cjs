@@ -34,7 +34,7 @@ const BASE = `http://127.0.0.1:${PORT}`;
     check('Bible starts ticked on the phone’s card and family page',
       /var choice = \{ bible: items\.bible, friend: false \};/.test(phone) && /openFamily\(null, ready, \{ bible: true, friend: false \}, f\.name\)/.test(phone));
     check('a phone check-in sends Bible / Friend with it (the Worker\'s desk check-in, site/checkin/desk-transport.js)',
-      /var choice = \{ bible: items\.bible && !!e\.choice\.bible, friend: items\.friend && !!e\.choice\.friend, friendName: friendName \};/.test(phone)
+      /var choice = \{ bible: items\.bible && !!e\.choice\.bible, friend: items\.friend && !!e\.choice\.friend, friendName: friendName, friendClub: String\(e\.choice\.friendClub \|\| ''\) \};/.test(phone)
       && /desk\.checkIn\(\{ clubberId: k\.clubberId, name: k\.name, club: k\.club \}, choice\)/.test(phone));
     check('the card goes back at once (the check-in runs in the background)',
       /hideSheet\(\);[\s\S]{0,200}checkInMany\(\[\{ p: p, choice: choice \}\], null\);/.test(phone));

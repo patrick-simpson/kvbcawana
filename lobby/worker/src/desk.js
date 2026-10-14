@@ -70,6 +70,7 @@ import { Families } from './families.js';
 import { PRINT_JOB_KIND } from './adopt.js';
 import { itemClubs } from './phone.js';
 import { openState, sealState, watchWindow } from './watcher.js';
+import { friendClubOf } from './friends.js';
 
 /** The roster's check-in page is re-read at most this often (pages poll every 15 s; 2 of the 4 reads a minute). */
 export const CHECKIN_PAGE_TTL_MS = 30 * 1000;
@@ -579,7 +580,8 @@ export class Desk {
     // The friend's first name, only with Brought a friend: for the 6:30 BARF email and the
     // BARF bags (friends.js, sealed under the Worker's key, as the phone path always sent it).
     const friendName = friend ? clean(body.friendName, 24) : '';
-    await this.fire('afterCheckin', { friend, friendName, night, tag, clubberId: 'clubberId' in who ? who.clubberId : undefined, gen: claim.gen, jobId, club, name, visitor: 'visitor' in who, historyRow: body.historyRow, source: 'desk' });
+    const friendClub = friend && friendName ? friendClubOf(body.friendClub) : '';
+    await this.fire('afterCheckin', { friend, friendName, friendClub, night, tag, clubberId: 'clubberId' in who ? who.clubberId : undefined, gen: claim.gen, jobId, club, name, visitor: 'visitor' in who, historyRow: body.historyRow, source: 'desk' });
     return json({ ok: true, already: false, jobId, gen: claim.gen, history: this.hooks.afterCheckin.length ? 'hooked' : 'off' });
   }
 

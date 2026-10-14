@@ -118,7 +118,9 @@ const today = (() => { const d = new Date(); return `${d.getFullYear()}-${String
     const same = (a, b) => fs.readFileSync(a.pngPath).equals(fs.readFileSync(b.pngPath));
     check('a child\'s bag label carries their club under the name', !same(bare, withClub));
     check('a friend\'s bag label carries whose friend they are', !same(friend, bareEd));
-    for (const l of [bare, withClub, friend, bareEd]) fs.unlinkSync(l.pngPath);
+    const clubFriend = await server.generateBarfBag('Ed', { club: 'Sparks', friendOf: 'Dot Tester' });
+    check('a friend whose club is known prints it, marked as a friend', !same(clubFriend, friend) && !same(clubFriend, bareEd));
+    for (const l of [bare, withClub, friend, bareEd, clubFriend]) fs.unlinkSync(l.pngPath);
     const beforeBags = jobs();
     r = await post('/print-barf-bags', { names: ['Dot Tester', 'Ed'], bags: [{ name: 'Dot Tester', club: 'Cubbies' }, { name: 'Ed', club: '', friendOf: 'Dot Tester' }, { name: 'Zoe', club: 'Sparks' }] });
     check('the new list of bags prints as ONE job, one label each', r.status === 200 && r.body.printed === 3 && jobs() === beforeBags + 1, `${JSON.stringify(r)} ${jobs() - beforeBags}`);
@@ -174,7 +176,7 @@ const today = (() => { const d = new Date(); return `${d.getFullYear()}-${String
       && /closest\('#checkin'\)[\s\S]{0,120}friendBoxTicked\(\)/.test(content));
     check('the touch screen and the phone page ask for the friend\'s first name',
       /friendInput\(/.test(touch) && /options\.FriendName = friendName/.test(touch)
-      && /friendInput\(/.test(phone) && /friend: items\.friend && !!e\.choice\.friend, friendName: friendName \}/.test(phone));
+      && /friendInput\(/.test(phone) && /friend: items\.friend && !!e\.choice\.friend, friendName: friendName, friendClub: /.test(phone));
     check('a brother or sister never gets the first child\'s friend name',
       /openFamily\(p, sibs, \{ bible: choice\.bible, friend: choice\.friend \}\)/.test(phone)
       && /var choice = \{ bible: state\.choice\.bible, friend: state\.choice\.friend, friendName: state\.choice\.friendName \|\| '' \};/.test(touch)

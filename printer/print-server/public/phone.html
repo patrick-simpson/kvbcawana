@@ -228,7 +228,8 @@
   /* BARF Night (8.1.0): the friend's first name, under Brought a friend. 16px: iOS zooms smaller inputs. */
   .fname { display: block; box-sizing: border-box; width: 100%; min-height: 50px; margin: 10px 0 0; padding: 0 14px;
     border: 3px solid var(--club, #4C72B8); border-radius: 12px; background: #fff; color: #16243F; font-weight: 600; font-size: 18px; line-height: 1.2; font-family: inherit; }
-  .fname[hidden] { display: none; }
+  .fname[hidden], .fwrap[hidden] { display: none; }
+  select.fname { appearance: auto; font-weight: 500; }
   .tile .fname { min-height: 44px; font-size: 16px; }
   .tile .go1 { border: none; cursor: pointer; width: 100%; display: grid; place-items: center; margin-top: 10px; min-height: 52px; border-radius: 14px;
     background: var(--club); color: #fff; font-family: var(--f-shout); font-size: 20px; }
@@ -1253,6 +1254,7 @@ document.addEventListener('keydown', function(e) {
 // BARF Night (8.1.0, owner): "Friend's first name", shown while Brought a
 // friend is on. The name belongs to this child only (never copied to a sibling).
 function friendInput(holder) {
+  var wrap = el('div', 'fwrap');
   var inp = el('input', 'fname');
   inp.type = 'text';
   inp.maxLength = 24;
@@ -1261,9 +1263,21 @@ function friendInput(holder) {
   inp.autocomplete = 'off';
   inp.setAttribute('autocapitalize', 'words');
   inp.setAttribute('enterkeyhint', 'done');
-  inp.hidden = !holder.friend;
   inp.addEventListener('input', function() { holder.friendName = inp.value; });
-  return inp;
+  // Owner 2026-10-14: ask the friend's club with their name; it goes on the
+  // friend's BARF bag. "Not sure" leaves it blank (the bag says FRIEND OF <child>).
+  var sel = el('select', 'fname');
+  sel.setAttribute('aria-label', 'Friend’s club');
+  [['', 'Friend’s club (optional)'], ['Puggles', 'Puggles'], ['Cubbies', 'Cubbies'], ['Sparks', 'Sparks'],
+   ['T&T', 'T&T'], ['Trek', 'Trek'], ['Journey', 'Journey'], ['', 'Not sure']].forEach(function(o) {
+    var op = el('option', null, o[1]); op.value = o[0]; sel.appendChild(op);
+  });
+  sel.addEventListener('change', function() { holder.friendClub = sel.value; });
+  wrap.appendChild(inp); wrap.appendChild(sel);
+  wrap.hidden = !holder.friend;
+  wrap.input = inp; wrap.select = sel;
+  wrap.focus = function() { inp.focus(); };
+  return wrap;
 }
 
 function optButton(label, on, onChange) {
@@ -1547,7 +1561,7 @@ function checkInMany(entries, family) {
     if (STATE[key] && STATE[key].status !== 'failed') return;
     var items = itemsFor(k.club);
     var friendName = String(e.choice.friendName || '').replace(/\s+/g, ' ').trim().slice(0, 24);
-    var choice = { bible: items.bible && !!e.choice.bible, friend: items.friend && !!e.choice.friend, friendName: friendName };
+    var choice = { bible: items.bible && !!e.choice.bible, friend: items.friend && !!e.choice.friend, friendName: friendName, friendClub: String(e.choice.friendClub || '') };
     group.left += 1;
     var finish = function() {
       group.left -= 1;
@@ -2198,12 +2212,14 @@ function cleanFriend(v) { return String(v || '').replace(/[\u0000-\u001f\u007f<>
 function barfName(k, typed) {
   $('barf-title').textContent = k.name + '’s friend';
   barfStep(function(body) {
-    var holder = { friend: true, friendName: typed || '' };
-    var inp = friendInput(holder);
-    inp.value = typed || '';
+    var holder = { friend: true, friendName: typed ? typed.name : '', friendClub: typed ? typed.club : '' };
+    var fw = friendInput(holder);
+    var inp = fw.input;
+    inp.value = holder.friendName;
+    fw.select.value = holder.friendClub;
     inp.required = true;
     body.appendChild(el('p', 'check', 'Who did ' + k.name.split(' ')[0] + ' bring? Their first name goes on tonight’s BARF list.'));
-    body.appendChild(inp);
+    body.appendChild(fw);
     var err = el('p', 'err'); err.setAttribute('role', 'alert');
     body.appendChild(err);
     var acts = el('div', 'acts');
@@ -2213,7 +2229,7 @@ function barfName(k, typed) {
     var go = function() {
       var name = cleanFriend(inp.value);
       if (!name) { err.textContent = 'Type the friend’s first name.'; inp.focus(); return; }
-      barfConfirm(k, name);
+      barfConfirm(k, name, fw.select.value);
     };
     next.addEventListener('click', go);
     inp.addEventListener('keydown', function(e) { if (e.key === 'Enter') go(); });
@@ -2222,7 +2238,7 @@ function barfName(k, typed) {
     setTimeout(function() { try { inp.focus(); } catch (e) { /* ignore */ } }, 30);
   });
 }
-function barfConfirm(k, friend) {
+function barfConfirm(k, friend, club) {
   var first = k.name.split(' ')[0];
   $('barf-title').textContent = k.name + ' brought ' + friend;
   barfStep(function(body) {
@@ -2230,19 +2246,19 @@ function barfConfirm(k, friend) {
       ' goes on tonight’s BARF list. ' + first + '’s name tag does not print again. ' + friend + ' is not checked in.'));
     var acts = el('div', 'acts');
     var back = el('button', 'btn ghost', 'Back'); back.type = 'button';
-    back.addEventListener('click', function() { barfName(k, friend); });
+    back.addEventListener('click', function() { barfName(k, { name: friend, club: club }); });
     var ok = el('button', 'btn go barf-go', 'Confirm'); ok.type = 'button';
-    ok.addEventListener('click', function() { hideSheet(); barfLate(k, friend); });
+    ok.addEventListener('click', function() { hideSheet(); barfLate(k, friend, club); });
     acts.appendChild(back); acts.appendChild(ok);
     body.appendChild(acts);
   });
 }
-function barfLate(k, friend) {
+function barfLate(k, friend, club) {
   var id = k.clubberId, first = k.name.split(' ')[0];
   var child = { clubberId: k.clubberId, name: k.name, club: k.club };
   enqueue({
     id: 'b:' + id,
-    go: function() { return desk.barfLate(child, friend, BARF.tagRoute); },
+    go: function() { return desk.barfLate(child, friend, BARF.tagRoute, club); },
     onState: function(status, left) {
       barfLine(id, { kind: 'pending', child: child, text: status === 'waiting' ? 'Waiting for TwoTimTwo… ' + left + 's (' + first + '’s friend ' + friend + ')' : 'Adding ' + friend + ' as ' + first + '’s friend…' });
     },

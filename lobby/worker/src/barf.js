@@ -46,7 +46,7 @@ import { WATCH_INTERVAL_MS } from './watcher.js';
 import { BIBLE_RE, FRIEND_RE, itemsToSend } from './twotimtwo.js';
 import { PRINT_JOB_KIND } from './adopt.js';
 import { validJobId } from './printq.js';
-import { cleanFriendName } from './friends.js';
+import { cleanFriendName, friendClubOf } from './friends.js';
 
 /** The station's BARF tag route (printer 9.3.1+), and what an older station already runs. */
 export const BARF_TAG_ROUTE = '/print-barf-tag';
@@ -180,7 +180,7 @@ export class BarfLate {
       if (!ok.ok) return refuse(ok.status, { reason: ok.reason, what: 'tagJob', ...(ok.reason === 'stations-changed' ? { stations: await core.stations.list() } : {}) });
       tagJob = { jobId: j.jobId, bundle: j.bundle };
     }
-    return this.guard(clubberId, () => this.lateFriend(night, clubberId, friendName, body.historyRow, tagJob));
+    return this.guard(clubberId, () => this.lateFriend(night, clubberId, friendName, body.historyRow, tagJob, friendClubOf(body.friendClub)));
   }
 
   /**
@@ -218,9 +218,10 @@ export class BarfLate {
 
   /**
    * @param {string} night @param {string} clubberId @param {string} friendName
+   * (and, last, the friend's club: '' when the page did not ask or was not told)
    * @param {any} historyRow @param {{ jobId: string, bundle: any }|null} tagJob
    */
-  async lateFriend(night, clubberId, friendName, historyRow, tagJob) {
+  async lateFriend(night, clubberId, friendName, historyRow, tagJob, friendClub = '') {
     const core = this.core;
     const desk = core.desk;
     const watcher = core.watcher;
@@ -294,7 +295,7 @@ export class BarfLate {
       const q = await core.printq.enqueue({ jobId: tagJob.jobId, kind: 'reprint', night, bundle: tagJob.bundle });
       if (q.ok) printed = tagJob.jobId;
     }
-    try { await core.friends.record({ name, club: entry.club || child.club, clubberId, friendName }); } catch (err) { console.error('[desk] recording a late friend failed', err); }
+    try { await core.friends.record({ name, club: entry.club || child.club, clubberId, friendName, friendClub }); } catch (err) { console.error('[desk] recording a late friend failed', err); }
     const history = await core.history.storeSealed(historyRow);
     return json({
       ok: true, checkedIn: redo.ok, items, jobId: printed, history: history.ok ? 'kept' : 'failed',
