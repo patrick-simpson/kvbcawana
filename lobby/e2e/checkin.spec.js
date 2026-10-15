@@ -34,9 +34,12 @@ async function snap(page, name) {
   await page.screenshot({ path: shot(name) });
 }
 
-async function stubSite(page, { kids, barf = true } = {}) {
+async function stubSite(page, { kids, barf = true, simple = false } = {}) {
   // BARF is off on the live page since 2026-10-15; these tests keep it working for next year.
   if (barf) await page.addInitScript(() => { window.AWANA_BARF = true; });
+  // Simple check-in is ON by default on the live page (owner 2026-10-15); these older tests
+  // drive the full flow (Bible, Brought a friend, the child's card), so they start with it off.
+  if (!simple) await page.addInitScript(() => { try { if (localStorage.getItem('awanaSimpleCheckin.v1') === null) localStorage.setItem('awanaSimpleCheckin.v1', 'off'); } catch (e) { /* none */ } });
   const history = await cc.createHistoryKey(PASS);
   const historyRing = await cc.keyRing(await cc.unwrapPrivateKey(history.wrapped, PASS, history.pub), history.pub);
   const kp = await cc.generateKeyPair();
@@ -574,6 +577,52 @@ test('"Not here the last two club nights" from the service (owner 2026-10-15): e
   await page.reload();
   await expect(page.locator('#list')).toContainText('3 families still to come', { timeout: 10_000 });
   await expect(page.locator('#list')).not.toContainText('Not here the last two club nights');
+});
+
+test('simple check-in (owner 2026-10-15): on by default, one tap for a child, "Check in all" for a family, attendance only, Undo', async ({ page }) => {
+  test.setTimeout(60_000);
+  const { world } = await stubSite(page, { simple: true });
+  world.busyFirst = false;
+  world.kids.push({ clubberId: '20', first: 'Zed', last: 'Solo', club: 'Sparks', clubId: '2', checkedIn: false },
+    { clubberId: '30', first: 'Amy', last: 'Pair', club: 'Cubbies', clubId: '1', checkedIn: false }, { clubberId: '31', first: 'Bo', last: 'Pair', club: 'Sparks', clubId: '2', checkedIn: false });
+  world.households = [...world.households, ['Amy Pair', 'Bo Pair']];
+  await signIn(page);
+  await expect(page.locator('#list')).toContainText('still to come', { timeout: 10_000 });
+  await snap(page, 'checkin-simple.png');
+  // One tap on a single child: checked in, nothing ticked, no card to confirm.
+  await page.locator('.fam', { hasText: 'Zed Solo' }).click();
+  await expect(page.locator('#kid-sheet')).not.toHaveClass(/on/);
+  await expect(page.locator('#toast')).toContainText('Zed Solo is checked in');
+  const zed = world.posts.find((p) => p.body.clubberId === '20');
+  expect(zed.path).toBe('/v1/desk/checkin');
+  expect(zed.body.items).toEqual({});
+  // ...with an Undo that really undoes it (no confirm).
+  await page.locator('#toast').getByRole('button', { name: 'Undo' }).click();
+  await expect.poll(() => world.posts.filter((p) => p.path === '/v1/desk/undo' && p.body.clubberId === '20').length).toBe(1);
+  // A family: its own "Check in all 2" strip, one tap, both in, nothing ticked.
+  const all = page.locator('.famw', { hasText: 'Tester' }).getByRole('button', { name: /^Check in all 2/ });
+  await expect(all).toBeVisible();
+  await all.click();
+  await expect(page.locator('#toast')).toContainText('Tester: 2 checked in', { timeout: 10_000 });
+  const testers = world.posts.filter((p) => p.path === '/v1/desk/checkin' && ['11', '12'].includes(p.body.clubberId));
+  expect(testers).toHaveLength(2);
+  expect(testers.every((p) => JSON.stringify(p.body.items) === '{}')).toBe(true);
+  // The family's name still opens its page (to pick some), with no Bible or friend boxes.
+  await page.locator('.famw', { hasText: 'Pair' }).locator('.fam').click();
+  await expect(page.locator('#fampage')).toHaveClass(/on/);
+  await expect(page.locator('#fampage')).not.toContainText('Bible');
+  await expect(page.locator('#fampage')).not.toContainText('Brought a friend');
+  await page.locator('#fampage').getByRole('button', { name: 'Done' }).click();
+  // The switch in the + menu turns it off: the card and its boxes come back.
+  await page.locator('#menu-btn').click();
+  await expect(page.locator('#simple-toggle')).toBeChecked();
+  await page.locator('label[for="simple-toggle"]').click();
+  await expect(page.locator('#simple-toggle')).not.toBeChecked();
+  await page.locator('#menu-close').click();
+  await expect(page.locator('.famw')).toHaveCount(0);
+  await page.locator('.fam', { hasText: 'Pair' }).click();
+  await expect(page.locator('#fampage')).toContainText('Bible');
+  expect(await page.evaluate(() => localStorage.getItem('awanaSimpleCheckin.v1'))).toBe('off');
 });
 
 test('a wrong passphrase stays on the sign-in, and a signed-out session returns to it', async ({ page }) => {

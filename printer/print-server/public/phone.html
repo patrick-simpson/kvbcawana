@@ -155,6 +155,17 @@
   body.has-undo .list { padding-bottom: calc(130px + env(safe-area-inset-bottom)); }
 
   .fams { display: grid; gap: 8px; }
+  /* Simple check-in (owner 2026-10-15): a family tile with its one-tap "Check in all N" strip. */
+  .famw { display: flex; flex-direction: column; gap: 4px; min-height: 0; }
+  .famw > .fam { flex: 1 1 auto; min-height: 0; }
+  .famall { flex: 0 0 auto; min-height: 40px; border: 0; border-radius: 12px; cursor: pointer; background: var(--c-blue-deep); color: #fff;
+    font-family: var(--f-shout); font-size: 17px; letter-spacing: .01em; padding: 6px 10px; }
+  .switchrow { display: flex; align-items: center; justify-content: space-between; gap: 14px; cursor: pointer; }
+  .switchrow b { font-family: var(--f-shout); font-weight: 400; font-size: 20px; color: var(--c-blue-deep); }
+  .switchrow input { appearance: none; -webkit-appearance: none; flex: 0 0 auto; width: 56px; height: 32px; border-radius: 16px; background: #CBD5E1; position: relative; cursor: pointer; transition: background 150ms; margin: 0; }
+  .switchrow input::after { content: ''; position: absolute; top: 3px; left: 3px; width: 26px; height: 26px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.25); transition: translate 150ms; }
+  .switchrow input:checked { background: var(--good); }
+  .switchrow input:checked::after { translate: 24px 0; }
   .fam, .fcard, .card, .famsm { border: none; cursor: pointer; text-align: left; background: #fff; position: relative; overflow: hidden; min-width: 0;
     box-shadow: 0 2px 10px rgba(15,23,42,.08); }
   .fam { display: flex; flex-direction: column; justify-content: center; gap: 4px; padding: 6px 10px 6px 16px; border-radius: 16px; }
@@ -413,6 +424,12 @@
 
 <div class="sheet" id="menu-sheet" role="dialog" aria-modal="true">
   <div class="grab"></div>
+  <div class="menu-sec" id="simple-panel">
+    <label class="switchrow" for="simple-toggle">
+      <span><b>Simple check-in</b><br><span class="quiet">One tap checks a child in; a family has its own “Check in all” button. No Bible or Brought a friend boxes.</span></span>
+      <input type="checkbox" id="simple-toggle" role="switch">
+    </label>
+  </div>
   <div class="menu-sec" id="oneoff-panel">
     <h3 id="oneoff-h">Walk-in name tag</h3>
     <div class="field">
@@ -722,7 +739,16 @@ var busyTimer = null;
 // the list's place, hides the search box, and asks again once a minute, so on the
 // club day it switches to the list by itself within a minute of the Worker saying so.
 var NO_CLUB = null;            // { today, next } while the Worker says there is no club today
-var TEST_DAY = null;           // { today, next, meeting } on a day with no club: a test day (desk.js TEST DAYS)
+var TEST_DAY = null;
+// Simple check-in (owner 2026-10-15: "remove bible check boxes and bring a friend ones ... a
+// 'simple check in' slider that defaults to on. Single kids should check in with one tap ...
+// families ... a button to check them in, in one click"): on by default, this phone's own
+// choice (+ menu). A child's tile is one tap; a family's tile has "Check in all N" (one tap)
+// and its name still opens the family page to pick some; attendance only goes to TwoTimTwo.
+// Every one-tap check-in toasts an Undo for QUICK_UNDO_MS (a real TwoTimTwo undo).
+var ONE_TAP_KEY = 'awanaSimpleCheckin.v1';
+var ONE_TAP = (function() { try { return localStorage.getItem(ONE_TAP_KEY) !== 'off'; } catch (e) { return true; } })();
+var QUICK_UNDO_MS = 10000;           // { today, next, meeting } on a day with no club: a test day (desk.js TEST DAYS)
 var NO_CLUB_POLL_MS = 60 * 1000;
 var noClubWords = null;        // desk-transport.js's words for the note
 
@@ -1130,6 +1156,8 @@ function stateText(st) {
 // A child the volunteer may tap: not in the queue (or their last try failed).
 function tappable(c) { var st = STATE[c.recid]; return !st || st.status === 'failed'; }
 function itemsFor(club) {
+  // Simple check-in: attendance only, nothing ticked, no boxes (owner 2026-10-15).
+  if (ONE_TAP) return { bible: false, friend: false };
   var has = function(list) { return (list || []).some(function(c) { return clubKit(c) && clubKit(c) === clubKit(club); }); };
   return { bible: has(ITEMS.bible), friend: has(ITEMS.friend) };
 }
@@ -1244,7 +1272,20 @@ function famTile(f, fit) {
   b.appendChild(fn); b.appendChild(line);
   b.setAttribute('aria-label', famLabel(f) + (busy ? ': ' + f.kids.filter(function(c) { return STATE[c.recid]; }).map(function(c) { return c.name.split(' ')[0] + ' ' + stateText(STATE[c.recid]); }).join(', ') : ''));
   b.onclick = function() { famClick(f); };
-  return b;
+  return withAllButton(b, f);
+}
+// Simple check-in: a family with two or more children still to check in gets its own
+// one-tap "Check in all N" strip under the tile (the tile itself opens the family page).
+function withAllButton(b, f) {
+  var ready = f.kids.filter(tappable);
+  if (!ONE_TAP || ready.length < 2) return b;
+  var w = el('div', 'famw');   // the tile keeps its data-k (the smooth redraws follow the tile)
+  var all = el('button', 'famall', 'Check in all ' + ready.length);
+  all.type = 'button';
+  all.setAttribute('aria-label', 'Check in all ' + ready.length + ': ' + ready.map(function(c) { return c.name; }).join(', '));
+  all.onclick = function(ev) { ev.stopPropagation(); quickCheckIn(ready, f.name); };
+  w.appendChild(b); w.appendChild(all);
+  return w;
 }
 function famCard(f, hits) {
   var b = keyed('button', 'fcard', 'r:' + f.key);
@@ -1265,7 +1306,7 @@ function famCard(f, hits) {
   b.appendChild(line);
   b.setAttribute('aria-label', famLabel(f));
   b.onclick = function() { famClick(f); };
-  return b;
+  return withAllButton(b, f);
 }
 function awayButton(f, prefix) {
   var b = keyed('button', 'famsm', prefix + f.key);
@@ -1290,7 +1331,7 @@ function kidCard(p) {
   txt.appendChild(el('div', 'cl', p.clubName || ''));
   b.appendChild(txt);
   if (p.checkedIn) { b.appendChild(el('span', 'tag', 'Checked in')); b.setAttribute('aria-disabled', 'true'); }
-  else b.onclick = function() { openKid(p); };
+  else b.onclick = function() { if (ONE_TAP) quickCheckIn([p], null); else openKid(p); };
   return b;
 }
 
@@ -1364,7 +1405,8 @@ function renderFamilies(list) {
   var cols = Math.max(2, Math.floor((W + 8) / (180 + 8)));
   var w = (W - 8 * (cols - 1)) / cols;
   var rows = Math.ceil(main.length / cols);
-  var h = Math.max(78, Math.min(120, (Math.max(200, H) - 8 * (rows - 1)) / rows));
+  // Simple check-in: taller tiles, room for a family's "Check in all" strip and fewer mis-taps.
+  var h = Math.max(ONE_TAP ? 118 : 78, Math.min(ONE_TAP ? 160 : 120, (Math.max(200, H) - 8 * (rows - 1)) / rows));
   var grid = el('div', 'fams');
   grid.style.gridTemplateColumns = 'repeat(' + cols + ', minmax(0, 1fr))';
   grid.style.gridAutoRows = Math.floor(h) + 'px';
@@ -1579,8 +1621,8 @@ function famClick(f) {
     if (waiting.length) askStop(waiting[0]);
     return;
   }
-  if (ready.length === 1) openKid(ready[0]);
-  else openFamily(null, ready, { bible: true, friend: false }, f.name);
+  if (ready.length === 1) { if (ONE_TAP) quickCheckIn(ready, null); else openKid(ready[0]); }
+  else openFamily(null, ready, { bible: !ONE_TAP, friend: false }, f.name);
 }
 
 // The family page: after a child's check-in (first) it offers the brothers
@@ -1793,8 +1835,23 @@ function askStop(c) {
 // child, posts to TwoTimTwo and settles: a child already claimed (another phone,
 // the desk, TwoTimTwo's own page) answers "already", never a second label.
 var groupSeq = 0;
-function checkInMany(entries, family) {
-  var group = { id: ++groupSeq, left: 0, ok: 0, already: 0, failed: [], family: family, single: entries.length === 1 ? entries[0].p.name : null };
+// Simple check-in's one tap: a child, or every child of a family still to come, with no
+// Bible or friend (attendance only); the toast carries an Undo (quickUndo).
+function quickCheckIn(people, family) {
+  checkInMany(people.map(function(p) { return { p: p, choice: { bible: false, friend: false } }; }), family, { quick: true });
+  $('search').value = '';
+  render();
+}
+// Undo of a one-tap check-in: the same real TwoTimTwo undo as Tonight's, without its confirm.
+function quickUndo(kids) {
+  kids.forEach(function(k) {
+    var parts = k.name.split(' ');
+    undoEntry({ key: kidKey(k), firstName: parts[0] || '', lastName: parts.slice(1).join(' '), clubName: k.club || '', clubberId: k.clubberId, kid: k });
+  });
+}
+function checkInMany(entries, family, opts) {
+  var group = { id: ++groupSeq, left: 0, ok: 0, already: 0, failed: [], family: family, single: entries.length === 1 ? entries[0].p.name : null,
+    quick: !!(opts && opts.quick), kids: [] };
   entries.forEach(function(e) {
     var k = e.p.kid, key = kidKey(k);
     if (STATE[key] && STATE[key].status !== 'failed') return;
@@ -1811,7 +1868,9 @@ function checkInMany(entries, family) {
       // (the tile already says "Checked in ✓").
       if (Date.now() < badUntil && !group.failed.length) { setTimeout(refreshStatus, 800); scheduleRosterPoll(6000); return; }
       if (!group.failed.length && group.ok) {
-        toast(group.single && group.ok + group.already === 1 ? group.single + ' is checked in' : (group.family ? group.family + ': ' : '') + group.ok + ' checked in', 3000, null, null, 'good');
+        var said = group.single && group.ok + group.already === 1 ? group.single + ' is checked in' : (group.family ? group.family + ': ' : '') + group.ok + ' checked in';
+        if (group.quick && group.kids.length) toast(said, QUICK_UNDO_MS, 'Undo', function() { quickUndo(group.kids); }, 'good');
+        else toast(said, 3000, null, null, 'good');
       } else if (!group.failed.length && group.already) toast('Already checked in (another phone or the desk got there first).', 4500);
       setTimeout(refreshStatus, 800);
       scheduleRosterPoll(6000);
@@ -1826,7 +1885,7 @@ function checkInMany(entries, family) {
         rosterEpoch += 1;
         saveLocal();
         joy[k.name.toLowerCase()] = true;
-        if (r.already) group.already++; else group.ok++;
+        if (r.already) group.already++; else { group.ok++; group.kids.push(k); }
         STATE[key] = { status: 'done' };
         paint();
         setTimeout(function() { if (STATE[key] && STATE[key].status === 'done') { delete STATE[key]; paint(); } }, DONE_SHOW_MS);
@@ -2365,7 +2424,13 @@ function checkoutEntry(entry) {
 // Every print here is a job sealed in this page to the print stations (a
 // reprint job, never a check-in, nothing sent to TwoTimTwo). The youth page's
 // menu is the walk-in tag alone, for its own clubs.
-$('menu-btn').addEventListener('click', function() { refreshLeaders(); fillClubSelects(); showSheet('menu-sheet'); });
+$('menu-btn').addEventListener('click', function() { refreshLeaders(); fillClubSelects(); $('simple-toggle').checked = ONE_TAP; showSheet('menu-sheet'); });
+$('simple-toggle').checked = ONE_TAP;
+$('simple-toggle').addEventListener('change', function() {
+  ONE_TAP = $('simple-toggle').checked;
+  try { localStorage.setItem(ONE_TAP_KEY, ONE_TAP ? 'on' : 'off'); } catch (e) { /* this load only */ }
+  render();
+});
 $('menu-close').addEventListener('click', hideSheet);
 // A label's failure, in its own panel when it is not one every action words alike.
 function printFailed(e, status) {

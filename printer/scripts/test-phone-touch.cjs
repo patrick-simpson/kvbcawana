@@ -31,8 +31,13 @@ const BASE = `http://127.0.0.1:${PORT}`;
     // Since 2026-10-12 "Not here" is read from the sealed history in the browser (memory only).
     check('who was here lately comes from the history, opened in the page, never stored',
       /desk\.recentAttendance\(2\)/.test(phone) && !/(?:localStorage|sessionStorage)\.setItem\([^)]*RECENT/.test(phone));
-    check('Bible starts ticked on the phone’s card and family page',
-      /var choice = \{ bible: items\.bible, friend: false \};/.test(phone) && /openFamily\(null, ready, \{ bible: true, friend: false \}, f\.name\)/.test(phone));
+    check('Bible starts ticked on the phone’s card and family page (simple check-in off)',
+      /var choice = \{ bible: items\.bible, friend: false \};/.test(phone) && /openFamily\(null, ready, \{ bible: !ONE_TAP, friend: false \}, f\.name\)/.test(phone));
+    check('simple check-in (owner 2026-10-15): on unless this phone turned it off, attendance only, one tap, an Undo',
+      /var ONE_TAP = \(function\(\) \{ try \{ return localStorage\.getItem\(ONE_TAP_KEY\) !== 'off'; \}/.test(phone)
+      && /if \(ONE_TAP\) return \{ bible: false, friend: false \};/.test(phone)
+      && /if \(ready\.length === 1\) \{ if \(ONE_TAP\) quickCheckIn\(ready, null\); else openKid\(ready\[0\]\); \}/.test(phone)
+      && /toast\(said, QUICK_UNDO_MS, 'Undo', function\(\) \{ quickUndo\(group\.kids\); \}, 'good'\)/.test(phone));
     check('a phone check-in sends Bible / Friend with it (the Worker\'s desk check-in, site/checkin/desk-transport.js)',
       /var choice = \{ bible: items\.bible && !!e\.choice\.bible, friend: items\.friend && !!e\.choice\.friend, friendName: friendName, friendClub: String\(e\.choice\.friendClub \|\| ''\), welcomeOnly: SIMPLE \};/.test(phone)
       && /desk\.checkIn\(\{ clubberId: k\.clubberId, name: k\.name, club: k\.club \}, choice\)/.test(phone));
