@@ -77,6 +77,7 @@ const SUITES = [
   ['test-barf', 10],
   ['test-listen', 22],
   ['test-print-async', 10],
+  ['test-print-helper', 11],
   ['test-history-icons', 10],
   ['test-stores-cache', 10],
   ['test-label-golden', 13],

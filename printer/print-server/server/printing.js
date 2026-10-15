@@ -6,6 +6,7 @@
 const lazy = require('./lazy');
 const { execFile } = require('child_process');
 const cups = require('../cups');
+const { createPrintHelper } = require('../print-helper');
 const fs    = require('fs');
 const $config = lazy('./config');
 const $images = lazy('./images');
@@ -20,6 +21,8 @@ Object.defineProperties(exports, {
   printerJobs: { enumerable: true, get: () => printerJobs },
   printImage: { enumerable: true, get: () => printImage },
   printImages: { enumerable: true, get: () => printImages },
+  printHelper: { enumerable: true, get: () => printHelper },
+  outcomeUnknownBody: { enumerable: true, get: () => outcomeUnknownBody },
   printingTarget: { enumerable: true, get: () => printingTarget },
   printLabel: { enumerable: true, get: () => printLabel },
   runPowerShell: { enumerable: true, get: () => runPowerShell },
@@ -101,8 +104,32 @@ async function cupsPrinterRows() {
   return got ? got.printers.map((p) => ({ Name: p.name, PrinterStatus: p.status, Default: p.isDefault })) : null;
 }
 
-async function printImageNow(imagePath, printerName) {
-  if ($config.CUPS_BACKEND) return printImageCups(imagePath, printerName);
+// The warm print helper (print-helper.js): ONE PowerShell kept running that prints
+// label after label, instead of a new PowerShell (start-up + Add-Type) for each one.
+// Windows only by default (it IS the Windows print path); AWANA_PRINT_HELPER=1 turns
+// it on anywhere (the suites' stand-in powershell), =0 turns it off. Anything wrong
+// with it prints the label the old way below; see print-helper.js for why an answer
+// that never came is never printed again.
+const printHelper = createPrintHelper({
+  enabled: () => {
+    if ($config.CUPS_BACKEND) return false;
+    const env = process.env.AWANA_PRINT_HELPER;
+    if (env === '0') return false;
+    return env === '1' || process.platform === 'win32';
+  },
+  log: (m) => console.log(m),
+});
+
+// The body a print route adds to its error answer when a label MAY have printed (the
+// helper took the request and then gave no answer): job-puller.js then treats the job
+// like a print with no answer (already-spooled, CHECK THE PRINTER), never as a refusal
+// that may run again.
+function outcomeUnknownBody(e) {
+  return e && e.printOutcomeUnknown === true ? { outcomeUnknown: true } : {};
+}
+
+// One label the old way: its own PowerShell, the script written to a temp .ps1.
+async function printImageScript(psPath, imagePath, printerName) {
   // Escape single quotes in paths/names for PowerShell single-quoted strings
   const safePath    = imagePath.replace(/'/g, "''");
   const safePrinter = (printerName || '').replace(/'/g, "''");
@@ -125,19 +152,30 @@ $pd.Print()
 $pd.Dispose()
 `.trim();
 
-  const psPath = $images.tmpFilePath('awana-print', 'ps1');
+  fs.writeFileSync(psPath, ps, 'utf8');
+  const result = await runPowerShell(['-File', psPath], { timeout: 15000 });
+  if (result && result.trim()) console.log('[print] PowerShell:', result.trim());
+}
+
+async function printImageNow(imagePath, printerName) {
+  if ($config.CUPS_BACKEND) return printImageCups(imagePath, printerName);
+  let psPath = null;
   try {
-    fs.writeFileSync(psPath, ps, 'utf8');
     // One retry on failure: transient spooler errors (printer waking from
     // sleep, USB renegotiation) routinely succeed on a second attempt. The
-    // child must not be sent away label-less over a hiccup.
+    // child must not be sent away label-less over a hiccup. Each attempt goes
+    // to the warm helper first; 'unavailable' (nothing was sent) means the old
+    // way. A label whose outcome is unknown (the helper took it and never
+    // answered) is NOT retried: it may be on the paper already.
     let lastErr = null;
     for (let attempt = 1; attempt <= 2; attempt++) {
       try {
-        const result = await runPowerShell(['-File', psPath], { timeout: 15000 });
-        if (result && result.trim()) console.log('[print] PowerShell:', result.trim());
+        if (await printHelper.print(imagePath, printerName) === 'printed') return;
+        if (!psPath) psPath = $images.tmpFilePath('awana-print', 'ps1');
+        await printImageScript(psPath, imagePath, printerName);
         return;
       } catch (e) {
+        if (e && e.printOutcomeUnknown) throw e;
         lastErr = e;
         if (attempt < 2) {
           console.warn(`[print] Attempt ${attempt} failed (${e.message.split('\n')[0]}) — retrying in 750ms`);
@@ -147,7 +185,7 @@ $pd.Dispose()
     }
     throw lastErr;
   } finally {
-    fs.unlink(psPath, () => {});
+    if (psPath) fs.unlink(psPath, () => {});
   }
 }
 
@@ -252,6 +290,9 @@ async function printLabel(pngPath, printerName) {
     lastLabelBackup = null;
     return { via: 'label' };
   } catch (e) {
+    // It may have printed on the name tag printer: a second copy on the backup is
+    // exactly what at most once forbids.
+    if (e && e.printOutcomeUnknown) throw e;
     const backup = backupPrinter();
     const main = String(printerName || $config.PRINTER_NAME || '').trim();
     if (!backup || backup.toLowerCase() === main.toLowerCase()

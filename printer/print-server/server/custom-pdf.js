@@ -87,7 +87,7 @@ app.post('/print-custom', async (req, res) => {
     return res.json({ success: true });
   } catch (err) {
     console.error('[print-custom] Error:', err.message);
-    return res.status(500).json({ success: false, error: err.message });
+    return res.status(500).json({ success: false, error: err.message, ...$printing.outcomeUnknownBody(err) });
   } finally {
     $clubbers.releasePrint(dupKey);
     if (pngPath) fs.unlink(pngPath, () => {});

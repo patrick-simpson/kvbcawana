@@ -384,7 +384,7 @@ async function performOneOffPrint(input) {
       $history.addHistoryEntry({ firstName, lastName: '', clubName, printer: effectivePrinter, success: false, oneOff: true });
       $eventBuffer.recordPrintFailure(firstName, clubName, err.message);
     }
-    return { status: 500, body: { error: err.message } };
+    return { status: 500, body: { error: err.message, ...$printing.outcomeUnknownBody(err) } };
   } finally {
     if (!isDemo) $clubbers.releasePrint(dupKey);
     if (pngPath) fs.unlink(pngPath, () => {});
@@ -452,7 +452,7 @@ async function performLeaderPrint(input) {
       $history.addHistoryEntry({ firstName, lastName, clubName, printer: effectivePrinter, success: false, isLeader: true });
       $eventBuffer.recordPrintFailure(`${firstName} ${lastName}`.trim(), clubName, err.message);
     }
-    return { status: 500, body: { error: err.message } };
+    return { status: 500, body: { error: err.message, ...$printing.outcomeUnknownBody(err) } };
   } finally {
     if (!isDemo) $clubbers.releasePrint(dupKey);
     if (pngPath) fs.unlink(pngPath, () => {});

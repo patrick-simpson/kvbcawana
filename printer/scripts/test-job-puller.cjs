@@ -411,6 +411,18 @@ const PORT = Number(process.env.AWANA_TEST_PORT || require('./free-port.cjs')())
     check('a Worker that sends no church field is fine (an older one)', (await oldWorker.tick()).wait === jp.IDLE_MS);
   }
 
+  console.log('\njob puller: the printer gave no answer (outcomeUnknown) is unknown, never re-run');
+  {
+    const w = makeWorker();
+    const answer = { error: 'The label printer helper exited (3): the label may or may not have printed.', outcomeUnknown: true };
+    const { puller, journal } = makePuller(w, { fetchFn: async () => new Response(JSON.stringify(answer), { status: 500, headers: { 'Content-Type': 'application/json' } }) });
+    const job = await makeJob(printRec(30, 'Uma', 'Hart', 'Sparks'));
+    const r = await puller.handle(job);
+    check('acked already-spooled, journalled unknown, CHECK THE PRINTER', r === 'unknown' && w.acks.at(-1).result === 'already-spooled' && journal.get(job.jobId).state === 'unknown' && puller.status().checkThePrinter.includes(job.jobId), `${r} ${JSON.stringify(w.acks.at(-1))}`);
+    check('never acked failed (a failed job may be leased and printed again)', !w.acks.some((a) => a.result === 'failed'));
+    check('and the same job coming back is not printed', await puller.handle(job) === 'already-spooled');
+  }
+
   console.log('\nstation: the roster and the completed books arrive sealed');
   {
     const w = makeWorker();

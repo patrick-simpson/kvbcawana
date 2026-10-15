@@ -33,7 +33,8 @@
 //   * a second jobId for the same night:child:generation is the same tag: not
 //     printed either (and printedTonightFor() in server.js still backstops it);
 //   * a print that gets NO answer (the server died, the request timed out) is
-//     `unknown`: acked already-spooled at once, never retried;
+//     `unknown`: acked already-spooled at once, never retried; so is an answer
+//     saying `outcomeUnknown` (the printer itself never answered: print-helper.js);
 //   * only a DEFINITE refusal (an HTTP error answer from the route) frees the
 //     job for another lease (`failed`).
 // The ack comes AFTER the print returns; an ack that did not get through is
@@ -349,6 +350,15 @@ function createJobPuller(o) {
       return 'unknown';
     }
     const body = res.body;
+    if (body && body.outcomeUnknown === true) {
+      // The route answered, but the printer's own answer never came (the warm print
+      // helper took the label and then went quiet, print-helper.js): it may be on the
+      // paper. The same as no answer at all: never retried, CHECK THE PRINTER.
+      journal.set(id, { state: 'unknown' });
+      log(`[jobs] ${id}: the printer gave no answer (${body.error || 'unknown'}); it may have printed: check the printer`);
+      await ack(id, 'already-spooled');
+      return 'unknown';
+    }
     if (res.status >= 200 && res.status < 300 && !(body && body.success === false)) {
       journal.set(id, { state: 'printed' });
       stats.printed++;

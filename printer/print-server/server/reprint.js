@@ -139,7 +139,7 @@ async function reprintRow(entry, printerName, opts = {}) {
       console.error('[reprint] Error:', err.message);
       $history.addHistoryEntry({ firstName: entry.firstName, lastName: '', clubName: entry.clubName, printer: effectivePrinter, success: false, oneOff: true });
       $eventBuffer.recordPrintFailure(entry.firstName, entry.clubName, err.message);
-      return { ok: false, name: entry.firstName, error: err.message };
+      return { ok: false, name: entry.firstName, error: err.message, ...$printing.outcomeUnknownBody(err) };
     } finally {
       if (png) fs.unlink(png, () => {});
     }
@@ -169,7 +169,7 @@ async function reprintRow(entry, printerName, opts = {}) {
         printer: effectivePrinter, success: false, isLeader: true,
       });
       $eventBuffer.recordPrintFailure(fullName.trim(), entry.clubName, err.message);
-      return { ok: false, name: fullName, error: err.message };
+      return { ok: false, name: fullName, error: err.message, ...$printing.outcomeUnknownBody(err) };
     } finally {
       if (leaderPng) fs.unlink(leaderPng, () => {});
     }
@@ -226,7 +226,7 @@ async function reprintRow(entry, printerName, opts = {}) {
       printer: effectivePrinter, success: false, clubberId: entry.clubberId
     });
     $eventBuffer.recordPrintFailure(fullName.trim(), entry.clubName, err.message);
-    return { ok: false, name: fullName, error: err.message };
+    return { ok: false, name: fullName, error: err.message, ...$printing.outcomeUnknownBody(err) };
   } finally {
     if (pngPath) fs.unlink(pngPath, () => {});
   }
@@ -273,7 +273,7 @@ app.post('/reprint', async (req, res) => {
   }
 
   const r = await reprintRow(entry, req.body.printerName);
-  if (!r.ok) return res.status(500).json({ error: r.error });
+  if (!r.ok) return res.status(500).json({ error: r.error, ...(r.outcomeUnknown ? { outcomeUnknown: true } : {}) });
   return res.json(Object.assign({ success: true, name: r.name }, r.leader ? { leader: true } : {}));
 });
 
@@ -459,7 +459,7 @@ app.post('/print-award', async (req, res) => {
       clubberId,
     });
     $eventBuffer.recordPrintFailure(`${firstName} ${lastName}`.trim(), effectiveClubName, err.message);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: err.message, ...$printing.outcomeUnknownBody(err) });
   } finally {
     $clubbers.releasePrint(dupKey);
     if (pngPath) fs.unlink(pngPath, () => {});

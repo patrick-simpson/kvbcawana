@@ -165,6 +165,9 @@ function stopListening() {
   const s = liveServer;
   liveServer = null;
   if (listenWaiter) { listenWaiter.reject(new Error('stopped before it was listening')); listenWaiter = null; }
+  // The warm print helper goes too (a label it is printing finishes first); the next
+  // label after a restart starts a new one.
+  $printing.printHelper.stop();
   return new Promise((resolve) => { if (!s) return resolve(); s.close(() => resolve()); });
 }
 

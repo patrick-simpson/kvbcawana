@@ -28,6 +28,7 @@
     "test:cloud-crypto": "node scripts/test-cloud-crypto.cjs",
     "test:station-keys": "node scripts/test-station-keys.cjs",
     "test:job-puller": "node scripts/test-job-puller.cjs",
+    "test:print-helper": "node scripts/test-print-helper.cjs",
     "test:station-wake": "node scripts/test-station-wake.cjs",
     "test:cloud-e2e": "node scripts/test-cloud-e2e.cjs",
     "test:station-greeting": "node scripts/test-station-greeting.cjs",

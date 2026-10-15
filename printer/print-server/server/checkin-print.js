@@ -524,7 +524,7 @@ async function performCheckinPrint(input) {
       });
       $eventBuffer.recordPrintFailure(`${firstName} ${lastName}`.trim(), effectiveClubName, err.message);
     }
-    return { status: 500, body: { error: err.message, ...(isDemo ? { demo: true } : {}) } };
+    return { status: 500, body: { error: err.message, ...(isDemo ? { demo: true } : {}), ...$printing.outcomeUnknownBody(err) } };
   } finally {
     if (!isDemo) $clubbers.releasePrint(dupKey);
     if (pngPath) fs.unlink(pngPath, () => {});
@@ -566,7 +566,7 @@ app.post('/print-barf-bags', async (req, res) => {
     res.json({ ok: true, printed: bags.length });
   } catch (e) {
     console.error('[print] BARF Bag labels failed:', e.message);
-    res.status(500).json({ error: 'The BARF Bag labels did not print. Check the label printer, then try again.' });
+    res.status(500).json({ error: 'The BARF Bag labels did not print. Check the label printer, then try again.', ...$printing.outcomeUnknownBody(e) });
   } finally {
     for (const p of paths) fs.unlink(p, () => {});
   }
@@ -589,7 +589,7 @@ app.post('/print-barf-tag', async (req, res) => {
     res.json({ ok: true });
   } catch (e) {
     console.error('[print] a late BARF tag failed:', e.message);
-    res.status(500).json({ error: 'The BARF tag did not print. Check the label printer.' });
+    res.status(500).json({ error: 'The BARF tag did not print. Check the label printer.', ...$printing.outcomeUnknownBody(e) });
   } finally {
     if (pngPath) fs.unlink(pngPath, () => {});
   }
