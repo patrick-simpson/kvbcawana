@@ -88,7 +88,8 @@ export class Tags {
 
 /**
  * @typedef {{ state: 'checking'|'queued'|'printed'|'undone', gen: number, source: string,
- *   at: number, until?: number, jobId?: string, recheck?: { bible: boolean } }} Claim
+ *   at: number, until?: number, jobId?: string, printedEarly?: boolean,
+ *   recheck?: { bible: boolean, friend?: boolean, early?: boolean } }} Claim
  */
 
 export class Ledger {
@@ -172,8 +173,10 @@ export class Ledger {
     await this.load();
     const c = this.peek(night, tag);
     if (!c || c.state !== 'checking' || c.gen !== gen) return { ok: false, reason: c ? c.state : 'none' };
-    c.state = 'queued';
+    // An early label (printq `early`) may already be out: then it is printed, not queued.
+    c.state = c.printedEarly ? 'printed' : 'queued';
     delete c.until;
+    delete c.printedEarly;
     if (jobId) c.jobId = jobId;
     await this.doc.save();
     return { ok: true };
@@ -191,6 +194,7 @@ export class Ledger {
     if (!c || c.state !== 'checking' || c.gen !== gen) return { ok: false };
     c.state = 'undone';
     delete c.until;
+    delete c.printedEarly;
     await this.doc.save();
     return { ok: true };
   }
@@ -204,8 +208,9 @@ export class Ledger {
     await this.load();
     const c = this.peek(night, tag);
     if (!c || c.state !== 'checking') return false;
-    c.state = 'queued';
+    c.state = c.printedEarly ? 'printed' : 'queued';
     delete c.until;
+    delete c.printedEarly;
     await this.doc.save();
     return true;
   }
@@ -214,8 +219,34 @@ export class Ledger {
   async markPrinted(night, tag, gen) {
     await this.load();
     const c = this.peek(night, tag);
-    if (!c || c.state !== 'queued' || c.gen !== gen) return false;
+    if (!c || c.gen !== gen) return false;
+    // An early label printed while the post to TwoTimTwo is still out: remembered,
+    // so the settle (or the keep for a re-check-in) makes it printed.
+    if (c.state === 'checking') { c.printedEarly = true; await this.doc.save(); return false; }
+    if (c.state !== 'queued') return false;
     c.state = 'printed';
+    await this.doc.save();
+    return true;
+  }
+
+  /**
+   * An early label is (or may be) out but TwoTimTwo did not take the check-in
+   * (desk.js, owner 2026-10-15): the claim stays LIVE (queued, or printed when
+   * the label is known out) and carries `recheck` with the child's items, so
+   * nothing prints a second label, nothing adopts or undoes them, and the
+   * desk's next tap on them is the post alone. Only the attempt holding `gen`.
+   * @param {string} night @param {string} tag @param {number} gen
+   * @param {{ bible: boolean, friend: boolean }} items @param {string} [jobId]
+   */
+  async keepForRecheck(night, tag, gen, items, jobId) {
+    await this.load();
+    const c = this.peek(night, tag);
+    if (!c || c.state !== 'checking' || c.gen !== gen) return false;
+    c.state = c.printedEarly ? 'printed' : 'queued';
+    delete c.until;
+    delete c.printedEarly;
+    if (jobId) c.jobId = jobId;
+    c.recheck = { bible: !!items.bible, friend: !!items.friend, early: true };
     await this.doc.save();
     return true;
   }
@@ -236,6 +267,7 @@ export class Ledger {
     delete c.until;
     delete c.jobId;
     delete c.recheck;
+    delete c.printedEarly;
     await this.doc.save();
     return { ok: true, was, gen: c.gen };
   }
@@ -258,7 +290,7 @@ export class Ledger {
     return true;
   }
 
-  /** The re-check-in a live claim waits for, or null. @param {string} night @param {string} tag (call after load) */
+  /** The re-check-in a live claim waits for, or null (`early`: an early label's, desk.js; else a late BARF friend's). @param {string} night @param {string} tag (call after load) */
   recheckOf(night, tag) {
     const c = this.peek(night, tag);
     return c && c.state !== 'undone' && c.recheck ? c.recheck : null;

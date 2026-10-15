@@ -7,7 +7,9 @@
 //
 // WHICH JOBS MAY BE LEASED. A check-in job names its claim (tag + gen), and is
 // leased only while that claim is `queued` at that very gen (ledger.js):
-//   claim checking          not yet (the post to TwoTimTwo is still out)
+//   claim checking          not yet (the post to TwoTimTwo is still out),
+//                           unless the job is EARLY (desk.js: TwoTimTwo has been
+//                           healthy, owner 2026-10-15): then it prints at once
 //   claim undone, or gen
 //   not the job's           the job is dead: dropped, never leased
 //   claim printed           already done: dropped (never a second label)
@@ -49,7 +51,7 @@ export function validJobId(id) {
  * @typedef {{ jobId: string, kind: 'checkin'|'reprint', night: string, tag: string|null, gen: number|null,
  *   bundle: any|null, raw: any|null, state: 'queued'|'leased'|'done'|'dead', leaseUntil: number,
  *   station: string|null, leases: number, fails: number, createdAt: number, doneAt?: number,
- *   result?: string, lastError?: string, checkPrinter?: boolean, greeted?: boolean }} Job
+ *   result?: string, lastError?: string, checkPrinter?: boolean, greeted?: boolean, early?: boolean }} Job
  */
 
 /** @typedef {(night: string, tag: string) => { state: string, gen: number }|undefined} ClaimLookup */
@@ -78,7 +80,7 @@ export class PrintQueue {
   /**
    * Add a job. Idempotent by jobId: a retried POST finds the one already there.
    * @param {{ jobId: string, kind?: 'checkin'|'reprint', night: string, tag?: string|null, gen?: number|null,
-   *   bundle?: any, raw?: any }} j
+   *   bundle?: any, raw?: any, early?: boolean }} j
    * @returns {Promise<{ ok: true, existing: boolean } | { ok: false, reason: string }>}
    */
   async enqueue(j) {
@@ -94,7 +96,7 @@ export class PrintQueue {
     jobs[j.jobId] = {
       jobId: j.jobId, kind, night: j.night, tag: kind === 'checkin' ? j.tag ?? null : null, gen: kind === 'checkin' ? j.gen ?? null : null,
       bundle: j.bundle || null, raw: j.bundle ? null : j.raw || null, state: 'queued', leaseUntil: 0, station: null,
-      leases: 0, fails: 0, createdAt: this.now(),
+      leases: 0, fails: 0, createdAt: this.now(), ...(kind === 'checkin' && j.early === true ? { early: true } : {}),
     };
     await this.doc.save();
     return { ok: true, existing: false };
@@ -111,7 +113,7 @@ export class PrintQueue {
     if (job.kind === 'reprint') return 'ok';
     const c = job.tag ? claim(job.night, job.tag) : undefined;
     if (!c || c.gen !== job.gen || c.state === 'undone' || c.state === 'printed') return 'stale';
-    return c.state === 'checking' ? 'wait' : 'ok';
+    return c.state === 'checking' && !job.early ? 'wait' : 'ok';
   }
 
   /**
@@ -258,6 +260,22 @@ export class PrintQueue {
     await this.load();
     const job = this.jobs()[jobId];
     if (!job || job.state === 'done') return false;
+    delete this.jobs()[jobId];
+    await this.doc.save();
+    return true;
+  }
+
+  /**
+   * An early job's check-in failed: drop it only if no station has taken it yet
+   * (never leased, not done). One synchronous step. false = it was leased or is
+   * done (its label may be out), so it stays and the claim waits for a re-check-in.
+   * @param {string} jobId
+   */
+  async dropUnlessLeased(jobId) {
+    await this.load();
+    const job = this.jobs()[jobId];
+    if (!job) return true;
+    if (job.leases > 0 || job.state === 'done') return false;
     delete this.jobs()[jobId];
     await this.doc.save();
     return true;

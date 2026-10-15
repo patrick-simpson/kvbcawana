@@ -250,3 +250,68 @@ describe('storage and restarts', () => {
     expect(storage.map.has('printq')).toBe(false);
   });
 });
+
+describe('early jobs (owner 2026-10-15)', () => {
+  /** A claim still checking, and its job, early or not. */
+  const early = async (flag) => {
+    const s = setup();
+    const tag = await s.tags.identity(NIGHT, '662');
+    const c = await s.ledger.claim(NIGHT, tag);
+    await s.q.enqueue({ jobId: idOf(1), night: NIGHT, tag, gen: c.gen, bundle: BUNDLE, ...(flag ? { early: true } : {}) });
+    return { ...s, tag, gen: c.gen };
+  };
+
+  it('an ordinary job waits while its claim is checking; an early one is leased at once', async () => {
+    const plain = await early(false);
+    expect(await plain.q.lease('station-a', 5, plain.lookup)).toEqual([]);
+    const eager = await early(true);
+    const got = await eager.q.lease('station-a', 5, eager.lookup);
+    expect(got.map((j) => j.jobId)).toEqual([idOf(1)]);
+  });
+
+  it('stores the early flag on a check-in job only when asked', async () => {
+    const plain = await early(false);
+    const eager = await early(true);
+    expect(plain.q.jobs()[idOf(1)].early).toBeUndefined();
+    expect(eager.q.jobs()[idOf(1)].early).toBe(true);
+    const r = await eager.q.enqueue({ jobId: REPRINT, kind: 'reprint', night: NIGHT, bundle: BUNDLE, early: true });
+    expect(r.ok).toBe(true);
+    expect(eager.q.jobs()[REPRINT].early).toBeUndefined();
+  });
+
+  it('an early job is still dead when its claim is undone or printed', async () => {
+    const a = await early(true);
+    await a.ledger.release(NIGHT, a.tag, a.gen);
+    expect(await a.q.lease('station-a', 5, a.lookup)).toEqual([]);
+    const b = await early(true);
+    await b.ledger.settle(NIGHT, b.tag, b.gen, idOf(1));
+    await b.ledger.markPrinted(NIGHT, b.tag, b.gen);
+    expect(await b.q.lease('station-a', 5, b.lookup)).toEqual([]);
+  });
+
+  it('dropUnlessLeased drops a job no station took, and keeps a leased or a done one', async () => {
+    const a = await early(true);
+    expect(await a.q.dropUnlessLeased(idOf(1))).toBe(true);
+    expect(a.q.jobs()[idOf(1)]).toBeUndefined();
+    expect(await a.q.dropUnlessLeased(idOf(1))).toBe(true);        // already gone
+
+    const b = await early(true);
+    await b.q.lease('station-a', 5, b.lookup);
+    expect(await b.q.dropUnlessLeased(idOf(1))).toBe(false);
+    expect(b.q.jobs()[idOf(1)]).toMatchObject({ state: 'leased' });
+
+    const c = await early(true);
+    await c.q.lease('station-a', 5, c.lookup);
+    await c.q.done(idOf(1));
+    expect(await c.q.dropUnlessLeased(idOf(1))).toBe(false);
+    expect(c.q.jobs()[idOf(1)]).toMatchObject({ state: 'done' });
+  });
+
+  it('a job whose lease ran out (leased once, back in the queue) counts as taken', async () => {
+    const a = await early(true);
+    await a.q.lease('station-a', 5, a.lookup);
+    await a.q.failed(idOf(1), 'jam');
+    expect(a.q.jobs()[idOf(1)].state).toBe('queued');
+    expect(await a.q.dropUnlessLeased(idOf(1))).toBe(false);
+  });
+});

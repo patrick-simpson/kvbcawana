@@ -27,6 +27,17 @@
 //
 // A visitor with no clubber id is not on TwoTimTwo: claim, job, hooks, no post.
 //
+// EARLY LABELS (owner 2026-10-15: "labels print sooner ... before TwoTimTwo
+// processes", "only print sooner when safe", "last 3 went fine"). While the last
+// EARLY_AFTER posts all went through first time in under EARLY_FAST_MS (memory
+// only: a restarted object waits for three again), the job is stored `early`
+// and may be leased while the claim is still `checking`. If TwoTimTwo then
+// fails: a job no station took yet is dropped as before; one that was leased
+// (its label may be out) stays, and the claim stays live marked `recheck`
+// {early: true} (ledger.keepForRecheck), answered with `printed: true` so the
+// page retries. The next check-in of that child is the post alone (no second
+// label) and fires the hooks the first attempt never did.
+//
 // READS (owner 2026-10-12: a check-in is "instantaneous as much as possible,
 // never a wait"). What a check-in, undo or check-out needs from the check-in
 // page (the meeting's calendar_id, the items and their clubs, each child's
@@ -91,6 +102,10 @@ export { FAMILIES_TTL_MS, FAMILIES_RETRY_MS } from './families.js';
 export const ROSTER_ACTIVE_MS = 45 * 1000;
 const ID_RE = /^\d{1,12}$/;
 const AMBIGUOUS = new Set(['timeout', 'network']);
+/** Early labels: this many posts in a row went through first time ... */
+export const EARLY_AFTER = 3;
+/** ... each in under this long (ms). */
+export const EARLY_FAST_MS = 10 * 1000;
 
 /**
  * The default shape check of a sealed history row (routes.md "Wire shapes").
@@ -108,6 +123,8 @@ export function defaultRowCheck(row, night) {
 
 /** @param {number} status @param {Record<string, unknown>} body */
 const refuse = (status, body) => json({ ok: false, ...body }, status);
+/** Is item `k` ticked? Items come as ['Bible', 'Friend'] or {Bible: true}. @param {any} items @param {string} k */
+const itemOn = (items, k) => (Array.isArray(items) ? items.map(String).includes(k) : !!(items && typeof items === 'object' && items[k] === true));
 
 /** @param {any} v */
 const clean = (v, max = 40) => String(v ?? '').replace(/\s+/g, ' ').trim().slice(0, max);
@@ -197,6 +214,27 @@ export class Desk {
     this.rosterAskedAt = 0;
     /** TwoTimTwo's households (families.js); the watcher's alarm catches it up. */
     this.familiesSource = new Families({ watcher, now });
+    /** The last EARLY_AFTER posts: true = through first time and fast (memory only). @type {boolean[]} */
+    this.postsLately = [];
+  }
+
+  /** May a label print before TwoTimTwo answers? The last EARLY_AFTER posts all went fine. */
+  healthy() {
+    return this.postsLately.length >= EARLY_AFTER && this.postsLately.every(Boolean);
+  }
+  /** @param {boolean} fine */
+  notePost(fine) {
+    this.postsLately.push(fine);
+    if (this.postsLately.length > EARLY_AFTER) this.postsLately.shift();
+  }
+
+  /**
+   * TwoTimTwo did not take it, but an early label may be out: the refusal the
+   * page would have had, marked `printed: true`. @param {Response} response
+   */
+  async printedRefusal(response) {
+    const body = await response.clone().json().catch(() => ({}));
+    return refuse(response.status, { ...body, printed: true });
   }
 
   /** The schedule the club-day rule reads: the watcher's (one rule, one place; tests swap it). */
@@ -587,6 +625,8 @@ export class Desk {
     // they wait to be checked in again on TwoTimTwo. A tap is that re-check-in alone:
     // no claim, no job, no row, no greeting (never a second name tag).
     const waiting = 'clubberId' in who ? this.ledger.recheckOf(night, tag) : null;
+    // An early label printed and TwoTimTwo did not take it then: the post alone, now.
+    if (waiting && waiting.early && 'clubberId' in who) return this.recheckEarly(night, tag, who.clubberId, body);
     if (waiting && 'clubberId' in who && this.barfRecheck) return this.barfRecheck(night, who.clubberId, waiting);
 
     // 2. The claim: from here to the settle, no other desk can take this child.
@@ -607,9 +647,11 @@ export class Desk {
       if (jobId) await this.printq.dropJob(jobId);
       return false;
     };
-    // 3. The job rides the claim: not leasable until it is queued.
+    // 3. The job rides the claim: not leasable until it is queued, unless TwoTimTwo
+    // has been healthy (EARLY LABELS above): then it prints while the post is out.
+    const early = !!job && 'clubberId' in who && this.healthy();
     if (job) {
-      const queued = await this.printq.enqueue({ jobId: /** @type {string} */ (jobId), night, tag, gen: claim.gen, bundle: job });
+      const queued = await this.printq.enqueue({ jobId: /** @type {string} */ (jobId), night, tag, gen: claim.gen, bundle: job, ...(early ? { early: true } : {}) });
       if (!queued.ok) {
         await this.ledger.release(night, tag, claim.gen);
         return refuse(409, { reason: queued.reason });
@@ -621,6 +663,11 @@ export class Desk {
     if ('clubberId' in who) {
       const posted = await this.post(who.clubberId, body.items);
       if (!posted.ok) {
+        // An early label a station already took stays: the claim waits for the post alone.
+        if (early && jobId && !(await this.printq.dropUnlessLeased(jobId))) {
+          const items = { bible: itemOn(body.items, 'Bible'), friend: itemOn(body.items, 'Friend') };
+          if (await this.ledger.keepForRecheck(night, tag, claim.gen, items, jobId)) return this.printedRefusal(posted.response);
+        }
         if (!(await giveUp())) return posted.response;
         // Promoted while the post was slow, failed or refused: the report shows the
         // child checked in, so this is a check-in like any other (the same as the
@@ -641,13 +688,39 @@ export class Desk {
         return refuse(409, { reason: 'superseded' });
       }
     }
-    const friend = Array.isArray(body.items) ? body.items.map(String).includes('Friend') : !!(body.items && body.items.Friend === true);
+    await this.afterCheckin(body, { night, tag, who, gen: claim.gen, jobId, club, name });
+    return json({ ok: true, already: false, jobId, gen: claim.gen, history: this.hooks.afterCheckin.length ? 'hooked' : 'off' });
+  }
+
+  /**
+   * The hooks of a check-in TwoTimTwo took.
+   * @param {any} body @param {{ night: string, tag: string, who: any, gen: number, jobId: string|null, club: string, name: string }} c
+   */
+  async afterCheckin(body, { night, tag, who, gen, jobId, club, name }) {
+    const friend = itemOn(body.items, 'Friend');
     // The friend's first name, only with Brought a friend: for the 6:30 BARF email and the
     // BARF bags (friends.js, sealed under the Worker's key, as the phone path always sent it).
     const friendName = friend ? clean(body.friendName, 24) : '';
     const friendClub = friend && friendName ? friendClubOf(body.friendClub) : '';
-    await this.fire('afterCheckin', { friend, friendName, friendClub, night, tag, clubberId: 'clubberId' in who ? who.clubberId : undefined, gen: claim.gen, jobId, club, name, visitor: 'visitor' in who, historyRow: body.historyRow, source: 'desk' });
-    return json({ ok: true, already: false, jobId, gen: claim.gen, history: this.hooks.afterCheckin.length ? 'hooked' : 'off' });
+    await this.fire('afterCheckin', { friend, friendName, friendClub, night, tag, clubberId: 'clubberId' in who ? who.clubberId : undefined, gen, jobId, club, name, visitor: 'visitor' in who, historyRow: body.historyRow, source: 'desk' });
+  }
+
+  /**
+   * The re-check-in of a child whose early label is out (ledger `recheck` {early}):
+   * the post alone, never a second label. TwoTimTwo taking it (or already having
+   * it) clears the mark and fires the hooks the first attempt never did; another
+   * failure keeps it, answered `printed: true` again.
+   * @param {string} night @param {string} tag @param {string} clubberId @param {any} body
+   */
+  async recheckEarly(night, tag, clubberId, body) {
+    const posted = await this.post(clubberId, body.items);
+    if (!posted.ok) return this.printedRefusal(posted.response);
+    await this.ledger.clearRecheck(night, tag);
+    const c = this.ledger.peek(night, tag);
+    const gen = c ? c.gen : 0;
+    const jobId = c && c.jobId ? c.jobId : null;
+    await this.afterCheckin(body, { night, tag, who: { clubberId }, gen, jobId, club: posted.club, name: posted.name });
+    return json({ ok: true, already: false, recheck: true, jobId, gen, history: this.hooks.afterCheckin.length ? 'hooked' : 'off' });
   }
 
   /**
@@ -656,6 +729,16 @@ export class Desk {
    * @returns {Promise<{ ok: true, club: string, name: string } | { ok: false, response: Response }>}
    */
   async post(clubberId, items) {
+    const started = this.now();
+    const r = await this.postOnce(clubberId, items);
+    // Fine = TwoTimTwo took it (or had it) and answered in time; anything else (busy,
+    // a lapsed sign-in, slow, refused) prints the next labels after TwoTimTwo again.
+    this.notePost(r.ok && this.now() - started < EARLY_FAST_MS);
+    return r;
+  }
+
+  /** @param {string} clubberId @param {any} items @returns {Promise<{ ok: true, club: string, name: string } | { ok: false, response: Response }>} */
+  async postOnce(clubberId, items) {
     const client = this.watcher.clientFor();
     if (!client || this.watcher.mode === 'off') return { ok: false, response: refuse(503, { reason: 'not-configured' }) };
     const want = Array.isArray(items) ? new Set(items.map(String)) : null;

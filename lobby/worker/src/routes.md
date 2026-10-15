@@ -433,7 +433,9 @@ exactly what the print role runs:
 `{route: '/print', body: {name, clubName, clubberId?, visitor?, friend?, friendName?}, clubberId, source: 'desk'}` (`body` is the print server's own `POST /print` body: `name` is split there, a visitor has no `clubberId` and `visitor: true`; Bible is an `items` flag for TwoTimTwo and is not a print field).
 `route` is one of the print server's own print routes (`/print`, `/reprint`,
 `/print-barf-bags`, `/print-barf-tag` (9.3.1+, 5.1), `/print-custom`, `/print-oneoff`,
-`/print-leader`, `/print-award`), `body` that route's own JSON. The page does NOT know the claim's
+`/print-leader`, `/print-award`, `/print-welcome` (9.4.8+: the `/checkin/ym` check-in, the
+same body as `/print`, the TV's welcome and the history row with NO label; owner 2026-10-15)),
+`body` that route's own JSON. The page does NOT know the claim's
 `gen` (the Worker assigns it): the lease carries it, plaintext (section 6), and
 the print role uses that over any `gen` in the record. The Worker adds
 `cloud: true` / `regen` itself on the print server side; the page never sends
@@ -441,7 +443,7 @@ them.
 
 **A check-in never waits for a read** (owner 2026-10-12: "When someone is
 checking in a child it should be instantaneous as much as possible, never a
-wait"; TwoTimTwo still confirms before the label prints). What check-in, undo
+wait"; TwoTimTwo still confirms before the label prints, unless EARLY below). What check-in, undo
 and check-out need from the check-in page (the meeting's `calendar_id`, the
 items and their clubs, each child's club) does not change within a meeting:
 the desk keeps the page for the whole club night (`hasNightPage`), warmed by
@@ -532,6 +534,21 @@ own, never leased and never shown to a station) and `drain()` seals it to the
 stations once one registers. Brought a friend: a child the report marks Brought a friend gets `friend: true` in the
 job body, so the station also prints the BARFED tag on a BARF night (section 8, "BARF on
 the TwoTimTwo-page fallback").
+
+**Early labels** (BUILT, `desk.js`; owner 2026-10-15: "labels print sooner ... before
+TwoTimTwo processes", "only print sooner when safe", "last 3 went fine"). The desk keeps the
+last `EARLY_AFTER` (3) posts' outcomes in memory; while all went through first time in under
+`EARLY_FAST_MS` (10 s), a check-in's job is stored `early` and may be leased while its claim
+is still `checking` (`printq.verdict`). A station's done on a `checking` claim marks it
+`printedEarly` (`settle`/`promote` then make it `printed`). When the post fails: a job no
+station leased is dropped and the claim released as ever; a leased or done one stays, the
+claim goes live (`queued`, or `printed`) with `recheck: {bible, friend, early: true}`
+(`ledger.keepForRecheck`; never undone by the report's gap, never adopted), and the answer is
+the refusal with `printed: true` (same status). The next `POST /v1/desk/checkin` of that child
+is the post alone (`desk.recheckEarly`): no new job, success clears `recheck`, fires the hooks
+(history row, count) and answers `{ok, already: false, recheck: true, jobId, gen}`; a failure is
+`printed: true` again. The page retries a `printed` failure by itself unless it is a flat
+refusal (`printer/CLAUDE.md` "ONE check-in page"). Tests `test/early.test.js`.
 
 ### 5.1 A late BARF friend (BUILT, `barf.js`; owner 2026-10-12)
 

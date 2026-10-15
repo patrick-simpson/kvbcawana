@@ -184,3 +184,83 @@ describe('storage', () => {
     expect((await ledger.claim('2026-10-21', tag)).ok).toBe(true); // a new night: gen 1 again
   });
 });
+
+describe('early labels (owner 2026-10-15)', () => {
+  const live = async () => {
+    const s = setup();
+    const tag = await s.tags.identity(NIGHT, '662');
+    await s.ledger.claim(NIGHT, tag);
+    return { ...s, tag };
+  };
+
+  it('markPrinted on a checking claim only remembers it (printedEarly); a stale gen does not', async () => {
+    const { ledger, tag } = await live();
+    expect(await ledger.markPrinted(NIGHT, tag, 7)).toBe(false);
+    expect(ledger.peek(NIGHT, tag).printedEarly).toBeUndefined();
+    expect(await ledger.markPrinted(NIGHT, tag, 1)).toBe(false);
+    expect(ledger.peek(NIGHT, tag)).toMatchObject({ state: 'checking', printedEarly: true });
+  });
+
+  it('settle and promote make a claim printed early, printed (and drop the mark)', async () => {
+    for (const how of ['settle', 'promote']) {
+      const { ledger, tag } = await live();
+      await ledger.markPrinted(NIGHT, tag, 1);
+      if (how === 'settle') expect(await ledger.settle(NIGHT, tag, 1, 'job-1')).toEqual({ ok: true });
+      else expect(await ledger.promote(NIGHT, tag)).toBe(true);
+      const c = ledger.peek(NIGHT, tag);
+      expect(c.state).toBe('printed');
+      expect(c.printedEarly).toBeUndefined();
+    }
+  });
+
+  it('release and undo drop the printedEarly mark', async () => {
+    const { ledger, tag } = await live();
+    await ledger.markPrinted(NIGHT, tag, 1);
+    await ledger.release(NIGHT, tag, 1);
+    expect(ledger.peek(NIGHT, tag)).toMatchObject({ state: 'undone' });
+    expect(ledger.peek(NIGHT, tag).printedEarly).toBeUndefined();
+    const b = await live();
+    await b.ledger.markPrinted(NIGHT, b.tag, 1);
+    await b.ledger.settle(NIGHT, b.tag, 1, 'j');
+    await b.ledger.undo(NIGHT, b.tag);
+    expect(b.ledger.peek(NIGHT, b.tag).recheck).toBeUndefined();
+  });
+
+  it('keepForRecheck moves checking to queued with the recheck mark and the job', async () => {
+    const { ledger, tag } = await live();
+    expect(await ledger.keepForRecheck(NIGHT, tag, 1, { bible: true, friend: false }, 'job-1')).toBe(true);
+    expect(ledger.peek(NIGHT, tag)).toMatchObject({ state: 'queued', gen: 1, jobId: 'job-1', recheck: { bible: true, friend: false, early: true } });
+    expect(ledger.peek(NIGHT, tag).until).toBeUndefined();
+    expect(ledger.recheckOf(NIGHT, tag)).toEqual({ bible: true, friend: false, early: true });
+  });
+
+  it('keepForRecheck after the label printed makes the claim printed', async () => {
+    const { ledger, tag } = await live();
+    await ledger.markPrinted(NIGHT, tag, 1);
+    expect(await ledger.keepForRecheck(NIGHT, tag, 1, { bible: false, friend: true }, 'job-1')).toBe(true);
+    const c = ledger.peek(NIGHT, tag);
+    expect(c).toMatchObject({ state: 'printed', recheck: { bible: false, friend: true, early: true } });
+    expect(c.printedEarly).toBeUndefined();
+  });
+
+  it('keepForRecheck only for the attempt holding the gen, and only from checking', async () => {
+    const { ledger, tag } = await live();
+    expect(await ledger.keepForRecheck(NIGHT, tag, 2, { bible: false, friend: false })).toBe(false);
+    expect(await ledger.keepForRecheck(NIGHT, 'no-such-tag', 1, { bible: false, friend: false })).toBe(false);
+    await ledger.settle(NIGHT, tag, 1, 'j');
+    expect(await ledger.keepForRecheck(NIGHT, tag, 1, { bible: false, friend: false })).toBe(false);
+    expect(ledger.peek(NIGHT, tag).recheck).toBeUndefined();
+    // a claim taken over after the 60 s: the old attempt cannot keep it
+    const b = await live();
+    b.clock.tick(CHECKING_TTL_MS);
+    await b.ledger.claim(NIGHT, b.tag);
+    expect(await b.ledger.keepForRecheck(NIGHT, b.tag, 1, { bible: false, friend: false })).toBe(false);
+  });
+
+  it('an undo clears the recheck mark', async () => {
+    const { ledger, tag } = await live();
+    await ledger.keepForRecheck(NIGHT, tag, 1, { bible: false, friend: false }, 'j');
+    expect(await ledger.undo(NIGHT, tag)).toMatchObject({ ok: true });
+    expect(ledger.recheckOf(NIGHT, tag)).toBeNull();
+  });
+});
