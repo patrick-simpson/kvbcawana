@@ -366,5 +366,36 @@ export function mountPublisher(registry, core) {
     if (changed) await core.publisher.publishDue('extras');
     return json({ ok: true, changed });
   });
+  // Check-outs made by hand on TwoTimTwo's Checkout page (owner 2026-10-15: "the
+  // extension should monitor the check out page on the laptop for manual check
+  // outs"): the extension sees a row leave between two good reads and tells its
+  // print server, which hands the night's list here as the station. Each child
+  // comes off tonight's count and the still-here list (and /checkin's Check out),
+  // as a desk check-out does. A child whose claim is undone is skipped (an undone
+  // check-in also leaves the Checkout page). Only while the watch window is open
+  // (the book is purged when it closes); ids already out are ignored.
+  registry.add('POST', '/v1/station/checked-out', 'station', async ({ body }) => {
+    const b = await body();
+    const now = core.now();
+    const night = localTime(now).date;
+    if (!b || b.date !== night) return json({ ok: true, applied: 0, reason: 'other-night' });
+    if (!watchWindow(now).open) return json({ ok: true, applied: 0, reason: 'window-closed' });
+    const ids = (Array.isArray(b.clubberIds) ? b.clubberIds : []).map(String).filter((id) => /^\d{1,20}$/.test(id)).slice(0, CHECKED_OUT_MAX);
+    await Promise.all([core.publisher.book.load(), core.ledger.load()]);
+    const out = new Set([...core.publisher.book.state(now).checkedOut.ids].map(String));
+    let applied = 0;
+    for (const id of ids) {
+      if (out.has(id)) continue;
+      const tag = await core.tags.identity(night, id);
+      const c = tag ? core.ledger.peek(night, tag) : undefined;
+      if (c && c.state === 'undone') continue;
+      if (await core.publisher.book.checkout({ night, clubberId: id })) applied += 1;
+    }
+    if (applied) await core.publisher.publishDue('station-checked-out');
+    return json({ ok: true, applied });
+  });
   registry.add('GET', '/v1/publisher/status', 'session', async () => json(await core.publisher.status()));
 }
+
+/** More than this many check-outs in one night's list is a bug. */
+const CHECKED_OUT_MAX = 500;

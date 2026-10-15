@@ -731,6 +731,13 @@ and non-personal: `POST /v1/station/extras` (station) `{season?, rehearsal?,
 pickupClubs?}`, sent every minute and on a change; the books and awards counts
 come from the laptop's `tonight` frame the gate drops (it remembers those two
 numbers). `GET /v1/publisher/status` (session) is counts and times only.
+Check-outs made by hand on TwoTimTwo's Checkout page (owner 2026-10-15): `POST
+/v1/station/checked-out` (station) `{date, clubberIds}` = the extension's list of
+children who left that page tonight (print server `sendCheckedOut`, whenever it
+grows): each id (digits, max 500) not already out and whose claim is not `undone`
+goes off tonight's book (`book.checkout`, as a desk check-out), then one
+`publishDue`. `{ok, applied}`; another night's date or a closed watch window
+applies nothing (`reason: 'other-night' | 'window-closed'`).
 
 **Names in the still-here list and the greeting: the design.** The Worker cannot
 read names from history (sealed to the history key, which it never holds), and
