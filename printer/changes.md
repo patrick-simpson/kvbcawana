@@ -1,4 +1,11 @@
-﻿## [9.5.0] - 2026-10-15
+﻿## [Unreleased] - 2026-10-15
+Labels come out faster at the busiest moments.
+
+**One printing program kept ready.** Until now the print computer started a fresh copy of Windows PowerShell (the part of Windows that sends each label to the printer) for every single label, and each start took around a second before anything printed. Now one copy is started with the first label and kept ready, and every label after that goes straight to it. If that copy ever misbehaves (will not start, stops, or does not answer), the label is printed the old way and the ready copy is tried again a little later. If it stops in the middle of a label, so nobody can tell whether that label came out, the label is NOT printed again on its own: the app shows "check the printer", the same as when the printer goes quiet today, because a label printed twice is worse than one a leader reprints by hand.
+
+**The next label is drawn while one prints.** When several check-ins arrive together (a big family, a line at the door), the print computer now draws the next child's label while the current one is still printing, instead of waiting for the printer to finish before starting to draw. Labels still come out in the same order the check-ins were made, and a child's extra labels (welcome card, drop-off tag, BARF tag) still come right after their own name tag. A check-in that fails or prints nothing never holds up the ones behind it.
+
+## [9.5.0] - 2026-10-15
 Labels come out the moment they are ready, and a big family's all at once.
 
 **Instant wake-up.** The print computer used to ask the check-in service for new labels every 5 seconds, so a label waited up to 5 seconds (2 1/2 on average) before it even started printing. Now the print computer keeps a live connection to the service, like the lobby TVs, and the service rings it the instant a label is ready. The 5-second check stays as a backup if that connection ever drops.
