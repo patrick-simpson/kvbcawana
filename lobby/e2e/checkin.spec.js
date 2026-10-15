@@ -80,7 +80,7 @@ async function stubSite(page, { kids, barf = true } = {}) {
       if (world.busyFirst) { world.busyFirst = false; return route.fulfill(json(429, { ok: false, reason: 'read-busy', retryAfterMs: 1500 })); }
       if (world.noClub) return route.fulfill(json(200, { noClub: true, ...world.noClub, readAt: new Date().toISOString(), kids: [], items: { bible: [], friend: [] } }));
       if (world.testDay) return route.fulfill(json(200, { readAt: new Date().toISOString(), testDay: world.testDay, kids: world.kids, items: { bible: ['Cubbies', 'Sparks'], friend: ['Sparks'] } }));
-      return route.fulfill(json(200, { readAt: new Date().toISOString(), kids: world.kids, items: { bible: ['Cubbies', 'Sparks'], friend: ['Sparks'] }, ...(world.familiesAt ? { familiesAt: world.familiesAt } : {}) }));
+      return route.fulfill(json(200, { readAt: new Date().toISOString(), kids: world.kids, items: { bible: ['Cubbies', 'Sparks'], friend: ['Sparks'] }, ...(world.familiesAt ? { familiesAt: world.familiesAt } : {}), ...(world.awayReady ? { awayReady: true } : {}) }));
     }
     if (p === '/v1/desk/families') {
       world.familiesCalls += 1;
@@ -551,6 +551,29 @@ test('a test day (no club today, owner 2026-10-15): the real list, a yellow stri
   await expect(page.locator('#list')).toContainText('still to come', { timeout: 10_000 });
   await expect(page.locator('#test-note')).toBeHidden();
   await expect(page.locator('#mode-btn')).toBeVisible();
+});
+
+test('"Not here the last two club nights" from the service (owner 2026-10-15): every phone, even a restored session with no history key', async ({ page }) => {
+  test.setTimeout(60_000);
+  const { world } = await stubSite(page);
+  world.busyFirst = false;
+  world.awayReady = true;
+  // Cy was not here the last two club nights; the Testers and Tia were.
+  for (const k of world.kids) k.away = k.clubberId === '13';
+  await signIn(page);
+  await expect(page.locator('#list')).toContainText('still to come', { timeout: 10_000 });
+  // A reload restores the session WITHOUT the history key: the page's own reading is off, the service's still works.
+  await page.reload();
+  await expect(page.locator('#list')).toContainText('Not here the last two club nights', { timeout: 10_000 });
+  const lead = page.locator('#list .lead', { hasText: 'still to come' });
+  await expect(lead).toHaveText(/^2 families still to come$/);
+  await expect(page.locator('#list')).toContainText('Cy Other');
+  expect(world.historyCalls).toHaveLength(0);
+  // Before both nights are known, nobody is sent to the bottom.
+  world.awayReady = false;
+  await page.reload();
+  await expect(page.locator('#list')).toContainText('3 families still to come', { timeout: 10_000 });
+  await expect(page.locator('#list')).not.toContainText('Not here the last two club nights');
 });
 
 test('a wrong passphrase stays on the sign-in, and a signed-out session returns to it', async ({ page }) => {

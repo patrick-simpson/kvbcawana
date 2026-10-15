@@ -688,6 +688,9 @@ var LOCAL = { night: '', walkins: [], out: [], at: {} };   // what only this pag
 // (nobody shown as away) until it is ready, and for good when it cannot be read.
 var RECENT = null;
 var recentAskedAt = 0;
+// The Worker's own answer (recent.js, owner 2026-10-15): each roster child carries `away`
+// once the last two club nights are known; then it wins over RECENT, on every phone.
+var AWAY_READY = false;
 var RECENT_RETRY_MS = 5 * 60 * 1000;
 var rosterLoaded = false;
 var unlockedState = false;
@@ -1030,7 +1033,7 @@ function applyRoster(data) {
   var old = {};
   KIDS.forEach(function(k) { old[kidKey(k)] = k; });
   KIDS = (data.kids || []).map(function(k) {
-    return { clubberId: String(k.clubberId), name: (String(k.first || '') + ' ' + String(k.last || '')).trim(), club: k.club || '', clubId: k.clubId || '', checkedIn: !!k.checkedIn };
+    return { clubberId: String(k.clubberId), name: (String(k.first || '') + ' ' + String(k.last || '')).trim(), club: k.club || '', clubId: k.clubId || '', checkedIn: !!k.checkedIn, away: k.away === true };
   }).filter(function(sk) {
     return !ONLY || ONLY.indexOf(clubKit(sk.club)) !== -1;
   }).map(function(sk) {
@@ -1045,6 +1048,8 @@ function applyRoster(data) {
     if (k.checkedOut === true && LOCAL.out.indexOf(key) === -1) { LOCAL.out.push(key); outMoved = true; }
   });
   if (outMoved) saveLocal();
+  // "Not here the last two club nights" from the Worker (owner 2026-10-15): every phone, no passphrase.
+  AWAY_READY = data.awayReady === true;
   ITEMS = data.items || { bible: [], friend: [] };
   $('down-note').hidden = !data.stale;
   fillClubSelects();
@@ -1129,13 +1134,14 @@ function itemsFor(club) {
   return { bible: has(ITEMS.bible), friend: has(ITEMS.friend) };
 }
 function isAway(f) {
+  if (AWAY_READY) return f.kids.every(function(k) { return !!(k.kid && k.kid.away === true); });
   if (!RECENT) return false;
   return f.kids.every(function(k) { return !RECENT.names[norm(k.name)] && !(k.kid && RECENT.ids[k.kid.clubberId]); });
 }
 // After the roster is on screen, never in the way of a check-in: the history's
 // last two club nights, read once (again after a while if it could not be).
 function loadRecent() {
-  if (RECENT || SIMPLE || !desk || !desk.canReadHistory) return;
+  if (RECENT || AWAY_READY || SIMPLE || !desk || !desk.canReadHistory) return;   // the Worker's answer wins
   if (recentAskedAt && Date.now() - recentAskedAt < RECENT_RETRY_MS) return;
   recentAskedAt = Date.now();
   desk.recentAttendance(2).then(function(r) {
