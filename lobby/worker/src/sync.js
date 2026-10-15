@@ -47,6 +47,7 @@ import { PBKDF2_ITER, PBKDF2_ITER_MAX, PBKDF2_ITER_MIN, authVerifier } from '../
 import { fromBase64, hmac, kidFor, newDisplayKey, randomBytes, safeEqual, seal, toBase64, toBase64Url } from './crypto.js';
 import { DEFAULT_CALENDAR_URL, scrapeCalendar } from './calendar.js';
 import { DOORBELL_EVENT, REPLAYED, checkPublish, frameText, replayKey } from './live.js';
+import { Recent } from './recent.js';
 import { Relay } from './relay.js';
 import { Watcher } from './watcher.js';
 import { CloudPhone } from './phone.js';
@@ -192,6 +193,10 @@ export class SyncCore {
     this.watcher.adopt = this.adopt;
     this.desk = new Desk({ watcher: this.watcher, ledger: this.ledger, printq: this.printq, stations: this.stations, tags: this.tags, now: this.now, adopt: this.adopt });
     this.desk.wake = () => this.wakeStations();
+    // Who came the last two club nights (recent.js): the watcher records each report, the roster asks.
+    this.recent = new Recent({ env: this.env, watcher: this.watcher, now: this.now });
+    this.desk.recent = this.recent;
+    this.watcher.recent = this.recent;
     // The watcher warms the desk's check-in page for the night and catches its families up.
     this.watcher.desk = this.desk;
     mountCheckin(this.registry, this);   // stations, print lease, desk (routes.md 4, 5, 6)
@@ -1103,6 +1108,8 @@ export class SyncCore {
     await this.friends.purge();
     // Test days (desk.js): the check-ins made on a day with no club are undone overnight.
     await this.desk.sweepTestDay();
+    // "Not here the last two club nights": a club night with no rows is read from TwoTimTwo once.
+    await this.recent.backfill();
     await this.history.flush().catch((err) => console.error('[history] flush failed', err));
     const res = await this.refreshCalendar();
     return res.status;

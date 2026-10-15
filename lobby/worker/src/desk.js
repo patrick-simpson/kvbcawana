@@ -235,6 +235,8 @@ export class Desk {
     this.rosterAskedAt = 0;
     /** TwoTimTwo's households (families.js); the watcher's alarm catches it up. */
     this.familiesSource = new Families({ watcher, now });
+    /** Who came the last two club nights (recent.js; SyncCore sets it). @type {{ seenOf(ids: string[]): Promise<Set<string>|null> }|null} */
+    this.recent = null;
     /** SyncCore's wake-up call (rings the stations when a label is ready). @type {() => Promise<unknown>} */
     this.wake = async () => 0;
     /** The last EARLY_AFTER posts: true = through first time and fast (memory only). @type {boolean[]} */
@@ -578,7 +580,11 @@ export class Desk {
     // `restored` is not `stale`: the page's "TwoTimTwo is not answering" note is for a failed read only.
     const flag = 'stale' in r && r.stale ? { stale: true } : 'restored' in r && r.restored ? { restored: true } : {};
     const test = testDay ? { testDay: { today: day.today, next: day.next, meeting: r.page.meetingDate || null } } : {};
-    return json({ readAt: new Date(r.readAt).toISOString(), ...flag, ...test, kids, items: itemClubs(r.page.events || []), ...(familiesAt ? { familiesAt } : {}) });
+    // "Not here the last two club nights" (owner 2026-10-15, recent.js): only once both nights are known.
+    const seen = this.recent ? await this.recent.seenOf(kids.map((/** @type {any} */ k) => String(k.clubberId))) : null;
+    if (seen) for (const k of kids) k.away = !seen.has(String(k.clubberId));
+    const away = seen ? { awayReady: true } : {};
+    return json({ readAt: new Date(r.readAt).toISOString(), ...flag, ...test, ...away, kids, items: itemClubs(r.page.events || []), ...(familiesAt ? { familiesAt } : {}) });
   }
 
   /**

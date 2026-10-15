@@ -243,6 +243,8 @@ export class Watcher {
     this.ym = null;
     /** The desk (desk.js): set by SyncCore; the watcher warms its check-in page and catches its families up. @type {import('./desk.js').Desk|null} */
     this.desk = null;
+    /** Who came the last two club nights (recent.js; SyncCore sets it). @type {any} */
+    this.recent = null;
     /** The trends back-fill (trendsimport.js): set by mountHistory; the watcher only gives it a turn of the closed-window alarm. @type {import('./trendsimport.js').TrendsImport|null} */
     this.trends = null;
     /** Children held on the report by a desk operation (barf.js): clubber id -> {entry, until}. Memory only. @type {Map<string, { entry: any, until: number }>} */
@@ -717,6 +719,8 @@ export class Watcher {
       this.desk?.familiesSource.noteChildren(date, res.report.entries.map((e) => e.name));
       // Who is checked in, for the desk's roster (the check-in page drops their rows; desk.js onReport).
       this.desk?.onReport(date, res.report.entries);
+      // Who came tonight, as keyed hashes in D1, for "Not here the last two club nights" (recent.js).
+      if (this.recent) await this.recent.record(date, res.report.entries);
       // The count's own state (tonight.js): what an applied report says, first names and clubs only.
       if (this.publisher) {
         try { await this.publisher.onReport({ night: date, at: now, entries: report.entries }); } catch (err) { console.error('[cloud] publishing the count failed', err); }
