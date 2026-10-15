@@ -12,3 +12,6 @@ printer/print-server/public/brand/
 # This week's lesson video is an asset on the journey-videos-v2 release
 # (journey/public/current-lesson-video.json is its pointer); never committed.
 journey/public/current-lesson-video.mp4
+
+# Helper agents' temporary working copies
+.claude/worktrees/
