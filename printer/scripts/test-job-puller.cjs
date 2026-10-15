@@ -106,8 +106,8 @@ const PORT = Number(process.env.AWANA_TEST_PORT || require('./free-port.cjs')())
     w.queue.push(await makeJob(printRec(1, 'Ava', 'Stone', 'Sparks')));
     const before = jobs();
     const r = await puller.tick();
-    const lease = w.calls.find((c) => c.p === '/v1/print/next?max=1');
-    check('one lease of one job, with the station header', lease && lease.opts.method === 'GET' && lease.opts.station === 'dev-0123456789abcdef' && r.handled === 1, JSON.stringify(w.calls[0]));
+    const lease = w.calls.find((c) => c.p === '/v1/print/next?max=10');
+    check('one lease asking for up to ten labels (a big family at once), with the station header', lease && lease.opts.method === 'GET' && lease.opts.station === 'dev-0123456789abcdef' && r.handled === 1, JSON.stringify(w.calls[0]));
     check('the label reached the printer once', jobs() === before + 1, `${before} -> ${jobs()}`);
     check('acked printed, after', w.acks.length === 1 && w.acks[0].result === 'printed' && w.acks[0].jobId, JSON.stringify(w.acks));
     check('the journal holds it as printed and acked', journal.get(w.acks[0].jobId).state === 'printed' && journal.get(w.acks[0].jobId).acked === true);

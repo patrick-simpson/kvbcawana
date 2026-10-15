@@ -6,6 +6,7 @@
 const lazy = require('./lazy');
 const cloudRequest = require('../cloud-request');
 const jobPuller = require('../job-puller');
+const stationWake = require('../station-wake');
 const historySync = require('../history-sync');
 const churchSyncModule = require('../church-sync');
 const pickup = require('../pickup');
@@ -195,13 +196,15 @@ function configureCloud(opts) {
   if (opts.start !== false) {
     const unref = (fn, ms) => { const t = setTimeout(fn, ms); if (t.unref) t.unref(); return t; };
     const stopPull = jobPuller.startJobPuller({ puller, bundles, log, setTimeoutFn: unref });
+    // The wake-up call: the service rings this station's socket when a label is ready.
+    const wake = stationWake.startStationWake({ signedIn, stationId, onWake: () => stopPull.kick(), log });
     const readAttendance = () => attendance.syncOnce().catch(() => {});
     const first = setTimeout(readAttendance, 20 * 1000);
     const every = setInterval(() => { readAttendance(); writer.flush().catch(() => {}); }, CLOUD_ATTENDANCE_MS);
     const extrasFirst = setTimeout(() => { sendStationExtras(true).catch(() => {}); }, 5 * 1000);
     const extrasEvery = setInterval(() => { sendStationExtras().catch(() => {}); }, STATION_EXTRAS_EVERY_MS);
     for (const t of [first, every, extrasFirst, extrasEvery]) if (t.unref) t.unref();
-    cloudStop = () => { stopPull(); clearTimeout(first); clearInterval(every); clearTimeout(extrasFirst); clearInterval(extrasEvery); };
+    cloudStop = () => { stopPull(); wake.stop(); clearTimeout(first); clearInterval(every); clearTimeout(extrasFirst); clearInterval(extrasEvery); };
   }
   console.log(`[station] This computer is print station ${opts.stationId}: print jobs come from the service; the tally and pickup list are the service's to publish.`);
   return { ok: true };

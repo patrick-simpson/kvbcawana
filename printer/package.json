@@ -1,7 +1,7 @@
 {
   "name": "check-in-label-generator",
   "private": true,
-  "version": "9.4.9",
+  "version": "9.5.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -28,6 +28,7 @@
     "test:cloud-crypto": "node scripts/test-cloud-crypto.cjs",
     "test:station-keys": "node scripts/test-station-keys.cjs",
     "test:job-puller": "node scripts/test-job-puller.cjs",
+    "test:station-wake": "node scripts/test-station-wake.cjs",
     "test:cloud-e2e": "node scripts/test-cloud-e2e.cjs",
     "test:station-greeting": "node scripts/test-station-greeting.cjs",
     "test:church-sync": "node scripts/test-church-sync.cjs",

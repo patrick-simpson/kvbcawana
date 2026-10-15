@@ -151,7 +151,7 @@ const fakeSafe = {
   let s = await status();
   check('the ack (POST /v1/print/done) marked the job done and the claim printed', s.done === 1 && s.queued === 0 && s.leased === 0 && s.claims.printed === 1, JSON.stringify(s));
   check('the station was seen, its printer state noted', s.stations[0].stationId === STATION && s.stations[0].lastSeenAt);
-  check('the puller called only the Worker\'s own canonical routes', net.calls.filter((c) => /\/v1\/print\//.test(c.p)).every((c) => /^\/v1\/print\/(next\?max=1|done|failed|heartbeat)$/.test(c.p)), JSON.stringify([...new Set(net.calls.map((c) => c.p))]));
+  check('the puller called only the Worker\'s own canonical routes', net.calls.filter((c) => /\/v1\/print\//.test(c.p)).every((c) => /^\/v1\/print\/(next\?max=10|done|failed|heartbeat)$/.test(c.p)), JSON.stringify([...new Set(net.calls.map((c) => c.p))]));
 
   console.log('\na duplicate prints nothing');
   t.night.kids.push({ id: '662', club: 'Sparks', name: 'Kit Zyxelquill' });   // TwoTimTwo now lists the child the desk checked in

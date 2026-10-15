@@ -1632,14 +1632,17 @@ function closeFamily() {
 // Owner, 2026-10-12: check-ins feel instant and never ask for a second tap. A tap
 // puts the child in this page's queue and their tile says "Checking in…" at once;
 // "Checked in ✓" only when the Worker answers that TwoTimTwo took it (the label
-// prints only then). The volunteer keeps tapping other children meanwhile: the
+// prints then, or sooner: early labels, routes.md 5). The volunteer keeps tapping other children meanwhile: the
 // queue runs them in tap order, at most MAX_RUNNING at a time. A busy Worker (the
 // 5 s read clock) is not a failure: the tile says "Waiting for TwoTimTwo… Ns" and
 // the queue tries again by itself when the count ends (safe: the Worker's claim
 // makes a retry "already", never a second label); tapping a waiting tile stops it.
 // A refusal reverts that child's tile alone, with its reason. Undo and check-out
 // ride the same queue. Leaving the page with work in it asks first.
-var MAX_RUNNING = 2;
+// Six at a time (owner 2026-10-15: "big families to be able to be printed all at
+// once"; was two): a family of six goes out together, and the print station takes
+// up to ten labels a lease (job-puller.js LEASE_BATCH).
+var MAX_RUNNING = 6;
 var DONE_SHOW_MS = 2500;
 var FAILED_SHOW_MS = 9000;
 var QUEUE = [];               // jobs waiting their turn, in tap order

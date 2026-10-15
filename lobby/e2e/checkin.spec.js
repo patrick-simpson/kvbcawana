@@ -677,8 +677,9 @@ for (const where of ['/checkin/', '/checkin/ym/']) {
     await expect(page.locator('#list')).not.toContainText('Checked in ✓');
     await expect(page.locator('#count-pill')).toHaveText('0 in');
     await snap(page, `${ym ? 'ym-' : ''}queue-pending.png`);
-    // At most two at the Worker at once, in tap order.
-    expect(world.posts.map((p) => p.body.clubberId)).toEqual([refused[0], busy[0]]);
+    // Up to six at the Worker at once (owner 2026-10-15: big families at once), in tap order.
+    await expect.poll(() => world.posts.length).toBe(ym ? 3 : 4);
+    expect(world.posts.map((p) => p.body.clubberId)).toEqual(ym ? [refused[0], busy[0], third[0]] : [refused[0], busy[0], third[0], '12']);
 
     release();
     world.gate = null;

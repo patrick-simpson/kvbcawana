@@ -1,4 +1,11 @@
-﻿## [9.4.9] - 2026-10-15
+﻿## [9.5.0] - 2026-10-15
+Labels come out the moment they are ready, and a big family's all at once.
+
+**Instant wake-up.** The print computer used to ask the check-in service for new labels every 5 seconds, so a label waited up to 5 seconds (2 1/2 on average) before it even started printing. Now the print computer keeps a live connection to the service, like the lobby TVs, and the service rings it the instant a label is ready. The 5-second check stays as a backup if that connection ever drops.
+
+**Big families.** The /checkin page now sends up to six check-ins at once (it was two), and the print computer takes up to ten labels each time it asks (it was one) and prints them back to back, so a family of five or six comes out together instead of trickling out over half a minute.
+
+## [9.4.9] - 2026-10-15
 The extension stops checking in and printing; manual check-outs reach every screen.
 
 **Check-in is on /checkin now.** The Chrome extension no longer prints labels or checks children in. Its blue Check in pill on TwoTimTwo's page now opens awana.kvbchurch.org/checkin in a new tab (the TwoTimTwo tab stays open for the extension's other work). A child checked in on TwoTimTwo's own page still gets a label: the check-in service prints it from TwoTimTwo's report, about half a minute later. With no internet there is no backup label any more: use the paper sheet.

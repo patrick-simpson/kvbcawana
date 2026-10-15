@@ -70,6 +70,7 @@ const SUITES = [
   ['test-cloud-print', 10],
   ['test-station-keys', 5],
   ['test-job-puller', 10],
+  ['test-station-wake', 2],
   ['test-cloud-e2e', 10],
   ['test-station-greeting', 10],
   ['test-church-sync', 5],

@@ -66,6 +66,8 @@ const jobPullAllowed = (method, p) => typeof method === 'string' && typeof p ===
 
 const JOB_ID_RE = /^(?:[A-Za-z0-9_-]{22}|reprint:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/;
 const IDLE_MS = 5 * 1000;
+/** Labels asked for in one lease (9.5.0, owner 2026-10-15: a big family prints at once; the Worker's LEASE_MAX). */
+const LEASE_BATCH = 10;
 const BUSY_MS = 1000;
 const SIGNED_OUT_MS = 60 * 1000;
 const ROUTE_MISSING_MS = 60 * 1000;
@@ -389,7 +391,7 @@ function createJobPuller(o) {
       await flushAcks();
       await hello(false);
       if (now() < pausedUntil) return { wait: Math.min(IDLE_MS, pausedUntil - now()) || BUSY_MS, handled: 0 };
-      const r = await call('/v1/print/next?max=1', { method: 'GET' });
+      const r = await call(`/v1/print/next?max=${LEASE_BATCH}`, { method: 'GET' });
       stats.lastLeaseAt = now();
       if (r.status === 401) { stats.signedOut = true; return { wait: SIGNED_OUT_MS, handled: 0 }; }
       if (r.status === 404 || r.status === 405 || r.status === 501) { stats.routeMissing = true; return { wait: ROUTE_MISSING_MS, handled: 0 }; }
@@ -485,16 +487,23 @@ function createBundleSync(o) {
 
 /**
  * Both loops, like startPhoneRelay. Returns a stop function.
- * @param {{ puller: ReturnType<typeof createJobPuller>, bundles?: ReturnType<typeof createBundleSync>, log?: Function, setTimeoutFn?: typeof setTimeout }} o
+ * @param {{ puller: ReturnType<typeof createJobPuller>, bundles?: ReturnType<typeof createBundleSync>, log?: Function, setTimeoutFn?: typeof setTimeout, clearTimeoutFn?: typeof clearTimeout }} o
  */
-function startJobPuller({ puller, bundles, log, setTimeoutFn = setTimeout }) {
+function startJobPuller({ puller, bundles, log, setTimeoutFn = setTimeout, clearTimeoutFn = clearTimeout }) {
   let stopped = false;
   let timer = null;
   let bundleTimer = null;
+  let running = false;
+  let again = false;
   const tick = async () => {
     if (stopped) return;
+    timer = null;
+    running = true;
     let wait = IDLE_MS;
     try { wait = (await puller.tick()).wait; } catch (e) { if (log) log(`[jobs] ${e && e.message}`); }
+    running = false;
+    // A wake-up call that came while this round ran: ask again at once.
+    if (again) { again = false; wait = 0; }
     if (!stopped) timer = setTimeoutFn(tick, wait);
   };
   const bundleTick = async () => {
@@ -504,11 +513,19 @@ function startJobPuller({ puller, bundles, log, setTimeoutFn = setTimeout }) {
   };
   timer = setTimeoutFn(tick, 3000);
   if (bundles) bundleTimer = setTimeoutFn(bundleTick, 5000);
-  return () => { stopped = true; if (timer) clearTimeout(timer); if (bundleTimer) clearTimeout(bundleTimer); };
+  const stop = () => { stopped = true; if (timer) clearTimeoutFn(timer); if (bundleTimer) clearTimeoutFn(bundleTimer); };
+  // The wake-up call (station-wake.js): ask for the label now instead of at the next poll.
+  stop.kick = () => {
+    if (stopped) return;
+    if (running) { again = true; return; }
+    if (timer) clearTimeoutFn(timer);
+    timer = setTimeoutFn(tick, 0);
+  };
+  return stop;
 }
 
 module.exports = {
   JOB_PULL_ROUTES, jobPullAllowed, JOB_ID_RE,
   createJournal, createJobPuller, createBundleSync, startJobPuller,
-  IDLE_MS, BUSY_MS, HELLO_MS, HEARTBEAT_MS, FAIL_PAUSE_MS, MALFORMED,
+  IDLE_MS, BUSY_MS, HELLO_MS, HEARTBEAT_MS, FAIL_PAUSE_MS, MALFORMED, LEASE_BATCH,
 };
