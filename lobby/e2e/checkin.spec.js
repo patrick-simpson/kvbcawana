@@ -39,7 +39,7 @@ async function stubSite(page, { kids, barf = true, simple = false } = {}) {
   if (barf) await page.addInitScript(() => { window.AWANA_BARF = true; });
   // Simple check-in is ON by default on the live page (owner 2026-10-15); these older tests
   // drive the full flow (Bible, Brought a friend, the child's card), so they start with it off.
-  if (!simple) await page.addInitScript(() => { try { if (localStorage.getItem('awanaSimpleCheckin.v1') === null) localStorage.setItem('awanaSimpleCheckin.v1', 'off'); } catch (e) { /* none */ } });
+  if (!simple) await page.addInitScript(() => { try { if (localStorage.getItem('awanaSimpleCheckin.v1') === null) localStorage.setItem('awanaSimpleCheckin.v1', 'off'); } catch { /* none */ } });
   const history = await cc.createHistoryKey(PASS);
   const historyRing = await cc.keyRing(await cc.unwrapPrivateKey(history.wrapped, PASS, history.pub), history.pub);
   const kp = await cc.generateKeyPair();
