@@ -8,6 +8,9 @@ import { isScreenId } from '../../src/lib/syncSpecs.js';
 
 /** A live socket opened by a registered screen carries this tag (screens.js). */
 const SCREEN_TAG = 'screen:';
+/** A print station's socket (?station=<id>): it hears only the wake-up call (owner 2026-10-15). */
+const STATION_TAG = 'station:';
+const STATION_ID_RE = /^[A-Za-z0-9._-]{8,64}$/;
 /** Live sockets kept open at once (the church has a few dozen screens at most). */
 const MAX_SOCKETS = 200;
 
@@ -61,6 +64,16 @@ export class SyncStore {
       },
       // Which registered screens are on the live channel right now: their
       // sockets carry the screen's id as a tag (live() below).
+      // The wake-up call: a label is ready, so a station's socket asks for it at once
+      // instead of at its next poll (job-puller.js). Station sockets only.
+      ringStations: (text) => {
+        let sent = 0;
+        for (const ws of state.getWebSockets()) {
+          if (!state.getTags(ws).some((t) => t.startsWith(STATION_TAG))) continue;
+          try { ws.send(text); sent += 1; } catch { /* its close handler tidies up */ }
+        }
+        return sent;
+      },
       liveScreens: () => {
         const ids = new Set();
         for (const ws of state.getWebSockets()) {
@@ -105,6 +118,13 @@ export class SyncStore {
     const open = this.state.getWebSockets();
     for (const old of open.slice(0, Math.max(0, open.length - (MAX_SOCKETS - 1)))) {
       try { old.close(1013, 'busy'); } catch { /* already closed */ }
+    }
+    // A print station names itself (?station=<id>, the id it leases with): its socket
+    // is for the wake-up call alone, so it gets no catch-up frames.
+    const station = url.searchParams.get('station');
+    if (station && STATION_ID_RE.test(station)) {
+      this.state.acceptWebSocket(server, [`${STATION_TAG}${station}`]);
+      return new Response(null, { status: 101, webSocket: client });
     }
     this.state.acceptWebSocket(server, isScreenId(screen) ? [`${SCREEN_TAG}${screen}`] : []);
     // Catch it up: the last tally, recap, birthdays and the rest, and the

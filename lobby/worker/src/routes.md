@@ -607,6 +607,16 @@ these (`job-puller.js`; the end-to-end test records every path it uses).
 | `GET /v1/print/status` | session | | `{queued, leased, done, dead, waitingToSeal, checkThePrinter: [jobId], dropped: {stale, expired}, claims: {checking, queued, printed, undone}, pendingToSeal, cloudPrint, stations: [{stationId, name, lastSeenAt, printer}]}`. Counts and random ids only |
 | `POST /v1/print/reprint` | session | `{jobId: 'reprint:<uuid>', bundle}` sealed to every station, `kind` `print-job`, `night` tonight | a reprint job: bypasses the claims entirely. `{ok, jobId, existing}` |
 
+**The wake-up call** (BUILT, owner 2026-10-15). A station also opens the live channel
+as itself, `GET /v1/live?session=<its session>&station=<stationId>` (WebSocket; the id
+matches `[A-Za-z0-9._-]{8,64}`): that socket gets NO catch-up frames and hears only
+`{e: 'changed', d: {what: 'print'}}`, sent to station sockets alone (index.js
+`ringStations`) whenever a label could be leased now (`printq.readyCount() > 0`,
+`SyncCore.wakeStations`): after a 200 POST on `/v1/desk/*`, `/v1/print/reprint` or
+`/v1/cloud/*`, after each alarm tick, and from the desk right after an early job is
+stored. The station then leases at once (`?max=10`); its 5 s poll stays the fallback.
+Counts only: the ring names nobody and reads nothing from TwoTimTwo.
+
 **Job ids.** A check-in job's id is its bundle's `id` (22 base64url
 characters); a reprint's `jobId` is `reprint:<uuid>` while its bundle keeps a
 22-character id (the AAD format): the print role checks `bundle.id === jobId`

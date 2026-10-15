@@ -214,6 +214,8 @@ export class Desk {
     this.rosterAskedAt = 0;
     /** TwoTimTwo's households (families.js); the watcher's alarm catches it up. */
     this.familiesSource = new Families({ watcher, now });
+    /** SyncCore's wake-up call (rings the stations when a label is ready). @type {() => Promise<unknown>} */
+    this.wake = async () => 0;
     /** The last EARLY_AFTER posts: true = through first time and fast (memory only). @type {boolean[]} */
     this.postsLately = [];
   }
@@ -656,6 +658,8 @@ export class Desk {
         await this.ledger.release(night, tag, claim.gen);
         return refuse(409, { reason: queued.reason });
       }
+      // An early label prints while TwoTimTwo is asked: ring the stations now, not after the post.
+      if (early) await this.wake();
     }
     // 4. TwoTimTwo. (Awaits the network: nothing is checked-and-set across it.)
     let club = 'visitor' in who ? who.visitor.club : '';

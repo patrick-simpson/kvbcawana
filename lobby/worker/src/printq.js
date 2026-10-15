@@ -266,6 +266,19 @@ export class PrintQueue {
   }
 
   /**
+   * How many jobs a station could lease right now (queued, sealed, not dead or
+   * waiting): the wake-up call rings only when there is one. Reads nothing.
+   * @param {ClaimLookup} claim
+   */
+  readyCount(claim) {
+    let n = 0;
+    for (const job of Object.values(this.jobs())) {
+      if (job.state === 'queued' && job.bundle && this.verdict(job, claim) === 'ok') n += 1;
+    }
+    return n;
+  }
+
+  /**
    * An early job's check-in failed: drop it only if no station has taken it yet
    * (never leased, not done). One synchronous step. false = it was leased or is
    * done (its label may be out), so it stays and the claim waits for a re-check-in.

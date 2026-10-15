@@ -152,7 +152,7 @@ export class SyncCore {
    *   alarms?: { set(atMs: number): Promise<void>|void, get(): Promise<number|null>|number|null },
    *   liveScreens?: () => Set<string>, sleep?: (ms: number) => Promise<void> }} deps
    */
-  constructor({ storage, env, fetchFn, now, broadcast, closeAll, alarms, liveScreens, sleep }) {
+  constructor({ storage, env, fetchFn, now, broadcast, closeAll, alarms, liveScreens, sleep, ringStations }) {
     this.storage = storage;
     // The runtime switches (switches.js, routes.md 10.2): every module gets the
     // EFFECTIVE env (wrangler.toml's values are the defaults, a stored switch
@@ -162,6 +162,8 @@ export class SyncCore {
     this.env = this.switches.effectiveEnv();
     this.fetchFn = fetchFn || ((...args) => fetch(...args));
     this.now = now || (() => Date.now());
+    /** Sends a frame to the print stations' sockets only (index.js). @type {(text: string) => number} */
+    this.ringStations = ringStations || (() => 0);
     /** A pause between tries (barf.js's redo); a test's clock moves time instead. */
     this.sleep = sleep || ((/** @type {number} */ ms) => new Promise((r) => setTimeout(r, ms)));
     // The live channel: every screen's socket (index.js) carries everything.
@@ -189,6 +191,7 @@ export class SyncCore {
     });
     this.watcher.adopt = this.adopt;
     this.desk = new Desk({ watcher: this.watcher, ledger: this.ledger, printq: this.printq, stations: this.stations, tags: this.tags, now: this.now, adopt: this.adopt });
+    this.desk.wake = () => this.wakeStations();
     // The watcher warms the desk's check-in page for the night and catches its families up.
     this.watcher.desk = this.desk;
     mountCheckin(this.registry, this);   // stations, print lease, desk (routes.md 4, 5, 6)
@@ -290,7 +293,25 @@ export class SyncCore {
     await this.switches.load();   // stored switches before anything reads env (a restart reloads them here)
     // An outbox waiting for D1 drains with nobody asking (cheap: nothing without HISTORY_DB).
     await this.history.flush().catch((err) => console.error('[history] flush failed', err));
-    return this.watcher.tick();
+    const r = await this.watcher.tick();
+    await this.wakeStations();   // a TwoTimTwo-page check-in the tick queued
+    return r;
+  }
+
+  /**
+   * The wake-up call (owner 2026-10-15: "add the instant wake-up call"): when a
+   * station could lease a label now, ring the stations' sockets so they ask at
+   * once rather than at their next poll (5 s idle). The poll stays the fallback.
+   * Counts only: nothing is read from TwoTimTwo, nothing named. Never throws.
+   */
+  async wakeStations() {
+    try {
+      await Promise.all([this.printq.load(), this.ledger.load()]);
+      if (this.printq.readyCount((night, tag) => this.ledger.peek(night, tag)) > 0) {
+        return this.ringStations(frameText(DOORBELL_EVENT, { what: 'print' }));
+      }
+    } catch (err) { console.error('[print] wake-up call failed', err); }
+    return 0;
   }
 
   /** Send a frame to every live screen, and keep it for late joiners. */
@@ -535,6 +556,14 @@ export class SyncCore {
    * @returns {Promise<Response>}
    */
   async handle(request, ip = 'unknown') {
+    const res = await this.handleRoute(request, ip);
+    // A desk action or a reprint may have queued a label: the wake-up call.
+    if (request.method === 'POST' && res.status === 200 && /^\/v1\/(desk\/|print\/reprint$|cloud\/)/.test(new URL(request.url).pathname)) await this.wakeStations();
+    return res;
+  }
+
+  /** @param {Request} request @param {string} ip */
+  async handleRoute(request, ip = 'unknown') {
     const url = new URL(request.url);
     const route = `${request.method} ${url.pathname}`;
     try {
