@@ -33,6 +33,8 @@ function check(name, cond, detail) {
   else { failed++; console.log(`  ✗ ${name}${detail ? ' — ' + detail : ''}`); }
 }
 const root = path.join(__dirname, '..');
+/** Wait (up to 3 s) for something sent in the background; a busy CI machine needs more than a fixed pause. */
+const until = async (ok, ms = 3000) => { const end = Date.now() + ms; while (!ok() && Date.now() < end) await new Promise((r) => setTimeout(r, 20)); };
 const PORT = Number(process.env.AWANA_TEST_PORT || require('./free-port.cjs')());
 const JOB_A = 'A'.repeat(22);
 const JOB_B = 'B'.repeat(22);
@@ -135,16 +137,16 @@ const JOB_C = 'C'.repeat(22);
     const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     const r = await post('/feed/checked-out', { date: today, clubberIds: ['77'], source: 'checkout-page' });
     check('the laptop takes the list', r.status === 200 && r.body.ok === true, JSON.stringify(r));
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    await until(() => calls.some((c) => c.p === '/v1/station/checked-out'));
     const sent = calls.filter((c) => c.p === '/v1/station/checked-out');
     check('and hands the night\'s list to the Worker, as the station', sent.length === 1 && sent[0].station === 'station-aaaaaaaa' && sent[0].method === 'POST'
       && sent[0].body.date === today && JSON.stringify(sent[0].body.clubberIds) === JSON.stringify(['77']), JSON.stringify(calls));
     fresh();
     await post('/feed/checked-out', { date: today, clubberIds: ['77'], source: 'checkout-page' });
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    await new Promise((resolve) => setTimeout(resolve, 300));   // a send that should NOT come: give it time
     check('the same list again is not sent twice', calls.filter((c) => c.p === '/v1/station/checked-out').length === 0, JSON.stringify(calls));
     await post('/feed/checked-out', { date: today, clubberIds: ['77', '78'], source: 'checkout-page' });
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    await until(() => calls.some((c) => c.p === '/v1/station/checked-out'));
     const grown = calls.filter((c) => c.p === '/v1/station/checked-out');
     check('a longer list is', grown.length === 1 && JSON.stringify(grown[0].body.clubberIds) === JSON.stringify(['77', '78']), JSON.stringify(calls));
   }
