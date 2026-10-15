@@ -59,7 +59,7 @@ async function boot({ device = KIOSK_PC, prefs = ANSWERED, pageUrl } = {}) {
   return { k, $, press, now };
 }
 
-test('the kiosk takes exactly the phone\'s eleven actions, in both of its files', () => {
+test('the kiosk takes exactly the phone\'s twelve actions, in both of its files', () => {
   const part = readFileSync(path.join(REPO, 'src', 'schedule', '28-phone-remote.js'), 'utf8');
   const fromPart = JSON.parse(/const REMOTE_COMMANDS = (\[[^\]]*\]);/.exec(part)[1].replace(/'/g, '"'));
   const fromSync = JSON.parse(/var PHONE_ACTIONS = (\[[^\]]*\]);/.exec(SYNC_JS)[1].replace(/'/g, '"'));
@@ -160,7 +160,7 @@ test('Begin on the splash, then Play/Pause, ±15 s and Mute act on the video; th
     assert.equal(press('unmute'), true);
     assert.equal(k.video.muted, false);
     const report = now();
-    assert.deepEqual(report.video, { t: 100, d: 600, paused: false, muted: false });
+    assert.deepEqual(report.video, { t: 100, d: 600, paused: false, muted: false, volume: 100 });
     assert.equal(report.week, CURRENT.week);
 
     // "Start teaching slides" while the video is up = the → handoff.
@@ -297,6 +297,83 @@ test('a pick waits for a person at the screen like every press: Settings, a hand
     assert.equal(fresh.now().wait, 'captions', 'the question is still up');
   } finally {
     await fresh.k.close();
+  }
+});
+
+test('Volume - / + moves the video 10% a press, clamps at 0 and 100, and raising while muted unmutes', async () => {
+  const { k, press, now } = await boot();
+  try {
+    assert.equal(press('volume', { step: 1 }), false);
+    assert.equal(now().last.reason, 'no-video');
+    k.window.setView('journey');
+    await ticks();
+    press('begin');
+    for (let i = 0; i < 40 && now().view !== 'video'; i += 1) await sleep(10);
+    assert.equal(now().view, 'video');
+    assert.equal(now().video.volume, 100, 'the report carries the level');
+
+    assert.equal(press('volume', { step: 1 }), false, 'already at 100');
+    assert.equal(now().last.reason, 'already');
+    assert.equal(press('volume', { step: -1 }, 'v1'), true);
+    assert.equal(k.video.volume, 0.9);
+    assert.equal(now().video.volume, 90);
+    for (let i = 0; i < 3; i += 1) press('volume', { step: -1 });
+    assert.equal(k.video.volume, 0.6);
+    assert.equal(now().video.volume, 60);
+    assert.equal(press('volume', { step: 1 }), true);
+    assert.equal(k.video.volume, 0.7);
+    for (let i = 0; i < 12; i += 1) press('volume', { step: -1 });
+    assert.equal(k.video.volume, 0, 'clamped at 0');
+    assert.equal(press('volume', { step: -1 }), false);
+    assert.equal(now().last.reason, 'already');
+    assert.equal(k.video.muted, false, 'lowering never mutes');
+
+    // Garbage never moves it.
+    for (const data of [undefined, {}, { step: 0 }, { step: 2 }, { step: '1' }, { step: 0.5 }, 7]) {
+      assert.equal(press('volume', data), false);
+      assert.equal(now().last.reason, 'unknown');
+    }
+    assert.equal(k.video.volume, 0);
+
+    // Raising while muted unmutes (sound is allowed here: the KVBC Awana app).
+    assert.equal(press('mute'), true);
+    assert.equal(k.video.muted, true);
+    assert.equal(press('volume', { step: 1 }), true);
+    assert.equal(k.video.muted, false);
+    assert.equal(k.video.volume, 0.1);
+    // ...and at 100% a muted video is still unmuted by +.
+    k.video.volume = 1;
+    press('mute');
+    assert.equal(press('volume', { step: 1 }), true);
+    assert.equal(k.video.muted, false);
+    assert.equal(k.video.volume, 1);
+    // Lowering while muted keeps it muted.
+    press('mute');
+    assert.equal(press('volume', { step: -1 }), true);
+    assert.equal(k.video.muted, true);
+    assert.equal(k.video.volume, 0.9);
+  } finally {
+    await k.close();
+  }
+});
+
+test('a plain browser: + while muted sets the level but says why it stayed muted', async () => {
+  const { k, press, now } = await boot({ device: DESKTOP });
+  try {
+    k.window.setView('journey');
+    await ticks();
+    press('begin');
+    for (let i = 0; i < 40 && now().view !== 'video'; i += 1) await sleep(10);
+    assert.equal(k.video.muted, true);
+    press('volume', { step: -1 });
+    press('volume', { step: -1 });
+    assert.equal(k.video.volume, 0.8);
+    assert.equal(press('volume', { step: 1 }), false);
+    assert.equal(now().last.reason, 'sound-blocked');
+    assert.equal(k.video.muted, true, 'no tap yet: the browser would refuse sound');
+    assert.equal(k.video.volume, 0.9, 'the level still moved');
+  } finally {
+    await k.close();
   }
 });
 
@@ -448,5 +525,104 @@ test('the doorbell collects the phone\'s presses at once; each press id runs onc
     assert.deepEqual(s.nows().at(-1).body.now.last, { id: 'p4', action: 'slide-next', ok: true, reason: null });
   } finally {
     await s.k.close();
+  }
+});
+
+/* ── The doorbell carries the press itself (owner 2026-10-15) ── */
+
+const bellFor = (s, extra) => {
+  const id = JSON.parse(s.k.window.localStorage.getItem('awanaScreens.v1')).journey.id;
+  const frame = s.k.window.document.querySelector('#checkin-view iframe');
+  s.k.window.dispatchEvent(new s.k.window.MessageEvent('message', {
+    data: { type: 'awana-display:sync-doorbell', what: 'screen-action', id, ...extra }, source: frame.contentWindow, origin: s.k.window.location.origin,
+  }));
+};
+
+test('a press carried by the doorbell runs at once with no collect request, exactly once, and the report follows promptly', async () => {
+  const sent = [];
+  const s = await bootSynced({ watch: true, onNow: (body) => { if (body.now) sent.push(body.now); } });
+  try {
+    for (let i = 0; i < 40 && !sent.length; i += 1) await sleep(10);
+    s.k.window.journeyRemote.command({ action: 'slides-start', id: 'seed' });
+    await ticks();
+    assert.equal(s.$('slide-counter').textContent.startsWith('Slide 1 '), true);
+    await sleep(150);
+    const before = { nows: s.nows().length, reports: sent.length };
+    // A long normal gap: the report after a doorbell press must NOT wait for it.
+    s.k.window.journeyScreenTuning = { ...s.k.window.journeyScreenTuning, nowGapMs: 5000 };
+
+    // The Worker ALSO still holds the press (its fallback queue): the collect must not run it again.
+    s.state.queue = [{ id: 'bell1', action: 'slide-next', at: '2026-10-15T19:00:00Z' }];
+    bellFor(s, { action: 'remote', press: { id: 'bell1', action: 'slide-next' } });
+    assert.equal(s.$('slide-counter').textContent.startsWith('Slide 2 '), true, 'ran inside the doorbell, before any request');
+    assert.equal(s.nows().length, before.nows, 'no collect request was needed to run it');
+    // The report goes up promptly (not after nowGapMs): the tuning here is 60 ms, the default 700.
+    for (let i = 0; i < 40 && sent.length === before.reports; i += 1) await sleep(10);
+    assert.equal(sent.at(-1).last.id, 'bell1');
+    assert.deepEqual(sent.at(-1).last, { id: 'bell1', action: 'slide-next', ok: true, reason: null });
+    assert.equal(sent.at(-1).slide.n, 2);
+    // That report's own collect handed the same id back: still slide 2.
+    await sleep(100);
+    assert.equal(s.$('slide-counter').textContent.startsWith('Slide 2 '), true);
+    // A later hello handing it again, and the same doorbell rung again: never twice.
+    s.state.queue = [{ id: 'bell1', action: 'slide-next' }];
+    await s.k.window.journeySync.hello();
+    bellFor(s, { action: 'remote', press: { id: 'bell1', action: 'slide-next' } });
+    await ticks();
+    assert.equal(s.$('slide-counter').textContent.startsWith('Slide 2 '), true);
+    // A new id through the same path runs again.
+    bellFor(s, { action: 'remote', press: { id: 'bell2', action: 'slide-next' } });
+    assert.equal(s.$('slide-counter').textContent.startsWith('Slide 3 '), true);
+  } finally {
+    await s.k.close();
+  }
+});
+
+test('the doorbell\'s press is ignored unless well formed; the ring still collects (the fallback), and configure mode never runs one', async () => {
+  const s = await bootSynced({ watch: true });
+  try {
+    for (let i = 0; i < 40 && !s.nows().length; i += 1) await sleep(10);
+    s.k.window.journeyRemote.command({ action: 'slides-start', id: 'seed' });
+    await ticks();
+    await sleep(100);
+    const slide = () => s.$('slide-counter').textContent;
+    const start = slide();
+    for (const press of [
+      null, 'slide-next', 42, [], {},
+      { id: 'x', action: 'format-disk' },            // not an action
+      { action: 'slide-next' },                        // no id
+      { id: 'a b', action: 'slide-next' },             // not url-safe
+      { id: 'x'.repeat(41), action: 'slide-next' },    // too long
+      { id: 'v9', action: 'volume', data: { step: 5 } },
+      { id: 'v8', action: 'seek', data: { by: 'x' } },
+      { id: 'v7', action: 'pick', data: { week: 'one', choice: 'slides' } },
+      { id: 'v6', action: 'slide-next', data: [] },
+    ]) {
+      const n = s.nows().length;
+      bellFor(s, { action: 'remote', press });
+      assert.equal(slide(), start, `not run: ${JSON.stringify(press)}`);
+      // Nothing was run, and the ring fell back to the collect poll.
+      for (let i = 0; i < 40 && s.nows().length === n; i += 1) await sleep(10);
+      assert.equal(s.nows().length > n, true, 'a malformed press falls back to the collect poll');
+      await sleep(30);
+    }
+    // And the collect path still carries a real one.
+    s.state.queue = [{ id: 'real', action: 'slide-next' }];
+    bellFor(s, { action: 'remote', press: { id: 'junk', action: 'nope' } });
+    for (let i = 0; i < 60 && slide() === start; i += 1) await sleep(10);
+    assert.notEqual(slide(), start);
+  } finally {
+    await s.k.close();
+  }
+});
+
+test('configure mode refuses a press from any path (the doorbell\'s press goes through the same command)', async () => {
+  const { k } = await boot({ pageUrl: 'https://example.test/?configure=1' });
+  try {
+    // sync.js also ignores every doorbell in configure mode; the page refuses on its own.
+    assert.equal(k.window.journeyRemote.command({ id: 'c1', action: 'slides-start' }), false);
+    assert.equal(k.window.journeyRemote.command({ id: 'c2', action: 'volume', data: { step: -1 } }), false);
+  } finally {
+    await k.close();
   }
 });

@@ -128,6 +128,55 @@ test('presses: one request each, the right action; the readout follows the scree
   });
 });
 
+test('volume: big - and + with the level between, each tap one step press, off with no video', { skip }, async () => {
+  for (const viewport of [{ width: 360, height: 740 }, { width: 430, height: 900 }]) {
+    await withBrowser(async (browser) => {
+      const { page, calls, ctl, context } = await openRemote(browser, viewport);
+      await waitForMain(page, 'Slides 3 of 7');
+      // No video showing: the control is there but off.
+      assert.equal(await page.isDisabled('#btn-vol-down'), true);
+      assert.equal(await page.isDisabled('#btn-vol-up'), true);
+      assert.equal(await page.textContent('#vol-level'), 'Volume: no video');
+
+      ctl.kiosks = [{ id: 'jk_aaaaaaaaaaaaaaaaaaaa', name: 'Journey kiosk', online: true, now: NOW.video(5, 765, 902, false, 60) }];
+      await waitForMain(page, 'Video 12:4');
+      assert.equal(await page.textContent('#vol-level'), 'Volume 60%');
+      assert.equal(await page.isDisabled('#btn-vol-down'), false);
+      const down = await box(page, '#btn-vol-down');
+      const up = await box(page, '#btn-vol-up');
+      const level = await box(page, '#vol-level');
+      const next = await box(page, '#btn-next');
+      assert.ok(down.height >= 112 && up.height >= 112, `buttons ${down.height}/${up.height}px tall`);
+      assert.ok(down.width >= 72 && up.width >= 72, `buttons ${down.width}/${up.width}px wide`);
+      assert.ok(down.x + down.width <= level.x && level.x + level.width <= up.x, 'the level sits between - and +');
+      assert.ok(down.x >= 0 && up.x + up.width <= viewport.width, 'both fit across the phone');
+      assert.ok(next.height >= 112 && down.height >= next.height - 1, 'as big as Back / Next');
+      const m = await page.evaluate(() => ({ sw: document.documentElement.scrollWidth, iw: window.innerWidth }));
+      assert.ok(m.sw <= m.iw, 'no sideways scroll');
+
+      const presses = () => calls.filter((c) => c.path === '/v1/journey/remote').map((c) => c.body);
+      await page.click('#btn-vol-up');
+      await page.click('#btn-vol-down');
+      await page.click('#btn-vol-down');
+      for (let i = 0; i < 50 && presses().length < 3; i += 1) await page.waitForTimeout(20);
+      assert.deepEqual(presses(), [{ action: 'volume', data: { step: 1 } }, { action: 'volume', data: { step: -1 } }, { action: 'volume', data: { step: -1 } }]);
+
+      // The ends: - is off at 0, + is off at 100 unless muted; muted shows in the words.
+      ctl.kiosks = [{ id: 'jk_aaaaaaaaaaaaaaaaaaaa', name: 'Journey kiosk', online: true, now: NOW.video(5, 765, 902, false, 0) }];
+      await page.waitForFunction(() => document.getElementById('vol-level').textContent === 'Volume 0%');
+      assert.equal(await page.isDisabled('#btn-vol-down'), true);
+      assert.equal(await page.isDisabled('#btn-vol-up'), false);
+      ctl.kiosks = [{ id: 'jk_aaaaaaaaaaaaaaaaaaaa', name: 'Journey kiosk', online: true, now: NOW.video(5, 765, 902, false, 100) }];
+      await page.waitForFunction(() => document.getElementById('vol-level').textContent === 'Volume 100%');
+      assert.equal(await page.isDisabled('#btn-vol-up'), true);
+      ctl.kiosks = [{ id: 'jk_aaaaaaaaaaaaaaaaaaaa', name: 'Journey kiosk', online: true, now: NOW.video(5, 765, 902, false, 100, true) }];
+      await page.waitForFunction(() => document.getElementById('vol-level').textContent === 'Volume 100% · muted');
+      assert.equal(await page.isDisabled('#btn-vol-up'), false);
+      await context.close();
+    });
+  }
+});
+
 test('picking a lesson over a running one asks first, then sends force; over nothing it just goes', { skip }, async () => {
   await withBrowser(async (browser) => {
     const { page, calls, ctl, context } = await openRemote(browser, { width: 390, height: 844 }, {

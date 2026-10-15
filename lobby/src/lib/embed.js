@@ -23,6 +23,7 @@
 // Standalone (window.self === window.top) none of it applies, and the page
 // is laid out exactly as it always was.
 
+import { sanitizeJourneyPress } from '../../shared/journeyRemote.js';
 import { EMBED_DOORBELL_MESSAGE } from './constants.js';
 
 /**
@@ -45,16 +46,28 @@ export function isEmbedded() {
  * EMBED_DOORBELL_MESSAGE): only a 'journey' ring, or a 'screen' /
  * 'screen-action' ring naming a screen by a well-formed id, and only the
  * word and the id (never an action or anything else the ring carried: the
- * kiosk fetches what it needs itself). null for anything else.
+ * kiosk fetches what it needs itself), with ONE exception: a phone remote
+ * ring (`action: 'remote'`) also hands up its press `{id, action, data?}`,
+ * only when it is well formed and cleaned by the phone remote's own rules
+ * (shared/journeyRemote.js sanitizeJourneyPress: a known action, the data
+ * that action takes, a url-safe id of at most 40 characters), so the kiosk
+ * can run it at once. A malformed press is dropped; the ring still goes up.
+ * null for anything else.
  * @param {unknown} what
  * @param {unknown} payload
- * @returns {{ type: string, what: string, id?: string } | null}
+ * @returns {{ type: string, what: string, id?: string, press?: { id: string, action: string, data?: Record<string, unknown> } } | null}
  */
 export function hostDoorbell(what, payload) {
   if (what === 'journey') return { type: EMBED_DOORBELL_MESSAGE, what };
   if (what !== 'screen' && what !== 'screen-action') return null;
   const id = payload && typeof payload === 'object' ? /** @type {any} */ (payload).id : null;
-  return typeof id === 'string' && /^[A-Za-z0-9_-]{16,64}$/.test(id) ? { type: EMBED_DOORBELL_MESSAGE, what, id } : null;
+  if (typeof id !== 'string' || !/^[A-Za-z0-9_-]{16,64}$/.test(id)) return null;
+  const message = { type: EMBED_DOORBELL_MESSAGE, what, id };
+  if (what === 'screen-action' && /** @type {any} */ (payload).action === 'remote') {
+    const press = sanitizeJourneyPress(/** @type {any} */ (payload).press);
+    if (press) return { ...message, press };
+  }
+  return message;
 }
 
 /**

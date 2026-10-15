@@ -61,7 +61,14 @@
      the same request carries what the screen shows (journeyRemote.now()):
      on every change, never twice within nowGapMs (700 ms), and every
      playingMs (10 s) (a playing video's position; a press whose doorbell was
-     missed). Nobody watching: nothing extra is sent at all. A service without the route (404) falls back to the hello.
+     missed). Nobody watching: nothing extra is sent at all.
+     Since 2026-10-15 the doorbell also CARRIES the press ({id, action, data?}
+     from the Worker's ring, cleaned by the display's hostDoorbell and checked
+     again by cleanBellPress): it runs the moment the doorbell arrives (no
+     collect round trip), the same phoneSeen list keeps a later collect or
+     hello from running it twice, and the report follows after afterPressMs
+     instead of waiting nowGapMs. A ring without a (well-formed) press still
+     collects as before. A service without the route (404) falls back to the hello.
    - A 401 on any request (the pull, a push, the hello, the phone remote's
      poll, the switches) means the service no longer knows this session: it
      is dropped as a sign-out drops it, and every remote poll and timer stops
@@ -102,7 +109,7 @@
   var SCREEN_ID_RE = /^[A-Za-z0-9_-]{16,64}$/;
   var SCREEN_TUNING = {
     helloMs: 2 * 60 * 1000, minGapMs: 60 * 1000, bellGapMs: 3000, ackMs: 4000, ackWindowMs: 30 * 1000, prefsDelayMs: 1000,
-    nowGapMs: 700, playingMs: 10 * 1000, pollGapMs: 250,
+    nowGapMs: 700, playingMs: 10 * 1000, pollGapMs: 250, afterPressMs: 40,
   };
   // What the settings page may ask this kiosk to do: exactly the lobby's
   // SCREEN_ACTIONS.journey (lobby/src/lib/syncSpecs.js; its screenSpecs.test.js
@@ -112,9 +119,11 @@
   var DOORBELL_MESSAGE = 'awana-display:sync-doorbell';
   // What the phone remote may ask: exactly lobby/shared/journeyRemote.js
   // JOURNEY_REMOTE_ACTIONS (test/phone-remote.test.mjs reads this line).
-  var PHONE_ACTIONS = ['slide-next', 'slide-prev', 'slides-start', 'play', 'pause', 'toggle-pause', 'seek', 'mute', 'unmute', 'begin', 'pick'];
+  var PHONE_ACTIONS = ['slide-next', 'slide-prev', 'slides-start', 'play', 'pause', 'toggle-pause', 'seek', 'mute', 'unmute', 'volume', 'begin', 'pick'];
   var PHONE_ACTIONS_MAX = 12;
   var PHONE_SEEN_MAX = 64;
+  var PRESS_ID_RE = /^[A-Za-z0-9_-]{1,40}$/;
+  var PICK_CHOICES = ['student', 'leader', 'slides', 'handout', 'student-prep', 'leader-prep'];
   var STATUS_ERROR_MAX = 120;
   var CONFIGURE = (function () {
     try { return new URLSearchParams(window.location.search).get('configure') === '1'; } catch (e) { return false; }
@@ -138,6 +147,7 @@
   var nowTimer = null;
   var playingTimer = null;
   var remoteBellTimer = null;
+  var reportAfterPressTimer = null;
   var lastNowAt = 0;
   var lastNowSent = '';
   var phoneSeen = []; // press ids already run (never twice)
@@ -418,6 +428,34 @@
     return r && typeof r.command === 'function' && typeof r.now === 'function' ? r : null;
   }
 
+  /* A press carried by the doorbell ({id, action, data?}, already cleaned by
+     the lobby's hostDoorbell, which the Worker's rules built): checked again
+     here before anything runs, because it came through postMessage. Only a
+     url-safe id, an allowlisted action and the few small data fields the
+     actions take (a seek's `by`, a volume `step` of +1/-1, a pick's week,
+     choice and force); anything else is dropped, and a press that is not
+     well formed is not run (the collect path still has it). null = no. */
+  function cleanBellPress(p) {
+    if (!p || typeof p !== 'object' || typeof p.id !== 'string' || !PRESS_ID_RE.test(p.id)) return null;
+    if (PHONE_ACTIONS.indexOf(p.action) === -1) return null;
+    var out = { id: p.id, action: p.action };
+    var d = p.data;
+    if (d !== undefined && d !== null && (typeof d !== 'object' || Array.isArray(d))) return null;
+    if (p.action === 'seek') {
+      if (!d || typeof d.by !== 'number' || !isFinite(d.by)) return null;
+      out.data = { by: d.by };
+    } else if (p.action === 'volume') {
+      if (!d || (d.step !== 1 && d.step !== -1)) return null;
+      out.data = { step: d.step };
+    } else if (p.action === 'pick') {
+      if (!d || typeof d.week !== 'number' || d.week % 1 !== 0 || d.week < 1 || d.week > 99
+        || typeof d.choice !== 'string' || PICK_CHOICES.indexOf(d.choice) === -1) return null;
+      out.data = { week: d.week, choice: d.choice };
+      if (d.force === true) out.data.force = true;
+    }
+    return out;
+  }
+
   /* Each press in order, each id once, only the allowlisted actions. */
   function runPhone(list) {
     var r = phone();
@@ -434,6 +472,27 @@
       try { r.command({ id: item.id, action: item.action, data: item.data }); ran++; } catch (e) { /* reported as skipped by schedule.js */ }
     }
     return ran;
+  }
+
+  /* The press the doorbell carried: run NOW (no collect round trip), once per
+     id (phoneSeen is shared with the collect path, so a later poll or hello
+     that hands the same id runs nothing), then say what the screen shows
+     without waiting nowGapMs (the phone should see the result promptly).
+     Returns true when the doorbell's press was well formed. */
+  function runBellPress(raw) {
+    var press = cleanBellPress(raw);
+    if (!press || !phone()) return false;
+    runPhone([press]);
+    if (watched && !nowGone) {
+      clearTimeout(nowTimer);
+      nowTimer = null;
+      clearTimeout(reportAfterPressTimer);
+      reportAfterPressTimer = setTimeout(function () {
+        reportAfterPressTimer = null;
+        phonePoll(true).then(armPlaying, armPlaying);
+      }, screenTuning().afterPressMs);
+    }
+    return true;
   }
 
   function currentNow() {
@@ -470,6 +529,8 @@
     setWatched(false);
     clearTimeout(remoteBellTimer);
     remoteBellTimer = null;
+    clearTimeout(reportAfterPressTimer);
+    reportAfterPressTimer = null;
     lastNowSent = '';
   }
 
@@ -645,6 +706,11 @@
     if (d.what !== 'screen' && d.what !== 'screen-action') return;
     var slot = screenSlot();
     if (!slot || d.id !== slot.id) return;
+    if (d.what === 'screen-action' && d.press && runBellPress(d.press)) {
+      // The doorbell carried the press itself and it ran at once; the report
+      // (runBellPress) also collects anything an earlier missed doorbell left.
+      return;
+    }
     if (d.what === 'screen-action' && !nowGone) {
       // A press from the phone (or from /settings, which the answer says): the
       // light poll, carrying what the screen shows, at once.

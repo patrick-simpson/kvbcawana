@@ -180,7 +180,11 @@ export class JourneyRemote {
     for (const k of kiosks) {
       const queue = [...this.fresh(k.id, t), item].slice(-JOURNEY_REMOTE_QUEUE_MAX);
       this.presses.set(k.id, queue);
-      this.ring({ what: 'screen-action', id: k.id, action: 'remote', at });
+      // The press rides the ring (owner 2026-10-15: the kiosk runs it the
+      // moment the doorbell arrives, no second round trip to collect it). It
+      // is the cleaned press, never private; the queue below stays as the
+      // fallback for a doorbell that never arrives.
+      this.ring({ what: 'screen-action', id: k.id, action: 'remote', at, press: { id, action: item.action, ...(item.data ? { data: item.data } : {}) } });
     }
     return { ok: true, body: { ok: true, id, kiosks: kiosks.length, online: kiosks.filter((k) => this.online(k, t)).length } };
   }

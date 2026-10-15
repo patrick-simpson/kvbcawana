@@ -96,6 +96,29 @@ describe('one press to every Journey kiosk', () => {
     expect((await s.poll(TV)).status).toBe(404); // a TV is not a Journey kiosk
   });
 
+  it('each ring carries the cleaned press itself (the kiosk runs it at once); the queued copy stays as the fallback', async () => {
+    const s = await setup();
+    const res = await s.press('volume', { step: -1, junk: 'x' });
+    expect(res.status).toBe(200);
+    const rings = s.frames.filter((f) => f.e === 'changed');
+    expect(rings).toHaveLength(2);
+    for (const f of rings) {
+      expect(f.d.press).toEqual({ id: res.body.id, action: 'volume', data: { step: -1 } });
+      expect(JSON.stringify(f.d).length).toBeLessThan(300);
+    }
+    // A bad volume step never rings or queues.
+    const bad = await s.press('volume', { step: 7 });
+    expect(bad.status).toBe(400);
+    expect(s.frames.filter((f) => f.e === 'changed')).toHaveLength(2);
+    // The same press is still there for a kiosk whose doorbell never came.
+    expect((await s.poll(K1)).body.actions).toEqual([{ id: res.body.id, action: 'volume', data: { step: -1 }, at: '2026-10-14T23:00:00.000Z' }]);
+    // The state-read ring (a phone started watching) carries no press.
+    await s.state();
+    const watch = s.frames.filter((f) => f.e === 'changed' && f.d.action === 'remote-watch');
+    expect(watch.length).toBeGreaterThan(0);
+    expect(watch.every((f) => f.d.press === undefined)).toBe(true);
+  });
+
   it('with no kiosk signed in, says so instead of queuing into nothing', async () => {
     const s = await setup({ kiosks: [] });
     const res = await s.press('slide-next');

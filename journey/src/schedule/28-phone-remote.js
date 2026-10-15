@@ -2,11 +2,13 @@
    Owner 2026-10-13: "build a way to advance slides for Journey on a phone.
    Doing it on the phone should advance the slide for all." A leader's phone
    presses Next (or Back, Start teaching slides, Play/Pause, Back 15s, Skip
-   15s, Mute, Begin, or picks a lesson) and EVERY Journey kiosk does it. The
+   15s, Mute, Volume - / +, Begin, or picks a lesson) and EVERY Journey kiosk does it. The
    press reaches this page through public/src/sync.js (the sync Worker keeps
    it for 20 seconds; the embedded Check-in Display's doorbell makes this
    page collect it within about a second), which hands each one to
-   journeyRemote.command() here.
+   journeyRemote.command() here. Since 2026-10-15 the doorbell carries the
+   press itself and public/src/sync.js runs it the moment the doorbell
+   arrives (the collect stays as the fallback; each press id runs once).
 
    - Each press runs through the very function this page's own buttons and
      keys call (nextSlide, prevSlide, skipToTeachingSlides / the → handoff,
@@ -34,7 +36,9 @@
 
 // What the phone may ask: exactly lobby/shared/journeyRemote.js
 // JOURNEY_REMOTE_ACTIONS (test/phone-remote.test.mjs pins the two lists).
-const REMOTE_COMMANDS = ['slide-next', 'slide-prev', 'slides-start', 'play', 'pause', 'toggle-pause', 'seek', 'mute', 'unmute', 'begin', 'pick'];
+const REMOTE_COMMANDS = ['slide-next', 'slide-prev', 'slides-start', 'play', 'pause', 'toggle-pause', 'seek', 'mute', 'unmute', 'volume', 'begin', 'pick'];
+// One volume press moves the lesson video's volume by this many percent (owner 2026-10-15).
+const REMOTE_VOLUME_STEP_PCT = 10;
 // The deck's four pictures, in Awana's order (20-teaching-slides.js).
 const REMOTE_DECK_KINDS = ['title', 'verse', 'misconception', 'illumination'];
 // How the last press went: { id, action, ok, reason }.
@@ -118,6 +122,7 @@ function remoteNow() {
       d: Number.isFinite(d) && d > 0 ? Math.round(d * 10) / 10 : 0,
       paused: journeyVideo.paused,
       muted: journeyVideo.muted,
+      volume: Math.round(journeyVideo.volume * 100),
     };
   }
   if (view === 'splash' && offeredResumeAt > 0) out.resume = Math.floor(offeredResumeAt);
@@ -230,6 +235,23 @@ function runRemoteCommand(action, data) {
       if (!remoteSoundAllowed()) return 'sound-blocked';
       setMuted(false);
       return null;
+    case 'volume': {
+      if (!remoteVideoUp()) return 'no-video';
+      const step = data && (data.step === 1 || data.step === -1) ? data.step : 0;
+      if (!step) return 'unknown';
+      // Whole tenths, so a level never drifts off the 10% grid.
+      const now = Math.round(journeyVideo.volume * 100 / REMOTE_VOLUME_STEP_PCT);
+      const next = Math.max(0, Math.min(100 / REMOTE_VOLUME_STEP_PCT, now + step));
+      const unmuting = step > 0 && journeyVideo.muted;
+      if (next === now && !unmuting) return 'already';
+      journeyVideo.volume = (next * REMOTE_VOLUME_STEP_PCT) / 100;
+      if (!unmuting) return null;
+      // Raising the volume while muted unmutes, where the browser allows sound
+      // (as Unmute); the level is kept either way.
+      if (!remoteSoundAllowed()) return 'sound-blocked';
+      setMuted(false);
+      return null;
+    }
     case 'begin':
       if (lessonIntroActive() || remoteVideoUp() || slideshowActive()) return 'already';
       if (!isAwaitingPlay()) return 'not-splash';

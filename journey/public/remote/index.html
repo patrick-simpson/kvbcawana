@@ -71,6 +71,11 @@
               <button id="btn-play" type="button" class="btn btn-mid btn-play" data-action="toggle-pause">Play / Pause</button>
               <button type="button" class="btn btn-mid" data-action="seek" data-by="15">Skip 15s</button>
             </div>
+            <div id="volume" class="volume" role="group" aria-label="Volume">
+              <button id="btn-vol-down" type="button" class="btn btn-big btn-vol" data-action="volume" data-step="-1" aria-label="Volume down"><span aria-hidden="true">&minus;</span></button>
+              <p id="vol-level" class="vol-level" role="status" aria-live="polite">Volume</p>
+              <button id="btn-vol-up" type="button" class="btn btn-big btn-vol" data-action="volume" data-step="1" aria-label="Volume up"><span aria-hidden="true">+</span></button>
+            </div>
             <div class="video-row">
               <button id="btn-mute" type="button" class="btn btn-mid" data-action="mute">Mute</button>
               <button id="btn-begin" type="button" class="btn btn-mid btn-begin" data-action="begin">Begin lesson</button>

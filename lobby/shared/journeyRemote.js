@@ -19,7 +19,7 @@
 /** Everything the phone may ask every Journey screen to do. */
 export const JOURNEY_REMOTE_ACTIONS = Object.freeze([
   'slide-next', 'slide-prev', 'slides-start',
-  'play', 'pause', 'toggle-pause', 'seek', 'mute', 'unmute',
+  'play', 'pause', 'toggle-pause', 'seek', 'mute', 'unmute', 'volume',
   'begin', 'pick',
 ]);
 
@@ -37,6 +37,8 @@ export const JOURNEY_REMOTE_BURST = 8;
 export const JOURNEY_REMOTE_REFILL_PER_S = 4;
 /** A seek moves at most this far, either way (the kiosk's Back 15s / Skip 15s). */
 export const JOURNEY_SEEK_MAX_S = 15;
+/** One volume press moves the video's volume by this many percent (owner 2026-10-15). */
+export const JOURNEY_VOLUME_STEP_PCT = 10;
 
 /** What a kiosk's screen can be showing. */
 export const JOURNEY_NOW_VIEWS = Object.freeze(['splash', 'intro', 'video', 'slides', 'checkin', 'trek', 'idle']);
@@ -83,12 +85,13 @@ function cleanSeconds(v) {
 /**
  * One press from the phone, or null. Only a seek and a pick carry data: a
  * seek its signed seconds (rounded, clamped to ±JOURNEY_SEEK_MAX_S, never 0),
- * a pick a week 1..99, a choice from JOURNEY_PICKER_CHOICES and, only after
+ * a volume press its direction `step` (exactly +1 or -1: one tap = one
+ * JOURNEY_VOLUME_STEP_PCT step), a pick a week 1..99, a choice from JOURNEY_PICKER_CHOICES and, only after
  * the phone's confirm tap, `force: true` (replace a lesson already running).
  * Every other action's data is dropped.
  * @param {unknown} action
  * @param {unknown} [data]
- * @returns {{ action: string, data?: { by: number } | { week: number, choice: string, force?: true } } | null}
+ * @returns {{ action: string, data?: { by: number } | { step: 1 | -1 } | { week: number, choice: string, force?: true } } | null}
  */
 export function sanitizeJourneyRemote(action, data) {
   if (!oneOf(JOURNEY_REMOTE_ACTIONS, action)) return null;
@@ -96,6 +99,10 @@ export function sanitizeJourneyRemote(action, data) {
     const by = isPlain(data) && typeof data.by === 'number' && Number.isFinite(data.by)
       ? Math.max(-JOURNEY_SEEK_MAX_S, Math.min(JOURNEY_SEEK_MAX_S, Math.round(data.by))) : 0;
     return by ? { action, data: { by } } : null;
+  }
+  if (action === 'volume') {
+    const step = isPlain(data) ? data.step : null;
+    return step === 1 || step === -1 ? { action, data: { step } } : null;
   }
   if (action === 'pick') {
     if (!isPlain(data)) return null;
@@ -107,8 +114,22 @@ export function sanitizeJourneyRemote(action, data) {
 }
 
 /**
+ * A press as the doorbell carries it to a kiosk: the Worker's press id, an
+ * action and its cleaned data, in exactly the shape sanitizeJourneyRemote
+ * allows, or null (anything else, an id that is not url-safe or over 40
+ * characters). Pure: the lobby's embed bridge and the tests use it.
+ * @param {unknown} raw
+ * @returns {{ id: string, action: string, data?: Record<string, unknown> } | null}
+ */
+export function sanitizeJourneyPress(raw) {
+  if (!isPlain(raw) || typeof raw.id !== 'string' || !PRESS_ID_RE.test(raw.id)) return null;
+  const clean = sanitizeJourneyRemote(raw.action, raw.data);
+  return clean ? { id: raw.id, action: clean.action, ...(clean.data ? { data: { ...clean.data } } : {}) } : null;
+}
+
+/**
  * @typedef {{ n: number, of: number, kind: string, heading: string | null, lines: string[] }} NowSlide
- * @typedef {{ t: number, d: number, paused: boolean, muted: boolean }} NowVideo
+ * @typedef {{ t: number, d: number, paused: boolean, muted: boolean, volume?: number }} NowVideo
  * @typedef {{ id: string | null, action: string, ok: boolean, reason: string | null }} NowLast
  * @typedef {{ view: string, week: number | null, title: string | null, preview: boolean, wait: string | null,
  *   slide?: NowSlide, video?: NowVideo, resume?: number, last: NowLast | null, at: string | null }} JourneyNow
@@ -128,7 +149,11 @@ function cleanSlide(s) {
 /** @param {unknown} v @returns {NowVideo | null} */
 function cleanVideo(v) {
   if (!isPlain(v)) return null;
-  return { t: cleanSeconds(v.t), d: cleanSeconds(v.d), paused: v.paused === true, muted: v.muted === true };
+  /** @type {NowVideo} */
+  const out = { t: cleanSeconds(v.t), d: cleanSeconds(v.d), paused: v.paused === true, muted: v.muted === true };
+  // The video's volume in whole percent (a kiosk that does not say leaves it out).
+  if (typeof v.volume === 'number' && Number.isFinite(v.volume)) out.volume = Math.round(Math.min(100, Math.max(0, v.volume)));
+  return out;
 }
 
 /** @param {unknown} l @returns {NowLast | null} */

@@ -47,6 +47,31 @@ describe('a press', () => {
     expect(sanitizeJourneyRemote('seek')).toBeNull();
   });
 
+  it('a volume press: exactly one step up or down, nothing else', () => {
+    expect(shared.JOURNEY_REMOTE_ACTIONS).toContain('volume');
+    expect(shared.JOURNEY_VOLUME_STEP_PCT).toBe(10);
+    expect(sanitizeJourneyRemote('volume', { step: 1 })).toEqual({ action: 'volume', data: { step: 1 } });
+    expect(sanitizeJourneyRemote('volume', { step: -1, extra: 'x' })).toEqual({ action: 'volume', data: { step: -1 } });
+    for (const bad of [undefined, null, {}, { step: 0 }, { step: 2 }, { step: -5 }, { step: '1' }, { step: 0.5 }, { step: NaN }, { level: 50 }, 1]) {
+      expect(sanitizeJourneyRemote('volume', bad), JSON.stringify(bad)).toBeNull();
+    }
+  });
+
+  it('a press as the doorbell carries it: a url-safe id (at most 40) and a clean press, else null', () => {
+    const clean = shared.sanitizeJourneyPress;
+    expect(specs.sanitizeJourneyPress).toBe(clean);
+    expect(clean({ id: 'r1abc', action: 'slide-next', junk: 1 })).toEqual({ id: 'r1abc', action: 'slide-next' });
+    expect(clean({ id: 'r1abc', action: 'volume', data: { step: -1, x: 1 } })).toEqual({ id: 'r1abc', action: 'volume', data: { step: -1 } });
+    expect(clean({ id: 'r1', action: 'seek', data: { by: 99 } })).toEqual({ id: 'r1', action: 'seek', data: { by: 15 } });
+    expect(clean({ id: 'r1', action: 'pick', data: { week: 5, choice: 'slides', force: true } }))
+      .toEqual({ id: 'r1', action: 'pick', data: { week: 5, choice: 'slides', force: true } });
+    for (const bad of [null, 'x', 7, [], {}, { id: 'r1' }, { action: 'slide-next' }, { id: '', action: 'slide-next' }, { id: 'a b', action: 'slide-next' },
+      { id: 'x'.repeat(41), action: 'slide-next' }, { id: 5, action: 'slide-next' }, { id: 'r1', action: 'format-disk' },
+      { id: 'r1', action: 'volume', data: { step: 3 } }, { id: 'r1', action: 'seek' }, { id: 'r1', action: 'pick', data: { week: 0, choice: 'slides' } }]) {
+      expect(clean(bad), JSON.stringify(bad)).toBeNull();
+    }
+  });
+
   it('a pick: a week 1..99 and a known choice; force only when literally true', () => {
     expect(sanitizeJourneyRemote('pick', { week: 5, choice: 'slides' })).toEqual({ action: 'pick', data: { week: 5, choice: 'slides' } });
     expect(sanitizeJourneyRemote('pick', { week: 5, choice: 'leader-prep', force: true, extra: 'x' }))
@@ -74,6 +99,15 @@ describe('a kiosk\'s report of its screen', () => {
       last: { id: 'rabc1', action: 'slide-next', ok: true, reason: null },
       at: '2026-10-14T23:00:00.000Z',
     });
+  });
+
+  it('a video readout carries the volume in whole percent, clamped, only when it is a number', () => {
+    const v = (volume) => sanitizeJourneyNow({ view: 'video', video: { t: 1, d: 2, paused: false, muted: false, volume } }).video;
+    expect(v(60)).toEqual({ t: 1, d: 2, paused: false, muted: false, volume: 60 });
+    expect(v(59.6).volume).toBe(60);
+    expect(v(400).volume).toBe(100);
+    expect(v(-3).volume).toBe(0);
+    for (const bad of ['60', null, NaN, Infinity, undefined]) expect(v(bad)).not.toHaveProperty('volume');
   });
 
   it('a video readout is numbers and switches; a splash may offer a resume point', () => {

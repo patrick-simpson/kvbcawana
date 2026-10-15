@@ -53,6 +53,7 @@ export const ACTION_WORDS = {
   seek: 'Skip',
   mute: 'Mute',
   unmute: 'Unmute',
+  volume: 'Volume',
   begin: 'Begin lesson',
   pick: 'Lesson',
 };
@@ -66,6 +67,23 @@ export const CHOICES = [
   { choice: 'handout', label: 'Leader handout', leader: true },
   { choice: 'leader-prep', label: 'Leader Read Prep', leader: true },
 ];
+
+/* The volume control's words and state for the report's video (or null: no
+   video showing). `text` is what sits between the - and + buttons:
+   "Volume 60%" (plus " · muted"); a kiosk too old to report a level just
+   says "Volume". `down` / `up` say whether each button can do anything now
+   (raising while muted still unmutes, so + stays on at 100% then). */
+export function volumeView(video) {
+  if (!video) return { text: 'Volume: no video', pct: null, down: false, up: false };
+  const pct = Number.isFinite(video.volume) ? Math.max(0, Math.min(100, Math.round(video.volume))) : null;
+  if (pct === null) return { text: video.muted ? 'Volume · muted' : 'Volume', pct, down: true, up: true };
+  return {
+    text: `Volume ${pct}%${video.muted ? ' · muted' : ''}`,
+    pct,
+    down: pct > 0,
+    up: pct < 100 || video.muted === true,
+  };
+}
 
 /* m:ss (or h:mm:ss) from seconds. */
 export function formatTime(seconds) {

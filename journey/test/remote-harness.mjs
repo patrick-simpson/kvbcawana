@@ -35,9 +35,9 @@ export const NOW = {
     slide: { n: 5, of: 7, kind: 'questions', heading: 'Talk About It', lines },
     last: null, at: null,
   }),
-  video: (week = 5, t = 765, d = 902, paused = false) => ({
+  video: (week = 5, t = 765, d = 902, paused = false, volume = 60, muted = false) => ({
     view: 'video', week, title: titleOf(week), preview: false, wait: null,
-    video: { t, d, paused, muted: false }, last: null, at: null,
+    video: { t, d, paused, muted, volume }, last: null, at: null,
   }),
   checkin: (week = 5) => ({ view: 'checkin', week, title: titleOf(week), preview: false, wait: null, last: null, at: null }),
 };

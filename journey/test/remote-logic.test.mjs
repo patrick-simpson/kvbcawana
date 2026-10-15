@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  answersFor, beginWords, cleanAnswersFile, describeNow, formatTime, lastWords, needsConfirm, pickKiosk, videoPosition, REASON_WORDS, CHOICES,
+  answersFor, beginWords, cleanAnswersFile, describeNow, formatTime, lastWords, needsConfirm, pickKiosk, videoPosition, volumeView, REASON_WORDS, CHOICES,
 } from '../public/remote/logic.js';
 import { JOURNEY_PICKER_CHOICES, JOURNEY_REMOTE_REASONS } from '../../lobby/shared/journeyRemote.js';
 
@@ -78,4 +78,18 @@ test('sample answers match the wall by exact text; an edit hides them; no file, 
   assert.equal(answersFor(file, { ...q(['One?']), week: 6 }), null);
   assert.equal(cleanAnswersFile({ version: 2, weeks: {} }), null);
   assert.deepEqual(cleanAnswersFile({ version: 1, weeks: { 5: [{ q: 'x', answer: 1 }], abc: [] } }).weeks, {});
+});
+
+test('the volume control: the level in plain words, and which buttons can do something', () => {
+  const v = (volume, muted = false) => ({ t: 1, d: 10, paused: false, muted, volume });
+  assert.deepEqual(volumeView(v(60)), { text: 'Volume 60%', pct: 60, down: true, up: true });
+  assert.deepEqual(volumeView(v(0)), { text: 'Volume 0%', pct: 0, down: false, up: true });
+  assert.deepEqual(volumeView(v(100)), { text: 'Volume 100%', pct: 100, down: true, up: false });
+  assert.equal(volumeView(v(100, true)).up, true, 'raising while muted unmutes, so + stays on');
+  assert.equal(volumeView(v(30, true)).text, 'Volume 30% · muted');
+  assert.equal(volumeView(v(140)).pct, 100, 'clamped');
+  // No video showing: both off.
+  assert.deepEqual(volumeView(null), { text: 'Volume: no video', pct: null, down: false, up: false });
+  // A kiosk too old to report a level: the buttons still work, the words stay plain.
+  assert.deepEqual(volumeView({ t: 1, d: 10, paused: false, muted: false }), { text: 'Volume', pct: null, down: true, up: true });
 });

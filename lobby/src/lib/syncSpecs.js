@@ -178,7 +178,9 @@ export {
   JOURNEY_REMOTE_TTL_MS,
   JOURNEY_REMOTE_WATCH_MS,
   JOURNEY_SEEK_MAX_S,
+  JOURNEY_VOLUME_STEP_PCT,
   sanitizeJourneyNow,
+  sanitizeJourneyPress,
   sanitizeJourneyRemote,
 } from '../../shared/journeyRemote.js';
 

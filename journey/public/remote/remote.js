@@ -237,6 +237,10 @@ function render() {
   $('btn-mute').textContent = v && v.muted ? 'Unmute' : 'Mute';
   $('btn-mute').dataset.action = v && v.muted ? 'unmute' : 'mute';
   $('btn-begin').textContent = logic.beginWords(now);
+  const vol = logic.volumeView(v);
+  $('vol-level').textContent = vol.text;
+  $('btn-vol-down').disabled = !vol.down;
+  $('btn-vol-up').disabled = !vol.up;
 
   renderLinesAndAnswers(now);
   renderScreens();
@@ -353,6 +357,7 @@ function onPadClick(event) {
   if (!button || !rules) return;
   const action = button.dataset.action;
   if (action === 'seek') { press('seek', { by: Number(button.dataset.by) }, button); return; }
+  if (action === 'volume') { press('volume', { step: Number(button.dataset.step) }, button); return; }
   press(action, undefined, button);
 }
 

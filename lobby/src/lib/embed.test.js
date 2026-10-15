@@ -218,6 +218,32 @@ describe('the sync doorbell, passed up to the Journey kiosk', () => {
     }
   });
 
+  it('a phone remote ring also hands up its press, only when well formed and cleaned; the Journey kiosk spells it the same', () => {
+    const ring = (press, action = 'remote') => ({ what: 'screen-action', id: ID, action, at: 'x', press });
+    expect(hostDoorbell('screen-action', ring({ id: 'r1abc', action: 'slide-next', evil: 1 })))
+      .toEqual({ type: EMBED_DOORBELL_MESSAGE, what: 'screen-action', id: ID, press: { id: 'r1abc', action: 'slide-next' } });
+    expect(hostDoorbell('screen-action', ring({ id: 'r1abc', action: 'volume', data: { step: -1, x: 2 } })).press)
+      .toEqual({ id: 'r1abc', action: 'volume', data: { step: -1 } });
+    expect(hostDoorbell('screen-action', ring({ id: 'r1', action: 'seek', data: { by: 900 } })).press.data).toEqual({ by: 15 });
+    expect(hostDoorbell('screen-action', ring({ id: 'r1', action: 'pick', data: { week: 5, choice: 'slides', force: true } })).press.data)
+      .toEqual({ week: 5, choice: 'slides', force: true });
+    // Malformed or oversized presses: the plain ring goes up (the kiosk collects), the press never does.
+    const plain = { type: EMBED_DOORBELL_MESSAGE, what: 'screen-action', id: ID };
+    for (const press of [null, undefined, 'slide-next', [], {}, { id: 'r1' }, { id: 'a b', action: 'slide-next' }, { id: 'x'.repeat(41), action: 'slide-next' },
+      { id: 'r1', action: 'format-disk' }, { id: 'r1', action: 'volume', data: { step: 9 } }, { id: 'r1', action: 'seek', data: { by: 'x' } },
+      { id: 'r1', action: 'pick', data: { week: 'x', choice: 'slides' } }]) {
+      expect(hostDoorbell('screen-action', ring(press)), JSON.stringify(press)).toEqual(plain);
+    }
+    // Only the phone remote's own ring carries one: not a settings-page action, not another word.
+    expect(hostDoorbell('screen-action', ring({ id: 'r1', action: 'slide-next' }, 'delete-downloads'))).toEqual(plain);
+    expect(hostDoorbell('screen', { id: ID, action: 'remote', press: { id: 'r1', action: 'slide-next' } })).toEqual({ ...plain, what: 'screen' });
+    // The message stays small whatever the ring carried.
+    const big = hostDoorbell('screen-action', ring({ id: 'r1', action: 'pick', data: { week: 5, choice: 'slides', force: true, pad: 'x'.repeat(10000) } }));
+    expect(JSON.stringify(big).length).toBeLessThan(300);
+    const journey = readFileSync(resolve(__dirname, '../../../journey/public/src/sync.js'), 'utf8');
+    expect(journey).toMatch(/d\.what === 'screen-action' && d\.press && runBellPress\(d\.press\)/);
+  });
+
   it('the App posts it to its own origin only, embedded only, and Journey spells the message the same', () => {
     const app = readFileSync(resolve(__dirname, '../App.jsx'), 'utf8');
     expect(app).toMatch(/hostDoorbell\(what, payload\)[\s\S]{0,200}window\.parent\.postMessage\(message, window\.location\.origin\)/);
