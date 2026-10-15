@@ -269,6 +269,16 @@ describe('a restart reads the held page back', () => {
     expect((await t.call('GET', '/v1/desk/roster')).body.kids.find((k) => k.clubberId === '662').checkedIn).toBe(false);
   });
 
+  it('a child checked out tonight is marked checkedOut on every roster answer (any phone; owner 2026-10-15)', async () => {
+    const t = await deskRig();
+    await t.call('GET', '/v1/desk/roster');
+    expect((await t.call('POST', '/v1/desk/checkout', { night: NIGHT, clubberId: '98765', historyRow: row('checkout') })).body).toMatchObject({ ok: true });
+    t.clock.tick(CHECKIN_PAGE_TTL_MS + 1000);
+    const kids = (await t.call('GET', '/v1/desk/roster')).body.kids;
+    expect(kids.find((k) => k.clubberId === '98765').checkedOut).toBe(true);
+    expect(kids.find((k) => k.clubberId === '662').checkedOut).toBeUndefined();
+  });
+
   it('after a failed read the restored copy is `stale`, as any held page', async () => {
     const t = await deskRig();
     await t.call('GET', '/v1/desk/roster');

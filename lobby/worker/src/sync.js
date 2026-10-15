@@ -211,6 +211,8 @@ export class SyncCore {
     });
     this.desk.hooks.afterUndo.push((e) => this.publisher.deskUndo(e));
     this.desk.hooks.afterCheckout.push((e) => this.publisher.deskCheckout(e));
+    // The roster marks who is checked out tonight, so every phone's check-out grid agrees.
+    this.desk.checkedOutIds = async () => { await this.publisher.book.load(); return this.publisher.book.state().checkedOut.ids; };
     // The youth check-out (ymcheckout.js, YM_CHECKOUT): Trek and Journey checked out on
     // TwoTimTwo from 7:15 pm, from the watcher's alarm; each one comes off tonight's count.
     this.ym = new YmCheckout({ storage: this.storage, env: this.env, now: this.now, watcher: this.watcher, publisher: this.publisher });

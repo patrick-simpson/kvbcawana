@@ -928,6 +928,13 @@ function applyRoster(data) {
     if (Object.prototype.hasOwnProperty.call(STATE, key) && old[key]) return old[key];
     return sk;
   });
+  // Checked out on another phone (the Worker's book, 2026-10-15): this page treats them as it treats its own.
+  var outMoved = false;
+  (data.kids || []).forEach(function(k) {
+    var key = 'id:' + String(k.clubberId);
+    if (k.checkedOut === true && LOCAL.out.indexOf(key) === -1) { LOCAL.out.push(key); outMoved = true; }
+  });
+  if (outMoved) saveLocal();
   ITEMS = data.items || { bible: [], friend: [] };
   $('down-note').hidden = !data.stale;
   fillClubSelects();

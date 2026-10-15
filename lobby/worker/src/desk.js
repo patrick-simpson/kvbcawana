@@ -178,6 +178,8 @@ export class Desk {
     this.reportKids = { night: '', kids: [] };
     /** Children this desk checked in tonight (memory only): a page read that began before a check-in landed must not un-check them. @type {{ night: string, ids: Set<string> }} */
     this.deskChecked = { night: '', ids: new Set() };
+    /** Tonight's checked-out clubber ids (set by SyncCore from the publisher's book). @type {null | (() => Promise<Set<string>>)} */
+    this.checkedOutIds = null;
     /** The one restore of a new object (single flight; kept once it ran to its end). @type {Promise<void>|null} */
     this.restoring = null;
     /** A restore that could not run yet is not tried again before this (ms). */
@@ -506,6 +508,10 @@ export class Desk {
       const parts = e.name.split(' ');
       kids.push({ clubberId: e.clubberId, first: parts[0] || '', last: parts.slice(1).join(' '), club: e.club, clubId: this.clubIdFor(e.club, r.page), checkedIn: true });
     }
+    // Checked out tonight (any phone, the youth sweep): from tonight's book, ids only
+    // (owner 2026-10-15: a family checked out on one phone stayed on another's grid).
+    const out = typeof this.checkedOutIds === 'function' ? await this.checkedOutIds() : null;
+    if (out && out.size) for (const k of kids) if (out.has(String(k.clubberId))) k.checkedOut = true;
     // Which clubs offer Bible / Brought a friend: from the page already read, no extra read.
     // familiesAt: when the households held were read, so a page sees a catch-up re-read and asks again.
     const familiesAt = this.familiesSource.readAt();
