@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   REPORT_FRESH_MS, authoritativeTonight, distinctReportChildren, historyIdentityKey, identityKeysOfRow,
-  massUndoRefused, reportIsPartial, splitFullName, tonightHereNow, tonightRows,
+  firstLast, massUndoRefused, normalizedName, reportIsPartial, splitFullName, tonightHereNow, tonightRows,
 } from './tonight.js';
 
 const DATE = '2026-10-14';
@@ -88,5 +88,19 @@ describe('the pure rules (the same code the printer and the Worker run)', () => 
   it('small helpers', () => {
     expect(splitFullName('  Mary   Kate Smith ')).toEqual({ firstName: 'Mary', lastName: 'Kate Smith' });
     expect(identityKeysOfRow({ clubberId: 4, firstName: 'A', lastName: 'B' })).toEqual(['id:4', 'name:a b']);
+  });
+});
+
+describe('"Sort by: Last Name" (owner 2026-10-15: duplicate labels printed "Last, First")', () => {
+  it('reads "Simpson, Micah" as Micah Simpson; leaves "Smith, Jr." and plain names alone', () => {
+    expect(firstLast('Simpson, Micah')).toBe('Micah Simpson');
+    expect(firstLast('  De la Cruz ,  Ana Maria ')).toBe('Ana Maria De la Cruz');
+    expect(firstLast('John Smith, Jr.')).toBe('John Smith, Jr.');
+    expect(firstLast('Micah Simpson')).toBe('Micah Simpson');
+    expect(firstLast(null)).toBe('');
+  });
+  it('so the split, the identity and the match all see one child', () => {
+    expect(splitFullName('Simpson, Micah')).toEqual({ firstName: 'Micah', lastName: 'Simpson' });
+    expect(normalizedName('Simpson, Micah')).toBe(normalizedName('Micah Simpson'));
   });
 });

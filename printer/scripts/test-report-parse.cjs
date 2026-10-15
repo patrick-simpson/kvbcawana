@@ -24,7 +24,12 @@ function loadParser(roster = {}) {
   const start = src.indexOf('  function fetchCheckinReport(date) {');
   const end = src.indexOf('  // Undo detection (roadmap follow-up to R-1)');
   if (start < 0 || end < 0) throw new Error('fetchCheckinReport not found in content.js');
+  // The parser reads every name through the extension's own firstLast() ("Sort by: Last Name").
+  const fl = src.indexOf('  function firstLast(text) {');
+  const flEnd = src.indexOf('\n  }\n', fl) + 4;
+  if (fl < 0) throw new Error('firstLast not found in content.js');
   const factory = new Function('fetch', 'DOMParser', 'ROSTER_CACHE', 'todayIsoDate', `
+    ${src.slice(fl, flEnd)}
     ${src.slice(start, end)}
     return fetchCheckinReport;
   `);

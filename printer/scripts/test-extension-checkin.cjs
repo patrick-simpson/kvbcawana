@@ -95,6 +95,9 @@ check('no direct-post path still trusts "the first name appears in the reply"',
 
 console.log('\nextension undo detection: the word, never a substring of a name');
 {
+  const firstLast = new Function(extractFunction('firstLast') + '; return firstLast;')();
+  check('"Sort by: Last Name" reads as First Last (2026-10-15 duplicate labels)', firstLast('Simpson, Micah') === 'Micah Simpson' && firstLast('Micah Simpson') === 'Micah Simpson' && firstLast('John Smith, Jr.') === 'John Smith, Jr.');
+  check('every page name the extension reads goes through it', /onCheckin\(firstLast\(text\)\)/.test(SRC) && /var displayName = firstLast\(nameEl\.innerText\)/.test(SRC) && /var name = firstLast\(clone\.textContent\)/.test(SRC));
   const isUndo = new Function(extractFunction('isUndo') + '; return isUndo;')();
   check('"(checkin undone)" after a name is an undo', isUndo('Ava Stone (checkin undone)') === true);
   check('the undo link\'s own word is an undo', isUndo('undo') === true && isUndo('Ava Stone undo') === true);

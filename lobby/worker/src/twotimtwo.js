@@ -31,6 +31,7 @@
 import { parseHTML } from 'linkedom';
 import { parse, serialize } from 'parse5';
 import { INTERACTIVE_WAIT_MS, READ_INTERVAL_MS } from './readbudget.js';
+import { firstLast } from '../../shared/tonight.js';
 
 export const DEFAULT_HOST = 'kvbchurch.twotimtwo.com';
 const HOST_RE = /^[a-z0-9][a-z0-9-]{0,62}\.twotimtwo\.com$/;
@@ -95,6 +96,8 @@ function documentOf(html) {
 
 /** @param {string} text */
 const squash = (text) => String(text || '').trim().replace(/\s+/g, ' ');
+/** A child's name as "First Last" (shared/tonight.js: "Sort by: Last Name" shows "Simpson, Micah"). */
+export { firstLast };
 
 /**
  * The check-in report (/clubber/checkin_report?date=), the authoritative
@@ -172,10 +175,10 @@ export function parseCheckinReport(html) {
       const cell = link.closest('td') || tds[0];
       const clone = cell.cloneNode(true);
       for (const a of clone.querySelectorAll('a')) a.remove();
-      let name = squash(clone.textContent);
+      let name = firstLast(clone.textContent);
       if (!name) {
         const next = cell.nextElementSibling;
-        name = next ? squash(next.textContent) : '';
+        name = next ? firstLast(next.textContent) : '';
       }
       if (name && SUMMARY_CELL_RE.test(name)) name = '';
       const friend = friendIdx >= 0 && tds.length > friendIdx && /^yes$/i.test(squash(tds[friendIdx].textContent));
@@ -322,7 +325,7 @@ export function parseCheckinPage(html) {
       return {
         clubberId: String(el.getAttribute('recid') || '').trim(),
         clubId: String(el.getAttribute('club_id') || '').trim(),
-        name: squash(el.querySelector('.name')?.textContent).slice(0, 80),
+        name: firstLast(el.querySelector('.name')?.textContent).slice(0, 80),
         club: crest ? String(crest.getAttribute('alt') || '').trim() : '',
         checkedIn: el.classList.contains('checked-in'),
       };

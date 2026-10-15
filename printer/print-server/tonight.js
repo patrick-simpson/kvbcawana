@@ -35,7 +35,21 @@
 const REPORT_FRESH_MS = 12 * 60 * 1000;
 
 /** @param {unknown} name */
-const normalizedName = (name) => String(name || '').toLowerCase().replace(/\s+/g, ' ').trim();
+/**
+ * A child's name as "First Last". TwoTimTwo's "Sort by: Last Name" shows
+ * "Simpson, Micah" (owner 2026-10-15: on BARF night labels printed again,
+ * "Last, First", because the name did not match the one already printed).
+ * "Smith, Jr." stays as it is. The extension's firstLast() keeps the same rule.
+ * @param {unknown} text
+ */
+function firstLast(text) {
+  const s = String(text == null ? '' : text).trim().replace(/\s+/g, ' ');
+  const m = /^([^,]+),\s*([^,]+)$/.exec(s);
+  if (!m || /^(jr|sr|ii|iii|iv|v)\.?$/i.test(m[2].trim())) return s;
+  return `${m[2].trim()} ${m[1].trim()}`;
+}
+
+const normalizedName = (name) => firstLast(name).toLowerCase();
 
 /**
  * The club name as it should be displayed, from whichever side supplied it.
@@ -51,7 +65,7 @@ const displayClub = (raw) => String(raw == null ? '' : raw).replace(/&amp;/gi, '
  * @param {unknown} name
  */
 function splitFullName(name) {
-  const parts = String(name == null ? '' : name).trim().split(/\s+/).filter(Boolean);
+  const parts = firstLast(name).split(/\s+/).filter(Boolean);
   return { firstName: parts[0] || '', lastName: parts.slice(1).join(' ') || '' };
 }
 
@@ -334,6 +348,7 @@ function authoritativeTonight(state, now) {
 
 module.exports = {
   REPORT_FRESH_MS,
+  firstLast,
   normalizedName,
   displayClub,
   splitFullName,

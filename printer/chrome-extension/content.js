@@ -2,7 +2,7 @@
   if (window.__awanaPrinterLoaded) return;
   window.__awanaPrinterLoaded = true;
 
-  const EXTENSION_VERSION = '9.4.6';
+  const EXTENSION_VERSION = '9.4.7';
   const PRINT_COOLDOWN = 2000;
   // POST /print is synchronous on the server: PowerShell + a cold printer can
   // take 15-30 s (the server retries the spooler internally). This must sit
@@ -354,6 +354,17 @@
   // Fundora, Mundorf) read as an undo until 7.11.1, so those children never
   // got a label and, on the reconcile and phone paths, were marked printed
   // without one.
+  // TwoTimTwo's "Sort by: Last Name" shows a child as "Simpson, Micah"
+  // (owner 2026-10-15: on BARF night labels came out again, "Last, First",
+  // because the name did not match the "Micah Simpson" already printed). Every
+  // name read off a TwoTimTwo page goes through this. "Smith, Jr." stays.
+  function firstLast(text) {
+    var s = String(text == null ? '' : text).trim().replace(/\s+/g, ' ');
+    var m = /^([^,]+),\s*([^,]+)$/.exec(s);
+    if (!m || /^(jr|sr|ii|iii|iv|v)\.?$/i.test(m[2].trim())) return s;
+    return m[2].trim() + ' ' + m[1].trim();
+  }
+
   function isUndo(text) {
     return !!text && /\bundo(ne)?\b/i.test(String(text));
   }
@@ -3550,7 +3561,7 @@
       } else if (text && text !== lastPrintedName) {
         lastPrintedName = text;
         console.log('[Awana] Check-in detected:', text);
-        onCheckin(text);
+        onCheckin(firstLast(text));
       } else if (!text) {
         lastPrintedName = null;
       }
@@ -3612,7 +3623,7 @@
     for (var i = 0; i < clubberEls.length; i++) {
       var nameEl = clubberEls[i].querySelector('.name');
       if (!nameEl) continue;
-      var displayName = nameEl.innerText.trim();
+      var displayName = firstLast(nameEl.innerText);
       if (!displayName) continue;
       // recid is TwoTimTwo's own id on the .clubber row — it gives exact
       // identity to the print server (CSV "Clubber ID" match), the direct
@@ -3747,7 +3758,7 @@
     var els = document.querySelectorAll('.clubber:not(.checked-in)');
     for (var i = 0; i < els.length; i++) {
       var nameEl = els[i].querySelector('.name');
-      if (nameEl && nameEl.innerText.trim() === target) return els[i];
+      if (nameEl && firstLast(nameEl.innerText) === firstLast(target)) return els[i];
     }
     return null;
   }
@@ -3757,7 +3768,7 @@
     for (var i = 0; i < clubbers.length; i++) {
       var clubber = clubbers[i];
       const nameEl = clubber.querySelector('.name');
-      if (nameEl && nameEl.innerText.trim() === name) {
+      if (nameEl && firstLast(nameEl.innerText) === firstLast(name)) {
         const imgEl = clubber.querySelector('.club img');
         if (imgEl) {
           return {
@@ -3846,7 +3857,7 @@
       var recid = idEl && idEl.value ? String(idEl.value) : '';
       var row = recid ? rowByRecid(recid) : null;
       var nameEl = row ? row.querySelector('.name') : null;
-      noteFriend(recid, nameEl ? nameEl.innerText.trim() : '', '', true);
+      noteFriend(recid, nameEl ? firstLast(nameEl.innerText) : '', '', true);
     } catch (e) { /* never in the way of TwoTimTwo's own button */ }
   }, true);
 
@@ -4791,10 +4802,10 @@
             var cell = link.closest('td') || tds[0];
             var clone = cell.cloneNode(true);
             clone.querySelectorAll('a').forEach(function(a) { a.remove(); });
-            var name = (clone.textContent || '').trim().replace(/\s+/g, ' ');
+            var name = firstLast(clone.textContent);
             if (!name) {
               var next = cell.nextElementSibling;
-              name = next ? (next.textContent || '').trim().replace(/\s+/g, ' ') : '';
+              name = next ? firstLast(next.textContent) : '';
             }
             // Never a summary cell: no child is called "YES" or "2 Points".
             // (the whole text: a child may be called "No..." or "Yes...").
@@ -5136,7 +5147,7 @@
     if (!clubberEl) return;
     var nameEl = clubberEl.querySelector('.name');
     if (!nameEl) return;
-    var name = nameEl.innerText.trim();
+    var name = firstLast(nameEl.innerText);
     if (!name) return;
     if (selectedMode === 'off') return;
     var recid = clubberEl.getAttribute('recid') || null;
@@ -5301,7 +5312,7 @@
       var el = rowByRecid(recid);
       if (!el) return Promise.resolve('gone');
       var nameEl = el.querySelector('.name');
-      var name = nameEl ? nameEl.innerText.trim() : '';
+      var name = nameEl ? firstLast(nameEl.innerText) : '';
       var clubId = el.getAttribute('club_id') || null;
       var opts = options || {};
       if (opts.Friend === true) noteFriend(recid, name, opts.FriendName || '');

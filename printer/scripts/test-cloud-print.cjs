@@ -46,6 +46,9 @@ const PORT = Number(process.env.AWANA_TEST_PORT || require('./free-port.cjs')())
     check('the extension\'s later print by name is refused', r.body.duplicate === true && jobs() === 1, JSON.stringify(r));
     r = await post('/print', { name: 'Ava Stone', clubName: 'Sparks', clubberId: '1' });
     check('and by id', r.body.duplicate === true && jobs() === 1, JSON.stringify(r));
+    // BARF night 2026-10-14: a page sorted by last name sent "Stone, Ava"; it printed again.
+    r = await post('/print', { name: 'Stone, Ava', clubName: 'Sparks' });
+    check('"Stone, Ava" (Sort by: Last Name) is the same child: refused', r.body.duplicate === true && jobs() === 1, JSON.stringify(r));
   }
 
   console.log('\ncloud check-in: a child the laptop already printed');

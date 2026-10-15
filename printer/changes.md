@@ -1,4 +1,9 @@
-﻿## [9.4.6] - 2026-10-14
+﻿## [9.4.7] - 2026-10-15
+No more duplicate labels from a page sorted by last name.
+
+**Duplicate labels.** When a TwoTimTwo page is set to "Sort by: Last Name" it shows a child as "Simpson, Micah". The Chrome extension and the check-in service read that as a different child from the "Micah Simpson" already printed, so labels printed again with the names reversed. Every name read from TwoTimTwo is now turned back into "Micah Simpson" first, and the print server treats "Simpson, Micah" as the same child, so a child who already has tonight's label never gets a second one. Names like "John Smith, Jr." are left alone.
+
+## [9.4.6] - 2026-10-14
 BARF Bag labels print.
 
 **BARF Bag labels.** The bag labels now print one at a time, the same way every name tag and BARF tag prints (with its retry and the backup printer), instead of as one job of several pages, which did not come out on BARF night. They still print in order, children then their friends.

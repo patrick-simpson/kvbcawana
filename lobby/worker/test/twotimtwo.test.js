@@ -14,6 +14,7 @@ import {
   parseCheckinPage,
   checkinReplyOk,
   parseCheckinReport,
+  firstLast,
   parseHouseholdCsv,
   reportColumns,
   rowShape,
@@ -58,11 +59,11 @@ function extensionParser() {
   const start = src.indexOf('  function fetchCheckinReport(date) {');
   const end = src.indexOf('  // Undo detection (roadmap follow-up to R-1)');
   if (start < 0 || end < 0) throw new Error('fetchCheckinReport not found in content.js');
-  const factory = new Function('fetch', 'DOMParser', 'ROSTER_CACHE', 'todayIsoDate',
+  const factory = new Function('fetch', 'DOMParser', 'ROSTER_CACHE', 'todayIsoDate', 'firstLast',
     `${src.slice(start, end)}\nreturn fetchCheckinReport;`);
   return (html) => factory(
     async () => ({ ok: true, url: `https://${HOST}/clubber/checkin_report`, text: async () => html }),
-    new JSDOM('').window.DOMParser, {}, () => '2026-10-07',
+    new JSDOM('').window.DOMParser, {}, () => '2026-10-07', firstLast,
   )();
 }
 
@@ -72,6 +73,12 @@ describe('the check-in report parser', () => {
     expect(r.entries.map((e) => e.name)).toEqual(['Ada Tester', 'Bo Tester', 'Cy Tester', 'Di Tester', 'Ed Tester']);
     expect(r.entries[3]).toEqual({ clubberId: '4', name: 'Di Tester', club: 'T&T' });
     expect(r.declared).toBe(5);
+  });
+
+  it('a report sorted by last name ("Tester, Ada") still names Ada Tester', () => {
+    const sorted = SAMPLES.live.replace(/Ada Tester/g, 'Tester, Ada');
+    expect(sorted).toContain('Tester, Ada');
+    expect(parseCheckinReport(sorted).entries[0].name).toBe('Ada Tester');
   });
 
   it('never takes a summary cell for a name', () => {

@@ -1,7 +1,7 @@
 {
   "name": "check-in-label-generator",
   "private": true,
-  "version": "9.4.6",
+  "version": "9.4.7",
   "type": "module",
   "scripts": {
     "dev": "vite",
