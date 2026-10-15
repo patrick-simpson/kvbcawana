@@ -66,6 +66,19 @@ describe('the check-in page', () => {
     assert.match(src, /job\.onFail\(e\);\n\s+if \(e && e\.code === 'no-club'\) scheduleRosterPoll\(0\);/);
   });
 
+  it('Check out (owner 2026-10-15): a mode, Puggles to T&T, one tap per household held for Undo before anything is sent', () => {
+    assert.match(src, /var PICKUP_KITS = \['puggles', 'cubbies', 'sparks', 'tnt'\];/);
+    assert.match(src, /var CHECKOUT_UNDO_MS = 10000;/);
+    // TwoTimTwo's check-out cannot be taken back: nothing is sent until the Undo time is over
+    assert.match(src, /batch\.timer = setTimeout\(function\(\) \{ sendHeld\(batch\); \}, CHECKOUT_UNDO_MS\);/);
+    assert.match(src, /go: function\(\) \{ return desk\.checkout\(\{ clubberId: k\.clubberId, name: k\.name, club: k\.club \}\); \}/);
+    // never on the youth page (the Worker checks Trek and Journey out) or a day with no club
+    assert.match(src, /\$\('mode-btn'\)\.hidden = SIMPLE;/);
+    assert.match(src, /MODE = m === 'out' && !SIMPLE && !NO_CLUB \? 'out' : 'in';/);
+    // leaving the page while a household is held asks first
+    assert.match(src, /Object\.keys\(WAITING\)\.length \+ HELD\.length > 0;/);
+  });
+
   it('draws with the brand kit under /checkin/brand/ and nothing from another host', () => {
     assert.match(index, /href="\/checkin\/brand\/fonts\.css"/);
     assert.match(index, /src="\/checkin\/brand\/logos\/kvbc-awana-two-line-white\.svg"/);

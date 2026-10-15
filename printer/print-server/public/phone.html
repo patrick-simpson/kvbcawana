@@ -115,6 +115,41 @@
   #main-screen.no-club .search .box, #main-screen.no-club .barf-btn, #main-screen.no-club .barf-alert, #main-screen.no-club #busy,
   #main-screen.no-club #down-note, #main-screen.no-club #nohistory, #main-screen.no-club .statusline { display: none !important; }
 
+  /* ── Check out (owner 2026-10-15): a mode of this page. The big button at the top
+     switches; in checkout mode the same place goes back to Check in. ── */
+  .mode-btn { display: block; width: 100%; min-height: 52px; margin: 0 0 8px; border: 3px solid var(--c-blue-deep); border-radius: 16px; cursor: pointer;
+    background: var(--c-blue-deep); color: #fff; font-family: var(--f-shout); font-size: 24px; letter-spacing: .02em; box-shadow: 0 3px 12px rgba(47,79,138,.25); }
+  .mode-btn.back { background: #fff; color: var(--c-blue-deep); }
+  #main-screen.no-club .mode-btn { display: none !important; }
+  #main-screen.out-mode .barf-btn, #main-screen.out-mode .barf-alert { display: none !important; }
+  /* The families not checked out yet: the check-in tiles, larger as fewer are left
+     (the page picks a step s1..s5 by how many tiles show; the sizes are here). */
+  .fams.out { --co-min: 150px; --co-h: 84px; --co-fn: 20px; --co-kid: 14px;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--co-min)), 1fr)); grid-auto-rows: minmax(var(--co-h), auto); }
+  .fams.out.s2 { --co-h: 112px; --co-fn: 24px; --co-kid: 16px; }
+  .fams.out.s3 { --co-min: 280px; --co-h: 136px; --co-fn: 30px; --co-kid: 18px; gap: 10px; }
+  .fams.out.s4 { --co-min: 320px; --co-h: 176px; --co-fn: 36px; --co-kid: 20px; gap: 12px; }
+  .fams.out.s5 { --co-min: 360px; --co-h: 240px; --co-fn: 46px; --co-kid: 24px; gap: 12px; }
+  .fams.out .fam { gap: 6px; padding: 10px 14px 10px 20px; }
+  .fams.out .fam .fn { font-size: var(--co-fn); }
+  .fams.out:not(.s1) .fam .fn { white-space: normal; overflow-wrap: anywhere; }
+  .fams.out .fam .kids { font-size: var(--co-kid); max-height: none; }
+  .fams.out .kid[data-state] { font-size: calc(var(--co-kid) * .9); }
+  .out-done { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+  .out-done .quiet { font-family: var(--f-read); font-size: 16px; }
+  /* Undo (the safety net): the check-outs wait CHECKOUT_UNDO_MS before anything goes to
+     TwoTimTwo, so Undo really puts them back. The strip drains over that time. */
+  .undo-bar { position: fixed; left: 50%; bottom: calc(12px + env(safe-area-inset-bottom)); translate: -50% 0; z-index: 19; overflow: hidden;
+    width: min(560px, calc(100vw - 24px)); display: flex; align-items: center; gap: 12px; padding: 12px 12px 17px 18px; border-radius: 20px;
+    background: var(--c-ink); color: #fff; font-weight: 700; font-size: 17px; line-height: 1.3; box-shadow: 0 8px 24px rgba(15,23,42,.3); }
+  .undo-msg { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+  .undo-btn { flex: none; border: none; cursor: pointer; min-height: 60px; min-width: 120px; padding: 0 22px; border-radius: 16px;
+    background: var(--c-sun); color: var(--c-ink); font-family: var(--f-shout); font-size: 28px; }
+  .undo-bar :focus-visible { outline-color: var(--c-sun); }
+  .undo-drain { position: absolute; left: 0; right: 0; bottom: 0; height: 5px; background: var(--c-sun); transform-origin: 0 50%; animation: undodrain 10s linear both; }
+  @keyframes undodrain { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+  body.has-undo .list { padding-bottom: calc(130px + env(safe-area-inset-bottom)); }
+
   .fams { display: grid; gap: 8px; }
   .fam, .fcard, .card, .famsm { border: none; cursor: pointer; text-align: left; background: #fff; position: relative; overflow: hidden; min-width: 0;
     box-shadow: 0 2px 10px rgba(15,23,42,.08); }
@@ -267,12 +302,12 @@
   .toast :focus-visible { outline-color: var(--c-sun); }
 
   /* ── Jelly: the touch check-in's, the lobby's spring ── */
-  .fam, .fcard, .card, .famsm, .btn, .go1, .opt, .pill, .round, .row button, .cpick button { transform-origin: 50% 100%;
+  .fam, .fcard, .card, .famsm, .btn, .go1, .opt, .pill, .round, .row button, .cpick button, .mode-btn, .undo-btn { transform-origin: 50% 100%;
     transition-property: scale, translate, border-color, background; transition-duration: 520ms;
     transition-timing-function: cubic-bezier(.34,1.56,.64,1);
     transition-timing-function: linear(0, 0.213, 0.605, 0.93, 1.103, 1.142, 1.106, 1.05, 1.006, 0.984, 0.98, 0.986, 0.994, 1, 1.002, 1.003, 1); }
   .fam:active, .fcard:active, .card:active, .famsm:active, .go1:active { scale: 1.03 .92; translate: 0 3px; transition-duration: 80ms; transition-timing-function: ease-out; }
-  .btn:active, .opt:active, .pill:active, .round:active, .row button:active, .cpick button:active { scale: 1.06 .9; translate: 0 3px; transition-duration: 80ms; transition-timing-function: ease-out; }
+  .btn:active, .opt:active, .pill:active, .round:active, .row button:active, .cpick button:active, .mode-btn:active, .undo-btn:active { scale: 1.06 .9; translate: 0 3px; transition-duration: 80ms; transition-timing-function: ease-out; }
   .card.in:active { scale: none; translate: none; }
   @keyframes land { 0% { opacity: 0; translate: 0 16px; scale: .84 1.16; } 45% { opacity: 1; translate: 0 -3px; scale: 1.07 .93; } 70% { translate: 0 0; scale: .98 1.02; } 100% { opacity: 1; translate: 0 0; scale: 1 1; } }
   .fam, .fcard, .card, .famsm, .tile, .noclub { animation: land 480ms cubic-bezier(.3,.7,.4,1) both; }
@@ -316,6 +351,7 @@
 
 <main id="main-screen" hidden>
   <div class="search">
+    <button class="mode-btn" id="mode-btn" type="button" hidden>Check out</button>
     <button class="barf-btn" id="barf-btn" type="button" hidden>BARF</button>
     <div class="barf-alert" id="barf-alert" role="alert" hidden></div>
     <div class="box">
@@ -401,6 +437,12 @@
 </div>
 
 <div class="toast" id="toast" role="status"></div>
+
+<div class="undo-bar" id="undo-bar" role="status" hidden>
+  <span class="undo-msg" id="undo-msg"></span>
+  <button class="undo-btn" id="undo-btn" type="button">Undo</button>
+  <span class="undo-drain" id="undo-drain" aria-hidden="true"></span>
+</div>
 
 <script>
 // ── The touch check-in's own search, households and tile fit, verbatim ─────
@@ -779,6 +821,8 @@ function showMainScreen() {
   // The youth page's + menu is the walk-in tag alone (its own clubs).
   $('leader-panel').hidden = SIMPLE;
   $('custom-panel').hidden = SIMPLE;
+  // Check out (owner 2026-10-15): not on the youth page (the Worker checks Trek and Journey out).
+  $('mode-btn').hidden = SIMPLE;
 }
 function showPinScreen(message) {
   closeAll();
@@ -797,7 +841,9 @@ function signOut(message) {
   unlockedState = false;
   if (desk) desk.signOut();
   stopQueue();
-  STATE = {}; OPS = {};
+  dropHeld();
+  STATE = {}; OPS = {}; OUT = {};
+  setMode('in');
   BARF_LINES = {}; BARF_DONE = {}; applyBarf(null); renderBarfLines();
   KIDS = [];
   HOUSEHOLDS = null; familiesAt = 0; familiesStamp = null;
@@ -826,7 +872,7 @@ function startSession() {
   showMainScreen();
   $('nohistory').hidden = desk.hasHistory;
   fillClubSelects();
-  render();
+  setMode(savedMode());
   refreshBarf();
   startRosterPoll();
   if (SIMPLE) return;   // the youth page: check-in only
@@ -901,6 +947,7 @@ function setNoClub(data) {
   SERVER_TONIGHT = null;
   $('down-note').hidden = true;
   if (!was) { $('search').value = ''; closeFamily(); }
+  if (MODE === 'out') setMode('in');   // nobody to check out on a day with no club
 }
 function noClubNote() {
   var w = noClubWords ? noClubWords(NO_CLUB) : { title: 'No club tonight', next: '', quip: '' };
@@ -1122,6 +1169,7 @@ function render() {
   else if (!rosterLoaded) list.appendChild(el('div', 'note', rosterTries ? 'Still counting crayons… trying again.'
     : rosterSlow ? 'Signing in to TwoTimTwo… this can take up to a minute.' : 'Reading the roster…'));
   else if (!KIDS.length) list.appendChild(el('div', 'note', 'TwoTimTwo has nobody on tonight’s check-in page yet. Is the meeting set up?'));
+  else if (MODE === 'out') renderCheckout(list, q);
   else if (!q.trim()) renderFamilies(list);
   else renderSearch(list, q);
   endKeyed();
@@ -1225,6 +1273,8 @@ function renderSearch(list, q) {
 $('search').addEventListener('input', render);
 $('search').addEventListener('keydown', function(e) {
   if (e.key !== 'Enter') return;
+  // Checking out is one tap: Enter never checks a family out by itself.
+  if (MODE === 'out') { $('search').blur(); return; }
   var first = $('list').querySelector('.fcard, .fam');
   if (first) first.click();
 });
@@ -1451,7 +1501,7 @@ var QUEUE = [];               // jobs waiting their turn, in tap order
 var RUNNING = 0;
 var WAITING = {};             // job id -> job, counting down to its automatic retry
 var queueEpoch = 0;           // a sign-out ends every job of the session before it
-function queueBusy() { return QUEUE.length + RUNNING + Object.keys(WAITING).length > 0; }
+function queueBusy() { return QUEUE.length + RUNNING + Object.keys(WAITING).length + HELD.length > 0; }
 function enqueue(job) {
   job.epoch = queueEpoch;
   QUEUE.push(job);
@@ -1605,6 +1655,217 @@ function checkInMany(entries, family) {
       onCancel: function() { delete STATE[key]; paint(); finish(); },
     });
   });
+}
+
+// ── Check out: a mode of this page (owner 2026-10-15) ───────────────────────
+// "Similar to the check-in, except it should be one click. Once a family name is
+// clicked, all of the kids in that household should be checked out. Let them get
+// larger as less kids are in the facility. There should be a big checkout button
+// at the top." The big button at the top switches modes (and back). The grid is
+// the check-in's family tiles, holding only children checked in tonight and not
+// checked out yet, in the clubs a parent picks up (Puggles, Cubbies, Sparks, T&T:
+// the Worker checks Trek and Journey out by itself at 7:15 pm). One tap on a tile
+// checks out every such child of that household: one job per child through
+// desk.checkout, in the same queue as check-ins ("Waiting for TwoTimTwo… Ns" and
+// the automatic retry; a refusal shows on that child alone).
+// The safety net is Undo, not a confirm. TwoTimTwo's check-out cannot be taken
+// back (the Worker has no route for it, routes.md 5), so the tap HOLDS the
+// household's check-outs for CHECKOUT_UNDO_MS with a big Undo at the bottom, and
+// only then are they sent: Undo inside that time puts them back with nothing sent.
+// Leaving the page while one is held asks first (queueBusy). Names stay in this
+// page's memory; sessionStorage keeps only the mode and LOCAL's child keys.
+var MODE = 'in';               // 'in' (check in) or 'out' (check out)
+var MODE_KEY = 'awanaCheckinMode.v1';
+var PICKUP_KITS = ['puggles', 'cubbies', 'sparks', 'tnt'];
+var CHECKOUT_UNDO_MS = 10000;
+var OUT = {};                  // child key -> { status: 'held'|'pending'|'waiting'|'done'|'failed', left?, msg? }
+var HELD = [];                 // households tapped, waiting out their Undo time: { kids, label, until, timer }
+function savedMode() { try { return sessionStorage.getItem(MODE_KEY) === 'out' ? 'out' : 'in'; } catch (e) { return 'in'; } }
+function setMode(m) {
+  MODE = m === 'out' && !SIMPLE && !NO_CLUB ? 'out' : 'in';
+  try { sessionStorage.setItem(MODE_KEY, MODE); } catch (e) { /* the mode lasts this load */ }
+  var out = MODE === 'out';
+  $('main-screen').classList.toggle('out-mode', out);
+  var b = $('mode-btn');
+  b.textContent = out ? '← Back to Check in' : 'Check out';
+  b.classList.toggle('back', out);
+  b.setAttribute('aria-label', out ? 'Back to check in' : 'Check out: switch to checking children out');
+  if (!ONLY) document.querySelector('.top h1').textContent = out ? 'Check out' : 'Check in';
+  $('search').placeholder = out ? 'Type a name to find a family' : 'Type a first or last name';
+  $('search').value = '';
+  if (openSheet === 'kid-sheet') hideSheet();
+  closeFamily();
+  render();
+}
+$('mode-btn').addEventListener('click', function() {
+  setMode(MODE === 'out' ? 'in' : 'out');
+  try { window.scrollTo(0, 0); } catch (e) { /* ignore */ }
+});
+// Checked in tonight, not checked out yet (by this page), in a club a parent picks up.
+function stillHere(k) { return !!k.checkedIn && LOCAL.out.indexOf(kidKey(k)) === -1 && PICKUP_KITS.indexOf(clubKit(k.club)) !== -1; }
+// The tiles: everyone still here, plus every child this page is checking out (their
+// tile stays, showing how it goes, until TwoTimTwo answers and a moment after).
+function outPeople() { return KIDS.filter(function(k) { return stillHere(k) || OUT[kidKey(k)]; }).map(person); }
+function outText(st) {
+  if (st.status === 'waiting') return 'Waiting for TwoTimTwo… ' + st.left + 's';
+  if (st.status === 'done') return 'Checked out ✓';
+  if (st.status === 'failed') return 'Not checked out' + (st.msg ? ': ' + st.msg : '');
+  return 'Checking out…';
+}
+// A tile's size step: the fewer tiles, the bigger each (the sizes are the stylesheet's .fams.out.s1..s5).
+function outStep(n) { return n <= 1 ? 5 : n <= 3 ? 4 : n <= 6 ? 3 : n <= 12 ? 2 : 1; }
+function renderCheckout(list, q) {
+  var people = outPeople();
+  var all = groupFamilies(people, HOUSEHOLDS);
+  if (!all.length && !KIDS.some(function(k) { return k.checkedIn && PICKUP_KITS.indexOf(clubKit(k.club)) !== -1; })) {
+    list.appendChild(el('div', 'note', 'Nobody in Puggles, Cubbies, Sparks or T&T is checked in yet tonight.'));
+    return;
+  }
+  if (!all.length) {
+    var done = el('div', 'cheer out-done');
+    done.setAttribute('role', 'status');
+    done.appendChild(el('div', null, 'Everyone has been checked out'));
+    done.appendChild(el('div', 'quiet', 'Nobody in Puggles, Cubbies, Sparks or T&T is waiting to be picked up.'));
+    list.appendChild(done);
+    return;
+  }
+  var shown = all;
+  if (q.trim()) {
+    var r = searchPeople(people, q);
+    var hit = {};
+    r.matches.concat(norm(q).length >= 3 ? r.close : []).forEach(function(p) { hit[p.recid] = true; });
+    shown = all.filter(function(f) { return f.kids.some(function(c) { return hit[c.recid]; }); });
+    if (!shown.length) { list.appendChild(el('div', 'note', 'Nobody waiting to be picked up matches “' + q.trim() + '”.')); return; }
+  }
+  var waiting = people.filter(function(p) { return stillHere(p.kid) && !OUT[p.recid]; }).length;
+  list.appendChild(el('div', 'lead', q.trim() ? (shown.length === 1 ? 'Family' : 'Families')
+    : waiting + (waiting === 1 ? ' child' : ' children') + ' not checked out yet · tap a family to check them out'));
+  var grid = el('div', 'fams out s' + outStep(shown.length));
+  shown.forEach(function(f) { grid.appendChild(outTile(f)); });
+  list.appendChild(grid);
+}
+function outTile(f) {
+  var busy = f.kids.some(function(c) { return OUT[c.recid]; });
+  var b = keyed('button', 'fam' + (busy ? ' has-pending' : ''), 'x:' + f.key);
+  b.dataset.names = names(f);
+  b.style.setProperty('--stripe', stripe(f));
+  var single = f.kids.length === 1;
+  b.appendChild(el('div', 'fn', single ? f.kids[0].name : f.name));
+  var line = el('div', 'kids');
+  f.kids.forEach(function(c) {
+    var st = OUT[c.recid];
+    var k = el('span', 'kid' + (st ? ' s-' + (st.status === 'held' ? 'pending' : st.status) : '')), d = el('span', 'dot');
+    d.style.setProperty('--c', clubOf(c.clubName).color);
+    k.appendChild(d);
+    if (st) { k.dataset.state = st.status; k.dataset.name = c.name; }
+    k.appendChild(document.createTextNode(single ? (st ? outText(st) : (c.clubName || '')) : c.name.split(' ')[0] + (st ? ' · ' + outText(st) : '')));
+    line.appendChild(k);
+  });
+  b.appendChild(line);
+  b.setAttribute('aria-label', 'Check out ' + famLabel(f) + (busy ? ': ' + f.kids.filter(function(c) { return OUT[c.recid]; }).map(function(c) { return c.name.split(' ')[0] + ' ' + outText(OUT[c.recid]); }).join(', ') : ''));
+  b.onclick = function() { checkOutFamily(f); };
+  return b;
+}
+// One tap: every child of the household still here (and not already on the way out).
+function checkOutFamily(f) {
+  var ready = f.kids.filter(function(c) { var st = OUT[c.recid]; return (!st || st.status === 'failed') && !OPS[c.recid]; });
+  if (!ready.length) return;
+  var kids = ready.map(function(c) { return c.kid; });
+  var batch = { kids: kids, until: Date.now() + CHECKOUT_UNDO_MS,
+    label: kids.length === 1 ? kids[0].name : 'the ' + f.name + ' family: ' + kids.map(function(k) { return k.name.split(' ')[0]; }).join(', '),
+    family: kids.length > 1 ? f.name : null };
+  kids.forEach(function(k) { OUT[kidKey(k)] = { status: 'held' }; });
+  batch.timer = setTimeout(function() { sendHeld(batch); }, CHECKOUT_UNDO_MS);
+  HELD.push(batch);
+  $('search').value = '';   // ready for the next family
+  showUndo();
+  paint();
+}
+// The Undo time is over: the check-outs go to TwoTimTwo, one job per child.
+function sendHeld(batch) {
+  var i = HELD.indexOf(batch);
+  if (i === -1) return;
+  HELD.splice(i, 1);
+  showUndo();
+  checkOutMany(batch);
+}
+function undoHeld(batch) {
+  var i = HELD.indexOf(batch);
+  if (i === -1) return;
+  clearTimeout(batch.timer);
+  HELD.splice(i, 1);
+  batch.kids.forEach(function(k) { var key = kidKey(k); if (OUT[key] && OUT[key].status === 'held') delete OUT[key]; });
+  showUndo();
+  paint();
+  toast((batch.kids.length === 1 ? batch.kids[0].name + ' is' : (batch.family ? 'The ' + batch.family + ' family is' : 'They are')) + ' not checked out.', 3000);
+}
+// Sign-out: nothing held is sent.
+function dropHeld() {
+  HELD.forEach(function(b) { clearTimeout(b.timer); });
+  HELD = [];
+  showUndo();
+}
+// The newest held household's Undo, at the bottom; the strip drains for the time it has left.
+function showUndo() {
+  var b = HELD[HELD.length - 1], bar = $('undo-bar');
+  document.body.classList.toggle('has-undo', !!b);
+  bar.hidden = !b;
+  if (!b) return;
+  $('undo-msg').textContent = 'Checking out ' + b.label;
+  $('undo-btn').setAttribute('aria-label', 'Undo: do not check out ' + b.label);
+  $('undo-btn').onclick = function() { undoHeld(b); };
+  var drain = $('undo-drain');
+  drain.style.animation = 'none';
+  void drain.offsetWidth;
+  drain.style.animation = '';
+  drain.style.animationDuration = Math.max(0, b.until - Date.now()) + 'ms';
+}
+function checkOutMany(batch) {
+  var group = { left: 0, ok: 0, failed: [] };
+  batch.kids.forEach(function(k) {
+    var key = kidKey(k);
+    group.left += 1;
+    var finish = function() {
+      group.left -= 1;
+      if (group.left > 0) return;
+      group.failed.forEach(function(x) { toast('Couldn’t check out ' + x.name + ': ' + (x.why || 'try again'), 7000, null, null, 'bad'); });
+      if (!group.failed.length && group.ok && Date.now() >= badUntil) {
+        toast(batch.kids.length === 1 ? batch.kids[0].name + ' is checked out' : (batch.family ? batch.family + ': ' : '') + group.ok + ' checked out', 3000, null, null, 'good');
+      }
+      scheduleRosterPoll(6000);
+    };
+    enqueue({
+      id: 'x:' + key,
+      go: function() { return desk.checkout({ clubberId: k.clubberId, name: k.name, club: k.club }); },
+      onState: function(status, left) { OUT[key] = { status: status, left: left }; paint(); },
+      onDone: function() {
+        if (LOCAL.out.indexOf(key) === -1) LOCAL.out.push(key);
+        saveLocal();
+        joy[k.name.toLowerCase()] = true;
+        group.ok++;
+        OUT[key] = { status: 'done' };
+        paint();
+        setTimeout(function() { if (OUT[key] && OUT[key].status === 'done') { delete OUT[key]; paint(); } }, DONE_SHOW_MS);
+        finish();
+      },
+      onFail: function(err) {
+        if (err && err.code === 'unreachable') showOffline(true);
+        var why = err && err.code === 'unreachable' ? 'no internet connection. Use the paper sheet at the desk.' : (err && err.message);
+        group.failed.push({ name: k.name, why: why });
+        OUT[key] = { status: 'failed', msg: why };
+        paint();
+        setTimeout(function() { if (OUT[key] && OUT[key].status === 'failed') { delete OUT[key]; paint(); } }, FAILED_SHOW_MS);
+        finish();
+      },
+      onCancel: function() { delete OUT[key]; paint(); finish(); },
+    });
+  });
+}
+// Tonight's row of a child this mode is checking out: its button says so, and is not offered twice.
+function outOp(key) {
+  var st = OUT[key];
+  if (!st || st.status === 'done' || st.status === 'failed') return null;
+  return { kind: 'checkout', status: 'pending' };
 }
 
 // ── Polling ────────────────────────────────────────────────────────────────
@@ -1802,7 +2063,7 @@ function renderTonight() {
       var d = e.at ? new Date(e.at) : null;
       who.appendChild(el('span', null, d && !isNaN(d.getTime()) ? d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : ''));
       var acts = el('div', 'rowacts');
-      var op = OPS[e.key];
+      var op = OPS[e.key] || outOp(e.key);
       // Check out: on TwoTimTwo. Never twice. While either is
       // in the queue its button says so; a waiting one is stopped by a tap.
       if (!e.checkedOut && !e.walkin) {

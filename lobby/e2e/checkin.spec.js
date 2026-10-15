@@ -456,6 +456,7 @@ test('the youth leaders\' page shows Trek and Journey only, on the same path', a
   await expect(page.locator('.fam')).toHaveText(/Tia Youth/);
   await expect(page.locator('#count-pill')).toBeVisible();   // its own Tonight, with Undo check-in
   await expect(page.locator('#menu-btn')).toBeVisible();   // the walk-in tag alone
+  await expect(page.locator('#mode-btn')).toBeHidden();   // no Check out: the Worker checks Trek and Journey out
   await page.locator('.fam').click();
   await page.locator('#kid-sheet').getByRole('button', { name: 'Check in' }).click();
   await expect(page.locator('#toast')).toContainText('Tia Youth is checked in');
@@ -779,6 +780,137 @@ test('BARF switched off (owner 2026-10-15): no green button, no friend name or c
   await ben.getByRole('button', { name: 'Brought a friend' }).click();
   await expect(ben.getByLabel('Friend’s first name')).toHaveCount(0);
   await expect(ben.getByLabel('Friend’s club')).toHaveCount(0);
+});
+
+// Check out (owner 2026-10-15): a mode of /checkin. The big button at the top switches; the
+// grid is the check-in's family tiles holding only children checked in and not checked out yet,
+// Puggles to T&T (the Worker checks Trek and Journey out); one tap checks out the whole household
+// (one desk check-out per child, after the Undo time: TwoTimTwo's check-out cannot be taken back);
+// the tiles grow as families leave.
+test('check out: the big button switches modes; one tap checks out a whole household after an Undo window; tiles grow as families leave', async ({ page }) => {
+  test.setTimeout(90_000);
+  const kids = [
+    { clubberId: '11', first: 'Ada', last: 'Tester', club: 'Cubbies', clubId: '1', checkedIn: true },
+    { clubberId: '12', first: 'Ben', last: 'Tester', club: 'Sparks', clubId: '2', checkedIn: true },
+    { clubberId: '13', first: 'Cy', last: 'Other', club: 'T&T', clubId: '3', checkedIn: true },
+    { clubberId: '15', first: 'Dee', last: 'Small', club: 'Puggles', clubId: '4', checkedIn: true },
+    { clubberId: '16', first: 'Gus', last: 'Grand', club: 'T&T', clubId: '3', checkedIn: true },
+    { clubberId: '17', first: 'Hal', last: 'Hill', club: 'Cubbies', clubId: '1', checkedIn: true },
+    { clubberId: '18', first: 'Eve', last: 'Later', club: 'Sparks', clubId: '2', checkedIn: false },
+    { clubberId: '14', first: 'Tia', last: 'Youth', club: 'Trek', clubId: '6', checkedIn: true },
+    { clubberId: '19', first: 'Jo', last: 'Journey', club: 'Journey', clubId: '7', checkedIn: true },
+  ];
+  const { world, historyRing } = await stubSite(page, { kids, barf: false });
+  world.busyFirst = false;
+  await page.clock.install();
+  await signIn(page);
+  const list = page.locator('#list');
+  await expect(list).toContainText('1 family still to come', { timeout: 10_000 });
+  const modeBtn = page.locator('#mode-btn');
+  await expect(modeBtn).toHaveText('Check out');
+  await expect(page.locator('h1')).toHaveText('Check in');
+
+  // The big button: checkout mode, and the same place goes back.
+  await modeBtn.click();
+  await expect(page.locator('h1')).toHaveText('Check out');
+  await expect(modeBtn).toHaveText('← Back to Check in');
+  const tiles = list.locator('.fams.out .fam');
+  // Only children checked in and not checked out, Puggles to T&T, grouped by household.
+  await expect(tiles).toHaveCount(5);
+  await expect(tiles.locator('.fn')).toHaveText(['Gus Grand', 'Hal Hill', 'Cy Other', 'Dee Small', 'Tester']);
+  const tester = tiles.filter({ hasText: 'Tester' });
+  await expect(tester.locator('.kid')).toHaveText(['Ada', 'Ben']);
+  await expect(list).not.toContainText(/Tia|Jo Journey|Eve/);
+  await expect(list.locator('.lead')).toHaveText('6 children not checked out yet · tap a family to check them out');
+  const tileHeight = () => tiles.first().evaluate((e) => e.offsetHeight);
+  const fiveHigh = await tileHeight();
+  await snap(page, 'checkout-mode.png');
+
+  // Search filters the tiles.
+  await search(page).fill('gus');
+  await expect(tiles).toHaveCount(1);
+  await expect(tiles.locator('.fn')).toHaveText('Gus Grand');
+  await search(page).fill('tester');
+  await expect(tiles.locator('.fn')).toHaveText(['Tester']);
+  await search(page).fill('');
+  await expect(tiles).toHaveCount(5);
+
+  // One tap: the household is held for the Undo time; nothing reaches TwoTimTwo yet.
+  await tester.click();
+  const undoBar = page.locator('#undo-bar');
+  await expect(undoBar).toBeVisible();
+  await expect(page.locator('#undo-msg')).toHaveText('Checking out the Tester family: Ada, Ben');
+  await expect(kidState(page, 'Ada Tester')).toHaveAttribute('data-state', 'held');
+  await expect(kidState(page, 'Ben Tester')).toContainText('Checking out…');
+  await snap(page, 'checkout-undo.png');
+  expect(world.posts).toHaveLength(0);
+  // Undo inside the window puts them back, and nothing is ever sent.
+  await page.locator('#undo-btn').click();
+  await expect(undoBar).toBeHidden();
+  await expect(page.locator('#toast')).toContainText('The Tester family is not checked out.');
+  await expect(tester.locator('.kid')).toHaveText(['Ada', 'Ben']);
+  await page.clock.fastForward(12_000);
+  await page.waitForTimeout(300);
+  expect(world.posts).toHaveLength(0);
+
+  // Tapped again and left alone: when the Undo time ends, one desk check-out per child.
+  await tester.click();
+  await page.clock.fastForward(10_500);
+  await expect.poll(() => world.posts.length).toBe(2);
+  await expect(undoBar).toBeHidden();
+  expect(world.posts.map((p) => [p.path, p.body.clubberId])).toEqual([['/v1/desk/checkout', '11'], ['/v1/desk/checkout', '12']]);
+  for (const post of world.posts) {
+    const { historyRow: _row, ...plain } = post.body;
+    expect(JSON.stringify(plain)).not.toMatch(/Ada|Ben|Tester/);
+    expect(post.body.historyRow.kind).toBe('checkout');
+  }
+  expect(await cc.openRow(historyRing, world.posts[0].body.historyRow)).toMatchObject({ first: 'Ada', last: 'Tester', club: 'Cubbies', clubberId: '11' });
+  await expect(page.locator('#toast')).toContainText('Tester: 2 checked out');
+  await expect(tiles.filter({ hasText: 'Tester' })).toHaveCount(0, { timeout: 8000 });
+  await expect(list.locator('.lead')).toHaveText('4 children not checked out yet · tap a family to check them out');
+  // Checked out comes off the count (Trek and Journey stay: the Worker checks them out).
+  await expect(page.locator('#count-pill')).toHaveText('6 in');
+
+  // A refusal shows on that child alone, and their tile stays.
+  world.refuseFor['13'] = 'no-attendance-item';
+  await tiles.filter({ hasText: 'Cy Other' }).click();
+  await page.clock.fastForward(10_500);
+  await expect(kidState(page, 'Cy Other')).toHaveAttribute('data-state', 'failed');
+  await expect(kidState(page, 'Cy Other')).toHaveText('Not checked out: TwoTimTwo has no attendance item for that club tonight.');
+  await expect(page.locator('#toast')).toContainText('Couldn’t check out Cy Other');
+  delete world.refuseFor['13'];
+
+  // Families leave one tap at a time (each its own Undo): the tiles grow.
+  for (const name of ['Gus Grand', 'Hal Hill']) await tiles.filter({ hasText: name }).click();
+  await page.clock.fastForward(10_500);
+  await expect(tiles).toHaveCount(2, { timeout: 8000 });
+  await expect(list.locator('.fams.out')).toHaveClass(/\bs4\b/);
+  const twoHigh = await tileHeight();
+  expect(twoHigh).toBeGreaterThan(fiveHigh);
+  await tiles.filter({ hasText: 'Dee Small' }).click();
+  await page.clock.fastForward(10_500);
+  await expect(tiles).toHaveCount(1, { timeout: 8000 });
+  await expect(list.locator('.fams.out')).toHaveClass(/\bs5\b/);
+  expect(await tileHeight()).toBeGreaterThan(twoHigh);
+  await snap(page, 'checkout-last.png');
+  await tiles.filter({ hasText: 'Cy Other' }).click();
+  await page.clock.fastForward(10_500);
+
+  // Nobody left: the friendly state.
+  await expect(list.locator('.out-done')).toContainText('Everyone has been checked out', { timeout: 8000 });
+  await expect(page.locator('#count-pill')).toHaveText('2 in');
+  await snap(page, 'checkout-everyone.png');
+  expect(world.posts.filter((p) => p.path === '/v1/desk/checkout').map((p) => p.body.clubberId)).toEqual(['11', '12', '13', '16', '17', '15', '13']);
+  expect(world.posts.filter((p) => p.path !== '/v1/desk/checkout')).toHaveLength(0);
+  // Nothing with a name kept in the browser's storage.
+  expect(await page.evaluate(() => JSON.stringify({ ...localStorage, ...sessionStorage }))).not.toMatch(/Ada Tester|Ben Tester|Cy Other|Gus Grand|Hal Hill|Dee Small/);
+
+  // Back to Check in: the same place, the check-in list.
+  await modeBtn.click();
+  await expect(page.locator('h1')).toHaveText('Check in');
+  await expect(modeBtn).toHaveText('Check out');
+  await expect(list).toContainText('1 family still to come');
+  await expect(list.locator('.fams.out')).toHaveCount(0);
 });
 
 test('a new familiesAt on the roster answer reads the families again, so a newly registered child joins their family', async ({ page }) => {
