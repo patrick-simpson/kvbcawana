@@ -278,7 +278,8 @@ export class Watcher {
     if (!this.client || this.clientKey !== key) {
       this.client = new TwoTimTwoClient(creds, {
         fetchFn: this.fetchFn, now: this.now, budget: this.budget,
-        writeGuard: async () => ((await this.clubToday()).club ? null : 'no-club'),
+        // A desk test-day write (desk.js TEST DAYS) says so itself; everything else asks the day.
+        writeGuard: async (/** @type {any} */ opts) => (opts && opts.testDay === true) || (await this.clubToday()).club ? null : 'no-club',
       });
       this.clientKey = key;
     }

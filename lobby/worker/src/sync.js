@@ -1101,6 +1101,8 @@ export class SyncCore {
     await this.watcher.arm();
     // Who brought a friend is kept a few nights, then deleted (friends.js).
     await this.friends.purge();
+    // Test days (desk.js): the check-ins made on a day with no club are undone overnight.
+    await this.desk.sweepTestDay();
     await this.history.flush().catch((err) => console.error('[history] flush failed', err));
     const res = await this.refreshCalendar();
     return res.status;

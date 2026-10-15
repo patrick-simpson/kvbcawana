@@ -27,6 +27,21 @@
 //
 // A visitor with no clubber id is not on TwoTimTwo: claim, job, hooks, no post.
 //
+// TEST DAYS (owner 2026-10-15: "I still want to be able to check people in when
+// it's not Wednesday ... I want to test and then just hit the undo button. I want
+// it to be a real test", "Auto-undo overnight"). On a day with no club the
+// roster READS TwoTimTwo's check-in page (slow is fine) and answers `testDay`
+// {today, next, meeting} instead of `noClub`; check-in and undo are real
+// (TwoTimTwo, the label, the claim), posted into the meeting TwoTimTwo shows
+// (its next one, the owner says) with `testDay` on the write so the client's
+// no-club guard lets them through. They fire NO hooks (no history row, no
+// count, no book): a Thursday is not a club night in the trends. Each test
+// check-in is remembered, sealed under the state key (`desk:testday`: night,
+// clubber id, meeting id), and the cron after that night (sweepTestDay, the
+// 6-hourly run, so about 2 am) undoes every one still there on TwoTimTwo. A
+// hand undo takes it off the list. Check-out and the BARF tools stay refused
+// `no-club` (TwoTimTwo's check-out has no undo).
+//
 // EARLY LABELS (owner 2026-10-15: "labels print sooner ... before TwoTimTwo
 // processes", "only print sooner when safe", "last 3 went fine"). While the last
 // EARLY_AFTER posts all went through first time in under EARLY_FAST_MS (memory
@@ -102,6 +117,12 @@ export { FAMILIES_TTL_MS, FAMILIES_RETRY_MS } from './families.js';
 export const ROSTER_ACTIVE_MS = 45 * 1000;
 const ID_RE = /^\d{1,12}$/;
 const AMBIGUOUS = new Set(['timeout', 'network']);
+/** Where the test days' check-ins wait for the overnight undo (sealed). */
+const TEST_DAY_KEY = 'desk:testday';
+/** Undo tries per test check-in before it is given up on (and logged). */
+const TEST_UNDO_TRIES = 3;
+/** Test check-ins undone in one sweep (the rest wait for the next run). */
+const TEST_SWEEP_MAX = 60;
 /** Early labels: this many posts in a row went through first time ... */
 export const EARLY_AFTER = 3;
 /** ... each in under this long (ms). */
@@ -522,9 +543,8 @@ export class Desk {
   async roster() {
     const t = this.now();
     const day = await this.clubToday();
-    if (!day.club) {
-      return json({ noClub: true, today: day.today, next: day.next, readAt: new Date(t).toISOString(), kids: [], items: { bible: [], friend: [] } });
-    }
+    // A day with no club is a test day (TEST DAYS above): the page is read like any other.
+    const testDay = !day.club;
     this.rosterAskedAt = t;
     await this.restore();
     const c = this.cache;
@@ -557,7 +577,8 @@ export class Desk {
     const familiesAt = this.familiesSource.readAt();
     // `restored` is not `stale`: the page's "TwoTimTwo is not answering" note is for a failed read only.
     const flag = 'stale' in r && r.stale ? { stale: true } : 'restored' in r && r.restored ? { restored: true } : {};
-    return json({ readAt: new Date(r.readAt).toISOString(), ...flag, kids, items: itemClubs(r.page.events || []), ...(familiesAt ? { familiesAt } : {}) });
+    const test = testDay ? { testDay: { today: day.today, next: day.next, meeting: r.page.meetingDate || null } } : {};
+    return json({ readAt: new Date(r.readAt).toISOString(), ...flag, ...test, kids, items: itemClubs(r.page.events || []), ...(familiesAt ? { familiesAt } : {}) });
   }
 
   /**
@@ -604,8 +625,7 @@ export class Desk {
   async checkIn(body) {
     const night = churchNight(this.now());
     if (body.night !== night) return refuse(400, { reason: 'wrong-night', night });
-    const noClub = await this.noClubRefusal();
-    if (noClub) return noClub;
+    const testDay = !(await this.clubToday()).club;   // TEST DAYS: real, remembered, undone overnight
     const who = this.who(body);
     if (!who) return refuse(400, { reason: 'no-child' });
     if (!(await this.checkRow(body.historyRow, night))) return refuse(400, { reason: 'unsealed', what: 'historyRow' });
@@ -665,7 +685,7 @@ export class Desk {
     let club = 'visitor' in who ? who.visitor.club : '';
     let name = 'visitor' in who ? `${who.visitor.first} ${who.visitor.last}`.trim() : '';
     if ('clubberId' in who) {
-      const posted = await this.post(who.clubberId, body.items);
+      const posted = await this.post(who.clubberId, body.items, testDay);
       if (!posted.ok) {
         // An early label a station already took stays: the claim waits for the post alone.
         if (early && jobId && !(await this.printq.dropUnlessLeased(jobId))) {
@@ -682,6 +702,7 @@ export class Desk {
       } else {
         club = posted.club;
         name = posted.name;
+        if (testDay) await this.noteTest(night, who.clubberId, posted.calendarId, true);
       }
     }
     const settled = await this.ledger.settle(night, tag, claim.gen, jobId ?? undefined);
@@ -692,6 +713,7 @@ export class Desk {
         return refuse(409, { reason: 'superseded' });
       }
     }
+    if (testDay) return json({ ok: true, already: false, jobId, gen: claim.gen, history: 'off', testDay: true });
     await this.afterCheckin(body, { night, tag, who, gen: claim.gen, jobId, club, name });
     return json({ ok: true, already: false, jobId, gen: claim.gen, history: this.hooks.afterCheckin.length ? 'hooked' : 'off' });
   }
@@ -717,9 +739,15 @@ export class Desk {
    * @param {string} night @param {string} tag @param {string} clubberId @param {any} body
    */
   async recheckEarly(night, tag, clubberId, body) {
-    const posted = await this.post(clubberId, body.items);
+    const testDay = !(await this.clubToday()).club;
+    const posted = await this.post(clubberId, body.items, testDay);
     if (!posted.ok) return this.printedRefusal(posted.response);
     await this.ledger.clearRecheck(night, tag);
+    if (testDay) {
+      await this.noteTest(night, clubberId, posted.calendarId, true);
+      const c0 = this.ledger.peek(night, tag);
+      return json({ ok: true, already: false, recheck: true, jobId: c0 && c0.jobId ? c0.jobId : null, gen: c0 ? c0.gen : 0, history: 'off', testDay: true });
+    }
     const c = this.ledger.peek(night, tag);
     const gen = c ? c.gen : 0;
     const jobId = c && c.jobId ? c.jobId : null;
@@ -732,17 +760,17 @@ export class Desk {
    * @param {string} clubberId @param {any} items {Bible, Friend} or ['Bible', 'Friend']
    * @returns {Promise<{ ok: true, club: string, name: string } | { ok: false, response: Response }>}
    */
-  async post(clubberId, items) {
+  async post(clubberId, items, testDay = false) {
     const started = this.now();
-    const r = await this.postOnce(clubberId, items);
+    const r = await this.postOnce(clubberId, items, testDay);
     // Fine = TwoTimTwo took it (or had it) and answered in time; anything else (busy,
     // a lapsed sign-in, slow, refused) prints the next labels after TwoTimTwo again.
     this.notePost(r.ok && this.now() - started < EARLY_FAST_MS);
     return r;
   }
 
-  /** @param {string} clubberId @param {any} items @returns {Promise<{ ok: true, club: string, name: string } | { ok: false, response: Response }>} */
-  async postOnce(clubberId, items) {
+  /** @param {string} clubberId @param {any} items @param {boolean} [testDay] @returns {Promise<{ ok: true, club: string, name: string, calendarId?: string } | { ok: false, response: Response }>} */
+  async postOnce(clubberId, items, testDay = false) {
     const client = this.watcher.clientFor();
     if (!client || this.watcher.mode === 'off') return { ok: false, response: refuse(503, { reason: 'not-configured' }) };
     const want = Array.isArray(items) ? new Set(items.map(String)) : null;
@@ -754,15 +782,15 @@ export class Desk {
     }
     const { child, page } = found;
     // TwoTimTwo already has them (checked in on its own page a moment ago): that is success.
-    if (child.checkedIn) return { ok: true, club: child.club, name: child.name };
+    if (child.checkedIn) return { ok: true, club: child.club, name: child.name, calendarId: page.calendarId };
     const events = itemsToSend(page.events, child.clubId, { Bible: flag('Bible'), Friend: flag('Friend') });
     const hasAttendance = page.events.some((/** @type {any} */ e) => e.automatic && (!e.clubs.length || e.clubs.includes(child.clubId)));
     if (!hasAttendance) return { ok: false, response: refuse(409, { reason: 'no-attendance-item' }) };
-    const res = await client.checkIn({ clubberId, calendarId: page.calendarId, events, name: child.name }, { desk: true });
+    const res = await client.checkIn({ clubberId, calendarId: page.calendarId, events, name: child.name }, { desk: true, ...(testDay ? { testDay: true } : {}) });
     if (res.ok) {
       child.checkedIn = true;
       this.noteDeskChecked(clubberId, true);
-      return { ok: true, club: child.club, name: child.name };
+      return { ok: true, club: child.club, name: child.name, calendarId: page.calendarId };
     }
     if (AMBIGUOUS.has(res.error)) {
       this.log('[desk] a check-in post timed out; the claim was released');
@@ -782,20 +810,79 @@ export class Desk {
     return child ? { ok: /** @type {const} */ (true), child, page: r.page } : { ok: /** @type {const} */ (false), error: 'not-found' };
   }
 
+  // ── test days (see the top of this file) ───────────────────────────────────
+
+  /** The test check-ins waiting for the overnight undo. @returns {Promise<{ id: string, cal: string, night: string, tries?: number }[]>} */
+  async testList() {
+    const secret = this.secret();
+    const sealed = await this.storage?.get(TEST_DAY_KEY);
+    if (!sealed || !secret) return [];
+    const opened = await openState(secret, sealed).catch(() => null);
+    return opened && Array.isArray(opened.entries) ? opened.entries : [];
+  }
+  /** @param {{ id: string, cal: string, night: string, tries?: number }[]} entries */
+  async saveTestList(entries) {
+    if (!this.storage) return;
+    if (!entries.length) { await this.storage.delete(TEST_DAY_KEY); return; }
+    const secret = this.secret();
+    if (!secret) return;
+    await this.storage.put(TEST_DAY_KEY, await sealState(secret, { entries }));
+  }
+  /**
+   * A test check-in to undo overnight (add), or one undone by hand (remove).
+   * @param {string} night @param {string} id @param {string|undefined} cal the meeting it went into @param {boolean} add
+   */
+  async noteTest(night, id, cal, add) {
+    const list = (await this.testList()).filter((e) => !(e.id === id && e.night === night));
+    if (add) list.push({ id, cal: String(cal || ''), night });
+    await this.saveTestList(list);
+  }
+  /**
+   * The overnight undo (SyncCore.cron): every test check-in from an EARLIER night
+   * is undone on TwoTimTwo, in the meeting it went into. A failure is tried again
+   * at the next run, TEST_UNDO_TRIES times, then given up on (logged). Never throws.
+   * @returns {Promise<{ undone: number, failed: number, left: number }>}
+   */
+  async sweepTestDay() {
+    const out = { undone: 0, failed: 0, left: 0 };
+    try {
+      const list = await this.testList();
+      if (!list.length) return out;
+      const today = churchNight(this.now());
+      const client = this.watcher.clientFor();
+      const keep = [];
+      let done = 0;
+      for (const e of list) {
+        if (e.night >= today || !client || !e.cal || done >= TEST_SWEEP_MAX) { if (e.cal || e.night >= today) keep.push(e); continue; }
+        done += 1;
+        const r = await client.undoCheckIn({ clubberId: e.id, calendarId: e.cal }, { desk: true, testDay: true });
+        if (r.ok) { out.undone += 1; continue; }
+        const tries = (e.tries || 0) + 1;
+        out.failed += 1;
+        if (tries < TEST_UNDO_TRIES) keep.push({ ...e, tries });
+        else this.log(`[desk] a test check-in could not be undone after ${tries} tries (${r.error}); undo it on TwoTimTwo`);
+      }
+      out.left = keep.length;
+      await this.saveTestList(keep);
+      if (out.undone || out.failed) this.log(`[desk] test day: ${out.undone} undone, ${out.failed} not yet`);
+    } catch (err) { console.error('[desk] the test-day undo failed', err); }
+    return out;
+  }
+
   // ── undo and check out ─────────────────────────────────────────────────────
 
   /** POST /v1/desk/undo {night, clubberId | visitor, historyRow}. @param {any} body */
   async undo(body) {
     const night = churchNight(this.now());
     if (body.night !== night) return refuse(400, { reason: 'wrong-night', night });
-    const noClub = await this.noClubRefusal();
-    if (noClub) return noClub;
+    const testDay = !(await this.clubToday()).club;   // TEST DAYS: the undo is real too
     const who = this.who(body);
     if (!who) return refuse(400, { reason: 'no-child' });
     if (!(await this.checkRow(body.historyRow, night))) return refuse(400, { reason: 'unsealed', what: 'historyRow' });
     if ('clubberId' in who) {
-      const sent = await this.postMeeting(who.clubberId, 'undo');
+      const sent = await this.postMeeting(who.clubberId, 'undo', testDay);
       if (!sent.ok) return sent.response;
+      if (testDay) await this.noteTest(night, who.clubberId, '', false);
       for (const k of this.cache?.page.roster || []) if (k.clubberId === who.clubberId) k.checkedIn = false;
       this.noteDeskChecked(who.clubberId, false);
     }
@@ -807,6 +894,7 @@ export class Desk {
     await this.ledger.undo(night, tag);
     const dropped = await this.printq.dropForTag(tag);
     if (this.adopt) await this.adopt.forget(night, tag);
+    if (testDay) return json({ ok: true, droppedJobs: dropped, testDay: true });
     await this.fire('afterUndo', { night, tag, clubberId: 'clubberId' in who ? who.clubberId : undefined, club: clean(body.club, 24), historyRow: body.historyRow, source: 'desk', visitor: 'visitor' in who });
     return json({ ok: true, droppedJobs: dropped });
   }
@@ -836,13 +924,13 @@ export class Desk {
    * @param {string} clubberId @param {'undo'|'checkout'} what
    * @returns {Promise<{ ok: true } | { ok: false, response: Response }>}
    */
-  async postMeeting(clubberId, what) {
+  async postMeeting(clubberId, what, testDay = false) {
     const client = this.watcher.clientFor();
     if (!client || this.watcher.mode === 'off') return { ok: false, response: refuse(503, { reason: 'not-configured' }) };
     const r = await this.page(Infinity, false, true);
     if (!r.ok) return { ok: false, response: this.pageFailure(r) };
     const res = what === 'undo'
-      ? await client.undoCheckIn({ clubberId, calendarId: r.page.calendarId }, { desk: true })
+      ? await client.undoCheckIn({ clubberId, calendarId: r.page.calendarId }, { desk: true, ...(testDay ? { testDay: true } : {}) })
       : await client.checkOut({ clubberId, calendarId: r.page.calendarId }, { desk: true });
     if (res.ok) return { ok: true };
     if (AMBIGUOUS.has(res.error)) return { ok: false, response: refuse(504, { reason: 'unsure', retry: true }) };

@@ -737,7 +737,7 @@ export class TwoTimTwoClient {
    */
   async write(send, opts) {
     if (this.writeGuard) {
-      const refused = await this.writeGuard();
+      const refused = await this.writeGuard(opts);
       if (refused) return { ok: /** @type {const} */ (false), error: refused };
     }
     const desk = !!(opts && opts.desk);

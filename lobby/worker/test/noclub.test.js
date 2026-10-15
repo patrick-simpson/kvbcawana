@@ -1,11 +1,11 @@
-// No club tonight (owner 2026-10-13, "build the no club tonight fix"): on a
-// Monday evening /checkin sat on "Reading the roster..." while the Worker tried
-// TwoTimTwo's check-in page, which on a day with no club shows some other
-// meeting. On a day that is not a club day (the shared club-night rule: the
-// schedule, its special dates, the Worker's calendar; the whole local day in the
-// church's zone) the roster answers at once with `noClub` and reads nothing, and
-// every desk write is refused `no-club` before any read, claim or post. The print
-// station's rehearsal mode lets a rehearsal through as before.
+// No club tonight (owner 2026-10-13), then TEST DAYS (owner 2026-10-15): a day
+// that is not a club day (the shared club-night rule: the schedule, its special
+// dates, the Worker's calendar; the whole local day in the church's zone) is a
+// test day. The roster reads TwoTimTwo's page like any day and answers `testDay`
+// {today, next, meeting}; desk check-in and undo are real (see testday.test.js);
+// check-out and the BARF late-friend tools, the relayed phone check-in and
+// POST /v1/cloud/checkin stay refused `no-club`. The print station's rehearsal
+// mode makes the day a club day as before (no `testDay` while rehearsing).
 import { describe, expect, it } from 'vitest';
 import { clubDay } from '../src/clubday.js';
 import { REHEARSAL_FRESH_MS } from '../src/publisher.js';
@@ -68,60 +68,63 @@ describe('the club-day rule (clubday.js)', () => {
   });
 });
 
-describe('GET /v1/desk/roster on a day with no club', () => {
-  it('answers at once with noClub, today and the next club night, and reads nothing from TwoTimTwo', async () => {
+describe('GET /v1/desk/roster on a day with no club (a test day)', () => {
+  it('reads the page like a club day and answers testDay {today, next, meeting} instead of noClub', async () => {
     const t = await monday();
     const res = await t.call('GET', '/v1/desk/roster');
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({ noClub: true, today: MON, next: NIGHT, readAt: new Date(MON_836PM).toISOString(), kids: [], items: { bible: [], friend: [] } });
-    expect(touched(t)).toBe(0);
-    // ...and does not mark the roster wanted, so the watcher's alarm reads nothing ahead either
-    expect(t.core.desk.rosterAskedAt).toBe(0);
-    expect(t.core.desk.rosterRefreshInMs()).toBe(null);
-    for (let i = 0; i < 5; i++) { t.clock.tick(60 * 1000); expect((await t.call('GET', '/v1/desk/roster')).body.noClub).toBe(true); }
-    expect(touched(t)).toBe(0);
+    expect(res.body.noClub).toBeUndefined();
+    expect(res.body.testDay).toEqual({ today: MON, next: NIGHT, meeting: NIGHT });
+    expect(res.body.kids.map((k) => k.clubberId)).toContain('662');
+    expect(t.reads.some((r) => r.path === '/clubber/checkin')).toBe(true);
+    // the roster is wanted like on a club day
+    expect(t.core.desk.rosterAskedAt).toBe(MON_836PM);
+    t.clock.tick(60 * 1000);
+    const again = await t.call('GET', '/v1/desk/roster');
+    expect(again.body.testDay).toMatchObject({ today: MON, next: NIGHT });
+    expect(again.body.noClub).toBeUndefined();
   });
 
-  it('a club day is unchanged: the check-in page is read, and the answer carries no noClub', async () => {
+  it('a club day is unchanged: the check-in page is read, and the answer carries no testDay', async () => {
     const t = await rig({ kids: [kid('662')] });
     const res = await t.call('GET', '/v1/desk/roster');
     expect(res.status).toBe(200);
     expect(res.body.noClub).toBeUndefined();
+    expect(res.body.testDay).toBeUndefined();
     expect(res.body.kids.map((k) => k.clubberId)).toContain('662');
     expect(t.reads.some((r) => r.path === '/clubber/checkin')).toBe(true);
   });
 
-  it('the whole club day counts: 7 am and 11 pm Eastern on a Wednesday read the page; 11 pm on Tuesday does not', async () => {
+  it('the whole club day counts: 7 am and 11 pm Eastern on a Wednesday carry no testDay; 11 pm on Tuesday is a test day', async () => {
     for (const start of [WED_7AM, WED_11PM]) {
       const t = await rig({ kids: [kid('662')], start });
       const res = await t.call('GET', '/v1/desk/roster');
-      expect(res.body.noClub).toBeUndefined();
+      expect(res.body.testDay).toBeUndefined();
       expect(t.reads.some((r) => r.path === '/clubber/checkin')).toBe(true);
     }
     const tue = await monday({ start: TUE_11PM });
-    expect((await tue.call('GET', '/v1/desk/roster')).body).toMatchObject({ noClub: true, today: '2026-10-13', next: NIGHT });
-    expect(touched(tue)).toBe(0);
+    expect((await tue.call('GET', '/v1/desk/roster')).body.testDay).toMatchObject({ today: '2026-10-13', next: NIGHT });
   });
 
-  it('a special no-club date in the schedule: noClub on a Wednesday, with the week after as next', async () => {
+  it('a special no-club date in the schedule: a test day on a Wednesday, with the week after as next', async () => {
     const t = await rig({ kids: [kid('662')] });
     t.core.desk.schedule = { version: 1, timezone: 'America/New_York', meeting: { day: 3 }, specialDates: { [NIGHT]: { noClub: true } } };
     const res = await t.call('GET', '/v1/desk/roster');
-    expect(res.body).toMatchObject({ noClub: true, today: NIGHT, next: '2026-10-21', kids: [] });
-    expect(t.reads).toHaveLength(0);
+    expect(res.body.testDay).toMatchObject({ today: NIGHT, next: '2026-10-21' });
+    expect(res.body.noClub).toBeUndefined();
+    expect(res.body.kids.map((k) => k.clubberId)).toContain('662');
   });
 
-  it('an extra club night on the calendar reads the page on a Monday; a cancelled Wednesday answers noClub', async () => {
+  it('an extra club night on the calendar reads the page on a Monday; a cancelled Wednesday is a test day', async () => {
     const t = await monday();
     await t.storage.put('calendar', feed([{ date: MON, kind: 'club', title: 'Awana Clubs (extra night)' }]));
     const res = await t.call('GET', '/v1/desk/roster');
-    expect(res.body.noClub).toBeUndefined();
+    expect(res.body.testDay).toBeUndefined();
     expect(t.reads.some((r) => r.path === '/clubber/checkin')).toBe(true);
 
     const w = await rig({ kids: [kid('662')] });
     await w.storage.put('calendar', feed([], { cancel: [NIGHT] }));
-    expect((await w.call('GET', '/v1/desk/roster')).body).toMatchObject({ noClub: true, today: NIGHT, next: '2026-10-21' });
-    expect(w.reads).toHaveLength(0);
+    expect((await w.call('GET', '/v1/desk/roster')).body.testDay).toMatchObject({ today: NIGHT, next: '2026-10-21' });
   });
 });
 
@@ -132,22 +135,22 @@ describe('rehearsal mode lets a rehearsal through', () => {
     expect((await st.call('POST', '/v1/station/extras', { rehearsal: true })).status).toBe(200);
     const res = await t.call('GET', '/v1/desk/roster');
     expect(res.status).toBe(200);
-    expect(res.body.noClub).toBeUndefined();
+    expect(res.body.testDay).toBeUndefined();
     expect(res.body.kids.map((k) => k.clubberId)).toContain('662');
     expect(t.reads.some((r) => r.path === '/clubber/checkin')).toBe(true);
-    // the station disarms: no club again, at once
+    // the station disarms: a test day again, at once
     await st.call('POST', '/v1/station/extras', { rehearsal: false });
-    expect((await t.call('GET', '/v1/desk/roster')).body.noClub).toBe(true);
+    expect((await t.call('GET', '/v1/desk/roster')).body.testDay).toMatchObject({ today: MON });
     // armed, then the laptop goes away still armed: it lapses after REHEARSAL_FRESH_MS
     await st.call('POST', '/v1/station/extras', { rehearsal: true });
     t.clock.tick(REHEARSAL_FRESH_MS - 1000);
     expect(t.core.publisher.rehearsing()).toBe(true);
     t.clock.tick(2000);
-    expect((await t.call('GET', '/v1/desk/roster')).body.noClub).toBe(true);
+    expect((await t.call('GET', '/v1/desk/roster')).body.testDay).toMatchObject({ today: MON });
     // a restart forgets it until the station's next post (it posts at least every minute or two)
     await st.call('POST', '/v1/station/extras', { rehearsal: true });
     t.restart();
-    expect((await t.call('GET', '/v1/desk/roster')).body.noClub).toBe(true);
+    expect((await t.call('GET', '/v1/desk/roster')).body.testDay).toMatchObject({ today: MON });
   });
 
   it('a desk check-in on a Monday goes through during a rehearsal', async () => {
@@ -163,13 +166,11 @@ describe('rehearsal mode lets a rehearsal through', () => {
 });
 
 describe('desk writes on a day with no club', () => {
-  it('check-in, undo, check-out and a late BARF friend are refused no-club: no read, no claim, no job, no post', async () => {
+  it('check-out and a late BARF friend are refused no-club: no read, no claim, no job, no post', async () => {
     const t = await monday();
     const st = await t.station();
     const base = { night: MON, clubberId: '662', historyRow: row('checkin', MON) };
     const answers = [
-      await t.call('POST', '/v1/desk/checkin', await t.deskBody([st], { ...base, items: { Bible: true } })),
-      await t.call('POST', '/v1/desk/undo', { ...base, historyRow: row('undo', MON) }),
       await t.call('POST', '/v1/desk/checkout', { ...base, historyRow: row('checkout', MON) }),
       await t.call('POST', '/v1/desk/barf-late', { ...base, friendName: 'Sam', historyRow: row('barf-friend', MON), tagJob: null }),
       await t.call('POST', '/v1/desk/barf-late', { night: MON, clubberId: '662', recheck: true, items: { Bible: true } }),
