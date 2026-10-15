@@ -596,14 +596,20 @@ test('simple check-in (owner 2026-10-15): on by default, one tap for a child, "C
   const zed = world.posts.find((p) => p.body.clubberId === '20');
   expect(zed.path).toBe('/v1/desk/checkin');
   expect(zed.body.items).toEqual({});
-  // ...with an Undo that really undoes it (no confirm).
-  await page.locator('#toast').getByRole('button', { name: 'Undo' }).click();
+  // ...with the big Undo at the bottom, which really undoes it (no confirm), then goes.
+  await expect(page.locator('#undo-bar')).toBeVisible();
+  await expect(page.locator('#undo-msg')).toHaveText('Checked in: Zed Solo');
+  await snap(page, 'checkin-big-undo.png');
+  await page.locator('#undo-btn').click();
   await expect.poll(() => world.posts.filter((p) => p.path === '/v1/desk/undo' && p.body.clubberId === '20').length).toBe(1);
+  await expect(page.locator('#undo-bar')).toBeHidden();
   // A family: its own "Check in all 2" strip, one tap, both in, nothing ticked.
   const all = page.locator('.famw', { hasText: 'Tester' }).getByRole('button', { name: /^Check in all 2/ });
   await expect(all).toBeVisible();
   await all.click();
   await expect(page.locator('#toast')).toContainText('Tester: 2 checked in', { timeout: 10_000 });
+  // The bar names the whole tap; the next tap ends it.
+  await expect(page.locator('#undo-msg')).toHaveText('Checked in: Tester family, 2');
   const testers = world.posts.filter((p) => p.path === '/v1/desk/checkin' && ['11', '12'].includes(p.body.clubberId));
   expect(testers).toHaveLength(2);
   expect(testers.every((p) => JSON.stringify(p.body.items) === '{}')).toBe(true);
@@ -623,6 +629,56 @@ test('simple check-in (owner 2026-10-15): on by default, one tap for a child, "C
   await page.locator('.fam', { hasText: 'Pair' }).click();
   await expect(page.locator('#fampage')).toContainText('Bible');
   expect(await page.evaluate(() => localStorage.getItem('awanaSimpleCheckin.v1'))).toBe('off');
+});
+
+test('family order (owner 2026-10-15): earliest usual arrival first by default, last name from the + menu', async ({ page }) => {
+  const { world } = await stubSite(page, { simple: true });
+  world.busyFirst = false;
+  // Tester (no times), Zed Solo usually 6:20, the Pairs usually 6:05 (Bo) and 6:40 (Amy).
+  world.kids.push({ clubberId: '20', first: 'Zed', last: 'Solo', club: 'Sparks', clubId: '2', checkedIn: false, usual: 18 * 60 + 20 },
+    { clubberId: '30', first: 'Amy', last: 'Pair', club: 'Cubbies', clubId: '1', checkedIn: false, usual: 18 * 60 + 40 },
+    { clubberId: '31', first: 'Bo', last: 'Pair', club: 'Sparks', clubId: '2', checkedIn: false, usual: 18 * 60 + 5 });
+  world.households = [...world.households, ['Amy Pair', 'Bo Pair']];
+  await signIn(page);
+  await expect(page.locator('#list')).toContainText('earliest arrivals first', { timeout: 10_000 });
+  const order = () => page.locator('#list .fams .fam').evaluateAll((els) => els.map((e) => e.textContent));
+  const firstOf = async (names) => { const o = await order(); return names.map((n) => o.findIndex((t) => t.includes(n))); };
+  const [pair, solo, tester] = await firstOf(['Pair', 'Zed Solo', 'Tester']);
+  expect(pair).toBeLessThan(solo);
+  expect(solo).toBeLessThan(tester);
+  // Last name, from the + menu, kept on this phone.
+  await page.locator('#menu-btn').click();
+  await expect(page.getByRole('radio', { name: 'Usually first' })).toHaveAttribute('aria-checked', 'true');
+  await page.getByRole('radio', { name: 'Last name' }).click();
+  await page.locator('#menu-close').click();
+  await expect(page.locator('#list')).not.toContainText('earliest arrivals first');
+  const [pair2, solo2, tester2] = await firstOf(['Pair', 'Zed Solo', 'Tester']);
+  expect(pair2).toBeLessThan(solo2);
+  expect(solo2).toBeLessThan(tester2);   // P, S, T: alphabetical happens to agree here...
+  world.kids.find((k) => k.clubberId === '20').last = 'Aaron';   // ...so move Zed to the front of the alphabet
+  await page.reload();
+  await expect(page.locator('#list')).toContainText('still to come', { timeout: 10_000 });
+  const [pair3, solo3] = await firstOf(['Pair', 'Zed Aaron']);
+  expect(solo3).toBeLessThan(pair3);
+  expect(await page.evaluate(() => localStorage.getItem('awanaCheckinSort.v1'))).toBe('name');
+});
+
+test('the youth page has the big Undo and the family order too', async ({ page }) => {
+  const { world } = await stubSite(page, { simple: true });
+  world.busyFirst = false;
+  // Tia Youth (no times) and Max Early, usually 6:02.
+  world.kids.push({ clubberId: '40', first: 'Max', last: 'Early', club: 'Journey', clubId: '6', checkedIn: false, usual: 18 * 60 + 2 });
+  await signIn(page, '/checkin/ym/');
+  await expect(page.locator('#list')).toContainText('2 families still to come · earliest arrivals first', { timeout: 10_000 });
+  await expect(page.locator('#list .fams .fam').first()).toHaveText(/Max Early/);
+  // One tap, then the big Undo, which undoes it on TwoTimTwo.
+  await page.locator('.fam', { hasText: 'Max Early' }).click();
+  await expect(page.locator('#undo-msg')).toHaveText('Checked in: Max Early', { timeout: 10_000 });
+  await page.locator('#undo-btn').click();
+  await expect.poll(() => world.posts.filter((p) => p.path === '/v1/desk/undo' && p.body.clubberId === '40').length).toBe(1);
+  // The order is in its + menu.
+  await page.locator('#menu-btn').click();
+  await expect(page.getByRole('radio', { name: 'Last name' })).toBeVisible();
 });
 
 test('a wrong passphrase stays on the sign-in, and a signed-out session returns to it', async ({ page }) => {

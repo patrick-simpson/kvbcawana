@@ -37,7 +37,15 @@ const BASE = `http://127.0.0.1:${PORT}`;
       /var ONE_TAP = \(function\(\) \{ try \{ return localStorage\.getItem\(ONE_TAP_KEY\) !== 'off'; \}/.test(phone)
       && /if \(ONE_TAP\) return \{ bible: false, friend: false \};/.test(phone)
       && /if \(ready\.length === 1\) \{ if \(ONE_TAP\) quickCheckIn\(ready, null\); else openKid\(ready\[0\]\); \}/.test(phone)
-      && /toast\(said, QUICK_UNDO_MS, 'Undo', function\(\) \{ quickUndo\(group\.kids\); \}, 'good'\)/.test(phone));
+      && /if \(group\.kids\.length\) offerUndo\(group\.kids, group\.family\);/.test(phone));
+    check('the big Undo (owner 2026-10-15): a bar until the next check-in tap or a minute; check-out\'s held Undo outranks it',
+      /var LAST_IN_MS = 60 \* 1000;/.test(phone)
+      && /clearLastIn\(\);   \/\/ the next tap ends the last one's Undo/.test(phone)
+      && /var q = !b && MODE === 'in' && lastIn \? lastIn : null;/.test(phone)
+      && /'Checked in: ' \+ q\.label/.test(phone));
+    check('family order (owner 2026-10-15): usual arrival by default, last name on request, this phone\'s choice',
+      /var SORT = \(function\(\) \{ try \{ return localStorage\.getItem\(SORT_KEY\) === 'name' \? 'name' : 'arrival'; \}/.test(phone)
+      && /var main = byArrival\(all\.filter\(function\(f\) \{ return !isAway\(f\); \}\)\);/.test(phone));
     check('a phone check-in sends Bible / Friend with it (the Worker\'s desk check-in, site/checkin/desk-transport.js)',
       /var choice = \{ bible: items\.bible && !!e\.choice\.bible, friend: items\.friend && !!e\.choice\.friend, friendName: friendName, friendClub: String\(e\.choice\.friendClub \|\| ''\), welcomeOnly: SIMPLE \};/.test(phone)
       && /desk\.checkIn\(\{ clubberId: k\.clubberId, name: k\.name, club: k\.club \}, choice\)/.test(phone));
