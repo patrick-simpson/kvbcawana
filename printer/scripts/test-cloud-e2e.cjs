@@ -558,6 +558,8 @@ const fakeSafe = {
       laptopPublishes.length = 0;
       await puller3.tick();
       await settle();
+      // The still-here list is debounced: on a busy CI machine 150 ms is not always enough (the 9.6.0 release run).
+      for (let i = 0; i < 60 && !(laptopPublishes.includes('tally') && laptopPublishes.includes('checkout')); i++) await new Promise((r) => setTimeout(r, 50));
       check('SINGLE_PUBLISHER turned off at runtime: the station publishes the tally and still-here list again, at once', server.singlePublisherSilent() === false
         && laptopPublishes.includes('tally') && laptopPublishes.includes('checkout') && frames('tally').length > tallies, `${JSON.stringify(laptopPublishes)} ${frames('tally').length}`);
       check('and the Worker passes the laptop\'s tally to the screens (it is no longer the one publisher)', frames('tally').at(-1).d.total === 5, JSON.stringify(frames('tally').at(-1).d));
