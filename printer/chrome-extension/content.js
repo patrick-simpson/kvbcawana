@@ -2,7 +2,15 @@
   if (window.__awanaPrinterLoaded) return;
   window.__awanaPrinterLoaded = true;
 
-  const EXTENSION_VERSION = '9.4.8';
+  const EXTENSION_VERSION = '9.4.9';
+  // The extension no longer checks in or prints (9.4.9, owner 2026-10-15: "not use the
+  // laptop extension for check-in now that we tested it"): awana.kvbchurch.org/checkin
+  // checks in, the check-in service prints (a check-in made on TwoTimTwo's own page
+  // too, from its report). The Check in pill opens /checkin in a new tab, so this tab
+  // stays open for what the extension still does: the Checkout page's manual
+  // check-outs, the roster and the feeds.
+  var EXTENSION_PRINTS = false;
+  var CHECKIN_PAGE_URL = 'https://awana.kvbchurch.org/checkin/';
   const PRINT_COOLDOWN = 2000;
   // POST /print is synchronous on the server: PowerShell + a cold printer can
   // take 15-30 s (the server retries the spooler internally). This must sit
@@ -3050,7 +3058,7 @@
     var touchPill = document.createElement('button');
     touchPill.id = 'awana-touch-pill';
     touchPill.type = 'button';
-    touchPill.title = 'Touch check-in (full screen)';
+    touchPill.title = 'Open the check-in page (awana.kvbchurch.org/checkin) in a new tab';
     touchPill.innerHTML = '<span style="font-size:14px">&#x2714;&#xFE0E;</span> Check in';
     Object.assign(touchPill.style, {
       position: 'fixed', top: PANEL_TOP + 'px', zIndex: '99999',
@@ -3067,6 +3075,7 @@
     touchPill.addEventListener('pointerup', releasePill);
     touchPill.addEventListener('pointerleave', releasePill);
     touchPill.addEventListener('click', function() {
+      if (!EXTENSION_PRINTS) { window.open(CHECKIN_PAGE_URL, '_blank', 'noopener'); return; }
       if (typeof window.__awanaTouchOpenScreen === 'function') window.__awanaTouchOpenScreen(touchPill.getBoundingClientRect());
     });
     document.body.appendChild(touchPill);
@@ -3862,6 +3871,7 @@
   }, true);
 
   function doPrint(fullName, clubName, imageData, source, explicitClubberId) {
+    if (!EXTENSION_PRINTS) { console.log('[Awana] Not printing ' + (source || 'a check-in') + ': the check-in service prints now'); return; }
     setStatus('\u23F3');
 
     var parts = fullName.split(' ');
@@ -4919,6 +4929,7 @@
       }
       updateReconcileWidget(phantomCount);
 
+      if (!EXTENSION_PRINTS) return;   // the check-in service prints a missed check-in from the same report
       if (missed.length === 0) return;
       if (missed.length > RECONCILE_MAX_PRINTS) {
         console.warn('[Awana] Reconcile found ' + missed.length + ' missed check-in(s) — printing only ' +
@@ -5541,6 +5552,19 @@
   // What only the printing tab runs: everything that detects a check-in,
   // prints, reconciles, drives phone actions or writes to the print server.
   function startPrintMachinery() {
+    // No check-in printing here any more (EXTENSION_PRINTS): the roster, the report
+    // (the count's fallback), the daily canary and the youth check-out stay.
+    if (!EXTENSION_PRINTS) {
+      setInterval(function() { ymSweep(false); }, YM_SWEEP_MS);
+      bootStep('roster sync', syncCsv);
+      setTimeout(maybeRunDailyContractCanary, 45000);
+      setTimeout(function() {
+        runReconcile().then(scheduleNextReconcile).catch(scheduleNextReconcile);
+      }, RECONCILE_FIRST_DELAY_MS);
+      setStatus('');
+      console.log('[Awana] Check-in is on awana.kvbchurch.org/checkin; this tab watches TwoTimTwo');
+      return;
+    }
     bootStep('printed state', loadPrintedState);   // the shared store as it stands now, not at this tab's load
     bootStep('check-in watcher', watchCheckins);
     // Establish the roster baseline on load (or re-populate ROSTER_CACHE after a

@@ -131,7 +131,19 @@ const pruneSharedDedup = new Function('SHARED_DEDUP_PREFIX', extractFunction('pr
       check(`${fn} runs in every tab (the widget still works)`, outside.includes(fn), fn);
     }
     check('the election is wired to navigator.locks with the machinery as the leader\'s work', /electPrintLeader\(typeof navigator !== 'undefined' \? navigator\.locks : null, startPrintMachinery,/.test(SRC));
-    check('the leader re-reads the shared store when it takes over', /function startPrintMachinery\(\) \{\s*bootStep\('printed state', loadPrintedState\);/.test(SRC));
+    check('the leader re-reads the shared store when it takes over (if it ever prints again)', /function startPrintMachinery\(\) \{[\s\S]{0,1200}?\n    bootStep\('printed state', loadPrintedState\);/.test(SRC));
+  }
+
+  console.log('\nthe extension no longer checks in or prints (9.4.9, owner 2026-10-15)');
+  {
+    check('the switch is off', /var EXTENSION_PRINTS = false;/.test(SRC));
+    check('the Check in pill opens /checkin in a new tab', /var CHECKIN_PAGE_URL = 'https:\/\/awana\.kvbchurch\.org\/checkin\/';/.test(SRC)
+      && /if \(!EXTENSION_PRINTS\) \{ window\.open\(CHECKIN_PAGE_URL, '_blank', 'noopener'\); return; \}/.test(SRC));
+    check('doPrint prints nothing', /function doPrint\(fullName, clubName, imageData, source, explicitClubberId\) \{\s*if \(!EXTENSION_PRINTS\) \{[^}]*return; \}/.test(SRC));
+    check('the reconcile pass prints no missed check-in', /if \(!EXTENSION_PRINTS\) return;\s*\/\/ the check-in service prints a missed check-in/.test(SRC));
+    const boot = SRC.slice(SRC.indexOf('function startPrintMachinery()'), SRC.indexOf("bootStep('printed state', loadPrintedState);", SRC.indexOf('function startPrintMachinery()')));
+    check('the leader starts no check-in watcher, scan, queue flush or phone actions', !/watchCheckins|scanClubberList|flushQueue|pollPendingActions|autoRefresh/.test(boot), boot);
+    check('and keeps the roster, the report and the youth check-out', /syncCsv/.test(boot) && /runReconcile/.test(boot) && /ymSweep/.test(boot));
   }
 
   console.log('\nboot: one failing step does not stop the rest');

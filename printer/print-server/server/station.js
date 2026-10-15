@@ -33,6 +33,7 @@ Object.defineProperties(exports, {
   importLaptopHistory: { enumerable: true, get: () => importLaptopHistory },
   mergeAttendance: { enumerable: true, get: () => mergeAttendance },
   sendStationExtras: { enumerable: true, get: () => sendStationExtras },
+  sendCheckedOut: { enumerable: true, get: () => sendCheckedOut },
   singlePublisherSilent: { enumerable: true, get: () => singlePublisherSilent },
   startChurchSync: { enumerable: true, get: () => startChurchSync },
   startClubNightTimers: { enumerable: true, get: () => startClubNightTimers },
@@ -118,7 +119,34 @@ async function sendStationExtras(force = false) {
   } catch { return false; } finally { stationExtrasBusy = false; }
 }
 
+// Check-outs made by hand on TwoTimTwo's Checkout page (9.4.9, owner 2026-10-15):
+// the extension's list for the night (POST /feed/checked-out, source
+// 'checkout-page') goes on to the Worker as the station, so the count, the
+// still-here list and /checkin's Check out drop those children. The whole list
+// each time it grows (the Worker ignores ones already out); a failed send is
+// tried again with the next read.
+let checkedOutSentSig = null;
+let checkedOutBusy = false;
+/** @param {string} date @param {string[]} clubberIds @returns {Promise<boolean>} */
+async function sendCheckedOut(date, clubberIds) {
+  if (!$config.cloudStation || checkedOutBusy || !clubberIds.length) return false;
+  const body = { date, clubberIds: clubberIds.slice(0, 500) };
+  const sig = JSON.stringify(body);
+  if (sig === checkedOutSentSig) return true;
+  const where = $config.cloudStation.signedIn();
+  if (!where) return false;
+  checkedOutBusy = true;
+  try {
+    const r = await $config.cloudStation.request(where.base, '/v1/station/checked-out', {
+      method: 'POST', body, session: where.session, station: $config.cloudStation.stationIdFn(),
+    });
+    if (r.ok) checkedOutSentSig = sig;
+    return !!r.ok;
+  } catch { return false; } finally { checkedOutBusy = false; }
+}
+
 function stopCloud() {
+  checkedOutSentSig = null;
   stationExtrasSig = null;
   stationExtrasAt = 0;
   if (cloudStop) { try { cloudStop(); } catch { /* best effort */ } }

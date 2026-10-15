@@ -23,6 +23,7 @@ const $tonightCount = lazy('./tonight-count');
 const $publishers = lazy('./publishers');
 const $relay = lazy('./relay');
 const $configRoutes = lazy('./config-routes');
+const $station = lazy('./station');
 const app = $http.app;
 
 // What other modules (and server.js) read from this one; live bindings, so cycles are safe.
@@ -228,6 +229,8 @@ app.post('/feed/checked-out', (req, res) => {
   // storage cleared) never puts children back.
   const changed = markCheckedOut(date, clubberIds, []);
   if (changed) $publishers.publishTally();
+  // A station hands the Checkout page's check-outs to the Worker (the one publisher).
+  if (req.body.source === 'checkout-page') $station.sendCheckedOut(date, [...$tonightCount.checkedOutTonight.ids]).catch(() => {});
   res.json({ ok: true, applied: true, checkedOut: $tonightCount.checkedOutTonight.ids.size, skipped });
 });
 

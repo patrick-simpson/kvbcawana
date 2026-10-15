@@ -1,4 +1,11 @@
-﻿## [9.4.8] - 2026-10-15
+﻿## [9.4.9] - 2026-10-15
+The extension stops checking in and printing; manual check-outs reach every screen.
+
+**Check-in is on /checkin now.** The Chrome extension no longer prints labels or checks children in. Its blue Check in pill on TwoTimTwo's page now opens awana.kvbchurch.org/checkin in a new tab (the TwoTimTwo tab stays open for the extension's other work). A child checked in on TwoTimTwo's own page still gets a label: the check-in service prints it from TwoTimTwo's report, about half a minute later. With no internet there is no backup label any more: use the paper sheet.
+
+**Manual check-outs.** A child checked out by hand on TwoTimTwo's Checkout page now comes off tonight's count, the lobby's pickup list and the /checkin Check out list. The extension already noticed these; the laptop now passes them on to the check-in service, which runs those screens. (Needs Chrome restarted once after this update for the new extension.)
+
+## [9.4.8] - 2026-10-15
 Labels print sooner, and the youth page prints none.
 
 **Sooner labels.** While TwoTimTwo has been answering well (the last three check-ins all went through on the first try in under ten seconds), a /checkin label goes to the printer the moment the leader taps, instead of waiting for TwoTimTwo to answer. One slow, busy or refused answer goes back to waiting until three in a row are fine again. If TwoTimTwo then does not take a check-in whose label is already out, the page tries again by itself and never prints a second label; a flat refusal stays red on the tile ("Label printed, but TwoTimTwo didn't take it. Tap to try again."). The lobby TV welcome comes with the label, as before. (The check-in service and page; this app needs no change for it.)
