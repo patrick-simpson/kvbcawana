@@ -7,6 +7,7 @@ const lazy = require('./lazy');
 const { execFile } = require('child_process');
 const cups = require('../cups');
 const { createPrintHelper } = require('../print-helper');
+const { createPrintTurns } = require('../print-turn');
 const fs    = require('fs');
 const $config = lazy('./config');
 const $images = lazy('./images');
@@ -22,6 +23,7 @@ Object.defineProperties(exports, {
   printImage: { enumerable: true, get: () => printImage },
   printImages: { enumerable: true, get: () => printImages },
   printHelper: { enumerable: true, get: () => printHelper },
+  printTurns: { enumerable: true, get: () => printTurns },
   outcomeUnknownBody: { enumerable: true, get: () => outcomeUnknownBody },
   printingTarget: { enumerable: true, get: () => printingTarget },
   printLabel: { enumerable: true, get: () => printLabel },
@@ -65,6 +67,10 @@ function runPowerShell(args, { timeout = 15000, env } = {}) {
 // run one at a time, in the order they were asked for, while everything else
 // the server does carries on around them. A failed job never blocks the next.
 let printerChain = Promise.resolve();
+// The print turn (print-turn.js): the station's job puller draws the next job's label
+// while this one prints, and each job prints only when the jobs leased before it are
+// done, so the labels still come out in lease order (job-puller.js, performCheckinPrint).
+const printTurns = createPrintTurns();
 let printerJobs = 0;   // jobs on the chain: printing, or waiting their turn (isBusy)
 function withPrinter(fn) {
   printerJobs += 1;

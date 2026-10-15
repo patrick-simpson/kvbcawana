@@ -22,7 +22,18 @@ const PORT = Number(process.env.AWANA_TEST_PORT || require('./free-port.cjs')())
 (async () => {
   const binDir = fs.mkdtempSync(path.join(os.tmpdir(), 'awana-pullbin-'));
   const jobLog = path.join(binDir, 'jobs.log');
-  fs.writeFileSync(path.join(binDir, 'powershell'), `#!/bin/sh\necho job >> ${jobLog}\nexit 0\n`, { mode: 0o755 });
+  // With a `slow` file beside it, each print takes 0.4 s and logs when it started and
+  // ended and on which printer (the draw-ahead checks below).
+  const timeLog = path.join(binDir, 'times.log');
+  fs.writeFileSync(path.join(binDir, 'powershell'), `#!/bin/sh
+if [ -f "${binDir}/slow" ]; then
+  f=""; for a in "$@"; do case "$a" in *.ps1) f="$a";; esac; done
+  p=$(sed -n "s/.*PrinterName = '\\([^']*\\)'.*/\\1/p" "$f" 2>/dev/null | head -1)
+  echo "start $(date +%s%N) $p" >> ${timeLog}; sleep 0.4; echo "end $(date +%s%N) $p" >> ${timeLog}
+fi
+echo job >> ${jobLog}
+exit 0
+`, { mode: 0o755 });
   process.env.PATH = `${binDir}:${process.env.PATH}`;
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'awana-pull-'));
   fs.writeFileSync(path.join(dataDir, 'config.json'), JSON.stringify({ printerName: 'Fake', lateGraceMin: 24 * 60 }));
@@ -421,6 +432,113 @@ const PORT = Number(process.env.AWANA_TEST_PORT || require('./free-port.cjs')())
     check('acked already-spooled, journalled unknown, CHECK THE PRINTER', r === 'unknown' && w.acks.at(-1).result === 'already-spooled' && journal.get(job.jobId).state === 'unknown' && puller.status().checkThePrinter.includes(job.jobId), `${r} ${JSON.stringify(w.acks.at(-1))}`);
     check('never acked failed (a failed job may be leased and printed again)', !w.acks.some((a) => a.result === 'failed'));
     check('and the same job coming back is not printed', await puller.handle(job) === 'already-spooled');
+  }
+
+  console.log('\nprint turn: tickets in order, a missing token waits for nothing, a stuck one gives up');
+  {
+    const pt = require(path.join(root, 'print-server', 'print-turn.js'));
+    const turns = pt.createPrintTurns({ waitMs: 300, log: () => {} });
+    const a = turns.take(), b = turns.take(), c = turns.take();
+    const order = [];
+    const pb = turns.wait(b).then((x) => order.push(['b', x]));
+    const pc = turns.wait(c).then((x) => order.push(['c', x]));
+    check('the first ticket has its turn at once', await turns.wait(a) === 'turn');
+    check('no token, or one it never gave, waits for nothing', await turns.wait(null) === 'no-turn' && await turns.wait('nope') === 'no-turn' && await turns.wait(require('crypto').randomUUID()) === 'no-turn');
+    await sleep(30);
+    check('the others wait', order.length === 0);
+    turns.release(a); turns.release(a);
+    await pb;
+    check('released in order: the next one goes (release is idempotent)', order.map((x) => x.join(':')).join() === 'b:turn');
+    turns.release(b);
+    await pc;
+    check('and the next', order.map((x) => x.join(':')).join() === 'b:turn,c:turn');
+    turns.release(c);
+    check('the line is empty', turns.size() === 0);
+    const stuck = turns.take(), d = turns.take(), e = turns.take();
+    const t0 = Date.now();
+    const rd = await turns.wait(d);
+    check('a ticket ahead that is never released holds the next one only for the limit', rd === 'timed-out' && Date.now() - t0 >= 280, `${rd} ${Date.now() - t0} ms`);
+    check('and is dropped, so the ones after it do not wait for it again', turns.size() === 2 && await turns.wait(stuck) === 'no-turn');
+    turns.release(d);
+    check('the one after goes at once', await turns.wait(e) === 'turn');
+    turns.release(e);
+  }
+
+  console.log('\njob puller: draw ahead (the next label is drawn while one prints), the paper in lease order');
+  {
+    const printing = require(path.join(root, 'print-server', 'server', 'printing.js'));
+    const cfg = require(path.join(root, 'print-server', 'server', 'config.js')).config;
+    const savedBarf = cfg.barfNights;
+    cfg.barfNights = [server.localDayISO()];
+    fs.appendFileSync(path.join(dataDir, 'clubbers.csv'), '40,Ana,Order,Sparks\n44,Dee,Order,Sparks\n45,Eve,Order,Cubbies\n');
+    const w = makeWorker();
+    const calls = [];
+    const fetchFn = async (url, init) => {
+      let body = {};
+      try { body = JSON.parse(init.body); } catch { /* none */ }
+      calls.push({ at: Date.now(), route: new URL(url).pathname, printer: body.printerName || body.text || '', turn: body.printTurn });
+      return fetch(url, init);
+    };
+    const { puller } = makePuller(w, { fetchFn, turns: printing.printTurns });
+    const rec = (id, first, extra = {}) => ({ route: '/print', body: { firstName: first, lastName: 'Order', clubName: 'Sparks', clubberId: String(id), printerName: `Order-${id}`, ...extra }, clubberId: String(id), gen: 0 });
+    w.queue.push(
+      await makeJob(rec(40, 'Ana', { friend: true })),                                   // a name tag and its BARF tag
+      await makeJob({ route: '/print', body: { printerName: 'Order-41' }, clubberId: '41', gen: 0 }),   // refused: no name
+      await makeJob({ ...rec(42, 'Bo'), route: '/print-welcome' }),                     // the youth page: no paper
+      await makeJob(rec(44, 'Dee')),
+      await makeJob(rec(45, 'Eve')),
+      await makeJob({ route: '/print-custom', body: { text: 'Order last', printerName: 'Order-46' } }, { kind: 'reprint' }),
+    );
+    fs.writeFileSync(timeLog, '');
+    fs.writeFileSync(path.join(binDir, 'slow'), '');
+    const before = jobs();
+    const t0 = Date.now();
+    const r = await puller.tick();
+    const total = Date.now() - t0;
+    fs.unlinkSync(path.join(binDir, 'slow'));
+    cfg.barfNights = savedBarf;
+    const prints = fs.readFileSync(timeLog, 'utf8').trim().split('\n').reduce((acc, l) => {
+      const [kind, ns, printer] = l.split(' ');
+      const ms = Number(BigInt(ns) / 1000000n);
+      if (kind === 'start') acc.push({ printer, start: ms });
+      else acc[acc.length - 1].end = ms;
+      return acc;
+    }, []);
+    const seq = prints.map((x) => x.printer).join(',');
+    check('all six handled in one round', r.handled === 6, JSON.stringify(r));
+    check('the paper came out in lease order, the BARF tag right after its own name tag', seq === 'Order-40,Order-40,Order-44,Order-45,Order-46', seq);
+    check('one print at a time', prints.every((x, i) => i === 0 || x.start >= prints[i - 1].end), JSON.stringify(prints));
+    check('five pieces of paper, no more', jobs() === before + 5, String(jobs() - before));
+    const callOf = (printer) => calls.find((c) => c.printer === printer || c.printer === printer.replace('Order-46', 'Order last'));
+    const lastEnd = (printer) => Math.max(...prints.filter((x) => x.printer === printer).map((x) => x.end));
+    const firstStart = (printer) => Math.min(...prints.filter((x) => x.printer === printer).map((x) => x.start));
+    check('Dee\'s label was being drawn while Ana\'s printed (her route called before Ana\'s last print ended)', callOf('Order-44').at < lastEnd('Order-40'), `${callOf('Order-44').at} vs ${lastEnd('Order-40')}`);
+    check('Eve\'s while Dee\'s printed', callOf('Order-45').at < lastEnd('Order-44'), `${callOf('Order-45').at} vs ${lastEnd('Order-44')}`);
+    check('the printer did not wait on drawing: Dee\'s print began within moments of Ana\'s end', firstStart('Order-44') - lastEnd('Order-40') < 300, `${firstStart('Order-44') - lastEnd('Order-40')} ms`);
+    check('a check-in route carries its turn, any other route is called only on its turn', calls.filter((c) => c.route === '/print' || c.route === '/print-welcome').every((c) => typeof c.turn === 'string')
+      && calls.filter((c) => c.route === '/print-custom').every((c) => c.turn === undefined && c.at >= lastEnd('Order-45') - 5), JSON.stringify(calls));
+    check('the refused job and the welcome did not hold anyone up', w.acks.filter((a) => a.result === 'failed').length === 1 && w.acks.filter((a) => a.result === 'printed').length === 5, JSON.stringify(w.acks));
+    check('every ticket was given back', printing.printTurns.size() === 0, String(printing.printTurns.size()));
+    check('and the round was shorter than drawing and printing one after another would be', total < 5 * 400 + 2000, `${total} ms`);
+  }
+
+  console.log('\njob puller: a turn nobody gives back holds printing up only for the limit');
+  {
+    // The print server's own turns (the route waits on them), with a short limit.
+    const turns = require(path.join(root, 'print-server', 'server', 'printing.js')).printTurns;
+    turns._setWaitMsForTests(400);
+    turns.take();   // a job that never ends
+    fs.appendFileSync(path.join(dataDir, 'clubbers.csv'), '50,Fay,Late,Sparks\n');
+    const w = makeWorker();
+    const { puller } = makePuller(w, { turns });
+    w.queue.push(await makeJob(printRec(50, 'Fay', 'Late', 'Sparks')));
+    const before = jobs();
+    const t0 = Date.now();
+    await puller.tick();
+    const ms = Date.now() - t0;
+    check('the label still printed, after the wait', jobs() === before + 1 && ms >= 380, `${jobs() - before} ${ms} ms`);
+    check('and the stuck ticket is gone', turns.size() === 0, String(turns.size()));
+    turns._setWaitMsForTests(require(path.join(root, 'print-server', 'print-turn.js')).TURN_WAIT_MS);
   }
 
   console.log('\nstation: the roster and the completed books arrive sealed');

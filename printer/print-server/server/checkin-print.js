@@ -147,7 +147,10 @@ async function performCheckinPrint(input) {
     greetJob      = null,
     // /print-welcome (9.4.8, owner 2026-10-15: "Don't print check ins from the ym page",
     // the lobby TV still welcomes them): everything a check-in does but the paper.
-    welcomeOnly   = false
+    welcomeOnly   = false,
+    // The station's print turn (print-turn.js): drawn already, this label waits for the
+    // jobs leased before it to finish printing. None (every other caller): no wait.
+    printTurn     = null
   } = input || {};
 
   // ── Demo / training mode ────────────────────────────────────────────────────
@@ -366,6 +369,8 @@ async function performCheckinPrint(input) {
       });
       pngPath = result.pngPath;
 
+      // Drawn while the job before it printed; now its turn at the printer (lease order).
+      await $printing.printTurns.wait(printTurn);
       // Musical printer: EVERY label announces itself (operator request — was
       // test prints only, which is why real check-ins printed silently). Tunes
       // cycle per label; a birthday kid's label plays Happy Birthday. Played
@@ -466,6 +471,8 @@ async function performCheckinPrint(input) {
         if (barfPath) fs.unlink(barfPath, () => {});
       }
     }
+    // This job's last label is out: the next job's (drawn meanwhile) may print.
+    $printing.printTurns.release(printTurn);
     // Who brought a friend, for BARF Night's email (a cloud check-in was
     // recorded by the service itself). Any night: the list is by date.
     if (broughtFriend === true && !isDemo && !cloudCheckin) {
@@ -608,17 +615,27 @@ async function checkinRoute(req, res, opts = {}) {
   } else {
     return res.status(400).json({ error: 'name or firstName is required' });
   }
-  const out = await performCheckinPrint({
-    firstName, lastName,
-    clubName: body.clubName, clubImageData: body.clubImageData, printerName: body.printerName,
-    visitor: body.visitor, stepUpNight: body.stepUpNight, awanaShares: body.awanaShares,
-    clubberId: body.clubberId, suppressConnectCard: body.suppressConnectCard, demo: body.demo,
-    cloudCheckin: body.cloud === true,
-    regen: body.regen === true,
-    broughtFriend: body.friend === true, friendName: $tags.cleanFriendName(body.friendName),
-    greetJob: typeof body.cloudJob === 'string' && /^[A-Za-z0-9_-]{22}$/.test(body.cloudJob) ? body.cloudJob : null,
-    welcomeOnly: opts.welcomeOnly === true,
-  });
+  const printTurn = typeof body.printTurn === 'string' ? body.printTurn : null;
+  // No paper on /print-welcome: it never holds the next job's label back.
+  if (opts.welcomeOnly === true) $printing.printTurns.release(printTurn);
+  let out;
+  try {
+    out = await performCheckinPrint({
+      firstName, lastName,
+      clubName: body.clubName, clubImageData: body.clubImageData, printerName: body.printerName,
+      visitor: body.visitor, stepUpNight: body.stepUpNight, awanaShares: body.awanaShares,
+      clubberId: body.clubberId, suppressConnectCard: body.suppressConnectCard, demo: body.demo,
+      cloudCheckin: body.cloud === true,
+      regen: body.regen === true,
+      broughtFriend: body.friend === true, friendName: $tags.cleanFriendName(body.friendName),
+      greetJob: typeof body.cloudJob === 'string' && /^[A-Za-z0-9_-]{22}$/.test(body.cloudJob) ? body.cloudJob : null,
+      welcomeOnly: opts.welcomeOnly === true,
+      printTurn,
+    });
+  } finally {
+    // A duplicate, a demo, a failure: the turn is never kept from the next job.
+    $printing.printTurns.release(printTurn);
+  }
   res.status(out.status).json(out.body);
 }
 app.post('/print', (req, res) => checkinRoute(req, res));

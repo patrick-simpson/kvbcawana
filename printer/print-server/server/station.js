@@ -23,6 +23,7 @@ const $relay = lazy('./relay');
 const $spooler = lazy('./spooler');
 const $configRoutes = lazy('./config-routes');
 const $leaders = lazy('./leaders');
+const $printing = lazy('./printing');
 const app = $http.app;
 
 // What other modules (and server.js) read from this one; live bindings, so cycles are safe.
@@ -176,6 +177,8 @@ function configureCloud(opts) {
   const writer = historySync.createHistoryWriter({ pub: opts.historyPub || (() => null), signedIn, request, stationId, log, now: opts.now });
   const puller = jobPuller.createJobPuller({
     signedIn, stationId, ring: opts.ring, localBase, request, journal, fetchFn: opts.fetchFn, now: opts.now, log, heartbeatMs: opts.heartbeatMs,
+    // Draw the next label while this one prints, in lease order (print-turn.js).
+    turns: $printing.printTurns,
     // The lease says when the church settings or the switches moved (routes.md 10.3).
     onChurch: (rev, switchesRev) => churchSyncInstance().onChurch(rev, switchesRev),
     heartbeatExtras: () => ({ version: $config.SERVER_VERSION, churchRev: churchSyncInstance().appliedRev() }),

@@ -40,6 +40,19 @@
 // The ack comes AFTER the print returns; an ack that did not get through is
 // retried every round (the journal remembers it), and a Worker that no longer
 // has the job (404 / 409 / 410: an undo dropped it) ends it quietly.
+//
+// DRAW AHEAD (owner 2026-10-15: "during peak times printouts can go fast"). With
+// the print turn (`turns`, print-turn.js) the jobs of a lease run DRAW_AHEAD at a
+// time: while one job's label prints, the next job's route is already drawing its
+// label. The paper still comes out in lease order: every job takes a ticket in
+// lease order; a check-in route (/print) carries it in its body as `printTurn` and
+// waits for its turn right before its first label (and lets go after its last:
+// the connect card, drop-off and BARF tags stay right after their name tag); any
+// other route is not even called until its turn. The ticket is released when the
+// job ends, whatever became of it (a duplicate, a refusal, no answer), and a turn
+// never waited for longer than print-turn.js's limit. Everything above holds per
+// job: journalled before its route is called, acked after its route answers, its
+// own heartbeat extending its own lease.
 'use strict';
 
 const fs = require('fs');
@@ -81,6 +94,10 @@ const LOCAL_TIMEOUT_MS = 60 * 1000;
 const JOURNAL_KEEP_MS = 4 * 24 * 60 * 60 * 1000;
 const ACK_TRIES_MAX = 30;
 const BUNDLE_MS = 60 * 1000;
+/** Jobs of one lease running at once with the print turn: one printing, the next one drawing. */
+const DRAW_AHEAD = 2;
+/** How long a check-in route that waits for its turn may take: its own time plus the wait. */
+const TURN_WAIT_MS = require('./print-turn').TURN_WAIT_MS;
 
 /** The Worker keeps an error as a short code (a-z, 0-9, hyphen, 32 at most), else just 'failed'. */
 const shortCode = (e) => String(e).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 32) || 'failed';
@@ -176,6 +193,7 @@ function createJournal(file, now = Date.now) {
  *   onPrinted?: (info: { jobId: string, record: any, night: string, result: any }) => any,
  *   onChurch?: (rev: number, switchesRev: number) => any,
  *   heartbeatExtras?: () => ({ version?: string, churchRev?: number }),
+ *   turns?: { take: () => string, wait: (token: string) => Promise<any>, release: (token: string) => void },
  * }} o
  */
 function createJobPuller(o) {
@@ -250,11 +268,11 @@ function createJobPuller(o) {
     return { ok: true, record: { ...rec, gen, night: job.bundle.night, source: rec.source || 'desk' } };
   }
 
-  async function localPost(route, body) {
+  async function localPost(route, body, timeoutMs = LOCAL_TIMEOUT_MS) {
     try {
       const res = await fetchFn(`${o.localBase}${route}`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body || {}), signal: AbortSignal.timeout(LOCAL_TIMEOUT_MS),
+        body: JSON.stringify(body || {}), signal: AbortSignal.timeout(timeoutMs),
       });
       let parsed = null;
       try { parsed = await res.json(); } catch { /* not JSON */ }
@@ -287,7 +305,7 @@ function createJobPuller(o) {
     return 'already-spooled';
   }
 
-  async function handleOne(job) {
+  async function handleOne(job, turn) {
     const id = job.jobId;
     const prior = journal.get(id);
     if (prior) return priorJob(id, prior);
@@ -331,6 +349,14 @@ function createJobPuller(o) {
       }
     }
 
+    // The print turn: a check-in route waits for it itself (after drawing its label);
+    // any other route is called only once it is this job's turn. A turn the sealed
+    // record names is never trusted: the token is this puller's own, or none.
+    delete rec.body.printTurn;
+    const turnInRoute = !!turn && CHECKIN_ROUTES.has(rec.route);
+    if (turnInRoute) rec.body.printTurn = turn;
+    else if (turn) await o.turns.wait(turn);
+
     journal.begin(id, { route: rec.route, night, key });   // on disk BEFORE the printer is touched
     const beat = setIntervalFn(() => {
       // Extends the lease (90 s) while the printer works; {ok: false} cannot stop a print already sent.
@@ -340,7 +366,7 @@ function createJobPuller(o) {
     }, heartbeatMs);
     if (beat && beat.unref) beat.unref();
     let res;
-    try { res = await localPost(rec.route, rec.body); } finally { clearInterval(beat); }
+    try { res = await localPost(rec.route, rec.body, turnInRoute ? LOCAL_TIMEOUT_MS + TURN_WAIT_MS : LOCAL_TIMEOUT_MS); } finally { clearInterval(beat); }
 
     if (!res.answered) {
       // No answer: it may be in the spooler. Never retried.
@@ -373,13 +399,16 @@ function createJobPuller(o) {
     return failJob(id, (body && body.error) || `HTTP ${res.status}`);
   }
 
-  /** One job. Never throws. @returns {Promise<string>} what became of it */
-  async function handle(job) {
+  /**
+   * One job. Never throws. `turn` is its print-turn ticket (released by the caller).
+   * @returns {Promise<string>} what became of it
+   */
+  async function handle(job, turn) {
     const id = job && job.jobId;
     if (typeof id !== 'string' || !JOB_ID_RE.test(id)) return 'invalid';
     if (inFlight.has(id)) { stats.duplicates++; return 'duplicate-in-flight'; }
     inFlight.add(id);
-    try { return await handleOne(job); } catch (e) {
+    try { return await handleOne(job, turn); } catch (e) {
       stats.lastError = e && e.message;
       log(`[jobs] ${id}: ${e && e.message}`);
       return 'error';
@@ -415,7 +444,21 @@ function createJobPuller(o) {
       }
       const jobs = Array.isArray(r.body.jobs) ? r.body.jobs : [];
       let handled = 0;
-      for (const job of jobs) { await handle(job); handled++; }
+      if (!o.turns) {
+        for (const job of jobs) { await handle(job); handled++; }
+      } else {
+        // Draw ahead: the next job's label is drawn while this one prints; the turn
+        // (a ticket per job, taken in lease order) keeps the paper in that order.
+        const running = new Set();
+        for (const job of jobs) {
+          while (running.size >= DRAW_AHEAD) await Promise.race(running);
+          const turn = o.turns.take();
+          const run = handle(job, turn).finally(() => { o.turns.release(turn); running.delete(run); });
+          running.add(run);
+          handled++;
+        }
+        await Promise.all(running);
+      }
       return { wait: handled ? BUSY_MS : IDLE_MS, handled };
     } catch (e) {
       log(`[jobs] ${e && e.message}`);
@@ -537,5 +580,5 @@ function startJobPuller({ puller, bundles, log, setTimeoutFn = setTimeout, clear
 module.exports = {
   JOB_PULL_ROUTES, jobPullAllowed, JOB_ID_RE,
   createJournal, createJobPuller, createBundleSync, startJobPuller,
-  IDLE_MS, BUSY_MS, HELLO_MS, HEARTBEAT_MS, FAIL_PAUSE_MS, MALFORMED, LEASE_BATCH,
+  IDLE_MS, BUSY_MS, HELLO_MS, HEARTBEAT_MS, FAIL_PAUSE_MS, MALFORMED, LEASE_BATCH, DRAW_AHEAD,
 };
