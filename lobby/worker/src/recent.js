@@ -16,6 +16,13 @@
 // (`/clubber/checkin_report?date=`, at most RECENT_NIGHTS reads a run, through
 // the one read clock) and records it (backfill()).
 //
+// WHEN THEY CAME (owner 2026-10-15: "sort family tiles by who usually arrives
+// first", over the "Whole season"). A row the watcher writes on tonight's own
+// date carries `at`, the minutes after local midnight it first saw the child
+// (migration 0005; a report every 30 s, so within about half a minute); a
+// filled night has no times. usualOf(ids): each child's average `at` over this
+// season's club nights before today (the season starts August 1), rounded.
+//
 // WHAT THE ROSTER GETS. awayOf(ids): for the last RECENT_NIGHTS club nights
 // before today (the shared club-night rule, the schedule and the calendar), the
 // set of the given clubber ids seen on any of them, or null until every one of
@@ -33,7 +40,9 @@ export const RECENT_NIGHTS = 2;
 /** The fixed "night" the cross-night hash is made with (identityTag wants a date). */
 export const SEEN_NIGHT = '1970-01-01';
 /** Rows kept this long. */
-export const KEEP_DAYS = 70;
+export const KEEP_DAYS = 300;
+/** The month a season starts (August); arrival averages look back to its first day. */
+export const SEASON_START_MONTH = 8;
 /** How long an answer is reused before D1 is asked again. */
 const CACHE_MS = 3 * 60 * 1000;
 /** A night that could not be filled is not tried again for this long. */
@@ -58,6 +67,8 @@ export class Recent {
     this.written = { night: '', tags: new Set() };
     /** @type {{ key: string, at: number, seen: Set<string>|null }|null} */
     this.cache = null;
+    /** @type {{ key: string, at: number, usual: Map<string, number> }|null} */
+    this.usualCache = null;
     /** night -> when a fill was last tried (memory). @type {Map<string, number>} */
     this.fillTried = new Map();
   }
@@ -79,6 +90,9 @@ export class Recent {
     return tag;
   }
 
+  /** The church's time zone (the schedule's). */
+  zone() { return typeof this.schedule?.timezone === 'string' ? this.schedule.timezone : undefined; }
+
   /** The calendar the Worker keeps (watcher's storage). */
   async feed() {
     try { return this.storage ? await this.storage.get('calendar') : null; } catch { return null; }
@@ -90,8 +104,7 @@ export class Recent {
    */
   pastNights(nowMs, feed, n = RECENT_NIGHTS) {
     const sources = { schedule: this.schedule, feed: feed && Array.isArray(feed.events) ? feed : null };
-    const tz = typeof this.schedule?.timezone === 'string' ? this.schedule.timezone : undefined;
-    const [y, m, d] = zonedParts(new Date(nowMs), tz).dateKey.split('-').map(Number);
+    const [y, m, d] = zonedParts(new Date(nowMs), this.zone()).dateKey.split('-').map(Number);
     const out = [];
     for (let i = 1; i <= LOOK_BACK_DAYS && out.length < n; i++) {
       // Noon UTC of that date is the same date in the church's zone.
@@ -102,10 +115,11 @@ export class Recent {
   }
 
   /**
-   * The children a report lists on `night` (a club night): the new ones written, one batch.
-   * Never throws. @param {string} night @param {any[]} entries
+   * The children a report lists on `night` (a club night): the new ones written, one batch,
+   * with the time first seen when `night` is today (a live report; `timed: false` for a fill).
+   * Never throws. @param {string} night @param {any[]} entries @param {{ timed?: boolean }} [opts]
    */
-  async record(night, entries) {
+  async record(night, entries, opts = {}) {
     const db = this.db;
     if (!db || !/^\d{4}-\d{2}-\d{2}$/.test(night)) return 0;
     try {
@@ -118,7 +132,9 @@ export class Recent {
         if (tag && !this.written.tags.has(tag)) fresh.push(tag);
       }
       if (!fresh.length) return 0;
-      await db.batch(fresh.map((tag) => db.prepare('INSERT OR IGNORE INTO seen_nights (night, tag) VALUES (?1, ?2)').bind(night, tag)));
+      const here = zonedParts(new Date(this.now()), this.zone());
+      const at = opts.timed !== false && here.dateKey === night ? here.minutes : null;
+      await db.batch(fresh.map((tag) => db.prepare('INSERT OR IGNORE INTO seen_nights (night, tag, at) VALUES (?1, ?2, ?3)').bind(night, tag, at)));
       for (const tag of fresh) this.written.tags.add(tag);
       this.cache = null;
       return fresh.length;
@@ -163,6 +179,38 @@ export class Recent {
   }
 
   /**
+   * Each given clubber id's usual arrival: the average minutes after local midnight it was
+   * first seen, over this season's club nights before today. Ids never timed are left out;
+   * null with no database or on a failed read. @param {string[]} ids @returns {Promise<Map<string, number>|null>}
+   */
+  async usualOf(ids) {
+    const db = this.db;
+    if (!db) return null;
+    try {
+      const t = this.now();
+      const today = zonedParts(new Date(t), this.zone()).dateKey;
+      const [y, m] = today.split('-').map(Number);
+      const from = `${m >= SEASON_START_MONTH ? y : y - 1}-${String(SEASON_START_MONTH).padStart(2, '0')}-01`;
+      const key = `${from},${today}`;
+      if (!this.usualCache || this.usualCache.key !== key || t - this.usualCache.at > CACHE_MS) {
+        const res = await db.prepare('SELECT tag, AVG(at) AS usual FROM seen_nights WHERE night >= ?1 AND night < ?2 AND at IS NOT NULL GROUP BY tag').bind(from, today).all();
+        const rows = Array.isArray(res?.results) ? res.results : [];
+        this.usualCache = { key, at: t, usual: new Map(rows.map((r) => [String(r.tag), Math.round(Number(r.usual))])) };
+      }
+      const out = new Map();
+      for (const id of ids) {
+        const tag = await this.hashOf(id);
+        const u = tag ? this.usualCache.usual.get(tag) : undefined;
+        if (Number.isFinite(u)) out.set(String(id), /** @type {number} */ (u));
+      }
+      return out;
+    } catch (err) {
+      console.error('[recent] reading usual arrivals failed', err);
+      return null;
+    }
+  }
+
+  /**
    * The cron's fill: each of the last RECENT_NIGHTS club nights with no rows is read
    * from TwoTimTwo's check-in report for that date and recorded; old rows go. Never throws.
    * @returns {Promise<{ filled: string[], failed: string[] }>}
@@ -186,7 +234,7 @@ export class Recent {
         this.fillTried.set(night, t);
         const r = await client.report(night, { waitMs: 20 * 1000, kind: 'recent-fill' });
         if (!r.ok) { out.failed.push(night); this.log(`[recent] could not read ${night}'s check-in report (${r.error})`); continue; }
-        await this.record(night, r.report.entries);
+        await this.record(night, r.report.entries, { timed: false });
         out.filled.push(night);
       }
       if (out.filled.length) this.log(`[recent] filled ${out.filled.join(', ')} from TwoTimTwo`);

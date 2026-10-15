@@ -584,6 +584,9 @@ export class Desk {
     const seen = this.recent ? await this.recent.seenOf(kids.map((/** @type {any} */ k) => String(k.clubberId))) : null;
     if (seen) for (const k of kids) k.away = !seen.has(String(k.clubberId));
     const away = seen ? { awayReady: true } : {};
+    // "Usually arrives first" (owner 2026-10-15, recent.js): minutes after local midnight, this season.
+    const usual = this.recent ? await this.recent.usualOf(kids.map((/** @type {any} */ k) => String(k.clubberId))) : null;
+    if (usual) for (const k of kids) { const u = usual.get(String(k.clubberId)); if (u != null) k.usual = u; }
     return json({ readAt: new Date(r.readAt).toISOString(), ...flag, ...test, ...away, kids, items: itemClubs(r.page.events || []), ...(familiesAt ? { familiesAt } : {}) });
   }
 

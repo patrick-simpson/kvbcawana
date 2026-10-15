@@ -242,14 +242,14 @@ describe('backfill', () => {
     expect(reportReads(t).length).toBe(first + 2);
   });
 
-  it('deletes rows older than 70 days and keeps newer ones', async () => {
+  it('deletes rows older than 300 days and keeps newer ones', async () => {
     const { db, recent } = await setup();
     quiet(recent);
-    await db.prepare('INSERT INTO seen_nights (night, tag) VALUES (?1, ?2)').bind('2026-07-01', 'a'.repeat(20)).run();
+    await db.prepare('INSERT INTO seen_nights (night, tag) VALUES (?1, ?2)').bind('2025-12-01', 'a'.repeat(20)).run();
     await db.prepare('INSERT INTO seen_nights (night, tag) VALUES (?1, ?2)').bind('2026-08-12', 'b'.repeat(20)).run();
     await recent.backfill();
     const left = db.query('SELECT night FROM seen_nights').map((r) => r.night);
-    expect(left).not.toContain('2026-07-01');
+    expect(left).not.toContain('2025-12-01');
     expect(left).toContain('2026-08-12');
   });
 
@@ -288,5 +288,57 @@ describe('with no HISTORY_DB', () => {
     expect(res.body.kids.length).toBeGreaterThan(0);
     expect(res.body).not.toHaveProperty('awayReady');
     expect(res.body.kids.every((k) => !('away' in k))).toBe(true);
+  });
+});
+
+describe('usual arrivals', () => {
+  const at = (db, night) => db.query('SELECT at FROM seen_nights WHERE night = ?', night).map((r) => r.at);
+
+  it('a live report on tonight\'s date stamps the minutes it first saw each child; later reports keep the first', async () => {
+    const { t, db, recent } = await setup({ start: WED_6PM });
+    await recent.record(NIGHT, entries(1, 2));
+    expect(at(db, NIGHT)).toEqual([18 * 60, 18 * 60]);
+    t.clock.tick(5 * 60 * 1000);
+    recent.written = { night: '', tags: new Set() };   // a restarted Worker writes again
+    await recent.record(NIGHT, entries(1, 3));
+    const rowsAt = db.query('SELECT at FROM seen_nights WHERE night = ? ORDER BY at', NIGHT).map((r) => r.at);
+    expect(rowsAt).toEqual([18 * 60, 18 * 60, 18 * 60 + 5]);
+  });
+
+  it('a past night (the fill, or another date) has no times', async () => {
+    const { db, recent } = await setup();
+    await recent.record(PREV, entries(1));
+    await recent.record('2026-10-15', entries(2), { timed: false });
+    expect(at(db, PREV)).toEqual([null]);
+    expect(at(db, '2026-10-15')).toEqual([null]);
+  });
+
+  it('usualOf averages this season\'s timed nights before today, by child, and leaves out the untimed', async () => {
+    const { db, recent } = await setup();
+    const tag = async (id) => recent.hashOf(id);
+    const put = async (night, id, minutes) => db.prepare('INSERT INTO seen_nights (night, tag, at) VALUES (?1, ?2, ?3)').bind(night, await tag(id), minutes).run();
+    await put('2026-09-30', '1', 18 * 60);
+    await put(PREV, '1', 18 * 60 + 10);
+    await put(PREV, '2', 18 * 60 + 25);
+    await put('2026-07-15', '2', 17 * 60);          // last season: not counted
+    await put('2026-10-15', '2', 17 * 60);          // today: not counted
+    await put('2026-10-14', '3', null);             // filled, untimed
+    const u = await recent.usualOf(['1', '2', '3', '4']);
+    expect(Object.fromEntries(u)).toEqual({ 1: 18 * 60 + 5, 2: 18 * 60 + 25 });
+  });
+
+  it('the roster carries `usual` for a child with times only', async () => {
+    // The rig's check-in page lists 662 and 663.
+    const { t, db, recent } = await setup({ start: WED_6PM, kids: [kid('1')] });
+    await db.prepare('INSERT INTO seen_nights (night, tag, at) VALUES (?1, ?2, ?3)').bind(PREV, await recent.hashOf('662'), 18 * 60 + 2).run();
+    const res = await t.call('GET', '/v1/desk/roster');
+    const byId = Object.fromEntries(res.body.kids.map((k) => [String(k.clubberId), k]));
+    expect(byId['662'].usual).toBe(18 * 60 + 2);
+    expect('usual' in byId['663']).toBe(false);
+  });
+
+  it('with no database: null, and no `usual` on the roster', async () => {
+    const { recent } = await setup({ db: null });
+    expect(await recent.usualOf(['1'])).toBeNull();
   });
 });
