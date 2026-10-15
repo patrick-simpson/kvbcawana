@@ -2,7 +2,7 @@
   if (window.__awanaPrinterLoaded) return;
   window.__awanaPrinterLoaded = true;
 
-  const EXTENSION_VERSION = '9.5.0';
+  const EXTENSION_VERSION = '9.6.0';
   // The extension no longer checks in or prints (9.4.9, owner 2026-10-15: "not use the
   // laptop extension for check-in now that we tested it"): awana.kvbchurch.org/checkin
   // checks in, the check-in service prints (a check-in made on TwoTimTwo's own page
