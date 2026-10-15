@@ -86,6 +86,11 @@ for (const viewport of [{ width: 390, height: 844 }, { width: 360, height: 740 }
       }
       const big = await page.$$eval('.video [data-action]', (els) => els.map((el) => el.getBoundingClientRect().height));
       for (const h of big) assert.ok(h >= 72, `video buttons ${h}px tall`);
+      // The header stays on one line, its status pill inside the right gutter.
+      const conn = await box(page, '#conn');
+      const top = await box(page, '.top');
+      assert.ok(conn.x + conn.width <= viewport.width - 15.5, `the status pill ends at ${conn.x + conn.width}px`);
+      assert.ok(top.height <= 60, `the header is ${top.height}px tall`);
       // The reach line names the online count from the service.
       assert.match(await page.textContent('#reach'), /every Journey screen \(1 online\)/);
       assert.match(await page.textContent('#screens-list'), /Gym TV\s*Offline/);
@@ -101,11 +106,15 @@ test('presses: one request each, the right action; the readout follows the scree
     assert.match(await page.textContent('#now-sub'), /^Week 5 · /);
     assert.match(await page.textContent('#now-last'), /Next: done/);
     const presses = () => calls.filter((c) => c.path === '/v1/journey/remote').map((c) => c.body);
+    // On the slides "Start teaching slides" is not there (the screen would only say it already is).
+    assert.equal(await page.isVisible('#btn-slides'), false);
     await page.click('#btn-next');
     await page.click('#btn-next');
     await page.click('#btn-prev');
+    ctl.kiosks = [{ id: 'jk_aaaaaaaaaaaaaaaaaaaa', name: 'Journey kiosk', online: true, now: NOW.checkin() }];
+    await waitForMain(page, 'Check-in display');
+    assert.equal(await page.textContent('#btn-slides'), 'Start teaching slides');
     await page.click('#btn-slides');
-    await page.waitForFunction(() => true);
     for (let i = 0; i < 50 && presses().length < 4; i += 1) await page.waitForTimeout(20);
     assert.deepEqual(presses(), [{ action: 'slide-next' }, { action: 'slide-next' }, { action: 'slide-prev' }, { action: 'slides-start' }]);
 
@@ -120,6 +129,11 @@ test('presses: one request each, the right action; the readout follows the scree
     await page.click('#btn-mute');
     for (let i = 0; i < 50 && presses().length < 8; i += 1) await page.waitForTimeout(20);
     assert.deepEqual(presses().slice(4), [{ action: 'pause' }, { action: 'seek', data: { by: -15 } }, { action: 'seek', data: { by: 15 } }, { action: 'mute' }]);
+    // Muted: Unmute is the hot button.
+    ctl.kiosks = [{ id: 'jk_aaaaaaaaaaaaaaaaaaaa', name: 'Journey kiosk', online: true, now: NOW.video(5, 765, 902, false, 60, true) }];
+    await page.waitForFunction(() => document.getElementById('btn-mute').textContent === 'Unmute');
+    assert.equal(await page.getAttribute('#btn-mute', 'data-action'), 'unmute');
+    assert.match(await page.getAttribute('#btn-mute', 'class'), /\bbtn-hot\b/);
 
     ctl.kiosks = [{ id: 'jk_aaaaaaaaaaaaaaaaaaaa', name: 'Journey kiosk', online: true, now: { ...NOW.checkin(), last: { id: 'x', action: 'slide-next', ok: false, reason: 'no-slides' } } }];
     await waitForMain(page, 'Check-in display');
@@ -280,9 +294,16 @@ test('the service unreachable: "Reconnecting…" in plain words, and it recovers
     await page.waitForSelector('#problem:not([hidden])', { timeout: 5000 });
     assert.match(await page.textContent('#problem'), /Reconnecting…/);
     assert.equal(await page.textContent('#conn'), 'Reconnecting…');
+    // What is shown is the last thing heard, and it says so.
+    await page.waitForFunction(() => /not live/.test(document.getElementById('now-kicker').textContent));
+    assert.match(await page.getAttribute('#now', 'class'), /\bis-stale\b/);
+    const conn = await box(page, '#conn');
+    assert.ok(conn.x + conn.width <= 390 - 15.5, 'Reconnecting… fits inside the gutter');
     ctl.stateStatus = 200;
     await page.waitForSelector('#problem[hidden]', { state: 'attached', timeout: 5000 });
     assert.equal(await page.textContent('#conn'), 'Connected');
+    assert.equal(await page.textContent('#now-kicker'), 'On the screen now');
+    assert.doesNotMatch(await page.getAttribute('#now', 'class'), /is-stale/);
     // No screen signed in at all.
     ctl.kiosks = [];
     await page.waitForSelector('#problem:not([hidden])', { timeout: 5000 });
@@ -308,6 +329,116 @@ test('stops asking while the page is hidden', { skip }, async () => {
     });
     await page.waitForTimeout(400);
     assert.ok(calls.length > n, 'back to polling when shown');
+    await context.close();
+  });
+});
+
+test('Back and Next stay put from slide to slide: the bullets, the answers and the press line go below them', { skip }, async () => {
+  await withBrowser(async (browser) => {
+    for (const viewport of [{ width: 360, height: 740 }, { width: 390, height: 844 }]) {
+      const { page, ctl, context } = await openRemote(browser, viewport, {
+        kiosks: [{ id: 'jk_aaaaaaaaaaaaaaaaaaaa', name: 'Journey kiosk', online: true, now: { ...NOW.slides(5, 3, 7), last: null } }],
+        answers: answersFixture(),
+      });
+      await waitForMain(page, 'Slides 3 of 7');
+      const at = async () => Math.round((await box(page, '#btn-next')).y);
+      const first = await at();
+      const slide = (now) => { ctl.kiosks = [{ id: 'jk_aaaaaaaaaaaaaaaaaaaa', name: 'Journey kiosk', online: true, now }]; };
+      // Three bullets on the wall, a long template heading, and how the last press went.
+      slide({
+        ...NOW.slides(5, 6, 7),
+        slide: {
+          n: 6, of: 7, kind: 'template', heading: 'A heading long enough that it would wrap onto a second line on any phone',
+          lines: ['Everyone has a worldview, whether they know it or not.', 'A worldview answers the big questions of life.', 'Scripture is the lens that brings it into focus.'],
+        },
+        last: { id: 'x', action: 'slide-next', ok: true, reason: null },
+      });
+      await waitForMain(page, 'Slides 6 of 7');
+      await page.waitForSelector('#lines:not([hidden])');
+      assert.equal(await at(), first, 'bullets and the press line do not move Next');
+      const next = await box(page, '#btn-next');
+      assert.ok((await box(page, '#lines')).y > next.y + next.height, 'the wall\'s bullets sit below the buttons');
+      assert.ok((await box(page, '#now-last')).y > next.y + next.height, 'so does the press line');
+      // The questions slide with its sample answers.
+      slide(NOW.questions());
+      await waitForMain(page, 'Slides 5 of 7');
+      await page.waitForSelector('#answers:not([hidden])');
+      assert.equal(await at(), first, 'the answers do not move Next');
+      // The screen waiting for a person: that line goes below too, and the skip does not repeat it.
+      slide({ ...NOW.slides(5, 3, 7), wait: 'settings', last: { id: 'x', action: 'slide-next', ok: false, reason: 'settings-open' } });
+      await page.waitForSelector('#now-wait:not([hidden])');
+      await page.waitForFunction(() => document.getElementById('now-last').textContent === 'Next skipped.');
+      assert.equal(await at(), first, 'nor does a waiting line');
+      assert.ok(first + next.height <= viewport.height, 'Next is on the first screenful');
+      await context.close();
+    }
+  });
+});
+
+test('a press says at once that it is on its way, then how the screen took it, or that no screen answered', { skip }, async () => {
+  await withBrowser(async (browser) => {
+    const { page, ctl, context } = await openRemote(browser, { width: 390, height: 844 }, {
+      echo: false,
+      kiosks: [{ id: 'jk_aaaaaaaaaaaaaaaaaaaa', name: 'Journey kiosk', online: true, now: { ...NOW.slides(), last: null } }],
+    });
+    await waitForMain(page, 'Slides 3 of 7');
+    await page.evaluate(() => { window.journeyRemoteTuning.pressAnswerMs = 800; });
+    assert.equal(await page.isVisible('#now-last'), false, 'nothing pressed yet');
+    await page.click('#btn-next');
+    await page.waitForFunction(() => /^Next: (sending|sent, waiting)/.test(document.getElementById('now-last').textContent));
+    assert.equal(await page.getAttribute('#now-last', 'data-ok'), 'wait');
+    // No report names the press: after a while the phone says so.
+    await page.waitForFunction(() => /no screen has answered/.test(document.getElementById('now-last').textContent), null, { timeout: 5000 });
+    assert.equal(await page.getAttribute('#now-last', 'data-ok'), 'false');
+    // The screen names it: its own words replace the waiting.
+    ctl.echo = true;
+    await page.waitForFunction(() => document.getElementById('now-last').textContent === 'Next: done ✓', null, { timeout: 5000 });
+    assert.equal(await page.getAttribute('#now-last', 'data-ok'), 'true');
+    ctl.kiosks = [{ id: 'jk_aaaaaaaaaaaaaaaaaaaa', name: 'Journey kiosk', online: true, now: { ...NOW.slides(5, 1, 7), last: { id: 'x', action: 'slide-prev', ok: false, reason: 'first-slide' } } }];
+    await page.click('#btn-prev');
+    await page.waitForFunction(() => document.getElementById('now-last').textContent === 'Back skipped: Already on the first slide.', null, { timeout: 5000 });
+    await context.close();
+  });
+});
+
+test('the controls follow the screen: Begin on the start screen, the video\'s buttons first during a video, Skip to slides takes two taps', { skip }, async () => {
+  await withBrowser(async (browser) => {
+    const splash = { view: 'splash', week: 5, title: 'Unit 2, Lesson 1: Worldview', preview: false, wait: null, last: null, at: null };
+    const { page, calls, ctl, context } = await openRemote(browser, { width: 360, height: 740 }, {
+      kiosks: [{ id: 'jk_aaaaaaaaaaaaaaaaaaaa', name: 'Journey kiosk', online: true, now: { ...splash, resume: 252 } }],
+    });
+    const presses = () => calls.filter((c) => c.path === '/v1/journey/remote').map((c) => c.body);
+    await waitForMain(page, 'Ready to begin');
+    // The start screen: a big hot Begin (Resume when offered) on the first screenful.
+    await page.waitForSelector('#btn-begin:not([hidden])');
+    assert.equal(await page.textContent('#btn-begin'), 'Resume at 4:12');
+    const begin = await box(page, '#btn-begin');
+    assert.ok(begin.height >= 112 && begin.y + begin.height <= 740, `Begin ${begin.height}px tall, ends at ${begin.y + begin.height}px`);
+    assert.equal(await page.textContent('#btn-slides'), 'Skip to teaching slides');
+    await page.click('#btn-begin');
+    for (let i = 0; i < 50 && presses().length < 1; i += 1) await page.waitForTimeout(20);
+    assert.deepEqual(presses(), [{ action: 'begin' }]);
+
+    // A video: no Begin; the video's buttons straight under the readout, Back / Next below them.
+    ctl.kiosks = [{ id: 'jk_aaaaaaaaaaaaaaaaaaaa', name: 'Journey kiosk', online: true, now: NOW.video(5, 765, 902, false, 60) }];
+    await waitForMain(page, 'Video 12:4');
+    assert.equal(await page.isVisible('#btn-begin'), false);
+    const now = await box(page, '#now');
+    const video = await box(page, '#video');
+    const pad = await box(page, '#slide-pad');
+    assert.ok(video.y > now.y && video.y < pad.y, 'the video card leads');
+    const mute = await box(page, '#btn-mute');
+    assert.ok(mute.y + mute.height <= 740, `Mute is on the first screenful (ends at ${mute.y + mute.height}px)`);
+    // Skip to teaching slides ends the video: the first tap only asks.
+    assert.equal(await page.textContent('#btn-slides'), 'Skip to teaching slides');
+    await page.click('#btn-slides');
+    await page.waitForFunction(() => document.getElementById('btn-slides').textContent === 'Tap again to end the video');
+    await page.waitForTimeout(250);
+    assert.deepEqual(presses().slice(1), [], 'nothing sent on the first tap');
+    await page.click('#btn-slides');
+    for (let i = 0; i < 50 && presses().length < 2; i += 1) await page.waitForTimeout(20);
+    assert.deepEqual(presses().slice(1), [{ action: 'slides-start' }]);
+    await page.waitForFunction(() => document.getElementById('btn-slides').textContent === 'Skip to teaching slides');
     await context.close();
   });
 });

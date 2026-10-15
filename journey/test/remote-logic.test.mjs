@@ -2,7 +2,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  answersFor, beginWords, cleanAnswersFile, describeNow, formatTime, lastWords, needsConfirm, pickKiosk, videoPosition, volumeView, REASON_WORDS, CHOICES,
+  answersFor, beginWords, cleanAnswersFile, describeNow, formatTime, lastWords, layoutMode, needsConfirm, pickKiosk, pressWords, slidesButton, videoPosition, volumeView,
+  CHOICES, PRESS_ANSWER_MS, REASON_WORDS, SLIDES_CONFIRM_WORDS,
 } from '../public/remote/logic.js';
 import { JOURNEY_PICKER_CHOICES, JOURNEY_REMOTE_REASONS } from '../../lobby/shared/journeyRemote.js';
 
@@ -92,4 +93,41 @@ test('the volume control: the level in plain words, and which buttons can do som
   assert.deepEqual(volumeView(null), { text: 'Volume: no video', pct: null, down: false, up: false });
   // A kiosk too old to report a level: the buttons still work, the words stay plain.
   assert.deepEqual(volumeView({ t: 1, d: 10, paused: false, muted: false }), { text: 'Volume', pct: null, down: true, up: true });
+});
+
+test('a skip whose reason is the waiting line already showing is not said twice', () => {
+  const now = { view: 'slides', wait: 'settings', last: { action: 'slide-next', ok: false, reason: 'settings-open' } };
+  assert.equal(lastWords(now), 'Next skipped.');
+  assert.equal(lastWords({ ...now, wait: null }), `Next skipped: ${REASON_WORDS['settings-open']}`);
+  assert.equal(lastWords({ ...now, wait: 'reader' }), `Next skipped: ${REASON_WORDS['settings-open']}`, 'a different wait: the reason in full');
+});
+
+test('this phone\'s press: sending, sent, no answer; the screen naming its id hands over to lastWords', () => {
+  const at = 1000;
+  assert.equal(pressWords(null, null, at), null);
+  assert.deepEqual(pressWords({ action: 'slide-next', id: null, at }, null, at), { text: 'Next: sending…', ok: null });
+  const sent = { action: 'slide-next', id: 'r9', at };
+  assert.deepEqual(pressWords(sent, { last: { id: 'r8', action: 'slide-next', ok: true } }, at + 500), { text: 'Next: sent, waiting for the screen…', ok: null });
+  assert.equal(pressWords(sent, { last: { id: 'r9', action: 'slide-next', ok: true } }, at + 500), null, 'answered');
+  const late = pressWords(sent, null, at + PRESS_ANSWER_MS + 1);
+  assert.equal(late.ok, false);
+  assert.match(late.text, /^Next: sent, but no screen has answered yet/);
+  assert.equal(pressWords(sent, null, at + 300, 200).ok, false, 'the wait is tunable');
+  assert.equal(pressWords({ action: 'volume', id: null, at }, null, at).text, 'Volume: sending…');
+});
+
+test('which controls lead, and the Start teaching slides button for each view', () => {
+  assert.equal(layoutMode(null), '');
+  assert.equal(layoutMode({ view: 'video' }), 'video');
+  assert.equal(layoutMode({ view: 'intro' }), 'video');
+  assert.equal(layoutMode({ view: 'slides' }), 'slides');
+  assert.equal(layoutMode({ view: 'splash' }), 'splash');
+  assert.equal(layoutMode({ view: 'checkin' }), 'other');
+  assert.deepEqual(slidesButton({ view: 'slides' }), { hidden: true, label: 'Start teaching slides', confirm: false });
+  assert.deepEqual(slidesButton({ view: 'video' }), { hidden: false, label: 'Skip to teaching slides', confirm: true });
+  assert.equal(slidesButton({ view: 'intro' }).confirm, true, 'a lesson starting is a running lesson');
+  assert.deepEqual(slidesButton({ view: 'splash' }), { hidden: false, label: 'Skip to teaching slides', confirm: false });
+  assert.deepEqual(slidesButton({ view: 'checkin' }), { hidden: false, label: 'Start teaching slides', confirm: false });
+  assert.deepEqual(slidesButton(null), { hidden: false, label: 'Start teaching slides', confirm: false });
+  assert.equal(SLIDES_CONFIRM_WORDS, 'Tap again to end the video');
 });

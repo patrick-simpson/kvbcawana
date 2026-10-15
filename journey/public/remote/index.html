@@ -14,7 +14,7 @@
 <body>
   <header class="top">
     <img class="top-mark" src="../brand/logos/journey-white.svg" alt="Journey" width="120" height="32" />
-    <span class="top-title">Phone remote</span>
+    <span class="top-title">Remote</span>
     <span id="conn" class="conn" data-state="off" role="status">Signed out</span>
   </header>
 
@@ -39,20 +39,29 @@
 
       <div class="cols">
         <div class="col">
-          <section class="card now" aria-live="polite">
+          <section id="now" class="card now" aria-labelledby="now-kicker">
             <p id="now-kicker" class="kicker">On the screen now</p>
             <h1 id="now-main" class="shout">Asking the screen…</h1>
             <p id="now-sub" class="now-sub"></p>
             <p id="now-detail" class="now-detail"></p>
-            <ul id="now-lines" class="now-lines" hidden></ul>
-            <p id="now-wait" class="wait" hidden></p>
-            <p id="now-last" class="last" hidden></p>
           </section>
+
+          <button id="btn-begin" type="button" class="btn btn-big btn-hot btn-begin" data-action="begin" hidden>Begin lesson</button>
 
           <div id="slide-pad" class="slide-pad" role="group" aria-label="Teaching slides">
             <button id="btn-prev" type="button" class="btn btn-big btn-back" data-action="slide-prev"><span aria-hidden="true">‹</span> Back</button>
             <button id="btn-next" type="button" class="btn btn-big btn-next" data-action="slide-next"><span id="next-label">Next</span> <span aria-hidden="true">›</span></button>
           </div>
+
+          <div id="press-status" class="press-status" role="status" aria-live="polite">
+            <p id="now-wait" class="wait" hidden></p>
+            <p id="now-last" class="last" hidden></p>
+          </div>
+
+          <section id="lines" class="card lines" aria-labelledby="lines-h" hidden>
+            <h2 id="lines-h" class="label">On the slide</h2>
+            <ul id="now-lines" class="now-lines"></ul>
+          </section>
 
           <section id="answers" class="card answers" hidden>
             <h2 class="label">Sample answers <span class="only">only on this phone</span></h2>
@@ -64,7 +73,7 @@
         </div>
 
         <div class="col">
-          <section class="card video" aria-labelledby="video-h">
+          <section id="video" class="card video" aria-labelledby="video-h">
             <h2 id="video-h" class="label">Video</h2>
             <div class="video-pad">
               <button type="button" class="btn btn-mid" data-action="seek" data-by="-15">Back 15s</button>
@@ -77,8 +86,7 @@
               <button id="btn-vol-up" type="button" class="btn btn-big btn-vol" data-action="volume" data-step="1" aria-label="Volume up"><span aria-hidden="true">+</span></button>
             </div>
             <div class="video-row">
-              <button id="btn-mute" type="button" class="btn btn-mid" data-action="mute">Mute</button>
-              <button id="btn-begin" type="button" class="btn btn-mid btn-begin" data-action="begin">Begin lesson</button>
+              <button id="btn-mute" type="button" class="btn btn-mid btn-mute" data-action="mute">Mute</button>
             </div>
           </section>
 

@@ -27,10 +27,12 @@ const ANSWERS_URL = new URL('../slide-answers.json', location.href).href;
 const ANSWERS_CACHE = 'journey-remote-v1';
 const REQUEST_TIMEOUT_MS = 8000;
 // A test may shorten these (read at each use).
-const TUNING = { pollMs: 1500, afterPressMs: 450, renderMs: 500, failuresBeforeWarning: 2 };
+const TUNING = { pollMs: 1500, afterPressMs: 450, renderMs: 500, failuresBeforeWarning: 2, pressAnswerMs: 5000 };
 const tuning = () => Object.assign({}, TUNING, window.journeyRemoteTuning || {});
 
 const $ = (id) => document.getElementById(id);
+/* Writes only a change, so a screen reader is not told the same words again each poll. */
+const setText = (el, text) => { if (el.textContent !== text) el.textContent = text; };
 const store = {
   get(k) { try { return localStorage.getItem(k); } catch { return null; } },
   set(k, v) { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch { /* private window: signed in for this visit only */ } },
@@ -48,6 +50,9 @@ let renderTimer = null;
 let lessons = [];
 let answersFile = null;
 let pendingPick = null;
+let pendingPress = null; // this phone's latest press, until the screen names it: { action, id, at }
+let slidesArmedAt = 0; // the first tap of a two-tap "Skip to teaching slides" (Date.now())
+let slidesArmTimer = null;
 let wakeLock = null;
 let memorySession = '';
 
@@ -93,8 +98,8 @@ function showSignedIn() {
 
 function setConn(kind, text) {
   const el = $('conn');
-  el.dataset.state = kind;
-  el.textContent = text;
+  if (el.dataset.state !== kind) el.dataset.state = kind;
+  setText(el, text);
 }
 
 async function signIn(event) {
@@ -211,34 +216,42 @@ function render() {
   showProblem();
 
   const d = logic.describeNow(kiosk, { serverNowMs: serverNowMs() });
-  $('now-kicker').textContent = d.kicker;
-  $('now-main').textContent = d.main;
-  $('now-sub').textContent = d.sub;
-  $('now-detail').textContent = d.detail;
+  // No fresh answer: what is shown is the last thing heard, and it says so.
+  const stale = failures >= tuning().failuresBeforeWarning || (typeof navigator.onLine === 'boolean' && !navigator.onLine);
+  $('now').classList.toggle('is-stale', stale);
+  setText($('now-kicker'), stale ? 'Last heard from the screen · not live' : d.kicker);
+  setText($('now-main'), d.main);
+  setText($('now-sub'), d.sub);
+  setText($('now-detail'), d.detail);
+  const mode = logic.layoutMode(now);
+  if ($('remote').dataset.mode !== mode) $('remote').dataset.mode = mode;
 
   const wait = now && now.wait ? logic.WAIT_WORDS[now.wait] : '';
   $('now-wait').hidden = !wait;
-  $('now-wait').textContent = wait || '';
-  const last = logic.lastWords(now);
-  $('now-last').hidden = !last;
-  $('now-last').textContent = last;
-  $('now-last').dataset.ok = String(Boolean(now && now.last && now.last.ok));
+  setText($('now-wait'), wait || '');
+  renderPressStatus(now);
+
+  // Begin: only on the lesson's start screen, big and hot (anywhere else the screen skips it).
+  $('btn-begin').hidden = !(now && now.view === 'splash');
+  setText($('btn-begin'), logic.beginWords(now));
 
   // Slide buttons: Next reads Finish on the last slide (the kiosk's own word).
   const onSlides = now && now.view === 'slides' && now.slide;
   // Not on the slides: the pad steps back (still pressable; the screen says why it skipped).
   $('slide-pad').classList.toggle('is-quiet', !onSlides);
-  $('next-label').textContent = onSlides && now.slide.n === now.slide.of ? 'Finish' : 'Next';
+  setText($('next-label'), onSlides && now.slide.n === now.slide.of ? 'Finish' : 'Next');
+  renderSlidesButton(now);
 
   // Video buttons follow the video.
   const v = now && now.view === 'video' ? now.video : null;
-  $('btn-play').textContent = v ? (v.paused ? 'Play' : 'Pause') : 'Play / Pause';
+  setText($('btn-play'), v ? (v.paused ? 'Play' : 'Pause') : 'Play / Pause');
   $('btn-play').dataset.action = v ? (v.paused ? 'play' : 'pause') : 'toggle-pause';
-  $('btn-mute').textContent = v && v.muted ? 'Unmute' : 'Mute';
+  setText($('btn-mute'), v && v.muted ? 'Unmute' : 'Mute');
   $('btn-mute').dataset.action = v && v.muted ? 'unmute' : 'mute';
-  $('btn-begin').textContent = logic.beginWords(now);
+  // Muted in the room is easy to miss: Unmute is then the hot button.
+  $('btn-mute').classList.toggle('btn-hot', Boolean(v && v.muted));
   const vol = logic.volumeView(v);
-  $('vol-level').textContent = vol.text;
+  setText($('vol-level'), vol.text);
   $('btn-vol-down').disabled = !vol.down;
   $('btn-vol-up').disabled = !vol.up;
 
@@ -247,6 +260,31 @@ function render() {
   // A closed picker follows the screens, so it opens on their lesson.
   if (!$('picker').open && lessons.length && now && String(now.week) !== $('week').value) preselectWeek();
   if (v && !v.paused && !document.hidden) renderTimer = setTimeout(render, tuning().renderMs);
+}
+
+/* The line under the buttons: this phone's own press while it is on its way
+   (sending, sent, no answer), then how the screen says it went. */
+function renderPressStatus(now) {
+  if (pendingPress && pendingPress.id && now && now.last && now.last.id === pendingPress.id) pendingPress = null;
+  const mine = logic.pressWords(pendingPress, now, Date.now(), tuning().pressAnswerMs);
+  const el = $('now-last');
+  const text = mine ? mine.text : logic.lastWords(now);
+  el.hidden = !text;
+  setText(el, text);
+  const ok = mine ? (mine.ok === null ? 'wait' : 'false') : String(Boolean(now && now.last && now.last.ok));
+  if (el.dataset.ok !== ok) el.dataset.ok = ok;
+}
+
+/* "Start teaching slides": hidden on the slides; over a running lesson it
+   reads "Skip to teaching slides" and its first tap only asks for a second. */
+function renderSlidesButton(now) {
+  const b = logic.slidesButton(now);
+  const button = $('btn-slides');
+  button.hidden = b.hidden;
+  const armed = b.confirm && slidesArmedAt && Date.now() - slidesArmedAt < logic.SLIDES_CONFIRM_MS;
+  if (!armed) slidesArmedAt = 0;
+  button.classList.toggle('is-armed', Boolean(armed));
+  setText(button, armed ? logic.SLIDES_CONFIRM_WORDS : b.label);
 }
 
 function showProblem() {
@@ -264,11 +302,15 @@ function showProblem() {
 function renderLinesAndAnswers(now) {
   const found = logic.answersFor(answersFile, now);
   const lines = now && now.view === 'slides' && now.slide && now.slide.lines.length ? now.slide.lines : [];
-  // The lines on the wall: shown here unless the answers list shows them already.
+  // The lines on the wall (below the buttons, so Back / Next never move): shown unless the answers list shows them already.
   const list = $('now-lines');
   const showLines = lines.length && !(found && found.items);
-  list.hidden = !showLines;
-  list.replaceChildren(...(showLines ? lines.map((l) => { const li = document.createElement('li'); li.textContent = l; return li; }) : []));
+  $('lines').hidden = !showLines;
+  const linesKey = showLines ? JSON.stringify(lines) : '';
+  if (list.dataset.key !== linesKey) {
+    list.dataset.key = linesKey;
+    list.replaceChildren(...(showLines ? lines.map((l) => { const li = document.createElement('li'); li.textContent = l; return li; }) : []));
+  }
 
   const box = $('answers');
   box.hidden = !found;
@@ -338,8 +380,21 @@ async function press(action, data, button) {
   flash(button);
   const s = session();
   if (!s) { showSignedOut('Type the passphrase to use the remote.'); return; }
+  // Said at once under the buttons: on its way, then how the screen took it.
+  const mine = { action, id: null, at: Date.now() };
+  pendingPress = mine;
+  renderPressNow();
   const res = await request('/v1/journey/remote', { method: 'POST', body: data === undefined ? { action } : { action, data }, session: s });
   if (res.status === 401) { signOut(); return; }
+  if (pendingPress === mine) {
+    if (res.ok && res.body && typeof res.body.id === 'string') {
+      mine.id = res.body.id;
+      mine.at = Date.now();
+    } else {
+      pendingPress = null;
+    }
+    renderPressNow();
+  }
   const note = $('now-last');
   if (!res.ok) {
     note.hidden = false;
@@ -352,10 +407,33 @@ async function press(action, data, button) {
   scheduleNextPoll(tuning().afterPressMs);
 }
 
+function renderPressNow() {
+  const kiosk = state && logic && logic.pickKiosk(state.kiosks);
+  renderPressStatus(kiosk ? kiosk.now : null);
+}
+
 function onPadClick(event) {
   const button = event.target.closest('button[data-action]');
   if (!button || !rules) return;
   const action = button.dataset.action;
+  if (action === 'slides-start') {
+    const kiosk = state && logic.pickKiosk(state.kiosks);
+    const now = kiosk ? kiosk.now : null;
+    // Over a running lesson this ends the video: the first tap only asks for a second.
+    if (logic.slidesButton(now).confirm && !(slidesArmedAt && Date.now() - slidesArmedAt < logic.SLIDES_CONFIRM_MS)) {
+      slidesArmedAt = Date.now();
+      flash(button);
+      renderSlidesButton(now);
+      clearTimeout(slidesArmTimer);
+      slidesArmTimer = setTimeout(() => { const k = state && logic.pickKiosk(state.kiosks); renderSlidesButton(k ? k.now : null); }, logic.SLIDES_CONFIRM_MS + 50);
+      return;
+    }
+    slidesArmedAt = 0;
+    clearTimeout(slidesArmTimer);
+    press(action, undefined, button);
+    renderSlidesButton(now);
+    return;
+  }
   if (action === 'seek') { press('seek', { by: Number(button.dataset.by) }, button); return; }
   if (action === 'volume') { press('volume', { step: Number(button.dataset.step) }, button); return; }
   press(action, undefined, button);
@@ -493,7 +571,7 @@ async function start() {
   [rules, logic] = await Promise.all([import(`../src/shared/journeyRemote.js${V}`), import(`./logic.js${V}`)]);
   $('signin-form').addEventListener('submit', signIn);
   $('signout').addEventListener('click', signOut);
-  for (const id of ['btn-prev', 'btn-next', 'btn-slides']) $(id).addEventListener('click', onPadClick);
+  for (const id of ['btn-begin', 'btn-prev', 'btn-next', 'btn-slides']) $(id).addEventListener('click', onPadClick);
   document.querySelector('.video').addEventListener('click', onPadClick);
   $('week').addEventListener('change', renderChoices);
   $('choices').addEventListener('click', onChoice);

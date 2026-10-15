@@ -42,8 +42,8 @@ body {
   color: #fff;
   box-shadow: 0 4px 0 var(--r-ink);
 }
-.top-mark { height: 28px; width: auto; display: block; }
-.top-title { font: 400 1.25rem/1 var(--r-label); letter-spacing: 0.02em; }
+.top-mark { height: 28px; width: auto; display: block; flex: none; }
+.top-title { font: 400 1.25rem/1 var(--r-label); letter-spacing: 0.02em; white-space: nowrap; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .conn {
   margin-left: auto;
   padding: 4px 10px;
@@ -52,6 +52,7 @@ body {
   background: #fff;
   color: var(--r-ink);
   white-space: nowrap;
+  flex: none;
 }
 .conn[data-state="bad"] { background: var(--r-hot-deep); color: #fff; }
 .conn[data-state="ok"]::before { content: '● '; color: #1F7A45; }
@@ -117,16 +118,26 @@ body {
   font-weight: 700;
 }
 
-/* What the screen shows */
+/* What the screen shows. The card keeps one height through a lesson (the
+   detail is one line, sub and detail hold their line when empty; the wall's
+   bullets and the press line sit BELOW the buttons), so Back / Next never
+   move under a thumb from one slide to the next. */
 .now { border-color: var(--r-deep); box-shadow: 0 5px 0 var(--r-deep); }
-.now-sub { margin: 0; font-weight: 600; color: var(--r-text); overflow-wrap: anywhere; }
-.now-detail { margin: 4px 0 0; color: #4A4458; }
-.now-lines { margin: 10px 0 0; padding-left: 1.2em; }
+.now-sub { margin: 0; min-height: 1.4em; font-weight: 600; color: var(--r-text); overflow-wrap: anywhere; }
+.now-detail { margin: 4px 0 0; min-height: 1.4em; color: #4A4458; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Not live (no internet, the service unreachable): the last thing heard, greyed. */
+.now.is-stale { border-color: #4A4458; box-shadow: 0 5px 0 #4A4458; }
+.now.is-stale .shout, .now.is-stale .kicker { color: #4A4458; }
+.now-lines { margin: 0; padding-left: 1.2em; }
 .now-lines li { margin: 4px 0; }
-.wait, .last { margin: 10px 0 0; padding: 8px 10px; border-radius: 8px; font-weight: 600; }
+.press-status { margin: -8px 0 18px; display: grid; gap: 8px; }
+.press-status:not(:has(> :not([hidden]))) { margin: 0; }
+.wait, .last { margin: 0; padding: 10px 12px; border-radius: 10px; font-weight: 600; }
 .wait { background: #FFF1E0; color: var(--r-hot-deep); border: 2px solid var(--r-hot-deep); }
-.last { background: var(--r-tint); color: var(--r-ink); }
-.last[data-ok="false"] { background: #FFF1E0; color: var(--r-hot-deep); }
+.last { background: var(--r-tint); color: var(--r-ink); border: 2px solid var(--r-tint); }
+.last[data-ok="false"] { background: #FFF1E0; color: var(--r-hot-deep); border-color: #FFF1E0; }
+/* On its way: the same tint, a dashed edge until the screen answers. */
+.last[data-ok="wait"] { background: #fff; border: 2px dashed var(--r-deep); color: var(--r-ink); }
 
 /* Buttons: flat, hard offset, instant press */
 .btn {
@@ -171,16 +182,21 @@ body {
 .btn-next { background: var(--r-hot); color: #fff; border-color: var(--r-hot-deep); box-shadow: 0 6px 0 var(--r-hot-deep); }
 .btn-next:active, .btn-next.is-pressed { transform: translateY(6px); box-shadow: 0 0 0 var(--r-hot-deep); }
 .btn-back { color: var(--r-ink); }
-/* Not on the slides: the pad steps back, so the control that matters now stands out. */
-.slide-pad.is-quiet .btn-big { opacity: 0.6; }
+/* Not on the slides: the pad steps back to outlines (still AA, still
+   pressable), so the control that matters now stands out. */
+.slide-pad.is-quiet .btn-back { color: var(--r-deep); border-color: var(--r-purple); box-shadow: 0 5px 0 var(--r-purple); }
+.slide-pad.is-quiet .btn-next { background: #fff; color: var(--r-hot-deep); border-color: var(--r-hot-deep); box-shadow: 0 6px 0 var(--r-hot-deep); }
 .btn-wide { width: 100%; margin: 0 0 22px; min-height: 64px; background: var(--r-tint); }
+/* Its first tap over a running lesson: the second one ends the video. */
+.btn-wide.is-armed { background: var(--r-hot); color: #fff; border-color: var(--r-hot-deep); box-shadow: 0 5px 0 var(--r-hot-deep); }
+/* Begin (Resume at m:ss): only on the lesson's start screen, the one thing to press. */
+.btn-begin { width: 100%; margin: 0 0 22px; }
 
 /* Video */
 .video-pad { display: grid; grid-template-columns: 1fr 1.3fr 1fr; gap: 10px; }
-.video-row { display: grid; grid-template-columns: 1fr 1.6fr; gap: 10px; margin-top: 12px; }
+.video-row { display: grid; grid-template-columns: 1fr; gap: 10px; margin-top: 12px; }
 .btn-mid { min-height: 72px; font-size: 1.25rem; padding: 8px 6px; }
 .btn-play { background: var(--r-deep); color: #fff; border-color: var(--r-ink); }
-.btn-begin { background: var(--r-purple); color: #fff; border-color: var(--r-ink); }
 
 /* Volume: the same big buttons as Back and Next (>= 112 px), the level between them */
 .volume { display: grid; grid-template-columns: 1fr 1.3fr 1fr; gap: 10px; align-items: center; margin-top: 12px; }
@@ -245,6 +261,27 @@ body {
 
 .foot { text-align: center; margin: 8px 0 0; }
 .link { background: none; border: 0; color: var(--r-ink); font: 600 1rem/1.4 var(--r-body); text-decoration: underline; padding: 12px; min-height: 44px; cursor: pointer; }
+
+/* A narrow phone: the header on one line, clear of the right gutter. */
+@media (max-width: 399px) {
+  .top { gap: 8px; }
+  .top-mark { height: 20px; }
+  .top-title { font-size: 1.0625rem; }
+  .conn { padding: 4px 8px; }
+}
+
+/* A phone: one column in which the controls for what the screen shows lead.
+   During a video its buttons go straight under the readout (Back / Next do
+   nothing then); otherwise the page order. */
+@media (max-width: 759px) {
+  .cols { display: flex; flex-direction: column; }
+  .col { display: contents; }
+  .remote[data-mode="video"] .col > * { order: 5; }
+  .remote[data-mode="video"] .now { order: 1; }
+  .remote[data-mode="video"] .video { order: 2; }
+  .remote[data-mode="video"] .press-status { order: 3; }
+  .remote[data-mode="video"] #btn-slides { order: 4; }
+}
 
 /* A tablet: two columns, the slides on the left, everything else on the right. */
 @media (min-width: 760px) {

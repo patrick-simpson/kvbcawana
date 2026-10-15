@@ -60,7 +60,7 @@ export function answersFixture(week = 5) {
 /**
  * @param browser  a playwright-core Chromium
  * @param viewport {width, height}
- * @param opts { signedIn, kiosks (array or function), answers (object | null = 404), stateStatus (number or fn) }
+ * @param opts { signedIn, kiosks (array or function), answers (object | null = 404), echo (false: no report names a press) }
  */
 export async function openRemote(browser, viewport, opts = {}) {
   const context = await browser.newContext({ viewport, deviceScaleFactor: 2, isMobile: viewport.width < 600, hasTouch: true, reducedMotion: 'reduce' });
@@ -70,6 +70,9 @@ export async function openRemote(browser, viewport, opts = {}) {
     kiosks: opts.kiosks || [{ id: 'jk_aaaaaaaaaaaaaaaaaaaa', name: 'Journey kiosk', online: true, now: NOW.slides() }],
     stateStatus: 200,
     answers: opts.answers === undefined ? null : opts.answers,
+    // As a kiosk does: its report names the latest press it ran (false: no kiosk answers).
+    echo: opts.echo !== false,
+    lastPress: null,
   };
   if (opts.signedIn !== false) {
     await page.addInitScript((s) => { localStorage.setItem('awanaSyncSession.v1', s); }, SESSION);
@@ -92,20 +95,28 @@ export async function openRemote(browser, viewport, opts = {}) {
         return send(200, { session: SESSION, displayKey: 'AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA=', state: {} });
       }
       if (call.auth !== `Bearer ${SESSION}`) return send(401, { reason: 'signed-out' });
+      // The fixture's `last` says how the latest press went; its id becomes that press's.
+      const echoed = (k) => {
+        const p = ctl.lastPress;
+        if (!ctl.echo || !p || !k.online) return {};
+        return { last: k.now.last ? { ...k.now.last, id: p.id } : { id: p.id, action: p.action, ok: true, reason: null } };
+      };
       if (call.path === '/v1/journey/remote/state') {
         const status = typeof ctl.stateStatus === 'function' ? ctl.stateStatus() : ctl.stateStatus;
         if (status !== 200) return route.fulfill({ status, body: 'down' });
         const kiosks = typeof ctl.kiosks === 'function' ? ctl.kiosks() : ctl.kiosks;
         const at = new Date().toISOString();
         return send(200, {
-          kiosks: kiosks.map((k) => ({ ...k, now: k.now ? { ...k.now, at } : null })),
+          kiosks: kiosks.map((k) => ({ ...k, now: k.now ? { ...k.now, ...echoed(k), at } : null })),
           online: kiosks.filter((k) => k.online).length,
           serverNow: at,
           watchMs: 30000,
         });
       }
       if (call.path === '/v1/journey/remote' && req.method() === 'POST') {
-        return send(200, { ok: true, id: `r${calls.length}`, kiosks: 1, online: 1 });
+        const id = `r${calls.length}`;
+        ctl.lastPress = { id, action: body.action };
+        return send(200, { ok: true, id, kiosks: 1, online: 1 });
       }
       return send(404, { error: 'Not found.' });
     }

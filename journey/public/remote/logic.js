@@ -154,13 +154,59 @@ export function describeNow(kiosk, { serverNowMs } = {}) {
   }
 }
 
-/* What the screen says about the last press, or ''. */
+/* What the screen says about the last press, or ''. A skip whose reason is
+   the waiting line already showing (Settings open, ...) does not repeat it. */
 export function lastWords(now) {
   const l = now && now.last;
   if (!l) return '';
   const what = ACTION_WORDS[l.action] || 'Press';
-  return l.ok ? `${what}: done ✓` : `${what} skipped: ${REASON_WORDS[l.reason] || REASON_WORDS.unknown}`;
+  if (l.ok) return `${what}: done ✓`;
+  const why = REASON_WORDS[l.reason] || REASON_WORDS.unknown;
+  return now.wait && WAIT_WORDS[now.wait] === why ? `${what} skipped.` : `${what} skipped: ${why}`;
 }
+
+/* How long this phone waits for a screen to say how its press went before
+   saying nobody has (a kiosk answers within about a second). */
+export const PRESS_ANSWER_MS = 5000;
+
+/* This phone's own press, from the tap until the screen's report names its
+   id: { text, ok: null (on its way) | false (no answer yet) }, or null when
+   there is none or the screen has answered (lastWords then says how it went).
+   pending = { action, id (null until the service took it), at (ms) }. */
+export function pressWords(pending, now, nowMs, answerMs = PRESS_ANSWER_MS) {
+  if (!pending) return null;
+  const what = ACTION_WORDS[pending.action] || 'Press';
+  if (!pending.id) return { text: `${what}: sending…`, ok: null };
+  if (now && now.last && now.last.id === pending.id) return null;
+  if (Number.isFinite(nowMs) && nowMs - pending.at > answerMs) {
+    return { text: `${what}: sent, but no screen has answered yet. Look at the screen.`, ok: false };
+  }
+  return { text: `${what}: sent, waiting for the screen…`, ok: null };
+}
+
+/* Which controls lead on the phone: 'video' (the video's own buttons go to
+   the top), 'slides', 'splash' (the big Begin), else 'other'; '' with no report. */
+export function layoutMode(now) {
+  if (!now) return '';
+  if (now.view === 'video' || now.view === 'intro') return 'video';
+  if (now.view === 'slides' || now.view === 'splash') return now.view;
+  return 'other';
+}
+
+/* The "Start teaching slides" button: hidden on the slides (the screen would
+   only say it already is); over a running lesson it ends the video, so it is
+   worded so and takes a second tap (confirm). */
+export function slidesButton(now) {
+  const view = now && now.view;
+  if (view === 'slides') return { hidden: true, label: 'Start teaching slides', confirm: false };
+  if (view === 'video' || view === 'intro') return { hidden: false, label: 'Skip to teaching slides', confirm: true };
+  if (view === 'splash') return { hidden: false, label: 'Skip to teaching slides', confirm: false };
+  return { hidden: false, label: 'Start teaching slides', confirm: false };
+}
+
+/* The second tap's words, shown for SLIDES_CONFIRM_MS after the first. */
+export const SLIDES_CONFIRM_WORDS = 'Tap again to end the video';
+export const SLIDES_CONFIRM_MS = 4000;
 
 /* Does a pick need the confirm tap (a lesson is up)? A screen waiting for a
    person (Settings, a handout / Read Prep, the caption question) skips every
@@ -169,7 +215,8 @@ export function needsConfirm(now) {
   return Boolean(now && RUNNING_VIEWS.includes(now.view));
 }
 
-/* The Begin button's words: what the splash's primary button would do. */
+/* The Begin button shows only on the lesson's start screen (anywhere else
+   the screen skips it); its words: what the splash's primary button would do. */
 export function beginWords(now) {
   return now && now.view === 'splash' && now.resume ? `Resume at ${formatTime(now.resume)}` : 'Begin lesson';
 }
