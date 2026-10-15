@@ -361,6 +361,7 @@
     </div>
     <p class="down-note" id="busy" role="status" hidden></p>
     <p class="down-note bad" id="offline-note" role="status" hidden>No internet connection to the check-in service. Check children in on the paper sheet at the desk; they are keyed into TwoTimTwo when the internet is back. Trying again.</p>
+    <p class="down-note" id="cached-note" role="status" hidden></p>
     <p class="down-note" id="down-note" role="status" hidden>This list is from a little while ago (TwoTimTwo could not be read just now). Trying again.</p>
     <p class="down-note bad" id="nohistory" role="status" hidden>Check-ins are paused: the service has no history key yet, so nothing could be recorded. Check children in on TwoTimTwo itself; the print station still prints them.</p>
     <div class="statusline"><span class="led" id="print-led" role="status">Printer status unknown</span></div>
@@ -785,6 +786,93 @@ function loadLocal() {
   } catch (e) { /* none */ }
   return { night: desk.night, walkins: [], out: [], at: {} };
 }
+// The last list this device saw tonight (owner 2026-10-15: "if I'm going to wait
+// thirty seconds for TwoTimTwo I want previously cached data"): shown at once
+// while a cold service signs in, marked as not live. Tonight only (the church's
+// night), on this device, gone on Sign out or the next day. SEALED: the names
+// rest in localStorage only as AES-GCM ciphertext under a NON-extractable key
+// kept in IndexedDB (no name readable from storage; Sign out deletes the key).
+var ROSTER_CACHE_KEY = 'awanaCheckinRoster.v1';
+var ROSTER_CACHE_DB = 'awanaCheckinCache';
+var rosterCache = null;          // tonight's opened copy, this load
+var rosterCacheWrite = Promise.resolve();
+function cacheDb() {
+  return new Promise(function(resolve, reject) {
+    var req = indexedDB.open(ROSTER_CACHE_DB, 1);
+    req.onupgradeneeded = function() { req.result.createObjectStore('k'); };
+    req.onsuccess = function() { resolve(req.result); };
+    req.onerror = function() { reject(req.error); };
+  });
+}
+function cacheKey(make) {
+  return cacheDb().then(function(db) {
+    return new Promise(function(resolve, reject) {
+      var get = db.transaction('k').objectStore('k').get('roster');
+      get.onsuccess = function() {
+        if (get.result || !make) { db.close(); return resolve(get.result || null); }
+        crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']).then(function(key) {
+          var put = db.transaction('k', 'readwrite').objectStore('k').put(key, 'roster');
+          put.onsuccess = function() { db.close(); resolve(key); };
+          put.onerror = function() { db.close(); reject(put.error); };
+        }, reject);
+      };
+      get.onerror = function() { db.close(); reject(get.error); };
+    });
+  });
+}
+function b64(bytes) { var s = ''; bytes = new Uint8Array(bytes); for (var i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]); return btoa(s); }
+function unb64(text) { var s = atob(text), out = new Uint8Array(s.length); for (var i = 0; i < s.length; i++) out[i] = s.charCodeAt(i); return out; }
+function loadRosterCache() {
+  var sealed;
+  try { sealed = JSON.parse(localStorage.getItem(ROSTER_CACHE_KEY) || 'null'); } catch (e) { sealed = null; }
+  if (!sealed) return Promise.resolve(null);
+  if (sealed.night !== desk.night || !sealed.iv || !sealed.ct) { forgetRosterCache(); return Promise.resolve(null); }
+  return cacheKey(false).then(function(key) {
+    if (!key) return null;
+    return crypto.subtle.decrypt({ name: 'AES-GCM', iv: unb64(sealed.iv) }, key, unb64(sealed.ct)).then(function(plain) {
+      var v = JSON.parse(new TextDecoder().decode(plain));
+      return v && v.night === desk.night && v.roster && Array.isArray(v.roster.kids) ? v : null;
+    });
+  }).catch(function() { return null; });
+}
+function saveRosterCache(part) {
+  if (!rosterCache || rosterCache.night !== desk.night) rosterCache = { night: desk.night };
+  if (part.roster) { rosterCache.roster = { kids: part.roster.kids || [], items: part.roster.items || null }; rosterCache.at = Date.now(); }
+  if (part.families) rosterCache.families = { households: part.families.households || [] };
+  if (!rosterCache.roster || !window.crypto || !crypto.subtle || !window.indexedDB) return;
+  var plain = new TextEncoder().encode(JSON.stringify(rosterCache)), night = rosterCache.night;
+  rosterCacheWrite = rosterCacheWrite.then(function() {
+    return cacheKey(true).then(function(key) {
+      var iv = crypto.getRandomValues(new Uint8Array(12));
+      return crypto.subtle.encrypt({ name: 'AES-GCM', iv: iv }, key, plain).then(function(ct) {
+        if (!rosterCache) return; // signed out meanwhile
+        localStorage.setItem(ROSTER_CACHE_KEY, JSON.stringify({ night: night, iv: b64(iv), ct: b64(ct) }));
+      });
+    });
+  }).catch(function() { /* the page works without it */ });
+}
+function forgetRosterCache() {
+  rosterCache = null;
+  try { localStorage.removeItem(ROSTER_CACHE_KEY); } catch (e) { /* none */ }
+  try { indexedDB.deleteDatabase(ROSTER_CACHE_DB); } catch (e) { /* none */ }
+}
+var showingCached = false, cacheTried = false;
+function showCachedList() {
+  cacheTried = true;
+  loadRosterCache().then(function(c) {
+    if (!c || rosterLoaded) return; // the live list came first
+    rosterCache = c;
+    applyRoster(c.roster);
+    if (c.families) applyFamilies(c.families);
+    showingCached = true;
+    var at = new Date(c.at || Date.now()).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    $('cached-note').textContent = 'Showing the list from ' + at + ' while TwoTimTwo signs in. It updates by itself.';
+    $('cached-note').hidden = false;
+    paint();
+  });
+}
+function liveListArrived() { showingCached = false; $('cached-note').hidden = true; }
+
 function saveLocal() { try { sessionStorage.setItem(LOCAL_KEY, JSON.stringify(LOCAL)); } catch (e) { /* the list lasts this load */ } }
 
 // The one club list (lobby/shared/clubs.js, served beside this page), plus any club the roster names.
@@ -852,6 +940,7 @@ function signOut(message) {
   leaderSelection = {};
   renderLeaderChips([]);
   rosterLoaded = false; rosterTries = 0; lastRosterAt = 0; rosterSlow = false;
+  forgetRosterCache(); showingCached = false; cacheTried = false; $('cached-note').hidden = true;
   if (rosterSlowTimer) { clearTimeout(rosterSlowTimer); rosterSlowTimer = null; }
   setNoClub(null);
   clearPinCountdown();
@@ -1932,6 +2021,8 @@ function refreshAll() {
   if (!rosterLoaded && !rosterSlowTimer && !rosterSlow) {
     rosterSlowTimer = setTimeout(function() { rosterSlowTimer = null; if (!rosterLoaded) { rosterSlow = true; render(); } }, ROSTER_SLOW_MS);
   }
+  // A first read that may take a while: tonight's last list on this device, at once.
+  if (!rosterLoaded && !cacheTried) showCachedList();
   refreshStatus();
   desk.roster().then(function(data) {
     showOffline(false);
@@ -1951,6 +2042,7 @@ function refreshAll() {
     // the list. Ask again instead.
     if (epoch !== rosterEpoch) { rosterFetchInFlight = false; scheduleRosterPoll(0); return null; }
     applyRoster(data);
+    if (!data.stale) { saveRosterCache({ roster: data }); liveListArrived(); }
     lastRosterAt = Date.now();
     paint();   // the list shows now; the households and the count join it as they arrive
     var more = [desk.tonight().then(function(t) { SERVER_TONIGHT = t; paint(); }, function() { /* the roster's own count stands */ }), refreshBarf()];
@@ -1959,7 +2051,7 @@ function refreshAll() {
     var newFamilies = data.familiesAt !== undefined && data.familiesAt !== familiesStamp;
     if (newFamilies || Date.now() - familiesAt > FAMILIES_EVERY_MS) {
       var stamp = data.familiesAt;
-      more.push(desk.families().then(function(d) { applyFamilies(d); if (stamp !== undefined) familiesStamp = stamp; paint(); },
+      more.push(desk.families().then(function(d) { applyFamilies(d); saveRosterCache({ families: d }); if (stamp !== undefined) familiesStamp = stamp; paint(); },
         function(e) { if (e && e.code === 'busy') familiesAt = Date.now() - FAMILIES_EVERY_MS + 20000; }));
     }
     return Promise.all(more).then(function() {

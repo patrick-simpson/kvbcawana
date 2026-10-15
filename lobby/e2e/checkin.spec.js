@@ -378,6 +378,31 @@ test('a slow first roster read (a cold sign-in to TwoTimTwo) says so after a few
   await expect(list).not.toContainText('Signing in to TwoTimTwo');
 });
 
+test('a slow read after the first: tonight\'s last list on this device shows at once, marked, then the live one replaces it (owner 2026-10-15)', async ({ page }) => {
+  test.setTimeout(60_000);
+  const { world } = await stubSite(page);
+  world.busyFirst = false;
+  await signIn(page);
+  await search(page).fill('Ada');
+  await expect(page.locator('#list')).toContainText('Ada', { timeout: 10_000 });
+  // Saved sealed: no name readable in the browser's storage.
+  await expect.poll(() => page.evaluate(() => localStorage.getItem('awanaCheckinRoster.v1'))).toContain('"ct"');
+  expect(await page.evaluate(() => JSON.stringify({ ...localStorage, ...sessionStorage }))).not.toMatch(/Ada|Tester/);
+  // The service restarts (a cold sign-in to TwoTimTwo): the next read hangs.
+  let open;
+  world.rosterGate = new Promise((resolve) => { open = resolve; });
+  await page.reload();
+  await expect(page.locator('#cached-note')).toContainText('Showing the list from', { timeout: 10_000 });
+  await search(page).fill('Ada');
+  await expect(page.locator('#list')).toContainText('Ada');
+  await expect(page.locator('#list')).not.toContainText('Signing in to TwoTimTwo');
+  open();
+  await expect(page.locator('#cached-note')).toBeHidden({ timeout: 15_000 });
+  // Sign out forgets it.
+  await page.evaluate(() => { document.getElementById('signout').click(); });
+  expect(await page.evaluate(() => localStorage.getItem('awanaCheckinRoster.v1'))).toBeNull();
+});
+
 test('no club tonight: one friendly note, no search, no error, asked again every minute, and the list comes by itself on the club day', async ({ page }) => {
   test.setTimeout(60_000);
   const { world } = await stubSite(page);
