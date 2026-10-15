@@ -79,6 +79,7 @@ async function stubSite(page, { kids, barf = true } = {}) {
       if (world.rosterGate) await world.rosterGate;
       if (world.busyFirst) { world.busyFirst = false; return route.fulfill(json(429, { ok: false, reason: 'read-busy', retryAfterMs: 1500 })); }
       if (world.noClub) return route.fulfill(json(200, { noClub: true, ...world.noClub, readAt: new Date().toISOString(), kids: [], items: { bible: [], friend: [] } }));
+      if (world.testDay) return route.fulfill(json(200, { readAt: new Date().toISOString(), testDay: world.testDay, kids: world.kids, items: { bible: ['Cubbies', 'Sparks'], friend: ['Sparks'] } }));
       return route.fulfill(json(200, { readAt: new Date().toISOString(), kids: world.kids, items: { bible: ['Cubbies', 'Sparks'], friend: ['Sparks'] }, ...(world.familiesAt ? { familiesAt: world.familiesAt } : {}) }));
     }
     if (p === '/v1/desk/families') {
@@ -525,6 +526,31 @@ test('an early label (printed before TwoTimTwo answered): a hiccup is retried by
   await page.locator('#kid-sheet').getByRole('button', { name: 'Check in' }).click();
   await expect(page.locator('#toast')).toContainText('Zed Solo is checked in', { timeout: 10_000 });
   expect(world.posts.filter((p) => p.body.clubberId === '20')).toHaveLength(2);
+});
+
+test('a test day (no club today, owner 2026-10-15): the real list, a yellow strip, a real check-in, no Check out', async ({ page }) => {
+  test.setTimeout(60_000);
+  const { world } = await stubSite(page);
+  world.busyFirst = false;
+  world.testDay = { today: '2026-10-15', next: '2026-10-21', meeting: null };
+  await signIn(page);
+  await expect(page.locator('#test-note')).toBeVisible({ timeout: 10_000 });
+  await expect(page.locator('#test-note')).toHaveText(/^Test day: check-ins go on TwoTimTwo’s next meeting \(Wed, Oct 21\)\. They’re undone by themselves overnight\.$/);
+  await expect(page.locator('#list')).not.toContainText('No club tonight');
+  await expect(page.locator('#mode-btn')).toBeHidden();
+  await expect(search(page)).toBeVisible();
+  await search(page).fill('Cy');
+  await page.locator('.fcard').click();
+  await page.locator('#kid-sheet').getByRole('button', { name: 'Check in' }).click();
+  await expect(page.locator('#toast')).toContainText('Cy Other is checked in');
+  expect(world.posts.map((p) => [p.path, p.body.clubberId])).toEqual([['/v1/desk/checkin', '13']]);
+  await snap(page, 'checkin-test-day.png');
+  // A club day again: the strip goes.
+  world.testDay = null;
+  await page.reload();
+  await expect(page.locator('#list')).toContainText('still to come', { timeout: 10_000 });
+  await expect(page.locator('#test-note')).toBeHidden();
+  await expect(page.locator('#mode-btn')).toBeVisible();
 });
 
 test('a wrong passphrase stays on the sign-in, and a signed-out session returns to it', async ({ page }) => {

@@ -121,6 +121,10 @@
     background: var(--c-blue-deep); color: #fff; font-family: var(--f-shout); font-size: 24px; letter-spacing: .02em; box-shadow: 0 3px 12px rgba(47,79,138,.25); }
   .mode-btn.back { background: #fff; color: var(--c-blue-deep); }
   #main-screen.no-club .mode-btn { display: none !important; }
+  /* A test day (owner 2026-10-15): a day with no club checks in for real, into TwoTimTwo's
+     next meeting, undone overnight by the service. No Check out (TwoTimTwo cannot undo one). */
+  #main-screen.test-day .mode-btn { display: none !important; }
+  .test-note { background: var(--c-sun); color: var(--c-ink); }
   #main-screen.out-mode .barf-btn, #main-screen.out-mode .barf-alert { display: none !important; }
   /* The families not checked out yet: the check-in tiles, larger as fewer are left
      (the page picks a step s1..s5 by how many tiles show; the sizes are here). */
@@ -375,6 +379,7 @@
     </div>
     <p class="down-note" id="busy" role="status" hidden></p>
     <p class="down-note bad" id="offline-note" role="status" hidden>No internet connection to the check-in service. Check children in on the paper sheet at the desk; they are keyed into TwoTimTwo when the internet is back. Trying again.</p>
+    <p class="down-note test-note" id="test-note" role="status" hidden></p>
     <p class="down-note" id="cached-note" role="status" hidden></p>
     <p class="down-note" id="down-note" role="status" hidden>This list is from a little while ago (TwoTimTwo could not be read just now). Trying again.</p>
     <p class="down-note bad" id="nohistory" role="status" hidden>Check-ins are paused: the service has no history key yet, so nothing could be recorded. Check children in on TwoTimTwo itself; the print station still prints them.</p>
@@ -714,6 +719,7 @@ var busyTimer = null;
 // the list's place, hides the search box, and asks again once a minute, so on the
 // club day it switches to the list by itself within a minute of the Worker saying so.
 var NO_CLUB = null;            // { today, next } while the Worker says there is no club today
+var TEST_DAY = null;           // { today, next, meeting } on a day with no club: a test day (desk.js TEST DAYS)
 var NO_CLUB_POLL_MS = 60 * 1000;
 var noClubWords = null;        // desk-transport.js's words for the note
 
@@ -955,6 +961,7 @@ function signOut(message) {
   renderLeaderChips([]);
   rosterLoaded = false; rosterTries = 0; lastRosterAt = 0; rosterSlow = false;
   forgetRosterCache(); showingCached = false; cacheTried = false; $('cached-note').hidden = true;
+  setTestDay(null);
   if (rosterSlowTimer) { clearTimeout(rosterSlowTimer); rosterSlowTimer = null; }
   setNoClub(null);
   clearPinCountdown();
@@ -1044,6 +1051,21 @@ function applyRoster(data) {
 }
 // A day with no club (the Worker's `noClub` answer): nobody to list or count, no
 // search, no walk-in tag (leader and custom labels still print); null = a club day.
+// A test day: the yellow strip says where the check-ins go and that they are undone
+// overnight; Check out goes away (TwoTimTwo's check-out has no undo).
+function setTestDay(td) {
+  TEST_DAY = td ? { today: String(td.today || ''), next: td.next || null, meeting: td.meeting || null } : null;
+  $('main-screen').classList.toggle('test-day', !!TEST_DAY);
+  var note = $('test-note');
+  note.hidden = !TEST_DAY;
+  if (!TEST_DAY) return;
+  var when = '';
+  if (TEST_DAY.next && /^\d{4}-\d{2}-\d{2}$/.test(TEST_DAY.next)) {
+    when = ' (' + new Date(TEST_DAY.next + 'T12:00:00').toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' }) + ')';
+  }
+  note.textContent = 'Test day: check-ins go on TwoTimTwo’s next meeting' + when + '. They’re undone by themselves overnight.';
+  if (MODE === 'out') setMode('in');
+}
 function setNoClub(data) {
   var was = !!NO_CLUB;
   NO_CLUB = data ? { today: String(data.today || ''), next: data.next || null } : null;
@@ -1845,7 +1867,7 @@ var OUT = {};                  // child key -> { status: 'held'|'pending'|'waiti
 var HELD = [];                 // households tapped, waiting out their Undo time: { kids, label, until, timer }
 function savedMode() { try { return sessionStorage.getItem(MODE_KEY) === 'out' ? 'out' : 'in'; } catch (e) { return 'in'; } }
 function setMode(m) {
-  MODE = m === 'out' && !SIMPLE && !NO_CLUB ? 'out' : 'in';
+  MODE = m === 'out' && !SIMPLE && !NO_CLUB && !TEST_DAY ? 'out' : 'in';
   try { sessionStorage.setItem(MODE_KEY, MODE); } catch (e) { /* the mode lasts this load */ }
   var out = MODE === 'out';
   $('main-screen').classList.toggle('out-mode', out);
@@ -2109,6 +2131,7 @@ function refreshAll() {
     // the list. Ask again instead.
     if (epoch !== rosterEpoch) { rosterFetchInFlight = false; scheduleRosterPoll(0); return null; }
     applyRoster(data);
+    if (!data.stale && !data.restored) setTestDay(data.testDay || null);
     if (!data.stale) { saveRosterCache({ roster: data }); liveListArrived(); }
     lastRosterAt = Date.now();
     paint();   // the list shows now; the households and the count join it as they arrive
