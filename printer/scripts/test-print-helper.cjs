@@ -103,7 +103,8 @@ exit 0
   const printing = require(path.join(root, 'print-server', 'server', 'printing.js'));
   const ph = require(path.join(root, 'print-server', 'print-helper.js'));
   const helper = printing.printHelper;
-  const FAST = { startMs: 1500, labelMs: 1500, backoffMinMs: 300, backoffMaxMs: 1000 };
+  // waitReadyMs: these checks let a label wait for the starting helper; the app never does (below).
+  const FAST = { startMs: 1500, labelMs: 1500, backoffMinMs: 300, backoffMaxMs: 1000, waitReadyMs: 1500 };
   helper._setOptionsForTests(FAST);
   const fresh = () => helper._setOptionsForTests({ resetRest: true });
   const png = (n) => path.join(os.tmpdir(), `awana-test-label-${n}.png`);
@@ -143,6 +144,35 @@ exit 0
     await printing.printLabel(path.join(os.tmpdir(), 'Zoë-label.png'), 'Fake');
     const line = logLines().find((l) => l.startsWith('helper')) || '';
     check('a non-ASCII path crosses the pipe escaped', /Zo\\u00eb-label\.png/.test(line) && !/ë/.test(line), line);
+  }
+
+  console.log('\nthe app never makes a label wait for a helper that is still starting (waitReadyMs 0)');
+  {
+    helper.stop();
+    await new Promise((r) => setTimeout(r, 200));
+    helper._setOptionsForTests({ waitReadyMs: 0, resetRest: true });
+    resetLog(); setModes();
+    const t0 = Date.now();
+    await printing.printLabel(png('cold'), 'Fake');
+    const ms = Date.now() - t0;
+    check('the first label does not wait: it prints the old way while the helper starts', count('spawn') === 1 && count('helper') === 0, logLines().join(' | '));
+    check('and the helper was started meanwhile', count('start') === 1, logLines().join(' | '));
+    check('quickly', ms < 1500, `${ms} ms`);
+    await new Promise((r) => setTimeout(r, 500));
+    resetLog();
+    await printing.printLabel(png('warm'), 'Fake');
+    check('once it is ready, the next label goes through it', count('helper') === 1 && count('spawn') === 0, logLines().join(' | '));
+    helper.stop();
+    await new Promise((r) => setTimeout(r, 200));
+    helper._setOptionsForTests({ resetRest: true });
+    resetLog();
+    helper.warm();
+    await new Promise((r) => setTimeout(r, 500));
+    await printing.printLabel(png('warmed'), 'Fake');
+    check('warm() (the print server\'s start-up) has it ready before the first label', count('start') === 1 && count('helper') === 1 && count('spawn') === 0, logLines().join(' | '));
+    check('the server starts it at start-up', /\$printing\.printHelper\.warm\(\)/.test(fs.readFileSync(path.join(root, 'print-server', 'server', 'lifecycle.js'), 'utf8')));
+    helper._setOptionsForTests(FAST);
+    fresh();
   }
 
   console.log('\nan answer is matched to its own request');
@@ -289,6 +319,7 @@ exit 0
       Object.assign(process.env, { AWANA_DATA_DIR: ${JSON.stringify(dataDir)}, PRINTER_NAME: 'Fake', AWANA_PRINT_HELPER: '1' });
       const printing = require(${JSON.stringify(path.join(root, 'print-server', 'server', 'printing.js'))});
       require(${JSON.stringify(path.join(root, 'print-server', 'server.js'))});
+      printing.printHelper._setOptionsForTests({ waitReadyMs: 3000 });   // this label goes through the helper
       printing.printLabel('/tmp/x.png', 'Fake').then(() => console.log('PRINTED ' + printing.printHelper.status().printed));
     `;
     resetLog(); setModes(); setHandshake('ok');

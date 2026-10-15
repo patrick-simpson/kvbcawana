@@ -177,6 +177,9 @@ function startListening(attempt = 1) {
     // One-time startup work (skipped on EADDRINUSE retries and restarts).
     // Clean up any temp files a crashed previous run left behind.
     $images.sweepOrphanedTempFiles();
+    // The warm print helper starts now, in the background, so the night's first labels
+    // find it ready; until it is, labels print the old way (print-helper.js waitReadyMs).
+    try { $printing.printHelper.warm(); } catch { /* the old way still prints */ }
     // Load clubbers before accepting requests so the first print has data ready.
     $clubbers.clubbers = $clubbers.loadClubbers();
     $station.startClubNightTimers();

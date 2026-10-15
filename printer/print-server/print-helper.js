@@ -106,6 +106,10 @@ function helperError(message, props) {
 function createPrintHelper(o = {}) {
   const opts = {
     startMs: START_MS, labelMs: LABEL_MS, backoffMinMs: BACKOFF_MIN_MS, backoffMaxMs: BACKOFF_MAX_MS, idleMs: IDLE_MS,
+    // How long a label may wait for a helper that is still starting. 0 (the app): never;
+    // the label prints the old way meanwhile, so a helper that will not start on some
+    // laptop never costs a label time at the door. The suites set it to test the helper.
+    waitReadyMs: 0,
   };
   const set = (x) => { for (const k of Object.keys(opts)) if (Number.isFinite(x[k]) && x[k] >= 0) opts[k] = x[k]; };
   set(o);
@@ -235,7 +239,13 @@ function createPrintHelper(o = {}) {
     if (!enabled() || now() < restUntil) return 'unavailable';
     if (!proc || !proc.alive) { proc = start(); if (!proc) return 'unavailable'; }
     const p = proc;
-    if (!(await p.ready) || !p.alive || p.pending || p.stopping) { stats.fallbacks += 1; return 'unavailable'; }
+    if (!p.readySeen) {
+      const ready = opts.waitReadyMs > 0
+        ? await Promise.race([p.ready, new Promise((r) => { const t = setTimeout(() => r(false), opts.waitReadyMs); if (t.unref) t.unref(); })])
+        : false;
+      if (!ready) { stats.fallbacks += 1; return 'unavailable'; }
+    }
+    if (!p.alive || p.pending || p.stopping) { stats.fallbacks += 1; return 'unavailable'; }
 
     const id = String(++seq);
     const outcome = await new Promise((resolve) => {
@@ -302,6 +312,12 @@ function createPrintHelper(o = {}) {
     );
   }
 
+  /** Start the helper ahead of the first label (the print server's start-up); never waits. */
+  function warm() {
+    if (!enabled() || now() < restUntil || (proc && proc.alive)) return;
+    proc = start();
+  }
+
   /** Let the helper go: a label being printed finishes first (it reads to the end of its input). */
   function stop() {
     if (idleTimer) { clearTimeout(idleTimer); idleTimer = null; }
@@ -322,7 +338,7 @@ function createPrintHelper(o = {}) {
   }
 
   return {
-    print, stop, status,
+    print, stop, status, warm,
     /** Tests: shorter limits, and forget a rest. */
     _setOptionsForTests(x) { set(x || {}); if (x && x.resetRest) { restUntil = 0; failures = 0; } },
     get pid() { return proc && proc.child ? proc.child.pid : null; },
