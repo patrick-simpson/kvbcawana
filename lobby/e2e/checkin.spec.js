@@ -372,6 +372,10 @@ test('a slow first roster read (a cold sign-in to TwoTimTwo) says so after a few
   const list = page.locator('#list');
   await expect(list).toContainText('Reading the roster', { timeout: 10_000 });
   await expect(list).toContainText('Signing in to TwoTimTwo… this can take up to a minute.', { timeout: 10_000 });
+  // The waiting Cubbies (owner 2026-10-15): the kit's mark over a sign whose line moves on.
+  await expect(list.locator('.wait-cub')).toHaveAttribute('src', /\/brand\/logos\/cubbies-color\.svg$/);
+  await expect(page.locator('#wait-line')).toHaveText('TwoTimTwo is stretching…');
+  await expect(page.locator('#wait-line')).toHaveText('Finding everyone’s name tags…', { timeout: 8_000 });
   open();
   await search(page).fill('Ada');
   await expect(list).toContainText('Ada', { timeout: 10_000 });

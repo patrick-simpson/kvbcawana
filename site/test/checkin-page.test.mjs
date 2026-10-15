@@ -47,7 +47,9 @@ describe('the check-in page', () => {
     assert.match(src, /if \(e && e\.code === 'busy'\) \{ setBusy\(e\.retryAfterMs\); scheduleRosterPoll\(\(e\.retryAfterMs \|\| 5000\) \+ 250\); return; \}/);
     assert.match(src, /var FAMILIES_EVERY_MS = 30 \* 60 \* 1000;/);
     // the roster is the one tick's only TwoTimTwo-backed call; nothing else polls on a timer
-    assert.equal((src.match(/setInterval\(/g) || []).length, 3, 'only the three countdowns tick (the passphrase lockout, the roster\'s busy note, a queued job\'s automatic retry)');
+    assert.equal((src.match(/setInterval\(/g) || []).length, 4, 'only the three countdowns and the waiting Cubbies\' sign tick (the passphrase lockout, the roster\'s busy note, a queued job\'s automatic retry, the sign\'s line)');
+    // the sign's tick changes words only: it calls nothing
+    assert.match(src, /if \(!waitTimer\) waitTimer = setInterval\(function\(\) \{\n\s+var now = document\.querySelector\('#list \.wait-line'\);/);
     // A busy Worker is a countdown and an automatic retry of that one job (owner 2026-10-12), never a hammer.
     assert.match(src, /if \(e && e\.code === 'busy' && !job\.cancelled\) \{ waitJob\(job, e\.retryAfterMs\); return; \}/);
     assert.match(src, /var until = Date\.now\(\) \+ Math\.max\(1000, ms \|\| 5000\);/);

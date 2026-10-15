@@ -315,6 +315,20 @@
   .ghosts { position: fixed; inset: 0; pointer-events: none; z-index: 4; overflow: hidden; }
   .ghosts > * { position: fixed; display: block !important; margin: 0 !important; }
   .ghosts > * > * { width: 100%; height: 100%; animation: none !important; }
+  /* A cold TwoTimTwo sign-in (owner 2026-10-15: "a joyful loading animation"): the
+     Cubbies mark, whole as the kit draws it, taps its foot (two quick bobs, a rest)
+     over a sign that swings and changes line every WAIT_LINE_MS. Still under reduced motion. */
+  .wait { display: flex; flex-direction: column; align-items: center; gap: 0; padding: 28px 8px 20px; text-align: center; }
+  .wait-cub { width: min(220px, 60vw); height: auto; transform-origin: 50% 100%; animation: cubtap 1.6s ease-in-out infinite; }
+  @keyframes cubtap { 0%, 50%, 100% { transform: translateY(0) rotate(0); } 12% { transform: translateY(-7px) rotate(-3deg); } 25% { transform: translateY(0) rotate(0); } 37% { transform: translateY(-7px) rotate(3deg); } }
+  .wait-strings { width: 120px; height: 22px; border-left: 3px solid var(--c-cubbies-deep); border-right: 3px solid var(--c-cubbies-deep); }
+  .wait-sign { transform-origin: 50% 0; animation: signswing 3.2s ease-in-out infinite; background: #fff; border: 3px solid var(--c-cubbies-deep);
+    border-radius: 10px; box-shadow: 5px 5px 0 var(--c-cubbies); padding: 14px 18px; min-width: 220px; max-width: 320px;
+    font-family: var(--f-shout); font-size: 22px; line-height: 1.15; color: var(--c-cubbies-deep); }
+  @keyframes signswing { 0%, 100% { transform: rotate(-2deg); } 50% { transform: rotate(2deg); } }
+  .wait-line { display: block; transition: opacity 200ms; }
+  .wait-line.swap { opacity: 0; }
+  .wait-small { margin-top: 16px; color: var(--ink-faint); font-size: 15px; line-height: 1.4; }
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation: none !important; transition: none !important; }
   }
@@ -1252,6 +1266,41 @@ function kidCard(p) {
   return b;
 }
 
+// The waiting Cubbies (owner 2026-10-15): the sign's line steps every WAIT_LINE_MS from
+// when the wait began; past the first four it alternates the last two.
+var WAIT_LINES = ['TwoTimTwo is stretching…', 'Finding everyone’s name tags…', 'Counting crayons…',
+  'Waking up the hamsters…', 'Almost there, keep smiling!', 'One more big stretch…'];
+var WAIT_LINE_MS = 5000;
+var waitSince = 0, waitTimer = null;
+function waitLine() {
+  var step = Math.floor((Date.now() - waitSince) / WAIT_LINE_MS);
+  return WAIT_LINES[step < 4 ? step : 4 + ((step - 4) % 2)];
+}
+function waitingCub() {
+  if (!waitSince) waitSince = Date.now();
+  var box = el('div', 'wait');
+  box.setAttribute('role', 'status');
+  var cub = document.createElement('img');
+  cub.className = 'wait-cub'; cub.src = "/brand/logos/cubbies-color.svg"; cub.alt = ''; cub.width = 220; cub.height = 62;
+  box.appendChild(cub);
+  box.appendChild(el('div', 'wait-strings'));
+  var sign = el('div', 'wait-sign');
+  var line = el('span', 'wait-line', waitLine());
+  line.id = 'wait-line';
+  sign.appendChild(line);
+  box.appendChild(sign);
+  box.appendChild(el('p', 'wait-small', 'Signing in to TwoTimTwo… this can take up to a minute.'));
+  if (!waitTimer) waitTimer = setInterval(function() {
+    var now = document.querySelector('#list .wait-line');
+    if (!now || rosterLoaded) { clearInterval(waitTimer); waitTimer = null; waitSince = 0; return; }
+    var next = waitLine();
+    if (now.textContent === next) return;
+    now.classList.add('swap');
+    setTimeout(function() { now.textContent = next; now.classList.remove('swap'); }, 200);
+  }, 500);
+  return box;
+}
+
 function render() {
   if (!unlockedState) return;
   var q = $('search').value;
@@ -1262,8 +1311,8 @@ function render() {
   // A cold start (the Worker just restarted) signs in to TwoTimTwo first: about 45 s on its
   // one-read-per-15-s clock. Past ROSTER_SLOW_MS the page says so (owner 2026-10-14).
   if (NO_CLUB) list.appendChild(noClubNote());
-  else if (!rosterLoaded) list.appendChild(el('div', 'note', rosterTries ? 'Still counting crayons… trying again.'
-    : rosterSlow ? 'Signing in to TwoTimTwo… this can take up to a minute.' : 'Reading the roster…'));
+  else if (!rosterLoaded) list.appendChild(rosterSlow && !rosterTries ? waitingCub()
+    : el('div', 'note', rosterTries ? 'Still counting crayons… trying again.' : 'Reading the roster…'));
   else if (!KIDS.length) list.appendChild(el('div', 'note', 'TwoTimTwo has nobody on tonight’s check-in page yet. Is the meeting set up?'));
   else if (MODE === 'out') renderCheckout(list, q);
   else if (!q.trim()) renderFamilies(list);
