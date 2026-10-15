@@ -34,7 +34,9 @@ async function snap(page, name) {
   await page.screenshot({ path: shot(name) });
 }
 
-async function stubSite(page, { kids } = {}) {
+async function stubSite(page, { kids, barf = true } = {}) {
+  // BARF is off on the live page since 2026-10-15; these tests keep it working for next year.
+  if (barf) await page.addInitScript(() => { window.AWANA_BARF = true; });
   const history = await cc.createHistoryKey(PASS);
   const historyRing = await cc.keyRing(await cc.unwrapPrivateKey(history.wrapped, PASS, history.pub), history.pub);
   const kp = await cc.generateKeyPair();
@@ -761,6 +763,22 @@ test('BARF: a child who is not checked in yet is found by typing a name, and con
   expect(world.posts[0].path).toBe('/v1/desk/checkin');
   expect(world.posts[0].body).toMatchObject({ clubberId: '12', items: { Bible: true, Friend: true }, friendName: 'Sam', friendClub: 'Cubbies' });
   expect(world.barfPosts).toHaveLength(0);   // an ordinary check-in, not the late-friend redo
+});
+
+test('BARF switched off (owner 2026-10-15): no green button, no friend name or club, the Brought a friend box stays', async ({ page }) => {
+  test.setTimeout(60_000);
+  const { world } = await stubSite(page, { barf: false });
+  world.busyFirst = false;
+  world.barf = { night: '2026-10-14', barfNight: true, friends: [], tagRoute: '/print-barf-tag', stations: 1 };
+  await signIn(page, '/checkin/');
+  await expect(page.locator('#list')).toContainText(/still to come|Everyone/, { timeout: 10_000 });
+  await expect(page.locator('#barf-btn')).toBeHidden();
+  await search(page).fill('tester');
+  await page.locator('.fcard').click();
+  const ben = page.locator('.tile', { hasText: 'Ben Tester' });
+  await ben.getByRole('button', { name: 'Brought a friend' }).click();
+  await expect(ben.getByLabel('Friend’s first name')).toHaveCount(0);
+  await expect(ben.getByLabel('Friend’s club')).toHaveCount(0);
 });
 
 test('a new familiesAt on the roster answer reads the families again, so a newly registered child joins their family', async ({ page }) => {

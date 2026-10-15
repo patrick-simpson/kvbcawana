@@ -185,7 +185,7 @@ describe('the reorganized sections (docs/SETTINGS-OVERHAUL.md "Reorganize", 2026
     answers.fn = (path) => (path === '/v1/church/settings' ? { ok: true, status: 200, body: CHURCH } : { ok: false, status: 404, body: null });
     const { container } = open(page());
     const expected = {
-      Printing: ['Tonight’s prints', 'Name tags and labels', 'BARF Night', 'Labels', 'Each club’s label', 'Club night schedule', 'Pickup list'],
+      Printing: ['Tonight’s prints', 'Name tags and labels', 'Labels', 'Each club’s label', 'Club night schedule', 'Pickup list'],
       'What screens show': ['Welcome banners', 'Welcome extras', 'Club lines', 'Celebrations', 'Pickup board', 'Corner'],
       'Slides & look': ['Typed & published slides', 'Calendar slides', 'Season', 'Weather effects'],
       Journey: ['Phone remote', 'Captions', 'Teaching slides', 'Lessons on the Journey PCs'],

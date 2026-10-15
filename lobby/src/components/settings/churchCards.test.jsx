@@ -49,7 +49,7 @@ beforeEach(() => {
   world.answer = serve(state);
   world.job.mockClear();
 });
-afterEach(() => { cleanup(); vi.restoreAllMocks(); });
+afterEach(() => { cleanup(); vi.restoreAllMocks(); delete window.AWANA_BARF; });
 
 const puts = () => calls.filter((c) => c.method === 'PUT');
 
@@ -109,6 +109,7 @@ describe('Printing: the church cards', () => {
   });
 
   it('pickup clubs and BARF nights', async () => {
+    window.AWANA_BARF = true;   // BARF is off since 2026-10-15; the card still works when switched on
     mount();
     fireEvent.click(await screen.findByRole('checkbox', { name: 'Cubbies' }));
     await waitFor(() => expect(puts()).toHaveLength(1));

@@ -13,6 +13,8 @@ let station;
 test.beforeAll(async () => { station = await generateKeyPair(); });
 
 test.beforeEach(async ({ page }) => {
+  // BARF is off on the live page since 2026-10-15; the BARF test switches it on for itself.
+  if (/BARF Night/.test(test.info().title)) await page.addInitScript(() => { window.AWANA_BARF = true; });
   await page.route(/open-meteo|twotimtwo|kvbchurch\.org/, (route) => route.abort());
   page.w = makeWorld({ stations: [{ stationId: 'st1', name: 'Check-in laptop', pub: station.publicKey, kid: station.kid, registeredAt: 1, lastSeenAt: Date.now(), printer: { state: 'ok' } }] });
   page.local = [];
@@ -181,4 +183,11 @@ test('the Worker address is the only network the cards use', async ({ page }) =>
   await expect(dialog.getByRole('textbox', { name: 'Label footer' })).toBeVisible();
   expect(page.w.calls.every((c) => c.path.startsWith('/v1/'))).toBe(true);
   expect(SYNC_BASE.startsWith('https://')).toBe(true);
+});
+
+test('BARF is switched off (owner 2026-10-15): no nights card, no bag labels button', async ({ page }) => {
+  const dialog = page.getByRole('dialog', { name: 'Settings' });
+  await expect(dialog.getByRole('textbox', { name: 'Label footer' })).toBeVisible();
+  await expect(dialog.getByRole('button', { name: 'Print BARF Bag labels' })).toHaveCount(0);
+  await expect(dialog.getByLabel('Add a night')).toHaveCount(0);
 });

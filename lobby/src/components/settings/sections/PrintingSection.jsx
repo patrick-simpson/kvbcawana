@@ -7,6 +7,12 @@ import { PanelCard } from '../fields.jsx';
 import { useSync } from '../../../hooks/useSync.js';
 
 /**
+ * BARF Night's card: off since 2026-10-15 (owner: done for the year). Next
+ * year: make this true. Tests switch it on with window.AWANA_BARF = true.
+ */
+const barfOn = () => typeof window !== 'undefined' && /** @type {any} */ (window).AWANA_BARF === true;
+
+/**
  * Printing (docs/SETTINGS-OVERHAUL.md 2.5, reordered 2026-10-13 "Reorganize"),
  * the settings page only: works from anywhere. Club-night tools first
  * (tonight's reprints and name tags, sealed in this browser and printed by the
@@ -31,7 +37,8 @@ export function PrintingSection({ goTo } = {}) {
       <ChurchGate church={church} />
       <TonightsPrintsCard />
       <NameTagsCard church={church} />
-      <BarfNightCard church={church} />
+      {/* BARF is switched off (owner 2026-10-15, done for the year); barfOn() brings the card back. */}
+      {barfOn() ? <BarfNightCard church={church} /> : null}
       <LabelsCard church={church} />
       <ClubLabelCard church={church} />
       <ClubNightCard church={church} />

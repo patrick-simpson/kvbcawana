@@ -1313,9 +1313,10 @@ function openKid(p) {
   if (items.bible || items.friend) {
     var opts = el('div', 'opts');
     if (items.bible) opts.appendChild(optButton('Bible', choice.bible, function(v) { choice.bible = v; }));
-    var fname = items.friend ? friendInput(choice) : null;
+    var fname = items.friend && BARF_ON ? friendInput(choice) : null;
     if (items.friend) opts.appendChild(optButton('Brought a friend', false, function(v) {
       choice.friend = v;
+      if (!fname) return;
       fname.hidden = !v;
       if (v) setTimeout(function() { try { fname.focus(); } catch (e) { /* ignore */ } }, 30);
     }));
@@ -1389,8 +1390,8 @@ function openFamily(first, kids, choice, title) {
     if (items.bible || items.friend) {
       var o = el('div', 'opts');
       if (items.bible) o.appendChild(optButton('Bible', mine.bible, function(v) { mine.bible = v; }));
-      var fn = items.friend ? friendInput(mine) : null;
-      if (items.friend) o.appendChild(optButton('Brought a friend', mine.friend, function(v) { mine.friend = v; fn.hidden = !v; }));
+      var fn = items.friend && BARF_ON ? friendInput(mine) : null;
+      if (items.friend) o.appendChild(optButton('Brought a friend', mine.friend, function(v) { mine.friend = v; if (fn) fn.hidden = !v; }));
       t.appendChild(o);
       if (fn) t.appendChild(fn);
     }
@@ -2116,6 +2117,11 @@ $('oneoff-name').addEventListener('keydown', function(e) { if (e.key === 'Enter'
 // a countdown and an automatic retry). When TwoTimTwo would not take the redo the
 // child is NOT checked in there: a red line at the top says so, with one tap to
 // check them in again (the same items plus Brought a friend, no label).
+// BARF is switched OFF (owner 2026-10-15: "comment everything barf related out,
+// we're done with that"): no green button, no friend's name or club question.
+// The Brought a friend tick box stays, a plain TwoTimTwo item. Kept for next
+// year: set BARF_ON true (tests switch it on with window.AWANA_BARF = true).
+var BARF_ON = window.AWANA_BARF === true;
 var BARF = { barfNight: null, friends: {}, tagRoute: '/print-custom' };
 var BARF_LINES = {};           // clubberId -> { kind: 'pending'|'bad', text, child, items?, at }
 function applyBarf(info, askedAt) {
@@ -2149,7 +2155,7 @@ function applyBarf(info, askedAt) {
 }
 var BARF_DONE = {};            // children this page recorded a friend for tonight
 function refreshBarf() {
-  if (!desk || !unlockedState) return Promise.resolve();
+  if (!BARF_ON || !desk || !unlockedState) return Promise.resolve();
   var askedAt = Date.now();
   return desk.barfInfo().then(function(info) { applyBarf(info, askedAt); }, function(e) { if (e && e.code === 'signed-out') signOut(e.message); });
 }
