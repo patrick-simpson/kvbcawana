@@ -93,7 +93,7 @@ const PORT = Number(process.env.AWANA_TEST_PORT || require('./free-port.cjs')())
 
   console.log('\njob puller: the routes a job may run');
   {
-    check('the print routes are allowed', ['/print', '/reprint', '/print-barf-bags', '/print-custom', '/print-oneoff', '/print-leader', '/print-award'].every((p) => jp.jobPullAllowed('POST', p)));
+    check('the print routes are allowed', ['/print', '/reprint', '/print-barf-bags', '/print-custom', '/print-oneoff', '/print-leader', '/print-award', '/print-welcome'].every((p) => jp.jobPullAllowed('POST', p)));
     check('nothing else is (settings, history, the roster, traversal, other methods)',
       !['/config', '/update-csv', '/history', '/reprint-range', '/rehearsal', '/print/../config', '/print-pdf', '/phone/checkin', '/printer/clear-queue', '/print?x=1']
         .some((p) => jp.jobPullAllowed('POST', p)) && !jp.jobPullAllowed('GET', '/print') && !jp.jobPullAllowed(undefined, '/print'));

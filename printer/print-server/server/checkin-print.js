@@ -144,7 +144,10 @@ async function performCheckinPrint(input) {
     regen         = false,
     broughtFriend = false,
     friendName    = '',
-    greetJob      = null
+    greetJob      = null,
+    // /print-welcome (9.4.8, owner 2026-10-15: "Don't print check ins from the ym page",
+    // the lobby TV still welcomes them): everything a check-in does but the paper.
+    welcomeOnly   = false
   } = input || {};
 
   // ── Demo / training mode ────────────────────────────────────────────────────
@@ -350,24 +353,26 @@ async function performCheckinPrint(input) {
     const isFirstTimerTonight = !!visitor || autoFirstTimer;
 
     const twin = record ? $eligibility.twinDisambiguation(record, $clubbers.clubbers) : { middleInitial: '', nameHint: '' };
-    const result = await $labelRender.generateLabel({
-      firstName, lastName, clubName: effectiveClubName, clubImageBuffer,
-      allergyTokens, handbookGroup, isBirthday: cakeWeek, birthdayAge, isVisitor: !!visitor,
-      stepUp, stepUpNextClub, awanaShares, noPhoto, streakCount, isNewKid: newKid,
-      middleInitial: twin.middleInitial, nameHint: twin.nameHint,
-      testBanner: isDemo,   // a demo label is visibly marked
-      footerText: $tags.labelFooterText(),
-      template: $tags.labelTemplateFor(effectiveClubName),
-      extras,
-    });
-    pngPath = result.pngPath;
+    if (!welcomeOnly) {
+      const result = await $labelRender.generateLabel({
+        firstName, lastName, clubName: effectiveClubName, clubImageBuffer,
+        allergyTokens, handbookGroup, isBirthday: cakeWeek, birthdayAge, isVisitor: !!visitor,
+        stepUp, stepUpNextClub, awanaShares, noPhoto, streakCount, isNewKid: newKid,
+        middleInitial: twin.middleInitial, nameHint: twin.nameHint,
+        testBanner: isDemo,   // a demo label is visibly marked
+        footerText: $tags.labelFooterText(),
+        template: $tags.labelTemplateFor(effectiveClubName),
+        extras,
+      });
+      pngPath = result.pngPath;
 
-    // Musical printer: EVERY label announces itself (operator request — was
-    // test prints only, which is why real check-ins printed silently). Tunes
-    // cycle per label; a birthday kid's label plays Happy Birthday. Played
-    // BEFORE the label so the backfeed returns the media to its start.
-    await $tunes.playTuneIfEnabled(effectivePrinter, cakeWeek ? 'birthday' : undefined);
-    await $printing.printLabel(pngPath, effectivePrinter);
+      // Musical printer: EVERY label announces itself (operator request — was
+      // test prints only, which is why real check-ins printed silently). Tunes
+      // cycle per label; a birthday kid's label plays Happy Birthday. Played
+      // BEFORE the label so the backfeed returns the media to its start.
+      await $tunes.playTuneIfEnabled(effectivePrinter, cakeWeek ? 'birthday' : undefined);
+      await $printing.printLabel(pngPath, effectivePrinter);
+    }
     if (!isDemo) $clubbers.recordPrint(dupKey);
 
     // Connect card (#27/#10): first-time families optionally get a second
@@ -389,7 +394,7 @@ async function performCheckinPrint(input) {
     // offline queue both depend on it.
     const suppressCard = suppressConnectCard === true || suppressConnectCard === 'true';
     let shouldConnectCard = false;
-    if ($config.config.connectCard && !suppressCard) {
+    if ($config.config.connectCard && !suppressCard && !welcomeOnly) {
       if (visitor) {
         shouldConnectCard = true;
       } else if (autoFirstTimer) {
@@ -429,7 +434,7 @@ async function performCheckinPrint(input) {
 
     // The drop-off tag: a late child, and the
     // first of their household tonight. Never fails the check-in.
-    if (dropOffInstead) {
+    if (dropOffInstead && !welcomeOnly) {
       let dropPath = null;
       try {
         const tag = $tags.dropOffTagFor(firstName, lastName, effectiveClubName, new Date(), { demo: isDemo });
@@ -448,7 +453,7 @@ async function performCheckinPrint(input) {
 
     // BARF Night (8.1.0, owner): a child who brought a friend gets a second
     // tag, BARFED, to choose from. After their own tag, and never in its way.
-    if (broughtFriend === true && $tags.isBarfNight()) {
+    if (broughtFriend === true && $tags.isBarfNight() && !welcomeOnly) {
       let barfPath = null;
       try {
         const out = await $tags.generateBarfTag({ firstName });
@@ -590,7 +595,9 @@ app.post('/print-barf-tag', async (req, res) => {
   }
 });
 
-app.post('/print', async (req, res) => {
+// /print and /print-welcome (the youth page's check-in: the TV's welcome, history and
+// count, no label) read the same body.
+async function checkinRoute(req, res, opts = {}) {
   const body = req.body || {};
   let firstName, lastName;
   if (body.firstName !== undefined) {
@@ -610,6 +617,9 @@ app.post('/print', async (req, res) => {
     regen: body.regen === true,
     broughtFriend: body.friend === true, friendName: $tags.cleanFriendName(body.friendName),
     greetJob: typeof body.cloudJob === 'string' && /^[A-Za-z0-9_-]{22}$/.test(body.cloudJob) ? body.cloudJob : null,
+    welcomeOnly: opts.welcomeOnly === true,
   });
   res.status(out.status).json(out.body);
-});
+}
+app.post('/print', (req, res) => checkinRoute(req, res));
+app.post('/print-welcome', (req, res) => checkinRoute(req, res, { welcomeOnly: true }));

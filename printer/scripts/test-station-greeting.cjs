@@ -41,7 +41,10 @@ const JOB_C = 'C'.repeat(22);
 (async () => {
   const env = await import(pathToFileURL(path.join(root, '..', 'lobby', 'src', 'lib', 'envelope.js')).href);
   const binDir = fs.mkdtempSync(path.join(os.tmpdir(), 'awana-greetbin-'));
-  fs.writeFileSync(path.join(binDir, 'powershell'), '#!/bin/sh\nexit 0\n', { mode: 0o755 });
+  // Every call to the printer leaves a line here, so a test can see whether paper moved.
+  const printLog = path.join(binDir, 'printed.log');
+  fs.writeFileSync(path.join(binDir, 'powershell'), `#!/bin/sh\necho x >> '${printLog}'\nexit 0\n`, { mode: 0o755 });
+  const printerCalls = () => { try { return fs.readFileSync(printLog, 'utf8').split('\n').filter(Boolean).length; } catch { return 0; } };
   process.env.PATH = `${binDir}:${process.env.PATH}`;
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'awana-greet-'));
   const today = new Date();
@@ -107,6 +110,22 @@ const JOB_C = 'C'.repeat(22);
     await new Promise((resolve) => setTimeout(resolve, 50));
     const opened = await env.openEnvelope(await env.importDisplayKey(key), 'checkin', greetings()[0].body.payload);
     check('the greeting says first-timer (the laptop\'s own rule, on the station)', opened.ok && opened.payload.isFirstTimer === true && opened.payload.firstName === 'Zoe', JSON.stringify(opened));
+  }
+
+  console.log('\nthe youth page\'s check-in: /print-welcome greets with its job and prints nothing (9.4.8)');
+  {
+    fresh();
+    const before = printerCalls();
+    const r = await post('/print-welcome', { name: 'Tia Young', clubName: 'Trek', clubberId: '8', cloud: true, cloudJob: 'D'.repeat(22) });
+    check('it answers like a check-in', r.status === 200 && r.body.success === true, JSON.stringify(r));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    check('the printer was never called', printerCalls() === before, `${before} -> ${printerCalls()}`);
+    check('and the station sent ONE greeting naming the job', greetings().length === 1 && greetings()[0].headers['X-Job'] === 'D'.repeat(22), JSON.stringify(calls));
+    const opened = await env.openEnvelope(await env.importDisplayKey(key), 'checkin', greetings()[0].body.payload);
+    check('it opens to the child\'s first name and club', opened.ok && opened.payload.firstName === 'Tia' && opened.payload.club === 'Trek', JSON.stringify(opened));
+    fresh();
+    const p = await post('/print', { name: 'Noa Park', clubName: 'Cubbies', clubberId: '9', cloud: true, cloudJob: 'E'.repeat(22) });
+    check('while /print still prints the label', p.body.success === true && printerCalls() > before, `${before} -> ${printerCalls()}`);
   }
 
   console.log('\na job that meets a label already printed greets late, with the same event; a job-less print names its child');

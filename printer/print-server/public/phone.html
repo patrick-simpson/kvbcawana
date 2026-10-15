@@ -1647,6 +1647,11 @@ var RUNNING = 0;
 var WAITING = {};             // job id -> job, counting down to its automatic retry
 var queueEpoch = 0;           // a sign-out ends every job of the session before it
 function queueBusy() { return QUEUE.length + RUNNING + Object.keys(WAITING).length + HELD.length > 0; }
+// Early labels (owner 2026-10-15; routes.md 5): the label printed before TwoTimTwo answered.
+var PRINTED_RETRIES = 6;
+var PRINTED_RETRY_MS = 5000;
+var PRINTED_FLAT = /^(refused|no-club|wrong-night|unsealed)$/;
+var PRINTED_NOT_TAKEN = 'Label printed, but TwoTimTwo didn’t take it. Tap to try again.';
 function enqueue(job) {
   job.epoch = queueEpoch;
   QUEUE.push(job);
@@ -1668,6 +1673,13 @@ function runJob(job) {
   job.go().then(settle(function(r) { job.onDone(r); }), settle(function(e) {
     if (e && e.code === 'busy' && !job.cancelled) { waitJob(job, e.retryAfterMs); return; }
     if (e && e.code === 'signed-out') { signOut(e.message); return; }
+    // An early label is out and TwoTimTwo did not answer (slow, unreachable, a hiccup):
+    // try again on its own a few times; a flat refusal goes to the tile at once.
+    if (e && e.printed && !job.cancelled && !PRINTED_FLAT.test(e.code) && (job.printedTries || 0) < PRINTED_RETRIES) {
+      job.printedTries = (job.printedTries || 0) + 1;
+      waitJob(job, PRINTED_RETRY_MS);
+      return;
+    }
     job.onFail(e);
     if (e && e.code === 'no-club') scheduleRosterPoll(0);   // no club today: the roster says so, and the note replaces the list
   }));
@@ -1757,7 +1769,8 @@ function checkInMany(entries, family) {
     if (STATE[key] && STATE[key].status !== 'failed') return;
     var items = itemsFor(k.club);
     var friendName = String(e.choice.friendName || '').replace(/\s+/g, ' ').trim().slice(0, 24);
-    var choice = { bible: items.bible && !!e.choice.bible, friend: items.friend && !!e.choice.friend, friendName: friendName, friendClub: String(e.choice.friendClub || '') };
+    // The youth page prints no labels (owner 2026-10-15): the TV still welcomes them.
+    var choice = { bible: items.bible && !!e.choice.bible, friend: items.friend && !!e.choice.friend, friendName: friendName, friendClub: String(e.choice.friendClub || ''), welcomeOnly: SIMPLE };
     group.left += 1;
     var finish = function() {
       group.left -= 1;
@@ -1791,10 +1804,12 @@ function checkInMany(entries, family) {
       onFail: function(err) {
         if (err && err.code === 'unreachable') showOffline(true);
         var why = err && err.code === 'unreachable' ? 'no internet connection. Use the paper sheet at the desk.' : (err && err.message);
+        // An early label is out: the tile stays red until a tap tries TwoTimTwo again (no second label).
+        if (err && err.printed) why = PRINTED_NOT_TAKEN;
         group.failed.push({ name: k.name, why: why });
         STATE[key] = { status: 'failed', msg: why };
         paint();
-        setTimeout(function() { if (STATE[key] && STATE[key].status === 'failed') { delete STATE[key]; paint(); } }, FAILED_SHOW_MS);
+        if (!(err && err.printed)) setTimeout(function() { if (STATE[key] && STATE[key].status === 'failed') { delete STATE[key]; paint(); } }, FAILED_SHOW_MS);
         finish();
       },
       onCancel: function() { delete STATE[key]; paint(); finish(); },

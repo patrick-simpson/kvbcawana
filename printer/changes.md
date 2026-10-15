@@ -1,4 +1,11 @@
-﻿## [9.4.7] - 2026-10-15
+﻿## [9.4.8] - 2026-10-15
+Labels print sooner, and the youth page prints none.
+
+**Sooner labels.** While TwoTimTwo has been answering well (the last three check-ins all went through on the first try in under ten seconds), a /checkin label goes to the printer the moment the leader taps, instead of waiting for TwoTimTwo to answer. One slow, busy or refused answer goes back to waiting until three in a row are fine again. If TwoTimTwo then does not take a check-in whose label is already out, the page tries again by itself and never prints a second label; a flat refusal stays red on the tile ("Label printed, but TwoTimTwo didn't take it. Tap to try again."). The lobby TV welcome comes with the label, as before. (The check-in service and page; this app needs no change for it.)
+
+**No labels from the youth page.** A Trek or Journey check-in on /checkin/ym now sends the print computer a welcome-only job (`/print-welcome`): the lobby TV still welcomes the student, the history and tonight's count are kept, and nothing prints. A print computer still on 9.4.7 or older refuses the new job, so it prints nothing either (and shows no welcome) until it updates.
+
+## [9.4.7] - 2026-10-15
 No more duplicate labels from a page sorted by last name.
 
 **Duplicate labels.** When a TwoTimTwo page is set to "Sort by: Last Name" it shows a child as "Simpson, Micah". The Chrome extension and the check-in service read that as a different child from the "Micah Simpson" already printed, so labels printed again with the names reversed. Every name read from TwoTimTwo is now turned back into "Micah Simpson" first, and the print server treats "Simpson, Micah" as the same child, so a child who already has tonight's label never gets a second one. Names like "John Smith, Jr." are left alone.

@@ -132,6 +132,9 @@ async function stubSite(page, { kids, barf = true } = {}) {
       const busyKey = `${p}:${body.clubberId}`;
       if (world.busyFor[busyKey] > 0) { world.busyFor[busyKey] -= 1; return route.fulfill(json(429, { ok: false, reason: 'read-busy', retryAfterMs: 1500 })); }
       if (world.refuseFor[body.clubberId]) return route.fulfill(json(409, { ok: false, reason: world.refuseFor[body.clubberId] }));
+      // Answers to give this child first, in order (e.g. an early label's `printed: true`).
+      const queued = world.answersFor && world.answersFor[body.clubberId];
+      if (queued && queued.length) return route.fulfill(queued.shift());
       if (world.refuse) return route.fulfill(world.refuse);
       const kid = world.kids.find((k) => k.clubberId === body.clubberId);
       if (p === '/v1/desk/checkin') {
@@ -477,7 +480,7 @@ test('no club tonight: a tap the Worker refuses no-club puts the child back and 
 });
 
 test('the youth leaders\' page shows Trek and Journey only, on the same path', async ({ page }) => {
-  const { world } = await stubSite(page);
+  const { world, stationRing } = await stubSite(page);
   world.busyFirst = false;
   await signIn(page, '/checkin/ym/');
   await expect(page.locator('h1')).toHaveText('Trek & Journey');
@@ -490,6 +493,38 @@ test('the youth leaders\' page shows Trek and Journey only, on the same path', a
   await page.locator('#kid-sheet').getByRole('button', { name: 'Check in' }).click();
   await expect(page.locator('#toast')).toContainText('Tia Youth is checked in');
   expect(world.posts.map((p) => [p.path, p.body.clubberId])).toEqual([['/v1/desk/checkin', '14']]);
+  // No label from the youth page (owner 2026-10-15): the job is the TV's welcome alone.
+  expect((await cc.openAsStation(stationRing, world.posts[0].body.job)).route).toBe('/print-welcome');
+});
+
+test('an early label (printed before TwoTimTwo answered): a hiccup is retried by itself, a refusal stays red until a tap', async ({ page }) => {
+  test.setTimeout(60_000);
+  const { world } = await stubSite(page);
+  world.busyFirst = false;
+  world.kids.push({ clubberId: '20', first: 'Zed', last: 'Solo', club: 'T&T', clubId: '3', checkedIn: false });
+  await signIn(page);
+  await expect(page.locator('#list')).toContainText('families still to come', { timeout: 10_000 });
+  // TwoTimTwo timed out after Cy's label printed: the page tries again on its own.
+  world.answersFor = { '13': [json(504, { ok: false, reason: 'unsure', retry: true, printed: true })] };
+  await search(page).fill('Cy');
+  await page.locator('.fcard').click();
+  await page.locator('#kid-sheet').getByRole('button', { name: 'Check in' }).click();
+  await expect(page.locator('#toast')).toContainText('Cy Other is checked in', { timeout: 15_000 });
+  expect(world.posts.filter((p) => p.body.clubberId === '13')).toHaveLength(2);
+
+  // A flat refusal after Zed's label printed: red, and it stays until a tap.
+  world.answersFor = { '20': [json(409, { ok: false, reason: 'checkin-refused', printed: true })] };
+  await search(page).fill('Zed');
+  await page.locator('.fcard').click();
+  await page.locator('#kid-sheet').getByRole('button', { name: 'Check in' }).click();
+  await expect(page.locator('#toast')).toContainText('Label printed, but TwoTimTwo didn’t take it. Tap to try again.');
+  await page.waitForTimeout(10_000);   // past FAILED_SHOW_MS (9 s), when an ordinary refusal clears
+  await expect(page.locator('.fam', { hasText: 'Zed Solo' })).toContainText('Label printed, but TwoTimTwo didn’t take it');
+  expect(world.posts.filter((p) => p.body.clubberId === '20')).toHaveLength(1);
+  await page.locator('.fam', { hasText: 'Zed Solo' }).click();
+  await page.locator('#kid-sheet').getByRole('button', { name: 'Check in' }).click();
+  await expect(page.locator('#toast')).toContainText('Zed Solo is checked in', { timeout: 10_000 });
+  expect(world.posts.filter((p) => p.body.clubberId === '20')).toHaveLength(2);
 });
 
 test('a wrong passphrase stays on the sign-in, and a signed-out session returns to it', async ({ page }) => {

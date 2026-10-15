@@ -56,7 +56,10 @@ const JOB_PULL_ROUTES = Object.freeze([
   ['POST', /^\/print-oneoff$/],
   ['POST', /^\/print-leader$/],
   ['POST', /^\/print-award$/],
+  ['POST', /^\/print-welcome$/],   // 9.4.8: the youth page's check-in, the TV's welcome without a label
 ]);
+/** A child's check-in job: the label, or (youth page) the welcome alone. */
+const CHECKIN_ROUTES = new Set(['/print', '/print-welcome']);
 
 const jobPullAllowed = (method, p) => typeof method === 'string' && typeof p === 'string'
   && JOB_PULL_ROUTES.some(([m, re]) => m === method && re.test(p));
@@ -297,12 +300,12 @@ function createJobPuller(o) {
       return failJob(id, 'route-not-allowed');
     }
     const night = typeof rec.night === 'string' ? rec.night : cc.churchNight(now());
-    if (rec.route === '/print' && night !== cc.churchNight(now())) return failJob(id, 'stale-night');
+    if (CHECKIN_ROUTES.has(rec.route) && night !== cc.churchNight(now())) return failJob(id, 'stale-night');
     // Every /print this station pulls is a cloud check-in (the print server's own
     // duplicate rule), and a second generation (an undo, then a new check-in)
     // is a NEW tag: the Worker's gen and the journal below are what stop a
     // second label of one generation, so the server's own rule steps aside.
-    if (rec.route === '/print') {
+    if (CHECKIN_ROUTES.has(rec.route)) {
       // `cloudJob` names this job to the print route, so the greeting it makes goes to the
       // Worker with the job (the one greeting per check-in the single publisher lets through).
       rec.body = { ...rec.body, cloud: true, cloudJob: id };
@@ -312,7 +315,7 @@ function createJobPuller(o) {
     // The backstop: the same child, the same night, the same generation (an
     // undo and a new check-in is the next one) is one tag, whatever the jobId.
     const childId = rec.clubberId != null ? rec.clubberId : rec.body.clubberId;
-    const key = rec.route === '/print' && childId != null && String(childId).trim()
+    const key = CHECKIN_ROUTES.has(rec.route) && childId != null && String(childId).trim()
       ? `${night}:${String(childId).trim()}:${Number.isInteger(rec.gen) ? rec.gen : 0}` : '';
     if (key) {
       const same = journal.byKey(key);

@@ -319,6 +319,14 @@ export function createDesk({ cc, fetch: fetchFn, store, base = DESK_API, now = D
 
   /** @param {{ status: number, body: any }} r */
   function httpError(r) {
+    const err = httpErrorOf(r);
+    // An early label is out though TwoTimTwo did not take the check-in (routes.md 5,
+    // "Early labels"): the page retries, and a retry never prints a second label.
+    if (r.body && r.body.printed === true) err.printed = true;
+    return err;
+  }
+  /** @param {{ status: number, body: any }} r */
+  function httpErrorOf(r) {
     const reason = r.body && typeof r.body.reason === 'string' ? r.body.reason : '';
     if (r.status === 504 || reason === 'unsure') return new DeskError('unsure', 'TwoTimTwo did not answer in time. Check TwoTimTwo before trying again.');
     if (reason === 'wrong-night') return new DeskError('wrong-night', 'The service says it is a different club night than this computer thinks.', { night: r.body.night });
@@ -440,7 +448,9 @@ export function createDesk({ cc, fetch: fetchFn, store, base = DESK_API, now = D
    * `{route: '/print', body: <the print server's /print body>, clubberId, source: 'desk'}`.
    * The page does not know the claim's gen: the lease carries it.
    * @param {{ clubberId?: string|null, name: string, club?: string, visitor?: boolean }} child
-   * @param {{ bible?: boolean, friend?: boolean, friendName?: string, friendClub?: string }} [choice]
+   * `welcomeOnly` (the youth page, owner 2026-10-15): the job is `/print-welcome`, the
+   * TV's welcome with no label (a station below 9.4.8 refuses the route: nothing prints).
+   * @param {{ bible?: boolean, friend?: boolean, friendName?: string, friendClub?: string, welcomeOnly?: boolean }} [choice]
    * @returns {Promise<{ already: boolean, jobId: string|null, gen?: number, history: string }>}
    */
   async function checkIn(child, choice = {}) {
@@ -459,7 +469,7 @@ export function createDesk({ cc, fetch: fetchFn, store, base = DESK_API, now = D
     const out = await sealedPost('/v1/desk/checkin', async (list) => ({
       night: n, ...who(child), items, ...(choice.friend && friendName ? { friendName, ...(friendClub ? { friendClub } : {}) } : {}),
       historyRow: await sealHistory(n, isVisitor ? 'visitor' : 'checkin', historyRecord(child, { friend: choice.friend, friendName })),
-      job: await sealJob(list, n, { route: '/print', body: printBody, clubberId, source: 'desk' }),
+      job: await sealJob(list, n, { route: choice.welcomeOnly ? '/print-welcome' : '/print', body: printBody, clubberId, source: 'desk' }),
     }));
     return { already: !!out.already, jobId: out.jobId ?? null, gen: out.gen, history: out.history || '' };
   }
