@@ -50,7 +50,6 @@ const SUITES = [
   ['test-tonight-count', 7],
   ['test-tonight-shared', 3],
   ['test-replay-night', 10],
-  ['test-attendance-audit', 10],
   ['test-brand-kit', 10],
   ['test-dashboard-chrome', 5],
   ['test-touch-search', 5],

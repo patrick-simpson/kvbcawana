@@ -198,9 +198,8 @@ const SETTINGS_PAGE_ROUTES = {
   '/printer/clear-queue': { methods: ['POST'] },
   '/play-tune': { methods: ['POST'] },
   // The tools that moved here when the print dashboard was retired (Online
-  // only, 2026-10-12). The label ones print on this computer's printer; the
-  // audit changes the season ledger only with confirm:true; rehearsal arms a
-  // TEST night (2 hours at most); sync-login signs THIS computer in again to
+  // only, 2026-10-12). The label ones print on this computer's printer;
+  // rehearsal arms a TEST night (2 hours at most); sync-login signs THIS computer in again to
   // the service it already uses (server.js never takes an address from the
   // page). Never here: the display key, the publish token, the display login
   // and sync-logout, which mint, read or drop a secret.
@@ -210,8 +209,6 @@ const SETTINGS_PAGE_ROUTES = {
   '/print-oneoff': { methods: ['POST'] },
   '/print-custom': { methods: ['POST'] },
   '/reprint-range': { methods: ['POST'] },
-  '/attendance-audit': { methods: ['GET'] },
-  '/attendance-audit/apply': { methods: ['POST'] },
   '/rehearsal': { methods: ['POST'] },
   '/config/sync-login': { methods: ['POST'] },
   // Online check-in, P2: this computer as a print station. The status shows

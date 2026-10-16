@@ -173,7 +173,7 @@ async function main() {
     const GET_PATHS = [
       '/', '/phone', '/phone/ym', '/phone.html', '/index.html', '/step-chip.js',
       '/health', '/stats/tonight', '/history', '/history/today', '/roster-status',
-      '/failures', '/diagnostics', '/config', '/clubs', '/leaders', '/attendance-audit',
+      '/failures', '/diagnostics', '/config', '/clubs', '/leaders',
       '/preview?name=Testkid%20Leakcanary',
       '/brand/fonts.css', '/brand/fonts/PaytoneOne-Regular.ttf', '/brand/tokens.css',
       '/brand/../index.html', '/brand/%2e%2e/index.html', '/brand/README.md', '/brand/',
@@ -193,8 +193,7 @@ async function main() {
       ['/print-leader', { name: 'Stranger Leader' }], ['/print-custom', { text: 'Stranger' }], ['/print-oneoff', { firstName: 'Stranger', clubName: 'Sparks' }],
       ['/leaders', {}], ['/leaders/forget', { key: 'lan leader' }], ['/clubs', {}],
       ['/feed/completed-books', { entries: [{ name: 'Stranger Leakcanary', book: 'Wingrunner', date: '2026-09-02' }] }],
-      ['/feed/attendance-grid', { meetingDates: ['2026-09-02'], clubsRead: ['Sparks'], rows: [{ name: 'Stranger Leakcanary', club: 'Sparks', dates: ['2026-09-02'] }] }],
-      ['/attendance-audit/apply', { confirm: true }], ['/printer/clear-queue', { confirm: true }], ['/rehearsal', { on: true }],
+      ['/printer/clear-queue', { confirm: true }], ['/rehearsal', { on: true }],
       ['/config', { pusherSecret: 'attacker' }], ['/config', { printerName: 'Evil' }], ['/config/sync-login', { passphrase: 'x', url: 'https://evil.example' }],
       ['/config/display-key/generate', {}],
     ];

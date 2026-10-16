@@ -8,6 +8,8 @@ const { createCanvas, loadImage } = require('@napi-rs/canvas');
 const syncClient = require('../sync-client');
 const { cleanText } = require('../textClean');
 const fs    = require('fs');
+const path  = require('path');
+const security = require('../security');
 const $config = lazy('./config');
 const $eventBuffer = lazy('./event-buffer');
 const $labelLayout = lazy('./label-layout');
@@ -17,7 +19,6 @@ const $images = lazy('./images');
 const $labelType = lazy('./label-type');
 const $labelRender = lazy('./label-render');
 const $ledger = lazy('./ledger');
-const $attendanceAudit = lazy('./attendance-audit');
 const $relay = lazy('./relay');
 
 // What other modules (and server.js) read from this one; live bindings, so cycles are safe.
@@ -41,10 +42,30 @@ Object.defineProperties(exports, {
 // ── The drop-off tag (7.7.0; on the label printer since 7.17.0) ──────────────
 // A child who arrives late gets a plain name tag and the family gets ONE
 // extra label: "Drop-off locations at 6:42 PM", then a line
-// per child of the household (TwoTimTwo's, from the check-in laptop's
-// /touch/context; a child it doesn't place is a household of one), each with
-// where their club is right now. Owner's choices: the whole household, printed
-// with the first late child, once per family per night.
+// per child of the household (TwoTimTwo's, as the Chrome extension last saved
+// them in touch-context.json; a child it doesn't place is a household of one),
+// each with where their club is right now. Owner's choices: the whole
+// household, printed with the first late child, once per family per night.
+//
+// The extension (gone in 10.0.0) was what kept that file up to date. It is
+// still read, so the households it knew keep their one label; a family it
+// never saw is a household of one per child until something writes it again.
+const TOUCH_CONTEXT_FILE = path.join($config.DATA_DIR, 'touch-context.json');
+function loadHouseholds() {
+  return $config.cachedStore(TOUCH_CONTEXT_FILE, () => {
+    try {
+      if (!fs.existsSync(TOUCH_CONTEXT_FILE)) return [];
+      const b = JSON.parse(fs.readFileSync(TOUCH_CONTEXT_FILE, 'utf8')) || {};
+      const name = (x) => security.sanitizeStoredText(String(x || ''), 120).toLowerCase().replace(/\s+/g, ' ').trim();
+      return (Array.isArray(b.households) ? b.households : []).slice(0, 2000)
+        .map((h) => (Array.isArray(h) ? h : []).slice(0, 20).map(name).filter(Boolean))
+        .filter((h) => h.length >= 2);
+    } catch (e) {
+      console.warn('[drop-off] Could not read the saved families:', e.message);
+      return [];
+    }
+  });
+}
 const dropOffPrinted = new Map();   // household key -> local day it printed
 function dropOffName(s) { return String(s || '').toLowerCase().replace(/\s+/g, ' ').trim(); }
 function titleCaseName(s) {
@@ -53,8 +74,7 @@ function titleCaseName(s) {
 function dropOffTagFor(firstName, lastName, clubName, now = new Date(), opts = {}) {
   const self = dropOffName(`${firstName} ${lastName}`);
   if (!self) return null;
-  const ctx = $attendanceAudit.loadTouchContext();
-  const house = (ctx.households || []).find(h => h.includes(self)) || [self];
+  const house = loadHouseholds().find(h => h.includes(self)) || [self];
   const key = house.slice().sort().join('|');
   const today = $eventBuffer.localDayISO(now);
   if (!opts.demo && dropOffPrinted.get(key) === today) return null;

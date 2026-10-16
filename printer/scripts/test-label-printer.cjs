@@ -157,8 +157,15 @@ exit 0
   {
     const at = new Date(); at.setHours(18, 42, 0, 0);
     fs.writeFileSync(path.join(dataDir, 'clubbers.csv'), 'First Name,Last Name,Club\nBobby,Kwik,Sparks\nElla,Kwik,T&T\nHal,Kwik,Cubbies\nSolo,Kid,Trek\n');
-    let r = await post('/touch/context', { households: [['Bobby Kwik', 'Ella Kwik', 'Hal Kwik']], items: { bible: [], friend: [] } });
-    check('(the laptop shares the households)', r.status === 200 && r.body.households === 1, JSON.stringify(r.body));
+    // The households the Chrome extension last saved (it is gone since 10.0.0; the file stays read).
+    const saveHouseholds = (households) => {
+      const file = path.join(dataDir, 'touch-context.json');
+      fs.writeFileSync(file, JSON.stringify({ households, items: { bible: [], friend: [] } }));
+      const later = new Date(Date.now() + (saveHouseholds.n = (saveHouseholds.n || 0) + 5000));
+      fs.utimesSync(file, later, later);
+    };
+    saveHouseholds([['Bobby Kwik', 'Ella Kwik', 'Hal Kwik']]);
+    let r;
     const tag = server.dropOffTagFor('Bobby', 'Kwik', 'Sparks', at);
     check('the drop-off label lists the whole household, each with where their club is now',
       tag && tag.title === 'Drop-off locations at 6:42 PM' && JSON.stringify(tag.lines.map((l) => [l.first, l.place, l.activity])) ===
@@ -183,7 +190,7 @@ exit 0
     useConfig({ schedule: [{ club: 'Trek', startTime: '00:00', location: 'Games', room: 'Gym' }], lateGraceMin: 0 });
     if (new Date().getHours() || new Date().getMinutes()) {
       fs.writeFileSync(path.join(dataDir, 'clubbers.csv'), 'First Name,Last Name,Club\nTess,Late,Trek\nTom,Late,Trek\n');
-      await post('/touch/context', { households: [['Tess Late', 'Tom Late']], items: { bible: [], friend: [] } });
+      saveHouseholds([['Tess Late', 'Tom Late']]);
       let n = jobs().length;
       r = await post('/print', { firstName: 'Tess', lastName: 'Late', clubName: 'Trek' });
       check('a late child: the name tag, then the family\'s drop-off label, both on the label printer',

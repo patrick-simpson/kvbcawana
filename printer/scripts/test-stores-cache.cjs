@@ -60,10 +60,9 @@ const PORT = Number(process.env.AWANA_TEST_PORT || require('./free-port.cjs')())
     let r = await post('/print', { name: 'Ava Stone', clubberId: '1', clubName: 'Sparks' });
     check('(a check-in printed)', r.status === 200 && r.body.success, JSON.stringify(r));
     const before = snapshot();
-    for (let i = 0; i < 5; i++) { await get('/history/today'); await get('/stats/tonight'); await post('/phone/tonight', {}); }
-    await get('/attendance-audit').catch(() => null);
+    for (let i = 0; i < 5; i++) { await get('/history/today'); await get('/stats/tonight'); await get('/history'); }
     const after = snapshot();
-    check('fifteen dashboard and phone requests read print-history.json from disk zero times', after.history === before.history, `${after.history - before.history} reads`);
+    check('fifteen settings-page requests read print-history.json from disk zero times', after.history === before.history, `${after.history - before.history} reads`);
     check('and attendance.json zero times', after.ledger === before.ledger, `${after.ledger - before.ledger} reads`);
     r = await post('/print', { name: 'Eli Stone', clubberId: '2', clubName: 'Sparks' });
     const rows = await get('/history/today');

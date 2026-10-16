@@ -94,11 +94,12 @@ async function main() {
       && !r(PAGE, '/api/lobby-slides', 'GET') && !r(PAGE, '/config/display-key/generate', 'POST')
       && !r(PAGE, '/config/slides-token/generate', 'POST') && !r(PAGE, '/config/display-login/generate', 'POST')
       && !r(PAGE, '/config/sync-logout', 'POST') && !r(PAGE, '/update-now', 'POST') && !r(PAGE, '/reconcile', 'GET')
+      && !r(PAGE, '/attendance-audit', 'GET') && !r(PAGE, '/attendance-audit/apply', 'POST')
       && !r(PAGE, '/constructor', 'GET') && !r(PAGE, '/__proto__', 'GET'));
     // The tools that moved here from the dashboard (Online only): each is a row of its own.
     check('the moved tools are in the table, with their own methods', [
       ['/leaders', 'GET'], ['/leaders/forget', 'POST'], ['/print-leader', 'POST'], ['/print-oneoff', 'POST'], ['/print-custom', 'POST'],
-      ['/reprint-range', 'POST'], ['/attendance-audit', 'GET'], ['/attendance-audit/apply', 'POST'], ['/rehearsal', 'POST'],
+      ['/reprint-range', 'POST'], ['/rehearsal', 'POST'],
       ['/config/sync-login', 'POST'],
     ].every(([p, m]) => r(PAGE, p, m) && !r(PAGE, p, 'DELETE') && !r(PAGE, p, m === 'GET' ? 'POST' : 'GET') && !r(PAGE, p, m).open));
     check('the print station\'s status, its clear and the history import are rows of their own', [
@@ -181,13 +182,13 @@ async function main() {
     for (const [p, m] of [['/stats/tonight', 'GET'], ['/phone/roster', 'POST'], ['/phone', 'GET'],
       ['/config/display-key/generate', 'POST'], ['/config/sync-logout', 'POST'], ['/config/slides-token/generate', 'POST'],
       ['/update-csv', 'POST'], ['/print', 'POST'], ['/health', 'POST'], ['/printers', 'POST'],
-      ['/rehearsal', 'GET'], ['/print-leader', 'GET'], ['/attendance-audit', 'POST']]) {
+      ['/rehearsal', 'GET'], ['/print-leader', 'GET'], ['/attendance-audit', 'GET']]) {
       const r = await preflight(p, m, PAGE);
       check(`preflight for ${m} ${p} is refused`, r.status === 403 && !r.headers.get('access-control-allow-origin'), String(r.status));
     }
     // The moved tools are preflighted for the page, with Private Network Access, and for nobody else.
     for (const [p, m] of [['/leaders', 'GET'], ['/leaders/forget', 'POST'], ['/print-leader', 'POST'], ['/print-oneoff', 'POST'],
-      ['/print-custom', 'POST'], ['/reprint-range', 'POST'], ['/attendance-audit', 'GET'], ['/attendance-audit/apply', 'POST'],
+      ['/print-custom', 'POST'], ['/reprint-range', 'POST'],
       ['/rehearsal', 'POST'], ['/config/sync-login', 'POST']]) {
       const r = await preflight(p, m, PAGE);
       check(`preflight for ${m} ${p} is answered for the page`, r.status === 204 && r.headers.get('access-control-allow-origin') === PAGE
@@ -311,7 +312,7 @@ async function main() {
     // Every one of them: refused without proof, and answered (not a 403) with it.
     const calls = [
       ['GET', '/leaders'], ['POST', '/leaders/forget'], ['POST', '/print-leader'], ['POST', '/print-oneoff'], ['POST', '/print-custom'],
-      ['POST', '/reprint-range'], ['GET', '/attendance-audit'], ['POST', '/attendance-audit/apply'], ['POST', '/rehearsal'],
+      ['POST', '/reprint-range'], ['POST', '/rehearsal'],
     ];
     const call = (m, p, headers) => (m === 'GET' ? j(p, { headers }) : post(p, {}, headers));
     for (const [m, p] of calls) {
@@ -338,9 +339,7 @@ async function main() {
     const range = await post('/reprint-range', { fromTs: 'x', toTs: 'y' }, H);
     check('a stretch reprint is allowed through (400: not times)', range.status === 400, `${range.status} ${JSON.stringify(range.body)}`);
     const audit = await j('/attendance-audit', { headers: H });
-    check('the attendance audit reads', audit.status === 200 && audit.body && typeof audit.body === 'object', String(audit.status));
-    const applyNo = await post('/attendance-audit/apply', {}, H);
-    check('applying it is allowed through and still needs confirm:true', applyNo.status === 400, `${applyNo.status} ${JSON.stringify(applyNo.body)}`);
+    check('the retired attendance audit is not there (10.0.0)', audit.status === 403 || audit.status === 404, String(audit.status));
 
     // Rehearsal: the page arms and disarms it (before this it was the dashboard's alone).
     const arm = await post('/rehearsal', { on: true }, H);

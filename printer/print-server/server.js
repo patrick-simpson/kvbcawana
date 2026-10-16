@@ -36,7 +36,6 @@ const $http = require('./server/http');
 require('./server/checkin-print');
 const $history = require('./server/history');
 const $tonightCount = require('./server/tonight-count');
-const $attendanceAudit = require('./server/attendance-audit');
 require('./server/reprint');
 const $leaders = require('./server/leaders');
 const $customPdf = require('./server/custom-pdf');
@@ -65,7 +64,7 @@ module.exports = {
   // Pure helpers exported for scripts/test-server-helpers.cjs — they carry
   // the assumptions about TwoTimTwo's real /clubber/csv export format.
   parseCSV: $clubbers.parseCSV, normalizeHeader: $clubbers.normalizeHeader, findClubberIn: $clubbers.findClubberIn, parseNoPhoto: $eligibility.parseNoPhoto, noPhotoFor: $eligibility.noPhotoFor,
-  lateGoToLine: $ledger.lateGoToLine, scheduleRowFor: $ledger.scheduleRowFor, DEFAULT_SCHEDULE: $ledger.DEFAULT_SCHEDULE, recentAttendance: $attendanceAudit.recentAttendance,
+  lateGoToLine: $ledger.lateGoToLine, scheduleRowFor: $ledger.scheduleRowFor, DEFAULT_SCHEDULE: $ledger.DEFAULT_SCHEDULE,
   parseYesRelease: $eligibility.parseYesRelease, rosterConsentSummary: $eligibility.rosterConsentSummary, consentWarningFor: $eligibility.consentWarningFor,
   isSafePrinterName: $customPdf.isSafePrinterName,
   parseAllergies: $eligibility.parseAllergies, recapEntriesForTonight: $eventBuffer.recapEntriesForTonight, calendarDaysBetween: $eventBuffer.calendarDaysBetween, isNewerVersion: $updates.isNewerVersion, historyClubImage: $history.historyClubImage,
@@ -79,9 +78,6 @@ module.exports = {
   _setStillHereWindowForTests(fn) { $publishers.stillHereWindowForTests = fn; },
   _setCheckedOutForTests(date, ids, names) { $tonightCount.checkedOutTonight = { date, ids: new Set(ids), names: new Set((names || []).map(normalizedName)) }; },
   _getLastCheckinReportForTests() { return $tonightCount.lastCheckinReport; },
-  // Attendance audit (#311) — the diff is PURE so "unknown is not zero" and
-  // "additive only" are exhaustively testable without a browser or a scrape.
-  auditAttendance: $attendanceAudit.auditAttendance, ATTENDANCE_GRID_STALE_MS: $attendanceAudit.ATTENDANCE_GRID_STALE_MS,
   // Trophy band (#293) — pure, so the 48-character clip and the malformed-title
   // cases are pinned without rendering a label.
   trophyBandFor: $ledger.trophyBandFor, TROPHY_BAND_MAX: $ledger.TROPHY_BAND_MAX,
@@ -99,7 +95,7 @@ module.exports = {
   // Range reprint (#257) — the selector is pure, so every exclusion rule
   // (awards, leader tags, failed rows, undone rows, the club filter, the
   // newest-row-per-child dedupe and the cap) is testable without printing.
-  selectReprintRange: $history.selectReprintRange, REPRINT_RANGE_MAX: $history.REPRINT_RANGE_MAX, REPRINT_RANGE_GAP_MS: $history.REPRINT_RANGE_GAP_MS, sanitizeTouchContext: $attendanceAudit.sanitizeTouchContext,
+  selectReprintRange: $history.selectReprintRange, REPRINT_RANGE_MAX: $history.REPRINT_RANGE_MAX, REPRINT_RANGE_GAP_MS: $history.REPRINT_RANGE_GAP_MS,
   dropOffTagFor: $tags.dropOffTagFor, generateDropOffTag: $tags.generateDropOffTag, generateBarfTag: $tags.generateBarfTag, generateBarfBag: $tags.generateBarfBag, barfBagOwner: $tags.barfBagOwner, isBarfNight: $tags.isBarfNight, cleanFriendName: $tags.cleanFriendName, performOneOffPrint: $leaders.performOneOffPrint, oneOffClub: $leaders.oneOffClub,
   localDayISO: $eventBuffer.localDayISO, historyIdentityKey, clubKey: $eligibility.clubKey,
   // Remembered leaders + the one club list every dropdown reads. Pure but for
