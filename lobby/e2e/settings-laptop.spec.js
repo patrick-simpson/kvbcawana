@@ -75,7 +75,7 @@ test('on the laptop: the printer, its pick saved with the page\'s sign-in, never
   // what needs the laptop is here; what works anywhere is not
   await expect(dialog.getByRole('button', { name: 'Rehearsal mode' })).toBeVisible();
   await expect(dialog.getByRole('button', { name: 'Print a test label' })).toBeVisible();
-  await expect(dialog.getByText('Attendance audit')).toBeVisible();
+  await expect(dialog.getByText('Attendance audit')).toHaveCount(0);   // retired with the extension (10.0.0)
   await expect(dialog.getByText('Remembered leaders')).toBeVisible();
   await expect(dialog.getByLabel('From (time)')).toBeVisible();
   await expect(dialog.getByRole('checkbox', { name: /Musical printer/ })).toBeVisible();
