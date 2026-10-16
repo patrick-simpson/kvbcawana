@@ -465,6 +465,11 @@ sup { font-size: .55em; line-height: 0; vertical-align: .9em; }
 .kv-doors #lobby { grid-area: tv; }
 .kv-doors__printer { grid-area: printer; }
 
+/* 6:30: the Journey room's PC, and the leader's phone remote held beside it. */
+.kv-journey { display: grid; grid-template-columns: minmax(0, 1fr) minmax(170px, 230px); gap: clamp(18px, 2.6vw, 36px); align-items: end; }
+.kv-journey__remote { margin-bottom: 48px; }
+.kv-journey__remote > .kv-twin { border-width: 9px; border-radius: 34px; }
+
 .kv-printer { width: min(340px, 100%); }
 .kv-printer__out { position: relative; height: clamp(120px, 13vw, 170px); margin: 0 7%; overflow: hidden; }
 .kv-printer__label {
@@ -506,7 +511,7 @@ html.is-lights-out .kv-film, html.is-lights-out .kv-open, html.is-lights-out .kv
 html.is-lights-out .kv-open__clock { color: #24222a; text-shadow: none; }
 html.is-lights-out .kv-open__clock small, html.is-lights-out .kv-scene__time, html.is-lights-out .kv-finale .kv-scene__time { color: #2c2a33; }
 html.is-lights-out .kv-twin, html.is-lights-out .kv-printer, html.is-lights-out .kv-reel, html.is-lights-out .kv-logo img, html.is-lights-out .kv-tag { opacity: .08; }
-html.is-lights-out .kv-scene--journey .kv-twin { opacity: 1; }
+html.is-lights-out .kv-scene--journey .kv-device--monitor .kv-twin { opacity: 1; }
 html.is-lights-out .kv-scene--journey .kv-device--monitor::before {
   content: ''; position: absolute; left: -12%; right: -12%; top: 96%; height: 46%; z-index: -1;
   background: var(--brand-journey); opacity: .28; clip-path: polygon(12% 0, 88% 0, 100% 100%, 0 100%);
@@ -531,6 +536,9 @@ html.is-lights-out .kv-footer__shine { opacity: .07; }
   .kv-scene__time { font-size: clamp(3.6rem, 2rem + 10vw, 5.5rem); }
   .kv-doors { grid-template-columns: minmax(0, 1fr); grid-template-areas: "phone" "printer" "tv"; justify-items: center; }
   .kv-doors #lobby { width: 100%; }
+  .kv-journey { grid-template-columns: minmax(0, 1fr); justify-items: center; }
+  .kv-journey .kv-device--monitor { width: 100%; }
+  .kv-journey__remote { margin-bottom: 0; }
   .kv-device--phone { width: min(300px, 86vw); }
   .kv-pickup .kv-device--laptop { width: 100%; margin: 28px 0 0; }
   .kv-clock { left: auto; right: 10px; bottom: 10px; padding: 6px 11px 7px; }

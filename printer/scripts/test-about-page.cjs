@@ -264,16 +264,18 @@ test('links out go only to the repo, the app\'s own downloads, this site\'s page
 });
 
 // ── The real screens, only as showcase twins (owner, 2026-10-16) ─────────────
-test('the home page frames the screens only as their showcase twins, and only the check-in phone takes taps', () => {
+test('the home page frames the screens only as their showcase twins, and only the two phones take taps', () => {
   const twin = live(read('components/home/Twin.tsx'));
   const srcs = [...twin.matchAll(/:\s*'(\/[^']+)'/g)].map((m) => m[1]);
-  assert.deepEqual(srcs.sort(), ['/checkin/showcase.html', '/journey/showcase.html', '/lobby/countdown-showcase.html', '/lobby/settings-showcase.html', '/lobby/showcase.html']);
+  assert.deepEqual(srcs.sort(), ['/checkin/showcase.html', '/journey/remote/showcase.html', '/journey/showcase.html', '/lobby/countdown-showcase.html', '/lobby/settings-showcase.html', '/lobby/showcase.html']);
   assert.match(twin, /e\.source !== win \|\| e\.origin !== window\.location\.origin/, 'a twin is heard only from its own frame, same origin');
   assert.match(twin, /win\.postMessage\(msg, window\.location\.origin\)/, 'a twin is told things only on this origin');
   assert.match(twin, /pointerEvents: interactive \? 'auto' : 'none'/);
   const night = live(read('components/home/Night.tsx'));
-  assert.equal((night.match(/\binteractive\b/g) || []).length, 1, 'one interactive screen: the check-in phone');
+  // Two interactive screens (owner, 2026-10-16): the check-in phone and the leader's remote.
+  assert.equal((night.match(/\binteractive\b/g) || []).length, 2, 'two interactive screens: the two phones');
   assert.match(night, /kind="checkin"[^>]*interactive/);
+  assert.match(night, /kind="remote"[^>]*interactive/);
   // Every made-up name on the page is the showcase club's (site/showcase/stub.js).
   const stub = readFileSync(path.join(REPO, 'site/showcase/stub.js'), 'utf8');
   for (const [, first, last] of night.matchAll(/'([A-Z][a-z]+) ([A-Z][a-z]+)'/g)) assert.ok(stub.includes(`['${first}', '${last}'`), `${first} ${last} is the showcase's`);

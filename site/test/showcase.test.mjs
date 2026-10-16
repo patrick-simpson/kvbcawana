@@ -23,6 +23,7 @@ test('the build puts the stand-in inline at the top of every twin, and Journey f
     ['lobby/countdown.html', 'lobby/countdown-showcase.html', 'projector'],
     ['lobby/settings.html', 'lobby/settings-showcase.html', 'settings'],
     ['journey/index.html', 'journey/showcase.html', 'journey'],
+    ['journey/remote/index.html', 'journey/remote/showcase.html', 'remote'],
     ['checkin/index.html', 'checkin/showcase.html', 'checkin'],
   ]) assert.ok(build.includes(`['${from}', '${to}', '${kind}']`), to);
   assert.match(build, /html\.replace\(head\[0\], head\[0\] \+ inject\)/, 'right after <head>');
@@ -37,6 +38,12 @@ test('the stand-in answers the Worker, this site\'s /api and the live socket its
   assert.match(stub, /String\(url\)\.indexOf\('\/v1\/live'\) < 0\) return new RealWebSocket\(url\)/);
   assert.match(stub, /if \(e\.origin !== parentOrigin \|\| e\.source !== window\.parent\) return;/);
   assert.doesNotMatch(stub, /\.innerHTML|eval\(|new Function\(/, 'a message is data, never code');
+});
+
+test('the leader\'s remote twin never has the Talk About It sample answers (Journey licensing: a leader\'s own phone only)', () => {
+  assert.ok(stub.includes(String.raw`if (/\/slide-answers\.json$/.test(url.pathname)) return Promise.resolve(json(404,`));
+  const at = stub.indexOf('slide-answers');
+  assert.ok(at > 0 && at < stub.lastIndexOf('return realFetch(input, init);'), 'refused before anything reaches the network');
 });
 
 test('run in a window, it swaps storage for memory and switches IndexedDB and BroadcastChannel off', () => {

@@ -11,15 +11,17 @@ import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useRef,
  *   a phone runs the one or two in front of it.
  * - Talks by postMessage, same origin only: `send()` hands it a clock, a live
  *   frame or a click; `onEvent` hears what it tells (a check-in on /checkin).
- * - Only the check-in phone takes the reader's taps; the rest are pictures.
+ * - Only the two phones (check-in, the leader's remote) take the reader's taps;
+ *   the rest are pictures.
  */
-export type TwinKind = 'lobby' | 'projector' | 'settings' | 'journey' | 'checkin';
+export type TwinKind = 'lobby' | 'projector' | 'settings' | 'journey' | 'remote' | 'checkin';
 
 const SRC: Record<TwinKind, string> = {
   lobby: '/lobby/showcase.html',
   projector: '/lobby/countdown-showcase.html',
   settings: '/lobby/settings-showcase.html',
   journey: '/journey/showcase.html',
+  remote: '/journey/remote/showcase.html',
   checkin: '/checkin/showcase.html',
 };
 

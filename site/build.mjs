@@ -144,6 +144,7 @@ run(`node scripts/stamp-build.mjs ${journeyBuild} ${JSON.stringify(journeyOut)}`
     ['lobby/countdown.html', 'lobby/countdown-showcase.html', 'projector'],
     ['lobby/settings.html', 'lobby/settings-showcase.html', 'settings'],
     ['journey/index.html', 'journey/showcase.html', 'journey'],
+    ['journey/remote/index.html', 'journey/remote/showcase.html', 'remote'],
     ['checkin/index.html', 'checkin/showcase.html', 'checkin'],
   ];
   for (const [from, to, kind] of TWINS) {
@@ -300,7 +301,7 @@ writeFileSync(path.join(OUT, '_routes.json'), `${JSON.stringify({
 writeFileSync(path.join(ROOT, 'site', 'lib', 'large-files.generated.js'),
   `// Written by site/build.mjs for build ${BUILD_ID}; not committed.\nexport const LARGE_FILES = ${JSON.stringify(largeFiles, null, 2)};\nexport const LARGE_PREFIXES = ${JSON.stringify(VIDEO_PREFIXES, null, 2)};\n`);
 
-for (const must of ['index.html', 'lobby/index.html', 'lobby/countdown.html', 'lobby/settings.html', 'journey/index.html', 'journey/remote/index.html', 'journey/remote/remote.js', 'journey/src/shared/journeyRemote.js', 'lobby/shared/sync.json', 'checkin/index.html', 'checkin/ym/index.html', 'checkin/desk-transport.js', 'checkin/cloud-crypto.js', 'checkin/clubs.js', 'checkin/brand/fonts.css', 'links/index.html', 'logo/index.html', 'classic.html', 'robots.txt', 'lobby/showcase.html', 'lobby/countdown-showcase.html', 'lobby/settings-showcase.html', 'journey/showcase.html', 'checkin/showcase.html']) {
+for (const must of ['index.html', 'lobby/index.html', 'lobby/countdown.html', 'lobby/settings.html', 'journey/index.html', 'journey/remote/index.html', 'journey/remote/remote.js', 'journey/src/shared/journeyRemote.js', 'lobby/shared/sync.json', 'checkin/index.html', 'checkin/ym/index.html', 'checkin/desk-transport.js', 'checkin/cloud-crypto.js', 'checkin/clubs.js', 'checkin/brand/fonts.css', 'links/index.html', 'logo/index.html', 'classic.html', 'robots.txt', 'lobby/showcase.html', 'lobby/countdown-showcase.html', 'lobby/settings-showcase.html', 'journey/showcase.html', 'journey/remote/showcase.html', 'checkin/showcase.html']) {
   if (!existsSync(path.join(OUT, must))) throw new Error(`site build is missing ${must}`);
 }
 console.log(`\n✓ site/dist built for ${ORIGIN} (build ${BUILD_ID.slice(0, 7)})`);

@@ -1,6 +1,6 @@
 // The showcase stand-in: the first script of every showcase twin page
 // (lobby/showcase.html, lobby/countdown-showcase.html, lobby/settings-showcase.html,
-// journey/showcase.html, checkin/showcase.html), which site/build.mjs makes from the
+// journey/showcase.html, journey/remote/showcase.html, checkin/showcase.html), which site/build.mjs makes from the
 // real built page by putting this file INLINE at the top of its <head>. The home
 // page frames the twins and plays a club night on them.
 //
@@ -49,6 +49,7 @@
     projector: { 'awanaSetupChecklistDismissed.v1': '1' },
     settings: { 'awanaSyncSession.v1': SESSION },
     journey: { 'journey.captions': 'on' },
+    remote: { 'awanaSyncSession.v1': SESSION },
     checkin: { 'awanaSyncSession.v1': SESSION, 'awanaDeskHistoryKey.v1': JSON.stringify(HISTORY_PIN) },
   };
   var define = function (name, value) {
@@ -131,10 +132,27 @@
     { id: 'scr-pc-1', kind: 'computer', name: 'Check-in laptop', online: true, lastSeen: seen },
   ];
 
+  // The leader's phone remote: what the Journey PC twin last reported (the home page
+  // hands it over, showcase:now), and each press told to the home page, which hands
+  // it to the PC twin as the Worker's doorbell would.
+  var journeyNow = null;
+  var presses = 0;
+
   /** The stand-in Worker: a JSON answer, or null for 404. */
   function answer(path, method, body) {
     var now = iso();
     switch (path) {
+      case '/v1/journey/remote/state': {
+        var report = journeyNow ? Object.assign({}, journeyNow, { at: now }) : null;
+        return { serverNow: now, online: report ? 1 : 0, kiosks: [{ id: 'scr-jr-1', name: 'Journey room', online: !!report, now: report }] };
+      }
+      case '/v1/journey/remote': {
+        if (method !== 'POST' || !body || typeof body.action !== 'string') return null;
+        presses += 1;
+        var id = 'showcase-press-' + presses;
+        tell('press', { id: id, action: body.action, data: body.data === undefined ? null : body.data });
+        return { ok: true, id: id, kiosks: 1 };
+      }
       case '/v1/state': return {};
       case '/v1/screens/hello': return { ok: true, id: (body && body.id) || 'scr-showcase', name: KIND === 'projector' ? 'Projector' : 'Lobby TV', actions: [] };
       case '/v1/screens': return { max: 40, screens: SCREENS };
@@ -180,6 +198,9 @@
     try { url = new URL(typeof input === 'string' || input instanceof URL ? String(input) : input.url, location.href); } catch (e) { return realFetch(input, init); }
     var method = String((init && init.method) || (input && input.method) || 'GET').toUpperCase();
     if (/\/shared\/sync\.json$/.test(url.pathname)) return Promise.resolve(json(200, { url: BASE }));
+    // The Talk About It sample answers are for a leader's own phone only, never the
+    // public home page (CLAUDE.md, Journey "Licensing"): the remote twin never has them.
+    if (/\/slide-answers\.json$/.test(url.pathname)) return Promise.resolve(json(404, { error: 'Not part of the showcase.' }));
     // The projector checks its clock against this page's Date header (useClockDrift):
     // the twin's clock is the night's, so the header is too.
     if (method === 'HEAD' && url.origin === location.origin && url.pathname === location.pathname) {
@@ -251,7 +272,13 @@
     } else if (m.type === 'showcase:journey' && KIND === 'journey' && typeof m.action === 'string') {
       // The kiosk's own remote commands (window.journeyRemote, the phone remote's path):
       // it checks the action against its own list and refuses what it should.
-      if (window.journeyRemote && typeof window.journeyRemote.command === 'function') window.journeyRemote.command({ action: m.action });
+      if (window.journeyRemote && typeof window.journeyRemote.command === 'function') window.journeyRemote.command({
+        action: m.action,
+        id: typeof m.id === 'string' ? m.id : null,
+        data: m.data && typeof m.data === 'object' ? m.data : undefined,
+      });
+    } else if (m.type === 'showcase:now' && KIND === 'remote') {
+      journeyNow = m.now && typeof m.now === 'object' ? m.now : null;
     } else if (m.type === 'showcase:key' && typeof m.key === 'string') {
       document.dispatchEvent(new KeyboardEvent('keydown', { key: m.key, code: m.code || '', bubbles: true }));
     }
@@ -262,6 +289,26 @@
     document.addEventListener('playing', function (e) {
       if (e.target && e.target.id === 'journey-video') tell('video-playing', { t: e.target.currentTime });
     }, true);
+    // What the kiosk would report to the Worker for a phone that watches (its own
+    // journeyRemote.now()), handed to the home page for the remote twin.
+    var lastNow = '';
+    var report = function () {
+      if (!window.journeyRemote || typeof window.journeyRemote.now !== 'function') return;
+      var now = window.journeyRemote.now();
+      var key = JSON.stringify(Object.assign({}, now, { at: '' }));
+      if (key === lastNow) return;
+      lastNow = key;
+      tell('now', now);
+    };
+    window.addEventListener('journey-remote-change', function () { setTimeout(report, 0); });
+    setInterval(report, 1000);
+  }
+  // The lobby: a poster the home page plays is the room's own, not a preview, so
+  // the "Preview · click or press Esc to stop" pill stays out of the picture.
+  if (KIND === 'lobby') {
+    var hide = document.createElement('style');
+    hide.textContent = '.lobby-preview__stop{display:none!important}';
+    document.head.appendChild(hide);
   }
   tell('ready', { at: iso() });
 }());

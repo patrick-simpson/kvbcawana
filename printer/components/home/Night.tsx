@@ -9,7 +9,8 @@ import { Twin, TwinHandle } from './Twin';
  *   #doors     6:00  the check-in page on a phone (the reader taps names, or it
  *                    taps on its own), the label each tap prints, the lobby TV
  *   #projector 6:05  the projector wall: game time
- *   #journey   6:30  the Journey room's PC: the lesson starts
+ *   #journey   6:30  the Journey room's PC: the lesson starts, run from the
+ *                    leader's phone remote (#remote; the reader may press too)
  *   #pickup    7:30  the lobby's pickup board, and /settings on a laptop
  *
  * Every name is made up (site/showcase/stub.js has the club). The screens'
@@ -228,53 +229,102 @@ const Games: React.FC = () => {
 
 // ── 6:30 Journey ─────────────────────────────────────────────────────────────
 // The lesson's first 15 seconds, then the teaching slides, one every 3 s (owner,
-// 2026-10-16: "only play the first fifteen seconds", then "pop through the slides").
+// 2026-10-16: "only play the first fifteen seconds", then "pop through the slides"),
+// pressed on the leader's phone remote beside it (owner, 2026-10-16: "show off the
+// leader remote"). The remote twin's presses reach the PC twin as the Worker's
+// doorbell carries them; the PC's report reaches the remote as its poll would.
+// The reader may press too: the remote is the scene's one interactive screen,
+// and a press of theirs holds the automatic leader off for a while.
 const LESSON_MS = 15000;
+const NO_VIDEO_MS = 25000; // the video never started (no network): on to the slides anyway
 const SLIDE_MS = 3000;
-const SLIDE_STEPS = 4; // a deck is 5 slides: stay on the last
+const SPLASH_MS = 2500;
+const HUMAN_HOLD_MS = 15000;
+
+interface KioskNow { view?: string; slide?: { n?: number; of?: number } }
 
 const Journey: React.FC = () => {
   const [ref, active] = useScene('18:30:02');
   const pc = useRef<TwinHandle>(null);
-  // When Begin is due, when it was pressed, when the video started, when the slides came up.
-  const run = useRef<{ beginAt: number; begun: number; playing: number; slidesAt: number; steps: number } | null>(null);
-  useEffect(() => { if (!active) run.current = null; }, [active]);
-  const press = (action: string) => pc.current?.send({ type: 'showcase:journey', action });
-  // A leader presses Begin; 15 s into the video they skip to the slides and step
-  // through them (the kiosk's own remote commands, as the leader's phone sends them).
+  const remote = useRef<TwinHandle>(null);
+  // What the PC last reported, since when, and when the leader (us or the reader) last pressed.
+  const kiosk = useRef<{ view: string; since: number; playing: number; slide: number; of: number }>({ view: '', since: 0, playing: 0, slide: 0, of: 0 });
+  const autoAt = useRef(0);
+  const humanAt = useRef(0);
+  const lastPress = useRef(0);
+  useEffect(() => {
+    if (!active) { kiosk.current = { view: '', since: 0, playing: 0, slide: 0, of: 0 }; humanAt.current = 0; lastPress.current = 0; }
+  }, [active]);
+
+  /** Press a button on the remote, as a leader's thumb would (or straight to the PC if the remote is not up). */
+  const tap = (selector: string, action: string) => {
+    autoAt.current = Date.now();
+    lastPress.current = Date.now();
+    if (remote.current?.loaded()) remote.current.send({ type: 'showcase:click', selector });
+    else pc.current?.send({ type: 'showcase:journey', action });
+  };
+
   useEvery(active, 500, () => {
     if (!pc.current?.loaded()) return;
     const now = Date.now();
-    if (!run.current) { run.current = { beginAt: now + 2500, begun: 0, playing: 0, slidesAt: 0, steps: 0 }; return; }
-    const r = run.current;
-    if (!r.begun) { if (now >= r.beginAt) { r.begun = now; press('begin'); } return; }
-    if (!r.slidesAt) {
-      // 15 s of video; or, if the video never starts (no network), 25 s after Begin.
-      const due = r.playing ? r.playing + LESSON_MS : r.begun + 25000;
-      if (now >= due) { r.slidesAt = now; press('slides-start'); }
-      return;
+    if (now - humanAt.current < HUMAN_HOLD_MS) return;
+    const k = kiosk.current;
+    if (!k.view) return;
+    if (k.view === 'splash') {
+      if (now - k.since >= SPLASH_MS && now - lastPress.current > SPLASH_MS) tap('#btn-begin', 'begin');
+    } else if (k.view === 'intro' || k.view === 'video') {
+      const due = k.playing ? k.playing + LESSON_MS : k.since + NO_VIDEO_MS;
+      // Over a video the remote's slides button takes a second tap (so a stray thumb never ends a lesson).
+      if (now >= due && now - lastPress.current > 1500) {
+        tap('#btn-slides', 'slides-start');
+        window.setTimeout(() => { if (remote.current?.loaded()) remote.current.send({ type: 'showcase:click', selector: '#btn-slides' }); }, 700);
+      }
+    } else if (k.view === 'slides') {
+      if (k.slide < k.of && now - lastPress.current >= SLIDE_MS) tap('#btn-next', 'slide-next');
     }
-    if (r.steps < SLIDE_STEPS && now - r.slidesAt >= (r.steps + 1) * SLIDE_MS) { r.steps += 1; press('slide-next'); }
   });
-  const onEvent = (what: string) => {
-    const r = run.current;
-    if (what === 'video-playing' && r && !r.playing) r.playing = Date.now();
+
+  const onKiosk = (what: string, data: Record<string, unknown>) => {
+    if (what === 'video-playing' && !kiosk.current.playing) kiosk.current.playing = Date.now();
+    if (what !== 'now') return;
+    remote.current?.send({ type: 'showcase:now', now: data });
+    const n = data as KioskNow;
+    const view = typeof n.view === 'string' ? n.view : '';
+    const k = kiosk.current;
+    // Intro then video is one stretch: the lesson's clock runs from the first of them.
+    const lesson = (v: string) => v === 'intro' || v === 'video';
+    if (view !== k.view && !(lesson(view) && lesson(k.view))) { k.since = Date.now(); if (!lesson(view)) k.playing = 0; }
+    k.view = view;
+    k.slide = n.slide && typeof n.slide.n === 'number' ? n.slide.n : 0;
+    k.of = n.slide && typeof n.slide.of === 'number' ? n.slide.of : 0;
   };
+  const onRemote = (what: string, data: Record<string, unknown>) => {
+    if (what !== 'press' || typeof data.action !== 'string') return;
+    if (Date.now() - autoAt.current > 1500) humanAt.current = Date.now();
+    lastPress.current = Date.now();
+    pc.current?.send({ type: 'showcase:journey', action: data.action, id: data.id, data: data.data });
+  };
+
   return (
     <section ref={ref} id="journey" className="kv-scene kv-scene--journey" aria-labelledby="journey-title">
       <div className="kv-wrap kv-scene__grid">
         <div className="kv-scene__copy">
           <Time hm="6:30" />
           <h2 className="kv-scene__title" id="journey-title">Journey.</h2>
-          <p className="kv-scene__line">Down the hall, the students' lesson starts on time, captions and all.</p>
+          <p className="kv-scene__line">Down the hall, the students' lesson starts on time, captions and all. The leader runs it from their own phone: press Next and the slide moves.</p>
           <p className="kv-scene__note">Curriculum the church already licenses through its own Awana Ministry Membership.</p>
         </div>
-        <div className="kv-scene__stage">
+        <div className="kv-scene__stage kv-journey">
           <figure className="kv-device kv-device--monitor">
-            <Twin ref={pc} kind="journey" at={wall('18:30:02')} width={1600} height={900} onEvent={onEvent}
+            <Twin ref={pc} kind="journey" at={wall('18:30:02')} width={1600} height={900} onEvent={onKiosk}
               title="The Journey room's PC: the lesson's title cards, its first seconds, then the teaching slides" />
             <span className="kv-device__stand" aria-hidden="true" />
             <figcaption><Tag>Journey room PC</Tag></figcaption>
+          </figure>
+          <figure id="remote" className="kv-device kv-device--phone kv-journey__remote">
+            <Twin ref={remote} kind="remote" at={wall('18:30:02')} width={390} height={844} interactive onEvent={onRemote}
+              title="The leader's phone remote: Begin, Back and Next for the Journey room's screen" />
+            <figcaption><Tag>Leader's remote · any phone</Tag></figcaption>
           </figure>
         </div>
       </div>
