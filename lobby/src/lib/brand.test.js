@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import tokens from '../../shared/brand/tokens.json';
+import tokens from '../../../shared/brand/tokens.json';
 import { BEAT, beats, EASE, DUR, parseShape, SHAPES, DOODLES, chipGeometry, measureEm, BRAND_CLUBS, HOUSE, PLATE, plateOutline } from './brand.js';
 
 describe('motion table', () => {

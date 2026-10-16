@@ -26,7 +26,7 @@
      running unless the phone sent `force: true` (only after its confirm
      tap).
    - journeyRemote.now() is what the screen shows, in the shape the Worker
-     keeps (lobby/shared/journeyRemote.js sanitizeJourneyNow): the view, the
+     keeps (shared/journeyRemote.js sanitizeJourneyNow): the view, the
      lesson's week and TITLE (never a file), the slide (number, kind, and the
      lines of a filled-in slide, so the phone can match the Talk About It
      questions to its sample answers), the video position, why it waits, and
@@ -34,7 +34,7 @@
      it may have changed; sync.js sends it only while a phone is watching.
    - Never in configure mode (that page is only the Settings panel). */
 
-// What the phone may ask: exactly lobby/shared/journeyRemote.js
+// What the phone may ask: exactly shared/journeyRemote.js
 // JOURNEY_REMOTE_ACTIONS (test/phone-remote.test.mjs pins the two lists).
 const REMOTE_COMMANDS = ['slide-next', 'slide-prev', 'slides-start', 'play', 'pause', 'toggle-pause', 'seek', 'mute', 'unmute', 'volume', 'begin', 'pick'];
 // One volume press moves the lesson video's volume by this many percent (owner 2026-10-15).
@@ -97,7 +97,7 @@ function remoteWait(view) {
   return null;
 }
 
-/* What the screen shows now (lobby/shared/journeyRemote.js sanitizeJourneyNow). */
+/* What the screen shows now (shared/journeyRemote.js sanitizeJourneyNow). */
 function remoteNow() {
   const view = remoteView();
   const week = remoteWeek(view);

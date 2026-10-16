@@ -30,8 +30,8 @@
 // bottom). The desk marks the rest `away: true`. Hashes are kept in memory per
 // clubber id, so a page polling every 15 s costs one D1 read every few minutes.
 
-import { identityTag } from '../../lobby/shared/cloud-crypto.js';
-import { clubNightToday, zonedParts } from '../../lobby/shared/clubNight.js';
+import { identityTag } from '../../shared/cloud-crypto.js';
+import { clubNightToday, zonedParts } from '../../shared/clubNight.js';
 import { tagKey } from './ledger.js';
 import { SCHEDULE } from './clubday.js';
 

@@ -1,4 +1,4 @@
-// GENERATED from lobby/shared/text.js by scripts/shared-copies.mjs: do not edit; edit the source and run
+// GENERATED from shared/text.js by scripts/shared-copies.mjs: do not edit; edit the source and run
 // `node scripts/family-assets.mjs`. scripts/check-mirrors.mjs fails when this copy drifts.
 'use strict';
 // @ts-check
@@ -17,7 +17,7 @@
 //
 // The limits stay with their callers (NAME_MAX, STORED_NAME_MAX, the friend's
 // 24): this module has none of its own. The contract and envelope vectors and
-// every sanitizer test pin the result. See lobby/shared/README.md for how each
+// every sanitizer test pin the result. See shared/README.md for how each
 // app loads it (the print server through a generated copy).
 
 /**

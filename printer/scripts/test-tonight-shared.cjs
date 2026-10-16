@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Online check-in P5: ONE authoritativeTonight. The pure rules live in
-// lobby/shared/tonight.js and reach this folder as the generated
+// shared/tonight.js and reach this folder as the generated
 // print-server/tonight.js; the sync Worker imports the same source. This test
 // pins that server.js has no copy of the rules left (it only supplies its own
 // state to them), that the generated copy is the shared source's, and that the
@@ -39,7 +39,7 @@ check('REPORT_FRESH_MS is the shared constant', !/^const REPORT_FRESH_MS\b/m.tes
 // The report reconcile that used the mass-undo guard went with the extension (10.0.0): the
 // guard is the shared module's alone (the Worker's watcher uses it), never a copy here.
 check('the mass-undo guard is the shared one, never a copy in the server', typeof rules.massUndoRefused === 'function' && !/^function massUndoRefused\(/m.test(src));
-check('the generated copy says so and is not hand-edited', fs.readFileSync(path.join(root, 'print-server', 'tonight.js'), 'utf8').startsWith('// GENERATED from lobby/shared/tonight.js'));
+check('the generated copy says so and is not hand-edited', fs.readFileSync(path.join(root, 'print-server', 'tonight.js'), 'utf8').startsWith('// GENERATED from shared/tonight.js'));
 
 console.log('\nthe server answers what the shared module answers');
 {

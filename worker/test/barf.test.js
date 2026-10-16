@@ -3,7 +3,7 @@
 // friend, holding the child on the report across the gap, queues only the BARF
 // tag, and records the friend for the 6:30 email and the BARF bags.
 import { describe, expect, it } from 'vitest';
-import { openAsStation } from '../../lobby/shared/cloud-crypto.js';
+import { openAsStation } from '../../shared/cloud-crypto.js';
 import { BARF_TAG_FALLBACK, BARF_TAG_ROUTE, HOLD_AFTER_MS, REDO_TRIES, barfTagRoute, versionAtLeast } from '../src/barf.js';
 import { READ_INTERVAL_MS } from '../src/readbudget.js';
 import { SPILL_MS, WATCH_INTERVAL_MS } from '../src/watcher.js';

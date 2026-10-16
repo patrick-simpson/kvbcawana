@@ -4,7 +4,7 @@ import {
 } from './chip.js';
 // The geometry is the one shared copy (shared/chipGeometry.js, tested there);
 // the projector's chip is that without the lobby's weather glyph.
-import { chipGeometry as sharedChipGeometry, markExtents } from '../../../shared/chipGeometry.js';
+import { chipGeometry as sharedChipGeometry, markExtents } from '../../../../shared/chipGeometry.js';
 
 describe('the projector\'s stepped chip', () => {
   it('is the shared geometry, with no glyph', () => {

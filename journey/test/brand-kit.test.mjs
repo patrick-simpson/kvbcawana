@@ -1,6 +1,6 @@
 // The brand kit mirror and the page's use of it.
 //
-// public/brand/ is a generated, gitignored copy of lobby/shared/brand/ (the
+// public/brand/ is a generated, gitignored copy of shared/brand/ (the
 // canonical kit; scripts/family-assets.mjs makes it, `npm test` runs that
 // first), so the kiosk never depends on another site or the network for its
 // own fonts and colours. These tests are the drift check: the copy must match

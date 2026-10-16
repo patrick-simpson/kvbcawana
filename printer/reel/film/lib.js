@@ -1,6 +1,6 @@
 // The film's motion toolkit. Every value is a pure function of time, so any
 // frame can be drawn on its own, in any order, and two renders are identical.
-// The curves and the spring are the brand kit's (lobby/shared/brand/tokens.json
+// The curves and the spring are the brand kit's (shared/brand/tokens.json
 // motion table; lobby/src/lib/squish.js for the spring: stiffness 260,
 // damping 17, mass 1).
 

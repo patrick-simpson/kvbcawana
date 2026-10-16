@@ -47,7 +47,7 @@ describe('shipped shared files', () => {
     ]);
     expect(paths.length).toBeGreaterThan(0);
     for (const p of paths) {
-      expect(() => readFileSync(resolve(__dirname, '../../../shared', p))).not.toThrow();
+      expect(() => readFileSync(resolve(__dirname, '../../../../shared', p))).not.toThrow();
     }
   });
 });

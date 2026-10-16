@@ -318,14 +318,14 @@ storage keys.
 
 ## 8. Build tracks (disjoint file ownership)
 
-Order: Track A's first commit is `lobby/shared/churchSettings.js` + its test (API in
+Order: Track A's first commit is `shared/churchSettings.js` + its test (API in
 routes.md 10.3); B and C stub against that API until it lands. All three branch from main
 after `worker-ymcheckout` is merged.
 
 ### Track A: Worker
 
 Owns: `worker/**` (src, test, `wrangler.toml`, `README.md`, `src/routes.md` BUILT
-marks), `lobby/shared/churchSettings.js`, `lobby/shared/churchSettings.test.js`.
+marks), `shared/churchSettings.js`, `shared/churchSettings.test.js`.
 
 - `src/device.js` (10.1 header parse), `src/switches.js` (10.2: store, effective-env
   wrapper, routes), `src/church.js` (10.3), `src/notice.js` (10.4 routes, gate, replay

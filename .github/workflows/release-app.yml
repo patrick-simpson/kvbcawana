@@ -221,7 +221,7 @@ jobs:
         working-directory: printer/print-server
 
       # The print server's brand kit is not committed: it is a copy of the one
-      # canonical kit (lobby/shared/brand), made here from the checkout, before
+      # canonical kit (shared/brand), made here from the checkout, before
       # the render smoke test reads it and before electron-builder packages
       # print-server/public/** (npm run dist makes it again, a no-op). The
       # installed app's smoke test below fails the release if it did not ship.

@@ -13,7 +13,7 @@ export default defineConfig(({ mode }) => {
       server: {
         port: 3000,
         host: '0.0.0.0',
-        // The home page draws the lobby's brand kit (lobby/shared/brand: its
+        // The home page draws the lobby's brand kit (shared/brand: its
         // shapes, doodles and club marks), imported from its one copy.
         fs: { allow: ['..'] },
       },

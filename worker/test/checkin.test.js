@@ -1,7 +1,7 @@
 // Online check-in, Worker core: stations, the print lease, the desk's claim
 // API and the read clock, end to end through SyncCore.handle().
 import { describe, expect, it } from 'vitest';
-import { openAsStation } from '../../lobby/shared/cloud-crypto.js';
+import { openAsStation } from '../../shared/cloud-crypto.js';
 import { Registry } from '../src/registry.js';
 import { LEASE_MS } from '../src/printq.js';
 import { READ_INTERVAL_MS } from '../src/readbudget.js';

@@ -27,7 +27,7 @@
 import { TwoTimTwoClient, credentialsFrom, reportColumns, rowShape } from './twotimtwo.js';
 import { fromBase64, toBase64 } from './crypto.js';
 import { INTERACTIVE_WAIT_MS, READ_INTERVAL_MS, ReadBudget } from './readbudget.js';
-import { massUndoRefused, reportIsPartial } from '../../lobby/shared/tonight.js';
+import { massUndoRefused, reportIsPartial } from '../../shared/tonight.js';
 import { SCHEDULE, clubDay } from './clubday.js';
 
 export { READ_INTERVAL_MS };
@@ -200,7 +200,7 @@ function clubsOf(ids, kids) {
  */
 export function compareReport(prev, report) {
   const kids = childrenOf(report.entries);
-  // The SHARED rules (lobby/shared/tonight.js, the print server's too): a report
+  // The SHARED rules (shared/tonight.js, the print server's too): a report
   // that parsed fewer children than its own Count: footers is partial, and a read
   // that drops more than half the room at once is refused.
   if (reportIsPartial(report)) {
@@ -257,7 +257,7 @@ export class Watcher {
     this.clientKey = '';
     /** @type {Promise<any>|null} */
     this.inFlight = null;
-    /** The schedule the club-day rule reads (lobby/shared/schedule.json, bundled; tests swap it). */
+    /** The schedule the club-day rule reads (shared/schedule.json, bundled; tests swap it). */
     this.schedule = SCHEDULE;
   }
 

@@ -97,7 +97,7 @@ describe('free plan: no key work in the new modules', () => {
       const src = readFileSync(new URL(`../src/${f}.js`, import.meta.url), 'utf8');
       expect(src, f).not.toMatch(/crypto\.subtle|subtle\.|from '\.\/crypto\.js'|cloud-crypto|sealState|openState/);
     }
-    const shared = readFileSync(new URL('../../lobby/shared/churchSettings.js', import.meta.url), 'utf8');
+    const shared = readFileSync(new URL('../../shared/churchSettings.js', import.meta.url), 'utf8');
     expect(shared).not.toMatch(/crypto/);
   });
 });

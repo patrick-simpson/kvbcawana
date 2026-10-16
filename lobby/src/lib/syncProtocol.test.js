@@ -19,10 +19,10 @@ import {
   screenSettingsPath,
   signInWithPassphrase,
   SCREEN_HELLO_PATH,
-} from '../../shared/sync-protocol.js';
+} from '../../../shared/sync-protocol.js';
 
 // The protocol is dependency-free and shared by every sync client
-// (lobby/shared/sync-protocol.js; the print server and the Electron app run a
+// (shared/sync-protocol.js; the print server and the Electron app run a
 // generated CommonJS copy, which scripts/check-mirrors.mjs keeps current).
 // These are the rules every client now gets from the one place.
 

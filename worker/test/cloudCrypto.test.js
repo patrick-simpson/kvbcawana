@@ -1,10 +1,10 @@
-// The Worker's side of lobby/shared/cloud-crypto.js: only the cheap pieces run
+// The Worker's side of shared/cloud-crypto.js: only the cheap pieces run
 // here (the verifier hash and the identifier tags; every derivation, seal and
 // open is a client's, ROADMAP.md#online-check-in). Pins that the module loads
 // in the Worker's environment and that its night key is the watcher's.
 import { describe, expect, it } from 'vitest';
-import { authVerifier, base64ToBytes, churchNight, generateKeyPair, identityTag, importPrivateKey, keyRing, openAsStation, sealForStations } from '../../lobby/shared/cloud-crypto.js';
-import vectors from '../../lobby/shared/cloud-vectors.json';
+import { authVerifier, base64ToBytes, churchNight, generateKeyPair, identityTag, importPrivateKey, keyRing, openAsStation, sealForStations } from '../../shared/cloud-crypto.js';
+import vectors from '../../shared/cloud-vectors.json';
 import { localTime } from '../src/watcher.js';
 
 describe('cloud-crypto in the Worker', () => {

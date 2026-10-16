@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// Writes lobby/shared/cloud-vectors.json: deterministic test vectors for every
-// construction in lobby/shared/cloud-crypto.js (fixed keys, salts, IVs and
+// Writes shared/cloud-vectors.json: deterministic test vectors for every
+// construction in shared/cloud-crypto.js (fixed keys, salts, IVs and
 // ephemeral keys). The lobby (vitest) and the printer (node) reproduce them
 // byte for byte.
 //
@@ -12,10 +12,10 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import * as cc from '../lobby/shared/cloud-crypto.js';
+import * as cc from '../shared/cloud-crypto.js';
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
-const OUT = path.join(ROOT, 'lobby/shared/cloud-vectors.json');
+const OUT = path.join(ROOT, 'shared/cloud-vectors.json');
 const prev = existsSync(OUT) ? JSON.parse(readFileSync(OUT, 'utf8')) : null;
 
 
@@ -102,7 +102,7 @@ const refuse = [
 
 const out = {
   version: cc.CLOUD_CRYPTO_VERSION,
-  about: 'Deterministic vectors for lobby/shared/cloud-crypto.js (scripts/gen-cloud-vectors.mjs). Every name is made up. Never regenerate to make a test pass.',
+  about: 'Deterministic vectors for shared/cloud-crypto.js (scripts/gen-cloud-vectors.mjs). Every name is made up. Never regenerate to make a test pass.',
   params: {
     PBKDF2_ITER: cc.PBKDF2_ITER, PBKDF2_ITER_MIN: cc.PBKDF2_ITER_MIN, PBKDF2_ITER_MAX: cc.PBKDF2_ITER_MAX,
     INFO_AUTH: cc.INFO_AUTH, INFO_WRAP: cc.INFO_WRAP, INFO_HIST: cc.INFO_HIST, INFO_STATION: cc.INFO_STATION,

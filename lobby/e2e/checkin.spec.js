@@ -3,8 +3,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { expect, test } from '@playwright/test';
 import { buildCheckinPages, CHECKIN_MODULES } from '../../site/checkin/checkin-page.mjs';
-import * as cc from '../shared/cloud-crypto.js';
-import { mergeChurch, sanitizeChurch } from '../shared/churchSettings.js';
+import * as cc from '../../shared/cloud-crypto.js';
+import { mergeChurch, sanitizeChurch } from '../../shared/churchSettings.js';
 
 // The one check-in page (awana.kvbchurch.org/checkin: the print app's phone page on
 // the desk's online path, ROADMAP.md#online-check-in) in a real browser against a
@@ -18,7 +18,7 @@ import { mergeChurch, sanitizeChurch } from '../shared/churchSettings.js';
 // site/build.mjs builds it, so no port or build is needed.
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-const SHARED = path.join(HERE, '..', 'shared');
+const SHARED = path.join(HERE, '..', '..', 'shared');
 const ORIGIN = 'https://checkin.test';
 const PASS = 'kennebec';
 const MIME = { '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.woff2': 'font/woff2', '.ttf': 'font/ttf', '.json': 'application/json' };
@@ -161,7 +161,7 @@ async function stubSite(page, { kids, barf = true, simple = false } = {}) {
     const mod = CHECKIN_MODULES[u.pathname.slice('/checkin/'.length)];
     if (mod) return route.fulfill({ status: 200, contentType: MIME['.js'], body: readFileSync(mod) });
     if (u.pathname.startsWith('/checkin/brand/')) {
-      // site/build.mjs serves the print server's copy of the kit; the kit's one committed copy is lobby/shared/brand.
+      // site/build.mjs serves the print server's copy of the kit; the kit's one committed copy is shared/brand.
       const file = path.join(SHARED, 'brand', u.pathname.slice('/checkin/brand/'.length));
       return route.fulfill({ status: 200, contentType: MIME[path.extname(file)] || 'application/octet-stream', body: readFileSync(file) });
     }

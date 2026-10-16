@@ -9,8 +9,8 @@ import path from 'node:path';
 import { bootKiosk, tick } from './kiosk-dom.mjs';
 // The family's one sign-in (sync-protocol.js) and derivation (cloud-crypto.js): the page imports them as ES
 // modules from src/shared/ (family-assets copies); jsdom cannot import(), so the harness hands them over.
-import * as sp from '../../lobby/shared/sync-protocol.js';
-import * as cc from '../../lobby/shared/cloud-crypto.js';
+import * as sp from '../../shared/sync-protocol.js';
+import * as cc from '../../shared/cloud-crypto.js';
 // The registry's own allowlist (the Worker applies exactly this to a hello's status).
 import { isScreenId, sanitizeScreenStatus } from '../../lobby/src/lib/syncSpecs.js';
 

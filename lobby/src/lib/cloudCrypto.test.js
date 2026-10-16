@@ -1,11 +1,11 @@
 // @vitest-environment node
-// lobby/shared/cloud-crypto.js against its deterministic vectors
-// (lobby/shared/cloud-vectors.json; printer/scripts/test-cloud-crypto.cjs runs
+// shared/cloud-crypto.js against its deterministic vectors
+// (shared/cloud-vectors.json; printer/scripts/test-cloud-crypto.cjs runs
 // the same vectors through the generated CommonJS copy). Every PBKDF2 here is
 // the real 600000 iterations, so the slow cases carry their own timeout.
 import { describe, expect, it } from 'vitest';
-import * as cc from '../../shared/cloud-crypto.js';
-import vectors from '../../shared/cloud-vectors.json';
+import * as cc from '../../../shared/cloud-crypto.js';
+import vectors from '../../../shared/cloud-vectors.json';
 import { normalizeSyncPassphrase } from './syncSpecs.js';
 
 const SLOW = 60_000;

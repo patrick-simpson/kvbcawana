@@ -3,10 +3,10 @@ import { M } from '../../lib/motion.jsx';
 import { EASE } from '../../lib/brand.js';
 import { holdThenLand } from '../../lib/lobbyMotion.js';
 import { ARRIVAL, squishLand, withSquish } from '../../lib/squish.js';
-import { LOGO_ARRIVAL, parseChurchLogo } from '../../../shared/churchLogo.js';
-import fullSvg from '../../../shared/brand/logos/kvbc-awana-full.svg?raw';
-import twoLineSvg from '../../../shared/brand/logos/kvbc-awana-two-line.svg?raw';
-import stackedSvg from '../../../shared/brand/logos/kvbc-awana-stacked.svg?raw';
+import { LOGO_ARRIVAL, parseChurchLogo } from '../../../../shared/churchLogo.js';
+import fullSvg from '../../../../shared/brand/logos/kvbc-awana-full.svg?raw';
+import twoLineSvg from '../../../../shared/brand/logos/kvbc-awana-two-line.svg?raw';
+import stackedSvg from '../../../../shared/brand/logos/kvbc-awana-stacked.svg?raw';
 
 const LOGOS = {
   full: parseChurchLogo(fullSvg),

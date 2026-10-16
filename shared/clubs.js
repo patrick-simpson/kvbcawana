@@ -19,7 +19,7 @@
 // and lobby/src/lib/clubs.test.js pin both. Colors are the Awana 2026-27
 // catalog's (shared/brand/tokens.json; Puggles is blue by the owner's call).
 //
-// Self-contained: see lobby/shared/README.md for how each app loads it.
+// Self-contained: see shared/README.md for how each app loads it.
 
 /**
  * @typedef {{

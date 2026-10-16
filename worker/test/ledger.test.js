@@ -1,7 +1,7 @@
 // The night's claims (ledger.js).
 import { describe, expect, it } from 'vitest';
 import { CHECKING_TTL_MS, Ledger, Tags } from '../src/ledger.js';
-import { churchNight } from '../../lobby/shared/cloud-crypto.js';
+import { churchNight } from '../../shared/cloud-crypto.js';
 import { everything, fakeClock, memoryStore, plainWords } from './helpers.js';
 import { leaks } from './noleak.js';
 

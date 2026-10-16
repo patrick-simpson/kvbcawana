@@ -23,7 +23,7 @@
 // Standalone (window.self === window.top) none of it applies, and the page
 // is laid out exactly as it always was.
 
-import { sanitizeJourneyPress } from '../../shared/journeyRemote.js';
+import { sanitizeJourneyPress } from '../../../shared/journeyRemote.js';
 import { EMBED_DOORBELL_MESSAGE } from './constants.js';
 
 /**

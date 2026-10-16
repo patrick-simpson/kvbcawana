@@ -142,7 +142,7 @@ Settings → **Lessons on this computer**:
 - `public/index.html` — the whole app. Two full-viewport layers (Check-in Display iframe, Journey video) are both always mounted; a small script toggles which one is visible.
 - `public/src/schedule.js` — the 6:30/7:15 schedule and the manual toggle button's behavior.
 - `public/src/style.css` — full-bleed layout and button styling, in the Awana 2026-27 catalog's Journey look.
-- `public/brand/` — a generated (ignored, `npm run assets`) byte-identical copy of the Awana brand kit in `lobby/shared/brand/` (colours, the Journey logo, and the three self-hosted fonts), so the kiosk never needs the network for its own look. Don't edit it by hand; see CLAUDE.md.
+- `public/brand/` — a generated (ignored, `npm run assets`) byte-identical copy of the Awana brand kit in `shared/brand/` (colours, the Journey logo, and the three self-hosted fonts), so the kiosk never needs the network for its own look. Don't edit it by hand; see CLAUDE.md.
 - `public/lessons.json` — the fixed week→video map for the 32-week Advocates course.
 - `public/current-lesson.json` — which week is "current" right now, refreshed nightly by GitHub Actions.
 

@@ -15,7 +15,7 @@
 // ─────────────────────────────────────────────────────────────
 
 import { SLIDE_THEMES, TEXT_SIZES } from './slides.js';
-import { isNoClubDate } from '../../shared/clubNight.js';
+import { isNoClubDate } from '../../../shared/clubNight.js';
 
 // Local-time YYYY-MM-DD key (same recipe as useTally's todayKey).
 export function localDateStr(d = new Date()) {

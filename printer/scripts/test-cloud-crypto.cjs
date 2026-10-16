@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // Online check-in's cryptography as the print server and the KVBC Awana app
 // load it: the GENERATED CommonJS copy (print-server/cloud-crypto.js, from
-// lobby/shared/cloud-crypto.js by scripts/shared-copies.mjs) against the
-// shared vectors (lobby/shared/cloud-vectors.json). Plain Node, zero deps.
+// shared/cloud-crypto.js by scripts/shared-copies.mjs) against the
+// shared vectors (shared/cloud-vectors.json). Plain Node, zero deps.
 // The negative cases are the product: a seal that opens somewhere it should
 // not is worse than none.
 //
@@ -23,7 +23,7 @@ const path = require('path');
 const fs = require('fs');
 const cc = require('../print-server/cloud-crypto.js');
 
-const vectors = JSON.parse(fs.readFileSync(path.join(__dirname, '..', '..', 'lobby', 'shared', 'cloud-vectors.json'), 'utf8'));
+const vectors = JSON.parse(fs.readFileSync(path.join(__dirname, '..', '..', 'shared', 'cloud-vectors.json'), 'utf8'));
 const bytes = (b64) => cc.base64ToBytes(b64);
 const ring = async (name) => cc.keyRing(await cc.importPrivateKey(vectors.keys[name].jwk), vectors.keys[name].pub);
 

@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { createHistoryKey, newRowId, sealRow } from '../shared/cloud-crypto.js';
+import { createHistoryKey, newRowId, sealRow } from '../../shared/cloud-crypto.js';
 
 // The settings page's History section (ROADMAP.md#online-check-in, P6), against a
 // stand-in sync Worker holding a real sealed history: the trends are drawn from

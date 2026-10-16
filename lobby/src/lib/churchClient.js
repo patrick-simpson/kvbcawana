@@ -14,7 +14,7 @@
 // a child.
 
 import { call } from './workerClient.js';
-import { CHURCH_JSON_MAX, CHURCH_KEYS, CHURCH_SPEC, mergeChurch, sanitizeChurch } from '../../shared/churchSettings.js';
+import { CHURCH_JSON_MAX, CHURCH_KEYS, CHURCH_SPEC, mergeChurch, sanitizeChurch } from '../../../shared/churchSettings.js';
 
 export { CHURCH_JSON_MAX, CHURCH_KEYS, CHURCH_SPEC };
 

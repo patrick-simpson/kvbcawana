@@ -11,7 +11,7 @@
  * fields and waves, settle for type landing, pop for chips and stickers,
  * exit for leaving (exits run faster than entrances).
  */
-import { BEAT, DUR as KIT_DUR, EASE as KIT_EASE } from '../../../shared/motion.js';
+import { BEAT, DUR as KIT_DUR, EASE as KIT_EASE } from '../../../../shared/motion.js';
 
 export const DUR = {
   /** --dur-beat: the kit's one beat; everything starts on one */

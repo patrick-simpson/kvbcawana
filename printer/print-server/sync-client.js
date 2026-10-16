@@ -2,7 +2,7 @@
 // worker/). Request helpers, no state: server.js owns when they run and
 // what is persisted. The PROTOCOL (address and session validation, request
 // building, sign-in and answer parsing) lives in ./sync-protocol.js, a
-// generated copy of lobby/shared/sync-protocol.js that the lobby's screens use
+// generated copy of shared/sync-protocol.js that the lobby's screens use
 // too; this file adds only Node's fetch and its timeout.
 //
 // Owner, 2026-10-01: one passphrase ("kennebec") sets up every screen through

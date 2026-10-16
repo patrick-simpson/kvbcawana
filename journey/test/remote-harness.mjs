@@ -1,6 +1,6 @@
 // Opens the phone remote (public/remote/) in real Chromium with every request
 // answered here: the page and the brand kit from public/, the site's
-// lobby/shared/sync.json naming a stand-in sync Worker on the same origin
+// shared/sync.json naming a stand-in sync Worker on the same origin
 // (/api, as the real site serves it), and that Worker's sign-in, state and
 // press routes. Used by test/remote-page.test.mjs (and for screenshots).
 import { existsSync, readFileSync } from 'node:fs';
@@ -23,7 +23,7 @@ const TYPES = {
 
 const titleOf = (week) => LESSONS.lessons.find((l) => l.week === week).title;
 
-/* Reports a kiosk would send (lobby/shared/journeyRemote.js shape). */
+/* Reports a kiosk would send (shared/journeyRemote.js shape). */
 export const NOW = {
   slides: (week = 5, n = 3, of = 7) => ({
     view: 'slides', week, title: titleOf(week), preview: false, wait: null,

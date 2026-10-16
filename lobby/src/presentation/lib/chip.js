@@ -10,9 +10,9 @@
 //
 // Pure functions only. StepChip.jsx draws with them.
 
-import { chipGeometry as sharedChipGeometry, inkEm, measureEm } from '../../../shared/chipGeometry.js';
+import { chipGeometry as sharedChipGeometry, inkEm, measureEm } from '../../../../shared/chipGeometry.js';
 
-export { SHOUT_BOX, inkEm, inkOverflow, markExtents, measureEm } from '../../../shared/chipGeometry.js';
+export { SHOUT_BOX, inkEm, inkOverflow, markExtents, measureEm } from '../../../../shared/chipGeometry.js';
 
 /**
  * Geometry for one chip, built around its own text so nothing can spill off

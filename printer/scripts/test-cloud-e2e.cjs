@@ -127,7 +127,7 @@ const fakeSafe = {
   // It derives authKey, signs in (the one upgrade login the first time), proves the
   // history key, then seals the job and the row in "the browser" and posts.
   const esm = (...p) => import(pathToFileURL(path.join(root, '..', ...p)).href);
-  const esmCc = await esm('lobby', 'shared', 'cloud-crypto.js');
+  const esmCc = await esm('shared', 'cloud-crypto.js');
   const { createDesk } = await esm('site', 'checkin', 'desk-transport.js');
   const deskFetch = async (url, init = {}) => t.core.handle(new Request(`${BASE}${String(url).replace(/^\/api/, '')}`, init));
   const desk = createDesk({ cc: esmCc, fetch: deskFetch, now: t.clock.now });

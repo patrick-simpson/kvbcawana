@@ -13,7 +13,7 @@
 // (409 `stations-changed`), at most RESEAL_MAX times, as site/desk/
 // desk-transport.js does.
 
-import { churchNight, newRowId, sealForStations, sealRow } from '../../shared/cloud-crypto.js';
+import { churchNight, newRowId, sealForStations, sealRow } from '../../../shared/cloud-crypto.js';
 import { call } from './workerClient.js';
 
 /** A stations-changed answer is resealed at most this many times. */

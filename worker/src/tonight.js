@@ -1,5 +1,5 @@
 // The Worker's own "who is here tonight" (ROADMAP.md#online-check-in, P5): the
-// state that the SHARED rules (lobby/shared/tonight.js, the very code the print
+// state that the SHARED rules (shared/tonight.js, the very code the print
 // server runs) are applied to when the Worker is the one publisher.
 //
 //   the applied report   what the watcher read (never a partial or a refused one):
@@ -24,7 +24,7 @@
 // the night adds an at-rest copy, not a new reader. Free plan: one AES-GCM
 // seal of a few KB per change (about a millisecond), written only on a change.
 
-import { REPORT_FRESH_MS, authoritativeTonight, tonightHereNow, tonightRows, normalizedName, splitFullName } from '../../lobby/shared/tonight.js';
+import { REPORT_FRESH_MS, authoritativeTonight, tonightHereNow, tonightRows, normalizedName, splitFullName } from '../../shared/tonight.js';
 import { Doc } from './doc.js';
 import { localTime, openState, sealState } from './watcher.js';
 

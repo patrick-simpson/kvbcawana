@@ -89,7 +89,7 @@ describe('saving with baseRev', () => {
 
 describe('one definition for the page, the Worker and the station', () => {
   it('uses the shared allowlist, and has a default for every key and no other', async () => {
-    const shared = await import('../../shared/churchSettings.js');
+    const shared = await import('../../../shared/churchSettings.js');
     const { CHURCH_KEYS } = await import('./churchClient.js');
     expect(CHURCH_KEYS).toBe(shared.CHURCH_KEYS);
     expect(Object.keys(CHURCH_DEFAULTS).sort()).toEqual([...shared.CHURCH_KEYS].sort());

@@ -6,7 +6,7 @@
 // signed in once has), and the history key is a real one made here, so the page
 // seals its rows exactly as it would on a club night. No print station is
 // registered, so a check-in carries no label job.
-import { generateKeyPair } from '../../../lobby/shared/cloud-crypto.js';
+import { generateKeyPair } from '../../../shared/cloud-crypto.js';
 
 const KIDS = [
   ['Ava Linden', 'Puggles', true], ['Mia Rourke', 'Puggles'], ['Ella Marchetti', 'Puggles'],

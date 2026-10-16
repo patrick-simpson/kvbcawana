@@ -4,11 +4,11 @@
 # default (the release workflow builds the installer on a Windows runner), which
 # would ship CRLF copies. The fonts are binary and never converted.
 # (printer/scripts/test-brand-kit.cjs refuses any CR outright.)
-shared/brand/** text=auto eol=lf
-shared/brand/**/*.svg text eol=lf
-shared/brand/**/*.css text eol=lf
-shared/brand/**/*.json text eol=lf
-shared/brand/**/*.md text eol=lf
-shared/brand/**/*.txt text eol=lf
-shared/brand/**/*.ttf binary
-shared/brand/**/*.woff2 binary
+brand/** text=auto eol=lf
+brand/**/*.svg text eol=lf
+brand/**/*.css text eol=lf
+brand/**/*.json text eol=lf
+brand/**/*.md text eol=lf
+brand/**/*.txt text eol=lf
+brand/**/*.ttf binary
+brand/**/*.woff2 binary

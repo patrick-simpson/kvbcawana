@@ -7,7 +7,7 @@
 -- APART from night_summary (the desk's live counts, added as deltas), so an
 -- imported night can never be added to a live one: GET /v1/history/summary
 -- answers the live line where one exists for a night and club, else this one.
--- club is the app's club table name (lobby/shared/clubs.js: Puggles, Cubbies,
+-- club is the app's club table name (shared/clubs.js: Puggles, Cubbies,
 -- Sparks, T&T, Trek, Journey), the same spelling the live lines carry.
 --
 -- Apply with the rest: npx wrangler d1 migrations apply awana-history --remote

@@ -22,7 +22,7 @@
 // and DisplayDocTitle. Run that second: a handout is not finished until it
 // is tagged, titled and language-marked.
 //
-// Fonts: the kit's own files from lobby/shared/brand/fonts/, the WHOLE font
+// Fonts: the kit's own files from shared/brand/fonts/, the WHOLE font
 // (never a webfont subset of a reserved-name face; see the kit README); the
 // PDF embeds what it draws, as every PDF does (document embedding, which the
 // OFL allows). Art: kit shapes and doodles, path data read from the kit at
@@ -48,7 +48,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 
 const REPO = path.dirname(path.dirname(new URL(import.meta.url).pathname));
-const KIT = path.join(REPO, '..', 'lobby', 'shared', 'brand');
+const KIT = path.join(REPO, '..', 'shared', 'brand');
 const OUT_DIR = path.join(REPO, 'public', 'handouts');
 const SUMMARIES_PATH = path.join(REPO, 'data', 'leader-handout-summaries.json');
 const PROSE_PATH = path.join(REPO, 'data', 'leader-transcript-prose.json');

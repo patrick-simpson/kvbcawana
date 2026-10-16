@@ -17,8 +17,8 @@ const MARK = '<script>\n// ── Search, households, families and tile fit';
 /** What the page imports at /checkin/<name>, and the one file each is served from. */
 export const CHECKIN_MODULES = Object.freeze({
   'desk-transport.js': path.join(HERE, 'desk-transport.js'),
-  'cloud-crypto.js': path.join(ROOT, 'lobby', 'shared', 'cloud-crypto.js'),
-  'clubs.js': path.join(ROOT, 'lobby', 'shared', 'clubs.js'),
+  'cloud-crypto.js': path.join(ROOT, 'shared', 'cloud-crypto.js'),
+  'clubs.js': path.join(ROOT, 'shared', 'clubs.js'),
 });
 
 /**

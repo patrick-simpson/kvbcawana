@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "about": "Deterministic vectors for lobby/shared/cloud-crypto.js (scripts/gen-cloud-vectors.mjs). Every name is made up. Never regenerate to make a test pass.",
+  "about": "Deterministic vectors for shared/cloud-crypto.js (scripts/gen-cloud-vectors.mjs). Every name is made up. Never regenerate to make a test pass.",
   "params": {
     "PBKDF2_ITER": 600000,
     "PBKDF2_ITER_MIN": 600000,

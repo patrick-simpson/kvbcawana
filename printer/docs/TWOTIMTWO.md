@@ -531,7 +531,7 @@ and addresses never leave the operator machine.
   silently dropped because `normalizeClub()` returned null for them.
   All six clubs are now recognised.
 - The game-time scoreboard is still data-driven: which clubs appear comes
-  from `gameWindow.clubs` in `lobby/shared/schedule.json`, not from code.
+  from `gameWindow.clubs` in `shared/schedule.json`, not from code.
   Teen clubs often meet outside game time, so a church opts them in by
   editing that file.
 - Club names arrive exactly as TwoTimTwo reports them (`"Sparks "` with a

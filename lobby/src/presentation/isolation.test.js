@@ -61,7 +61,7 @@ describe('presentation isolation rule', () => {
     for (const file of sources) {
       for (const target of importsOf(file)) {
         if (target.startsWith('src/presentation/')) continue;
-        if (target.startsWith('shared/')) continue;
+        if (target.startsWith('../shared/')) continue;
         if (target === 'countdown.html') continue;
         if (!ALLOWED.has(target)) offenders.push(`${relative(ROOT, file)} → ${target}`);
       }

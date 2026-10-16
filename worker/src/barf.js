@@ -39,7 +39,7 @@
 // the job and the row. Names stay in this call's memory and in the hold (memory
 // only), except the friends list, the owner-approved exception.
 
-import { churchNight } from '../../lobby/shared/cloud-crypto.js';
+import { churchNight } from '../../shared/cloud-crypto.js';
 import { json } from './http.js';
 import { INTERACTIVE_WAIT_MS, READ_INTERVAL_MS } from './readbudget.js';
 import { WATCH_INTERVAL_MS } from './watcher.js';

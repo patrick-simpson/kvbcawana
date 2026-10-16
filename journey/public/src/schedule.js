@@ -4,7 +4,7 @@
 // constants, and for how the video content itself gets here.
 const JOURNEY_START_MINUTES = 18 * 60 + 30; // 6:30 PM
 const JOURNEY_END_MINUTES = 19 * 60 + 15; // 7:15 PM
-// Club nights only (the lobby's rule, lobby/shared/clubNight.js): Trek's small
+// Club nights only (the lobby's rule, shared/clubNight.js): Trek's small
 // group time, a full-screen title card from 7:00 to 7:30 PM. It takes the
 // Journey window's last quarter hour on those nights, but never cuts a lesson
 // that is still running (see 25-trek.js).
@@ -5083,7 +5083,7 @@ applyMotion();
    things feed it, none of them a new connection of its own:
 
    - Is tonight a club night? Exactly the lobby's answer: the shared rule
-     lobby/shared/clubNight.js (copied byte for byte beside this script by
+     shared/clubNight.js (copied byte for byte beside this script by
      scripts/family-assets.mjs, loaded once as an ES module) asked with the
      lobby's own two files, its shared/schedule.json (noClub and special
      dates) and its calendar-feed.json (the season, cancelled nights). Both
@@ -6639,7 +6639,7 @@ window.journeySettingsPage = { command: settingsPageCommand, prefs: downloadPref
      running unless the phone sent `force: true` (only after its confirm
      tap).
    - journeyRemote.now() is what the screen shows, in the shape the Worker
-     keeps (lobby/shared/journeyRemote.js sanitizeJourneyNow): the view, the
+     keeps (shared/journeyRemote.js sanitizeJourneyNow): the view, the
      lesson's week and TITLE (never a file), the slide (number, kind, and the
      lines of a filled-in slide, so the phone can match the Talk About It
      questions to its sample answers), the video position, why it waits, and
@@ -6647,7 +6647,7 @@ window.journeySettingsPage = { command: settingsPageCommand, prefs: downloadPref
      it may have changed; sync.js sends it only while a phone is watching.
    - Never in configure mode (that page is only the Settings panel). */
 
-// What the phone may ask: exactly lobby/shared/journeyRemote.js
+// What the phone may ask: exactly shared/journeyRemote.js
 // JOURNEY_REMOTE_ACTIONS (test/phone-remote.test.mjs pins the two lists).
 const REMOTE_COMMANDS = ['slide-next', 'slide-prev', 'slides-start', 'play', 'pause', 'toggle-pause', 'seek', 'mute', 'unmute', 'volume', 'begin', 'pick'];
 // One volume press moves the lesson video's volume by this many percent (owner 2026-10-15).
@@ -6710,7 +6710,7 @@ function remoteWait(view) {
   return null;
 }
 
-/* What the screen shows now (lobby/shared/journeyRemote.js sanitizeJourneyNow). */
+/* What the screen shows now (shared/journeyRemote.js sanitizeJourneyNow). */
 function remoteNow() {
   const view = remoteView();
   const week = remoteWeek(view);

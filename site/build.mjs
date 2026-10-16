@@ -12,7 +12,7 @@
 //                from the print app's phone page (site/checkin/checkin-page.mjs) on the
 //                desk's online path: passphrase v2, the Worker's desk routes, every seal
 //                made in the browser (site/checkin/desk-transport.js, the canonical
-//                lobby/shared/cloud-crypto.js and clubs.js beside it); /checkin/ym for the
+//                shared/cloud-crypto.js and clubs.js beside it); /checkin/ym for the
 //                youth leaders.
 //                /desk 301s to /checkin (site/lib/redirects.js).
 //   /api/*       the sync Worker, through site/functions (not built here)

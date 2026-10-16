@@ -1,6 +1,6 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { cleanup, configure, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { createHistoryKey, newRowId, sealRow } from '../../../shared/cloud-crypto.js';
+import { createHistoryKey, newRowId, sealRow } from '../../../../shared/cloud-crypto.js';
 import { lockHistory } from '../../lib/historyCrypto.js';
 import { saveSyncSession } from '../../lib/syncService.js';
 import HistorySection from './history.jsx';

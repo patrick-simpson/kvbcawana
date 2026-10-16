@@ -9,9 +9,9 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { bootKiosk, tick, pinClock, DESKTOP, KIOSK_PC } from './kiosk-dom.mjs';
-import { JOURNEY_REMOTE_ACTIONS, sanitizeJourneyNow } from '../../lobby/shared/journeyRemote.js';
-import * as sp from '../../lobby/shared/sync-protocol.js';
-import * as cc from '../../lobby/shared/cloud-crypto.js';
+import { JOURNEY_REMOTE_ACTIONS, sanitizeJourneyNow } from '../../shared/journeyRemote.js';
+import * as sp from '../../shared/sync-protocol.js';
+import * as cc from '../../shared/cloud-crypto.js';
 
 const REPO = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const PUBLIC = path.join(REPO, 'public');

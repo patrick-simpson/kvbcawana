@@ -20,7 +20,7 @@
 // `export async function` and `export const` declarations and plain
 // JavaScript: the generator is a text transform and refuses anything else.
 //
-// Test vectors: lobby/shared/cloud-vectors.json (every construction, fixed
+// Test vectors: shared/cloud-vectors.json (every construction, fixed
 // keys, salts, IVs and ephemeral keys), reproduced by
 // lobby/src/lib/cloudCrypto.test.js and printer/scripts/test-cloud-crypto.cjs.
 // Regenerate with `node scripts/gen-cloud-vectors.mjs` ONLY on a deliberate

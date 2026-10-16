@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import tokens from '../../../shared/brand/tokens.json';
+import tokens from '../../../../shared/brand/tokens.json';
 import { CELEBRATION, CLUB_ORDER, HOUSE, KIT_CLUBS, URGENT_COLOR, WARNING_TONES, shade } from './kit.js';
 import { THEME } from './shared-config.js';
 
@@ -47,7 +47,7 @@ describe('the projector kit', () => {
   });
 
   it('index.css pulls the kit tokens.css into the bundle', () => {
-    expect(css).toMatch(/@import\s+["']\.\.\/\.\.\/shared\/brand\/tokens\.css["']/);
+    expect(css).toMatch(/@import\s+["']\.\.\/\.\.\/\.\.\/shared\/brand\/tokens\.css["']/);
   });
 
   it('index.css bundles the kit\'s three voices and no retired face', () => {
@@ -78,8 +78,8 @@ describe('the projector kit', () => {
     expect(projector).toHaveLength(1);
     expect(lobby).toHaveLength(1);
     expect(projector[0]).toEqual(lobby[0]);
-    expect(projector[0].src).toContain("url('../../shared/brand/fonts/paytone-one-full-400-normal.woff2') format('woff2')");
-    expect(projector[0].src).toContain("url('../../shared/brand/fonts/PaytoneOne-Regular.ttf') format('truetype')");
+    expect(projector[0].src).toContain("url('../../../shared/brand/fonts/paytone-one-full-400-normal.woff2') format('woff2')");
+    expect(projector[0].src).toContain("url('../../../shared/brand/fonts/PaytoneOne-Regular.ttf') format('truetype')");
   });
 
   it('the label voice is the lobby\'s own Londrina Solid face: the kit\'s full 400 files, never a subset', () => {
@@ -90,7 +90,7 @@ describe('the projector kit', () => {
     expect(lobby).toHaveLength(1);
     expect(projector[0]).toEqual(lobby[0]);
     expect(projector[0].src).toBe(
-      "url('../../shared/brand/fonts/londrina-solid-full-400-normal.woff2') format('woff2'), url('../../shared/brand/fonts/LondrinaSolid-Regular.ttf') format('truetype')",
+      "url('../../../shared/brand/fonts/londrina-solid-full-400-normal.woff2') format('woff2'), url('../../../shared/brand/fonts/LondrinaSolid-Regular.ttf') format('truetype')",
     );
     expect(projector[0]['unicode-range']).toBeUndefined();
     expect(projector[0]['font-weight']).toBe('400');

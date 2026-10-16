@@ -1,4 +1,4 @@
-// GENERATED from lobby/shared/sync-protocol.js by scripts/shared-copies.mjs: do not edit; edit the source and run
+// GENERATED from shared/sync-protocol.js by scripts/shared-copies.mjs: do not edit; edit the source and run
 // `node scripts/family-assets.mjs`. scripts/check-mirrors.mjs fails when this copy drifts.
 'use strict';
 // @ts-check

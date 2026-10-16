@@ -48,7 +48,7 @@
 // check-out and the adopter's backlog), for the night only. A partial or failed read
 // keeps the last good copy.
 
-import { newRowId, sealForStations } from '../../lobby/shared/cloud-crypto.js';
+import { newRowId, sealForStations } from '../../shared/cloud-crypto.js';
 import { PRINT_JOB_KIND } from './adopt.js';
 import { Doc } from './doc.js';
 import { fail, json } from './http.js';

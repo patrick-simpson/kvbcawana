@@ -9,7 +9,7 @@ import { describe, expect, it } from 'vitest';
 // code, tokens.css by plain CSS, theme.json by both screens). These tests
 // are what keeps the three spellings of one palette from drifting apart.
 
-const SHARED = resolve(__dirname, '../../shared');
+const SHARED = resolve(__dirname, '../../../shared');
 const KIT = resolve(SHARED, 'brand');
 const tokens = JSON.parse(readFileSync(resolve(KIT, 'tokens.json'), 'utf8'));
 const css = readFileSync(resolve(KIT, 'tokens.css'), 'utf8');

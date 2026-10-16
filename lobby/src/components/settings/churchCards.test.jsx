@@ -246,7 +246,7 @@ describe('Printing: name tags from anywhere', () => {
 
 describe('Printing: one church settings table', () => {
   it('every CHURCH_KEYS key has exactly one place on the page', async () => {
-    const { CHURCH_KEYS } = await import('../../../shared/churchSettings.js');
+    const { CHURCH_KEYS } = await import('../../../../shared/churchSettings.js');
     const { PRINTING_FIELDS } = await import('./ChurchCards.jsx');
     expect(Object.keys(PRINTING_FIELDS).sort()).toEqual([...CHURCH_KEYS].sort());
   });

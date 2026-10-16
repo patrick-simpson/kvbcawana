@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import tokens from '../../shared/brand/tokens.json';
+import tokens from '../../../shared/brand/tokens.json';
 import {
   ARRIVAL, BULGE, DEPTH, HALF_PERIOD, IMPACT, OVERSHOOT, PRESS, REST, SPRING,
   releaseEasing, settleScale, springPeaks, springProgress, squishBump, squishLand, withSquish,

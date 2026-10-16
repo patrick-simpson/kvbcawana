@@ -24,7 +24,7 @@ import { publishDeck } from '../lib/publishDeck.js';
 import { loadPublishToken } from '../lib/publishToken.js';
 import { publishViaSync, useSync } from '../hooks/useSync.js';
 import CornerTab from './brand/CornerTab.jsx';
-import churchLogo from '../../shared/brand/logos/kvbc-awana-two-line-white.svg';
+import churchLogo from '../../../shared/brand/logos/kvbc-awana-two-line-white.svg';
 
 const THEME_OPTIONS = [
   { value: 'auto', label: 'Auto (rotate)' },

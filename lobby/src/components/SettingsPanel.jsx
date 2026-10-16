@@ -25,7 +25,7 @@ import { ScreenOverviewSection, ScreensSection } from './settings/screens.jsx';
 import HistorySection from './settings/history.jsx';
 import { CORNER_CLUB_IDS } from '../lib/clubs.js';
 import { celebrateChange } from '../lib/settingsJoy.js';
-import churchLogo from '../../shared/brand/logos/kvbc-awana-two-line-white.svg';
+import churchLogo from '../../../shared/brand/logos/kvbc-awana-two-line-white.svg';
 
 const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
 

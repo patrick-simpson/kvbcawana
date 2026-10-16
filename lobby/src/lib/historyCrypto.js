@@ -9,7 +9,7 @@
 // exported even by this page). A wrong passphrase, or a key that is not the
 // stored history:pub's, unlocks nothing.
 
-import { keyRing, openRow, rewrapPrivateKey, unwrapPrivateKey } from '../../shared/cloud-crypto.js';
+import { keyRing, openRow, rewrapPrivateKey, unwrapPrivateKey } from '../../../shared/cloud-crypto.js';
 import { syncRequest } from './syncService.js';
 
 /** @typedef {{ privateKey: CryptoKey, publicKey: string, kid: string }} Ring */

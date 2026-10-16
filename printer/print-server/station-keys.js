@@ -1,5 +1,5 @@
 // This computer's keys as an online check-in STATION (ROADMAP.md#online-check-in,
-// P2; the constructions are lobby/shared/cloud-crypto.js, loaded here as the
+// P2; the constructions are shared/cloud-crypto.js, loaded here as the
 // generated CommonJS copy ./cloud-crypto.js).
 //
 //   * the STATION key: an ECDH P-256 pair made once on this computer. The

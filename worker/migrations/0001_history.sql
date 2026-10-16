@@ -3,7 +3,7 @@
 -- writes a day; a club night writes a few hundred rows).
 --
 -- Every child's name lives ONLY inside history_rows.ct: an ECIES seal made by a
--- CLIENT to the history public key (lobby/shared/cloud-crypto.js sealRow), so
+-- CLIENT to the history public key (shared/cloud-crypto.js sealRow), so
 -- neither the Worker nor Cloudflare can read it at rest. The Worker stores what
 -- it is handed and never decrypts. No ledger blob table: rows only.
 --

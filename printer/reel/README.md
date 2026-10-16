@@ -32,7 +32,7 @@ Animations timeline (it only uses WAAPI when `Element.prototype` owns
 smooth 60 fps however slowly a frame draws, and identical on every run.
 
 **The look** is the Awana Clubs 2026-27 catalog's, from the family's one kit
-(`lobby/shared/brand`): Paytone One shouts, Londrina Solid labels, Figtree is
+(`shared/brand`): Paytone One shouts, Londrina Solid labels, Figtree is
 read; the club waves, the corner tabs, the stepped chip
 (`shared/chipGeometry.js`), the doodles in threes, the starburst, photos on a
 plate with an offset outline, depth as a hard offset, never a blur. The real

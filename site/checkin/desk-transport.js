@@ -3,7 +3,7 @@
 // Worker's desk routes, and everything that seals, in ONE small module
 // (ROADMAP.md#online-check-in; it was the /desk page's). No DOM and no globals:
 // the page hands it `fetch`, a storage object and the cloud-crypto module
-// (lobby/shared/cloud-crypto.js, the canonical copy), so Node tests run it as it
+// (shared/cloud-crypto.js, the canonical copy), so Node tests run it as it
 // is. The routes are worker/src/routes.md; when the Worker's contract
 // moves, this is the only file that follows.
 //
@@ -38,7 +38,7 @@ export const SESSION_STORAGE = 'awanaSyncSession.v1';
 export const HISTORY_PIN_STORAGE = 'awanaDeskHistoryKey.v1';
 /** A stations-changed answer is resealed at most this many times. */
 export const RESEAL_MAX = 3;
-/** The most remembered leaders (church settings `leaders`, lobby/shared/churchSettings.js). */
+/** The most remembered leaders (church settings `leaders`, shared/churchSettings.js). */
 export const LEADERS_MAX = 80;
 /**
  * A read waits this long before the page gives up and asks again. The Worker
@@ -667,7 +667,7 @@ export function createDesk({ cc, fetch: fetchFn, store, base = DESK_API, now = D
   }
 
   // ── remembered leaders (the church settings, routes.md 10.3) ───────────────
-  // `leaders` in lobby/shared/churchSettings.js: at most LEADERS_MAX unique
+  // `leaders` in shared/churchSettings.js: at most LEADERS_MAX unique
   // {firstName, lastName, clubName, lastPrintedAt, printCount}. The page writes
   // only the names and the club of a NEW leader; lastPrintedAt and printCount are
   // the station's / Worker's (the sanitizer fills their defaults), and a leader

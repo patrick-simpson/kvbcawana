@@ -1,5 +1,5 @@
 // The catalog's parts, drawn from the family's one brand kit
-// (lobby/shared/brand, served at /shared/brand): the club waves, the corner
+// (shared/brand, served at /shared/brand): the club waves, the corner
 // tabs, the stepped chip (shared/chipGeometry.js, the same geometry every
 // screen draws), the doodles, the starburst, and the plate a photo sits on.
 import { chipGeometry, inkEm, measureEm } from '/shared/chipGeometry.js';

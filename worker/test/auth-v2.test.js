@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { SyncCore } from '../src/sync.js';
 import {
   PBKDF2_ITER, authVerifier, bytesToBase64, createHistoryKey, deriveKeys, rewrapPrivateKey, unwrapPrivateKey,
-} from '../../lobby/shared/cloud-crypto.js';
+} from '../../shared/cloud-crypto.js';
 
 // Passphrase v2 (routes.md section 1): GET /v1/auth/params, login with authKey,
 // and the BOOTSTRAP: a fresh store holds only the HMAC of INITIAL_PASSPHRASE,

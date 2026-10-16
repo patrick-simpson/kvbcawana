@@ -741,21 +741,21 @@ def previews():
 
 REPO = HERE.parents[1]
 EXISTING = {  # club: (files the repos ship today, catalog replacements)
-    "puggles": (["src/assets/clubs/puggles.png", "shared/art/puggles-logo.png",
+    "puggles": (["src/assets/clubs/puggles.png", "../shared/art/puggles-logo.png",
                  "src/assets/clubs/extras/puggles/puggles-logo-color.png"],
                 ["puggles/puggles-white.png", "puggles/puggles-fullcolor.png"]),
-    "cubbies": (["src/assets/clubs/cubbies.png", "shared/art/cubbies-logo.png"],
+    "cubbies": (["src/assets/clubs/cubbies.png", "../shared/art/cubbies-logo.png"],
                 ["cubbies/cubbies-white.png", "cubbies/cubbies-fullcolor.png"]),
-    "sparks":  (["src/assets/clubs/sparks.png", "shared/art/sparks-logo.png"],
+    "sparks":  (["src/assets/clubs/sparks.png", "../shared/art/sparks-logo.png"],
                 ["sparks/sparks-white.png", "sparks/sparks-fullcolor.png"]),
-    "tnt":     (["src/assets/clubs/tnt.png", "shared/art/tnt-logo.png",
+    "tnt":     (["src/assets/clubs/tnt.png", "../shared/art/tnt-logo.png",
                  "src/assets/clubs/extras/tnt/tnt-blue-logo.png"],
                 ["tnt/tnt-white.png", "tnt/tnt-fullcolor.png"]),
-    "trek":    (["src/assets/clubs/trek.png", "shared/art/trek-logo.png"],
+    "trek":    (["src/assets/clubs/trek.png", "../shared/art/trek-logo.png"],
                 ["trek/trek-white.png", "trek/trek-fullcolor.png"]),
-    "journey": (["src/assets/clubs/journey.png", "shared/art/journey-logo.png"],
+    "journey": (["src/assets/clubs/journey.png", "../shared/art/journey-logo.png"],
                 ["journey/journey-white.png", "journey/journey-fullcolor.png"]),
-    "awana":   (["shared/art/awana-clubs-logo.png"], ["awana-clubs/awana-clubs-white.png"]),
+    "awana":   (["../shared/art/awana-clubs-logo.png"], ["awana-clubs/awana-clubs-white.png"]),
 }
 
 

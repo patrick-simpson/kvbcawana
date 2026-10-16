@@ -1,5 +1,5 @@
 # The Awana Clubs product catalog, kept as a graphical reference (owner,
-# 2026-10-11): the brand kit (lobby/shared/brand/) was drawn from it, and
+# 2026-10-11): the brand kit (shared/brand/) was drawn from it, and
 # lobby/scripts/brand/extract-catalog-brand.py reads it. It is the flipbook's
 # Download PDF (about 50 MB), so it lives as a release asset, never in the
 # tree. Run by hand; a second run replaces the file. Next season: change the
@@ -33,6 +33,6 @@ jobs:
         run: |
           if ! gh release view "$TAG" >/dev/null 2>&1; then
             gh release create "$TAG" --latest=false --title "Awana Clubs catalog 2026-27 (brand reference)" \
-              --notes "The Awana Clubs 2026-27 product guide, the source of the brand kit in lobby/shared/brand/. Reference only. Source: the Download button of https://awana-catalog.s3.us-east-2.amazonaws.com/flipbooks/awana-product-guide-26-27/index.html"
+              --notes "The Awana Clubs 2026-27 product guide, the source of the brand kit in shared/brand/. Reference only. Source: the Download button of https://awana-catalog.s3.us-east-2.amazonaws.com/flipbooks/awana-product-guide-26-27/index.html"
           fi
           gh release upload "$TAG" "$NAME" --clobber

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
-import tokens from '../../shared/brand/tokens.json';
+import tokens from '../../../shared/brand/tokens.json';
 import { PRESS, releaseEasing } from './squish.js';
 
 

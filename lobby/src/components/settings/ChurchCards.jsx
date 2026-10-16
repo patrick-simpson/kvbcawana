@@ -2,12 +2,12 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { useSync } from '../../hooks/useSync.js';
 import { loadSyncSession } from '../../lib/syncService.js';
 import { CHURCH_SPEC, churchValue, PAUSED_WORDS, UNSEEDED_WORDS } from '../../lib/churchClient.js';
-import { CLUB_TABLE } from '../../../shared/clubs.js';
+import { CLUB_TABLE } from '../../../../shared/clubs.js';
 import {
   NAME_SIZE_MAX, NAME_SIZE_MIN, PICKUP_CLUBS, cleanScheduleRows, formToTemplate, pickupTicked, probePrintServer, callPrintServer,
   TEMPLATE_FIELDS, templateClubLabel, templateToForm, validStartTime, withTemplate,
 } from '../../lib/printServer.js';
-import { churchNight } from '../../../shared/cloud-crypto.js';
+import { churchNight } from '../../../../shared/cloud-crypto.js';
 import { fetchNightRows, historyUnlocked, unlockHistory } from '../../lib/historyCrypto.js';
 import { customRecord, leaderRecord, oneOffRecord, reprintRecord, sendToolJob } from '../../lib/toolJobs.js';
 import { BarfBagsField, FriendsListField, PanelCard, Toggle } from './fields.jsx';

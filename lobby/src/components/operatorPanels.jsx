@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { lazyPanel } from '../lib/lazyPanel.jsx';
-import churchLogo from '../../shared/brand/logos/kvbc-awana-two-line-white.svg';
+import churchLogo from '../../../shared/brand/logos/kvbc-awana-two-line-white.svg';
 
 // The operator panels, each in its own chunk (src/lib/lazyPanel.jsx; App hands
 // each its `fallback`). Nothing a TV shows on its own lives here: the check-in

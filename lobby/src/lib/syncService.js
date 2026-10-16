@@ -27,8 +27,8 @@ import {
   readResponse,
   signInWithPassphrase,
   UNREACHABLE,
-} from '../../shared/sync-protocol.js';
-import { deriveAuthKey } from '../../shared/cloud-crypto.js';
+} from '../../../shared/sync-protocol.js';
+import { deriveAuthKey } from '../../../shared/cloud-crypto.js';
 import { saveDisplayKey } from './displayKey.js';
 import { sanitizeTemplate } from './syncSpecs.js';
 import { timedFetch } from './timedFetch.js';

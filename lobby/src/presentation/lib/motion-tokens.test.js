@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, it, expect } from 'vitest';
 import { DUR, EASE } from './motion-tokens.js';
-import tokens from '../../../shared/brand/tokens.json';
+import tokens from '../../../../shared/brand/tokens.json';
 
 // Drift guard in the same spirit as the club-color check in
 // shared-config.test.js: the CSS custom properties in index.css and

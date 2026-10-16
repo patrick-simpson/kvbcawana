@@ -7,9 +7,9 @@ import { fireWelcome } from '../lib/confetti.js';
 import {
   FLAGSHIP_LINES, flagshipLabel, nextFlagshipPick,
 } from '../lib/flagship.js';
-import { LOGO_ARRIVAL, LOGO_INK, LOGO_WHITE, logoLetters, parseChurchLogo } from '../../shared/churchLogo.js';
-import fullSvg from '../../shared/brand/logos/kvbc-awana-full.svg?raw';
-import twoLineSvg from '../../shared/brand/logos/kvbc-awana-two-line.svg?raw';
+import { LOGO_ARRIVAL, LOGO_INK, LOGO_WHITE, logoLetters, parseChurchLogo } from '../../../shared/churchLogo.js';
+import fullSvg from '../../../shared/brand/logos/kvbc-awana-full.svg?raw';
+import twoLineSvg from '../../../shared/brand/logos/kvbc-awana-two-line.svg?raw';
 
 // ─────────────────────────────────────────────────────────────
 // The flagship slide: the church's own logo, huge in the middle of the

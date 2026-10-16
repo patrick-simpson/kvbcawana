@@ -88,7 +88,7 @@
 // refused 409 `no-club` before any read, claim or post. The print station's
 // rehearsal mode (publisher.js `rehearsing`) lets a rehearsal through as before.
 
-import { churchNight } from '../../lobby/shared/cloud-crypto.js';
+import { churchNight } from '../../shared/cloud-crypto.js';
 import { json } from './http.js';
 import { INTERACTIVE_WAIT_MS, READ_INTERVAL_MS } from './readbudget.js';
 import { BIBLE_RE, FRIEND_RE, itemsToSend } from './twotimtwo.js';

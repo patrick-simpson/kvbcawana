@@ -26,7 +26,7 @@
    lacks and a chunky face still draws, so a birthday name stays in one
    chunky voice, as it does in the lobby. */
 @import "@fontsource-variable/baloo-2";
-@import "../../shared/brand/tokens.css";
+@import "../../../shared/brand/tokens.css";
 
 @import "tailwindcss" source(none);
 @source "./";
@@ -45,8 +45,8 @@
   ascent-override: 96%;
   descent-override: 43.6%;
   line-gap-override: 0%;
-  src: url("../../shared/brand/fonts/paytone-one-full-400-normal.woff2") format("woff2"),
-       url("../../shared/brand/fonts/PaytoneOne-Regular.ttf") format("truetype");
+  src: url("../../../shared/brand/fonts/paytone-one-full-400-normal.woff2") format("woff2"),
+       url("../../../shared/brand/fonts/PaytoneOne-Regular.ttf") format("truetype");
 }
 
 /* The label voice: Londrina Solid, the kit's own full, unmodified files (its
@@ -59,8 +59,8 @@
   font-style: normal;
   font-display: swap;
   font-weight: 400;
-  src: url("../../shared/brand/fonts/londrina-solid-full-400-normal.woff2") format("woff2"),
-       url("../../shared/brand/fonts/LondrinaSolid-Regular.ttf") format("truetype");
+  src: url("../../../shared/brand/fonts/londrina-solid-full-400-normal.woff2") format("woff2"),
+       url("../../../shared/brand/fonts/LondrinaSolid-Regular.ttf") format("truetype");
 }
 
 @theme {

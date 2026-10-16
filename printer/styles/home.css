@@ -13,7 +13,7 @@
    and every element's resting style is its final frame, so reduced motion
    shows the finished design. Only transform and opacity animate.
    ========================================================================== */
-@import "../../lobby/shared/brand/tokens.css";
+@import "../../shared/brand/tokens.css";
 
 :root {
   --paper: #fffdf8;

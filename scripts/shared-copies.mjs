@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Generated copies of lobby/shared/*.js, for the readers that cannot import
+// Generated copies of shared/*.js, for the readers that cannot import
 // them: the ONE table of committed generated copies (the sync protocol and the
 // cloud crypto joined it from their own generators, 2026-10-16). The lobby's
 // Vite build imports the shared modules directly; the
@@ -27,14 +27,14 @@ const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 
 /** [shared source, copy, format] */
 export const COPIES = [
-  ['lobby/shared/clubNight.js', 'printer/electron-app/src/display/clubNight.js', 'cjs'],
-  ['lobby/shared/clubs.js', 'printer/print-server/clubTable.js', 'cjs'],
-  ['lobby/shared/text.js', 'printer/print-server/textClean.js', 'cjs'],
-  ['lobby/shared/tonight.js', 'printer/print-server/tonight.js', 'cjs'],
-  ['lobby/shared/pickup.js', 'printer/print-server/pickup.js', 'cjs'],
-  ['lobby/shared/churchSettings.js', 'printer/print-server/churchSettings.js', 'cjs'],
-  ['lobby/shared/sync-protocol.js', 'printer/print-server/sync-protocol.js', 'cjs'],
-  ['lobby/shared/cloud-crypto.js', 'printer/print-server/cloud-crypto.js', 'cjs'],
+  ['shared/clubNight.js', 'printer/electron-app/src/display/clubNight.js', 'cjs'],
+  ['shared/clubs.js', 'printer/print-server/clubTable.js', 'cjs'],
+  ['shared/text.js', 'printer/print-server/textClean.js', 'cjs'],
+  ['shared/tonight.js', 'printer/print-server/tonight.js', 'cjs'],
+  ['shared/pickup.js', 'printer/print-server/pickup.js', 'cjs'],
+  ['shared/churchSettings.js', 'printer/print-server/churchSettings.js', 'cjs'],
+  ['shared/sync-protocol.js', 'printer/print-server/sync-protocol.js', 'cjs'],
+  ['shared/cloud-crypto.js', 'printer/print-server/cloud-crypto.js', 'cjs'],
 ];
 
 export function render(source, format, src) {

@@ -4,7 +4,7 @@
 // D1 down never blocks a check-in and the outbox drains from cron() and alarm(),
 // and the passphrase change re-wraps the history key in ONE atomic put.
 import { beforeAll, describe, expect, it } from 'vitest';
-import { createHistoryKey, newRowId, openRow, keyRing, rewrapPrivateKey, sealRow, unwrapPrivateKey } from '../../lobby/shared/cloud-crypto.js';
+import { createHistoryKey, newRowId, openRow, keyRing, rewrapPrivateKey, sealRow, unwrapPrivateKey } from '../../shared/cloud-crypto.js';
 import { d1Stub } from './d1stub.js';
 import { memoryStore, v2Next } from './helpers.js';
 import { NIGHT, kid, rig } from './rig.js';

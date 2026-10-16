@@ -3,14 +3,14 @@
 //
 //   contract / envelope vectors   ONE copy each, printer/*.json: the lobby's tests read
 //                                 them in place (the lobby mirrors went 2026-10-16)
-//   shared modules                lobby/shared/*.js (the sync protocol and the cloud crypto
+//   shared modules                shared/*.js (the sync protocol and the cloud crypto
 //                                 among them)  ->  generated CommonJS copies for the packaged
 //                                 Windows app (scripts/shared-copies.mjs lists them; committed,
 //                                 checked for drift). The cloud crypto's vectors,
-//                                 lobby/shared/cloud-vectors.json, have ONE copy: the printer's
+//                                 shared/cloud-vectors.json, have ONE copy: the printer's
 //                                 test reads it in place.
 //
-//   the brand kit                 canonical lobby/shared/brand/
+//   the brand kit                 canonical shared/brand/
 //                                 NOT mirrored in git any more: each app gets its own copy at
 //                                 build time (scripts/family-assets.mjs), so every screen still
 //                                 holds a full local copy at runtime. Here: the copies exist and
@@ -69,4 +69,4 @@ if (problems.length) {
   console.error('Brand kit and every generated copy: change the canonical file, then run node scripts/family-assets.mjs.');
   process.exit(1);
 }
-console.log('✓ the brand kit copies are generated, ignored and match their canonical files; the generated shared-module copies match lobby/shared');
+console.log('✓ the brand kit copies are generated, ignored and match their canonical files; the generated shared-module copies match shared');

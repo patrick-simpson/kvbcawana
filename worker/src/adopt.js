@@ -34,7 +34,7 @@
 // night): while it is off no job is made on a report. The promotion and the
 // undo rules above need no switch (they only touch claims the desk made).
 
-import { newRowId, sealForStations } from '../../lobby/shared/cloud-crypto.js';
+import { newRowId, sealForStations } from '../../shared/cloud-crypto.js';
 import { Doc } from './doc.js';
 import { openState, sealState, SEAL_PER_TICK } from './watcher.js';
 

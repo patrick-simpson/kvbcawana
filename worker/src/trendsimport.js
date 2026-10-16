@@ -62,7 +62,7 @@
 // self-check) and one small storage write; the whole back-fill is at most 20
 // reads, once; then one read a week.
 
-import { clubIdByAlias, CLUB_TABLE } from '../../lobby/shared/clubs.js';
+import { clubIdByAlias, CLUB_TABLE } from '../../shared/clubs.js';
 import { Doc } from './doc.js';
 import { READ_INTERVAL_MS } from './readbudget.js';
 import { CLUB_NIGHTS, GRACE_MIN, localTime, watchWindow } from './watcher.js';

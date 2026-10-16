@@ -42,7 +42,7 @@ import {
   sanitizeJourney,
   sanitizeTemplate,
 } from '../../lobby/src/lib/syncSpecs.js';
-import { PBKDF2_ITER, PBKDF2_ITER_MAX, PBKDF2_ITER_MIN, authVerifier } from '../../lobby/shared/cloud-crypto.js';
+import { PBKDF2_ITER, PBKDF2_ITER_MAX, PBKDF2_ITER_MIN, authVerifier } from '../../shared/cloud-crypto.js';
 import { fromBase64, hmac, kidFor, newDisplayKey, randomBytes, safeEqual, seal, toBase64, toBase64Url } from './crypto.js';
 import { DEFAULT_CALENDAR_URL, scrapeCalendar } from './calendar.js';
 import { DOORBELL_EVENT, REPLAYED, checkPublish, frameText, replayKey } from './live.js';

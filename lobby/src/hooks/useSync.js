@@ -22,8 +22,8 @@ import {
 } from '../lib/syncService.js';
 import { normalizeSyncPassphrase, sanitizeTemplate, PASSPHRASE_MIN } from '../lib/syncSpecs.js';
 import { saveDisplayKey } from '../lib/displayKey.js';
-import { AUTH_PARAMS_PATH, parseAuthParams } from '../../shared/sync-protocol.js';
-import { PBKDF2_ITER, authVerifier, bytesToBase64, deriveAuthKey, randomBytes } from '../../shared/cloud-crypto.js';
+import { AUTH_PARAMS_PATH, parseAuthParams } from '../../../shared/sync-protocol.js';
+import { PBKDF2_ITER, authVerifier, bytesToBase64, deriveAuthKey, randomBytes } from '../../../shared/cloud-crypto.js';
 import { historyWrapLanded, lockHistory, rewrapHistoryKey } from '../lib/historyCrypto.js';
 import { barfBagsRecord, sendToolJob } from '../lib/toolJobs.js';
 

@@ -5,7 +5,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { History, validWrapped } from '../src/history.js';
 import {
   createHistoryKey, keyRing, newRowId, openRow, rewrapPrivateKey, sealRow, unwrapPrivateKey,
-} from '../../lobby/shared/cloud-crypto.js';
+} from '../../shared/cloud-crypto.js';
 import { d1Stub } from './d1stub.js';
 
 const NIGHT = '2026-10-14';

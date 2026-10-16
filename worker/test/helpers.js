@@ -1,7 +1,7 @@
 // Shared test helpers for the online check-in modules.
 import {
   PBKDF2_ITER_MIN, authVerifier, deriveAuthKey, generateKeyPair, importPrivateKey, keyRing, newRowId, openAsStation, sealForStations,
-} from '../../lobby/shared/cloud-crypto.js';
+} from '../../shared/cloud-crypto.js';
 
 // ── Signing in by passphrase v2 (routes.md section 1) ───────────────────────
 // The only sign-in a client has: GET /v1/auth/params, derive authKey on the

@@ -3,7 +3,7 @@
 // the fail-open promise.
 //
 //   1. THE COPY. print-server/public/brand/ is not committed: it is a copy of
-//      the one canonical kit (lobby/shared/brand/) that
+//      the one canonical kit (shared/brand/) that
 //      scripts/family-assets.mjs makes before every test run, dev start and
 //      packaging (npm test's pretest, print-server's prestart, electron-app's
 //      predev / prebuild:renderer, release-app.yml). Here it must exist and be
@@ -54,7 +54,7 @@ async function main() {
   // ── 1. The copy is the canonical kit ───────────────────────────────────────
   console.log('brand kit: the print server\'s copy is byte-identical to the canonical kit');
   {
-    const HOW = 'run `npm run assets` (npm test does); the copy is generated from lobby/shared/brand, never edited here';
+    const HOW = 'run `npm run assets` (npm test does); the copy is generated from shared/brand, never edited here';
     check('the canonical kit exists', fs.existsSync(KIT_DIR), KIT_DIR);
     check('the copy exists', fs.existsSync(MIRROR_DIR), `${MIRROR_DIR} — ${HOW}`);
     const canon = fs.existsSync(KIT_DIR) ? hashTree(KIT_DIR) : [];
@@ -77,7 +77,7 @@ async function main() {
     // the kit's text files are LF, everywhere.
     const crlf = fs.existsSync(KIT_DIR) ? filesWithCarriageReturns(KIT_DIR) : [];
     check('no text file in the kit has a CR line ending (the kit is LF only)', crlf.length === 0,
-      `${crlf.slice(0, 5).join(', ')} — check lobby/shared/brand out with core.autocrlf=false`);
+      `${crlf.slice(0, 5).join(', ')} — check shared/brand out with core.autocrlf=false`);
 
     // The detector: text files with a CR are listed, fonts (binary, full of
     // 0x0D bytes) never are.
@@ -97,9 +97,9 @@ async function main() {
     }
 
     // And git: the canonical kit's text types are LF in every checkout and
-    // normalised on commit (lobby/.gitattributes); the fonts are binary.
+    // normalised on commit (shared/.gitattributes); the fonts are binary.
     // Checked only where this is a git work tree (it is in CI and in every clone).
-    const files = ['lobby/shared/brand/tokens.css', 'lobby/shared/brand/logos/sparks-black.svg', 'lobby/shared/brand/fonts/PaytoneOne-Regular.ttf'];
+    const files = ['shared/brand/tokens.css', 'shared/brand/logos/sparks-black.svg', 'shared/brand/fonts/PaytoneOne-Regular.ttf'];
     const attr = spawnSync('git', ['check-attr', 'text', 'eol', '--', ...files], { cwd: path.join(REPO, '..'), encoding: 'utf8' });
     if (attr.status === 0 && attr.stdout) {
       const a = (file, name) => {

@@ -8,8 +8,8 @@
 //   checkout  the still-here list (first name + club, SEALED, padded)
 //
 // in the printer's frame shapes (frames.js), from the printer's rules
-// (lobby/shared/tonight.js: authoritativeTonight / tonightHereNow, and
-// lobby/shared/pickup.js: the pickup clubs), applied to the Worker's own state
+// (shared/tonight.js: authoritativeTonight / tonightHereNow, and
+// shared/pickup.js: the pickup clubs), applied to the Worker's own state
 // (tonight.js: the applied report, the desk's marks), with the printer's timing:
 //
 //   * on every change (an applied report, a desk check-in, undo or check-out),
@@ -44,7 +44,7 @@
 // Free plan: a publish is a few microseconds of counting plus at most one AES
 // seal (the still-here list), and the book is written only when it changes.
 
-import { buildStillHere, normalizePickupClubs, pickupClubsOf } from '../../lobby/shared/pickup.js';
+import { buildStillHere, normalizePickupClubs, pickupClubsOf } from '../../shared/pickup.js';
 import { Doc } from './doc.js';
 import { buildCheckout, buildTally, buildTonight, CHECKOUT_MAX } from './frames.js';
 import { json } from './http.js';

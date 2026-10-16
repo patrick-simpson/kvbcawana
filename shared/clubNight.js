@@ -2,9 +2,9 @@
 // THE club-night rule: when a Wednesday club night is on, and when a screen
 // shows for it. Pure (no Electron, no clock of its own, no DOM), so one copy
 // serves every reader and the rules are unit-tested once
-// (lobby/shared/clubNight.test.js).
+// (shared/clubNight.test.js).
 //
-// Who reads it, and how (see lobby/shared/README.md):
+// Who reads it, and how (see shared/README.md):
 //   - lobby/src (the signage, the projector) imports this file through Vite;
 //   - printer/electron-app (the one KVBC Awana app) ships in an installer
 //     that cannot reach outside its own folder, so it carries a GENERATED copy

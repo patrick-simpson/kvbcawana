@@ -20,7 +20,7 @@ const WORK = path.join(HERE, '.work');
 
 export async function render({ fps = 60, scale = 1, from = 0, to = null, out = path.join(WORK, 'film.mp4'), stills = null, quality = 95 } = {}) {
   mkdirSync(WORK, { recursive: true });
-  const srv = await serve({ site: path.join(ROOT, 'site', 'dist'), film: path.join(HERE, 'film'), work: WORK, shared: path.join(ROOT, 'lobby', 'shared') });
+  const srv = await serve({ site: path.join(ROOT, 'site', 'dist'), film: path.join(HERE, 'film'), work: WORK, shared: path.join(ROOT, 'shared') });
   const browser = await launch();
   const context = await browser.newContext({ viewport: { width: 1920, height: 1080 }, deviceScaleFactor: scale });
   const page = await context.newPage();

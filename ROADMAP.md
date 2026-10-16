@@ -738,12 +738,12 @@ said); "Owner" is what only the owner can do.
 
 | Phase | What | Builder | Owner |
 | --- | --- | --- | --- |
-| **P0** Foundation | `lobby/shared/cloud-crypto.js` (+ generated `printer/print-server/cloud-crypto.js`), `cloud-vectors.json` and its three test suites, the D1 schema (`worker/migrations/0001_history.sql`), the route contract (`worker/src/routes.md`), SECURITY.md, the 5 s read budget in the watcher. | Claude (done 2026-10-12) | Read and approve; create the free D1 database (`wrangler.toml` has the steps). |
+| **P0** Foundation | `shared/cloud-crypto.js` (+ generated `printer/print-server/cloud-crypto.js`), `cloud-vectors.json` and its three test suites, the D1 schema (`worker/migrations/0001_history.sql`), the route contract (`worker/src/routes.md`), SECURITY.md, the 5 s read budget in the watcher. | Claude (done 2026-10-12) | Read and approve; create the free D1 database (`wrangler.toml` has the steps). |
 | **P1** Passphrase v2, history key, one read clock | `/v1/auth/params`, v2 / upgrade / legacy login, v2 passphrase change (atomic put, `history:wrapped:prev` 7 days), `GET/PUT /v1/history/key`; every client (lobby `syncService`, the printer's `sync-client.js`, the KVBC Awana wizard, Journey) derives `authKey` and the first one creates the history key; every TwoTimTwo read in the Worker on ONE 5 s clock (the phone page's back-to-back reads included). | Claude: Worker + lobby, then printer (release) | Watch `auth:legacyLastAt`; turn the legacy login off. **Done 2026-10-16** (43c2805). |
 | **P2** Desk page + history rows | The desk page (`/desk`, lobby build): roster, check in, undo, check out, visitors, a sealed history row with every action; `/v1/desk/*`, `/v1/history/rows`, `night_summary`; claims keyed and purged nightly. | Claude: lobby + Worker | Bind `HISTORY_DB`; try the desk page on a test child. |
 | **P3** Stations | KVBC Awana's print role registers a station key (safeStorage, refused without it); `/v1/station/*`; the roster CSV read through the Worker and sealed by the station to every station; completed books. | Claude: printer (release) + Worker | Install on the check-in laptop (and any second printer). |
 | **P4** Print lease | The station leases and prints EVERY job from the Worker, journals jobIds (at most once, "check the printer" on a retried spooled job), reports printer state; the desk page and TVs show it. | Claude: printer (release) + Worker | Shadow night: every label printed from a lease, compared with the extension's. |
-| **P5** One publisher, one count, the fallback | The shared `authoritativeTonight()` module (Worker + generated copy for the printer); the Worker publishes `tally`, `tonight`, the pickup list and the greetings; the relay drops the laptop's tally / still-here frames in cloud mode; TwoTimTwo-page check-ins found by the watcher become jobs (BARFED tag without the friend's name); the watcher seals each such job to the stations itself (`sealForStations`) and the station writes the history row when it prints. | Claude: lobby/shared + Worker + printer | Shadow night: the Worker's count against the laptop's. **Built (2026-10-12, not released):** step 1 `lobby/shared/tonight.js` (+ `printer/print-server/tonight.js`) and `shared/pickup.js`; step 2 the Worker publishes (`publisher.js`); step 3 the station greets; step 4 BARFED on the fallback. Design below. |
+| **P5** One publisher, one count, the fallback | The shared `authoritativeTonight()` module (Worker + generated copy for the printer); the Worker publishes `tally`, `tonight`, the pickup list and the greetings; the relay drops the laptop's tally / still-here frames in cloud mode; TwoTimTwo-page check-ins found by the watcher become jobs (BARFED tag without the friend's name); the watcher seals each such job to the stations itself (`sealForStations`) and the station writes the history row when it prints. | Claude: shared + Worker + printer | Shadow night: the Worker's count against the laptop's. **Built (2026-10-12, not released):** step 1 `shared/tonight.js` (+ `printer/print-server/tonight.js`) and `shared/pickup.js`; step 2 the Worker publishes (`publisher.js`); step 3 the station greets; step 4 BARFED on the fallback. Design below. |
 | **P6** History | History and summary views in /settings (unwrapped in the browser); `POST /v1/history/import` of the laptop's past nights, sealed by the KVBC Awana app. | Claude: lobby + Worker + printer | Look over the history and summary views. **Built (lobby + Worker half):** `worker/src/history.js`, `historyCrypto.js`, the History section; the printer's import of the laptop's past nights is not. (Built later: "Import laptop history", tray and /settings, `POST /cloud/import-history`.) |
 | **P7** Switch | Retire the Chrome extension (and the relay's laptop paths it served); the paper-sheet drill; remove the legacy hash; docs and SECURITY.md final. Never on a Wednesday. | Claude + owner | Pick the night; keep the paper sheet and blank tags at the desk. **Done 2026-10-16:** the extension deleted in KVBC Awana 10.0.0 (commits 7dbd30f..b7d6015, feed live 5497ea3, run 38881739599), the Worker took over its roster, books, meeting report and Checkout page (03e13d1, 7dbd30f), the relay deleted (2c3282e), the legacy login deleted (43c2805), read clock 5 s (16a8051), paper-sheet drill in `printer/docs/NIGHT-OF.md`, SECURITY.md final (b1095ea, 43c2805). |
 
@@ -761,7 +761,7 @@ said); "Owner" is what only the owner can do.
   commit 43c2805: `AUTH_LEGACY`, `auth.legacyLastAt` and the old login are deleted.)* The shadow-night count
   comparison is not recorded as done.
 - **P0 built (2026-10-12).** The module's API is documented at the top of
-  `lobby/shared/cloud-crypto.js` and in `lobby/shared/README.md`; the route
+  `shared/cloud-crypto.js` and in `shared/README.md`; the route
   shapes in `worker/src/routes.md`; what is and is not protected in
   `lobby/SECURITY.md` ("Online check-in history"). The only behaviour that
   changed is the watcher's read clock (5 s, and it waits out any other read
@@ -811,7 +811,7 @@ said); "Owner" is what only the owner can do.
     `desk-transport.js` every Worker call and every seal, `desk-page.mjs` injects
     the touch check-in's own touch-core block from `phone.html` so search, "did you
     mean" and families are exactly the phone's and the laptop's). `site/build.mjs`
-    serves it with a copy of `lobby/shared/cloud-crypto.js` beside it. Signed in
+    serves it with a copy of `shared/cloud-crypto.js` beside it. Signed in
     with the passphrase (passphrase v2: `authKey` derived in the browser, never
     stored; the history key is unwrapped once to prove it and its `pub` pinned in
     `awanaDeskHistoryKey.v1`; the session is the screens' own slot). All sealing is
@@ -829,23 +829,23 @@ said); "Owner" is what only the owner can do.
     change in one atomic put) and EVERY client: the lobby screens, projector and OBS
     links, Settings' change, the desk and phone pages, Journey, the print server and
     the Electron wizard sign in through `signInWithPassphrase`
-    (`lobby/shared/sync-protocol.js`) with `deriveAuthKey` (`cloud-crypto.js`). The desk
+    (`shared/sync-protocol.js`) with `deriveAuthKey` (`cloud-crypto.js`). The desk
     page seals the job as `{route: '/print', body, clubberId, source: 'desk'}` and rows
     of kind checkin / visitor / undo / checkout. Open: watch `auth.legacyLastAt` in
     `GET /v1/cloud/status`, then set `AUTH_LEGACY = "off"` and later delete the legacy
     code (routes.md section 1). **Done 2026-10-16** (43c2805): the old login is refused
     and its code deleted in every client; the bootstrap upgrade login stays.
-  - **P5 built (2026-10-12, not released).** One count: `lobby/shared/tonight.js`
+  - **P5 built (2026-10-12, not released).** One count: `shared/tonight.js`
     (generated copy `printer/print-server/tonight.js`) is the printer's AND the
     Worker's `authoritativeTonight()` / `tonightHereNow()`, with the partial-report and
-    mass-undo rules; `lobby/shared/pickup.js` the still-here list. With
+    mass-undo rules; `shared/pickup.js` the still-here list. With
     `SINGLE_PUBLISHER` on the Worker publishes `tally`, `tonight` and the sealed
     still-here list from its own state (it keeps tonight's first names + clubs sealed
     for the night: see "P5: how the Worker names children" above), the relay drops the
     laptop's frames and lets one station greeting per print job through (birthday,
     first-timer and milestone are back), and a TwoTimTwo-page child the report marks
     Brought a friend gets the BARFED tag (station-side `isBarfNight()`, no friend's
-    name). Tests: `lobby/shared/tonight.test.js`, Worker `publisher.test.js`,
+    name). Tests: `shared/tonight.test.js`, Worker `publisher.test.js`,
     `adopt.test.js`, `twotimtwo.test.js`, printer `test-tonight-shared.cjs`,
     `test-station-greeting.cjs`, `test-barf.cjs`, and `test-cloud-e2e.cjs` (the real
     print server behind the puller: one greeting per check-in, the tally, the list).

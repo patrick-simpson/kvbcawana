@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 
 const SITE = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const ROOT = path.dirname(SITE);
-const LOGOS = path.join(ROOT, 'lobby', 'shared', 'brand', 'logos');
+const LOGOS = path.join(ROOT, 'shared', 'brand', 'logos');
 const page = readFileSync(path.join(SITE, 'logo', 'index.html'), 'utf8');
 const links = readFileSync(path.join(SITE, 'links', 'index.html'), 'utf8');
 
@@ -33,7 +33,7 @@ test('no external hosts, no Google fonts, no remote script', () => {
 
 test('the fonts come from the brand kit', () => {
   assert.match(page, /<link rel="stylesheet" href="\/lobby\/shared\/brand\/fonts\.css">/);
-  assert.ok(existsSync(path.join(ROOT, 'lobby', 'shared', 'brand', 'fonts.css')));
+  assert.ok(existsSync(path.join(ROOT, 'shared', 'brand', 'fonts.css')));
 });
 
 test('every download link is a kit file that exists, and the sheet has ink and white for each version', () => {

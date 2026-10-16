@@ -15,7 +15,7 @@
 // Stored as ONE document, `stations`, with public keys and a few fixed-word
 // fields only: no name of a child, nothing secret. A restart reloads it.
 
-import { STATION_PAD_LADDER, base64ToBytes, kidOf } from '../../lobby/shared/cloud-crypto.js';
+import { STATION_PAD_LADDER, base64ToBytes, kidOf } from '../../shared/cloud-crypto.js';
 import { Doc } from './doc.js';
 
 export const STATIONS_MAX = 10;

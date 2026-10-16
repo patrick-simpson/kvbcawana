@@ -125,7 +125,7 @@ describe('the shout face (app.css)', () => {
   it('is Paytone One from the kit\'s own full files: never a subset under its reserved name', () => {
     for (const face of [shout]) {
       expect(face.d.src).toBe(
-        "url('../../shared/brand/fonts/paytone-one-full-400-normal.woff2') format('woff2'), url('../../shared/brand/fonts/PaytoneOne-Regular.ttf') format('truetype')",
+        "url('../../../shared/brand/fonts/paytone-one-full-400-normal.woff2') format('woff2'), url('../../../shared/brand/fonts/PaytoneOne-Regular.ttf') format('truetype')",
       );
       // One file covers every letter it draws: no subset split.
       expect(face.d['unicode-range']).toBeUndefined();
@@ -162,7 +162,7 @@ describe('the label face (app.css)', () => {
     // be a Modified Version carrying the reserved name "Londrina Solid".
     expect(label).toHaveLength(1);
     expect(label[0].d.src).toBe(
-      "url('../../shared/brand/fonts/londrina-solid-full-400-normal.woff2') format('woff2'), url('../../shared/brand/fonts/LondrinaSolid-Regular.ttf') format('truetype')",
+      "url('../../../shared/brand/fonts/londrina-solid-full-400-normal.woff2') format('woff2'), url('../../../shared/brand/fonts/LondrinaSolid-Regular.ttf') format('truetype')",
     );
     expect(label[0].d['unicode-range']).toBeUndefined();
     expect(main).not.toMatch(/@fontsource\/londrina/);

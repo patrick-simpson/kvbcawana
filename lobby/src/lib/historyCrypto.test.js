@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it, vi } from 'vitest';
-import { createHistoryKey, newRowId, sealRow, unwrapPrivateKey } from '../../shared/cloud-crypto.js';
+import { createHistoryKey, newRowId, sealRow, unwrapPrivateKey } from '../../../shared/cloud-crypto.js';
 import { fetchNightRows, historyUnlocked, historyWrapLanded, lockHistory, rewrapHistoryKey, unlockHistory } from './historyCrypto.js';
 
 const BASE = 'https://sync.test';

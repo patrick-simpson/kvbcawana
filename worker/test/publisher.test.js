@@ -4,7 +4,7 @@
 // (and is not) kept at rest.
 import { describe, expect, it } from 'vitest';
 import { importDisplayKey, openEnvelope, paddedSize } from '../../lobby/src/lib/envelope.js';
-import { REPORT_FRESH_MS } from '../../lobby/shared/tonight.js';
+import { REPORT_FRESH_MS } from '../../shared/tonight.js';
 import { seal } from '../src/crypto.js';
 import { MINUTE_MS, STILL_GAP_MS } from '../src/publisher.js';
 import { SyncCore } from '../src/sync.js';

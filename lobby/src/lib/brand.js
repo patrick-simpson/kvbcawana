@@ -7,20 +7,20 @@
 // Pure data and pure functions only. The components that draw with them
 // live in src/components/brand/.
 
-import tokens from '../../shared/brand/tokens.json';
-import { CHIP, SHOUT_BOX } from '../../shared/chipGeometry.js';
-import { BEAT, DUR, EASE, beats } from '../../shared/motion.js';
-import waveSvg from '../../shared/brand/shapes/wave-journey.svg?raw';
-import tabSvg from '../../shared/brand/shapes/tab-c-journey.svg?raw';
-import starburstSvg from '../../shared/brand/shapes/starburst.svg?raw';
-import tipBlobSvg from '../../shared/brand/shapes/tip-blob.svg?raw';
-import sparkleSvg from '../../shared/brand/doodles/sparkle-4pt.svg?raw';
-import sparkleXSvg from '../../shared/brand/doodles/sparkle-4pt-x.svg?raw';
-import dotSvg from '../../shared/brand/doodles/dot.svg?raw';
-import ringSvg from '../../shared/brand/doodles/ring.svg?raw';
-import squiggleSvg from '../../shared/brand/doodles/squiggle-wave.svg?raw';
-import zigzagSvg from '../../shared/brand/doodles/zigzag.svg?raw';
-import loopSvg from '../../shared/brand/doodles/loop.svg?raw';
+import tokens from '../../../shared/brand/tokens.json';
+import { CHIP, SHOUT_BOX } from '../../../shared/chipGeometry.js';
+import { BEAT, DUR, EASE, beats } from '../../../shared/motion.js';
+import waveSvg from '../../../shared/brand/shapes/wave-journey.svg?raw';
+import tabSvg from '../../../shared/brand/shapes/tab-c-journey.svg?raw';
+import starburstSvg from '../../../shared/brand/shapes/starburst.svg?raw';
+import tipBlobSvg from '../../../shared/brand/shapes/tip-blob.svg?raw';
+import sparkleSvg from '../../../shared/brand/doodles/sparkle-4pt.svg?raw';
+import sparkleXSvg from '../../../shared/brand/doodles/sparkle-4pt-x.svg?raw';
+import dotSvg from '../../../shared/brand/doodles/dot.svg?raw';
+import ringSvg from '../../../shared/brand/doodles/ring.svg?raw';
+import squiggleSvg from '../../../shared/brand/doodles/squiggle-wave.svg?raw';
+import zigzagSvg from '../../../shared/brand/doodles/zigzag.svg?raw';
+import loopSvg from '../../../shared/brand/doodles/loop.svg?raw';
 
 /* ── Motion: one rhythm, four curves ─────────────────────────────── */
 
@@ -32,7 +32,7 @@ export { BEAT, DUR, EASE, beats };
 
 // Their geometry and measurement are shared/chipGeometry.js, which the
 // projector's chip reads too; the plate below is the lobby's own.
-export { SHOUT_BOX, chipGeometry, inkEm, inkOverflow, markExtents, measureEm } from '../../shared/chipGeometry.js';
+export { SHOUT_BOX, chipGeometry, inkEm, inkOverflow, markExtents, measureEm } from '../../../shared/chipGeometry.js';
 
 /** @param {number} n */
 const round3 = (n) => Math.round(n * 1000) / 1000;

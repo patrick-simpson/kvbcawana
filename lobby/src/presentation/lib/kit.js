@@ -8,7 +8,7 @@
 //
 // Pure data and pure functions only.
 
-import tokens from '../../../shared/brand/tokens.json';
+import tokens from '../../../../shared/brand/tokens.json';
 
 /** @typedef {{ name: string, primary: string, deep: string, tint: string, ink?: string }} KitClub */
 

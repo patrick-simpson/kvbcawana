@@ -7,7 +7,9 @@ import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const SHARED_DIR = resolve(__dirname, 'shared');
+// The family's shared folder sits at the repo root (it left lobby/ on 2026-10-16);
+// the site still serves it at /lobby/shared/.
+const SHARED_DIR = resolve(__dirname, '..', 'shared');
 
 const MIME = {
   '.json': 'application/json',
@@ -125,6 +127,8 @@ export default defineConfig({
   server: {
     host: true,
     port: 3000,
+    // The shared modules and the brand kit are imported from ../shared.
+    fs: { allow: ['..'] },
   },
   build: {
     rollupOptions: {
@@ -146,6 +150,9 @@ export default defineConfig({
     // Playwright specs live in e2e/ and must never run under vitest; the
     // Worker's tests run in its own ci job.
     exclude: [...configDefaults.exclude, 'e2e/**'],
+    // The family's shared modules (../shared, at the repo root) keep their
+    // tests beside them; the lobby's vitest runs them.
+    include: [...configDefaults.include, '../shared/**/*.test.js'],
     coverage: {
       provider: 'v8',
       reporter: ['text-summary', 'html', 'lcov'],

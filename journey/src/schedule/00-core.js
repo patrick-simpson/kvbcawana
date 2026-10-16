@@ -4,7 +4,7 @@
 // constants, and for how the video content itself gets here.
 const JOURNEY_START_MINUTES = 18 * 60 + 30; // 6:30 PM
 const JOURNEY_END_MINUTES = 19 * 60 + 15; // 7:15 PM
-// Club nights only (the lobby's rule, lobby/shared/clubNight.js): Trek's small
+// Club nights only (the lobby's rule, shared/clubNight.js): Trek's small
 // group time, a full-screen title card from 7:00 to 7:30 PM. It takes the
 // Journey window's last quarter hour on those nights, but never cuts a lesson
 // that is still running (see 25-trek.js).

@@ -9,7 +9,7 @@
 // over the pledges happening in the next room.
 
 import { dateKey } from './time.js';
-import { DEFAULT_MEETING_DAY, isNoClubDate as isNoClubIn } from '../../shared/clubNight.js';
+import { DEFAULT_MEETING_DAY, isNoClubDate as isNoClubIn } from '../../../shared/clubNight.js';
 
 export const PHASES = ['off', 'countdown', 'ceremony', 'game-time', 'closing', 'shutdown'];
 

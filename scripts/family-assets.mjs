@@ -1,17 +1,17 @@
 #!/usr/bin/env node
 // The family's shared files, kept once and copied where each screen needs them.
 //
-//   the brand kit   canonical lobby/shared/brand/       -> journey/public/brand/,
+//   the brand kit   canonical shared/brand/       -> journey/public/brand/,
 //                                                          printer/print-server/public/brand/
-//   sync modules    canonical lobby/shared/sync-protocol.js and cloud-crypto.js
+//   sync modules    canonical shared/sync-protocol.js and cloud-crypto.js
 //                                                       -> journey/public/src/shared/ (the kiosk's
 //                                                          passphrase v2 sign-in imports them, byte for byte)
-//   club nights     canonical lobby/shared/clubNight.js -> journey/public/src/shared/ (the kiosk's
+//   club nights     canonical shared/clubNight.js -> journey/public/src/shared/ (the kiosk's
 //                                                          Trek small group card asks it, byte for byte)
-//   phone remote    canonical lobby/shared/journeyRemote.js -> journey/public/src/shared/ (the phone
+//   phone remote    canonical shared/journeyRemote.js -> journey/public/src/shared/ (the phone
 //                                                          remote page cleans the Worker's answers with it)
 //
-//   committed copies  the CommonJS copies of lobby/shared/*.js the Windows app ships
+//   committed copies  the CommonJS copies of shared/*.js the Windows app ships
 //                     (printer/print-server/*.js and the display's clubNight.js; table in
 //                     scripts/shared-copies.mjs). Unlike the rest these ARE committed (the
 //                     installer is built from the repo): the printer run rewrites any that
@@ -40,7 +40,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { drift as sharedDrift, writeCopies as writeSharedCopies } from './shared-copies.mjs';
 
 export const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
-export const KIT = 'lobby/shared/brand';
+export const KIT = 'shared/brand';
 // ES modules the Journey kiosk loads: at sign-in (public/src/sync.js), and the
 // club-night rule its Trek small group card follows (src/schedule/25-trek.js);
 // and the phone remote's rules (public/remote/, which also signs in with the first two).
@@ -92,7 +92,7 @@ function pairs(apps) {
     const c = COPIES[app];
     if (!c) throw new Error(`family-assets: unknown app "${app}" (journey, printer, lobby or all)`);
     if (c.kit) out.push({ kind: 'dir', from: KIT, to: c.kit });
-    if (c.modules) for (const name of JOURNEY_MODULES) out.push({ kind: 'file', from: `lobby/shared/${name}`, to: `${c.modules}/${name}` });
+    if (c.modules) for (const name of JOURNEY_MODULES) out.push({ kind: 'file', from: `shared/${name}`, to: `${c.modules}/${name}` });
   }
   return out;
 }

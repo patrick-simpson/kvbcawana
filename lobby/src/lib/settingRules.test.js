@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { cleanRule, cleanSpec, matchesRule } from './settingRules.js';
-import { plainText as sharedPlainText } from '../../shared/text.js';
+import { plainText as sharedPlainText } from '../../../shared/text.js';
 const plainText = (/** @type {unknown} */ s, /** @type {number} */ n) => sharedPlainText(s, n, { coerce: true });
 
 describe('cleanRule (the wire)', () => {

@@ -5,7 +5,7 @@ import {
   answersFor, beginWords, cleanAnswersFile, describeNow, formatTime, lastWords, layoutMode, needsConfirm, pickKiosk, pressWords, slidesButton, videoPosition, volumeView,
   CHOICES, PRESS_ANSWER_MS, REASON_WORDS, SLIDES_CONFIRM_WORDS,
 } from '../public/remote/logic.js';
-import { JOURNEY_PICKER_CHOICES, JOURNEY_REMOTE_REASONS } from '../../lobby/shared/journeyRemote.js';
+import { JOURNEY_PICKER_CHOICES, JOURNEY_REMOTE_REASONS } from '../../shared/journeyRemote.js';
 
 const slides = (n, of, kind = 'title', lines = []) => ({ view: 'slides', week: 5, title: 'Unit 2, Lesson 1: Worldview', preview: false, wait: null, slide: { n, of, kind, heading: null, lines }, last: null, at: null });
 

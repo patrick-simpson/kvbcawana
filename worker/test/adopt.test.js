@@ -2,7 +2,7 @@
 // claim and a print job sealed in the Worker; children gone are undone; the
 // work per alarm tick stays inside the free plan's 10 ms of CPU.
 import { describe, expect, it } from 'vitest';
-import { generateKeyPair, openAsStation, sealForStations } from '../../lobby/shared/cloud-crypto.js';
+import { generateKeyPair, openAsStation, sealForStations } from '../../shared/cloud-crypto.js';
 import { printRecord } from '../src/adopt.js';
 import { SEAL_PER_TICK, SPILL_MS, WATCH_INTERVAL_MS } from '../src/watcher.js';
 import { everything } from './helpers.js';

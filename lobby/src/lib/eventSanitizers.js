@@ -114,7 +114,7 @@
  *   screen keeps it after RECEIVING it; 0 takes it down now. Absent: the screen's own ceiling.
  */
 
-import { cleanText, plainText } from '../../shared/text.js';
+import { cleanText, plainText } from '../../../shared/text.js';
 import {
   MAX_DURATION_SEC,
   MAX_EYEBROW,

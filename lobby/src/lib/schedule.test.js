@@ -145,7 +145,7 @@ describe('sanitizeSpecialDates', () => {
     // someone adds a break week the projector accepts and this reader drops,
     // this fails — the whole point of #342 is one file, one answer.
     const here = dirname(fileURLToPath(import.meta.url));
-    const raw = JSON.parse(readFileSync(resolve(here, '../../shared/schedule.json'), 'utf8'));
+    const raw = JSON.parse(readFileSync(resolve(here, '../../../shared/schedule.json'), 'utf8'));
     const parsed = sanitizeSchedule(raw);
     expect(parsed).not.toBeNull();
     const source = raw.specialDates ?? {};

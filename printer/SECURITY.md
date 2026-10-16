@@ -174,7 +174,7 @@ sees names in memory; anyone with the public key can forge a row; the owner
 accepted a short passphrase; there is no recovery), is written down once in
 `lobby/SECURITY.md`, "Online check-in history". The print server loads the
 same cryptography as `print-server/cloud-crypto.js`, generated from
-`lobby/shared/cloud-crypto.js`.
+`shared/cloud-crypto.js`.
 
 ## Remembered leaders in the sync service (owner-approved exception)
 

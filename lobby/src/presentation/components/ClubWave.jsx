@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import waveSvg from '../../../shared/brand/shapes/wave-journey.svg?raw';
+import waveSvg from '../../../../shared/brand/shapes/wave-journey.svg?raw';
 import { DUR, EASE } from '../lib/motion-tokens.js';
 
 /**

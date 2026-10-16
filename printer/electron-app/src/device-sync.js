@@ -141,7 +141,7 @@ function writeStore(userData, store) {
  *   session: () => ({url: string, session: string} | null),   null: not signed in (or setup not done)
  *   protocol: {SCREEN_HELLO_PATH: string, screenSettingsPath: (id: string) => string, screenNamePath: (id: string) => string},
  *                                               the sync protocol's routes (print-server/sync-protocol.js, generated
- *                                               from lobby/shared/; main.js passes syncClient.protocol: the packaged
+ *                                               from shared/; main.js passes syncClient.protocol: the packaged
  *                                               app cannot require print-server from inside app.asar)
  *   request: (base: string, path: string, opts: object) => Promise<{ok: boolean, status: number, body: any}>,
  *   name: () => string,                         what to call it (roles.name, else the computer's own name)

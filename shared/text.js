@@ -14,7 +14,7 @@
 //
 // The limits stay with their callers (NAME_MAX, STORED_NAME_MAX, the friend's
 // 24): this module has none of its own. The contract and envelope vectors and
-// every sanitizer test pin the result. See lobby/shared/README.md for how each
+// every sanitizer test pin the result. See shared/README.md for how each
 // app loads it (the print server through a generated copy).
 
 /**

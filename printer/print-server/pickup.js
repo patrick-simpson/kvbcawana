@@ -1,4 +1,4 @@
-// GENERATED from lobby/shared/pickup.js by scripts/shared-copies.mjs: do not edit; edit the source and run
+// GENERATED from shared/pickup.js by scripts/shared-copies.mjs: do not edit; edit the source and run
 // `node scripts/family-assets.mjs`. scripts/check-mirrors.mjs fails when this copy drifts.
 'use strict';
 // The lobby's "still here" list (7.16.0, owner 2026-10-08) — pure helpers.

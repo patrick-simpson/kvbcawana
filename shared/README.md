@@ -4,7 +4,10 @@
 > **KVBC-Awana-Countdown** repo; edit schedule/theme data here.
 
 This directory is the **single source of truth** for shared Awana app
-data. It is copied into `lobby/dist/shared/` at build time; the one site
+data, kept at the repo root beside the apps (it lived in `lobby/shared/` until
+2026-10-16; its web address did not move). The lobby's tests and lint cover it
+(`cd lobby && npm run lint && npx vitest run`). It is copied into
+`lobby/dist/shared/` at build time; the one site
 (`site/build.mjs`) copies that under `/lobby/`, so it is served at:
 
     https://awana.kvbchurch.org/lobby/shared/schedule.json
@@ -73,7 +76,7 @@ imports, only `export const` / `export function`), and is **never served**
 How each reader loads one:
 
 - **The lobby and the projector** import it through Vite
-  (`import ... from '../../shared/<name>.js'`); the projector may, see
+  (`import ... from './<name>.js'`); the projector may, see
   "isolation" in `CLAUDE.md`.
 - **The packaged apps** (`printer/electron-app` and `printer/print-server`,
   CommonJS; the retired sound room app `lobby/desktop` took an ES module) ship in

@@ -1,7 +1,7 @@
 // The Awana 2026-27 catalog brand kit, as the label renderer uses it.
 //
 // print-server/public/brand/ is a generated copy of the one canonical kit in
-// lobby/shared/brand/ (scripts/family-assets.mjs makes it before every test,
+// shared/brand/ (scripts/family-assets.mjs makes it before every test,
 // start and build; it is not committed), checked by scripts/test-brand-kit.cjs. It ships
 // inside the installer because electron-builder's extraResources already
 // copies print-server/public/**.

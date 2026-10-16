@@ -19,7 +19,7 @@ import { useFontsReady } from '../hooks/useFontsReady.js';
 import Wave from './brand/Wave.jsx';
 import Sticker from './brand/Sticker.jsx';
 import DoodleCluster from './brand/DoodleCluster.jsx';
-import churchLogo from '../../shared/brand/logos/kvbc-awana-two-line-white.svg';
+import churchLogo from '../../../shared/brand/logos/kvbc-awana-two-line-white.svg';
 
 /**
  * The check-in moment: the catalog's club opener page (p.63), played live.

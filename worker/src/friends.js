@@ -14,7 +14,7 @@
 
 import { localTime, openState, sealState } from './watcher.js';
 import { toBase64Url } from './crypto.js';
-import { CLUB_TABLE, clubIdByAlias } from '../../lobby/shared/clubs.js';
+import { CLUB_TABLE, clubIdByAlias } from '../../shared/clubs.js';
 
 export const KEEP_DAYS = 3;
 export const CLUB_ORDER = Object.freeze(['Puggles', 'Cubbies', 'Sparks', 'T&T', 'Trek', 'Journey']);

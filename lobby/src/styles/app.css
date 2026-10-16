@@ -7,7 +7,7 @@
 
 /* The shared brand kit's tokens (--brand-*): club colors, house colors,
    the three voices and the motion table. See shared/brand/README.md. */
-@import '../../shared/brand/tokens.css';
+@import '../../../shared/brand/tokens.css';
 
 /* The flagship welcome slide (src/components/FlagshipSlide.jsx). */
 @import './flagship.css';
@@ -50,8 +50,8 @@
   ascent-override: 96%;
   descent-override: 43.6%;
   line-gap-override: 0%;
-  src: url('../../shared/brand/fonts/paytone-one-full-400-normal.woff2') format('woff2'),
-       url('../../shared/brand/fonts/PaytoneOne-Regular.ttf') format('truetype');
+  src: url('../../../shared/brand/fonts/paytone-one-full-400-normal.woff2') format('woff2'),
+       url('../../../shared/brand/fonts/PaytoneOne-Regular.ttf') format('truetype');
 }
 /* The label voice: Londrina Solid, from the kit's own files, for the same
    reason as the shout above: its license reserves the name "Londrina Solid",
@@ -68,8 +68,8 @@
   font-style: normal;
   font-display: swap;
   font-weight: 400;
-  src: url('../../shared/brand/fonts/londrina-solid-full-400-normal.woff2') format('woff2'),
-       url('../../shared/brand/fonts/LondrinaSolid-Regular.ttf') format('truetype');
+  src: url('../../../shared/brand/fonts/londrina-solid-full-400-normal.woff2') format('woff2'),
+       url('../../../shared/brand/fonts/LondrinaSolid-Regular.ttf') format('truetype');
 }
 :root {
   /* Catalog palette */
@@ -1641,8 +1641,8 @@ html, body, #root {
   width: 19px;
   height: 19px;
   background: #ffffff;
-  -webkit-mask: url('../../shared/brand/doodles/check.svg') center / contain no-repeat;
-  mask: url('../../shared/brand/doodles/check.svg') center / contain no-repeat;
+  -webkit-mask: url('../../../shared/brand/doodles/check.svg') center / contain no-repeat;
+  mask: url('../../../shared/brand/doodles/check.svg') center / contain no-repeat;
   scale: 0;
   /* Going out on the exit curve, which never overshoots: any overshoot past
      0 is a negative scale, a mirrored check. */
@@ -3614,8 +3614,8 @@ details.advanced-fields > summary::before {
   width: 0.62rem;
   height: 1rem;
   background: currentColor;
-  -webkit-mask: url('../../shared/brand/doodles/chevron.svg') center / contain no-repeat;
-  mask: url('../../shared/brand/doodles/chevron.svg') center / contain no-repeat;
+  -webkit-mask: url('../../../shared/brand/doodles/chevron.svg') center / contain no-repeat;
+  mask: url('../../../shared/brand/doodles/chevron.svg') center / contain no-repeat;
   rotate: 180deg;
 }
 details.advanced-fields[open] > summary::before { rotate: 270deg; }
@@ -4137,8 +4137,8 @@ html.configure-mode .panel-backdrop { background: #F6F4EF; }
   top: -8px;
   width: 16px;
   height: 16px;
-  -webkit-mask: url('../../shared/brand/doodles/sparkle-4pt.svg') center / contain no-repeat;
-  mask: url('../../shared/brand/doodles/sparkle-4pt.svg') center / contain no-repeat;
+  -webkit-mask: url('../../../shared/brand/doodles/sparkle-4pt.svg') center / contain no-repeat;
+  mask: url('../../../shared/brand/doodles/sparkle-4pt.svg') center / contain no-repeat;
 }
 .joy-burst__dot {
   left: -4px;

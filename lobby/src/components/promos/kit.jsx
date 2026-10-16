@@ -2,8 +2,8 @@ import { useContext, useEffect, useState } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import { M, ZeroAnimationContext } from '../../lib/motion.jsx';
 import { PROMO_DURATION_SEC } from '../../lib/promos.js';
-import LOGO_WHITE from '../../../shared/brand/logos/kvbc-awana-two-line-white.svg';
-import LOGO_INK from '../../../shared/brand/logos/kvbc-awana-two-line-ink.svg';
+import LOGO_WHITE from '../../../../shared/brand/logos/kvbc-awana-two-line-white.svg';
+import LOGO_INK from '../../../../shared/brand/logos/kvbc-awana-two-line-ink.svg';
 
 // ─────────────────────────────────────────────────────────────
 // The promo kit: what every fall showreel poster is built from.

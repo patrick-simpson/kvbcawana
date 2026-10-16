@@ -3,7 +3,7 @@
 // session, registered stations, and a TwoTimTwo whose report the test edits,
 // whose check-in / undo / check-out posts it can break, and whose every data
 // read is timed (the 5 s clock is checked against it).
-import { newRowId } from '../../lobby/shared/cloud-crypto.js';
+import { newRowId } from '../../shared/cloud-crypto.js';
 import { SyncCore } from '../src/sync.js';
 import { CHECKIN_PAGE, checkoutPage, fakeTwoTimTwo, page, table } from './fixtures.js';
 import { fakeClock, makeStation, memoryStore, sealJob, signInV2 } from './helpers.js';

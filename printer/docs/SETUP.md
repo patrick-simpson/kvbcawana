@@ -95,7 +95,7 @@ the laptop is back.
 
 Leaders who have had a tag printed are remembered in the church settings
 (names only, no contact details) and offered back as chips on /checkin and the
-settings page. Every club list reads the one club table (`lobby/shared/clubs.js`).
+settings page. Every club list reads the one club table (`shared/clubs.js`).
 
 See [SECURITY.md](../SECURITY.md) for the full trust model, what it
 deliberately does not defend against, and the fork checklist.

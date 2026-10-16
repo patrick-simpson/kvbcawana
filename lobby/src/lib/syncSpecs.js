@@ -63,7 +63,7 @@ export const PASSPHRASE_MAX = 128;
 
 // Both the screens and the Worker apply exactly this before comparing: the
 // sync protocol's one definition (shared/sync-protocol.js).
-export { normalizeSyncPassphrase } from '../../shared/sync-protocol.js';
+export { normalizeSyncPassphrase } from '../../../shared/sync-protocol.js';
 
 /**
  * Exactly the template allowlist; anything else is dropped. {} for junk.
@@ -182,7 +182,7 @@ export {
   sanitizeJourneyNow,
   sanitizeJourneyPress,
   sanitizeJourneyRemote,
-} from '../../shared/journeyRemote.js';
+} from '../../../shared/journeyRemote.js';
 
 /** What a screen is called until someone names it. @type {Record<ScreenKind, string>} */
 export const SCREEN_DEFAULT_NAMES = { lobby: 'Lobby TV', projector: 'Projector', journey: 'Journey kiosk', computer: 'Computer' };

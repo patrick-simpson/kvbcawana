@@ -48,7 +48,7 @@ function tonightCheckins(history = $history.loadHistory(), today = $eventBuffer.
 // and, on a station with its SINGLE_PUBLISHER switch on, publishes the count
 // itself, so this printer's own count is built from its history.
 // `lastCheckinReport` is no longer fed by any route; the shared rules
-// (lobby/shared/tonight.js) still take one, and tests set it to pin them.
+// (shared/tonight.js) still take one, and tests set it to pin them.
 //
 // Rules worth not relearning:
 //   * ONLY a report the reconcile pass actually APPLIED is kept. A report the
@@ -82,7 +82,7 @@ function tonightState(tonight, now) {
 
 /**
  * WHO is here now tonight: one entry per child, by the rules of the count
- * (lobby/shared/tonight.js, the SAME code the sync Worker runs). The lobby's
+ * (shared/tonight.js, the SAME code the sync Worker runs). The lobby's
  * still-here list (7.16.0, publishStillHere) names them. Pure but for its
  * reads of lastCheckinReport and checkedOutTonight.
  *
@@ -96,7 +96,7 @@ function tonightHereNow(tonight = tonightCheckins(), now = Date.now()) {
 
 /**
  * THE one function every surface asks "how many children are here tonight"
- * (lobby/shared/tonight.js).
+ * (shared/tonight.js).
  *
  * @returns {{source:'report'|'history', at:number|null, ageMs:number|null,
  *            checkedIn:number, byClub:Object}}

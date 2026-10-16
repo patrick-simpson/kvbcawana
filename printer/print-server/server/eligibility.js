@@ -56,7 +56,7 @@ const STEP_UP_NEXT_CLUB = {
 };
 
 // Substring matching on purpose (label text is free-form); the table and the
-// matcher are lobby/shared/clubs.js, through the generated ./clubTable.js.
+// matcher are shared/clubs.js, through the generated ./clubTable.js.
 function clubKey(clubName) {
   return clubKeyByLabel(clubName);
 }

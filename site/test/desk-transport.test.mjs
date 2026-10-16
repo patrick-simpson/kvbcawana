@@ -4,8 +4,8 @@
 // station's and the history key's own private keys to prove what is inside.
 import assert from 'node:assert/strict';
 import { describe, it, before, mock } from 'node:test';
-import * as cc from '../../lobby/shared/cloud-crypto.js';
-import { mergeChurch, sanitizeChurch } from '../../lobby/shared/churchSettings.js';
+import * as cc from '../../shared/cloud-crypto.js';
+import { mergeChurch, sanitizeChurch } from '../../shared/churchSettings.js';
 import { createDesk, dayWords, DeskError, HISTORY_PIN_STORAGE, NO_CLUB_QUIPS, noClubWords, READ_TIMEOUT_MS, printLabel, SESSION_STORAGE } from '../checkin/desk-transport.js';
 
 const PASS = 'kennebec';

@@ -3,14 +3,14 @@
 // buildTally, buildCheckout, buildTonight; the contract vectors pin them and
 // printer/scripts/test-cloud-e2e.cjs compares the Worker's frames with the
 // printer's builders on the same input). Names and caps are the same:
-// the text cleaner is lobby/shared/text.js, the one both sides use.
+// the text cleaner is shared/text.js, the one both sides use.
 //
 // PRIVACY (unchanged): `tally` and `tonight` are PURE NUMBERS (plaintext, like
 // today); `checkout` (who is still here) is first name + club only and is
 // SEALED with the display key by the caller (sync.js publishSealed), padded on
 // the `checkout` ladder by crypto.js seal(), so its length leaks nothing.
 
-import { cleanText } from '../../lobby/shared/text.js';
+import { cleanText } from '../../shared/text.js';
 
 export const NAME_MAX = 40;
 export const TALLY_CLUBS_MAX = 30;

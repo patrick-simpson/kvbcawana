@@ -14,7 +14,7 @@ import {
   wirePayloads,
 } from './syncService.js';
 import { DISPLAY_KEY_STORAGE, loadDisplayKey } from './displayKey.js';
-import { deriveAuthKey } from '../../shared/cloud-crypto.js';
+import { deriveAuthKey } from '../../../shared/cloud-crypto.js';
 import { sanitizeOverrides } from '../hooks/useConfig.js';
 import { parseUrlFlags } from './urlFlags.js';
 import { sanitizeSettings, sanitizeSlidesChunk } from './eventSanitizers.js';

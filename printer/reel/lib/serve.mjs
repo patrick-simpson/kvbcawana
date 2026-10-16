@@ -1,7 +1,7 @@
 // A tiny static server for the reel: the built site (site/dist, the same files
 // awana.kvbchurch.org serves, with Pages' pretty addresses), the film page
 // (printer/reel/film) under /film/, the work folder (recorded footage,
-// rendered labels) under /work/ and the family's shared folder (lobby/shared:
+// rendered labels) under /work/ and the family's shared folder (shared:
 // the brand kit, chipGeometry.js) under /shared/. A JSON file asked for by a
 // module script is answered as a module (`export default ...`), so the shared
 // modules' bare JSON imports load in the browser as they do in the bundler.

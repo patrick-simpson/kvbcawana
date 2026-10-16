@@ -36,7 +36,7 @@
 // A night is the church's LOCAL date (churchNight). Claims are purged at the
 // end of the night (the watcher, once the window has closed).
 
-import { identityTag, visitorTag } from '../../lobby/shared/cloud-crypto.js';
+import { identityTag, visitorTag } from '../../shared/cloud-crypto.js';
 import { Doc } from './doc.js';
 
 export const CHECKING_TTL_MS = 60 * 1000;

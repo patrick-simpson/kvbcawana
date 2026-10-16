@@ -6,7 +6,7 @@ import { _resetForTest as resetConfig, receiveSharedSettings, useConfig } from '
 import { loadSyncSession, saveSyncSession } from '../lib/syncService.js';
 import { BarfBagsField, CloudCheckinTestField, FriendsListField, SyncSignInField } from '../components/settings/fields.jsx';
 import { useCalendar } from './useCalendar.js';
-import { deriveAuthKey, generateKeyPair } from '../../shared/cloud-crypto.js';
+import { deriveAuthKey, generateKeyPair } from '../../../shared/cloud-crypto.js';
 
 const BASE = 'https://awana-sync.example.workers.dev';
 const SESSION = 'v1.1.1790839331729.oWr6n92IJW5ldPGmtiyjPHAZpca-QGToNlKGXlKI6vc';

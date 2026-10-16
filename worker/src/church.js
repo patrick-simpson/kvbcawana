@@ -6,7 +6,7 @@
 // them (it learns of a change from GET /v1/print/next's `church.rev`), and
 // keeps config.json as the offline copy.
 //
-// ONE allowlist: lobby/shared/churchSettings.js (the print server runs the same
+// ONE allowlist: shared/churchSettings.js (the print server runs the same
 // source). Values are church-authored, never child data.
 //
 // STORAGE `church` = {v: 1, rev, savedAt, by, seededBy: {stationId, name, at}|null,
@@ -15,7 +15,7 @@
 // check-and-set is one synchronous step on the in-memory document (doc.js),
 // written through before the answer.
 
-import { CHURCH_JSON_MAX, mergeChurch, sanitizeChurch } from '../../lobby/shared/churchSettings.js';
+import { CHURCH_JSON_MAX, mergeChurch, sanitizeChurch } from '../../shared/churchSettings.js';
 import { Doc } from './doc.js';
 import { fail, json } from './http.js';
 import { DOORBELL_EVENT, frameText } from './live.js';

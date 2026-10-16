@@ -14,17 +14,17 @@
 // produces a joyful banner. Trek and Journey have no mascot characters
 // (mascot: null).
 
-import pugglesLogo from '../../shared/brand/logos/puggles-white.svg';
-import cubbiesLogo from '../../shared/brand/logos/cubbies-white.svg';
-import sparksLogo from '../../shared/brand/logos/sparks-white.svg';
-import tntLogo from '../../shared/brand/logos/tnt-white.svg';
-import trekLogo from '../../shared/brand/logos/trek-white.svg';
-import journeyLogo from '../../shared/brand/logos/journey-white.svg';
+import pugglesLogo from '../../../shared/brand/logos/puggles-white.svg';
+import cubbiesLogo from '../../../shared/brand/logos/cubbies-white.svg';
+import sparksLogo from '../../../shared/brand/logos/sparks-white.svg';
+import tntLogo from '../../../shared/brand/logos/tnt-white.svg';
+import trekLogo from '../../../shared/brand/logos/trek-white.svg';
+import journeyLogo from '../../../shared/brand/logos/journey-white.svg';
 import pugglesMascot from '../assets/clubs/puggles-mascot.png';
 import cubbiesMascot from '../assets/clubs/cubbies-mascot.png';
 import sparksMascot from '../assets/clubs/sparks-mascot.png';
 import tntMascot from '../assets/clubs/tnt-mascot.png';
-import { CLUB_TABLE, clubIdByAlias } from '../../shared/clubs.js';
+import { CLUB_TABLE, clubIdByAlias } from '../../../shared/clubs.js';
 
 // Each club's art, by id. Everything else about a club (name, colors, spellings)
 // is the one table in shared/clubs.js, which the print server reads too.

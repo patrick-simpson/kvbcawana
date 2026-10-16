@@ -11,7 +11,7 @@
 // these). The first draft's aliases (`POST /v1/print/lease|ack|hello`) are gone:
 // nothing used them.
 
-import { churchNight } from '../../lobby/shared/cloud-crypto.js';
+import { churchNight } from '../../shared/cloud-crypto.js';
 import { fail, json } from './http.js';
 import { LEASE_MAX, LEASE_MS, validJobId } from './printq.js';
 import { PRINT_JOB_KIND } from './adopt.js';

@@ -6,7 +6,7 @@
 // here is made up.
 import { createRequire } from 'node:module';
 import { describe, expect, it, vi } from 'vitest';
-import { STATION_PAD_LADDER, generateKeyPair, sealForStations } from '../../lobby/shared/cloud-crypto.js';
+import { STATION_PAD_LADDER, generateKeyPair, sealForStations } from '../../shared/cloud-crypto.js';
 import {
   BOOK_CLUB_IDS, MEETING_MS, ROSTER_FRESH_MS, ROSTER_RETRY_MS, SLIPS_FROM_VERSION, SLIPS_PER_READ_MAX, SLIP_CAP, STALE_STATION_MS, inClubHours, versionAtLeast,
 } from '../src/stationfeeds.js';

@@ -3,7 +3,7 @@
 // lesson that is still running; the Trek count from the lobby's stored tally;
 // tonight's Trek lesson title only when the calendar names one.
 //
-// The rule is lobby/shared/clubNight.js itself, handed to the page through
+// The rule is shared/clubNight.js itself, handed to the page through
 // its test seam (jsdom cannot import() a module). The clock is pinned to
 // Wednesday 2026-10-07, local time, and moved by re-pinning it.
 import { test } from 'node:test';
@@ -13,7 +13,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { bootKiosk, tick, pinClock } from './kiosk-dom.mjs';
 
-const clubNight = await import('../../lobby/shared/clubNight.js');
+const clubNight = await import('../../shared/clubNight.js');
 
 const PUBLIC = path.join(path.dirname(path.dirname(fileURLToPath(import.meta.url))), 'public');
 const json = (rel) => JSON.parse(readFileSync(path.join(PUBLIC, rel), 'utf8'));

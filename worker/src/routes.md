@@ -2,7 +2,7 @@
 
 The route table the P1–P7 builders work against (root
 `ROADMAP.md#online-check-in`). Built so far: the crypto module
-(`lobby/shared/cloud-crypto.js`), the D1 schema (`../migrations/0001_history.sql`,
+(`shared/cloud-crypto.js`), the D1 schema (`../migrations/0001_history.sql`,
 `0002_applied_batches.sql`, `0003_trends_import.sql`), sections 2 and 3 (P6, `history.js`) and, in the
 Worker core, **the routes marked BUILT below** (stations, the print lease, the
 desk's claim API, the one read clock; section 7 says how a module adds its
@@ -61,7 +61,7 @@ here and keep its shape; a change of shape is a change to this file first.
 - **Single publisher** (`SINGLE_PUBLISHER = "on"` with cloud check-in
   running; section 8 has the design). The Worker publishes `tally`, `tonight`
   and the still-here list (`checkout`) from its own state with the shared
-  count (`lobby/shared/tonight.js`), and `POST /v1/publish` drops the laptop's
+  count (`shared/tonight.js`), and `POST /v1/publish` drops the laptop's
   `tally`, `tonight`, `checkout` and `checkin` frames with 200
   `{dropped: true}` so the print server owes no resend, keeping every other
   event. The ONE exception is a `checkin` greeting sent by a registered
@@ -242,7 +242,7 @@ into the database in Cloudflare." Fully automatic, no button:
   what the blank-headed column beside each club holds (never read beyond being
   number-like).
 - **Strict** (`parseAttendanceSummary`): the header must be `Meeting`, then each
-  club the app's club table knows (`lobby/shared/clubs.js`; stored under its
+  club the app's club table knows (`shared/clubs.js`; stored under its
   name, `T&T` etc.) with a blank partner, then `TOTAL`, `""`; every row the same
   width; counts digits or blank; a row's clubs must add up to its TOTAL; a
   Meeting cell is a date, a summary word (`Total`, `Average`) or blank with no
@@ -395,8 +395,8 @@ yellow strip and no Check out.
 /checkin sat on "Reading the roster..." on a Monday evening while the Worker
 tried TwoTimTwo, whose check-in page on such a day shows some other meeting: a
 tap would check a child into it). A club day is decided by THE club-night rule,
-`lobby/shared/clubNight.js` `clubNightToday` (the one the TVs and the KVBC
-Awana app use), given `lobby/shared/schedule.json` (bundled at deploy: its time
+`shared/clubNight.js` `clubNightToday` (the one the TVs and the KVBC
+Awana app use), given `shared/schedule.json` (bundled at deploy: its time
 zone, meeting day and `specialDates`, so a `noClub` date is never a club day and
 a special meeting with its own `windows` is one) and the calendar the Worker
 keeps (storage `calendar`: an extra club night it lists is a club day, a
@@ -765,7 +765,7 @@ undo): the station ends it quietly.
 
 `src/tonight.js` (the book), `src/publisher.js` (frames, timing, the gate and
 three routes), `src/frames.js` (the printer's frame shapes), and the shared
-rules `lobby/shared/tonight.js` + `lobby/shared/pickup.js` (the print server runs
+rules `shared/tonight.js` + `shared/pickup.js` (the print server runs
 the same source through generated copies, `scripts/shared-copies.mjs`:
 `authoritativeTonight`, `tonightHereNow`, the identity keys, `reportIsPartial`,
 `massUndoRefused`, the pickup list). With `SINGLE_PUBLISHER = "off"` the Worker
@@ -962,7 +962,7 @@ out with the Checkout page's own `POST /clubber/checkout` (`calendar_id` +
 Built (Track A): `src/device.js` (10.1), `src/switches.js` (10.2), `src/church.js`
 (10.3), `src/notice.js` (10.4), `src/changes.js` (10.5), `src/overview.js` (10.6),
 each mounted with one line in `SyncCore`; tests `test/{changes,switches,church,notice,overview}.test.js`
-and `lobby/shared/churchSettings.test.js`. Where the build settled something the
+and `shared/churchSettings.test.js`. Where the build settled something the
 spec left open, or corrected it, the text below says so ("Built:").
 
 Design and build split: `docs/SETTINGS-OVERHAUL.md` (repo root). Section 9 is the
@@ -1053,7 +1053,7 @@ none) is the switch's own fallback. `SWITCHES_STORED` unset counts as `on`.
 
 ### 10.3 Church settings (the laptop's church-wide printing settings, edited from anywhere)
 
-One allowlist, `lobby/shared/churchSettings.js` (pure; generated CommonJS copy
+One allowlist, `shared/churchSettings.js` (pure; generated CommonJS copy
 `printer/print-server/churchSettings.js` via `scripts/shared-copies.mjs`,
 checked by `check-mirrors.mjs`): `CHURCH_SPEC`, `CHURCH_KEYS`,
 `sanitizeChurch(raw, {patch?}) -> {settings, dropped: [key]}` (a `null` value is

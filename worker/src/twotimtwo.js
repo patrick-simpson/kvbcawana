@@ -32,7 +32,7 @@
 import { parseHTML } from 'linkedom';
 import { parse, serialize } from 'parse5';
 import { INTERACTIVE_WAIT_MS, READ_INTERVAL_MS } from './readbudget.js';
-import { firstLast } from '../../lobby/shared/tonight.js';
+import { firstLast } from '../../shared/tonight.js';
 
 export const DEFAULT_HOST = 'kvbchurch.twotimtwo.com';
 const HOST_RE = /^[a-z0-9][a-z0-9-]{0,62}\.twotimtwo\.com$/;

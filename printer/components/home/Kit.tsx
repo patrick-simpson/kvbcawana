@@ -2,7 +2,7 @@ import React from 'react';
 
 /**
  * The brand kit on the public pages. Every shape and doodle is the kit's own
- * file (lobby/shared/brand/, the catalog's art), imported at build time from
+ * file (shared/brand/, the catalog's art), imported at build time from
  * its one copy, so nothing here is redrawn or copied and a kit change reaches
  * the page by itself. Each paints in currentColor.
  *
@@ -12,31 +12,31 @@ import React from 'react';
  * by a member church with the disclaimer in the header, the footer and the
  * meta description (owner, 2026-10-11).
  */
-import logoTwoLineInk from '../../../lobby/shared/brand/logos/kvbc-awana-two-line-ink.svg';
-import logoTwoLineWhite from '../../../lobby/shared/brand/logos/kvbc-awana-two-line-white.svg';
-import logoFullWhite from '../../../lobby/shared/brand/logos/kvbc-awana-full-white.svg';
-import logoStackedInk from '../../../lobby/shared/brand/logos/kvbc-awana-stacked-ink.svg';
-import pugglesColor from '../../../lobby/shared/brand/logos/puggles-color.svg';
-import cubbiesColor from '../../../lobby/shared/brand/logos/cubbies-color.svg';
-import sparksColor from '../../../lobby/shared/brand/logos/sparks-color.svg';
-import tntColor from '../../../lobby/shared/brand/logos/tnt-color.svg';
-import trekColor from '../../../lobby/shared/brand/logos/trek-color.svg';
-import journeyColor from '../../../lobby/shared/brand/logos/journey-color.svg';
-import pugglesWhite from '../../../lobby/shared/brand/logos/puggles-white.svg';
-import cubbiesWhite from '../../../lobby/shared/brand/logos/cubbies-white.svg';
-import sparksWhite from '../../../lobby/shared/brand/logos/sparks-white.svg';
-import tntWhite from '../../../lobby/shared/brand/logos/tnt-white.svg';
-import trekWhite from '../../../lobby/shared/brand/logos/trek-white.svg';
-import journeyWhite from '../../../lobby/shared/brand/logos/journey-white.svg';
-import pugglesBlack from '../../../lobby/shared/brand/logos/puggles-black.svg';
-import cubbiesBlack from '../../../lobby/shared/brand/logos/cubbies-black.svg';
-import sparksBlack from '../../../lobby/shared/brand/logos/sparks-black.svg';
-import tntBlack from '../../../lobby/shared/brand/logos/tnt-black.svg';
-import trekBlack from '../../../lobby/shared/brand/logos/trek-black.svg';
-import journeyBlack from '../../../lobby/shared/brand/logos/journey-black.svg';
+import logoTwoLineInk from '../../../shared/brand/logos/kvbc-awana-two-line-ink.svg';
+import logoTwoLineWhite from '../../../shared/brand/logos/kvbc-awana-two-line-white.svg';
+import logoFullWhite from '../../../shared/brand/logos/kvbc-awana-full-white.svg';
+import logoStackedInk from '../../../shared/brand/logos/kvbc-awana-stacked-ink.svg';
+import pugglesColor from '../../../shared/brand/logos/puggles-color.svg';
+import cubbiesColor from '../../../shared/brand/logos/cubbies-color.svg';
+import sparksColor from '../../../shared/brand/logos/sparks-color.svg';
+import tntColor from '../../../shared/brand/logos/tnt-color.svg';
+import trekColor from '../../../shared/brand/logos/trek-color.svg';
+import journeyColor from '../../../shared/brand/logos/journey-color.svg';
+import pugglesWhite from '../../../shared/brand/logos/puggles-white.svg';
+import cubbiesWhite from '../../../shared/brand/logos/cubbies-white.svg';
+import sparksWhite from '../../../shared/brand/logos/sparks-white.svg';
+import tntWhite from '../../../shared/brand/logos/tnt-white.svg';
+import trekWhite from '../../../shared/brand/logos/trek-white.svg';
+import journeyWhite from '../../../shared/brand/logos/journey-white.svg';
+import pugglesBlack from '../../../shared/brand/logos/puggles-black.svg';
+import cubbiesBlack from '../../../shared/brand/logos/cubbies-black.svg';
+import sparksBlack from '../../../shared/brand/logos/sparks-black.svg';
+import tntBlack from '../../../shared/brand/logos/tnt-black.svg';
+import trekBlack from '../../../shared/brand/logos/trek-black.svg';
+import journeyBlack from '../../../shared/brand/logos/journey-black.svg';
 
-const doodleFiles = import.meta.glob<string>('../../../lobby/shared/brand/doodles/*.svg', { query: '?raw', import: 'default', eager: true });
-const shapeFiles = import.meta.glob<string>('../../../lobby/shared/brand/shapes/*.svg', { query: '?raw', import: 'default', eager: true });
+const doodleFiles = import.meta.glob<string>('../../../shared/brand/doodles/*.svg', { query: '?raw', import: 'default', eager: true });
+const shapeFiles = import.meta.glob<string>('../../../shared/brand/shapes/*.svg', { query: '?raw', import: 'default', eager: true });
 
 interface Art { viewBox: string; inner: string }
 const parse = (raw: string): Art => ({
@@ -123,7 +123,7 @@ export const clubByName = (name: string): Club =>
  * on every screen and on these pages): always ONE colour, ink on a light
  * field and white on a dark or strong one; two-line no narrower than 260px,
  * full (with the tagline) no narrower than 520px. Rules and the sheet:
- * lobby/shared/churchLogo.js and awana.kvbchurch.org/logo/.
+ * shared/churchLogo.js and awana.kvbchurch.org/logo/.
  */
 export const LOGO = {
   twoLineInk: logoTwoLineInk,

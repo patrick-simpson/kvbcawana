@@ -6,9 +6,9 @@
  * long before it can reach the live display. Everything exported here
  * is plain data — the schedule engine stays pure.
  */
-import rawSchedule from '../../../shared/schedule.json';
-import rawTheme from '../../../shared/theme.json';
-import rawSlides from '../../../shared/slides.json';
+import rawSchedule from '../../../../shared/schedule.json';
+import rawTheme from '../../../../shared/theme.json';
+import rawSlides from '../../../../shared/slides.json';
 
 /* ── Validation helpers (hand-rolled; no runtime deps) ────────────── */
 

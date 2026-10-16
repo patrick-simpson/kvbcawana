@@ -3,9 +3,9 @@
 // TwoTimTwo's check-in page anyway, and what that page shows on a day with no
 // club is some other meeting, whose list a tap would check a child into.)
 //
-// THE club-night rule, not a second one: lobby/shared/clubNight.js
+// THE club-night rule, not a second one: shared/clubNight.js
 // (`clubNightToday`, `nextClubNight`), the rule the TVs, the KVBC Awana app and
-// the sound room use, given the schedule (lobby/shared/schedule.json: its time
+// the sound room use, given the schedule (shared/schedule.json: its time
 // zone, meeting day and `specialDates`, so a `noClub` date is never a club day
 // and a special meeting with its own windows is one) and the church calendar
 // the Worker keeps (storage `calendar`, read every 6 hours: an extra club
@@ -17,8 +17,8 @@
 // Pure, and cheap on the free plan: the answer is kept per (local date,
 // calendar read), so a page polling every minute costs one date format.
 
-import schedule from '../../lobby/shared/schedule.json' with { type: 'json' };
-import { clubNightToday, nextClubNight, zonedParts } from '../../lobby/shared/clubNight.js';
+import schedule from '../../shared/schedule.json' with { type: 'json' };
+import { clubNightToday, nextClubNight, zonedParts } from '../../shared/clubNight.js';
 
 /** How far ahead `next` looks for the next club night (a long Christmas break is 3 weeks). */
 export const NEXT_LOOKAHEAD_DAYS = 120;

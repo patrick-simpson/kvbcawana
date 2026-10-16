@@ -1,7 +1,7 @@
 import { useRef } from 'react';
 import { getAllClubs } from '../lib/clubs.js';
 import { SAMPLE_NAMES, pick } from '../lib/demoNames.js';
-import churchLogo from '../../shared/brand/logos/kvbc-awana-two-line-white.svg';
+import churchLogo from '../../../shared/brand/logos/kvbc-awana-two-line-white.svg';
 
 export default function DebugPanel({
   onSimulate, onSimulateRecap, onSimulateOps, onSimulateTonight, onSimulateNotice, onClearNotice,

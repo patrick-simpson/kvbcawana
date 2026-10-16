@@ -54,13 +54,13 @@ jobs:
   #           ALL of worker/src, worker/migrations, the four test
   #           helpers it reuses (rig, helpers, fixtures, d1stub), the Worker's
   #           package files (its two runtime packages are installed for it) and
-  #           the lobby/src/lib and lobby/shared files the Worker imports
+  #           the lobby/src/lib and shared files the Worker imports
   #           (calendarParse, envelope, settingRules, sharedSettings, slides,
   #           syncSpecs; text.js; tonight.js, whose generated copy is the
   #           print server's count; clubNight.js and schedule.json, the
   #           desk's club-day rule), site/build.mjs (test-phone-touch),
-  #           lobby/src/lib/syncSpecs.js and the lobby/shared/sync-protocol.js it
-  #           re-exports (electron-app's device-sync test), and lobby/shared/brand/
+  #           lobby/src/lib/syncSpecs.js and the shared/sync-protocol.js it
+  #           re-exports (electron-app's device-sync test), and shared/brand/
   #           (the print server's brand kit is a copy of it, made before the tests
   #           by scripts/family-assets.mjs; the home page imports its shapes,
   #           doodles and club marks, and test-about-page reads them)
@@ -69,9 +69,9 @@ jobs:
   #           lobby/src/components/settings/laptop*.jsx: test-leaders,
   #           test-custom-label, test-pickup-board, test-attendance-audit,
   #           test-server-security, test-server-helpers)
-  #           and lobby/shared/cloud-vectors.json (test-cloud-crypto reads it;
+  #           and shared/cloud-vectors.json (test-cloud-crypto reads it;
   #           its print-server/cloud-crypto.js is generated from
-  #           lobby/shared/cloud-crypto.js, which the copies job checks)
+  #           shared/cloud-crypto.js, which the copies job checks)
   changes:
     name: What changed
     runs-on: ubuntu-latest
@@ -126,7 +126,7 @@ jobs:
                 *) lobby=true ;;
               esac
               case "$f" in
-                worker/src/*|worker/migrations/*|worker/test/rig.js|worker/test/helpers.js|worker/test/fixtures.js|worker/test/d1stub.js|worker/package.json|worker/package-lock.json|lobby/src/lib/calendarParse.js|lobby/src/lib/envelope.js|lobby/src/lib/settingRules.js|lobby/src/lib/sharedSettings.js|lobby/src/lib/slides.js|lobby/src/lib/syncSpecs.js|lobby/shared/journeyRemote.js|lobby/shared/text.js|lobby/shared/sync-protocol.js|lobby/shared/brand/*|lobby/shared/cloud-crypto.js|lobby/shared/cloud-vectors.json|lobby/shared/tonight.js|lobby/shared/pickup.js|lobby/shared/clubs.js|lobby/shared/clubNight.js|lobby/shared/schedule.json|lobby/shared/churchSettings.js|lobby/src/lib/printServer.js|lobby/src/components/settings/laptop*.jsx|site/build.mjs) printer=true ;;
+                worker/src/*|worker/migrations/*|worker/test/rig.js|worker/test/helpers.js|worker/test/fixtures.js|worker/test/d1stub.js|worker/package.json|worker/package-lock.json|lobby/src/lib/calendarParse.js|lobby/src/lib/envelope.js|lobby/src/lib/settingRules.js|lobby/src/lib/sharedSettings.js|lobby/src/lib/slides.js|lobby/src/lib/syncSpecs.js|shared/journeyRemote.js|shared/text.js|shared/sync-protocol.js|shared/brand/*|shared/cloud-crypto.js|shared/cloud-vectors.json|shared/tonight.js|shared/pickup.js|shared/clubs.js|shared/clubNight.js|shared/schedule.json|shared/churchSettings.js|lobby/src/lib/printServer.js|lobby/src/components/settings/laptop*.jsx|site/build.mjs) printer=true ;;
                 lobby/*|journey/*|site/updates/*|.github/workflows/*) ;;
                 *) printer=true ;;
               esac
@@ -450,7 +450,7 @@ jobs:
           if [ -z "$BASE" ]; then
             echo "No base commit to compare against; deploying the Worker."
             echo "changed=true" >> "$GITHUB_OUTPUT"
-          elif git diff --quiet "$BASE" HEAD -- worker lobby/src/lib lobby/shared/text.js lobby/shared/sync-protocol.js lobby/shared/cloud-crypto.js lobby/shared/tonight.js lobby/shared/pickup.js lobby/shared/clubs.js lobby/shared/churchSettings.js lobby/shared/clubNight.js lobby/shared/schedule.json lobby/shared/journeyRemote.js .github/workflows/ci.yml; then
+          elif git diff --quiet "$BASE" HEAD -- worker lobby/src/lib shared/text.js shared/sync-protocol.js shared/cloud-crypto.js shared/tonight.js shared/pickup.js shared/clubs.js shared/churchSettings.js shared/clubNight.js shared/schedule.json shared/journeyRemote.js .github/workflows/ci.yml; then
             echo "Nothing the Worker is built from changed since $BASE; its deploy is skipped."
             echo "changed=false" >> "$GITHUB_OUTPUT"
           else

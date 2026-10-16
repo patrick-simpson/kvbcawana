@@ -18,7 +18,7 @@
 // (the owner's notice; a laptop notice has none), beside the live channel's own
 // replay copy `live:notice`.
 
-import { plainText } from '../../lobby/shared/text.js';
+import { plainText } from '../../shared/text.js';
 import { Doc } from './doc.js';
 import { fail, json } from './http.js';
 import { frameText, replayKey } from './live.js';

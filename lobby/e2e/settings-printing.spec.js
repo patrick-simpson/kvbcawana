@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { generateKeyPair, importPrivateKey, keyRing, openAsStation } from '../shared/cloud-crypto.js';
+import { generateKeyPair, importPrivateKey, keyRing, openAsStation } from '../../shared/cloud-crypto.js';
 import { SYNC_BASE, installWorker, makeWorld } from './settingsStub.js';
 
 // The Printing section (docs/SETTINGS-OVERHAUL.md 2.5): the laptop's church-

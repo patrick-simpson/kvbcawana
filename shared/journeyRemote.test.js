@@ -3,7 +3,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import * as shared from './journeyRemote.js';
-import * as specs from '../src/lib/syncSpecs.js';
+import * as specs from '../lobby/src/lib/syncSpecs.js';
 
 // The Journey phone remote's one set of rules: the Worker (through
 // syncSpecs.js) and the phone page (a byte copy under journey/public/src/shared/)
@@ -21,7 +21,7 @@ describe('the same rules for the Worker and the phone page', () => {
 
   it('the picker choices are the kiosk\'s own PICKER_CHOICES keys', () => {
     const here = dirname(fileURLToPath(import.meta.url));
-    const src = readFileSync(resolve(here, '../../journey/src/schedule/19-picker-final-step.js'), 'utf8');
+    const src = readFileSync(resolve(here, '../journey/src/schedule/19-picker-final-step.js'), 'utf8');
     const block = /const PICKER_CHOICES = \{([\s\S]*?)\n\};/.exec(src)[1];
     const keys = [...block.matchAll(/^ {2}'?([a-z-]+)'?: \(/gm)].map((m) => m[1]);
     expect(keys).toEqual([...shared.JOURNEY_PICKER_CHOICES]);

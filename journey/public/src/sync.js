@@ -19,8 +19,8 @@
      section stays hidden and nothing here runs.
    - Sign-in is passphrase v2 (worker/src/routes.md section 1): the
      passphrase is turned into an authKey HERE and only that is sent. The
-     protocol dance is the family's one copy, lobby/shared/sync-protocol.js, and
-     the derivation lobby/shared/cloud-crypto.js: both are loaded as ES modules
+     protocol dance is the family's one copy, shared/sync-protocol.js, and
+     the derivation shared/cloud-crypto.js: both are loaded as ES modules
      at sign-in from src/shared/ (copied by scripts/family-assets.mjs, never
      edited). The derivation is 600000 PBKDF2 rounds, about a second ONCE, off
      the page's thread; nothing re-derives afterwards (every later
@@ -116,7 +116,7 @@
   var REMOTE_ACTIONS = ['start-downloads', 'pause-downloads', 'resume-downloads', 'stop-downloads', 'delete-downloads'];
   var REMOTE_ACTIONS_MAX = 5;
   var DOORBELL_MESSAGE = 'awana-display:sync-doorbell';
-  // What the phone remote may ask: exactly lobby/shared/journeyRemote.js
+  // What the phone remote may ask: exactly shared/journeyRemote.js
   // JOURNEY_REMOTE_ACTIONS (test/phone-remote.test.mjs reads this line).
   var PHONE_ACTIONS = ['slide-next', 'slide-prev', 'slides-start', 'play', 'pause', 'toggle-pause', 'seek', 'mute', 'unmute', 'volume', 'begin', 'pick'];
   var PHONE_ACTIONS_MAX = 12;

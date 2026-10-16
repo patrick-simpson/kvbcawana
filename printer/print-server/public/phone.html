@@ -951,7 +951,7 @@ function liveListArrived() { showingCached = false; $('cached-note').hidden = tr
 
 function saveLocal() { try { sessionStorage.setItem(LOCAL_KEY, JSON.stringify(LOCAL)); } catch (e) { /* the list lasts this load */ } }
 
-// The one club list (lobby/shared/clubs.js, served beside this page), plus any club the roster names.
+// The one club list (shared/clubs.js, served beside this page), plus any club the roster names.
 function fillClubSelects() {
   var lead = $('leader-club');
   var keepL = lead.value;

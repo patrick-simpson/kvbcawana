@@ -1,4 +1,4 @@
-// GENERATED from lobby/shared/clubs.js by scripts/shared-copies.mjs: do not edit; edit the source and run
+// GENERATED from shared/clubs.js by scripts/shared-copies.mjs: do not edit; edit the source and run
 // `node scripts/family-assets.mjs`. scripts/check-mirrors.mjs fails when this copy drifts.
 'use strict';
 // @ts-check
@@ -22,7 +22,7 @@
 // and lobby/src/lib/clubs.test.js pin both. Colors are the Awana 2026-27
 // catalog's (shared/brand/tokens.json; Puggles is blue by the owner's call).
 //
-// Self-contained: see lobby/shared/README.md for how each app loads it.
+// Self-contained: see shared/README.md for how each app loads it.
 
 /**
  * @typedef {{

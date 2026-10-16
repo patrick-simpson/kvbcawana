@@ -1,7 +1,7 @@
 // Church settings (routes.md 10.3): the laptop's church-wide printing settings,
 // seeded once by a station, edited from the settings page, applied by stations.
 import { describe, expect, it } from 'vitest';
-import { CHURCH_JSON_MAX } from '../../lobby/shared/churchSettings.js';
+import { CHURCH_JSON_MAX } from '../../shared/churchSettings.js';
 import { rig } from './rig.js';
 
 const SUNDAY = Date.parse('2026-10-11T16:00:00Z');

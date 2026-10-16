@@ -25,8 +25,8 @@ const HOME_PAGE = ['App.tsx', 'components/Simulator.tsx', 'components/ClubberLis
 const HELP_PAGE = ['HelpPage.tsx', 'components/InstallGuide.tsx', 'components/Faq.tsx', 'components/home/Chrome.tsx'];
 const CSS = 'styles/home.css';
 const css = read(CSS);
-const kitTokens = readFileSync(path.join(REPO, 'lobby/shared/brand/tokens.css'), 'utf8');
-const kitFonts = readFileSync(path.join(REPO, 'lobby/shared/brand/fonts.css'), 'utf8');
+const kitTokens = readFileSync(path.join(REPO, 'shared/brand/tokens.css'), 'utf8');
+const kitFonts = readFileSync(path.join(REPO, 'shared/brand/fonts.css'), 'utf8');
 
 let n = 0;
 const test = (name, fn) => { fn(); n += 1; console.log(`ok - ${name}`); };
@@ -95,7 +95,7 @@ test('home.css declares no font, imports only the kit\'s tokens and reaches no o
   const sheet = live(css);
   assert.doesNotMatch(sheet, /@font-face\b/i);
   const imports = [...sheet.matchAll(/@import\s+(?:url\()?["']?([^"')\s;]+)/gi)].map((m) => m[1]);
-  assert.deepEqual(imports, ['../../lobby/shared/brand/tokens.css']);
+  assert.deepEqual(imports, ['../../shared/brand/tokens.css']);
   const urls = [...sheet.matchAll(/url\(\s*(?:"([^"]*)"|'([^']*)'|([^)\s]*))\s*\)/gi)].map((m) => (m[1] ?? m[2] ?? m[3]).trim());
   assert.deepEqual(urls.filter(isExternal), []);
   // The three voices come from the kit's tokens, never a family named here.
@@ -113,12 +113,12 @@ test('no address on the pages names a brand face', () => {
 });
 
 // ── The kit's art, from its one copy; Awana marks with the trademark line ────
-test('every shape, doodle and club mark is the kit\'s own file, imported from lobby/shared/brand', () => {
+test('every shape, doodle and club mark is the kit\'s own file, imported from shared/brand', () => {
   const kit = read('components/home/Kit.tsx');
   const imports = [...kit.matchAll(/from\s+'([^']+\.svg)'/g)].map((m) => m[1]);
   assert.ok(imports.length >= 18, 'the club marks are imported');
   for (const rel of imports) {
-    assert.match(rel, /^\.\.\/\.\.\/\.\.\/lobby\/shared\/brand\/logos\/[a-z-]+\.svg$/, rel);
+    assert.match(rel, /^\.\.\/\.\.\/\.\.\/shared\/brand\/logos\/[a-z-]+\.svg$/, rel);
     assert.ok(existsSync(path.join(ROOT, 'components/home', rel)), `${rel} is in the kit`);
   }
   for (const folder of ['doodles', 'shapes']) {
@@ -130,7 +130,7 @@ test('every shape, doodle and club mark is the kit\'s own file, imported from lo
     for (const [, kind, name] of live(read(rel)).matchAll(/<(Doodle|Shape)\s+(?:key=\{[^}]*\}\s+)?name=["']([a-z0-9-]+)["']/g)) names.add(`${kind === 'Doodle' ? 'doodles' : 'shapes'}/${name}`);
   }
   assert.ok(names.size >= 12, 'found the pages\' shapes and doodles');
-  for (const n of names) assert.ok(existsSync(path.join(REPO, 'lobby/shared/brand', `${n}.svg`)), `${n}.svg is in the kit`);
+  for (const n of names) assert.ok(existsSync(path.join(REPO, 'shared/brand', `${n}.svg`)), `${n}.svg is in the kit`);
   // Nothing else on the pages is an image from elsewhere: every <img> draws a kit mark.
   for (const rel of HOME) {
     for (const [tag] of live(read(rel)).matchAll(/<img\b[^>]*>/g)) {

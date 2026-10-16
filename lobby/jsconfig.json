@@ -14,5 +14,5 @@
     "paths": { "react": ["./types/react.d.ts"], "react-dom": ["./types/react-dom.d.ts"] },
     "types": []
   },
-  "include": ["src", "shared/cloud-crypto.js", "types/env.d.ts", "types/react.d.ts", "types/react-dom.d.ts"]
+  "include": ["src", "../shared/cloud-crypto.js", "types/env.d.ts", "types/react.d.ts", "types/react-dom.d.ts"]
 }

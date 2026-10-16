@@ -1,8 +1,8 @@
 import React, { useSyncExternalStore } from 'react';
 import { motion } from 'framer-motion';
-import { LOGO_ARRIVAL, MIN_WIDTH_PX, parseChurchLogo } from '../../../shared/churchLogo.js';
-import fullSvg from '../../../shared/brand/logos/kvbc-awana-full.svg?raw';
-import twoLineSvg from '../../../shared/brand/logos/kvbc-awana-two-line.svg?raw';
+import { LOGO_ARRIVAL, MIN_WIDTH_PX, parseChurchLogo } from '../../../../shared/churchLogo.js';
+import fullSvg from '../../../../shared/brand/logos/kvbc-awana-full.svg?raw';
+import twoLineSvg from '../../../../shared/brand/logos/kvbc-awana-two-line.svg?raw';
 import { DUR, EASE } from '../lib/motion-tokens.js';
 import { useLowPower } from '../hooks/useLowPower.js';
 

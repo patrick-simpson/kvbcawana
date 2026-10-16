@@ -31,7 +31,7 @@
 // website open in the volunteer's browser.
 
 const crypto = require('crypto');
-// The text cleaner every trust-boundary caller shares (lobby/shared/text.js,
+// The text cleaner every trust-boundary caller shares (shared/text.js,
 // through its generated copy).
 const { isControlCharCode, stripControlChars, cleanText } = require('./textClean');
 

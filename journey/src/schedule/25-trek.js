@@ -4,7 +4,7 @@
    things feed it, none of them a new connection of its own:
 
    - Is tonight a club night? Exactly the lobby's answer: the shared rule
-     lobby/shared/clubNight.js (copied byte for byte beside this script by
+     shared/clubNight.js (copied byte for byte beside this script by
      scripts/family-assets.mjs, loaded once as an ES module) asked with the
      lobby's own two files, its shared/schedule.json (noClub and special
      dates) and its calendar-feed.json (the season, cancelled nights). Both
