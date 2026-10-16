@@ -143,9 +143,11 @@ service**:
   where the old frame needed 12+ characters. Every client is on passphrase v2
   (built 2026-10-12): it derives `authKey` itself (PBKDF2-SHA256, 600000 rounds,
   then HKDF) and the service keeps only SHA-256 of that, so the word never
-  reaches the service. The old salted HMAC of the word is kept only while an old
-  client may still sign in (`AUTH_LEGACY`, `auth:legacyLastAt`; routes.md
-  section 1 says when it goes): "Online check-in history" below.
+  reaches the service. The old passphrase-only sign-in is gone (owner
+  2026-10-16): a client that sends the word itself is refused. The only salted
+  HMAC of the word the service ever holds is the BOOTSTRAP one, made from
+  `INITIAL_PASSPHRASE` on a brand-new store so the first client can upgrade it
+  (routes.md section 1): "Online check-in history" below.
 - A sign-in returns a session (its own storage slot, `awanaSyncSession.v1`,
   never config, never an export or a URL) and the display key.
   **Anyone with the word can read names and change every screen** (the owner's
@@ -366,13 +368,14 @@ stored readable**. That is not the same as "Cloudflare can never see a name".
 - **No recovery.** There is no recovery code and no escrow (owner). Lose the
   passphrase and the history is gone for good; a changed passphrase keeps it
   (the key is re-wrapped), and the previous wrap is kept 7 days.
-- **Until the old hash is retired** (P1's migration) the store still holds the
-  fast salted HMAC of the passphrase beside the new verifier, so its weakness
-  lasts until the legacy hash is deleted: by the first v2 passphrase change, or
-  by the owner setting `AUTH_LEGACY = "off"` (the next v2 sign-in then deletes
-  it) once `GET /v1/cloud/status` shows `auth.legacyLastAt` is old. The first v2
-  sign-in after the deploy still sends the passphrase ONCE (to upgrade the
-  store), over TLS, as every sign-in did before.
+- **The bootstrap hash.** A brand-new store holds only the fast salted HMAC of
+  `INITIAL_PASSPHRASE` (the Worker never runs PBKDF2, so it cannot make the v2
+  verifier itself). The first client to sign in sends the passphrase ONCE with
+  its `authKey` (over TLS) to upgrade the store; the next v2 sign-in, or a v2
+  passphrase change, deletes the hash, so its weakness lasts only that long.
+  `GET /v1/cloud/status` shows `auth.bootstrap` while it is still kept. Since
+  2026-10-16 there is no other passphrase-only path: the plain `{passphrase}`
+  login, the `AUTH_LEGACY` switch and the old-shape passphrase change are gone.
 - **What is visible anyway.** Row counts per night and kind, the per-club
   numbers in `night_summary`, the times rows arrive, and which station leased
   which job. The same counts are already public on the `tally` frame.

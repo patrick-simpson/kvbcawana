@@ -6,7 +6,7 @@
 import { newRowId } from '../../shared/cloud-crypto.js';
 import { SyncCore } from '../src/sync.js';
 import { CHECKIN_PAGE, checkoutPage, fakeTwoTimTwo, page, table } from './fixtures.js';
-import { fakeClock, makeStation, memoryStore, sealJob } from './helpers.js';
+import { fakeClock, makeStation, memoryStore, sealJob, signInV2 } from './helpers.js';
 
 export const WED_6PM = Date.parse('2026-10-14T22:00:00Z');
 export const NIGHT = '2026-10-14';
@@ -76,7 +76,7 @@ export async function rig({ env = {}, kids = [], households = null, attendance =
     broadcast: (text) => { sent.push(JSON.parse(text)); return 1; },
   });
   const r = {
-    clock, storage, tt, night, faults, on, reads, slots, posts, alarm, sent, core: make(), session: '',
+    clock, storage, tt, night, faults, on, reads, slots, posts, alarm, sent, core: make(), session: '', authKey: /** @type {string|null} */ (null),
     /** A new object over the same storage: a Durable Object restart. */
     restart() { r.core = make(); r.wire(); return r.core; },
     wire() { r.watcher = r.core.watcher; },
@@ -107,8 +107,11 @@ export async function rig({ env = {}, kids = [], households = null, attendance =
   // A history key is stored (the desk refuses a row with no key to check its kid against):
   // a stand-in public value, since the Worker only compares the kid.
   if (!(await storage.get('history:pub'))) await storage.put('history:pub', { pub: 'A'.repeat(87), kid: '0123456789abcdef' });
-  const login = await r.core.handle(new Request('https://sync.test/v1/login', { method: 'POST', body: JSON.stringify({ passphrase: 'kennebec' }) }));
-  r.session = (await login.json()).session;
+  // Passphrase v2, as every client signs in (helpers.js signInV2): the upgrade on a fresh store, authKey after.
+  const login = await signInV2(r.core);
+  if (login.status !== 200) throw new Error(`sign-in failed ${login.status} ${JSON.stringify(login.body)}`);
+  r.session = login.body.session;
+  r.authKey = login.authKey;
   r.wire();
   return r;
 }

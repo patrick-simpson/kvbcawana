@@ -6,7 +6,7 @@ import { _resetForTest as resetConfig, receiveSharedSettings, useConfig } from '
 import { loadSyncSession, saveSyncSession } from '../lib/syncService.js';
 import { BarfBagsField, CloudCheckinTestField, FriendsListField, SyncSignInField } from '../components/settings/fields.jsx';
 import { useCalendar } from './useCalendar.js';
-import { generateKeyPair } from '../../shared/cloud-crypto.js';
+import { deriveAuthKey, generateKeyPair } from '../../shared/cloud-crypto.js';
 
 const BASE = 'https://awana-sync.example.workers.dev';
 const SESSION = 'v1.1.1790839331729.oWr6n92IJW5ldPGmtiyjPHAZpca-QGToNlKGXlKI6vc';
@@ -20,14 +20,23 @@ const STATE = {
   kid: 'abcd1234',
 };
 
+// Passphrase v2, the only sign-in (routes.md section 1): the stand-in takes the
+// authKey "kennebec" derives under its salt, never the word itself.
+const PARAMS = { v: 2, salt: 'AAECAwQFBgcICQoLDA0ODw==', iter: 600000, legacy: false, upgrade: false };
+const AUTH_KEY = await deriveAuthKey('kennebec', PARAMS.salt, PARAMS.iter);
+
 /** A fake sync service: routes by path, records calls. */
 function fakeService(overrides = {}) {
   const calls = [];
   const routes = {
     'shared/sync.json': () => [200, { url: BASE }],
-    '/v1/login': (init) => (JSON.parse(init.body).passphrase === 'kennebec'
-      ? [200, { session: SESSION, displayKey: KEY, state: STATE }]
-      : [401, { reason: 'wrong', triesLeft: 4 }]),
+    '/v1/auth/params': () => [200, PARAMS],
+    '/v1/login': (init) => {
+      const b = JSON.parse(init.body);
+      return b.authKey === AUTH_KEY && !b.passphrase
+        ? [200, { session: SESSION, displayKey: KEY, state: STATE }]
+        : [401, { reason: 'wrong', triesLeft: 4 }];
+    },
     '/v1/state': () => [200, STATE],
     ...overrides,
   };
@@ -73,7 +82,7 @@ describe('signing in with the passphrase', () => {
     expect(result.current.shared).toMatchObject({ rev: 7, settings: { checkoutBoardNamesAbove: 7 } });
     expect(result.current.config.checkoutBoardNamesAbove).toBe(7);
     expect(onSlides).toHaveBeenCalledWith(expect.objectContaining({ deckRev: 3, slides: [expect.objectContaining({ text: 'Store next week' })] }), undefined);
-  });
+  }, 30000);
 
   it('the template never overrides what this screen already chose', async () => {
     fakeService();
@@ -83,8 +92,9 @@ describe('signing in with the passphrase', () => {
     await act(async () => {
       await signIn('kennebec', { config: result.current.config, overrides: result.current.overrides, updateConfig: result.current.updateConfig });
     });
+    expect(loadSyncSession()).toBe(SESSION);
     expect(result.current.config.audioMuted).toBe(false);
-  });
+  }, 30000);
 });
 
 describe('staying in sync', () => {
@@ -150,13 +160,13 @@ describe('the passphrase box', () => {
     const box = screen.getByLabelText('Passphrase');
     fireEvent.change(box, { target: { value: 'kenebec' } });
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Sign in' })); });
-    expect(await screen.findByText(/4 tries left/)).toBeTruthy();
+    expect(await screen.findByText(/4 tries left/, {}, { timeout: 15000 })).toBeTruthy();
 
     fireEvent.change(screen.getByLabelText('Passphrase'), { target: { value: 'Kennebec' } });
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Sign in' })); });
-    expect(await screen.findByText(/signed in · key abcd1234/)).toBeTruthy();
+    expect(await screen.findByText(/signed in · key abcd1234/, {}, { timeout: 15000 })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Sign out' })).toBeTruthy();
-  });
+  }, 40000);
 });
 
 describe('the calendar from the sync service', () => {

@@ -48,12 +48,6 @@ YM_CHECKOUT = "on"
 # value here. SWITCHES_STORED = "off" is the deploy kill: stored values are ignored
 # (these defaults only) and the settings page cannot flip anything.
 SWITCHES_STORED = "on"
-# Passphrase v2 migration (src/routes.md section 1). "on": clients that still send
-# the passphrase itself keep signing in (and the first v2 sign-in upgrades the
-# stored verifier). Set "off" once auth:legacyLastAt is old (every screen, the app
-# and the print server are on v2); old-protocol logins then answer 401 legacy-off
-# and the old hash is deleted at the next v2 sign-in.
-AUTH_LEGACY = "on"
 
 [[durable_objects.bindings]]
 name = "SYNC"

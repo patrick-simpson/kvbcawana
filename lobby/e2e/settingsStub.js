@@ -58,7 +58,7 @@ export function makeWorld(over = {}) {
     church: { rev: 2, savedAt: new Date(now - 3600_000).toISOString(), by: null, seeded: true, paused: false, settings: { labelFooter: 'KVBC Awana', lateGraceMin: 10, pickupClubs: ['Sparks', 'Cubbies'], barfNights: ['2026-10-28'] }, switches: {}, switchesRev: 1 },
     churchStale: false,
     stations: [{ stationId: 'st1', name: 'Check-in laptop', pub: 'AAAA', kid: 'k1', registeredAt: 1, lastSeenAt: now, printer: { state: 'ok' } }],
-    auth: { v2: true, legacy: false, legacyOn: false, legacyLastAt: null },
+    auth: { v2: true, bootstrap: false },
     screens: [],
     journey: null,
     nights: [],

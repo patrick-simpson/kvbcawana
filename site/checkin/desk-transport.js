@@ -233,8 +233,8 @@ export function createDesk({ cc, fetch: fetchFn, store, base = DESK_API, now = D
 
   /**
    * Sign in with the church passphrase. Derives authKey in the browser (the
-   * passphrase is sent only for the one-time v2 upgrade routes.md allows, and
-   * for a Worker that has no v2 yet), unwraps the history key to prove it is
+   * passphrase is sent only for the one-time v2 upgrade routes.md allows; the
+   * old passphrase-only login is gone, owner 2026-10-16), unwraps the history key to prove it is
    * ours, pins it, and keeps the session in the screens' own slot. The
    * passphrase itself is never stored.
    * @param {string} passphrase
@@ -243,18 +243,18 @@ export function createDesk({ cc, fetch: fetchFn, store, base = DESK_API, now = D
     const typed = cc.normalizePassphrase(passphrase);
     if (!typed) throw new DeskError('wrong', 'Type the passphrase.');
     const params = await request('GET', '/v1/auth/params', undefined, { auth: false });
-    /** @type {{ status: number, body: any }} */
-    let login;
-    if (params.status === 200 && params.body && params.body.v === 2) {
-      const { authKey } = await cc.deriveKeys(passphrase, params.body.salt, params.body.iter);
-      const key = cc.bytesToBase64(authKey);
-      // While the Worker stores no v2 verifier (`upgrade`), the first client sends the passphrase once, with its authKey.
-      login = await request('POST', '/v1/login', params.body.upgrade ? { passphrase: typed, authKey: key } : { authKey: key }, { auth: false });
-      if (login.status === 401 && login.body && login.body.reason === 'upgrade-needed') login = await request('POST', '/v1/login', { passphrase: typed, authKey: key }, { auth: false });
-    } else {
-      // A Worker without v2 yet (or a failed params call): today's login.
-      login = await request('POST', '/v1/login', { passphrase: typed }, { auth: false });
+    if (!(params.status === 200 && params.body && params.body.v === 2)) {
+      // No v2 sign-in values (a Worker older than v2, or a failed call): there is no other sign-in, so nothing is sent.
+      throw new DeskError('http', params.status === 404
+        ? 'The check-in service is older than this page and cannot sign it in. Ask for the service to be updated.'
+        : (params.body && params.body.error) || `The check-in service answered HTTP ${params.status}.`);
     }
+    const { authKey } = await cc.deriveKeys(passphrase, params.body.salt, params.body.iter);
+    const key = cc.bytesToBase64(authKey);
+    // While the Worker stores no v2 verifier (`upgrade`), the first client sends the passphrase once, with its authKey.
+    /** @type {{ status: number, body: any }} */
+    let login = await request('POST', '/v1/login', params.body.upgrade ? { passphrase: typed, authKey: key } : { authKey: key }, { auth: false });
+    if (login.status === 401 && login.body && login.body.reason === 'upgrade-needed') login = await request('POST', '/v1/login', { passphrase: typed, authKey: key }, { auth: false });
     if (login.status === 401) throw new DeskError('wrong', 'That is not the passphrase.');
     if (login.status === 429) throw new DeskError('locked', 'Too many wrong tries. Wait a little, then try again.', { retryAfterSec: Number(login.body && login.body.retryAfterSec) || 900 });
     if (login.status !== 200 || !login.body || !SESSION_RE.test(login.body.session)) {

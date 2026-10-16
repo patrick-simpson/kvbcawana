@@ -26,7 +26,7 @@ const V2_AUTHKEY = await cc.deriveAuthKey('kennebec', V2_PARAMS.salt, V2_PARAMS.
 const settle = async () => { for (let i = 0; i < 8; i++) await tick(); };
 
 /** Boot the kiosk, then sync.js against a stand-in service. */
-function boot({ url = SERVICE, journey = null, prefs = {}, stateStatus = 200, v2 = false, modules = true, pageUrl, screenName = '', tuning = null, helloAnswer = null, helloStatus = 200, nowAnswer = null } = {}) {
+function boot({ url = SERVICE, journey = null, prefs = {}, stateStatus = 200, v2 = true, modules = true, pageUrl, screenName = '', tuning = null, helloAnswer = null, helloStatus = 200, nowAnswer = null } = {}) {
   const kiosk = bootKiosk({}, prefs, undefined, null, pageUrl);
   const { window } = kiosk;
   if (modules) window.journeyAuthModules = { sp, cc };
@@ -48,13 +48,11 @@ function boot({ url = SERVICE, journey = null, prefs = {}, stateStatus = 200, v2
     if (route === '/v1/auth/params') return v2 ? reply(200, V2_PARAMS) : reply(404, {});
     if (route === '/v1/login' && body.authKey) {
       return body.authKey === V2_AUTHKEY && !body.passphrase
-        ? reply(200, { session: SESSION, displayKey: KEY, state: { journey }, history: null })
+        ? reply(200, { session: SESSION, displayKey: KEY, pusher: { key: 'pk', cluster: 'us2' }, state: { journey }, history: null })
         : reply(401, { reason: 'wrong', triesLeft: 4 });
     }
-    if (route === '/v1/login') {
-      if (body.passphrase !== 'kennebec') return reply(401, { triesLeft: 4 });
-      return reply(200, { session: SESSION, displayKey: KEY, pusher: { key: 'pk', cluster: 'us2' }, state: { journey } });
-    }
+    // The old {passphrase} login is gone (owner 2026-10-16): the service refuses it.
+    if (route === '/v1/login') return reply(401, { reason: 'legacy-off' });
     if (route === '/v1/state') return reply(stateStatus, { journey });
     if (route === '/v1/journey') return reply(200, { savedAt: '2026-10-01T19:00:00.000Z', settings: body.settings });
     if (route === '/v1/screens/hello') {
@@ -100,11 +98,13 @@ test('"kennebec" signs in into the slots the lobby screen shares, and takes the 
 
   doc.getElementById('sync-passphrase').value = 'kenebec';
   doc.getElementById('sync-signin-btn').click();
-  await settle();
+  // passphrase v2: the kiosk derives the authKey first (600000 rounds), so wait for the answer
+  for (let i = 0; i < 60 && !/4 tries left/.test(doc.getElementById('sync-status').textContent); i++) await new Promise((r) => setTimeout(r, 100));
   assert.match(doc.getElementById('sync-status').textContent, /4 tries left/);
 
   doc.getElementById('sync-passphrase').value = '  Kennebec ';
   doc.getElementById('sync-signin-btn').click();
+  for (let i = 0; i < 60 && !k.window.localStorage.getItem('awanaSyncSession.v1'); i++) await new Promise((r) => setTimeout(r, 100));
   await settle();
   const ls = k.window.localStorage;
   assert.equal(ls.getItem('awanaSyncSession.v1'), SESSION);
@@ -225,16 +225,30 @@ test('passphrase v2: a wrong word is refused and counted, and the session stays 
   k.close();
 });
 
-test('if the shared modules cannot load, the kiosk still signs in the old way', async () => {
+test('if the shared modules cannot load, the kiosk says to reload and sends no sign-in at all', async () => {
   const k = boot({ journey: ROOM, modules: false });
   k.window.journeyAuthModules = undefined;
-  // jsdom cannot import(), so loading fails: that is the "old browser / missing file" case
+  // jsdom cannot import(), so loading fails: that is the "old browser / missing file / stale page" case
   await settle();
   k.document.getElementById('sync-passphrase').value = 'kennebec';
   k.document.getElementById('sync-signin-btn').click();
-  for (let i = 0; i < 40 && !k.window.localStorage.getItem('awanaSyncSession.v1'); i++) await new Promise((r) => setTimeout(r, 100));
-  assert.equal(k.window.localStorage.getItem('awanaSyncSession.v1'), SESSION);
-  assert.deepEqual(k.calls.find((c) => c.route === '/v1/login').body, { passphrase: 'kennebec' });
+  for (let i = 0; i < 40 && !/newest page/.test(k.document.getElementById('sync-status').textContent); i++) await new Promise((r) => setTimeout(r, 100));
+  assert.match(k.document.getElementById('sync-status').textContent, /Sign-in needs the newest page\. Reload this page/);
+  assert.equal(k.window.localStorage.getItem('awanaSyncSession.v1'), null);
+  assert.equal(k.calls.filter((c) => c.route === '/v1/login').length, 0);
+  assert.ok(!JSON.stringify(k.calls).includes('kennebec'));
+  k.close();
+});
+
+test('a service with no passphrase v2 is never sent the passphrase', async () => {
+  const k = boot({ journey: ROOM, v2: false });
+  await settle();
+  k.document.getElementById('sync-passphrase').value = 'kennebec';
+  k.document.getElementById('sync-signin-btn').click();
+  for (let i = 0; i < 40 && !/older than this app/.test(k.document.getElementById('sync-status').textContent); i++) await new Promise((r) => setTimeout(r, 100));
+  assert.match(k.document.getElementById('sync-status').textContent, /older than this app/);
+  assert.equal(k.calls.filter((c) => c.route === '/v1/login').length, 0);
+  assert.equal(k.window.localStorage.getItem('awanaSyncSession.v1'), null);
   k.close();
 });
 

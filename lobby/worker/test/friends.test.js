@@ -3,6 +3,7 @@
 // the scheduled 6:30 pm email through a one-night link.
 import { describe, expect, it } from 'vitest';
 import { SyncCore } from '../src/sync.js';
+import { signInV2 } from './helpers.js';
 import { friendsReport, friendClubOf, KEEP_DAYS } from '../src/friends.js';
 import { HOUSEHOLD_CSV, fakeTwoTimTwo, page, table } from './fixtures.js';
 import { leaks } from './noleak.js';
@@ -32,8 +33,7 @@ async function setup() {
   tt.checkinName = 'Sophie Tester';
   const storage = memoryStore();
   const core = new SyncCore({ storage, env: ENV, fetchFn: tt.fetchFn, now: () => t, sleep: async (ms) => { t += ms; } });
-  const login = await core.handle(new Request('https://sync.test/v1/login', { method: 'POST', body: JSON.stringify({ passphrase: 'kennebec' }) }));
-  const { session } = await login.json();
+  const { session } = (await signInV2(core)).body;
   const call = async (method, path, body, auth = true) => {
     const res = await core.handle(new Request(`https://sync.test${path}`, {
       method, headers: { ...(auth ? { Authorization: `Bearer ${session}` } : {}), 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined,

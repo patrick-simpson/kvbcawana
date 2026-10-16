@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { SyncCore } from '../src/sync.js';
+import { signInV2 } from './helpers.js';
 import { REMOTE_BUCKETS_MAX, sessionKeyOf, takeToken } from '../src/journeyRemote.js';
 import { parseSession } from '../src/session.js';
 import {
@@ -46,7 +47,7 @@ async function setup({ kiosks = [K1, K2], tv = true } = {}) {
     }), '10.0.0.1');
     return { status: res.status, body: await res.json() };
   };
-  const signIn = async () => (await call('POST', '/v1/login', { passphrase: 'kennebec' })).body.session;
+  const signIn = async () => (await signInV2(core)).body.session;
   const phone = await signIn();
   t += 1;
   const kioskSession = await signIn();

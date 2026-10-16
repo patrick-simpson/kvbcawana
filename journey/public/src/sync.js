@@ -747,11 +747,13 @@
     if (!passphrase) { note('Type the passphrase first.', 'bad'); return; }
     note('Signing in… (the first time takes a few seconds)');
     loadAuth().then(function (m) {
-      // The modules did not load (offline file, old browser): today's login, which a service that still has the old hash accepts.
-      if (!m) return request('/v1/login', { method: 'POST', body: { passphrase: passphrase } });
+      // The modules did not load (offline file, old browser, a stale page): there is no
+      // other sign-in (the old passphrase login is gone), so say what to do and send nothing.
+      if (!m) return null;
       return m.sp.signInWithPassphrase({ request: request, derive: m.cc.deriveAuthKey, passphrase: passphrase })
         .then(function (out) { return out.res; });
     }).then(function (res) {
+      if (!res) { note('Sign-in needs the newest page. Reload this page (Ctrl+Shift+R), then try again.', 'bad'); return; }
       var b = res.body || {};
       if (res.status === 401) {
         note('That is not the passphrase.' + (typeof b.triesLeft === 'number' ? ' ' + b.triesLeft + ' tries left before a 15-minute wait.' : ''), 'bad');

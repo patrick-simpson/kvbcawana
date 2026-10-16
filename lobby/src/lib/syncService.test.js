@@ -124,11 +124,13 @@ describe('signing in (passphrase v2)', () => {
     expect(svc.calls[1].body.authKey).toBeTruthy();
   }, 30000);
 
-  it('a service that has no v2 yet gets today\'s login', async () => {
+  it('a service that has no v2 is never sent the passphrase: it is told it is too old', async () => {
     const svc = service({ login: () => [200, OK] });
-    expect((await syncLogin(BASE, 'kennebec', { fetchFn: svc.fetchFn })).ok).toBe(true);
-    expect(svc.calls.map((c) => c.route)).toEqual(['/v1/auth/params', '/v1/login']);
-    expect(svc.calls[1].body).toEqual({ passphrase: 'kennebec' });
+    const res = await syncLogin(BASE, 'kennebec', { fetchFn: svc.fetchFn });
+    expect(res).toMatchObject({ ok: false, reason: 'rejected' });
+    expect(res.message).toMatch(/older than this app/);
+    expect(svc.calls.map((c) => c.route)).toEqual(['/v1/auth/params']);
+    expect(loadSyncSession()).toBe('');
   });
 
   it('words each refusal by what to do', async () => {

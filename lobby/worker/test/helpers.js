@@ -1,5 +1,56 @@
 // Shared test helpers for the online check-in modules.
-import { generateKeyPair, importPrivateKey, keyRing, newRowId, openAsStation, sealForStations } from '../../shared/cloud-crypto.js';
+import {
+  PBKDF2_ITER_MIN, authVerifier, deriveAuthKey, generateKeyPair, importPrivateKey, keyRing, newRowId, openAsStation, sealForStations,
+} from '../../shared/cloud-crypto.js';
+
+// ── Signing in by passphrase v2 (routes.md section 1) ───────────────────────
+// The only sign-in a client has: GET /v1/auth/params, derive authKey on the
+// client (cloud-crypto.js deriveAuthKey), POST /v1/login {authKey}. A fresh
+// Durable Object holds only the bootstrap HMAC of INITIAL_PASSPHRASE, so the
+// first sign-in is the one upgrade {passphrase, authKey}, which stores the v2
+// verifier. A test Worker's v2 salt is set to TEST_SALT before that upgrade, so
+// the 600000-round derivation (PBKDF2_ITER_MIN: the least any client may use)
+// runs once per passphrase per test file instead of once per Worker.
+
+/** The v2 salt every test Worker gets before its first sign-in (16 bytes, standard base64). */
+export const TEST_SALT = 'dGVzdC1zYWx0LTE2Ynl0ZQ==';
+const derived = new Map();
+
+/** The authKey for a passphrase under a salt and count, derived once. @param {string} passphrase @param {string} [salt] @param {number} [iter] */
+export async function testAuthKey(passphrase = 'kennebec', salt = TEST_SALT, iter = PBKDF2_ITER_MIN) {
+  const k = `${passphrase}\u0000${salt}\u0000${iter}`;
+  if (!derived.has(k)) derived.set(k, deriveAuthKey(passphrase, salt, iter));
+  return derived.get(k);
+}
+
+/** The `next` of a v2 passphrase change (POST /v1/passphrase): {salt, iter, verifier} for a new word. @param {string} passphrase @param {string} [salt] */
+export async function v2Next(passphrase, salt = TEST_SALT, iter = PBKDF2_ITER_MIN) {
+  return { salt, iter, verifier: await authVerifier(await testAuthKey(passphrase, salt, iter)) };
+}
+
+/**
+ * Sign in to a SyncCore by v2, as a client does (the upgrade first on a fresh
+ * store). Answers `{status, body, authKey}`; extra login fields (seedKey) ride along.
+ * @param {{ handle: (r: Request, ip?: string) => Promise<Response>, storage: any }} core
+ * @param {{ passphrase?: string, ip?: string, extra?: Record<string, unknown> }} [opts]
+ */
+export async function signInV2(core, { passphrase = 'kennebec', ip = '10.0.0.1', extra = {} } = {}) {
+  const pres = await core.handle(new Request('https://sync.test/v1/auth/params'), ip);
+  const params = await pres.json();
+  if (pres.status !== 200) return { status: pres.status, body: params, authKey: null };
+  let { salt, iter } = params;
+  if (params.upgrade) {
+    const auth = await core.storage.get('auth');
+    if (auth && auth.v2 && !auth.v2.verifier && auth.v2.salt !== TEST_SALT) {
+      await core.storage.put('auth', { ...auth, v2: { ...auth.v2, salt: TEST_SALT, iter: PBKDF2_ITER_MIN } });
+    }
+    ({ salt, iter } = (await core.storage.get('auth')).v2);
+  }
+  const authKey = await testAuthKey(passphrase, salt, iter);
+  const fields = params.upgrade ? { passphrase, authKey, ...extra } : { authKey, ...extra };
+  const res = await core.handle(new Request('https://sync.test/v1/login', { method: 'POST', body: JSON.stringify(fields) }), ip);
+  return { status: res.status, body: await res.json(), authKey };
+}
 
 /** A Durable Object's storage as a Map (copies in and out, like the real one). */
 export function memoryStore(map = new Map()) {

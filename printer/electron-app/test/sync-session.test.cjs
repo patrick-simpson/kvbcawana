@@ -22,20 +22,22 @@ const fakeSafe = (available = true) => ({
 
 const SALT = 'AAECAwQFBgcICQoLDA0ODw==';
 
-function fakeFetch({ login = 200, triesLeft, v2Key } = {}) {
+// Passphrase v2 is the only sign-in (the old {passphrase} login is gone, owner 2026-10-16).
+let keyForKennebec = null;
+const kennebecKey = () => (keyForKennebec ||= require('../../print-server/cloud-crypto').deriveAuthKey('kennebec', SALT, 600000));
+
+/** A stand-in service: v2 params, and a login that takes only the authKey "kennebec" derives. `v2: false` = a service older than v2. */
+function fakeFetch({ v2 = true } = {}) {
   const calls = [];
   const fn = async (url, init = {}) => {
     calls.push({ url, init });
     const json = (status, body) => ({ ok: status >= 200 && status < 300, status, json: async () => body });
     if (url.endsWith('/lobby/shared/sync.json')) return json(200, { url: 'https://awana.kvbchurch.org/api' });
-    if (url === 'https://awana.kvbchurch.org/api/v1/auth/params' && v2Key) return json(200, { v: 2, salt: SALT, iter: 600000, legacy: true, upgrade: false });
+    if (url === 'https://awana.kvbchurch.org/api/v1/auth/params' && v2) return json(200, { v: 2, salt: SALT, iter: 600000, legacy: false, upgrade: false });
     if (url === 'https://awana.kvbchurch.org/api/v1/login') {
-      if (v2Key) {
-        const b = JSON.parse(init.body);
-        return b.authKey === v2Key && !b.passphrase ? json(200, { session: SESSION, displayKey: `${'k'.repeat(43)}=`, history: null }) : json(401, { triesLeft: 4 });
-      }
-      if (login === 200) return json(200, { session: SESSION, displayKey: `${'k'.repeat(43)}=` });
-      return json(login, { triesLeft });
+      const b = JSON.parse(init.body);
+      if (!b.authKey) return json(401, { reason: 'legacy-off' });
+      return b.authKey === await kennebecKey() && !b.passphrase ? json(200, { session: SESSION, displayKey: `${'k'.repeat(43)}=`, history: null }) : json(401, { reason: 'wrong', triesLeft: 4 });
     }
     return json(404, {});
   };
@@ -46,9 +48,8 @@ const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'kvbc-sync-'));
 
 describe('sync session, passphrase v2', () => {
   it('derives the authKey on this computer and sends only that', async () => {
-    const v2Key = await require('../../print-server/cloud-crypto').deriveAuthKey('kennebec', SALT, 600000);
     const dir = tmp();
-    const f = fakeFetch({ v2Key });
+    const f = fakeFetch();
     const s = createSyncSession({ userData: dir, safeStorage: fakeSafe(), syncClient, fetchFn: f.fn });
     assert.deepEqual(await s.signIn('  Kennebec '), { ok: true, url: 'https://awana.kvbchurch.org/api', kept: 'encrypted' });
     const login = f.calls.find((c) => c.url.endsWith('/v1/login'));
@@ -69,7 +70,7 @@ describe('sync session', () => {
     assert.deepEqual(r, { ok: true, url: 'https://awana.kvbchurch.org/api', kept: 'encrypted' });
     const login = f.calls.find((c) => c.url.endsWith('/v1/login'));
     assert.equal(login.init.method, 'POST');
-    assert.deepEqual(JSON.parse(login.init.body), { passphrase: 'kennebec' });
+    assert.deepEqual(Object.keys(JSON.parse(login.init.body)), ['authKey']);
     const onDisk = fs.readFileSync(path.join(dir, FILE), 'utf8');
     assert.ok(onDisk.startsWith('ENC:'));
     assert.ok(!onDisk.includes(SESSION) && !onDisk.includes('kennebec'));
@@ -93,10 +94,16 @@ describe('sync session', () => {
   });
 
   it('says what went wrong', async () => {
-    const s = createSyncSession({ userData: tmp(), safeStorage: fakeSafe(), syncClient, fetchFn: fakeFetch({ login: 401, triesLeft: 4 }).fn });
+    const s = createSyncSession({ userData: tmp(), safeStorage: fakeSafe(), syncClient, fetchFn: fakeFetch().fn });
     const r = await s.signIn('wrong');
     assert.equal(r.ok, false);
     assert.equal(r.triesLeft, 4);
+    // A service older than v2 is never sent the passphrase.
+    const old = fakeFetch({ v2: false });
+    const tooOld = await createSyncSession({ userData: tmp(), safeStorage: fakeSafe(), syncClient, fetchFn: old.fn }).signIn('kennebec');
+    assert.equal(tooOld.ok, false);
+    assert.match(tooOld.error, /older than this app/);
+    assert.equal(old.calls.filter((c) => c.url.endsWith('/v1/login')).length, 0);
     assert.equal((await s.signIn('   ')).error, 'Type the passphrase first.');
     const offline = createSyncSession({ userData: tmp(), safeStorage: fakeSafe(), syncClient, fetchFn: async () => { throw new Error('offline'); } });
     assert.match((await offline.signIn('kennebec')).error, /internet/);

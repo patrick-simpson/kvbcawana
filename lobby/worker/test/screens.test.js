@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { SyncCore } from '../src/sync.js';
+import { signInV2 } from './helpers.js';
 import { ONLINE_MS, SCREENS_MAX, STALE_MS, freshActions, screenQueueKey, screenSettingsKey } from '../src/screens.js';
 import { SHARED_KEYS } from '../../src/lib/sharedSettings.js';
 import { SCREEN_ACTION_QUEUE_MAX, SCREEN_ACTION_TTL_MS, SCREEN_SPECS } from '../../src/lib/syncSpecs.js';
@@ -45,7 +46,7 @@ function setup({ start = Date.parse('2026-10-11T18:00:00Z') } = {}) {
     return { status: res.status, body: await res.json() };
   };
   const signIn = async () => {
-    session = (await call('POST', '/v1/login', { passphrase: 'kennebec' }, '')).body.session;
+    session = (await signInV2(core)).body.session;
   };
   return { core, storage, frames, live, call, signIn, tick: (ms) => { t += ms; } };
 }

@@ -267,7 +267,7 @@ export function SyncSignInField({ secure }) {
 
 /**
  * The sign-in security line (GET /v1/cloud/status `auth`, routes.md section 1):
- * the new sign-in is on, and when the last old sign-in was seen. Read once.
+ * the new sign-in is on; the old passphrase sign-in is gone (owner 2026-10-16). Read once.
  */
 export function AuthSecurityLine() {
   const sync = useSync();
@@ -279,11 +279,7 @@ export function AuthSecurityLine() {
     return () => { live = false; };
   }, [sync.signedIn]);
   if (!auth) return null;
-  const when = auth.legacyLastAt ? whenWords(auth.legacyLastAt) : '';
-  const old = auth.legacy
-    ? `old sign-ins: ${when ? `last seen ${when}, ` : 'none seen yet, '}${auth.legacyOn === false ? 'off' : 'still allowed'}`
-    : 'old sign-ins: off';
-  return <p className="hint auth-security" role="status">{`New sign-in (v2) ${auth.v2 === false ? 'off' : 'on'}; ${old}.`}</p>;
+  return <p className="hint auth-security" role="status">{`New sign-in (v2) ${auth.v2 === false ? 'off' : 'on'}; old sign-ins: off.`}</p>;
 }
 
 /** Change the church passphrase for every screen (needs the current one). */

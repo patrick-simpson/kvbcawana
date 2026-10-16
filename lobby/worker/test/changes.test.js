@@ -3,7 +3,7 @@
 import { describe, expect, it } from 'vitest';
 import { Changes, ENTRY_MAX_BYTES, LOG_MAX, canonical, diffKeys, signature } from '../src/changes.js';
 import { deviceName, deviceOf } from '../src/device.js';
-import { fakeClock, memoryStore } from './helpers.js';
+import { fakeClock, memoryStore, v2Next } from './helpers.js';
 import { rig } from './rig.js';
 
 const PAGE = { 'X-Device': 'page_aaaaaaaaaaaaaaaa', 'X-Device-Name': encodeURIComponent('Patrick’s phone') };
@@ -134,7 +134,7 @@ describe('logging the writes', () => {
     expect(by['screen-forget']).toMatchObject({ target: TV, undoable: false });
     expect(entries.some((e) => e.what === 'journey')).toBe(false);   // nothing changed: no entry
     // A passphrase change: no values at all.
-    const pc = await r.call('POST', '/v1/passphrase', { current: 'kennebec', next: 'kennebec2' }, PAGE);
+    const pc = await r.call('POST', '/v1/passphrase', { currentAuthKey: r.authKey, next: await v2Next('kennebec2') }, PAGE);
     expect(pc.status).toBe(200);
     r.session = pc.body.session;
     const last = (await r.call('GET', '/v1/changes?limit=1')).body.entries[0];

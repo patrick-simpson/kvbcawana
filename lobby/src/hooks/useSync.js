@@ -321,24 +321,27 @@ export async function changePassphrase(current, next) {
   const wrap = await rewrapHistoryKey(url, loadSyncSession(), current, next);
   if (!wrap.ok) return { ok: false, message: wrap.message };
   // Passphrase v2: derive everything HERE (the current authKey, a fresh salt and
-  // the new verifier) so the service never sees either word. A service that has
-  // no v2 yet gets the old request.
-  const params = parseAuthParams(await syncRequest(url, AUTH_PARAMS_PATH));
+  // the new verifier) so the service never sees either word. There is no other
+  // request (the old {current, next} change is gone, owner 2026-10-16).
+  const pres = await syncRequest(url, AUTH_PARAMS_PATH);
+  const params = parseAuthParams(pres);
+  if (!params) {
+    if (pres.status === 0) return { ok: false, message: 'Could not reach the sync service.' };
+    return { ok: false, message: 'The sync service did not send its sign-in values, so nothing was changed. Try again in a moment.' };
+  }
   /** @type {Record<string, unknown>} */
-  let body = wrap.wrapped ? { current, next, wrapped: wrap.wrapped } : { current, next };
-  if (params) {
-    try {
-      const salt = bytesToBase64(randomBytes(16));
-      const nextKey = await deriveAuthKey(normalizeSyncPassphrase(next), salt, PBKDF2_ITER);
-      body = {
-        // while no verifier is stored the service checks the passphrase itself, once
-        ...(params.upgrade ? { current: normalizeSyncPassphrase(current) } : { currentAuthKey: await deriveAuthKey(normalizeSyncPassphrase(current), params.salt, params.iter) }),
-        next: { salt, iter: PBKDF2_ITER, verifier: await authVerifier(nextKey) },
-        ...(wrap.wrapped ? { wrapped: wrap.wrapped } : {}),
-      };
-    } catch {
-      return { ok: false, message: 'This device could not work out the new sign-in key.' };
-    }
+  let body;
+  try {
+    const salt = bytesToBase64(randomBytes(16));
+    const nextKey = await deriveAuthKey(normalizeSyncPassphrase(next), salt, PBKDF2_ITER);
+    body = {
+      // while no verifier is stored the service checks the passphrase itself, once
+      ...(params.upgrade ? { current: normalizeSyncPassphrase(current) } : { currentAuthKey: await deriveAuthKey(normalizeSyncPassphrase(current), params.salt, params.iter) }),
+      next: { salt, iter: PBKDF2_ITER, verifier: await authVerifier(nextKey) },
+      ...(wrap.wrapped ? { wrapped: wrap.wrapped } : {}),
+    };
+  } catch {
+    return { ok: false, message: 'This device could not work out the new sign-in key.' };
   }
   const res = await syncRequest(url, '/v1/passphrase', { method: 'POST', body, session: loadSyncSession() });
   if (res.status === 0) return { ok: false, message: 'Could not reach the sync service.' };

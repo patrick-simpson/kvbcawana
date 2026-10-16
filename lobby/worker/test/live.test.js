@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { SyncCore } from '../src/sync.js';
+import { signInV2, v2Next } from './helpers.js';
 import { LIVE_EVENTS, LIVE_MAX_BYTES, checkPublish } from '../src/live.js';
 import { importDisplayKey, openEnvelope } from '../../src/lib/envelope.js';
 
@@ -31,7 +32,7 @@ function setup() {
     headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
     body: body === undefined ? undefined : JSON.stringify(body),
   }), '10.0.0.1');
-  const login = async () => (await (await call('POST', '/v1/login', { passphrase: 'kennebec' })).json());
+  const login = async () => { const out = await signInV2(core); return { ...out.body, authKey: out.authKey }; };
   return { core, frames, call, login, closed: () => closed };
 }
 
@@ -105,9 +106,9 @@ describe('publishing and catching up', () => {
 
   it('changing the passphrase closes every socket and forgets what it would replay', async () => {
     const s = setup();
-    const { session } = await s.login();
+    const { session, authKey } = await s.login();
     await s.call('POST', '/v1/publish', { event: 'tally', payload: { total: 4 } }, session);
-    await s.call('POST', '/v1/passphrase', { current: 'kennebec', next: 'moosehead' }, session);
+    expect((await s.call('POST', '/v1/passphrase', { currentAuthKey: authKey, next: await v2Next('moosehead') }, session)).status).toBe(200);
     expect(s.closed()).toBe(4001);
     expect(await s.core.replayFrames()).toEqual([]);
     expect(await s.core.sessionValid(session)).toBe(false);

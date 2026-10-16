@@ -4,7 +4,6 @@ import {
   AUTH_PARAMS_PATH,
   SYNC_URL_MAX,
   UNREACHABLE,
-  buildLoginBody,
   buildRequest,
   isPlausibleDisplayKey,
   isValidSession,
@@ -81,11 +80,6 @@ describe('building requests', () => {
     expect(post.init).toEqual({ method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{"a":1}' });
   });
 
-  it('builds the login body, seeding a key only when one is given', () => {
-    expect(buildLoginBody(' Kennebec ')).toEqual({ passphrase: 'kennebec' });
-    expect(buildLoginBody('kennebec', ` ${KEY} `)).toEqual({ passphrase: 'kennebec', seedKey: KEY });
-  });
-
   it('knows the publish and registry routes', () => {
     expect(publishRequest('settings', { a: 1 })).toEqual({ path: '/v1/settings', method: 'PUT', body: { settings: { a: 1 } } });
     expect(publishRequest('slides', [1])).toEqual({ path: '/v1/slides', method: 'PUT', body: { slides: [1] } });
@@ -132,7 +126,7 @@ describe('the CommonJS copy the print server and the Electron app load', () => {
     const cjs = createRequire(import.meta.url)('../../../printer/print-server/sync-protocol.js');
     expect(Object.keys(cjs).sort()).toEqual(Object.keys({
       AUTH_PARAMS_PATH, parseAuthParams, signInWithPassphrase,
-      SYNC_URL_MAX, UNREACHABLE, buildLoginBody, buildRequest, isPlausibleDisplayKey, isValidSession, isValidSyncUrl,
+      SYNC_URL_MAX, UNREACHABLE, buildRequest, isPlausibleDisplayKey, isValidSession, isValidSyncUrl,
       normalizeSyncPassphrase, parseLoginResponse, parseSessionCheck, parseSyncIndex, publishRequest, readResponse,
       screenNamePath, screenSettingsPath, SCREEN_HELLO_PATH,
       SESSION_RE: 0, DISPLAY_KEY_RE: 0, SYNC_TIMEOUT_MS: 0,
@@ -186,10 +180,12 @@ describe('passphrase v2 sign-in (one driver for every client)', () => {
     expect(r.calls.map((c) => Object.keys(c.body || {}).join('+'))).toEqual(['', 'authKey', 'passphrase+authKey']);
   });
 
-  it('falls back to today\'s login only for a service with no v2 (404); other failures are reported as they are', async () => {
+  it('never sends the passphrase alone: a service with no v2 (404) is told it is too old; other failures are reported as they are', async () => {
     const old = rig({ '/v1/auth/params': () => ({ ok: false, status: 404, body: null }), '/v1/login': () => ok({ session: SESSION }) });
     const a = await signInWithPassphrase({ request: old.request, derive, passphrase: 'Kennebec' });
-    expect(old.calls[1].body).toEqual({ passphrase: 'kennebec' });
+    expect(old.calls).toHaveLength(1);   // no login was sent at all
+    expect(a.res).toMatchObject({ ok: false, status: 404, body: { reason: 'no-v2' } });
+    expect(a.res.body.error).toMatch(/older than this app/);
     expect(a.derived).toBeNull();
     for (const status of [0, 503, 500]) {
       const r = rig({ '/v1/auth/params': () => ({ ok: false, status, body: null }), '/v1/login': () => ok({}) });

@@ -41,8 +41,9 @@ function worker({ stations = [], params = 'v2', history = 'login', legacy = fals
       if (body.authKey) {
         const mine = await cc.deriveKeys(PASS, salt, 600000);
         if (body.authKey !== cc.bytesToBase64(mine.authKey)) return body.passphrase === PASS ? json(200, loginAnswer()) : json(401, { error: 'no' });
-      } else if (cc.normalizePassphrase(body.passphrase) !== PASS) return json(401, { error: 'no' });
-      return json(200, loginAnswer());
+        return json(200, loginAnswer());
+      }
+      return json(401, { reason: 'legacy-off' });   // the old {passphrase} login is gone
     }
     if (w.expire) return json(401, { error: 'signed out' });
     if (path === '/v1/history/key' && (init.method || 'GET') === 'GET') return w.historyKey ? json(200, { ...w.historyKey, prev: null }) : json(404, { error: 'none' });
@@ -140,10 +141,11 @@ describe('sign-in, passphrase v2', () => {
     assert.deepEqual(Object.keys(logins[0].body).sort(), ['authKey', 'passphrase']);
   });
 
-  it('a Worker without v2 yet gets today\'s login', async () => {
+  it('a Worker without v2 is never sent the passphrase: the sign-in says the service is too old', async () => {
     const w = worker({ params: 'none' });
-    await make(w).desk.signIn(PASS);
-    assert.deepEqual(w.calls.find((c) => c.path === '/v1/login').body, { passphrase: PASS });
+    await assert.rejects(make(w).desk.signIn(PASS), (e) => e.code === 'http' && /older than this page/.test(e.message));
+    assert.equal(w.calls.filter((c) => c.path === '/v1/login').length, 0);
+    assert.ok(!JSON.stringify(w.calls).includes(PASS));
   });
 
   it('makes the history key when there is none (first writer wins) and proves it', async () => {

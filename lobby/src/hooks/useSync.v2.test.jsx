@@ -97,7 +97,7 @@ describe('passphrase v2 on the screen', () => {
     expect(sent.currentAuthKey).toBeUndefined();
   }, 30000);
 
-  it('an old service (no params route) gets the old change request', async () => {
+  it('an old service (no params route) is sent nothing: the old change request is gone', async () => {
     let sent = null;
     saveSyncSession(SESSION);
     _resetSyncForTest();
@@ -105,7 +105,9 @@ describe('passphrase v2 on the screen', () => {
       '/v1/history/key': () => [404, {}],
       '/v1/passphrase': (init) => { sent = JSON.parse(init.body); return [200, { session: SESSION, displayKey: KEY }]; },
     });
-    expect(await changePassphrase('kennebec', 'moosehead lake')).toMatchObject({ ok: true });
-    expect(sent).toEqual({ current: 'kennebec', next: 'moosehead lake' });
+    const res = await changePassphrase('kennebec', 'moosehead lake');
+    expect(res).toMatchObject({ ok: false });
+    expect(res.message).toMatch(/nothing was changed/);
+    expect(sent).toBeNull();
   });
 });

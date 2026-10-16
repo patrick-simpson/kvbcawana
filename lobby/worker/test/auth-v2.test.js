@@ -5,8 +5,11 @@ import {
 } from '../../shared/cloud-crypto.js';
 
 // Passphrase v2 (routes.md section 1): GET /v1/auth/params, login with authKey,
-// the one upgrade login, and the migration from today's HMAC verifier. The
-// real 600000-round PBKDF2 runs here (about 0.3 s in Node), as a client's does.
+// and the BOOTSTRAP: a fresh store holds only the HMAC of INITIAL_PASSPHRASE,
+// and the one upgrade login {passphrase, authKey} stores the first verifier.
+// The old {passphrase} login and the old-shape passphrase change are gone
+// (owner 2026-10-16). The real 600000-round PBKDF2 runs here (about 0.3 s in
+// Node), as a client's does.
 
 const PASS = 'kennebec';
 const NEXT = 'moosehead lake';
@@ -83,6 +86,13 @@ describe('migration: the first v2 client upgrades the old verifier', () => {
     const again = await s.call('POST', '/v1/login', { authKey });
     expect(again.status).toBe(200);
     expect(again.body.upgraded).toBeUndefined();
+    // ...and that first v2 login after the upgrade deletes the bootstrap hash
+    const after = await s.storage.get('auth');
+    expect(after.hash).toBeUndefined();
+    expect(after.salt).toBeUndefined();
+    expect(after.v2.verifier).toBe(await authVerifier(authKey));
+    expect((await s.params()).legacy).toBe(false);
+    expect((await s.call('POST', '/v1/login', { authKey })).status).toBe(200);
   }, 30000);
 
   it('a wrong passphrase on the upgrade is a counted failure and stores nothing', async () => {
@@ -104,18 +114,19 @@ describe('migration: the first v2 client upgrades the old verifier', () => {
     expect((await s.call('POST', '/v1/login', { authKey: 'short' })).status).toBe(400);
   }, 30000);
 
-  it('old-protocol logins keep working before and after the upgrade, and the last one is recorded', async () => {
+  it('the old {passphrase} login is refused before and after the upgrade: 401 legacy-off, not a counted guess, nothing stored', async () => {
     const s = setup();
-    const old = await s.call('POST', '/v1/login', { passphrase: PASS });
-    expect(old.status).toBe(200);
-    expect(old.body.legacy).toBe(true);
-    expect(old.body.history).toBeUndefined();   // today's answer
+    const before = await s.call('POST', '/v1/login', { passphrase: PASS });
+    expect(before.status).toBe(401);
+    expect(before.body.reason).toBe('legacy-off');
+    expect(before.body.triesLeft).toBeUndefined();
+    expect(before.body.session).toBeUndefined();
     const p = await s.params();
     await s.call('POST', '/v1/login', { passphrase: PASS, authKey: await s.keyFor(PASS, p) });
-    s.tick(60000);
-    expect((await s.call('POST', '/v1/login', { passphrase: PASS })).status).toBe(200);
-    expect(await s.storage.get('auth:legacyLastAt')).toBe('2026-10-14T22:01:00.000Z');
-    expect((await s.call('POST', '/v1/login', { passphrase: 'wrong word' })).status).toBe(401);
+    for (let i = 0; i < 6; i++) expect((await s.call('POST', '/v1/login', { passphrase: PASS })).body.reason).toBe('legacy-off');
+    expect(await s.storage.get('fails:10.0.0.1')).toBeUndefined();   // never a counted failure: no lockout
+    expect(await s.storage.get('auth:legacyLastAt')).toBeUndefined();
+    expect((await s.call('POST', '/v1/login', { authKey: await s.keyFor(PASS, p) })).status).toBe(200);
   }, 30000);
 
   it('a v2 login hands back the history key, and the lockout counts v2 failures like the old ones', async () => {
@@ -131,22 +142,6 @@ describe('migration: the first v2 client upgrades the old verifier', () => {
     for (let i = 0; i < 5; i++) await s.call('POST', '/v1/login', { authKey: bad });
     expect((await s.call('POST', '/v1/login', { authKey })).status).toBe(429);
   }, 60000);
-});
-
-describe('AUTH_LEGACY = "off"', () => {
-  it('stops old-protocol logins and deletes the old hash at the next v2 sign-in', async () => {
-    const s = setup({ AUTH_LEGACY: 'off' });
-    const p = await s.params();
-    const authKey = await s.keyFor(PASS, p);
-    expect((await s.call('POST', '/v1/login', { passphrase: PASS })).body.reason).toBe('legacy-off');
-    expect((await s.call('POST', '/v1/login', { passphrase: PASS, authKey })).status).toBe(200);   // the upgrade still works
-    expect((await s.storage.get('auth')).hash).toBeTruthy();
-    expect((await s.call('POST', '/v1/login', { authKey })).status).toBe(200);
-    const auth = await s.storage.get('auth');
-    expect(auth.hash).toBeUndefined();
-    expect(auth.salt).toBeUndefined();
-    expect((await s.params()).legacy).toBe(false);
-  }, 30000);
 });
 
 describe('changing the passphrase', () => {
@@ -186,24 +181,38 @@ describe('changing the passphrase', () => {
     expect((await s.call('POST', '/v1/login', { passphrase: NEXT })).status).toBe(401);   // old protocol is gone
   }, 60000);
 
-  it('the old-protocol change keeps working and clears the v2 verifier, so the next v2 client upgrades again', async () => {
+  it('the old-shape change (the new word itself) is refused and changes nothing', async () => {
+    const s = setup();
+    const p = await s.params();
+    const authKey = await s.keyFor(PASS, p);
+    const first = (await s.call('POST', '/v1/login', { passphrase: PASS, authKey })).body;
+    const before = await s.storage.get('auth');
+    const old = await s.call('POST', '/v1/passphrase', { current: PASS, next: NEXT }, first.session);
+    expect(old.status).toBe(400);
+    expect(old.body.reason).toBe('legacy-off');
+    expect(await s.storage.get('auth')).toEqual(before);
+    expect((await s.call('GET', '/v1/state', undefined, first.session)).status).toBe(200);   // nobody signed out
+  }, 30000);
+
+  it('once a verifier is stored the passphrase is no proof for a change (only the current authKey is)', async () => {
     const s = setup();
     const p = await s.params();
     const first = (await s.call('POST', '/v1/login', { passphrase: PASS, authKey: await s.keyFor(PASS, p) })).body;
-    const done = await s.call('POST', '/v1/passphrase', { current: PASS, next: NEXT }, first.session);
-    expect(done.status).toBe(200);
-    const auth = await s.storage.get('auth');
-    expect(auth.v2.verifier).toBe(null);
-    expect(auth.hash).toBeTruthy();
-    expect((await s.params()).upgrade).toBe(true);
-    const up = await s.call('POST', '/v1/login', { passphrase: NEXT, authKey: await s.keyFor(NEXT, p) });
-    expect(up.status).toBe(200);
-    expect(up.body.upgraded).toBe(true);
+    const salt = bytesToBase64(crypto.getRandomValues(new Uint8Array(16)));
+    const derived = await deriveKeys(NEXT, salt, PBKDF2_ITER);
+    const res = await s.call('POST', '/v1/passphrase', {
+      current: PASS, next: { salt, iter: PBKDF2_ITER, verifier: await authVerifier(derived.authKey) },
+    }, first.session);
+    expect(res.status).toBe(401);
+    expect((await s.storage.get('auth')).epoch).toBe(1);
   }, 60000);
 
   it('a v2 change from a store that has no verifier yet may prove itself with the passphrase', async () => {
     const s = setup();
-    const first = (await s.call('POST', '/v1/login', { passphrase: PASS })).body;
+    // A session made before the switch, while no verifier was stored (the store as a fresh deploy leaves it).
+    const epoch = (await s.core.ensureAuth()).epoch;
+    const first = { session: await s.core.mintSession(epoch) };
+    expect((await s.call('GET', '/v1/state', undefined, first.session)).status).toBe(200);
     const salt = bytesToBase64(crypto.getRandomValues(new Uint8Array(16)));
     const derived = await deriveKeys(NEXT, salt, PBKDF2_ITER);
     const done = await s.call('POST', '/v1/passphrase', {

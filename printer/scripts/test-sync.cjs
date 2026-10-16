@@ -40,7 +40,8 @@ function check(name, cond, detail) {
 }
 
 // The stand-in service.
-const service = { calls: [], key: SERVICE_KEY, stateStatus: 200, publishStatus: 200 };
+// Passphrase v2 is the only sign-in (the old {passphrase} login is gone, owner 2026-10-16).
+const service = { calls: [], key: SERVICE_KEY, stateStatus: 200, publishStatus: 200, v2: true, v2Key: '' };
 const realFetch = globalThis.fetch;
 globalThis.fetch = async (url, init = {}) => {
   const u = String(url);
@@ -54,10 +55,7 @@ globalThis.fetch = async (url, init = {}) => {
     if (body.authKey !== service.v2Key || body.passphrase) return reply(401, { reason: 'wrong', triesLeft: 4 });
     return reply(200, { session: SESSION, displayKey: service.key, state: {}, history: null });
   }
-  if (route === '/v1/login') {
-    if (body.passphrase !== 'kennebec') return reply(401, { reason: 'wrong', triesLeft: 4 });
-    return reply(200, { session: SESSION, displayKey: service.key, state: {} });
-  }
+  if (route === '/v1/login') return reply(401, { reason: 'legacy-off' });
   if (route === '/v1/state') return reply(service.stateStatus, {});
   if (route === '/v1/publish') { if (service.publishDelayMs) await new Promise((r) => setTimeout(r, service.publishDelayMs)); return reply(service.livePublishStatus || 200, { ok: true, screens: 2 }); }
   if (route === '/v1/slides') return reply(service.publishStatus, { deckRev: 5, publishedAt: '2026-10-01T18:00:00.000Z', slideCount: 1, droppedCount: 0 });
@@ -77,6 +75,7 @@ const post = (pathname, body, headers) => j(pathname, {
 const settle = (ms = 60) => new Promise((r) => setTimeout(r, ms));
 
 async function main() {
+  service.v2Key = await require('../print-server/cloud-crypto').deriveAuthKey('kennebec', V2_SALT, 600000);
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'awana-sync-'));
   fs.writeFileSync(path.join(dataDir, 'config.json'), JSON.stringify({
     printerName: 'Fake',
@@ -128,8 +127,6 @@ async function main() {
 
   console.log('sync: signing in by passphrase v2 (the passphrase never leaves this computer)');
   {
-    service.v2 = true;
-    service.v2Key = await require('../print-server/cloud-crypto').deriveAuthKey('kennebec', V2_SALT, 600000);
     service.calls.length = 0;
     const wrong = await post('/config/sync-login', { passphrase: 'kenebec', url: SYNC });
     check('v2: a wrong word is a 401 with the tries left', wrong.status === 401 && wrong.body.triesLeft === 4, JSON.stringify(wrong.body));
@@ -140,7 +137,19 @@ async function main() {
     check('v2: it sent the authKey and the seed key, and no passphrase', Object.keys(last).sort().join() === 'authKey,seedKey', Object.keys(last).join());
     check('v2: the passphrase is nowhere on the wire', !JSON.stringify(service.calls).includes('ennebec'));
     check('v2: it asked for the params first', service.calls[0].route === '/v1/auth/params');
+    service.calls.length = 0;
+  }
+
+  console.log('sync: a service with no v2 is never sent the passphrase');
+  {
     service.v2 = false;
+    service.calls.length = 0;
+    const old = await post('/config/sync-login', { passphrase: 'kennebec', url: SYNC });
+    check('no v2: the sign-in fails and says the service is too old', old.status !== 200 && /older than this app/.test(JSON.stringify(old.body)), JSON.stringify(old.body));
+    check('no v2: no login was sent at all', !service.calls.some((c) => c.route === '/v1/login'));
+    check('no v2: the passphrase is nowhere on the wire', !JSON.stringify(service.calls).includes('ennebec'));
+    service.v2 = true;
+    await post('/config/sync-login', { passphrase: 'kennebec', url: SYNC });   // signed in again for what follows
     service.calls.length = 0;
   }
 

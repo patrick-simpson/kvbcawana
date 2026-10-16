@@ -17,6 +17,7 @@ import {
   watchWindow,
 } from '../src/watcher.js';
 import { SyncCore } from '../src/sync.js';
+import { signInV2 } from './helpers.js';
 import { CHECKIN_PAGE, fakeTwoTimTwo, page, table } from './fixtures.js';
 
 const WED_6PM = Date.parse('2026-10-14T22:00:00Z'); // 6:00 pm EDT, a club night
@@ -290,8 +291,7 @@ describe('the status routes', () => {
     }));
     expect((await call('GET', '/v1/cloud/status')).status).toBe(401);
     expect((await call('POST', '/v1/cloud/read-now')).status).toBe(401);
-    const login = await core.handle(new Request('https://sync.test/v1/login', { method: 'POST', body: JSON.stringify({ passphrase: 'kennebec' }) }));
-    const { session } = await login.json();
+    const { session } = (await signInV2(core)).body;
     const read = await (await call('POST', '/v1/cloud/read-now', session)).json();
     expect(read).toMatchObject({ ok: true, verdict: 'baseline', status: { checkedIn: 1, host: 'kvbchurch.twotimtwo.com' } });
     const status = await (await call('GET', '/v1/cloud/status', session)).json();

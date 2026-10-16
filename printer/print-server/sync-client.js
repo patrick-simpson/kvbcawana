@@ -62,8 +62,8 @@ async function syncRequest(base, path, { method, body, session, fetchFn } = {}) 
 /**
  * Sign in (passphrase v2, lobby/worker/src/routes.md section 1): the passphrase
  * is turned into an authKey HERE (cloud-crypto's generated CommonJS copy, 600000
- * PBKDF2 rounds, about 0.3 s on a PC) and only the authKey is sent; a service
- * that has no v2 yet gets today's login. `seedKey` is the display key this
+ * PBKDF2 rounds, about 0.3 s on a PC) and only the authKey is sent, the only
+ * sign-in there is (a service with no v2 is told it is too old). `seedKey` is the display key this
  * server already seals with; the service adopts it only if it has none yet.
  * `derived` (what an earlier call returned, kept IN MEMORY by a caller that has
  * to sign in again on its own) signs in with one request and no derivation; pass

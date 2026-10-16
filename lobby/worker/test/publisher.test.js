@@ -9,7 +9,7 @@ import { seal } from '../src/crypto.js';
 import { MINUTE_MS, STILL_GAP_MS } from '../src/publisher.js';
 import { SyncCore } from '../src/sync.js';
 import { SPILL_MS, WATCH_INTERVAL_MS } from '../src/watcher.js';
-import { fakeClock, everything, memoryStore, sealJob } from './helpers.js';
+import { fakeClock, everything, memoryStore, sealJob, signInV2 } from './helpers.js';
 import { ENV, NIGHT, kid, rig, row } from './rig.js';
 import { leaks } from './noleak.js';
 
@@ -19,8 +19,7 @@ async function core(env) {
   const clock = fakeClock();
   const sent = [];
   const c = new SyncCore({ storage: memoryStore(), env, now: clock.now, fetchFn: async () => new Response('', { status: 500 }), broadcast: (text) => { sent.push(JSON.parse(text).e); return 1; } });
-  const login = await c.handle(new Request('https://sync.test/v1/login', { method: 'POST', body: JSON.stringify({ passphrase: 'kennebec' }) }));
-  const { session } = await login.json();
+  const { session } = (await signInV2(c)).body;
   const publish = async (event, payload, headers = {}) => (await c.handle(new Request('https://sync.test/v1/publish', {
     method: 'POST', headers: { Authorization: `Bearer ${session}`, ...headers }, body: JSON.stringify({ event, payload }),
   }))).json();

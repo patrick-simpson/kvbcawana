@@ -124,6 +124,8 @@ async function main() {
       !security.SETTINGS_PAGE_CONFIG_KEYS.some((k) => ['pusherSecret', 'phonePin', 'displayKey', 'slidesPublishToken', 'displayLoginPassphrase', 'syncSession', 'allowedOrigins', 'lanAccess'].includes(k)));
   }
 
+  const V2_PARAMS = { v: 2, salt: 'AAECAwQFBgcICQoLDA0ODw==', iter: 600000, legacy: false, upgrade: false };
+  const V2_KEY = await require('../print-server/cloud-crypto').deriveAuthKey('kennebec', V2_PARAMS.salt, V2_PARAMS.iter);
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'awana-settings-page-'));
   fs.writeFileSync(path.join(dataDir, 'config.json'), JSON.stringify({
     printerName: 'Fake',
@@ -142,10 +144,12 @@ async function main() {
       syncChecks.push(auth);
       return new Response(JSON.stringify({}), { status: auth === `Bearer ${GOOD_SESSION}` || auth === `Bearer ${GOOD_SESSION_B}` || /printserver/.test(auth) ? 200 : 401 });
     }
+    // Passphrase v2, the only sign-in: the params, then the authKey "kennebec" derives under them.
+    if (String(url) === `${SYNC}/v1/auth/params`) return new Response(JSON.stringify(V2_PARAMS), { status: 200 });
     if (String(url) === `${SYNC}/v1/login`) {
       loginUrls.push(String(url));
-      const said = JSON.parse((opts && opts.body) || '{}').passphrase;
-      if (said !== 'kennebec') return new Response(JSON.stringify({ error: 'no', triesLeft: 4 }), { status: 401 });
+      const said = JSON.parse((opts && opts.body) || '{}');
+      if (said.passphrase !== undefined || said.authKey !== V2_KEY) return new Response(JSON.stringify({ error: 'no', triesLeft: 4 }), { status: 401 });
       return new Response(JSON.stringify({ session: NEW_SESSION, displayKey: SERVICE_KEY }), { status: 200 });
     }
     if (String(url) === `${SYNC}/v1/church/settings` && churchDoc) return new Response(JSON.stringify(churchDoc), { status: 200 });

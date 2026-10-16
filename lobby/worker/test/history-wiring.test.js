@@ -6,7 +6,7 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { createHistoryKey, newRowId, openRow, keyRing, rewrapPrivateKey, sealRow, unwrapPrivateKey } from '../../shared/cloud-crypto.js';
 import { d1Stub } from './d1stub.js';
-import { memoryStore } from './helpers.js';
+import { memoryStore, v2Next } from './helpers.js';
 import { NIGHT, kid, rig } from './rig.js';
 
 const PASS = 'kennebec';
@@ -126,7 +126,7 @@ describe('the passphrase change re-wraps the history key in the one atomic put',
     const real = storage.put;
     storage.put = async (k, v) => { puts.push(k); return real(k, v); };
     const next = await rewrapPrivateKey(key.wrapped, PASS, NEW_PASS, key.pub);
-    const res = await t.call('POST', '/v1/passphrase', { current: PASS, next: NEW_PASS, wrapped: next });
+    const res = await t.call('POST', '/v1/passphrase', { currentAuthKey: t.authKey, next: await v2Next(NEW_PASS), wrapped: next });
     expect(res.status).toBe(200);
     const one = puts.find((k) => k && typeof k === 'object' && 'auth' in k);
     expect(Object.keys(one).sort()).toEqual(['auth', 'history:wrapped', 'history:wrapped:prev']);
@@ -137,7 +137,7 @@ describe('the passphrase change re-wraps the history key in the one atomic put',
   it('with a history key and no wrap in the body, the passphrase does NOT change', async () => {
     const { t, storage } = await setup();
     const before = await storage.get('auth');
-    const res = await t.call('POST', '/v1/passphrase', { current: PASS, next: NEW_PASS });
+    const res = await t.call('POST', '/v1/passphrase', { currentAuthKey: t.authKey, next: await v2Next(NEW_PASS) });
     expect(res.status).toBe(400);
     expect(res.body.reason).toBe('wrap-missing');
     expect(await storage.get('auth')).toEqual(before);

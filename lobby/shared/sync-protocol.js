@@ -135,20 +135,6 @@ export async function readResponse(res) {
 export const UNREACHABLE = Object.freeze({ ok: false, status: 0, body: null });
 
 /**
- * The body of POST /v1/login. `seedKey` is the display key the caller already
- * seals with; the service adopts it only if it has none yet.
- * @param {string} passphrase
- * @param {string} [seedKey]
- * @returns {{passphrase: string, seedKey?: string}}
- */
-export function buildLoginBody(passphrase, seedKey) {
-  /** @type {{passphrase: string, seedKey?: string}} */
-  const body = { passphrase: normalizeSyncPassphrase(passphrase) };
-  if (seedKey) body.seedKey = String(seedKey).trim();
-  return body;
-}
-
-/**
  * Read the answer to POST /v1/login.
  * @param {{ok: boolean, status: number, body: any}} res
  * @param {{who?: string}} [opts] what to call this client in the words ("screen", "computer")
@@ -191,6 +177,9 @@ export function parseLoginResponse(res, opts = {}) {
 /** GET: the PBKDF2 salt and count a client derives `authKey` from. */
 export const AUTH_PARAMS_PATH = '/v1/auth/params';
 
+/** What a client says when the service has no /v1/auth/params (older than passphrase v2). */
+const NO_V2 = 'The sync service is older than this app and cannot sign it in. Ask for the service to be updated.';
+
 /**
  * Read the answer to GET /v1/auth/params, or null when the service has no v2.
  * `upgrade` is true while the service stores no v2 verifier yet: the first
@@ -205,8 +194,10 @@ export function parseAuthParams(res) {
 }
 
 /**
- * Sign in with the passphrase by protocol v2, falling back to today's login
- * for a service that has no v2 yet. `derived` is what an earlier call returned
+ * Sign in with the passphrase by protocol v2, the only sign-in there is (the
+ * old {passphrase} login is gone, owner 2026-10-16). `seedKey` is the display
+ * key the caller already seals with; the service adopts it only if it has none
+ * yet. `derived` is what an earlier call returned
  * ({salt, iter, authKey}): a client that signs in AGAIN on its own (the print
  * server, after a 401) keeps it IN MEMORY (never on disk) and re-signs in with
  * one request and no 600000-round derivation. Pass it only for the passphrase it
@@ -237,9 +228,9 @@ export async function signInWithPassphrase(opts) {
   const pres = await opts.request(AUTH_PARAMS_PATH);
   const params = parseAuthParams(pres);
   if (!params) {
-    // Only an old service (no such route) gets today's login; unreachable, 503 and the rest are reported as they are.
+    // A service with no v2 (no such route) cannot be signed in to any more; unreachable, 503 and the rest are reported as they are.
     if (pres.status !== 404) return { res: pres, derived: null };
-    return { res: await login({ passphrase: typed }), derived: null };
+    return { res: { ok: false, status: 404, body: { reason: 'no-v2', error: NO_V2 } }, derived: null };
   }
   /** @type {string} */
   let authKey;

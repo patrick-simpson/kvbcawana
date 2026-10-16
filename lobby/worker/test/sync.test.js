@@ -9,6 +9,7 @@ import {
   buildSlidesChunks,
 } from '../src/sync.js';
 import { allowedOrigin } from '../src/index.js';
+import { signInV2, v2Next } from './helpers.js';
 import { importDisplayKey, openEnvelope } from '../../src/lib/envelope.js';
 import { sanitizeSettings, sanitizeSlidesChunk } from '../../src/lib/eventSanitizers.js';
 
@@ -47,9 +48,10 @@ function setup({ env = {}, html = CALENDAR_HTML, start = Date.parse('2026-10-01T
     headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
     body: body === undefined || method === 'GET' ? undefined : JSON.stringify(body),
   }), ip);
-  const login = async (passphrase = 'kennebec', ip) => {
-    const res = await call('POST', '/v1/login', { passphrase }, undefined, ip);
-    return { res, body: await res.json() };
+  // Passphrase v2, the only sign-in (helpers.js signInV2: the upgrade on a fresh store, authKey after).
+  const login = async (passphrase = 'kennebec', ip = '10.0.0.1', extra = {}) => {
+    const out = await signInV2(core, { passphrase, ip, extra });
+    return { res: { status: out.status }, body: out.body, authKey: out.authKey };
   };
   return { core, storage, sent, fetched, call, login, tick: (ms) => { t += ms; }, now: () => t };
 }
@@ -75,23 +77,25 @@ describe('login with the passphrase', () => {
     const s = setup();
     const a = await s.login();
     const b = await s.login();
+    expect(a.body.displayKey).toMatch(/^[A-Za-z0-9+/]{43}=$/);
     expect(a.body.displayKey).toBe(b.body.displayKey);
   });
 
   it('the first login may seed the key the laptop already uses; later ones adopt it', async () => {
     const s = setup();
     const laptopKey = Buffer.alloc(32, 7).toString('base64');
-    const first = await s.call('POST', '/v1/login', { passphrase: 'kennebec', seedKey: laptopKey });
-    expect((await first.json()).displayKey).toBe(laptopKey);
-    const other = await s.call('POST', '/v1/login', { passphrase: 'kennebec', seedKey: Buffer.alloc(32, 9).toString('base64') });
-    expect((await other.json()).displayKey).toBe(laptopKey);
+    const first = await s.login('kennebec', undefined, { seedKey: laptopKey });
+    expect(first.body.displayKey).toBe(laptopKey);
+    const other = await s.login('kennebec', undefined, { seedKey: Buffer.alloc(32, 9).toString('base64') });
+    expect(other.body.displayKey).toBe(laptopKey);
     // A wrong word seeds nothing.
     const t = setup();
-    await t.call('POST', '/v1/login', { passphrase: 'nope', seedKey: laptopKey });
+    expect((await t.login('nope', undefined, { seedKey: laptopKey })).res.status).toBe(401);
     expect(await t.storage.get('displayKey')).toBeUndefined();
     // Junk is ignored and a fresh key is made.
     const u = setup();
-    const junk = await (await u.call('POST', '/v1/login', { passphrase: 'kennebec', seedKey: 'short' })).json();
+    const junk = (await u.login('kennebec', undefined, { seedKey: 'short' })).body;
+    expect(junk.displayKey).toMatch(/^[A-Za-z0-9+/]{43}=$/);
     expect(junk.displayKey).not.toBe('short');
   });
 
@@ -136,7 +140,7 @@ describe('login with the passphrase', () => {
 
   it('keeps only a salted hash, never the word', async () => {
     const s = setup();
-    await s.login();
+    expect((await s.login()).res.status).toBe(200);
     expect(JSON.stringify([...s.storage.map])).not.toMatch(/kennebec/i);
   });
 });
@@ -362,12 +366,15 @@ describe('the calendar', () => {
 describe('changing the passphrase', () => {
   it('needs the current word, signs every screen out and replaces the key', async () => {
     const s = setup();
-    const { body: a } = await s.login();
+    const { body: a, authKey } = await s.login();
     const { body: b } = await s.login();
-    const bad = await s.call('POST', '/v1/passphrase', { current: 'wrong', next: 'moosehead' }, a.session);
+    const { authKey: wrongKey } = await setup().login('wrong word');   // the key a wrong current word derives
+    const bad = await s.call('POST', '/v1/passphrase', { currentAuthKey: wrongKey, next: await v2Next('moosehead') }, a.session);
     expect(bad.status).toBe(401);
+    // the passphrase itself is no proof once a v2 verifier is stored
+    expect((await s.call('POST', '/v1/passphrase', { current: 'kennebec', next: await v2Next('moosehead') }, a.session)).status).toBe(401);
 
-    const res = await s.call('POST', '/v1/passphrase', { current: 'kennebec', next: 'Moosehead' }, a.session);
+    const res = await s.call('POST', '/v1/passphrase', { currentAuthKey: authKey, next: await v2Next('Moosehead') }, a.session);
     const out = await res.json();
     expect(res.status).toBe(200);
     expect(out.rotatedKey).toBe(true);
@@ -379,18 +386,25 @@ describe('changing the passphrase', () => {
     expect((await s.login('moosehead')).res.status).toBe(200);
   });
 
-  it('refuses a new word that is too short', async () => {
+  it('refuses new sign-in values that are not the right shape, and the old shape (the new word itself)', async () => {
     const s = setup();
-    const { body } = await s.login();
-    const res = await s.call('POST', '/v1/passphrase', { current: 'kennebec', next: 'abc' }, body.session);
-    expect(res.status).toBe(400);
+    const { body, authKey } = await s.login();
+    const next = await v2Next('moosehead');
+    const cheap = await s.call('POST', '/v1/passphrase', { currentAuthKey: authKey, next: { ...next, iter: 1000 } }, body.session);
+    expect(cheap.status).toBe(400);
+    expect((await cheap.json()).reason).toBe('bad-next');
+    const old = await s.call('POST', '/v1/passphrase', { current: 'kennebec', next: 'moosehead' }, body.session);
+    expect(old.status).toBe(400);
+    expect((await old.json()).reason).toBe('legacy-off');
+    expect((await s.login('kennebec')).res.status).toBe(200);   // nothing changed
   });
 
   it('INITIAL_PASSPHRASE only counts the first time', async () => {
     const s = setup();
-    const { body } = await s.login();
-    await s.call('POST', '/v1/passphrase', { current: 'kennebec', next: 'moosehead' }, body.session);
+    const { body, authKey } = await s.login();
+    expect((await s.call('POST', '/v1/passphrase', { currentAuthKey: authKey, next: await v2Next('moosehead') }, body.session)).status).toBe(200);
     expect((await s.login('kennebec')).res.status).toBe(401);
+    expect((await s.login('moosehead')).res.status).toBe(200);
   });
 });
 
