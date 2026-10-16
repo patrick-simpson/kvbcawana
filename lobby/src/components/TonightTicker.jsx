@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, memo } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import { M } from '../lib/motion.jsx';
 import { DUR, EASE, beats } from '../lib/brand.js';
@@ -28,7 +28,9 @@ const VALUE_POP = withSquish(
  * later shifts the others' places, and as keyframes a new beat would be a new
  * target, so a pill that had already landed would land again.
  */
-function Stat({ index, value, label }) {
+// ⚡ Bolt Optimization: Memoize Stat to prevent unnecessary re-renders
+// when TonightTicker updates other stats in the strip.
+const Stat = memo(function Stat({ index, value, label }) {
   const [enter] = useState(() => withSquish(
     holdThenLand(beats(index), DUR.pop, { opacity: 0, scale: 0.6 }, { opacity: 1, scale: 1 }, EASE.pop),
     squishLand(beats(index), 'chip', DUR.pop, 'pop'),
@@ -54,7 +56,7 @@ function Stat({ index, value, label }) {
       <span className="tonight-ticker-label">{label}</span>
     </M.span>
   );
-}
+});
 
 const ROW_SPECS = [
   { key: 'checkedIn', label: 'checked in' },
