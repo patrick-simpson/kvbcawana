@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
-  PICKUP_DEFAULT, PRINT_SERVER, auditDays, auditSummary, callPrintServer, canReprint, cleanScheduleRows, formToTemplate, healthSummary,
+  PICKUP_DEFAULT, PRINT_SERVER, callPrintServer, canReprint, cleanScheduleRows, formToTemplate, healthSummary,
   pickupTicked, printerOptions, probePrintServer, templateToForm, timeToday, validStartTime, withTemplate,
 } from './printServer.js';
 
@@ -138,22 +138,5 @@ describe('the moved tools\' helpers', () => {
     expect(timeToday('6:7', false, now)).toBeNull();
     expect(timeToday('soon', true, now)).toBeNull();
     expect(timeToday('', true, now)).toBeNull();
-  });
-
-  it('counts the grid\'s age in whole days', () => {
-    expect(auditDays(0)).toBe(0);
-    expect(auditDays(86400000 * 2 + 5)).toBe(2);
-    expect(auditDays(undefined)).toBe(0);
-  });
-
-  it('words the attendance audit from the server\'s own answer', () => {
-    expect(auditSummary(null).tone).toBe('none');
-    expect(auditSummary({ known: false }).text).toMatch(/no attendance grid/);
-    expect(auditSummary({ known: false, reason: 'stale', ageMs: 86400000 * 9 }).text).toMatch(/9 day\(s\) old/);
-    expect(auditSummary({ known: false, reason: 'no-meetings' }).text).toMatch(/no past meeting dates/);
-    expect(auditSummary({ known: true, matches: true, scopeDates: 7 })).toEqual({ tone: 'ok', text: 'Agrees with TwoTimTwo across 7 meeting(s).' });
-    const warn = auditSummary({ known: true, matches: false, totals: { missing: 3, ledgerOnly: 1 } });
-    expect(warn.tone).toBe('warn');
-    expect(warn.text).toMatch(/3 night\(s\) TwoTimTwo has/);
   });
 });

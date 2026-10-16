@@ -31,6 +31,10 @@ import '../../styles/settings-overhaul.css';
  * Where each church setting (CHURCH_KEYS, routes.md 10.3) is edited on the
  * page: every key once. `seasonTheme` is the one Season select in Slides &
  * look (lib/season.js writes it with the screens' own theme).
+ * `enableDrivenCheckin` is listed but shown nowhere: it switched the Chrome
+ * extension's own TwoTimTwo check-ins, and the extension is gone (KVBC Awana
+ * 10.0.0). The key stays in the shared table (three apps read it) and nothing
+ * acts on it.
  */
 export const PRINTING_FIELDS = Object.freeze({
   labelFooter: 'Labels',
@@ -39,7 +43,7 @@ export const PRINTING_FIELDS = Object.freeze({
   connectCard: 'Labels',
   connectCardAutoFirstTimer: 'Labels',
   connectCardGreeting: 'Labels',
-  enableDrivenCheckin: 'Labels',
+  enableDrivenCheckin: '(not shown: retired with the extension)',
   labelTemplates: 'Each club’s label',
   schedule: 'Club night schedule',
   lateGraceMin: 'Club night schedule',
@@ -113,7 +117,7 @@ export function ChurchGate({ church }) {
   );
 }
 
-/** Labels: footer, visitor palette, trophy band, connect card, direct check-in through the extension. */
+/** Labels: footer, visitor palette, trophy band, connect card. */
 export function LabelsCard({ church }) {
   const id = useId();
   const readOnly = church.state !== 'ready';
@@ -154,11 +158,6 @@ export function LabelsCard({ church }) {
           onBlur={() => greeting.dirty && apply({ connectCardGreeting: greeting.value.trim() }, greeting.clear)}
         />
       </div>
-      {toggle(
-        'enableDrivenCheckin',
-        'Let the check-in laptop’s Chrome extension check children in on TwoTimTwo directly',
-        'Desk clicks, phone Undo and Check out. Turn it off only if something is going wrong with the extension.',
-      )}
       <Note note={note} />
     </PanelCard>
   );
@@ -441,7 +440,7 @@ export function TonightsPrintsCard() {
         </form>
       )}
       {unlocked && !state && !note && <p className="hint" role="status">Opening…</p>}
-      {state && state.people.length === 0 && <p className="hint">Nothing has printed through the service tonight yet. An extension-only print is on the check-in laptop’s own list (At the laptop).</p>}
+      {state && state.people.length === 0 && <p className="hint">Nothing has printed through the service tonight yet.</p>}
       {state && state.people.length > 0 && (
         <ul className="laptop-history">
           {state.people.map((p) => (

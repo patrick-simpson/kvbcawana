@@ -82,8 +82,8 @@ export function warningWords(code) {
     'no-station': 'No printing computer has been heard from in 2 minutes, so nothing would notice the change yet.',
     'station-old': 'A printing computer is on an older KVBC Awana (before 9.3.0) and cannot follow this change until it updates.',
     'window-open': 'Check-in is open right now.',
-    'ym-tab-reload': 'The TwoTimTwo tab on the check-in laptop must be reloaded before its own Trek and Journey check-out runs again.',
-    'station-old-sweep': 'A printing computer is on an older KVBC Awana (before 9.3.0): its Chrome extension may still check Trek and Journey out too, so there would be two. Update it first.',
+    'ym-tab-reload': 'With this off, nothing checks Trek and Journey out at 7:15 pm: KVBC Awana 10.0.0 has no Chrome extension to do it (only a laptop still on 9.x does, once its TwoTimTwo tab is reloaded).',
+    'station-old-sweep': 'A printing computer is on an older KVBC Awana (before 9.3.0): its Chrome extension may still check Trek and Journey out too, so there would be two. Update it to the newest first (10.0.0 has no extension).',
     'station-old-publish': 'A printing computer is on an older KVBC Awana (before 9.3.0): it publishes the count only by how it started, so with this off nobody may publish the count and pickup list. Update it first.',
   })[code] || code;
 }

@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useState } from 'react';
 import { probePrintServer } from '../../lib/printServer.js';
 import { ConnectCard, LabelsCard, NightCard, PrintersCard, StatusCard, useLaptopApi } from './laptop.jsx';
-import { AttendanceAuditCard, ReprintStretch, SyncSignInCard, useClubs } from './laptop-tools.jsx';
+import { ReprintStretch, SyncSignInCard, useClubs } from './laptop-tools.jsx';
 import { PanelCard, Toggle } from './fields.jsx';
 import '../../styles/laptop.css';
 import '../../styles/settings-overhaul.css';
@@ -165,7 +165,6 @@ function Found({ health, onRefresh, paused }) {
           <LabelPreviewCard api={api} />
           <ReprintStretch api={api} clubs={clubs} />
           <RememberedLeaders api={api} />
-          <AttendanceAuditCard api={api} />
           {paused && (
             <>
               <p className="hint hint--warn" role="status">Printing settings are paused on the service, so these are this laptop’s own again.</p>

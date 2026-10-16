@@ -260,28 +260,26 @@ async function main() {
 
   // ── 7. The three surfaces ─────────────────────────────────────────────────
   // Source-level, like the club-list checks in test-leaders.cjs: the settings-page
-  // card, the phone section and the widget checkbox are plain DOM with no way
-  // to be exercised headlessly, but "it never marks a name printed and never
-  // registers anyone" is exactly the kind of claim that quietly stops being
-  // true, so it is pinned against the shipped source.
-  console.log('\ncustom label: the settings page, the phone and the widget');
+  // card and the check-in page's panel are plain DOM with no way to be exercised
+  // headlessly here, but "it never marks a name printed and never registers
+  // anyone" is exactly the kind of claim that quietly stops being true, so it is
+  // pinned against the shipped source. (The Chrome extension's Custom checkbox
+  // went with the extension in 10.0.0.)
+  console.log('\ncustom label: the settings page and the check-in page');
   {
     const read = (...p) => fs.readFileSync(path.join(__dirname, '..', ...p), 'utf8');
-    // The dashboard is retired: its Custom Label card is the settings page's (CustomLabel in laptop-tools.jsx).
-    const tools = read('..', 'lobby', 'src', 'components', 'settings', 'laptop-tools.jsx');
-    const custom = tools.slice(tools.indexOf('function CustomLabel('), tools.indexOf('/** Leader tags, one-off name tags'));
+    // The settings page's Name tags and labels card (Printing), which seals the job to the stations.
+    const cards = read('..', 'lobby', 'src', 'components', 'settings', 'ChurchCards.jsx');
+    const card = cards.slice(cards.indexOf('export function NameTagsCard('));
     const phone = read('print-server', 'public', 'phone.html');
-    const ext = read('chrome-extension', 'content.js');
 
-    check('the settings page has a Custom label card after the leader and one-off tags',
-      tools.indexOf('<CustomLabel api={api} />') > tools.indexOf('<LeaderTags api={api} clubs={clubs} />')
-      && tools.indexOf('<CustomLabel api={api} />') > tools.indexOf('<OneOffTag api={api} clubs={clubs} />'));
-    check('its input is capped at 60 characters, like the server', /maxLength=\{60\}/.test(custom));
-    check('it says out loud that nothing is counted or recorded',
-      /nothing is counted, no history row is written/i.test(custom));
-    check('Enter submits it', /e\.key === 'Enter' && print\(\)/.test(custom));
-    check('it posts to /print-custom and never reloads the history afterwards (there is no row to reload)',
-      /'\/print-custom'/.test(custom) && !/\/history|load\(\)/.test(custom));
+    check('the settings page has a Custom label section after the leader and one-off tags',
+      card.indexOf('Custom label</h4>') > card.indexOf('Leader name tag</h4>') && card.indexOf('Custom label</h4>') > 0);
+    check('its input is capped at 60 characters, like the server', /maxLength=\{60\}[^>]*placeholder="VOLUNTEER/.test(card));
+    check('it says out loud that nothing is counted', /Not a check-in: nothing is counted/.test(card));
+    check('it prints as a sealed /print-custom job (lobby/src/lib/toolJobs.js)',
+      /run\('custom', customRecord\(t\)/.test(card)
+      && /toolRecord\('\/print-custom', \{ text \}, now\)/.test(read('..', 'lobby', 'src', 'lib', 'toolJobs.js')));
 
     check('the phone page has a Custom label panel after the leader panel',
       phone.indexOf('id="custom-panel"') > phone.indexOf('id="leader-panel"')
@@ -289,23 +287,6 @@ async function main() {
     check('it prints through the Worker as a sealed job on /print-custom (site/checkin/desk-transport.js)',
       /desk\.customLabel\(\{ text: text \}\)/.test(phone)
       && /reprintJob\('\/print-custom', \{ text \}\)/.test(read('..', 'site', 'checkin', 'desk-transport.js')));
-
-    check('the widget has a Custom checkbox beside Leader',
-      /createTextNode\('Custom'\)/.test(ext) && /walkInClubRow\.append\(clubSelect, visitorCheck, leaderCheck, customCheck\)/.test(ext));
-    check('the two modes are mutually exclusive',
-      /if \(leaderCb\.checked\) customCb\.checked = false;/.test(ext)
-      && /if \(customCb\.checked\) leaderCb\.checked = false;/.test(ext));
-    check('ticking Custom visibly retargets the row',
-      /Print Custom Label/.test(ext) && /Label text/.test(ext) && /clubSelect\.disabled = custom/.test(ext));
-    const customBranch = ext.slice(ext.indexOf('function printCustomLabel('),
-      ext.indexOf('function printCustomLabel(') + 1400);
-    check('the widget has a custom print function', customBranch.length > 200);
-    check('custom mode never marks a name printed (that is check-in dedup)',
-      !/markPrinted/.test(customBranch));
-    check('custom mode never registers anyone in TwoTimTwo',
-      !/registerWalkInFamily/.test(customBranch));
-    check('and it posts to /print-custom, not /print',
-      /\/print-custom/.test(customBranch) && !/PRINT_SERVER \+ '\/print'/.test(customBranch));
   }
 
   console.log('');

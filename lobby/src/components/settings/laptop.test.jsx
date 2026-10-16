@@ -18,7 +18,7 @@ const SESSION = 'v1.1.1700000000000.settingspagesettingspagesettings';
 const signIn = () => localStorage.setItem('awanaSyncSession.v1', SESSION);
 
 /** A stand-in print server: routes by method and path, remembers what it was sent. */
-function server({ online = true, health = HEALTH, audit } = {}) {
+function server({ online = true, health = HEALTH } = {}) {
   const calls = [];
   let rehearsal = Boolean(health.rehearsal);
   const fn = vi.fn(async (url, init = {}) => {
@@ -52,8 +52,6 @@ function server({ online = true, health = HEALTH, audit } = {}) {
         ? res({ confirmed: true, printed: [{ name: 'Maya R' }, { name: 'Zed Q' }] })
         : res({ confirmed: false, count: 2, rows: [{ name: 'Maya R', clubName: 'Sparks' }, { name: 'Zed Q', clubName: 'T&T' }] });
     }
-    if (path === '/attendance-audit' && method === 'GET') return res(audit || { known: false });
-    if (path === '/attendance-audit/apply') return res({ ok: true, added: 2, children: ['Maya R'], deleted: 0 });
     if (path === '/rehearsal') { rehearsal = JSON.parse(init.body).on === true; return res({ ok: true, rehearsal }); }
     if (path === '/config/sync-login') return res({ ok: true, kid: 'abc', changedKey: false });
     if (path === '/failures') return res([{ name: 'Maya R', club: 'Sparks', at: '2026-10-14T23:00:00Z', error: 'Printer offline' }]);
@@ -264,37 +262,6 @@ describe('At the laptop', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Reprint this stretch' }));
     expect(await screen.findByText('Enter both a start and an end time, like 6:30.')).toBeTruthy();
     expect(s.calls.some((c) => c.path === '/reprint-range')).toBe(false);
-  });
-
-  it('shows the attendance audit and applies the missing dates only after a confirm', async () => {
-    signIn();
-    const audit = {
-      known: true, matches: false, ageMs: 86400000, scopeDates: 5, totals: { missing: 2, ledgerOnly: 0 },
-      rows: [{ key: 'id:1', name: 'Maya R', club: 'Sparks', missingHere: ['2026-10-07'], ledgerOnly: [] }],
-    };
-    const s = server({ audit });
-    vi.stubGlobal('fetch', s.fn);
-    const ask = vi.fn(() => true);
-    vi.stubGlobal('confirm', ask);
-    window.confirm = ask;
-    render(<LaptopSection />);
-    openIt();
-    expect(await screen.findByText(/2 night\(s\) TwoTimTwo has/)).toBeTruthy();
-    expect(within(screen.getByRole('list', { name: 'Nights that differ' })).getByText('Maya R')).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: 'Apply 2 missing date(s)' }));
-    await waitFor(() => expect(s.calls.some((c) => c.path === '/attendance-audit/apply')).toBe(true));
-    expect(ask).toHaveBeenCalled();
-    expect(s.calls.find((c) => c.path === '/attendance-audit/apply').body).toEqual({ confirm: true });
-    expect(await screen.findByText(/Added 2 date\(s\)/)).toBeTruthy();
-  });
-
-  it('says so plainly when the audit has no grid yet, and offers nothing to apply', async () => {
-    signIn();
-    vi.stubGlobal('fetch', server().fn);
-    render(<LaptopSection />);
-    openIt();
-    expect(await screen.findByText(/no attendance grid has been read yet/)).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Apply missing dates' }).disabled).toBe(true);
   });
 
   it('arms rehearsal mode only after a confirm, and turns it off without one', async () => {

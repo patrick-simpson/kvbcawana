@@ -272,27 +272,3 @@ export function timeToday(hhmm, endOfMinute, now = new Date()) {
   const d = new Date(now.getFullYear(), now.getMonth(), now.getDate(), Number(m[1]), Number(m[2]), endOfMinute ? 59 : 0, endOfMinute ? 999 : 0);
   return d.toISOString();
 }
-
-/** @param {number} ms the age of the attendance grid @returns {number} whole days */
-export function auditDays(ms) {
-  return Math.max(0, Math.floor((Number(ms) || 0) / 86400000));
-}
-
-/**
- * What the attendance audit says, in words. The server's own answer (`known`,
- * `matches`, `totals`, `reason`) decides; this only phrases it.
- * @param {any} v
- * @returns {{ tone: 'ok' | 'warn' | 'none', text: string }}
- */
-export function auditSummary(v) {
-  if (!v || !v.known) {
-    if (v && v.reason === 'stale') return { tone: 'none', text: `Not checked: the last grid read is ${auditDays(v.ageMs)} day(s) old, too stale to trust. It refreshes on its own from a TwoTimTwo tab.` };
-    if (v && v.reason === 'no-meetings') return { tone: 'none', text: 'Not checked: the grid held no past meeting dates, so there is nothing to compare.' };
-    return { tone: 'none', text: 'Not checked: no attendance grid has been read yet. Open TwoTimTwo in Chrome with the extension loaded (outside club hours) and this fills in on its own.' };
-  }
-  if (v.matches) return { tone: 'ok', text: `Agrees with TwoTimTwo across ${v.scopeDates} meeting(s).` };
-  return {
-    tone: 'warn',
-    text: `${v.totals?.missing ?? 0} night(s) TwoTimTwo has that this ledger does not, and ${v.totals?.ledgerOnly ?? 0} this ledger has that TwoTimTwo does not. A night only this machine knows about is usually a walk-in guest, and is never removed.`,
-  };
-}

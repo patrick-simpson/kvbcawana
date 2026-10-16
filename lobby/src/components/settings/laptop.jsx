@@ -279,8 +279,6 @@ export function LabelsCard({ cfg, save, api }) {
         checked={!!cfg.connectCard} onChange={(e) => apply({ connectCard: e.target.checked })} />
       <Toggle title="Print it automatically on a first-ever check-in" checked={!!cfg.connectCardAutoFirstTimer}
         onChange={(e) => apply({ connectCardAutoFirstTimer: e.target.checked })} />
-      <Toggle title="Let the check-in laptop's Chrome extension check children in on TwoTimTwo directly" hint="Desk clicks, phone Undo and Check out. Turn it off only if something is going wrong with the extension."
-        checked={cfg.enableDrivenCheckin !== false} onChange={(e) => apply({ enableDrivenCheckin: e.target.checked })} />
       <Toggle title="Musical printer" hint="A tune with every label, Happy Birthday for birthday kids (TSPL printers such as the D450). If the label creeps forward instead of returning, turn it off."
         checked={cfg.musicalPrinter === true} onChange={(e) => apply({ musicalPrinter: e.target.checked })} />
       <Toggle title="Update health beacon" hint="After an update, announce that the new version came back cleanly (the version number only)."

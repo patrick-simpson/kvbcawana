@@ -298,53 +298,29 @@ async function main() {
   }
 
   // ── 7. The surfaces read the ONE list ─────────────────────────────────────
-  // Source-level, deliberately: these are the three files that each used to
-  // keep their own copy of the club list, and the drift between them is the
-  // whole reason this endpoint exists. A behavioural test cannot see a
-  // hardcoded <option> that quietly disagrees with the server, so this pins
-  // the structure instead — if a surface goes back to its own list, this fails.
+  // Source-level, deliberately: each surface used to keep its own copy of the
+  // club list, and the drift between them is the whole reason the one table
+  // exists. A behavioural test cannot see a hardcoded <option> that quietly
+  // disagrees with the server, so this pins the structure instead. (The Chrome
+  // extension's widget, with its own fallback list, went in 10.0.0.)
   console.log('\nleaders: every surface reads the one club list');
   {
     const read = (rel) => fs.readFileSync(path.join(__dirname, '..', rel), 'utf8');
-    const ext = read('chrome-extension/content.js');
-    // The dashboard is retired: its name-tag cards are the settings page's
-    // (lobby/src/components/settings/laptop-tools.jsx), served by /checkin's sibling page.
+    // The settings page's tools at the laptop (lobby/src/components/settings/laptop-tools.jsx)
+    // and its Name tags card (ChurchCards.jsx, the one club table shared/clubs.js).
     const dash = read('../lobby/src/components/settings/laptop-tools.jsx');
+    const cards = read('../lobby/src/components/settings/ChurchCards.jsx');
     const phone = read('print-server/public/phone.html');
 
-    check('the check-in widget fetches /clubs', /\/clubs'/.test(ext) || ext.includes("+ '/clubs'"));
-    check('the settings page fetches /clubs', dash.includes("'/clubs'"));
+    check('the settings page\'s laptop tools fetch /clubs', dash.includes("'/clubs'"));
+    check('its Name tags card reads the one club table', /import \{ CLUB_TABLE \} from '\.\.\/\.\.\/\.\.\/shared\/clubs\.js';/.test(cards));
     // The phone page is on the Worker's path (no laptop to ask): it reads the one club table.
     check('the phone page reads the one club table (lobby/shared/clubs.js)', phone.includes("import('/checkin/clubs.js')") && /CLUBS = table\.map\(function\(r\) \{ return r\.name; \}\)/.test(phone));
 
-    // The regression: a second hardcoded club list living in a dropdown. The
-    // widget keeps ONE baked list as an offline fallback (named so it is
-    // obviously a fallback); the two server-served pages keep none.
+    // The regression: a second hardcoded club list living in a dropdown.
     const hardcodedOptions = (html) => (html.match(/<option>(?:Puggles|Cubbies|Sparks|Trek|Journey)<\/option>/g) || []).length;
-    check('the settings page has no hardcoded club options', hardcodedOptions(dash) === 0);
+    check('the settings page has no hardcoded club options', hardcodedOptions(dash) === 0 && hardcodedOptions(cards) === 0);
     check('the phone page has no hardcoded club options', hardcodedOptions(phone) === 0);
-    check('the widget labels its offline list as a fallback', /CLUB_FALLBACK/.test(ext));
-
-    // A leader tag is not a check-in, and the panel shares the guest row — so
-    // the one thing that must never happen is a leader entering the session
-    // dedup set or TwoTimTwo registration.
-    const leaderBranch = ext.slice(ext.indexOf('if (isLeaderMode())'), ext.indexOf('if (isLeaderMode())') + 700);
-    check('the widget has a leader branch in the walk-in handler', leaderBranch.length > 100);
-    check('leader mode never marks the name printed (that is check-in dedup)',
-      !/markPrinted/.test(leaderBranch));
-    check('leader mode never registers anyone in TwoTimTwo',
-      !/registerWalkInFamily/.test(leaderBranch));
-    // Renamed in v6.11.0 (a guest FAMILY registers under one household), so
-    // pin the real name — a scan for a function that no longer exists passes
-    // while testing nothing.
-    check('...and that is the real registration function name',
-      /function registerWalkInFamily\(/.test(ext));
-    check('leader mode prints through the leader path', /printLeaders\(/.test(leaderBranch));
-    check('ticking Leader visibly retargets the row rather than leaving it identical',
-      /Print Leader Tag/.test(ext) && /visitorCb\.disabled/.test(ext) && /registerCb\.disabled/.test(ext));
-    // 7.0.0: the panel is tabs; the chips belong to the Walk-ins tab.
-    check('the remembered-leader chips are in the panel layout (Walk-ins tab)',
-      /pane\('walkins', \[[^\]]*leaderChipsWrap/.test(ext));
   }
 
   listener.close();

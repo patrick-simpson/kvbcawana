@@ -31,7 +31,6 @@ async function stubLaptop(page, { saved, sync = { signedIn: true, state: 'ok' },
     if (path === '/printers') return route.fulfill(reply({ printers: [{ name: 'Dock' }, { name: 'Spare' }] }));
     if (path === '/clubs') return route.fulfill(reply({ clubs: ['Puggles', 'Sparks'] }));
     if (path === '/leaders') return route.fulfill(reply({ leaders: [{ key: 'ann lee', firstName: 'Ann', lastName: 'Lee', clubName: 'Sparks' }], hidden: 0, clubs: [] }));
-    if (path === '/attendance-audit') return route.fulfill(reply({ known: false }));
     if (path === '/cloud/print-status' && req.method() === 'GET') return route.fulfill(reply({ station: true, jobs: { checkThePrinter: checks } }));
     if (path === '/cloud/print-status/clear') { checks.length = 0; return route.fulfill(reply({ station: true, jobs: { checkThePrinter: [] } })); }
     if (path === '/cloud/import-history') return route.fulfill(reply({ ok: true, rows: 120, stored: 118, duplicates: 2 }));
