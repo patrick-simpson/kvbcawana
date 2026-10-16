@@ -196,7 +196,13 @@ writeFileSync(path.join(OUT, '_redirects'), [
   '/settings/ /lobby/settings 302',
   '',
 ].join('\n'));
+// The whole site stays out of search engines (owner, 2026-10-16): robots.txt asks
+// every crawler to keep out, and every response says noindex, nofollow, so a page
+// reached some other way is still never listed.
+writeFileSync(path.join(OUT, 'robots.txt'), 'User-agent: *\nDisallow: /\n');
 writeFileSync(path.join(OUT, '_headers'), [
+  '/*',
+  '  X-Robots-Tag: noindex, nofollow',
   // Vite names every built asset by its content hash (main-DVTDSuLn.js), so a
   // changed file is a new URL and the old one can be kept for good. Pages'
   // default for them was max-age=0: every TV revalidated every script and
@@ -294,7 +300,7 @@ writeFileSync(path.join(OUT, '_routes.json'), `${JSON.stringify({
 writeFileSync(path.join(ROOT, 'site', 'lib', 'large-files.generated.js'),
   `// Written by site/build.mjs for build ${BUILD_ID}; not committed.\nexport const LARGE_FILES = ${JSON.stringify(largeFiles, null, 2)};\nexport const LARGE_PREFIXES = ${JSON.stringify(VIDEO_PREFIXES, null, 2)};\n`);
 
-for (const must of ['index.html', 'lobby/index.html', 'lobby/countdown.html', 'lobby/settings.html', 'journey/index.html', 'journey/remote/index.html', 'journey/remote/remote.js', 'journey/src/shared/journeyRemote.js', 'lobby/shared/sync.json', 'checkin/index.html', 'checkin/ym/index.html', 'checkin/desk-transport.js', 'checkin/cloud-crypto.js', 'checkin/clubs.js', 'checkin/brand/fonts.css', 'links/index.html', 'logo/index.html', 'classic.html', 'lobby/showcase.html', 'lobby/countdown-showcase.html', 'lobby/settings-showcase.html', 'journey/showcase.html', 'checkin/showcase.html']) {
+for (const must of ['index.html', 'lobby/index.html', 'lobby/countdown.html', 'lobby/settings.html', 'journey/index.html', 'journey/remote/index.html', 'journey/remote/remote.js', 'journey/src/shared/journeyRemote.js', 'lobby/shared/sync.json', 'checkin/index.html', 'checkin/ym/index.html', 'checkin/desk-transport.js', 'checkin/cloud-crypto.js', 'checkin/clubs.js', 'checkin/brand/fonts.css', 'links/index.html', 'logo/index.html', 'classic.html', 'robots.txt', 'lobby/showcase.html', 'lobby/countdown-showcase.html', 'lobby/settings-showcase.html', 'journey/showcase.html', 'checkin/showcase.html']) {
   if (!existsSync(path.join(OUT, must))) throw new Error(`site build is missing ${must}`);
 }
 console.log(`\n✓ site/dist built for ${ORIGIN} (build ${BUILD_ID.slice(0, 7)})`);
