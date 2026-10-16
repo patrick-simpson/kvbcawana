@@ -267,7 +267,7 @@ on the check-in laptop to set the printer" and lists what it would show.
   and settings); letting a page set the PIN or the display key would widen it.
   Say so if you want them on /settings anyway (it would need a separate
   confirmation credential).
-- **Real Chrome.** Preflight and Private Network Access are pinned with
+- ~~**Real Chrome.**~~ Done 2026-10-16: the owner checked the laptop's local-network prompt and allowed it. Preflight and Private Network Access are pinned with
   headers in tests; not seen in a real browser here. Chrome 142+ replaces PNA
   with a Local Network Access permission prompt for a public page calling the
   laptop: allow it once; test on the laptop before relying on it.
@@ -669,6 +669,16 @@ said); "Owner" is what only the owner can do.
 
 ### Status and hand-off
 
+- **Owner update (2026-10-16).** The D1 database `awana-history` is created, and
+  `lobby/worker/wrangler.toml` binds it as `HISTORY_DB` (id `893de8eb-13cf-4187-8ea2-eab652735acf`,
+  matching the one the owner pasted). The pasted block named the binding `DB`; the
+  deployed Worker must pick up the repo's `HISTORY_DB` name, or history stays off.
+  Online check-in has been used successfully, all check-in tests are done, and the
+  laptop was upgraded to the latest software (owner report; the release state is not
+  recorded here). The switches in the repo are `CLOUD_PRINT`, `SINGLE_PUBLISHER` and
+  `YM_CHECKOUT` = `"on"`, and `AUTH_LEGACY` = `"on"`: the old login is still accepted, so
+  set it to `"off"` once `auth.legacyLastAt` stops moving. The shadow-night count
+  comparison is not recorded as done.
 - **P0 built (2026-10-12).** The module's API is documented at the top of
   `lobby/shared/cloud-crypto.js` and in `lobby/shared/README.md`; the route
   shapes in `lobby/worker/src/routes.md`; what is and is not protected in
@@ -800,12 +810,14 @@ said); "Owner" is what only the owner can do.
     tag's own route `/print-barf-tag` needs printer 9.3.1; a 9.3.0 station gets a
     "BARFED! <first>" custom label. (4) `/checkin/ym` gets all of it (walk-in tag for
     Trek and Journey, its own Tonight with Undo check-in, no Check out).
-  - **`/checkin/classic`: DELETE after Wednesday 2026-10-14.** The relayed phone
+  - **`/checkin/classic`: REMOVED 2026-10-16 (owner).** The relayed phone
     page exactly as /checkin served it on 2026-10-12 (`site/checkin/classic.html`,
     a frozen copy, pinned by its SHA-256 in `site/test/checkin-classic.test.mjs`),
     with `/checkin/classic/ym`, kept as the one-night fallback while /checkin moves
-    to the desk's online path. After 10/14 delete the file, its block in
-    `site/build.mjs` (and its two `must` entries) and the test.
+    to the desk's online path. Done 2026-10-16: the page, its build block, its
+    `must` entries, its test, and the copy of `sync-protocol.js` only it used are
+    gone. The Worker's relayed check-in code (`lobby/worker/src/phone.js`) is still
+    there and was not part of this removal.
 
 ## Online only
 
@@ -873,7 +885,7 @@ Read off `printer/print-server/public/index.html` (every `fetch` it makes) again
 ### Still to do
 
 1. ~~**Confirm on the laptop, with the internet off, that check-in still prints at the desk.**~~ Dropped: with no internet the fallback is the paper sheet ([Online check-in](#online-check-in), 2026-10-11).
-2. **Real Chrome.** The Laptop section's calls to `http://localhost:3456` are pinned with headers in tests and stubbed in `e2e/settings-laptop.spec.js`; open /settings on the laptop and allow Chrome's local-network prompt once. Every settings tool now depends on it.
+2. ~~**Real Chrome.**~~ Done 2026-10-16 (the owner checked the laptop's local-network prompt). The Laptop section's calls to `http://localhost:3456` are pinned with headers in tests and stubbed in `e2e/settings-laptop.spec.js`; open /settings on the laptop and allow Chrome's local-network prompt once. Every settings tool now depends on it.
 3. **Release.** Nothing is released: the version, `changes.md` and the dispatch are the owner's. The first release that carries this removes the dashboard and the LAN page from every laptop at once, so tell the volunteers the phone address changed to awana.kvbchurch.org/checkin.
 4. Left alone because another change owns it: the display-login screens in the lobby still tell a person to read the passphrase "on the print-server dashboard" (`SetupChecklist.jsx`, `QuickNav.jsx`, `settings/fields.jsx`); that flow is the retired Pusher design.
 
@@ -1045,7 +1057,7 @@ are archived, and the Pusher keys are cleared. This is what is still open.
 
 ### Status
 
-The code items are done (2026-10-12): the print server's Pusher publisher, the
+Owner update (2026-10-16): the three hand-done items (the Pusher secrets, the Pusher app, and the stray-screen check) are confirmed done. The code items are done (2026-10-12): the print server's Pusher publisher, the
 Worker's `pusher.js` and its secrets-gated mirror, the Pusher key in the login
 body, `ci.yml`'s `PUSHER_*` block, the legacy `provision` display login (the
 lobby's `displayLogin.js` machinery, the printer's display-login state and

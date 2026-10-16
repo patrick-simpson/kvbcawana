@@ -13,7 +13,7 @@
 //                desk's online path: passphrase v2, the Worker's desk routes, every seal
 //                made in the browser (site/checkin/desk-transport.js, the canonical
 //                lobby/shared/cloud-crypto.js and clubs.js beside it); /checkin/ym for the
-//                youth leaders; /checkin/classic the old relayed page, Wednesday only.
+//                youth leaders.
 //                /desk 301s to /checkin (site/lib/redirects.js).
 //   /api/*       the sync Worker, through site/functions (not built here)
 //
@@ -110,30 +110,9 @@ run(`node scripts/stamp-build.mjs ${journeyBuild} ${JSON.stringify(journeyOut)}`
   const { index, ym } = buildCheckinPages();
   writeFileSync(path.join(checkinOut, 'index.html'), index);
   for (const [name, from] of Object.entries(CHECKIN_MODULES)) cpSync(from, path.join(checkinOut, name));
-  // /checkin/classic still signs in through the family's one sign-in (sync-protocol.js).
-  cpSync(path.join(ROOT, 'lobby', 'shared', 'sync-protocol.js'), path.join(checkinOut, 'sync-protocol.js'));
   // The youth leaders' page (7.10.0): Trek and Journey only, check-in only.
   mkdirSync(path.join(checkinOut, 'ym'), { recursive: true });
   writeFileSync(path.join(checkinOut, 'ym', 'index.html'), ym);
-}
-
-// /checkin/classic (and /checkin/classic/ym): the relayed phone page exactly as it
-// was on 2026-10-12, a frozen copy (site/checkin/classic.html, byte for byte that
-// day's printer/print-server/public/phone.html) made into a page the same way
-// /checkin was. A fallback for Wednesday 2026-10-14 ONLY: DELETE after 10/14
-// (this block, site/checkin/classic.html and its test; ROADMAP.md#online-check-in).
-{
-  const classicOut = path.join(OUT, 'checkin', 'classic');
-  const page = readFileSync(path.join(ROOT, 'site', 'checkin', 'classic.html'), 'utf8');
-  const online = page
-    .replaceAll('"/brand/', '"/checkin/brand/')
-    .replace('<script>\n// ── The touch check-in', `<script>window.AWANA_RELAY = '/api';</script>\n<script>\n// ── The touch check-in`);
-  const ym = online.replace("<script>window.AWANA_RELAY = '/api';</script>\n",
-    "<script>window.AWANA_RELAY = '/api';</script>\n<script>window.AWANA_ONLY_CLUBS = ['trek', 'journey']; window.AWANA_SIMPLE = true;</script>\n");
-  if (online === page || ym === online || online.includes('"/brand/')) throw new Error('site/build.mjs: site/checkin/classic.html lost its shape');
-  mkdirSync(path.join(classicOut, 'ym'), { recursive: true });
-  writeFileSync(path.join(classicOut, 'index.html'), online);
-  writeFileSync(path.join(classicOut, 'ym', 'index.html'), ym);
 }
 
 // /links: the unlisted volunteer page (site/links/index.html, one static file with no
@@ -277,7 +256,7 @@ writeFileSync(path.join(OUT, '_routes.json'), `${JSON.stringify({
 writeFileSync(path.join(ROOT, 'site', 'lib', 'large-files.generated.js'),
   `// Written by site/build.mjs for build ${BUILD_ID}; not committed.\nexport const LARGE_FILES = ${JSON.stringify(largeFiles, null, 2)};\nexport const LARGE_PREFIXES = ${JSON.stringify(VIDEO_PREFIXES, null, 2)};\n`);
 
-for (const must of ['index.html', 'lobby/index.html', 'lobby/countdown.html', 'lobby/settings.html', 'journey/index.html', 'journey/remote/index.html', 'journey/remote/remote.js', 'journey/src/shared/journeyRemote.js', 'lobby/shared/sync.json', 'checkin/index.html', 'checkin/ym/index.html', 'checkin/desk-transport.js', 'checkin/cloud-crypto.js', 'checkin/clubs.js', 'checkin/sync-protocol.js', 'checkin/brand/fonts.css', 'checkin/classic/index.html', 'checkin/classic/ym/index.html', 'links/index.html', 'logo/index.html']) {
+for (const must of ['index.html', 'lobby/index.html', 'lobby/countdown.html', 'lobby/settings.html', 'journey/index.html', 'journey/remote/index.html', 'journey/remote/remote.js', 'journey/src/shared/journeyRemote.js', 'lobby/shared/sync.json', 'checkin/index.html', 'checkin/ym/index.html', 'checkin/desk-transport.js', 'checkin/cloud-crypto.js', 'checkin/clubs.js', 'checkin/brand/fonts.css', 'links/index.html', 'logo/index.html']) {
   if (!existsSync(path.join(OUT, must))) throw new Error(`site build is missing ${must}`);
 }
 console.log(`\n✓ site/dist built for ${ORIGIN} (build ${BUILD_ID.slice(0, 7)})`);
