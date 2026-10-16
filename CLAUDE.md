@@ -13,7 +13,7 @@ This one repo holds three apps for Kennebec Valley Baptist Church's Awana club:
 - Push to `main` directly, as the owner's standing rule. Do not create branches or pull requests unless asked.
 - Run the app's own checks before committing. Each app's `CLAUDE.md` names them.
 - Make one finding per commit.
-- Never put a model name in commit messages or files.
+- Model names are allowed in commit messages and files.
 - Never work in the archived repos (`Print-TwoTimTwo-Labels`, `Awana-Check-in-Display`, `Journey-Display`). All work lands here.
 
 ## CI and deploy
@@ -49,6 +49,6 @@ This one repo holds three apps for Kennebec Valley Baptist Church's Awana club:
 
 - Prefer small, clear changes. Explain each change in plain English.
 - Read a file before changing it.
-- Use helper agents for simple, low-stakes jobs such as running a check or searching for text. Use a lower-cost, faster model for these when one is available. Keep harder work with the main model.
+- Use helper agents for simple, low-stakes jobs such as running a check or searching for text. Use Claude Haiku (the fast, low-cost model) for these. Keep harder work with the main model.
 - Never store passwords, tokens, or passphrases in files.
 - If a check fails, stop and report it. Do not change a test to make it pass.
