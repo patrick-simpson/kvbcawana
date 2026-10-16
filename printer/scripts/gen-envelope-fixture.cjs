@@ -69,7 +69,7 @@ cases.push({
 const out = {
   note: [
     'Cross-implementation interop fixture for the sealed-envelope transport.',
-    'ONE copy, in printer/; the lobby's tests read it in place.',
+    "ONE copy, in printer/; the lobby's tests read it in place.",
     'Both apps assert they can open every envelope here,',
     'which is what stops the Node seal and the WebCrypto open from drifting.',
     'The testKey below is deliberately public and protects nothing — never use',
