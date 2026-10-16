@@ -351,7 +351,12 @@ describe('undo, check out and the one-off tag', () => {
     await assert.rejects(desk.leaderTag({ name: ' ' }), { reason: 'no-name' });
     await assert.rejects(desk.customLabel({ text: '' }), { reason: 'no-text' });
     assert.equal(w.calls.filter((c) => c.path === '/v1/desk/checkin').length, 0);
-    assert.ok(!JSON.stringify(lead.body).includes('Pat'), 'the leader\'s name rides only the sealed job');
+    // The sealed bundle is random base64, which can spell "Pat" by chance (about
+    // one run in 250 on CI, 2026-10-16): check the rest of the request for the
+    // name, and the bundle for the whole name, whose space base64 never holds.
+    const { bundle, ...rest } = lead.body;
+    assert.ok(!JSON.stringify(rest).includes('Pat'), 'the leader\'s name rides only the sealed job');
+    assert.ok(!String(bundle).includes('Pat Leader'), 'and never in clear inside it');
   });
 
   it('without Brought a friend no friend\'s name is sent', async () => {
