@@ -204,17 +204,39 @@ const Games: React.FC = () => {
 };
 
 // ── 6:30 Journey ─────────────────────────────────────────────────────────────
+// The lesson's first 15 seconds, then the teaching slides, one every 3 s (owner,
+// 2026-10-16: "only play the first fifteen seconds", then "pop through the slides").
+const LESSON_MS = 15000;
+const SLIDE_MS = 3000;
+const SLIDE_STEPS = 4; // a deck is 5 slides: stay on the last
+
 const Journey: React.FC = () => {
   const [ref, active] = useScene('18:30:02');
   const pc = useRef<TwinHandle>(null);
-  const begun = useRef(false);
-  useEffect(() => { if (!active) begun.current = false; }, [active]);
-  // A leader presses Begin a few seconds after the start screen comes up.
-  useEvery(active, 3500, () => {
-    if (begun.current || !pc.current?.loaded()) return;
-    begun.current = true;
-    pc.current.send({ type: 'showcase:click', selector: '#journey-splash-play-btn' });
+  // When Begin is due, when it was pressed, when the video started, when the slides came up.
+  const run = useRef<{ beginAt: number; begun: number; playing: number; slidesAt: number; steps: number } | null>(null);
+  useEffect(() => { if (!active) run.current = null; }, [active]);
+  const press = (action: string) => pc.current?.send({ type: 'showcase:journey', action });
+  // A leader presses Begin; 15 s into the video they skip to the slides and step
+  // through them (the kiosk's own remote commands, as the leader's phone sends them).
+  useEvery(active, 500, () => {
+    if (!pc.current?.loaded()) return;
+    const now = Date.now();
+    if (!run.current) { run.current = { beginAt: now + 2500, begun: 0, playing: 0, slidesAt: 0, steps: 0 }; return; }
+    const r = run.current;
+    if (!r.begun) { if (now >= r.beginAt) { r.begun = now; press('begin'); } return; }
+    if (!r.slidesAt) {
+      // 15 s of video; or, if the video never starts (no network), 25 s after Begin.
+      const due = r.playing ? r.playing + LESSON_MS : r.begun + 25000;
+      if (now >= due) { r.slidesAt = now; press('slides-start'); }
+      return;
+    }
+    if (r.steps < SLIDE_STEPS && now - r.slidesAt >= (r.steps + 1) * SLIDE_MS) { r.steps += 1; press('slide-next'); }
   });
+  const onEvent = (what: string) => {
+    const r = run.current;
+    if (what === 'video-playing' && r && !r.playing) r.playing = Date.now();
+  };
   return (
     <section ref={ref} id="journey" className="kv-scene kv-scene--journey" aria-labelledby="journey-title">
       <div className="kv-wrap kv-scene__grid">
@@ -226,8 +248,8 @@ const Journey: React.FC = () => {
         </div>
         <div className="kv-scene__stage">
           <figure className="kv-device kv-device--monitor">
-            <Twin ref={pc} kind="journey" at={wall('18:30:02')} width={1600} height={900}
-              title="The Journey room's PC: the lesson's title cards, then the lesson" />
+            <Twin ref={pc} kind="journey" at={wall('18:30:02')} width={1600} height={900} onEvent={onEvent}
+              title="The Journey room's PC: the lesson's title cards, its first seconds, then the teaching slides" />
             <span className="kv-device__stand" aria-hidden="true" />
             <figcaption><Tag>Journey room PC</Tag></figcaption>
           </figure>

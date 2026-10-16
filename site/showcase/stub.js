@@ -224,9 +224,20 @@
     } else if (m.type === 'showcase:click' && typeof m.selector === 'string') {
       var el = document.querySelector(m.selector);
       if (el) el.click();
+    } else if (m.type === 'showcase:journey' && KIND === 'journey' && typeof m.action === 'string') {
+      // The kiosk's own remote commands (window.journeyRemote, the phone remote's path):
+      // it checks the action against its own list and refuses what it should.
+      if (window.journeyRemote && typeof window.journeyRemote.command === 'function') window.journeyRemote.command({ action: m.action });
     } else if (m.type === 'showcase:key' && typeof m.key === 'string') {
       document.dispatchEvent(new KeyboardEvent('keydown', { key: m.key, code: m.code || '', bubbles: true }));
     }
   });
+  // Journey: the home page plays only the lesson's first seconds, so it hears when
+  // the video really starts (media events do not bubble; capture sees them).
+  if (KIND === 'journey') {
+    document.addEventListener('playing', function (e) {
+      if (e.target && e.target.id === 'journey-video') tell('video-playing', { t: e.target.currentTime });
+    }, true);
+  }
   tell('ready', { at: iso() });
 }());
