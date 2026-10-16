@@ -310,7 +310,7 @@ console.log('\nsurfaces chrome: the phone page loads only the kit under /brand/'
   // Markup attributes, CSS url()s, and every URL a script assigns to .src /
   // .href or through setAttribute: the tab-shape probe is one of those, and a
   // script-set path outside /brand/ would 404 on /checkin exactly like a tag's
-  // (site/build.mjs rewrites only "/brand/ to "/checkin/brand/).
+  // (site/checkin/checkin-page.mjs rewrites only "/brand/ to "/checkin/brand/).
   const refs = pageAssetRefs(SURFACES.phone).filter((r) => !/^(https?:|data:|javascript:)/.test(r.url));
   const local = refs.map((r) => r.url);
   check('the phone page draws the church\'s logo (two-line, white) from the kit', local.includes('/brand/logos/kvbc-awana-two-line-white.svg') && !local.some((r) => r.includes('awana-clubs')), JSON.stringify(local));
@@ -324,8 +324,8 @@ console.log('\nsurfaces chrome: the phone page loads only the kit under /brand/'
     server.indexOf("app.use('/brand'") > server.indexOf('security.isLoopbackRequest(req)') && server.indexOf('security.isLoopbackRequest(req)') > 0);
   check('the brand mount serves only css, fonts and svg with plain paths',
     /BRAND_PUBLIC_PATH = \/\^\\\/\[A-Za-z0-9_\\-\/\]\+\\\.\(css\|woff2\|ttf\|svg\)\$\//.test(server));
-  const build = read('..', 'site', 'build.mjs');
-  check('site/build.mjs still makes /checkin from phone.html and its kit', /replaceAll\('"\/brand\/', '"\/checkin\/brand\/'\)/.test(build));
+  const checkinPage = read('..', 'site', 'checkin', 'checkin-page.mjs');
+  check('site/checkin/checkin-page.mjs still makes /checkin from phone.html and its kit', /replaceAll\('"\/brand\/', '"\/checkin\/brand\/'\)/.test(checkinPage));
 }
 
 console.log('\nsurfaces chrome: the Windows windows ship their own copy of the kit');
