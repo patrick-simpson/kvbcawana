@@ -109,7 +109,8 @@ test('"kennebec" signs in into the slots the lobby screen shares, and takes the 
   const ls = k.window.localStorage;
   assert.equal(ls.getItem('awanaSyncSession.v1'), SESSION);
   assert.equal(ls.getItem('awanaDisplayKey.v1'), KEY);
-  assert.equal(JSON.parse(ls.getItem('awanaConfig.v1')).pusherAppKey, 'pk');
+  // An old service's Pusher key is never copied into the lobby's config slot (Pusher is gone).
+  assert.ok(!(JSON.parse(ls.getItem('awanaConfig.v1') || '{}')).pusherAppKey);
   assert.ok(doc.getElementById('sync-signin').classList.contains('hidden'));
 
   assert.equal(ls.getItem('journey.captions'), 'on');

@@ -81,7 +81,6 @@
   var SYNC_INDEX = new URL('../lobby/shared/sync.json', window.location.href).href;
   var SESSION_KEY = 'awanaSyncSession.v1';
   var DISPLAY_KEY = 'awanaDisplayKey.v1';
-  var CONFIG_KEY = 'awanaConfig.v1';
   var APPLIED_KEY = 'journey.sync.savedAt';
   var POLL_MS = 10 * 60 * 1000;
   var REQUEST_TIMEOUT_MS = 8000;   // one answer or none: a hung request must not hold a pull or a push forever
@@ -765,14 +764,6 @@
       }
       set(SESSION_KEY, b.session);
       set(DISPLAY_KEY, b.displayKey);
-      // The embedded lobby screen shares this storage: hand it the Pusher key
-      // too if it has none, so it is fully set up by the same sign-in.
-      var cfg = parse(get(CONFIG_KEY)) || {};
-      if (b.pusher && b.pusher.key && !cfg.pusherAppKey) {
-        cfg.pusherAppKey = b.pusher.key;
-        if (b.pusher.cluster) cfg.pusherCluster = b.pusher.cluster;
-        set(CONFIG_KEY, JSON.stringify(cfg));
-      }
       input.value = '';
       render();
       note('Signed in. Room settings now follow every Journey screen.', 'ok');
