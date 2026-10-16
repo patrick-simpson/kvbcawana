@@ -810,12 +810,14 @@ said); "Owner" is what only the owner can do.
     tag's own route `/print-barf-tag` needs printer 9.3.1; a 9.3.0 station gets a
     "BARFED! <first>" custom label. (4) `/checkin/ym` gets all of it (walk-in tag for
     Trek and Journey, its own Tonight with Undo check-in, no Check out).
-  - **`/checkin/classic`: DELETE after Wednesday 2026-10-14.** The relayed phone
+  - **`/checkin/classic`: REMOVED 2026-10-16 (owner).** The relayed phone
     page exactly as /checkin served it on 2026-10-12 (`site/checkin/classic.html`,
     a frozen copy, pinned by its SHA-256 in `site/test/checkin-classic.test.mjs`),
     with `/checkin/classic/ym`, kept as the one-night fallback while /checkin moves
-    to the desk's online path. After 10/14 delete the file, its block in
-    `site/build.mjs` (and its two `must` entries) and the test.
+    to the desk's online path. Done 2026-10-16: the page, its build block, its
+    `must` entries, its test, and the copy of `sync-protocol.js` only it used are
+    gone. The Worker's relayed check-in code (`lobby/worker/src/phone.js`) is still
+    there and was not part of this removal.
 
 ## Online only
 
