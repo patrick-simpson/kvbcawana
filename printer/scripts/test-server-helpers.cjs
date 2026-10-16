@@ -31,7 +31,7 @@ const {
   parseYesRelease, rosterConsentSummary, consentWarningFor,
   parseAllergies, isSafePrinterName,
   effectiveHandbookGroup, reconcileHistoryWithReport, reportEntryIdentityKey,
-  tonightCheckins, markManualUndo, clearManualUndo, computeTonightStats, isNonCheckinRow, splitFullName,
+  tonightCheckins, computeTonightStats, isNonCheckinRow, splitFullName,
   trophyBandFor, TROPHY_BAND_MAX,
   lateGoToLine, scheduleRowFor, DEFAULT_SCHEDULE, applySavedConfig, recentAttendance,
   recapEntriesForTonight, calendarDaysBetween, isNewerVersion,
@@ -741,41 +741,6 @@ console.log('tonightCheckins — THE definition of who is checked in tonight');
   check('entries keeps reprints (it is the labels-printed population)', t.entries.filter((e) => e.firstName === 'Cal').length === 2);
   const st = computeTonightStats(t);
   check('computeTonightStats counts exactly the active set', st.checkedIn === 2 && st.visitors === 1 && st.byClub.Sparks === 2 && st.prints === t.entries.length, JSON.stringify(st));
-}
-
-console.log('markManualUndo / clearManualUndo — the phone Remove and its Add back');
-{
-  const today = '2026-08-02';
-  const iso = (h, m = '00') => `${today}T${h}:${m}:00.000Z`;
-  const row = (over) => Object.assign({ firstName: 'Amy', lastName: 'Zephyr', clubName: 'Sparks', success: true, timestamp: iso('18') }, over);
-  const history = [
-    row({ clubberId: '1', timestamp: iso('19') }),   // Amy newest
-    row({ clubberId: '1', timestamp: iso('18') }),   // Amy's same-night reprint
-    row({ clubberId: '2', firstName: 'Ben' }),
-    row({ clubberId: '1', timestamp: '2026-08-01T19:00:00.000Z' }),   // Amy last night
-    row({ firstName: 'Amy', lastName: 'Zephyr', isAward: true, award: 'Book 1' }),
-    row({ clubberId: '1', timestamp: iso('17'), undone: true, undoneAt: iso('17') }), // reconcile-undone earlier row
-  ];
-  const now = Date.parse(iso('20'));
-  const out = markManualUndo(history, { firstName: 'Amy', lastName: 'Zephyr', clubberId: '1' }, now);
-  check('marks EVERY active row for the identity tonight (both same-night rows)', out.changed === 2 && out.history[0].undone === true && out.history[1].undone === true);
-  check('stamps undoneAt and undoneBy', out.history[0].undoneAt === new Date(now).toISOString() && out.history[0].undoneBy === 'phone');
-  check('another kid is untouched', out.history[2].undone === undefined);
-  check('another night is untouched', out.history[3].undone === undefined);
-  check('an award row is untouched', out.history[4].undone === undefined);
-  check('an already-undone row is untouched (keeps its reconcile provenance)', out.history[5].undoneBy === undefined && out.history[5].undoneAt === iso('17'));
-  check('copy-on-write', history[0].undone === undefined && out.history !== history);
-  check('id-first: a same-named kid with a different id is a different child',
-    markManualUndo(history, { firstName: 'Amy', lastName: 'Zephyr', clubberId: '99' }, now).changed === 0);
-  check('name fallback when the caller has no id', markManualUndo(history, { firstName: 'amy', lastName: 'ZEPHYR' }, now).changed === 2);
-  check('nobody matching → unchanged, same array back',
-    markManualUndo(history, { firstName: 'Zed', lastName: 'Nobody' }, now).changed === 0 && markManualUndo(history, { firstName: 'Zed', lastName: 'Nobody' }, now).history === history);
-
-  const back = clearManualUndo(out.history, { firstName: 'Amy', lastName: 'Zephyr', clubberId: '1' });
-  check('Add back clears exactly the phone-undone rows', back.changed === 2 && back.history[0].undone === undefined && back.history[1].undone === undefined);
-  check('and removes all three marker fields', !('undoneAt' in back.history[0]) && !('undoneBy' in back.history[0]));
-  check('a reconcile-undone row is NOT restorable from a phone', back.history[5].undone === true);
-  check('Add back on a kid nobody removed → unchanged', clearManualUndo(history, { firstName: 'Ben', lastName: 'Zephyr', clubberId: '2' }).changed === 0);
 }
 
 console.log('isSafePrinterName — a printer name reaches PowerShell, so it is validated not escaped');

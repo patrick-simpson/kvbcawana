@@ -197,7 +197,7 @@ async function main() {
       ['/feed/attendance-grid', { meetingDates: ['2026-09-02'], clubsRead: ['Sparks'], rows: [{ name: 'Stranger Leakcanary', club: 'Sparks', dates: ['2026-09-02'] }] }],
       ['/attendance-audit/apply', { confirm: true }], ['/printer/clear-queue', { confirm: true }], ['/rehearsal', { on: true }],
       ['/config', { pusherSecret: 'attacker' }], ['/config', { printerName: 'Evil' }], ['/config/sync-login', { passphrase: 'x', url: 'https://evil.example' }],
-      ['/config/display-key/generate', {}], ['/pending-actions/x/claim', {}],
+      ['/config/display-key/generate', {}],
     ];
     for (const [p, body] of POST_PATHS) {
       const res = await lanReq({ method: 'POST', pathname: p, body: { pin: PIN, ...body }, headers: { 'X-Awana-Pin': PIN } });

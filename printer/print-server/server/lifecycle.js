@@ -5,8 +5,6 @@
 
 const lazy = require('./lazy');
 const events  = require('../events');
-const syncClient = require('../sync-client');
-const phoneRelay = require('../phone-relay');
 const fs    = require('fs');
 const path  = require('path');
 const SERVER_DIR = path.join(__dirname, '..'); // print-server/, where server.js lives
@@ -191,15 +189,6 @@ function startListening(attempt = 1) {
     // Update health beacon (#5): delayed so config.json is loaded and the
     // relay has settled — same reasoning as the birthday publish.
     setTimeout(() => { try { recordBootVersionAndMaybeBeacon(); } catch (e) { /* never blocks boot */ } }, 4000);
-    // The phone check-in relay (7.9.0): awana.kvbchurch.org/checkin's requests,
-    // collected from the sync service and run here, while signed in to it.
-    phoneRelay.startPhoneRelay({
-      signedIn: () => ($relay.signedInToSync() ? { base: $config.config.syncUrl, session: $config.config.syncSession } : null),
-      localBase: `http://127.0.0.1:${$config.PORT}`,
-      syncRequest: syncClient.syncRequest,
-      log: (m) => console.log(m),
-      setTimeoutFn: (fn, ms) => { const t = setTimeout(fn, ms); if (t.unref) t.unref(); return t; },
-    });
     // The church-wide settings from the sync Worker (church-sync.js): waits for the
     // sync sign-in, then keeps config.json in step. Never in a print's way.
     $station.startChurchSync();

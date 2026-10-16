@@ -4,7 +4,7 @@
 //
 // Until 7.11.1 every PowerShell call was execSync with Atomics.wait between
 // retries: a hung driver blocked the whole process (every request, the
-// extension's long poll, the Electron tray) for up to about a minute, and
+// station's job puller, the Electron tray) for up to about a minute, and
 // /health blocked a few seconds every minute probing the spooler.
 'use strict';
 const fs = require('fs');
@@ -84,17 +84,6 @@ const PORT = Number(process.env.AWANA_TEST_PORT || require('./free-port.cjs')())
     const overlapping = starts.slice(1).some((st, i) => st < ends[i]);
     check('and no job started before the one before it had finished', !overlapping);
     check('idle again once the last label is out', server.isBusy() === false);
-  }
-
-  console.log('\nbusy: a phone check-in waiting for the extension is a label still to come');
-  {
-    check('idle with nothing queued', server.isBusy() === false);
-    const q = await post('/phone/checkin', { name: 'Ava Stone' });
-    check('the check-in is queued', q.status === 200 && q.body && q.body.queued === true, JSON.stringify(q));
-    check('busy while it waits', server.isBusy() === true);
-    const done = await post(`/pending-actions/${q.body.id}/result`, { ok: true });
-    check('the extension reports it', done.status === 200, JSON.stringify(done));
-    check('idle once it is driven (its label comes as a /print, counted there)', server.isBusy() === false);
   }
 
   console.log('\nroutes: a rejected async handler is a 500 at once, never a hang');

@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 // Cloud check-in (8.0.0): the sync service checks a child in on TwoTimTwo and
-// asks this laptop for the tag (POST /print with cloud: true). The extension,
-// which did not drive that check-in, finds the child later and asks again;
-// the child must get ONE tag tonight, not two. A stub powershell counts the
-// jobs that reach the printer.
+// asks this laptop for the tag (POST /print with cloud: true). A later print
+// for the same child that is not that job (another path, another key) must
+// not give them a second tag tonight; printedTonightFor() is the backstop the
+// station's job puller relies on. A stub powershell counts the jobs that
+// reach the printer.
 'use strict';
 const fs = require('fs');
 const os = require('os');
@@ -41,9 +42,9 @@ const PORT = Number(process.env.AWANA_TEST_PORT || require('./free-port.cjs')())
     check('the service\'s job prints the tag', r.status === 200 && r.body.success === true && !r.body.duplicate && jobs() === 1, JSON.stringify(r));
     const history = await (await fetch(`${base}/history`)).json();
     check('and it is in tonight\'s history', history.some((h) => h.firstName === 'Ava' && h.success), JSON.stringify(history).slice(0, 200));
-    // The extension finds her later, by name alone (a different duplicate key).
+    // A later print by name alone (a different duplicate key).
     r = await post('/print', { name: 'Ava Stone', clubName: 'Sparks' });
-    check('the extension\'s later print by name is refused', r.body.duplicate === true && jobs() === 1, JSON.stringify(r));
+    check('a later print by name is refused', r.body.duplicate === true && jobs() === 1, JSON.stringify(r));
     r = await post('/print', { name: 'Ava Stone', clubName: 'Sparks', clubberId: '1' });
     check('and by id', r.body.duplicate === true && jobs() === 1, JSON.stringify(r));
     // BARF night 2026-10-14: a page sorted by last name sent "Stone, Ava"; it printed again.
@@ -61,8 +62,13 @@ const PORT = Number(process.env.AWANA_TEST_PORT || require('./free-port.cjs')())
 
   console.log('\ncloud check-in: undone, then checked in again');
   {
-    const u = await post('/phone/undo', { firstName: 'Ava', lastName: 'Stone', clubberId: '1' });
-    check('Remove marks her undone', u.status === 200 && u.body.ok === true, JSON.stringify(u));
+    // Her row marked undone in the history file (the test's stand-in for an undo).
+    const file = path.join(dataDir, 'print-history.json');
+    const rows = JSON.parse(fs.readFileSync(file, 'utf8')).map((h) => (h.firstName === 'Ava' ? { ...h, undone: true, undoneAt: new Date().toISOString(), undoneBy: 'twotimtwo' } : h));
+    fs.writeFileSync(file, JSON.stringify(rows, null, 2));
+    const later = new Date(Date.now() + 5000);
+    fs.utimesSync(file, later, later);
+    check('(her row is undone)', rows.some((h) => h.firstName === 'Ava' && h.undone));
     // The tag rule no longer holds her back (the 45 s double-tap window, which
     // is older and still applies, would refuse a re-print this fast).
     check('her undone tag no longer counts as tonight\'s', server.printedTonightFor('Ava', 'Stone', '1', true) === false

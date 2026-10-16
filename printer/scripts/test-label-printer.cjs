@@ -203,7 +203,7 @@ exit 0
     const sent = [];
     const realPublish = events.publish;
     events.publish = (channel, name, payload) => { sent.push({ name, payload }); return realPublish(channel, name, payload); };
-    const before = (await post('/phone/tonight', {})).body.checkedIn;
+    const before = (await (await fetch(BASE + '/stats/tonight')).json()).checkedIn;
     const histBefore = (await (await fetch(BASE + '/history/today')).json());
     let n = jobs().length;
     let r = await post('/print-oneoff', { firstName: '  Maddie ', clubName: 'sparks' });
@@ -211,7 +211,7 @@ exit 0
     const ci = sent.filter((x) => x.name === 'checkin').pop();
     check('the screens get the welcome, marked oneOff', ci && ci.payload.firstName === 'Maddie' && ci.payload.club === 'Sparks' && ci.payload.oneOff === true, JSON.stringify(ci));
     check('and nothing else: no tally, no recap', !sent.some((x) => x.name === 'tally' || x.name === 'recap'), sent.map((x) => x.name).join(','));
-    const after = (await post('/phone/tonight', {})).body.checkedIn;
+    const after = (await (await fetch(BASE + '/stats/tonight')).json()).checkedIn;
     check('tonight\'s count does not move', after === before, `${before} -> ${after}`);
     const hist = JSON.parse(fs.readFileSync(path.join(dataDir, 'print-history.json'), 'utf8'));
     check('the print log keeps it, marked oneOff', hist[0] && hist[0].firstName === 'Maddie' && hist[0].oneOff === true && hist[0].success === true, JSON.stringify(hist[0]));
@@ -230,7 +230,7 @@ exit 0
     r = await post('/reprint', { index: 0 });
     const hist2 = JSON.parse(fs.readFileSync(path.join(dataDir, 'print-history.json'), 'utf8'));
     check('a reprint of a one-off is a one-off again, with no welcome', r.status === 200 && jobs().length === n + 1 && hist2[0].oneOff === true && !sent.some((x) => x.name === 'checkin'), `${r.status} ${JSON.stringify(r.body)} ${JSON.stringify(hist2[0])}`);
-    check('(the count still has not moved)', (await post('/phone/tonight', {})).body.checkedIn === before);
+    check('(the count still has not moved)', (await (await fetch(BASE + '/stats/tonight')).json()).checkedIn === before);
     events.publish = realPublish;
     void histBefore;
   }

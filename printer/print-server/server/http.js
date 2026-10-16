@@ -13,7 +13,6 @@ const $config = lazy('./config');
 const $clubbers = lazy('./clubbers');
 const $eligibility = lazy('./eligibility');
 const $printing = lazy('./printing');
-const $pendingActions = lazy('./pending-actions');
 const $reprint = lazy('./reprint');
 const $feedRoutes = lazy('./feed-routes');
 
@@ -160,8 +159,8 @@ app.use(corsPolicy);
 // change made on awana.kvbchurch.org/settings is held until this says no) and
 // before an update installs (capped there at a minute). Busy is: a request on
 // a printing route still being answered (its label is still being drawn, or a
-// stretch reprint is between labels), a job on the printer chain, or a phone
-// check-in the extension has not driven yet (its label is still to come).
+// stretch reprint is between labels) or a job on the printer chain. (Until
+// 10.0.0 also a phone check-in the Chrome extension had not driven yet.)
 // Internal only: /health does not carry it.
 const PRINTING_ROUTE = /^\/(print|reprint|canary|play-tune)(\/|-|$)/;
 let printRequests = 0;
@@ -176,12 +175,7 @@ app.use((req, res, next) => {
 });
 
 function isBusy() {
-  if (printRequests > 0 || $printing.printerJobs > 0 || $reprint.reprintRun) return true;
-  // Within the queue's own lifetime: an action nobody drove is gone after
-  // PENDING_TTL_MS whether or not anything has pruned the list yet.
-  const cutoff = Date.now() - $pendingActions.PENDING_TTL_MS;
-  return $pendingActions.pendingActions.some((a) => $pendingActions.actionType(a) === 'checkin' && (a.status === 'pending' || a.status === 'claimed')
-    && new Date(a.at).getTime() >= cutoff);
+  return printRequests > 0 || $printing.printerJobs > 0 || Boolean($reprint.reprintRun);
 }
 
 // Keep the GLOBAL body limit small so a hostile or buggy tab can't push

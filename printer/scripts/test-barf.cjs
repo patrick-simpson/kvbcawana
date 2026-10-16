@@ -128,8 +128,7 @@ const today = (() => { const d = new Date(); return `${d.getFullYear()}-${String
     check('nothing to print is a clear refusal', r.status === 400 && jobs() === beforeBags + 3, JSON.stringify(r));
     r = await post('/print-barf-bags', {});
     check('and so is no list', r.status === 400);
-    const relay = require(path.join(root, 'print-server', 'phone-relay.js'));
-    check('the sync service may send it as a job; a phone page may not', relay.jobAllowed('POST', '/print-barf-bags') && !relay.relayAllowed('POST', '/print-barf-bags'));
+    check('the sync service sends it as a station job', require(path.join(root, 'print-server', 'job-puller.js')).jobPullAllowed('POST', '/print-barf-bags'));
   }
 
   console.log('\nA late BARF friend: the tag alone (9.3.1, a station job)');
@@ -148,39 +147,15 @@ const today = (() => { const d = new Date(); return `${d.getFullYear()}-${String
     check('no first name is a clear refusal, nothing printed', r.status === 400 && jobs() === before + 1, JSON.stringify(r));
     const puller = require(path.join(root, 'print-server', 'job-puller.js'));
     check('the station runs it as a job', puller.jobPullAllowed('POST', '/print-barf-tag'));
-    const relay = require(path.join(root, 'print-server', 'phone-relay.js'));
-    check('the laptop relay never runs it (station jobs only)', !relay.jobAllowed('POST', '/print-barf-tag') && !relay.relayAllowed('POST', '/print-barf-tag'));
   }
 
-  console.log('\nBARF Night: the phone\'s card');
+  console.log('\nBARF Night: the check-in page carries it');
   {
-    const q = await post('/phone/checkin', { name: 'Ava Stone', options: { Bible: true, Friend: true, FriendName: ' Maya<b> ' } });
-    const pending = await (await realFetch(`${base}/pending-actions`)).json();
-    const a = (pending.actions || []).find((x) => x.id === q.body.id);
-    check('the friend\'s name rides the check-in to the laptop, cleaned', a && a.options.Friend === true && a.options.FriendName === 'Mayab', JSON.stringify(a && a.options));
-    const q2 = await post('/phone/checkin', { name: 'Eli Stone', options: { Friend: false, FriendName: 'Jo' } });
-    const p2 = await (await realFetch(`${base}/pending-actions`)).json();
-    const a2 = (p2.actions || []).find((x) => x.id === q2.body.id);
-    check('no name without Brought a friend', a2 && !('FriendName' in a2.options), JSON.stringify(a2 && a2.options));
-  }
-
-  console.log('\nBARF Night: the extension and the pages carry it');
-  {
-    const content = fs.readFileSync(path.join(root, 'chrome-extension', 'content.js'), 'utf8');
-    const touch = fs.readFileSync(path.join(root, 'chrome-extension', 'touch.js'), 'utf8');
     const phone = fs.readFileSync(path.join(root, 'print-server', 'public', 'phone.html'), 'utf8');
-    check('every tag the extension prints takes the friend note', /var friendNote = takeFriendNote\(resolvedClubberId, fullName\);[\s\S]{0,200}payload\.friend = true;/.test(content));
-    check('the touch screen, phone actions and the desk box all leave one',
-      /if \(opts\.Friend === true\) noteFriend\(recid, name, opts\.FriendName/.test(content)
-      && /if \(phoneOpts\.Friend === true\) noteFriend\(recid, action\.name, action\.options\.FriendName/.test(content)
-      && /closest\('#checkin'\)[\s\S]{0,120}friendBoxTicked\(\)/.test(content));
-    check('the touch screen and the phone page ask for the friend\'s first name',
-      /friendInput\(/.test(touch) && /options\.FriendName = friendName/.test(touch)
-      && /friendInput\(/.test(phone) && /friend: items\.friend && !!e\.choice\.friend, friendName: friendName, friendClub: /.test(phone));
+    check('the check-in page asks for the friend\'s first name',
+      /friendInput\(/.test(phone) && /friend: items\.friend && !!e\.choice\.friend, friendName: friendName, friendClub: /.test(phone));
     check('a brother or sister never gets the first child\'s friend name',
-      /openFamily\(p, sibs, \{ bible: choice\.bible, friend: choice\.friend \}\)/.test(phone)
-      && /var choice = \{ bible: state\.choice\.bible, friend: state\.choice\.friend, friendName: state\.choice\.friendName \|\| '' \};/.test(touch)
-      && !/friendName: choice\.friendName/.test(touch.slice(touch.indexOf('function openSiblings'))));
+      /openFamily\(p, sibs, \{ bible: choice\.bible, friend: choice\.friend \}\)/.test(phone));
   }
 
   console.log(`\n${passed} passed, ${failed} failed`);

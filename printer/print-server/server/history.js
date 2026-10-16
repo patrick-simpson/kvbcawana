@@ -23,13 +23,11 @@ const app = $http.app;
 // What other modules (and server.js) read from this one; live bindings, so cycles are safe.
 Object.defineProperties(exports, {
   addHistoryEntry: { enumerable: true, get: () => addHistoryEntry },
-  clearManualUndo: { enumerable: true, get: () => clearManualUndo },
   historyClubImage: { enumerable: true, get: () => historyClubImage },
   historyRowMatches: { enumerable: true, get: () => historyRowMatches },
   isNonCheckinRow: { enumerable: true, get: () => isNonCheckinRow },
   ledgerKeysFor: { enumerable: true, get: () => ledgerKeysFor },
   loadHistory: { enumerable: true, get: () => loadHistory },
-  markManualUndo: { enumerable: true, get: () => markManualUndo },
   printedTonightFor: { enumerable: true, get: () => printedTonightFor },
   reconcileHistoryWithReport: { enumerable: true, get: () => reconcileHistoryWithReport },
   REPRINT_RANGE_GAP_MS: { enumerable: true, get: () => REPRINT_RANGE_GAP_MS },
@@ -259,45 +257,6 @@ function reconcileHistoryWithReport(history, reportEntries, now = Date.now()) {
   });
 
   return { history: next, changed: toUndo.length + toClear.length, skipped: false, reason: null };
-}
-
-// Manual undo from the phone page's Tonight tab. Marks EVERY active row for
-// this identity tonight — not just the newest — so an older same-night reprint
-// can never be read as "still here" once the volunteer has said otherwise.
-// Rows carry `undoneBy` so reconcileHistoryWithReport() never clears them:
-// Remove is local by design, the child is very likely still listed on
-// TwoTimTwo's report, and without the marker the next pass would re-count them
-// within 60 s. Pure and copy-on-write, like reconcile; the caller owns
-// load/save, the ledger strip and publishTally().
-function markManualUndo(history, ident, now = Date.now(), by = 'phone') {
-  const today = $eventBuffer.localDayISO(new Date(now));
-  const nowIso = new Date(now).toISOString();
-  const { firstName, lastName, clubberId } = ident || {};
-  let changed = 0;
-  const next = history.map((row) => {
-    if (!row || row.success === false || isNonCheckinRow(row) || row.undone) return row;
-    if (!$eventBuffer.isOnLocalDay(row.timestamp, today)) return row;
-    if (!historyRowMatches(row, firstName, lastName, clubberId)) return row;
-    changed++;
-    return { ...row, undone: true, undoneAt: nowIso, undoneBy: by };
-  });
-  return { history: changed ? next : history, changed };
-}
-
-// The reverse, restricted to rows THIS surface undid (`undoneBy === by`): a
-// reconcile-detected undo is TwoTimTwo's truth, and a phone must not be able to
-// override it — that path is "check the kid in again", not "un-undo".
-function clearManualUndo(history, ident, by = 'phone') {
-  const { firstName, lastName, clubberId } = ident || {};
-  let changed = 0;
-  const next = history.map((row) => {
-    if (!row || !row.undone || row.undoneBy !== by) return row;
-    if (!historyRowMatches(row, firstName, lastName, clubberId)) return row;
-    changed++;
-    const { undone, undoneAt, undoneBy, ...rest } = row;
-    return rest;
-  });
-  return { history: changed ? next : history, changed };
 }
 
 // The season-ledger keys a child may be filed under — see recordAttendance():

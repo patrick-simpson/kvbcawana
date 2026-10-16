@@ -211,9 +211,14 @@ exit 0
     const r = await puller.handle(second);
     check('a second jobId for her is acked printed and not printed', r === 'duplicate-key' && jobs() === before + 1 && w.acks.at(-1).result === 'printed' && w.acks.at(-1).jobId === second.jobId, r);
     const next = await makeJob(printRec(10, 'Lia', 'Fox', 'Sparks', { gen: 1 }));   // undone and checked in again
-    const fresh = await post('/phone/undo', { firstName: 'Lia', lastName: 'Fox', clubberId: '10' });
+    // Her row undone in the history file (the test's stand-in for the undo).
+    const histFile = path.join(dataDir, 'print-history.json');
+    const undone = JSON.parse(fs.readFileSync(histFile, 'utf8')).map((h) => (h.clubberId === '10' ? { ...h, undone: true, undoneAt: new Date().toISOString(), undoneBy: 'twotimtwo' } : h));
+    fs.writeFileSync(histFile, JSON.stringify(undone, null, 2));
+    const later = new Date(Date.now() + 5000);
+    fs.utimesSync(histFile, later, later);
     const r2 = await puller.handle(next);
-    check('the next generation (an undo, then a new check-in) is not the journal\'s duplicate (the server\'s own 45 s double-tap window may still hold it)', fresh.status === 200 && /^printed/.test(r2), `${r2} ${jobs() - before}`);
+    check('the next generation (an undo, then a new check-in) is not the journal\'s duplicate (the server\'s own 45 s double-tap window may still hold it)', undone.some((h) => h.clubberId === '10' && h.undone) && /^printed/.test(r2), `${r2} ${jobs() - before}`);
   }
 
   console.log('\njob puller: the server\'s own backstop (printedTonightFor) still holds');

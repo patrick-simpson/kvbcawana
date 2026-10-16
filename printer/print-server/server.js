@@ -32,7 +32,6 @@ const $printing = require('./server/printing');
 const $tunes = require('./server/tunes');
 const $ledger = require('./server/ledger');
 const $tags = require('./server/tags');
-require('./server/pending-actions');
 const $http = require('./server/http');
 require('./server/checkin-print');
 const $history = require('./server/history');
@@ -49,7 +48,6 @@ require('./server/canary');
 const $spooler = require('./server/spooler');
 const $updates = require('./server/updates');
 const $configRoutes = require('./server/config-routes');
-require('./server/phone-routes');
 require('./server/diagnostics');
 const $lifecycle = require('./server/lifecycle');
 const app = $http.app;
@@ -81,7 +79,7 @@ module.exports = {
   // Tonight's count. authoritativeTonight() is THE definition every surface
   // reads; the setter exists so a test can put the server in report mode (and
   // in stale-report mode) without a scrape, a socket or a wall-clock wait.
-  printedTonightFor: $history.printedTonightFor, authoritativeTonight: $tonightCount.authoritativeTonight, tonightHereNow: $tonightCount.tonightHereNow, stillHereEntries: $publishers.stillHereEntries, publishStillHere: $publishers.publishStillHere, sendStationExtras: $station.sendStationExtras, sendGreeting: $relay.sendGreeting, REPORT_FRESH_MS, TALLY_GRACE_MIN: $publishers.TALLY_GRACE_MIN, TALLY_LEAD_MIN: $publishers.TALLY_LEAD_MIN,
+  printedTonightFor: $history.printedTonightFor, authoritativeTonight: $tonightCount.authoritativeTonight, tonightHereNow: $tonightCount.tonightHereNow, stillHereEntries: $publishers.stillHereEntries, publishStillHere: $publishers.publishStillHere, publishTally: $publishers.publishTally, sendStationExtras: $station.sendStationExtras, sendGreeting: $relay.sendGreeting, REPORT_FRESH_MS, TALLY_GRACE_MIN: $publishers.TALLY_GRACE_MIN, TALLY_LEAD_MIN: $publishers.TALLY_LEAD_MIN,
   _setLastCheckinReportForTests(report) { $tonightCount.lastCheckinReport = report; },
   _setStillHereWindowForTests(fn) { $publishers.stillHereWindowForTests = fn; },
   _setCheckedOutForTests(date, ids, names) { $tonightCount.checkedOutTonight = { date, ids: new Set(ids), names: new Set((names || []).map(normalizedName)) }; },
@@ -92,9 +90,8 @@ module.exports = {
   // Trophy band (#293) — pure, so the 48-character clip and the malformed-title
   // cases are pinned without rendering a label.
   trophyBandFor: $ledger.trophyBandFor, TROPHY_BAND_MAX: $ledger.TROPHY_BAND_MAX,
-  // Phone Tonight tab: the shared "who is checked in" set and the manual
-  // undo/restore that must survive reconcile — pure, so they are unit-tested.
-  tonightCheckins: $tonightCount.tonightCheckins, markManualUndo: $history.markManualUndo, clearManualUndo: $history.clearManualUndo, splitFullName,
+  // The shared "who is checked in tonight" set — pure, so it is unit-tested.
+  tonightCheckins: $tonightCount.tonightCheckins, splitFullName,
   // The duplicate-print window, exported so a test that has to wait it out
   // reads the real number instead of a copy that drifts (it was 25s while the
   // extension's own client timeout was 35s, which is the bug it now outlasts).
