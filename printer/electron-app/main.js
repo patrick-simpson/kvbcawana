@@ -23,6 +23,7 @@ const { createUpdateState } = require('./src/update-state');
 const chromeRestart = require('./src/chrome-restart');
 const rolesStore = require('./src/roles');
 const handoff = require('./src/handoff');
+const repairInstaller = require('./src/repair-installer');
 const oldApp = require('./src/old-app');
 const { createDisplay } = require('./src/display/display');
 const { createSetupWizard } = require('./src/setup-wizard');
@@ -757,7 +758,35 @@ function offerRepairInstall(errMessage) {
 // plain https.get does not) to temp and launches it VISIBLY — the operator
 // clicks through it, so nothing installs behind their back — then quits so
 // NSIS can replace the app files.
+// Before it is run, its sha512 must match the one the update feed names
+// (src/repair-installer.js). The feed is read first, so a feed that cannot be
+// read refuses before 245 MB are downloaded; a mismatch deletes the file.
+function fetchRepairFeed() {
+  return new Promise((resolve, reject) => {
+    const req = electronNet.request(repairInstaller.FEED_URL);
+    req.on('response', (res) => {
+      if (res.statusCode !== 200) { reject(new Error('HTTP ' + res.statusCode)); return; }
+      const parts = [];
+      res.on('data', (c) => parts.push(c));
+      res.on('end', () => resolve(Buffer.concat(parts).toString('utf8')));
+      res.on('error', reject);
+    });
+    req.on('error', reject);
+    req.end();
+  });
+}
+
 function downloadAndRunRepairInstaller() {
+  fetchRepairFeed().then(
+    (feedText) => downloadRepairInstaller(feedText),
+    (err) => dialog.showErrorBox(
+      'Repair not started',
+      'The update feed could not be read, so the installer cannot be checked (' + ((err && err.message) || err) + ').\n\nDownload it manually instead:\n' + REPAIR_INSTALLER_URL
+    )
+  );
+}
+
+function downloadRepairInstaller(feedText) {
   const dest = path.join(os.tmpdir(), 'KVBC-Awana-Setup.exe');
   const file = fs.createWriteStream(dest);
   const request = electronNet.request(REPAIR_INSTALLER_URL);
@@ -786,10 +815,14 @@ function downloadAndRunRepairInstaller() {
       if (expected && received !== expected) { fail('download incomplete'); return; }
       file.end(() => {
         if (failed) return;
-        shell.openPath(dest).then((openErr) => {
-          if (openErr) { fail(openErr); return; }
-          app.isQuitting = true;
-          app.quit();
+        repairInstaller.verifyInstaller(dest, feedText).then((check) => {
+          if (failed) return;
+          if (!check.ok) { fail('Refused to run it: ' + check.reason + '.'); return; }
+          return shell.openPath(dest).then((openErr) => {
+            if (openErr) { fail(openErr); return; }
+            app.isQuitting = true;
+            app.quit();
+          });
         });
       });
     });

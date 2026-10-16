@@ -67,12 +67,18 @@ describe('the wizard', () => {
 });
 
 describe('the repair installer download', () => {
-  const start = main.indexOf('function downloadAndRunRepairInstaller');
+  const start = main.indexOf('function downloadRepairInstaller');
   const body = main.slice(start, main.indexOf('function probeServer', start));
   it('handles a write error and never runs an incomplete file', () => {
     assert.match(body, /file\.on\('error'/);
     assert.match(body, /received !== expected/);
     assert.match(body, /fs\.unlinkSync\(dest\)/);
+  });
+  it('checks the installer\'s sha512 against the feed before it is opened', () => {
+    const i = main.indexOf('function downloadRepairInstaller');
+    const fn = main.slice(i, main.indexOf('function probeServer', i));
+    assert.match(fn, /verifyInstaller\(dest, feedText\)/);
+    assert.ok(fn.indexOf('verifyInstaller') < fn.indexOf('shell.openPath'));
   });
 });
 
