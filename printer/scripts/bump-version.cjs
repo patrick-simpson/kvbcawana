@@ -1,6 +1,5 @@
 const fs = require('fs');
 const path = require('path');
-const { execSync } = require('child_process');
 
 const version = process.argv[2];
 if (!version || !/^\d+\.\d+\.\d+(\.\d+)?$/.test(version)) {
@@ -30,24 +29,6 @@ const files = [
       ]
   },
   {
-    path: path.join(rootDir, 'chrome-extension', 'manifest.json'),
-    patterns: [
-      { from: /"version": "\d+\.\d+\.\d+(\.\d+)?"/g, to: '"version": "' + version + '"' }
-    ]
-  },
-  {
-    path: path.join(rootDir, 'chrome-extension', 'content.js'),
-    patterns: [
-      { from: /EXTENSION_VERSION = '[^']+'/g, to: "EXTENSION_VERSION = '" + version + "'" }
-    ]
-  },
-  {
-    path: path.join(rootDir, 'chrome-extension', 'popup.html'),
-    patterns: [
-      { from: /Extension v[\d.]+/g, to: 'Extension v' + version }
-    ]
-  },
-  {
     path: path.join(rootDir, 'package.json'),
     patterns: [
       { from: /"version": "\d+\.\d+\.\d+(\.\d+)?"/g, to: '"version": "' + version + '"' }
@@ -73,34 +54,5 @@ files.forEach(file => {
   fs.writeFileSync(file.path, content);
   console.log('Updated:', file.path);
 });
-
-// Rebuild the downloadable extension zip so it can't drift from the
-// source we just stamped. (Found the hard way: the committed zip still
-// contained the 4.0.0 extension while the repo was at 5.0.2 — the website's
-// "Download chrome-extension.zip" button served a two-major-versions-stale
-// extension because nothing regenerated them on bump.)
-function rebuildExtensionZip() {
-  const primary = path.join(rootDir, 'public', 'chrome-extension.zip');
-  const srcDir = path.join(rootDir, 'chrome-extension');
-  try {
-    fs.rmSync(primary, { force: true });
-    if (process.platform === 'win32') {
-      // Compress-Archive can't produce a zip whose entries are prefixed with
-      // the folder name unless we pass the directory itself.
-      execSync(
-        `powershell -NoProfile -Command "Compress-Archive -Path '${srcDir}' -DestinationPath '${primary}' -Force"`,
-        { stdio: 'pipe' }
-      );
-    } else {
-      execSync(`zip -q -r '${primary}' chrome-extension -x '*.DS_Store'`, { cwd: rootDir, stdio: 'pipe' });
-    }
-    console.log('Rebuilt:', primary);
-  } catch (e) {
-    console.error('ERROR: could not rebuild chrome-extension.zip:', e.message);
-    console.error('Rebuild it manually before committing — the website serves this file.');
-    process.exitCode = 1;
-  }
-}
-rebuildExtensionZip();
 
 console.log('Successfully bumped version to:', version);
