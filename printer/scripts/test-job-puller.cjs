@@ -578,16 +578,16 @@ exit 0
     const published = [];
     const realPublish = events.publish;
     events.publish = (...a) => { published.push(a[1]); return realPublish.apply(events, a); };
-    await post('/reset-tonight', { confirm: true });
+    server.publishTally();
     check('before: the print server publishes the tally itself', published.includes('tally'), published.join());
     published.length = 0;
     const cfg = server.configureCloud({ stationId: 'dev-0123456789abcdef', ring: async () => ring, historyRing: async () => histRing, historyPub: () => hist.pub, start: false, journalFile: null });
     check('configureCloud makes this a station', cfg.ok === true && server.cloudStatus().station === true && server.cloudStatus().stationId === 'dev-0123456789abcdef');
-    await post('/reset-tonight', { confirm: true });
+    server.publishTally();
     server.publishStillHere();
     await sleep(2300);
     check('in cloud mode publishTally and publishStillHere are inert', !published.includes('tally') && !published.includes('checkout'), published.join());
-    check('every other frame still goes (a check-in greeting, a reset\'s others)', true);
+    check('every other frame still goes (a check-in greeting)', true);
     const st = await (await fetch(`${localBase}/cloud/print-status`)).json();
     check('the status route answers (for the app and /settings)', st.station === true && st.jobs && Array.isArray(st.jobs.checkThePrinter), JSON.stringify(st).slice(0, 160));
     const cleared = await post('/cloud/print-status/clear', {});
@@ -599,7 +599,7 @@ exit 0
     server.stopCloud();
     check('stopping cloud mode brings the old paths back', server.cloudStatus().station === false);
     published.length = 0;
-    await post('/reset-tonight', { confirm: true });
+    server.publishTally();
     check('publishTally publishes again', published.includes('tally'), published.join());
     events.publish = realPublish;
     check('a bad configuration is refused', server.configureCloud({ stationId: '' }).ok === false && server.cloudStatus().station === false);

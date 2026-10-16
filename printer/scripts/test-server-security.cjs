@@ -172,8 +172,8 @@ async function main() {
 
     const GET_PATHS = [
       '/', '/phone', '/phone/ym', '/phone.html', '/index.html', '/step-chip.js',
-      '/health', '/stats/tonight', '/history', '/history/today', '/checkin-csv-export', '/roster-status',
-      '/failures', '/diagnostics', '/config', '/reconcile', '/clubs', '/leaders', '/attendance-audit',
+      '/health', '/stats/tonight', '/history', '/history/today', '/roster-status',
+      '/failures', '/diagnostics', '/config', '/clubs', '/leaders', '/attendance-audit',
       '/preview?name=Testkid%20Leakcanary',
       '/brand/fonts.css', '/brand/fonts/PaytoneOne-Regular.ttf', '/brand/tokens.css',
       '/brand/../index.html', '/brand/%2e%2e/index.html', '/brand/README.md', '/brand/',
@@ -191,8 +191,7 @@ async function main() {
       ['/phone/restore', { firstName: 'Testkid', lastName: 'Leakcanary' }], ['/phone/visitor', { name: 'Stranger Danger' }],
       ['/phone/checkin', { name: 'Testkid Leakcanary' }],
       ['/print-leader', { name: 'Stranger Leader' }], ['/print-custom', { text: 'Stranger' }], ['/print-oneoff', { firstName: 'Stranger', clubName: 'Sparks' }],
-      ['/leaders', {}], ['/leaders/forget', { key: 'lan leader' }], ['/clubs', {}], ['/reconcile', {}],
-      ['/feed/source-count', { date: '2026-09-02', checkedIn: 999 }],
+      ['/leaders', {}], ['/leaders/forget', { key: 'lan leader' }], ['/clubs', {}],
       ['/feed/completed-books', { entries: [{ name: 'Stranger Leakcanary', book: 'Wingrunner', date: '2026-09-02' }] }],
       ['/feed/attendance-grid', { meetingDates: ['2026-09-02'], clubsRead: ['Sparks'], rows: [{ name: 'Stranger Leakcanary', club: 'Sparks', dates: ['2026-09-02'] }] }],
       ['/attendance-audit/apply', { confirm: true }], ['/printer/clear-queue', { confirm: true }], ['/rehearsal', { on: true }],
@@ -211,8 +210,6 @@ async function main() {
       const hist = json(await request({ host: '127.0.0.1', pathname: '/history' })) || [];
       check('no history row was added by the refused writes',
         Array.isArray(hist) && !hist.some((r) => /Stranger/.test(r.firstName || '')), JSON.stringify(hist.map((r) => r.firstName)));
-      const rec = json(await request({ host: '127.0.0.1', pathname: '/reconcile' })) || {};
-      check('a refused source-count post planted no second opinion', rec.known === false || rec.theirs !== 999, JSON.stringify(rec));
       const cfg = JSON.parse(fs.readFileSync(path.join(dataDir, 'config.json'), 'utf8'));
       check('a refused config write changed nothing', cfg.printerName === '' && cfg.pusherSecret === 'SECRET-MUST-NOT-LEAK', JSON.stringify(Object.keys(cfg)));
     }

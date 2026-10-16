@@ -60,12 +60,10 @@ Object.defineProperties(exports, {
 // A leader tag is a PRINT, never a CHECK-IN. It carries `isLeader` on its
 // history row, which isNonCheckinRow() excludes from tonight's stats and the
 // lobby tally, the checkin event and recap buffer, the season ledger, the
-// checkout board's printed count, the TwoTimTwo write-back CSV, R-1 undo
-// reconciliation (and its mass-undo denominator), /reset-tonight and the phone
-// roster. This route never calls recordAttendance, events.publish,
-// pushEventToBuffer or publishTally.
+// checkout board's printed count and the sealed history. This route never
+// calls recordAttendance, events.publish, pushEventToBuffer or publishTally.
 //
-// Reachable from the phone page (relayed, from loopback) and the settings page.
+// Reachable from the settings page and as a station job (/checkin's leader tags).
 // The phone-never-prints-directly rule exists to keep a KID's label from
 // double-printing through the extension's detection paths; a leader has
 // nothing to drive on TwoTimTwo, so there is nothing to double.

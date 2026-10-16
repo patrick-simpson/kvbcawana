@@ -158,8 +158,8 @@ async function performCheckinPrint(input) {
   // carrying the same diagonal TEST band /canary uses, and touches nothing else.
   // Every persistent side effect below is skipped, because each one causes real
   // damage during training:
-  //   • addHistoryEntry   → print-history.json feeds /checkin-csv-export, which
-  //                         is imported BACK INTO TwoTimTwo. Fake kids would be
+  //   • addHistoryEntry   → print-history.json is the night's record (the count,
+  //                         reprints, the sealed history). Fake kids would be
   //                         recorded as having attended.
   //   • recordAttendance  → the season ledger is permanent; a padded count makes
   //                         real milestone lines ("10th club night!") wrong for

@@ -86,15 +86,17 @@ const PORT = Number(process.env.AWANA_TEST_PORT || require('./free-port.cjs')())
     const bufferFile = path.join(dataDir, 'events-buffer.json');
     try { fs.unlinkSync(bufferFile); } catch (_) { /* may not exist yet */ }
     fs.mkdirSync(bufferFile);
-    const r = await post('/reset-tonight', { confirm: true });
-    check('the route still answers', r.status === 200, JSON.stringify(r));
+    // A save of the recap buffer (what a check-in's greeting writes).
+    const buffer = require(path.join(root, 'print-server', 'server', 'event-buffer.js'));
+    buffer.pushEventToBuffer({ firstName: 'Tess', club: 'Sparks', at: new Date().toISOString() });
+    check('the save does not throw', true);
     let health = await get('/health');
     let w = (health.warnings || []).find((x) => x && x.type === 'dataSave');
     check('/health warns, as a {type, message} object, naming the file', !!w && typeof w.message === 'string' && w.message.includes('events-buffer.json'), JSON.stringify(health.warnings));
     check('and says labels still print', !!w && /Labels still print/.test(w.message));
     check('no .tmp is left behind', !fs.existsSync(`${bufferFile}.tmp`));
     fs.rmdirSync(bufferFile);
-    await post('/reset-tonight', { confirm: true });
+    buffer.pushEventToBuffer({ firstName: 'Tess', club: 'Sparks', at: new Date().toISOString() });
     health = await get('/health');
     w = (health.warnings || []).find((x) => x && x.type === 'dataSave');
     check('the next good save clears it', !w, JSON.stringify(health.warnings));

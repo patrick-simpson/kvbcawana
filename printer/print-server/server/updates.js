@@ -5,7 +5,6 @@
 
 const lazy = require('./lazy');
 const events  = require('../events');
-const feeds   = require('../feeds');
 const brand = require('../brand');
 const syncClient = require('../sync-client');
 const tonightRules = require('../tonight');
@@ -153,9 +152,6 @@ app.get('/health', async (req, res) => {
       message: 'The saved display key is invalid, so names are going out in the clear. Sign this computer in to the sync service again (awana.kvbchurch.org/settings → Printing → At the laptop → This laptop’s sign-in): it installs the church\'s key.',
     });
   }
-  // #2: check-ins the extension could not verify as stuck on TwoTimTwo.
-  // Names are allowed here: /health is loopback/operator-facing and this
-  // list exists precisely so a human re-checks these kids on the site.
   // Version skew (#7): the app synced a new extension to disk, but Chrome is
   // still running the old code until it restarts. The widget already shows
   // its own "restart Chrome" banner; this is the dashboard half, driven by
@@ -186,37 +182,11 @@ app.get('/health', async (req, res) => {
       message: 'Rehearsal mode is ON: every label prints with a TEST band and nothing is recorded or broadcast as real. Turn it off before real check-ins (it auto-disarms 2 hours after arming).',
     });
   }
-  // Where tonight's number is coming from. Only the FALLBACK is a warning: the
-  // report-backed count is the normal, good state and a yellow box that is up
-  // 165 hours a week is a yellow box people learn to ignore. Gated on the club
-  // window (or on a report having landed today and then gone stale), because
-  // "no report at 3pm on a Tuesday" is not news.
+  // Tonight's count is this printer's own history since 10.0.0 (the Chrome
+  // extension posted TwoTimTwo's report until then; on a station the Worker
+  // publishes the count from it). No warning about that: it would be up every
+  // club night. `tallySource` below still says which, as data.
   const tallyNow = $tonightCount.authoritativeTonight();
-  if ($tonightCount.lastPartialReport && Date.now() - $tonightCount.lastPartialReport.at < REPORT_FRESH_MS) {
-    warnings.push({
-      type: 'report-partial',
-      message: `TwoTimTwo's check-in report lists ${$tonightCount.lastPartialReport.declared} children but only ${$tonightCount.lastPartialReport.parsed} could be read, so tonight's count is not taken from it. Reload the Chrome extension (chrome://extensions) or restart Chrome to pick up the newest version.`,
-    });
-  }
-  if (tallyNow.source === 'history'
-      && (events.isClubNightNow($config.churchConfig.clubNights) || $tonightCount.lastCheckinReport)) {
-    const mins = $tonightCount.lastCheckinReport ? Math.round((Date.now() - $tonightCount.lastCheckinReport.at) / 60000) : null;
-    warnings.push({
-      type: 'tally-source',
-      message: mins === null
-        ? "Tonight's count is from the printer's own history; TwoTimTwo's check-in report has not been received tonight. Open the check-in page in Chrome so the extension can read it."
-        : `Tonight's count is from the printer's own history; the TwoTimTwo report has not been received in ${mins} minute${mins === 1 ? '' : 's'}. Check that the check-in page is still open in Chrome.`,
-    });
-  }
-
-  const unverified = feeds.getUnverifiedCheckins(Date.now());
-  if (unverified.length) {
-    const names = unverified.map(e => e.name).join(', ');
-    warnings.push({
-      type: 'unverifiedCheckins',
-      message: `${unverified.length} check-in${unverified.length > 1 ? 's' : ''} may not have stuck on TwoTimTwo: ${names}. Labels printed, but the site never confirmed - re-check these kids on the check-in page.`,
-    });
-  }
   // The label's brand kit (fonts + official club marks). A failed piece never
   // stops a print — the renderer falls back to the old font or the letter
   // monogram — but it must not be invisible either: a broken install would
@@ -284,9 +254,6 @@ app.get('/health', async (req, res) => {
     // under the operator's Windows profile and /health is CORS-readable).
     fonts: brandKit.fonts,
     clubMarks: brandKit.marks,
-    // Freshness per POST /feed/* so the dashboard can show whether the
-    // extension's tonight/points/schedule/notice scrapes are still landing.
-    feeds: feeds.getFeedsHealth(),
     // The published lobby deck — rev/stamp/count only, never the slide text
     // (that is one GET away on the dashboard, and /health is CORS-reachable
     // from the check-in site).

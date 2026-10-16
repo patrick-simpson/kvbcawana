@@ -26,15 +26,12 @@ Object.defineProperties(exports, {
   historyClubImage: { enumerable: true, get: () => historyClubImage },
   historyRowMatches: { enumerable: true, get: () => historyRowMatches },
   isNonCheckinRow: { enumerable: true, get: () => isNonCheckinRow },
-  ledgerKeysFor: { enumerable: true, get: () => ledgerKeysFor },
   loadHistory: { enumerable: true, get: () => loadHistory },
   printedTonightFor: { enumerable: true, get: () => printedTonightFor },
-  reconcileHistoryWithReport: { enumerable: true, get: () => reconcileHistoryWithReport },
   REPRINT_RANGE_GAP_MS: { enumerable: true, get: () => REPRINT_RANGE_GAP_MS },
   REPRINT_RANGE_MAX: { enumerable: true, get: () => REPRINT_RANGE_MAX },
   saveHistory: { enumerable: true, get: () => saveHistory },
   selectReprintRange: { enumerable: true, get: () => selectReprintRange },
-  stripDayFromLedger: { enumerable: true, get: () => stripDayFromLedger },
 });
 
 // ── Print history ────────────────────────────────────────────────────────────
@@ -147,151 +144,10 @@ function historyRowMatches(row, firstName, lastName, clubberId) {
   return !!rowName && rowName === wantName;
 }
 
-// R-1's /clubber/checkin_report is already the authoritative "who's checked in
-// tonight" list (content.js has polled it every ~60s since v5.2 to catch
-// missed check-ins). This is the other direction it never covered: an UNDO on
-// TwoTimTwo — a child removed from the roster after having been checked in —
-// is invisible to both the roster-diff detector and to print-history, which
-// has no way to learn a print it already recorded got undone. Reusing the same
-// report for this means no second scrape, no new event type, no parallel
-// pipeline — only a diff against history the server already owns.
-//
-// Pure by design (mirrors the display repo's decideBoard() philosophy per
-// CLAUDE.md): takes and returns a history array, so it is exhaustively
-// testable without touching disk. The caller (POST /feed/checkin-report)
-// owns load/save and the follow-up publishTally().
-//
-// History is never deleted — it doubles as the print log — so an undone
-// check-in is marked `undone: true` / `undoneAt: <ISO>` in place rather than
-// removed.
-//
-// Identity resolution: for each identity, only the NEWEST qualifying row
-// tonight (history is newest-first) is eligible to be marked/cleared. That is
-// the same row computeTonightStats() treats as "currently checked in" for
-// that identity, and it is what makes the outcome deterministic when both an
-// undone row and a newer successful re-check-in exist for the same child: the
-// newer row always wins, never an older duplicate (a same-night reprint, or a
-// stale prior undo) reviving or re-hiding a status that has since moved on.
-//
-// Safety guards baked in (a bad/partial scrape must never mass-undo a night):
-//   - Only entries actually present in the (already-validated) report count as
-//     "still checked in" — this function trusts its caller to have confirmed
-//     the report parsed successfully; see feeds.validateCheckinReportBody()'s
-//     `ok: true` requirement.
-//   - Visitors are exempt from being marked undone: it is unknown whether
-//     /clubber/checkin_report lists first-timers at all (TWOTIMTWO.md is
-//     silent on it), so treating their absence as "undone" could be nothing
-//     more than the report not tracking them. Reappearance still clears an
-//     existing `undone` flag for a visitor — that direction can only correct a
-//     false undo, never wrongly cause one.
-//   - If applying the report would mark more than half of tonight's currently
-//     checked-in kids as undone in one pass, the WHOLE pass is skipped (history
-//     comes back unchanged) rather than trusted partially — that ratio is far
-//     more consistent with a broken/partial scrape (wrong table, filtered
-//     view, login bounce mid-parse) than with a real mass walkout.
-//   - A row a PERSON undid (`undoneBy`, set by the phone page's Remove) is never
-//     cleared by a reappearance. Remove is local-only by design — the child is
-//     expected to still be on TwoTimTwo's report — so without this the very
-//     next pass would re-count them within a minute of the volunteer's tap.
-//     Rows this function itself marks never carry `undoneBy`.
-function reconcileHistoryWithReport(history, reportEntries, now = Date.now()) {
-  const today = $eventBuffer.localDayISO(new Date(now));
-  // Every key each report entry could be filed under (id AND name): a row
-  // printed without an id (a walk-in, a print before the roster cache knew the
-  // child) is still that child, and comparing it to the entry's id alone
-  // marked a child TwoTimTwo lists as undone, all night (2026-10-08).
-  const reportKeys = new Set();
-  (Array.isArray(reportEntries) ? reportEntries : []).forEach((entry) => {
-    identityKeysOfReportEntry(entry).forEach((k) => reportKeys.add(k));
-  });
-  // A row with an id is matched on its id only, so a namesake on the report
-  // never keeps a different child's undone row alive.
-  const onReport = (row) => {
-    const keys = identityKeysOfRow(row);
-    const id = keys.find((k) => k.startsWith('id:'));
-    return id ? reportKeys.has(id) : keys.some((k) => reportKeys.has(k));
-  };
-
-  // The newest (index-first, since history is unshift()ed newest-first) row
-  // per identity — the one row this pass is allowed to touch.
-  const activeIdx = new Map(); // identityKey -> index into history[]
-  history.forEach((row, i) => {
-    if (!row || row.success === false || isNonCheckinRow(row)) return;
-    if (!$eventBuffer.isOnLocalDay(row.timestamp, today)) return;
-    const key = historyIdentityKey(row);
-    if (!activeIdx.has(key)) activeIdx.set(key, i);
-  });
-
-  const toUndo = [];
-  const toClear = [];
-  let checkedInBefore = 0;
-  activeIdx.forEach((i) => {
-    const row = history[i];
-    if (!row.undone) checkedInBefore++;
-    const inReport = onReport(row);
-    if (!inReport && !row.undone && !row.visitor) toUndo.push(i);
-    else if (inReport && row.undone && !row.undoneBy) toClear.push(i);
-  });
-
-  if (massUndoRefused(toUndo.length, checkedInBefore)) {
-    return {
-      history,
-      changed: 0,
-      skipped: true,
-      reason: `refusing to mark ${toUndo.length}/${checkedInBefore} checked-in kid(s) undone in one pass ` +
-        '(more than half — treating as a suspect/partial scrape rather than a real mass walkout)',
-    };
-  }
-
-  if (!toUndo.length && !toClear.length) {
-    return { history, changed: 0, skipped: false, reason: null };
-  }
-
-  // Copy-on-write: only the rows that actually change become new objects.
-  const next = history.slice();
-  const nowIso = new Date(now).toISOString();
-  toUndo.forEach((i) => { next[i] = { ...next[i], undone: true, undoneAt: nowIso }; });
-  toClear.forEach((i) => {
-    const { undone, undoneAt, ...rest } = next[i];
-    next[i] = rest;
-  });
-
-  return { history: next, changed: toUndo.length + toClear.length, skipped: false, reason: null };
-}
-
-// The season-ledger keys a child may be filed under — see recordAttendance():
-// id-first with the legacy lowercased-name key kept for rows that predate ids.
-function ledgerKeysFor(firstName, lastName, clubberId) {
-  const keys = [];
-  const idRaw = clubberId == null ? '' : String(clubberId).trim();
-  if (idRaw) keys.push(`id:${idRaw.toLowerCase()}`);
-  const nameKey = `${firstName || ''} ${lastName || ''}`.toLowerCase().trim();
-  if (nameKey) keys.push(nameKey);
-  return keys;
-}
-
-// Takes one day out of one child's ledger so a removed check-in does not keep a
-// streak or milestone night. Same per-entry shape /reset-tonight applies to
-// every key at once. Returns whether anything changed.
-function stripDayFromLedger(keys, day) {
-  const ledger = $ledger.loadAttendance();
-  let touched = false;
-  for (const key of keys) {
-    const dates = ledger[key] && Array.isArray(ledger[key].dates) ? ledger[key].dates : null;
-    if (dates && dates.includes(day)) {
-      ledger[key].dates = dates.filter((d) => d !== day);
-      touched = true;
-    }
-  }
-  if (touched) $ledger.saveAttendance(ledger);
-  return touched;
-}
-
 // A history row that is a PRINT but not a CHECK-IN: award slips, connect cards
 // and leader name tags. One predicate, used by every consumer that counts
-// check-ins (tonight's stats and the tally, the CSV write-back into TwoTimTwo,
-// undo reconciliation, the checkout board's printed count, name-based reprint
-// lookup, the phone roster) — a missed exclusion at any of those sites means a
+// check-ins (tonight's stats and the tally, the checkout board's printed count,
+// name-based reprint lookup, the sealed history) — a missed exclusion at any of those sites means a
 // recognition print counts as a child, so they must all share this test.
 // Has this child a tag tonight that a cloud check-in stands behind? For a
 // cloud job (cloud = true): any successful, not-undone check-in row tonight.

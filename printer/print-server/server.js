@@ -70,12 +70,7 @@ module.exports = {
   isSafePrinterName: $customPdf.isSafePrinterName,
   parseAllergies: $eligibility.parseAllergies, recapEntriesForTonight: $eventBuffer.recapEntriesForTonight, calendarDaysBetween: $eventBuffer.calendarDaysBetween, isNewerVersion: $updates.isNewerVersion, historyClubImage: $history.historyClubImage,
   historyRowMatches: $history.historyRowMatches, historyIdentityKey, distinctChildrenPrintedToday: $feedRoutes.distinctChildrenPrintedToday,
-  reconcileHistoryWithReport: $history.reconcileHistoryWithReport, reportEntryIdentityKey, computeTonightStats: $tonightCount.computeTonightStats,
-  // "Is our count right?" — the pure comparison against TwoTimTwo's own
-  // per-club numbers, plus our side of it. Exported so every direction
-  // (short, over, explained by walk-ins, stale, no source) is unit-tested
-  // without a browser or a live report.
-  compareCounts: $tonightCount.compareCounts, countsForCompare: $tonightCount.countsForCompare, SOURCE_COUNT_STALE_MS: $tonightCount.SOURCE_COUNT_STALE_MS,
+  reportEntryIdentityKey, computeTonightStats: $tonightCount.computeTonightStats,
   // Tonight's count. authoritativeTonight() is THE definition every surface
   // reads; the setter exists so a test can put the server in report mode (and
   // in stale-report mode) without a scrape, a socket or a wall-clock wait.

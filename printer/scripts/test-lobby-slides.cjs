@@ -193,7 +193,7 @@ async function main() {
     check('and it reached the wire sealed', slidesFrames().length === 1 && isSealed(slidesFrames()[0].payload));
 
     // The token is NOT a skeleton key: it must not open any other endpoint.
-    const otherRoute = await post('/reset-tonight', { confirm: true },
+    const otherRoute = await post('/rehearsal', { on: true },
       { Origin: DISPLAY_ORIGIN, Authorization: `Bearer ${gen.body.token}` });
     check('the display origin + token cannot touch any other mutating route', otherRoute.status === 403);
 

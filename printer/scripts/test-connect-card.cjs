@@ -260,10 +260,6 @@ async function main() {
     // Non-check-in guarantees, with the card row present:
     const stats = (await get('/stats/tonight')).json || {};
     check('the card does NOT inflate tonight\'s check-ins', stats.checkedIn === 1, JSON.stringify(stats));
-    const csv = (await get('/checkin-csv-export')).body || '';
-    const csvRows = csv.trim().split('\n').slice(1);
-    check('the card does NOT reach the TwoTimTwo write-back CSV',
-      csvRows.length === 1 && csvRows[0].includes('Auto'), JSON.stringify(csvRows));
 
     // Reprint-by-name must find the check-in label, never the card row (the
     // card row is newer — history is newest-first — so a missing exclusion

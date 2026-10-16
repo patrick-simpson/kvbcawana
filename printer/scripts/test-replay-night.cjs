@@ -170,11 +170,22 @@ async function main() {
       check(`leader tag (${step.label}) publishes NO tally`, wire.filter((w) => w.event === 'tally').length === talliesBefore);
       continue;
     }
-    if (step.step === 'checkin-report-undo') {
-      const res = await post('/feed/checkin-report', { ok: true, entries: step.reportEntries });
-      check(`reconcile (${step.label}) applies exactly ${step.expect.changed} undo`,
-        res.status === 200 && res.body && res.body.applied === true && res.body.changed === step.expect.changed,
-        JSON.stringify(res.body));
+    if (step.step === 'mark-undone') {
+      // Since 10.0.0 no route of this server reads TwoTimTwo's report, so the
+      // undo is marked in the history file, as the night's record would carry it.
+      const file = path.join(dataDir, 'print-history.json');
+      let changed = 0;
+      const rows = JSON.parse(fs.readFileSync(file, 'utf8')).map((r) => {
+        if (String(r.clubberId || '') !== step.clubberId || r.undone) return r;
+        changed++;
+        return { ...r, undone: true, undoneAt: new Date().toISOString() };
+      });
+      fs.writeFileSync(file, JSON.stringify(rows, null, 2));
+      const later = new Date(Date.now() + 5000);
+      fs.utimesSync(file, later, later);
+      server.publishTally();   // what moves the count republishes it
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      check(`undo (${step.label}) marks exactly ${step.expect.changed} row`, changed === step.expect.changed, String(changed));
       continue;
     }
     check(`unknown fixture step "${step.step}"`, false);

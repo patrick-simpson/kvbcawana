@@ -5,8 +5,9 @@
 // WHAT THIS GUARDS
 //
 // * The report is the source of truth WHEN IT IS FRESH, and this printer's own
-//   history when it is not. Both modes, the boundary between them, and the
-//   fact that the fallback is announced rather than silent.
+//   history when it is not. Both modes and the boundary between them (the
+//   shared rules; since 10.0.0 no route feeds this printer a report, so the
+//   tests set one, and /health no longer warns about the fallback).
 // * A person's decision beats the report. A row marked `undoneBy` (the phone's
 //   Remove, or the operator's Reset) stays removed even though TwoTimTwo's
 //   report goes on listing that child all evening — which is exactly what made
@@ -65,7 +66,6 @@ function check(name, cond, detail) {
 const wire = [];
 
 const events = require(path.join(__dirname, '..', 'print-server', 'events.js'));
-const feeds = require(path.join(__dirname, '..', 'print-server', 'feeds.js'));
 
 async function j(pathname, opts) {
   const res = await fetch(BASE + pathname, opts);
@@ -364,46 +364,7 @@ async function main() {
     check('two children are checked in', computeTonightStats().checkedIn === 2,
       String(computeTonightStats().checkedIn));
 
-    // Reset, then let the report come back still listing both of them — the
-    // exact sequence that used to un-reset the night within a minute.
-    const reset = await post('/reset-tonight', { confirm: true });
-    check('reset marks both rows undone', reset.status === 200 && reset.body.undone === 2,
-      JSON.stringify(reset.body));
-    const history = (await j('/history')).body || [];
-    check('and stamps them undoneBy: reset, so reconcile leaves them alone',
-      history.filter((r) => r.undone).length === 2
-      && history.filter((r) => r.undoneBy === 'reset').length === 2,
-      JSON.stringify(history.map((r) => [r.firstName, r.undone, r.undoneBy])));
-    check('the count is zero', computeTonightStats().checkedIn === 0);
-
-    feeds._resetForTests();
-    const rep = await post('/feed/checkin-report', { ok: true, entries: [
-      { clubberId: '9001', name: 'Nova Tester', club: 'Sparks' },
-      { clubberId: '9002', name: 'Orion Tester', club: 'Sparks' },
-    ] });
-    check('a report listing both of them is accepted', rep.status === 200 && rep.body.applied === true,
-      JSON.stringify(rep.body));
-    check('...and the reset STAYS reset', computeTonightStats().checkedIn === 0,
-      String(computeTonightStats().checkedIn));
-    check('the report is what the count is built from now',
-      computeTonightStats().countSource === 'report');
-
-    // A report the mass-undo guard refuses must not become the count either.
-    // Fresh names: the duplicate-print window would swallow a repeat of the
-    // two above, and this phase needs real rows, not suppressed ones.
-    await post('/print', { firstName: 'Rigel', lastName: 'Tester', clubName: 'Sparks', clubberId: '9003' });
-    await post('/print', { firstName: 'Sirius', lastName: 'Tester', clubName: 'Sparks', clubberId: '9004' });
-    check('two children are checked in again', computeTonightStats().checkedIn === 2,
-      String(computeTonightStats().checkedIn));
-    const trusted = server._getLastCheckinReportForTests();
-    feeds._resetForTests();
-    const guarded = await post('/feed/checkin-report', { ok: true, entries: [] });
-    check('an empty report is refused by the mass-undo guard',
-      guarded.body.applied === false, JSON.stringify(guarded.body));
-    check('...and is NOT adopted as the count — the guard is the one judge of a scrape',
-      server._getLastCheckinReportForTests() === trusted);
-    check('so the night is still two children, not zero', computeTonightStats().checkedIn === 2,
-      String(computeTonightStats().checkedIn));
+    check('counted from this printer\'s history', computeTonightStats().countSource === 'history');
   }
 
   // ── 9. A reprint cannot launder an award slip ────────────────────────────
@@ -437,28 +398,21 @@ async function main() {
   }
 
   // ── 10. /health says which measurement it used ───────────────────────────
-  console.log('\ntonight: /health names the fallback');
+  console.log('\ntonight: /health names the source as data, and never warns about it');
   {
     const texts = (w) => (w || []).map((x) => (x && typeof x === 'object' ? x.message : String(x)));
     const typed = (w) => (w || []).filter((x) => x && x.type === 'tally-source');
 
     setReport({ at: Date.now(), entries: [] });
     let h = await j('/health');
-    check('a fresh report is not a warning — it is the good state',
-      typed(h.body.warnings).length === 0, JSON.stringify(h.body.warnings));
-    check('and /health reports the source as data too', h.body.tallySource.source === 'report',
+    check('a fresh report is not a warning', typed(h.body.warnings).length === 0, JSON.stringify(h.body.warnings));
+    check('and /health reports the source as data', h.body.tallySource.source === 'report',
       JSON.stringify(h.body.tallySource));
 
     setReport({ at: Date.now() - 25 * 60000, entries: [] });
     h = await j('/health');
-    const warn = typed(h.body.warnings)[0];
-    check('a stale report IS a warning', !!warn, JSON.stringify(h.body.warnings));
-    check('it is a {type, message} object, never a bare string',
-      warn && typeof warn.message === 'string' && warn.message.length > 20, JSON.stringify(warn));
-    check('it says the count came from the printer’s own history',
-      /printer’s own history|printer's own history/.test(warn.message), warn.message);
-    check('and how long the report has been missing', /25 minutes/.test(warn.message), warn.message);
-    check('the data field agrees', h.body.tallySource.source === 'history');
+    check('nor is the history fallback (10.0.0: it would be up every club night)', typed(h.body.warnings).length === 0, JSON.stringify(h.body.warnings));
+    check('the data field says history', h.body.tallySource.source === 'history');
     check('every /health warning is still an object',
       texts(h.body.warnings).every((t) => typeof t === 'string' && t !== 'undefined'));
 
@@ -531,37 +485,6 @@ async function main() {
     check('a name-only row still matches its report entry', authoritativeTonight(t2, NOW).checkedIn === 1,
       JSON.stringify(authoritativeTonight(t2, NOW)));
     setReport(null);
-  }
-
-  console.log('\ntonight: report intake drops summary-cell names and refuses a partial report');
-  {
-    const feeds = require(path.join(__dirname, '..', 'print-server', 'feeds.js'));
-    const v = feeds.validateCheckinReportBody({
-      ok: true, declared: 3,
-      entries: [
-        { clubberId: '7101', name: 'YES 1 Share 1 Point', club: 'T&T' },
-        { clubberId: null, name: '2 Points', club: 'T&T' },
-        { clubberId: '7102', name: 'Ada Tester', club: 'Sparks' },
-      ],
-    });
-    check('a summary-cell name keeps its id and loses the name',
-      v.ok && v.payload.entries.length === 2 && v.payload.entries[0].clubberId === '7101' && v.payload.entries[0].name === '',
-      JSON.stringify(v));
-    check('the declared count comes through', v.ok && v.payload.declared === 3);
-    check('real names are not summaries', !feeds.isSummaryCellText('Noah Tester') && !feeds.isSummaryCellText('Yesenia Tester') && !feeds.isSummaryCellText('No Id Kid')
-      && feeds.isSummaryCellText('YES') && feeds.isSummaryCellText('1 Share 1 Point'));
-
-    setReport(null);
-    await new Promise((resolve) => setTimeout(resolve, 5200));   // past the intake's 5 s throttle
-    const r = await post('/feed/checkin-report', {
-      ok: true, declared: 11,
-      entries: [{ clubberId: '7201', name: 'Ada Tester', club: 'Sparks' }, { clubberId: '7202', name: 'Bo Tester', club: 'Cubbies' }],
-    });
-    check('a report that parsed 2 of the 11 it lists is not applied as the count',
-      r.status === 200 && r.body.applied === false && authoritativeTonight().source === 'history', `${r.status} ${JSON.stringify(r.body)} ${JSON.stringify(authoritativeTonight())}`);
-    const h = await j('/health');
-    check('and /health says why', (h.body.warnings || []).some((w) => w.type === 'report-partial'),
-      JSON.stringify((h.body.warnings || []).map((w) => w.type)));
   }
 
   // ── 7.15.0: checked out tonight comes off the count, everywhere ──────────

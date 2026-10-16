@@ -43,8 +43,6 @@
     "test:tonight-shared": "node scripts/test-tonight-shared.cjs",
     "test:pickup": "node scripts/test-pickup-board.cjs",
     "gen:envelope-fixture": "node scripts/gen-envelope-fixture.cjs",
-    "test:checkout": "node scripts/test-checkout-parser.cjs",
-    "test:reconcile": "node scripts/test-reconcile.cjs",
     "test:audit": "node scripts/test-attendance-audit.cjs",
     "test:brand": "node scripts/test-brand-kit.cjs",
     "test:club-fonts": "node scripts/test-club-fonts.cjs",

@@ -8,8 +8,8 @@
 // happily if /print were broken entirely.
 //
 // Each guarded side effect matters for a concrete reason:
-//   • print-history.json feeds /checkin-csv-export, which is imported BACK
-//     INTO TwoTimTwo — a fake kid would be recorded as having attended.
+//   • print-history.json is the night's record (the count, reprints, the
+//     history the station seals) — a fake kid would be recorded as having attended.
 //   • attendance.json is the permanent season ledger; padding it corrupts real
 //     milestone lines ("10th club night!") for the rest of the year.
 //   • events-buffer.json + the Pusher publish put a fake child's name on the
