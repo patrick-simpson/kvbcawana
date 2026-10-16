@@ -257,9 +257,10 @@ export async function testCloudCheckin() {
  * "Print BARF Bag labels": tonight's names (each child who brought a friend,
  * and each named friend), printed as one job. Owner 2026-10-14: the job the
  * Worker queued for the laptop's relay never printed, so the page asks for the
- * list and seals it to the print stations itself, the way every name tag
- * travels (toolJobs.js). A service with no list, or no print station, falls
- * back to the relay as before.
+ * list ({list: true}) and seals it to the print stations itself, the way every
+ * name tag travels (toolJobs.js). That is the only path since KVBC Awana
+ * 10.0.0, which has no relay: no list or no print station prints nothing and
+ * says why.
  * @returns {Promise<{ok: boolean, text: string}>}
  */
 export async function printBarfBags() {
@@ -267,13 +268,15 @@ export async function printBarfBags() {
   if (!url || !loadSyncSession()) return { ok: false, text: 'Sign this screen in with the passphrase first.' };
   const listed = await syncRequest(url, '/v1/cloud/barf-bags', { method: 'POST', body: { list: true }, session: loadSyncSession() });
   const b = listed.body && typeof listed.body === 'object' ? listed.body : {};
-  // An older service ignored `list` and already queued the relay job: say what it said.
-  if (!listed.ok || b.listed !== true) return describeBarfBags(listed);
+  if (!listed.ok || b.ok !== true) return describeBarfBags(listed);
+  // A service older than the list ignored `list` and queued a job for the
+  // laptop's relay, which KVBC Awana 10.0.0 no longer runs.
+  if (b.listed !== true) return { ok: false, text: 'The sync service is older than this page, so the labels went to a queue nothing reads any more. Nothing printed.' };
   const job = await sendToolJob(barfBagsRecord(b.names, b.bags));
   const summary = { ...b, names: undefined, bags: undefined, listed: undefined };
   if (job.ok) return describeBarfBags({ ok: true, status: 200, body: summary });
-  if (job.reason !== 'no-station') return { ok: false, text: job.message };
-  return describeBarfBags(await syncRequest(url, '/v1/cloud/barf-bags', { method: 'POST', body: {}, session: loadSyncSession() }));
+  if (job.reason === 'no-station') return { ok: false, text: 'No printing computer is signed in, so nothing printed. Turn the check-in laptop on (KVBC Awana, with the label printer), then press again.' };
+  return { ok: false, text: job.message };
 }
 
 /**

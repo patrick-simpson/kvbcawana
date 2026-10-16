@@ -6,6 +6,7 @@ import { _resetForTest as resetConfig, receiveSharedSettings, useConfig } from '
 import { loadSyncSession, saveSyncSession } from '../lib/syncService.js';
 import { BarfBagsField, CloudCheckinTestField, FriendsListField, SyncSignInField } from '../components/settings/fields.jsx';
 import { useCalendar } from './useCalendar.js';
+import { generateKeyPair } from '../../shared/cloud-crypto.js';
 
 const BASE = 'https://awana-sync.example.workers.dev';
 const SESSION = 'v1.1.1790839331729.oWr6n92IJW5ldPGmtiyjPHAZpca-QGToNlKGXlKI6vc';
@@ -245,8 +246,13 @@ describe('Setup: BARF Night', () => {
     expect(view.getByRole('status').textContent).toContain('Al Tester: friend’s name not given');
   });
 
-  it('asks before printing the BARF Bag labels, then says what went', async () => {
-    const calls = fakeService({ '/v1/cloud/barf-bags': () => [200, { ok: true, labels: 3, kids: 2, friends: 1, unnamed: 1, date: '2026-10-14' }] });
+  it('asks before printing the BARF Bag labels, seals the list to the print stations, then says what went', async () => {
+    const station = await generateKeyPair();
+    const calls = fakeService({
+      '/v1/cloud/barf-bags': () => [200, { ok: true, listed: true, names: ['Kit Tester', 'Maya'], bags: [{ name: 'Kit Tester', club: 'Sparks' }, { name: 'Maya', club: '', friendOf: 'Kit Tester' }], labels: 2, kids: 1, friends: 1, unnamed: 1, date: '2026-10-14' }],
+      '/v1/stations': () => [200, [{ stationId: 'station-1', name: 'Check-in laptop', kid: 'k1', pub: station.publicKey }]],
+      '/v1/print/reprint': () => [200, { ok: true }],
+    });
     saveSyncSession(SESSION);
     _resetSyncForTest();
     const confirm = vi.spyOn(window, 'confirm');
@@ -256,8 +262,40 @@ describe('Setup: BARF Night', () => {
     expect(calls.some((c) => c.url.endsWith('/v1/cloud/barf-bags'))).toBe(false);
     confirm.mockReturnValueOnce(true);
     fireEvent.click(view.getByRole('button', { name: 'Print BARF Bag labels' }));
-    await waitFor(() => expect(view.getByRole('status').textContent).toContain('Sent 3 BARF Bag labels to the label printer as one job: 2 children and 1 friend.'));
+    await waitFor(() => expect(view.getByRole('status').textContent).toContain('Sent 2 BARF Bag labels to the label printer as one job: 1 child and 1 friend.'));
     expect(view.getByRole('status').textContent).toContain('1 friend was checked in at TwoTimTwo’s desk box with no name');
+    const asked = calls.filter((c) => c.url.endsWith('/v1/cloud/barf-bags'));
+    expect(asked.map((c) => JSON.parse(c.init.body))).toEqual([{ list: true }]);
+    const job = calls.find((c) => c.url.endsWith('/v1/print/reprint'));
+    const sent = JSON.parse(job.init.body);
+    expect(sent.jobId).toMatch(/^reprint:/);
+    expect(JSON.stringify(sent)).not.toContain('Kit Tester');   // sealed to the stations
+    confirm.mockRestore();
+  });
+
+  it('with no print station nothing prints, it says why, and nothing goes to the old relay', async () => {
+    const calls = fakeService({
+      '/v1/cloud/barf-bags': () => [200, { ok: true, listed: true, names: ['Kit Tester'], bags: [{ name: 'Kit Tester', club: 'Sparks' }], labels: 1, kids: 1, friends: 0, unnamed: 0, date: '2026-10-14' }],
+      '/v1/stations': () => [200, []],
+    });
+    saveSyncSession(SESSION);
+    _resetSyncForTest();
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const view = within(render(<BarfBagsField />).container);
+    fireEvent.click(view.getByRole('button', { name: 'Print BARF Bag labels' }));
+    await waitFor(() => expect(view.getByRole('status').textContent).toContain('No printing computer is signed in, so nothing printed.'));
+    expect(calls.filter((c) => c.url.endsWith('/v1/cloud/barf-bags')).map((c) => JSON.parse(c.init.body))).toEqual([{ list: true }]);
+    confirm.mockRestore();
+  });
+
+  it('a service that ignores the list is not taken for a print', async () => {
+    fakeService({ '/v1/cloud/barf-bags': () => [200, { ok: true, labels: 3, kids: 2, friends: 1, unnamed: 1, date: '2026-10-14' }] });
+    saveSyncSession(SESSION);
+    _resetSyncForTest();
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const view = within(render(<BarfBagsField />).container);
+    fireEvent.click(view.getByRole('button', { name: 'Print BARF Bag labels' }));
+    await waitFor(() => expect(view.getByRole('status').textContent).toContain('Nothing printed.'));
     confirm.mockRestore();
   });
 });

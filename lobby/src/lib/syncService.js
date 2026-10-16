@@ -367,6 +367,5 @@ export function describeBarfBags(res) {
     return { ok: true, text: `Sent ${n(b.labels)} BARF Bag label${n(b.labels) === 1 ? '' : 's'} to the label printer as one job: ${n(b.kids)} child${n(b.kids) === 1 ? '' : 'ren'} and ${n(b.friends)} friend${n(b.friends) === 1 ? '' : 's'}.${unnamed}` };
   }
   if (b.reason === 'none') return { ok: false, text: 'Nobody has been checked in with Brought a friend tonight yet.' };
-  if (b.reason === 'laptop-off') return { ok: false, text: 'The check-in laptop is not on, so nothing could print. Turn it on (with the label printer), then press again.' };
-  return { ok: false, text: 'Too many requests are waiting for the laptop. Try again in a moment.' };
+  return { ok: false, text: 'The sync service could not list tonight’s names. Try again in a moment.' };
 }

@@ -277,7 +277,7 @@ describe('the BARF Bag button\'s words', () => {
   it('names what went, and what could not', () => {
     expect(ans({ ok: true, labels: 1, kids: 1, friends: 0, unnamed: 1 }).text).toBe('Sent 1 BARF Bag label to the label printer as one job: 1 child and 0 friends. 1 friend was checked in at TwoTimTwo’s desk box with no name, so no label for them.');
     expect(ans({ ok: false, reason: 'none' }).text).toContain('Nobody has been checked in with Brought a friend');
-    expect(ans({ ok: false, reason: 'laptop-off' })).toMatchObject({ ok: false, text: expect.stringContaining('laptop is not on') });
+    expect(ans({ ok: false, reason: 'busy' })).toMatchObject({ ok: false, text: expect.stringContaining('could not list') });
     expect(describeBarfBags({ ok: false, status: 404, body: {} }).text).toContain('next deploy');
   });
 });
