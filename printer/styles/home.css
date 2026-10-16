@@ -316,6 +316,9 @@ sup { font-size: .55em; line-height: 0; vertical-align: .9em; }
 .kv-reel__ctl:hover { background: rgba(35, 31, 32, .85); }
 .kv-reel__ctl .kv-ico { width: 20px; height: 20px; }
 .kv-reel__sound.is-muted { background: var(--hot-btn); border-color: #fff; }
+/* While it plays, the buttons step away after a little stillness (Reel.tsx IDLE_MS). */
+.kv-reel.is-idle .kv-reel__bar { opacity: 0; visibility: hidden; }
+.kv-reel.is-idle { cursor: none; }
 
 /* The stand-in: the catalog cover, in the kit. */
 .kv-standin { position: absolute; inset: 0; background: linear-gradient(170deg, #2a4a8a, var(--navy)); color: #fff; }
@@ -478,14 +481,16 @@ sup { font-size: .55em; line-height: 0; vertical-align: .9em; }
 .kv-pickup { display: grid; }
 .kv-pickup .kv-device--laptop { width: 52%; justify-self: end; margin-top: 28px; margin-right: 6%; z-index: 1; }
 
-/* ── 8:00: the film ─────────────────────────────────────────────────────── */
+/* ── The film, first ─────────────────────────────────────────────────────── */
+.kv-film { background: #17151c; padding: clamp(20px, 3vw, 40px) 0 clamp(28px, 4vw, 52px); }
+.kv-film .kv-reel { border-color: #fff; box-shadow: 14px 14px 0 rgba(0, 0, 0, .5); }
+
+/* ── 8:00: the end of the night ─────────────────────────────────────────── */
 .kv-finale { position: relative; background: #17151c; color: #fff; padding: clamp(64px, 10vh, 120px) 0 clamp(80px, 12vh, 150px); }
 .kv-finale::before { content: ''; position: absolute; left: 0; right: 0; top: 0; height: 12px; background: repeating-linear-gradient(90deg, currentColor 0 2px, transparent 2px 24px); opacity: .22; }
 .kv-finale .kv-scene__time { color: var(--sun); }
 .kv-finale__title { margin-top: 18px; font: 400 clamp(2.2rem, 1.4rem + 3vw, 4.4rem)/1 var(--shout); text-transform: uppercase; text-wrap: balance; }
 .kv-finale__line { margin-top: 12px; font-size: 1.15rem; color: rgba(255, 255, 255, .86); }
-.kv-finale__film { margin-top: clamp(26px, 4vw, 44px); }
-.kv-finale .kv-reel { border-color: #fff; box-shadow: 14px 14px 0 rgba(0, 0, 0, .5); }
 
 /* Past 8:00: the light switch (the owner's easter egg). */
 .kv-lights { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 18px; margin-top: clamp(40px, 6vw, 70px); }
@@ -497,7 +502,7 @@ sup { font-size: .55em; line-height: 0; vertical-align: .9em; }
 .kv-lights__note { font-size: .95rem; color: var(--brand-journey-tint); min-height: 1.4em; }
 
 /* Lights out: every field goes dark; only the Journey room's PC is still on. */
-html.is-lights-out .kv-open, html.is-lights-out .kv-scene, html.is-lights-out .kv-finale, html.is-lights-out .kv-footer, html.is-lights-out .kv-header, html.is-lights-out .kv-disclaimer { background: #08070b; color: #3d3a44; }
+html.is-lights-out .kv-film, html.is-lights-out .kv-open, html.is-lights-out .kv-scene, html.is-lights-out .kv-finale, html.is-lights-out .kv-footer, html.is-lights-out .kv-header, html.is-lights-out .kv-disclaimer { background: #08070b; color: #3d3a44; }
 html.is-lights-out .kv-open__clock { color: #24222a; text-shadow: none; }
 html.is-lights-out .kv-open__clock small, html.is-lights-out .kv-scene__time, html.is-lights-out .kv-finale .kv-scene__time { color: #2c2a33; }
 html.is-lights-out .kv-twin, html.is-lights-out .kv-printer, html.is-lights-out .kv-reel, html.is-lights-out .kv-logo img, html.is-lights-out .kv-tag { opacity: .08; }
@@ -623,6 +628,7 @@ html.is-lights-out .kv-footer__shine { opacity: .07; }
   .kv-open__clock span { display: inline-block; animation: kv-tick .5s var(--settle) both; }
   .kv-open__title, .kv-open__line, .kv-open__go { animation: kv-in .7s var(--settle) .15s both; }
   .kv-clock { transition: opacity .25s, visibility .25s; }
+  .kv-reel__bar { transition: opacity .35s, visibility .35s; }
   .kv-printer__label { animation: kv-feed 1.1s steps(11, end) both; }
   .kv-printer__led { animation: kv-led 1.4s ease-in-out infinite; }
   .kv-switch__toggle { transition: top .12s var(--settle), box-shadow .12s; }

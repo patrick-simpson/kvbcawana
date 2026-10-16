@@ -9,6 +9,8 @@ import { Doodle, LOGO, Shape } from './Kit';
  *
  * - It starts by itself, muted and inline, with a Tap for sound button and a
  *   pause button (anything that moves for more than five seconds can be paused).
+ *   The buttons step away after 2.5 s of stillness and come back on any
+ *   movement, touch or focus; turning the sound on starts the film over.
  * - When it ends it goes back to the poster, with a Watch again button.
  * - With reduced motion it never starts by itself: the poster and a play
  *   button wait, and that button plays it with sound.
@@ -16,6 +18,7 @@ import { Doodle, LOGO, Shape } from './Kit';
  *   stand-in, which also sits behind the poster while it loads.
  */
 const FILM = '/reel/reel.mp4';
+const IDLE_MS = 2500;
 export const POSTER = '/reel/poster.jpg';
 
 type Mode = 'waiting' | 'playing' | 'paused' | 'ended' | 'missing';
@@ -49,6 +52,17 @@ export const Reel: React.FC = () => {
   const [film, setFilm] = useState<string | null>(null);
   const [mode, setMode] = useState<Mode>('waiting');
   const [muted, setMuted] = useState(true);
+  // The controls step away after a few seconds of stillness while it plays, and
+  // come back on any movement, touch or keyboard focus (owner, 2026-10-16).
+  const [idle, setIdle] = useState(false);
+  const idleTimer = useRef<number | undefined>(undefined);
+  const wake = () => {
+    setIdle(false);
+    window.clearTimeout(idleTimer.current);
+    idleTimer.current = window.setTimeout(() => setIdle(true), IDLE_MS);
+  };
+  useEffect(() => () => window.clearTimeout(idleTimer.current), []);
+  useEffect(() => { if (mode === 'playing') wake(); else { setIdle(false); window.clearTimeout(idleTimer.current); } }, [mode]);
 
   // The film mounts after the first render (the prerendered page has none).
   useEffect(() => { setFilm(FILM); }, []);
@@ -68,11 +82,19 @@ export const Reel: React.FC = () => {
     setMuted(!sound);
     v.play()?.catch(() => setMode('waiting'));
   };
+  // Sound on starts the film over, so the music is heard from its first beat
+  // (owner, 2026-10-16); sound off just mutes.
   const toggleSound = () => {
     const v = video.current;
     if (!v) return;
-    v.muted = !v.muted;
-    setMuted(v.muted);
+    const on = v.muted;
+    v.muted = !on;
+    setMuted(!on);
+    if (on) {
+      v.currentTime = 0;
+      v.play()?.catch(() => undefined);
+    }
+    wake();
   };
   const togglePause = () => {
     const v = video.current;
@@ -84,7 +106,8 @@ export const Reel: React.FC = () => {
   const showBig = mode === 'waiting' || mode === 'ended';
 
   return (
-    <div className={`kv-reel is-${mode}`}>
+    <div className={`kv-reel is-${mode}${idle && mode === 'playing' ? ' is-idle' : ''}`}
+      onPointerMove={wake} onPointerDown={wake} onFocus={wake}>
       <StandIn missing={missing} />
       {film && !missing && (
         <video

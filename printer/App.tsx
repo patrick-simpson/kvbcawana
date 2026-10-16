@@ -8,11 +8,12 @@ import { Reel } from './components/home/Reel';
  * The home page of awana.kvbchurch.org (owner, 2026-10-16): a showcase that
  * plays ONE club night on the real screens (CLAUDE.md, "Public website").
  *
+ *   #reel    the film, first (owner, 2026-10-16: "get the video to the top")
  *   #top     the opening: the time, and what this is
  *   #night   the night (components/home/Night.tsx): #doors (#phone, #labels,
- *            #lobby), #projector, #journey, #pickup (#app)
- *   #reel    8:00: the film, the finale
- *   footer   the practical links, quietly; past 8:00, the Lights out switch
+ *            #lobby), #projector, #journey (#remote), #pickup (#app)
+ *   #end     8:00: that's a club night, and the Lights out switch
+ *   footer   the practical links, quietly
  *
  * /help keeps the install guide and the FAQ; index.html sends old /#install,
  * /#how-it-works and /#faq links there.
@@ -23,10 +24,11 @@ const Clock: React.FC = () => {
   const { hm, ampm } = useNightTime();
   const [shown, setShown] = useState(false);
   useEffect(() => {
-    const top = document.getElementById('top');
-    if (!top || typeof IntersectionObserver === 'undefined') return;
-    const io = new IntersectionObserver(([e]) => setShown(!e.isIntersecting));
-    io.observe(top);
+    // Only while the night itself is on screen.
+    const night = document.getElementById('night');
+    if (!night || typeof IntersectionObserver === 'undefined') return;
+    const io = new IntersectionObserver(([e]) => setShown(e.isIntersecting));
+    io.observe(night);
     return () => io.disconnect();
   }, []);
   return (
@@ -44,7 +46,7 @@ const PROGRAM: [string, string, string][] = [
   ['6:05', 'Game time', '#projector'],
   ['6:30', 'Journey', '#journey'],
   ['7:30', 'Pickup', '#pickup'],
-  ['8:00', 'The film', '#reel'],
+  ['8:00', 'Lights out', '#end'],
 ];
 
 const Opening: React.FC = () => {
@@ -94,13 +96,19 @@ const LightsOut: React.FC = () => {
   );
 };
 
+/** The film, first: ninety seconds, every screen at once. */
+const Film: React.FC = () => (
+  <section id="reel" className="kv-film" aria-label="The film: one club night in ninety seconds">
+    <div className="kv-wrap"><Reel /></div>
+  </section>
+);
+
 const Finale: React.FC = () => (
-  <section id="reel" className="kv-finale" aria-labelledby="finale-title">
+  <section id="end" className="kv-finale" aria-labelledby="finale-title">
     <div className="kv-wrap">
       <p className="kv-scene__time" aria-hidden="true"><span>8:00</span><small>PM</small></p>
       <h2 className="kv-finale__title" id="finale-title">That's a club night.</h2>
-      <p className="kv-finale__line">Ninety seconds, every screen at once.</p>
-      <div className="kv-finale__film"><Reel /></div>
+      <p className="kv-finale__line">The last car pulls out. Somebody should get the lights.</p>
       <LightsOut />
     </div>
   </section>
@@ -113,6 +121,7 @@ const App: React.FC = () => (
     <Header page="home" />
     <Clock />
     <main id="main">
+      <Film />
       <Opening />
       <Night />
       <Finale />
