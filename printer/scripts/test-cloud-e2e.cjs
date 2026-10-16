@@ -651,7 +651,13 @@ const fakeSafe = {
         }
         const rw = await puller2.tick();
         await settle();
-        check('the TwoTimTwo-page check-in printed one label', rw.handled === 1 && labels() === lw + 1, JSON.stringify(rw));
+        // The late rule reads the print server's REAL clock (lateGoToLine, local time): past
+        // the club's start + grace (the church settings cap the grace at 120 min) the child
+        // also gets the household's drop-off tag, so CI in the evening sees two labels.
+        const late = server.lateGoToLine('Sparks') !== '';
+        const dropOff = lines.some((l) => /\[print\] Drop-off tag for the Allerby family/.test(l));
+        check('the TwoTimTwo-page check-in printed one name tag (plus the drop-off tag when it is late by this computer\'s clock)',
+          rw.handled === 1 && labels() === lw + (late ? 2 : 1) && dropOff === late, JSON.stringify({ ...rw, late, dropOff, printed: labels() - lw }));
       } finally { console.log = logBefore; }
       const enriched = lines.find((l) => /\[csv\] Enriched: Wynn Allerby/.test(l)) || '';
       check('and the label was drawn WITH the allergy from the Worker-delivered roster (the print path\'s own enrichment line)', /allergies: [A-Z]/.test(enriched) && !/allergies: \(none\)/.test(enriched), enriched || lines.filter((l) => /csv|Enriched/.test(l)).join(' / '));
