@@ -915,7 +915,6 @@
       var modalContainer = document.getElementById('checkin-modal') || checkinBtn.parentElement;
       applyCheckinOptions(modalContainer, options);
 
-      // Bug 3 fix: only call .click() once — the dispatchEvent was causing a double-submission
       checkinBtn.click();
 
       // Verify the click actually checked the kid in (row disappears)
