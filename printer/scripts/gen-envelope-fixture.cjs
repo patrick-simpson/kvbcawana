@@ -69,8 +69,8 @@ cases.push({
 const out = {
   note: [
     'Cross-implementation interop fixture for the sealed-envelope transport.',
-    'CANONICAL COPY lives in the printer repo; the display repo carries a',
-    'byte-identical mirror. Both repos assert they can open every envelope here,',
+    'ONE copy, in printer/; the lobby's tests read it in place.',
+    'Both apps assert they can open every envelope here,',
     'which is what stops the Node seal and the WebCrypto open from drifting.',
     'The testKey below is deliberately public and protects nothing — never use',
     'it on a real install.',
@@ -91,13 +91,6 @@ const out = {
 };
 
 const canonical = path.join(__dirname, '..', 'envelope-vectors.json');
-const mirror = path.join(__dirname, '..', '..', 'lobby', 'src', 'lib', '__fixtures__', 'envelope-vectors.json');
 const json = `${JSON.stringify(out, null, 2)}\n`;
 fs.writeFileSync(canonical, json);
 console.log(`wrote ${canonical} (${cases.length} cases)`);
-if (fs.existsSync(path.dirname(mirror))) {
-  fs.writeFileSync(mirror, json);
-  console.log(`mirrored to ${mirror}`);
-} else {
-  console.warn(`lobby fixtures folder not present — mirror ${path.basename(mirror)} by hand`);
-}

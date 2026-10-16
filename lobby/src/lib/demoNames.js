@@ -7,7 +7,7 @@
 // actually arrived.
 //
 // This list deliberately does NOT come from
-// `src/lib/__fixtures__/contract-vectors.json`. Those vectors carry realistic
+// `printer/contract-vectors.json`. Those vectors carry realistic
 // first names (Alice, Marcos, Nora) because their job is to prove the
 // sanitizers handle real-looking traffic — exactly the wrong thing to put on a
 // screen in front of families.

@@ -6,9 +6,8 @@
 // fields the check-in system might send must never reach the display.
 //
 // Each sanitizer returns null on garbage and never throws. Payload
-// shapes are pinned by src/lib/__fixtures__/contract-vectors.json — a
-// byte-identical mirror of the canonical copy in the printer repo
-// (Print-TwoTimTwo-Labels/contract-vectors.json).
+// shapes are pinned by printer/contract-vectors.json (the one copy; the
+// lobby's tests read it in place).
 //
 // The typedefs below ARE the display's data surface: if a field isn't
 // named here, nothing downstream can see it.

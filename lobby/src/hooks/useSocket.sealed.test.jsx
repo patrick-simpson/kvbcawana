@@ -29,7 +29,7 @@ const { useSocket } = await import('./useSocket.js');
 const cfg = await import('./useConfig.js');
 const { sealForTest, fromBase64 } = await import('./../lib/envelope.js');
 const { saveDisplayKey } = await import('./../lib/displayKey.js');
-const fixture = (await import('./../lib/__fixtures__/envelope-vectors.json')).default;
+const fixture = (await import('../../../printer/envelope-vectors.json')).default;
 
 const KEY = fixture.testKey;
 // The sanitizers require `at` to parse to epoch ms, so a placeholder string

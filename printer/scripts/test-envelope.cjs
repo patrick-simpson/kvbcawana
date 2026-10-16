@@ -58,8 +58,8 @@ const FIXTURE = JSON.parse(
 const KEY = FIXTURE.testKey;
 
 // ── 1. The committed fixture still opens ─────────────────────────────────────
-// This is the interop pin. The display repo runs the equivalent assertion
-// against a byte-identical mirror using WebCrypto, so a framing change on
+// This is the interop pin. The lobby runs the equivalent assertion against
+// this same file using WebCrypto, so a framing change on
 // either side breaks that side's build instead of the club night.
 console.log('\nenvelope: the committed interop fixture still opens');
 {

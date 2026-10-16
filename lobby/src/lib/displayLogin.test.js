@@ -3,7 +3,7 @@ import { LEGACY_LOGIN_ISSUED_STORAGE, LEGACY_LOGIN_KEY_STORAGE, logout } from '.
 import { DISPLAY_KEY_STORAGE, loadDisplayKey, saveDisplayKey } from './displayKey.js';
 import { PUBLISH_TOKEN_STORAGE, loadPublishToken, savePublishToken } from './publishToken.js';
 import { loadFleetConfigUrl, saveFleetConfigUrl } from './fleetConfigUrl.js';
-import fixture from './__fixtures__/envelope-vectors.json';
+import fixture from '../../../printer/envelope-vectors.json';
 
 beforeEach(() => localStorage.clear());
 

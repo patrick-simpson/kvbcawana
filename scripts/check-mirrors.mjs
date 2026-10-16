@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // The family's shared files, checked in one place.
 //
-//   contract / envelope vectors   printer/  ->  lobby/src/lib/__fixtures__/
-//                                 still committed, byte-identical mirrors (canonical first)
+//   contract / envelope vectors   ONE copy each, printer/*.json: the lobby's tests read
+//                                 them in place (the lobby mirrors went 2026-10-16)
 //   shared modules                lobby/shared/*.js (the sync protocol and the cloud crypto
 //                                 among them)  ->  generated CommonJS copies for the packaged
 //                                 Windows app (scripts/shared-copies.mjs lists them; committed,
@@ -28,15 +28,6 @@ import { drift as sharedDrift } from './shared-copies.mjs';
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 
 const problems = [];
-function same(canonical, copy) {
-  const a = path.join(ROOT, canonical);
-  const b = path.join(ROOT, copy);
-  if (!existsSync(b)) { problems.push(`${copy} is missing (canonical: ${canonical})`); return; }
-  if (!readFileSync(a).equals(readFileSync(b))) problems.push(`${copy} differs from ${canonical}`);
-}
-
-same('printer/contract-vectors.json', 'lobby/src/lib/__fixtures__/contract-vectors.json');
-same('printer/envelope-vectors.json', 'lobby/src/lib/__fixtures__/envelope-vectors.json');
 
 // The generated copies exist and match the canonical files.
 problems.push(...checkAssets(Object.keys(COPIES)));
@@ -75,8 +66,7 @@ for (const d of sharedDrift()) problems.push(`${d.dest} differs from what ${d.sr
 
 if (problems.length) {
   console.error(`✗ ${problems.length} problem(s):\n  ${problems.join('\n  ')}`);
-  console.error('Vectors: change the canonical file, then copy it over the other (never the other way round).');
   console.error('Brand kit and every generated copy: change the canonical file, then run node scripts/family-assets.mjs.');
   process.exit(1);
 }
-console.log('✓ contract and envelope vectors match; the brand kit copies are generated, ignored and match their canonical files; the generated shared-module copies match lobby/shared');
+console.log('✓ the brand kit copies are generated, ignored and match their canonical files; the generated shared-module copies match lobby/shared');

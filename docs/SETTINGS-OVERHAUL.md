@@ -306,8 +306,8 @@ with the time left; screens hide it `durationSec` after receipt; "Take it down" 
 0..14400, else dropped); `noticeShowing(notice, now)` uses `min(durationSec * 1000,
 NOTICE_MAX_AGE_MS)` from the receive stamp; `0` clears (`clearNotice`). Contract vectors:
 `printer/contract-vectors.json` `events.notice.optionalFields: ["durationSec"]` + one valid
-vector with it + one dirty (`durationSec: -5` dropped), then copy byte-identical to
-`lobby/src/lib/__fixtures__/contract-vectors.json`.
+vector with it + one dirty (`durationSec: -5` dropped) (the lobby reads that file in
+place since 2026-10-16; it was then copied to a lobby mirror).
 
 Change log (routes.md 10.5): every write path logs who (device name), when, which keys,
 before/after; Undo on Tonight's Recent changes and Account's Change log calls `POST
@@ -358,8 +358,7 @@ files via `bump-version.cjs` (9.3.0), and the two root generator lines
 ### Track C: lobby settings UI (+ the screen side of `notice.durationSec`)
 
 Owns: `lobby/src/**` (not `worker/`), `lobby/e2e/**`, `CLAUDE.md`, `ROADMAP.md`
-"Settings page" status lines, `printer/contract-vectors.json` (the `notice` entry only) and
-`lobby/src/lib/__fixtures__/contract-vectors.json`.
+"Settings page" status lines, `printer/contract-vectors.json` (the `notice` entry only).
 
 - `lib/settingsSections.js`, `components/SettingsPanel.jsx`, new
   `components/settings/sections/{TonightSection,ShowSection,LookSection,PrintingSection,AccountSection}.jsx`

@@ -1,5 +1,5 @@
 {
-  "note": "Cross-implementation interop fixture for the sealed-envelope transport. CANONICAL COPY lives in the printer repo; the display repo carries a byte-identical mirror. Both repos assert they can open every envelope here, which is what stops the Node seal and the WebCrypto open from drifting. The testKey below is deliberately public and protects nothing — never use it on a real install.",
+  "note": "Cross-implementation interop fixture for the sealed-envelope transport. ONE copy, in printer/; the lobby's tests read it in place. Both apps assert they can open every envelope here, which is what stops the Node seal and the WebCrypto open from drifting. The testKey below is deliberately public and protects nothing — never use it on a real install.",
   "envelopeVersion": 1,
   "encryptedEvents": [
     "checkin",

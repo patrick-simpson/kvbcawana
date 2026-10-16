@@ -10,11 +10,9 @@ absorbed the retired KVBC-Awana-Countdown app) — subscribing with the
 public key only.
 
 The machine-readable version of this contract is
-[`contract-vectors.json`](./contract-vectors.json) — **this repo holds the
-canonical copy**, mirrored byte-identical into the consumer repo at
-`src/lib/__fixtures__/contract-vectors.json`. Each repo's tests validate
-against its own copy, and the consumer repo's CI byte-compares its mirror
-against this repo's canonical file, so any drift breaks a build somewhere.
+[`contract-vectors.json`](./contract-vectors.json): **the one copy**. The
+lobby's tests read this file in place (its mirror went 2026-10-16), so both
+apps validate against the same bytes.
 
 ## The privacy rule
 
@@ -202,9 +200,8 @@ exact key sets, correct types, PII structurally impossible, plus the
 
 1. Update `contract-vectors.json` **here first** (canonical copy).
 2. Update the builders + `test-contracts.cjs`, keep them green.
-3. Mirror the vectors file byte-identical into `lobby/` (was Awana-Check-in-Display; `scripts/check-mirrors.mjs` fails until you do)
-   (`src/lib/__fixtures__/contract-vectors.json`) and update its
-   sanitizers/tests in the same change.
+3. Update the lobby's sanitizers/tests in the same change (they read this
+   file in place).
 4. New fields must be optional for consumers for at least one release cycle so
    deploy order never matters.
 
@@ -226,8 +223,8 @@ This is a **transport** layer, strictly outside the contract above:
   authenticated, not trusted.
 - The framing (envelope version, AAD construction, padding sizes, ciphertext
   layout) and a cross-implementation interop fixture live in
-  **`envelope-vectors.json`**, mirrored byte-identically into the display repo
-  exactly like this file. Both repos assert they can open every envelope in it,
+  **`envelope-vectors.json`**, one copy read in place by the lobby
+  exactly like this file. Both apps assert they can open every envelope in it,
   which is what stops the Node seal and the WebCrypto open from drifting.
 - **Changing the framing is a bigger deal than adding a field.** There is no
   partial failure: either the two sides agree or no child's name renders

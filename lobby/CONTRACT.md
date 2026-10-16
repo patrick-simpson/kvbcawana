@@ -2,10 +2,10 @@
 
 **The canonical copy of this contract lives in the printer repo:**
 [`printer/CONTRACT.md`](../printer/CONTRACT.md) (was Print-TwoTimTwo-Labels),
-alongside the machine-readable `contract-vectors.json`, which is mirrored
-byte-identical here as `src/lib/__fixtures__/contract-vectors.json`.
-If you change anything, update the canonical copy first, then the mirrors
-and every repo's contract tests in the same change.
+alongside the machine-readable `contract-vectors.json` (`printer/contract-vectors.json`,
+the one copy: the lobby's tests read it in place).
+If you change anything, update the canonical copy first, then every app's
+contract tests in the same change.
 
 ## Transport
 

@@ -45,6 +45,8 @@ jobs:
   #           whose lint moved into its own job below), plus
   #           journey/public/src/schedule.js, journey/public/src/sync.js and
   #           journey/src/schedule/19-picker-final-step.js (the phone remote's picker choices)
+  #           printer/contract-vectors.json and printer/envelope-vectors.json
+  #           (the lobby's tests read the one copy in place),
   #           site/checkin/ and printer/print-server/public/phone.html
   #           (e2e/checkin.spec.js serves the one check-in page, built from the
   #           phone page by site/checkin/checkin-page.mjs, from a stub origin)
@@ -119,7 +121,8 @@ jobs:
               if [[ "$f" != */* && "$f" == *.md ]]; then continue; fi
               case "$f" in
                 journey/public/src/schedule.js|journey/public/src/sync.js|journey/src/schedule/19-picker-final-step.js) lobby=true ;;  # screenSpecs.test.js reads both, embed.test.js sync.js, shared/journeyRemote.test.js the picker's choices
-                site/checkin/*|printer/print-server/public/phone.html|printer/print-server/sync-protocol.js) lobby=true ;;  # e2e/checkin.spec.js serves the check-in page (site/checkin/checkin-page.mjs builds it from phone.html)
+                site/checkin/*|printer/print-server/public/phone.html|printer/print-server/sync-protocol.js) lobby=true ;;
+                printer/contract-vectors.json|printer/envelope-vectors.json) lobby=true ;;  # the lobby's sanitizer and envelope tests read the one copy in place  # e2e/checkin.spec.js serves the check-in page (site/checkin/checkin-page.mjs builds it from phone.html)
                 lobby/worker/*|printer/*|journey/*|site/*|.github/workflows/*) ;;
                 *) lobby=true ;;
               esac

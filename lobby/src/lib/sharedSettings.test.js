@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import vectors from './__fixtures__/contract-vectors.json';
+import vectors from '../../../printer/contract-vectors.json';
 import { RETIRED_SHARED, SHARED_KEYS, SHARED_SPEC, isSharedKey, pickShared, sanitizeSettingsPayload, sanitizeSharedValues } from './sharedSettings.js';
 import defaults from '../config.js';
 

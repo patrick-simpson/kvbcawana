@@ -20,8 +20,8 @@ event is dispatched. The typedefs in that file *are* the display's entire data
 surface.
 
 Payload shapes are pinned by
-[`src/lib/__fixtures__/contract-vectors.json`](src/lib/__fixtures__/contract-vectors.json)
-— a byte-identical mirror of the canonical copy in the printer repo — and
+[`printer/contract-vectors.json`](../printer/contract-vectors.json)
+(the one copy; the lobby's tests read it in place) and
 enforced by `src/lib/eventSanitizers.test.js`. See [CONTRACT.md](CONTRACT.md).
 
 Two supporting rules:

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { dispatchEvent, simulateEvent, SIMULATABLE_EVENTS } from './useSocket.js';
-import vectors from '../lib/__fixtures__/contract-vectors.json';
+import vectors from '../../../printer/contract-vectors.json';
 
 // The point of these tests is a single claim: a SIMULATED event is filtered by
 // exactly the same allowlist sanitizer as a real one.
