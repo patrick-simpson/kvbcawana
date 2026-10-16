@@ -37,8 +37,8 @@ test('the film the home page plays is committed, small enough for one request, a
   for (const file of ['reel.mp4', 'poster.jpg']) {
     assert.ok(existsSync(path.join(ROOT, 'printer/public/reel', file)), `printer/public/reel/${file} is committed`);
   }
-  // The owner's limit (2026-10-12): one 540p film of about 1.5 MB.
-  assert.ok(statSync(path.join(ROOT, 'printer/public/reel/reel.mp4')).size <= 1.6 * 1000 * 1000);
+  // The owner's choice (2026-10-16): one 720p film of about 5.5 MB.
+  assert.ok(statSync(path.join(ROOT, 'printer/public/reel/reel.mp4')).size <= 6.2 * 1000 * 1000);
   // Its Function is the large-file proxy, like Journey's.
   const fn = readFileSync(path.join(SITE, 'functions/reel/[[path]].js'), 'utf8');
   assert.match(fn, /proxyLarge\(context\.request, LARGE_FILES, fetch\)\) \|\| context\.next\(\)/);

@@ -4,7 +4,7 @@ import { Doodle, LOGO, Shape } from './Kit';
 
 /*
  * The demo reel at the top of the home page. The film is ONE small file,
- * /reel/reel.mp4 (960x540, about 1.5 MB), with /reel/poster.jpg as the poster: printer/public/reel/,
+ * /reel/reel.mp4 (1280x720, about 5.5 MB; the finale of the home page since 2026-10-16), with /reel/poster.jpg as the poster: printer/public/reel/,
  * which the site build streams like Journey's big files (site/build.mjs).
  *
  * - It starts by itself, muted and inline, with a Tap for sound button and a

@@ -4,7 +4,7 @@
 //   1. the site, if site/dist is not built yet (--site rebuilds it anyway)
 //   2. the labels      (labels.cjs: the print server's own renderer)
 //   3. the footage     (record.mjs: the real screens, frame by frame)
-//   4. the film        (render.mjs: film/ at 1920x1080, 60 fps)
+//   4. the film        (render.mjs: film/ at 1920x1080, 30 fps)
 //   5. the edit        (edit.mjs: soundtrack, encodes, poster)
 //
 // Writes printer/public/reel/{reel.mp4, poster.jpg}.
@@ -38,7 +38,8 @@ step('film');
 if (draft) {
   await render({ fps: 30, scale: 2 / 3, out: path.join(HERE, '.work', 'draft-film.mp4') });
 } else {
-  await render({ fps: 60, scale: 1 });
+  // The site plays 30 fps (edit.mjs), so the film is drawn at 30.
+  await render({ fps: 30, scale: 1 });
 }
 step('edit');
 edit({ draft });

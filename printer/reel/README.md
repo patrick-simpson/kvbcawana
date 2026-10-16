@@ -1,7 +1,8 @@
 # The reel
 
-The overview film at the top of awana.kvbchurch.org: a 78-second product film
-of the family's screens on a club night, cut to its soundtrack's beat. Every
+The film at the end of awana.kvbchurch.org (the home page's finale): a
+90-second montage of the family's screens on a club night, cut to its
+soundtrack's beat. Every
 frame is rebuilt from the sources in this folder:
 
 ```
@@ -11,7 +12,7 @@ npm run reel          # in printer/: labels, footage, film, edit (about 20 minut
 It needs the built site (`SITE_ORIGIN=https://awana.kvbchurch.org node site/build.mjs`
 at the repo root; `npm run reel` builds it when `site/dist` is missing),
 Chromium (`PLAYWRIGHT_CHROMIUM`, else `/opt/pw-browsers/chromium`) and ffmpeg.
-It writes `printer/public/reel/reel.mp4` (one 960x540 file, about 1.5 MB) and `poster.jpg`,
+It writes `printer/public/reel/reel.mp4` (one 1280x720 file, about 5.5 MB) and `poster.jpg`,
 which the page plays; everything in between goes to `reel/.work/` (ignored).
 
 ## How it is made
@@ -45,18 +46,18 @@ never a real child's.
 
 ## The music
 
-"Incredible You" by **Soft and Furious**, released under **CC0 1.0**
-(Creative Commons Zero, public domain dedication).
+"Happy Dance" by **MercyMe**, chosen by the owner (2026-10-16), who supplied
+the file and accepted that it is a copyrighted song on a public page. The
+end card credits it.
 
-- Source: https://commons.wikimedia.org/wiki/File:Soft_and_Furious_-_03_-_Incredible_You.ogg
-- File: https://upload.wikimedia.org/wikipedia/commons/8/87/Soft_and_Furious_-_03_-_Incredible_You.ogg
-- License: https://creativecommons.org/publicdomain/zero/1.0/
-- Kept here as `music/soft-and-furious-incredible-you.ogg` (sha256
-  `ffc0d13137c9a4cdf5a5a6ceb453a6aaf9d9b44df6e92482d79685fcc3ae019b`), so the
-  reel rebuilds without the network.
+The audio file is **not in the repo** (the repo is public; publishing the
+song is not ours to do). Put it at `reel/music/happy-dance.mp3` (git-ignored)
+or name it in `REEL_MUSIC`; `edit.mjs` stops with a plain message without it.
 
-Measured off the file: 120.25 BPM (beat 0.498947 s, first downbeat 0.2812 s),
-F major. The film's timeline (`film.js`, `BEAT`) is on that grid: the music
-starts at bar 2, the picture's title lands on the lift at bar 8, the
-projector's 6:00 on the melody at bar 24, and the payoff on the final phrase
-(bar 72 to the track's own ending, spliced in at a phrase boundary).
+Measured off the file: exactly 125 BPM (beat 0.480 s, first beat 0.044 s;
+the grid holds to 4 ms over the whole song). The film's timeline (`film.js`,
+`BEAT`) is on that grid: the film starts on song beat 4 (the band's first
+downbeat), the first chorus lands at film beat 92 (0:44), the cut jumps at
+film beat 156 (the end of the first chorus) to song beat 368 (the second half
+of the final chorus), and the end card's logo lands on the song's last hit,
+film beat 180 (1:26).

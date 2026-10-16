@@ -18,3 +18,8 @@ journey/public/current-lesson-video.mp4
 
 # Helper agents' temporary working copies
 .claude/worktrees/
+
+# The film's soundtrack ("Happy Dance", MercyMe) is not ours to publish: never committed
+printer/reel/music/*.mp3
+printer/reel/music/*.m4a
+printer/reel/music/*.wav

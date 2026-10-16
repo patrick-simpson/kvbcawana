@@ -1,15 +1,21 @@
 #!/usr/bin/env node
 // The edit: cuts the soundtrack to the film and encodes what the site plays.
 //
-// The music is "Incredible You" by Soft and Furious (CC0; reel/README.md),
-// 120.25 BPM. The film runs on its beat from bar 2 (MUSIC.start): bars 2-31,
-// then a splice into the final phrase, bar 72 to the track's own ending, so
-// every picture cut in film.js lands on the music's grid. A 20 ms crossfade
-// at the splice, a short fade in, and a 2.4 s fade out at the end.
+// The music is "Happy Dance" by MercyMe (owner, 2026-10-16; reel/README.md),
+// exactly 125 BPM (beat 0.480 s, first beat 0.044 s, steady to 4 ms). It is
+// NOT in the repo (the repo is public; the song is not ours to publish): put
+// the file at reel/music/happy-dance.mp3 (git-ignored) or name it in
+// REEL_MUSIC. The film runs on its beat from song beat 4 (the first downbeat
+// with the band): beats 4-159 (the intro, the verse, the first chorus), then a
+// splice into the second half of the final chorus, beat 368 to the song's own
+// last hit (beat 392) and its ring, so every picture cut in film.js lands on
+// the music's grid. A 20 ms crossfade at the splice, a short fade in, and a
+// 1.8 s fade out at the end.
 //
-// Writes printer/public/reel/reel.mp4 (ONE file: H.264 High, 960x540, 30 fps,
-// AAC mono 64 kbps, about 1.5 MB) and poster.jpg (a still of the closing
-// title, 1280x720), from reel/.work/film.mp4 (render.mjs).
+// Writes printer/public/reel/reel.mp4 (ONE file: H.264 High, 1280x720, 30 fps,
+// AAC stereo 96 kbps, about 5.5 MB; owner 2026-10-16 "not compress it quite as
+// heavily") and poster.jpg (the end card, 1280x720), from reel/.work/film.mp4
+// (render.mjs).
 //
 //   node reel/edit.mjs            all of it
 //   node reel/edit.mjs --draft    a quick 720p cut into reel/.work/draft.mp4
@@ -21,16 +27,16 @@ import { fileURLToPath } from 'node:url';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const WORK = path.join(HERE, '.work');
 const OUT = path.join(HERE, '..', 'public', 'reel');
-const TRACK = path.join(HERE, 'music', 'soft-and-furious-incredible-you.ogg');
+const TRACK = process.env.REEL_MUSIC || path.join(HERE, 'music', 'happy-dance.mp3');
 
-// The track's beat grid, measured off the file (reel/README.md): beat 0.498947 s.
+// The track's beat grid, measured off the file (reel/README.md): beat 0.480 s.
 export const MUSIC = {
-  beat: 0.498947,
-  bar: (n) => 0.2812 + n * 4 * 0.498947,
+  beat: 0.48,
+  at: (n) => 0.044 + n * 0.48,
 };
-const A_START = MUSIC.bar(2);   // 4.2728 s
-const A_END = MUSIC.bar(32);    // 64.1463 s
-const B_START = MUSIC.bar(72);  // 143.9778 s
+const A_START = MUSIC.at(4);    // 1.964 s
+const A_END = MUSIC.at(160);    // 76.844 s: the first chorus ends (156 film beats)
+const B_START = MUSIC.at(368);  // 176.684 s: the final chorus's second half
 const XF = 0.02;
 
 const ff = (args) => execFileSync('ffmpeg', ['-v', 'error', '-y', ...args], { stdio: 'inherit' });
@@ -39,7 +45,8 @@ const probe = (file) => Number(execFileSync('ffprobe', ['-v', 'error', '-show_en
 /** The soundtrack, cut to `duration` seconds, as 48 kHz stereo WAV. */
 export function soundtrack(duration, out = path.join(WORK, 'soundtrack.wav')) {
   mkdirSync(WORK, { recursive: true });
-  const fadeOut = 2.4;
+  if (!existsSync(TRACK)) throw new Error(`the soundtrack ${TRACK} is missing: put "Happy Dance" there or name it in REEL_MUSIC (it is not in the repo)`);
+  const fadeOut = 1.8;
   const graph = [
     `[0:a]atrim=start=${A_START.toFixed(4)}:end=${A_END.toFixed(4)},asetpts=PTS-STARTPTS[a]`,
     `[0:a]atrim=start=${(B_START - XF).toFixed(4)},asetpts=PTS-STARTPTS[b]`,
@@ -51,14 +58,14 @@ export function soundtrack(duration, out = path.join(WORK, 'soundtrack.wav')) {
   return out;
 }
 
-function twoPass(input, audio, out, { width, height, fps, kbps, audioKbps = 128 }) {
+function twoPass(input, audio, out, { width, height, fps, kbps, audioKbps = 128, channels = 1 }) {
   const log = path.join(WORK, `x264-${width}`);
   const vf = `scale=${width}:${height}:flags=lanczos,fps=${fps},format=yuv420p`;
   const common = ['-c:v', 'libx264', '-preset', 'veryslow', '-tune', 'animation', '-profile:v', 'high', '-level', '3.1',
     '-b:v', `${kbps}k`, '-maxrate', `${kbps * 2}k`, '-bufsize', `${kbps * 4}k`, '-g', String(fps * 2), '-passlogfile', log];
   ff(['-i', input, '-vf', vf, ...common, '-pass', '1', '-an', '-f', 'mp4', '/dev/null']);
   ff(['-i', input, '-i', audio, '-map', '0:v', '-map', '1:a', '-vf', vf, ...common, '-pass', '2',
-    '-c:a', 'aac', '-b:a', `${audioKbps}k`, '-ac', '1', '-shortest', '-movflags', '+faststart', out]);
+    '-c:a', 'aac', '-b:a', `${audioKbps}k`, '-ac', String(channels), '-shortest', '-movflags', '+faststart', out]);
 }
 
 export function edit({ draft = false } = {}) {
@@ -74,12 +81,12 @@ export function edit({ draft = false } = {}) {
     return;
   }
   mkdirSync(OUT, { recursive: true });
-  // The owner's limit (2026-10-12): about 1.5 MB (decimal) in all, audio
-  // included: 540p at 30 fps, video near 86 kbit/s, music at 64 kbit/s mono.
+  // The owner's choice (2026-10-16): 720p, about 5.5 MB (decimal) in all, audio
+  // included: 30 fps, video near 390 kbit/s, music at 96 kbit/s stereo.
   const budget = (mb, audioKbps) => Math.floor((mb * 8000) / duration - audioKbps);
-  twoPass(film, audio, path.join(OUT, 'reel.mp4'), { width: 960, height: 540, fps: 30, kbps: budget(1.5, 64) - 3, audioKbps: 64 });
-  // The poster: the closing title, settled (film.js POSTER_AT).
-  const posterAt = Number(process.env.REEL_POSTER_AT || 73.2);
+  twoPass(film, audio, path.join(OUT, 'reel.mp4'), { width: 1280, height: 720, fps: 30, kbps: budget(5.5, 96) - 8, audioKbps: 96, channels: 2 });
+  // The poster: the end card, settled (film.js POSTER_AT = beat 182.5).
+  const posterAt = Number(process.env.REEL_POSTER_AT || 87.6);
   ff(['-ss', String(posterAt), '-i', film, '-frames:v', '1', '-vf', 'scale=1280:720:flags=lanczos', '-q:v', '4', path.join(OUT, 'poster.jpg')]);
   for (const f of ['reel.mp4', 'poster.jpg']) {
     console.log(`  ${f}: ${(statSync(path.join(OUT, f)).size / 1048576).toFixed(2)} MB`);

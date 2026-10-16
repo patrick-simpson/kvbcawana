@@ -111,7 +111,7 @@ export const SHOTS = {
     warmup: async (shot) => { await shot.run(1.5); },
   },
   // Journey at 6:30: the kiosk turns from the lobby feed to the lesson's start
-  // screen and waits for a leader. The lesson title is a placeholder.
+  // screen and waits for a leader: this week's real lesson (owner, 2026-10-16).
   'journey': {
     url: '/journey/', time: at('18:29:58'), seconds: 6,
     setup: async (page) => {
@@ -125,17 +125,13 @@ export const SHOTS = {
           localStorage.setItem('awanaConfig.v1', JSON.stringify({ calendarEnabled: false, seasonPromos: false }));
         } catch { /* */ }
       });
-      await page.route(/current-lesson\.json/, (r) => r.fulfill({
-        contentType: 'application/json',
-        body: JSON.stringify({ version: 2, week: 7, title: 'Lesson', downloadUrl: 'current-lesson-video.mp4', transcodedAt: '2026-10-13T15:44:31.611Z', resolvedAt: '2026-10-13T15:43:56.061Z' }),
-      }));
     },
     ready: '#journey-splash',
     // The kiosk looks at the clock every 15 s: run up to just before it turns.
     warmup: async (shot) => { await shot.run(13.4, 100); },
   },
-  // The phone page, awana.kvbchurch.org/checkin, on a phone: tap a child, keep
-  // Bible ticked, check in. The check-in service behind it is a stand-in (lib/phone.mjs).
+  // The phone page, awana.kvbchurch.org/checkin, on a phone: one tap checks a
+  // child in (simple check-in, on by default since 2026-10-15), then another. The check-in service behind it is a stand-in (lib/phone.mjs).
   'phone': {
     url: '/checkin/', time: at('18:02:00'), seconds: 7,
     viewport: { width: 390, height: 844 }, dpr: 2, mobile: true,
@@ -143,7 +139,7 @@ export const SHOTS = {
     ready: '.fam',
     cues: (ctx) => ({
       1.4: (page) => ctx.tap(page, '.fam[aria-label="Owen Pemberly"]'),
-      3.3: (page) => ctx.tap(page, '#kid-sheet .btn.go'),
+      3.6: (page) => ctx.tap(page, '.fam[aria-label="Ivy Calloway"]'),
     }),
   },
   // One settings page for every screen (awana.kvbchurch.org/settings): the

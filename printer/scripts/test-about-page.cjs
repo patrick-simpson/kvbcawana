@@ -164,7 +164,7 @@ test('the reel plays /reel/ muted and inline, ends on its poster, waits under re
   assert.doesNotMatch(reel, /reel-1080|reel-720/, 'one film, no size choice');
   assert.match(reel, /POSTER = '\/reel\/poster\.jpg'/);
   for (const f of ['reel.mp4', 'poster.jpg']) assert.ok(require('fs').existsSync(require('path').join(__dirname, '..', 'public', 'reel', f)), `public/reel/${f} is committed, so the page never shows Coming soon`);
-  assert.ok(require('fs').statSync(require('path').join(__dirname, '..', 'public', 'reel', 'reel.mp4')).size <= 1.6 * 1000 * 1000, 'the film stays about 1.5 MB');
+  assert.ok(require('fs').statSync(require('path').join(__dirname, '..', 'public', 'reel', 'reel.mp4')).size <= 6.2 * 1000 * 1000, 'the film stays about 5.5 MB (720p, owner 2026-10-16)');
   assert.match(reel, /<video[\s\S]*playsInline[\s\S]*muted[\s\S]*\/>/);
   assert.match(reel, /prefers-reduced-motion: reduce/);
   assert.match(reel, /onEnded=\{\(e\) => \{ setMode\('ended'\); e\.currentTarget\.load\(\);/);
