@@ -48,11 +48,10 @@
 // check-out and the adopter's backlog), for the night only. A partial or failed read
 // keeps the last good copy.
 
-import { churchNight, newRowId, sealForStations } from '../../shared/cloud-crypto.js';
+import { newRowId, sealForStations } from '../../shared/cloud-crypto.js';
 import { PRINT_JOB_KIND } from './adopt.js';
 import { Doc } from './doc.js';
 import { fail, json } from './http.js';
-import { INTERACTIVE_WAIT_MS } from './readbudget.js';
 import { trimRosterCsv } from './twotimtwo.js';
 import { CLUB_NIGHTS, localTime, openState, sealState, watchWindow } from './watcher.js';
 
@@ -60,8 +59,6 @@ import { CLUB_NIGHTS, localTime, openState, sealState, watchWindow } from './wat
 export const ROSTER_FRESH_MS = 60 * 60 * 1000;
 /** After a failed roster read, the next try waits this long. */
 export const ROSTER_RETRY_MS = 10 * 60 * 1000;
-/** GET /v1/station/roster-source: at most one TwoTimTwo read this often. */
-export const ROSTER_SOURCE_GAP_MS = 5 * 60 * 1000;
 /** Completed books: a pass (one read per club) this often in the club window (the extension's 10 min). */
 export const BOOKS_MS = 10 * 60 * 1000;
 /** The meeting report this often in the club window. */
@@ -123,7 +120,6 @@ const freshStatus = () => ({
   roster: { readAt: 0, tries: 0, reads: 0, rows: 0, columns: 0, error: /** @type {string|null} */ (null), errorAt: 0, shrunkTo: 0, sealedAt: 0 },
   books: { at: 0, readAt: 0, passes: 0, entries: 0, clubsRead: 0, error: /** @type {string|null} */ (null), sealedAt: 0 },
   meeting: { at: 0, readAt: 0, night: /** @type {string|null} */ (null), booksCompleted: 0, awardsEarned: 0, slipsQueued: 0, slipsHeld: 0, error: /** @type {string|null} */ (null) },
-  sourceAt: 0,
 });
 
 export class StationFeeds {
@@ -591,44 +587,6 @@ export class StationFeeds {
     return json({ bundle: doc.bundle, night: doc.night, readAt: new Date(doc.readAt).toISOString(), rows: doc.rows });
   }
 
-  /**
-   * PUT /v1/station/roster | books (routes.md 4): a station that read and sealed
-   * the record itself; the latest wins. Sealed to every registered station or refused.
-   * @param {'roster'|'books'} kind @param {any} b
-   */
-  async put(kind, b) {
-    await this.load();
-    const night = typeof b?.night === 'string' ? b.night : '';
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(night) || night !== churchNight(this.now())) return fail('That is not tonight.', 400, { reason: 'night' });
-    const ok = this.stations.checkBundle(b.bundle, { night, kind });
-    if (!ok.ok) return json({ ok: false, reason: ok.reason, ...(ok.reason === 'stations-changed' ? { stations: await this.stations.list() } : {}) }, ok.status);
-    const doc = kind === 'roster' ? this.rosterDoc : this.booksDoc;
-    doc.data = { bundle: b.bundle, night, readAt: this.now(), rows: 0, digest: null };
-    await doc.save();
-    if (this.pending && this.pending.kind === kind) this.pending = null;
-    return json({ ok: true });
-  }
-
-  /**
-   * GET /v1/station/roster-source (routes.md 4): TwoTimTwo's roster export as it
-   * came, for a station that seals it itself. Passed through in memory, never
-   * stored; one read every ROSTER_SOURCE_GAP_MS at most, on the one read clock.
-   */
-  async source() {
-    await this.load();
-    if (!this.on) return fail('The service does not read TwoTimTwo.', 409, { reason: 'off' });
-    const client = this.watcher.clientFor();
-    if (!client) return fail('No TwoTimTwo user is set up.', 409, { reason: 'not-configured' });
-    const since = this.now() - this.st.sourceAt;
-    if (this.st.sourceAt && since < ROSTER_SOURCE_GAP_MS) return fail('Asked too soon.', 429, { retryAfterMs: ROSTER_SOURCE_GAP_MS - since });
-    await this.watcher.budget.load();
-    const res = await client.rosterCsv({ waitMs: INTERACTIVE_WAIT_MS, kind: 'roster-source' });
-    if (!res.ok) return fail('The roster could not be read.', res.error === 'read-busy' ? 429 : 502, { reason: res.error, ...('retryAfterMs' in res ? { retryAfterMs: res.retryAfterMs } : {}) });
-    this.st.sourceAt = this.now();
-    await this.statusDoc.save();
-    return json({ csv: res.text, rows: res.roster.rows.length, readAt: new Date(this.now()).toISOString() });
-  }
-
   /** For GET /v1/cloud/status: counts and times only, never a name. */
   async statusView() {
     await this.load().catch(() => {});
@@ -645,11 +603,13 @@ export class StationFeeds {
   }
 }
 
-/** The routes this module owns (routes.md section 4). @param {import('./registry.js').Registry} registry @param {any} core the SyncCore */
+/**
+ * The routes this module owns (routes.md section 4): GET only. There is no way to
+ * hand the Worker a roster or to take TwoTimTwo's raw export out of it (owner
+ * review 2026-10-16: the raw export holds addresses, phones and medical notes, and a
+ * PUT could replace the roster with one whose Notes are blank); the Worker reads,
+ * trims and seals the roster itself. @param {import('./registry.js').Registry} registry @param {any} core the SyncCore */
 export function mountStationFeeds(registry, core) {
-  registry.add('GET', '/v1/station/roster-source', 'station', () => core.feeds.source());
   registry.add('GET', '/v1/station/roster', 'station', ({ stationId }) => core.feeds.serve('roster', /** @type {string} */ (stationId)));
-  registry.add('PUT', '/v1/station/roster', 'station', async ({ body }) => core.feeds.put('roster', await body()));
   registry.add('GET', '/v1/station/books', 'station', ({ stationId }) => core.feeds.serve('books', /** @type {string} */ (stationId)));
-  registry.add('PUT', '/v1/station/books', 'station', async ({ body }) => core.feeds.put('books', await body()));
 }

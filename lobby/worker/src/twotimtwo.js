@@ -1095,8 +1095,9 @@ export class TwoTimTwoClient {
   }
 
   /**
-   * The roster export, /clubber/csv (parseRosterCsv). `text` is TwoTimTwo's own
-   * answer, for GET /v1/station/roster-source: in memory only.
+   * The roster export, /clubber/csv (parseRosterCsv). TwoTimTwo's own text never
+   * leaves this function: callers get the parsed rows, which stationfeeds.js trims
+   * (trimRosterCsv) before anything is sealed.
    * @param {{ waitMs?: number, kind?: string }} [opts]
    */
   async rosterCsv(opts = {}) {
@@ -1105,7 +1106,7 @@ export class TwoTimTwoClient {
     const roster = parseRosterCsv(page.html);
     if (!roster) return { ok: /** @type {const} */ (false), error: 'roster-unreadable' };
     if (roster.partial) return { ok: /** @type {const} */ (false), error: 'roster-partial' };
-    return { ok: /** @type {const} */ (true), roster, text: page.html };
+    return { ok: /** @type {const} */ (true), roster };
   }
 
   /**

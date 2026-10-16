@@ -225,7 +225,7 @@ export class SyncCore {
     // counts and award slips. From the watcher's alarm, on the one read clock.
     this.feeds = new StationFeeds({ storage: this.storage, watcher: this.watcher, stations: this.stations, printq: this.printq, tags: this.tags, publisher: this.publisher, now: this.now });
     this.watcher.feeds = this.feeds;
-    mountStationFeeds(this.registry, this);   // /v1/station/roster-source, roster, books (routes.md 4)
+    mountStationFeeds(this.registry, this);   // GET /v1/station/roster, books (routes.md 4)
     mountPublisher(this.registry, this);   // /v1/desk/tonight, /v1/station/extras, /v1/publisher/status (routes.md 8)
     // The screen registry (ROADMAP.md#settings-page, phase 2): its doorbells ride the live
     // channel only, for the one screen they name.

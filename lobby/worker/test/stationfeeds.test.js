@@ -261,24 +261,26 @@ describe('the roster, read by the Worker and sealed to the stations', () => {
     expect((await old.call('GET', '/v1/station/roster')).status).toBe(200);
   });
 
-  it('routes.md 4: PUT takes a bundle sealed to every station, roster-source passes the export through, never twice in 5 minutes', async () => {
+  it('routes.md 4: GET only. roster-source and both PUTs are not served (the raw export never leaves the Worker)', async () => {
     const t = await make();
     const st = await modern(t);
-    expect(t.core.registry.list()).toEqual(expect.arrayContaining([
-      'GET /v1/station/roster-source station', 'GET /v1/station/roster station', 'PUT /v1/station/roster station',
-      'GET /v1/station/books station', 'PUT /v1/station/books station',
-    ]));
-    const src = await st.call('GET', '/v1/station/roster-source?night=2026-10-14');
-    expect(src.status).toBe(200);
-    expect(src.body.csv).toBe(t.src.csv.replace(/^\uFEFF/, ''));
-    expect(src.body.rows).toBe(3);
-    expect((await st.call('GET', '/v1/station/roster-source')).status).toBe(429);
-    expect(everything(t.storage)).not.toContain('Zyxelquill');
+    const routes = t.core.registry.list();
+    expect(routes).toEqual(expect.arrayContaining(['GET /v1/station/roster station', 'GET /v1/station/books station']));
+    expect(routes.filter((r) => /roster-source|^PUT \/v1\/station\//.test(r))).toEqual([]);
+    expect((await st.call('GET', '/v1/station/roster-source?night=2026-10-14')).status).toBe(404);
+    expect((await st.call('GET', '/v1/station/roster-source')).status).toBe(404);
     const bundle = await sealForStations([{ publicKey: st.pub }], { id: 'putAAAAAAAAAAAAAAAAAAA', night: '2026-10-14', kind: 'roster', record: { csv: 'x' } });
-    expect((await st.call('PUT', '/v1/station/roster', { night: '2026-10-14', bundle })).body).toEqual({ ok: true });
-    expect((await st.call('GET', '/v1/station/roster')).body.bundle.id).toBe('putAAAAAAAAAAAAAAAAAAA');
-    expect((await st.call('PUT', '/v1/station/roster', { night: '2026-10-13', bundle })).status).toBe(400);
-    expect((await st.call('PUT', '/v1/station/books', { night: '2026-10-14', bundle })).body.reason).toBe('unsealed');   // its kind is roster
+    expect((await st.call('PUT', '/v1/station/roster', { night: '2026-10-14', bundle })).status).toBe(404);
+    expect((await st.call('PUT', '/v1/station/books', { night: '2026-10-14', bundle })).status).toBe(404);
+    // the Worker's own read still serves, and TwoTimTwo's raw text is not in what rosterCsv answers
+    await drive(t, 3 * 60 * 1000);
+    const got = await st.call('GET', '/v1/station/roster');
+    expect(got.status).toBe(200);
+    expect(got.body.bundle.id).not.toBe('putAAAAAAAAAAAAAAAAAAA');
+    const res = await t.core.watcher.clientFor().rosterCsv({ waitMs: 60 * 1000 });
+    expect(res.ok).toBe(true);
+    expect('text' in res).toBe(false);
+    expect(everything(t.storage)).not.toContain('Zyxelquill');
     expect((await t.call('GET', '/v1/station/roster')).status).toBe(403);
   });
 });
