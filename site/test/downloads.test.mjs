@@ -31,12 +31,12 @@ test('the installer is the feed\'s first absolute .exe url', () => {
   assert.equal(installerFromFeed(null), null);
 });
 
-test('KVBC Awana at /download/kvbc-awana and at the printer\'s old name; the sound room keeps its own', () => {
+test('KVBC Awana at /download/kvbc-awana and at the printer\'s old name and the retired sound room app\'s', () => {
   const lines = downloadRedirects((f) => ({ 'printer/latest.yml': PRINTER_9, 'lobby/lobby.yml': LOBBY_2_1 })[f] ?? null, RELEASES);
   assert.deepEqual(lines, [
     `/download/kvbc-awana ${BASE}/printer-v9.0.0/KVBC-Awana-Setup.exe 302`,
     `/download/club-label-printer ${BASE}/printer-v9.0.0/KVBC-Awana-Setup.exe 302`,
-    `/download/lobby-display ${BASE}/desktop-v2.1.0/Awana-Lobby-Display-Setup.exe 302`,
+    `/download/lobby-display ${BASE}/printer-v9.0.0/KVBC-Awana-Setup.exe 302`,
   ]);
 });
 

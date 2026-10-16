@@ -17,8 +17,10 @@ KVBC Awana installer, which would install it without the hand-off.
 **Both are empty until the first release cut from this repo.** An installed
 app that finds no feed simply sees "no update".
 
-Do not edit them by hand. `.github/workflows/printer-release.yml` and
-`desktop-release.yml` write them after publishing a GitHub Release: they take
+Do not edit them by hand. `.github/workflows/printer-release.yml`
+writes them after publishing a GitHub Release (the lobby feed was written by
+the retired `desktop-release.yml` and stays at its last version, 2.1.1, for any
+sound room PC still on the old app): it takes
 electron-builder's generated yml, rewrite every `url` and `path` to the
 absolute release asset URL
 (`https://github.com/patrick-simpson/kvbcawana/releases/download/<tag>/<asset>`),

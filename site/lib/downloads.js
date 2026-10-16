@@ -6,8 +6,10 @@
 // since 9.0.0 (ROADMAP.md#kvbc-awana-one-app: the printer became KVBC Awana and keeps its
 // feed), so both follow printer/latest.yml; the old name stays for every link
 // already printed or bookmarked (the Install Guide, the extension popup, the
-// app's own repair). /download/lobby-display stays the sound room app's last
-// release (the 2.1.0 bridge), never a KVBC Awana installer.
+// app's own repair). /download/lobby-display was the old sound room app's; that
+// app was retired on 2026-10-16 (every sound room PC runs KVBC Awana), so the
+// old link now gives KVBC Awana too. The lobby feed itself (site/updates/lobby/)
+// is left alone: a straggler on the old app still gets the hand-off from it.
 
 /** The installer's absolute URL in an electron-builder feed, or null. @param {string} text */
 export function installerFromFeed(text) {
@@ -26,6 +28,6 @@ export function downloadRedirects(readFeed, releases) {
   return [
     `/download/kvbc-awana ${app} 302`,
     `/download/club-label-printer ${app} 302`,
-    `/download/lobby-display ${newest('lobby/lobby.yml')} 302`,
+    `/download/lobby-display ${app} 302`,
   ];
 }

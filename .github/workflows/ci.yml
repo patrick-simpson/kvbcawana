@@ -41,8 +41,8 @@ jobs:
   # 2026-10-11: a Worker fix waited 8 minutes on lobby tests it cannot touch).
   # Anything unknown runs everything: a manual run or a bot's dispatch, no
   # base to compare with, or a change to this file. The fast jobs always run.
-  #   lobby   reads only lobby/ (its vitest excludes worker/ and desktop/,
-  #           whose lint moved into their own jobs below), plus
+  #   lobby   reads only lobby/ (its vitest excludes worker/,
+  #           whose lint moved into its own job below), plus
   #           journey/public/src/schedule.js, journey/public/src/sync.js and
   #           journey/src/schedule/19-picker-final-step.js (the phone remote's picker choices)
   #           site/checkin/ and printer/print-server/public/phone.html
@@ -121,7 +121,7 @@ jobs:
               case "$f" in
                 journey/public/src/schedule.js|journey/public/src/sync.js|journey/src/schedule/19-picker-final-step.js) lobby=true ;;  # screenSpecs.test.js reads both, embed.test.js sync.js, shared/journeyRemote.test.js the picker's choices
                 site/checkin/*|printer/print-server/public/phone.html|printer/print-server/sync-protocol.js) lobby=true ;;  # e2e/checkin.spec.js serves the check-in page (site/checkin/checkin-page.mjs builds it from phone.html)
-                lobby/worker/*|lobby/desktop/*|printer/*|journey/*|site/*|.github/workflows/*) ;;
+                lobby/worker/*|printer/*|journey/*|site/*|.github/workflows/*) ;;
                 *) lobby=true ;;
               esac
               case "$f" in
@@ -252,23 +252,6 @@ jobs:
       - run: npx eslint worker
       - run: npx vitest run --config worker/vitest.config.js
 
-  desktop:
-    name: Sound room app (unit tests)
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    defaults:
-      run:
-        working-directory: lobby
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/setup-app
-        with:
-          lockfile: lobby/package-lock.json
-          working-directory: lobby
-      # The lobby-checks job's \`eslint .\` covers desktop/ too, but it may be skipped.
-      - run: npx eslint desktop
-      - run: npx vitest run --config desktop/vitest.config.js
-
   journey:
     name: Journey kiosk
     runs-on: ubuntu-latest
@@ -361,7 +344,7 @@ jobs:
     # A test job a newer run cancelled is neither failed nor skipped, so it is
     # named: without that this older run would deploy untested.
     if: ${{ !failure() && !cancelled() && !contains(needs.*.result, 'cancelled') && github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}
-    needs: [changes, copies, lobby-checks, lobby-e2e, worker, desktop, journey, printer, site]
+    needs: [changes, copies, lobby-checks, lobby-e2e, worker, journey, printer, site]
     runs-on: ubuntu-latest
     timeout-minutes: 30
     # Deploys take turns and are never cancelled; of several waiting, only

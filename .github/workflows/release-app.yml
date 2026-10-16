@@ -1,9 +1,10 @@
 name: Release an Electron app (reusable)
 
 # The one release pipeline behind printer-release.yml (KVBC Awana, the label
-# printer) and desktop-release.yml (the sound room app). Those two keep their
-# names, dispatch inputs and run page; they only call this with what differs.
-# Run THEM, never this one (it has no trigger of its own).
+# printer). It keeps its name, dispatch inputs and run page; it only calls this
+# with what differs. Run IT, never this one (it has no trigger of its own).
+# The `app: desktop` steps below served the old sound room app (lobby/desktop),
+# retired 2026-10-16 with its desktop-release.yml; nothing calls them now.
 #
 # Test, tag, build, smoke test, publish, in that order, chained with `needs`.
 # The tests run FIRST, and the tag is created only once they pass: the tag

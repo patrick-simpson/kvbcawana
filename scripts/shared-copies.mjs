@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 // Generated copies of lobby/shared/*.js, for the readers that cannot import
-// them. The lobby's Vite build imports the shared modules directly; the two
-// Electron apps and the print server ship in installers that contain only
-// their own folder, so each carries a generated copy of the modules it uses
-// (an ES module for lobby/desktop, which is `"type": "module"`; CommonJS for
-// printer/, which is not). The shared source is the one place to edit:
+// them. The lobby's Vite build imports the shared modules directly; the
+// KVBC Awana app and the print server ship in an installer that contains only
+// printer/, so it carries a generated CommonJS copy of the modules it uses
+// (the old sound room app, lobby/desktop, took an ES module copy until it was
+// retired on 2026-10-16; the 'esm' format is kept for a future reader). The shared source is the one place to edit:
 //
 //   node scripts/shared-copies.mjs          rewrite the copies
 //   node scripts/shared-copies.mjs --check  fail when any copy has drifted
@@ -23,7 +23,6 @@ const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 
 /** [shared source, copy, format] */
 export const COPIES = [
-  ['lobby/shared/clubNight.js', 'lobby/desktop/src/clubNight.js', 'esm'],
   ['lobby/shared/clubNight.js', 'printer/electron-app/src/display/clubNight.js', 'cjs'],
   ['lobby/shared/clubs.js', 'printer/print-server/clubTable.js', 'cjs'],
   ['lobby/shared/text.js', 'printer/print-server/textClean.js', 'cjs'],

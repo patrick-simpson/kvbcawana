@@ -9,12 +9,12 @@
 //
 // Who reads it, and how (see lobby/shared/README.md):
 //   - lobby/src (the signage, the projector) imports this file through Vite;
-//   - lobby/desktop (the sound room bridge) and printer/electron-app (the
-//     one KVBC Awana app) ship in installers that cannot reach outside their
-//     own folder, so each carries a GENERATED copy
-//     (lobby/desktop/src/clubNight.js, printer/electron-app/src/display/clubNight.js)
-//     made by `node scripts/shared-copies.mjs`; scripts/check-mirrors.mjs
-//     fails CI when either has drifted. Edit this file, then regenerate.
+//   - printer/electron-app (the one KVBC Awana app) ships in an installer
+//     that cannot reach outside its own folder, so it carries a GENERATED copy
+//     (printer/electron-app/src/display/clubNight.js) made by
+//     `node scripts/shared-copies.mjs`; scripts/check-mirrors.mjs fails CI
+//     when it has drifted. Edit this file, then regenerate. (The old sound
+//     room app, lobby/desktop, had a copy too until it was retired 2026-10-16.)
 //
 // The window is the computer's own hours (the printer app's settings.hours,
 // owner 2026-10-11: "hours per computer"); without hours it is the church's

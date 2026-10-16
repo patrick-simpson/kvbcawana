@@ -1,7 +1,8 @@
 name: Delete release
 
 # Cleanup tool for a mistakenly created tag/release (duplicate, stray manual
-# publish) -- symmetric with printer-release.yml and desktop-release.yml.
+# publish) -- symmetric with printer-release.yml (and the retired
+# desktop-release.yml: `desktop` still deletes an old sound room release).
 # Deleting a release/tag hits the same restriction as creating one (a Claude
 # Code session's git remote is commonly scoped to branch pushes only), so
 # this does it via the workflow's own GITHUB_TOKEN instead.

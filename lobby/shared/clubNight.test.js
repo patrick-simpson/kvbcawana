@@ -4,9 +4,9 @@ import {
   clubNightToday, displayWindow, hoursOrDefault, isClubNight, isNoClubDate, nextClubNight, zonedParts,
 } from './clubNight.js';
 
-// The rule's one source. The sound room bridge (lobby/desktop) and the KVBC
-// Awana app (printer/electron-app) run generated copies of this file, kept
-// honest by scripts/check-mirrors.mjs; the apps' own tests exercise those.
+// The rule's one source. The KVBC Awana app (printer/electron-app) runs a
+// generated copy of this file, kept honest by scripts/check-mirrors.mjs; the
+// app's own tests exercise it.
 
 describe('the shared constants', () => {
   it('are the church\'s: Eastern, Wednesday, 5 to 8 pm', () => {

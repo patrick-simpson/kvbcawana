@@ -943,7 +943,11 @@ that." Ship it as v9, once the /settings work in progress ([Settings track](#set
   builds and smoke-tests KVBC Awana, `/download/kvbc-awana` exists and the
   signage's Setup card links it.
 - After the sound room PC shows on /settings as a KVBC Awana computer: remove
-  lobby/desktop and /download/lobby-display (owner, 2026-10-11).
+  lobby/desktop and /download/lobby-display (owner, 2026-10-11). **Done
+  2026-10-16** (owner: every sound room PC runs KVBC Awana): `lobby/desktop`,
+  its CI job and `desktop-release.yml` are deleted; `/download/lobby-display`
+  now gives the KVBC Awana installer; the lobby feed stays at 2.1.1 for any
+  straggler, so no other release may be GitHub's "Latest".
 
 ### How it is built (9.0.0)
 
