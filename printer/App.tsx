@@ -1,87 +1,124 @@
-import React from 'react';
-import { Footer, Header, LINKS } from './components/home/Chrome';
-import { Ico, IconSprite } from './components/home/Icons';
-import { Doodle, Shape, StepChip, Sticker } from './components/home/Kit';
-import { ClubStrip, Parts } from './components/home/Parts';
+import React, { useEffect, useState } from 'react';
+import { Footer, Header } from './components/home/Chrome';
+import { IconSprite } from './components/home/Icons';
+import { Night, NightClock, useNightTime } from './components/home/Night';
 import { Reel } from './components/home/Reel';
-import { Simulator } from './components/Simulator';
 
 /*
- * The home page of awana.kvbchurch.org: a demo reel page in the look of the
- * Awana Clubs 2026-27 catalog (CLAUDE.md, "Public website").
+ * The home page of awana.kvbchurch.org (owner, 2026-10-16): a showcase that
+ * plays ONE club night on the real screens (CLAUDE.md, "Public website").
  *
- *   #reel       the film, framed, and one line saying what this is
- *               (then the six clubs' marks)
- *   #features   the six parts of a club night (#labels, #lobby, #projector,
- *               #journey, #phone, #app)
- *   #simulator  the TwoTimTwo replica, with a lobby TV and a printer acting out
- *               each check-in
+ *   #top     the opening: the time, and what this is
+ *   #night   the night (components/home/Night.tsx): #doors (#phone, #labels,
+ *            #lobby), #projector, #journey, #pickup (#app)
+ *   #reel    8:00: the film, the finale
+ *   footer   the practical links, quietly; past 8:00, the Lights out switch
  *
- * The install guide and the FAQ are on /help; index.html sends old /#install,
+ * /help keeps the install guide and the FAQ; index.html sends old /#install,
  * /#how-it-works and /#faq links there.
  */
-const Hero: React.FC = () => (
-  <section id="reel" className="kv-hero" aria-labelledby="hero-title">
-    <div className="kv-hero__tab" aria-hidden="true">
-      <Shape name="tab-b-sparks" className="kv-hero__tabshape" />
-      <span className="kv-hero__tabtext">Club night<br />tools</span>
-    </div>
-    <div className="kv-hero__doodles" aria-hidden="true">
-      <Doodle name="sparkle-4pt" className="kv-hero__d kv-hero__d--1" />
-      <Doodle name="loop" className="kv-hero__d kv-hero__d--2" />
-      <Doodle name="dot" className="kv-hero__d kv-hero__d--3" />
-      <Doodle name="sparkle-4pt-x" className="kv-hero__d kv-hero__d--4" />
-      <Doodle name="squiggle-s" className="kv-hero__d kv-hero__d--5" />
-      <Doodle name="ring" className="kv-hero__d kv-hero__d--6" />
-    </div>
-    <div className="kv-wrap kv-hero__inner">
-      <div className="kv-hero__frame">
-        <Reel />
-        <StepChip className="kv-hero__chip" label="Watch" value="Club night" as="span" />
-        <Sticker className="kv-hero__sticker">Free for<br />any church</Sticker>
-      </div>
-      <div className="kv-hero__copy">
-        <h1 className="kv-hero__title" id="hero-title">Every child, welcomed by name.</h1>
-        <p className="kv-hero__line">
-          Free tools a church built for its Awana<sup>®</sup> club nights: labels that print at check-in, a lobby TV
-          that greets every child, and screens that keep the whole night on time.
+
+/** The time of night, always in sight: big at the opening, a chip after. */
+const Clock: React.FC = () => {
+  const { hm, ampm } = useNightTime();
+  const [shown, setShown] = useState(false);
+  useEffect(() => {
+    const top = document.getElementById('top');
+    if (!top || typeof IntersectionObserver === 'undefined') return;
+    const io = new IntersectionObserver(([e]) => setShown(!e.isIntersecting));
+    io.observe(top);
+    return () => io.disconnect();
+  }, []);
+  return (
+    <p className={`kv-clock${shown ? ' is-shown' : ''}`} aria-hidden="true">
+      <span className="kv-clock__day">Wed</span>
+      <span className="kv-clock__hm">{hm}</span>
+      <span className="kv-clock__ampm">{ampm}</span>
+    </p>
+  );
+};
+
+/** The evening's program, as the printed sheet on the welcome table has it. */
+const PROGRAM: [string, string, string][] = [
+  ['6:00', 'Doors open', '#doors'],
+  ['6:05', 'Game time', '#projector'],
+  ['6:30', 'Journey', '#journey'],
+  ['7:30', 'Pickup', '#pickup'],
+  ['8:00', 'The film', '#reel'],
+];
+
+const Opening: React.FC = () => {
+  const { hm } = useNightTime();
+  return (
+    <section id="top" className="kv-open" aria-labelledby="open-title">
+      <div className="kv-wrap kv-open__inner">
+        <p className="kv-open__kicker">Wednesday night · Kennebec Valley Baptist Church</p>
+        <p className="kv-open__clock" aria-hidden="true"><span>{hm}</span><small>PM</small></p>
+        <h1 className="kv-open__title" id="open-title">One club night, on the real screens.</h1>
+        <p className="kv-open__line">
+          Every screen below is the software our Awana<sup>®</sup> club runs on, playing a made-up night. Scroll to
+          open the doors; tap a name when you get there.
         </p>
-        <div className="kv-hero__actions">
-          <a className="kv-btn kv-btn--hot" href="#simulator">Try a check-in<Ico name="arrow" /></a>
-          <a className="kv-btn kv-btn--line" href="/help"><Ico name="download" />Install and help</a>
-        </div>
+        <a className="kv-open__go" href="#doors">Open the doors</a>
+        <nav className="kv-program" aria-label="Tonight">
+          <p className="kv-program__head">Tonight</p>
+          <ol className="kv-program__list">
+            {PROGRAM.map(([t, what, href]) => (
+              <li key={href}><a href={href}><span className="kv-program__t">{t}</span><span className="kv-program__what">{what}</span></a></li>
+            ))}
+          </ol>
+        </nav>
       </div>
+    </section>
+  );
+};
+
+/**
+ * Past 8:00 a switch appears (the owner's easter egg): Lights out puts the whole
+ * page in the dark except the Journey room's screen, and a mop crosses the floor.
+ */
+const LightsOut: React.FC = () => {
+  const [off, setOff] = useState(false);
+  useEffect(() => {
+    document.documentElement.classList.toggle('is-lights-out', off);
+    return () => document.documentElement.classList.remove('is-lights-out');
+  }, [off]);
+  return (
+    <div className="kv-lights">
+      <button type="button" className={`kv-switch${off ? ' is-off' : ''}`} aria-pressed={off} onClick={() => setOff((v) => !v)}>
+        <span className="kv-switch__plate" aria-hidden="true"><span className="kv-switch__toggle" /></span>
+        <span className="kv-switch__word">{off ? 'Lights on' : 'Lights out'}</span>
+      </button>
+      <p className="kv-lights__note" aria-live="polite">{off ? 'Somebody left the Journey PC on again.' : ''}</p>
     </div>
-    <div className="kv-hero__edge" aria-hidden="true">
-      <Shape name="wave-tnt" stretch className="kv-hero__wave kv-hero__wave--back" />
-      <Shape name="wave-sparks" stretch className="kv-hero__wave kv-hero__wave--front" />
+  );
+};
+
+const Finale: React.FC = () => (
+  <section id="reel" className="kv-finale" aria-labelledby="finale-title">
+    <div className="kv-wrap">
+      <p className="kv-scene__time" aria-hidden="true"><span>8:00</span><small>PM</small></p>
+      <h2 className="kv-finale__title" id="finale-title">That's a club night.</h2>
+      <p className="kv-finale__line">Ninety seconds, every screen at once.</p>
+      <div className="kv-finale__film"><Reel /></div>
+      <LightsOut />
     </div>
   </section>
 );
 
 const App: React.FC = () => (
-  <>
+  <NightClock>
     <a className="kv-skip" href="#main">Skip to the content</a>
     <IconSprite />
     <Header page="home" />
+    <Clock />
     <main id="main">
-      <Hero />
-      <ClubStrip />
-      <Parts />
-      <Simulator />
-      <section className="kv-next" aria-labelledby="next-title">
-        <div className="kv-wrap kv-next__inner">
-          <h2 className="kv-next__title" id="next-title">Ready for your club night?</h2>
-          <p className="kv-next__line">One Windows app and any 4×2 thermal label printer. The install guide walks you through it.</p>
-          <div className="kv-next__actions">
-            <a className="kv-btn kv-btn--hot" href="/help#install">Install guide<Ico name="arrow" /></a>
-            <a className="kv-btn kv-btn--line" href={LINKS.download}><Ico name="download" />Download for Windows</a>
-          </div>
-        </div>
-      </section>
+      <Opening />
+      <Night />
+      <Finale />
     </main>
     <Footer />
-  </>
+  </NightClock>
 );
 
 export default App;

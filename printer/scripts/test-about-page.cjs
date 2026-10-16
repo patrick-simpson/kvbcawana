@@ -1,11 +1,11 @@
-// The public pages of awana.kvbchurch.org: the home page (/, a demo reel page
-// in the 2026-27 catalog look) and /help (the install guide and the FAQ), plus
-// the capabilities reference. The site has no browser test of its own, so
-// these read the sources for the rules in CLAUDE.md, "Public website":
-// the kit's own faces and nothing from another host, the kit's art from its
-// one copy, the trademark line, the reel's contract, motion that stops for
-// reduced motion, AA colour pairs, the anchors people link to, the Simulator's
-// DOM contract, Journey's licensing wording and where links may go.
+// The public pages of awana.kvbchurch.org: the home page (/, one club night
+// played on the REAL screens, owner 2026-10-16) and /help (the install guide and
+// the FAQ), plus the capabilities reference. These read the sources for the rules
+// in CLAUDE.md, "Public website": the kit's own faces and nothing from another
+// host, the kit's art from its one copy, the trademark line, the reel's contract,
+// motion that stops for reduced motion, AA colour pairs, the anchors people link
+// to, the screens framed only as showcase twins, Journey's wording, and where
+// links may go.
 const assert = require('node:assert/strict');
 const { existsSync, readFileSync, readdirSync } = require('node:fs');
 const path = require('node:path');
@@ -17,11 +17,9 @@ const read = (rel) => readFileSync(path.join(ROOT, rel), 'utf8');
 const live = (s) => s.replace(/<!--[\s\S]*?-->/g, '').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
 
 const PAGES = ['index.html', 'help.html'];
-const HOME = ['App.tsx', 'HelpPage.tsx', 'components/Simulator.tsx', 'components/ClubberList.tsx', 'components/CheckinModal.tsx',
-  'components/InstallGuide.tsx', 'components/Faq.tsx',
+const HOME = ['App.tsx', 'HelpPage.tsx', 'components/InstallGuide.tsx', 'components/Faq.tsx',
   ...readdirSync(path.join(ROOT, 'components/home')).filter((f) => f.endsWith('.tsx')).map((f) => `components/home/${f}`)];
-const HOME_PAGE = ['App.tsx', 'components/Simulator.tsx', 'components/ClubberList.tsx', 'components/CheckinModal.tsx',
-  'components/home/Chrome.tsx', 'components/home/Parts.tsx', 'components/home/Reel.tsx', 'components/home/Screens.tsx'];
+const HOME_PAGE = ['App.tsx', 'components/home/Chrome.tsx', 'components/home/Night.tsx', 'components/home/Reel.tsx', 'components/home/Twin.tsx'];
 const HELP_PAGE = ['HelpPage.tsx', 'components/InstallGuide.tsx', 'components/Faq.tsx', 'components/home/Chrome.tsx'];
 const CSS = 'styles/home.css';
 const css = read(CSS);
@@ -129,14 +127,15 @@ test('every shape, doodle and club mark is the kit\'s own file, imported from sh
   for (const rel of HOME) {
     for (const [, kind, name] of live(read(rel)).matchAll(/<(Doodle|Shape)\s+(?:key=\{[^}]*\}\s+)?name=["']([a-z0-9-]+)["']/g)) names.add(`${kind === 'Doodle' ? 'doodles' : 'shapes'}/${name}`);
   }
-  assert.ok(names.size >= 12, 'found the pages\' shapes and doodles');
+  assert.ok(names.size >= 6, 'found the pages\' shapes and doodles');
   for (const n of names) assert.ok(existsSync(path.join(REPO, 'shared/brand', `${n}.svg`)), `${n}.svg is in the kit`);
-  // Nothing else on the pages is an image from elsewhere: every <img> draws a kit mark.
+  // Nothing else on the pages is an image from elsewhere: every <img> draws a kit mark,
+  // or a label the print server's own renderer drew (scripts/showcase-labels.cjs).
   for (const rel of HOME) {
     for (const [tag] of live(read(rel)).matchAll(/<img\b[^>]*>/g)) {
       const src = attr(tag, 'src');
       if (!src && /\bhidden\b/.test(tag)) continue; // the replica's empty club image (its alt names the club)
-      assert.match(src, /^\{(?:LOGO\.(?:twoLineInk|twoLineWhite|fullWhite|stackedInk)|c\.(?:color|white)|spec\.club\.black|club\('[a-z]+'\)\.white)\}$/, `${rel}: ${tag}`);
+      assert.match(src, /^\{(?:LOGO\.(?:twoLineInk|twoLineWhite|fullWhite|stackedInk)|c\.(?:color|white)|spec\.club\.black|club\('[a-z]+'\)\.white|`\/showcase\/labels\/\$\{last\.first\.toLowerCase\(\)\}\.png`)\}$/, `${rel}: ${tag}`);
       assert.ok(/\balt=/.test(tag), `${rel}: ${tag} has alt`);
     }
   }
@@ -189,7 +188,7 @@ test('every animation lives under prefers-reduced-motion: no-preference', () => 
   assert.doesNotMatch(outside, /@keyframes|\banimation(?:-name)?\s*:/, 'an animation outside the no-preference block');
   assert.ok((sheet.slice(start, end).match(/@keyframes/g) || []).length >= 8);
   // Script-driven motion checks the same preference.
-  for (const rel of ['components/home/Screens.tsx', 'components/home/Chrome.tsx', 'components/Simulator.tsx']) {
+  for (const rel of ['components/home/Night.tsx', 'components/home/Chrome.tsx', 'components/home/Reel.tsx']) {
     assert.match(read(rel), /prefers-reduced-motion: reduce/, rel);
   }
 });
@@ -204,8 +203,13 @@ test('the text colour pairs pass AA', () => {
     ['ink on the sun band', declared('--ink'), declared('--sun')],
     ['white on the footer', white, declared('--footer')],
     ['ink-2 on paper', declared('--ink-2'), declared('--paper')],
+    ['navy on the sky (the opening)', declared('--navy'), declared('--sky')],
+    ['ink on the sun (6:00)', declared('--ink'), declared('--sun')],
+    ['white on the Journey room (6:30)', white, declared('--brand-journey-ink')],
+    ['white on dusk (7:30)', white, declared('--navy')],
+    ['the hot program times on paper', declared('--hot-btn'), '#ffffff'],
   ];
-  for (const id of ['puggles', 'cubbies', 'sparks', 'tnt', 'trek', 'journey']) {
+  for (const id of [/* the club plates the old page drew are gone; the colours stay pinned */ 'puggles', 'cubbies', 'sparks', 'tnt', 'trek', 'journey']) {
     pairs.push([`${id} text on white`, club(id, '--c-text'), white]);
     pairs.push([`white on the ${id} plate`, white, club(id, '--c-text')]);
   }
@@ -218,11 +222,10 @@ test('the text colour pairs pass AA', () => {
 
 // ── Anchors and links ────────────────────────────────────────────────────────
 const ids = (files) => files.map((rel) => live(read(rel))).join('\n').match(/\bid=["']([^"']+)["']/g).map((m) => m.slice(4, -1));
-const partIds = [...live(read('components/home/Parts.tsx')).matchAll(/\bid: '([a-z]+)'/g)].map((m) => m[1]);
 
 test('the anchors people link to resolve: the home page\'s sections, the old about pages\' targets, /help\'s two', () => {
-  const home = new Set([...ids(HOME_PAGE), ...partIds]);
-  for (const id of ['reel', 'features', 'simulator', 'lobby', 'journey', 'labels', 'projector', 'phone', 'app', 'main']) assert.ok(home.has(id), `#${id} on /`);
+  const home = new Set(ids(HOME_PAGE));
+  for (const id of ['top', 'night', 'doors', 'projector', 'journey', 'pickup', 'reel', 'lobby', 'labels', 'phone', 'app', 'main']) assert.ok(home.has(id), `#${id} on /`);
   const help = new Set(ids(HELP_PAGE));
   for (const id of ['install', 'faq', 'main']) assert.ok(help.has(id), `#${id} on /help`);
   // The old about pages' redirects land on sections that exist.
@@ -241,7 +244,7 @@ test('the anchors people link to resolve: the home page\'s sections, the old abo
 
 test('no id repeats on a page', () => {
   for (const files of [HOME_PAGE, HELP_PAGE]) {
-    const all = [...ids(files).filter((id) => !/\$\{/.test(id)), ...partIds];
+    const all = ids(files).filter((id) => !/\$\{/.test(id));
     const dupes = all.filter((id, i) => all.indexOf(id) !== i);
     assert.deepEqual(dupes, []);
   }
@@ -260,36 +263,32 @@ test('links out go only to the repo, the app\'s own downloads, this site\'s page
   }
 });
 
-// ── The Simulator's DOM contract (src/constants.ts DOM_SELECTORS) ────────────
-test('the Simulator keeps TwoTimTwo\'s own DOM (DOM_SELECTORS)', () => {
-  const sim = read('components/Simulator.tsx');
-  assert.match(sim, /<div id="lastCheckin"[^>]*>[\s\S]*?<div className="tt-last__who">[\s\S]*?\{lastCheckin\?\.name\}/, '#lastCheckin div holds the name');
-  assert.match(sim, /<div className="clubbers">\s*<ClubberList/);
-  const list = read('components/ClubberList.tsx');
-  assert.match(list, /className=\{`clubber /, '.clubber');
-  assert.match(list, /<div className="name [^"]*">\{clubber\.name\}<\/div>/, '.name');
-  assert.match(list, /<div className="club [^"]*">\s*<span><img alt=\{clubber\.club\}/, '.club img alt');
-  const modal = read('components/CheckinModal.tsx');
-  assert.match(modal, /id="checkin-modal"/);
-  assert.match(modal, /<button id="checkin"/);
-  const constants = read('src/constants.ts');
-  for (const sel of ["'#lastCheckin div'", "'.clubber'", "'.name'", "'.club img'"]) assert.ok(constants.includes(sel), sel);
+// ── The real screens, only as showcase twins (owner, 2026-10-16) ─────────────
+test('the home page frames the screens only as their showcase twins, and only the check-in phone takes taps', () => {
+  const twin = live(read('components/home/Twin.tsx'));
+  const srcs = [...twin.matchAll(/:\s*'(\/[^']+)'/g)].map((m) => m[1]);
+  assert.deepEqual(srcs.sort(), ['/checkin/showcase.html', '/journey/showcase.html', '/lobby/countdown-showcase.html', '/lobby/settings-showcase.html', '/lobby/showcase.html']);
+  assert.match(twin, /e\.source !== win \|\| e\.origin !== window\.location\.origin/, 'a twin is heard only from its own frame, same origin');
+  assert.match(twin, /win\.postMessage\(msg, window\.location\.origin\)/, 'a twin is told things only on this origin');
+  assert.match(twin, /pointerEvents: interactive \? 'auto' : 'none'/);
+  const night = live(read('components/home/Night.tsx'));
+  assert.equal((night.match(/\binteractive\b/g) || []).length, 1, 'one interactive screen: the check-in phone');
+  assert.match(night, /kind="checkin"[^>]*interactive/);
+  // Every made-up name on the page is the showcase club's (site/showcase/stub.js).
+  const stub = readFileSync(path.join(REPO, 'site/showcase/stub.js'), 'utf8');
+  for (const [, first, last] of night.matchAll(/'([A-Z][a-z]+) ([A-Z][a-z]+)'/g)) assert.ok(stub.includes(`['${first}', '${last}'`), `${first} ${last} is the showcase's`);
 });
 
-// ── Journey's wording (CLAUDE.md, "Licensing boundary") ──────────────
-test('the Journey part keeps the licensing wording strict and the room students', () => {
-  const parts = live(read('components/home/Parts.tsx'));
-  const journey = parts.slice(parts.indexOf("id: 'journey'"), parts.indexOf("id: 'phone'"));
-  assert.ok(journey.length > 200, 'found the Journey part');
+// ── Journey's wording (CLAUDE.md, "Public website"; owner 2026-10-16) ─────────
+test('the Journey scene says whose curriculum it is, and its room is students', () => {
+  const night = live(read('components/home/Night.tsx'));
+  const journey = night.slice(night.indexOf('const Journey: React.FC'), night.indexOf('const STILL_HERE'));
+  assert.ok(journey.length > 200, 'found the Journey scene');
   assert.match(journey, /already licenses through its own Awana Ministry Membership/);
   assert.match(journey, /students/);
   assert.doesNotMatch(journey, /\bchildren\b|\bkids\b/i, 'Journey is the high-school ministry: students');
-  // Never links to, names or advertises a lesson video, copy, release asset, transcript, handout or slide image.
-  for (const rel of ['components/home/Parts.tsx', 'components/home/Screens.tsx']) {
-    const text = live(read(rel));
-    assert.doesNotMatch(text, /\.mp4|\.vtt|releases\/download|journey-videos|<video\b|<source\b/i, rel);
-    assert.doesNotMatch(text, /re-?host|mirror|re-?encod|transcod|a smaller copy|a copy of the|download the lesson/i, rel);
-  }
+  // The page never links a lesson file or release asset (the twin plays what the kiosk plays).
+  for (const rel of HOME_PAGE) assert.doesNotMatch(live(read(rel)), /\.vtt|releases\/download|journey-videos|current-lesson-video/i, rel);
 });
 
 console.log(`\n${n} checks passed`);

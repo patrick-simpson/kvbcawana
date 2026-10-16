@@ -30,12 +30,11 @@ test('the desk check-in goes permanently to the one check-in page, and its sourc
 
 test('the sections they land on exist on the home page, and the old files are gone', () => {
   const read = (rel) => readFileSync(path.join(SITE, '..', rel), 'utf8');
-  // The home page's six parts are cards with ids (printer/components/home/Parts.tsx,
-  // rendered as <li id={part.id}>); the lobby's and Journey's are two of them.
-  const parts = read('printer/components/home/Parts.tsx');
-  assert.match(parts, /<li ref=\{ref\} id=\{part\.id\}/);
-  assert.match(parts, /id: 'lobby', club:/);
-  assert.match(parts, /id: 'journey', club:/);
+  // The home page's night (printer/components/home/Night.tsx, owner 2026-10-16): the
+  // lobby TV at 6:00 and the Journey scene at 6:30 carry the ids.
+  const night = read('printer/components/home/Night.tsx');
+  assert.match(night, /<figure id="lobby" /);
+  assert.match(night, /<section ref=\{ref\} id="journey" /);
   assert.equal(existsSync(path.join(SITE, '..', 'lobby/public/about.html')), false);
   assert.equal(existsSync(path.join(SITE, '..', 'journey/public/about.html')), false);
 });

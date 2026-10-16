@@ -43,7 +43,7 @@
     };
     return store;
   }
-  var LOBBY_CONFIG = JSON.stringify({ calendarEnabled: false, seasonPromos: false, standardDisplayMs: 3600, specialDisplayMs: 4200 });
+  var LOBBY_CONFIG = JSON.stringify({ calendarEnabled: false, seasonPromos: false, standardDisplayMs: 3600, specialDisplayMs: 4200, checkoutBoardNamesAbove: 0 });
   var SEED = {
     lobby: { 'awanaSyncSession.v1': SESSION, 'awanaSetupCardDismissed.v1': '1', 'awanaConfig.v1': LOBBY_CONFIG },
     projector: { 'awanaSetupChecklistDismissed.v1': '1' },
@@ -127,7 +127,7 @@
         return { queued: 0, leased: 0, done: count, dead: 0, checkThePrinter: [], pendingToSeal: 0, claims: { printed: count }, stations: [{ stationId: 'showcase', name: 'Check-in laptop', lastSeenAt: now, printer: { state: 'ok' } }] };
       case '/v1/desk/checkin': {
         var kid = KIDS.find(function (k) { return body && k.clubberId === String(body.clubberId); });
-        if (kid && !kid.checkedIn) { kid.checkedIn = true; count += 1; tell('checkin', { firstName: kid.first, lastName: kid.last, club: kid.club, count: count }); }
+        if (kid && !kid.checkedIn) { kid.checkedIn = true; count += 1; tell('checkin', { firstName: kid.first, lastName: kid.last, club: kid.club, count: count, at: iso() }); }
         return { ok: true, already: false, jobId: null, gen: 1, history: 'hooked' };
       }
       case '/v1/desk/undo': {
@@ -160,6 +160,11 @@
     try { url = new URL(typeof input === 'string' || input instanceof URL ? String(input) : input.url, location.href); } catch (e) { return realFetch(input, init); }
     var method = String((init && init.method) || (input && input.method) || 'GET').toUpperCase();
     if (/\/shared\/sync\.json$/.test(url.pathname)) return Promise.resolve(json(200, { url: BASE }));
+    // The projector checks its clock against this page's Date header (useClockDrift):
+    // the twin's clock is the night's, so the header is too.
+    if (method === 'HEAD' && url.origin === location.origin && url.pathname === location.pathname) {
+      return Promise.resolve(new Response(null, { status: 200, headers: { Date: new RealDate(RealDate.now() + offset).toUTCString() } }));
+    }
     // The stand-in address, and this site's own /api (the check-in page's DESK_API):
     // a twin never reaches the real Worker.
     var own = url.origin === location.origin && /^\/api(\/|$)/.test(url.pathname);

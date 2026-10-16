@@ -32,15 +32,6 @@ export const LABEL_DPI = 300;
 // Default check-in URL
 export const DEFAULT_CHECKIN_URL = 'https://kvbchurch.twotimtwo.com/clubber/checkin?#';
 
-// TwoTimTwo's check-in page DOM, which the Simulator replica keeps (the Chrome
-// extension read these until it was retired in 10.0.0)
-export const DOM_SELECTORS = {
-  LAST_CHECKIN: '#lastCheckin div', // The "Last Checked In" element
-  CLUBBER: '.clubber', // Child/clubber container
-  CLUBBER_NAME: '.name', // Name element within clubber
-  CLUB_IMAGE: '.club img', // Club logo image within clubber
-};
-
 // API Endpoints
 export const API_ENDPOINTS = {
   HEALTH: '/health',

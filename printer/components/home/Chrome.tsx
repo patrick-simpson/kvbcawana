@@ -21,16 +21,14 @@ type Page = 'home' | 'help';
 
 const NAV: Record<Page, { href: string; label: string }[]> = {
   home: [
-    { href: '#reel', label: 'Watch' },
-    { href: '#features', label: 'What it does' },
-    { href: '#simulator', label: 'Try it' },
-    { href: '/help', label: 'Install & help' },
+    { href: '#night', label: 'The night' },
+    { href: '#reel', label: 'The film' },
   ],
   help: [
     { href: '/', label: 'Home' },
     { href: '#install', label: 'Install' },
     { href: '#faq', label: 'Questions' },
-    { href: '/#simulator', label: 'Try it' },
+    { href: '/#doors', label: 'Try it' },
   ],
 };
 
@@ -66,7 +64,7 @@ export const Header: React.FC<{ page: Page }> = ({ page }) => {
     <>
       <p className="kv-disclaimer" role="note">{TRADEMARK}</p>
       <div ref={sentinel} className="kv-sentinel" aria-hidden="true" />
-      <header className={`kv-header${stuck ? ' is-stuck' : ''}`}>
+      <header className={`kv-header kv-header--${page}${stuck ? ' is-stuck' : ''}`}>
         <div className="kv-wrap kv-header__inner">
           <a className="kv-header__home" href="/" aria-label="KVBC Awana home">
             <Wordmark />
@@ -78,9 +76,11 @@ export const Header: React.FC<{ page: Page }> = ({ page }) => {
               ))}
             </ul>
           </nav>
-          <a className="kv-btn kv-btn--hot kv-header__cta" href={LINKS.download}>
-            <Ico name="download" /><span className="kv-header__cta-word">Download</span><span className="kv-sr"> KVBC Awana for Windows</span>
-          </a>
+          {page === 'help' && (
+            <a className="kv-btn kv-btn--hot kv-header__cta" href={LINKS.download}>
+              <Ico name="download" /><span className="kv-header__cta-word">Download</span><span className="kv-sr"> KVBC Awana for Windows</span>
+            </a>
+          )}
         </div>
       </header>
     </>
@@ -95,44 +95,48 @@ export const WaveEdge: React.FC<{ className?: string; flip?: boolean }> = ({ cla
   </div>
 );
 
+/** The mop that crosses the floor when the lights go out (App.tsx, Lights out). */
+const Mop: React.FC = () => (
+  <svg className="kv-mop" viewBox="0 0 120 160" aria-hidden="true" focusable="false">
+    <rect x="57" y="0" width="7" height="112" rx="3" fill="#C97A08" />
+    <rect x="34" y="106" width="53" height="12" rx="4" fill="#9AA4AE" />
+    <path d="M30 118h61l6 34c1 5-3 8-8 8H31c-5 0-9-3-8-8z" fill="#E9E4D8" />
+    <path d="M38 124v30M48 124v32M58 124v32M68 124v32M78 124v30" stroke="#C9C2B2" strokeWidth="4" strokeLinecap="round" />
+  </svg>
+);
+
+/**
+ * The quiet end of every page: the practical links (install, download, source)
+ * and the trademark line. The home page keeps nothing practical above it.
+ */
 export const Footer: React.FC = () => (
   <footer className="kv-footer">
     <WaveEdge className="kv-footer__edge" />
+    <div className="kv-footer__shine" aria-hidden="true" />
+    <Mop />
     <div className="kv-wrap kv-footer__inner">
       <div className="kv-footer__lead">
         <Wordmark inverse />
         <p className="kv-footer__credit">
-          Built by and for <strong>Kennebec Valley Baptist Church</strong>, so every child at club is welcomed by name.
-          Free for any church, with every line of its source on GitHub.
+          Built by volunteers at <strong>Kennebec Valley Baptist Church</strong> for their own club nights. Free for any
+          church, with every line of it on GitHub.
         </p>
       </div>
-      <div className="kv-footer__cols">
-        <div>
-          <h2 className="kv-footer__head">Get started</h2>
-          <ul className="kv-footer__list">
-            <li><a href="/help#install">Install guide</a></li>
-            <li><a href="/help#faq">Questions volunteers ask</a></li>
-            <li><a href={LINKS.download}>Download for Windows</a></li>
-          </ul>
-        </div>
-        <div>
-          <h2 className="kv-footer__head">Under the hood</h2>
-          <ul className="kv-footer__list">
-            <li><a href={LINKS.reference}>TwoTimTwo reference</a></li>
-            <li><a href={LINKS.srcPrinter}>Label printer source</a></li>
-            <li><a href={LINKS.srcLobby}>Lobby and projector source</a></li>
-            <li><a href={LINKS.srcJourney}>Journey kiosk source</a></li>
-          </ul>
-        </div>
-      </div>
+      <ul className="kv-footer__list">
+        <li><a href="/help#install">Install guide</a></li>
+        <li><a href="/help#faq">Questions</a></li>
+        <li><a href={LINKS.download}>Download for Windows</a></li>
+        <li><a href={LINKS.repo}>Source on GitHub</a></li>
+        <li><a href={LINKS.reference}>TwoTimTwo reference</a></li>
+      </ul>
     </div>
     <div className="kv-wrap kv-footer__legal">
       <p><strong>{TRADEMARK}</strong></p>
       <p>
-        KVBC Awana is an independent project made by volunteers at Kennebec Valley Baptist Church for its own club
-        nights; it is not sponsored, reviewed or approved by Awana Clubs International. TwoTimTwo is a separate
-        service, named here only to describe what these tools work alongside. Screens on this page are drawn for
-        illustration, and every child’s name on it is an example.
+        KVBC Awana is an independent project made by volunteers at Kennebec Valley Baptist Church; it is not sponsored,
+        reviewed or approved by Awana Clubs International. TwoTimTwo is a separate service, named here only to describe
+        what these tools work alongside. The screens on the home page are the real software playing a made-up night:
+        every child’s name on them is made up.
       </p>
     </div>
   </footer>
