@@ -176,7 +176,7 @@ jobs:
       - run: npm run test:coverage
 
   lobby-e2e:
-    # The smoke suite (237 tests, 4 minutes on one runner) in 4 shards. The
+    # The smoke and events suites (237 + 51 tests, about 7 minutes on one runner) in 4 shards. The
     # shards split by test (--fully-parallel): touch.spec.js alone holds 88
     # of them, and by file the shards would be 74 / 75 / 88 / 0. Every shard
     # builds and installs on its own; the deploy job needs the job, so it
@@ -224,6 +224,13 @@ jobs:
         run: npx playwright install-deps chromium
       - name: E2E smoke
         run: npm run e2e -- --fully-parallel --shard=${{ matrix.shard }}/4
+      # The events project (51 tests, about 3 minutes on one runner): real-time
+      # frames of the check-in moment, toasts, pickup board, flagship and the
+      # embedded corner. Sharded like the smoke suite. The `visual` project is
+      # NOT run here: its baselines are regenerated only by
+      # lobby-update-snapshots.yml and a pixel drift must not block a deploy.
+      - name: E2E events
+        run: npm run e2e:events -- --fully-parallel --shard=${{ matrix.shard }}/4
       - name: Upload Playwright report
         if: failure()
         uses: actions/upload-artifact@v4
