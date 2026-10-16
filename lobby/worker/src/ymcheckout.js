@@ -22,8 +22,8 @@
 //            (published while SINGLE_PUBLISHER is on and the window is open)
 //
 // THE OWNER'S PACE (2026-10-12): at most ONE check-out every YM_CHECKOUT_GAP_MS
-// (15 s), a refused one included. The next allowed moment is claimed in memory
-// in one synchronous step and written through to storage before the post, so a
+// (15 s, its own pace: posts are writes, not reads), a refused one included.
+// The next allowed moment is claimed in memory in one synchronous step and written through to storage before the post, so a
 // restarted object never bursts. Forty children at 7:15 take about ten minutes.
 //
 // READS. Who is in comes from the watcher's report (handed over in memory after

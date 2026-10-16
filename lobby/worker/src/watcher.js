@@ -2,8 +2,7 @@
 //
 // During the club window a Durable Object alarm reads TwoTimTwo's check-in
 // report every 30 seconds (WATCH_INTERVAL_MS) on the ONE read clock
-// (readbudget.js: one read every 15 s, every Worker read combined, while the
-// laptop's extension tab still reads; a manual "read now" shares the same
+// (readbudget.js: one read every 5 s, every Worker read combined; a manual "read now" shares the same
 // clock, and the alarm skips its turn when another read holds the slot) and
 // compares it with the last read:
 //   - a child new on the report is a check-in made on TwoTimTwo (nothing
@@ -34,11 +33,10 @@ import { SCHEDULE, clubDay } from './clubday.js';
 export { READ_INTERVAL_MS };
 /**
  * The report is read every WATCH_INTERVAL_MS: every other slot of the read
- * clock (readbudget.js READ_INTERVAL_MS, 15 s while the laptop's extension tab
- * still reads, owner 2026-10-12). The watcher RESERVES the next report's
+ * clock (readbudget.js READ_INTERVAL_MS, 5 s). The watcher RESERVES the next report's
  * moment, so the slot between is everyone else's (the roster's check-in page,
  * the Checkout page, a households catch-up) and the report never starves: a
- * waiting request may push it one slot, once (45 s at worst). The alarm is
+ * waiting request may push it one slot, once (35 s at worst). The alarm is
  * also the scheduler of the Worker's own other reads, one per free slot, in
  * this order: the night's check-in page (warms the desk), a households
  * catch-up (families.js), the youth check-out's Checkout page (once a minute

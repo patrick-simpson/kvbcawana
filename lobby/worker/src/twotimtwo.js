@@ -7,9 +7,9 @@
 // TwoTimTwo agreed (Devin, 2026-10-11) to an automated check-in user on the
 // church's site, reading as often as ONE read every 5 seconds (all reads
 // combined; the first word was 15 s), everything encrypted, and with no
-// technical support from them if it breaks. While the laptop's extension tab
-// still reads beside it, the Worker keeps to one read every 15 s (owner
-// 2026-10-12, readbudget.js READ_INTERVAL_MS). So:
+// technical support from them if it breaks. The extension tab that once read
+// beside it is retired, so the Worker keeps to exactly that: one read every 5 s
+// (readbudget.js READ_INTERVAL_MS). So:
 //   - every request is https to ONE host (TWOTIMTWO_HOST, a *.twotimtwo.com
 //     name), and a redirect anywhere else is refused, so the session cookie
 //     and the password can never be sent to another site;

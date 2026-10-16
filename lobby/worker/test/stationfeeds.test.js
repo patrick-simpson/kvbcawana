@@ -135,7 +135,7 @@ describe('the roster, read by the Worker and sealed to the stations', () => {
       expect(rec.csv).not.toContain('555-0100');
       expect(parseCSV(rec.csv).map((r) => r.FirstName)).toEqual(['Kit', 'Ottoline', 'Bram']);
     }
-    // every Worker read still 15 s apart
+    // every Worker read still 5 s apart
     const all = t.reads.map((r) => r.at);
     for (let i = 1; i < all.length; i++) expect(all[i] - all[i - 1]).toBeGreaterThanOrEqual(READ_INTERVAL_MS);
   });
@@ -156,7 +156,9 @@ describe('the roster, read by the Worker and sealed to the stations', () => {
     const st = await modern(t);
     await drive(t, 3 * 60 * 1000);
     const first = (await st.call('GET', '/v1/station/roster')).body.bundle.id;
-    await drive(t, ROSTER_FRESH_MS - 2 * 60 * 1000);
+    // (on the 5 s clock the first read comes in the first minute: count from when it was made)
+    const firstAt = readsOf(t, '/clubber/csv')[0].at;
+    await drive(t, firstAt + ROSTER_FRESH_MS - 60 * 1000 - t.clock.t);
     expect(readsOf(t, '/clubber/csv')).toHaveLength(1);
     await drive(t, 3 * 60 * 1000);
     expect(readsOf(t, '/clubber/csv')).toHaveLength(2);

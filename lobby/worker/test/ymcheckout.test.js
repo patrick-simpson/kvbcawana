@@ -69,7 +69,7 @@ describe('the sweep', () => {
 
   it('at 7:15 checks out each Trek and Journey child, ONE post every 15 s, with the page\'s meeting', async () => {
     const t = await rig({ env: ON, kids: [...YOUNGER, ...TREK], start: AT('19:15') });
-    await drive(t, 3 * 60 * 1000);   // a sign-in first: three slots of the 15 s clock
+    await drive(t, 3 * 60 * 1000);   // a sign-in first: three slots of the 5 s clock
     expect(posted(t)).toEqual(['7001', '7002', '7003']);
     const at = t.posts.checkoutAt;
     expect(at[1] - at[0]).toBe(YM_CHECKOUT_GAP_MS);
@@ -127,7 +127,7 @@ describe('the sweep', () => {
     expect(posted(t)).toEqual(['7001', '7009', '7010']);
   });
 
-  it('reads no report of its own: the Checkout page at most every 60 s, all reads 15 s apart', async () => {
+  it('reads no report of its own: the Checkout page at most every 60 s, all reads 5 s apart', async () => {
     const run = async (env) => {
       const t = await rig({ env, kids: [...YOUNGER, ...TREK], start: AT('19:15') });
       await drive(t, 3 * 60 * 1000);

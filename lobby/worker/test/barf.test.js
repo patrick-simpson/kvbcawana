@@ -56,7 +56,7 @@ function followPosts(t, { refuse = 0, readDuringGap = true } = {}) {
   t.on.undo = async () => { t.night.kids = t.night.kids.filter((k) => k.id !== '662'); };
   t.on.checkin = async () => {
     if (readDuringGap) {
-      // The watcher's 15 s read lands in the gap: TwoTimTwo does not list Kit right now.
+      // The watcher's read lands in the gap: TwoTimTwo does not list Kit right now.
       t.clock.tick(WATCH_INTERVAL_MS);
       await t.core.watcher.tick();
       t.gapRead = t.reads.at(-1)?.path;
@@ -141,7 +141,7 @@ describe('POST /v1/desk/barf-late', () => {
     expect(everything(t.storage)).not.toMatch(plainWords(['Kit', 'Tester', 'Sam']));
   });
 
-  it('reads as a desk action on the 15 s clock: one urgent report read, the night\'s check-in page held, the hold outlasting a pushed-back report', async () => {
+  it('reads as a desk action on the 5 s clock: one urgent report read, the night\'s check-in page held, the hold outlasting a pushed-back report', async () => {
     const { t, st } = await barfNight();
     // A page asked for the roster: the check-in page is held for the night.
     expect((await t.call('GET', '/v1/desk/roster')).status).toBe(200);

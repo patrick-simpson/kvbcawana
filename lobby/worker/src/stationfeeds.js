@@ -1,7 +1,7 @@
 // What the print stations need from TwoTimTwo besides the check-ins (owner
 // 2026-10-16: the Chrome extension goes; the Worker takes over the four things
 // only it still did). Three of them live here, all run from the watcher's alarm
-// on the ONE read clock (readbudget.js, 15 s; routes.md section 7 says how the
+// on the ONE read clock (readbudget.js, 5 s; routes.md section 7 says how the
 // slots are shared); the fourth, the Checkout page's hand-made check-outs, is
 // ymcheckout.js's (it already reads that page).
 //

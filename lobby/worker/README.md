@@ -188,7 +188,7 @@ All JSON. Every route but the first three needs `Authorization: Bearer
 
 | `GET /v1/cloud/status` | the cloud check-in watcher: `{mode, configured, windowOpen, readIntervalSec, watchIntervalSec, budget: {intervalMs, interactiveWaitMs, readyInMs, reportReservedInMs, taken, refused, reportBumps, displaced}, deskPage: {held, readAt}, families: {held, readAt, waiting, lookedFor, catchUps}, checkedIn, byClub, tonight, lastError, checkinPage, log, ...}`, counts and fixed codes only |
 | `GET /v1/history/import-status` | the trends back-fill: `{state, seasons: [{season, nights, importedAt}], oldestSeason, lastRunAt, nextDueAt, lastError, ...}`, fixed codes only (`src/routes.md` section 3) |
-| `POST /v1/cloud/read-now` | one report read now, on any day (a rehearsal), never within 15 s of any read: `{ok, verdict?, error?, throttled?, status}` |
+| `POST /v1/cloud/read-now` | one report read now, on any day (a rehearsal), never within 5 s of any read: `{ok, verdict?, error?, throttled?, status}` |
 
 Changes to the template, Journey's settings and the calendar ring a plaintext
 doorbell, `changed` `{what, at}` on the live channel; it carries
@@ -242,13 +242,12 @@ either side) and sleeps the rest of the week. It **publishes nothing**: it
 logs the tally it would publish and what it would print
 (`npx wrangler tail`, lines starting `[cloud] shadow:`) and keeps the status
 above. TwoTimTwo's terms (2026-10-11): an automated user, ONE read every 5
-seconds with every read combined. While the laptop's extension tab still reads
-beside it, the Worker keeps to ONE read every 15 s, all its reads combined
-(owner 2026-10-12; `READ_INTERVAL_MS` in `src/readbudget.js` goes back to 5 s
-when the tab is retired), so the watcher never reads within 15 s of any read
-the session made ("read now" and the pages' reads included). Putting every
-read on one clock is ROADMAP.md#online-check-in P1; how the slots are shared
-is routes.md section 7.
+seconds with every read combined. The Worker keeps to exactly that
+(`READ_INTERVAL_MS = 5000` in `src/readbudget.js`; it was 15 s from 2026-10-12
+only while the laptop's extension tab still read, which is retired), so the
+watcher never reads within 5 s of any read the session made ("read now" and the
+pages' reads included). Putting every read on one clock is
+ROADMAP.md#online-check-in P1; how the slots are shared is routes.md section 7.
 
 Safety: a report with fewer children than its own `Count:` footers is partial
 and changes nothing; a read that would drop more than half the room is

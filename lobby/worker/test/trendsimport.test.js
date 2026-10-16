@@ -2,7 +2,7 @@
 // TwoTimTwo's Attendance Summary CSV, one season per read, into D1's
 // night_summary_import, by itself from the watcher's alarm. The parser is strict
 // (a changed report stores nothing), the live desk line always wins over an
-// imported one, the reads keep the one 15 s clock at the lowest priority and
+// imported one, the reads keep the one 5 s clock at the lowest priority and
 // never in a club night's window, and a restart resumes where it was.
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
@@ -222,7 +222,7 @@ describe('the back-fill, from the alarm', () => {
     expect(asked).toHaveLength(4);
   });
 
-  it('keeps the one read clock: every TwoTimTwo request 15 s apart, a booked clock waits a tick', async () => {
+  it('keeps the one read clock: every TwoTimTwo request 5 s apart, a booked clock waits a tick', async () => {
     const { r, asked } = await setup();
     // Another read has just taken the clock: the back-fill does not read, and wakes when it frees.
     r.core.watcher.budget.note(r.clock.t);

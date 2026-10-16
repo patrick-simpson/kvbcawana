@@ -428,7 +428,7 @@ describe('a restart (a new object over the same storage)', () => {
     expect((await st.call('POST', '/v1/print/heartbeat', { jobId: body.job.id })).body).toMatchObject({ ok: true });
     // and the read clock: the first check-in read the page; a read right after the
     // restart (a fresh object with no page held: the stored copy is taken away
-    // here, deskpage.test.js tests reading it back) waits out the rest of the 15 s
+    // here, deskpage.test.js tests reading it back) waits out the rest of the 5 s
     await t.storage.delete('desk:page');
     const before = t.reads.at(-1).at;
     await t.call('GET', '/v1/desk/roster');
@@ -437,7 +437,7 @@ describe('a restart (a new object over the same storage)', () => {
   });
 });
 
-describe('every TwoTimTwo read, of every kind, keeps the 15 s clock', () => {
+describe('every TwoTimTwo read, of every kind, keeps the 5 s clock', () => {
   it('desk check-ins, the roster, the households, undo and the watcher interleaved', async () => {
     const t = await rig({ kids: [kid(1), kid(2)] });
     const st = await t.station();
@@ -471,7 +471,7 @@ describe('every TwoTimTwo read, of every kind, keeps the 15 s clock', () => {
     expect(t.reads.filter((r) => r.path === '/clubber/checkin')).toHaveLength(1);
     // the clock booked solid (a long queue): 429 with when to ask again
     const t2 = await rig();
-    for (let i = 0; i < 4; i++) t2.core.watcher.budget.claim(60000);
+    for (let i = 0; i < 6; i++) t2.core.watcher.budget.claim(60000);
     const busy = await t2.call('GET', '/v1/desk/roster');
     expect(busy.status).toBe(429);
     expect(busy.body.retryAfterMs).toBeGreaterThan(0);
@@ -510,7 +510,7 @@ describe('the desk page\'s items and families', () => {
     await t.call('GET', '/v1/desk/families');
     expect(t.reads.length).toBe(before);
     const t2 = await rig({ households: () => HOUSEHOLD_CSV });
-    for (let i = 0; i < 4; i++) t2.core.watcher.budget.claim(60000);
+    for (let i = 0; i < 6; i++) t2.core.watcher.budget.claim(60000);
     const busy = await t2.call('GET', '/v1/desk/families');
     expect(busy.status).toBe(429);
     expect(busy.body.reason).toBe('read-busy');

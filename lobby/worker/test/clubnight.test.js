@@ -1,6 +1,6 @@
-// A simulated club night on the ONE read clock (owner 2026-10-12): while the
-// laptop's extension tab still reads TwoTimTwo, the Worker makes at most ONE read
-// every 15 s, all of them combined, and a desk check-in never waits for one.
+// A simulated club night on the ONE read clock (TwoTimTwo's limit, back at 5 s since
+// the extension was retired; 15 s from 2026-10-12): the Worker makes at most ONE read
+// every 5 s, all of them combined, and a desk check-in never waits for one.
 // Real concurrency: every sleep is a timer on a simulated clock, and the alarm,
 // three phones polling the roster, the desk and the youth check-out run side by side.
 import { describe, expect, it } from 'vitest';
@@ -111,7 +111,7 @@ async function night({ start, minutes, env = {}, script = [], households }) {
           if (f.status === 200) { phone.familiesAt = f.body.familiesAt; log.families.push({ at: clock.t, households: f.body.households }); }
         }
         phone.busy = false;
-        phone.next = clock.t + 15000;
+        phone.next = clock.t + 15000;   // a phone's own poll cadence, not the read clock
         done.n += 1;
       })());
       continue;
@@ -162,12 +162,12 @@ const deskCheckin = (at, clubberId = '662') => ({
 });
 
 // Real time passes while the simulation settles: these take a few seconds each.
-describe('a club night on the one 15 s read clock', { timeout: 60000 }, () => {
-  it('6 pm: report every 30 s, the roster 30 s fresh for three phones, no two reads within 15 s, a check-in never waits', async () => {
+describe('a club night on the one 5 s read clock', { timeout: 60000 }, () => {
+  it('6 pm: report every 30 s, the roster 30 s fresh for three phones, no two reads within 5 s, a check-in never waits', async () => {
     const { t, log } = await night({
       start: AT('18:00'), minutes: 8,
       // a check-in while the clock is booked (a read started, the next not yet allowed)
-      script: [deskCheckin(AT('18:04:05'))],
+      script: [deskCheckin(AT('18:04:02'))],
     });
     const all = t.slots.map((s) => s.at);
     expect(Math.min(...gaps(all))).toBeGreaterThanOrEqual(READ_INTERVAL_MS);
@@ -179,7 +179,8 @@ describe('a club night on the one 15 s read clock', { timeout: 60000 }, () => {
     const signedIn = t.reads.find((x) => x.path === '/clubber/checkin_report').at;
     expect(log.roster.filter((r) => r.at >= signedIn && (r.status !== 200 || r.waited > 20000))).toEqual([]);
     const rosterPages = t.reads.filter((r) => r.path === '/clubber/checkin').map((r) => r.at);
-    expect(Math.min(...gaps(rosterPages))).toBeGreaterThanOrEqual(CHECKIN_PAGE_TTL_MS);
+    // (the first gap aside: the watcher's one start-up probe of the night's page may follow a phone's first read by a few slots)
+    expect(Math.min(...gaps(rosterPages.slice(1)))).toBeGreaterThanOrEqual(CHECKIN_PAGE_TTL_MS);
     // the desk check-in: answered at once, no read, TwoTimTwo's post made
     expect(log.checkins).toHaveLength(1);
     expect(log.checkins[0]).toMatchObject({ status: 200, ms: 0, readsDuring: 0 });
@@ -190,7 +191,7 @@ describe('a club night on the one 15 s read clock', { timeout: 60000 }, () => {
     const rate = perMinute(t.slots, AT('18:02'), AT('18:08'));
     console.warn('[schedule 6:00 pm]', JSON.stringify(rate));
     expect(rate['/clubber/checkin_report']).toBe(2);
-    expect(Object.values(rate).reduce((a, b) => a + b, 0)).toBeLessThanOrEqual(4);
+    expect(Object.values(rate).reduce((a, b) => a + b, 0)).toBeLessThanOrEqual(5);   // report 2 + roster page 2 + a stations' feed read now and then: 4 to 5 of the 12 slots a minute
   });
 
   it('7:30 pm: the youth check-out joins (Checkout page once a minute, one post per 15 s), the report still every 30-45 s', async () => {
@@ -211,7 +212,8 @@ describe('a club night on the one 15 s read clock', { timeout: 60000 }, () => {
     const rate = perMinute(t.slots, AT('19:25'), AT('19:32'));
     console.warn('[schedule 7:30 pm]', JSON.stringify(rate));
     expect(rate['/clubber/checkin_report']).toBeGreaterThanOrEqual(1.4);
-    expect(Object.values(rate).reduce((a, b) => a + b, 0)).toBeLessThanOrEqual(4);
+    // report 2 + roster page 2 + Checkout page 1 (+ the odd meeting report): 5 of the 12 slots a minute
+    expect(Object.values(rate).reduce((a, b) => a + b, 0)).toBeLessThanOrEqual(6);
   });
 
   it('a child the household export does not list: ONE catch-up read, and the phones regroup', async () => {

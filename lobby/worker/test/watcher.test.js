@@ -146,8 +146,8 @@ describe('the watcher', () => {
     expect(near.alarm.at - near.now()).toBe(10 * 60 * 1000);
   });
 
-  it('reads the report every 30 s, and every read of every kind shares one 15 s clock', async () => {
-    expect(READ_INTERVAL_MS).toBe(15000);
+  it('reads the report every 30 s, and every read of every kind shares one 5 s clock', async () => {
+    expect(READ_INTERVAL_MS).toBe(5000);
     expect(WATCH_INTERVAL_MS).toBe(30000);
     expect(SEAL_PER_TICK).toBe(1);
     const s = setup({ kids: [kid(1)] });
@@ -156,7 +156,7 @@ describe('the watcher', () => {
     // the free slot between two reports: the night's check-in page
     expect(s.alarm.at - s.now()).toBe(READ_INTERVAL_MS);
     s.tick(2000);
-    // read-now is a read like any other: 13 s of the 15 s clock are left
+    // read-now is a read like any other: 3 s of the 5 s clock are left
     expect((await s.w.readNow()).throttled).toBe(true);
     s.tick(READ_INTERVAL_MS - 2000);
     await s.w.tick();

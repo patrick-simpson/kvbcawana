@@ -107,7 +107,7 @@ export function itemClubs(events) {
   return { bible: clubsOf(BIBLE_RE), friend: clubsOf(FRIEND_RE) };
 }
 
-/** The roster's check-in page is re-read at most this often (pages poll every 15 s; 2 of the 4 reads a minute). */
+/** The roster's check-in page is re-read at most this often (pages poll every 15 s; 2 of the 12 reads a minute). */
 export const CHECKIN_PAGE_TTL_MS = 30 * 1000;
 /** TwoTimTwo's club ids (printer/docs/TWOTIMTWO.md 2.1), when the page names no child of that club. */
 const KNOWN_CLUB_IDS = /** @type {Record<string, string>} */ ({ cubbies: '1', sparks: '2', 't&t': '3', puggles: '4', trek: '6', journey: '7' });
@@ -278,8 +278,8 @@ export class Desk {
 
   /**
    * Is a roster refresh worth a free slot of the watcher's alarm: a page asked
-   * for the roster lately (they poll every 15 s) and the page held is a slot
-   * old? Then the alarm reads it ahead (`refreshRoster`) and the next poll is
+   * for the roster lately (they poll every 15 s) and the page held has expired
+   * (30 s old)? Then the alarm reads it ahead (`refreshRoster`) and the next poll is
    * answered at once. @returns {number|null} ms until due, or null
    */
   rosterRefreshInMs() {
@@ -288,7 +288,9 @@ export class Desk {
     if (!c || c.night !== churchNight(this.now())) return 0;
     // A page read back after a restart: the very next free slot reads a fresh one.
     if (c.restored) return 0;
-    return Math.max(0, c.at + READ_INTERVAL_MS - this.now());
+    // Read ahead when the page has just expired (the poll's own freshness, CHECKIN_PAGE_TTL_MS),
+    // not a slot after it was read: at a 5 s clock that would be a read every 5 s.
+    return Math.max(0, c.at + CHECKIN_PAGE_TTL_MS - this.now());
   }
 
   /** The watcher's read ahead of the roster (waitMs 0). true when it read. */

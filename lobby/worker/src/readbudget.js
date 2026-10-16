@@ -1,11 +1,12 @@
-// ONE TwoTimTwo read every 15 seconds, ALL the Worker's reads combined. TwoTimTwo's
-// terms (owner 2026-10-11) are one read every 5 s; while the laptop's extension
-// tab still reads TwoTimTwo beside the Worker (about 3 reads a minute), the owner
-// (2026-10-12) keeps the Worker to one read every 15 s, so the two together stay
-// well inside them. READ_INTERVAL_MS goes back to 5 s when the extension tab is
-// retired (ROADMAP.md#cloud-check-in). That is 4 reads a minute for the
-// watcher's report, the check-in page behind the desk's and phones' roster, the
-// Checkout page, the household export and each hop of a sign-in. They all take
+// ONE TwoTimTwo read every 5 seconds, ALL the Worker's reads combined. That is
+// TwoTimTwo's own limit (their word to the owner, 2026-10-11: an automated user
+// may read as often as one read every 5 s, every read combined). The owner's
+// 2026-10-12 rule kept the Worker to one read every 15 s only while the laptop's
+// Chrome extension tab still read TwoTimTwo beside it; the extension is retired
+// (KVBC Awana 10.0.0), so the clock is back at the vendor's 5 s. That is 12
+// reads a minute for the watcher's report, the check-in page behind the desk's
+// and phones' roster, the Checkout page, the household export, the stations'
+// feeds and each hop of a sign-in. They all take
 // a slot from this clock before they GET a page (TwoTimTwoClient.page does it),
 // so no caller keeps its own ad-hoc wait and no two reads can ever land inside
 // one interval.
@@ -30,7 +31,7 @@
 // report every 30 s the slots go report, other, report, other. Only a request
 // that could not otherwise be served within its wait may take the reserved
 // slot, and only ONCE per reservation (the report then reads one slot later,
-// 45 s after the last). `priority` reads (the watcher's report, and a hop of a
+// 35 s after the last). `priority` reads (the watcher's report, and a hop of a
 // request already under way) ignore the reservation.
 //
 // DESK ACTIONS FIRST (owner 2026-10-12: "When someone is checking in a child it
@@ -44,8 +45,8 @@
 // The last booked moment is also kept in storage, so a restarted Durable
 // Object does not start a read inside the interval of the one before it.
 
-/** One TwoTimTwo read per this long, every Worker read combined (owner 2026-10-12; 5 s once the extension tab is retired). */
-export const READ_INTERVAL_MS = 15 * 1000;
+/** One TwoTimTwo read per this long, every Worker read combined (the vendor's limit; was 15 s while the extension tab still read, 2026-10-12). */
+export const READ_INTERVAL_MS = 5 * 1000;
 /** How long an interactive request (a desk or phone page) will queue for a slot: more than one slot. */
 export const INTERACTIVE_WAIT_MS = 20 * 1000;
 const KEY = 'read:next';

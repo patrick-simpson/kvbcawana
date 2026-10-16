@@ -339,7 +339,7 @@ describe('a stored page that is not tonight\'s is never trusted', () => {
     const t = await deskRig();
     t.restart();
     await t.storage.put(DESK_PAGE_KEY, await sealState('another-password', { at: WED_6PM, night: NIGHT, page: goodPage() }));
-    for (let i = 0; i < 4; i++) t.core.watcher.budget.claim(60000);
+    for (let i = 0; i < 6; i++) t.core.watcher.budget.claim(60000);
     expect((await t.call('GET', '/v1/desk/roster')).status).toBe(429);
     expect(t.storage.map.has(DESK_PAGE_KEY)).toBe(false);
   });

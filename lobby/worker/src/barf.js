@@ -9,7 +9,7 @@
 //      under the report's Brought a friend column), and no other operation or
 //      desk check-in of theirs is under way (one synchronous check-and-set)
 //   2. ONE report read through the shared read clock (readbudget.js: one read
-//      every 15 s), URGENT like every desk action's read (the head of the queue,
+//      every 5 s), URGENT like every desk action's read (the head of the queue,
 //      never behind the roster's or the watcher's background reads): the child
 //      must be on it, and the items they had (YES under Bible) are what the redo
 //      sends again. The check-in page (the meeting's id, the child's club, the

@@ -625,8 +625,8 @@ const fakeSafe = {
         t2.clock.t = Math.max(t2.clock.t + 1000, t2.alarm.at);
       }
       const rosterReads = t2.reads.filter((r) => r.path === '/clubber/csv').length;
-      const gaps = t2.reads.map((r) => r.at).every((at, i, all) => i === 0 || at - all[i - 1] >= 15000);
-      check('the Worker read the roster export ONCE (the station\'s polls meanwhile ask no second read) and the completed books, on its 15 s read clock', rosterReads === 1 && t2.reads.some((r) => r.path === '/report/completed_books') && gaps,
+      const gaps = t2.reads.map((r) => r.at).every((at, i, all) => i === 0 || at - all[i - 1] >= 5000);
+      check('the Worker read the roster export ONCE (the station\'s polls meanwhile ask no second read) and the completed books, on its 5 s read clock', rosterReads === 1 && t2.reads.some((r) => r.path === '/report/completed_books') && gaps,
         t2.reads.slice(-12).map((r) => `${(r.at - t2.reads[0].at) / 1000}s ${r.path}`).join(', '));
       check('and keeps no name or allergy in its storage', !/Allerby|peanuts|HangGlider/.test(everything(storage2)));
       const synced = await bundles.syncOnce();
