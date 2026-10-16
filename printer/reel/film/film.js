@@ -1,13 +1,18 @@
 // The KVBC Awana reel: one timeline, every frame a pure function of time.
 //
 // Owner, 2026-10-16: a whole-system montage cut to "Happy Dance" (MercyMe;
-// reel/README.md), about 1:30. The title (the clock ticking to 6:00, as on the
-// home page) as the band comes in, then the real screens one at a time over
-// the verse; a hard cut on every bar and then every screen at once over the
-// first chorus; after the splice (edit.mjs) the Journey room over the build,
-// the screens again over the final chorus, and the end card with the church's
-// logo on the song's last hit. Words are corner
-// labels only, plus the title and the end card's credit and trademark line.
+// reel/README.md), about 1:01, every screen ONCE ("Should it be shortened in
+// order to just show once, and put more in time with the music?": yes). The
+// title (the clock ticking to 6:00, as on the home page) as the band comes in,
+// then the night's screens swept in two bars each over the verse; the first
+// chorus cuts hard (game time on its first hit, the season's posters a bar
+// each, Journey with the leader's remote, the milestone, pickup, Settings),
+// then every screen at once across the splice (edit.mjs), and the end card
+// with the church's logo on the song's last hit. Inside each shot the moment
+// itself lands on a beat: a name, a tap, a label, the countdown's 0:00 (the
+// shots are filmed with their cues one bar apart; the offsets below seat them).
+// Words are corner labels only, plus the title and the end card's credit and
+// trademark line.
 //
 // Real footage comes from record.mjs (/work/footage/<shot>/), the labels from
 // labels.cjs (/work/labels/); everything else is drawn from the brand kit.
@@ -17,9 +22,9 @@ import { C, CLUBS, Footage, Screen, art, chip, loadKit, mark, words } from './ki
 // Measured off the track (reel/README.md): exactly 125 BPM, steady to 4 ms.
 export const BEAT = 0.48;
 const b = (n) => n * BEAT;
-// Song beats 48-159 (the verse and the first chorus: film 0-112), then 320 to
-// the last hit (the build and the final chorus: film 112-184), ringing out to 190.5.
-export const DURATION = b(190.5);
+// Song beats 48-151 (the verse and the first chorus, while it is loud: film
+// 0-104), then 376 to the last hit (film 104-120), ringing out to 126.5.
+export const DURATION = b(126.5);
 
 const W = 1920, H = 1080;
 const stage = document.getElementById('stage');
@@ -256,7 +261,7 @@ function plate(parent, footage, { w, h, outline = '#fff', face = '#000' }) {
 
 const F = {};
 for (const name of ['lobby-open', 'lobby-run', 'lobby-milestone', 'lobby-pickup', 'projector-countdown',
-  'projector-game', 'journey', 'phone', 'settings', 'promo-barf', 'promo-snow', 'promo-contest', 'promo-parents']) F[name] = new Footage(name);
+  'projector-game', 'journey-slides', 'remote', 'phone', 'settings', 'promo-barf', 'promo-snow', 'promo-contest', 'promo-parents']) F[name] = new Footage(name);
 
 /* ── The night, cut to the music (owner, 2026-10-16) ──────────────────
    A whole-system montage on "Happy Dance"'s beat: one title, then the real
@@ -344,12 +349,31 @@ function printing(root, { files, field, accent, sweep = true }) {
     enter(t);
     put(printer, { x: 510, y: 680 });
     labels.forEach((img, i) => {
-      const t0 = 0.25 + i * b(2);
+      // One label every two beats, starting on beat 1.
+      const t0 = b(1 + i * 2);
       const k = E.settle(prog(t, t0, b(1.6)));
       // Each new label pushes the last one up and off the top.
-      const next = labels[i + 1] ? E.settle(prog(t, 0.25 + (i + 1) * b(2), b(1.6))) : 0;
+      const next = labels[i + 1] ? E.settle(prog(t, b(1 + (i + 1) * 2), b(1.6))) : 0;
       put(img, { y: lerp(560, 150, k) - next * 520, o: t >= t0 ? 1 : 0 });
     });
+    drawLabel(t);
+  };
+}
+
+/** The Journey room's PC and the leader's phone remote, side by side, pressed together. */
+function pair(root, { at, field }) {
+  const body = el('div', 'layer', root);
+  body.style.background = field;
+  const drawLabel = cornerLabel(body, 'Journey room · leader’s remote');
+  const pw = 1200, ph = 675;
+  const pc = plate(body, F['journey-slides'], { w: pw, h: ph, outline: '#fff' });
+  const phone = phoneBody(body, F.remote, { h: 820 });
+  return (t) => {
+    const s = lerp(0.9, 1, E.pop(prog(t, 0, 0.36)));
+    put(pc.box, { x: 120, y: 250, s });
+    put(phone.box, { x: 1420, y: lerp(H + 40, 150, E.settle(prog(t, 0.05, 0.45))) });
+    wait(pc.screen.set(at(t)));
+    wait(phone.screen.set(at(t)));
     drawLabel(t);
   };
 }
@@ -431,54 +455,47 @@ function endCard(root) {
 
 const OVERLAP = 0.75; // a swept scene stays up under the next one's sweep
 const T = (n) => b(n);
-export const POSTER_AT = T(186.5); // the end card, settled
+export const POSTER_AT = T(122.5); // the end card, settled
 function build() {
   const S = (name, from, to, fn, sweepNext = true) => scene(name, T(from), T(to) + (sweepNext ? OVERLAP : 0), fn);
-  // The verse (song beats 48-95): the title as the band comes in, then one screen at a time.
+  // The verse (song beats 48-95): the title as the band comes in, then two bars a screen.
   S('opener', 0, 8, opener);
-  S('lobby-open', 8, 16, (r) => shot(r, { clip: 'lobby-open', at: (t) => 2.6 + t, label: 'Lobby TV', field: C.sun, accent: C.orange }));
-  S('phone', 16, 24, (r) => shot(r, { clip: 'phone', at: (t) => 0.9 + t, label: 'Check-in · any phone', field: C.cubbies, accent: C.blueDeep, portrait: true, from: 'left' }));
-  S('labels', 24, 30, (r) => printing(r, { files: ['1-maya', '2-noah', '3-ella'], field: C.cream, accent: C.hot }));
-  S('lobby-run', 30, 40, (r) => shot(r, { clip: 'lobby-run', at: (t) => 0.3 + t, label: 'Lobby TV', field: C.sparks, accent: C.sparksDeep, from: 'left' }));
-  // The countdown runs out (clip 11 s) a beat and a half before the chorus.
-  S('countdown', 40, 48, (r) => shot(r, { clip: 'projector-countdown', at: (t) => 8.4 + t, label: 'Projector wall', field: '#000', accent: C.sun }), false);
-  // The first chorus (song beats 96-159): a hard cut on every bar, then every screen at once.
-  const CHORUS = [
-    ['journey', (t) => 1.4 + t * 0.7, 'Journey room', C.journeyInk],
-    ['lobby-milestone', (t) => t, 'Lobby TV', C.tnt],
-    ['projector-game', (t) => 1 + t, 'Game time', '#000'],
-    ['lobby-run', (t) => 8 + t, 'Lobby TV', C.puggles],
-    ['settings', (t) => 2 + t, 'Settings · any device', C.cream],
-    ['lobby-pickup', (t) => 0.5 + t, 'Pickup board', C.orange],
-    [null, null, 'Label printer', C.sun],
-    ['phone', (t) => 2.6 + t, 'Check-in · any phone', C.cubbies],
-  ];
-  CHORUS.forEach(([clip, at, label, field], i) => {
-    const from = 48 + i * 4;
-    if (!clip) S(`chorus-${i}`, from, from + 4, (r) => printing(r, { files: ['4-leo', '5-sophia', '6-owen'], field, accent: field, sweep: false }), false);
-    else S(`chorus-${i}`, from, from + 4, (r) => shot(r, { clip, at, label, field, accent: field, sweep: false, portrait: clip === 'phone', ratio: clip === 'settings' ? 1.6 : 16 / 9 }), false);
-  });
-  S('everything', 80, 112, (r) => everything(r, [
-    { clip: 'lobby-run', at: (t) => 0.5 + t, label: 'Lobby TV' },
+  // The phone's two taps (clip 1.4 s, 3.32 s) on beats 2 and 6.
+  S('phone', 8, 16, (r) => shot(r, { clip: 'phone', at: (t) => 0.44 + t, label: 'Check-in · any phone', field: C.cubbies, accent: C.blueDeep, portrait: true, from: 'left' }));
+  S('labels', 16, 24, (r) => printing(r, { files: ['1-maya', '2-noah', '3-ella'], field: C.cream, accent: C.hot }));
+  // The first child of the night: her name lands (clip 4.75 s) on beat 2.
+  S('lobby-open', 24, 32, (r) => shot(r, { clip: 'lobby-open', at: (t) => 3.79 + t, label: 'Lobby TV', field: C.sun, accent: C.orange }));
+  // A run, a name a bar (the lobby holds each 1.92 s): on beats 2 and 6.
+  S('lobby-run', 32, 40, (r) => shot(r, { clip: 'lobby-run', at: (t) => 0.29 + t, label: 'Lobby TV', field: C.sparks, accent: C.sparksDeep, from: 'left' }));
+  // The countdown hits 0:00 (clip 8.75 s) on beat 4; the opening lands before the chorus.
+  S('countdown', 40, 48, (r) => shot(r, { clip: 'projector-countdown', at: (t) => 6.83 + t, label: 'Projector wall', field: '#000', accent: C.sun }), false);
+  // The first chorus (song beats 96-151): hard cuts.
+  const cut = (name, from, to, opts) => S(name, from, to, (r) => shot(r, { sweep: false, accent: opts.field, ...opts }), false);
+  // Game time: WRAP IT UP (clip 5.0 s) on beat 4.
+  cut('game', 48, 56, { clip: 'projector-game', at: (t) => 3.08 + t, label: 'Game time', field: '#000' });
+  // The season's posters, a bar each, a little quick, each on its big moment.
+  cut('promo-barf', 56, 60, { clip: 'promo-barf', at: (t) => 4.6 + t * 1.4, label: 'Lobby TV · BARF Night', field: '#5B2C83' });
+  cut('promo-contest', 60, 64, { clip: 'promo-contest', at: (t) => 6.85 + t * 1.2, label: 'Lobby TV · poster contest', field: C.blueDeep });
+  cut('promo-parents', 64, 68, { clip: 'promo-parents', at: (t) => 8.85 + t * 1.2, label: "Lobby TV · Parents' Night", field: C.orange });
+  cut('promo-snow', 68, 72, { clip: 'promo-snow', at: (t) => 5.6 + t, label: 'Lobby TV · snow alerts', field: '#1B2F66' });
+  // Journey with the leader's remote: each Next (clip 1.0 s, 2.92 s) settles on beats 2 and 6.
+  S('journey', 72, 80, (r) => pair(r, { at: (t) => 0.54 + t, field: C.journeyInk }), false);
+  cut('milestone', 80, 84, { clip: 'lobby-milestone', at: (t) => t, label: 'Lobby TV', field: C.tnt });
+  // Pickup: "Owen has checked out" (clip about 4.3 s) on beat 2.
+  cut('pickup', 84, 88, { clip: 'lobby-pickup', at: (t) => 3.34 + t, label: 'Pickup board', field: C.orange });
+  // Settings: the two taps (clip 2.0 s, 3.92 s) on beats 2 and 6.
+  cut('settings', 88, 96, { clip: 'settings', at: (t) => 1.04 + t, label: 'Settings · any device', field: C.cream, ratio: 1.6 });
+  // Every screen at once, across the splice (film 104 = song beat 376).
+  S('everything', 96, 112, (r) => everything(r, [
+    { clip: 'lobby-run', at: (t) => 2.2 + t, label: 'Lobby TV' },
     { clip: 'projector-game', at: (t) => 1 + t, label: 'Projector' },
-    { clip: 'journey', at: (t) => 1.6 + t * 0.4, label: 'Journey room' },
-    { clip: 'lobby-milestone', at: (t) => t, label: 'Lobby TV' },
+    { clip: 'journey-slides', at: (t) => 0.5 + t * 0.5, label: 'Journey room' },
+    { clip: 'promo-barf', at: (t) => 9 + t, label: 'Lobby TV' },
     { clip: 'lobby-pickup', at: (t) => 0.4 + t, label: 'Pickup board' },
     { clip: 'settings', at: (t) => 1.5 + t * 0.6, label: 'Settings' },
   ]), false);
-  // The build (song beats 320-335, after the splice): the Journey room, a breath.
-  S('journey', 112, 128, (r) => shot(r, { clip: 'journey', at: (t) => 0.6 + t * 0.7, label: 'Journey room', field: C.journeyInk, accent: C.journey }));
-  // The final chorus (song beats 336-391): the screens again, swept in on every other bar.
-  S('pickup', 128, 136, (r) => shot(r, { clip: 'lobby-pickup', at: (t) => 2.6 + t, label: 'Pickup board', field: C.orange, accent: C.hot, from: 'left' }));
-  // The season's posters (owner, 2026-10-16), on the real lobby, a bar each and a
-  // little quick, the way they play between the slides.
-  S('promo-contest', 136, 144, (r) => shot(r, { clip: 'promo-contest', at: (t) => 1.5 + t * 1.5, label: 'Lobby TV · poster contest', field: C.blueDeep, accent: C.sun }));
-  S('promo-barf', 144, 152, (r) => shot(r, { clip: 'promo-barf', at: (t) => 5 + t * 1.6, label: 'Lobby TV · BARF Night', field: '#5B2C83', accent: '#8BD13A', from: 'left' }));
-  S('promo-snow', 152, 160, (r) => shot(r, { clip: 'promo-snow', at: (t) => 3 + t * 1.2, label: 'Lobby TV · snow alerts', field: '#1B2F66', accent: '#FFFFFF' }));
-  S('labels-2', 160, 168, (r) => printing(r, { files: ['4-leo', '5-sophia', '6-owen'], field: C.cream, accent: C.sparks }));
-  S('promo-parents', 168, 176, (r) => shot(r, { clip: 'promo-parents', at: (t) => 4.5 + t * 1.6, label: "Lobby TV · Parents' Night", field: C.orange, accent: C.hot, from: 'left' }));
-  // The end card: the logo lands on the song's last hit (song beat 392 = film beat 184).
-  scene('end', T(176), DURATION + 1, endCard);
+  // The end card: the logo lands on the song's last hit (song beat 392 = film beat 120).
+  scene('end', T(112), DURATION + 1, endCard);
 }
 
 /* ── Seeking ─────────────────────────────────────────────────────── */

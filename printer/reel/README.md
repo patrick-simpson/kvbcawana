@@ -58,7 +58,11 @@ Measured off the file: exactly 125 BPM (beat 0.480 s, first beat 0.044 s;
 the grid holds to 4 ms over the whole song). The film's timeline (`film.js`,
 `BEAT`) is on that grid: the film starts on song beat 48 (23.08 s, where the
 song really starts; the owner, 2026-10-16: before it is the file's lead-in),
-the first chorus lands at film beat 48 (0:23), the cut jumps at film beat 112
-(the end of the first chorus) to song beat 320 (the build, four bars before
-the final chorus, which lands at film beat 128), and the end card's logo
-lands on the song's last hit, film beat 184 (1:28).
+the first chorus lands at film beat 48 (0:23), the cut jumps at film beat 104
+(song beat 152, before the first chorus quiets) to song beat 376 (the last two
+bars of the final chorus, just as loud), and the end card's logo lands on the
+song's last hit, film beat 120 (0:58). About 1:01 (owner, 2026-10-16: every
+screen once, in time with the music). Inside a shot the moment itself sits on
+a beat too: `shots.mjs` cues things one bar (1.92 s) apart (the lobby holds a
+name one bar), and `film.js` offsets each clip so the name, tap, label or
+0:00 lands on beat 2, 4 or 6 of its shot.

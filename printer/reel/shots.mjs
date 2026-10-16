@@ -69,7 +69,8 @@ export const SHOTS = {
   // full time and the next one flips in, in their own club's colours.
   'lobby-run': {
     url: '/lobby/', time: at('18:12:00'), seconds: 13.5,
-    setup: lobby({ manualSlides: TYPED_DECK, standardDisplayMs: 3200, specialDisplayMs: 3800, firstArrivalMoment: false }),
+    // One bar of the song (1.92 s) per name, so each flips on the bar (owner 2026-10-16: "in time with the music").
+    setup: lobby({ manualSlides: TYPED_DECK, standardDisplayMs: 1920, specialDisplayMs: 1920, firstArrivalMoment: false }),
     ready: '.stage',
     cues: (ctx) => ({
       0.5: checkin(ctx, 'Noah', 'T&T', { isBirthday: true }),
@@ -89,8 +90,8 @@ export const SHOTS = {
       return {
         0.0: tally({ Puggles: 14, Cubbies: 21, Sparks: 19, 'T&T': 32, Trek: 9, Journey: 3 }),
         0.1: tonight(96, 4),
-        0.3: tally({ Puggles: 14, Cubbies: 21, Sparks: 20, 'T&T': 32, Trek: 9, Journey: 3 }),
-        2.6: tonight(100, 6),
+        0.7: tally({ Puggles: 14, Cubbies: 21, Sparks: 20, 'T&T': 32, Trek: 9, Journey: 3 }),
+        2.62: tonight(100, 6),
       };
     },
   },
@@ -133,14 +134,15 @@ export const SHOTS = {
     ready: 'body',
     warmup: async (shot) => { await shot.run(1.5); },
   },
-  // Journey at 6:30: the kiosk turns from the lobby feed to the lesson's start
-  // screen and waits for a leader: this week's real lesson (owner, 2026-10-16).
-  'journey': {
-    url: '/journey/', time: at('18:29:58'), seconds: 6,
+  // Journey's teaching slides, stepped by the leader's phone remote (owner,
+  // 2026-10-16: the remote beside the screen). The room's PC and the phone are
+  // filmed apart, pressed at the same clip times (one bar apart): the PC takes
+  // the kiosk's own remote command, the phone taps its real Next button.
+  'journey-slides': {
+    url: '/journey/', time: at('18:30:05'), seconds: 6,
     setup: async (page) => {
       await page.route(/open-meteo|twotimtwo/, (r) => r.abort());
       await page.route(/\.mp4(\?|$)/, (r) => r.abort());
-      // The lobby feed it shows until 6:30 is a set-up, signed-in screen.
       await liveChannel(page);
       await page.addInitScript(() => {
         try {
@@ -150,8 +152,53 @@ export const SHOTS = {
       });
     },
     ready: '#journey-splash',
-    // The kiosk looks at the clock every 15 s: run up to just before it turns.
-    warmup: async (shot) => { await shot.run(13.4, 100); },
+    warmup: async (shot) => {
+      await shot.run(3, 100);
+      await shot.page.evaluate(() => window.journeyRemote.command({ action: 'slides-start' }));
+      await shot.run(2.5, 100);
+    },
+    cues: () => {
+      const next = (page) => page.evaluate(() => window.journeyRemote.command({ action: 'slide-next' }));
+      return { 1.0: next, 2.92: next };
+    },
+  },
+  'remote': {
+    url: '/journey/remote/', time: at('18:30:05'), seconds: 6,
+    viewport: { width: 390, height: 844 }, dpr: 2, mobile: true,
+    setup: async (page, ctx) => {
+      // The Talk About It sample answers stay on a leader's own phone (licensing):
+      // never in the film, which plays on the public home page.
+      await page.route(/slide-answers\.json/, (r) => r.fulfill({ status: 404, body: '' }));
+      const kinds = ['title', 'verse', 'misconception', 'illumination'];
+      ctx.slide = 1;
+      ctx.last = null;
+      let presses = 0;
+      await liveChannel(page, {
+        answer: (url, method, body) => {
+          const now = new Date(ctx.now ? ctx.now() : Date.now()).toISOString();
+          if (url.pathname.endsWith('/v1/journey/remote/state')) {
+            return { body: { serverNow: now, online: 1, kiosks: [{ id: 'jr-1', name: 'Journey room', online: true, now: {
+              view: 'slides', week: 8, title: 'Unit 2, Lesson 4: Naturalism', preview: false, wait: null, last: ctx.last, at: now,
+              slide: { n: ctx.slide, of: 7, kind: kinds[ctx.slide - 1] || 'template', heading: null, lines: [] },
+            } }] } };
+          }
+          if (url.pathname.endsWith('/v1/journey/remote') && method === 'POST') {
+            presses += 1;
+            const id = `reel-press-${presses}`;
+            if (body && body.action === 'slide-next') ctx.slide = Math.min(4, ctx.slide + 1);
+            ctx.last = { id, action: body && body.action, ok: true, reason: null };
+            return { body: { ok: true, id, kiosks: 1 } };
+          }
+          return undefined;
+        },
+      });
+    },
+    ready: '#btn-next',
+    warmup: async (shot) => { await shot.run(2, 100); },
+    cues: (ctx) => ({
+      1.0: (page) => ctx.tap(page, '#btn-next'),
+      2.92: (page) => ctx.tap(page, '#btn-next'),
+    }),
   },
   // The phone page, awana.kvbchurch.org/checkin, on a phone: one tap checks a
   // child in (simple check-in, on by default since 2026-10-15), then another. The check-in service behind it is a stand-in (lib/phone.mjs).
@@ -162,7 +209,7 @@ export const SHOTS = {
     ready: '.fam',
     cues: (ctx) => ({
       1.4: (page) => ctx.tap(page, '.fam[aria-label="Owen Pemberly"]'),
-      3.6: (page) => ctx.tap(page, '.fam[aria-label="Ivy Calloway"]'),
+      3.32: (page) => ctx.tap(page, '.fam[aria-label="Ivy Calloway"]'),
     }),
   },
   // One settings page for every screen (awana.kvbchurch.org/settings): the
@@ -197,7 +244,7 @@ export const SHOTS = {
     cues: (ctx) => ({
       // The rail since 2026-10-13: Tonight, Printing, Screens, What screens show, Slides & look...
       2.0: (page) => ctx.tap(page, '[role=tab]:has-text("What screens show")'),
-      4.2: (page) => ctx.tap(page, '[role=tab]:has-text("Slides & look")'),
+      3.92: (page) => ctx.tap(page, '[role=tab]:has-text("Slides & look")'),
     }),
   },
 };

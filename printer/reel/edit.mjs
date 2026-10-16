@@ -36,8 +36,8 @@ export const MUSIC = {
   at: (n) => 0.044 + n * 0.48,
 };
 const A_START = MUSIC.at(48);   // 23.084 s: the band comes in (film beat 0)
-const A_END = MUSIC.at(160);    // 76.844 s: the first chorus ends (112 film beats)
-const B_START = MUSIC.at(320);  // 153.644 s: the build into the final chorus
+const A_END = MUSIC.at(152);    // 73.004 s: the first chorus, before it quiets (104 film beats)
+const B_START = MUSIC.at(376);  // 180.524 s: the last two bars of the final chorus, to its last hit (beat 392)
 const XF = 0.02;
 
 const ff = (args) => execFileSync('ffmpeg', ['-v', 'error', '-y', ...args], { stdio: 'inherit' });
@@ -86,8 +86,8 @@ export function edit({ draft = false } = {}) {
   // included: 30 fps, video near 390 kbit/s, music at 96 kbit/s stereo.
   const budget = (mb, audioKbps) => Math.floor((mb * 8000) / duration - audioKbps);
   twoPass(film, audio, path.join(OUT, 'reel.mp4'), { width: 1280, height: 720, fps: 30, kbps: budget(5.5, 96) - 8, audioKbps: 96, channels: 2 });
-  // The poster: the end card, settled (film.js POSTER_AT = beat 186.5).
-  const posterAt = Number(process.env.REEL_POSTER_AT || 89.52);
+  // The poster: the end card, settled (film.js POSTER_AT = beat 122.5).
+  const posterAt = Number(process.env.REEL_POSTER_AT || 58.8);
   ff(['-ss', String(posterAt), '-i', film, '-frames:v', '1', '-vf', 'scale=1280:720:flags=lanczos', '-q:v', '4', path.join(OUT, 'poster.jpg')]);
   for (const f of ['reel.mp4', 'poster.jpg']) {
     console.log(`  ${f}: ${(statSync(path.join(OUT, f)).size / 1048576).toFixed(2)} MB`);
