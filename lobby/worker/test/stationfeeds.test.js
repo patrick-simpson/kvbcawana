@@ -461,6 +461,32 @@ describe('check-outs made by hand on the Checkout page', () => {
     expect(everything(t.storage)).not.toMatch(/8002|Bright/);
   });
 
+  it('a child checked out by hand at 6:50 pm leaves tonight\'s count before 7:15, with YM_CHECKOUT off', async () => {
+    const t = await rig({ env: { SINGLE_PUBLISHER: 'on' }, kids: YOUNG, start: AT('18:45') });
+    t.night.out = YOUNG.map((k) => row(k.name, k.club, k.id));
+    await drive(t, 3 * 60 * 1000);
+    expect(tally(t)).toMatchObject({ total: 3 });
+    expect(t.clock.t).toBeLessThan(AT('18:50'));
+    t.clock.t = AT('18:50');
+    t.night.out = t.night.out.filter((r) => r.id !== '8002');
+    await drive(t, 150 * 1000);
+    expect(t.clock.t).toBeLessThan(AT('19:15'));
+    expect(tally(t)).toMatchObject({ total: 2 });
+    expect((await t.call('GET', '/v1/desk/tonight')).body).toMatchObject({ checkedIn: 2 });
+    const ym = (await t.call('GET', '/v1/cloud/status')).body.ymCheckout;
+    expect(ym).toMatchObject({ enabled: false, due: false, pageWatch: true, leftPage: 1, leftPageCounted: 1 });
+    expect(t.posts.checkout).toEqual([]);   // the sweep itself stays off
+    // the page is read on the one clock, at most once a minute
+    const pages = t.reads.filter((r) => r.path === '/clubber/checkout').map((r) => r.at);
+    for (let i = 1; i < pages.length; i++) expect(pages[i] - pages[i - 1]).toBeGreaterThanOrEqual(60 * 1000);
+  });
+
+  it('outside club hours, with YM_CHECKOUT off, the Checkout page is not read', async () => {
+    const t = await rig({ env: {}, kids: YOUNG, start: AT('20:01') });
+    await drive(t, 3 * 60 * 1000);
+    expect(t.reads.filter((r) => r.path === '/clubber/checkout')).toEqual([]);
+  });
+
   it('a filtered or unreadable page compares nothing: nobody leaves', async () => {
     const t = await rig({ env: ON, kids: YOUNG, start: AT('19:15') });
     t.night.out = YOUNG.map((k) => row(k.name, k.club, k.id));

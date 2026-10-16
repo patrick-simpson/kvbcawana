@@ -191,7 +191,8 @@ describe('a club night on the one 5 s read clock', { timeout: 60000 }, () => {
     const rate = perMinute(t.slots, AT('18:02'), AT('18:08'));
     console.warn('[schedule 6:00 pm]', JSON.stringify(rate));
     expect(rate['/clubber/checkin_report']).toBe(2);
-    expect(Object.values(rate).reduce((a, b) => a + b, 0)).toBeLessThanOrEqual(5);   // report 2 + roster page 2 + a stations' feed read now and then: 4 to 5 of the 12 slots a minute
+    expect(rate['/clubber/checkout']).toBeLessThanOrEqual(1);   // the Checkout page all club night (hand check-outs), YM_CHECKOUT off
+    expect(Object.values(rate).reduce((a, b) => a + b, 0)).toBeLessThanOrEqual(6);   // report 2 + roster page 2 + Checkout page 1 + a stations' feed read now and then: 5 to 6 of the 12 slots a minute
   });
 
   it('7:30 pm: the youth check-out joins (Checkout page once a minute, one post per 15 s), the report still every 30-45 s', async () => {

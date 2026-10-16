@@ -27,18 +27,24 @@
 // restarted object never bursts. Forty children at 7:15 take about ten minutes.
 //
 // READS. Who is in comes from the watcher's report (handed over in memory after
-// each applied read; no report read of its own). The Checkout page is read only
-// for the meeting's calendar_id and date (and its rows), at most every
-// YM_PAGE_MS (60 s), only while due, through the one read clock with waitMs 0
-// (it skips its turn when the clock is booked, and keeps clear of the report's
-// reserved slot: readbudget.js). It needs the page for the meeting's id and the
-// rare row the report does not list, so once a minute is plenty, and it leaves
-// the roster its share of the 4 reads a minute. Posts are writes.
+// each applied read; no report read of its own). The Checkout page is read for
+// two things: the sweep's meeting calendar_id and date (and its rows), and the
+// check-outs leaders make BY HAND on that page (every club). The second is not
+// the sweep's: it is due all club night (`inClubHours`, stationfeeds.js: CLUB_NIGHTS
+// start to end, as the extension's runCheckout read it every 60 s for the whole
+// club window) WHATEVER YM_CHECKOUT says (owner review 2026-10-16: a child checked
+// out by hand at 6:50 pm must leave tonight's count before 7:15). So the page is
+// read at most every YM_PAGE_MS (60 s) whenever `pageDue()` (club hours, or the
+// sweep due), through the one read clock with waitMs 0 (it skips its turn when
+// the clock is booked, and keeps clear of the report's reserved slot:
+// readbudget.js), by `readPageStep()`; only the POSTS wait for `due()`. Once a
+// minute is plenty, and it leaves the other reads their share. Posts are writes.
 //
 // STORAGE. `ym:state` (the night, the meeting, the page's rows, the done list
 // and the tries) is ONE blob sealed under the state key (sealState, as the
 // watcher's snapshot); `ym:status` is counts and times only.
 
+import { inClubHours } from './stationfeeds.js';
 import { CLUB_NIGHTS, localTime, openState, sealState, watchWindow } from './watcher.js';
 
 /** When the sweep starts on a club night (the extension's YM_CHECKOUT.at). */
@@ -138,6 +144,11 @@ export class YmCheckout {
     return String(this.env.YM_CHECKOUT || '').trim().toLowerCase() === 'on' && this.watcher.mode !== 'off' && !!this.watcher.creds();
   }
 
+  /** The Worker reads TwoTimTwo at all (cloud check-in running, a TwoTimTwo user): the page watch needs no more. */
+  get reading() {
+    return this.watcher.mode !== 'off' && !!this.watcher.creds();
+  }
+
   secret() { return this.watcher.creds()?.password || null; }
 
   load() {
@@ -190,9 +201,31 @@ export class YmCheckout {
     await this.storage.put('ym:status', this.status);
   }
 
-  /** Is a Checkout page read due (the sweep due, YM_PAGE_MS since the last)? */
+  /** Is the Checkout page wanted at `now` at all: club hours (hand check-outs, any YM_CHECKOUT), or the sweep due? */
+  pageWanted() {
+    return this.reading && (inClubHours(this.now()) || this.due());
+  }
+
+  /** Is a Checkout page read due (wanted, YM_PAGE_MS since the last)? */
   pageDue() {
-    return this.due() && this.now() - (this.status.night === localTime(this.now()).date ? this.status.lastPageAt : 0) >= YM_PAGE_MS;
+    return this.pageWanted() && this.now() - (this.status.night === localTime(this.now()).date ? this.status.lastPageAt : 0) >= YM_PAGE_MS;
+  }
+
+  /**
+   * The page read alone (the watcher's free-slot turn): when one is due and the
+   * read clock has a slot. Never a post. true when it read (or tried).
+   */
+  async readPageStep() {
+    if (!this.pageWanted() || this.busy) return false;
+    this.busy = true;
+    try {
+      await this.load();
+      this.roll(localTime(this.now()).date);
+      if (!this.pageDue() || this.watcher.budget.peek(false) !== 0) return false;
+      return await this.readPage();
+    } finally {
+      this.busy = false;
+    }
   }
 
   /** Due now, and on? */
@@ -308,25 +341,26 @@ export class YmCheckout {
     return true;
   }
 
-  /** How long until the sweep has something to do (ms), or null when it is not due. */
+  /** How long until the page watch or the sweep has something to do (ms), or null when neither is due. */
   wakeInMs() {
-    if (!this.due()) return null;
+    if (!this.pageWanted()) return null;
     const now = this.now();
     const night = localTime(now).date;
     const page = Math.max(this.status.night === night ? this.status.lastPageAt + YM_PAGE_MS - now : 0, this.watcher.budget.peek(false));
-    const post = this.st.cal && this.st.night === night && this.pending(night).length ? Math.max(this.status.nextPostAt - now, 0) : Infinity;
+    const post = this.due() && this.st.cal && this.st.night === night && this.pending(night).length ? Math.max(this.status.nextPostAt - now, 0) : Infinity;
     return Math.min(page, post);
   }
 
   /** For GET /v1/cloud/status: counts and times only, never a name or an id. */
   async statusView() {
-    if (this.enabled) await this.load().catch(() => {});
+    if (this.reading) await this.load().catch(() => {});
     const now = this.now();
     const night = localTime(now).date;
     const tonight = this.status.night === night;
     return {
       enabled: this.enabled,
       due: this.due(),
+      pageWatch: this.pageWanted(),
       at: YM_AT,
       clubs: [...YM_CLUBS],
       gapSec: YM_CHECKOUT_GAP_MS / 1000,

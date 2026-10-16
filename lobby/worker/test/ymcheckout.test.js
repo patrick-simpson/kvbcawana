@@ -56,15 +56,18 @@ describe('when and who', () => {
 });
 
 describe('the sweep', () => {
-  it('does nothing at 7:14, nor while YM_CHECKOUT is off', async () => {
+  it('posts nothing at 7:14, nor while YM_CHECKOUT is off (the page itself is read all club night for hand check-outs)', async () => {
     const early = await rig({ env: ON, kids: TREK, start: AT('19:13:30') });
     await drive(early, 30 * 1000);
     expect(posted(early)).toEqual([]);
-    expect(pageReads(early)).toEqual([]);
     const off = await rig({ kids: TREK, start: AT('19:15') });
     await drive(off, 2 * 60 * 1000);
     expect(posted(off)).toEqual([]);
-    expect(pageReads(off)).toEqual([]);
+    expect(pageReads(off).length).toBeGreaterThan(0);   // club hours: hand check-outs are watched
+    const late = await rig({ kids: TREK, start: AT('20:05') });
+    await drive(late, 2 * 60 * 1000);
+    expect(posted(late)).toEqual([]);
+    expect(pageReads(late)).toEqual([]);   // past club hours with the sweep off: nothing
   });
 
   it('at 7:15 checks out each Trek and Journey child, ONE post every 15 s, with the page\'s meeting', async () => {

@@ -456,8 +456,9 @@ export class Watcher {
         && await families.refresh().catch((err) => { console.error('[cloud] households catch-up failed', err); return false; })) {
         // One households re-read: a child the export did not list (families.js).
       } else if (this.budget.peek(false) === 0 && this.ym && this.ym.pageDue()
-        && await this.ym.step().catch((err) => { console.error('[cloud] youth check-out failed', err); return false; })) {
-        // The Checkout page, once a minute after 7:15 pm (ymcheckout.js).
+        && await this.ym.readPageStep().catch((err) => { console.error('[cloud] Checkout page read failed', err); return false; })) {
+        // The Checkout page, once a minute all club night whatever YM_CHECKOUT says: the
+        // check-outs made by hand on it come off tonight's count (ymcheckout.js).
       } else if (this.budget.peek(false) === 0 && feeds && feeds.readDue(true)
         && await feeds.step(true).catch((err) => { console.error('[feeds] read failed', err); return false; })) {
         // The stations' roster export (about hourly: labels' allergies), or a completed-books

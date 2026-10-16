@@ -719,9 +719,10 @@ undo): the station ends it quietly.
   5 s later: at worst 35 s apart, never starved). The watcher's alarm hands out
   the other slot, in this order: tonight's check-in page once (warms the desk),
   a households catch-up (an unknown child), the Checkout page (once a minute
-  after 7:15 pm, section 9), the roster's check-in page read ahead while pages
+  all club night whatever `YM_CHECKOUT` says, and on to midnight while the youth
+  check-out is due, section 9), the roster's check-in page read ahead while pages
   poll. Outside the window, and never ahead of any of these, the trends
-  back-fill (section 3) reads one season in a free slot. Reads a minute: at 6:00 pm report 2 + roster page 2 = 4 of the 12 slots
+  back-fill (section 3) reads one season in a free slot. Reads a minute: at 6:00 pm report 2 + roster page 2 + Checkout page 1 = 5 of the 12 slots
   (the rest are free); at 7:30 pm report 2 + Checkout page 1 + roster page 2 = 5
   (a poll that finds the page older than 30 s reads it itself, waiting its turn).
   **The stations' feeds** (`stationfeeds.js`, section 4; owner 2026-10-16) share the
@@ -907,8 +908,13 @@ out with the Checkout page's own `POST /clubber/checkout` (`calendar_id` +
   a restart never bursts. Forty children take about ten minutes.
 - **Reads.** The Checkout page (`GET /clubber/checkout`: `calendar_id` from its
   script, the date from `select#date`, rows `a.checkout[clubber_id]`) at most every
-  60 s (`YM_PAGE_MS`) and only while due, on the one read clock with `waitMs` 0,
-  in the slot between two reports (section 7). With the report every 30 s and the
+  60 s (`YM_PAGE_MS`) whenever `pageDue()`: **all club night** (`inClubHours`,
+  `stationfeeds.js`: `CLUB_NIGHTS` start to end, 5:30 to 8 pm) **whatever
+  `YM_CHECKOUT` says** (owner review 2026-10-16: the hand check-outs below), and on
+  from there while the sweep is due. On the one read clock with `waitMs` 0, in the
+  slot between two reports (section 7; the watcher's free-slot branch calls
+  `ym.readPageStep()`, a page read and never a post). Only the POSTS wait for `due()`
+  (`YM_CHECKOUT` on, 7:15 pm to midnight). With the report every 30 s and the
   roster's page that is well inside the 12 reads a minute the 5 s clock allows.
 - **Count.** Each check-out goes into tonight's book as a desk check-out does
   (`publisher.deskCheckout`), while the watch window is open (the book is purged
@@ -924,17 +930,19 @@ out with the Checkout page's own `POST /clubber/checkout` (`calendar_id` +
   that is not genuine compares nothing and keeps the last good one; another meeting
   starts afresh) and comes off tonight's book through `Publisher.checkedOut` (an id
   already out, or whose claim is `undone`, is skipped: an undone check-in also leaves the
-  page), while the watch window is open. So this runs from 7:15 pm, as the youth
-  check-out's page reads do (the extension read it from 5:30); a child checked out by
-  hand before 7:15 pm is seen at the first read after it only if a read before it listed
-  them, which none did: at most that early pickup stays on the count until the report
+  page), while the watch window is open. So this runs all club night from 5:30 pm,
+  as the extension's `runCheckout` did, with `YM_CHECKOUT` on or off: a child checked
+  out by hand at 6:50 pm leaves tonight's count at the next page read (within about a
+  minute; `test/stationfeeds.test.js`). After 8 pm it runs on only while the sweep is
+  due; a check-out by hand after that stays on the count until the report
   drops them or the window closes. `ymCheckout.leftPage` / `leftPageCounted` on the status.
 - **Storage.** `ym:state` (the night, meeting, page rows, the last genuine read's ids,
   the night's check-outs by hand, done list, tries) is one blob sealed under the state
   key (`sealState`); `ym:status` counts and times only.
-- **Status.** `GET /v1/cloud/status` carries `ymCheckout: {enabled, due, at, clubs,
+- **Status.** `GET /v1/cloud/status` carries `ymCheckout: {enabled, due, pageWatch, at, clubs,
   gapSec, pageSec, maxTries, night, checkedOut, failed, gaveUp, pending, meeting, lastSweep,
-  lastPageAt, lastError}`: no name, no id.
+  lastPageAt, lastError, leftPage, leftPageCounted}`: no name, no id. `pageWatch` = the
+  Checkout page is being read now (club hours or the sweep due).
 - **Hand-off.** A computer that is the Worker's print station (`configureCloud`)
   answers `GET /config/church` with `ymCheckout.enabled: false`, so its extension
   stops sweeping (it reads that at start-up); `stopCloud` hands it back. So turn
