@@ -12,6 +12,7 @@ This one repo holds three apps for Kennebec Valley Baptist Church's Awana club:
 
 - Push to `main` directly, as the owner's standing rule. Do not create branches or pull requests unless asked.
 - Run the app's own checks before committing. Each app's section names them.
+- Apps read each other's files. Before pushing, run every app's checks that CI would run for the files you changed: the "What changed" step in `.github/workflows/ci.yml` lists which paths start which jobs. For example, a change to `site/build.mjs` or `site/checkin/` also needs `cd printer && npm test`.
 - Make one finding per commit.
 - Model names are allowed in commit messages and files.
 - Never work in the archived repos (`Print-TwoTimTwo-Labels`, `Awana-Check-in-Display`, `Journey-Display`). All work lands here.
