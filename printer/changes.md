@@ -1,4 +1,31 @@
-﻿## [9.6.0] - 2026-10-15
+﻿## [10.0.0] - 2026-10-16
+The Chrome extension is gone. The check-in service and KVBC Awana do its work.
+
+**No extension.** Check-in is awana.kvbchurch.org/checkin, at the desk or on a phone, and a child checked in on TwoTimTwo's own page still gets a label. Everything the extension did for check-in is done by the check-in service now: it reads TwoTimTwo's roster, the completed books (for the trophy band), the meeting report (for award slips) and the Checkout page, and checks Trek and Journey out at 7:15 pm. The laptop needs only KVBC Awana: nothing to load in Chrome, no widget on TwoTimTwo's page.
+
+**The roster comes from the check-in service.** The print computer now gets tonight's roster (with allergies, birthdays and photo answers, but without the families' phones and addresses) and the completed books from the check-in service, sealed so only the print computers can open them. The service sends them only to a print computer on 10.0.0 or newer.
+
+**The old extension switches itself off.** Chrome keeps loading the extension from its folder on the laptop, and nobody has to touch Chrome: on every start the app replaces that folder's contents with an empty extension that does nothing (same name, version 10.0.0, no access to any page), and on the first start after this update it closes Chrome and opens it again on the check-in page, once, so the old code stops running. The "KVBC Kids Check-in Extension" may stay listed in chrome://extensions; it is harmless, and it can be removed any time.
+
+**Repair installer is checked.** When an update leaves the app broken and it offers to download the installer to repair itself, the downloaded installer is now checked against the checksum in the update feed before it runs. If it does not match, or the feed cannot be read, it is deleted, nothing is run, and the app tells you and gives the manual download link.
+
+**With no internet, use the paper sheet.** Nothing at church checks in or prints without the internet any more. Keep TwoTimTwo's printed sign-in sheet, blank name tags and a marker at the desk, and key the sheet into TwoTimTwo when the connection is back (NIGHT-OF.md has the drill).
+
+**Removed with the extension** (each only worked through it):
+- the attendance audit (Settings → Printing → At the laptop);
+- the laptop's touch-screen check-in, and the phone page's old path through the laptop;
+- the copy of TwoTimTwo's announcements on the lobby screens (send a notice from Settings → Tonight instead), the team points scoreboard, the TwoTimTwo calendar feed and leader worksheet printing;
+- the "count matches TwoTimTwo" check and the extension's Reset tonight button;
+- the "Let the check-in laptop's Chrome extension check children in" switch (hidden; it did nothing without the extension);
+- the "Open Chrome extension folder" tray item, and the download of the extension zip on the website.
+
+BARF Bag labels now print only through the print computer's sealed jobs: with no print computer signed in, the button says so instead of queueing labels nothing would print.
+
+**Safer.** The print server no longer lets any browser extension or any TwoTimTwo page read tonight's roster or change its settings; only this computer's own app and the settings page can.
+
+**Known, unchanged:** an award slip prints only when the meeting report names a clubber column; check-outs made by hand on TwoTimTwo's Checkout page are read from 7:15 pm. A late child's drop-off label groups brothers and sisters from the families the extension last saved; a family it never saw gets one drop-off label per child.
+
+## [9.6.0] - 2026-10-15
 Labels come out faster at the busiest moments.
 
 **One printing program kept ready.** Until now the print computer started a fresh copy of Windows PowerShell (the part of Windows that sends each label to the printer) for every single label, and each start took around a second before anything printed. Now one copy is started in the background when the app starts and kept ready, and every label goes straight to it. No label ever waits for it: until it is ready, labels print the old way. If that copy ever misbehaves (will not start, stops, or does not answer), the label is printed the old way and the ready copy is tried again a little later. If it stops in the middle of a label, so nobody can tell whether that label came out, the label is NOT printed again on its own: the app shows "check the printer", the same as when the printer goes quiet today, because a label printed twice is worse than one a leader reprints by hand.
