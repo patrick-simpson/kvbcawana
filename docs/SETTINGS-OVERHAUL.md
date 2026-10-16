@@ -190,7 +190,7 @@ Staying per laptop (config.json only, At the laptop): `printerName`, `backupPrin
 the page: `checkinUrl`, `historyRetentionDays`, `fleetConfigUrl`, `SECRET_CONFIG_KEYS`.
 
 Station side (`printer/print-server/church-sync.js`, new; started by `server.js` after the
-relay's sync sign-in, for every signed-in print server, station or not):
+sync sign-in, for every signed-in print server, station or not):
 
 1. **Fetch.** At start (5 s after sign-in), whenever `GET /v1/print/next`'s `church.rev` or
    `church.switchesRev` is above the applied one (stations: within ~5 s), and every 60 s

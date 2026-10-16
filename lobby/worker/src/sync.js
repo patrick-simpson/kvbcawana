@@ -48,9 +48,7 @@ import { fromBase64, hmac, kidFor, newDisplayKey, randomBytes, safeEqual, seal, 
 import { DEFAULT_CALENDAR_URL, scrapeCalendar } from './calendar.js';
 import { DOORBELL_EVENT, REPLAYED, checkPublish, frameText, replayKey } from './live.js';
 import { Recent } from './recent.js';
-import { Relay } from './relay.js';
 import { Watcher } from './watcher.js';
-import { CloudPhone } from './phone.js';
 import { Friends } from './friends.js';
 import { mountBarf } from './barf.js';
 import { Screens } from './screens.js';
@@ -171,13 +169,10 @@ export class SyncCore {
     // The live channel: every screen's socket (index.js) carries everything.
     this.broadcast = broadcast || (() => 0);
     this.closeAll = closeAll || (() => {});
-    this.relayQueue = new Relay(this.storage, this.now);
     // Cloud check-in (ROADMAP.md#cloud-check-in), phase 1: the read-only report watcher.
     this.watcher = new Watcher({ storage: this.storage, env: this.env, fetchFn: this.fetchFn, now: this.now, alarms, sleep });
-    // ...and the phone page's check-ins, answered here instead of by the laptop.
     // ...and who brought a friend tonight (BARF Night's email; friends.js).
     this.friends = new Friends({ storage: this.storage, watcher: this.watcher, now: this.now });
-    this.phone = new CloudPhone({ watcher: this.watcher, relay: this.relayQueue, storage: this.storage, now: this.now, friends: this.friends });
     // Online check-in (ROADMAP.md#online-check-in): the night's claims, the print
     // lease queue, the registered stations, what the watcher does with the
     // report (P4) and the desk's check-in claim logic. Every module that owns
@@ -603,8 +598,7 @@ export class SyncCore {
       const known = new Set([
         'GET /v1/state', 'PUT /v1/settings', 'PUT /v1/slides', 'PUT /v1/template',
         'GET /v1/journey', 'PUT /v1/journey', 'POST /v1/calendar/refresh', 'POST /v1/passphrase', 'POST /v1/publish',
-        'POST /v1/relay', 'GET /v1/relay/next', 'POST /v1/relay/answer', 'GET /v1/relay/result',
-        'GET /v1/cloud/status', 'POST /v1/cloud/read-now', 'POST /v1/cloud/checkin',
+        'GET /v1/cloud/status', 'POST /v1/cloud/read-now',
         'POST /v1/cloud/friend', 'GET /v1/cloud/friends', 'POST /v1/cloud/friends-link', 'POST /v1/cloud/barf-bags',
       ]);
       if (!known.has(route)) return fail('Not found.', 404);
@@ -622,28 +616,6 @@ export class SyncCore {
         case 'POST /v1/calendar/refresh': return await this.refreshCalendar({ minGapMs: CALENDAR_MANUAL_GAP_MS });
         case 'POST /v1/passphrase': return await this.changePassphrase(request, ip);
         case 'POST /v1/publish': return await this.livePublish(request);
-        // The phone check-in relay (relay.js): the page asks, the laptop answers.
-        case 'POST /v1/relay': {
-          const req = await this.body(request);
-          // Cloud check-in: the calls the Worker answers itself (phone.js);
-          // the page collects the answer from /v1/relay/result as ever.
-          const laptopOnline = await this.relayQueue.laptopOnline();
-          const own = await this.phone.answer(req, laptopOnline);
-          if (own) return json({ id: await this.relayQueue.store(own.status, own.body), laptopOnline });
-          const r = await this.relayQueue.enqueue(req);
-          return r.ok ? json({ id: r.id, laptopOnline: r.laptopOnline }) : fail(r.error, r.status);
-        }
-        case 'GET /v1/relay/next': return json(await this.relayQueue.take());
-        case 'POST /v1/relay/answer': {
-          const ans = await this.body(request);
-          // The laptop's roster, with families filled in from TwoTimTwo when it
-          // has none yet (phone.js fillRoster).
-          const asked = typeof ans.id === 'string' ? (await this.relayQueue.queue()).find((x) => x.id === ans.id) : null;
-          if (asked && asked.path === '/phone/roster' && ans.status === 200) ans.body = await this.phone.fillRoster(ans.body);
-          const r = await this.relayQueue.answer(ans);
-          return r.ok ? json({ ok: true }) : fail(r.error, r.status);
-        }
-        case 'GET /v1/relay/result': return json(await this.relayQueue.result(url.searchParams.get('id')));
         // Cloud check-in, phase 1: counts and codes only, never a name or an id.
         case 'GET /v1/cloud/status':
           await this.watcher.arm();
@@ -656,22 +628,20 @@ export class SyncCore {
         }
         case 'GET /v1/cloud/friends': return json(await this.friends.report(url.searchParams.get('date')));
         case 'POST /v1/cloud/friends-link': return json(await this.friends.makeLink((await this.body(request)).date));
-        // BARF Bag labels: tonight's names to the laptop, printed as one job
-        // (printer 8.2.0's /print-barf-bags, a job no page can send itself).
+        // BARF Bag labels: tonight's names to this signed-in page ({list: true}),
+        // which seals them to the print stations itself (lobby toolJobs.js), the
+        // same path as every name tag (owner 2026-10-14). Nothing is queued here:
+        // the laptop relay that once printed the old form is gone, so a request
+        // without {list: true} is refused rather than queued for nobody.
         case 'POST /v1/cloud/barf-bags': {
           const asked = await this.body(request);
+          if (asked.list !== true) {
+            return fail('BARF Bag labels are listed for this page to send to the print stations: ask with {list: true}. Reload the page if it is older than the service.', 400, { reason: 'list-only' });
+          }
           const bags = await this.friends.bagNames(asked.date);
           if (!bags.names.length) return json({ ok: false, reason: 'none', ...bags, names: undefined, bags: undefined });
-          // {list: true} (owner 2026-10-14, the relayed job never printed): the names to this
-          // signed-in page, which seals them to the print stations itself (lobby toolJobs.js),
-          // the same path as every name tag. Nothing is queued here.
-          if (asked.list === true) return json({ ok: true, listed: true, names: bags.names, bags: bags.bags, labels: bags.names.length, kids: bags.kids, friends: bags.friends, unnamed: bags.unnamed, date: bags.date });
-          if (!(await this.relayQueue.laptopOnline())) return json({ ok: false, reason: 'laptop-off', ...bags, names: undefined, bags: undefined });
-          const job = await this.relayQueue.enqueueJob('/print-barf-bags', { names: bags.names, bags: bags.bags });
-          return json({ ok: job.ok, reason: job.ok ? undefined : 'busy', labels: bags.names.length, kids: bags.kids, friends: bags.friends, unnamed: bags.unnamed, date: bags.date });
+          return json({ ok: true, listed: true, names: bags.names, bags: bags.bags, labels: bags.names.length, kids: bags.kids, friends: bags.friends, unnamed: bags.unnamed, date: bags.date });
         }
-        // Check one child in on TwoTimTwo; a preview unless {confirm: true}.
-        case 'POST /v1/cloud/checkin': return json(await this.watcher.checkIn(await this.body(request)));
         case 'POST /v1/cloud/read-now': {
           // {test: true} is the Settings button: the most recent club night.
           const body = await this.body(request);
@@ -1103,10 +1073,22 @@ export class SyncCore {
     return json({ ok: true, screens });
   }
 
+  /**
+   * The laptop relay and the relayed phone check-in were deleted (KVBC Awana
+   * 10.0.0 has no relay). What they left in storage goes on the first run:
+   * an uncollected answer could hold a roster's names. Cheap once gone.
+   */
+  async forgetRelay() {
+    const held = [...((await this.storage.get('relay:held')) || []), ...((await this.storage.get('cloud:acts')) || [])];
+    const keys = ['relay:queue', 'relay:laptop', 'relay:busy', 'relay:held', 'cloud:acts'];
+    for (const h of held) if (h && typeof h.id === 'string') keys.push(`relay:ans:${h.id}`, `cloud:act:${h.id}`);
+    for (const k of keys) if ((await this.storage.get(k)) !== undefined) await this.storage.delete(k);
+  }
+
   /** The scheduled run: keep the calendar fresh without anyone pressing a button. */
   async cron() {
     await this.switches.load();
-    await this.relayQueue.purge();
+    await this.forgetRelay();
     await this.pruneFails();
     // Keeps the watcher's alarm set (it sets its own after each run; this is
     // the safety net if one was ever lost).

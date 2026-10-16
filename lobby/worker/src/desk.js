@@ -91,12 +91,21 @@
 import { churchNight } from '../../shared/cloud-crypto.js';
 import { json } from './http.js';
 import { INTERACTIVE_WAIT_MS, READ_INTERVAL_MS } from './readbudget.js';
-import { itemsToSend } from './twotimtwo.js';
+import { BIBLE_RE, FRIEND_RE, itemsToSend } from './twotimtwo.js';
 import { Families } from './families.js';
 import { PRINT_JOB_KIND } from './adopt.js';
-import { itemClubs } from './phone.js';
 import { openState, sealState, watchWindow } from './watcher.js';
 import { friendClubOf } from './friends.js';
+
+/** TwoTimTwo's club ids (printer/docs/TWOTIMTWO.md §2.1). */
+const CLUB_BY_ID = Object.freeze({ 1: 'Cubbies', 2: 'Sparks', 3: 'T&T', 4: 'Puggles', 6: 'Trek', 7: 'Journey' });
+
+/** Which clubs offer Bible / Brought a friend: the check-in card's toggles. @param {{clubs: string[], label?: string, automatic: boolean}[]} events */
+export function itemClubs(events) {
+  const clubsOf = (/** @type {RegExp} */ re) => [...new Set(events.filter((e) => !e.automatic && re.test(e.label || ''))
+    .flatMap((e) => (e.clubs.length ? e.clubs : Object.keys(CLUB_BY_ID)).map((id) => CLUB_BY_ID[/** @type {keyof typeof CLUB_BY_ID} */ (Number(id))]).filter(Boolean)))];
+  return { bible: clubsOf(BIBLE_RE), friend: clubsOf(FRIEND_RE) };
+}
 
 /** The roster's check-in page is re-read at most this often (pages poll every 15 s; 2 of the 4 reads a minute). */
 export const CHECKIN_PAGE_TTL_MS = 30 * 1000;

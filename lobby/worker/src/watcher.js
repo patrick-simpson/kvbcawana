@@ -25,7 +25,7 @@
 //                 the storage alone opens nothing). No names, ever.
 // The session cookie and the password never touch storage (twotimtwo.js).
 
-import { TwoTimTwoClient, credentialsFrom, itemsToSend, reportColumns, rowShape } from './twotimtwo.js';
+import { TwoTimTwoClient, credentialsFrom, reportColumns, rowShape } from './twotimtwo.js';
 import { fromBase64, toBase64 } from './crypto.js';
 import { INTERACTIVE_WAIT_MS, READ_INTERVAL_MS, ReadBudget } from './readbudget.js';
 import { massUndoRefused, reportIsPartial } from '../../shared/tonight.js';
@@ -292,9 +292,7 @@ export class Watcher {
 
   // ── no club tonight (clubday.js; owner 2026-10-13) ─────────────────────────
   // THE one place the rule is applied to TwoTimTwo writes: the desk's routes
-  // (desk.js, barf.js), the relayed phone check-in (phone.js) and POST
-  // /v1/cloud/checkin (checkIn below) all ask here BEFORE any read, claim or
-  // post, and the client's own posts ask again (clientFor's writeGuard), so a
+  // (desk.js, barf.js) ask here BEFORE any read, claim or post, and the client's own posts ask again (clientFor's writeGuard), so a
   // path added later cannot post a check-in into whatever meeting TwoTimTwo
   // shows on a day with no club.
 
@@ -313,12 +311,6 @@ export class Watcher {
     const pub = this.publisher;
     if (pub && typeof pub.rehearsing === 'function' && pub.rehearsing()) return { ...day, club: true, rehearsal: true };
     return day;
-  }
-
-  /** null on a club day (or a rehearsal), else `{today, next}` for the refusal. @returns {Promise<{ today: string, next: string|null }|null>} */
-  async noClub() {
-    const day = await this.clubToday();
-    return day.club ? null : { today: day.today, next: day.next };
   }
 
   async loadStatus() {
@@ -554,52 +546,6 @@ export class Watcher {
     if (!this.creds()) return { ok: false, error: 'not-configured', status: await this.status() };
     const r = await this.read();
     return { ...r, status: await this.status() };
-  }
-
-  /**
-   * Check one child in on TwoTimTwo (ROADMAP.md#cloud-check-in phase 4's first piece,
-   * owner-only: a signed-in screen asks, never the watcher). Without
-   * `confirm: true` it only previews: who it found, their club, and the
-   * meeting the check-in would record on. It sends what the check-in page
-   * would: Attendance (every automatic item), plus Bible and Brought a friend
-   * when `options` ticks them, each only where it applies to the child's club.
-   * The answer names the child (the caller asked for them by name); nothing
-   * stored or logged does. On a day with no club (and no rehearsal) it is
-   * `{ok: false, error: 'no-club', today, next}` before any read (noClub).
-   * @param {{name?: unknown, clubberId?: unknown, confirm?: unknown, options?: unknown}} body
-   */
-  async checkIn(body) {
-    if (this.mode === 'off') return { ok: false, error: 'off' };
-    const client = this.clientFor();
-    if (!client) return { ok: false, error: 'not-configured' };
-    // No club today (and no rehearsal): refused before the page is read, preview or not.
-    const noClub = await this.noClub();
-    if (noClub) return { ok: false, error: 'no-club', ...noClub };
-    const wantId = /^\d{1,20}$/.test(String(body.clubberId ?? '')) ? String(body.clubberId) : '';
-    const wantName = String(body.name ?? '').trim().toLowerCase().replace(/\s+/g, ' ').slice(0, 80);
-    if (!wantId && !wantName) return { ok: false, error: 'no-child' };
-    const page = await client.checkinPage({ waitMs: INTERACTIVE_WAIT_MS, kind: 'desk-checkin', urgent: true });
-    if (!page.ok) return { ok: false, error: page.error, ...('retryAfterMs' in page ? { retryAfterMs: page.retryAfterMs } : {}) };
-    const found = page.page.roster.filter((r) => (wantId ? r.clubberId === wantId : r.name.toLowerCase() === wantName));
-    if (!found.length) return { ok: false, error: 'not-found' };
-    if (found.length > 1) return { ok: false, error: 'ambiguous', matches: found.length };
-    const child = found[0];
-    const o = body.options && typeof body.options === 'object' ? /** @type {any} */ (body.options) : {};
-    const events = itemsToSend(page.page.events, child.clubId, { Bible: o.Bible === true, Friend: o.Friend === true });
-    const hasAttendance = page.page.events.some((e) => e.automatic && (!e.clubs.length || e.clubs.includes(child.clubId)));
-    const preview = {
-      child: { name: child.name, club: child.club, clubberId: child.clubberId },
-      meeting: { calendarId: page.page.calendarId, date: page.page.meetingDate },
-      events: events.length,
-    };
-    if (child.checkedIn) return { ok: false, error: 'already-checked-in', ...preview };
-    if (!hasAttendance) return { ok: false, error: 'no-attendance-item', ...preview };
-    if (body.confirm !== true) return { ok: true, preview: true, ...preview };
-    const res = await client.checkIn({ clubberId: child.clubberId, calendarId: page.page.calendarId, events, name: child.name }, { desk: true });
-    const status = await this.loadStatus();
-    this.note(status, 'cloud-check-in', { ok: res.ok, club: child.club });
-    await this.storage.put('cloud:status', status);
-    return res.ok ? { ok: true, checkedIn: true, ...preview } : { ok: false, error: res.error, ...preview };
   }
 
   /**

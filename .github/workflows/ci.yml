@@ -48,8 +48,7 @@ jobs:
   #           site/checkin/ and printer/print-server/public/phone.html
   #           (e2e/checkin.spec.js serves the one check-in page, built from the
   #           phone page by site/checkin/checkin-page.mjs, from a stub origin)
-  #   printer reads printer/, plus lobby/worker/src/relay.js
-  #           (test-phone-relay) and, since the online check-in end-to-end test
+  #   printer reads printer/, plus, since the online check-in end-to-end test
   #           (printer/scripts/test-cloud-e2e.cjs) runs the Worker in process,
   #           ALL of lobby/worker/src, lobby/worker/migrations, the four test
   #           helpers it reuses (rig, helpers, fixtures, d1stub), the Worker's

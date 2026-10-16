@@ -397,8 +397,8 @@ the write so the client's guard lets them through, answer `testDay: true`, and f
 hooks (no history row, no count, no book). Each test check-in is kept sealed
 (`desk:testday`: night, clubber id, meeting id); a hand undo removes it; the cron after
 that night (`sweepTestDay`, the 6-hourly run, about 2 am Eastern) undoes the rest on
-TwoTimTwo (3 tries each, then logged). Check-out, the BARF routes, the relayed phone
-check-in and `POST /v1/cloud/checkin` keep the `no-club` refusal. The page shows a
+TwoTimTwo (3 tries each, then logged). Check-out and the BARF routes keep the
+`no-club` refusal. The page shows a
 yellow strip and no Check out.
 
 **No club tonight** (BUILT, `desk.js` + `clubday.js`; owner 2026-10-13, after
@@ -429,13 +429,10 @@ the next post) every route behaves as on a club day. The page shows one note,
 "No club tonight" and "Next club night: Wednesday, October 14", and asks again
 every 60 s (desk-transport.js maps `no-club` to `DeskError` `no-club`, "There is
 no club tonight."). The rule lives in ONE place, `watcher.js clubToday()` (the
-desk asks it), and covers every TwoTimTwo write: the older cloud check-in path
-too (code review 2026-10-13): `POST /v1/cloud/checkin`, preview or confirmed,
-answers `{ok: false, error: 'no-club', today, next}` (its own 200-with-`error`
-convention) and the relayed phone check-in of `/checkin/classic` (`phone.js`
-`/phone/checkin`, through `Watcher.checkIn`) is saved `failed` with "there is
-no club tonight. Check in at the desk on a club night.", both before the check-in
-page is read. Under every entry, the TwoTimTwo client's own check-in, undo and
+desk asks it), and covers every TwoTimTwo write. The older cloud check-in paths
+(`POST /v1/cloud/checkin` and the relayed phone check-in of `/checkin/classic`)
+were deleted with the laptop relay (2026-10-16): the desk's routes are the only
+check-in writes. Under every entry, the TwoTimTwo client's own check-in, undo and
 check-out posts ask again (`watcher.clientFor` gives it a `writeGuard`) and are
 refused `no-club` unsent, so a path added later cannot post into another
 meeting. `test/noclub.test.js`.
@@ -865,8 +862,8 @@ names. Chosen:
   the printer used to say, whether the desk page or TwoTimTwo's own page checked
   them in, and the Worker never opens or seals a name for a greeting.
 - **Once per CHILD per night, whichever path printed** (review fix, 2026-10-12).
-  A label the station prints with NO print job (the phone page's relay job, the
-  extension, a phone visitor) greets as the station too, naming the child in the
+  A label the station prints with NO print job (the touch screen, a hand-made
+  check-in on the laptop) greets as the station too, naming the child in the
   publish body: `POST /v1/publish {event: 'checkin', payload, greet: {clubberId}}`
   (or a visitor's `greet: {name, club}`; the id the roster knows wins). The gate
   turns it into the claim's own tag (`identityTag` / `visitorTag`) in memory and
@@ -878,7 +875,7 @@ names. Chosen:
   nothing and greets LATE: the same event the first label made (same `id`, so a
   screen that showed it drops it; a fresh welcome if this computer has none) with
   its `X-Job` and `late: true`. That is how a child whose first greeting the gate
-  dropped (an extension print relayed without a station) is still greeted once.
+  dropped (a print made without a station) is still greeted once.
   With `SINGLE_PUBLISHER` off the gate passes every greeting as before and drops
   only a `late` one (`reason: 'late'`: the laptop already greeted the child).
   Undo then a new check-in is the same child: not greeted again.

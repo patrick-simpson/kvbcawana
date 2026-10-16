@@ -26,7 +26,7 @@ function memoryStore() {
   };
 }
 
-async function setup({ laptopOn = false } = {}) {
+async function setup() {
   let t = BARF_6PM;
   const tt = fakeTwoTimTwo({ checkin: () => CHECKIN, households: () => HOUSEHOLD_CSV, report: () => page(table('Sparks ', [])) });
   tt.checkinName = 'Sophie Tester';
@@ -40,7 +40,6 @@ async function setup({ laptopOn = false } = {}) {
     }));
     return { status: res.status, body: await res.json() };
   };
-  if (laptopOn) await call('GET', '/v1/relay/next');
   return { core, tt, storage, call, tick: (ms) => { t += ms; }, now: () => t };
 }
 
@@ -92,23 +91,6 @@ describe('recording who brought a friend', () => {
     await s.call('POST', '/v1/cloud/friend', { name: 'Kit Uniquename', club: 'Sparks', friendName: 'Maya Otherone' });
     expect(leaks(JSON.stringify([...s.storage.map.values()]), ['Uniquename', 'Otherone', 'Kit', 'Maya'])).toEqual([]);
   });
-
-  it('a cloud check-in with Brought a friend records it, and the laptop\'s print job carries it', async () => {
-    const s = await setup({ laptopOn: true });
-    const sent = await s.call('POST', '/v1/relay', { method: 'POST', path: '/phone/checkin', body: { name: 'Sophie Tester', options: { Friend: true, FriendName: ' Maya ' } } });
-    expect(sent.status).toBe(200);
-    expect(s.tt.checkins[0].getAll('events[]')).toEqual(['40', '410']);
-    expect((await s.call('GET', '/v1/cloud/friends')).body.clubs).toEqual([{ club: 'T&T', kids: [{ name: 'Sophie Tester', friend: 'Maya' }] }]);
-    const job = (await s.call('GET', '/v1/relay/next')).body.requests[0];
-    expect(job).toMatchObject({ path: '/print', job: true, body: { name: 'Sophie Tester', cloud: true, friend: true, friendName: 'Maya' } });
-  });
-
-  it('without Brought a friend nothing is recorded and the job is as before', async () => {
-    const s = await setup({ laptopOn: true });
-    await s.call('POST', '/v1/relay', { method: 'POST', path: '/phone/checkin', body: { name: 'Sophie Tester', options: { FriendName: 'Maya' } } });
-    expect((await s.call('GET', '/v1/cloud/friends')).body.total).toBe(0);
-    expect((await s.call('GET', '/v1/relay/next')).body.requests[0].body).toEqual({ name: 'Sophie Tester', clubName: 'T&T', clubberId: '191', cloud: true });
-  });
 });
 
 describe('the scheduled email\'s link', () => {
@@ -140,18 +122,17 @@ describe('tidying up', () => {
 });
 
 describe('BARF Bag labels', () => {
-  it('each child, then their named friend, club by club, as one job for the laptop', async () => {
-    const s = await setup({ laptopOn: true });
+  it('each child, then their named friend, club by club, listed for the page as one set', async () => {
+    const s = await setup();
     await s.call('POST', '/v1/cloud/friend', { name: 'Zoe Tester', club: 'Sparks', friendName: 'Ana' });
     await s.call('POST', '/v1/cloud/friend', { name: 'Dot Tester', club: 'Cubbies', friendName: 'Ed' });
     await s.call('POST', '/v1/cloud/friend', { name: 'Al Tester', club: 'Trek', friendName: '' });
-    expect((await s.call('POST', '/v1/cloud/barf-bags', {}, false)).status).toBe(401);
-    const r = await s.call('POST', '/v1/cloud/barf-bags', {});
-    expect(r.body).toEqual({ ok: true, labels: 5, kids: 3, friends: 2, unnamed: 1, date: '2026-10-14' });
-    const job = (await s.call('GET', '/v1/relay/next')).body.requests[0];
-    expect(job).toMatchObject({ path: '/print-barf-bags', job: true, body: { names: ['Dot Tester', 'Ed', 'Zoe Tester', 'Ana', 'Al Tester'] } });
+    expect((await s.call('POST', '/v1/cloud/barf-bags', { list: true }, false)).status).toBe(401);
+    const r = (await s.call('POST', '/v1/cloud/barf-bags', { list: true })).body;
+    expect(r).toMatchObject({ ok: true, listed: true, labels: 5, kids: 3, friends: 2, unnamed: 1, date: '2026-10-14' });
+    expect(r.names).toEqual(['Dot Tester', 'Ed', 'Zoe Tester', 'Ana', 'Al Tester']);
     // Each bag also says what the label must show: a child's club, whose friend a friend is.
-    expect(job.body.bags).toEqual([
+    expect(r.bags).toEqual([
       { name: 'Dot Tester', club: 'Cubbies' },
       { name: 'Ed', club: '', friendOf: 'Dot Tester' },
       { name: 'Zoe Tester', club: 'Sparks' },
@@ -160,23 +141,26 @@ describe('BARF Bag labels', () => {
     ]);
   });
 
-  it('{list: true}: the names to the signed-in page (it seals them to the print stations), nothing queued, laptop on or off', async () => {
+  it('{list: true}: the names to the signed-in page (it seals them to the print stations), nothing stored', async () => {
     const s = await setup();
     await s.call('POST', '/v1/cloud/friend', { name: 'Dot Tester', club: 'Cubbies', friendName: 'Ed', friendClub: 'Sparks' });
-    expect((await s.call('POST', '/v1/cloud/barf-bags', { list: true }, false)).status).toBe(401);
+    const before = [...s.storage.map.keys()].sort();
     const r = (await s.call('POST', '/v1/cloud/barf-bags', { list: true })).body;
     expect(r).toEqual({ ok: true, listed: true, names: ['Dot Tester', 'Ed'], bags: [{ name: 'Dot Tester', club: 'Cubbies' }, { name: 'Ed', club: 'Sparks', friendOf: 'Dot Tester' }],
       labels: 2, kids: 1, friends: 1, unnamed: 0, date: '2026-10-14' });
-    expect(s.storage.map.get('relay:queue') || []).toEqual([]);
+    expect([...s.storage.map.keys()].sort()).toEqual(before);
   });
 
-  it('says why when it cannot: nobody tonight, or the laptop is off', async () => {
-    const s = await setup({ laptopOn: true });
-    expect((await s.call('POST', '/v1/cloud/barf-bags', {})).body).toMatchObject({ ok: false, reason: 'none' });
-    const off = await setup();
-    await off.call('POST', '/v1/cloud/friend', { name: 'Zoe Tester', club: 'Sparks', friendName: 'Ana' });
-    expect((await off.call('POST', '/v1/cloud/barf-bags', {})).body).toMatchObject({ ok: false, reason: 'laptop-off', kids: 1 });
-    expect(off.storage.map.get('relay:queue') || []).toEqual([]);
+  it('says why when it cannot: nobody tonight; the old unlisted form (once a relay job) is refused, nothing queued', async () => {
+    const s = await setup();
+    expect((await s.call('POST', '/v1/cloud/barf-bags', { list: true })).body).toMatchObject({ ok: false, reason: 'none' });
+    await s.call('POST', '/v1/cloud/friend', { name: 'Zoe Tester', club: 'Sparks', friendName: 'Ana' });
+    const before = [...s.storage.map.keys()].sort();
+    const old = await s.call('POST', '/v1/cloud/barf-bags', {});
+    expect(old.status).toBe(400);
+    expect(old.body).toMatchObject({ reason: 'list-only' });
+    expect(old.body.names).toBeUndefined();
+    expect([...s.storage.map.keys()].sort()).toEqual(before);
   });
 });
 

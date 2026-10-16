@@ -1,10 +1,10 @@
 // Who brought a friend tonight (BARF Night, owner 2026-10-11): the child, their
 // club and the friend's first name, for the 6:30 pm email, "grouped by club".
 //
-// Recorded from every check-in path: the Worker's own cloud check-in (phone.js)
-// and the laptop (POST /v1/cloud/friend, from the print server whenever a tag
-// prints with Brought a friend: the touch screen, a phone on the Wi-Fi, or
-// TwoTimTwo's own box at the desk, which has no name field).
+// Recorded from every check-in path: the desk's check-in (desk.js), the
+// TwoTimTwo-page fallback (adopt.js) and the laptop (POST /v1/cloud/friend, from
+// the print server whenever a tag prints with Brought a friend, e.g. the touch
+// screen).
 //
 // Children's and friends' names, so: sealed at rest under the watcher's key
 // (AES-256-GCM, derived from the TwoTimTwo password secret; watcher.js), one

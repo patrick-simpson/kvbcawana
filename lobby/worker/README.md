@@ -231,26 +231,6 @@ is how the list knows it is on the channel.
 | `GET /v1/changes`, `POST /v1/changes/<seq>/undo` | the last 200 changes, who made them (`X-Device`, `X-Device-Name`) and Undo (`src/changes.js`) |
 | `GET /v1/tonight/overview` | mission control's one poll: counts, codes, times and station names only (`src/overview.js`) |
 
-## The phone check-in relay (printer 7.9.0)
-
-`awana.kvbchurch.org/checkin` is the print app's phone page, online. It signs in
-with the passphrase like any screen, and every call it would make to the
-check-in laptop on the church Wi-Fi goes through four routes instead
-(`src/relay.js`):
-
-| Route | Who | What |
-|---|---|---|
-| `POST /v1/relay` `{method, path, body}` | the page | queue one of the phone page's own calls (`RELAY_ROUTES` only) |
-| `GET /v1/relay/next` | the laptop's print app | take every waiting call; `busy` says whether to ask again in a second or in 20 s |
-| `POST /v1/relay/answer` `{id, status, body}` | the laptop | the call's answer |
-| `GET /v1/relay/result?id=` | the page | the answer, once (`{done: false}` until then) |
-
-Nothing about the roster is stored: a call waits at most 45 s for the laptop, an
-answer at most 2 minutes for its page, and is deleted as it is read. The laptop
-runs only the same `RELAY_ROUTES` (`printer/print-server/phone-relay.js`,
-pinned equal by `printer/scripts/test-phone-relay.cjs`), and only while it is
-signed in to this service.
-
 ## Cloud check-in: the report watcher (phase 1, shadow)
 
 `src/twotimtwo.js` (the client and parsers) and `src/watcher.js` (the

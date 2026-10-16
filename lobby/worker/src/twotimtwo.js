@@ -1,7 +1,8 @@
 // The sync Worker's TwoTimTwo client (ROADMAP.md#cloud-check-in, piece 1): signs in as
 // the church's dedicated check-in user and reads the pages the check-in laptop's
-// extension reads today. Phase 1 is READ-ONLY: nothing here posts a check-in,
-// an undo or a check-out.
+// Chrome extension once read (retired with KVBC Awana 10.0.0). It began
+// read-only; the desk's check-in, undo and check-out posts (desk.js, barf.js,
+// ymcheckout.js) are here too now, each behind the club-day writeGuard.
 //
 // TwoTimTwo agreed (Devin, 2026-10-11) to an automated check-in user on the
 // church's site, reading as often as ONE read every 5 seconds (all reads
@@ -188,7 +189,7 @@ export function parseCheckinReport(html) {
   }
   // No club table: before the night's first check-in TwoTimTwo draws the report
   // with none at all, so the report's own title says it is an empty night (as
-  // the laptop's extension reads it). Any other page is no report.
+  // the laptop's extension read it). Any other page is no report.
   if (!readAnyClub) return isReportPage(doc) ? { entries: [], declared: 0 } : null;
   return { entries, declared: declaredAll ? declared : null };
 }

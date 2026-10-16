@@ -438,14 +438,14 @@ describe('a restart (a new object over the same storage)', () => {
 });
 
 describe('every TwoTimTwo read, of every kind, keeps the 15 s clock', () => {
-  it('desk check-ins, the roster, undo, the watcher and a phone roster interleaved', async () => {
+  it('desk check-ins, the roster, the households, undo and the watcher interleaved', async () => {
     const t = await rig({ kids: [kid(1), kid(2)] });
     const st = await t.station();
     await t.core.watcher.tick();
     await Promise.all([
       t.call('POST', '/v1/desk/checkin', await t.deskBody([st])),
       t.call('GET', '/v1/desk/roster'),
-      t.call('POST', '/v1/relay', { method: 'POST', path: '/phone/tonight' }),
+      t.call('GET', '/v1/desk/families'),
     ]);
     t.clock.tick(10000);
     await t.core.watcher.tick();

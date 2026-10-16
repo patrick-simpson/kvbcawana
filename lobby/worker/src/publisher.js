@@ -30,7 +30,7 @@
 // ONCE PER CHILD PER NIGHT: the greeting only the station can make (birthday,
 // first-timer, milestone: it holds the roster and the history key), named
 // either by the job it printed (`X-Job`, printq.greet) or, for a label it printed
-// with no job (the phone page's relay job, the extension, a phone visitor), by
+// with no job (the touch screen, a hand-made check-in on the laptop), by
 // the child in the body (`greet: {clubberId}` or `greet: {name, club}`), which the
 // Worker turns into the claim's own tag in memory (never stored). So whichever
 // door a child came through, and whichever path then printed (a TwoTimTwo-page
@@ -394,8 +394,9 @@ export function mountPublisher(registry, core) {
   });
   // Check-outs made by hand on TwoTimTwo's Checkout page (owner 2026-10-15: "the
   // extension should monitor the check out page on the laptop for manual check
-  // outs"): the extension sees a row leave between two good reads and tells its
-  // print server, which hands the night's list here as the station. Each child
+  // outs"): a print server that sees a row leave between two good reads (the
+  // extension did, before 10.0.0; the Worker's own ymcheckout.js reads that page
+  // now) hands the night's list here as the station. Each child
   // comes off tonight's count and the still-here list (and /checkin's Check out),
   // as a desk check-out does. A child whose claim is undone is skipped (an undone
   // check-in also leaves the Checkout page). Only while the watch window is open

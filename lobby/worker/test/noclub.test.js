@@ -3,8 +3,7 @@
 // dates, the Worker's calendar; the whole local day in the church's zone) is a
 // test day. The roster reads TwoTimTwo's page like any day and answers `testDay`
 // {today, next, meeting}; desk check-in and undo are real (see testday.test.js);
-// check-out and the BARF late-friend tools, the relayed phone check-in and
-// POST /v1/cloud/checkin stay refused `no-club`. The print station's rehearsal
+// check-out and the BARF late-friend tools stay refused `no-club`. The print station's rehearsal
 // mode makes the day a club day as before (no `testDay` while rehearsing).
 import { describe, expect, it } from 'vitest';
 import { clubDay } from '../src/clubday.js';
@@ -194,52 +193,17 @@ describe('desk writes on a day with no club', () => {
   });
 });
 
-// The older cloud check-in path (code review 2026-10-13): the relayed phone
-// check-in (/checkin/classic, CloudPhone.checkIn) and POST /v1/cloud/checkin
-// both reach Watcher.checkIn, which reads TwoTimTwo's check-in page and posts.
-// The same club-day rule (the watcher's, the desk's too) refuses them before
-// any read or post; a rehearsal still goes through; and the client's own
-// posts are refused on such a day, so no path can forget the rule.
-describe('the older cloud check-in path on a day with no club', () => {
-  /** The phone page's relayCall: hand over, then collect the answer (the laptop is off). */
-  const relay = async (t, method, path, body) => {
-    const sent = await t.call('POST', '/v1/relay', { method, path, body });
-    return (await t.call('GET', `/v1/relay/result?id=${sent.body.id}`)).body;
-  };
-
-  it('POST /v1/cloud/checkin, preview or confirmed, is refused no-club: no read, no post', async () => {
+// The older cloud check-in paths (the relayed phone check-in and POST
+// /v1/cloud/checkin) are deleted: nothing but the desk's routes (above) posts a
+// check-in. The client's own posts are still refused on a day with no club, so
+// no path added later can forget the rule.
+describe('no other check-in path, and the client\'s own guard', () => {
+  it('the relayed phone check-in and POST /v1/cloud/checkin are gone: 404, no read, no post', async () => {
     const t = await monday();
-    for (const body of [{ clubberId: '662' }, { clubberId: '662', confirm: true }, { name: 'Kit Tester', confirm: true }]) {
-      const res = await t.call('POST', '/v1/cloud/checkin', body);
-      expect(res.status).toBe(200);
-      expect(res.body).toEqual({ ok: false, error: 'no-club', today: MON, next: NIGHT });
+    for (const [m, p, body] of [['POST', '/v1/cloud/checkin', { clubberId: '662', confirm: true }], ['POST', '/v1/relay', { method: 'POST', path: '/phone/checkin', body: { name: 'Kit Tester' } }]]) {
+      expect((await t.call(m, p, body)).status).toBe(404);
     }
     expect(touched(t)).toBe(0);
-  });
-
-  it('the relayed phone check-in (/checkin/classic) is refused no-club, in the page\'s words: no read, no post, no print job', async () => {
-    const t = await monday();
-    const ans = await relay(t, 'POST', '/phone/checkin', { name: 'Kit Tester', options: { Bible: true } });
-    expect(ans).toMatchObject({ done: true, status: 200, body: { queued: true } });
-    const status = await relay(t, 'GET', `/phone/status/${ans.body.id}`);
-    expect(status.body).toEqual({ status: 'failed', detail: 'there is no club tonight. Check in at the desk on a club night.' });
-    expect(touched(t)).toBe(0);
-  });
-
-  it('a club day is unchanged: POST /v1/cloud/checkin posts', async () => {
-    const t = await rig({ kids: [kid('662')] });
-    const res = await t.call('POST', '/v1/cloud/checkin', { clubberId: '662', confirm: true });
-    expect(res.body).toMatchObject({ ok: true, checkedIn: true });
-    expect(t.tt.checkins).toHaveLength(1);
-  });
-
-  it('during a rehearsal a Monday check-in through POST /v1/cloud/checkin goes through', async () => {
-    const t = await monday();
-    const st = await t.station();
-    await st.call('POST', '/v1/station/extras', { rehearsal: true });
-    const res = await t.call('POST', '/v1/cloud/checkin', { clubberId: '662', confirm: true });
-    expect(res.body).toMatchObject({ ok: true, checkedIn: true });
-    expect(t.checkinPosts).toBe(1);
   });
 
   it('the TwoTimTwo client itself refuses a check-in, undo or check-out post on such a day (no future path can forget)', async () => {
