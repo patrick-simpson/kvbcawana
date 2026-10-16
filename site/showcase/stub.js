@@ -309,6 +309,19 @@
     var hide = document.createElement('style');
     hide.textContent = '.lobby-preview__stop{display:none!important}';
     document.head.appendChild(hide);
+    // The home page's promos section: the lobby's own list of posters (its App puts
+    // PREVIEW_PROMOS' keys and labels on __SHOWCASE__), and when one is on screen.
+    var asked = 0;
+    var listTimer = setInterval(function () {
+      var list = window.__SHOWCASE__ && window.__SHOWCASE__.promos;
+      if (Array.isArray(list)) { clearInterval(listTimer); tell('promos', { list: list }); }
+      else if (++asked > 100) clearInterval(listTimer);
+    }, 200);
+    var showing = false;
+    new MutationObserver(function () {
+      var now = !!document.querySelector('.lobby-preview');
+      if (now !== showing) { showing = now; tell('promo', { playing: now }); }
+    }).observe(document.documentElement, { childList: true, subtree: true });
   }
   tell('ready', { at: iso() });
 }());

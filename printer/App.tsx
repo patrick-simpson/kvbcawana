@@ -11,7 +11,7 @@ import { Reel } from './components/home/Reel';
  *   #reel    the film, first (owner, 2026-10-16: "get the video to the top")
  *   #top     the opening: the time, and what this is
  *   #night   the night (components/home/Night.tsx): #doors (#phone, #labels,
- *            #lobby), #projector, #journey (#remote), #pickup (#app)
+ *            #lobby), #promos, #projector, #journey (#remote), #pickup (#app)
  *   #end     8:00: that's a club night, and the Lights out switch
  *   footer   the practical links, quietly
  *
@@ -43,6 +43,7 @@ const Clock: React.FC = () => {
 /** The evening's program, as the printed sheet on the welcome table has it. */
 const PROGRAM: [string, string, string][] = [
   ['6:00', 'Doors open', '#doors'],
+  ['6:02', 'Coming up', '#promos'],
   ['6:05', 'Game time', '#projector'],
   ['6:30', 'Journey', '#journey'],
   ['7:30', 'Pickup', '#pickup'],

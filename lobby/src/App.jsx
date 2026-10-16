@@ -118,6 +118,10 @@ const PROMO_KEYS = new Set(PREVIEW_PROMOS.map((p) => p.key));
 // relay channel is the stub's own, in-frame, spoken only by the home page.
 // Journey's embedded copy (a real kiosk) still never does.
 const SHOWCASE = typeof window !== 'undefined' && !!(/** @type {any} */ (window).__SHOWCASE__);
+// The home page's promos section loops every poster this lobby has (owner,
+// 2026-10-16): the twin hands the list up (the stub reads it here), so a poster
+// added to PREVIEW_PROMOS joins the loop by itself.
+if (SHOWCASE) /** @type {any} */ (window).__SHOWCASE__.promos = PREVIEW_PROMOS.map((p) => ({ key: p.key, label: p.label }));
 const noop = () => {};
 // Configure mode and the settings page open Settings on the first render, so
 // its chunk is asked for now, beside the main one, not after it has run.

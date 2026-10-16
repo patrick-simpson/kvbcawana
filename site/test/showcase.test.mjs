@@ -78,3 +78,15 @@ test('run in a window, it swaps storage for memory and switches IndexedDB and Br
   assert.equal(d.getHours(), 18);
   assert.equal(d.getDay(), 3, 'a Wednesday');
 });
+
+test('the promos section loops the lobby\'s own list of posters, so a new one joins by itself', () => {
+  const app = readFileSync(path.join(ROOT, 'lobby/src/App.jsx'), 'utf8');
+  assert.match(app, /if \(SHOWCASE\) \/\*\* @type \{any\} \*\/ \(window\)\.__SHOWCASE__\.promos = PREVIEW_PROMOS\.map/);
+  assert.match(stub, /tell\('promos', \{ list: list \}\)/);
+  const night = readFileSync(path.join(ROOT, 'printer/components/home/Night.tsx'), 'utf8');
+  const keys = [...app.matchAll(/key: '([a-zA-Z]+)'/g)].map((m) => m[1]);
+  for (const key of ['contest', 'friend', 'barfEpic', 'parents', 'snowAlerts', 'snowAlertsStorm']) {
+    assert.doesNotMatch(night, new RegExp(`'${key}'`), `the home page never lists ${key} itself`);
+  }
+  assert.ok(Array.isArray(keys));
+});

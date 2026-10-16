@@ -426,12 +426,18 @@ sup { font-size: .55em; line-height: 0; vertical-align: .9em; }
 .kv-scene__stage { min-width: 0; }
 
 .kv-scene--doors { background: var(--sun); color: var(--ink); }
+.kv-scene--promos { background: var(--sky); color: var(--ink); }
 .kv-scene--projector { background: #000; color: #fff; }
 .kv-scene--journey { background: var(--brand-journey-ink); color: #fff; }
 .kv-scene--pickup { background: var(--navy); color: #fff; }
 .kv-scene--projector .kv-scene__time { color: var(--sun); }
 .kv-scene--journey .kv-scene__time { color: var(--brand-journey-tint); }
 .kv-scene--pickup .kv-scene__time { color: var(--brand-cloud); }
+
+/* 6:02: the season's posters, the one on screen marked. */
+.kv-promos__list { list-style: none; margin: 18px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; max-width: 34ch; }
+.kv-promos__list li { padding: 5px 10px 6px; border-radius: 9px; font: 400 .9rem/1 var(--label); letter-spacing: .06em; text-transform: uppercase; background: #fff; color: var(--ink); box-shadow: 3px 3px 0 rgba(35, 31, 32, .22); }
+.kv-promos__list li.is-on { background: var(--ink); color: #fff; }
 
 /* A screen's label: the catalog's small plate, a hard offset under it. */
 .kv-tag {

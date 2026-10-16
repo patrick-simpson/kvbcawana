@@ -8,6 +8,7 @@ import { Twin, TwinHandle } from './Twin';
  *
  *   #doors     6:00  the check-in page on a phone (the reader taps names, or it
  *                    taps on its own), the label each tap prints, the lobby TV
+ *   #promos    6:02  the lobby TV looping every season poster (the lobby's own list)
  *   #projector 6:05  the projector wall: game time
  *   #journey   6:30  the Journey room's PC: the lesson starts, run from the
  *                    leader's phone remote (#remote; the reader may press too)
@@ -101,15 +102,6 @@ const COUNTS: Record<string, number> = { Puggles: 6, Cubbies: 9, Sparks: 11, 'T&
 
 interface Printed { key: number; first: string; club: string }
 
-// The lobby's promos between arrivals (owner, 2026-10-16: "add promos ... like
-// barf and snow days"), played as the sound room's Settings window previews them
-// (lobby PREVIEW_PROMOS keys, through the configure relay): one after every
-// three check-ins. A poster holds the greetings, as on the real TV.
-const PROMOS: [string, number][] = [
-  ['friend', 15], ['snowAlertsStorm', 20], ['barfEpic', 15], ['snowAlerts', 20], ['contest', 15], ['parents', 15],
-];
-const PROMO_EVERY = 3;
-
 const Printer: React.FC<{ printed: Printed[] }> = ({ printed }) => {
   const last = printed[printed.length - 1];
   return (
@@ -136,7 +128,6 @@ const Doors: React.FC = () => {
   const lastHuman = useRef(0);
   const n = useRef(0);
   const counts = useRef({ ...COUNTS });
-  const promo = useRef({ next: 0, until: 0, since: 0 });
 
   const onCheckin = useCallback((data: Record<string, unknown>) => {
     const first = String(data.firstName || '');
@@ -154,26 +145,14 @@ const Doors: React.FC = () => {
     setPrinted((p) => [...p.slice(-3), { key: n.current, first, club }]);
   }, []);
 
-  // While nobody is tapping, the phone checks the next child in by itself; every
-  // third arrival a promo plays (and the phone waits for it).
+  // While nobody is tapping, the phone checks the next child in by itself.
   useEvery(active, 4600, () => {
     if (!phone.current?.loaded() || !tv.current?.loaded()) return;
     const now = Date.now();
-    const p = promo.current;
-    if (now < p.until) return;
-    if (p.since >= PROMO_EVERY) {
-      const [key, sec] = PROMOS[p.next % PROMOS.length];
-      p.next += 1;
-      p.since = 0;
-      p.until = now + sec * 1000 + 1500;
-      tv.current.send({ type: 'showcase:relay', screen: 'lobby', action: 'preview-promo', data: { key } });
-      return;
-    }
     if (now - lastHuman.current < 12000) return;
     const next = ARRIVALS.find((name) => !done.current.has(name));
     if (!next) return;
     lastAuto.current = { name: next, t: Date.now() };
-    p.since += 1;
     phone.current.send({ type: 'showcase:click', selector: `.fam[aria-label="${next}"]` });
   });
 
@@ -183,7 +162,7 @@ const Doors: React.FC = () => {
         <div className="kv-scene__copy">
           <Time hm="6:00" />
           <h2 className="kv-scene__title" id="doors-title">Doors open.</h2>
-          <p className="kv-scene__line">Tap a name on the phone. A label prints and the lobby says hello. Between arrivals, the lobby tells everyone what's coming.</p>
+          <p className="kv-scene__line">Tap a name on the phone. A label prints and the lobby says hello.</p>
         </div>
         <div className="kv-scene__stage kv-doors">
           <figure id="phone" className="kv-device kv-device--phone">
@@ -197,6 +176,78 @@ const Doors: React.FC = () => {
             <Twin ref={tv} kind="lobby" at={wall('18:00:30')} width={1600} height={900}
               title="The lobby TV, welcoming each child by first name" />
             <figcaption><Tag>Lobby TV</Tag></figcaption>
+          </figure>
+        </div>
+      </div>
+    </section>
+  );
+};
+
+// ── 6:02 Coming up: the season's posters ─────────────────────────────────────
+// Every poster the lobby has, on a loop, on its own TV (owner, 2026-10-16: "a
+// section for the promos that plays all of them on loop. Then any new ones can
+// get added"). The list is the lobby's own (PREVIEW_PROMOS, handed up by the
+// twin), so a new poster joins by itself; each plays to its end card, as the
+// Settings window's Preview the promos plays it, then the next.
+interface PromoItem { key: string; label: string }
+const PROMO_GAP_MS = 900;
+const PROMO_START_MS = 5000; // a poster that never comes up is skipped
+const PROMO_MAX_MS = 40000; // and one that never ends is moved on from
+
+const Promos: React.FC = () => {
+  const [ref, active] = useScene('18:02:00');
+  const tv = useRef<TwinHandle>(null);
+  const [list, setList] = useState<PromoItem[]>([]);
+  const [now, setNow] = useState<PromoItem | null>(null);
+  const run = useRef({ next: 0, sentAt: 0, playing: false, endedAt: 0 });
+  useEffect(() => {
+    if (!active) { run.current = { next: 0, sentAt: 0, playing: false, endedAt: 0 }; setNow(null); }
+  }, [active]);
+
+  useEvery(active, 300, () => {
+    if (!tv.current?.loaded() || !list.length) return;
+    const r = run.current;
+    const t = Date.now();
+    const stuck = r.sentAt && ((!r.playing && t - r.sentAt > PROMO_START_MS) || t - r.sentAt > PROMO_MAX_MS);
+    const ready = !r.sentAt || stuck || (!r.playing && r.endedAt && t - r.endedAt >= PROMO_GAP_MS);
+    if (!ready) return;
+    const item = list[r.next % list.length];
+    r.next += 1;
+    r.sentAt = t;
+    r.playing = false;
+    r.endedAt = 0;
+    setNow(item);
+    tv.current.send({ type: 'showcase:relay', screen: 'lobby', action: 'preview-promo', data: { key: item.key } });
+  });
+
+  const onEvent = (what: string, data: Record<string, unknown>) => {
+    if (what === 'promos' && Array.isArray(data.list)) {
+      setList((data.list as unknown[]).filter((p): p is PromoItem => !!p && typeof (p as PromoItem).key === 'string' && typeof (p as PromoItem).label === 'string'));
+    } else if (what === 'promo') {
+      const r = run.current;
+      if (data.playing === true) r.playing = true;
+      else if (r.playing) { r.playing = false; r.endedAt = Date.now(); }
+    }
+  };
+
+  return (
+    <section ref={ref} id="promos" className="kv-scene kv-scene--promos" aria-labelledby="promos-title">
+      <div className="kv-wrap kv-scene__grid">
+        <div className="kv-scene__copy">
+          <Time hm="6:02" />
+          <h2 className="kv-scene__title" id="promos-title">Coming up.</h2>
+          <p className="kv-scene__line">Between arrivals, the lobby tells families what's next: every poster of the season, one after another.</p>
+          {list.length > 0 && (
+            <ol className="kv-promos__list" aria-label="The season's posters">
+              {list.map((p) => <li key={p.key} className={now && now.key === p.key ? 'is-on' : undefined}>{p.label}</li>)}
+            </ol>
+          )}
+        </div>
+        <div className="kv-scene__stage">
+          <figure className="kv-device kv-device--tv">
+            <Twin ref={tv} kind="lobby" at={wall('18:02:00')} width={1600} height={900} onEvent={onEvent}
+              title="The lobby TV playing the season's posters, one after another" />
+            <figcaption><Tag>{now ? `Lobby TV · ${now.label}` : 'Lobby TV'}</Tag></figcaption>
           </figure>
         </div>
       </div>
@@ -387,6 +438,7 @@ const Pickup: React.FC = () => {
 export const Night: React.FC = () => (
   <div id="night" className="kv-night">
     <Doors />
+    <Promos />
     <Games />
     <Journey />
     <Pickup />
