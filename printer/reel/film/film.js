@@ -256,7 +256,7 @@ function plate(parent, footage, { w, h, outline = '#fff', face = '#000' }) {
 
 const F = {};
 for (const name of ['lobby-open', 'lobby-run', 'lobby-milestone', 'lobby-pickup', 'projector-countdown',
-  'projector-game', 'journey', 'phone', 'settings']) F[name] = new Footage(name);
+  'projector-game', 'journey', 'phone', 'settings', 'promo-barf', 'promo-snow', 'promo-contest', 'promo-parents']) F[name] = new Footage(name);
 
 /* ── The night, cut to the music (owner, 2026-10-16) ──────────────────
    A whole-system montage on "Happy Dance"'s beat: one title, then the real
@@ -470,11 +470,13 @@ function build() {
   S('journey', 112, 128, (r) => shot(r, { clip: 'journey', at: (t) => 0.6 + t * 0.7, label: 'Journey room', field: C.journeyInk, accent: C.journey }));
   // The final chorus (song beats 336-391): the screens again, swept in on every other bar.
   S('pickup', 128, 136, (r) => shot(r, { clip: 'lobby-pickup', at: (t) => 2.6 + t, label: 'Pickup board', field: C.orange, accent: C.hot, from: 'left' }));
-  S('settings', 136, 144, (r) => shot(r, { clip: 'settings', at: (t) => 1.5 + t, label: 'Settings · any device', field: C.tnt, accent: C.tntDeep, ratio: 1.6 }));
-  S('lobby-run-2', 144, 152, (r) => shot(r, { clip: 'lobby-run', at: (t) => 4 + t, label: 'Lobby TV', field: C.trek, accent: C.trekDeep, from: 'left' }));
-  S('game', 152, 160, (r) => shot(r, { clip: 'projector-game', at: (t) => 0.5 + t, label: 'Game time', field: '#000', accent: C.tnt }));
+  // The season's posters (owner, 2026-10-16), on the real lobby, a bar each and a
+  // little quick, the way they play between the slides.
+  S('promo-contest', 136, 144, (r) => shot(r, { clip: 'promo-contest', at: (t) => 1.5 + t * 1.5, label: 'Lobby TV · poster contest', field: C.blueDeep, accent: C.sun }));
+  S('promo-barf', 144, 152, (r) => shot(r, { clip: 'promo-barf', at: (t) => 5 + t * 1.6, label: 'Lobby TV · BARF Night', field: '#5B2C83', accent: '#8BD13A', from: 'left' }));
+  S('promo-snow', 152, 160, (r) => shot(r, { clip: 'promo-snow', at: (t) => 3 + t * 1.2, label: 'Lobby TV · snow alerts', field: '#1B2F66', accent: '#FFFFFF' }));
   S('labels-2', 160, 168, (r) => printing(r, { files: ['4-leo', '5-sophia', '6-owen'], field: C.cream, accent: C.sparks }));
-  S('phone-2', 168, 176, (r) => shot(r, { clip: 'phone', at: (t) => 0.9 + t, label: 'Check-in · any phone', field: C.cubbies, accent: C.blueDeep, portrait: true, from: 'left' }));
+  S('promo-parents', 168, 176, (r) => shot(r, { clip: 'promo-parents', at: (t) => 4.5 + t * 1.6, label: "Lobby TV · Parents' Night", field: C.orange, accent: C.hot, from: 'left' }));
   // The end card: the logo lands on the song's last hit (song beat 392 = film beat 184).
   scene('end', T(176), DURATION + 1, endCard);
 }

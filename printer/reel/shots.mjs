@@ -40,6 +40,22 @@ const checkin = (ctx, firstName, club, flags = {}) => () => ctx.send('checkin', 
   id: `reel-${++n}-${firstName}`, firstName, club, at: new Date(ctx.now()).toISOString(), ...flags,
 });
 
+/** One season poster on the lobby, asked for at 0.2 s and played to its end card. */
+function promoShot(key, seconds) {
+  return {
+    url: '/lobby/', time: at('18:15:00'), seconds,
+    setup: lobby({ manualSlides: TYPED_DECK, firstArrivalMoment: false }),
+    ready: '.stage',
+    // The room sees the poster, not the preview's "click or press Esc to stop" pill.
+    warmup: (shot) => shot.page.addStyleTag({ content: '.lobby-preview__stop{display:none!important}' }),
+    cues: () => ({
+      0.2: (page) => page.evaluate((k) => {
+        new BroadcastChannel('awana-configure').postMessage({ screen: 'lobby', action: 'preview-promo', data: { key: k } });
+      }, key),
+    }),
+  };
+}
+
 export const SHOTS = {
   // 5:44 pm, doors open: the flagship title plays, the first child of the
   // night arrives and the lobby crowns her.
@@ -96,6 +112,13 @@ export const SHOTS = {
       };
     },
   },
+  // The season's posters (owner, 2026-10-16: "the promos like barf, snow day and
+  // poster contest and parents night"), played the way the Settings window's
+  // Preview the promos plays them on a TV: a relay on the lobby's own channel.
+  'promo-barf': promoShot('friend', 15.5),
+  'promo-snow': promoShot('snowAlertsStorm', 20.5),
+  'promo-contest': promoShot('contest', 15.5),
+  'promo-parents': promoShot('parents', 15.5),
   // The projector: the countdown runs out at 6:00 and the opening begins.
   'projector-countdown': {
     url: '/lobby/countdown', time: at('17:59:49'), seconds: 15,
