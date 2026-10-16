@@ -116,7 +116,7 @@ jobs:
       # packages (linkedom, parse5), not wrangler (as ci.yml's printer job).
       - name: Install the sync Worker's runtime packages
         if: inputs.app == 'printer'
-        run: npm ci --omit=dev --prefix ../lobby/worker
+        run: npm ci --omit=dev --prefix ../worker
         working-directory: printer
       - name: Run the test suites
         if: inputs.app == 'printer'

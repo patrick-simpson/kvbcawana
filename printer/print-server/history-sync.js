@@ -1,5 +1,5 @@
 // The print role's part of the church's sealed history (ROADMAP.md#online-check-in,
-// P2; the routes are lobby/worker/src/routes.md section 3, built by P6 / P5, so
+// P2; the routes are worker/src/routes.md section 3, built by P6 / P5, so
 // every call here TOLERATES A MISSING ROUTE: it keeps what it can and says so).
 //
 //   * WRITE: when this computer prints a job that came from a TwoTimTwo-page

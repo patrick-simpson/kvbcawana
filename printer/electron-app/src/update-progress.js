@@ -90,7 +90,7 @@ function createProgress({ now = Date.now, minRepaintMs = MIN_REPAINT_MS } = {}) 
 
 // ── This computer's app on /settings (the row's status line) ──────────────
 // The hello device-sync.js sends carries {app: {version, update: {state,
-// percent, at}}} (lobby/worker/src/routes.md 10.7; the Worker's allowlist is
+// percent, at}}} (worker/src/routes.md 10.7; the Worker's allowlist is
 // sanitizeScreenStatus in lobby/src/lib/syncSpecs.js). /settings says
 // "KVBC Awana 9.4.0 · up to date", "· downloading update 42%", "· update
 // ready, installing when idle" or "· update could not finish downloading".

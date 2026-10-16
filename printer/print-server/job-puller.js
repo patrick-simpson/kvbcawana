@@ -1,7 +1,7 @@
 // The print role's half of online check-in (ROADMAP.md#online-check-in, P2):
 // this computer, a registered STATION, takes ALL its print jobs from the sync
 // Worker instead of the Chrome extension or the phone relay's job route. The
-// Worker's side is lobby/worker/src/routes.md section 6 (the one truth); the
+// Worker's side is worker/src/routes.md section 6 (the one truth); the
 // loop was modelled on the retired phone-relay.js.
 //
 //   next       GET  /v1/print/next?max=1   -> {jobs: [{jobId, kind, night, gen, bundle, leaseUntil, attempt}], leaseMs,

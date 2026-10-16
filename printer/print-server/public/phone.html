@@ -751,7 +751,7 @@ var busyUntil = 0;
 var busyTimer = null;
 // No club tonight (owner 2026-10-13): on a day that is not a club day the Worker's
 // roster answers at once `{noClub: true, today, next}` and reads nothing from
-// TwoTimTwo (lobby/worker/src/routes.md 5). The page shows one friendly note in
+// TwoTimTwo (worker/src/routes.md 5). The page shows one friendly note in
 // the list's place, hides the search box, and asks again once a minute, so on the
 // club day it switches to the list by itself within a minute of the Worker saying so.
 var NO_CLUB = null;            // { today, next } while the Worker says there is no club today
@@ -2725,7 +2725,7 @@ $('oneoff-name').addEventListener('keydown', function(e) { if (e.key === 'Enter'
 // GET /v1/desk/barf; hidden when unknown). Tap -> tonight's checked-in children
 // ("Who brought the friend?"; one who already has a friend is greyed out) -> the
 // friend's first name -> confirm. ONE Worker operation (POST /v1/desk/barf-late,
-// lobby/worker/src/routes.md 5.1) redoes the child's TwoTimTwo check-in with the
+// worker/src/routes.md 5.1) redoes the child's TwoTimTwo check-in with the
 // same items plus Brought a friend, prints ONLY the child's BARF tag (no second
 // name tag, no second greeting) and puts the friend on the 6:30 list and the BARF
 // bags. The friend is not checked in. It rides the page's queue (a busy Worker is

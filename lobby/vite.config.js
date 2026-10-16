@@ -145,7 +145,7 @@ export default defineConfig({
     environment: 'jsdom',
     // Playwright specs live in e2e/ and must never run under vitest; the
     // Worker's tests run in its own ci job.
-    exclude: [...configDefaults.exclude, 'e2e/**', 'worker/**'],
+    exclude: [...configDefaults.exclude, 'e2e/**'],
     coverage: {
       provider: 'v8',
       reporter: ['text-summary', 'html', 'lcov'],

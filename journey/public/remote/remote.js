@@ -7,7 +7,7 @@
      sync-protocol.js + cloud-crypto.js, only that is sent; the session goes
      in the shared slot awanaSyncSession.v1; the passphrase is never kept).
    - Every press is ONE request, POST /v1/journey/remote {action, data?}: the
-     sync Worker hands it to every Journey kiosk (lobby/worker/src/routes.md
+     sync Worker hands it to every Journey kiosk (worker/src/routes.md
      10.9), each runs it through its own buttons' functions.
    - Polls GET /v1/journey/remote/state every 1.5 s while this page is
      visible (never while hidden), which also tells the kiosks a phone is

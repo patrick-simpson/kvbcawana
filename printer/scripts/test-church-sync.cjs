@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // The church settings from the sync Worker (docs/SETTINGS-OVERHAUL.md section 4;
-// wire: lobby/worker/src/routes.md section 10.3), on the REAL print server with a
+// wire: worker/src/routes.md section 10.3), on the REAL print server with a
 // stub powershell and a stand-in Worker that speaks GET/PUT /v1/church/settings.
 // What it must do:
 //   * an empty doc is seeded by a STATION only, with config.json's church part and

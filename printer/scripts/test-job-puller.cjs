@@ -2,7 +2,7 @@
 // Online check-in P2: the print role takes ALL its print jobs from the Worker
 // (print-server/job-puller.js), at most once each. The real print server runs
 // here (a stand-in `powershell` counts the jobs that reach the printer); the
-// Worker is a stand-in that speaks lobby/worker/src/routes.md section 6.
+// Worker is a stand-in that speaks worker/src/routes.md section 6.
 'use strict';
 const fs = require('fs');
 const os = require('os');

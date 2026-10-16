@@ -23,7 +23,7 @@
 // and plain JavaScript: the generator turns them into `exports` by a simple
 // text transform, and refuses anything it cannot.
 //
-// Served by the Worker (lobby/worker/src/sync.js); what it answers is the
+// Served by the Worker (worker/src/sync.js); what it answers is the
 // contract these functions read, so change them together.
 
 /**
@@ -157,7 +157,7 @@ function parseLoginResponse(res, opts = {}) {
     return { ok: false, status: 429, reason: 'locked', message: 'Too many wrong tries. Wait a little, then try again.', retryAfterSec: Number(res.body?.retryAfterSec) || 900 };
   }
   if (res.status === 503) {
-    return { ok: false, status: 503, reason: 'not-set-up', message: 'The sync service has no passphrase yet. Finish its setup (lobby/worker/README.md).' };
+    return { ok: false, status: 503, reason: 'not-set-up', message: 'The sync service has no passphrase yet. Finish its setup (worker/README.md).' };
   }
   const b = res.body && typeof res.body === 'object' ? res.body : {};
   if (!res.ok || !isValidSession(b.session) || !isPlausibleDisplayKey(b.displayKey)) {
@@ -170,7 +170,7 @@ function parseLoginResponse(res, opts = {}) {
   };
 }
 
-// ── passphrase v2 (lobby/worker/src/routes.md section 1) ─────────────────────
+// ── passphrase v2 (worker/src/routes.md section 1) ─────────────────────
 // The passphrase never reaches the service once a client is on v2: the client
 // asks GET /v1/auth/params for the salt and count, derives `authKey` itself
 // (cloud-crypto.js deriveAuthKey: PBKDF2-SHA256 600000 rounds, then HKDF) and

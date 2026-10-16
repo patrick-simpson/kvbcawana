@@ -2,6 +2,9 @@ node_modules
 site/dist
 site/.wrangler
 site/lib/large-files.generated.js
+# Sync Worker
+worker/.wrangler/
+worker/.dev.vars
 
 # Generated copies of the family's shared files (scripts/family-assets.mjs):
 # the brand kit and the sync modules each have ONE canonical file; every app gets

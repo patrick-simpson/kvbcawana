@@ -7,10 +7,10 @@ Captured 2026-07-26 against a live church tenant (`kvbchurch.twotimtwo.com`,
 Yii 1.x + Bootstrap 3 + jQuery). TwoTimTwo is closed-source and has no public
 API; everything here was observed from the authenticated site. Treat it as a
 contract that can drift — the tests in `scripts/test-server-helpers.cjs` and
-the sync Worker's own (`lobby/worker/test/`) exist to catch drift loudly.
+the sync Worker's own (`worker/test/`) exist to catch drift loudly.
 
 > **Since KVBC Awana 10.0.0 (2026-10-16) there is no Chrome extension.** The
-> sync Worker (`lobby/worker/src/twotimtwo.js` and its readers) is the only
+> sync Worker (`worker/src/twotimtwo.js` and its readers) is the only
 > thing that talks to TwoTimTwo, signed in as the church's check-in user. The
 > sections below that describe the extension (§1's session, §2, §7) are kept as
 > the record of what it read; the selectors and routes are TwoTimTwo's own and
@@ -390,10 +390,10 @@ of what it touched), same-origin on twotimtwo.com:**
 TwoTimTwo directly; enriches labels from `clubbers.csv`, which since 10.0.0 is
 the roster the sync Worker read and sealed to the station.
 
-**Sync Worker (`lobby/worker/src/`)** — everything TwoTimTwo-facing since
+**Sync Worker (`worker/src/`)** — everything TwoTimTwo-facing since
 10.0.0: the check-in page and posts, the check-in report, the roster and
 household CSVs, completed books, the meeting report, the Checkout page; its
-routes are in `lobby/worker/src/routes.md`.
+routes are in `worker/src/routes.md`.
 
 Everything else in this doc is **available but unused** — see the capabilities
 page (`/capabilities.html`) for the ranked backlog of what to build next.

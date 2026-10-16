@@ -37,7 +37,7 @@ Nothing at church checks in or prints without the internet (since 10.0.0 there i
 ### Architecture
 
 - **KVBC Awana app** (`electron-app/`) - Windows installer, tray app and auto-updater. It runs the print server when the print role is on, and the lobby display when the display role is on.
-- **No Chrome extension** since 10.0.0: the sync Worker (`lobby/worker/`) reads TwoTimTwo (check-ins made there, the roster, completed books, the youth check-out) and the app prints the jobs it leases. On its first 10.x launch the app empties the old extension's folder and restarts Chrome once.
+- **No Chrome extension** since 10.0.0: the sync Worker (`worker/`) reads TwoTimTwo (check-ins made there, the roster, completed books, the youth check-out) and the app prints the jobs it leases. On its first 10.x launch the app empties the old extension's folder and restarts Chrome once.
 - **Node.js print server** - runs on the computer that has the print role, generates PDFs and prints silently. It answers only the computer it runs on: phones use awana.kvbchurch.org/checkin, and every setting is on awana.kvbchurch.org/settings ([SETUP.md](docs/SETUP.md#3-settings-awanakvbchurchorgsettings)).
 - **React web UI** (optional) - Simulator and configuration reference
 

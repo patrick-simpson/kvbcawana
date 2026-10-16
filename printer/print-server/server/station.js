@@ -87,7 +87,7 @@ function mergeAttendance(entries) {
   return changed;
 }
 
-// P5, the one publisher (lobby/worker/src/routes.md section 8): the Worker makes the tally, the
+// P5, the one publisher (worker/src/routes.md section 8): the Worker makes the tally, the
 // ticker and the still-here list, but three of their inputs live only in this computer's config:
 // the Screen season and rehearsal flag that ride the tally, and the clubs on the pickup list.
 // Plaintext, non-personal; sent when one changes and at least once a minute.

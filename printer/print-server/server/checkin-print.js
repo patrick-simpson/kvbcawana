@@ -405,7 +405,7 @@ async function performCheckinPrint(input) {
       });
       // A station's job: the greeting (birthday, first-timer, milestone: only this computer
       // has the roster and the history) is the ONE the single publisher lets through,
-      // named by the job it is for (lobby/worker/src/routes.md section 8).
+      // named by the job it is for (worker/src/routes.md section 8).
       // With no job (the phone page's relay job, the extension, a phone visitor) a station
       // names the child instead, so the single publisher can still greet them once.
       // (An id-less print the roster knows is named by the roster's id: the same child.)
@@ -493,7 +493,7 @@ app.post('/print-barf-bags', async (req, res) => {
 // A late BARF friend's tag (9.3.1, owner 2026-10-12): the child is already
 // checked in and has their name tag; the sync Worker redid the check-in with
 // Brought a friend and sends ONLY this (a job from awana.kvbchurch.org/checkin's
-// BARF button, lobby/worker/src/routes.md 5.1). generateBarfTag(): slime band,
+// BARF button, worker/src/routes.md 5.1). generateBarfTag(): slime band,
 // BARFED!, the first name alone. No history row, no count, no greeting: the
 // station's journal keeps it to one label; the Worker decided it is a BARF night.
 app.post('/print-barf-tag', async (req, res) => {

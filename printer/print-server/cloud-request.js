@@ -1,4 +1,4 @@
-// One request to the sync Worker's online check-in routes (lobby/worker/src/
+// One request to the sync Worker's online check-in routes (worker/src/
 // routes.md): the shared protocol's request building (sync-protocol.js) plus
 // the `X-Station` header the station routes name the registered computer by.
 // Never throws; status 0 means unreachable. Tests hand the modules that take

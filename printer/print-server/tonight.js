@@ -3,7 +3,7 @@
 'use strict';
 // @ts-check
 // THE definition of "who is here tonight" (ROADMAP.md#online-check-in, P5): ONE
-// source, imported by the sync Worker (lobby/worker/src/tonight.js) and run by
+// source, imported by the sync Worker (worker/src/tonight.js) and run by
 // the print server through a generated CommonJS copy
 // (printer/print-server/tonight.js, scripts/shared-copies.mjs). It is the pure
 // core of what used to be print-server/server.js's authoritativeTonight() and

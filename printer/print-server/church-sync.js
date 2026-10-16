@@ -1,5 +1,5 @@
 // The church settings, pulled from the sync Worker (docs/SETTINGS-OVERHAUL.md
-// section 4; wire: lobby/worker/src/routes.md section 10.3).
+// section 4; wire: worker/src/routes.md section 10.3).
 //
 // The check-in laptop's church-wide printing settings (label footer, connect
 // card, label templates, schedule, late grace, pickup list, Screen season, BARF

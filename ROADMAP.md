@@ -101,7 +101,7 @@ Chosen, safest first, all on the free plan:
   Screen season, the rehearsal flag and the pickup list's clubs (`POST /v1/station/extras`);
   the laptop's dropped `tonight` frame hands over the books and awards counts.
 
-Full contract: `lobby/worker/src/routes.md` section 8.
+Full contract: `worker/src/routes.md` section 8.
 
 ### Status and hand-off
 
@@ -117,7 +117,7 @@ Full contract: `lobby/worker/src/routes.md` section 8.
   pill and footer speak of the sign-in, and it opens on Setup until signed in.
   `e2e/settings-page.spec.js` pins it. The lobby TV's own Settings is unchanged.
 - 2026-10-11: **Phase 2 built** (lobby TVs and projectors; Journey left, below).
-  - **Worker** (`lobby/worker/src/screens.js`, routes in `sync.js`, API in
+  - **Worker** (`worker/src/screens.js`, routes in `sync.js`, API in
     `worker/README.md`): `POST /v1/screens/hello`, `GET /v1/screens`,
     `GET/PUT /v1/screens/<id>/settings`, `PUT .../name`, `POST .../action`,
     `DELETE /v1/screens/<id>`, all behind the session. At most 40 screens,
@@ -152,7 +152,7 @@ Full contract: `lobby/worker/src/routes.md` section 8.
   - **Journey** (2026-10-12, BUILT for status): `journey/public/src/sync.js`
     says hello as kind `journey` every 2 minutes while signed in and not in
     configure mode (id in the same `awanaScreens.v1` slot under `journey`),
-    carrying its saved lessons (`status`, `lobby/worker/src/routes.md` 10.7),
+    carrying its saved lessons (`status`, `worker/src/routes.md` 10.7),
     shown in its row on /settings. It follows no settings by hello:
     `SCREEN_SPECS.journey` is `{}` since the Pi mode switch went with the Pi;
     a future kiosk setting would be applied from the hello's answer (Journey
@@ -201,7 +201,7 @@ Full contract: `lobby/worker/src/routes.md` section 8.
   Captions and Teaching slides edit the Worker's one journey document (new
   `GET /v1/journey`), and "Lessons on the Journey PCs" lists every kiosk with
   progress, Start / Pause / Resume / Stop / Delete (queued for the kiosk's next
-  hello, `lobby/worker/src/routes.md` 10.8; the embedded Check-in Display passes
+  hello, `worker/src/routes.md` 10.8; the embedded Check-in Display passes
   the doorbell up so it lands in seconds) and its two download switches
   (`SCREEN_SPECS.journey`). Needs one sync Worker deploy.
 - 2026-10-16: **Done; nothing left for the owner on this track.** The classic rail
@@ -537,14 +537,14 @@ Read this first if you are picking the work up in a new session.
   permission ever needs showing, file the email (or note how it was given)
   here.
 - **Built (2026-10-11): phase 1, the read-only watcher.** In the sync Worker:
-  `lobby/worker/src/twotimtwo.js` (sign-in, the report and check-in page
+  `worker/src/twotimtwo.js` (sign-in, the report and check-in page
   parsers, which a test runs against the extension's own parser on the same
-  pages) and `lobby/worker/src/watcher.js` (the 15 s alarm in the club
+  pages) and `worker/src/watcher.js` (the 15 s alarm in the club
   window, the partial and mass-undo guards, the sealed state). It publishes
   nothing; `GET /api/v1/cloud/status` (signed in with the passphrase) shows
   its counts, and `POST /api/v1/cloud/read-now` reads once on any day for a
   rehearsal. `CLOUD_CHECKIN = "shadow"` in `wrangler.toml`; `"off"` stops it.
-  Tests: `lobby/worker/test/twotimtwo.test.js`, `watcher.test.js`.
+  Tests: `worker/test/twotimtwo.test.js`, `watcher.test.js`.
 - **Checked against the live site (2026-10-11):** the secrets are set and the
   dedicated user signs in. Read as that user, the report for 2026-10-07 gave
   all 94 children its Count: footers declare (Sparks 23, T&T 22, Trek 22,
@@ -567,7 +567,7 @@ Read this first if you are picking the work up in a new session.
   longer. /checkin uses the Worker's desk routes for all of it, and this relayed
   check-in, `POST /v1/cloud/checkin` and `phone.js`, was deleted, commit 2c3282e.)*
 - **BARF Night, 2026-10-14 (owner).** Who brought a friend is recorded in the
-  Worker (`lobby/worker/src/friends.js`: child, club, the friend's first name,
+  Worker (`worker/src/friends.js`: child, club, the friend's first name,
   sealed per night, deleted after three days) from the cloud check-in and from
   the laptop (printer 8.1.0, every check-in path). `GET /v1/cloud/friends` is
   the report grouped by club; `POST /v1/cloud/friends-link` makes the one
@@ -641,7 +641,7 @@ just prints. Check-ins typed on TwoTimTwo's own page still get a label.
 
 What is left for you:
 
-1. Set `workers_dev = false` in `lobby/worker/wrangler.toml` once every laptop
+1. Set `workers_dev = false` in `worker/wrangler.toml` once every laptop
    and kiosk is confirmed to use the `/api` address. It is the Worker's second
    public address.
 2. The lobby's screenshot tests (the `visual` e2e project) do not run in CI.
@@ -695,7 +695,7 @@ hashing (SHA-256, HMAC). A design that needs a paid plan is not this design.
 | Question | Decision |
 | --- | --- |
 | The passphrase | Clients derive `K = PBKDF2-SHA256(normalized passphrase, salt from the Worker, iter)` with iter in [600000, 2000000] (600000 for new wraps), then HKDF-SHA256 splits it: `authKey` (info `kvbc-auth-v1`) and `wrapKey` (info `kvbc-history-wrap-v1`). Clients send only `authKey`; the Worker stores SHA-256(authKey) and never receives the passphrase. This closes the fast-hash weakness of today's `HMAC(salt, passphrase)`. |
-| Moving off the old hash | The first v2 login after the deploy sends `{passphrase, authKey}` once and upgrades the stored verifier; old clients keep signing in with the old hash until every client has updated (the first v2 passphrase change, or the owner's switch, deletes it). **Done 2026-10-16 (owner; commit 43c2805): the old login is refused and deleted; only the bootstrap upgrade login stays.** OBS / ProPresenter links keep their `?passphrase=`: the page computes `authKey` in the browser. `lobby/worker/src/routes.md` §1. |
+| Moving off the old hash | The first v2 login after the deploy sends `{passphrase, authKey}` once and upgrades the stored verifier; old clients keep signing in with the old hash until every client has updated (the first v2 passphrase change, or the owner's switch, deletes it). **Done 2026-10-16 (owner; commit 43c2805): the old login is refused and deleted; only the bootstrap upgrade login stays.** OBS / ProPresenter links keep their `?passphrase=`: the page computes `authKey` in the browser. `worker/src/routes.md` §1. |
 | Passphrase strength | Unchanged (six characters minimum). The owner accepts the risk; SECURITY.md says so. |
 | History key | ECDH P-256. `history:pub` in the Durable Object, first writer wins, replaceable only by an explicit re-key flow (none is built: **no rekey button**). The private key is wrapped with `wrapKey` (AES-GCM, a fresh 16-byte PBKDF2 salt per wrap) as `history:wrapped {v, salt, iter, iv, ct}`, served only to signed-in sessions. Clients unwrap it into a NON-extractable key and check it belongs to `history:pub`. |
 | Passphrase change | The client re-wraps, unwraps the new wrap to prove it, and submits `{newAuthVerifier, newWrapped}` in ONE atomic multi-key put; the Worker keeps `history:wrapped:prev` for 7 days. **No recovery code: lose the passphrase, lose the history** (owner). |
@@ -703,7 +703,7 @@ hashing (SHA-256, HMAC). A design that needs a paid plan is not this design.
 | Stations | **No pairing step** (owner): any computer signed in with the passphrase may register a station key pair (ECDH P-256, private key in Electron safeStorage; the app refuses the station role when safeStorage is unavailable). Medical notes (allergies) are sealed **only** to station keys, never to the history key. Rosters, completed books and print jobs are sealed to every registered station (the same ECIES, info `kvbc-station-v1`, AAD prefix `stn1:`). |
 | Identifiers | The Durable Object never stores a plaintext clubber id: claims and job ids are keyed by HMAC(stateKey, night‖clubberId) (watcher.js's state-key approach); a visitor without an id by HMAC(stateKey, night‖normalized name‖club). The night is the church's LOCAL date (America/New_York, `localTime()` / TwoTimTwo's meeting date), never UTC. Claims are purged at the end of the night. |
 | BARF friend list | **Stays as is** (owner, 2026-10-12): sealed under the Worker-derived key (3-day retention), readable by the Worker only so it can send the 6:30 pm email. It does NOT move under the history key. |
-| TwoTimTwo's terms | Names may be stored, encrypted. Read budget: **one read every 5 seconds, all reads combined** (replaces the 15 s). **Owner 2026-10-12: while the laptop's extension tab still reads TwoTimTwo (about 3 reads a minute), the Worker makes at most ONE read every 15 s, all its reads combined** (`READ_INTERVAL_MS` 15000 in `lobby/worker/src/readbudget.js`; back to 5000 when the tab is retired: **5 s since 2026-10-16**, commit 16a8051, 12 slots a minute). Since 2026-10-16 the clock has 12 slots a minute and uses about 5 at 6 pm: the report every 30 s (its slot reserved), the roster's check-in page (30 s fresh), the Checkout page once a minute all club night (review fix 2d3e4d1; it was 7:15 pm on), the roster export about hourly, completed books and the meeting report in club hours, and a households catch-up when an unknown child appears (routes.md section 7). A desk check-in, undo or check-out reads nothing: the check-in page is kept for the night (routes.md section 5). |
+| TwoTimTwo's terms | Names may be stored, encrypted. Read budget: **one read every 5 seconds, all reads combined** (replaces the 15 s). **Owner 2026-10-12: while the laptop's extension tab still reads TwoTimTwo (about 3 reads a minute), the Worker makes at most ONE read every 15 s, all its reads combined** (`READ_INTERVAL_MS` 15000 in `worker/src/readbudget.js`; back to 5000 when the tab is retired: **5 s since 2026-10-16**, commit 16a8051, 12 slots a minute). Since 2026-10-16 the clock has 12 slots a minute and uses about 5 at 6 pm: the report every 30 s (its slot reserved), the roster's check-in page (30 s fresh), the Checkout page once a minute all club night (review fix 2d3e4d1; it was 7:15 pm on), the roster export about hourly, completed books and the meeting report in club hours, and a households catch-up when an unknown child appears (routes.md section 7). A desk check-in, undo or check-out reads nothing: the check-in page is kept for the night (routes.md section 5). |
 | No internet | **The paper sheet** (TwoTimTwo's `/clubber/checkin_form`), keyed in when the internet is back. This replaces Online only's "check-in still prints at the desk": with the extension retired, nothing at church checks in or prints offline. |
 | BARF on the TwoTimTwo-page fallback | When the report marks Brought a friend, the station prints a BARFED tag **without the friend's name** (TwoTimTwo's box has no name field). |
 | Printing | **At most once.** The station journals every jobId it spooled; a retried job it already spooled acks `already-spooled` without printing and the Worker flags "check the printer" (the label may not have come out). |
@@ -738,7 +738,7 @@ said); "Owner" is what only the owner can do.
 
 | Phase | What | Builder | Owner |
 | --- | --- | --- | --- |
-| **P0** Foundation | `lobby/shared/cloud-crypto.js` (+ generated `printer/print-server/cloud-crypto.js`), `cloud-vectors.json` and its three test suites, the D1 schema (`lobby/worker/migrations/0001_history.sql`), the route contract (`lobby/worker/src/routes.md`), SECURITY.md, the 5 s read budget in the watcher. | Claude (done 2026-10-12) | Read and approve; create the free D1 database (`wrangler.toml` has the steps). |
+| **P0** Foundation | `lobby/shared/cloud-crypto.js` (+ generated `printer/print-server/cloud-crypto.js`), `cloud-vectors.json` and its three test suites, the D1 schema (`worker/migrations/0001_history.sql`), the route contract (`worker/src/routes.md`), SECURITY.md, the 5 s read budget in the watcher. | Claude (done 2026-10-12) | Read and approve; create the free D1 database (`wrangler.toml` has the steps). |
 | **P1** Passphrase v2, history key, one read clock | `/v1/auth/params`, v2 / upgrade / legacy login, v2 passphrase change (atomic put, `history:wrapped:prev` 7 days), `GET/PUT /v1/history/key`; every client (lobby `syncService`, the printer's `sync-client.js`, the KVBC Awana wizard, Journey) derives `authKey` and the first one creates the history key; every TwoTimTwo read in the Worker on ONE 5 s clock (the phone page's back-to-back reads included). | Claude: Worker + lobby, then printer (release) | Watch `auth:legacyLastAt`; turn the legacy login off. **Done 2026-10-16** (43c2805). |
 | **P2** Desk page + history rows | The desk page (`/desk`, lobby build): roster, check in, undo, check out, visitors, a sealed history row with every action; `/v1/desk/*`, `/v1/history/rows`, `night_summary`; claims keyed and purged nightly. | Claude: lobby + Worker | Bind `HISTORY_DB`; try the desk page on a test child. |
 | **P3** Stations | KVBC Awana's print role registers a station key (safeStorage, refused without it); `/v1/station/*`; the roster CSV read through the Worker and sealed by the station to every station; completed books. | Claude: printer (release) + Worker | Install on the check-in laptop (and any second printer). |
@@ -750,7 +750,7 @@ said); "Owner" is what only the owner can do.
 ### Status and hand-off
 
 - **Owner update (2026-10-16).** The D1 database `awana-history` is created, and
-  `lobby/worker/wrangler.toml` binds it as `HISTORY_DB` (id `893de8eb-13cf-4187-8ea2-eab652735acf`,
+  `worker/wrangler.toml` binds it as `HISTORY_DB` (id `893de8eb-13cf-4187-8ea2-eab652735acf`,
   matching the one the owner pasted). The pasted block named the binding `DB`; the
   deployed Worker must pick up the repo's `HISTORY_DB` name, or history stays off.
   Online check-in has been used successfully, all check-in tests are done, and the
@@ -762,7 +762,7 @@ said); "Owner" is what only the owner can do.
   comparison is not recorded as done.
 - **P0 built (2026-10-12).** The module's API is documented at the top of
   `lobby/shared/cloud-crypto.js` and in `lobby/shared/README.md`; the route
-  shapes in `lobby/worker/src/routes.md`; what is and is not protected in
+  shapes in `worker/src/routes.md`; what is and is not protected in
   `lobby/SECURITY.md` ("Online check-in history"). The only behaviour that
   changed is the watcher's read clock (5 s, and it waits out any other read
   its session made).
@@ -777,7 +777,7 @@ said); "Owner" is what only the owner can do.
     itself with `sealForStations` (ECDH P-256 in WebCrypto is native and cheap
     enough for the free plan's 10 ms of CPU), and the station writes the
     history row when it prints. Measured in
-    `lobby/worker/test/cloudCrypto.test.js` (Node, not workerd, so an upper
+    `worker/test/cloudCrypto.test.js` (Node, not workerd, so an upper
     bound on the work and not the Worker's own figure): about 4.2 ms per job
     sealed to 3 stations (about 1.4 ms per station). Check the real figure in
     the Worker's logs on the shadow night, and note the station count it was
@@ -787,7 +787,7 @@ said); "Owner" is what only the owner can do.
     while the extension tab still reads, owner 2026-10-12; 5 s since 2026-10-16); the watcher reads its
     report every 30 s and reserves its slot. Stations, the print lease, the
     claim ledger, the desk claim API and the watcher's claim rules are in
-    `lobby/worker/src` (routes.md sections 4 to 7, marked BUILT). Still open for
+    `worker/src` (routes.md sections 4 to 7, marked BUILT). Still open for
     the owner: `CLOUD_PRINT` and `SINGLE_PUBLISHER` stay `"off"` in
     `wrangler.toml` until the shadow night (P5 publishes the tally itself, built; both
     `"on"` since 2026-10-12), and
@@ -853,7 +853,7 @@ said); "Owner" is what only the owner can do.
     (closed by the Worker's youth check-out below once `YM_CHECKOUT` is on). **Closed:**
     `ymcheckout.js`, with `YM_CHECKOUT` on, and the extension is gone.
   - **Youth check-out in the Worker (2026-10-12, not released; `YM_CHECKOUT = "off"`).**
-    `lobby/worker/src/ymcheckout.js` runs the extension's Trek/Journey sweep from the
+    `worker/src/ymcheckout.js` runs the extension's Trek/Journey sweep from the
     watcher's alarm with exactly its rules (club nights 7:15 pm to midnight, the
     Checkout page's own POST, exact "OK", 3 tries, a done list), from the watcher's
     latest report (no report read of its own; the Checkout page at most every 60 s),
@@ -902,13 +902,13 @@ said); "Owner" is what only the owner can do.
     with `/checkin/classic/ym`, kept as the one-night fallback while /checkin moves
     to the desk's online path. Done 2026-10-16: the page, its build block, its
     `must` entries, its test, and the copy of `sync-protocol.js` only it used are
-    gone. The Worker's relayed check-in code (`lobby/worker/src/phone.js`) is still
+    gone. The Worker's relayed check-in code (`worker/src/phone.js`) is still
     there and was not part of this removal. *(Gone later the same day, commit
     2c3282e: `phone.js`, `POST /v1/cloud/checkin` and the relay routes are deleted.)*
   - **P7 done (2026-10-16).** In order: the Worker took over the extension's last
     jobs, the roster export, completed books, the meeting report (award slips as
     sealed `/print-award` jobs) and the Checkout page's hand check-outs
-    (`lobby/worker/src/stationfeeds.js`, `ymcheckout.js`; 03e13d1, 7dbd30f); KVBC
+    (`worker/src/stationfeeds.js`, `ymcheckout.js`; 03e13d1, 7dbd30f); KVBC
     Awana 10.0.0 deleted the extension, the phone relay, the pending actions, the
     `/phone/*` routes, the touch mode and the attendance audit, and neuters the old
     extension folder (7dbd30f..b7d6015; released 5:44 AM Eastern, run 38881739599,
@@ -1188,7 +1188,7 @@ Nothing; the three items below are done (kept as the record).
   `PUSHER_*` GitHub secrets). If still present, the Worker's own
   `PUSHER_APP_ID`, `PUSHER_KEY`, `PUSHER_SECRET` and `PUSHER_CLUSTER` can go
   too (Cloudflare dashboard, or `npx wrangler secret delete <name>` in
-  `lobby/worker`); nothing reads them.
+  `worker`); nothing reads them.
 - **Pusher app.** Done 2026-10-12 (owner deleted it).
 - **Stray screens.** Find any screen still on the old github.io address
   (it stops getting check-ins once Pusher is off) and open

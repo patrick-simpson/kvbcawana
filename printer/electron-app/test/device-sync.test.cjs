@@ -1,6 +1,6 @@
 'use strict';
 // This computer's row on /settings (src/device-sync.js), against a stand-in
-// of the sync Worker's screen registry (lobby/worker/src/screens.js: hello,
+// of the sync Worker's screen registry (worker/src/screens.js: hello,
 // GET and PUT settings, PUT name, 401 when signed out) and stand-in timers.
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');

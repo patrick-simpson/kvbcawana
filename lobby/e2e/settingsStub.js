@@ -1,6 +1,6 @@
 import { SYNC_BASE, liveChannel } from './liveChannel.js';
 
-// A stand-in for the sync Worker's overhaul routes (lobby/worker/src/routes.md
+// A stand-in for the sync Worker's overhaul routes (worker/src/routes.md
 // section 10) for the settings page's specs, built beside the real Worker and
 // coded to the documented contract: the overview, the switches, the notice,
 // the change log, the church settings document and the cloud status. A plain

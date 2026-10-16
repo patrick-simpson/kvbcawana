@@ -60,7 +60,7 @@ function boot({ url = SERVICE, journey = null, prefs = {}, stateStatus = 200, v2
       const extra = helloAnswer ? helloAnswer(body, calls) : { settings: null };
       return reply(200, { screen: { id: body.id, kind: body.kind, name: screenName || body.name }, ...extra });
     }
-    // The phone remote's poll (lobby/worker/src/routes.md 10.9): [status, body].
+    // The phone remote's poll (worker/src/routes.md 10.9): [status, body].
     if (route === '/v1/screens/now' && nowAnswer) return reply(...nowAnswer(body, calls));
     if (/^\/v1\/screens\/[^/]+\/settings$/.test(route) && init.method === 'PUT') {
       return reply(200, { savedAt: `2026-10-12T20:00:0${calls.length % 10}.000Z`, settings: body.settings, dropped: [] });
@@ -396,7 +396,7 @@ test('a hello\'s actions run once each, only the five allowlisted, then a quick 
   ];
   const k = boot({
     journey: ROOM, prefs: { 'awanaSyncSession.v1': SESSION }, tuning: { helloMs: 60_000, ackMs: 50 },
-    // The service hands a queue over once (lobby/worker/src/screens.js).
+    // The service hands a queue over once (worker/src/screens.js).
     helloAnswer: () => { const actions = queue; queue = []; return { settings: null, actions }; },
   });
   const page = fakePage(k);

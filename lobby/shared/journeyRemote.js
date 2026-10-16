@@ -2,7 +2,7 @@
 // The Journey phone remote's rules (owner 2026-10-13: "build a way to advance
 // slides for Journey on a phone ... Doing it on the phone should advance the
 // slide for all"). ONE copy, pure, no imports, used by:
-//   - the sync Worker (lobby/worker/src/journeyRemote.js, through
+//   - the sync Worker (worker/src/journeyRemote.js, through
 //     src/lib/syncSpecs.js), which checks every press and every kiosk report
 //   - the phone page (journey/public/remote/, a byte copy in
 //     journey/public/src/shared/ made by scripts/family-assets.mjs), which

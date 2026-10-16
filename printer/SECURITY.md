@@ -63,7 +63,7 @@ Be clear-eyed about the limits:
   service's runtime switches (CLOUD_PRINT, SINGLE_PUBLISHER, YM_CHECKOUT and
   the safety switches), the church settings this computer applies to
   config.json, notices and the change log's undo need only the passphrase
-  (`lobby/worker/src/routes.md` section 10), including the session an OBS /
+  (`worker/src/routes.md` section 10), including the session an OBS /
   ProPresenter `?passphrase=` link makes. The owner decided this on 2026-10-12
   after the risk was explained; there is no owner-only role.
 - **The data at rest is not encrypted.** `clubbers.csv`, `print-history.json`
@@ -179,7 +179,7 @@ same cryptography as `print-server/cloud-crypto.js`, generated from
 ## Remembered leaders in the sync service (owner-approved exception)
 
 Since 9.3.0 the remembered leaders (the leader-tag chips) live in the sync
-Worker's church settings (`lobby/worker/src/routes.md` section 10.3), so any
+Worker's church settings (`worker/src/routes.md` section 10.3), so any
 phone or computer signed in with the passphrase shows the same chips. Those are
 adult volunteers' **full names** (first and last, club, when last printed, how
 many times), and they are stored **unencrypted**: in the Worker's church

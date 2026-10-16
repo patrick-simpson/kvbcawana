@@ -41,8 +41,7 @@ jobs:
   # 2026-10-11: a Worker fix waited 8 minutes on lobby tests it cannot touch).
   # Anything unknown runs everything: a manual run or a bot's dispatch, no
   # base to compare with, or a change to this file. The fast jobs always run.
-  #   lobby   reads only lobby/ (its vitest excludes worker/,
-  #           whose lint moved into its own job below), plus
+  #   lobby   reads only lobby/ (the Worker, worker/, has its own job), plus
   #           journey/public/src/schedule.js, journey/public/src/sync.js and
   #           journey/src/schedule/19-picker-final-step.js (the phone remote's picker choices)
   #           printer/contract-vectors.json and printer/envelope-vectors.json
@@ -52,7 +51,7 @@ jobs:
   #           phone page by site/checkin/checkin-page.mjs, from a stub origin)
   #   printer reads printer/, plus, since the online check-in end-to-end test
   #           (printer/scripts/test-cloud-e2e.cjs) runs the Worker in process,
-  #           ALL of lobby/worker/src, lobby/worker/migrations, the four test
+  #           ALL of worker/src, worker/migrations, the four test
   #           helpers it reuses (rig, helpers, fixtures, d1stub), the Worker's
   #           package files (its two runtime packages are installed for it) and
   #           the lobby/src/lib and lobby/shared files the Worker imports
@@ -123,11 +122,11 @@ jobs:
                 journey/public/src/schedule.js|journey/public/src/sync.js|journey/src/schedule/19-picker-final-step.js) lobby=true ;;  # screenSpecs.test.js reads both, embed.test.js sync.js, shared/journeyRemote.test.js the picker's choices
                 site/checkin/*|printer/print-server/public/phone.html|printer/print-server/sync-protocol.js) lobby=true ;;
                 printer/contract-vectors.json|printer/envelope-vectors.json) lobby=true ;;  # the lobby's sanitizer and envelope tests read the one copy in place  # e2e/checkin.spec.js serves the check-in page (site/checkin/checkin-page.mjs builds it from phone.html)
-                lobby/worker/*|printer/*|journey/*|site/*|.github/workflows/*) ;;
+                worker/*|printer/*|journey/*|site/*|.github/workflows/*) ;;
                 *) lobby=true ;;
               esac
               case "$f" in
-                lobby/worker/src/*|lobby/worker/migrations/*|lobby/worker/test/rig.js|lobby/worker/test/helpers.js|lobby/worker/test/fixtures.js|lobby/worker/test/d1stub.js|lobby/worker/package.json|lobby/worker/package-lock.json|lobby/src/lib/calendarParse.js|lobby/src/lib/envelope.js|lobby/src/lib/settingRules.js|lobby/src/lib/sharedSettings.js|lobby/src/lib/slides.js|lobby/src/lib/syncSpecs.js|lobby/shared/journeyRemote.js|lobby/shared/text.js|lobby/shared/sync-protocol.js|lobby/shared/brand/*|lobby/shared/cloud-crypto.js|lobby/shared/cloud-vectors.json|lobby/shared/tonight.js|lobby/shared/pickup.js|lobby/shared/clubs.js|lobby/shared/clubNight.js|lobby/shared/schedule.json|lobby/shared/churchSettings.js|lobby/src/lib/printServer.js|lobby/src/components/settings/laptop*.jsx|site/build.mjs) printer=true ;;
+                worker/src/*|worker/migrations/*|worker/test/rig.js|worker/test/helpers.js|worker/test/fixtures.js|worker/test/d1stub.js|worker/package.json|worker/package-lock.json|lobby/src/lib/calendarParse.js|lobby/src/lib/envelope.js|lobby/src/lib/settingRules.js|lobby/src/lib/sharedSettings.js|lobby/src/lib/slides.js|lobby/src/lib/syncSpecs.js|lobby/shared/journeyRemote.js|lobby/shared/text.js|lobby/shared/sync-protocol.js|lobby/shared/brand/*|lobby/shared/cloud-crypto.js|lobby/shared/cloud-vectors.json|lobby/shared/tonight.js|lobby/shared/pickup.js|lobby/shared/clubs.js|lobby/shared/clubNight.js|lobby/shared/schedule.json|lobby/shared/churchSettings.js|lobby/src/lib/printServer.js|lobby/src/components/settings/laptop*.jsx|site/build.mjs) printer=true ;;
                 lobby/*|journey/*|site/updates/*|.github/workflows/*) ;;
                 *) printer=true ;;
               esac
@@ -251,19 +250,17 @@ jobs:
     timeout-minutes: 15
     defaults:
       run:
-        working-directory: lobby
+        working-directory: worker
     steps:
       - uses: actions/checkout@v4
+      # The Worker has its own lint and test tools (it left lobby/ on 2026-10-16);
+      # the lobby files it imports need no packages of their own.
       - uses: ./.github/actions/setup-app
         with:
-          lockfile: |
-            lobby/package-lock.json
-            lobby/worker/package-lock.json
-          working-directory: lobby
-      - run: npm ci --prefix worker
-      # The lobby-checks job's \`eslint .\` covers worker/ too, but it may be skipped.
-      - run: npx eslint worker
-      - run: npx vitest run --config worker/vitest.config.js
+          lockfile: worker/package-lock.json
+          working-directory: worker
+      - run: npm run lint
+      - run: npm test
 
   journey:
     name: Journey kiosk
@@ -305,7 +302,7 @@ jobs:
         working-directory: printer/print-server
       # test-cloud-e2e.cjs runs the sync Worker in process: its two runtime
       # packages (linkedom, parse5), not wrangler.
-      - run: npm ci --omit=dev --prefix ../lobby/worker
+      - run: npm ci --omit=dev --prefix ../worker
       # The suites take their own ports (scripts/free-port.cjs), so the runner
       # (scripts/run-tests.cjs) runs them 4 at a time; `-- --serial` is the old order.
       - run: npm test
@@ -375,7 +372,7 @@ jobs:
           node-version: '22'
           cache: npm
           cache-dependency-path: |
-            lobby/worker/package-lock.json
+            worker/package-lock.json
             lobby/package-lock.json
             printer/package-lock.json
       - name: Check the Cloudflare secrets
@@ -389,7 +386,7 @@ jobs:
           fi
       - name: Install the Worker's packages (wrangler)
         if: steps.ready.outputs.ready == 'true'
-        run: npm ci --prefix lobby/worker
+        run: npm ci --prefix worker
       - name: Build the site
         # Same commit and SITE_ORIGIN as the site job's checked build (no run
         # file hand-off: see the site job). dist, plus
@@ -453,7 +450,7 @@ jobs:
           if [ -z "$BASE" ]; then
             echo "No base commit to compare against; deploying the Worker."
             echo "changed=true" >> "$GITHUB_OUTPUT"
-          elif git diff --quiet "$BASE" HEAD -- lobby/worker lobby/worker/migrations lobby/src/lib lobby/shared/text.js lobby/shared/sync-protocol.js lobby/shared/cloud-crypto.js lobby/shared/tonight.js lobby/shared/pickup.js lobby/shared/clubs.js lobby/shared/churchSettings.js lobby/shared/clubNight.js lobby/shared/schedule.json lobby/shared/journeyRemote.js .github/workflows/ci.yml; then
+          elif git diff --quiet "$BASE" HEAD -- worker lobby/src/lib lobby/shared/text.js lobby/shared/sync-protocol.js lobby/shared/cloud-crypto.js lobby/shared/tonight.js lobby/shared/pickup.js lobby/shared/clubs.js lobby/shared/churchSettings.js lobby/shared/clubNight.js lobby/shared/schedule.json lobby/shared/journeyRemote.js .github/workflows/ci.yml; then
             echo "Nothing the Worker is built from changed since $BASE; its deploy is skipped."
             echo "changed=false" >> "$GITHUB_OUTPUT"
           else
@@ -463,18 +460,18 @@ jobs:
       - name: Apply the history database's migrations
         # Before the Worker that needs them. Idempotent (wrangler remembers what
         # it applied), so it runs on every Worker deploy rather than guessing
-        # whether lobby/worker/migrations changed (a change there changes the
+        # whether worker/migrations changed (a change there changes the
         # Worker's own folder, so it deploys too).
         if: steps.ready.outputs.ready == 'true' && steps.worker.outputs.changed == 'true'
-        working-directory: lobby/worker
+        working-directory: worker
         run: npx wrangler d1 migrations apply awana-history --remote
       - name: Deploy the sync Worker
         if: steps.ready.outputs.ready == 'true' && steps.worker.outputs.changed == 'true'
-        working-directory: lobby/worker
+        working-directory: worker
         run: npx wrangler deploy
       - name: Set the Worker's secrets
         if: steps.ready.outputs.ready == 'true' && steps.worker.outputs.changed == 'true'
-        working-directory: lobby/worker
+        working-directory: worker
         env:
           INITIAL_PASSPHRASE: ${{ secrets.SYNC_PASSPHRASE }}
           # Cloud check-in (ROADMAP.md#cloud-check-in): the church's dedicated TwoTimTwo
@@ -499,7 +496,7 @@ jobs:
         if: steps.ready.outputs.ready == 'true'
         working-directory: site
         run: |
-          WRANGLER=../lobby/worker/node_modules/.bin/wrangler
+          WRANGLER=../worker/node_modules/.bin/wrangler
           $WRANGLER pages project create kvbcawana --production-branch main 2>/dev/null || true
           $WRANGLER pages deploy dist --project-name kvbcawana --branch main --commit-dirty=true
 

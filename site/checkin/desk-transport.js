@@ -4,7 +4,7 @@
 // (ROADMAP.md#online-check-in; it was the /desk page's). No DOM and no globals:
 // the page hands it `fetch`, a storage object and the cloud-crypto module
 // (lobby/shared/cloud-crypto.js, the canonical copy), so Node tests run it as it
-// is. The routes are lobby/worker/src/routes.md; when the Worker's contract
+// is. The routes are worker/src/routes.md; when the Worker's contract
 // moves, this is the only file that follows.
 //
 // THE RULES it keeps (routes.md "Rules every route keeps"):

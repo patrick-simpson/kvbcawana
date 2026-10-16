@@ -17,7 +17,7 @@
      changes here. No socket of its own.
    - Until the display site's shared/sync.json names a service, the Settings
      section stays hidden and nothing here runs.
-   - Sign-in is passphrase v2 (lobby/worker/src/routes.md section 1): the
+   - Sign-in is passphrase v2 (worker/src/routes.md section 1): the
      passphrase is turned into an authKey HERE and only that is sent. The
      protocol dance is the family's one copy, lobby/shared/sync-protocol.js, and
      the derivation lobby/shared/cloud-crypto.js: both are loaded as ES modules
@@ -26,7 +26,7 @@
      the page's thread; nothing re-derives afterwards (every later
      request rides the session).
    - Signed in, the kiosk also says hello to the screen registry
-     (POST /v1/screens/hello, kind 'journey', lobby/worker/src/routes.md 10.7)
+     (POST /v1/screens/hello, kind 'journey', worker/src/routes.md 10.7)
      so awana.kvbchurch.org/settings lists it, with how saving the lessons is
      going (schedule.js's journeyDownloadStatus(), trimmed to numbers,
      switches and one short reason; also when it has not looked yet or
@@ -38,7 +38,7 @@
    - The settings page can work this kiosk's "Lessons on this computer"
      (owner 2026-10-12, /settings → Journey): the hello's answer carries what
      it asked since the last hello (`actions`, each handed over once by the
-     service, lobby/worker/src/routes.md 10.8), checked against
+     service, worker/src/routes.md 10.8), checked against
      REMOTE_ACTIONS and run through schedule.js's own buttons
      (window.journeySettingsPage); and this kiosk's two switches (automatic
      download, Leader Videos) are its own settings there, taken when the
@@ -51,7 +51,7 @@
      bellGapMs). Without it, the ten-minute pull and two-minute hello still
      carry everything.
    - The phone remote (owner 2026-10-13, awana.kvbchurch.org/journey/remote/;
-     lobby/worker/src/routes.md 10.9): one press on a leader's phone goes to
+     worker/src/routes.md 10.9): one press on a leader's phone goes to
      every Journey kiosk. The Worker keeps it 20 seconds and rings this kiosk's
      doorbell; the doorbell makes this page ask POST /v1/screens/now at once
      (light: no storage on the service), which hands the presses over, each

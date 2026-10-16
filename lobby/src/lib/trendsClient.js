@@ -1,6 +1,6 @@
 // @ts-check
 // The trends back-fill's status, for the History section's Trends card
-// (lobby/worker/src/routes.md section 3, "The trends back-fill" and its
+// (worker/src/routes.md section 3, "The trends back-fill" and its
 // self-check; owner 2026-10-13). The Worker brings in earlier seasons from
 // TwoTimTwo's Attendance Summary by itself; this reads what it has done
 // (`GET /v1/history/import-status`) and says it in plain words: where the

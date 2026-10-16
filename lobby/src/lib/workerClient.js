@@ -1,6 +1,6 @@
 // @ts-check
 // The settings page's calls to the sync Worker's overhaul routes
-// (lobby/worker/src/routes.md section 10): the overview, the switches, the
+// (worker/src/routes.md section 10): the overview, the switches, the
 // notice and the change log. One signed-in request each, through the same
 // `syncAuthed` every other Settings call uses (so every one carries X-Device /
 // X-Device-Name). Never throws; every answer is {ok, status, body, message}.

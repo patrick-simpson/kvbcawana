@@ -1,6 +1,6 @@
 # Settings overhaul (spec, owner decisions 2026-10-12; ships before club night Wed 2026-10-14)
 
-Machine-oriented. Wire/route truth: `lobby/worker/src/routes.md` section 10 (this file
+Machine-oriented. Wire/route truth: `worker/src/routes.md` section 10 (this file
 never restates a shape it defines). Rules that hold throughout: root `CLAUDE.md`
 "Everything free" (10 ms CPU per Worker request, no key work in the Worker),
 `CLAUDE.md` "Privacy invariant" (first names only, names sealed end to end,
@@ -324,7 +324,7 @@ after `worker-ymcheckout` is merged.
 
 ### Track A: Worker
 
-Owns: `lobby/worker/**` (src, test, `wrangler.toml`, `README.md`, `src/routes.md` BUILT
+Owns: `worker/**` (src, test, `wrangler.toml`, `README.md`, `src/routes.md` BUILT
 marks), `lobby/shared/churchSettings.js`, `lobby/shared/churchSettings.test.js`.
 
 - `src/device.js` (10.1 header parse), `src/switches.js` (10.2: store, effective-env
@@ -382,7 +382,7 @@ Owns: `lobby/src/**` (not `worker/`), `lobby/e2e/**`, `CLAUDE.md`, `ROADMAP.md`
 
 ## 9. Test plan
 
-Track A (`npx vitest run --config worker/vitest.config.js`, root `npm run lint`):
+Track A (`cd worker && npm test`, `npm run lint`):
 switches: default from env, stored override, `default` deletes, stale rev, `SWITCHES_STORED
 off`, a flip changes `adopt.on` / `core.singlePublisher` / `ym.enabled` in the same request,
 reload after a restart (new `SyncCore`, same storage) before the first alarm, warnings;
@@ -508,7 +508,7 @@ sections"); no card title is used twice on the page (same test).
   downloaded lessons with a confirm, disabled while the kiosk is off, checking
   or unable to save; "Download lessons automatically" and "Include Leader
   Videos" per kiosk). Captions and Teaching slides carry an "Every Journey
-  kiosk" tag. Wire: `lobby/worker/src/routes.md` 10.8. The kiosk's own panel
+  kiosk" tag. Wire: `worker/src/routes.md` 10.8. The kiosk's own panel
   keeps every control (the fallback at the PC); the lesson picker and the
   bullet editor stay only there (owner's choice).
 - **History**: Trends · Nights · Import laptop history. Unchanged.

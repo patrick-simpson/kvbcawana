@@ -21,6 +21,3 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
-# Sync Worker (worker/)
-worker/.wrangler/
-worker/.dev.vars

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Online check-in, end to end (ROADMAP.md#online-check-in): the sync Worker's
-// real handlers run in this process (lobby/worker/src, over the Worker tests'
+// real handlers run in this process (worker/src, over the Worker tests'
 // stand-in TwoTimTwo, Durable Object storage and D1), and the REAL print-role
 // modules talk to it through the same request shape the packaged app uses:
 //
@@ -29,8 +29,8 @@
 // while the station's print server tells the extension its own sweep is off.
 //
 // The Worker is ESM and this is CommonJS, so it is loaded with import(). Its
-// two runtime packages (linkedom, parse5) come from lobby/worker/node_modules
-// (CI: `npm ci --omit=dev --prefix lobby/worker` before the printer's tests).
+// two runtime packages (linkedom, parse5) come from worker/node_modules
+// (CI: `npm ci --omit=dev --prefix worker` before the printer's tests).
 'use strict';
 
 const fs = require('fs');
@@ -46,7 +46,7 @@ function check(name, cond, detail) {
 }
 
 const root = path.join(__dirname, '..');
-const worker = path.join(root, '..', 'lobby', 'worker');
+const worker = path.join(root, '..', 'worker');
 const load = (...p) => import(pathToFileURL(path.join(worker, ...p)).href);
 const cc = require(path.join(root, 'print-server', 'cloud-crypto.js'));
 const { createStationKeys } = require(path.join(root, 'print-server', 'station-keys.js'));

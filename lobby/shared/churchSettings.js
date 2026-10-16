@@ -1,9 +1,9 @@
 // @ts-check
-// THE church settings allowlist (lobby/worker/src/routes.md section 10.3): the
+// THE church settings allowlist (worker/src/routes.md section 10.3): the
 // check-in laptop's church-wide printing settings, kept by the sync Worker and
 // edited from awana.kvbchurch.org/settings. Three readers, ONE table:
 //
-//   - the Worker (lobby/worker/src/church.js) cleans every seed and edit with it;
+//   - the Worker (worker/src/church.js) cleans every seed and edit with it;
 //   - the settings page (lobby/src) shows and sends these keys;
 //   - the print server (through its generated copy,
 //     printer/print-server/churchSettings.js) cleans what it fetches before its

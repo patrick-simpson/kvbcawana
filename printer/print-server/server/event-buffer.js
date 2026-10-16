@@ -88,7 +88,7 @@ function pruneEventBuffer() {
 // Tonight's greetings by child (memory only, today's only): a TwoTimTwo-page job that
 // meets a label already printed greets LATE with the very same event (the same id, so a
 // screen that already showed it drops it), because the single publisher may have dropped
-// the first one (lobby/worker/src/routes.md section 8).
+// the first one (worker/src/routes.md section 8).
 let greetingsTonight = { day: null, byKey: new Map() };
 function greetingKeys(firstName, lastName, clubberId) {
   const keys = [];

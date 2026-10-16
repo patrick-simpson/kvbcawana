@@ -1,5 +1,5 @@
 // The print server's half of the Awana sync service (the Cloudflare Worker in
-// lobby/worker/). Request helpers, no state: server.js owns when they run and
+// worker/). Request helpers, no state: server.js owns when they run and
 // what is persisted. The PROTOCOL (address and session validation, request
 // building, sign-in and answer parsing) lives in ./sync-protocol.js, a
 // generated copy of lobby/shared/sync-protocol.js that the lobby's screens use
@@ -60,7 +60,7 @@ async function syncRequest(base, path, { method, body, session, fetchFn } = {}) 
 }
 
 /**
- * Sign in (passphrase v2, lobby/worker/src/routes.md section 1): the passphrase
+ * Sign in (passphrase v2, worker/src/routes.md section 1): the passphrase
  * is turned into an authKey HERE (cloud-crypto's generated CommonJS copy, 600000
  * PBKDF2 rounds, about 0.3 s on a PC) and only the authKey is sent, the only
  * sign-in there is (a service with no v2 is told it is too old). `seedKey` is the display key this
