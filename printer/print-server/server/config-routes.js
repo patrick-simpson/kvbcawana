@@ -402,12 +402,10 @@ app.post('/config', (req, res) => {
       if (m && !cups.isMediaKeyword(m)) return res.status(400).json({ error: 'cupsMedia is not a CUPS media name' });
       if (m) next.cupsMedia = m; else delete next.cupsMedia;
     }
-    // Worksheets (POST /print-pdf) are letter-size, not 4x2 labels, so a
-    // church running two printers can route them separately.
+    // The worksheet printer (until 10.0.0 the Chrome extension's /print-pdf
+    // used it; nothing prints worksheets now). Still validated like every
+    // printer name, so a poisoned value is never stored.
     if (worksheetPrinter !== undefined) {
-      // This value reaches a shell via printPdf(); refuse to persist anything
-      // that isn't a plain printer label so it can never be poisoned once and
-      // fire later during a legitimate worksheet print.
       const wp = String(worksheetPrinter || '').trim();
       if (!$customPdf.isSafePrinterName(wp)) {
         return res.status(400).json({ error: 'worksheetPrinter contains unsupported characters' });
@@ -514,8 +512,8 @@ app.post('/play-tune', async (req, res) => {
 // phone on the venue Wi-Fi must not be able to bin labels that are about to
 // print. Confirm-gated too, and never invoked automatically by anything.
 //
-// The body is validated BEFORE the platform short-circuit, exactly as
-// POST /print-pdf does, so the 400s stay observable from Linux CI.
+// The body is validated BEFORE the platform short-circuit, so the 400s stay
+// observable from Linux CI.
 app.post('/printer/clear-queue', async (req, res) => {
   if (!isTrustedOrSettingsPage(req)) {
     return res.status(403).json({ error: 'The print queue can only be cleared from this computer' });

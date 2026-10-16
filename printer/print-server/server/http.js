@@ -20,7 +20,6 @@ const $feedRoutes = lazy('./feed-routes');
 Object.defineProperties(exports, {
   app: { enumerable: true, get: () => app },
   isBusy: { enumerable: true, get: () => isBusy },
-  PDF_UPLOAD_PATH: { enumerable: true, get: () => PDF_UPLOAD_PATH },
   SETTINGS_URL: { enumerable: true, get: () => SETTINGS_URL },
 });
 
@@ -178,19 +177,10 @@ function isBusy() {
   return printRequests > 0 || $printing.printerJobs > 0 || Boolean($reprint.reprintRun);
 }
 
-// Keep the GLOBAL body limit small so a hostile or buggy tab can't push
-// megabytes of JSON through a laptop that is mid-event. Exactly one route
-// legitimately carries a base64 PDF (/print-pdf, where base64 inflates a 12MB
-// worksheet by ~4/3), so the global parser steps aside for that single path and
-// the route mounts its own larger parser. The global parser must skip it rather
-// than the route "overriding" it — app-level middleware runs first, so a big
-// body would otherwise be rejected here before the route is ever reached.
-const PDF_UPLOAD_PATH = '/print-pdf';
-const globalJson = express.json({ limit: '2mb' });
-app.use((req, res, next) => {
-  if (req.path === PDF_UPLOAD_PATH) return next();
-  return globalJson(req, res, next);
-});
+// Keep the body limit small so a hostile or buggy tab can't push megabytes of
+// JSON through a laptop that is mid-event. (Until 10.0.0 one route, the
+// extension's /print-pdf worksheets, carried a larger body of its own.)
+app.use(express.json({ limit: '2mb' }));
 
 // ── The loopback gate ────────────────────────────────────────────────────────
 // Online only (owner, 2026-10-11): this server answers the computer it runs on
@@ -198,8 +188,8 @@ app.use((req, res, next) => {
 // open a socket here at all; this refuses a non-loopback caller anyway, at the
 // one place every route passes through, so a later change to the bind can never
 // quietly expose the roster to the church Wi-Fi. There is no PIN and no LAN
-// page any more: phones use awana.kvbchurch.org/checkin, which the sync Worker
-// relays to /phone/* below (from this computer, so loopback).
+// page any more: phones use awana.kvbchurch.org/checkin, which talks to the
+// sync Worker; this computer prints the jobs it leases from there.
 app.use((req, res, next) => {
   if (security.isLoopbackRequest(req)) return next();
   const addr = (req.socket && req.socket.remoteAddress) || 'unknown';
