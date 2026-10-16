@@ -79,6 +79,12 @@ export const SLIP_CAP = 10;
  */
 export const FEEDS_FROM_VERSION = '10.0.0';
 export const SLIPS_FROM_VERSION = FEEDS_FROM_VERSION;
+/**
+ * A station not heard from (no heartbeat, else since it registered) for this long
+ * is a computer that has gone: it no longer holds the hand-over back (owner review
+ * 2026-10-16: one dead laptop on 9.x kept award slips from ever printing).
+ */
+export const STALE_STATION_MS = 7 * 24 * 60 * 60 * 1000;
 /** Between two seal ticks. */
 export const SEAL_SPILL_MS = 1000;
 /** A roster that drops below half of the last good one is taken only when a second read agrees. */
@@ -201,12 +207,34 @@ export class StationFeeds {
     return this.stations.all().some((s) => versionAtLeast(s.version, FEEDS_FROM_VERSION));
   }
 
+  /** The stations heard from (heartbeat, else registration) within STALE_STATION_MS. */
+  live() {
+    const now = this.now();
+    return this.stations.all().filter((s) => {
+      const at = Date.parse(s.lastSeenAt || s.registeredAt || '');
+      return Number.isFinite(at) && now - at < STALE_STATION_MS;
+    });
+  }
+
+  /** The live stations still on an app older than FEEDS_FROM_VERSION (id, name, version: no key). */
+  oldStations() {
+    return this.live().filter((s) => !versionAtLeast(s.version, FEEDS_FROM_VERSION))
+      .map((s) => ({ stationId: s.stationId, name: s.name, version: s.version || null }));
+  }
+
+  /** No LIVE station runs anything older (a station gone a week does not count). */
   noOld() {
-    return this.stations.all().every((s) => versionAtLeast(s.version, FEEDS_FROM_VERSION));
+    return this.oldStations().length === 0;
   }
 
   slipsOpen() {
-    return this.stations.all().length > 0 && this.noOld();
+    return this.live().length > 0 && this.noOld();
+  }
+
+  /** Tonight's slips only marked because an old station prints its own (0 on another night). */
+  slipsHeldTonight() {
+    const m = this.st.meeting;
+    return m.night === localTime(this.now()).date ? m.slipsHeld : 0;
   }
 
   // ── what is due ────────────────────────────────────────────────────────────
@@ -481,6 +509,7 @@ export class StationFeeds {
     }
     m.error = null;
     m.readAt = m.at;
+    if (m.night !== night) { m.slipsQueued = 0; m.slipsHeld = 0; }   // the counts are a night's
     m.night = night;
     m.booksCompleted = res.report.booksCompleted;
     m.awardsEarned = res.report.awardsEarned;
@@ -596,7 +625,8 @@ export class StationFeeds {
       roster: { readAt: iso(this.rosterDoc.data.readAt), rows: this.rosterDoc.data.rows, columns: s.roster.columns, stations: this.rosterDoc.data.bundle ? this.rosterDoc.data.bundle.to.length : 0, error: s.roster.error, reads: s.roster.reads, freshMin: ROSTER_FRESH_MS / 60000 },
       books: { readAt: iso(this.booksDoc.data.readAt), entries: this.booksDoc.data.rows, clubsRead: s.books.clubsRead, clubs: BOOK_CLUB_IDS.length, error: s.books.error, everyMin: BOOKS_MS / 60000 },
       meeting: { readAt: iso(s.meeting.readAt), booksCompleted: s.meeting.booksCompleted, awardsEarned: s.meeting.awardsEarned, slipsQueued: s.meeting.slipsQueued, slipsHeld: s.meeting.slipsHeld, slipsOpen: this.slipsOpen(), slipsFrom: SLIPS_FROM_VERSION, error: s.meeting.error, everyMin: MEETING_MS / 60000 },
-      handOver: { from: FEEDS_FROM_VERSION, modern: this.modern(), noOld: this.noOld() },
+      // While tonight's slips are held, which live stations hold them (owner review 2026-10-16).
+      handOver: { from: FEEDS_FROM_VERSION, modern: this.modern(), noOld: this.noOld(), staleDays: STALE_STATION_MS / 86400000, slipsHeld: this.slipsHeldTonight(), oldStations: this.slipsHeldTonight() > 0 ? this.oldStations() : [] },
       sealing: this.pending ? { kind: this.pending.kind, done: this.pending.to.length, of: this.pending.targets.length } : null,
       slipsWaiting: this.slips ? this.slips.list.length : 0,
     };

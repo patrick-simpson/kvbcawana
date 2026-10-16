@@ -802,9 +802,16 @@ award: <the column's header>}`, at most once per child and award a night (an HMA
 of the night, name and award in `awards:slipped`), at most 10 new a read, queued as a
 REPRINT-kind job (`reprint:<uuid>`, section 6) whose sealed record is `{route:
 '/print-award', body: {name, clubName, award}}` (the print role's `JOB_PULL_ROUTES`
-already has it). Slips print from the Worker only once every registered station
+already has it). Slips print from the Worker only once every LIVE registered station
 reports KVBC Awana 10.0.0 or newer in its heartbeat (`FEEDS_FROM_VERSION`): until then
-the extension prints its own, and each slip the Worker sees is only marked. NOTE: the
+the extension prints its own, and each slip the Worker sees is only marked. A station
+not heard from (its `lastSeenAt`, else its `registeredAt`) for 7 days
+(`STALE_STATION_MS`) is ignored, so a laptop that went away on 9.x never holds them
+for good (owner review 2026-10-16). While tonight's slips are held, `GET
+/v1/cloud/status` `stationFeeds.handOver` carries `{slipsHeld, oldStations:
+[{stationId, name, version}]}` and the overview's `feeds` part (section 10.6) the
+names and versions, which /settings Tonight's "Needs a look" words as "Award slips
+are waiting: station <name> is on an old app". NOTE: the
 meeting report's documented header (`"HBGroup","Clubber","Book","Unit","Award","Note"`,
 printer/docs/TWOTIMTWO.md 8.1) has no name column the extension's rule knows
 ("Clubber" is not "Name" / "Clubber Name" / First + Last), so on that layout the counts
@@ -1230,7 +1237,8 @@ Undo presses at once run once (the second is 409 `already-undone`,
   notice:   {level, message, at, until, by} | null,
   church:   {rev, savedAt, seeded, paused},
   history:  {db, pending},
-  changes:  {head, last: Entry | null} }
+  changes:  {head, last: Entry | null},
+  feeds:    {slipsHeld, oldStations: [{name, version}]} }   // tonight's award slips held for an old station (section 8)
 ```
 
 Built: `print.checkThePrinter` is a COUNT (the job ids stay on `GET

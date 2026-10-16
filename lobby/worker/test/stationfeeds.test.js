@@ -8,7 +8,7 @@ import { createRequire } from 'node:module';
 import { describe, expect, it } from 'vitest';
 import { STATION_PAD_LADDER, generateKeyPair, sealForStations } from '../../shared/cloud-crypto.js';
 import {
-  BOOK_CLUB_IDS, MEETING_MS, ROSTER_FRESH_MS, ROSTER_RETRY_MS, SLIPS_FROM_VERSION, SLIP_CAP, inClubHours, versionAtLeast,
+  BOOK_CLUB_IDS, MEETING_MS, ROSTER_FRESH_MS, ROSTER_RETRY_MS, SLIPS_FROM_VERSION, SLIP_CAP, STALE_STATION_MS, inClubHours, versionAtLeast,
 } from '../src/stationfeeds.js';
 import {
   parseCheckoutIds, parseCompletedBooksCsv, parseMeetingReportCsv, parseRosterCsv, trimRosterCsv,
@@ -402,6 +402,43 @@ describe('the meeting report', () => {
     expect((await t.call('GET', '/v1/print/status')).body.queued).toBe(SLIP_CAP);
     await drive(t, MEETING_MS + 30 * 1000);
     expect((await t.call('GET', '/v1/print/status')).body.queued).toBe(14);
+  });
+});
+
+describe('the hand-over and a station that has gone', () => {
+  const MEETING = (awards) => () => `"First Name","Last Name","Club","Award"\r\n${awards.map((a) => `"${a[0]}","${a[1]}","Sparks","${a[2]}"`).join('\r\n')}\r\n`;
+
+  it('a station not heard from in 7 days no longer holds the award slips', async () => {
+    expect(STALE_STATION_MS).toBe(7 * 24 * 60 * 60 * 1000);
+    const t = await rig({ start: AT('18:00', '2026-09-30'), meeting: () => MEETING([['Kit', 'Zyxelquill', 'Ticket']])() });
+    await t.station('station-gonegone', 'Old laptop');   // registered, never a heartbeat: no version
+    t.clock.t = AT('18:00');   // two weeks later
+    await modern(t, 'station-aaaaaaaa', 'Desk laptop');
+    await drive(t, 3 * 60 * 1000);
+    expect((await t.call('GET', '/v1/print/status')).body.queued).toBe(1);
+    const s = (await t.call('GET', '/v1/cloud/status')).body.stationFeeds;
+    expect(s.meeting).toMatchObject({ slipsHeld: 0, slipsQueued: 1, slipsOpen: true });
+    expect(s.handOver).toMatchObject({ noOld: true, slipsHeld: 0, oldStations: [], staleDays: 7 });
+  });
+
+  it('a live old station still holds them, and status and the overview name it', async () => {
+    const t = await rig({ meeting: () => MEETING([['Kit', 'Zyxelquill', 'Ticket']])() });
+    const old = await t.station('station-oldoldold', 'Gym laptop');
+    await old.call('POST', '/v1/print/heartbeat', { version: '9.4.9', printer: { state: 'ok' } });
+    await modern(t, 'station-aaaaaaaa', 'Desk laptop');
+    await drive(t, 3 * 60 * 1000);
+    expect((await t.call('GET', '/v1/print/status')).body.queued).toBe(0);
+    const s = (await t.call('GET', '/v1/cloud/status')).body.stationFeeds;
+    expect(s.meeting).toMatchObject({ slipsHeld: 1, slipsOpen: false });
+    expect(s.handOver).toMatchObject({ noOld: false, slipsHeld: 1, oldStations: [{ stationId: 'station-oldoldold', name: 'Gym laptop', version: '9.4.9' }] });
+    const ov = (await t.call('GET', '/v1/tonight/overview')).body;
+    expect(ov.feeds).toEqual({ slipsHeld: 1, oldStations: [{ name: 'Gym laptop', version: '9.4.9' }] });
+    expect(JSON.stringify(ov)).not.toMatch(/Zyxelquill|Kit/);
+    // a week of silence later, the next club night's slips print from the Worker
+    t.clock.t = AT('18:00', '2026-10-28');
+    await t.asStation({ body: { stationId: 'station-aaaaaaaa' } })('POST', '/v1/print/heartbeat', { version: '10.0.0' });
+    await drive(t, 3 * 60 * 1000);
+    expect((await t.call('GET', '/v1/cloud/status')).body.stationFeeds.meeting).toMatchObject({ slipsHeld: 0, slipsQueued: 1, slipsOpen: true });
   });
 });
 

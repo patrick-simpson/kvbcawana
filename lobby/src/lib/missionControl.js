@@ -132,6 +132,13 @@ export function alertsFrom(overview, now = Date.now()) {
   if (print.dead > 0) out.push({ id: 'dead-jobs', tone: 'bad', text: `${print.dead} label${print.dead === 1 ? '' : 's'} could not be printed after several tries.` });
   const ym = overview.ym;
   if (ym && (ym.failed > 0 || ym.gaveUp > 0)) out.push({ id: 'ym', tone: 'warn', text: `Trek and Journey check-out: ${(ym.failed || 0) + (ym.gaveUp || 0)} did not go through.` });
+  // Award slips the Worker only marks while a station still on an old app prints its own (stationfeeds.js hand-over).
+  const feeds = overview.feeds;
+  const oldOnes = feeds && Array.isArray(feeds.oldStations) ? feeds.oldStations.map((/** @type {any} */ s) => String(s?.name || 'unnamed')) : [];
+  if (feeds && feeds.slipsHeld > 0 && oldOnes.length) {
+    const who = oldOnes.length === 1 ? `station ${oldOnes[0]} is` : `stations ${oldOnes.join(', ')} are`;
+    out.push({ id: 'slips-held', tone: 'warn', text: `Award slips are waiting: ${who} on an old app. Its Chrome extension prints them; update it to KVBC Awana 10.0.0 so the service prints them.` });
+  }
   if (overview.history?.pending > 0) out.push({ id: 'history', tone: 'warn', text: `${overview.history.pending} saved-history batch${overview.history.pending === 1 ? ' is' : 'es are'} still waiting to be stored.` });
   const church = overview.church;
   const savedAt = atMs(church?.savedAt);

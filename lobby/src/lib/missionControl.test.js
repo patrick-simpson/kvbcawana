@@ -113,6 +113,16 @@ describe('mission control: alerts', () => {
     expect(ids(behind)).toContain('church-behind');
     expect(ids({ ...ok, church: { rev: 4, savedAt: new Date(now - 30000).toISOString() } })).not.toContain('church-behind');
   });
+  it('award slips held for a station on an old app, named', () => {
+    const held = { ...ok, feeds: { slipsHeld: 2, oldStations: [{ name: 'Gym laptop', version: '9.4.9' }] } };
+    const a = alertsFrom(held, now).find((x) => x.id === 'slips-held');
+    expect(a).toMatchObject({ tone: 'warn' });
+    expect(a.text).toContain('Award slips are waiting: station Gym laptop is on an old app');
+    expect(ids({ ...ok, feeds: { slipsHeld: 0, oldStations: [] } })).not.toContain('slips-held');
+    expect(ids({ ...ok, feeds: null })).not.toContain('slips-held');
+    const two = alertsFrom({ ...ok, feeds: { slipsHeld: 1, oldStations: [{ name: 'A' }, { name: 'B' }] } }, now).find((x) => x.id === 'slips-held');
+    expect(two.text).toContain('stations A, B are on an old app');
+  });
   it('nothing in a missing overview', () => expect(alertsFrom(null, now)).toEqual([]));
 });
 

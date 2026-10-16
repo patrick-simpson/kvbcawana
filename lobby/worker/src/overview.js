@@ -46,7 +46,7 @@ async function part(fn) {
 export async function overview(core) {
   const now = core.now();
   const when = windowNow(now);
-  const [count, read, print, ym, notice, church, history, changes] = await Promise.all([
+  const [count, read, print, ym, notice, church, history, changes, feeds] = await Promise.all([
     part(async () => {
       const s = await core.publisher.status();
       return { source: s.source, checkedIn: s.checkedIn, checkedOut: s.checkedOut, byClub: s.byClub, reportAgeMs: s.reportAgeMs, enabled: s.enabled };
@@ -80,13 +80,19 @@ export async function overview(core) {
     part(() => core.church.summary(core.switches.value('CHURCH_SETTINGS') === 'off')),
     part(() => core.history.status()),
     part(async () => ({ head: await core.changes.head(), last: await core.changes.last() })),
+    part(async () => {
+      // Award slips held for an old station (stationfeeds.js hand-over): station names and versions only.
+      if (!core.feeds) return null;
+      const h = (await core.feeds.statusView()).handOver;
+      return { slipsHeld: h.slipsHeld, oldStations: h.oldStations.map((/** @type {any} */ s) => ({ name: s.name, version: s.version })) };
+    }),
   ]);
   return {
     at: new Date(now).toISOString(),
     ...when,
     count, read, print, ym,
     switches: core.switches.list(),
-    notice, church, history, changes,
+    notice, church, history, changes, feeds,
   };
 }
 

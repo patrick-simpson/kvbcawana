@@ -20,7 +20,7 @@ describe('GET /v1/tonight/overview', () => {
     const res = await r.call('GET', '/v1/tonight/overview');
     expect(res.status).toBe(200);
     const o = res.body;
-    expect(Object.keys(o)).toEqual(['at', 'night', 'clubNight', 'window', 'count', 'read', 'print', 'ym', 'switches', 'notice', 'church', 'history', 'changes']);
+    expect(Object.keys(o)).toEqual(['at', 'night', 'clubNight', 'window', 'count', 'read', 'print', 'ym', 'switches', 'notice', 'church', 'history', 'changes', 'feeds']);
     expect(o).toMatchObject({ at: new Date(r.clock.t).toISOString(), night: '2026-10-14', clubNight: true, window: { open: true, opensInMin: 0, closesInMin: 180 } });
     expect(o.count).toMatchObject({ checkedIn: 3, checkedOut: 0, byClub: { Sparks: 1, Trek: 1, Cubbies: 1 }, enabled: true });
     expect(Object.keys(o.count)).toEqual(['source', 'checkedIn', 'checkedOut', 'byClub', 'reportAgeMs', 'enabled']);
@@ -34,6 +34,7 @@ describe('GET /v1/tonight/overview', () => {
     expect(o.church).toEqual({ rev: 0, savedAt: null, seeded: false, paused: false });
     expect(o.history).toEqual({ db: false, pending: 0 });
     expect(o.changes).toMatchObject({ head: 2, last: { what: 'notice' } });
+    expect(o.feeds).toEqual({ slipsHeld: 0, oldStations: [] });
   });
 
   it('on a Sunday: no window, counts from nothing, and the same shape', async () => {
