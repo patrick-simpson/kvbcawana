@@ -1,7 +1,7 @@
 // The public pages of awana.kvbchurch.org: the home page (/, a demo reel page
 // in the 2026-27 catalog look) and /help (the install guide and the FAQ), plus
 // the capabilities reference. The site has no browser test of its own, so
-// these read the sources for the rules in printer/CLAUDE.md, "Public website":
+// these read the sources for the rules in CLAUDE.md, "Public website":
 // the kit's own faces and nothing from another host, the kit's art from its
 // one copy, the trademark line, the reel's contract, motion that stops for
 // reduced motion, AA colour pairs, the anchors people link to, the Simulator's
@@ -276,7 +276,7 @@ test('the Simulator keeps the DOM the extension watches', () => {
   for (const sel of ["'#lastCheckin div'", "'.clubber'", "'.name'", "'.club img'"]) assert.ok(constants.includes(sel), sel);
 });
 
-// ── Journey's wording (journey/CLAUDE.md, "Licensing boundary") ──────────────
+// ── Journey's wording (CLAUDE.md, "Licensing boundary") ──────────────
 test('the Journey part keeps the licensing wording strict and the room students', () => {
   const parts = live(read('components/home/Parts.tsx'));
   const journey = parts.slice(parts.indexOf("id: 'journey'"), parts.indexOf("id: 'phone'"));

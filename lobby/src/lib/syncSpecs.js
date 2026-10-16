@@ -138,7 +138,7 @@ export const SCREEN_SPECS = {
  * configureRelay.js), delivered on the live channel. Each one is a request the
  * screen treats like a press of its own button.
  *
- * A Journey kiosk has no socket of its own (journey/CLAUDE.md "room sync"), so
+ * A Journey kiosk has no socket of its own (CLAUDE.md "room sync"), so
  * its actions are QUEUED by the Worker and handed over in its next hello's
  * answer, each one once (SCREEN_ACTION_QUEUED_KINDS; worker/src/screens.js,
  * worker/src/routes.md 10.8): the buttons of its own Settings → "Lessons on

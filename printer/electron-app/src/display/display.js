@@ -2,7 +2,7 @@
 // main process (lobby/desktop/main.js, Awana Lobby Display 2.0.0), moved in
 // as a module that main.js starts only when this computer's display role is
 // on and stops when it is turned off. Its behaviour is the sound room app's
-// (lobby/CLAUDE.md, "The sound room desktop app"), with three changes:
+// (CLAUDE.md, "The sound room desktop app"), with three changes:
 //
 // - The hours are this computer's (settings.hours, default 17:00 to 20:00),
 //   not a fixed 5:00 to 8:00 pm (owner, 2026-10-11).
@@ -635,7 +635,7 @@ function createDisplay(opts) {
   // `?configure=1` mode) in the same browser profile, so every change there
   // reaches the live screen through the profile's shared storage, and the
   // screen-side buttons are relayed to it over a BroadcastChannel
-  // (lobby/CLAUDE.md, "Configure mode"). The screen is never reloaded.
+  // (CLAUDE.md, "Configure mode"). The screen is never reloaded.
 
   /** @type {BrowserWindow | null} */
   let config = null;

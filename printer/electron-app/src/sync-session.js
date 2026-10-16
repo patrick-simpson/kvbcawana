@@ -4,7 +4,7 @@
 // print server signs in with, on the shared protocol in lobby/shared/
 // sync-protocol.js; the url comes from the site's lobby/shared/sync.json). The passphrase itself is never stored.
 //
-// The session is a secret (lobby/CLAUDE.md: "never config, an export or a
+// The session is a secret (CLAUDE.md: "never config, an export or a
 // URL"), so it is kept with Electron's safeStorage (DPAPI on Windows, bound
 // to this Windows user) in userData\sync-session.bin, never in a plain file.
 // Where safeStorage cannot encrypt, it is held in memory only, for this run.

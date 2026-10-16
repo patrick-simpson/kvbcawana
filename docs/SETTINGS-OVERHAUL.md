@@ -3,9 +3,9 @@
 Machine-oriented. Wire/route truth: `lobby/worker/src/routes.md` section 10 (this file
 never restates a shape it defines). Rules that hold throughout: root `CLAUDE.md`
 "Everything free" (10 ms CPU per Worker request, no key work in the Worker),
-`lobby/CLAUDE.md` "Privacy invariant" (first names only, names sealed end to end,
+`CLAUDE.md` "Privacy invariant" (first names only, names sealed end to end,
 one sanitizer per event), contract/envelope vectors printer-canonical first, at-most-once
-printing unchanged (`routes.md` section 6), `printer/CLAUDE.md` config-write rules.
+printing unchanged (`routes.md` section 6), `CLAUDE.md` config-write rules.
 Line numbers are `origin/main` at `da64825`. Section 9 of `routes.md`
 (`YM_CHECKOUT`, branch `worker-ymcheckout`) is assumed merged before Track A starts.
 
@@ -33,7 +33,7 @@ cannot work (not signed in / no key), `tonight` when anything is wrong, else `sh
 `setup`→`account`, `laptop`→`printing`, `connection`→`account`, `background`→`look`,
 `banners`→`show`, `display`→`show`, `calendar`→`look`. Every copy string naming an old
 section ("Settings → Setup", "→ Slides", "→ Screen & corner", "→ Laptop", "→ Status") is
-rewritten (`lobby/CLAUDE.md` rename rule; grep `lobby/src`, `journey/`, `printer/print-server`
+rewritten (`CLAUDE.md` rename rule; grep `lobby/src`, `journey/`, `printer/print-server`
 error strings, `printer/chrome-extension` options/popup copy).
 
 Kill switch for the rail: `?rail=classic` (or localStorage `awanaSettingsRail.v1 =
@@ -338,7 +338,7 @@ marks), `lobby/shared/churchSettings.js`, `lobby/shared/churchSettings.test.js`.
 ### Track B: print server + Electron
 
 Owns: `printer/print-server/**`, `printer/electron-app/**`, `printer/scripts/test-*.cjs`
-(new + edited), `printer/package.json`, `printer/changes.md`, `printer/CLAUDE.md`, version
+(new + edited), `printer/package.json`, `printer/changes.md`, `CLAUDE.md`, version
 files via `bump-version.cjs` (9.3.0), and the two root generator lines
 (`scripts/shared-copies.mjs` entry for `churchSettings.js`, `scripts/check-mirrors.mjs`).
 
@@ -353,7 +353,7 @@ files via `bump-version.cjs` (9.3.0), and the two root generator lines
 
 ### Track C: lobby settings UI (+ the screen side of `notice.durationSec`)
 
-Owns: `lobby/src/**` (not `worker/`), `lobby/e2e/**`, `lobby/CLAUDE.md`, `ROADMAP.md`
+Owns: `lobby/src/**` (not `worker/`), `lobby/e2e/**`, `CLAUDE.md`, `ROADMAP.md`
 "Settings page" status lines, `printer/contract-vectors.json` (the `notice` entry only) and
 `lobby/src/lib/__fixtures__/contract-vectors.json`.
 

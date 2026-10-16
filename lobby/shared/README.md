@@ -74,7 +74,7 @@ How each reader loads one:
 
 - **The lobby and the projector** import it through Vite
   (`import ... from '../../shared/<name>.js'`); the projector may, see
-  "isolation" in `lobby/CLAUDE.md`.
+  "isolation" in `CLAUDE.md`.
 - **The packaged apps** (`lobby/desktop`, the sound room bridge, an ES module;
   `printer/electron-app` and `printer/print-server`, CommonJS) ship in
   installers that hold only their own folder, so each carries a **generated

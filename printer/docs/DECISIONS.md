@@ -1,5 +1,5 @@
 # printer/ decisions and history
-Terse, dated. Rules live in `../CLAUDE.md`; this is the why. Tests cited pin the behavior.
+Terse, dated. Rules live in `CLAUDE.md`; this is the why. Tests cited pin the behavior.
 
 ## Naming and identifiers
 - 5.9.0: "Awana Label Printer" -> "Club Label Printer" for Awana Clubs International trademark compliance (`changes.md` 5.9.0). 9.0.0 (owner 2026-10-11): one app, "KVBC Awana".

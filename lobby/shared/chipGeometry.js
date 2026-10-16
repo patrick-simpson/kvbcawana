@@ -5,7 +5,7 @@
 // (src/lib/brand.js re-exports it) and the projector's (src/presentation/lib/chip.js,
 // which wraps chipGeometry). One copy, so the two cannot drift; the projector
 // may read it because shared/ belongs to every app (the isolation rule,
-// lobby/CLAUDE.md). Pure functions and numbers, plus the canvas measurement
+// CLAUDE.md). Pure functions and numbers, plus the canvas measurement
 // (measureEm, inkEm) that falls back to an estimate where there is no canvas.
 //
 // Pinned by shared/chipGeometry.test.js.

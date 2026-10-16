@@ -8,7 +8,7 @@ import { Simulator } from './components/Simulator';
 
 /*
  * The home page of awana.kvbchurch.org: a demo reel page in the look of the
- * Awana Clubs 2026-27 catalog (printer/CLAUDE.md, "Public website").
+ * Awana Clubs 2026-27 catalog (CLAUDE.md, "Public website").
  *
  *   #reel       the film, framed, and one line saying what this is
  *               (then the six clubs' marks)

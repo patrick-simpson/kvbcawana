@@ -15,7 +15,7 @@ name: Update current lesson (Journey)
 # original) — see the top of journey/scripts/transcode-lesson-video.mjs for the
 # full rationale, including the deliberate, informed exception this makes to
 # this project's normal "never re-host the original video files" rule
-# (journey/CLAUDE.md).
+# (CLAUDE.md).
 #
 # The video is never committed (owner, 2026-10-12; every lesson added ~20 MB to
 # history): it replaces the asset current-lesson-video.mp4 on the

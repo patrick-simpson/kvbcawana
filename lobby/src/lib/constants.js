@@ -115,7 +115,7 @@ export const EMBED_FULLSCREEN_MESSAGE = 'awana-display:toggle-fullscreen';
 // room settings changed) and 'screen' / 'screen-action' with a screen id
 // (lib/embed.js hostDoorbell). Journey's public/src/sync.js listens, checks
 // event.source is its own iframe, and asks the service at once. Both sides
-// spell the string the same way (journey/CLAUDE.md "room sync").
+// spell the string the same way (CLAUDE.md "room sync").
 export const EMBED_DOORBELL_MESSAGE = 'awana-display:sync-doorbell';
 
 // Self-updating pages (see CLAUDE.md, "Self-updating pages"). A display that

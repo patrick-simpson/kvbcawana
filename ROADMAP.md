@@ -536,7 +536,7 @@ Read this first if you are picking the work up in a new session.
   on or off, with Bible and Brought a friend as ticked (item labels read off
   TwoTimTwo's check-in page, each sent only for the clubs it applies to). With
   the laptop on, the Worker tells it to print the tag at once (printer 8.0.0's
-  job route; one tag a night, see printer/CLAUDE.md); with it off the child is
+  job route; one tag a night, see CLAUDE.md); with it off the child is
   checked in with no tag, and the roster and Tonight come from TwoTimTwo.
   Undo, check-out, visitors and custom labels still go to the laptop.
   `CLOUD_CHECKIN = "off"` puts the check-in back on the laptop.
@@ -547,7 +547,7 @@ Read this first if you are picking the work up in a new session.
   the report grouped by club; `POST /v1/cloud/friends-link` makes the one
   read-only link (`GET /v1/cloud/friends-report?token=`, that night only,
   until noon the next day) that a scheduled Claude run reads at 6:30 pm to
-  email the owner. The BARFED tag is the printer's (printer/CLAUDE.md).
+  email the owner. The BARFED tag is the printer's (CLAUDE.md).
 - **To start the shadow night:** add the three GitHub secrets, then **Actions
   → CI → Run workflow** with "Redeploy the sync Worker" ticked (a Worker only
   gets new secrets when it deploys). Before Wednesday, on any lobby screen signed
@@ -846,7 +846,7 @@ The laptop keeps its own check-in and its own label path. What moved is the lapt
   1. The inventory (below).
   2. The tools moved into `lobby/src/components/settings/laptop-tools.jsx` and `laptop.jsx`, each through a new row in `SETTINGS_PAGE_ROUTES` with its check in `printer/scripts/test-settings-page.cjs` written first: leader tags (`/print-leader`, `/leaders`, `/leaders/forget`), one-off tags (`/print-oneoff`), custom labels (`/print-custom`), a stretch reprint (`/reprint-range`, a dry run and then a confirm), the attendance audit (`/attendance-audit`, apply needs `confirm`), rehearsal mode (`/rehearsal`, with a confirm), print failures, the switches `updateBeacon`, `enableDrivenCheckin` and `musicalPrinter`, and this computer's sync sign-in (`/config/sync-login`).
   3. The dashboard and the LAN phone page retired: `print-server/public/index.html` deleted; `/phone` and `/phone/ym` removed; the server binds 127.0.0.1 only and a loopback gate refuses any other socket (the PIN gate, rate limiter, `resolveBindHost`, `lanAccess`, `AWANA_BIND_HOST` and the config's `allowedOrigins` are gone; "our own page" in the CORS rule is a loopback host); `GET /` answers a tiny page that links to /settings; the app's firewall button, "Phones" address and LAN IPC are gone and its tray and status window open /settings; the extension's popup and options point only there. `phone.html` and its `site/build.mjs` step (`/checkin`) are untouched.
-  4. Tests, `printer/CLAUDE.md`, the printer docs, `lobby/CLAUDE.md`, the public site's claims and this file.
+  4. Tests, `CLAUDE.md`, the printer docs, `CLAUDE.md`, the public site's claims and this file.
 - **Secrets.** The display key, the publish token and the display login are never read, minted or set from the page (their routes are not in the table; POST /config refuses their keys from it). The sync sign-in keeps the model the page already used: the page's sync session, confirmed by the print server with the sync service it is already configured for (`config.syncUrl`, which a dropped sign-in keeps, so a computer signed out by a passphrase change can be signed back in from the page's own fresh session). The page then sends only the passphrase, and the print server signs in to `config.syncUrl`, never an address the page names. A computer with no service on record is signed in by the app's setup wizard ("Set up this computer...", the same route with no Origin). Sign-out is removed.
 - **Not moved, on purpose.** The check-in URL stays in the app's setup wizard (it is handed to the Windows shell). The extension folder stays in the tray ("Open Chrome extension folder"; the path holds the Windows user name). Tonight at a glance, the roster count, the welcome-screen privacy card, the count check card, the update banner and "Update now", and the what's-new card were read-only monitoring or duplicated elsewhere (the screens show the count, `/health`'s warnings carry every fault, the app updates itself every 10 minutes, the release notes are a /settings card): they went with the page.
 
@@ -947,7 +947,7 @@ that." Ship it as v9, once the /settings work in progress ([Settings track](#set
 
 ### How it is built (9.0.0)
 
-All in `printer/electron-app/` unless named; `printer/CLAUDE.md` ("KVBC
+All in `printer/electron-app/` unless named; `CLAUDE.md` ("KVBC
 Awana") has the rules.
 
 - **Identity.** `build.productName` "KVBC Awana", installer

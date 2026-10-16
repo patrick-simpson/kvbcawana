@@ -58,7 +58,7 @@ for the art to come down, remove `shared/brand/logos/` and the older art
 and the screens fall back to text club names in club colors.
 
 On 2026-10-11 the owner extended that decision to the public pages
-(awana.kvbchurch.org/ and /help, printer/CLAUDE.md "Public website"):
+(awana.kvbchurch.org/ and /help, CLAUDE.md "Public website"):
 the Awana Clubs mark and the club marks may appear there too, with the
 line "Awana® and club marks are trademarks of Awana Clubs International,
 used here by a member church. Not affiliated with or endorsed by Awana."

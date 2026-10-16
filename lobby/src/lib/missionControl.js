@@ -6,7 +6,7 @@
 //   - the live channel's check-in frames, decrypted in THIS browser by
 //     useSocket and already reduced by sanitizeCheckin / sanitizeRecap.
 //
-// PRIVACY (lobby/CLAUDE.md "Privacy invariant"): the check-in ring keeps a
+// PRIVACY (CLAUDE.md "Privacy invariant"): the check-in ring keeps a
 // first name, a club, a time and an id, for five children at most, in React
 // state only. It is never stored, never sent anywhere, and `clear` empties it
 // (sign-out, and the page hidden for MISSION_HIDDEN_CLEAR_MS). The reducer

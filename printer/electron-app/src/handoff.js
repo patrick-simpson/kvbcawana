@@ -11,7 +11,7 @@
 // which is KVBC Awana's own userData folder (electron-builder and Electron
 // take that folder from package.json's "name", awana-label-printer, kept
 // since the printer's first release so the check-in laptop upgrades in place;
-// printer/CLAUDE.md). So the file is where KVBC Awana looks first, on a PC
+// CLAUDE.md). So the file is where KVBC Awana looks first, on a PC
 // that has never run it. Both apps name the folder and the file in a
 // constant (HANDOFF_DIR / HANDOFF_FILE); change them together.
 //

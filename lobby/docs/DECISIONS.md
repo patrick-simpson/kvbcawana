@@ -1,5 +1,5 @@
 # lobby/ decisions and history
-Terse, dated. Rules live in `../CLAUDE.md`; this is the why. Tests cited pin the behavior.
+Terse, dated. Rules live in `CLAUDE.md`; this is the why. Tests cited pin the behavior.
 
 ## Motion / zero animation
 - `M` replaced `motion` because `MotionConfig reducedMotion="always"` only gates transform/positional values (framer-motion `positionalKeys`), never opacity (verified in its source); nested transitions (`exit`, `animate` target, variants) beat the element prop, so every Pi exit with its own timing still animated until `stripTransition`/`stripVariants`. Blanket CSS rule chosen over selector lists so future animations are covered; pseudo-elements named because `*` skips them and neither property inherits (kit checkbox `::before` pop still played under `?lowPower=1`).

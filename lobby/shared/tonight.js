@@ -14,7 +14,7 @@
 //     the printer's machine clock, the Worker's America/New_York),
 //   - the night's rows, the last APPLIED report and the checked-out marks.
 //
-// THE RULES (each one came from a bug; printer/CLAUDE.md "Tonight's count"):
+// THE RULES (each one came from a bug; CLAUDE.md "Tonight's count"):
 //   * a report is the floor while it is fresh (REPORT_FRESH_MS) and from tonight;
 //     otherwise the night's own rows are the count (`source: 'history'`);
 //   * ONLY an applied report is ever passed in: a PARTIAL one (fewer children

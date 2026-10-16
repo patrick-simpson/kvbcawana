@@ -21,7 +21,7 @@ import '../../styles/settings-overhaul.css';
 //
 // Motion off: everything sits inside ZeroAnimationContext value={true}, so
 // every `M` element renders its last keyframe, which is the finished frame
-// (lobby/CLAUDE.md "Zero-animation / ?lowPower=1"). Pointer events off and
+// (CLAUDE.md "Zero-animation / ?lowPower=1"). Pointer events off and
 // aria-hidden; ONE role="img" label describes it. SAMPLE names only (never a
 // child from mission control). Any throw lands on a static miniature, and two
 // throws hide the preview. ?preview=0 turns it off.

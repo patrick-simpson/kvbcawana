@@ -110,7 +110,7 @@ Regular for the last name and the other small lines); Trek and Journey in
 Figtree. The allergy, birthday and no-photo icons are unchanged.
 
 Only the label printer's canvas uses them (`printer/print-server/brand.js`
-`CLUB_FACES`; rules in `printer/CLAUDE.md` "Labels"). No screen loads them, so
+`CLUB_FACES`; rules in `CLAUDE.md` "Labels"). No screen loads them, so
 `fonts.css` and the tokens do not name them, and there is no WOFF2 of either.
 They ride along in every copy of this folder like any other file.
 
@@ -296,7 +296,7 @@ wide, two-line 260px, stacked 130px ("BAPTIST CHURCH" is a thin weight), and a
 smaller space takes the next version down or no logo at all; it arrives once,
 church line then Awana Clubs then tagline, then never moves (the check-in
 moment and the promos never animate it). Where each screen puts it:
-`lobby/CLAUDE.md` ("Brand kit") and `printer/CLAUDE.md`.
+`CLAUDE.md` ("Brand kit") and `CLAUDE.md`.
 
 ## Trademarks
 

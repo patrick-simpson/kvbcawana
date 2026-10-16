@@ -70,7 +70,7 @@ Total install size: ~300 MB (Puppeteer/Chromium is large, but one-time download)
 
 ## Releases
 
-The installer is built and released by GitHub Actions on Windows. Never create a release tag by hand: dispatch `printer-release.yml` with the version, as [printer/CLAUDE.md](CLAUDE.md) ("Releasing the Windows app") describes. Users download from https://awana.kvbchurch.org/download/kvbc-awana, which serves the newest release named in `site/updates/printer/latest.yml`.
+The installer is built and released by GitHub Actions on Windows. Never create a release tag by hand: dispatch `printer-release.yml` with the version, as [CLAUDE.md](CLAUDE.md) ("Releasing the Windows app") describes. Users download from https://awana.kvbchurch.org/download/kvbc-awana, which serves the newest release named in `site/updates/printer/latest.yml`.
 
 ## Credits
 

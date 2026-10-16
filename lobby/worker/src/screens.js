@@ -21,7 +21,7 @@
 // is worse than none), and neither goes to Pusher. No child's name is ever in
 // any of it: a screen's settings are its chime, motion and the like.
 //
-// A Journey kiosk has no live channel of its own (journey/CLAUDE.md "room
+// A Journey kiosk has no live channel of its own (CLAUDE.md "room
 // sync"), so ITS actions (the lesson-download buttons, src/routes.md 10.8)
 // also wait here, in `screenq:<id>` {items: [{action, at}]}: at most
 // SCREEN_ACTION_QUEUE_MAX, each dropped after SCREEN_ACTION_TTL_MS, and handed

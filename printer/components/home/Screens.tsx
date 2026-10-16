@@ -287,7 +287,7 @@ export const ProjectorArt: React.FC<{ on: boolean }> = ({ on }) => {
 /* ── The Journey kiosk ────────────────────────────────────────────────────── */
 
 /*
- * The Journey screen on the youth room's PC (journey/CLAUDE.md, "Motion" and
+ * The Journey screen on the youth room's PC (CLAUDE.md, "Motion" and
  * "Lesson intro"): the 6:30 start screen; on Begin the title cards (Journey,
  * Advocates, the lesson, Large Group Time), each wiping in over the one
  * before; then the carry (one striped band, hot / ink / deep / purple, with

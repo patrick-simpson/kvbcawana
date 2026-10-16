@@ -1,5 +1,5 @@
 # journey/ decisions and history
-Terse, dated. Rules live in `../CLAUDE.md`; this is the why. Tests cited pin the behavior.
+Terse, dated. Rules live in `CLAUDE.md`; this is the why. Tests cited pin the behavior.
 
 - 2026-08-22 outage: kiosk loaded a URL valid only under the wrong GitHub Pages source; worked when the wrong build won a race. Lesson: self-recovery != correct config. Pages is gone (Cloudflare Pages since 2026-10); old github.io addresses are not forwarded (`ROADMAP.md#switch-day-cleanup`).
 - 2026-08-22 owner: re-encoded 480p Pi-playable copies of EVERY lesson (32 Student + 31 Leader) on release `journey-videos-v2` (each <25 MiB, `scripts/pi-encode.mjs`, batch `scripts/transcode-all-lessons.mjs` / `journey-transcode-all-lessons.yml`). Picker plays them (originals 1080p H.264 ~90-220MB undecodable on Pi Zero; reported broken live). Release keeps ~1.1GB out of repo/history/deploys. Served from `/journey/videos/` since 2026-10-03, streamed from the release with Range passed through (Pages static ignores Range; video must seek).

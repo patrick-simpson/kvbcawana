@@ -562,7 +562,7 @@ the refusal with `printed: true` (same status). The next `POST /v1/desk/checkin`
 is the post alone (`desk.recheckEarly`): no new job, success clears `recheck`, fires the hooks
 (history row, count) and answers `{ok, already: false, recheck: true, jobId, gen}`; a failure is
 `printed: true` again. The page retries a `printed` failure by itself unless it is a flat
-refusal (`printer/CLAUDE.md` "ONE check-in page"). Tests `test/early.test.js`.
+refusal (`CLAUDE.md` "ONE check-in page"). Tests `test/early.test.js`.
 
 ### 5.1 A late BARF friend (BUILT, `barf.js`; owner 2026-10-12)
 

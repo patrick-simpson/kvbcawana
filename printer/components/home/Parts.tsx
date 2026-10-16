@@ -10,7 +10,7 @@ import { AppArt, KioskArt, LabelsArt, LobbyArt, PhoneArt, ProjectorArt } from '.
  * colour by each child's own club). #lobby and #journey are the cards the old
  * /lobby/about and /journey/about pages redirect to (site/lib/redirects.js).
  *
- * Claims track the code (printer/CLAUDE.md, "Public website").
+ * Claims track the code (CLAUDE.md, "Public website").
  */
 interface Part {
   id: string;
