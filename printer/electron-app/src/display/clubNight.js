@@ -1,5 +1,5 @@
 // GENERATED from lobby/shared/clubNight.js by scripts/shared-copies.mjs: do not edit; edit the source and run
-// `node scripts/shared-copies.mjs`. scripts/check-mirrors.mjs fails when this copy drifts.
+// `node scripts/family-assets.mjs`. scripts/check-mirrors.mjs fails when this copy drifts.
 'use strict';
 // @ts-check
 // THE club-night rule: when a Wednesday club night is on, and when a screen
@@ -12,7 +12,7 @@
 //   - printer/electron-app (the one KVBC Awana app) ships in an installer
 //     that cannot reach outside its own folder, so it carries a GENERATED copy
 //     (printer/electron-app/src/display/clubNight.js) made by
-//     `node scripts/shared-copies.mjs`; scripts/check-mirrors.mjs fails CI
+//     `node scripts/family-assets.mjs`; scripts/check-mirrors.mjs fails CI
 //     when it has drifted. Edit this file, then regenerate. (The old sound
 //     room app, lobby/desktop, had a copy too until it was retired 2026-10-16.)
 //

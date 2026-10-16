@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Online check-in's cryptography as the print server and the KVBC Awana app
 // load it: the GENERATED CommonJS copy (print-server/cloud-crypto.js, from
-// lobby/shared/cloud-crypto.js by scripts/gen-cloud-crypto.mjs) against the
+// lobby/shared/cloud-crypto.js by scripts/shared-copies.mjs) against the
 // shared vectors (lobby/shared/cloud-vectors.json). Plain Node, zero deps.
 // The negative cases are the product: a seal that opens somewhere it should
 // not is worse than none.

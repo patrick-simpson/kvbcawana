@@ -1,8 +1,7 @@
-// GENERATED from lobby/shared/cloud-crypto.js by scripts/gen-cloud-crypto.mjs. DO NOT EDIT:
-// change the canonical file, then run the generator (scripts/check-mirrors.mjs
-// fails CI when this copy is stale). CommonJS because the print server and the
-// packaged Windows app cannot import the shared ES module.
+// GENERATED from lobby/shared/cloud-crypto.js by scripts/shared-copies.mjs: do not edit; edit the source and run
+// `node scripts/family-assets.mjs`. scripts/check-mirrors.mjs fails when this copy drifts.
 'use strict';
+// @ts-check
 // Online check-in's client-side cryptography (ROADMAP.md#online-check-in, P0).
 //
 // DEPENDENCY-FREE WebCrypto only (no imports, no DOM, no Node, no storage):
@@ -18,7 +17,7 @@
 //
 // CANONICAL COPY. The print server and the Electron app load a GENERATED
 // CommonJS copy, printer/print-server/cloud-crypto.js
-// (`node scripts/gen-cloud-crypto.mjs`; scripts/check-mirrors.mjs fails CI
+// (`node scripts/family-assets.mjs`; scripts/check-mirrors.mjs fails CI
 // when it is stale), because the packaged Windows app ships print-server/*.js
 // and has no lobby/ folder. Keep this file to top-level `export function`,
 // `export async function` and `export const` declarations and plain

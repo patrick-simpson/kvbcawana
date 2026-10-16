@@ -1,5 +1,5 @@
 // GENERATED from lobby/shared/text.js by scripts/shared-copies.mjs: do not edit; edit the source and run
-// `node scripts/shared-copies.mjs`. scripts/check-mirrors.mjs fails when this copy drifts.
+// `node scripts/family-assets.mjs`. scripts/check-mirrors.mjs fails when this copy drifts.
 'use strict';
 // @ts-check
 // THE text cleaner, at the trust boundary. Every name, club, id and note that

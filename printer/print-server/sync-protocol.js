@@ -1,8 +1,7 @@
-// GENERATED from lobby/shared/sync-protocol.js by scripts/gen-sync-protocol.mjs. DO NOT EDIT:
-// change the canonical file, then run the generator (scripts/check-mirrors.mjs
-// fails CI when this copy is stale). CommonJS because the print server and the
-// packaged Windows app cannot import the shared ES module.
+// GENERATED from lobby/shared/sync-protocol.js by scripts/shared-copies.mjs: do not edit; edit the source and run
+// `node scripts/family-assets.mjs`. scripts/check-mirrors.mjs fails when this copy drifts.
 'use strict';
+// @ts-check
 // The sync service's wire protocol, in one place: how a client validates the
 // service's address and a session, builds a request, signs in and reads the
 // answer. DEPENDENCY-FREE on purpose (no imports, no DOM, no Node, no storage,
@@ -13,7 +12,7 @@
 // CANONICAL COPY. Clients:
 //   lobby/src/lib/syncService.js               imports this file (ES module)
 //   printer/print-server/sync-protocol.js      GENERATED CommonJS copy of this
-//       file (`node scripts/gen-sync-protocol.mjs`), checked by
+//       file (`node scripts/family-assets.mjs`), checked by
 //       scripts/check-mirrors.mjs. The print server, and through it the
 //       Electron app's sign-in and its /settings row (electron-app/src/
 //       sync-session.js, device-sync.js), load that copy at run time:

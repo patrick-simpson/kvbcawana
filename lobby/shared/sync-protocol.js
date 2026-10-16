@@ -9,7 +9,7 @@
 // CANONICAL COPY. Clients:
 //   lobby/src/lib/syncService.js               imports this file (ES module)
 //   printer/print-server/sync-protocol.js      GENERATED CommonJS copy of this
-//       file (`node scripts/gen-sync-protocol.mjs`), checked by
+//       file (`node scripts/family-assets.mjs`), checked by
 //       scripts/check-mirrors.mjs. The print server, and through it the
 //       Electron app's sign-in and its /settings row (electron-app/src/
 //       sync-session.js, device-sync.js), load that copy at run time:

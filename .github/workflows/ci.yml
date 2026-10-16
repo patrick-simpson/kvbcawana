@@ -147,6 +147,10 @@ jobs:
       # The brand kit and the sync modules have one canonical file each; the apps'
       # copies are generated (and gitignored), so make them, then check them.
       - run: node scripts/family-assets.mjs
+      # family-assets also rewrites the COMMITTED CommonJS copies (printer/print-server/*.js);
+      # a run that changed one means a commit forgot to regenerate it.
+      - name: Committed copies were regenerated
+        run: git diff --exit-code --stat || { echo "::error::A committed generated copy is stale: run node scripts/family-assets.mjs and commit."; exit 1; }
       - run: node scripts/check-mirrors.mjs
 
   lobby-checks:

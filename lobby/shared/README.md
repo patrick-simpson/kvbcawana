@@ -78,7 +78,7 @@ How each reader loads one:
 - **The packaged apps** (`printer/electron-app` and `printer/print-server`,
   CommonJS; the retired sound room app `lobby/desktop` took an ES module) ship in
   installers that hold only their own folder, so each carries a **generated
-  copy** at a fixed path. `node scripts/shared-copies.mjs` rewrites them from
+  copy** at a fixed path. `node scripts/family-assets.mjs` rewrites them from
   the sources (its `COPIES` table lists every pair); `scripts/check-mirrors.mjs`
   (the `copies` CI job) fails when one has drifted. Edit the source, run the
   script, commit both.
@@ -106,7 +106,7 @@ safeStorage, config.json) and offline cache.
   `printer/electron-app/src/sync-session.js`, `device-sync.js`) run a
   **generated CommonJS copy**, `printer/print-server/sync-protocol.js`: the
   packaged Windows app has no `lobby/` folder and cannot `require` an ES module.
-  After editing the canonical file run `node scripts/gen-sync-protocol.mjs`;
+  After editing the canonical file run `node scripts/family-assets.mjs`;
   `node scripts/check-mirrors.mjs` fails CI when the copy is stale.
 - Journey's `public/src/sync.js` is a browser script with its own copy of the
   session pattern; it is not on this module yet.
@@ -131,5 +131,5 @@ verifier hash and the tags (free plan, 10 ms of CPU).
   root) only for a deliberate format change, never to make a test pass.
 - **The printer's copy is generated**: `printer/print-server/cloud-crypto.js`
   (CommonJS, for the print server and the KVBC Awana app). After editing this
-  file run `node scripts/gen-cloud-crypto.mjs`; `node scripts/check-mirrors.mjs`
+  file run `node scripts/family-assets.mjs`; `node scripts/check-mirrors.mjs`
   fails CI when the copy is stale.

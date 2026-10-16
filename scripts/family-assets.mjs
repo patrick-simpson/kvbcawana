@@ -11,6 +11,15 @@
 //   phone remote    canonical lobby/shared/journeyRemote.js -> journey/public/src/shared/ (the phone
 //                                                          remote page cleans the Worker's answers with it)
 //
+//   committed copies  the CommonJS copies of lobby/shared/*.js the Windows app ships
+//                     (printer/print-server/*.js and the display's clubNight.js; table in
+//                     scripts/shared-copies.mjs). Unlike the rest these ARE committed (the
+//                     installer is built from the repo): the printer run rewrites any that
+//                     drifted, and CI fails when a run changed a committed file.
+//
+// This is the ONE command for every copy (it replaced gen-sync-protocol.mjs and
+// gen-cloud-crypto.mjs, 2026-10-16): change a canonical file, run it, commit.
+//
 // (family.css is no longer copied: the site bundles printer/styles/family.css
 // itself, and no lobby or Journey file loads it.)
 //
@@ -28,6 +37,7 @@
 import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { drift as sharedDrift, writeCopies as writeSharedCopies } from './shared-copies.mjs';
 
 export const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 export const KIT = 'lobby/shared/brand';
@@ -38,7 +48,7 @@ export const JOURNEY_MODULES = ['sync-protocol.js', 'cloud-crypto.js', 'clubNigh
 // What each app holds a copy of. Paths are repo-relative.
 export const COPIES = {
   journey: { kit: 'journey/public/brand', modules: 'journey/public/src/shared' },
-  printer: { kit: 'printer/print-server/public/brand' },
+  printer: { kit: 'printer/print-server/public/brand', committed: true },
 };
 
 const abs = (p) => path.join(ROOT, p);
@@ -90,6 +100,7 @@ function pairs(apps) {
 /* Copy the shared files into the given apps; returns how many files changed. */
 export function copyAssets(apps) {
   let changed = 0;
+  if (apps.some((app) => COPIES[app]?.committed)) changed += writeSharedCopies();
   for (const p of pairs(apps)) {
     if (!existsSync(abs(p.from))) throw new Error(`family-assets: the canonical ${p.from} is missing`);
     if (p.kind === 'dir') {
@@ -107,6 +118,9 @@ export function copyAssets(apps) {
 /* Problems with the copies (empty when every one exists and matches), as lines. */
 export function checkAssets(apps) {
   const problems = [];
+  if (apps.some((app) => COPIES[app]?.committed)) {
+    for (const d of sharedDrift()) problems.push(`${d.dest} differs from what ${d.src} generates: run node scripts/family-assets.mjs`);
+  }
   for (const p of pairs(apps)) {
     if (p.kind === 'file') {
       if (!existsSync(abs(p.to))) problems.push(`${p.to} is missing: run node scripts/family-assets.mjs`);

@@ -14,7 +14,7 @@
 //
 // CANONICAL COPY. The print server and the Electron app load a GENERATED
 // CommonJS copy, printer/print-server/cloud-crypto.js
-// (`node scripts/gen-cloud-crypto.mjs`; scripts/check-mirrors.mjs fails CI
+// (`node scripts/family-assets.mjs`; scripts/check-mirrors.mjs fails CI
 // when it is stale), because the packaged Windows app ships print-server/*.js
 // and has no lobby/ folder. Keep this file to top-level `export function`,
 // `export async function` and `export const` declarations and plain

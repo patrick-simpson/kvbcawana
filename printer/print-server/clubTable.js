@@ -1,5 +1,5 @@
 // GENERATED from lobby/shared/clubs.js by scripts/shared-copies.mjs: do not edit; edit the source and run
-// `node scripts/shared-copies.mjs`. scripts/check-mirrors.mjs fails when this copy drifts.
+// `node scripts/family-assets.mjs`. scripts/check-mirrors.mjs fails when this copy drifts.
 'use strict';
 // @ts-check
 // THE club table: every club's id, display name, spellings, colors, mark name
