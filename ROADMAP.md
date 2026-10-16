@@ -648,8 +648,9 @@ What is left for you:
    Their pictures are made on Ubuntu by `lobby-update-snapshots.yml`, run by hand.
 3. Award slips print only when TwoTimTwo's meeting report names a clubber column.
    That rule is unchanged; widening it would print a slip for nearly every child.
-4. Check-outs typed by hand on TwoTimTwo's Checkout page are now noticed from
-   7:15 pm (the extension watched from 5:30).
+4. Check-outs typed by hand on TwoTimTwo's Checkout page are now watched all
+   club night, about once a minute (the review found the first version only
+   watched from 7:15 pm; fixed). They come off tonight's count within a minute.
 5. Lost with the extension, on purpose: the team points scoreboard, the
    TwoTimTwo calendar feed to the projector's notice, leader worksheet printing,
    the attendance audit, the laptop touch-screen mode, the TwoTimTwo message
@@ -664,6 +665,19 @@ What is left for you:
    updating the app) fixes it.
 9. The paper-sheet drill and blank name tags at the desk are yours
    (`printer/docs/NIGHT-OF.md`, "Paper sheet when the internet is down").
+10. Drop-off tags: the print server still looks for a file the old extension
+    wrote, and nothing writes it now. A family the extension never saw gets one
+    drop-off label per child instead of one per family. The roster has no
+    household column. Your call whether the Worker should add a household number.
+11. GitHub marks `printer-v10.0.0` as the Latest release; the rule says the
+    sound-room bridge (`desktop-v2.1.1`) should be Latest for any PC still on the
+    2.0 sound-room app. The overnight session could not edit releases: on GitHub,
+    edit release desktop-v2.1.1 and tick "Set as the latest release". Harmless if
+    every PC runs KVBC Awana.
+12. The review found two unused Worker routes that could have exposed or replaced
+    the whole roster (one handed out TwoTimTwo's raw export, one let anyone with
+    the passphrase swap it). Both were deleted before any club night (commit
+    8ff59e7); the Worker alone reads and seals the roster.
 
 ### Project-wide rule: everything free, forever
 
@@ -971,7 +985,7 @@ Read off `printer/print-server/public/index.html` (every `fetch` it makes) again
 
 1. ~~**Confirm on the laptop, with the internet off, that check-in still prints at the desk.**~~ Dropped: with no internet the fallback is the paper sheet ([Online check-in](#online-check-in), 2026-10-11).
 2. ~~**Real Chrome.**~~ Done 2026-10-16 (the owner checked the laptop's local-network prompt). The Laptop section's calls to `http://localhost:3456` are pinned with headers in tests and stubbed in `e2e/settings-laptop.spec.js`; open /settings on the laptop and allow Chrome's local-network prompt once. Every settings tool now depends on it.
-3. **Release.** Nothing is released: the version, `changes.md` and the dispatch are the owner's. The first release that carries this removes the dashboard and the LAN page from every laptop at once, so tell the volunteers the phone address changed to awana.kvbchurch.org/checkin.
+3. **Release.** Done: it shipped in 9.x and 10.0.0. The first release that carried this removed the dashboard and the LAN page from every laptop at once, so tell the volunteers the phone address changed to awana.kvbchurch.org/checkin.
 4. Left alone because another change owns it: the display-login screens in the lobby still tell a person to read the passphrase "on the print-server dashboard" (`SetupChecklist.jsx`, `QuickNav.jsx`, `settings/fields.jsx`); that flow is the retired Pusher design.
 
 ## KVBC Awana one app
