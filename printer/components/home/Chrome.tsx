@@ -17,12 +17,19 @@ export const LINKS = {
  */
 export const TRADEMARK = 'Awana® and club marks are trademarks of Awana Clubs International, used here by a member church. Not affiliated with or endorsed by Awana.';
 
-type Page = 'home' | 'help';
+type Page = 'home' | 'help' | 'classic';
 
 const NAV: Record<Page, { href: string; label: string }[]> = {
   home: [
     { href: '#night', label: 'The night' },
     { href: '#reel', label: 'The film' },
+  ],
+  // The old home page, kept at /classic (owner, 2026-10-16: "don't trash the old site").
+  classic: [
+    { href: '#reel', label: 'Watch' },
+    { href: '#features', label: 'What it does' },
+    { href: '#simulator', label: 'Try it' },
+    { href: '/help', label: 'Install & help' },
   ],
   help: [
     { href: '/', label: 'Home' },
@@ -69,14 +76,14 @@ export const Header: React.FC<{ page: Page }> = ({ page }) => {
           <a className="kv-header__home" href="/" aria-label="KVBC Awana home">
             <Wordmark />
           </a>
-          <nav className="kv-nav" aria-label={page === 'home' ? 'On this page' : 'Help'}>
+          <nav className="kv-nav" aria-label={page === 'help' ? 'Help' : 'On this page'}>
             <ul className="kv-nav__list">
               {NAV[page].map((l) => (
                 <li key={l.href}><a className="kv-nav__link" href={l.href}>{l.label}</a></li>
               ))}
             </ul>
           </nav>
-          {page === 'help' && (
+          {page !== 'home' && (
             <a className="kv-btn kv-btn--hot kv-header__cta" href={LINKS.download}>
               <Ico name="download" /><span className="kv-header__cta-word">Download</span><span className="kv-sr"> KVBC Awana for Windows</span>
             </a>

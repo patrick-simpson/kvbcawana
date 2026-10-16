@@ -279,6 +279,16 @@ test('the home page frames the screens only as their showcase twins, and only th
   for (const [, first, last] of night.matchAll(/'([A-Z][a-z]+) ([A-Z][a-z]+)'/g)) assert.ok(stub.includes(`['${first}', '${last}'`), `${first} ${last} is the showcase's`);
 });
 
+// ── The old home page, kept unlisted (owner, 2026-10-16) ─────────────────────
+test('the old home page lives on at /classic, out of search engines, on its own stylesheet', () => {
+  const page = read('classic.html');
+  assert.match(page, /<meta name="robots" content="noindex, nofollow" \/>/);
+  assert.match(page, /src="\/classic\.tsx"/);
+  assert.match(read('classic.tsx'), /import '\.\/styles\/classic\.css';/);
+  assert.match(read('vite.config.ts'), /classic: path\.resolve\(__dirname, 'classic\.html'\)/);
+  assert.match(readFileSync(path.join(REPO, 'site/build.mjs'), 'utf8'), /'\/classic\*',\s*'  Cache-Control: no-cache',\s*'  X-Robots-Tag: noindex, nofollow'/);
+});
+
 // ── Journey's wording (CLAUDE.md, "Public website"; owner 2026-10-16) ─────────
 test('the Journey scene says whose curriculum it is, and its room is students', () => {
   const night = live(read('components/home/Night.tsx'));

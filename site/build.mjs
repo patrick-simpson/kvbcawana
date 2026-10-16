@@ -228,6 +228,10 @@ writeFileSync(path.join(OUT, '_headers'), [
   '/logo*',
   '  Cache-Control: no-cache',
   '  X-Robots-Tag: noindex, nofollow',
+  // The old home page, kept unlisted (owner, 2026-10-16): never in a search engine.
+  '/classic*',
+  '  Cache-Control: no-cache',
+  '  X-Robots-Tag: noindex, nofollow',
   // The home page's showcase twins (site/showcase/stub.js): never in a search engine.
   '/*showcase.html',
   '  Cache-Control: no-cache',
@@ -290,7 +294,7 @@ writeFileSync(path.join(OUT, '_routes.json'), `${JSON.stringify({
 writeFileSync(path.join(ROOT, 'site', 'lib', 'large-files.generated.js'),
   `// Written by site/build.mjs for build ${BUILD_ID}; not committed.\nexport const LARGE_FILES = ${JSON.stringify(largeFiles, null, 2)};\nexport const LARGE_PREFIXES = ${JSON.stringify(VIDEO_PREFIXES, null, 2)};\n`);
 
-for (const must of ['index.html', 'lobby/index.html', 'lobby/countdown.html', 'lobby/settings.html', 'journey/index.html', 'journey/remote/index.html', 'journey/remote/remote.js', 'journey/src/shared/journeyRemote.js', 'lobby/shared/sync.json', 'checkin/index.html', 'checkin/ym/index.html', 'checkin/desk-transport.js', 'checkin/cloud-crypto.js', 'checkin/clubs.js', 'checkin/brand/fonts.css', 'links/index.html', 'logo/index.html', 'lobby/showcase.html', 'lobby/countdown-showcase.html', 'lobby/settings-showcase.html', 'journey/showcase.html', 'checkin/showcase.html']) {
+for (const must of ['index.html', 'lobby/index.html', 'lobby/countdown.html', 'lobby/settings.html', 'journey/index.html', 'journey/remote/index.html', 'journey/remote/remote.js', 'journey/src/shared/journeyRemote.js', 'lobby/shared/sync.json', 'checkin/index.html', 'checkin/ym/index.html', 'checkin/desk-transport.js', 'checkin/cloud-crypto.js', 'checkin/clubs.js', 'checkin/brand/fonts.css', 'links/index.html', 'logo/index.html', 'classic.html', 'lobby/showcase.html', 'lobby/countdown-showcase.html', 'lobby/settings-showcase.html', 'journey/showcase.html', 'checkin/showcase.html']) {
   if (!existsSync(path.join(OUT, must))) throw new Error(`site build is missing ${must}`);
 }
 console.log(`\n✓ site/dist built for ${ORIGIN} (build ${BUILD_ID.slice(0, 7)})`);

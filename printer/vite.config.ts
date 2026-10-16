@@ -31,6 +31,7 @@ export default defineConfig(({ mode }) => {
           input: {
             main: path.resolve(__dirname, 'index.html'),
             help: path.resolve(__dirname, 'help.html'),
+            classic: path.resolve(__dirname, 'classic.html'),
             capabilities: path.resolve(__dirname, 'capabilities.html'),
           },
         },
