@@ -672,38 +672,56 @@
     var doc = new DOMParser().parseFromString(html, 'text/html');
     var out = document.createElement('div');
     var safeTags = { 'a': true, 'small': true, 'b': true, 'i': true, 'strong': true, 'em': true, 'span': true };
+    // DOM clobbering: the reply is untrusted HTML, and a named child can shadow
+    // a property on its parent (<form><input name="childNodes"></form> makes
+    // form.childNodes the input; name="getAttribute" or "tagName" makes those
+    // calls throw). So read every property through the real prototype
+    // getter/method, which a named child cannot replace.
+    function protoDesc(obj, prop) {
+      for (var p = Object.getPrototypeOf(obj); p; p = Object.getPrototypeOf(p)) {
+        var d = Object.getOwnPropertyDescriptor(p, prop);
+        if (d) return d;
+      }
+      return null;
+    }
+    var probeText = document.createTextNode('');
+    var probeEl = document.createElement('div');
+    var getNodeType = protoDesc(probeText, 'nodeType').get;
+    var getChildNodes = protoDesc(probeText, 'childNodes').get;
+    var getNodeValue = protoDesc(probeText, 'nodeValue').get;
+    var getLocalName = protoDesc(probeEl, 'localName').get;
+    var getAttribute = protoDesc(probeEl, 'getAttribute').value;
+    function walkChildren(node, parent) {
+      var kids = getChildNodes.call(node);
+      for (var i = 0; i < kids.length; i++) walk(kids[i], parent);
+    }
     function walk(node, parent) {
-      if (node.nodeType === 3) {
-        parent.appendChild(document.createTextNode(node.nodeValue));
-      } else if (node.nodeType === 1) {
-        var tag = node.tagName.toLowerCase();
+      var type = getNodeType.call(node);
+      if (type === 3) {
+        parent.appendChild(document.createTextNode(getNodeValue.call(node)));
+      } else if (type === 1) {
+        var tag = String(getLocalName.call(node) || '').toLowerCase();
         if (tag === 'script' || tag === 'style' || tag === 'iframe' || tag === 'object') return;
         if (safeTags[tag]) {
           var el = document.createElement(tag);
           if (tag === 'a') {
-            var href = node.getAttribute('href');
+            var href = getAttribute.call(node, 'href');
             if (href && /^(\/|#)/.test(href) && href.toLowerCase().indexOf('javascript:') !== 0) {
               el.setAttribute('href', href);
             }
-            var onclick = node.getAttribute('onclick');
+            var onclick = getAttribute.call(node, 'onclick');
             if (onclick && /^undoCheckin\(\d+\)$/.test(onclick.replace(/\s+/g, ''))) {
               el.setAttribute('onclick', onclick);
             }
           }
-          for (var i = 0; i < node.childNodes.length; i++) {
-            walk(node.childNodes[i], el);
-          }
+          walkChildren(node, el);
           parent.appendChild(el);
         } else {
-          for (var j = 0; j < node.childNodes.length; j++) {
-            walk(node.childNodes[j], parent);
-          }
+          walkChildren(node, parent);
         }
       }
     }
-    for (var i = 0; i < doc.body.childNodes.length; i++) {
-      walk(doc.body.childNodes[i], out);
-    }
+    walkChildren(doc.body, out);
     return out.innerHTML;
   }
 

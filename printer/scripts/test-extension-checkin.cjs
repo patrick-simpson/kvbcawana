@@ -179,4 +179,29 @@ console.log('\nextension check-in sanitizer: strips XSS and unsafe URLs');
   const s2 = sanitizeCheckinReply(evilSnippet);
   check('strips dangerous tags like script and img', s2.indexOf('script') === -1 && s2.indexOf('img') === -1);
   check('strips dangerous javascript: href attributes', s2.indexOf('alert(3)') === -1);
+
+  // DOM clobbering: in a browser, <form><input name="childNodes"> makes
+  // form.childNodes the input (likewise getAttribute, tagName, nodeType).
+  // jsdom does not do this, so shadow those properties on the parsed form the
+  // way Chrome would; the sanitizer must read through the prototypes anyway.
+  const RealParser = global.DOMParser;
+  global.DOMParser = function () {
+    const p = new RealParser();
+    return { parseFromString(html, type) {
+      const d = p.parseFromString(html, type);
+      d.querySelectorAll('form').forEach((f) => {
+        f.querySelectorAll('input[name]').forEach((inp) => {
+          Object.defineProperty(f, inp.getAttribute('name'), { value: inp, configurable: true });
+        });
+      });
+      return d;
+    } };
+  };
+  const clobbered = '<form><input name="childNodes"><input name="getAttribute"><input name="tagName"><input name="nodeType"><input name="localName"><b>Ava</b></form><a href="/x">ok</a>';
+  let s3, threw = null;
+  try { s3 = sanitizeCheckinReply(clobbered); } catch (e) { threw = e; }
+  global.DOMParser = RealParser;
+  check('a reply whose form controls clobber DOM properties does not throw', !threw, threw && threw.message);
+  check('a clobbering form still has its safe children walked, its controls dropped',
+    s3 === '<b>Ava</b><a href="/x">ok</a>', s3);
 }
