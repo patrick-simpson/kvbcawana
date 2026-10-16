@@ -172,8 +172,9 @@ export const SHOTS = {
       await shot.run(1.2);
     },
     cues: (ctx) => ({
-      2.0: (page) => ctx.tap(page, '[role=tab]:has-text("Check-ins")'),
-      4.2: (page) => ctx.tap(page, '[role=tab]:has-text("Celebrations")'),
+      // The rail since 2026-10-13: Tonight, Printing, Screens, What screens show, Slides & look...
+      2.0: (page) => ctx.tap(page, '[role=tab]:has-text("What screens show")'),
+      4.2: (page) => ctx.tap(page, '[role=tab]:has-text("Slides & look")'),
     }),
   },
 };
