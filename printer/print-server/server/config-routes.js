@@ -49,7 +49,8 @@ Object.defineProperties(exports, {
 //     (back when the server listened there).
 //
 // Now: the request must come from the loopback interface, AND its Origin (when
-// present) must be the extension or one of this server's own loopback pages.
+// present) must be one of this server's own loopback pages (until 10.0.0 also
+// the Chrome extension's options page).
 // A LAN caller never reaches this server at all.
 // pusherSecret and displayLoginPassphrase: an old config.json may still hold one; neither is ever read, but both stay redacted.
 const SECRET_CONFIG_KEYS = ['pusherSecret', 'phonePin', 'displayKey', 'slidesPublishToken', 'displayLoginPassphrase', 'syncSession'];
@@ -124,8 +125,8 @@ const CONFIG_POST_CHURCH_KEYS = [
 // One writer (docs/SETTINGS-OVERHAUL.md section 4): while this computer applies the
 // Worker's church settings (signed in, CHURCH_SETTINGS on, a doc applied), the settings
 // page changes them under Printing, through the Worker; its direct write of a church key
-// here would be undone by the next apply, so it is refused. The extension's and the
-// app's own writes are unaffected (the offline fallback; config.json is theirs too).
+// here would be undone by the next apply, so it is refused. The app's own writes are
+// unaffected (the offline fallback; config.json is its too).
 function refuseChurchManaged(req, res, keys) {
   if (req.settingsPage !== true) return false;
   if (!keys.some(k => churchSettings.CHURCH_KEYS.includes(k))) return false;
@@ -310,8 +311,7 @@ app.post('/config', (req, res) => {
     const next = $config.loadConfigFile();
     if (printerName !== undefined) next.printerName = printerName;
     // checkinUrl is handed to shell.openExternal() (Electron), so an unvalidated value was an arbitrary URI aimed at
-    // the Windows shell — and this route accepts writes from the extension's
-    // origin. Same reasoning as worksheetPrinter below: refuse to PERSIST
+    // the Windows shell. Same reasoning as worksheetPrinter below: refuse to PERSIST
     // anything unsafe, so it can never be poisoned once and fire later.
     if (checkinUrl !== undefined) {
       if (!security.isSafeExternalUrl(checkinUrl)) {

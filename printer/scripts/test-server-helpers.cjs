@@ -681,13 +681,14 @@ console.log('effectiveHandbookGroup — no line unless it routes somewhere');
   check('surviving values are trimmed',
     effectiveHandbookGroup('  Flight 3:16  ', 'Sparks') === 'Flight 3:16');
 
-  // Wiring: all four enrichment sites must go through the helper. The old
-  // pattern was the same two lines pasted four times, and a fifth paste is
-  // exactly how a future call site would miss the policy.
+  // Wiring: all three enrichment sites must go through the helper (four until
+  // 10.0.0 removed POST /label, the extension's Print Dialog). The old pattern
+  // was the same two lines pasted at each, and another paste is exactly how a
+  // future call site would miss the policy.
   const fs = require('fs');
   const serverSrc = require('./server-source.cjs')();
   const calls = (serverSrc.match(/handbookGroup = effectiveHandbookGroup\(/g) || []).length;
-  check('all four enrichment sites route through the helper', calls === 4, `found ${calls}`);
+  check('all three enrichment sites route through the helper', calls === 3, `found ${calls}`);
   check("the old inline 'all' check is gone from every call site",
     !/rawGroup\.trim\(\)\.toLowerCase\(\) === 'all'/.test(serverSrc));
 }
@@ -743,12 +744,12 @@ console.log('half-birthday cake (#8) — June–August birthdays, label only');
 
   // Wiring: the display-facing sites must stay REAL birthdays. The checkin
   // event and publishBirthdays/birthday-roster sites keep isBirthdayWeek;
-  // the five label-render sites use isCakeWeek.
+  // the four label-render sites use isCakeWeek (five until 10.0.0 removed POST /label).
   const fs2 = require('fs');
   const src = require('./server-source.cjs')();
   const cakeCalls = (src.match(/= isCakeWeek\(record\.Birthdate\)/g) || []).length;
   const realCalls = (src.match(/isBirthdayWeek\(record\.Birthdate\)/g) || []).length;
-  check('five label sites key the cake on isCakeWeek', cakeCalls === 5, `found ${cakeCalls}`);
+  check('four label sites key the cake on isCakeWeek', cakeCalls === 4, `found ${cakeCalls}`);
   check('the /print event split and the stats roster key on real birthdays',
     realCalls === 2, `found ${realCalls}`);
   check('publishBirthdays (the weekly display list) keys on real birthdays',
@@ -833,18 +834,18 @@ console.log('birthday age line (#291) — real birthday weeks only');
       birthdayAgeThisWeek(bd) === null || isBirthdayWeek(bd) === true);
   }
 
-  // Wiring, mirroring the isCakeWeek scan above: the same five label-render
+  // Wiring, mirroring the isCakeWeek scan above: the same four label-render
   // sites derive the age, so a reprint/preview/award label can't silently
   // differ from the label that first printed.
   const ageSrc = require('./server-source.cjs')();
   const ageCalls = (ageSrc.match(/birthdayAgeThisWeek\(record\.Birthdate\)/g) || []).length;
   // Re-assert the isCakeWeek/isBirthdayWeek counts the block above pins, so
   // the birthdayWeekYear refactor is PROVEN not to have disturbed them.
-  check('the five cake sites are still exactly five',
-    (ageSrc.match(/= isCakeWeek\(record\.Birthdate\)/g) || []).length === 5);
+  check('the four cake sites are still exactly four',
+    (ageSrc.match(/= isCakeWeek\(record\.Birthdate\)/g) || []).length === 4);
   check('the two real-birthday sites are still exactly two',
     (ageSrc.match(/isBirthdayWeek\(record\.Birthdate\)/g) || []).length === 2);
-  check('all five label sites derive the age from the roster', ageCalls === 5, `found ${ageCalls}`);
+  check('all four label sites derive the age from the roster', ageCalls === 4, `found ${ageCalls}`);
   check('the birth YEAR never reaches the sealed checkin contract',
     !/birthYear|birthdayAge/.test(
       require('fs').readFileSync(path.join(__dirname, '..', 'print-server', 'events.js'), 'utf8')));

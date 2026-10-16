@@ -55,7 +55,7 @@ Object.defineProperties(exports, {
 //     TwoTimTwo-page check-in;
 //   * stops publishing the tally and the pickup list itself (cloudStation set:
 //     publishTally / publishStillHere are inert, the Worker publishes).
-// Every old path (the extension, the phone relay's job route) keeps working.
+// A /print from anything else on this computer (the settings page's tools) keeps working.
 const CLOUD_ATTENDANCE_MS = 30 * 60 * 1000;
 let cloudStop = null;
 let cloudImporting = false;
@@ -121,8 +121,9 @@ async function sendStationExtras(force = false) {
 }
 
 // Check-outs made by hand on TwoTimTwo's Checkout page (9.4.9, owner 2026-10-15):
-// the extension's list for the night (POST /feed/checked-out, source
-// 'checkout-page') goes on to the Worker as the station, so the count, the
+// the list for the night posted to POST /feed/checked-out with source
+// 'checkout-page' (the Chrome extension's, until 10.0.0; since then the
+// Worker reads that page itself) goes on to the Worker as the station, so the count, the
 // still-here list and /checkin's Check out drop those children. The whole list
 // each time it grows (the Worker ignores ones already out); a failed send is
 // tried again with the next read.

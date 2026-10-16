@@ -21,7 +21,7 @@ Object.defineProperties(exports, {
 
 // ── The one club list every dropdown reads ────────────────────────────────────
 // Display names for the clubs above, in club order, served by GET /clubs and
-// consumed by the extension panel, the dashboard and the phone page.
+// consumed by the settings page (until 10.0.0 also the Chrome extension's panel).
 //
 // There used to be five hardcoded copies of this list across those three
 // surfaces, and they drifted: the extension's walk-in guest dropdown was the

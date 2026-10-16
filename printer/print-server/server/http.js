@@ -254,10 +254,11 @@ app.get('/printers', async (req, res) => {
   }
 });
 
-// ── Receive CSV from the extension (authenticated browser session) ───────────
-// The extension fetches /clubber/csv from the same origin (which has the
-// user's session cookies) and POSTs the raw CSV text here so the server can
-// write it to clubbers.csv for enriched label data.
+// ── Receive the roster CSV ───────────────────────────────────────────────────
+// Since 10.0.0 the station's job puller posts the roster the sync Worker read
+// from TwoTimTwo's /clubber/csv and sealed to this station (job-puller.js
+// createBundleSync); until then the Chrome extension posted it. Written to
+// clubbers.csv for enriched label data.
 app.post('/update-csv', (req, res) => {
   const { csv } = req.body || {};
   if (!csv || typeof csv !== 'string' || !csv.trim()) {

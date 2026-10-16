@@ -283,7 +283,7 @@ function backupPrinter() {
   return String($config.config.backupPrinterName || '').trim();
 }
 
-// Where labels print, in words, for the extension's panel and the dashboard.
+// Where labels print, in words, for the settings page (GET /printers).
 function printingTarget() {
   return { kind: 'label', name: $config.PRINTER_NAME || null, backup: backupPrinter() || null };
 }

@@ -81,9 +81,9 @@ const SCALE = DPI / 72;            // convert pt → px
 // past that the monogram badge) — the icon zone never silently disappears.
 // The kit's official club marks go through this same converter.
 //
-// POST /label (the extension's Print Dialog mode) is the surface that shows
-// this output before paper. GET /preview takes no image parameter, so the
-// dashboard preview always renders the club mark.
+// GET /preview takes no image parameter, so the settings page's preview always
+// renders the club mark. (POST /label, the Chrome extension's Print Dialog
+// mode, showed this output before paper until 10.0.0.)
 const LOGO_INK_ALPHA = 64;        // out of 255 — below this a pixel is "air"
 const LOGO_INK_WHITE_DIST = 64;   // max(255-r,255-g,255-b) at or above this is ink
 const LOGO_MAX_DECODE_SIDE = 2048; // bound on the scan canvas (see sniff below for decode)
