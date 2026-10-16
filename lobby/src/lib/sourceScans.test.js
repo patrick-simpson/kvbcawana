@@ -470,8 +470,8 @@ function stylesheetAnimations(sheets) {
 
 describe('every animation the code names survives the build (lobby/src, shared/)', () => {
   const code = [...filesUnder(SRC, (n) => /\.(jsx?|tsx?)$/.test(n) && !/\.test\.[jt]sx?$/.test(n)),
-    ...filesUnder(resolve(LOBBY, 'shared'), (n) => /\.(jsx?|tsx?)$/.test(n) && !/\.test\.[jt]sx?$/.test(n))];
-  const sheets = [...filesUnder(SRC, (n) => n.endsWith('.css')), ...filesUnder(resolve(LOBBY, 'shared'), (n) => n.endsWith('.css'))]
+    ...filesUnder(resolve(LOBBY, '..', 'shared'), (n) => /\.(jsx?|tsx?)$/.test(n) && !/\.test\.[jt]sx?$/.test(n))];
+  const sheets = [...filesUnder(SRC, (n) => n.endsWith('.css')), ...filesUnder(resolve(LOBBY, '..', 'shared'), (n) => n.endsWith('.css'))]
     .map((file) => ({ file: relative(LOBBY, file), text: readFileSync(file, 'utf8') }));
   const { keyframes, ruled } = stylesheetAnimations(sheets);
 

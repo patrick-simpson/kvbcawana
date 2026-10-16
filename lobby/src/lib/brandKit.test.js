@@ -419,7 +419,7 @@ describe('shared/brand fonts', () => {
     expect([...names].sort()).toEqual(['londrina-solid', 'paytone', 'paytone-one', 'playfair-display']);
     const banned = (pkg) => names.some((n) => pkg.replace(/^@fontsource(-variable)?\//, '').startsWith(n));
 
-    const pkg = JSON.parse(readFileSync(resolve(SHARED, '../package.json'), 'utf8'));
+    const pkg = JSON.parse(readFileSync(resolve(SHARED, '../lobby/package.json'), 'utf8'));
     const deps = Object.keys({ ...pkg.dependencies, ...pkg.devDependencies }).filter((d) => d.startsWith('@fontsource'));
     expect(deps.length).toBeGreaterThan(0); // the other faces still come from @fontsource
     expect(deps.filter(banned)).toEqual([]);
@@ -428,7 +428,7 @@ describe('shared/brand fonts', () => {
       readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
         e.isDirectory() ? walk(resolve(dir, e.name)) : [resolve(dir, e.name)],
       );
-    const source = walk(resolve(SHARED, '../src')).filter((f) => /\.(jsx?|css|html)$/.test(f) && !/\.test\.jsx?$/.test(f));
+    const source = walk(resolve(SHARED, '../lobby/src')).filter((f) => /\.(jsx?|css|html)$/.test(f) && !/\.test\.jsx?$/.test(f));
     expect(source.length).toBeGreaterThan(50);
     for (const f of source) {
       const text = readFileSync(f, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');

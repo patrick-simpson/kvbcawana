@@ -122,7 +122,7 @@ test('every shape, doodle and club mark is the kit\'s own file, imported from sh
     assert.ok(existsSync(path.join(ROOT, 'components/home', rel)), `${rel} is in the kit`);
   }
   for (const folder of ['doodles', 'shapes']) {
-    assert.match(kit, new RegExp(`import\\.meta\\.glob<string>\\('\\.\\./\\.\\./\\.\\./lobby/shared/brand/${folder}/\\*\\.svg'`), folder);
+    assert.match(kit, new RegExp(`import\\.meta\\.glob<string>\\('\\.\\./\\.\\./\\.\\./shared/brand/${folder}/\\*\\.svg'`), folder);
   }
   // Every shape and doodle name the pages ask for is a file in the kit.
   const names = new Set();
