@@ -96,7 +96,9 @@ const JOB_C = 'C'.repeat(22);
     check('and the station sent ONE frame to the Worker, to /v1/publish, as the station, naming the job', greetings().length === 1
       && greetings()[0].station === 'station-aaaaaaaa' && greetings()[0].headers['X-Job'] === JOB_A && greetings()[0].method === 'POST', JSON.stringify(calls));
     const frame = greetings()[0] && greetings()[0].body;
-    check('a sealed checkin (no name in it)', frame && frame.event === 'checkin' && env.isEnvelope(frame.payload) && !JSON.stringify(frame).includes('Ava'), JSON.stringify(frame).slice(0, 200));
+    // The name check reads the frame's clear fields only: iv/ct are base64 ciphertext, which spells "Ava" by chance now and then.
+    const { iv: _iv, ct: _ct, ...clear } = (frame && frame.payload) || {};
+    check('a sealed checkin (no name in it)', frame && frame.event === 'checkin' && env.isEnvelope(frame.payload) && !JSON.stringify({ ...frame, payload: clear }).includes('Ava'), JSON.stringify(frame).slice(0, 200));
     const opened = await env.openEnvelope(await env.importDisplayKey(key), 'checkin', frame.payload);
     greetingsSeen.A = opened.payload;
     check('it opens with the display key: first name, club, the birthday this week', opened.ok && opened.payload.firstName === 'Ava' && opened.payload.club === 'Sparks' && opened.payload.isBirthday === true && opened.payload.isFirstTimer === false, JSON.stringify(opened));
