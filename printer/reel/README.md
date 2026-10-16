@@ -56,8 +56,9 @@ or name it in `REEL_MUSIC`; `edit.mjs` stops with a plain message without it.
 
 Measured off the file: exactly 125 BPM (beat 0.480 s, first beat 0.044 s;
 the grid holds to 4 ms over the whole song). The film's timeline (`film.js`,
-`BEAT`) is on that grid: the film starts on song beat 4 (the band's first
-downbeat), the first chorus lands at film beat 92 (0:44), the cut jumps at
-film beat 156 (the end of the first chorus) to song beat 368 (the second half
-of the final chorus), and the end card's logo lands on the song's last hit,
-film beat 180 (1:26).
+`BEAT`) is on that grid: the film starts on song beat 48 (23.08 s, where the
+song really starts; the owner, 2026-10-16: before it is the file's lead-in),
+the first chorus lands at film beat 48 (0:23), the cut jumps at film beat 112
+(the end of the first chorus) to song beat 320 (the build, four bars before
+the final chorus, which lands at film beat 128), and the end card's logo
+lands on the song's last hit, film beat 184 (1:28).

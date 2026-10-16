@@ -5,11 +5,12 @@
 // exactly 125 BPM (beat 0.480 s, first beat 0.044 s, steady to 4 ms). It is
 // NOT in the repo (the repo is public; the song is not ours to publish): put
 // the file at reel/music/happy-dance.mp3 (git-ignored) or name it in
-// REEL_MUSIC. The film runs on its beat from song beat 4 (the first downbeat
-// with the band): beats 4-159 (the intro, the verse, the first chorus), then a
-// splice into the second half of the final chorus, beat 368 to the song's own
-// last hit (beat 392) and its ring, so every picture cut in film.js lands on
-// the music's grid. A 20 ms crossfade at the splice, a short fade in, and a
+// REEL_MUSIC. The film runs on its beat from song beat 48 (23.08 s: where the
+// song really starts, owner 2026-10-16; before it is the file's lead-in):
+// beats 48-159 (the verse and the first chorus), then a splice into the build,
+// beat 320, four bars before the final chorus, to the song's own last hit
+// (beat 392) and its ring, so every picture cut in film.js lands on the
+// music's grid. A 20 ms crossfade at the splice, a short fade in, and a
 // 1.8 s fade out at the end.
 //
 // Writes printer/public/reel/reel.mp4 (ONE file: H.264 High, 1280x720, 30 fps,
@@ -34,9 +35,9 @@ export const MUSIC = {
   beat: 0.48,
   at: (n) => 0.044 + n * 0.48,
 };
-const A_START = MUSIC.at(4);    // 1.964 s
-const A_END = MUSIC.at(160);    // 76.844 s: the first chorus ends (156 film beats)
-const B_START = MUSIC.at(368);  // 176.684 s: the final chorus's second half
+const A_START = MUSIC.at(48);   // 23.084 s: the band comes in (film beat 0)
+const A_END = MUSIC.at(160);    // 76.844 s: the first chorus ends (112 film beats)
+const B_START = MUSIC.at(320);  // 153.644 s: the build into the final chorus
 const XF = 0.02;
 
 const ff = (args) => execFileSync('ffmpeg', ['-v', 'error', '-y', ...args], { stdio: 'inherit' });
@@ -85,8 +86,8 @@ export function edit({ draft = false } = {}) {
   // included: 30 fps, video near 390 kbit/s, music at 96 kbit/s stereo.
   const budget = (mb, audioKbps) => Math.floor((mb * 8000) / duration - audioKbps);
   twoPass(film, audio, path.join(OUT, 'reel.mp4'), { width: 1280, height: 720, fps: 30, kbps: budget(5.5, 96) - 8, audioKbps: 96, channels: 2 });
-  // The poster: the end card, settled (film.js POSTER_AT = beat 182.5).
-  const posterAt = Number(process.env.REEL_POSTER_AT || 87.6);
+  // The poster: the end card, settled (film.js POSTER_AT = beat 186.5).
+  const posterAt = Number(process.env.REEL_POSTER_AT || 89.52);
   ff(['-ss', String(posterAt), '-i', film, '-frames:v', '1', '-vf', 'scale=1280:720:flags=lanczos', '-q:v', '4', path.join(OUT, 'poster.jpg')]);
   for (const f of ['reel.mp4', 'poster.jpg']) {
     console.log(`  ${f}: ${(statSync(path.join(OUT, f)).size / 1048576).toFixed(2)} MB`);

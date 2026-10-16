@@ -2,10 +2,11 @@
 //
 // Owner, 2026-10-16: a whole-system montage cut to "Happy Dance" (MercyMe;
 // reel/README.md), about 1:30. The title (the clock ticking to 6:00, as on the
-// home page) over the intro; the real screens one at a time over the verse;
-// a hard cut on every bar and then every screen at once over the chorus; after
-// the splice into the final chorus (edit.mjs), the pickup board, settings, and
-// the end card with the church's logo on the song's last hit. Words are corner
+// home page) as the band comes in, then the real screens one at a time over
+// the verse; a hard cut on every bar and then every screen at once over the
+// first chorus; after the splice (edit.mjs) the Journey room over the build,
+// the screens again over the final chorus, and the end card with the church's
+// logo on the song's last hit. Words are corner
 // labels only, plus the title and the end card's credit and trademark line.
 //
 // Real footage comes from record.mjs (/work/footage/<shot>/), the labels from
@@ -16,9 +17,9 @@ import { C, CLUBS, Footage, Screen, art, chip, loadKit, mark, words } from './ki
 // Measured off the track (reel/README.md): exactly 125 BPM, steady to 4 ms.
 export const BEAT = 0.48;
 const b = (n) => n * BEAT;
-// 156 beats of the song's opening (to the end of the first chorus), then 28 of
-// the final chorus to its last hit (film beat 180), ringing out to 186.5.
-export const DURATION = b(186.5);
+// Song beats 48-159 (the verse and the first chorus: film 0-112), then 320 to
+// the last hit (the build and the final chorus: film 112-184), ringing out to 190.5.
+export const DURATION = b(190.5);
 
 const W = 1920, H = 1080;
 const stage = document.getElementById('stage');
@@ -378,7 +379,7 @@ function everything(root, tiles) {
 }
 
 /* The opening: the clock is the title (as on the home page), 5:59 to 6:00. */
-function opener(root) {
+function opener(root) { // 8 beats: the band comes in on its first frame
   const body = el('div', 'layer', root);
   body.style.background = C.sky;
   const kicker = textBox(body, 'label', 'Wednesday night · Kennebec Valley Baptist Church', { fontSize: '50px', color: C.blueDeep, left: '150px', top: '250px', letterSpacing: '0.06em', whiteSpace: 'nowrap' });
@@ -389,14 +390,16 @@ function opener(root) {
   head.box.style.top = '760px';
   const deco = cluster(body, 0, 0, [['sparkle-4pt', 1560, 300, 70], ['ring', 1680, 420, 34], ['loop', 1500, 520, 140, 0, 3]], '#fff');
   return (t) => {
-    put(kicker, { o: prog(t, b(2), 0.3), y: lerp(16, 0, E.settle(prog(t, b(2), 0.5))) });
-    const tick = t >= b(12);
+    // The band comes in on the first frame: everything is up at once, the
+    // title lands on beat 2, the clock turns 6:00 on beat 4.
+    put(kicker, { o: prog(t, 0, 0.12), y: lerp(16, 0, E.settle(prog(t, 0, 0.4))) });
+    const tick = t >= b(4);
     clock.textContent = tick ? '6:00' : '5:59';
-    const s = tick ? lerp(1.08, 1, E.settle(prog(t, b(12), 0.4))) : lerp(0.9, 1, E.settle(prog(t, b(4), 0.6)));
-    put(clock, { s, o: prog(t, b(4), 0.25) });
-    put(pm, { o: prog(t, b(5), 0.3) });
-    land(head.parts, t, b(8), { gap: 0.06, drop: 40, from: 0.4, speed: 1.25 });
-    drawCluster(deco, t, b(10));
+    const s = tick ? lerp(1.08, 1, E.settle(prog(t, b(4), 0.4))) : lerp(0.92, 1, E.settle(prog(t, 0, 0.5)));
+    put(clock, { s, o: prog(t, 0, 0.12) });
+    put(pm, { o: prog(t, b(0.5), 0.2) });
+    land(head.parts, t, b(2), { gap: 0.06, drop: 40, from: 0.4, speed: 1.25 });
+    drawCluster(deco, t, b(5));
   };
 }
 
@@ -428,20 +431,20 @@ function endCard(root) {
 
 const OVERLAP = 0.75; // a swept scene stays up under the next one's sweep
 const T = (n) => b(n);
-export const POSTER_AT = T(182.5); // the end card, settled
+export const POSTER_AT = T(186.5); // the end card, settled
 function build() {
   const S = (name, from, to, fn, sweepNext = true) => scene(name, T(from), T(to) + (sweepNext ? OVERLAP : 0), fn);
-  // The intro: the title.
-  S('opener', 0, 16, opener);
-  // The verse: one screen at a time, swept in on the bar.
-  S('lobby-open', 16, 28, (r) => shot(r, { clip: 'lobby-open', at: (t) => 0.4 + t, label: 'Lobby TV', field: C.sun, accent: C.orange }));
-  S('phone', 28, 36, (r) => shot(r, { clip: 'phone', at: (t) => 0.5 + t, label: 'Check-in · any phone', field: C.cubbies, accent: C.blueDeep, portrait: true, from: 'left' }));
-  S('labels', 36, 44, (r) => printing(r, { files: ['1-maya', '2-noah', '3-ella'], field: C.cream, accent: C.hot }));
-  S('lobby-run', 44, 60, (r) => shot(r, { clip: 'lobby-run', at: (t) => 0.3 + t, label: 'Lobby TV', field: C.sparks, accent: C.sparksDeep, from: 'left' }));
-  S('countdown', 60, 76, (r) => shot(r, { clip: 'projector-countdown', at: (t) => 5 + t, label: 'Projector wall', field: '#000', accent: C.sun }));
-  S('journey', 76, 92, (r) => shot(r, { clip: 'journey', at: (t) => 0.6 + t * 0.7, label: 'Journey room', field: C.journeyInk, accent: C.journey, from: 'left' }), false);
-  // The chorus: a hard cut on every bar.
+  // The verse (song beats 48-95): the title as the band comes in, then one screen at a time.
+  S('opener', 0, 8, opener);
+  S('lobby-open', 8, 16, (r) => shot(r, { clip: 'lobby-open', at: (t) => 2.6 + t, label: 'Lobby TV', field: C.sun, accent: C.orange }));
+  S('phone', 16, 24, (r) => shot(r, { clip: 'phone', at: (t) => 0.9 + t, label: 'Check-in · any phone', field: C.cubbies, accent: C.blueDeep, portrait: true, from: 'left' }));
+  S('labels', 24, 30, (r) => printing(r, { files: ['1-maya', '2-noah', '3-ella'], field: C.cream, accent: C.hot }));
+  S('lobby-run', 30, 40, (r) => shot(r, { clip: 'lobby-run', at: (t) => 0.3 + t, label: 'Lobby TV', field: C.sparks, accent: C.sparksDeep, from: 'left' }));
+  // The countdown runs out (clip 11 s) a beat and a half before the chorus.
+  S('countdown', 40, 48, (r) => shot(r, { clip: 'projector-countdown', at: (t) => 8.4 + t, label: 'Projector wall', field: '#000', accent: C.sun }), false);
+  // The first chorus (song beats 96-159): a hard cut on every bar, then every screen at once.
   const CHORUS = [
+    ['journey', (t) => 1.4 + t * 0.7, 'Journey room', C.journeyInk],
     ['lobby-milestone', (t) => t, 'Lobby TV', C.tnt],
     ['projector-game', (t) => 1 + t, 'Game time', '#000'],
     ['lobby-run', (t) => 8 + t, 'Lobby TV', C.puggles],
@@ -449,14 +452,13 @@ function build() {
     ['lobby-pickup', (t) => 0.5 + t, 'Pickup board', C.orange],
     [null, null, 'Label printer', C.sun],
     ['phone', (t) => 2.6 + t, 'Check-in · any phone', C.cubbies],
-    ['projector-countdown', (t) => 11 + t, 'Projector wall', '#000'],
   ];
   CHORUS.forEach(([clip, at, label, field], i) => {
-    const from = 92 + i * 4;
+    const from = 48 + i * 4;
     if (!clip) S(`chorus-${i}`, from, from + 4, (r) => printing(r, { files: ['4-leo', '5-sophia', '6-owen'], field, accent: field, sweep: false }), false);
     else S(`chorus-${i}`, from, from + 4, (r) => shot(r, { clip, at, label, field, accent: field, sweep: false, portrait: clip === 'phone', ratio: clip === 'settings' ? 1.6 : 16 / 9 }), false);
   });
-  S('everything', 124, 156, (r) => everything(r, [
+  S('everything', 80, 112, (r) => everything(r, [
     { clip: 'lobby-run', at: (t) => 0.5 + t, label: 'Lobby TV' },
     { clip: 'projector-game', at: (t) => 1 + t, label: 'Projector' },
     { clip: 'journey', at: (t) => 1.6 + t * 0.4, label: 'Journey room' },
@@ -464,10 +466,17 @@ function build() {
     { clip: 'lobby-pickup', at: (t) => 0.4 + t, label: 'Pickup board' },
     { clip: 'settings', at: (t) => 1.5 + t * 0.6, label: 'Settings' },
   ]), false);
-  // The final chorus (the splice, edit.mjs): pickup, settings, the end card.
-  S('pickup', 156, 164, (r) => shot(r, { clip: 'lobby-pickup', at: (t) => 2.6 + t, label: 'Pickup board', field: C.orange, accent: C.hot }));
-  S('settings', 164, 172, (r) => shot(r, { clip: 'settings', at: (t) => 1.5 + t, label: 'Settings · any device', field: C.tnt, accent: C.tntDeep, from: 'left', ratio: 1.6 }));
-  scene('end', T(172), DURATION + 1, endCard);
+  // The build (song beats 320-335, after the splice): the Journey room, a breath.
+  S('journey', 112, 128, (r) => shot(r, { clip: 'journey', at: (t) => 0.6 + t * 0.7, label: 'Journey room', field: C.journeyInk, accent: C.journey }));
+  // The final chorus (song beats 336-391): the screens again, swept in on every other bar.
+  S('pickup', 128, 136, (r) => shot(r, { clip: 'lobby-pickup', at: (t) => 2.6 + t, label: 'Pickup board', field: C.orange, accent: C.hot, from: 'left' }));
+  S('settings', 136, 144, (r) => shot(r, { clip: 'settings', at: (t) => 1.5 + t, label: 'Settings · any device', field: C.tnt, accent: C.tntDeep, ratio: 1.6 }));
+  S('lobby-run-2', 144, 152, (r) => shot(r, { clip: 'lobby-run', at: (t) => 4 + t, label: 'Lobby TV', field: C.trek, accent: C.trekDeep, from: 'left' }));
+  S('game', 152, 160, (r) => shot(r, { clip: 'projector-game', at: (t) => 0.5 + t, label: 'Game time', field: '#000', accent: C.tnt }));
+  S('labels-2', 160, 168, (r) => printing(r, { files: ['4-leo', '5-sophia', '6-owen'], field: C.cream, accent: C.sparks }));
+  S('phone-2', 168, 176, (r) => shot(r, { clip: 'phone', at: (t) => 0.9 + t, label: 'Check-in · any phone', field: C.cubbies, accent: C.blueDeep, portrait: true, from: 'left' }));
+  // The end card: the logo lands on the song's last hit (song beat 392 = film beat 184).
+  scene('end', T(176), DURATION + 1, endCard);
 }
 
 /* ── Seeking ─────────────────────────────────────────────────────── */
