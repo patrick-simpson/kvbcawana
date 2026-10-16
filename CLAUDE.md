@@ -42,7 +42,7 @@ This one repo holds three apps for Kennebec Valley Baptist Church's Awana club:
 
 ## Deferred work (do not start unless the owner asks)
 
-- Split the large file `printer/chrome-extension/content.js` (about 5,200 lines), and add a test harness for the extension.
+- Split the large file `printer/chrome-extension/content.js` (about 5,600 lines), and add a test harness for the extension.
 - Remove the remaining Pusher code from the print server (`ROADMAP.md#switch-day-cleanup`).
 - Open audit items: the second public Worker address in `lobby/worker/wrangler.toml`, extra lobby test suites not yet in CI, the extension's local network calls, and the repair installer's missing hash check.
 
