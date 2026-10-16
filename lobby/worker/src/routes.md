@@ -799,7 +799,9 @@ report (`stationfeeds.js`, every 5 minutes in club hours, the extension's
 award, "book"/"section" a book; a failed read keeps the last counts). **Award slips**
 (BUILT): each row with a name under such a column is one slip, `{name, clubName,
 award: <the column's header>}`, at most once per child and award a night (an HMAC tag
-of the night, name and award in `awards:slipped`), at most 10 new a read, queued as a
+of the night, name and award in `awards:slipped`), at most 10 new a read, at most 40
+slips tagged a read (`SLIPS_PER_READ_MAX`: the free plan's 10 ms of CPU; a longer report
+is walked in turns from where the last read stopped, and the HMAC key is imported once), queued as a
 REPRINT-kind job (`reprint:<uuid>`, section 6) whose sealed record is `{route:
 '/print-award', body: {name, clubName, award}}` (the print role's `JOB_PULL_ROUTES`
 already has it). Slips print from the Worker only once every LIVE registered station

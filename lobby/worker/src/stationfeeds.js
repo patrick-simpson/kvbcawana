@@ -90,7 +90,13 @@ export const SEAL_SPILL_MS = 1000;
 /** A roster that drops below half of the last good one is taken only when a second read agrees. */
 const SHRINK_MIN = 20;
 const SLIPS_MAX = 200;
-const SLIPS_PER_READ_MAX = 120;
+/**
+ * Award slips HMAC-tagged in one read (each tag is one HMAC; with the parse, the
+ * seal of the status and the publish it must stay well inside the free plan's
+ * 10 ms of CPU). A report with more rows is walked in turns: each read starts where
+ * the last stopped (`slipCursor`, memory only), so every slip is reached.
+ */
+export const SLIPS_PER_READ_MAX = 40;
 
 /** @param {string} hm */
 const minutesOf = (hm) => { const m = /^(\d{1,2}):(\d{2})$/.exec(hm); return m ? Number(m[1]) * 60 + Number(m[2]) : 0; };
@@ -157,6 +163,8 @@ export class StationFeeds {
     this.wanted = { roster: false, books: false };
     /** Award slips waiting for their seal (opened from feeds:slips). @type {{ night: string, list: { name: string, clubName: string, award: string }[] }|null} */
     this.slips = null;
+    /** Where the next read's award-slip pass starts (memory only; a restart starts at 0). */
+    this.slipCursor = { night: '', at: 0 };
     /** @type {Promise<void>|null} */
     this.loading = null;
   }
@@ -538,8 +546,14 @@ export class StationFeeds {
     const open = this.slipsOpen();
     let taken = 0;
     let changed = false;
-    // An HMAC per slip: a bounded number a read (the free plan's CPU); a night has far fewer.
-    for (const s of slips.slice(0, SLIPS_PER_READ_MAX)) {
+    // An HMAC per slip: at most SLIPS_PER_READ_MAX a read (the free plan's CPU), taken
+    // in turns from where the last read stopped, so a longer report is still walked whole.
+    if (this.slipCursor.night !== night) this.slipCursor = { night, at: 0 };
+    const n = Math.min(slips.length, SLIPS_PER_READ_MAX);
+    const start = this.slipCursor.at % slips.length;
+    const turn = Array.from({ length: n }, (_, i) => slips[(start + i) % slips.length]);
+    this.slipCursor.at = slips.length > SLIPS_PER_READ_MAX ? start + n : 0;
+    for (const s of turn) {
       if (!s || !s.name || !s.award) continue;
       const tag = await this.tags.visitor(night, s.name, `award|${s.award}`);
       if (!tag || d.tags[tag]) continue;

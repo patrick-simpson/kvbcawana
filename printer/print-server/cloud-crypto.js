@@ -203,10 +203,25 @@ function normalizeName(name) {
   return String(name == null ? '' : name).normalize('NFKC').toLowerCase().replace(/\s+/g, ' ').trim();
 }
 
+/**
+ * The imported HMAC key for a key's bytes, imported ONCE per Uint8Array (the
+ * Worker's free plan gives an invocation 10 ms of CPU, and a meeting report tags
+ * every award slip: an importKey per tag was most of it). Keyed by the array
+ * object, so callers keep their key bytes unchanged once used (the Worker's
+ * tagKey() caches one array per secret). Non-extractable, memory only.
+ * @type {WeakMap<Uint8Array, Promise<CryptoKey>>}
+ */
+const hmacKeys = new WeakMap();
+
 /** @param {Uint8Array} key @param {string} message */
 async function hmacB64Url(key, message) {
-  const k = await crypto.subtle.importKey('raw', /** @type {Uint8Array<ArrayBuffer>} */ (key), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
-  return bytesToBase64Url(new Uint8Array(await crypto.subtle.sign('HMAC', k, utf8(message))));
+  let k = hmacKeys.get(key);
+  if (!k) {
+    k = crypto.subtle.importKey('raw', /** @type {Uint8Array<ArrayBuffer>} */ (key), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+    hmacKeys.set(key, k);
+    k.catch(() => hmacKeys.delete(key));
+  }
+  return bytesToBase64Url(new Uint8Array(await crypto.subtle.sign('HMAC', await k, utf8(message))));
 }
 
 /**

@@ -5,10 +5,10 @@
 // parsers are the extension's (chrome-extension/feeds.js), rule for rule; every name
 // here is made up.
 import { createRequire } from 'node:module';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { STATION_PAD_LADDER, generateKeyPair, sealForStations } from '../../shared/cloud-crypto.js';
 import {
-  BOOK_CLUB_IDS, MEETING_MS, ROSTER_FRESH_MS, ROSTER_RETRY_MS, SLIPS_FROM_VERSION, SLIP_CAP, STALE_STATION_MS, inClubHours, versionAtLeast,
+  BOOK_CLUB_IDS, MEETING_MS, ROSTER_FRESH_MS, ROSTER_RETRY_MS, SLIPS_FROM_VERSION, SLIPS_PER_READ_MAX, SLIP_CAP, STALE_STATION_MS, inClubHours, versionAtLeast,
 } from '../src/stationfeeds.js';
 import {
   parseCheckoutIds, parseCompletedBooksCsv, parseMeetingReportCsv, parseRosterCsv, trimRosterCsv,
@@ -403,6 +403,36 @@ describe('the meeting report', () => {
     await drive(t, MEETING_MS + 30 * 1000);
     expect((await t.call('GET', '/v1/print/status')).body.queued).toBe(14);
   });
+});
+
+describe('the meeting report tick stays inside the free plan\'s CPU', () => {
+  const MEETING = (awards) => () => `"First Name","Last Name","Club","Award"\r\n${awards.map((a) => `"${a[0]}","${a[1]}","Sparks","${a[2]}"`).join('\r\n')}\r\n`;
+
+  it('at most 40 HMACs a read, the HMAC key imported once, and a 60-slip report still prints each slip once', async () => {
+    expect(SLIPS_PER_READ_MAX).toBe(40);
+    const list = Array.from({ length: 60 }, (_, i) => [`Kid${String(i).padStart(2, '0')}`, 'Tester', 'Ticket']);
+    const t = await rig({ meeting: () => MEETING(list)() });
+    const st = await modern(t);
+    const tag = vi.spyOn(t.core.feeds.tags, 'visitor');
+    const imports = vi.spyOn(crypto.subtle, 'importKey');
+    await drive(t, 3 * 60 * 1000);
+    const awardTags = () => tag.mock.calls.filter((c) => String(c[2]).startsWith('award|')).length;
+    expect(awardTags()).toBe(SLIPS_PER_READ_MAX);   // one read so far
+    expect(imports.mock.calls.filter((c) => c[2] && c[2].name === 'HMAC').length).toBeLessThanOrEqual(1);
+    imports.mockRestore();
+    const jobs = [];
+    for (let i = 0; i < 12; i++) {
+      await drive(t, MEETING_MS);
+      const next = await st.call('GET', '/v1/print/next?max=10');
+      for (const j of next.body.jobs) {
+        jobs.push((await openAsStation(st.ring, j.bundle)).body.name);
+        await st.call('POST', '/v1/print/done', { jobId: j.jobId });
+      }
+    }
+    expect(jobs.length).toBe(60);
+    expect(new Set(jobs).size).toBe(60);
+    tag.mockRestore();
+  }, 60000);
 });
 
 describe('the hand-over and a station that has gone', () => {
