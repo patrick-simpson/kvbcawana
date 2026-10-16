@@ -57,10 +57,9 @@ describe('settings copy: no stale words (comments excluded)', () => {
   });
 
   it('no section path names an old section the owner would hunt for', () => {
-    const OLD = /Settings → (Setup|Slides|Screen & corner|Laptop|Status)\b|→ Laptop →|Setup → /;
+    const OLD = /Settings → (Setup|Slides(?! (&|&amp;) look)|Screen & corner|Laptop|Status)\b|→ Laptop →|Setup → /;
     const hits = [];
     for (const file of SOURCES) {
-      if (/(StatusSection|SetupSection|SlidesSection|ScreenSection|laptop)\.jsx$|SettingsPanel\.jsx$/.test(file)) continue;   // the classic rail's own files name its own sections
       const code = withoutComments(readFileSync(file, 'utf8'));
       code.split('\n').forEach((l, i) => { if (OLD.test(l)) hits.push(`${relative(ROOT, file)}:${i + 1}`); });
     }

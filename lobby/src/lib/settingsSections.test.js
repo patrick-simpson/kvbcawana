@@ -1,7 +1,6 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import {
-  CLASSIC_SECTIONS, LEGACY_TABS, RAIL_STORAGE, SECTIONS, classicOpeningSection, classicSectionsFor, openingSection, phaseWords, railMode,
-  resolveClassicSection, resolveSection, sectionsFor,
+  LEGACY_TABS, SECTIONS, openingSection, phaseWords, resolveSection, sectionsFor,
 } from './settingsSections.js';
 
 describe('the new rail (docs/SETTINGS-OVERHAUL.md section 1)', () => {
@@ -63,42 +62,6 @@ describe('the new rail (docs/SETTINGS-OVERHAUL.md section 1)', () => {
     expect(phaseWords('shutdown')).toBe('After club (pickup)');
     expect(phaseWords('something-new')).toBe('something-new');
     expect(phaseWords(null)).toBe('');
-  });
-});
-
-describe('the classic rail (?rail=classic)', () => {
-  beforeEach(() => localStorage.clear());
-
-  it('is today\'s eight, and the page adds Screens, Laptop and History', () => {
-    expect(classicSectionsFor(false)).toBe(CLASSIC_SECTIONS);
-    expect(classicSectionsFor(true).map((s) => s.id)).toEqual(['status', 'screens', 'checkins', 'slides', 'screen', 'celebrations', 'pickup', 'look', 'laptop', 'history', 'setup']);
-    expect(classicSectionsFor(true, { remote: true })).toBe(CLASSIC_SECTIONS);
-    expect(resolveClassicSection('connection')).toBe('setup');
-    expect(resolveClassicSection('laptop')).toBe('laptop');
-    expect(resolveClassicSection('tonight')).toBe('status');
-    expect(resolveClassicSection('account')).toBe('setup');
-    expect(resolveClassicSection('nope')).toBeNull();
-  });
-
-  it('opens as it always did', () => {
-    expect(classicOpeningSection(null, { status: 'off' })).toBe('setup');
-    expect(classicOpeningSection(null, { status: 'disconnected', keyed: true })).toBe('status');
-    expect(classicOpeningSection(null, { status: 'connected', keyed: true })).toBe('checkins');
-  });
-
-  it('is chosen by ?rail=classic, remembered, and left with ?rail=new', () => {
-    expect(railMode('')).toBe('new');
-    expect(railMode('?rail=classic')).toBe('classic');
-    expect(localStorage.getItem(RAIL_STORAGE)).toBe('classic');
-    expect(railMode('')).toBe('classic');
-    expect(railMode('?rail=new')).toBe('new');
-    expect(railMode('')).toBe('new');
-  });
-
-  it('falls back to the new rail when storage throws', () => {
-    const real = Storage.prototype.getItem;
-    Storage.prototype.getItem = () => { throw new Error('blocked'); };
-    try { expect(railMode('')).toBe('new'); } finally { Storage.prototype.getItem = real; }
   });
 });
 

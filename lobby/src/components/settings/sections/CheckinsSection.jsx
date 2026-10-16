@@ -106,14 +106,3 @@ export function ClubLinesCard({ form, update }) {
       </PanelCard>
   );
 }
-
-// The classic rail's Check-ins section (?rail=classic).
-export function CheckinsSection({ form, set, update, onPreview }) {
-  return (
-    <>
-      <WelcomeBannersCard form={form} update={update} onPreview={onPreview} />
-      <WelcomeExtrasCard form={form} set={set} />
-      <ClubLinesCard form={form} update={update} />
-    </>
-  );
-}

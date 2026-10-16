@@ -1,33 +1,18 @@
-import { Fragment, useCallback, useEffect, useId, useState } from 'react';
+import { useCallback, useEffect, useId, useState } from 'react';
 import { loadSyncSession } from '../../lib/syncService.js';
 import { useSync } from '../../hooks/useSync.js';
 import {
-  PICKUP_CLUBS, callPrintServer, canReprint, cleanScheduleRows, formToTemplate, healthSummary,
-  historyTags, NAME_SIZE_MAX, NAME_SIZE_MIN, pickupTicked, printerOptions, probePrintServer, TEMPLATE_FIELDS,
+  PICKUP_CLUBS, callPrintServer, cleanScheduleRows, formToTemplate, healthSummary,
+  NAME_SIZE_MAX, NAME_SIZE_MIN, pickupTicked, printerOptions, TEMPLATE_FIELDS,
   templateClubLabel, templateToForm, validStartTime, withTemplate,
 } from '../../lib/printServer.js';
 import { PanelCard, Toggle } from './fields.jsx';
-import { AttendanceAuditCard, NameTagsCard, ReprintStretch, SyncSignInCard, useClubs } from './laptop-tools.jsx';
 import '../../styles/laptop.css';
 
-// The classic rail's Laptop section (?rail=classic) and the pieces the new rail's
-// Printing → At the laptop card reuses (AtTheLaptop.jsx): the check-in laptop's
-// own settings and tools. It looks for the print service on
-// http://localhost:3456 only when the section is opened (a browser may ask the
-// person before an https page talks to their own computer, so it must not do
-// that on load). Found: the printer's parts and tools. Not found: one calm
-// card that says where to open this page. What the page may do is the
+// The cards Printing → At the laptop (AtTheLaptop.jsx) is made of: the
+// check-in laptop's own settings and tools. What the page may do is the
 // server's call (security.js SETTINGS_PAGE_ROUTES; POST /config takes the
 // printer's own keys only, never a key or a token), see lib/printServer.js.
-
-const WOULD_SHOW = [
-  ['The printer', 'which printer prints the name tags, and the backup'],
-  ['Labels', 'the footer, the visitor and connect-card options, each club’s layout with a preview'],
-  ['Name tags', 'leader tags, one-off tags and custom labels'],
-  ['Pickup list and schedule', 'which clubs are on the pickup list, the club schedule, the late grace'],
-  ['Tonight’s prints', 'the list, with a Reprint on each, or a whole stretch at once'],
-  ['Checks', 'diagnostics, a test label, clear the print queue, rehearsal mode, the attendance audit'],
-];
 
 /** One line of feedback under a control, announced politely. */
 function Note({ note }) {
@@ -35,40 +20,6 @@ function Note({ note }) {
   return <span className={`hint laptop-note${note.bad ? ' hint--warn' : ''}`} role="status">{note.text}</span>;
 }
 
-function NotFound({ onLookAgain, checking }) {
-  return (
-    <PanelCard title="The check-in laptop" tab="var(--brand-blue)">
-      <div className="laptop-away">
-        <p className="laptop-away__lead">Open this page on the check-in laptop to set the printer.</p>
-        <p className="hint">
-          The printer itself belongs to the laptop that runs the KVBC Awana app, and this page can only
-          reach it from that computer, in Chrome, with the app running. Everything else here works from any device.
-          With no internet the desk uses the paper sheet; the settings wait until it is back.
-        </p>
-        <h4 className="settings-subhead">What shows up there</h4>
-        <ul className="laptop-would">
-          {WOULD_SHOW.map(([title, text]) => (
-            <li key={title}><strong>{title}</strong>{' '}<span>{text}</span></li>
-          ))}
-        </ul>
-        <div className="field">
-          <button type="button" className="ghost section-jump" onClick={onLookAgain} disabled={checking}>
-            {checking ? 'Looking…' : 'Look again'}
-          </button>
-          <span className="hint">
-            On the laptop and still here? Check the KVBC Awana app is running (its tray icon), then look again.
-            Chrome may also ask to let this site connect to devices on your computer: allow it.
-          </span>
-        </div>
-      </div>
-    </PanelCard>
-  );
-}
-
-/**
- * How the page proves itself to the printer: this page's own sign-in under
- * Account & app (the laptop asks the church's sign-in to confirm it).
- */
 export function ConnectCard({ problem, signedIn }) {
   const lead = problem?.reason === 'sign-in-refused' || problem?.reason === 'no-token-on-server' ? problem.error
     : signedIn ? 'The printer is here.' : 'The printer is here. Sign in under Account & app with the church passphrase to change its settings.';
@@ -428,57 +379,6 @@ export function NightCard({ cfg, save, api }) {
   );
 }
 
-function TonightCard({ api }) {
-  const clubs = useClubs(api);
-  const [rows, setRows] = useState(null);
-  const [note, setNote] = useState(null);
-  const [nonce, setNonce] = useState(0);
-  const load = () => setNonce((n) => n + 1);
-  useEffect(() => {
-    let alive = true;
-    api('/history/today').then((r) => {
-      if (!alive) return;
-      if (r.ok && Array.isArray(r.data)) setRows(r.data);
-      else if (!r.ok) setNote({ bad: true, text: r.error });
-    });
-    return () => { alive = false; };
-  }, [api, nonce]);
-  const reprint = async (e) => {
-    if (!window.confirm(`Reprint ${e.firstName}’s label?`)) return;
-    const r = await api('/reprint', { method: 'POST', body: { name: `${e.firstName} ${e.lastName || ''}`.trim(), clubberId: e.clubberId || null } });
-    setNote(r.ok ? { text: `Reprinted ${e.firstName}’s label.` } : { bad: true, text: r.error });
-    if (r.ok) load();
-  };
-  const fmt = (iso) => { const d = new Date(iso); return Number.isNaN(d.getTime()) ? '' : d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }); };
-  return (
-    <PanelCard title="Tonight’s prints" tab="var(--brand-sun)">
-      <div className="laptop-actions"><button type="button" className="ghost" onClick={load}>Refresh</button></div>
-      <ReprintStretch api={api} clubs={clubs} onDone={load} />
-      <Note note={note} />
-      {rows && rows.length === 0 && <p className="hint">Nothing has printed today.</p>}
-      {rows && rows.length > 0 && (
-        <ul className="laptop-history">
-          {rows.slice(0, 30).map((e, i) => (
-            <li key={`${e.timestamp}-${i}`}>
-              <span className="laptop-history__who">
-                <strong>{e.firstName} {e.lastName}</strong>
-                {historyTags(e).map((t) => <span className="laptop-tag" key={t}>{t}</span>)}
-              </span>
-              <span className="hint">{[e.clubName, fmt(e.timestamp)].filter(Boolean).join(' · ')}</span>
-              {canReprint(e) ? <button type="button" className="ghost" aria-label={`Reprint ${e.firstName}`} onClick={() => reprint(e)}>Reprint</button> : <span />}
-            </li>
-          ))}
-        </ul>
-      )}
-    </PanelCard>
-  );
-}
-
-/**
- * Calls to the print service on this computer, proven by this page's sign-in
- * (the laptop asks the church's sign-in to confirm it; no token anywhere).
- * @returns {{ api: (path: string, opts?: any) => Promise<any>, signedIn: boolean, proof: string, problem: any }}
- */
 export function useLaptopApi() {
   // (useSync re-renders this on signing in or out; the stored session is what
   // is sent, and one the church's sign-in no longer knows is refused, with a word.)
@@ -493,63 +393,4 @@ export function useLaptopApi() {
     return r;
   }, [session]);
   return { api, signedIn, proof: session, problem };
-}
-
-function Found({ health, onRefresh }) {
-  const { api, signedIn, proof, problem } = useLaptopApi();
-  const [cfg, setCfg] = useState(null);
-  const [printers, setPrinters] = useState(undefined);
-
-  useEffect(() => {
-    if (!proof) return undefined;
-    let alive = true;
-    (async () => {
-      const [c, p] = await Promise.all([api('/config'), api('/printers')]);
-      if (!alive) return;
-      if (c.ok) setCfg(c.data);
-      setPrinters(p.ok ? p.data.printers || [] : null);
-    })();
-    return () => { alive = false; };
-  }, [proof, api]);
-
-  const save = useCallback(async (patch) => {
-    const r = await api('/config', { method: 'POST', body: patch });
-    if (r.ok) setCfg((c) => ({ ...c, ...patch }));
-    return r;
-  }, [api]);
-
-  const connected = Boolean(proof) && !problem;
-  return (
-    <>
-      <StatusCard health={health} api={api} onRefresh={onRefresh} />
-      {!connected && <ConnectCard problem={problem} signedIn={signedIn} />}
-      {connected && health.sync?.signedIn === false && <SyncSignInCard health={health} api={api} onRefresh={onRefresh} />}
-      {connected && cfg && (
-        <Fragment key={proof}>
-          <PrintersCard cfg={cfg} printers={printers} save={save} />
-          <LabelsCard cfg={cfg} save={save} api={api} />
-          <NightCard cfg={cfg} save={save} api={api} />
-          <TonightCard api={api} />
-          <NameTagsCard api={api} />
-          <AttendanceAuditCard api={api} />
-        </Fragment>
-      )}
-      {connected && !cfg && <PanelCard><p className="hint">Reading the printer’s settings…</p></PanelCard>}
-    </>
-  );
-}
-
-export default function LaptopSection() {
-  const [probe, setProbe] = useState(null);
-  const [round, setRound] = useState(0);
-  const look = () => { setProbe(null); setRound((n) => n + 1); };
-  useEffect(() => {
-    let alive = true;
-    probePrintServer().then((p) => { if (alive) setProbe(p); });
-    return () => { alive = false; };
-  }, [round]);
-
-  if (!probe) return <PanelCard title="The check-in laptop" tab="var(--brand-blue)"><p className="hint" role="status">Looking for the printer on this computer…</p></PanelCard>;
-  if (!probe.found) return <NotFound onLookAgain={look} checking={false} />;
-  return <Found health={probe.health} onRefresh={look} />;
 }

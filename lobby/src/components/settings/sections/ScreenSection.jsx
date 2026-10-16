@@ -152,19 +152,3 @@ export function ThisTvCard({ form, set, update, wakeLockStatus, lowPowerForced }
     </PanelCard>
   );
 }
-
-// The classic rail's Screen & corner section (?rail=classic).
-export function ScreenSection({ form, set, update, panicMode, onPanic, wakeLockStatus, lowPowerForced }) {
-  return (
-    <>
-      <SimplifiedModeCard panicMode={panicMode} onPanic={onPanic} />
-      <PanelCard title="Corner" scope="shared">
-        <CornerToggles form={form} set={set} />
-      </PanelCard>
-      <PanelCard title="Weather" tab="var(--brand-journey)" scope="shared">
-        <WeatherFields form={form} set={set} update={update} />
-      </PanelCard>
-      <ThisTvCard form={form} set={set} update={update} wakeLockStatus={wakeLockStatus} lowPowerForced={lowPowerForced} />
-    </>
-  );
-}

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, configure, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import LaptopSection from './laptop.jsx';
+import AtTheLaptop from './AtTheLaptop.jsx';
 
 // The section draws a dozen cards that each ask the stand-in server for something; on a busy CI
 // runner (or the full suite with coverage) the default 1 s is not always enough.
@@ -69,14 +69,19 @@ beforeEach(() => {
 });
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
-describe('Laptop section', () => {
+// Printing → At the laptop, opened, with the church's printing settings paused so the
+// laptop's own Labels and Night cards show (they are what this suite exercises).
+const LaptopSection = () => <AtTheLaptop paused />;
+/** Open the collapsed card, which only then looks for the printer. */
+const openIt = () => fireEvent.click(screen.getByText('At the laptop'));
+
+describe('At the laptop', () => {
   it('says to open the page on the laptop when nothing answers, and what it would show', async () => {
     const s = server({ online: false });
     vi.stubGlobal('fetch', s.fn);
     render(<LaptopSection />);
-    expect(await screen.findByText('Open this page on the check-in laptop to set the printer.')).toBeTruthy();
-    expect(screen.getByText('What shows up there')).toBeTruthy();
-    expect(screen.getByText('Tonight’s prints')).toBeTruthy();
+    openIt();
+    expect(await screen.findByText('Open this page on the check-in laptop for the printer itself.')).toBeTruthy();
     expect(screen.queryByLabelText('Name tag printer')).toBeNull();
     expect(s.calls.map((c) => c.path)).toEqual(['/health']);
   });
@@ -85,6 +90,7 @@ describe('Laptop section', () => {
     const s = server({ online: false });
     vi.stubGlobal('fetch', s.fn);
     render(<LaptopSection />);
+    openIt();
     fireEvent.click(await screen.findByRole('button', { name: 'Look again' }));
     await waitFor(() => expect(s.calls.filter((c) => c.path === '/health')).toHaveLength(2));
   });
@@ -93,6 +99,7 @@ describe('Laptop section', () => {
     const s = server();
     vi.stubGlobal('fetch', s.fn);
     render(<LaptopSection />);
+    openIt();
     expect(await screen.findByText('The printer is out of labels')).toBeTruthy();
     expect(screen.getByText('Connect to the printer')).toBeTruthy();
     expect(screen.getByText(/Sign in under Account & app/)).toBeTruthy();
@@ -106,6 +113,7 @@ describe('Laptop section', () => {
     const s = server();
     vi.stubGlobal('fetch', s.fn);
     render(<LaptopSection />);
+    openIt();
     expect((await screen.findByLabelText('Name tag printer')).value).toBe('Dock');
     expect(s.calls.find((c) => c.path === '/config').headers.Authorization).toBe(`Sync ${SESSION}`);
   });
@@ -115,6 +123,7 @@ describe('Laptop section', () => {
     const s = server();
     vi.stubGlobal('fetch', s.fn);
     render(<LaptopSection />);
+    openIt();
     expect(await screen.findByText(/Sign in to the settings page again/)).toBeTruthy();
     expect(screen.queryByText(/publish token/i)).toBeNull();
     expect(screen.queryByLabelText('Name tag printer')).toBeNull();
@@ -125,13 +134,13 @@ describe('Laptop section', () => {
     const s = server();
     vi.stubGlobal('fetch', s.fn);
     render(<LaptopSection />);
+    openIt();
     const tag = await screen.findByLabelText('Name tag printer');
     expect(tag.value).toBe('Dock');
     expect(screen.getByRole('textbox', { name: 'Label footer' }).value).toBe('KVBC');
     expect(screen.getByRole('checkbox', { name: 'Sparks' }).checked).toBe(true);
     expect(screen.getByRole('checkbox', { name: 'Cubbies' }).checked).toBe(false);
     expect(await screen.findByLabelText('Row 1 club')).toBeTruthy();
-    expect(await screen.findByText('Maya R')).toBeTruthy();
     // Every call after the probe carries the page's sign-in, never a token.
     for (const c of s.calls.filter((x) => x.path !== '/health')) expect(c.headers.Authorization).toBe(`Sync ${SESSION}`);
     // One Season control: the laptop's own copy is gone.
@@ -143,6 +152,7 @@ describe('Laptop section', () => {
     const s = server();
     vi.stubGlobal('fetch', s.fn);
     render(<LaptopSection />);
+    openIt();
     fireEvent.change(await screen.findByLabelText('Name tag printer'), { target: { value: 'Spare' } });
     await waitFor(() => expect(s.calls.some((c) => c.method === 'POST' && c.path === '/config')).toBe(true));
     const post = s.calls.find((c) => c.method === 'POST' && c.path === '/config');
@@ -155,6 +165,7 @@ describe('Laptop section', () => {
     const s = server();
     vi.stubGlobal('fetch', s.fn);
     render(<LaptopSection />);
+    openIt();
     fireEvent.click(await screen.findByRole('checkbox', { name: 'Cubbies' }));
     await waitFor(() => expect(s.calls.some((c) => c.method === 'POST' && c.body?.pickupClubs)).toBe(true));
     expect(s.calls.find((c) => c.body?.pickupClubs).body.pickupClubs).toEqual(['Cubbies', 'Sparks']);
@@ -165,6 +176,7 @@ describe('Laptop section', () => {
     const s = server();
     vi.stubGlobal('fetch', s.fn);
     render(<LaptopSection />);
+    openIt();
     fireEvent.change(await screen.findByLabelText('Row 1 starts'), { target: { value: '6:45' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save schedule' }));
     await waitFor(() => expect(s.calls.some((c) => c.method === 'POST' && c.path === '/config/schedule')).toBe(true));
@@ -177,22 +189,11 @@ describe('Laptop section', () => {
     const s = server();
     vi.stubGlobal('fetch', s.fn);
     render(<LaptopSection />);
+    openIt();
     fireEvent.change(await screen.findByLabelText('Row 1 starts'), { target: { value: 'soon' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save schedule' }));
     expect(await screen.findByText('A start time reads like 6:30.')).toBeTruthy();
     expect(s.calls.some((c) => c.method === 'POST' && c.path === '/config/schedule')).toBe(false);
-  });
-
-  it('reprints after a confirm', async () => {
-    signIn();
-    const s = server();
-    vi.stubGlobal('fetch', s.fn);
-    vi.stubGlobal('confirm', vi.fn(() => true));
-    window.confirm = globalThis.confirm;
-    render(<LaptopSection />);
-    fireEvent.click(await screen.findByRole('button', { name: 'Reprint Maya' }));
-    await waitFor(() => expect(s.calls.some((c) => c.path === '/reprint')).toBe(true));
-    expect(s.calls.find((c) => c.path === '/reprint').body).toMatchObject({ name: 'Maya R' });
   });
 
   it('runs the diagnostics and lists each check as passed or failed', async () => {
@@ -200,6 +201,7 @@ describe('Laptop section', () => {
     const s = server();
     vi.stubGlobal('fetch', s.fn);
     render(<LaptopSection />);
+    openIt();
     fireEvent.click(await screen.findByRole('button', { name: 'Run diagnostics' }));
     const list = await screen.findByRole('list', { name: 'Diagnostics' });
     expect(within(list).getByText('Printer detected')).toBeTruthy();
@@ -211,6 +213,7 @@ describe('Laptop section', () => {
     signIn();
     vi.stubGlobal('fetch', server().fn);
     render(<LaptopSection />);
+    openIt();
     await screen.findByLabelText('Name tag printer');
     expect(screen.queryByText('PIN and keys')).toBeNull();
     expect(screen.queryByRole('link', { name: /print dashboard/i })).toBeNull();
@@ -221,41 +224,17 @@ describe('Laptop section', () => {
     expect(screen.queryByText(/publish token/i)).toBeNull();
   });
 
-  it('prints a leader tag, lists the remembered ones, and forgets one after a confirm', async () => {
+  it('lists the remembered leaders, and forgets one after a confirm', async () => {
     signIn();
     const s = server();
     vi.stubGlobal('fetch', s.fn);
     vi.stubGlobal('confirm', vi.fn(() => true));
     window.confirm = globalThis.confirm;
     render(<LaptopSection />);
-    fireEvent.change(await screen.findByLabelText('Leader’s name'), { target: { value: 'Bo Kim' } });
-    fireEvent.change(screen.getByLabelText('Leader’s club'), { target: { value: 'Sparks' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Print leader tag' }));
-    await waitFor(() => expect(s.calls.some((c) => c.path === '/print-leader')).toBe(true));
-    expect(s.calls.find((c) => c.path === '/print-leader').body).toEqual({ name: 'Bo Kim', clubName: 'Sparks' });
-    expect(await screen.findByText('Printed Bo Kim.')).toBeTruthy();
+    openIt();
     fireEvent.click(await screen.findByRole('button', { name: 'Forget Ann Lee' }));
     await waitFor(() => expect(s.calls.some((c) => c.path === '/leaders/forget')).toBe(true));
     expect(s.calls.find((c) => c.path === '/leaders/forget').body).toEqual({ key: 'ann lee' });
-  });
-
-  it('prints a one-off tag only with a name and a club, and a custom label with its text', async () => {
-    signIn();
-    const s = server();
-    vi.stubGlobal('fetch', s.fn);
-    render(<LaptopSection />);
-    fireEvent.click(await screen.findByRole('button', { name: 'Print tag' }));
-    expect(await screen.findByText('Type the child’s first name first.')).toBeTruthy();
-    expect(s.calls.some((c) => c.path === '/print-oneoff')).toBe(false);
-    fireEvent.change(screen.getByLabelText('Child’s first name'), { target: { value: 'Zed' } });
-    fireEvent.change(screen.getByLabelText('Child’s club'), { target: { value: 'T&T' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Print tag' }));
-    await waitFor(() => expect(s.calls.some((c) => c.path === '/print-oneoff')).toBe(true));
-    expect(s.calls.find((c) => c.path === '/print-oneoff').body).toEqual({ firstName: 'Zed', clubName: 'T&T' });
-    fireEvent.change(screen.getByLabelText('Label text'), { target: { value: 'KITCHEN' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Print custom label' }));
-    await waitFor(() => expect(s.calls.some((c) => c.path === '/print-custom')).toBe(true));
-    expect(s.calls.find((c) => c.path === '/print-custom').body).toEqual({ text: 'KITCHEN' });
   });
 
   it('reprints a stretch in two steps: the server counts first, and only a confirm prints', async () => {
@@ -263,6 +242,7 @@ describe('Laptop section', () => {
     const s = server();
     vi.stubGlobal('fetch', s.fn);
     render(<LaptopSection />);
+    openIt();
     fireEvent.change(await screen.findByLabelText('From (time)'), { target: { value: '6:30' } });
     fireEvent.change(screen.getByLabelText('To (time)'), { target: { value: '6:45' } });
     fireEvent.click(screen.getByRole('button', { name: 'Reprint this stretch' }));
@@ -280,6 +260,7 @@ describe('Laptop section', () => {
     const s = server();
     vi.stubGlobal('fetch', s.fn);
     render(<LaptopSection />);
+    openIt();
     fireEvent.click(await screen.findByRole('button', { name: 'Reprint this stretch' }));
     expect(await screen.findByText('Enter both a start and an end time, like 6:30.')).toBeTruthy();
     expect(s.calls.some((c) => c.path === '/reprint-range')).toBe(false);
@@ -297,6 +278,7 @@ describe('Laptop section', () => {
     vi.stubGlobal('confirm', ask);
     window.confirm = ask;
     render(<LaptopSection />);
+    openIt();
     expect(await screen.findByText(/2 night\(s\) TwoTimTwo has/)).toBeTruthy();
     expect(within(screen.getByRole('list', { name: 'Nights that differ' })).getByText('Maya R')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Apply 2 missing date(s)' }));
@@ -310,6 +292,7 @@ describe('Laptop section', () => {
     signIn();
     vi.stubGlobal('fetch', server().fn);
     render(<LaptopSection />);
+    openIt();
     expect(await screen.findByText(/no attendance grid has been read yet/)).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Apply missing dates' }).disabled).toBe(true);
   });
@@ -322,6 +305,7 @@ describe('Laptop section', () => {
     vi.stubGlobal('confirm', ask);
     window.confirm = ask;
     render(<LaptopSection />);
+    openIt();
     fireEvent.click(await screen.findByRole('button', { name: 'Rehearsal mode' }));
     await waitFor(() => expect(ask).toHaveBeenCalled());
     expect(s.calls.some((c) => c.path === '/rehearsal')).toBe(false);
@@ -335,17 +319,17 @@ describe('Laptop section', () => {
     expect(ask).toHaveBeenCalledTimes(2);
   });
 
-  it('saves the three switches that live here, one key each', async () => {
+  it('saves the two switches that live here, one key each', async () => {
     signIn();
     const s = server();
     vi.stubGlobal('fetch', s.fn);
-    render(<LaptopSection />);
+    render(<AtTheLaptop />);   // not paused: the church's printing settings own the rest
+    openIt();
     fireEvent.click(await screen.findByRole('checkbox', { name: /Musical printer/ }));
     fireEvent.click(screen.getByRole('checkbox', { name: /Update health beacon/ }));
-    fireEvent.click(screen.getByRole('checkbox', { name: /Chrome extension check children in on TwoTimTwo directly/ }));
-    await waitFor(() => expect(s.calls.filter((c) => c.path === '/config' && c.method === 'POST')).toHaveLength(3));
+    await waitFor(() => expect(s.calls.filter((c) => c.path === '/config' && c.method === 'POST')).toHaveLength(2));
     expect(s.calls.filter((c) => c.path === '/config' && c.method === 'POST').map((c) => c.body)).toEqual([
-      { musicalPrinter: true }, { updateBeacon: true }, { enableDrivenCheckin: false },
+      { musicalPrinter: true }, { updateBeacon: true },
     ]);
   });
 
@@ -353,6 +337,7 @@ describe('Laptop section', () => {
     signIn();
     vi.stubGlobal('fetch', server({ health: { ...HEALTH, printFailures: 1 } }).fn);
     render(<LaptopSection />);
+    openIt();
     const list = await screen.findByRole('list', { name: 'Print failures tonight' });
     expect(within(list).getByText(/Printer offline/)).toBeTruthy();
   });
@@ -362,6 +347,7 @@ describe('Laptop section', () => {
     const s = server({ health: { ...HEALTH, sync: { signedIn: false, state: 'signed-out', error: 'The passphrase was changed on another screen.' } } });
     vi.stubGlobal('fetch', s.fn);
     render(<LaptopSection />);
+    openIt();
     expect(await screen.findByText('This laptop was signed out of the church’s sign-in.')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Sign this laptop in' }));
     expect(await screen.findByText('Type the church passphrase first.')).toBeTruthy();
@@ -379,6 +365,7 @@ describe('Laptop section', () => {
     signIn();
     vi.stubGlobal('fetch', server().fn);
     render(<LaptopSection />);
+    openIt();
     await screen.findByLabelText('Name tag printer');
     expect(screen.queryByText('This laptop’s sign-in')).toBeNull();
     expect(screen.queryByLabelText('Church passphrase')).toBeNull();

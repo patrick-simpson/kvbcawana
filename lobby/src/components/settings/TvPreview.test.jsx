@@ -95,7 +95,6 @@ describe('TvPreview (docs/SETTINGS-OVERHAUL.md section 6)', () => {
   it('?preview=0 turns it off; the label describes each focus', () => {
     expect(previewEnabled('?preview=0')).toBe(false);
     expect(previewEnabled('')).toBe(true);
-    expect(previewEnabled('?rail=classic')).toBe(true);
     for (const f of ['slide', 'welcome', 'pickup', 'corner', 'notice']) expect(previewLabel(f)).toMatch(/preview/i);
   });
 });

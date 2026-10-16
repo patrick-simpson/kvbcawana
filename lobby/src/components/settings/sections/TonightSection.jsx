@@ -74,7 +74,7 @@ export function TonightSection({
       ) : (
         <ConnectionCard
           status={status} keyed={keyed} displayKey={displayKey} nameStatus={nameStatus}
-          lastEventAt={lastEventAt} openedAt={openedAt} goTo={goTo} accountId="account"
+          lastEventAt={lastEventAt} openedAt={openedAt} goTo={goTo}
         />
       )}
 

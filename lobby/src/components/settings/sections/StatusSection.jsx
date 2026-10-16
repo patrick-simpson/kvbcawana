@@ -194,8 +194,8 @@ export function StatusAlerts({ opsFailures, layerFaults, remoteConfigError, wake
   return alerts.length > 0 ? <div className="status-alerts" role="status">{alerts}</div> : null;
 }
 
-/** "Connection": the sentence, realtime, the church's sign-in, names. @param {{ goTo: (id: string) => void, accountId?: string }} props */
-export function ConnectionCard({ status, keyed, displayKey, nameStatus, lastEventAt, openedAt, goTo, accountId = 'setup' }) {
+/** "Connection": the sentence, realtime, the church's sign-in, names. @param {{ goTo: (id: string) => void }} props */
+export function ConnectionCard({ status, keyed, displayKey, nameStatus, lastEventAt, openedAt, goTo }) {
   const syncState = useSync();
   const realtime = {
     connected: 'connected',
@@ -207,17 +207,17 @@ export function ConnectionCard({ status, keyed, displayKey, nameStatus, lastEven
     ? `${new Date(lastEventAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} (${Math.max(0, Math.round((openedAt - lastEventAt) / 60000))} min ago)`
     : 'none yet this session';
   const needsSetup = status === 'off' || !keyed;
-  const where = accountId === 'account' ? 'Account & app' : 'Setup';
+  const where = 'Account & app';
   return (
     <PanelCard title="Sign-in & connection">
-      <p className={`status-sentence ${status}`}><span className="dot" />{statusSentence(status, keyed, accountId === 'account' ? 'Account & app → Sign in' : 'Setup → Connect this screen')}</p>
+      <p className={`status-sentence ${status}`}><span className="dot" />{statusSentence(status, keyed)}</p>
       <div className="hint conn-summary">
         <div><strong>Realtime:</strong> {realtime} · last check-in {lastSeen}</div>
         <div><strong>Church sign-in:</strong> {syncState.signedIn ? `signed in${syncState.lastSyncAt ? `, synced ${new Date(syncState.lastSyncAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` : ''}` : (syncState.phase === 'expired' ? `signed out: the passphrase was changed, type the new one under ${where}` : `not signed in: type the passphrase under ${where}`)}</div>
         {status !== 'off' && <div><strong>Names:</strong> {namesLineFor(nameStatus, displayKey)}</div>}
       </div>
       {needsSetup && (
-        <button type="button" className="secondary section-jump" onClick={() => goTo(accountId)}>
+        <button type="button" className="secondary section-jump" onClick={() => goTo('account')}>
           Set up this screen →
         </button>
       )}
@@ -250,7 +250,7 @@ export function CalendarPhaseCard({
 /**
  * About. `part` 'screen': this screen's build and self-update line (a TV's
  * Tonight); 'legal': the trademark line (Account & app, everywhere); 'all':
- * both, as the classic Status section has them.
+ * both.
  * @param {{ build?: string | null, part?: 'screen' | 'legal' | 'all' }} props
  */
 export function AboutCard({ build, part = 'all' }) {
@@ -270,32 +270,5 @@ export function AboutCard({ build, part = 'all' }) {
         </p>
       )}
     </PanelCard>
-  );
-}
-
-// The classic rail's Status section (?rail=classic): minus the display login,
-// the key paste hints and the "Other screens" links (docs/SETTINGS-OVERHAUL.md section 3).
-export function StatusSection({
-  status, nameStatus, keyed, displayKey, lastEventAt, openedAt, phase, scheduleSource,
-  calendar, calendarEnabled, opsFailures, layerFaults, remoteConfigError, wakeLockStatus, demoActive,
-  syncedDeck, slidesStatus, following, build, goTo, onReload,
-}) {
-  return (
-    <>
-      <StatusAlerts
-        opsFailures={opsFailures} layerFaults={layerFaults} remoteConfigError={remoteConfigError}
-        wakeLockStatus={wakeLockStatus} demoActive={demoActive} onReload={onReload}
-      />
-      <ConnectionCard
-        status={status} keyed={keyed} displayKey={displayKey} nameStatus={nameStatus}
-        lastEventAt={lastEventAt} openedAt={openedAt} goTo={goTo}
-      />
-      <CalendarPhaseCard
-        phase={phase} scheduleSource={scheduleSource} calendar={calendar} calendarEnabled={calendarEnabled}
-        syncedDeck={syncedDeck} slidesStatus={slidesStatus} following={following} keyed={keyed} openedAt={openedAt}
-        slidesWhere="Slides" accountWhere="Setup"
-      />
-      <AboutCard build={build} />
-    </>
   );
 }

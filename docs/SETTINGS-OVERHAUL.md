@@ -36,10 +36,9 @@ section ("Settings → Setup", "→ Slides", "→ Screen & corner", "→ Laptop"
 rewritten (`CLAUDE.md` rename rule; grep `lobby/src`, `journey/`, `printer/print-server`
 error strings, `printer/chrome-extension` options/popup copy).
 
-Kill switch for the rail: `?rail=classic` (or localStorage `awanaSettingsRail.v1 =
-'classic'`, per-viewer convenience, try/catch) renders today's rail with today's section
-components (kept compiling this release, minus the removed controls of section 3). Deleted
-the release after Wednesday.
+Kill switch for the rail (`?rail=classic`, or localStorage `awanaSettingsRail.v1 =
+'classic'`): removed 2026-10-16, with the old section components. `LEGACY_TABS` still
+maps the old tab ids to the new sections.
 
 ## 2. Section → card → control (old location → new)
 
@@ -359,7 +358,7 @@ Owns: `lobby/src/**` (not `worker/`), `lobby/e2e/**`, `CLAUDE.md`, `ROADMAP.md`
 
 - `lib/settingsSections.js`, `components/SettingsPanel.jsx`, new
   `components/settings/sections/{TonightSection,ShowSection,LookSection,PrintingSection,AccountSection}.jsx`
-  (old section files kept for `?rail=classic`), `settings/{TvPreview,MissionControl,SwitchesCard,NoticeCard,ChangeLogCard,ChurchCards,AtTheLaptop}.jsx`,
+  (the old section files' shared cards stay; the classic-only section wrappers were removed 2026-10-16), `settings/{TvPreview,MissionControl,SwitchesCard,NoticeCard,ChangeLogCard,ChurchCards,AtTheLaptop}.jsx`,
   `lib/{missionControl,churchClient,deviceId,toolJobs}.js` (`toolJobs` seals via
   `shared/cloud-crypto.js` `sealForStations`, reseals on 409 `stations-changed` up to 3
   times, as `site/desk/desk-transport.js` does), removals and wording (section 3),
@@ -439,7 +438,7 @@ deploy between 4:30 and 9:30 pm Wednesday.
 | Change log | storage growth / write latency | `CHANGE_LOG` off; fixed 30 keys max; logging never fails a write |
 | Mission control | poll load, names leak | overview has no names (test); poll stops after 3 failures; `?mission=0` hides the card; names only in React state |
 | TV preview | crash or jank on the page | error boundary → static miniature; `?preview=0` |
-| New rail | owner cannot find a control | `?rail=classic`; `LEGACY_TABS` keep old deep links working |
+| New rail | owner cannot find a control | the `?rail=classic` kill switch was removed 2026-10-16; `LEGACY_TABS` keep old deep links working |
 | Tool jobs from anywhere (name tags, reprint) | duplicate tags | at-most-once journal per jobId unchanged; each press mints ONE `reprint:<uuid>` (button disabled until answered); confirm before sending |
 | Removed publish-token fallback | the laptop page cannot prove itself without a sync session | sign in under Account (the page's sync session is the proof); the print server still accepts a stored token |
 
@@ -447,8 +446,7 @@ deploy between 4:30 and 9:30 pm Wednesday.
 
 Decided without a plan step (owner). What a volunteer needs on a club night
 comes first, what is set once comes later. Nothing changed what a setting does
-or its stored key / wire name; section ids, `LEGACY_TABS`, `?rail=`,
-`awanaSettingsRail.v1` and the classic rail are unchanged. Section and card
+or its stored key / wire name; section ids, `LEGACY_TABS` are unchanged (`?rail=`, `awanaSettingsRail.v1` and the classic rail were removed 2026-10-16). Section and card
 names that other pages cite were kept (Printing → Labels, Printing → At the
 laptop, Printing → Pickup list, What screens show → Pickup board, Account &
 app → Sign in / Church-wide settings). Card order is pinned by
@@ -518,8 +516,7 @@ sections"); no card title is used twice on the page (same test).
 ### 11.3 Left alone on purpose
 
 Section names (printer docs, print-server error strings and the extension cite
-"Printing → …"), every stored key and wire name, the classic rail (deleted the
-release after Wednesday as planned), the TV's own panel order (a TV opens on
+"Printing → …"), every stored key and wire name, the classic rail (removed 2026-10-16, as planned), the TV's own panel order (a TV opens on
 What screens show and its emergency switch, Simplified mode, stays first), the
 TV preview (Tonight, What screens show, Slides & look only), "Typed &
 published slides" (a radio label of the same words is test-pinned), and the

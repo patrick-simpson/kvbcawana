@@ -1,5 +1,4 @@
 import { useContext, useState } from 'react';
-import { skinOptions } from '../../../lib/skins.js';
 import { seasonChoice, seasonLine, seasonOptions, seasonWrites } from '../../../lib/season.js';
 import { useChurch } from '../../../hooks/useChurch.js';
 import { PanelCard, SettingsPageContext, Toggle } from '../fields.jsx';
@@ -109,40 +108,6 @@ export function LookSection({
       <CalendarSlidesCard form={form} set={set} today={today} />
       <SeasonCard form={form} update={update} today={today} tonightTitle={tonightTitle} />
       <WeatherEffectsCard form={form} set={set} />
-      <JustForFunFold form={form} set={set} />
-    </>
-  );
-}
-
-// The classic rail's Look & season section (?rail=classic): its own Season select.
-export function ClassicLookSection({ form, set }) {
-  return (
-    <>
-      <PanelCard title="Season" tab="var(--brand-journey)" scope="shared">
-        <div className="field">
-          <label htmlFor="nightTheme">Themed night skin</label>
-          <select id="nightTheme" value={form.nightTheme} onChange={set('nightTheme')}>
-            <option value="none">None (classic)</option>
-            {/* Generated from SKIN_TABLE so a new season needs one edit, not five. */}
-            {skinOptions().filter((o) => o.value !== 'none').map((o) => (
-              <option key={o.value} value={o.value}>{o.label}</option>
-            ))}
-          </select>
-          <span className="hint">
-            Dresses the stage for the season. Banners always keep their club colors. Auto reads tonight&apos;s calendar
-            title (Easter, VBS, Thanksgiving&hellip;) and falls back to the month.
-          </span>
-        </div>
-        {form.nightTheme === 'auto' && (
-          <Toggle
-            checked={form.followPrinterTheme === true}
-            onChange={set('followPrinterTheme')}
-            title="Follow the printer's season"
-            hint="When the label printer broadcasts its season theme, this screen wears the matching skin so labels and screens switch together."
-          />
-        )}
-      </PanelCard>
-      <WeatherEffectsCard form={form} set={set} where="Screen & corner" />
       <JustForFunFold form={form} set={set} />
     </>
   );

@@ -10,20 +10,18 @@ import { useDisplayLogin } from '../hooks/useDisplayLogin.js';
 import { useSync } from '../hooks/useSync.js';
 import { pageBuild } from '../lib/buildReload.js';
 import {
-  classicOpeningSection, classicSectionsFor, nextFocusState, openingSection, railMode, resolveClassicSection, resolveSection, sectionsFor,
+  nextFocusState, openingSection, resolveSection, sectionsFor,
 } from '../lib/settingsSections.js';
 import { initialMission } from '../lib/missionControl.js';
 import { isSharedKey, pickShared } from '../lib/sharedSettings.js';
 import { ZeroAnimationContext } from '../lib/motion.jsx';
 import {
-  AccountSection, CelebrationsSection, CheckinsSection, ClassicLookSection, JourneySection, LookSection, PickupSection, PrintingSection,
-  ScreenSection, SetupSection, SharedSettingsCard, ShowSection, SlidesSection, StatusSection, TonightSection, statusProblems,
+  AccountSection, JourneySection, LookSection, PrintingSection, SharedSettingsCard, ShowSection, TonightSection, statusProblems,
 } from './settings/sections/index.js';
 import TvPreview, { previewEnabled } from './settings/TvPreview.jsx';
 import { EMPTY_NOTICE } from './settings/NoticeCard.jsx';
 import { FollowingContext, RemoteScreenContext, SettingsPageContext } from './settings/fields.jsx';
 import { ScreenOverviewSection, ScreensSection } from './settings/screens.jsx';
-import LaptopSection from './settings/laptop.jsx';
 import HistorySection from './settings/history.jsx';
 import { CORNER_CLUB_IDS } from '../lib/clubs.js';
 import { celebrateChange } from '../lib/settingsJoy.js';
@@ -141,8 +139,8 @@ export default function SettingsPanel({
   // one from the list; `screen` is set when this panel IS that screen's
   // (RemoteScreenPanel), with its note, actions, rename and forget.
   onOpenScreen = null, screen = null, screenNote = null, onScreenAction, onScreenRenamed, onScreenForgotten,
-  // Mission control's memory-only feed of recent first names (App, settings page only), and the rail.
-  mission = null, rail: railProp = null, tonightTitle = null,
+  // Mission control's memory-only feed of recent first names (App, settings page only).
+  mission = null, tonightTitle = null,
 }) {
   const stored = savedConfig ?? config;
   const [initial] = useState(() => seedForm(stored));
@@ -168,15 +166,11 @@ export default function SettingsPanel({
   const problems = statusProblems({ opsFailures, layerFaults, remoteConfigError, wakeLockStatus, demoActive, status });
 
   const { signedIn } = useSync();
-  // The new rail (eight sections since the 2026-10-13 reorganize), or the old one (?rail=classic: deleted the release after the overhaul).
-  const [rail] = useState(() => railProp ?? railMode());
-  const classic = rail === 'classic';
-  const sections = classic ? classicSectionsFor(page, { remote: Boolean(screen) }) : sectionsFor(page, { remote: Boolean(screen) });
+  // Eight sections since the 2026-10-13 reorganize (the old rail was removed 2026-10-16).
+  const sections = sectionsFor(page, { remote: Boolean(screen) });
   // The settings page opens on signing in until it is signed in: nothing
   // there reaches a screen without it.
-  const [section, setSectionState] = useState(() => (classic
-    ? (page && !signedIn && !initialTab ? 'setup' : classicOpeningSection(initialTab, { status, keyed, problems: problems.length }))
-    : openingSection(initialTab, { status, keyed, problems: problems.length, page, signedIn })));
+  const [section, setSectionState] = useState(() => openingSection(initialTab, { status, keyed, problems: problems.length, page, signedIn }));
   // The live TV preview (settings page only): what the draft would look like.
   // The focus belongs to the section it was set in: a new section starts on the slide.
   const [focusState, setFocusState] = useState({ section: '', focus: 'slide' });
@@ -268,7 +262,7 @@ export default function SettingsPanel({
   };
 
   const goTo = (asked) => {
-    const id = (classic ? resolveClassicSection(asked) : resolveSection(asked)) ?? asked;
+    const id = resolveSection(asked) ?? asked;
     setSectionState(id);
     setView('section');
     onTabChange?.(id);
@@ -440,7 +434,7 @@ export default function SettingsPanel({
   let body;
   if (section === 'screens' && onOpenScreen) {
     body = <ScreensSection onOpen={onOpenScreen} goTo={goTo} />;
-  } else if ((section === 'status' || section === 'tonight') && screen) {
+  } else if (section === 'tonight' && screen) {
     body = (
       <>
         <ScreenOverviewSection
@@ -448,7 +442,7 @@ export default function SettingsPanel({
           onAction={(a) => { flush(); onScreenAction?.(a); }} onRenamed={onScreenRenamed} onForgotten={onScreenForgotten}
         />
         {/* The new rail has no Account section on a screen opened from the page: its follow switch lives here. */}
-        {!classic && <SharedSettingsCard form={form} set={set} shared={shared} shareStatus={shareStatus} onShareNow={null} />}
+        <SharedSettingsCard form={form} set={set} shared={shared} shareStatus={shareStatus} onShareNow={null} />
       </>
     );
   } else if (section === 'tonight') {
@@ -464,18 +458,6 @@ export default function SettingsPanel({
         mission={mission ?? initialMission()} noticeDraft={noticeDraft} onNoticeDraft={setNoticeDraft}
       />
     );
-  } else if (section === 'status') {
-    body = (
-      <StatusSection
-        status={status} nameStatus={nameStatus} keyed={keyed} displayKey={displayKey}
-        lastEventAt={lastEventAt} openedAt={openedAt} phase={phase} scheduleSource={scheduleSource}
-        calendar={calendar} calendarEnabled={form.calendarEnabled} opsFailures={opsFailures}
-        layerFaults={layerFaults} remoteConfigError={remoteConfigError} wakeLockStatus={wakeLockStatus}
-        demoActive={demoActive} syncedDeck={syncedDeck} slidesStatus={slidesStatus}
-        following={form.followPublishedSlides !== false} build={build} goTo={goTo}
-        onReload={() => window.location.reload()}
-      />
-    );
   } else if (section === 'show') {
     body = (
       <ShowSection
@@ -483,38 +465,22 @@ export default function SettingsPanel({
         panicMode={panicMode} onPanic={onPanic} wakeLockStatus={wakeLockStatus} lowPowerForced={lowPowerForced} goTo={goTo}
       />
     );
-  } else if (section === 'look' && !classic) {
+  } else if (section === 'look') {
     body = <LookSection {...props} {...slidesProps} />;
   } else if (section === 'printing') {
     body = <PrintingSection goTo={goTo} />;
   } else if (section === 'journey') {
     body = <JourneySection goTo={goTo} />;
-  } else if (section === 'account') {
-    body = <AccountSection {...props} {...accountProps} />;
-  } else if (section === 'checkins') {
-    body = <CheckinsSection {...props} onPreview={onTest ? preview : null} />;
-  } else if (section === 'slides') {
-    body = <SlidesSection {...props} {...slidesProps} />;
-  } else if (section === 'screen') {
-    body = <ScreenSection {...props} panicMode={panicMode} onPanic={onPanic} wakeLockStatus={wakeLockStatus} lowPowerForced={lowPowerForced} />;
-  } else if (section === 'celebrations') {
-    body = <CelebrationsSection {...props} />;
-  } else if (section === 'pickup') {
-    body = <PickupSection {...props} onBoardDemo={onBoardDemo ? () => { flush(); onBoardDemo(); } : null} />;
-  } else if (section === 'laptop') {
-    body = <LaptopSection />;
   } else if (section === 'history') {
     body = <HistorySection />;
-  } else if (section === 'look') {
-    body = <ClassicLookSection {...props} />;
   } else {
-    body = <SetupSection {...props} {...accountProps} />;
+    body = <AccountSection {...props} {...accountProps} />;
   }
 
   // The live TV preview (docs/SETTINGS-OVERHAUL.md section 6): the settings
   // page only, on Tonight / What screens show / Slides & look. Wide screens get
   // a sticky column; narrower ones a toggle strip on show / look.
-  const previewAllowed = !classic && page && !screen && !previewKilled && previewEnabled();
+  const previewAllowed = page && !screen && !previewKilled && previewEnabled();
   const previewOnSection = previewAllowed && ['tonight', 'show', 'look'].includes(section);
   const showColumn = previewOnSection && wide;
   const showStrip = previewAllowed && !wide && ['show', 'look'].includes(section);
@@ -640,9 +606,9 @@ export default function SettingsPanel({
             {screen && screenNote ? screenNote.text
               : shareStatus?.state === 'sending' ? 'Sending to every screen…'
               : shareStatus?.state === 'sent' ? 'Sent to every screen.'
-                : shareStatus?.state === 'failed' ? `This screen only (see ${classic ? 'Setup' : 'Account & app'} → Church-wide settings).`
+                : shareStatus?.state === 'failed' ? `This screen only (see Account & app → Church-wide settings).`
                   : screen ? `Changes reach ${screen.name} as you make them.`
-                  : page ? (signedIn ? 'Changes reach every screen as you make them.' : (classic ? 'Sign in under Setup to change every screen.' : 'Sign in under Account & app to change every screen.'))
+                  : page ? (signedIn ? 'Changes reach every screen as you make them.' : 'Sign in under Account & app to change every screen.')
                     : configure ? 'Changes go live on the screen as you make them.'
                     : changed ? 'Changes are live on this screen.' : 'Changes apply as you make them.'}
           </span>

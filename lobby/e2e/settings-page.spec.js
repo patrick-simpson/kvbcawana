@@ -5,7 +5,7 @@ import { SYNC_BASE, installWorker, makeWorld } from './settingsStub.js';
 // ROADMAP.md#settings-page, docs/SETTINGS-OVERHAUL.md section 1): configure mode on a
 // device that is not a screen. The eight-section rail since the 2026-10-13
 // reorganize (Tonight, Printing, Screens, What screens show, Slides & look,
-// Journey, History, Account & app), the old rail behind ?rail=classic, every
+// Journey, History, Account & app), every
 // removed control gone, the TV preview column, the Journey section.
 
 const RAIL = ['Tonight', 'Printing', 'Screens', 'What screens show', 'Slides & look', 'Journey', 'History', 'Account & app'];
@@ -68,19 +68,6 @@ test.describe('not signed in', () => {
     }
     await expect(dialog.getByText('Club Label Printer')).toHaveCount(0);
     await expect(dialog.getByText(/NOT AFFILIATED OR ENDORSED BY/)).toBeVisible();
-  });
-
-  test('?rail=classic is the old rail, minus the removed controls', async ({ page }) => {
-    await page.goto('/settings.html?lowPower=1&rail=classic');
-    const dialog = page.getByRole('dialog', { name: 'Settings' });
-    await expect(dialog.locator('.settings-nav__label')).toHaveText(['Status', 'Screens', 'Check-ins', 'Slides', 'Screen & corner', 'Celebrations', 'Pickup board', 'Look & season', 'Laptop', 'History', 'Setup']);
-    await expect(dialog.getByRole('tab', { name: 'Setup' })).toHaveAttribute('aria-selected', 'true');
-    await expect(dialog.getByText(/Display key|Publish token|Display login/)).toHaveCount(0);
-    // it is remembered for this viewer, and ?rail=new forgets it
-    await page.goto('/settings.html?lowPower=1');
-    await expect(page.getByRole('dialog', { name: 'Settings' }).getByRole('tab', { name: 'Status' })).toBeVisible();
-    await page.goto('/settings.html?lowPower=1&rail=new');
-    await expect(page.getByRole('dialog', { name: 'Settings' }).getByRole('tab', { name: 'Tonight' })).toBeVisible();
   });
 });
 

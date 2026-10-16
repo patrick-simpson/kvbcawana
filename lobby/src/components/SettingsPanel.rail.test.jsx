@@ -281,22 +281,6 @@ describe('the new rail on a TV and on a screen opened from the page', () => {
   });
 });
 
-describe('the classic rail (?rail=classic)', () => {
-  it('is still the eight sections', () => {
-    open(baseProps({ rail: 'classic' }));
-    expect(labels()).toEqual(['Status', 'Check-ins', 'Slides', 'Screen & corner', 'Celebrations', 'Pickup board', 'Look & season', 'Setup']);
-  });
-
-  it('keeps compiling, minus the removed controls', () => {
-    open(baseProps({ rail: 'classic', status: 'off' }));
-    expect(screen.queryByLabelText('Display key')).toBeNull();
-    expect(screen.queryByLabelText('Display login')).toBeNull();
-    expect(screen.queryByText(/Publish token/i)).toBeNull();
-    tab('Status');
-    expect(screen.queryByRole('heading', { name: 'Other screens' })).toBeNull();
-  });
-});
-
 describe('the TV preview wiring', () => {
   it('a wide page gets the sticky column on Tonight / show / look only', () => {
     vi.stubGlobal('matchMedia', (q) => ({ matches: true, media: q, addEventListener() {}, removeEventListener() {}, addListener() {}, removeListener() {} }));

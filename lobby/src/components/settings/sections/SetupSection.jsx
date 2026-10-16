@@ -121,26 +121,3 @@ export function SignInCard({ secure, title, includePassphrase = true }) {
     </PanelCard>
   );
 }
-
-// The classic rail's Setup section (?rail=classic), minus the display login,
-// the display key fold, the publish token and the stale cloud check-in card
-// (docs/SETTINGS-OVERHAUL.md section 3). The new rail's Account & app uses the
-// same cards (AccountSection).
-export function SetupSection({
-  form, set, secure, onOpenDebug, onExport, onImport, onResetTally, onReset, shared, shareStatus, onShareNow,
-}) {
-  const page = useContext(SettingsPageContext);
-  return (
-    <>
-      <SignInCard secure={secure} />
-      <SharedSettingsCard
-        form={form} set={set} shared={shared} shareStatus={shareStatus} onShareNow={onShareNow}
-      />
-      {/* This browser's own settings file and counter: not on the settings page. */}
-      {!page && (
-        <ToolsCard onOpenDebug={onOpenDebug} onExport={onExport} onImport={onImport} onResetTally={onResetTally} onReset={onReset} />
-      )}
-      <KvbcAwanaCards />
-    </>
-  );
-}

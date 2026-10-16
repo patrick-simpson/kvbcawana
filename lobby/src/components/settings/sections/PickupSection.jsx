@@ -86,13 +86,3 @@ export function PickupPreviewCard({ form, onBoardDemo }) {
       </PanelCard>
   );
 }
-
-// The classic rail's Pickup board section (?rail=classic).
-export function PickupSection({ form, set, onBoardDemo }) {
-  return (
-    <>
-      <PickupBoardCard form={form} set={set} />
-      <PickupPreviewCard form={form} onBoardDemo={onBoardDemo} />
-    </>
-  );
-}

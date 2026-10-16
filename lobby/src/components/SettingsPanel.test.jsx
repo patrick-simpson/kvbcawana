@@ -73,22 +73,18 @@ const baseProps = () => ({
   onResetTally: vi.fn(),
   onOpenSlideEditor: vi.fn(),
   onOpenDebug: vi.fn(),
-  // The classic rail (?rail=classic): this suite keeps it compiling and honest.
-  // The new rail has its own suite (SettingsPanel.rail.test.jsx).
-  rail: 'classic',
 });
-/** A screen that works: connected and keyed, so it opens on Check-ins. */
+/** A screen that works: connected and keyed, so it opens on What screens show. */
 const happyProps = () => {
   saveDisplayKey(FAKE_KEY);
   return { ...baseProps(), status: 'connected' };
 };
 
-const SECTION_NAMES = [
-  'Status', 'Check-ins', 'Slides', 'Screen & corner', 'Celebrations', 'Pickup board', 'Look & season', 'Setup',
-];
+// A TV's own panel (the settings page lists all eight: SettingsPanel.rail.test.jsx).
+const SECTION_NAMES = ['Tonight', 'What screens show', 'Slides & look', 'Account & app'];
 
 describe('SettingsPanel: the two-pane shell', () => {
-  it('lists the eight sections in order, as a vertical tab list', () => {
+  it('lists the four TV sections in order, as a vertical tab list', () => {
     render(<SettingsPanel {...happyProps()} />);
     const tabs = screen.getAllByRole('tab');
     expect(tabs.map((t) => t.querySelector('.settings-nav__label').textContent)).toEqual(SECTION_NAMES);
@@ -97,17 +93,17 @@ describe('SettingsPanel: the two-pane shell', () => {
     for (const name of SECTION_NAMES) expect(screen.getByRole('tab', { name })).toBeTruthy();
   });
 
-  it('a working screen opens on Check-ins, with focus on its rail item', () => {
+  it('a working screen opens on What screens show, with focus on its rail item', () => {
     render(<SettingsPanel {...happyProps()} />);
-    const tab = screen.getByRole('tab', { name: 'Check-ins' });
+    const tab = screen.getByRole('tab', { name: 'What screens show' });
     expect(tab.getAttribute('aria-selected')).toBe('true');
     expect(document.activeElement).toBe(tab);
     expect(screen.getByLabelText('How long each name stays up (seconds)')).toBeTruthy();
   });
 
-  it('an unconfigured screen opens on Setup, with the passphrase to type and no key or token to paste', () => {
+  it('an unconfigured screen opens on Account & app, with the passphrase to type and no key or token to paste', () => {
     const { container } = render(<SettingsPanel {...baseProps()} />);
-    expect(screen.getByRole('tab', { name: 'Setup' }).getAttribute('aria-selected')).toBe('true');
+    expect(screen.getByRole('tab', { name: 'Account & app' }).getAttribute('aria-selected')).toBe('true');
     expect(container.querySelector('details.advanced-fields summary')?.textContent).not.toMatch(/paste keys by hand/);
     // Pusher is gone, and so are the display login, the display key and the publish token.
     expect(screen.queryByLabelText('Pusher App Key')).toBeNull();
@@ -117,9 +113,9 @@ describe('SettingsPanel: the two-pane shell', () => {
     expect(screen.getByLabelText('Passphrase')).toBeTruthy();
   });
 
-  it('a working screen with a problem opens on Status and counts it on the rail', () => {
+  it('a working screen with a problem opens on Tonight and counts it on the rail', () => {
     render(<SettingsPanel {...{ ...happyProps(), opsFailures: [{ club: 'Sparks', at: Date.now() }] }} />);
-    const tab = screen.getByRole('tab', { name: 'Status' });
+    const tab = screen.getByRole('tab', { name: 'Tonight' });
     expect(tab.getAttribute('aria-selected')).toBe('true');
     expect(tab.querySelector('.settings-nav__badge').textContent).toBe('1');
     expect(screen.getByText(/The printer reported 1 problem tonight/)).toBeTruthy();
@@ -127,51 +123,51 @@ describe('SettingsPanel: the two-pane shell', () => {
 
   it('opens on a requested section, old tab ids included', () => {
     const { unmount } = render(<SettingsPanel {...{ ...happyProps(), initialTab: 'background' }} />);
-    expect(screen.getByRole('tab', { name: 'Slides' }).getAttribute('aria-selected')).toBe('true');
+    expect(screen.getByRole('tab', { name: 'Slides & look' }).getAttribute('aria-selected')).toBe('true');
     unmount();
     render(<SettingsPanel {...{ ...happyProps(), initialTab: 'pickup', onTabChange: vi.fn() }} />);
-    expect(screen.getByRole('tab', { name: 'Pickup board' }).getAttribute('aria-selected')).toBe('true');
+    expect(screen.getByRole('tab', { name: 'What screens show' }).getAttribute('aria-selected')).toBe('true');
   });
 
   it('switches sections on click and reports the change', () => {
     const props = { ...happyProps(), onTabChange: vi.fn() };
     render(<SettingsPanel {...props} />);
-    section('Slides');
+    section('Slides & look');
     expect(screen.getByLabelText('Calendar page URL')).toBeTruthy();
     expect(screen.queryByLabelText('How long each name stays up (seconds)')).toBeNull();
-    expect(props.onTabChange).toHaveBeenCalledWith('slides');
+    expect(props.onTabChange).toHaveBeenCalledWith('look');
   });
 
   it('moves along the rail with Up/Down (and Left/Right), Home and End', () => {
     render(<SettingsPanel {...happyProps()} />);
     const selected = () => screen.getAllByRole('tab').find((t) => t.getAttribute('aria-selected') === 'true')
       .querySelector('.settings-nav__label').textContent;
-    fireEvent.keyDown(screen.getByRole('tab', { name: 'Check-ins' }), { key: 'ArrowDown' });
-    expect(selected()).toBe('Slides');
-    expect(document.activeElement).toBe(screen.getByRole('tab', { name: 'Slides' }));
+    fireEvent.keyDown(screen.getByRole('tab', { name: 'What screens show' }), { key: 'ArrowDown' });
+    expect(selected()).toBe('Slides & look');
+    expect(document.activeElement).toBe(screen.getByRole('tab', { name: 'Slides & look' }));
     fireEvent.keyDown(document.activeElement, { key: 'ArrowUp' });
     fireEvent.keyDown(document.activeElement, { key: 'ArrowLeft' });
-    expect(selected()).toBe('Status');
+    expect(selected()).toBe('Tonight');
     fireEvent.keyDown(document.activeElement, { key: 'End' });
-    expect(selected()).toBe('Setup');
+    expect(selected()).toBe('Account & app');
     fireEvent.keyDown(document.activeElement, { key: 'ArrowRight' });
-    expect(selected()).toBe('Status');
+    expect(selected()).toBe('Tonight');
     fireEvent.keyDown(document.activeElement, { key: 'Home' });
-    expect(selected()).toBe('Status');
+    expect(selected()).toBe('Tonight');
   });
 
   it('a phone sees the list first, and a tap opens the section with a way back', () => {
     const { container } = render(<SettingsPanel {...happyProps()} />);
     const dialog = container.querySelector('[role="dialog"]');
     expect(dialog.dataset.view).toBe('list');
-    section('Celebrations');
+    section('Slides & look');
     expect(dialog.dataset.view).toBe('section');
     fireEvent.click(screen.getByRole('button', { name: 'Back to all settings' }));
     expect(dialog.dataset.view).toBe('list');
   });
 
   it('a requested section opens straight on it on a phone too', () => {
-    const { container } = render(<SettingsPanel {...{ ...baseProps(), initialTab: 'setup' }} />);
+    const { container } = render(<SettingsPanel {...{ ...baseProps(), initialTab: 'account' }} />);
     expect(container.querySelector('[role="dialog"]').dataset.view).toBe('section');
   });
 });
@@ -189,7 +185,7 @@ describe('SettingsPanel: live apply, Undo and Done', () => {
   it('a typed field applies when it loses focus, not on every keystroke', () => {
     const props = happyProps();
     render(<SettingsPanel {...props} />);
-    section('Slides');
+    section('Slides & look');
     const welcome = screen.getByLabelText('Calendar welcome wording (regular nights)');
     fireEvent.change(welcome, { target: { value: 'Welcome to KVB Awana!' } });
     expect(props.onChange).not.toHaveBeenCalled();
@@ -200,7 +196,7 @@ describe('SettingsPanel: live apply, Undo and Done', () => {
   it('Enter in a typed field applies it too', () => {
     const props = baseProps();
     render(<SettingsPanel {...props} />);
-    section('Check-ins');
+    section('What screens show');
     const std = screen.getByLabelText('How long each name stays up (seconds)');
     fireEvent.change(std, { target: { value: '7' } });
     fireEvent.keyDown(std, { key: 'Enter' });
@@ -221,7 +217,7 @@ describe('SettingsPanel: live apply, Undo and Done', () => {
   it('Done applies a field still being typed in, then closes', () => {
     const props = baseProps();
     render(<SettingsPanel {...props} />);
-    section('Check-ins');
+    section('What screens show');
     fireEvent.change(screen.getByLabelText('How long each name stays up (seconds)'), { target: { value: '7' } });
     clickDone();
     expect(props.onChange).toHaveBeenCalledWith({ standardDisplayMs: 7000 });
@@ -278,7 +274,7 @@ describe('SettingsPanel: live apply, Undo and Done', () => {
     props.savedConfig = saved;
     props.config = applyPanicMode(saved);
     render(<SettingsPanel {...props} />);
-    section('Screen & corner');
+    section('What screens show');
     const box = screen.getByRole('checkbox', { name: 'Strip the screen to the basics' });
     expect(box.checked).toBe(true);
     fireEvent.click(box);
@@ -290,13 +286,13 @@ describe('SettingsPanel: live apply, Undo and Done', () => {
   });
 
   it('Preview a check-in, Debug panel and Edit slides… apply a field still being typed in first', () => {
-    for (const [label, cb, where] of [['Preview a check-in', 'onTest', 'Check-ins'], ['Debug panel', 'onOpenDebug', 'Setup'], [/Edit slides/, 'onOpenSlideEditor', 'Slides']]) {
+    for (const [label, cb, where] of [['Preview a check-in', 'onTest', 'What screens show'], ['Debug panel', 'onOpenDebug', 'Account & app'], [/Edit slides/, 'onOpenSlideEditor', 'Slides & look']]) {
       const props = happyProps();
       render(<SettingsPanel {...props} />);
-      section('Celebrations');
+      section('What screens show');
       fireEvent.change(screen.getByLabelText('Room milestone (every N check-ins)'), { target: { value: '40' } });
       section(where);
-      // Leaving Celebrations unmounts the field without a blur: the pending
+      // Leaving What screens show unmounts the field without a blur: the pending
       // value is still applied before the action runs.
       fireEvent.click(screen.getByRole('button', { name: label }));
       expect(props.onChange).toHaveBeenCalledWith({ milestoneEvery: 40 });
@@ -336,12 +332,12 @@ describe('Status', () => {
     expect(screen.getByText(/this screen can read encrypted names/)).toBeTruthy();
   });
 
-  it('a connected but unkeyed screen is told to sign in, with a jump to Setup', () => {
+  it('a connected but unkeyed screen is told to sign in, with a jump to Account & app', () => {
     render(<SettingsPanel {...{ ...baseProps(), status: 'connected', nameStatus: 'no-key', initialTab: 'status' }} />);
-    expect(screen.getByText('Connected — not signed in yet (Setup → Connect this screen)')).toBeTruthy();
+    expect(screen.getByText('Connected — not signed in yet (Account & app → Sign in)')).toBeTruthy();
     expect(screen.getByText(/encrypted names are arriving but this screen has no key/)).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: /Set up this screen/ }));
-    expect(screen.getByRole('tab', { name: 'Setup' }).getAttribute('aria-selected')).toBe('true');
+    expect(screen.getByRole('tab', { name: 'Account & app' }).getAttribute('aria-selected')).toBe('true');
   });
 
   it('shows tonight in plain words and the live calendar line', () => {
@@ -375,16 +371,16 @@ describe('Status', () => {
     expect(screen.getByText(/A screen layer crashed/)).toBeTruthy();
     expect(screen.getByText(/central config for this screen could not be applied/)).toBeTruthy();
     expect(screen.getByText(/no Screen Wake Lock/)).toBeTruthy();
-    expect(screen.getByRole('tab', { name: 'Status' }).querySelector('.settings-nav__badge').textContent).toBe('3');
+    expect(screen.getByRole('tab', { name: 'Tonight' }).querySelector('.settings-nav__badge').textContent).toBe('3');
   });
 
   it('keeps the trademark line', () => {
-    render(<SettingsPanel {...{ ...happyProps(), initialTab: 'status' }} />);
+    render(<SettingsPanel {...{ ...happyProps(), initialTab: 'account' }} />);
     expect(screen.getByText(/NOT AFFILIATED OR ENDORSED BY/)).toBeTruthy();
   });
 });
 
-describe('Setup: connecting this screen', () => {
+describe('Account & app: connecting this screen', () => {
   it('a screen that is not connected is told to sign in with the passphrase', () => {
     render(<SettingsPanel {...baseProps()} />);
     expect(screen.getByText(/Type the church.s passphrase/)).toBeTruthy();
@@ -416,7 +412,7 @@ describe('Setup: connecting this screen', () => {
   it('without secure crypto nothing pretends a pasted key would help', () => {
     vi.stubGlobal('crypto', {});
     render(<SettingsPanel {...{ ...baseProps(), status: 'connected' }} />);
-    expect(screen.getByRole('tab', { name: 'Setup' }).getAttribute('aria-selected')).toBe('true');
+    expect(screen.getByRole('tab', { name: 'Account & app' }).getAttribute('aria-selected')).toBe('true');
     expect(screen.getAllByText(/not in a secure context/).length).toBeGreaterThan(0);
     expect(screen.queryByRole('button', { name: 'Paste key' })).toBeNull();
     expect(screen.getByLabelText('Passphrase').disabled).toBe(true);
@@ -424,7 +420,7 @@ describe('Setup: connecting this screen', () => {
   });
 
   it('the removed controls are gone: no display login, key fold, publish token, cloud card or Club Label Printer', () => {
-    render(<SettingsPanel {...{ ...baseProps(), status: 'connected', initialTab: 'setup' }} />);
+    render(<SettingsPanel {...{ ...baseProps(), status: 'connected', initialTab: 'account' }} />);
     for (const gone of [/Display login/, /Display key/, /Publish token/, /Paste key/, /Club Label Printer/, /Being built to replace the check-in laptop/]) {
       expect(screen.queryByText(gone)).toBeNull();
       expect(screen.queryByLabelText(gone)).toBeNull();
@@ -434,8 +430,8 @@ describe('Setup: connecting this screen', () => {
   });
 });
 
-describe('Slides', () => {
-  const open = (props = happyProps()) => { render(<SettingsPanel {...{ ...props, initialTab: 'slides' }} />); return props; };
+describe('Slides & look', () => {
+  const open = (props = happyProps()) => { render(<SettingsPanel {...{ ...props, initialTab: 'look' }} />); return props; };
 
   it('lists the typed & published deck first and defaults to it', () => {
     open();
@@ -517,18 +513,18 @@ describe('Slides', () => {
     vi.useRealTimers();
   });
 
-  it('published-slide hints on Status lead with signing in', () => {
+  it('published-slide hints on Tonight lead with signing in', () => {
     render(<SettingsPanel {...{ ...baseProps(), status: 'connected', initialTab: 'status' }} />);
-    expect(screen.getByText(/type the church passphrase under Setup/)).toBeTruthy();
+    expect(screen.getByText(/type the church passphrase under Account & app/)).toBeTruthy();
     expect(screen.queryByText(/Advanced|display key by hand/)).toBeNull();
   });
 });
 
-describe('Check-ins, Screen & corner, Celebrations, Pickup board, Look & season', () => {
-  it('confetti and reduce motion sit together on Screen & corner', () => {
+describe('What screens show, Slides & look', () => {
+  it('confetti and reduce motion sit together on What screens show', () => {
     const props = happyProps();
     render(<SettingsPanel {...props} />);
-    section('Screen & corner');
+    section('What screens show');
     expect(screen.getByLabelText('Confetti')).toBeTruthy();
     fireEvent.click(screen.getByRole('checkbox', { name: 'Reduce motion on this screen' }));
     expect(props.onChange).toHaveBeenCalledWith({ reduceMotion: true });
@@ -589,16 +585,9 @@ describe('Check-ins, Screen & corner, Celebrations, Pickup board, Look & season'
     expect(screen.getByLabelText('Stop showing names at or below')).toBeTruthy();
     expect(screen.getByText(/This is the setting that matters/)).toBeTruthy();
   });
-
-  it("follow-the-printer's-season only shows while the skin is Auto", () => {
-    render(<SettingsPanel {...{ ...happyProps(), initialTab: 'look' }} />);
-    expect(screen.queryByText("Follow the printer's season")).toBeNull();
-    fireEvent.change(screen.getByLabelText('Themed night skin'), { target: { value: 'auto' } });
-    expect(screen.getByText("Follow the printer's season")).toBeTruthy();
-  });
 });
 
-describe('Setup: tools', () => {
+describe('Account & app: tools', () => {
   it('Import refuses a file with no display settings', async () => {
     const alert = vi.spyOn(window, 'alert').mockImplementation(() => {});
     const props = happyProps();
@@ -632,7 +621,7 @@ describe('Setup: tools', () => {
     props.config = { ...props.savedConfig, reduceMotion: true };   // what a URL flag (?lowPower=1) layers on
     render(<SettingsPanel {...props} />);
     fireEvent.click(screen.getByRole('checkbox', { name: 'First arrival of the night' }));
-    section('Setup');
+    section('Account & app');
     fireEvent.click(screen.getByRole('button', { name: 'Export settings' }));
     const text = await new Promise((resolve) => {
       const r = new FileReader();
@@ -776,7 +765,7 @@ describe('shared settings (contract v6)', () => {
     expect(sent.firstArrivalMoment).toBe(false);
     expect(sent.milestoneEvery).toBe(25);
     expect('backgroundSource' in sent).toBe(false);
-    section('Screen & corner');
+    section('What screens show');
     fireEvent.click(screen.getByRole('checkbox', { name: 'Reduce motion on this screen' }));
     fireEvent.click(screen.getByRole('checkbox', { name: 'Play a chime with each welcome' }));
     expect(props.onShare).toHaveBeenCalledTimes(1);
@@ -802,25 +791,30 @@ describe('shared settings (contract v6)', () => {
   });
 
   it('every card says where its settings apply', () => {
-    open({ initialTab: 'screen' });
+    open({ initialTab: 'show' });
     const tags = [...document.querySelectorAll('.panel-card__head')].map((h) => [h.textContent.replace(/(Every screen|This screen)$/, ''), h.querySelector('.scope-tag')?.textContent]);
     expect(tags).toEqual([
       ['Simplified mode', 'This screen'],
+      ['Welcome banners', 'Every screen'],
+      ['Welcome extras', 'Every screen'],
+      ['Club lines', 'Every screen'],
+      ['Celebrations', 'Every screen'],
+      ['Pickup board', 'Every screen'],
+      ['Preview', undefined],
       ['Corner', 'Every screen'],
-      ['Weather', 'Every screen'],
       ['This TV', 'This screen'],
     ]);
   });
 
   it('Setup shows what the screen follows, and can send its own set now', () => {
     const props = open({
-      initialTab: 'setup',
+      initialTab: 'account',
       shared: { rev: 4, publishedAt: '2026-10-01T23:35:00.000Z', settings: {} },
       shareStatus: { state: 'failed', message: 'Could not reach the check-in laptop from this screen' },
     });
     expect(screen.getByText(/Following update 4/)).toBeTruthy();
     expect(screen.getAllByText(/Could not reach the check-in laptop from this screen/).length).toBeGreaterThan(0);
-    expect(screen.getByText(/This screen only \(see Setup → Church-wide settings\)/)).toBeTruthy();
+    expect(screen.getByText(/This screen only \(see Account & app → Church-wide settings\)/)).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: /Send this screen’s church-wide settings to every screen/ }));
     expect(props.onShare).toHaveBeenCalledTimes(1);
     fireEvent.click(screen.getByRole('checkbox', { name: 'Follow the church-wide settings' }));

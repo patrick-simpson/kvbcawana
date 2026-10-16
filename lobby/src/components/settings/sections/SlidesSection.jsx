@@ -236,16 +236,3 @@ export function CalendarSlidesCard({ form, set, today }) {
     </PanelCard>
   );
 }
-
-// The classic rail's Slides section (?rail=classic).
-export function SlidesSection({ form, set, update, slideCount, onEditSlides, syncedDeck, today, onPreviewPromo, onForgetSyncedDeck }) {
-  return (
-    <>
-      <IgnoredDeckNotice form={form} update={update} syncedDeck={syncedDeck} />
-      <PreviewPromosCard onPreviewPromo={onPreviewPromo} />
-      <BackgroundCard form={form} set={set} />
-      <SlidesCard form={form} set={set} slideCount={slideCount} onEditSlides={onEditSlides} syncedDeck={syncedDeck} onForgetSyncedDeck={onForgetSyncedDeck} />
-      <CalendarSlidesCard form={form} set={set} today={today} />
-    </>
-  );
-}
