@@ -10,15 +10,19 @@ const SANDBOX_CHROMIUM = '/opt/pw-browsers/chromium';
 const executablePath = !process.env.CI && existsSync(SANDBOX_CHROMIUM) ? SANDBOX_CHROMIUM : undefined;
 
 // E2E suites run against the built site (dist/) via `vite preview` —
-// the same artifact GitHub Pages serves. `base: './'` means every
-// asset path is relative, so tests navigate plain
-// `/countdown.html` / `/index.html` regardless of where Pages mounts
-// the site.
+// the same artifact the deploy publishes to Cloudflare Pages under
+// /lobby/. `base: './'` means every asset path is relative, so tests
+// navigate plain `/countdown.html` / `/index.html` regardless of where
+// the site is mounted.
 //
-// Two projects:
-//   smoke  — functional assertions (runs in ci.yml AND deploy.yml)
-//   visual — screenshot comparisons (ci.yml only, so a 1-px font drift
-//            can never block a club-night redeploy)
+// Three projects:
+//   smoke  — functional assertions (ci.yml `lobby-e2e`, 4 shards; the deploy
+//            job waits on it)
+//   events — real-time event choreography (ci.yml `lobby-e2e` too, since
+//            2026-10-16, sharded like smoke)
+//   visual — screenshot comparisons. NOT run in ci.yml: its baselines are
+//            regenerated only by lobby-update-snapshots.yml (dispatched by
+//            hand), so a 1-px font drift can never block a club-night deploy
 export default defineConfig({
   testDir: 'e2e',
   retries: process.env.CI ? 1 : 0,
@@ -37,10 +41,10 @@ export default defineConfig({
     launchOptions: executablePath ? { executablePath } : {},
   },
   projects: [
-    // `smoke` gates the live deploy (deploy.yml), so it holds only fast,
-    // stable, load-bearing checks. `visual` and `events` run in ci.yml only —
-    // pixel drift and multi-step event choreography should flag a PR or the
-    // weekly run, never stand between someone and a 5:55pm club-night fix.
+    // `smoke` and `events` gate the live deploy (ci.yml's deploy job needs
+    // `lobby-e2e`), so they hold stable, load-bearing checks. `visual` is left
+    // out of CI: pixel drift should never stand between someone and a 5:55pm
+    // club-night fix.
     {
       name: 'smoke',
       testMatch: /.*\.spec\.js/,

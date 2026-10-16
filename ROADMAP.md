@@ -180,7 +180,7 @@ Full contract: `lobby/worker/src/routes.md` section 8.
   The page's rail is seven sections (Tonight, Screens, What screens show, Slides &
   look, Printing, History, Account & app); a TV's own panel lists four, a screen
   opened from the page three; the old rail is behind `?rail=classic` (deleted the
-  release after Wednesday) and every old section id still resolves
+  release after Wednesday; removed 2026-10-16) and every old section id still resolves
   (`LEGACY_TABS`). Tonight has mission control (the Worker's overview polled
   every 10 s, plus the last five FIRST NAMES from the live frames, in memory
   only), the online check-in switches, the notice composer (`durationSec` on the
@@ -204,12 +204,20 @@ Full contract: `lobby/worker/src/routes.md` section 8.
   hello, `lobby/worker/src/routes.md` 10.8; the embedded Check-in Display passes
   the doorbell up so it lands in seconds) and its two download switches
   (`SCREEN_SPECS.journey`). Needs one sync Worker deploy.
+- 2026-10-16: **Done; nothing left for the owner on this track.** The classic rail
+  (`?rail=classic` and its saved choice) is removed (commit 9646102; old section
+  links still open the right section). `/checkin/classic`, the frozen relayed
+  phone page, is gone. The attendance audit is gone with the Chrome extension
+  (KVBC Awana 10.0.0, commit 9241bb8). The extension's settings, popup and folder
+  rows in the inventory below are history: 10.0.0 deleted the extension.
 
 #### Inventory: every setting and tool, and where it lives now
 
 *As of phase 3 (2026-10-11). The "dashboard only" rows are historical: the
 dashboard was retired on 2026-10-12 and each of them was moved or removed, see
-the [Online only](#online-only) inventory.*
+the [Online only](#online-only) inventory. The extension rows are history too:
+KVBC Awana 10.0.0 deleted the extension on 2026-10-16, and the attendance audit
+went with it.*
 
 The print dashboard (`printer/print-server/public/index.html`, localhost:3456)
 and the Chrome extension (`chrome-extension/`). The extension's options page
@@ -286,8 +294,15 @@ last one.
 history lives in D1 encrypted to the history key, and TwoTimTwo's read budget
 is one read every 5 s, all reads combined (not the 15 s below; the Worker keeps
 to one every 15 s while the laptop's extension tab still reads, owner
-2026-10-12: see the terms row under Online check-in). Phase 1 and
-the phone page's cloud check-in stand as built.
+2026-10-12: see the terms row under Online check-in; back to 5 s since
+2026-10-16, when the extension was retired). Phase 1 and
+the phone page's cloud check-in stand as built (the relayed phone check-in,
+`POST /v1/cloud/checkin`, was deleted on 2026-10-16: /checkin uses the desk routes).
+
+**The Raspberry Pi is SUPERSEDED (owner decision, 2026-10-16).** The KVBC Awana
+print station (the check-in laptop's print role, [Online check-in](#online-check-in)
+P3 and P4) replaced it. There is nothing to build. The Linux print path
+(`printer/print-server/cups.js`) stays as code for a future Linux station.
 
 ### The owner's decisions (2026-10-11)
 
@@ -296,9 +311,13 @@ the phone page's cloud check-in stand as built.
 | Where are check-ins made? | **Anywhere.** Our phone page and touch screen check in through Cloudflare, and a check-in made on TwoTimTwo itself (its site or app, on any device) is noticed and still gets a label. |
 | Allergy and medical notes (they print on labels) | **Sealed on arrival.** Cloudflare fetches TwoTimTwo's roster and locks it at once with a key only the church print station holds. Cloudflare stores it but cannot read it. |
 | Which TwoTimTwo login | **A new, dedicated check-in user**, made by the owner. Its password lives only in GitHub's secret store and Cloudflare's, never in chat or the repo. |
-| What prints at church | **A Raspberry Pi**, always on, with the label printer on USB. |
+| What prints at church | **A Raspberry Pi**, always on, with the label printer on USB. **Superseded 2026-10-16 (owner): the KVBC Awana print station.** |
 
 ### Today, and what changes
+
+*(2026-10-16: this section describes the laptop as it was on 2026-10-11. KVBC
+Awana 10.0.0 deleted the extension and the relay; the Worker does every
+TwoTimTwo action and the laptop is a print station.)*
 
 Today every TwoTimTwo action happens in Chrome on the check-in laptop. The
 extension rides the volunteer's logged-in session, posts check-ins and undos,
@@ -372,6 +391,9 @@ compares it with the last read:
   made on TwoTimTwo directly: queue their label and greet them on the TVs;
 - a child who left the report was undone on TwoTimTwo: stop counting them.
 
+(As built, the report is read every 30 s with its slot reserved on the one read
+clock: one read every 15 s from 2026-10-12, every 5 s since 2026-10-16.)
+
 This is the cloud form of the extension's roster-diff detector, and it keeps
 its safety rules: a report that parses fewer children than its own `Count:`
 footers is partial and changes nothing, and a read that would drop most of the
@@ -398,6 +420,8 @@ TwoTimTwo's reply and the seal, the same moment it exists in the laptop's
 Chrome today.
 
 #### 4. The print station (Raspberry Pi)
+
+*Superseded 2026-10-16 (owner): the KVBC Awana print station does this job. Kept as the plan that was.*
 
 - Raspberry Pi 5 (4 GB) with a good power supply and a small SSD or
   high-endurance SD card, the label printer on USB (a DYMO LabelWriter 450 is
@@ -539,7 +563,9 @@ Read this first if you are picking the work up in a new session.
   job route; one tag a night, see CLAUDE.md); with it off the child is
   checked in with no tag, and the roster and Tonight come from TwoTimTwo.
   Undo, check-out, visitors and custom labels still go to the laptop.
-  `CLOUD_CHECKIN = "off"` puts the check-in back on the laptop.
+  `CLOUD_CHECKIN = "off"` puts the check-in back on the laptop. *(2026-10-16: no
+  longer. /checkin uses the Worker's desk routes for all of it, and this relayed
+  check-in, `POST /v1/cloud/checkin` and `phone.js`, was deleted, commit 2c3282e.)*
 - **BARF Night, 2026-10-14 (owner).** Who brought a friend is recorded in the
   Worker (`lobby/worker/src/friends.js`: child, club, the friend's first name,
   sealed per night, deleted after three days) from the cloud check-in and from
@@ -582,11 +608,18 @@ Read this first if you are picking the work up in a new session.
   the Worker redeploy above; the Pi hardware; the printer's exact model; and
   changing the password that was posted in a chat on 2026-10-11 (the
   dedicated user should have its own, never that one).
+- **Closed (2026-10-16).** Everything above was built under [Online
+  check-in](#online-check-in) (P2 to P7), except the Pi, which is superseded (top
+  of this track). The secrets are set and the dedicated user signs in
+  (2026-10-11). Nothing is left for the owner here.
 
 ## Online check-in
 
-Owner, 2026-10-11, after an Opus review of the design. **Status: P0
-(foundation) built; P1 to P7 not started.** This track **supersedes [Cloud
+Owner, 2026-10-11, after an Opus review of the design. **Status: P0 to P7
+done.** P0 built 2026-10-12; P1 to P6 built 2026-10-12 and used live from the
+first online club night, Wednesday 2026-10-14; P7 done 2026-10-16 (KVBC Awana
+10.0.0, released 5:44 AM Eastern). *(The 2026-10-11 status was "P0 built; P1 to
+P7 not started".)* This track **supersedes [Cloud
 check-in](#cloud-check-in) phases 2 and later** (that track's phase 1, the
 read-only watcher, and the phone page's cloud check-in stay as built) and the
 **"No internet" line of [Online only](#online-only)**. Read "Status and
@@ -598,6 +631,39 @@ with **TwoTimTwo's own page as the fallback**; **KVBC Awana's print role prints
 every job it pulls from the Worker**; and a **Cloudflare D1 history** keeps
 every night with children's names encrypted, so neither the Worker nor
 Cloudflare can read them at rest.
+
+### Owner's notes, 2026-10-16
+
+What changed for the volunteers: check-in is only awana.kvbchurch.org/checkin
+(any phone or browser at the desk). The laptop's Chrome extension is gone: KVBC
+Awana 10.0.0 turned it into an empty stub and restarted Chrome once. The laptop
+just prints. Check-ins typed on TwoTimTwo's own page still get a label.
+
+What is left for you:
+
+1. Set `workers_dev = false` in `lobby/worker/wrangler.toml` once every laptop
+   and kiosk is confirmed to use the `/api` address. It is the Worker's second
+   public address.
+2. The lobby's screenshot tests (the `visual` e2e project) do not run in CI.
+   Their pictures are made on Ubuntu by `lobby-update-snapshots.yml`, run by hand.
+3. Award slips print only when TwoTimTwo's meeting report names a clubber column.
+   That rule is unchanged; widening it would print a slip for nearly every child.
+4. Check-outs typed by hand on TwoTimTwo's Checkout page are now noticed from
+   7:15 pm (the extension watched from 5:30).
+5. Lost with the extension, on purpose: the team points scoreboard, the
+   TwoTimTwo calendar feed to the projector's notice, leader worksheet printing,
+   the attendance audit, the laptop touch-screen mode, the TwoTimTwo message
+   mirror, and `/reset-tonight`. Say so if you want any of them back.
+6. The Worker keeps the whole roster's last names sealed for the night (the
+   check-in page it holds). You kept that design; it stays as built.
+7. After the next nightly Journey run, check that `journey/public/current-lesson.json`
+   has a `sourceUrl` on CloudFront. If it is still the clubs.awana.org address,
+   Awana's CDN did not honour the Origin header.
+8. A device still on the sign-in from before 2026-10-12 now sees "This service
+   now needs the updated app or page. Reload it." Reloading the page (or
+   updating the app) fixes it.
+9. The paper-sheet drill and blank name tags at the desk are yours
+   (`printer/docs/NIGHT-OF.md`, "Paper sheet when the internet is down").
 
 ### Project-wide rule: everything free, forever
 
@@ -615,7 +681,7 @@ hashing (SHA-256, HMAC). A design that needs a paid plan is not this design.
 | Question | Decision |
 | --- | --- |
 | The passphrase | Clients derive `K = PBKDF2-SHA256(normalized passphrase, salt from the Worker, iter)` with iter in [600000, 2000000] (600000 for new wraps), then HKDF-SHA256 splits it: `authKey` (info `kvbc-auth-v1`) and `wrapKey` (info `kvbc-history-wrap-v1`). Clients send only `authKey`; the Worker stores SHA-256(authKey) and never receives the passphrase. This closes the fast-hash weakness of today's `HMAC(salt, passphrase)`. |
-| Moving off the old hash | The first v2 login after the deploy sends `{passphrase, authKey}` once and upgrades the stored verifier; old clients keep signing in with the old hash until every client has updated (the first v2 passphrase change, or the owner's switch, deletes it). OBS / ProPresenter links keep their `?passphrase=`: the page computes `authKey` in the browser. `lobby/worker/src/routes.md` §1. |
+| Moving off the old hash | The first v2 login after the deploy sends `{passphrase, authKey}` once and upgrades the stored verifier; old clients keep signing in with the old hash until every client has updated (the first v2 passphrase change, or the owner's switch, deletes it). **Done 2026-10-16 (owner; commit 43c2805): the old login is refused and deleted; only the bootstrap upgrade login stays.** OBS / ProPresenter links keep their `?passphrase=`: the page computes `authKey` in the browser. `lobby/worker/src/routes.md` §1. |
 | Passphrase strength | Unchanged (six characters minimum). The owner accepts the risk; SECURITY.md says so. |
 | History key | ECDH P-256. `history:pub` in the Durable Object, first writer wins, replaceable only by an explicit re-key flow (none is built: **no rekey button**). The private key is wrapped with `wrapKey` (AES-GCM, a fresh 16-byte PBKDF2 salt per wrap) as `history:wrapped {v, salt, iter, iv, ct}`, served only to signed-in sessions. Clients unwrap it into a NON-extractable key and check it belongs to `history:pub`. |
 | Passphrase change | The client re-wraps, unwraps the new wrap to prove it, and submits `{newAuthVerifier, newWrapped}` in ONE atomic multi-key put; the Worker keeps `history:wrapped:prev` for 7 days. **No recovery code: lose the passphrase, lose the history** (owner). |
@@ -623,7 +689,7 @@ hashing (SHA-256, HMAC). A design that needs a paid plan is not this design.
 | Stations | **No pairing step** (owner): any computer signed in with the passphrase may register a station key pair (ECDH P-256, private key in Electron safeStorage; the app refuses the station role when safeStorage is unavailable). Medical notes (allergies) are sealed **only** to station keys, never to the history key. Rosters, completed books and print jobs are sealed to every registered station (the same ECIES, info `kvbc-station-v1`, AAD prefix `stn1:`). |
 | Identifiers | The Durable Object never stores a plaintext clubber id: claims and job ids are keyed by HMAC(stateKey, night‖clubberId) (watcher.js's state-key approach); a visitor without an id by HMAC(stateKey, night‖normalized name‖club). The night is the church's LOCAL date (America/New_York, `localTime()` / TwoTimTwo's meeting date), never UTC. Claims are purged at the end of the night. |
 | BARF friend list | **Stays as is** (owner, 2026-10-12): sealed under the Worker-derived key (3-day retention), readable by the Worker only so it can send the 6:30 pm email. It does NOT move under the history key. |
-| TwoTimTwo's terms | Names may be stored, encrypted. Read budget: **one read every 5 seconds, all reads combined** (replaces the 15 s). **Owner 2026-10-12: while the laptop's extension tab still reads TwoTimTwo (about 3 reads a minute), the Worker makes at most ONE read every 15 s, all its reads combined** (`READ_INTERVAL_MS` 15000 in `lobby/worker/src/readbudget.js`; back to 5000 when the tab is retired). The 4 slots a minute: the report every 30 s, the other slot to the roster's check-in page (30 s fresh), the Checkout page (once a minute after 7:15 pm) and a households catch-up when an unknown child appears (routes.md section 7). A desk check-in, undo or check-out reads nothing: the check-in page is kept for the night (routes.md section 5). |
+| TwoTimTwo's terms | Names may be stored, encrypted. Read budget: **one read every 5 seconds, all reads combined** (replaces the 15 s). **Owner 2026-10-12: while the laptop's extension tab still reads TwoTimTwo (about 3 reads a minute), the Worker makes at most ONE read every 15 s, all its reads combined** (`READ_INTERVAL_MS` 15000 in `lobby/worker/src/readbudget.js`; back to 5000 when the tab is retired: **5 s since 2026-10-16**, commit 16a8051, 12 slots a minute). The 4 slots a minute: the report every 30 s, the other slot to the roster's check-in page (30 s fresh), the Checkout page (once a minute after 7:15 pm) and a households catch-up when an unknown child appears (routes.md section 7). A desk check-in, undo or check-out reads nothing: the check-in page is kept for the night (routes.md section 5). |
 | No internet | **The paper sheet** (TwoTimTwo's `/clubber/checkin_form`), keyed in when the internet is back. This replaces Online only's "check-in still prints at the desk": with the extension retired, nothing at church checks in or prints offline. |
 | BARF on the TwoTimTwo-page fallback | When the report marks Brought a friend, the station prints a BARFED tag **without the friend's name** (TwoTimTwo's box has no name field). |
 | Printing | **At most once.** The station journals every jobId it spooled; a retried job it already spooled acks `already-spooled` without printing and the Worker flags "check the printer" (the label may not have come out). |
@@ -638,7 +704,7 @@ hashing (SHA-256, HMAC). A design that needs a paid plan is not this design.
                                  ▼   does key work
               ┌────────────────────────────────────┐
               │ sync Worker (free plan)            │  claims/jobs keyed by HMAC(stateKey, night|id)
-              │ · TwoTimTwo writes, 1 read / 15 s  │  history:pub, history:wrapped (DO)
+              │ · TwoTimTwo writes, 1 read / 5 s   │  history:pub, history:wrapped (DO)
               │ · print-job queue (leases)         │  history_rows, night_summary (D1, HISTORY_DB)
               │ · the ONE publisher to the screens │
               └───────────────┬────────────────────┘
@@ -659,13 +725,13 @@ said); "Owner" is what only the owner can do.
 | Phase | What | Builder | Owner |
 | --- | --- | --- | --- |
 | **P0** Foundation | `lobby/shared/cloud-crypto.js` (+ generated `printer/print-server/cloud-crypto.js`), `cloud-vectors.json` and its three test suites, the D1 schema (`lobby/worker/migrations/0001_history.sql`), the route contract (`lobby/worker/src/routes.md`), SECURITY.md, the 5 s read budget in the watcher. | Claude (done 2026-10-12) | Read and approve; create the free D1 database (`wrangler.toml` has the steps). |
-| **P1** Passphrase v2, history key, one read clock | `/v1/auth/params`, v2 / upgrade / legacy login, v2 passphrase change (atomic put, `history:wrapped:prev` 7 days), `GET/PUT /v1/history/key`; every client (lobby `syncService`, the printer's `sync-client.js`, the KVBC Awana wizard, Journey) derives `authKey` and the first one creates the history key; every TwoTimTwo read in the Worker on ONE 5 s clock (the phone page's back-to-back reads included). | Claude: Worker + lobby, then printer (release) | Watch `auth:legacyLastAt`; turn the legacy login off. |
+| **P1** Passphrase v2, history key, one read clock | `/v1/auth/params`, v2 / upgrade / legacy login, v2 passphrase change (atomic put, `history:wrapped:prev` 7 days), `GET/PUT /v1/history/key`; every client (lobby `syncService`, the printer's `sync-client.js`, the KVBC Awana wizard, Journey) derives `authKey` and the first one creates the history key; every TwoTimTwo read in the Worker on ONE 5 s clock (the phone page's back-to-back reads included). | Claude: Worker + lobby, then printer (release) | Watch `auth:legacyLastAt`; turn the legacy login off. **Done 2026-10-16** (43c2805). |
 | **P2** Desk page + history rows | The desk page (`/desk`, lobby build): roster, check in, undo, check out, visitors, a sealed history row with every action; `/v1/desk/*`, `/v1/history/rows`, `night_summary`; claims keyed and purged nightly. | Claude: lobby + Worker | Bind `HISTORY_DB`; try the desk page on a test child. |
 | **P3** Stations | KVBC Awana's print role registers a station key (safeStorage, refused without it); `/v1/station/*`; the roster CSV read through the Worker and sealed by the station to every station; completed books. | Claude: printer (release) + Worker | Install on the check-in laptop (and any second printer). |
 | **P4** Print lease | The station leases and prints EVERY job from the Worker, journals jobIds (at most once, "check the printer" on a retried spooled job), reports printer state; the desk page and TVs show it. | Claude: printer (release) + Worker | Shadow night: every label printed from a lease, compared with the extension's. |
 | **P5** One publisher, one count, the fallback | The shared `authoritativeTonight()` module (Worker + generated copy for the printer); the Worker publishes `tally`, `tonight`, the pickup list and the greetings; the relay drops the laptop's tally / still-here frames in cloud mode; TwoTimTwo-page check-ins found by the watcher become jobs (BARFED tag without the friend's name); the watcher seals each such job to the stations itself (`sealForStations`) and the station writes the history row when it prints. | Claude: lobby/shared + Worker + printer | Shadow night: the Worker's count against the laptop's. **Built (2026-10-12, not released):** step 1 `lobby/shared/tonight.js` (+ `printer/print-server/tonight.js`) and `shared/pickup.js`; step 2 the Worker publishes (`publisher.js`); step 3 the station greets; step 4 BARFED on the fallback. Design below. |
-| **P6** History | History and summary views in /settings (unwrapped in the browser); `POST /v1/history/import` of the laptop's past nights, sealed by the KVBC Awana app. | Claude: lobby + Worker + printer | Look over the history and summary views. **Built (lobby + Worker half):** `worker/src/history.js`, `historyCrypto.js`, the History section; the printer's import of the laptop's past nights is not. |
-| **P7** Switch | Retire the Chrome extension (and the relay's laptop paths it served); the paper-sheet drill; remove the legacy hash; docs and SECURITY.md final. Never on a Wednesday. | Claude + owner | Pick the night; keep the paper sheet and blank tags at the desk. |
+| **P6** History | History and summary views in /settings (unwrapped in the browser); `POST /v1/history/import` of the laptop's past nights, sealed by the KVBC Awana app. | Claude: lobby + Worker + printer | Look over the history and summary views. **Built (lobby + Worker half):** `worker/src/history.js`, `historyCrypto.js`, the History section; the printer's import of the laptop's past nights is not. (Built later: "Import laptop history", tray and /settings, `POST /cloud/import-history`.) |
+| **P7** Switch | Retire the Chrome extension (and the relay's laptop paths it served); the paper-sheet drill; remove the legacy hash; docs and SECURITY.md final. Never on a Wednesday. | Claude + owner | Pick the night; keep the paper sheet and blank tags at the desk. **Done 2026-10-16:** the extension deleted in KVBC Awana 10.0.0 (commits 7dbd30f..b7d6015, feed live 5497ea3, run 38881739599), the Worker took over its roster, books, meeting report and Checkout page (03e13d1, 7dbd30f), the relay deleted (2c3282e), the legacy login deleted (43c2805), read clock 5 s (16a8051), paper-sheet drill in `printer/docs/NIGHT-OF.md`, SECURITY.md final (b1095ea, 43c2805). |
 
 ### Status and hand-off
 
@@ -677,7 +743,8 @@ said); "Owner" is what only the owner can do.
   laptop was upgraded to the latest software (owner report; the release state is not
   recorded here). The switches in the repo are `CLOUD_PRINT`, `SINGLE_PUBLISHER` and
   `YM_CHECKOUT` = `"on"`, and `AUTH_LEGACY` = `"on"`: the old login is still accepted, so
-  set it to `"off"` once `auth.legacyLastAt` stops moving. The shadow-night count
+  set it to `"off"` once `auth.legacyLastAt` stops moving. *(Done later the same day,
+  commit 43c2805: `AUTH_LEGACY`, `auth.legacyLastAt` and the old login are deleted.)* The shadow-night count
   comparison is not recorded as done.
 - **P0 built (2026-10-12).** The module's API is documented at the top of
   `lobby/shared/cloud-crypto.js` and in `lobby/shared/README.md`; the route
@@ -703,12 +770,13 @@ said); "Owner" is what only the owner can do.
     sealed to.
   - **Worker core built (2026-10-12):** the phone page's reads, the desk's and the
     watcher's now all take a slot on the one read clock (`readbudget.js`; 15 s
-    while the extension tab still reads, owner 2026-10-12); the watcher reads its
+    while the extension tab still reads, owner 2026-10-12; 5 s since 2026-10-16); the watcher reads its
     report every 30 s and reserves its slot. Stations, the print lease, the
     claim ledger, the desk claim API and the watcher's claim rules are in
     `lobby/worker/src` (routes.md sections 4 to 7, marked BUILT). Still open for
     the owner: `CLOUD_PRINT` and `SINGLE_PUBLISHER` stay `"off"` in
-    `wrangler.toml` until the shadow night (P5 publishes the tally itself, built), and
+    `wrangler.toml` until the shadow night (P5 publishes the tally itself, built; both
+    `"on"` since 2026-10-12), and
     the desk's sealed history row is validated but stored only once the history
     module (P6) registers its hook.
   - **P1 + P4 + P6 + P2 merged and reconciled (2026-10-12).** One print lease
@@ -751,7 +819,8 @@ said); "Owner" is what only the owner can do.
     page seals the job as `{route: '/print', body, clubberId, source: 'desk'}` and rows
     of kind checkin / visitor / undo / checkout. Open: watch `auth.legacyLastAt` in
     `GET /v1/cloud/status`, then set `AUTH_LEGACY = "off"` and later delete the legacy
-    code (routes.md section 1).
+    code (routes.md section 1). **Done 2026-10-16** (43c2805): the old login is refused
+    and its code deleted in every client; the bootstrap upgrade login stays.
   - **P5 built (2026-10-12, not released).** One count: `lobby/shared/tonight.js`
     (generated copy `printer/print-server/tonight.js`) is the printer's AND the
     Worker's `authoritativeTonight()` / `tonightHereNow()`, with the partial-report and
@@ -767,7 +836,8 @@ said); "Owner" is what only the owner can do.
     `test-station-greeting.cjs`, `test-barf.cjs`, and `test-cloud-e2e.cjs` (the real
     print server behind the puller: one greeting per check-in, the tally, the list).
     Known gap for P7: the extension's youth check-out sweep posts to the laptop only
-    (closed by the Worker's youth check-out below once `YM_CHECKOUT` is on).
+    (closed by the Worker's youth check-out below once `YM_CHECKOUT` is on). **Closed:**
+    `ymcheckout.js`, with `YM_CHECKOUT` on, and the extension is gone.
   - **Youth check-out in the Worker (2026-10-12, not released; `YM_CHECKOUT = "off"`).**
     `lobby/worker/src/ymcheckout.js` runs the extension's Trek/Journey sweep from the
     watcher's alarm with exactly its rules (club nights 7:15 pm to midnight, the
@@ -776,7 +846,9 @@ said); "Owner" is what only the owner can do.
     at most ONE post every 15 s (owner), each child off the Worker's count. A print
     station's `/config/church` turns the extension's sweep off; `stopCloud` hands it
     back. Owner: set `YM_CHECKOUT = "on"` before (or with) the station role, and
-    release the print server change. routes.md section 9.
+    release the print server change. routes.md section 9. *(2026-10-16: on; it also
+    reads the Checkout page's hand check-outs, two genuine reads apart, from 7:15 pm;
+    the `/config/church` hand-off went with the extension.)*
   - **ONE check-in page (owner, 2026-10-12).** awana.kvbchurch.org/checkin is the phone
     page (`printer/print-server/public/phone.html`: its look, search, families, Bible and
     Brought a friend with the friend's first name, the + menu, Tonight) on the desk's
@@ -817,7 +889,20 @@ said); "Owner" is what only the owner can do.
     to the desk's online path. Done 2026-10-16: the page, its build block, its
     `must` entries, its test, and the copy of `sync-protocol.js` only it used are
     gone. The Worker's relayed check-in code (`lobby/worker/src/phone.js`) is still
-    there and was not part of this removal.
+    there and was not part of this removal. *(Gone later the same day, commit
+    2c3282e: `phone.js`, `POST /v1/cloud/checkin` and the relay routes are deleted.)*
+  - **P7 done (2026-10-16).** In order: the Worker took over the extension's last
+    jobs, the roster export, completed books, the meeting report (award slips as
+    sealed `/print-award` jobs) and the Checkout page's hand check-outs
+    (`lobby/worker/src/stationfeeds.js`, `ymcheckout.js`; 03e13d1, 7dbd30f); KVBC
+    Awana 10.0.0 deleted the extension, the phone relay, the pending actions, the
+    `/phone/*` routes, the touch mode and the attendance audit, and neuters the old
+    extension folder (7dbd30f..b7d6015; released 5:44 AM Eastern, run 38881739599,
+    feed 5497ea3); the Worker's relay and relayed check-in deleted (2c3282e); the old
+    passphrase login off and deleted (43c2805); the read clock back to 5 s (16a8051).
+    Also that day: the lobby events e2e in CI (704c968) and the repair installer's
+    sha512 check (fdc1fdb). What is left for the owner is the list in "Owner's
+    notes, 2026-10-16" at the top of this track.
 
 ## Online only
 
@@ -948,6 +1033,9 @@ that." Ship it as v9, once the /settings work in progress ([Settings track](#set
   its CI job and `desktop-release.yml` are deleted; `/download/lobby-display`
   now gives the KVBC Awana installer; the lobby feed stays at 2.1.1 for any
   straggler, so no other release may be GitHub's "Latest".
+- **Status (2026-10-16): done.** KVBC Awana was released as 9.x (now 10.0.0) and
+  is the label printer and the sound room display; the old sound room app is
+  retired (commit cd06b68). Nothing is left for the owner on this track.
 
 ### How it is built (9.0.0)
 
@@ -1033,6 +1121,10 @@ Awana") has the rules.
 
 ### Still to do
 
+*(2026-10-16: items 1 and 2 are done: 9.x was released and every sound room PC
+runs KVBC Awana. Item 3 was never added. Item 4 was the owner's Windows checks
+before 9.0.0; the computers have run it since.)*
+
 1. Land after /settings phases 2 and 3; merge the printer version (8.3.0 is
    on another branch: this is 9.0.0 on top of it).
 2. Release order: printer 9.0.0 first (the laptop updates), check it on the
@@ -1069,7 +1161,14 @@ lobby's `displayLogin.js` machinery, the printer's display-login state and
 `envelope-vectors.json`) and the PowerPoint add-in. Three items are the
 owner's, by hand.
 
+**All done (2026-10-16).** Kept on purpose: the internal church-config key
+`pusherChannel` (it is the relay's channel name, never shown) and the
+`pusherSecret` redaction in GET /config, so an old config.json never shows its
+secret. Nothing live uses Pusher.
+
 ### Still to do
+
+Nothing; the three items below are done (kept as the record).
 
 - **Pusher secrets and variables.** Done 2026-10-12 (owner deleted the
   `PUSHER_*` GitHub secrets). If still present, the Worker's own

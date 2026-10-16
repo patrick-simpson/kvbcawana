@@ -9,6 +9,11 @@ printing unchanged (`routes.md` section 6), `CLAUDE.md` config-write rules.
 Line numbers are `origin/main` at `da64825`. Section 9 of `routes.md`
 (`YM_CHECKOUT`, branch `worker-ymcheckout`) is assumed merged before Track A starts.
 
+*2026-10-16 (KVBC Awana 10.0.0): the Chrome extension, the laptop relay, the `/phone/*`
+routes, the attendance audit and `/checkin/classic` are gone, and the classic rail is
+removed. Mentions of them below are the spec as written; the notes in brackets say what
+changed.*
+
 User: the owner, alone, from a phone or home PC (awana.kvbchurch.org/settings). TVs keep
 their own Settings panel with a reduced rail.
 
@@ -34,7 +39,7 @@ cannot work (not signed in / no key), `tonight` when anything is wrong, else `sh
 `banners`→`show`, `display`→`show`, `calendar`→`look`. Every copy string naming an old
 section ("Settings → Setup", "→ Slides", "→ Screen & corner", "→ Laptop", "→ Status") is
 rewritten (`CLAUDE.md` rename rule; grep `lobby/src`, `journey/`, `printer/print-server`
-error strings, `printer/chrome-extension` options/popup copy).
+error strings, `printer/chrome-extension` options/popup copy [the extension was deleted 2026-10-16]).
 
 Kill switch for the rail (`?rail=classic`, or localStorage `awanaSettingsRail.v1 =
 'classic'`): removed 2026-10-16, with the old section components. `LEGACY_TABS` still
@@ -104,14 +109,14 @@ derived from S `nightTheme` alone.
 
 | Card | Controls | Old location | Store | Notes |
 | --- | --- | --- | --- | --- |
-| Labels | label footer, visitor black palette, trophy band, connect card, auto on first-ever check-in, greeting, "Let the check-in laptop's Chrome extension check children in on TwoTimTwo directly (desk clicks, phone Undo and Check out)" | Laptop → Labels (`laptop.jsx:330-357`) | C | `enableDrivenCheckin` kept (section 3, item 4) |
+| Labels | label footer, visitor black palette, trophy band, connect card, auto on first-ever check-in, greeting, "Let the check-in laptop's Chrome extension check children in on TwoTimTwo directly (desk clicks, phone Undo and Check out)" | Laptop → Labels (`laptop.jsx:330-357`) | C | `enableDrivenCheckin` kept (section 3, item 4) [2026-10-16: the switch is hidden; the key stays in the church table, read by nothing] |
 | Each club's label | club select, six toggles, name size cap; Save | Laptop → Labels → TemplateEditor (`laptop.jsx:230-299`) | C `labelTemplates` | preview image only when the laptop is reachable (`GET /preview`); elsewhere "Preview on the check-in laptop" |
 | Club night schedule | rows, add/remove, late grace; Save | Laptop → Club night (`laptop.jsx:414-442`) | C `schedule`, `lateGraceMin` | |
 | Pickup list | six club boxes | Laptop → Pickup list (`laptop.jsx:402-413`) | C `pickupClubs` | |
 | BARF Night | nights (date list add/remove), Show tonight's list, Print BARF Bag labels | Setup → Cloud check-in → BARF Night (`SetupSection.jsx:128-130`); `church-config.json` `barfNights` (no UI before) | C `barfNights`; W `GET /v1/cloud/friends`, `POST /v1/cloud/barf-bags` (unchanged) | |
 | Tonight's prints | tonight's history rows (unlock with the passphrase, as History does), Reprint per row | Laptop → Tonight's prints (`laptop.jsx:456-500`) | W `GET /v1/history/rows?night=` (sealed, opened in the browser) + `POST /v1/print/reprint` (bundle sealed in the browser to every station, record `{route: '/reprint', body: {name, clubberId}, source: 'settings'}` + a `reprint` history row via `POST /v1/history/rows`) | lists what reached D1 (desk, station-printed TwoTimTwo-page and phone jobs); an extension-only print is not there: "At the laptop" still has the laptop's own list |
 | Name tags | leader tag (typed name + club), one-off tag, custom label | Laptop → Name tags (`laptop-tools.jsx:221-235`) | W `POST /v1/print/reprint` with a tool record `{route: '/print-leader' \| '/print-oneoff' \| '/print-custom', body}` (sealed in the browser; `JOB_PULL_ROUTES` already allow them; job id `reprint:<uuid>`) | remembered leaders list + Forget from anywhere: C `leaders` (section 4; moved from the laptop's `leaders.json`, owner 2026-10-12) |
-| At the laptop | collapsed until opened (probes `http://localhost:3456/health` on open only, as today); then: This laptop (status, warnings, Print a test label, Run diagnostics, Clear print queue, Rehearsal mode, Play test tune, print failures), CHECK THE PRINTER clear, Printers (tag + backup, musical printer, update beacon), label preview, Reprint a stretch, Attendance audit, This laptop's sign-in (only when the print server is signed out) | Laptop (`laptop.jsx:96-228`, `502-579`; `laptop-tools.jsx:237-410`) | L | not found: one line "Open this page on the check-in laptop for the printer itself" |
+| At the laptop | collapsed until opened (probes `http://localhost:3456/health` on open only, as today); then: This laptop (status, warnings, Print a test label, Run diagnostics, Clear print queue, Rehearsal mode, Play test tune, print failures), CHECK THE PRINTER clear, Printers (tag + backup, musical printer, update beacon), label preview, Reprint a stretch, Attendance audit [removed 2026-10-16 with its server routes], This laptop's sign-in (only when the print server is signed out) | Laptop (`laptop.jsx:96-228`, `502-579`; `laptop-tools.jsx:237-410`) | L | not found: one line "Open this page on the check-in laptop for the printer itself" |
 
 Before the seed (`GET /v1/church/settings` `rev: 0`): the C cards are read-only with "Waiting
 for the check-in laptop to send its settings (KVBC Awana 9.3.0)" and one button "Start from
@@ -150,7 +155,7 @@ this a moment ago; check and save again".
 | 1 | Display login field | `lobby/src/components/settings/fields.jsx:149-258` (`DisplayLoginField`); `sections/SetupSection.jsx:78` (the `!viaSync` branch); `sections/StatusSection.jsx:152-163` (`loginLine`), `:234` (Display login row) | `shared/sync.json` always names the service; `useDisplayLogin.js` stays (projector, `SettingsPanel.jsx:156-158` `keyed`) |
 | 2 | Display key paste fold | `SetupSection.jsx:79-91`; `fields.jsx:626-719` (`DisplayKeyField`); `StatusSection.jsx:94-101` hints naming "Advanced" / "print server" | `INSECURE_CONTEXT_COPY` (`fields.jsx:22`) stays (sync sign-in uses it) |
 | 3 | Publish token (field, card, laptop fold) | `fields.jsx:721-795` (`PublishTokenField`); `SetupSection.jsx:99-102` (card body; the forget-deck button moves to Look → Slides); `laptop.jsx:2`, `:10`, `:80-94` (`ConnectCard` fold; keep the lead line), `:503-525` (token state: proof = sync session only) | `lib/publishToken.js` stays (logout clears it; `App.jsx:591` non-sync fallback untouched). Print server keeps accepting a token (no Track B change) |
-| 4 | "Allow driven check-ins from phones" | `laptop.jsx:345-346` | **NOT removed (verified)**: it still gates the extension's direct TwoTimTwo post on desk clicks (`printer/chrome-extension/content.js:712`, `:5108`) and the phone page's Undo / Check out through the laptop (`printer/print-server/server/phone-routes.js:183`, `:242`); `/phone/checkin` (`:342`) is the old relay path. Reworded, moved to Printing → Labels as C `enableDrivenCheckin`; dies with the extension (P7) |
+| 4 | "Allow driven check-ins from phones" | `laptop.jsx:345-346` | **NOT removed (verified)**: it still gates the extension's direct TwoTimTwo post on desk clicks (`printer/chrome-extension/content.js:712`, `:5108`) and the phone page's Undo / Check out through the laptop (`printer/print-server/server/phone-routes.js:183`, `:242`); `/phone/checkin` (`:342`) is the old relay path. Reworded, moved to Printing → Labels as C `enableDrivenCheckin`; dies with the extension (P7) [done 2026-10-16: hidden everywhere, acted on by nothing; the key stays] |
 | 5 | "Other screens" links | `StatusSection.jsx:258-271`, import `:7` | |
 | 6 | Duplicate season | `LookSection.jsx:7-30` + `laptop.jsx:24-28`, `:395-398`, `:443-449` | one Season control (2.4) |
 | 7 | Duplicate sign-in | `laptop-tools.jsx:370-410` (`SyncSignInCard`) shown always | shown only when the print server reports signed out, inside At the laptop |
@@ -229,7 +234,7 @@ sync sign-in, for every signed-in print server, station or not):
    SETTINGS-PAGE request (`req.settingsPage`) to POST /config, `/config/schedule` or
    `/config/label-templates` that touches a church key answers 409 `{reason:
    'church-managed', error: 'This is a church-wide setting now: change it under Printing.'}`.
-   The extension's and Electron's own writes are unaffected.
+   The extension's and Electron's own writes are unaffected [the extension is gone since 2026-10-16].
 7. **Switch-aware gates.** The fetched `switches` are kept in memory: `publishers.js:50`,
    `:97`, `:110` gate on `cloudStation && switches.SINGLE_PUBLISHER === 'on'` (a runtime
    off makes the station publish the tally and still-here list again within ~5 s);
