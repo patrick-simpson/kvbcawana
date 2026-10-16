@@ -115,6 +115,46 @@ does not leave the check-in page waiting, tonight's check-in page roster
 (`desk:page`: clubber ids, full names, clubs, checked-in marks), deleted when
 the watch window closes. The trends back-fill (below) keeps counts only: D1
 `night_summary_import` and `trends:import` (seasons, times, fixed codes).
+The stations' roster and completed books (below) rest SEALED TO THE PRINT
+STATIONS' KEYS only (`station:roster`, `station:books`: the Worker cannot open
+them after the seal; allergies are in the roster's Notes), award slips waiting
+for their seal sit under the state key for the night (`feeds:slips`), and the
+slips already queued are HMAC tags (`awards:slipped`).
+
+## The stations' roster, completed books and award slips (`src/stationfeeds.js`, owner 2026-10-16)
+
+What the laptop's Chrome extension fed its print server besides check-ins, now
+read by the Worker from its alarm on the same one read clock (`src/routes.md`
+sections 4 and 7):
+
+- **The roster** (`/clubber/csv`, every label's allergies, birthday, group and
+  photo consent): read about hourly in the watch window, once a day outside it,
+  and at once when a station asks with no copy. The household's addresses,
+  phones, emails and payments are left out; the rest is sealed to every
+  registered station (one station per alarm tick, the free plan's CPU) and served
+  by `GET /v1/station/roster`, which the print role's bundle sync
+  (`printer/print-server/job-puller.js createBundleSync`) feeds to its
+  `/update-csv`. A cut download, a page or a sign-in form keeps the last good copy.
+- **Completed books** (`/report/completed_books`, clubs 2-6, the last 21 days):
+  every 10 minutes in club hours, one club per free slot, one sealed bundle,
+  `GET /v1/station/books` -> the print server's `/feed/completed-books` (the
+  trophy band).
+- **The meeting report** (`/meeting/report?output=csv`): every 5 minutes in club
+  hours; its books and awards counts go into the Worker's own `tonight` frame,
+  and each award slip becomes one sealed `/print-award` job, once per child and
+  award a night.
+- **The hand-over**: a station reports its app version with its heartbeat. The
+  roster and books are served only to a station on KVBC Awana 10.0.0 or newer
+  (an older one, which still has the extension, is answered 404 as before), and
+  award slips print from the Worker only once no station is older (meanwhile
+  each slip is only marked, so an update in the middle of a club night never
+  prints one twice).
+
+Check-outs made by hand on TwoTimTwo's Checkout page are the youth check-out's
+(`src/ymcheckout.js`, which already reads that page every minute from 7:15 pm):
+a child gone between two genuinely read pages leaves tonight's count.
+`GET /v1/cloud/status` shows all of it as counts and times (`stationFeeds`,
+`ymCheckout.leftPage`).
 
 ## Developing
 

@@ -63,6 +63,7 @@ import { PrintQueue } from './printq.js';
 import { Stations } from './stations.js';
 import { Adopter } from './adopt.js';
 import { YmCheckout } from './ymcheckout.js';
+import { StationFeeds, mountStationFeeds } from './stationfeeds.js';
 import { Desk } from './desk.js';
 import { mountCheckin } from './checkinRoutes.js';
 import { History, mountHistory } from './history.js';
@@ -225,6 +226,12 @@ export class SyncCore {
     // TwoTimTwo from 7:15 pm, from the watcher's alarm; each one comes off tonight's count.
     this.ym = new YmCheckout({ storage: this.storage, env: this.env, now: this.now, watcher: this.watcher, publisher: this.publisher });
     this.watcher.ym = this.ym;
+    // What the Chrome extension fed the print server besides check-ins (stationfeeds.js): the
+    // roster export and the completed books, sealed to the stations, and the meeting report's
+    // counts and award slips. From the watcher's alarm, on the one read clock.
+    this.feeds = new StationFeeds({ storage: this.storage, watcher: this.watcher, stations: this.stations, printq: this.printq, tags: this.tags, publisher: this.publisher, now: this.now });
+    this.watcher.feeds = this.feeds;
+    mountStationFeeds(this.registry, this);   // /v1/station/roster-source, roster, books (routes.md 4)
     mountPublisher(this.registry, this);   // /v1/desk/tonight, /v1/station/extras, /v1/publisher/status (routes.md 8)
     // The screen registry (ROADMAP.md#settings-page, phase 2): its doorbells ride the live
     // channel only, for the one screen they name.
@@ -640,7 +647,7 @@ export class SyncCore {
         // Cloud check-in, phase 1: counts and codes only, never a name or an id.
         case 'GET /v1/cloud/status':
           await this.watcher.arm();
-          return json({ ...(await this.watcher.status()), ymCheckout: await this.ym.statusView(), auth: await this.authStatus() });
+          return json({ ...(await this.watcher.status()), ymCheckout: await this.ym.statusView(), stationFeeds: await this.feeds.statusView(), auth: await this.authStatus() });
         // Who brought a friend (friends.js): recorded by the laptop, read by a
         // signed-in screen, and one read-only link for the scheduled email.
         case 'POST /v1/cloud/friend': {

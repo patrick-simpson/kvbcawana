@@ -68,12 +68,46 @@ export function ymClubOf(club) {
   return YM_CLUBS.find((c) => a.includes(c)) || '';
 }
 
-/** @returns {{ night: string|null, cal: {calendarId: string, date: string}|null, rows: Record<string, string>, done: string[], fails: Record<string, number> }} */
-const freshState = (night = /** @type {string|null} */ (null)) => ({ night, cal: null, rows: {}, done: [], fails: {} });
+/**
+ * @returns {{ night: string|null, cal: {calendarId: string, date: string}|null, rows: Record<string, string>, done: string[], fails: Record<string, number>,
+ *   seen: {date: string, ids: string[]}|null, gone: {date: string, ids: string[]}|null }}
+ */
+const freshState = (night = /** @type {string|null} */ (null)) => ({ night, cal: null, rows: {}, done: [], fails: {}, seen: null, gone: null });
 const freshStatus = (night = /** @type {string|null} */ (null)) => ({
   night, checkedOut: 0, failed: 0, gaveUp: 0, posts: 0, pageReads: 0,
   lastSweep: /** @type {string|null} */ (null), lastPageAt: 0, nextPostAt: 0, lastError: /** @type {string|null} */ (null),
+  /** Children seen leaving the Checkout page between two genuine reads, and how many came off tonight's count. */
+  leftPage: 0, leftPageCounted: 0,
 });
+
+/**
+ * Check-outs made by hand on TwoTimTwo's Checkout page (the extension's
+ * checkoutDisappearances, feeds.js, rule for rule): a child the last GENUINE read
+ * listed and this genuine read does not has been checked out. Only two genuine
+ * reads of the same meeting are compared; a read that could not be trusted
+ * (`read` null: signed out, filtered, drifted, parseCheckoutIds) compares nothing
+ * and keeps the last good one; another meeting starts afresh. A row also leaves
+ * the page when its check-in is UNDONE: the caller skips a child whose claim is
+ * undone, and the rest of that ambiguity is the owner's accepted one (2026-10-08).
+ * Pure. @param {{ seen: {date: string, ids: string[]}|null, gone: {date: string, ids: string[]}|null }|null} state
+ * @param {{ date: string, ids: string[] }|null} read
+ * @returns {{ seen: {date: string, ids: string[]}|null, gone: {date: string, ids: string[]}|null, left: string[] }}
+ */
+export function checkoutDisappearances(state, read) {
+  const st = state || { seen: null, gone: null };
+  if (!read) return { seen: st.seen, gone: st.gone, left: [] };
+  /** @type {string[]} */
+  const left = [];
+  const tonight = st.gone && st.gone.date === read.date ? st.gone.ids.slice() : [];
+  if (st.seen && st.seen.date === read.date) {
+    for (const id of st.seen.ids) {
+      if (read.ids.includes(id)) continue;
+      left.push(id);
+      if (!tonight.includes(id)) tonight.push(id);
+    }
+  }
+  return { seen: { date: read.date, ids: read.ids.slice(0, LIST_MAX) }, gone: { date: read.date, ids: tonight.slice(-LIST_MAX) }, left };
+}
 
 export class YmCheckout {
   /**
@@ -192,6 +226,8 @@ export class YmCheckout {
   async readPage() {
     const client = this.watcher.clientFor();
     if (!client) return false;
+    /** @type {string[]} */
+    let left = [];
     const res = await client.checkoutPage({ waitMs: 0, kind: 'ym-checkout' });
     if (!res.ok && res.error === 'read-busy') return false;
     this.status.lastPageAt = this.now();
@@ -203,11 +239,29 @@ export class YmCheckout {
       for (const r of res.page.rows.slice(0, LIST_MAX)) if (ymClubOf(r.club)) rows[r.clubberId] = r.club;
       this.st.rows = rows;
       if (this.status.lastError && /^page:/.test(this.status.lastError)) this.status.lastError = null;
+      // A check-out made by hand on that page (every club): gone between two genuine reads.
+      const d = checkoutDisappearances({ seen: this.st.seen || null, gone: this.st.gone || null }, res.ids || null);
+      this.st.seen = d.seen;
+      this.st.gone = d.gone;
+      left = res.ids && res.ids.date === localTime(this.now()).date ? d.left : [];
+      this.status.leftPage += left.length;
     } else {
       this.status.lastError = `page:${res.error}`;
       this.log(`[cloud] youth check-out: the Checkout page was unreadable (${res.error})`);
     }
     await this.persist();
+    // Off tonight's count and the still-here list, as the station's POST /v1/station/checked-out
+    // does (the book is purged when the window closes, so only while it is open).
+    if (left.length && this.publisher && watchWindow(this.now()).open) {
+      try {
+        const n = await this.publisher.checkedOut(localTime(this.now()).date, left, 'checkout-page');
+        if (n) {
+          this.status.leftPageCounted += n;
+          await this.storage.put('ym:status', this.status);
+          this.log(`[cloud] ${n} child(ren) checked out on TwoTimTwo's Checkout page`);
+        }
+      } catch (err) { console.error('[cloud] counting a Checkout-page check-out failed', err); }
+    }
     return true;
   }
 
@@ -287,6 +341,8 @@ export class YmCheckout {
       lastSweep: tonight ? this.status.lastSweep : null,
       lastPageAt: tonight && this.status.lastPageAt ? new Date(this.status.lastPageAt).toISOString() : null,
       lastError: tonight ? this.status.lastError : null,
+      leftPage: tonight ? this.status.leftPage : 0,
+      leftPageCounted: tonight ? this.status.leftPageCounted : 0,
     };
   }
 }

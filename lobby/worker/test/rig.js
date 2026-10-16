@@ -20,8 +20,8 @@ export const row = (kind = 'checkin', night = NIGHT) => ({
   id: newRowId(), night, kind, v: 1, kid: '0123456789abcdef', epk: `BA${'A'.repeat(85)}=`, iv: 'A'.repeat(16), ct: 'A'.repeat(1388),
 });
 
-export async function rig({ env = {}, kids = [], households = null, attendance = null, start = WED_6PM, storage = memoryStore(), clock = fakeClock(start), checkinPage = () => CHECKIN_PAGE } = {}) {
-  const night = { kids: [...kids], count: null, /** rows the Checkout page lists */ out: [] };
+export async function rig({ env = {}, kids = [], households = null, attendance = null, roster = null, books = null, meeting = null, start = WED_6PM, storage = memoryStore(), clock = fakeClock(start), checkinPage = () => CHECKIN_PAGE } = {}) {
+  const night = { kids: [...kids], count: null, /** rows the Checkout page lists */ out: [], /** the whole Checkout page, when a test writes it itself */ checkoutPage: /** @type {null|(() => string)} */ (null) };
   const render = () => {
     const clubs = [...new Set(night.kids.map((k) => k.club))];
     return page(...clubs.map((club) => {
@@ -29,7 +29,7 @@ export async function rig({ env = {}, kids = [], households = null, attendance =
       return table(`${club} `, these.map((k) => ({ id: k.id, name: k.name, friend: k.friend, bible: k.bible })), { count: night.count ?? these.length });
     }), clubs.length ? '' : table('Sparks ', []));
   };
-  const tt = fakeTwoTimTwo({ report: render, checkin: checkinPage, checkout: () => checkoutPage({ rows: night.out }), households, attendance });
+  const tt = fakeTwoTimTwo({ report: render, checkin: checkinPage, checkout: () => (night.checkoutPage ? night.checkoutPage() : checkoutPage({ rows: night.out })), households, attendance, roster, books, meeting });
   tt.checkinName = 'Kit Tester';
   /** checkoutReply: what TwoTimTwo answers a check-out post instead of "OK". */
   const faults = { checkin: null, undo: null, checkout: null, checkoutReply: null };

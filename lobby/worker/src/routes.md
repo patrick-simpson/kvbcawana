@@ -17,7 +17,11 @@ here and keep its shape; a change of shape is a change to this file first.
 - **Free forever.** Workers free plan: 10 ms of CPU per request. The Worker
   never derives a key, never runs ECDH, never seals or opens a row or bundle.
   It may hash (SHA-256 of an `authKey`, HMAC identifier tags) and it validates
-  shapes and sizes. Every seal and open is a client's (`cloud-crypto.js`).
+  shapes and sizes. Every open is a client's (`cloud-crypto.js`). The one kind of
+  seal the Worker makes is TO the print stations' public keys, for what only it
+  reads from TwoTimTwo (ECDH P-256 in WebCrypto, at most one per alarm tick or
+  request): a TwoTimTwo-page check-in's job (`adopt.js`), and the roster, the
+  completed books and the award slips (`stationfeeds.js`, section 4).
 - **Paths.** The site serves the Worker under `/api`, so `GET /v1/x` here is
   `https://awana.kvbchurch.org/api/v1/x`. Bodies are JSON; `BODY_MAX` (128 KB)
   holds unless a route says otherwise.
@@ -313,17 +317,49 @@ into the database in Cloudflare." Fully automatic, no button:
   `history-off` (no `HISTORY_DB`), `sign-in-refused`, `no-permission` (403 on the
   report). It reads nothing and waits.
 
-## 4. Stations (BUILT: register, list, revoke; the rest is the station role's)
+## 4. Stations (BUILT: register, list, revoke, the roster and the completed books)
 
 | Route | Auth | Request | Answer |
 | --- | --- | --- | --- |
 | `POST /v1/station/register` **BUILT** | session | `{stationId, name, pub, kid}`; `stationId` is the KVBC Awana app's `roles.json` `deviceId` (8 to 64 of `A-Za-z0-9._-`); `pub` is the 65-byte raw P-256 key in base64, `kid` must be its `kidOf` (the Worker checks it, a hash); the private key is in Electron safeStorage (the app refuses the station role when safeStorage is unavailable) | stores it in the `stations` document; the same `stationId` may replace its own key (keeps `registeredAt`). `{ok, station, stations: [...list]}`. 409: another station already uses that key, or ten stations are registered (`STATIONS_MAX`) |
 | `GET /v1/stations` **BUILT** | session | | `[{stationId, name, pub, kid, registeredAt, lastSeenAt, printer}]` (what a client seals bundles to) |
 | `DELETE /v1/stations/<stationId>` **BUILT** | session | | removes a dead computer's key; `{ok, stations}`, 404 when unknown. Bundles already sealed to it stay unreadable to it only. Its calls answer 403 from then on |
-| `GET /v1/station/roster-source?night=` | station | | TwoTimTwo's roster CSV, read through the Worker (counts against the read clock), passed through in memory and never stored. The station seals it to every station. |
-| `PUT /v1/station/roster` | station | `{night, bundle}` (`kind: 'roster'`, allergies inside) | stores `roster:<night>` (the latest wins); `{ok}` |
-| `GET /v1/station/roster?night=` | station | | `{bundle}` or 404 |
-| `PUT /v1/station/books` / `GET /v1/station/books?night=` | station | `{night, bundle}` (`kind: 'books'`, completed books) | as the roster |
+| `GET /v1/station/roster-source?night=` **BUILT** | station | | `{csv, rows, readAt}`: TwoTimTwo's roster CSV exactly as it came (`/clubber/csv`), read through the Worker on the read clock (interactive wait), passed through in memory and never stored. At most one every 5 minutes (`ROSTER_SOURCE_GAP_MS`; 429 `{retryAfterMs}`); a cut download (its `Clubber Count=` footer disagrees), a page or a sign-in form is 502 `{reason: 'roster-partial' \| 'roster-unreadable' \| ...}`. For a station that seals the roster itself; the Worker's own refresh (below) makes it unnecessary |
+| `PUT /v1/station/roster` **BUILT** | station | `{night, bundle}` (`kind: 'roster'`, allergies inside; `night` tonight) | sealed to every registered station or refused (`Stations.checkBundle`: 400 `unsealed`, 409 `stations-changed` with the list); stored as `station:roster` (the latest wins, a PUT or the Worker's own read); `{ok}`. Held to `BODY_MAX` (128 KB) like every body: a roster for more than one station on the 65536 rung does not fit, the Worker's own read does |
+| `GET /v1/station/roster?night=` **BUILT** | station | | `{bundle, night, readAt, rows}`: the NEWEST roster, whatever night it was read (`night` is the bundle's). 404 `{reason: 'none'}` before the first read, `'resealing'` when this station has no copy in it yet (a station registered since: the roster is read and sealed again), and `'old-app'` for a station whose heartbeat reports an app below 10.0.0 (`FEEDS_FROM_VERSION`; it still has the extension, so it is answered as before these routes existed). A stale or missing copy asks for a read at once (the alarm is set a second out, even outside the window) |
+| `PUT /v1/station/books` / `GET /v1/station/books?night=` **BUILT** | station | `{night, bundle}` (`kind: 'books'`, completed books) | as the roster (`station:books`) |
+
+**The Worker's own read of both** (BUILT, `src/stationfeeds.js`, owner 2026-10-16:
+the Chrome extension goes, so nothing on the laptop reads TwoTimTwo any more). The
+watcher's alarm reads them itself and seals them to the stations; the print role's
+bundle sync (`job-puller.js createBundleSync`, every minute) GETs and opens them and
+feeds its own `/update-csv {csv}` and `/feed/completed-books {entries}`.
+
+- **Roster** (`kind: 'roster'`, record `{csv}`): `/clubber/csv` about hourly in the
+  watch window (`ROSTER_FRESH_MS`), once a day outside it, and at once when a station
+  asks with a stale or missing copy; only while at least one station runs 10.0.0. The
+  CSV is TwoTimTwo's own with the household's contact, address and payment columns left
+  out (`twotimtwo.js trimRosterCsv`: parent/guardian, address, city, state, zip, every
+  phone, email, emergency contact, others pickup, doctor, church, payments, rate, shirt
+  size, invited by, created/updated), every field quoted, with the `Clubber Count=<n>`
+  footer: the print server's `parseCSV` reads it unchanged (`test/stationfeeds.test.js`
+  runs it). A cut download (footer disagrees), a page, a sign-in form, an empty roster,
+  or one that lost more than half its children on one read (a second read must agree)
+  keeps the last good copy; a failed read is tried again after 10 minutes. An unchanged
+  roster (a keyed digest of the plaintext) is not sealed again.
+- **Completed books** (`kind: 'books'`, record `{entries: [{name, book, date}]}`): the
+  extension's `runCompletedBooks`, `/report/completed_books?output=csv&club_id=<id>&from_date=<21 days back>&to_date=<today>`
+  for clubs 2, 3, 4, 5, 6 (church-config `sharesClubIds`), at most 300 a club, merged
+  (at most 500), every 10 minutes in club hours (`CLUB_NIGHTS` 5:30 to 8 pm), one club
+  per free slot. A club that cannot be read is skipped (the stations merge what they
+  get); a pass where none could keeps the last good copy.
+- **The seal** (the free plan's 10 ms CPU): the read keeps the record in MEMORY and each
+  following alarm tick seals it to ONE station (an ECIES entry is per station; a
+  church-sized roster is about 3 to 4 ms to one station under Node,
+  `test/stationfeeds.test.js` prints it); when every station has its entry the bundle
+  is stored and the plaintext dropped. A restarted object reads again. What rests is
+  ciphertext sealed to the stations' keys only: never the state key, never the history
+  key (the medical notes rule).
 
 A job's bundle must be sealed to **every** registered station and nobody else
 (`Stations.checkBundle`): a missing station answers 409
@@ -699,7 +735,21 @@ undo): the station ends it quietly.
   poll. Outside the window, and never ahead of any of these, the trends
   back-fill (section 3) reads one season in a free slot. Reads a minute: at 6:00 pm report 2 + roster page 2; at 7:30 pm report
   2 + Checkout page 1 + roster page 1 (a poll that finds the page older than 30 s
-  reads it itself, waiting its turn). After a restart the page comes back sealed from storage (`desk:page`, section 5), so the
+  reads it itself, waiting its turn).
+  **The stations' feeds** (`stationfeeds.js`, section 4; owner 2026-10-16) share the
+  same "other" slot, never the report's: the roster export (`/clubber/csv`, about one
+  read an hour in the window, once a day outside it, or when a station asks with no
+  copy) goes right after the Checkout page and AHEAD of the roster's read-ahead (it is
+  what every label's allergies come from: one slot an hour); in club hours the meeting
+  report (`/meeting/report`, every 5 minutes) and a completed-books pass (one club per
+  slot, 5 reads every 10 minutes) come AFTER the read-ahead and the sealing, in a slot
+  nothing above wanted, unless one has waited twice its turn (10 / 20 minutes), when it
+  too goes ahead of the read-ahead. So at 6:00 pm with /checkin polling: report 2 +
+  roster page about 1.4 + meeting and books about 0.6 a minute; still 4 reads a minute,
+  15 s apart. The seals of the roster and books (one station per tick) and of an award
+  slip are CPU work in the tick after the read, beside `adopt.drain`, never a read.
+  Outside the window the alarm's only feed is the roster (once a day), ahead of the
+  trends back-fill. After a restart the page comes back sealed from storage (`desk:page`, section 5), so the
   first roster poll is answered at once and the next free slot refreshes it. A desk action's read (only with nothing
   held, section 5) is URGENT: the head of the queue (queued reads give way and
   book again), never inside 15 s of a read already started. The clock survives
@@ -754,14 +804,33 @@ that ride the tally, and the pickup list's clubs. The station tells it, plaintex
 and non-personal: `POST /v1/station/extras` (station) `{season?, rehearsal?,
 pickupClubs?}`, sent every minute and on a change; the books and awards counts
 come from the laptop's `tonight` frame the gate drops (it remembers those two
-numbers). `GET /v1/publisher/status` (session) is counts and times only.
+numbers) and, since 2026-10-16, from the Worker's own read of TwoTimTwo's meeting
+report (`stationfeeds.js`, every 5 minutes in club hours, the extension's
+`parseMeetingReportCsv` rule for rule: a column whose header says "award" counts an
+award, "book"/"section" a book; a failed read keeps the last counts). **Award slips**
+(BUILT): each row with a name under such a column is one slip, `{name, clubName,
+award: <the column's header>}`, at most once per child and award a night (an HMAC tag
+of the night, name and award in `awards:slipped`), at most 10 new a read, queued as a
+REPRINT-kind job (`reprint:<uuid>`, section 6) whose sealed record is `{route:
+'/print-award', body: {name, clubName, award}}` (the print role's `JOB_PULL_ROUTES`
+already has it). Slips print from the Worker only once every registered station
+reports KVBC Awana 10.0.0 or newer in its heartbeat (`FEEDS_FROM_VERSION`): until then
+the extension prints its own, and each slip the Worker sees is only marked. NOTE: the
+meeting report's documented header (`"HBGroup","Clubber","Book","Unit","Award","Note"`,
+printer/docs/TWOTIMTWO.md 8.1) has no name column the extension's rule knows
+("Clubber" is not "Name" / "Clubber Name" / First + Last), so on that layout the counts
+are read and no slip is made, as the extension did; widening the rule is the owner's call
+(a "Book" column holds every child's current book, which would be a slip per child). `GET /v1/publisher/status` (session) is counts and times only.
 Check-outs made by hand on TwoTimTwo's Checkout page (owner 2026-10-15): `POST
 /v1/station/checked-out` (station) `{date, clubberIds}` = the extension's list of
 children who left that page tonight (print server `sendCheckedOut`, whenever it
 grows): each id (digits, max 500) not already out and whose claim is not `undone`
 goes off tonight's book (`book.checkout`, as a desk check-out), then one
 `publishDue`. `{ok, applied}`; another night's date or a closed watch window
-applies nothing (`reason: 'other-night' | 'window-closed'`).
+applies nothing (`reason: 'other-night' | 'window-closed'`). Since 2026-10-16 the
+Worker sees the same check-outs itself (section 9: its own Checkout page reads), through
+the same rule (`Publisher.checkedOut`), so the station's post and the Worker's read of
+one child are one check-out.
 
 **Names in the still-here list and the greeting: the design.** The Worker cannot
 read names from history (sealed to the history key, which it never holds), and
@@ -856,8 +925,25 @@ out with the Checkout page's own `POST /clubber/checkout` (`calendar_id` +
 - **Count.** Each check-out goes into tonight's book as a desk check-out does
   (`publisher.deskCheckout`), while the watch window is open (the book is purged
   when it closes): the tally and still-here list drop with `SINGLE_PUBLISHER` on.
-- **Storage.** `ym:state` (the night, meeting, page rows, done list, tries) is one
-  blob sealed under the state key (`sealState`); `ym:status` counts and times only.
+- **Check-outs made by hand on that page** (BUILT, owner 2026-10-16: the extension's
+  `runCheckout` / `checkoutDisappearances`, which the station's `POST
+  /v1/station/checked-out` carried, section 8). Every Checkout page read also takes
+  every club's ids (`twotimtwo.js parseCheckoutIds`) when the page was GENUINELY read:
+  the extension's four guards (the page's own title; the data table, not the notices
+  table; no club filter unticked; rows that parse, or the page's own "nobody here"
+  placeholder), else null. A child listed at the last genuine read of that meeting and
+  gone at this one has been checked out (`ymcheckout.js checkoutDisappearances`: a read
+  that is not genuine compares nothing and keeps the last good one; another meeting
+  starts afresh) and comes off tonight's book through `Publisher.checkedOut` (an id
+  already out, or whose claim is `undone`, is skipped: an undone check-in also leaves the
+  page), while the watch window is open. So this runs from 7:15 pm, as the youth
+  check-out's page reads do (the extension read it from 5:30); a child checked out by
+  hand before 7:15 pm is seen at the first read after it only if a read before it listed
+  them, which none did: at most that early pickup stays on the count until the report
+  drops them or the window closes. `ymCheckout.leftPage` / `leftPageCounted` on the status.
+- **Storage.** `ym:state` (the night, meeting, page rows, the last genuine read's ids,
+  the night's check-outs by hand, done list, tries) is one blob sealed under the state
+  key (`sealState`); `ym:status` counts and times only.
 - **Status.** `GET /v1/cloud/status` carries `ymCheckout: {enabled, due, at, clubs,
   gapSec, pageSec, maxTries, night, checkedOut, failed, gaveUp, pending, meeting, lastSweep,
   lastPageAt, lastError}`: no name, no id.

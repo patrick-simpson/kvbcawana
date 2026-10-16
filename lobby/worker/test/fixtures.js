@@ -57,7 +57,7 @@ export function checkoutPage({ calendarId = '368', date = '2026-10-14', rows = [
  * A stand-in TwoTimTwo: /site/login with a CSRF token and a session cookie,
  * a signed-in report, and the login form for anything without the cookie.
  */
-export function fakeTwoTimTwo({ password = 'right-pass', report = () => page(table('Sparks ', [{ id: 1, name: 'Ada Tester' }])), checkin = () => CHECKIN_PAGE, checkout = () => checkoutPage(), households = null, attendance = null } = {}) {
+export function fakeTwoTimTwo({ password = 'right-pass', report = () => page(table('Sparks ', [{ id: 1, name: 'Ada Tester' }])), checkin = () => CHECKIN_PAGE, checkout = () => checkoutPage(), households = null, attendance = null, roster = null, books = null, meeting = null } = {}) {
   const calls = [];
   let session = 0;
   const live = new Set();
@@ -94,6 +94,12 @@ export function fakeTwoTimTwo({ password = 'right-pass', report = () => page(tab
       if (a instanceof Response) return a;
       return new Response(a, { status: 200, headers: { 'Content-Type': 'application/csv' } });
     }
+    // The roster export, the completed-books report and the meeting report (stationfeeds.js):
+    // each a CSV, or a Response (a refusal), or null for TwoTimTwo's 404.
+    const csvOf = (/** @type {any} */ v) => (v instanceof Response ? v : v == null ? new Response('not found', { status: 404 }) : new Response(v, { status: 200, headers: { 'Content-Type': 'application/csv' } }));
+    if (u.pathname === '/clubber/csv' && roster) return csvOf(roster());
+    if (u.pathname === '/report/completed_books' && books) return csvOf(books(u.searchParams.get('club_id'), u.searchParams.get('from_date'), u.searchParams.get('to_date')));
+    if (u.pathname === '/meeting/report' && meeting) return csvOf(meeting(u.searchParams.get('calendar_id')));
     if (u.pathname === '/clubber/checkinclubber' && init.method === 'POST') {
       state.checkins.push(body);
       return new Response(state.checkinReply ?? `<b>${state.checkinName ?? 'Kit Tester'}</b> 6:02 pm`, { status: 200 });
@@ -110,3 +116,41 @@ export const HOUSEHOLD_CSV = '\uFEFF"Household ID","Parent/Guardian#1","Address1
   '"12","Lee Other","2 Oak Ave","555-0102","Only Child",""\r\n' +
   '"13","Kim ""Q"" Smith","3 Pine Rd, Apt 4","555-0103","Ann Smith, Ben Smith, Cy Smith","note, with comma"\r\n' +
   '"14","No Kids","4 Ash Ln","555-0104","",""\r\n';
+
+// The roster export's 66 columns in TwoTimTwo's order (printer/docs/TWOTIMTWO.md section 3),
+// with a made-up child per row. `notes` is where the church records allergies.
+export const ROSTER_HEADER = ['Clubber ID', 'Inactive', 'First Name', 'Last Name', 'Gender', 'Grade', 'Club', 'Group', 'Color',
+  'Handbook Group', 'Birthdate', 'Shirt Size', 'New to Awana?', 'Has an Awana vest?', 'Invited by', 'Completed Handbooks', 'Notes',
+  'Clubber Created', 'Clubber Last Updated', '# payments', 'Med Release?', 'Share Balance', 'Book', 'Doctor Name', 'Doctor Phone',
+  'Payments total', 'Rate', 'Parent/Guardian#1', 'Parent/Guardian#2', 'Address1', 'Address2', 'City', 'State', 'Zip', 'Alt Address1',
+  'Alt Address2', 'Alt City', 'Alt State', 'Alt Zip', 'Primary Phone', 'Primary Phone Type', 'Primary Phone SMS (Text)?', 'Alt Phone',
+  'Alt Phone Type', 'Alt Phone SMS (Text)?', '3rd Phone', '3rd Phone Type', '3rd Phone SMS (Text)?', 'Alt Primary Phone',
+  'Alt Primary Phone Type', 'Alt Primary Phone SMS (Te...', 'Alt Phone#2', 'Alt Phone#2 Type', 'Alt Phone#2 SMS (Text)?', 'Alt Phone#3',
+  'Alt Phone#3 Type', 'Alt Phone#3 SMS (Text)?', 'Emergency Contact', 'Others Pickup', 'Church', 'Email', 'Alt Email', 'GrandPrix Type',
+  'Photo Release?', 'Leader Notes', ''];
+
+/**
+ * TwoTimTwo's /clubber/csv: a BOM, the quoted header, a row per child, the
+ * "Clubber Count=<n>" footer (`count` overrides it: a cut download), a blank
+ * line and FILTER,VALUE. Every name and value is made up.
+ * @param {{ id: string|number, first: string, last: string, club?: string, notes?: string, birthdate?: string, photo?: string }[]} kids
+ * @param {{ count?: number }} [o]
+ */
+export function rosterCsv(kids, { count = kids.length } = {}) {
+  const q = (/** @type {unknown} */ v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  const lines = [ROSTER_HEADER.map(q).join(',')];
+  for (const k of kids) {
+    /** @type {Record<string, unknown>} */
+    const values = {
+      'Clubber ID': k.id, Inactive: 'N', 'First Name': k.first, 'Last Name': k.last, Gender: 'F', Grade: '2', Club: k.club || 'Sparks',
+      Group: 'Red', 'Handbook Group': 'Group 1', Birthdate: k.birthdate || '3/3/2017', Notes: k.notes || '', 'Med Release?': 'Yes',
+      'Photo Release?': k.photo || 'Yes', 'Parent/Guardian#1': `Pat ${k.last}`, Address1: '12 Elmwood Street', City: 'Augusta', Zip: '04330',
+      'Primary Phone': '555-0100', Email: 'family@example.org', 'Emergency Contact': 'Grandma 555-0199', 'Doctor Name': 'Dr Example',
+    };
+    lines.push(ROSTER_HEADER.map((h) => q(values[h] ?? '')).join(','));
+  }
+  return `\uFEFF${lines.join('\r\n')}\r\nClubber Count=${count}\r\n\r\nFILTER,VALUE\r\n`;
+}
+
+/** The completed-books report ("Name","Book","Date"), one club's. @param {{ name: string, book: string, date: string }[]} rows */
+export const booksCsv = (rows) => `"Name","Book","Date"\r\n${rows.map((r) => `"${r.name}","${r.book}","${r.date}"`).join('\r\n')}\r\n`;

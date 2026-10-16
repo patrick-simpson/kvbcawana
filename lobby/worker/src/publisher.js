@@ -230,6 +230,32 @@ export class Publisher {
     await this.publishDue('desk-checkout');
   }
 
+  /**
+   * Children checked out by hand on TwoTimTwo's Checkout page (the station's
+   * POST /v1/station/checked-out, and the Worker's own reads of that page,
+   * ymcheckout.js): each id not already out and whose claim is not `undone` (an
+   * undone check-in also leaves the page) comes off tonight's book, as a desk
+   * check-out does, then one publish. The caller checks the night and the window.
+   * @param {string} night @param {unknown[]} clubberIds @param {string} [reason]
+   * @returns {Promise<number>} how many came off
+   */
+  async checkedOut(night, clubberIds, reason = 'checked-out') {
+    const now = this.now();
+    const ids = clubberIds.map(String).filter((id) => /^\d{1,20}$/.test(id)).slice(0, CHECKED_OUT_MAX);
+    await Promise.all([this.book.load(), this.ledger.load()]);
+    const out = new Set([...this.book.state(now).checkedOut.ids].map(String));
+    let applied = 0;
+    for (const id of ids) {
+      if (out.has(id)) continue;
+      const tag = this.tags ? await this.tags.identity(night, id) : null;
+      const c = tag ? this.ledger.peek(night, tag) : undefined;
+      if (c && c.state === 'undone') continue;
+      if (await this.book.checkout({ night, clubberId: id })) { applied += 1; out.add(id); }
+    }
+    if (applied) await this.publishDue(reason);
+    return applied;
+  }
+
   /** The window has closed: names and the night's counters go; the next night starts clean. */
   async endOfNight() {
     const n = await this.book.endOfNight();
@@ -380,18 +406,7 @@ export function mountPublisher(registry, core) {
     const night = localTime(now).date;
     if (!b || b.date !== night) return json({ ok: true, applied: 0, reason: 'other-night' });
     if (!watchWindow(now).open) return json({ ok: true, applied: 0, reason: 'window-closed' });
-    const ids = (Array.isArray(b.clubberIds) ? b.clubberIds : []).map(String).filter((id) => /^\d{1,20}$/.test(id)).slice(0, CHECKED_OUT_MAX);
-    await Promise.all([core.publisher.book.load(), core.ledger.load()]);
-    const out = new Set([...core.publisher.book.state(now).checkedOut.ids].map(String));
-    let applied = 0;
-    for (const id of ids) {
-      if (out.has(id)) continue;
-      const tag = await core.tags.identity(night, id);
-      const c = tag ? core.ledger.peek(night, tag) : undefined;
-      if (c && c.state === 'undone') continue;
-      if (await core.publisher.book.checkout({ night, clubberId: id })) applied += 1;
-    }
-    if (applied) await core.publisher.publishDue('station-checked-out');
+    const applied = await core.publisher.checkedOut(night, Array.isArray(b.clubberIds) ? b.clubberIds : [], 'station-checked-out');
     return json({ ok: true, applied });
   });
   registry.add('GET', '/v1/publisher/status', 'session', async () => json(await core.publisher.status()));

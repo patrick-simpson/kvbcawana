@@ -247,6 +247,8 @@ export class Watcher {
     this.recent = null;
     /** The trends back-fill (trendsimport.js): set by mountHistory; the watcher only gives it a turn of the closed-window alarm. @type {import('./trendsimport.js').TrendsImport|null} */
     this.trends = null;
+    /** The stations' roster, completed books and meeting report (stationfeeds.js): set by SyncCore; the watcher gives it its turns. @type {import('./stationfeeds.js').StationFeeds|null} */
+    this.feeds = null;
     /** Children held on the report by a desk operation (barf.js): clubber id -> {entry, until}. Memory only. @type {Map<string, { entry: any, until: number }>} */
     this.holds = new Map();
     this.alarms = alarms || { set() {}, get: () => null };
@@ -435,11 +437,21 @@ export class Watcher {
         try { await this.ym.step(); } catch (err) { console.error('[cloud] youth check-out failed', err); }
         next = this.ymWake(next);
       }
+      // The stations' roster once a day (or when a station asked), and its seal (stationfeeds.js).
+      let fed = false;
+      if (this.feeds) {
+        try { await this.feeds.endOfNight(); } catch (err) { console.error('[feeds] end-of-night purge failed', err); }
+        const r = await this.feeds.onClosedAlarm(next);
+        fed = r.did;
+        next = r.next;
+      }
       // The trends back-fill (trendsimport.js): one season read at the lowest priority, never in the window.
-      if (this.trends) next = await this.trends.onAlarm(next);
+      if (this.trends && !fed) next = await this.trends.onAlarm(next);
     } else {
       await this.budget.load();
       await this.adopt?.load();
+      const feeds = this.feeds;
+      if (feeds) await feeds.load().catch((err) => console.error('[feeds] load failed', err));
       const before = await this.loadStatus();
       const reportAt = this.lastWatcherRead(before) + WATCH_INTERVAL_MS;
       // The next report's slot is the watcher's: other reads keep clear of it.
@@ -456,11 +468,21 @@ export class Watcher {
       } else if (this.budget.peek(false) === 0 && this.ym && this.ym.pageDue()
         && await this.ym.step().catch((err) => { console.error('[cloud] youth check-out failed', err); return false; })) {
         // The Checkout page, once a minute after 7:15 pm (ymcheckout.js).
+      } else if (this.budget.peek(false) === 0 && feeds && feeds.readDue(true)
+        && await feeds.step(true).catch((err) => { console.error('[feeds] read failed', err); return false; })) {
+        // The stations' roster export (about hourly: labels' allergies), or a completed-books
+        // pass / meeting report that has waited two of its turns (stationfeeds.js).
       } else if (this.budget.peek(false) === 0 && this.desk && this.desk.rosterRefreshInMs() === 0
         && await this.desk.refreshRoster().catch((err) => { console.error('[cloud] roster read ahead failed', err); return false; })) {
         // The roster's page read ahead, so the pages' next poll is answered at once.
       } else if (this.adopt && this.adopt.pending() > 0) {
         try { await this.adopt.drain(SEAL_PER_TICK); } catch (err) { console.error('[cloud] sealing a job failed', err); }
+      } else if (feeds && feeds.sealDue()) {
+        // One station's copy of the roster or the books, or one award slip (stationfeeds.js: one seal a tick).
+        try { await feeds.sealOne(); } catch (err) { console.error('[feeds] sealing failed', err); }
+      } else if (this.budget.peek(false) === 0 && feeds && feeds.readDue(false)
+        && await feeds.step(false).catch((err) => { console.error('[feeds] read failed', err); return false; })) {
+        // The completed books (one club a slot) and the meeting report, in a slot nothing above wanted.
       } else if (this.ym && this.ym.due() && await this.ym.step().catch((err) => { console.error('[cloud] youth check-out failed', err); return false; })) {
         // A Checkout page read or ONE check-out post (at most one every 15 s, ymcheckout.js).
       } else if (this.publisher) {
@@ -478,6 +500,7 @@ export class Watcher {
       if (other !== null) next = Math.min(next, Math.max(other, this.budget.peek(false), 1000));
       // Jobs still waiting to be sealed: the next tick (not the next read) seals one.
       if (this.adopt && this.adopt.pending() > 0) next = Math.min(next, SPILL_MS);
+      if (feeds && feeds.sealDue()) next = Math.min(next, SPILL_MS);
       next = this.ymWake(next);
       // A sign-in that is backing off waits it out instead of waking every few seconds.
       if (this.client && this.client.loginBlockedUntil > this.now()) {
@@ -514,7 +537,7 @@ export class Watcher {
    */
   otherWakeInMs(status) {
     if (this.checkinPageDue(status)) return 0;
-    const waits = [this.desk ? this.desk.familiesSource.wakeInMs() : null, this.desk ? this.desk.rosterRefreshInMs() : null];
+    const waits = [this.desk ? this.desk.familiesSource.wakeInMs() : null, this.desk ? this.desk.rosterRefreshInMs() : null, this.feeds ? this.feeds.wakeInMs() : null];
     const due = waits.filter((w) => w !== null);
     return due.length ? Math.min(...due) : null;
   }

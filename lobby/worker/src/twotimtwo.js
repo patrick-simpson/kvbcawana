@@ -350,7 +350,11 @@ export function parseCheckinPage(html) {
  */
 export function parseCheckoutPage(html) {
   if (!html || isLoginPage(html)) return null;
-  const doc = documentOf(html);
+  return checkoutPageOf(documentOf(html), html);
+}
+
+/** parseCheckoutPage on a document already built. @param {any} doc @param {string} html */
+function checkoutPageOf(doc, html) {
   if (!/Checkout Clubber/.test(squash(doc.querySelector('title')?.textContent))) return null;
   const cal = /calendar_id:\s*(\d{1,12})/.exec(html);
   const opt = doc.querySelector('select#date option[selected]');
@@ -365,6 +369,256 @@ export function parseCheckoutPage(html) {
     rows.push({ clubberId: id, club: img ? String(img.getAttribute('alt') || '').trim() : '' });
   }
   return { calendarId: cal[1], date, rows };
+}
+
+/**
+ * Who the Checkout page lists, by clubber id (every club), when the page was
+ * GENUINELY read: the extension's parseCheckoutHtml guards (feeds.js), rule for
+ * rule, then parseCheckoutIds. null whenever the page could not be trusted to
+ * be the whole list, so a check-out is never read from a page that only LOOKS
+ * empty:
+ *   1. not positively the Checkout page (title), or signed out
+ *   2. no data table (the first table, `table.items`, is an unrelated notices table)
+ *   3. a club filter checkbox unticked (a subset: the hidden clubs would look picked up)
+ *   4. rows but none parsed and no "nobody here" placeholder (selector drift)
+ * Ids only; no name is kept. @param {string} html @param {string} today YYYY-MM-DD, when the page names no date
+ * @returns {{ date: string, ids: string[] } | null}
+ */
+export function parseCheckoutIds(html, today) {
+  if (!html || isLoginPage(html)) return null;
+  return checkoutIdsOf(documentOf(html), today);
+}
+
+/** @param {any} doc @param {string} today */
+function checkoutIdsOf(doc, today) {
+  if (!/checkout\s*clubber/i.test(String(doc.querySelector('title')?.textContent || ''))) return null;
+  let table = null;
+  for (const t of doc.querySelectorAll('table')) {
+    if (String(t.getAttribute('class') || '').split(/\s+/).includes('items')) continue;
+    table = t;
+    break;
+  }
+  if (!table) return null;
+  for (const f of doc.querySelectorAll('input.filter[name^="clubs"]')) if (!f.hasAttribute('checked')) return null;
+  let entries = 0;
+  let sawEmpty = false;
+  for (const row of table.querySelectorAll('tr')) {
+    if (row.querySelector('th') && !row.querySelector('td')) continue;
+    if (row.querySelector('td.empty, .empty')) { sawEmpty = true; continue; }
+    const cell = row.querySelector('td.clubber.name') || row.querySelector('td.clubber');
+    if (!cell) continue;
+    if (!(String(cell.textContent || '').trim().split(/\s+/)[0] || '')) continue;
+    entries += 1;
+  }
+  if (!entries && !sawEmpty) return null;
+  /** @type {string[]} */
+  const ids = [];
+  for (const a of doc.querySelectorAll('a.checkout[clubber_id]')) {
+    const id = String(a.getAttribute('clubber_id') || '').trim();
+    if (/^\d{1,20}$/.test(id) && !ids.includes(id)) ids.push(id);
+  }
+  const opt = doc.querySelector('select#date option[selected]');
+  const v = opt ? String(opt.getAttribute('value') || '') : '';
+  return { date: /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : today, ids };
+}
+
+// ── TwoTimTwo's CSV exports (the extension's feeds.js, rule for rule) ─────────
+
+/**
+ * The extension's parseCsvText: quoted fields with commas and newlines, a
+ * leading BOM dropped, CR skipped. Rows of field strings. @param {string} text
+ * @returns {string[][]}
+ */
+export function parseCsvRows(text) {
+  let t = String(text || '');
+  if (t.charCodeAt(0) === 0xFEFF) t = t.slice(1);
+  /** @type {string[][]} */
+  const rows = [];
+  /** @type {string[]} */
+  let row = [];
+  let field = '';
+  let q = false;
+  for (let i = 0; i < t.length; i++) {
+    const c = t[i];
+    if (q) {
+      if (c === '"') { if (t[i + 1] === '"') { field += '"'; i++; } else q = false; } else field += c;
+    } else if (c === '"') q = true;
+    else if (c === ',') { row.push(field); field = ''; } else if (c === '\r') { /* skip */ } else if (c === '\n') { row.push(field); rows.push(row); row = []; field = ''; } else field += c;
+  }
+  if (field.length || row.length) { row.push(field); rows.push(row); }
+  return rows;
+}
+
+/** The extension's looksLikeCsv: a first line with a comma that is not markup. @param {string} text */
+export function looksLikeCsv(text) {
+  if (!text) return false;
+  const t = text.charCodeAt(0) === 0xFEFF ? text.slice(1) : text;
+  const first = (t.split(/\r?\n/)[0] || '').replace(/^\s+/, '');
+  return first.charAt(0) !== '<' && first.includes(',');
+}
+
+/** The extension's signed-out test for a feed (its login form, or the bare "Login Required"). @param {string} text */
+function feedSignedOut(text) {
+  if (typeof text !== 'string' || !text) return true;
+  return text.trim() === 'Login Required' || isLoginPage(text);
+}
+
+/** The extension's isFooterOrBlankRow ("Clubber Count=<n>", "FILTER,VALUE", blank lines). @param {string[]} row */
+export function isFooterOrBlankRow(row) {
+  if (!row || !row.length) return true;
+  if (!row.join('').trim()) return true;
+  if (/count\s*=/i.test(row[0] || '')) return true;
+  if (/^filter$/i.test((row[0] || '').trim())) return true;
+  return false;
+}
+
+/**
+ * Columns of the roster export the stations never need: the household's
+ * contact, address and payment fields (printer/docs/TWOTIMTWO.md section 3 lists
+ * all 66). Everything else is kept as TwoTimTwo wrote it, a column this list does
+ * not know included, and ROSTER_KEEP always wins: the consent columns the print
+ * server shape-matches (`normalizeHeader`), Notes (the allergies), any middle name.
+ */
+const ROSTER_DROP = /^(?:parent|guardian|address|alt address|city|state|zip|alt city|alt state|alt zip|emergency|others pickup|doctor|church$|# ?payments|payments|rate$|shirt|grandprix|invited by|clubber created|clubber last updated|email|alt email)|phone/;
+const ROSTER_KEEP = /release|consent|permission|waiver|allerg|medic|note|middle/;
+/** A header as the print server compares it (clubbers.js normalizeHeader's first step). @param {string} h */
+const rosterKey = (h) => String(h || '').toLowerCase().replace(/[_\s]+/g, ' ').replace(/[?!.:]+$/, '').trim();
+
+/**
+ * TwoTimTwo's roster export (GET /clubber/csv, printer/docs/TWOTIMTWO.md section
+ * 3): what the print server enriches every label from (allergies in Notes,
+ * birthday, group, photo consent). null when it is not that CSV at all (signed
+ * out, a page, no Clubber ID / First Name / Last Name header); `partial` when its
+ * own "Clubber Count=<n>" footer names more or fewer rows than were read (a cut
+ * download): never a roster with children missing.
+ * @param {string} text
+ * @returns {{ header: string[], rows: string[][], declared: number|null, partial: boolean } | null}
+ */
+export function parseRosterCsv(text) {
+  if (feedSignedOut(text) || !looksLikeCsv(text)) return null;
+  const all = parseCsvRows(text);
+  if (!all.length) return null;
+  const header = all[0].map((h) => String(h).trim());
+  const keys = header.map(rosterKey);
+  if (!keys.includes('clubber id') || !keys.includes('first name') || !keys.includes('last name')) return null;
+  /** @type {string[][]} */
+  const rows = [];
+  let declared = null;
+  for (const r of all.slice(1)) {
+    const first = String(r[0] || '').trim();
+    const m = /^Clubber Count=(\d+)/i.exec(first);
+    if (m) { declared = Number(m[1]); break; }
+    if (/^FILTER$/i.test(first)) break;
+    if (!r.join('').trim()) continue;
+    rows.push(r);
+  }
+  return { header, rows, declared, partial: declared !== null && declared !== rows.length };
+}
+
+/** One CSV field, always quoted (the print server's parser reads quoted fields with newlines). @param {unknown} v */
+const csvField = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+
+/**
+ * The roster the stations get: the columns they use, in TwoTimTwo's own order,
+ * every field quoted, with the "Clubber Count=<n>" footer the print server's
+ * parser stops at. The household's addresses, phones, emails and payments are
+ * left out (ROSTER_DROP): nothing on a label reads them.
+ * @param {{ header: string[], rows: string[][] }} r
+ * @returns {{ csv: string, columns: number }}
+ */
+export function trimRosterCsv(r) {
+  const keep = r.header.map((h, i) => ({ h, i, k: rosterKey(h) })).filter((c) => c.k && (ROSTER_KEEP.test(c.k) || !ROSTER_DROP.test(c.k)));
+  const lines = [keep.map((c) => csvField(c.h)).join(',')];
+  for (const row of r.rows) lines.push(keep.map((c) => csvField(String(row[c.i] ?? '').trim())).join(','));
+  lines.push(`Clubber Count=${r.rows.length}`);
+  return { csv: `${lines.join('\r\n')}\r\n`, columns: keep.length };
+}
+
+/**
+ * The completed-books report (/report/completed_books?output=csv, "Name","Book","Date"):
+ * the extension's parseCompletedBooksCsv, rule for rule. [] is an honest "nobody
+ * finished one"; null when the shape cannot be confidently understood (signed
+ * out, a page, no Name or Book column).
+ * @param {string} text @returns {{ name: string, book: string, date: string }[] | null}
+ */
+export function parseCompletedBooksCsv(text) {
+  if (feedSignedOut(text) || !looksLikeCsv(text)) return null;
+  const rows = parseCsvRows(text);
+  if (rows.length < 2 || !rows[0]) return null;
+  let nameIdx = -1, bookIdx = -1, dateIdx = -1;
+  rows[0].forEach((raw, i) => {
+    const h = String(raw || '').trim().toLowerCase();
+    if (h === 'name') nameIdx = i;
+    else if (h === 'book') bookIdx = i;
+    else if (h === 'date') dateIdx = i;
+  });
+  if (nameIdx < 0 || bookIdx < 0) return null;
+  const out = [];
+  for (const row of rows.slice(1)) {
+    if (isFooterOrBlankRow(row)) continue;
+    const name = String(row[nameIdx] || '').trim();
+    const book = String(row[bookIdx] || '').trim();
+    if (!name || !book) continue;
+    const date = dateIdx >= 0 ? String(row[dateIdx] || '').trim() : '';
+    out.push({ name: name.slice(0, 80), book: book.slice(0, 60), date: date.slice(0, 40) });
+  }
+  return out;
+}
+
+/** The extension's award and book columns of the meeting report (feeds.js AWARD_RE / BOOK_RE). */
+const AWARD_RE = /award/i;
+const BOOK_RE = /book|section/i;
+
+/**
+ * The meeting report (/meeting/report?output=csv): tonight's books and awards
+ * counts for the lobby ticker, and an award slip per child and award. The
+ * extension's parseMeetingReportCsv, rule for rule (a column whose header says
+ * "award" is an award, "book"/"section" a book; a slip needs a name, from First +
+ * Last, or a "Name" / "Clubber Name" column). null when it is not that CSV.
+ * @param {string} text
+ * @returns {{ booksCompleted: number, awardsEarned: number, slips: { name: string, clubName: string, award: string }[] } | null}
+ */
+export function parseMeetingReportCsv(text) {
+  if (feedSignedOut(text) || !looksLikeCsv(text)) return null;
+  const rows = parseCsvRows(text);
+  if (rows.length < 2 || !rows[0] || rows[0].length < 2) return null;
+  const header = rows[0];
+  /** @type {{ idx: number, label: string }[]} */
+  const awardCols = [];
+  /** @type {{ idx: number, label: string }[]} */
+  const bookCols = [];
+  let firstIdx = -1, lastIdx = -1, nameIdx = -1, clubIdx = -1;
+  header.forEach((raw, i) => {
+    const h = String(raw || '').trim();
+    const hl = h.toLowerCase();
+    if (AWARD_RE.test(h)) { awardCols.push({ idx: i, label: h }); return; }
+    if (BOOK_RE.test(h)) { bookCols.push({ idx: i, label: h }); return; }
+    if (/^first/.test(hl)) firstIdx = i;
+    else if (/^last/.test(hl)) lastIdx = i;
+    else if (hl === 'name' || /clubber\s*name/.test(hl)) nameIdx = i;
+    else if (/^club$/.test(hl)) clubIdx = i;
+  });
+  let booksCompleted = 0, awardsEarned = 0;
+  /** @type {{ name: string, clubName: string, award: string }[]} */
+  const slips = [];
+  for (const row of rows.slice(1)) {
+    if (isFooterOrBlankRow(row)) continue;
+    let name = '';
+    if (firstIdx >= 0 && lastIdx >= 0) name = `${String(row[firstIdx] || '').trim()} ${String(row[lastIdx] || '').trim()}`.trim();
+    else if (nameIdx >= 0) name = String(row[nameIdx] || '').trim();
+    const clubName = clubIdx >= 0 ? String(row[clubIdx] || '').trim() : '';
+    for (const col of awardCols) {
+      if (!String(row[col.idx] || '').trim()) continue;
+      awardsEarned++;
+      if (name) slips.push({ name, clubName, award: col.label });
+    }
+    for (const col of bookCols) {
+      if (!String(row[col.idx] || '').trim()) continue;
+      booksCompleted++;
+      if (name) slips.push({ name, clubName, award: col.label });
+    }
+  }
+  return { booksCompleted, awardsEarned, slips };
 }
 
 /**
@@ -829,10 +1083,53 @@ export class TwoTimTwoClient {
   async checkoutPage(opts = {}) {
     const page = await this.page('/clubber/checkout', { kind: 'checkout-page', ...opts });
     if (!page.ok) return page;
-    const parsed = parseCheckoutPage(page.html);
+    if (isLoginPage(page.html)) return { ok: /** @type {const} */ (false), error: 'checkout-page-unreadable' };
+    const doc = documentOf(page.html);
+    const parsed = checkoutPageOf(doc, page.html);
     if (!parsed) return { ok: /** @type {const} */ (false), error: 'checkout-page-unreadable' };
     if (!parsed.calendarId) return { ok: /** @type {const} */ (false), error: 'no-meeting' };
-    return { ok: /** @type {const} */ (true), page: parsed };
+    // Every club's ids, when the page was genuinely read (null otherwise): the
+    // check-outs made by hand on that page (ymcheckout.js, the extension's runCheckout).
+    return { ok: /** @type {const} */ (true), page: parsed, ids: checkoutIdsOf(doc, parsed.date) };
+  }
+
+  /**
+   * The roster export, /clubber/csv (parseRosterCsv). `text` is TwoTimTwo's own
+   * answer, for GET /v1/station/roster-source: in memory only.
+   * @param {{ waitMs?: number, kind?: string }} [opts]
+   */
+  async rosterCsv(opts = {}) {
+    const page = await this.page('/clubber/csv', { kind: 'roster-csv', ...opts });
+    if (!page.ok) return page;
+    const roster = parseRosterCsv(page.html);
+    if (!roster) return { ok: /** @type {const} */ (false), error: 'roster-unreadable' };
+    if (roster.partial) return { ok: /** @type {const} */ (false), error: 'roster-partial' };
+    return { ok: /** @type {const} */ (true), roster, text: page.html };
+  }
+
+  /**
+   * One club's completed books, the extension's query (output=csv, club_id,
+   * from_date, to_date as YYYY-MM-DD). @param {number|string} clubId @param {string} from @param {string} to
+   * @param {{ waitMs?: number, kind?: string }} [opts]
+   */
+  async completedBooks(clubId, from, to, opts = {}) {
+    const q = `output=csv&club_id=${encodeURIComponent(String(clubId))}&from_date=${encodeURIComponent(from)}&to_date=${encodeURIComponent(to)}`;
+    const page = await this.page(`/report/completed_books?${q}`, { kind: 'completed-books', ...opts });
+    if (!page.ok) return page;
+    const entries = parseCompletedBooksCsv(page.html);
+    return entries ? { ok: /** @type {const} */ (true), entries } : { ok: /** @type {const} */ (false), error: 'books-unreadable' };
+  }
+
+  /**
+   * Tonight's meeting report (output=csv, with the meeting's calendar_id when it is known).
+   * @param {string} calendarId '' when not known @param {{ waitMs?: number, kind?: string }} [opts]
+   */
+  async meetingReport(calendarId, opts = {}) {
+    const cal = /^\d{1,12}$/.test(String(calendarId || '')) ? `&calendar_id=${calendarId}` : '';
+    const page = await this.page(`/meeting/report?output=csv${cal}`, { kind: 'meeting-report', ...opts });
+    if (!page.ok) return page;
+    const report = parseMeetingReportCsv(page.html);
+    return report ? { ok: /** @type {const} */ (true), report } : { ok: /** @type {const} */ (false), error: 'meeting-unreadable' };
   }
 
   /** @param {{ waitMs?: number, kind?: string }} [opts] */
