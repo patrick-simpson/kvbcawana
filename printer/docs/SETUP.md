@@ -12,26 +12,27 @@ The tray's **Settings (awana.kvbchurch.org/settings)** opens the one settings pa
 
 **Updates.** The app checks the update feed at awana.kvbchurch.org/updates/printer/ on every launch and every ten minutes after that, so a release reaches a laptop within about ten minutes. Nothing needs setting up.
 
-Updates install themselves within a minute or two of a release going out, **deliberately even mid-club-night**, since a release that ships while a club is running is almost always an urgent fix. A print server waits only while a label is in flight (a printing request still open, a job on the printer chain, a stretch reprint, or a phone check-in the extension has not driven yet), capped at a minute; a display-only computer waits five seconds. The tray icon shows "Updating to vX… restarting" for those few seconds. The print server comes back up on its own within seconds; nobody needs to touch the laptop.
+Updates install themselves within a minute or two of a release going out, **deliberately even mid-club-night**, since a release that ships while a club is running is almost always an urgent fix. A print server waits only while a label is in flight (a printing request still open, a job on the printer chain, a stretch reprint), capped at a minute; a display-only computer waits five seconds. The tray icon shows "Updating to vX… restarting" for those few seconds. The print server comes back up on its own within seconds; nobody needs to touch the laptop.
 
-## 2. Chrome extension
+## 2. No Chrome extension (since 10.0.0)
 
-`chrome://extensions` → Developer mode → *Load unpacked* → pick
-**`%APPDATA%\awana-label-printer\chrome-extension`**. Open the TwoTimTwo
-check-in page — the green widget appears. Pin the page as the browser
-homepage.
+There is nothing to load in Chrome. Check-in is **awana.kvbchurch.org/checkin**
+(§4); the sync service reads TwoTimTwo for the check-in work the extension used to do
+(check-ins made on TwoTimTwo's own page, the roster and completed books, the
+meeting report's award slips, the Trek and Journey check-out at 7:15 pm and
+hand check-outs on TwoTimTwo's Checkout page), and this computer prints the
+jobs it leases.
 
-Load *that* folder, not a copy from Downloads: the app rewrites it on
-every launch, so an app update also updates the extension — restart
-Chrome to pick it up. The tray menu has **Open Chrome extension folder**,
-which opens it in Explorer to drag onto the dialog or copy the path from.
-Details in `EXTENSION.md`.
+A laptop that had the old extension needs nothing done: on its first 10.x
+launch the app turns the folder Chrome loaded it from
+(`%APPDATA%\awana-label-printer\chrome-extension`) into a stub that does
+nothing and restarts Chrome once. The entry may stay in `chrome://extensions`;
+remove it whenever you like.
 
 ## 3. Settings: awana.kvbchurch.org/settings
 
 Everything is set on the one settings page. Open it in Chrome **on this
-computer** (the tray's *Settings*, the extension's Settings button and its
-options page all open it): the **Printing** section's *At the laptop* card
+computer** (the tray's *Settings* opens it): the **Printing** section's *At the laptop* card
 finds the print server on `localhost:3456` by itself, after you sign in under
 Account & app with the church passphrase. Chrome may ask once to let the site
 connect to devices on your computer: allow it. Opened on any other device, *At
@@ -39,9 +40,8 @@ the laptop* says to open the page on the check-in laptop; everything else on
 the page, the rest of Printing included, works from anywhere.
 
 The print dashboard that used to be at `http://localhost:3456` is retired
-(owner, 2026-10-11: online only). **With no internet the desk still prints:
-check-in and the extension talk to this computer only. There are no phones and
-no settings changes until the internet is back.**
+(owner, 2026-10-11: online only). **With no internet nothing checks in or
+prints: the desk uses the paper sheet ([NIGHT-OF.md](NIGHT-OF.md#paper-sheet-when-the-internet-is-down)).**
 
 What Printing holds (the church-wide settings work from any device; *At the laptop* needs this computer):
 
@@ -54,10 +54,8 @@ What Printing holds (the church-wide settings work from any device; *At the lapt
   *Set up this computer...*.) Signing in installs the church's display key, so
   names go out sealed; there is no key to generate or paste any more.
 - **Printers** — the name tag printer and the backup ("if it fails, print on").
-- **Labels** — the footer, the visitor palette, the trophy band, connect cards
-  and *Let the check-in laptop’s Chrome extension check children in on
-  TwoTimTwo directly* (the kill switch for the phone page's check-in, undo and
-  check-out); **Each club’s label** — each club's layout. Church-wide: saved in
+- **Labels** — the footer, the visitor palette, the trophy band and connect
+  cards; **Each club’s label** — each club's layout. Church-wide: saved in
   the sync service and followed by the laptop. The musical printer and the
   update beacon stay with this laptop (At the laptop).
 - **Pickup list**, **Club night schedule** (the schedule and the late grace; the
@@ -72,13 +70,10 @@ What Printing holds (the church-wide settings work from any device; *At the lapt
   reprint), **One-off name tag** (a lost tag, or a child who isn't checking in
   tonight; welcomed on the screens, never counted) and **Custom label** (one
   line of text, nothing recorded).
-- **Attendance audit** — compares the season ledger with TwoTimTwo's attendance
-  grid; *Apply missing dates* only ever adds nights, and asks first.
 
-Two things are not on the page on purpose. The **check-in URL** is set in the
+One thing is not on the page on purpose: the **check-in URL** is set in the
 app's setup wizard (tray → *Set up this computer...*), because it is handed to
-the Windows shell. The **extension folder** is the tray's *Open Chrome extension
-folder*, because its path contains the Windows user name.
+the Windows shell.
 
 ## 4. Phone check-in
 
@@ -91,21 +86,16 @@ signed in to the sync service. **The print server no longer listens on the
 network at all**: it answers only the computer it runs on, so the roster,
 check-in history and allergy list are not reachable from the church Wi-Fi.
 
-Two things print through the laptop straight from the phone, because neither
-can double-print: a **visitor label** for someone not on the roster, and a
-**Leader tag** for an adult volunteer (never counted as a check-in). The
-Tonight tab shows who is being counted; its Remove is local only and does not
-undo the check-in on TwoTimTwo. How volunteers use it on club night is in
-[NIGHT-OF.md](NIGHT-OF.md). With the laptop off the phone page still checks
-children in, but nothing prints until the laptop is back.
+The page's **+** menu prints a **walk-in name tag** (welcomed, never counted),
+a **leader tag** (never counted) and a **custom label**, each a sealed job to
+the print stations. The Tonight list shows who is checked in, with Undo
+check-in. How volunteers use it on club night is in [NIGHT-OF.md](NIGHT-OF.md).
+With the laptop off the page still checks children in, but nothing prints until
+the laptop is back.
 
-Leaders who have had a tag printed are remembered on this server
-(`leaders.json` in the data folder — names only, no contact details) and
-offered back as chips on the phone page, the settings page and the check-in
-widget. Every club dropdown on all three surfaces is served by the server
-(`GET /clubs`), so a club can never be missing from one of them — which is
-exactly how the widget's walk-in dropdown ended up as the only one without
-Journey.
+Leaders who have had a tag printed are remembered in the church settings
+(names only, no contact details) and offered back as chips on /checkin and the
+settings page. Every club list reads the one club table (`lobby/shared/clubs.js`).
 
 See [SECURITY.md](../SECURITY.md) for the full trust model, what it
 deliberately does not defend against, and the fork checklist.
@@ -115,9 +105,3 @@ deliberately does not defend against, and the fork checklist.
 `print-server/church-config.json` — check-in URL, club-night windows
 (when live broadcasts run), shares club ids, the live channel's name (`pusherChannel`). Baked
 KVBC defaults apply if the file is missing. Forks change this one file.
-
-## Per-night knobs (widget)
-
-Step Up Night and Awana Store night modes: auto (from the TwoTimTwo
-calendar), or forced on/off. Quick Mode makes any roster click a
-one-tap check-in.

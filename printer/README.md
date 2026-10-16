@@ -23,24 +23,21 @@ No PowerShell, no Node.js install, no terminal window.
 
 ## What it does on club night
 
-- **Prints automatically** when a kid checks in — on this laptop, another device, or a volunteer's phone (see [SETUP.md](docs/SETUP.md#4-phone-check-in-optional-off-by-default)).
+- **Prints automatically** when a kid checks in at awana.kvbchurch.org/checkin (the desk, or a volunteer's phone) or on TwoTimTwo's own check-in page: the sync Worker hands this computer a sealed print job, and it prints within seconds.
 - **Enriched labels**: set in the Awana 2026-27 catalog's fonts (Paytone One, Londrina Solid, Figtree; Puggles and Cubbies in Comic Neue, Trek and Journey in Playfair Display — all bundled, so every PC prints the same label) with the club's TwoTimTwo logo or, when that can't be fetched, its official one-colour club mark; handbook group, allergy/birthday/no-photo icons, store-night share balances, Step Up Night, attendance milestones ("10th club night!"), and a "Go to:" line for late arrivals (from the dashboard's group schedule).
 - **Broadcasts the party**: the lobby welcome display and the countdown app's live per-club counts are fed from this server's live-channel events (first names only, ever — see CONTRACT.md).
-- **Tells you when it's sick**: selector self-tests, an end-to-end "Night Test" canary, visible print failures, and a status card on the settings page (awana.kvbchurch.org/settings → Printing → At the laptop).
+- **Tells you when it's sick**: an end-to-end "Night Test" canary, visible print failures, CHECK THE PRINTER when a job's outcome is unknown, and a status card on the settings page (awana.kvbchurch.org/settings → Printing → At the laptop).
 
-### Fallback Behavior
+### With no internet
 
-If the server isn't running or can't reach the printer, the extension falls back to a plain label through the browser's normal print dialog. This means:
-- Users can still print manually if needed
-- Setup failures are graceful, not blocking
-- The tool degrades but doesn't break the check-in workflow
+Nothing at church checks in or prints without the internet (since 10.0.0 there is no Chrome extension on the laptop). The desk uses TwoTimTwo's paper sign-in sheet and hand-written name tags, and the sheet is keyed into TwoTimTwo when the connection is back ([NIGHT-OF.md](docs/NIGHT-OF.md#paper-sheet-when-the-internet-is-down)).
 
 ## Technical Details
 
 ### Architecture
 
 - **KVBC Awana app** (`electron-app/`) - Windows installer, tray app and auto-updater. It runs the print server when the print role is on, and the lobby display when the display role is on.
-- **Chrome extension** - runs on TwoTimTwo.com, detects check-ins and drives the print server
+- **No Chrome extension** since 10.0.0: the sync Worker (`lobby/worker/`) reads TwoTimTwo (check-ins made there, the roster, completed books, the youth check-out) and the app prints the jobs it leases. On its first 10.x launch the app empties the old extension's folder and restarts Chrome once.
 - **Node.js print server** - runs on the computer that has the print role, generates PDFs and prints silently. It answers only the computer it runs on: phones use awana.kvbchurch.org/checkin, and every setting is on awana.kvbchurch.org/settings ([SETUP.md](docs/SETUP.md#3-settings-awanakvbchurchorgsettings)).
 - **React web UI** (optional) - Simulator and configuration reference
 
@@ -65,8 +62,8 @@ Total install size: ~300 MB (Puppeteer/Chromium is large, but one-time download)
 
 - **Windows only** - the app requires Windows 10+ (a Raspberry Pi print station runs the server under CUPS)
 - **Printer must be Windows-compatible** - Uses Windows printer drivers
-- **TwoTimTwo.com structure** - If the site's HTML changes, the extension may need updates
-- **Online only** - the server is reachable from this computer alone, so settings and phone check-in need the internet; with none, check-in still prints at the desk
+- **TwoTimTwo.com structure** - If the site's HTML changes, the sync Worker's readers may need updates
+- **Online only** - the server is reachable from this computer alone, and check-in, printing and settings all need the internet; with none, the desk uses the paper sheet
 
 ## Releases
 

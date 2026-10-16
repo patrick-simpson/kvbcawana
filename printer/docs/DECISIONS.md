@@ -46,7 +46,7 @@ Terse, dated. Rules live in `CLAUDE.md`; this is the why. Tests cited pin the be
 - Plain `Object.assign` could not delete a key; clearing the old phone PIN once left the old one accepted until restart (why `applySavedConfig()`).
 
 ## Online only (owner 2026-10-11, built 2026-10-12)
-- Dashboard and Wi-Fi phone page retired (9.1.0); tools moved to awana.kvbchurch.org/settings. With no internet the desk uses the extension and prints; no phones or settings changes until back. Builds on "everything free, forever" (root `CLAUDE.md`, `ROADMAP.md#online-check-in`).
+- Dashboard and Wi-Fi phone page retired (9.1.0); tools moved to awana.kvbchurch.org/settings. With no internet the desk used the extension and printed (until 10.0.0; since then the paper sheet). Builds on "everything free, forever" (root `CLAUDE.md`, `ROADMAP.md#online-check-in`).
 - 8.0.0 (owner 2026-10-11): cloud check-in from the online phone page, Worker answers TwoTimTwo itself.
 - P2 (2026-10-12): the print role is an online check-in station; at-most-once printing is an owner rule (a duplicate tag is the worse failure, so unknown outcomes raise CHECK THE PRINTER instead of reprinting). P5: the Worker makes tally/ticker/still-here; station greets because only it has roster and history.
 
@@ -55,3 +55,10 @@ Terse, dated. Rules live in `CLAUDE.md`; this is the why. Tests cited pin the be
 - Awana marks allowed (owner 2026-10-11) with the trademark line. White on `--c-deep` fails AA (T&T 4.3); kit hot is 3.4, hence `--hot-btn`.
 - Container-unit caveat: a container cannot size its own padding in its cq units (they resolve against the viewport), so roots use `%`.
 - Reel: 60-90 s film of the screens on a club night, first thing on the site. Pages' static files ignore Range and Safari will not play video without it, so films stream via `site/functions/reel`. Real footage, never mock-ups. Real logos/marks allowed inside the film (in-house use).
+
+## The Chrome extension retired (owner 2026-10-16, KVBC Awana 10.0.0)
+- Owner: delete the extension; the sync Worker and KVBC Awana do its work. The Worker took over the roster, completed books, the meeting report's award slips and the Checkout page's hand check-outs (commits 03e13d1, 7dbd30f; roster and books are served only to stations whose heartbeat reports 10.0.0 or later). Check-in is awana.kvbchurch.org/checkin; a TwoTimTwo-page check-in prints from the Worker's report watcher.
+- With no internet nothing checks in or prints: the desk uses TwoTimTwo's paper sheet (`/clubber/checkin_form`), keyed in later (ROADMAP.md#online-check-in, "No internet").
+- Nobody can remove an unpacked extension from the laptop's Chrome remotely, so the app NEUTERS its folder on every launch (a stub manifest that runs nothing, every other file deleted) and restarts Chrome once, on the launch that replaced a real 9.x manifest (`electron-app/src/extension-sync.js`).
+- Gone with it: the phone relay and the pending-action queue, the /phone/* routes, the report/feed intake and the count check, /reset-tonight, the attendance audit, the touch screen, /print-pdf, /label, the self-test and site check, version skew, /update-now, and the extension and `*.twotimtwo.com` origins (they were only a way in). Not replaced: the points race, the TwoTimTwo iCal schedule and announcement mirror, and worksheets, which only the extension read.
+- `enableDrivenCheckin` stays in the shared church table (three apps read it) but is shown nowhere and read by nothing.

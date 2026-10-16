@@ -7,13 +7,20 @@ Captured 2026-07-26 against a live church tenant (`kvbchurch.twotimtwo.com`,
 Yii 1.x + Bootstrap 3 + jQuery). TwoTimTwo is closed-source and has no public
 API; everything here was observed from the authenticated site. Treat it as a
 contract that can drift — the tests in `scripts/test-server-helpers.cjs` and
-the extension's selector self-test exist to catch drift loudly.
+the sync Worker's own (`lobby/worker/test/`) exist to catch drift loudly.
+
+> **Since KVBC Awana 10.0.0 (2026-10-16) there is no Chrome extension.** The
+> sync Worker (`lobby/worker/src/twotimtwo.js` and its readers) is the only
+> thing that talks to TwoTimTwo, signed in as the church's check-in user. The
+> sections below that describe the extension (§1's session, §2, §7) are kept as
+> the record of what it read; the selectors and routes are TwoTimTwo's own and
+> the Worker reads the same pages.
 
 > **Privacy:** every field below is a column name, selector, or shape — never
 > real data. The live site holds real children's PII (names, allergies,
 > guardians, phones, addresses). Never commit captured pages, CSVs, or cookie
-> jars. The extension already reduces everything to first-name-only before it
-> reaches any display (see the privacy invariant in the display repo).
+> jars. Everything is reduced to first-name-only before it reaches any display
+> (see the privacy invariant in the root CLAUDE.md, lobby section).
 
 ---
 
@@ -22,9 +29,9 @@ the extension's selector self-test exist to catch drift loudly.
 - Login form: `POST /site/login`, form-encoded, fields `LoginForm[username]`
   (email), `LoginForm[password]`, `Login=1`, plus a `YII_CSRF_TOKEN` hidden
   field read from the GET of `/site/login`.
-- Session is a cookie (`PHPSESSID`-style). The browser extension relies on the
-  volunteer already being logged in — it never handles credentials; it just
-  issues same-origin `fetch()`s that ride the existing cookie.
+- Session is a cookie (`PHPSESSID`-style). The retired browser extension relied
+  on the volunteer already being logged in and rode that cookie; the sync
+  Worker signs in itself as the church's dedicated user (`TWOTIMTWO_*` secrets).
 - **Session-health probe:** `GET /clubber/ajaxSearch?text=zz` returns an HTML
   fragment normally, or the literal string `Login Required` when the session
   has expired. Cheap way to detect a dead session before a check-in fails.
@@ -33,8 +40,8 @@ the extension's selector self-test exist to catch drift loudly.
 
 ## 2. The check-in page — `/clubber/checkin`
 
-This is the page the Chrome extension content script runs on. Everything the
-automatic-printing pipeline depends on lives here.
+This is the page the Chrome extension's content script ran on until 10.0.0;
+the sync Worker reads it now (the desk's roster, check-ins made here).
 
 ### 2.1 Roster DOM (load-bearing selectors)
 
@@ -369,7 +376,8 @@ Awards / meeting flow (HTML, mutating POSTs **not** used by this project):
 
 ## 7. What this project touches today (surface area to protect)
 
-**Chrome extension (`chrome-extension/content.js`), same-origin on twotimtwo.com:**
+**Chrome extension (`chrome-extension/content.js`, deleted in 10.0.0; the record
+of what it touched), same-origin on twotimtwo.com:**
 - Reads `.clubber` / `.name` / `.club img` / `recid` / `club_id` (roster diff,
   labels, identity).
 - Watches `#lastCheckin` (local check-in detection).
@@ -379,7 +387,13 @@ Awards / meeting flow (HTML, mutating POSTs **not** used by this project):
 - Scans page text for "step up" / "store" (night-mode auto-detect).
 
 **Print server (`print-server/server.js`), from the CSV only** — never talks to
-TwoTimTwo directly; enriches labels from the synced `clubbers.csv`.
+TwoTimTwo directly; enriches labels from `clubbers.csv`, which since 10.0.0 is
+the roster the sync Worker read and sealed to the station.
+
+**Sync Worker (`lobby/worker/src/`)** — everything TwoTimTwo-facing since
+10.0.0: the check-in page and posts, the check-in report, the roster and
+household CSVs, completed books, the meeting report, the Checkout page; its
+routes are in `lobby/worker/src/routes.md`.
 
 Everything else in this doc is **available but unused** — see the capabilities
 page (`/capabilities.html`) for the ranked backlog of what to build next.

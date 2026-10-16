@@ -15,7 +15,7 @@ every route.
 
 | Caller | Trust | What it can reach |
 |---|---|---|
-| **Loopback** (`127.0.0.1`, `::1`) — the Chrome extension via `http://localhost:3456`, the KVBC Awana app, the phone-relay loop that runs the sync Worker's check-in requests | Trusted | Everything |
+| **Loopback** (`127.0.0.1`, `::1`) — the KVBC Awana app and its own loops (the station's job puller posting the jobs it leased) | Trusted | Everything |
 | **awana.kvbchurch.org/settings**, in the laptop's own browser | Trusted only for a short route table, and only with proof | Printer settings and tools (no key, no token): see below |
 | **The LAN** | Not served | Nothing: the server does not listen there, and the gate refuses a non-loopback socket anyway |
 | **Any other website open in the volunteer's browser** | Untrusted | Nothing, unless its origin is on the allowlist |
@@ -26,12 +26,13 @@ Four consequences worth stating plainly:
   environment variable that opens it to the network (`AWANA_BIND_HOST` and
   `lanAccess` are ignored), and a request from any non-loopback address gets a
   403 from the gate on every route. Phones use awana.kvbchurch.org/checkin,
-  which the sync Worker answers itself and relays to this computer. Old
+  which talks to the sync Worker; this computer prints the jobs it leases. Old
   `phonePin`, `lanAccess` and `allowedOrigins` keys in a config.json are never
   read.
-- **CORS is an allowlist, never `*`.** Only the extension, `*.twotimtwo.com`,
-  a loopback page on this server's own port, and the one settings-page origin
-  (below) may read a response. Mutating requests carrying a non-allowlisted
+- **CORS is an allowlist, never `*`.** Only a loopback page on this server's
+  own port and the one settings-page origin (below) may read a response.
+  (Until 10.0.0 also `chrome-extension://…` and `*.twotimtwo.com`, for the
+  Chrome extension; with it gone they were only a way in, and were removed.) Mutating requests carrying a non-allowlisted
   `Origin` are refused outright, which is what stops a hostile tab from writing
   to the server even on requests a browser would not preflight.
 - **The settings page is one exact origin, a route table and a proof.**
