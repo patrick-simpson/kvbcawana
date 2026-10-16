@@ -248,8 +248,8 @@ async function main() {
       host: '127.0.0.1', pathname: '/stats/tonight',
       headers: { Origin: 'https://kvbchurch.twotimtwo.com' },
     });
-    check('the check-in site origin is allowed to read',
-      res.headers['access-control-allow-origin'] === 'https://kvbchurch.twotimtwo.com',
+    check('the check-in site may no longer read the roster (10.0.0: it was the extension\'s content script)',
+      !res.headers['access-control-allow-origin'],
       `got ${res.headers['access-control-allow-origin']}`);
     check('the allowlist never answers with a wildcard',
       res.headers['access-control-allow-origin'] !== '*');

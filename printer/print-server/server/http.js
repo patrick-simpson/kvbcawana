@@ -45,8 +45,8 @@ for (const method of ['get', 'post', 'put', 'delete', 'patch']) {
 // every response. Because the browser lets a page READ a response bearing that
 // header, any website open in the volunteer's browser could fetch
 // /stats/tonight and walk away with tonight's children plus their allergy
-// tokens. The allowlist (security.isAllowedOrigin) admits only the extension,
-// *.twotimtwo.com, this server's own pages, and any operator-configured extra.
+// tokens. The allowlist (security.isAllowedOrigin) admits only this server's
+// own pages (and the settings page, for its own table of routes below).
 //
 // Two rules, both necessary:
 //   • Reads  — no ACAO header for a stranger, so the browser blocks the read.

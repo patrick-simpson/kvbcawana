@@ -9,19 +9,18 @@
 // THE TRUST MODEL, in one sentence: the loopback interface is trusted, and
 // nothing else is: not the LAN, not the open internet.
 //
-//   • Loopback (127.0.0.1 / ::1) — trusted. This is the Chrome extension
-//     talking to http://localhost:3456, the KVBC Awana app's windows, and the
-//     phone-relay loop that runs the Worker's check-in requests. No credential
-//     is required; these callers already run as the volunteer on the
-//     volunteer's own machine.
+//   • Loopback (127.0.0.1 / ::1) — trusted. This is the KVBC Awana app's
+//     windows and its own loops (the station's job puller posting the jobs it
+//     leased to its own routes). No credential is required; these callers
+//     already run as the volunteer on the volunteer's own machine.
 //
 //   • The LAN — not served. Online only (owner, 2026-10-11): the Wi-Fi phone
 //     page and its PIN are gone, the server binds 127.0.0.1 and refuses any
 //     non-loopback socket. Phones use awana.kvbchurch.org/checkin.
 //
-//   • Any other web page the volunteer has open — untrusted. It shares the
-//     loopback interface with the extension, so the socket address cannot
-//     tell them apart; the Origin header is what distinguishes them. Hence
+//   • Any web page the volunteer has open — untrusted. It shares the loopback
+//     interface with the app, so the socket address cannot tell them apart;
+//     the Origin header is what distinguishes them. Hence
 //     the origin allowlist below, applied to reads AND writes. The one public
 //     page that may reach this server is awana.kvbchurch.org/settings, through
 //     SETTINGS_PAGE_ROUTES below.
@@ -77,12 +76,10 @@ function isLoopbackRequest(req) {
 // /stats/tonight — names plus allergy tokens — with a single fetch().
 //
 // Allowed origins, and why each is needed:
-//   • chrome-extension://…      the extension's options page
-//   • https://*.twotimtwo.com   the content script's page origin (a fetch from
-//                               a content script carries the PAGE's origin, not
-//                               the extension's). Subdomain-wide because every
-//                               church has its own subdomain — a fork must work
-//                               without editing this list.
+//   (Until 10.0.0 also chrome-extension://…, moz-extension://… and
+//   https://*.twotimtwo.com, for the Chrome extension's options page and its
+//   content script. The extension is gone; so are they: no extension and no
+//   TwoTimTwo page may read this server's roster or write to it any more.)
 //   • http://<loopback-or-private-host>:<our port>   a page this server
 //                               itself serves (the tiny GET / page; the
 //                               dashboard and Wi-Fi phone page are retired).
@@ -100,12 +97,6 @@ function isLoopbackHostname(hostname) {
   return h === 'localhost' || h.endsWith('.localhost') || isLoopbackAddress(h);
 }
 
-function isTwoTimTwoOrigin(url) {
-  if (url.protocol !== 'https:') return false;
-  const h = url.hostname.toLowerCase();
-  return h === 'twotimtwo.com' || h.endsWith('.twotimtwo.com');
-}
-
 // `extraOrigins` are exact, case-insensitive origin strings (nothing passes
 // any since Online only: config.allowedOrigins is no longer read). Wildcards
 // are NOT accepted: one pasted "*" would silently restore the hole this
@@ -116,13 +107,8 @@ function isAllowedOrigin(origin, opts) {
   const o = origin.trim();
   if (!o || o === 'null') return false;                // sandboxed iframe / file://
 
-  if (o.startsWith('chrome-extension://')) return true;
-  if (o.startsWith('moz-extension://')) return true;
-
   let url;
   try { url = new URL(o); } catch { return false; }
-
-  if (isTwoTimTwoOrigin(url)) return true;
 
   // Our own pages. Requires BOTH our port and a loopback host, so a hostile
   // site merely served on port 3456 (or a LAN machine's) does not qualify — the

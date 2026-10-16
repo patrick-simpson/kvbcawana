@@ -501,9 +501,9 @@ console.log('packaging — every print-server module must ship inside the Window
 
   // Origin allowlist.
   const allow = (o) => sec.isAllowedOrigin(o, { port: 3456 });
-  check('allows the extension options page', allow('chrome-extension://abcdefghijklmnop') === true);
-  check('allows the check-in site', allow('https://kvbchurch.twotimtwo.com') === true);
-  check('allows another church subdomain (fork-friendly)', allow('https://other.twotimtwo.com') === true);
+  // 10.0.0: the Chrome extension is gone, and so are its two origins.
+  check('refuses an extension page', allow('chrome-extension://abcdefghijklmnop') === false && allow('moz-extension://abcdefghijklmnop') === false);
+  check('refuses the check-in site (it was the extension\'s content script)', allow('https://kvbchurch.twotimtwo.com') === false && allow('https://other.twotimtwo.com') === false && allow('https://twotimtwo.com') === false);
   check('allows our own page over loopback', allow('http://localhost:3456') === true && allow('http://127.0.0.1:3456') === true && allow('http://[::1]:3456') === true);
   check('rejects a private LAN IP on our port (the Wi-Fi phone page is gone: that is somebody else\'s server)',
     allow('http://192.168.1.20:3456') === false && allow('http://10.0.0.5:3456') === false && allow('http://laptop.local:3456') === false);

@@ -402,14 +402,16 @@ async function main() {
     check('a stranger\'s origin is refused', evil.status === 403);
   }
 
-  console.log('settings page: the app and the extension are unchanged');
+  console.log('settings page: the app is unchanged; the extension and TwoTimTwo are out (10.0.0)');
   {
     const own = `http://127.0.0.1:${PORT}`;
     const fromDashboard = await post('/config', { printerName: 'Back' }, { Origin: own });
     check('the dashboard\'s own origin still saves', fromDashboard.status === 200 && savedConfig().printerName === 'Back');
     const KEY2 = Buffer.alloc(32, 9).toString('base64');
     const fromExtension = await post('/config', { displayKey: KEY2 }, { Origin: 'chrome-extension://abcdefghijklmnop' });
-    check('the extension can still set a key', fromExtension.status === 200 && savedConfig().displayKey === KEY2);
+    check('an extension page can no longer set a key', fromExtension.status === 403 && savedConfig().displayKey !== KEY2, String(fromExtension.status));
+    const fromApp = await post('/config', { displayKey: KEY2 });
+    check('the app itself (no Origin) still can', fromApp.status === 200 && savedConfig().displayKey === KEY2);
     const noOrigin = await j('/config');
     check('GET /config without an Origin still carries the secrets (this computer)', noOrigin.status === 200 && noOrigin.body.displayKey === KEY2);
     check('...and a stale PIN left in an old config.json is never read, never written', noOrigin.body.phonePin === '4321' && savedConfig().phonePin === '4321');
@@ -418,7 +420,7 @@ async function main() {
     const slides = await fetch(`${BASE}/api/display-settings`, { method: 'OPTIONS', headers: { Origin: PAGE, 'Access-Control-Request-Method': 'POST', 'Access-Control-Request-Headers': 'content-type,authorization', 'Access-Control-Request-Private-Network': 'true' } });
     check('the slides publish preflight is as it was', slides.status === 204 && slides.headers.get('access-control-allow-private-network') === 'true');
     const twotimtwo = await preflight('/print', 'POST', 'https://kvbchurch.twotimtwo.com');
-    check('TwoTimTwo\'s own calls are as they were (no private-network opt-in)', twotimtwo.status === 204 && !twotimtwo.headers.get('access-control-allow-private-network'));
+    check('a TwoTimTwo page can no longer print here', twotimtwo.status === 403 && !twotimtwo.headers.get('access-control-allow-origin'), String(twotimtwo.status));
   }
 
   console.log('settings page: signed in with the passphrase instead of the token');

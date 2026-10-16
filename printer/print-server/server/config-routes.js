@@ -92,8 +92,6 @@ function isTrustedConfigOrigin(req) {
   if (!security.isLoopbackRequest(req)) return false;
   const origin = req.headers.origin;
   if (!origin) return true;                                   // same-origin GET, curl on this machine, tests
-  if (origin.startsWith('chrome-extension://')) return true;   // the extension's options page
-  if (origin.startsWith('moz-extension://')) return true;
   try {
     const url = new URL(origin);
     return url.protocol === 'http:'
