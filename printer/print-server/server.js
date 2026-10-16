@@ -56,8 +56,8 @@ module.exports = {
   configureCloud: $station.configureCloud, stopCloud: $station.stopCloud,
   // The church settings from the Worker (church-sync.js) and the switch-aware gates.
   get churchSync() { return $station.churchSync; }, startChurchSync: $station.startChurchSync, stopChurchSync: $station.stopChurchSync,
-  singlePublisherSilent: $station.singlePublisherSilent, ymHandedOff: $station.ymHandedOff, cloudStatus: $station.cloudStatus, clearCheckThePrinter: $station.clearCheckThePrinter, importLaptopHistory: $station.importLaptopHistory, mergeAttendance: $station.mergeAttendance,
-  app, startListening: $lifecycle.startListening, stopListening: $lifecycle.stopListening, isBusy: $http.isBusy, resetRelayForTest: $relay.resetRelayForTest, setUpdateHandler: $updates.setUpdateHandler, setLatestVersion: $updates.setLatestVersion, setExtensionInfo: $updates.setExtensionInfo, setOpsAlertHandler: $eventBuffer.setOpsAlertHandler,
+  singlePublisherSilent: $station.singlePublisherSilent, cloudStatus: $station.cloudStatus, clearCheckThePrinter: $station.clearCheckThePrinter, importLaptopHistory: $station.importLaptopHistory, mergeAttendance: $station.mergeAttendance,
+  app, startListening: $lifecycle.startListening, stopListening: $lifecycle.stopListening, isBusy: $http.isBusy, resetRelayForTest: $relay.resetRelayForTest, setLatestVersion: $updates.setLatestVersion, setOpsAlertHandler: $eventBuffer.setOpsAlertHandler,
   // For the Electron shell: this module is require-cached across settings
   // saves, so the shell pushes the freshly merged config.json and printer
   // name into the LIVE module instead of relying on load-time state.
@@ -91,7 +91,7 @@ module.exports = {
   // reads the real number instead of a copy that drifts (it was 25s while the
   // extension's own client timeout was 35s, which is the bug it now outlasts).
   DUPLICATE_WINDOW_MS: $clubbers.DUPLICATE_WINDOW_MS,
-  shouldSendUpdateBeacon: $lifecycle.shouldSendUpdateBeacon, parseLatestChangeEntry: $lifecycle.parseLatestChangeEntry, extensionSkew: $updates.extensionSkew,
+  shouldSendUpdateBeacon: $lifecycle.shouldSendUpdateBeacon, parseLatestChangeEntry: $lifecycle.parseLatestChangeEntry,
   // Attendance ledger — exported so the id-migration and the auto-connect-card
   // signals (firstEver / priorNightExists) can be unit-tested against a temp
   // AWANA_DATA_DIR without driving the whole /print route.
@@ -153,7 +153,7 @@ if (require.main === module) {
   $lifecycle.startListening();
   // Standalone only: poll the repo VERSION file for /health's update notice.
   // The Electron shell does NOT get this — electron-updater owns its update
-  // lifecycle (see setUpdateHandler above).
+  // lifecycle (it reports it through setLatestVersion).
   $updates.checkForUpdates();
   setInterval($updates.checkForUpdates, $updates.UPDATE_CHECK_INTERVAL);
 }

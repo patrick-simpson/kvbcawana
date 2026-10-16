@@ -584,10 +584,7 @@ const fakeSafe = {
       globalThis.fetch = fetchBefore;
     }
 
-    // The youth check-out (YM_CHECKOUT on): the Worker sweeps Trek and Journey from 7:15 pm,
-    // and the station's print server tells its extension that its own sweep is off.
-    const church = await (await real(`http://127.0.0.1:${E2E_PORT}/config/church`)).json();
-    check('the station\'s print server turns the extension\'s youth check-out off', church.ymCheckout && church.ymCheckout.enabled === false, JSON.stringify(church.ymCheckout));
+    // The youth check-out (YM_CHECKOUT on): the Worker sweeps Trek and Journey from 7:15 pm.
     t2.core.env.YM_CHECKOUT = 'on';
     t2.night.kids.push({ id: '706', club: 'Trek', name: 'Tom Trekker' });
     t2.clock.t = Date.parse('2026-10-14T23:15:00Z');   // 7:15 pm Eastern
@@ -674,8 +671,6 @@ const fakeSafe = {
       check('the meeting report\'s counts reached the Worker\'s own tonight frame', frames('tonight').at(-1).d.awardsEarned === 1, JSON.stringify(frames('tonight').at(-1).d));
     }
     server.stopCloud();
-    const back = await (await real(`http://127.0.0.1:${E2E_PORT}/config/church`)).json();
-    check('stopCloud hands the sweep back to the extension', !back.ymCheckout || back.ymCheckout.enabled !== false);
     listener.close();
   }
 

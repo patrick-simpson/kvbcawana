@@ -1,5 +1,5 @@
 'use strict';
-// Tonight's event buffer, greetings, print failures, self-test state.
+// Tonight's event buffer, greetings, print failures, canary state.
 // One of the modules server.js was split into (server.js loads them in the order the old
 // file ran them). Another module's names are reached as $module.name.
 
@@ -19,15 +19,11 @@ Object.defineProperties(exports, {
   greetLate: { enumerable: true, get: () => greetLate },
   isOnLocalDay: { enumerable: true, get: () => isOnLocalDay },
   lastCanary: { enumerable: true, get: () => lastCanary, set: (v) => { lastCanary = v; } },
-  lastContractCanary: { enumerable: true, get: () => lastContractCanary, set: (v) => { lastContractCanary = v; } },
-  lastExtensionReport: { enumerable: true, get: () => lastExtensionReport },
-  lastSelfTest: { enumerable: true, get: () => lastSelfTest, set: (v) => { lastSelfTest = v; } },
   localDayISO: { enumerable: true, get: () => localDayISO },
   printFailures: { enumerable: true, get: () => printFailures },
   pruneEventBuffer: { enumerable: true, get: () => pruneEventBuffer },
   pushEventToBuffer: { enumerable: true, get: () => pushEventToBuffer },
   recapEntriesForTonight: { enumerable: true, get: () => recapEntriesForTonight },
-  recordExtensionReport: { enumerable: true, get: () => recordExtensionReport },
   recordPrintFailure: { enumerable: true, get: () => recordPrintFailure },
   rememberGreeting: { enumerable: true, get: () => rememberGreeting },
   setOpsAlertHandler: { enumerable: true, get: () => setOpsAlertHandler },
@@ -149,22 +145,10 @@ function recordPrintFailure(name, club, error) {
   events.publish($config.EVENT_CHANNEL, 'ops', events.buildOps('print-failure', club));
 }
 
-// ── Selector self-test + canary state ────────────────────────────────────────
-let lastSelfTest = null;   // { ok, results, extensionVersion, at } — posted by the extension
-let lastContractCanary = null; // { ok, results, extensionVersion, manual, at } — full daily sweep (#3)
-// Version skew (#7): the RUNNING extension version, as the extension itself
-// last reported it (every /selftest and /contract-canary post carries one).
-// The app knows what it SYNCED to disk (extensionInfo.version); Chrome keeps
-// running the old code until it restarts, and only the extension's own posts
-// reveal which version is actually live in the browser.
-let lastExtensionReport = null; // { version, at (ms) }
-function recordExtensionReport(version) {
-  const v = String(version || '').trim();
-  if (/^\d+\.\d+\.\d+$/.test(v)) lastExtensionReport = { version: v, at: Date.now() };
-}
+// ── Canary state + operator alerts ───────────────────────────────────────────
 // The Electron shell registers a handler here to surface operator alerts as
-// tray/system notifications (contract drift, and anything else that must not
-// wait for someone to open the dashboard). No-op when running headless.
+// tray/system notifications (an update landed, and anything else that must not
+// wait for someone to open the settings page). No-op when running headless.
 let opsAlertHandler = null;
 function setOpsAlertHandler(fn) { opsAlertHandler = typeof fn === 'function' ? fn : null; }
 function fireOpsAlert(title, body) {

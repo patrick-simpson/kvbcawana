@@ -270,20 +270,6 @@ console.log('parseAllergies — negation-aware, biased toward flagging a real al
     arrEq(parseAllergies('loves eggnog at Christmas'), []));
 }
 
-console.log('extensionSkew (#7) — dashboard half of the restart-Chrome banner');
-{
-  const { extensionSkew: skew } = require(path.join(__dirname, '..', 'print-server', 'server.js'));
-  const now = 1_700_000_000_000;
-  const fresh = { version: '5.28.0', at: now - 60_000 };
-  check('skew detected when the running version lags the synced folder',
-    JSON.stringify(skew('5.29.0', fresh, now)) === JSON.stringify({ running: '5.28.0', synced: '5.29.0' }));
-  check('no skew when versions match', skew('5.28.0', fresh, now) === null);
-  check('a stale report never warns (Chrome may have restarted since)',
-    skew('5.29.0', { version: '5.28.0', at: now - 31 * 60 * 1000 }, now) === null);
-  check('no synced version → no warning (extension not app-managed)', skew(null, fresh, now) === null);
-  check('no report yet → no warning', skew('5.29.0', null, now) === null);
-}
-
 console.log('parseLatestChangeEntry (#6) — the what\'s-new panel reads changes.md');
 {
   const { parseLatestChangeEntry: parse } = require(path.join(__dirname, '..', 'print-server', 'server.js'));
@@ -367,10 +353,9 @@ console.log('isNewerVersion — an update is newer, never merely different');
   check('an older version in the feed is not an update (a pulled release, a stale mirror)', !isNewerVersion('7.10.9', '7.11.0'));
   check('garbage is never newer', !isNewerVersion('latest', '7.11.0') && !isNewerVersion(null, '7.11.0') && !isNewerVersion('7.11.0', ''));
   const src = require('./server-source.cjs')();
-  check('the VERSION poll, the shell\'s report and /update-now all judge by it',
+  check('the VERSION poll and the shell\'s report both judge by it',
     /if \(isNewerVersion\(ver, SERVER_VERSION\)\) \{\s*latestVersion = ver;/.test(src)
-    && /function setLatestVersion\(ver\) \{\s*if \(isNewerVersion\(ver, SERVER_VERSION\)\)/.test(src)
-    && /if \(!isNewerVersion\(latestVersion, SERVER_VERSION\)\) \{\s*return res\.status\(409\)/.test(src));
+    && /function setLatestVersion\(ver\) \{\s*if \(isNewerVersion\(ver, SERVER_VERSION\)\)/.test(src));
 }
 
 console.log('isNonCheckinRow — one predicate for every non-check-in print');

@@ -41,7 +41,6 @@ Object.defineProperties(exports, {
   startClubNightTimers: { enumerable: true, get: () => startClubNightTimers },
   stopChurchSync: { enumerable: true, get: () => stopChurchSync },
   stopCloud: { enumerable: true, get: () => stopCloud },
-  ymHandedOff: { enumerable: true, get: () => ymHandedOff },
 });
 
 // ── Online check-in, P2: this computer as a print STATION ───────────────────
@@ -302,20 +301,14 @@ function stopChurchSync() {
 }
 
 // routes.md 10.2: the station follows the Worker's runtime switches. Never fetched
-// (or a Worker without them) = the behaviour before 9.3.0: a station is silent and
-// hands the youth check-out to the Worker.
+// (or a Worker without them) = the behaviour before 9.3.0: a station is silent.
+// (YM_CHECKOUT is the Worker's own: until 10.0.0 it also told the Chrome
+// extension, through GET /config/church, to leave the youth check-out alone.)
 /** True when this station must NOT publish the tally / still-here list (the Worker does). */
 function singlePublisherSilent() {
   if (!$config.cloudStation) return false;
   const sw = churchSync ? churchSync.switches() : null;
   return !sw || sw.SINGLE_PUBLISHER !== 'off';
-}
-
-/** True when this station's extension must leave the Trek/Journey check-out to the Worker. */
-function ymHandedOff() {
-  if (!$config.cloudStation) return false;
-  const sw = churchSync ? churchSync.switches() : null;
-  return !sw || sw.YM_CHECKOUT !== 'off';
 }
 
 /** "I looked at the printer": clears the CHECK THE PRINTER warning. */

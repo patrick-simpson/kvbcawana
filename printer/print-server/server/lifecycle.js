@@ -36,7 +36,7 @@ Object.defineProperties(exports, {
 // running server needs (temp-file sweep, roster load, publish timers, birthday
 // push, prewarm) happens inside startListening(); only the legacy VERSION-poll
 // self-update stays in the require.main block, because the Electron shell owns
-// updates itself via setUpdateHandler()/setLatestVersion().
+// updates itself and reports it via setLatestVersion().
 
 // Pre-warm: send a blank label to the printer to eliminate cold-start delay.
 // Off by default — enable via config.json { "prewarmPrinter": true }
