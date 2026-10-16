@@ -21,7 +21,7 @@ This one repo holds three apps for Kennebec Valley Baptist Church's Awana club:
 - `.github/workflows/ci.yml` runs on every push and pull request, using Node 22. It runs each app's checks.
 - `scripts/check-mirrors.mjs` confirms that shared files match across apps. The brand kit has one master copy, in `lobby/shared/brand/`. Copies are made at build time by `scripts/family-assets.mjs`. Do not edit the copies.
 - Deploy runs only on `main`, after all checks pass. It builds the site and publishes it to Cloudflare Pages at awana.kvbchurch.org. It deploys the sync Worker only when the Worker's files changed.
-- Every Worker deploy restarts the Durable Object and drops every screen's connection. Avoid unneeded Worker deploys.
+- Every Worker deploy restarts the Durable Object and drops every screen's connection for a moment. That is accepted, so deploy the Worker whenever its changes need to go out.
 - Journey kiosks reload only when Journey's own files change.
 - Release workflows (`printer-release.yml`, `desktop-release.yml`) build installers. Installer files are kept one day, then deleted by a cleanup job. The update feeds live on our site, not on GitHub's "Latest" releases.
 - `brand-catalog-release.yml` is run by hand. It downloads the large catalog PDF to a release. Never add that PDF to the repo.
