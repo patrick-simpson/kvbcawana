@@ -478,21 +478,8 @@ async function main() {
   {
     const read = (...p) => fs.readFileSync(path.join(__dirname, '..', ...p), 'utf8');
     const URL_ = 'https://awana.kvbchurch.org/settings';
-    const options = read('chrome-extension', 'options.html');
-    check('the options page links to the settings page', options.includes(`href="${URL_}"`));
-    check('...and no longer points at the dashboard', !options.includes('localhost:3456') && !/print dashboard/i.test(options.replace(/<!--[\s\S]*?-->/g, '')));
-    const optionsJs = read('chrome-extension', 'options.js');
-    check('options.js sends an online tab there', optionsJs.includes(URL_) && /location\.replace/.test(optionsJs));
-    check('...but not an offline one (the card says the desk still prints)', /onLine\s*===\s*false/.test(optionsJs));
-    check('options.html loads it (no inline script: Manifest V3 forbids it)', options.includes('src="options.js"') && !/<script>/.test(options));
-    const popupJs = read('chrome-extension', 'popup.js');
-    const popupHtml = read('chrome-extension', 'popup.html');
-    check('the popup\'s Settings button opens the settings page', popupJs.includes(`url: '${URL_}'`));
-    check('the popup has no dashboard button any more', !/dashboard/i.test(popupJs) && !/dashboard/i.test(popupHtml) && !popupJs.includes("localhost:3456/'"));
-    check('the check-in page\'s "Printing to … Change" link opens the settings page', read('chrome-extension', 'content.js').includes(`printingToChange.href = '${URL_}'`));
     check('the dashboard page is gone and the server serves none', !fs.existsSync(path.join(__dirname, '..', 'print-server', 'public', 'index.html')));
-    const manifest = JSON.parse(read('chrome-extension', 'manifest.json'));
-    check('the manifest still points options at options.html', manifest.options_ui.page === 'options.html');
+    check('no Chrome extension ships with the app any more (10.0.0)', !fs.existsSync(path.join(__dirname, '..', 'chrome-extension')));
     const tray = read('electron-app', 'main.js');
     check('the app\'s tray and status window open the settings page', tray.includes(`const SETTINGS_URL = '${URL_}'`)
       && /openExternalSafely\(SETTINGS_URL, 'tray menu'\)/.test(tray) && /ipcMain\.handle\('open-settings'/.test(tray));

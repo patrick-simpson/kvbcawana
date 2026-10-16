@@ -21,8 +21,6 @@
     "pretest": "node ../scripts/family-assets.mjs printer",
     "test": "node scripts/run-tests.cjs",
     "test:serial": "npm run pretest && node scripts/run-tests.cjs --serial",
-    "test:extension": "node scripts/test-extension-identity.cjs && node scripts/test-extension-checkin.cjs && node scripts/test-extension-queue.cjs",
-    "test:extension-sync": "node scripts/test-extension-sync.cjs",
     "test:config-store": "node scripts/test-config-store.cjs",
     "test:envelope": "node scripts/test-envelope.cjs",
     "test:cloud-crypto": "node scripts/test-cloud-crypto.cjs",

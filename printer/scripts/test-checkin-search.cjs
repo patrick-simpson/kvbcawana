@@ -1,6 +1,9 @@
 #!/usr/bin/env node
-// Tests for the touch check-in's search and household parsing
-// (chrome-extension/touch.js, whose pure half loads in Node).
+// Tests for the check-in page's search, household parsing, families and tile
+// fit: the touch-core block of print-server/public/phone.html (the page
+// site/checkin/checkin-page.mjs builds into awana.kvbchurch.org/checkin).
+// Until 10.0.0 the block was copied from the Chrome extension's touch.js and
+// tested there (test-touch-search.cjs); the page is its one source now.
 //
 // WHAT THIS GUARDS
 // * First name, last name, both, either order, as typed: every typed word
@@ -13,11 +16,12 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
-// A content script, not a module: run it with a `module` to fill, the way it
-// detects Node (the printer's package.json makes a bare require load it as ESM).
-const mod = { exports: {} };
-new Function('module', fs.readFileSync(path.join(__dirname, '..', 'chrome-extension', 'touch.js'), 'utf8'))(mod);
-const t = mod.exports;
+// The block is plain functions inside the page's script: lift it out and run it.
+const page = fs.readFileSync(path.join(__dirname, '..', 'print-server', 'public', 'phone.html'), 'utf8');
+const begin = page.indexOf('  // touch-core:begin'), end = page.indexOf('  // touch-core:end');
+if (begin < 0 || end < begin) throw new Error('the touch-core block is not in phone.html');
+const t = new Function(`${page.slice(begin, end)}
+return { norm: norm, sound: sound, editDistance: editDistance, searchPeople: searchPeople, householdIndex: householdIndex, parseCsv: parseCsv, groupFamilies: groupFamilies, fitTiles: fitTiles };`)();
 
 let passed = 0, failed = 0;
 function check(name, cond, detail) {
@@ -31,7 +35,7 @@ const kids = [
 ].map((name) => ({ name }));
 const names = (r) => r.map((p) => p.name);
 
-console.log('touch check-in: search');
+console.log('check-in page: search');
 {
   let r = t.searchPeople(kids, 'smi');
   check('last name prefix', names(r.matches).includes('Jackson Smith') && names(r.matches).includes('Ava Smith'));
@@ -60,7 +64,7 @@ console.log('touch check-in: search');
   check('edit distance counts a swap as one', t.editDistance('micah', 'mciah') === 1);
 }
 
-console.log('touch check-in: households');
+console.log('check-in page: households');
 {
   const csv = 'Household ID,Parent/Guardian#1,Address1,Primary Phone,Active Clubbers\n'
     + '101,"Doe, Jane",1 Main St,555-0100,"Micah Johnson, Ava Smith"\n'
@@ -74,7 +78,7 @@ console.log('touch check-in: households');
   check('an export without the columns yields nothing', !Object.keys(t.householdIndex('a,b\n1,2\n').byName).length);
 }
 
-console.log('touch check-in: families still to come');
+console.log('check-in page: families still to come');
 {
   const csv = 'Household ID,Active Clubbers\n1,"Micah Johnson, Ava Johnson, Eli Ross"\n2,"Jackson Smith, Lily Smith"\n';
   const h = t.householdIndex(csv);
@@ -102,40 +106,6 @@ console.log('touch check-in: families still to come');
   let prev = Infinity, shrinking = true;
   for (let n = 1; n <= 60; n++) { const r = t.fitTiles(n, W, H, 12, 1.6, 92); if (r.h > prev + 0.5) shrinking = false; prev = r.h; }
   check('a tile never gets smaller as families leave (one fewer is never smaller)', shrinking);
-}
-
-// The touch path never opens TwoTimTwo's modal (7.4.1): behind the full-screen
-// overlay it stacked up and left its grey backdrop over the page after Close.
-{
-  const c = fs.readFileSync(path.join(__dirname, '..', 'chrome-extension', 'content.js'), 'utf8');
-  const api = c.slice(c.indexOf('window.__awanaTouchApi = {'), c.indexOf("bootStep('widget', injectWidget);", c.indexOf('window.__awanaTouchApi = {')));
-  check('the touch API never clicks a TwoTimTwo row or polls for its modal', api.length > 200 && !/\.click\(\)|pollForCheckinButton|tryDirectCheckin/.test(api));
-  check('no CSRF token needed: TwoTimTwo\'s check-in page has none (live, 7.4.2)',
-    /if \(!calendarId\) return Promise\.resolve\('no-form'\);/.test(c) && /if \(csrfToken\) body \+= '&YII_CSRF_TOKEN=/.test(c));
-  check('rows TwoTimTwo already checked in (.checked-in, hidden) are not offered or posted',
-    /:not\(\.checked-in\)'\) : null;/.test(c) && /querySelectorAll\('\.clubber:not\(\.checked-in\)'\)/.test(fs.readFileSync(path.join(__dirname, '..', 'chrome-extension', 'touch.js'), 'utf8')));
-  const tj = fs.readFileSync(path.join(__dirname, '..', 'chrome-extension', 'touch.js'), 'utf8');
-  check('Bible starts ticked wherever the club has it (7.6.0)', /state\.choice = \{ bible: !!state\.items\.bible, friend: false \};/.test(tj)
-    && /openSiblings\(null, f\.kids, \{ bible: true, friend: false \}, f\.name\)/.test(tj));
-  check('a typed search shows households first, then the children, away families last', (function () {
-    const r = tj.slice(tj.indexOf('function renderSearch'), tj.indexOf('// ── Families still to come'));
-    const a = r.indexOf("'Families'"), b = r.indexOf("'Children'"), c = r.indexOf("'Not here the last two club nights'");
-    return a > 0 && a < b && b < c;
-  })());
-  check('redraws are keyed (no tile replays its landing) and survivors glide', /function keyed\(tag, cls, k\)/.test(tj) && /beginKeyed\(list\);[\s\S]{0,400}endKeyed\(\);/.test(tj));
-  check('rows TwoTimTwo has checked in never count as "still there" for the panel and phone paths',
-    /function findClubberElByName\(name\) \{[\s\S]{0,120}querySelectorAll\('\.clubber:not\(\.checked-in\)'\)/.test(c));
-  check('the panel and phone direct path needs no CSRF token either', /var csrfToken = findCsrfToken\(\);\s*if \(!calendarId\) return Promise\.resolve\(false\);/.test(c));
-  check('a phone check-in never opens the modal under the touch screen', /if \(window\.__awanaTouchOpen\) \{[\s\S]{0,300}reportPhoneAction\(action\.id, false/.test(c));
-  check('touch check-ins run one at a time', /touchQueue = run\.catch/.test(api));
-  check('the row is dropped by its recid, not its name text', /var row = rowByRecid\(recid\);/.test(c));
-  check('a failed post refreshes the token in the background and retries once', /return refreshCheckinTokens\(\)\.then\(function\(\) \{ return postTouchCheckin\(/.test(c));
-  check('Close clears a stuck modal and reloads only after check-ins', /closed: function\(checkedIn\) \{\s*clearStuckModal\(\);\s*if \(!checkedIn\) return;/.test(api));
-  check('a new version on disk loads itself: the extension re-reads its folder, then the tab reloads',
-    /if \(managed\) selfUpdateTo\(data\.version\);/.test(c) && /type: 'AWANA_RELOAD_SELF'/.test(c)
-    && /AWANA_RELOAD_SELF[\s\S]{0,120}chrome\.runtime\.reload\(\)/.test(fs.readFileSync(path.join(__dirname, '..', 'chrome-extension', 'background.js'), 'utf8')));
-  check('once per version per tab, so a copy that cannot reload never loops', /sessionStorage\.getItem\(key\)\) return;/.test(c));
-  check('the peak-window auto-reload waits while the touch screen is up', /if \(window\.__awanaTouchOpen\) return;[\s\S]{0,400}if \(isShowing\(document\.getElementById\('checkin-modal'\)\)\) return;/.test(c));
 }
 
 console.log(`\n${passed} passed, ${failed} failed`);

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// Chrome restarts after an update (7.4.1): closed, then reopened on the
-// check-in page only. Drives electron-app/src/chrome-restart.js with fakes for
+// Chrome restarts after an update (7.4.1; since 10.0.0 once, when the
+// extension is retired): closed, then reopened on the check-in page only. Drives electron-app/src/chrome-restart.js with fakes for
 // tasklist, taskkill and the launch, so it runs anywhere.
 'use strict';
 const fs = require('fs');
@@ -69,9 +69,10 @@ function rig({ running = true, installed = true, dies = true } = {}) {
   check('per-user and per-machine installs are both looked for', cr.chromeCandidates(ENV).some(p => p.startsWith('C:\\Users')) && cr.chromeCandidates(ENV).includes(EXE));
 
   const main = fs.readFileSync(path.join(__dirname, '..', 'electron-app', 'main.js'), 'utf8');
-  check('it runs on the launch that wrote a newer extension, packaged builds only',
-    /const restartChromeNow = app\.isPackaged && extensionState\.action === 'updated'/.test(main));
-  check('after the extension folder is synced', main.indexOf('syncBundledExtension();\n') < main.indexOf('const restartChromeNow'));
+  // 10.0.0: once, on the launch that replaced the 9.x extension with the stub (src/extension-sync.js).
+  check('it runs on the launch that retired the extension, packaged builds only',
+    /const restartChromeNow = app\.isPackaged && extensionState\.action === 'retired'/.test(main));
+  check('after the extension folder is neutered', main.indexOf('retireBundledExtension();\n') > 0 && main.indexOf('retireBundledExtension();\n') < main.indexOf('const restartChromeNow'));
   check('with a check-in address judged safe first', /restartChromeNow = [^;]*isSafeExternalUrl\(config\.checkinUrl\)/.test(main));
 
   console.log(`\n${passed} passed, ${failed} failed`);

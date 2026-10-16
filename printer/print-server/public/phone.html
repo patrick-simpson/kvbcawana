@@ -19,9 +19,11 @@
      history row sealed to the history key. site/checkin/desk-transport.js is
      every Worker call and every seal; site/build.mjs serves it, cloud-crypto.js
      and clubs.js beside this page.
-     This file stays in the print server's folder because its touch-core block
-     is the laptop touch screen's own (scripts/sync-touch-core.cjs); the print
-     server does not serve it. The brand kit mirror (public/brand/) is copied to
+     This file stays in the print server's folder (it began as the laptop's
+     phone page); the print server does not serve it. Its touch-core block
+     (search, households, families, tile fit) was copied from the Chrome
+     extension's touch screen until 10.0.0: this page is its one source now,
+     tested by scripts/test-checkin-search.cjs. The brand kit mirror (public/brand/) is copied to
      /checkin/brand/ by the site build. The hex after each var() is the kit's own
      value, a fallback pinned to tokens.css by scripts/test-dashboard-chrome.cjs. -->
 <link rel="stylesheet" href="/brand/fonts.css">
@@ -496,8 +498,8 @@
 </div>
 
 <script>
-// ── The touch check-in's own search, households and tile fit, verbatim ─────
-  // touch-core:begin (this block is copied verbatim into print-server/public/phone.html by scripts/sync-touch-core.cjs; test-touch-search.cjs pins the two equal)
+// ── Search, households, families and tile fit ────────────────────────────────
+  // touch-core:begin (pure: scripts/test-checkin-search.cjs lifts this block out and tests it in Node)
   // ── Search (pure; the tests load this half in Node) ──────────────────────
   function norm(s) {
     return String(s == null ? '' : s)

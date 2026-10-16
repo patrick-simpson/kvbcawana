@@ -254,7 +254,7 @@ test('links out go only to the repo, the app\'s own downloads, this site\'s page
       assert.match(url, /^https:\/\/(?:github\.com\/patrick-simpson\/kvbcawana(?:\/tree\/main\/(?:printer|lobby|journey))?|awana\.kvbchurch\.org\/(?:download\/[a-z-]+)?)$/, `${rel}: ${url}`);
     }
     for (const [, href] of text.matchAll(/href=["']([^"'#][^"']*)["']/g)) {
-      assert.match(href, /^(?:\/|\/help(?:#[a-z]+)?|\/#[a-z]+|\/capabilities\.html|\/download\/[a-z-]+|\/chrome-extension\.zip)$/, `${rel}: ${href}`);
+      assert.match(href, /^(?:\/|\/help(?:#[a-z]+)?|\/#[a-z]+|\/capabilities\.html|\/download\/[a-z-]+)$/, `${rel}: ${href}`);
     }
     assert.doesNotMatch(text, /["'`]\/(?:lobby|journey)\/?(?:index\.html|countdown(?:\.html)?)?["'`]/, `${rel} links a live screen`);
   }

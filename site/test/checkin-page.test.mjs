@@ -1,6 +1,6 @@
 // The one check-in page (/checkin, /checkin/ym): built from the print app's phone
 // page by site/checkin/checkin-page.mjs, on the desk's online path. Pinned from the
-// source: the touch core is the laptop touch screen's own, every module it imports
+// source: the touch core is in it whole, every module it imports
 // is one the build serves, nothing leaves the site, nothing relays to the laptop,
 // and no passphrase or medical field is ever kept.
 import assert from 'node:assert/strict';
@@ -18,9 +18,9 @@ describe('the check-in page', () => {
   const { index, ym } = buildCheckinPages();
   const src = readFileSync(PHONE_PAGE, 'utf8');
 
-  it('carries the touch check-in\'s own touch-core block (the laptop\'s touch.js is the source)', () => {
-    const touch = block(read('printer', 'chrome-extension', 'touch.js'));
-    assert.ok(touch.length > 1000 && index.includes(touch), 'the page\'s search, households and grouping differ from touch.js');
+  it('carries the phone page\'s touch-core block whole (search, households, grouping; its one source since 10.0.0)', () => {
+    const touch = block(src);
+    assert.ok(touch.length > 1000 && index.includes(touch), 'the built page lost or changed the touch-core block');
     for (const fn of ['function norm(', 'function searchPeople(', 'function groupFamilies(']) assert.ok(index.includes(fn), fn);
   });
 
@@ -99,7 +99,7 @@ describe('the check-in page', () => {
   });
 
   it('/checkin/ym is the same page for Trek and Journey, check-in only', () => {
-    assert.match(ym, /<script>window\.AWANA_ONLY_CLUBS = \['trek', 'journey'\]; window\.AWANA_SIMPLE = true;<\/script>\n<script>\n\/\/ ── The touch check-in/);
+    assert.match(ym, /<script>window\.AWANA_ONLY_CLUBS = \['trek', 'journey'\]; window\.AWANA_SIMPLE = true;<\/script>\n<script>\n\/\/ ── Search, households, families and tile fit/);
     assert.equal(ym.replace("<script>window.AWANA_ONLY_CLUBS = ['trek', 'journey']; window.AWANA_SIMPLE = true;</script>\n", ''), index);
   });
 
