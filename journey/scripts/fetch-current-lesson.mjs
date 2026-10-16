@@ -107,7 +107,7 @@
 
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { JSDOM } from 'jsdom';
-import { keepResolvedUrl } from './lesson-url.mjs';
+import { keepResolvedUrl, resolveCorsFriendlyVideoUrl } from './lesson-url.mjs';
 
 const DEFAULT_URL = 'https://kvbchurch.twotimtwo.com/calendar/index?current_only=Y';
 const DEFAULT_LESSONS = 'public/lessons.json';
@@ -133,29 +133,6 @@ async function fetchWithRetry(url, attempts = 3) {
     }
   }
   throw lastError;
-}
-
-/** Resolve lesson.downloadUrl's redirect to its final CDN URL, server-side,
- * so the browser never has to follow a cross-origin redirect that lacks
- * CORS headers of its own. Falls back to the original URL (still fine for
- * direct <video> playback, just not for the Cache API pre-fetch) if the
- * resolution fails or the final response turns out not to be CORS-enabled
- * — a transient failure here must never block writing the rest of the feed.
- */
-async function resolveCorsFriendlyVideoUrl(downloadUrl) {
-  try {
-    const res = await fetch(downloadUrl, {
-      method: 'HEAD',
-      redirect: 'follow',
-      signal: AbortSignal.timeout(30000),
-    });
-    if (res.ok && res.headers.get('access-control-allow-origin')) {
-      return res.url;
-    }
-  } catch {
-    // fall through
-  }
-  return downloadUrl;
 }
 
 /** Reads a book-track-mtg row's own scheduled date, if present — the
