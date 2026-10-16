@@ -57,10 +57,30 @@
   define('localStorage', memoryStorage(SEED[KIND]));
   define('sessionStorage', memoryStorage({}));
   define('indexedDB', undefined);
-  // The configure relay (another window's Settings) and other tabs never reach a twin.
-  define('BroadcastChannel', function BroadcastChannel() {
-    return { postMessage: function () {}, close: function () {}, addEventListener: function () {}, removeEventListener: function () {}, onmessage: null };
+  // The configure relay (another window's Settings) and other tabs never reach a twin:
+  // BroadcastChannel is an in-frame bus that only the home page speaks on
+  // (showcase:relay below), never the browser's real one.
+  var bus = [];
+  define('BroadcastChannel', function BroadcastChannel(name) {
+    var ch = {
+      name: String(name), onmessage: null,
+      postMessage: function () {},
+      close: function () { bus = bus.filter(function (c) { return c !== ch; }); },
+      addEventListener: function (type, fn) { if (type === 'message') ch._fns.push(fn); },
+      removeEventListener: function (type, fn) { ch._fns = ch._fns.filter(function (f) { return f !== fn; }); },
+      _fns: [],
+    };
+    bus.push(ch);
+    return ch;
   });
+  var relay = function (data) {
+    bus.forEach(function (ch) {
+      if (ch.name !== 'awana-configure') return;
+      var ev = { data: data };
+      if (typeof ch.onmessage === 'function') ch.onmessage(ev);
+      ch._fns.forEach(function (fn) { fn(ev); });
+    });
+  };
   try {
     if (navigator.serviceWorker) {
       Object.defineProperty(navigator.serviceWorker, 'register', { value: function () { return new Promise(function () {}); }, configurable: true });
@@ -224,6 +244,10 @@
     } else if (m.type === 'showcase:click' && typeof m.selector === 'string') {
       var el = document.querySelector(m.selector);
       if (el) el.click();
+    } else if (m.type === 'showcase:relay' && typeof m.screen === 'string' && typeof m.action === 'string') {
+      // A Settings button's relay (lobby/src/lib/configureRelay.js), as the sound
+      // room's Settings window sends it: the screen obeys only its own allowlist.
+      relay({ screen: m.screen, action: m.action, data: m.data === undefined ? null : m.data });
     } else if (m.type === 'showcase:journey' && KIND === 'journey' && typeof m.action === 'string') {
       // The kiosk's own remote commands (window.journeyRemote, the phone remote's path):
       // it checks the action against its own list and refuses what it should.

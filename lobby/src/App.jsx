@@ -39,7 +39,7 @@ import { useWeather } from './hooks/useWeather.js';
 import { useSnowForecast } from './hooks/useSnowForecast.js';
 import { LobbyLiveContext } from './lib/lobbyLive.jsx';
 import { localDateStr } from './lib/calendarLogic.js';
-import { previewPromo } from './lib/promos.js';
+import { PREVIEW_PROMOS, previewPromo } from './lib/promos.js';
 import PromoSlide from './components/PromoSlide.jsx';
 import { fireMilestone, setConfettiLevel, setConfettiLoad, setConfettiSkin } from './lib/confetti.js';
 import { resolveSkin, sceneForSkin, SKIN_TABLE } from './lib/skins.js';
@@ -108,7 +108,16 @@ const CONFIGURE = isConfigureMode();
 // is not a screen, so nothing is relayed and this browser's own cards hide.
 const SETTINGS_PAGE = isSettingsPage();
 // The live screen's side of the relay: what a configure page may ask of it.
-const RELAYED = ['preview-checkin', 'reset-tally', 'board-demo', 'media-changed'];
+// 'preview-promo' (2026-10-16): Settings → Slides & look → Preview the promos,
+// from the sound room's Settings window, plays on the live TV (one of
+// PREVIEW_PROMOS' keys, nothing else).
+const RELAYED = ['preview-checkin', 'reset-tally', 'board-demo', 'media-changed', 'preview-promo'];
+const PROMO_KEYS = new Set(PREVIEW_PROMOS.map((p) => p.key));
+// The home page's showcase twin (site/showcase/stub.js, which sets this before
+// any app code runs) is framed but is a lobby screen, so it hears relays; its
+// relay channel is the stub's own, in-frame, spoken only by the home page.
+// Journey's embedded copy (a real kiosk) still never does.
+const SHOWCASE = typeof window !== 'undefined' && !!(/** @type {any} */ (window).__SHOWCASE__);
 const noop = () => {};
 // Configure mode and the settings page open Settings on the first render, so
 // its chunk is asked for now, beside the main one, not after it has run.
@@ -1264,14 +1273,18 @@ export default function App() {
   // own Settings buttons would. Never in configure mode itself, and never in
   // Journey's embedded copy (a lobby relay is for the lobby screen).
   useEffect(() => {
-    if (CONFIGURE || isEmbedded()) return undefined;
+    if (CONFIGURE || (isEmbedded() && !SHOWCASE)) return undefined;
     return listenForRelay('lobby', RELAYED, (action, data) => {
       if (action === 'preview-checkin') previewCheckIn(data);
+      else if (action === 'preview-promo') {
+        const key = data && typeof data === 'object' ? /** @type {{ key?: unknown }} */ (data).key : null;
+        if (typeof key === 'string' && PROMO_KEYS.has(key)) startPromoPreview(key);
+      }
       else if (action === 'reset-tally') resetTonight();
       else if (action === 'board-demo') startBoardDemo();
       else if (action === 'media-changed') window.dispatchEvent(new Event(BACKGROUND_VIDEO_CHANGED_EVENT));
     });
-  }, [previewCheckIn, resetTonight, startBoardDemo]);
+  }, [previewCheckIn, resetTonight, startBoardDemo, startPromoPreview]);
 
   // Journey's embedded copy passes the sync service's doorbell up to the
   // kiosk page, which has no live channel of its own, so a change or a
@@ -1783,7 +1796,7 @@ export default function App() {
               setSlideEditorOpen(true);
             }}
             onOpenDebug={CONFIGURE ? undefined : () => { DebugPanel.preload(); setSettingsOpen(false); setDebugOpen(true); }}
-            onPreviewPromo={CONFIGURE ? undefined : (key) => {
+            onPreviewPromo={SETTINGS_PAGE ? undefined : CONFIGURE ? (key) => relayToScreen('lobby', 'preview-promo', { key }) : (key) => {
               // Like the board demo: close Settings so the TV shows it.
               startPromoPreview(key);
               setSettingsOpen(false);

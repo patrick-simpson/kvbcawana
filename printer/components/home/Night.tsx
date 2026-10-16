@@ -100,6 +100,15 @@ const COUNTS: Record<string, number> = { Puggles: 6, Cubbies: 9, Sparks: 11, 'T&
 
 interface Printed { key: number; first: string; club: string }
 
+// The lobby's promos between arrivals (owner, 2026-10-16: "add promos ... like
+// barf and snow days"), played as the sound room's Settings window previews them
+// (lobby PREVIEW_PROMOS keys, through the configure relay): one after every
+// three check-ins. A poster holds the greetings, as on the real TV.
+const PROMOS: [string, number][] = [
+  ['friend', 15], ['snowAlertsStorm', 20], ['barfEpic', 15], ['snowAlerts', 20], ['contest', 15], ['parents', 15],
+];
+const PROMO_EVERY = 3;
+
 const Printer: React.FC<{ printed: Printed[] }> = ({ printed }) => {
   const last = printed[printed.length - 1];
   return (
@@ -126,6 +135,7 @@ const Doors: React.FC = () => {
   const lastHuman = useRef(0);
   const n = useRef(0);
   const counts = useRef({ ...COUNTS });
+  const promo = useRef({ next: 0, until: 0, since: 0 });
 
   const onCheckin = useCallback((data: Record<string, unknown>) => {
     const first = String(data.firstName || '');
@@ -143,13 +153,26 @@ const Doors: React.FC = () => {
     setPrinted((p) => [...p.slice(-3), { key: n.current, first, club }]);
   }, []);
 
-  // While nobody is tapping, the phone checks the next child in by itself.
+  // While nobody is tapping, the phone checks the next child in by itself; every
+  // third arrival a promo plays (and the phone waits for it).
   useEvery(active, 4600, () => {
     if (!phone.current?.loaded() || !tv.current?.loaded()) return;
-    if (Date.now() - lastHuman.current < 12000) return;
+    const now = Date.now();
+    const p = promo.current;
+    if (now < p.until) return;
+    if (p.since >= PROMO_EVERY) {
+      const [key, sec] = PROMOS[p.next % PROMOS.length];
+      p.next += 1;
+      p.since = 0;
+      p.until = now + sec * 1000 + 1500;
+      tv.current.send({ type: 'showcase:relay', screen: 'lobby', action: 'preview-promo', data: { key } });
+      return;
+    }
+    if (now - lastHuman.current < 12000) return;
     const next = ARRIVALS.find((name) => !done.current.has(name));
     if (!next) return;
     lastAuto.current = { name: next, t: Date.now() };
+    p.since += 1;
     phone.current.send({ type: 'showcase:click', selector: `.fam[aria-label="${next}"]` });
   });
 
@@ -159,7 +182,7 @@ const Doors: React.FC = () => {
         <div className="kv-scene__copy">
           <Time hm="6:00" />
           <h2 className="kv-scene__title" id="doors-title">Doors open.</h2>
-          <p className="kv-scene__line">Tap a name on the phone. A label prints and the lobby says hello.</p>
+          <p className="kv-scene__line">Tap a name on the phone. A label prints and the lobby says hello. Between arrivals, the lobby tells everyone what's coming.</p>
         </div>
         <div className="kv-scene__stage kv-doors">
           <figure id="phone" className="kv-device kv-device--phone">
