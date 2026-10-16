@@ -2,7 +2,6 @@
 // are built from the selectors in printer/docs/TWOTIMTWO.md, never captured:
 // obviously made-up names, no real data.
 import { readFileSync } from 'node:fs';
-import { JSDOM } from 'jsdom';
 import { describe, expect, it } from 'vitest';
 import { CHECKIN_PAGE, HOUSEHOLD_CSV, LOGIN_PAGE, fakeTwoTimTwo, page, table } from './fixtures.js';
 import { ReadBudget, READ_INTERVAL_MS } from '../src/readbudget.js';
@@ -14,7 +13,6 @@ import {
   parseCheckinPage,
   checkinReplyOk,
   parseCheckinReport,
-  firstLast,
   parseHouseholdCsv,
   reportColumns,
   rowShape,
@@ -49,23 +47,13 @@ const SAMPLES = {
   formAround: `<html><body><form>${table('Trek ', [{ id: 15, name: 'Max Tester' }])}</form>${table('Sparks ', [{ id: 16, name: 'Ned Tester' }])}</body></html>`,
 };
 
-// The extension's own parser, lifted out of content.js exactly as
-// printer/scripts/test-report-parse.cjs lifts it, run on jsdom's DOMParser:
-// a standard HTML tree builder, as Chrome is, so the agreement below is with
-// what the extension reads on the live site (on linkedom's own, laxer parser
-// it agreed with the Worker's first copy, which read no rows on 2026-10-11).
-function extensionParser() {
-  const src = readFileSync(new URL('../../../printer/chrome-extension/content.js', import.meta.url), 'utf8');
-  const start = src.indexOf('  function fetchCheckinReport(date) {');
-  const end = src.indexOf('  // Undo detection (roadmap follow-up to R-1)');
-  if (start < 0 || end < 0) throw new Error('fetchCheckinReport not found in content.js');
-  const factory = new Function('fetch', 'DOMParser', 'ROSTER_CACHE', 'todayIsoDate', 'firstLast',
-    `${src.slice(start, end)}\nreturn fetchCheckinReport;`);
-  return (html) => factory(
-    async () => ({ ok: true, url: `https://${HOST}/clubber/checkin_report`, text: async () => html }),
-    new JSDOM('').window.DOMParser, {}, () => '2026-10-07', firstLast,
-  )();
-}
+// What the retired Chrome extension's own parser (content.js
+// fetchCheckinReport, run on jsdom's DOMParser: a standard HTML tree builder,
+// as Chrome is) read from each sample below, frozen into a fixture when the
+// extension was deleted (KVBC Awana 10.0.0, 2026-10-16). The agreement below is
+// with what the extension read on the live site (on linkedom's own, laxer parser
+// the Worker's first copy agreed with it and read no rows on 2026-10-11).
+const EXTENSION_PARSE = JSON.parse(readFileSync(new URL('./fixtures/extension-report-parse.json', import.meta.url), 'utf8'));
 
 describe('the check-in report parser', () => {
   it('reads the live layout: names from the link cell, ids, clubs, the declared count', () => {
@@ -133,11 +121,15 @@ describe('the check-in report parser', () => {
 
   // The extension runs as the volunteer, whose report has edit links; the
   // undo-only page is the check-in user's, which only this parser reads.
-  it.each(Object.keys(SAMPLES).filter((k) => k !== 'undoOnly'))('agrees with the extension\'s own parser (%s)', async (name) => {
+  it('the frozen fixture covers every sample but the undo-only page', () => {
+    expect(Object.keys(EXTENSION_PARSE).sort()).toEqual(Object.keys(SAMPLES).filter((k) => k !== 'undoOnly').sort());
+  });
+
+  it.each(Object.keys(SAMPLES).filter((k) => k !== 'undoOnly'))('agrees with the extension\'s own parser (%s)', (name) => {
     const ours = parseCheckinReport(SAMPLES[name]);
-    const theirs = await extensionParser()(SAMPLES[name]);
-    expect(ours.entries).toEqual([...theirs].map((e) => ({ clubberId: e.clubberId, name: e.name, club: e.club })));
-    expect(ours.declared).toBe(typeof theirs.declared === 'number' ? theirs.declared : null);
+    const theirs = EXTENSION_PARSE[name];
+    expect(ours.entries).toEqual(theirs.entries);
+    expect(ours.declared).toBe(theirs.declared);
   });
 });
 

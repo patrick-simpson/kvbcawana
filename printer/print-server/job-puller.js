@@ -488,7 +488,9 @@ function createJobPuller(o) {
  * paths: /update-csv {csv} and /feed/completed-books {entries}. A bundle is
  * applied once (its id is remembered); a missing one (404) is simply not there yet.
  *
- * Record shapes (sealed by the station that read them from TwoTimTwo):
+ * Record shapes (the Worker reads both from TwoTimTwo and seals them to every
+ * registered station; it serves them only to a station whose heartbeat reports
+ * 10.0.0 or later, and answers 404 `old-app` / `none` / `resealing` until then):
  *   roster {csv: "<the roster CSV>"}      books {entries: [{name, book, date}]}
  */
 function createBundleSync(o) {

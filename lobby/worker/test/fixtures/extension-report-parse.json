@@ -1,0 +1,116 @@
+{
+  "live": {
+    "entries": [
+      {
+        "clubberId": "1",
+        "name": "Ada Tester",
+        "club": "Cubbies"
+      },
+      {
+        "clubberId": "2",
+        "name": "Bo Tester",
+        "club": "Sparks"
+      },
+      {
+        "clubberId": "3",
+        "name": "Cy Tester",
+        "club": "Sparks"
+      },
+      {
+        "clubberId": "4",
+        "name": "Di Tester",
+        "club": "T&T"
+      },
+      {
+        "clubberId": "5",
+        "name": "Ed Tester",
+        "club": "T&T"
+      }
+    ],
+    "declared": 5
+  },
+  "old": {
+    "entries": [
+      {
+        "clubberId": "7",
+        "name": "Fay Tester",
+        "club": "Sparks"
+      },
+      {
+        "clubberId": "8",
+        "name": "Gus Tester",
+        "club": "Sparks"
+      }
+    ],
+    "declared": 2
+  },
+  "summaryOnly": {
+    "entries": [
+      {
+        "clubberId": "9",
+        "name": "",
+        "club": "T&T"
+      }
+    ],
+    "declared": 1
+  },
+  "partial": {
+    "entries": [
+      {
+        "clubberId": "10",
+        "name": "Hal Tester",
+        "club": "Sparks"
+      }
+    ],
+    "declared": 3
+  },
+  "noFooter": {
+    "entries": [
+      {
+        "clubberId": "11",
+        "name": "Ivy Tester",
+        "club": "Sparks"
+      },
+      {
+        "clubberId": "12",
+        "name": "Jo Tester",
+        "club": "Trek"
+      }
+    ],
+    "declared": null
+  },
+  "empty": {
+    "entries": [],
+    "declared": 0
+  },
+  "noTbody": {
+    "entries": [
+      {
+        "clubberId": "13",
+        "name": "Kim Tester",
+        "club": "Sparks"
+      },
+      {
+        "clubberId": "14",
+        "name": "Lev Tester",
+        "club": "Sparks"
+      }
+    ],
+    "declared": 2
+  },
+  "formAround": {
+    "entries": [
+      {
+        "clubberId": "15",
+        "name": "Max Tester",
+        "club": "Trek"
+      },
+      {
+        "clubberId": "16",
+        "name": "Ned Tester",
+        "club": "Sparks"
+      }
+    ],
+    "declared": 2
+  }
+}
