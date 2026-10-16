@@ -143,30 +143,22 @@ const appReport = updateProgress.createAppReport();
 function reportUpdate() {
   if (deviceSync) deviceSync.reportSoon();
 }
-// The managed copy of the Chrome extension — see src/extension-sync.js. Filled
-// in once at startup and then reported verbatim to the tray, the settings
-// window and /health, so the folder the operator must load unpacked is never
-// something they have to go hunting for.
+// The retired Chrome extension's folder (10.0.0): src/extension-sync.js
+// neuters it on every launch of the print role; `retired` (the launch that
+// replaced a real 9.x extension) restarts Chrome once so the old code stops.
 let extensionState = { action: 'skipped', version: null, targetDir: null };
 
-// ─── Chrome extension ────────────────────────────────────────────────────────
+// ─── The retired Chrome extension ────────────────────────────────────────────
 
-// One stable path, deliberately NOT inside resources/: an app update replaces
-// resources/ wholesale, and Chrome would be left pointing at a folder that
-// vanished. userData survives every update and every uninstall-reinstall.
+// The one folder 9.x copied the extension into (never resources/: it survived
+// every update), which the check-in laptop's Chrome still loads unpacked.
 const EXTENSION_DIR = path.join(app.getPath('userData'), 'chrome-extension');
 
-function syncBundledExtension() {
-  const sourceDir = app.isPackaged
-    ? path.join(process.resourcesPath, 'chrome-extension')
-    : path.join(__dirname, '..', 'chrome-extension');
-  extensionState = extensionSync.syncExtension({ sourceDir, targetDir: EXTENSION_DIR });
-  const { action, version, error } = extensionState;
-  if (error) {
-    console.warn(`[extension] ${action}: ${error}`);
-  } else {
-    console.log(`[extension] ${action} v${version} at ${EXTENSION_DIR}`);
-  }
+function retireBundledExtension() {
+  extensionState = extensionSync.retireExtension({ targetDir: EXTENSION_DIR, version: app.getVersion() });
+  const { action, error } = extensionState;
+  if (error) console.warn(`[extension] ${action}: ${error}`);
+  else if (action !== 'absent' && action !== 'current') console.log(`[extension] ${action}: ${EXTENSION_DIR} now holds the stub`);
   return extensionState;
 }
 
@@ -496,15 +488,6 @@ function buildTray(config) {
       label: config.printerName ? 'Print server status...' : 'Finish print server setup…',
       click: () => createSetupWindow()
     });
-    if (extensionState.targetDir && extensionState.action !== 'skipped') {
-      template.push({
-        // "Load unpacked" wants a folder, and a folder is exactly the thing a
-        // file dialog is worst at finding. Open it in Explorer so the operator
-        // can drag it onto the dialog or paste the path from the title bar.
-        label: 'Open Chrome extension folder',
-        click: () => shell.openPath(extensionState.targetDir)
-      });
-    }
   }
 
   if (roles.display && display && display.isRunning()) {
@@ -674,7 +657,6 @@ function startServer(config) {
     // before first-time setup. Push the current truth into the live module.
     if (serverModule.setPrinterName) serverModule.setPrinterName(config.printerName || '');
     if (serverModule.applySavedConfig) serverModule.applySavedConfig(loadConfig() || {});
-    serverModule.setUpdateHandler(() => installUpdateNow());
     // Operator alerts (#3 contract drift, etc.): the server decides WHEN,
     // this shell decides HOW — a system notification, so it lands even when
     // no settings tab is open. Guarded: notifications are best-effort.
@@ -686,7 +668,6 @@ function startServer(config) {
       });
     }
     if (updateState.available) serverModule.setLatestVersion(updateState.available);
-    if (serverModule.setExtensionInfo) serverModule.setExtensionInfo(extensionState);
     serverInstance = serverModule.startListening();
     // The bind is asynchronous and retries a busy port for about 20 s, so
     // "running" is said only once it is true. Until 7.11.1 the tray said
@@ -930,14 +911,6 @@ ipcMain.handle('open-settings', () => openExternalSafely(SETTINGS_URL, 'status w
 
 ipcMain.handle('install-update', () => { installUpdateNow(); return { ok: true }; });
 
-ipcMain.handle('get-extension-info', () => ({ ...extensionState }));
-
-ipcMain.handle('open-extension-folder', () => {
-  if (!extensionState.targetDir) return { ok: false, error: 'no managed extension folder' };
-  shell.openPath(extensionState.targetDir);
-  return { ok: true, path: extensionState.targetDir };
-});
-
 // The Settings window's "Start Server" button. Unconditional restart rather
 // than probe-first: the person clicking it believes the server is down, and a
 // restart of a healthy server is cheap and harmless.
@@ -989,7 +962,7 @@ let printRoleStarted = false;
 
 /**
  * Everything the printer app did at launch, now only when the print role is
- * on: the port check, the Chrome extension, the server,
+ * on: the port check, the retired extension's stub, the server,
  * the release ping, the check-in page, the old-shortcut offer.
  * `fromWizard`: the role was just turned on (the printer is already chosen).
  */
@@ -1001,10 +974,9 @@ async function startPrintRole({ fromWizard = false } = {}) {
 
   await resolvePortConflict();
 
-  // Before the server starts, so the very first /health already reports the
-  // folder and version. An update landed this launch; the operator should be
-  // told about the owed Chrome restart from the moment the page loads.
-  syncBundledExtension();
+  // The retired extension's folder becomes the stub before anything else here
+  // (src/extension-sync.js); Chrome is restarted below when that was a 9.x one.
+  retireBundledExtension();
 
   const config = loadConfig() || {};
   currentConfig = config;
@@ -1017,10 +989,11 @@ async function startPrintRole({ fromWizard = false } = {}) {
   buildTray(config);
   startStationLoop();
 
-  // A new version landed this launch (the app wrote a newer extension to its
-  // folder): restart Chrome so it loads it, on the check-in page only, at any
-  // hour (owner, 7.4.1). Packaged builds only; it replaces the startup open.
-  const restartChromeNow = app.isPackaged && extensionState.action === 'updated'
+  // This launch replaced the 9.x extension with the stub (the first 10.x
+  // launch): restart Chrome once so the old code stops running, on the
+  // check-in page only, at any hour (owner, 7.4.1 and 2026-10-16). Packaged
+  // builds only; it replaces the startup open.
+  const restartChromeNow = app.isPackaged && extensionState.action === 'retired'
     && !!config.printerName && isSafeExternalUrl(config.checkinUrl);
 
   if (!config.printerName) {

@@ -1,46 +1,49 @@
-// Keep the Chrome extension's files in step with the installed app.
+// Retire the Chrome extension (KVBC Awana 10.0.0, owner 2026-10-16).
 //
-// What this can and cannot do, stated plainly because the difference matters:
-// the extension is installed UNPACKED (chrome://extensions → Load unpacked),
-// and Chrome never auto-updates an unpacked extension. Self-hosting an
-// `update_url` is not an option either — Chrome only honours that for Web
-// Store or enterprise-policy installs. So true silent auto-update is off the
-// table for how this extension is distributed.
+// Up to 9.x the app copied its bundled Chrome extension into one folder under
+// userData (%APPDATA%\awana-label-printer\chrome-extension) on every launch,
+// and the check-in laptop's Chrome loads that folder UNPACKED. 10.0.0 ships no
+// extension: the sync Worker and this app do its work. Chrome, though, keeps
+// loading whatever is in that folder, and nobody is at the laptop to remove it
+// from chrome://extensions. So on every launch this module NEUTERS the folder:
 //
-// What IS achievable, and what this module does: make the folder Chrome loads
-// from a folder the INSTALLER owns. The app copies its bundled extension into
-// one stable path under userData on every launch, and the operator loads that
-// path unpacked exactly once. From then on an app update rewrites those files
-// underneath Chrome, and picking them up costs a Chrome restart instead of a
-// download-unzip-reload cycle. The version banner in the page widget tells
-// them when that restart is owed.
+//   * manifest.json becomes a stub: the same name, this app's version,
+//     manifest v3, and nothing else (no content_scripts, no host_permissions,
+//     no background, no permissions, no popup). Chrome loads an extension
+//     that does nothing.
+//   * every other file in the folder is deleted (the old prune), so no 9.x
+//     code is left on disk for anything to load.
 //
-// Deliberately Electron-free so it can be unit-tested with a temp directory,
-// same reasoning as config-store.js.
+// It returns `retired` only on the launch that replaced a real manifest; main.js
+// then restarts Chrome once (src/chrome-restart.js, the old restart-on-update
+// path) so the running 9.x code stops by itself. Every later launch finds the
+// stub and answers `current` (or `cleaned` if a leftover file had to go or a
+// later 10.x version number was written, which does not restart Chrome again). A folder that does not exist is left alone:
+// no Chrome loads it, and creating one would only invite somebody to.
+//
+// Deliberately Electron-free so electron-app/test/extension-stub.test.cjs can
+// drive it with a temp directory, same reasoning as config-store.js.
+'use strict';
 
 const fs = require('fs');
 const path = require('path');
 
-// A guard, not a limit: the real extension is ~10 flat files. Anything wildly
-// outside that shape means we are pointed at the wrong directory, and copying
-// it into userData would be the wrong move.
-const MAX_FILES = 200;
-const MAX_BYTES = 32 * 1024 * 1024;
+// The name the 9.x extension carried; used when the folder's own manifest
+// cannot be read, so Chrome's list still shows the same entry.
+const EXTENSION_NAME = 'KVBC Kids Check-in Extension';
+const DESCRIPTION = 'Retired in KVBC Awana 10.0.0: it does nothing. Check-in is at awana.kvbchurch.org/checkin. You may remove it from chrome://extensions.';
 
-function readManifestVersion(dir) {
-  try {
-    const raw = fs.readFileSync(path.join(dir, 'manifest.json'), 'utf8');
-    const version = JSON.parse(raw).version;
-    return typeof version === 'string' && version.trim() ? version.trim() : null;
-  } catch {
-    return null;
-  }
+/** The stub manifest, exactly as it is written (stable text, so a re-run can compare it). */
+function stubManifest({ name, version }) {
+  return JSON.stringify({
+    manifest_version: 3,
+    name: typeof name === 'string' && name.trim() ? name.trim().slice(0, 75) : EXTENSION_NAME,
+    version,
+    description: DESCRIPTION,
+  }, null, 2) + '\n';
 }
 
-// Relative paths of every regular file under `dir`, depth-first, sorted.
-// Symlinks are skipped rather than followed: this walks a directory we are
-// about to copy wholesale into the user's profile, and a link pointing out of
-// the tree would copy something we never intended to ship.
+/** Relative paths of every regular file under `dir` (symlinks skipped, never followed), sorted. */
 function listFiles(dir, prefix = '', out = []) {
   let entries;
   try {
@@ -49,116 +52,113 @@ function listFiles(dir, prefix = '', out = []) {
     return out;
   }
   for (const entry of entries) {
-    if (entry.isSymbolicLink()) continue;
     const rel = prefix ? `${prefix}/${entry.name}` : entry.name;
-    if (entry.isDirectory()) {
-      listFiles(path.join(dir, entry.name), rel, out);
-    } else if (entry.isFile()) {
-      out.push(rel);
-    }
+    if (entry.isSymbolicLink()) { out.push(rel); continue; }   // removed as a link, never followed
+    if (entry.isDirectory()) listFiles(path.join(dir, entry.name), rel, out);
+    else out.push(rel);
   }
   return out.sort();
 }
 
-// Write via a temp file in the same directory + rename. Chrome may have this
-// very folder loaded, and a half-written content.js that it happens to read is
-// a broken extension on the check-in page — the one screen that must not break.
-function writeFileAtomic(destPath, buffer) {
-  fs.mkdirSync(path.dirname(destPath), { recursive: true });
+/** Empty sub-folders left once their files are gone, deepest first (the folder itself stays). */
+function removeEmptyDirs(dir) {
+  let entries;
+  try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
+  for (const entry of entries) {
+    if (!entry.isDirectory() || entry.isSymbolicLink()) continue;
+    const sub = path.join(dir, entry.name);
+    removeEmptyDirs(sub);
+    try { fs.rmdirSync(sub); } catch { /* not empty: leave it */ }
+  }
+}
+
+function readManifest(dir) {
+  try {
+    return { text: fs.readFileSync(path.join(dir, 'manifest.json'), 'utf8') };
+  } catch {
+    return { text: null };
+  }
+}
+
+/** A manifest this module wrote (any version): nothing in it runs. */
+function isStub(text) {
+  try {
+    const m = JSON.parse(text);
+    return !!m && m.description === DESCRIPTION && !m.content_scripts && !m.background && !m.host_permissions && !m.permissions;
+  } catch {
+    return false;
+  }
+}
+
+function manifestName(text) {
+  try {
+    const name = JSON.parse(text).name;
+    return typeof name === 'string' ? name : null;
+  } catch {
+    return null;
+  }
+}
+
+/** temp file in the same folder + rename: Chrome may have this very folder loaded. */
+function writeFileAtomic(destPath, text) {
   const tmp = `${destPath}.tmp`;
-  fs.writeFileSync(tmp, buffer);
+  fs.writeFileSync(tmp, text);
   fs.renameSync(tmp, destPath);
 }
 
 /**
- * Copy `sourceDir` into `targetDir`, skipping the copy entirely when the two
- * already hold the same manifest version.
+ * Neuter the managed extension folder.
  *
- * @returns {{action: string, version: string|null, targetDir: string, error?: string, files?: number}}
- *   action is one of:
- *     'installed' — target did not exist, files written
- *     'updated'   — versions differed, files rewritten
- *     'current'   — versions matched, nothing touched
- *     'skipped'   — no usable source bundle (dev checkout, bad path)
- *     'failed'    — the copy itself threw; `error` says why
+ * @param {{targetDir: string, version: string}} o  version = this app's (`app.getVersion()`)
+ * @returns {{action: 'retired'|'cleaned'|'current'|'absent'|'skipped'|'failed',
+ *            version: string|null, targetDir: string|null, removed: number, error?: string}}
+ *   retired  the folder held a real (9.x) manifest; it now holds only the stub.
+ *            The caller restarts Chrome once.
+ *   cleaned  a stub (perhaps of another version) or no manifest was there; the
+ *            stub was (re)written and/or leftover files were deleted. No restart.
+ *   current  only the stub is there; nothing touched.
+ *   absent   no folder; nothing written.
+ *   skipped  called without a folder or a version.
+ *   failed   writing or deleting threw; `error` says why. The next launch tries again.
  */
-function syncExtension({ sourceDir, targetDir, force = false } = {}) {
-  const result = { action: 'skipped', version: null, targetDir: targetDir || null };
-  if (!sourceDir || !targetDir) {
-    result.error = 'sourceDir and targetDir are required';
+function retireExtension({ targetDir, version } = {}) {
+  const result = { action: 'skipped', version: null, targetDir: targetDir || null, removed: 0 };
+  if (!targetDir || typeof version !== 'string' || !/^\d+\.\d+\.\d+$/.test(version)) {
+    result.error = 'targetDir and an X.Y.Z version are required';
     return result;
   }
+  let stat = null;
+  try { stat = fs.lstatSync(targetDir); } catch { /* absent */ }
+  if (!stat) return { ...result, action: 'absent' };
+  if (!stat.isDirectory()) return { ...result, action: 'failed', error: 'the extension path is not a folder' };
 
-  const sourceVersion = readManifestVersion(sourceDir);
-  if (!sourceVersion) {
-    // No bundled extension (running from a dev checkout without one, or the
-    // packaged resource is missing). Report the target's state so callers can
-    // still show the operator where the folder is.
-    result.version = readManifestVersion(targetDir);
-    result.error = 'no manifest.json in the bundled extension';
-    return result;
-  }
-
-  const targetVersion = readManifestVersion(targetDir);
-  if (!force && targetVersion === sourceVersion) {
-    return { action: 'current', version: sourceVersion, targetDir };
-  }
-
-  const files = listFiles(sourceDir);
-  if (!files.length) {
-    result.version = targetVersion;
-    result.error = 'the bundled extension folder is empty';
-    return result;
-  }
-  if (files.length > MAX_FILES) {
-    result.version = targetVersion;
-    result.error = `refusing to copy ${files.length} files — that is not the extension folder`;
-    return result;
-  }
-
+  const before = readManifest(targetDir);
+  const wanted = stubManifest({ name: manifestName(before.text), version });
+  const manifestIsStub = before.text === wanted;
+  // Only replacing a REAL extension's manifest restarts Chrome: a stub from an
+  // earlier 10.x launch (another version number) or a folder with no manifest
+  // at all (Chrome could not load it anyway) is just rewritten.
+  const realBefore = before.text !== null && !isStub(before.text);
+  let removed = 0;
   try {
-    let bytes = 0;
-    // manifest.json goes LAST: it is what the next launch reads to decide the
-    // folder is current, so a copy that dies half way must not have written it.
-    const manifestRel = 'manifest.json';
-    const ordered = [...files.filter((rel) => rel !== manifestRel), ...files.filter((rel) => rel === manifestRel)];
-    const written = [];
-    for (const rel of ordered) {
-      const buf = fs.readFileSync(path.join(sourceDir, rel));
-      bytes += buf.length;
-      if (bytes > MAX_BYTES) throw new Error('bundled extension is implausibly large');
-      written.push([rel, buf]);
-    }
-    for (const [rel, buf] of written.filter(([rel]) => rel !== manifestRel)) {
-      writeFileAtomic(path.join(targetDir, rel), buf);
-    }
-
-    // Drop files the new version no longer ships. A stale content script left
-    // behind is not merely clutter — manifest.json can still list it, and then
-    // Chrome loads old code alongside new.
-    const wanted = new Set(files);
+    // The stub first: from this moment nothing in the folder names a script,
+    // so a delete that fails half way leaves an extension that does nothing.
+    if (!manifestIsStub) writeFileAtomic(path.join(targetDir, 'manifest.json'), wanted);
     for (const rel of listFiles(targetDir)) {
-      if (wanted.has(rel) || rel.endsWith('.tmp')) continue;
-      try { fs.unlinkSync(path.join(targetDir, rel)); } catch { /* best effort */ }
+      if (rel === 'manifest.json') continue;
+      fs.rmSync(path.join(targetDir, rel), { force: true });
+      removed++;
     }
-    for (const [rel, buf] of written.filter(([rel]) => rel === manifestRel)) {
-      writeFileAtomic(path.join(targetDir, rel), buf);
-    }
-
-    return {
-      action: targetVersion ? 'updated' : 'installed',
-      version: sourceVersion,
-      targetDir,
-      files: files.length,
-    };
+    removeEmptyDirs(targetDir);
   } catch (e) {
-    return {
-      action: 'failed',
-      version: targetVersion,
-      targetDir,
-      error: e && e.message ? e.message : String(e),
-    };
+    return { ...result, action: 'failed', version: manifestIsStub ? version : null, removed, error: e && e.message ? e.message : String(e) };
   }
+  return {
+    action: realBefore ? 'retired' : (manifestIsStub && !removed ? 'current' : 'cleaned'),
+    version,
+    targetDir,
+    removed,
+  };
 }
 
-module.exports = { syncExtension, readManifestVersion, listFiles };
+module.exports = { retireExtension, stubManifest, listFiles, EXTENSION_NAME };

@@ -78,17 +78,6 @@
         "filter": [
           "changes.md"
         ]
-      },
-      {
-        "from": "../chrome-extension",
-        "to": "chrome-extension",
-        "filter": [
-          "*.js",
-          "*.json",
-          "*.html",
-          "*.png",
-          "*.md"
-        ]
       }
     ]
   }

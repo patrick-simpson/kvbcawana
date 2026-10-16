@@ -1,8 +1,9 @@
 // Restart Chrome after an update (owner, 7.4.1): "once there's a new version,
 // everything needs to restart. Chrome browser, print server, etc." The app's
 // own update already restarts it and the print server inside it; this is
-// Chrome's half. It runs on the first launch after an update, once the new
-// extension files are on disk, so the Chrome that comes back loads them.
+// Chrome's half. Since 10.0.0 (the extension retired) it runs once: on the
+// launch that replaced the 9.x extension with the stub (src/extension-sync.js),
+// so the Chrome that comes back stops running the old code.
 //
 // Chrome is closed outright (every window, owner's choice) and reopened on the
 // check-in page only. Closed with /F, Chrome would offer "Restore pages?" on
