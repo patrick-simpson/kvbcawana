@@ -242,7 +242,13 @@ const fakeSafe = {
     // The check-in page the stand-in TwoTimTwo serves: the rig's own until the late-BARF section swaps it.
     let checkinPage2 = null;
     const { CHECKIN_PAGE } = await load('test', 'fixtures.js');
-    const t2 = await rig({ storage: storage2, env: { SINGLE_PUBLISHER: 'on', HISTORY_DB: d1Stub() }, kids: [], checkinPage: () => (checkinPage2 ? checkinPage2() : CHECKIN_PAGE) });
+    // TwoTimTwo's roster export, completed books and meeting report (the Worker's stationfeeds.js):
+    // nothing (404) until the last section sets them, so the sections above run as before.
+    const feedsSrc = { roster: null, books: null, meeting: null };
+    const t2 = await rig({
+      storage: storage2, env: { SINGLE_PUBLISHER: 'on', HISTORY_DB: d1Stub() }, kids: [], checkinPage: () => (checkinPage2 ? checkinPage2() : CHECKIN_PAGE),
+      roster: () => feedsSrc.roster, books: () => feedsSrc.books, meeting: () => feedsSrc.meeting,
+    });
     {   // a real history key, as the first client makes it (the rig's stand-in is replaced before anything is sealed)
       const hk = await cc.createHistoryKey(PASS);
       await storage2.delete('history:pub'); await storage2.delete('history:wrapped');
@@ -593,6 +599,80 @@ const fakeSafe = {
     const ym = (await t2.call('GET', '/v1/cloud/status')).body.ymCheckout;
     check('the Worker checks the Trek child out on TwoTimTwo with the Checkout page\'s own post', t2.posts.checkout.length === before + 1 && t2.posts.checkout.at(-1).get('clubber_id') === '706' && ym.checkedOut === 1, JSON.stringify(ym));
     check('and takes them off its tally', frames('tally').at(-1).d.total === 5 && !frames('tally').at(-1).d.counts.Trek, JSON.stringify(frames('tally').at(-1).d));
+
+    // ── what the Chrome extension fed the print server, now the Worker's (stationfeeds.js) ──
+    // The roster export is read by the Worker, sealed to the station and delivered to THIS print
+    // server's /update-csv by the station's own bundle sync (job-puller.js createBundleSync): a
+    // child known only to that roster then prints WITH their allergy. Award slips from the meeting
+    // report print as sealed /print-award jobs once the station runs 10.0.0.
+    console.log('\nthe roster, the completed books and the award slips come from the Worker');
+    {
+      const { rosterCsv, booksCsv } = await load('test', 'fixtures.js');
+      const todayIso = new Date().toISOString().slice(0, 10);   // the print server keeps books by its own clock
+      feedsSrc.roster = rosterCsv([
+        { id: 662, first: 'Kit', last: 'Tester', club: 'Sparks', birthdate: `${today.getMonth() + 1}/${today.getDate()}/2016` },
+        { id: 707, first: 'Wynn', last: 'Allerby', club: 'Sparks', notes: 'Allergic to peanuts' },
+      ]);
+      feedsSrc.books = booksCsv([{ name: 'Wynn Allerby', book: 'HangGlider', date: todayIso }]);
+      server.configureCloud({ stationId: STATION, ring: async () => st.ring, request: request2, start: false, journalFile: null });
+      const bundles = jp.createBundleSync({ signedIn: () => ({ base: BASE, session: t2.session }), stationId: () => STATION, ring: async () => st.ring, localBase: 'http://127.0.0.1:' + E2E_PORT, request: request2, fetchFn: real, now: t2.clock.now, log: () => {} });
+      const old = await bundles.syncOnce();
+      check('a station below 10.0.0 is answered as before these routes existed (its extension syncs the roster)', old.roster === 'none' && old.books === 'none', JSON.stringify(old));
+      // The 10.0.0 app's heartbeat carries its version.
+      await request2(BASE, '/v1/print/heartbeat', { method: 'POST', body: { version: '10.0.0', printer: { state: 'ok' } }, session: t2.session, station: STATION });
+      t2.clock.t = Date.parse('2026-10-14T23:30:00Z');   // 7:30 pm Eastern: club hours
+      const feedsReady = async () => (await request2(BASE, '/v1/station/roster', { session: t2.session, station: STATION })).status === 200
+        && (await request2(BASE, '/v1/station/books', { session: t2.session, station: STATION })).status === 200;
+      for (let i = 0; i < 400 && !(await feedsReady()); i++) {
+        await t2.core.alarm();
+        t2.clock.t = Math.max(t2.clock.t + 1000, t2.alarm.at);
+      }
+      const rosterReads = t2.reads.filter((r) => r.path === '/clubber/csv').length;
+      const gaps = t2.reads.map((r) => r.at).every((at, i, all) => i === 0 || at - all[i - 1] >= 15000);
+      check('the Worker read the roster export ONCE (the station\'s polls meanwhile ask no second read) and the completed books, on its 15 s read clock', rosterReads === 1 && t2.reads.some((r) => r.path === '/report/completed_books') && gaps,
+        t2.reads.slice(-12).map((r) => `${(r.at - t2.reads[0].at) / 1000}s ${r.path}`).join(', '));
+      check('and keeps no name or allergy in its storage', !/Allerby|peanuts|HangGlider/.test(everything(storage2)));
+      const synced = await bundles.syncOnce();
+      check('the station\'s bundle sync opened both bundles and fed this print server (/update-csv, /feed/completed-books)', synced.roster === 'applied' && synced.books === 'applied', JSON.stringify(synced));
+      const csvOnDisk = fs.readFileSync(path.join(data, 'clubbers.csv'), 'utf8');
+      check('clubbers.csv is now the Worker\'s roster, without the household\'s phones and addresses', csvOnDisk.includes('Wynn') && csvOnDisk.includes('Allergic to peanuts') && !csvOnDisk.includes('555-0100') && !csvOnDisk.includes('Elmwood'));
+      check('a second sync applies nothing new', JSON.stringify(await bundles.syncOnce()) === JSON.stringify({ roster: 'unchanged', books: 'unchanged' }));
+
+      // A child the print server knew only from that roster checks in (on TwoTimTwo's own page:
+      // the watcher's job; the desk page's fixture lists Kit alone).
+      // (The Trek child above, checked in on TwoTimTwo's page, prints first: nothing else waits.)
+      for (let i = 0; i < 5 && (await puller2.tick()).handled; i++) await settle();
+      const lines = [];
+      const logBefore = console.log;
+      console.log = (...a) => { lines.push(a.join(' ')); };
+      try {
+        t2.night.kids.push({ id: '707', club: 'Sparks', name: 'Wynn Allerby' });
+        const lw = labels();
+        for (let i = 0; i < 200 && !(await t2.call('GET', '/v1/print/status')).body.queued; i++) {
+          await t2.core.alarm();
+          t2.clock.t = Math.max(t2.clock.t + 1000, t2.alarm.at);
+        }
+        const rw = await puller2.tick();
+        await settle();
+        check('the TwoTimTwo-page check-in printed one label', rw.handled === 1 && labels() === lw + 1, JSON.stringify(rw));
+      } finally { console.log = logBefore; }
+      const enriched = lines.find((l) => /\[csv\] Enriched: Wynn Allerby/.test(l)) || '';
+      check('and the label was drawn WITH the allergy from the Worker-delivered roster (the print path\'s own enrichment line)', /allergies: [A-Z]/.test(enriched) && !/allergies: \(none\)/.test(enriched), enriched || lines.filter((l) => /csv|Enriched/.test(l)).join(' / '));
+
+      // The award slip: the meeting report lists one (TwoTimTwo's next report read, every 5 minutes).
+      feedsSrc.meeting = '"First Name","Last Name","Club","Award"\r\n"Wynn","Allerby","Sparks","Ticket"\r\n';
+      const la = labels();
+      for (let i = 0; i < 600 && !(await t2.call('GET', '/v1/print/status')).body.queued; i++) {
+        await t2.core.alarm();
+        t2.clock.t = Math.max(t2.clock.t + 1000, t2.alarm.at);
+      }
+      const ra = await puller2.tick();
+      await settle();
+      check('the meeting report\'s award slip printed once, as a sealed /print-award job', ra.handled === 1 && labels() === la + 1, `${JSON.stringify(ra)} ${labels() - la}`);
+      for (let i = 0; i < 40; i++) { await t2.core.alarm(); t2.clock.t = Math.max(t2.clock.t + 1000, t2.alarm.at); }
+      check('and never twice: the next meeting reads queue nothing more', (await puller2.tick()).handled === 0 && labels() === la + 1);
+      check('the meeting report\'s counts reached the Worker\'s own tonight frame', frames('tonight').at(-1).d.awardsEarned === 1, JSON.stringify(frames('tonight').at(-1).d));
+    }
     server.stopCloud();
     const back = await (await real(`http://127.0.0.1:${E2E_PORT}/config/church`)).json();
     check('stopCloud hands the sweep back to the extension', !back.ymCheckout || back.ymCheckout.enabled !== false);
