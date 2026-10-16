@@ -32,8 +32,8 @@ export const LABEL_DPI = 300;
 // Default check-in URL
 export const DEFAULT_CHECKIN_URL = 'https://kvbchurch.twotimtwo.com/clubber/checkin?#';
 
-// DOM Selectors (if used in React, keep documented here)
-// Note: These are used by the extension, not the React app itself
+// TwoTimTwo's check-in page DOM, which the Simulator replica keeps (the Chrome
+// extension read these until it was retired in 10.0.0)
 export const DOM_SELECTORS = {
   LAST_CHECKIN: '#lastCheckin div', // The "Last Checked In" element
   CLUBBER: '.clubber', // Child/clubber container

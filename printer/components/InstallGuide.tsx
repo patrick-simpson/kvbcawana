@@ -89,52 +89,37 @@ export const InstallGuide: React.FC = () => {
             </p>
           </Step>
 
-          <Step n={2} title="Load the browser extension" club="sparks">
+          <Step n={2} title="Check children in at /checkin" club="sparks">
             <p>
-              The app already installed the extension’s files for you. You just have to point your browser
-              at them <em>once</em>.
+              Check-in happens at <strong>awana.kvbchurch.org/checkin</strong>, in any browser at the desk
+              (or on a phone), signed in with the church passphrase. Each check-in is made on TwoTimTwo
+              and its label prints on this computer within seconds. A child checked in on TwoTimTwo’s own
+              page gets a label too.
             </p>
-            <div className="kv-callout">
-              <p><strong>In Edge or Chrome:</strong></p>
-              <ol className="kv-olist">
-                <li>Open <Code>edge://extensions</Code> or <Code>chrome://extensions</Code></li>
-                <li>Turn on <strong>Developer Mode</strong> (top right)</li>
-                <li>Click <strong>Load unpacked</strong> and pick <Code>%APPDATA%\awana-label-printer\chrome-extension</Code></li>
-              </ol>
-              <p className="kv-small">
-                Can’t find it? The tray menu has <strong>Open Chrome extension folder</strong>, which opens it
-                in Explorer so you can drag it onto the dialog.
-              </p>
-            </div>
             <div className="kv-callout kv-callout--tint">
-              <p><strong>Why that folder and not a download</strong></p>
+              <p><strong>No browser extension</strong></p>
               <p>
-                The app rewrites that folder every time it starts, so when the app updates itself the
-                extension updates with it. Just <strong>restart Chrome</strong> to pick it up, and the widget
-                tells you when one is owed. A copy you download and unzip somewhere else never updates, and
-                quietly drifts behind the print server.
+                Since version 10 there is nothing to load in Chrome. A laptop that had the old KVBC Kids
+                Check-in Extension updates by itself: the app empties that extension and restarts Chrome
+                once, and you may remove it from <Code>chrome://extensions</Code> whenever you like.
               </p>
             </div>
             <p className="kv-small">
-              The green <strong>Club Print</strong> widget appears on your check-in page once it’s loaded.
-              (<a href="/chrome-extension.zip" download>The zip</a> is still there for anyone not using the
-              Windows app.)
+              With no internet, nothing checks in or prints: use TwoTimTwo’s paper sign-in sheet and
+              hand-written tags, and key the sheet into TwoTimTwo when the connection is back.
             </p>
           </Step>
 
-          <Step n={3} title="Enrich labels from your roster (automatic)" club="tnt">
+          <Step n={3} title="Labels know your roster (automatic)" club="tnt">
             <p>
-              The extension syncs your TwoTimTwo roster to the print server on every visit, which unlocks
-              allergy icons, birthday cakes, handbook groups and the no-photo flag. You can also drop a{' '}
-              <Code>clubbers.csv</Code> next to the server with these columns:
+              The church’s check-in service reads your TwoTimTwo roster and completed books and seals them
+              to this computer, which unlocks allergy icons, birthday cakes, handbook groups, trophy bands
+              and the no-photo flag. Only the printing computers can open them.
             </p>
-            <div className="kv-scroll" tabIndex={0} role="region" aria-label="CSV columns">
-              <Code>FirstName, LastName, Birthdate, Allergies, HandbookGroup, MedRelease</Code>
-            </div>
             <p className="kv-small">
-              A “no” in <strong>MedRelease</strong> (or TwoTimTwo’s photo-release column) prints a crossed-out
-              camera on that child’s label, so volunteers know not to photograph them. Unknown children still
-              get a basic label; nothing ever crashes.
+              A “no” in TwoTimTwo’s photo-release column prints a crossed-out camera on that child’s label,
+              so volunteers know not to photograph them. Unknown children still get a basic label; nothing
+              ever crashes.
             </p>
           </Step>
 
@@ -150,8 +135,8 @@ export const InstallGuide: React.FC = () => {
               </span>
             </div>
             <p className="kv-small">
-              Then open your church’s TwoTimTwo check-in page in Chrome and check a child in. A real label
-              should print. (The settings page’s test label works too.)
+              Then check a child in at awana.kvbchurch.org/checkin. A real label should print. (The
+              settings page’s test label works too.)
             </p>
           </Step>
         </ol>

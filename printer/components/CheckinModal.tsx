@@ -7,8 +7,8 @@ interface CheckinModalProps {
   onConfirm: (clubber: Clubber) => void;
 }
 
-// A replica of TwoTimTwo's check-in modal. The extension looks for
-// #checkin-modal and the button#checkin inside it; keep both ids. The tt-
+// A replica of TwoTimTwo's check-in modal: #checkin-modal and the
+// button#checkin inside it, TwoTimTwo's own ids (DOM_SELECTORS); keep both. The tt-
 // classes are the replica's look (styles/home.css).
 export const CheckinModal: React.FC<CheckinModalProps> = ({ clubber, onClose, onConfirm }) => {
   const checkinRef = useRef<HTMLButtonElement>(null);

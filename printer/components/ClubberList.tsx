@@ -7,9 +7,8 @@ interface ClubberListProps {
 }
 
 // Each row keeps TwoTimTwo's own structure (.clubber > .name + .club img):
-// the extension reads the name from .name and the club from the img's alt.
-// The img carries no src: the replica has no club art, and the extension's
-// capture treats an unloaded image exactly like a missing one (monogram).
+// the name in .name and the club in the img's alt. The img carries no src:
+// the replica has no club art.
 // The tt- classes are the replica's look (styles/home.css); never the contract.
 export const ClubberList: React.FC<ClubberListProps> = ({ clubbers, onSelect }) => (
   <div className="tt-grid">

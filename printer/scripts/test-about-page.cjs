@@ -135,7 +135,7 @@ test('every shape, doodle and club mark is the kit\'s own file, imported from lo
   for (const rel of HOME) {
     for (const [tag] of live(read(rel)).matchAll(/<img\b[^>]*>/g)) {
       const src = attr(tag, 'src');
-      if (!src && /\bhidden\b/.test(tag)) continue; // the replica's empty club image (the extension reads its alt)
+      if (!src && /\bhidden\b/.test(tag)) continue; // the replica's empty club image (its alt names the club)
       assert.match(src, /^\{(?:LOGO\.(?:twoLineInk|twoLineWhite|fullWhite|stackedInk)|c\.(?:color|white)|spec\.club\.black|club\('[a-z]+'\)\.white)\}$/, `${rel}: ${tag}`);
       assert.ok(/\balt=/.test(tag), `${rel}: ${tag} has alt`);
     }
@@ -261,7 +261,7 @@ test('links out go only to the repo, the app\'s own downloads, this site\'s page
 });
 
 // ── The Simulator's DOM contract (src/constants.ts DOM_SELECTORS) ────────────
-test('the Simulator keeps the DOM the extension watches', () => {
+test('the Simulator keeps TwoTimTwo\'s own DOM (DOM_SELECTORS)', () => {
   const sim = read('components/Simulator.tsx');
   assert.match(sim, /<div id="lastCheckin"[^>]*>[\s\S]*?<div className="tt-last__who">[\s\S]*?\{lastCheckin\?\.name\}/, '#lastCheckin div holds the name');
   assert.match(sim, /<div className="clubbers">\s*<ClubberList/);

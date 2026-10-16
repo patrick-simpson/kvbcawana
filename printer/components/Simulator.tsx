@@ -8,14 +8,13 @@ import { Doodle, Shape, clubByName } from './home/Kit';
 import { Moment, PrinterArt, Tv } from './home/Screens';
 
 /**
- * A working replica of the TwoTimTwo check-in page. It renders the exact DOM
- * the browser extension watches (#lastCheckin and .clubber rows with .name and
- * .club img, plus #checkin-modal / button#checkin — see src/constants.ts
- * DOM_SELECTORS and chrome-extension/content.js). The extension's content
- * script only runs on *.twotimtwo.com (manifest.json content_scripts), so no
+ * A working replica of the TwoTimTwo check-in page. It renders TwoTimTwo's
+ * own DOM (#lastCheckin and .clubber rows with .name and .club img, plus
+ * #checkin-modal / button#checkin — see src/constants.ts DOM_SELECTORS; the
+ * Chrome extension read exactly these until it was retired in 10.0.0). No
  * label prints from this page: beside the replica, a lobby TV and a printer
  * act out what a real check-in sets off. Restyle freely around it; never
- * change that DOM.
+ * change that DOM (scripts/test-about-page.cjs pins it).
  *
  * The replica keeps TwoTimTwo's own light colours, because it is a picture of
  * somebody else's website.
@@ -98,7 +97,7 @@ export const Simulator: React.FC = () => {
                 {isLoading && <div className="tt-loading">Checking in...</div>}
               </div>
 
-              {/* The DOM the extension watches — keep this structure intact */}
+              {/* TwoTimTwo's own DOM (DOM_SELECTORS) — keep this structure intact */}
               <div id="lastCheckin" className={shown ? 'tt-last' : ''} style={!shown ? { display: 'none' } : {}}>
                 <span className="tt-last__label">Last checked in:</span>
                 <div className="tt-last__who">

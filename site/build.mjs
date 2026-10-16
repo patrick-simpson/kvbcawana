@@ -145,7 +145,7 @@ cpSync(path.join(ROOT, 'printer', 'changes.md'), path.join(OUT, 'release-notes',
 // Pretty addresses, and HTML / JSON never cached at the edge, so a deploy
 // and a calendar change reach the screens at once (Cloudflare Pages honours
 // _headers; the apps' service workers already go network-first for both).
-// Stable download links (the Install Guide, the extension popup, the
+// Stable download links (the Install Guide, the retired extension's popup, the
 // signage's KVBC Awana card): the newest installer each update feed names,
 // else the releases page until the first release from this repo
 // (site/lib/downloads.js; /download/kvbc-awana and /download/club-label-printer

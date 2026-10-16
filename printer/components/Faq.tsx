@@ -8,19 +8,19 @@ const QA: { q: string; a: React.ReactNode }[] = [
   },
   {
     q: 'Can it print the same child twice by accident?',
-    a: 'No. The print server holds back a repeat print of the same child within a 45-second window, so retries, double-taps and overlapping detection paths produce exactly one label. Deliberate reprints from the widget or the settings page always work.',
+    a: 'No. The print server holds back a repeat print of the same child within a 45-second window, so retries, double-taps and overlapping detection paths produce exactly one label. Deliberate reprints from /checkin or the settings page always work.',
   },
   {
     q: 'What happens if the Wi-Fi goes down mid-event?',
-    a: 'Labels keep printing. The roster is kept on the laptop and in the extension, prints wait in line while the server is briefly out of reach, and the widget search works from the saved roster, so you can keep printing labels and finish the TwoTimTwo check-ins when the connection returns. Phones and the settings page need the internet, so they wait until it is back; the check-in desk does not.',
+    a: 'Check-in needs the internet: /checkin, TwoTimTwo and the print jobs all go through it. If it drops, the desk uses TwoTimTwo’s paper sign-in sheet and hand-written name tags, and the sheet is keyed into TwoTimTwo once the connection is back. Labels already sent to the laptop still print.',
   },
   {
     q: 'How do updates work?',
-    a: 'The Windows app checks for new versions and installs them itself, restarting within seconds. The Chrome extension’s files are updated along with it; restart Chrome to load them, and the widget tells you when that’s owed.',
+    a: 'The Windows app checks for new versions and installs them itself, restarting within seconds. There is no browser extension to update.',
   },
   {
     q: 'Where does the allergy and birthday data come from, and where does it go?',
-    a: 'From your own TwoTimTwo roster: the extension syncs it to the print server on your laptop using your logged-in session. Allergies, birthdates and photo answers stay on that computer. If you connect lobby screens, they receive only what they need to greet a child by first name, sealed once you set a display key.',
+    a: 'From your own TwoTimTwo roster: the church’s check-in service reads it and seals it to the print server on your laptop, so only that computer can open it. Allergies, birthdates and photo answers stay there. Lobby screens receive only what they need to greet a child by first name, sealed.',
   },
   {
     q: 'Is this an official Awana or TwoTimTwo product?',
@@ -28,7 +28,7 @@ const QA: { q: string; a: React.ReactNode }[] = [
   },
   {
     q: 'Something isn’t printing. Help?',
-    a: <>Click <strong>Help — Not Working?</strong> in the widget for automatic diagnostics, or open <code className="kv-code">awana.kvbchurch.org/settings</code> in Chrome on the laptop for a health check, plain-language warnings, diagnostics and a test label.</>,
+    a: <>Open <code className="kv-code">awana.kvbchurch.org/settings</code> in Chrome on the laptop for a health check, plain-language warnings, diagnostics and a test label.</>,
   },
 ];
 

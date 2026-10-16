@@ -5,7 +5,7 @@
 // /download/kvbc-awana and /download/club-label-printer are the same app
 // since 9.0.0 (ROADMAP.md#kvbc-awana-one-app: the printer became KVBC Awana and keeps its
 // feed), so both follow printer/latest.yml; the old name stays for every link
-// already printed or bookmarked (the Install Guide, the extension popup, the
+// already printed or bookmarked (the Install Guide, the retired extension's popup, the
 // app's own repair). /download/lobby-display was the old sound room app's; that
 // app was retired on 2026-10-16 (every sound room PC runs KVBC Awana), so the
 // old link now gives KVBC Awana too. The lobby feed itself (site/updates/lobby/)
