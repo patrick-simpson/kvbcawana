@@ -163,6 +163,24 @@
     </div>
   </div>
 
+  <!-- Club transitions (owner 2026-10-17; src/schedule/29-transition-gap.js):
+       pure black over every view for the gap around a scheduled hand-off
+       (shared/transitionGap.js), under the corner buttons; the check-in frame
+       stays loaded beneath it. A check-in from one of the gap's clubs gets
+       its club's welcome card here for 20 s. First names only. -->
+  <div id="gap-view" class="hidden">
+    <div id="gap-welcome-journey" class="gap-welcome hidden" role="status" data-club="journey">
+      <span class="gap-welcome-mark"><img src="brand/logos/journey-white.svg" alt="Journey" draggable="false" /></span>
+      <span class="gap-welcome-kicker">Welcome</span>
+      <span class="gap-welcome-names"></span>
+    </div>
+    <div id="gap-welcome-trek" class="gap-welcome hidden" role="status" data-club="trek">
+      <span class="gap-welcome-mark"><img src="brand/logos/trek-white.svg" alt="Trek" draggable="false" /></span>
+      <span class="gap-welcome-kicker">Welcome</span>
+      <span class="gap-welcome-names"></span>
+    </div>
+  </div>
+
   <!-- The two corner buttons' icons: drawn on a 24px grid with one round
        2.25 stroke in currentColor (the home page's icon family, the weight of
        the kit's doodles at button size), so they never depend on a font

@@ -1336,6 +1336,106 @@ html.cursor-hidden #video-controls:not(.force-visible) {
   margin-bottom: 1.25rem;
 }
 
+/* Club transitions (owner 2026-10-17; src/schedule/29-transition-gap.js):
+   the gap's pure black, one fixed layer over every view (the check-in frame
+   stays loaded under it) and under the corner buttons (10) and the panels.
+   A welcome card per club sits on it: the club's catalog field (Journey
+   purple with its deep wave, Trek's deep teal with its wave), the club's
+   white wordmark, a Londrina kicker and the first names in Paytone. Flat
+   fills and hard offsets; its fade and entrance live in the motion block. */
+#gap-view {
+  position: fixed;
+  inset: 0;
+  z-index: 9;
+  background: #000000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4vw;
+  padding: 6vh 8vw;
+}
+
+.gap-welcome {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(0.4rem, 1.2 * var(--u), 1.6rem);
+  width: min(84vw, 64 * var(--u));
+  min-height: min(70vh, 36 * var(--u));
+  padding: clamp(1.2rem, 3.2 * var(--u), 4rem) clamp(1.2rem, 3 * var(--u), 4rem) clamp(2.4rem, 7 * var(--u), 8rem);
+  border-radius: clamp(1rem, 2.4 * var(--u), 3rem);
+  color: #ffffff;
+  text-align: center;
+  background: var(--jr-art-wave-on-purple) left bottom / 100% 18% no-repeat, var(--jr-purple);
+  box-shadow: clamp(8px, 0.9 * var(--u), 18px) clamp(8px, 0.9 * var(--u), 18px) 0 var(--jr-deep);
+  overflow: hidden;
+}
+
+.gap-welcome[data-club='trek'] {
+  background: var(--jr-art-wave-trek) left bottom / 100% 18% no-repeat, var(--jr-trek-deep);
+  box-shadow: clamp(8px, 0.9 * var(--u), 18px) clamp(8px, 0.9 * var(--u), 18px) 0 var(--jr-trek);
+}
+
+/* Both clubs at once: two cards side by side, Journey left, Trek right. */
+.gap-welcome[data-slot='left'],
+.gap-welcome[data-slot='right'] {
+  width: min(42vw, 40 * var(--u));
+}
+
+.gap-welcome-mark {
+  display: block;
+  line-height: 0;
+}
+
+.gap-welcome-mark img {
+  display: block;
+  width: clamp(10rem, 30 * var(--u), 36rem);
+  height: auto;
+}
+
+.gap-welcome[data-slot='left'] .gap-welcome-mark img,
+.gap-welcome[data-slot='right'] .gap-welcome-mark img {
+  width: clamp(8rem, 22 * var(--u), 28rem);
+}
+
+.gap-welcome-kicker {
+  font-family: var(--jr-font-label);
+  font-size: clamp(1rem, 2.6 * var(--u), 3.2rem);
+  line-height: 1;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--jr-tint);
+}
+
+.gap-welcome[data-club='trek'] .gap-welcome-kicker {
+  color: var(--jr-trek-tint);
+}
+
+.gap-welcome-names {
+  max-width: 100%;
+  font-family: var(--jr-font-shout);
+  font-size: calc(clamp(1.8rem, 6.4 * var(--u), 8rem) * var(--jr-shout-fit));
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+  text-shadow: clamp(3px, 0.3 * var(--u), 6px) clamp(3px, 0.3 * var(--u), 6px) 0 var(--jr-ink);
+}
+
+.gap-welcome[data-club='trek'] .gap-welcome-names {
+  text-shadow: clamp(3px, 0.3 * var(--u), 6px) clamp(3px, 0.3 * var(--u), 6px) 0 var(--jr-trek);
+}
+
+.gap-welcome[data-size='long'] .gap-welcome-names,
+.gap-welcome[data-slot='left'] .gap-welcome-names,
+.gap-welcome[data-slot='right'] .gap-welcome-names {
+  font-size: calc(clamp(1.4rem, 4.2 * var(--u), 5.2rem) * var(--jr-shout-fit));
+}
+
+.gap-welcome[data-size='long'][data-slot='left'] .gap-welcome-names,
+.gap-welcome[data-size='long'][data-slot='right'] .gap-welcome-names {
+  font-size: calc(clamp(1.2rem, 3.2 * var(--u), 4rem) * var(--jr-shout-fit));
+}
+
 /* Configure mode (?configure=1): the page is only this panel, shown in the
    sound room app's Settings window beside the live kiosk. No kiosk under it,
    so no scrim and no corner buttons; the plain ground is the warm paper of
@@ -1349,6 +1449,7 @@ html.configure-mode body {
 html.configure-mode #checkin-view,
 html.configure-mode #journey-view,
 html.configure-mode #trek-view,
+html.configure-mode #gap-view,
 html.configure-mode #toggle-btn,
 html.configure-mode #settings-btn,
 html.configure-mode #settings-backdrop,
@@ -3119,6 +3220,23 @@ html.cursor-hidden #slide-controls {
     pointer-events: none;
   }
 
+  /* Club transitions (29-transition-gap.js): the black fades in over what
+     was showing and fades out off the next view (.jm-gap-out, kept shown
+     for its length); a welcome card pops up on it. */
+  html.motion-full #gap-view:not(.jm-gap-out) {
+    animation: jm-fade 900ms var(--jm-wipe) backwards;
+  }
+  html.motion-full #gap-view.jm-gap-out {
+    pointer-events: none;
+    animation: jm-gap-out 900ms var(--jm-wipe) forwards;
+  }
+  html.motion-full .gap-welcome:not(.hidden) {
+    animation: jm-card-in 620ms var(--jm-settle) backwards;
+  }
+
+  @keyframes jm-gap-out {
+    to { opacity: 0; }
+  }
   @keyframes jm-slam {
     from { opacity: 0; transform: scale(1.6); }
     60% { opacity: 1; transform: scale(0.97); }

@@ -122,6 +122,12 @@ function startMotionWatchers() {
     const now = visibleLayer();
     shownLayer = now;
     if (was === now) return;
+    // Under a club transition's black (29-transition-gap.js) the black is the
+    // transition: no band rides over it.
+    if (gapBlackUp()) {
+      clearStinger();
+      return;
+    }
     // Into Trek's card: the card has its own entrance (style.css). Only
     // flips into or out of Journey get the band, as they always have.
     if (now === trekView || (was !== journeyView && now !== journeyView)) {

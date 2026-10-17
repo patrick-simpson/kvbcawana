@@ -10,6 +10,8 @@
 //                                                          Trek small group card asks it, byte for byte)
 //   phone remote    canonical shared/journeyRemote.js -> journey/public/src/shared/ (the phone
 //                                                          remote page cleans the Worker's answers with it)
+//   club gaps       canonical shared/transitionGap.js -> journey/public/src/shared/ (the kiosk's
+//                                                          black gaps and gap welcomes, byte for byte)
 //   the classroom   the brand kit -> classroom/public/brand/, clubNight.js and transitionGap.js -> classroom/public/src/shared/
 //                   (the downstairs classroom screen, owner 2026-10-17: its schedule asks the rule)
 //
@@ -45,8 +47,9 @@ export const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 export const KIT = 'shared/brand';
 // ES modules the Journey kiosk loads: at sign-in (public/src/sync.js), and the
 // club-night rule its Trek small group card follows (src/schedule/25-trek.js);
-// and the phone remote's rules (public/remote/, which also signs in with the first two).
-export const JOURNEY_MODULES = ['sync-protocol.js', 'cloud-crypto.js', 'clubNight.js', 'journeyRemote.js'];
+// and the phone remote's rules (public/remote/, which also signs in with the first two);
+// and the club transition gap (src/schedule/29-transition-gap.js, owner 2026-10-17).
+export const JOURNEY_MODULES = ['sync-protocol.js', 'cloud-crypto.js', 'clubNight.js', 'journeyRemote.js', 'transitionGap.js'];
 // What each app holds a copy of. Paths are repo-relative.
 export const COPIES = {
   journey: { kit: 'journey/public/brand', modules: 'journey/public/src/shared' },

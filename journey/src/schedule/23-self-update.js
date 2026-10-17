@@ -48,6 +48,10 @@ let lastVersionCheckMs = 0;
    press Begin: all of those are the room's, not ours. In practice this means
    the Check-in Display is showing, or the Journey window has ended. */
 function safeToReload() {
+  // A club transition's black with no welcome on it is nobody's to watch
+  // (the black is only ever up when nothing below is being watched; the
+  // splash waiting under it is not on screen yet).
+  if (gapBlackUp() && !gapWelcoming()) return true;
   const el = document.activeElement;
   const typing =
     !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable);

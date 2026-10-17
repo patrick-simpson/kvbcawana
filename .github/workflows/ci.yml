@@ -119,7 +119,7 @@ jobs:
               # suite. (In a case pattern * also matches "/", so this is a test.)
               if [[ "$f" != */* && "$f" == *.md ]]; then continue; fi
               case "$f" in
-                journey/public/src/schedule.js|journey/public/src/sync.js|journey/src/schedule/19-picker-final-step.js) lobby=true ;;  # screenSpecs.test.js reads both, embed.test.js sync.js, shared/journeyRemote.test.js the picker's choices
+                journey/public/src/schedule.js|journey/public/src/sync.js|journey/src/schedule/19-picker-final-step.js|journey/src/schedule/29-transition-gap.js) lobby=true ;;  # screenSpecs.test.js reads both, embed.test.js sync.js and the gap welcomes' hand-up, shared/journeyRemote.test.js the picker's choices
                 classroom/public/src/app.js) lobby=true ;;  # embed.test.js reads the classroom's side of the check-in hand-up
                 site/checkin/*|printer/print-server/public/phone.html|printer/print-server/sync-protocol.js) lobby=true ;;
                 printer/contract-vectors.json|printer/envelope-vectors.json) lobby=true ;;  # the lobby's sanitizer and envelope tests read the one copy in place  # e2e/checkin.spec.js serves the check-in page (site/checkin/checkin-page.mjs builds it from phone.html)

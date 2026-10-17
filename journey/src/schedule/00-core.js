@@ -143,10 +143,21 @@ const trekLesson = document.getElementById('trek-lesson');
 const trekLessonTitle = document.getElementById('trek-lesson-title');
 const journeyChip = document.getElementById('journey-chip');
 const journeyChipCount = document.getElementById('journey-chip-count');
+const gapView = document.getElementById('gap-view');
+const gapWelcomeEls = {
+  journey: document.getElementById('gap-welcome-journey'),
+  trek: document.getElementById('gap-welcome-trek'),
+};
 
 // What the Trek card knows about tonight (25-trek.js fills it in). Declared up
 // here because scheduledPhase() reads it from the very first setView() call,
 // long before that file's own lines have run. `ready` stays false until the
 // club-night rule itself has loaded: until then no night is a club night.
 const trekNight = { ready: false, rule: null, schedule: null, feed: null };
+
+// The club transition gaps (29-transition-gap.js), declared up here for the
+// same reason: setView() asks about them. `rule` is the shared module
+// (shared/transitionGap.js); until it has loaded there is no gap at all.
+// `welcomes` holds tonight's gap welcomes' first names, in memory only.
+const gapState = { rule: null, up: false, clubs: [], key: '', dismissed: '', welcomes: null, outTimer: null };
 

@@ -21,6 +21,9 @@ function setView(phase) {
     // the schedule's own phase being adopted, never a fake flip.
     if (scheduledPhase() === 'trek') lastPhase = 'trek';
   }
+  // The club transition black (29-transition-gap.js) follows what is now on
+  // screen: a lesson that just finished inside a gap goes to black here.
+  refreshGap();
 }
 
 /* Where a finished scheduled lesson (its video, then its slides) hands the
@@ -68,6 +71,9 @@ setInterval(pollSchedule, POLL_INTERVAL_MS);
 
 toggleBtn.addEventListener('click', () => {
   audioUnlocked = true;
+  // Over a club transition's black: the operator wants a view, so the black
+  // goes for the rest of this gap (29-transition-gap.js), then as below.
+  dismissGap();
   if (previewMode) {
     endPreview();
     return;
