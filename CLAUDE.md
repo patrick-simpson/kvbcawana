@@ -6,6 +6,7 @@ This one repo holds three apps for Kennebec Valley Baptist Church's Awana club:
 - `worker/`: the sync Worker (Cloudflare), at the root since 2026-10-16; its rules stay in the lobby section below ("Settings panel, shared settings, sync service").
 - `shared/`: the family's shared modules, data and brand kit (one master copy each), at the root since 2026-10-16; the site still serves it at `/lobby/shared/`. The lobby's lint and vitest cover it (`cd lobby && npm run lint`), and its rules stay in the lobby section below ("Brand kit"). Where the lobby section writes `shared/...` it means this folder.
 - `journey/`: the Journey room kiosk.
+- `classroom/`: the downstairs classroom screen (Cubbies, Sparks Large Group Time, the Sparks lobby), since 2026-10-17.
 - `printer/`: KVBC Awana (the Windows app: print server, sound room display, or both), the public site, and the check-in page's source.
 
 **Before changing anything inside an app folder, read that app's section in this file** (the `## App:` sections below). Each app's section is the authority for that app. The long-term plans are in `ROADMAP.md`.
@@ -342,6 +343,34 @@ Journey room kiosk at https://awana.kvbchurch.org/journey/ (only correct address
 - `README.md` (PC setup, plain words).
 - Tests: `test/*.test.mjs` + harness `test/kiosk-dom.mjs`.
 
+
+## App: classroom/ — downstairs classroom screen
+
+Rules for `classroom/` only. Rationale/history/dated owner decisions: `classroom/docs/DECISIONS.md`. Setup in plain words: `classroom/README.md`.
+
+### classroom: Purpose and schedule
+- awana.kvbchurch.org/classroom/, KVBC Awana's FOURTH display screen ("Downstairs classroom", `printer/electron-app/src/display/screens.js` `classroom`; choosing it sets hours 18:30-20:00 and the 20:00 shutdown on, `settings.js settingsForScreen`, once, owner 2026-10-17). Club nights only (`shared/clubNight.js`, generated copy `public/src/shared/clubNight.js`, with the lobby's `../lobby/shared/schedule.json` + `../lobby/calendar-feed.json`; not loaded = not a club night). By the church clock (`public/src/logic.js phaseAt`): 18:30 Cubbies card, 18:57 BLACK (#000; the clubs pass at the door), 19:03 Sparks "Large Group Time", 19:30 the lobby (`../lobby/?club=sparks`), 20:00 off. Before 18:30 / other nights: black (the app has the window down anyway). No manual override (owner). The Cubbies card animates OUT into the black at 18:57 and Sparks IN at 19:03 (2.4 s; reduced motion = instant). Tests `test/logic.test.mjs` (every boundary), `test/page.test.mjs` (Chromium: the clock, fit at 720p/1080p/4K/1024x768, welcomes).
+- Future (owner): the Sparks part grows into a Journey-like app here (`ROADMAP.md#downstairs-classroom`).
+
+### classroom: Checks
+- Git rules are in the Git section at the top. `cd classroom && npm test` (pretest makes the kit + clubNight copies: `node ../scripts/family-assets.mjs classroom`, gitignored, `scripts/check-mirrors.mjs`); `node --check public/src/app.js`. CI job `classroom`. `public/src/app.js` is also read by lobby `src/lib/embed.test.js` (ci "What changed" runs the lobby suite for it).
+- Plain static page: NO framework, NO bundler. Only `public/` deploys (site/build.mjs copies it and runs `scripts/stamp-build.mjs` with a hash of `classroom/public`: meta `classroom-build`, `version.json`, `?v=` on `STAMPED`). Self-update (`checkBuild`): every 3 min + `online`; reloads only while the screen is black/off, page fetched first must carry the new id.
+- Preview one moment: `?preview=cubbies|honey|bear|sparks|welcome-cubbies|welcome-sparks` (`&count=N`); time travel `?now=<ISO>`. Configure mode (`?configure=1`, KVBC Awana's Settings window): a note of the schedule, the lobby frame removed at parse (no second socket).
+
+### classroom: Look
+- Cubbies card = the 2026-27 catalog's Cubbies opener (p. 33): kit only (`public/brand/` copy of `shared/brand/`): sky field, white line doodles (kit doodles via CSS mask), the Cubbies wave (path data baked from `shapes/wave-cubbies.svg` with `preserveAspectRatio='none'`) with a deep-blue hard offset wave, the official colour mark. No "HELLO, CUBBIES!" line (owner removed it).
+- Sparks card = a page of the Sparks HangGlider handbook (owner's sample, 2026-10-17; reference only, never committed): lime field with a flat darker-green edge band (the handbook's soft gradient as FLAT bands), a big rounded white page with a deep-green hard offset, yellow + teal arcs off the right edge, the colour Sparks mark, red Paytone "Grades K–2", "LARGE GROUP TIME" in lime with a deep-green outline (`-webkit-text-stroke`, `paint-order`) and hard offset, Sparky flying out of a green-ringed circle. Sparks red stays in the mark, the heading and the chip. The owner may still change it ("not perfect").
+- Shared rules: Paytone shouts x `--cr-shout-fit` 1.057, Londrina labels; NEVER a gradient, blur, glow or soft shadow (hard offsets only).
+- Awana clipart (owner 2026-10-17: committing it to the public repo is OK; the Cubbies style has not changed since 2013, so that whole set is on brand), in `public/art/`, only the pieces used: `cubbie-waving.svg` and `cubbie-arms-up.svg` (Cubbies 2013 clip art PDFs -> SVG, cropped by viewBox only), `sparky-flying.png` (HangGlider Sparky_Flying, white background cut out, 900 px). Never redrawn, recoloured or distorted.
+- Count chip top-right during each card = the kit's stepped chip: `logic.js chipGeometry` is a port of `shared/chipGeometry.js` (which imports JSON a plain page cannot), numbers pinned to it by `test/logic.test.mjs`; plate in the club's deep shade (Sparks red deep), white keyline out of register, "CHECKED IN" + count; count from the embedded lobby's `awanaClubCounts.v1` (numbers only, `clubCountFrom`, same reading as Journey's chip); hidden with none.
+- Motion: arrival (Cubbies: wave rises, mark pops with a soft squish; Sparks: title rises, ring pops, Sparky flies in), then calm ambient (mark breathes 1.2%, doodles bob, Sparky floats), all in ONE `@media (prefers-reduced-motion: no-preference)` block under `html.cr-motion`; outside it = the finished frame. Transform/opacity only.
+- Easter eggs (owner): Cubbie (`cubbie-waving.svg`) pops up bottom right once a night at `bearMinute(dateKey)` (18:33-18:50), waves, ducks back (`awanaClassroomBear.v1` holds the date only); a flat honey drip oozes from under the mark from 18:54 for 150 s, done before the 18:57 fade (`honeyProgress`). Neither under reduced motion.
+- Welcome cards: Cubbies = white card on the wave with Cubbie cheering (`cubbie-arms-up.svg`) at its left end; Sparks = a handbook sticker (thick green ring, green kicker, names in Sparks red) over the page's right half.
+
+### classroom: Welcomes and privacy (owner 2026-10-17)
+- While a club's card is up, a child OF THAT CLUB checking in = a ding (WebAudio, made in the page, no file) + a welcome card for 20 s after the LATEST arrival (`WELCOME_MS`); arrivals together share one card ("Ava, Ben & Cara!", over 5 = "& N more"); other clubs, the black window, the lobby phase: nothing (the lobby welcomes Sparks there itself). Deduped by id (`welcomeFor`). oneOff welcomed like any child (the count is the tally's).
+- Names come ONLY from the embedded lobby: `?club=` makes the lobby post each sanitized (decrypted) check-in UP (`lobby/src/lib/embed.js hostCheckin`: `{type: 'awana-display:checkin', id, firstName, club, oneOff?}`, allowlist; `EMBED_CHECKIN_MESSAGE`; only framed, never in configure mode or a Settings preview, at `window.location.origin`); `app.js` accepts it only when `event.source` is its own iframe and the origin is its own (`lobby/src/lib/embed.test.js` pins both spellings). Names are held in memory only, never storage (tests). The lobby frame stays loaded all evening, hidden under the cards (its one socket is the screen's only connection).
+- Lobby side (`lobby/src/lib/urlFlags.js` `club`, `CLUB_FLAG_IDS` = `CORNER_CLUB_IDS`): for that URL only, `cornerClub` = the club and `audioMuted` (useConfig `applyFlags`), the pickup board's entries filtered to the club before anything sees them (`handleCheckout`; the naming rule then counts that club alone), check-ins and recap replays of other clubs not welcomed (after dedupe; the tally still counts everyone). Standalone and every other URL unchanged. The embedded geometry (`isEmbedded`, Journey's corner column) still applies inside the classroom frame (no buttons there; harmless).
 
 ## App: printer/ — KVBC Awana (print server, Windows app), public site
 

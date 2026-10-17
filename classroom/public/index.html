@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="classroom-build" content="dev">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Downstairs classroom</title>
+  <link rel="preload" href="brand/fonts/paytone-one-full-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="brand/fonts/londrina-solid-full-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="brand/tokens.css">
+  <link rel="stylesheet" href="brand/fonts.css">
+  <link rel="stylesheet" href="src/style.css">
+</head>
+<body>
+  <!-- The Sparks lobby (7:30-8:00): the real lobby page, Sparks only. It is
+       loaded all evening, hidden under the cards, so its one live socket is
+       up and the counts and welcomes are tonight's. -->
+  <iframe id="lobby" class="cr-layer" title="Sparks lobby" src="../lobby/?club=sparks" tabindex="-1"></iframe>
+  <script>
+    // KVBC Awana's Settings window (?configure=1) shows the page beside the
+    // live screen: no second lobby (no second socket), just the note below.
+    if (new URLSearchParams(location.search).get('configure') === '1') document.getElementById('lobby').remove();
+  </script>
+
+  <section id="cubbies" class="cr-layer cr-card cr-cubbies" aria-label="Cubbies" hidden>
+    <div class="cr-blob cr-blob--a"></div>
+    <div class="cr-blob cr-blob--b"></div>
+    <div class="cr-doodles" aria-hidden="true">
+      <i class="cr-d cr-d--loop" style="--x:7;--y:9;--s:7;--r:-12"></i>
+      <i class="cr-d cr-d--squiggle" style="--x:21;--y:20;--s:9;--r:8"></i>
+      <i class="cr-d cr-d--sparkle" style="--x:31;--y:7;--s:2.4;--r:0"></i>
+      <i class="cr-d cr-d--dot" style="--x:36;--y:13;--s:0.9;--r:0"></i>
+      <i class="cr-d cr-d--squiggle" style="--x:66;--y:14;--s:10;--r:-6"></i>
+      <i class="cr-d cr-d--sparkle" style="--x:76;--y:28;--s:2;--r:0"></i>
+      <i class="cr-d cr-d--dot" style="--x:80;--y:31;--s:0.8;--r:0"></i>
+      <i class="cr-d cr-d--zigzag" style="--x:86;--y:50;--s:7;--r:-4"></i>
+      <i class="cr-d cr-d--sparkle" style="--x:9;--y:52;--s:1.8;--r:0"></i>
+    </div>
+    <div class="cr-wave cr-wave--cubbies cr-wave--deep" aria-hidden="true"></div>
+    <div class="cr-wave cr-wave--cubbies" aria-hidden="true"></div>
+    <div class="cr-hero">
+      <div class="cr-honey" aria-hidden="true"><span class="cr-honey-run"></span><span class="cr-honey-drop"></span></div>
+      <img class="cr-mark" src="brand/logos/cubbies-color.svg" alt="Cubbies">
+    </div>
+    <div class="cr-doodles cr-doodles--wave" aria-hidden="true">
+      <i class="cr-d cr-d--sparkle" style="--x:80;--y:74;--s:3.2;--r:0"></i>
+      <i class="cr-d cr-d--dot" style="--x:85.5;--y:72;--s:1.1;--r:0"></i>
+      <i class="cr-d cr-d--sparkle" style="--x:88;--y:80;--s:2;--r:0"></i>
+      <i class="cr-d cr-d--squiggle" style="--x:5;--y:78;--s:9;--r:-10"></i>
+      <i class="cr-d cr-d--dot" style="--x:13;--y:73;--s:0.9;--r:0"></i>
+    </div>
+    <img class="cr-bear" src="art/cubbie-waving.svg" alt="" aria-hidden="true">
+    <div class="cr-chip" data-club="cubbies" role="status" hidden></div>
+  </section>
+
+  <!-- Sparks: a page from the HangGlider handbook (owner's sample, 2026-10-17):
+       a lime edge band, a big rounded page, yellow and teal arcs sweeping off
+       the right edge, a chunky outlined title, Sparky flying out of a ringed
+       circle. Sparks red stays in the mark and the chip. -->
+  <section id="sparks" class="cr-layer cr-card cr-sparks" aria-label="Sparks Large Group Time" hidden>
+    <div class="cr-sp-arc cr-sp-arc--sun" aria-hidden="true"></div>
+    <div class="cr-sp-arc cr-sp-arc--teal" aria-hidden="true"></div>
+    <div class="cr-sp-page">
+      <div class="cr-doodles" aria-hidden="true">
+        <i class="cr-d cr-d--sparkle" style="--x:52;--y:12;--s:2.2;--r:0"></i>
+        <i class="cr-d cr-d--dot" style="--x:56;--y:9;--s:0.8;--r:0"></i>
+        <i class="cr-d cr-d--sparkle" style="--x:47;--y:84;--s:1.8;--r:0"></i>
+      </div>
+      <div class="cr-title">
+        <img class="cr-mark cr-mark--sparks" src="brand/logos/sparks-color.svg" alt="Sparks">
+        <p class="cr-kicker">Grades K–2</p>
+        <h1 class="cr-headline"><span>Large Group</span><span>Time</span></h1>
+      </div>
+      <div class="cr-sp-ring" aria-hidden="true"></div>
+      <img class="cr-sparky" src="art/sparky-flying.png" alt="" aria-hidden="true">
+    </div>
+    <div class="cr-chip" data-club="sparks" role="status" hidden></div>
+  </section>
+
+  <!-- The welcome: a child of the card's club checked in. First names only,
+       from the embedded lobby's sanitized frames; never stored. -->
+  <div id="welcome" class="cr-welcome" role="status" aria-live="polite" hidden>
+    <img class="cr-welcome-art" src="art/cubbie-arms-up.svg" alt="" aria-hidden="true">
+    <span class="cr-welcome-kicker"></span>
+    <span class="cr-welcome-names"></span>
+  </div>
+
+  <div id="black" class="cr-layer cr-black"></div>
+
+  <section class="cr-configure" aria-label="Downstairs classroom">
+    <h1>Downstairs classroom</h1>
+    <p>Nothing to set here: this screen runs by the clock on club nights.</p>
+    <ul>
+      <li><b>6:30</b> the Cubbies card</li>
+      <li><b>6:57</b> black, while the clubs pass at the door</li>
+      <li><b>7:03</b> Sparks Large Group Time</li>
+      <li><b>7:30</b> the lobby screen, Sparks only</li>
+      <li><b>8:00</b> this computer shuts down (the shutdown setting on the left)</li>
+    </ul>
+    <p>A Cubbies or Sparks child who checks in while their card is up gets a welcome and a ding.</p>
+  </section>
+
+  <script type="module" src="src/app.js"></script>
+</body>
+</html>

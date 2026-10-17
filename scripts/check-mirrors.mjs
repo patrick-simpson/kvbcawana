@@ -51,6 +51,7 @@ const textStep = (file, re, what) => {
   if (!re.test(readFileSync(path.join(ROOT, file), 'utf8'))) problems.push(`${file} no longer ${what}`);
 };
 pkgStep('journey/package.json', 'pretest', 'journey');
+pkgStep('classroom/package.json', 'pretest', 'classroom');
 pkgStep('printer/package.json', 'pretest', 'printer');
 pkgStep('printer/electron-app/package.json', 'prebuild:renderer', 'printer');
 pkgStep('printer/electron-app/package.json', 'predev', 'printer');

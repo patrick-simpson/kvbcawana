@@ -120,14 +120,15 @@ jobs:
               if [[ "$f" != */* && "$f" == *.md ]]; then continue; fi
               case "$f" in
                 journey/public/src/schedule.js|journey/public/src/sync.js|journey/src/schedule/19-picker-final-step.js) lobby=true ;;  # screenSpecs.test.js reads both, embed.test.js sync.js, shared/journeyRemote.test.js the picker's choices
+                classroom/public/src/app.js) lobby=true ;;  # embed.test.js reads the classroom's side of the check-in hand-up
                 site/checkin/*|printer/print-server/public/phone.html|printer/print-server/sync-protocol.js) lobby=true ;;
                 printer/contract-vectors.json|printer/envelope-vectors.json) lobby=true ;;  # the lobby's sanitizer and envelope tests read the one copy in place  # e2e/checkin.spec.js serves the check-in page (site/checkin/checkin-page.mjs builds it from phone.html)
-                worker/*|printer/*|journey/*|site/*|.github/workflows/*) ;;
+                worker/*|printer/*|journey/*|classroom/*|site/*|.github/workflows/*) ;;
                 *) lobby=true ;;
               esac
               case "$f" in
                 worker/src/*|worker/migrations/*|worker/test/rig.js|worker/test/helpers.js|worker/test/fixtures.js|worker/test/d1stub.js|worker/package.json|worker/package-lock.json|lobby/src/lib/calendarParse.js|lobby/src/lib/envelope.js|lobby/src/lib/settingRules.js|lobby/src/lib/sharedSettings.js|lobby/src/lib/slides.js|lobby/src/lib/syncSpecs.js|shared/journeyRemote.js|shared/text.js|shared/sync-protocol.js|shared/brand/*|shared/cloud-crypto.js|shared/cloud-vectors.json|shared/tonight.js|shared/pickup.js|shared/clubs.js|shared/clubNight.js|shared/schedule.json|shared/churchSettings.js|lobby/src/lib/printServer.js|lobby/src/components/settings/laptop*.jsx|site/build.mjs) printer=true ;;
-                lobby/*|journey/*|site/updates/*|.github/workflows/*) ;;
+                lobby/*|journey/*|classroom/*|site/updates/*|.github/workflows/*) ;;
                 *) printer=true ;;
               esac
             done <<< "$files"
@@ -279,6 +280,22 @@ jobs:
       - run: node scripts/build-schedule.mjs --check && node --check public/src/schedule.js && node --check public/src/sync.js
       - run: npm test
 
+  classroom:
+    name: Downstairs classroom
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: classroom
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-app
+        with:
+          lockfile: classroom/package-lock.json
+          working-directory: classroom
+      - run: node --check public/src/app.js && node --check public/src/logic.js && node --check scripts/stamp-build.mjs
+      - run: npm test
+
   printer:
     name: Club Label Printer
     needs: changes
@@ -355,7 +372,7 @@ jobs:
     # A test job a newer run cancelled is neither failed nor skipped, so it is
     # named: without that this older run would deploy untested.
     if: ${{ !failure() && !cancelled() && !contains(needs.*.result, 'cancelled') && github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}
-    needs: [changes, copies, lobby-checks, lobby-e2e, worker, journey, printer, site]
+    needs: [changes, copies, lobby-checks, lobby-e2e, worker, journey, classroom, printer, site]
     runs-on: ubuntu-latest
     timeout-minutes: 30
     # Deploys take turns and are never cancelled; of several waiting, only

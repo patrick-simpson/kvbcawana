@@ -1,0 +1,469 @@
+/* Downstairs classroom (CLAUDE.md "App: classroom/"). The 2026-27 catalog's
+   club opener pages, as screens: a sky field with white line doodles, the
+   club's wave rising from the bottom, the club's official mark, Paytone One
+   shouts, Londrina Solid labels. Flat: no gradient, blur, glow or soft
+   shadow; depth is a hard offset in the club's deep shade.
+
+   Everything outside the motion block at the end is the finished frame (what
+   reduced motion sees). */
+
+:root {
+  /* 1% of the largest 16:9 box in the window. */
+  --u: min(1vw, 1.7778vh);
+  --cr-sky: var(--brand-sky, #B3D0E7);
+  --cr-cloud: var(--brand-cloud, #D6EFF8);
+  --cr-ink: var(--brand-ink, #231F20);
+  --cr-cubbies: var(--brand-cubbies, #4C72B8);
+  --cr-cubbies-deep: var(--brand-cubbies-deep, #2F4F8A);
+  --cr-cubbies-tint: var(--brand-cubbies-tint, #C4DDF3);
+  --cr-sparks: var(--brand-sparks, #F04A4B);
+  --cr-sparks-deep: var(--brand-sparks-deep, #B82B32);
+  --cr-sparks-tint: var(--brand-sparks-tint, #FDDACF);
+  --cr-sun: var(--brand-sun, #FCB614);
+  --cr-honey: #F5A91C;
+  --cr-honey-deep: #B9740A;
+  --cr-shout: var(--brand-font-display, 'Paytone One', sans-serif);
+  --cr-label: var(--brand-font-label, 'Londrina Solid', sans-serif);
+  --cr-body: var(--brand-font-body, 'Figtree', sans-serif);
+  /* Paytone One's caps sit small in their box: shouts are sized to the
+     catalog's cap heights (CLAUDE.md "Brand kit"). */
+  --cr-shout-fit: 1.057;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #000000;
+  color: #ffffff;
+  font-family: var(--cr-body);
+  cursor: none;
+}
+
+[hidden] { display: none !important; }
+
+.cr-layer {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  margin: 0;
+}
+
+/* The lobby frame stays loaded (its socket stays up); only shown 7:30-8:00. */
+#lobby { background: var(--cr-sky); visibility: hidden; }
+html[data-phase="lobby"] #lobby { visibility: visible; }
+
+.cr-black { background: #000000; z-index: 5; display: none; }
+html[data-phase="black"] .cr-black,
+html[data-phase="off"] .cr-black { display: block; }
+
+.cr-card {
+  overflow: hidden;
+  z-index: 2;
+  background: var(--cr-sky);
+  isolation: isolate;
+}
+
+/* ── Doodles: the kit's line art, white, painted through a mask ──── */
+.cr-doodles { position: absolute; inset: 0; z-index: 0; }
+.cr-doodles--wave { z-index: 2; }
+.cr-d {
+  position: absolute;
+  left: calc(var(--x) * 1%);
+  top: calc(var(--y) * 1%);
+  width: calc(var(--s) * var(--u));
+  height: calc(var(--s) * var(--u));
+  background: #ffffff;
+  -webkit-mask: var(--m) center / contain no-repeat;
+  mask: var(--m) center / contain no-repeat;
+  rotate: calc(var(--r) * 1deg);
+}
+.cr-d--loop { --m: url('../brand/doodles/loop.svg'); }
+.cr-d--squiggle { --m: url('../brand/doodles/squiggle-long.svg'); }
+.cr-d--sparkle { --m: url('../brand/doodles/sparkle-4pt.svg'); }
+.cr-d--dot { --m: url('../brand/doodles/dot.svg'); }
+.cr-d--zigzag { --m: url('../brand/doodles/zigzag.svg'); }
+.cr-d--steps { --m: url('../brand/doodles/zigzag-steps.svg'); }
+
+/* The catalog's soft cloud blobs behind the doodles (flat). */
+.cr-blob {
+  position: absolute;
+  z-index: 0;
+  background: var(--cr-cloud);
+  opacity: 0.55;
+  border-radius: 46% 54% 58% 42% / 52% 44% 56% 48%;
+}
+.cr-blob--a { width: 46vw; height: 46vw; left: -14vw; top: -20vw; }
+.cr-blob--b { width: 28vw; height: 24vw; right: -6vw; top: 8vh; border-radius: 58% 42% 40% 60% / 50% 60% 40% 50%; }
+
+/* ── The club wave, rising to the right, with its hard offset ───── */
+.cr-wave {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 44%;
+  z-index: 1;
+  background: var(--cr-wave);
+  -webkit-mask: var(--wave) left bottom / 100% 100% no-repeat;
+  mask: var(--wave) left bottom / 100% 100% no-repeat;
+}
+/* The catalog's hard offset: the same wave, deep, a step up and left. */
+.cr-wave--deep { left: calc(-2 * var(--u)); right: calc(-2 * var(--u)); translate: calc(-1.2 * var(--u)) calc(-1.4 * var(--u)); background: var(--cr-wave-deep); z-index: 1; }
+.cr-wave--cubbies { --wave: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 576.00 309.78' preserveAspectRatio='none'><path d='M-43.69,318.51C-32.24,290.76 -31.36,260.78 -19.43,233.16C-7.51,205.54 20.90,178.73 57.81,178.33C69.98,178.20 81.87,180.96 93.85,182.68C111.48,185.22 129.63,185.49 147.37,183.49C164.31,181.58 181.40,177.36 194.29,168.45C207.97,158.99 215.50,145.32 223.47,132.41C238.40,108.24 257.92,83.99 288.51,72.24C316.28,61.56 348.90,62.86 379.38,66.76C409.86,70.66 440.30,76.92 471.12,75.40C527.07,72.64 572.47,41.71 591.47,0.00L591.47,325.95L-43.69,325.95L-43.69,318.51'/></svg>"); --cr-wave: var(--cr-cubbies); --cr-wave-deep: var(--cr-cubbies-deep); }
+
+/* ── Cubbies ────────────────────────────────────────────────────── */
+.cr-hero {
+  position: absolute;
+  z-index: 3;
+  left: 50%;
+  top: 41%;
+  width: calc(70 * var(--u));
+  translate: -50% -50%;
+}
+.cr-mark { position: relative; display: block; width: 100%; height: auto; }
+
+
+/* The honey (easter egg, 6:54): a flat golden drip gathers under the mark's
+   letters and runs slowly down, a drop swelling at its tip. Rest = gone. */
+.cr-honey {
+  position: absolute;
+  left: 51.5%;
+  top: 74%;
+  width: calc(5.4 * var(--u));
+  height: 0;
+  opacity: 0;
+  translate: -50% 0;
+}
+.cr-honey::before {
+  /* The glob it runs from. */
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: calc(4.2 * var(--u));
+  background: var(--cr-honey);
+  border-radius: 0 0 50% 50% / 0 0 70% 70%;
+  box-shadow: calc(0.4 * var(--u)) calc(0.4 * var(--u)) 0 var(--cr-honey-deep);
+}
+.cr-honey-run {
+  position: absolute;
+  left: 50%;
+  top: calc(2 * var(--u));
+  width: calc(2.2 * var(--u));
+  height: var(--drip, 0px);
+  translate: -50% 0;
+  background: var(--cr-honey);
+  border-radius: 0 0 999px 999px;
+  box-shadow: calc(0.4 * var(--u)) calc(0.4 * var(--u)) 0 var(--cr-honey-deep);
+}
+.cr-honey-drop {
+  position: absolute;
+  left: 50%;
+  top: calc(2 * var(--u) + var(--drip, 0px));
+  width: calc(var(--drop, 2.6) * var(--u));
+  height: calc(var(--drop, 2.6) * 1.25 * var(--u));
+  translate: -50% -30%;
+  background: var(--cr-honey);
+  border-radius: 50% 50% 50% 50% / 60% 60% 42% 42%;
+  box-shadow: calc(0.4 * var(--u)) calc(0.4 * var(--u)) 0 var(--cr-honey-deep);
+}
+.cr-honey-drop::after {
+  /* One flat highlight: a hard white fleck, no gloss. */
+  content: '';
+  position: absolute;
+  left: 24%;
+  top: 30%;
+  width: 22%;
+  height: 22%;
+  border-radius: 50%;
+  background: #FFF4D6;
+}
+
+/* The bear peek (easter egg, once a night): Cubbie (Awana's own clipart,
+   art/cubbie-waving.svg, owner 2026-10-17) pops up from below the frame at
+   the bottom right, waves, and ducks back down. Rest = below the frame. */
+.cr-bear {
+  position: absolute;
+  z-index: 4;
+  right: calc(9 * var(--u));
+  bottom: calc(-33 * var(--u));
+  width: calc(21 * var(--u));
+  height: auto;
+  rotate: 6deg;
+  transform-origin: 50% 100%;
+}
+
+/* ── Sparks: Large Group Time, as a HangGlider handbook page ──────
+   Flat bands for the handbook's soft green edge (no gradient), the page a
+   white panel with a deep green hard offset, the arcs flat. */
+.cr-sparks {
+  --sp-lime: #8DC63F;
+  --sp-green: #2E9B48;
+  --sp-deep: #1C6B33;
+  --sp-teal: #17A9B5;
+  background: var(--sp-lime);
+  /* The handbook's darker edge, as one flat band down the left. */
+  box-shadow: inset calc(4.5 * var(--u)) 0 0 var(--sp-green);
+}
+.cr-sp-arc {
+  position: absolute;
+  z-index: 0;
+  border-radius: 50%;
+  border-style: solid;
+  border-color: transparent;
+}
+.cr-sp-arc--sun {
+  width: calc(70 * var(--u));
+  height: calc(70 * var(--u));
+  right: calc(-60 * var(--u));
+  top: calc(-6 * var(--u));
+  border-width: calc(4.4 * var(--u));
+  border-left-color: var(--cr-sun);
+  rotate: 20deg;
+}
+.cr-sp-arc--teal {
+  width: calc(56 * var(--u));
+  height: calc(56 * var(--u));
+  right: calc(-47 * var(--u));
+  bottom: calc(-24 * var(--u));
+  border-width: calc(3.2 * var(--u));
+  border-left-color: var(--sp-teal);
+  rotate: -18deg;
+}
+.cr-sp-page {
+  position: absolute;
+  z-index: 1;
+  left: calc(8 * var(--u));
+  right: calc(19 * var(--u));
+  top: calc(50% - 23 * var(--u));
+  height: calc(48 * var(--u));
+  background: #ffffff;
+  border-radius: calc(5 * var(--u));
+  box-shadow: calc(1.1 * var(--u)) calc(1.1 * var(--u)) 0 var(--sp-deep);
+}
+.cr-sp-page .cr-d { background: var(--sp-lime); }
+.cr-sparks .cr-title {
+  position: absolute;
+  z-index: 3;
+  left: 6%;
+  top: 50%;
+  translate: 0 -50%;
+  width: 56%;
+  align-items: flex-start;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+}
+.cr-mark--sparks { width: calc(28 * var(--u)); }
+.cr-kicker {
+  margin: calc(3 * var(--u)) 0 calc(0.8 * var(--u));
+  font-family: var(--cr-shout);
+  font-size: calc(3.2 * var(--u) * var(--cr-shout-fit));
+  line-height: 1;
+  color: var(--cr-sparks);
+}
+.cr-headline {
+  margin: 0;
+  font-family: var(--cr-shout);
+  font-weight: 400;
+  font-size: calc(8.6 * var(--u) * var(--cr-shout-fit));
+  line-height: 0.95;
+  text-transform: uppercase;
+  display: flex;
+  flex-direction: column;
+}
+.cr-headline span { display: block; }
+/* The handbook's chunky wordmark: lime letters, a deep green outline, a hard offset. */
+.cr-sparks .cr-headline {
+  color: var(--sp-lime);
+  -webkit-text-stroke: 0.045em var(--sp-deep);
+  paint-order: stroke fill;
+  text-shadow: 0.06em 0.06em 0 var(--sp-deep);
+}
+/* Sparky flies out of a ringed circle (the handbook's photo rings). */
+.cr-sp-ring {
+  position: absolute;
+  z-index: 2;
+  right: calc(5 * var(--u));
+  top: 52%;
+  width: calc(31 * var(--u));
+  height: calc(31 * var(--u));
+  translate: 0 -50%;
+  border-radius: 50%;
+  background: var(--cr-cloud);
+  border: calc(1.6 * var(--u)) solid var(--sp-green);
+  box-shadow: calc(0.8 * var(--u)) calc(0.8 * var(--u)) 0 var(--sp-deep);
+}
+.cr-sparky {
+  position: absolute;
+  z-index: 3;
+  right: calc(3 * var(--u));
+  top: calc(50% - 25 * var(--u));
+  height: calc(44 * var(--u));
+  width: auto;
+}
+
+/* ── The count chip: the kit's stepped chip (shared/chipGeometry.js,
+   ported in logic.js chipGeometry), drawn by app.js around its own text in
+   the club's deep shade, its white keyline out of register. ─────────── */
+.cr-chip {
+  position: absolute;
+  z-index: 6;
+  top: max(3vh, 24px);
+  right: max(3vw, 24px);
+  font-size: clamp(1.6rem, 3.3 * var(--u), 5rem);
+  line-height: 0;
+}
+.cr-chip svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.cr-chip text { font-family: var(--cr-shout); fill: #ffffff; }
+
+/* ── The welcome (a child of the card's club checked in) ────────── */
+.cr-welcome {
+  position: fixed;
+  z-index: 7;
+  left: 50%;
+  bottom: calc(5 * var(--u));
+  translate: -50% 0;
+  width: max-content;
+  max-width: calc(84 * var(--u));
+  padding: calc(1.6 * var(--u)) calc(4 * var(--u)) calc(2 * var(--u));
+  border-radius: calc(2.6 * var(--u));
+  background: #ffffff;
+  color: var(--cr-club);
+  box-shadow: calc(0.9 * var(--u)) calc(0.9 * var(--u)) 0 var(--cr-club-deep);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+html[data-phase="cubbies"] .cr-welcome { --cr-club: var(--cr-cubbies); --cr-club-deep: var(--cr-cubbies-deep); }
+html[data-phase="sparks"] .cr-welcome { --cr-club: var(--cr-sparks); --cr-club-deep: var(--cr-sparks-deep); }
+.cr-welcome-kicker {
+  font-family: var(--cr-label);
+  font-size: calc(2.6 * var(--u));
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--cr-club-deep);
+  line-height: 1;
+}
+.cr-welcome-names {
+  margin-top: calc(0.8 * var(--u));
+  font-family: var(--cr-shout);
+  font-size: calc(var(--names-size, 6) * var(--u) * var(--cr-shout-fit));
+  line-height: 1.04;
+  text-transform: uppercase;
+  text-wrap: balance;
+}
+/* Cubbies: Cubbie cheers at the card's left end (Awana clipart). */
+.cr-welcome-art { display: none; }
+html[data-phase="cubbies"] .cr-welcome { padding-left: calc(16 * var(--u)); }
+html[data-phase="cubbies"] .cr-welcome-art {
+  display: block;
+  position: absolute;
+  left: calc(1.5 * var(--u));
+  bottom: calc(0.5 * var(--u));
+  height: calc(19 * var(--u));
+  width: auto;
+}
+/* Sparks: a handbook sticker over the page's right half, a thick green ring
+   for its edge (the handbook's photo rings), names in Sparks red. */
+html[data-phase="sparks"] .cr-welcome {
+  left: auto;
+  right: calc(13 * var(--u));
+  bottom: calc(9 * var(--u));
+  translate: none;
+  max-width: calc(52 * var(--u));
+  border: calc(1.2 * var(--u)) solid #2E9B48;
+  box-shadow: calc(0.9 * var(--u)) calc(0.9 * var(--u)) 0 #1C6B33;
+}
+html[data-phase="sparks"] .cr-welcome-kicker { color: #2E9B48; }
+html[data-phase="sparks"] .cr-welcome { right: calc(16 * var(--u)); bottom: calc(4 * var(--u)); }
+/* Sparky makes room: he rises and steps left so his face stays above the sticker. */
+html.cr-welcoming .cr-sparks .cr-sparky { translate: calc(-4 * var(--u)) calc(-6 * var(--u)); scale: 0.8; }
+html.cr-welcoming .cr-sparks .cr-sp-ring { translate: calc(-4 * var(--u)) calc(-50% - 6 * var(--u)); scale: 0.8; }
+
+
+/* ── Configure mode (KVBC Awana's Settings window) ─────────────── */
+.cr-configure { display: none; }
+html[data-phase="configure"] body { background: #f6f4ef; cursor: auto; }
+html[data-phase="configure"] .cr-configure {
+  display: block;
+  max-width: 40rem;
+  margin: 3rem auto;
+  padding: 0 1.5rem;
+  color: var(--cr-ink);
+  font-size: 1.15rem;
+  line-height: 1.5;
+}
+.cr-configure h1 { font-family: var(--cr-shout); font-weight: 400; color: var(--cr-sparks); margin: 0 0 0.5rem; }
+.cr-configure ul { padding-left: 1.2rem; }
+html[data-phase="configure"] .cr-black { display: none; }
+
+/* ── Motion: only when the OS allows it ─────────────────────────── */
+@media (prefers-reduced-motion: no-preference) {
+  /* Arrival: the wave rises, the mark pops with a soft squish, doodles land. */
+  html.cr-motion .cr-card.is-arriving .cr-wave { animation: cr-rise 900ms var(--brand-ease-settle, ease-out) backwards; }
+  html.cr-motion .cr-card.is-arriving .cr-hero { animation: cr-pop 1100ms var(--brand-ease-pop, ease-out) 300ms backwards; }
+  html.cr-motion .cr-card.is-arriving .cr-title { animation: cr-up 1000ms var(--brand-ease-settle, ease-out) 250ms backwards; }
+  html.cr-motion .cr-card.is-arriving .cr-sparky { animation: cr-fly 1400ms var(--brand-ease-settle, ease-out) 500ms backwards; }
+  html.cr-motion .cr-card.is-arriving .cr-sp-ring { animation: cr-pop 900ms var(--brand-ease-pop, ease-out) 300ms backwards; }
+  html.cr-motion .cr-card.is-arriving .cr-d { animation: cr-fade 900ms ease-out calc(500ms + var(--i, 0) * 90ms) backwards; }
+  html.cr-motion .cr-card.is-arriving .cr-chip { animation: cr-fade 600ms ease-out 1300ms backwards; }
+
+  /* Calm ambient drift after the arrival: slow, small, ends on rest. */
+  html.cr-motion .cr-card.is-calm .cr-mark { animation: cr-breathe 9s ease-in-out infinite; }
+  html.cr-motion .cr-card.is-calm .cr-d { animation: cr-bob 11s ease-in-out calc(var(--i, 0) * -1.3s) infinite; }
+  html.cr-motion .cr-card.is-calm .cr-sparky { animation: cr-float 7s ease-in-out infinite; }
+
+  /* Gentle exit into black (6:57) and entry out of black (7:03). */
+  html.cr-motion .cr-card.is-leaving { animation: cr-out 2400ms ease-in-out forwards; }
+  html.cr-motion .cr-card.is-leaving .cr-hero,
+  html.cr-motion .cr-card.is-leaving .cr-title { animation: cr-sink 2400ms ease-in-out forwards; }
+  html.cr-motion .cr-card.is-entering { animation: cr-in 2400ms ease-in-out backwards; }
+
+  /* The bear: in from the right, a wave, back out. */
+  html.cr-motion .cr-bear.is-peeking { animation: cr-peek 6s ease-in-out forwards; }
+
+  /* The welcome comes in soft and leaves soft. */
+  html.cr-motion .cr-sparks .cr-sparky,
+  html.cr-motion .cr-sparks .cr-sp-ring { transition: translate 700ms var(--brand-ease-settle, ease-out), scale 700ms var(--brand-ease-settle, ease-out); }
+  html.cr-motion .cr-welcome.is-in { animation: cr-welcome-in 700ms var(--brand-ease-pop, ease-out) backwards; }
+  html.cr-motion .cr-welcome.is-out { animation: cr-welcome-out 600ms ease-in forwards; }
+  html.cr-motion .cr-welcome-names.is-more { animation: cr-squish 520ms var(--brand-ease-pop, ease-out); }
+}
+
+@keyframes cr-rise { from { translate: 0 60%; } to { translate: 0 0; } }
+@keyframes cr-pop {
+  0% { scale: 0.6; opacity: 0; }
+  55% { scale: 1.04 0.97; opacity: 1; }
+  78% { scale: 0.99 1.01; }
+  100% { scale: 1; opacity: 1; }
+}
+@keyframes cr-up { from { opacity: 0; translate: 0 calc(-50% + 6 * var(--u)); } to { opacity: 1; translate: 0 -50%; } }
+@keyframes cr-fly { 0% { opacity: 0; translate: calc(40 * var(--u)) calc(-12 * var(--u)); rotate: 12deg; } 70% { opacity: 1; rotate: -4deg; } 100% { opacity: 1; translate: 0 0; rotate: 0deg; } }
+@keyframes cr-float { 0%, 100% { translate: 0 0; rotate: 0deg; } 50% { translate: calc(-0.6 * var(--u)) calc(-1.2 * var(--u)); rotate: -2deg; } }
+@keyframes cr-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes cr-breathe { 0%, 100% { scale: 1; } 50% { scale: 1.012; } }
+@keyframes cr-bob { 0%, 100% { translate: 0 0; } 50% { translate: 0 calc(-0.8 * var(--u)); } }
+@keyframes cr-out { 0% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes cr-sink { 0% { scale: 1; } 100% { scale: 0.94; } }
+@keyframes cr-in { 0% { opacity: 0; } 100% { opacity: 1; } }
+@keyframes cr-peek {
+  0% { translate: 0 0; rotate: 6deg; }
+  16% { translate: 0 calc(-20 * var(--u)); rotate: 6deg; }
+  28% { rotate: -3deg; }
+  40% { rotate: 7deg; }
+  52% { rotate: -3deg; }
+  66% { translate: 0 calc(-20 * var(--u)); rotate: 6deg; }
+  86%, 100% { translate: 0 0; rotate: 6deg; }
+}
+@keyframes cr-welcome-in { from { opacity: 0; margin-bottom: calc(-6 * var(--u)); scale: 0.92; } to { opacity: 1; margin-bottom: 0; scale: 1; } }
+@keyframes cr-welcome-out { from { opacity: 1; } to { opacity: 0; scale: 0.96; } }
+@keyframes cr-squish { 0% { scale: 1; } 35% { scale: 1.05 0.94; } 70% { scale: 0.99 1.02; } 100% { scale: 1; } }

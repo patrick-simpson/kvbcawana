@@ -1,0 +1,17 @@
+{
+  "name": "kvbc-classroom",
+  "private": true,
+  "description": "The downstairs classroom screen: Cubbies, Sparks Large Group Time, the Sparks lobby (CLAUDE.md App: classroom/).",
+  "type": "module",
+  "scripts": {
+    "assets": "node ../scripts/family-assets.mjs classroom",
+    "pretest": "node ../scripts/family-assets.mjs classroom",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "devDependencies": {
+    "playwright-core": "^1.55.0"
+  }
+}

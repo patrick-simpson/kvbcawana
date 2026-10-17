@@ -2,7 +2,7 @@
 
 The plans for the Awana screens and check-in, one section per track. Each track has the owner's decisions (dated), what exists today, the design, the status, and what is still to do. Read a track's status before you touch the code it names.
 
-Tracks: [Settings page](#settings-page) · [Online check-in](#online-check-in) · [Cloud check-in](#cloud-check-in) · [Online only](#online-only) · [KVBC Awana one app](#kvbc-awana-one-app) · [Switch-day cleanup](#switch-day-cleanup)
+Tracks: [Settings page](#settings-page) · [Online check-in](#online-check-in) · [Cloud check-in](#cloud-check-in) · [Online only](#online-only) · [KVBC Awana one app](#kvbc-awana-one-app) · [Switch-day cleanup](#switch-day-cleanup) · [Downstairs classroom](#downstairs-classroom)
 
 ## Settings page
 
@@ -1193,3 +1193,16 @@ Nothing; the three items below are done (kept as the record).
 - **Stray screens.** Find any screen still on the old github.io address
   (it stops getting check-ins once Pusher is off) and open
   awana.kvbchurch.org on it.
+
+## Downstairs classroom
+
+### The owner's decisions (2026-10-16/17)
+- A fourth KVBC Awana display screen for the downstairs classroom: Cubbies card 6:30, black 6:57-7:03, Sparks Large Group Time 7:03, the Sparks-only lobby 7:30, the PC shuts down at 8:00; the PC wakes itself. Highly styled in each club's catalog look; welcomes with a ding for the card's own club; two easter eggs (Cubbie peeks, honey drip). Details: `classroom/docs/DECISIONS.md`; rules: CLAUDE.md "App: classroom/".
+
+### Status
+- First version built 2026-10-17 (`classroom/`, lobby `?club=`, KVBC Awana screen `classroom`). The PC needs a KVBC Awana release with the new screen choice.
+
+### Still to do
+- **The Sparks screen** (owner, "very involved much like the Journey screen, with different styles of content"): its own lesson/content flow for 7:03-7:30, to be designed with the owner. The classroom folder, its build id and its schedule are the home for it.
+- Register the classroom page with /settings Screens (a `classroom` kind in `worker/src/screens.js` + `sanitizeScreenStatus`), if the owner wants it listed beside the computer row (the PC's own `computer` row already shows it).
+

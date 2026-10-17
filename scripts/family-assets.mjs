@@ -10,6 +10,8 @@
 //                                                          Trek small group card asks it, byte for byte)
 //   phone remote    canonical shared/journeyRemote.js -> journey/public/src/shared/ (the phone
 //                                                          remote page cleans the Worker's answers with it)
+//   the classroom   the brand kit -> classroom/public/brand/, clubNight.js -> classroom/public/src/shared/
+//                   (the downstairs classroom screen, owner 2026-10-17: its schedule asks the rule)
 //
 //   committed copies  the CommonJS copies of shared/*.js the Windows app ships
 //                     (printer/print-server/*.js and the display's clubNight.js; table in
@@ -28,7 +30,7 @@
 // server and the Windows installer work offline; nothing fetches another app's
 // files), because every build that serves or packages an app runs this first:
 //
-//   node scripts/family-assets.mjs <journey|printer|all>   copy (writes only what differs)
+//   node scripts/family-assets.mjs <journey|classroom|printer|all>   copy (writes only what differs)
 //   node scripts/family-assets.mjs --check [app ...]       verify the copies exist and match
 //
 // wired into each app's npm scripts (pretest, prestart), into site/build.mjs and
@@ -48,6 +50,7 @@ export const JOURNEY_MODULES = ['sync-protocol.js', 'cloud-crypto.js', 'clubNigh
 // What each app holds a copy of. Paths are repo-relative.
 export const COPIES = {
   journey: { kit: 'journey/public/brand', modules: 'journey/public/src/shared' },
+  classroom: { kit: 'classroom/public/brand', modules: 'classroom/public/src/shared', moduleList: ['clubNight.js'] },
   printer: { kit: 'printer/print-server/public/brand', committed: true },
 };
 
@@ -90,9 +93,9 @@ function pairs(apps) {
   const out = [];
   for (const app of apps) {
     const c = COPIES[app];
-    if (!c) throw new Error(`family-assets: unknown app "${app}" (journey, printer, lobby or all)`);
+    if (!c) throw new Error(`family-assets: unknown app "${app}" (journey, classroom, printer or all)`);
     if (c.kit) out.push({ kind: 'dir', from: KIT, to: c.kit });
-    if (c.modules) for (const name of JOURNEY_MODULES) out.push({ kind: 'file', from: `shared/${name}`, to: `${c.modules}/${name}` });
+    if (c.modules) for (const name of c.moduleList || JOURNEY_MODULES) out.push({ kind: 'file', from: `shared/${name}`, to: `${c.modules}/${name}` });
   }
   return out;
 }

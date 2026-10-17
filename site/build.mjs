@@ -8,6 +8,7 @@
 //   /lobby/      the lobby signage (lobby/ build; countdown.html is the projector)
 //   /settings    a redirect to /lobby/settings.html, one settings page (ROADMAP.md#settings-page)
 //   /journey/    the Journey kiosk (journey/public, build-stamped)
+//   /classroom/  the downstairs classroom screen (classroom/public, build-stamped)
 //   /checkin     the ONE check-in page (phones, tablets, the desk; owner 2026-10-12), made
 //                from the print app's phone page (site/checkin/checkin-page.mjs) on the
 //                desk's online path: passphrase v2, the Worker's desk routes, every seal
@@ -95,6 +96,13 @@ cpSync(path.join(ROOT, 'journey', 'public'), journeyOut, { recursive: true });
 // every idle kiosk and dropped the embedded lobby's socket for nothing.
 const journeyBuild = hashTree(path.join(ROOT, 'journey', 'public'));
 run(`node scripts/stamp-build.mjs ${journeyBuild} ${JSON.stringify(journeyOut)}`, path.join(ROOT, 'journey'));
+
+// The downstairs classroom (classroom/public, owner 2026-10-17): static,
+// stamped like Journey with a hash of its OWN files, so only its own changes
+// reload the classroom PC.
+const classroomOut = path.join(OUT, 'classroom');
+cpSync(path.join(ROOT, 'classroom', 'public'), classroomOut, { recursive: true });
+run(`node scripts/stamp-build.mjs ${hashTree(path.join(ROOT, 'classroom', 'public'))} ${JSON.stringify(classroomOut)}`, path.join(ROOT, 'classroom'));
 
 // The check-in page (owner, 2026-10-12: ONE page at /checkin; ROADMAP.md#online-check-in):
 // the print app's own phone page, with its brand kit beside it, signed in with the
@@ -223,6 +231,10 @@ writeFileSync(path.join(OUT, '_headers'), [
   '  Cache-Control: no-cache',
   '/journey/',
   '  Cache-Control: no-cache',
+  // The downstairs classroom (classroom/public): always the newest page, never in a search engine.
+  '/classroom/*',
+  '  Cache-Control: no-cache',
+  '  X-Robots-Tag: noindex, nofollow',
   // The phone remote (journey/public/remote/, owner 2026-10-13): always the newest page, never in a search engine.
   '/journey/remote/*',
   '  Cache-Control: no-cache',
@@ -301,7 +313,7 @@ writeFileSync(path.join(OUT, '_routes.json'), `${JSON.stringify({
 writeFileSync(path.join(ROOT, 'site', 'lib', 'large-files.generated.js'),
   `// Written by site/build.mjs for build ${BUILD_ID}; not committed.\nexport const LARGE_FILES = ${JSON.stringify(largeFiles, null, 2)};\nexport const LARGE_PREFIXES = ${JSON.stringify(VIDEO_PREFIXES, null, 2)};\n`);
 
-for (const must of ['index.html', 'lobby/index.html', 'lobby/countdown.html', 'lobby/settings.html', 'journey/index.html', 'journey/remote/index.html', 'journey/remote/remote.js', 'journey/src/shared/journeyRemote.js', 'lobby/shared/sync.json', 'checkin/index.html', 'checkin/ym/index.html', 'checkin/desk-transport.js', 'checkin/cloud-crypto.js', 'checkin/clubs.js', 'checkin/brand/fonts.css', 'links/index.html', 'logo/index.html', 'classic.html', 'robots.txt', 'lobby/showcase.html', 'lobby/countdown-showcase.html', 'lobby/settings-showcase.html', 'journey/showcase.html', 'journey/remote/showcase.html', 'checkin/showcase.html']) {
+for (const must of ['index.html', 'lobby/index.html', 'lobby/countdown.html', 'lobby/settings.html', 'journey/index.html', 'journey/remote/index.html', 'classroom/index.html', 'classroom/version.json', 'classroom/src/logic.js', 'journey/remote/remote.js', 'journey/src/shared/journeyRemote.js', 'lobby/shared/sync.json', 'checkin/index.html', 'checkin/ym/index.html', 'checkin/desk-transport.js', 'checkin/cloud-crypto.js', 'checkin/clubs.js', 'checkin/brand/fonts.css', 'links/index.html', 'logo/index.html', 'classic.html', 'robots.txt', 'lobby/showcase.html', 'lobby/countdown-showcase.html', 'lobby/settings-showcase.html', 'journey/showcase.html', 'journey/remote/showcase.html', 'checkin/showcase.html']) {
   if (!existsSync(path.join(OUT, must))) throw new Error(`site build is missing ${must}`);
 }
 console.log(`\n✓ site/dist built for ${ORIGIN} (build ${BUILD_ID.slice(0, 7)})`);

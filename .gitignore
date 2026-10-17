@@ -12,6 +12,8 @@ worker/.dev.vars
 journey/public/brand/
 journey/public/src/shared/
 printer/print-server/public/brand/
+classroom/public/brand/
+classroom/public/src/shared/
 # This week's lesson video is an asset on the journey-videos-v2 release
 # (journey/public/current-lesson-video.json is its pointer); never committed.
 journey/public/current-lesson-video.mp4

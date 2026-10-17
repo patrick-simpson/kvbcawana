@@ -1,0 +1,316 @@
+// The downstairs classroom screen (CLAUDE.md "App: classroom/"). Rules in
+// logic.js; this file is the clock, the page and the lobby frame.
+//
+// One live connection only: the embedded lobby's (../lobby/?club=sparks).
+// It leaves tonight's per-club counts in localStorage (awanaClubCounts.v1,
+// numbers only) and, because this page asked with ?club=, hands each
+// sanitized check-in UP to this page (lobby/src/lib/embed.js hostCheckin:
+// id, first name, club, oneOff; nothing else). Names live in memory only.
+
+const own = new URL(import.meta.url);
+const L = await import(new URL(`./logic.js${own.search}`, own).href);
+
+const params = new URLSearchParams(window.location.search);
+const CONFIGURE = params.get('configure') === '1';
+// ?preview=<state> draws one fixed moment (mock-ups, the layout test); ?now=<ISO> runs the clock from then.
+const PREVIEW = params.get('preview') || '';
+const NOW_FROM = Date.parse(params.get('now') || '');
+const CLOCK_OFFSET = Number.isFinite(NOW_FROM) ? NOW_FROM - Date.now() : 0;
+const now = () => new Date(Date.now() + CLOCK_OFFSET);
+
+const LOBBY = new URL('../lobby/', window.location.href);
+const SCHEDULE_URL = new URL('shared/schedule.json', LOBBY).href;
+const FEED_URL = new URL('calendar-feed.json', LOBBY).href;
+// The rule sits beside this script (src/shared/clubNight.js, a generated copy
+// of shared/clubNight.js) and is asked for with this script's own ?v=.
+const RULE_URL = new URL(`./shared/clubNight.js${own.search}`, own).href;
+const NIGHT_REFRESH_MS = 6 * 60 * 60 * 1000;
+const BEAR_KEY = 'awanaClassroomBear.v1';
+export const CHECKIN_MESSAGE = 'awana-display:checkin';
+
+const root = document.documentElement;
+const $ = (id) => /** @type {HTMLElement} */ (document.getElementById(id));
+const frame = /** @type {HTMLIFrameElement | null} */ (document.getElementById('lobby'));
+const cards = { cubbies: $('cubbies'), sparks: $('sparks') };
+const welcomeEl = $('welcome');
+const motionQuery = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : null;
+const motionOk = () => !(motionQuery && motionQuery.matches);
+root.classList.toggle('cr-motion', motionOk());
+motionQuery?.addEventListener?.('change', () => root.classList.toggle('cr-motion', motionOk()));
+
+// Each doodle its own beat in the arrival and the ambient drift.
+document.querySelectorAll('.cr-d').forEach((d, i) => /** @type {HTMLElement} */ (d).style.setProperty('--i', String(i % 9)));
+
+/* ── Is tonight a club night? The lobby's own rule and files. ────── */
+const night = { rule: null, schedule: null, feed: null, ready: false };
+async function loadJson(url) {
+  try {
+    const r = await fetch(`${url}?b=${Date.now()}`, { cache: 'no-store' });
+    return r.ok ? await r.json() : null;
+  } catch { return null; }
+}
+async function loadNight() {
+  try { night.rule = night.rule || await import(RULE_URL); } catch { /* not a club night until it loads */ }
+  const [schedule, feed] = await Promise.all([loadJson(SCHEDULE_URL), loadJson(FEED_URL)]);
+  if (schedule) night.schedule = schedule;
+  if (feed) night.feed = feed;
+  night.ready = Boolean(night.rule);
+  tick();
+}
+
+function church(at) {
+  const zone = night.schedule && typeof night.schedule.timezone === 'string' ? night.schedule.timezone : 'America/New_York';
+  if (night.rule) {
+    try {
+      const p = night.rule.zonedParts(at, zone);
+      return { ...p, seconds: p.minutes * 60 + at.getSeconds(), clubNight: night.rule.clubNightToday(at, { schedule: night.schedule, feed: night.feed }) === true };
+    } catch { /* below */ }
+  }
+  return { dateKey: '', minutes: NaN, seconds: NaN, clubNight: false };
+}
+
+/* ── The count chips: the kit's stepped chip, built around its text ── */
+const PLATE = { cubbies: '#2F4F8A', sparks: '#B82B32' };
+const CHIP_LABEL = 'CHECKED IN';
+let measure = null;
+function em(text) {
+  try {
+    measure = measure || document.createElement('canvas').getContext('2d');
+    measure.font = "100px 'Paytone One'";
+    const w = measure.measureText(text).width / 100;
+    if (w > 0) return w;
+  } catch { /* the estimate below */ }
+  return [...text].reduce((s, ch) => s + (ch === ' ' ? 0.3 : 0.64), 0);
+}
+function chipSvg(club, value) {
+  const g = L.chipGeometry(em(CHIP_LABEL), em(value));
+  const ns = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(ns, 'svg');
+  svg.setAttribute('viewBox', `-0.04 -0.04 ${g.width.toFixed(3)} ${g.height.toFixed(3)}`);
+  svg.setAttribute('aria-hidden', 'true');
+  const path = (attrs) => { const p = document.createElementNS(ns, 'path'); for (const [k, v] of Object.entries(attrs)) p.setAttribute(k, v); svg.append(p); };
+  path({ d: g.d, fill: PLATE[club], transform: 'translate(0.12 0.07)' });
+  path({ d: g.d, fill: 'none', stroke: '#fff', 'stroke-width': '0.045' });
+  for (const [t, at] of [[CHIP_LABEL, g.label], [value, g.value]]) {
+    const text = document.createElementNS(ns, 'text');
+    text.setAttribute('x', String(at.x));
+    text.setAttribute('y', String(at.y));
+    text.setAttribute('font-size', String(at.size));
+    text.setAttribute('text-anchor', 'middle');
+    text.setAttribute('dominant-baseline', 'central');
+    text.setAttribute('lengthAdjust', 'spacingAndGlyphs');
+    text.setAttribute('textLength', at.width.toFixed(3));
+    text.textContent = t;
+    svg.append(text);
+  }
+  return { svg, width: g.width, height: g.height };
+}
+function readCounts() { try { return localStorage.getItem(L.CLUB_COUNTS_KEY); } catch { return null; } }
+function drawChips(nowMs, forced) {
+  for (const club of /** @type {const} */ (['cubbies', 'sparks'])) {
+    const chip = /** @type {HTMLElement} */ (cards[club].querySelector('.cr-chip'));
+    const n = forced != null ? forced : L.clubCountFrom(readCounts(), nowMs, club);
+    chip.hidden = n == null;
+    if (n == null || chip.dataset.value === String(n)) continue;
+    chip.dataset.value = String(n);
+    const { svg, width, height } = chipSvg(club, String(n));
+    chip.replaceChildren(svg);
+    chip.style.width = `${width.toFixed(3)}em`;
+    chip.style.height = `${height.toFixed(3)}em`;
+    chip.setAttribute('aria-label', `${club === 'cubbies' ? 'Cubbies' : 'Sparks'} checked in: ${n}`);
+  }
+}
+document.fonts?.ready?.then(() => { for (const el of Object.values(cards)) delete el.querySelector('.cr-chip').dataset.value; drawChips(now().getTime(), PREVIEW ? previewCount() : null); });
+window.addEventListener('storage', (e) => { if (e.key === L.CLUB_COUNTS_KEY) drawChips(now().getTime()); });
+
+/* ── The phase, and the cards' hand-offs ────────────────────────── */
+let phase = /** @type {string} */ ('');
+const SWAP_MS = 2400;
+function setPhase(next, first) {
+  if (next === phase) return;
+  const was = phase;
+  phase = next;
+  // 6:57: the Cubbies card animates OUT into black before black takes over.
+  if (was === 'cubbies' && next === 'black' && motionOk() && !first) {
+    cards.cubbies.classList.remove('is-arriving', 'is-calm');
+    cards.cubbies.classList.add('is-leaving');
+    root.dataset.phase = 'cubbies';
+    setTimeout(() => { cards.cubbies.classList.remove('is-leaving'); show(next); }, SWAP_MS);
+    return;
+  }
+  show(next, was === 'black' && next === 'sparks' && !first ? 'is-entering' : 'is-arriving');
+}
+function show(next, how = 'is-arriving') {
+  root.dataset.phase = next;
+  for (const [club, el] of Object.entries(cards)) {
+    const on = club === next;
+    el.hidden = !on;
+    el.classList.remove('is-arriving', 'is-calm', 'is-leaving', 'is-entering');
+    if (on && motionOk()) {
+      el.classList.add(how);
+      if (how === 'is-entering') el.classList.add('is-arriving');
+      setTimeout(() => { el.classList.remove('is-arriving', 'is-entering'); el.classList.add('is-calm'); }, 3200);
+    }
+  }
+  if (!L.cardClub(next)) hideWelcome(true);
+}
+
+/* ── Easter eggs ────────────────────────────────────────────────── */
+function drawHoney(seconds, ms) {
+  const honey = /** @type {HTMLElement} */ (cards.cubbies.querySelector('.cr-honey'));
+  const p = L.honeyProgress(seconds + (ms % 1000) / 1000);
+  if (p == null || !motionOk()) { honey.style.opacity = '0'; return; }
+  // Runs slowly, a drop gathering at its tip; the last tenth it lets go.
+  const run = Math.min(1, p / 0.9);
+  honey.style.opacity = p > 0.97 ? String((1 - p) / 0.03) : '1';
+  honey.style.setProperty('--drip', `calc(${(run * 15).toFixed(2)} * var(--u))`);
+  honey.style.setProperty('--drop', (1.6 + run * 1.6).toFixed(2));
+}
+let bearDoneFor = '';
+try { bearDoneFor = localStorage.getItem(BEAR_KEY) || ''; } catch { /* memory only */ }
+function maybeBear(dateKey, minutes) {
+  if (!dateKey || bearDoneFor === dateKey || phase !== 'cubbies' || !motionOk()) return;
+  if (minutes !== L.bearMinute(dateKey) || welcomeUp()) return;
+  bearDoneFor = dateKey;
+  try { localStorage.setItem(BEAR_KEY, dateKey); } catch { /* memory only */ }
+  const bear = /** @type {HTMLElement} */ (cards.cubbies.querySelector('.cr-bear'));
+  bear.classList.remove('is-peeking');
+  void bear.offsetWidth;
+  bear.classList.add('is-peeking');
+  setTimeout(() => bear.classList.remove('is-peeking'), L.BEAR_MS + 200);
+}
+
+/* ── Welcomes ───────────────────────────────────────────────────── */
+let welcome = L.emptyWelcome();
+let welcomeTimer = 0;
+const welcomeUp = () => L.welcomeUp(welcome, phase, now().getTime());
+function drawWelcome() {
+  const kicker = /** @type {HTMLElement} */ (welcomeEl.querySelector('.cr-welcome-kicker'));
+  const names = /** @type {HTMLElement} */ (welcomeEl.querySelector('.cr-welcome-names'));
+  kicker.textContent = 'Welcome';
+  const words = L.welcomeWords(welcome.names);
+  names.style.setProperty('--names-size', String(words.length > 34 ? 4 : words.length > 20 ? 5 : 6.4));
+  if (names.textContent !== words) {
+    names.textContent = words;
+    if (!welcomeEl.hidden && motionOk()) { names.classList.remove('is-more'); void names.offsetWidth; names.classList.add('is-more'); }
+  }
+  if (welcomeEl.hidden) {
+    welcomeEl.hidden = false;
+    welcomeEl.classList.remove('is-out');
+    welcomeEl.classList.add('is-in');
+  }
+  root.classList.add('cr-welcoming');
+  clearTimeout(welcomeTimer);
+  welcomeTimer = setTimeout(() => hideWelcome(false), Math.min(2 ** 31 - 1, Math.max(0, welcome.until - now().getTime())));
+}
+function hideWelcome(atOnce) {
+  clearTimeout(welcomeTimer);
+  if (welcomeEl.hidden) return;
+  welcome = { ...L.emptyWelcome(), seen: welcome.seen };
+  root.classList.remove('cr-welcoming');
+  if (atOnce || !motionOk()) { welcomeEl.hidden = true; return; }
+  welcomeEl.classList.remove('is-in');
+  welcomeEl.classList.add('is-out');
+  setTimeout(() => { if (!welcome.names.length) welcomeEl.hidden = true; }, 600);
+}
+
+let audio = null;
+/** A soft two-note ding, made here (no sound file). */
+function ding() {
+  try {
+    audio = audio || new AudioContext();
+    if (audio.state === 'suspended') audio.resume();
+    const t = audio.currentTime + 0.02;
+    for (const [freq, at, gain] of [[1318.5, 0, 0.16], [1760, 0.12, 0.12]]) {
+      const osc = audio.createOscillator();
+      const g = audio.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      g.gain.setValueAtTime(0, t + at);
+      g.gain.linearRampToValueAtTime(gain, t + at + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + at + 1.1);
+      osc.connect(g).connect(audio.destination);
+      osc.start(t + at);
+      osc.stop(t + at + 1.2);
+    }
+  } catch { /* no sound here */ }
+}
+
+window.addEventListener('message', (event) => {
+  if (!frame || event.source !== frame.contentWindow || event.origin !== window.location.origin) return;
+  const d = event.data;
+  if (!d || typeof d !== 'object' || d.type !== CHECKIN_MESSAGE) return;
+  const r = L.welcomeFor(welcome, d, /** @type {any} */ (phase), now().getTime());
+  if (!r.ding) return;
+  welcome = r.state;
+  drawWelcome();
+  ding();
+});
+
+/* ── The clock ──────────────────────────────────────────────────── */
+let first = true;
+function tick() {
+  if (PREVIEW) return;
+  const at = now();
+  const c = church(at);
+  setPhase(L.phaseAt(c.minutes, night.ready && c.clubNight), first);
+  first = false;
+  drawChips(at.getTime());
+  if (phase === 'cubbies') { drawHoney(c.seconds, at.getMilliseconds()); maybeBear(c.dateKey, c.minutes); }
+}
+
+/* ── A new build: reload when nothing is on screen for someone ──── */
+const BUILD = document.querySelector('meta[name="classroom-build"]')?.getAttribute('content') || 'dev';
+async function checkBuild() {
+  if (BUILD === 'dev' || PREVIEW) return;
+  try {
+    const r = await fetch(`version.json?b=${Date.now()}`, { cache: 'no-store' });
+    if (!r.ok) return;
+    const v = await r.json();
+    if (!v || typeof v.build !== 'string' || v.build === BUILD) return;
+    const page = await fetch(`${window.location.pathname}?b=${Date.now()}`, { cache: 'no-store' });
+    if (!page.ok || !(await page.text()).includes(v.build)) return;
+    if (welcomeUp() || phase === 'cubbies' || phase === 'sparks' || phase === 'lobby') return; // only while black
+    window.location.reload();
+  } catch { /* no news */ }
+}
+
+function previewCount() { return Number(params.get('count') || (PREVIEW.includes('sparks') ? 18 : 12)); }
+
+/* ── Preview: one fixed moment, for the mock-ups and the layout test ── */
+function preview(what) {
+  root.classList.add('cr-preview');
+  const names = { 'welcome-cubbies': ['Ava', 'Ben', 'Cara'], 'welcome-sparks': ['Micah'] }[what];
+  const club = what.includes('sparks') ? 'sparks' : what === 'lobby' || what === 'black' ? what : 'cubbies';
+  show(club, 'none');
+  for (const el of Object.values(cards)) el.classList.remove('is-calm');
+  drawChips(0, previewCount());
+  if (what === 'honey') {
+    const honey = /** @type {HTMLElement} */ (cards.cubbies.querySelector('.cr-honey'));
+    honey.style.opacity = '1';
+    honey.style.setProperty('--drip', 'calc(10 * var(--u))');
+    honey.style.setProperty('--drop', '2.7');
+  }
+  if (what === 'bear') {
+    const bear = /** @type {HTMLElement} */ (cards.cubbies.querySelector('.cr-bear'));
+    bear.style.translate = '0 calc(-20 * var(--u))';
+    bear.style.rotate = '-3deg';
+  }
+  if (names) {
+    welcome = { club, names, until: Number.MAX_SAFE_INTEGER, seen: [] };
+    drawWelcome();
+  }
+}
+
+if (CONFIGURE) {
+  root.dataset.phase = 'configure';
+} else if (PREVIEW) {
+  preview(PREVIEW);
+} else {
+  tick();
+  loadNight();
+  setInterval(tick, 250);
+  setInterval(loadNight, NIGHT_REFRESH_MS);
+  setInterval(checkBuild, 3 * 60 * 1000);
+  window.addEventListener('online', () => { loadNight(); checkBuild(); });
+}

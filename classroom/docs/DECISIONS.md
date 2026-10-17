@@ -1,0 +1,13 @@
+# Downstairs classroom: decisions
+
+Dated owner decisions and why; the rules themselves are in the root CLAUDE.md ("App: classroom/").
+
+## The screen (owner 2026-10-16/17)
+- A fourth screen for KVBC Awana's display role, "Downstairs classroom", on a Windows PC that wakes itself. Club nights only: Cubbies card 6:30, black 6:57 to 7:03 (so the two clubs can pass at the door with no wrong logo up; the Cubbies card animates out into the black, the Sparks card animates in out of it), Sparks "Large Group Time" 7:03, the lobby screen made Sparks-only 7:30, the computer shuts down at 8:00. Off before 6:30 and on other nights. No manual override.
+- Choosing the screen sets 6:30 to 8:00 pm hours and turns the 8:00 pm shutdown on (settings.js `settingsForScreen`); changed afterwards, they stay.
+- "Sparks specific" lobby (7:30-8:00): the pickup board lists only Sparks children, the corner club count is Sparks, only Sparks check-ins are welcomed. Done as a lobby URL flag (`?club=sparks`) so saved Settings and every default stay untouched.
+- Silent cards, except (owner 2026-10-17) a ding and a 20 s welcome on this screen when a child of the card's club checks in; several close together share one card; other clubs and the black window get nothing. Names come from the embedded lobby's sanitized frames by a same-origin postMessage (first name, club, id, oneOff), held in memory only.
+- Look: the Cubbies card follows the 2026-27 catalog's Cubbies opener (p. 33): sky field, white line doodles, the club wave with a hard offset, the official mark. "HELLO, CUBBIES!" was tried and removed (owner). The Sparks card was first a catalog opener (red field, white mark); the owner said it was not perfect and gave a Sparks HangGlider handbook sample ("Bible Biography" pages) as inspiration, so it became a handbook page: lime edge band, rounded white page, yellow and teal arcs, a chunky outlined title, Sparky in a ringed circle; the handbook's soft green gradient is drawn as flat bands (the kit is flat). Sparks red stays in the mark and the chip.
+- Easter eggs (owner's pick "Both"): Cubbie peeks up once a night at a minute the date picks (6:33-6:50) and waves; a honey drip oozes from under the mark from 6:54 and is gone before the 6:57 fade.
+- Awana clipart in the public repo (owner 2026-10-17: yes, like the logos): `public/art/cubbie-waving.svg` is "Cubbie_Waving_Left_Color" from Awana's Cubbies 2013 clip art (clubs.awana.org Club Resources), converted from its PDF to SVG and cropped to the art's own bounds (viewBox only; nothing redrawn, recoloured or distorted). Only the pieces the screen uses are committed.
+- The Sparks screen will grow into a Journey-like app later (owner); that is why the classroom has its own folder and build id.
