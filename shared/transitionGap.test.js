@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { TRANSITION_GAP_MIN, gapAround, inTransitionGap, periodAt, periodsFor } from './transitionGap.js';
+import {
+  TRANSITION_GAP_MIN, WELCOME_MS, clubIdOf, emptyWelcomes, gapAround, inTransitionGap, periodAt, periodsFor, welcomeFor, welcomeWords, welcomesUp,
+} from './transitionGap.js';
 
 describe('the club-night transition gap (owner 2026-10-17)', () => {
   it('is two minutes before and two after a hand-off', () => {
@@ -33,5 +35,32 @@ describe('the club-night transition gap (owner 2026-10-17)', () => {
   it('follows the one constant: a different gap moves every edge', () => {
     const p = periodsFor([{ view: 'a', from: 0, until: 10, clubs: ['a'] }, { view: 'b', from: 10, until: 20, clubs: ['b'] }], 3);
     expect(p.map((x) => [x.view, x.from, x.until])).toEqual([['a', 0, 7], ['black', 7, 13], ['b', 13, 20]]);
+  });
+});
+
+describe('the gap welcomes (owner 2026-10-17; the classroom and the Journey kiosk)', () => {
+  const ci = (id, firstName, club, extra = {}) => ({ id, firstName, club, ...extra });
+  it('one card per club of the moment, deduped by id, up WELCOME_MS after the latest arrival', () => {
+    const clubs = ['journey', 'trek'];
+    let r = welcomeFor(emptyWelcomes(), ci('a', 'Ava', 'Journey'), clubs, 0);
+    expect(r.ding).toBe(true);
+    r = welcomeFor(r.state, ci('b', 'Ben', 'Trek'), clubs, 1000);
+    r = welcomeFor(r.state, ci('e', 'Eli', 'Journey', { oneOff: true }), clubs, 2000);
+    expect(r.state.cards.journey.names).toEqual(['Ava', 'Eli']);
+    expect(r.state.cards.trek.names).toEqual(['Ben']);
+    expect(welcomeFor(r.state, ci('a', 'Ava', 'Journey'), clubs, 3000).ding).toBe(false);
+    expect(welcomeFor(r.state, ci('t', 'Tom', 'T&T'), clubs, 3000).ding).toBe(false);
+    expect(welcomesUp(r.state, clubs, 2000 + WELCOME_MS - 1)).toEqual(['journey']);
+    expect(welcomesUp(r.state, clubs, 1000 + WELCOME_MS - 1)).toEqual(['journey', 'trek']);
+    expect(welcomesUp(r.state, clubs, 2000 + WELCOME_MS)).toEqual([]);
+    expect(WELCOME_MS).toBe(20 * 1000);
+  });
+
+  it('reads clubs and words the same for every screen', () => {
+    expect(['Cubbies', 'Truth & Training', 'T&T', 'Trek', 'Journey', 'Puggles', 'Sparks', 'Leaders'].map(clubIdOf))
+      .toEqual(['cubbies', 'tnt', 'tnt', 'trek', 'journey', 'puggles', 'sparks', '']);
+    expect(welcomeWords(['Ava'])).toBe('Ava!');
+    expect(welcomeWords(['Ava', 'Ben', 'Cara'])).toBe('Ava, Ben & Cara!');
+    expect(welcomeWords(['A', 'B', 'C', 'D', 'E', 'F'])).toBe('A, B, C, D & 2 more!');
   });
 });

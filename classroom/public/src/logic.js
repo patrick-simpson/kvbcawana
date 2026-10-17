@@ -13,9 +13,13 @@
 // 6:58-7:02 black, 7:02-7:28 Sparks, 7:28-7:32 black, 7:32-8:00 lobby.
 // Nothing here spells a gap edge: PERIODS is derived.
 
-import { TRANSITION_GAP_MIN, gapAround, periodAt, periodsFor } from './shared/transitionGap.js';
+import {
+  TRANSITION_GAP_MIN, gapAround, periodAt, periodsFor,
+  WELCOME_MS, WELCOME_NAMES_MAX, clubIdOf, welcomeWords, emptyWelcomes, welcomeFor, welcomesUp,
+} from './shared/transitionGap.js';
 
-export { TRANSITION_GAP_MIN };
+// The gap welcomes' rules are the shared module's (Journey's kiosk uses the same).
+export { TRANSITION_GAP_MIN, WELCOME_MS, WELCOME_NAMES_MAX, clubIdOf, welcomeWords, emptyWelcomes, welcomeFor, welcomesUp };
 export const CUBBIES_AT = 18 * 60 + 30;
 export const SPARKS_AT = 19 * 60;
 export const LOBBY_AT = 19 * 60 + 30;
@@ -81,10 +85,6 @@ export const BEAR_FROM = 18 * 60 + 33;
 export const BEAR_UNTIL = 18 * 60 + 50;
 export const BEAR_MS = 6000;
 
-/** A welcome stays this long after the latest arrival. */
-export const WELCOME_MS = 20 * 1000;
-export const WELCOME_NAMES_MAX = 5;
-
 export const CLUB_COUNTS_KEY = 'awanaClubCounts.v1';
 const COUNT_MAX_AGE_MS = 12 * 60 * 60 * 1000;
 const COUNT_SKEW_MS = 60 * 60 * 1000;
@@ -118,72 +118,6 @@ export function clubCountFrom(raw, nowMs, club) {
   if (new Date(entry.at).toDateString() !== new Date(nowMs).toDateString()) return null;
   const n = entry.byClub && entry.byClub[club];
   return Number.isInteger(n) && n >= 0 && n <= 999 ? n : null;
-}
-
-/** "Cubbies" / "T&T" / "Truth & Training" ... -> a club id, or ''. */
-export function clubIdOf(club) {
-  const s = typeof club === 'string' ? club.toLowerCase() : '';
-  if (s.includes('cubbies')) return 'cubbies';
-  if (s.includes('sparks')) return 'sparks';
-  if (s.includes('puggles')) return 'puggles';
-  if (s.includes('t&t') || s.includes('truth')) return 'tnt';
-  if (s.includes('trek')) return 'trek';
-  if (s.includes('journey')) return 'journey';
-  return '';
-}
-
-/**
- * The words of a welcome for these first names (arrival order).
- * "Welcome, Ava!" / "Ava & Ben" / "Ava, Ben & Cara" / "... & 3 more".
- * @param {string[]} names
- */
-export function welcomeWords(names) {
-  const list = names.filter((n) => typeof n === 'string' && n);
-  if (list.length === 0) return '';
-  const shown = list.length > WELCOME_NAMES_MAX ? list.slice(0, WELCOME_NAMES_MAX - 1) : list;
-  const more = list.length - shown.length;
-  const parts = more > 0 ? [...shown, `${more} more`] : shown;
-  if (parts.length === 1) return `${parts[0]}!`;
-  return `${parts.slice(0, -1).join(', ')} & ${parts[parts.length - 1]}!`;
-}
-
-/**
- * The welcome cards' state: ONE card per club (a Cubbies and a Sparks name
- * never share one), names added as they come, each card up WELCOME_MS after
- * its latest arrival. Which clubs are welcomed is the period's `clubs` (a
- * card's own club; both neighbours in a black gap).
- * @typedef {{ cards: Record<string, { names: string[], until: number }>, seen: string[] }} Welcomes
- */
-
-/** @returns {Welcomes} */
-export function emptyWelcomes() { return { cards: {}, seen: [] }; }
-
-/**
- * A check-in heard. Returns the next state, whether to ding, and the club.
- * @param {Welcomes} state
- * @param {{ id?: unknown, firstName?: unknown, club?: unknown }} event  already sanitized by the lobby
- * @param {string[]} clubs  the clubs welcomed now (welcomeClubsAt)
- * @param {number} nowMs
- */
-export function welcomeFor(state, event, clubs, nowMs) {
-  const club = clubIdOf(event?.club);
-  const id = typeof event?.id === 'string' ? event.id : '';
-  const name = typeof event?.firstName === 'string' ? event.firstName.trim() : '';
-  if (!club || !name || !clubs.includes(club)) return { state, ding: false, club: '' };
-  if (id && state.seen.includes(id)) return { state, ding: false, club: '' };
-  const card = state.cards[club];
-  const live = Boolean(card) && nowMs < card.until;
-  const seen = id ? [...state.seen.slice(-199), id] : state.seen;
-  const names = live ? [...card.names, name] : [name];
-  return { state: { cards: { ...state.cards, [club]: { names, until: nowMs + WELCOME_MS } }, seen }, ding: true, club };
-}
-
-/**
- * The clubs whose welcome card is up now, in the period's order.
- * @param {Welcomes} state @param {string[]} clubs @param {number} nowMs
- */
-export function welcomesUp(state, clubs, nowMs) {
-  return clubs.filter((c) => state.cards[c] && state.cards[c].names.length > 0 && nowMs < state.cards[c].until);
 }
 
 // The kit's stepped chip, ported from shared/chipGeometry.js (which imports
