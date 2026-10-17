@@ -73,7 +73,7 @@ describe('the check-in page', () => {
     assert.match(src, /var CHECKOUT_UNDO_MS = 10000;/);
     // TwoTimTwo's check-out cannot be taken back: nothing is sent until the Undo time is over
     assert.match(src, /batch\.timer = setTimeout\(function\(\) \{ sendHeld\(batch\); \}, CHECKOUT_UNDO_MS\);/);
-    assert.match(src, /go: function\(\) \{ return desk\.checkout\(\{ clubberId: k\.clubberId, name: k\.name, club: k\.club \}\); \}/);
+    assert.match(src, /go: function\(signal\) \{ return desk\.checkout\(\{ clubberId: k\.clubberId, name: k\.name, club: k\.club \}, \{ signal: signal \}\); \}/);
     // never on the youth page (the Worker checks Trek and Journey out) or a day with no club
     assert.match(src, /\$\('mode-btn'\)\.hidden = SIMPLE;/);
     assert.match(src, /MODE = m === 'out' && !SIMPLE && !NO_CLUB && !TEST_DAY \? 'out' : 'in';/);
@@ -110,5 +110,27 @@ describe('the check-in page', () => {
     assert.equal(readFileSync(path.join(dist, 'ym', 'index.html'), 'utf8'), ym);
     for (const [name, from] of Object.entries(CHECKIN_MODULES)) assert.equal(readFileSync(path.join(dist, name), 'utf8'), readFileSync(from, 'utf8'), name);
     assert.ok(existsSync(path.join(dist, 'brand', 'tokens.css')));
+  });
+  it('retries a check-in on a brief hiccup, never `unsure`, an undo or a check-out; settles a silent one from the roster; keeps unconfirmed check-ins sealed for a reload (owner request 2026-10-17)', () => {
+    assert.match(src, /var HICCUP_RETRY_MS = \[2000, 5000, 10000\];/);
+    assert.match(src, /var SLOW_CHECK_MS = 30000;/);
+    assert.match(src, /var NO_ANSWER_MS = 60000;/);
+    assert.match(src, /function hiccupError\(e\) \{ return !!e && \(e\.code === 'unreachable' \|\| e\.code === 'hiccup'\); \}/);
+    // Only the check-in job opts in to the automatic resend (the claim makes it safe).
+    assert.equal((src.match(/retryOn: true/g) || []).length, 1);
+    const checkIns = src.slice(src.indexOf('function checkInMany('), src.indexOf('// ── Check out: a mode of this page'));
+    assert.ok(checkIns.includes('retryOn: true') && checkIns.includes('truth: function(rk) { return rk.checkedIn === true; }'));
+    // The roster that settles a job is a fresh one, never restored or stale.
+    assert.match(src, /function settleFromRoster\(data\) \{\n  if \(!data \|\| data\.stale \|\| data\.restored/);
+    // Kept sealed (AES-GCM under a non-extractable key in its own IndexedDB), tonight only, gone on Sign out.
+    assert.match(src, /var PENDING_KEY = 'awanaCheckinPending\.v1';/);
+    assert.match(src, /localStorage\.setItem\(PENDING_KEY, JSON\.stringify\(\{ night: night, iv: b64\(iv\), ct: b64\(ct\) \}\)\)/);
+    assert.match(src, /generateKey\(\{ name: 'AES-GCM', length: 256 \}, false,/);
+    assert.match(src.slice(src.indexOf('function signOut('), src.indexOf('function commonError(')), /forgetPending\(\);/);
+    // Only check-ins are kept: nothing of the check-out path (held behind its Undo, never sent) is.
+    const keepers = [...src.matchAll(/keepPending\(/g)].map((m) => m.index);
+    const out = [src.indexOf('// ── Check out: a mode of this page'), src.indexOf('// ── Polling')];
+    assert.ok(keepers.length >= 4 && keepers.every((i) => i < out[0] || i > out[1]), 'keepPending is used only by check-ins');
+    assert.ok(!/HELD[^\n]*PENDING|PENDING[^\n]*HELD/.test(src));
   });
 });

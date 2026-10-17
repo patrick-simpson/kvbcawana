@@ -611,3 +611,52 @@ describe('no club tonight (routes.md 5: the roster\'s noClub answer, the writes\
     for (const bad of ['', null, '2026-02-30', '14/10/2026', '2026-10-14T00:00']) assert.equal(dayWords(bad), '', String(bad));
   });
 });
+
+describe('a brief hiccup and a check-in nobody answers (owner request 2026-10-17)', () => {
+  it('a 500/502/503 with no Worker reason is a "hiccup"; the Worker\'s own 502/503 refusals stay "refused"', async () => {
+    for (const status of [500, 502, 503]) {
+      const w = worker({ stations: [], check: (path) => (path === '/v1/desk/checkin' ? new Response('<html>error</html>', { status }) : null) });
+      const { desk } = make(w);
+      await desk.signIn(PASS);
+      await assert.rejects(desk.checkIn(kid, {}), (e) => e instanceof DeskError && e.code === 'hiccup' && e.status === status);
+    }
+    const own = worker({ stations: [], check: () => new Response(JSON.stringify({ ok: false, reason: 'twotimtwo-unreadable' }), { status: 502 }) });
+    const d = make(own).desk;
+    await d.signIn(PASS);
+    await assert.rejects(d.checkIn(kid, {}), (e) => e.code === 'refused' && e.reason === 'twotimtwo-unreadable');
+  });
+
+  it('the caller\'s signal aborts a check-in, undo or check-out post as "unreachable" with `aborted`', async () => {
+    const w = worker({ stations: [] });
+    const inner = w.fetch;
+    w.fetch = (url, init = {}) => (/\/v1\/desk\/(checkin|undo|checkout)$/.test(String(url))
+      ? new Promise((_, reject) => init.signal.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError'))))
+      : inner(url, init));
+    const { desk } = make(w);
+    await desk.signIn(PASS);
+    for (const go of [(s) => desk.checkIn(kid, {}, { signal: s }), (s) => desk.undo(kid, { signal: s }), (s) => desk.checkout(kid, { signal: s })]) {
+      const ctl = new AbortController();
+      const p = go(ctl.signal);
+      setTimeout(() => ctl.abort(), 10);
+      await assert.rejects(p, (e) => e instanceof DeskError && e.code === 'unreachable' && e.aborted === true && /did not answer in time/.test(e.message));
+    }
+    // Already aborted: nothing is sent.
+    const before = w.calls.length;
+    const done = new AbortController(); done.abort();
+    await assert.rejects(desk.checkIn(kid, {}, { signal: done.signal }), { code: 'unreachable', aborted: true });
+    assert.equal(w.calls.filter((c, i) => i >= before && c.path === '/v1/desk/checkin').length, 0);
+  });
+
+  it('a check-in answered "already" carries the claim\'s state, so the page can tell "still checking" from done', async () => {
+    const w = worker({ stations: [], check: (path) => (path === '/v1/desk/checkin' ? new Response(JSON.stringify({ ok: true, already: true, state: 'checking', jobId: null }), { status: 200 }) : null) });
+    const { desk } = make(w);
+    await desk.signIn(PASS);
+    const r = await desk.checkIn(kid, {});
+    assert.equal(r.already, true);
+    assert.equal(r.state, 'checking');
+    const w2 = worker({ stations: [] });
+    const d2 = make(w2).desk;
+    await d2.signIn(PASS);
+    assert.equal('state' in (await d2.checkIn(kid, {})), false);
+  });
+});

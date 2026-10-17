@@ -356,12 +356,17 @@ test('error states: a refusal puts the child back, no internet points to the pap
   await expect(page.locator('.fam', { hasText: 'Cy Other' })).toHaveCount(1);
   await expect(page.locator('#count-pill')).toHaveText('0 in');
 
-  // No internet: the next call cannot reach the service.
-  await page.route(`${ORIGIN}/api/v1/desk/checkin`, (route) => route.abort());
+  // No internet: the call cannot reach the service. A hiccup is tried again by itself
+  // (2 s, 5 s, 10 s on the live page; a second each here), then the tile says so.
+  await page.evaluate(() => { window.AWANA_CHECKIN_TUNING = { hiccupMs: [1000, 1000, 1000] }; });
+  let tries = 0;
+  await page.route(`${ORIGIN}/api/v1/desk/checkin`, (route) => { tries += 1; return route.abort(); });
   world.refuse = null;
   await page.locator('.fam', { hasText: 'Cy Other' }).click();
   await page.locator('#kid-sheet').getByRole('button', { name: 'Check in' }).click();
-  await expect(page.locator('#toast')).toContainText('paper sheet');
+  await expect(page.locator('.fam', { hasText: 'Cy Other' })).toContainText(/Connection hiccup\. Trying again in \d+s/);
+  await expect(page.locator('#toast')).toContainText('paper sheet', { timeout: 15_000 });
+  expect(tries).toBe(4);
   await expect(page.locator('#offline-note')).toBeVisible();
   await expect(page.locator('#offline-note')).toContainText('paper sheet at the desk');
   await expect(page.locator('.fam', { hasText: 'Cy Other' })).toHaveCount(1);
@@ -529,6 +534,105 @@ test('an early label (printed before TwoTimTwo answered): a hiccup is retried by
   await page.locator('#kid-sheet').getByRole('button', { name: 'Check in' }).click();
   await expect(page.locator('#toast')).toContainText('Zed Solo is checked in', { timeout: 10_000 });
   expect(world.posts.filter((p) => p.body.clubberId === '20')).toHaveLength(2);
+});
+
+// Reliability (owner request 2026-10-17): a hiccup is retried by itself, a check-in nobody
+// answers settles from the roster's checked-in marks or is sent again after a minute, and a
+// reload sends the check-ins it had not confirmed yet (sealed in storage, tonight only).
+test('a connection hiccup is sent again by itself; `unsure` and refusals are not', async ({ page }) => {
+  test.setTimeout(60_000);
+  const { world } = await stubSite(page);
+  world.busyFirst = false;
+  world.kids.push({ clubberId: '20', first: 'Zed', last: 'Solo', club: 'T&T', clubId: '3', checkedIn: false });
+  await page.addInitScript(() => { window.AWANA_CHECKIN_TUNING = { hiccupMs: [1000, 1000, 1000] }; });
+  await signIn(page);
+  await expect(page.locator('#list')).toContainText('families still to come', { timeout: 10_000 });
+  // Two dropped connections, then a 503 that is not the Worker's own refusal (a restart): the fourth try takes.
+  let dropped = 0;
+  await page.route(`${ORIGIN}/api/v1/desk/checkin`, (route) => (dropped < 2 ? (dropped += 1, route.abort()) : route.fallback()));
+  world.answersFor = { '13': [json(503, { error: 'Something went wrong on the sync service.' })] };
+  await search(page).fill('Cy');
+  await page.locator('.fcard').click();
+  await page.locator('#kid-sheet').getByRole('button', { name: 'Check in' }).click();
+  await expect(page.locator('.fam', { hasText: 'Cy Other' })).toContainText(/Connection hiccup\. Trying again in \d+s/);
+  await expect(page.locator('#toast')).toContainText('Cy Other is checked in', { timeout: 15_000 });
+  expect(dropped).toBe(2);
+  expect(world.posts.filter((p) => p.body.clubberId === '13')).toHaveLength(2);   // the 503, then the one that took
+  // TwoTimTwo timed out (`unsure`): ambiguous by design, so it is NOT sent again by itself.
+  world.answersFor = { '20': [json(504, { ok: false, reason: 'unsure', retry: true })] };
+  await search(page).fill('Zed');
+  await page.locator('.fcard').click();
+  await page.locator('#kid-sheet').getByRole('button', { name: 'Check in' }).click();
+  await expect(page.locator('#toast')).toContainText('Couldn’t check in Zed Solo: TwoTimTwo did not answer in time.');
+  await page.waitForTimeout(2500);
+  expect(world.posts.filter((p) => p.body.clubberId === '20')).toHaveLength(1);
+});
+
+test('a check-in nobody answers: after half a minute the roster says whether it landed; after a minute it is sent again', async ({ page }) => {
+  test.setTimeout(90_000);
+  const { world } = await stubSite(page);
+  world.busyFirst = false;
+  await page.addInitScript(() => { window.AWANA_CHECKIN_TUNING = { slowMs: 1500, noAnswerMs: 5000, hiccupMs: [1000, 1000, 1000] }; });
+  await signIn(page);
+  await expect(page.locator('#list')).toContainText('families still to come', { timeout: 10_000 });
+  // Cy's check-in reaches the Worker and TwoTimTwo takes it, but the answer never comes back.
+  let hung = 0;
+  await page.route(`${ORIGIN}/api/v1/desk/checkin`, (route) => {
+    const body = route.request().postDataJSON();
+    if (body.clubberId === '13') { hung += 1; world.kids.find((k) => k.clubberId === '13').checkedIn = true; return new Promise(() => {}); }
+    if (body.clubberId === '14' && hung < 2) { hung += 1; return new Promise(() => {}); }   // Tia's first try: nothing at all
+    return route.fallback();
+  });
+  await search(page).fill('Cy');
+  await page.locator('.fcard').click();
+  await page.locator('#kid-sheet').getByRole('button', { name: 'Check in' }).click();
+  // The roster's checked-in mark settles it: checked in, one post, its place in the queue free.
+  await expect(page.locator('#toast')).toContainText('Cy Other is checked in', { timeout: 10_000 });
+  expect(hung).toBe(1);
+  // Tia's never arrived: the roster does not show her, so after the minute it goes again (safe: the claim).
+  await search(page).fill('Tia');
+  await page.locator('.fcard').click();
+  await page.locator('#kid-sheet').getByRole('button', { name: 'Check in' }).click();
+  await search(page).fill('');
+  await expect(page.locator('.fam', { hasText: 'Tia Youth' })).toContainText('Still checking in (slow connection)…');
+  await expect(page.locator('#toast')).toContainText('Tia Youth is checked in', { timeout: 15_000 });
+  expect(hung).toBe(2);
+  expect(world.posts.filter((p) => p.body.clubberId === '14')).toHaveLength(1);   // the one the stand-in answered
+});
+
+test('a reload sends the check-ins it had not confirmed yet, sealed in storage for tonight; Sign out forgets them', async ({ page }) => {
+  test.setTimeout(60_000);
+  const { world } = await stubSite(page);
+  world.busyFirst = false;
+  page.on('dialog', (d) => d.accept());   // "leave the page?" while the queue is busy
+  await signIn(page);
+  await expect(page.locator('#list')).toContainText('families still to come', { timeout: 10_000 });
+  // The Worker is busy for a long while: Cy's check-in waits its turn to try again.
+  world.answersFor = { '13': [json(429, { ok: false, reason: 'read-busy', retryAfterMs: 60_000 })] };
+  await search(page).fill('Cy');
+  await page.locator('.fcard').click();
+  await page.locator('#kid-sheet').getByRole('button', { name: 'Check in' }).click();
+  await expect(page.locator('.fam', { hasText: 'Cy Other' })).toContainText(/Waiting for TwoTimTwo… \d+s/);
+  // Kept sealed: no name readable in the browser's storage.
+  await expect.poll(() => page.evaluate(() => localStorage.getItem('awanaCheckinPending.v1'))).toContain('"ct"');
+  const stored = await page.evaluate(() => JSON.stringify({ ...localStorage, ...sessionStorage }));
+  expect(stored).not.toContain('Cy Other');
+  expect(stored).not.toMatch(/clubberId|"choice"|"name"/);
+  expect(Object.keys(JSON.parse(await page.evaluate(() => localStorage.getItem('awanaCheckinPending.v1')))).sort()).toEqual(['ct', 'iv', 'night']);
+  await page.reload();
+  // After the reload it goes again by itself, and TwoTimTwo takes it.
+  await expect(page.locator('#toast')).toContainText(/Cy Other is checked in|from before the page reloaded/, { timeout: 15_000 });
+  await expect(page.locator('#toast')).toContainText('Cy Other is checked in', { timeout: 15_000 });
+  expect(world.posts.filter((p) => p.body.clubberId === '13')).toHaveLength(2);
+  await expect.poll(() => page.evaluate(() => localStorage.getItem('awanaCheckinPending.v1'))).toBeNull();
+  // Another one left waiting, then Sign out: the slot goes.
+  world.answersFor = { '14': [json(429, { ok: false, reason: 'read-busy', retryAfterMs: 60_000 })] };
+  await search(page).fill('Tia');
+  await page.locator('.fcard').click();
+  await page.locator('#kid-sheet').getByRole('button', { name: 'Check in' }).click();
+  await expect.poll(() => page.evaluate(() => localStorage.getItem('awanaCheckinPending.v1'))).toContain('"ct"');
+  await page.evaluate(() => { document.getElementById('signout').click(); });
+  expect(await page.evaluate(() => localStorage.getItem('awanaCheckinPending.v1'))).toBeNull();
 });
 
 test('a test day (no club today, owner 2026-10-15): the real list, a yellow strip, a real check-in, no Check out', async ({ page }) => {

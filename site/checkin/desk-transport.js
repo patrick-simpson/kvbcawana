@@ -55,7 +55,10 @@ const SESSION_RE = /^v1\.\d+\.\d+\.[A-Za-z0-9_-]{20,}$/;
 /**
  * Every failure the page words, as one error with a fixed `code`:
  * 'wrong' 'locked' 'unreachable' 'signed-out' 'busy' 'no-history' 'history-mismatch'
- * 'unsealed' 'no-station' 'wrong-night' 'no-club' 'unsure' 'refused' 'http'.
+ * 'unsealed' 'no-station' 'wrong-night' 'no-club' 'unsure' 'refused' 'hiccup' 'http'.
+ * 'hiccup' is a 500/502/503 that is not one of the Worker's own refusals (no
+ * `reason`: a restart, a crash, the edge): nothing the Worker decided, so the page
+ * may send a check-in again (the claim makes that safe, routes.md 5).
  */
 export class DeskError extends Error {
   /** @param {string} code @param {string} message @param {Record<string, any>} [extra] */
@@ -193,7 +196,10 @@ export function createDesk({ cc, fetch: fetchFn, store, base = DESK_API, now = D
   /**
    * One request. Returns {status, body}; throws only DeskError for the failures
    * every call words the same way (unreachable, signed out, busy).
-   * @param {string} method @param {string} path @param {unknown} [body] @param {{ auth?: boolean, timeoutMs?: number }} [opts]
+   * `signal`: the caller's own abort (the page gives up on a check-in nobody answered
+   * for a minute, after asking the roster whether it landed); an abort is 'unreachable'
+   * with `aborted: true`.
+   * @param {string} method @param {string} path @param {unknown} [body] @param {{ auth?: boolean, timeoutMs?: number, signal?: AbortSignal|null }} [opts]
    * @returns {Promise<{ status: number, body: any }>}
    */
   async function request(method, path, body, opts = {}) {
@@ -207,10 +213,14 @@ export function createDesk({ cc, fetch: fetchFn, store, base = DESK_API, now = D
     // check-in that was sent must never be reported as lost on a timer.
     const timer = opts.timeoutMs && typeof AbortController === 'function' ? new AbortController() : null;
     const timeout = timer ? setTimeout(() => timer.abort(), opts.timeoutMs) : null;
+    const signal = timer ? timer.signal : opts.signal || null;
+    if (opts.signal && opts.signal.aborted) throw new DeskError('unreachable', 'The check-in service did not answer in time.', { aborted: true });
     try {
-      res = await fetchFn(`${base}${path}`, { method, headers, body: body === undefined ? undefined : JSON.stringify(body), cache: 'no-store', ...(timer ? { signal: timer.signal } : {}) });
+      res = await fetchFn(`${base}${path}`, { method, headers, body: body === undefined ? undefined : JSON.stringify(body), cache: 'no-store', ...(signal ? { signal } : {}) });
     } catch {
-      throw new DeskError('unreachable', timer && timer.signal.aborted ? 'The check-in service did not answer in time.' : 'No internet connection to the check-in service.');
+      if (timer && timer.signal.aborted) throw new DeskError('unreachable', 'The check-in service did not answer in time.');
+      if (opts.signal && opts.signal.aborted) throw new DeskError('unreachable', 'The check-in service did not answer in time.', { aborted: true });
+      throw new DeskError('unreachable', 'No internet connection to the check-in service.');
     } finally {
       if (timeout) clearTimeout(timeout);
     }
@@ -333,6 +343,10 @@ export function createDesk({ cc, fetch: fetchFn, store, base = DESK_API, now = D
     // A day with no club (routes.md 5, "No club tonight"): nothing was read, claimed or posted.
     if (reason === 'no-club') return new DeskError('no-club', refusalWords('no-club'), { today: r.body.today ?? null, next: r.body.next ?? null });
     if (reason === 'unsealed') return new DeskError('unsealed', refusalWords('unsealed'), { what: r.body.what });
+    // Not the Worker's own refusal (it always names a reason): a restart or a crash mid-request.
+    if (!reason && (r.status === 500 || r.status === 502 || r.status === 503)) {
+      return new DeskError('hiccup', 'The check-in service had a hiccup.', { status: r.status });
+    }
     if (r.status === 409 || r.status === 502 || r.status === 503) return new DeskError('refused', refusalWords(reason || 'refused'), { reason });
     return new DeskError('http', (r.body && (r.body.error || r.body.reason)) || `The check-in service answered HTTP ${r.status}.`, { status: r.status });
   }
@@ -367,7 +381,7 @@ export function createDesk({ cc, fetch: fetchFn, store, base = DESK_API, now = D
    * the list the Worker sends back is the new truth: reseal and send again.
    * @param {string} path
    * @param {(stationList: any[]) => Promise<Record<string, any>>} build the body, sealing as it goes
-   * @param {{ needJob?: boolean }} [opts]
+   * @param {{ needJob?: boolean, signal?: AbortSignal|null }} [opts]
    */
   async function sealedPost(path, build, opts = {}) {
     if (!history) throw new DeskError('no-history', 'The history key is not ready, so check-ins are off. Open /settings or ask the owner.');
@@ -375,7 +389,7 @@ export function createDesk({ cc, fetch: fetchFn, store, base = DESK_API, now = D
     if (opts.needJob && !current.length) throw new DeskError('no-station', 'No print station is registered, so there is nowhere to print a name tag.');
     for (let attempt = 0; attempt <= RESEAL_MAX; attempt++) {
       const body = await build(current);
-      const r = await request('POST', path, body);
+      const r = await request('POST', path, body, { signal: opts.signal || null });
       if (r.status === 409 && r.body && r.body.reason === 'stations-changed') {
         stations = asStations(r.body.stations);
         if (!stations.length) stations = await loadStations(true);
@@ -451,9 +465,13 @@ export function createDesk({ cc, fetch: fetchFn, store, base = DESK_API, now = D
    * `welcomeOnly` (the youth page, owner 2026-10-15): the job is `/print-welcome`, the
    * TV's welcome with no label (a station below 9.4.8 refuses the route: nothing prints).
    * @param {{ bible?: boolean, friend?: boolean, friendName?: string, friendClub?: string, welcomeOnly?: boolean }} [choice]
-   * @returns {Promise<{ already: boolean, jobId: string|null, gen?: number, history: string }>}
+   * `opts.signal` aborts the post (the page's minute with no answer). Sending a check-in
+   * again is safe: the Worker's claim answers `already` and never prints a second label.
+   * An `already` whose `state` is 'checking' means an earlier send is still with TwoTimTwo.
+   * @param {{ signal?: AbortSignal|null }} [opts]
+   * @returns {Promise<{ already: boolean, state?: string, jobId: string|null, gen?: number, history: string }>}
    */
-  async function checkIn(child, choice = {}) {
+  async function checkIn(child, choice = {}, opts = {}) {
     const n = night();
     const friendName = choice.friend ? String(choice.friendName || '').replace(/\s+/g, ' ').trim().slice(0, 24) : '';
     const items = { ...(choice.bible ? { Bible: true } : {}), ...(choice.friend ? { Friend: true } : {}) };
@@ -470,21 +488,27 @@ export function createDesk({ cc, fetch: fetchFn, store, base = DESK_API, now = D
       night: n, ...who(child), items, ...(choice.friend && friendName ? { friendName, ...(friendClub ? { friendClub } : {}) } : {}),
       historyRow: await sealHistory(n, isVisitor ? 'visitor' : 'checkin', historyRecord(child, { friend: choice.friend, friendName })),
       job: await sealJob(list, n, { route: choice.welcomeOnly ? '/print-welcome' : '/print', body: printBody, clubberId, source: 'desk' }),
-    }));
-    return { already: !!out.already, jobId: out.jobId ?? null, gen: out.gen, history: out.history || '' };
+    }), { signal: opts.signal || null });
+    return { already: !!out.already, ...(out.already && typeof out.state === 'string' ? { state: out.state } : {}), jobId: out.jobId ?? null, gen: out.gen, history: out.history || '' };
   }
 
-  /** @param {'undo'|'checkout'} what @param {{ clubberId?: string|null, name: string, club?: string, visitor?: boolean }} child */
-  async function undoOrCheckout(what, child) {
+  /**
+   * Undo and check-out are NOT sent again by the page on a hiccup: each re-posts to
+   * TwoTimTwo and adds another history row (a second `undone`/`checkedOut` in the
+   * night summary), so a lost answer is the volunteer's to check.
+   * @param {'undo'|'checkout'} what @param {{ clubberId?: string|null, name: string, club?: string, visitor?: boolean }} child
+   * @param {{ signal?: AbortSignal|null }} [opts]
+   */
+  async function undoOrCheckout(what, child, opts = {}) {
     const n = night();
     // `club` rides the post so the Worker can count the night_summary line.
     return sealedPost(`/v1/desk/${what}`, async () => ({
       night: n, ...who(child), club: child.club || '',
       historyRow: await sealHistory(n, what, historyRecord(child)),
-    }));
+    }), { signal: opts.signal || null });
   }
-  const undo = (/** @type {any} */ child) => undoOrCheckout('undo', child);
-  const checkout = (/** @type {any} */ child) => undoOrCheckout('checkout', child);
+  const undo = (/** @type {any} */ child, /** @type {any} */ opts) => undoOrCheckout('undo', child, opts);
+  const checkout = (/** @type {any} */ child, /** @type {any} */ opts) => undoOrCheckout('checkout', child, opts);
 
   /**
    * A label that is not a check-in: a `reprint:` job sealed to every station

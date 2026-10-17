@@ -872,16 +872,16 @@ var ROSTER_CACHE_KEY = 'awanaCheckinRoster.v1';
 var ROSTER_CACHE_DB = 'awanaCheckinCache';
 var rosterCache = null;          // tonight's opened copy, this load
 var rosterCacheWrite = Promise.resolve();
-function cacheDb() {
+function cacheDb(name) {
   return new Promise(function(resolve, reject) {
-    var req = indexedDB.open(ROSTER_CACHE_DB, 1);
+    var req = indexedDB.open(name || ROSTER_CACHE_DB, 1);
     req.onupgradeneeded = function() { req.result.createObjectStore('k'); };
     req.onsuccess = function() { resolve(req.result); };
     req.onerror = function() { reject(req.error); };
   });
 }
-function cacheKey(make) {
-  return cacheDb().then(function(db) {
+function cacheKey(make, dbName) {
+  return cacheDb(dbName).then(function(db) {
     return new Promise(function(resolve, reject) {
       var get = db.transaction('k').objectStore('k').get('roster');
       get.onsuccess = function() {
@@ -945,9 +945,81 @@ function showCachedList() {
     $('cached-note').textContent = 'Showing the list from ' + at + ' while TwoTimTwo signs in. It updates by itself.';
     $('cached-note').hidden = false;
     paint();
+    resumePending();
   });
 }
 function liveListArrived() { showingCached = false; $('cached-note').hidden = true; }
+
+// Check-ins not confirmed yet survive a reload (owner request 2026-10-17): the queue's
+// check-ins still waiting for TwoTimTwo (in flight, counting down to a retry, or waiting
+// their turn) are kept for TONIGHT on this device, SEALED the roster's way (AES-GCM under
+// a NON-extractable key in its own IndexedDB, no name readable from storage), and sent
+// again after the reload (safe: the claim answers "already", never a second label).
+// Confirmed, refused or stopped ones leave it; Sign out or another night deletes slot and
+// key. Check-outs held behind their 10 s Undo were never sent and are NOT kept (a reload
+// drops them, as it always did); undo and check-out are not kept either (never resent).
+var PENDING_KEY = 'awanaCheckinPending.v1';
+var PENDING_DB = 'awanaCheckinPending';
+var PENDING_IN = {};             // child key -> { clubberId, name, club, choice }: tonight's unconfirmed check-ins
+var pendingWrite = Promise.resolve();
+var RESUME = null;               // the records a reload left, until the list is there to put them on
+function keepPending(key, rec) { if (rec) PENDING_IN[key] = rec; else delete PENDING_IN[key]; savePending(); }
+function savePending() {
+  if (!desk) return;
+  var list = Object.keys(PENDING_IN).map(function(k) { return PENDING_IN[k]; });
+  var night = desk.night, epoch = queueEpoch;
+  pendingWrite = pendingWrite.then(function() {
+    if (epoch !== queueEpoch) return;   // signed out meanwhile
+    if (!list.length) { localStorage.removeItem(PENDING_KEY); return; }
+    if (!window.crypto || !crypto.subtle || !window.indexedDB) return;
+    var plain = new TextEncoder().encode(JSON.stringify({ night: night, jobs: list }));
+    return cacheKey(true, PENDING_DB).then(function(key) {
+      var iv = crypto.getRandomValues(new Uint8Array(12));
+      return crypto.subtle.encrypt({ name: 'AES-GCM', iv: iv }, key, plain).then(function(ct) {
+        if (epoch !== queueEpoch) return;
+        localStorage.setItem(PENDING_KEY, JSON.stringify({ night: night, iv: b64(iv), ct: b64(ct) }));
+      });
+    });
+  }).catch(function() { /* the queue works without it */ });
+}
+function loadPending() {
+  var sealed;
+  try { sealed = JSON.parse(localStorage.getItem(PENDING_KEY) || 'null'); } catch (e) { sealed = null; }
+  if (!sealed) return Promise.resolve([]);
+  if (sealed.night !== desk.night || !sealed.iv || !sealed.ct || !window.crypto || !crypto.subtle || !window.indexedDB) { forgetPending(); return Promise.resolve([]); }
+  return cacheKey(false, PENDING_DB).then(function(key) {
+    if (!key) return [];
+    return crypto.subtle.decrypt({ name: 'AES-GCM', iv: unb64(sealed.iv) }, key, unb64(sealed.ct)).then(function(plain) {
+      var v = JSON.parse(new TextDecoder().decode(plain));
+      if (!v || v.night !== desk.night || !Array.isArray(v.jobs)) return [];
+      return v.jobs.filter(function(r) { return r && /^\d{1,20}$/.test(String(r.clubberId)) && r.choice && typeof r.choice === 'object'; });
+    });
+  }).catch(function() { return []; });
+}
+function forgetPending() {
+  PENDING_IN = {}; RESUME = null;
+  try { localStorage.removeItem(PENDING_KEY); } catch (e) { /* none */ }
+  try { indexedDB.deleteDatabase(PENDING_DB); } catch (e) { /* none */ }
+}
+// Put a reload's unconfirmed check-ins back in the queue once a list is there (live or
+// this device's last one): a child the list already shows checked in needs nothing.
+function resumePending() {
+  if (!RESUME || !rosterLoaded || NO_CLUB || !unlockedState) return;
+  var list = RESUME;
+  RESUME = null;
+  var entries = [];
+  list.forEach(function(r) {
+    var key = 'id:' + String(r.clubberId);
+    var k = KIDS.filter(function(x) { return kidKey(x) === key; })[0];
+    if (!k || k.checkedIn) return;
+    entries.push({ p: { kid: k, name: k.name }, choice: r.choice });
+  });
+  PENDING_IN = {};
+  savePending();
+  if (!entries.length) return;
+  toast('Sending ' + (entries.length === 1 ? entries[0].p.name + '’s check-in' : entries.length + ' check-ins') + ' from before the page reloaded…', 4000);
+  checkInMany(entries, null);
+}
 
 function saveLocal() { try { sessionStorage.setItem(LOCAL_KEY, JSON.stringify(LOCAL)); } catch (e) { /* the list lasts this load */ } }
 
@@ -1018,6 +1090,7 @@ function signOut(message) {
   renderLeaderChips([]);
   rosterLoaded = false; rosterTries = 0; lastRosterAt = 0; rosterSlow = false;
   forgetRosterCache(); showingCached = false; cacheTried = false; $('cached-note').hidden = true;
+  forgetPending();
   setTestDay(null);
   if (rosterSlowTimer) { clearTimeout(rosterSlowTimer); rosterSlowTimer = null; }
   setNoClub(null);
@@ -1036,6 +1109,14 @@ function startSession() {
   LOCAL = loadLocal();
   unlockedState = true;
   STATE = {};
+  // A reload's unconfirmed check-ins go back in the queue once a list is there.
+  var epoch = queueEpoch;
+  loadPending().then(function(list) {
+    if (epoch !== queueEpoch || !unlockedState || !list.length) return;
+    RESUME = list;
+    list.forEach(function(r) { PENDING_IN['id:' + String(r.clubberId)] = r; });   // kept until resumed
+    resumePending();
+  });
   showMainScreen();
   $('nohistory').hidden = desk.hasHistory;
   fillClubSelects();
@@ -1175,9 +1256,16 @@ function waitingPeople() {
   return KIDS.filter(function(k) { return !k.checkedIn || STATE[kidKey(k)]; }).map(person);
 }
 // What a tapped child's tile says while the queue has them.
+// The words while a job waits or runs long (runJob, waitJob): plain, and they say it goes again by itself.
+function waitText(st) {
+  if (st.why === 'hiccup') return 'Connection hiccup. Trying again in ' + st.left + 's…';
+  if (st.why === 'checking') return 'Still checking with TwoTimTwo… ' + st.left + 's';
+  return 'Waiting for TwoTimTwo… ' + st.left + 's';
+}
 function stateText(st) {
   if (!st) return '';
-  if (st.status === 'waiting') return 'Waiting for TwoTimTwo… ' + st.left + 's';
+  if (st.status === 'waiting') return waitText(st);
+  if (st.status === 'pending' && st.why === 'slow') return 'Still checking in (slow connection)…';
   if (st.status === 'done') return 'Checked in ✓';
   if (st.status === 'failed') return 'Not checked in' + (st.msg ? ': ' + st.msg : '');
   return 'Checking in…';
@@ -1772,6 +1860,29 @@ var PRINTED_RETRIES = 6;
 var PRINTED_RETRY_MS = 5000;
 var PRINTED_FLAT = /^(refused|no-club|wrong-night|unsealed)$/;
 var PRINTED_NOT_TAKEN = 'Label printed, but TwoTimTwo didn’t take it. Tap to try again.';
+// A brief connection hiccup (owner request 2026-10-17): a check-in that could not reach the
+// service, or met a 5xx that is not the Worker's own refusal (a restart), is sent again by
+// itself after 2 s, 5 s and 10 s (four tries in all) before its tile goes red. Safe: the
+// Worker's claim answers a second send "already", never a second label (worker/src/desk.js).
+// Only check-ins (job.retryOn): an undo or a check-out sent twice posts to TwoTimTwo twice and
+// adds a second history row, and `unsure` (TwoTimTwo timed out) is never resent by itself.
+// No answer at all (job.truth): a check-in POST has no timer of its own (a sent one is never
+// called lost), so after SLOW_CHECK_MS the page asks the roster, whose checked-in marks are
+// the Worker's own; a mark settles the tile as checked in and frees its place in the queue.
+// Still no answer at NO_ANSWER_MS: the request is dropped and treated as unreachable (a
+// check-in is sent again, as above; an undo or check-out says to look before trying again).
+// window.AWANA_CHECKIN_TUNING: the e2e suite's shorter clocks (read at each use).
+function tuning(name, ms) { var t = window.AWANA_CHECKIN_TUNING; return t && (typeof t[name] === 'number' || Array.isArray(t[name])) ? t[name] : ms; }
+var HICCUP_RETRY_MS = [2000, 5000, 10000];
+var SLOW_CHECK_MS = 30000;
+var NO_ANSWER_MS = 60000;
+// "Already" while the claim is still `checking`: an earlier send is still with TwoTimTwo.
+// Asked again every 5 s, for longer than the Worker's 60 s checking time (ledger.js).
+var CHECKING_RETRY_MS = 5000;
+var CHECKING_RETRIES = 18;
+var NO_ANSWER_WORDS = 'the check-in service did not answer for a minute. Look at Tonight (or TwoTimTwo) before trying again.';
+function hiccupError(e) { return !!e && (e.code === 'unreachable' || e.code === 'hiccup'); }
+var RUNNING_JOBS = {};        // job id -> job, while its request is out
 function enqueue(job) {
   job.epoch = queueEpoch;
   QUEUE.push(job);
@@ -1782,17 +1893,52 @@ function pump() { while (RUNNING < MAX_RUNNING && QUEUE.length) runJob(QUEUE.shi
 function runJob(job) {
   RUNNING += 1;
   job.onState('pending');
+  var ctl = typeof AbortController === 'function' ? new AbortController() : null;
+  var run = { over: false, noAnswer: false };
+  job.sent = true;
+  RUNNING_JOBS[job.id] = job;
+  // Half a minute and no answer: say so, and ask the roster whether it landed.
+  var slow = setTimeout(function() {
+    if (run.over) return;
+    job.onState('pending', null, 'slow');
+    if (job.truth) scheduleRosterPoll(0);
+  }, tuning('slowMs', SLOW_CHECK_MS));
+  // A minute: give up on this request (the roster said nothing either).
+  var stuck = setTimeout(function() { if (!run.over && ctl) { run.noAnswer = true; ctl.abort(); } }, tuning('noAnswerMs', NO_ANSWER_MS));
   var settle = function(fn) {
     return function(x) {
+      if (run.over) return;                   // already settled (the roster said it landed)
+      run.over = true;
+      clearTimeout(slow); clearTimeout(stuck);
+      if (RUNNING_JOBS[job.id] === job) delete RUNNING_JOBS[job.id];
       if (job.epoch !== queueEpoch) return;   // signed out meanwhile: the queue was emptied
       RUNNING -= 1;
       fn(x);
       pump();
     };
   };
-  job.go().then(settle(function(r) { job.onDone(r); }), settle(function(e) {
+  // The roster shows it done (settleFromRoster): the tile settles, its place frees, the request is dropped.
+  job.landed = settle(function(r) { if (ctl) ctl.abort(); job.onDone(r); });
+  job.go(ctl ? ctl.signal : null).then(settle(function(r) {
+    // "Already", but the claim is still `checking`: an earlier send is still with TwoTimTwo. Ask again shortly.
+    if (job.inProgress && job.inProgress(r) && !job.cancelled && (job.checkingTries || 0) < CHECKING_RETRIES) {
+      job.checkingTries = (job.checkingTries || 0) + 1;
+      waitJob(job, tuning('checkingMs', CHECKING_RETRY_MS), 'checking');
+      return;
+    }
+    job.onDone(r);
+  }), settle(function(e) {
     if (e && e.code === 'busy' && !job.cancelled) { waitJob(job, e.retryAfterMs); return; }
     if (e && e.code === 'signed-out') { signOut(e.message); return; }
+    // A brief connection hiccup: a check-in goes again by itself, a few times.
+    var hiccups = tuning('hiccupMs', HICCUP_RETRY_MS);
+    if (hiccupError(e) && job.retryOn && !job.cancelled && (job.hiccups || 0) < hiccups.length) {
+      waitJob(job, hiccups[job.hiccups || 0], 'hiccup');
+      job.hiccups = (job.hiccups || 0) + 1;
+      return;
+    }
+    // A minute with no answer, and it is not one the page sends again: say what to do.
+    if (run.noAnswer && e && e.code === 'unreachable' && !job.retryOn) e = { code: 'no-answer', message: NO_ANSWER_WORDS, noAnswer: true };
     // An early label is out and TwoTimTwo did not answer (slow, unreachable, a hiccup):
     // try again on its own a few times; a flat refusal goes to the tile at once.
     if (e && e.printed && !job.cancelled && !PRINTED_FLAT.test(e.code) && (job.printedTries || 0) < PRINTED_RETRIES) {
@@ -1804,7 +1950,7 @@ function runJob(job) {
     if (e && e.code === 'no-club') scheduleRosterPoll(0);   // no club today: the roster says so, and the note replaces the list
   }));
 }
-function waitJob(job, ms) {
+function waitJob(job, ms, why) {
   var until = Date.now() + Math.max(1000, ms || 5000);
   WAITING[job.id] = job;
   function tick() {
@@ -1817,7 +1963,7 @@ function waitJob(job, ms) {
       pump();
       return;
     }
-    job.onState('waiting', left);
+    job.onState('waiting', left, why);
   }
   tick();
   job.timer = setInterval(tick, 500);
@@ -1832,7 +1978,29 @@ function stopJob(job) {
 function stopQueue() {
   queueEpoch += 1;
   Object.keys(WAITING).forEach(function(id) { clearInterval(WAITING[id].timer); });
-  WAITING = {}; QUEUE = []; RUNNING = 0;
+  WAITING = {}; QUEUE = []; RUNNING = 0; RUNNING_JOBS = {};
+}
+// A fresh roster (never a restored or stale one) is the Worker's own word on who is checked
+// in (and, from tonight's book, checked out): a job whose child it shows done settles as done,
+// whether its request is out, counting down to a retry, or waiting its turn.
+function settleFromRoster(data) {
+  if (!data || data.stale || data.restored || !Array.isArray(data.kids)) return;
+  var byId = {};
+  data.kids.forEach(function(k) { byId[String(k.clubberId)] = k; });
+  var jobs = [];
+  Object.keys(RUNNING_JOBS).forEach(function(id) { jobs.push(RUNNING_JOBS[id]); });
+  Object.keys(WAITING).forEach(function(id) { jobs.push(WAITING[id]); });
+  QUEUE.forEach(function(j) { jobs.push(j); });
+  jobs.forEach(function(job) {
+    var k = job.truth && job.clubberId != null ? byId[String(job.clubberId)] : null;
+    if (!k || !job.truth(k)) return;
+    if (RUNNING_JOBS[job.id] === job && job.landed) { job.landed({ already: false, landed: true }); return; }
+    // Not out right now: take it off the queue and settle it here.
+    clearInterval(job.timer);
+    delete WAITING[job.id];
+    QUEUE = QUEUE.filter(function(x) { return x !== job; });
+    job.onDone({ already: !job.sent, landed: true });
+  });
 }
 function jobFor(id) {
   if (WAITING[id]) return WAITING[id];
@@ -1855,7 +2023,7 @@ function paintFamily() {
   if (head) {
     var hs = STATE[head.dataset.key], hk = KIDS.filter(function(k) { return kidKey(k) === head.dataset.key; })[0];
     head.textContent = hs && hs.status === 'failed' ? head.dataset.name + ' is not checked in'
-      : (hs && hs.status !== 'done') ? (hs.status === 'waiting' ? 'Waiting for TwoTimTwo… ' + hs.left + 's' : 'Checking in ' + head.dataset.name + '…')
+      : (hs && hs.status !== 'done') ? (hs.status === 'waiting' ? waitText(hs) : 'Checking in ' + head.dataset.name + '…')
         : (hk && hk.checkedIn ? '✓ ' + head.dataset.name + ' is checked in' : head.textContent);
   }
   famEntries.forEach(function(x) {
@@ -1872,7 +2040,9 @@ function askStop(c) {
   if (!job) return;
   pendingConfirm = { mode: 'stop', job: job, back: null };
   $('confirm-title').textContent = 'Stop checking in ' + c.name + '?';
-  $('confirm-body').textContent = 'TwoTimTwo is busy for a moment, so this page is waiting to try again by itself. Stop, and ' + c.name.split(' ')[0] + ' goes back on the list, not checked in.';
+  var st = STATE[c.recid];
+  $('confirm-body').textContent = (st && st.why === 'hiccup' ? 'The connection dropped for a moment' : st && st.why === 'checking' ? 'TwoTimTwo is still answering an earlier try' : 'TwoTimTwo is busy for a moment')
+    + ', so this page is waiting to try again by itself. Stop, and ' + c.name.split(' ')[0] + ' goes back on the list, not checked in.';
   $('confirm-ok').textContent = 'Stop trying';
   showSheet('confirm-sheet');
 }
@@ -1944,11 +2114,20 @@ function checkInMany(entries, family) {
       setTimeout(refreshStatus, 800);
       scheduleRosterPoll(6000);
     };
+    // Kept sealed until TwoTimTwo confirms it, so a reload sends it again (keepPending).
+    keepPending(key, { clubberId: String(k.clubberId), name: k.name, club: k.club || '', choice: choice });
     enqueue({
       id: 'c:' + key,
-      go: function() { return desk.checkIn({ clubberId: k.clubberId, name: k.name, club: k.club }, choice); },
-      onState: function(status, left) { STATE[key] = { status: status, left: left }; paint(); },
+      clubberId: k.clubberId,
+      go: function(signal) { return desk.checkIn({ clubberId: k.clubberId, name: k.name, club: k.club }, choice, { signal: signal }); },
+      // A hiccup or a minute with no answer: sent again by itself (the claim makes it safe).
+      retryOn: true,
+      // The roster shows them checked in: it landed.
+      truth: function(rk) { return rk.checkedIn === true; },
+      inProgress: function(r) { return !!r && r.already && r.state === 'checking'; },
+      onState: function(status, left, why) { STATE[key] = { status: status, left: left, why: why }; paint(); },
       onDone: function(r) {
+        keepPending(key, null);
         k.checkedIn = true;
         LOCAL.at[key] = Date.now();
         rosterEpoch += 1;
@@ -1961,8 +2140,10 @@ function checkInMany(entries, family) {
         finish();
       },
       onFail: function(err) {
+        keepPending(key, null);
         if (err && err.code === 'unreachable') showOffline(true);
-        var why = err && err.code === 'unreachable' ? 'no internet connection. Use the paper sheet at the desk.' : (err && err.message);
+        var why = err && err.code === 'unreachable' ? 'no internet connection. Use the paper sheet at the desk.'
+          : err && err.code === 'hiccup' ? 'the check-in service is not answering. Try again in a moment, or use the paper sheet.' : (err && err.message);
         // An early label is out: the tile stays red until a tap tries TwoTimTwo again (no second label).
         if (err && err.printed) why = PRINTED_NOT_TAKEN;
         group.failed.push({ name: k.name, why: why });
@@ -1971,7 +2152,7 @@ function checkInMany(entries, family) {
         if (!(err && err.printed)) setTimeout(function() { if (STATE[key] && STATE[key].status === 'failed') { delete STATE[key]; paint(); } }, FAILED_SHOW_MS);
         finish();
       },
-      onCancel: function() { delete STATE[key]; paint(); finish(); },
+      onCancel: function() { keepPending(key, null); delete STATE[key]; paint(); finish(); },
     });
   });
 }
@@ -2027,7 +2208,8 @@ function stillHere(k) { return !!k.checkedIn && LOCAL.out.indexOf(kidKey(k)) ===
 // tile stays, showing how it goes, until TwoTimTwo answers and a moment after).
 function outPeople() { return KIDS.filter(function(k) { return stillHere(k) || OUT[kidKey(k)]; }).map(person); }
 function outText(st) {
-  if (st.status === 'waiting') return 'Waiting for TwoTimTwo… ' + st.left + 's';
+  if (st.status === 'waiting') return waitText(st);
+  if (st.status === 'pending' && st.why === 'slow') return 'Still checking out (slow connection)…';
   if (st.status === 'done') return 'Checked out ✓';
   if (st.status === 'failed') return 'Not checked out' + (st.msg ? ': ' + st.msg : '');
   return 'Checking out…';
@@ -2165,8 +2347,11 @@ function checkOutMany(batch) {
     };
     enqueue({
       id: 'x:' + key,
-      go: function() { return desk.checkout({ clubberId: k.clubberId, name: k.name, club: k.club }); },
-      onState: function(status, left) { OUT[key] = { status: status, left: left }; paint(); },
+      clubberId: k.clubberId,
+      go: function(signal) { return desk.checkout({ clubberId: k.clubberId, name: k.name, club: k.club }, { signal: signal }); },
+      // Never sent again by itself (a second post to TwoTimTwo); tonight's book on the roster settles a slow one.
+      truth: function(rk) { return rk.checkedOut === true; },
+      onState: function(status, left, why) { OUT[key] = { status: status, left: left, why: why }; paint(); },
       onDone: function() {
         if (LOCAL.out.indexOf(key) === -1) LOCAL.out.push(key);
         saveLocal();
@@ -2271,11 +2456,14 @@ function refreshAll() {
     }
     if (NO_CLUB) setNoClub(null);
     rosterPollMs = ROSTER_POLL_BASE_MS;
+    // The Worker's own marks settle any check-in (or check-out) whose answer never came.
+    settleFromRoster(data);
     // Asked before a check-in was confirmed: it would put that child back on
     // the list. Ask again instead.
     if (epoch !== rosterEpoch) { rosterFetchInFlight = false; scheduleRosterPoll(0); return null; }
     applyRoster(data);
     if (!data.stale && !data.restored) setTestDay(data.testDay || null);
+    resumePending();
     if (!data.stale) { saveRosterCache({ roster: data }); liveListArrived(); }
     lastRosterAt = Date.now();
     paint();   // the list shows now; the households and the count join it as they arrive
@@ -2466,6 +2654,9 @@ function rowJob(entry, kind, go, done, failWords) {
   enqueue({
     id: 'o:' + entry.key,
     go: go,
+    // A slow check-out settles from tonight's book on the roster; an undo waits for its answer (or the minute).
+    clubberId: entry.clubberId,
+    truth: kind === 'checkout' ? function(rk) { return rk.checkedOut === true; } : null,
     onState: function(status, left) { OPS[entry.key] = { kind: kind, status: status, left: left }; if (openSheet === 'tonight-sheet') renderTonight(); },
     onDone: function() { delete OPS[entry.key]; done(); },
     onFail: function(e) {
@@ -2479,7 +2670,7 @@ function rowJob(entry, kind, go, done, failWords) {
 }
 function undoEntry(entry) {
   var name = displayName(entry);
-  rowJob(entry, 'undo', function() { return desk.undo(childOf(entry)); }, function() {
+  rowJob(entry, 'undo', function(signal) { return desk.undo(childOf(entry), { signal: signal }); }, function() {
     if (entry.kid) { entry.kid.checkedIn = false; rosterEpoch += 1; }
     saveLocal();
     toast(name + '’s check-in is undone.', 4000, null, null, 'good');
@@ -2490,7 +2681,7 @@ function undoEntry(entry) {
 }
 function checkoutEntry(entry) {
   var name = displayName(entry);
-  rowJob(entry, 'checkout', function() { return desk.checkout(childOf(entry)); }, function() {
+  rowJob(entry, 'checkout', function(signal) { return desk.checkout(childOf(entry), { signal: signal }); }, function() {
     LOCAL.out.push(entry.key);
     saveLocal();
     toast(name + ' is checked out.', 4000, null, null, 'good');
